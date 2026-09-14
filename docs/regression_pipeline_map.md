@@ -634,6 +634,12 @@ Write the before/after audit of the mPFC unit-GLM stop cohort.
 
 `read_sidecars`, `runner_code`, `provenance_table`, `bundle_sessions`, `session_cohort_table`, `coverage_summary`, `alignment_prose`, `gate_counts`, `significance_table`, `population_comparison`, `build_report`, `main`
 
+### `scripts/qa/compare_pfc_fitters.py`
+
+Write the equivalence audit of the batched JAX fitter against statsmodels.
+
+`bundle_stems`, `load_bundle`, `compare_statistics`, `compare_modulations`, `compare_diagnostics`, `parse_time_file`, `build_report`, `main`
+
 ### `scripts/qa/compare_to_golden_baseline.py`
 
 Diff a candidate replay_content root against a frozen golden baseline.

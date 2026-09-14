@@ -86,6 +86,12 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
 - `summarize_stage6_fdr.py` — prints Stage 6's per-role cross-session FDR table for
   any saved `stage6_is_stay_logistic*.pkl`, using the runner's own statistic, so a
   before/after comparison across populations reads one implementation.
+- `compare_pfc_fitters.py` — writes the equivalence audit of the batched JAX Poisson
+  fitter against the per-neuron statsmodels IRLS it replaces, from two runs of the
+  same sessions (`--fitter jax` / `--fitter statsmodels`, both with
+  `--fit-diagnostics`): every numeric column of the shipped statistics, the five
+  modulation time courses, the best-AIC and NaN patterns that must be identical, the
+  per-model parameters and fit criteria, and the wall clock of both runs.
 
 ## `pfc/` — cross-area / staged analyses
 - `run_pfc_analysis_bandit.py`, `run_stage5b_retrospective.py`, `run_stage6_learning.py`.
