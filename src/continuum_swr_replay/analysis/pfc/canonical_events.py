@@ -44,7 +44,7 @@ from continuum_swr_replay.analysis.hippocampus.event_immobility import (
 )
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.table_io import parquet_path, read_table, sha256_file
+from continuum_swr_replay.table_io import read_table, resolved_table_path, sha256_file
 
 __all__ = [
     "DEFAULT_EVENT_TABLE_PATH",
@@ -149,8 +149,10 @@ def load_session_canonical_events(
         .sort_values("start_time")
         .reset_index(drop=True)
     )
-    resolved = parquet_path(path) if parquet_path(path).exists() else path
-    return events, sha256_file(resolved)
+    # Hash the file ``read_table`` resolved, not the parquet name: a directory
+    # still holding the pickle form would otherwise be hashed at a path that
+    # does not exist.
+    return events, sha256_file(resolved_table_path(path))
 
 
 def session_data_over_time_path(
@@ -296,7 +298,7 @@ def canonical_event_input_hashes(
     table = (
         DEFAULT_EVENT_TABLE_PATH if event_table_path is None else Path(event_table_path)
     )
-    resolved_table = parquet_path(table) if parquet_path(table).exists() else table
+    resolved_table = resolved_table_path(table)
     dot = session_data_over_time_path(
         nwb_file_name, epoch_name, non_local_threshold=non_local_threshold
     )

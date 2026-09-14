@@ -74,6 +74,11 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
   bins and events on either side of the stop cohort (from the bundles' own provenance
   sidecars), the decode/position alignment trim, the leading-edge coverage diagnostic,
   and the Figure 4 population loaded from both bundle trees.
+- `diagnose_pfc_event_definition.py` — reports, per session, what the mPFC unit GLM's
+  retired run-time event construction yielded against the canonical event table it now
+  reads: the two event counts, how many events change SWR class once the lists are
+  matched by overlap, the start-time shifts, and how many reclassifications are
+  partial-overlap cases the two split rules may legitimately disagree on.
 - `summarize_stage6_fdr.py` — prints Stage 6's per-role cross-session FDR table for
   any saved `stage6_is_stay_logistic*.pkl`, using the runner's own statistic, so a
   before/after comparison across populations reads one implementation.

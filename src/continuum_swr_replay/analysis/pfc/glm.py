@@ -18,6 +18,10 @@ import statsmodels.api as sm
 from numpy.typing import NDArray
 from patsy import dmatrix
 
+from continuum_swr_replay.analysis.constants import (
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    DEFAULT_NON_LOCAL_THRESHOLD,
+)
 from continuum_swr_replay.analysis.replay.cohort_selection import (
     events_in_stops,
     stop_interval_mask,
@@ -1251,7 +1255,7 @@ def build_session_event_sets(
     non_local_times, n_events_outside_frame = _restrict_to_frame(
         canonical_events, position_time, what="canonical events"
     )
-    ripple_times, n_swr_outside_frame = _restrict_to_frame(
+    swr_intervals, n_swr_outside_frame = _restrict_to_frame(
         swr_intervals, position_time, what="SWR intervals"
     )
 
@@ -1260,7 +1264,7 @@ def build_session_event_sets(
         "n_events_outside_frame": n_events_outside_frame,
         "n_swr_intervals_outside_frame": n_swr_outside_frame,
         "n_nonlocal_before": int(len(non_local_times)),
-        "n_ripple_before": int(len(ripple_times)),
+        "n_ripple_before": int(len(swr_intervals)),
     }
     dropped_non_local_onsets = np.empty(0, dtype=float)
     dropped_ripple_onsets = np.empty(0, dtype=float)
@@ -1275,18 +1279,18 @@ def build_session_event_sets(
             non_local_times.start_time.to_numpy(dtype=float), cohort_stops
         )
         keep_ripple = events_in_stops(
-            ripple_times.start_time.to_numpy(dtype=float), cohort_stops
+            swr_intervals.start_time.to_numpy(dtype=float), cohort_stops
         )
         dropped_non_local_onsets = non_local_times.start_time.to_numpy(dtype=float)[
             ~keep_non_local
         ]
-        dropped_ripple_onsets = ripple_times.start_time.to_numpy(dtype=float)[
+        dropped_ripple_onsets = swr_intervals.start_time.to_numpy(dtype=float)[
             ~keep_ripple
         ]
         non_local_times = non_local_times.loc[keep_non_local]
-        ripple_times = ripple_times.loc[keep_ripple]
+        swr_intervals = swr_intervals.loc[keep_ripple]
     counts["n_nonlocal_after"] = int(len(non_local_times))
-    counts["n_ripple_after"] = int(len(ripple_times))
+    counts["n_ripple_after"] = int(len(swr_intervals))
     counts.update(
         _basis_coverage_counts(
             dropped_non_local_onsets,
@@ -1316,7 +1320,7 @@ def build_session_event_sets(
         "non_local_no_SWR": non_local_no_swr_times,
         "non_local_SWR": non_local_swr_times,
         "non_local": non_local_times,
-        "SWR": ripple_times,
+        "SWR": swr_intervals,
     }
     return event_times, counts
 
@@ -1326,8 +1330,8 @@ def run_session(
     epoch_name: str,
     brain_area: str = "mPFC",
     sampling_frequency: float = 500,
-    immobility_threshold: float = 4.0,
-    non_local_threshold: float = 0.8,
+    immobility_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    non_local_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
     run_parallel: bool = True,
     stop_cohort: str = "at_well",
     cohort_stops: pd.DataFrame | None = None,
@@ -1346,7 +1350,11 @@ def run_session(
         Sampling frequency in Hz.
     immobility_threshold : float
         Speed threshold for immobility classification (cm/s). The rule is
-        strictly ``<``, on the fit mask and on the SWR speed gate alike.
+        strictly ``<``, on the fit mask and on the SWR speed gate alike. It
+        gates the SWR intervals the canonical ``is_swr`` column was computed
+        against, so a value other than
+        :data:`~continuum_swr_replay.analysis.constants.DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC`
+        is refused rather than silently applied to one side of the split only.
     non_local_threshold : float
         Probability threshold the events were cut at. It is not applied here:
         non-local events are read from the canonical event table, which is cut
@@ -1403,8 +1411,9 @@ def run_session(
     Raises
     ------
     ValueError
-        If ``non_local_threshold`` differs from the threshold the canonical
-        event table is cut at; the table cannot be re-cut at run time.
+        If ``non_local_threshold`` or ``immobility_threshold`` differs from the
+        threshold the canonical events were cut and speed-gated at; neither can
+        be re-cut at run time.
 
     Notes
     -----
@@ -1418,7 +1427,6 @@ def run_session(
     # import time. Keeping them function-local lets the rest of the
     # module (pure GLM helpers + design-matrix builders) stay
     # offline-importable for unit tests.
-    from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
     from continuum_swr_replay.analysis.hippocampus import load_results
     from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
         align_results_to_position,
@@ -1432,6 +1440,16 @@ def run_session(
     )
     from continuum_swr_replay.data_loaders import load_data
 
+    if immobility_threshold != DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC:
+        raise ValueError(
+            f"immobility_threshold={immobility_threshold!r} is not the "
+            "threshold the canonical events were speed-gated at "
+            f"({DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC}). The event table's "
+            "``is_swr`` column and the SWR intervals it was computed against "
+            "are cut at that one threshold, so re-gating the SWR population "
+            "here would split the events on a population the canonical column "
+            "never saw."
+        )
     if non_local_threshold != DEFAULT_NON_LOCAL_THRESHOLD:
         raise ValueError(
             f"non_local_threshold={non_local_threshold!r} is not the threshold "

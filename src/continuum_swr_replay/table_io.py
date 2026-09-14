@@ -43,6 +43,7 @@ __all__ = [
     "write_table",
     "publish_canonical",
     "parquet_path",
+    "resolved_table_path",
     "table_exists",
     "umask_file_mode",
     "sha256_file",
@@ -125,6 +126,18 @@ def publish_canonical(
 def parquet_path(path: str | Path) -> Path:
     """Return `path` with a ``.parquet`` suffix, whatever suffix it arrived with."""
     return Path(path).with_suffix(".parquet")
+
+
+def resolved_table_path(path: str | Path) -> Path:
+    """Return the file :func:`read_table` would actually open for `path`.
+
+    Parquet wins when it exists, otherwise the pickle sibling. Callers that
+    hash the table they read must resolve it through this function rather than
+    assume parquet: a directory still holding the pickle form would otherwise
+    be hashed at a path that does not exist.
+    """
+    parquet = parquet_path(path)
+    return parquet if parquet.exists() else Path(path).with_suffix(".pkl")
 
 
 def write_table(frame: pd.DataFrame, path: str | Path, **kwargs: Any) -> Path:
