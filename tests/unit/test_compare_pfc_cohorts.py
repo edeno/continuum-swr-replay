@@ -21,11 +21,13 @@ import pytest
 from scripts.qa.compare_pfc_cohorts import (
     FDR_TESTS,
     _md,
+    _short_hash,
     alignment_prose,
     build_report,
     bundle_sessions,
     coverage_summary,
     gate_counts,
+    provenance_table,
     read_sidecars,
     session_cohort_table,
     significance_table,
@@ -218,6 +220,62 @@ class TestMarkdown:
         assert "| after | 10986 |" in rendered
         assert "| before |  |" in rendered
         assert "10986.0" not in rendered
+
+
+class TestProvenance:
+    def test_a_dirty_hash_keeps_its_marker_when_abbreviated(self):
+        """Truncating to seven characters must not launder a dirty tree."""
+        assert _short_hash("1ba32acbec635f7dc36d01423d82e05789279536") == "1ba32ac"
+        assert (
+            _short_hash("1ba32acbec635f7dc36d01423d82e05789279536-dirty")
+            == "1ba32ac-dirty"
+        )
+
+    def test_runner_code_comes_from_the_sidecar_not_the_recorded_hash(
+        self, bundle_trees
+    ):
+        """The recorded HEAD drifts ahead of the imported code; two facts do not.
+
+        A session with no alignment block predates that step; a session trimmed
+        past the single budget could only have been accepted by the per-axis
+        form. Both bundles here record the same hash family, and they must still
+        land in different regimes.
+        """
+        _, after = bundle_trees
+        _write_bundle(
+            after,
+            "senor20201101_02_r1",
+            n_neurons=1,
+            fit_rate=5.0,
+            all_immobile_rate=5.0,
+            pvals=0.5,
+            sidecar=_sidecar(
+                "senor20201101_02_r1",
+                bins_immobile=1000,
+                bins_fit=900,
+                nonlocal_before=10,
+                nonlocal_after=9,
+                ripple_before=5,
+                ripple_after=5,
+                alignment={
+                    "dropped_at": "tail",
+                    "n_results_bins_dropped": 2232,
+                    "dropped_seconds_results": 4.464,
+                    "n_position_rows_dropped": 0,
+                    "dropped_seconds_position": 0.0,
+                },
+            ),
+        )
+        table = provenance_table(read_sidecars(after))
+        regimes = dict(zip(table.runner_code, table.n_sessions, strict=True))
+        assert regimes["50bf4b7 (no alignment step)"] == 1
+        assert regimes["7362347 (alignment, 0.1 s budget)"] == 1
+        assert regimes["6c162ce (alignment, per-axis budgets)"] == 1
+        # The over-budget session is the one that names the per-axis form.
+        per_axis = table.loc[
+            table.runner_code == "6c162ce (alignment, per-axis budgets)"
+        ]
+        assert per_axis.alignment_block.item() == "yes"
 
 
 class TestSidecarTables:

@@ -245,6 +245,19 @@ def align_results_to_position(
     drift inside the shared run still raises. Anything else raises rather than
     silently re-aligning data that does not share a timebase.
 
+    **What the trim removed, on the mPFC corpus** (27 of 71 sessions trimmed,
+    always at the tail; measured 2026-09-14 and recorded in
+    ``docs/audits/2026-09-14-pfc-atwell-cohort.md``): no non-local event begins
+    in a dropped tail and none straddles its leading edge (0 of either, in all
+    27); the stops overlapping the two largest tails -- 135.2 s in
+    ``wilbur20210329_16_r8`` and 76.1 s in ``j1620210706_10_r5`` -- are
+    ``in_transit``, so outside the fit cohort in any case; and across the whole
+    corpus 36 dropped timestamps (72 ms) fall inside a well-anchored stop, in
+    four ``mixed`` stops. Those 36 are timestamps the position frame does not
+    carry -- which is why the decode bin had no partner and was dropped -- so
+    they were never fittable; the trim removes the decode side of a gap the
+    position frame already had.
+
     Parameters
     ----------
     results : xarray.Dataset
@@ -254,8 +267,11 @@ def align_results_to_position(
     max_dropped_seconds_results : float
         Largest span the decode may lose. Decodes were run on the untrimmed
         epoch, so their tail past the trimmed position frame is pre/post
-        trial time (0.01-135 s in practice, no non-local events in it) and
-        is safe to drop; the budget only catches a wrong file.
+        trial time (0.002-135 s in practice) and is safe to drop: no
+        non-local event begins in it or straddles its edge, and the stops
+        it covers are ``in_transit`` or (for 36 timestamps corpus-wide)
+        ``mixed`` stops whose position samples are missing anyway. See the
+        paragraph above. The budget only catches a wrong file.
     max_dropped_seconds_position : float
         Largest span the position frame may lose. Position rows without a
         decode would be fit bins with no event evidence, so this stays

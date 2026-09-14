@@ -72,8 +72,29 @@ def _invocation() -> str:
     return shlex.join(["uv", "run", "python", str(script), *sys.argv[1:]])
 
 
+#: Suffix ``fit_provenance`` appends when the working tree carried uncommitted
+#: changes. It is part of the provenance, so it survives truncation.
+DIRTY_SUFFIX = "-dirty"
+
+
+def _short_hash(git_hash: str) -> str:
+    """Abbreviate a recorded hash, keeping any ``-dirty`` marker.
+
+    Truncating to seven characters would turn a dirty tree into a clean commit,
+    which is the one thing the marker exists to prevent.
+    """
+    if git_hash.endswith(DIRTY_SUFFIX):
+        return git_hash[: -len(DIRTY_SUFFIX)][:7] + DIRTY_SUFFIX
+    return git_hash[:7]
+
+
 def _commit_subject(git_hash: str) -> str:
-    """One-line subject of ``git_hash``, or an empty string if unavailable."""
+    """One-line subject of ``git_hash``, or an empty string if unavailable.
+
+    A ``-dirty`` hash names a real commit plus uncommitted changes; strip the
+    marker so the commit is still found.
+    """
+    git_hash = git_hash.removesuffix(DIRTY_SUFFIX)
     try:
         out = subprocess.run(
             ["git", "-C", str(REPO), "show", "-s", "--format=%s", git_hash],
@@ -117,7 +138,7 @@ def read_sidecars(data_dir: Path, artifact_suffix: str = "") -> pd.DataFrame:
             "nwb_file_name": sidecar.get("nwb_file_name", ""),
             "stop_cohort": sidecar.get("stop_cohort"),
             "stop_table_sha256": sidecar.get("stop_table_sha256"),
-            "git_hash": sidecar.get("git_hash", "")[:7],
+            "git_hash": _short_hash(sidecar.get("git_hash", "")),
             "written_at": sidecar.get("written_at", "")[:19],
             **counts,
             **{f"align_{k}": v for k, v in alignment.items()},
@@ -152,6 +173,67 @@ def read_sidecars(data_dir: Path, artifact_suffix: str = "") -> pd.DataFrame:
         frame["nwb_file_name"].map(lambda name: parse_nwb_filename(name)[0]),
     )
     return frame
+
+
+#: Budget (seconds) the single-budget form of ``align_results_to_position``
+#: allowed on either axis. A session trimmed by more than this could only have
+#: been fit by the later per-axis form, so the trim size identifies the code.
+SINGLE_BUDGET_S = 0.1
+
+#: How a sidecar's own fields identify the runner code the worker had imported.
+#: The recorded ``git_hash`` is the repository HEAD when the sidecar was
+#: WRITTEN, which drifts ahead of the running process; these two facts do not.
+RUNNER_CODE_PRE_ALIGNMENT = "50bf4b7 (no alignment step)"
+RUNNER_CODE_SINGLE_BUDGET = f"7362347 (alignment, {SINGLE_BUDGET_S} s budget)"
+RUNNER_CODE_PER_AXIS = "6c162ce (alignment, per-axis budgets)"
+
+
+def runner_code(sidecars: pd.DataFrame) -> pd.Series:
+    """Which runner code fit each session, from the sidecar's own fields.
+
+    Three regimes, separated by two observable facts rather than by the
+    recorded hash:
+
+    - no ``alignment`` block at all: the code predates the alignment step;
+    - an alignment block with a trim inside the single budget: the step exists,
+      and either budget form would have accepted it;
+    - a trim larger than that budget: only the per-axis form would have
+      accepted it, so that is the code that ran.
+    """
+    bins = sidecars.get("align_n_results_bins_dropped")
+    if bins is None:
+        return pd.Series(RUNNER_CODE_PRE_ALIGNMENT, index=sidecars.index)
+    zeros = pd.Series(0.0, index=sidecars.index)
+    seconds = sidecars.get("align_dropped_seconds_results", zeros).fillna(0)
+    code = pd.Series(RUNNER_CODE_SINGLE_BUDGET, index=sidecars.index)
+    code[bins.isna()] = RUNNER_CODE_PRE_ALIGNMENT
+    code[bins.notna() & (seconds > SINGLE_BUDGET_S)] = RUNNER_CODE_PER_AXIS
+    return code
+
+
+def provenance_table(sidecars: pd.DataFrame) -> pd.DataFrame:
+    """Sessions grouped by the code that fit them and the hash they recorded."""
+    frame = sidecars.copy()
+    frame["runner_code"] = runner_code(frame)
+    frame["alignment_block"] = (
+        "yes" if "align_n_results_bins_dropped" not in frame else ""
+    )
+    if "align_n_results_bins_dropped" in frame:
+        frame["alignment_block"] = np.where(
+            frame["align_n_results_bins_dropped"].notna(), "yes", "no"
+        )
+    grouped = (
+        frame.groupby(["runner_code", "alignment_block", "git_hash"])
+        .agg(
+            n_sessions=("session", "size"),
+            first_written=("written_at", "min"),
+            last_written=("written_at", "max"),
+        )
+        .reset_index()
+        .sort_values("first_written")
+    )
+    grouped["recorded_hash_subject"] = grouped["git_hash"].map(_commit_subject)
+    return grouped
 
 
 def bundle_sessions(data_dir: Path, artifact_suffix: str = "") -> set[str]:
@@ -383,6 +465,41 @@ def population_comparison(
     )
 
 
+def _fdr_movement_prose(comparison: pd.DataFrame) -> str:
+    """How far the pooled significant fractions moved, and which one fell.
+
+    The interesting quantity is the size of the move, not its direction on any
+    one test: a cohort that changed which neurons are significant would show it
+    here.
+    """
+    pooled = comparison.loc[comparison["animal"] == "all"].copy()
+    if pooled.empty:
+        return ""
+    pooled["delta_pp"] = 100.0 * (pooled["frac_sig_after"] - pooled["frac_sig_before"])
+    biggest = pooled.loc[pooled["delta_pp"].abs().idxmax()]
+    fell = pooled.loc[pooled["delta_pp"] < 0]
+    if fell.empty:
+        which_fell = "No test's fraction fell."
+    else:
+        named = "; ".join(
+            f"`{row.test}` ({100 * row.frac_sig_before:.1f}% to "
+            f"{100 * row.frac_sig_after:.1f}%)"
+            for row in fell.itertuples()
+        )
+        which_fell = (
+            f"{len(fell)} of {len(pooled)} fell: {named}"
+            if len(fell) > 1
+            else f"Exactly one fell: {named}."
+        )
+    return (
+        "**In the pooled population the significant fractions barely move**: "
+        f"the largest change across the {len(pooled)} tests is "
+        f"{biggest['delta_pp']:+.1f} percentage points (`{biggest['test']}`), "
+        f"and every test moves by at most {pooled['delta_pp'].abs().max():.1f} "
+        f"points. {which_fell}\n"
+    )
+
+
 def _cell(value: object, float_format: str) -> str:
     """One markdown cell: missing renders blank, a count renders as a count."""
     if value is None:
@@ -480,24 +597,46 @@ def build_report(
             f"({', '.join(before_only) or 'none'}) and {len(after_only)} only in "
             f"the after tree ({', '.join(after_only) or 'none'}).\n"
         )
-    provenance = (
-        sidecars.groupby("git_hash")
-        .agg(
-            n_sessions=("session", "size"),
-            first_written=("written_at", "min"),
-            last_written=("written_at", "max"),
-        )
-        .reset_index()
-        .sort_values("first_written")
-    )
-    provenance["subject"] = provenance["git_hash"].map(_commit_subject)
+    provenance = provenance_table(sidecars)
     add(
-        "The sessions were fit in several passes and each sidecar records the "
-        "repository HEAD **at the moment it was written**, so a bundle's "
-        "`git_hash` can be a commit later than the code the worker had already "
-        "imported:\n"
+        "The sessions were fit in several passes, and each sidecar records the "
+        "repository HEAD **at the moment it was written** -- which drifts ahead "
+        "of the code the worker had already imported, and can even carry a "
+        "`-dirty` marker for changes that are not in the imported code at all. "
+        "`runner_code` is therefore derived from the sidecar's own fields "
+        "instead: a session with no `alignment` block was fit before that step "
+        f"existed, and a session trimmed by more than the {SINGLE_BUDGET_S} s "
+        "single budget could only have been accepted by the later per-axis "
+        "form.\n"
     )
     add(_md(provenance))
+    dirty = sorted(
+        sidecars.loc[sidecars["git_hash"].str.endswith(DIRTY_SUFFIX), "session"]
+    )
+    if dirty:
+        add(
+            f"{len(dirty)} sidecar(s) carry a `{DIRTY_SUFFIX}` marker "
+            f"({', '.join(dirty)}): the working tree held uncommitted changes "
+            "when the sidecar was written. The marker describes the tree at "
+            "that moment, not the code the worker had imported hours earlier, "
+            "so read it with `runner_code` beside it.\n"
+        )
+    add(
+        "Between the earliest and the latest of those three, "
+        "`git diff 50bf4b7..6c162ce -- src scripts/pfc` touches four files: "
+        "`analysis/pfc/glm.py`, where the whole change is swapping the strict "
+        "1-to-1 validator for `align_results_to_position` (once in "
+        "`run_session`, once in `build_session_event_sets`), logging what it "
+        "trimmed, and adding the `alignment` block to `cohort_info`; "
+        "`analysis/hippocampus/data_aggregation.py`, which is the new function "
+        "and its budget constants; and `scripts/pfc/run_stage6_learning.py` "
+        "plus `analysis/replay/retrospective.py`, which are the Stage 6 and "
+        "Stage 5B paths and are not imported by the unit runner. No estimation "
+        "code moved. On matched axes the alignment step is the identity, which "
+        "is what `tests/analysis/pfc/test_alignment.py::"
+        "test_matched_axes_are_returned_untouched` pins, so the three regimes "
+        "differ only in which sessions they accept -- not in what they fit.\n"
+    )
 
     add("## Bins and events, before and after\n")
     table = session_cohort_table(sidecars)
@@ -559,6 +698,22 @@ def build_report(
     for column in gate.columns.drop("side"):
         gate[column] = gate[column].astype("Int64")
     add(_md(gate))
+    matched = after_gate.get("n_passing_all_immobile_rate")
+    if matched is not None:
+        shipped_before = before_gate["n_passing_fit_bin_rate"]
+        shipped_after = after_gate["n_passing_fit_bin_rate"]
+        add(
+            "**Decomposed, the population moves in two independent steps.** "
+            f"{shipped_before:,} neurons passed the gate before. Holding the "
+            f"gated quantity fixed at the old all-immobile rate, the new tree "
+            f"has {matched:,} ({matched - shipped_before:+,}) -- that step is "
+            "per-neuron GLM convergence on the same screen, not the cohort. "
+            f"Switching the screen to the fit-bin denominator then takes it to "
+            f"{shipped_after:,} ({shipped_after - matched:+,}): the neurons "
+            "whose rate over the cohort's immobile bins falls below the "
+            f"threshold their whole-epoch rate cleared. Net "
+            f"{shipped_after - shipped_before:+,}.\n"
+        )
     add(
         f"The gated column means different things on the two sides. "
         f"`{FIT_RATE_COLUMN}` is the mean rate over the bins the bundle was fit "
@@ -588,7 +743,9 @@ def build_report(
         "BH is applied within each tree, so the q-values are not paired across "
         "the two sides -- read the fractions, not a per-neuron difference.\n"
     )
-    add(_md(population_comparison(before, after, alpha)))
+    comparison = population_comparison(before, after, alpha)
+    add(_fdr_movement_prose(comparison))
+    add(_md(comparison))
 
     return "\n".join(lines)
 
