@@ -12,11 +12,14 @@ by `scripts/pfc/run_pfc_analysis_bandit.py` via `fit_provenance.write_fit_proven
 immobility inequality is already `<` on both paths. Build on those; do not re-create them.
 
 **What the user wants (binding):** "it is very important for this paper that we are talking about
-the same events everywhere in all analyses." Measured on the 71 refit sessions: the PFC GLM's
-detected non-local events equal the canonical event table's count in every session, but its
-SWR/non-SWR split (overlap with `data["ripple_times"]`) labels a median 44.7 % of events SWR-coupled
-where the canonical `is_swr` (strict positive-duration overlap with the speed-gated `SWR_event`
-labels) gives 43.0 %.
+the same events everywhere in all analyses." Measured on the 71 refit sessions (corrected 2026-09-14 after
+Task 1): the PFC GLM's detected non-local events equal the canonical event table's count in every
+session, and on the same well-anchored population its SWR/non-SWR split (overlap with
+`data["ripple_times"]`) and the canonical `is_swr` agree exactly in 71 of 71 sessions (median SWR
+fraction 0.447 both ways; an earlier 44.7 % vs 43.0 % comparison set the PFC split against the
+canonical fraction over all events, including off-well ones, and was wrong). The phases therefore
+buy traceability — Figure 4 carries the canonical `event_id`s, `is_swr`, and input hashes — and
+the matched control; they do not change which events are labelled SWR-coupled.
 
 ## Decisions (binding)
 
