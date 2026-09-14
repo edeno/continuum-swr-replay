@@ -215,13 +215,10 @@ def provenance_table(sidecars: pd.DataFrame) -> pd.DataFrame:
     """Sessions grouped by the code that fit them and the hash they recorded."""
     frame = sidecars.copy()
     frame["runner_code"] = runner_code(frame)
+    dropped = frame.get("align_n_results_bins_dropped")
     frame["alignment_block"] = (
-        "yes" if "align_n_results_bins_dropped" not in frame else ""
+        "no" if dropped is None else np.where(dropped.notna(), "yes", "no")
     )
-    if "align_n_results_bins_dropped" in frame:
-        frame["alignment_block"] = np.where(
-            frame["align_n_results_bins_dropped"].notna(), "yes", "no"
-        )
     grouped = (
         frame.groupby(["runner_code", "alignment_block", "git_hash"])
         .agg(

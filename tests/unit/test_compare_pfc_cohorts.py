@@ -485,3 +485,18 @@ class TestReport:
         # The headline restriction, computed from the sidecars.
         assert "1,900 of 3,000" in report
         assert "240 of 300" in report
+
+
+def test_provenance_marks_no_alignment_block_when_no_sidecar_has_one():
+    """A corpus fit entirely before the alignment step has no alignment column."""
+    sidecars = pd.DataFrame(
+        {
+            "session": ["a", "b"],
+            "git_hash": ["50bf4b7", "50bf4b7"],
+            "written_at": ["2026-09-13T18:00:00Z", "2026-09-13T19:00:00Z"],
+        }
+    )
+    from scripts.qa.compare_pfc_cohorts import provenance_table
+
+    table = provenance_table(sidecars)
+    assert set(table["alignment_block"]) == {"no"}
