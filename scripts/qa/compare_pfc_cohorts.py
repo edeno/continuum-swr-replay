@@ -240,6 +240,42 @@ def coverage_summary(sidecars: pd.DataFrame) -> tuple[dict[str, int], pd.DataFra
     return totals, affected
 
 
+def alignment_prose(sidecars: pd.DataFrame) -> str:
+    """What the decode/position trim did, across the corpus.
+
+    The PFC path is the only consumer that reloads ``load_data`` beside a saved
+    decode, so it is the only one that meets the length mismatch between a
+    decode written before ``get_position_info`` was trimmed and the position
+    frame returned today. Sidecars written before that step existed carry no
+    ``alignment`` block at all, which is distinct from a recorded no-op.
+    """
+    bins = sidecars.get("align_n_results_bins_dropped")
+    if bins is None:
+        return (
+            "No sidecar in this tree records an alignment block, so nothing "
+            "can be said here about the decode/position trim.\n"
+        )
+    recorded = bins.notna()
+    trimmed = bins.fillna(0) > 0
+    seconds = sidecars["align_dropped_seconds_results"].fillna(0)
+    position_rows = sidecars["align_n_position_rows_dropped"].fillna(0)
+    worst = sidecars.loc[seconds.idxmax()]
+    return (
+        f"{int(recorded.sum())} of {len(sidecars)} sidecars record the "
+        f"decode/position alignment step, and every one of those "
+        f"{int(trimmed.sum())} session(s) needed a trim: "
+        f"{int(bins.fillna(0).sum()):,} decode bins "
+        f"({seconds.sum():.1f} s) dropped in total, against "
+        f"{int(position_rows.sum()):,} position rows -- the decode always "
+        "outlives the position frame, never the reverse. The largest single "
+        f"trim is {seconds.max():.1f} s in `{worst['session']}`. The remaining "
+        f"{int((~recorded).sum())} session(s) were fit before the step existed, "
+        "by code whose strict 1-to-1 validator refused any mismatch at all, so "
+        "their axes already agreed exactly and the step would be the identity "
+        "on them.\n"
+    )
+
+
 def gate_counts(data_dir: Path, min_firing_rate: float, suffix: str = "") -> dict:
     """How many neurons survive the loader, and the firing-rate gate.
 
@@ -316,27 +352,37 @@ def population_comparison(
     )
 
 
+def _cell(value: object, float_format: str) -> str:
+    """One markdown cell: missing renders blank, a count renders as a count."""
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if pd.isna(value):
+        return ""
+    if isinstance(value, float):
+        return float_format.format(value)
+    return str(value)
+
+
 def _md(frame: pd.DataFrame, float_format: str = "{:.4g}") -> str:
-    """A markdown table, with NaN rendered as an empty cell."""
+    """A markdown table, with missing values rendered as an empty cell.
+
+    Cells are rendered by iterating the columns rather than with
+    ``Series.map``: mapping over a nullable-integer column coerces its values
+    to float, which turns a neuron count into ``10986.0``.
+    """
     if frame.empty:
         return "_(no rows)_\n"
-    formatted = frame.copy()
-    for column in formatted.columns:
-        if pd.api.types.is_float_dtype(formatted[column]):
-            formatted[column] = formatted[column].map(
-                lambda v: "" if pd.isna(v) else float_format.format(v)
-            )
-        else:
-            formatted[column] = formatted[column].map(
-                lambda v: ""
-                if v is None or (isinstance(v, float) and pd.isna(v))
-                else v
-            )
-    header = "| " + " | ".join(str(c) for c in formatted.columns) + " |"
-    rule = "| " + " | ".join("---" for _ in formatted.columns) + " |"
+    columns = {
+        name: [_cell(value, float_format) for value in frame[name]]
+        for name in frame.columns
+    }
+    header = "| " + " | ".join(str(name) for name in columns) + " |"
+    rule = "| " + " | ".join("---" for _ in columns) + " |"
     body = [
-        "| " + " | ".join(str(v) for v in row) + " |"
-        for row in formatted.itertuples(index=False)
+        "| " + " | ".join(cells[i] for cells in columns.values()) + " |"
+        for i in range(len(frame))
     ]
     return "\n".join([header, rule, *body]) + "\n"
 
@@ -445,6 +491,9 @@ def build_report(
         "position frame; blank where the sidecar predates that step.\n"
     )
     add(_md(table, "{:.2f}"))
+
+    add("## Decode/position alignment\n")
+    add(alignment_prose(sidecars))
 
     totals, affected = coverage_summary(sidecars)
     add("## Leading-edge coverage\n")

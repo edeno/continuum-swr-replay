@@ -20,6 +20,8 @@ import pytest
 
 from scripts.qa.compare_pfc_cohorts import (
     FDR_TESTS,
+    _md,
+    alignment_prose,
     build_report,
     bundle_sessions,
     coverage_summary,
@@ -205,6 +207,19 @@ def bundle_trees(tmp_path):
     return before, after
 
 
+class TestMarkdown:
+    def test_nullable_integer_counts_render_as_counts(self):
+        """A neuron count must not render as ``10986.0`` because one row is NA."""
+        frame = pd.DataFrame(
+            [{"side": "before", "n": None}, {"side": "after", "n": 10986}]
+        )
+        frame["n"] = frame["n"].astype("Int64")
+        rendered = _md(frame)
+        assert "| after | 10986 |" in rendered
+        assert "| before |  |" in rendered
+        assert "10986.0" not in rendered
+
+
 class TestSidecarTables:
     def test_session_table_carries_both_sides_and_totals(self, bundle_trees):
         _, after = bundle_trees
@@ -244,6 +259,15 @@ class TestSidecarTables:
         assert totals["n_sessions_nonlocal"] == 1
         assert totals["n_ripple_dropped_overlapping_fit"] == 0
         assert list(affected.session) == ["chimi20200223_02_r1"]
+
+    def test_alignment_prose_separates_no_record_from_no_trim(self, bundle_trees):
+        """A sidecar with no alignment block is not a session that needed none."""
+        _, after = bundle_trees
+        prose = alignment_prose(read_sidecars(after))
+        assert "1 of 2 sidecars record" in prose
+        assert "8 decode bins" in prose
+        assert "0 position rows" in prose
+        assert "1 session(s) were fit before the step existed" in prose
 
     def test_animal_is_not_split_on_a_digit(self, bundle_trees):
         """``j16`` sessions must not collapse to ``j1``."""

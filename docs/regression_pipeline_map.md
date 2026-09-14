@@ -632,7 +632,7 @@ Compare a backed-up rate fit against the current one and write a markdown audit.
 
 Write the before/after audit of the mPFC unit-GLM stop cohort.
 
-`read_sidecars`, `bundle_sessions`, `session_cohort_table`, `coverage_summary`, `gate_counts`, `significance_table`, `population_comparison`, `build_report`, `main`
+`read_sidecars`, `bundle_sessions`, `session_cohort_table`, `coverage_summary`, `alignment_prose`, `gate_counts`, `significance_table`, `population_comparison`, `build_report`, `main`
 
 ### `scripts/qa/compare_to_golden_baseline.py`
 
