@@ -17,6 +17,7 @@ from continuum_swr_replay.analysis.pfc.glm import (
     create_lagged_signal,
     get_frac_explained_deviance,
     get_frac_null_deviance,
+    make_matched_control_times,
     process_neuron,
 )
 from continuum_swr_replay.analysis.pfc.glm import (
@@ -41,7 +42,12 @@ def time_axis(sampling_frequency):
 
 @pytest.fixture
 def simple_event_times():
-    """Two non-overlapping events for each event type."""
+    """Two non-overlapping events for each event type.
+
+    ``matched_control`` carries one duration-matched non-event window per
+    ``non_local`` event, in immobile time (the run window is 4-5 s) and clear
+    of every real event, as :func:`make_matched_control_times` draws them.
+    """
     return {
         "SWR": pd.DataFrame({
             "start_time": [1.0, 5.0],
@@ -58,6 +64,10 @@ def simple_event_times():
         "non_local_no_SWR": pd.DataFrame({
             "start_time": [7.0],
             "end_time": [7.1],
+        }),
+        "matched_control": pd.DataFrame({
+            "start_time": [2.0, 6.0, 8.0],
+            "end_time": [2.1, 6.1, 8.1],
         }),
     }
 
@@ -217,6 +227,7 @@ class TestMakeDesignMatrices:
             "constant", "SWR", "non_local", "non_local_no_SWR",
             "non_local_SWR", "non_local_SWR + non_local_no_SWR",
             "SWR + non_local_no_SWR",
+            "matched_control", "matched_control + non_local_no_SWR",
         }
         assert set(dm.keys()) == expected_models
 
@@ -391,7 +402,9 @@ class TestProcessNeuron:
             lags=np.arange(-50, 51),
         )
 
-        stats, swr_mod, no_swr_mod, nl_swr_mod, nl_no_swr_mod = process_neuron(
+        (
+            stats, swr_mod, no_swr_mod, nl_swr_mod, nl_no_swr_mod, mc_mod
+        ) = process_neuron(
             poisson_spike_times, is_immobile, theta_phase,
             time_axis, dm, spline_basis, lag_time,
         )
@@ -418,13 +431,13 @@ class TestProcessNeuron:
             lags=lags,
         )
 
-        _, swr_mod, no_swr_mod, nl_swr_mod, nl_no_swr_mod = process_neuron(
+        _, swr_mod, no_swr_mod, nl_swr_mod, nl_no_swr_mod, mc_mod = process_neuron(
             poisson_spike_times, is_immobile, theta_phase,
             time_axis, dm, spline_basis, lag_time,
         )
 
         n_lags = len(lags)
-        for arr in (swr_mod, no_swr_mod, nl_swr_mod, nl_no_swr_mod):
+        for arr in (swr_mod, no_swr_mod, nl_swr_mod, nl_no_swr_mod, mc_mod):
             assert arr.shape == (n_lags,)
             # A function returning all-NaN/all-zero arrays would pass the
             # shape check alone.
@@ -490,13 +503,17 @@ class TestProcessNeuron:
             "non_local_no_SWR": pd.DataFrame(
                 columns=["start_time", "end_time"]
             ),
+            "matched_control": pd.DataFrame({"start_time": [2.0, 6.0],
+                                             "end_time": [2.1, 6.1]}),
         }
         dm, spline_basis, lag_time = _make_design_matrices(
             event_times, position_info,
             sampling_frequency=sampling_frequency,
             lags=np.arange(-50, 51),
         )
-        stats, swr_mod, no_swr_mod, nl_swr_mod, nl_no_swr_mod = process_neuron(
+        (
+            stats, swr_mod, no_swr_mod, nl_swr_mod, nl_no_swr_mod, mc_mod
+        ) = process_neuron(
             poisson_spike_times, is_immobile, theta_phase,
             time_axis, dm, spline_basis, lag_time,
         )
@@ -1165,6 +1182,9 @@ class TestAlignmentIsIdentityOnMatchedAxes:
             swr_intervals=_swr_intervals(cls.RIPPLE_WINDOWS),
             stop_cohort="all_stops",
             fit_mask=fit_mask,
+        )
+        event_times["matched_control"] = make_matched_control_times(
+            event_times, fit_mask, np.random.default_rng(0)
         )
         design_matrices, _, _ = _make_design_matrices(
             event_times,

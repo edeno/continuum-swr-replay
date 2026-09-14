@@ -5,6 +5,7 @@ replay events (SWR-coincident and non-SWR) during immobility, and tests
 theta phase modulation during running.
 """
 
+import hashlib
 import logging
 import warnings
 from collections.abc import Mapping
@@ -366,6 +367,11 @@ def _make_design_matrices(
     ----------
     times : dict[str, pd.DataFrame]
         Event times keyed by name. Each DataFrame must have ``start_time``.
+        The five keys the models are built from are ``non_local_no_SWR``,
+        ``non_local_SWR``, ``non_local``, ``SWR`` and ``matched_control`` --
+        the last from :func:`make_matched_control_times`, so a caller that has
+        not drawn the control fails here rather than silently fitting a ladder
+        without its non-event baseline.
     position_info : pd.DataFrame
         Position data (index defines time bins).
     sampling_frequency : float
@@ -440,6 +446,28 @@ def _make_design_matrices(
         axis=1,
     )
 
+    # The matched non-event control, built exactly as ``non_local_no_SWR`` is,
+    # and jointly with it: the pair is what makes the replay question nested
+    # ("does replay add beyond a duration-matched non-event baseline?") rather
+    # than a comparison of two single-regressor models the LR test cannot
+    # license.
+    matched_control_design_matrix = np.concatenate(
+        [
+            constant_design_matrix,
+            conv_spline_basis["matched_control"],
+        ],
+        axis=1,
+    )
+
+    matched_control_and_non_local_no_swr_design_matrix = np.concatenate(
+        [
+            constant_design_matrix,
+            conv_spline_basis["matched_control"],
+            conv_spline_basis["non_local_no_SWR"],
+        ],
+        axis=1,
+    )
+
     design_matrices = {
         "constant": constant_design_matrix,
         "non_local_no_SWR": non_local_no_swr_design_matrix,
@@ -448,6 +476,10 @@ def _make_design_matrices(
         "non_local_SWR + non_local_no_SWR": non_local_swr_and_non_local_no_swr_design_matrix,
         "SWR + non_local_no_SWR": swr_and_non_local_no_swr_design_matrix,
         "non_local": non_local_design_matrix,
+        "matched_control": matched_control_design_matrix,
+        "matched_control + non_local_no_SWR": (
+            matched_control_and_non_local_no_swr_design_matrix
+        ),
     }
 
     return design_matrices, spline_basis, lag_time
@@ -556,10 +588,10 @@ def process_neuron(
     lag_time: NDArray,
     logger_name: str | None = None,
     fit_mask: pd.Series | None = None,
-) -> tuple[dict[str, Any], NDArray, NDArray, NDArray, NDArray]:
+) -> tuple[dict[str, Any], NDArray, NDArray, NDArray, NDArray, NDArray]:
     """Fit GLM models for a single neuron and compute modulation statistics.
 
-    Fits 7 Poisson GLM models during immobility to test how the neuron's
+    Fits 9 Poisson GLM models during immobility to test how the neuron's
     firing rate relates to SWR and non-local (replay) events. Models are
     organized into two decomposition strategies:
 
@@ -579,6 +611,14 @@ def process_neuron(
     - ``non_local_no_SWR``: replay events without a ripple
     - ``non_local_SWR + non_local_no_SWR``: both replay types with
       separate regressors
+
+    **Engagement decomposition** -- separates replay from the immobility
+    it happens in:
+
+    - ``matched_control``: duration-matched non-event windows drawn from
+      the same fitted immobility bouts (:func:`make_matched_control_times`)
+    - ``matched_control + non_local_no_SWR``: the baseline plus non-SWR
+      replay, the model the engagement test is run on
 
     The analysis addresses a sequence of scientific questions:
 
@@ -604,7 +644,17 @@ def process_neuron(
     improve fit?). AIC: ``min_aic_model_replay_split``. Compare
     ``non_local_swr_modulation`` vs ``non_local_no_swr_modulation`` shapes.
 
-    **Q6. What is the relationship to theta modulation during running?**
+    **Q6. Does replay engage the neuron beyond the immobility it occurs
+    in?**
+    ``matched_control + non_local_no_SWR vs. matched_control`` (the
+    engagement test: non-SWR replay adds beyond a duration-matched
+    non-event baseline drawn from the same bouts), and
+    ``matched_control vs. constant`` (does that baseline itself modulate
+    firing -- a positive answer means the peri-event window is not
+    exchangeable with the rest of the bout, and the engagement test is the
+    comparison to read).
+
+    **Q7. What is the relationship to theta modulation during running?**
     ``theta_mod``, ``theta_preferred_phase``, firing rates.
 
     Every likelihood ratio test has a paired effect size (``frac_null_dev``,
@@ -666,6 +716,8 @@ def process_neuron(
           from SWR-controlled model
         - ``non_local_SWR_max_mod``, ``non_local_no_SWR_split_max_mod``:
           peak modulation from replay-split model
+        - ``matched_control_max_mod``: peak modulation of the matched
+          non-event baseline from the engagement model
         - ``*_max_mod_time``: corresponding peak lag times (s)
 
         Empty dict with only firing rates if GLM fitting fails.
@@ -684,6 +736,13 @@ def process_neuron(
         for replay-coincident ripples only. Shape (n_lag_times,).
         Comparing this with ``no_swr_modulation`` tests whether the
         non-SWR replay response is robust to the choice of SWR control.
+    matched_control_modulation : NDArray
+        Matched non-event baseline modulation from the engagement model
+        (``matched_control + non_local_no_SWR``), i.e. the response around
+        duration-matched control windows after accounting for real non-SWR
+        replay. Shape (n_lag_times,). A curve that is flat while
+        ``no_swr_modulation`` is not is the evidence that the replay
+        response is to replay rather than to the immobility around it.
 
     """
     _logger = logging.getLogger(logger_name) if logger_name else logger
@@ -781,6 +840,11 @@ def process_neuron(
             ("non_local_SWR + non_local_no_SWR", "non_local_SWR"),
             ("non_local_SWR + non_local_no_SWR", "non_local_no_SWR"),
             ("non_local_SWR + non_local_no_SWR", "non_local"),
+            # Engagement: does non-SWR replay add beyond a duration-matched
+            # non-event baseline drawn from the same fitted immobility bouts,
+            # and does that baseline itself modulate firing?
+            ("matched_control + non_local_no_SWR", "matched_control"),
+            ("matched_control", "constant"),
         ]
 
         for model1, model2 in test_cases:
@@ -940,6 +1004,27 @@ def process_neuron(
                 lag_time[non_local_no_swr_max_ind]
             )
 
+        # Matched-control model: the non-event baseline's own peri-window
+        # modulation, taken from the joint engagement model so it is the
+        # baseline response after accounting for real non-SWR replay --
+        # the same model the engagement LR test is run on.
+        if "matched_control + non_local_no_SWR" in non_estimable_models:
+            matched_control_modulation = nan_modulation
+            neuron_stats["matched_control_max_mod"] = np.nan
+            neuron_stats["matched_control_max_mod_time"] = np.nan
+        else:
+            engagement_params = results["matched_control + non_local_no_SWR"].params
+            matched_control_modulation = (
+                spline_basis @ engagement_params[1 : n_basis_functions + 1]
+            )
+            matched_control_max_ind = np.argmax(np.abs(matched_control_modulation))
+            neuron_stats["matched_control_max_mod"] = matched_control_modulation[
+                matched_control_max_ind
+            ]
+            neuron_stats["matched_control_max_mod_time"] = lag_time[
+                matched_control_max_ind
+            ]
+
     except (ValueError, np.linalg.LinAlgError):
         _logger.warning(
             "GLM fitting failed for neuron; falling back to firing rates only",
@@ -960,6 +1045,7 @@ def process_neuron(
         no_swr_modulation = nan_modulation
         non_local_swr_modulation = nan_modulation
         non_local_no_swr_modulation = nan_modulation
+        matched_control_modulation = nan_modulation
 
     return (
         neuron_stats,
@@ -967,6 +1053,7 @@ def process_neuron(
         no_swr_modulation,
         non_local_swr_modulation,
         non_local_no_swr_modulation,
+        matched_control_modulation,
     )
 
 
@@ -1325,6 +1412,312 @@ def build_session_event_sets(
     return event_times, counts
 
 
+#: The event classes the design matrices are keyed on. A matched control may
+#: not overlap a window of any of them -- including ``SWR``, whose windows are
+#: not all covered by the non-local classes.
+EVENT_CLASSES = ("non_local_no_SWR", "non_local_SWR", "non_local", "SWR")
+
+#: The class matched controls are drawn one-for-one against.
+MATCHED_CONTROL_SOURCE_CLASS = "non_local"
+
+
+#: Draws attempted per event before a matched control is given up on.
+DEFAULT_MATCHED_CONTROL_ATTEMPTS = 50
+
+
+def matched_control_seed(nwb_file_name: str, epoch_name: str) -> int:
+    """Per-session seed for the matched-control draw.
+
+    Derived from the session key rather than taken from a counter so a session
+    refit on its own -- to repair one bundle, say -- redraws exactly the control
+    population the batch drew, and two sessions never share a draw.
+
+    Parameters
+    ----------
+    nwb_file_name : str
+        NWB file name, e.g. ``"wilbur20210329_.nwb"``.
+    epoch_name : str
+        Epoch name, e.g. ``"02_r1"``.
+
+    Returns
+    -------
+    int
+        The low 64 bits of ``sha256(f"{nwb_file_name}|{epoch_name}")``.
+    """
+    digest = hashlib.sha256(f"{nwb_file_name}|{epoch_name}".encode()).digest()
+    return int.from_bytes(digest[:8], "little")
+
+
+def _contiguous_true_runs(mask: NDArray) -> NDArray:
+    """Half-open ``[start, stop)`` sample bounds of each contiguous True run.
+
+    Parameters
+    ----------
+    mask : NDArray of bool, shape (n_time,)
+
+    Returns
+    -------
+    NDArray of int, shape (n_runs, 2)
+        One row per run; ``mask[start:stop]`` is all True and is bounded by
+        False (or by the array's ends) on both sides.
+    """
+    flat = np.asarray(mask, dtype=bool)
+    if flat.size == 0:
+        return np.empty((0, 2), dtype=np.int64)
+    padded = np.concatenate([[False], flat, [False]])
+    edges = np.flatnonzero(padded[1:] != padded[:-1])
+    return edges.reshape(-1, 2).astype(np.int64)
+
+
+def _bout_containing(runs: NDArray, index: int) -> int:
+    """Row of ``runs`` whose half-open bounds contain ``index``, or ``-1``.
+
+    Parameters
+    ----------
+    runs : NDArray of int, shape (n_runs, 2)
+        Ascending, non-overlapping half-open bounds, as
+        :func:`_contiguous_true_runs` returns them.
+    index : int
+        Sample index to locate.
+
+    Returns
+    -------
+    int
+        Row index into ``runs``, or ``-1`` when ``index`` is in no run.
+    """
+    if len(runs) == 0 or index < 0:
+        return -1
+    row = int(np.searchsorted(runs[:, 0], index, side="right")) - 1
+    if row < 0 or index >= int(runs[row, 1]):
+        return -1
+    return row
+
+
+def _within_immobile(
+    start_time: float, end_time: float, times: NDArray, run: NDArray
+) -> bool:
+    """Whether ``[start_time, end_time]`` lies inside one run's sampled span.
+
+    Every sample between a run's first and last is True by construction, so a
+    window bounded by those two times covers True bins only.
+
+    Parameters
+    ----------
+    start_time, end_time : float
+        Window bounds in seconds.
+    times : NDArray, shape (n_time,)
+        Ascending sample times in seconds.
+    run : NDArray of int, shape (2,)
+        One row of :func:`_contiguous_true_runs`.
+
+    Returns
+    -------
+    bool
+    """
+    run_start, run_stop = int(run[0]), int(run[1])
+    if run_stop <= run_start:
+        return False
+    return bool(start_time >= times[run_start] and end_time <= times[run_stop - 1])
+
+
+def _overlaps_any(
+    start_time: float, end_time: float, starts: NDArray, ends: NDArray
+) -> bool:
+    """Whether ``[start_time, end_time)`` overlaps any of the given windows.
+
+    Windows are half-open, so abutting one exactly is not an overlap.
+
+    Parameters
+    ----------
+    start_time, end_time : float
+        Window bounds in seconds.
+    starts, ends : NDArray, shape (n_windows,)
+        Ascending, non-overlapping window bounds (as :func:`_merge_windows`
+        returns them). ``ends`` is then ascending too, so the only window that
+        can reach past ``start_time`` among those starting before ``end_time``
+        is the last of them.
+
+    Returns
+    -------
+    bool
+    """
+    if len(starts) == 0:
+        return False
+    n_starting_before = int(np.searchsorted(starts, end_time, side="left"))
+    if n_starting_before == 0:
+        return False
+    return bool(ends[n_starting_before - 1] > start_time)
+
+
+def _merge_windows(starts: NDArray, ends: NDArray) -> tuple[NDArray, NDArray]:
+    """Sort and union windows into ascending, non-overlapping bounds.
+
+    Parameters
+    ----------
+    starts, ends : NDArray, shape (n_windows,)
+        Window bounds in seconds, in any order, possibly overlapping.
+
+    Returns
+    -------
+    merged_starts, merged_ends : NDArray, shape (n_merged,)
+        Ascending and disjoint; touching windows are merged.
+    """
+    starts = np.asarray(starts, dtype=float)
+    ends = np.asarray(ends, dtype=float)
+    if starts.size == 0:
+        return starts, ends
+    order = np.argsort(starts, kind="stable")
+    starts, ends = starts[order], ends[order]
+    # A window that starts after every end seen so far opens a new merged group.
+    reach = np.maximum.accumulate(ends)
+    opens_group = np.concatenate([[True], starts[1:] > reach[:-1]])
+    group_start = np.flatnonzero(opens_group)
+    return starts[opens_group], np.maximum.reduceat(ends, group_start)
+
+
+def make_matched_control_times(
+    event_times: Mapping[str, pd.DataFrame],
+    is_immobile: pd.Series,
+    rng: np.random.Generator,
+    max_attempts: int = DEFAULT_MATCHED_CONTROL_ATTEMPTS,
+) -> pd.DataFrame:
+    """Time-shifted-onset matched non-event control.
+
+    The non-SWR replay regressor asks whether a neuron responds to replay. On
+    its own it cannot say whether the response is to replay or to *being in the
+    stretch of immobility where replay happens* -- events are not uniform over
+    a stop, and neither is firing. This draws, for every real non-local event, a
+    window of the same duration inside the same fitted immobility bout that
+    holds no real event at all. Entered as its own event class, it turns the
+    replay question into a nested one: does replay add beyond a duration-matched
+    non-event baseline drawn from the same bins.
+
+    For each source event the control onset is drawn uniformly over the sample
+    times of its own bout, and the draw is rejected unless
+
+    - the control window lies entirely inside that bout (so every bin it covers
+      is a bin the models are fit on),
+    - it overlaps no window of any real event class, ``SWR`` included, and
+    - it overlaps no control already placed, so the control population is
+      non-overlapping exactly as the real one is.
+
+    An event whose bout cannot hold a non-overlapping window of its duration is
+    dropped after ``max_attempts`` draws, so the returned count is ``<=`` the
+    number of source events and the caller must record the shortfall rather than
+    assume a one-to-one match.
+
+    Parameters
+    ----------
+    event_times : Mapping[str, pandas.DataFrame]
+        The event sets :func:`build_session_event_sets` returns, keyed
+        ``non_local_no_SWR``, ``non_local_SWR``, ``non_local``, ``SWR``, each
+        with ``start_time`` / ``end_time`` in seconds. ``non_local`` supplies
+        the source events; every class supplies windows a control may not
+        overlap.
+    is_immobile : pandas.Series of bool, shape (n_time,)
+        The bins a control may be drawn from, indexed by the session's sample
+        times in seconds. Callers pass the *fit mask*
+        (:func:`build_session_fit_mask`'s second return), not raw immobility:
+        the control has to sample the same bins the models are fit on. A "bout"
+        is a contiguous True run of this mask.
+    rng : numpy.random.Generator
+        Seeded generator; see :func:`matched_control_seed`.
+    max_attempts : int
+        Draws per event before that event is given up on.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Columns ``start_time``, ``end_time`` in seconds, one row per *placed*
+        control, in source-event order. Rows are deliberately not re-sorted by
+        time: row ``k`` is then the ``k``-th placeable source event, so the
+        duration match is readable row by row when nothing was dropped.
+
+    Raises
+    ------
+    KeyError
+        If ``event_times`` lacks one of the four event classes.
+    """
+    times = np.asarray(is_immobile.index, dtype=float)
+    runs = _contiguous_true_runs(np.asarray(is_immobile, dtype=bool))
+
+    source = event_times[MATCHED_CONTROL_SOURCE_CLASS]
+    blocked_starts, blocked_ends = _merge_windows(
+        np.concatenate(
+            [
+                event_times[name].start_time.to_numpy(dtype=float)
+                for name in EVENT_CLASSES
+            ]
+        ),
+        np.concatenate(
+            [event_times[name].end_time.to_numpy(dtype=float) for name in EVENT_CLASSES]
+        ),
+    )
+
+    control_starts: list[float] = []
+    control_ends: list[float] = []
+    n_unplaced = 0
+    for start, end in zip(
+        source.start_time.to_numpy(dtype=float),
+        source.end_time.to_numpy(dtype=float),
+        strict=True,
+    ):
+        duration = end - start
+        # The bin holding the onset, and the bout that bin belongs to.
+        onset_index = int(np.searchsorted(times, start, side="right")) - 1
+        run_row = _bout_containing(runs, onset_index)
+        if run_row < 0:
+            n_unplaced += 1
+            continue
+        run_start, run_stop = int(runs[run_row, 0]), int(runs[run_row, 1])
+        # Onsets late enough in the bout that the window would run past its last
+        # sample are never drawn, so a rejection can only be an overlap.
+        last_offset = (
+            int(
+                np.searchsorted(
+                    times[run_start:run_stop],
+                    times[run_stop - 1] - duration,
+                    side="right",
+                )
+            )
+            - 1
+        )
+        if last_offset < 0:
+            n_unplaced += 1
+            continue
+
+        for _ in range(max_attempts):
+            candidate = float(times[run_start + int(rng.integers(0, last_offset + 1))])
+            candidate_end = candidate + duration
+            if not _within_immobile(
+                candidate, candidate_end, times, runs[run_row]
+            ) or _overlaps_any(candidate, candidate_end, blocked_starts, blocked_ends):
+                continue
+            control_starts.append(candidate)
+            control_ends.append(candidate_end)
+            # Placed controls join the windows later draws must avoid.
+            blocked_starts, blocked_ends = _merge_windows(
+                np.append(blocked_starts, candidate),
+                np.append(blocked_ends, candidate_end),
+            )
+            break
+        else:
+            n_unplaced += 1
+
+    if n_unplaced:
+        logger.warning(
+            "%d of %d matched controls could not be placed in %d attempts: the "
+            "event's fitted immobility bout holds no free window of its "
+            "duration",
+            n_unplaced,
+            len(source),
+            max_attempts,
+        )
+    return pd.DataFrame(
+        {"start_time": control_starts, "end_time": control_ends}, dtype=float
+    )
+
+
 def run_session(
     nwb_file_name: str,
     epoch_name: str,
@@ -1335,7 +1728,9 @@ def run_session(
     run_parallel: bool = True,
     stop_cohort: str = "at_well",
     cohort_stops: pd.DataFrame | None = None,
-) -> tuple[pd.DataFrame, NDArray, NDArray, NDArray, NDArray, dict[str, Any]]:
+) -> tuple[
+    pd.DataFrame, NDArray, NDArray, NDArray, NDArray, NDArray, dict[str, Any]
+]:
     """Run PFC GLM analysis for all neurons in a single session.
 
     Parameters
@@ -1398,6 +1793,9 @@ def run_session(
         Non-SWR replay modulation from replay-split model, controlling
         for replay-coincident ripples only.
         Shape (n_lag_times, n_neurons).
+    matched_control_modulation : NDArray
+        Matched non-event baseline modulation from the engagement model.
+        Shape (n_lag_times, n_neurons).
     cohort_info : dict
         How the population was cut and which event definition it was cut on:
         ``stop_cohort``, the bin counts (``n_bins_total``, ``n_bins_immobile``,
@@ -1405,8 +1803,11 @@ def run_session(
         the canonical-event provenance (``is_swr_definition``,
         ``immobility_inequality``, ``canonical_event_table_path`` /
         ``_sha256``, ``swr_interval_source``, ``data_over_time_path`` /
-        ``_sha256``). Written to the run's provenance sidecar so an artifact
-        states both the population and the events it was fit on.
+        ``_sha256``), plus the matched non-event control's draw
+        (``matched_control_seed``, ``n_matched_control``,
+        ``n_matched_control_unplaced``). Written to the run's provenance
+        sidecar so an artifact states both the population and the events it
+        was fit on.
 
     Raises
     ------
@@ -1422,6 +1823,11 @@ def run_session(
     session, and that table's ``is_swr`` column (strict positive-duration
     overlap with the speed-gated ``SWR_event`` labels). Figure 4 therefore
     describes the same ``event_id``s as the content and rate families.
+
+    The matched non-event control is drawn here rather than by the caller so
+    every fit on this path carries one, with the seed
+    :func:`matched_control_seed` derives from the session key -- a refit of one
+    session redraws the batch's control population exactly.
     """
     # Deferred imports: these helpers open Spyglass / DataJoint at
     # import time. Keeping them function-local lets the rest of the
@@ -1542,10 +1948,23 @@ def run_session(
         fit_mask=fit_mask,
         basis_half_window_s=float(np.abs(fit_lags).max()) / sampling_frequency,
     )
+    # The matched non-event control is drawn after the cohort restriction and
+    # from the fit mask, so its windows sample exactly the bins the models are
+    # fit on and avoid exactly the events that survived the restriction.
+    control_seed = matched_control_seed(nwb_file_name, epoch_name)
+    event_times["matched_control"] = make_matched_control_times(
+        event_times, fit_mask, np.random.default_rng(control_seed)
+    )
+    n_matched_control = int(len(event_times["matched_control"]))
     cohort_info = {
         **bin_counts,
         **event_counts,
         **event_provenance,
+        "matched_control_seed": control_seed,
+        "n_matched_control": n_matched_control,
+        "n_matched_control_unplaced": (
+            int(len(event_times[MATCHED_CONTROL_SOURCE_CLASS])) - n_matched_control
+        ),
         "alignment": alignment_counts,
     }
     logger.info(
@@ -1564,6 +1983,12 @@ def run_session(
         event_counts["n_ripple_dropped_overlapping_fit"],
     )
     logger.info(
+        "Matched non-event controls: %d placed, %d unplaced (seed %d)",
+        cohort_info["n_matched_control"],
+        cohort_info["n_matched_control_unplaced"],
+        control_seed,
+    )
+    logger.info(
         "Canonical events outside the aligned position frame: %d (%d SWR intervals)",
         event_counts["n_events_outside_frame"],
         event_counts["n_swr_intervals_outside_frame"],
@@ -1580,7 +2005,7 @@ def run_session(
     if brain_area not in data["spike_times"] or not data["spike_times"][brain_area]:
         logger.warning("No %s neurons found for this session", brain_area)
         empty = np.empty((0, 0))
-        return pd.DataFrame(), empty, empty, empty, empty, cohort_info
+        return pd.DataFrame(), empty, empty, empty, empty, empty, cohort_info
 
     n_neurons = len(data["spike_times"][brain_area])
     logger.info(
@@ -1631,6 +2056,7 @@ def run_session(
         no_swr_modulation_list,
         non_local_swr_modulation_list,
         non_local_no_swr_modulation_list,
+        matched_control_modulation_list,
     ) = zip(*result, strict=True)
 
     neuron_stats = pd.DataFrame(list(neuron_stats_list))
@@ -1640,6 +2066,7 @@ def run_session(
     non_local_no_swr_modulation = np.stack(
         non_local_no_swr_modulation_list, axis=1
     )
+    matched_control_modulation = np.stack(matched_control_modulation_list, axis=1)
 
     # Trim modulation arrays from fit window (±250ms) to report window (±200ms)
     # to remove spline boundary artifacts at the edges
@@ -1650,6 +2077,7 @@ def run_session(
     no_swr_modulation = no_swr_modulation[report_mask]
     non_local_swr_modulation = non_local_swr_modulation[report_mask]
     non_local_no_swr_modulation = non_local_no_swr_modulation[report_mask]
+    matched_control_modulation = matched_control_modulation[report_mask]
 
     neuron_stats["nwb_file_name"] = nwb_file_name
     neuron_stats["epoch_name"] = epoch_name
@@ -1664,5 +2092,6 @@ def run_session(
         no_swr_modulation,
         non_local_swr_modulation,
         non_local_no_swr_modulation,
+        matched_control_modulation,
         cohort_info,
     )
