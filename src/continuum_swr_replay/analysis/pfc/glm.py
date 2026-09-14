@@ -1601,10 +1601,12 @@ def make_matched_control_times(
     - it overlaps no control already placed, so the control population is
       non-overlapping exactly as the real one is.
 
-    An event whose bout cannot hold a non-overlapping window of its duration is
-    dropped after ``max_attempts`` draws, so the returned count is ``<=`` the
-    number of source events and the caller must record the shortfall rather than
-    assume a one-to-one match.
+    An event is dropped -- never placed somewhere else -- when its onset falls
+    in no fitted bout at all (the cohort keeps an event by onset, and an onset
+    bin can still be outside the fit mask) or when its bout cannot hold a
+    non-overlapping window of its duration in ``max_attempts`` draws. The
+    returned count is therefore ``<=`` the number of source events, and the
+    caller must record the shortfall rather than assume a one-to-one match.
 
     Parameters
     ----------
@@ -1707,8 +1709,8 @@ def make_matched_control_times(
     if n_unplaced:
         logger.warning(
             "%d of %d matched controls could not be placed in %d attempts: the "
-            "event's fitted immobility bout holds no free window of its "
-            "duration",
+            "event's onset is in no fitted bout, or its bout holds no free "
+            "window of the event's duration",
             n_unplaced,
             len(source),
             max_attempts,
