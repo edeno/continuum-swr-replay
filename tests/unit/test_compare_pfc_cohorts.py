@@ -40,6 +40,7 @@ from scripts.qa.compare_pfc_cohorts import (
     shared_statistic_differences,
     significance_table,
     try_read_sidecars,
+    worker_time_table,
 )
 
 N_LAG_TIMES = 201
@@ -703,7 +704,7 @@ class TestSameEventsPrecondition:
 class TestSharedStatisticDifferences:
     def test_identical_trees_report_zero_outside_tolerance(self, rerun_trees):
         before, after = rerun_trees
-        differences, unpairable = shared_statistic_differences(
+        differences, per_session, unpairable = shared_statistic_differences(
             before,
             after,
             ["chimi20200223_02_r1", "j1620210706_02_r1"],
@@ -711,6 +712,13 @@ class TestSharedStatisticDifferences:
         assert unpairable.empty
         assert int(differences["n_outside_tolerance"].sum()) == 0
         assert differences.attrs["n_neurons_paired"] == 5
+        # "Expected zero" is a per-session claim, so it is made per session.
+        assert list(per_session["session"]) == [
+            "chimi20200223_02_r1",
+            "j1620210706_02_r1",
+        ]
+        assert int(per_session["n_cells_outside_tolerance"].sum()) == 0
+        assert int(per_session["n_best_aic_labels_on_one_side_only"].sum()) == 0
         compared = differences.loc[differences["n_cells"] > 0, "max_abs_diff"]
         assert (compared.fillna(0) == 0).all()
 
@@ -723,7 +731,7 @@ class TestSharedStatisticDifferences:
         frame.loc[0, column] = frame.loc[0, column] + 1e-3
         frame.to_pickle(path)
 
-        differences, _ = shared_statistic_differences(
+        differences, per_session, _ = shared_statistic_differences(
             before,
             after,
             ["chimi20200223_02_r1", "j1620210706_02_r1"],
@@ -733,6 +741,10 @@ class TestSharedStatisticDifferences:
         ]
         assert row["n_outside_tolerance"] == 1
         assert row["max_abs_diff"] == pytest.approx(1e-3)
+        # ...and the session it is in is named, not just the corpus total.
+        moved = per_session.set_index("session")["n_cells_outside_tolerance"]
+        assert moved["chimi20200223_02_r1"] == 1
+        assert moved["j1620210706_02_r1"] == 0
         # Nothing else moved.
         others = differences.loc[
             differences["quantity"] != "LR p-value (`: pval`)", "n_outside_tolerance"
@@ -746,7 +758,7 @@ class TestSharedStatisticDifferences:
         array[0, 0] += 10 * RERUN_PARAM_TOL
         np.save(path, array)
 
-        differences, _ = shared_statistic_differences(
+        differences, per_session, _ = shared_statistic_differences(
             before, after, ["chimi20200223_02_r1"]
         )
         row = differences.loc[
@@ -764,7 +776,7 @@ class TestSharedStatisticDifferences:
         frame.loc[0, f"{FDR_TESTS[0]}: pval"] = np.nan
         frame.to_pickle(path)
 
-        differences, _ = shared_statistic_differences(
+        differences, per_session, _ = shared_statistic_differences(
             before, after, ["chimi20200223_02_r1"]
         )
         row = differences.loc[differences["quantity"] == "LR p-value (`: pval`)"].iloc[
@@ -785,7 +797,7 @@ class TestSharedStatisticDifferences:
             sidecar=_rerun_sidecar("chimi20200223_02_r1", extra=_after_extra()),
             matched_control_array=True,
         )
-        differences, unpairable = shared_statistic_differences(
+        differences, per_session, unpairable = shared_statistic_differences(
             before, after, ["chimi20200223_02_r1", "j1620210706_02_r1"]
         )
         assert list(unpairable.session) == ["chimi20200223_02_r1"]
@@ -793,6 +805,91 @@ class TestSharedStatisticDifferences:
         assert unpairable.iloc[0].n_neurons_after == 2
         # The other session is still compared.
         assert differences.attrs["n_sessions_paired"] == 1
+
+
+class TestBestAICComparison:
+    def test_a_neuron_with_no_fit_on_either_side_is_not_a_disagreement(
+        self, rerun_trees
+    ):
+        # A neuron statsmodels refused carries no best-AIC label in either
+        # tree. Comparing the two labels with != would call NaN != NaN a
+        # disagreement and report the corpus's unfittable neurons as an
+        # estimator difference.
+        before, after = rerun_trees
+        for tree in (before, after):
+            path = tree / "chimi20200223_02_r1_mPFC_modulation.pkl"
+            frame = pd.read_pickle(path)
+            frame.loc[0, "min_aic_model"] = np.nan
+            frame.to_pickle(path)
+
+        differences, per_session, _ = shared_statistic_differences(
+            before, after, ["chimi20200223_02_r1"]
+        )
+
+        row = differences.loc[
+            differences["quantity"] == "best-AIC model (identity)"
+        ].iloc[0]
+        assert row["n_outside_tolerance"] == 0
+        assert row["n_finite_on_one_side_only"] == 0
+        assert int(per_session["n_best_aic_labels_on_one_side_only"].sum()) == 0
+
+    def test_a_neuron_that_lost_its_fit_is_counted_as_one_sided(self, rerun_trees):
+        before, after = rerun_trees
+        path = after / "chimi20200223_02_r1_mPFC_modulation.pkl"
+        frame = pd.read_pickle(path)
+        frame.loc[0, "min_aic_model"] = np.nan
+        frame.to_pickle(path)
+
+        differences, per_session, _ = shared_statistic_differences(
+            before, after, ["chimi20200223_02_r1"]
+        )
+
+        row = differences.loc[
+            differences["quantity"] == "best-AIC model (identity)"
+        ].iloc[0]
+        assert row["n_finite_on_one_side_only"] == 1
+        assert row["n_outside_tolerance"] == 0
+        assert (
+            per_session.set_index("session").loc[
+                "chimi20200223_02_r1", "n_best_aic_labels_on_one_side_only"
+            ]
+            == 1
+        )
+
+
+class TestWorkerTimes:
+    def test_a_workers_wall_clock_and_session_count_are_read(self, tmp_path):
+        (tmp_path / "worker0.time").write_text(
+            '\tCommand being timed: "uv run python x.py"\n'
+            "\tPercent of CPU this job got: 338%\n"
+            "\tElapsed (wall clock) time (h:mm:ss or m:ss): 12:19:27\n"
+            "\tMaximum resident set size (kbytes): 225591152\n"
+            "\tExit status: 0\n"
+        )
+        (tmp_path / "worker0.sessions").write_text(
+            "# a comment\nchimi20200223_.nwb 02_r1\n\nj1620210706_.nwb 02_r1\n"
+        )
+
+        table = worker_time_table([tmp_path / "worker0.time"])
+
+        assert len(table) == 1
+        row = table.iloc[0]
+        assert row["worker"] == "worker0"
+        assert row["wall_clock"] == "12:19:27"
+        assert row["cpu_pct"] == "338%"
+        assert row["peak_rss_gb"] == pytest.approx(225.6)
+        assert row["exit_status"] == "0"
+        assert row["n_sessions"] == 2
+
+    def test_a_worker_without_a_partition_file_still_reports(self, tmp_path):
+        (tmp_path / "worker1.time").write_text(
+            "\tElapsed (wall clock) time (h:mm:ss or m:ss): 1:00\n\tExit status: 2\n"
+        )
+
+        row = worker_time_table([tmp_path / "worker1.time"]).iloc[0]
+
+        assert row["n_sessions"] is None
+        assert row["exit_status"] == "2"
 
 
 class TestMatchedControl:

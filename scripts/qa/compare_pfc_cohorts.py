@@ -741,6 +741,12 @@ def shared_statistic_differences(
         every neuron and session, the tolerance it is read against, the number
         of neuron x column cells outside it, and the cells that are finite on
         one side only.
+    per_session : pandas.DataFrame
+        One row per paired session: its neuron count, the cells outside
+        tolerance, the cells finite on one side only, and how many neurons
+        have a best-AIC model on one side and none on the other -- a neuron
+        that lost (or gained) its whole row. A corpus total hides which
+        sessions carry it, and "expected zero" is a per-session claim.
     unpairable : pandas.DataFrame
         Sessions whose neuron counts differ between the trees.
     """
@@ -766,11 +772,16 @@ def shared_statistic_differences(
     array_unpaired = dict.fromkeys(SHARED_MODULATION_ARRAYS, 0)
     array_cells = dict.fromkeys(SHARED_MODULATION_ARRAYS, 0)
     model_disagreements = 0
+    model_unpaired = 0
     n_models_compared = 0
     n_neurons = 0
     unpairable_rows = []
+    per_session_rows = []
 
     for session in sessions:
+        session_outside = 0
+        session_unpaired = 0
+        session_model_unpaired = 0
         before = _bundle_statistics(before_dir, session, "")
         after = _bundle_statistics(after_dir, session, artifact_suffix)
         if len(before) != len(after):
@@ -794,9 +805,10 @@ def shared_statistic_differences(
                 )
                 n_cells[family] += len(before)
                 unpaired[family] += n_unpaired
+                session_unpaired += n_unpaired
                 if np.isfinite(difference):
                     worst[family] = max(worst[family], difference)
-                    outside[family] += int(
+                    n_column_outside = int(
                         (
                             np.abs(
                                 after[column].to_numpy(dtype=float)
@@ -805,12 +817,25 @@ def shared_statistic_differences(
                             > tol
                         ).sum()
                     )
-        # The selected model is a label, so it is compared for identity.
+                    outside[family] += n_column_outside
+                    session_outside += n_column_outside
+        # The selected model is a label, so it is compared for identity --
+        # and a neuron with no fit at all carries no label on either side,
+        # which is agreement, not a disagreement between two NaNs.
         for column in ("min_aic_model", "min_aic_model_replay_split"):
             if column in shared_columns:
                 n_models_compared += len(before)
+                named_before = before[column].notna().to_numpy()
+                named_after = after[column].notna().to_numpy()
+                both_named = named_before & named_after
+                n_column_unpaired = int((named_before != named_after).sum())
+                model_unpaired += n_column_unpaired
+                session_model_unpaired += n_column_unpaired
                 model_disagreements += int(
-                    (before[column].to_numpy() != after[column].to_numpy()).sum()
+                    (
+                        before[column].to_numpy()[both_named]
+                        != after[column].to_numpy()[both_named]
+                    ).sum()
                 )
         for name in SHARED_MODULATION_ARRAYS:
             before_array = _bundle_modulation(before_dir, session, "", name)
@@ -820,14 +845,26 @@ def shared_statistic_differences(
             difference, n_unpaired = _max_abs_difference(before_array, after_array)
             array_cells[name] += before_array.size
             array_unpaired[name] += n_unpaired
+            session_unpaired += n_unpaired
             if np.isfinite(difference):
                 array_worst[name] = max(array_worst[name], difference)
                 finite = np.isfinite(before_array) & np.isfinite(after_array)
-                array_outside[name] += int(
+                n_array_outside = int(
                     (
                         np.abs(after_array[finite] - before_array[finite]) > param_tol
                     ).sum()
                 )
+                array_outside[name] += n_array_outside
+                session_outside += n_array_outside
+        per_session_rows.append(
+            {
+                "session": session,
+                "n_neurons": len(before),
+                "n_cells_outside_tolerance": session_outside,
+                "n_cells_finite_on_one_side_only": session_unpaired,
+                "n_best_aic_labels_on_one_side_only": session_model_unpaired,
+            }
+        )
 
     rows = [
         {
@@ -858,13 +895,13 @@ def shared_statistic_differences(
             "max_abs_diff": np.nan,
             "tolerance": np.nan,
             "n_outside_tolerance": model_disagreements,
-            "n_finite_on_one_side_only": 0,
+            "n_finite_on_one_side_only": model_unpaired,
         }
     )
     per_quantity = pd.DataFrame(rows)
     per_quantity.attrs["n_neurons_paired"] = n_neurons
     per_quantity.attrs["n_sessions_paired"] = len(sessions) - len(unpairable_rows)
-    return per_quantity, pd.DataFrame(unpairable_rows)
+    return per_quantity, pd.DataFrame(per_session_rows), pd.DataFrame(unpairable_rows)
 
 
 def matched_control_arrays(data_dir: Path, artifact_suffix: str = "") -> pd.DataFrame:
@@ -948,8 +985,12 @@ def fitter_table(sidecars: pd.DataFrame) -> pd.DataFrame:
     """Which estimator, device and inputs each session was fit with.
 
     One row per distinct combination rather than per session: a batch run as
-    one job should collapse to a single row, and any session that did not is
-    then visible without reading 71 rows.
+    one job should collapse to a single row per card, and any session that did
+    not is then visible without reading 71 rows. The cached decode frame's
+    hash is deliberately not part of the combination -- it is a property of the
+    session, not of the run, so grouping on it would put every session in a row
+    of its own; the number of distinct values is reported instead, and it
+    should equal the number of sessions.
     """
     columns = [
         "fitter",
@@ -960,7 +1001,6 @@ def fitter_table(sidecars: pd.DataFrame) -> pd.DataFrame:
         "gpu_name",
         "stop_table_sha256",
         "canonical_event_table_sha256",
-        "data_over_time_sha256",
         "git_hash",
     ]
     present = [c for c in columns if c in sidecars.columns]
@@ -971,7 +1011,10 @@ def fitter_table(sidecars: pd.DataFrame) -> pd.DataFrame:
                 lambda value: value[:12] if isinstance(value, str) else value
             )
     grouped = frame.groupby(present, dropna=False)
-    table = grouped.agg(n_sessions=("session", "size")).reset_index()
+    table = grouped.agg(
+        n_sessions=("session", "size"),
+        n_distinct_data_over_time=("data_over_time_sha256", "nunique"),
+    ).reset_index()
     for column in (
         "n_neurons_reference_fit",
         "n_model_fits",
@@ -990,6 +1033,93 @@ def fitter_table(sidecars: pd.DataFrame) -> pd.DataFrame:
         table = table.merge(totals, on=present, how="left")
         table[column] = table[column].astype("Int64")
     return table
+
+
+def session_fit_counts_table(sidecars: pd.DataFrame) -> pd.DataFrame:
+    """Per session: the card it was fit on, and what its fits did.
+
+    The collapsed estimator table says the batch was one job; this says what
+    each session inside it cost in fits that never settled, which is the
+    quantity a reader has to weigh a session's claims against.
+    """
+    columns = [
+        "session",
+        "gpu_index",
+        "n_neurons_reference_fit",
+        "n_model_fits",
+        "n_nonconverged_model_fits",
+        "n_neurons_with_nonconverged_model",
+    ]
+    present = [c for c in columns if c in sidecars.columns]
+    table = sidecars[present].copy().sort_values("session")
+    for column in present[1:]:
+        table[column] = _numeric(table[column]).astype("Int64")
+    if {"n_nonconverged_model_fits", "n_model_fits"} <= set(present):
+        table["nonconverged_frac"] = (
+            _numeric(table["n_nonconverged_model_fits"])
+            / _numeric(table["n_model_fits"])
+        ).round(4)
+    return table.reset_index(drop=True)
+
+
+#: The ``/usr/bin/time -v`` fields a batch's wall clock is read from.
+_TIME_FIELDS = {
+    "Elapsed (wall clock) time (h:mm:ss or m:ss)": "wall_clock",
+    "Percent of CPU this job got": "cpu_pct",
+    "Maximum resident set size (kbytes)": "max_rss_kb",
+    "Exit status": "exit_status",
+}
+
+
+def worker_time_table(paths: list[Path]) -> pd.DataFrame:
+    """What each worker of the batch cost, from its ``/usr/bin/time -v`` file.
+
+    Parameters
+    ----------
+    paths : list of Path
+        ``worker*.time`` files. A sibling ``worker*.sessions`` partition file,
+        when present, gives the number of sessions that worker was handed.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per worker: wall clock, CPU percentage, peak resident set in
+        GB, exit status and session count.
+    """
+    rows = []
+    for path in sorted(paths):
+        fields: dict[str, str] = {}
+        for line in Path(path).read_text().splitlines():
+            key, _, value = line.strip().partition(": ")
+            if key in _TIME_FIELDS:
+                fields[_TIME_FIELDS[key]] = value.strip()
+        sessions = Path(path).with_suffix(".sessions")
+        n_sessions = (
+            len(
+                [
+                    line
+                    for line in sessions.read_text().splitlines()
+                    if line.strip() and not line.strip().startswith("#")
+                ]
+            )
+            if sessions.exists()
+            else None
+        )
+        rows.append(
+            {
+                "worker": Path(path).stem,
+                "n_sessions": n_sessions,
+                "wall_clock": fields.get("wall_clock"),
+                "cpu_pct": fields.get("cpu_pct"),
+                "peak_rss_gb": (
+                    round(int(fields["max_rss_kb"]) / 1e6, 1)
+                    if "max_rss_kb" in fields
+                    else None
+                ),
+                "exit_status": fields.get("exit_status"),
+            }
+        )
+    return pd.DataFrame(rows)
 
 
 def _cell(value: object, float_format: str) -> str:
@@ -1036,6 +1166,7 @@ def rerun_sections(
     after_dir: Path,
     alpha: float,
     artifact_suffix: str,
+    worker_times: list[Path],
 ) -> list[str]:
     """The rerun audit: same events, new estimator, plus the new control.
 
@@ -1089,7 +1220,7 @@ def rerun_sections(
         shared = sorted(
             set(before_sidecars["session"]) & set(after_sidecars["session"])
         )
-        differences, unpairable = shared_statistic_differences(
+        differences, per_session, unpairable = shared_statistic_differences(
             before_dir, after_dir, shared, artifact_suffix=artifact_suffix
         )
         add(
@@ -1111,6 +1242,34 @@ def rerun_sections(
             if n_outside
             else "**No cell falls outside tolerance.**\n"
         )
+        if not per_session.empty:
+            moved = per_session.loc[
+                (per_session["n_cells_outside_tolerance"] > 0)
+                | (per_session["n_cells_finite_on_one_side_only"] > 0)
+                | (per_session["n_best_aic_labels_on_one_side_only"] > 0)
+            ]
+            add(
+                'Per session, because "expected zero" is a claim about every '
+                "session and not about a corpus total: "
+                + (
+                    f"**all {len(per_session)} paired session(s) have zero "
+                    "cells outside tolerance, zero cells finite on one side "
+                    "only and zero neurons that carry a best-AIC label on one "
+                    "side and none on the other.**\n"
+                    if moved.empty
+                    else f"{len(per_session) - len(moved)} of "
+                    f"{len(per_session)} paired session(s) are clean on all "
+                    f"three counts; the {len(moved)} that are not are listed "
+                    "below.\n"
+                )
+            )
+            if not moved.empty:
+                add(_md(moved))
+                lost = int(moved["n_best_aic_labels_on_one_side_only"].sum())
+                add(
+                    f"{lost} best-AIC label(s) exist on one side only, over "
+                    "the two label columns each neuron carries.\n"
+                )
         if not unpairable.empty:
             add(
                 f"{len(unpairable)} session(s) could not be paired at all: the "
@@ -1206,6 +1365,12 @@ def rerun_sections(
         "ask.\n"
     )
     add(_md(fitter_table(after_sidecars)))
+    add(
+        "And per session, so a claim can be weighed against the fits it rests "
+        "on: `nonconverged_frac` is `n_nonconverged_model_fits / "
+        "n_model_fits`.\n"
+    )
+    add(_md(session_fit_counts_table(after_sidecars)))
     nonconverged = after_sidecars.get("n_nonconverged_model_fits")
     if nonconverged is not None and nonconverged.notna().any():
         neurons = _numeric(
@@ -1222,6 +1387,15 @@ def rerun_sections(
             f"neurons; the worst single session is `{worst['session']}` with "
             f"{int(worst['n_nonconverged_model_fits'])}.\n"
         )
+    if worker_times:
+        add("## Wall clock\n")
+        add(
+            "One row per worker process of the batch, from the "
+            "`/usr/bin/time -v` file each was run under. Sessions were split "
+            "across the workers in advance, one card per worker, so the batch "
+            "is as long as its slowest worker rather than the sum.\n"
+        )
+        add(_md(worker_time_table(worker_times)))
     return lines
 
 
@@ -1240,8 +1414,10 @@ def build_report(
     command: str,
     artifact_suffix: str = "",
     before_sidecars: pd.DataFrame | None = None,
+    worker_times: list[Path] | None = None,
 ) -> str:
     """Assemble the audit markdown."""
+    worker_times = worker_times or []
     lines: list[str] = []
     add = lines.append
 
@@ -1447,6 +1623,7 @@ def build_report(
             after_dir=after_dir,
             alpha=alpha,
             artifact_suffix=artifact_suffix,
+            worker_times=worker_times,
         )
     )
 
@@ -1490,6 +1667,19 @@ def main() -> None:
         help="Extra paragraph to place under the Command line. Repeatable.",
     )
     parser.add_argument(
+        "--worker-time",
+        dest="worker_times",
+        type=Path,
+        nargs="*",
+        default=[],
+        help=(
+            "``/usr/bin/time -v`` output files, one per worker process of the "
+            "batch (e.g. logs/<batch>/worker*.time), to report the wall clock "
+            "the bundles cost. A sibling worker*.sessions file, where one "
+            "exists, gives that worker's session count."
+        ),
+    )
+    parser.add_argument(
         "--out",
         type=Path,
         default=None,
@@ -1522,6 +1712,7 @@ def main() -> None:
         notes=args.note,
         command=_invocation(),
         artifact_suffix=args.artifact_suffix,
+        worker_times=args.worker_times,
     )
     if args.out is None:
         print(report)
