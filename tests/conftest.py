@@ -7,9 +7,18 @@ don't require cross-file coordination.
 
 from __future__ import annotations
 
-import networkx as nx
-import numpy as np
-import pytest
+import os
+
+# The suite runs on a shared GPU host, and JAX preallocates most of every card
+# it can see the first time it is used. A test must never do that to somebody
+# else's job, so the suite is CPU-only unless the caller has deliberately made
+# a card visible. Set before any test imports JAX -- the backend is chosen on
+# first use, and this module is imported before every test module.
+os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
+
+import networkx as nx  # noqa: E402
+import numpy as np  # noqa: E402
+import pytest  # noqa: E402
 
 # ============================================================================
 # Track Graph Fixtures

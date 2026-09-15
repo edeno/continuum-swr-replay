@@ -19,7 +19,16 @@ touching Spyglass.
 from __future__ import annotations
 
 import importlib
+import os
 from typing import TYPE_CHECKING
+
+# This runs on a shared GPU host. JAX's default is to preallocate ~75% of every
+# card it can see the first time it is used, which on a box carrying other
+# people's jobs is not a default anyone can afford; a run that wants a card
+# should take what it needs and no more. Set here rather than in each entry
+# point because it has to be in place before JAX chooses a backend, and it is
+# only a default -- a caller that means to preallocate still can.
+os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
 
 __version__ = "0.1.0"
 
