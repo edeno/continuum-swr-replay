@@ -63,6 +63,7 @@ from continuum_swr_replay.analysis.pfc.canonical_events import (
 )
 from continuum_swr_replay.analysis.pfc.cohort import load_session_stop_cohort
 from continuum_swr_replay.analysis.pfc.glm import FITTERS
+from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
 from continuum_swr_replay.analysis.pfc.load_population import load_population_data
 from continuum_swr_replay.analysis.replay.cohort_selection import stop_cohort_suffix
 from continuum_swr_replay.data_loaders import load_data
@@ -574,10 +575,27 @@ def main():
             "the population bundle's run."
         ),
     )
+    parser.add_argument(
+        "--gpu",
+        type=int,
+        default=None,
+        help="Fit on this GPU instead of the emptiest free one.",
+    )
+    parser.add_argument(
+        "--allow-cpu",
+        action="store_true",
+        help="Permit the batched fitter to run on CPU when no GPU is free.",
+    )
     parser.add_argument("--show", action="store_true")
 
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Before anything imports JAX: the panel's fit runs on the same backend the
+    # population bundle was fit with, on a card nobody else is using.
+    if args.fitter == "jax":
+        record = configure_jax_gpu(gpu=args.gpu, allow_cpu=args.allow_cpu)
+        print(f"JAX device: {record}")
 
     generate_figure(
         nwb_file_name=args.nwb_file_name,

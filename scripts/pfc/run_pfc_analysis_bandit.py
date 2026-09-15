@@ -76,6 +76,7 @@ from continuum_swr_replay.analysis.pfc.cohort import (
     load_session_stop_cohort,
 )
 from continuum_swr_replay.analysis.pfc.glm import FITTERS
+from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
 from continuum_swr_replay.analysis.replay.cohort_selection import stop_cohort_suffix
 from continuum_swr_replay.analysis.replay.fit_provenance import (
     fit_provenance_path,
@@ -192,6 +193,8 @@ def run_analysis(
     output_dir: Path = PROCESSED_DATA_DIR,
     fitter: str = "jax",
     fit_diagnostics: bool = False,
+    gpu: int | None = None,
+    allow_cpu: bool = False,
 ) -> None:
     """Run PFC GLM analysis for a single session.
 
@@ -226,6 +229,13 @@ def run_analysis(
         Also write ``<artifact>.fit_diagnostics.npz`` -- per-neuron, per-model
         parameters and fit criteria, for the fitter equivalence audit. Forces
         the serial neuron path.
+    gpu : int, optional
+        Fit on this GPU instead of the emptiest free one. The card is still
+        claimed against sibling workers, but its occupancy is not checked.
+    allow_cpu : bool
+        Permit the batched fitter to run on CPU when no GPU is free. Off by
+        default: the CPU path is many times slower, and a batch that quietly
+        fell back to it would not be noticed until it overran.
     """
     epoch_identifier = (
         f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{brain_area}"
@@ -282,6 +292,23 @@ def run_analysis(
     logger.info(f"fitter: {fitter}")
 
     diagnostics: dict | None = {} if fit_diagnostics else None
+
+    # Before anything imports JAX: pick the card this process will fit on and
+    # bound what it takes of it. Each Dask worker runs this for itself, and the
+    # claim keeps two of them off the same card.
+    gpu_record: dict[str, object] = {}
+    if fitter == "jax":
+        gpu_record = configure_jax_gpu(gpu=gpu, allow_cpu=allow_cpu)
+        logger.info(
+            "JAX device: %s%s",
+            gpu_record["jax_backend"],
+            (
+                f" (GPU {gpu_record['gpu_index']}, {gpu_record['gpu_name']}, "
+                f"{gpu_record['gpu_uuid']})"
+                if gpu_record["gpu_index"] is not None
+                else ""
+            ),
+        )
 
     try:
         logger.info(f"Processing {epoch_identifier}...")
@@ -379,6 +406,11 @@ def run_analysis(
                 "fitter_tol": cohort_info.get("fitter_tol"),
                 "jax_backend": cohort_info.get("jax_backend"),
                 "jax_version": cohort_info.get("jax_version"),
+                # Which card the batched fits ran on, so a bundle names the
+                # device as well as the estimator.
+                "gpu_index": gpu_record.get("gpu_index"),
+                "gpu_uuid": gpu_record.get("gpu_uuid"),
+                "gpu_name": gpu_record.get("gpu_name"),
                 # Neurons the batched fitter handed back to statsmodels because
                 # their fits left the range the two agree over.
                 "n_neurons_reference_fit": cohort_info.get(
@@ -487,6 +519,25 @@ def get_command_line_arguments() -> Namespace:
             "keeps the original per-neuron IRLS, which is the control the "
             "fitter equivalence audit is read against. Both use the same "
             "starting values, step and convergence rule."
+        ),
+    )
+    parser.add_argument(
+        "--gpu",
+        type=int,
+        default=None,
+        help=(
+            "Fit on this GPU instead of the emptiest free one. The card is "
+            "still claimed against sibling workers, but its occupancy is not "
+            "checked."
+        ),
+    )
+    parser.add_argument(
+        "--allow-cpu",
+        action="store_true",
+        help=(
+            "Permit the batched fitter to run on CPU when no GPU is free. Off "
+            "by default: the CPU path is many times slower, and a batch that "
+            "quietly fell back to it would not be noticed until it overran."
         ),
     )
     parser.add_argument(
@@ -625,6 +676,8 @@ def main() -> None:
                 output_dir=args.output_dir,
                 fitter=args.fitter,
                 fit_diagnostics=args.fit_diagnostics,
+                gpu=args.gpu,
+                allow_cpu=args.allow_cpu,
             )
     else:
         cluster = LocalCluster(
@@ -650,6 +703,8 @@ def main() -> None:
                     output_dir=args.output_dir,
                     fitter=args.fitter,
                     fit_diagnostics=args.fit_diagnostics,
+                    gpu=args.gpu,
+                    allow_cpu=args.allow_cpu,
                 )
                 for epoch in epoch_info.itertuples()
             ]
