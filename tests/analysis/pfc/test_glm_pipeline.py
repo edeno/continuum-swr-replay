@@ -26,6 +26,7 @@ from continuum_swr_replay.analysis.pfc.glm import (
     get_frac_explained_deviance,
     get_frac_null_deviance,
     make_matched_control_times,
+    model_penalties,
     process_neuron,
     shipped_fit_counts,
 )
@@ -33,6 +34,14 @@ from continuum_swr_replay.analysis.pfc.glm import (
     test_theta_modulation as run_theta_modulation_test,
 )
 from continuum_swr_replay.analysis.replay.cohort_selection import select_stop_cohort
+
+#: Prior standard deviation of an event-basis coefficient, on the log-rate
+#: scale, for the tests that fit the penalised estimator. The fixtures here are
+#: ten seconds of a ~5 Hz Poisson train with three events, so every event class
+#: has spline columns with no spikes under them and the unpenalised fits run
+#: away (coefficients past 100, a deviance above the constant model's, half the
+#: ladder at ``maxiter``); the prior is what makes them estimable.
+PENALTY_SIGMA = 2.0
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -289,6 +298,26 @@ class TestMakeDesignMatrices:
 # ---------------------------------------------------------------------------
 
 
+def _fit_ladder(is_immobile, design_matrices, spike_count, fitter):
+    """The ladder as it is shipped under each backend.
+
+    The batched backend fits the penalised estimator; statsmodels has no
+    penalised path and fits the maximum-likelihood one, which is the only
+    reason both appear here.
+    """
+    return _fit_immobility_models(
+        is_immobile,
+        design_matrices,
+        spike_count,
+        fitter=fitter,
+        penalties=(
+            model_penalties(design_matrices, PENALTY_SIGMA)
+            if fitter == "jax"
+            else None
+        ),
+    )
+
+
 @pytest.mark.parametrize("fitter", ["statsmodels", "jax"])
 class TestFitImmobilityModels:
     def test_returns_results_for_all_models(
@@ -297,9 +326,7 @@ class TestFitImmobilityModels:
         dm, _, _ = _make_design_matrices(
             simple_event_times, position_info, lags=np.arange(-50, 51)
         )
-        results, models = _fit_immobility_models(
-            is_immobile, dm, spike_count, fitter=fitter
-        )
+        results, models = _fit_ladder(is_immobile, dm, spike_count, fitter)
 
         assert set(results.keys()) == set(dm.keys())
         # The batched backend has no per-unit statsmodels model object, and
@@ -316,7 +343,7 @@ class TestFitImmobilityModels:
         dm, _, _ = _make_design_matrices(
             simple_event_times, position_info, lags=np.arange(-50, 51)
         )
-        results, _ = _fit_immobility_models(is_immobile, dm, spike_count, fitter=fitter)
+        results, _ = _fit_ladder(is_immobile, dm, spike_count, fitter)
 
         for name, result in results.items():
             assert hasattr(result, "aic"), f"{name} result missing AIC"
@@ -329,7 +356,7 @@ class TestFitImmobilityModels:
         dm, _, _ = _make_design_matrices(
             simple_event_times, position_info, lags=np.arange(-50, 51)
         )
-        results, _ = _fit_immobility_models(is_immobile, dm, spike_count, fitter=fitter)
+        results, _ = _fit_ladder(is_immobile, dm, spike_count, fitter)
 
         # Nested: constant ⊂ SWR ⊂ SWR + non_local_no_SWR
         assert results["SWR"].deviance <= results["constant"].deviance + 1e-6
@@ -494,6 +521,8 @@ class TestProcessNeuron:
             dm,
             spline_basis,
             lag_time,
+            fitter="jax",
+            penalty_sigma=PENALTY_SIGMA,
         )
 
         n_lags = len(lags)
@@ -534,6 +563,8 @@ class TestProcessNeuron:
             dm,
             spline_basis,
             lag_time,
+            fitter="jax",
+            penalty_sigma=PENALTY_SIGMA,
         )
 
         # Check key LR tests exist
@@ -784,25 +815,46 @@ def dense_session():
             {"start_time": onsets + 0.4, "end_time": onsets + 0.48}
         ),
     }
-    design_matrices, _, _ = _make_design_matrices(
+    lags = np.arange(-50, 51)
+    design_matrices, spline_basis, lag_time = _make_design_matrices(
         event_times,
         position_info,
         sampling_frequency=sampling_frequency,
-        lags=np.arange(-50, 51),
+        lags=lags,
     )
     # ~20 Hz, so every basis column's support holds hundreds of spikes.
     spike_count = rng.poisson(20.0 / sampling_frequency, size=len(time))
-    return design_matrices, spike_count, fit_mask
+    spike_times = np.repeat(time, spike_count) + rng.uniform(
+        0.0, 1.0 / sampling_frequency, size=int(spike_count.sum())
+    )
+    return {
+        "design_matrices": design_matrices,
+        "spline_basis": spline_basis,
+        "lag_time": lag_time,
+        "spike_count": spike_count,
+        "spike_times": np.sort(spike_times),
+        "fit_mask": fit_mask,
+        "theta_phase": pd.Series(
+            np.mod(2 * np.pi * 8 * time, 2 * np.pi) - np.pi, index=time
+        ),
+        "time": time,
+    }
 
 
 class TestFitterEquivalence:
-    """The batched backend must not move a single shipped number.
+    """Unpenalised, the batched backend must not move a single shipped number.
 
     ``process_neuron`` is the unit of comparison because it is what the
     pipeline calls: everything the bundle carries -- the LR tests, the
     fractional deviances, the AIC selections and the modulation curves -- is
     derived from the fits, so comparing its outputs compares the fits through
     every transformation they are read through.
+
+    The comparison is run on a well-posed session, because that is where there
+    is anything to compare: where a spline column's support holds no spikes the
+    maximum-likelihood estimate is at infinity and the two solvers disagree
+    about a number neither of them means. That regime is what the prior is for,
+    and statsmodels has no penalised path to check it against.
     """
 
     #: Far tighter than the real-data audit's gate; on a synthetic session the
@@ -810,29 +862,16 @@ class TestFitterEquivalence:
     ATOL = 1e-8
 
     def test_process_neuron_outputs_are_the_same_under_either_fitter(
-        self,
-        poisson_spike_times,
-        is_immobile,
-        theta_phase,
-        time_axis,
-        simple_event_times,
-        position_info,
-        sampling_frequency,
+        self, dense_session
     ):
-        dm, spline_basis, lag_time = _make_design_matrices(
-            simple_event_times,
-            position_info,
-            sampling_frequency=sampling_frequency,
-            lags=np.arange(-50, 51),
-        )
         arguments = (
-            poisson_spike_times,
-            is_immobile,
-            theta_phase,
-            time_axis,
-            dm,
-            spline_basis,
-            lag_time,
+            dense_session["spike_times"],
+            dense_session["fit_mask"],
+            dense_session["theta_phase"],
+            dense_session["time"],
+            dense_session["design_matrices"],
+            dense_session["spline_basis"],
+            dense_session["lag_time"],
         )
 
         sm_stats, *sm_mods = process_neuron(*arguments, fitter="statsmodels")
@@ -854,23 +893,23 @@ class TestFitterEquivalence:
     def test_the_batched_path_is_taken_and_agrees_on_a_well_posed_session(
         self, dense_session
     ):
-        """The comparison above on a session the batched fitter can vouch for.
+        """The same comparison, read off the fits rather than off the outputs.
 
-        The small fixture the other tests share has one to three events of each
-        class, so every spline column has a handful of spikes in its support
-        and the fits separate -- the batched fitter hands them all back and the
-        agreement is trivially exact. This fixture has enough events and enough
-        spikes that nothing is handed back, so it is the batched arithmetic
-        being compared, not statsmodels against itself.
+        The maximum-likelihood fit exists only where no spline column's support
+        is empty of spikes; this fixture has enough events and enough spikes
+        that every model has one, which is the regime the two backends can be
+        compared in at all.
         """
         from continuum_swr_replay.analysis.pfc.batched_glm import fit_poisson_glms
 
-        design_matrices, spike_count, fit_mask = dense_session
+        design_matrices = dense_session["design_matrices"]
+        spike_count = dense_session["spike_count"]
+        fit_mask = dense_session["fit_mask"]
         counts = spike_count[np.asarray(fit_mask, dtype=bool)]
         for name, design in design_matrices.items():
             batched = fit_poisson_glms(design[np.asarray(fit_mask, dtype=bool)], counts)
-            assert not batched.needs_reference_fit.any(), (
-                f"{name} was handed back; the fixture is not well posed"
+            assert batched.converged.all(), (
+                f"{name} did not converge; the fixture is not well posed"
             )
 
         expected, _ = _fit_immobility_models(
@@ -892,30 +931,6 @@ class TestFitterEquivalence:
             assert abs(actual[name].deviance - expected[name].deviance) < self.ATOL
             assert abs(actual[name].llf - expected[name].llf) < self.ATOL
             assert abs(actual[name].aic - expected[name].aic) < self.ATOL
-
-    def test_the_two_backends_agree_model_by_model(
-        self, simple_event_times, position_info, is_immobile, spike_count
-    ):
-        dm, _, _ = _make_design_matrices(
-            simple_event_times, position_info, lags=np.arange(-50, 51)
-        )
-
-        expected, _ = _fit_immobility_models(
-            is_immobile, dm, spike_count, fitter="statsmodels"
-        )
-        actual, _ = _fit_immobility_models(is_immobile, dm, spike_count, fitter="jax")
-
-        for name in dm:
-            np.testing.assert_allclose(
-                actual[name].params,
-                expected[name].params,
-                atol=self.ATOL,
-                rtol=0,
-                err_msg=name,
-            )
-            assert abs(actual[name].deviance - expected[name].deviance) < self.ATOL
-            assert abs(actual[name].aic - expected[name].aic) < self.ATOL
-            assert actual[name].df_resid == expected[name].df_resid
 
     def test_theta_modulation_is_the_same_under_either_fitter(
         self, theta_phase, is_immobile, spike_count
@@ -1687,11 +1702,10 @@ class TestShippedFitCounts:
 
     def test_converged_fits_count_as_fits_and_not_as_failures(self):
         counts = shipped_fit_counts(
-            [self._neuron(True, True, True), self._neuron(True, True, True)], 0
+            [self._neuron(True, True, True), self._neuron(True, True, True)]
         )
 
         assert counts == {
-            "n_neurons_reference_fit": 0,
             "n_model_fits": 6,
             "n_nonconverged_model_fits": 0,
             "n_neurons_with_nonconverged_model": 0,
@@ -1701,18 +1715,17 @@ class TestShippedFitCounts:
         # Two failures on one neuron is two fits but one neuron: the two
         # denominators answer different questions and must not be conflated.
         counts = shipped_fit_counts(
-            [self._neuron(True, False, False), self._neuron(True, True, True)], 1
+            [self._neuron(True, False, False), self._neuron(True, True, True)]
         )
 
         assert counts["n_model_fits"] == 6
         assert counts["n_nonconverged_model_fits"] == 2
         assert counts["n_neurons_with_nonconverged_model"] == 1
-        assert counts["n_neurons_reference_fit"] == 1
 
     def test_a_neuron_with_no_fit_at_all_enters_neither_total(self):
-        # statsmodels refuses a response with no spikes, so that neuron has no
+        # A response with no spikes has no fit at all, so that neuron has no
         # results; counting it as neurons x models would invent fits.
-        counts = shipped_fit_counts([None, self._neuron(True, False)], 2)
+        counts = shipped_fit_counts([None, self._neuron(True, False)])
 
         assert counts["n_model_fits"] == 2
         assert counts["n_nonconverged_model_fits"] == 1
@@ -1723,12 +1736,12 @@ class TestShippedFitCounts:
         class Bare:
             pass
 
-        counts = shipped_fit_counts([{"m0": Bare()}], 0)
+        counts = shipped_fit_counts([{"m0": Bare()}])
 
         assert counts["n_model_fits"] == 1
         assert counts["n_nonconverged_model_fits"] == 0
 
-    def test_a_real_prefit_reports_counts_consistent_with_its_hand_back(
+    def test_a_real_prefit_reports_counts_consistent_with_its_fits(
         self,
         poisson_spike_times,
         is_immobile,
@@ -1755,7 +1768,6 @@ class TestShippedFitCounts:
             logger=logging.getLogger("test_shipped_fit_counts"),
         )
 
-        assert counts["n_neurons_reference_fit"] in (0, 1)
         assert counts["n_model_fits"] in (0, len(design_matrices))
         assert (
             0 <= counts["n_nonconverged_model_fits"] <= max(counts["n_model_fits"], 0)

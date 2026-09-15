@@ -79,10 +79,7 @@ from continuum_swr_replay.analysis.pfc.cohort import (
     DEFAULT_STOP_TABLE_PATH,
     load_session_stop_cohort,
 )
-from continuum_swr_replay.analysis.pfc.glm import (
-    DEFAULT_REFERENCE_FIT_WORKERS,
-    FITTERS,
-)
+from continuum_swr_replay.analysis.pfc.glm import FITTERS
 from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
 from continuum_swr_replay.analysis.replay.cohort_selection import stop_cohort_suffix
 from continuum_swr_replay.analysis.replay.fit_provenance import (
@@ -211,7 +208,6 @@ def run_analysis(
     fit_diagnostics: bool = False,
     gpu: int | None = None,
     allow_cpu: bool = False,
-    reference_fit_workers: int = DEFAULT_REFERENCE_FIT_WORKERS,
 ) -> None:
     """Run PFC GLM analysis for a single session.
 
@@ -371,7 +367,6 @@ def run_analysis(
             cohort_stops=cohort_stops,
             fitter=fitter,
             fit_diagnostics_out=diagnostics,
-            reference_fit_workers=reference_fit_workers,
         )
 
         logger.info(f"Analyzed {len(neuron_stats)} neurons")
@@ -444,12 +439,9 @@ def run_analysis(
                 "gpu_index": gpu_record.get("gpu_index"),
                 "gpu_uuid": gpu_record.get("gpu_uuid"),
                 "gpu_name": gpu_record.get("gpu_name"),
-                # Neurons the batched fitter handed back to statsmodels because
-                # their fits left the range the two agree over, and how many of
-                # the shipped fits never settled. A fit that ran to maxiter
-                # still reports an LR test and an AIC, so this is the only
-                # place that fact survives the run.
-                "n_neurons_reference_fit": cohort_info.get("n_neurons_reference_fit"),
+                # How many of the shipped fits never settled. A fit that ran
+                # to maxiter still reports an LR test and an AIC, so this is
+                # the only place that fact survives the run.
                 "n_model_fits": cohort_info.get("n_model_fits"),
                 "n_nonconverged_model_fits": cohort_info.get(
                     "n_nonconverged_model_fits"
@@ -578,17 +570,6 @@ def get_command_line_arguments() -> Namespace:
             "Fit on this GPU instead of the emptiest free one. The card is "
             "still claimed against sibling workers, but its occupancy is not "
             "checked."
-        ),
-    )
-    parser.add_argument(
-        "--reference-fit-workers",
-        type=int,
-        default=DEFAULT_REFERENCE_FIT_WORKERS,
-        help=(
-            "Threads each worker gives the statsmodels reference fits "
-            f"(default: {DEFAULT_REFERENCE_FIT_WORKERS}). These dominate a "
-            "session's wall clock and are the only threaded part of a run, so "
-            "keep (Dask workers) x (this) inside the host's core count."
         ),
     )
     parser.add_argument(
@@ -833,7 +814,6 @@ def main() -> None:
                 fit_diagnostics=args.fit_diagnostics,
                 gpu=args.gpu,
                 allow_cpu=args.allow_cpu,
-                reference_fit_workers=args.reference_fit_workers,
             )
     else:
         cluster = LocalCluster(
@@ -861,7 +841,6 @@ def main() -> None:
                     fit_diagnostics=args.fit_diagnostics,
                     gpu=args.gpu,
                     allow_cpu=args.allow_cpu,
-                    reference_fit_workers=args.reference_fit_workers,
                 )
                 for epoch in epoch_info.itertuples()
             ]

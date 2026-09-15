@@ -53,24 +53,45 @@ get wrong:
   results come back all-``nan`` (the rest of the batch is unaffected), which
   the caller's NaN-parameter check turns into the same failure it always was.
 
-**Where the mirroring stops, and what to do about it.** statsmodels does not
-solve the normal equations at all: each step is a least-squares solve on the
-weighted design ``W^{1/2} X`` with a singular-value cutoff, which tolerates
-condition numbers no Gram-matrix method can. The two agree to ~1e-12 for as
-long as the fitted means stay in range, and part company once a fit is driven
-into separation -- a spline column with no spikes anywhere in its support
-sends its coefficient to ``-inf``, and the fitted means then spread over so
-many orders of magnitude that the information matrix's condition number
-exceeds what a Gram-matrix solve can carry (statsmodels' own ``_clean``
-clipping makes it worse still, giving weights of ``eps**2 / mu`` on the bins
-the model has given up on). Past that point neither fitter's answer means
-anything, but they are different meaningless answers.
-:attr:`BatchedGLMResults.needs_reference_fit` names the units that entered
-that regime (or failed to converge), so a caller that must match statsmodels
-exactly can refit just those units with statsmodels and pay the per-unit cost
-only for them -- :func:`continuum_swr_replay.analysis.pfc.glm.run_session`
-does, as does :func:`~continuum_swr_replay.analysis.pfc.glm.process_neuron`
-for a single neuron.
+**The penalty, and why separation stops being a special case.** Left
+unpenalised, a peri-event spline fit separates whenever one basis column's
+support holds no spikes: that coefficient's maximum-likelihood estimate is at
+``-inf``, the fitted means spread over so many orders of magnitude that no
+Gram-matrix solve can carry the information matrix, and the number that comes
+back means nothing. ``penalty`` replaces that limit with a Gaussian prior on
+the coefficients -- a per-column ``lambda_j = 1 / sigma_j**2``, zero on the
+intercept -- so the objective is strictly concave and every fit is finite.
+
+The prior is stated in the design's **own** columns, where each spline
+coefficient is a log-rate modulation and ``sigma`` is therefore readable as a
+rate multiplier. The fit runs in the orthonormal basis, so the penalty is
+carried across: with ``X = Q S V'`` and ``beta = V S^-1 c = B c``,
+
+.. code-block:: text
+
+    (1/2) sum_j lambda_j beta_j**2 = (1/2) c' (B' Lambda B) c =: (1/2) c' P c
+
+``P`` is added to the information and its gradient ``P c`` to the score, which
+in the IRLS form is exactly ``c <- (H + P)^+ r`` with the same working-response
+right-hand side ``r``: the Newton step of the penalised log-likelihood is a
+ridge-weighted least squares on the same working response. Nothing else about
+the iteration changes, so ``penalty=None`` (or a vector of zeros) reproduces
+the unpenalised fit bit for bit.
+
+Convergence is on the **penalised** deviance ``deviance + c' P c`` -- the
+quantity the iteration actually maximises -- on the same absolute ``1e-8``
+rule. The reported ``deviance`` and ``llf`` stay unpenalised, because they are
+what a held-out score and a deviance fraction are read from. ``bse`` becomes
+the penalised posterior-mode standard error, ``sqrt(diag((X' W X + Lambda)^+))``
+(see :func:`_standard_errors`), which is narrower than the unpenalised one
+wherever the prior binds.
+
+Against statsmodels, the unpenalised fit agrees to ~1e-12 for as long as the
+fitted means stay in range. statsmodels does not solve the normal equations at
+all -- each step is a least-squares solve on the weighted design ``W^{1/2} X``
+with a singular-value cutoff -- so where an unpenalised fit is driven into
+separation the two part company, and neither answer means anything. That is
+the regime the penalty removes.
 
 Float64 throughout: the convergence test is an absolute ``1e-8`` on a deviance
 of order ``1e5``, which float32 cannot even represent.
@@ -108,15 +129,6 @@ DEFAULT_TOL = 1e-8
 #: direction a healthy fit uses comes anywhere near it.
 DEFAULT_RCOND = 1e-12
 
-#: Widest spread of fitted means, ``min(mu) / max(mu)``, this fitter will
-#: vouch for. The information matrix's condition number is bounded by that
-#: spread, and the normal equations lose twice as many digits as the
-#: least-squares solve statsmodels uses, so past ~1e-8 the two stop agreeing to
-#: the tolerances the audit is read at. A healthy peri-event fit spans a factor
-#: of tens; a spread of 1e-8 is a coefficient of -18 or beyond, i.e. a design
-#: column whose support holds no spikes and whose MLE is at -infinity.
-_MIN_FITTED_MEAN_RATIO = 1e-8
-
 #: ``statsmodels.genmod.families.family.Family._clean`` clips at this before
 #: dividing, and the log link's ``deriv`` clips ``mu`` the same way. Mirrored
 #: so an underflowing fitted mean is handled identically.
@@ -142,21 +154,20 @@ class UnitGLMResult:
     aic : float
         ``-2 llf + 2 rank``, statsmodels' ``-2 llf + 2 (df_model + 1)``.
     converged : bool
+        The penalised deviance settled inside ``tol`` before ``maxiter``.
     n_iter : int
         IRLS steps taken, as statsmodels' ``fit_history["iteration"]``.
     rank : int
         Rank of the design (shared by every unit).
     nobs : int
     n_features : int
-    needs_reference_fit : bool
-        The fit left the range where this fitter and statsmodels agree -- it
-        did not converge, or its fitted means spread further than the normal
-        equations can carry. See the module docstring.
     bse : NDArray, shape (n_features,)
-        Standard errors of ``params``, as statsmodels' ``bse``: the square
-        root of the diagonal of ``(X' W X)^+`` at the fitted weights, with
-        Poisson's fixed unit scale. Exactly zero in a direction the design
-        does not span, where the parameter is itself exactly zero.
+        Standard errors of ``params``: the square root of the diagonal of
+        ``(X' W X + Lambda)^+`` at the fitted weights, with Poisson's fixed
+        unit scale -- the penalised posterior-mode standard error, which is
+        statsmodels' ``bse`` exactly when the penalty is zero. Exactly zero in
+        a direction the design does not span, where the parameter is itself
+        exactly zero.
     """
 
     params: NDArray
@@ -168,7 +179,6 @@ class UnitGLMResult:
     rank: int
     nobs: int
     n_features: int
-    needs_reference_fit: bool = False
     bse: NDArray | None = None
 
     @property
@@ -194,11 +204,8 @@ class BatchedGLMResults:
     n_iter : NDArray of int, shape (n_units,)
     rank, nobs, n_features : int
         Properties of the design, shared by every unit.
-    needs_reference_fit : NDArray of bool, shape (n_units,)
-        Units whose fit left the range where this fitter and statsmodels
-        agree. A caller that must match statsmodels refits these with it.
     bse : NDArray, shape (n_units, n_features)
-        Per-unit standard errors of ``params``, as statsmodels' ``bse``.
+        Per-unit penalised posterior-mode standard errors of ``params``.
     """
 
     params: NDArray
@@ -210,14 +217,9 @@ class BatchedGLMResults:
     rank: int
     nobs: int
     n_features: int
-    needs_reference_fit: NDArray | None = None
     bse: NDArray | None = None
 
     def __post_init__(self) -> None:
-        if self.needs_reference_fit is None:
-            object.__setattr__(
-                self, "needs_reference_fit", np.zeros(len(self.params), dtype=bool)
-            )
         if self.bse is None:
             object.__setattr__(self, "bse", np.full_like(self.params, np.nan))
 
@@ -255,7 +257,6 @@ class BatchedGLMResults:
             rank=self.rank,
             nobs=self.nobs,
             n_features=self.n_features,
-            needs_reference_fit=bool(self.needs_reference_fit[index]),
             bse=np.asarray(self.bse[index]),
         )
 
@@ -331,17 +332,15 @@ def _sweep(
         ``Q' (W eta + (y - mu))``, the weighted-least-squares right-hand side.
     deviance, llf_kernel : jnp.ndarray, shape (n_units,)
         ``llf_kernel`` is ``sum(y log mu - mu)``; the ``-log(y!)`` term is a
-        constant of the data and is added once by the caller.
-    smallest_mu, largest_mu : jnp.ndarray, shape (n_units,)
-        Extremes of the fitted mean over the sampled bins. Their ratio bounds
-        the information matrix's condition number, which is what decides
-        whether this fitter can vouch for the unit.
+        constant of the data and is added once by the caller. Both are
+        unpenalised: the penalty is a function of the parameters alone and is
+        added by the caller, which holds them.
     """
     rank = design_chunks.shape[-1]
     n_units = count_chunks.shape[-1]
 
     def body(carry, block):
-        information, rhs, deviance, llf_kernel, smallest_mu, largest_mu = carry
+        information, rhs, deviance, llf_kernel = carry
         design, count, valid = block
         if start:
             mu = 0.5 * (count + mean_count)
@@ -374,55 +373,37 @@ def _sweep(
         llf_kernel = llf_kernel + jnp.sum(
             jnp.where(keep, count * jnp.log(mu) - mu, 0.0), axis=0
         )
-        smallest_mu = jnp.minimum(
-            smallest_mu, jnp.min(jnp.where(keep, mu, jnp.inf), axis=0)
-        )
-        largest_mu = jnp.maximum(
-            largest_mu, jnp.max(jnp.where(keep, mu, -jnp.inf), axis=0)
-        )
-        return (
-            information,
-            rhs,
-            deviance,
-            llf_kernel,
-            smallest_mu,
-            largest_mu,
-        ), None
+        return (information, rhs, deviance, llf_kernel), None
 
     init = (
         jnp.zeros((n_units, rank * rank)),
         jnp.zeros((rank, n_units)),
         jnp.zeros(n_units),
         jnp.zeros(n_units),
-        jnp.full(n_units, jnp.inf),
-        jnp.full(n_units, -jnp.inf),
     )
-    (information, rhs, deviance, llf_kernel, smallest_mu, largest_mu), _ = jax.lax.scan(
+    (information, rhs, deviance, llf_kernel), _ = jax.lax.scan(
         body, init, (design_chunks, count_chunks, valid_chunks)
     )
-    return (
-        information.reshape(n_units, rank, rank),
-        rhs,
-        deviance,
-        llf_kernel,
-        smallest_mu,
-        largest_mu,
-    )
+    return information.reshape(n_units, rank, rank), rhs, deviance, llf_kernel
 
 
 @jax.jit
 def _solve(information: jnp.ndarray, rhs: jnp.ndarray, rcond: float) -> jnp.ndarray:
-    """Per-unit symmetric pseudo-inverse solve of ``H c = r``.
+    """Per-unit symmetric pseudo-inverse solve of ``(H + P) c = r``.
 
     ``H = Q' W Q`` with ``Q`` orthonormal, so its eigenvalues are the squared
     singular values of the weighted basis and the relative cutoff reads the
     spread of the weights alone. Cutting there is what a least-squares solve on
     the weighted design does, and it is what stops a direction the weights have
-    abandoned from producing an unbounded step.
+    abandoned from producing an unbounded step. With a penalty, the caller
+    passes ``H + P``: adding ``P`` to the information and its gradient ``P c``
+    to the score leaves the IRLS step at ``c <- (H + P)^+ r`` with the same
+    working-response right-hand side.
 
     Parameters
     ----------
     information : jnp.ndarray, shape (n_units, rank, rank)
+        ``H``, or ``H + P`` when the fit is penalised.
     rhs : jnp.ndarray, shape (rank, n_units)
     rcond : float
         Eigenvalue cutoff relative to the largest eigenvalue.
@@ -445,17 +426,20 @@ def _standard_errors(information: jnp.ndarray, back: NDArray, rcond: float) -> N
 
     The fit runs in an orthonormal basis ``Q`` with information ``H = Q' W Q``,
     and ``beta = B c`` with ``B = V S^-1`` (``back``). So
-    ``cov(beta) = B H^+ B'`` -- Poisson's scale is fixed at one, which is why
-    no dispersion estimate enters -- and only its diagonal is wanted. ``H^+``
-    is taken on the same eigenvalue cutoff the IRLS step uses, so a direction
-    the weights have abandoned contributes nothing here either, and a column
-    the design does not span gets an exactly zero standard error beside its
-    exactly zero parameter.
+    ``cov(beta) = B (H + P)^+ B'`` -- Poisson's scale is fixed at one, which is
+    why no dispersion estimate enters -- and only its diagonal is wanted. On a
+    design of full rank that is exactly ``(X' W X + Lambda)^-1``, the penalised
+    posterior-mode covariance: ``B (H + B' Lambda B)^-1 B' =
+    (A H A' + Lambda)^-1`` with ``A = B^-T = V S``, and ``A H A' = X' W X``.
+    The pseudo-inverse is taken on the same eigenvalue cutoff the IRLS step
+    uses, so a direction the weights have abandoned contributes nothing here
+    either, and a column the design does not span gets an exactly zero standard
+    error beside its exactly zero parameter.
 
     Parameters
     ----------
     information : jnp.ndarray, shape (n_units, rank, rank)
-        ``H`` at the fitted parameters.
+        ``H + P`` at the fitted parameters (``H`` alone when unpenalised).
     back : NDArray, shape (n_features, rank)
         ``V S^-1``, the map out of the orthonormal basis.
     rcond : float
@@ -512,10 +496,98 @@ def orthonormal_design_basis(
     )
 
 
+def make_ridge_penalty(
+    n_features: int,
+    sigma: float,
+    *,
+    n_unpenalized: int = 1,
+) -> NDArray:
+    """Per-column ``lambda = 1 / sigma**2``, with the leading columns free.
+
+    The prior is on the event-basis coefficients, which are log-rate
+    modulations: ``sigma`` is read as a rate multiplier, so ``sigma = 2`` puts
+    95 % of the prior mass between about x0.02 and x55 of baseline. The
+    intercept carries the unit's baseline rate, which the prior has nothing to
+    say about, so it is left unpenalised.
+
+    Parameters
+    ----------
+    n_features : int
+        Columns of the design.
+    sigma : float
+        Prior standard deviation of a penalised coefficient, on the log-rate
+        scale. Must be positive.
+    n_unpenalized : int
+        Leading columns to leave free -- 1 for the designs here, whose first
+        column is the intercept.
+
+    Returns
+    -------
+    NDArray, shape (n_features,)
+        ``0`` on the free columns, ``1 / sigma**2`` on the rest.
+
+    Raises
+    ------
+    ValueError
+        If ``sigma`` is not positive, or ``n_unpenalized`` is out of range.
+    """
+    if not sigma > 0:
+        raise ValueError(f"sigma must be positive, got {sigma!r}")
+    if not 0 <= n_unpenalized <= n_features:
+        raise ValueError(
+            f"n_unpenalized must be in [0, {n_features}], got {n_unpenalized!r}"
+        )
+    penalty = np.full(n_features, 1.0 / float(sigma) ** 2)
+    penalty[:n_unpenalized] = 0.0
+    return penalty
+
+
+def _penalty_matrix(back: NDArray, penalty: NDArray | None) -> NDArray | None:
+    """``P = B' Lambda B``, the prior's quadratic form in the fit's basis.
+
+    Parameters
+    ----------
+    back : NDArray, shape (n_features, rank)
+        ``B = V S^-1``, the map ``beta = B c``.
+    penalty : NDArray, shape (n_features,), optional
+        Per-column ``lambda``. ``None`` or all-zero means no penalty, reported
+        as ``None`` so the unpenalised path adds nothing at all.
+
+    Returns
+    -------
+    NDArray, shape (rank, rank), or None
+
+    Raises
+    ------
+    ValueError
+        If ``penalty`` is not one non-negative value per design column.
+    """
+    if penalty is None:
+        return None
+    penalty = np.asarray(penalty, dtype=float)
+    if penalty.shape != (back.shape[0],):
+        raise ValueError(
+            f"penalty must have one value per design column "
+            f"({back.shape[0]},), got {penalty.shape}"
+        )
+    if np.any(penalty < 0) or not np.all(np.isfinite(penalty)):
+        raise ValueError("penalty must be finite and non-negative")
+    if not penalty.any():
+        return None
+    return back.T @ (penalty[:, None] * back)
+
+
+@jax.jit
+def _penalty_quadratic(params: jnp.ndarray, matrix: jnp.ndarray) -> jnp.ndarray:
+    """``c' P c`` per unit -- the penalty on the deviance scale."""
+    return jnp.einsum("nr,rs,ns->n", params, matrix, params)
+
+
 def fit_poisson_glms(
     design: NDArray,
     counts: NDArray,
     *,
+    penalty: NDArray | None = None,
     maxiter: int = DEFAULT_MAXITER,
     tol: float = DEFAULT_TOL,
     rcond: float = DEFAULT_RCOND,
@@ -523,9 +595,12 @@ def fit_poisson_glms(
 ) -> BatchedGLMResults:
     """Fit one Poisson GLM per column of ``counts`` against a shared design.
 
-    Reproduces ``statsmodels.api.GLM(y, X, family=Poisson()).fit()`` unit by
-    unit: same log link, same starting mean, same IRLS step, same convergence
-    rule, same pseudo-inverse treatment of a rank-deficient design.
+    Unpenalised, this reproduces ``statsmodels.api.GLM(y, X,
+    family=Poisson()).fit()`` unit by unit: same log link, same starting mean,
+    same IRLS step, same convergence rule, same pseudo-inverse treatment of a
+    rank-deficient design. With ``penalty``, it is the posterior mode of the
+    same model under a Gaussian prior on the named coefficients; see the module
+    docstring for how the prior is carried into the orthonormal basis.
 
     Parameters
     ----------
@@ -534,10 +609,18 @@ def fit_poisson_glms(
         every unit.
     counts : NDArray, shape (n_time, n_units) or (n_time,)
         Spike counts per bin and unit. A 1-D array is one unit.
+    penalty : NDArray, shape (n_features,), optional
+        Per-column ``lambda = 1 / sigma**2`` of a Gaussian prior on the
+        coefficients **in the design's own columns**, penalising
+        ``(1/2) sum_j lambda_j beta_j**2``. Zero on a column leaves it free;
+        ``None`` (the default) or an all-zero vector is the unpenalised fit,
+        bit for bit. See :func:`make_ridge_penalty`.
     maxiter : int
         Maximum IRLS steps per unit.
     tol : float
-        Absolute deviance change below which a unit has converged.
+        Absolute change of the *penalised* deviance
+        (``deviance + beta' Lambda beta``) below which a unit has converged.
+        Equal to the deviance change when the penalty is zero.
     rcond : float
         Eigenvalue cutoff for the pseudo-inverse solve, relative to the largest
         eigenvalue of ``Q' W Q``.
@@ -549,16 +632,17 @@ def fit_poisson_glms(
     -------
     BatchedGLMResults
         Units whose fit is not defined -- no spikes at all on these bins, so
-        statsmodels' first deviance is ``nan`` and it raises -- come back with
-        ``nan`` parameters, deviance, llf and aic, and ``converged`` False.
-        Units that did not converge, or whose fitted means spread further
-        than the normal equations can carry, are named in
-        ``needs_reference_fit``.
+        statsmodels' first deviance is ``nan`` and it raises, or an iteration
+        that ran away to a non-finite deviance -- come back with ``nan``
+        parameters, deviance, llf and aic, and ``converged`` False. The rest of
+        the batch is unaffected, so a caller reads each unit x model cell on
+        its own.
 
     Raises
     ------
     ValueError
-        If the design and counts disagree on the number of rows.
+        If the design and counts disagree on the number of rows, or if
+        ``penalty`` is not one finite non-negative value per design column.
     UnconfiguredDeviceError
         If no JAX device has been chosen and CUDA is still reachable. The
         check is here, at the one function that runs the solver, because a
@@ -599,7 +683,6 @@ def fit_poisson_glms(
             rank=0,
             nobs=0,
             n_features=n_features,
-            needs_reference_fit=np.zeros(n_units, dtype=bool),
         )
 
     # The fit runs in an orthonormal basis of the design's column space; its
@@ -607,6 +690,12 @@ def fit_poisson_glms(
     # ``df_model``/``df_resid``/``aic`` are counted exactly as statsmodels
     # counts them -- and computed once for a design every unit shares.
     basis, back, rank = orthonormal_design_basis(design_array)
+    # The prior is stated in the design's own columns; ``P = B' Lambda B`` is
+    # the same quadratic form written in the basis the fit runs in.
+    penalty_matrix = _penalty_matrix(back, penalty)
+    penalty_device = (
+        None if penalty_matrix is None else jnp.asarray(penalty_matrix)
+    )
 
     if chunk_rows is None:
         chunk_rows = _chunk_rows(n_units, rank)
@@ -622,7 +711,7 @@ def fit_poisson_glms(
     )
 
     params = jnp.zeros((n_units, rank))
-    information, rhs, deviance, _, _, _ = _sweep(
+    information, rhs, deviance, _ = _sweep(
         design_chunks, count_chunks, valid_chunks, params, mean_count, True
     )
     # ``_fit_irls`` raises when the deviance at the starting mean is nan; the
@@ -635,56 +724,63 @@ def fit_poisson_glms(
     llf_kernel = np.full(n_units, np.nan)
     deviance_at_params = np.full(n_units, np.nan)
 
-    active_device = jnp.asarray(active)
-    params = jnp.where(active_device[:, None], _solve(information, rhs, rcond), params)
+    def step(information: jnp.ndarray) -> jnp.ndarray:
+        """The IRLS step, ``(H + P)^+ r``, for the units still active."""
+        if penalty_device is not None:
+            information = information + penalty_device
+        return _solve(information, rhs, rcond)
 
-    overspread = np.zeros(n_units, dtype=bool)
+    def penalty_of(params: jnp.ndarray) -> NDArray:
+        """``beta' Lambda beta`` per unit, on the deviance scale."""
+        if penalty_device is None:
+            return np.zeros(n_units)
+        return np.asarray(_penalty_quadratic(params, penalty_device))
+
+    active_device = jnp.asarray(active)
+    params = jnp.where(active_device[:, None], step(information), params)
+
+    diverged = np.zeros(n_units, dtype=bool)
     for iteration in range(1, maxiter + 1):
-        information, rhs, deviance, llf, smallest_mu, largest_mu = _sweep(
+        information, rhs, deviance, llf = _sweep(
             design_chunks, count_chunks, valid_chunks, params, mean_count, False
         )
-        # A non-finite largest fitted mean is an overflow of ``exp(X beta)``,
-        # not a spread the ratio test can see -- ``nan`` compares false against
-        # everything -- so such a unit would otherwise stay active to
-        # ``maxiter``, holding the whole batch at its iteration count.
-        largest_host = np.asarray(largest_mu)
-        overspread |= active & (
-            ~np.isfinite(largest_host)
-            | (np.asarray(smallest_mu) < _MIN_FITTED_MEAN_RATIO * largest_host)
-        )
         deviance_host = np.asarray(deviance)
+        # The iteration maximises the penalised log-likelihood, so that is what
+        # has to settle; the reported deviance stays the unpenalised one.
+        penalized_host = deviance_host + penalty_of(params)
         deviance_at_params = np.where(active, deviance_host, deviance_at_params)
         llf_kernel = np.where(active, np.asarray(llf), llf_kernel)
         n_iter = np.where(active, iteration, n_iter)
 
         # ``_check_convergence``: np.allclose(prev, current, atol=tol, rtol=0).
-        just_converged = active & (np.abs(deviance_host - deviance_prev) <= tol)
+        just_converged = active & (np.abs(penalized_host - deviance_prev) <= tol)
         converged |= just_converged
-        # A unit whose fitted means have spread past what this solver can carry
-        # is stopped here rather than iterated to ``maxiter``: its answer is
-        # going to be replaced by a reference fit either way, and leaving it in
-        # would hold the whole batch at the iteration count of its worst
-        # member.
-        active = active & ~just_converged & ~overspread
+        # An iteration that ran away to a non-finite deviance has no fit to
+        # report and can never meet the convergence rule, so it is stopped here
+        # rather than held to ``maxiter`` at the whole batch's expense.
+        diverged |= active & ~np.isfinite(penalized_host)
+        active = active & ~just_converged & ~diverged
         if not active.any() or iteration == maxiter:
             break
 
-        deviance_prev = np.where(active, deviance_host, deviance_prev)
+        deviance_prev = np.where(active, penalized_host, deviance_prev)
         active_device = jnp.asarray(active)
-        params = jnp.where(
-            active_device[:, None], _solve(information, rhs, rcond), params
-        )
+        params = jnp.where(active_device[:, None], step(information), params)
 
     # Back out of the orthonormal basis: ``beta = V S^-1 c``, the minimum-norm
     # parameters in the design's own columns.
     params_host = np.asarray(params) @ back.T
     llf_host = llf_kernel - np.asarray(log_factorial)
     aic = -2.0 * llf_host + 2.0 * rank
-    # A unit with no spikes has no fit to speak of, and statsmodels refuses it
-    # rather than returning one, so it is not a candidate for a reference fit.
-    needs_reference_fit = (overspread | ~converged) & ~failed
+    # A unit whose iteration ran away has no usable fit; it is reported like
+    # one with no spikes at all rather than as a finite near-miss.
+    failed = failed | diverged
 
-    standard_errors = _standard_errors(information, back, rcond)
+    standard_errors = _standard_errors(
+        information if penalty_device is None else information + penalty_device,
+        back,
+        rcond,
+    )
 
     if failed.any():
         params_host = params_host.copy()
@@ -705,6 +801,5 @@ def fit_poisson_glms(
         rank=rank,
         nobs=n_time,
         n_features=n_features,
-        needs_reference_fit=needs_reference_fit,
         bse=standard_errors,
     )

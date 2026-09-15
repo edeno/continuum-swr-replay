@@ -19,6 +19,7 @@ from continuum_swr_replay.analysis.pfc.batched_glm import (
     BatchedGLMResults,
     fit_poisson_glms,
     jax_backend,
+    make_ridge_penalty,
 )
 
 # Well below the audit's gate (params 1e-5, deviance/llf 1e-6): the two fitters
@@ -288,15 +289,12 @@ class TestNonConvergence:
 
 
 class TestSeparation:
-    """Where the two fitters part company, and how that is reported.
+    """A design column whose support holds no spikes, with and without a prior.
 
-    statsmodels solves each IRLS step as a least squares on the weighted
-    design; this fitter solves the normal equations in an orthonormal basis.
-    They agree while the fitted means stay within a few orders of magnitude of
-    one another. A design column with no spikes in its support sends its
-    coefficient to -inf, the fitted means spread past what a Gram matrix can
-    carry, and the two solvers take different steps. The fitter has to *say*
-    so rather than quietly report a near-miss.
+    Unpenalised, that coefficient's maximum-likelihood estimate is at ``-inf``
+    and whatever a solver reports is an artefact of where it stopped. The
+    prior's whole job is to make the fit finite there, and to leave it alone
+    everywhere else.
     """
 
     @pytest.fixture
@@ -311,26 +309,179 @@ class TestSeparation:
         counts[100:200] = 0.0
         return design, counts
 
-    def test_a_separating_fit_is_flagged_for_a_reference_fit(self, separating):
+    def test_the_unpenalised_fit_runs_away(self, separating):
         design, counts = separating
         batched = fit_poisson_glms(design, counts)
 
-        assert batched.needs_reference_fit[0]
-        assert batched.for_unit(0).needs_reference_fit is True
+        # Not an error, and not NaN -- just a number with no meaning: a rate
+        # multiplier of 1e-10 on the bins the column covers.
+        assert batched.params[0, 1] < -15.0
 
-    def test_a_well_posed_fit_is_not_flagged(self, planted):
+    def test_the_prior_makes_the_separated_coefficient_finite(self, separating):
+        design, counts = separating
+        penalty = make_ridge_penalty(design.shape[1], sigma=2.0)
+
+        batched = fit_poisson_glms(design, counts, penalty=penalty)
+
+        assert batched.converged[0]
+        assert np.all(np.isfinite(batched.params))
+        # "at most a small fraction of baseline", which is what the prior has
+        # to say about a column with no spikes under it -- not -infinity, and
+        # not zero either.
+        assert -3.0 < batched.params[0, 1] < -2.0
+        assert batched.n_iter[0] < DEFAULT_MAXITER
+
+    def test_the_intercept_still_carries_the_baseline_rate(self, separating):
+        """The prior is on the basis columns; the intercept is left free."""
+        design, counts = separating
+        penalty = make_ridge_penalty(design.shape[1], sigma=2.0)
+
+        batched = fit_poisson_glms(design, counts, penalty=penalty)
+
+        # Every bin outside the indicator's support keeps its own mean rate,
+        # to within the sliver of it the now-finite indicator coefficient
+        # accounts for (exp(-2.2) x 100 bins out of 4000).
+        outside = counts[design[:, 1] == 0.0]
+        assert batched.params[0, 0] == pytest.approx(np.log(outside.mean()), abs=5e-3)
+
+
+class TestPenalty:
+    """The Gaussian prior, against a dense penalised Newton solve."""
+
+    @staticmethod
+    def dense_penalized_fit(design, counts, penalty, maxiter=200, tol=1e-10):
+        """Penalised IRLS in the design's own columns, in dense NumPy.
+
+        The estimator the batched solver must reproduce, written the obvious
+        way: no orthonormal basis, no chunking, no batching -- solve
+        ``(X' W X + Lambda) beta = X' W z`` on the working response until the
+        penalised deviance settles.
+        """
+        penalty_matrix = np.diag(penalty)
+        mean = (counts + counts.mean()) / 2.0
+        eta = np.log(mean)
+        beta = np.zeros(design.shape[1])
+        previous = np.inf
+        for _ in range(maxiter):
+            weight = mean
+            working = eta + (counts - mean) / mean
+            beta = np.linalg.solve(
+                design.T @ (design * weight[:, None]) + penalty_matrix,
+                design.T @ (weight * working),
+            )
+            eta = design @ beta
+            mean = np.exp(eta)
+            ratio = np.where(counts > 0, counts / mean, 1.0)
+            deviance = 2.0 * np.sum(counts * np.log(ratio) - (counts - mean))
+            penalized = deviance + beta @ penalty_matrix @ beta
+            if abs(penalized - previous) < tol:
+                break
+            previous = penalized
+        return beta
+
+    def test_a_zero_penalty_is_the_unpenalised_fit_bit_for_bit(self, planted):
         design, counts, _ = planted
-        batched = fit_poisson_glms(design, counts)
+        unpenalised = fit_poisson_glms(design, counts)
 
-        assert not batched.needs_reference_fit.any()
+        zeros = fit_poisson_glms(design, counts, penalty=np.zeros(design.shape[1]))
 
-    def test_a_unit_without_spikes_is_not_offered_for_a_reference_fit(self):
-        """statsmodels refuses it too, so there is no reference to fall back to."""
-        design = np.column_stack([np.ones(800), np.linspace(-1, 1, 800)])
-        batched = fit_poisson_glms(design, np.zeros(800))
+        assert np.array_equal(zeros.params, unpenalised.params)
+        assert np.array_equal(zeros.deviance, unpenalised.deviance)
+        assert np.array_equal(zeros.llf, unpenalised.llf)
+        assert np.array_equal(zeros.bse, unpenalised.bse)
+        assert np.array_equal(zeros.n_iter, unpenalised.n_iter)
 
-        assert not batched.converged[0]
-        assert not batched.needs_reference_fit[0]
+    def test_the_penalised_fit_matches_a_dense_newton_reference(self, planted):
+        design, counts, _ = planted
+        penalty = make_ridge_penalty(design.shape[1], sigma=2.0)
+
+        batched = fit_poisson_glms(design, counts, penalty=penalty)
+
+        for unit in range(counts.shape[1]):
+            expected = self.dense_penalized_fit(design, counts[:, unit], penalty)
+            np.testing.assert_allclose(
+                batched.params[unit], expected, atol=ATOL, rtol=0
+            )
+
+    def test_the_penalty_shrinks_only_the_penalised_columns(self, planted):
+        """A column with lambda 0 is fit exactly as it was; its neighbours are not.
+
+        Not a tautology: the penalty is stated in the design's own columns but
+        applied in the orthonormal basis, where a wrong transform would leak
+        shrinkage into the free directions.
+        """
+        design, counts, _ = planted
+        penalty = np.zeros(design.shape[1])
+        penalty[-1] = 10.0
+
+        batched = fit_poisson_glms(design, counts, penalty=penalty)
+        unpenalised = fit_poisson_glms(design, counts)
+
+        assert np.all(np.abs(batched.params[:, -1]) < np.abs(unpenalised.params[:, -1]))
+        for unit in range(counts.shape[1]):
+            expected = self.dense_penalized_fit(design, counts[:, unit], penalty)
+            np.testing.assert_allclose(
+                batched.params[unit], expected, atol=ATOL, rtol=0
+            )
+
+    def test_an_intercept_only_design_is_untouched_by_a_zero_penalty(self, planted):
+        _, counts, _ = planted
+        constant = np.ones((counts.shape[0], 1))
+
+        penalised = fit_poisson_glms(constant, counts, penalty=np.zeros(1))
+        plain = fit_poisson_glms(constant, counts)
+
+        assert np.array_equal(penalised.params, plain.params)
+        np.testing.assert_allclose(
+            penalised.params[:, 0], np.log(counts.mean(axis=0)), atol=1e-10
+        )
+
+    def test_standard_errors_are_the_penalised_posterior_mode(self, planted):
+        design, counts, _ = planted
+        penalty = make_ridge_penalty(design.shape[1], sigma=2.0)
+
+        batched = fit_poisson_glms(design, counts, penalty=penalty)
+
+        for unit in range(counts.shape[1]):
+            fitted_mean = np.exp(design @ batched.params[unit])
+            dense = np.sqrt(
+                np.diag(
+                    np.linalg.pinv(
+                        design.T @ (design * fitted_mean[:, None]) + np.diag(penalty)
+                    )
+                )
+            )
+            np.testing.assert_allclose(batched.bse[unit], dense, atol=1e-12, rtol=0)
+
+    def test_a_rank_deficient_design_is_still_the_minimum_norm_solution(self):
+        """An all-zero column stays at exactly zero under the prior too."""
+        rng = np.random.default_rng(11)
+        n_time = 3000
+        design = np.column_stack(
+            [np.ones(n_time), rng.normal(size=n_time) * 0.4, np.zeros(n_time)]
+        )
+        counts = rng.poisson(np.exp(design @ np.array([-1.0, 0.3, 0.0]))).astype(float)
+
+        batched = fit_poisson_glms(
+            design, counts, penalty=make_ridge_penalty(3, sigma=2.0)
+        )
+
+        assert batched.params[0, 2] == pytest.approx(0.0, abs=1e-12)
+        assert batched.bse[0, 2] == pytest.approx(0.0, abs=1e-12)
+
+    def test_make_ridge_penalty_leaves_the_intercept_free(self):
+        penalty = make_ridge_penalty(5, sigma=2.0)
+
+        np.testing.assert_allclose(penalty, [0.0, 0.25, 0.25, 0.25, 0.25])
+
+    def test_a_malformed_penalty_is_refused(self, planted):
+        design, counts, _ = planted
+        with pytest.raises(ValueError, match="one value per design column"):
+            fit_poisson_glms(design, counts, penalty=np.zeros(design.shape[1] - 1))
+        with pytest.raises(ValueError, match="non-negative"):
+            fit_poisson_glms(design, counts, penalty=-np.ones(design.shape[1]))
+        with pytest.raises(ValueError, match="sigma must be positive"):
+            make_ridge_penalty(3, sigma=0.0)
 
 
 class TestResultsContract:

@@ -220,7 +220,6 @@ def fake_session(monkeypatch):
                 "n_nonlocal_swr": 5,
                 "n_nonlocal_no_swr": 3,
                 "n_events_outside_frame": 0,
-                "n_neurons_reference_fit": 3,
                 "n_model_fits": 18,
                 "n_nonconverged_model_fits": 2,
                 "n_neurons_with_nonconverged_model": 1,
@@ -317,7 +316,6 @@ def test_the_sidecar_states_the_event_definition_the_fit_was_read_on(
     assert record["matched_control_seed"] == 12345
     assert record["n_matched_control"] == 7
     assert record["n_matched_control_unplaced"] == 1
-    assert record["n_neurons_reference_fit"] == 3
     assert record["n_nonconverged_model_fits"] == 2
     assert record["n_neurons_with_nonconverged_model"] == 1
     assert record["n_model_fits"] == 18
