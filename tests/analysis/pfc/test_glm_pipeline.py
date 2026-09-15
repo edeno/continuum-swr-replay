@@ -15,11 +15,13 @@ import statsmodels.api as sm
 
 from continuum_swr_replay.analysis.pfc.glm import (
     _fit_immobility_models,
+    _fit_theta_models,
     _make_design_matrices,
     _prefit_session,
     build_theta_design,
     create_conv_basis,
     create_lagged_signal,
+    fit_models_batched,
     fitter_provenance,
     get_frac_explained_deviance,
     get_frac_null_deviance,
@@ -1620,6 +1622,50 @@ class TestTheRetiredEventConstructionIsGone:
         ]
 
         assert offenders == []
+
+
+class TestTheBatchedFitterRefusesAnUnconfiguredDevice:
+    """A library caller cannot reach the GPU without going through the policy.
+
+    The runner picks one card and bounds what JAX takes of it. Anything that
+    imports the fitter directly -- a notebook, another script -- would
+    otherwise get JAX's default on a shared host: every visible card, most of
+    each preallocated, and other people's jobs evicted with no message.
+    """
+
+    @pytest.fixture
+    def unconfigured(self, monkeypatch):
+        from continuum_swr_replay.analysis.pfc import gpu as gpu_module
+
+        monkeypatch.setattr(gpu_module, "_CONFIGURED", None)
+        # The suite pins CPU, which is a legitimate way to fit; lift it so the
+        # process looks like one that could reach a card.
+        monkeypatch.delenv("JAX_PLATFORMS", raising=False)
+
+    def test_fit_models_batched_refuses(self, unconfigured):
+        from continuum_swr_replay.analysis.pfc.gpu import UnconfiguredDeviceError
+
+        design = np.ones((32, 2))
+        design[:, 1] = np.arange(32)
+        with pytest.raises(UnconfiguredDeviceError, match="configure_jax_gpu"):
+            fit_models_batched({"constant": design}, np.ones((32, 3)))
+
+    def test_the_batched_theta_fit_refuses(self, unconfigured):
+        from continuum_swr_replay.analysis.pfc.gpu import UnconfiguredDeviceError
+
+        with pytest.raises(UnconfiguredDeviceError, match="configure_jax_gpu"):
+            _fit_theta_models(np.ones((32, 3)), np.ones((32, 2)), fitter="jax")
+
+    def test_a_cpu_pinned_process_still_fits(self, monkeypatch):
+        from continuum_swr_replay.analysis.pfc import gpu as gpu_module
+
+        monkeypatch.setattr(gpu_module, "_CONFIGURED", None)
+        monkeypatch.setenv("JAX_PLATFORMS", "cpu")
+
+        design = np.ones((64, 1))
+        results = fit_models_batched({"constant": design}, np.ones((64, 2)))
+
+        assert results["constant"].params.shape == (2, 1)
 
 
 class TestShippedFitCounts:

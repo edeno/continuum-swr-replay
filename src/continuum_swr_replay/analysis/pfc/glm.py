@@ -295,9 +295,17 @@ def fit_models_batched(
     -------
     dict[str, BatchedGLMResults]
         Keyed by model name.
+
+    Raises
+    ------
+    UnconfiguredDeviceError
+        When no JAX device has been chosen and CUDA is still reachable -- the
+        batched fitter would otherwise take every card on a shared host.
     """
     from continuum_swr_replay.analysis.pfc.batched_glm import fit_poisson_glms
+    from continuum_swr_replay.analysis.pfc.gpu import require_configured_device
 
+    require_configured_device()
     return {
         model_name: fit_poisson_glms(design, counts)
         for model_name, design in design_matrices.items()
@@ -323,12 +331,19 @@ def _fit_theta_models(
     -------
     constant_result, theta_result
         Single-unit results for 1-D ``counts``, batched results for 2-D.
+
+    Raises
+    ------
+    UnconfiguredDeviceError
+        From the batched path, when no JAX device has been chosen.
     """
     _check_fitter(fitter)
     constant_design = np.ones((design_matrix.shape[0], 1))
     if fitter == "jax":
         from continuum_swr_replay.analysis.pfc.batched_glm import fit_poisson_glms
+        from continuum_swr_replay.analysis.pfc.gpu import require_configured_device
 
+        require_configured_device()
         constant_result = fit_poisson_glms(constant_design, counts)
         theta_result = fit_poisson_glms(design_matrix, counts)
         if counts.ndim != 1:
@@ -2463,12 +2478,15 @@ def run_session(
         and events inside the well-anchored stops the hippocampal rate and
         content ladders are read on; ``"all_stops"`` applies no stop restriction
         at all, fitting every immobile bin and every speed-eligible event in the
-        epoch. Under ``"all_stops"`` the fit mask, the event sets and every
-        fitted number reproduce the pre-cohort pipeline bit-for-bit; what
-        differs is the shape of the output -- the stats table gains the
+        epoch. Under ``"all_stops"`` the fit mask and the event sets reproduce
+        the pre-cohort pipeline exactly, and so does every fitted number when
+        ``fitter="statsmodels"`` -- the batched fitter reaches the same point
+        to the equivalence audit's tolerances rather than bit-for-bit, because
+        it is a different arithmetic order on a different device. What differs
+        in either case is the shape of the output -- the stats table gains the
         provenance columns ``stop_cohort`` and
         ``immobility_avg_firing_rate_all_immobile``, and this function returns a
-        6-tuple rather than a 5-tuple.
+        7-tuple rather than a 5-tuple.
     cohort_stops : pd.DataFrame, optional
         The session's kept stops from
         :func:`~continuum_swr_replay.analysis.pfc.cohort.load_session_stop_cohort`.
@@ -2535,6 +2553,11 @@ def run_session(
         If ``non_local_threshold`` or ``immobility_threshold`` differs from the
         threshold the canonical events were cut and speed-gated at; neither can
         be re-cut at run time.
+    UnconfiguredDeviceError
+        With ``fitter="jax"``, if no JAX device was chosen first. Call
+        :func:`~continuum_swr_replay.analysis.pfc.gpu.configure_jax_gpu` (the
+        runner does) or pin ``JAX_PLATFORMS=cpu``; otherwise JAX would take
+        every card on a shared host.
 
     Notes
     -----
@@ -2801,9 +2824,7 @@ def run_session(
             "prefitted_theta": (
                 None if prefitted_theta is None else prefitted_theta[index]
             ),
-            "fit_diagnostics_out": (
-                None if fit_diagnostics_out is None else {}
-            ),
+            "fit_diagnostics_out": (None if fit_diagnostics_out is None else {}),
         }
 
     neuron_diagnostics: list[dict[str, Any]] = []

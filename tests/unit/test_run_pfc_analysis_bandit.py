@@ -74,6 +74,7 @@ def _write_bundle_files(
     is_swr_definition=runner.IS_SWR_DEFINITION,
     event_table_sha=EVENT_TABLE_SHA,
     data_over_time_sha=DOT_SHA,
+    fitter=None,
 ):
     """Touch one bundle's six files, optionally with a provenance sidecar."""
     artifact = runner.modulation_path(directory, epoch_identifier, stop_cohort)
@@ -96,6 +97,7 @@ def _write_bundle_files(
                     "is_swr_definition": is_swr_definition,
                     "canonical_event_table_sha256": event_table_sha,
                     "data_over_time_sha256": data_over_time_sha,
+                    "fitter": fitter,
                 }
             )
         )
@@ -355,6 +357,37 @@ def test_a_bundle_cut_from_another_event_table_or_decode_frame_is_refit(tmp_path
     )
 
 
+def test_a_bundle_fit_by_the_other_estimator_is_refit(tmp_path):
+    # The two fitters agree to the equivalence audit's tolerances, not
+    # bit-for-bit, so a batch that means to be one estimator throughout must
+    # not keep sessions from the other under the name it is about to write.
+    epoch_identifier = "wilbur20210329_02_r1_mPFC"
+    _write_bundle_files(
+        tmp_path, epoch_identifier, "at_well", "at_well", fitter="statsmodels"
+    )
+
+    assert not runner.results_exist(
+        tmp_path,
+        epoch_identifier,
+        False,
+        "at_well",
+        "abc123",
+        EVENT_TABLE_SHA,
+        DOT_SHA,
+        "jax",
+    )
+    assert runner.results_exist(
+        tmp_path,
+        epoch_identifier,
+        False,
+        "at_well",
+        "abc123",
+        EVENT_TABLE_SHA,
+        DOT_SHA,
+        "statsmodels",
+    )
+
+
 def test_all_stops_fits_without_a_cohort_and_writes_the_suffixed_bundle(
     tmp_path, fake_session, monkeypatch
 ):
@@ -496,3 +529,31 @@ class TestSessionPartitionFile:
         filtered = runner._filter_epoch_info(_epoch_info(keys), args)
 
         assert runner._session_keys(filtered) == [("chimi20200223_.nwb", "02_r1")]
+
+
+def test_one_card_cannot_be_handed_to_every_worker(monkeypatch, capsys):
+    # --gpu names one card; a multi-worker run would send every worker to it,
+    # each claiming and preallocating a share of the same card while the
+    # sidecars all named it. The layout that works is one process per card.
+    monkeypatch.setattr(
+        runner.sys,
+        "argv",
+        ["run_pfc_analysis_bandit.py", "--gpu", "3", "--n_workers", "6"],
+    )
+
+    with pytest.raises(SystemExit):
+        runner.get_command_line_arguments()
+
+    assert "every worker would be sent to that card" in capsys.readouterr().err
+
+
+def test_one_card_and_one_worker_is_the_supported_layout(monkeypatch):
+    monkeypatch.setattr(
+        runner.sys,
+        "argv",
+        ["run_pfc_analysis_bandit.py", "--gpu", "3", "--n_workers", "1"],
+    )
+
+    args = runner.get_command_line_arguments()
+
+    assert (args.gpu, args.n_workers) == (3, 1)

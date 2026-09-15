@@ -587,8 +587,14 @@ def fit_poisson_glms(
         information, rhs, deviance, llf, smallest_mu, largest_mu = _sweep(
             design_chunks, count_chunks, valid_chunks, params, mean_count, False
         )
+        # A non-finite largest fitted mean is an overflow of ``exp(X beta)``,
+        # not a spread the ratio test can see -- ``nan`` compares false against
+        # everything -- so such a unit would otherwise stay active to
+        # ``maxiter``, holding the whole batch at its iteration count.
+        largest_host = np.asarray(largest_mu)
         overspread |= active & (
-            np.asarray(smallest_mu) < _MIN_FITTED_MEAN_RATIO * np.asarray(largest_mu)
+            ~np.isfinite(largest_host)
+            | (np.asarray(smallest_mu) < _MIN_FITTED_MEAN_RATIO * largest_host)
         )
         deviance_host = np.asarray(deviance)
         deviance_at_params = np.where(active, deviance_host, deviance_at_params)

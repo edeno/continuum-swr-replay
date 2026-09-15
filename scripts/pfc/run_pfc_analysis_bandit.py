@@ -128,6 +128,7 @@ def results_exist(
     stop_table_sha256: str | None = None,
     event_table_sha256: str | None = None,
     data_over_time_sha256: str | None = None,
+    fitter: str | None = None,
 ) -> bool:
     """Check if this session's bundle already exists *for this population*.
 
@@ -159,6 +160,13 @@ def results_exist(
         Hashes of the canonical event table and the session's cached decode
         frame this run would read. ``None`` matches no existing bundle, so a
         session whose inputs could not be hashed is refit rather than skipped.
+    fitter : str or None
+        The backend this run would fit with. A bundle fit with the other one is
+        not this run's bundle: the two agree to the equivalence audit's
+        tolerances, not bit-for-bit, so a batch that means to be one estimator
+        throughout must not silently keep sessions from the other. ``None``
+        (the default) matches a sidecar that names no fitter, which is how a
+        bundle written before the flag existed is read.
     """
     if overwrite:
         return False
@@ -184,6 +192,7 @@ def results_exist(
         and record.get("is_swr_definition") == IS_SWR_DEFINITION
         and record.get("canonical_event_table_sha256") == event_table_sha256
         and record.get("data_over_time_sha256") == data_over_time_sha256
+        and record.get("fitter") == fitter
     )
 
 
@@ -244,6 +253,18 @@ def run_analysis(
         Permit the batched fitter to run on CPU when no GPU is free. Off by
         default: the CPU path is many times slower, and a batch that quietly
         fell back to it would not be noticed until it overran.
+
+    Notes
+    -----
+    With ``fitter="jax"`` the device is chosen before anything is loaded, and a
+    device that cannot be chosen ends the session rather than degrading it: no
+    free card (and no ``allow_cpu``) raises ``NoFreeGPUError``, and a process
+    that had already initialised a JAX backend on every card raises
+    ``WrongJAXDeviceError``. Both propagate out of this function -- they are
+    raised before the ``try`` that turns a per-session failure into a log line,
+    because they are a fact about the host rather than about the session, and a
+    batch that hits them should stop rather than work through 70 more sessions
+    failing the same way.
     """
     epoch_identifier = (
         f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{brain_area}"
@@ -287,6 +308,7 @@ def run_analysis(
         cohort_report.get("stop_table_sha256"),
         event_inputs["canonical_event_table_sha256"],
         event_inputs["data_over_time_sha256"],
+        fitter,
     ):
         logger.info(f"Results already exist for {epoch_identifier}. Skipping...")
         return
@@ -427,9 +449,7 @@ def run_analysis(
                 # the shipped fits never settled. A fit that ran to maxiter
                 # still reports an LR test and an AIC, so this is the only
                 # place that fact survives the run.
-                "n_neurons_reference_fit": cohort_info.get(
-                    "n_neurons_reference_fit"
-                ),
+                "n_neurons_reference_fit": cohort_info.get("n_neurons_reference_fit"),
                 "n_model_fits": cohort_info.get("n_model_fits"),
                 "n_nonconverged_model_fits": cohort_info.get(
                     "n_nonconverged_model_fits"
@@ -603,7 +623,20 @@ def get_command_line_arguments() -> Namespace:
         ),
     )
 
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.gpu is not None and args.n_workers > 1:
+        # --gpu names one card and every worker would be handed the same one:
+        # they would all claim it, all preallocate a share of it, and every
+        # sidecar would name a card most of them are not really alone on. One
+        # worker per card is the layout that works -- separate processes, each
+        # with its own --gpu and its own session list.
+        parser.error(
+            f"--gpu {args.gpu} names one card but --n_workers is "
+            f"{args.n_workers}: every worker would be sent to that card. Run "
+            "one process per card (--n_workers 1 --gpu N --sessions <list>), "
+            "or drop --gpu and let each worker claim a free card of its own."
+        )
+    return args
 
 
 def read_session_list(path: Path) -> list[tuple[str, str]]:

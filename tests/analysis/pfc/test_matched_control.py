@@ -142,13 +142,15 @@ class TestMatchedControlInvariants:
         source = event_times["non_local"]
         assert len(controls) <= len(source)
         # This configuration places all four, so row k pairs with source row k
-        # and the durations must match exactly rather than in distribution.
+        # and the durations must match one for one rather than in
+        # distribution. The tolerance is the float64 rounding of a start plus a
+        # duration, not room for a different duration.
         assert len(controls) == len(source)
         np.testing.assert_allclose(
             (controls.end_time - controls.start_time).to_numpy(),
             (source.end_time - source.start_time).to_numpy(),
             rtol=0,
-            atol=0,
+            atol=1e-9,
         )
 
     def test_the_draw_is_a_function_of_the_seed(self, event_times, fit_mask):
@@ -410,7 +412,8 @@ def test_a_real_session_writes_the_control_array_and_records_its_draw(tmp_path):
         record["n_matched_control"] + record["n_matched_control_unplaced"]
         == record["cohort_counts"]["n_nonlocal_after"]
     )
-    # A run that writes the array must also be skippable as complete.
+    # A run that writes the array must also be skippable as complete -- by a
+    # run asking for the same estimator, which is what the skip check compares.
     assert runner.results_exist(
         tmp_path / "out",
         epoch_identifier,
@@ -419,4 +422,5 @@ def test_a_real_session_writes_the_control_array_and_records_its_draw(tmp_path):
         record["stop_table_sha256"],
         record["canonical_event_table_sha256"],
         record["data_over_time_sha256"],
+        record["fitter"],
     )

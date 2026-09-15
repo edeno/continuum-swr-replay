@@ -18,10 +18,12 @@ import pytest
 from continuum_swr_replay.analysis.pfc import gpu as gpu_module
 from continuum_swr_replay.analysis.pfc.gpu import (
     NoFreeGPUError,
+    UnconfiguredDeviceError,
     WrongJAXDeviceError,
     configure_jax_gpu,
     occupancy_table,
     parse_gpu_query,
+    require_configured_device,
     select_free_gpu,
     verify_jax_device,
 )
@@ -60,6 +62,18 @@ def claims(tmp_path, monkeypatch):
     # tests are about the selection rules, so they run as if unpinned; the
     # pin has its own test.
     monkeypatch.delenv("JAX_PLATFORMS", raising=False)
+    # ``configure_jax_gpu`` writes these straight into ``os.environ``.
+    # Registering them with monkeypatch first means what a test leaves behind
+    # is undone at teardown rather than inherited by the next test -- a leaked
+    # ``CUDA_VISIBLE_DEVICES`` would follow the suite into every later
+    # subprocess.
+    for name in (
+        "CUDA_VISIBLE_DEVICES",
+        "XLA_PYTHON_CLIENT_PREALLOCATE",
+        "XLA_PYTHON_CLIENT_MEM_FRACTION",
+    ):
+        monkeypatch.setenv(name, os.environ.get(name, ""))
+        monkeypatch.delenv(name, raising=False)
     return tmp_path / "claims"
 
 
@@ -127,39 +141,36 @@ class TestSelection:
 
 
 class TestConfiguration:
-    def test_the_chosen_card_is_the_only_one_jax_can_see(
-        self, occupied, claims, monkeypatch
-    ):
-        monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
-
+    def test_the_chosen_card_is_the_only_one_jax_can_see(self, occupied, claims):
         record = configure_jax_gpu()
 
-        assert os.environ["CUDA_VISIBLE_DEVICES"] == "4"
+        # By uuid, not by index: CUDA reads an index in its own enumeration
+        # order, which is not nvidia-smi's unless CUDA_DEVICE_ORDER is set, so
+        # an index could send the process to a card other than the one whose
+        # occupancy was measured and whose uuid the sidecar records.
+        assert os.environ["CUDA_VISIBLE_DEVICES"] == "GPU-eee"
         assert record == {
             "jax_backend": "gpu",
             "gpu_index": 4,
             "gpu_uuid": "GPU-eee",
             "gpu_name": "NVIDIA A100 80GB PCIe",
         }
+        # What the run tells the world it used and what CUDA was actually
+        # given are the same card.
+        assert os.environ["CUDA_VISIBLE_DEVICES"] == record["gpu_uuid"]
 
-    def test_the_card_is_not_preallocated_whole(self, occupied, claims, monkeypatch):
-        monkeypatch.delenv("XLA_PYTHON_CLIENT_PREALLOCATE", raising=False)
-        monkeypatch.delenv("XLA_PYTHON_CLIENT_MEM_FRACTION", raising=False)
-
+    def test_the_card_is_not_preallocated_whole(self, occupied, claims):
         configure_jax_gpu(mem_fraction=0.5)
 
         assert os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] == "false"
         assert os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] == "0.5"
 
-    def test_a_forced_card_is_taken_whatever_is_on_it(
-        self, occupied, claims, monkeypatch
-    ):
-        monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
-
+    def test_a_forced_card_is_taken_whatever_is_on_it(self, occupied, claims):
         record = configure_jax_gpu(gpu=0)
 
         assert record["gpu_index"] == 0
-        assert os.environ["CUDA_VISIBLE_DEVICES"] == "0"
+        assert record["gpu_uuid"] == "GPU-aaa"
+        assert os.environ["CUDA_VISIBLE_DEVICES"] == record["gpu_uuid"]
 
     def test_cpu_is_refused_unless_asked_for(self, monkeypatch, claims):
         monkeypatch.setattr(gpu_module, "query_gpus", list)
@@ -169,7 +180,6 @@ class TestConfiguration:
 
     def test_cpu_is_allowed_when_asked_for(self, monkeypatch, claims):
         monkeypatch.setattr(gpu_module, "query_gpus", list)
-        monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
 
         record = configure_jax_gpu(allow_cpu=True)
 
@@ -200,16 +210,23 @@ class TestConfiguration:
         # nothing except what the second session's sidecar claims -- and it
         # would consume a free card that nothing releases until the process
         # exits, which is how a four-worker batch runs out of cards.
-        monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
-
         first = configure_jax_gpu()
         second = configure_jax_gpu()
 
         assert first == second
-        assert os.environ["CUDA_VISIBLE_DEVICES"] == str(first["gpu_index"])
+        assert os.environ["CUDA_VISIBLE_DEVICES"] == first["gpu_uuid"]
         assert sorted(path.name for path in claims.iterdir()) == [
             f"gpu{first['gpu_index']}.claim"
         ]
+
+    def test_a_mem_fraction_that_is_not_a_fraction_is_refused(self, occupied, claims):
+        # A caller reaching for gigabytes would otherwise hand XLA a number it
+        # reads as "several cards' worth" and preallocate past the card.
+        with pytest.raises(ValueError, match="mem_fraction"):
+            configure_jax_gpu(mem_fraction=40)
+        with pytest.raises(ValueError, match="mem_fraction"):
+            configure_jax_gpu(mem_fraction=0.0)
+        assert "CUDA_VISIBLE_DEVICES" not in os.environ
 
     def test_reclaiming_the_card_this_process_holds_succeeds(self, claims):
         # The claim file is not a mutex against its own holder; treating it as
@@ -291,3 +308,25 @@ def test_the_occupancy_table_names_every_card():
 
     assert table.count("GPU ") == 6
     assert "13097/81920 MiB used, 0% utilisation" in table
+
+
+class TestFittingRequiresAConfiguredDevice:
+    """The library fitter refuses before JAX can grab a shared host's cards."""
+
+    def test_an_unconfigured_process_that_can_reach_cuda_is_refused(self, claims):
+        with pytest.raises(UnconfiguredDeviceError, match="configure_jax_gpu"):
+            require_configured_device()
+
+    def test_a_configured_process_may_fit(self, occupied, claims):
+        configure_jax_gpu()
+
+        require_configured_device()
+
+    def test_a_cpu_pinned_process_may_fit_without_configuring(
+        self, claims, monkeypatch
+    ):
+        # No card is reachable, so there is nothing to take and nothing to
+        # configure. This is how the test suite itself runs.
+        monkeypatch.setenv("JAX_PLATFORMS", "cpu")
+
+        require_configured_device()

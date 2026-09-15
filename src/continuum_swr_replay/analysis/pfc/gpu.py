@@ -11,7 +11,12 @@ narrow and invisible -- and :func:`verify_jax_device` closes it by checking
 afterwards that the process really did end up on one card.
 
 Selection reads ``nvidia-smi`` and sets environment variables; only the
-verification touches JAX, and nothing here imports Spyglass.
+verification touches JAX, and nothing here imports Spyglass. The chosen card
+is named to CUDA by its **uuid** rather than by its ``nvidia-smi`` index:
+``CUDA_VISIBLE_DEVICES`` accepts either, but an index is read in CUDA's own
+enumeration order, which is not ``nvidia-smi``'s unless
+``CUDA_DEVICE_ORDER=PCI_BUS_ID`` is exported. A uuid names one physical card
+in any ordering, so the card that was measured is the card the process gets.
 
 Three rules keep it from colliding with other work:
 
@@ -56,6 +61,10 @@ _QUERY = "index,memory.used,memory.total,utilization.gpu,uuid,name"
 
 class NoFreeGPUError(RuntimeError):
     """Raised when no card is free enough to fit on."""
+
+
+class UnconfiguredDeviceError(RuntimeError):
+    """Raised when a JAX fit is attempted before a device was chosen."""
 
 
 @dataclass(frozen=True)
@@ -293,6 +302,46 @@ def verify_jax_device(
         )
 
 
+def cpu_is_pinned() -> bool:
+    """Whether ``JAX_PLATFORMS`` puts a card out of reach of this process."""
+    platforms = os.environ.get("JAX_PLATFORMS", "")
+    return bool(platforms) and not {"cuda", "gpu"} & {
+        part.strip().lower() for part in platforms.split(",")
+    }
+
+
+def require_configured_device() -> None:
+    """Refuse to fit with the batched solver until a device has been chosen.
+
+    The runner calls :func:`configure_jax_gpu` before anything asks JAX for a
+    device, so the process ends up on one card with a bounded share of it. A
+    library caller -- a notebook, a test, another script importing
+    ``run_session`` -- can reach the same fitter without going through the
+    runner, and JAX's default is then the opposite of the policy: every visible
+    card, most of each preallocated, on a host other people are running on.
+    Nothing would say so until their jobs died, so the fit refuses instead.
+
+    A CPU-pinned process (``JAX_PLATFORMS`` naming no CUDA platform) cannot
+    reach a card at all, so it needs no configuration and is allowed through;
+    that is how the test suite runs.
+
+    Raises
+    ------
+    UnconfiguredDeviceError
+        When no device has been configured and CUDA is still reachable.
+    """
+    if _CONFIGURED is not None or cpu_is_pinned():
+        return
+    raise UnconfiguredDeviceError(
+        "The batched JAX fitter was called before a device was chosen. On a "
+        "shared host JAX would otherwise take every visible card, most of "
+        "each preallocated, and evict other people's jobs. Call "
+        "continuum_swr_replay.analysis.pfc.gpu.configure_jax_gpu() first "
+        "(the runner's --gpu/--allow-cpu do this), or set JAX_PLATFORMS=cpu "
+        "to fit on CPU."
+    )
+
+
 def _cpu_record() -> dict[str, object]:
     """The record a CPU run carries: a backend and no card."""
     return {
@@ -318,7 +367,7 @@ def configure_jax_gpu(
 ) -> dict[str, object]:
     """Point JAX at one card, before JAX initialises a backend.
 
-    Sets ``CUDA_VISIBLE_DEVICES`` to the chosen card,
+    Sets ``CUDA_VISIBLE_DEVICES`` to the chosen card's uuid,
     ``XLA_PYTHON_CLIENT_PREALLOCATE=false`` and
     ``XLA_PYTHON_CLIENT_MEM_FRACTION`` so the process takes what it needs
     rather than the whole card, then checks with :func:`verify_jax_device` that
@@ -340,7 +389,7 @@ def configure_jax_gpu(
         run is many times slower and would not be noticed until the batch
         overran.
     mem_fraction : float
-        Fraction of the card JAX may take.
+        Fraction of the card JAX may take, in (0, 1].
     max_used_mib : int
         Passed to :func:`select_free_gpu`.
 
@@ -353,11 +402,19 @@ def configure_jax_gpu(
 
     Raises
     ------
+    ValueError
+        When ``mem_fraction`` is not a fraction of a card.
     NoFreeGPUError
         When no card is free and ``allow_cpu`` is False.
     WrongJAXDeviceError
         When JAX did not end up on the configured card.
     """
+    if not 0 < mem_fraction <= 1:
+        raise ValueError(
+            f"mem_fraction must be in (0, 1]; got {mem_fraction!r}. It is a "
+            "fraction of one card, not a number of gigabytes."
+        )
+
     global _CONFIGURED
     if _CONFIGURED is not None:
         return dict(_CONFIGURED)
@@ -367,9 +424,7 @@ def configure_jax_gpu(
     # park it for nothing and then fail verification. Treated as "no card is
     # free", which the caller already knows how to refuse.
     platforms = os.environ.get("JAX_PLATFORMS", "")
-    if platforms and not {"cuda", "gpu"} & {
-        part.strip().lower() for part in platforms.split(",")
-    }:
+    if cpu_is_pinned():
         if not allow_cpu:
             raise NoFreeGPUError(
                 f"JAX_PLATFORMS={platforms!r} excludes CUDA, so no GPU can be "
@@ -401,7 +456,10 @@ def configure_jax_gpu(
             _CONFIGURED = record
             return dict(record)
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = str(chosen.index)
+    # By uuid, not by index: an index would be read in CUDA's enumeration
+    # order, which need not be the ``nvidia-smi`` order the occupancy was
+    # measured in.
+    os.environ["CUDA_VISIBLE_DEVICES"] = chosen.uuid
     os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
     os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = str(mem_fraction)
     record = {
