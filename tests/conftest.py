@@ -11,9 +11,16 @@ import os
 
 # The suite runs on a shared GPU host, and JAX preallocates most of every card
 # it can see the first time it is used. A test must never do that to somebody
-# else's job, so the suite is CPU-only unless the caller has deliberately made
-# a card visible. Set before any test imports JAX -- the backend is chosen on
-# first use, and this module is imported before every test module.
+# else's job, so the suite is CPU-only unless the caller has deliberately said
+# otherwise. Set before any test imports JAX -- the backend is chosen on first
+# use, and this module is imported before every test module.
+#
+# ``JAX_PLATFORMS`` rather than ``CUDA_VISIBLE_DEVICES`` alone because it also
+# stops the CUDA plugin being loaded at all: several tests fan out over
+# processes, and paying for the CUDA runtime in every child makes the suite
+# several times slower for a backend no test wants. Both are set; the second is
+# what a child inherits if something clears the first.
+os.environ.setdefault("JAX_PLATFORMS", "cpu")
 os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
 
 import networkx as nx  # noqa: E402
