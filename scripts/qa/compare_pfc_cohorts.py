@@ -98,6 +98,9 @@ SIDECAR_TOP_LEVEL_KEYS = [
     "gpu_uuid",
     "gpu_name",
     "n_neurons_reference_fit",
+    "n_model_fits",
+    "n_nonconverged_model_fits",
+    "n_neurons_with_nonconverged_model",
     "canonical_event_table_sha256",
     "canonical_event_table_path",
     "data_over_time_sha256",
@@ -967,20 +970,25 @@ def fitter_table(sidecars: pd.DataFrame) -> pd.DataFrame:
             frame[column] = frame[column].map(
                 lambda value: value[:12] if isinstance(value, str) else value
             )
-    hand_back = frame.get("n_neurons_reference_fit")
     grouped = frame.groupby(present, dropna=False)
     table = grouped.agg(n_sessions=("session", "size")).reset_index()
-    if hand_back is not None:
+    for column in (
+        "n_neurons_reference_fit",
+        "n_model_fits",
+        "n_nonconverged_model_fits",
+        "n_neurons_with_nonconverged_model",
+    ):
+        values = frame.get(column)
+        if values is None:
+            continue
         totals = (
-            frame.assign(_hand_back=_numeric(hand_back))
-            .groupby(present, dropna=False)["_hand_back"]
+            frame.assign(_total=_numeric(values))
+            .groupby(present, dropna=False)["_total"]
             .sum()
-            .reset_index(name="n_neurons_reference_fit")
+            .reset_index(name=column)
         )
         table = table.merge(totals, on=present, how="left")
-        table["n_neurons_reference_fit"] = table["n_neurons_reference_fit"].astype(
-            "Int64"
-        )
+        table[column] = table[column].astype("Int64")
     return table
 
 
@@ -1190,9 +1198,30 @@ def rerun_sections(
         "to a single row. `n_neurons_reference_fit` is the neurons the batched "
         "fitter handed back to statsmodels because their fits left the range "
         "the two agree over; those neurons' shipped numbers are statsmodels' "
-        "own.\n"
+        "own. `n_nonconverged_model_fits` counts the shipped neuron x model "
+        "fits that ran to `maxiter` without settling, over "
+        "`n_neurons_with_nonconverged_model` neurons -- those fits still "
+        "report an LR test and an AIC, so a reader who wants to know how much "
+        "of a result rests on a fit that never converged has nowhere else to "
+        "ask.\n"
     )
     add(_md(fitter_table(after_sidecars)))
+    nonconverged = after_sidecars.get("n_nonconverged_model_fits")
+    if nonconverged is not None and nonconverged.notna().any():
+        neurons = _numeric(
+            after_sidecars.get(
+                "n_neurons_with_nonconverged_model",
+                pd.Series(np.nan, index=after_sidecars.index),
+            )
+        )
+        worst = after_sidecars.loc[_numeric(nonconverged).idxmax()]
+        add(
+            f"Across the corpus {int(_numeric(nonconverged).sum()):,} of "
+            f"{int(_numeric(after_sidecars['n_model_fits']).sum()):,} shipped "
+            f"model fits did not converge, over {int(neurons.sum()):,} "
+            f"neurons; the worst single session is `{worst['session']}` with "
+            f"{int(worst['n_nonconverged_model_fits'])}.\n"
+        )
     return lines
 
 

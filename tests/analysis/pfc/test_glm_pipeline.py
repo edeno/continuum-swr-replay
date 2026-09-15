@@ -6,6 +6,8 @@ PFC neuron modulation during hippocampal replay events.
 
 from __future__ import annotations
 
+import logging
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -14,6 +16,7 @@ import statsmodels.api as sm
 from continuum_swr_replay.analysis.pfc.glm import (
     _fit_immobility_models,
     _make_design_matrices,
+    _prefit_session,
     build_theta_design,
     create_conv_basis,
     create_lagged_signal,
@@ -22,6 +25,7 @@ from continuum_swr_replay.analysis.pfc.glm import (
     get_frac_null_deviance,
     make_matched_control_times,
     process_neuron,
+    shipped_fit_counts,
 )
 from continuum_swr_replay.analysis.pfc.glm import (
     test_theta_modulation as run_theta_modulation_test,
@@ -31,6 +35,7 @@ from continuum_swr_replay.analysis.replay.cohort_selection import select_stop_co
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def sampling_frequency():
@@ -52,22 +57,30 @@ def simple_event_times():
     of every real event, as :func:`make_matched_control_times` draws them.
     """
     return {
-        "SWR": pd.DataFrame({
-            "start_time": [1.0, 5.0],
-            "end_time": [1.1, 5.1],
-        }),
-        "non_local": pd.DataFrame({
-            "start_time": [1.0, 5.0, 7.0],
-            "end_time": [1.1, 5.1, 7.1],
-        }),
-        "non_local_SWR": pd.DataFrame({
-            "start_time": [1.0, 5.0],
-            "end_time": [1.1, 5.1],
-        }),
-        "non_local_no_SWR": pd.DataFrame({
-            "start_time": [7.0],
-            "end_time": [7.1],
-        }),
+        "SWR": pd.DataFrame(
+            {
+                "start_time": [1.0, 5.0],
+                "end_time": [1.1, 5.1],
+            }
+        ),
+        "non_local": pd.DataFrame(
+            {
+                "start_time": [1.0, 5.0, 7.0],
+                "end_time": [1.1, 5.1, 7.1],
+            }
+        ),
+        "non_local_SWR": pd.DataFrame(
+            {
+                "start_time": [1.0, 5.0],
+                "end_time": [1.1, 5.1],
+            }
+        ),
+        "non_local_no_SWR": pd.DataFrame(
+            {
+                "start_time": [7.0],
+                "end_time": [7.1],
+            }
+        ),
         "matched_control": pd.DataFrame(
             {
                 "start_time": [2.0, 6.0, 8.0],
@@ -113,6 +126,7 @@ def poisson_spike_times(time_axis):
 @pytest.fixture
 def spike_count(poisson_spike_times, time_axis):
     from continuum_swr_replay.analysis.pfc.glm import get_spikecount_per_time_bin
+
     return get_spikecount_per_time_bin(poisson_spike_times, time_axis)
 
 
@@ -229,10 +243,15 @@ class TestMakeDesignMatrices:
         )
 
         expected_models = {
-            "constant", "SWR", "non_local", "non_local_no_SWR",
-            "non_local_SWR", "non_local_SWR + non_local_no_SWR",
+            "constant",
+            "SWR",
+            "non_local",
+            "non_local_no_SWR",
+            "non_local_SWR",
+            "non_local_SWR + non_local_no_SWR",
             "SWR + non_local_no_SWR",
-            "matched_control", "matched_control + non_local_no_SWR",
+            "matched_control",
+            "matched_control + non_local_no_SWR",
         }
         assert set(dm.keys()) == expected_models
 
@@ -295,9 +314,7 @@ class TestFitImmobilityModels:
         dm, _, _ = _make_design_matrices(
             simple_event_times, position_info, lags=np.arange(-50, 51)
         )
-        results, _ = _fit_immobility_models(
-            is_immobile, dm, spike_count, fitter=fitter
-        )
+        results, _ = _fit_immobility_models(is_immobile, dm, spike_count, fitter=fitter)
 
         for name, result in results.items():
             assert hasattr(result, "aic"), f"{name} result missing AIC"
@@ -310,15 +327,12 @@ class TestFitImmobilityModels:
         dm, _, _ = _make_design_matrices(
             simple_event_times, position_info, lags=np.arange(-50, 51)
         )
-        results, _ = _fit_immobility_models(
-            is_immobile, dm, spike_count, fitter=fitter
-        )
+        results, _ = _fit_immobility_models(is_immobile, dm, spike_count, fitter=fitter)
 
         # Nested: constant ⊂ SWR ⊂ SWR + non_local_no_SWR
         assert results["SWR"].deviance <= results["constant"].deviance + 1e-6
         assert (
-            results["SWR + non_local_no_SWR"].deviance
-            <= results["SWR"].deviance + 1e-6
+            results["SWR + non_local_no_SWR"].deviance <= results["SWR"].deviance + 1e-6
         )
 
 
@@ -377,7 +391,9 @@ class TestDevianceFractions:
 class TestThetaModulation:
     def test_returns_four_values(self, theta_phase, is_immobile, spike_count):
         lr, p, mod, phase = run_theta_modulation_test(
-            theta_phase, is_immobile, spike_count,
+            theta_phase,
+            is_immobile,
+            spike_count,
         )
         assert np.isfinite(lr)
         assert 0 <= p <= 1
@@ -395,7 +411,9 @@ class TestThetaModulation:
         )
 
         lr, p, mod, _ = run_theta_modulation_test(
-            theta_phase, is_immobile, spike_count,
+            theta_phase,
+            is_immobile,
+            spike_count,
         )
         # A function returning (p=0, mod=0) would pass the prior
         # disjunction (mod < 0.5 is True). Require *both* a non-significant
@@ -411,18 +429,30 @@ class TestThetaModulation:
 
 class TestProcessNeuron:
     def test_returns_expected_structure(
-        self, poisson_spike_times, is_immobile, theta_phase,
-        time_axis, simple_event_times, position_info, sampling_frequency,
+        self,
+        poisson_spike_times,
+        is_immobile,
+        theta_phase,
+        time_axis,
+        simple_event_times,
+        position_info,
+        sampling_frequency,
     ):
         dm, spline_basis, lag_time = _make_design_matrices(
-            simple_event_times, position_info,
+            simple_event_times,
+            position_info,
             sampling_frequency=sampling_frequency,
             lags=np.arange(-50, 51),
         )
 
         stats, swr_mod, no_swr_mod, nl_swr_mod, nl_no_swr_mod, mc_mod = process_neuron(
-            poisson_spike_times, is_immobile, theta_phase,
-            time_axis, dm, spline_basis, lag_time,
+            poisson_spike_times,
+            is_immobile,
+            theta_phase,
+            time_axis,
+            dm,
+            spline_basis,
+            lag_time,
         )
 
         # Both rates must be strictly positive — the prior ``>= 0`` check
@@ -437,19 +467,31 @@ class TestProcessNeuron:
         assert stats["immobility_avg_firing_rate"] > 0
 
     def test_modulation_arrays_have_correct_shape(
-        self, poisson_spike_times, is_immobile, theta_phase,
-        time_axis, simple_event_times, position_info, sampling_frequency,
+        self,
+        poisson_spike_times,
+        is_immobile,
+        theta_phase,
+        time_axis,
+        simple_event_times,
+        position_info,
+        sampling_frequency,
     ):
         lags = np.arange(-50, 51)
         dm, spline_basis, lag_time = _make_design_matrices(
-            simple_event_times, position_info,
+            simple_event_times,
+            position_info,
             sampling_frequency=sampling_frequency,
             lags=lags,
         )
 
         _, swr_mod, no_swr_mod, nl_swr_mod, nl_no_swr_mod, mc_mod = process_neuron(
-            poisson_spike_times, is_immobile, theta_phase,
-            time_axis, dm, spline_basis, lag_time,
+            poisson_spike_times,
+            is_immobile,
+            theta_phase,
+            time_axis,
+            dm,
+            spline_basis,
+            lag_time,
         )
 
         n_lags = len(lags)
@@ -466,18 +508,30 @@ class TestProcessNeuron:
         assert not np.array_equal(nl_swr_mod, nl_no_swr_mod)
 
     def test_stats_contain_likelihood_ratio_tests(
-        self, poisson_spike_times, is_immobile, theta_phase,
-        time_axis, simple_event_times, position_info, sampling_frequency,
+        self,
+        poisson_spike_times,
+        is_immobile,
+        theta_phase,
+        time_axis,
+        simple_event_times,
+        position_info,
+        sampling_frequency,
     ):
         dm, spline_basis, lag_time = _make_design_matrices(
-            simple_event_times, position_info,
+            simple_event_times,
+            position_info,
             sampling_frequency=sampling_frequency,
             lags=np.arange(-50, 51),
         )
 
         stats, *_ = process_neuron(
-            poisson_spike_times, is_immobile, theta_phase,
-            time_axis, dm, spline_basis, lag_time,
+            poisson_spike_times,
+            is_immobile,
+            theta_phase,
+            time_axis,
+            dm,
+            spline_basis,
+            lag_time,
         )
 
         # Check key LR tests exist
@@ -491,8 +545,13 @@ class TestProcessNeuron:
                 assert 0 <= val <= 1, f"{key} = {val} out of range"
 
     def test_absent_event_class_marks_dependent_outputs_as_unavailable(
-        self, poisson_spike_times, is_immobile, theta_phase,
-        time_axis, position_info, sampling_frequency,
+        self,
+        poisson_spike_times,
+        is_immobile,
+        theta_phase,
+        time_axis,
+        position_info,
+        sampling_frequency,
     ):
         """Regression: ``_make_design_matrices`` builds spline
         regressors for every event class regardless of whether that
@@ -510,27 +569,32 @@ class TestProcessNeuron:
         """
         # Empty non_local_no_SWR. Other event classes are populated.
         event_times = {
-            "SWR": pd.DataFrame({"start_time": [1.0, 5.0],
-                                 "end_time": [1.1, 5.1]}),
-            "non_local": pd.DataFrame({"start_time": [1.0, 5.0],
-                                       "end_time": [1.1, 5.1]}),
-            "non_local_SWR": pd.DataFrame({"start_time": [1.0, 5.0],
-                                           "end_time": [1.1, 5.1]}),
-            "non_local_no_SWR": pd.DataFrame(
-                columns=["start_time", "end_time"]
+            "SWR": pd.DataFrame({"start_time": [1.0, 5.0], "end_time": [1.1, 5.1]}),
+            "non_local": pd.DataFrame(
+                {"start_time": [1.0, 5.0], "end_time": [1.1, 5.1]}
             ),
+            "non_local_SWR": pd.DataFrame(
+                {"start_time": [1.0, 5.0], "end_time": [1.1, 5.1]}
+            ),
+            "non_local_no_SWR": pd.DataFrame(columns=["start_time", "end_time"]),
             "matched_control": pd.DataFrame(
                 {"start_time": [2.0, 6.0], "end_time": [2.1, 6.1]}
             ),
         }
         dm, spline_basis, lag_time = _make_design_matrices(
-            event_times, position_info,
+            event_times,
+            position_info,
             sampling_frequency=sampling_frequency,
             lags=np.arange(-50, 51),
         )
         stats, swr_mod, no_swr_mod, nl_swr_mod, nl_no_swr_mod, mc_mod = process_neuron(
-            poisson_spike_times, is_immobile, theta_phase,
-            time_axis, dm, spline_basis, lag_time,
+            poisson_spike_times,
+            is_immobile,
+            theta_phase,
+            time_axis,
+            dm,
+            spline_basis,
+            lag_time,
         )
 
         # Every test that touches the absent event class must be NaN.
@@ -544,8 +608,7 @@ class TestProcessNeuron:
             "non_local_SWR + non_local_no_SWR vs. non_local_no_SWR",
             "non_local_SWR + non_local_no_SWR vs. non_local",
         ):
-            for suffix in (": lr", ": pval", ": frac_null_dev",
-                           ": frac_explained_dev"):
+            for suffix in (": lr", ": pval", ": frac_null_dev", ": frac_explained_dev"):
                 key = affected + suffix
                 assert np.isnan(stats[key]), (
                     f"{key} = {stats[key]} but the model uses an empty "
@@ -567,8 +630,10 @@ class TestProcessNeuron:
         assert np.all(np.isnan(no_swr_mod))
         assert np.all(np.isnan(nl_no_swr_mod))
         for stat in (
-            "SWR_max_mod", "SWR_max_mod_time",
-            "non_local_no_SWR_max_mod", "non_local_no_SWR_max_mod_time",
+            "SWR_max_mod",
+            "SWR_max_mod_time",
+            "non_local_no_SWR_max_mod",
+            "non_local_no_SWR_max_mod_time",
             "non_local_no_SWR_split_max_mod",
             "non_local_no_SWR_split_max_mod_time",
         ):
@@ -588,8 +653,14 @@ class TestProcessNeuron:
         assert stats["min_aic_model_replay_split"] in {"constant", "non_local"}
 
     def test_non_nested_swr_vs_non_local_lr_test_is_not_emitted(
-        self, poisson_spike_times, is_immobile, theta_phase,
-        time_axis, simple_event_times, position_info, sampling_frequency,
+        self,
+        poisson_spike_times,
+        is_immobile,
+        theta_phase,
+        time_axis,
+        simple_event_times,
+        position_info,
+        sampling_frequency,
     ):
         """Regression: ``("SWR + non_local_no_SWR", "non_local")`` is
         NOT a nested model pair in general. The full design carries
@@ -610,13 +681,19 @@ class TestProcessNeuron:
         ``"SWR"`` and ``"non_local_no_SWR"`` are preserved.
         """
         dm, spline_basis, lag_time = _make_design_matrices(
-            simple_event_times, position_info,
+            simple_event_times,
+            position_info,
             sampling_frequency=sampling_frequency,
             lags=np.arange(-50, 51),
         )
         stats, *_ = process_neuron(
-            poisson_spike_times, is_immobile, theta_phase,
-            time_axis, dm, spline_basis, lag_time,
+            poisson_spike_times,
+            is_immobile,
+            theta_phase,
+            time_axis,
+            dm,
+            spline_basis,
+            lag_time,
         )
 
         invalid_test = "SWR + non_local_no_SWR vs. non_local"
@@ -685,17 +762,13 @@ def dense_session():
     """
     sampling_frequency = 500.0
     time = np.arange(0, 120, 1.0 / sampling_frequency)
-    position_info = pd.DataFrame(
-        {"head_speed": np.full(len(time), 2.0)}, index=time
-    )
+    position_info = pd.DataFrame({"head_speed": np.full(len(time), 2.0)}, index=time)
     fit_mask = position_info.head_speed < 4.0
 
     rng = np.random.default_rng(11)
     onsets = np.sort(rng.uniform(1.0, 118.0, size=60))
     event_times = {
-        "non_local": pd.DataFrame(
-            {"start_time": onsets, "end_time": onsets + 0.08}
-        ),
+        "non_local": pd.DataFrame({"start_time": onsets, "end_time": onsets + 0.08}),
         "non_local_SWR": pd.DataFrame(
             {"start_time": onsets[::2], "end_time": onsets[::2] + 0.08}
         ),
@@ -793,9 +866,7 @@ class TestFitterEquivalence:
         design_matrices, spike_count, fit_mask = dense_session
         counts = spike_count[np.asarray(fit_mask, dtype=bool)]
         for name, design in design_matrices.items():
-            batched = fit_poisson_glms(
-                design[np.asarray(fit_mask, dtype=bool)], counts
-            )
+            batched = fit_poisson_glms(design[np.asarray(fit_mask, dtype=bool)], counts)
             assert not batched.needs_reference_fit.any(), (
                 f"{name} was handed back; the fixture is not well posed"
             )
@@ -830,9 +901,7 @@ class TestFitterEquivalence:
         expected, _ = _fit_immobility_models(
             is_immobile, dm, spike_count, fitter="statsmodels"
         )
-        actual, _ = _fit_immobility_models(
-            is_immobile, dm, spike_count, fitter="jax"
-        )
+        actual, _ = _fit_immobility_models(is_immobile, dm, spike_count, fitter="jax")
 
         for name in dm:
             np.testing.assert_allclose(
@@ -1551,3 +1620,98 @@ class TestTheRetiredEventConstructionIsGone:
         ]
 
         assert offenders == []
+
+
+class TestShippedFitCounts:
+    """What a session records about fits that never settled.
+
+    A GLM that runs to ``maxiter`` still reports an LR test and an AIC, so the
+    fact that it did not converge leaves no trace in the bundle. These counts
+    are the only place it survives the run, which is why they are taken over
+    the results that are actually read -- after the hand-back, so a neuron the
+    batched fitter declined is counted on statsmodels' flag, not on its own.
+    """
+
+    class _Fit:
+        def __init__(self, converged: bool) -> None:
+            self.converged = converged
+
+    def _neuron(self, *converged: bool) -> dict:
+        return {f"m{i}": self._Fit(flag) for i, flag in enumerate(converged)}
+
+    def test_converged_fits_count_as_fits_and_not_as_failures(self):
+        counts = shipped_fit_counts(
+            [self._neuron(True, True, True), self._neuron(True, True, True)], 0
+        )
+
+        assert counts == {
+            "n_neurons_reference_fit": 0,
+            "n_model_fits": 6,
+            "n_nonconverged_model_fits": 0,
+            "n_neurons_with_nonconverged_model": 0,
+        }
+
+    def test_failures_are_counted_per_fit_and_per_neuron(self):
+        # Two failures on one neuron is two fits but one neuron: the two
+        # denominators answer different questions and must not be conflated.
+        counts = shipped_fit_counts(
+            [self._neuron(True, False, False), self._neuron(True, True, True)], 1
+        )
+
+        assert counts["n_model_fits"] == 6
+        assert counts["n_nonconverged_model_fits"] == 2
+        assert counts["n_neurons_with_nonconverged_model"] == 1
+        assert counts["n_neurons_reference_fit"] == 1
+
+    def test_a_neuron_with_no_fit_at_all_enters_neither_total(self):
+        # statsmodels refuses a response with no spikes, so that neuron has no
+        # results; counting it as neurons x models would invent fits.
+        counts = shipped_fit_counts([None, self._neuron(True, False)], 2)
+
+        assert counts["n_model_fits"] == 2
+        assert counts["n_nonconverged_model_fits"] == 1
+        assert counts["n_neurons_with_nonconverged_model"] == 1
+
+    def test_a_result_with_no_convergence_flag_is_read_as_converged(self):
+        # ``fit_regularized`` results carry no flag; absence is not failure.
+        class Bare:
+            pass
+
+        counts = shipped_fit_counts([{"m0": Bare()}], 0)
+
+        assert counts["n_model_fits"] == 1
+        assert counts["n_nonconverged_model_fits"] == 0
+
+    def test_a_real_prefit_reports_counts_consistent_with_its_hand_back(
+        self,
+        poisson_spike_times,
+        is_immobile,
+        theta_phase,
+        time_axis,
+        simple_event_times,
+        position_info,
+        sampling_frequency,
+    ):
+        design_matrices, _, _ = _make_design_matrices(
+            simple_event_times,
+            position_info,
+            sampling_frequency=sampling_frequency,
+            lags=np.arange(-50, 51),
+        )
+
+        *_, counts = _prefit_session(
+            [poisson_spike_times],
+            np.asarray(time_axis),
+            is_immobile,
+            is_immobile,
+            design_matrices,
+            theta_phase,
+            logger=logging.getLogger("test_shipped_fit_counts"),
+        )
+
+        assert counts["n_neurons_reference_fit"] in (0, 1)
+        assert counts["n_model_fits"] in (0, len(design_matrices))
+        assert (
+            0 <= counts["n_nonconverged_model_fits"] <= max(counts["n_model_fits"], 0)
+        )
+        assert counts["n_neurons_with_nonconverged_model"] <= 1

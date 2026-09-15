@@ -2165,6 +2165,57 @@ def _reference_fits(
         return dict(pool.map(fit_one, [int(index) for index in indices]))
 
 
+def shipped_fit_counts(
+    prefitted_immobility: list[dict[str, Any] | None], n_reference_fits: int
+) -> dict[str, int]:
+    """How many of a session's shipped immobility fits never settled.
+
+    A fit that runs to ``maxiter`` is not an error: ``process_neuron`` reports
+    its LR test and its AIC like any other. So unless the count is taken here
+    -- once, over the results that will actually be read -- the fact does not
+    survive the run at all, and a reader asking how much of a session's result
+    rests on a fit that never converged has nowhere to ask.
+
+    Counted after the hand-back, so a neuron the batched fitter declined is
+    counted on statsmodels' own convergence flag rather than on the batched
+    fitter's. A neuron statsmodels refused outright (no spikes) has no fit and
+    enters neither total, which is why ``n_model_fits`` is reported beside the
+    failures rather than assumed to be neurons x models.
+
+    Parameters
+    ----------
+    prefitted_immobility : list of (dict or None)
+        Per neuron, the results keyed by model name, as
+        :func:`_prefit_session` assembles them.
+    n_reference_fits : int
+        Neurons handed back to statsmodels, passed through.
+
+    Returns
+    -------
+    dict[str, int]
+        ``n_neurons_reference_fit``, ``n_model_fits``,
+        ``n_nonconverged_model_fits``, ``n_neurons_with_nonconverged_model``.
+    """
+    n_model_fits = 0
+    n_nonconverged = 0
+    n_neurons_nonconverged = 0
+    for fits in prefitted_immobility:
+        if fits is None:
+            continue
+        failures = sum(
+            not bool(getattr(fit, "converged", True)) for fit in fits.values()
+        )
+        n_model_fits += len(fits)
+        n_nonconverged += failures
+        n_neurons_nonconverged += failures > 0
+    return {
+        "n_neurons_reference_fit": int(n_reference_fits),
+        "n_model_fits": int(n_model_fits),
+        "n_nonconverged_model_fits": int(n_nonconverged),
+        "n_neurons_with_nonconverged_model": int(n_neurons_nonconverged),
+    }
+
+
 def _prefit_session(
     spike_times: list[NDArray],
     time: NDArray,
@@ -2179,7 +2230,7 @@ def _prefit_session(
     list[tuple[Any, Any] | None],
     dict[str, int],
     tuple[NDArray, NDArray],
-    int,
+    dict[str, int],
 ]:
     """Fit every neuron of a session against every design, in batches.
 
@@ -2212,8 +2263,15 @@ def _prefit_session(
         Rank of each design on the fit mask.
     theta_design : tuple
         ``(joint_mask, design_matrix)``, built once for the session.
-    n_reference_fits : int
-        How many neurons were handed back.
+    fit_counts : dict[str, int]
+        ``n_neurons_reference_fit`` (neurons handed back), plus what the
+        shipped fits say about themselves: ``n_model_fits`` (neuron x model
+        cells that produced a fit at all), ``n_nonconverged_model_fits`` and
+        ``n_neurons_with_nonconverged_model``. A cell that ran to ``maxiter``
+        is not an error -- its LR test and AIC are still reported -- so the
+        only place that fact survives is here, and a reader who wants to know
+        how much of a result rests on a fit that never settled has no other
+        way to ask.
 
     Notes
     -----
@@ -2299,12 +2357,13 @@ def _prefit_session(
             # unprefitted sends it down the same failure path it always took.
             prefitted_immobility[index] = None if fits is None else fits[0]
             prefitted_theta[index] = None if fits is None else fits[1]
+
     return (
         prefitted_immobility,
         prefitted_theta,
         design_ranks,
         (joint_mask, theta_design),
-        int(hand_back.sum()),
+        shipped_fit_counts(prefitted_immobility, int(hand_back.sum())),
     )
 
 
@@ -2625,8 +2684,13 @@ def run_session(
         **event_provenance,
         **fitter_provenance(fitter),
         # Filled in after the fits: how many neurons the batched fitter handed
-        # back to statsmodels. ``None`` when no neuron was fit at all.
+        # back to statsmodels, and how many of the shipped fits ran to
+        # ``maxiter`` without settling. ``None`` when no neuron was fit at all,
+        # or on the statsmodels path, which never reaches the batched fitter.
         "n_neurons_reference_fit": None,
+        "n_model_fits": None,
+        "n_nonconverged_model_fits": None,
+        "n_neurons_with_nonconverged_model": None,
         "matched_control_seed": control_seed,
         "n_matched_control": n_matched_control,
         "n_matched_control_unplaced": control_draw.n_unplaced,
@@ -2692,7 +2756,15 @@ def run_session(
     prefitted_theta: list[tuple[Any, Any] | None] | None = None
     design_ranks: dict[str, int] | None = None
     theta_design: tuple[NDArray, NDArray] | None = None
-    n_reference_fits = 0
+    # The statsmodels path fits inside ``process_neuron`` and never reaches the
+    # batched fitter, so it has nothing to say here; the sidecar carries
+    # ``None`` rather than a zero that would read as "nothing failed".
+    fit_counts: dict[str, int | None] = {
+        "n_neurons_reference_fit": None,
+        "n_model_fits": None,
+        "n_nonconverged_model_fits": None,
+        "n_neurons_with_nonconverged_model": None,
+    }
     if fitter == "jax":
         # Every neuron shares the design; only the response column differs. Fit
         # the whole session against each design once, then hand each neuron its
@@ -2703,7 +2775,7 @@ def run_session(
             prefitted_theta,
             design_ranks,
             theta_design,
-            n_reference_fits,
+            fit_counts,
         ) = _prefit_session(
             data["spike_times"][brain_area],
             time,
@@ -2777,7 +2849,16 @@ def run_session(
         fit_diagnostics_out.update(
             _stack_fit_diagnostics(neuron_diagnostics, immobility_design_matrices)
         )
-    cohort_info["n_neurons_reference_fit"] = n_reference_fits
+    cohort_info.update(fit_counts)
+    if fit_counts["n_nonconverged_model_fits"]:
+        logger.info(
+            "%d of %d shipped model fits ran to maxiter without converging, "
+            "over %d of %d neurons. Their LR tests and AIC are still reported.",
+            fit_counts["n_nonconverged_model_fits"],
+            fit_counts["n_model_fits"],
+            fit_counts["n_neurons_with_nonconverged_model"],
+            n_neurons,
+        )
 
     (
         neuron_stats_list,

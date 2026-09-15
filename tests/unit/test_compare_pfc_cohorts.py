@@ -562,6 +562,9 @@ def _after_extra(**overrides) -> dict:
         "gpu_name": "NVIDIA A100-SXM4-80GB",
         "gpu_uuid": "GPU-abc",
         "n_neurons_reference_fit": 1,
+        "n_model_fits": 27,
+        "n_nonconverged_model_fits": 2,
+        "n_neurons_with_nonconverged_model": 1,
         "canonical_event_table_sha256": "c" * 64,
         "data_over_time_sha256": "d" * 64,
         "is_swr_definition": "canonical_event_table",
@@ -859,6 +862,11 @@ class TestFitterTable:
         assert row.gpu_index == 3
         assert row.n_sessions == 2
         assert row.n_neurons_reference_fit == 2
+        # The count of fits that ran to maxiter is the only trace those fits
+        # leave: their LR tests and AIC are reported like any other.
+        assert row.n_model_fits == 54
+        assert row.n_nonconverged_model_fits == 4
+        assert row.n_neurons_with_nonconverged_model == 2
         # Hashes are abbreviated, not dropped.
         assert row.canonical_event_table_sha256 == "c" * 12
 
@@ -915,6 +923,7 @@ class TestRerunReport:
         assert "## The matched non-event control" in report
         assert "2 of 2 bundle(s) carry a `matched_control_modulation` array" in report
         assert "## Estimator, device and inputs" in report
+        assert "4 of 54 shipped model fits did not converge" in report
 
     def test_a_tree_without_the_estimator_fields_gets_no_rerun_sections(
         self, bundle_trees

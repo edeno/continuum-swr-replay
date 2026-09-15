@@ -423,9 +423,19 @@ def run_analysis(
                 "gpu_uuid": gpu_record.get("gpu_uuid"),
                 "gpu_name": gpu_record.get("gpu_name"),
                 # Neurons the batched fitter handed back to statsmodels because
-                # their fits left the range the two agree over.
+                # their fits left the range the two agree over, and how many of
+                # the shipped fits never settled. A fit that ran to maxiter
+                # still reports an LR test and an AIC, so this is the only
+                # place that fact survives the run.
                 "n_neurons_reference_fit": cohort_info.get(
                     "n_neurons_reference_fit"
+                ),
+                "n_model_fits": cohort_info.get("n_model_fits"),
+                "n_nonconverged_model_fits": cohort_info.get(
+                    "n_nonconverged_model_fits"
+                ),
+                "n_neurons_with_nonconverged_model": cohort_info.get(
+                    "n_neurons_with_nonconverged_model"
                 ),
                 # Which events the fit describes, from the same block the skip
                 # check above compares against.
