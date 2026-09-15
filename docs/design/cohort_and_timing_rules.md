@@ -208,6 +208,20 @@ The restriction is not balanced across the SWR contrast (3.3% of SWR events are
 off-well against 13.0% of non-SWR events) — expected, since SWR events
 concentrate at wells — so the cohort belongs in Methods.
 
+**Which estimator answered for a unit is device-dependent.** The mPFC unit GLMs
+are fit by a batched Poisson IRLS in JAX, one call per model for every unit of a
+session, and it declines units whose fits leave the range it can vouch for —
+`needs_reference_fit` flags a unit when its fitted means spread past a
+threshold, or when it did not converge — refitting those with statsmodels
+instead. That criterion reads floating-point quantities, so a GPU run and a CPU
+run of the same session can flag slightly different units. Both fitters agree to
+~1e-10 on every unit that stays inside the flag (that is the equivalence gate),
+and a flagged unit's shipped numbers are statsmodels' own either way, so the
+estimates do not depend on the device — only the route to them does. The backend
+is recorded in each bundle's provenance sidecar (`fitter`, `jax_backend`,
+`jax_version`, `gpu_index`) alongside `n_neurons_reference_fit`, the count of
+units that took the statsmodels route.
+
 ## Covariate causal hygiene
 
 Every ladder runner enforces covariate timing at model-build via

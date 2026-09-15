@@ -203,8 +203,11 @@ def compare_statistics(
 
         left_values = left.to_numpy(dtype=float)
         right_values = right.to_numpy(dtype=float)
+        # ``isfinite``, not ``isnan``: a value that is NaN on one side and
+        # +/-inf on the other has a matching NaN pattern but is not a matching
+        # result, and the difference over the finite entries cannot see it.
         nan_matches = bool(
-            np.array_equal(np.isnan(left_values), np.isnan(right_values))
+            np.array_equal(np.isfinite(left_values), np.isfinite(right_values))
         )
         difference = _max_abs_difference(left_values, right_values)
         tolerance = _column_tolerance(column)
@@ -229,7 +232,9 @@ def compare_statistics(
             }
         )
         if not nan_matches:
-            failures.append(f"{column}: NaN pattern differs between fitters")
+            failures.append(
+                f"{column}: finite/non-finite pattern differs between fitters"
+            )
         if difference > tolerance:
             failures.append(
                 f"{column}: max|diff| {difference:.3e} exceeds {tolerance:.0e}"
@@ -250,7 +255,7 @@ def compare_modulations(
         if left.shape != right.shape:
             failures.append(f"{name}: shapes differ {left.shape} vs {right.shape}")
             continue
-        nan_matches = bool(np.array_equal(np.isnan(left), np.isnan(right)))
+        nan_matches = bool(np.array_equal(np.isfinite(left), np.isfinite(right)))
         difference = _max_abs_difference(left, right)
         rows.append(
             {
@@ -261,7 +266,9 @@ def compare_modulations(
             }
         )
         if not nan_matches:
-            failures.append(f"{name}: NaN pattern differs between fitters")
+            failures.append(
+                f"{name}: finite/non-finite pattern differs between fitters"
+            )
         if difference > PARAM_TOL:
             failures.append(
                 f"{name}: max|diff| {difference:.3e} exceeds {PARAM_TOL:.0e}"
@@ -534,8 +541,20 @@ def build_report(
         f"{DEVIANCE_TOL:.0e} absolute |\n"
         f"| LR p-values | {PVAL_TOL:.0e} absolute |\n"
         f"| AIC | {AIC_TOL:.0e} absolute (`aic = -2 llf + 2 rank`) |\n"
-        f"| best-AIC model, NaN pattern, convergence flags, design rank | "
-        f"identical |\n"
+        f"| best-AIC model, finite/non-finite pattern, convergence flags, "
+        f"design rank | identical |\n"
+    )
+    add(
+        "The parameter gate is read on the estimable models only. A "
+        "rank-deficient design has no unique minimum-norm solution the two "
+        "fitters must agree on -- statsmodels takes a pseudo-inverse of the "
+        "weighted design with a singular-value cutoff of `1e-15` while the "
+        "batched fitter cuts eigenvalues of the information matrix at "
+        "`1e-12`, and a direction between those is kept by one and dropped by "
+        "the other -- and `process_neuron` routes every shipped statistic of "
+        "such a model to NaN, so nothing downstream reads those parameters. "
+        "The design rank itself is still required to be identical, which is "
+        "what says the two fitters agree on *which* models those are.\n"
     )
     add(f"- statsmodels run: `{statsmodels_dir}`\n- JAX run: `{jax_dir}`\n")
 
