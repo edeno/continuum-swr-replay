@@ -1467,7 +1467,7 @@ class TestAlignmentIsIdentityOnMatchedAxes:
         )
         event_times["matched_control"] = make_matched_control_times(
             event_times, fit_mask, np.random.default_rng(0)
-        )
+        ).times
         design_matrices, _, _ = _make_design_matrices(
             event_times,
             position_info,

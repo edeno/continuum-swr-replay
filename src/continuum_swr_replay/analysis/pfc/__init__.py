@@ -18,7 +18,9 @@ build_session_fit_mask
     The time bins one session's GLMs are fit on: immobility, inside the cohort.
 make_matched_control_times
     Draw the duration-matched non-event control windows the engagement test
-    compares replay against, from those same fitted bins.
+    compares replay against, from those same fitted bins. Returns a
+    ``MatchedControlDraw``: the windows, and the two counts of events that
+    could not be given one.
 process_neuron
     Fit GLM to relate single neuron activity to task/behavioral covariates.
     Primary entry point for single-unit analysis.
@@ -65,6 +67,7 @@ from continuum_swr_replay.analysis.pfc.glm import (
     _make_design_matrices as make_design_matrices,
 )
 from continuum_swr_replay.analysis.pfc.glm import (
+    MatchedControlDraw,
     build_session_event_sets,
     build_session_fit_mask,
     get_spikecount_per_time_bin,
@@ -75,6 +78,7 @@ from continuum_swr_replay.analysis.pfc.glm import (
 )
 
 __all__ = [
+    "MatchedControlDraw",
     "make_design_matrices",
     "fit_immobility_models",
     "build_session_event_sets",

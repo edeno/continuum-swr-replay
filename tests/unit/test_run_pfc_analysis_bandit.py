@@ -208,6 +208,8 @@ def fake_session(monkeypatch):
                 "matched_control_seed": 12345,
                 "n_matched_control": 7,
                 "n_matched_control_unplaced": 1,
+                "n_matched_control_onset_outside_fitted_bout": 1,
+                "n_matched_control_bout_saturated": 0,
             },
         )
 
@@ -296,6 +298,8 @@ def test_the_sidecar_states_the_event_definition_the_fit_was_read_on(
     assert record["matched_control_seed"] == 12345
     assert record["n_matched_control"] == 7
     assert record["n_matched_control_unplaced"] == 1
+    assert record["n_matched_control_onset_outside_fitted_bout"] == 1
+    assert record["n_matched_control_bout_saturated"] == 0
 
 
 def test_a_bundle_fit_on_the_retired_event_definition_is_refit(tmp_path):

@@ -56,7 +56,26 @@ tag is not `"canonical_event_table"`.
 
 Written with `json.dump(..., indent=2)`. The counts come from the canonical
 event table restricted to immobility (Phase 1); `n_matched_control` is filled
-once Phase 2 lands (0 in Phase 1's sidecar). Production sidecars must bind to
+once Phase 2 lands (0 in Phase 1's sidecar).
+
+**Amended 2026-09-14 (shipped shape).** The sidecar carries four more
+matched-control keys than the block above lists, all written from `cohort_info`:
+
+```python
+    "matched_control_seed": int,        # session-keyed, from matched_control_seed()
+    "n_matched_control_unplaced": int,  # source events with no control window
+    "n_matched_control_onset_outside_fitted_bout": int,
+    "n_matched_control_bout_saturated": int,
+```
+
+`n_matched_control + n_matched_control_unplaced == n_events_total`, and the last
+two sum to `n_matched_control_unplaced`. They are kept apart because they mean
+different things: an onset outside every fitted bout is a cohort fact (an event
+is kept by its onset bin, which can lie outside the fit mask), while a saturated
+bout is an event-density fact (the bout is too short, or too full of real
+events, to hold one more window of that duration). A session with many of the
+second has a control population thinner than its events exactly where events
+cluster, which is the case where the engagement test loses power. Production sidecars must bind to
 the frozen staged canonical-table generation and per-session input manifests
 created by regression-integrity Phase 13. A sidecar whose source hash differs
 from that generation is stale even when its artifact files are present.
@@ -201,6 +220,23 @@ completion file.
 Phase 2 adds one public helper to `analysis/pfc/glm.py`. Its signature and
 output columns are frozen here because Phase 3's rerun depends on them and the
 divergence guard tests them.
+
+**Amended 2026-09-14 (shipped shape).** Two departures from the signature
+below, both forced by what the placement rule needs. First, the helper takes the
+whole *mapping* of event classes `build_session_event_sets` returns
+(`non_local_no_SWR`, `non_local_SWR`, `non_local`, `SWR`), not one event frame:
+`non_local` supplies the source events, but a control must avoid the windows of
+every class — a bare `SWR` belongs to no non-local class, so a helper given only
+the non-local frame could place a control on top of one. It also takes
+`max_attempts` (default 50). Second it returns a `MatchedControlDraw` named
+tuple — `times` (the DataFrame the signature below promises), plus
+`n_onset_outside_fitted_bout` and `n_bout_saturated`, the two causes of the
+shortfall, with `n_unplaced` as their total. Callers use `.times` where the
+signature below says the return value is the frame. `is_immobile` is documented
+as the *fit mask*, not raw immobility, so the control samples the bins the
+models are fit on. One invariant is stronger than the list below: placed
+controls join the blocked windows, so no two controls overlap each other
+either.
 
 ```python
 def make_matched_control_times(

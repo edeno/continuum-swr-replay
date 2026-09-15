@@ -432,6 +432,14 @@ def run_analysis(
                 "n_matched_control_unplaced": cohort_info.get(
                     "n_matched_control_unplaced"
                 ),
+                # ...and split by why: an onset outside every fitted bout is a
+                # cohort fact, a saturated bout is an event-density one.
+                "n_matched_control_onset_outside_fitted_bout": cohort_info.get(
+                    "n_matched_control_onset_outside_fitted_bout"
+                ),
+                "n_matched_control_bout_saturated": cohort_info.get(
+                    "n_matched_control_bout_saturated"
+                ),
             },
         )
 

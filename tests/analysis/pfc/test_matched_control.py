@@ -15,7 +15,10 @@ that, at the level of the returned windows rather than of the code path:
 - the draw is a function of the seed alone.
 
 and the one property that makes it usable: an event whose bout has no free
-window of its duration is dropped and counted, never placed somewhere else.
+window of its duration is dropped and counted under the right one of the two
+shortfall reasons, never placed somewhere else. Controls also avoid one
+another, so the baseline population is non-overlapping exactly as the events
+it stands in for are.
 """
 
 from __future__ import annotations
@@ -103,7 +106,7 @@ class TestMatchedControlInvariants:
         # measured somewhere else.
         controls = make_matched_control_times(
             event_times, fit_mask, np.random.default_rng(1)
-        )
+        ).times
 
         assert len(controls) > 0, "nothing was placed; the invariant is vacuous"
         times = fit_mask.index.to_numpy(dtype=float)
@@ -120,7 +123,7 @@ class TestMatchedControlInvariants:
         # honoured only the non-local windows could land on it.
         controls = make_matched_control_times(
             event_times, fit_mask, np.random.default_rng(2)
-        )
+        ).times
 
         assert len(controls) > 0
         for start, end in zip(controls.start_time, controls.end_time, strict=True):
@@ -134,7 +137,7 @@ class TestMatchedControlInvariants:
     ):
         controls = make_matched_control_times(
             event_times, fit_mask, np.random.default_rng(3)
-        )
+        ).times
 
         source = event_times["non_local"]
         assert len(controls) <= len(source)
@@ -151,13 +154,13 @@ class TestMatchedControlInvariants:
     def test_the_draw_is_a_function_of_the_seed(self, event_times, fit_mask):
         first = make_matched_control_times(
             event_times, fit_mask, np.random.default_rng(4)
-        )
+        ).times
         again = make_matched_control_times(
             event_times, fit_mask, np.random.default_rng(4)
-        )
+        ).times
         other = make_matched_control_times(
             event_times, fit_mask, np.random.default_rng(5)
-        )
+        ).times
 
         pd.testing.assert_frame_equal(first, again)
         assert not first.equals(other), (
@@ -178,10 +181,13 @@ class TestMatchedControlInvariants:
             swr=[(1.4, 2.0)],
         )
 
-        controls = make_matched_control_times(crowded, mask, np.random.default_rng(6))
+        draw = make_matched_control_times(crowded, mask, np.random.default_rng(6))
 
-        assert len(controls) == 0
-        assert list(controls.columns) == ["start_time", "end_time"]
+        assert len(draw.times) == 0
+        assert list(draw.times.columns) == ["start_time", "end_time"]
+        # A full bout, not an onset the fit mask never covered.
+        assert (draw.n_onset_outside_fitted_bout, draw.n_bout_saturated) == (0, 1)
+        assert draw.n_unplaced == 1
 
     def test_an_event_outside_every_fitted_bout_is_dropped(self, fit_mask):
         # An event whose onset is in the moving gap has no bout to be matched
@@ -193,12 +199,37 @@ class TestMatchedControlInvariants:
             swr=[],
         )
 
-        controls = make_matched_control_times(
-            outside, fit_mask, np.random.default_rng(7)
+        draw = make_matched_control_times(outside, fit_mask, np.random.default_rng(7))
+
+        assert len(draw.times) == 1
+        assert 0.5 <= float(draw.times.start_time.iloc[0]) < 4.0
+        # An onset the fit mask never covered, not a bout with no room.
+        assert (draw.n_onset_outside_fitted_bout, draw.n_bout_saturated) == (1, 0)
+        assert draw.n_unplaced == 1
+
+    def test_no_two_control_windows_overlap_each_other(self):
+        # A near-full bout: four 0.1 s events fill 1.0-1.4 s of a 1-2 s bout,
+        # so all four controls have to share the 0.6 s that is left. If placed
+        # controls did not block later draws, two of them would sit on the same
+        # bins and that bin would count twice in the baseline regressor.
+        times = _times(duration_s=3.0)
+        mask = pd.Series((times >= 1.0) & (times < 2.0), index=times)
+        packed = _event_sets(
+            non_local_no_swr=[(1.0, 1.1), (1.1, 1.2), (1.2, 1.3), (1.3, 1.4)],
+            non_local_swr=[],
+            swr=[],
         )
 
-        assert len(controls) == 1
-        assert 0.5 <= float(controls.start_time.iloc[0]) < 4.0
+        draw = make_matched_control_times(packed, mask, np.random.default_rng(8))
+
+        assert len(draw.times) >= 2, "too few placed; the invariant is vacuous"
+        starts = draw.times.start_time.to_numpy(dtype=float)
+        ends = draw.times.end_time.to_numpy(dtype=float)
+        order = np.argsort(starts)
+        starts, ends = starts[order], ends[order]
+        assert np.all(starts[1:] >= ends[:-1]), (
+            f"control windows overlap each other: {list(zip(starts, ends))}"
+        )
 
 
 class TestMatchedControlSeed:
@@ -271,7 +302,7 @@ def test_replay_beats_the_matched_control_for_a_replay_tracking_neuron(
     event_times = dict(session["event_times"])
     event_times["matched_control"] = make_matched_control_times(
         event_times, session["is_immobile"], np.random.default_rng(12)
-    )
+    ).times
     assert len(event_times["matched_control"]) == len(event_times["non_local"]), (
         "not every event got a control; the engagement comparison would be "
         "against a smaller baseline than the events it is read against"

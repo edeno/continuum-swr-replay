@@ -10,7 +10,7 @@ import logging
 import warnings
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any
+from typing import Any, NamedTuple
 
 import dask
 import numpy as np
@@ -934,7 +934,11 @@ def process_neuron(
     ``matched_control vs. constant`` (does that baseline itself modulate
     firing -- a positive answer means the peri-event window is not
     exchangeable with the rest of the bout, and the engagement test is the
-    comparison to read).
+    comparison to read). The control is matched one per *non-local* event,
+    SWR-coincident ones included, so it is more numerous than the
+    ``non_local_no_SWR`` class it is compared against; a source event's
+    duration fixes its control's duration and constrains where the window
+    fits, and nothing else about the event is matched.
 
     **Q7. What is the relationship to theta modulation during running?**
     ``theta_mod``, ``theta_preferred_phase``, firing rates.
@@ -1901,12 +1905,46 @@ def _merge_windows(starts: NDArray, ends: NDArray) -> tuple[NDArray, NDArray]:
     return starts[opens_group], np.maximum.reduceat(ends, group_start)
 
 
+class MatchedControlDraw(NamedTuple):
+    """One draw of the matched non-event control, and why events went unplaced.
+
+    The two shortfall counts are kept apart because they mean different things
+    about a session. An onset outside every fitted bout is a *cohort* fact --
+    the event is kept by its onset bin, which can sit outside the fit mask --
+    and says nothing about how crowded the session is. A saturated bout is a
+    *density* fact: that bout is too short, or too full of real events, to hold
+    one more window of this event's duration, so the control population is
+    thinner than the event population wherever events cluster.
+
+    Attributes
+    ----------
+    times : pandas.DataFrame
+        Columns ``start_time``, ``end_time`` in seconds, one row per placed
+        control.
+    n_onset_outside_fitted_bout : int
+        Source events whose onset bin belongs to no fitted immobility bout.
+    n_bout_saturated : int
+        Source events whose bout could not hold a free window of their
+        duration -- too short for one at all, or no free placement found in
+        ``max_attempts`` draws.
+    """
+
+    times: pd.DataFrame
+    n_onset_outside_fitted_bout: int
+    n_bout_saturated: int
+
+    @property
+    def n_unplaced(self) -> int:
+        """Source events with no control window, for either reason."""
+        return self.n_onset_outside_fitted_bout + self.n_bout_saturated
+
+
 def make_matched_control_times(
     event_times: Mapping[str, pd.DataFrame],
     is_immobile: pd.Series,
     rng: np.random.Generator,
     max_attempts: int = DEFAULT_MATCHED_CONTROL_ATTEMPTS,
-) -> pd.DataFrame:
+) -> MatchedControlDraw:
     """Time-shifted-onset matched non-event control.
 
     The non-SWR replay regressor asks whether a neuron responds to replay. On
@@ -1955,11 +1993,13 @@ def make_matched_control_times(
 
     Returns
     -------
-    pandas.DataFrame
-        Columns ``start_time``, ``end_time`` in seconds, one row per *placed*
-        control, in source-event order. Rows are deliberately not re-sorted by
-        time: row ``k`` is then the ``k``-th placeable source event, so the
-        duration match is readable row by row when nothing was dropped.
+    MatchedControlDraw
+        ``times`` holds columns ``start_time``, ``end_time`` in seconds, one
+        row per *placed* control, in source-event order. Rows are deliberately
+        not re-sorted by time: row ``k`` is then the ``k``-th placeable source
+        event, so the duration match is readable row by row when nothing was
+        dropped. ``n_onset_outside_fitted_bout`` and ``n_bout_saturated`` split
+        the shortfall by its two causes.
 
     Raises
     ------
@@ -1984,7 +2024,8 @@ def make_matched_control_times(
 
     control_starts: list[float] = []
     control_ends: list[float] = []
-    n_unplaced = 0
+    n_onset_outside_fitted_bout = 0
+    n_bout_saturated = 0
     for start, end in zip(
         source.start_time.to_numpy(dtype=float),
         source.end_time.to_numpy(dtype=float),
@@ -1995,7 +2036,7 @@ def make_matched_control_times(
         onset_index = int(np.searchsorted(times, start, side="right")) - 1
         run_row = _bout_containing(runs, onset_index)
         if run_row < 0:
-            n_unplaced += 1
+            n_onset_outside_fitted_bout += 1
             continue
         run_start, run_stop = int(runs[run_row, 0]), int(runs[run_row, 1])
         # Onsets late enough in the bout that the window would run past its last
@@ -2011,7 +2052,7 @@ def make_matched_control_times(
             - 1
         )
         if last_offset < 0:
-            n_unplaced += 1
+            n_bout_saturated += 1
             continue
 
         for _ in range(max_attempts):
@@ -2030,19 +2071,25 @@ def make_matched_control_times(
             )
             break
         else:
-            n_unplaced += 1
+            n_bout_saturated += 1
 
-    if n_unplaced:
+    if n_onset_outside_fitted_bout or n_bout_saturated:
         logger.warning(
-            "%d of %d matched controls could not be placed in %d attempts: the "
-            "event's onset is in no fitted bout, or its bout holds no free "
-            "window of the event's duration",
-            n_unplaced,
+            "%d of %d matched controls could not be placed in %d attempts: "
+            "%d events have an onset in no fitted bout, %d sit in a bout with "
+            "no free window of the event's duration",
+            n_onset_outside_fitted_bout + n_bout_saturated,
             len(source),
             max_attempts,
+            n_onset_outside_fitted_bout,
+            n_bout_saturated,
         )
-    return pd.DataFrame(
-        {"start_time": control_starts, "end_time": control_ends}, dtype=float
+    return MatchedControlDraw(
+        times=pd.DataFrame(
+            {"start_time": control_starts, "end_time": control_ends}, dtype=float
+        ),
+        n_onset_outside_fitted_bout=n_onset_outside_fitted_bout,
+        n_bout_saturated=n_bout_saturated,
     )
 
 
@@ -2415,7 +2462,9 @@ def run_session(
         ``_sha256``, ``swr_interval_source``, ``data_over_time_path`` /
         ``_sha256``), plus the matched non-event control's draw
         (``matched_control_seed``, ``n_matched_control``,
-        ``n_matched_control_unplaced``). Written to the run's provenance
+        ``n_matched_control_unplaced`` and the two causes that total,
+        ``n_matched_control_onset_outside_fitted_bout`` and
+        ``n_matched_control_bout_saturated``). Written to the run's provenance
         sidecar so an artifact states both the population and the events it
         was fit on. Also records how the models were fit: ``fitter``,
         ``fitter_tol`` and, for the batched fitter, ``jax_backend`` and
@@ -2565,10 +2614,11 @@ def run_session(
     # from the fit mask, so its windows sample exactly the bins the models are
     # fit on and avoid exactly the events that survived the restriction.
     control_seed = matched_control_seed(nwb_file_name, epoch_name)
-    event_times["matched_control"] = make_matched_control_times(
+    control_draw = make_matched_control_times(
         event_times, fit_mask, np.random.default_rng(control_seed)
     )
-    n_matched_control = int(len(event_times["matched_control"]))
+    event_times["matched_control"] = control_draw.times
+    n_matched_control = int(len(control_draw.times))
     cohort_info = {
         **bin_counts,
         **event_counts,
@@ -2579,9 +2629,11 @@ def run_session(
         "n_neurons_reference_fit": None,
         "matched_control_seed": control_seed,
         "n_matched_control": n_matched_control,
-        "n_matched_control_unplaced": (
-            int(len(event_times[MATCHED_CONTROL_SOURCE_CLASS])) - n_matched_control
+        "n_matched_control_unplaced": control_draw.n_unplaced,
+        "n_matched_control_onset_outside_fitted_bout": (
+            control_draw.n_onset_outside_fitted_bout
         ),
+        "n_matched_control_bout_saturated": control_draw.n_bout_saturated,
         "alignment": alignment_counts,
     }
     logger.info(
@@ -2600,9 +2652,12 @@ def run_session(
         event_counts["n_ripple_dropped_overlapping_fit"],
     )
     logger.info(
-        "Matched non-event controls: %d placed, %d unplaced (seed %d)",
+        "Matched non-event controls: %d placed, %d unplaced "
+        "(%d onset outside a fitted bout, %d bout saturated; seed %d)",
         cohort_info["n_matched_control"],
         cohort_info["n_matched_control_unplaced"],
+        cohort_info["n_matched_control_onset_outside_fitted_bout"],
+        cohort_info["n_matched_control_bout_saturated"],
         control_seed,
     )
     logger.info(

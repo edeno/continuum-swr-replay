@@ -425,7 +425,7 @@ def generate_figure(
         event_times,
         fit_mask,
         np.random.default_rng(matched_control_seed(nwb_file_name, epoch_name)),
-    )
+    ).times
     print(
         f"Matched non-event controls: {len(event_times['matched_control'])}"
         f"/{len(event_times['non_local'])} placed"
