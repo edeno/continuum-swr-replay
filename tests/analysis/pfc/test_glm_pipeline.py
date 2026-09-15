@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import pytest
 import statsmodels.api as sm
+from patsy import dmatrix
 
 from continuum_swr_replay.analysis.pfc.glm import (
     _fit_immobility_models,
@@ -19,8 +20,8 @@ from continuum_swr_replay.analysis.pfc.glm import (
     _make_design_matrices,
     _prefit_session,
     build_theta_design,
-    create_conv_basis,
-    create_lagged_signal,
+    convolve_event_basis,
+    event_basis_functions,
     fit_models_batched,
     fitter_provenance,
     get_frac_explained_deviance,
@@ -142,109 +143,169 @@ def spike_count(poisson_spike_times, time_axis):
 
 
 # ---------------------------------------------------------------------------
-# create_lagged_signal
+# The peri-event basis and its convolution
 # ---------------------------------------------------------------------------
 
 
-class TestCreateLaggedSignal:
-    def test_output_shape(self):
-        signal = np.array([0, 0, 1, 0, 0], dtype=float)
-        lags = np.array([-1, 0, 1])
-        result = create_lagged_signal(signal, lags)
-        assert result.shape == (5, 3)
+class TestEventBasisFunctions:
+    """The peri-event kernel's basis: zero at both ends, one in the middle."""
 
-    def test_zero_lag_is_identity(self):
-        signal = np.array([1, 2, 3, 4, 5], dtype=float)
-        lags = np.array([0])
-        result = create_lagged_signal(signal, lags)
-        np.testing.assert_array_equal(result[:, 0], signal)
+    def test_the_kernel_is_zero_at_both_ends_of_the_fit_window(
+        self, sampling_frequency
+    ):
+        """Neither edge is free.
 
-    def test_positive_lag_shifts_forward(self):
-        signal = np.array([1, 0, 0, 0, 0], dtype=float)
-        lags = np.array([2])
-        result = create_lagged_signal(signal, lags)
-        # Shift by 2 moves the spike to index 0+2=2... but shift(2) moves
-        # the value DOWN by 2 rows (pandas convention)
-        expected = np.array([0, 0, 1, 0, 0], dtype=float)
-        np.testing.assert_array_equal(result[:, 0], expected)
+        A clamped cubic B-spline has one function equal to one at each edge of
+        the window. Dropping only the first -- which is what patsy's
+        ``bs(...) - 1`` does -- pins the kernel to zero at the left edge and
+        leaves the right edge free to run off, so the same modulation gets a
+        boundary artefact at one end and not the other.
+        """
+        lags = np.arange(-125, 126)
 
-    def test_out_of_bounds_filled_with_zero(self):
-        signal = np.array([0, 0, 0, 0, 1], dtype=float)
-        lags = np.array([2])
-        result = create_lagged_signal(signal, lags)
-        # The 1 at index 4 shifted by 2 would land at index 6 — OOB,
-        # so the column must be all-zero. Pin the *whole* expected
-        # vector: a regression that leaks the value into any in-range
-        # bin (e.g. via wrap-around or fill-with-edge) would still
-        # have most slots equal to zero, so an
-        # ``any-bin-is-zero``-style assertion silently passes.
-        expected = np.zeros(5, dtype=float)
-        np.testing.assert_array_equal(result[:, 0], expected)
+        spline_basis, _, _ = event_basis_functions(lags, sampling_frequency)
 
-    def test_default_lags(self):
-        signal = np.zeros(300)
-        result = create_lagged_signal(signal)
-        # Default is np.arange(-100, 101) = 201 lags
-        assert result.shape == (300, 201)
+        assert np.all(spline_basis[0] == 0.0)
+        assert np.all(spline_basis[-1] == 0.0)
+        # Any coefficient vector, not just the basis functions one at a time.
+        rng = np.random.default_rng(0)
+        kernels = spline_basis @ rng.normal(size=(spline_basis.shape[1], 20))
+        np.testing.assert_array_equal(kernels[0], 0.0)
+        np.testing.assert_array_equal(kernels[-1], 0.0)
 
+    def test_the_basis_sums_to_one_between_the_outer_knots(
+        self, sampling_frequency
+    ):
+        """So a flat modulation is representable, with equal coefficients."""
+        lags = np.arange(-125, 126)
 
-# ---------------------------------------------------------------------------
-# create_conv_basis
-# ---------------------------------------------------------------------------
-
-
-class TestCreateConvBasis:
-    def test_output_shapes(self, sampling_frequency):
-        n_time = 1000
-        count = np.zeros(n_time)
-        count[500] = 1  # single event at midpoint
-        lags = np.arange(-50, 51)
-        knots = np.arange(-0.08, 0.08, 0.02)[1:]
-
-        conv_basis, spline_basis, lag_time = create_conv_basis(
-            count, lags, knots, sampling_frequency
+        spline_basis, lag_time, knots = event_basis_functions(
+            lags, sampling_frequency
         )
 
-        n_lags = len(lags)
-        n_basis = spline_basis.shape[1]
+        interior = (lag_time >= knots[0]) & (lag_time <= knots[-1])
+        np.testing.assert_allclose(spline_basis[interior].sum(axis=1), 1.0, atol=1e-12)
+        assert np.all(spline_basis >= -1e-12)
 
-        assert spline_basis.shape[0] == n_lags
-        assert lag_time.shape == (n_lags,)
-        assert conv_basis.shape == (n_time, n_basis)
+    def test_the_window_that_sums_to_one_covers_the_reported_lags(
+        self, sampling_frequency
+    ):
+        """The +/-250 ms fit window's flat span is the +/-200 ms report window."""
+        spline_basis, lag_time, knots = event_basis_functions(
+            np.arange(-125, 126), sampling_frequency
+        )
 
-    def test_lag_time_in_seconds(self, sampling_frequency):
+        assert knots[0] == pytest.approx(-0.20)
+        assert knots[-1] == pytest.approx(0.20)
+        assert spline_basis.shape == (251, len(knots) + 2)
+
+    def test_the_basis_is_two_functions_narrower_than_the_full_one(
+        self, sampling_frequency
+    ):
+        """Stated, because it changes every design's width and every fit."""
+        lags = np.arange(-125, 126)
+        lag_time = lags / sampling_frequency
+        knots = np.arange(lag_time[0], lag_time[-1], 0.050)[1:]
+        full = np.asarray(
+            dmatrix(
+                "bs(lag_time, knots=knots, include_intercept=True) - 1",
+                {"lag_time": lag_time, "knots": knots},
+            )
+        )
+
+        spline_basis, _, _ = event_basis_functions(lags, sampling_frequency)
+
+        assert full.shape[1] == len(knots) + 4
+        assert spline_basis.shape[1] == len(knots) + 2
+        np.testing.assert_allclose(spline_basis, full[:, 1:-1])
+
+
+class TestConvolveEventBasis:
+    """The convolution columns, against the lagged-matrix product they replace."""
+
+    @staticmethod
+    def lagged_matrix_product(signal, spline_basis, lags):
+        """The construction this replaces: 201 shifted copies, then a product.
+
+        ``pandas.Series.shift(lag)`` moves a value DOWN by ``lag`` rows, so
+        column ``j`` holds ``signal[t - lags[j]]`` and a positive lag reads as
+        time after an onset. Written out here rather than imported, so the test
+        pins the arithmetic and not the implementation.
+        """
+        frame = pd.DataFrame(signal)
+        lagged = np.concatenate(
+            [frame.shift(int(lag), fill_value=0).to_numpy() for lag in lags], axis=1
+        )
+        return lagged @ spline_basis
+
+    def test_it_equals_the_lagged_matrix_product(self, sampling_frequency):
+        lags = np.arange(-125, 126)
+        spline_basis, _, _ = event_basis_functions(lags, sampling_frequency)
+        rng = np.random.default_rng(3)
+        signal = np.zeros(20_000)
+        signal[rng.choice(20_000, 200, replace=False)] = 1.0
+
+        actual = convolve_event_basis(signal, spline_basis, lags)
+
+        expected = self.lagged_matrix_product(signal, spline_basis, lags)
+        np.testing.assert_allclose(actual, expected, atol=1e-12, rtol=0)
+
+    def test_an_onset_puts_the_kernel_after_it_at_positive_lags(
+        self, sampling_frequency
+    ):
+        """The sign convention, pinned on a single onset.
+
+        Column ``b`` at time ``t`` must carry ``B_b(t - onset)``: the response
+        at lag ``L`` after the onset is the basis evaluated at ``+L``.
+        """
         lags = np.arange(-50, 51)
-        knots = np.arange(-0.08, 0.08, 0.02)[1:]
-        count = np.zeros(200)
+        spline_basis, _, _ = event_basis_functions(lags, sampling_frequency)
+        signal = np.zeros(400)
+        signal[200] = 1.0
 
-        _, _, lag_time = create_conv_basis(count, lags, knots, sampling_frequency)
+        actual = convolve_event_basis(signal, spline_basis, lags)
 
-        np.testing.assert_allclose(lag_time, lags / sampling_frequency)
+        for offset, lag_index in ((0, 50), (20, 70), (-20, 30)):
+            np.testing.assert_allclose(
+                actual[200 + offset], spline_basis[lag_index], atol=1e-12
+            )
 
-    def test_zero_input_gives_zero_output(self, sampling_frequency):
-        count = np.zeros(200)
+    def test_two_onsets_add(self, sampling_frequency):
         lags = np.arange(-20, 21)
-        knots = np.array([-0.02, 0.0, 0.02])
+        spline_basis, _, _ = event_basis_functions(lags, sampling_frequency)
+        first, second = np.zeros(300), np.zeros(300)
+        first[100] = 1.0
+        second[110] = 1.0
 
-        conv_basis, _, _ = create_conv_basis(count, lags, knots, sampling_frequency)
+        both = convolve_event_basis(first + second, spline_basis, lags)
 
-        np.testing.assert_array_equal(conv_basis, 0)
+        np.testing.assert_allclose(
+            both,
+            convolve_event_basis(first, spline_basis, lags)
+            + convolve_event_basis(second, spline_basis, lags),
+            atol=1e-12,
+        )
 
-    def test_spline_basis_rows_sum_positive(self, sampling_frequency):
-        """B-spline basis should have non-negative partition of unity."""
-        count = np.zeros(200)
-        lags = np.arange(-50, 51)
-        knots = np.arange(-0.08, 0.08, 0.02)[1:]
+    def test_no_onsets_gives_no_signal(self, sampling_frequency):
+        lags = np.arange(-20, 21)
+        spline_basis, _, _ = event_basis_functions(lags, sampling_frequency)
 
-        _, spline_basis, _ = create_conv_basis(count, lags, knots, sampling_frequency)
+        actual = convolve_event_basis(np.zeros(300), spline_basis, lags)
 
-        # B-spline basis functions should be non-negative
-        assert np.all(spline_basis >= -1e-10)
+        np.testing.assert_array_equal(actual, 0.0)
 
+    def test_an_onset_near_the_edge_is_not_wrapped(self, sampling_frequency):
+        """An onset whose window runs off the start contributes only what fits."""
+        lags = np.arange(-20, 21)
+        spline_basis, _, _ = event_basis_functions(lags, sampling_frequency)
+        signal = np.zeros(300)
+        signal[2] = 1.0
 
-# ---------------------------------------------------------------------------
-# _make_design_matrices
-# ---------------------------------------------------------------------------
+        actual = convolve_event_basis(signal, spline_basis, lags)
+
+        expected = self.lagged_matrix_product(signal, spline_basis, lags)
+        np.testing.assert_allclose(actual, expected, atol=1e-12)
+        assert np.all(actual[-1] == 0.0)
 
 
 class TestMakeDesignMatrices:
@@ -351,12 +412,17 @@ class TestFitImmobilityModels:
             assert np.isfinite(result.aic), f"{name} AIC is not finite"
 
     def test_more_complex_model_has_lower_or_equal_deviance(
-        self, simple_event_times, position_info, is_immobile, spike_count, fitter
+        self, dense_session, fitter
     ):
-        dm, _, _ = _make_design_matrices(
-            simple_event_times, position_info, lags=np.arange(-50, 51)
+        # On the well-posed fixture: a nested model can only lower the
+        # deviance at the optimum, and neither an unpenalised fit that never
+        # settled nor a prior that binds hard has an optimum to say that of.
+        results, _ = _fit_ladder(
+            dense_session["fit_mask"],
+            dense_session["design_matrices"],
+            dense_session["spike_count"],
+            fitter,
         )
-        results, _ = _fit_ladder(is_immobile, dm, spike_count, fitter)
 
         # Nested: constant ⊂ SWR ⊂ SWR + non_local_no_SWR
         assert results["SWR"].deviance <= results["constant"].deviance + 1e-6
@@ -371,13 +437,21 @@ class TestFitImmobilityModels:
 
 
 class TestDevianceFractions:
-    def test_frac_null_deviance_positive_for_nested_models(
-        self, simple_event_times, position_info, is_immobile, spike_count
-    ):
-        dm, _, _ = _make_design_matrices(
-            simple_event_times, position_info, lags=np.arange(-50, 51)
+    """Read off the well-posed fixture, under the estimator that is shipped.
+
+    The fractions are differences of deviances between nested fits; on a
+    fixture where the maximum-likelihood fit does not exist, an unpenalised
+    "fit" can leave the larger model with the larger deviance and the fractions
+    then describe the solver rather than the data.
+    """
+
+    def test_frac_null_deviance_positive_for_nested_models(self, dense_session):
+        results, _ = _fit_ladder(
+            dense_session["fit_mask"],
+            dense_session["design_matrices"],
+            dense_session["spike_count"],
+            "jax",
         )
-        results, _ = _fit_immobility_models(is_immobile, dm, spike_count)
 
         frac = get_frac_null_deviance(
             results["SWR + non_local_no_SWR"],
@@ -391,13 +465,13 @@ class TestDevianceFractions:
         assert np.isfinite(frac)
         assert frac >= -1e-10
 
-    def test_frac_explained_deviance_bounded(
-        self, simple_event_times, position_info, is_immobile, spike_count
-    ):
-        dm, _, _ = _make_design_matrices(
-            simple_event_times, position_info, lags=np.arange(-50, 51)
+    def test_frac_explained_deviance_bounded(self, dense_session):
+        results, _ = _fit_ladder(
+            dense_session["fit_mask"],
+            dense_session["design_matrices"],
+            dense_session["spike_count"],
+            "jax",
         )
-        results, _ = _fit_immobility_models(is_immobile, dm, spike_count)
 
         frac = get_frac_explained_deviance(
             results["SWR + non_local_no_SWR"],

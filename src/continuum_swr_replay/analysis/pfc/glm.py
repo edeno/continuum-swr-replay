@@ -492,67 +492,109 @@ def test_theta_modulation(
     return likelihood_ratio, p_value, modulation, preferred_phase
 
 
-def create_lagged_signal(signal: NDArray, lags: NDArray | None = None) -> NDArray:
-    """Create matrix of time-shifted copies of a signal for convolution GLM.
-
-    Parameters
-    ----------
-    signal : NDArray, shape (n_time,) or (n_time, 1)
-        Input signal (e.g., event indicator).
-    lags : NDArray, shape (n_lags,), optional
-        Lag indices in samples. Default: np.arange(-100, 101).
-
-    Returns
-    -------
-    NDArray, shape (n_time, n_lags)
-        Each column is the signal shifted by the corresponding lag.
-        Out-of-bounds values are zero-filled.
-
-    """
-    if lags is None:
-        lags = np.arange(-100, 101, 1)
-    signal_df = pd.DataFrame(signal)
-    return np.concatenate(
-        [signal_df.shift(lag, fill_value=0).to_numpy() for lag in lags], axis=1
-    )
+#: Spacing of the B-spline's internal knots, in seconds. 50 ms resolves the
+#: sharp peri-SWR responses (~50 ms peaks) without giving the kernel more
+#: freedom than the events can support.
+KNOT_SPACING_S = 0.050
 
 
-def create_conv_basis(
-    count: NDArray, lags: NDArray, knots: NDArray, sampling_frequency: float
+def event_basis_functions(
+    lags: NDArray, sampling_frequency: float
 ) -> tuple[NDArray, NDArray, NDArray]:
-    """Create convolution spline basis from event indicator counts.
+    """Cubic B-spline basis over the lag window, zero at both ends.
+
+    The kernel a design column carries is ``sum_b beta_b B_b(lag)``. A clamped
+    cubic B-spline has exactly two functions that are non-zero at the window's
+    edges -- the first, which is 1 at the left edge, and the last, which is 1
+    at the right -- and dropping *both* is what makes the kernel return to
+    baseline at both ends of the fit window rather than being pinned at one end
+    and free at the other. What is left sums to one between the first and last
+    internal knot, so a flat modulation over that span is representable by
+    equal coefficients, and each coefficient reads as the log-rate modulation
+    near its knot.
 
     Parameters
     ----------
-    count : NDArray, shape (n_time,)
-        Event indicator (0/1) time series.
     lags : NDArray, shape (n_lags,)
-        Lag indices in samples.
-    knots : NDArray, shape (n_knots,)
-        Internal knot positions for B-spline basis (in seconds).
+        Lag indices in samples, positive meaning after onset.
     sampling_frequency : float
         Sampling frequency in Hz.
 
     Returns
     -------
-    conv_spline_basis : NDArray, shape (n_time, n_basis)
-        Lagged signal projected onto spline basis.
     spline_basis : NDArray, shape (n_lags, n_basis)
-        B-spline basis functions evaluated at lag times.
+        ``n_basis = len(knots) + 2`` for a cubic spline.
     lag_time : NDArray, shape (n_lags,)
         Lag times in seconds.
-
+    knots : NDArray, shape (n_knots,)
+        Internal knot positions in seconds.
     """
-    lag_time = lags / sampling_frequency
+    lag_time = np.asarray(lags, dtype=float) / sampling_frequency
+    knots = np.arange(lag_time[0], lag_time[-1], KNOT_SPACING_S)[1:]
+    # ``include_intercept=True`` asks patsy for the whole basis (patsy drops
+    # the first function otherwise); both edge functions are dropped here.
     spline_basis = np.asarray(
         dmatrix(
-            "bs(lag_time, knots=knots) - 1",
+            "bs(lag_time, knots=knots, include_intercept=True) - 1",
             {"lag_time": lag_time, "knots": knots},
         )
-    )
-    conv_spline_basis = create_lagged_signal(count, lags) @ spline_basis
+    )[:, 1:-1]
+    return spline_basis, lag_time, knots
 
-    return conv_spline_basis, spline_basis, lag_time
+
+def convolve_event_basis(
+    onset_counts: NDArray, spline_basis: NDArray, lags: NDArray
+) -> NDArray:
+    """Convolve an onset indicator with each basis function.
+
+    Column ``b`` is ``sum_L indicator[t - L] B_b(L)`` over the lags ``L``, so a
+    positive lag is time *after* an onset. One convolution per basis function
+    replaces the ``(n_time, n_lags)`` matrix of shifted copies the same product
+    used to be formed from -- 1.4 GB per event class on the longest sessions,
+    against a few MB here -- and is exact: both are the same sum of the same
+    terms.
+
+    Parameters
+    ----------
+    onset_counts : NDArray, shape (n_time,)
+        Event onsets per time bin.
+    spline_basis : NDArray, shape (n_lags, n_basis)
+        Basis functions evaluated at the lags, from
+        :func:`event_basis_functions`.
+    lags : NDArray, shape (n_lags,)
+        Contiguous lag indices in samples, ascending by one sample.
+
+    Returns
+    -------
+    NDArray, shape (n_time, n_basis)
+    """
+    signal = np.asarray(onset_counts, dtype=float)
+    n_time = signal.shape[0]
+    # ``np.convolve(s, k)[n] = sum_i s[n - i] k[i]`` indexes the kernel from
+    # lag zero, so the window's first lag is the offset back into it.
+    offset = -int(lags[0])
+    columns = [
+        np.convolve(signal, spline_basis[:, b])[offset : offset + n_time]
+        for b in range(spline_basis.shape[1])
+    ]
+    return np.column_stack(columns)
+
+
+def event_onset_counts(times: pd.DataFrame, time: NDArray) -> NDArray:
+    """Event onsets per time bin, from a table of event windows.
+
+    Parameters
+    ----------
+    times : pandas.DataFrame
+        Event windows with a ``start_time`` column, in seconds.
+    time : NDArray, shape (n_time,)
+        Time bin starts in seconds.
+
+    Returns
+    -------
+    NDArray, shape (n_time,)
+    """
+    return get_spikecount_per_time_bin(times.start_time, time)
 
 
 def _make_conv_spline_basis(
@@ -563,30 +605,19 @@ def _make_conv_spline_basis(
 ) -> tuple[dict[str, NDArray], NDArray, NDArray]:
     if lags is None:
         lags = np.arange(-100, 101, 1)
-    # 50ms knot spacing resolves sharp peri-SWR responses (~50ms peaks)
-    knots = np.arange(
-        lags[0] / sampling_frequency, lags[-1] / sampling_frequency, 0.050
-    )[1:]
     if not times:
         raise ValueError("times dict must be non-empty")
 
-    # Compute spline basis and lag_time once (they depend only on lags/knots,
-    # not on per-event indicator signals)
-    lag_time = lags / sampling_frequency
-    spline_basis = np.asarray(
-        dmatrix(
-            "bs(lag_time, knots=knots) - 1",
-            {"lag_time": lag_time, "knots": knots},
-        )
-    )
+    # The basis depends only on the lags, not on the per-class onsets.
+    spline_basis, lag_time, _ = event_basis_functions(lags, sampling_frequency)
 
-    conv_spline_basis: dict[str, NDArray] = {}
-    for times_name, times_df in times.items():
-        is_time = get_spikecount_per_time_bin(
-            times_df.start_time, position_info.index.to_numpy()
+    time = position_info.index.to_numpy()
+    conv_spline_basis: dict[str, NDArray] = {
+        times_name: convolve_event_basis(
+            event_onset_counts(times_df, time), spline_basis, lags
         )
-        lagged = create_lagged_signal(is_time, lags)
-        conv_spline_basis[times_name] = lagged @ spline_basis
+        for times_name, times_df in times.items()
+    }
 
     return conv_spline_basis, spline_basis, lag_time
 
