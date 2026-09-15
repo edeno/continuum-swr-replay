@@ -107,6 +107,34 @@ class TestAgreementWithStatsmodels:
             rtol=0,
         )
 
+    def test_standard_errors_are_the_information_at_the_fitted_parameters(
+        self, planted
+    ):
+        """``sqrt(diag((X' W X)^+))`` at the parameters that were returned.
+
+        The single-neuron figure panel draws a +/-1 SE band, so the batched
+        path has to carry standard errors. They are exact against a direct
+        dense evaluation, and agree with statsmodels to ~1e-7 rather than to
+        ATOL -- statsmodels reports the covariance of its *last weighted
+        least-squares step*, whose weights are one IRLS iteration behind the
+        parameters it returns. The same 1e-7 separates statsmodels from the
+        dense evaluation, so the gap is statsmodels' lag and not this
+        fitter's arithmetic.
+        """
+        design, counts, _ = planted
+        batched = fit_poisson_glms(design, counts)
+
+        for unit in range(counts.shape[1]):
+            actual = batched.for_unit(unit)
+            fitted_mean = np.exp(design @ actual.params)
+            dense = np.sqrt(
+                np.diag(np.linalg.pinv(design.T @ (design * fitted_mean[:, None])))
+            )
+            np.testing.assert_allclose(actual.bse, dense, atol=1e-12, rtol=0)
+
+            expected = statsmodels_fit(design, counts[:, unit])
+            np.testing.assert_allclose(actual.bse, expected.bse, atol=1e-6, rtol=0)
+
     def test_batching_does_not_change_a_units_answer(self, planted):
         """A unit fit alone and the same unit fit in a batch give one answer.
 
@@ -185,6 +213,17 @@ class TestRankDeficientDesign:
         # and leaves an all-zero column at exactly zero.
         assert actual.params[2] == pytest.approx(0.0, abs=1e-12)
         assert actual.params[1] == pytest.approx(actual.params[4], abs=1e-9)
+
+    def test_standard_errors_follow_the_pinv_solution(self, deficient):
+        design, counts = deficient
+        batched = fit_poisson_glms(design, counts)
+        expected = statsmodels_fit(design, counts)
+
+        actual = batched.for_unit(0)
+        np.testing.assert_allclose(actual.bse, expected.bse, atol=1e-6, rtol=0)
+        # A column the design does not span has an exactly zero parameter, and
+        # no uncertainty about it either.
+        assert actual.bse[2] == pytest.approx(0.0, abs=1e-12)
 
     def test_aic_counts_the_rank_not_the_columns(self, deficient):
         design, counts = deficient

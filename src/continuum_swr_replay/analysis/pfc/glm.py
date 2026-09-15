@@ -299,13 +299,12 @@ def fit_models_batched(
     Raises
     ------
     UnconfiguredDeviceError
-        When no JAX device has been chosen and CUDA is still reachable -- the
-        batched fitter would otherwise take every card on a shared host.
+        From the batched solver, when no JAX device has been chosen and CUDA
+        is still reachable -- it would otherwise take every card on a shared
+        host.
     """
     from continuum_swr_replay.analysis.pfc.batched_glm import fit_poisson_glms
-    from continuum_swr_replay.analysis.pfc.gpu import require_configured_device
 
-    require_configured_device()
     return {
         model_name: fit_poisson_glms(design, counts)
         for model_name, design in design_matrices.items()
@@ -341,9 +340,7 @@ def _fit_theta_models(
     constant_design = np.ones((design_matrix.shape[0], 1))
     if fitter == "jax":
         from continuum_swr_replay.analysis.pfc.batched_glm import fit_poisson_glms
-        from continuum_swr_replay.analysis.pfc.gpu import require_configured_device
 
-        require_configured_device()
         constant_result = fit_poisson_glms(constant_design, counts)
         theta_result = fit_poisson_glms(design_matrix, counts)
         if counts.ndim != 1:

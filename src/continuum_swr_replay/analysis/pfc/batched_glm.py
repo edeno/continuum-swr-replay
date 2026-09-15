@@ -86,6 +86,8 @@ import jax.numpy as jnp
 import numpy as np
 from numpy.typing import NDArray
 
+from continuum_swr_replay.analysis.pfc.gpu import require_configured_device
+
 # Float64 is a correctness requirement, not a preference: the IRLS stops on an
 # absolute deviance change of 1e-8 against deviances of order 1e5, which is
 # below float32's resolution there -- in float32 the loop would either never
@@ -150,6 +152,11 @@ class UnitGLMResult:
         The fit left the range where this fitter and statsmodels agree -- it
         did not converge, or its fitted means spread further than the normal
         equations can carry. See the module docstring.
+    bse : NDArray, shape (n_features,)
+        Standard errors of ``params``, as statsmodels' ``bse``: the square
+        root of the diagonal of ``(X' W X)^+`` at the fitted weights, with
+        Poisson's fixed unit scale. Exactly zero in a direction the design
+        does not span, where the parameter is itself exactly zero.
     """
 
     params: NDArray
@@ -162,6 +169,7 @@ class UnitGLMResult:
     nobs: int
     n_features: int
     needs_reference_fit: bool = False
+    bse: NDArray | None = None
 
     @property
     def df_model(self) -> float:
@@ -189,6 +197,8 @@ class BatchedGLMResults:
     needs_reference_fit : NDArray of bool, shape (n_units,)
         Units whose fit left the range where this fitter and statsmodels
         agree. A caller that must match statsmodels refits these with it.
+    bse : NDArray, shape (n_units, n_features)
+        Per-unit standard errors of ``params``, as statsmodels' ``bse``.
     """
 
     params: NDArray
@@ -201,12 +211,15 @@ class BatchedGLMResults:
     nobs: int
     n_features: int
     needs_reference_fit: NDArray | None = None
+    bse: NDArray | None = None
 
     def __post_init__(self) -> None:
         if self.needs_reference_fit is None:
             object.__setattr__(
                 self, "needs_reference_fit", np.zeros(len(self.params), dtype=bool)
             )
+        if self.bse is None:
+            object.__setattr__(self, "bse", np.full_like(self.params, np.nan))
 
     @property
     def n_units(self) -> int:
@@ -243,6 +256,7 @@ class BatchedGLMResults:
             nobs=self.nobs,
             n_features=self.n_features,
             needs_reference_fit=bool(self.needs_reference_fit[index]),
+            bse=np.asarray(self.bse[index]),
         )
 
 
@@ -426,6 +440,41 @@ def _solve(information: jnp.ndarray, rhs: jnp.ndarray, rcond: float) -> jnp.ndar
     return jnp.einsum("nij,nj->ni", eigenvectors, inverse * projected)
 
 
+def _standard_errors(information: jnp.ndarray, back: NDArray, rcond: float) -> NDArray:
+    """Per-unit ``sqrt(diag(cov(beta)))`` in the design's own columns.
+
+    The fit runs in an orthonormal basis ``Q`` with information ``H = Q' W Q``,
+    and ``beta = B c`` with ``B = V S^-1`` (``back``). So
+    ``cov(beta) = B H^+ B'`` -- Poisson's scale is fixed at one, which is why
+    no dispersion estimate enters -- and only its diagonal is wanted. ``H^+``
+    is taken on the same eigenvalue cutoff the IRLS step uses, so a direction
+    the weights have abandoned contributes nothing here either, and a column
+    the design does not span gets an exactly zero standard error beside its
+    exactly zero parameter.
+
+    Parameters
+    ----------
+    information : jnp.ndarray, shape (n_units, rank, rank)
+        ``H`` at the fitted parameters.
+    back : NDArray, shape (n_features, rank)
+        ``V S^-1``, the map out of the orthonormal basis.
+    rcond : float
+        Eigenvalue cutoff relative to the largest, as in :func:`_solve`.
+
+    Returns
+    -------
+    NDArray, shape (n_units, n_features)
+    """
+    eigenvalues, eigenvectors = jnp.linalg.eigh(information)
+    largest = jnp.max(jnp.abs(eigenvalues), axis=1, keepdims=True)
+    keep = eigenvalues > rcond * largest
+    inverse = jnp.where(keep, 1.0 / jnp.where(keep, eigenvalues, 1.0), 0.0)
+    # ``B V`` per unit, then the diagonal of ``(B V) diag(1/lambda) (B V)'``.
+    rotated = jnp.einsum("pr,nrk->npk", jnp.asarray(back), eigenvectors)
+    variance = jnp.einsum("npk,nk->np", rotated**2, inverse)
+    return np.sqrt(np.asarray(variance))
+
+
 def orthonormal_design_basis(
     design: NDArray,
 ) -> tuple[NDArray, NDArray, int]:
@@ -510,7 +559,14 @@ def fit_poisson_glms(
     ------
     ValueError
         If the design and counts disagree on the number of rows.
+    UnconfiguredDeviceError
+        If no JAX device has been chosen and CUDA is still reachable. The
+        check is here, at the one function that runs the solver, because a
+        caller that reaches it without going through a runner would otherwise
+        get JAX's default on a shared host: every visible card, most of each
+        preallocated.
     """
+    require_configured_device()
     design_array = np.ascontiguousarray(np.asarray(design, dtype=float))
     counts_array = np.asarray(counts, dtype=float)
     if counts_array.ndim == 1:
@@ -628,8 +684,12 @@ def fit_poisson_glms(
     # rather than returning one, so it is not a candidate for a reference fit.
     needs_reference_fit = (overspread | ~converged) & ~failed
 
+    standard_errors = _standard_errors(information, back, rcond)
+
     if failed.any():
         params_host = params_host.copy()
+        standard_errors = standard_errors.copy()
+        standard_errors[failed] = np.nan
         params_host[failed] = np.nan
         deviance_at_params = np.where(failed, np.nan, deviance_at_params)
         llf_host = np.where(failed, np.nan, llf_host)
@@ -646,4 +706,5 @@ def fit_poisson_glms(
         nobs=n_time,
         n_features=n_features,
         needs_reference_fit=needs_reference_fit,
+        bse=standard_errors,
     )
