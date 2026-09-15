@@ -12,7 +12,7 @@ Command: `uv run python scripts/qa/compare_pfc_cohorts.py --before Processed-Dat
 
 ## Inputs
 
-- before: `Processed-Data/_pre_canonical_events_backup_20260914` -- 17137 neurons with a usable fit, no cohort restriction, no provenance sidecars (these bundles predate them).
+- before: `Processed-Data/_pre_canonical_events_backup_20260914` -- 17137 neurons with a usable fit, 71 provenance sidecars read.
 - after: `Processed-Data` -- 71 bundles, each with a provenance sidecar (a bundle without one is refused, so the tables below and the population summary describe one session set), every one `stop_cohort` ['at_well'], every one on stop table `ea62e0b65fbe` (SHA-256 agrees across all bundles).
 
 The sessions were fit in several passes, and each sidecar records the repository HEAD **at the moment it was written** -- which drifts ahead of the code the worker had already imported, and can even carry a `-dirty` marker for changes that are not in the imported code at all. `runner_code` is therefore derived from the sidecar's own fields instead: a session with no `alignment` block was fit before that step existed, and a session trimmed by more than the 0.1 s single budget could only have been accepted by the later per-axis form.
@@ -261,7 +261,7 @@ The control is matched one per non-local event, SWR-coupled ones included, so it
 
 ## Estimator, device and inputs
 
-One row per distinct combination, so a batch run as one job collapses to a single row. `n_neurons_reference_fit` is the neurons the batched fitter handed back to statsmodels because their fits left the range the two agree over; those neurons' shipped numbers are statsmodels' own. `n_nonconverged_model_fits` counts the shipped neuron x model fits that ran to `maxiter` without settling, over `n_neurons_with_nonconverged_model` neurons -- those fits still report an LR test and an AIC, so a reader who wants to know how much of a result rests on a fit that never converged has nowhere else to ask.
+One row per distinct combination, so a batch run as one job per card collapses to one row per card. `n_neurons_reference_fit` is the neurons the batched fitter handed back to statsmodels because their fits left the range the two agree over; those neurons' shipped numbers are statsmodels' own. `n_nonconverged_model_fits` counts the shipped neuron x model fits that ran to `maxiter` without settling, over `n_neurons_with_nonconverged_model` neurons -- those fits still report an LR test and an AIC, so a reader who wants to know how much of a result rests on a fit that never converged has nowhere else to ask.
 
 | fitter | fitter_tol | jax_backend | jax_version | gpu_index | gpu_name | stop_table_sha256 | canonical_event_table_sha256 | git_hash | n_sessions | n_distinct_data_over_time | n_neurons_reference_fit | n_model_fits | n_nonconverged_model_fits | n_neurons_with_nonconverged_model |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |

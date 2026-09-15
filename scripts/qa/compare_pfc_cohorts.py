@@ -1353,8 +1353,8 @@ def rerun_sections(
 
     add("## Estimator, device and inputs\n")
     add(
-        "One row per distinct combination, so a batch run as one job collapses "
-        "to a single row. `n_neurons_reference_fit` is the neurons the batched "
+        "One row per distinct combination, so a batch run as one job per card "
+        "collapses to one row per card. `n_neurons_reference_fit` is the neurons the batched "
         "fitter handed back to statsmodels because their fits left the range "
         "the two agree over; those neurons' shipped numbers are statsmodels' "
         "own. `n_nonconverged_model_fits` counts the shipped neuron x model "
@@ -1441,10 +1441,14 @@ def build_report(
     add("## Inputs\n")
     cohorts = sorted(sidecars["stop_cohort"].dropna().unique())
     hashes = sidecars["stop_table_sha256"].dropna().unique()
+    before_sidecar_clause = (
+        f"{len(before_sidecars)} provenance sidecars read.\n"
+        if before_sidecars is not None and len(before_sidecars)
+        else "no cohort restriction, no provenance sidecars (these bundles predate them).\n"
+    )
     add(
         f"- before: `{before_dir}` -- {before_gate['n_neurons_with_fit']} neurons "
-        "with a usable fit, no cohort restriction, no provenance sidecars "
-        "(these bundles predate them).\n"
+        f"with a usable fit, {before_sidecar_clause}"
         f"- after: `{after_dir}` -- {len(sidecars)} bundles, each with a "
         "provenance sidecar (a bundle without one is refused, so the tables "
         "below and the population summary describe one session set), every one "
