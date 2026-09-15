@@ -312,10 +312,23 @@ def compare_diagnostics(
         )
         statsmodels_rank = side(statsmodels_diagnostics, model, "df_model") + 1
         jax_rank = side(jax_diagnostics, model, "df_model") + 1
-        rank_matches = bool(np.array_equal(statsmodels_rank, jax_rank))
+        # A neuron with no fit at all -- statsmodels refuses a response with no
+        # spikes, and both runs then take the firing-rates-only fallback --
+        # has no rank to compare. The two sides must agree on *which* neurons
+        # those are, and on the rank of every neuron that does have a fit.
+        statsmodels_fitted = np.isfinite(statsmodels_rank) & ~np.all(
+            np.isnan(side(statsmodels_diagnostics, model, "params")), axis=1
+        )
+        jax_fitted = np.isfinite(jax_rank) & ~np.all(
+            np.isnan(side(jax_diagnostics, model, "params")), axis=1
+        )
+        fitted = statsmodels_fitted & jax_fitted
+        no_fit_matches = bool(np.array_equal(statsmodels_fitted, jax_fitted))
+        rank_matches = no_fit_matches and bool(
+            np.array_equal(statsmodels_rank[fitted], jax_rank[fitted])
+        )
         n_features = side(statsmodels_diagnostics, model, "params").shape[1]
-        finite_rank = statsmodels_rank[np.isfinite(statsmodels_rank)]
-        estimable = bool(np.all(finite_rank == n_features))
+        estimable = bool(np.all(statsmodels_rank[fitted] == n_features))
         converged_matches = bool(
             np.array_equal(
                 side(statsmodels_diagnostics, model, "converged"),
@@ -333,6 +346,7 @@ def compare_diagnostics(
         rows.append(
             {
                 "model": model,
+                "n_without_a_fit": int((~fitted).sum()),
                 "estimable": estimable,
                 "max_abs_dparams": params_difference,
                 "max_abs_ddeviance": deviance_difference,
@@ -343,7 +357,11 @@ def compare_diagnostics(
                 "max_diter": iteration_difference,
             }
         )
-        if not rank_matches:
+        if not no_fit_matches:
+            failures.append(
+                f"{model}: the two runs disagree on which neurons have no fit"
+            )
+        elif not rank_matches:
             failures.append(f"{model}: the two fitters disagree on the design's rank")
         if not converged_matches:
             failures.append(f"{model}: convergence flags differ")

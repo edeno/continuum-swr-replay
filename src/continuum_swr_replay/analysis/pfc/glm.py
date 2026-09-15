@@ -1097,8 +1097,6 @@ def process_neuron(
             fitter=fitter,
             prefitted=prefitted_immobility,
         )
-        if fit_diagnostics_out is not None:
-            fit_diagnostics_out.update(_fit_diagnostics(results))
 
         # Check for silent non-convergence (NaN parameters from rank-deficient design)
         nan_models = [
@@ -1111,6 +1109,13 @@ def process_neuron(
                 f"Immobility firing rate: "
                 f"{neuron_stats['immobility_avg_firing_rate']:.3f} Hz."
             )
+
+        # Recorded only once the fits are known to be usable, so a neuron with
+        # no fit is absent from the diagnostics whichever backend produced it:
+        # the statsmodels path raises inside the fitter and never reaches here,
+        # and the batched path returns NaN parameters and raises just above.
+        if fit_diagnostics_out is not None:
+            fit_diagnostics_out.update(_fit_diagnostics(results))
 
         # Detect non-estimable models. ``_make_conv_spline_basis``
         # builds spline regressors for every event class regardless
