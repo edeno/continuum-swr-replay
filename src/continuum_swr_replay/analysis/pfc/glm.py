@@ -9,6 +9,7 @@ import hashlib
 import logging
 import warnings
 from collections.abc import Mapping
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import dask
@@ -366,6 +367,7 @@ def test_theta_modulation(
     *,
     fitter: str = "statsmodels",
     prefitted: tuple[Any, Any] | None = None,
+    design: tuple[NDArray, NDArray] | None = None,
 ) -> tuple[float, float, float, float]:
     """Test theta phase modulation of neuron firing during running.
 
@@ -397,6 +399,11 @@ def test_theta_modulation(
         ``(constant_result, theta_result)`` for this unit, already fit on the
         design :func:`build_theta_design` returns for this session. Passed by
         :func:`run_session`, which fits every unit at once.
+    design : tuple, optional
+        ``(joint_mask, design_matrix)`` from :func:`build_theta_design`. The
+        design is the same for every unit of a session and reindexing the theta
+        phase onto the time axis is not free, so a session builds it once and
+        passes it here; omitted, it is built from ``theta_phase``.
 
     Returns
     -------
@@ -410,9 +417,11 @@ def test_theta_modulation(
         Preferred theta phase in radians (-pi to pi).
 
     """
-    joint_mask, design_matrix = build_theta_design(
-        theta_phase, is_immobile, sampling_frequency=sampling_frequency
-    )
+    if design is None:
+        design = build_theta_design(
+            theta_phase, is_immobile, sampling_frequency=sampling_frequency
+        )
+    joint_mask, design_matrix = design
 
     if prefitted is not None:
         constant_glm_results, theta_glm_results = prefitted
@@ -858,6 +867,7 @@ def process_neuron(
     fitter: str = "statsmodels",
     prefitted_immobility: Mapping[str, Any] | None = None,
     prefitted_theta: tuple[Any, Any] | None = None,
+    theta_design: tuple[NDArray, NDArray] | None = None,
     design_ranks: Mapping[str, int] | None = None,
     fit_diagnostics_out: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], NDArray, NDArray, NDArray, NDArray, NDArray]:
@@ -973,6 +983,9 @@ def process_neuron(
         ``(constant_result, theta_result)`` for the theta LR test, likewise
         already fit. The regularized fit ``theta_mod`` and
         ``theta_preferred_phase`` come from is always run here, in statsmodels.
+    theta_design : tuple | None, optional
+        ``(joint_mask, design_matrix)`` from :func:`build_theta_design`, built
+        once for the session rather than once per neuron.
     design_ranks : Mapping[str, int] | None, optional
         ``numpy.linalg.matrix_rank`` of each design on ``fit_mask``. The rank
         is a property of the design, not of the neuron, so a session computes
@@ -1057,6 +1070,7 @@ def process_neuron(
             sampling_frequency=sampling_frequency,
             fitter=fitter,
             prefitted=prefitted_theta,
+            design=theta_design,
         )
         neuron_stats["run_avg_firing_rate"] = (
             neuron_spike_count[~is_immobile].mean() * sampling_frequency
@@ -2027,6 +2041,78 @@ def make_matched_control_times(
     )
 
 
+#: Threads the statsmodels reference fits run on. They are the dominant cost of
+#: a batched session -- a neuron the batched fitter will not vouch for is one
+#: whose fits run to ``maxiter``, so it costs several times what an ordinary
+#: neuron does -- and they are independent of one another. statsmodels' IRLS
+#: spends its time inside LAPACK, which releases the GIL, so threads give real
+#: parallelism without copying a 500 MB design per worker. Kept modest so a
+#: batch running several sessions at once does not oversubscribe the host.
+DEFAULT_REFERENCE_FIT_WORKERS = 8
+
+
+def _reference_fits(
+    indices: NDArray,
+    counts: NDArray,
+    fit_mask: pd.Series,
+    immobility_design_matrices: Mapping[str, NDArray],
+    theta_design: tuple[NDArray, NDArray],
+    max_workers: int,
+) -> dict[int, tuple[Any, Any] | None]:
+    """statsmodels fits for the neurons the batched fitter would not vouch for.
+
+    Parameters
+    ----------
+    indices : NDArray of int
+        Neurons to fit.
+    counts : NDArray, shape (n_time, n_units)
+        Spike counts, full length; the masks are applied inside.
+    fit_mask : pd.Series of bool
+        The immobility models' mask.
+    immobility_design_matrices : Mapping[str, NDArray]
+        Full-length designs keyed by model name.
+    theta_design : tuple
+        ``(joint_mask, design_matrix)`` from :func:`build_theta_design`.
+    max_workers : int
+        Threads to run the fits on.
+
+    Returns
+    -------
+    dict[int, tuple or None]
+        Per neuron, ``(immobility_results, theta_results)``, or ``None`` when
+        statsmodels refused the fit -- that neuron is left to
+        :func:`process_neuron`, which raises and falls back exactly as it
+        always has.
+    """
+    joint_mask, theta_matrix = theta_design
+    # The batch carries float counts; statsmodels is handed the integer counts
+    # ``get_spikecount_per_time_bin`` returns, so a handed-back neuron goes
+    # through byte for byte the call the per-neuron path makes.
+    integer_counts = counts.astype(np.int64, copy=False)
+
+    def fit_one(index: int) -> tuple[int, tuple[Any, Any] | None]:
+        try:
+            immobility, _ = _fit_immobility_models(
+                fit_mask,
+                dict(immobility_design_matrices),
+                integer_counts[:, index],
+                fitter="statsmodels",
+            )
+            theta = _fit_theta_models(
+                theta_matrix,
+                integer_counts[joint_mask, index],
+                fitter="statsmodels",
+            )
+        except (ValueError, np.linalg.LinAlgError):
+            return int(index), None
+        return int(index), (immobility, theta)
+
+    if len(indices) == 0:
+        return {}
+    with ThreadPoolExecutor(max_workers=max(1, max_workers)) as pool:
+        return dict(pool.map(fit_one, [int(index) for index in indices]))
+
+
 def _prefit_session(
     spike_times: list[NDArray],
     time: NDArray,
@@ -2035,10 +2121,12 @@ def _prefit_session(
     immobility_design_matrices: Mapping[str, NDArray],
     theta_phase: pd.Series,
     logger: logging.Logger,
+    reference_fit_workers: int = DEFAULT_REFERENCE_FIT_WORKERS,
 ) -> tuple[
     list[dict[str, Any] | None],
     list[tuple[Any, Any] | None],
     dict[str, int],
+    tuple[NDArray, NDArray],
     int,
 ]:
     """Fit every neuron of a session against every design, in batches.
@@ -2056,6 +2144,8 @@ def _prefit_session(
     theta_phase : pd.Series
         Theta phase timeseries, on its own clock.
     logger : logging.Logger
+    reference_fit_workers : int
+        Threads the statsmodels reference fits run on.
 
     Returns
     -------
@@ -2068,6 +2158,8 @@ def _prefit_session(
         or ``None`` for the same neurons.
     design_ranks : dict[str, int]
         Rank of each design on the fit mask.
+    theta_design : tuple
+        ``(joint_mask, design_matrix)``, built once for the session.
     n_reference_fits : int
         How many neurons were handed back.
 
@@ -2132,22 +2224,34 @@ def _prefit_session(
     hand_back = np.zeros(counts.shape[1], dtype=bool)
     for result in (*batched.values(), theta_constant, theta_full):
         hand_back |= result.needs_reference_fit
-    for index in np.flatnonzero(hand_back):
-        prefitted_immobility[index] = None
-        prefitted_theta[index] = None
     if hand_back.any():
         logger.info(
             "%d of %d neurons left the range where the batched fitter and "
             "statsmodels agree (a fit that did not converge, or fitted means "
-            "spread past what the normal equations carry); they are fit with "
-            "statsmodels instead",
+            "spread past what the normal equations carry); fitting them with "
+            "statsmodels on %d threads",
             int(hand_back.sum()),
             counts.shape[1],
+            reference_fit_workers,
         )
+        reference = _reference_fits(
+            np.flatnonzero(hand_back),
+            counts,
+            fit_mask,
+            immobility_design_matrices,
+            (joint_mask, theta_design),
+            reference_fit_workers,
+        )
+        for index, fits in reference.items():
+            # ``None`` means statsmodels refused this neuron; leaving it
+            # unprefitted sends it down the same failure path it always took.
+            prefitted_immobility[index] = None if fits is None else fits[0]
+            prefitted_theta[index] = None if fits is None else fits[1]
     return (
         prefitted_immobility,
         prefitted_theta,
         design_ranks,
+        (joint_mask, theta_design),
         int(hand_back.sum()),
     )
 
@@ -2214,6 +2318,7 @@ def run_session(
     cohort_stops: pd.DataFrame | None = None,
     fitter: str = "jax",
     fit_diagnostics_out: dict[str, Any] | None = None,
+    reference_fit_workers: int = DEFAULT_REFERENCE_FIT_WORKERS,
 ) -> tuple[pd.DataFrame, NDArray, NDArray, NDArray, NDArray, NDArray, dict[str, Any]]:
     """Run PFC GLM analysis for all neurons in a single session.
 
@@ -2269,6 +2374,10 @@ def run_session(
     fit_diagnostics_out : dict, optional
         When given, filled with ``{model_name: {quantity: array over neurons}}``
         for the fitter equivalence audit. Never part of the shipped bundle.
+    reference_fit_workers : int
+        Threads the statsmodels fits of the handed-back neurons run on. Those
+        neurons are the dominant cost of a batched session, and their fits are
+        independent, so they are run concurrently; LAPACK releases the GIL.
 
     Returns
     -------
@@ -2522,6 +2631,7 @@ def run_session(
     prefitted_immobility: list[dict[str, Any] | None] | None = None
     prefitted_theta: list[tuple[Any, Any] | None] | None = None
     design_ranks: dict[str, int] | None = None
+    theta_design: tuple[NDArray, NDArray] | None = None
     n_reference_fits = 0
     if fitter == "jax":
         # Every neuron shares the design; only the response column differs. Fit
@@ -2532,6 +2642,7 @@ def run_session(
             prefitted_immobility,
             prefitted_theta,
             design_ranks,
+            theta_design,
             n_reference_fits,
         ) = _prefit_session(
             data["spike_times"][brain_area],
@@ -2541,6 +2652,7 @@ def run_session(
             immobility_design_matrices,
             data["theta_phase"],
             logger=logger,
+            reference_fit_workers=reference_fit_workers,
         )
 
     def _neuron_args(index: int) -> dict[str, Any]:
@@ -2552,6 +2664,7 @@ def run_session(
             # here on the statsmodels path it would have taken all along.
             "fitter": fitter if prefit is not None else "statsmodels",
             "design_ranks": design_ranks,
+            "theta_design": theta_design,
             "prefitted_immobility": prefit,
             "prefitted_theta": (
                 None if prefitted_theta is None else prefitted_theta[index]
