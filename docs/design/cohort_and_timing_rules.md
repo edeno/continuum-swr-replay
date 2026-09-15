@@ -220,7 +220,27 @@ and a flagged unit's shipped numbers are statsmodels' own either way, so the
 estimates do not depend on the device — only the route to them does. The backend
 is recorded in each bundle's provenance sidecar (`fitter`, `jax_backend`,
 `jax_version`, `gpu_index`) alongside `n_neurons_reference_fit`, the count of
-units that took the statsmodels route.
+units that took the statsmodels route. The 71 canonical bundles were fit on
+2026-09-15 at git `9879ff0`, `fitter = jax` throughout, one worker per card on
+GPUs 2/3/4/6/7/9 (12/12/12/12/12/11 sessions), 13.7 h wall.
+
+**A seventh of the shipped fits never converged, and their statistics ship
+anyway.** Over those 71 sessions, 22,902 of 154,350 neuron × model fits
+(14.8%) ran to `maxiter` without meeting the convergence rule, spread over
+4,640 of the 17,150 neurons that were fit at all; 5,781 neurons took the
+statsmodels route. A fit that never settled is not refused by any current
+gate: it still reports a likelihood-ratio test, a fractional deviance and an
+AIC, and those enter the population fractions and the best-AIC counts exactly
+like a converged fit's. The cause is separation — a spline column whose
+support holds no spikes drives its coefficient without bound — which the
+rank-deficiency gate cannot see, because the design is full rank. The counts
+are in every bundle's sidecar (`n_model_fits`,
+`n_nonconverged_model_fits`, `n_neurons_with_nonconverged_model`) and are
+totalled per session in
+[`../audits/2026-09-15-pfc-canonical-rerun.md`](../audits/2026-09-15-pfc-canonical-rerun.md).
+Treating a non-converged fit as non-estimable is the fit-validity work, and
+until it lands the mPFC unit-GLM numbers — Figure 4 and claim 20 — are pending
+rather than final.
 
 ## Covariate causal hygiene
 

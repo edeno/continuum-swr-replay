@@ -632,7 +632,7 @@ Compare a backed-up rate fit against the current one and write a markdown audit.
 
 Write the before/after audit of the mPFC unit-GLM stop cohort.
 
-`read_sidecars`, `runner_code`, `provenance_table`, `bundle_sessions`, `session_cohort_table`, `coverage_summary`, `alignment_prose`, `gate_counts`, `significance_table`, `population_comparison`, `try_read_sidecars`, `same_events_precondition`, `event_count_agreement`, `shared_statistic_differences`, `matched_control_arrays`, `matched_control_significance`, `fitter_table`, `rerun_sections`, `build_report`, `main`
+`read_sidecars`, `runner_code`, `provenance_table`, `bundle_sessions`, `session_cohort_table`, `coverage_summary`, `alignment_prose`, `gate_counts`, `significance_table`, `population_comparison`, `try_read_sidecars`, `same_events_precondition`, `event_count_agreement`, `shared_statistic_differences`, `matched_control_arrays`, `matched_control_significance`, `fitter_table`, `session_fit_counts_table`, `worker_time_table`, `rerun_sections`, `build_report`, `main`
 
 ### `scripts/qa/compare_pfc_fitters.py`
 

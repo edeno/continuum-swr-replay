@@ -77,7 +77,13 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
 - `compare_pfc_cohorts.py` — writes the mPFC unit-GLM before/after audit: per-session
   bins and events on either side of the stop cohort (from the bundles' own provenance
   sidecars), the decode/position alignment trim, the leading-edge coverage diagnostic,
-  and the Figure 4 population loaded from both bundle trees.
+  and the Figure 4 population loaded from both bundle trees. When the earlier tree
+  also carries sidecars it audits a **rerun** as well: whether the two trees describe
+  the same events, the unit-by-unit differences against the estimator's gate
+  tolerances (per quantity and per session), the matched non-event control's tests,
+  the estimator/device/fit counts per card and per session, and — given
+  `--worker-time <batch>/worker*.time` — the wall clock each worker of the batch
+  cost.
 - `diagnose_pfc_event_definition.py` — reports, per session, what the mPFC unit GLM's
   retired run-time event construction yielded against the canonical event table it now
   reads: the two event counts, how many events change SWR class once the lists are
@@ -99,6 +105,13 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
   and content ladders are read on is the default (`at_well`, canonical artifact
   names), `all_stops` publishes an unrestricted sensitivity bundle under `_allstops`
   names, and Stage 5B accepts only `at_well` because its metrics need a current arm.
+  `run_pfc_analysis_bandit.py` also takes `--fitter` (`jax`, the batched per-session
+  Poisson IRLS, is the default; `statsmodels` is the per-neuron control the
+  equivalence audit is read against) and, on the batched path, `--gpu N` /
+  `--allow-cpu` to say which card it may take on a shared host. A batch runs as one
+  process per card — `--n_workers 1 --gpu N --sessions <partition file>` — because one
+  card handed to several workers is refused, and the same card handed twice to one
+  process is ignored.
 
 ## `exploratory/` — unsupported one-offs
 Scratch scripts (`_*.py`): diagnostics, ad-hoc plots, verification checks. Not part of the

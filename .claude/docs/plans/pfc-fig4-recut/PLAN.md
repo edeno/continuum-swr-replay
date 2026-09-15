@@ -7,7 +7,21 @@ skip check state the event definition, the retired construction survives only in
 `scripts/qa/diagnose_pfc_event_definition.py`, and a duration-matched non-event control is drawn
 inside the fit mask and entered as its own event class with the nested engagement test
 (`matched_control + non_local_no_SWR vs. matched_control`) and `matched_control vs. constant`.
-No batch rerun happened, so the 71 shipped at-well unit bundles still predate both.
+**Phase 0 (fitter) landed 2026-09-15** per [phase-0-fitter-execution.md](phase-0-fitter-execution.md):
+the unit GLMs are fit by a batched Poisson IRLS in JAX (equivalence-gated against statsmodels at
+1e-10 on three real sessions), and **the batch rerun ran** — all 71 at-well bundles refit at
+`9879ff0` under the canonical event definition and with the matched control, one worker per card on
+six A100s, 13.7 h. Audited in `docs/audits/2026-09-15-pfc-canonical-rerun.md`: nothing the old and
+new trees share moves outside the gate tolerances in any session, and the two engagement tests read
+for the first time. Figure 4 is regenerated from the new bundles.
+
+**What the rerun exposed, and what comes next.** 14.8 % of the shipped model fits (22,902 of
+154,350, over 4,640 neurons) run to `maxiter` without converging — separating fits, which the
+rank-deficiency gate cannot see — and their LR tests and AICs are inside every number the figure and
+claim 20 quote. That is the subject of
+[phase-0b-ridge-heldout-execution.md](phase-0b-ridge-heldout-execution.md) (informative ridge +
+blocked held-out deviance), the next phase, which supersedes the statsmodels hand-back and the
+asymptotic LR/AIC machinery. Claim 20's numbers are pending it.
 
 **Corrected premise (2026-09-14):** Phase 1's motivating discrepancy does not hold. On the
 well-anchored mPFC population the retired ripple-overlap split and the canonical `is_swr` agree
@@ -16,7 +30,8 @@ well-anchored mPFC population the retired ripple-overlap split and the canonical
 ones included, and was wrong. Phase 1 therefore buys traceability — the canonical `event_id`s
 and input hashes on Figure 4 — not a relabelling; the matched control is the substantive change.
 
-Phases 0, 2b, 3 and 4 are open.
+Phase 0's fitter half and Phase 3's rerun are done; Phase 0b, Phase 0's GLM mechanics, 2b and 4
+are open.
 
 Rebuild the mPFC cross-area analysis (Figure 4 / claim #20) on a correct,
 provenance-tracked footing. It repairs spike-bin and fit-validity mechanics,
@@ -46,6 +61,8 @@ For agent invocation, **load only the slice you need**:
 - Phases (0–2b each ship as a separable PR; Phases 3–4 each declare a pre-freeze code PR and a
   post-freeze, no-code production record):
   - [phase-0-glm-mechanics.md](phase-0-glm-mechanics.md) — fix spike-bin edges, rank/convergence, and theta fitting.
+  - [phase-0-fitter-execution.md](phase-0-fitter-execution.md) — batched JAX Poisson GLMs, the equivalence gate, and the batch rerun (landed).
+  - [phase-0b-ridge-heldout-execution.md](phase-0b-ridge-heldout-execution.md) — informative ridge and blocked held-out deviance, replacing the hand-back and the asymptotic LR/AIC (next).
   - [phase-1-canonical-events.md](phase-1-canonical-events.md) — swap in canonical `is_swr`, fix `<=`/`<`, write provenance, old-vs-new diagnostic.
   - [phase-2-matched-control.md](phase-2-matched-control.md) — time-shifted-onset matched non-event control model + wiring.
   - [phase-2b-dependence-inference.md](phase-2b-dependence-inference.md) — spike-history/drift controls, autocorrelation-preserving nulls, and blocked scores.
