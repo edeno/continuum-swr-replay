@@ -228,7 +228,7 @@ class TestMatchedControlInvariants:
         order = np.argsort(starts)
         starts, ends = starts[order], ends[order]
         assert np.all(starts[1:] >= ends[:-1]), (
-            f"control windows overlap each other: {list(zip(starts, ends))}"
+            f"control windows overlap each other: {list(zip(starts, ends, strict=True))}"
         )
 
 
@@ -379,6 +379,8 @@ def test_a_real_session_writes_the_control_array_and_records_its_draw(tmp_path):
         session["epoch_name"],
         log_directory=tmp_path / "logs",
         output_dir=tmp_path / "out",
+        # The suite pins JAX to CPU so no test takes a card on a shared host.
+        allow_cpu=True,
     )
 
     epoch_identifier = (

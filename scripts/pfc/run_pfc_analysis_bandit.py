@@ -75,7 +75,10 @@ from continuum_swr_replay.analysis.pfc.cohort import (
     DEFAULT_STOP_TABLE_PATH,
     load_session_stop_cohort,
 )
-from continuum_swr_replay.analysis.pfc.glm import FITTERS
+from continuum_swr_replay.analysis.pfc.glm import (
+    DEFAULT_REFERENCE_FIT_WORKERS,
+    FITTERS,
+)
 from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
 from continuum_swr_replay.analysis.replay.cohort_selection import stop_cohort_suffix
 from continuum_swr_replay.analysis.replay.fit_provenance import (
@@ -195,6 +198,7 @@ def run_analysis(
     fit_diagnostics: bool = False,
     gpu: int | None = None,
     allow_cpu: bool = False,
+    reference_fit_workers: int = DEFAULT_REFERENCE_FIT_WORKERS,
 ) -> None:
     """Run PFC GLM analysis for a single session.
 
@@ -293,9 +297,11 @@ def run_analysis(
 
     diagnostics: dict | None = {} if fit_diagnostics else None
 
-    # Before anything imports JAX: pick the card this process will fit on and
-    # bound what it takes of it. Each Dask worker runs this for itself, and the
-    # claim keeps two of them off the same card.
+    # Before JAX initialises a backend -- later than the import, and checked
+    # afterwards -- pick the card this process will fit on and bound what it
+    # takes of it. Each Dask worker runs this for itself; the claim keeps two
+    # of them off the same card, and a worker handed a second session gets the
+    # card it is already on rather than a second one.
     gpu_record: dict[str, object] = {}
     if fitter == "jax":
         gpu_record = configure_jax_gpu(gpu=gpu, allow_cpu=allow_cpu)
@@ -339,6 +345,7 @@ def run_analysis(
             cohort_stops=cohort_stops,
             fitter=fitter,
             fit_diagnostics_out=diagnostics,
+            reference_fit_workers=reference_fit_workers,
         )
 
         logger.info(f"Analyzed {len(neuron_stats)} neurons")
@@ -540,6 +547,17 @@ def get_command_line_arguments() -> Namespace:
         ),
     )
     parser.add_argument(
+        "--reference-fit-workers",
+        type=int,
+        default=DEFAULT_REFERENCE_FIT_WORKERS,
+        help=(
+            "Threads each worker gives the statsmodels reference fits "
+            f"(default: {DEFAULT_REFERENCE_FIT_WORKERS}). These dominate a "
+            "session's wall clock and are the only threaded part of a run, so "
+            "keep (Dask workers) x (this) inside the host's core count."
+        ),
+    )
+    parser.add_argument(
         "--allow-cpu",
         action="store_true",
         help=(
@@ -686,6 +704,7 @@ def main() -> None:
                 fit_diagnostics=args.fit_diagnostics,
                 gpu=args.gpu,
                 allow_cpu=args.allow_cpu,
+                reference_fit_workers=args.reference_fit_workers,
             )
     else:
         cluster = LocalCluster(
@@ -713,6 +732,7 @@ def main() -> None:
                     fit_diagnostics=args.fit_diagnostics,
                     gpu=args.gpu,
                     allow_cpu=args.allow_cpu,
+                    reference_fit_workers=args.reference_fit_workers,
                 )
                 for epoch in epoch_info.itertuples()
             ]

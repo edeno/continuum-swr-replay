@@ -167,6 +167,19 @@ def fake_session(monkeypatch):
     """Replace the per-session fit and the cohort load with recorded stubs."""
     calls: dict[str, object] = {}
 
+    # These tests are about what the runner writes, not about which card it
+    # fits on; without this they would claim a real GPU on a shared host.
+    monkeypatch.setattr(
+        runner,
+        "configure_jax_gpu",
+        lambda **kwargs: {
+            "jax_backend": "cpu",
+            "gpu_index": None,
+            "gpu_uuid": None,
+            "gpu_name": None,
+        },
+    )
+
     def _fake_cohort(nwb_file_name, epoch_name, *, cohort="at_well", **kwargs):
         calls["cohort"] = cohort
         stops = pd.DataFrame(

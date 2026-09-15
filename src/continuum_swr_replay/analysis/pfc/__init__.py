@@ -61,12 +61,6 @@ Examples
 """
 
 from continuum_swr_replay.analysis.pfc.glm import (
-    _fit_immobility_models as fit_immobility_models,
-)
-from continuum_swr_replay.analysis.pfc.glm import (
-    _make_design_matrices as make_design_matrices,
-)
-from continuum_swr_replay.analysis.pfc.glm import (
     MatchedControlDraw,
     build_session_event_sets,
     build_session_fit_mask,
@@ -75,6 +69,12 @@ from continuum_swr_replay.analysis.pfc.glm import (
     matched_control_seed,
     process_neuron,
     run_session,
+)
+from continuum_swr_replay.analysis.pfc.glm import (
+    _fit_immobility_models as fit_immobility_models,
+)
+from continuum_swr_replay.analysis.pfc.glm import (
+    _make_design_matrices as make_design_matrices,
 )
 
 __all__ = [

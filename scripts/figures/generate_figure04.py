@@ -591,7 +591,8 @@ def main():
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Before anything imports JAX: the panel's fit runs on the same backend the
+    # Before JAX initialises a backend (which is later than the import, and
+    # checked afterwards): the panel's fit runs on the same backend the
     # population bundle was fit with, on a card nobody else is using.
     if args.fitter == "jax":
         record = configure_jax_gpu(gpu=args.gpu, allow_cpu=args.allow_cpu)
