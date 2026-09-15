@@ -373,3 +373,118 @@ def test_all_stops_fits_without_a_cohort_and_writes_the_suffixed_bundle(
     # restriction, not a cohort that happens to keep everything.
     assert "cohort" not in fake_session
     assert fake_session["run_session"]["cohort_stops"] is None
+
+
+# ---------------------------------------------------------------------------
+# Partitioning a batch across workers
+# ---------------------------------------------------------------------------
+
+
+def _epoch_info(keys: list[tuple[str, str]]) -> pd.DataFrame:
+    """An ``epoch_info`` frame holding exactly ``keys``, as the loader shapes it."""
+    index = pd.MultiIndex.from_tuples(
+        keys, names=["nwb_file_name", "interval_list_name"]
+    )
+    return pd.DataFrame(
+        {
+            "animal": [name.split("2")[0] for name, _ in keys],
+            "date": [int(name[-13:-5]) for name, _ in keys],
+        },
+        index=index,
+    )
+
+
+class TestSessionPartitionFile:
+    def test_a_partition_file_reads_as_session_keys_in_file_order(self, tmp_path):
+        path = tmp_path / "worker0.sessions"
+        path.write_text(
+            "# worker 0\n"
+            "chimi20200223_.nwb 02_r1\n"
+            "\n"
+            "j1620210710_.nwb,04_r2  # trailing comment\n"
+            "chimi20200223_.nwb 02_r1\n"  # a repeat must not be fit twice
+        )
+
+        assert runner.read_session_list(path) == [
+            ("chimi20200223_.nwb", "02_r1"),
+            ("j1620210710_.nwb", "04_r2"),
+        ]
+
+    def test_a_malformed_line_names_itself(self, tmp_path):
+        path = tmp_path / "bad.sessions"
+        path.write_text("chimi20200223_.nwb\n")
+
+        with pytest.raises(ValueError, match="bad.sessions:1"):
+            runner.read_session_list(path)
+
+    def test_an_empty_partition_file_is_an_error(self, tmp_path):
+        path = tmp_path / "empty.sessions"
+        path.write_text("# nothing here\n")
+
+        with pytest.raises(ValueError, match="names no sessions"):
+            runner.read_session_list(path)
+
+    def test_only_the_named_sessions_are_fit(self, tmp_path, monkeypatch):
+        keys = [
+            ("chimi20200223_.nwb", "02_r1"),
+            ("chimi20200223_.nwb", "06_r3"),
+            ("j1620210710_.nwb", "02_r1"),
+        ]
+        path = tmp_path / "worker1.sessions"
+        path.write_text("j1620210710_.nwb 02_r1\nchimi20200223_.nwb 06_r3\n")
+        monkeypatch.setattr(
+            runner.sys,
+            "argv",
+            ["run_pfc_analysis_bandit.py", "--sessions", str(path)],
+        )
+        args = runner.get_command_line_arguments()
+
+        filtered = runner._filter_epoch_info(_epoch_info(keys), args)
+
+        assert set(runner._session_keys(filtered)) == {
+            ("j1620210710_.nwb", "02_r1"),
+            ("chimi20200223_.nwb", "06_r3"),
+        }
+
+    def test_a_session_that_does_not_exist_stops_the_worker(
+        self, tmp_path, monkeypatch
+    ):
+        # A mistyped partition line must not quietly shrink the batch: the
+        # missing session would simply never be fit, and the shortfall would
+        # only show up when the audit counted 70 bundles instead of 71.
+        keys = [("chimi20200223_.nwb", "02_r1")]
+        path = tmp_path / "worker2.sessions"
+        path.write_text("chimi20200223_.nwb 99_r9\n")
+        monkeypatch.setattr(
+            runner.sys,
+            "argv",
+            ["run_pfc_analysis_bandit.py", "--sessions", str(path)],
+        )
+        args = runner.get_command_line_arguments()
+
+        with pytest.raises(ValueError, match="chimi20200223_.nwb 99_r9"):
+            runner._filter_epoch_info(_epoch_info(keys), args)
+
+    def test_a_partition_composes_with_the_animal_filter(self, tmp_path, monkeypatch):
+        keys = [
+            ("chimi20200223_.nwb", "02_r1"),
+            ("j1620210710_.nwb", "02_r1"),
+        ]
+        path = tmp_path / "worker3.sessions"
+        path.write_text("chimi20200223_.nwb 02_r1\nj1620210710_.nwb 02_r1\n")
+        monkeypatch.setattr(
+            runner.sys,
+            "argv",
+            [
+                "run_pfc_analysis_bandit.py",
+                "--sessions",
+                str(path),
+                "--animal",
+                "chimi",
+            ],
+        )
+        args = runner.get_command_line_arguments()
+
+        filtered = runner._filter_epoch_info(_epoch_info(keys), args)
+
+        assert runner._session_keys(filtered) == [("chimi20200223_.nwb", "02_r1")]

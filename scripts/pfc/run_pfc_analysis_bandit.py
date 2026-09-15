@@ -42,6 +42,10 @@ python run_pfc_analysis_bandit.py --max-sessions 1 --output-dir /tmp/pfc_smoke
 
 # Fit with the original per-neuron statsmodels IRLS (for the fitter audit)
 python run_pfc_analysis_bandit.py --fitter statsmodels --output-dir /tmp/pfc_sm
+
+# One worker of a partitioned batch: its own sessions, its own card
+python run_pfc_analysis_bandit.py --brain_area mPFC --n_workers 1 \
+    --gpu 2 --sessions worker0.sessions
 """
 
 import json
@@ -575,8 +579,74 @@ def get_command_line_arguments() -> Namespace:
             "Forces the serial neuron path."
         ),
     )
+    parser.add_argument(
+        "--sessions",
+        type=Path,
+        default=None,
+        help=(
+            "Fit only the sessions named in this file: one "
+            "'<nwb_file_name> <epoch_name>' per line (comma or whitespace "
+            "separated), '#' comments and blank lines ignored. For splitting "
+            "a corpus across workers that cannot be named by animal or date. "
+            "A named session that does not exist is an error, so a mistyped "
+            "partition cannot quietly fit nothing."
+        ),
+    )
 
     return parser.parse_args()
+
+
+def read_session_list(path: Path) -> list[tuple[str, str]]:
+    """Session keys from a partition file, in file order.
+
+    Parameters
+    ----------
+    path : Path
+        One ``<nwb_file_name> <epoch_name>`` per line, comma or whitespace
+        separated. Blank lines and ``#`` comments are ignored.
+
+    Returns
+    -------
+    list of (str, str)
+        ``(nwb_file_name, epoch_name)`` pairs, duplicates removed, first
+        occurrence kept.
+
+    Raises
+    ------
+    ValueError
+        On a line that is not two fields, naming the line so the file can be
+        fixed rather than guessed at.
+    """
+    pairs: list[tuple[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for number, raw in enumerate(path.read_text().splitlines(), start=1):
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        fields = [field for field in line.replace(",", " ").split() if field]
+        if len(fields) != 2:
+            raise ValueError(
+                f"{path}:{number}: expected '<nwb_file_name> <epoch_name>', "
+                f"got {raw.strip()!r}"
+            )
+        key = (fields[0], fields[1])
+        if key not in seen:
+            seen.add(key)
+            pairs.append(key)
+    if not pairs:
+        raise ValueError(f"{path} names no sessions")
+    return pairs
+
+
+def _session_keys(epoch_info: pd.DataFrame) -> list[tuple[str, str]]:
+    """``(nwb_file_name, epoch_name)`` for every row, in row order."""
+    return list(
+        zip(
+            epoch_info.index.get_level_values("nwb_file_name"),
+            epoch_info.index.get_level_values("interval_list_name"),
+            strict=True,
+        )
+    )
 
 
 def _filter_epoch_info(epoch_info: pd.DataFrame, args: Namespace) -> pd.DataFrame:
@@ -595,6 +665,22 @@ def _filter_epoch_info(epoch_info: pd.DataFrame, args: Namespace) -> pd.DataFram
         Filtered epochs
     """
     is_epoch = np.ones(len(epoch_info), dtype=bool)
+
+    if getattr(args, "sessions", None) is not None:
+        wanted = read_session_list(args.sessions)
+        keys = _session_keys(epoch_info)
+        missing = [key for key in wanted if key not in set(keys)]
+        if missing:
+            raise ValueError(
+                f"{args.sessions} names {len(missing)} session(s) that do not "
+                "exist: "
+                + ", ".join(f"{name} {epoch}" for name, epoch in missing[:10])
+                + (", ..." if len(missing) > 10 else "")
+            )
+        requested = set(wanted)
+        is_epoch = np.logical_and(
+            np.array([key in requested for key in keys], dtype=bool), is_epoch
+        )
 
     if args.animal is not None:
         is_epoch = np.logical_and(epoch_info.animal == args.animal, is_epoch)
