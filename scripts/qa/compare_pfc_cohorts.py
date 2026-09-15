@@ -22,6 +22,17 @@ Usage::
 
     uv run python scripts/qa/compare_pfc_cohorts.py \\
         --out docs/audits/2026-09-14-pfc-atwell-cohort.md
+
+When the earlier tree also carries provenance sidecars, three further sections
+are written: whether the two trees describe the same events, the unit-by-unit
+before/after differences on everything both carry (against the tolerances the
+batched estimator was accepted at), what the matched non-event control says,
+and which estimator and device fit each session::
+
+    uv run python scripts/qa/compare_pfc_cohorts.py \\
+        --before Processed-Data/_pre_canonical_events_backup_20260914 \\
+        --after Processed-Data \\
+        --out docs/audits/2026-09-14-pfc-canonical-rerun.md
 """
 
 from __future__ import annotations
@@ -35,6 +46,8 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from numpy.typing import NDArray
+from scipy.stats import false_discovery_control
 
 from continuum_swr_replay.analysis.pfc.load_population import (
     load_population_data,
@@ -70,6 +83,30 @@ def _invocation() -> str:
     except ValueError:
         pass
     return shlex.join(["uv", "run", "python", str(script), *sys.argv[1:]])
+
+
+#: Top-level sidecar keys carried into the per-session frame beside the
+#: ``cohort_counts`` block: which estimator and device fit the session, and
+#: which event inputs it was fit on. A sidecar written before one of these
+#: existed simply yields ``None``, which is what the rerun precondition reads.
+SIDECAR_TOP_LEVEL_KEYS = [
+    "fitter",
+    "fitter_tol",
+    "jax_backend",
+    "jax_version",
+    "gpu_index",
+    "gpu_uuid",
+    "gpu_name",
+    "n_neurons_reference_fit",
+    "canonical_event_table_sha256",
+    "canonical_event_table_path",
+    "data_over_time_sha256",
+    "is_swr_definition",
+    "n_matched_control",
+    "n_matched_control_unplaced",
+    "n_matched_control_onset_outside_fitted_bout",
+    "n_matched_control_bout_saturated",
+]
 
 
 #: Suffix ``fit_provenance`` appends when the working tree carried uncommitted
@@ -142,6 +179,10 @@ def read_sidecars(data_dir: Path, artifact_suffix: str = "") -> pd.DataFrame:
             "written_at": sidecar.get("written_at", "")[:19],
             **counts,
             **{f"align_{k}": v for k, v in alignment.items()},
+            # Top-level keys the estimator and event-definition tables read.
+            # Absent from sidecars written before those fields existed, which
+            # is itself the signal the rerun audit's precondition tests.
+            **{key: sidecar.get(key) for key in SIDECAR_TOP_LEVEL_KEYS},
         }
         rows.append(row)
     if not rows:
@@ -497,6 +538,452 @@ def _fdr_movement_prose(comparison: pd.DataFrame) -> str:
     )
 
 
+# ---------------------------------------------------------------------------
+# The canonical-events rerun audit: before/after on the same events
+# ---------------------------------------------------------------------------
+
+#: Tolerances the batched fitter was accepted at against statsmodels on the
+#: three gate sessions. Reused here because the rerun is the same swap on the
+#: whole corpus: when the two sides describe the same events on the same
+#: cohort, every statistic a pre-existing model produces must land inside them.
+RERUN_PARAM_TOL = 1e-5
+RERUN_PVALUE_TOL = 1e-6
+
+#: The two LR tests the matched non-event control adds. Not in ``FDR_TESTS``:
+#: ``load_population_data`` does not FDR-correct them, so this script does.
+MATCHED_CONTROL_TESTS = [
+    "matched_control + non_local_no_SWR vs. matched_control",
+    "matched_control vs. constant",
+]
+
+#: The modulation array the control adds, and the four both sides carry.
+MATCHED_CONTROL_ARRAY = "matched_control_modulation"
+SHARED_MODULATION_ARRAYS = [
+    "SWR_modulation",
+    "no_SWR_modulation",
+    "non_local_SWR_modulation",
+    "non_local_no_SWR_modulation",
+]
+
+
+def _numeric(values: pd.Series) -> pd.Series:
+    """A sidecar column as floats with missing entries at zero.
+
+    Columns assembled from sidecars of different vintages come back as object
+    dtype when some rows filled the key and others carry ``None``; summing
+    those directly either raises or silently downcasts.
+    """
+    return pd.to_numeric(values, errors="coerce").fillna(0.0)
+
+
+def try_read_sidecars(data_dir: Path, artifact_suffix: str = "") -> pd.DataFrame | None:
+    """``read_sidecars``, or ``None`` when the tree carries no sidecars at all.
+
+    The before side of the cohort audit predates provenance sidecars entirely;
+    the before side of the rerun audit has them. Distinguishing the two is what
+    decides whether the rerun sections can be written.
+    """
+    try:
+        return read_sidecars(data_dir, artifact_suffix)
+    except FileNotFoundError:
+        return None
+
+
+def same_events_precondition(
+    before: pd.DataFrame | None, after: pd.DataFrame
+) -> tuple[bool, str]:
+    """Whether the two trees were fit on the same events, and what says so.
+
+    The unit-by-unit tolerance check below is only a check of the *fitter* when
+    nothing else about the fit changed. Three facts have to hold across every
+    session both trees hold:
+
+    - the before side has provenance sidecars at all (otherwise nothing can be
+      said about what it was fit on);
+    - both sides name the same stop table, so the cohort is the same;
+    - the before side records no ``canonical_event_table_sha256``, i.e. it is
+      the tree from before the canonical events were read, and the after side
+      does record one.
+
+    The third is a *marker*, not a proof: a tree with no recorded event hash
+    cannot be shown to describe the same events as one that has it. The
+    per-session event counts are compared alongside, and it is those that
+    decide whether the comparison reads as a fitter check -- see
+    :func:`event_count_agreement`.
+    """
+    if before is None:
+        return False, (
+            "the before tree carries no provenance sidecars, so what it was "
+            "fit on cannot be read from it"
+        )
+    if (
+        "canonical_event_table_sha256" not in after.columns
+        or not after["canonical_event_table_sha256"].notna().any()
+    ):
+        return False, (
+            "the after tree records no `canonical_event_table_sha256`, so it "
+            "is not a canonical-events tree"
+        )
+    shared = sorted(set(before["session"]) & set(after["session"]))
+    if not shared:
+        return False, "the two trees hold no session in common"
+    before_rows = before.set_index("session").loc[shared]
+    after_rows = after.set_index("session").loc[shared]
+    mismatched = [
+        session
+        for session in shared
+        if before_rows.at[session, "stop_table_sha256"]
+        != after_rows.at[session, "stop_table_sha256"]
+    ]
+    if mismatched:
+        return False, (
+            f"{len(mismatched)} shared session(s) name a different stop table "
+            f"on the two sides ({', '.join(mismatched[:5])}"
+            f"{', ...' if len(mismatched) > 5 else ''}), so the cohort is not "
+            "the same"
+        )
+    if "canonical_event_table_sha256" in before_rows.columns and (
+        before_rows["canonical_event_table_sha256"].notna().any()
+    ):
+        return False, (
+            "the before tree already records a `canonical_event_table_sha256`, "
+            "so it is not the pre-canonical tree this comparison is for"
+        )
+    return True, (
+        f"{len(shared)} shared session(s), same stop table on both sides, and "
+        "no recorded event-table hash on the before side"
+    )
+
+
+def event_count_agreement(
+    before: pd.DataFrame, after: pd.DataFrame
+) -> tuple[pd.DataFrame, int]:
+    """Per-session event counts on the two sides, and how many disagree.
+
+    The coefficient comparison is a check of the fitter only where these agree.
+    Where they do not, the two sides were fit on different regressors and any
+    difference in the estimates is the event definition, not the solver.
+    """
+    columns = ["n_nonlocal_after", "n_nonlocal_swr", "n_nonlocal_no_swr"]
+    shared = sorted(set(before["session"]) & set(after["session"]))
+    table = (
+        before.set_index("session")
+        .loc[shared, columns]
+        .join(
+            after.set_index("session").loc[shared, columns],
+            lsuffix="_before",
+            rsuffix="_after",
+        )
+        .reset_index()
+    )
+    disagree = np.zeros(len(table), dtype=bool)
+    for column in columns:
+        disagree |= (
+            table[f"{column}_before"].to_numpy() != table[f"{column}_after"].to_numpy()
+        )
+    table.insert(1, "same_events", ~disagree)
+    return table, int(disagree.sum())
+
+
+def _bundle_statistics(data_dir: Path, session: str, suffix: str) -> pd.DataFrame:
+    """One session's statistics table, unfiltered."""
+    return pd.read_pickle(data_dir / f"{session}_mPFC_modulation{suffix}.pkl")
+
+
+def _bundle_modulation(data_dir: Path, session: str, suffix: str, name: str) -> NDArray:
+    """One session's modulation array, shape ``(n_lag_times, n_neurons)``."""
+    return np.load(data_dir / f"{session}_mPFC_modulation{suffix}.{name}.npy")
+
+
+def _max_abs_difference(before: NDArray, after: NDArray) -> tuple[float, int]:
+    """Largest finite ``|after - before|``, and how many entries are unpaired.
+
+    A NaN on exactly one side is a change the maximum cannot see -- a model
+    that became estimable, or stopped being -- so it is counted separately
+    rather than skipped.
+    """
+    before = np.asarray(before, dtype=float)
+    after = np.asarray(after, dtype=float)
+    both = np.isfinite(before) & np.isfinite(after)
+    neither = ~np.isfinite(before) & ~np.isfinite(after)
+    unpaired = int((~both & ~neither).sum())
+    if not both.any():
+        return float("nan"), unpaired
+    return float(np.abs(after[both] - before[both]).max()), unpaired
+
+
+def shared_statistic_differences(
+    before_dir: Path,
+    after_dir: Path,
+    sessions: list[str],
+    *,
+    artifact_suffix: str = "",
+    param_tol: float = RERUN_PARAM_TOL,
+    pvalue_tol: float = RERUN_PVALUE_TOL,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Unit-by-unit before/after differences on everything both trees carry.
+
+    Neurons are paired by their row position within a session, which is the
+    order ``run_session`` writes them in; a session whose two bundles hold
+    different numbers of neurons cannot be paired at all and is reported as
+    such instead of being aligned by truncation.
+
+    Returns
+    -------
+    per_quantity : pandas.DataFrame
+        One row per compared quantity family (the LR statistics, the LR
+        p-values, the fractional-deviance effect sizes, the peak modulations
+        and their times, the theta columns, the firing rates, and each shared
+        modulation time course), with the largest absolute difference over
+        every neuron and session, the tolerance it is read against, the number
+        of neuron x column cells outside it, and the cells that are finite on
+        one side only.
+    unpairable : pandas.DataFrame
+        Sessions whose neuron counts differ between the trees.
+    """
+    families = {
+        "LR statistic (`: lr`)": (lambda c: c.endswith(": lr"), param_tol),
+        "LR p-value (`: pval`)": (lambda c: c.endswith(": pval"), pvalue_tol),
+        "fractional deviance": (
+            lambda c: c.endswith(": frac_null_dev")
+            or c.endswith(": frac_explained_dev"),
+            param_tol,
+        ),
+        "peak modulation": (lambda c: c.endswith("_max_mod"), param_tol),
+        "peak modulation time": (lambda c: c.endswith("_max_mod_time"), param_tol),
+        "theta": (lambda c: c.startswith("theta"), param_tol),
+        "firing rate": (lambda c: c.endswith("_avg_firing_rate"), param_tol),
+    }
+    worst = dict.fromkeys(families, 0.0)
+    outside = dict.fromkeys(families, 0)
+    unpaired = dict.fromkeys(families, 0)
+    n_cells = dict.fromkeys(families, 0)
+    array_worst = dict.fromkeys(SHARED_MODULATION_ARRAYS, 0.0)
+    array_outside = dict.fromkeys(SHARED_MODULATION_ARRAYS, 0)
+    array_unpaired = dict.fromkeys(SHARED_MODULATION_ARRAYS, 0)
+    array_cells = dict.fromkeys(SHARED_MODULATION_ARRAYS, 0)
+    model_disagreements = 0
+    n_models_compared = 0
+    n_neurons = 0
+    unpairable_rows = []
+
+    for session in sessions:
+        before = _bundle_statistics(before_dir, session, "")
+        after = _bundle_statistics(after_dir, session, artifact_suffix)
+        if len(before) != len(after):
+            unpairable_rows.append(
+                {
+                    "session": session,
+                    "n_neurons_before": len(before),
+                    "n_neurons_after": len(after),
+                }
+            )
+            continue
+        n_neurons += len(before)
+        shared_columns = [c for c in before.columns if c in after.columns]
+        for family, (matches, tol) in families.items():
+            columns = [c for c in shared_columns if matches(c)]
+            for column in columns:
+                if before[column].dtype == object:
+                    continue
+                difference, n_unpaired = _max_abs_difference(
+                    before[column].to_numpy(), after[column].to_numpy()
+                )
+                n_cells[family] += len(before)
+                unpaired[family] += n_unpaired
+                if np.isfinite(difference):
+                    worst[family] = max(worst[family], difference)
+                    outside[family] += int(
+                        (
+                            np.abs(
+                                after[column].to_numpy(dtype=float)
+                                - before[column].to_numpy(dtype=float)
+                            )
+                            > tol
+                        ).sum()
+                    )
+        # The selected model is a label, so it is compared for identity.
+        for column in ("min_aic_model", "min_aic_model_replay_split"):
+            if column in shared_columns:
+                n_models_compared += len(before)
+                model_disagreements += int(
+                    (before[column].to_numpy() != after[column].to_numpy()).sum()
+                )
+        for name in SHARED_MODULATION_ARRAYS:
+            before_array = _bundle_modulation(before_dir, session, "", name)
+            after_array = _bundle_modulation(after_dir, session, artifact_suffix, name)
+            if before_array.shape != after_array.shape:
+                continue
+            difference, n_unpaired = _max_abs_difference(before_array, after_array)
+            array_cells[name] += before_array.size
+            array_unpaired[name] += n_unpaired
+            if np.isfinite(difference):
+                array_worst[name] = max(array_worst[name], difference)
+                finite = np.isfinite(before_array) & np.isfinite(after_array)
+                array_outside[name] += int(
+                    (
+                        np.abs(after_array[finite] - before_array[finite]) > param_tol
+                    ).sum()
+                )
+
+    rows = [
+        {
+            "quantity": family,
+            "n_cells": n_cells[family],
+            "max_abs_diff": worst[family] if n_cells[family] else np.nan,
+            "tolerance": families[family][1],
+            "n_outside_tolerance": outside[family],
+            "n_finite_on_one_side_only": unpaired[family],
+        }
+        for family in families
+    ]
+    rows += [
+        {
+            "quantity": f"modulation `{name}`",
+            "n_cells": array_cells[name],
+            "max_abs_diff": array_worst[name] if array_cells[name] else np.nan,
+            "tolerance": param_tol,
+            "n_outside_tolerance": array_outside[name],
+            "n_finite_on_one_side_only": array_unpaired[name],
+        }
+        for name in SHARED_MODULATION_ARRAYS
+    ]
+    rows.append(
+        {
+            "quantity": "best-AIC model (identity)",
+            "n_cells": n_models_compared,
+            "max_abs_diff": np.nan,
+            "tolerance": np.nan,
+            "n_outside_tolerance": model_disagreements,
+            "n_finite_on_one_side_only": 0,
+        }
+    )
+    per_quantity = pd.DataFrame(rows)
+    per_quantity.attrs["n_neurons_paired"] = n_neurons
+    per_quantity.attrs["n_sessions_paired"] = len(sessions) - len(unpairable_rows)
+    return per_quantity, pd.DataFrame(unpairable_rows)
+
+
+def matched_control_arrays(data_dir: Path, artifact_suffix: str = "") -> pd.DataFrame:
+    """Whether every bundle carries the matched-control modulation, and its shape.
+
+    A bundle without the array was fit by code that had no control, so its
+    engagement test does not exist; the audit must say so per session rather
+    than report a pooled fraction over an unknown denominator.
+    """
+    rows = []
+    for session in sorted(bundle_sessions(data_dir, artifact_suffix)):
+        base = data_dir / f"{session}_mPFC_modulation{artifact_suffix}"
+        array_path = Path(f"{base}.{MATCHED_CONTROL_ARRAY}.npy")
+        reference = Path(f"{base}.non_local_no_SWR_modulation.npy")
+        present = array_path.exists()
+        shape = np.load(array_path).shape if present else None
+        rows.append(
+            {
+                "session": session,
+                "matched_control_array": present,
+                "shape": str(shape) if present else "",
+                "matches_non_local_no_SWR_shape": (
+                    present and reference.exists() and shape == np.load(reference).shape
+                ),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _fdr_q(frame: pd.DataFrame, test: str) -> NDArray:
+    """BH-corrected q-values for ``test``, from the frame's own p-values.
+
+    ``load_population_data`` corrects only the six tests it ships, so the two
+    matched-control tests are corrected here, over the same population and by
+    the same method, and only over the finite p-values.
+    """
+    column = f"{test}: pval"
+    if column not in frame.columns:
+        return np.full(len(frame), np.nan)
+    raw = frame[column].to_numpy(dtype=float)
+    q = np.full_like(raw, np.nan)
+    ok = np.isfinite(raw)
+    if ok.any():
+        q[ok] = false_discovery_control(np.clip(raw[ok], 1e-300, 1.0), method="bh")
+    return q
+
+
+def matched_control_significance(frame: pd.DataFrame, alpha: float) -> pd.DataFrame:
+    """FDR-significant fraction of the two matched-control tests, per animal.
+
+    BH is applied within the pooled population, which is where the two tests
+    are read; the per-animal rows are that same correction sliced by animal,
+    so they are comparable with the pooled row rather than separate families.
+    """
+    frame = frame.copy()
+    for test in MATCHED_CONTROL_TESTS:
+        frame[f"{test}: fdr_q"] = _fdr_q(frame, test)
+    rows = []
+    groups = [("all", frame)] + [
+        (animal, sub) for animal, sub in frame.groupby("animal", sort=True)
+    ]
+    for animal, sub in groups:
+        for test in MATCHED_CONTROL_TESTS:
+            q = sub[f"{test}: fdr_q"].to_numpy(dtype=float)
+            tested = np.isfinite(q)
+            n_tested = int(tested.sum())
+            n_sig = int((q[tested] < alpha).sum())
+            rows.append(
+                {
+                    "animal": animal,
+                    "test": test,
+                    "n_tested": n_tested,
+                    "n_sig": n_sig,
+                    "frac_sig": n_sig / n_tested if n_tested else np.nan,
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def fitter_table(sidecars: pd.DataFrame) -> pd.DataFrame:
+    """Which estimator, device and inputs each session was fit with.
+
+    One row per distinct combination rather than per session: a batch run as
+    one job should collapse to a single row, and any session that did not is
+    then visible without reading 71 rows.
+    """
+    columns = [
+        "fitter",
+        "fitter_tol",
+        "jax_backend",
+        "jax_version",
+        "gpu_index",
+        "gpu_name",
+        "stop_table_sha256",
+        "canonical_event_table_sha256",
+        "data_over_time_sha256",
+        "git_hash",
+    ]
+    present = [c for c in columns if c in sidecars.columns]
+    frame = sidecars.copy()
+    for column in present:
+        if column.endswith("sha256"):
+            frame[column] = frame[column].map(
+                lambda value: value[:12] if isinstance(value, str) else value
+            )
+    hand_back = frame.get("n_neurons_reference_fit")
+    grouped = frame.groupby(present, dropna=False)
+    table = grouped.agg(n_sessions=("session", "size")).reset_index()
+    if hand_back is not None:
+        totals = (
+            frame.assign(_hand_back=_numeric(hand_back))
+            .groupby(present, dropna=False)["_hand_back"]
+            .sum()
+            .reset_index(name="n_neurons_reference_fit")
+        )
+        table = table.merge(totals, on=present, how="left")
+        table["n_neurons_reference_fit"] = table["n_neurons_reference_fit"].astype(
+            "Int64"
+        )
+    return table
+
+
 def _cell(value: object, float_format: str) -> str:
     """One markdown cell: missing renders blank, a count renders as a count."""
     if value is None:
@@ -532,6 +1019,183 @@ def _md(frame: pd.DataFrame, float_format: str = "{:.4g}") -> str:
     return "\n".join([header, rule, *body]) + "\n"
 
 
+def rerun_sections(
+    *,
+    before_sidecars: pd.DataFrame | None,
+    after_sidecars: pd.DataFrame,
+    after: pd.DataFrame,
+    before_dir: Path,
+    after_dir: Path,
+    alpha: float,
+    artifact_suffix: str,
+) -> list[str]:
+    """The rerun audit: same events, new estimator, plus the new control.
+
+    Three things a reader of the rerun needs, in order. Whether the two trees
+    really do describe the same events (without which the next section is not a
+    check of the estimator at all); the unit-by-unit differences on everything
+    both trees carry, against the tolerances the estimator was accepted at; and
+    what the matched non-event control -- which exists only on the after side
+    -- says. The estimator/device provenance closes it.
+
+    Returns an empty list when the after tree records no estimator and no
+    matched control, i.e. it is not a rerun tree and none of this applies.
+    """
+    lines: list[str] = []
+    add = lines.append
+    # Every sidecar row carries these keys, ``None`` where the sidecar predates
+    # them, so a tree is a rerun tree only if some row actually filled one in.
+    is_rerun_tree = any(
+        column in after_sidecars.columns and after_sidecars[column].notna().any()
+        for column in ("fitter", "canonical_event_table_sha256")
+    )
+    if not is_rerun_tree:
+        return lines
+
+    add("## Same events, new estimator\n")
+    same_events, why = same_events_precondition(before_sidecars, after_sidecars)
+    if not same_events:
+        add(
+            "**The before/after coefficient check is not run**: "
+            f"{why}. Without it a difference between the two trees cannot be "
+            "attributed to the estimator rather than to what it was fit on.\n"
+        )
+    else:
+        counts, n_disagree = event_count_agreement(before_sidecars, after_sidecars)
+        add(
+            f"Precondition: {why}. Whether that marker is the whole story is "
+            "settled by the event counts themselves -- "
+            + (
+                f"**{n_disagree} of {len(counts)} shared session(s) have "
+                "different event counts on the two sides**, so for those the "
+                "comparison below is not a check of the estimator: they were "
+                "fit on different regressors.\n"
+                if n_disagree
+                else f"all {len(counts)} shared session(s) carry identical "
+                "non-local, SWR-coupled and non-SWR counts, so the two trees "
+                "differ only in how the same models were fit.\n"
+            )
+        )
+        if n_disagree:
+            add(_md(counts.loc[~counts["same_events"]].head(20)))
+        shared = sorted(
+            set(before_sidecars["session"]) & set(after_sidecars["session"])
+        )
+        differences, unpairable = shared_statistic_differences(
+            before_dir, after_dir, shared, artifact_suffix=artifact_suffix
+        )
+        add(
+            "Every neuron of every shared session, paired by its row position "
+            "within the session, on every column and modulation array both "
+            "bundles carry. The tolerances are the ones the estimator was "
+            f"accepted at on the gate sessions: {RERUN_PARAM_TOL:g} on "
+            f"parameters and anything derived from them, {RERUN_PVALUE_TOL:g} "
+            "on LR p-values. `n_finite_on_one_side_only` counts cells that are "
+            "NaN on exactly one side -- a model that became estimable or "
+            "stopped being, which no maximum over finite differences can "
+            f"see. {differences.attrs['n_neurons_paired']:,} neurons over "
+            f"{differences.attrs['n_sessions_paired']} session(s).\n"
+        )
+        add(_md(differences, "{:.3g}"))
+        n_outside = int(differences["n_outside_tolerance"].sum())
+        add(
+            f"**{n_outside:,} cell(s) fall outside tolerance.**\n"
+            if n_outside
+            else "**No cell falls outside tolerance.**\n"
+        )
+        if not unpairable.empty:
+            add(
+                f"{len(unpairable)} session(s) could not be paired at all: the "
+                "two trees hold different numbers of neurons for them, so no "
+                "row correspondence exists.\n"
+            )
+            add(_md(unpairable))
+
+    add("## The matched non-event control\n")
+    arrays = matched_control_arrays(after_dir, artifact_suffix)
+    missing = arrays.loc[~arrays["matched_control_array"]]
+    mismatched = arrays.loc[
+        arrays["matched_control_array"] & ~arrays["matches_non_local_no_SWR_shape"]
+    ]
+    add(
+        f"{len(arrays) - len(missing)} of {len(arrays)} bundle(s) carry a "
+        f"`{MATCHED_CONTROL_ARRAY}` array"
+        + (
+            ", every one the same shape as that bundle's "
+            "`non_local_no_SWR_modulation`.\n"
+            if missing.empty and mismatched.empty
+            else f"; {len(missing)} have none and {len(mismatched)} have one "
+            "whose shape does not match that bundle's "
+            "`non_local_no_SWR_modulation`, so those sessions have no usable "
+            "engagement test.\n"
+        )
+    )
+    if not missing.empty or not mismatched.empty:
+        add(_md(pd.concat([missing, mismatched]).head(20)))
+    placed = after_sidecars.get("n_matched_control")
+    if placed is not None and placed.notna().any():
+        unplaced = _numeric(
+            after_sidecars.get(
+                "n_matched_control_unplaced",
+                pd.Series(0, index=after_sidecars.index),
+            )
+        )
+        outside_bout = after_sidecars.get(
+            "n_matched_control_onset_outside_fitted_bout",
+            pd.Series(np.nan, index=after_sidecars.index),
+        )
+        saturated = after_sidecars.get(
+            "n_matched_control_bout_saturated",
+            pd.Series(np.nan, index=after_sidecars.index),
+        )
+        source = after_sidecars["n_nonlocal_after"]
+        n_placed = _numeric(placed).sum()
+        add(
+            f"{int(n_placed):,} control windows were placed against "
+            f"{int(source.sum()):,} non-local events "
+            f"({100.0 * n_placed / source.sum():.1f}%); "
+            f"{int(unplaced.sum()):,} events got none"
+            + (
+                f" ({int(_numeric(outside_bout).sum()):,} with an onset in no "
+                f"fitted bout, {int(_numeric(saturated).sum()):,} in a bout "
+                "with no free window of their duration).\n"
+                if outside_bout.notna().any()
+                else ".\n"
+            )
+        )
+        add(
+            "The control is matched one per non-local event, SWR-coupled ones "
+            "included, so it is more numerous than the `non_local_no_SWR` "
+            "class the engagement test compares against; a source event's "
+            "duration fixes its control's duration and constrains where the "
+            "window fits, and nothing else about the event is matched.\n"
+        )
+    add(f"### FDR-significant fraction, matched-control tests (q < {alpha})\n")
+    add(
+        "`load_population_data` does not correct these two, so BH is applied "
+        "here over the same pooled population, per test, on the finite "
+        "p-values only; the per-animal rows slice that one correction. "
+        "`matched_control + non_local_no_SWR vs. matched_control` is the "
+        "engagement test -- does non-SWR replay add beyond a duration-matched "
+        "non-event baseline from the same bouts. `matched_control vs. "
+        "constant` asks whether that baseline modulates firing on its own; "
+        "where it does, the peri-event window is not exchangeable with the "
+        "rest of the bout and the engagement test is the comparison to read.\n"
+    )
+    add(_md(matched_control_significance(after, alpha)))
+
+    add("## Estimator, device and inputs\n")
+    add(
+        "One row per distinct combination, so a batch run as one job collapses "
+        "to a single row. `n_neurons_reference_fit` is the neurons the batched "
+        "fitter handed back to statsmodels because their fits left the range "
+        "the two agree over; those neurons' shipped numbers are statsmodels' "
+        "own.\n"
+    )
+    add(_md(fitter_table(after_sidecars)))
+    return lines
+
+
 def build_report(
     *,
     sidecars: pd.DataFrame,
@@ -546,6 +1210,7 @@ def build_report(
     notes: list[str],
     command: str,
     artifact_suffix: str = "",
+    before_sidecars: pd.DataFrame | None = None,
 ) -> str:
     """Assemble the audit markdown."""
     lines: list[str] = []
@@ -744,6 +1409,18 @@ def build_report(
     add(_fdr_movement_prose(comparison))
     add(_md(comparison))
 
+    lines.extend(
+        rerun_sections(
+            before_sidecars=before_sidecars,
+            after_sidecars=sidecars,
+            after=after,
+            before_dir=before_dir,
+            after_dir=after_dir,
+            alpha=alpha,
+            artifact_suffix=artifact_suffix,
+        )
+    )
+
     return "\n".join(lines)
 
 
@@ -751,15 +1428,23 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--before-dir",
+        "--before",
+        dest="before_dir",
         type=Path,
         default=PROCESSED_DATA_DIR / "_pre_atwell_pfc_backup_20260913",
-        help="Directory holding the pre-cohort mPFC bundles.",
+        help=(
+            "Directory holding the earlier mPFC bundles. For the cohort audit "
+            "that is the pre-cohort tree; for the rerun audit it is the "
+            "backup taken before the rerun."
+        ),
     )
     parser.add_argument(
         "--after-dir",
+        "--after",
+        dest="after_dir",
         type=Path,
         default=PROCESSED_DATA_DIR,
-        help="Directory holding the cohort-restricted mPFC bundles.",
+        help="Directory holding the current mPFC bundles.",
     )
     parser.add_argument(
         "--artifact-suffix",
@@ -794,6 +1479,7 @@ def main() -> None:
     )
     report = build_report(
         sidecars=sidecars,
+        before_sidecars=try_read_sidecars(args.before_dir),
         before=before,
         after=after,
         before_gate=gate_counts(args.before_dir, args.min_firing_rate),
