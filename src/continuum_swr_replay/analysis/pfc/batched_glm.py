@@ -121,6 +121,16 @@ jax.config.update("jax_enable_x64", True)
 DEFAULT_MAXITER = 100
 DEFAULT_TOL = 1e-8
 
+#: Prior standard deviation of a penalised coefficient, on the log-rate scale.
+#: Read what it means for a *curve* with :func:`implied_prior_sd`, not off this
+#: number: the coefficients are B-spline weights, so the prior on the kernel at
+#: one lag is wider than ``sigma`` by ``sqrt(sum_b B_b(lag)**2)`` (~0.69 on the
+#: shipped basis) and the prior on a *sustained* modulation is narrower by
+#: ``sqrt(n_basis)``. At 3.0 those are about 2.1 and 0.9 -- a rate multiplier
+#: between x0.02 and x57 at one lag, and between x0.17 and x5.9 held across the
+#: reported window.
+DEFAULT_PENALTY_SIGMA = 3.0
+
 #: Eigenvalue cutoff for the symmetric pseudo-inverse solve, relative to the
 #: largest eigenvalue of ``Q' W Q``. Because ``Q`` is orthonormal, that ratio
 #: reads the spread of the *weights* over the design's directions, not the
@@ -168,6 +178,10 @@ class UnitGLMResult:
         statsmodels' ``bse`` exactly when the penalty is zero. Exactly zero in
         a direction the design does not span, where the parameter is itself
         exactly zero.
+    covariance : NDArray, shape (n_features, n_features)
+        ``(X' W X + Lambda)^+`` itself. Carried because the uncertainty of a
+        *curve* is not a function of the diagonal: the standard error of
+        ``basis @ params`` at one lag needs the off-diagonal terms too.
     """
 
     params: NDArray
@@ -180,6 +194,7 @@ class UnitGLMResult:
     nobs: int
     n_features: int
     bse: NDArray | None = None
+    covariance: NDArray | None = None
 
     @property
     def df_model(self) -> float:
@@ -206,6 +221,9 @@ class BatchedGLMResults:
         Properties of the design, shared by every unit.
     bse : NDArray, shape (n_units, n_features)
         Per-unit penalised posterior-mode standard errors of ``params``.
+    covariance : NDArray, shape (n_units, n_features, n_features)
+        Per-unit ``(X' W X + Lambda)^+``, for the standard error of a curve
+        read off the parameters.
     """
 
     params: NDArray
@@ -218,10 +236,18 @@ class BatchedGLMResults:
     nobs: int
     n_features: int
     bse: NDArray | None = None
+    covariance: NDArray | None = None
 
     def __post_init__(self) -> None:
         if self.bse is None:
             object.__setattr__(self, "bse", np.full_like(self.params, np.nan))
+        if self.covariance is None:
+            n_units, n_features = self.params.shape
+            object.__setattr__(
+                self,
+                "covariance",
+                np.full((n_units, n_features, n_features), np.nan),
+            )
 
     @property
     def n_units(self) -> int:
@@ -258,6 +284,7 @@ class BatchedGLMResults:
             nobs=self.nobs,
             n_features=self.n_features,
             bse=np.asarray(self.bse[index]),
+            covariance=np.asarray(self.covariance[index]),
         )
 
 
@@ -421,14 +448,15 @@ def _solve(information: jnp.ndarray, rhs: jnp.ndarray, rcond: float) -> jnp.ndar
     return jnp.einsum("nij,nj->ni", eigenvectors, inverse * projected)
 
 
-def _standard_errors(information: jnp.ndarray, back: NDArray, rcond: float) -> NDArray:
-    """Per-unit ``sqrt(diag(cov(beta)))`` in the design's own columns.
+def _parameter_covariance(
+    information: jnp.ndarray, back: NDArray, rcond: float
+) -> NDArray:
+    """Per-unit ``cov(beta)`` in the design's own columns.
 
     The fit runs in an orthonormal basis ``Q`` with information ``H = Q' W Q``,
     and ``beta = B c`` with ``B = V S^-1`` (``back``). So
     ``cov(beta) = B (H + P)^+ B'`` -- Poisson's scale is fixed at one, which is
-    why no dispersion estimate enters -- and only its diagonal is wanted. On a
-    design of full rank that is exactly ``(X' W X + Lambda)^-1``, the penalised
+    why no dispersion estimate enters. On a design of full rank that is exactly ``(X' W X + Lambda)^-1``, the penalised
     posterior-mode covariance: ``B (H + B' Lambda B)^-1 B' =
     (A H A' + Lambda)^-1`` with ``A = B^-T = V S``, and ``A H A' = X' W X``.
     The pseudo-inverse is taken on the same eigenvalue cutoff the IRLS step
@@ -447,16 +475,15 @@ def _standard_errors(information: jnp.ndarray, back: NDArray, rcond: float) -> N
 
     Returns
     -------
-    NDArray, shape (n_units, n_features)
+    NDArray, shape (n_units, n_features, n_features)
     """
     eigenvalues, eigenvectors = jnp.linalg.eigh(information)
     largest = jnp.max(jnp.abs(eigenvalues), axis=1, keepdims=True)
     keep = eigenvalues > rcond * largest
     inverse = jnp.where(keep, 1.0 / jnp.where(keep, eigenvalues, 1.0), 0.0)
-    # ``B V`` per unit, then the diagonal of ``(B V) diag(1/lambda) (B V)'``.
+    # ``B V`` per unit, then ``(B V) diag(1/lambda) (B V)'``.
     rotated = jnp.einsum("pr,nrk->npk", jnp.asarray(back), eigenvectors)
-    variance = jnp.einsum("npk,nk->np", rotated**2, inverse)
-    return np.sqrt(np.asarray(variance))
+    return np.asarray(jnp.einsum("npk,nk,nqk->npq", rotated, inverse, rotated))
 
 
 def orthonormal_design_basis(
@@ -504,11 +531,28 @@ def make_ridge_penalty(
 ) -> NDArray:
     """Per-column ``lambda = 1 / sigma**2``, with the leading columns free.
 
-    The prior is on the event-basis coefficients, which are log-rate
-    modulations: ``sigma`` is read as a rate multiplier, so ``sigma = 2`` puts
-    95 % of the prior mass between about x0.02 and x55 of baseline. The
-    intercept carries the unit's baseline rate, which the prior has nothing to
-    say about, so it is left unpenalised.
+    The prior is on the event-basis **coefficients**, and those are B-spline
+    weights rather than the modulation itself, so ``sigma`` has two different
+    readings on the curve and both matter:
+
+    - **at one lag**, the kernel is ``sum_b beta_b B_b(lag)``, so its prior
+      standard deviation is ``sigma * sqrt(sum_b B_b(lag)**2)`` -- about
+      ``0.69 * sigma`` on the shipped basis, since a cubic B-spline partition of
+      unity puts roughly that much squared weight at any lag;
+    - **held across the window**, a sustained modulation of height ``h`` is
+      ``beta = h`` in every coefficient, which the prior weights as
+      ``exp(-h**2 n_basis / 2 sigma**2)``: its prior standard deviation is
+      ``sigma / sqrt(n_basis)``, a factor of ``sqrt(11) = 3.3`` **tighter** than
+      ``sigma`` on the shipped basis.
+
+    A ``sigma`` chosen to look loose per coefficient is therefore tighter than
+    it looks on a sustained response, which is why the default is
+    :data:`DEFAULT_PENALTY_SIGMA` rather than the per-coefficient figure the
+    peak modulations alone would suggest. :func:`implied_prior_sd` computes
+    both readings for a given basis; quote it rather than restating numbers.
+
+    The intercept carries the unit's baseline rate, which the prior has nothing
+    to say about, so it is left unpenalised.
 
     Parameters
     ----------
@@ -516,7 +560,7 @@ def make_ridge_penalty(
         Columns of the design.
     sigma : float
         Prior standard deviation of a penalised coefficient, on the log-rate
-        scale. Must be positive.
+        scale. Must be positive. See :data:`DEFAULT_PENALTY_SIGMA`.
     n_unpenalized : int
         Leading columns to leave free -- 1 for the designs here, whose first
         column is the intercept.
@@ -540,6 +584,56 @@ def make_ridge_penalty(
     penalty = np.full(n_features, 1.0 / float(sigma) ** 2)
     penalty[:n_unpenalized] = 0.0
     return penalty
+
+
+def implied_prior_sd(
+    sigma: float, spline_basis: NDArray, keep: NDArray | None = None
+) -> dict[str, float]:
+    """What a per-coefficient ``sigma`` says about the modulation curve.
+
+    Parameters
+    ----------
+    sigma : float
+        Prior standard deviation of one basis coefficient, on the log-rate
+        scale.
+    spline_basis : NDArray, shape (n_lags, n_basis)
+        The basis the coefficients weight.
+    keep : NDArray of bool, shape (n_lags,), optional
+        Lags to summarise over -- the reported window, when it is narrower than
+        the fit window. Defaults to every lag.
+
+    Returns
+    -------
+    dict
+        ``per_lag`` : prior sd of the kernel at one lag (root mean square over
+        the kept lags), with ``per_lag_min`` / ``per_lag_max`` over the same
+        lags; ``sustained`` : prior sd of a modulation held across the window,
+        ``sigma / sqrt(n_basis)``; and the 95 % rate-multiplier bounds each
+        implies (``per_lag_multiplier_low`` / ``_high``, ``sustained_*``).
+
+    Raises
+    ------
+    ValueError
+        If ``sigma`` is not positive.
+    """
+    if not sigma > 0:
+        raise ValueError(f"sigma must be positive, got {sigma!r}")
+    basis = np.asarray(spline_basis, dtype=float)
+    if keep is not None:
+        basis = basis[np.asarray(keep, dtype=bool)]
+    squared = (basis**2).sum(axis=1)
+    per_lag = float(sigma * np.sqrt(squared.mean()))
+    sustained = float(sigma / np.sqrt(basis.shape[1]))
+    return {
+        "per_lag": per_lag,
+        "per_lag_min": float(sigma * np.sqrt(squared.min())),
+        "per_lag_max": float(sigma * np.sqrt(squared.max())),
+        "sustained": sustained,
+        "per_lag_multiplier_low": float(np.exp(-1.96 * per_lag)),
+        "per_lag_multiplier_high": float(np.exp(1.96 * per_lag)),
+        "sustained_multiplier_low": float(np.exp(-1.96 * sustained)),
+        "sustained_multiplier_high": float(np.exp(1.96 * sustained)),
+    }
 
 
 def _penalty_matrix(back: NDArray, penalty: NDArray | None) -> NDArray | None:
@@ -693,9 +787,7 @@ def fit_poisson_glms(
     # The prior is stated in the design's own columns; ``P = B' Lambda B`` is
     # the same quadratic form written in the basis the fit runs in.
     penalty_matrix = _penalty_matrix(back, penalty)
-    penalty_device = (
-        None if penalty_matrix is None else jnp.asarray(penalty_matrix)
-    )
+    penalty_device = None if penalty_matrix is None else jnp.asarray(penalty_matrix)
 
     if chunk_rows is None:
         chunk_rows = _chunk_rows(n_units, rank)
@@ -776,16 +868,21 @@ def fit_poisson_glms(
     # one with no spikes at all rather than as a finite near-miss.
     failed = failed | diverged
 
-    standard_errors = _standard_errors(
+    covariance = _parameter_covariance(
         information if penalty_device is None else information + penalty_device,
         back,
         rcond,
     )
+    # A variance can come back a hair below zero on a direction the weights
+    # have all but abandoned; the parameter there is zero and so is its error.
+    standard_errors = np.sqrt(np.clip(np.einsum("npp->np", covariance), 0.0, None))
 
     if failed.any():
         params_host = params_host.copy()
         standard_errors = standard_errors.copy()
+        covariance = covariance.copy()
         standard_errors[failed] = np.nan
+        covariance[failed] = np.nan
         params_host[failed] = np.nan
         deviance_at_params = np.where(failed, np.nan, deviance_at_params)
         llf_host = np.where(failed, np.nan, llf_host)
@@ -802,4 +899,5 @@ def fit_poisson_glms(
         nobs=n_time,
         n_features=n_features,
         bse=standard_errors,
+        covariance=covariance,
     )

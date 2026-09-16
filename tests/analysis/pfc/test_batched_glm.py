@@ -15,9 +15,11 @@ import statsmodels.api as sm
 
 from continuum_swr_replay.analysis.pfc.batched_glm import (
     DEFAULT_MAXITER,
+    DEFAULT_PENALTY_SIGMA,
     DEFAULT_TOL,
     BatchedGLMResults,
     fit_poisson_glms,
+    implied_prior_sd,
     jax_backend,
     make_ridge_penalty,
 )
@@ -469,6 +471,34 @@ class TestPenalty:
         assert batched.params[0, 2] == pytest.approx(0.0, abs=1e-12)
         assert batched.bse[0, 2] == pytest.approx(0.0, abs=1e-12)
 
+    def test_the_covariance_is_the_penalised_inverse_information(self, planted):
+        """The curve helpers need the off-diagonal terms, not just ``bse``."""
+        design, counts, _ = planted
+        penalty = make_ridge_penalty(design.shape[1], sigma=2.0)
+
+        batched = fit_poisson_glms(design, counts, penalty=penalty)
+
+        for unit in range(counts.shape[1]):
+            fitted_mean = np.exp(design @ batched.params[unit])
+            dense = np.linalg.pinv(
+                design.T @ (design * fitted_mean[:, None]) + np.diag(penalty)
+            )
+            np.testing.assert_allclose(
+                batched.covariance[unit], dense, atol=1e-12, rtol=0
+            )
+            # And ``bse`` is its diagonal, so the two can never disagree.
+            np.testing.assert_allclose(
+                batched.bse[unit], np.sqrt(np.diag(batched.covariance[unit])), rtol=0,
+                atol=1e-15,
+            )
+
+    def test_a_failed_unit_has_no_covariance_either(self):
+        design = np.column_stack([np.ones(600), np.linspace(-1, 1, 600)])
+
+        batched = fit_poisson_glms(design, np.zeros(600))
+
+        assert np.all(np.isnan(batched.covariance[0]))
+
     def test_make_ridge_penalty_leaves_the_intercept_free(self):
         penalty = make_ridge_penalty(5, sigma=2.0)
 
@@ -543,3 +573,95 @@ class TestBackend:
         design, counts, _ = planted
         assert jax.config.read("jax_enable_x64")
         assert fit_poisson_glms(design, counts).params.dtype == np.float64
+
+
+class TestImpliedPriorSd:
+    """What a per-coefficient sigma says about the curve it shapes.
+
+    Two readings, and they differ by a factor of ``sqrt(n_basis)``: a sigma
+    picked to look loose on one coefficient is tight on a modulation held
+    across the window. The audit quotes these rather than restating them.
+    """
+
+    @staticmethod
+    def basis(n_basis=11, n_lags=251):
+        """A partition of unity, as the event basis is."""
+        from continuum_swr_replay.analysis.pfc.glm import event_basis_functions
+
+        spline_basis, lag_time, _ = event_basis_functions(
+            np.arange(-125, 126), 500.0
+        )
+        assert spline_basis.shape == (n_lags, n_basis)
+        return spline_basis, lag_time
+
+    def test_the_sustained_reading_is_sigma_over_root_n_basis(self):
+        spline_basis, _ = self.basis()
+
+        implied = implied_prior_sd(3.0, spline_basis)
+
+        assert implied["sustained"] == pytest.approx(3.0 / np.sqrt(11))
+
+    def test_the_per_lag_reading_is_sigma_times_the_basis_norm(self):
+        spline_basis, lag_time = self.basis()
+        window = np.abs(lag_time) <= 0.2
+
+        implied = implied_prior_sd(3.0, spline_basis, window)
+
+        norms = np.sqrt((spline_basis[window] ** 2).sum(axis=1))
+        assert implied["per_lag"] == pytest.approx(
+            3.0 * np.sqrt((norms**2).mean())
+        )
+        assert implied["per_lag_min"] == pytest.approx(3.0 * norms.min())
+        assert implied["per_lag_max"] == pytest.approx(3.0 * norms.max())
+
+    def test_a_sustained_modulation_is_the_tighter_of_the_two(self):
+        """The asymmetry the default sigma was chosen for."""
+        spline_basis, lag_time = self.basis()
+        window = np.abs(lag_time) <= 0.2
+
+        implied = implied_prior_sd(DEFAULT_PENALTY_SIGMA, spline_basis, window)
+
+        assert implied["sustained"] < DEFAULT_PENALTY_SIGMA < implied["per_lag"] * 2
+        # The gap between the two readings is a property of the basis alone:
+        # sqrt(n_basis) times the basis norm, about 2.3 on this one.
+        norms = np.sqrt((spline_basis[window] ** 2).sum(axis=1))
+        assert implied["per_lag"] / implied["sustained"] == pytest.approx(
+            np.sqrt(11 * (norms**2).mean())
+        )
+
+    def test_the_default_prior_admits_the_modulations_the_corpus_shows(self):
+        """x0.02 to x57 at one lag, x0.17 to x5.9 held across the window.
+
+        Rat mPFC units are reported to move by at most ~10x above baseline and
+        to near silence below, so the prior has to hold that comfortably at one
+        lag and still bound a sustained response.
+        """
+        spline_basis, lag_time = self.basis()
+        window = np.abs(lag_time) <= 0.2
+
+        implied = implied_prior_sd(DEFAULT_PENALTY_SIGMA, spline_basis, window)
+
+        assert implied["per_lag_multiplier_high"] > 20.0
+        assert implied["per_lag_multiplier_low"] < 0.05
+        assert 3.0 < implied["sustained_multiplier_high"] < 10.0
+        assert implied["sustained_multiplier_low"] == pytest.approx(
+            1.0 / implied["sustained_multiplier_high"]
+        )
+
+    def test_it_scales_linearly_in_sigma(self):
+        spline_basis, _ = self.basis()
+
+        loose = implied_prior_sd(4.5, spline_basis)
+        tight = implied_prior_sd(1.5, spline_basis)
+
+        assert loose["per_lag"] == pytest.approx(3.0 * tight["per_lag"])
+        assert loose["sustained"] == pytest.approx(3.0 * tight["sustained"])
+
+    def test_a_non_positive_sigma_is_refused(self):
+        spline_basis, _ = self.basis()
+
+        with pytest.raises(ValueError, match="sigma must be positive"):
+            implied_prior_sd(0.0, spline_basis)
+
+    def test_the_default_is_the_documented_one(self):
+        assert DEFAULT_PENALTY_SIGMA == 3.0
