@@ -1075,6 +1075,7 @@ def _write_ridge_bundle(
     *,
     n_neurons: int,
     peak: float,
+    mle_peak: float = 40.0,
     fit_rate: float = 5.0,
     n_folds: int = 5,
     separated: int = 0,
@@ -1101,6 +1102,13 @@ def _write_ridge_bundle(
         "matched_control + non_local_no_SWR",
     ):
         frame[f"{model}: separated_columns"] = separated
+    for curve in ("SWR", "no_SWR", "non_local_SWR", "non_local_no_SWR",
+                  "matched_control"):
+        frame[f"{curve}: peak_log_modulation"] = peak
+        frame[f"{curve}: peak_log_modulation_mle"] = mle_peak
+        frame[f"{curve}: peak_log_modulation_mle_se"] = 0.1
+        frame[f"{curve}: mle_separated"] = bool(separated)
+        frame[f"{curve}: prior_binds"] = abs(peak - mle_peak) > 0.1
     for pair in NESTED_MODEL_PAIRS:
         frame[f"{pair}: heldout_delta_dev"] = 5.0
         frame[f"{pair}: heldout_delta_dev_folds"] = [
@@ -1194,33 +1202,39 @@ class TestPeakShrinkage:
         assert peaks[0] == 0.0
         assert np.isnan(peaks[1])
 
-    def test_the_shrinkage_pairs_each_unit_across_the_two_trees(
+    def test_the_shrinkage_is_read_off_each_bundles_own_columns(
         self, estimator_trees
     ):
-        before, after = estimator_trees
+        _, after = estimator_trees
+        population, _, _ = __import__(
+            "continuum_swr_replay.analysis.pfc.load_population",
+            fromlist=["load_population_data"],
+        ).load_population_data(after, min_firing_rate=0.0)
 
-        frame = peak_shrinkage(before, after, sidecars=read_sidecars(after))
+        frame = peak_shrinkage(population)
 
-        swr = frame[frame["event_class"] == "SWR"]
+        swr = frame[frame["curve"] == "SWR"]
         assert len(swr) == 4  # two sessions x two units
         np.testing.assert_allclose(swr["peak_mle"], 40.0)
         np.testing.assert_allclose(swr["peak_penalised"], 1.5)
         np.testing.assert_allclose(swr["delta"], -38.5)
         # A peak that moved by 38.5 on the log-rate scale moved by far more
-        # than any spike count can pin down, so the prior plainly binds.
+        # than its own standard error, so the prior plainly binds.
         assert swr["prior_binds"].all()
 
     def test_the_summary_separates_the_units_whose_mle_does_not_exist(
         self, estimator_trees
     ):
-        before, after = estimator_trees
+        _, after = estimator_trees
         _write_ridge_bundle(
             after, "chimi20200223_02_r1", n_neurons=2, peak=1.5, separated=3
         )
+        population, _, _ = __import__(
+            "continuum_swr_replay.analysis.pfc.load_population",
+            fromlist=["load_population_data"],
+        ).load_population_data(after, min_firing_rate=0.0)
 
-        table = shrinkage_table(
-            peak_shrinkage(before, after, sidecars=read_sidecars(after))
-        )
+        table = shrinkage_table(peak_shrinkage(population))
 
         assert set(table["units"]) == {"separated", "well posed"}
         assert (table["n_prior_binds"] <= table["n_units"]).all()

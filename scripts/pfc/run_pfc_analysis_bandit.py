@@ -80,6 +80,11 @@ from continuum_swr_replay.analysis.pfc import (
     matched_control_seed,
     run_session,
 )
+from continuum_swr_replay.analysis.pfc.batched_glm import (
+    DEFAULT_PENALTY_SIGMA,
+    fit_poisson_glms,
+    implied_prior_sd,
+)
 from continuum_swr_replay.analysis.pfc.canonical_events import (
     IS_SWR_DEFINITION,
     canonical_event_input_hashes,
@@ -91,7 +96,11 @@ from continuum_swr_replay.analysis.pfc.cohort import (
 from continuum_swr_replay.analysis.pfc.glm import (
     EVENT_CLASSES,
     get_spikecount_per_time_bin,
+    is_separated,
     model_penalties,
+    peak_log_modulation,
+    peak_modulation_se,
+    prior_binds,
 )
 from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
 from continuum_swr_replay.analysis.pfc.heldout import (
@@ -99,6 +108,7 @@ from continuum_swr_replay.analysis.pfc.heldout import (
     control_draw_null,
     empirical_pvalue,
     heldout_deviance,
+    null_draw_seeds,
 )
 from continuum_swr_replay.analysis.replay.cohort_selection import stop_cohort_suffix
 from continuum_swr_replay.analysis.replay.fit_provenance import (
@@ -126,13 +136,11 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, module="hdmf")
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="pynwb")
 
 #: Prior standard deviation of an event-basis coefficient, on the log-rate
-#: scale, that the canonical bundle is fit at. A B-spline coefficient of this
-#: basis is the log-rate modulation near its knot, so the prior is read as a
-#: rate multiplier: sigma = 2 puts 95 % of its mass between about x0.02 and x55
-#: of baseline. It is loose enough not to shape a modulation the spikes can
-#: support and tight enough that a basis column with no spikes under it settles
-#: near "a small fraction of baseline" instead of running to -infinity.
-CANONICAL_PENALTY_SIGMA = 2.0
+#: scale, that the canonical bundle is fit at. What it says about a *curve* is
+#: not this number -- the coefficients are B-spline weights -- so the sidecar
+#: records the implied per-lag and sustained standard deviations beside it,
+#: from ``implied_prior_sd``.
+CANONICAL_PENALTY_SIGMA = DEFAULT_PENALTY_SIGMA
 
 #: The estimator and the inference each bundle is produced by, recorded in the
 #: provenance sidecar and compared by the skip check: a bundle fit by maximum
@@ -181,6 +189,19 @@ BEST_MODEL_CANDIDATES = {
         "non_local",
         "non_local_SWR + non_local_no_SWR",
     ),
+}
+
+#: The five peri-event curves a bundle ships, and where each comes from: the
+#: model whose fit it is read off, and which basis block of that model's
+#: parameters. The block order is the design's own, which is what the shipped
+#: curves are built from, so the maximum-likelihood peak reported beside a
+#: curve is the peak of the same block.
+CURVE_SOURCES = {
+    "SWR": ("SWR + non_local_no_SWR", 0),
+    "no_SWR": ("SWR + non_local_no_SWR", 1),
+    "non_local_SWR": ("non_local_SWR + non_local_no_SWR", 0),
+    "non_local_no_SWR": ("non_local_SWR + non_local_no_SWR", 1),
+    "matched_control": ("matched_control + non_local_no_SWR", 0),
 }
 
 #: Columns the maximum-likelihood ladder wrote that this estimator cannot
@@ -374,6 +395,10 @@ def results_exist(
 #: the ones the bundle was fit on, so they are built on the same lags.
 FIT_LAGS = np.arange(-125, 126, 1)
 
+#: Half-width of the window the curves are reported on, in seconds. The models
+#: are fit over a wider one so the spline's boundary behaviour falls outside it.
+REPORT_HALF_WINDOW_S = 0.2
+
 
 def build_scoring_context(
     nwb_file_name: str,
@@ -414,7 +439,8 @@ def build_scoring_context(
     dict
         ``fit_mask`` (bool Series on the session's time axis), ``counts``
         (``(n_time, n_units)`` spike counts), ``designs`` (full-length design
-        matrices by model name), ``spline_basis``, ``lags``, ``event_times``,
+        matrices by model name), ``spline_basis``, ``lags``, ``lag_time``,
+        ``event_times``,
         ``n_basis_per_class``, and the ``bin_counts`` / ``event_counts`` /
         ``n_matched_control`` / ``matched_control_seed`` the shipped fit is
         checked against.
@@ -472,7 +498,7 @@ def build_scoring_context(
         event_times, fit_mask, np.random.default_rng(control_seed)
     ).times
 
-    designs, spline_basis, _ = make_design_matrices(
+    designs, spline_basis, lag_time = make_design_matrices(
         event_times,
         position_info,
         sampling_frequency=sampling_frequency,
@@ -495,6 +521,7 @@ def build_scoring_context(
         "designs": designs,
         "spline_basis": spline_basis,
         "lags": FIT_LAGS,
+        "lag_time": lag_time,
         "event_times": event_times,
         "n_basis_per_class": int(spline_basis.shape[1]),
         "bin_counts": bin_counts,
@@ -578,6 +605,7 @@ def separated_column_counts(design: NDArray, counts: NDArray) -> NDArray:
 def score_session(
     context: dict[str, object],
     *,
+    modulation_curves: dict[str, NDArray],
     penalty_sigma: float,
     n_folds: int,
     fold_seed: int,
@@ -600,6 +628,10 @@ def score_session(
     ----------
     context : dict
         From :func:`build_scoring_context`.
+    modulation_curves : dict[str, NDArray]
+        The shipped penalised curves, keyed as :data:`CURVE_SOURCES` is, so the
+        prior's effect on each can be read against the same curve fit without
+        it.
     penalty_sigma : float
         The prior the shipped fit used, applied to every training fit.
     n_folds : int
@@ -694,15 +726,16 @@ def score_session(
         "non_estimable_models": sorted(non_estimable),
     }
 
+    statistics.update(
+        maximum_likelihood_comparison(
+            designs, fit_rows, fit_counts, context, modulation_curves, logger
+        )
+    )
+
     if n_control_draws > 0:
-        seeds = [
-            int(seed)
-            for seed in np.random.default_rng(control_draw_seed).integers(
-                0, 2**62, size=n_control_draws
-            )
-        ]
+        seeds = null_draw_seeds(control_draw_seed, n_control_draws)
         logger.info(
-            "Drawing the null: %d matched-control draws on %d folds...",
+            "Drawing the null: %d matched-control draws per class on %d folds...",
             n_control_draws,
             n_folds,
         )
@@ -717,18 +750,128 @@ def score_session(
             penalty_sigma=penalty_sigma,
             baseline_control=context["event_times"]["matched_control"],
         )
+        # Each class is read against a null drawn to its own onset count and
+        # its own durations: a regressor built from 30 windows buys less than
+        # one built from 300 whatever either contains, so one shared null would
+        # hold classes of different size to the same reference.
         for event_class in EVENT_CLASSES:
-            observed = statistics[f"{pair_name(event_class, 'constant')}: heldout_delta_dev"]
+            stem = pair_name(event_class, "constant")
             statistics[f"{event_class}: p_heldout"] = empirical_pvalue(
-                observed, null.improvement
+                statistics[f"{stem}: heldout_delta_dev"],
+                null.improvement[event_class],
             )
         engagement_stem = pair_name(*ENGAGEMENT_PAIR)
         statistics[f"{engagement_stem}: p_heldout"] = empirical_pvalue(
             statistics[f"{engagement_stem}: heldout_delta_dev"], null.engagement
         )
-        diagnostics["n_placed_per_draw"] = null.n_placed.tolist()
+        diagnostics["null_windows"] = {
+            name: {
+                "n_events": int(null.n_events[name]),
+                "n_placed_median": float(np.median(null.n_placed[name])),
+                "n_placed_min": int(np.min(null.n_placed[name])),
+            }
+            for name in null.n_placed
+        }
 
     return pd.DataFrame(statistics), diagnostics
+
+
+def maximum_likelihood_comparison(
+    designs: dict[str, NDArray],
+    fit_rows: NDArray,
+    fit_counts: NDArray,
+    context: dict[str, object],
+    modulation_curves: dict[str, NDArray],
+    logger: logging.Logger,
+) -> dict[str, NDArray]:
+    """What the same curve looks like without the prior, and whether it binds.
+
+    The shipped curve is the penalised one; the question a prior has to answer
+    is where it did the work. So each curve-bearing model is fit unpenalised as
+    well, and the two peaks are differenced against the estimation error the
+    *unpenalised* fit itself reports -- the standard error of the kernel at its
+    own peak lag, off-diagonal terms included, which a diagonal ``bse`` cannot
+    give. A unit whose unpenalised fit ran away has no peak to difference
+    against: it is flagged instead, and left out of the binding count.
+
+    Parameters
+    ----------
+    designs : dict[str, NDArray]
+        Full-length designs by model name.
+    fit_rows : NDArray of bool, shape (n_time,)
+        The bins the models were fit on.
+    fit_counts : NDArray, shape (n_fit_bins, n_units)
+        Spike counts on those bins.
+    context : dict
+        From :func:`build_scoring_context`; its ``spline_basis`` and
+        ``lag_time`` say what a coefficient block means.
+    modulation_curves : dict[str, NDArray]
+        The shipped penalised curves, ``(n_report_lags, n_units)`` each, keyed
+        as :data:`CURVE_SOURCES` is.
+    logger : logging.Logger
+
+    Returns
+    -------
+    dict[str, NDArray]
+        Per curve: the penalised peak, the unpenalised peak and its standard
+        error, whether the unpenalised fit is separated, and whether the prior
+        binds.
+    """
+    spline_basis = context["spline_basis"]
+    lag_time = context["lag_time"]
+    n_basis = spline_basis.shape[1]
+    wanted = sorted({model for model, _ in CURVE_SOURCES.values()})
+    logger.info(
+        "Fitting %d models unpenalised, to read the prior against", len(wanted)
+    )
+    unpenalised = {
+        model: fit_poisson_glms(designs[model][fit_rows], fit_counts, penalty=None)
+        for model in wanted
+    }
+
+    columns: dict[str, NDArray] = {}
+    for curve, (model, block) in CURVE_SOURCES.items():
+        start = 1 + block * n_basis
+        params = np.asarray(unpenalised[model].params)[:, start : start + n_basis]
+        covariance = np.asarray(unpenalised[model].covariance)[
+            :, start : start + n_basis, start : start + n_basis
+        ]
+        mle = peak_log_modulation(params, spline_basis, lag_time)
+        mle_se = peak_modulation_se(covariance, spline_basis, mle.index)
+        penalised_peak = curve_peaks(modulation_curves[curve])
+        columns[f"{curve}: peak_log_modulation"] = penalised_peak
+        columns[f"{curve}: peak_log_modulation_mle"] = mle.value
+        columns[f"{curve}: peak_log_modulation_mle_se"] = mle_se
+        columns[f"{curve}: mle_separated"] = is_separated(params)
+        columns[f"{curve}: prior_binds"] = prior_binds(
+            penalised_peak, mle.value, mle_se
+        )
+    return columns
+
+
+def curve_peaks(curves: NDArray) -> NDArray:
+    """Peak log-modulation per unit: the curve's value where ``|curve|`` is largest.
+
+    The shipped curve is ``spline_basis @ params`` over the reported window, so
+    this is what a coefficient-level peak helper returns for the coefficients
+    that produced it -- read off the curve the bundle actually ships.
+
+    Parameters
+    ----------
+    curves : NDArray, shape (n_report_lags, n_units)
+
+    Returns
+    -------
+    NDArray, shape (n_units,)
+        ``nan`` for a unit whose curve is not finite.
+    """
+    curves = np.asarray(curves, dtype=float)
+    peaks = np.full(curves.shape[1], np.nan)
+    usable = np.isfinite(curves).all(axis=0)
+    if usable.any():
+        block = curves[:, usable]
+        peaks[usable] = block[np.abs(block).argmax(axis=0), np.arange(block.shape[1])]
+    return peaks
 
 
 def events_per_fold(
@@ -1005,6 +1148,7 @@ def run_analysis(
         # dropped and the held-out ones take their place.
         neuron_stats = drop_retired_statistics(neuron_stats)
         n_basis_per_class: int | None = None
+        implied_prior: dict[str, float] = {}
         scoring_diagnostics: dict[str, object] = {}
         if len(neuron_stats):
             context = build_scoring_context(
@@ -1019,8 +1163,26 @@ def run_analysis(
             )
             verify_scoring_context(context, cohort_info)
             n_basis_per_class = context["n_basis_per_class"]
+            # What the prior says about a curve, not about a coefficient: the
+            # basis is a partition of unity, so the prior on the kernel at one
+            # lag is wider than sigma and the prior on a modulation held across
+            # the window is narrower. Both are recorded, over the reported
+            # window rather than the wider one the models are fit on.
+            reported = (
+                np.abs(context["lag_time"]) <= REPORT_HALF_WINDOW_S + 1e-12
+            )
+            implied_prior = implied_prior_sd(
+                penalty_sigma, context["spline_basis"], reported
+            )
             heldout_stats, scoring_diagnostics = score_session(
                 context,
+                modulation_curves={
+                    "SWR": SWR_modulation,
+                    "no_SWR": no_SWR_modulation,
+                    "non_local_SWR": non_local_SWR_modulation,
+                    "non_local_no_SWR": non_local_no_SWR_modulation,
+                    "matched_control": matched_control_modulation,
+                },
                 penalty_sigma=penalty_sigma,
                 n_folds=n_folds,
                 fold_seed=fold_seed,
@@ -1105,11 +1267,17 @@ def run_analysis(
                 "n_control_draws": int(n_control_draws),
                 "control_draw_seed": int(control_draw_seed),
                 "n_basis_per_class": n_basis_per_class,
+                "implied_prior_sd": implied_prior,
                 "fold_sizes": scoring_diagnostics.get("fold_sizes"),
                 "events_per_fold": scoring_diagnostics.get("events_per_fold"),
                 "non_estimable_models": scoring_diagnostics.get(
                     "non_estimable_models"
                 ),
+                # How many windows each class's null draws actually placed,
+                # against the real onset count they were matched to: a draw
+                # that placed far fewer is a thinner regressor, and its
+                # improvement is not the reference the observed one needs.
+                "null_windows": scoring_diagnostics.get("null_windows"),
                 "stop_table_sha256": cohort_report.get("stop_table_sha256"),
                 "stop_cohort_report": cohort_report,
                 "cohort_counts": cohort_info,

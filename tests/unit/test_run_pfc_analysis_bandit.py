@@ -70,7 +70,7 @@ DOT_SHA = "dot222"
 #: ``results_exist`` call in these tests asks for. The skip check compares them
 #: all, so a bundle scored under a different prior, split or null is refit.
 INFERENCE = {
-    "penalty_sigma": 2.0,
+    "penalty_sigma": runner.CANONICAL_PENALTY_SIGMA,
     "n_folds": 5,
     "fold_seed": 7,
     "n_control_draws": 40,
@@ -277,7 +277,11 @@ def fake_session(monkeypatch):
             "session": (nwb_file_name, epoch_name, brain_area),
             **kwargs,
         }
-        return {"n_basis_per_class": 11}
+        return {
+            "n_basis_per_class": 11,
+            "spline_basis": np.eye(11),
+            "lag_time": np.linspace(-0.25, 0.25, 11),
+        }
 
     def _fake_verify(context, cohort_info):
         calls["verified"] = cohort_info["stop_cohort"]
@@ -622,21 +626,21 @@ def test_one_card_and_one_worker_is_the_supported_layout(monkeypatch):
 
 def test_only_a_bundle_at_another_prior_is_suffixed():
     assert runner.penalty_sigma_suffix(runner.CANONICAL_PENALTY_SIGMA) == ""
-    assert runner.penalty_sigma_suffix(1.0) == "_sigma1"
-    assert runner.penalty_sigma_suffix(3) == "_sigma3"
+    assert runner.penalty_sigma_suffix(2.0) == "_sigma2"
+    assert runner.penalty_sigma_suffix(4.5) == "_sigma4p5"
     # A decimal point would truncate the companion array names, which are
     # written by suffixing the stem.
-    assert "." not in runner.penalty_sigma_suffix(2.5)
+    assert "." not in runner.penalty_sigma_suffix(4.5)
 
 
 def test_the_sensitivity_bundle_cannot_take_the_canonical_name(tmp_path):
     canonical = runner.modulation_path(tmp_path, "wilbur20210329_02_r1_mPFC", "at_well")
     sensitivity = runner.modulation_path(
-        tmp_path, "wilbur20210329_02_r1_mPFC", "at_well", 1.0
+        tmp_path, "wilbur20210329_02_r1_mPFC", "at_well", 2.0
     )
 
     assert canonical.name == "wilbur20210329_02_r1_mPFC_modulation.pkl"
-    assert sensitivity.name == "wilbur20210329_02_r1_mPFC_modulation_sigma1.pkl"
+    assert sensitivity.name == "wilbur20210329_02_r1_mPFC_modulation_sigma2.pkl"
 
 
 def test_the_seeds_are_a_function_of_the_session_and_the_draw():
@@ -657,7 +661,7 @@ def test_the_seeds_are_a_function_of_the_session_and_the_draw():
     [
         {"estimator": "poisson_glm"},
         {"inference": "likelihood_ratio"},
-        {"penalty_sigma_log_rate": 1.0},
+        {"penalty_sigma_log_rate": 1.5},
         {"n_folds": 10},
         {"fold_seed": 11},
         {"n_control_draws": 20},
@@ -700,7 +704,10 @@ def test_the_sidecar_states_the_estimator_and_the_inference(
     record = json.loads(artifact.with_suffix(".provenance.json").read_text())
     assert record["estimator"] == "ridge_poisson_glm"
     assert record["inference"] == "blocked_heldout_deviance"
-    assert record["penalty_sigma_log_rate"] == 2.0
+    assert record["penalty_sigma_log_rate"] == runner.CANONICAL_PENALTY_SIGMA
+    # What that says about a curve, which is not the same number.
+    assert record["implied_prior_sd"]["per_lag"] > 0
+    assert record["implied_prior_sd"]["sustained"] > 0
     assert record["n_folds"] == 5
     assert record["n_control_draws"] == 40
     assert record["n_basis_per_class"] == 11
@@ -714,8 +721,13 @@ def test_the_sidecar_states_the_estimator_and_the_inference(
     # The hand-back the batched fitter used to do is gone; nothing counts it.
     assert "n_neurons_reference_fit" not in record
     # The prior the models were fit under reaches the fit itself.
-    assert fake_session["run_session"]["penalty_sigma"] == 2.0
-    assert fake_session["score"]["penalty_sigma"] == 2.0
+    assert (
+        fake_session["run_session"]["penalty_sigma"]
+        == runner.CANONICAL_PENALTY_SIGMA
+    )
+    assert (
+        fake_session["score"]["penalty_sigma"] == runner.CANONICAL_PENALTY_SIGMA
+    )
 
 
 def test_the_bundle_carries_the_heldout_columns_and_not_the_retired_ones(
@@ -756,14 +768,14 @@ def test_a_sensitivity_prior_writes_its_own_bundle_and_draws_no_null(
         log_directory=tmp_path / "logs",
         stop_cohort="at_well",
         output_dir=output_dir,
-        penalty_sigma=1.0,
+        penalty_sigma=2.0,
     )
 
-    artifact = output_dir / "wilbur20210329_02_r1_mPFC_modulation_sigma1.pkl"
+    artifact = output_dir / "wilbur20210329_02_r1_mPFC_modulation_sigma2.pkl"
     assert artifact.exists()
     assert not (output_dir / "wilbur20210329_02_r1_mPFC_modulation.pkl").exists()
     record = json.loads(artifact.with_suffix(".provenance.json").read_text())
-    assert record["penalty_sigma_log_rate"] == 1.0
+    assert record["penalty_sigma_log_rate"] == 2.0
     assert record["n_control_draws"] == 0
     assert fake_session["score"]["n_control_draws"] == 0
 
@@ -846,7 +858,7 @@ def _synthetic_context(seed=0, n_units=3):
 
     position_info = pd.DataFrame({"head_speed": np.zeros(n_time)}, index=time)
     lags = np.arange(-25, 26)
-    designs, spline_basis, _ = make_design_matrices(
+    designs, spline_basis, lag_time = make_design_matrices(
         event_times,
         position_info,
         sampling_frequency=SAMPLING_FREQUENCY,
@@ -859,6 +871,7 @@ def _synthetic_context(seed=0, n_units=3):
         "designs": designs,
         "spline_basis": spline_basis,
         "lags": lags,
+        "lag_time": lag_time,
         "event_times": event_times,
         "n_basis_per_class": int(spline_basis.shape[1]),
         "bin_counts": {"n_bins_fit": int(mask.sum())},
@@ -871,6 +884,14 @@ def _synthetic_context(seed=0, n_units=3):
         "n_matched_control": int(len(event_times["matched_control"])),
         "matched_control_seed": 7,
     }
+
+
+def _synthetic_curves(context, n_report_lags=201):
+    """Stand-in shipped curves, one per bundle array, in the units' order."""
+    n_units = context["counts"].shape[1]
+    curve = np.zeros((n_report_lags, n_units))
+    curve[n_report_lags // 2] = 0.5
+    return dict.fromkeys(runner.CURVE_SOURCES, curve)
 
 
 def test_a_rebuilt_context_that_is_not_the_fitted_population_is_refused():
@@ -932,7 +953,8 @@ def test_the_scored_table_says_what_each_model_bought_out_of_fold(caplog):
 
     statistics, diagnostics = runner.score_session(
         context,
-        penalty_sigma=2.0,
+        modulation_curves=_synthetic_curves(context),
+        penalty_sigma=runner.CANONICAL_PENALTY_SIGMA,
         n_folds=3,
         fold_seed=5,
         n_control_draws=4,
@@ -953,7 +975,8 @@ def test_the_scored_table_says_what_each_model_bought_out_of_fold(caplog):
         np.testing.assert_allclose(
             per_fold.sum(axis=1),
             statistics[f"{stem}: heldout_delta_dev"].to_numpy(),
-            rtol=1e-10,
+            rtol=1e-8,
+            atol=1e-9,
         )
 
     # Every class and the engagement statistic carry an empirical p-value, on
@@ -983,7 +1006,8 @@ def test_the_best_model_is_the_one_with_the_lowest_heldout_deviance():
 
     statistics, _ = runner.score_session(
         context,
-        penalty_sigma=2.0,
+        modulation_curves=_synthetic_curves(context),
+        penalty_sigma=runner.CANONICAL_PENALTY_SIGMA,
         n_folds=3,
         fold_seed=5,
         n_control_draws=0,

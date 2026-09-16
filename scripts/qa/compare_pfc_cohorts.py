@@ -1222,63 +1222,30 @@ NESTED_MODEL_PAIRS = (
     "matched_control vs. constant",
 )
 
-#: Peri-event curve each event class is read from, and the model it comes from.
-#: The names are the bundle's array names; ``non_local_no_SWR_split`` is the
-#: same class seen through the replay-split model rather than the SWR-
-#: controlled one.
-MODULATION_CURVES = {
-    "SWR": "SWR_modulation",
-    "non_local_no_SWR": "no_SWR_modulation",
-    "non_local_SWR": "non_local_SWR_modulation",
-    "non_local_no_SWR_split": "non_local_no_SWR_modulation",
-    "matched_control": "matched_control_modulation",
-}
-
-#: Which model's ``separated_columns`` count says whether a class's fit had a
-#: basis column with no spikes under it -- the configuration whose maximum
-#: likelihood estimate does not exist.
-SEPARATION_MODEL = {
-    "SWR": "SWR + non_local_no_SWR",
-    "non_local_no_SWR": "SWR + non_local_no_SWR",
-    "non_local_SWR": "non_local_SWR + non_local_no_SWR",
-    "non_local_no_SWR_split": "non_local_SWR + non_local_no_SWR",
-    "matched_control": "matched_control + non_local_no_SWR",
-}
-
-#: Event count in the sidecar that drives each class's peak, for the
-#: approximate estimation error below.
-CLASS_EVENT_COUNT = {
-    "SWR": "n_ripple_after",
-    "non_local_no_SWR": "n_events_non_swr",
-    "non_local_SWR": "n_events_swr",
-    "non_local_no_SWR_split": "n_events_non_swr",
-    "matched_control": "n_matched_control",
-}
-
-#: Integral of a squared cubic B-spline basis function of this basis, in
-#: seconds: 50 ms knots, so a basis function spans four knot intervals and
-#: ``int b(t)^2 dt`` is about 0.6 of one interval. Used only in the
-#: approximate estimation error below, where a factor of two does not change
-#: which side of the threshold a unit falls on.
-BASIS_SECOND_MOMENT_S = 0.030
+#: The five peri-event curves a bundle ships. The bundle carries, beside each,
+#: the peak of the penalised curve, the peak the same block reaches unpenalised
+#: and that peak's own standard error, so the audit reads the prior's effect
+#: off the artifact rather than differencing two trees fit on different bases.
+CURVE_NAMES = (
+    "SWR",
+    "no_SWR",
+    "non_local_SWR",
+    "non_local_no_SWR",
+    "matched_control",
+)
 
 
 def curve_peaks(curves: NDArray) -> NDArray:
     """Peak log-modulation per unit: the curve's value where ``|curve|`` is largest.
 
-    The shipped curve is ``spline_basis @ params``, so this is the same
-    quantity a curve-level peak helper returns from the coefficients -- read
-    off the artifact rather than refit.
-
     Parameters
     ----------
-    curves : NDArray, shape (n_lag_times, n_units)
+    curves : NDArray, shape (n_report_lags, n_units)
 
     Returns
     -------
     NDArray, shape (n_units,)
-        ``nan`` for a unit whose curve is not finite (its model was not
-        estimable).
+        ``nan`` for a unit whose curve is not finite.
     """
     curves = np.asarray(curves, dtype=float)
     peaks = np.full(curves.shape[1], np.nan)
@@ -1289,167 +1256,87 @@ def curve_peaks(curves: NDArray) -> NDArray:
     return peaks
 
 
-def approximate_peak_error(rate_hz: NDArray, n_events: NDArray) -> NDArray:
-    """Scale of the estimation error on a peak log-rate modulation.
-
-    The peak of a partition-of-unity B-spline kernel is essentially one
-    coefficient, and the Poisson information for that coefficient is
-    ``sum_t mu_t x_tk**2``, which for ``n`` events at baseline rate
-    ``lambda`` is about ``lambda * n * int b_k(t)**2 dt``. So the standard
-    error is about ``1 / sqrt(lambda * n * m)`` with ``m`` the basis
-    function's second moment in seconds.
-
-    This is a scale, not the fit's own standard error: the bundles ship the
-    fitted curves and not their covariance, so a unit-by-unit posterior
-    standard error is not available from the artifacts. It is used only to ask
-    whether a coefficient moved by more than the data could pin it down, where
-    an approximation good to a factor of order one is enough to separate "the
-    prior did the work" from "the spikes did".
+def peak_shrinkage(after: pd.DataFrame) -> pd.DataFrame:
+    """Per unit and curve, what the prior did to the peak modulation.
 
     Parameters
     ----------
-    rate_hz : NDArray, shape (n_units,)
-        Each unit's mean firing rate over the fitted bins.
-    n_events : NDArray, shape (n_units,)
-        Events of the class the peak belongs to, in that unit's session.
-
-    Returns
-    -------
-    NDArray, shape (n_units,)
-    """
-    information = (
-        np.asarray(rate_hz, dtype=float)
-        * np.asarray(n_events, dtype=float)
-        * BASIS_SECOND_MOMENT_S
-    )
-    with np.errstate(divide="ignore", invalid="ignore"):
-        return np.where(information > 0, 1.0 / np.sqrt(information), np.inf)
-
-
-def peak_shrinkage(
-    before_dir: Path,
-    after_dir: Path,
-    artifact_suffix: str = "",
-    sidecars: pd.DataFrame | None = None,
-) -> pd.DataFrame:
-    """Per unit and class, the peak log-modulation under each estimator.
-
-    The two trees hold the same sessions fit the same way except for the
-    prior, and each session's units are in the order its spike-time list gave,
-    so the two tables pair row for row. A session whose row counts disagree is
-    reported rather than paired.
+    after : pandas.DataFrame
+        The penalised population, from ``load_population_data``.
 
     Returns
     -------
     pandas.DataFrame
-        One row per (session, unit, class): ``peak_mle``, ``peak_penalised``,
-        ``delta``, ``separated_columns`` (from the after bundle), the unit's
-        fitted-bin firing rate and its class's event count.
+        One row per (unit, curve): ``peak_penalised``, ``peak_mle``,
+        ``peak_mle_se``, ``mle_separated`` and ``prior_binds``, plus the
+        unit's animal. Empty when the bundles carry none of those columns.
     """
-    events = (
-        sidecars.set_index("session") if sidecars is not None else pd.DataFrame()
-    )
     rows = []
-    shared = sorted(
-        bundle_sessions(before_dir) & bundle_sessions(after_dir, artifact_suffix)
-    )
-    for session in shared:
-        before_stats = _bundle_statistics(before_dir, session, "")
-        after_stats = _bundle_statistics(after_dir, session, artifact_suffix)
-        if len(before_stats) != len(after_stats) or not len(after_stats):
+    for curve in CURVE_NAMES:
+        columns = {
+            "peak_penalised": f"{curve}: peak_log_modulation",
+            "peak_mle": f"{curve}: peak_log_modulation_mle",
+            "peak_mle_se": f"{curve}: peak_log_modulation_mle_se",
+            "mle_separated": f"{curve}: mle_separated",
+            "prior_binds": f"{curve}: prior_binds",
+        }
+        if not set(columns.values()) <= set(after.columns):
             continue
-        rate = _numeric(
-            after_stats.get(FIT_RATE_COLUMN, pd.Series(np.nan, index=after_stats.index))
-        ).to_numpy()
-        for name, array in MODULATION_CURVES.items():
-            try:
-                before_curves = _bundle_modulation(before_dir, session, "", array)
-                after_curves = _bundle_modulation(
-                    after_dir, session, artifact_suffix, array
-                )
-            except FileNotFoundError:
-                # The matched non-event control postdates the first bundles,
-                # so a tree written before it has no curve for that class.
-                # There is nothing to compare, which is not the same as a
-                # comparison that came out at zero.
-                continue
-            before_peak = curve_peaks(before_curves)
-            after_peak = curve_peaks(after_curves)
-            separated_col = f"{SEPARATION_MODEL[name]}: separated_columns"
-            separated = (
-                _numeric(after_stats[separated_col]).to_numpy()
-                if separated_col in after_stats
-                else np.full(len(after_stats), np.nan)
-            )
-            n_events = np.nan
-            if session in events.index:
-                n_events = pd.to_numeric(
-                    events.loc[session].get(CLASS_EVENT_COUNT[name], np.nan),
-                    errors="coerce",
-                )
-            rows.append(
-                pd.DataFrame(
-                    {
-                        "session": session,
-                        "unit": np.arange(len(after_stats)),
-                        "event_class": name,
-                        "peak_mle": before_peak,
-                        "peak_penalised": after_peak,
-                        "separated_columns": separated,
-                        "fit_rate_hz": rate,
-                        "n_events": float(n_events),
-                    }
-                )
-            )
+        frame = after[list(columns.values())].rename(
+            columns={value: key for key, value in columns.items()}
+        )
+        frame.insert(0, "curve", curve)
+        frame["animal"] = after["animal"].to_numpy()
+        rows.append(frame)
     if not rows:
         return pd.DataFrame(
             columns=[
-                "session",
-                "unit",
-                "event_class",
-                "peak_mle",
+                "curve",
                 "peak_penalised",
-                "separated_columns",
-                "fit_rate_hz",
-                "n_events",
-                "delta",
-                "peak_error",
+                "peak_mle",
+                "peak_mle_se",
+                "mle_separated",
                 "prior_binds",
+                "animal",
+                "delta",
             ]
         )
     frame = pd.concat(rows, ignore_index=True)
     frame["delta"] = frame["peak_penalised"] - frame["peak_mle"]
-    frame["peak_error"] = approximate_peak_error(
-        frame["fit_rate_hz"].to_numpy(), frame["n_events"].to_numpy()
-    )
-    frame["prior_binds"] = frame["delta"].abs() > frame["peak_error"]
     return frame
 
 
 def shrinkage_table(frame: pd.DataFrame) -> pd.DataFrame:
-    """Per class and separation status: how far the prior moved the peak."""
+    """Per curve and separation status: how far the prior moved the peak.
+
+    A unit whose unpenalised fit ran away has no peak to difference against,
+    so its row is reported -- it is where a prior is supposed to do the work --
+    but "the prior binds" is counted only where a maximum-likelihood peak
+    exists to be moved.
+    """
     if frame.empty:
         return frame
-    paired = frame.dropna(subset=["peak_mle", "peak_penalised"]).copy()
-    paired["units"] = np.where(
-        paired["separated_columns"].fillna(0) > 0, "separated", "well posed"
+    table = frame.copy()
+    table["units"] = np.where(
+        table["mle_separated"].fillna(False).astype(bool), "separated", "well posed"
     )
-    grouped = paired.groupby(["event_class", "units"], dropna=False)
-    table = grouped.agg(
+    grouped = table.groupby(["curve", "units"], dropna=False)
+    summary = grouped.agg(
         n_units=("delta", "size"),
-        median_abs_peak_mle=("peak_mle", lambda s: float(np.median(np.abs(s)))),
+        median_abs_peak_mle=("peak_mle", lambda s: float(np.nanmedian(np.abs(s)))),
         median_abs_peak_penalised=(
             "peak_penalised",
-            lambda s: float(np.median(np.abs(s))),
+            lambda s: float(np.nanmedian(np.abs(s))),
         ),
-        median_abs_delta=("delta", lambda s: float(np.median(np.abs(s)))),
-        max_abs_delta=("delta", lambda s: float(np.max(np.abs(s)))),
-        n_prior_binds=("prior_binds", "sum"),
+        median_abs_delta=("delta", lambda s: float(np.nanmedian(np.abs(s)))),
+        max_abs_delta=("delta", lambda s: float(np.nanmax(np.abs(s)))),
+        median_peak_mle_se=("peak_mle_se", lambda s: float(np.nanmedian(s))),
+        n_prior_binds=("prior_binds", lambda s: int(s.fillna(False).sum())),
     ).reset_index()
-    table["prior_binds_pct"] = (
-        100.0 * table["n_prior_binds"] / table["n_units"]
+    summary["prior_binds_pct"] = (
+        100.0 * summary["n_prior_binds"] / summary["n_units"]
     ).round(1)
-    return table
+    return summary
 
 
 def heldout_fraction_table(
@@ -1583,7 +1470,8 @@ def sigma_sensitivity_table(
             bundle_sessions(after_dir, artifact_suffix)
             & bundle_sessions(after_dir, variant)
         )
-        for name, array in MODULATION_CURVES.items():
+        for name in CURVE_NAMES:
+            array = f"{name}_modulation"
             deltas = []
             for session in shared:
                 canonical = curve_peaks(
@@ -2209,25 +2097,21 @@ def build_estimator_report(
 
     add("## What the prior did to the fits\n")
     add(
-        "Per unit and event class, the peak of the peri-event log-modulation "
-        "curve under each estimator -- the curve the bundle ships, so this is "
-        "the coefficient-level peak read off the artifact rather than refit. "
-        "Units are split by whether that class's model had a basis column with "
-        "no spikes under its support in the fitted bins (`separated_columns`): "
-        "those are the fits whose maximum likelihood estimate does not exist, "
-        "and are where a prior is supposed to do the work.\n"
+        "Each bundle carries, beside every peri-event curve, the peak of the "
+        "penalised curve, the peak the same coefficient block reaches "
+        "**unpenalised**, and that peak's own standard error -- the standard "
+        "error of the kernel at its peak lag, off-diagonal terms included. So "
+        "the prior's effect is read inside one fit of one design, not by "
+        "differencing two trees that were fit on different bases.\n"
     )
     add(
-        "`prior_binds` counts units whose peak moved by more than the "
-        "estimation error the spikes afford it. The bundles ship fitted curves "
-        "and not their covariance, so that error is the analytic scale "
-        "`1 / sqrt(rate * n_events * m)` with `m` the basis function's second "
-        "moment in seconds -- a scale good to a factor of order one, which is "
-        "enough to separate 'the prior did the work' from 'the spikes did', "
-        "and not a substitute for the fit's own posterior standard error.\n"
+        "`prior_binds` counts units whose penalised peak differs from the "
+        "maximum-likelihood one by more than that error. A unit whose "
+        "unpenalised fit ran away has no peak to difference against: it is "
+        "reported on its own row (`separated`), which is where a prior is "
+        "supposed to do the work, and is left out of the binding count.\n"
     )
-    shrinkage = peak_shrinkage(before_dir, after_dir, artifact_suffix, sidecars)
-    add(_md(shrinkage_table(shrinkage)))
+    add(_md(shrinkage_table(peak_shrinkage(after))))
 
     add("## The separating columns the prior was introduced for\n")
     add(
