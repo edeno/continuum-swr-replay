@@ -1,8 +1,8 @@
-"""Blocked folds and out-of-fold deviance.
+"""Blocked folds, out-of-fold deviance, and the control-draw null.
 
 Value-level throughout: the fold assignment is checked against the blocks it
-was built from, and the held-out score against the model that generated the
-data.
+was built from, the held-out score against the model that generated the data,
+and the null against the uniform distribution a valid p-value has to have.
 """
 
 from __future__ import annotations
@@ -10,6 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import pytest
+from scipy import stats
 
 from continuum_swr_replay.analysis.pfc.batched_glm import make_ridge_penalty
 from continuum_swr_replay.analysis.pfc.glm import (
@@ -19,6 +20,8 @@ from continuum_swr_replay.analysis.pfc.glm import (
 )
 from continuum_swr_replay.analysis.pfc.heldout import (
     assign_blocked_folds,
+    control_draw_null,
+    empirical_pvalue,
     heldout_deviance,
     poisson_deviance,
 )
@@ -317,3 +320,162 @@ class TestHeldoutDeviance:
                 None,
                 folds,
             )
+
+
+class TestEmpiricalPvalue:
+    def test_it_is_the_fraction_of_draws_at_least_as_large(self):
+        null = np.array([[1.0], [2.0], [3.0], [4.0]])
+
+        assert empirical_pvalue(np.array([2.5]), null)[0] == pytest.approx(0.5)
+        assert empirical_pvalue(np.array([0.0]), null)[0] == pytest.approx(1.0)
+        assert empirical_pvalue(np.array([5.0]), null)[0] == pytest.approx(0.0)
+
+    def test_a_tie_counts_as_the_null_being_as_large(self):
+        null = np.array([[1.0], [2.0]])
+
+        assert empirical_pvalue(np.array([2.0]), null)[0] == pytest.approx(0.5)
+
+    def test_draws_that_failed_are_left_out_of_the_denominator(self):
+        null = np.array([[1.0], [np.nan], [3.0]])
+
+        assert empirical_pvalue(np.array([2.0]), null)[0] == pytest.approx(0.5)
+
+    def test_a_unit_with_no_usable_draw_is_nan(self):
+        null = np.full((3, 1), np.nan)
+
+        assert np.isnan(empirical_pvalue(np.array([2.0]), null)[0])
+
+
+@pytest.fixture
+def null_session():
+    """Immobility bouts with events, and units that ignore them entirely."""
+    rng = np.random.default_rng(4242)
+    mask = bouts_mask([1500] * 14, gap=150)
+    time = np.asarray(mask.index, dtype=float)
+    fit_rows = np.asarray(mask, dtype=bool)
+
+    onsets = time[np.flatnonzero(fit_rows)[::300]][1:]
+    events = pd.DataFrame({"start_time": onsets, "end_time": onsets + 0.08})
+    event_times = {
+        "non_local": events,
+        "non_local_SWR": events.iloc[::2].reset_index(drop=True),
+        "non_local_no_SWR": events.iloc[1::2].reset_index(drop=True),
+        "SWR": events.iloc[::2].reset_index(drop=True),
+    }
+    # Every unit is a flat Poisson train: nothing in the data is locked to an
+    # event, so an event-shaped regressor is exchangeable with a control.
+    counts = rng.poisson(
+        np.exp(np.log(12.0 / SAMPLING_FREQUENCY)), size=(len(time), 24)
+    ).astype(float)
+    lags = np.arange(-50, 51)
+    spline_basis, _, _ = event_basis_functions(lags, SAMPLING_FREQUENCY)
+    return {
+        "fit_mask": mask,
+        "event_times": event_times,
+        "counts": counts,
+        "lags": lags,
+        "spline_basis": spline_basis,
+    }
+
+
+class TestControlDrawNull:
+    def test_it_returns_one_improvement_per_draw_and_unit(self, null_session):
+        folds = assign_blocked_folds(null_session["fit_mask"], n_folds=5, seed=2)
+        seeds = [101, 102, 103]
+
+        null = control_draw_null(
+            null_session["event_times"],
+            null_session["fit_mask"],
+            null_session["counts"],
+            folds,
+            rng_seeds=seeds,
+            spline_basis=null_session["spline_basis"],
+            lags=null_session["lags"],
+            penalty_sigma=2.0,
+        )
+
+        assert null.improvement.shape == (len(seeds), null_session["counts"].shape[1])
+        assert null.n_placed.shape == (len(seeds),)
+        assert np.all(null.n_placed > 0)
+        assert null.engagement.shape[0] == 0
+
+    def test_two_draws_differ_and_a_repeated_seed_does_not(self, null_session):
+        folds = assign_blocked_folds(null_session["fit_mask"], n_folds=5, seed=2)
+
+        first = control_draw_null(
+            null_session["event_times"],
+            null_session["fit_mask"],
+            null_session["counts"][:, :2],
+            folds,
+            rng_seeds=[101, 202],
+            spline_basis=null_session["spline_basis"],
+            lags=null_session["lags"],
+            penalty_sigma=2.0,
+        )
+        again = control_draw_null(
+            null_session["event_times"],
+            null_session["fit_mask"],
+            null_session["counts"][:, :2],
+            folds,
+            rng_seeds=[101],
+            spline_basis=null_session["spline_basis"],
+            lags=null_session["lags"],
+            penalty_sigma=2.0,
+        )
+
+        np.testing.assert_allclose(first.improvement[0], again.improvement[0])
+        assert not np.allclose(first.improvement[0], first.improvement[1])
+
+    def test_the_engagement_null_replaces_the_tested_regressor(self, null_session):
+        folds = assign_blocked_folds(null_session["fit_mask"], n_folds=5, seed=2)
+        baseline = null_session["event_times"]["non_local_no_SWR"]
+
+        null = control_draw_null(
+            null_session["event_times"],
+            null_session["fit_mask"],
+            null_session["counts"][:, :3],
+            folds,
+            rng_seeds=[11, 12],
+            spline_basis=null_session["spline_basis"],
+            lags=null_session["lags"],
+            penalty_sigma=2.0,
+            baseline_control=baseline,
+        )
+
+        assert null.engagement.shape == (2, 3)
+        assert np.all(np.isfinite(null.engagement))
+
+    @pytest.mark.slow
+    def test_the_p_values_are_uniform_on_units_with_no_event_response(
+        self, null_session
+    ):
+        """The property that makes the null usable, on units built to have none.
+
+        Each unit's "observed" statistic is one draw's improvement and the null
+        is the other draws': under exchangeability the rank of the observed
+        among ``R`` draws is uniform, so the p-values must be too. The test is
+        a one-sample KS against U(0, 1) over the units, at a threshold well
+        clear of what ``R = 40`` draws and 24 units can resolve (the statistic
+        cannot go below ``1 / (2 R)`` by discreteness alone).
+        """
+        folds = assign_blocked_folds(null_session["fit_mask"], n_folds=5, seed=2)
+        seeds = list(range(9000, 9041))  # one observed draw + R = 40 null draws
+
+        null = control_draw_null(
+            null_session["event_times"],
+            null_session["fit_mask"],
+            null_session["counts"],
+            folds,
+            rng_seeds=seeds,
+            spline_basis=null_session["spline_basis"],
+            lags=null_session["lags"],
+            penalty_sigma=2.0,
+        )
+
+        observed, draws = null.improvement[0], null.improvement[1:]
+        pvalues = empirical_pvalue(observed, draws)
+
+        assert np.all(np.isfinite(pvalues))
+        ks = stats.kstest(pvalues, "uniform").statistic
+        assert ks < 0.30, f"p-values are not uniform enough: KS = {ks:.3f}"
+        assert 0.2 < pvalues.mean() < 0.8
