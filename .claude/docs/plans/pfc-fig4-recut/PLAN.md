@@ -29,7 +29,10 @@ claim update in Task C have not run. The original smoke selected σ = 3, K = 5 a
 corrected the Monte Carlo test to `(b + 1)/(R + 1)`, excludes incompletely placed null draws,
 requires at least 20 usable draws, groups runs whose event-kernel supports overlap, and keeps the
 unit-level raw-p fraction explicitly descriptive pending Phase 4's session/animal inference. Those
-changes require the three-session GPU smoke to be repeated before Task C launches.
+changes passed the corrected three-session GPU smoke at `00765b2`: every class produced 40/40 exact
+draws on its fixed matchable event subset, the three artifacts passed the combined population
+loader and estimator audit, and the largest session completed in 27:25 at 8.89 GiB peak RSS. Task C
+may now launch on the idle subset of the host's ten A100s.
 
 **Corrected premise (2026-09-14):** Phase 1's motivating discrepancy does not hold. On the
 well-anchored mPFC population the retired ripple-overlap split and the canonical `is_swr` agree

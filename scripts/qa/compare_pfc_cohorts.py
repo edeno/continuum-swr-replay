@@ -1356,16 +1356,37 @@ def shrinkage_table(frame: pd.DataFrame) -> pd.DataFrame:
         default="well posed",
     )
     grouped = table.groupby(["curve", "units"], dropna=False)
+
+    def finite_statistic(
+        values: pd.Series, statistic: object, *, absolute: bool = False
+    ) -> float:
+        """Summarize finite values without warning on an all-NaN group."""
+        finite = values.to_numpy(dtype=float)
+        finite = finite[np.isfinite(finite)]
+        if finite.size == 0:
+            return float("nan")
+        if absolute:
+            finite = np.abs(finite)
+        return float(statistic(finite))  # type: ignore[operator]
+
     summary = grouped.agg(
         n_units=("delta", "size"),
-        median_abs_peak_mle=("peak_mle", lambda s: float(np.nanmedian(np.abs(s)))),
+        median_abs_peak_mle=(
+            "peak_mle", lambda s: finite_statistic(s, np.median, absolute=True)
+        ),
         median_abs_peak_penalised=(
             "peak_penalised",
-            lambda s: float(np.nanmedian(np.abs(s))),
+            lambda s: finite_statistic(s, np.median, absolute=True),
         ),
-        median_abs_delta=("delta", lambda s: float(np.nanmedian(np.abs(s)))),
-        max_abs_delta=("delta", lambda s: float(np.nanmax(np.abs(s)))),
-        median_peak_mle_se=("peak_mle_se", lambda s: float(np.nanmedian(s))),
+        median_abs_delta=(
+            "delta", lambda s: finite_statistic(s, np.median, absolute=True)
+        ),
+        max_abs_delta=(
+            "delta", lambda s: finite_statistic(s, np.max, absolute=True)
+        ),
+        median_peak_mle_se=(
+            "peak_mle_se", lambda s: finite_statistic(s, np.median)
+        ),
         n_prior_binds=("prior_binds", lambda s: int(s.fillna(False).sum())),
     ).reset_index()
     summary["prior_binds_pct"] = (

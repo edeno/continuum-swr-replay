@@ -1270,7 +1270,7 @@ class TestPeakShrinkage:
         assert swr["prior_binds"].all()
 
     def test_the_summary_separates_the_units_whose_mle_does_not_exist(
-        self, estimator_trees
+        self, estimator_trees, recwarn
     ):
         _, after = estimator_trees
         _write_ridge_bundle(
@@ -1285,6 +1285,7 @@ class TestPeakShrinkage:
 
         assert set(table["units"]) == {"separated", "well posed"}
         assert (table["n_prior_binds"] <= table["n_units"]).all()
+        assert not [warning for warning in recwarn if warning.category is RuntimeWarning]
 
 
 class TestEstimatorTables:

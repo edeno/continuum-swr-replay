@@ -2,15 +2,15 @@
 
 Date: 2026-09-16
 
-Branch reviewed: `pfc-ridge-heldout` through `df757b3`, plus the follow-up fixed-subset fix in this working tree
+Branch reviewed: `pfc-ridge-heldout` through `00765b2`
 
 Scope: scientific correctness, inference validity, failure handling, memory and runtime
 
 ## Outcome
 
-Task A and the Task B integration are implemented. The corrected three-session smoke must be
-repeated, and Task C has not run: no ridge production batch, final cohort audit, regenerated
-Figure 4 or updated claim should be treated as complete yet.
+Task A and the Task B integration are implemented, reviewed and have passed the corrected
+three-session GPU gate. Task C has not run: no ridge production batch, final cohort audit,
+regenerated Figure 4 or updated claim should be treated as complete yet.
 
 The review found and fixed eight inference defects:
 
@@ -31,11 +31,9 @@ model-level separation. A failed maximum-likelihood fit no longer supplies a pea
 
 ## Performance and memory
 
-The restricted review shell did not expose NVIDIA device nodes, but a host-level probe found ten
-NVIDIA A100 80GB PCIe devices (indices 0--9). A repository-managed claim on idle GPU 3 confirmed
-that JAX used the intended single device with a 10% memory cap. The user expected eight devices;
-the host inventory should be reconciled before choosing the production worker pool, but it does
-not block a single-device smoke.
+The host has ten NVIDIA A100 80GB PCIe devices (indices 0--9), as confirmed by the user. A
+repository-managed claim on idle GPU 3 confirmed that JAX used the intended single device with a
+10% memory cap. Production uses only cards that are idle at launch.
 
 | benchmark | before | after | result |
 |---|---:|---:|---:|
@@ -94,8 +92,25 @@ baseline controls and 208/210 chimi controls (wilbur placed 217/217). Because co
 exclude one another except at their onset bins, those four shortfalls are properties of the source
 events' own bouts, not rejection-sampling failures. The corrected implementation now carries source
 indices out of placement, freezes a matchable subset independently of spikes, and reports both the
-all-event and subset-matched observed differences. A fresh full gate of that implementation remains
-required.
+all-event and subset-matched observed differences.
+
+The full corrected gate at `00765b2` then passed on GPUs 3, 4 and 6. Every class produced all 40
+exact draws on the same fixed event subset used by its observed statistic, and all sidecars record
+`fixed_jointly_matchable_subset`, the plus-one p-value correction, K = 5, R = 40 and sigma = 3.
+
+| session | wall | peak RSS | usable units | excluded matched-test events | exact draws |
+|---|---:|---:|---:|---:|---:|
+| j1620210710_02_r1 | 12:00 | 4.25 GiB | 73/74 | 1 non-SWR, 1 SWR-coupled; 2 in each parent class | 40/40, every class |
+| chimi20200223_06_r3 | 13:38 | 5.06 GiB | 166/166 | 2 non-SWR; therefore 2 in non-local | 40/40, every class |
+| wilbur20210329_02_r1 | 27:25 | 8.89 GiB | 342/344 | none | 40/40, every class |
+
+Wilbur is the comparable full-workload performance case: device-side held-out scoring reduced it
+from 37:46 to 27:25 (27% less wall time). GPU use remained bursty and host CPU stayed near 83%, so
+the remaining ceiling is the host-orchestrated IRLS loop and its per-iteration convergence
+synchronisation, not device memory or compute capacity. Removing that synchronisation would require
+a larger solver rewrite and is not needed for the production run. The three smoke artifacts loaded
+together as 581 usable units with five aligned 201-sample modulation matrices; all five empirical
+p-value columns were finite for every retained unit. The estimator audit completed successfully.
 
 ## Validation
 
@@ -116,9 +131,11 @@ required.
   diagnostics correctly showed that the non-SWR subclass excluded zero; the expectation was fixed
   and the corrected runner test passed in the 81-test gate.
 - Single-device A100 compile and steady-state fit benchmark: passed on GPU 3.
+- Corrected real-data GPU gate: all three processes exited 0; all 12 class/session nulls produced
+  40 exact draws; the combined population-loader and estimator-audit smokes passed.
 - Ruff and `git diff --check`: clean.
 
-The production batch must not launch until the corrected three-session GPU smoke, the real-session
-placement/fold diagnostics and the intended eight-device worker pool are resolved. Existing
-bundles without `empirical_pvalue_method = plus_one` and `min_usable_null_draws = 20` are
-deliberately rejected by the skip check and population loader.
+The pre-production gates are satisfied. The production batch may launch on whichever of the ten
+cards are idle at launch. Existing bundles without `empirical_pvalue_method = plus_one`,
+`control_null_event_policy = fixed_jointly_matchable_subset` and
+`min_usable_null_draws = 20` are deliberately rejected by the skip check and population loader.
