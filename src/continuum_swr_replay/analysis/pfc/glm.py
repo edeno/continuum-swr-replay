@@ -1107,7 +1107,11 @@ def process_neuron(
           non-event baseline from the engagement model
         - ``*_max_mod_time``: corresponding peak lag times (s)
 
-        Empty dict with only firing rates if GLM fitting fails.
+        A model with no usable fit -- NaN parameters, or an iteration that
+        never settled -- is non-estimable for this neuron: every statistic
+        that reads it is NaN, and the neuron's other models are reported as
+        usual. Empty dict with only firing rates if the fitting call itself
+        raised.
 
     swr_modulation : NDArray
         SWR peri-event modulation from SWR-controlled model
@@ -1182,22 +1186,28 @@ def process_neuron(
             penalties=model_penalties(immobility_design_matrices, penalty_sigma),
         )
 
-        # Check for silent non-convergence (NaN parameters from rank-deficient design)
-        nan_models = [
-            name for name, res in results.items()
-            if np.any(np.isnan(res.params))
-        ]
-        if nan_models:
-            raise ValueError(
-                f"GLM IRLS produced NaN params for models: {nan_models}. "
-                f"Immobility firing rate: "
-                f"{neuron_stats['immobility_avg_firing_rate']:.3f} Hz."
+        # A model whose fit produced nothing usable -- NaN parameters, or an
+        # iteration that never settled -- is marked non-estimable for THIS
+        # neuron and routed to NaN below, exactly as an absent event class is.
+        # The neuron's other models are unaffected: they are separate fits of
+        # separate designs, and a neuron whose ``matched_control`` fit failed
+        # still has a ``SWR`` fit that says something. Failing the whole neuron
+        # would discard that, and would do it silently -- the neuron would come
+        # back with firing rates and no statistics at all.
+        failed_models = {
+            name
+            for name, res in results.items()
+            if np.any(np.isnan(res.params)) or not bool(getattr(res, "converged", True))
+        }
+        if failed_models:
+            _logger.warning(
+                "No usable fit for models %s (NaN parameters, or no "
+                "convergence); their statistics are NaN for this neuron. "
+                "Immobility firing rate: %.3f Hz.",
+                sorted(failed_models),
+                neuron_stats["immobility_avg_firing_rate"],
             )
 
-        # Recorded only once the fits are known to be usable, so a neuron with
-        # no fit is absent from the diagnostics whichever backend produced it:
-        # the statsmodels path raises inside the fitter and never reaches here,
-        # and the batched path returns NaN parameters and raises just above.
         if fit_diagnostics_out is not None:
             fit_diagnostics_out.update(_fit_diagnostics(results))
 
@@ -1205,15 +1215,15 @@ def process_neuron(
         # builds spline regressors for every event class regardless
         # of whether that class has any events; an empty event class
         # leaves its spline columns all-zero, so the design matrix is
-        # rank-deficient against the intercept. statsmodels still
+        # rank-deficient against the intercept. The fitter still
         # returns finite (zero) parameters for those columns and
         # finite degenerate LR / fractional-deviance values, so the
-        # NaN-params check above doesn't catch them. Mark every
+        # failed-fit check above doesn't catch them. Mark every
         # rank-deficient design as non-estimable up front and route
         # the affected LR tests, AIC selections, and modulation
         # extractions to NaN below — so downstream consumers can
         # tell "absent event class" from "estimated zero effect".
-        non_estimable_models = set()
+        non_estimable_models = set(failed_models)
         for name, design in immobility_design_matrices.items():
             X_im = design[fit_mask]
             if X_im.shape[0] == 0:

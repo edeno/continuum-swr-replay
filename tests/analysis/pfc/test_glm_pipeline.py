@@ -36,6 +36,14 @@ from continuum_swr_replay.analysis.pfc.glm import (
 )
 from continuum_swr_replay.analysis.replay.cohort_selection import select_stop_cohort
 
+
+def spike_counts_of(spike_times, time_axis):
+    """The binned counts ``process_neuron`` derives from the same spike times."""
+    from continuum_swr_replay.analysis.pfc.glm import get_spikecount_per_time_bin
+
+    return get_spikecount_per_time_bin(spike_times, np.asarray(time_axis))
+
+
 #: Prior standard deviation of an event-basis coefficient, on the log-rate
 #: scale, for the tests that fit the penalised estimator. The fixtures here are
 #: ten seconds of a ~5 Hz Poisson train with three events, so every event class
@@ -650,6 +658,103 @@ class TestProcessNeuron:
         for key, val in stats.items():
             if key.endswith(": pval"):
                 assert 0 <= val <= 1, f"{key} = {val} out of range"
+
+    def test_one_models_failed_fit_leaves_the_neurons_other_models_alone(
+        self,
+        poisson_spike_times,
+        is_immobile,
+        theta_phase,
+        time_axis,
+        simple_event_times,
+        position_info,
+        sampling_frequency,
+    ):
+        """A fit that produced nothing usable is non-estimable, not fatal.
+
+        The ladder is nine fits of nine designs. One of them coming back with
+        NaN parameters says nothing about the other eight, and failing the
+        neuron would discard them -- and would do it silently, the neuron
+        coming back with firing rates and no statistics at all.
+        """
+        import dataclasses
+
+        dm, spline_basis, lag_time = _make_design_matrices(
+            simple_event_times,
+            position_info,
+            sampling_frequency=sampling_frequency,
+            lags=np.arange(-50, 51),
+        )
+        fits, _ = _fit_ladder(is_immobile, dm, spike_counts_of(poisson_spike_times,
+                                                              time_axis), "jax")
+        broken = dict(fits)
+        broken["SWR"] = dataclasses.replace(
+            fits["SWR"], params=np.full_like(fits["SWR"].params, np.nan)
+        )
+
+        stats, swr_mod, no_swr_mod, *_ = process_neuron(
+            poisson_spike_times,
+            is_immobile,
+            theta_phase,
+            time_axis,
+            dm,
+            spline_basis,
+            lag_time,
+            prefitted_immobility=broken,
+        )
+
+        # Every comparison that reads the broken fit is unavailable ...
+        assert np.isnan(stats["SWR vs. constant: lr"])
+        assert np.isnan(stats["SWR vs. constant: frac_null_dev"])
+        assert np.isnan(stats["SWR + non_local_no_SWR vs. SWR: lr"])
+        assert stats["min_aic_model"] != "SWR"
+        # ... and nothing else is: the other models were fit on their own.
+        assert np.isfinite(stats["non_local vs. constant: lr"])
+        assert np.isfinite(stats["non_local_SWR + non_local_no_SWR vs. non_local: lr"])
+        assert np.isfinite(stats["matched_control + non_local_no_SWR vs. "
+                                 "matched_control: lr"])
+        assert np.isfinite(swr_mod).all()
+        assert np.isfinite(no_swr_mod).all()
+        assert np.isfinite(stats["immobility_avg_firing_rate"])
+
+    def test_a_model_that_never_converged_is_marked_non_estimable(
+        self,
+        poisson_spike_times,
+        is_immobile,
+        theta_phase,
+        time_axis,
+        simple_event_times,
+        position_info,
+        sampling_frequency,
+    ):
+        """A fit that ran to maxiter is not an estimate, whatever it returned."""
+        import dataclasses
+
+        dm, spline_basis, lag_time = _make_design_matrices(
+            simple_event_times,
+            position_info,
+            sampling_frequency=sampling_frequency,
+            lags=np.arange(-50, 51),
+        )
+        fits, _ = _fit_ladder(is_immobile, dm, spike_counts_of(poisson_spike_times,
+                                                              time_axis), "jax")
+        broken = dict(fits)
+        broken["non_local"] = dataclasses.replace(fits["non_local"], converged=False)
+
+        stats, *_ = process_neuron(
+            poisson_spike_times,
+            is_immobile,
+            theta_phase,
+            time_axis,
+            dm,
+            spline_basis,
+            lag_time,
+            prefitted_immobility=broken,
+        )
+
+        assert np.isnan(stats["non_local vs. constant: lr"])
+        assert stats["min_aic_model"] != "non_local"
+        assert stats["min_aic_model_replay_split"] != "non_local"
+        assert np.isfinite(stats["SWR vs. constant: lr"])
 
     def test_absent_event_class_marks_dependent_outputs_as_unavailable(
         self,
