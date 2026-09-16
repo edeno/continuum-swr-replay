@@ -129,7 +129,7 @@ Three tiers:
 
    | artifact | producer | holds |
    |---|---|---|
-   | `Processed-Data/{epoch_identifier}_mPFC_modulation.pkl` + five `*_modulation.npy` | `scripts/pfc/run_pfc_analysis_bandit.py` | per-neuron GLM statistics and the five peri-event modulation time courses (`SWR`, `no_SWR`, `non_local_SWR`, `non_local_no_SWR`, and `matched_control` — the duration-matched non-event baseline); the Figure 4 population, read by `analysis/pfc/load_population.py`, which still loads only the first four curves — the matched-control curve is written per session but not yet read into the population, which waits on the loader update |
+   | `Processed-Data/{epoch_identifier}_mPFC_modulation.pkl` + five `*_modulation.npy` | `scripts/pfc/run_pfc_analysis_bandit.py` | per-unit penalised-GLM statistics — held-out deviance and separated-column count per model, each nested pair's held-out difference (total and per fold), an empirical p-value per event class and for the engagement comparison, the best model by held-out deviance, and per curve the penalised and unpenalised peak with that peak's own standard error — plus the five peri-event modulation time courses (`SWR`, `no_SWR`, `non_local_SWR`, `non_local_no_SWR`, and `matched_control`, the duration-matched non-event baseline). All five are read into the Figure 4 population by `analysis/pfc/load_population.py`; the first four are NaN-free by its drop rule, while the matched-control curve may carry NaN and is reduced with `nanmean` |
    | `replay_content/stop_replay_summary.pkl`, `stage6_is_stay_{logistic,pooled_gee}{,_swr,_non_swr,_mua}.pkl` | `scripts/pfc/run_stage6_learning.py` | the per-stop replay summary and the stay/leave models (claim 19e) |
    | `replay_content/stage5b_retrospective{,_swr_only,_non_swr_only}.pkl` | `scripts/pfc/run_stage5b_retrospective.py` | the retrospective/prospective event-grain metrics against their visit-context shuffle |
 
@@ -140,7 +140,9 @@ Three tiers:
    the unit-GLM one has never been run — produce it with
    `run_pfc_analysis_bandit.py --stop-cohort all_stops` (a full 71-session refit), which
    is the only way to compare the unit fits across populations on artifacts rather than
-   on the unit test that pins the unrestricted path. Every PFC artifact carries a `*.provenance.json`
+   on the unit test that pins the unrestricted path. A bundle fit at a prior other than
+   the canonical one is written under a `_sigma<value>` name beside it and draws no
+   null — it exists for its modulation curves. Every PFC artifact carries a `*.provenance.json`
    sidecar recording `stop_cohort`, the stop-table SHA-256, and the bins and events
    before and after the restriction. The unit bundles' sidecar also states **which
    events the fit describes**: `is_swr_definition`, the SHA-256 of the canonical event
@@ -149,13 +151,20 @@ Three tiers:
    `n_events_total` / `n_events_swr` / `n_events_non_swr`, and the matched control's
    `matched_control_seed` / `n_matched_control` / `n_matched_control_unplaced`;
    `run_pfc_analysis_bandit.py` refuses to skip a bundle that does not carry the
-   current values — or that names the other `fitter`. It also records what the fits
+   current values. It also states the **estimator and the inference**: `estimator`
+   (`ridge_poisson_glm`), `inference` (`blocked_heldout_deviance`),
+   `penalty_sigma_log_rate` with the `implied_prior_sd` it means for a curve,
+   `n_basis_per_class`, `n_folds` / `fold_seed` / `fold_sizes` / `events_per_fold`,
+   and `n_control_draws` / `control_draw_seed` / `null_windows` (how many windows each
+   class's null draws placed against the real onset count they were matched to). A
+   bundle that does not state all of these is refit rather than skipped — the
+   canonical bundle name is unsuffixed, so nothing else tells a penalised bundle from
+   the maximum-likelihood one that held the same name. It also records what the fits
    themselves did: `n_model_fits` (neuron × model cells that produced a fit at all),
    `n_nonconverged_model_fits` and `n_neurons_with_nonconverged_model` (fits that ran
-   to `maxiter` without settling, and how many neurons carry at least one), and
-   `n_neurons_reference_fit` (neurons the batched fitter handed to statsmodels). A
-   non-converged fit still reports an LR test and an AIC, so those counts are the only
-   place the fact survives the run.
+   to `maxiter` without settling, and how many neurons carry at least one). A fit that
+   never settled is non-estimable for the unit that owns it — every statistic reading
+   it is NaN — so those counts are the only record of how much was dropped.
 
    **The 71 at-well unit bundles were refit on 2026-09-15** at git `9879ff0`, under the
    canonical event definition and with the matched non-event control, on six A100s

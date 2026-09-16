@@ -208,39 +208,88 @@ The restriction is not balanced across the SWR contrast (3.3% of SWR events are
 off-well against 13.0% of non-SWR events) — expected, since SWR events
 concentrate at wells — so the cohort belongs in Methods.
 
-**Which estimator answered for a unit is device-dependent.** The mPFC unit GLMs
-are fit by a batched Poisson IRLS in JAX, one call per model for every unit of a
-session, and it declines units whose fits leave the range it can vouch for —
-`needs_reference_fit` flags a unit when its fitted means spread past a
-threshold, or when it did not converge — refitting those with statsmodels
-instead. That criterion reads floating-point quantities, so a GPU run and a CPU
-run of the same session can flag slightly different units. Both fitters agree to
-~1e-10 on every unit that stays inside the flag (that is the equivalence gate),
-and a flagged unit's shipped numbers are statsmodels' own either way, so the
-estimates do not depend on the device — only the route to them does. The backend
-is recorded in each bundle's provenance sidecar (`fitter`, `jax_backend`,
-`jax_version`, `gpu_index`) alongside `n_neurons_reference_fit`, the count of
-units that took the statsmodels route. The 71 canonical bundles were fit on
-2026-09-15 at git `9879ff0`, `fitter = jax` throughout, one worker per card on
-GPUs 2/3/4/6/7/9 (12/12/12/12/12/11 sessions), 13.7 h wall.
+**The estimator: a penalised Poisson GLM.** The mPFC unit GLMs are fit by a
+batched Poisson IRLS in JAX, one call per model for every unit of a session,
+with a Gaussian prior on the event-basis coefficients and the intercept left
+free. The prior is a stated scientific assumption, not a regularisation
+convenience. It exists because 23% of units had at least one model whose
+unpenalised fit *separates*: the peri-event basis is a cubic B-spline with
+50 ms knots, and a basis column whose support holds no spikes drives its
+coefficient without bound. Such a fit has no maximum-likelihood estimate at
+all, and the design stays full rank throughout, so no rank-deficiency gate can
+see it.
 
-**A seventh of the shipped fits never converged, and their statistics ship
-anyway.** Over those 71 sessions, 22,902 of 154,350 neuron × model fits
-(14.8%) ran to `maxiter` without meeting the convergence rule, spread over
-4,640 of the 17,150 neurons that were fit at all; 5,781 neurons took the
-statsmodels route. A fit that never settled is not refused by any current
-gate: it still reports a likelihood-ratio test, a fractional deviance and an
-AIC, and those enter the population fractions and the best-AIC counts exactly
-like a converged fit's. The cause is separation — a spline column whose
-support holds no spikes drives its coefficient without bound — which the
-rank-deficiency gate cannot see, because the design is full rank. The counts
-are in every bundle's sidecar (`n_model_fits`,
-`n_nonconverged_model_fits`, `n_neurons_with_nonconverged_model`) and are
-totalled per session in
-[`../audits/2026-09-15-pfc-canonical-rerun.md`](../audits/2026-09-15-pfc-canonical-rerun.md).
-Treating a non-converged fit as non-estimable is the fit-validity work, and
-until it lands the mPFC unit-GLM numbers — Figure 4 and claim 20 — are pending
-rather than final.
+The prior's job is to exclude implausible rates, not to shape plausible ones.
+Its standard deviation is `DEFAULT_PENALTY_SIGMA` in `analysis/pfc/batched_glm.py`,
+on the log-rate scale, per coefficient. What that says about a *curve* is not
+that number: the basis is a partition of unity, so the prior on the kernel at
+one lag is wider than sigma by `sqrt(sum_b B_b(lag)^2)` and the prior on a
+modulation held across the reported window is narrower by `sqrt(n_basis)`.
+Both implied standard deviations, and the rate multipliers they bound, are
+computed by `implied_prior_sd` and recorded in every bundle's sidecar
+(`penalty_sigma_log_rate`, `implied_prior_sd`). Under the prior every unit x
+model converges; a unit that still fails is non-estimable and reported as NaN
+everywhere, counted. Sensitivity bundles at other priors are written under
+`_sigma<value>` names.
+
+Each bundle also states **where the prior did the work**. Every curve-bearing
+model is fit unpenalised as well, and each of the five curves carries the peak
+of the penalised kernel, the peak the same coefficient block reaches
+unpenalised, that peak's own standard error (the standard error of the kernel
+at its peak lag, off-diagonal terms included — a diagonal `bse` cannot answer
+it), whether the unpenalised fit ran away, and whether the two peaks differ by
+more than the data can resolve. A unit whose unpenalised fit ran away has no
+peak to difference against and is reported separately rather than counted as
+bound.
+
+**The inference: blocked held-out deviance against a matched-control null.**
+Two things make the usual asymptotics unusable here. The fits are penalised, so
+a likelihood ratio has no chi-square reference distribution at any stated
+degrees of freedom; and spike counts in neighbouring 2 ms bins are not
+independent, so an in-sample deviance drop is worth much less than its nominal
+degrees of freedom suggest. The models are therefore compared by how well they
+predict spikes they were not fit on.
+
+`K` folds are cut over *whole contiguous runs* of the fit mask — a bin-wise
+split would leave the training set 2 ms either side of every held-out bin, and
+a model could score well by interpolating the local rate. Runs are visited in a
+seeded random order and each goes to the lightest fold, so the folds carry
+comparable bin counts; the assignment is seeded from the session name and
+recorded (`n_folds`, `fold_seed`). Each model is fit on `K-1` folds under the
+same prior and scored by the Poisson deviance of the fold left out, summed over
+folds. A nested pair reports `heldout_delta_dev = D_ho(reduced) - D_ho(full)`,
+positive meaning the added regressors predict held-out spikes better, and the
+per-fold values beside it. The best model per unit is the one with the lowest
+held-out deviance. No likelihood-ratio statistic, p-value or AIC is produced.
+
+A held-out improvement has no analytic null, so one is drawn. The matched
+non-event control already defines "a duration-matched non-event regressor drawn
+from the fitted bouts"; drawing it `R` times, **per class, matched to that
+class's own onset count and durations**, gives the distribution of improvements
+a regressor of that size and shape with no event content buys. A class's
+empirical p-value is the fraction of its draws whose improvement matched or
+beat the observed one; the engagement statistic gets its own null the same way,
+with the tested regressor replaced and the baseline left as it is. The
+resolution is `1/R`, so zero is attainable and means "no draw reached it", and
+a population fraction read off these p-values cannot resolve finer than the
+null's size. `n_control_draws`, `control_draw_seed` and the per-class window
+counts each draw placed are in the sidecar. One caveat is recorded in the
+library: the null draws are independent of the shipped control and may overlap
+its windows, whereas two real event classes never do.
+
+The population layer (neuron → session → animal) is unchanged and stays in its
+own phase; `analysis/pfc/load_population.py` applies Benjamini-Hochberg across
+units to the empirical p-values, and refuses a bundle carrying likelihood-ratio
+columns.
+
+**History.** Before this, the models were fit by maximum likelihood — a
+per-unit statsmodels IRLS, later a batched JAX one that handed separating fits
+back to statsmodels — and tested by likelihood ratio with AIC model selection.
+Over the 71 bundles fit that way on 2026-09-15, 22,902 of 154,350 neuron x
+model fits (14.8%, over 4,640 of 17,150 neurons) ran to `maxiter` without
+converging, and their likelihood-ratio tests and AICs were shipped like any
+other fit's. That is the estimator this one replaces; those bundles and the
+audits of them are kept as the record.
 
 ## Covariate causal hygiene
 

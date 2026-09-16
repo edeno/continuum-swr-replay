@@ -83,7 +83,13 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
   tolerances (per quantity and per session), the matched non-event control's tests,
   the estimator/device/fit counts per card and per session, and — given
   `--worker-time <batch>/worker*.time` — the wall clock each worker of the batch
-  cost.
+  cost. When the after tree's sidecars name the penalised estimator it writes a
+  different report instead (`--comparison` forces either): what the prior did to each
+  unit's peak modulation against the same block fit unpenalised, split by whether that
+  fit ran away; how many units carried a basis column with no spikes under it; what
+  the two inferences call, per class and animal; how steady each nested pair's
+  held-out difference is between folds; and the peaks' sensitivity to the prior,
+  against whatever `_sigma<value>` bundles are on disk.
 - `diagnose_pfc_event_definition.py` — reports, per session, what the mPFC unit GLM's
   retired run-time event construction yielded against the canonical event table it now
   reads: the two event counts, how many events change SWR class once the lists are
@@ -92,12 +98,14 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
 - `summarize_stage6_fdr.py` — prints Stage 6's per-role cross-session FDR table for
   any saved `stage6_is_stay_logistic*.pkl`, using the runner's own statistic, so a
   before/after comparison across populations reads one implementation.
-- `compare_pfc_fitters.py` — writes the equivalence audit of the batched JAX Poisson
-  fitter against the per-neuron statsmodels IRLS it replaces, from two runs of the
+- `compare_pfc_fitters.py` — **history.** Wrote the equivalence audit of the batched
+  JAX Poisson fitter against the per-neuron statsmodels IRLS, from two runs of the
   same sessions (`--fitter jax` / `--fitter statsmodels`, both with
   `--fit-diagnostics`): every numeric column of the shipped statistics, the five
-  modulation time courses, the best-AIC and NaN patterns that must be identical, the
-  per-model parameters and fit criteria, and the wall clock of both runs.
+  modulation time courses, the best-model and NaN patterns that must be identical, the
+  per-model parameters and fit criteria, and the wall clock of both runs. The unit
+  runner no longer offers the unpenalised per-neuron backend, so this compares two
+  archived trees rather than two runs anyone can make now.
 
 ## `pfc/` — cross-area / staged analyses
 - `run_pfc_analysis_bandit.py`, `run_stage5b_retrospective.py`, `run_stage6_learning.py`.
@@ -105,13 +113,16 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
   and content ladders are read on is the default (`at_well`, canonical artifact
   names), `all_stops` publishes an unrestricted sensitivity bundle under `_allstops`
   names, and Stage 5B accepts only `at_well` because its metrics need a current arm.
-  `run_pfc_analysis_bandit.py` also takes `--fitter` (`jax`, the batched per-session
-  Poisson IRLS, is the default; `statsmodels` is the per-neuron control the
-  equivalence audit is read against) and, on the batched path, `--gpu N` /
-  `--allow-cpu` to say which card it may take on a shared host. A batch runs as one
-  process per card — `--n_workers 1 --gpu N --sessions <partition file>` — because one
-  card handed to several workers is refused, and the same card handed twice to one
-  process is ignored.
+  `run_pfc_analysis_bandit.py` fits the unit GLMs under a Gaussian prior on the
+  event-basis coefficients and scores them out of fold: `--penalty-sigma` (the prior
+  standard deviation on the log-rate scale; another value writes a `_sigma<value>`
+  sensitivity bundle and draws no null), `--n-folds` (blocked over whole immobility
+  runs), `--n-control-draws` with `--fold-seed` / `--control-draw-seed` (derived from
+  the session key unless given, so a lone refit reproduces the batch's split and
+  null). It takes `--gpu N` / `--allow-cpu` to say which card it may take on a shared
+  host. A batch runs as one process per card — `--n_workers 1 --gpu N --sessions
+  <partition file>` — because one card handed to several workers is refused, and the
+  same card handed twice to one process is ignored.
 
 ## `exploratory/` — unsupported one-offs
 Scratch scripts (`_*.py`): diagnostics, ad-hoc plots, verification checks. Not part of the
