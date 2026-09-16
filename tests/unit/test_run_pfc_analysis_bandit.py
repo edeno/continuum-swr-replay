@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import logging
 from pathlib import Path
 
 import numpy as np
@@ -65,6 +66,23 @@ EVENT_TABLE_SHA = "event111"
 DOT_SHA = "dot222"
 
 
+#: The estimator and inference a test bundle claims, and the values a
+#: ``results_exist`` call in these tests asks for. The skip check compares them
+#: all, so a bundle scored under a different prior, split or null is refit.
+INFERENCE = {
+    "penalty_sigma": 2.0,
+    "n_folds": 5,
+    "fold_seed": 7,
+    "n_control_draws": 40,
+    "control_draw_seed": 9,
+}
+
+
+def _results_exist(*args, **overrides):
+    """``runner.results_exist`` asking for the inference these tests write."""
+    return runner.results_exist(*args, **{**INFERENCE, **overrides})
+
+
 def _write_bundle_files(
     directory,
     epoch_identifier,
@@ -75,6 +93,9 @@ def _write_bundle_files(
     event_table_sha=EVENT_TABLE_SHA,
     data_over_time_sha=DOT_SHA,
     fitter=None,
+    estimator=runner.ESTIMATOR,
+    inference=runner.INFERENCE,
+    **sidecar_overrides,
 ):
     """Touch one bundle's six files, optionally with a provenance sidecar."""
     artifact = runner.modulation_path(directory, epoch_identifier, stop_cohort)
@@ -98,6 +119,14 @@ def _write_bundle_files(
                     "canonical_event_table_sha256": event_table_sha,
                     "data_over_time_sha256": data_over_time_sha,
                     "fitter": fitter,
+                    "estimator": estimator,
+                    "inference": inference,
+                    "penalty_sigma_log_rate": INFERENCE["penalty_sigma"],
+                    "n_folds": INFERENCE["n_folds"],
+                    "fold_seed": INFERENCE["fold_seed"],
+                    "n_control_draws": INFERENCE["n_control_draws"],
+                    "control_draw_seed": INFERENCE["control_draw_seed"],
+                    **sidecar_overrides,
                 }
             )
         )
@@ -107,13 +136,13 @@ def test_results_exist_does_not_confuse_the_two_cohorts(tmp_path):
     epoch_identifier = "wilbur20210329_02_r1_mPFC"
     _write_bundle_files(tmp_path, epoch_identifier, "at_well", "at_well")
 
-    assert runner.results_exist(
+    assert _results_exist(
         tmp_path, epoch_identifier, False, "at_well", "abc123", EVENT_TABLE_SHA, DOT_SHA
     )
-    assert not runner.results_exist(
+    assert not _results_exist(
         tmp_path, epoch_identifier, False, "all_stops", None, EVENT_TABLE_SHA, DOT_SHA
     )
-    assert not runner.results_exist(
+    assert not _results_exist(
         tmp_path, epoch_identifier, True, "at_well", "abc123", EVENT_TABLE_SHA, DOT_SHA
     )
 
@@ -127,7 +156,7 @@ def test_a_bundle_cut_from_another_stop_table_is_refit(tmp_path):
         tmp_path, epoch_identifier, "at_well", "at_well", sidecar_hash="stale999"
     )
 
-    assert not runner.results_exist(
+    assert not _results_exist(
         tmp_path, epoch_identifier, False, "at_well", "abc123", EVENT_TABLE_SHA, DOT_SHA
     )
 
@@ -139,7 +168,7 @@ def test_a_bundle_that_does_not_state_its_population_is_refit(tmp_path):
     epoch_identifier = "wilbur20210329_02_r1_mPFC"
     _write_bundle_files(tmp_path, epoch_identifier, "at_well", sidecar_cohort=None)
 
-    assert not runner.results_exist(
+    assert not _results_exist(
         tmp_path, epoch_identifier, False, "at_well", "abc123", EVENT_TABLE_SHA, DOT_SHA
     )
 
@@ -148,7 +177,7 @@ def test_a_bundle_naming_another_population_is_refit(tmp_path):
     epoch_identifier = "wilbur20210329_02_r1_mPFC"
     _write_bundle_files(tmp_path, epoch_identifier, "at_well", "all_stops")
 
-    assert not runner.results_exist(
+    assert not _results_exist(
         tmp_path, epoch_identifier, False, "at_well", "abc123", EVENT_TABLE_SHA, DOT_SHA
     )
 
@@ -159,7 +188,7 @@ def test_an_allstops_bundle_matches_when_no_stop_table_was_read(tmp_path):
         tmp_path, epoch_identifier, "all_stops", "all_stops", sidecar_hash=None
     )
 
-    assert runner.results_exist(
+    assert _results_exist(
         tmp_path, epoch_identifier, False, "all_stops", None, EVENT_TABLE_SHA, DOT_SHA
     )
 
@@ -243,9 +272,38 @@ def fake_session(monkeypatch):
             "data_over_time_sha256": DOT_SHA,
         }
 
+    def _fake_context(nwb_file_name, epoch_name, brain_area, **kwargs):
+        calls["scoring_context"] = {
+            "session": (nwb_file_name, epoch_name, brain_area),
+            **kwargs,
+        }
+        return {"n_basis_per_class": 11}
+
+    def _fake_verify(context, cohort_info):
+        calls["verified"] = cohort_info["stop_cohort"]
+
+    def _fake_score(context, **kwargs):
+        calls["score"] = kwargs
+        statistics = pd.DataFrame(
+            {
+                "SWR: heldout_deviance": [100.0, 200.0],
+                "SWR vs. constant: heldout_delta_dev": [1.5, -0.5],
+                "SWR: p_heldout": [0.025, 0.9],
+                "min_heldout_model": ["SWR", "constant"],
+            }
+        )
+        return statistics, {
+            "fold_sizes": [10, 10, 10, 10, 10],
+            "events_per_fold": {"non_local_no_SWR": [2, 1, 3, 2, 2]},
+            "non_estimable_models": [],
+        }
+
     monkeypatch.setattr(runner, "load_session_stop_cohort", _fake_cohort)
     monkeypatch.setattr(runner, "run_session", _fake_run_session)
     monkeypatch.setattr(runner, "canonical_event_input_hashes", _fake_event_inputs)
+    monkeypatch.setattr(runner, "build_scoring_context", _fake_context)
+    monkeypatch.setattr(runner, "verify_scoring_context", _fake_verify)
+    monkeypatch.setattr(runner, "score_session", _fake_score)
     return calls
 
 
@@ -333,7 +391,7 @@ def test_a_bundle_fit_on_the_retired_event_definition_is_refit(tmp_path):
         is_swr_definition="ripple_times_overlap",
     )
 
-    assert not runner.results_exist(
+    assert not _results_exist(
         tmp_path, epoch_identifier, False, "at_well", "abc123", EVENT_TABLE_SHA, DOT_SHA
     )
 
@@ -343,14 +401,14 @@ def test_a_bundle_cut_from_another_event_table_or_decode_frame_is_refit(tmp_path
     _write_bundle_files(
         tmp_path, epoch_identifier, "at_well", "at_well", event_table_sha="stale111"
     )
-    assert not runner.results_exist(
+    assert not _results_exist(
         tmp_path, epoch_identifier, False, "at_well", "abc123", EVENT_TABLE_SHA, DOT_SHA
     )
 
     _write_bundle_files(
         tmp_path, epoch_identifier, "at_well", "at_well", data_over_time_sha="stale222"
     )
-    assert not runner.results_exist(
+    assert not _results_exist(
         tmp_path, epoch_identifier, False, "at_well", "abc123", EVENT_TABLE_SHA, DOT_SHA
     )
 
@@ -364,7 +422,7 @@ def test_a_bundle_fit_by_the_other_estimator_is_refit(tmp_path):
         tmp_path, epoch_identifier, "at_well", "at_well", fitter="statsmodels"
     )
 
-    assert not runner.results_exist(
+    assert not _results_exist(
         tmp_path,
         epoch_identifier,
         False,
@@ -374,7 +432,7 @@ def test_a_bundle_fit_by_the_other_estimator_is_refit(tmp_path):
         DOT_SHA,
         "jax",
     )
-    assert runner.results_exist(
+    assert _results_exist(
         tmp_path,
         epoch_identifier,
         False,
@@ -555,3 +613,386 @@ def test_one_card_and_one_worker_is_the_supported_layout(monkeypatch):
     args = runner.get_command_line_arguments()
 
     assert (args.gpu, args.n_workers) == (3, 1)
+
+
+# ---------------------------------------------------------------------------
+# The estimator and the inference the bundle states
+# ---------------------------------------------------------------------------
+
+
+def test_only_a_bundle_at_another_prior_is_suffixed():
+    assert runner.penalty_sigma_suffix(runner.CANONICAL_PENALTY_SIGMA) == ""
+    assert runner.penalty_sigma_suffix(1.0) == "_sigma1"
+    assert runner.penalty_sigma_suffix(3) == "_sigma3"
+    # A decimal point would truncate the companion array names, which are
+    # written by suffixing the stem.
+    assert "." not in runner.penalty_sigma_suffix(2.5)
+
+
+def test_the_sensitivity_bundle_cannot_take_the_canonical_name(tmp_path):
+    canonical = runner.modulation_path(tmp_path, "wilbur20210329_02_r1_mPFC", "at_well")
+    sensitivity = runner.modulation_path(
+        tmp_path, "wilbur20210329_02_r1_mPFC", "at_well", 1.0
+    )
+
+    assert canonical.name == "wilbur20210329_02_r1_mPFC_modulation.pkl"
+    assert sensitivity.name == "wilbur20210329_02_r1_mPFC_modulation_sigma1.pkl"
+
+
+def test_the_seeds_are_a_function_of_the_session_and_the_draw():
+    folds = runner.session_seed("folds", "wilbur20210329_.nwb", "02_r1")
+
+    # Reproducible: a session refit on its own splits the same way.
+    assert folds == runner.session_seed("folds", "wilbur20210329_.nwb", "02_r1")
+    # Two draws of the same session are independent of each other, and of the
+    # matched control's own draw.
+    assert folds != runner.session_seed("control_draws", "wilbur20210329_.nwb", "02_r1")
+    assert folds != runner.matched_control_seed("wilbur20210329_.nwb", "02_r1")
+    # Two sessions never share a draw.
+    assert folds != runner.session_seed("folds", "wilbur20210329_.nwb", "04_r2")
+
+
+@pytest.mark.parametrize(
+    "stale",
+    [
+        {"estimator": "poisson_glm"},
+        {"inference": "likelihood_ratio"},
+        {"penalty_sigma_log_rate": 1.0},
+        {"n_folds": 10},
+        {"fold_seed": 11},
+        {"n_control_draws": 20},
+        {"control_draw_seed": 12},
+    ],
+)
+def test_a_bundle_produced_by_another_estimator_or_inference_is_refit(tmp_path, stale):
+    # The canonical name is unsuffixed, so the maximum-likelihood bundle sits
+    # under exactly the name this run wants; and a bundle scored on another
+    # split or against a null of another size carries different held-out
+    # differences and different p-values.
+    epoch_identifier = "wilbur20210329_02_r1_mPFC"
+    _write_bundle_files(
+        tmp_path, epoch_identifier, "at_well", "at_well", **stale
+    )
+
+    assert not _results_exist(
+        tmp_path, epoch_identifier, False, "at_well", "abc123", EVENT_TABLE_SHA, DOT_SHA
+    )
+
+
+def test_the_sidecar_states_the_estimator_and_the_inference(
+    tmp_path, fake_session, monkeypatch
+):
+    monkeypatch.setattr(runner.sys, "argv", ["run_pfc_analysis_bandit.py"])
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+
+    runner.run_analysis(
+        "wilbur20210329_.nwb",
+        "02_r1",
+        log_directory=tmp_path / "logs",
+        stop_cohort="at_well",
+        output_dir=output_dir,
+        n_folds=5,
+        n_control_draws=40,
+    )
+
+    artifact = output_dir / "wilbur20210329_02_r1_mPFC_modulation.pkl"
+    record = json.loads(artifact.with_suffix(".provenance.json").read_text())
+    assert record["estimator"] == "ridge_poisson_glm"
+    assert record["inference"] == "blocked_heldout_deviance"
+    assert record["penalty_sigma_log_rate"] == 2.0
+    assert record["n_folds"] == 5
+    assert record["n_control_draws"] == 40
+    assert record["n_basis_per_class"] == 11
+    # Derived from the session key, so a lone refit reproduces the batch.
+    assert record["fold_seed"] == runner.session_seed(
+        "folds", "wilbur20210329_.nwb", "02_r1"
+    )
+    assert record["control_draw_seed"] == runner.session_seed(
+        "control_draws", "wilbur20210329_.nwb", "02_r1"
+    )
+    # The hand-back the batched fitter used to do is gone; nothing counts it.
+    assert "n_neurons_reference_fit" not in record
+    # The prior the models were fit under reaches the fit itself.
+    assert fake_session["run_session"]["penalty_sigma"] == 2.0
+    assert fake_session["score"]["penalty_sigma"] == 2.0
+
+
+def test_the_bundle_carries_the_heldout_columns_and_not_the_retired_ones(
+    tmp_path, fake_session, monkeypatch
+):
+    monkeypatch.setattr(runner.sys, "argv", ["run_pfc_analysis_bandit.py"])
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+
+    runner.run_analysis(
+        "wilbur20210329_.nwb",
+        "02_r1",
+        log_directory=tmp_path / "logs",
+        stop_cohort="at_well",
+        output_dir=output_dir,
+    )
+
+    table = pd.read_pickle(output_dir / "wilbur20210329_02_r1_mPFC_modulation.pkl")
+    assert "SWR vs. constant: heldout_delta_dev" in table.columns
+    assert "SWR: p_heldout" in table.columns
+    assert "min_heldout_model" in table.columns
+    assert not [c for c in table.columns if c.endswith((": lr", ": pval", ": aic"))]
+    assert "min_aic_model" not in table.columns
+
+
+def test_a_sensitivity_prior_writes_its_own_bundle_and_draws_no_null(
+    tmp_path, fake_session, monkeypatch
+):
+    # A null drawn under a prior nothing is shipped at is a null for nothing,
+    # and it is the expensive half of the run.
+    monkeypatch.setattr(runner.sys, "argv", ["run_pfc_analysis_bandit.py"])
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+
+    runner.run_analysis(
+        "wilbur20210329_.nwb",
+        "02_r1",
+        log_directory=tmp_path / "logs",
+        stop_cohort="at_well",
+        output_dir=output_dir,
+        penalty_sigma=1.0,
+    )
+
+    artifact = output_dir / "wilbur20210329_02_r1_mPFC_modulation_sigma1.pkl"
+    assert artifact.exists()
+    assert not (output_dir / "wilbur20210329_02_r1_mPFC_modulation.pkl").exists()
+    record = json.loads(artifact.with_suffix(".provenance.json").read_text())
+    assert record["penalty_sigma_log_rate"] == 1.0
+    assert record["n_control_draws"] == 0
+    assert fake_session["score"]["n_control_draws"] == 0
+
+
+def test_the_retired_statistics_are_dropped_before_the_bundle_is_written():
+    table = pd.DataFrame(
+        {
+            "SWR vs. constant: lr": [1.0],
+            "SWR vs. constant: pval": [0.2],
+            "SWR vs. constant: frac_null_dev": [0.01],
+            "theta vs. constant: pval": [0.3],
+            "min_aic_model": ["SWR"],
+            "min_aic_model_replay_split": ["constant"],
+            "immobility_avg_firing_rate": [3.0],
+        }
+    )
+
+    kept = runner.drop_retired_statistics(table)
+
+    assert list(kept.columns) == [
+        "SWR vs. constant: frac_null_dev",
+        "immobility_avg_firing_rate",
+    ]
+
+
+def test_the_statsmodels_backend_cannot_fit_the_penalised_models(monkeypatch, capsys):
+    monkeypatch.setattr(
+        runner.sys, "argv", ["run_pfc_analysis_bandit.py", "--fitter", "statsmodels"]
+    )
+
+    with pytest.raises(SystemExit) as excinfo:
+        runner.get_command_line_arguments()
+
+    assert excinfo.value.code == 2
+    assert "penalised" in capsys.readouterr().err
+
+
+# ---------------------------------------------------------------------------
+# Scoring a session out of fold
+# ---------------------------------------------------------------------------
+
+SAMPLING_FREQUENCY = 500.0
+
+
+def _synthetic_context(seed=0, n_units=3):
+    """A small session with the nine designs, three bouts and real events."""
+    from continuum_swr_replay.analysis.pfc import (
+        make_design_matrices,
+        make_matched_control_times,
+    )
+
+    rng = np.random.default_rng(seed)
+    n_time = 30_000
+    time = np.arange(n_time) / SAMPLING_FREQUENCY
+    mask = np.zeros(n_time, dtype=bool)
+    for start, stop in ((500, 10_000), (11_000, 20_000), (21_000, 29_500)):
+        mask[start:stop] = True
+    fit_mask = pd.Series(mask, index=time)
+
+    def windows(onsets):
+        return pd.DataFrame(
+            {"start_time": onsets, "end_time": onsets + 0.08}
+        )
+
+    swr_onsets = time[np.arange(600, 29_000, 900)]
+    non_local_onsets = time[np.arange(700, 29_000, 700)]
+    is_swr = np.zeros(len(non_local_onsets), dtype=bool)
+    is_swr[::2] = True
+    event_times = {
+        "SWR": windows(swr_onsets),
+        "non_local": windows(non_local_onsets),
+        "non_local_SWR": windows(non_local_onsets[is_swr]),
+        "non_local_no_SWR": windows(non_local_onsets[~is_swr]),
+    }
+    event_times["matched_control"] = make_matched_control_times(
+        event_times, fit_mask, np.random.default_rng(7)
+    ).times
+
+    position_info = pd.DataFrame({"head_speed": np.zeros(n_time)}, index=time)
+    lags = np.arange(-25, 26)
+    designs, spline_basis, _ = make_design_matrices(
+        event_times,
+        position_info,
+        sampling_frequency=SAMPLING_FREQUENCY,
+        lags=lags,
+    )
+    counts = rng.poisson(0.01, size=(n_time, n_units)).astype(float)
+    return {
+        "fit_mask": fit_mask,
+        "counts": counts,
+        "designs": designs,
+        "spline_basis": spline_basis,
+        "lags": lags,
+        "event_times": event_times,
+        "n_basis_per_class": int(spline_basis.shape[1]),
+        "bin_counts": {"n_bins_fit": int(mask.sum())},
+        "event_counts": {
+            "n_nonlocal_after": len(non_local_onsets),
+            "n_nonlocal_swr": int(is_swr.sum()),
+            "n_nonlocal_no_swr": int((~is_swr).sum()),
+            "n_ripple_after": len(swr_onsets),
+        },
+        "n_matched_control": int(len(event_times["matched_control"])),
+        "matched_control_seed": 7,
+    }
+
+
+def test_a_rebuilt_context_that_is_not_the_fitted_population_is_refused():
+    context = _synthetic_context()
+    cohort_info = {
+        **context["bin_counts"],
+        **context["event_counts"],
+        "n_matched_control": context["n_matched_control"],
+        "matched_control_seed": context["matched_control_seed"],
+    }
+
+    runner.verify_scoring_context(context, cohort_info)
+
+    with pytest.raises(ValueError, match="n_bins_fit"):
+        runner.verify_scoring_context(
+            context, {**cohort_info, "n_bins_fit": cohort_info["n_bins_fit"] - 1}
+        )
+
+
+def test_a_basis_column_with_no_spikes_under_it_is_counted():
+    design = np.column_stack(
+        [np.ones(6), [1.0, 1.0, 0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0, 1.0, 0.0]]
+    )
+    counts = np.array(
+        [
+            [1.0, 0.0],
+            [0.0, 0.0],
+            [0.0, 0.0],
+            [0.0, 0.0],
+            [0.0, 0.0],
+            [3.0, 3.0],
+        ]
+    )
+
+    separated = runner.separated_column_counts(design, counts)
+
+    # Unit 0 has a spike under the first basis column and none under the
+    # second; unit 1's only spikes fall where neither column has support.
+    np.testing.assert_array_equal(separated, [1, 2])
+
+
+def test_every_fold_holds_some_of_the_rarest_class():
+    from continuum_swr_replay.analysis.pfc.heldout import assign_blocked_folds
+
+    context = _synthetic_context()
+    folds = assign_blocked_folds(context["fit_mask"], 3, seed=5)
+
+    per_class = runner.events_per_fold(context, folds)
+
+    assert set(per_class) == set(context["event_times"])
+    for name, counts in per_class.items():
+        assert len(counts) == 3
+        assert sum(counts) <= len(context["event_times"][name])
+    assert all(count > 0 for count in per_class["non_local_no_SWR"])
+
+
+def test_the_scored_table_says_what_each_model_bought_out_of_fold(caplog):
+    context = _synthetic_context()
+
+    statistics, diagnostics = runner.score_session(
+        context,
+        penalty_sigma=2.0,
+        n_folds=3,
+        fold_seed=5,
+        n_control_draws=4,
+        control_draw_seed=6,
+        logger=logging.getLogger("test"),
+    )
+
+    assert len(statistics) == context["counts"].shape[1]
+    for model in context["designs"]:
+        assert np.isfinite(statistics[f"{model}: heldout_deviance"]).all()
+        assert (statistics[f"{model}: separated_columns"] >= 0).all()
+
+    # A nested pair's per-fold differences sum to the total it reports.
+    for full, reduced in runner.NESTED_MODEL_PAIRS:
+        stem = runner.pair_name(full, reduced)
+        per_fold = np.stack(statistics[f"{stem}: heldout_delta_dev_folds"].to_numpy())
+        assert per_fold.shape == (len(statistics), 3)
+        np.testing.assert_allclose(
+            per_fold.sum(axis=1),
+            statistics[f"{stem}: heldout_delta_dev"].to_numpy(),
+            rtol=1e-10,
+        )
+
+    # Every class and the engagement statistic carry an empirical p-value, on
+    # the grid one draw gives.
+    for column in (
+        "SWR: p_heldout",
+        "non_local: p_heldout",
+        "non_local_no_SWR: p_heldout",
+        "non_local_SWR: p_heldout",
+        f"{runner.pair_name(*runner.ENGAGEMENT_PAIR)}: p_heldout",
+    ):
+        values = statistics[column].to_numpy(dtype=float)
+        assert np.all((values >= 0) & (values <= 1))
+        np.testing.assert_allclose(values * 4, np.round(values * 4))
+
+    assert set(statistics["min_heldout_model"]) <= set(
+        runner.BEST_MODEL_CANDIDATES["min_heldout_model"]
+    )
+    assert sum(diagnostics["fold_sizes"]) == int(
+        np.asarray(context["fit_mask"]).sum()
+    )
+    assert diagnostics["non_estimable_models"] == []
+
+
+def test_the_best_model_is_the_one_with_the_lowest_heldout_deviance():
+    context = _synthetic_context()
+
+    statistics, _ = runner.score_session(
+        context,
+        penalty_sigma=2.0,
+        n_folds=3,
+        fold_seed=5,
+        n_control_draws=0,
+        control_draw_seed=6,
+        logger=logging.getLogger("test"),
+    )
+
+    assert "SWR: p_heldout" not in statistics.columns
+    for column, candidates in runner.BEST_MODEL_CANDIDATES.items():
+        deviances = np.column_stack(
+            [statistics[f"{name}: heldout_deviance"] for name in candidates]
+        )
+        expected = [candidates[index] for index in deviances.argmin(axis=1)]
+        assert list(statistics[column]) == expected

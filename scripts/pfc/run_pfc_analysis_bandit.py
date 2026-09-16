@@ -40,14 +40,15 @@ python run_pfc_analysis_bandit.py --brain_area mPFC --stop-cohort all_stops
 # Smoke one session into a scratch directory
 python run_pfc_analysis_bandit.py --max-sessions 1 --output-dir /tmp/pfc_smoke
 
-# Fit with the original per-neuron statsmodels IRLS (for the fitter audit)
-python run_pfc_analysis_bandit.py --fitter statsmodels --output-dir /tmp/pfc_sm
+# Sensitivity bundle at another prior, written as *_modulation_sigma1.*
+python run_pfc_analysis_bandit.py --brain_area mPFC --penalty-sigma 1
 
 # One worker of a partitioned batch: its own sessions, its own card
 python run_pfc_analysis_bandit.py --brain_area mPFC --n_workers 1 \
     --gpu 2 --sessions worker0.sessions
 """
 
+import hashlib
 import json
 import logging
 import os
@@ -69,8 +70,16 @@ import dask
 import numpy as np
 import pandas as pd
 from dask.distributed import Client, LocalCluster
+from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.pfc import run_session
+from continuum_swr_replay.analysis.pfc import (
+    build_session_event_sets,
+    build_session_fit_mask,
+    make_design_matrices,
+    make_matched_control_times,
+    matched_control_seed,
+    run_session,
+)
 from continuum_swr_replay.analysis.pfc.canonical_events import (
     IS_SWR_DEFINITION,
     canonical_event_input_hashes,
@@ -79,8 +88,19 @@ from continuum_swr_replay.analysis.pfc.cohort import (
     DEFAULT_STOP_TABLE_PATH,
     load_session_stop_cohort,
 )
-from continuum_swr_replay.analysis.pfc.glm import FITTERS
+from continuum_swr_replay.analysis.pfc.glm import (
+    EVENT_CLASSES,
+    FITTERS,
+    get_spikecount_per_time_bin,
+    model_penalties,
+)
 from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
+from continuum_swr_replay.analysis.pfc.heldout import (
+    assign_blocked_folds,
+    control_draw_null,
+    empirical_pvalue,
+    heldout_deviance,
+)
 from continuum_swr_replay.analysis.replay.cohort_selection import stop_cohort_suffix
 from continuum_swr_replay.analysis.replay.fit_provenance import (
     fit_provenance_path,
@@ -106,14 +126,142 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, module="datajoint
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="hdmf")
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="pynwb")
 
+#: Prior standard deviation of an event-basis coefficient, on the log-rate
+#: scale, that the canonical bundle is fit at. A B-spline coefficient of this
+#: basis is the log-rate modulation near its knot, so the prior is read as a
+#: rate multiplier: sigma = 2 puts 95 % of its mass between about x0.02 and x55
+#: of baseline. It is loose enough not to shape a modulation the spikes can
+#: support and tight enough that a basis column with no spikes under it settles
+#: near "a small fraction of baseline" instead of running to -infinity.
+CANONICAL_PENALTY_SIGMA = 2.0
 
-def modulation_path(save_folder: Path, epoch_identifier: str, stop_cohort: str) -> Path:
-    """Artifact path for one session, named for the population it was fit on.
+#: The estimator and the inference each bundle is produced by, recorded in the
+#: provenance sidecar and compared by the skip check: a bundle fit by maximum
+#: likelihood and tested by a likelihood ratio is not this runner's bundle.
+ESTIMATOR = "ridge_poisson_glm"
+INFERENCE = "blocked_heldout_deviance"
 
-    The canonical at-well bundle keeps the unsuffixed name every reader already
-    hard-codes, so a sensitivity bundle can never be mistaken for it.
+#: Nested ``(full, reduced)`` pairs the held-out comparison is reported for.
+#: Every pair is nested -- the reduced design's columns lie in the full
+#: design's span -- so the difference of held-out deviances is a statement
+#: about the added regressors alone. ``("SWR + non_local_no_SWR",
+#: "non_local")`` is absent for the same reason it always was: it is only
+#: nested when the session has no SWR-only events. The last two are the
+#: engagement decomposition, whose baseline is the matched non-event control.
+NESTED_MODEL_PAIRS = (
+    ("SWR", "constant"),
+    ("non_local", "constant"),
+    ("non_local_no_SWR", "constant"),
+    ("non_local_SWR", "constant"),
+    ("SWR + non_local_no_SWR", "constant"),
+    ("SWR + non_local_no_SWR", "SWR"),
+    ("SWR + non_local_no_SWR", "non_local_no_SWR"),
+    ("non_local_SWR + non_local_no_SWR", "constant"),
+    ("non_local_SWR + non_local_no_SWR", "non_local_SWR"),
+    ("non_local_SWR + non_local_no_SWR", "non_local_no_SWR"),
+    ("non_local_SWR + non_local_no_SWR", "non_local"),
+    ("matched_control + non_local_no_SWR", "matched_control"),
+    ("matched_control", "constant"),
+)
+
+#: The engagement comparison: does non-SWR replay predict held-out spikes
+#: beyond a duration-matched non-event baseline drawn from the same bouts?
+ENGAGEMENT_PAIR = ("matched_control + non_local_no_SWR", "matched_control")
+
+#: Best model per unit, by held-out deviance, within each decomposition. Only
+#: comparable models compete, as they did under AIC.
+BEST_MODEL_CANDIDATES = {
+    "min_heldout_model": (
+        "constant",
+        "SWR",
+        "non_local",
+        "SWR + non_local_no_SWR",
+    ),
+    "min_heldout_model_replay_split": (
+        "constant",
+        "non_local",
+        "non_local_SWR + non_local_no_SWR",
+    ),
+}
+
+#: Columns the maximum-likelihood ladder wrote that this estimator cannot
+#: produce. A penalised fit has no likelihood-ratio reference distribution and
+#: no AIC at a stated number of parameters, so the statistics table must not
+#: carry either: a reader who found a ``: pval`` column beside a ridge fit
+#: would read an asymptotic test of a model that was never fit unpenalised.
+RETIRED_STATISTIC_SUFFIXES = (": lr", ": pval", ": aic")
+RETIRED_STATISTIC_COLUMNS = ("min_aic_model", "min_aic_model_replay_split")
+
+
+def pair_name(full: str, reduced: str) -> str:
+    """Column stem for one nested comparison, as the statistics table spells it."""
+    return f"{full} vs. {reduced}"
+
+
+def penalty_sigma_suffix(penalty_sigma: float) -> str:
+    """Artifact-name suffix naming the prior a sensitivity bundle was fit at.
+
+    The canonical prior publishes the unsuffixed name every reader hard-codes,
+    so a bundle fit at another sigma can never be mistaken for it.
+
+    Parameters
+    ----------
+    penalty_sigma : float
+        Prior standard deviation of an event-basis coefficient, on the log-rate
+        scale.
+
+    Returns
+    -------
+    str
+        ``""`` at the canonical prior, else ``"_sigma<value>"`` with any
+        decimal point written ``p`` -- the bundle's companion arrays are named
+        by suffixing the stem, so a dot in the stem would truncate them.
     """
-    suffix = stop_cohort_suffix(stop_cohort)
+    if float(penalty_sigma) == CANONICAL_PENALTY_SIGMA:
+        return ""
+    return "_sigma" + f"{float(penalty_sigma):g}".replace(".", "p")
+
+
+def session_seed(stream: str, nwb_file_name: str, epoch_name: str) -> int:
+    """Per-session, per-stream seed derived from the session key.
+
+    Derived rather than counted, exactly as the matched control's own seed is:
+    a session refit on its own -- to repair one bundle, say -- draws the same
+    folds and the same null as the batch drew, and two sessions never share a
+    draw. The stream name keeps the fold split and the null draws independent
+    of each other and of the shipped control.
+
+    Parameters
+    ----------
+    stream : str
+        Which draw the seed is for, e.g. ``"folds"`` or ``"control_draws"``.
+    nwb_file_name : str
+        NWB file name, e.g. ``"wilbur20210329_.nwb"``.
+    epoch_name : str
+        Epoch name, e.g. ``"02_r1"``.
+
+    Returns
+    -------
+    int
+        The low 64 bits of ``sha256(f"{stream}|{nwb_file_name}|{epoch_name}")``.
+    """
+    key = f"{stream}|{nwb_file_name}|{epoch_name}".encode()
+    return int.from_bytes(hashlib.sha256(key).digest()[:8], "little")
+
+
+def modulation_path(
+    save_folder: Path,
+    epoch_identifier: str,
+    stop_cohort: str,
+    penalty_sigma: float = CANONICAL_PENALTY_SIGMA,
+) -> Path:
+    """Artifact path for one session, named for how it was cut and fit.
+
+    The canonical at-well bundle at the canonical prior keeps the unsuffixed
+    name every reader already hard-codes, so a sensitivity bundle -- another
+    population, or another prior -- can never be mistaken for it.
+    """
+    suffix = stop_cohort_suffix(stop_cohort) + penalty_sigma_suffix(penalty_sigma)
     return save_folder / f"{epoch_identifier}_modulation{suffix}.pkl"
 
 
@@ -126,6 +274,12 @@ def results_exist(
     event_table_sha256: str | None = None,
     data_over_time_sha256: str | None = None,
     fitter: str | None = None,
+    *,
+    penalty_sigma: float = CANONICAL_PENALTY_SIGMA,
+    n_folds: int | None = None,
+    fold_seed: int | None = None,
+    n_control_draws: int | None = None,
+    control_draw_seed: int | None = None,
 ) -> bool:
     """Check if this session's bundle already exists *for this population*.
 
@@ -164,10 +318,25 @@ def results_exist(
         throughout must not silently keep sessions from the other. ``None``
         (the default) matches a sidecar that names no fitter, which is how a
         bundle written before the flag existed is read.
+    penalty_sigma : float
+        Prior this run would fit at. It is already in the artifact name for a
+        sensitivity bundle, but the canonical name is unsuffixed, so the
+        sidecar is what tells a ridge bundle from the maximum-likelihood one
+        that occupied the same name before.
+    n_folds, fold_seed, n_control_draws, control_draw_seed : int or None
+        The inference this run would produce. A bundle scored on a different
+        number of folds, a different split, or a null of a different size is
+        not this run's bundle: its held-out differences and its empirical
+        p-values are not the ones a current batch means to ship. ``None``
+        matches a sidecar that records no value, which is how a bundle written
+        before the held-out inference existed is read -- and such a bundle also
+        fails the estimator comparison above, so it is refit.
     """
     if overwrite:
         return False
-    artifact = modulation_path(save_folder, epoch_identifier, stop_cohort)
+    artifact = modulation_path(
+        save_folder, epoch_identifier, stop_cohort, penalty_sigma
+    )
     save_base = artifact.with_suffix("")
     required_files = [
         save_base.with_suffix(".pkl"),
@@ -190,7 +359,424 @@ def results_exist(
         and record.get("canonical_event_table_sha256") == event_table_sha256
         and record.get("data_over_time_sha256") == data_over_time_sha256
         and record.get("fitter") == fitter
+        and record.get("estimator") == ESTIMATOR
+        and record.get("inference") == INFERENCE
+        and record.get("penalty_sigma_log_rate") == penalty_sigma
+        and record.get("n_folds") == n_folds
+        and record.get("fold_seed") == fold_seed
+        and record.get("n_control_draws") == n_control_draws
+        and record.get("control_draw_seed") == control_draw_seed
     )
+
+
+#: Half-width of the peri-event spline basis, in samples at 500 Hz. The models
+#: are fit over +/-250 ms so the spline's boundary behaviour falls outside the
+#: +/-200 ms the modulation curves are reported on. The scoring designs must be
+#: the ones the bundle was fit on, so they are built on the same lags.
+FIT_LAGS = np.arange(-125, 126, 1)
+
+
+def build_scoring_context(
+    nwb_file_name: str,
+    epoch_name: str,
+    brain_area: str,
+    *,
+    stop_cohort: str,
+    cohort_stops: pd.DataFrame | None,
+    sampling_frequency: float,
+    immobility_threshold: float,
+    logger: logging.Logger,
+) -> dict[str, object]:
+    """Rebuild the population, the designs and the counts a session was fit on.
+
+    The held-out score and its null are fit on the same bins, the same events
+    and the same designs the shipped fit used, so they are assembled here from
+    the same functions and the same session-keyed control seed. Nothing is
+    re-detected and nothing is re-cut: the events are the canonical table's
+    rows for this session and the cohort is the stop cohort the caller
+    resolved.
+
+    Parameters
+    ----------
+    nwb_file_name, epoch_name, brain_area : str
+        The session key and the population of units.
+    stop_cohort : {"at_well", "all_stops"}
+        Population the models were fit on.
+    cohort_stops : pandas.DataFrame or None
+        The session's kept stops; ``None`` for ``all_stops``.
+    sampling_frequency : float
+        Sampling frequency in Hz.
+    immobility_threshold : float
+        Speed threshold the fit mask and the SWR gate are cut at (cm/s).
+    logger : logging.Logger
+
+    Returns
+    -------
+    dict
+        ``fit_mask`` (bool Series on the session's time axis), ``counts``
+        (``(n_time, n_units)`` spike counts), ``designs`` (full-length design
+        matrices by model name), ``spline_basis``, ``lags``, ``event_times``,
+        ``n_basis_per_class``, and the ``bin_counts`` / ``event_counts`` /
+        ``n_matched_control`` / ``matched_control_seed`` the shipped fit is
+        checked against.
+    """
+    # Deferred, as they are in ``run_session``: these open Spyglass at import
+    # time, and this module is imported by tests that never touch it.
+    from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
+    from continuum_swr_replay.analysis.hippocampus import load_results
+    from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+        align_results_to_position,
+    )
+    from continuum_swr_replay.analysis.pfc.canonical_events import (
+        load_session_canonical_events,
+        load_session_swr_intervals,
+    )
+    from continuum_swr_replay.data_loaders import load_data
+
+    logger.info("Rebuilding the session's designs for the held-out score...")
+    results, _, _ = load_results(
+        nwb_file_name, epoch_name, decoding_brain_area="HPC", load_detector=False
+    )
+    data = load_data(nwb_file_name, epoch_name)
+    results, position_info, _ = align_results_to_position(
+        results, data["position_info"]
+    )
+    data = {**data, "position_info": position_info}
+
+    is_immobile, fit_mask, bin_counts = build_session_fit_mask(
+        position_info,
+        cohort_stops=cohort_stops,
+        stop_cohort=stop_cohort,
+        immobility_threshold=immobility_threshold,
+    )
+    del is_immobile
+
+    canonical_events, _ = load_session_canonical_events(nwb_file_name, epoch_name)
+    swr_intervals, _ = load_session_swr_intervals(
+        nwb_file_name,
+        epoch_name,
+        non_local_threshold=DEFAULT_NON_LOCAL_THRESHOLD,
+        speed_threshold=immobility_threshold,
+    )
+    event_times, event_counts = build_session_event_sets(
+        data,
+        results,
+        canonical_events=canonical_events,
+        swr_intervals=swr_intervals,
+        cohort_stops=cohort_stops,
+        stop_cohort=stop_cohort,
+        fit_mask=fit_mask,
+        basis_half_window_s=float(np.abs(FIT_LAGS).max()) / sampling_frequency,
+    )
+    control_seed = matched_control_seed(nwb_file_name, epoch_name)
+    event_times["matched_control"] = make_matched_control_times(
+        event_times, fit_mask, np.random.default_rng(control_seed)
+    ).times
+
+    designs, spline_basis, _ = make_design_matrices(
+        event_times,
+        position_info,
+        sampling_frequency=sampling_frequency,
+        lags=FIT_LAGS,
+    )
+
+    time = position_info.index.to_numpy(dtype=float)
+    neurons = data["spike_times"].get(brain_area) or []
+    counts = (
+        np.column_stack(
+            [get_spikecount_per_time_bin(neuron, time) for neuron in neurons]
+        ).astype(float)
+        if neurons
+        else np.zeros((len(time), 0))
+    )
+
+    return {
+        "fit_mask": fit_mask,
+        "counts": counts,
+        "designs": designs,
+        "spline_basis": spline_basis,
+        "lags": FIT_LAGS,
+        "event_times": event_times,
+        "n_basis_per_class": int(spline_basis.shape[1]),
+        "bin_counts": bin_counts,
+        "event_counts": event_counts,
+        "n_matched_control": int(len(event_times["matched_control"])),
+        "matched_control_seed": control_seed,
+    }
+
+
+#: Counts the rebuilt scoring context and the shipped fit must agree on. They
+#: come from two independent passes over the same inputs, so a disagreement is
+#: a drift between the two -- not something to average over.
+CONTEXT_AGREEMENT_KEYS = (
+    "n_bins_fit",
+    "n_nonlocal_after",
+    "n_nonlocal_swr",
+    "n_nonlocal_no_swr",
+    "n_ripple_after",
+)
+
+
+def verify_scoring_context(
+    context: dict[str, object], cohort_info: dict[str, object]
+) -> None:
+    """Refuse a scoring context that is not the population the fit was on.
+
+    The context is rebuilt from the same functions and the same seeds the fit
+    used, so every count must match exactly. If one does not, the held-out
+    score would describe a different set of bins or events than the modulation
+    curves beside it, and the bundle would be internally inconsistent in a way
+    no reader could see.
+
+    Raises
+    ------
+    ValueError
+        Naming every count that disagrees.
+    """
+    rebuilt = {
+        **context["bin_counts"],
+        **context["event_counts"],
+        "n_matched_control": context["n_matched_control"],
+        "matched_control_seed": context["matched_control_seed"],
+    }
+    keys = (*CONTEXT_AGREEMENT_KEYS, "n_matched_control", "matched_control_seed")
+    disagreements = [
+        f"{key}: fit {cohort_info.get(key)!r}, rebuilt {rebuilt.get(key)!r}"
+        for key in keys
+        if cohort_info.get(key) != rebuilt.get(key)
+    ]
+    if disagreements:
+        raise ValueError(
+            "the rebuilt scoring designs do not describe the population the "
+            "models were fit on: " + "; ".join(disagreements)
+        )
+
+
+def separated_column_counts(design: NDArray, counts: NDArray) -> NDArray:
+    """Basis columns with no spikes anywhere under their support, per unit.
+
+    A column whose support holds no spikes is the configuration that drives an
+    unpenalised coefficient to minus infinity; under the prior it is finite but
+    uninformed, so the count is reported beside the fit rather than acted on.
+    The intercept is not counted -- its support is every bin.
+
+    Parameters
+    ----------
+    design : NDArray, shape (n_fit_bins, n_features)
+        Design on the bins the models were fit on; column 0 is the intercept.
+    counts : NDArray, shape (n_fit_bins, n_units)
+        Spike counts on those bins.
+
+    Returns
+    -------
+    NDArray of int, shape (n_units,)
+    """
+    support = np.asarray(design[:, 1:], dtype=float) > 0
+    spikes_under_support = support.T.astype(float) @ np.asarray(counts, dtype=float)
+    return (spikes_under_support == 0).sum(axis=0).astype(int)
+
+
+def score_session(
+    context: dict[str, object],
+    *,
+    penalty_sigma: float,
+    n_folds: int,
+    fold_seed: int,
+    n_control_draws: int,
+    control_draw_seed: int,
+    logger: logging.Logger,
+) -> tuple[pd.DataFrame, dict[str, object]]:
+    """Score every model out of fold, and read the improvements against a null.
+
+    Each model is refit on ``K - 1`` folds of contiguous immobility runs and
+    scored by the Poisson deviance of the fold left out, under the same prior
+    the shipped fit used. A nested pair's ``heldout_delta_dev`` is the reduced
+    model's held-out deviance minus the full model's: positive means the added
+    regressors predict spikes the fit never saw. The improvement a real event
+    class buys is read against ``R`` draws of the matched non-event control --
+    the same rules, no event content -- which is the only null available for a
+    statistic that is neither a likelihood ratio nor independent across bins.
+
+    Parameters
+    ----------
+    context : dict
+        From :func:`build_scoring_context`.
+    penalty_sigma : float
+        The prior the shipped fit used, applied to every training fit.
+    n_folds : int
+        Folds ``K``.
+    fold_seed : int
+        Seed of the run-to-fold assignment, recorded in the sidecar.
+    n_control_draws : int
+        Draws ``R`` of the null. ``0`` skips the null entirely, and the
+        empirical p-value columns are then not written at all rather than
+        written empty.
+    control_draw_seed : int
+        Seed the ``R`` draw seeds are derived from, recorded in the sidecar.
+    logger : logging.Logger
+
+    Returns
+    -------
+    statistics : pandas.DataFrame
+        One row per unit, in unit order, carrying the held-out deviances, the
+        nested differences (total and per fold), the empirical p-values and the
+        best model per decomposition.
+    diagnostics : dict
+        ``fold_sizes``, ``events_per_fold`` for each event class, and the
+        models found non-estimable -- what the choice of ``K`` is read from.
+    """
+    fit_mask = context["fit_mask"]
+    designs: dict[str, NDArray] = context["designs"]
+    fit_rows = np.asarray(fit_mask, dtype=bool)
+    counts = np.asarray(context["counts"], dtype=float)
+    fit_counts = counts[fit_rows]
+    n_units = counts.shape[1]
+
+    folds = assign_blocked_folds(fit_mask, n_folds, fold_seed)
+    penalties = model_penalties(designs, penalty_sigma)
+
+    # A design whose event class has no events leaves an all-zero basis block,
+    # which is rank-deficient against the intercept. Such a model is not an
+    # estimated zero effect, it is no estimate at all, so every statistic that
+    # reads it is NaN -- the same rule the modulation curves are held to.
+    non_estimable = {
+        name
+        for name, design in designs.items()
+        if np.linalg.matrix_rank(design[fit_rows]) < design.shape[1]
+    }
+    if non_estimable:
+        logger.warning(
+            "Non-estimable designs (rank-deficient on the fit bins): %s",
+            sorted(non_estimable),
+        )
+
+    deviance: dict[str, NDArray] = {}
+    per_fold: dict[str, NDArray] = {}
+    for name, design in designs.items():
+        if name in non_estimable:
+            deviance[name] = np.full(n_units, np.nan)
+            per_fold[name] = np.full((n_folds, n_units), np.nan)
+            continue
+        scored = heldout_deviance(
+            design[fit_rows], fit_counts, penalties.get(name), folds
+        )
+        deviance[name] = scored.total
+        per_fold[name] = scored.per_fold
+    logger.info("Scored %d models on %d folds", len(designs), n_folds)
+
+    statistics: dict[str, object] = {}
+    for name in designs:
+        statistics[f"{name}: heldout_deviance"] = deviance[name]
+        statistics[f"{name}: separated_columns"] = separated_column_counts(
+            designs[name][fit_rows], fit_counts
+        )
+
+    for full, reduced in NESTED_MODEL_PAIRS:
+        stem = pair_name(full, reduced)
+        statistics[f"{stem}: heldout_delta_dev"] = deviance[reduced] - deviance[full]
+        difference = per_fold[reduced] - per_fold[full]
+        statistics[f"{stem}: heldout_delta_dev_folds"] = list(difference.T)
+
+    for column, candidates in BEST_MODEL_CANDIDATES.items():
+        usable = [name for name in candidates if name not in non_estimable]
+        if usable:
+            stacked = np.column_stack([deviance[name] for name in usable])
+            best = np.argmin(np.where(np.isnan(stacked), np.inf, stacked), axis=1)
+            statistics[column] = [
+                None if not np.isfinite(row).any() else usable[index]
+                for row, index in zip(stacked, best, strict=True)
+            ]
+        else:
+            statistics[column] = [None] * n_units
+
+    diagnostics: dict[str, object] = {
+        "fold_sizes": np.bincount(folds, minlength=n_folds).tolist(),
+        "events_per_fold": events_per_fold(context, folds),
+        "non_estimable_models": sorted(non_estimable),
+    }
+
+    if n_control_draws > 0:
+        seeds = [
+            int(seed)
+            for seed in np.random.default_rng(control_draw_seed).integers(
+                0, 2**62, size=n_control_draws
+            )
+        ]
+        logger.info(
+            "Drawing the null: %d matched-control draws on %d folds...",
+            n_control_draws,
+            n_folds,
+        )
+        null = control_draw_null(
+            context["event_times"],
+            fit_mask,
+            counts,
+            folds,
+            rng_seeds=seeds,
+            spline_basis=context["spline_basis"],
+            lags=context["lags"],
+            penalty_sigma=penalty_sigma,
+            baseline_control=context["event_times"]["matched_control"],
+        )
+        for event_class in EVENT_CLASSES:
+            observed = statistics[f"{pair_name(event_class, 'constant')}: heldout_delta_dev"]
+            statistics[f"{event_class}: p_heldout"] = empirical_pvalue(
+                observed, null.improvement
+            )
+        engagement_stem = pair_name(*ENGAGEMENT_PAIR)
+        statistics[f"{engagement_stem}: p_heldout"] = empirical_pvalue(
+            statistics[f"{engagement_stem}: heldout_delta_dev"], null.engagement
+        )
+        diagnostics["n_placed_per_draw"] = null.n_placed.tolist()
+
+    return pd.DataFrame(statistics), diagnostics
+
+
+def events_per_fold(
+    context: dict[str, object], folds: NDArray
+) -> dict[str, list[int]]:
+    """Event onsets falling in each fold, per event class.
+
+    The rarest class's count is what a choice of ``K`` has to live with: a fold
+    holding a handful of events of the class under test cannot say much about
+    a model built on it.
+    """
+    fit_mask = context["fit_mask"]
+    time = np.asarray(fit_mask.index, dtype=float)
+    fit_rows = np.asarray(fit_mask, dtype=bool)
+    fold_of_bin = np.full(len(time), -1, dtype=np.int64)
+    fold_of_bin[fit_rows] = folds
+    n_folds = int(folds.max()) + 1
+    per_class: dict[str, list[int]] = {}
+    for name, times in context["event_times"].items():
+        if not len(times):
+            per_class[name] = [0] * n_folds
+            continue
+        index = np.searchsorted(time, times["start_time"].to_numpy(dtype=float))
+        index = np.clip(index, 0, len(time) - 1)
+        assigned = fold_of_bin[index]
+        per_class[name] = [
+            int((assigned == fold).sum()) for fold in range(n_folds)
+        ]
+    return per_class
+
+
+def drop_retired_statistics(neuron_stats: pd.DataFrame) -> pd.DataFrame:
+    """Remove the maximum-likelihood ladder's columns from a statistics table.
+
+    The per-unit fits are penalised and the inference is out of fold, so the
+    likelihood-ratio statistics, their asymptotic p-values and the AICs are not
+    quantities this estimator produces. They are dropped before the bundle is
+    written rather than shipped alongside the held-out columns, where a reader
+    could pick either.
+    """
+    retired = [
+        column
+        for column in neuron_stats.columns
+        if column.endswith(RETIRED_STATISTIC_SUFFIXES)
+        or column in RETIRED_STATISTIC_COLUMNS
+    ]
+    return neuron_stats.drop(columns=retired)
 
 
 def run_analysis(
@@ -208,6 +794,11 @@ def run_analysis(
     fit_diagnostics: bool = False,
     gpu: int | None = None,
     allow_cpu: bool = False,
+    penalty_sigma: float = CANONICAL_PENALTY_SIGMA,
+    n_folds: int = 5,
+    n_control_draws: int = 40,
+    fold_seed: int | None = None,
+    control_draw_seed: int | None = None,
 ) -> None:
     """Run PFC GLM analysis for a single session.
 
@@ -249,6 +840,22 @@ def run_analysis(
         Permit the batched fitter to run on CPU when no GPU is free. Off by
         default: the CPU path is many times slower, and a batch that quietly
         fell back to it would not be noticed until it overran.
+    penalty_sigma : float
+        Prior standard deviation of an event-basis coefficient, on the log-rate
+        scale. A value other than the canonical one writes a suffixed
+        sensitivity bundle and skips the null, whose draws would then describe
+        a prior the canonical bundle is not fit under.
+    n_folds : int
+        Folds the held-out deviance is summed over. Whole contiguous
+        immobility runs are assigned to folds, so no fold is predicted from
+        bins 2 ms either side of it.
+    n_control_draws : int
+        Draws of the matched non-event control the observed held-out
+        improvements are read against. ``0`` skips the null.
+    fold_seed, control_draw_seed : int, optional
+        Seeds of the fold split and of the null draws. Derived from the session
+        key when omitted, so a session refit on its own reproduces the batch's
+        split and null exactly.
 
     Notes
     -----
@@ -265,7 +872,18 @@ def run_analysis(
     epoch_identifier = (
         f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{brain_area}"
     )
-    save_file = modulation_path(output_dir, epoch_identifier, stop_cohort)
+    save_file = modulation_path(
+        output_dir, epoch_identifier, stop_cohort, penalty_sigma
+    )
+    if fold_seed is None:
+        fold_seed = session_seed("folds", nwb_file_name, epoch_name)
+    if control_draw_seed is None:
+        control_draw_seed = session_seed("control_draws", nwb_file_name, epoch_name)
+    # A bundle fit under another prior is a sensitivity bundle: it is written
+    # for its modulation curves, and a null drawn under a prior the canonical
+    # bundle is not fit under would not be a null for anything shipped.
+    if float(penalty_sigma) != CANONICAL_PENALTY_SIGMA:
+        n_control_draws = 0
 
     logger = setup_logger(
         name_logfile=epoch_identifier,
@@ -305,6 +923,11 @@ def run_analysis(
         event_inputs["canonical_event_table_sha256"],
         event_inputs["data_over_time_sha256"],
         fitter,
+        penalty_sigma=penalty_sigma,
+        n_folds=n_folds,
+        fold_seed=fold_seed,
+        n_control_draws=n_control_draws,
+        control_draw_seed=control_draw_seed,
     ):
         logger.info(f"Results already exist for {epoch_identifier}. Skipping...")
         return
@@ -316,6 +939,12 @@ def run_analysis(
     logger.info(f"immobility_threshold: {immobility_threshold}")
     logger.info(f"stop_cohort: {stop_cohort}")
     logger.info(f"fitter: {fitter}")
+    logger.info(f"penalty_sigma_log_rate: {penalty_sigma}")
+    logger.info(f"n_folds: {n_folds} (fold_seed {fold_seed})")
+    logger.info(
+        f"n_control_draws: {n_control_draws} "
+        f"(control_draw_seed {control_draw_seed})"
+    )
 
     diagnostics: dict | None = {} if fit_diagnostics else None
 
@@ -367,9 +996,54 @@ def run_analysis(
             cohort_stops=cohort_stops,
             fitter=fitter,
             fit_diagnostics_out=diagnostics,
+            penalty_sigma=penalty_sigma,
         )
 
         logger.info(f"Analyzed {len(neuron_stats)} neurons")
+
+        # The statistics table's inference is the held-out score, so the
+        # likelihood-ratio columns the maximum-likelihood ladder wrote are
+        # dropped and the held-out ones take their place.
+        neuron_stats = drop_retired_statistics(neuron_stats)
+        n_basis_per_class: int | None = None
+        scoring_diagnostics: dict[str, object] = {}
+        if len(neuron_stats):
+            context = build_scoring_context(
+                nwb_file_name,
+                epoch_name,
+                brain_area,
+                stop_cohort=stop_cohort,
+                cohort_stops=cohort_stops,
+                sampling_frequency=sampling_frequency,
+                immobility_threshold=immobility_threshold,
+                logger=logger,
+            )
+            verify_scoring_context(context, cohort_info)
+            n_basis_per_class = context["n_basis_per_class"]
+            heldout_stats, scoring_diagnostics = score_session(
+                context,
+                penalty_sigma=penalty_sigma,
+                n_folds=n_folds,
+                fold_seed=fold_seed,
+                n_control_draws=n_control_draws,
+                control_draw_seed=control_draw_seed,
+                logger=logger,
+            )
+            if len(heldout_stats) != len(neuron_stats):
+                raise ValueError(
+                    f"the held-out score describes {len(heldout_stats)} units "
+                    f"and the fit {len(neuron_stats)}; they are the same "
+                    "neurons in the same order or they are not comparable"
+                )
+            neuron_stats = pd.concat(
+                [neuron_stats, heldout_stats.set_index(neuron_stats.index)], axis=1
+            )
+            logger.info(
+                "Fold sizes: %s; events per fold: %s",
+                scoring_diagnostics["fold_sizes"],
+                scoring_diagnostics["events_per_fold"],
+            )
+
         logger.info("Saving results...")
 
         save_file.parent.mkdir(parents=True, exist_ok=True)
@@ -416,10 +1090,27 @@ def run_analysis(
         sidecar = write_fit_provenance(
             save_file,
             {"stop_table": DEFAULT_STOP_TABLE_PATH} if cohort_stops is not None else {},
-            estimator="poisson_glm",
+            estimator=ESTIMATOR,
             cli=sys.argv,
             extra={
                 "stop_cohort": stop_cohort,
+                # The estimator and the inference, in full: the prior the
+                # coefficients were fit under, the blocked split the models
+                # were scored out of, and the null the improvements are read
+                # against. A bundle that does not state these cannot be told
+                # from the maximum-likelihood one that held the same name.
+                "inference": INFERENCE,
+                "penalty_sigma_log_rate": float(penalty_sigma),
+                "n_folds": int(n_folds),
+                "fold_seed": int(fold_seed),
+                "n_control_draws": int(n_control_draws),
+                "control_draw_seed": int(control_draw_seed),
+                "n_basis_per_class": n_basis_per_class,
+                "fold_sizes": scoring_diagnostics.get("fold_sizes"),
+                "events_per_fold": scoring_diagnostics.get("events_per_fold"),
+                "non_estimable_models": scoring_diagnostics.get(
+                    "non_estimable_models"
+                ),
                 "stop_table_sha256": cohort_report.get("stop_table_sha256"),
                 "stop_cohort_report": cohort_report,
                 "cohort_counts": cohort_info,
@@ -439,9 +1130,9 @@ def run_analysis(
                 "gpu_index": gpu_record.get("gpu_index"),
                 "gpu_uuid": gpu_record.get("gpu_uuid"),
                 "gpu_name": gpu_record.get("gpu_name"),
-                # How many of the shipped fits never settled. A fit that ran
-                # to maxiter still reports an LR test and an AIC, so this is
-                # the only place that fact survives the run.
+                # How many of the shipped fits never settled. A unit x model
+                # that never settled is non-estimable for that neuron alone, so
+                # this is the only place the fact survives the run.
                 "n_model_fits": cohort_info.get("n_model_fits"),
                 "n_nonconverged_model_fits": cohort_info.get(
                     "n_nonconverged_model_fits"
@@ -591,6 +1282,58 @@ def get_command_line_arguments() -> Namespace:
         ),
     )
     parser.add_argument(
+        "--penalty-sigma",
+        type=float,
+        default=CANONICAL_PENALTY_SIGMA,
+        help=(
+            "Prior standard deviation of an event-basis coefficient, on the "
+            f"log-rate scale (default: {CANONICAL_PENALTY_SIGMA}). A "
+            "coefficient of this basis is a log-rate modulation near its knot, "
+            "so the value reads as a rate multiplier. Another value writes a "
+            "'_sigma<value>' sensitivity bundle and skips the null, which "
+            "would otherwise describe a prior nothing is shipped under."
+        ),
+    )
+    parser.add_argument(
+        "--n-folds",
+        type=int,
+        default=5,
+        help=(
+            "Folds the held-out deviance is summed over (default: 5). Whole "
+            "contiguous immobility runs are assigned to folds, so no fold is "
+            "predicted from the bins 2 ms either side of it."
+        ),
+    )
+    parser.add_argument(
+        "--n-control-draws",
+        type=int,
+        default=40,
+        help=(
+            "Draws of the matched non-event control that make the null each "
+            "held-out improvement is read against (default: 40). 0 skips the "
+            "null, and no empirical p-value is written."
+        ),
+    )
+    parser.add_argument(
+        "--fold-seed",
+        type=int,
+        default=None,
+        help=(
+            "Seed of the run-to-fold assignment. Derived from the session key "
+            "when omitted, so a session refit on its own reproduces the "
+            "batch's split."
+        ),
+    )
+    parser.add_argument(
+        "--control-draw-seed",
+        type=int,
+        default=None,
+        help=(
+            "Seed the null's draw seeds are derived from. Derived from the "
+            "session key when omitted."
+        ),
+    )
+    parser.add_argument(
         "--sessions",
         type=Path,
         default=None,
@@ -605,6 +1348,30 @@ def get_command_line_arguments() -> Namespace:
     )
 
     args = parser.parse_args()
+    if args.fitter != "jax":
+        # The per-unit statsmodels IRLS has no penalised path, and the shipped
+        # estimator is penalised. Letting the flag through would fit an
+        # unpenalised ladder and write it under a sidecar claiming a prior.
+        parser.error(
+            f"--fitter {args.fitter} cannot fit the penalised models this "
+            "runner ships: only the batched backend has a penalised path. "
+            "Use --fitter jax."
+        )
+    if args.penalty_sigma <= 0:
+        parser.error(
+            f"--penalty-sigma {args.penalty_sigma} is not positive; it is a "
+            "prior standard deviation on the log-rate scale."
+        )
+    if args.n_folds < 2:
+        parser.error(
+            f"--n-folds {args.n_folds} leaves nothing held out; the held-out "
+            "deviance needs at least two folds."
+        )
+    if args.n_control_draws < 0:
+        parser.error(
+            f"--n-control-draws {args.n_control_draws} is negative; 0 skips "
+            "the null."
+        )
     if args.gpu is not None and args.n_workers > 1:
         # --gpu names one card and every worker would be handed the same one:
         # they would all claim it, all preallocate a share of it, and every
@@ -794,7 +1561,9 @@ def main() -> None:
 
     print(
         f"Processing {len(epoch_info)} sessions for {args.brain_area} "
-        f"(stop cohort: {args.stop_cohort}, fitter: {args.fitter})..."
+        f"(stop cohort: {args.stop_cohort}, fitter: {args.fitter}, "
+        f"penalty sigma: {args.penalty_sigma}, folds: {args.n_folds}, "
+        f"control draws: {args.n_control_draws})..."
     )
 
     if args.n_workers <= 1 or len(epoch_info) <= 1:
@@ -814,6 +1583,11 @@ def main() -> None:
                 fit_diagnostics=args.fit_diagnostics,
                 gpu=args.gpu,
                 allow_cpu=args.allow_cpu,
+                penalty_sigma=args.penalty_sigma,
+                n_folds=args.n_folds,
+                n_control_draws=args.n_control_draws,
+                fold_seed=args.fold_seed,
+                control_draw_seed=args.control_draw_seed,
             )
     else:
         cluster = LocalCluster(
@@ -841,6 +1615,11 @@ def main() -> None:
                     fit_diagnostics=args.fit_diagnostics,
                     gpu=args.gpu,
                     allow_cpu=args.allow_cpu,
+                    penalty_sigma=args.penalty_sigma,
+                    n_folds=args.n_folds,
+                    n_control_draws=args.n_control_draws,
+                    fold_seed=args.fold_seed,
+                    control_draw_seed=args.control_draw_seed,
                 )
                 for epoch in epoch_info.itertuples()
             ]
