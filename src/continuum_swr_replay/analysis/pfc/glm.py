@@ -1566,7 +1566,14 @@ def process_neuron(
             )
 
         # Replay-split model: SWR-replay and non-SWR replay modulation
-        # controlling for replay-coincident ripples only
+        # controlling for replay-coincident ripples only. The blocks are read
+        # in the order ``_make_design_matrices`` concatenates them --
+        # ``[constant, non_local_no_SWR, non_local_SWR]`` -- which is NOT the
+        # order the model's name lists them in. Reading them by the name's
+        # order is exactly the bug this comment exists to prevent: between
+        # 2026-04-24 and 2026-09-15 each curve carried the other class's
+        # kernel, and so did ``non_local_SWR_max_mod`` and
+        # ``non_local_no_SWR_split_max_mod``.
         if "non_local_SWR + non_local_no_SWR" in non_estimable_models:
             non_local_swr_modulation = nan_modulation
             non_local_no_swr_modulation = nan_modulation
@@ -1576,10 +1583,10 @@ def process_neuron(
             neuron_stats["non_local_no_SWR_split_max_mod_time"] = np.nan
         else:
             replay_split_params = results["non_local_SWR + non_local_no_SWR"].params
-            non_local_swr_modulation = (
+            non_local_no_swr_modulation = (
                 spline_basis @ replay_split_params[1 : n_basis_functions + 1]
             )
-            non_local_no_swr_modulation = (
+            non_local_swr_modulation = (
                 spline_basis @ replay_split_params[n_basis_functions + 1 :]
             )
 

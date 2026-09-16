@@ -1222,6 +1222,16 @@ NESTED_MODEL_PAIRS = (
     "matched_control vs. constant",
 )
 
+#: Date the replay-split curve swap was fixed. A bundle written before it has
+#: ``non_local_SWR_modulation`` and ``non_local_no_SWR_modulation`` -- and the
+#: statistics ``non_local_SWR_max_mod`` and ``non_local_no_SWR_split_max_mod``
+#: -- carrying each other's kernel, because the design is concatenated
+#: ``[constant, non_local_no_SWR, non_local_SWR]`` and was read in the order
+#: the model's *name* lists the classes. Whole-model comparisons (the
+#: likelihood ratios then, the held-out deviances now) are unaffected: they
+#: never read a block.
+REPLAY_SPLIT_SWAP_FIXED = "2026-09-15"
+
 #: The five peri-event curves a bundle ships. The bundle carries, beside each,
 #: the peak of the penalised curve, the peak the same block reaches unpenalised
 #: and that peak's own standard error, so the audit reads the prior's effect
@@ -2083,6 +2093,20 @@ def build_estimator_report(
         )
 
     add("## Estimator and inference, as the bundles state them\n")
+    add(
+        f"**Bundles written before {REPLAY_SPLIT_SWAP_FIXED} carry the "
+        "replay-split curves swapped.** That model's design is concatenated "
+        "`[constant, non_local_no_SWR, non_local_SWR]` and was read in the "
+        "order its name lists the classes, so `non_local_SWR_modulation` held "
+        "the non-SWR kernel and `non_local_no_SWR_modulation` the SWR-coupled "
+        "one, as did `non_local_SWR_max_mod` and "
+        "`non_local_no_SWR_split_max_mod`. Any per-class modulation magnitude "
+        "quoted from the split model in an earlier audit or claim is "
+        "mislabelled and must be re-read from a bundle written after the fix. "
+        "Whole-model comparisons -- the likelihood ratios then, the held-out "
+        "deviances now -- never read a block and are unaffected, and so are "
+        "the SWR-controlled and engagement curves.\n"
+    )
     add(
         "One row per distinct combination. `penalty_sigma_log_rate` is the "
         "prior standard deviation of an event-basis coefficient on the "

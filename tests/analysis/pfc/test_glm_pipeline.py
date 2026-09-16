@@ -405,6 +405,165 @@ class TestPlantedKernelRecovery:
         assert -8.0 < penalised_peak.value[separated] < -1.0
 
 
+
+#: Peak lags (s) and signed amplitudes the replay-split regression test plants,
+#: one per event class. They are far apart in lag and opposite in sign, so a
+#: curve carrying the other class's kernel cannot be mistaken for noise.
+SPLIT_KERNELS = {
+    "non_local_no_SWR": {"lag": 0.03, "amplitude": 1.5},
+    "non_local_SWR": {"lag": -0.06, "amplitude": -1.5},
+}
+
+
+@pytest.fixture(scope="module")
+def replay_split_session():
+    """A unit driven by two different kernels, one per replay class.
+
+    The replay-split design is concatenated ``[constant, non_local_no_SWR,
+    non_local_SWR]`` -- not in the order the model's name lists the classes --
+    so a reader that trusts the name hands each curve the other class's
+    coefficients. Planting two kernels that differ in both lag and sign makes
+    that swap a sign error rather than a subtle one.
+    """
+    rng = np.random.default_rng(20260915)
+    sampling_frequency = 500.0
+    lags = np.arange(-125, 126)
+    spline_basis, lag_time, _ = event_basis_functions(lags, sampling_frequency)
+    n_time = int(200 * sampling_frequency)
+    time = np.arange(n_time) / sampling_frequency
+
+    # Two interleaved event trains, each onset at least 0.8 s from the next, so
+    # the two kernels' +/-250 ms windows barely overlap and each class's
+    # coefficients are identified by its own spikes.
+    onsets = 1.0 + np.arange(240) * 0.8
+    event_times = {
+        "non_local_no_SWR": pd.DataFrame(
+            {"start_time": onsets[0::2], "end_time": onsets[0::2] + 0.06}
+        ),
+        "non_local_SWR": pd.DataFrame(
+            {"start_time": onsets[1::2], "end_time": onsets[1::2] + 0.06}
+        ),
+    }
+    event_times["non_local"] = pd.concat(
+        [event_times["non_local_no_SWR"], event_times["non_local_SWR"]]
+    ).sort_values("start_time", ignore_index=True)
+    # The SWR class is the SWR-coincident replay events, so the SWR-controlled
+    # model's two curves are planted with the same two kernels -- one test
+    # pins both models' block order.
+    event_times["SWR"] = event_times["non_local_SWR"]
+    event_times["matched_control"] = pd.DataFrame(
+        {"start_time": onsets[0::2] + 0.4, "end_time": onsets[0::2] + 0.46}
+    )
+
+    log_rate = np.full(n_time, np.log(20.0 / sampling_frequency))
+    planted = {}
+    for name, kernel in SPLIT_KERNELS.items():
+        shape = kernel["amplitude"] * np.exp(
+            -0.5 * ((lag_time - kernel["lag"]) / 0.02) ** 2
+        )
+        coefficients = np.linalg.lstsq(spline_basis, shape, rcond=None)[0]
+        curve = spline_basis @ coefficients
+        at = np.argmax(np.abs(curve))
+        planted[name] = {"peak": curve[at], "lag": lag_time[at]}
+        log_rate += (
+            convolve_event_basis(
+                event_onset_counts(event_times[name], time), spline_basis, lags
+            )
+            @ coefficients
+        )
+
+    counts = rng.poisson(np.exp(log_rate))
+    spike_times = np.repeat(time, counts)
+    position_info = pd.DataFrame({"head_speed": np.zeros(n_time)}, index=time)
+    is_immobile = pd.Series(np.ones(n_time, dtype=bool), index=time)
+    # A short run window, so the theta comparison has bins to read.
+    is_immobile.iloc[:500] = False
+    theta_phase = pd.Series(
+        np.mod(2 * np.pi * 8 * time, 2 * np.pi) - np.pi, index=time
+    )
+    designs, basis, basis_lag_time = _make_design_matrices(
+        event_times, position_info, sampling_frequency=sampling_frequency, lags=lags
+    )
+    return {
+        "planted": planted,
+        "designs": designs,
+        "spline_basis": basis,
+        "lag_time": basis_lag_time,
+        "spike_times": spike_times,
+        "time": time,
+        "is_immobile": is_immobile,
+        "theta_phase": theta_phase,
+    }
+
+
+class TestReplaySplitCurvesAreNotSwapped:
+    """Each shipped curve must carry the class it is named after.
+
+    Between 2026-04-24 and 2026-09-15 it did not: the replay-split design is
+    built ``[constant, non_local_no_SWR, non_local_SWR]`` and was read in the
+    order the model's *name* lists the classes, so
+    ``non_local_SWR_modulation`` carried the non-SWR kernel and
+    ``non_local_no_SWR_modulation`` the SWR-coupled one, and so did
+    ``non_local_SWR_max_mod`` and ``non_local_no_SWR_split_max_mod``. The
+    likelihood-ratio and held-out comparisons were unaffected -- they read
+    whole models, not blocks.
+    """
+
+    @staticmethod
+    def shipped(session):
+        return process_neuron(
+            session["spike_times"],
+            session["is_immobile"],
+            session["theta_phase"],
+            session["time"],
+            session["designs"],
+            session["spline_basis"],
+            session["lag_time"],
+            fitter="jax",
+            penalty_sigma=PENALTY_SIGMA,
+        )
+
+    def test_each_replay_split_curve_recovers_its_own_kernel(
+        self, replay_split_session
+    ):
+        stats, _, _, nl_swr, nl_no_swr, _ = self.shipped(replay_split_session)
+        lag_time = replay_split_session["lag_time"]
+        planted = replay_split_session["planted"]
+
+        for curve, name in (
+            (nl_no_swr, "non_local_no_SWR"),
+            (nl_swr, "non_local_SWR"),
+        ):
+            at = np.argmax(np.abs(curve))
+            assert curve[at] == pytest.approx(planted[name]["peak"], rel=0.35), name
+            assert lag_time[at] == pytest.approx(planted[name]["lag"], abs=0.03), name
+
+        # Said again through the statistics table, which reads the same blocks:
+        # the SWR-coupled kernel is the negative one, the non-SWR kernel the
+        # positive one. Under the swap both signs flip.
+        assert stats["non_local_SWR_max_mod"] < 0
+        assert stats["non_local_no_SWR_split_max_mod"] > 0
+        assert stats["non_local_SWR_max_mod_time"] == pytest.approx(-0.06, abs=0.03)
+        assert stats["non_local_no_SWR_split_max_mod_time"] == pytest.approx(
+            0.03, abs=0.03
+        )
+
+    def test_the_swr_controlled_curves_recover_their_own_kernels_too(
+        self, replay_split_session
+    ):
+        """The other two-class model, whose blocks the name does list in order."""
+        stats, swr, no_swr, _, _, _ = self.shipped(replay_split_session)
+        lag_time = replay_split_session["lag_time"]
+        planted = replay_split_session["planted"]
+
+        for curve, name in ((swr, "non_local_SWR"), (no_swr, "non_local_no_SWR")):
+            at = np.argmax(np.abs(curve))
+            assert curve[at] == pytest.approx(planted[name]["peak"], rel=0.35), name
+            assert lag_time[at] == pytest.approx(planted[name]["lag"], abs=0.03), name
+
+        assert stats["SWR_max_mod"] < 0
+        assert stats["non_local_no_SWR_max_mod"] > 0
+
 class TestPeakLogModulation:
     """The curve-level read of a fit: where the kernel peaks, and how well."""
 

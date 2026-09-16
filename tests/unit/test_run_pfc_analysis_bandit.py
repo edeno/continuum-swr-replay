@@ -1022,3 +1022,33 @@ def test_the_best_model_is_the_one_with_the_lowest_heldout_deviance():
         )
         expected = [candidates[index] for index in deviances.argmin(axis=1)]
         assert list(statistics[column]) == expected
+
+
+def test_every_curve_is_read_from_its_own_classs_block():
+    """`CURVE_SOURCES` must name the design block the curve is named after.
+
+    The replay-split design is concatenated `[constant, non_local_no_SWR,
+    non_local_SWR]`, the reverse of the order the model's name lists the
+    classes; reading it by the name swapped both of that model's curves in
+    every bundle written before 2026-09-15. This compares the block against
+    the single-class design of the class the curve is named for, so the
+    mapping cannot drift again.
+    """
+    context = _synthetic_context()
+    designs = context["designs"]
+    n_basis = context["n_basis_per_class"]
+    single_class = {
+        "SWR": "SWR",
+        "no_SWR": "non_local_no_SWR",
+        "non_local_SWR": "non_local_SWR",
+        "non_local_no_SWR": "non_local_no_SWR",
+        "matched_control": "matched_control",
+    }
+
+    for curve, (model, block) in runner.CURVE_SOURCES.items():
+        start = 1 + block * n_basis
+        np.testing.assert_array_equal(
+            designs[model][:, start : start + n_basis],
+            designs[single_class[curve]][:, 1:],
+            err_msg=f"{curve} does not read {single_class[curve]}'s block",
+        )

@@ -193,14 +193,19 @@ BEST_MODEL_CANDIDATES = {
 
 #: The five peri-event curves a bundle ships, and where each comes from: the
 #: model whose fit it is read off, and which basis block of that model's
-#: parameters. The block order is the design's own, which is what the shipped
+#: parameters. The block order is the *design's* own, which is what the shipped
 #: curves are built from, so the maximum-likelihood peak reported beside a
 #: curve is the peak of the same block.
+#:
+#: For the replay-split model that order is ``[constant, non_local_no_SWR,
+#: non_local_SWR]`` -- the reverse of the order the model's name lists the
+#: classes in. Reading it by the name is the swap that mislabelled both of that
+#: model's curves in every bundle written before 2026-09-15.
 CURVE_SOURCES = {
     "SWR": ("SWR + non_local_no_SWR", 0),
     "no_SWR": ("SWR + non_local_no_SWR", 1),
-    "non_local_SWR": ("non_local_SWR + non_local_no_SWR", 0),
-    "non_local_no_SWR": ("non_local_SWR + non_local_no_SWR", 1),
+    "non_local_SWR": ("non_local_SWR + non_local_no_SWR", 1),
+    "non_local_no_SWR": ("non_local_SWR + non_local_no_SWR", 0),
     "matched_control": ("matched_control + non_local_no_SWR", 0),
 }
 

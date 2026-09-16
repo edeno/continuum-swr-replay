@@ -282,6 +282,23 @@ own phase; `analysis/pfc/load_population.py` applies Benjamini-Hochberg across
 units to the empirical p-values, and refuses a bundle carrying likelihood-ratio
 columns.
 
+**The replay-split curves were swapped until 2026-09-15.** The replay-split
+design is concatenated `[constant, non_local_no_SWR, non_local_SWR]` — the
+reverse of the order the model's *name* lists the classes — and
+`process_neuron` read it by the name. So from 2026-04-24 (when the design gained
+its second block in that order) until the fix, every bundle's
+`non_local_SWR_modulation` carried the non-SWR kernel and
+`non_local_no_SWR_modulation` the SWR-coupled one, and with them
+`non_local_SWR_max_mod` / `non_local_no_SWR_split_max_mod` and their `_time`
+twins. **Any per-class modulation magnitude quoted from the split model before
+that date is mislabelled** and must be re-read from a bundle written after it;
+this is the pair Q4 and Q5 are asked on. Whole-model comparisons never read a
+block and are unaffected — the likelihood-ratio tests then, the held-out
+deviances now — and so are the SWR-controlled model's two curves and the
+engagement model's. The order is pinned by a regression test that plants two
+kernels differing in lag and in sign, one per class, and asserts each shipped
+curve recovers its own.
+
 **History.** Before this, the models were fit by maximum likelihood — a
 per-unit statsmodels IRLS, later a batched JAX one that handed separating fits
 back to statsmodels — and tested by likelihood ratio with AIC model selection.
