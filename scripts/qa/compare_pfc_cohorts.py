@@ -33,6 +33,17 @@ and which estimator and device fit each session::
         --before Processed-Data/_pre_canonical_events_backup_20260914 \\
         --after Processed-Data \\
         --out docs/audits/2026-09-14-pfc-canonical-rerun.md
+
+When the after tree's sidecars name the penalised estimator, a different
+report is written instead: what the prior did to each unit's peak
+modulation, how many units carried a basis column with no spikes under it,
+what the two inferences call, how steady the held-out difference is between
+folds, and the sensitivity of the curves to the prior::
+
+    uv run python scripts/qa/compare_pfc_cohorts.py \\
+        --before Processed-Data/_pre_ridge_backup \\
+        --after Processed-Data \\
+        --out docs/audits/<date>-pfc-ridge-heldout.md
 """
 
 from __future__ import annotations
@@ -51,6 +62,7 @@ from scipy.stats import false_discovery_control
 
 from continuum_swr_replay.analysis.pfc.load_population import (
     load_population_data,
+    significant_fraction,
 )
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
@@ -90,6 +102,14 @@ def _invocation() -> str:
 #: which event inputs it was fit on. A sidecar written before one of these
 #: existed simply yields ``None``, which is what the rerun precondition reads.
 SIDECAR_TOP_LEVEL_KEYS = [
+    "estimator",
+    "inference",
+    "penalty_sigma_log_rate",
+    "n_folds",
+    "fold_seed",
+    "n_control_draws",
+    "control_draw_seed",
+    "n_basis_per_class",
     "fitter",
     "fitter_tol",
     "jax_backend",
@@ -97,7 +117,6 @@ SIDECAR_TOP_LEVEL_KEYS = [
     "gpu_index",
     "gpu_uuid",
     "gpu_name",
-    "n_neurons_reference_fit",
     "n_model_fits",
     "n_nonconverged_model_fits",
     "n_neurons_with_nonconverged_model",
@@ -105,6 +124,9 @@ SIDECAR_TOP_LEVEL_KEYS = [
     "canonical_event_table_path",
     "data_over_time_sha256",
     "is_swr_definition",
+    "n_events_total",
+    "n_events_swr",
+    "n_events_non_swr",
     "n_matched_control",
     "n_matched_control_unplaced",
     "n_matched_control_onset_outside_fitted_bout",
@@ -430,7 +452,12 @@ def alignment_prose(sidecars: pd.DataFrame) -> str:
     )
 
 
-def gate_counts(data_dir: Path, min_firing_rate: float, suffix: str = "") -> dict:
+def gate_counts(
+    data_dir: Path,
+    min_firing_rate: float,
+    suffix: str = "",
+    inference: str = "legacy",
+) -> dict:
     """How many neurons survive the loader, and the firing-rate gate.
 
     The gate is applied to whichever rate column the bundle carries under
@@ -441,7 +468,10 @@ def gate_counts(data_dir: Path, min_firing_rate: float, suffix: str = "") -> dic
     shipped one.
     """
     frame, _, _ = load_population_data(
-        data_dir, min_firing_rate=0.0, artifact_suffix=suffix
+        data_dir,
+        min_firing_rate=0.0,
+        artifact_suffix=suffix,
+        inference=inference,
     )
     counts = {
         "n_neurons_with_fit": int(len(frame)),
@@ -1016,8 +1046,7 @@ def fitter_table(sidecars: pd.DataFrame) -> pd.DataFrame:
         n_distinct_data_over_time=("data_over_time_sha256", "nunique"),
     ).reset_index()
     for column in (
-        "n_neurons_reference_fit",
-        "n_model_fits",
+            "n_model_fits",
         "n_nonconverged_model_fits",
         "n_neurons_with_nonconverged_model",
     ):
@@ -1045,8 +1074,7 @@ def session_fit_counts_table(sidecars: pd.DataFrame) -> pd.DataFrame:
     columns = [
         "session",
         "gpu_index",
-        "n_neurons_reference_fit",
-        "n_model_fits",
+            "n_model_fits",
         "n_nonconverged_model_fits",
         "n_neurons_with_nonconverged_model",
     ]
@@ -1155,6 +1183,470 @@ def _md(frame: pd.DataFrame, float_format: str = "{:.4g}") -> str:
         for i in range(len(frame))
     ]
     return "\n".join([header, rule, *body]) + "\n"
+
+
+# ---------------------------------------------------------------------------
+# The estimator change: penalised fits, scored out of fold
+# ---------------------------------------------------------------------------
+
+#: Sidecar keys that state the estimator and the inference a bundle was
+#: produced by. A bundle from the earlier maximum-likelihood batch carries none
+#: of them, which is how the two trees are told apart.
+ESTIMATOR_SIDECAR_KEYS = [
+    "estimator",
+    "inference",
+    "penalty_sigma_log_rate",
+    "n_folds",
+    "fold_seed",
+    "n_control_draws",
+    "control_draw_seed",
+    "n_basis_per_class",
+]
+
+#: The nested ``full vs. reduced`` comparisons the bundles carry a held-out
+#: difference for, as the statistics table spells them. Mirrors the runner's
+#: list: the audit reads the columns by name, so it has to know them.
+NESTED_MODEL_PAIRS = (
+    "SWR vs. constant",
+    "non_local vs. constant",
+    "non_local_no_SWR vs. constant",
+    "non_local_SWR vs. constant",
+    "SWR + non_local_no_SWR vs. constant",
+    "SWR + non_local_no_SWR vs. SWR",
+    "SWR + non_local_no_SWR vs. non_local_no_SWR",
+    "non_local_SWR + non_local_no_SWR vs. constant",
+    "non_local_SWR + non_local_no_SWR vs. non_local_SWR",
+    "non_local_SWR + non_local_no_SWR vs. non_local_no_SWR",
+    "non_local_SWR + non_local_no_SWR vs. non_local",
+    "matched_control + non_local_no_SWR vs. matched_control",
+    "matched_control vs. constant",
+)
+
+#: Peri-event curve each event class is read from, and the model it comes from.
+#: The names are the bundle's array names; ``non_local_no_SWR_split`` is the
+#: same class seen through the replay-split model rather than the SWR-
+#: controlled one.
+MODULATION_CURVES = {
+    "SWR": "SWR_modulation",
+    "non_local_no_SWR": "no_SWR_modulation",
+    "non_local_SWR": "non_local_SWR_modulation",
+    "non_local_no_SWR_split": "non_local_no_SWR_modulation",
+    "matched_control": "matched_control_modulation",
+}
+
+#: Which model's ``separated_columns`` count says whether a class's fit had a
+#: basis column with no spikes under it -- the configuration whose maximum
+#: likelihood estimate does not exist.
+SEPARATION_MODEL = {
+    "SWR": "SWR + non_local_no_SWR",
+    "non_local_no_SWR": "SWR + non_local_no_SWR",
+    "non_local_SWR": "non_local_SWR + non_local_no_SWR",
+    "non_local_no_SWR_split": "non_local_SWR + non_local_no_SWR",
+    "matched_control": "matched_control + non_local_no_SWR",
+}
+
+#: Event count in the sidecar that drives each class's peak, for the
+#: approximate estimation error below.
+CLASS_EVENT_COUNT = {
+    "SWR": "n_ripple_after",
+    "non_local_no_SWR": "n_events_non_swr",
+    "non_local_SWR": "n_events_swr",
+    "non_local_no_SWR_split": "n_events_non_swr",
+    "matched_control": "n_matched_control",
+}
+
+#: Integral of a squared cubic B-spline basis function of this basis, in
+#: seconds: 50 ms knots, so a basis function spans four knot intervals and
+#: ``int b(t)^2 dt`` is about 0.6 of one interval. Used only in the
+#: approximate estimation error below, where a factor of two does not change
+#: which side of the threshold a unit falls on.
+BASIS_SECOND_MOMENT_S = 0.030
+
+
+def curve_peaks(curves: NDArray) -> NDArray:
+    """Peak log-modulation per unit: the curve's value where ``|curve|`` is largest.
+
+    The shipped curve is ``spline_basis @ params``, so this is the same
+    quantity a curve-level peak helper returns from the coefficients -- read
+    off the artifact rather than refit.
+
+    Parameters
+    ----------
+    curves : NDArray, shape (n_lag_times, n_units)
+
+    Returns
+    -------
+    NDArray, shape (n_units,)
+        ``nan`` for a unit whose curve is not finite (its model was not
+        estimable).
+    """
+    curves = np.asarray(curves, dtype=float)
+    peaks = np.full(curves.shape[1], np.nan)
+    usable = np.isfinite(curves).all(axis=0)
+    if usable.any():
+        block = curves[:, usable]
+        peaks[usable] = block[np.abs(block).argmax(axis=0), np.arange(block.shape[1])]
+    return peaks
+
+
+def approximate_peak_error(rate_hz: NDArray, n_events: NDArray) -> NDArray:
+    """Scale of the estimation error on a peak log-rate modulation.
+
+    The peak of a partition-of-unity B-spline kernel is essentially one
+    coefficient, and the Poisson information for that coefficient is
+    ``sum_t mu_t x_tk**2``, which for ``n`` events at baseline rate
+    ``lambda`` is about ``lambda * n * int b_k(t)**2 dt``. So the standard
+    error is about ``1 / sqrt(lambda * n * m)`` with ``m`` the basis
+    function's second moment in seconds.
+
+    This is a scale, not the fit's own standard error: the bundles ship the
+    fitted curves and not their covariance, so a unit-by-unit posterior
+    standard error is not available from the artifacts. It is used only to ask
+    whether a coefficient moved by more than the data could pin it down, where
+    an approximation good to a factor of order one is enough to separate "the
+    prior did the work" from "the spikes did".
+
+    Parameters
+    ----------
+    rate_hz : NDArray, shape (n_units,)
+        Each unit's mean firing rate over the fitted bins.
+    n_events : NDArray, shape (n_units,)
+        Events of the class the peak belongs to, in that unit's session.
+
+    Returns
+    -------
+    NDArray, shape (n_units,)
+    """
+    information = (
+        np.asarray(rate_hz, dtype=float)
+        * np.asarray(n_events, dtype=float)
+        * BASIS_SECOND_MOMENT_S
+    )
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return np.where(information > 0, 1.0 / np.sqrt(information), np.inf)
+
+
+def peak_shrinkage(
+    before_dir: Path,
+    after_dir: Path,
+    artifact_suffix: str = "",
+    sidecars: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """Per unit and class, the peak log-modulation under each estimator.
+
+    The two trees hold the same sessions fit the same way except for the
+    prior, and each session's units are in the order its spike-time list gave,
+    so the two tables pair row for row. A session whose row counts disagree is
+    reported rather than paired.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per (session, unit, class): ``peak_mle``, ``peak_penalised``,
+        ``delta``, ``separated_columns`` (from the after bundle), the unit's
+        fitted-bin firing rate and its class's event count.
+    """
+    events = (
+        sidecars.set_index("session") if sidecars is not None else pd.DataFrame()
+    )
+    rows = []
+    shared = sorted(
+        bundle_sessions(before_dir) & bundle_sessions(after_dir, artifact_suffix)
+    )
+    for session in shared:
+        before_stats = _bundle_statistics(before_dir, session, "")
+        after_stats = _bundle_statistics(after_dir, session, artifact_suffix)
+        if len(before_stats) != len(after_stats) or not len(after_stats):
+            continue
+        rate = _numeric(
+            after_stats.get(FIT_RATE_COLUMN, pd.Series(np.nan, index=after_stats.index))
+        ).to_numpy()
+        for name, array in MODULATION_CURVES.items():
+            try:
+                before_curves = _bundle_modulation(before_dir, session, "", array)
+                after_curves = _bundle_modulation(
+                    after_dir, session, artifact_suffix, array
+                )
+            except FileNotFoundError:
+                # The matched non-event control postdates the first bundles,
+                # so a tree written before it has no curve for that class.
+                # There is nothing to compare, which is not the same as a
+                # comparison that came out at zero.
+                continue
+            before_peak = curve_peaks(before_curves)
+            after_peak = curve_peaks(after_curves)
+            separated_col = f"{SEPARATION_MODEL[name]}: separated_columns"
+            separated = (
+                _numeric(after_stats[separated_col]).to_numpy()
+                if separated_col in after_stats
+                else np.full(len(after_stats), np.nan)
+            )
+            n_events = np.nan
+            if session in events.index:
+                n_events = pd.to_numeric(
+                    events.loc[session].get(CLASS_EVENT_COUNT[name], np.nan),
+                    errors="coerce",
+                )
+            rows.append(
+                pd.DataFrame(
+                    {
+                        "session": session,
+                        "unit": np.arange(len(after_stats)),
+                        "event_class": name,
+                        "peak_mle": before_peak,
+                        "peak_penalised": after_peak,
+                        "separated_columns": separated,
+                        "fit_rate_hz": rate,
+                        "n_events": float(n_events),
+                    }
+                )
+            )
+    if not rows:
+        return pd.DataFrame(
+            columns=[
+                "session",
+                "unit",
+                "event_class",
+                "peak_mle",
+                "peak_penalised",
+                "separated_columns",
+                "fit_rate_hz",
+                "n_events",
+                "delta",
+                "peak_error",
+                "prior_binds",
+            ]
+        )
+    frame = pd.concat(rows, ignore_index=True)
+    frame["delta"] = frame["peak_penalised"] - frame["peak_mle"]
+    frame["peak_error"] = approximate_peak_error(
+        frame["fit_rate_hz"].to_numpy(), frame["n_events"].to_numpy()
+    )
+    frame["prior_binds"] = frame["delta"].abs() > frame["peak_error"]
+    return frame
+
+
+def shrinkage_table(frame: pd.DataFrame) -> pd.DataFrame:
+    """Per class and separation status: how far the prior moved the peak."""
+    if frame.empty:
+        return frame
+    paired = frame.dropna(subset=["peak_mle", "peak_penalised"]).copy()
+    paired["units"] = np.where(
+        paired["separated_columns"].fillna(0) > 0, "separated", "well posed"
+    )
+    grouped = paired.groupby(["event_class", "units"], dropna=False)
+    table = grouped.agg(
+        n_units=("delta", "size"),
+        median_abs_peak_mle=("peak_mle", lambda s: float(np.median(np.abs(s)))),
+        median_abs_peak_penalised=(
+            "peak_penalised",
+            lambda s: float(np.median(np.abs(s))),
+        ),
+        median_abs_delta=("delta", lambda s: float(np.median(np.abs(s)))),
+        max_abs_delta=("delta", lambda s: float(np.max(np.abs(s)))),
+        n_prior_binds=("prior_binds", "sum"),
+    ).reset_index()
+    table["prior_binds_pct"] = (
+        100.0 * table["n_prior_binds"] / table["n_units"]
+    ).round(1)
+    return table
+
+
+def heldout_fraction_table(
+    after: pd.DataFrame, alpha: float
+) -> pd.DataFrame:
+    """Units beating the control-draw null, per class, overall and per animal."""
+    rows = []
+    for scope, frame in [("all", after), *sorted(after.groupby("animal"))]:
+        row: dict[str, object] = {"animal": scope, "n_units": len(frame)}
+        for name, (n_significant, n_tested) in significant_fraction(
+            frame, alpha=alpha
+        ).items():
+            row[f"{name}_n_tested"] = n_tested
+            row[f"{name}_pct"] = (
+                round(100.0 * n_significant / n_tested, 1) if n_tested else np.nan
+            )
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def legacy_fdr_table(before: pd.DataFrame, alpha: float) -> pd.DataFrame:
+    """The same fractions the superseded bundles reported, per test and animal."""
+    rows = []
+    for scope, frame in [("all", before), *sorted(before.groupby("animal"))]:
+        row: dict[str, object] = {"animal": scope, "n_units": len(frame)}
+        for test in FDR_TESTS:
+            column = f"{test}: fdr_q"
+            if column not in frame:
+                row[f"{test}_pct"] = np.nan
+                continue
+            q = frame[column].to_numpy(dtype=float)
+            tested = np.isfinite(q)
+            row[f"{test}_n_tested"] = int(tested.sum())
+            row[f"{test}_pct"] = (
+                round(100.0 * (q[tested] < alpha).sum() / tested.sum(), 1)
+                if tested.any()
+                else np.nan
+            )
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def separated_column_table(after: pd.DataFrame) -> pd.DataFrame:
+    """Per model, how many units had a basis column with no spikes under it."""
+    rows = []
+    for column in sorted(
+        c for c in after.columns if c.endswith(": separated_columns")
+    ):
+        values = _numeric(after[column]).to_numpy()
+        finite = np.isfinite(values)
+        rows.append(
+            {
+                "model": column.removesuffix(": separated_columns"),
+                "n_units": int(finite.sum()),
+                "n_units_with_a_separated_column": int((values[finite] > 0).sum()),
+                "pct_units": round(
+                    100.0 * (values[finite] > 0).sum() / finite.sum(), 1
+                )
+                if finite.any()
+                else np.nan,
+                "max_separated_columns": (
+                    int(values[finite].max()) if finite.any() else 0
+                ),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def fold_spread_table(after: pd.DataFrame) -> pd.DataFrame:
+    """Per nested pair, how much the held-out difference moves between folds.
+
+    The statistic is each unit's fold-to-fold standard deviation of the
+    difference divided by the absolute value of its mean; the table reports
+    the median over units. A pair whose fold-to-fold spread dwarfs its mean is
+    a pair whose total is one fold's accident, which is what the number of
+    folds has to be chosen against.
+    """
+    rows = []
+    for column in sorted(
+        c for c in after.columns if c.endswith(": heldout_delta_dev_folds")
+    ):
+        stacked = np.array(
+            [np.asarray(value, dtype=float) for value in after[column]]
+        )
+        if stacked.ndim != 2 or not stacked.size:
+            continue
+        mean = stacked.mean(axis=1)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            relative = stacked.std(axis=1, ddof=1) / np.abs(mean)
+        usable = np.isfinite(relative)
+        rows.append(
+            {
+                "pair": column.removesuffix(": heldout_delta_dev_folds"),
+                "n_folds": stacked.shape[1],
+                "n_units": int(usable.sum()),
+                "median_fold_sd_over_abs_mean": (
+                    round(float(np.median(relative[usable])), 3)
+                    if usable.any()
+                    else np.nan
+                ),
+                "median_abs_mean": (
+                    round(float(np.median(np.abs(mean[np.isfinite(mean)]))), 4)
+                    if np.isfinite(mean).any()
+                    else np.nan
+                ),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def sigma_sensitivity_table(
+    after_dir: Path, artifact_suffix: str = ""
+) -> pd.DataFrame:
+    """Peak modulation at the canonical prior against each sensitivity bundle.
+
+    Reads whatever ``*_modulation<suffix>_sigma*`` bundles are on disk beside
+    the canonical ones and pairs them session by session; empty when none were
+    written.
+    """
+    rows = []
+    stem = f"_mPFC_modulation{artifact_suffix}_sigma"
+    suffixes = sorted(
+        {
+            path.name.split(stem)[1].removesuffix(".pkl")
+            for path in after_dir.glob(f"*{stem}*.pkl")
+        }
+    )
+    for sigma in suffixes:
+        variant = f"{artifact_suffix}_sigma{sigma}"
+        shared = sorted(
+            bundle_sessions(after_dir, artifact_suffix)
+            & bundle_sessions(after_dir, variant)
+        )
+        for name, array in MODULATION_CURVES.items():
+            deltas = []
+            for session in shared:
+                canonical = curve_peaks(
+                    _bundle_modulation(after_dir, session, artifact_suffix, array)
+                )
+                other = curve_peaks(
+                    _bundle_modulation(after_dir, session, variant, array)
+                )
+                if canonical.shape != other.shape:
+                    continue
+                deltas.append(other - canonical)
+            if not deltas:
+                continue
+            stacked = np.concatenate(deltas)
+            finite = np.isfinite(stacked)
+            rows.append(
+                {
+                    "sigma": sigma.replace("p", "."),
+                    "event_class": name,
+                    "n_units": int(finite.sum()),
+                    "median_abs_delta_peak": round(
+                        float(np.median(np.abs(stacked[finite]))), 4
+                    )
+                    if finite.any()
+                    else np.nan,
+                    "max_abs_delta_peak": round(
+                        float(np.max(np.abs(stacked[finite]))), 4
+                    )
+                    if finite.any()
+                    else np.nan,
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+#: Sidecar keys that are per session by construction: they are derived from
+#: the session name, so grouping on them would put every session in a row of
+#: its own. Their distinctness is reported instead of their value.
+PER_SESSION_SEED_KEYS = ("fold_seed", "control_draw_seed")
+
+
+def estimator_provenance_table(sidecars: pd.DataFrame) -> pd.DataFrame:
+    """One row per distinct estimator/inference combination across the bundles.
+
+    A batch run as one job collapses to a single row, and any session that was
+    produced differently is then visible without reading every sidecar. The
+    two draw seeds are session-derived, so the table counts how many distinct
+    values each took: anything other than one per session would mean two
+    sessions shared a split or a null.
+    """
+    present = [
+        c
+        for c in ESTIMATOR_SIDECAR_KEYS
+        if c in sidecars.columns and c not in PER_SESSION_SEED_KEYS
+    ]
+    if not present:
+        return pd.DataFrame()
+    grouped = sidecars.groupby(present, dropna=False)
+    aggregations = {"n_sessions": ("session", "size")}
+    for key in PER_SESSION_SEED_KEYS:
+        if key in sidecars.columns:
+            aggregations[f"n_distinct_{key}"] = (key, "nunique")
+    return grouped.agg(**aggregations).reset_index()
 
 
 def rerun_sections(
@@ -1354,15 +1846,12 @@ def rerun_sections(
     add("## Estimator, device and inputs\n")
     add(
         "One row per distinct combination, so a batch run as one job per card "
-        "collapses to one row per card. `n_neurons_reference_fit` is the neurons the batched "
-        "fitter handed back to statsmodels because their fits left the range "
-        "the two agree over; those neurons' shipped numbers are statsmodels' "
-        "own. `n_nonconverged_model_fits` counts the shipped neuron x model "
-        "fits that ran to `maxiter` without settling, over "
-        "`n_neurons_with_nonconverged_model` neurons -- those fits still "
-        "report an LR test and an AIC, so a reader who wants to know how much "
-        "of a result rests on a fit that never converged has nowhere else to "
-        "ask.\n"
+        "collapses to one row per card. `n_nonconverged_model_fits` counts the "
+        "shipped neuron x model fits that ran to `maxiter` without settling, "
+        "over `n_neurons_with_nonconverged_model` neurons. Those fits are "
+        "non-estimable for the neuron that owns them -- every statistic that "
+        "reads one is NaN -- so these counts are the only record of how much "
+        "was dropped and from where.\n"
     )
     add(_md(fitter_table(after_sidecars)))
     add(
@@ -1634,6 +2123,206 @@ def build_report(
     return "\n".join(lines)
 
 
+def build_estimator_report(
+    *,
+    sidecars: pd.DataFrame,
+    before: pd.DataFrame,
+    after: pd.DataFrame,
+    before_gate: dict,
+    after_gate: dict,
+    before_dir: Path,
+    after_dir: Path,
+    min_firing_rate: float,
+    alpha: float,
+    notes: list[str],
+    command: str,
+    artifact_suffix: str = "",
+    worker_times: list[Path] | None = None,
+) -> str:
+    """Assemble the audit of the estimator and inference change.
+
+    The before tree holds maximum-likelihood fits tested by a likelihood ratio
+    and selected by AIC; the after tree holds penalised fits scored out of
+    fold against a matched-control null. The two are not two runs of one
+    estimator, so nothing here is a paired difference of a statistic: what is
+    compared is the peak modulation each estimator reports for the same unit,
+    and the fraction of units each inference calls.
+    """
+    worker_times = worker_times or []
+    lines: list[str] = []
+    add = lines.append
+
+    add("# The mPFC unit GLM under a prior, scored out of fold\n")
+    add(
+        "Generated by `scripts/qa/compare_pfc_cohorts.py`. The unit GLMs were "
+        "fit by maximum likelihood and tested by a likelihood ratio against an "
+        "asymptotic chi-square, with AIC selecting between models. Neither "
+        "survives the fits themselves: a basis column with no spikes under its "
+        "support drives its coefficient to minus infinity, and neighbouring "
+        "2 ms bins are not independent, so an in-sample deviance drop is worth "
+        "much less than its nominal degrees of freedom. The models now carry a "
+        "Gaussian prior on the event-basis coefficients -- loose enough that "
+        "the spikes shape any modulation they can support -- and are compared "
+        "by how well they predict spikes they were not fit on, in folds of "
+        "whole immobility runs, against a null built by redrawing the "
+        "duration-matched non-event control.\n"
+    )
+    if command:
+        add(f"Command: `{command}`\n")
+    for note in notes:
+        add(f"{note}\n")
+
+    add("## Inputs\n")
+    add(
+        f"- before: `{before_dir}` -- {before_gate['n_neurons_with_fit']} units "
+        "with a usable fit, maximum likelihood, likelihood-ratio tests, AIC "
+        "selection.\n"
+        f"- after: `{after_dir}` -- {len(sidecars)} bundles, "
+        f"{after_gate['n_neurons_with_fit']} units with a usable fit, "
+        "penalised fits scored out of fold.\n"
+    )
+    before_sessions = bundle_sessions(before_dir)
+    after_sessions = bundle_sessions(after_dir, artifact_suffix)
+    before_only = sorted(before_sessions - after_sessions)
+    after_only = sorted(after_sessions - before_sessions)
+    if before_only or after_only:
+        add(
+            "**The two trees do not hold the same sessions**, so the totals "
+            f"below are not a like-for-like difference: {len(before_only)} "
+            f"session(s) only in the before tree ({', '.join(before_only) or 'none'}) "
+            f"and {len(after_only)} only in the after tree "
+            f"({', '.join(after_only) or 'none'}).\n"
+        )
+
+    add("## Estimator and inference, as the bundles state them\n")
+    add(
+        "One row per distinct combination. `penalty_sigma_log_rate` is the "
+        "prior standard deviation of an event-basis coefficient on the "
+        "log-rate scale; `n_folds` the blocked split the models were scored "
+        "out of; `n_control_draws` the size of the null each held-out "
+        "improvement is read against, so the finest p-value it can resolve is "
+        "one over that. The two seeds are derived from the session name, so a "
+        "session refit on its own reproduces the batch's split and null; the "
+        "table counts their distinct values rather than showing them.\n"
+    )
+    add(_md(estimator_provenance_table(sidecars)))
+
+    add("## What the prior did to the fits\n")
+    add(
+        "Per unit and event class, the peak of the peri-event log-modulation "
+        "curve under each estimator -- the curve the bundle ships, so this is "
+        "the coefficient-level peak read off the artifact rather than refit. "
+        "Units are split by whether that class's model had a basis column with "
+        "no spikes under its support in the fitted bins (`separated_columns`): "
+        "those are the fits whose maximum likelihood estimate does not exist, "
+        "and are where a prior is supposed to do the work.\n"
+    )
+    add(
+        "`prior_binds` counts units whose peak moved by more than the "
+        "estimation error the spikes afford it. The bundles ship fitted curves "
+        "and not their covariance, so that error is the analytic scale "
+        "`1 / sqrt(rate * n_events * m)` with `m` the basis function's second "
+        "moment in seconds -- a scale good to a factor of order one, which is "
+        "enough to separate 'the prior did the work' from 'the spikes did', "
+        "and not a substitute for the fit's own posterior standard error.\n"
+    )
+    shrinkage = peak_shrinkage(before_dir, after_dir, artifact_suffix, sidecars)
+    add(_md(shrinkage_table(shrinkage)))
+
+    add("## The separating columns the prior was introduced for\n")
+    add(
+        "A basis column with no spikes anywhere under its support is the "
+        "configuration that has no maximum likelihood estimate. The count is "
+        "reported, not acted on: under the prior those coefficients are finite "
+        "and small, and the unit is fit like any other.\n"
+    )
+    add(_md(separated_column_table(after)))
+
+    add("## What the two inferences call\n")
+    add(
+        f"Before, BH-corrected likelihood-ratio p-values at q < {alpha}; after, "
+        "BH-corrected empirical p-values from the control-draw null at the same "
+        "level. The two are not comparable test by test -- they test different "
+        "things against different references -- so read them as two accounts of "
+        "the same population, not as a movement. `n_tested` is the units with a "
+        "finite value for that test: a unit whose session had no events of a "
+        "class is untested for it, not a negative.\n"
+    )
+    add("### Before: FDR-significant fraction per likelihood-ratio test\n")
+    add(_md(legacy_fdr_table(before, alpha)))
+    add("### After: fraction beating the control-draw null, per class\n")
+    add(_md(heldout_fraction_table(after, alpha)))
+
+    add("## How steady the held-out difference is between folds\n")
+    add(
+        "Each unit's fold-to-fold standard deviation of a nested pair's "
+        "held-out difference, divided by the absolute value of its mean over "
+        "folds; the median over units. It is the quantity the number of folds "
+        "is chosen against: a pair whose spread dwarfs its mean has a total "
+        "that is one fold's accident.\n"
+    )
+    add(_md(fold_spread_table(after)))
+
+    add("## Sensitivity to the prior\n")
+    sigma_table = sigma_sensitivity_table(after_dir, artifact_suffix)
+    if sigma_table.empty:
+        add(
+            "No sensitivity bundle at another prior is on disk beside the "
+            "canonical ones, so this section is empty. Write one with "
+            "`run_pfc_analysis_bandit.py --penalty-sigma <value>`.\n"
+        )
+    else:
+        add(
+            "Peak log-modulation at each sensitivity prior against the "
+            "canonical one, unit by unit. A curve the spikes determine barely "
+            "moves; one the prior determines moves with it.\n"
+        )
+        add(_md(sigma_table))
+
+    add("## The population that reaches Figure 4\n")
+    add(
+        f"Loaded with `load_population_data(min_firing_rate={min_firing_rate})` "
+        "from each tree. A unit enters when its fit exists, its four shipped "
+        f"modulation traces are NaN-free, and its `{FIT_RATE_COLUMN}` clears "
+        "the gate.\n"
+    )
+    gate = pd.DataFrame(
+        [{"side": "before", **before_gate}, {"side": "after", **after_gate}]
+    )
+    for column in gate.columns.drop("side"):
+        gate[column] = gate[column].astype("Int64")
+    add(_md(gate))
+
+    add("### Units per animal\n")
+    per_animal = (
+        before.groupby("animal")
+        .size()
+        .rename("n_before")
+        .to_frame()
+        .join(after.groupby("animal").size().rename("n_after"), how="outer")
+    ).reset_index()
+    per_animal["delta"] = per_animal["n_after"] - per_animal["n_before"]
+    add(_md(per_animal))
+
+    add("## Fits that never settled\n")
+    add(
+        "A unit x model that ran to `maxiter` without settling is "
+        "non-estimable for the unit that owns it -- every statistic that reads "
+        "it is NaN -- so these counts are the only record of how much was "
+        "dropped and from where.\n"
+    )
+    add(_md(session_fit_counts_table(sidecars)))
+
+    if worker_times:
+        add("## Wall clock\n")
+        add(
+            "One row per worker process of the batch, from the "
+            "`/usr/bin/time -v` file each was run under.\n"
+        )
+        add(_md(worker_time_table(worker_times)))
+    return "\n".join(lines)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -1661,6 +2350,20 @@ def main() -> None:
         type=str,
         default="",
         help="Cohort suffix on the after-side bundle names ('' = canonical).",
+    )
+    parser.add_argument(
+        "--comparison",
+        type=str,
+        default="auto",
+        choices=["auto", "cohort", "estimator"],
+        help=(
+            "Which audit to write. 'estimator' compares the maximum-likelihood "
+            "bundles against the penalised ones scored out of fold; 'cohort' "
+            "is the earlier before/after of the stop restriction, for "
+            "reproducing the audits that were written with it. 'auto' (the "
+            "default) reads the after tree's sidecars and picks the one they "
+            "describe."
+        ),
     )
     parser.add_argument("--min-firing-rate", type=float, default=1.0)
     parser.add_argument("--alpha", type=float, default=0.05)
@@ -1692,31 +2395,52 @@ def main() -> None:
     args = parser.parse_args()
 
     sidecars = read_sidecars(args.after_dir, args.artifact_suffix)
+    comparison = args.comparison
+    if comparison == "auto":
+        # The bundles state which estimator produced them, so the audit does
+        # not have to be told: an after tree that names the penalised
+        # estimator is an estimator change, not another cut of the cohort.
+        stated = set(sidecars.get("estimator", pd.Series(dtype=object)).dropna())
+        comparison = "estimator" if stated == {"ridge_poisson_glm"} else "cohort"
+
+    # Each tree is read as the estimator that produced it. The two generations
+    # carry different statistics under the same file names, so reading one as
+    # the other would report a likelihood-ratio p-value as a held-out one.
     before, _, _ = load_population_data(
-        args.before_dir, min_firing_rate=args.min_firing_rate
+        args.before_dir, min_firing_rate=args.min_firing_rate, inference="legacy"
     )
     after, _, _ = load_population_data(
         args.after_dir,
         min_firing_rate=args.min_firing_rate,
         artifact_suffix=args.artifact_suffix,
+        inference="heldout" if comparison == "estimator" else "legacy",
     )
-    report = build_report(
-        sidecars=sidecars,
-        before_sidecars=try_read_sidecars(args.before_dir),
-        before=before,
-        after=after,
-        before_gate=gate_counts(args.before_dir, args.min_firing_rate),
-        after_gate=gate_counts(
-            args.after_dir, args.min_firing_rate, args.artifact_suffix
+    common = {
+        "sidecars": sidecars,
+        "before": before,
+        "after": after,
+        "before_gate": gate_counts(args.before_dir, args.min_firing_rate),
+        "after_gate": gate_counts(
+            args.after_dir,
+            args.min_firing_rate,
+            args.artifact_suffix,
+            inference="heldout" if comparison == "estimator" else "legacy",
         ),
-        before_dir=args.before_dir,
-        after_dir=args.after_dir,
-        min_firing_rate=args.min_firing_rate,
-        alpha=args.alpha,
-        notes=args.note,
-        command=_invocation(),
-        artifact_suffix=args.artifact_suffix,
-        worker_times=args.worker_times,
+        "before_dir": args.before_dir,
+        "after_dir": args.after_dir,
+        "min_firing_rate": args.min_firing_rate,
+        "alpha": args.alpha,
+        "notes": args.note,
+        "command": _invocation(),
+        "artifact_suffix": args.artifact_suffix,
+        "worker_times": args.worker_times,
+    }
+    report = (
+        build_estimator_report(**common)
+        if comparison == "estimator"
+        else build_report(
+            before_sidecars=try_read_sidecars(args.before_dir), **common
+        )
     )
     if args.out is None:
         print(report)

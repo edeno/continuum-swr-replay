@@ -18,26 +18,37 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.pfc.load_population import HELDOUT_P_COLUMNS
 from scripts.qa.compare_pfc_cohorts import (
     FDR_TESTS,
     MATCHED_CONTROL_TESTS,
+    NESTED_MODEL_PAIRS,
     RERUN_PARAM_TOL,
     _md,
     _short_hash,
     alignment_prose,
+    build_estimator_report,
     build_report,
     bundle_sessions,
     coverage_summary,
+    curve_peaks,
+    estimator_provenance_table,
     event_count_agreement,
     fitter_table,
+    fold_spread_table,
     gate_counts,
+    heldout_fraction_table,
     matched_control_arrays,
     matched_control_significance,
+    peak_shrinkage,
     provenance_table,
     read_sidecars,
     same_events_precondition,
+    separated_column_table,
     session_cohort_table,
     shared_statistic_differences,
+    shrinkage_table,
+    sigma_sensitivity_table,
     significance_table,
     try_read_sidecars,
     worker_time_table,
@@ -464,7 +475,7 @@ class TestPopulation:
             load_population_data,
         )
 
-        frame, _, _ = load_population_data(before, min_firing_rate=1.0)
+        frame, _, _ = load_population_data(before, min_firing_rate=1.0, inference="legacy")
         table = significance_table(frame, alpha=0.05)
 
         chimi = table.loc[
@@ -493,8 +504,8 @@ class TestReport:
             load_population_data,
         )
 
-        before_frame, _, _ = load_population_data(before, min_firing_rate=1.0)
-        after_frame, _, _ = load_population_data(after, min_firing_rate=1.0)
+        before_frame, _, _ = load_population_data(before, min_firing_rate=1.0, inference="legacy")
+        after_frame, _, _ = load_population_data(after, min_firing_rate=1.0, inference="legacy")
         report = build_report(
             sidecars=read_sidecars(after),
             before=before_frame,
@@ -562,7 +573,6 @@ def _after_extra(**overrides) -> dict:
         "gpu_index": 3,
         "gpu_name": "NVIDIA A100-SXM4-80GB",
         "gpu_uuid": "GPU-abc",
-        "n_neurons_reference_fit": 1,
         "n_model_fits": 27,
         "n_nonconverged_model_fits": 2,
         "n_neurons_with_nonconverged_model": 1,
@@ -949,7 +959,7 @@ class TestMatchedControl:
 
 
 class TestFitterTable:
-    def test_one_batch_collapses_to_one_row_with_its_hand_back_total(self, rerun_trees):
+    def test_one_batch_collapses_to_one_row(self, rerun_trees):
         _, after = rerun_trees
         table = fitter_table(read_sidecars(after))
         assert len(table) == 1
@@ -958,9 +968,8 @@ class TestFitterTable:
         assert row.jax_backend == "gpu"
         assert row.gpu_index == 3
         assert row.n_sessions == 2
-        assert row.n_neurons_reference_fit == 2
         # The count of fits that ran to maxiter is the only trace those fits
-        # leave: their LR tests and AIC are reported like any other.
+        # leave: their statistics are NaN for the neuron that owns them.
         assert row.n_model_fits == 54
         assert row.n_nonconverged_model_fits == 4
         assert row.n_neurons_with_nonconverged_model == 2
@@ -995,11 +1004,11 @@ class TestRerunReport:
         population_before, _, _ = __import__(
             "continuum_swr_replay.analysis.pfc.load_population",
             fromlist=["load_population_data"],
-        ).load_population_data(before, min_firing_rate=1.0)
+        ).load_population_data(before, min_firing_rate=1.0, inference="legacy")
         population_after, _, _ = __import__(
             "continuum_swr_replay.analysis.pfc.load_population",
             fromlist=["load_population_data"],
-        ).load_population_data(after, min_firing_rate=1.0)
+        ).load_population_data(after, min_firing_rate=1.0, inference="legacy")
 
         report = build_report(
             sidecars=after_sidecars,
@@ -1031,11 +1040,11 @@ class TestRerunReport:
         population_before, _, _ = __import__(
             "continuum_swr_replay.analysis.pfc.load_population",
             fromlist=["load_population_data"],
-        ).load_population_data(before, min_firing_rate=1.0)
+        ).load_population_data(before, min_firing_rate=1.0, inference="legacy")
         population_after, _, _ = __import__(
             "continuum_swr_replay.analysis.pfc.load_population",
             fromlist=["load_population_data"],
-        ).load_population_data(after, min_firing_rate=0.0)
+        ).load_population_data(after, min_firing_rate=0.0, inference="legacy")
         report = build_report(
             sidecars=read_sidecars(after),
             before_sidecars=try_read_sidecars(before),
@@ -1052,3 +1061,296 @@ class TestRerunReport:
         )
         assert "## Same events, new estimator" not in report
         assert "## Estimator, device and inputs" not in report
+
+
+# ---------------------------------------------------------------------------
+# The estimator change: penalised fits, scored out of fold
+# ---------------------------------------------------------------------------
+
+
+
+def _write_ridge_bundle(
+    data_dir,
+    session: str,
+    *,
+    n_neurons: int,
+    peak: float,
+    fit_rate: float = 5.0,
+    n_folds: int = 5,
+    separated: int = 0,
+    p_heldout: float = 0.0,
+    suffix: str = "",
+    sidecar_extra: dict | None = None,
+) -> None:
+    """A bundle as the penalised, out-of-fold runner writes one."""
+    data_dir.mkdir(parents=True, exist_ok=True)
+    frame = pd.DataFrame(
+        {
+            "nwb_file_name": [f"{session.split('_')[0]}_.nwb"] * n_neurons,
+            "epoch_name": ["02_r1"] * n_neurons,
+            "immobility_avg_firing_rate": [fit_rate] * n_neurons,
+            "SWR: heldout_deviance": [100.0] * n_neurons,
+            "min_heldout_model": ["SWR"] * n_neurons,
+        }
+    )
+    for column in HELDOUT_P_COLUMNS.values():
+        frame[column] = p_heldout
+    for model in (
+        "SWR + non_local_no_SWR",
+        "non_local_SWR + non_local_no_SWR",
+        "matched_control + non_local_no_SWR",
+    ):
+        frame[f"{model}: separated_columns"] = separated
+    for pair in NESTED_MODEL_PAIRS:
+        frame[f"{pair}: heldout_delta_dev"] = 5.0
+        frame[f"{pair}: heldout_delta_dev_folds"] = [
+            np.full(n_folds, 1.0) for _ in range(n_neurons)
+        ]
+
+    base = data_dir / f"{session}_mPFC_modulation{suffix}"
+    frame.to_pickle(base.with_suffix(".pkl"))
+    curve = np.zeros((N_LAG_TIMES, n_neurons))
+    curve[N_LAG_TIMES // 2] = peak
+    for name in (
+        "SWR_modulation",
+        "no_SWR_modulation",
+        "non_local_SWR_modulation",
+        "non_local_no_SWR_modulation",
+        "matched_control_modulation",
+    ):
+        np.save(f"{base}.{name}.npy", curve)
+    (data_dir / f"{session}_mPFC_modulation{suffix}.provenance.json").write_text(
+        json.dumps(
+            _sidecar(
+                session,
+                bins_immobile=1000,
+                bins_fit=800,
+                nonlocal_before=40,
+                nonlocal_after=20,
+                ripple_before=50,
+                ripple_after=30,
+                extra={
+                    "estimator": "ridge_poisson_glm",
+                    "inference": "blocked_heldout_deviance",
+                    "penalty_sigma_log_rate": 2.0,
+                    "n_folds": n_folds,
+                    "fold_seed": abs(hash(session)) % 10_000,
+                    "n_control_draws": 40,
+                    "control_draw_seed": abs(hash(session + "c")) % 10_000,
+                    "n_basis_per_class": 11,
+                    "n_events_swr": 10,
+                    "n_events_non_swr": 10,
+                    "n_matched_control": 19,
+                    "n_model_fits": 9 * n_neurons,
+                    "n_nonconverged_model_fits": 0,
+                    "n_neurons_with_nonconverged_model": 0,
+                    **(sidecar_extra or {}),
+                },
+            )
+        )
+    )
+
+
+@pytest.fixture
+def estimator_trees(tmp_path):
+    """A maximum-likelihood before tree and a penalised after tree."""
+    before = tmp_path / "before"
+    after = tmp_path / "after"
+    for session in ("chimi20200223_02_r1", "j1620210710_02_r1"):
+        _write_bundle(
+            before,
+            session,
+            n_neurons=2,
+            fit_rate=5.0,
+            all_immobile_rate=5.0,
+            pvals=0.001,
+            sidecar=None,
+            modulation=0.0,
+        )
+        # The before curves are flat, so their peak is 0; make one channel
+        # carry a large maximum-likelihood peak to shrink from.
+        base = before / f"{session}_mPFC_modulation"
+        curve = np.zeros((N_LAG_TIMES, 2))
+        curve[N_LAG_TIMES // 2] = 40.0
+        np.save(f"{base}.SWR_modulation.npy", curve)
+        _write_ridge_bundle(after, session, n_neurons=2, peak=1.5)
+    return before, after
+
+
+class TestPeakShrinkage:
+    def test_the_peak_is_the_curves_largest_excursion(self):
+        curves = np.zeros((5, 2))
+        curves[1, 0] = 2.0
+        curves[3, 1] = -3.0
+
+        np.testing.assert_array_equal(curve_peaks(curves), [2.0, -3.0])
+
+    def test_a_curve_that_is_not_estimable_has_no_peak(self):
+        curves = np.zeros((5, 2))
+        curves[2, 1] = np.nan
+
+        peaks = curve_peaks(curves)
+
+        assert peaks[0] == 0.0
+        assert np.isnan(peaks[1])
+
+    def test_the_shrinkage_pairs_each_unit_across_the_two_trees(
+        self, estimator_trees
+    ):
+        before, after = estimator_trees
+
+        frame = peak_shrinkage(before, after, sidecars=read_sidecars(after))
+
+        swr = frame[frame["event_class"] == "SWR"]
+        assert len(swr) == 4  # two sessions x two units
+        np.testing.assert_allclose(swr["peak_mle"], 40.0)
+        np.testing.assert_allclose(swr["peak_penalised"], 1.5)
+        np.testing.assert_allclose(swr["delta"], -38.5)
+        # A peak that moved by 38.5 on the log-rate scale moved by far more
+        # than any spike count can pin down, so the prior plainly binds.
+        assert swr["prior_binds"].all()
+
+    def test_the_summary_separates_the_units_whose_mle_does_not_exist(
+        self, estimator_trees
+    ):
+        before, after = estimator_trees
+        _write_ridge_bundle(
+            after, "chimi20200223_02_r1", n_neurons=2, peak=1.5, separated=3
+        )
+
+        table = shrinkage_table(
+            peak_shrinkage(before, after, sidecars=read_sidecars(after))
+        )
+
+        assert set(table["units"]) == {"separated", "well posed"}
+        assert (table["n_prior_binds"] <= table["n_units"]).all()
+
+
+class TestEstimatorTables:
+    def test_the_separated_columns_are_counted_per_model(self, estimator_trees):
+        _, after = estimator_trees
+        _write_ridge_bundle(
+            after, "chimi20200223_02_r1", n_neurons=2, peak=1.5, separated=3
+        )
+        population, _, _ = __import__(
+            "continuum_swr_replay.analysis.pfc.load_population",
+            fromlist=["load_population_data"],
+        ).load_population_data(after, min_firing_rate=0.0)
+
+        table = separated_column_table(population)
+
+        assert set(table["model"]) == {
+            "SWR + non_local_no_SWR",
+            "non_local_SWR + non_local_no_SWR",
+            "matched_control + non_local_no_SWR",
+        }
+        assert (table["n_units_with_a_separated_column"] == 2).all()
+        assert (table["max_separated_columns"] == 3).all()
+
+    def test_the_fold_spread_is_the_relative_spread_over_folds(
+        self, estimator_trees
+    ):
+        _, after = estimator_trees
+        population, _, _ = __import__(
+            "continuum_swr_replay.analysis.pfc.load_population",
+            fromlist=["load_population_data"],
+        ).load_population_data(after, min_firing_rate=0.0)
+
+        table = fold_spread_table(population)
+
+        assert len(table) == len(NESTED_MODEL_PAIRS)
+        # Every fold contributed exactly 1.0, so the spread is zero.
+        assert (table["median_fold_sd_over_abs_mean"] == 0.0).all()
+        assert (table["n_folds"] == 5).all()
+
+    def test_the_held_out_fraction_is_reported_per_animal(self, estimator_trees):
+        _, after = estimator_trees
+        population, _, _ = __import__(
+            "continuum_swr_replay.analysis.pfc.load_population",
+            fromlist=["load_population_data"],
+        ).load_population_data(after, min_firing_rate=0.0)
+
+        table = heldout_fraction_table(population, alpha=0.05)
+
+        assert list(table["animal"]) == ["all", "chimi", "j16"]
+        # Every unit's empirical p is 0, so every unit survives BH.
+        assert (table["SWR_pct"] == 100.0).all()
+        assert (table["engagement_pct"] == 100.0).all()
+
+    def test_one_batch_collapses_to_one_estimator_row(self, estimator_trees):
+        _, after = estimator_trees
+
+        table = estimator_provenance_table(read_sidecars(after))
+
+        assert len(table) == 1
+        row = table.iloc[0]
+        assert row.estimator == "ridge_poisson_glm"
+        assert row.inference == "blocked_heldout_deviance"
+        assert row.penalty_sigma_log_rate == 2.0
+        assert row.n_sessions == 2
+        # The seeds are session-derived, so two sessions never share one.
+        assert row.n_distinct_fold_seed == 2
+        assert row.n_distinct_control_draw_seed == 2
+
+    def test_the_sensitivity_table_is_empty_without_a_sensitivity_bundle(
+        self, estimator_trees
+    ):
+        _, after = estimator_trees
+
+        assert sigma_sensitivity_table(after).empty
+
+    def test_a_sensitivity_bundle_is_paired_with_the_canonical_one(
+        self, estimator_trees
+    ):
+        _, after = estimator_trees
+        for session in ("chimi20200223_02_r1", "j1620210710_02_r1"):
+            _write_ridge_bundle(
+                after, session, n_neurons=2, peak=1.1, suffix="_sigma1"
+            )
+
+        table = sigma_sensitivity_table(after)
+
+        assert set(table["sigma"]) == {"1"}
+        swr = table[table["event_class"] == "SWR"].iloc[0]
+        assert swr["n_units"] == 4
+        np.testing.assert_allclose(swr["median_abs_delta_peak"], 0.4)
+
+
+class TestEstimatorReport:
+    def test_the_report_states_what_the_prior_and_the_folds_did(
+        self, estimator_trees
+    ):
+        before, after = estimator_trees
+        loader = __import__(
+            "continuum_swr_replay.analysis.pfc.load_population",
+            fromlist=["load_population_data"],
+        ).load_population_data
+        population_before, _, _ = loader(
+            before, min_firing_rate=0.0, inference="legacy"
+        )
+        population_after, _, _ = loader(after, min_firing_rate=0.0)
+
+        report = build_estimator_report(
+            sidecars=read_sidecars(after),
+            before=population_before,
+            after=population_after,
+            before_gate=gate_counts(before, 1.0),
+            after_gate=gate_counts(after, 1.0, inference="heldout"),
+            before_dir=before,
+            after_dir=after,
+            min_firing_rate=1.0,
+            alpha=0.05,
+            notes=[],
+            command="",
+        )
+
+        assert "## Estimator and inference, as the bundles state them" in report
+        assert "## What the prior did to the fits" in report
+        assert "## The separating columns the prior was introduced for" in report
+        assert "## What the two inferences call" in report
+        assert "## How steady the held-out difference is between folds" in report
+        assert "## Sensitivity to the prior" in report
+        # No sensitivity bundle was written, and the report says so rather
+        # than printing an empty table.
+        assert "No sensitivity bundle at another prior is on disk" in report
+        assert "ridge_poisson_glm" in report
