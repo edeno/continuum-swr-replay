@@ -16,14 +16,23 @@ Composite figure with 4 panels in 3 rows:
     Row 3 (panels c, d):
         c: Population average modulation curves (mean ± SEM) for SWR vs
            non-SWR replay.
-        d: Consolidated statistics — fraction of neurons significantly
-           modulated by each event type, and distribution of best-AIC
-           model across the population.
+        d: Consolidated statistics — fraction of neurons whose event
+           regressor improves held-out deviance beyond the matched
+           non-event control's null, and the distribution of the best
+           model by held-out deviance across the population.
+
+Every fitted quantity in the figure comes from the same estimator the
+bundles were fit with: a Poisson GLM with a Gaussian prior on the
+event-basis coefficients, and a peri-event kernel that returns to
+baseline at both ends of the ±250 ms fit window. The example neuron's
+band is the penalised posterior-mode standard error, and the population
+significance is an empirical p-value from repeated matched-control
+draws, Benjamini-Hochberg corrected across units.
 
 April 2026: the figure was tightened from 6 panels to 4. The previous
-standalone single-neuron AIC was dropped (it duplicated the population
-AIC), and the two side-by-side single-neuron columns were collapsed
-into one overlay panel.
+standalone single-neuron model selection was dropped (it duplicated the
+population one), and the two side-by-side single-neuron columns were
+collapsed into one overlay panel.
 
 Usage:
     python scripts/figures/generate_figure04.py
@@ -62,9 +71,12 @@ from continuum_swr_replay.analysis.pfc.canonical_events import (
     load_session_swr_intervals,
 )
 from continuum_swr_replay.analysis.pfc.cohort import load_session_stop_cohort
-from continuum_swr_replay.analysis.pfc.glm import FITTERS
+from continuum_swr_replay.analysis.pfc.glm import model_penalties
 from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
-from continuum_swr_replay.analysis.pfc.load_population import load_population_data
+from continuum_swr_replay.analysis.pfc.load_population import (
+    load_population_data,
+    significant_fraction,
+)
 from continuum_swr_replay.analysis.replay.cohort_selection import stop_cohort_suffix
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.figure_utilities import (
@@ -77,6 +89,12 @@ from continuum_swr_replay.parameters import COLORS, PROCESSED_DATA_DIR
 
 figure_utilities.set_figure_defaults(context="paper")
 warnings.filterwarnings("ignore")
+
+#: Prior standard deviation of an event-basis coefficient, on the log-rate
+#: scale, that the canonical bundles are fit at. The example neuron is refit in
+#: this script, so it carries the same prior the population it sits beside was
+#: fit under.
+CANONICAL_PENALTY_SIGMA = 2.0
 
 
 # ---------------------------------------------------------------------------
@@ -108,9 +126,12 @@ def plot_single_neuron_overlay(
         Spline basis matching ``glm_result.params[1:]``.
     neuron_spike_times : np.ndarray
         Spike times for the example neuron (seconds).
-    glm_results : dict[str, statsmodels result]
-        Full dict of fitted GLMs; only the models in ``model_configs``
-        are plotted.
+    glm_results : dict[str, fitted GLM result]
+        Full dict of fitted GLMs; only the models in ``model_configs`` are
+        plotted. ``bse`` is read as the penalised posterior-mode standard
+        error the fit reports, so the band is the one the shipped estimator
+        gives -- not a maximum-likelihood interval drawn around a penalised
+        point estimate.
     event_times : dict[str, pd.DataFrame]
         Event interval tables keyed by name (columns: start_time, end_time).
     model_configs : list of dict
@@ -149,7 +170,9 @@ def plot_single_neuron_overlay(
     ax_mod.set_ylabel("GLM\nmodulation")
     ax_mod.legend(frameon=False, fontsize=6, loc="upper right")
     ax_mod.tick_params(labelbottom=False)
-    ax_mod.set_title("Example mPFC neuron", fontsize=8, pad=4)
+    ax_mod.set_title(
+        "Example mPFC neuron (penalised fit, ±1 posterior SE)", fontsize=8, pad=4
+    )
 
     # ── Sub-row 2: overlaid PSTHs ──
     # Cheap manual PSTH: compute spike-count density in lag bins around
@@ -258,40 +281,56 @@ def plot_population_average(modulations, lag_time, ax):
 # Panel f — Significance + AIC (accepts axes)
 # ---------------------------------------------------------------------------
 
-def plot_significance(df, ax):
-    """Plot fraction of significant neurons on provided ax."""
-    tests = {
-        "SWR": "SWR vs. constant: fdr_q",
-        "Replay": "non_local vs. constant: fdr_q",
-        "no-SWR": "non_local_no_SWR vs. constant: fdr_q",
-        "Beyond\nSWR": "SWR + non_local_no_SWR vs. SWR: fdr_q",
-    }
+#: Panel d's bars: which held-out test each one reads, and how it is labelled.
+#: The "beyond control" bar is the engagement comparison -- does non-SWR replay
+#: predict held-out spikes beyond a duration-matched non-event baseline drawn
+#: from the same bouts?
+SIGNIFICANCE_BARS = (
+    ("SWR", "SWR", "SWR"),
+    ("Replay", "non_local", "Non-Local"),
+    ("no-SWR", "non_local_no_SWR", "Non-Local"),
+    ("Beyond\ncontrol", "engagement", "Combined"),
+)
 
-    n_total = len(df)
-    labels = list(tests.keys())
-    fracs = [100 * (df[col] < 0.05).sum() / n_total for col in tests.values()]
-    colors_list = [COLORS["SWR"], COLORS["Non-Local"], COLORS["Non-Local"], COLORS["Non-Local"]]
+
+def plot_significance(df, ax, alpha=0.05):
+    """Fraction of units whose regressor beats the control-draw null.
+
+    A unit counts when its empirical p-value -- the fraction of matched-control
+    draws whose held-out improvement matched or beat the observed one --
+    survives Benjamini-Hochberg across units at ``alpha``. The denominator is
+    the units actually tested for that class: a unit whose session had no
+    events of a class is untested for it, not a negative.
+    """
+    fractions = significant_fraction(df, alpha=alpha)
+    labels, fracs, colors_list = [], [], []
+    for label, name, color in SIGNIFICANCE_BARS:
+        n_significant, n_tested = fractions[name]
+        labels.append(label)
+        fracs.append(100 * n_significant / n_tested if n_tested else np.nan)
+        colors_list.append(COLORS[color])
 
     bars = ax.bar(labels, fracs, color=colors_list, alpha=0.7, edgecolor="none")
     for bar, frac in zip(bars, fracs, strict=True):
-        if frac > 2:
+        if np.isfinite(frac) and frac > 2:
             ax.text(bar.get_x() + bar.get_width() / 2, frac + 1,
                     f"{frac:.0f}%", ha="center", fontsize=5)
 
-    ax.axhline(5, color="gray", linewidth=0.5, linestyle="--")
-    ax.set_ylabel("% sig.")
-    ax.set_ylim(0, max(fracs) * 1.3)
+    ax.axhline(100 * alpha, color="gray", linewidth=0.5, linestyle="--")
+    ax.set_ylabel("% units")
+    ax.set_ylim(0, np.nanmax(fracs) * 1.3)
     ax.tick_params(axis="x", labelsize=5)
+    ax.set_title("Beats control null", fontsize=7)
 
 
-def plot_aic_selection(df, ax):
-    """Plot AIC model selection distribution on provided ax."""
+def plot_best_model_selection(df, ax):
+    """Distribution of the best model per unit, by held-out deviance."""
     n_total = len(df)
     model_order = ["constant", "SWR", "non_local", "SWR + non_local_no_SWR"]
     model_labels = ["Const.", "SWR", "Replay", "SWR+\nno-SWR"]
     model_colors = ["gray", COLORS["SWR"], COLORS["Non-Local"], COLORS["Combined"]]
 
-    counts = df["min_aic_model"].value_counts()
+    counts = df["min_heldout_model"].value_counts()
     vals = [100 * counts.get(m, 0) / n_total for m in model_order]
 
     bars = ax.bar(model_labels, vals, color=model_colors, alpha=0.7, edgecolor="none")
@@ -299,14 +338,22 @@ def plot_aic_selection(df, ax):
         if val > 2:
             ax.text(bar.get_x() + bar.get_width() / 2, val + 1,
                     f"{val:.0f}%", ha="center", fontsize=5)
-    ax.set_ylabel("% neurons")
+    ax.set_ylabel("% units")
     ax.tick_params(axis="x", labelsize=5)
-    ax.set_title("Best model (AIC)")
+    ax.set_title("Best model\n(held-out deviance)", fontsize=7)
 
 
 # ---------------------------------------------------------------------------
 # Main Figure Assembly
 # ---------------------------------------------------------------------------
+
+#: The lags the models are fit on (+/-250 ms at 500 Hz) and the ones the
+#: curves are reported on (+/-200 ms). The bundle is fit on the wider window so
+#: the spline's boundary behaviour falls outside the reported one; the example
+#: neuron is fit the same way and its curve trimmed to match.
+FIT_LAGS = np.arange(-125, 126, 1)
+REPORT_LAGS = np.arange(-100, 101, 1)
+
 
 def generate_figure(
     nwb_file_name="wilbur20210329_.nwb",
@@ -315,6 +362,7 @@ def generate_figure(
     data_dir=PROCESSED_DATA_DIR,
     stop_cohort="at_well",
     fitter="jax",
+    penalty_sigma=CANONICAL_PENALTY_SIGMA,
 ):
     """Generate composite Figure 4.
 
@@ -332,11 +380,14 @@ def generate_figure(
         Population the panels describe. The example neuron is refit here, so it
         must be cut the same way the population bundle in ``data_dir`` was; the
         suffixed ``_allstops`` bundle is read for ``all_stops``.
-    fitter : {"jax", "statsmodels"}
-        How the example neuron's GLMs are fit -- the same choice the population
-        bundle's run made, so the panel and the population it sits beside come
-        off one fitter. The two agree to the tolerances of the fitter
-        equivalence audit.
+    fitter : {"jax"}
+        Backend the example neuron's GLMs are fit with -- the batched one the
+        population bundle was fit with, and the only one with a penalised path.
+    penalty_sigma : float
+        Prior standard deviation of an event-basis coefficient, on the log-rate
+        scale. The panel is refit here, so it must carry the prior the
+        population bundle in ``data_dir`` was fit under; a sensitivity bundle's
+        panel is generated by naming its sigma.
 
     Returns
     -------
@@ -380,7 +431,7 @@ def generate_figure(
         )
     # Design matrices
     time = position_time.to_numpy(dtype=float)
-    lags = np.arange(-100, 101, 1)
+    lags = FIT_LAGS
     _, fit_mask, bin_counts = build_session_fit_mask(
         data["position_info"],
         cohort_stops=cohort_stops,
@@ -440,10 +491,24 @@ def generate_figure(
     neuron_spike_times = data["spike_times"]["mPFC"][neuron_ind]
     neuron_spike_count = get_spikecount_per_time_bin(neuron_spike_times, time)
 
-    print(f"Fitting GLM models (fitter: {fitter})...")
+    print(f"Fitting GLM models (fitter: {fitter}, prior sigma: {penalty_sigma})...")
     glm_results, _ = fit_immobility_models(
-        fit_mask, immobility_design_matrices, neuron_spike_count, fitter=fitter
+        fit_mask,
+        immobility_design_matrices,
+        neuron_spike_count,
+        fitter=fitter,
+        penalties=model_penalties(immobility_design_matrices, penalty_sigma),
     )
+
+    # The models are fit over +/-250 ms and reported over +/-200 ms, as the
+    # bundle's curves are: the spline's boundary behaviour stays outside the
+    # window the panel draws.
+    report_mask = np.isin(
+        np.round(lag_time, 6),
+        np.round(REPORT_LAGS / DEFAULT_SAMPLING_FREQUENCY_HZ, 6),
+    )
+    spline_basis = spline_basis[report_mask]
+    lag_time = lag_time[report_mask]
 
     # --- Load population data ---
     print("Loading population data...")
@@ -463,7 +528,7 @@ def generate_figure(
     #                      overlaid SWR and non-SWR replay)
     #     Row 2: panel b — population heatmaps (2 side by side)
     #     Row 3: panel c — population average
-    #            panel d — consolidated stats (% modulated + best AIC)
+    #            panel d — consolidated stats (% over the null + best model)
     print("Assembling composite figure...")
     fig_height = min(8.5, PAGE_HEIGHT)
     fig = plt.figure(figsize=(TWO_COLUMN, fig_height), dpi=450,
@@ -524,12 +589,12 @@ def generate_figure(
     ax_c = fig.add_subplot(gs_cd[0])
     plot_population_average(modulations, pop_lag_time, ax_c)
 
-    # Panel d: consolidated stats — % significant + best-AIC
+    # Panel d: consolidated stats — % beating the control null + best model
     gs_d = gs_cd[1].subgridspec(1, 2, wspace=0.3)
     ax_d1 = fig.add_subplot(gs_d[0])
     ax_d2 = fig.add_subplot(gs_d[1])
     plot_significance(pop_df, ax_d1)
-    plot_aic_selection(pop_df, ax_d2)
+    plot_best_model_selection(pop_df, ax_d2)
 
     # ── Panel Labels ──
     label_panels(
@@ -569,10 +634,22 @@ def main():
         "--fitter",
         type=str,
         default="jax",
-        choices=list(FITTERS),
+        choices=["jax"],
         help=(
-            "How the example neuron's GLMs are fit (default: jax), matching "
-            "the population bundle's run."
+            "Backend the example neuron's GLMs are fit with (default and only "
+            "choice: jax, the one the population bundle was fit with and the "
+            "only one with a penalised path)."
+        ),
+    )
+    parser.add_argument(
+        "--penalty-sigma",
+        type=float,
+        default=CANONICAL_PENALTY_SIGMA,
+        help=(
+            "Prior standard deviation of an event-basis coefficient, on the "
+            f"log-rate scale (default: {CANONICAL_PENALTY_SIGMA}). The example "
+            "neuron is refit here, so this must be the prior the population "
+            "bundle in --data-dir was fit under."
         ),
     )
     parser.add_argument(
@@ -605,6 +682,7 @@ def main():
         data_dir=args.data_dir,
         stop_cohort=args.stop_cohort,
         fitter=args.fitter,
+        penalty_sigma=args.penalty_sigma,
     )
 
     print(f"Saving to {args.output_dir}...")

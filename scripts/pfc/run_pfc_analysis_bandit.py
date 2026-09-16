@@ -90,7 +90,6 @@ from continuum_swr_replay.analysis.pfc.cohort import (
 )
 from continuum_swr_replay.analysis.pfc.glm import (
     EVENT_CLASSES,
-    FITTERS,
     get_spikecount_per_time_bin,
     model_penalties,
 )
@@ -1131,8 +1130,9 @@ def run_analysis(
                 "gpu_uuid": gpu_record.get("gpu_uuid"),
                 "gpu_name": gpu_record.get("gpu_name"),
                 # How many of the shipped fits never settled. A unit x model
-                # that never settled is non-estimable for that neuron alone, so
-                # this is the only place the fact survives the run.
+                # that never settled is non-estimable for that neuron alone --
+                # every statistic that reads it is NaN -- so these counts are
+                # the only record of how much was dropped and from where.
                 "n_model_fits": cohort_info.get("n_model_fits"),
                 "n_nonconverged_model_fits": cohort_info.get(
                     "n_nonconverged_model_fits"
@@ -1244,13 +1244,13 @@ def get_command_line_arguments() -> Namespace:
         "--fitter",
         type=str,
         default="jax",
-        choices=list(FITTERS),
+        choices=["jax"],
         help=(
-            "How the GLMs are fit (default: jax). 'jax' fits every neuron of "
-            "a session against each design in one batched IRLS; 'statsmodels' "
-            "keeps the original per-neuron IRLS, which is the control the "
-            "fitter equivalence audit is read against. Both use the same "
-            "starting values, step and convergence rule."
+            "How the GLMs are fit (default and only choice: jax, the batched "
+            "IRLS that fits every neuron of a session against each design at "
+            "once). The per-neuron statsmodels IRLS has no penalised path, so "
+            "a batch cannot be launched on it; it survives in the library as "
+            "the control the fitter equivalence tests are read against."
         ),
     )
     parser.add_argument(
@@ -1348,15 +1348,6 @@ def get_command_line_arguments() -> Namespace:
     )
 
     args = parser.parse_args()
-    if args.fitter != "jax":
-        # The per-unit statsmodels IRLS has no penalised path, and the shipped
-        # estimator is penalised. Letting the flag through would fit an
-        # unpenalised ladder and write it under a sidecar claiming a prior.
-        parser.error(
-            f"--fitter {args.fitter} cannot fit the penalised models this "
-            "runner ships: only the batched backend has a penalised path. "
-            "Use --fitter jax."
-        )
     if args.penalty_sigma <= 0:
         parser.error(
             f"--penalty-sigma {args.penalty_sigma} is not positive; it is a "

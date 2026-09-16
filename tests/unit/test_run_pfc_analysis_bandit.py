@@ -789,7 +789,10 @@ def test_the_retired_statistics_are_dropped_before_the_bundle_is_written():
     ]
 
 
-def test_the_statsmodels_backend_cannot_fit_the_penalised_models(monkeypatch, capsys):
+def test_a_batch_cannot_be_launched_on_the_unpenalised_backend(monkeypatch):
+    # The per-unit statsmodels IRLS has no penalised path, so a batch fit with
+    # it would be an unpenalised ladder written under a sidecar claiming a
+    # prior. It is not offered at all.
     monkeypatch.setattr(
         runner.sys, "argv", ["run_pfc_analysis_bandit.py", "--fitter", "statsmodels"]
     )
@@ -798,7 +801,6 @@ def test_the_statsmodels_backend_cannot_fit_the_penalised_models(monkeypatch, ca
         runner.get_command_line_arguments()
 
     assert excinfo.value.code == 2
-    assert "penalised" in capsys.readouterr().err
 
 
 # ---------------------------------------------------------------------------
