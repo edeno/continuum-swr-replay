@@ -9,13 +9,17 @@ interface" (unchanged). Everything else in the recut plan that this contradicts 
 **Implementation status (reviewed 2026-09-16).** Task A and the Task B integration are implemented
 and passed the corrected three-session GPU gate at `00765b2`; Task C (the production batch, final
 audit, Figure 4 and claim update) has not run. The original smoke selected σ = 3, K = 5 and R = 40.
-The implementation review supersedes the draft values
+A follow-up prediction-only, microbatched JAX scorer reduced the j16 null phase from 8:26 to 1:49
+and made **R = 1,000** the production setting; R = 40 is retained only as the historical
+equivalence gate. The implementation review supersedes the draft values
 below where they conflict: empirical p-values use `(b + 1)/(R + 1)`, not `b/R`; incompletely
 placed draws are excluded and at least 20 usable draws are required; runs whose ±250 ms kernel
 supports overlap are one fold block; and raw-p unit fractions are descriptive previews, not
 population inference. In the corrected gate every class produced 40/40 exact draws on its fixed
 matchable event subset, the combined population loader and estimator audit passed, and the largest
-session completed in 27:25 at 8.89 GiB peak RSS. Task C may launch on idle cards.
+session completed in 27:25 at 8.89 GiB peak RSS. The optimized j16 gate completed in 5:23 at
+4.66 GiB peak RSS with an equivalent 74 x 131 result table and byte-identical modulation arrays.
+Task C may launch on idle cards.
 
 **The problem.** 23 % of mPFC units have at least one model whose unpenalised Poisson fit
 separates (a spline column with no spikes under its support drives a coefficient to −∞); statsmodels

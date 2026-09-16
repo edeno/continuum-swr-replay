@@ -22,6 +22,9 @@ from continuum_swr_replay.analysis.pfc.batched_glm import (
     implied_prior_sd,
     jax_backend,
     make_ridge_penalty,
+    poisson_deviance_from_params,
+    prepare_heldout_response,
+    score_poisson_designs_heldout,
 )
 
 # Well below the audit's gate (params 1e-5, deviance/llf 1e-6): the two fitters
@@ -565,6 +568,114 @@ class TestResultsContract:
         design, counts, _ = planted
         with pytest.raises(ValueError, match="rows"):
             fit_poisson_glms(design, counts[:-1])
+
+
+class TestPredictionOnlyHeldoutBatch:
+    def test_scores_and_fit_diagnostics_match_the_reference_path(self):
+        """Batch designs/folds without changing any scientific result."""
+        rng = np.random.default_rng(20260916)
+        n_time, n_features, n_units, n_folds = 800, 4, 3, 5
+        base = np.column_stack(
+            [np.ones(n_time), rng.normal(size=(n_time, n_features - 1)) * 0.3]
+        )
+        alternative = base.copy()
+        alternative[:, 1:] += rng.normal(size=(n_time, n_features - 1)) * 0.05
+        designs = np.stack([base, alternative])
+        coefficients = rng.normal(size=(n_units, n_features)) * 0.2
+        coefficients[:, 0] -= 1.5
+        counts = rng.poisson(np.exp(base @ coefficients.T)).astype(float)
+        folds = np.arange(n_time, dtype=int) % n_folds
+        penalty = make_ridge_penalty(n_features, sigma=2.0)
+        penalties = np.broadcast_to(penalty, (len(designs), n_features)).copy()
+
+        response = prepare_heldout_response(counts, folds)
+        actual = score_poisson_designs_heldout(
+            designs,
+            response,
+            penalties,
+            # Exercise stable-shape padding of the final partial batch.
+            design_batch_size=4,
+        )
+
+        expected_scores = np.full((len(designs), n_folds, n_units), np.nan)
+        expected_converged = np.zeros_like(expected_scores, dtype=bool)
+        expected_iterations = np.zeros_like(expected_scores, dtype=int)
+        expected_rank = np.zeros((len(designs), n_folds), dtype=int)
+        for design_index, design in enumerate(designs):
+            for fold in range(n_folds):
+                held_out = folds == fold
+                fitted = fit_poisson_glms(
+                    design[~held_out],
+                    counts[~held_out],
+                    penalty=penalty,
+                    compute_covariance=False,
+                )
+                expected_converged[design_index, fold] = fitted.converged
+                expected_iterations[design_index, fold] = fitted.n_iter
+                expected_rank[design_index, fold] = fitted.rank
+                score = poisson_deviance_from_params(
+                    design[held_out], counts[held_out], fitted.params
+                )
+                expected_scores[design_index, fold] = np.where(
+                    fitted.converged & np.isfinite(score), score, np.nan
+                )
+
+        np.testing.assert_allclose(
+            actual.per_fold, expected_scores, atol=1e-8, rtol=1e-10
+        )
+        np.testing.assert_array_equal(actual.converged, expected_converged)
+        np.testing.assert_array_equal(actual.n_iter, expected_iterations)
+        np.testing.assert_array_equal(actual.rank, expected_rank)
+        np.testing.assert_allclose(
+            actual.total, expected_scores.sum(axis=1), atol=1e-8, rtol=1e-10
+        )
+
+    def test_rank_deficiency_and_a_silent_unit_match_the_reference(self):
+        rng = np.random.default_rng(17)
+        n_time = 600
+        informative = rng.normal(scale=0.3, size=n_time)
+        design = np.column_stack(
+            [
+                np.ones(n_time),
+                informative,
+                informative,
+                np.zeros(n_time),
+            ]
+        )
+        active = rng.poisson(np.exp(-1.5 + 0.4 * informative)).astype(float)
+        counts = np.column_stack([np.zeros(n_time), active])
+        folds = np.arange(n_time, dtype=int) % 3
+        penalty = make_ridge_penalty(design.shape[1], sigma=2.0)
+
+        response = prepare_heldout_response(counts, folds)
+        actual = score_poisson_designs_heldout(
+            design, response, penalty, design_batch_size=4
+        )
+
+        expected = np.full((3, 2), np.nan)
+        expected_iterations = np.zeros((3, 2), dtype=int)
+        for fold in range(3):
+            held_out = folds == fold
+            fitted = fit_poisson_glms(
+                design[~held_out],
+                counts[~held_out],
+                penalty=penalty,
+                compute_covariance=False,
+            )
+            expected_iterations[fold] = fitted.n_iter
+            score = poisson_deviance_from_params(
+                design[held_out], counts[held_out], fitted.params
+            )
+            expected[fold] = np.where(
+                fitted.converged & np.isfinite(score), score, np.nan
+            )
+
+        assert np.isnan(actual.total[0, 0])
+        np.testing.assert_allclose(
+            actual.per_fold[0, :, 1], expected[:, 1], atol=1e-8, rtol=1e-10
+        )
+        np.testing.assert_array_equal(actual.n_iter[0], expected_iterations)
+        np.testing.assert_array_equal(actual.rank[0], np.full(3, 2))
 
 
 class TestBackend:

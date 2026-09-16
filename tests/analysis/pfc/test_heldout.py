@@ -7,6 +7,8 @@ and the null against the uniform distribution a valid p-value has to have.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -499,6 +501,45 @@ class TestNullDrawSeeds:
 
 
 class TestControlDrawNull:
+    def test_draw_designs_are_scored_in_bounded_microbatches(
+        self, null_session, monkeypatch
+    ):
+        folds = assign_blocked_folds(null_session["fit_mask"], n_folds=5, seed=2)
+        batch_sizes = []
+
+        def fake_score(designs, response, penalties, *, design_batch_size, **kwargs):
+            designs = np.asarray(designs)
+            batch_sizes.append(designs.shape[0])
+            assert designs.shape[0] <= design_batch_size == 2
+            return SimpleNamespace(total=np.zeros((designs.shape[0], response.n_units)))
+
+        monkeypatch.setattr(
+            "continuum_swr_replay.analysis.pfc.heldout.score_poisson_designs_heldout",
+            fake_score,
+        )
+        n_units = 2
+        model_deviance = {
+            "constant": np.zeros(n_units),
+            "non_local": np.zeros(n_units),
+        }
+
+        null = control_draw_null(
+            null_session["event_times"],
+            null_session["fit_mask"],
+            null_session["counts"][:, :n_units],
+            folds,
+            rng_seeds=[101, 102, 103, 104, 105],
+            spline_basis=null_session["spline_basis"],
+            lags=null_session["lags"],
+            penalty_sigma=2.0,
+            classes=["non_local"],
+            model_deviance=model_deviance,
+            design_batch_size=2,
+        )
+
+        assert batch_sizes == [2, 2, 1]
+        assert null.improvement["non_local"].shape == (5, n_units)
+
     def test_each_class_gets_its_own_count_matched_draws(self, null_session):
         """The point of the per-class null: a class with half the onsets is
         stood in for by half as many windows."""

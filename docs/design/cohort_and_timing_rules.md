@@ -297,8 +297,8 @@ or beat the subset-matched observed one, with the observed statistic included
 through the plus-one correction; the engagement statistic gets its own null the
 same way, with the tested regressor replaced and the baseline left as it is.
 
-**R = 40**. The finite-sample Monte Carlo p-value is `(r + 1)/(R + 1)`, so its
-minimum with 40 usable draws is **1/41 = 0.024** and zero is impossible. A draw
+**R = 1,000**. The finite-sample Monte Carlo p-value is `(r + 1)/(R + 1)`, so its
+minimum with 1,000 usable draws is **1/1,001 ≈ 0.001** and zero is impossible. A draw
 that fails to place every class-matched window is a thinner regressor and is
 excluded; fewer than 20 usable draws leaves that unit's p-value unavailable.
 `n_control_draws`, `control_draw_seed`, exact-draw counts, tested source indices,

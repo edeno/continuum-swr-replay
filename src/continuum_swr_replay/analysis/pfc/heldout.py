@@ -59,6 +59,11 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
+from continuum_swr_replay.analysis.pfc.batched_glm import (
+    PreparedHeldoutResponse,
+    prepare_heldout_response,
+    score_poisson_designs_heldout,
+)
 from continuum_swr_replay.analysis.pfc.glm import (
     DEFAULT_MATCHED_CONTROL_ATTEMPTS,
     EVENT_CLASSES,
@@ -70,9 +75,10 @@ from continuum_swr_replay.analysis.pfc.glm import (
     make_matched_control_times,
 )
 
-#: Smallest Monte Carlo sample used for a reported empirical p-value.  The
-#: production null uses 40 draws; below this floor the grid is too coarse even
-#: for the descriptive ``p < .05`` preview this phase reports.
+#: Smallest Monte Carlo sample used for a reported empirical p-value. Below
+#: this floor the grid is too coarse even for the descriptive ``p < .05``
+#: preview this phase reports. Production requests a larger sample, but this
+#: floor also governs deliberately shortened diagnostics and failed fits.
 MIN_USABLE_NULL_DRAWS = 20
 
 #: Provenance name for the finite-sample correction used by
@@ -565,6 +571,8 @@ def control_draw_null(
     engagement_class: str = "non_local_no_SWR",
     max_attempts: int = DEFAULT_MATCHED_CONTROL_ATTEMPTS,
     model_deviance: Mapping[str, NDArray] | None = None,
+    response: PreparedHeldoutResponse | None = None,
+    design_batch_size: int = 4,
 ) -> ControlDrawNull:
     """Held-out improvements from repeated matched-control draws, per class.
 
@@ -633,6 +641,14 @@ def control_draw_null(
         Already computed all-event held-out deviances, keyed by model name.
         When a tested subset contains every event, these values avoid refitting
         the identical observed model. A proper subset is always rescored.
+    response : PreparedHeldoutResponse, optional
+        Device-resident fit-bin counts and folds. Supplying the response used
+        for the session's all-event scores avoids retransferring it for every
+        null draw. When omitted, it is prepared once here.
+    design_batch_size : int
+        Number of equal-width null designs fit together. Draws are generated,
+        scored and discarded in batches of this size, so memory use stays
+        bounded as ``len(rng_seeds)`` grows.
 
     Returns
     -------
@@ -656,12 +672,37 @@ def control_draw_null(
     if counts.ndim == 1:
         counts = counts[:, None]
     fit_rows = np.asarray(fit_mask, dtype=bool)
-    fit_counts = counts[fit_rows]
+    n_fit_rows = int(fit_rows.sum())
+    if design_batch_size < 1:
+        raise ValueError(f"design_batch_size must be positive, got {design_batch_size}")
+    if response is None:
+        response = prepare_heldout_response(counts[fit_rows], folds)
+    elif response.n_time != n_fit_rows or response.n_units != counts.shape[1]:
+        raise ValueError(
+            "the prepared response does not match the null's fit-bin counts: "
+            f"response {(response.n_time, response.n_units)}, counts "
+            f"{(n_fit_rows, counts.shape[1])}"
+        )
 
     def penalty_for(design: NDArray) -> NDArray | None:
         if penalty_sigma is None:
             return None
         return make_ridge_penalty(design.shape[1], penalty_sigma)
+
+    def score_design_batch(designs: NDArray) -> NDArray:
+        """Score one bounded host batch and return only per-design totals."""
+        designs = np.asarray(designs, dtype=float)
+        if designs.ndim != 3 or designs.shape[0] == 0:
+            raise ValueError(
+                "a score batch must have shape "
+                f"(n_designs, n_time, n_features), got {designs.shape}"
+            )
+        return score_poisson_designs_heldout(
+            designs,
+            response,
+            penalty_for(designs[0]),
+            design_batch_size=design_batch_size,
+        ).total
 
     selection_classes = list(classes)
     if baseline_control is not None and engagement_class not in selection_classes:
@@ -691,8 +732,6 @@ def control_draw_null(
         )
     n_tested = {name: int(len(events)) for name, events in tested_events.items()}
 
-    draw_times: dict[tuple[str, int], pd.DataFrame] = {}
-
     def draw_for(class_name: str, seed: int) -> pd.DataFrame:
         """One control draw matched to the class's fixed tested subset.
 
@@ -701,25 +740,22 @@ def control_draw_null(
         covers the real ``non_local`` set either way (it is the union of its
         two subclasses).
         """
-        key = (class_name, seed)
-        if key not in draw_times:
-            source = {
-                **event_times,
-                MATCHED_CONTROL_SOURCE_CLASS: tested_events[class_name],
-            }
-            draw_times[key] = make_matched_control_times(
-                source,
-                fit_mask,
-                np.random.default_rng(seed),
-                max_attempts=max_attempts,
-            ).times
-        return draw_times[key]
+        source = {
+            **event_times,
+            MATCHED_CONTROL_SOURCE_CLASS: tested_events[class_name],
+        }
+        return make_matched_control_times(
+            source,
+            fit_mask,
+            np.random.default_rng(seed),
+            max_attempts=max_attempts,
+        ).times
 
     if model_deviance is not None and "constant" in model_deviance:
         constant_deviance = np.asarray(model_deviance["constant"], dtype=float)
     else:
         constant = np.ones((int(fit_rows.sum()), 1))
-        constant_deviance = heldout_deviance(constant, fit_counts, None, folds).total
+        constant_deviance = score_design_batch(constant[None, :, :])[0]
 
     observed_improvement: dict[str, NDArray] = {}
     for class_name in classes:
@@ -738,16 +774,11 @@ def control_draw_null(
         observed_design = control_design(
             tested_events[class_name], fit_mask, spline_basis, lags
         )
-        observed_deviance = heldout_deviance(
-            observed_design,
-            fit_counts,
-            penalty_for(observed_design),
-            folds,
-        ).total
+        observed_deviance = score_design_batch(observed_design[None, :, :])[0]
         observed_improvement[class_name] = constant_deviance - observed_deviance
 
-    engagement: list[NDArray] = []
-    engagement_overlap: list[float] = []
+    engagement = np.empty((0, counts.shape[1]))
+    engagement_overlap = np.empty(0)
     observed_engagement = np.empty(0)
     baseline_design = None
     baseline_deviance = None
@@ -760,9 +791,7 @@ def control_draw_null(
                 model_deviance["matched_control"], dtype=float
             )
         else:
-            baseline_deviance = heldout_deviance(
-                baseline_design, fit_counts, penalty_for(baseline_design), folds
-            ).total
+            baseline_deviance = score_design_batch(baseline_design[None, :, :])[0]
         baseline_starts, baseline_ends = _merge_windows(
             baseline_control["start_time"].to_numpy(dtype=float),
             baseline_control["end_time"].to_numpy(dtype=float),
@@ -785,78 +814,89 @@ def control_draw_null(
             observed_joint = np.concatenate(
                 [baseline_design, tested_design[:, 1:]], axis=1
             )
-            observed_joint_deviance = heldout_deviance(
-                observed_joint,
-                fit_counts,
-                penalty_for(observed_joint),
-                folds,
-            ).total
+            observed_joint_deviance = score_design_batch(observed_joint[None, :, :])[0]
             observed_engagement = baseline_deviance - observed_joint_deviance
+        engagement = np.full((len(seeds), counts.shape[1]), np.nan)
+        engagement_overlap = np.full(len(seeds), np.nan)
 
-    def append_engagement(times: pd.DataFrame, design: NDArray | None) -> None:
-        """Score one engagement draw while its class design is in memory."""
-        engagement_overlap.append(
-            overlapping_fraction(times, baseline_starts, baseline_ends)
+    def score_draw_stream(
+        class_name: str, *, score_improvement: bool
+    ) -> tuple[NDArray, NDArray]:
+        """Build, score and release fixed-size batches for one event class."""
+        per_draw = np.full((len(seeds), counts.shape[1]), np.nan)
+        placed = np.zeros(len(seeds), dtype=int)
+        score_engagement = (
+            baseline_control is not None and class_name == engagement_class
         )
-        if design is None:
-            engagement.append(np.full(counts.shape[1], np.nan))
-            return
-        if baseline_design is None or baseline_deviance is None:
-            raise RuntimeError("engagement scoring needs a baseline control")
-        # Both designs have the same intercept. Reuse the already-built
-        # baseline and draw blocks instead of reconvolving both event sets.
-        joint = np.concatenate([baseline_design, design[:, 1:]], axis=1)
-        joint_deviance = heldout_deviance(
-            joint, fit_counts, penalty_for(joint), folds
-        ).total
-        engagement.append(baseline_deviance - joint_deviance)
+
+        for batch_start in range(0, len(seeds), design_batch_size):
+            batch_stop = min(batch_start + design_batch_size, len(seeds))
+            exact_indices: list[int] = []
+            exact_designs: list[NDArray] = []
+            for draw_index in range(batch_start, batch_stop):
+                times = draw_for(class_name, seeds[draw_index])
+                placed[draw_index] = len(times)
+                if score_engagement:
+                    engagement_overlap[draw_index] = overlapping_fraction(
+                        times, baseline_starts, baseline_ends
+                    )
+                if len(times) != n_tested[class_name] or n_tested[class_name] == 0:
+                    continue
+                exact_indices.append(draw_index)
+                exact_designs.append(
+                    control_design(times, fit_mask, spline_basis, lags)
+                )
+
+            if not exact_designs:
+                continue
+            design_batch = np.stack(exact_designs)
+            del exact_designs
+            if score_improvement:
+                draw_deviance = score_design_batch(design_batch)
+                per_draw[exact_indices] = constant_deviance - draw_deviance
+
+            if score_engagement:
+                if baseline_design is None or baseline_deviance is None:
+                    raise RuntimeError("engagement scoring needs a baseline control")
+                # Both designs have the same intercept. Reuse the baseline and
+                # draw blocks, but materialize only this small batch of joints.
+                joint_batch = np.empty(
+                    (
+                        design_batch.shape[0],
+                        design_batch.shape[1],
+                        baseline_design.shape[1] + design_batch.shape[2] - 1,
+                    ),
+                    dtype=float,
+                )
+                joint_batch[:, :, : baseline_design.shape[1]] = baseline_design
+                joint_batch[:, :, baseline_design.shape[1] :] = design_batch[:, :, 1:]
+                joint_deviance = score_design_batch(joint_batch)
+                engagement[exact_indices] = baseline_deviance - joint_deviance
+
+        return per_draw, placed
 
     improvement: dict[str, NDArray] = {}
     n_placed: dict[str, NDArray] = {}
     for class_name in classes:
-        per_draw = []
-        placed = []
-        for seed in seeds:
-            times = draw_for(class_name, seed)
-            placed.append(len(times))
-            if len(times) != n_tested[class_name] or n_tested[class_name] == 0:
-                per_draw.append(np.full(counts.shape[1], np.nan))
-                if baseline_control is not None and class_name == engagement_class:
-                    append_engagement(times, None)
-                continue
-            design = control_design(times, fit_mask, spline_basis, lags)
-            deviance = heldout_deviance(
-                design, fit_counts, penalty_for(design), folds
-            ).total
-            per_draw.append(constant_deviance - deviance)
-            if baseline_control is not None and class_name == engagement_class:
-                append_engagement(times, design)
-        improvement[class_name] = np.asarray(per_draw)
-        n_placed[class_name] = np.asarray(placed, dtype=int)
+        per_draw, placed = score_draw_stream(class_name, score_improvement=True)
+        improvement[class_name] = per_draw
+        n_placed[class_name] = placed
 
     # A custom ``classes`` subset may omit the engagement class. It still gets
     # its own streamed designs, but the production/default path above reuses
     # the design while scoring that class and never retains an R-sized cache.
     if baseline_control is not None and engagement_class not in classes:
-        for seed in seeds:
-            times = draw_for(engagement_class, seed)
-            if len(times) != n_tested[engagement_class] or not len(times):
-                append_engagement(times, None)
-                continue
-            design = control_design(times, fit_mask, spline_basis, lags)
-            append_engagement(times, design)
+        score_draw_stream(engagement_class, score_improvement=False)
 
     return ControlDrawNull(
         improvement=improvement,
         observed_improvement=observed_improvement,
-        engagement=(
-            np.asarray(engagement) if engagement else np.empty((0, counts.shape[1]))
-        ),
+        engagement=engagement,
         observed_engagement=observed_engagement,
         constant_deviance=constant_deviance,
         n_placed=n_placed,
         n_events=n_events,
         n_tested=n_tested,
         tested_source_indices=tested_source_indices,
-        engagement_overlap=np.asarray(engagement_overlap, dtype=float),
+        engagement_overlap=engagement_overlap,
     )

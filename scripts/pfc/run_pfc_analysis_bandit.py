@@ -77,6 +77,8 @@ from continuum_swr_replay.analysis.pfc.batched_glm import (
     DEFAULT_PENALTY_SIGMA,
     fit_poisson_glms,
     implied_prior_sd,
+    prepare_heldout_response,
+    score_poisson_designs_heldout,
 )
 from continuum_swr_replay.analysis.pfc.canonical_events import (
     IS_SWR_DEFINITION,
@@ -105,7 +107,6 @@ from continuum_swr_replay.analysis.pfc.heldout import (
     assign_blocked_folds,
     control_draw_null,
     empirical_pvalue,
-    heldout_deviance,
     null_draw_seeds,
 )
 from continuum_swr_replay.analysis.replay.cohort_selection import stop_cohort_suffix
@@ -139,6 +140,12 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, module="pynwb")
 #: records the implied per-lag and sustained standard deviations beside it,
 #: from ``implied_prior_sd``.
 CANONICAL_PENALTY_SIGMA = DEFAULT_PENALTY_SIGMA
+
+#: Production Monte Carlo sample. With the plus-one correction this gives a
+#: minimum p-value of 1/1001 and about 50 grid points at or below 0.05. The
+#: prediction-only microbatched scorer makes this feasible without holding all
+#: draw designs in memory at once.
+DEFAULT_CONTROL_DRAWS = 1_000
 
 #: The estimator and the inference each bundle is produced by, recorded in the
 #: provenance sidecar and compared by the skip check: a bundle fit by maximum
@@ -479,6 +486,7 @@ def score_session(
         support_radius_bins=support_radius_bins,
     )
     penalties = model_penalties(designs, penalty_sigma)
+    scoring_response = prepare_heldout_response(fit_counts, folds)
 
     # A design whose event class has no events leaves an all-zero basis block,
     # which is rank-deficient against the intercept. Such a model is not an
@@ -497,16 +505,35 @@ def score_session(
 
     deviance: dict[str, NDArray] = {}
     per_fold: dict[str, NDArray] = {}
-    for name, design in designs.items():
-        if name in non_estimable:
-            deviance[name] = np.full(n_units, np.nan)
-            per_fold[name] = np.full((n_folds, n_units), np.nan)
-            continue
-        scored = heldout_deviance(
-            design[fit_rows], fit_counts, penalties.get(name), folds
+    for name in non_estimable:
+        deviance[name] = np.full(n_units, np.nan)
+        per_fold[name] = np.full((n_folds, n_units), np.nan)
+    widths = sorted(
+        {
+            design.shape[1]
+            for name, design in designs.items()
+            if name not in non_estimable
+        }
+    )
+    for width in widths:
+        names = [
+            name
+            for name, design in designs.items()
+            if name not in non_estimable and design.shape[1] == width
+        ]
+        design_batch = np.stack([designs[name][fit_rows] for name in names])
+        penalty_batch = np.stack(
+            [penalties.get(name, np.zeros(width)) for name in names]
         )
-        deviance[name] = scored.total
-        per_fold[name] = scored.per_fold
+        scored = score_poisson_designs_heldout(
+            design_batch,
+            scoring_response,
+            penalty_batch,
+            design_batch_size=4,
+        )
+        for index, name in enumerate(names):
+            deviance[name] = scored.total[index]
+            per_fold[name] = scored.per_fold[index]
     logger.info("Scored %d models on %d folds", len(designs), n_folds)
 
     statistics: dict[str, object] = {}
@@ -566,6 +593,7 @@ def score_session(
             penalty_sigma=penalty_sigma,
             baseline_control=context["event_times"]["matched_control"],
             model_deviance=deviance,
+            response=scoring_response,
         )
         # Each class is read against a null drawn to its own fixed matchable
         # onset subset and durations: a regressor built from 30 windows buys
@@ -790,7 +818,7 @@ def run_analysis(
     allow_cpu: bool = False,
     penalty_sigma: float = CANONICAL_PENALTY_SIGMA,
     n_folds: int = 5,
-    n_control_draws: int = 40,
+    n_control_draws: int = DEFAULT_CONTROL_DRAWS,
     fold_seed: int | None = None,
     control_draw_seed: int | None = None,
 ) -> None:
@@ -1340,11 +1368,12 @@ def get_command_line_arguments() -> Namespace:
     parser.add_argument(
         "--n-control-draws",
         type=int,
-        default=40,
+        default=DEFAULT_CONTROL_DRAWS,
         help=(
             "Draws of the matched non-event control that make the null each "
-            "held-out improvement is read against (default: 40). 0 skips the "
-            "null, and no empirical p-value is written."
+            f"held-out improvement is read against (default: "
+            f"{DEFAULT_CONTROL_DRAWS}). 0 skips the null, and no empirical "
+            "p-value is written."
         ),
     )
     parser.add_argument(

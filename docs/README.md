@@ -160,9 +160,9 @@ Three tiers:
    class's null draws placed against the real onset count they were matched to). The
    canonical bundles carry **σ = 3** (implied per-lag sd **2.066**, a rate multiplier
    of ×0.017–×57 at 95 %; sustained sd **0.905**, ×0.17–×5.9), **K = 5** folds and
-   **R = 40** null draws — quoted from the sidecars, which is where a reader should
+   **R = 1,000** null draws — quoted from the sidecars, which is where a reader should
    check them. The finite-sample Monte Carlo p-value is **`(r + 1)/(R + 1)`**,
-   so with 40 usable draws its minimum is **1/41 = 0.024**; zero is impossible.
+   so with 1,000 usable draws its minimum is **1/1,001 ≈ 0.001**; zero is impossible.
    Draws that fail to place every matched window are excluded, and fewer than 20
    usable draws leaves the p-value unavailable. Unit fractions at raw p < 0.05 are
    descriptive previews only; population inference aggregates through session and

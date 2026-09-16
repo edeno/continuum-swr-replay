@@ -95,6 +95,14 @@ the regime the penalty removes.
 
 Float64 throughout: the convergence test is an absolute ``1e-8`` on a deviance
 of order ``1e5``, which float32 cannot even represent.
+
+Held-out scoring uses a separate prediction-only engine. It keeps the shared
+response on one device, batches designs and folds, runs the per-unit stopping
+logic in a compiled ``while_loop``, and skips covariance, log-likelihood and
+AIC work that cannot affect a prediction score. Each tall training design is
+reduced by QR before a feature-sized SVD supplies the rank-aware minimum-norm
+map. Fixed-size design microbatches give repeated null draws stable compiled
+shapes and a bounded large-array working set.
 """
 
 from __future__ import annotations
@@ -286,6 +294,72 @@ class BatchedGLMResults:
             bse=np.asarray(self.bse[index]),
             covariance=np.asarray(self.covariance[index]),
         )
+
+
+@dataclass(frozen=True)
+class PreparedHeldoutResponse:
+    """One session's response and folds, resident on the configured device.
+
+    Held-out scoring fits many changing event designs against the same spike
+    counts and the same fold assignment.  Keeping these two arrays on-device
+    avoids transferring and rechunking the response for every class, draw and
+    fold.
+    """
+
+    counts: jax.Array
+    folds: jax.Array
+    n_folds: int
+
+    @property
+    def n_time(self) -> int:
+        return int(self.counts.shape[0])
+
+    @property
+    def n_units(self) -> int:
+        return int(self.counts.shape[1])
+
+
+@dataclass(frozen=True)
+class BatchedHeldoutResults:
+    """Prediction-only held-out scores for a batch of equal-width designs."""
+
+    per_fold: NDArray
+    total: NDArray
+    converged: NDArray
+    n_iter: NDArray
+    rank: NDArray
+
+
+def prepare_heldout_response(
+    counts: NDArray, folds: NDArray
+) -> PreparedHeldoutResponse:
+    """Validate and transfer a session response once for repeated scoring."""
+    require_configured_device()
+    counts_array = np.asarray(counts, dtype=float)
+    if counts_array.ndim == 1:
+        counts_array = counts_array[:, None]
+    folds_array = np.asarray(folds, dtype=np.int64)
+    if counts_array.ndim != 2 or folds_array.ndim != 1:
+        raise ValueError(
+            "counts must be 1-D or 2-D and folds 1-D; got "
+            f"{counts_array.shape} and {folds_array.shape}"
+        )
+    if counts_array.shape[0] != folds_array.shape[0]:
+        raise ValueError(
+            f"counts has {counts_array.shape[0]} rows but folds has "
+            f"{folds_array.shape[0]}"
+        )
+    labels = np.unique(folds_array)
+    if labels.size < 2 or not np.array_equal(labels, np.arange(labels.size)):
+        raise ValueError(
+            "folds must use every consecutive label from 0 and contain at "
+            f"least two folds; got {labels.tolist()}"
+        )
+    return PreparedHeldoutResponse(
+        counts=jax.device_put(np.ascontiguousarray(counts_array)),
+        folds=jax.device_put(np.ascontiguousarray(folds_array)),
+        n_folds=int(labels.size),
+    )
 
 
 def jax_backend() -> str:
@@ -741,6 +815,407 @@ def poisson_deviance_from_params(
         _poisson_deviance_from_params(
             jnp.asarray(design), jnp.asarray(counts), jnp.asarray(params)
         )
+    )
+
+
+def _heldout_chunk_rows(n_models: int, n_units: int, rank: int) -> int:
+    """Rows per chunk for a microbatch of design x fold fits."""
+    widest = n_models * max(n_units, rank * rank, 1)
+    return int(np.clip(_TARGET_CHUNK_ELEMENTS // widest, 256, 1 << 15))
+
+
+def _pad_axis_one(array: jax.Array, n_pad: int) -> jax.Array:
+    """Pad the time axis (axis 1) of a batched array with zeros."""
+    if not n_pad:
+        return array
+    return jnp.pad(array, ((0, 0), (0, n_pad)) + ((0, 0),) * (array.ndim - 2))
+
+
+def _sweep_prediction_batch(
+    design_chunks: jax.Array,
+    count_chunks: jax.Array,
+    valid_chunks: jax.Array,
+    params: jax.Array,
+    mean_count: jax.Array,
+    *,
+    start: bool,
+) -> tuple[jax.Array, jax.Array, jax.Array]:
+    """One IRLS sweep for many design x fold fits, without likelihood work.
+
+    The leading model dimension is a flattened ``design x fold`` batch.  The
+    spike counts are shared, so they stay ``(chunk, time, unit)`` instead of
+    being copied once per model.
+    """
+    n_models, _, _, rank = design_chunks.shape
+    n_units = count_chunks.shape[-1]
+
+    def body(carry, block):
+        information, rhs, deviance = carry
+        design, count, valid = block
+        if start:
+            mu = 0.5 * (count[None, :, :] + mean_count[:, None, :])
+            eta = jnp.log(mu)
+        else:
+            eta = jnp.einsum("mlp,mnp->mln", design, params)
+            mu = jnp.exp(eta)
+        mu_clean = jnp.clip(mu, _FLOAT_EPS, jnp.inf)
+        weight = mu_clean**2 / mu
+        weighted_response = weight * eta + (mu_clean / mu) * (count[None, :, :] - mu)
+
+        keep = valid[:, :, None]
+        weight = jnp.where(keep, weight, 0.0)
+        weighted_response = jnp.where(keep, weighted_response, 0.0)
+        rhs = rhs + jnp.einsum("mlp,mln->mpn", design, weighted_response)
+        information = information + jnp.einsum(
+            "mln,mlp,mlq->mnpq", weight, design, design
+        )
+
+        ratio = jnp.clip(count[None, :, :] / mu, _FLOAT_EPS, jnp.inf)
+        residual = 2.0 * (count[None, :, :] * jnp.log(ratio) - (count[None, :, :] - mu))
+        deviance = deviance + jnp.sum(jnp.where(keep, residual, 0.0), axis=1)
+        return (information, rhs, deviance), None
+
+    init = (
+        jnp.zeros((n_models, n_units, rank, rank), dtype=count_chunks.dtype),
+        jnp.zeros((n_models, rank, n_units), dtype=count_chunks.dtype),
+        jnp.zeros((n_models, n_units), dtype=count_chunks.dtype),
+    )
+    (information, rhs, deviance), _ = jax.lax.scan(
+        body,
+        init,
+        (
+            design_chunks.transpose(1, 0, 2, 3),
+            count_chunks,
+            valid_chunks.transpose(1, 0, 2),
+        ),
+    )
+    return information, rhs, deviance
+
+
+def _solve_prediction_batch(
+    information: jax.Array, rhs: jax.Array, rcond: float
+) -> jax.Array:
+    """Symmetric pseudo-inverse solve over model and unit batch axes."""
+    eigenvalues, eigenvectors = jnp.linalg.eigh(information)
+    largest = jnp.max(jnp.abs(eigenvalues), axis=-1, keepdims=True)
+    keep = eigenvalues > rcond * largest
+    inverse = jnp.where(keep, 1.0 / jnp.where(keep, eigenvalues, 1.0), 0.0)
+    projected = jnp.einsum("mnji,mnj->mni", eigenvectors, rhs.transpose(0, 2, 1))
+    return jnp.einsum("mnij,mnj->mni", eigenvectors, inverse * projected)
+
+
+def _score_prediction_batch(
+    designs: jax.Array,
+    counts: jax.Array,
+    folds: jax.Array,
+    params: jax.Array,
+    design_valid: jax.Array,
+    *,
+    n_folds: int,
+    chunk_rows: int,
+) -> jax.Array:
+    """Held-out Poisson deviance without materializing full predictions."""
+    n_designs, n_time, _ = designs.shape
+    n_units = counts.shape[1]
+    n_pad = (-n_time) % chunk_rows
+    designs = _pad_axis_one(designs, n_pad)
+    counts = jnp.pad(counts, ((0, n_pad), (0, 0)))
+    folds = jnp.pad(folds, (0, n_pad), constant_values=-1)
+    n_chunks = counts.shape[0] // chunk_rows
+    design_chunks = designs.reshape(n_designs, n_chunks, chunk_rows, -1)
+    count_chunks = counts.reshape(n_chunks, chunk_rows, n_units)
+    fold_chunks = folds.reshape(n_chunks, chunk_rows)
+
+    def body(total, block):
+        design, count, fold = block
+        eta = jnp.einsum("blp,bknp->bkln", design, params)
+        fitted_mean = jnp.exp(eta)
+        ratio = jnp.where(
+            count[None, None, :, :] > 0,
+            count[None, None, :, :] / fitted_mean,
+            1.0,
+        )
+        terms = count[None, None, :, :] * jnp.log(ratio) - (
+            count[None, None, :, :] - fitted_mean
+        )
+        score_fold = jnp.arange(n_folds)[:, None] == fold[None, :]
+        keep = design_valid[:, None, None, None] & score_fold[None, :, :, None]
+        return total + 2.0 * jnp.sum(jnp.where(keep, terms, 0.0), axis=2), None
+
+    initial = jnp.zeros((n_designs, n_folds, n_units), dtype=counts.dtype)
+    total, _ = jax.lax.scan(
+        body,
+        initial,
+        (design_chunks.transpose(1, 0, 2, 3), count_chunks, fold_chunks),
+    )
+    return total
+
+
+@partial(
+    jax.jit,
+    static_argnames=("n_folds", "maxiter", "chunk_rows"),
+)
+def _heldout_prediction_batch(
+    designs: jax.Array,
+    counts: jax.Array,
+    folds: jax.Array,
+    penalties: jax.Array,
+    design_valid: jax.Array,
+    *,
+    n_folds: int,
+    maxiter: int,
+    tol: float,
+    rcond: float,
+    chunk_rows: int,
+) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
+    """Fit and score a microbatch with folds and IRLS entirely on-device."""
+    n_designs, n_time, n_features = designs.shape
+    n_units = counts.shape[1]
+    fold_ids = jnp.arange(n_folds)
+    training_by_fold = folds[None, :] != fold_ids[:, None]
+    training = jnp.broadcast_to(
+        training_by_fold[None, :, :], (n_designs, n_folds, n_time)
+    ).reshape(n_designs * n_folds, n_time)
+    flat_design = (designs[:, None, :, :] * training_by_fold[None, :, :, None]).reshape(
+        n_designs * n_folds, n_time, n_features
+    )
+
+    # Stable tall-skinny decomposition: QR reduces the large matrix to a
+    # feature-sized R; only that small matrix needs an SVD for rank and the
+    # minimum-norm map back to the original scientific coefficients.
+    reduced = jnp.linalg.qr(flat_design, mode="r")
+    _, singular_values, right = jnp.linalg.svd(reduced, full_matrices=False)
+    n_training = training.sum(axis=1)
+    tolerance = (
+        singular_values[:, :1]
+        * jnp.maximum(n_training[:, None], n_features)
+        * jnp.finfo(designs.dtype).eps
+    )
+    kept = singular_values > tolerance
+    inverse = jnp.where(kept, 1.0 / jnp.where(kept, singular_values, 1.0), 0.0)
+    back = right.transpose(0, 2, 1) * inverse[:, None, :]
+    basis = jnp.einsum("mtp,mpr->mtr", flat_design, back)
+    rank = kept.sum(axis=1)
+
+    penalty_by_fit = jnp.broadcast_to(
+        penalties[:, None, :], (n_designs, n_folds, n_features)
+    ).reshape(n_designs * n_folds, n_features)
+    penalty_matrix = jnp.einsum("mpr,mp,mps->mrs", back, penalty_by_fit, back)
+
+    n_pad = (-n_time) % chunk_rows
+    basis = _pad_axis_one(basis, n_pad)
+    training = jnp.pad(training, ((0, 0), (0, n_pad)))
+    count_padded = jnp.pad(counts, ((0, n_pad), (0, 0)))
+    n_chunks = count_padded.shape[0] // chunk_rows
+    basis_chunks = basis.reshape(n_designs * n_folds, n_chunks, chunk_rows, n_features)
+    valid_chunks = training.reshape(n_designs * n_folds, n_chunks, chunk_rows)
+    count_chunks = count_padded.reshape(n_chunks, chunk_rows, n_units)
+    mean_count = (
+        jnp.einsum("mt,tn->mn", training[:, :n_time], counts) / n_training[:, None]
+    )
+
+    information, rhs, initial_deviance = _sweep_prediction_batch(
+        basis_chunks,
+        count_chunks,
+        valid_chunks,
+        jnp.zeros((n_designs * n_folds, n_units, n_features), dtype=counts.dtype),
+        mean_count,
+        start=True,
+    )
+    failed = jnp.isnan(initial_deviance)
+    active = ~failed
+    params = jnp.where(
+        active[:, :, None],
+        _solve_prediction_batch(
+            information + penalty_matrix[:, None, :, :], rhs, rcond
+        ),
+        0.0,
+    )
+    penalized_previous = initial_deviance
+    converged = jnp.zeros_like(active)
+    diverged = jnp.zeros_like(active)
+    n_iter = jnp.zeros_like(active, dtype=jnp.int32)
+
+    def condition(carry):
+        iteration, _, active_now, _, _, _, _ = carry
+        return (iteration < maxiter) & jnp.any(active_now)
+
+    def body(carry):
+        (
+            iteration,
+            params_now,
+            active_now,
+            converged_now,
+            diverged_now,
+            iters,
+            previous,
+        ) = carry
+        information_now, rhs_now, deviance_now = _sweep_prediction_batch(
+            basis_chunks,
+            count_chunks,
+            valid_chunks,
+            params_now,
+            mean_count,
+            start=False,
+        )
+        penalty_value = jnp.einsum(
+            "mnr,mrs,mns->mn", params_now, penalty_matrix, params_now
+        )
+        penalized = deviance_now + penalty_value
+        next_iteration = iteration + 1
+        iters = jnp.where(active_now, next_iteration, iters)
+        just_converged = active_now & (jnp.abs(penalized - previous) <= tol)
+        converged_now = converged_now | just_converged
+        diverged_now = diverged_now | (active_now & ~jnp.isfinite(penalized))
+        next_active = active_now & ~just_converged & ~diverged_now
+        previous = jnp.where(next_active, penalized, previous)
+        stepped = _solve_prediction_batch(
+            information_now + penalty_matrix[:, None, :, :], rhs_now, rcond
+        )
+        should_step = next_active & (next_iteration < maxiter)
+        params_now = jnp.where(should_step[:, :, None], stepped, params_now)
+        return (
+            next_iteration,
+            params_now,
+            next_active,
+            converged_now,
+            diverged_now,
+            iters,
+            previous,
+        )
+
+    _, params, _, converged, diverged, n_iter, _ = jax.lax.while_loop(
+        condition,
+        body,
+        (
+            jnp.asarray(0, dtype=jnp.int32),
+            params,
+            active,
+            converged,
+            diverged,
+            n_iter,
+            penalized_previous,
+        ),
+    )
+    usable = converged & ~failed & ~diverged
+    beta = jnp.einsum("mpr,mnr->mnp", back, params).reshape(
+        n_designs, n_folds, n_units, n_features
+    )
+    usable = usable.reshape(n_designs, n_folds, n_units)
+    n_iter = n_iter.reshape(n_designs, n_folds, n_units)
+    usable = usable & jnp.all(jnp.isfinite(beta), axis=-1)
+    score = _score_prediction_batch(
+        designs,
+        counts,
+        folds,
+        beta,
+        design_valid,
+        n_folds=n_folds,
+        chunk_rows=chunk_rows,
+    )
+    usable = usable & jnp.isfinite(score) & design_valid[:, None, None]
+    return (
+        jnp.where(usable, score, jnp.nan),
+        usable,
+        n_iter,
+        rank.reshape(n_designs, n_folds),
+    )
+
+
+def score_poisson_designs_heldout(
+    designs: NDArray,
+    response: PreparedHeldoutResponse,
+    penalties: NDArray | None = None,
+    *,
+    design_batch_size: int = 4,
+    maxiter: int = DEFAULT_MAXITER,
+    tol: float = DEFAULT_TOL,
+    rcond: float = DEFAULT_RCOND,
+) -> BatchedHeldoutResults:
+    """Fit and score equal-width designs in stable-shape GPU microbatches.
+
+    This prediction-only path deliberately omits covariance, log-factorials,
+    likelihood and AIC.  It batches all folds and several changing null
+    designs, keeps the response resident on-device, and returns only the small
+    per-fold scores and convergence diagnostics to the host.
+    """
+    require_configured_device()
+    design_array = np.asarray(designs, dtype=float)
+    if design_array.ndim == 2:
+        design_array = design_array[None, :, :]
+    if design_array.ndim != 3:
+        raise ValueError(
+            "designs must have shape (n_designs, n_time, n_features), got "
+            f"{design_array.shape}"
+        )
+    n_designs, n_time, n_features = design_array.shape
+    if n_designs < 1 or design_batch_size < 1:
+        raise ValueError(
+            "at least one design and a positive design_batch_size are required"
+        )
+    if n_time != response.n_time:
+        raise ValueError(
+            f"designs have {n_time} rows but the prepared response has "
+            f"{response.n_time}"
+        )
+    if penalties is None:
+        penalty_array = np.zeros((n_designs, n_features), dtype=float)
+    else:
+        penalty_array = np.asarray(penalties, dtype=float)
+        if penalty_array.ndim == 1:
+            penalty_array = np.broadcast_to(
+                penalty_array, (n_designs, n_features)
+            ).copy()
+        if penalty_array.shape != (n_designs, n_features):
+            raise ValueError(
+                "penalties must have one value per design column, per design; "
+                f"expected {(n_designs, n_features)}, got {penalty_array.shape}"
+            )
+        if np.any(penalty_array < 0) or not np.all(np.isfinite(penalty_array)):
+            raise ValueError("penalties must be finite and non-negative")
+
+    per_fold_parts = []
+    converged_parts = []
+    n_iter_parts = []
+    rank_parts = []
+    n_models = design_batch_size * response.n_folds
+    chunk_rows = _heldout_chunk_rows(n_models, response.n_units, n_features)
+    for start in range(0, n_designs, design_batch_size):
+        stop = min(start + design_batch_size, n_designs)
+        n_actual = stop - start
+        design_batch = np.zeros((design_batch_size, n_time, n_features), dtype=float)
+        penalty_batch = np.zeros((design_batch_size, n_features), dtype=float)
+        valid = np.zeros(design_batch_size, dtype=bool)
+        design_batch[:n_actual] = design_array[start:stop]
+        penalty_batch[:n_actual] = penalty_array[start:stop]
+        valid[:n_actual] = True
+        scored, converged, n_iter, rank = _heldout_prediction_batch(
+            jax.device_put(design_batch),
+            response.counts,
+            response.folds,
+            jax.device_put(penalty_batch),
+            jax.device_put(valid),
+            n_folds=response.n_folds,
+            maxiter=maxiter,
+            tol=tol,
+            rcond=rcond,
+            chunk_rows=chunk_rows,
+        )
+        scored_host, converged_host, n_iter_host, rank_host = jax.device_get(
+            (scored, converged, n_iter, rank)
+        )
+        per_fold_parts.append(np.asarray(scored_host[:n_actual]))
+        converged_parts.append(np.asarray(converged_host[:n_actual]))
+        n_iter_parts.append(np.asarray(n_iter_host[:n_actual]))
+        rank_parts.append(np.asarray(rank_host[:n_actual]))
+
+    per_fold = np.concatenate(per_fold_parts, axis=0)
+    return BatchedHeldoutResults(
+        per_fold=per_fold,
+        total=per_fold.sum(axis=1),
+        converged=np.concatenate(converged_parts, axis=0),
+        n_iter=np.concatenate(n_iter_parts, axis=0),
+        rank=np.concatenate(rank_parts, axis=0),
     )
 
 

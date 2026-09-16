@@ -35,6 +35,7 @@ def test_stop_cohort_defaults_to_the_canonical_at_well_population(monkeypatch):
     assert args.stop_cohort == "at_well"
     assert args.output_dir == runner.PROCESSED_DATA_DIR
     assert args.max_sessions is None
+    assert args.n_control_draws == runner.DEFAULT_CONTROL_DRAWS == 1_000
 
 
 def test_an_unoffered_cohort_is_rejected(monkeypatch):

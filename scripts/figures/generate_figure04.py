@@ -27,8 +27,8 @@ event-basis coefficients, and a peri-event kernel that returns to
 baseline at both ends of the ±250 ms fit window. The example neuron's
 band is the penalised posterior-mode standard error, and the population
 significance is an empirical p-value from repeated matched-control
-draws (R = 40, with the finite-sample plus-one correction, so its minimum is
-1/(R+1) = 0.024). Panel d's unit fraction is a descriptive raw-p preview;
+draws (R = 1,000, with the finite-sample plus-one correction, so its minimum is
+1/(R+1) ≈ 0.001). Panel d's unit fraction is a descriptive raw-p preview;
 population inference requires aggregation through session and animal.
 
 April 2026: the figure was tightened from 6 panels to 4. The previous

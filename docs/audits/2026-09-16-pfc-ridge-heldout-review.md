@@ -105,15 +105,43 @@ exact draws on the same fixed event subset used by its observed statistic, and a
 | wilbur20210329_02_r1 | 27:25 | 8.89 GiB | 342/344 | none | 40/40, every class |
 
 Wilbur is the comparable full-workload performance case: device-side held-out scoring reduced it
-from 37:46 to 27:25 (27% less wall time). GPU use remained bursty and host CPU stayed near 83%, so
-the remaining ceiling is the host-orchestrated IRLS loop and its per-iteration convergence
-synchronisation, not device memory or compute capacity. Removing that synchronisation would require
-a larger solver rewrite and is not needed for the production run. The three smoke artifacts loaded
+from 37:46 to 27:25 (27% less wall time). At that gate GPU use remained bursty and host CPU stayed
+near 83%, identifying the host-orchestrated IRLS loop and its per-iteration convergence
+synchronisation as the next ceiling. The follow-up below moves that loop onto the device. The three
+smoke artifacts loaded
 together as 581 usable units with five aligned 201-sample modulation matrices; all five empirical
 p-value columns were finite for every retained unit. The estimator audit completed successfully.
 
+### Follow-up GPU optimization and production draw count
+
+The held-out scorer now has a prediction-only path: spike counts and folds are transferred once,
+four equal-width designs and all five folds are fit together, per-unit convergence stays inside one
+compiled JAX loop, and a tall QR followed by an SVD of its small triangular factor replaces the
+repeated tall SVD. Null designs are generated and released in microbatches, so the large design
+working set does not grow with R. On the saved 64,000-bin x 128-unit benchmark, warm scoring fell
+from 0.471 s/design to 0.097 s for one design and 0.048 s/design in a four-design batch. The maximum
+score difference from
+the reference was 1.82e-12; convergence flags and iteration counts were identical.
+
+The end-to-end j16 gate at the same K = 5, R = 40, seeds and fixed event subsets completed in 5:23
+instead of 12:00. Its null phase took 1:49 instead of 8:26 (4.6x faster), and peak host RSS was
+4.66 GiB instead of 4.25 GiB. The 74 x 131 result table passed the numerical gate (absolute 1e-8,
+relative 1e-10), including identical p-values and model choices, and all five modulation arrays were
+byte-identical. Linear extrapolation of the measured null phase puts R = 1,000 at about 49 minutes
+for this session. That cost is suitable for the ten-device production batch and gives a minimum
+plus-one p-value of 1/1,001 rather than 1/41, so production now defaults to R = 1,000. The R = 40
+artifacts above remain pre-production correctness/performance gates, not the final inferential
+resolution.
+
 ## Validation
 
+- Prediction-only scorer and null-microbatch gate: 132 passed, 1 slow test deselected; this includes
+  exact convergence/iteration agreement, rank-deficient and silent-unit behavior, and a direct
+  2/2/1 bounded-batch regression.
+- Broad PFC/runner/cohort-audit gate after optimization: 354 passed, 2 slow tests deselected.
+- Repository-wide non-slow gate: 2,831 tests passed and one stale generated pipeline-map check
+  failed because `null_window_table` was absent from the map. Regenerating the map fixed that branch
+  hygiene issue; its dedicated check then passed.
 - Focused correctness/performance gate: 136 passed, including the 40-draw null calibration.
 - Follow-up control/inference/runner/loader gate after the real-smoke finding: 110 passed in 8 min
   13 s; the dense-bout regression fails under the disjoint-window policy and passes only when all
