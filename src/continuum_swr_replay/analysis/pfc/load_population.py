@@ -196,7 +196,15 @@ def load_population_data(
         sess_no_swr = np.load(f"{base}.no_SWR_modulation.npy")
         sess_nl_swr = np.load(f"{base}.non_local_SWR_modulation.npy")
         sess_nl_no_swr = np.load(f"{base}.non_local_no_SWR_modulation.npy")
-        sess_matched = np.load(f"{base}.matched_control_modulation.npy")
+        # The matched non-event control postdates the first bundles, so a
+        # tree written before it has no such array. Reading one is still
+        # legitimate -- an audit does it on purpose -- and the curve is then
+        # absent rather than zero: NaN, which the nanmean reduction the
+        # docstring asks for already handles.
+        try:
+            sess_matched = np.load(f"{base}.matched_control_modulation.npy")
+        except FileNotFoundError:
+            sess_matched = np.full_like(sess_swr, np.nan)
 
         # Sessions with no surviving neurons in this brain area save
         # placeholder arrays of shape ``(0, 0)`` (see ``run_session``
