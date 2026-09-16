@@ -12,6 +12,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.pfc.load_population import (
+    HELDOUT_P_COLUMNS,
     _extract_animal,
     load_population_data,
 )
@@ -41,7 +42,9 @@ def _write_bundle(directory, epoch_identifier, suffix, firing_rate):
         {
             "nwb_file_name": ["chimi20200212_.nwb"],
             "immobility_avg_firing_rate": [firing_rate],
-            "SWR vs. constant: pval": [0.5],
+            "SWR: heldout_deviance": [100.0],
+            "min_heldout_model": ["SWR"],
+            **{column: [0.025] for column in HELDOUT_P_COLUMNS.values()},
         }
     )
     base = directory / f"{epoch_identifier}_mPFC_modulation{suffix}"
@@ -51,6 +54,7 @@ def _write_bundle(directory, epoch_identifier, suffix, firing_rate):
         "no_SWR_modulation",
         "non_local_SWR_modulation",
         "non_local_no_SWR_modulation",
+        "matched_control_modulation",
     ):
         np.save(base.with_suffix(f".{name}.npy"), modulation)
 
