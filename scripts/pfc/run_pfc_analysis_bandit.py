@@ -72,14 +72,7 @@ import pandas as pd
 from dask.distributed import Client, LocalCluster
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.pfc import (
-    build_session_event_sets,
-    build_session_fit_mask,
-    make_design_matrices,
-    make_matched_control_times,
-    matched_control_seed,
-    run_session,
-)
+from continuum_swr_replay.analysis.pfc import run_session
 from continuum_swr_replay.analysis.pfc.batched_glm import (
     DEFAULT_PENALTY_SIGMA,
     fit_poisson_glms,
@@ -95,7 +88,8 @@ from continuum_swr_replay.analysis.pfc.cohort import (
 )
 from continuum_swr_replay.analysis.pfc.glm import (
     EVENT_CLASSES,
-    get_spikecount_per_time_bin,
+    NESTED_MODEL_PAIRS,
+    REPORT_HALF_WINDOW_S,
     is_separated,
     model_penalties,
     peak_log_modulation,
@@ -147,29 +141,6 @@ CANONICAL_PENALTY_SIGMA = DEFAULT_PENALTY_SIGMA
 #: likelihood and tested by a likelihood ratio is not this runner's bundle.
 ESTIMATOR = "ridge_poisson_glm"
 INFERENCE = "blocked_heldout_deviance"
-
-#: Nested ``(full, reduced)`` pairs the held-out comparison is reported for.
-#: Every pair is nested -- the reduced design's columns lie in the full
-#: design's span -- so the difference of held-out deviances is a statement
-#: about the added regressors alone. ``("SWR + non_local_no_SWR",
-#: "non_local")`` is absent for the same reason it always was: it is only
-#: nested when the session has no SWR-only events. The last two are the
-#: engagement decomposition, whose baseline is the matched non-event control.
-NESTED_MODEL_PAIRS = (
-    ("SWR", "constant"),
-    ("non_local", "constant"),
-    ("non_local_no_SWR", "constant"),
-    ("non_local_SWR", "constant"),
-    ("SWR + non_local_no_SWR", "constant"),
-    ("SWR + non_local_no_SWR", "SWR"),
-    ("SWR + non_local_no_SWR", "non_local_no_SWR"),
-    ("non_local_SWR + non_local_no_SWR", "constant"),
-    ("non_local_SWR + non_local_no_SWR", "non_local_SWR"),
-    ("non_local_SWR + non_local_no_SWR", "non_local_no_SWR"),
-    ("non_local_SWR + non_local_no_SWR", "non_local"),
-    ("matched_control + non_local_no_SWR", "matched_control"),
-    ("matched_control", "constant"),
-)
 
 #: The engagement comparison: does non-SWR replay predict held-out spikes
 #: beyond a duration-matched non-event baseline drawn from the same bouts?
@@ -394,195 +365,6 @@ def results_exist(
     )
 
 
-#: Half-width of the peri-event spline basis, in samples at 500 Hz. The models
-#: are fit over +/-250 ms so the spline's boundary behaviour falls outside the
-#: +/-200 ms the modulation curves are reported on. The scoring designs must be
-#: the ones the bundle was fit on, so they are built on the same lags.
-FIT_LAGS = np.arange(-125, 126, 1)
-
-#: Half-width of the window the curves are reported on, in seconds. The models
-#: are fit over a wider one so the spline's boundary behaviour falls outside it.
-REPORT_HALF_WINDOW_S = 0.2
-
-
-def build_scoring_context(
-    nwb_file_name: str,
-    epoch_name: str,
-    brain_area: str,
-    *,
-    stop_cohort: str,
-    cohort_stops: pd.DataFrame | None,
-    sampling_frequency: float,
-    immobility_threshold: float,
-    logger: logging.Logger,
-) -> dict[str, object]:
-    """Rebuild the population, the designs and the counts a session was fit on.
-
-    The held-out score and its null are fit on the same bins, the same events
-    and the same designs the shipped fit used, so they are assembled here from
-    the same functions and the same session-keyed control seed. Nothing is
-    re-detected and nothing is re-cut: the events are the canonical table's
-    rows for this session and the cohort is the stop cohort the caller
-    resolved.
-
-    Parameters
-    ----------
-    nwb_file_name, epoch_name, brain_area : str
-        The session key and the population of units.
-    stop_cohort : {"at_well", "all_stops"}
-        Population the models were fit on.
-    cohort_stops : pandas.DataFrame or None
-        The session's kept stops; ``None`` for ``all_stops``.
-    sampling_frequency : float
-        Sampling frequency in Hz.
-    immobility_threshold : float
-        Speed threshold the fit mask and the SWR gate are cut at (cm/s).
-    logger : logging.Logger
-
-    Returns
-    -------
-    dict
-        ``fit_mask`` (bool Series on the session's time axis), ``counts``
-        (``(n_time, n_units)`` spike counts), ``designs`` (full-length design
-        matrices by model name), ``spline_basis``, ``lags``, ``lag_time``,
-        ``event_times``,
-        ``n_basis_per_class``, and the ``bin_counts`` / ``event_counts`` /
-        ``n_matched_control`` / ``matched_control_seed`` the shipped fit is
-        checked against.
-    """
-    # Deferred, as they are in ``run_session``: these open Spyglass at import
-    # time, and this module is imported by tests that never touch it.
-    from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
-    from continuum_swr_replay.analysis.hippocampus import load_results
-    from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
-        align_results_to_position,
-    )
-    from continuum_swr_replay.analysis.pfc.canonical_events import (
-        load_session_canonical_events,
-        load_session_swr_intervals,
-    )
-    from continuum_swr_replay.data_loaders import load_data
-
-    logger.info("Rebuilding the session's designs for the held-out score...")
-    results, _, _ = load_results(
-        nwb_file_name, epoch_name, decoding_brain_area="HPC", load_detector=False
-    )
-    data = load_data(nwb_file_name, epoch_name)
-    results, position_info, _ = align_results_to_position(
-        results, data["position_info"]
-    )
-    data = {**data, "position_info": position_info}
-
-    is_immobile, fit_mask, bin_counts = build_session_fit_mask(
-        position_info,
-        cohort_stops=cohort_stops,
-        stop_cohort=stop_cohort,
-        immobility_threshold=immobility_threshold,
-    )
-    del is_immobile
-
-    canonical_events, _ = load_session_canonical_events(nwb_file_name, epoch_name)
-    swr_intervals, _ = load_session_swr_intervals(
-        nwb_file_name,
-        epoch_name,
-        non_local_threshold=DEFAULT_NON_LOCAL_THRESHOLD,
-        speed_threshold=immobility_threshold,
-    )
-    event_times, event_counts = build_session_event_sets(
-        data,
-        results,
-        canonical_events=canonical_events,
-        swr_intervals=swr_intervals,
-        cohort_stops=cohort_stops,
-        stop_cohort=stop_cohort,
-        fit_mask=fit_mask,
-        basis_half_window_s=float(np.abs(FIT_LAGS).max()) / sampling_frequency,
-    )
-    control_seed = matched_control_seed(nwb_file_name, epoch_name)
-    event_times["matched_control"] = make_matched_control_times(
-        event_times, fit_mask, np.random.default_rng(control_seed)
-    ).times
-
-    designs, spline_basis, lag_time = make_design_matrices(
-        event_times,
-        position_info,
-        sampling_frequency=sampling_frequency,
-        lags=FIT_LAGS,
-    )
-
-    time = position_info.index.to_numpy(dtype=float)
-    neurons = data["spike_times"].get(brain_area) or []
-    counts = (
-        np.column_stack(
-            [get_spikecount_per_time_bin(neuron, time) for neuron in neurons]
-        ).astype(float)
-        if neurons
-        else np.zeros((len(time), 0))
-    )
-
-    return {
-        "fit_mask": fit_mask,
-        "counts": counts,
-        "designs": designs,
-        "spline_basis": spline_basis,
-        "lags": FIT_LAGS,
-        "lag_time": lag_time,
-        "event_times": event_times,
-        "n_basis_per_class": int(spline_basis.shape[1]),
-        "bin_counts": bin_counts,
-        "event_counts": event_counts,
-        "n_matched_control": int(len(event_times["matched_control"])),
-        "matched_control_seed": control_seed,
-    }
-
-
-#: Counts the rebuilt scoring context and the shipped fit must agree on. They
-#: come from two independent passes over the same inputs, so a disagreement is
-#: a drift between the two -- not something to average over.
-CONTEXT_AGREEMENT_KEYS = (
-    "n_bins_fit",
-    "n_nonlocal_after",
-    "n_nonlocal_swr",
-    "n_nonlocal_no_swr",
-    "n_ripple_after",
-)
-
-
-def verify_scoring_context(
-    context: dict[str, object], cohort_info: dict[str, object]
-) -> None:
-    """Refuse a scoring context that is not the population the fit was on.
-
-    The context is rebuilt from the same functions and the same seeds the fit
-    used, so every count must match exactly. If one does not, the held-out
-    score would describe a different set of bins or events than the modulation
-    curves beside it, and the bundle would be internally inconsistent in a way
-    no reader could see.
-
-    Raises
-    ------
-    ValueError
-        Naming every count that disagrees.
-    """
-    rebuilt = {
-        **context["bin_counts"],
-        **context["event_counts"],
-        "n_matched_control": context["n_matched_control"],
-        "matched_control_seed": context["matched_control_seed"],
-    }
-    keys = (*CONTEXT_AGREEMENT_KEYS, "n_matched_control", "matched_control_seed")
-    disagreements = [
-        f"{key}: fit {cohort_info.get(key)!r}, rebuilt {rebuilt.get(key)!r}"
-        for key in keys
-        if cohort_info.get(key) != rebuilt.get(key)
-    ]
-    if disagreements:
-        raise ValueError(
-            "the rebuilt scoring designs do not describe the population the "
-            "models were fit on: " + "; ".join(disagreements)
-        )
-
-
 def separated_column_counts(design: NDArray, counts: NDArray) -> NDArray:
     """Basis columns with no spikes anywhere under their support, per unit.
 
@@ -632,7 +414,8 @@ def score_session(
     Parameters
     ----------
     context : dict
-        From :func:`build_scoring_context`.
+        The session's fit material, as ``run_session`` hands it back through
+        ``scoring_out``.
     modulation_curves : dict[str, NDArray]
         The shipped penalised curves, keyed as :data:`CURVE_SOURCES` is, so the
         prior's effect on each can be read against the same curve fit without
@@ -808,8 +591,8 @@ def maximum_likelihood_comparison(
     fit_counts : NDArray, shape (n_fit_bins, n_units)
         Spike counts on those bins.
     context : dict
-        From :func:`build_scoring_context`; its ``spline_basis`` and
-        ``lag_time`` say what a coefficient block means.
+        The session's fit material from ``run_session``; its ``spline_basis``
+        and ``lag_time`` say what a coefficient block means.
     modulation_curves : dict[str, NDArray]
         The shipped penalised curves, ``(n_report_lags, n_units)`` each, keyed
         as :data:`CURVE_SOURCES` is.
@@ -1094,6 +877,10 @@ def run_analysis(
     )
 
     diagnostics: dict | None = {} if fit_diagnostics else None
+    # Filled by ``run_session`` with the bins, counts, designs and events it
+    # fit on, so the out-of-fold score is taken on exactly that material
+    # rather than on a second assembly of it.
+    scoring_context: dict[str, object] = {}
 
     # Before JAX initialises a backend -- later than the import, and checked
     # afterwards -- pick the card this process will fit on and bound what it
@@ -1144,6 +931,7 @@ def run_analysis(
             fitter=fitter,
             fit_diagnostics_out=diagnostics,
             penalty_sigma=penalty_sigma,
+            scoring_out=scoring_context,
         )
 
         logger.info(f"Analyzed {len(neuron_stats)} neurons")
@@ -1156,18 +944,8 @@ def run_analysis(
         implied_prior: dict[str, float] = {}
         scoring_diagnostics: dict[str, object] = {}
         if len(neuron_stats):
-            context = build_scoring_context(
-                nwb_file_name,
-                epoch_name,
-                brain_area,
-                stop_cohort=stop_cohort,
-                cohort_stops=cohort_stops,
-                sampling_frequency=sampling_frequency,
-                immobility_threshold=immobility_threshold,
-                logger=logger,
-            )
-            verify_scoring_context(context, cohort_info)
-            n_basis_per_class = context["n_basis_per_class"]
+            context = scoring_context
+            n_basis_per_class = int(context["spline_basis"].shape[1])
             # What the prior says about a curve, not about a coefficient: the
             # basis is a partition of unity, so the prior on the kernel at one
             # lag is wider than sigma and the prior on a modulation held across

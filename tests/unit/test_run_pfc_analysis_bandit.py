@@ -227,6 +227,14 @@ def fake_session(monkeypatch):
 
     def _fake_run_session(nwb_file_name, epoch_name, **kwargs):
         calls["run_session"] = kwargs
+        # The real one hands the scoring material back through this dict.
+        if kwargs.get("scoring_out") is not None:
+            kwargs["scoring_out"].update(
+                {
+                    "spline_basis": np.eye(11),
+                    "lag_time": np.linspace(-0.25, 0.25, 11),
+                }
+            )
         neuron_stats = pd.DataFrame({"immobility_avg_firing_rate": [3.0, 4.0]})
         modulation = np.zeros((201, 2))
         return (
@@ -272,20 +280,6 @@ def fake_session(monkeypatch):
             "data_over_time_sha256": DOT_SHA,
         }
 
-    def _fake_context(nwb_file_name, epoch_name, brain_area, **kwargs):
-        calls["scoring_context"] = {
-            "session": (nwb_file_name, epoch_name, brain_area),
-            **kwargs,
-        }
-        return {
-            "n_basis_per_class": 11,
-            "spline_basis": np.eye(11),
-            "lag_time": np.linspace(-0.25, 0.25, 11),
-        }
-
-    def _fake_verify(context, cohort_info):
-        calls["verified"] = cohort_info["stop_cohort"]
-
     def _fake_score(context, **kwargs):
         calls["score"] = kwargs
         statistics = pd.DataFrame(
@@ -305,8 +299,6 @@ def fake_session(monkeypatch):
     monkeypatch.setattr(runner, "load_session_stop_cohort", _fake_cohort)
     monkeypatch.setattr(runner, "run_session", _fake_run_session)
     monkeypatch.setattr(runner, "canonical_event_input_hashes", _fake_event_inputs)
-    monkeypatch.setattr(runner, "build_scoring_context", _fake_context)
-    monkeypatch.setattr(runner, "verify_scoring_context", _fake_verify)
     monkeypatch.setattr(runner, "score_session", _fake_score)
     return calls
 
@@ -651,7 +643,9 @@ def test_the_seeds_are_a_function_of_the_session_and_the_draw():
     # Two draws of the same session are independent of each other, and of the
     # matched control's own draw.
     assert folds != runner.session_seed("control_draws", "wilbur20210329_.nwb", "02_r1")
-    assert folds != runner.matched_control_seed("wilbur20210329_.nwb", "02_r1")
+    from continuum_swr_replay.analysis.pfc import matched_control_seed
+
+    assert folds != matched_control_seed("wilbur20210329_.nwb", "02_r1")
     # Two sessions never share a draw.
     assert folds != runner.session_seed("folds", "wilbur20210329_.nwb", "04_r2")
 
@@ -874,15 +868,6 @@ def _synthetic_context(seed=0, n_units=3):
         "lag_time": lag_time,
         "event_times": event_times,
         "n_basis_per_class": int(spline_basis.shape[1]),
-        "bin_counts": {"n_bins_fit": int(mask.sum())},
-        "event_counts": {
-            "n_nonlocal_after": len(non_local_onsets),
-            "n_nonlocal_swr": int(is_swr.sum()),
-            "n_nonlocal_no_swr": int((~is_swr).sum()),
-            "n_ripple_after": len(swr_onsets),
-        },
-        "n_matched_control": int(len(event_times["matched_control"])),
-        "matched_control_seed": 7,
     }
 
 
@@ -892,23 +877,6 @@ def _synthetic_curves(context, n_report_lags=201):
     curve = np.zeros((n_report_lags, n_units))
     curve[n_report_lags // 2] = 0.5
     return dict.fromkeys(runner.CURVE_SOURCES, curve)
-
-
-def test_a_rebuilt_context_that_is_not_the_fitted_population_is_refused():
-    context = _synthetic_context()
-    cohort_info = {
-        **context["bin_counts"],
-        **context["event_counts"],
-        "n_matched_control": context["n_matched_control"],
-        "matched_control_seed": context["matched_control_seed"],
-    }
-
-    runner.verify_scoring_context(context, cohort_info)
-
-    with pytest.raises(ValueError, match="n_bins_fit"):
-        runner.verify_scoring_context(
-            context, {**cohort_info, "n_bins_fit": cohort_info["n_bins_fit"] - 1}
-        )
 
 
 def test_a_basis_column_with_no_spikes_under_it_is_counted():

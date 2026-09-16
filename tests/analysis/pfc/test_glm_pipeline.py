@@ -15,6 +15,7 @@ import statsmodels.api as sm
 from patsy import dmatrix
 
 from continuum_swr_replay.analysis.pfc.glm import (
+    NESTED_MODEL_PAIRS,
     _fit_immobility_models,
     _fit_theta_models,
     _make_design_matrices,
@@ -1120,7 +1121,7 @@ class TestProcessNeuron:
         assert not np.array_equal(swr_mod, no_swr_mod)
         assert not np.array_equal(nl_swr_mod, nl_no_swr_mod)
 
-    def test_stats_contain_likelihood_ratio_tests(
+    def test_stats_carry_deviance_fractions_and_no_test_statistic(
         self,
         poisson_spike_times,
         is_immobile,
@@ -1149,15 +1150,24 @@ class TestProcessNeuron:
             penalty_sigma=PENALTY_SIGMA,
         )
 
-        # Check key LR tests exist
-        assert "SWR vs. constant: lr" in stats
-        assert "SWR vs. constant: pval" in stats
-        assert "min_aic_model" in stats
+        # Every nested pair carries its two deviance fractions ...
+        for full, reduced in NESTED_MODEL_PAIRS:
+            for suffix in (": frac_null_dev", ": frac_explained_dev"):
+                assert f"{full} vs. {reduced}{suffix}" in stats
 
-        # p-values should be valid
-        for key, val in stats.items():
-            if key.endswith(": pval"):
-                assert 0 <= val <= 1, f"{key} = {val} out of range"
+        # ... and nothing here is a test: the fits are penalised, so a
+        # likelihood ratio has no reference distribution and an AIC no stated
+        # number of parameters. The theta comparison is the one exception --
+        # it is an unpenalised fit of its own.
+        retired = [
+            key
+            for key in stats
+            if key.endswith((": lr", ": pval", ": aic"))
+            and not key.startswith("theta ")
+        ]
+        assert retired == [], retired
+        assert "min_aic_model" not in stats
+        assert "min_aic_model_replay_split" not in stats
 
     def test_one_models_failed_fit_leaves_the_neurons_other_models_alone(
         self,
@@ -1203,15 +1213,15 @@ class TestProcessNeuron:
         )
 
         # Every comparison that reads the broken fit is unavailable ...
-        assert np.isnan(stats["SWR vs. constant: lr"])
         assert np.isnan(stats["SWR vs. constant: frac_null_dev"])
-        assert np.isnan(stats["SWR + non_local_no_SWR vs. SWR: lr"])
-        assert stats["min_aic_model"] != "SWR"
+        assert np.isnan(stats["SWR + non_local_no_SWR vs. SWR: frac_null_dev"])
         # ... and nothing else is: the other models were fit on their own.
-        assert np.isfinite(stats["non_local vs. constant: lr"])
-        assert np.isfinite(stats["non_local_SWR + non_local_no_SWR vs. non_local: lr"])
+        assert np.isfinite(stats["non_local vs. constant: frac_null_dev"])
+        assert np.isfinite(
+            stats["non_local_SWR + non_local_no_SWR vs. non_local: frac_null_dev"]
+        )
         assert np.isfinite(stats["matched_control + non_local_no_SWR vs. "
-                                 "matched_control: lr"])
+                                 "matched_control: frac_null_dev"])
         assert np.isfinite(swr_mod).all()
         assert np.isfinite(no_swr_mod).all()
         assert np.isfinite(stats["immobility_avg_firing_rate"])
@@ -1251,10 +1261,11 @@ class TestProcessNeuron:
             prefitted_immobility=broken,
         )
 
-        assert np.isnan(stats["non_local vs. constant: lr"])
-        assert stats["min_aic_model"] != "non_local"
-        assert stats["min_aic_model_replay_split"] != "non_local"
-        assert np.isfinite(stats["SWR vs. constant: lr"])
+        assert np.isnan(stats["non_local vs. constant: frac_null_dev"])
+        assert np.isnan(
+            stats["non_local_SWR + non_local_no_SWR vs. non_local: frac_null_dev"]
+        )
+        assert np.isfinite(stats["SWR vs. constant: frac_null_dev"])
 
     def test_absent_event_class_marks_dependent_outputs_as_unavailable(
         self,
@@ -1320,21 +1331,21 @@ class TestProcessNeuron:
             "non_local_SWR + non_local_no_SWR vs. non_local_no_SWR",
             "non_local_SWR + non_local_no_SWR vs. non_local",
         ):
-            for suffix in (": lr", ": pval", ": frac_null_dev", ": frac_explained_dev"):
+            for suffix in (": frac_null_dev", ": frac_explained_dev"):
                 key = affected + suffix
                 assert np.isnan(stats[key]), (
                     f"{key} = {stats[key]} but the model uses an empty "
-                    "event class — the LR/dev statistic is not "
+                    "event class — the deviance fraction is not "
                     "estimable and must be NaN."
                 )
 
-        # Tests that don't touch the absent class stay finite.
+        # Comparisons that don't touch the absent class stay finite.
         for unaffected in (
             "SWR vs. constant",
             "non_local vs. constant",
             "non_local_SWR vs. constant",
         ):
-            assert np.isfinite(stats[unaffected + ": pval"])
+            assert np.isfinite(stats[unaffected + ": frac_null_dev"])
 
         # Modulation curves sourced from rank-deficient designs are
         # all-NaN; the corresponding max-mod stats are NaN.
@@ -1356,13 +1367,10 @@ class TestProcessNeuron:
         assert np.isnan(stats["non_local_SWR_max_mod"])
         assert np.isnan(stats["non_local_SWR_max_mod_time"])
 
-        # AIC selectors must skip non-estimable models. With
-        # non_local_no_SWR absent, "SWR + non_local_no_SWR" and
-        # "non_local_SWR + non_local_no_SWR" drop out; the remaining
-        # candidates are constant / SWR / non_local on the SWR side
-        # and constant / non_local on the replay-split side.
-        assert stats["min_aic_model"] in {"constant", "SWR", "non_local"}
-        assert stats["min_aic_model_replay_split"] in {"constant", "non_local"}
+        # Model selection is the runner's, off the held-out deviance; nothing
+        # in-sample selects a model here any more.
+        assert "min_aic_model" not in stats
+        assert "min_aic_model_replay_split" not in stats
 
     def test_non_nested_swr_vs_non_local_lr_test_is_not_emitted(
         self,
@@ -1385,9 +1393,9 @@ class TestProcessNeuron:
         distribution and ``frac_*_dev`` no longer represents "unique
         deviance explained by the added regressors."
 
-        The fix drops that comparison from ``process_neuron``'s
-        ``test_cases`` so the invalid LR / fractional-deviance
-        columns are no longer emitted. The valid sibling comparison
+        The fix drops that comparison from ``NESTED_MODEL_PAIRS`` so the
+        invalid fractional-deviance columns are no longer emitted, and the
+        runner's held-out difference is not reported for it either. The valid sibling comparison
         ``("non_local_SWR + non_local_no_SWR", "non_local")`` (which
         IS nested) and the SWR-controlled comparisons against
         ``"SWR"`` and ``"non_local_no_SWR"`` are preserved.
@@ -1409,20 +1417,21 @@ class TestProcessNeuron:
         )
 
         invalid_test = "SWR + non_local_no_SWR vs. non_local"
+        assert (invalid_test.split(" vs. ")[0], "non_local") not in NESTED_MODEL_PAIRS
         for suffix in (": lr", ": pval", ": frac_null_dev", ": frac_explained_dev"):
             key = invalid_test + suffix
             assert key not in stats, (
                 f"non-nested comparison {invalid_test!r} still emitted "
-                f"{key!r} — chi-square LR has no valid null distribution "
-                "and 'unique deviance explained' loses its interpretation "
-                "when SWR-only events exist."
+                f"{key!r} — 'unique deviance explained' loses its "
+                "interpretation when SWR-only events exist, and so would a "
+                "held-out difference read as one."
             )
 
         # Sibling nested comparisons must still be reported.
         for valid_key in (
-            "non_local_SWR + non_local_no_SWR vs. non_local: pval",
-            "SWR + non_local_no_SWR vs. SWR: pval",
-            "SWR + non_local_no_SWR vs. non_local_no_SWR: pval",
+            "non_local_SWR + non_local_no_SWR vs. non_local: frac_null_dev",
+            "SWR + non_local_no_SWR vs. SWR: frac_null_dev",
+            "SWR + non_local_no_SWR vs. non_local_no_SWR: frac_null_dev",
         ):
             assert valid_key in stats, (
                 f"valid nested comparison {valid_key!r} was dropped by "

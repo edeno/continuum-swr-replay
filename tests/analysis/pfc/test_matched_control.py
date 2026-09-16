@@ -326,10 +326,17 @@ def test_replay_beats_the_matched_control_for_a_replay_tracking_neuron(
         lag_time,
     )
 
-    engagement = stats["matched_control + non_local_no_SWR vs. matched_control: pval"]
-    assert engagement < 0.05, (
-        "a neuron that fires only at non-SWR replay onsets did not beat its "
-        f"duration-matched non-event baseline (p = {engagement})"
+    # The engagement comparison, as a deviance fraction: the in-sample test
+    # statistic is gone with the penalised estimator, and the held-out
+    # difference is the runner's. What has to be true here is that non-SWR
+    # replay explains deviance the matched baseline does not.
+    engagement = stats[
+        "matched_control + non_local_no_SWR vs. matched_control: frac_null_dev"
+    ]
+    assert engagement > 0.01, (
+        "a neuron that fires only at non-SWR replay onsets explained almost no "
+        "deviance beyond its duration-matched non-event baseline "
+        f"(frac_null_dev = {engagement})"
     )
     # The baseline's own curve must be estimable and flat next to the replay
     # response; an all-NaN or replay-sized control curve would mean the
@@ -337,7 +344,7 @@ def test_replay_beats_the_matched_control_for_a_replay_tracking_neuron(
     assert np.isfinite(matched_control_mod).all()
     assert np.abs(matched_control_mod).max() < np.abs(no_swr_mod).max()
     assert np.isfinite(stats["matched_control_max_mod"])
-    assert np.isfinite(stats["matched_control vs. constant: pval"])
+    assert np.isfinite(stats["matched_control vs. constant: frac_null_dev"])
 
 
 # ---------------------------------------------------------------------------

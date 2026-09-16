@@ -1157,7 +1157,7 @@ def process_neuron(
     **Q2. Are non-local events and SWRs redundant or independent?**
     ``SWR + non_local_no_SWR vs SWR`` (replay adds beyond ripples),
     ``SWR + non_local_no_SWR vs non_local_no_SWR`` (ripples add beyond
-    replay). AIC: ``min_aic_model``.
+    replay).
 
     **Q3. Do PFC neurons respond to non-local events lacking a detected SWR?**
     ``non_local_no_SWR vs constant``. Modulation: ``no_swr_modulation``.
@@ -1170,7 +1170,7 @@ def process_neuron(
 
     **Q5. Do SWR-coincident and non-SWR replay drive different responses?**
     ``non_local_SWR + non_local_no_SWR vs non_local`` (does splitting
-    improve fit?). AIC: ``min_aic_model_replay_split``. Compare
+    improve fit?). Compare
     ``non_local_swr_modulation`` vs ``non_local_no_swr_modulation`` shapes.
 
     **Q6. Does replay engage the neuron beyond the immobility it occurs
@@ -1190,11 +1190,15 @@ def process_neuron(
     **Q7. What is the relationship to theta modulation during running?**
     ``theta_mod``, ``theta_preferred_phase``, firing rates.
 
-    Every likelihood ratio test has a paired effect size (``frac_null_dev``,
-    ``frac_explained_dev``). AIC model selection is performed separately
-    for each decomposition (only comparable models compete). Multiple
-    comparison correction (e.g., FDR per test type across neurons) and
-    population-level analyses are deferred to downstream figure code.
+    Each nested pair carries an effect size -- ``frac_null_dev`` and
+    ``frac_explained_dev``, ratios of the deviances the added regressors buy.
+    No likelihood-ratio statistic, p-value or AIC is produced here: the fits
+    are penalised, so a likelihood ratio has no chi-square reference
+    distribution at any stated degrees of freedom and an AIC has no stated
+    number of parameters. What the models are compared and selected by is the
+    held-out deviance the runner scores them on, read against a null drawn by
+    redrawing the matched non-event control. Multiple-comparison correction
+    across neurons and the population layer are downstream.
 
     Parameters
     ----------
@@ -1267,11 +1271,8 @@ def process_neuron(
           bin, cohort or not. Equal to ``immobility_avg_firing_rate`` exactly
           when no stop restriction was applied.
         - ``theta_mod``, ``theta_preferred_phase``: theta modulation during running
-        - ``{model} vs. {baseline}: lr, pval``: likelihood ratio tests
         - ``{model} vs. {baseline}: frac_null_dev, frac_explained_dev``:
           fractional deviance measures
-        - ``min_aic_model``: best SWR-controlled model by AIC
-        - ``min_aic_model_replay_split``: best replay-split model by AIC
         - ``SWR_max_mod``, ``non_local_no_SWR_max_mod``: peak modulation
           from SWR-controlled model
         - ``non_local_SWR_max_mod``, ``non_local_no_SWR_split_max_mod``:
@@ -1393,7 +1394,7 @@ def process_neuron(
         # finite degenerate LR / fractional-deviance values, so the
         # failed-fit check above doesn't catch them. Mark every
         # rank-deficient design as non-estimable up front and route
-        # the affected LR tests, AIC selections, and modulation
+        # the affected deviance fractions and modulation
         # extractions to NaN below — so downstream consumers can
         # tell "absent event class" from "estimated zero effect".
         non_estimable_models = set(failed_models)
@@ -1413,57 +1414,20 @@ def process_neuron(
             if rank < X_im.shape[1]:
                 non_estimable_models.add(name)
 
-        ## Likelihood ratio tests
-        # Every (full, reduced) pair must be nested — the reduced
-        # regressors must lie in the column span of the full design.
-        # ``("SWR + non_local_no_SWR", "non_local")`` is intentionally
-        # absent: it's only nested when there are no SWR-only events.
-        test_cases = [
-            # Individual event types vs baseline
-            ("SWR", "constant"),
-            ("non_local", "constant"),
-            ("non_local_no_SWR", "constant"),
-            ("non_local_SWR", "constant"),
-            # SWR-controlled: does separating SWR and replay help?
-            ("SWR + non_local_no_SWR", "constant"),
-            ("SWR + non_local_no_SWR", "SWR"),
-            ("SWR + non_local_no_SWR", "non_local_no_SWR"),
-            # Replay-split: does splitting replay by SWR status help?
-            ("non_local_SWR + non_local_no_SWR", "constant"),
-            ("non_local_SWR + non_local_no_SWR", "non_local_SWR"),
-            ("non_local_SWR + non_local_no_SWR", "non_local_no_SWR"),
-            ("non_local_SWR + non_local_no_SWR", "non_local"),
-            # Engagement: does non-SWR replay add beyond a duration-matched
-            # non-event baseline drawn from the same fitted immobility bouts,
-            # and does that baseline itself modulate firing?
-            ("matched_control + non_local_no_SWR", "matched_control"),
-            ("matched_control", "constant"),
-        ]
-
-        for model1, model2 in test_cases:
-            test_name = f"{model1} vs. {model2}"
-            if (
-                model1 in non_estimable_models
-                or model2 in non_estimable_models
-            ):
-                # Either side is rank-deficient (typically because an
-                # event class has zero events in this session), so the
-                # LR statistic / p-value are not meaningful. Mark the
-                # comparison as unavailable rather than emitting a
-                # finite degenerate value.
-                neuron_stats[f"{test_name}: lr"] = np.nan
-                neuron_stats[f"{test_name}: pval"] = np.nan
-            else:
-                neuron_stats[f"{test_name}: lr"], neuron_stats[
-                    f"{test_name}: pval"
-                ] = _lr_test(results[model1], results[model2])
-
-        ## Effect sizes: fractional deviance for every LR test
+        ## Effect sizes: the deviance each nested pair's added regressors buy
         # frac_null_dev: (reduced - full) / constant deviance
         #   = fraction of total deviance uniquely explained by added regressors
         # frac_explained_dev: (reduced - full) / (constant - full)
-        #   = fraction of full model's explained deviance due to added regressors
-        for model1, model2 in test_cases:
+        #   = fraction of full model's explained deviance due to added
+        #     regressors
+        #
+        # These are ratios of deviances, not tests. No likelihood ratio and no
+        # AIC is computed here: the fits carry a prior on the event-basis
+        # coefficients, so a likelihood ratio has no chi-square reference
+        # distribution at any stated degrees of freedom and an AIC has no
+        # stated number of parameters. What the models are compared by is the
+        # held-out deviance the runner scores them on.
+        for model1, model2 in NESTED_MODEL_PAIRS:
             test_name = f"{model1} vs. {model2}"
             if (
                 model1 in non_estimable_models
@@ -1484,47 +1448,8 @@ def process_neuron(
                     )
                 )
 
-        ## AIC — SWR-controlled: what best explains immobility firing?
-        # Skip rank-deficient models so a non-estimable design (e.g. a
-        # session with zero ``non_local_no_SWR`` events) cannot be
-        # selected as the "best" model just because statsmodels
-        # returned a finite AIC for its degenerate fit.
-        swr_controlled_candidates = [
-            "constant",
-            "SWR",
-            "non_local",
-            "SWR + non_local_no_SWR",
-        ]
-        swr_controlled_aics = {
-            model_name: results[model_name].aic
-            for model_name in swr_controlled_candidates
-            if model_name not in non_estimable_models
-        }
-        neuron_stats["min_aic_model"] = (
-            min(swr_controlled_aics, key=swr_controlled_aics.get)
-            if swr_controlled_aics
-            else None
-        )
-
-        ## AIC — Replay-split: is replay one process or two?
-        replay_split_candidates = [
-            "constant",
-            "non_local",
-            "non_local_SWR + non_local_no_SWR",
-        ]
-        replay_split_aics = {
-            model_name: results[model_name].aic
-            for model_name in replay_split_candidates
-            if model_name not in non_estimable_models
-        }
-        neuron_stats["min_aic_model_replay_split"] = (
-            min(replay_split_aics, key=replay_split_aics.get)
-            if replay_split_aics
-            else None
-        )
-
         ## Modulation time courses
-        # Share fits with the LR-test / AIC path so neuron_stats and
+        # Share fits with the deviance-fraction path so neuron_stats and
         # the modulation arrays can never disagree due to divergent
         # IRLS convergence. When the source model is non-estimable
         # (rank-deficient design — typically an absent event class),
@@ -1607,7 +1532,7 @@ def process_neuron(
         # Matched-control model: the non-event baseline's own peri-window
         # modulation, taken from the joint engagement model so it is the
         # baseline response after accounting for real non-SWR replay --
-        # the same model the engagement LR test is run on.
+        # the same model the engagement comparison is run on.
         if "matched_control + non_local_no_SWR" in non_estimable_models:
             matched_control_modulation = nan_modulation
             neuron_stats["matched_control_max_mod"] = np.nan
@@ -2011,6 +1936,39 @@ def build_session_event_sets(
     }
     return event_times, counts
 
+
+#: Nested ``(full, reduced)`` model pairs the comparisons are reported for.
+#: Every pair is nested -- the reduced design's columns lie in the full
+#: design's span -- so a difference between them is a statement about the added
+#: regressors alone. ``("SWR + non_local_no_SWR", "non_local")`` is
+#: intentionally absent: it is only nested when the session has no SWR-only
+#: events. The last two are the engagement decomposition, whose baseline is the
+#: matched non-event control.
+#:
+#: One list, read by :func:`process_neuron` for its deviance fractions and by
+#: the runner for the held-out differences, so the two can never describe
+#: different sets of comparisons.
+NESTED_MODEL_PAIRS: tuple[tuple[str, str], ...] = (
+    # Individual event types vs baseline
+    ("SWR", "constant"),
+    ("non_local", "constant"),
+    ("non_local_no_SWR", "constant"),
+    ("non_local_SWR", "constant"),
+    # SWR-controlled: does separating SWR and replay help?
+    ("SWR + non_local_no_SWR", "constant"),
+    ("SWR + non_local_no_SWR", "SWR"),
+    ("SWR + non_local_no_SWR", "non_local_no_SWR"),
+    # Replay-split: does splitting replay by SWR status help?
+    ("non_local_SWR + non_local_no_SWR", "constant"),
+    ("non_local_SWR + non_local_no_SWR", "non_local_SWR"),
+    ("non_local_SWR + non_local_no_SWR", "non_local_no_SWR"),
+    ("non_local_SWR + non_local_no_SWR", "non_local"),
+    # Engagement: does non-SWR replay add beyond a duration-matched non-event
+    # baseline drawn from the same fitted immobility bouts, and does that
+    # baseline itself modulate firing?
+    ("matched_control + non_local_no_SWR", "matched_control"),
+    ("matched_control", "constant"),
+)
 
 #: The event classes the design matrices are keyed on. A matched control may
 #: not overlap a window of any of them -- including ``SWR``, whose windows are
@@ -2582,6 +2540,7 @@ def run_session(
     fitter: str = "jax",
     fit_diagnostics_out: dict[str, Any] | None = None,
     penalty_sigma: float | None = None,
+    scoring_out: dict[str, Any] | None = None,
 ) -> tuple[pd.DataFrame, NDArray, NDArray, NDArray, NDArray, NDArray, dict[str, Any]]:
     """Run PFC GLM analysis for all neurons in a single session.
 
@@ -2644,13 +2603,23 @@ def run_session(
         Prior standard deviation of an event-basis coefficient, on the log-rate
         scale, for the batched fitter. ``None`` fits the models unpenalised.
         The statsmodels backend has no penalised path and refuses a value.
+    scoring_out : dict, optional
+        When given, filled with everything an out-of-fold score and its null
+        need from this session: ``fit_mask`` (bool Series on the session's time
+        axis), ``counts`` (``(n_time, n_units)`` spike counts in unit order),
+        ``designs`` (the full-length design matrices by model name),
+        ``spline_basis``, ``lag_time``, ``lags`` and ``event_times`` (the
+        matched control included, as drawn here). It is the same material the
+        fits were built from, handed over rather than rebuilt: a caller that
+        reassembled it from the same functions would pay a second load of the
+        session and could drift from what was actually fit. Left empty for a
+        session with no units in ``brain_area``.
 
     Returns
     -------
     neuron_stats : pd.DataFrame
         Per-neuron statistics. Shape (n_neurons, n_stats). Includes GLM
-        comparison results, theta modulation, firing rates, and AIC model
-        selection.
+        comparison results, theta modulation and firing rates.
     swr_modulation : NDArray
         SWR peri-event modulation from SWR-controlled model.
         Shape (n_lag_times, n_neurons).
@@ -2905,6 +2874,28 @@ def run_session(
         logger.warning("No %s neurons found for this session", brain_area)
         empty = np.empty((0, 0))
         return pd.DataFrame(), empty, empty, empty, empty, empty, cohort_info
+
+    if scoring_out is not None:
+        # Handed over, not rebuilt: an out-of-fold score has to be taken on the
+        # bins, events and designs the shipped fit used, and reassembling them
+        # from the same functions would cost a second load of the session and
+        # could drift from what was fit.
+        scoring_out.update(
+            {
+                "fit_mask": fit_mask,
+                "counts": np.column_stack(
+                    [
+                        get_spikecount_per_time_bin(neuron, time)
+                        for neuron in data["spike_times"][brain_area]
+                    ]
+                ).astype(float),
+                "designs": immobility_design_matrices,
+                "spline_basis": spline_basis,
+                "lag_time": lag_time,
+                "lags": fit_lags,
+                "event_times": event_times,
+            }
+        )
 
     n_neurons = len(data["spike_times"][brain_area])
     logger.info(

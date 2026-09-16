@@ -27,7 +27,9 @@ event-basis coefficients, and a peri-event kernel that returns to
 baseline at both ends of the ±250 ms fit window. The example neuron's
 band is the penalised posterior-mode standard error, and the population
 significance is an empirical p-value from repeated matched-control
-draws, Benjamini-Hochberg corrected across units.
+draws (R = 40, so it lives on a grid of 1/R = 0.025 and q = 0 means
+no draw reached the observed improvement), Benjamini-Hochberg
+corrected across units.
 
 April 2026: the figure was tightened from 6 panels to 4. The previous
 standalone single-neuron model selection was dropped (it duplicated the
@@ -66,6 +68,7 @@ from continuum_swr_replay.analysis.pfc import (
     make_matched_control_times,
     matched_control_seed,
 )
+from continuum_swr_replay.analysis.pfc.batched_glm import DEFAULT_PENALTY_SIGMA
 from continuum_swr_replay.analysis.pfc.canonical_events import (
     load_session_canonical_events,
     load_session_swr_intervals,
@@ -90,11 +93,10 @@ from continuum_swr_replay.parameters import COLORS, PROCESSED_DATA_DIR
 figure_utilities.set_figure_defaults(context="paper")
 warnings.filterwarnings("ignore")
 
-#: Prior standard deviation of an event-basis coefficient, on the log-rate
-#: scale, that the canonical bundles are fit at. The example neuron is refit in
-#: this script, so it carries the same prior the population it sits beside was
-#: fit under.
-CANONICAL_PENALTY_SIGMA = 2.0
+#: Draws the canonical bundles' null is built from. Only the label on panel d
+#: is read from it; the p-values themselves come from the bundles.
+DEFAULT_CONTROL_DRAWS = 40
+
 
 
 # ---------------------------------------------------------------------------
@@ -293,7 +295,7 @@ SIGNIFICANCE_BARS = (
 )
 
 
-def plot_significance(df, ax, alpha=0.05):
+def plot_significance(df, ax, alpha=0.05, n_control_draws=DEFAULT_CONTROL_DRAWS):
     """Fraction of units whose regressor beats the control-draw null.
 
     A unit counts when its empirical p-value -- the fraction of matched-control
@@ -301,6 +303,12 @@ def plot_significance(df, ax, alpha=0.05):
     survives Benjamini-Hochberg across units at ``alpha``. The denominator is
     the units actually tested for that class: a unit whose session had no
     events of a class is untested for it, not a negative.
+
+    That p-value is ``r / R`` over ``R`` draws, so it lives on a grid of
+    ``1 / R`` and cannot be smaller than zero -- ``q = 0`` means no draw of
+    ``R`` reached the observed improvement, not a vanishing tail. Every
+    fraction here inherits that resolution, which is why ``n_control_draws``
+    is drawn on the panel.
     """
     fractions = significant_fraction(df, alpha=alpha)
     labels, fracs, colors_list = [], [], []
@@ -320,7 +328,13 @@ def plot_significance(df, ax, alpha=0.05):
     ax.set_ylabel("% units")
     ax.set_ylim(0, np.nanmax(fracs) * 1.3)
     ax.tick_params(axis="x", labelsize=5)
-    ax.set_title("Beats control null", fontsize=7)
+    # The empirical p-value is r/R over R control draws, so it lives on a grid
+    # of 1/R and every fraction read off it inherits that resolution. Say R on
+    # the panel rather than leave the reader to find it in a sidecar.
+    ax.set_title(
+        f"Beats control null\n(R={n_control_draws} draws, 1/R={1 / n_control_draws:.3f})",
+        fontsize=7,
+    )
 
 
 def plot_best_model_selection(df, ax):
@@ -362,7 +376,7 @@ def generate_figure(
     data_dir=PROCESSED_DATA_DIR,
     stop_cohort="at_well",
     fitter="jax",
-    penalty_sigma=CANONICAL_PENALTY_SIGMA,
+    penalty_sigma=DEFAULT_PENALTY_SIGMA,
 ):
     """Generate composite Figure 4.
 
@@ -644,10 +658,10 @@ def main():
     parser.add_argument(
         "--penalty-sigma",
         type=float,
-        default=CANONICAL_PENALTY_SIGMA,
+        default=DEFAULT_PENALTY_SIGMA,
         help=(
             "Prior standard deviation of an event-basis coefficient, on the "
-            f"log-rate scale (default: {CANONICAL_PENALTY_SIGMA}). The example "
+            f"log-rate scale (default: {DEFAULT_PENALTY_SIGMA}). The example "
             "neuron is refit here, so this must be the prior the population "
             "bundle in --data-dir was fit under."
         ),

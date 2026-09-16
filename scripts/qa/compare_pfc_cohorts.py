@@ -1349,6 +1349,64 @@ def shrinkage_table(frame: pd.DataFrame) -> pd.DataFrame:
     return summary
 
 
+def empirical_bayes_sigma(
+    frame: pd.DataFrame, penalty_sigma: float, per_lag_sd: float
+) -> pd.DataFrame:
+    """The prior width the corpus's own spread implies, beside the chosen one.
+
+    The unpenalised peaks scatter for two reasons: units really do modulate by
+    different amounts, and each peak is estimated with error. Deconvolving the
+    second leaves the first --
+    ``sqrt(var(peak_mle) - mean(se_mle**2))`` -- which is a prior standard
+    deviation for the *kernel at one lag*. The prior is stated per coefficient,
+    so it is divided by what one unit of ``sigma`` buys at one lag
+    (``implied_prior_sd(sigma, basis)["per_lag"] / sigma``) to be read against
+    the chosen value.
+
+    Separated units are excluded: they have no maximum-likelihood peak to take
+    a variance of.
+
+    Parameters
+    ----------
+    frame : pandas.DataFrame
+        From :func:`peak_shrinkage`.
+    penalty_sigma : float
+        The prior the bundles were fit at.
+    per_lag_sd : float
+        ``implied_prior_sd(penalty_sigma, basis)["per_lag"]`` from the sidecar.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per curve; empty when the frame carries no peaks.
+    """
+    if frame.empty or not per_lag_sd > 0:
+        return pd.DataFrame()
+    per_lag_per_sigma = per_lag_sd / penalty_sigma
+    rows = []
+    for curve, block in frame.groupby("curve"):
+        well_posed = block[~block["mle_separated"].fillna(False).astype(bool)]
+        peaks = well_posed["peak_mle"].to_numpy(dtype=float)
+        errors = well_posed["peak_mle_se"].to_numpy(dtype=float)
+        usable = np.isfinite(peaks) & np.isfinite(errors)
+        if usable.sum() < 2:
+            continue
+        observed = float(np.var(peaks[usable], ddof=1))
+        noise = float(np.mean(errors[usable] ** 2))
+        deconvolved = float(np.sqrt(max(observed - noise, 0.0)))
+        rows.append(
+            {
+                "curve": curve,
+                "n_units": int(usable.sum()),
+                "sd_peak_mle": round(float(np.sqrt(observed)), 3),
+                "rms_se_peak_mle": round(float(np.sqrt(noise)), 3),
+                "deconvolved_sd_per_lag": round(deconvolved, 3),
+                "implied_sigma": round(deconvolved / per_lag_per_sigma, 2),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def heldout_fraction_table(
     after: pd.DataFrame, alpha: float
 ) -> pd.DataFrame:
@@ -1367,8 +1425,31 @@ def heldout_fraction_table(
     return pd.DataFrame(rows)
 
 
+def restrict_to_sessions(frame: pd.DataFrame, sessions: set[str]) -> pd.DataFrame:
+    """The rows of a population that belong to the named sessions.
+
+    The two trees rarely hold the same sessions -- a smoke tree holds three
+    against the corpus's 71 -- and a fraction taken over different populations
+    is not a comparison. The session key is rebuilt from the columns every
+    bundle carries rather than read from a name.
+    """
+    if not {"nwb_file_name", "epoch_name"} <= set(frame.columns):
+        return frame
+    key = (
+        frame["nwb_file_name"].str.replace("_.nwb", "", regex=False)
+        + "_"
+        + frame["epoch_name"]
+    )
+    return frame.loc[key.isin(sessions)].reset_index(drop=True)
+
+
 def legacy_fdr_table(before: pd.DataFrame, alpha: float) -> pd.DataFrame:
-    """The same fractions the superseded bundles reported, per test and animal."""
+    """The same fractions the superseded bundles reported, per test and animal.
+
+    The caller restricts ``before`` to the sessions the after tree holds
+    (:func:`restrict_to_sessions`); without that the two tables below describe
+    different populations and must not be read side by side.
+    """
     rows = []
     for scope, frame in [("all", before), *sorted(before.groupby("animal"))]:
         row: dict[str, object] = {"animal": scope, "n_units": len(frame)}
