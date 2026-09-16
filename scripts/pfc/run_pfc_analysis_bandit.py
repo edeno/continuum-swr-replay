@@ -373,12 +373,15 @@ def separated_column_counts(design: NDArray, counts: NDArray) -> NDArray:
     uninformed, so the count is reported beside the fit rather than acted on.
     The intercept is not counted -- its support is every bin.
 
+    The bin set is every bin the models were fit on -- the whole fit mask, not
+    one fold of it -- so the count describes the shipped full-data fit.
+
     Parameters
     ----------
     design : NDArray, shape (n_fit_bins, n_features)
-        Design on the bins the models were fit on; column 0 is the intercept.
+        Design restricted to the fit mask; column 0 is the intercept.
     counts : NDArray, shape (n_fit_bins, n_units)
-        Spike counts on those bins.
+        Spike counts on those same bins.
 
     Returns
     -------
@@ -755,10 +758,10 @@ def run_analysis(
         read on, or no stop restriction at all.
     output_dir : Path
         Directory the artifacts and their provenance sidecar are written to.
-    fitter : {"jax", "statsmodels"}
-        How the GLMs are fit. ``"jax"`` fits every neuron of the session
-        against each design at once; ``"statsmodels"`` keeps the original
-        per-neuron IRLS. The sidecar records which was used.
+    fitter : {"jax"}
+        How the GLMs are fit: the batched backend, which fits every neuron of
+        the session against each design at once and is the only one with a
+        penalised path. The sidecar records it.
     fit_diagnostics : bool
         Also write ``<artifact>.fit_diagnostics.npz`` -- per-neuron, per-model
         parameters and fit criteria, for the fitter equivalence audit. Forces

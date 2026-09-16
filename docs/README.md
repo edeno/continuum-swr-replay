@@ -156,7 +156,13 @@ Three tiers:
    `penalty_sigma_log_rate` with the `implied_prior_sd` it means for a curve,
    `n_basis_per_class`, `n_folds` / `fold_seed` / `fold_sizes` / `events_per_fold`,
    and `n_control_draws` / `control_draw_seed` / `null_windows` (how many windows each
-   class's null draws placed against the real onset count they were matched to). A
+   class's null draws placed against the real onset count they were matched to). The
+   canonical bundles carry **σ = 3** (implied per-lag sd **2.066**, a rate multiplier
+   of ×0.017–×57 at 95 %; sustained sd **0.905**, ×0.17–×5.9), **K = 5** folds and
+   **R = 40** null draws — quoted from the sidecars, which is where a reader should
+   check them. Because an empirical p-value is `r/R`, it lives on a grid of
+   **1/R = 0.025**: a q of 0 means no draw of 40 reached the observed improvement,
+   and every population fraction read off these p-values inherits that resolution. A
    bundle that does not state all of these is refit rather than skipped — the
    canonical bundle name is unsuffixed, so nothing else tells a penalised bundle from
    the maximum-likelihood one that held the same name. It also records what the fits

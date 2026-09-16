@@ -282,3 +282,54 @@ class TestLoadPopulationCrossSessionAlignment:
         assert mods["swr"].shape[1] == 3
         assert df["animal"].tolist() == ["chimi", "chimi", "j16"]
         np.testing.assert_array_equal(mods["swr"][0, :], [10.0, 10.0, 21.0])
+
+
+class TestTheControlCurveFallbackIsLegacyOnly:
+    """A missing control array is a vintage on the legacy path and a fault here.
+
+    The matched non-event control postdates the first bundles, so a tree
+    written before it legitimately has no such array and an audit reads one on
+    purpose. A *current* bundle always writes it, so a missing one there is a
+    truncated write, and filling it with NaN would hide that.
+    """
+
+    def test_a_legacy_tree_without_the_array_reads_it_as_absent(self, tmp_path):
+        statistics = {f"{test}: pval": [0.5] for test in LEGACY_FDR_TESTS}
+        write_bundle(
+            tmp_path / "session_mPFC_modulation",
+            ["chimi20200212_.nwb"],
+            1,
+            statistics=statistics,
+        )
+        (tmp_path / "session_mPFC_modulation.matched_control_modulation.npy").unlink()
+
+        _, modulations, _ = load_population_data(
+            tmp_path, min_firing_rate=0.0, inference="legacy"
+        )
+
+        assert np.isnan(modulations["matched_control"]).all()
+
+    def test_a_current_bundle_without_the_array_is_a_fault(self, tmp_path):
+        write_bundle(
+            tmp_path / "session_mPFC_modulation", ["chimi20200212_.nwb"], 1
+        )
+        (tmp_path / "session_mPFC_modulation.matched_control_modulation.npy").unlink()
+
+        with pytest.raises(FileNotFoundError):
+            load_population_data(tmp_path, min_firing_rate=0.0)
+
+    def test_a_tree_of_neither_generation_is_refused_on_the_legacy_path(
+        self, tmp_path
+    ):
+        # Neither the held-out columns nor the likelihood-ratio ones.
+        write_bundle(
+            tmp_path / "session_mPFC_modulation",
+            ["chimi20200212_.nwb"],
+            1,
+            statistics={"run_avg_firing_rate": [5.0]},
+        )
+
+        with pytest.raises(ValueError, match="neither generation"):
+            load_population_data(
+                tmp_path, min_firing_rate=0.0, inference="legacy"
+            )

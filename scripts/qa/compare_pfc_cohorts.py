@@ -110,6 +110,7 @@ SIDECAR_TOP_LEVEL_KEYS = [
     "n_control_draws",
     "control_draw_seed",
     "n_basis_per_class",
+    "implied_prior_sd",
     "fitter",
     "fitter_tol",
     "jax_backend",
@@ -1349,6 +1350,22 @@ def shrinkage_table(frame: pd.DataFrame) -> pd.DataFrame:
     return summary
 
 
+def implied_prior_per_lag(sidecars: pd.DataFrame) -> float:
+    """The prior's standard deviation for the kernel at one lag, from a sidecar.
+
+    Recorded by the runner (``implied_prior_sd``), not recomputed here: it
+    depends on the basis the bundles were fit on, and the audit should read
+    what they were fit under rather than what this tree would build now.
+    """
+    recorded = sidecars.get("implied_prior_sd")
+    if recorded is None:
+        return float("nan")
+    for value in recorded.dropna():
+        if isinstance(value, dict) and "per_lag" in value:
+            return float(value["per_lag"])
+    return float("nan")
+
+
 def empirical_bayes_sigma(
     frame: pd.DataFrame, penalty_sigma: float, per_lag_sd: float
 ) -> pd.DataFrame:
@@ -2130,6 +2147,14 @@ def build_estimator_report(
     worker_times = worker_times or []
     lines: list[str] = []
     add = lines.append
+    # Quoted from the bundles rather than restated: the prior is the library's
+    # and the implied per-lag spread is what it means for a curve.
+    penalty_sigma = float(
+        _numeric(sidecars.get("penalty_sigma_log_rate", pd.Series(dtype=float)))
+        .dropna()
+        .iloc[0]
+    )
+    per_lag_sd = float(implied_prior_per_lag(sidecars))
 
     add("# The mPFC unit GLM under a prior, scored out of fold\n")
     add(
@@ -2216,7 +2241,25 @@ def build_estimator_report(
         "reported on its own row (`separated`), which is where a prior is "
         "supposed to do the work, and is left out of the binding count.\n"
     )
-    add(_md(shrinkage_table(peak_shrinkage(after))))
+    shrinkage = peak_shrinkage(after)
+    add(_md(shrinkage_table(shrinkage)))
+
+    add("### The prior the corpus's own spread would have chosen\n")
+    add(
+        "The unpenalised peaks scatter for two reasons: units really do "
+        "modulate by different amounts, and each peak is estimated with "
+        "error. Deconvolving the second -- "
+        "`sqrt(var(peak_mle) - mean(se_mle**2))` over the well-posed units -- "
+        "leaves the first, which is a prior standard deviation for the kernel "
+        "at one lag. Divided by what one unit of sigma buys at one lag it is "
+        "an empirical-Bayes estimate of the per-coefficient sigma, to be read "
+        "against the value the bundles were actually fit at "
+        f"(`penalty_sigma_log_rate` = {penalty_sigma}, implied per-lag "
+        f"sd {per_lag_sd:.3f}, both from the sidecar). A chosen sigma well "
+        "above the implied one is a deliberately loose prior; one below it "
+        "would be shaping modulations the spikes can support.\n"
+    )
+    add(_md(empirical_bayes_sigma(shrinkage, penalty_sigma, per_lag_sd)))
 
     add("## The separating columns the prior was introduced for\n")
     add(
@@ -2238,7 +2281,15 @@ def build_estimator_report(
         "class is untested for it, not a negative.\n"
     )
     add("### Before: FDR-significant fraction per likelihood-ratio test\n")
-    add(_md(legacy_fdr_table(before, alpha)))
+    paired_before = restrict_to_sessions(before, after_sessions)
+    if len(paired_before) != len(before):
+        add(
+            f"Restricted to the {len(after_sessions)} session(s) the after "
+            f"tree holds: {len(paired_before)} of {len(before)} units. Without "
+            "that the two tables would describe different populations and "
+            "could not be read side by side.\n"
+        )
+    add(_md(legacy_fdr_table(paired_before, alpha)))
     add("### After: fraction beating the control-draw null, per class\n")
     add(_md(heldout_fraction_table(after, alpha)))
 
@@ -2284,7 +2335,7 @@ def build_estimator_report(
 
     add("### Units per animal\n")
     per_animal = (
-        before.groupby("animal")
+        paired_before.groupby("animal")
         .size()
         .rename("n_before")
         .to_frame()

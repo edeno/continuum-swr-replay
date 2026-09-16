@@ -32,17 +32,20 @@ from scripts.qa.compare_pfc_cohorts import (
     bundle_sessions,
     coverage_summary,
     curve_peaks,
+    empirical_bayes_sigma,
     estimator_provenance_table,
     event_count_agreement,
     fitter_table,
     fold_spread_table,
     gate_counts,
     heldout_fraction_table,
+    legacy_fdr_table,
     matched_control_arrays,
     matched_control_significance,
     peak_shrinkage,
     provenance_table,
     read_sidecars,
+    restrict_to_sessions,
     same_events_precondition,
     separated_column_table,
     session_cohort_table,
@@ -1146,6 +1149,10 @@ def _write_ridge_bundle(
                     "n_control_draws": 40,
                     "control_draw_seed": abs(hash(session + "c")) % 10_000,
                     "n_basis_per_class": 11,
+                    "implied_prior_sd": {
+                        "per_lag": 2.065937776992323,
+                        "sustained": 0.9045340337332909,
+                    },
                     "n_events_swr": 10,
                     "n_events_non_swr": 10,
                     "n_matched_control": 19,
@@ -1368,3 +1375,140 @@ class TestEstimatorReport:
         # than printing an empty table.
         assert "No sensitivity bundle at another prior is on disk" in report
         assert "ridge_poisson_glm" in report
+
+
+class TestEmpiricalBayesSigma:
+    """The width the corpus's own spread implies, beside the chosen one."""
+
+    def test_the_estimation_error_is_deconvolved(self):
+        # Peaks scattering by 1.0 with a per-peak standard error of 0.6 leave
+        # sqrt(1.0**2 - 0.6**2) = 0.8 of real spread.
+        rng = np.random.default_rng(0)
+        peaks = rng.normal(0.0, 1.0, size=4000)
+        frame = pd.DataFrame(
+            {
+                "curve": "SWR",
+                "peak_mle": peaks,
+                "peak_mle_se": 0.6,
+                "mle_separated": False,
+            }
+        )
+
+        table = empirical_bayes_sigma(frame, penalty_sigma=3.0, per_lag_sd=2.1)
+
+        row = table.iloc[0]
+        assert row["deconvolved_sd_per_lag"] == pytest.approx(0.8, abs=0.05)
+        # Read back on the per-coefficient scale the prior is stated on.
+        assert row["implied_sigma"] == pytest.approx(0.8 / (2.1 / 3.0), abs=0.1)
+        assert row["n_units"] == 4000
+
+    def test_a_separated_unit_has_no_peak_to_take_a_variance_of(self):
+        frame = pd.DataFrame(
+            {
+                "curve": ["SWR"] * 3,
+                "peak_mle": [0.5, -0.5, 40.0],
+                "peak_mle_se": [0.1, 0.1, 12.0],
+                "mle_separated": [False, False, True],
+            }
+        )
+
+        table = empirical_bayes_sigma(frame, penalty_sigma=3.0, per_lag_sd=2.1)
+
+        assert table.iloc[0]["n_units"] == 2
+        assert table.iloc[0]["sd_peak_mle"] < 1.0
+
+    def test_the_report_puts_it_beside_the_shrinkage(self, estimator_trees):
+        before, after = estimator_trees
+        loader = __import__(
+            "continuum_swr_replay.analysis.pfc.load_population",
+            fromlist=["load_population_data"],
+        ).load_population_data
+        population_before, _, _ = loader(
+            before, min_firing_rate=0.0, inference="legacy"
+        )
+        population_after, _, _ = loader(after, min_firing_rate=0.0)
+
+        report = build_estimator_report(
+            sidecars=read_sidecars(after),
+            before=population_before,
+            after=population_after,
+            before_gate=gate_counts(before, 1.0),
+            after_gate=gate_counts(after, 1.0, inference="heldout"),
+            before_dir=before,
+            after_dir=after,
+            min_firing_rate=1.0,
+            alpha=0.05,
+            notes=[],
+            command="",
+        )
+
+        assert "### The prior the corpus's own spread would have chosen" in report
+        # The prior and its per-lag meaning are quoted from the sidecar, not
+        # restated: the fixture's bundles say sigma 2.0, per-lag 2.066.
+        assert "penalty_sigma_log_rate` = 2.0" in report
+        assert "per-lag sd 2.066" in report
+
+
+class TestBeforeTreeIsPairedToTheAfterTree:
+    """A fraction over a different population is not a comparison."""
+
+    def test_only_the_sessions_the_after_tree_holds_are_counted(self):
+        frame = pd.DataFrame(
+            {
+                "nwb_file_name": ["chimi20200223_.nwb", "j1620210710_.nwb"],
+                "epoch_name": ["02_r1", "04_r2"],
+            }
+        )
+
+        kept = restrict_to_sessions(frame, {"chimi20200223_02_r1"})
+
+        assert len(kept) == 1
+        assert kept["nwb_file_name"].iloc[0] == "chimi20200223_.nwb"
+
+    def test_the_report_says_when_it_restricted_the_before_tree(
+        self, estimator_trees
+    ):
+        before, after = estimator_trees
+        # A third session only the before tree holds.
+        _write_bundle(
+            before,
+            "senor20201030_02_r1",
+            n_neurons=2,
+            fit_rate=5.0,
+            all_immobile_rate=5.0,
+            pvals=0.001,
+            sidecar=None,
+        )
+        loader = __import__(
+            "continuum_swr_replay.analysis.pfc.load_population",
+            fromlist=["load_population_data"],
+        ).load_population_data
+        population_before, _, _ = loader(
+            before, min_firing_rate=0.0, inference="legacy"
+        )
+        population_after, _, _ = loader(after, min_firing_rate=0.0)
+
+        assert len(population_before) == 6
+        restricted = restrict_to_sessions(
+            population_before, bundle_sessions(after)
+        )
+        assert len(restricted) == 4
+
+        report = build_estimator_report(
+            sidecars=read_sidecars(after),
+            before=population_before,
+            after=population_after,
+            before_gate=gate_counts(before, 1.0),
+            after_gate=gate_counts(after, 1.0, inference="heldout"),
+            before_dir=before,
+            after_dir=after,
+            min_firing_rate=1.0,
+            alpha=0.05,
+            notes=[],
+            command="",
+        )
+
+        assert "Restricted to the 2 session(s) the after tree holds" in report
+        # And the fractions below it describe those units, not the six.
+        assert "4 of 6 units" in report
+        assert legacy_fdr_table(restricted, 0.05).iloc[0]["n_units"] == 4

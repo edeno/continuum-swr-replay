@@ -101,6 +101,16 @@ def _refuse_stale_bundle(df: pd.DataFrame, inference: str, data_dir: Path) -> No
                 "likelihood-ratio statistics; read them with "
                 "inference='heldout'."
             )
+        absent = sorted(
+            f"{test}: pval" for test in LEGACY_FDR_TESTS
+            if f"{test}: pval" not in df.columns
+        )
+        if absent:
+            raise ValueError(
+                f"{data_dir} was read as a maximum-likelihood tree but carries "
+                f"none of {absent}: it is neither generation's bundle. Check "
+                "the directory."
+            )
     else:
         raise ValueError(
             f"inference={inference!r} is not one of 'heldout', 'legacy'"
@@ -200,11 +210,16 @@ def load_population_data(
         # tree written before it has no such array. Reading one is still
         # legitimate -- an audit does it on purpose -- and the curve is then
         # absent rather than zero: NaN, which the nanmean reduction the
-        # docstring asks for already handles.
-        try:
+        # docstring asks for already handles. Only on the legacy path: a
+        # current bundle always writes the array, and a missing one there is a
+        # truncated write, not a vintage.
+        if inference == "legacy":
+            try:
+                sess_matched = np.load(f"{base}.matched_control_modulation.npy")
+            except FileNotFoundError:
+                sess_matched = np.full_like(sess_swr, np.nan)
+        else:
             sess_matched = np.load(f"{base}.matched_control_modulation.npy")
-        except FileNotFoundError:
-            sess_matched = np.full_like(sess_swr, np.nan)
 
         # Sessions with no surviving neurons in this brain area save
         # placeholder arrays of shape ``(0, 0)`` (see ``run_session``

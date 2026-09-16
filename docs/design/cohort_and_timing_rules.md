@@ -220,14 +220,27 @@ all, and the design stays full rank throughout, so no rank-deficiency gate can
 see it.
 
 The prior's job is to exclude implausible rates, not to shape plausible ones.
-Its standard deviation is `DEFAULT_PENALTY_SIGMA` in `analysis/pfc/batched_glm.py`,
-on the log-rate scale, per coefficient. What that says about a *curve* is not
-that number: the basis is a partition of unity, so the prior on the kernel at
-one lag is wider than sigma by `sqrt(sum_b B_b(lag)^2)` and the prior on a
-modulation held across the reported window is narrower by `sqrt(n_basis)`.
-Both implied standard deviations, and the rate multipliers they bound, are
+Its standard deviation is `DEFAULT_PENALTY_SIGMA` in `analysis/pfc/batched_glm.py`
+— **σ = 3** on the log-rate scale, per coefficient. What that says about a
+*curve* is not that number: the basis is a partition of unity, so the prior on
+the kernel at one lag is wider than σ by `sqrt(sum_b B_b(lag)^2)` and the prior
+on a modulation held across the reported window is narrower by `sqrt(n_basis)`.
+On the shipped 11-function basis those are **2.066 per lag** (95 % of the prior
+mass between a rate multiplier of **×0.017 and ×57** at one lag) and **0.905
+sustained** (**×0.17 to ×5.9** held across the reported window). Both are
 computed by `implied_prior_sd` and recorded in every bundle's sidecar
-(`penalty_sigma_log_rate`, `implied_prior_sd`). Under the prior every unit x
+(`penalty_sigma_log_rate`, `implied_prior_sd`); the figures here are quoted
+from those sidecars, not restated by hand.
+
+Measured against that choice: on the three sessions the estimator was smoked
+on (374 units past the 1 Hz gate), the corpus's own spread — the unpenalised
+peaks' standard deviation with their estimation error deconvolved, divided by
+what one unit of σ buys at one lag — implies **σ ≈ 1.0–1.2** per coefficient
+(0.52 for the matched control). The shipped prior is about three times wider,
+which is the intent: it binds on **0.5–2.1 %** of well-posed units, and the
+median peak moves by about 0.01 on the log-rate scale against a standard error
+near 0.23. The audit reports that table beside the chosen value for whatever
+tree it is run on. Under the prior every unit x
 model converges; a unit that still fails is non-estimable and reported as NaN
 everywhere, counted. Sensitivity bundles at other priors are written under
 `_sigma<value>` names.
@@ -250,7 +263,7 @@ independent, so an in-sample deviance drop is worth much less than its nominal
 degrees of freedom suggest. The models are therefore compared by how well they
 predict spikes they were not fit on.
 
-`K` folds are cut over *whole contiguous runs* of the fit mask — a bin-wise
+**K = 5** folds are cut over *whole contiguous runs* of the fit mask — a bin-wise
 split would leave the training set 2 ms either side of every held-out bin, and
 a model could score well by interpolating the local rate. Runs are visited in a
 seeded random order and each goes to the lightest fold, so the folds carry
@@ -269,18 +282,20 @@ class's own onset count and durations**, gives the distribution of improvements
 a regressor of that size and shape with no event content buys. A class's
 empirical p-value is the fraction of its draws whose improvement matched or
 beat the observed one; the engagement statistic gets its own null the same way,
-with the tested regressor replaced and the baseline left as it is. The
-resolution is `1/R`, so zero is attainable and means "no draw reached it", and
-a population fraction read off these p-values cannot resolve finer than the
-null's size. `n_control_draws`, `control_draw_seed` and the per-class window
+with the tested regressor replaced and the baseline left as it is.
+
+**R = 40**, so an empirical p-value is `r/40` and lives on a grid of
+**1/R = 0.025**. Zero is attainable and means *no draw of 40 reached the
+observed improvement* — not a vanishing tail — and a BH q of 0 means the same.
+Every population fraction read off these p-values inherits that resolution, so
+quote `R` wherever a fraction appears. `n_control_draws`, `control_draw_seed` and the per-class window
 counts each draw placed are in the sidecar. One caveat is recorded in the
 library: the null draws are independent of the shipped control and may overlap
 its windows, whereas two real event classes never do.
 
-The population layer (neuron → session → animal) is unchanged and stays in its
-own phase; `analysis/pfc/load_population.py` applies Benjamini-Hochberg across
-units to the empirical p-values, and refuses a bundle carrying likelihood-ratio
-columns.
+The population layer (neuron → session → animal) is unchanged:
+`analysis/pfc/load_population.py` applies Benjamini-Hochberg across units to the
+empirical p-values, and refuses a bundle carrying likelihood-ratio columns.
 
 **The replay-split curves were swapped until 2026-09-15.** The replay-split
 design is concatenated `[constant, non_local_no_SWR, non_local_SWR]` — the
