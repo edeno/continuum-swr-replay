@@ -12,7 +12,10 @@ import pandas as pd
 import pytest
 from scipy import stats
 
-from continuum_swr_replay.analysis.pfc.batched_glm import make_ridge_penalty
+from continuum_swr_replay.analysis.pfc.batched_glm import (
+    BatchedGLMResults,
+    make_ridge_penalty,
+)
 from continuum_swr_replay.analysis.pfc.glm import (
     convolve_event_basis,
     event_basis_functions,
@@ -122,6 +125,32 @@ class TestAssignBlockedFolds:
 
         with pytest.raises(ValueError, match="at least 2"):
             assign_blocked_folds(mask, n_folds=1, seed=0)
+
+    def test_runs_with_overlapping_kernel_support_stay_in_one_fold(self):
+        values = np.concatenate(
+            [
+                np.ones(100, dtype=bool),
+                np.zeros(10, dtype=bool),
+                np.ones(100, dtype=bool),
+                np.zeros(100, dtype=bool),
+                np.ones(100, dtype=bool),
+                np.zeros(10, dtype=bool),
+                np.ones(100, dtype=bool),
+            ]
+        )
+        mask = pd.Series(values, index=np.arange(len(values)) / SAMPLING_FREQUENCY)
+
+        folds = assign_blocked_folds(mask, n_folds=2, seed=3, support_radius_bins=10)
+
+        assert np.unique(folds[:200]).size == 1
+        assert np.unique(folds[200:]).size == 1
+        assert folds[0] != folds[-1]
+
+    def test_too_few_support_separated_blocks_is_refused(self):
+        mask = bouts_mask([100, 100, 100], gap=10)
+
+        with pytest.raises(ValueError, match="support-separated blocks"):
+            assign_blocked_folds(mask, n_folds=2, seed=0, support_radius_bins=10)
 
 
 class TestPoissonDeviance:
@@ -316,27 +345,99 @@ class TestHeldoutDeviance:
                 folds,
             )
 
+    def test_a_nonconverged_training_fit_invalidates_that_units_score(
+        self, monkeypatch
+    ):
+        def finite_but_nonconverged(design, counts, **kwargs):
+            n_units = np.atleast_2d(counts).shape[1]
+            return BatchedGLMResults(
+                params=np.zeros((n_units, design.shape[1])),
+                llf=np.zeros(n_units),
+                deviance=np.zeros(n_units),
+                aic=np.zeros(n_units),
+                converged=np.array([False, True]),
+                n_iter=np.full(n_units, 100),
+                rank=design.shape[1],
+                nobs=len(design),
+                n_features=design.shape[1],
+            )
+
+        monkeypatch.setattr(
+            "continuum_swr_replay.analysis.pfc.batched_glm.fit_poisson_glms",
+            finite_but_nonconverged,
+        )
+        design = np.ones((20, 1))
+        counts = np.ones((20, 2))
+        folds = np.repeat([0, 1], 10)
+
+        scored = heldout_deviance(design, counts, None, folds)
+
+        assert np.isnan(scored.total[0])
+        assert np.isfinite(scored.total[1])
+
+    def test_a_nonfinite_heldout_prediction_invalidates_the_score(self, monkeypatch):
+        def overflowing_fit(design, counts, **kwargs):
+            n_units = np.atleast_2d(counts).shape[1]
+            return BatchedGLMResults(
+                params=np.full((n_units, design.shape[1]), 1_000.0),
+                llf=np.zeros(n_units),
+                deviance=np.zeros(n_units),
+                aic=np.zeros(n_units),
+                converged=np.ones(n_units, dtype=bool),
+                n_iter=np.ones(n_units, dtype=int),
+                rank=design.shape[1],
+                nobs=len(design),
+                n_features=design.shape[1],
+            )
+
+        monkeypatch.setattr(
+            "continuum_swr_replay.analysis.pfc.batched_glm.fit_poisson_glms",
+            overflowing_fit,
+        )
+        design = np.ones((20, 1))
+        counts = np.ones((20, 1))
+        folds = np.repeat([0, 1], 10)
+
+        scored = heldout_deviance(design, counts, None, folds)
+
+        assert np.isnan(scored.total[0])
+
 
 class TestEmpiricalPvalue:
-    def test_it_is_the_fraction_of_draws_at_least_as_large(self):
+    def test_it_uses_the_finite_sample_plus_one_correction(self):
         null = np.array([[1.0], [2.0], [3.0], [4.0]])
 
-        assert empirical_pvalue(np.array([2.5]), null)[0] == pytest.approx(0.5)
-        assert empirical_pvalue(np.array([0.0]), null)[0] == pytest.approx(1.0)
-        assert empirical_pvalue(np.array([5.0]), null)[0] == pytest.approx(0.0)
+        assert empirical_pvalue(np.array([2.5]), null, min_usable_draws=1)[
+            0
+        ] == pytest.approx(3 / 5)
+        assert empirical_pvalue(np.array([0.0]), null, min_usable_draws=1)[
+            0
+        ] == pytest.approx(1.0)
+        assert empirical_pvalue(np.array([5.0]), null, min_usable_draws=1)[
+            0
+        ] == pytest.approx(1 / 5)
 
     def test_a_tie_counts_as_the_null_being_as_large(self):
         null = np.array([[1.0], [2.0]])
 
-        assert empirical_pvalue(np.array([2.0]), null)[0] == pytest.approx(0.5)
+        assert empirical_pvalue(np.array([2.0]), null, min_usable_draws=1)[
+            0
+        ] == pytest.approx(2 / 3)
 
     def test_draws_that_failed_are_left_out_of_the_denominator(self):
         null = np.array([[1.0], [np.nan], [3.0]])
 
-        assert empirical_pvalue(np.array([2.0]), null)[0] == pytest.approx(0.5)
+        assert empirical_pvalue(np.array([2.0]), null, min_usable_draws=1)[
+            0
+        ] == pytest.approx(2 / 3)
 
     def test_a_unit_with_no_usable_draw_is_nan(self):
         null = np.full((3, 1), np.nan)
+
+        assert np.isnan(empirical_pvalue(np.array([2.0]), null, min_usable_draws=1)[0])
+
+    def test_fewer_than_the_reporting_floor_is_unavailable(self):
+        null = np.arange(19.0)[:, None]
 
         assert np.isnan(empirical_pvalue(np.array([2.0]), null)[0])
 
@@ -495,6 +596,24 @@ class TestControlDrawNull:
                 lags=null_session["lags"],
                 classes=["non_local"],
             )
+
+    def test_an_incompletely_placed_draw_is_not_a_null_replicate(self, null_session):
+        folds = assign_blocked_folds(null_session["fit_mask"], n_folds=5, seed=2)
+
+        null = control_draw_null(
+            null_session["event_times"],
+            null_session["fit_mask"],
+            null_session["counts"][:, :2],
+            folds,
+            rng_seeds=[101],
+            spline_basis=null_session["spline_basis"],
+            lags=null_session["lags"],
+            classes=["non_local"],
+            max_attempts=0,
+        )
+
+        assert null.n_placed["non_local"].tolist() == [0]
+        assert np.isnan(null.improvement["non_local"]).all()
 
     def test_the_engagement_null_replaces_the_tested_regressor(self, null_session):
         folds = assign_blocked_folds(null_session["fit_mask"], n_folds=5, seed=2)

@@ -560,11 +560,12 @@ def convolve_event_basis(
     """Convolve an onset indicator with each basis function.
 
     Column ``b`` is ``sum_L indicator[t - L] B_b(L)`` over the lags ``L``, so a
-    positive lag is time *after* an onset. One convolution per basis function
-    replaces the ``(n_time, n_lags)`` matrix of shifted copies the same product
-    used to be formed from -- 1.4 GB per event class on the longest sessions,
-    against a few MB here -- and is exact: both are the same sum of the same
-    terms.
+    positive lag is time *after* an onset. Event onsets are sparse, so each
+    non-zero bin adds the small basis block at its affected rows. This avoids
+    both the old ``(n_time, n_lags)`` matrix of shifted copies (about 1.4 GB
+    per event class on the longest sessions) and a dense full-session
+    convolution for every basis function. It is exact: all three forms sum the
+    same terms.
 
     Parameters
     ----------
@@ -581,15 +582,29 @@ def convolve_event_basis(
     NDArray, shape (n_time, n_basis)
     """
     signal = np.asarray(onset_counts, dtype=float)
+    basis = np.asarray(spline_basis, dtype=float)
+    lag_indices = np.asarray(lags)
+    if signal.ndim != 1:
+        raise ValueError(f"onset_counts must be 1-D, got shape {signal.shape}")
+    if basis.ndim != 2:
+        raise ValueError(f"spline_basis must be 2-D, got shape {basis.shape}")
+    if lag_indices.ndim != 1 or len(lag_indices) != basis.shape[0]:
+        raise ValueError(
+            "lags must be 1-D with one value per spline_basis row; got "
+            f"{lag_indices.shape} and {basis.shape}"
+        )
+    if not np.issubdtype(lag_indices.dtype, np.integer) or (
+        len(lag_indices) > 1 and not np.all(np.diff(lag_indices) == 1)
+    ):
+        raise ValueError("lags must be contiguous ascending integer sample offsets")
+
     n_time = signal.shape[0]
-    # ``np.convolve(s, k)[n] = sum_i s[n - i] k[i]`` indexes the kernel from
-    # lag zero, so the window's first lag is the offset back into it.
-    offset = -int(lags[0])
-    columns = [
-        np.convolve(signal, spline_basis[:, b])[offset : offset + n_time]
-        for b in range(spline_basis.shape[1])
-    ]
-    return np.column_stack(columns)
+    convolved = np.zeros((n_time, basis.shape[1]), dtype=float)
+    for onset in np.flatnonzero(signal):
+        positions = onset + lag_indices
+        valid = (positions >= 0) & (positions < n_time)
+        convolved[positions[valid]] += signal[onset] * basis[valid]
+    return convolved
 
 
 def event_onset_counts(times: pd.DataFrame, time: NDArray) -> NDArray:
@@ -897,9 +912,7 @@ def get_frac_explained_deviance(
     denominator = constant_model.deviance - full_model.deviance
     if abs(denominator) < 1e-10:
         return 0.0
-    return float(
-        (reduced_model.deviance - full_model.deviance) / denominator
-    )
+    return float((reduced_model.deviance - full_model.deviance) / denominator)
 
 
 #: Half-width of the window peak modulations are read over, in seconds. The
@@ -1117,6 +1130,7 @@ def process_neuron(
     design_ranks: Mapping[str, int] | None = None,
     fit_diagnostics_out: dict[str, Any] | None = None,
     penalty_sigma: float | None = None,
+    prebinned_spike_count: NDArray | None = None,
 ) -> tuple[dict[str, Any], NDArray, NDArray, NDArray, NDArray, NDArray]:
     """Fit GLM models for a single neuron and compute modulation statistics.
 
@@ -1254,6 +1268,10 @@ def process_neuron(
         scale, when this neuron's immobility models are fit here. ``None`` fits
         them unpenalised. Ignored when ``prefitted_immobility`` is given -- the
         prior is then whatever the session was prefit with.
+    prebinned_spike_count : NDArray, shape (n_time,), optional
+        Counts already binned on ``time``. The session runner bins every unit
+        once for the batched and held-out fits and passes the corresponding
+        column here; direct callers may continue to pass spike times only.
 
     Returns
     -------
@@ -1312,7 +1330,16 @@ def process_neuron(
     """
     _logger = logging.getLogger(logger_name) if logger_name else logger
 
-    neuron_spike_count = get_spikecount_per_time_bin(neuron_spike_times, time)
+    neuron_spike_count = (
+        get_spikecount_per_time_bin(neuron_spike_times, time)
+        if prebinned_spike_count is None
+        else np.asarray(prebinned_spike_count, dtype=float)
+    )
+    if neuron_spike_count.shape != np.asarray(time).shape:
+        raise ValueError(
+            "prebinned_spike_count must have one value per time bin; got "
+            f"{neuron_spike_count.shape} for time {np.asarray(time).shape}"
+        )
     sampling_frequency = 1 / np.median(np.diff(time))
     if fit_mask is None:
         fit_mask = is_immobile
@@ -1327,7 +1354,9 @@ def process_neuron(
             neuron_stats["theta_mod"],
             neuron_stats["theta_preferred_phase"],
         ) = test_theta_modulation(
-            theta_phase, is_immobile, neuron_spike_count,
+            theta_phase,
+            is_immobile,
+            neuron_spike_count,
             sampling_frequency=sampling_frequency,
             fitter=fitter,
             prefitted=prefitted_theta,
@@ -1437,10 +1466,8 @@ def process_neuron(
                 neuron_stats[f"{test_name}: frac_null_dev"] = np.nan
                 neuron_stats[f"{test_name}: frac_explained_dev"] = np.nan
             else:
-                neuron_stats[f"{test_name}: frac_null_dev"] = (
-                    get_frac_null_deviance(
-                        results[model1], results[model2], results["constant"]
-                    )
+                neuron_stats[f"{test_name}: frac_null_dev"] = get_frac_null_deviance(
+                    results[model1], results[model2], results["constant"]
                 )
                 neuron_stats[f"{test_name}: frac_explained_dev"] = (
                     get_frac_explained_deviance(
@@ -1471,24 +1498,18 @@ def process_neuron(
             neuron_stats["non_local_no_SWR_max_mod_time"] = np.nan
         else:
             swr_ctrl_params = results["SWR + non_local_no_SWR"].params
-            swr_modulation = (
-                spline_basis @ swr_ctrl_params[1 : n_basis_functions + 1]
-            )
-            no_swr_modulation = (
-                spline_basis @ swr_ctrl_params[n_basis_functions + 1 :]
-            )
+            swr_modulation = spline_basis @ swr_ctrl_params[1 : n_basis_functions + 1]
+            no_swr_modulation = spline_basis @ swr_ctrl_params[n_basis_functions + 1 :]
 
             swr_max_mod_ind = np.argmax(np.abs(swr_modulation))
             neuron_stats["SWR_max_mod"] = swr_modulation[swr_max_mod_ind]
             neuron_stats["SWR_max_mod_time"] = lag_time[swr_max_mod_ind]
 
             no_swr_max_mod_ind = np.argmax(np.abs(no_swr_modulation))
-            neuron_stats["non_local_no_SWR_max_mod"] = (
-                no_swr_modulation[no_swr_max_mod_ind]
-            )
-            neuron_stats["non_local_no_SWR_max_mod_time"] = (
-                lag_time[no_swr_max_mod_ind]
-            )
+            neuron_stats["non_local_no_SWR_max_mod"] = no_swr_modulation[
+                no_swr_max_mod_ind
+            ]
+            neuron_stats["non_local_no_SWR_max_mod_time"] = lag_time[no_swr_max_mod_ind]
 
         # Replay-split model: SWR-replay and non-SWR replay modulation
         # controlling for replay-coincident ripples only. The blocks are read
@@ -1516,18 +1537,18 @@ def process_neuron(
             )
 
             non_local_swr_max_ind = np.argmax(np.abs(non_local_swr_modulation))
-            neuron_stats["non_local_SWR_max_mod"] = (
-                non_local_swr_modulation[non_local_swr_max_ind]
-            )
+            neuron_stats["non_local_SWR_max_mod"] = non_local_swr_modulation[
+                non_local_swr_max_ind
+            ]
             neuron_stats["non_local_SWR_max_mod_time"] = lag_time[non_local_swr_max_ind]
 
             non_local_no_swr_max_ind = np.argmax(np.abs(non_local_no_swr_modulation))
             neuron_stats["non_local_no_SWR_split_max_mod"] = (
                 non_local_no_swr_modulation[non_local_no_swr_max_ind]
             )
-            neuron_stats["non_local_no_SWR_split_max_mod_time"] = (
-                lag_time[non_local_no_swr_max_ind]
-            )
+            neuron_stats["non_local_no_SWR_split_max_mod_time"] = lag_time[
+                non_local_no_swr_max_ind
+            ]
 
         # Matched-control model: the non-event baseline's own peri-window
         # modulation, taken from the joint engagement model so it is the
@@ -2377,6 +2398,7 @@ def _prefit_session(
     theta_phase: pd.Series,
     logger: logging.Logger,
     penalty_sigma: float | None = None,
+    counts: NDArray | None = None,
 ) -> tuple[
     list[dict[str, Any] | None],
     list[tuple[Any, Any] | None],
@@ -2403,6 +2425,10 @@ def _prefit_session(
         Prior standard deviation of an event-basis coefficient, on the log-rate
         scale, for the immobility models. ``None`` fits them unpenalised. The
         two theta models carry no event basis and are never penalised.
+    counts : NDArray, shape (n_time, n_units), optional
+        Spike counts already binned on ``time``. Supplying the session-wide
+        matrix avoids binning the same spikes again for scoring and for each
+        per-neuron summary.
 
     Returns
     -------
@@ -2421,9 +2447,17 @@ def _prefit_session(
         reported per model rather than discarding the neuron, so the only place
         that fact survives is here.
     """
-    counts = np.column_stack(
-        [get_spikecount_per_time_bin(neuron, time) for neuron in spike_times]
-    ).astype(float)
+    if counts is None:
+        counts = np.column_stack(
+            [get_spikecount_per_time_bin(neuron, time) for neuron in spike_times]
+        ).astype(float)
+    else:
+        counts = np.asarray(counts, dtype=float)
+        if counts.shape != (len(time), len(spike_times)):
+            raise ValueError(
+                "counts must have shape (n_time, n_units); got "
+                f"{counts.shape}, expected {(len(time), len(spike_times))}"
+            )
 
     fit_rows = np.asarray(fit_mask, dtype=bool)
     logger.info(
@@ -2726,7 +2760,10 @@ def run_session(
 
     logger.info("Loading HPC decoding results...")
     results, _, _ = load_results(
-        nwb_file_name, epoch_name, decoding_brain_area="HPC", load_detector=False,
+        nwb_file_name,
+        epoch_name,
+        decoding_brain_area="HPC",
+        load_detector=False,
     )
 
     logger.info("Loading session data...")
@@ -2875,6 +2912,16 @@ def run_session(
         empty = np.empty((0, 0))
         return pd.DataFrame(), empty, empty, empty, empty, empty, cohort_info
 
+    spike_times = data["spike_times"][brain_area]
+    # The JAX fit, held-out scorer and serial per-neuron summaries all consume
+    # the same binned response. Bin it once instead of repeating the histogram
+    # pass up to three times over every unit.
+    session_counts = None
+    if fitter == "jax" or scoring_out is not None:
+        session_counts = np.column_stack(
+            [get_spikecount_per_time_bin(neuron, time) for neuron in spike_times]
+        ).astype(float)
+
     if scoring_out is not None:
         # Handed over, not rebuilt: an out-of-fold score has to be taken on the
         # bins, events and designs the shipped fit used, and reassembling them
@@ -2883,12 +2930,7 @@ def run_session(
         scoring_out.update(
             {
                 "fit_mask": fit_mask,
-                "counts": np.column_stack(
-                    [
-                        get_spikecount_per_time_bin(neuron, time)
-                        for neuron in data["spike_times"][brain_area]
-                    ]
-                ).astype(float),
+                "counts": session_counts,
                 "designs": immobility_design_matrices,
                 "spline_basis": spline_basis,
                 "lag_time": lag_time,
@@ -2897,7 +2939,7 @@ def run_session(
             }
         )
 
-    n_neurons = len(data["spike_times"][brain_area])
+    n_neurons = len(spike_times)
     logger.info(
         "Fitting GLMs for %d %s neurons (fitter=%s, parallel=%s)...",
         n_neurons,
@@ -2930,7 +2972,7 @@ def run_session(
             theta_design,
             fit_counts,
         ) = _prefit_session(
-            data["spike_times"][brain_area],
+            spike_times,
             time,
             is_immobile,
             fit_mask,
@@ -2938,6 +2980,7 @@ def run_session(
             data["theta_phase"],
             logger=logger,
             penalty_sigma=penalty_sigma,
+            counts=session_counts,
         )
 
     def _neuron_args(index: int) -> dict[str, Any]:
@@ -2953,6 +2996,14 @@ def run_session(
                 None if prefitted_theta is None else prefitted_theta[index]
             ),
             "fit_diagnostics_out": (None if fit_diagnostics_out is None else {}),
+            # Passing a full-length count vector to each Dask task is more
+            # expensive than re-binning its sparse spikes. The production
+            # runner is serial here; that path reuses the session matrix.
+            "prebinned_spike_count": (
+                None
+                if run_parallel or session_counts is None
+                else session_counts[:, index]
+            ),
         }
 
     neuron_diagnostics: list[dict[str, Any]] = []
@@ -2972,13 +3023,13 @@ def run_session(
                 lag_time,
                 **_neuron_args(i),
             )
-            for i, neuron_spike_times in enumerate(data["spike_times"][brain_area])
+            for i, neuron_spike_times in enumerate(spike_times)
         ]
 
         result = dask.compute(*tasks)
     else:
         result = []
-        for i, neuron_spike_times in enumerate(data["spike_times"][brain_area]):
+        for i, neuron_spike_times in enumerate(spike_times):
             logger.info("  Neuron %d/%d...", i + 1, n_neurons)
             kwargs = _neuron_args(i)
             neuron_diagnostics.append(kwargs["fit_diagnostics_out"])
@@ -3024,9 +3075,7 @@ def run_session(
     swr_modulation = np.stack(swr_modulation_list, axis=1)
     no_swr_modulation = np.stack(no_swr_modulation_list, axis=1)
     non_local_swr_modulation = np.stack(non_local_swr_modulation_list, axis=1)
-    non_local_no_swr_modulation = np.stack(
-        non_local_no_swr_modulation_list, axis=1
-    )
+    non_local_no_swr_modulation = np.stack(non_local_no_swr_modulation_list, axis=1)
     matched_control_modulation = np.stack(matched_control_modulation_list, axis=1)
 
     # Trim modulation arrays from fit window (±250ms) to report window (±200ms)

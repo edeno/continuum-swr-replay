@@ -172,6 +172,13 @@ class TestConfiguration:
         assert record["gpu_uuid"] == "GPU-aaa"
         assert os.environ["CUDA_VISIBLE_DEVICES"] == record["gpu_uuid"]
 
+    def test_a_forced_card_claimed_by_a_sibling_is_refused(self, occupied, claims):
+        claims.mkdir(parents=True, exist_ok=True)
+        (claims / "gpu0.claim").write_text(str(os.getppid()))
+
+        with pytest.raises(NoFreeGPUError, match="claimed by another worker"):
+            configure_jax_gpu(gpu=0)
+
     def test_cpu_is_refused_unless_asked_for(self, monkeypatch, claims):
         monkeypatch.setattr(gpu_module, "query_gpus", list)
 

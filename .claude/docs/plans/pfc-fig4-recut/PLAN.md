@@ -23,6 +23,14 @@ claim 20 quote. That is the subject of
 blocked held-out deviance), the next phase, which supersedes the statsmodels hand-back and the
 asymptotic LR/AIC machinery. Claim 20's numbers are pending it.
 
+**Phase 0b implementation status (reviewed 2026-09-16):** Task A and the Task B integration are
+implemented on `pfc-ridge-heldout`; the production batch, final audit, Figure 4 regeneration and
+claim update in Task C have not run. The original smoke selected σ = 3, K = 5 and R = 40. Review
+corrected the Monte Carlo test to `(b + 1)/(R + 1)`, excludes incompletely placed null draws,
+requires at least 20 usable draws, groups runs whose event-kernel supports overlap, and keeps the
+unit-level raw-p fraction explicitly descriptive pending Phase 4's session/animal inference. Those
+changes require the three-session GPU smoke to be repeated before Task C launches.
+
 **Corrected premise (2026-09-14):** Phase 1's motivating discrepancy does not hold. On the
 well-anchored mPFC population the retired ripple-overlap split and the canonical `is_swr` agree
 **exactly in 71 of 71 sessions** (median SWR fraction 0.447 both ways); the earlier 44.7 % vs

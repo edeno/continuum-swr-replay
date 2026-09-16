@@ -126,6 +126,8 @@ def _write_bundle_files(
                     "fold_seed": INFERENCE["fold_seed"],
                     "n_control_draws": INFERENCE["n_control_draws"],
                     "control_draw_seed": INFERENCE["control_draw_seed"],
+                    "empirical_pvalue_method": runner.EMPIRICAL_PVALUE_METHOD,
+                    "min_usable_null_draws": runner.MIN_USABLE_NULL_DRAWS,
                     **sidecar_overrides,
                 }
             )
@@ -660,6 +662,8 @@ def test_the_seeds_are_a_function_of_the_session_and_the_draw():
         {"fold_seed": 11},
         {"n_control_draws": 20},
         {"control_draw_seed": 12},
+        {"empirical_pvalue_method": "raw_exceedance"},
+        {"min_usable_null_draws": 0},
     ],
 )
 def test_a_bundle_produced_by_another_estimator_or_inference_is_refit(tmp_path, stale):
@@ -668,9 +672,7 @@ def test_a_bundle_produced_by_another_estimator_or_inference_is_refit(tmp_path, 
     # split or against a null of another size carries different held-out
     # differences and different p-values.
     epoch_identifier = "wilbur20210329_02_r1_mPFC"
-    _write_bundle_files(
-        tmp_path, epoch_identifier, "at_well", "at_well", **stale
-    )
+    _write_bundle_files(tmp_path, epoch_identifier, "at_well", "at_well", **stale)
 
     assert not _results_exist(
         tmp_path, epoch_identifier, False, "at_well", "abc123", EVENT_TABLE_SHA, DOT_SHA
@@ -704,6 +706,8 @@ def test_the_sidecar_states_the_estimator_and_the_inference(
     assert record["implied_prior_sd"]["sustained"] > 0
     assert record["n_folds"] == 5
     assert record["n_control_draws"] == 40
+    assert record["empirical_pvalue_method"] == "plus_one"
+    assert record["min_usable_null_draws"] == runner.MIN_USABLE_NULL_DRAWS
     assert record["n_basis_per_class"] == 11
     # Derived from the session key, so a lone refit reproduces the batch.
     assert record["fold_seed"] == runner.session_seed(
@@ -716,12 +720,9 @@ def test_the_sidecar_states_the_estimator_and_the_inference(
     assert "n_neurons_reference_fit" not in record
     # The prior the models were fit under reaches the fit itself.
     assert (
-        fake_session["run_session"]["penalty_sigma"]
-        == runner.CANONICAL_PENALTY_SIGMA
+        fake_session["run_session"]["penalty_sigma"] == runner.CANONICAL_PENALTY_SIGMA
     )
-    assert (
-        fake_session["score"]["penalty_sigma"] == runner.CANONICAL_PENALTY_SIGMA
-    )
+    assert fake_session["score"]["penalty_sigma"] == runner.CANONICAL_PENALTY_SIGMA
 
 
 def test_the_bundle_carries_the_heldout_columns_and_not_the_retired_ones(
@@ -809,6 +810,19 @@ def test_a_batch_cannot_be_launched_on_the_unpenalised_backend(monkeypatch):
     assert excinfo.value.code == 2
 
 
+def test_a_null_below_the_reporting_floor_is_rejected(monkeypatch):
+    monkeypatch.setattr(
+        runner.sys,
+        "argv",
+        ["run_pfc_analysis_bandit.py", "--n-control-draws", "19"],
+    )
+
+    with pytest.raises(SystemExit) as excinfo:
+        runner.get_command_line_arguments()
+
+    assert excinfo.value.code == 2
+
+
 # ---------------------------------------------------------------------------
 # Scoring a session out of fold
 # ---------------------------------------------------------------------------
@@ -832,9 +846,7 @@ def _synthetic_context(seed=0, n_units=3):
     fit_mask = pd.Series(mask, index=time)
 
     def windows(onsets):
-        return pd.DataFrame(
-            {"start_time": onsets, "end_time": onsets + 0.08}
-        )
+        return pd.DataFrame({"start_time": onsets, "end_time": onsets + 0.08})
 
     swr_onsets = time[np.arange(600, 29_000, 900)]
     non_local_onsets = time[np.arange(700, 29_000, 700)]
@@ -947,8 +959,9 @@ def test_the_scored_table_says_what_each_model_bought_out_of_fold(caplog):
             atol=1e-9,
         )
 
-    # Every class and the engagement statistic carry an empirical p-value, on
-    # the grid one draw gives.
+    # Four draws exercise the null integration but are deliberately below the
+    # reporting floor, so the columns exist and say "unavailable" rather than
+    # turning a coarse rank into evidence.
     for column in (
         "SWR: p_heldout",
         "non_local: p_heldout",
@@ -957,16 +970,18 @@ def test_the_scored_table_says_what_each_model_bought_out_of_fold(caplog):
         f"{runner.pair_name(*runner.ENGAGEMENT_PAIR)}: p_heldout",
     ):
         values = statistics[column].to_numpy(dtype=float)
-        assert np.all((values >= 0) & (values <= 1))
-        np.testing.assert_allclose(values * 4, np.round(values * 4))
+        assert np.isnan(values).all()
 
     assert set(statistics["min_heldout_model"]) <= set(
         runner.BEST_MODEL_CANDIDATES["min_heldout_model"]
     )
-    assert sum(diagnostics["fold_sizes"]) == int(
-        np.asarray(context["fit_mask"]).sum()
-    )
+    assert sum(diagnostics["fold_sizes"]) == int(np.asarray(context["fit_mask"]).sum())
     assert diagnostics["non_estimable_models"] == []
+    assert diagnostics["fold_support_radius_bins"] == 25
+    assert all(
+        record["n_required_draws"] == runner.MIN_USABLE_NULL_DRAWS
+        for record in diagnostics["null_windows"].values()
+    )
 
 
 def test_the_best_model_is_the_one_with_the_lowest_heldout_deviance():
@@ -1020,3 +1035,48 @@ def test_every_curve_is_read_from_its_own_classs_block():
             designs[single_class[curve]][:, 1:],
             err_msg=f"{curve} does not read {single_class[curve]}'s block",
         )
+
+
+def test_a_nonconverged_mle_is_not_used_for_the_prior_audit(monkeypatch):
+    from continuum_swr_replay.analysis.pfc.batched_glm import BatchedGLMResults
+
+    n_time, n_units, n_basis = 20, 2, 2
+    wanted = {model for model, _ in runner.CURVE_SOURCES.values()}
+    designs = {
+        model: np.ones((n_time, 1 + n_basis * (1 + int(" + " in model))), dtype=float)
+        for model in wanted
+    }
+
+    def finite_but_nonconverged(design, counts, **kwargs):
+        n_features = design.shape[1]
+        return BatchedGLMResults(
+            params=np.zeros((n_units, n_features)),
+            llf=np.zeros(n_units),
+            deviance=np.zeros(n_units),
+            aic=np.zeros(n_units),
+            converged=np.array([False, True]),
+            n_iter=np.array([100, 2]),
+            rank=n_features,
+            nobs=len(design),
+            n_features=n_features,
+            covariance=np.tile(np.eye(n_features), (n_units, 1, 1)),
+        )
+
+    monkeypatch.setattr(runner, "fit_poisson_glms", finite_but_nonconverged)
+    columns = runner.maximum_likelihood_comparison(
+        designs,
+        np.ones(n_time, dtype=bool),
+        np.ones((n_time, n_units)),
+        {
+            "spline_basis": np.eye(n_basis),
+            "lag_time": np.array([-0.1, 0.1]),
+        },
+        {curve: np.zeros((n_basis, n_units)) for curve in runner.CURVE_SOURCES},
+        logging.getLogger("test"),
+    )
+
+    for curve in runner.CURVE_SOURCES:
+        assert columns[f"{curve}: mle_converged"].tolist() == [False, True]
+        assert np.isnan(columns[f"{curve}: peak_log_modulation_mle"][0])
+        assert np.isfinite(columns[f"{curve}: peak_log_modulation_mle"][1])
+        assert not columns[f"{curve}: prior_binds"][0]

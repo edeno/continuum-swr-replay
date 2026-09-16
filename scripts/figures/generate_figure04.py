@@ -27,9 +27,9 @@ event-basis coefficients, and a peri-event kernel that returns to
 baseline at both ends of the ±250 ms fit window. The example neuron's
 band is the penalised posterior-mode standard error, and the population
 significance is an empirical p-value from repeated matched-control
-draws (R = 40, so it lives on a grid of 1/R = 0.025 and q = 0 means
-no draw reached the observed improvement), Benjamini-Hochberg
-corrected across units.
+draws (R = 40, with the finite-sample plus-one correction, so its minimum is
+1/(R+1) = 0.024). Panel d's unit fraction is a descriptive raw-p preview;
+population inference requires aggregation through session and animal.
 
 April 2026: the figure was tightened from 6 panels to 4. The previous
 standalone single-neuron model selection was dropped (it duplicated the
@@ -98,10 +98,10 @@ warnings.filterwarnings("ignore")
 DEFAULT_CONTROL_DRAWS = 40
 
 
-
 # ---------------------------------------------------------------------------
 # Panel a — Single-neuron example (overlaid SWR + non-SWR modulation)
 # ---------------------------------------------------------------------------
+
 
 def plot_single_neuron_overlay(
     axes,
@@ -154,11 +154,18 @@ def plot_single_neuron_overlay(
         lower = (result.params[1:] - result.bse[1:]) @ spline_basis.T
 
         ax_mod.plot(
-            lag_time, modulation, color=cfg["color"],
-            linewidth=1.2, label=cfg["label"],
+            lag_time,
+            modulation,
+            color=cfg["color"],
+            linewidth=1.2,
+            label=cfg["label"],
         )
         ax_mod.fill_between(
-            lag_time, lower, upper, color=cfg["color"], alpha=0.2,
+            lag_time,
+            lower,
+            upper,
+            color=cfg["color"],
+            alpha=0.2,
         )
 
     ax_mod.axhline(0, color="black", linestyle="--", linewidth=0.5)
@@ -167,7 +174,11 @@ def plot_single_neuron_overlay(
     ax_mod.set_xticks((lag_bounds[0], 0, lag_bounds[1]))
     ax_mod.set_yticks((modulation_bounds[0], 0, modulation_bounds[1]))
     ax_mod.set_yticklabels(
-        (f"{np.exp(modulation_bounds[0]):.1f}", "1", f"{np.exp(modulation_bounds[1]):.1f}")
+        (
+            f"{np.exp(modulation_bounds[0]):.1f}",
+            "1",
+            f"{np.exp(modulation_bounds[1]):.1f}",
+        )
     )
     ax_mod.set_ylabel("GLM\nmodulation")
     ax_mod.legend(frameon=False, fontsize=6, loc="upper right")
@@ -180,7 +191,9 @@ def plot_single_neuron_overlay(
     # Cheap manual PSTH: compute spike-count density in lag bins around
     # each event start for each event type.
     psth_bin_ms = 10.0
-    psth_edges = np.arange(lag_bounds[0], lag_bounds[1] + psth_bin_ms / 1000.0, psth_bin_ms / 1000.0)
+    psth_edges = np.arange(
+        lag_bounds[0], lag_bounds[1] + psth_bin_ms / 1000.0, psth_bin_ms / 1000.0
+    )
     psth_centers = 0.5 * (psth_edges[:-1] + psth_edges[1:])
 
     for cfg in model_configs:
@@ -201,7 +214,10 @@ def plot_single_neuron_overlay(
         counts, _ = np.histogram(all_rel, bins=psth_edges)
         rate = counts / (len(starts) * (psth_bin_ms / 1000.0))
         ax_psth.plot(
-            psth_centers, rate, color=cfg["color"], linewidth=1.2,
+            psth_centers,
+            rate,
+            color=cfg["color"],
+            linewidth=1.2,
             label=cfg["label"],
         )
 
@@ -214,6 +230,7 @@ def plot_single_neuron_overlay(
 # ---------------------------------------------------------------------------
 # Panel d — Population heatmaps (accepts axes)
 # ---------------------------------------------------------------------------
+
 
 def plot_population_heatmaps(swr_mod, no_swr_mod, lag_time, axes):
     """Plot side-by-side heatmaps on provided (ax1, ax2) axes."""
@@ -228,8 +245,11 @@ def plot_population_heatmaps(swr_mod, no_swr_mod, lag_time, axes):
     lag_ms = lag_time * 1000
 
     im1 = ax1.imshow(
-        swr_sorted.T, aspect="auto", cmap="RdBu_r",
-        vmin=vmin, vmax=vmax,
+        swr_sorted.T,
+        aspect="auto",
+        cmap="RdBu_r",
+        vmin=vmin,
+        vmax=vmax,
         extent=[lag_ms[0], lag_ms[-1], swr_sorted.shape[1], 0],
         interpolation="none",
     )
@@ -239,8 +259,11 @@ def plot_population_heatmaps(swr_mod, no_swr_mod, lag_time, axes):
     ax1.set_title("SWR modulation")
 
     ax2.imshow(
-        no_swr_sorted.T, aspect="auto", cmap="RdBu_r",
-        vmin=vmin, vmax=vmax,
+        no_swr_sorted.T,
+        aspect="auto",
+        cmap="RdBu_r",
+        vmin=vmin,
+        vmax=vmax,
         extent=[lag_ms[0], lag_ms[-1], no_swr_sorted.shape[1], 0],
         interpolation="none",
     )
@@ -254,6 +277,7 @@ def plot_population_heatmaps(swr_mod, no_swr_mod, lag_time, axes):
 # ---------------------------------------------------------------------------
 # Panel e — Population average (accepts ax)
 # ---------------------------------------------------------------------------
+
 
 def plot_population_average(modulations, lag_time, ax):
     """Plot population mean ± SEM modulation on provided ax."""
@@ -296,19 +320,17 @@ SIGNIFICANCE_BARS = (
 
 
 def plot_significance(df, ax, alpha=0.05, n_control_draws=DEFAULT_CONTROL_DRAWS):
-    """Fraction of units whose regressor beats the control-draw null.
+    """Descriptive fraction of units whose regressor beats the control null.
 
-    A unit counts when its empirical p-value -- the fraction of matched-control
-    draws whose held-out improvement matched or beat the observed one --
-    survives Benjamini-Hochberg across units at ``alpha``. The denominator is
-    the units actually tested for that class: a unit whose session had no
-    events of a class is untested for it, not a negative.
+    A unit counts when its plus-one Monte Carlo p-value is below ``alpha``.
+    The denominator is the units actually tested for that class: a unit whose
+    session had no events of a class is untested for it, not a negative. This
+    is a descriptive implementation preview, not population inference: units
+    within a session and animal are not independent replicates.
 
-    That p-value is ``r / R`` over ``R`` draws, so it lives on a grid of
-    ``1 / R`` and cannot be smaller than zero -- ``q = 0`` means no draw of
-    ``R`` reached the observed improvement, not a vanishing tail. Every
-    fraction here inherits that resolution, which is why ``n_control_draws``
-    is drawn on the panel.
+    The p-value is ``(r + 1) / (R + 1)`` over ``R`` usable draws, so it cannot
+    be zero. Every fraction here inherits that resolution, which is why
+    ``n_control_draws`` is drawn on the panel.
     """
     fractions = significant_fraction(df, alpha=alpha)
     labels, fracs, colors_list = [], [], []
@@ -321,18 +343,27 @@ def plot_significance(df, ax, alpha=0.05, n_control_draws=DEFAULT_CONTROL_DRAWS)
     bars = ax.bar(labels, fracs, color=colors_list, alpha=0.7, edgecolor="none")
     for bar, frac in zip(bars, fracs, strict=True):
         if np.isfinite(frac) and frac > 2:
-            ax.text(bar.get_x() + bar.get_width() / 2, frac + 1,
-                    f"{frac:.0f}%", ha="center", fontsize=5)
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                frac + 1,
+                f"{frac:.0f}%",
+                ha="center",
+                fontsize=5,
+            )
 
     ax.axhline(100 * alpha, color="gray", linewidth=0.5, linestyle="--")
     ax.set_ylabel("% units")
-    ax.set_ylim(0, np.nanmax(fracs) * 1.3)
+    finite_fractions = np.asarray(fracs, dtype=float)
+    finite_fractions = finite_fractions[np.isfinite(finite_fractions)]
+    observed_max = float(finite_fractions.max()) if finite_fractions.size else 0.0
+    ax.set_ylim(0, max(100 * alpha * 1.2, observed_max * 1.3))
     ax.tick_params(axis="x", labelsize=5)
-    # The empirical p-value is r/R over R control draws, so it lives on a grid
-    # of 1/R and every fraction read off it inherits that resolution. Say R on
-    # the panel rather than leave the reader to find it in a sidecar.
+    # Say both the raw-p threshold and R on the panel: this is a descriptive
+    # preview, and its Monte Carlo resolution is part of what the bars mean.
     ax.set_title(
-        f"Beats control null\n(R={n_control_draws} draws, 1/R={1 / n_control_draws:.3f})",
+        "Raw empirical p < "
+        f"{alpha:g} (descriptive)\n"
+        f"R={n_control_draws}, min p={1 / (n_control_draws + 1):.3f}",
         fontsize=7,
     )
 
@@ -350,8 +381,13 @@ def plot_best_model_selection(df, ax):
     bars = ax.bar(model_labels, vals, color=model_colors, alpha=0.7, edgecolor="none")
     for bar, val in zip(bars, vals, strict=True):
         if val > 2:
-            ax.text(bar.get_x() + bar.get_width() / 2, val + 1,
-                    f"{val:.0f}%", ha="center", fontsize=5)
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                val + 1,
+                f"{val:.0f}%",
+                ha="center",
+                fontsize=5,
+            )
     ax.set_ylabel("% units")
     ax.tick_params(axis="x", labelsize=5)
     ax.set_title("Best model\n(held-out deviance)", fontsize=7)
@@ -497,7 +533,8 @@ def generate_figure(
     )
 
     immobility_design_matrices, spline_basis, lag_time = make_design_matrices(
-        event_times, data["position_info"],
+        event_times,
+        data["position_info"],
         sampling_frequency=DEFAULT_SAMPLING_FREQUENCY_HZ,
         lags=lags,
     )
@@ -545,8 +582,7 @@ def generate_figure(
     #            panel d — consolidated stats (% over the null + best model)
     print("Assembling composite figure...")
     fig_height = min(8.5, PAGE_HEIGHT)
-    fig = plt.figure(figsize=(TWO_COLUMN, fig_height), dpi=450,
-                     constrained_layout=True)
+    fig = plt.figure(figsize=(TWO_COLUMN, fig_height), dpi=450, constrained_layout=True)
     gs = GridSpec(3, 1, figure=fig, height_ratios=[1.4, 1.4, 1.2], hspace=0.4)
 
     # ── Row 1: panel a — overlaid single-neuron example ──
@@ -587,8 +623,10 @@ def generate_figure(
     ax_b1 = fig.add_subplot(gs_b[0])
     ax_b2 = fig.add_subplot(gs_b[1])
     im = plot_population_heatmaps(
-        modulations["swr"], modulations["no_swr"],
-        pop_lag_time, [ax_b1, ax_b2],
+        modulations["swr"],
+        modulations["no_swr"],
+        pop_lag_time,
+        [ax_b1, ax_b2],
     )
     vmin, vmax = -np.log(2), np.log(2)
     cbar = fig.colorbar(im, ax=[ax_b1, ax_b2], shrink=0.8, pad=0.02)
@@ -624,10 +662,13 @@ def generate_figure(
 
 def main():
     parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--output-dir", type=Path, default=Path("paper/figures/figure04"),
+        "--output-dir",
+        type=Path,
+        default=Path("paper/figures/figure04"),
     )
     parser.add_argument("--nwb-file-name", type=str, default="wilbur20210329_.nwb")
     parser.add_argument("--epoch-name", type=str, default="02_r1")

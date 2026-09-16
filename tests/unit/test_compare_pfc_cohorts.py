@@ -483,7 +483,9 @@ class TestPopulation:
             load_population_data,
         )
 
-        frame, _, _ = load_population_data(before, min_firing_rate=1.0, inference="legacy")
+        frame, _, _ = load_population_data(
+            before, min_firing_rate=1.0, inference="legacy"
+        )
         table = significance_table(frame, alpha=0.05)
 
         chimi = table.loc[
@@ -512,8 +514,12 @@ class TestReport:
             load_population_data,
         )
 
-        before_frame, _, _ = load_population_data(before, min_firing_rate=1.0, inference="legacy")
-        after_frame, _, _ = load_population_data(after, min_firing_rate=1.0, inference="legacy")
+        before_frame, _, _ = load_population_data(
+            before, min_firing_rate=1.0, inference="legacy"
+        )
+        after_frame, _, _ = load_population_data(
+            after, min_firing_rate=1.0, inference="legacy"
+        )
         report = build_report(
             sidecars=read_sidecars(after),
             before=before_frame,
@@ -1076,7 +1082,6 @@ class TestRerunReport:
 # ---------------------------------------------------------------------------
 
 
-
 def _write_ridge_bundle(
     data_dir,
     session: str,
@@ -1110,8 +1115,13 @@ def _write_ridge_bundle(
         "matched_control + non_local_no_SWR",
     ):
         frame[f"{model}: separated_columns"] = separated
-    for curve in ("SWR", "no_SWR", "non_local_SWR", "non_local_no_SWR",
-                  "matched_control"):
+    for curve in (
+        "SWR",
+        "no_SWR",
+        "non_local_SWR",
+        "non_local_no_SWR",
+        "matched_control",
+    ):
         frame[f"{curve}: peak_log_modulation"] = peak
         frame[f"{curve}: peak_log_modulation_mle"] = mle_peak
         frame[f"{curve}: peak_log_modulation_mle_se"] = 0.1
@@ -1148,6 +1158,8 @@ def _write_ridge_bundle(
                 extra={
                     "estimator": "ridge_poisson_glm",
                     "inference": "blocked_heldout_deviance",
+                    "empirical_pvalue_method": "plus_one",
+                    "min_usable_null_draws": 20,
                     "penalty_sigma_log_rate": 2.0,
                     "n_folds": n_folds,
                     "fold_seed": abs(hash(session)) % 10_000,
@@ -1215,9 +1227,7 @@ class TestPeakShrinkage:
         assert peaks[0] == 0.0
         assert np.isnan(peaks[1])
 
-    def test_the_shrinkage_is_read_off_each_bundles_own_columns(
-        self, estimator_trees
-    ):
+    def test_the_shrinkage_is_read_off_each_bundles_own_columns(self, estimator_trees):
         _, after = estimator_trees
         population, _, _ = __import__(
             "continuum_swr_replay.analysis.pfc.load_population",
@@ -1274,9 +1284,7 @@ class TestEstimatorTables:
         assert (table["n_units_with_a_separated_column"] == 2).all()
         assert (table["max_separated_columns"] == 3).all()
 
-    def test_the_fold_spread_is_the_relative_spread_over_folds(
-        self, estimator_trees
-    ):
+    def test_the_fold_spread_is_the_relative_spread_over_folds(self, estimator_trees):
         _, after = estimator_trees
         population, _, _ = __import__(
             "continuum_swr_replay.analysis.pfc.load_population",
@@ -1300,7 +1308,7 @@ class TestEstimatorTables:
         table = heldout_fraction_table(population, alpha=0.05)
 
         assert list(table["animal"]) == ["all", "chimi", "j16"]
-        # Every unit's empirical p is 0, so every unit survives BH.
+        # Every fixture unit is below the raw-p preview threshold.
         assert (table["SWR_pct"] == 100.0).all()
         assert (table["engagement_pct"] == 100.0).all()
 
@@ -1331,9 +1339,7 @@ class TestEstimatorTables:
     ):
         _, after = estimator_trees
         for session in ("chimi20200223_02_r1", "j1620210710_02_r1"):
-            _write_ridge_bundle(
-                after, session, n_neurons=2, peak=1.1, suffix="_sigma1"
-            )
+            _write_ridge_bundle(after, session, n_neurons=2, peak=1.1, suffix="_sigma1")
 
         table = sigma_sensitivity_table(after)
 
@@ -1344,9 +1350,7 @@ class TestEstimatorTables:
 
 
 class TestEstimatorReport:
-    def test_the_report_states_what_the_prior_and_the_folds_did(
-        self, estimator_trees
-    ):
+    def test_the_report_states_what_the_prior_and_the_folds_did(self, estimator_trees):
         before, after = estimator_trees
         loader = __import__(
             "continuum_swr_replay.analysis.pfc.load_population",
@@ -1471,9 +1475,7 @@ class TestBeforeTreeIsPairedToTheAfterTree:
         assert len(kept) == 1
         assert kept["nwb_file_name"].iloc[0] == "chimi20200223_.nwb"
 
-    def test_the_report_says_when_it_restricted_the_before_tree(
-        self, estimator_trees
-    ):
+    def test_the_report_says_when_it_restricted_the_before_tree(self, estimator_trees):
         before, after = estimator_trees
         # A third session only the before tree holds.
         _write_bundle(
@@ -1495,9 +1497,7 @@ class TestBeforeTreeIsPairedToTheAfterTree:
         population_after, _, _ = loader(after, min_firing_rate=0.0)
 
         assert len(population_before) == 6
-        restricted = restrict_to_sessions(
-            population_before, bundle_sessions(after)
-        )
+        restricted = restrict_to_sessions(population_before, bundle_sessions(after))
         assert len(restricted) == 4
 
         report = build_estimator_report(

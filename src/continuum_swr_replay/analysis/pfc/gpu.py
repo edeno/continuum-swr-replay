@@ -437,12 +437,16 @@ def configure_jax_gpu(
 
     cards = {card.index: card for card in query_gpus()}
     if gpu is not None:
-        _claim(gpu)
         chosen = cards.get(gpu)
         if chosen is None:
             raise NoFreeGPUError(
                 f"GPU {gpu} was requested but is not visible:\n"
                 + occupancy_table(list(cards.values()))
+            )
+        if not _claim(gpu):
+            raise NoFreeGPUError(
+                f"GPU {gpu} was requested but is claimed by another worker. "
+                "Choose a different card or wait for that worker to exit."
             )
     else:
         try:

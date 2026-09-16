@@ -10,9 +10,11 @@ worth much less than its nominal degrees of freedom suggest.
 **Folds are blocks, not bins.** A random split of bins would put a bin 2 ms
 either side of a held-out bin in the training set, and a model could score well
 by interpolating the local rate rather than by predicting the event response.
-The fit mask is already a union of contiguous immobility runs, so each *whole*
-run is assigned to one fold, greedily to the lightest fold so the folds carry
-comparable numbers of bins. The assignment is seeded and recorded.
+The fit mask is already a union of contiguous immobility runs. Each whole run
+is kept together, and runs close enough for the event kernel's supports to
+overlap are joined before assignment; the resulting blocks go greedily to the
+lightest fold so the folds carry comparable numbers of bins. The assignment is
+seeded and recorded.
 
 **The score is the Poisson deviance on the held-out fold**, from a fit on the
 other ``K - 1``. The penalty is part of the estimator, so it is applied to the
@@ -58,6 +60,16 @@ from continuum_swr_replay.analysis.pfc.glm import (
     event_onset_counts,
     make_matched_control_times,
 )
+
+#: Smallest Monte Carlo sample used for a reported empirical p-value.  The
+#: production null uses 40 draws; below this floor the grid is too coarse even
+#: for the descriptive ``p < .05`` preview this phase reports.
+MIN_USABLE_NULL_DRAWS = 20
+
+#: Provenance name for the finite-sample correction used by
+#: :func:`empirical_pvalue`. Readers use this to refuse older held-out bundles
+#: whose identically named columns used the invalid ``b / R`` estimate.
+EMPIRICAL_PVALUE_METHOD = "plus_one"
 
 
 class HeldoutDeviance(NamedTuple):
@@ -128,13 +140,21 @@ def _contiguous_runs(mask: NDArray) -> NDArray:
 
 
 def assign_blocked_folds(
-    fit_mask: pd.Series | NDArray, n_folds: int, seed: int
+    fit_mask: pd.Series | NDArray,
+    n_folds: int,
+    seed: int,
+    *,
+    support_radius_bins: int = 0,
 ) -> NDArray:
-    """Assign whole immobility runs to folds, balanced by bin count.
+    """Assign support-separated immobility blocks to folds, balanced by size.
 
     A run is the unit of assignment because neighbouring bins of one run are
     not independent: splitting a run across folds would let a model score on
-    held-out bins it has effectively seen. Runs are visited in a seeded random
+    held-out bins it has effectively seen. When ``support_radius_bins`` is
+    positive, runs separated by no more than twice that radius are first
+    joined into one block. This prevents a symmetric peri-event kernel from
+    covering training bins in one run and held-out bins in another across a
+    short False gap. Blocks are visited in a seeded random
     order and each goes to the fold holding the fewest bins so far, so no fold
     can end more than one run's length above any other -- a few percent of a
     fold on a session with hundreds of bouts. The order is random rather than
@@ -151,6 +171,10 @@ def assign_blocked_folds(
         Number of folds; at least 2, and no more than the number of runs.
     seed : int
         Seeds the shuffle. The same mask and seed always give the same folds.
+    support_radius_bins : int
+        Half-width of the widest time-local regressor, in bins. Nearby runs
+        whose expanded supports overlap are assigned together. Zero preserves
+        the ordinary contiguous-run definition.
 
     Returns
     -------
@@ -161,33 +185,52 @@ def assign_blocked_folds(
     Raises
     ------
     ValueError
-        If ``n_folds`` is below 2 or above the number of contiguous runs.
+        If ``n_folds`` is below 2 or above the number of support-separated
+        blocks, or if ``support_radius_bins`` is negative.
     """
     mask = np.asarray(fit_mask, dtype=bool)
     runs = _contiguous_runs(mask)
+    if support_radius_bins < 0:
+        raise ValueError(
+            f"support_radius_bins must be non-negative, got {support_radius_bins}"
+        )
+    if len(runs) and support_radius_bins:
+        joined: list[list[int]] = [[int(runs[0, 0]), int(runs[0, 1])]]
+        maximum_gap = 2 * int(support_radius_bins)
+        for start, stop in runs[1:]:
+            if int(start) - joined[-1][1] <= maximum_gap:
+                joined[-1][1] = int(stop)
+            else:
+                joined.append([int(start), int(stop)])
+        blocks = np.asarray(joined, dtype=np.int64)
+    else:
+        blocks = runs
     if n_folds < 2:
         raise ValueError(f"n_folds must be at least 2, got {n_folds}")
-    if len(runs) < n_folds:
+    if len(blocks) < n_folds:
         raise ValueError(
-            f"the fit mask has {len(runs)} contiguous runs, fewer than the "
-            f"{n_folds} folds asked for; a fold would be empty"
+            f"the fit mask has {len(blocks)} support-separated blocks, fewer "
+            f"than the {n_folds} folds asked for; a fold would be empty"
         )
 
-    lengths = runs[:, 1] - runs[:, 0]
-    order = np.random.default_rng(seed).permutation(len(runs))
+    lengths = np.asarray(
+        [int(mask[start:stop].sum()) for start, stop in blocks], dtype=np.int64
+    )
+    order = np.random.default_rng(seed).permutation(len(blocks))
 
     fold_sizes = np.zeros(n_folds, dtype=np.int64)
-    fold_of_run = np.empty(len(runs), dtype=np.int64)
-    for run_index in order:
+    fold_of_block = np.empty(len(blocks), dtype=np.int64)
+    for block_index in order:
         fold = int(np.argmin(fold_sizes))
-        fold_of_run[run_index] = fold
-        fold_sizes[fold] += int(lengths[run_index])
+        fold_of_block[block_index] = fold
+        fold_sizes[fold] += int(lengths[block_index])
 
     folds = np.empty(int(mask.sum()), dtype=np.int64)
     position = 0
-    for run_index, length in enumerate(lengths):
-        folds[position : position + int(length)] = fold_of_run[run_index]
-        position += int(length)
+    for block_index, length in enumerate(lengths):
+        stop = position + int(length)
+        folds[position:stop] = fold_of_block[block_index]
+        position = stop
     return folds
 
 
@@ -258,19 +301,41 @@ def heldout_deviance(
             f"design has {design.shape[0]} rows, counts {counts.shape[0]} and "
             f"folds {folds.shape[0]}; they must agree"
         )
+    labels = np.unique(folds)
+    if labels.size < 2 or not np.array_equal(labels, np.arange(labels.size)):
+        raise ValueError(
+            "folds must use every consecutive label from 0 and contain at "
+            f"least two folds; got {labels.tolist()}"
+        )
 
-    n_folds = int(folds.max()) + 1
+    n_folds = int(labels.size)
     per_fold = np.full((n_folds, counts.shape[1]), np.nan)
     for fold in range(n_folds):
         held_out = folds == fold
-        fitted = fit_poisson_glms(design[~held_out], counts[~held_out], penalty=penalty)
-        fitted_mean = np.exp(design[held_out] @ fitted.params.T)
-        per_fold[fold] = poisson_deviance(counts[held_out], fitted_mean)
+        fitted = fit_poisson_glms(
+            design[~held_out],
+            counts[~held_out],
+            penalty=penalty,
+            compute_covariance=False,
+        )
+        with np.errstate(over="ignore", invalid="ignore"):
+            fitted_mean = np.exp(design[held_out] @ fitted.params.T)
+            score = poisson_deviance(counts[held_out], fitted_mean)
+        usable = np.asarray(fitted.converged, dtype=bool) & np.all(
+            np.isfinite(fitted.params), axis=1
+        )
+        usable &= np.isfinite(score)
+        per_fold[fold] = np.where(usable, score, np.nan)
     return HeldoutDeviance(per_fold=per_fold, total=per_fold.sum(axis=0))
 
 
-def empirical_pvalue(observed: NDArray, null: NDArray) -> NDArray:
-    """Fraction of null draws at least as large as the observed statistic.
+def empirical_pvalue(
+    observed: NDArray,
+    null: NDArray,
+    *,
+    min_usable_draws: int = MIN_USABLE_NULL_DRAWS,
+) -> NDArray:
+    """Finite-sample-valid Monte Carlo p-value for an observed statistic.
 
     Parameters
     ----------
@@ -278,21 +343,35 @@ def empirical_pvalue(observed: NDArray, null: NDArray) -> NDArray:
         The observed statistic per unit.
     null : NDArray, shape (n_draws, n_units)
         The same statistic from draws with no event content.
+    min_usable_draws : int
+        Minimum finite draws required per unit. Fewer draws return ``nan``;
+        production uses :data:`MIN_USABLE_NULL_DRAWS`.
 
     Returns
     -------
     NDArray, shape (n_units,)
-        ``mean(null >= observed)`` over the draws that produced a finite value.
-        The resolution is one draw, so zero is attainable and a unit with no
-        finite draw is ``nan``.
+        ``(1 + count(null >= observed)) / (1 + n_usable)``. The plus-one
+        correction treats the observed statistic as one exchangeable draw and
+        prevents an impossible zero p-value. A unit below the usable-draw floor
+        is ``nan``.
     """
     observed = np.asarray(observed, dtype=float)
     null = np.asarray(null, dtype=float)
+    if observed.ndim != 1 or null.ndim != 2 or null.shape[1] != observed.size:
+        raise ValueError(
+            "observed must have shape (n_units,) and null "
+            f"(n_draws, n_units); got {observed.shape} and {null.shape}"
+        )
+    if min_usable_draws < 1:
+        raise ValueError(f"min_usable_draws must be at least 1, got {min_usable_draws}")
     usable = np.isfinite(null)
     n_usable = usable.sum(axis=0)
     at_least = (usable & (null >= observed[None, :])).sum(axis=0)
-    with np.errstate(invalid="ignore", divide="ignore"):
-        pvalue = np.where(n_usable > 0, at_least / n_usable, np.nan)
+    pvalue = np.where(
+        n_usable >= min_usable_draws,
+        (at_least + 1) / (n_usable + 1),
+        np.nan,
+    )
     return np.where(np.isfinite(observed), pvalue, np.nan)
 
 
@@ -517,6 +596,8 @@ def control_draw_null(
             return None
         return make_ridge_penalty(design.shape[1], penalty_sigma)
 
+    draw_times: dict[tuple[str, int], pd.DataFrame] = {}
+
     def draw_for(class_name: str, seed: int) -> pd.DataFrame:
         """One class-matched control draw.
 
@@ -524,16 +605,56 @@ def control_draw_null(
         windows are still the union over every class, which covers the real
         ``non_local`` set either way (it is the union of its two subclasses).
         """
-        source = {**event_times, MATCHED_CONTROL_SOURCE_CLASS: event_times[class_name]}
-        return make_matched_control_times(
-            source,
-            fit_mask,
-            np.random.default_rng(seed),
-            max_attempts=max_attempts,
-        ).times
+        key = (class_name, seed)
+        if key not in draw_times:
+            source = {
+                **event_times,
+                MATCHED_CONTROL_SOURCE_CLASS: event_times[class_name],
+            }
+            draw_times[key] = make_matched_control_times(
+                source,
+                fit_mask,
+                np.random.default_rng(seed),
+                max_attempts=max_attempts,
+            ).times
+        return draw_times[key]
 
     constant = np.ones((int(fit_rows.sum()), 1))
     constant_deviance = heldout_deviance(constant, fit_counts, None, folds).total
+
+    engagement: list[NDArray] = []
+    engagement_overlap: list[float] = []
+    baseline_design = None
+    baseline_deviance = None
+    baseline_starts = np.empty(0)
+    baseline_ends = np.empty(0)
+    if baseline_control is not None:
+        baseline_design = control_design(baseline_control, fit_mask, spline_basis, lags)
+        baseline_deviance = heldout_deviance(
+            baseline_design, fit_counts, penalty_for(baseline_design), folds
+        ).total
+        baseline_starts, baseline_ends = _merge_windows(
+            baseline_control["start_time"].to_numpy(dtype=float),
+            baseline_control["end_time"].to_numpy(dtype=float),
+        )
+
+    def append_engagement(times: pd.DataFrame, design: NDArray | None) -> None:
+        """Score one engagement draw while its class design is in memory."""
+        engagement_overlap.append(
+            overlapping_fraction(times, baseline_starts, baseline_ends)
+        )
+        if design is None:
+            engagement.append(np.full(counts.shape[1], np.nan))
+            return
+        if baseline_design is None or baseline_deviance is None:
+            raise RuntimeError("engagement scoring needs a baseline control")
+        # Both designs have the same intercept. Reuse the already-built
+        # baseline and draw blocks instead of reconvolving both event sets.
+        joint = np.concatenate([baseline_design, design[:, 1:]], axis=1)
+        joint_deviance = heldout_deviance(
+            joint, fit_counts, penalty_for(joint), folds
+        ).total
+        engagement.append(baseline_deviance - joint_deviance)
 
     improvement: dict[str, NDArray] = {}
     n_placed: dict[str, NDArray] = {}
@@ -544,37 +665,32 @@ def control_draw_null(
         for seed in seeds:
             times = draw_for(class_name, seed)
             placed.append(len(times))
+            if len(times) != n_events[class_name] or n_events[class_name] == 0:
+                per_draw.append(np.full(counts.shape[1], np.nan))
+                if baseline_control is not None and class_name == engagement_class:
+                    append_engagement(times, None)
+                continue
             design = control_design(times, fit_mask, spline_basis, lags)
             deviance = heldout_deviance(
                 design, fit_counts, penalty_for(design), folds
             ).total
             per_draw.append(constant_deviance - deviance)
+            if baseline_control is not None and class_name == engagement_class:
+                append_engagement(times, design)
         improvement[class_name] = np.asarray(per_draw)
         n_placed[class_name] = np.asarray(placed, dtype=int)
 
-    engagement: list[NDArray] = []
-    engagement_overlap: list[float] = []
-    if baseline_control is not None:
-        baseline_design = control_design(baseline_control, fit_mask, spline_basis, lags)
-        baseline_deviance = heldout_deviance(
-            baseline_design, fit_counts, penalty_for(baseline_design), folds
-        ).total
-        baseline_starts, baseline_ends = _merge_windows(
-            baseline_control["start_time"].to_numpy(dtype=float),
-            baseline_control["end_time"].to_numpy(dtype=float),
-        )
+    # A custom ``classes`` subset may omit the engagement class. It still gets
+    # its own streamed designs, but the production/default path above reuses
+    # the design while scoring that class and never retains an R-sized cache.
+    if baseline_control is not None and engagement_class not in classes:
         for seed in seeds:
             times = draw_for(engagement_class, seed)
-            engagement_overlap.append(
-                overlapping_fraction(times, baseline_starts, baseline_ends)
-            )
-            joint = control_design(
-                baseline_control, fit_mask, spline_basis, lags, extra_times=times
-            )
-            joint_deviance = heldout_deviance(
-                joint, fit_counts, penalty_for(joint), folds
-            ).total
-            engagement.append(baseline_deviance - joint_deviance)
+            if len(times) != len(event_times[engagement_class]) or not len(times):
+                append_engagement(times, None)
+                continue
+            design = control_design(times, fit_mask, spline_basis, lags)
+            append_engagement(times, design)
 
     return ControlDrawNull(
         improvement=improvement,

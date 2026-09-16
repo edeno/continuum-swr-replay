@@ -16,7 +16,8 @@ the artifacts themselves:
   would still have covered fitted bins);
 - the population that reaches Figure 4, loaded from both bundle trees with
   ``load_population_data`` -- neurons passing the firing-rate gate and the
-  FDR-significant fraction per test, overall and per animal.
+  legacy FDR-significant fraction or the held-out analysis's descriptive raw-p
+  fraction per test, overall and per animal.
 
 Usage::
 
@@ -1048,7 +1049,7 @@ def fitter_table(sidecars: pd.DataFrame) -> pd.DataFrame:
         n_distinct_data_over_time=("data_over_time_sha256", "nunique"),
     ).reset_index()
     for column in (
-            "n_model_fits",
+        "n_model_fits",
         "n_nonconverged_model_fits",
         "n_neurons_with_nonconverged_model",
     ):
@@ -1076,7 +1077,7 @@ def session_fit_counts_table(sidecars: pd.DataFrame) -> pd.DataFrame:
     columns = [
         "session",
         "gpu_index",
-            "n_model_fits",
+        "n_model_fits",
         "n_nonconverged_model_fits",
         "n_neurons_with_nonconverged_model",
     ]
@@ -1280,8 +1281,9 @@ def peak_shrinkage(after: pd.DataFrame) -> pd.DataFrame:
     -------
     pandas.DataFrame
         One row per (unit, curve): ``peak_penalised``, ``peak_mle``,
-        ``peak_mle_se``, ``mle_separated`` and ``prior_binds``, plus the
-        unit's animal. Empty when the bundles carry none of those columns.
+        ``peak_mle_se``, ``mle_converged``, ``mle_separated`` and
+        ``prior_binds``, plus the unit's animal. Empty when the bundles carry
+        none of those columns.
     """
     rows = []
     for curve in CURVE_NAMES:
@@ -1297,6 +1299,12 @@ def peak_shrinkage(after: pd.DataFrame) -> pd.DataFrame:
         frame = after[list(columns.values())].rename(
             columns={value: key for key, value in columns.items()}
         )
+        convergence_column = f"{curve}: mle_converged"
+        frame["mle_converged"] = (
+            after[convergence_column].to_numpy(dtype=bool)
+            if convergence_column in after
+            else True
+        )
         frame.insert(0, "curve", curve)
         frame["animal"] = after["animal"].to_numpy()
         rows.append(frame)
@@ -1307,6 +1315,7 @@ def peak_shrinkage(after: pd.DataFrame) -> pd.DataFrame:
                 "peak_penalised",
                 "peak_mle",
                 "peak_mle_se",
+                "mle_converged",
                 "mle_separated",
                 "prior_binds",
                 "animal",
@@ -1329,8 +1338,13 @@ def shrinkage_table(frame: pd.DataFrame) -> pd.DataFrame:
     if frame.empty:
         return frame
     table = frame.copy()
-    table["units"] = np.where(
-        table["mle_separated"].fillna(False).astype(bool), "separated", "well posed"
+    table["units"] = np.select(
+        [
+            ~table["mle_converged"].fillna(False).astype(bool),
+            table["mle_separated"].fillna(False).astype(bool),
+        ],
+        ["nonconverged", "separated"],
+        default="well posed",
     )
     grouped = table.groupby(["curve", "units"], dropna=False)
     summary = grouped.agg(
@@ -1403,7 +1417,13 @@ def empirical_bayes_sigma(
     per_lag_per_sigma = per_lag_sd / penalty_sigma
     rows = []
     for curve, block in frame.groupby("curve"):
-        well_posed = block[~block["mle_separated"].fillna(False).astype(bool)]
+        converged = block.get(
+            "mle_converged", pd.Series(True, index=block.index, dtype=bool)
+        )
+        well_posed = block[
+            converged.fillna(False).astype(bool)
+            & ~block["mle_separated"].fillna(False).astype(bool)
+        ]
         peaks = well_posed["peak_mle"].to_numpy(dtype=float)
         errors = well_posed["peak_mle_se"].to_numpy(dtype=float)
         usable = np.isfinite(peaks) & np.isfinite(errors)
@@ -1425,9 +1445,7 @@ def empirical_bayes_sigma(
     return pd.DataFrame(rows)
 
 
-def heldout_fraction_table(
-    after: pd.DataFrame, alpha: float
-) -> pd.DataFrame:
+def heldout_fraction_table(after: pd.DataFrame, alpha: float) -> pd.DataFrame:
     """Units beating the control-draw null, per class, overall and per animal."""
     rows = []
     for scope, frame in [("all", after), *sorted(after.groupby("animal"))]:
@@ -1491,9 +1509,7 @@ def legacy_fdr_table(before: pd.DataFrame, alpha: float) -> pd.DataFrame:
 def separated_column_table(after: pd.DataFrame) -> pd.DataFrame:
     """Per model, how many units had a basis column with no spikes under it."""
     rows = []
-    for column in sorted(
-        c for c in after.columns if c.endswith(": separated_columns")
-    ):
+    for column in sorted(c for c in after.columns if c.endswith(": separated_columns")):
         values = _numeric(after[column]).to_numpy()
         finite = np.isfinite(values)
         rows.append(
@@ -1501,9 +1517,7 @@ def separated_column_table(after: pd.DataFrame) -> pd.DataFrame:
                 "model": column.removesuffix(": separated_columns"),
                 "n_units": int(finite.sum()),
                 "n_units_with_a_separated_column": int((values[finite] > 0).sum()),
-                "pct_units": round(
-                    100.0 * (values[finite] > 0).sum() / finite.sum(), 1
-                )
+                "pct_units": round(100.0 * (values[finite] > 0).sum() / finite.sum(), 1)
                 if finite.any()
                 else np.nan,
                 "max_separated_columns": (
@@ -1546,9 +1560,7 @@ def fold_spread_table(after: pd.DataFrame) -> pd.DataFrame:
     for column in sorted(
         c for c in after.columns if c.endswith(": heldout_delta_dev_folds")
     ):
-        stacked = np.array(
-            [np.asarray(value, dtype=float) for value in after[column]]
-        )
+        stacked = np.array([np.asarray(value, dtype=float) for value in after[column]])
         if stacked.ndim != 2 or not stacked.size:
             continue
         mean = stacked.mean(axis=1)
@@ -1575,9 +1587,7 @@ def fold_spread_table(after: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def sigma_sensitivity_table(
-    after_dir: Path, artifact_suffix: str = ""
-) -> pd.DataFrame:
+def sigma_sensitivity_table(after_dir: Path, artifact_suffix: str = "") -> pd.DataFrame:
     """Peak modulation at the canonical prior against each sensitivity bundle.
 
     Reads whatever ``*_modulation<suffix>_sigma*`` bundles are on disk beside
@@ -2293,10 +2303,12 @@ def build_estimator_report(
     add("## What the two inferences call\n")
     add(
         f"Before, BH-corrected likelihood-ratio p-values at q < {alpha}; after, "
-        "BH-corrected empirical p-values from the control-draw null at the same "
-        "level. The two are not comparable test by test -- they test different "
-        "things against different references -- so read them as two accounts of "
-        "the same population, not as a movement. `n_tested` is the units with a "
+        f"the descriptive fraction of units with raw empirical p < {alpha} "
+        "from the control-draw null. The latter is not population inference: "
+        "that requires aggregation through session and animal. The two are not "
+        "comparable test by test -- they test different things against different "
+        "references -- so read them as two accounts of the same population, not "
+        "as a movement. `n_tested` is the units with a "
         "finite value for that test: a unit whose session had no events of a "
         "class is untested for it, not a negative.\n"
     )
@@ -2512,9 +2524,7 @@ def main() -> None:
     report = (
         build_estimator_report(**common)
         if comparison == "estimator"
-        else build_report(
-            before_sidecars=try_read_sidecars(args.before_dir), **common
-        )
+        else build_report(before_sidecars=try_read_sidecars(args.before_dir), **common)
     )
     if args.out is None:
         print(report)

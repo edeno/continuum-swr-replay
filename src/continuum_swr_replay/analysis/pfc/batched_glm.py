@@ -692,6 +692,7 @@ def fit_poisson_glms(
     tol: float = DEFAULT_TOL,
     rcond: float = DEFAULT_RCOND,
     chunk_rows: int | None = None,
+    compute_covariance: bool = True,
 ) -> BatchedGLMResults:
     """Fit one Poisson GLM per column of ``counts`` against a shared design.
 
@@ -727,6 +728,10 @@ def fit_poisson_glms(
     chunk_rows : int, optional
         Rows of the time axis per chunk. Defaults to a size that keeps the
         working arrays around 64 MB.
+    compute_covariance : bool
+        Whether to compute the inverse-information covariance and standard
+        errors after convergence. Held-out prediction needs parameters only
+        and disables this extra eigendecomposition; full-data fits keep it.
 
     Returns
     -------
@@ -874,21 +879,25 @@ def fit_poisson_glms(
     # one with no spikes at all rather than as a finite near-miss.
     failed = failed | diverged
 
-    covariance = _parameter_covariance(
-        information if penalty_device is None else information + penalty_device,
-        back,
-        rcond,
-    )
-    # A variance can come back a hair below zero on a direction the weights
-    # have all but abandoned; the parameter there is zero and so is its error.
-    standard_errors = np.sqrt(np.clip(np.einsum("npp->np", covariance), 0.0, None))
+    covariance = None
+    standard_errors = None
+    if compute_covariance:
+        covariance = _parameter_covariance(
+            information if penalty_device is None else information + penalty_device,
+            back,
+            rcond,
+        )
+        # A variance can come back a hair below zero on a direction the weights
+        # have all but abandoned; the parameter there is zero and so is its error.
+        standard_errors = np.sqrt(np.clip(np.einsum("npp->np", covariance), 0.0, None))
 
     if failed.any():
         params_host = params_host.copy()
-        standard_errors = standard_errors.copy()
-        covariance = covariance.copy()
-        standard_errors[failed] = np.nan
-        covariance[failed] = np.nan
+        if standard_errors is not None and covariance is not None:
+            standard_errors = standard_errors.copy()
+            covariance = covariance.copy()
+            standard_errors[failed] = np.nan
+            covariance[failed] = np.nan
         params_host[failed] = np.nan
         deviance_at_params = np.where(failed, np.nan, deviance_at_params)
         llf_host = np.where(failed, np.nan, llf_host)

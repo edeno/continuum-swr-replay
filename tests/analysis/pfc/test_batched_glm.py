@@ -494,6 +494,19 @@ class TestPenalty:
                 atol=1e-15,
             )
 
+    def test_prediction_only_fit_skips_covariance(self, planted):
+        design, counts, _ = planted
+
+        prediction_only = fit_poisson_glms(design, counts, compute_covariance=False)
+        full = fit_poisson_glms(design, counts)
+
+        np.testing.assert_allclose(prediction_only.params, full.params, rtol=0, atol=0)
+        np.testing.assert_allclose(
+            prediction_only.deviance, full.deviance, rtol=0, atol=0
+        )
+        assert np.isnan(prediction_only.bse).all()
+        assert np.isnan(prediction_only.covariance).all()
+
     def test_a_failed_unit_has_no_covariance_either(self):
         design = np.column_stack([np.ones(600), np.linspace(-1, 1, 600)])
 

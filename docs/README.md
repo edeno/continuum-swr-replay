@@ -160,10 +160,13 @@ Three tiers:
    canonical bundles carry **σ = 3** (implied per-lag sd **2.066**, a rate multiplier
    of ×0.017–×57 at 95 %; sustained sd **0.905**, ×0.17–×5.9), **K = 5** folds and
    **R = 40** null draws — quoted from the sidecars, which is where a reader should
-   check them. Because an empirical p-value is `r/R`, it lives on a grid of
-   **1/R = 0.025**: a q of 0 means no draw of 40 reached the observed improvement,
-   and every population fraction read off these p-values inherits that resolution. A
-   bundle that does not state all of these is refit rather than skipped — the
+   check them. The finite-sample Monte Carlo p-value is **`(r + 1)/(R + 1)`**,
+   so with 40 usable draws its minimum is **1/41 = 0.024**; zero is impossible.
+   Draws that fail to place every matched window are excluded, and fewer than 20
+   usable draws leaves the p-value unavailable. Unit fractions at raw p < 0.05 are
+   descriptive previews only; population inference aggregates through session and
+   animal. A bundle that does not state all of these is refit rather than skipped,
+   and the population loader also refuses it before figure generation — the
    canonical bundle name is unsuffixed, so nothing else tells a penalised bundle from
    the maximum-likelihood one that held the same name. It also records what the fits
    themselves did: `n_model_fits` (neuron × model cells that produced a fit at all),

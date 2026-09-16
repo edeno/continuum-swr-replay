@@ -263,10 +263,13 @@ independent, so an in-sample deviance drop is worth much less than its nominal
 degrees of freedom suggest. The models are therefore compared by how well they
 predict spikes they were not fit on.
 
-**K = 5** folds are cut over *whole contiguous runs* of the fit mask — a bin-wise
-split would leave the training set 2 ms either side of every held-out bin, and
-a model could score well by interpolating the local rate. Runs are visited in a
-seeded random order and each goes to the lightest fold, so the folds carry
+**K = 5** folds are cut over *support-separated blocks* of the fit mask. Whole
+contiguous runs are never split, and runs close enough for the ±250 ms event
+kernel's supports to overlap are joined before assignment. A bin-wise split
+would leave the training set 2 ms either side of every held-out bin; assigning
+nearby runs separately could also let one event contribute to both train and
+test. Blocks are visited in a seeded random order and each goes to the lightest
+fold, so the folds carry
 comparable bin counts; the assignment is seeded from the session name and
 recorded (`n_folds`, `fold_seed`). Each model is fit on `K-1` folds under the
 same prior and scored by the Poisson deviance of the fold left out, summed over
@@ -280,22 +283,27 @@ non-event control already defines "a duration-matched non-event regressor drawn
 from the fitted bouts"; drawing it `R` times, **per class, matched to that
 class's own onset count and durations**, gives the distribution of improvements
 a regressor of that size and shape with no event content buys. A class's
-empirical p-value is the fraction of its draws whose improvement matched or
-beat the observed one; the engagement statistic gets its own null the same way,
-with the tested regressor replaced and the baseline left as it is.
+empirical p-value counts draws whose improvement matched or beat the observed
+one, with the observed statistic included through the plus-one correction; the
+engagement statistic gets its own null the same way, with the tested regressor
+replaced and the baseline left as it is.
 
-**R = 40**, so an empirical p-value is `r/40` and lives on a grid of
-**1/R = 0.025**. Zero is attainable and means *no draw of 40 reached the
-observed improvement* — not a vanishing tail — and a BH q of 0 means the same.
-Every population fraction read off these p-values inherits that resolution, so
-quote `R` wherever a fraction appears. `n_control_draws`, `control_draw_seed` and the per-class window
-counts each draw placed are in the sidecar. One caveat is recorded in the
+**R = 40**. The finite-sample Monte Carlo p-value is `(r + 1)/(R + 1)`, so its
+minimum with 40 usable draws is **1/41 = 0.024** and zero is impossible. A draw
+that fails to place every class-matched window is a thinner regressor and is
+excluded; fewer than 20 usable draws leaves that unit's p-value unavailable.
+`n_control_draws`, `control_draw_seed`, exact-draw counts and the per-class
+window counts are in the sidecar. One caveat is recorded in the
 library: the null draws are independent of the shipped control and may overlap
 its windows, whereas two real event classes never do.
 
-The population layer (neuron → session → animal) is unchanged:
-`analysis/pfc/load_population.py` applies Benjamini-Hochberg across units to the
-empirical p-values, and refuses a bundle carrying likelihood-ratio columns.
+The fraction of units with raw empirical `p < .05` is an explicitly
+descriptive implementation preview. Units within a session and animal are not
+independent replicates, so no Benjamini-Hochberg correction is applied across
+them; population inference aggregates neuron → session → animal in its own
+phase. `analysis/pfc/load_population.py` refuses a bundle carrying
+likelihood-ratio columns or a sidecar that does not state the corrected plus-one
+Monte Carlo method and usable-draw floor.
 
 **The replay-split curves were swapped until 2026-09-15.** The replay-split
 design is concatenated `[constant, non_local_no_SWR, non_local_SWR]` — the

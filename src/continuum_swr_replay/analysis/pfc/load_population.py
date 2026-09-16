@@ -6,12 +6,15 @@ The bundles are fit under a Gaussian prior on the event-basis coefficients and
 tested out of fold: a unit's evidence for an event class is the improvement in
 held-out Poisson deviance that class's regressor buys, read against repeated
 draws of the matched non-event control. So the population's "significant
-fraction" is a fraction of units whose *empirical* p-value survives
-Benjamini-Hochberg -- not a fraction of asymptotic likelihood-ratio tests. A
-bundle that still carries the likelihood-ratio columns was produced by the
-earlier estimator and is refused rather than pooled with these.
+fraction" in this phase is the explicitly descriptive fraction of units with
+raw *empirical* ``p < .05`` -- not a population-level inferential result and
+not a fraction of asymptotic likelihood-ratio tests. Population inference is
+performed only after aggregation from neuron to session to animal. A bundle
+that still carries likelihood-ratio columns, or does not record the corrected
+Monte Carlo method, is refused rather than pooled with these.
 """
 
+import json
 import logging
 from pathlib import Path
 
@@ -19,6 +22,11 @@ import numpy as np
 import pandas as pd
 from scipy.stats import false_discovery_control
 
+from continuum_swr_replay.analysis.pfc.heldout import (
+    EMPIRICAL_PVALUE_METHOD,
+    MIN_USABLE_NULL_DRAWS,
+)
+from continuum_swr_replay.analysis.replay.fit_provenance import fit_provenance_path
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 
 logger = logging.getLogger(__name__)
@@ -31,16 +39,13 @@ RETIRED_SUFFIXES = (": lr", ": pval", ": aic")
 
 #: Per-unit empirical p-values the population fractions are read from: one per
 #: event class, plus the engagement comparison against the matched non-event
-#: baseline. Each is the fraction of control draws whose held-out improvement
-#: matched or beat the observed one.
+#: baseline. Each uses the finite-sample plus-one Monte Carlo correction.
 HELDOUT_P_COLUMNS = {
     "SWR": "SWR: p_heldout",
     "non_local": "non_local: p_heldout",
     "non_local_no_SWR": "non_local_no_SWR: p_heldout",
     "non_local_SWR": "non_local_SWR: p_heldout",
-    "engagement": (
-        "matched_control + non_local_no_SWR vs. matched_control: p_heldout"
-    ),
+    "engagement": ("matched_control + non_local_no_SWR vs. matched_control: p_heldout"),
 }
 
 #: Column a unit is judged to have a usable fit by. A unit the fitter could not
@@ -70,7 +75,12 @@ LEGACY_FDR_TESTS = (
 
 
 def heldout_q_column(name: str) -> str:
-    """BH-adjusted column name for one of :data:`HELDOUT_P_COLUMNS`."""
+    """Retired BH column name, for readers diagnosing pre-review tables.
+
+    Current held-out populations do not create these columns: 40 Monte Carlo
+    draws cannot support unit-wise BH over a population of thousands, and the
+    implementation phase calls only for a descriptive raw-p preview.
+    """
     return f"{HELDOUT_P_COLUMNS[name]}: heldout_q"
 
 
@@ -102,7 +112,8 @@ def _refuse_stale_bundle(df: pd.DataFrame, inference: str, data_dir: Path) -> No
                 "inference='heldout'."
             )
         absent = sorted(
-            f"{test}: pval" for test in LEGACY_FDR_TESTS
+            f"{test}: pval"
+            for test in LEGACY_FDR_TESTS
             if f"{test}: pval" not in df.columns
         )
         if absent:
@@ -112,9 +123,7 @@ def _refuse_stale_bundle(df: pd.DataFrame, inference: str, data_dir: Path) -> No
                 "the directory."
             )
     else:
-        raise ValueError(
-            f"inference={inference!r} is not one of 'heldout', 'legacy'"
-        )
+        raise ValueError(f"inference={inference!r} is not one of 'heldout', 'legacy'")
 
 
 def _extract_animal(nwb_file_name: str) -> str:
@@ -126,6 +135,40 @@ def _extract_animal(nwb_file_name: str) -> str:
     contains a ``"2"`` early on).
     """
     return parse_nwb_filename(nwb_file_name)[0]
+
+
+def _validate_heldout_provenance(artifacts: list[Path]) -> None:
+    """Refuse held-out bundles carrying the pre-review p-value semantics."""
+    expected = {
+        "estimator": "ridge_poisson_glm",
+        "inference": "blocked_heldout_deviance",
+        "empirical_pvalue_method": EMPIRICAL_PVALUE_METHOD,
+        "min_usable_null_draws": MIN_USABLE_NULL_DRAWS,
+    }
+    for artifact in artifacts:
+        sidecar = fit_provenance_path(artifact)
+        try:
+            record = json.loads(sidecar.read_text())
+        except (OSError, UnicodeError, json.JSONDecodeError) as error:
+            raise ValueError(
+                f"{artifact.name} has no readable provenance sidecar at {sidecar}; "
+                "its held-out p-value semantics cannot be verified. Refit the bundle."
+            ) from error
+        if not isinstance(record, dict):
+            raise ValueError(
+                f"{artifact.name} has a non-object provenance record at {sidecar}; "
+                "its held-out p-value semantics cannot be verified. Refit the bundle."
+            )
+        mismatches = {
+            name: {"expected": value, "observed": record.get(name)}
+            for name, value in expected.items()
+            if record.get(name) != value
+        }
+        if mismatches:
+            raise ValueError(
+                f"{artifact.name} has incompatible held-out provenance {mismatches}; "
+                "refit it before population loading."
+            )
 
 
 def load_population_data(
@@ -164,9 +207,9 @@ def load_population_data(
     Returns
     -------
     df : pd.DataFrame
-        Per-neuron statistics, filtered, with BH-adjusted ``heldout_q`` columns
-        beside each empirical p-value (or the legacy ``fdr_q`` columns when
-        reading legacy bundles).
+        Per-neuron statistics, filtered. Held-out empirical p-values remain raw
+        for the descriptive preview; legacy reads gain their historical
+        BH-adjusted ``fdr_q`` columns.
     modulations : dict[str, np.ndarray]
         Modulation time courses keyed by "swr", "no_swr", "non_local_swr",
         "non_local_no_swr" and "matched_control". Each shape
@@ -195,6 +238,7 @@ def load_population_data(
         raise FileNotFoundError(f"No *{stem}.pkl files in {data_dir}")
 
     dfs = []
+    loaded_artifacts: list[Path] = []
     swr_list, no_swr_list, nl_swr_list, nl_no_swr_list = [], [], [], []
     matched_control_list = []
 
@@ -271,13 +315,14 @@ def load_population_data(
             raise ValueError(
                 f"Per-session shape mismatch in {p.name}: pickle has "
                 f"{n_rows} rows but modulation column counts are "
-                f"{col_counts}. All four modulation arrays must have "
+                f"{col_counts}. All five modulation arrays must have "
                 f"exactly {n_rows} columns; otherwise concatenation "
                 "across sessions silently misaligns neuron metadata "
                 "with modulation traces."
             )
 
         dfs.append(df_session)
+        loaded_artifacts.append(p)
         swr_list.append(sess_swr)
         no_swr_list.append(sess_no_swr)
         nl_swr_list.append(sess_nl_swr)
@@ -292,6 +337,8 @@ def load_population_data(
 
     df = pd.concat(dfs, ignore_index=True)
     _refuse_stale_bundle(df, inference, data_dir)
+    if inference == "heldout":
+        _validate_heldout_provenance(loaded_artifacts)
     df["animal"] = df["nwb_file_name"].map(_extract_animal)
 
     swr_all = np.hstack(swr_list)
@@ -337,29 +384,16 @@ def load_population_data(
     nl_no_swr_all = nl_no_swr_all[:, good]
     matched_control_all = matched_control_all[:, good]
 
-    # Multiple comparisons across units, per test. The correction is the same
-    # Benjamini-Hochberg it always was; what it is applied to has changed. An
-    # empirical p-value from R control draws lives on a grid of 1/R and can be
-    # exactly zero (no draw matched the observed improvement), which is a
-    # statement bounded by the number of draws, not a vanishing tail -- so the
-    # q-values are bounded the same way, and a fraction read off them cannot
-    # resolve finer than the null's size.
-    #
-    # ``false_discovery_control`` raises on NaN input, and the gate above only
-    # screens one column, so a unit whose *secondary* test is NaN (its session
-    # had no events of the class that test needs) passes the gate and would
-    # crash the correction. Apply BH per test to the finite values only and
-    # leave the NaN positions NaN.
-    if inference == "heldout":
-        adjusted = {
-            HELDOUT_P_COLUMNS[name]: heldout_q_column(name)
-            for name in HELDOUT_P_COLUMNS
-        }
-    else:
-        adjusted = {
-            f"{test}: pval": f"{test}: fdr_q"
-            for test in LEGACY_FDR_TESTS
-        }
+    # The legacy audit keeps its historical BH correction. Current held-out
+    # p-values have only 40 Monte Carlo draws: even their finite-sample minimum
+    # is 1/41, so BH across thousands of neurons has no useful resolution.
+    # This phase reports raw-p fractions descriptively and leaves the actual
+    # population inference to the session -> animal layer.
+    adjusted = (
+        {f"{test}: pval": f"{test}: fdr_q" for test in LEGACY_FDR_TESTS}
+        if inference == "legacy"
+        else {}
+    )
     for source_col, q_col in adjusted.items():
         if source_col not in df.columns:
             # Column absent because every session that ran this loader call had
@@ -371,9 +405,7 @@ def load_population_data(
         ok = np.isfinite(raw)
         q = np.full_like(raw, np.nan)
         if ok.any():
-            q[ok] = false_discovery_control(
-                np.clip(raw[ok], 1e-300, 1.0), method="bh"
-            )
+            q[ok] = false_discovery_control(np.clip(raw[ok], 1e-300, 1.0), method="bh")
         df[q_col] = q
 
     modulations = {
@@ -390,26 +422,30 @@ def load_population_data(
 def significant_fraction(
     df: pd.DataFrame, alpha: float = 0.05
 ) -> dict[str, tuple[int, int]]:
-    """Units whose held-out improvement survives BH, per class and engagement.
+    """Descriptive raw-p fraction per class and engagement.
 
     Parameters
     ----------
     df : pandas.DataFrame
         A population from :func:`load_population_data` (``inference="heldout"``).
     alpha : float
-        BH level.
+        Raw empirical-p threshold. This is a preview, not population
+        inference; neurons are not independent replicates.
 
     Returns
     -------
     dict[str, tuple[int, int]]
-        ``(n_significant, n_tested)`` per key of :data:`HELDOUT_P_COLUMNS`.
-        ``n_tested`` counts the units with a finite q: a unit is untested for a
+        ``(n_below_alpha, n_tested)`` per key of :data:`HELDOUT_P_COLUMNS`.
+        ``n_tested`` counts the units with a finite p: a unit is untested for a
         class its session had no events of, and must not be counted as a
         negative.
     """
     fractions: dict[str, tuple[int, int]] = {}
-    for name in HELDOUT_P_COLUMNS:
-        q = df[heldout_q_column(name)].to_numpy(dtype=float)
-        tested = np.isfinite(q)
-        fractions[name] = (int((q[tested] < alpha).sum()), int(tested.sum()))
+    for name, column in HELDOUT_P_COLUMNS.items():
+        pvalue = df[column].to_numpy(dtype=float)
+        tested = np.isfinite(pvalue)
+        fractions[name] = (
+            int((pvalue[tested] < alpha).sum()),
+            int(tested.sum()),
+        )
     return fractions

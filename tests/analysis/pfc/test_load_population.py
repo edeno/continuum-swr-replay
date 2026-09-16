@@ -5,7 +5,10 @@ returned ``"j1"`` for j16 sessions (e.g. ``j1620210706_.nwb``) because
 the date YYYYMMDD that follows the animal name often contains a ``"2"``
 early on. Pin the parse_nwb_filename-based replacement.
 """
+
 from __future__ import annotations
+
+import json
 
 import numpy as np
 import pandas as pd
@@ -49,6 +52,16 @@ def _write_bundle(directory, epoch_identifier, suffix, firing_rate):
     )
     base = directory / f"{epoch_identifier}_mPFC_modulation{suffix}"
     frame.to_pickle(base.with_suffix(".pkl"))
+    base.with_suffix(".provenance.json").write_text(
+        json.dumps(
+            {
+                "estimator": "ridge_poisson_glm",
+                "inference": "blocked_heldout_deviance",
+                "empirical_pvalue_method": "plus_one",
+                "min_usable_null_draws": 20,
+            }
+        )
+    )
     for name in (
         "SWR_modulation",
         "no_SWR_modulation",

@@ -98,6 +98,8 @@ from continuum_swr_replay.analysis.pfc.glm import (
 )
 from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
 from continuum_swr_replay.analysis.pfc.heldout import (
+    EMPIRICAL_PVALUE_METHOD,
+    MIN_USABLE_NULL_DRAWS,
     assign_blocked_folds,
     control_draw_null,
     empirical_pvalue,
@@ -141,7 +143,6 @@ CANONICAL_PENALTY_SIGMA = DEFAULT_PENALTY_SIGMA
 #: likelihood and tested by a likelihood ratio is not this runner's bundle.
 ESTIMATOR = "ridge_poisson_glm"
 INFERENCE = "blocked_heldout_deviance"
-
 #: The engagement comparison: does non-SWR replay predict held-out spikes
 #: beyond a duration-matched non-event baseline drawn from the same bouts?
 ENGAGEMENT_PAIR = ("matched_control + non_local_no_SWR", "matched_control")
@@ -362,6 +363,8 @@ def results_exist(
         and record.get("fold_seed") == fold_seed
         and record.get("n_control_draws") == n_control_draws
         and record.get("control_draw_seed") == control_draw_seed
+        and record.get("empirical_pvalue_method") == EMPIRICAL_PVALUE_METHOD
+        and record.get("min_usable_null_draws") == MIN_USABLE_NULL_DRAWS
     )
 
 
@@ -405,7 +408,8 @@ def score_session(
 ) -> tuple[pd.DataFrame, dict[str, object]]:
     """Score every model out of fold, and read the improvements against a null.
 
-    Each model is refit on ``K - 1`` folds of contiguous immobility runs and
+    Each model is refit on ``K - 1`` folds of support-separated immobility
+    blocks and
     scored by the Poisson deviance of the fold left out, under the same prior
     the shipped fit used. A nested pair's ``heldout_delta_dev`` is the reduced
     model's held-out deviance minus the full model's: positive means the added
@@ -454,7 +458,13 @@ def score_session(
     fit_counts = counts[fit_rows]
     n_units = counts.shape[1]
 
-    folds = assign_blocked_folds(fit_mask, n_folds, fold_seed)
+    support_radius_bins = int(np.max(np.abs(np.asarray(context["lags"]))))
+    folds = assign_blocked_folds(
+        fit_mask,
+        n_folds,
+        fold_seed,
+        support_radius_bins=support_radius_bins,
+    )
     penalties = model_penalties(designs, penalty_sigma)
 
     # A design whose event class has no events leaves an all-zero basis block,
@@ -515,6 +525,7 @@ def score_session(
         "fold_sizes": np.bincount(folds, minlength=n_folds).tolist(),
         "events_per_fold": events_per_fold(context, folds),
         "non_estimable_models": sorted(non_estimable),
+        "fold_support_radius_bins": support_radius_bins,
     }
 
     statistics.update(
@@ -550,16 +561,23 @@ def score_session(
             statistics[f"{event_class}: p_heldout"] = empirical_pvalue(
                 statistics[f"{stem}: heldout_delta_dev"],
                 null.improvement[event_class],
+                min_usable_draws=MIN_USABLE_NULL_DRAWS,
             )
         engagement_stem = pair_name(*ENGAGEMENT_PAIR)
         statistics[f"{engagement_stem}: p_heldout"] = empirical_pvalue(
-            statistics[f"{engagement_stem}: heldout_delta_dev"], null.engagement
+            statistics[f"{engagement_stem}: heldout_delta_dev"],
+            null.engagement,
+            min_usable_draws=MIN_USABLE_NULL_DRAWS,
         )
         diagnostics["null_windows"] = {
             name: {
                 "n_events": int(null.n_events[name]),
                 "n_placed_median": float(np.median(null.n_placed[name])),
                 "n_placed_min": int(np.min(null.n_placed[name])),
+                "n_exact_draws": int(
+                    np.sum(null.n_placed[name] == null.n_events[name])
+                ),
+                "n_required_draws": MIN_USABLE_NULL_DRAWS,
             }
             for name in null.n_placed
         }
@@ -618,16 +636,14 @@ def maximum_likelihood_comparison(
     -------
     dict[str, NDArray]
         Per curve: the penalised peak, the unpenalised peak and its standard
-        error, whether the unpenalised fit is separated, and whether the prior
-        binds.
+        error, whether the unpenalised fit converged or separated, and whether
+        the prior binds.
     """
     spline_basis = context["spline_basis"]
     lag_time = context["lag_time"]
     n_basis = spline_basis.shape[1]
     wanted = sorted({model for model, _ in CURVE_SOURCES.values()})
-    logger.info(
-        "Fitting %d models unpenalised, to read the prior against", len(wanted)
-    )
+    logger.info("Fitting %d models unpenalised, to read the prior against", len(wanted))
     unpenalised = {
         model: fit_poisson_glms(designs[model][fit_rows], fit_counts, penalty=None)
         for model in wanted
@@ -636,17 +652,25 @@ def maximum_likelihood_comparison(
     columns: dict[str, NDArray] = {}
     for curve, (model, block) in CURVE_SOURCES.items():
         start = 1 + block * n_basis
-        params = np.asarray(unpenalised[model].params)[:, start : start + n_basis]
-        covariance = np.asarray(unpenalised[model].covariance)[
+        result = unpenalised[model]
+        raw_params = np.asarray(result.params)
+        model_separated = is_separated(raw_params[:, 1:])
+        converged = np.asarray(result.converged, dtype=bool)
+        usable = converged & ~model_separated
+        params = raw_params[:, start : start + n_basis].copy()
+        covariance = np.asarray(result.covariance)[
             :, start : start + n_basis, start : start + n_basis
-        ]
+        ].copy()
+        params[~usable] = np.nan
+        covariance[~usable] = np.nan
         mle = peak_log_modulation(params, spline_basis, lag_time)
         mle_se = peak_modulation_se(covariance, spline_basis, mle.index)
         penalised_peak = curve_peaks(modulation_curves[curve])
         columns[f"{curve}: peak_log_modulation"] = penalised_peak
         columns[f"{curve}: peak_log_modulation_mle"] = mle.value
         columns[f"{curve}: peak_log_modulation_mle_se"] = mle_se
-        columns[f"{curve}: mle_separated"] = is_separated(params)
+        columns[f"{curve}: mle_converged"] = converged
+        columns[f"{curve}: mle_separated"] = model_separated
         columns[f"{curve}: prior_binds"] = prior_binds(
             penalised_peak, mle.value, mle_se
         )
@@ -678,9 +702,7 @@ def curve_peaks(curves: NDArray) -> NDArray:
     return peaks
 
 
-def events_per_fold(
-    context: dict[str, object], folds: NDArray
-) -> dict[str, list[int]]:
+def events_per_fold(context: dict[str, object], folds: NDArray) -> dict[str, list[int]]:
     """Event onsets falling in each fold, per event class.
 
     The rarest class's count is what a choice of ``K`` has to live with: a fold
@@ -701,9 +723,7 @@ def events_per_fold(
         index = np.searchsorted(time, times["start_time"].to_numpy(dtype=float))
         index = np.clip(index, 0, len(time) - 1)
         assigned = fold_of_bin[index]
-        per_class[name] = [
-            int((assigned == fold).sum()) for fold in range(n_folds)
-        ]
+        per_class[name] = [int((assigned == fold).sum()) for fold in range(n_folds)]
     return per_class
 
 
@@ -792,9 +812,9 @@ def run_analysis(
         sensitivity bundle and skips the null, whose draws would then describe
         a prior the canonical bundle is not fit under.
     n_folds : int
-        Folds the held-out deviance is summed over. Whole contiguous
-        immobility runs are assigned to folds, so no fold is predicted from
-        bins 2 ms either side of it.
+        Folds the held-out deviance is summed over. Whole immobility runs whose
+        event-kernel supports overlap are assigned together, so one event
+        cannot enter both train and test.
     n_control_draws : int
         Draws of the matched non-event control the observed held-out
         improvements are read against. ``0`` skips the null.
@@ -815,9 +835,7 @@ def run_analysis(
     batch that hits them should stop rather than work through 70 more sessions
     failing the same way.
     """
-    epoch_identifier = (
-        f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{brain_area}"
-    )
+    epoch_identifier = f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{brain_area}"
     save_file = modulation_path(
         output_dir, epoch_identifier, stop_cohort, penalty_sigma
     )
@@ -888,8 +906,7 @@ def run_analysis(
     logger.info(f"penalty_sigma_log_rate: {penalty_sigma}")
     logger.info(f"n_folds: {n_folds} (fold_seed {fold_seed})")
     logger.info(
-        f"n_control_draws: {n_control_draws} "
-        f"(control_draw_seed {control_draw_seed})"
+        f"n_control_draws: {n_control_draws} (control_draw_seed {control_draw_seed})"
     )
 
     diagnostics: dict | None = {} if fit_diagnostics else None
@@ -967,9 +984,7 @@ def run_analysis(
             # lag is wider than sigma and the prior on a modulation held across
             # the window is narrower. Both are recorded, over the reported
             # window rather than the wider one the models are fit on.
-            reported = (
-                np.abs(context["lag_time"]) <= REPORT_HALF_WINDOW_S + 1e-12
-            )
+            reported = np.abs(context["lag_time"]) <= REPORT_HALF_WINDOW_S + 1e-12
             implied_prior = implied_prior_sd(
                 penalty_sigma, context["spline_basis"], reported
             )
@@ -1065,13 +1080,16 @@ def run_analysis(
                 "fold_seed": int(fold_seed),
                 "n_control_draws": int(n_control_draws),
                 "control_draw_seed": int(control_draw_seed),
+                "empirical_pvalue_method": EMPIRICAL_PVALUE_METHOD,
+                "min_usable_null_draws": MIN_USABLE_NULL_DRAWS,
                 "n_basis_per_class": n_basis_per_class,
                 "implied_prior_sd": implied_prior,
                 "fold_sizes": scoring_diagnostics.get("fold_sizes"),
-                "events_per_fold": scoring_diagnostics.get("events_per_fold"),
-                "non_estimable_models": scoring_diagnostics.get(
-                    "non_estimable_models"
+                "fold_support_radius_bins": scoring_diagnostics.get(
+                    "fold_support_radius_bins"
                 ),
+                "events_per_fold": scoring_diagnostics.get("events_per_fold"),
+                "non_estimable_models": scoring_diagnostics.get("non_estimable_models"),
                 # How many windows each class's null draws actually placed,
                 # against the real onset count they were matched to: a draw
                 # that placed far fewer is a thinner regressor, and its
@@ -1150,36 +1168,51 @@ def get_command_line_arguments() -> Namespace:
         formatter_class=RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--local_scratch_dir", type=str, default="/tmp/dask_scratch",
+        "--local_scratch_dir",
+        type=str,
+        default="/tmp/dask_scratch",
         help="Local scratch directory for Dask workers (default: /tmp/dask_scratch)",
     )
     parser.add_argument(
-        "--n_workers", type=int, default=4,
+        "--n_workers",
+        type=int,
+        default=4,
         help="Number of Dask workers (default: 4)",
     )
     parser.add_argument(
-        "--animal", type=str, default=None,
+        "--animal",
+        type=str,
+        default=None,
         help="Filter to specific animal (e.g., wilbur)",
     )
     parser.add_argument(
-        "--date", type=int, default=None,
+        "--date",
+        type=int,
+        default=None,
         help="Filter to specific date (e.g., 20210329)",
     )
     parser.add_argument(
-        "--epoch", type=str, default=None,
+        "--epoch",
+        type=str,
+        default=None,
         help="Filter to specific epoch (e.g., 02_r1)",
     )
     parser.add_argument(
-        "--brain_area", type=str, default="mPFC",
+        "--brain_area",
+        type=str,
+        default="mPFC",
         choices=["mPFC", "OFC"],
         help="Brain area to analyze: mPFC or OFC (default: mPFC)",
     )
     parser.add_argument(
-        "--log_directory", type=str, default="logs",
+        "--log_directory",
+        type=str,
+        default="logs",
         help="Directory for log files (default: logs)",
     )
     parser.add_argument(
-        "--overwrite", action="store_true",
+        "--overwrite",
+        action="store_true",
         help="Overwrite existing results",
     )
     parser.add_argument(
@@ -1270,8 +1303,8 @@ def get_command_line_arguments() -> Namespace:
         default=5,
         help=(
             "Folds the held-out deviance is summed over (default: 5). Whole "
-            "contiguous immobility runs are assigned to folds, so no fold is "
-            "predicted from the bins 2 ms either side of it."
+            "immobility runs whose event-kernel supports overlap are assigned "
+            "together, so one event cannot enter both train and test."
         ),
     )
     parser.add_argument(
@@ -1330,8 +1363,13 @@ def get_command_line_arguments() -> Namespace:
         )
     if args.n_control_draws < 0:
         parser.error(
-            f"--n-control-draws {args.n_control_draws} is negative; 0 skips "
-            "the null."
+            f"--n-control-draws {args.n_control_draws} is negative; 0 skips the null."
+        )
+    if 0 < args.n_control_draws < MIN_USABLE_NULL_DRAWS:
+        parser.error(
+            f"--n-control-draws {args.n_control_draws} is below the "
+            f"{MIN_USABLE_NULL_DRAWS}-draw reporting floor; use 0 to skip "
+            "the null or request at least that many draws."
         )
     if args.gpu is not None and args.n_workers > 1:
         # --gpu names one card and every worker would be handed the same one:
@@ -1475,9 +1513,7 @@ def _filter_to_sorted_sessions(epoch_info: pd.DataFrame) -> pd.DataFrame:
             "sort_interval_name": (
                 "sleeps_runs_noPrePostTrialTimes raw data valid times"
             ),
-            "sorter_params_name": (
-                "franklab_probe_ctx_30KHz_115rad_new_mountainsort2"
-            ),
+            "sorter_params_name": ("franklab_probe_ctx_30KHz_115rad_new_mountainsort2"),
             "team_name": "ac_em_xs",
             "sorter": "mountainsort4",
         }

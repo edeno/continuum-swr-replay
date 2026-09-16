@@ -14,6 +14,8 @@ sliced with them, and may carry NaN.
 
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -23,6 +25,7 @@ from continuum_swr_replay.analysis.pfc.load_population import (
     LEGACY_FDR_TESTS,
     heldout_q_column,
     load_population_data,
+    significant_fraction,
 )
 
 N_LAG_TIMES = 201
@@ -56,6 +59,7 @@ def write_bundle(
     swr_marker: float = 0.0,
     statistics: dict[str, list[float]] | None = None,
     arrays: dict[str, np.ndarray] | None = None,
+    provenance_overrides: dict[str, object] | None = None,
 ) -> None:
     """Write one session's pickle and its five modulation arrays."""
     frame = pd.DataFrame(
@@ -65,17 +69,21 @@ def write_bundle(
         }
     )
     for column, values in (
-        statistics
-        if statistics is not None
-        else heldout_statistics(len(nwb_files))
+        statistics if statistics is not None else heldout_statistics(len(nwb_files))
     ).items():
         frame[column] = values
     frame.to_pickle(base.with_suffix(".pkl"))
+    provenance = {
+        "estimator": "ridge_poisson_glm",
+        "inference": "blocked_heldout_deviance",
+        "empirical_pvalue_method": "plus_one",
+        "min_usable_null_draws": 20,
+        **(provenance_overrides or {}),
+    }
+    base.with_suffix(".provenance.json").write_text(json.dumps(provenance))
 
     default = {
-        "SWR_modulation": np.full(
-            (N_LAG_TIMES, n_mod_cols), swr_marker, dtype=float
-        ),
+        "SWR_modulation": np.full((N_LAG_TIMES, n_mod_cols), swr_marker, dtype=float),
     }
     for name in MODULATION_ARRAYS:
         values = (arrays or {}).get(
@@ -85,14 +93,13 @@ def write_bundle(
 
 
 class TestLoadPopulationNanFilter:
-    def test_nan_in_a_secondary_pvalue_does_not_crash_the_correction(self, tmp_path):
-        """A unit tested for one class and not another must not crash BH.
+    def test_nan_in_a_secondary_pvalue_stays_untested(self, tmp_path):
+        """A unit tested for one class and not another stays untested there.
 
         A unit whose session had no events of some class carries NaN for that
         class's empirical p-value while its primary column is finite, so it
-        passes the gate and reaches the correction.
-        ``scipy.stats.false_discovery_control`` rejects NaN, so BH is applied
-        per test to the finite values only and the NaN positions stay NaN.
+        passes the population gate. The raw-p preview must leave that class out
+        of its denominator rather than count the unit as a negative.
         """
         statistics = heldout_statistics(1)
         statistics[HELDOUT_P_COLUMNS["non_local_no_SWR"]] = [np.nan]
@@ -106,8 +113,10 @@ class TestLoadPopulationNanFilter:
         df, _, _ = load_population_data(tmp_path, min_firing_rate=0.0)
 
         assert len(df) == 1
-        assert pd.isna(df[heldout_q_column("non_local_no_SWR")].iloc[0])
-        assert pd.notna(df[heldout_q_column("SWR")].iloc[0])
+        assert pd.isna(df[HELDOUT_P_COLUMNS["non_local_no_SWR"]].iloc[0])
+        assert significant_fraction(df)["non_local_no_SWR"] == (0, 0)
+        assert significant_fraction(df)["SWR"] == (1, 1)
+        assert heldout_q_column("SWR") not in df
 
     def test_a_session_whose_every_fit_failed_does_not_keyerror(self, tmp_path):
         """A fallback bundle writes only firing rates and all-NaN curves."""
@@ -159,8 +168,7 @@ class TestLoadPopulationNanFilter:
         df, modulations, _ = load_population_data(tmp_path, min_firing_rate=0.0)
 
         assert df.shape[0] == 1, (
-            "the unit with NaN in its non_local_SWR curve slipped past the "
-            "filter"
+            "the unit with NaN in its non_local_SWR curve slipped past the filter"
         )
         for key in ("swr", "no_swr", "non_local_swr", "non_local_no_swr"):
             assert not np.any(np.isnan(modulations[key]))
@@ -207,9 +215,7 @@ class TestBundleGeneration:
             load_population_data(tmp_path, min_firing_rate=0.0)
 
     def test_the_superseded_bundles_can_still_be_read_on_purpose(self, tmp_path):
-        statistics = {
-            f"{test}: pval": [0.5] for test in LEGACY_FDR_TESTS
-        }
+        statistics = {f"{test}: pval": [0.5] for test in LEGACY_FDR_TESTS}
         statistics["min_aic_model"] = ["SWR"]
         write_bundle(
             tmp_path / "session_mPFC_modulation",
@@ -225,14 +231,29 @@ class TestBundleGeneration:
         assert pd.notna(df["SWR vs. constant: fdr_q"].iloc[0])
 
     def test_an_out_of_fold_bundle_is_not_read_as_a_legacy_one(self, tmp_path):
-        write_bundle(
-            tmp_path / "session_mPFC_modulation", ["chimi20200212_.nwb"], 1
-        )
+        write_bundle(tmp_path / "session_mPFC_modulation", ["chimi20200212_.nwb"], 1)
 
         with pytest.raises(ValueError, match="scored out of fold"):
-            load_population_data(
-                tmp_path, min_firing_rate=0.0, inference="legacy"
-            )
+            load_population_data(tmp_path, min_firing_rate=0.0, inference="legacy")
+
+    def test_a_pre_review_empirical_pvalue_bundle_is_refused(self, tmp_path):
+        write_bundle(
+            tmp_path / "session_mPFC_modulation",
+            ["chimi20200212_.nwb"],
+            1,
+            provenance_overrides={"empirical_pvalue_method": "raw_exceedance"},
+        )
+
+        with pytest.raises(ValueError, match="incompatible held-out provenance"):
+            load_population_data(tmp_path, min_firing_rate=0.0)
+
+    def test_a_heldout_bundle_without_provenance_is_refused(self, tmp_path):
+        base = tmp_path / "session_mPFC_modulation"
+        write_bundle(base, ["chimi20200212_.nwb"], 1)
+        base.with_suffix(".provenance.json").unlink()
+
+        with pytest.raises(ValueError, match="no readable provenance sidecar"):
+            load_population_data(tmp_path, min_firing_rate=0.0)
 
 
 class TestLoadPopulationCrossSessionAlignment:
@@ -310,17 +331,13 @@ class TestTheControlCurveFallbackIsLegacyOnly:
         assert np.isnan(modulations["matched_control"]).all()
 
     def test_a_current_bundle_without_the_array_is_a_fault(self, tmp_path):
-        write_bundle(
-            tmp_path / "session_mPFC_modulation", ["chimi20200212_.nwb"], 1
-        )
+        write_bundle(tmp_path / "session_mPFC_modulation", ["chimi20200212_.nwb"], 1)
         (tmp_path / "session_mPFC_modulation.matched_control_modulation.npy").unlink()
 
         with pytest.raises(FileNotFoundError):
             load_population_data(tmp_path, min_firing_rate=0.0)
 
-    def test_a_tree_of_neither_generation_is_refused_on_the_legacy_path(
-        self, tmp_path
-    ):
+    def test_a_tree_of_neither_generation_is_refused_on_the_legacy_path(self, tmp_path):
         # Neither the held-out columns nor the likelihood-ratio ones.
         write_bundle(
             tmp_path / "session_mPFC_modulation",
@@ -330,6 +347,4 @@ class TestTheControlCurveFallbackIsLegacyOnly:
         )
 
         with pytest.raises(ValueError, match="neither generation"):
-            load_population_data(
-                tmp_path, min_firing_rate=0.0, inference="legacy"
-            )
+            load_population_data(tmp_path, min_firing_rate=0.0, inference="legacy")
