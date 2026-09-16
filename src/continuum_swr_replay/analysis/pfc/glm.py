@@ -311,9 +311,7 @@ def fit_models_batched(
 
     penalties = penalties or {}
     return {
-        model_name: fit_poisson_glms(
-            design, counts, penalty=penalties.get(model_name)
-        )
+        model_name: fit_poisson_glms(design, counts, penalty=penalties.get(model_name))
         for model_name, design in design_matrices.items()
     }
 
@@ -449,7 +447,12 @@ def test_theta_modulation(
     Returns
     -------
     likelihood_ratio : float
-        Likelihood ratio statistic (theta vs constant).
+        Likelihood ratio statistic (theta vs constant), or ``nan`` if either
+        unregularized fit ran to ``maxiter`` without converging -- a pair of
+        fits that never settled has no likelihood ratio to report. The
+        regularized fit ``theta_mod`` and ``theta_preferred_phase`` come from
+        is a different estimator (statsmodels' coordinate descent, which
+        reports no convergence flag) and is not gated.
     p_value : float
         P-value from chi-square test.
     modulation : float
@@ -471,7 +474,16 @@ def test_theta_modulation(
             design_matrix, neuron_spike_count[joint_mask], fitter=fitter
         )
 
-    likelihood_ratio, p_value = _lr_test(theta_glm_results, constant_glm_results)
+    # Gated on convergence for the same reason the immobility models are: a
+    # pair of fits that ran to ``maxiter`` has no likelihood ratio to report,
+    # and a finite number here would be read as one.
+    if all(
+        bool(getattr(result, "converged", True))
+        for result in (constant_glm_results, theta_glm_results)
+    ):
+        likelihood_ratio, p_value = _lr_test(theta_glm_results, constant_glm_results)
+    else:
+        likelihood_ratio, p_value = np.nan, np.nan
 
     theta_glm_model = sm.GLM(
         neuron_spike_count[joint_mask],
@@ -888,6 +900,167 @@ def get_frac_explained_deviance(
     return float(
         (reduced_model.deviance - full_model.deviance) / denominator
     )
+
+
+#: Half-width of the window peak modulations are read over, in seconds. The
+#: models are fit on a wider window (+/-250 ms) so the kernel's ends are outside
+#: what is reported; a peak taken over the fit window would be reporting the
+#: part that was widened to be thrown away.
+REPORT_HALF_WINDOW_S = 0.200
+
+#: A coefficient past this on the log-rate scale is a rate multiplier of 5e8:
+#: a basis column whose support holds no spikes, whose maximum-likelihood
+#: estimate is at -infinity, and whose fitted value says only where the solver
+#: stopped. Used to separate units that have a maximum-likelihood fit to
+#: compare against from units that do not.
+SEPARATED_LOG_RATE = 20.0
+
+
+class PeakModulation(NamedTuple):
+    """The largest excursion of a peri-event kernel, and where it is.
+
+    Attributes
+    ----------
+    value : NDArray, shape (n_units,)
+        Signed log-rate modulation at the peak -- the value at the largest
+        absolute excursion, not the largest value.
+    lag : NDArray, shape (n_units,)
+        Lag of that peak, in seconds.
+    index : NDArray of int, shape (n_units,)
+        Row of ``spline_basis`` the peak sits at, for evaluating the basis
+        there.
+    """
+
+    value: NDArray
+    lag: NDArray
+    index: NDArray
+
+
+def peak_log_modulation(
+    params: NDArray,
+    spline_basis: NDArray,
+    lag_time: NDArray,
+    half_window_s: float = REPORT_HALF_WINDOW_S,
+) -> PeakModulation:
+    """Peak of ``spline_basis @ params`` over the reported window, per unit.
+
+    Parameters
+    ----------
+    params : NDArray, shape (n_units, n_basis) or (n_basis,)
+        One event class's basis coefficients -- the block of a design's
+        parameters that multiplies ``spline_basis``, not the whole parameter
+        vector.
+    spline_basis : NDArray, shape (n_lags, n_basis)
+    lag_time : NDArray, shape (n_lags,)
+        Lag of each basis row, in seconds.
+    half_window_s : float
+        Peaks are taken over ``|lag| <= half_window_s``.
+
+    Returns
+    -------
+    PeakModulation
+        With ``nan`` value and lag, and index ``-1``, for a unit whose
+        coefficients are not finite.
+
+    Raises
+    ------
+    ValueError
+        If no lag falls inside the window.
+    """
+    coefficients = np.atleast_2d(np.asarray(params, dtype=float))
+    lag_time = np.asarray(lag_time, dtype=float)
+    inside = np.flatnonzero(np.abs(lag_time) <= half_window_s + 1e-12)
+    if inside.size == 0:
+        raise ValueError(
+            f"no lag inside +/-{half_window_s} s; the basis covers "
+            f"{lag_time.min()} to {lag_time.max()}"
+        )
+    curves = coefficients @ np.asarray(spline_basis, dtype=float)[inside].T
+    usable = np.isfinite(curves).all(axis=1)
+    at = np.argmax(np.abs(np.nan_to_num(curves)), axis=1)
+    index = np.where(usable, inside[at], -1)
+    value = np.where(usable, curves[np.arange(len(curves)), at], np.nan)
+    lag = np.where(usable, lag_time[index], np.nan)
+    return PeakModulation(value=value, lag=lag, index=index)
+
+
+def peak_modulation_se(
+    covariance: NDArray, spline_basis: NDArray, peak_index: NDArray
+) -> NDArray:
+    """Standard error of the kernel at each unit's peak lag.
+
+    The kernel at one lag is ``b(lag)' beta``, a linear function of the
+    coefficients, so its variance is ``b(lag)' cov(beta) b(lag)`` -- the
+    off-diagonal terms included, which is why the diagonal ``bse`` cannot
+    answer this. The peak lag is treated as fixed, as a delta-method standard
+    error does.
+
+    Parameters
+    ----------
+    covariance : NDArray, shape (n_units, n_basis, n_basis)
+        Covariance of the same coefficient block ``params`` came from.
+    spline_basis : NDArray, shape (n_lags, n_basis)
+    peak_index : NDArray of int, shape (n_units,)
+        Basis row of each unit's peak, from :func:`peak_log_modulation`.
+        ``-1`` gives ``nan``.
+
+    Returns
+    -------
+    NDArray, shape (n_units,)
+    """
+    covariance = np.asarray(covariance, dtype=float)
+    basis = np.asarray(spline_basis, dtype=float)
+    peak_index = np.asarray(peak_index, dtype=int)
+    at_peak = basis[np.clip(peak_index, 0, len(basis) - 1)]
+    variance = np.einsum("np,npq,nq->n", at_peak, covariance, at_peak)
+    return np.where(peak_index >= 0, np.sqrt(np.clip(variance, 0.0, None)), np.nan)
+
+
+def is_separated(params: NDArray, threshold: float = SEPARATED_LOG_RATE) -> NDArray:
+    """Units whose fit has no maximum-likelihood estimate to compare against.
+
+    Parameters
+    ----------
+    params : NDArray, shape (n_units, n_basis) or (n_basis,)
+        Basis coefficients of an **unpenalised** fit.
+    threshold : float
+        Absolute log-rate a coefficient has to pass to count as separated.
+
+    Returns
+    -------
+    NDArray of bool, shape (n_units,)
+        True where the fit ran away (or is not finite).
+    """
+    coefficients = np.atleast_2d(np.asarray(params, dtype=float))
+    return ~np.all(np.abs(coefficients) <= threshold, axis=1)
+
+
+def prior_binds(
+    penalised_peak: NDArray, mle_peak: NDArray, mle_peak_se: NDArray
+) -> NDArray:
+    """Where the prior moved the curve by more than the data could resolve.
+
+    "The prior binds" is a statement about the modulation, not about a
+    coefficient: the peak of the penalised kernel differs from the peak of the
+    maximum-likelihood one by more than the latter's own estimation error. A
+    unit with no maximum-likelihood fit (see :func:`is_separated`) has nothing
+    to difference and is not counted here -- report it separately.
+
+    Parameters
+    ----------
+    penalised_peak, mle_peak : NDArray, shape (n_units,)
+        Peak log-rate modulations, from :func:`peak_log_modulation`.
+    mle_peak_se : NDArray, shape (n_units,)
+        Standard error of ``mle_peak``, from :func:`peak_modulation_se`.
+
+    Returns
+    -------
+    NDArray of bool, shape (n_units,)
+        False wherever any of the three is not finite.
+    """
+    difference = np.abs(np.asarray(penalised_peak) - np.asarray(mle_peak))
+    finite = np.isfinite(difference) & np.isfinite(mle_peak_se)
+    return finite & (difference > np.asarray(mle_peak_se))
 
 
 def _fit_diagnostics(results: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
@@ -2188,11 +2361,12 @@ def shipped_fit_counts(
 ) -> dict[str, int]:
     """How many of a session's shipped immobility fits never settled.
 
-    A fit that runs to ``maxiter`` is not an error: ``process_neuron`` reports
-    its LR test and its AIC like any other. So unless the count is taken here
-    -- once, over the results that will actually be read -- the fact does not
-    survive the run at all, and a reader asking how much of a session's result
-    rests on a fit that never converged has nowhere to ask.
+    A fit that runs to ``maxiter`` is not an estimate: ``process_neuron`` marks
+    it non-estimable for that neuron and every statistic that reads it is NaN
+    (the neuron's other models are reported as usual). The NaNs say a number is
+    missing but not how many, or over how many neurons, so unless the count is
+    taken here -- once, over the results that will actually be read -- there is
+    no record of what a session dropped.
 
     A neuron with no fit at all (no spikes on the fitted bins) enters neither
     total, which is why ``n_model_fits`` is reported beside the failures rather
@@ -2830,7 +3004,9 @@ def run_session(
     if fit_counts["n_nonconverged_model_fits"]:
         logger.info(
             "%d of %d shipped model fits ran to maxiter without converging, "
-            "over %d of %d neurons. Their LR tests and AIC are still reported.",
+            "over %d of %d neurons. Each is non-estimable for its neuron: "
+            "every statistic that reads it is NaN, and this count is the only "
+            "record of what was dropped.",
             fit_counts["n_nonconverged_model_fits"],
             fit_counts["n_model_fits"],
             fit_counts["n_neurons_with_nonconverged_model"],

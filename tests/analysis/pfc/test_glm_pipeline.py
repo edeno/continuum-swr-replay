@@ -22,12 +22,17 @@ from continuum_swr_replay.analysis.pfc.glm import (
     build_theta_design,
     convolve_event_basis,
     event_basis_functions,
+    event_onset_counts,
     fit_models_batched,
     fitter_provenance,
     get_frac_explained_deviance,
     get_frac_null_deviance,
+    is_separated,
     make_matched_control_times,
     model_penalties,
+    peak_log_modulation,
+    peak_modulation_se,
+    prior_binds,
     process_neuron,
     shipped_fit_counts,
 )
@@ -226,6 +231,342 @@ class TestEventBasisFunctions:
         assert full.shape[1] == len(knots) + 4
         assert spline_basis.shape[1] == len(knots) + 2
         np.testing.assert_allclose(spline_basis, full[:, 1:-1])
+
+
+#: Prior the planted-kernel recovery is read at -- the shipped default.
+PLANTED_KERNEL_SIGMA = 3.0
+
+
+@pytest.fixture(scope="module")
+def planted_kernel_session():
+    """Units whose rate really is driven by a known peri-event kernel.
+
+    Three modulation amplitudes x two baseline rates, all sharing one design:
+    a 300 s epoch with 300 events, the kernel a 30 ms bump 20 ms after onset,
+    projected into the basis so it is exactly representable (50 ms knots cannot
+    carry a 30 ms bump, and the recoverable truth is the projection, not the
+    bump). A seventh unit fires nowhere near an event, so its unpenalised fit
+    separates.
+    """
+    rng = np.random.default_rng(20260916)
+    sampling_frequency = 500.0
+    lags = np.arange(-125, 126)
+    spline_basis, lag_time, _ = event_basis_functions(lags, sampling_frequency)
+    n_time = int(300 * sampling_frequency)
+    time = np.arange(n_time) / sampling_frequency
+
+    onsets = np.sort(rng.uniform(1.0, 295.0, size=300))
+    events = pd.DataFrame({"start_time": onsets, "end_time": onsets + 0.08})
+    convolved = convolve_event_basis(
+        event_onset_counts(events, time), spline_basis, lags
+    )
+    design = np.column_stack([np.ones(n_time), convolved])
+
+    shape = np.exp(-0.5 * ((lag_time - 0.02) / 0.03) ** 2)
+    cells, counts = [], []
+    for amplitude in (0.5, 1.5, 3.0):
+        coefficients = np.linalg.lstsq(spline_basis, amplitude * shape, rcond=None)[0]
+        curve = spline_basis @ coefficients
+        planted = curve[np.argmax(np.abs(curve))]
+        for rate in (2.0, 20.0):
+            cells.append(
+                {"amplitude": amplitude, "rate": rate, "planted_peak": planted}
+            )
+            counts.append(
+                rng.poisson(
+                    np.exp(np.log(rate / sampling_frequency) + convolved @ coefficients)
+                )
+            )
+
+    # The separated unit: spikes everywhere except under the kernel's support.
+    covered = convolved.sum(axis=1) > 0
+    silent = rng.poisson(np.exp(np.log(5.0 / sampling_frequency)), size=n_time)
+    silent[covered] = 0
+    counts.append(silent)
+
+    from continuum_swr_replay.analysis.pfc.batched_glm import (
+        fit_poisson_glms,
+        make_ridge_penalty,
+    )
+
+    counts = np.column_stack(counts).astype(float)
+    penalty = make_ridge_penalty(design.shape[1], PLANTED_KERNEL_SIGMA)
+    return {
+        "design": design,
+        "counts": counts,
+        "cells": cells,
+        "spline_basis": spline_basis,
+        "lag_time": lag_time,
+        # Fit once: every test below reads the same two fits.
+        "penalised": fit_poisson_glms(design, counts, penalty=penalty),
+        "unpenalised": fit_poisson_glms(design, counts),
+    }
+
+
+class TestPlantedKernelRecovery:
+    """The estimator has to return the kernel that generated the spikes.
+
+    Agreement with a reference solver says the arithmetic is right; this says
+    the answer is. The prior shrinks towards no modulation, so a recovered peak
+    is expected to come back *at most* the planted one plus sampling noise, and
+    at least the planted one times the ridge factor ``tau**2 / (tau**2 + s**2)``
+    -- ``tau`` the prior standard deviation of the kernel at one lag, ``s`` the
+    fit's own standard error there. On a design with this many events that
+    factor is above 0.99, which is the point of the prior: it is meant to bind
+    only where the data say nothing.
+    """
+
+    SIGMA = PLANTED_KERNEL_SIGMA
+
+    @staticmethod
+    def fits(session):
+        return session["penalised"], session["unpenalised"]
+
+    def peaks(self, fit, session):
+        peak = peak_log_modulation(
+            fit.params[:, 1:], session["spline_basis"], session["lag_time"]
+        )
+        se = peak_modulation_se(
+            fit.covariance[:, 1:, 1:], session["spline_basis"], peak.index
+        )
+        return peak, se
+
+    def test_every_planted_amplitude_and_rate_is_recovered(
+        self, planted_kernel_session
+    ):
+        from continuum_swr_replay.analysis.pfc.batched_glm import implied_prior_sd
+
+        penalised, _ = self.fits(planted_kernel_session)
+        peak, se = self.peaks(penalised, planted_kernel_session)
+        window = np.abs(planted_kernel_session["lag_time"]) <= 0.2
+        tau = implied_prior_sd(
+            self.SIGMA, planted_kernel_session["spline_basis"], window
+        )["per_lag"]
+
+        for unit, cell in enumerate(planted_kernel_session["cells"]):
+            planted = cell["planted_peak"]
+            ridge_factor = tau**2 / (tau**2 + se[unit] ** 2)
+            assert ridge_factor > 0.99, cell
+            # Shrunk towards zero by at most the ridge factor, and free to
+            # scatter by the fit's own standard error either way.
+            assert planted * ridge_factor - 3 * se[unit] <= peak.value[unit], cell
+            assert peak.value[unit] <= planted + 3 * se[unit], cell
+            assert peak.lag[unit] == pytest.approx(0.02, abs=0.02), cell
+
+    def test_a_higher_rate_recovers_the_same_kernel_more_precisely(
+        self, planted_kernel_session
+    ):
+        penalised, _ = self.fits(planted_kernel_session)
+        peak, se = self.peaks(penalised, planted_kernel_session)
+
+        for low, high in ((0, 1), (2, 3), (4, 5)):  # 2 Hz then 20 Hz, per amplitude
+            assert se[high] < se[low]
+            planted = planted_kernel_session["cells"][high]["planted_peak"]
+            assert abs(peak.value[high] - planted) <= max(3 * se[high], 0.1)
+
+    def test_the_recovered_amplitudes_are_ordered_like_the_planted_ones(
+        self, planted_kernel_session
+    ):
+        penalised, _ = self.fits(planted_kernel_session)
+        peak, _ = self.peaks(penalised, planted_kernel_session)
+
+        n_cells = len(planted_kernel_session["cells"])
+        for rate_offset in (0, 1):
+            small, middle, large = peak.value[:n_cells][rate_offset::2]
+            assert small < middle < large
+
+    def test_the_prior_barely_moves_a_well_sampled_fit(self, planted_kernel_session):
+        """Where the data speak, the prior does not: binding is the exception."""
+        penalised, unpenalised = self.fits(planted_kernel_session)
+        penalised_peak, _ = self.peaks(penalised, planted_kernel_session)
+        mle_peak, mle_se = self.peaks(unpenalised, planted_kernel_session)
+
+        n_cells = len(planted_kernel_session["cells"])
+        binds = prior_binds(
+            penalised_peak.value[:n_cells], mle_peak.value[:n_cells], mle_se[:n_cells]
+        )
+
+        assert not binds.any()
+        assert not is_separated(unpenalised.params[:n_cells, 1:]).any()
+
+    def test_the_separated_unit_gets_a_finite_curve_instead_of_a_runaway(
+        self, planted_kernel_session
+    ):
+        penalised, unpenalised = self.fits(planted_kernel_session)
+        penalised_peak, _ = self.peaks(penalised, planted_kernel_session)
+        mle_peak, _ = self.peaks(unpenalised, planted_kernel_session)
+
+        separated = -1
+        assert is_separated(unpenalised.params[:, 1:])[separated]
+        assert mle_peak.value[separated] < -10.0  # a rate multiplier of 5e-5
+        assert np.isfinite(penalised_peak.value[separated])
+        # Suppression, said at a scale a rate can have: at most a few percent
+        # of baseline, not zero.
+        assert -8.0 < penalised_peak.value[separated] < -1.0
+
+
+class TestPeakLogModulation:
+    """The curve-level read of a fit: where the kernel peaks, and how well."""
+
+    @staticmethod
+    def basis():
+        spline_basis, lag_time, _ = event_basis_functions(np.arange(-125, 126), 500.0)
+        return spline_basis, lag_time
+
+    def test_it_finds_the_planted_peak(self):
+        spline_basis, lag_time = self.basis()
+        # A bump at +20 ms, built in the basis so it is exactly representable.
+        shape = np.exp(-0.5 * ((lag_time - 0.02) / 0.03) ** 2)
+        coefficients = np.linalg.lstsq(spline_basis, 1.5 * shape, rcond=None)[0]
+
+        peak = peak_log_modulation(coefficients, spline_basis, lag_time)
+
+        # Against the curve the basis can actually carry: 50 ms knots smooth a
+        # 30 ms bump, so the representable peak is a little under the 1.5 asked
+        # for, and that is what a fit could recover.
+        curve = spline_basis @ coefficients
+        assert peak.value[0] == pytest.approx(np.abs(curve).max(), rel=1e-12)
+        assert peak.value[0] == pytest.approx(1.34, abs=0.05)
+        assert peak.lag[0] == pytest.approx(0.02, abs=0.006)
+        assert spline_basis[peak.index[0]] @ coefficients == pytest.approx(
+            peak.value[0]
+        )
+
+    def test_a_negative_excursion_is_the_peak_when_it_is_the_largest(self):
+        spline_basis, lag_time = self.basis()
+        shape = -np.exp(-0.5 * ((lag_time + 0.05) / 0.03) ** 2)
+        coefficients = np.linalg.lstsq(spline_basis, 2.0 * shape, rcond=None)[0]
+
+        peak = peak_log_modulation(coefficients, spline_basis, lag_time)
+
+        assert peak.value[0] < -1.5
+        assert peak.lag[0] == pytest.approx(-0.05, abs=0.006)
+
+    def test_the_peak_is_taken_over_the_reported_window_only(self):
+        """A kernel that runs away outside +/-200 ms is not reported as a peak.
+
+        The models are fit on +/-250 ms precisely so the ends are outside what
+        is read; a peak over the fit window would report the discarded part.
+        """
+        spline_basis, lag_time = self.basis()
+        coefficients = np.zeros(spline_basis.shape[1])
+        coefficients[0] = 5.0  # the first basis function, which lives at -250 ms
+        coefficients[5] = 1.0
+
+        peak = peak_log_modulation(coefficients, spline_basis, lag_time)
+
+        assert abs(peak.lag[0]) <= 0.2
+        assert peak.value[0] < 5.0
+
+    def test_units_are_read_independently(self):
+        spline_basis, lag_time = self.basis()
+        shape = np.exp(-0.5 * ((lag_time - 0.02) / 0.03) ** 2)
+        one = np.linalg.lstsq(spline_basis, 1.0 * shape, rcond=None)[0]
+        two = np.linalg.lstsq(spline_basis, -2.0 * shape, rcond=None)[0]
+
+        peak = peak_log_modulation(np.row_stack([one, two]), spline_basis, lag_time)
+
+        assert peak.value[0] > 0 > peak.value[1]
+        assert abs(peak.value[1]) == pytest.approx(2 * peak.value[0], rel=0.01)
+
+    def test_a_unit_with_no_fit_comes_back_nan(self):
+        spline_basis, lag_time = self.basis()
+        coefficients = np.full(spline_basis.shape[1], np.nan)
+
+        peak = peak_log_modulation(coefficients, spline_basis, lag_time)
+
+        assert np.isnan(peak.value[0])
+        assert np.isnan(peak.lag[0])
+        assert peak.index[0] == -1
+
+    def test_a_window_that_excludes_every_lag_is_refused(self):
+        spline_basis, lag_time = self.basis()
+
+        with pytest.raises(ValueError, match="no lag inside"):
+            peak_log_modulation(
+                np.zeros(spline_basis.shape[1]),
+                spline_basis,
+                lag_time,
+                half_window_s=-1.0,
+            )
+
+
+class TestPeakModulationSe:
+    def test_it_is_the_basis_quadratic_form_not_the_diagonal(self):
+        """The off-diagonal terms matter: the coefficients are correlated."""
+        spline_basis, lag_time = self.basis()
+        rng = np.random.default_rng(0)
+        root = rng.normal(size=(spline_basis.shape[1], spline_basis.shape[1])) * 0.1
+        covariance = (root @ root.T)[None]
+        index = np.array([120])
+
+        actual = peak_modulation_se(covariance, spline_basis, index)
+
+        at_peak = spline_basis[120]
+        assert actual[0] == pytest.approx(np.sqrt(at_peak @ covariance[0] @ at_peak))
+        diagonal_only = np.sqrt(at_peak**2 @ np.diag(covariance[0]))
+        assert actual[0] != pytest.approx(diagonal_only)
+
+    def test_it_matches_a_fitted_curves_own_uncertainty(self):
+        """Against the standard error of the same linear functional, from a fit."""
+        rng = np.random.default_rng(5)
+        spline_basis, lag_time = self.basis()
+        n_time = 20_000
+        onsets = np.sort(rng.uniform(1.0, 38.0, size=150))
+        events = pd.DataFrame({"start_time": onsets, "end_time": onsets + 0.08})
+        time = np.arange(n_time) / 500.0
+        convolved = convolve_event_basis(
+            event_onset_counts(events, time), spline_basis, np.arange(-125, 126)
+        )
+        design = np.column_stack([np.ones(n_time), convolved])
+        counts = rng.poisson(np.exp(np.log(0.02) + convolved.sum(axis=1) * 0.5))
+
+        from continuum_swr_replay.analysis.pfc.batched_glm import fit_poisson_glms
+
+        fit = fit_poisson_glms(design, counts.astype(float))
+        peak = peak_log_modulation(fit.params[:, 1:], spline_basis, lag_time)
+        actual = peak_modulation_se(fit.covariance[:, 1:, 1:], spline_basis, peak.index)
+
+        at_peak = spline_basis[peak.index[0]]
+        expected = np.sqrt(at_peak @ fit.covariance[0, 1:, 1:] @ at_peak)
+        assert actual[0] == pytest.approx(expected)
+        assert 0.0 < actual[0] < 1.0
+
+    def test_a_unit_without_a_peak_has_no_error(self):
+        spline_basis, _ = self.basis()
+        covariance = np.eye(spline_basis.shape[1])[None]
+
+        assert np.isnan(peak_modulation_se(covariance, spline_basis, np.array([-1]))[0])
+
+    basis = staticmethod(TestPeakLogModulation.basis)
+
+
+class TestPriorBinds:
+    def test_it_is_a_statement_about_the_curve_not_a_coefficient(self):
+        penalised = np.array([1.0, 1.0, 1.0])
+        mle = np.array([1.05, 2.0, 1.0])
+        mle_se = np.array([0.5, 0.5, 0.5])
+
+        binds = prior_binds(penalised, mle, mle_se)
+
+        # Moved by less than the data can resolve -> not binding; more -> yes.
+        assert not binds[0]
+        assert binds[1]
+        assert not binds[2]
+
+    def test_a_unit_without_a_maximum_likelihood_peak_does_not_count(self):
+        binds = prior_binds(
+            np.array([1.0, 1.0]), np.array([np.nan, 1.0]), np.array([0.1, np.nan])
+        )
+
+        assert not binds.any()
+
+    def test_is_separated_finds_the_runaway_coefficients(self):
+        params = np.array([[0.5, -1.0, 2.0], [0.5, -40.0, 2.0], [np.nan, 1.0, 1.0]])
+
+        separated = is_separated(params)
+
+        assert separated.tolist() == [False, True, True]
 
 
 class TestConvolveEventBasis:
