@@ -19,18 +19,28 @@ other ``K - 1``. The penalty is part of the estimator, so it is applied to the
 training fit exactly as in the full-data fit; the score itself is unpenalised,
 because it is a prediction error and not an objective.
 
-**The null comes from re-drawing the matched control.** A held-out improvement
-has no null distribution to read it against: it is not a likelihood ratio, and
-its sampling distribution depends on the autocorrelation of the spike train and
-on how the events happen to fall in the folds. The matched control already
-defines "a duration-matched non-event regressor drawn from the fitted bouts";
-drawing it ``R`` times with different seeds gives, per unit, ``R`` held-out
-improvements from a regressor built by the same rules with no event content.
-The observed improvement is read against that distribution.
+**The null comes from re-drawing the matched control, once per event class.**
+A held-out improvement has no null distribution to read it against: it is not a
+likelihood ratio, and its sampling distribution depends on the autocorrelation
+of the spike train and on how the events happen to fall in the folds. The
+matched control already defines "a duration-matched non-event regressor drawn
+from the fitted bouts"; drawing it ``R`` times with different seeds gives, per
+unit, ``R`` held-out improvements from a regressor built by the same rules with
+no event content.
+
+That null has to be matched to the class it stands in for. An improvement grows
+with the number of onsets a regressor carries and with how long each one is, so
+a null drawn from all non-local events -- hundreds of them -- would be a
+*harder* comparison for a class with a third as many, and an easier one for a
+class with more. Each class therefore gets its own draws: ``n_k`` windows
+carrying class ``k``'s own durations, drawn by the same rules from the same
+bouts and avoiding the same real events, and class ``k``'s improvement is read
+against class ``k``'s draws.
 """
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Mapping, Sequence
 from typing import NamedTuple
 
@@ -40,6 +50,8 @@ from numpy.typing import NDArray
 
 from continuum_swr_replay.analysis.pfc.glm import (
     DEFAULT_MATCHED_CONTROL_ATTEMPTS,
+    EVENT_CLASSES,
+    MATCHED_CONTROL_SOURCE_CLASS,
     convolve_event_basis,
     event_onset_counts,
     make_matched_control_times,
@@ -68,25 +80,31 @@ class ControlDrawNull(NamedTuple):
 
     Attributes
     ----------
-    improvement : NDArray, shape (n_draws, n_units)
-        ``D_ho(constant) - D_ho(control_r)`` -- what a content-free regressor
-        buys, on the same folds and under the same penalty as a real class.
+    improvement : dict[str, NDArray], each of shape (n_draws, n_units)
+        Per event class, ``D_ho(constant) - D_ho(control_r)`` -- what a
+        regressor with that class's own onset count and durations, and no event
+        content, buys on the same folds under the same penalty. Read class
+        ``k``'s observed improvement against ``improvement[k]``.
     engagement : NDArray, shape (n_draws, n_units)
         ``D_ho(control) - D_ho(control + control_r)``: the engagement
         statistic's null, with the tested regressor replaced by a content-free
-        one and the baseline left as it is. Empty when no baseline control was
-        given.
+        one matched to it and the baseline left as it is. Empty when no
+        baseline control was given.
     constant_deviance : NDArray, shape (n_units,)
         ``D_ho(constant)``, the reference every improvement is taken against.
-    n_placed : NDArray of int, shape (n_draws,)
-        Control windows each draw placed. A draw that placed far fewer than the
-        others is a thinner regressor and its improvement is not comparable.
+    n_placed : dict[str, NDArray of int], each of shape (n_draws,)
+        Windows each draw placed, per class, against ``n_events`` below. A draw
+        that placed far fewer is a thinner regressor and its improvement is not
+        comparable.
+    n_events : dict[str, int]
+        Real onsets of each class -- what each draw was matched to.
     """
 
-    improvement: NDArray
+    improvement: dict[str, NDArray]
     engagement: NDArray
     constant_deviance: NDArray
-    n_placed: NDArray
+    n_placed: dict[str, NDArray]
+    n_events: dict[str, int]
 
 
 def _contiguous_runs(mask: NDArray) -> NDArray:
@@ -235,9 +253,7 @@ def heldout_deviance(
     per_fold = np.full((n_folds, counts.shape[1]), np.nan)
     for fold in range(n_folds):
         held_out = folds == fold
-        fitted = fit_poisson_glms(
-            design[~held_out], counts[~held_out], penalty=penalty
-        )
+        fitted = fit_poisson_glms(design[~held_out], counts[~held_out], penalty=penalty)
         fitted_mean = np.exp(design[held_out] @ fitted.params.T)
         per_fold[fold] = poisson_deviance(counts[held_out], fitted_mean)
     return HeldoutDeviance(per_fold=per_fold, total=per_fold.sum(axis=0))
@@ -308,6 +324,57 @@ def control_design(
     return np.concatenate(blocks, axis=1)[rows]
 
 
+def null_draw_seeds(control_seed: int, n_draws: int) -> NDArray:
+    """Seeds for the null draws, derived from the session's own control seed.
+
+    The null has to be a different draw from the control the models were fit
+    with -- a draw that reproduced it would score the shipped regressor against
+    itself and return a p-value of 1 by construction. Deriving the seeds from
+    the session's seed (rather than from a counter) keeps a session's null
+    reproducible on its own, and hashing seed and draw index together makes a
+    collision with the session seed, or between draws, something that is
+    checked rather than assumed.
+
+    Parameters
+    ----------
+    control_seed : int
+        The session's matched-control seed, from
+        :func:`~continuum_swr_replay.analysis.pfc.glm.matched_control_seed`.
+    n_draws : int
+        Number of draws, ``R``.
+
+    Returns
+    -------
+    NDArray of int, shape (n_draws,)
+        Distinct, and none equal to ``control_seed``.
+
+    Raises
+    ------
+    ValueError
+        If ``n_draws`` is negative, or if the derived seeds are not distinct
+        and different from ``control_seed`` (which would make a draw a repeat
+        of another, or of the shipped control).
+    """
+    if n_draws < 0:
+        raise ValueError(f"n_draws must be non-negative, got {n_draws}")
+    seeds = np.array(
+        [
+            int.from_bytes(
+                hashlib.sha256(f"{int(control_seed)}|{draw}".encode()).digest()[:8],
+                "little",
+            )
+            for draw in range(n_draws)
+        ],
+        dtype=np.uint64,
+    )
+    if len(set(seeds.tolist())) != n_draws or int(control_seed) in seeds.tolist():
+        raise ValueError(
+            "the derived null seeds are not distinct from each other and from "
+            "the session's control seed"
+        )
+    return seeds
+
+
 def control_draw_null(
     event_times: Mapping[str, pd.DataFrame],
     fit_mask: pd.Series,
@@ -318,21 +385,29 @@ def control_draw_null(
     spline_basis: NDArray,
     lags: NDArray,
     penalty_sigma: float | None = None,
+    classes: Sequence[str] = EVENT_CLASSES,
     baseline_control: pd.DataFrame | None = None,
+    engagement_class: str = "non_local_no_SWR",
     max_attempts: int = DEFAULT_MATCHED_CONTROL_ATTEMPTS,
 ) -> ControlDrawNull:
-    """Held-out improvements from repeated draws of the matched control.
+    """Held-out improvements from repeated matched-control draws, per class.
 
-    Each draw re-runs :func:`~continuum_swr_replay.analysis.pfc.glm.make_matched_control_times`
-    with a different seed and the same rules, builds the same design a real
-    event class gets, and scores it on the same folds under the same penalty.
-    The result is, per unit, what a regressor with no event content buys --
-    the distribution an observed improvement is read against.
+    For each event class and each seed, this re-runs
+    :func:`~continuum_swr_replay.analysis.pfc.glm.make_matched_control_times`
+    with **that class's events as the source**, so the draw carries the class's
+    own onset count and its own durations, drawn from the same fitted bouts and
+    avoiding the same real events (every class's windows, including the ones
+    being stood in for). The draw is turned into the design a real class gets
+    and scored on the same folds under the same penalty, giving per unit what a
+    regressor of that size and shape with no event content buys.
 
     Parameters
     ----------
     event_times : Mapping[str, pandas.DataFrame]
-        The session's event classes, as the matched-control draw needs them.
+        The session's event classes, as the matched-control draw needs them:
+        the four of
+        :data:`~continuum_swr_replay.analysis.pfc.glm.EVENT_CLASSES`, each with
+        ``start_time`` / ``end_time``.
     fit_mask : pandas.Series of bool, shape (n_time,)
         The bins the models are fit on, indexed by sample time in seconds.
     counts : NDArray, shape (n_time, n_units)
@@ -340,28 +415,47 @@ def control_draw_null(
     folds : NDArray of int, shape (n_fit_bins,)
         Fold index per fit bin, from :func:`assign_blocked_folds`.
     rng_seeds : Sequence[int]
-        One seed per draw. Recorded by the caller; the number of seeds is ``R``.
+        One seed per draw, ``R`` of them; see :func:`null_draw_seeds`. Each
+        class's draw ``r`` is seeded from the same value, so the classes share
+        a draw index but not a window -- their source events differ.
     spline_basis : NDArray, shape (n_lags, n_basis)
     lags : NDArray, shape (n_lags,)
         The fit window's lags in samples.
     penalty_sigma : float or None
         Prior standard deviation of a basis coefficient, on the log-rate scale.
         ``None`` scores unpenalised fits.
+    classes : Sequence[str]
+        Event classes to build a null for.
     baseline_control : pandas.DataFrame, optional
         The session's shipped matched control. Given, each draw also scores
         ``baseline_control + control_r`` against ``baseline_control`` alone --
         the engagement statistic's null, with the tested regressor replaced by
-        a content-free one drawn by the same rules. The draws are independent
-        of the shipped control and may overlap it, exactly as two real classes
-        never do; a caller comparing the two should say so.
+        a draw matched to ``engagement_class`` (the class the real statistic
+        tests) and the baseline left as it is. The draws are independent of the
+        shipped control and may overlap it, which two real classes never do; a
+        caller comparing the two should say so.
+    engagement_class : str
+        Class the engagement null's added regressor is matched to.
     max_attempts : int
         Placement attempts per source event, passed to the draw.
 
     Returns
     -------
     ControlDrawNull
+
+    Raises
+    ------
+    ValueError
+        If ``rng_seeds`` holds a repeat -- two draws from one seed are one
+        draw counted twice.
+    KeyError
+        If a requested class is not in ``event_times``.
     """
     from continuum_swr_replay.analysis.pfc.batched_glm import make_ridge_penalty
+
+    seeds = [int(seed) for seed in rng_seeds]
+    if len(set(seeds)) != len(seeds):
+        raise ValueError("rng_seeds must be distinct; a repeated seed repeats a draw")
 
     counts = np.asarray(counts, dtype=float)
     if counts.ndim == 1:
@@ -374,50 +468,63 @@ def control_draw_null(
             return None
         return make_ridge_penalty(design.shape[1], penalty_sigma)
 
-    constant = np.ones((int(fit_rows.sum()), 1))
-    constant_deviance = heldout_deviance(constant, fit_counts, None, folds).total
+    def draw_for(class_name: str, seed: int) -> pd.DataFrame:
+        """One class-matched control draw.
 
-    baseline_deviance = None
-    if baseline_control is not None:
-        baseline_design = control_design(
-            baseline_control, fit_mask, spline_basis, lags
-        )
-        baseline_deviance = heldout_deviance(
-            baseline_design, fit_counts, penalty_for(baseline_design), folds
-        ).total
-
-    improvements = []
-    engagements = []
-    n_placed = []
-    for seed in rng_seeds:
-        draw = make_matched_control_times(
-            event_times,
+        The source slot is swapped for this class's events; the blocked
+        windows are still the union over every class, which covers the real
+        ``non_local`` set either way (it is the union of its two subclasses).
+        """
+        source = {**event_times, MATCHED_CONTROL_SOURCE_CLASS: event_times[class_name]}
+        return make_matched_control_times(
+            source,
             fit_mask,
             np.random.default_rng(seed),
             max_attempts=max_attempts,
-        )
-        n_placed.append(len(draw.times))
-        design = control_design(draw.times, fit_mask, spline_basis, lags)
-        deviance = heldout_deviance(
-            design, fit_counts, penalty_for(design), folds
+        ).times
+
+    constant = np.ones((int(fit_rows.sum()), 1))
+    constant_deviance = heldout_deviance(constant, fit_counts, None, folds).total
+
+    improvement: dict[str, NDArray] = {}
+    n_placed: dict[str, NDArray] = {}
+    n_events = {name: int(len(event_times[name])) for name in classes}
+    for class_name in classes:
+        per_draw = []
+        placed = []
+        for seed in seeds:
+            times = draw_for(class_name, seed)
+            placed.append(len(times))
+            design = control_design(times, fit_mask, spline_basis, lags)
+            deviance = heldout_deviance(
+                design, fit_counts, penalty_for(design), folds
+            ).total
+            per_draw.append(constant_deviance - deviance)
+        improvement[class_name] = np.asarray(per_draw)
+        n_placed[class_name] = np.asarray(placed, dtype=int)
+
+    engagement: list[NDArray] = []
+    if baseline_control is not None:
+        baseline_design = control_design(baseline_control, fit_mask, spline_basis, lags)
+        baseline_deviance = heldout_deviance(
+            baseline_design, fit_counts, penalty_for(baseline_design), folds
         ).total
-        improvements.append(constant_deviance - deviance)
-        if baseline_deviance is not None:
+        for seed in seeds:
+            times = draw_for(engagement_class, seed)
             joint = control_design(
-                baseline_control, fit_mask, spline_basis, lags, extra_times=draw.times
+                baseline_control, fit_mask, spline_basis, lags, extra_times=times
             )
             joint_deviance = heldout_deviance(
                 joint, fit_counts, penalty_for(joint), folds
             ).total
-            engagements.append(baseline_deviance - joint_deviance)
+            engagement.append(baseline_deviance - joint_deviance)
 
     return ControlDrawNull(
-        improvement=np.asarray(improvements),
+        improvement=improvement,
         engagement=(
-            np.asarray(engagements)
-            if engagements
-            else np.empty((0, counts.shape[1]))
+            np.asarray(engagement) if engagement else np.empty((0, counts.shape[1]))
         ),
         constant_deviance=constant_deviance,
-        n_placed=np.asarray(n_placed, dtype=int),
+        n_placed=n_placed,
+        n_events=n_events,
     )

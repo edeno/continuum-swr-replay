@@ -23,6 +23,7 @@ from continuum_swr_replay.analysis.pfc.heldout import (
     control_draw_null,
     empirical_pvalue,
     heldout_deviance,
+    null_draw_seeds,
     poisson_deviance,
 )
 
@@ -378,8 +379,33 @@ def null_session():
     }
 
 
+class TestNullDrawSeeds:
+    def test_the_seeds_are_distinct_and_none_is_the_session_seed(self):
+        seeds = null_draw_seeds(control_seed=123456789, n_draws=50)
+
+        assert len(seeds) == 50
+        assert len(set(seeds.tolist())) == 50
+        assert 123456789 not in seeds.tolist()
+
+    def test_they_are_derived_from_the_session_seed(self):
+        """Reproducible for a session refit on its own, and different between
+        sessions -- two sessions must not share a null draw."""
+        first = null_draw_seeds(11, 8)
+        again = null_draw_seeds(11, 8)
+        other = null_draw_seeds(12, 8)
+
+        np.testing.assert_array_equal(first, again)
+        assert not set(first.tolist()) & set(other.tolist())
+
+    def test_a_negative_count_is_refused(self):
+        with pytest.raises(ValueError, match="non-negative"):
+            null_draw_seeds(1, -1)
+
+
 class TestControlDrawNull:
-    def test_it_returns_one_improvement_per_draw_and_unit(self, null_session):
+    def test_each_class_gets_its_own_count_matched_draws(self, null_session):
+        """The point of the per-class null: a class with half the onsets is
+        stood in for by half as many windows."""
         folds = assign_blocked_folds(null_session["fit_mask"], n_folds=5, seed=2)
         seeds = [101, 102, 103]
 
@@ -394,13 +420,49 @@ class TestControlDrawNull:
             penalty_sigma=2.0,
         )
 
-        assert null.improvement.shape == (len(seeds), null_session["counts"].shape[1])
-        assert null.n_placed.shape == (len(seeds),)
-        assert np.all(null.n_placed > 0)
+        n_units = null_session["counts"].shape[1]
+        for name, events in null_session["event_times"].items():
+            assert null.improvement[name].shape == (len(seeds), n_units)
+            assert null.n_events[name] == len(events)
+            # Every window placed, and never more than the class has events.
+            assert np.all(null.n_placed[name] <= len(events))
+            assert np.all(null.n_placed[name] > 0)
+        # The halved class really is drawn half as often.
+        assert null.n_events["non_local_no_SWR"] == null.n_events["non_local"] // 2
+        assert (
+            null.n_placed["non_local_no_SWR"].max()
+            < null.n_placed["non_local"].min()
+        )
         assert null.engagement.shape[0] == 0
+
+    def test_a_classs_draws_have_that_classs_durations(self, null_session):
+        """Duration matching, read off the drawn windows themselves."""
+        from continuum_swr_replay.analysis.pfc.glm import (
+            MATCHED_CONTROL_SOURCE_CLASS,
+            make_matched_control_times,
+        )
+
+        events = null_session["event_times"]["non_local_no_SWR"]
+        drawn = make_matched_control_times(
+            {**null_session["event_times"], MATCHED_CONTROL_SOURCE_CLASS: events},
+            null_session["fit_mask"],
+            np.random.default_rng(5),
+        ).times
+
+        np.testing.assert_allclose(
+            np.sort((drawn.end_time - drawn.start_time).to_numpy()),
+            np.sort((events.end_time - events.start_time).to_numpy())[: len(drawn)],
+            atol=1e-12,
+        )
 
     def test_two_draws_differ_and_a_repeated_seed_does_not(self, null_session):
         folds = assign_blocked_folds(null_session["fit_mask"], n_folds=5, seed=2)
+        arguments = {
+            "spline_basis": null_session["spline_basis"],
+            "lags": null_session["lags"],
+            "penalty_sigma": 2.0,
+            "classes": ["non_local"],
+        }
 
         first = control_draw_null(
             null_session["event_times"],
@@ -408,9 +470,7 @@ class TestControlDrawNull:
             null_session["counts"][:, :2],
             folds,
             rng_seeds=[101, 202],
-            spline_basis=null_session["spline_basis"],
-            lags=null_session["lags"],
-            penalty_sigma=2.0,
+            **arguments,
         )
         again = control_draw_null(
             null_session["event_times"],
@@ -418,13 +478,30 @@ class TestControlDrawNull:
             null_session["counts"][:, :2],
             folds,
             rng_seeds=[101],
-            spline_basis=null_session["spline_basis"],
-            lags=null_session["lags"],
-            penalty_sigma=2.0,
+            **arguments,
         )
 
-        np.testing.assert_allclose(first.improvement[0], again.improvement[0])
-        assert not np.allclose(first.improvement[0], first.improvement[1])
+        np.testing.assert_allclose(
+            first.improvement["non_local"][0], again.improvement["non_local"][0]
+        )
+        assert not np.allclose(
+            first.improvement["non_local"][0], first.improvement["non_local"][1]
+        )
+
+    def test_a_repeated_seed_is_refused(self, null_session):
+        folds = assign_blocked_folds(null_session["fit_mask"], n_folds=5, seed=2)
+
+        with pytest.raises(ValueError, match="distinct"):
+            control_draw_null(
+                null_session["event_times"],
+                null_session["fit_mask"],
+                null_session["counts"][:, :1],
+                folds,
+                rng_seeds=[7, 7],
+                spline_basis=null_session["spline_basis"],
+                lags=null_session["lags"],
+                classes=["non_local"],
+            )
 
     def test_the_engagement_null_replaces_the_tested_regressor(self, null_session):
         folds = assign_blocked_folds(null_session["fit_mask"], n_folds=5, seed=2)
@@ -439,6 +516,7 @@ class TestControlDrawNull:
             spline_basis=null_session["spline_basis"],
             lags=null_session["lags"],
             penalty_sigma=2.0,
+            classes=["non_local_no_SWR"],
             baseline_control=baseline,
         )
 
@@ -446,17 +524,19 @@ class TestControlDrawNull:
         assert np.all(np.isfinite(null.engagement))
 
     @pytest.mark.slow
-    def test_the_p_values_are_uniform_on_units_with_no_event_response(
+    def test_the_p_values_are_uniform_for_classes_of_different_sizes(
         self, null_session
     ):
         """The property that makes the null usable, on units built to have none.
 
-        Each unit's "observed" statistic is one draw's improvement and the null
-        is the other draws': under exchangeability the rank of the observed
-        among ``R`` draws is uniform, so the p-values must be too. The test is
-        a one-sample KS against U(0, 1) over the units, at a threshold well
-        clear of what ``R = 40`` draws and 24 units can resolve (the statistic
-        cannot go below ``1 / (2 R)`` by discreteness alone).
+        Run for two classes whose onset counts differ by a factor of two: a
+        null that was not count-matched would be uniform for one of them at
+        best. Each unit's "observed" statistic is one draw's improvement and
+        the null is the other draws'; under exchangeability the rank of the
+        observed among ``R`` draws is uniform, so the p-values must be too. The
+        threshold is well clear of what ``R = 40`` draws and 24 units can
+        resolve (the statistic cannot go below ``1 / (2 R)`` by discreteness
+        alone).
         """
         folds = assign_blocked_folds(null_session["fit_mask"], n_folds=5, seed=2)
         seeds = list(range(9000, 9041))  # one observed draw + R = 40 null draws
@@ -470,12 +550,15 @@ class TestControlDrawNull:
             spline_basis=null_session["spline_basis"],
             lags=null_session["lags"],
             penalty_sigma=2.0,
+            classes=["non_local", "non_local_no_SWR"],
         )
 
-        observed, draws = null.improvement[0], null.improvement[1:]
-        pvalues = empirical_pvalue(observed, draws)
+        assert null.n_events["non_local"] > 1.5 * null.n_events["non_local_no_SWR"]
+        for class_name in ("non_local", "non_local_no_SWR"):
+            draws = null.improvement[class_name]
+            pvalues = empirical_pvalue(draws[0], draws[1:])
 
-        assert np.all(np.isfinite(pvalues))
-        ks = stats.kstest(pvalues, "uniform").statistic
-        assert ks < 0.30, f"p-values are not uniform enough: KS = {ks:.3f}"
-        assert 0.2 < pvalues.mean() < 0.8
+            assert np.all(np.isfinite(pvalues)), class_name
+            ks = stats.kstest(pvalues, "uniform").statistic
+            assert ks < 0.30, f"{class_name}: p-values not uniform, KS = {ks:.3f}"
+            assert 0.2 < pvalues.mean() < 0.8, class_name
