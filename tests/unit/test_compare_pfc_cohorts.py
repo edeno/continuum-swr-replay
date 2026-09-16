@@ -13,6 +13,7 @@ name, so the gate's effect is separable from the cohort's.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -33,6 +34,7 @@ from scripts.qa.compare_pfc_cohorts import (
     coverage_summary,
     curve_peaks,
     empirical_bayes_sigma,
+    engagement_overlap_table,
     estimator_provenance_table,
     event_count_agreement,
     fitter_table,
@@ -58,6 +60,9 @@ from scripts.qa.compare_pfc_cohorts import (
 )
 
 N_LAG_TIMES = 201
+
+#: Repository root, for loading a sibling QA script by path.
+_REPO = Path(__file__).resolve().parents[2]
 
 
 def _write_bundle(
@@ -1149,6 +1154,7 @@ def _write_ridge_bundle(
                     "n_control_draws": 40,
                     "control_draw_seed": abs(hash(session + "c")) % 10_000,
                     "n_basis_per_class": 11,
+                    "engagement_null_overlap": {"median": 0.02, "max": 0.06},
                     "implied_prior_sd": {
                         "per_lag": 2.065937776992323,
                         "sustained": 0.9045340337332909,
@@ -1512,3 +1518,48 @@ class TestBeforeTreeIsPairedToTheAfterTree:
         # And the fractions below it describe those units, not the six.
         assert "4 of 6 units" in report
         assert legacy_fdr_table(restricted, 0.05).iloc[0]["n_units"] == 4
+
+
+class TestEngagementNullOverlap:
+    """The cost of drawing the null by the control's own rules is reported."""
+
+    def test_each_sessions_overlap_is_read_off_its_sidecar(self, estimator_trees):
+        _, after = estimator_trees
+
+        table = engagement_overlap_table(read_sidecars(after))
+
+        assert len(table) == 2
+        assert set(table["median_overlap_fraction"]) == {0.02}
+        assert set(table["max_overlap_fraction"]) == {0.06}
+
+    def test_a_tree_that_recorded_no_overlap_gets_an_empty_table(self, bundle_trees):
+        _, after = bundle_trees
+
+        assert engagement_overlap_table(read_sidecars(after)).empty
+
+
+class TestTheLambdaZeroGateRebuildsTheAuditedBasis:
+    """The gate must compare against the design the reference was fit on."""
+
+    def test_the_audited_basis_keeps_patsys_last_boundary_function(self):
+        import importlib.util
+
+        from continuum_swr_replay.analysis.pfc.glm import event_basis_functions
+
+        spec = importlib.util.spec_from_file_location(
+            "check_pfc_ridge_lambda0",
+            _REPO / "scripts" / "qa" / "check_pfc_ridge_lambda0.py",
+        )
+        gate = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(gate)
+
+        lags = np.arange(-125, 126)
+        audited = gate.audited_basis(lags, 500.0)
+        current, _, _ = event_basis_functions(lags, 500.0)
+
+        # One function wider than today's, and free at the right edge where
+        # today's returns to baseline -- which is the whole of the difference.
+        assert audited.shape[1] == current.shape[1] + 1
+        assert audited[-1].max() > 0.9
+        assert current[-1].max() == 0.0
+        assert current[0].max() == 0.0

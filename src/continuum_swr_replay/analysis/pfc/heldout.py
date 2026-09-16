@@ -52,6 +52,8 @@ from continuum_swr_replay.analysis.pfc.glm import (
     DEFAULT_MATCHED_CONTROL_ATTEMPTS,
     EVENT_CLASSES,
     MATCHED_CONTROL_SOURCE_CLASS,
+    _merge_windows,
+    _overlaps_any,
     convolve_event_basis,
     event_onset_counts,
     make_matched_control_times,
@@ -98,6 +100,13 @@ class ControlDrawNull(NamedTuple):
         comparable.
     n_events : dict[str, int]
         Real onsets of each class -- what each draw was matched to.
+    engagement_overlap : NDArray, shape (n_draws,)
+        Fraction of each engagement draw's windows that overlap the shipped
+        baseline control's. The draws are independent of that control, so they
+        may land on it, which two real event classes never do; a large fraction
+        would mean the null's added regressor duplicates the baseline it is
+        entered beside and buys less than a content-free regressor should.
+        Empty when no baseline control was given.
     """
 
     improvement: dict[str, NDArray]
@@ -105,6 +114,7 @@ class ControlDrawNull(NamedTuple):
     constant_deviance: NDArray
     n_placed: dict[str, NDArray]
     n_events: dict[str, int]
+    engagement_overlap: NDArray
 
 
 def _contiguous_runs(mask: NDArray) -> NDArray:
@@ -375,6 +385,45 @@ def null_draw_seeds(control_seed: int, n_draws: int) -> NDArray:
     return seeds
 
 
+def overlapping_fraction(
+    windows: pd.DataFrame, starts: NDArray, ends: NDArray
+) -> float:
+    """Fraction of ``windows`` that overlap any of ``[starts, ends)``.
+
+    The null's draws are independent of the shipped matched control, so a draw
+    may place a window where the control already sits -- something two real
+    event classes never do, because each class's windows avoid the others'.
+    Blocking it would mean drawing the null by different rules from the control
+    it stands in for, which is the worse trade; measuring it is the cost of
+    that choice, and the caller reports it.
+
+    Parameters
+    ----------
+    windows : pandas.DataFrame
+        ``start_time`` / ``end_time`` of the drawn windows.
+    starts, ends : NDArray, shape (n_windows,)
+        Ascending, non-overlapping bounds to test against, as
+        :func:`~continuum_swr_replay.analysis.pfc.glm._merge_windows` returns
+        them.
+
+    Returns
+    -------
+    float
+        ``nan`` when no window was drawn.
+    """
+    if not len(windows):
+        return float("nan")
+    hits = sum(
+        _overlaps_any(float(start), float(end), starts, ends)
+        for start, end in zip(
+            windows["start_time"].to_numpy(dtype=float),
+            windows["end_time"].to_numpy(dtype=float),
+            strict=True,
+        )
+    )
+    return float(hits / len(windows))
+
+
 def control_draw_null(
     event_times: Mapping[str, pd.DataFrame],
     fit_mask: pd.Series,
@@ -504,13 +553,21 @@ def control_draw_null(
         n_placed[class_name] = np.asarray(placed, dtype=int)
 
     engagement: list[NDArray] = []
+    engagement_overlap: list[float] = []
     if baseline_control is not None:
         baseline_design = control_design(baseline_control, fit_mask, spline_basis, lags)
         baseline_deviance = heldout_deviance(
             baseline_design, fit_counts, penalty_for(baseline_design), folds
         ).total
+        baseline_starts, baseline_ends = _merge_windows(
+            baseline_control["start_time"].to_numpy(dtype=float),
+            baseline_control["end_time"].to_numpy(dtype=float),
+        )
         for seed in seeds:
             times = draw_for(engagement_class, seed)
+            engagement_overlap.append(
+                overlapping_fraction(times, baseline_starts, baseline_ends)
+            )
             joint = control_design(
                 baseline_control, fit_mask, spline_basis, lags, extra_times=times
             )
@@ -527,4 +584,5 @@ def control_draw_null(
         constant_deviance=constant_deviance,
         n_placed=n_placed,
         n_events=n_events,
+        engagement_overlap=np.asarray(engagement_overlap, dtype=float),
     )

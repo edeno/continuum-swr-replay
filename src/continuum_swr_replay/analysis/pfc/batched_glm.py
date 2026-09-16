@@ -600,7 +600,13 @@ def implied_prior_sd(
         The basis the coefficients weight.
     keep : NDArray of bool, shape (n_lags,), optional
         Lags to summarise over -- the reported window, when it is narrower than
-        the fit window. Defaults to every lag.
+        the fit window. Defaults to every lag, which is **not** what a reader
+        usually wants: the basis sums to one only between the first and last
+        internal knot, so over the full fit window ``per_lag_min`` is the value
+        at an edge the curves are never reported at and reads as a far tighter
+        prior than any reported lag carries. Pass the reported window's mask
+        (``|lag| <= REPORT_HALF_WINDOW_S``) for the figure a bundle should
+        record.
 
     Returns
     -------

@@ -563,6 +563,19 @@ def score_session(
             }
             for name in null.n_placed
         }
+        # The engagement null's draws are independent of the shipped control
+        # they are entered beside, so they may land on it -- which two real
+        # event classes never do. The cost of drawing the null by the control's
+        # own rules is measured rather than assumed away.
+        overlap = np.asarray(null.engagement_overlap, dtype=float)
+        diagnostics["engagement_null_overlap"] = (
+            {
+                "median": float(np.median(overlap)),
+                "max": float(np.max(overlap)),
+            }
+            if overlap.size
+            else None
+        )
 
     return pd.DataFrame(statistics), diagnostics
 
@@ -1064,6 +1077,9 @@ def run_analysis(
                 # that placed far fewer is a thinner regressor, and its
                 # improvement is not the reference the observed one needs.
                 "null_windows": scoring_diagnostics.get("null_windows"),
+                "engagement_null_overlap": scoring_diagnostics.get(
+                    "engagement_null_overlap"
+                ),
                 "stop_table_sha256": cohort_report.get("stop_table_sha256"),
                 "stop_cohort_report": cohort_report,
                 "cohort_counts": cohort_info,

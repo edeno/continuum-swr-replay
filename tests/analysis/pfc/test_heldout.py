@@ -194,9 +194,7 @@ def event_session():
 
 
 class TestHeldoutDeviance:
-    def test_the_generating_model_predicts_held_out_spikes_better(
-        self, event_session
-    ):
+    def test_the_generating_model_predicts_held_out_spikes_better(self, event_session):
         folds = assign_blocked_folds(event_session["fit_mask"], n_folds=5, seed=5)
         penalty = make_ridge_penalty(
             event_session["designs"]["events"].shape[1], sigma=2.0
@@ -228,9 +226,7 @@ class TestHeldoutDeviance:
         design = event_session["designs"]["events"]
         penalty = make_ridge_penalty(design.shape[1], sigma=2.0)
 
-        heldout = heldout_deviance(
-            design, event_session["fit_counts"], penalty, folds
-        )
+        heldout = heldout_deviance(design, event_session["fit_counts"], penalty, folds)
 
         assert heldout.total[1] >= (
             heldout_deviance(
@@ -273,9 +269,7 @@ class TestHeldoutDeviance:
 
         for fold in range(5):
             held = folds == fold
-            fitted = fit_poisson_glms(
-                design[~held], counts[~held], penalty=penalty
-            )
+            fitted = fit_poisson_glms(design[~held], counts[~held], penalty=penalty)
             expected = poisson_deviance(
                 counts[held], np.exp(design[held] @ fitted.params.T)
             )
@@ -430,8 +424,7 @@ class TestControlDrawNull:
         # The halved class really is drawn half as often.
         assert null.n_events["non_local_no_SWR"] == null.n_events["non_local"] // 2
         assert (
-            null.n_placed["non_local_no_SWR"].max()
-            < null.n_placed["non_local"].min()
+            null.n_placed["non_local_no_SWR"].max() < null.n_placed["non_local"].min()
         )
         assert null.engagement.shape[0] == 0
 

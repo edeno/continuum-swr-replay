@@ -624,7 +624,7 @@ class TestPeakLogModulation:
         one = np.linalg.lstsq(spline_basis, 1.0 * shape, rcond=None)[0]
         two = np.linalg.lstsq(spline_basis, -2.0 * shape, rcond=None)[0]
 
-        peak = peak_log_modulation(np.row_stack([one, two]), spline_basis, lag_time)
+        peak = peak_log_modulation(np.vstack([one, two]), spline_basis, lag_time)
 
         assert peak.value[0] > 0 > peak.value[1]
         assert abs(peak.value[1]) == pytest.approx(2 * peak.value[0], rel=0.01)

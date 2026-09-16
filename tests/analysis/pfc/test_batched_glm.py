@@ -488,7 +488,9 @@ class TestPenalty:
             )
             # And ``bse`` is its diagonal, so the two can never disagree.
             np.testing.assert_allclose(
-                batched.bse[unit], np.sqrt(np.diag(batched.covariance[unit])), rtol=0,
+                batched.bse[unit],
+                np.sqrt(np.diag(batched.covariance[unit])),
+                rtol=0,
                 atol=1e-15,
             )
 
@@ -588,9 +590,7 @@ class TestImpliedPriorSd:
         """A partition of unity, as the event basis is."""
         from continuum_swr_replay.analysis.pfc.glm import event_basis_functions
 
-        spline_basis, lag_time, _ = event_basis_functions(
-            np.arange(-125, 126), 500.0
-        )
+        spline_basis, lag_time, _ = event_basis_functions(np.arange(-125, 126), 500.0)
         assert spline_basis.shape == (n_lags, n_basis)
         return spline_basis, lag_time
 
@@ -608,9 +608,7 @@ class TestImpliedPriorSd:
         implied = implied_prior_sd(3.0, spline_basis, window)
 
         norms = np.sqrt((spline_basis[window] ** 2).sum(axis=1))
-        assert implied["per_lag"] == pytest.approx(
-            3.0 * np.sqrt((norms**2).mean())
-        )
+        assert implied["per_lag"] == pytest.approx(3.0 * np.sqrt((norms**2).mean()))
         assert implied["per_lag_min"] == pytest.approx(3.0 * norms.min())
         assert implied["per_lag_max"] == pytest.approx(3.0 * norms.max())
 

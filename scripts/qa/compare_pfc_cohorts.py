@@ -111,6 +111,7 @@ SIDECAR_TOP_LEVEL_KEYS = [
     "control_draw_seed",
     "n_basis_per_class",
     "implied_prior_sd",
+    "engagement_null_overlap",
     "fitter",
     "fitter_tol",
     "jax_backend",
@@ -1513,6 +1514,25 @@ def separated_column_table(after: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def engagement_overlap_table(sidecars: pd.DataFrame) -> pd.DataFrame:
+    """Per session, how much the engagement null's draws hit the shipped control."""
+    recorded = sidecars.get("engagement_null_overlap")
+    if recorded is None:
+        return pd.DataFrame()
+    rows = []
+    for session, value in zip(sidecars["session"], recorded, strict=True):
+        if not isinstance(value, dict):
+            continue
+        rows.append(
+            {
+                "session": session,
+                "median_overlap_fraction": round(float(value.get("median", np.nan)), 4),
+                "max_overlap_fraction": round(float(value.get("max", np.nan)), 4),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def fold_spread_table(after: pd.DataFrame) -> pd.DataFrame:
     """Per nested pair, how much the held-out difference moves between folds.
 
@@ -2292,6 +2312,20 @@ def build_estimator_report(
     add(_md(legacy_fdr_table(paired_before, alpha)))
     add("### After: fraction beating the control-draw null, per class\n")
     add(_md(heldout_fraction_table(after, alpha)))
+
+    add("## What the engagement null's draws overlap\n")
+    add(
+        "The null's draws are independent of the shipped matched control they "
+        "are entered beside, so a draw may place a window where that control "
+        "already sits -- something two real event classes never do, because "
+        "each class's windows avoid the others'. Blocking it would mean "
+        "drawing the null by different rules from the control it stands in "
+        "for, which is the worse trade; the cost is measured instead. A large "
+        "fraction would mean the null's added regressor duplicates the "
+        "baseline and buys less than a content-free regressor should, which "
+        "would make the engagement p-value anti-conservative.\n"
+    )
+    add(_md(engagement_overlap_table(sidecars)))
 
     add("## How steady the held-out difference is between folds\n")
     add(

@@ -622,6 +622,12 @@ Report whether every fitted artifact is still current for the tables it read.
 
 `artifact_for_sidecar`, `find_sidecars`, `resolve_input`, `check_artifact`, `propagate_stale`, `format_line`, `main`
 
+### `scripts/qa/check_pfc_ridge_lambda0.py`
+
+Check that the penalised solver reproduces maximum likelihood at lambda = 0.
+
+`audited_basis`, `audited_designs`, `rebuild_session`, `compare_session`, `build_report`, `main`
+
 ### `scripts/qa/compare_fits.py`
 
 Compare a backed-up rate fit against the current one and write a markdown audit.
@@ -632,7 +638,7 @@ Compare a backed-up rate fit against the current one and write a markdown audit.
 
 Write the before/after audit of the mPFC unit-GLM stop cohort.
 
-`read_sidecars`, `runner_code`, `provenance_table`, `bundle_sessions`, `session_cohort_table`, `coverage_summary`, `alignment_prose`, `gate_counts`, `significance_table`, `population_comparison`, `try_read_sidecars`, `same_events_precondition`, `event_count_agreement`, `shared_statistic_differences`, `matched_control_arrays`, `matched_control_significance`, `fitter_table`, `session_fit_counts_table`, `worker_time_table`, `curve_peaks`, `peak_shrinkage`, `shrinkage_table`, `implied_prior_per_lag`, `empirical_bayes_sigma`, `heldout_fraction_table`, `restrict_to_sessions`, `legacy_fdr_table`, `separated_column_table`, `fold_spread_table`, `sigma_sensitivity_table`, `estimator_provenance_table`, `rerun_sections`, `build_report`, `build_estimator_report`, `main`
+`read_sidecars`, `runner_code`, `provenance_table`, `bundle_sessions`, `session_cohort_table`, `coverage_summary`, `alignment_prose`, `gate_counts`, `significance_table`, `population_comparison`, `try_read_sidecars`, `same_events_precondition`, `event_count_agreement`, `shared_statistic_differences`, `matched_control_arrays`, `matched_control_significance`, `fitter_table`, `session_fit_counts_table`, `worker_time_table`, `curve_peaks`, `peak_shrinkage`, `shrinkage_table`, `implied_prior_per_lag`, `empirical_bayes_sigma`, `heldout_fraction_table`, `restrict_to_sessions`, `legacy_fdr_table`, `separated_column_table`, `engagement_overlap_table`, `fold_spread_table`, `sigma_sensitivity_table`, `estimator_provenance_table`, `rerun_sections`, `build_report`, `build_estimator_report`, `main`
 
 ### `scripts/qa/compare_pfc_fitters.py`
 

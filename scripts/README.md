@@ -98,6 +98,14 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
 - `summarize_stage6_fdr.py` — prints Stage 6's per-role cross-session FDR table for
   any saved `stage6_is_stay_logistic*.pkl`, using the runner's own statistic, so a
   before/after comparison across populations reads one implementation.
+- `check_pfc_ridge_lambda0.py` — writes the audit that the penalised solver with
+  its penalty set to zero is still the maximum-likelihood one: it rebuilds each
+  gate session's design *as it stood when the reference was fit* (the basis that
+  dropped only patsy's first boundary function) from that session's own fit mask,
+  event sets and seeded control draw, fits it unpenalised, and compares against
+  the stored statsmodels diagnostics. Cells whose maximum-likelihood estimate
+  does not exist are reported rather than gated — they are the ones the prior was
+  introduced for.
 - `compare_pfc_fitters.py` — **history.** Wrote the equivalence audit of the batched
   JAX Poisson fitter against the per-neuron statsmodels IRLS, from two runs of the
   same sessions (`--fitter jax` / `--fitter statsmodels`, both with
