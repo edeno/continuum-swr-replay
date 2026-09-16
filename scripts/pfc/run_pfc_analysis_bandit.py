@@ -99,6 +99,7 @@ from continuum_swr_replay.analysis.pfc.glm import (
 )
 from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
 from continuum_swr_replay.analysis.pfc.heldout import (
+    CONTROL_NULL_EVENT_POLICY,
     EMPIRICAL_PVALUE_METHOD,
     MIN_USABLE_NULL_DRAWS,
     assign_blocked_folds,
@@ -370,6 +371,7 @@ def results_exist(
         and record.get("n_control_draws") == n_control_draws
         and record.get("control_draw_seed") == control_draw_seed
         and record.get("empirical_pvalue_method") == EMPIRICAL_PVALUE_METHOD
+        and record.get("control_null_event_policy") == CONTROL_NULL_EVENT_POLICY
         and record.get("min_usable_null_draws") == MIN_USABLE_NULL_DRAWS
         and record.get("matched_control_placement_method")
         == MATCHED_CONTROL_PLACEMENT_METHOD
@@ -425,6 +427,9 @@ def score_session(
     class buys is read against ``R`` draws of the matched non-event control --
     the same rules, no event content -- which is the only null available for a
     statistic that is neither a likelihood ratio nor independent across bins.
+    If an event has no legal within-bout match, the empirical test uses one
+    fixed matchable subset on both its observed and null sides; the all-event
+    held-out difference remains separately reported.
 
     Parameters
     ----------
@@ -555,35 +560,50 @@ def score_session(
             counts,
             folds,
             rng_seeds=seeds,
+            subset_seed=control_draw_seed,
             spline_basis=context["spline_basis"],
             lags=context["lags"],
             penalty_sigma=penalty_sigma,
             baseline_control=context["event_times"]["matched_control"],
+            model_deviance=deviance,
         )
-        # Each class is read against a null drawn to its own onset count and
-        # its own durations: a regressor built from 30 windows buys less than
-        # one built from 300 whatever either contains, so one shared null would
-        # hold classes of different size to the same reference.
+        # Each class is read against a null drawn to its own fixed matchable
+        # onset subset and durations: a regressor built from 30 windows buys
+        # less than one built from 300 whatever either contains, so one shared
+        # null would hold classes of different size to the same reference.
         for event_class in EVENT_CLASSES:
             stem = pair_name(event_class, "constant")
+            statistics[f"{stem}: matched_null_observed_delta_dev"] = (
+                null.observed_improvement[event_class]
+            )
             statistics[f"{event_class}: p_heldout"] = empirical_pvalue(
-                statistics[f"{stem}: heldout_delta_dev"],
+                null.observed_improvement[event_class],
                 null.improvement[event_class],
                 min_usable_draws=MIN_USABLE_NULL_DRAWS,
             )
         engagement_stem = pair_name(*ENGAGEMENT_PAIR)
+        statistics[f"{engagement_stem}: matched_null_observed_delta_dev"] = (
+            null.observed_engagement
+        )
         statistics[f"{engagement_stem}: p_heldout"] = empirical_pvalue(
-            statistics[f"{engagement_stem}: heldout_delta_dev"],
+            null.observed_engagement,
             null.engagement,
             min_usable_draws=MIN_USABLE_NULL_DRAWS,
         )
         diagnostics["null_windows"] = {
             name: {
-                "n_events": int(null.n_events[name]),
+                "n_events_total": int(null.n_events[name]),
+                "n_events_tested": int(null.n_tested[name]),
+                "n_events_excluded_unmatchable": int(
+                    null.n_events[name] - null.n_tested[name]
+                ),
+                "tested_source_indices": (
+                    null.tested_source_indices[name].astype(int).tolist()
+                ),
                 "n_placed_median": float(np.median(null.n_placed[name])),
                 "n_placed_min": int(np.min(null.n_placed[name])),
                 "n_exact_draws": int(
-                    np.sum(null.n_placed[name] == null.n_events[name])
+                    np.sum(null.n_placed[name] == null.n_tested[name])
                 ),
                 "n_required_draws": MIN_USABLE_NULL_DRAWS,
             }
@@ -1089,10 +1109,9 @@ def run_analysis(
                 "n_control_draws": int(n_control_draws),
                 "control_draw_seed": int(control_draw_seed),
                 "empirical_pvalue_method": EMPIRICAL_PVALUE_METHOD,
+                "control_null_event_policy": CONTROL_NULL_EVENT_POLICY,
                 "min_usable_null_draws": MIN_USABLE_NULL_DRAWS,
-                "matched_control_placement_method": (
-                    MATCHED_CONTROL_PLACEMENT_METHOD
-                ),
+                "matched_control_placement_method": (MATCHED_CONTROL_PLACEMENT_METHOD),
                 "n_basis_per_class": n_basis_per_class,
                 "implied_prior_sd": implied_prior,
                 "fold_sizes": scoring_diagnostics.get("fold_sizes"),
@@ -1101,10 +1120,10 @@ def run_analysis(
                 ),
                 "events_per_fold": scoring_diagnostics.get("events_per_fold"),
                 "non_estimable_models": scoring_diagnostics.get("non_estimable_models"),
-                # How many windows each class's null draws actually placed,
-                # against the real onset count they were matched to: a draw
-                # that placed far fewer is a thinner regressor, and its
-                # improvement is not the reference the observed one needs.
+                # Which real onsets enter the fixed matched test, and how many
+                # windows each null draw actually placed against that tested
+                # count. A thinner draw is not the reference the subset-
+                # matched observed statistic needs.
                 "null_windows": scoring_diagnostics.get("null_windows"),
                 "engagement_null_overlap": scoring_diagnostics.get(
                     "engagement_null_overlap"

@@ -4,8 +4,9 @@ Loads and filters the batch PFC GLM results for use by figure04 panel scripts.
 
 The bundles are fit under a Gaussian prior on the event-basis coefficients and
 tested out of fold: a unit's evidence for an event class is the improvement in
-held-out Poisson deviance that class's regressor buys, read against repeated
-draws of the matched non-event control. So the population's "significant
+held-out Poisson deviance its fixed, matchable event subset buys, read against
+repeated draws of the matched non-event control for that identical subset. The
+all-event difference remains a separate descriptive result. So the population's "significant
 fraction" in this phase is the explicitly descriptive fraction of units with
 raw *empirical* ``p < .05`` -- not a population-level inferential result and
 not a fraction of asymptotic likelihood-ratio tests. Population inference is
@@ -24,6 +25,7 @@ from scipy.stats import false_discovery_control
 
 from continuum_swr_replay.analysis.pfc.glm import MATCHED_CONTROL_PLACEMENT_METHOD
 from continuum_swr_replay.analysis.pfc.heldout import (
+    CONTROL_NULL_EVENT_POLICY,
     EMPIRICAL_PVALUE_METHOD,
     MIN_USABLE_NULL_DRAWS,
 )
@@ -49,6 +51,22 @@ HELDOUT_P_COLUMNS = {
     "engagement": ("matched_control + non_local_no_SWR vs. matched_control: p_heldout"),
 }
 
+#: Observed statistics those empirical p-values compare against. These are
+#: deliberately separate from the all-event held-out differences because a
+#: real event with no legal within-bout control cannot enter the matched test.
+MATCHED_NULL_OBSERVED_COLUMNS = {
+    "SWR": "SWR vs. constant: matched_null_observed_delta_dev",
+    "non_local": "non_local vs. constant: matched_null_observed_delta_dev",
+    "non_local_no_SWR": (
+        "non_local_no_SWR vs. constant: matched_null_observed_delta_dev"
+    ),
+    "non_local_SWR": "non_local_SWR vs. constant: matched_null_observed_delta_dev",
+    "engagement": (
+        "matched_control + non_local_no_SWR vs. matched_control: "
+        "matched_null_observed_delta_dev"
+    ),
+}
+
 #: Column a unit is judged to have a usable fit by. A unit the fitter could not
 #: place -- no spikes on the fitted bins, or a design it could not estimate --
 #: carries NaN here.
@@ -60,6 +78,7 @@ REQUIRED_COLUMNS = (
     HELDOUT_FIT_COLUMN,
     "min_heldout_model",
     *HELDOUT_P_COLUMNS.values(),
+    *MATCHED_NULL_OBSERVED_COLUMNS.values(),
 )
 
 
@@ -144,6 +163,7 @@ def _validate_heldout_provenance(artifacts: list[Path]) -> None:
         "estimator": "ridge_poisson_glm",
         "inference": "blocked_heldout_deviance",
         "empirical_pvalue_method": EMPIRICAL_PVALUE_METHOD,
+        "control_null_event_policy": CONTROL_NULL_EVENT_POLICY,
         "min_usable_null_draws": MIN_USABLE_NULL_DRAWS,
         "matched_control_placement_method": MATCHED_CONTROL_PLACEMENT_METHOD,
     }

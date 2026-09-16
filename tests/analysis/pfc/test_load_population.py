@@ -14,8 +14,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.pfc.glm import MATCHED_CONTROL_PLACEMENT_METHOD
+from continuum_swr_replay.analysis.pfc.heldout import CONTROL_NULL_EVENT_POLICY
 from continuum_swr_replay.analysis.pfc.load_population import (
     HELDOUT_P_COLUMNS,
+    MATCHED_NULL_OBSERVED_COLUMNS,
     _extract_animal,
     load_population_data,
 )
@@ -48,6 +51,7 @@ def _write_bundle(directory, epoch_identifier, suffix, firing_rate):
             "SWR: heldout_deviance": [100.0],
             "min_heldout_model": ["SWR"],
             **{column: [0.025] for column in HELDOUT_P_COLUMNS.values()},
+            **{column: [1.0] for column in MATCHED_NULL_OBSERVED_COLUMNS.values()},
         }
     )
     base = directory / f"{epoch_identifier}_mPFC_modulation{suffix}"
@@ -58,7 +62,9 @@ def _write_bundle(directory, epoch_identifier, suffix, firing_rate):
                 "estimator": "ridge_poisson_glm",
                 "inference": "blocked_heldout_deviance",
                 "empirical_pvalue_method": "plus_one",
+                "control_null_event_policy": CONTROL_NULL_EVENT_POLICY,
                 "min_usable_null_draws": 20,
+                "matched_control_placement_method": (MATCHED_CONTROL_PLACEMENT_METHOD),
             }
         )
     )

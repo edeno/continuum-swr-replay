@@ -19,7 +19,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.pfc.load_population import HELDOUT_P_COLUMNS
+from continuum_swr_replay.analysis.pfc.glm import MATCHED_CONTROL_PLACEMENT_METHOD
+from continuum_swr_replay.analysis.pfc.heldout import CONTROL_NULL_EVENT_POLICY
+from continuum_swr_replay.analysis.pfc.load_population import (
+    HELDOUT_P_COLUMNS,
+    MATCHED_NULL_OBSERVED_COLUMNS,
+)
 from scripts.qa.compare_pfc_cohorts import (
     FDR_TESTS,
     MATCHED_CONTROL_TESTS,
@@ -44,6 +49,7 @@ from scripts.qa.compare_pfc_cohorts import (
     legacy_fdr_table,
     matched_control_arrays,
     matched_control_significance,
+    null_window_table,
     peak_shrinkage,
     provenance_table,
     read_sidecars,
@@ -1092,7 +1098,7 @@ def _write_ridge_bundle(
     fit_rate: float = 5.0,
     n_folds: int = 5,
     separated: int = 0,
-    p_heldout: float = 0.0,
+    p_heldout: float = 1 / 41,
     suffix: str = "",
     sidecar_extra: dict | None = None,
 ) -> None:
@@ -1109,6 +1115,8 @@ def _write_ridge_bundle(
     )
     for column in HELDOUT_P_COLUMNS.values():
         frame[column] = p_heldout
+    for column in MATCHED_NULL_OBSERVED_COLUMNS.values():
+        frame[column] = 5.0
     for model in (
         "SWR + non_local_no_SWR",
         "non_local_SWR + non_local_no_SWR",
@@ -1159,7 +1167,11 @@ def _write_ridge_bundle(
                     "estimator": "ridge_poisson_glm",
                     "inference": "blocked_heldout_deviance",
                     "empirical_pvalue_method": "plus_one",
+                    "control_null_event_policy": CONTROL_NULL_EVENT_POLICY,
                     "min_usable_null_draws": 20,
+                    "matched_control_placement_method": (
+                        MATCHED_CONTROL_PLACEMENT_METHOD
+                    ),
                     "penalty_sigma_log_rate": 2.0,
                     "n_folds": n_folds,
                     "fold_seed": abs(hash(session)) % 10_000,
@@ -1167,6 +1179,18 @@ def _write_ridge_bundle(
                     "control_draw_seed": abs(hash(session + "c")) % 10_000,
                     "n_basis_per_class": 11,
                     "engagement_null_overlap": {"median": 0.02, "max": 0.06},
+                    "null_windows": {
+                        "SWR": {
+                            "n_events_total": 10,
+                            "n_events_tested": 9,
+                            "n_events_excluded_unmatchable": 1,
+                            "n_exact_draws": 40,
+                            "n_required_draws": 20,
+                            "n_placed_min": 9,
+                            "n_placed_median": 9.0,
+                            "tested_source_indices": list(range(9)),
+                        }
+                    },
                     "implied_prior_sd": {
                         "per_lag": 2.065937776992323,
                         "sustained": 0.9045340337332909,
@@ -1264,6 +1288,19 @@ class TestPeakShrinkage:
 
 
 class TestEstimatorTables:
+    def test_the_matched_test_event_population_is_reported(self, estimator_trees):
+        _, after = estimator_trees
+        sidecars = read_sidecars(after)
+
+        table = null_window_table(sidecars)
+
+        assert len(table) == 2
+        assert (table["event_class"] == "SWR").all()
+        assert (table["n_events_total"] == 10).all()
+        assert (table["n_events_tested"] == 9).all()
+        assert (table["n_events_excluded_unmatchable"] == 1).all()
+        assert (table["n_exact_draws"] == 40).all()
+
     def test_the_separated_columns_are_counted_per_model(self, estimator_trees):
         _, after = estimator_trees
         _write_ridge_bundle(

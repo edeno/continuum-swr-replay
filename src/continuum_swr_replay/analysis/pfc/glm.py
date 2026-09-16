@@ -2184,6 +2184,11 @@ class MatchedControlDraw(NamedTuple):
     times : pandas.DataFrame
         Columns ``start_time``, ``end_time`` in seconds, one row per placed
         control.
+    source_indices : NDArray of int, shape (n_placed,)
+        Positional indices of the source events represented by ``times``, in
+        the same order. This makes a placement shortfall auditable and lets a
+        caller restrict both the observed statistic and subsequent null draws
+        to one fixed, jointly matchable event subset.
     n_onset_outside_fitted_bout : int
         Source events whose onset bin belongs to no fitted immobility bout.
     n_bout_saturated : int
@@ -2193,6 +2198,7 @@ class MatchedControlDraw(NamedTuple):
     """
 
     times: pd.DataFrame
+    source_indices: NDArray
     n_onset_outside_fitted_bout: int
     n_bout_saturated: int
 
@@ -2268,10 +2274,9 @@ def make_matched_control_times(
     MatchedControlDraw
         ``times`` holds columns ``start_time``, ``end_time`` in seconds, one
         row per *placed* control, in source-event order. Rows are deliberately
-        not re-sorted by time: row ``k`` is then the ``k``-th placeable source
-        event, so the duration match is readable row by row when nothing was
-        dropped. ``n_onset_outside_fitted_bout`` and ``n_bout_saturated`` split
-        the shortfall by its two causes.
+        not re-sorted by time; ``source_indices[k]`` identifies the source
+        event matched by row ``k``. ``n_onset_outside_fitted_bout`` and
+        ``n_bout_saturated`` split the shortfall by its two causes.
 
     Raises
     ------
@@ -2329,9 +2334,7 @@ def make_matched_control_times(
             candidate_indices.append(np.empty(0, dtype=np.int64))
             continue
 
-        indices = np.arange(
-            run_start, run_start + last_offset + 1, dtype=np.int64
-        )
+        indices = np.arange(run_start, run_start + last_offset + 1, dtype=np.int64)
         starts = times[indices]
         ends = starts + duration
         # For each candidate, the only merged real window that can overlap is
@@ -2341,8 +2344,7 @@ def make_matched_control_times(
         overlaps = np.zeros(len(indices), dtype=bool)
         has_predecessor = n_starting_before > 0
         overlaps[has_predecessor] = (
-            real_ends[n_starting_before[has_predecessor] - 1]
-            > starts[has_predecessor]
+            real_ends[n_starting_before[has_predecessor] - 1] > starts[has_predecessor]
         )
         candidate_indices.append(indices[~overlaps])
 
@@ -2397,6 +2399,7 @@ def make_matched_control_times(
         times=pd.DataFrame(
             {"start_time": control_starts, "end_time": control_ends}, dtype=float
         ),
+        source_indices=np.asarray(placed_source_indices, dtype=np.int64),
         n_onset_outside_fitted_bout=n_onset_outside_fitted_bout,
         n_bout_saturated=n_bout_saturated,
     )

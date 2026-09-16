@@ -23,6 +23,7 @@ from continuum_swr_replay.analysis.pfc.glm import (
 )
 from continuum_swr_replay.analysis.pfc.heldout import (
     assign_blocked_folds,
+    control_design,
     control_draw_null,
     empirical_pvalue,
     heldout_deviance,
@@ -519,8 +520,9 @@ class TestControlDrawNull:
         for name, events in null_session["event_times"].items():
             assert null.improvement[name].shape == (len(seeds), n_units)
             assert null.n_events[name] == len(events)
+            assert 0 < null.n_tested[name] <= len(events)
             # Every window placed, and never more than the class has events.
-            assert np.all(null.n_placed[name] <= len(events))
+            assert np.all(null.n_placed[name] <= null.n_tested[name])
             assert np.all(null.n_placed[name] > 0)
         # The halved class really is drawn half as often.
         assert null.n_events["non_local_no_SWR"] == null.n_events["non_local"] // 2
@@ -528,6 +530,61 @@ class TestControlDrawNull:
             null.n_placed["non_local_no_SWR"].max() < null.n_placed["non_local"].min()
         )
         assert null.engagement.shape[0] == 0
+
+    def test_observed_and_null_use_one_fixed_matchable_event_subset(self, null_session):
+        """An unmatchable real event is excluded from both sides, not only null."""
+        event_times = dict(null_session["event_times"])
+        events = event_times["non_local"]
+        # 3.1 s falls in the first moving gap, so this source event cannot be
+        # matched within a fitted bout. It remains a real event in the
+        # all-event descriptive model but cannot enter the randomisation test.
+        outside = pd.DataFrame({"start_time": [3.1], "end_time": [3.18]})
+        event_times["non_local"] = pd.concat(
+            [events, outside], ignore_index=True
+        ).sort_values("start_time", ignore_index=True)
+        folds = assign_blocked_folds(null_session["fit_mask"], n_folds=5, seed=2)
+
+        null = control_draw_null(
+            event_times,
+            null_session["fit_mask"],
+            null_session["counts"][:, :2],
+            folds,
+            rng_seeds=[101, 102],
+            subset_seed=77,
+            spline_basis=null_session["spline_basis"],
+            lags=null_session["lags"],
+            penalty_sigma=2.0,
+            classes=["non_local"],
+        )
+
+        assert null.n_events["non_local"] == len(events) + 1
+        assert null.n_tested["non_local"] == len(events)
+        assert 3.1 not in (
+            event_times["non_local"]
+            .iloc[null.tested_source_indices["non_local"]]
+            .start_time.to_numpy()
+        )
+        assert np.all(null.n_placed["non_local"] == len(events))
+        assert np.isfinite(null.improvement["non_local"]).all()
+
+        tested = event_times["non_local"].iloc[null.tested_source_indices["non_local"]]
+        fit_rows = np.asarray(null_session["fit_mask"], dtype=bool)
+        fit_counts = null_session["counts"][fit_rows, :2]
+        constant = np.ones((fit_rows.sum(), 1))
+        design = control_design(
+            tested,
+            null_session["fit_mask"],
+            null_session["spline_basis"],
+            null_session["lags"],
+        )
+        expected = heldout_deviance(constant, fit_counts, None, folds).total
+        expected -= heldout_deviance(
+            design,
+            fit_counts,
+            make_ridge_penalty(design.shape[1], 2.0),
+            folds,
+        ).total
+        np.testing.assert_allclose(null.observed_improvement["non_local"], expected)
 
     def test_a_classs_draws_have_that_classs_durations(self, null_session):
         """Duration matching, read off the drawn windows themselves."""
@@ -537,15 +594,16 @@ class TestControlDrawNull:
         )
 
         events = null_session["event_times"]["non_local_no_SWR"]
-        drawn = make_matched_control_times(
+        draw = make_matched_control_times(
             {**null_session["event_times"], MATCHED_CONTROL_SOURCE_CLASS: events},
             null_session["fit_mask"],
             np.random.default_rng(5),
-        ).times
+        )
+        drawn = draw.times
 
         np.testing.assert_allclose(
-            np.sort((drawn.end_time - drawn.start_time).to_numpy()),
-            np.sort((events.end_time - events.start_time).to_numpy())[: len(drawn)],
+            (drawn.end_time - drawn.start_time).to_numpy(),
+            (events.end_time - events.start_time).iloc[draw.source_indices].to_numpy(),
             atol=1e-12,
         )
 

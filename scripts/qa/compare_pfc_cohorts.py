@@ -110,8 +110,13 @@ SIDECAR_TOP_LEVEL_KEYS = [
     "fold_seed",
     "n_control_draws",
     "control_draw_seed",
+    "empirical_pvalue_method",
+    "control_null_event_policy",
+    "min_usable_null_draws",
+    "matched_control_placement_method",
     "n_basis_per_class",
     "implied_prior_sd",
+    "null_windows",
     "engagement_null_overlap",
     "fitter",
     "fitter_tol",
@@ -1203,6 +1208,10 @@ ESTIMATOR_SIDECAR_KEYS = [
     "fold_seed",
     "n_control_draws",
     "control_draw_seed",
+    "empirical_pvalue_method",
+    "control_null_event_policy",
+    "min_usable_null_draws",
+    "matched_control_placement_method",
     "n_basis_per_class",
 ]
 
@@ -1544,6 +1553,36 @@ def engagement_overlap_table(sidecars: pd.DataFrame) -> pd.DataFrame:
                 "max_overlap_fraction": round(float(value.get("max", np.nan)), 4),
             }
         )
+    return pd.DataFrame(rows)
+
+
+def null_window_table(sidecars: pd.DataFrame) -> pd.DataFrame:
+    """Per session/class, the real-event subset and exact null-draw counts."""
+    recorded = sidecars.get("null_windows")
+    if recorded is None:
+        return pd.DataFrame()
+    rows = []
+    for session, value in zip(sidecars["session"], recorded, strict=True):
+        if not isinstance(value, dict):
+            continue
+        for event_class, record in sorted(value.items()):
+            if not isinstance(record, dict):
+                continue
+            rows.append(
+                {
+                    "session": session,
+                    "event_class": event_class,
+                    "n_events_total": record.get("n_events_total"),
+                    "n_events_tested": record.get("n_events_tested"),
+                    "n_events_excluded_unmatchable": record.get(
+                        "n_events_excluded_unmatchable"
+                    ),
+                    "n_exact_draws": record.get("n_exact_draws"),
+                    "n_required_draws": record.get("n_required_draws"),
+                    "n_placed_min": record.get("n_placed_min"),
+                    "n_placed_median": record.get("n_placed_median"),
+                }
+            )
     return pd.DataFrame(rows)
 
 
@@ -2249,7 +2288,9 @@ def build_estimator_report(
         "log-rate scale; `n_folds` the blocked split the models were scored "
         "out of; `n_control_draws` the size of the null each held-out "
         "improvement is read against, so the finest p-value it can resolve is "
-        "one over that. The two seeds are derived from the session name, so a "
+        "one over one plus that count under the recorded plus-one correction. "
+        "The event policy states that both sides use one fixed matchable "
+        "subset. The two seeds are derived from the session name, so a "
         "session refit on its own reproduces the batch's split and null; the "
         "table counts their distinct values rather than showing them.\n"
     )
@@ -2324,6 +2365,18 @@ def build_estimator_report(
     add(_md(legacy_fdr_table(paired_before, alpha)))
     add("### After: fraction beating the control-draw null, per class\n")
     add(_md(heldout_fraction_table(after, alpha)))
+
+    add("## Which events entered each matched-control test\n")
+    add(
+        "A real event with no legal non-event window in its own fitted bout "
+        "cannot enter a matched randomisation test. `n_events_tested` is the "
+        "fixed, timing-only subset used on both the observed and null sides; "
+        "the original all-event held-out difference remains separately in the "
+        "bundle. `n_exact_draws` must meet `n_required_draws` for the empirical "
+        "p-value to be available. The tested source indices are retained in "
+        "the sidecar but omitted from this compact table.\n"
+    )
+    add(_md(null_window_table(sidecars)))
 
     add("## What the engagement null's draws overlap\n")
     add(

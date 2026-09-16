@@ -137,9 +137,10 @@ class TestMatchedControlInvariants:
     def test_controls_are_at_most_as_many_as_events_and_keep_each_duration(
         self, event_times, fit_mask
     ):
-        controls = make_matched_control_times(
+        draw = make_matched_control_times(
             event_times, fit_mask, np.random.default_rng(3)
-        ).times
+        )
+        controls = draw.times
 
         source = event_times["non_local"]
         assert len(controls) <= len(source)
@@ -148,6 +149,7 @@ class TestMatchedControlInvariants:
         # distribution. The tolerance is the float64 rounding of a start plus a
         # duration, not room for a different duration.
         assert len(controls) == len(source)
+        np.testing.assert_array_equal(draw.source_indices, np.arange(len(source)))
         np.testing.assert_allclose(
             (controls.end_time - controls.start_time).to_numpy(),
             (source.end_time - source.start_time).to_numpy(),
@@ -188,6 +190,7 @@ class TestMatchedControlInvariants:
         draw = make_matched_control_times(crowded, mask, np.random.default_rng(6))
 
         assert len(draw.times) == 0
+        assert draw.source_indices.tolist() == []
         assert list(draw.times.columns) == ["start_time", "end_time"]
         # A full bout, not an onset the fit mask never covered.
         assert (draw.n_onset_outside_fitted_bout, draw.n_bout_saturated) == (0, 1)
@@ -206,6 +209,7 @@ class TestMatchedControlInvariants:
         draw = make_matched_control_times(outside, fit_mask, np.random.default_rng(7))
 
         assert len(draw.times) == 1
+        assert draw.source_indices.tolist() == [0]
         assert 0.5 <= float(draw.times.start_time.iloc[0]) < 4.0
         # An onset the fit mask never covered, not a bout with no room.
         assert (draw.n_onset_outside_fitted_bout, draw.n_bout_saturated) == (1, 0)

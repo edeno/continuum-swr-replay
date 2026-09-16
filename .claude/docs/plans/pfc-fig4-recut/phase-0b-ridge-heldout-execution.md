@@ -66,6 +66,13 @@ wall clock.
    non_local_SWR}`; and the engagement statistic `D_ho(MC) − D_ho(MC + non_local_no_SWR)` with its
    own null from re-drawn controls. `R` is set from a smoke (target 50; floor 20); each draw is one
    batched fit per fold across all units, so cost scales as `R × K` batched fits per session — measure.
+   **Amended after the 2026-09-16 exact-null gate:** if a real event has no legal non-event window
+   in its own fitted bout, it cannot enter a matched randomisation test. Select one deterministic,
+   jointly matchable event subset per class using timing/duration only, and use that identical subset
+   for the observed statistic and all null draws. Keep the original all-event `heldout_delta_dev` as a
+   separate descriptive result; store the matched-test observed statistic separately and record total,
+   tested and excluded event counts plus tested source indices in the sidecar. Never compare an
+   all-event observed statistic with a thinner null.
 5. **Modulation curves** come from the full-data penalised fit at `σ = 2`.
 6. **Basis fixes folded in (user instruction 2026-09-15).** (a) Boundary symmetry: the patsy
    `bs(...) - 1` basis drops one boundary function, pinning the kernel to zero at −250 ms but

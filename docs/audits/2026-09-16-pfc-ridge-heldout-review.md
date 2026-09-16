@@ -2,7 +2,7 @@
 
 Date: 2026-09-16
 
-Branch reviewed: `pfc-ridge-heldout` through `fc5486f`, plus the follow-up fixes in this working tree
+Branch reviewed: `pfc-ridge-heldout` through `df757b3`, plus the follow-up fixed-subset fix in this working tree
 
 Scope: scientific correctness, inference validity, failure handling, memory and runtime
 
@@ -12,7 +12,7 @@ Task A and the Task B integration are implemented. The corrected three-session s
 repeated, and Task C has not run: no ridge production batch, final cohort audit, regenerated
 Figure 4 or updated claim should be treated as complete yet.
 
-The review found and fixed seven inference defects:
+The review found and fixed eight inference defects:
 
 | defect | consequence before review | resolution |
 |---|---|---|
@@ -20,6 +20,7 @@ The review found and fixed seven inference defects:
 | Monte Carlo p-values used `b/R` | zero p-values were possible with only 40 draws | use the finite-sample `(b + 1)/(R + 1)` correction; the minimum at R = 40 is 1/41 |
 | Incompletely placed control draws were retained | a thinner regressor entered the null and could make it anti-conservative | a draw is usable only when it places every requested window; fewer than 20 usable draws yields `NaN` |
 | Exact-draw validation was combined with mutually disjoint control duration windows | the first corrected smoke produced 0/40 exact draws for every j16 class and for both key non-local classes in chimi, so their empirical p-values were unavailable | enumerate legal same-bout, real-event-free onset bins directly and require distinct onsets; auxiliary duration windows may overlap because duration constrains placement but never enters the onset-only GLM design; version the placement policy in provenance |
+| The observed statistic still used every real event when some events had no legal within-bout match | the replacement gate startup found two genuinely unmatchable events in both j16 and chimi; their null could never reach the all-event count, so the p-value would remain unavailable (and accepting a thinner draw would change the estimand) | select one deterministic, jointly matchable subset from event timing/duration alone; compute both the observed statistic and every null draw on that fixed subset, keep the all-event held-out difference separately, and version/record the tested population in provenance |
 | Held-out empirical p-values were BH-corrected across thousands of dependent units | the old zero p-values became spuriously tiny q-values; units were also treated as independent replicates | the phase-0b fraction is raw `p < .05`, explicitly descriptive; population inference remains session → animal in Phase 4 |
 | Short gaps could put two runs touched by one event kernel in different folds | one onset could inform both training and held-out bins | runs whose ±250 ms supports overlap are grouped before fold assignment |
 | The population loader trusted column names without checking held-out provenance | a pre-review `b/R` bundle could silently reach Figure 4 after the formula changed | held-out loads now require the ridge/blocked-deviance estimator plus `empirical_pvalue_method = plus_one` and the 20-draw floor in every used artifact's sidecar |
@@ -68,6 +69,12 @@ Other removed work:
 - the engagement null reuses the already drawn times and class design instead of drawing and
   convolving them again.
 
+The fixed-subset correction does not add an observed-model refit for fully matchable classes: it
+reuses the all-event held-out deviances already computed by the model ladder. Only a class that
+actually excludes an unmatchable event is rescored on its tested subset (one additional K-fold fit),
+and the engagement model is likewise rescored only when its tested class was reduced. The upfront
+selection is four timing-only placement passes per session and does not inspect or copy spike data.
+
 The device audit also found that an explicit `--gpu N` attempted to claim the card but ignored a
 failed claim. It now refuses a card held by a sibling worker, preventing two explicitly pinned
 processes from colliding. The host has ten physical A100s (indices 0--9), as the user subsequently
@@ -81,6 +88,15 @@ skipped. Wilbur exercised the full 40-draw path for all four classes; its low, b
 motivated moving held-out prediction and deviance onto JAX. A replacement three-session gate under
 the versioned placement policy and device-side scoring remains required before production launch.
 
+The replacement gate under `df757b3` was stopped during startup rather than spending another full
+GPU-hour on a known-invalid estimand. Direct legal-onset enumeration still placed only 275/277 j16
+baseline controls and 208/210 chimi controls (wilbur placed 217/217). Because controls no longer
+exclude one another except at their onset bins, those four shortfalls are properties of the source
+events' own bouts, not rejection-sampling failures. The corrected implementation now carries source
+indices out of placement, freezes a matchable subset independently of spikes, and reports both the
+all-event and subset-matched observed differences. A fresh full gate of that implementation remains
+required.
+
 ## Validation
 
 - Focused correctness/performance gate: 136 passed, including the 40-draw null calibration.
@@ -93,6 +109,12 @@ the versioned placement policy and device-side scoring remains required before p
   from moving the p-value method constant while that same Python process was running; the exact
   real-session test passed in a fresh process (1 passed in 2 min 10 s).
 - Final focused gates after the provenance, linear-fold and GPU-claim fixes: 42 passed and 28 passed.
+- Fixed-subset runner, loader and cohort-audit regressions: 81 passed; the two direct
+  placement/count-matching regressions passed separately. The full focused scientific suite ran all
+  120 tests (including the slow real-session and null-calibration gates); 119 passed immediately and
+  the sole failure was a stale fixture expectation that every event class excluded two events. The
+  diagnostics correctly showed that the non-SWR subclass excluded zero; the expectation was fixed
+  and the corrected runner test passed in the 81-test gate.
 - Single-device A100 compile and steady-state fit benchmark: passed on GPU 3.
 - Ruff and `git diff --check`: clean.
 

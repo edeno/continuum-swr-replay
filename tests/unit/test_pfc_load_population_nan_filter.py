@@ -21,9 +21,11 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.pfc.glm import MATCHED_CONTROL_PLACEMENT_METHOD
+from continuum_swr_replay.analysis.pfc.heldout import CONTROL_NULL_EVENT_POLICY
 from continuum_swr_replay.analysis.pfc.load_population import (
     HELDOUT_P_COLUMNS,
     LEGACY_FDR_TESTS,
+    MATCHED_NULL_OBSERVED_COLUMNS,
     heldout_q_column,
     load_population_data,
     significant_fraction,
@@ -49,6 +51,8 @@ def heldout_statistics(n_neurons: int) -> dict[str, list[float]]:
     }
     for column in HELDOUT_P_COLUMNS.values():
         columns[column] = [0.025] * n_neurons
+    for column in MATCHED_NULL_OBSERVED_COLUMNS.values():
+        columns[column] = [1.0] * n_neurons
     return columns
 
 
@@ -78,6 +82,7 @@ def write_bundle(
         "estimator": "ridge_poisson_glm",
         "inference": "blocked_heldout_deviance",
         "empirical_pvalue_method": "plus_one",
+        "control_null_event_policy": CONTROL_NULL_EVENT_POLICY,
         "min_usable_null_draws": 20,
         "matched_control_placement_method": MATCHED_CONTROL_PLACEMENT_METHOD,
         **(provenance_overrides or {}),
@@ -244,6 +249,19 @@ class TestBundleGeneration:
             ["chimi20200212_.nwb"],
             1,
             provenance_overrides={"empirical_pvalue_method": "raw_exceedance"},
+        )
+
+        with pytest.raises(ValueError, match="incompatible held-out provenance"):
+            load_population_data(tmp_path, min_firing_rate=0.0)
+
+    def test_an_all_event_observed_null_bundle_is_refused(self, tmp_path):
+        write_bundle(
+            tmp_path / "session_mPFC_modulation",
+            ["chimi20200212_.nwb"],
+            1,
+            provenance_overrides={
+                "control_null_event_policy": "all_events_even_if_null_is_thinner"
+            },
         )
 
         with pytest.raises(ValueError, match="incompatible held-out provenance"):

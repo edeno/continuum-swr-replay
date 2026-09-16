@@ -127,6 +127,7 @@ def _write_bundle_files(
                     "n_control_draws": INFERENCE["n_control_draws"],
                     "control_draw_seed": INFERENCE["control_draw_seed"],
                     "empirical_pvalue_method": runner.EMPIRICAL_PVALUE_METHOD,
+                    "control_null_event_policy": runner.CONTROL_NULL_EVENT_POLICY,
                     "min_usable_null_draws": runner.MIN_USABLE_NULL_DRAWS,
                     "matched_control_placement_method": (
                         runner.MATCHED_CONTROL_PLACEMENT_METHOD
@@ -666,6 +667,7 @@ def test_the_seeds_are_a_function_of_the_session_and_the_draw():
         {"n_control_draws": 20},
         {"control_draw_seed": 12},
         {"empirical_pvalue_method": "raw_exceedance"},
+        {"control_null_event_policy": "all_events_even_if_null_is_thinner"},
         {"min_usable_null_draws": 0},
         {"matched_control_placement_method": "disjoint_control_windows"},
     ],
@@ -711,6 +713,7 @@ def test_the_sidecar_states_the_estimator_and_the_inference(
     assert record["n_folds"] == 5
     assert record["n_control_draws"] == 40
     assert record["empirical_pvalue_method"] == "plus_one"
+    assert record["control_null_event_policy"] == runner.CONTROL_NULL_EVENT_POLICY
     assert record["min_usable_null_draws"] == runner.MIN_USABLE_NULL_DRAWS
     assert (
         record["matched_control_placement_method"]
@@ -967,6 +970,20 @@ def test_the_scored_table_says_what_each_model_bought_out_of_fold(caplog):
             atol=1e-9,
         )
 
+    # This fixture has two event onsets outside the fit mask. They are excluded
+    # from the matched test, but cannot contribute to the fit-mask design, so
+    # its statistic still equals the separately reported all-event difference.
+    null_pairs = [
+        (event_class, runner.pair_name(event_class, "constant"))
+        for event_class in runner.EVENT_CLASSES
+    ]
+    null_pairs.append(("engagement", runner.pair_name(*runner.ENGAGEMENT_PAIR)))
+    for _, stem in null_pairs:
+        np.testing.assert_allclose(
+            statistics[f"{stem}: matched_null_observed_delta_dev"],
+            statistics[f"{stem}: heldout_delta_dev"],
+        )
+
     # Four draws exercise the null integration but are deliberately below the
     # reporting floor, so the columns exist and say "unavailable" rather than
     # turning a coarse rank into evidence.
@@ -990,6 +1007,20 @@ def test_the_scored_table_says_what_each_model_bought_out_of_fold(caplog):
         record["n_required_draws"] == runner.MIN_USABLE_NULL_DRAWS
         for record in diagnostics["null_windows"].values()
     )
+    assert all(
+        record["n_events_total"] - record["n_events_tested"]
+        == record["n_events_excluded_unmatchable"]
+        for record in diagnostics["null_windows"].values()
+    )
+    assert {
+        name: record["n_events_excluded_unmatchable"]
+        for name, record in diagnostics["null_windows"].items()
+    } == {
+        "non_local_no_SWR": 0,
+        "non_local_SWR": 2,
+        "non_local": 2,
+        "SWR": 2,
+    }
 
 
 def test_the_best_model_is_the_one_with_the_lowest_heldout_deviance():

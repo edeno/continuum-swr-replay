@@ -287,18 +287,24 @@ A held-out improvement has no analytic null, so one is drawn. The matched
 non-event control already defines "a duration-matched non-event regressor drawn
 from the fitted bouts"; drawing it `R` times, **per class, matched to that
 class's own onset count and durations**, gives the distribution of improvements
-a regressor of that size and shape with no event content buys. A class's
-empirical p-value counts draws whose improvement matched or beat the observed
-one, with the observed statistic included through the plus-one correction; the
-engagement statistic gets its own null the same way, with the tested regressor
-replaced and the baseline left as it is.
+a regressor of that size and shape with no event content buys. When an event has
+no legal non-event window in its own fitted bout, one deterministic,
+jointly-matchable subset is selected from timing and duration alone. The
+observed test statistic and every null draw use exactly that fixed subset; the
+all-event `heldout_delta_dev` remains separately available and is not used for
+that p-value. A class's empirical p-value counts draws whose improvement matched
+or beat the subset-matched observed one, with the observed statistic included
+through the plus-one correction; the engagement statistic gets its own null the
+same way, with the tested regressor replaced and the baseline left as it is.
 
 **R = 40**. The finite-sample Monte Carlo p-value is `(r + 1)/(R + 1)`, so its
 minimum with 40 usable draws is **1/41 = 0.024** and zero is impossible. A draw
 that fails to place every class-matched window is a thinner regressor and is
 excluded; fewer than 20 usable draws leaves that unit's p-value unavailable.
-`n_control_draws`, `control_draw_seed`, exact-draw counts and the per-class
-window counts are in the sidecar. One caveat is recorded in the
+`n_control_draws`, `control_draw_seed`, exact-draw counts, tested source indices,
+and per-class total/tested/excluded window counts are in the sidecar. The
+`control_null_event_policy` provenance field prevents older all-event/thinner-null
+bundles from being pooled with this fixed-subset estimand. One caveat is recorded in the
 library: the null draws are independent of the shipped control and may overlap
 its windows, whereas two real event classes never do.
 

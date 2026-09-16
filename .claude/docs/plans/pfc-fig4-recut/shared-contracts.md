@@ -245,6 +245,17 @@ class). Every window still lies in its source event's bout and avoids every
 real event window. The placement method is versioned in each sidecar so the
 two policies cannot be pooled.
 
+**Amended 2026-09-16 after the replacement gate startup.** `MatchedControlDraw`
+also returns `source_indices`, the positional source event represented by each
+control row. Two gate sessions each contain two events for which no legal
+within-bout non-event onset exists even under the onset-only placement rule.
+The repeated-control test therefore freezes a deterministic, jointly matchable
+source subset per class and uses it for both the real observed statistic and
+every null draw. The all-event held-out difference remains a separate
+descriptive output. Sidecars version this policy and record total, tested and
+excluded counts plus the tested indices; old bundles that compared an
+all-event statistic with a thinner null are refused.
+
 ```python
 def make_matched_control_times(
     event_times: pd.DataFrame,      # canonical events (immobile), cols start_time/end_time

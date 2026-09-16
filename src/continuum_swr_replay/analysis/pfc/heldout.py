@@ -38,6 +38,15 @@ class with more. Each class therefore gets its own draws: ``n_k`` windows
 carrying class ``k``'s own durations, drawn by the same rules from the same
 bouts and avoiding the same real events, and class ``k``'s improvement is read
 against class ``k``'s draws.
+
+Some real events have no legal non-event window in their own fitted bout. They
+cannot enter a matched randomisation test: comparing an all-event observed
+regressor with a thinner null changes the estimand. A dedicated, deterministic
+placement therefore selects one fixed jointly matchable subset per class,
+before spikes are inspected. Both the observed test statistic and every null
+draw use exactly that subset. The all-event held-out deviances and differences
+remain separate descriptive outputs; the sidecar reports how many events the
+matched test excluded.
 """
 
 from __future__ import annotations
@@ -71,6 +80,12 @@ MIN_USABLE_NULL_DRAWS = 20
 #: whose identically named columns used the invalid ``b / R`` estimate.
 EMPIRICAL_PVALUE_METHOD = "plus_one"
 
+#: Provenance name for the event population entering the matched-control test.
+#: Bundles produced before this policy compared the all-event observed
+#: statistic with a sometimes thinner control draw, so readers must not pool
+#: them with the corrected fixed-subset estimand.
+CONTROL_NULL_EVENT_POLICY = "fixed_jointly_matchable_subset"
+
 
 class HeldoutDeviance(NamedTuple):
     """A model's out-of-fold Poisson deviance, per fold and summed.
@@ -99,19 +114,33 @@ class ControlDrawNull(NamedTuple):
         regressor with that class's own onset count and durations, and no event
         content, buys on the same folds under the same penalty. Read class
         ``k``'s observed improvement against ``improvement[k]``.
+    observed_improvement : dict[str, NDArray], each of shape (n_units,)
+        Observed class improvement computed from the same fixed matchable
+        source events used by that class's null draws. This can differ from the
+        separately reported all-event held-out difference when an event has no
+        legal within-bout match.
     engagement : NDArray, shape (n_draws, n_units)
         ``D_ho(control) - D_ho(control + control_r)``: the engagement
         statistic's null, with the tested regressor replaced by a content-free
         one matched to it and the baseline left as it is. Empty when no
         baseline control was given.
+    observed_engagement : NDArray, shape (n_units,)
+        Engagement improvement with the tested real regressor restricted to
+        the same fixed source-event subset as ``engagement``. Empty when no
+        baseline control was given.
     constant_deviance : NDArray, shape (n_units,)
         ``D_ho(constant)``, the reference every improvement is taken against.
     n_placed : dict[str, NDArray of int], each of shape (n_draws,)
-        Windows each draw placed, per class, against ``n_events`` below. A draw
+        Windows each draw placed, per class, against ``n_tested`` below. A draw
         that placed far fewer is a thinner regressor and its improvement is not
         comparable.
     n_events : dict[str, int]
-        Real onsets of each class -- what each draw was matched to.
+        Total real onsets of each class.
+    n_tested : dict[str, int]
+        Real onsets in the class's fixed jointly matchable subset -- what each
+        observed test statistic and every null draw is matched to.
+    tested_source_indices : dict[str, NDArray of int]
+        Positional indices of the real events in each fixed tested subset.
     engagement_overlap : NDArray, shape (n_draws,)
         Fraction of each engagement draw's windows that overlap the shipped
         baseline control's. The draws are independent of that control, so they
@@ -122,10 +151,14 @@ class ControlDrawNull(NamedTuple):
     """
 
     improvement: dict[str, NDArray]
+    observed_improvement: dict[str, NDArray]
     engagement: NDArray
+    observed_engagement: NDArray
     constant_deviance: NDArray
     n_placed: dict[str, NDArray]
     n_events: dict[str, int]
+    n_tested: dict[str, int]
+    tested_source_indices: dict[str, NDArray]
     engagement_overlap: NDArray
 
 
@@ -467,6 +500,16 @@ def null_draw_seeds(control_seed: int, n_draws: int) -> NDArray:
     return seeds
 
 
+def _matchable_subset_seed(control_seed: int, class_name: str) -> int:
+    """A class-specific seed for selecting the fixed tested event subset."""
+    return int.from_bytes(
+        hashlib.sha256(
+            f"{int(control_seed)}|matchable_subset|{class_name}".encode()
+        ).digest()[:8],
+        "little",
+    )
+
+
 def overlapping_fraction(
     windows: pd.DataFrame, starts: NDArray, ends: NDArray
 ) -> float:
@@ -513,6 +556,7 @@ def control_draw_null(
     folds: NDArray,
     *,
     rng_seeds: Sequence[int],
+    subset_seed: int = 0,
     spline_basis: NDArray,
     lags: NDArray,
     penalty_sigma: float | None = None,
@@ -520,16 +564,25 @@ def control_draw_null(
     baseline_control: pd.DataFrame | None = None,
     engagement_class: str = "non_local_no_SWR",
     max_attempts: int = DEFAULT_MATCHED_CONTROL_ATTEMPTS,
+    model_deviance: Mapping[str, NDArray] | None = None,
 ) -> ControlDrawNull:
     """Held-out improvements from repeated matched-control draws, per class.
 
-    For each event class and each seed, this re-runs
+    For each event class, a dedicated seed first selects one fixed subset of
+    real events for which a joint within-bout control placement exists. The
+    selection uses event timing and duration only, never spikes. The observed
+    statistic and every null draw then use exactly that subset. This is
+    necessary when a real event has no legal non-event window in its own bout:
+    an all-event observed regressor and a thinner control regressor are not the
+    same statistic.
+
+    For each event class and each draw seed, this then re-runs
     :func:`~continuum_swr_replay.analysis.pfc.glm.make_matched_control_times`
-    with **that class's events as the source**, so the draw carries the class's
-    own onset count and its own durations, drawn from the same fitted bouts and
-    avoiding the same real events (every class's windows, including the ones
-    being stood in for). The draw is turned into the design a real class gets
-    and scored on the same folds under the same penalty, giving per unit what a
+    with **that class's tested events as the source**, so the draw carries the
+    tested onset count and durations, drawn from the same fitted bouts and
+    avoiding all real events (every class's windows, including the ones being
+    stood in for). The draw is turned into the design a real class gets and
+    scored on the same folds under the same penalty, giving per unit what a
     regressor of that size and shape with no event content buys.
 
     Parameters
@@ -549,6 +602,10 @@ def control_draw_null(
         One seed per draw, ``R`` of them; see :func:`null_draw_seeds`. Each
         class's draw ``r`` is seeded from the same value, so the classes share
         a draw index but not a window -- their source events differ.
+    subset_seed : int
+        Session seed from which a distinct selection seed is derived for each
+        class. This selection is independent of ``rng_seeds`` and is recorded
+        by the caller as part of the control-draw provenance.
     spline_basis : NDArray, shape (n_lags, n_basis)
     lags : NDArray, shape (n_lags,)
         The fit window's lags in samples.
@@ -568,7 +625,14 @@ def control_draw_null(
     engagement_class : str
         Class the engagement null's added regressor is matched to.
     max_attempts : int
-        Placement attempts per source event, passed to the draw.
+        Whole-draw placement attempts for each null replicate. The fixed
+        subset selection always uses the production default so setting this to
+        zero can test incomplete-draw handling without selecting an empty
+        estimand.
+    model_deviance : mapping, optional
+        Already computed all-event held-out deviances, keyed by model name.
+        When a tested subset contains every event, these values avoid refitting
+        the identical observed model. A proper subset is always rescored.
 
     Returns
     -------
@@ -599,20 +663,49 @@ def control_draw_null(
             return None
         return make_ridge_penalty(design.shape[1], penalty_sigma)
 
+    selection_classes = list(classes)
+    if baseline_control is not None and engagement_class not in selection_classes:
+        selection_classes.append(engagement_class)
+
+    n_events = {name: int(len(event_times[name])) for name in selection_classes}
+    tested_source_indices: dict[str, NDArray] = {}
+    tested_events: dict[str, pd.DataFrame] = {}
+    for class_name in selection_classes:
+        source = {
+            **event_times,
+            MATCHED_CONTROL_SOURCE_CLASS: event_times[class_name],
+        }
+        selection = make_matched_control_times(
+            source,
+            fit_mask,
+            np.random.default_rng(_matchable_subset_seed(subset_seed, class_name)),
+            # Keep the estimand independent of a caller deliberately reducing
+            # attempts to exercise incomplete-null handling.
+            max_attempts=DEFAULT_MATCHED_CONTROL_ATTEMPTS,
+        )
+        tested_source_indices[class_name] = selection.source_indices
+        tested_events[class_name] = (
+            event_times[class_name]
+            .iloc[selection.source_indices]
+            .reset_index(drop=True)
+        )
+    n_tested = {name: int(len(events)) for name, events in tested_events.items()}
+
     draw_times: dict[tuple[str, int], pd.DataFrame] = {}
 
     def draw_for(class_name: str, seed: int) -> pd.DataFrame:
-        """One class-matched control draw.
+        """One control draw matched to the class's fixed tested subset.
 
-        The source slot is swapped for this class's events; the blocked
-        windows are still the union over every class, which covers the real
-        ``non_local`` set either way (it is the union of its two subclasses).
+        The source slot is swapped for this class's selected events; the
+        blocked windows are still the union over every original class, which
+        covers the real ``non_local`` set either way (it is the union of its
+        two subclasses).
         """
         key = (class_name, seed)
         if key not in draw_times:
             source = {
                 **event_times,
-                MATCHED_CONTROL_SOURCE_CLASS: event_times[class_name],
+                MATCHED_CONTROL_SOURCE_CLASS: tested_events[class_name],
             }
             draw_times[key] = make_matched_control_times(
                 source,
@@ -622,24 +715,83 @@ def control_draw_null(
             ).times
         return draw_times[key]
 
-    constant = np.ones((int(fit_rows.sum()), 1))
-    constant_deviance = heldout_deviance(constant, fit_counts, None, folds).total
+    if model_deviance is not None and "constant" in model_deviance:
+        constant_deviance = np.asarray(model_deviance["constant"], dtype=float)
+    else:
+        constant = np.ones((int(fit_rows.sum()), 1))
+        constant_deviance = heldout_deviance(constant, fit_counts, None, folds).total
+
+    observed_improvement: dict[str, NDArray] = {}
+    for class_name in classes:
+        if n_tested[class_name] == 0:
+            observed_improvement[class_name] = np.full(counts.shape[1], np.nan)
+            continue
+        if (
+            n_tested[class_name] == n_events[class_name]
+            and model_deviance is not None
+            and class_name in model_deviance
+        ):
+            observed_improvement[class_name] = constant_deviance - np.asarray(
+                model_deviance[class_name], dtype=float
+            )
+            continue
+        observed_design = control_design(
+            tested_events[class_name], fit_mask, spline_basis, lags
+        )
+        observed_deviance = heldout_deviance(
+            observed_design,
+            fit_counts,
+            penalty_for(observed_design),
+            folds,
+        ).total
+        observed_improvement[class_name] = constant_deviance - observed_deviance
 
     engagement: list[NDArray] = []
     engagement_overlap: list[float] = []
+    observed_engagement = np.empty(0)
     baseline_design = None
     baseline_deviance = None
     baseline_starts = np.empty(0)
     baseline_ends = np.empty(0)
     if baseline_control is not None:
         baseline_design = control_design(baseline_control, fit_mask, spline_basis, lags)
-        baseline_deviance = heldout_deviance(
-            baseline_design, fit_counts, penalty_for(baseline_design), folds
-        ).total
+        if model_deviance is not None and "matched_control" in model_deviance:
+            baseline_deviance = np.asarray(
+                model_deviance["matched_control"], dtype=float
+            )
+        else:
+            baseline_deviance = heldout_deviance(
+                baseline_design, fit_counts, penalty_for(baseline_design), folds
+            ).total
         baseline_starts, baseline_ends = _merge_windows(
             baseline_control["start_time"].to_numpy(dtype=float),
             baseline_control["end_time"].to_numpy(dtype=float),
         )
+        full_engagement_name = f"matched_control + {engagement_class}"
+        if n_tested[engagement_class] == 0:
+            observed_engagement = np.full(counts.shape[1], np.nan)
+        elif (
+            n_tested[engagement_class] == n_events[engagement_class]
+            and model_deviance is not None
+            and full_engagement_name in model_deviance
+        ):
+            observed_engagement = baseline_deviance - np.asarray(
+                model_deviance[full_engagement_name], dtype=float
+            )
+        else:
+            tested_design = control_design(
+                tested_events[engagement_class], fit_mask, spline_basis, lags
+            )
+            observed_joint = np.concatenate(
+                [baseline_design, tested_design[:, 1:]], axis=1
+            )
+            observed_joint_deviance = heldout_deviance(
+                observed_joint,
+                fit_counts,
+                penalty_for(observed_joint),
+                folds,
+            ).total
+            observed_engagement = baseline_deviance - observed_joint_deviance
 
     def append_engagement(times: pd.DataFrame, design: NDArray | None) -> None:
         """Score one engagement draw while its class design is in memory."""
@@ -661,14 +813,13 @@ def control_draw_null(
 
     improvement: dict[str, NDArray] = {}
     n_placed: dict[str, NDArray] = {}
-    n_events = {name: int(len(event_times[name])) for name in classes}
     for class_name in classes:
         per_draw = []
         placed = []
         for seed in seeds:
             times = draw_for(class_name, seed)
             placed.append(len(times))
-            if len(times) != n_events[class_name] or n_events[class_name] == 0:
+            if len(times) != n_tested[class_name] or n_tested[class_name] == 0:
                 per_draw.append(np.full(counts.shape[1], np.nan))
                 if baseline_control is not None and class_name == engagement_class:
                     append_engagement(times, None)
@@ -689,7 +840,7 @@ def control_draw_null(
     if baseline_control is not None and engagement_class not in classes:
         for seed in seeds:
             times = draw_for(engagement_class, seed)
-            if len(times) != len(event_times[engagement_class]) or not len(times):
+            if len(times) != n_tested[engagement_class] or not len(times):
                 append_engagement(times, None)
                 continue
             design = control_design(times, fit_mask, spline_basis, lags)
@@ -697,11 +848,15 @@ def control_draw_null(
 
     return ControlDrawNull(
         improvement=improvement,
+        observed_improvement=observed_improvement,
         engagement=(
             np.asarray(engagement) if engagement else np.empty((0, counts.shape[1]))
         ),
+        observed_engagement=observed_engagement,
         constant_deviance=constant_deviance,
         n_placed=n_placed,
         n_events=n_events,
+        n_tested=n_tested,
+        tested_source_indices=tested_source_indices,
         engagement_overlap=np.asarray(engagement_overlap, dtype=float),
     )
