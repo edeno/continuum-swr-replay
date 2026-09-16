@@ -88,6 +88,7 @@ from continuum_swr_replay.analysis.pfc.cohort import (
 )
 from continuum_swr_replay.analysis.pfc.glm import (
     EVENT_CLASSES,
+    MATCHED_CONTROL_PLACEMENT_METHOD,
     NESTED_MODEL_PAIRS,
     REPORT_HALF_WINDOW_S,
     is_separated,
@@ -324,10 +325,15 @@ def results_exist(
         The inference this run would produce. A bundle scored on a different
         number of folds, a different split, or a null of a different size is
         not this run's bundle: its held-out differences and its empirical
-        p-values are not the ones a current batch means to ship. ``None``
-        matches a sidecar that records no value, which is how a bundle written
-        before the held-out inference existed is read -- and such a bundle also
-        fails the estimator comparison above, so it is refit.
+    p-values are not the ones a current batch means to ship. ``None``
+    matches a sidecar that records no value, which is how a bundle written
+    before the held-out inference existed is read -- and such a bundle also
+    fails the estimator comparison above, so it is refit.
+
+    The sidecar must also name the current matched-control placement method.
+    The former disjoint-duration-window policy can leave every null draw
+    thinner than the real class on dense bouts, so those bundles do not carry
+    the same empirical test even when their p-value column names match.
     """
     if overwrite:
         return False
@@ -365,6 +371,8 @@ def results_exist(
         and record.get("control_draw_seed") == control_draw_seed
         and record.get("empirical_pvalue_method") == EMPIRICAL_PVALUE_METHOD
         and record.get("min_usable_null_draws") == MIN_USABLE_NULL_DRAWS
+        and record.get("matched_control_placement_method")
+        == MATCHED_CONTROL_PLACEMENT_METHOD
     )
 
 
@@ -1082,6 +1090,9 @@ def run_analysis(
                 "control_draw_seed": int(control_draw_seed),
                 "empirical_pvalue_method": EMPIRICAL_PVALUE_METHOD,
                 "min_usable_null_draws": MIN_USABLE_NULL_DRAWS,
+                "matched_control_placement_method": (
+                    MATCHED_CONTROL_PLACEMENT_METHOD
+                ),
                 "n_basis_per_class": n_basis_per_class,
                 "implied_prior_sd": implied_prior,
                 "fold_sizes": scoring_diagnostics.get("fold_sizes"),

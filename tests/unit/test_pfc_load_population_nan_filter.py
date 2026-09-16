@@ -20,6 +20,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.pfc.glm import MATCHED_CONTROL_PLACEMENT_METHOD
 from continuum_swr_replay.analysis.pfc.load_population import (
     HELDOUT_P_COLUMNS,
     LEGACY_FDR_TESTS,
@@ -78,6 +79,7 @@ def write_bundle(
         "inference": "blocked_heldout_deviance",
         "empirical_pvalue_method": "plus_one",
         "min_usable_null_draws": 20,
+        "matched_control_placement_method": MATCHED_CONTROL_PLACEMENT_METHOD,
         **(provenance_overrides or {}),
     }
     base.with_suffix(".provenance.json").write_text(json.dumps(provenance))
@@ -242,6 +244,19 @@ class TestBundleGeneration:
             ["chimi20200212_.nwb"],
             1,
             provenance_overrides={"empirical_pvalue_method": "raw_exceedance"},
+        )
+
+        with pytest.raises(ValueError, match="incompatible held-out provenance"):
+            load_population_data(tmp_path, min_firing_rate=0.0)
+
+    def test_a_disjoint_window_null_bundle_is_refused(self, tmp_path):
+        write_bundle(
+            tmp_path / "session_mPFC_modulation",
+            ["chimi20200212_.nwb"],
+            1,
+            provenance_overrides={
+                "matched_control_placement_method": "disjoint_control_windows"
+            },
         )
 
         with pytest.raises(ValueError, match="incompatible held-out provenance"):

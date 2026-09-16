@@ -1999,8 +1999,20 @@ EVENT_CLASSES = ("non_local_no_SWR", "non_local_SWR", "non_local", "SWR")
 #: The class matched controls are drawn one-for-one against.
 MATCHED_CONTROL_SOURCE_CLASS = "non_local"
 
+#: Placement semantics written to every bundle.  The duration-matching window
+#: for each control must avoid real events, but two controls may have
+#: overlapping windows because the fitted regressor contains only their
+#: distinct onsets.  Treating those auxiliary windows as occupied time makes
+#: an exact count-matched null impossible in dense bouts even when hundreds of
+#: distinct event-free onset bins exist.
+MATCHED_CONTROL_PLACEMENT_METHOD = (
+    "same_bout_real_event_free_distinct_onsets_windows_may_overlap"
+)
 
-#: Draws attempted per event before a matched control is given up on.
+
+#: Whole-draw placement attempts before the best incomplete matching is kept.
+#: Each attempt visits source events in a new random order and samples directly
+#: from their legal onset bins; it is not rejection sampling over illegal bins.
 DEFAULT_MATCHED_CONTROL_ATTEMPTS = 50
 
 
@@ -2161,9 +2173,11 @@ class MatchedControlDraw(NamedTuple):
     about a session. An onset outside every fitted bout is a *cohort* fact --
     the event is kept by its onset bin, which can sit outside the fit mask --
     and says nothing about how crowded the session is. A saturated bout is a
-    *density* fact: that bout is too short, or too full of real events, to hold
-    one more window of this event's duration, so the control population is
-    thinner than the event population wherever events cluster.
+    *density* fact: that bout is too short or too full of real events to offer
+    a legal onset for this event's duration, or the finite whole-draw matching
+    could not give every source a distinct onset. Control duration windows may
+    overlap one another; only their onsets enter the fitted design, and those
+    onsets are distinct.
 
     Attributes
     ----------
@@ -2173,9 +2187,9 @@ class MatchedControlDraw(NamedTuple):
     n_onset_outside_fitted_bout : int
         Source events whose onset bin belongs to no fitted immobility bout.
     n_bout_saturated : int
-        Source events whose bout could not hold a free window of their
-        duration -- too short for one at all, or no free placement found in
-        ``max_attempts`` draws.
+        Source events whose bout could not supply a distinct event-free onset
+        for a window of their duration after ``max_attempts`` whole-draw
+        matchings.
     """
 
     times: pd.DataFrame
@@ -2205,21 +2219,28 @@ def make_matched_control_times(
     replay question into a nested one: does replay add beyond a duration-matched
     non-event baseline drawn from the same bins.
 
-    For each source event the control onset is drawn uniformly over the sample
-    times of its own bout, and the draw is rejected unless
+    For each source event the control onset is drawn uniformly from the legal
+    sample times of its own bout, where a legal onset has these properties:
 
     - the control window lies entirely inside that bout (so every bin it covers
       is a bin the models are fit on),
     - it overlaps no window of any real event class, ``SWR`` included, and
-    - it overlaps no control already placed, so the control population is
-      non-overlapping exactly as the real one is.
+    - no other control in the draw uses that exact onset bin.
+
+    The duration-matching windows may overlap one another. Duration constrains
+    where an onset may be drawn, but the GLM design is onset-only: it does not
+    contain an event-in-progress box. Requiring the auxiliary windows to be
+    mutually disjoint can therefore make a count-matched null impossible in a
+    dense bout even when many distinct, individually event-free onsets exist.
+    Directly enumerating legal onsets also avoids stochastic shortfalls from
+    missing a narrow valid interval during rejection sampling.
 
     An event is dropped -- never placed somewhere else -- when its onset falls
     in no fitted bout at all (the cohort keeps an event by onset, and an onset
-    bin can still be outside the fit mask) or when its bout cannot hold a
-    non-overlapping window of its duration in ``max_attempts`` draws. The
-    returned count is therefore ``<=`` the number of source events, and the
-    caller must record the shortfall rather than assume a one-to-one match.
+    bin can still be outside the fit mask) or when no distinct legal onset can
+    be assigned in ``max_attempts`` whole-draw matchings. The returned count is
+    therefore ``<=`` the number of source events, and the caller must record
+    the shortfall rather than assume a one-to-one match.
 
     Parameters
     ----------
@@ -2238,7 +2259,9 @@ def make_matched_control_times(
     rng : numpy.random.Generator
         Seeded generator; see :func:`matched_control_seed`.
     max_attempts : int
-        Draws per event before that event is given up on.
+        Random source-order matchings attempted before the best incomplete
+        matching is kept. Zero deliberately places nothing (used by the
+        incomplete-null regression test).
 
     Returns
     -------
@@ -2259,7 +2282,7 @@ def make_matched_control_times(
     runs = _contiguous_true_runs(np.asarray(is_immobile, dtype=bool))
 
     source = event_times[MATCHED_CONTROL_SOURCE_CLASS]
-    blocked_starts, blocked_ends = _merge_windows(
+    real_starts, real_ends = _merge_windows(
         np.concatenate(
             [
                 event_times[name].start_time.to_numpy(dtype=float)
@@ -2271,25 +2294,27 @@ def make_matched_control_times(
         ),
     )
 
-    control_starts: list[float] = []
-    control_ends: list[float] = []
-    n_onset_outside_fitted_bout = 0
-    n_bout_saturated = 0
-    for start, end in zip(
-        source.start_time.to_numpy(dtype=float),
-        source.end_time.to_numpy(dtype=float),
-        strict=True,
+    if max_attempts < 0:
+        raise ValueError(f"max_attempts must be non-negative, got {max_attempts}")
+
+    source_starts = source.start_time.to_numpy(dtype=float)
+    source_ends = source.end_time.to_numpy(dtype=float)
+    candidate_indices: list[NDArray] = []
+    onset_outside = np.zeros(len(source), dtype=bool)
+    for source_index, (start, end) in enumerate(
+        zip(source_starts, source_ends, strict=True)
     ):
         duration = end - start
         # The bin holding the onset, and the bout that bin belongs to.
         onset_index = int(np.searchsorted(times, start, side="right")) - 1
         run_row = _bout_containing(runs, onset_index)
         if run_row < 0:
-            n_onset_outside_fitted_bout += 1
+            onset_outside[source_index] = True
+            candidate_indices.append(np.empty(0, dtype=np.int64))
             continue
         run_start, run_stop = int(runs[run_row, 0]), int(runs[run_row, 1])
-        # Onsets late enough in the bout that the window would run past its last
-        # sample are never drawn, so a rejection can only be an overlap.
+        # Onsets late enough in the bout that the window would run past its
+        # last sample are not candidates.
         last_offset = (
             int(
                 np.searchsorted(
@@ -2301,26 +2326,61 @@ def make_matched_control_times(
             - 1
         )
         if last_offset < 0:
-            n_bout_saturated += 1
+            candidate_indices.append(np.empty(0, dtype=np.int64))
             continue
 
-        for _ in range(max_attempts):
-            candidate = float(times[run_start + int(rng.integers(0, last_offset + 1))])
-            candidate_end = candidate + duration
-            if not _within_immobile(
-                candidate, candidate_end, times, runs[run_row]
-            ) or _overlaps_any(candidate, candidate_end, blocked_starts, blocked_ends):
+        indices = np.arange(
+            run_start, run_start + last_offset + 1, dtype=np.int64
+        )
+        starts = times[indices]
+        ends = starts + duration
+        # For each candidate, the only merged real window that can overlap is
+        # the last one starting before candidate_end.  This vectorized search
+        # enumerates all legal onset bins without a candidate x event matrix.
+        n_starting_before = np.searchsorted(real_starts, ends, side="left")
+        overlaps = np.zeros(len(indices), dtype=bool)
+        has_predecessor = n_starting_before > 0
+        overlaps[has_predecessor] = (
+            real_ends[n_starting_before[has_predecessor] - 1]
+            > starts[has_predecessor]
+        )
+        candidate_indices.append(indices[~overlaps])
+
+    # This is a randomized matching between source events and legal onset
+    # bins.  Windows are allowed to overlap, but onset bins are not: duplicate
+    # onsets would be summed by ``event_onset_counts`` and would not represent
+    # the requested number of events.  Retrying source orders avoids a greedy
+    # early choice starving a later event whose legal set is narrower.
+    target = int(sum(len(candidates) > 0 for candidates in candidate_indices))
+    best: dict[int, int] = {}
+    for _ in range(max_attempts):
+        used = np.zeros(len(times), dtype=bool)
+        placed: dict[int, int] = {}
+        for source_index in rng.permutation(len(source)):
+            candidates = candidate_indices[int(source_index)]
+            available = candidates[~used[candidates]]
+            if not len(available):
                 continue
-            control_starts.append(candidate)
-            control_ends.append(candidate_end)
-            # Placed controls join the windows later draws must avoid.
-            blocked_starts, blocked_ends = _merge_windows(
-                np.append(blocked_starts, candidate),
-                np.append(blocked_ends, candidate_end),
-            )
+            chosen = int(available[int(rng.integers(len(available)))])
+            placed[int(source_index)] = chosen
+            used[chosen] = True
+        if len(placed) > len(best):
+            best = placed
+        if len(best) == target:
             break
-        else:
-            n_bout_saturated += 1
+
+    placed_source_indices = sorted(best)
+    control_starts = [float(times[best[index]]) for index in placed_source_indices]
+    control_ends = [
+        control_start + (source_ends[index] - source_starts[index])
+        for index, control_start in zip(
+            placed_source_indices, control_starts, strict=True
+        )
+    ]
+    n_onset_outside_fitted_bout = int(onset_outside.sum())
+    n_bout_saturated = (
+        len(source) - n_onset_outside_fitted_bout - len(placed_source_indices)
+    )
 
     if n_onset_outside_fitted_bout or n_bout_saturated:
         logger.warning(

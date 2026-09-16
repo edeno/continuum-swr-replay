@@ -22,6 +22,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import false_discovery_control
 
+from continuum_swr_replay.analysis.pfc.glm import MATCHED_CONTROL_PLACEMENT_METHOD
 from continuum_swr_replay.analysis.pfc.heldout import (
     EMPIRICAL_PVALUE_METHOD,
     MIN_USABLE_NULL_DRAWS,
@@ -144,6 +145,7 @@ def _validate_heldout_provenance(artifacts: list[Path]) -> None:
         "inference": "blocked_heldout_deviance",
         "empirical_pvalue_method": EMPIRICAL_PVALUE_METHOD,
         "min_usable_null_draws": MIN_USABLE_NULL_DRAWS,
+        "matched_control_placement_method": MATCHED_CONTROL_PLACEMENT_METHOD,
     }
     for artifact in artifacts:
         sidecar = fit_provenance_path(artifact)

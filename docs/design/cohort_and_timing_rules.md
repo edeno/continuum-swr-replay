@@ -132,10 +132,13 @@ Reading the canonical table therefore buys traceability, not a different split;
 session.
 The unit GLM also draws a **matched non-event control** from that same fit
 mask, one window per kept non-local event: the control onset is drawn uniformly
-over the sample times of the *same* contiguous run of fitted bins the event's
-onset falls in, and the draw is rejected unless the window lies wholly inside
-that run, overlaps no real event of any class (`SWR` included) and overlaps no
-control already placed. It preserves its source event's duration, so the
+from the legal sample times of the *same* contiguous run of fitted bins the
+event's onset falls in. Its duration-matching window must lie wholly inside
+that run and overlap no real event of any class (`SWR` included), and no two
+controls use the same onset bin. Control duration windows may overlap one
+another: duration constrains placement, but the fitted regressor contains only
+the distinct onsets, not an event-in-progress box. It preserves its source
+event's duration, so the
 comparison `matched_control + non_local_no_SWR vs. matched_control` asks whether
 non-SWR replay modulates firing beyond a duration-matched non-event baseline
 sampled from the same bins — the question a replay regressor on its own cannot
@@ -154,8 +157,10 @@ Three properties of that control decide what the comparison can be read as.
   187 non-SWR events, from 277 kept events). The two regressors are therefore
   not equal-n.
 - **The preserved duration governs only where a control may be placed** — it
-  sets the rejection window that must fit inside the bout and clear every real
-  and already-placed window. The regressor itself is built from onsets alone,
+  sets the window that must fit inside the bout and clear every real event.
+  Legal onset bins are enumerated directly, rather than found by rejection;
+  control onsets are unique even though their auxiliary duration windows may
+  overlap. The regressor itself is built from onsets alone,
   for every event class: each class's indicator is a spike-count-per-bin of its
   `start_time`s convolved with the lagged spline basis, so a window's length
   never enters the design.

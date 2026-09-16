@@ -149,7 +149,8 @@ Three tiers:
    table and of the session's cached decode frame
    (`canonical_event_table_sha256`, `data_over_time_sha256`), the cohort-restricted
    `n_events_total` / `n_events_swr` / `n_events_non_swr`, and the matched control's
-   `matched_control_seed` / `n_matched_control` / `n_matched_control_unplaced`;
+   `matched_control_seed` / `n_matched_control` / `n_matched_control_unplaced` /
+   `matched_control_placement_method`;
    `run_pfc_analysis_bandit.py` refuses to skip a bundle that does not carry the
    current values. It also states the **estimator and the inference**: `estimator`
    (`ridge_poisson_glm`), `inference` (`blocked_heldout_deviance`),

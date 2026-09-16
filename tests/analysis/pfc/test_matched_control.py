@@ -16,9 +16,11 @@ that, at the level of the returned windows rather than of the code path:
 
 and the one property that makes it usable: an event whose bout has no free
 window of its duration is dropped and counted under the right one of the two
-shortfall reasons, never placed somewhere else. Controls also avoid one
-another, so the baseline population is non-overlapping exactly as the events
-it stands in for are.
+shortfall reasons, never placed somewhere else. Control *onsets* are distinct,
+but their duration-matching windows may overlap one another. Duration only
+constrains where an onset may be drawn; the GLM regressor contains the onsets,
+not an event-in-progress box. Requiring the auxiliary windows to be disjoint
+can make an exact count-matched null mathematically impossible in dense bouts.
 """
 
 from __future__ import annotations
@@ -209,28 +211,38 @@ class TestMatchedControlInvariants:
         assert (draw.n_onset_outside_fitted_bout, draw.n_bout_saturated) == (1, 0)
         assert draw.n_unplaced == 1
 
-    def test_no_two_control_windows_overlap_each_other(self):
-        # A near-full bout: four 0.1 s events fill 1.0-1.4 s of a 1-2 s bout,
-        # so all four controls have to share the 0.6 s that is left. If placed
-        # controls did not block later draws, two of them would sit on the same
-        # bins and that bin would count twice in the baseline regressor.
+    def test_dense_bout_keeps_exact_count_with_distinct_control_onsets(self):
+        # Seven 0.1 s events leave only 0.3 s of non-event time. Seven
+        # duration windows cannot be packed there without overlap, but the
+        # onset-only GLM has hundreds of distinct legal onset bins. The null
+        # must retain the event count instead of becoming a thinner regressor.
         times = _times(duration_s=3.0)
         mask = pd.Series((times >= 1.0) & (times < 2.0), index=times)
         packed = _event_sets(
-            non_local_no_swr=[(1.0, 1.1), (1.1, 1.2), (1.2, 1.3), (1.3, 1.4)],
+            non_local_no_swr=[
+                (1.0, 1.1),
+                (1.1, 1.2),
+                (1.2, 1.3),
+                (1.3, 1.4),
+                (1.4, 1.5),
+                (1.5, 1.6),
+                (1.6, 1.7),
+            ],
             non_local_swr=[],
             swr=[],
         )
 
         draw = make_matched_control_times(packed, mask, np.random.default_rng(8))
 
-        assert len(draw.times) >= 2, "too few placed; the invariant is vacuous"
+        assert len(draw.times) == len(packed["non_local"])
         starts = draw.times.start_time.to_numpy(dtype=float)
         ends = draw.times.end_time.to_numpy(dtype=float)
+        assert len(np.unique(starts)) == len(starts)
         order = np.argsort(starts)
         starts, ends = starts[order], ends[order]
-        assert np.all(starts[1:] >= ends[:-1]), (
-            f"control windows overlap each other: {list(zip(starts, ends, strict=True))}"
+        assert np.any(starts[1:] < ends[:-1]), (
+            "the fixture requires overlapping duration windows; without one "
+            "it does not distinguish exact onset matching from interval packing"
         )
 
 

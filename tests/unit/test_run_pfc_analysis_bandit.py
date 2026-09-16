@@ -128,6 +128,9 @@ def _write_bundle_files(
                     "control_draw_seed": INFERENCE["control_draw_seed"],
                     "empirical_pvalue_method": runner.EMPIRICAL_PVALUE_METHOD,
                     "min_usable_null_draws": runner.MIN_USABLE_NULL_DRAWS,
+                    "matched_control_placement_method": (
+                        runner.MATCHED_CONTROL_PLACEMENT_METHOD
+                    ),
                     **sidecar_overrides,
                 }
             )
@@ -664,6 +667,7 @@ def test_the_seeds_are_a_function_of_the_session_and_the_draw():
         {"control_draw_seed": 12},
         {"empirical_pvalue_method": "raw_exceedance"},
         {"min_usable_null_draws": 0},
+        {"matched_control_placement_method": "disjoint_control_windows"},
     ],
 )
 def test_a_bundle_produced_by_another_estimator_or_inference_is_refit(tmp_path, stale):
@@ -708,6 +712,10 @@ def test_the_sidecar_states_the_estimator_and_the_inference(
     assert record["n_control_draws"] == 40
     assert record["empirical_pvalue_method"] == "plus_one"
     assert record["min_usable_null_draws"] == runner.MIN_USABLE_NULL_DRAWS
+    assert (
+        record["matched_control_placement_method"]
+        == runner.MATCHED_CONTROL_PLACEMENT_METHOD
+    )
     assert record["n_basis_per_class"] == 11
     # Derived from the session key, so a lone refit reproduces the batch.
     assert record["fold_seed"] == runner.session_seed(

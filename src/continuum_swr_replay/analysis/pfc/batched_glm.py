@@ -683,6 +683,67 @@ def _penalty_quadratic(params: jnp.ndarray, matrix: jnp.ndarray) -> jnp.ndarray:
     return jnp.einsum("nr,rs,ns->n", params, matrix, params)
 
 
+@jax.jit
+def _poisson_deviance_from_params(
+    design: jnp.ndarray, counts: jnp.ndarray, params: jnp.ndarray
+) -> jnp.ndarray:
+    """Held-out Poisson deviance without materialising predictions on host."""
+    fitted_mean = jnp.exp(design @ params.T)
+    ratio = jnp.where(counts > 0, counts / fitted_mean, 1.0)
+    terms = counts * jnp.log(ratio) - (counts - fitted_mean)
+    return 2.0 * terms.sum(axis=0)
+
+
+def poisson_deviance_from_params(
+    design: NDArray, counts: NDArray, params: NDArray
+) -> NDArray:
+    """Predict and score a batch on the configured JAX device.
+
+    Held-out scoring used to form ``design @ params.T`` in NumPy.  On a real
+    PFC session that is a tens-of-thousands by hundreds matrix, repeated once
+    per fold for roughly a thousand null fits; doing the prediction on the
+    host left the A100 idle between short fitting bursts.  This wrapper keeps
+    the same float64 formula while transferring only the final per-unit score
+    back to the host.
+
+    Parameters
+    ----------
+    design : NDArray, shape (n_time, n_features)
+    counts : NDArray, shape (n_time, n_units) or (n_time,)
+    params : NDArray, shape (n_units, n_features)
+
+    Returns
+    -------
+    NDArray, shape (n_units,)
+        Unpenalised Poisson deviance on these rows.
+    """
+    require_configured_device()
+    design = np.asarray(design, dtype=float)
+    counts = np.asarray(counts, dtype=float)
+    params = np.asarray(params, dtype=float)
+    if counts.ndim == 1:
+        counts = counts[:, None]
+    if design.ndim != 2 or params.ndim != 2 or counts.ndim != 2:
+        raise ValueError(
+            "design, counts and params must be two-dimensional after "
+            f"normalizing counts; got {design.shape}, {counts.shape}, {params.shape}"
+        )
+    if design.shape[0] != counts.shape[0]:
+        raise ValueError(
+            f"design has {design.shape[0]} rows but counts has {counts.shape[0]}"
+        )
+    if params.shape != (counts.shape[1], design.shape[1]):
+        raise ValueError(
+            "params must have shape (n_units, n_features); got "
+            f"{params.shape}, expected {(counts.shape[1], design.shape[1])}"
+        )
+    return np.asarray(
+        _poisson_deviance_from_params(
+            jnp.asarray(design), jnp.asarray(counts), jnp.asarray(params)
+        )
+    )
+
+
 def fit_poisson_glms(
     design: NDArray,
     counts: NDArray,

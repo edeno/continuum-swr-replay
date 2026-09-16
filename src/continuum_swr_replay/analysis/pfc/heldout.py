@@ -289,7 +289,10 @@ def heldout_deviance(
     ValueError
         If the design, the counts and the folds disagree on the number of rows.
     """
-    from continuum_swr_replay.analysis.pfc.batched_glm import fit_poisson_glms
+    from continuum_swr_replay.analysis.pfc.batched_glm import (
+        fit_poisson_glms,
+        poisson_deviance_from_params,
+    )
 
     design = np.asarray(design, dtype=float)
     counts = np.asarray(counts, dtype=float)
@@ -318,9 +321,9 @@ def heldout_deviance(
             penalty=penalty,
             compute_covariance=False,
         )
-        with np.errstate(over="ignore", invalid="ignore"):
-            fitted_mean = np.exp(design[held_out] @ fitted.params.T)
-            score = poisson_deviance(counts[held_out], fitted_mean)
+        score = poisson_deviance_from_params(
+            design[held_out], counts[held_out], fitted.params
+        )
         usable = np.asarray(fitted.converged, dtype=bool) & np.all(
             np.isfinite(fitted.params), axis=1
         )

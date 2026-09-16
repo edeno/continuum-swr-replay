@@ -234,9 +234,16 @@ tuple — `times` (the DataFrame the signature below promises), plus
 shortfall, with `n_unplaced` as their total. Callers use `.times` where the
 signature below says the return value is the frame. `is_immobile` is documented
 as the *fit mask*, not raw immobility, so the control samples the bins the
-models are fit on. One invariant is stronger than the list below: placed
-controls join the blocked windows, so no two controls overlap each other
-either.
+models are fit on.
+
+**Amended 2026-09-16 after the exact-null smoke.** Legal onset bins are
+enumerated directly. Control onsets are distinct, but their auxiliary
+duration-matching windows may overlap one another. The GLM design contains
+only onsets; treating duration windows as occupied time made exact class-count
+matching impossible on the gate sessions (j16 had zero exact draws for every
+class). Every window still lies in its source event's bout and avoids every
+real event window. The placement method is versioned in each sidecar so the
+two policies cannot be pooled.
 
 ```python
 def make_matched_control_times(
@@ -250,7 +257,7 @@ def make_matched_control_times(
     bout, offset from the real onset, such that:
       - the control window [start, start + duration) lies entirely in immobile bins,
       - it does not overlap ANY real event window,
-      - control count == real event count, and per-event duration is preserved.
+      - control onsets are distinct, and per-event duration is preserved.
 
     Returns a DataFrame with columns ``start_time``, ``end_time`` (same schema
     as ``event_times``), one row per real event. Rows that cannot be placed
@@ -265,6 +272,8 @@ def make_matched_control_times(
 - Zero overlap between any control window and any real event window.
 - Control count ≤ real count; each control duration equals its source event's duration.
 - Deterministic given the same `rng` seed.
+- Control onset bins are distinct; duration windows are not required to be
+  mutually disjoint because they are not part of the fitted design.
 
 The matched-control onsets enter `_make_design_matrices` as an additional event
 class `"matched_control"`, producing a `matched_control` design matrix parallel
