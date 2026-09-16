@@ -413,7 +413,8 @@ def test_a_real_session_writes_the_control_array_and_records_its_draw(tmp_path):
         == record["cohort_counts"]["n_nonlocal_after"]
     )
     # A run that writes the array must also be skippable as complete -- by a
-    # run asking for the same estimator, which is what the skip check compares.
+    # run asking for the same estimator, which is what the skip check compares:
+    # the prior, the folds and the null's size and seed as well as the inputs.
     assert runner.results_exist(
         tmp_path / "out",
         epoch_identifier,
@@ -423,4 +424,9 @@ def test_a_real_session_writes_the_control_array_and_records_its_draw(tmp_path):
         record["canonical_event_table_sha256"],
         record["data_over_time_sha256"],
         record["fitter"],
+        penalty_sigma=record["penalty_sigma_log_rate"],
+        n_folds=record["n_folds"],
+        fold_seed=record["fold_seed"],
+        n_control_draws=record["n_control_draws"],
+        control_draw_seed=record["control_draw_seed"],
     )
