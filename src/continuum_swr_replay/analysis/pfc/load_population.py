@@ -23,11 +23,13 @@ import numpy as np
 import pandas as pd
 from scipy.stats import false_discovery_control
 
+from continuum_swr_replay.analysis.pfc.batched_glm import DEFAULT_PENALTY_SIGMA
 from continuum_swr_replay.analysis.pfc.glm import MATCHED_CONTROL_PLACEMENT_METHOD
 from continuum_swr_replay.analysis.pfc.heldout import (
     CONTROL_NULL_EVENT_POLICY,
+    DEFAULT_CONTROL_DRAWS,
     EMPIRICAL_PVALUE_METHOD,
-    MIN_USABLE_NULL_DRAWS,
+    required_usable_null_draws,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import fit_provenance_path
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
@@ -49,6 +51,21 @@ HELDOUT_P_COLUMNS = {
     "non_local_no_SWR": "non_local_no_SWR: p_heldout",
     "non_local_SWR": "non_local_SWR: p_heldout",
     "engagement": ("matched_control + non_local_no_SWR vs. matched_control: p_heldout"),
+}
+
+#: Per-unit denominator of each empirical p-value. A finite p-value in the
+#: canonical R=1,000 bundle must carry exactly 1,000 usable draws; retaining
+#: the counts also makes failed fits auditable instead of silently changing
+#: the p-value grid.
+HELDOUT_USABLE_DRAW_COLUMNS = {
+    "SWR": "SWR: n_usable_null_draws",
+    "non_local": "non_local: n_usable_null_draws",
+    "non_local_no_SWR": "non_local_no_SWR: n_usable_null_draws",
+    "non_local_SWR": "non_local_SWR: n_usable_null_draws",
+    "engagement": (
+        "matched_control + non_local_no_SWR vs. matched_control: "
+        "n_usable_null_draws"
+    ),
 }
 
 #: Observed statistics those empirical p-values compare against. These are
@@ -78,6 +95,7 @@ REQUIRED_COLUMNS = (
     HELDOUT_FIT_COLUMN,
     "min_heldout_model",
     *HELDOUT_P_COLUMNS.values(),
+    *HELDOUT_USABLE_DRAW_COLUMNS.values(),
     *MATCHED_NULL_OBSERVED_COLUMNS.values(),
 )
 
@@ -97,9 +115,9 @@ LEGACY_FDR_TESTS = (
 def heldout_q_column(name: str) -> str:
     """Retired BH column name, for readers diagnosing pre-review tables.
 
-    Current held-out populations do not create these columns: 40 Monte Carlo
-    draws cannot support unit-wise BH over a population of thousands, and the
-    implementation phase calls only for a descriptive raw-p preview.
+    Current held-out populations do not create these columns: even the R=1,000
+    Monte Carlo grid cannot support unit-wise BH over a population of
+    thousands, and this phase calls only for a descriptive raw-p preview.
     """
     return f"{HELDOUT_P_COLUMNS[name]}: heldout_q"
 
@@ -157,17 +175,28 @@ def _extract_animal(nwb_file_name: str) -> str:
     return parse_nwb_filename(nwb_file_name)[0]
 
 
-def _validate_heldout_provenance(artifacts: list[Path]) -> None:
-    """Refuse held-out bundles carrying the pre-review p-value semantics."""
+def _validate_heldout_provenance(
+    artifacts: list[Path],
+    frames: list[pd.DataFrame],
+    *,
+    expected_n_control_draws: int,
+    expected_n_folds: int,
+    expected_penalty_sigma: float,
+) -> None:
+    """Refuse bundles with incompatible or unauditable inference settings."""
+    required_draws = required_usable_null_draws(expected_n_control_draws)
     expected = {
         "estimator": "ridge_poisson_glm",
         "inference": "blocked_heldout_deviance",
+        "penalty_sigma_log_rate": expected_penalty_sigma,
+        "n_folds": expected_n_folds,
+        "n_control_draws": expected_n_control_draws,
         "empirical_pvalue_method": EMPIRICAL_PVALUE_METHOD,
         "control_null_event_policy": CONTROL_NULL_EVENT_POLICY,
-        "min_usable_null_draws": MIN_USABLE_NULL_DRAWS,
+        "min_usable_null_draws": required_draws,
         "matched_control_placement_method": MATCHED_CONTROL_PLACEMENT_METHOD,
     }
-    for artifact in artifacts:
+    for artifact, frame in zip(artifacts, frames, strict=True):
         sidecar = fit_provenance_path(artifact)
         try:
             record = json.loads(sidecar.read_text())
@@ -191,6 +220,37 @@ def _validate_heldout_provenance(artifacts: list[Path]) -> None:
                 f"{artifact.name} has incompatible held-out provenance {mismatches}; "
                 "refit it before population loading."
             )
+        recorded_counts = record.get("null_usable_draws")
+        if not isinstance(recorded_counts, dict):
+            raise ValueError(
+                f"{artifact.name} does not record per-unit usable null draws; "
+                "refit it before population loading."
+            )
+        for name, column in HELDOUT_USABLE_DRAW_COLUMNS.items():
+            raw = recorded_counts.get(name)
+            if not isinstance(raw, list) or len(raw) != len(frame):
+                raise ValueError(
+                    f"{artifact.name} has invalid usable null draws for {name!r}: "
+                    f"expected {len(frame)} per-unit values, got {raw!r}."
+                )
+            sidecar_values = np.asarray(raw)
+            table_values = frame[column].to_numpy()
+            if (
+                not np.issubdtype(sidecar_values.dtype, np.integer)
+                or np.any(sidecar_values < 0)
+                or np.any(sidecar_values > expected_n_control_draws)
+                or not np.array_equal(sidecar_values, table_values)
+            ):
+                raise ValueError(
+                    f"{artifact.name} has inconsistent usable null draws for "
+                    f"{name!r} between its sidecar and unit table."
+                )
+            finite_p = np.isfinite(frame[HELDOUT_P_COLUMNS[name]].to_numpy(dtype=float))
+            if np.any(finite_p & (table_values != required_draws)):
+                raise ValueError(
+                    f"{artifact.name} reports a finite {name!r} p-value without "
+                    f"all {required_draws} usable null draws."
+                )
 
 
 def load_population_data(
@@ -198,6 +258,10 @@ def load_population_data(
     min_firing_rate: float = 1.0,
     artifact_suffix: str = "",
     inference: str = "heldout",
+    *,
+    expected_n_control_draws: int = DEFAULT_CONTROL_DRAWS,
+    expected_n_folds: int = 5,
+    expected_penalty_sigma: float = DEFAULT_PENALTY_SIGMA,
 ) -> tuple[pd.DataFrame, dict[str, np.ndarray], np.ndarray]:
     """Load and filter PFC population data.
 
@@ -225,6 +289,11 @@ def load_population_data(
         an audit that reads the superseded bundles on purpose. Neither reads
         the other: the canonical bundle name is unsuffixed, so the two trees
         are indistinguishable from the outside.
+    expected_n_control_draws, expected_n_folds, expected_penalty_sigma : number
+        Canonical held-out inference settings. Every loaded sidecar must match
+        all three, preventing partial reruns from pooling generations with
+        different p-value grids, folds, or estimators. Ignored for legacy
+        reads.
 
     Returns
     -------
@@ -360,7 +429,13 @@ def load_population_data(
     df = pd.concat(dfs, ignore_index=True)
     _refuse_stale_bundle(df, inference, data_dir)
     if inference == "heldout":
-        _validate_heldout_provenance(loaded_artifacts)
+        _validate_heldout_provenance(
+            loaded_artifacts,
+            dfs,
+            expected_n_control_draws=expected_n_control_draws,
+            expected_n_folds=expected_n_folds,
+            expected_penalty_sigma=expected_penalty_sigma,
+        )
     df["animal"] = df["nwb_file_name"].map(_extract_animal)
 
     swr_all = np.hstack(swr_list)
@@ -407,8 +482,9 @@ def load_population_data(
     matched_control_all = matched_control_all[:, good]
 
     # The legacy audit keeps its historical BH correction. Current held-out
-    # p-values have only 40 Monte Carlo draws: even their finite-sample minimum
-    # is 1/41, so BH across thousands of neurons has no useful resolution.
+    # p-values use a finite R=1,000 Monte Carlo grid; its 1/1001 minimum still
+    # cannot support BH across thousands of neurons, so they remain a raw-p
+    # descriptive preview rather than a population-level inferential result.
     # This phase reports raw-p fractions descriptively and leaves the actual
     # population inference to the session -> animal layer.
     adjusted = (

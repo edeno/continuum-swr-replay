@@ -102,12 +102,14 @@ from continuum_swr_replay.analysis.pfc.glm import (
 from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
 from continuum_swr_replay.analysis.pfc.heldout import (
     CONTROL_NULL_EVENT_POLICY,
+    DEFAULT_CONTROL_DRAWS,
     EMPIRICAL_PVALUE_METHOD,
     MIN_USABLE_NULL_DRAWS,
     assign_blocked_folds,
     control_draw_null,
     empirical_pvalue,
     null_draw_seeds,
+    required_usable_null_draws,
 )
 from continuum_swr_replay.analysis.replay.cohort_selection import stop_cohort_suffix
 from continuum_swr_replay.analysis.replay.fit_provenance import (
@@ -140,12 +142,6 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, module="pynwb")
 #: records the implied per-lag and sustained standard deviations beside it,
 #: from ``implied_prior_sd``.
 CANONICAL_PENALTY_SIGMA = DEFAULT_PENALTY_SIGMA
-
-#: Production Monte Carlo sample. With the plus-one correction this gives a
-#: minimum p-value of 1/1001 and about 50 grid points at or below 0.05. The
-#: prediction-only microbatched scorer makes this feasible without holding all
-#: draw designs in memory at once.
-DEFAULT_CONTROL_DRAWS = 1_000
 
 #: The estimator and the inference each bundle is produced by, recorded in the
 #: provenance sidecar and compared by the skip check: a bundle fit by maximum
@@ -363,6 +359,11 @@ def results_exist(
     if not sidecar.exists():
         return False
     record = json.loads(sidecar.read_text())
+    expected_usable_draws = (
+        None
+        if n_control_draws is None
+        else required_usable_null_draws(n_control_draws)
+    )
     return (
         record.get("stop_cohort") == stop_cohort
         and record.get("stop_table_sha256") == stop_table_sha256
@@ -379,7 +380,11 @@ def results_exist(
         and record.get("control_draw_seed") == control_draw_seed
         and record.get("empirical_pvalue_method") == EMPIRICAL_PVALUE_METHOD
         and record.get("control_null_event_policy") == CONTROL_NULL_EVENT_POLICY
-        and record.get("min_usable_null_draws") == MIN_USABLE_NULL_DRAWS
+        and record.get("min_usable_null_draws") == expected_usable_draws
+        and (
+            n_control_draws in (None, 0)
+            or isinstance(record.get("null_usable_draws"), dict)
+        )
         and record.get("matched_control_placement_method")
         == MATCHED_CONTROL_PLACEMENT_METHOD
     )
@@ -575,6 +580,7 @@ def score_session(
     )
 
     if n_control_draws > 0:
+        required_draws = required_usable_null_draws(n_control_draws)
         seeds = null_draw_seeds(control_draw_seed, n_control_draws)
         logger.info(
             "Drawing the null: %d matched-control draws per class on %d folds...",
@@ -584,8 +590,8 @@ def score_session(
         null = control_draw_null(
             context["event_times"],
             fit_mask,
-            counts,
-            folds,
+            None,
+            None,
             rng_seeds=seeds,
             subset_seed=control_draw_seed,
             spline_basis=context["spline_basis"],
@@ -599,25 +605,36 @@ def score_session(
         # onset subset and durations: a regressor built from 30 windows buys
         # less than one built from 300 whatever either contains, so one shared
         # null would hold classes of different size to the same reference.
+        usable_draws: dict[str, NDArray] = {}
         for event_class in EVENT_CLASSES:
             stem = pair_name(event_class, "constant")
             statistics[f"{stem}: matched_null_observed_delta_dev"] = (
                 null.observed_improvement[event_class]
             )
+            usable = np.isfinite(null.improvement[event_class]).sum(axis=0)
+            usable_draws[event_class] = usable
+            statistics[f"{event_class}: n_usable_null_draws"] = usable
             statistics[f"{event_class}: p_heldout"] = empirical_pvalue(
                 null.observed_improvement[event_class],
                 null.improvement[event_class],
-                min_usable_draws=MIN_USABLE_NULL_DRAWS,
+                min_usable_draws=required_draws,
             )
         engagement_stem = pair_name(*ENGAGEMENT_PAIR)
         statistics[f"{engagement_stem}: matched_null_observed_delta_dev"] = (
             null.observed_engagement
         )
+        usable_draws["engagement"] = np.isfinite(null.engagement).sum(axis=0)
+        statistics[f"{engagement_stem}: n_usable_null_draws"] = usable_draws[
+            "engagement"
+        ]
         statistics[f"{engagement_stem}: p_heldout"] = empirical_pvalue(
             null.observed_engagement,
             null.engagement,
-            min_usable_draws=MIN_USABLE_NULL_DRAWS,
+            min_usable_draws=required_draws,
         )
+        diagnostics["null_usable_draws"] = {
+            name: values.astype(int).tolist() for name, values in usable_draws.items()
+        }
         diagnostics["null_windows"] = {
             name: {
                 "n_events_total": int(null.n_events[name]),
@@ -633,7 +650,7 @@ def score_session(
                 "n_exact_draws": int(
                     np.sum(null.n_placed[name] == null.n_tested[name])
                 ),
-                "n_required_draws": MIN_USABLE_NULL_DRAWS,
+                "n_required_draws": required_draws,
             }
             for name in null.n_placed
         }
@@ -1138,7 +1155,9 @@ def run_analysis(
                 "control_draw_seed": int(control_draw_seed),
                 "empirical_pvalue_method": EMPIRICAL_PVALUE_METHOD,
                 "control_null_event_policy": CONTROL_NULL_EVENT_POLICY,
-                "min_usable_null_draws": MIN_USABLE_NULL_DRAWS,
+                "min_usable_null_draws": required_usable_null_draws(
+                    n_control_draws
+                ),
                 "matched_control_placement_method": (MATCHED_CONTROL_PLACEMENT_METHOD),
                 "n_basis_per_class": n_basis_per_class,
                 "implied_prior_sd": implied_prior,
@@ -1153,6 +1172,7 @@ def run_analysis(
                 # count. A thinner draw is not the reference the subset-
                 # matched observed statistic needs.
                 "null_windows": scoring_diagnostics.get("null_windows"),
+                "null_usable_draws": scoring_diagnostics.get("null_usable_draws"),
                 "engagement_null_overlap": scoring_diagnostics.get(
                     "engagement_null_overlap"
                 ),

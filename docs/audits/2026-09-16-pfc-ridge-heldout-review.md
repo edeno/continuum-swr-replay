@@ -1,29 +1,42 @@
 # PFC ridge/held-out implementation review
 
-Date: 2026-09-16
+Date: 2026-09-16; updated 2026-09-17 after the independent review and R = 1,000 gate
 
-Branch reviewed: `pfc-ridge-heldout` through `00765b2`
+Branch reviewed: `pfc-ridge-heldout` release candidate
 
 Scope: scientific correctness, inference validity, failure handling, memory and runtime
 
 ## Outcome
 
-Task A and the Task B integration are implemented, reviewed and have passed the corrected
-three-session GPU gate. Task C has not run: no ridge production batch, final cohort audit,
-regenerated Figure 4 or updated claim should be treated as complete yet.
+Task A and the Task B integration are implemented, independently reviewed and have passed the
+corrected three-session GPU gate plus a full R = 1,000 endurance gate on the largest 510-unit
+session. Task C has not run: no ridge production batch, final cohort audit, regenerated Figure 4
+or updated claim should be treated as complete yet.
 
-The review found and fixed eight inference defects:
+The initial review found and fixed eight inference defects:
 
 | defect | consequence before review | resolution |
 |---|---|---|
 | A finite fit with `converged=False` was scored out of fold | an iteration-cap result could contribute a plausible held-out deviance | every affected unit × fold is now `NaN`; a unit is reported only when every fold converged and scored finitely |
 | Monte Carlo p-values used `b/R` | zero p-values were possible with only 40 draws | use the finite-sample `(b + 1)/(R + 1)` correction; the minimum at R = 40 is 1/41 |
-| Incompletely placed control draws were retained | a thinner regressor entered the null and could make it anti-conservative | a draw is usable only when it places every requested window; fewer than 20 usable draws yields `NaN` |
+| Incompletely placed control draws were retained | a thinner regressor entered the null and could make it anti-conservative | a draw is usable only when it places every requested window; production now requires all requested draws per unit and records the effective count (20 remains only a shortened-diagnostic floor) |
 | Exact-draw validation was combined with mutually disjoint control duration windows | the first corrected smoke produced 0/40 exact draws for every j16 class and for both key non-local classes in chimi, so their empirical p-values were unavailable | enumerate legal same-bout, real-event-free onset bins directly and require distinct onsets; auxiliary duration windows may overlap because duration constrains placement but never enters the onset-only GLM design; version the placement policy in provenance |
 | The observed statistic still used every real event when some events had no legal within-bout match | the replacement gate startup found two genuinely unmatchable events in both j16 and chimi; their null could never reach the all-event count, so the p-value would remain unavailable (and accepting a thinner draw would change the estimand) | select one deterministic, jointly matchable subset from event timing/duration alone; compute both the observed statistic and every null draw on that fixed subset, keep the all-event held-out difference separately, and version/record the tested population in provenance |
 | Held-out empirical p-values were BH-corrected across thousands of dependent units | the old zero p-values became spuriously tiny q-values; units were also treated as independent replicates | the phase-0b fraction is raw `p < .05`, explicitly descriptive; population inference remains session → animal in Phase 4 |
 | Short gaps could put two runs touched by one event kernel in different folds | one onset could inform both training and held-out bins | runs whose ±250 ms supports overlap are grouped before fold assignment |
-| The population loader trusted column names without checking held-out provenance | a pre-review `b/R` bundle could silently reach Figure 4 after the formula changed | held-out loads now require the ridge/blocked-deviance estimator plus `empirical_pvalue_method = plus_one` and the 20-draw floor in every used artifact's sidecar |
+| The population loader trusted column names without checking held-out provenance | a pre-review `b/R` bundle could silently reach Figure 4 after the formula changed | held-out loads now require the complete canonical ridge/blocked-deviance contract in every used artifact's sidecar |
+
+The independent release review found four further launch blockers. Figure 4 still executed with
+R = 40 while its prose advertised R = 1,000; the figure now imports the runner's canonical
+`DEFAULT_CONTROL_DRAWS` and a rendering regression requires the `R=1000, min p=0.001` title. The
+population loader could also pool retained R = 40 bundles with new R = 1,000 bundles; it now
+requires the canonical draw count, fold count, penalty, p-value method, null policy, placement
+method and usable-draw requirement. Finally, requested R was not effective R: p-values could be
+reported from only 20 finite fits. Production now requires all 1,000 usable draws per finite
+p-value, stores the per-unit counts in the table and sidecar, and cross-validates the two on load.
+The prepared-response fast path also accepted redundant same-shaped raw counts and folds, which
+could silently score another dataset or split. The API now accepts either raw inputs or one prepared
+response, never both, so the ambiguous identity path is structurally unavailable.
 
 The unpenalised comparison used to audit prior binding is also gated on convergence and on
 model-level separation. A failed maximum-likelihood fit no longer supplies a peak, covariance or
@@ -46,19 +59,18 @@ repository-managed claim on idle GPU 3 confirmed that JAX used the intended sing
 
 The sparse onset accumulator remains value-equivalent to the former lagged-matrix product to
 `1e-12`. At 700,000 bins, the old 251-lag float64 matrix would occupy about 1.34 GiB per event
-class; the 11-column output is about 58.7 MiB. Null designs are streamed one draw at a time. The
-engagement model reuses the current class design and the fixed baseline block without retaining an
-R-sized design cache, so the speedup does not create multi-gigabyte host growth.
+class; the 11-column output is about 58.7 MiB. Null designs are streamed in four-design
+microbatches. The engagement model reuses the current class design and the fixed baseline block
+without retaining an R-sized design cache, so the speedup does not create multi-gigabyte host
+growth.
 
-The canonical K = 5, R = 40 workload is still intrinsically large: 45 observed model-fold fits plus
-about 1,010 null model-fold fits per session, before the full-data fits. JAX compilation is reused
+The canonical K = 5, R = 1,000 workload is intrinsically large: 45 observed model-fold fits plus
+about 25,000 null model-fold fits per session, before the full-data fits. JAX compilation is reused
 for repeated shapes (the measured CPU first call was 2.29 s versus 0.52 s steady state). On the
 A100 synthetic workload, covariance added about 1.5 ms (roughly 1.2%) in a counterbalanced warm
 benchmark; disabling it remains a material CPU saving and avoids an unnecessary calculation. The
-production smoke must still confirm memory and end-to-end wall time on three real sessions. In
-particular, every null fit currently transfers its fold's design and response through the public
-NumPy-to-JAX fitter boundary; the synthetic kernel timing does not establish whether those repeated
-host/device transfers dominate the canonical 1,055-fit session workload.
+prediction-only path keeps the shared response and folds device-resident, transfers only each
+bounded design microbatch, and returns only scores and fit diagnostics.
 
 Other removed work:
 
@@ -115,7 +127,7 @@ p-value columns were finite for every retained unit. The estimator audit complet
 ### Follow-up GPU optimization and production draw count
 
 The held-out scorer now has a prediction-only path: spike counts and folds are transferred once,
-four equal-width designs and all five folds are fit together, per-unit convergence stays inside one
+up to four equal-width designs and all five folds are fit together, per-unit convergence stays inside one
 compiled JAX loop, and a tall QR followed by an SVD of its small triangular factor replaces the
 repeated tall SVD. Null designs are generated and released in microbatches, so the large design
 working set does not grow with R. On the saved 64,000-bin x 128-unit benchmark, warm scoring fell
@@ -132,6 +144,22 @@ for this session. That cost is suitable for the ten-device production batch and 
 plus-one p-value of 1/1,001 rather than 1/41, so production now defaults to R = 1,000. The R = 40
 artifacts above remain pre-production correctness/performance gates, not the final inferential
 resolution.
+
+The final endurance gate used `wilbur20210331_06_r3`, the largest profiled session (510 units,
+290,322 fit bins), at the exact production K = 5, R = 1,000 and sigma = 3 settings on GPU 9. It
+completed in 1:33:07 wall time; the null phase was 1:27:22. Across 4,976 one-second null-phase
+samples the A100 averaged 95.05% compute utilization, reached 100%, and used at most 9,124 MiB of
+its 80 GiB framebuffer. Peak host RSS was 8.40 GiB and no thermal-limit event occurred. An attempted
+eight-design microbatch was rejected before this gate because a real R = 20 replay increased the
+null phase from 104 s to 119 s; four remains the measured production choice.
+
+All 506 estimable units had exactly 1,000 usable draws for all five null tests; the four
+non-estimable units had zero usable draws and `NaN` p-values. Every finite p-value was exactly on
+the k/1,001 grid, all four class window records reported 1,000/1,000 exact draws, and sidecar counts
+matched the table exactly. Relative to the R = 20 equivalence run, all R-independent scalar and
+fold results were identical, all model/fit decisions were identical, and all five modulation arrays
+were byte-identical. The canonical population loader accepted the bundle and retained the same 506
+estimable units.
 
 ## Validation
 
@@ -162,8 +190,12 @@ resolution.
 - Corrected real-data GPU gate: all three processes exited 0; all 12 class/session nulls produced
   40 exact draws; the combined population-loader and estimator-audit smokes passed.
 - Ruff and `git diff --check`: clean.
+- Independent-review regressions and expanded PFC gate: 257 passed, 1 slow test deselected.
+- Final repository-wide non-slow gate: 2,839 passed, 27 slow tests deselected; only known warnings.
+- Full R = 1,000 largest-session profile and artifact audit: passed as described above.
 
 The pre-production gates are satisfied. The production batch may launch on whichever of the ten
 cards are idle at launch. Existing bundles without `empirical_pvalue_method = plus_one`,
 `control_null_event_policy = fixed_jointly_matchable_subset` and
-`min_usable_null_draws = 20` are deliberately rejected by the skip check and population loader.
+the exact canonical R = 1,000 / K = 5 / sigma = 3 contract are deliberately rejected by the skip
+check and population loader.

@@ -20,9 +20,13 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.pfc.glm import MATCHED_CONTROL_PLACEMENT_METHOD
-from continuum_swr_replay.analysis.pfc.heldout import CONTROL_NULL_EVENT_POLICY
+from continuum_swr_replay.analysis.pfc.heldout import (
+    CONTROL_NULL_EVENT_POLICY,
+    DEFAULT_CONTROL_DRAWS,
+)
 from continuum_swr_replay.analysis.pfc.load_population import (
     HELDOUT_P_COLUMNS,
+    HELDOUT_USABLE_DRAW_COLUMNS,
     MATCHED_NULL_OBSERVED_COLUMNS,
 )
 from scripts.qa.compare_pfc_cohorts import (
@@ -1098,7 +1102,7 @@ def _write_ridge_bundle(
     fit_rate: float = 5.0,
     n_folds: int = 5,
     separated: int = 0,
-    p_heldout: float = 1 / 41,
+    p_heldout: float = 1 / (DEFAULT_CONTROL_DRAWS + 1),
     suffix: str = "",
     sidecar_extra: dict | None = None,
 ) -> None:
@@ -1115,6 +1119,8 @@ def _write_ridge_bundle(
     )
     for column in HELDOUT_P_COLUMNS.values():
         frame[column] = p_heldout
+    for column in HELDOUT_USABLE_DRAW_COLUMNS.values():
+        frame[column] = DEFAULT_CONTROL_DRAWS
     for column in MATCHED_NULL_OBSERVED_COLUMNS.values():
         frame[column] = 5.0
     for model in (
@@ -1168,14 +1174,14 @@ def _write_ridge_bundle(
                     "inference": "blocked_heldout_deviance",
                     "empirical_pvalue_method": "plus_one",
                     "control_null_event_policy": CONTROL_NULL_EVENT_POLICY,
-                    "min_usable_null_draws": 20,
+                    "min_usable_null_draws": DEFAULT_CONTROL_DRAWS,
                     "matched_control_placement_method": (
                         MATCHED_CONTROL_PLACEMENT_METHOD
                     ),
-                    "penalty_sigma_log_rate": 2.0,
+                    "penalty_sigma_log_rate": 3.0,
                     "n_folds": n_folds,
                     "fold_seed": abs(hash(session)) % 10_000,
-                    "n_control_draws": 40,
+                    "n_control_draws": DEFAULT_CONTROL_DRAWS,
                     "control_draw_seed": abs(hash(session + "c")) % 10_000,
                     "n_basis_per_class": 11,
                     "engagement_null_overlap": {"median": 0.02, "max": 0.06},
@@ -1184,8 +1190,8 @@ def _write_ridge_bundle(
                             "n_events_total": 10,
                             "n_events_tested": 9,
                             "n_events_excluded_unmatchable": 1,
-                            "n_exact_draws": 40,
-                            "n_required_draws": 20,
+                            "n_exact_draws": DEFAULT_CONTROL_DRAWS,
+                            "n_required_draws": DEFAULT_CONTROL_DRAWS,
                             "n_placed_min": 9,
                             "n_placed_median": 9.0,
                             "tested_source_indices": list(range(9)),
@@ -1201,6 +1207,10 @@ def _write_ridge_bundle(
                     "n_model_fits": 9 * n_neurons,
                     "n_nonconverged_model_fits": 0,
                     "n_neurons_with_nonconverged_model": 0,
+                    "null_usable_draws": {
+                        name: [DEFAULT_CONTROL_DRAWS] * n_neurons
+                        for name in HELDOUT_USABLE_DRAW_COLUMNS
+                    },
                     **(sidecar_extra or {}),
                 },
             )
@@ -1300,7 +1310,7 @@ class TestEstimatorTables:
         assert (table["n_events_total"] == 10).all()
         assert (table["n_events_tested"] == 9).all()
         assert (table["n_events_excluded_unmatchable"] == 1).all()
-        assert (table["n_exact_draws"] == 40).all()
+        assert (table["n_exact_draws"] == DEFAULT_CONTROL_DRAWS).all()
 
     def test_the_separated_columns_are_counted_per_model(self, estimator_trees):
         _, after = estimator_trees
@@ -1359,7 +1369,7 @@ class TestEstimatorTables:
         row = table.iloc[0]
         assert row.estimator == "ridge_poisson_glm"
         assert row.inference == "blocked_heldout_deviance"
-        assert row.penalty_sigma_log_rate == 2.0
+        assert row.penalty_sigma_log_rate == 3.0
         assert row.n_sessions == 2
         # The seeds are session-derived, so two sessions never share one.
         assert row.n_distinct_fold_seed == 2
@@ -1493,7 +1503,7 @@ class TestEmpiricalBayesSigma:
         assert "### The prior the corpus's own spread would have chosen" in report
         # The prior and its per-lag meaning are quoted from the sidecar, not
         # restated: the fixture's bundles say sigma 2.0, per-lag 2.066.
-        assert "penalty_sigma_log_rate` = 2.0" in report
+        assert "penalty_sigma_log_rate` = 3.0" in report
         assert "per-lag sd 2.066" in report
 
 

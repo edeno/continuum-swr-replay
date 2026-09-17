@@ -6,14 +6,16 @@ AIC machinery for the per-unit statistics. Spec authority: this file; `phase-2b-
 only where it names the blocked held-out contract; `shared-contracts.md` §"Matched-control
 interface" (unchanged). Everything else in the recut plan that this contradicts is superseded here.
 
-**Implementation status (reviewed 2026-09-16).** Task A and the Task B integration are implemented
-and passed the corrected three-session GPU gate at `00765b2`; Task C (the production batch, final
-audit, Figure 4 and claim update) has not run. The original smoke selected σ = 3, K = 5 and R = 40.
+**Implementation status (reviewed 2026-09-17).** Task A and the Task B integration are implemented
+and passed the corrected three-session GPU gate at `00765b2` plus the full R = 1,000 endurance
+gate; Task C (the production batch, final audit, Figure 4 and claim update) has not run. The
+original smoke selected σ = 3, K = 5 and R = 40.
 A follow-up prediction-only, microbatched JAX scorer reduced the j16 null phase from 8:26 to 1:49
 and made **R = 1,000** the production setting; R = 40 is retained only as the historical
 equivalence gate. The implementation review supersedes the draft values
 below where they conflict: empirical p-values use `(b + 1)/(R + 1)`, not `b/R`; incompletely
-placed draws are excluded and at least 20 usable draws are required; runs whose ±250 ms kernel
+placed draws are excluded and every requested production draw must be usable (20 remains only the
+diagnostic floor); runs whose ±250 ms kernel
 supports overlap are one fold block; and raw-p unit fractions are descriptive previews, not
 population inference. In the corrected gate every class produced 40/40 exact draws on its fixed
 matchable event subset, the combined population loader and estimator audit passed, and the largest

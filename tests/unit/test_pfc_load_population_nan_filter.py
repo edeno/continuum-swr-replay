@@ -21,9 +21,13 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.pfc.glm import MATCHED_CONTROL_PLACEMENT_METHOD
-from continuum_swr_replay.analysis.pfc.heldout import CONTROL_NULL_EVENT_POLICY
+from continuum_swr_replay.analysis.pfc.heldout import (
+    CONTROL_NULL_EVENT_POLICY,
+    DEFAULT_CONTROL_DRAWS,
+)
 from continuum_swr_replay.analysis.pfc.load_population import (
     HELDOUT_P_COLUMNS,
+    HELDOUT_USABLE_DRAW_COLUMNS,
     LEGACY_FDR_TESTS,
     MATCHED_NULL_OBSERVED_COLUMNS,
     heldout_q_column,
@@ -51,6 +55,8 @@ def heldout_statistics(n_neurons: int) -> dict[str, list[float]]:
     }
     for column in HELDOUT_P_COLUMNS.values():
         columns[column] = [0.025] * n_neurons
+    for column in HELDOUT_USABLE_DRAW_COLUMNS.values():
+        columns[column] = [DEFAULT_CONTROL_DRAWS] * n_neurons
     for column in MATCHED_NULL_OBSERVED_COLUMNS.values():
         columns[column] = [1.0] * n_neurons
     return columns
@@ -83,8 +89,15 @@ def write_bundle(
         "inference": "blocked_heldout_deviance",
         "empirical_pvalue_method": "plus_one",
         "control_null_event_policy": CONTROL_NULL_EVENT_POLICY,
-        "min_usable_null_draws": 20,
+        "penalty_sigma_log_rate": 3.0,
+        "n_folds": 5,
+        "n_control_draws": DEFAULT_CONTROL_DRAWS,
+        "min_usable_null_draws": DEFAULT_CONTROL_DRAWS,
         "matched_control_placement_method": MATCHED_CONTROL_PLACEMENT_METHOD,
+        "null_usable_draws": {
+            name: [DEFAULT_CONTROL_DRAWS] * len(nwb_files)
+            for name in HELDOUT_USABLE_DRAW_COLUMNS
+        },
         **(provenance_overrides or {}),
     }
     base.with_suffix(".provenance.json").write_text(json.dumps(provenance))

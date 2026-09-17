@@ -76,6 +76,7 @@ from continuum_swr_replay.analysis.pfc.canonical_events import (
 from continuum_swr_replay.analysis.pfc.cohort import load_session_stop_cohort
 from continuum_swr_replay.analysis.pfc.glm import model_penalties
 from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
+from continuum_swr_replay.analysis.pfc.heldout import DEFAULT_CONTROL_DRAWS
 from continuum_swr_replay.analysis.pfc.load_population import (
     load_population_data,
     significant_fraction,
@@ -92,11 +93,6 @@ from continuum_swr_replay.parameters import COLORS, PROCESSED_DATA_DIR
 
 figure_utilities.set_figure_defaults(context="paper")
 warnings.filterwarnings("ignore")
-
-#: Draws the canonical bundles' null is built from. Only the label on panel d
-#: is read from it; the p-values themselves come from the bundles.
-DEFAULT_CONTROL_DRAWS = 40
-
 
 # ---------------------------------------------------------------------------
 # Panel a — Single-neuron example (overlaid SWR + non-SWR modulation)

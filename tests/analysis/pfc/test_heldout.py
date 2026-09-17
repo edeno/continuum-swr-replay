@@ -17,6 +17,7 @@ from scipy import stats
 from continuum_swr_replay.analysis.pfc.batched_glm import (
     BatchedGLMResults,
     make_ridge_penalty,
+    prepare_heldout_response,
 )
 from continuum_swr_replay.analysis.pfc.glm import (
     convolve_event_basis,
@@ -444,6 +445,16 @@ class TestEmpiricalPvalue:
 
         assert np.isnan(empirical_pvalue(np.array([2.0]), null)[0])
 
+    def test_a_requested_thousand_draw_grid_requires_all_thousand_finite_draws(self):
+        null = np.arange(1_000.0)[:, None]
+        null[-1] = np.nan
+
+        assert np.isnan(
+            empirical_pvalue(
+                np.array([2.0]), null, min_usable_draws=1_000
+            )[0]
+        )
+
 
 @pytest.fixture
 def null_session():
@@ -501,6 +512,27 @@ class TestNullDrawSeeds:
 
 
 class TestControlDrawNull:
+    def test_prepared_response_is_mutually_exclusive_with_raw_counts_and_folds(
+        self, null_session
+    ):
+        fit_rows = np.asarray(null_session["fit_mask"], dtype=bool)
+        counts = null_session["counts"][:, :2]
+        folds = assign_blocked_folds(null_session["fit_mask"], n_folds=5, seed=2)
+        response = prepare_heldout_response(counts[fit_rows], folds)
+
+        with pytest.raises(ValueError, match="either raw counts and folds or response"):
+            control_draw_null(
+                null_session["event_times"],
+                null_session["fit_mask"],
+                counts,
+                folds,
+                rng_seeds=[101],
+                spline_basis=null_session["spline_basis"],
+                lags=null_session["lags"],
+                classes=["non_local"],
+                response=response,
+            )
+
     def test_draw_designs_are_scored_in_bounded_microbatches(
         self, null_session, monkeypatch
     ):

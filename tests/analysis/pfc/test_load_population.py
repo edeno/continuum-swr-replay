@@ -14,10 +14,15 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.pfc.batched_glm import DEFAULT_PENALTY_SIGMA
 from continuum_swr_replay.analysis.pfc.glm import MATCHED_CONTROL_PLACEMENT_METHOD
-from continuum_swr_replay.analysis.pfc.heldout import CONTROL_NULL_EVENT_POLICY
+from continuum_swr_replay.analysis.pfc.heldout import (
+    CONTROL_NULL_EVENT_POLICY,
+    DEFAULT_CONTROL_DRAWS,
+)
 from continuum_swr_replay.analysis.pfc.load_population import (
     HELDOUT_P_COLUMNS,
+    HELDOUT_USABLE_DRAW_COLUMNS,
     MATCHED_NULL_OBSERVED_COLUMNS,
     _extract_animal,
     load_population_data,
@@ -40,7 +45,17 @@ def test_extract_animal(nwb_file_name, expected):
     assert _extract_animal(nwb_file_name) == expected
 
 
-def _write_bundle(directory, epoch_identifier, suffix, firing_rate):
+def _write_bundle(
+    directory,
+    epoch_identifier,
+    suffix,
+    firing_rate,
+    *,
+    n_control_draws=DEFAULT_CONTROL_DRAWS,
+    n_folds=5,
+    penalty_sigma=DEFAULT_PENALTY_SIGMA,
+    usable_draws=None,
+):
     """Write one session's modulation bundle under the cohort's suffix."""
     n_lag_times = 201
     modulation = np.zeros((n_lag_times, 1))
@@ -51,6 +66,10 @@ def _write_bundle(directory, epoch_identifier, suffix, firing_rate):
             "SWR: heldout_deviance": [100.0],
             "min_heldout_model": ["SWR"],
             **{column: [0.025] for column in HELDOUT_P_COLUMNS.values()},
+            **{
+                column: [n_control_draws if usable_draws is None else usable_draws]
+                for column in HELDOUT_USABLE_DRAW_COLUMNS.values()
+            },
             **{column: [1.0] for column in MATCHED_NULL_OBSERVED_COLUMNS.values()},
         }
     )
@@ -63,8 +82,15 @@ def _write_bundle(directory, epoch_identifier, suffix, firing_rate):
                 "inference": "blocked_heldout_deviance",
                 "empirical_pvalue_method": "plus_one",
                 "control_null_event_policy": CONTROL_NULL_EVENT_POLICY,
-                "min_usable_null_draws": 20,
+                "penalty_sigma_log_rate": penalty_sigma,
+                "n_folds": n_folds,
+                "n_control_draws": n_control_draws,
+                "min_usable_null_draws": n_control_draws,
                 "matched_control_placement_method": (MATCHED_CONTROL_PLACEMENT_METHOD),
+                "null_usable_draws": {
+                    name: [n_control_draws if usable_draws is None else usable_draws]
+                    for name in HELDOUT_USABLE_DRAW_COLUMNS
+                },
             }
         )
     )
@@ -100,3 +126,34 @@ def test_a_missing_cohort_bundle_is_named_in_the_error(tmp_path):
 
     with pytest.raises(FileNotFoundError, match="_allstops"):
         load_population_data(tmp_path, artifact_suffix="_allstops")
+
+
+@pytest.mark.parametrize(
+    "override,match",
+    [
+        ({"n_control_draws": 40}, "n_control_draws"),
+        ({"n_folds": 10}, "n_folds"),
+        ({"penalty_sigma": 2.0}, "penalty_sigma_log_rate"),
+    ],
+)
+def test_incompatible_inference_bundles_are_refused_before_pooling(
+    tmp_path, override, match
+):
+    _write_bundle(tmp_path, "chimi20200212_02_r1", "", 10.0)
+    _write_bundle(tmp_path, "j1620210706_02_r1", "", 12.0, **override)
+
+    with pytest.raises(ValueError, match=match):
+        load_population_data(tmp_path, min_firing_rate=0.0)
+
+
+def test_recorded_usable_draw_counts_must_match_the_unit_table(tmp_path):
+    _write_bundle(
+        tmp_path,
+        "chimi20200212_02_r1",
+        "",
+        10.0,
+        usable_draws=DEFAULT_CONTROL_DRAWS - 1,
+    )
+
+    with pytest.raises(ValueError, match="usable null draws"):
+        load_population_data(tmp_path, min_firing_rate=0.0)

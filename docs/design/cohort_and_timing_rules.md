@@ -300,7 +300,9 @@ same way, with the tested regressor replaced and the baseline left as it is.
 **R = 1,000**. The finite-sample Monte Carlo p-value is `(r + 1)/(R + 1)`, so its
 minimum with 1,000 usable draws is **1/1,001 ≈ 0.001** and zero is impossible. A draw
 that fails to place every class-matched window is a thinner regressor and is
-excluded; fewer than 20 usable draws leaves that unit's p-value unavailable.
+excluded. Production requires every requested draw to be finite for a unit's
+p-value, and records that effective count per unit; the lower 20-draw floor is
+retained only for deliberately shortened diagnostics.
 `n_control_draws`, `control_draw_seed`, exact-draw counts, tested source indices,
 and per-class total/tested/excluded window counts are in the sidecar. The
 `control_null_event_policy` provenance field prevents older all-event/thinner-null

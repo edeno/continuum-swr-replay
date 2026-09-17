@@ -129,7 +129,10 @@ def _write_bundle_files(
                     "control_draw_seed": INFERENCE["control_draw_seed"],
                     "empirical_pvalue_method": runner.EMPIRICAL_PVALUE_METHOD,
                     "control_null_event_policy": runner.CONTROL_NULL_EVENT_POLICY,
-                    "min_usable_null_draws": runner.MIN_USABLE_NULL_DRAWS,
+                    "min_usable_null_draws": runner.required_usable_null_draws(
+                        INFERENCE["n_control_draws"]
+                    ),
+                    "null_usable_draws": {},
                     "matched_control_placement_method": (
                         runner.MATCHED_CONTROL_PLACEMENT_METHOD
                     ),
@@ -289,11 +292,13 @@ def fake_session(monkeypatch):
 
     def _fake_score(context, **kwargs):
         calls["score"] = kwargs
+        n_draws = kwargs["n_control_draws"]
         statistics = pd.DataFrame(
             {
                 "SWR: heldout_deviance": [100.0, 200.0],
                 "SWR vs. constant: heldout_delta_dev": [1.5, -0.5],
                 "SWR: p_heldout": [0.025, 0.9],
+                "SWR: n_usable_null_draws": [n_draws, n_draws],
                 "min_heldout_model": ["SWR", "constant"],
             }
         )
@@ -301,6 +306,16 @@ def fake_session(monkeypatch):
             "fold_sizes": [10, 10, 10, 10, 10],
             "events_per_fold": {"non_local_no_SWR": [2, 1, 3, 2, 2]},
             "non_estimable_models": [],
+            "null_usable_draws": {
+                name: [n_draws, n_draws]
+                for name in (
+                    "SWR",
+                    "non_local",
+                    "non_local_no_SWR",
+                    "non_local_SWR",
+                    "engagement",
+                )
+            },
         }
 
     monkeypatch.setattr(runner, "load_session_stop_cohort", _fake_cohort)
@@ -715,7 +730,7 @@ def test_the_sidecar_states_the_estimator_and_the_inference(
     assert record["n_control_draws"] == 40
     assert record["empirical_pvalue_method"] == "plus_one"
     assert record["control_null_event_policy"] == runner.CONTROL_NULL_EVENT_POLICY
-    assert record["min_usable_null_draws"] == runner.MIN_USABLE_NULL_DRAWS
+    assert record["min_usable_null_draws"] == 40
     assert (
         record["matched_control_placement_method"]
         == runner.MATCHED_CONTROL_PLACEMENT_METHOD
@@ -997,6 +1012,22 @@ def test_the_scored_table_says_what_each_model_bought_out_of_fold(caplog):
     ):
         values = statistics[column].to_numpy(dtype=float)
         assert np.isnan(values).all()
+
+    usable_columns = {
+        "SWR": "SWR: n_usable_null_draws",
+        "non_local": "non_local: n_usable_null_draws",
+        "non_local_no_SWR": "non_local_no_SWR: n_usable_null_draws",
+        "non_local_SWR": "non_local_SWR: n_usable_null_draws",
+        "engagement": (
+            f"{runner.pair_name(*runner.ENGAGEMENT_PAIR)}: n_usable_null_draws"
+        ),
+    }
+    for name, column in usable_columns.items():
+        assert column in statistics
+        np.testing.assert_array_equal(
+            statistics[column].to_numpy(),
+            diagnostics["null_usable_draws"][name],
+        )
 
     assert set(statistics["min_heldout_model"]) <= set(
         runner.BEST_MODEL_CANDIDATES["min_heldout_model"]

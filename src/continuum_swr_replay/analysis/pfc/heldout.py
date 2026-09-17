@@ -81,6 +81,16 @@ from continuum_swr_replay.analysis.pfc.glm import (
 #: floor also governs deliberately shortened diagnostics and failed fits.
 MIN_USABLE_NULL_DRAWS = 20
 
+#: Canonical production Monte Carlo sample. With the plus-one correction this
+#: gives a minimum p-value of 1/1001 and about 50 grid points at or below 0.05.
+#: Kept with the p-value implementation so runners and figures cannot silently
+#: advertise different null sizes.
+DEFAULT_CONTROL_DRAWS = 1_000
+
+#: Number of equal-width null designs scored together. A real-session profile
+#: retained four after a larger batch increased end-to-end null wall time.
+DEFAULT_NULL_DESIGN_BATCH_SIZE = 4
+
 #: Provenance name for the finite-sample correction used by
 #: :func:`empirical_pvalue`. Readers use this to refuse older held-out bundles
 #: whose identically named columns used the invalid ``b / R`` estimate.
@@ -91,6 +101,22 @@ EMPIRICAL_PVALUE_METHOD = "plus_one"
 #: statistic with a sometimes thinner control draw, so readers must not pool
 #: them with the corrected fixed-subset estimand.
 CONTROL_NULL_EVENT_POLICY = "fixed_jointly_matchable_subset"
+
+
+def required_usable_null_draws(n_requested: int) -> int:
+    """Finite draws required to report a p-value from a requested null.
+
+    Production requires the complete requested Monte Carlo sample, so an
+    ``R=1000`` label always means a denominator of 1,000 rather than merely up
+    to 1,000. The fixed floor still keeps deliberately shortened diagnostics
+    from reporting very coarse p-values.
+    """
+    n_requested = int(n_requested)
+    if n_requested < 0:
+        raise ValueError(f"n_requested must be non-negative, got {n_requested}")
+    if n_requested == 0:
+        return 0
+    return max(MIN_USABLE_NULL_DRAWS, n_requested)
 
 
 class HeldoutDeviance(NamedTuple):
@@ -387,7 +413,8 @@ def empirical_pvalue(
         The same statistic from draws with no event content.
     min_usable_draws : int
         Minimum finite draws required per unit. Fewer draws return ``nan``;
-        production uses :data:`MIN_USABLE_NULL_DRAWS`.
+        production passes the complete requested sample from
+        :func:`required_usable_null_draws`.
 
     Returns
     -------
@@ -558,8 +585,8 @@ def overlapping_fraction(
 def control_draw_null(
     event_times: Mapping[str, pd.DataFrame],
     fit_mask: pd.Series,
-    counts: NDArray,
-    folds: NDArray,
+    counts: NDArray | None,
+    folds: NDArray | None,
     *,
     rng_seeds: Sequence[int],
     subset_seed: int = 0,
@@ -572,7 +599,7 @@ def control_draw_null(
     max_attempts: int = DEFAULT_MATCHED_CONTROL_ATTEMPTS,
     model_deviance: Mapping[str, NDArray] | None = None,
     response: PreparedHeldoutResponse | None = None,
-    design_batch_size: int = 4,
+    design_batch_size: int = DEFAULT_NULL_DESIGN_BATCH_SIZE,
 ) -> ControlDrawNull:
     """Held-out improvements from repeated matched-control draws, per class.
 
@@ -602,10 +629,12 @@ def control_draw_null(
         ``start_time`` / ``end_time``.
     fit_mask : pandas.Series of bool, shape (n_time,)
         The bins the models are fit on, indexed by sample time in seconds.
-    counts : NDArray, shape (n_time, n_units)
-        Spike counts on the full time axis, one column per unit.
-    folds : NDArray of int, shape (n_fit_bins,)
-        Fold index per fit bin, from :func:`assign_blocked_folds`.
+    counts : NDArray, shape (n_time, n_units), optional
+        Spike counts on the full time axis, one column per unit. Supply this
+        together with ``folds`` only when ``response`` is omitted.
+    folds : NDArray of int, shape (n_fit_bins,), optional
+        Fold index per fit bin, from :func:`assign_blocked_folds`. Supply this
+        together with ``counts`` only when ``response`` is omitted.
     rng_seeds : Sequence[int]
         One seed per draw, ``R`` of them; see :func:`null_draw_seeds`. Each
         class's draw ``r`` is seeded from the same value, so the classes share
@@ -644,10 +673,13 @@ def control_draw_null(
     response : PreparedHeldoutResponse, optional
         Device-resident fit-bin counts and folds. Supplying the response used
         for the session's all-event scores avoids retransferring it for every
-        null draw. When omitted, it is prepared once here.
+        null draw. When supplied, ``counts`` and ``folds`` must both be
+        ``None``: accepting redundant same-shaped inputs would let a response
+        prepared from another dataset or fold split silently win. When
+        omitted, the response is prepared once here from the raw inputs.
     design_batch_size : int
-        Number of equal-width null designs fit together. Draws are generated,
-        scored and discarded in batches of this size, so memory use stays
+        Maximum number of equal-width null designs generated and scored
+        together. Draws are discarded after each batch, so memory use stays
         bounded as ``len(rng_seeds)`` grows.
 
     Returns
@@ -668,21 +700,30 @@ def control_draw_null(
     if len(set(seeds)) != len(seeds):
         raise ValueError("rng_seeds must be distinct; a repeated seed repeats a draw")
 
-    counts = np.asarray(counts, dtype=float)
-    if counts.ndim == 1:
-        counts = counts[:, None]
     fit_rows = np.asarray(fit_mask, dtype=bool)
     n_fit_rows = int(fit_rows.sum())
     if design_batch_size < 1:
         raise ValueError(f"design_batch_size must be positive, got {design_batch_size}")
     if response is None:
-        response = prepare_heldout_response(counts[fit_rows], folds)
-    elif response.n_time != n_fit_rows or response.n_units != counts.shape[1]:
+        if counts is None or folds is None:
+            raise ValueError(
+                "supply either raw counts and folds or response; raw mode needs both"
+            )
+        counts_array = np.asarray(counts, dtype=float)
+        if counts_array.ndim == 1:
+            counts_array = counts_array[:, None]
+        response = prepare_heldout_response(counts_array[fit_rows], folds)
+    elif counts is not None or folds is not None:
         raise ValueError(
-            "the prepared response does not match the null's fit-bin counts: "
-            f"response {(response.n_time, response.n_units)}, counts "
-            f"{(n_fit_rows, counts.shape[1])}"
+            "supply either raw counts and folds or response, not both; redundant "
+            "same-shaped inputs cannot establish response identity"
         )
+    elif response.n_time != n_fit_rows:
+        raise ValueError(
+            "the prepared response does not match the null's fit mask: "
+            f"response has {response.n_time} rows, mask has {n_fit_rows}"
+        )
+    n_units = response.n_units
 
     def penalty_for(design: NDArray) -> NDArray | None:
         if penalty_sigma is None:
@@ -760,7 +801,7 @@ def control_draw_null(
     observed_improvement: dict[str, NDArray] = {}
     for class_name in classes:
         if n_tested[class_name] == 0:
-            observed_improvement[class_name] = np.full(counts.shape[1], np.nan)
+            observed_improvement[class_name] = np.full(n_units, np.nan)
             continue
         if (
             n_tested[class_name] == n_events[class_name]
@@ -777,7 +818,7 @@ def control_draw_null(
         observed_deviance = score_design_batch(observed_design[None, :, :])[0]
         observed_improvement[class_name] = constant_deviance - observed_deviance
 
-    engagement = np.empty((0, counts.shape[1]))
+    engagement = np.empty((0, n_units))
     engagement_overlap = np.empty(0)
     observed_engagement = np.empty(0)
     baseline_design = None
@@ -798,7 +839,7 @@ def control_draw_null(
         )
         full_engagement_name = f"matched_control + {engagement_class}"
         if n_tested[engagement_class] == 0:
-            observed_engagement = np.full(counts.shape[1], np.nan)
+            observed_engagement = np.full(n_units, np.nan)
         elif (
             n_tested[engagement_class] == n_events[engagement_class]
             and model_deviance is not None
@@ -816,14 +857,14 @@ def control_draw_null(
             )
             observed_joint_deviance = score_design_batch(observed_joint[None, :, :])[0]
             observed_engagement = baseline_deviance - observed_joint_deviance
-        engagement = np.full((len(seeds), counts.shape[1]), np.nan)
+        engagement = np.full((len(seeds), n_units), np.nan)
         engagement_overlap = np.full(len(seeds), np.nan)
 
     def score_draw_stream(
         class_name: str, *, score_improvement: bool
     ) -> tuple[NDArray, NDArray]:
         """Build, score and release fixed-size batches for one event class."""
-        per_draw = np.full((len(seeds), counts.shape[1]), np.nan)
+        per_draw = np.full((len(seeds), n_units), np.nan)
         placed = np.zeros(len(seeds), dtype=int)
         score_engagement = (
             baseline_control is not None and class_name == engagement_class
