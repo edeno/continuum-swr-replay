@@ -2214,7 +2214,7 @@ def geometry_section(path: Path) -> str:
 
     Written by ``scripts/qa/measure_pfc_null_geometry.py``. Its title and
     preamble are dropped -- the audit supplies its own -- and its sections are
-    demoted one level so they sit under this report's headings.
+    kept at their own heading level (their titles avoid this report's).
     """
     lines = path.read_text().splitlines()
     try:

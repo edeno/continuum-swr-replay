@@ -14,7 +14,6 @@ from typing import Any, NamedTuple
 import dask
 import numpy as np
 import pandas as pd
-import scipy
 import statsmodels.api as sm
 from numpy.typing import NDArray
 from patsy import dmatrix
@@ -132,38 +131,6 @@ def reindex_by(
     if isinstance(df, pd.Series):
         return merged.iloc[:, 0].rename(df.name)
     return merged
-
-
-def likelihood_ratio_test(
-    deviance_full: float,
-    deviance_restricted: float,
-    degrees_of_freedom_full: float,
-    degrees_of_freedom_restricted: float,
-) -> tuple[float, float]:
-    """Compare goodness of fit of nested models.
-
-    Parameters
-    ----------
-    deviance_full : float
-        Deviance of the more complicated model
-    deviance_restricted : float
-        Deviance of the simpler model
-    degrees_of_freedom_full : float
-        Degrees of freedom of the more complicated model
-    degrees_of_freedom_restricted : float
-        Degrees of freedom of the simpler model
-
-    Returns
-    -------
-    likelihood_ratio : float
-    p_value : float
-
-    """
-    degrees_of_freedom = degrees_of_freedom_restricted - degrees_of_freedom_full
-    likelihood_ratio = deviance_restricted - deviance_full
-    p_value = scipy.stats.chi2.sf(likelihood_ratio, df=degrees_of_freedom)
-
-    return likelihood_ratio, p_value
 
 
 #: The three-column theta design, as a patsy formula.
