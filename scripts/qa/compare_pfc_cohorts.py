@@ -2207,6 +2207,25 @@ def build_report(
     return "\n".join(lines)
 
 
+def geometry_section(path: Path) -> str:
+    """The null-geometry report's own sections, folded into this audit.
+
+    Written by ``scripts/qa/measure_pfc_null_geometry.py``. Its title and
+    preamble are dropped -- the audit supplies its own -- and its sections are
+    demoted one level so they sit under this report's headings.
+    """
+    lines = path.read_text().splitlines()
+    try:
+        start = next(i for i, line in enumerate(lines) if line.startswith("## "))
+    except StopIteration:  # pragma: no cover - a report always has sections
+        raise ValueError(f"{path} carries no sections to fold in") from None
+    body = "\n".join(lines[start:]).strip()
+    return (
+        f"{body}\n\n_Sections above measured by "
+        "`scripts/qa/measure_pfc_null_geometry.py`._\n"
+    )
+
+
 def build_estimator_report(
     *,
     sidecars: pd.DataFrame,
@@ -2222,6 +2241,7 @@ def build_estimator_report(
     command: str,
     artifact_suffix: str = "",
     worker_times: list[Path] | None = None,
+    geometry: Path | None = None,
 ) -> str:
     """Assemble the audit of the estimator and inference change.
 
@@ -2421,6 +2441,13 @@ def build_estimator_report(
     )
     add(_md(fold_spread_table(after)))
 
+    if geometry is not None:
+        # Measured separately because two of its four parts have to redraw the
+        # null from its recorded seeds, which needs the sessions' own fit masks
+        # rather than their bundles. Folded in here so the terms on which these
+        # p-values should be read sit beside the p-values themselves.
+        add(geometry_section(geometry))
+
     add("## Sensitivity to the prior\n")
     sigma_table = sigma_sensitivity_table(after_dir, artifact_suffix)
     if sigma_table.empty:
@@ -2545,6 +2572,17 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--geometry",
+        type=Path,
+        default=None,
+        help=(
+            "Markdown written by scripts/qa/measure_pfc_null_geometry.py: the "
+            "null's onset spacing, its overlap with the shipped control, the "
+            "units called without an out-of-fold gain and the events the "
+            "matched test could not use. Folded into the estimator audit."
+        ),
+    )
+    parser.add_argument(
         "--out",
         type=Path,
         default=None,
@@ -2594,7 +2632,7 @@ def main() -> None:
         "worker_times": args.worker_times,
     }
     report = (
-        build_estimator_report(**common)
+        build_estimator_report(geometry=args.geometry, **common)
         if comparison == "estimator"
         else build_report(before_sidecars=try_read_sidecars(args.before_dir), **common)
     )
