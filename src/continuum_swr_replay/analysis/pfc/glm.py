@@ -166,15 +166,6 @@ def likelihood_ratio_test(
     return likelihood_ratio, p_value
 
 
-def _lr_test(full_model: Any, restricted_model: Any) -> tuple[float, float]:
-    return likelihood_ratio_test(
-        full_model.deviance,
-        restricted_model.deviance,
-        full_model.df_resid,
-        restricted_model.df_resid,
-    )
-
-
 #: The three-column theta design, as a patsy formula.
 THETA_FORMULA = "1 + np.cos(theta_phase) + np.sin(theta_phase)"
 
@@ -345,80 +336,25 @@ def model_penalties(
     }
 
 
-def _fit_theta_models(
-    design_matrix: NDArray,
-    counts: NDArray,
-    fitter: str = "statsmodels",
-) -> tuple[Any, Any]:
-    """The constant and theta fits the theta LR test compares.
-
-    Parameters
-    ----------
-    design_matrix : NDArray, shape (n_joint, 3)
-    counts : NDArray, shape (n_joint,) or (n_joint, n_units)
-        Spike counts on the running bins. A 2-D array fits every unit at once
-        and returns batched results.
-    fitter : {"statsmodels", "jax"}
-
-    Returns
-    -------
-    constant_result, theta_result
-        Single-unit results for 1-D ``counts``, batched results for 2-D.
-
-    Raises
-    ------
-    UnconfiguredDeviceError
-        From the batched path, when no JAX device has been chosen.
-    """
-    _check_fitter(fitter)
-    constant_design = np.ones((design_matrix.shape[0], 1))
-    if fitter == "jax":
-        from continuum_swr_replay.analysis.pfc.batched_glm import fit_poisson_glms
-
-        constant_result = fit_poisson_glms(constant_design, counts)
-        theta_result = fit_poisson_glms(design_matrix, counts)
-        if counts.ndim != 1:
-            return constant_result, theta_result
-        return constant_result.for_unit(0), theta_result.for_unit(0)
-    if counts.ndim != 1:
-        raise ValueError(
-            "the statsmodels theta fitter takes one unit's counts at a time; "
-            "use fitter='jax' to fit a whole session at once"
-        )
-    constant_result = sm.GLM(
-        counts,
-        np.ones_like(counts),
-        family=sm.families.Poisson(),
-    ).fit()
-    theta_result = sm.GLM(
-        counts,
-        design_matrix,
-        family=sm.families.Poisson(),
-    ).fit()
-    return constant_result, theta_result
-
-
 def test_theta_modulation(
     theta_phase: pd.Series,
     is_immobile: pd.Series,
     neuron_spike_count: NDArray,
     sampling_frequency: float = 500.0,
     *,
-    fitter: str = "statsmodels",
-    prefitted: tuple[Any, Any] | None = None,
     design: tuple[NDArray, NDArray] | None = None,
-) -> tuple[float, float, float, float]:
-    """Test theta phase modulation of neuron firing during running.
+) -> tuple[float, float]:
+    """Theta modulation depth and preferred phase of a neuron's running bins.
 
-    Uses an unregularized GLM for the likelihood ratio test (correct for
-    hypothesis testing), then a ridge-regularized fit (alpha=1e-20, L1_wt=0)
-    for extracting modulation amplitude and preferred phase to avoid
-    overfitting.
+    A ridge-regularized fit (``alpha=1e-20``, ``L1_wt=0``) supplies both, as it
+    always has: statsmodels' coordinate descent lands ~1e-4 from the
+    unregularized MLE, so ``theta_mod`` and ``theta_preferred_phase`` are that
+    estimator's and swapping an IRLS backend must not quietly change them.
 
-    The regularized fit is statsmodels' coordinate-descent elastic net under
-    both fitters: its answer differs from the unregularized MLE by ~1e-4, so
-    ``theta_mod`` and ``theta_preferred_phase`` are that estimator's, not
-    IRLS's, and swapping the IRLS backend must not quietly change them.
+    No hypothesis test is read off these fits. The bundles' inference is the
+    blocked held-out deviance of the immobility models, and an asymptotic
+    likelihood ratio over autocorrelated 2 ms bins is not a quantity this
+    estimator reports, so the two unregularized fits it would need are not run.
 
     Parameters
     ----------
@@ -431,13 +367,6 @@ def test_theta_modulation(
         Binned spike counts aligned to ``is_immobile.index``.
     sampling_frequency : float
         Sampling frequency in Hz, used to set reindex tolerance.
-    fitter : {"statsmodels", "jax"}
-        Backend for the two unregularized fits the LR test is read from.
-        Ignored when ``prefitted`` is given.
-    prefitted : tuple, optional
-        ``(constant_result, theta_result)`` for this unit, already fit on the
-        design :func:`build_theta_design` returns for this session. Passed by
-        :func:`run_session`, which fits every unit at once.
     design : tuple, optional
         ``(joint_mask, design_matrix)`` from :func:`build_theta_design`. The
         design is the same for every unit of a session and reindexing the theta
@@ -446,20 +375,10 @@ def test_theta_modulation(
 
     Returns
     -------
-    likelihood_ratio : float
-        Likelihood ratio statistic (theta vs constant), or ``nan`` if either
-        unregularized fit ran to ``maxiter`` without converging -- a pair of
-        fits that never settled has no likelihood ratio to report. The
-        regularized fit ``theta_mod`` and ``theta_preferred_phase`` come from
-        is a different estimator (statsmodels' coordinate descent, which
-        reports no convergence flag) and is not gated.
-    p_value : float
-        P-value from chi-square test.
     modulation : float
         Theta modulation strength (sqrt of sum of squared cos/sin coefficients).
     preferred_phase : float
         Preferred theta phase in radians (-pi to pi).
-
     """
     if design is None:
         design = build_theta_design(
@@ -467,32 +386,11 @@ def test_theta_modulation(
         )
     joint_mask, design_matrix = design
 
-    if prefitted is not None:
-        constant_glm_results, theta_glm_results = prefitted
-    else:
-        constant_glm_results, theta_glm_results = _fit_theta_models(
-            design_matrix, neuron_spike_count[joint_mask], fitter=fitter
-        )
-
-    # Gated on convergence for the same reason the immobility models are: a
-    # pair of fits that ran to ``maxiter`` has no likelihood ratio to report,
-    # and a finite number here would be read as one.
-    if all(
-        bool(getattr(result, "converged", True))
-        for result in (constant_glm_results, theta_glm_results)
-    ):
-        likelihood_ratio, p_value = _lr_test(theta_glm_results, constant_glm_results)
-    else:
-        likelihood_ratio, p_value = np.nan, np.nan
-
-    theta_glm_model = sm.GLM(
+    theta_glm_results = sm.GLM(
         neuron_spike_count[joint_mask],
         design_matrix,
         family=sm.families.Poisson(),
-    )
-
-    # Fit regularized model to avoid overfitting for modulation and preferred phase
-    theta_glm_results = theta_glm_model.fit_regularized(alpha=1e-20, L1_wt=0.0)
+    ).fit_regularized(alpha=1e-20, L1_wt=0.0)
 
     modulation = np.sqrt(
         theta_glm_results.params[1] ** 2 + theta_glm_results.params[2] ** 2
@@ -501,7 +399,7 @@ def test_theta_modulation(
         theta_glm_results.params[2], theta_glm_results.params[1]
     )
 
-    return likelihood_ratio, p_value, modulation, preferred_phase
+    return modulation, preferred_phase
 
 
 #: Spacing of the B-spline's internal knots, in seconds. 50 ms resolves the
@@ -1125,7 +1023,6 @@ def process_neuron(
     fit_mask: pd.Series | None = None,
     fitter: str = "statsmodels",
     prefitted_immobility: Mapping[str, Any] | None = None,
-    prefitted_theta: tuple[Any, Any] | None = None,
     theta_design: tuple[NDArray, NDArray] | None = None,
     design_ranks: Mapping[str, int] | None = None,
     fit_diagnostics_out: dict[str, Any] | None = None,
@@ -1248,10 +1145,6 @@ def process_neuron(
         This neuron's immobility-model results, keyed by model name, already
         fit on ``fit_mask``. :func:`run_session` fits every neuron of a session
         at once and passes each neuron's slice in here.
-    prefitted_theta : tuple | None, optional
-        ``(constant_result, theta_result)`` for the theta LR test, likewise
-        already fit. The regularized fit ``theta_mod`` and
-        ``theta_preferred_phase`` come from is always run here, in statsmodels.
     theta_design : tuple | None, optional
         ``(joint_mask, design_matrix)`` from :func:`build_theta_design`, built
         once for the session rather than once per neuron.
@@ -1349,8 +1242,6 @@ def process_neuron(
 
         # Get run theta statistics
         (
-            neuron_stats["theta vs. constant: lr"],
-            neuron_stats["theta vs. constant: pval"],
             neuron_stats["theta_mod"],
             neuron_stats["theta_preferred_phase"],
         ) = test_theta_modulation(
@@ -1358,8 +1249,6 @@ def process_neuron(
             is_immobile,
             neuron_spike_count,
             sampling_frequency=sampling_frequency,
-            fitter=fitter,
-            prefitted=prefitted_theta,
             design=theta_design,
         )
         neuron_stats["run_avg_firing_rate"] = (
@@ -2464,7 +2353,6 @@ def _prefit_session(
     counts: NDArray | None = None,
 ) -> tuple[
     list[dict[str, Any] | None],
-    list[tuple[Any, Any] | None],
     dict[str, int],
     tuple[NDArray, NDArray],
     dict[str, int],
@@ -2486,8 +2374,7 @@ def _prefit_session(
     logger : logging.Logger
     penalty_sigma : float or None
         Prior standard deviation of an event-basis coefficient, on the log-rate
-        scale, for the immobility models. ``None`` fits them unpenalised. The
-        two theta models carry no event basis and are never penalised.
+        scale, for the immobility models. ``None`` fits them unpenalised.
     counts : NDArray, shape (n_time, n_units), optional
         Spike counts already binned on ``time``. Supplying the session-wide
         matrix avoids binning the same spikes again for scoring and for each
@@ -2497,8 +2384,6 @@ def _prefit_session(
     -------
     prefitted_immobility : list of dict
         Per neuron, the immobility results keyed by model name.
-    prefitted_theta : list of tuple
-        Per neuron, ``(constant_result, theta_result)`` for the theta LR test.
     design_ranks : dict[str, int]
         Rank of each design on the fit mask.
     theta_design : tuple
@@ -2547,27 +2432,14 @@ def _prefit_session(
     joint_mask, theta_design = build_theta_design(
         theta_phase, is_immobile, sampling_frequency=sampling_frequency
     )
-    logger.info(
-        "Batch-fitting %d neurons x 2 theta models on %d running bins...",
-        counts.shape[1],
-        int(joint_mask.sum()),
-    )
-    theta_constant, theta_full = _fit_theta_models(
-        theta_design, counts[joint_mask], fitter="jax"
-    )
 
     prefitted_immobility: list[dict[str, Any]] = [
         {name: result.for_unit(i) for name, result in batched.items()}
         for i in range(counts.shape[1])
     ]
-    prefitted_theta: list[tuple[Any, Any]] = [
-        (theta_constant.for_unit(i), theta_full.for_unit(i))
-        for i in range(counts.shape[1])
-    ]
 
     return (
         prefitted_immobility,
-        prefitted_theta,
         design_ranks,
         (joint_mask, theta_design),
         shipped_fit_counts(prefitted_immobility),
@@ -3012,7 +2884,6 @@ def run_session(
     )
 
     prefitted_immobility: list[dict[str, Any]] | None = None
-    prefitted_theta: list[tuple[Any, Any]] | None = None
     design_ranks: dict[str, int] | None = None
     theta_design: tuple[NDArray, NDArray] | None = None
     # The statsmodels path fits inside ``process_neuron`` and never reaches the
@@ -3030,7 +2901,6 @@ def run_session(
         # is taken from the same batched fit rather than recomputed per neuron.
         (
             prefitted_immobility,
-            prefitted_theta,
             design_ranks,
             theta_design,
             fit_counts,
@@ -3055,9 +2925,6 @@ def run_session(
             "design_ranks": design_ranks,
             "theta_design": theta_design,
             "prefitted_immobility": prefit,
-            "prefitted_theta": (
-                None if prefitted_theta is None else prefitted_theta[index]
-            ),
             "fit_diagnostics_out": (None if fit_diagnostics_out is None else {}),
             # Passing a full-length count vector to each Dask task is more
             # expensive than re-binning its sparse spikes. The production

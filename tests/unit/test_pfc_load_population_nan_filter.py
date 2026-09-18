@@ -30,7 +30,6 @@ from continuum_swr_replay.analysis.pfc.load_population import (
     HELDOUT_USABLE_DRAW_COLUMNS,
     LEGACY_FDR_TESTS,
     MATCHED_NULL_OBSERVED_COLUMNS,
-    heldout_q_column,
     load_population_data,
     significant_fraction,
 )
@@ -136,7 +135,10 @@ class TestLoadPopulationNanFilter:
         assert pd.isna(df[HELDOUT_P_COLUMNS["non_local_no_SWR"]].iloc[0])
         assert significant_fraction(df)["non_local_no_SWR"] == (0, 0)
         assert significant_fraction(df)["SWR"] == (1, 1)
-        assert heldout_q_column("SWR") not in df
+        # No BH column is created: a 1/1001 Monte Carlo grid cannot support
+        # unit-wise correction over thousands of dependent units, so the raw
+        # p-value is all the loader ships.
+        assert f"{HELDOUT_P_COLUMNS['SWR']}: heldout_q" not in df
 
     def test_a_session_whose_every_fit_failed_does_not_keyerror(self, tmp_path):
         """A fallback bundle writes only firing rates and all-NaN curves."""

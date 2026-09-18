@@ -60,6 +60,7 @@ import pandas as pd
 from numpy.typing import NDArray
 
 from continuum_swr_replay.analysis.pfc.batched_glm import (
+    DEFAULT_NULL_DESIGN_BATCH_SIZE,
     PreparedHeldoutResponse,
     prepare_heldout_response,
     score_poisson_designs_heldout,
@@ -77,7 +78,7 @@ from continuum_swr_replay.analysis.pfc.glm import (
 
 #: Smallest Monte Carlo sample used for a reported empirical p-value. Below
 #: this floor the grid is too coarse even for the descriptive ``p < .05``
-#: preview this phase reports. Production requests a larger sample, but this
+#: preview the bundles report. Production requests a larger sample, but this
 #: floor also governs deliberately shortened diagnostics and failed fits.
 MIN_USABLE_NULL_DRAWS = 20
 
@@ -86,10 +87,6 @@ MIN_USABLE_NULL_DRAWS = 20
 #: Kept with the p-value implementation so runners and figures cannot silently
 #: advertise different null sizes.
 DEFAULT_CONTROL_DRAWS = 1_000
-
-#: Number of equal-width null designs scored together. A real-session profile
-#: retained four after a larger batch increased end-to-end null wall time.
-DEFAULT_NULL_DESIGN_BATCH_SIZE = 4
 
 #: Provenance name for the finite-sample correction used by
 #: :func:`empirical_pvalue`. Readers use this to refuse older held-out bundles

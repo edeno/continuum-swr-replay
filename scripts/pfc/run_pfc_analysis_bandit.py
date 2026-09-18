@@ -103,6 +103,7 @@ from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
 from continuum_swr_replay.analysis.pfc.heldout import (
     CONTROL_NULL_EVENT_POLICY,
     DEFAULT_CONTROL_DRAWS,
+    DEFAULT_NULL_DESIGN_BATCH_SIZE,
     EMPIRICAL_PVALUE_METHOD,
     MIN_USABLE_NULL_DRAWS,
     assign_blocked_folds,
@@ -360,9 +361,7 @@ def results_exist(
         return False
     record = json.loads(sidecar.read_text())
     expected_usable_draws = (
-        None
-        if n_control_draws is None
-        else required_usable_null_draws(n_control_draws)
+        None if n_control_draws is None else required_usable_null_draws(n_control_draws)
     )
     return (
         record.get("stop_cohort") == stop_cohort
@@ -534,7 +533,7 @@ def score_session(
             design_batch,
             scoring_response,
             penalty_batch,
-            design_batch_size=4,
+            design_batch_size=DEFAULT_NULL_DESIGN_BATCH_SIZE,
         )
         for index, name in enumerate(names):
             deviance[name] = scored.total[index]
@@ -1155,9 +1154,7 @@ def run_analysis(
                 "control_draw_seed": int(control_draw_seed),
                 "empirical_pvalue_method": EMPIRICAL_PVALUE_METHOD,
                 "control_null_event_policy": CONTROL_NULL_EVENT_POLICY,
-                "min_usable_null_draws": required_usable_null_draws(
-                    n_control_draws
-                ),
+                "min_usable_null_draws": required_usable_null_draws(n_control_draws),
                 "matched_control_placement_method": (MATCHED_CONTROL_PLACEMENT_METHOD),
                 "n_basis_per_class": n_basis_per_class,
                 "implied_prior_sd": implied_prior,

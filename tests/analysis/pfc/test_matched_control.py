@@ -397,25 +397,35 @@ def test_a_real_session_writes_the_control_array_and_records_its_draw(tmp_path):
         pytest.skip(f"session listing unavailable: {exc}")
     if not sessions:
         pytest.skip("no session with decode results on disk")
-    session = sessions[0]
 
-    runner.run_analysis(
-        session["nwb_file_name"],
-        session["epoch_name"],
-        log_directory=tmp_path / "logs",
-        output_dir=tmp_path / "out",
-        # The suite pins JAX to CPU so no test takes a card on a shared host.
-        allow_cpu=True,
-    )
-
-    epoch_identifier = (
-        f"{session['nwb_file_name'].replace('_.nwb', '')}_{session['epoch_name']}_mPFC"
-    )
-    artifact = tmp_path / "out" / f"{epoch_identifier}_modulation.pkl"
-    if not artifact.exists():
+    # A session with no mPFC units writes arrays and a sidecar but never scores
+    # anything, so it carries none of the inference the skip check asks about.
+    # Take the first session that actually fits units.
+    # The null is drawn at the shortened reporting floor rather than the
+    # production count: the number of draws is not what the skip check reads,
+    # and a production-sized null would make one test an hour long.
+    n_control_draws = runner.MIN_USABLE_NULL_DRAWS
+    for session in sessions:
+        runner.run_analysis(
+            session["nwb_file_name"],
+            session["epoch_name"],
+            log_directory=tmp_path / "logs",
+            output_dir=tmp_path / "out",
+            n_control_draws=n_control_draws,
+            # The suite pins JAX to CPU so no test takes a card on a shared host.
+            allow_cpu=True,
+        )
+        epoch_identifier = (
+            f"{session['nwb_file_name'].replace('_.nwb', '')}_"
+            f"{session['epoch_name']}_mPFC"
+        )
+        artifact = tmp_path / "out" / f"{epoch_identifier}_modulation.pkl"
+        if artifact.exists() and len(pd.read_pickle(artifact)):
+            break
+    else:
         pytest.skip(
-            "the session did not fit (Spyglass, canonical inputs or mPFC units "
-            f"unavailable); see {tmp_path / 'logs'}"
+            "no listed session fit any mPFC unit (Spyglass, canonical inputs "
+            f"or mPFC units unavailable); see {tmp_path / 'logs'}"
         )
 
     control_array = artifact.with_suffix(".matched_control_modulation.npy")
@@ -437,7 +447,13 @@ def test_a_real_session_writes_the_control_array_and_records_its_draw(tmp_path):
     )
     # A run that writes the array must also be skippable as complete -- by a
     # run asking for the same estimator, which is what the skip check compares:
-    # the prior, the folds and the null's size and seed as well as the inputs.
+    # the prior, the folds and the null's size, seed, p-value convention,
+    # placement rule and per-unit usable-draw counts as well as the inputs.
+    assert record["n_control_draws"] == n_control_draws
+    assert record["min_usable_null_draws"] == runner.required_usable_null_draws(
+        n_control_draws
+    )
+    assert set(record["null_usable_draws"]) >= set(runner.EVENT_CLASSES)
     assert runner.results_exist(
         tmp_path / "out",
         epoch_identifier,

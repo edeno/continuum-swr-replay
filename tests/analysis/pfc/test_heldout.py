@@ -450,9 +450,7 @@ class TestEmpiricalPvalue:
         null[-1] = np.nan
 
         assert np.isnan(
-            empirical_pvalue(
-                np.array([2.0]), null, min_usable_draws=1_000
-            )[0]
+            empirical_pvalue(np.array([2.0]), null, min_usable_draws=1_000)[0]
         )
 
 

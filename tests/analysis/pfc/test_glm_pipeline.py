@@ -17,7 +17,6 @@ from patsy import dmatrix
 from continuum_swr_replay.analysis.pfc.glm import (
     NESTED_MODEL_PAIRS,
     _fit_immobility_models,
-    _fit_theta_models,
     _make_design_matrices,
     _prefit_session,
     build_theta_design,
@@ -187,15 +186,11 @@ class TestEventBasisFunctions:
         np.testing.assert_array_equal(kernels[0], 0.0)
         np.testing.assert_array_equal(kernels[-1], 0.0)
 
-    def test_the_basis_sums_to_one_between_the_outer_knots(
-        self, sampling_frequency
-    ):
+    def test_the_basis_sums_to_one_between_the_outer_knots(self, sampling_frequency):
         """So a flat modulation is representable, with equal coefficients."""
         lags = np.arange(-125, 126)
 
-        spline_basis, lag_time, knots = event_basis_functions(
-            lags, sampling_frequency
-        )
+        spline_basis, lag_time, knots = event_basis_functions(lags, sampling_frequency)
 
         interior = (lag_time >= knots[0]) & (lag_time <= knots[-1])
         np.testing.assert_allclose(spline_basis[interior].sum(axis=1), 1.0, atol=1e-12)
@@ -406,7 +401,6 @@ class TestPlantedKernelRecovery:
         assert -8.0 < penalised_peak.value[separated] < -1.0
 
 
-
 #: Peak lags (s) and signed amplitudes the replay-split regression test plants,
 #: one per event class. They are far apart in lag and opposite in sign, so a
 #: curve carrying the other class's kernel cannot be mistaken for noise.
@@ -479,9 +473,7 @@ def replay_split_session():
     is_immobile = pd.Series(np.ones(n_time, dtype=bool), index=time)
     # A short run window, so the theta comparison has bins to read.
     is_immobile.iloc[:500] = False
-    theta_phase = pd.Series(
-        np.mod(2 * np.pi * 8 * time, 2 * np.pi) - np.pi, index=time
-    )
+    theta_phase = pd.Series(np.mod(2 * np.pi * 8 * time, 2 * np.pi) - np.pi, index=time)
     designs, basis, basis_lag_time = _make_design_matrices(
         event_times, position_info, sampling_frequency=sampling_frequency, lags=lags
     )
@@ -564,6 +556,7 @@ class TestReplaySplitCurvesAreNotSwapped:
 
         assert stats["SWR_max_mod"] < 0
         assert stats["non_local_no_SWR_max_mod"] > 0
+
 
 class TestPeakLogModulation:
     """The curve-level read of a fit: where the kernel peaks, and how well."""
@@ -881,9 +874,7 @@ def _fit_ladder(is_immobile, design_matrices, spike_count, fitter):
         spike_count,
         fitter=fitter,
         penalties=(
-            model_penalties(design_matrices, PENALTY_SIGMA)
-            if fitter == "jax"
-            else None
+            model_penalties(design_matrices, PENALTY_SIGMA) if fitter == "jax" else None
         ),
     )
 
@@ -1001,14 +992,12 @@ class TestDevianceFractions:
 
 
 class TestThetaModulation:
-    def test_returns_four_values(self, theta_phase, is_immobile, spike_count):
-        lr, p, mod, phase = run_theta_modulation_test(
+    def test_returns_a_depth_and_a_phase(self, theta_phase, is_immobile, spike_count):
+        mod, phase = run_theta_modulation_test(
             theta_phase,
             is_immobile,
             spike_count,
         )
-        assert np.isfinite(lr)
-        assert 0 <= p <= 1
         assert mod >= 0
         assert -np.pi <= phase <= np.pi
 
@@ -1022,16 +1011,15 @@ class TestThetaModulation:
             index=time_axis,
         )
 
-        lr, p, mod, _ = run_theta_modulation_test(
+        mod, phase = run_theta_modulation_test(
             theta_phase,
             is_immobile,
             spike_count,
         )
-        # A function returning (p=0, mod=0) would pass the prior
-        # disjunction (mod < 0.5 is True). Require *both* a non-significant
-        # p-value AND a modest modulation depth so a degenerate output is
-        # caught.
-        assert p > 0.01 and mod < 0.5, f"p={p:.3f}, mod={mod:.3f}"
+        # A function returning a constant 0 would pass ``mod < 0.5`` on its
+        # own, so require a usable preferred phase beside the modest depth.
+        assert mod < 0.5, f"mod={mod:.3f}"
+        assert np.isfinite(phase)
 
 
 # ---------------------------------------------------------------------------
@@ -1194,8 +1182,9 @@ class TestProcessNeuron:
             sampling_frequency=sampling_frequency,
             lags=np.arange(-50, 51),
         )
-        fits, _ = _fit_ladder(is_immobile, dm, spike_counts_of(poisson_spike_times,
-                                                              time_axis), "jax")
+        fits, _ = _fit_ladder(
+            is_immobile, dm, spike_counts_of(poisson_spike_times, time_axis), "jax"
+        )
         broken = dict(fits)
         broken["SWR"] = dataclasses.replace(
             fits["SWR"], params=np.full_like(fits["SWR"].params, np.nan)
@@ -1220,8 +1209,11 @@ class TestProcessNeuron:
         assert np.isfinite(
             stats["non_local_SWR + non_local_no_SWR vs. non_local: frac_null_dev"]
         )
-        assert np.isfinite(stats["matched_control + non_local_no_SWR vs. "
-                                 "matched_control: frac_null_dev"])
+        assert np.isfinite(
+            stats[
+                "matched_control + non_local_no_SWR vs. matched_control: frac_null_dev"
+            ]
+        )
         assert np.isfinite(swr_mod).all()
         assert np.isfinite(no_swr_mod).all()
         assert np.isfinite(stats["immobility_avg_firing_rate"])
@@ -1245,8 +1237,9 @@ class TestProcessNeuron:
             sampling_frequency=sampling_frequency,
             lags=np.arange(-50, 51),
         )
-        fits, _ = _fit_ladder(is_immobile, dm, spike_counts_of(poisson_spike_times,
-                                                              time_axis), "jax")
+        fits, _ = _fit_ladder(
+            is_immobile, dm, spike_counts_of(poisson_spike_times, time_axis), "jax"
+        )
         broken = dict(fits)
         broken["non_local"] = dataclasses.replace(fits["non_local"], converged=False)
 
@@ -1620,31 +1613,19 @@ class TestFitterEquivalence:
             assert abs(actual[name].llf - expected[name].llf) < self.ATOL
             assert abs(actual[name].aic - expected[name].aic) < self.ATOL
 
-    def test_theta_modulation_is_the_same_under_either_fitter(
-        self, theta_phase, is_immobile, spike_count
-    ):
-        expected = run_theta_modulation_test(
-            theta_phase, is_immobile, spike_count, fitter="statsmodels"
-        )
-        actual = run_theta_modulation_test(
-            theta_phase, is_immobile, spike_count, fitter="jax"
-        )
-
-        for expected_value, actual_value in zip(expected, actual, strict=True):
-            assert abs(actual_value - expected_value) < self.ATOL
-
-    def test_the_regularized_theta_fit_is_statsmodels_under_both(
+    def test_the_regularized_theta_fit_is_statsmodels(
         self, theta_phase, is_immobile, spike_count
     ):
         """``theta_mod`` comes from the elastic net, whichever IRLS ran.
 
         statsmodels' ``fit_regularized(alpha=1e-20, L1_wt=0)`` lands ~1e-4 from
         the unregularized MLE, so substituting one for the other would move a
-        shipped column by more than the audit's tolerance. Both paths must call
-        the same estimator for it.
+        shipped column by more than the audit's tolerance. The theta pair is
+        the one place no IRLS fit is read at all: no hypothesis test is taken
+        off it, so the depth and phase come from this estimator alone.
         """
-        _, _, modulation, preferred_phase = run_theta_modulation_test(
-            theta_phase, is_immobile, spike_count, fitter="jax"
+        modulation, preferred_phase = run_theta_modulation_test(
+            theta_phase, is_immobile, spike_count
         )
         joint_mask, design = build_theta_design(theta_phase, is_immobile)
         regularized = sm.GLM(
@@ -2352,12 +2333,6 @@ class TestTheBatchedFitterRefusesAnUnconfiguredDevice:
         design[:, 1] = np.arange(32)
         with pytest.raises(UnconfiguredDeviceError, match="configure_jax_gpu"):
             fit_models_batched({"constant": design}, np.ones((32, 3)))
-
-    def test_the_batched_theta_fit_refuses(self, unconfigured):
-        from continuum_swr_replay.analysis.pfc.gpu import UnconfiguredDeviceError
-
-        with pytest.raises(UnconfiguredDeviceError, match="configure_jax_gpu"):
-            _fit_theta_models(np.ones((32, 3)), np.ones((32, 2)), fitter="jax")
 
     def test_a_cpu_pinned_process_still_fits(self, monkeypatch):
         from continuum_swr_replay.analysis.pfc import gpu as gpu_module

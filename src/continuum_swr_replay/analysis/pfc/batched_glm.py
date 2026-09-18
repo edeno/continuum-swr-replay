@@ -147,6 +147,11 @@ DEFAULT_PENALTY_SIGMA = 3.0
 #: direction a healthy fit uses comes anywhere near it.
 DEFAULT_RCOND = 1e-12
 
+#: Number of equal-width designs scored together by
+#: :func:`score_poisson_designs_heldout`. A real-session profile retained
+#: four after a larger batch increased end-to-end null wall time.
+DEFAULT_NULL_DESIGN_BATCH_SIZE = 4
+
 #: ``statsmodels.genmod.families.family.Family._clean`` clips at this before
 #: dividing, and the log link's ``deriv`` clips ``mu`` the same way. Mirrored
 #: so an underflowing fitted mean is handled identically.
@@ -1127,7 +1132,7 @@ def score_poisson_designs_heldout(
     response: PreparedHeldoutResponse,
     penalties: NDArray | None = None,
     *,
-    design_batch_size: int = 4,
+    design_batch_size: int = DEFAULT_NULL_DESIGN_BATCH_SIZE,
     maxiter: int = DEFAULT_MAXITER,
     tol: float = DEFAULT_TOL,
     rcond: float = DEFAULT_RCOND,

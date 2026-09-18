@@ -7,7 +7,7 @@ tested out of fold: a unit's evidence for an event class is the improvement in
 held-out Poisson deviance its fixed, matchable event subset buys, read against
 repeated draws of the matched non-event control for that identical subset. The
 all-event difference remains a separate descriptive result. So the population's "significant
-fraction" in this phase is the explicitly descriptive fraction of units with
+fraction" here is the explicitly descriptive fraction of units with
 raw *empirical* ``p < .05`` -- not a population-level inferential result and
 not a fraction of asymptotic likelihood-ratio tests. Population inference is
 performed only after aggregation from neuron to session to animal. A bundle
@@ -63,8 +63,7 @@ HELDOUT_USABLE_DRAW_COLUMNS = {
     "non_local_no_SWR": "non_local_no_SWR: n_usable_null_draws",
     "non_local_SWR": "non_local_SWR: n_usable_null_draws",
     "engagement": (
-        "matched_control + non_local_no_SWR vs. matched_control: "
-        "n_usable_null_draws"
+        "matched_control + non_local_no_SWR vs. matched_control: n_usable_null_draws"
     ),
 }
 
@@ -110,16 +109,6 @@ LEGACY_FDR_TESTS = (
     "SWR + non_local_no_SWR vs. non_local_no_SWR",
     "non_local_SWR + non_local_no_SWR vs. non_local",
 )
-
-
-def heldout_q_column(name: str) -> str:
-    """Retired BH column name, for readers diagnosing pre-review tables.
-
-    Current held-out populations do not create these columns: even the R=1,000
-    Monte Carlo grid cannot support unit-wise BH over a population of
-    thousands, and this phase calls only for a descriptive raw-p preview.
-    """
-    return f"{HELDOUT_P_COLUMNS[name]}: heldout_q"
 
 
 def _refuse_stale_bundle(df: pd.DataFrame, inference: str, data_dir: Path) -> None:
@@ -485,8 +474,7 @@ def load_population_data(
     # p-values use a finite R=1,000 Monte Carlo grid; its 1/1001 minimum still
     # cannot support BH across thousands of neurons, so they remain a raw-p
     # descriptive preview rather than a population-level inferential result.
-    # This phase reports raw-p fractions descriptively and leaves the actual
-    # population inference to the session -> animal layer.
+    # The population inference itself belongs to the session -> animal layer.
     adjusted = (
         {f"{test}: pval": f"{test}: fdr_q" for test in LEGACY_FDR_TESTS}
         if inference == "legacy"

@@ -1372,21 +1372,19 @@ def shrinkage_table(frame: pd.DataFrame) -> pd.DataFrame:
     summary = grouped.agg(
         n_units=("delta", "size"),
         median_abs_peak_mle=(
-            "peak_mle", lambda s: finite_statistic(s, np.median, absolute=True)
+            "peak_mle",
+            lambda s: finite_statistic(s, np.median, absolute=True),
         ),
         median_abs_peak_penalised=(
             "peak_penalised",
             lambda s: finite_statistic(s, np.median, absolute=True),
         ),
         median_abs_delta=(
-            "delta", lambda s: finite_statistic(s, np.median, absolute=True)
+            "delta",
+            lambda s: finite_statistic(s, np.median, absolute=True),
         ),
-        max_abs_delta=(
-            "delta", lambda s: finite_statistic(s, np.max, absolute=True)
-        ),
-        median_peak_mle_se=(
-            "peak_mle_se", lambda s: finite_statistic(s, np.median)
-        ),
+        max_abs_delta=("delta", lambda s: finite_statistic(s, np.max, absolute=True)),
+        median_peak_mle_se=("peak_mle_se", lambda s: finite_statistic(s, np.median)),
         n_prior_binds=("prior_binds", lambda s: int(s.fillna(False).sum())),
     ).reset_index()
     summary["prior_binds_pct"] = (
