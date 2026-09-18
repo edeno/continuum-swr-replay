@@ -395,7 +395,7 @@ def overlap_section(data_dir: Path) -> tuple[str, pd.DataFrame]:
         ]
     )
     text = (
-        "## What the engagement null's draws overlap\n\n"
+        "## How much of the engagement null is a copy of its baseline\n\n"
         "The engagement statistic's null draws are independent of the shipped "
         "matched control they are entered beside, so a draw may place a window "
         "where that control already sits -- something two real event classes "

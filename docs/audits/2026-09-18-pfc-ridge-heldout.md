@@ -520,7 +520,7 @@ Gaps are between consecutive onsets of one window set, in milliseconds, measured
 | wilbur20210329_02_r1 | null draws (non_local) | 217 | 20 | 3053 | 155.7 | 9 | 0.03194 |
 | wilbur20210329_02_r1 | null draws (SWR) | 126 | 20 | 5438 | 218.4 | 24 | 0.0308 |
 
-## What the engagement null's draws overlap
+## How much of the engagement null is a copy of its baseline
 
 The engagement statistic's null draws are independent of the shipped matched control they are entered beside, so a draw may place a window where that control already sits -- something two real event classes never do, because each class's windows avoid the others'. The cost is measured rather than removed: blocking it would draw the null by different rules from the control it stands in for. The larger this fraction, the more of the null's added regressor is a copy of the baseline it is entered beside, and the more anti-conservative the engagement p-value.
 
