@@ -237,14 +237,15 @@ computed by `implied_prior_sd` and recorded in every bundle's sidecar
 (`penalty_sigma_log_rate`, `implied_prior_sd`); the figures here are quoted
 from those sidecars, not restated by hand.
 
-Measured against that choice: on the three sessions the estimator was smoked
-on (374 units past the 1 Hz gate), the corpus's own spread — the unpenalised
-peaks' standard deviation with their estimation error deconvolved, divided by
-what one unit of σ buys at one lag — implies **σ ≈ 1.0–1.2** per coefficient
-(0.52 for the matched control). The shipped prior is about three times wider,
-which is the intent: it binds on **0.5–2.1 %** of well-posed units, and the
-median peak moves by about 0.01 on the log-rate scale against a standard error
-near 0.23. The audit reports that table beside the chosen value for whatever
+Measured against that choice on the shipped 71-session batch (10,907 units past
+the 1 Hz gate): the corpus's own spread — the unpenalised peaks' standard
+deviation with their estimation error deconvolved, divided by what one unit of σ
+buys at one lag — implies **σ = 1.05** (SWR), **1.15** (non-SWR), **1.28**
+(SWR-coupled replay) and **1.12** (the replay-split non-SWR curve) per
+coefficient, and **0.66** for the matched control. The shipped prior is about
+three times wider, which is the intent: it binds on **1.7 / 2.1 / 2.8 / 1.8 /
+1.2 %** of well-posed units for those five curves, and the median peak moves by
+0.009–0.028 on the log-rate scale against a standard error near 0.20–0.31. The audit reports that table beside the chosen value for whatever
 tree it is run on. Under the prior every unit x
 model converges; a unit that still fails is non-estimable and reported as NaN
 everywhere, counted. Sensitivity bundles at other priors are written under
@@ -306,15 +307,43 @@ retained only for deliberately shortened diagnostics.
 `n_control_draws`, `control_draw_seed`, exact-draw counts, tested source indices,
 and per-class total/tested/excluded window counts are in the sidecar. The
 `control_null_event_policy` provenance field prevents older all-event/thinner-null
-bundles from being pooled with this fixed-subset estimand. One caveat is recorded in the
-library: the null draws are independent of the shipped control and may overlap
-its windows, whereas two real event classes never do.
+bundles from being pooled with this fixed-subset estimand.
+
+**What the draw costs, measured** (`scripts/qa/measure_pfc_null_geometry.py`,
+reported in the batch audit). *Placement.* Control windows are found by
+enumerating legal same-bout, real-event-free onset bins and requiring the onsets
+to be distinct; the auxiliary duration-matching windows of two controls may
+overlap one another, because duration only constrains where an onset may be
+drawn and never enters the onset-only design. The former disjoint-window policy
+made an exact count-matched draw impossible in dense bouts — 0/40 usable draws
+for several classes on the first corrected smoke — which is the worse trade. The
+price is a drawn regressor whose onsets can bunch where a real one's never do:
+on three rebuilt sessions the drawn sets match the real class's median spacing
+closely (j16 non-local 1,310 ms drawn against 1,257 ms real; SWR 2,898 against
+2,895) but **1.2–6.6 %** of consecutive drawn onsets sit closer than the earlier
+window's own duration, against **0 %** of real ones, and the closest drawn pair
+is 4–33 ms apart against 24–86 ms real. *Engagement-null overlap.* The
+engagement null's draws are independent of the shipped control they are entered
+beside and may land on it, which two real classes never do: over the 71 sessions
+they overlap it on a **median 11.0 % of their windows** (5.4–52.9 % across
+sessions, one draw as high as 59.4 %, worst session `senor20201101_14_r7`). That
+much of the added regressor is a copy of its own baseline, so the engagement
+p-value is anti-conservative by about that much. *Units called without a gain.*
+A one-sided empirical p-value can be small while the unit's own held-out
+improvement is zero or negative — the draws simply did worse: **7.0–10.0 %** of
+the units at raw p < .05 are in that state per class (engagement 9.3 %, 250 of
+2,696). They are evidence against a content-free regressor of the same size, not
+evidence of out-of-fold prediction. *Events the test could not use.* Corpus-wide
+**0.3–1.4 %** of a class's events have no legal within-bout control and enter
+neither the observed nor the null side; the worst single session/class is
+`senor20201101_14_r7` / SWR, which excludes 40 of 162 (24.7 %), so a p-value
+there describes three quarters of that class's events.
 
 The fraction of units with raw empirical `p < .05` is an explicitly
 descriptive implementation preview. Units within a session and animal are not
 independent replicates, so no Benjamini-Hochberg correction is applied across
-them; population inference aggregates neuron → session → animal in its own
-phase. `analysis/pfc/load_population.py` refuses a bundle carrying
+them; the population inference that aggregates neuron → session → animal is a
+separate, still-pending analysis. `analysis/pfc/load_population.py` refuses a bundle carrying
 likelihood-ratio columns or a sidecar that does not state the corrected plus-one
 Monte Carlo method and usable-draw floor.
 

@@ -89,7 +89,17 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
   fit ran away; how many units carried a basis column with no spikes under it; what
   the two inferences call, per class and animal; how steady each nested pair's
   held-out difference is between folds; and the peaks' sensitivity to the prior,
-  against whatever `_sigma<value>` bundles are on disk.
+  against whatever `_sigma<value>` bundles are on disk (the report names how many
+  sessions those are). `--geometry <report.md>` folds in the null-geometry
+  measurements beside the p-values they qualify.
+- `measure_pfc_null_geometry.py` — measures what the mPFC held-out null's windows
+  look like beside the real events, and changes nothing: the inter-onset spacing of
+  the shipped matched control and of the null's own draws (rebuilt draw by draw from
+  their recorded seeds, for the sessions named on the command line) against the real
+  classes'; how much of the engagement null's draws land on the shipped control they
+  are entered beside; how many units called at raw p < .05 have no positive held-out
+  improvement of their own; and how many events of each class had no legal within-bout
+  control and so entered neither side of its test.
 - `diagnose_pfc_event_definition.py` — reports, per session, what the mPFC unit GLM's
   retired run-time event construction yielded against the canonical event table it now
   reads: the two event counts, how many events change SWR class once the lists are
@@ -125,9 +135,13 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
   event-basis coefficients and scores them out of fold: `--penalty-sigma` (the prior
   standard deviation on the log-rate scale; another value writes a `_sigma<value>`
   sensitivity bundle and draws no null), `--n-folds` (blocked over whole immobility
-  runs), `--n-control-draws` with `--fold-seed` / `--control-draw-seed` (derived from
-  the session key unless given, so a lone refit reproduces the batch's split and
-  null). It takes `--gpu N` / `--allow-cpu` to say which card it may take on a shared
+  runs, with runs whose ±250 ms kernel supports overlap joined into one block before
+  assignment), `--n-control-draws` with `--fold-seed` / `--control-draw-seed` (derived
+  from the session key unless given, so a lone refit reproduces the batch's split and
+  null). The canonical batch is **σ = 3**, **K = 5** and **R = 1,000** — a plus-one
+  p-value floor of 1/1,001 — and every requested draw must be usable for a unit's
+  p-value to be reported; the 20-draw floor is for deliberately shortened
+  diagnostics. It takes `--gpu N` / `--allow-cpu` to say which card it may take on a shared
   host. A batch runs as one process per card — `--n_workers 1 --gpu N --sessions
   <partition file>` — because one card handed to several workers is refused, and the
   same card handed twice to one process is ignored.

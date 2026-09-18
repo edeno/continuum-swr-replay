@@ -6,9 +6,13 @@ AIC machinery for the per-unit statistics. Spec authority: this file; `phase-2b-
 only where it names the blocked held-out contract; `shared-contracts.md` §"Matched-control
 interface" (unchanged). Everything else in the recut plan that this contradicts is superseded here.
 
-**Implementation status (reviewed 2026-09-17).** Task A and the Task B integration are implemented
-and passed the corrected three-session GPU gate at `00765b2` plus the full R = 1,000 endurance
-gate; Task C (the production batch, final audit, Figure 4 and claim update) has not run. The
+**Implementation status (2026-09-18): complete.** Task A, the Task B integration and Task C are all
+done. The library and runner passed the corrected three-session GPU gate at `00765b2` and the full
+R = 1,000 endurance gate; the production batch then ran at `db01df0` (71/71 sessions, 2026-09-16 to
+2026-09-17, five workers on cards 3/4/6/7/9, 13 h 52 m–16 h 59 m each, all exit 0), with the
+maximum-likelihood tree kept at `Processed-Data/_pre_ridge_backup_20260915`. The audit is
+`docs/audits/2026-09-18-pfc-ridge-heldout.md`; Figure 4 and claim 20 are regenerated and requoted
+from it; the null's geometry is measured in `scripts/qa/measure_pfc_null_geometry.py`. The
 original smoke selected σ = 3, K = 5 and R = 40.
 A follow-up prediction-only, microbatched JAX scorer reduced the j16 null phase from 8:26 to 1:49
 and made **R = 1,000** the production setting; R = 40 is retained only as the historical
@@ -21,7 +25,6 @@ population inference. In the corrected gate every class produced 40/40 exact dra
 matchable event subset, the combined population loader and estimator audit passed, and the largest
 session completed in 27:25 at 8.89 GiB peak RSS. The optimized j16 gate completed in 5:23 at
 4.66 GiB peak RSS with an equivalent 74 x 131 result table and byte-identical modulation arrays.
-Task C may launch on idle cards.
 
 **The problem.** 23 % of mPFC units have at least one model whose unpenalised Poisson fit
 separates (a spline column with no spikes under its support drives a coefficient to −∞); statsmodels
@@ -35,15 +38,17 @@ wall clock.
 1. **Estimator: penalised Poisson GLM with a loose Gaussian prior on the event-basis
    coefficients.** The coefficients live on the log-rate scale (the cubic B-spline basis with 50 ms
    knots is a partition of unity, so each coefficient is the log-rate modulation near its knot). The
-   prior's only job is to exclude implausible rates, not to shape plausible ones: `σ = 2` per
-   coefficient (`λ = 1/σ² = 0.25`), 95 % of prior mass on rate multipliers between about ×0.02 and
-   ×55; rat mPFC units are reported to move by at most ~10× above baseline and to near silence below,
+   prior's only job is to exclude implausible rates, not to shape plausible ones. **Ruling 2 set
+   the shipped value to `σ = 3` per coefficient** (`λ = 1/σ² ≈ 0.111`), whose implied per-lag sd of
+   2.066 puts 95 % of the prior mass on rate multipliers between about ×0.02 and ×57; the draft's
+   `σ = 2` below is superseded and survives only as one of the two sensitivity values; rat mPFC units are reported to move by at most ~10× above baseline and to near silence below,
    and 99 % of this corpus's well-posed SWR modulations are under ×20, so the prior binds only where
    the unpenalised fit diverges (a basis column with no spikes under it, whose coefficient the prior
    settles near −2 to −3, i.e. "rate at most a small fraction of baseline"). The same prior for every
-   unit, model and event class; the intercept is unpenalised. Sensitivity bundles at `σ = 1` and
-   `σ = 3`, plus an empirical-Bayes estimate of σ from the converged units' coefficient spread with
-   estimation noise deconvolved, reported next to the chosen value. The audit reports for how many
+   unit, model and event class; the intercept is unpenalised. Sensitivity bundles at `σ = 2` and
+   `σ = 4.5` (written for `j1620210710_02_r1`), plus an empirical-Bayes estimate of σ from the
+   converged units' coefficient spread with estimation noise deconvolved, reported next to the
+   chosen value (the batch gives 0.66–1.28 against the shipped 3). The audit reports for how many
    units the prior binds (penalised vs unpenalised peak modulation differing by more than the
    estimation error). The choice is documented as a stated scientific assumption.
 2. **One fitter.** The batched JAX Newton solver gains the penalty (`H + Λ`, `Λ = λ` on the
@@ -81,7 +86,7 @@ wall clock.
    separate descriptive result; store the matched-test observed statistic separately and record total,
    tested and excluded event counts plus tested source indices in the sidecar. Never compare an
    all-event observed statistic with a thinner null.
-5. **Modulation curves** come from the full-data penalised fit at `σ = 2`.
+5. **Modulation curves** come from the full-data penalised fit at the shipped prior (`σ = 3`).
 6. **Basis fixes folded in (user instruction 2026-09-15).** (a) Boundary symmetry: the patsy
    `bs(...) - 1` basis drops one boundary function, pinning the kernel to zero at −250 ms but
    leaving +250 ms free. Drop BOTH boundary functions so the kernel returns to baseline at both

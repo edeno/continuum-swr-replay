@@ -156,15 +156,24 @@ Three tiers:
    (`ridge_poisson_glm`), `inference` (`blocked_heldout_deviance`),
    `penalty_sigma_log_rate` with the `implied_prior_sd` it means for a curve,
    `n_basis_per_class`, `n_folds` / `fold_seed` / `fold_sizes` / `events_per_fold`,
-   and `n_control_draws` / `control_draw_seed` / `null_windows` (how many windows each
-   class's null draws placed against the real onset count they were matched to). The
+   `n_control_draws` / `control_draw_seed` / `null_usable_draws` /
+   `min_usable_null_draws` / `null_windows` (per class: the events total, the fixed
+   matchable subset actually tested, the excluded remainder, the tested source indices
+   and how many windows each draw placed), `empirical_pvalue_method` (`plus_one`),
+   `control_null_event_policy` (`fixed_jointly_matchable_subset`) and
+   `engagement_null_overlap` (how much of the engagement null's draws land on the shipped
+   control). The
    canonical bundles carry **σ = 3** (implied per-lag sd **2.066**, a rate multiplier
    of ×0.017–×57 at 95 %; sustained sd **0.905**, ×0.17–×5.9), **K = 5** folds and
    **R = 1,000** null draws — quoted from the sidecars, which is where a reader should
    check them. The finite-sample Monte Carlo p-value is **`(r + 1)/(R + 1)`**,
    so with 1,000 usable draws its minimum is **1/1,001 ≈ 0.001**; zero is impossible.
-   Draws that fail to place every matched window are excluded, and fewer than 20
-   usable draws leaves the p-value unavailable. Unit fractions at raw p < 0.05 are
+   Draws that fail to place every matched window are excluded, and **every
+   requested draw must be usable** for a unit's p-value to be reported — an
+   `R = 1,000` label always means a denominator of 1,000, and the per-unit
+   effective counts are in both the table and the sidecar (`null_usable_draws`,
+   `min_usable_null_draws`). The 20-draw floor governs deliberately shortened
+   diagnostics only. Unit fractions at raw p < 0.05 are
    descriptive previews only; population inference aggregates through session and
    animal. A bundle that does not state all of these is refit rather than skipped,
    and the population loader also refuses it before figure generation — the
@@ -176,19 +185,33 @@ Three tiers:
    never settled is non-estimable for the unit that owns it — every statistic reading
    it is NaN — so those counts are the only record of how much was dropped.
 
-   **The 71 at-well unit bundles were refit on 2026-09-15** at git `9879ff0`, under the
-   canonical event definition and with the matched non-event control, on six A100s
-   (13.7 h wall). They are the current bundles; the tree they replaced is kept whole at
-   `Processed-Data/_pre_canonical_events_backup_20260914/` (426 files, nothing deleted).
-   The rerun is audited in
-   [audits/2026-09-15-pfc-canonical-rerun.md](audits/2026-09-15-pfc-canonical-rerun.md):
-   nothing the two trees share moves outside the estimator gate's tolerances in any
-   session. **Figure 4 and claim 20 are still pending**, on the refit *and* on the
-   fit-validity work: 22,902 of 154,350 shipped model fits (14.8%, over 4,640 neurons)
-   never converged, and their statistics are inside the current numbers. See
+   **The current 71 at-well unit bundles are the ridge/held-out batch**, fit at git
+   `db01df0` — launched 2026-09-16, finished 2026-09-17, five workers on the idle A100s
+   (cards 3, 4, 6, 7 and 9), 13 h 52 m to 16 h 59 m of wall clock each. They replaced the
+   maximum-likelihood tree, which is kept whole at
+   `Processed-Data/_pre_ridge_backup_20260915/`. The before/after is audited in
+   [audits/2026-09-18-pfc-ridge-heldout.md](audits/2026-09-18-pfc-ridge-heldout.md):
+   non-converged fits fall from 14.8% of shipped model fits to **0.28%** (432 of 155,952,
+   over 48 neurons); the prior binds on 1.2–2.8% of well-posed units per curve; and the
+   two inferences call comparable fractions of a comparable population, which are **not**
+   comparable test by test. That audit also carries the null's geometry
+   (`scripts/qa/measure_pfc_null_geometry.py`): the engagement null's draws land on the
+   shipped control they are entered beside on a median 11.0% of their windows, 7–10% of
+   the units called at raw p < .05 have no positive held-out improvement of their own,
+   and 0.3–1.4% of a class's events have no legal within-bout control and enter neither
+   side of its test. Figure 4 is regenerated from these bundles; claim 20 is requoted from
+   this audit. A one-session sensitivity pair at σ = 2 and σ = 4.5
+   (`j1620210710_02_r1`) sits beside them under `_sigma2` / `_sigma4p5`.
+   **The replay-split curves were swapped in every bundle written before 2026-09-15** —
+   `non_local_SWR_modulation` held the non-SWR kernel and vice versa — so any per-class
+   modulation magnitude quoted from the split model before that date, including from the
+   backup tree, is mislabelled; whole-model comparisons never read a block and are
+   unaffected. See
    [design/cohort_and_timing_rules.md](design/cohort_and_timing_rules.md),
    [audits/2026-09-14-pfc-atwell-cohort.md](audits/2026-09-14-pfc-atwell-cohort.md) and
    [audits/2026-09-13-stage5b-stage6-atwell.md](audits/2026-09-13-stage5b-stage6-atwell.md).
+   The earlier canonical-events rerun is in
+   [audits/2026-09-15-pfc-canonical-rerun.md](audits/2026-09-15-pfc-canonical-rerun.md).
 
    The batched fitter runs on GPU through the project's `cuda` extra. **`uv.lock` has
    no entries for that extra** — it resolves empty — so the CUDA plugin was installed

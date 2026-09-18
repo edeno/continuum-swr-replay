@@ -23,9 +23,17 @@ claim 20 quote. That is the subject of
 blocked held-out deviance), the next phase, which supersedes the statsmodels hand-back and the
 asymptotic LR/AIC machinery. Claim 20's numbers are pending it.
 
-**Phase 0b implementation status (reviewed 2026-09-17):** Task A and the Task B integration are
-implemented on `pfc-ridge-heldout`; the production batch, final audit, Figure 4 regeneration and
-claim update in Task C have not run. The original smoke selected σ = 3, K = 5 and R = 40. A
+**Phase 0b status (2026-09-18): complete.** Task A, the Task B integration and Task C all landed
+on `pfc-ridge-heldout`. The production batch ran at `db01df0` — 71/71 sessions, launched 2026-09-16
+and finished 2026-09-17 on five idle A100s (cards 3, 4, 6, 7, 9), 13 h 52 m–16 h 59 m per worker,
+every worker exit 0 — and the maximum-likelihood tree is kept at
+`Processed-Data/_pre_ridge_backup_20260915`. Non-converged fits fell from 14.8 % of shipped model
+fits to 0.28 %. The before/after audit is `docs/audits/2026-09-18-pfc-ridge-heldout.md`, Figure 4 is
+regenerated from these bundles, claim 20 is requoted from that audit, and the null's geometry is
+measured (`scripts/qa/measure_pfc_null_geometry.py`): engagement-null/control overlap median 11.0 %,
+7–10 % of called units with no positive held-out improvement, 0.3–1.4 % of events unmatchable.
+Population inference (neuron → session → animal) remains Phase 4. The original smoke selected
+σ = 3, K = 5 and R = 40. A
 follow-up GPU optimization gate reduced that smoke's null phase from 8:26 to 1:49 and made
 **R = 1,000** the production default (minimum p = 1/1,001; the 40-draw artifact remains only a
 pre-production equivalence gate). Review
@@ -40,8 +48,7 @@ optimized one-session rerun was scientifically equivalent to the gated artifact 
 5:23 at 4.66 GiB peak RSS. The production-scale R = 1,000 gate then completed on the largest
 510-unit session in 1:33:07, with a 1:27:22 null phase, 95.05% average GPU compute, 9.1 GiB peak
 device memory and 8.4 GiB peak RSS. All 506 estimable units had all 1,000 usable draws for all five
-tests and every finite p-value lay on the k/1,001 grid. Task C may now launch on the idle subset of
-the host's ten A100s.
+tests and every finite p-value lay on the k/1,001 grid.
 
 **Corrected premise (2026-09-14):** Phase 1's motivating discrepancy does not hold. On the
 well-anchored mPFC population the retired ripple-overlap split and the canonical `is_swr` agree
@@ -50,7 +57,7 @@ well-anchored mPFC population the retired ripple-overlap split and the canonical
 ones included, and was wrong. Phase 1 therefore buys traceability — the canonical `event_id`s
 and input hashes on Figure 4 — not a relabelling; the matched control is the substantive change.
 
-Phase 0's fitter half and Phase 3's rerun are done; Phase 0b, Phase 0's GLM mechanics, 2b and 4
+Phase 0's fitter half, Phase 3's rerun and Phase 0b are done; Phase 0's GLM mechanics, 2b and 4
 are open.
 
 Rebuild the mPFC cross-area analysis (Figure 4 / claim #20) on a correct,

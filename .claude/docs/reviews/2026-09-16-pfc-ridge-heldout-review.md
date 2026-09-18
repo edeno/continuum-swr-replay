@@ -8,10 +8,24 @@ Scope: scientific correctness, inference validity, failure handling, memory and 
 
 ## Outcome
 
-Task A and the Task B integration are implemented, independently reviewed and have passed the
-corrected three-session GPU gate plus a full R = 1,000 endurance gate on the largest 510-unit
-session. Task C has not run: no ridge production batch, final cohort audit, regenerated Figure 4
-or updated claim should be treated as complete yet.
+The library, the runner integration and the batch are all complete. The pre-production gates
+below (the corrected three-session GPU gate and the full R = 1,000 endurance gate on the largest
+510-unit session) were followed by the production batch: **71/71 sessions at `db01df0`**, launched
+2026-09-16 and finished 2026-09-17 on five idle A100s (cards 3, 4, 6, 7 and 9), 13 h 52 m to
+16 h 59 m of wall clock per worker and at most 15.5 GiB of host memory; every worker exited 0. The
+maximum-likelihood tree it replaced is kept whole at `Processed-Data/_pre_ridge_backup_20260915`.
+Non-converged fits fell from 14.8 % of shipped model fits to 0.28 % (432 of 155,952, over 48
+neurons). The before/after audit is
+[docs/audits/2026-09-18-pfc-ridge-heldout.md](../../../docs/audits/2026-09-18-pfc-ridge-heldout.md),
+Figure 4 is regenerated from these bundles and claim 20 is requoted from that audit.
+
+Three properties of the null were measured afterwards rather than assumed
+(`scripts/qa/measure_pfc_null_geometry.py`, folded into that audit): the engagement null's draws
+land on the shipped control they are entered beside on a median 11.0 % of their windows (5.4–52.9 %
+across sessions), not the ~3 % assumed here; 7.0–10.0 % of the units called at raw p < .05 have a
+non-positive observed held-out improvement; and 0.3–1.4 % of a class's events corpus-wide have no
+legal within-bout control, with one session/class excluding 24.7 %. None of them changes the draw;
+all three are terms on which the p-values should be read.
 
 The initial review found and fixed eight inference defects:
 
