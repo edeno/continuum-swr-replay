@@ -141,6 +141,7 @@ def _canonical_events_and_arm_rows():
     timing = {10: (1.0, 1.04, False), 11: (2.0, 2.06, True), 12: (3.0, 3.08, False)}
     for event_id in (10, 11, 12):
         start, end, is_swr = timing[event_id]
+        duration = end - start + 1 / SAMPLING_FREQUENCY
         hard, posterior = values[event_id]
         rows.extend(
             [
@@ -150,6 +151,7 @@ def _canonical_events_and_arm_rows():
                     "is_swr": is_swr,
                     "event_start_s": start,
                     "event_end_s": end,
+                    "event_duration_s": duration,
                     "occupancy_state": "at_well",
                     "at_well": True,
                     "occupancy_well_arm": 2,
@@ -162,6 +164,7 @@ def _canonical_events_and_arm_rows():
                     "is_swr": is_swr,
                     "event_start_s": start,
                     "event_end_s": end,
+                    "event_duration_s": duration,
                     "occupancy_state": "at_well",
                     "at_well": True,
                     "occupancy_well_arm": 2,
@@ -182,7 +185,7 @@ def test_current_arm_marks_join_one_to_one_without_changing_event_order():
     assert marked["non_local_no_SWR"].current_arm_fraction.tolist() == [0.9, 0.2]
     assert marked["non_local_SWR"].current_arm_fraction_posterior.tolist() == [0.55]
     assert marked["non_local_no_SWR"][EVENT_DURATION_MARK].tolist() == pytest.approx(
-        np.log([0.08, 0.04])
+        np.log([0.082, 0.042])
     )
     assert "current_arm_fraction" not in classes["non_local_no_SWR"]
 
@@ -240,6 +243,7 @@ def test_current_arm_marks_fail_on_non_positive_event_duration():
     ] = 3.0
     zero_duration = arm_rows.copy()
     zero_duration.loc[zero_duration.event_id == 12, "event_end_s"] = 3.0
+    zero_duration.loc[zero_duration.event_id == 12, "event_duration_s"] = 0.0
 
     with pytest.raises(ValueError, match="non-positive durations"):
         attach_current_arm_marks(collapsed, zero_duration)

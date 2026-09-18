@@ -481,6 +481,7 @@ def attach_current_arm_marks(
         "is_swr",
         "event_start_s",
         "event_end_s",
+        "event_duration_s",
         "occupancy_state",
         "at_well",
         "occupancy_well_arm",
@@ -531,6 +532,7 @@ def attach_current_arm_marks(
         "is_swr",
         "event_start_s",
         "event_end_s",
+        "event_duration_s",
         "occupancy_state",
         "at_well",
         "occupancy_well_arm",
@@ -612,9 +614,12 @@ def attach_current_arm_marks(
                     f"event-arm timing column {content!r} disagrees with "
                     f"canonical {canonical!r} for class {event_class!r}"
                 )
-        duration = pd.to_numeric(frame["end_time"], errors="coerce").to_numpy(
+        # The canonical replay table's duration is inclusive of one sampled
+        # decode bin. Recomputing ``end - start`` here would shorten every
+        # event, with the largest relative error on the shortest events.
+        duration = pd.to_numeric(frame["event_duration_s"], errors="coerce").to_numpy(
             float
-        ) - pd.to_numeric(frame["start_time"], errors="coerce").to_numpy(float)
+        )
         if not np.isfinite(duration).all() or np.any(duration <= 0):
             raise ValueError(
                 f"class {event_class!r} has non-finite or non-positive durations"
@@ -653,6 +658,7 @@ def attach_current_arm_marks(
                 "arm_is_swr",
                 "event_start_s",
                 "event_end_s",
+                "event_duration_s",
                 "arm_occupancy_state",
                 "arm_at_well",
                 "arm_occupancy_well_arm",
