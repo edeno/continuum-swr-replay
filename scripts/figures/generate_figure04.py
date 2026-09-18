@@ -558,7 +558,10 @@ def generate_figure(
     lag_time = lag_time[report_mask]
 
     # --- Load population data ---
-    print("Loading population data...")
+    print(
+        f"Loading population data (prior sigma {penalty_sigma}, "
+        f"R={DEFAULT_CONTROL_DRAWS} control draws)..."
+    )
     pop_df, modulations, pop_lag_time = load_population_data(
         data_dir,
         min_firing_rate=1.0,
