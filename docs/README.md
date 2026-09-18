@@ -59,6 +59,12 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     Dirichlet-multinomial, on one 218-session cohort: what each assumes,
     simulation recovery, which conclusions are estimator-dependent, and the
     `log_phi_is_swr` concentration result. Not yet reflected in the claims table.
+  - [design/pfc_marked_event_kernels.md](design/pfc_marked_event_kernels.md)
+    — the content-marked mPFC replay kernels: the `current_arm_fraction` mark
+    and its within-session/class scaling, the jointly fit ordinary + duration +
+    content kernels, the nested held-out comparison per replay class, and why
+    the mark-label shuffle is a descriptive reference rather than a calibrated
+    conditional test. Nothing has been fit yet.
 - [known_issues/](known_issues/) — *reference*: documented data/pipeline issues.
   - [three_sessions_blocked_by_nwb_checksum.md](known_issues/three_sessions_blocked_by_nwb_checksum.md)
     — the canonical cohort is 215 of 218; three sessions fail an upstream NWB
@@ -129,9 +135,10 @@ Three tiers:
 
    | artifact | producer | holds |
    |---|---|---|
-   | `Processed-Data/{epoch_identifier}_mPFC_modulation.pkl` + five `*_modulation.npy` | `scripts/pfc/run_pfc_analysis_bandit.py` | per-unit penalised-GLM statistics — held-out deviance and separated-column count per model, each nested pair's held-out difference (total and per fold), an empirical p-value per event class and for the engagement comparison, the best model by held-out deviance, and per curve the penalised and unpenalised peak with that peak's own standard error — plus the five peri-event modulation time courses (`SWR`, `no_SWR`, `non_local_SWR`, `non_local_no_SWR`, and `matched_control`, the duration-matched non-event baseline). All five are read into the Figure 4 population by `analysis/pfc/load_population.py`; the first four are NaN-free by its drop rule, while the matched-control curve may carry NaN and is reduced with `nanmean` |
+   | `Processed-Data/{epoch_identifier}_mPFC_modulation.pkl` + five `*_modulation.npy` | `scripts/pfc/run_pfc_analysis_bandit.py` | per-unit penalised-GLM statistics — held-out deviance and separated-column count per model, each nested pair's held-out difference (total and per fold), an empirical p-value per event class and for the engagement comparison, the best model by held-out deviance, and per curve the penalised and unpenalised peak with that peak's own standard error — plus the five peri-event modulation time courses (`SWR`, `no_SWR`, `non_local_SWR`, `non_local_no_SWR`, and `matched_control`, the duration-matched non-event baseline). All five are read into the Figure 4 population by `analysis/pfc/load_population.py`; a unit enters when its first four curves are finite. Firing rate and inferential values do not gate this descriptive population. The matched-control curve may carry NaN and is reduced with `nanmean` |
    | `replay_content/stop_replay_summary.pkl`, `stage6_is_stay_{logistic,pooled_gee}{,_swr,_non_swr,_mua}.pkl` | `scripts/pfc/run_stage6_learning.py` | the per-stop replay summary and the stay/leave models (claim 19e) |
    | `replay_content/stage5b_retrospective{,_swr_only,_non_swr_only}.pkl` | `scripts/pfc/run_stage5b_retrospective.py` | the retrospective/prospective event-grain metrics against their visit-context shuffle |
+   | `pfc_marked_kernels/{epoch_identifier}_{mark}_marked_kernels.pkl` + `.lag_time.npy`, `.{class}.typical.npy`, `.{class}.mark_slope.npy`, `.mark_label_shuffle_reference.npz`, `.provenance.json` | `scripts/pfc/run_pfc_marked_kernels.py` | the content-marked kernels of [design/pfc_marked_event_kernels.md](design/pfc_marked_event_kernels.md). One bundle per session × mark (`current_arm_fraction`, or `current_arm_fraction_posterior` as a sensitivity): the pickle holds the per-neuron statistics (held-out deviance of the joint full model and of each class's reduced model, the class's held-out improvement, the label-shuffle tail fraction and usable-shuffle count, convergence flags); the `.npy` companions hold the reported lag axis and, per replay class (`non_local_SWR`, `non_local_no_SWR`), the typical-event kernel and the content mark-slope kernel; the `.npz` holds that class's shuffled held-out improvements; the sidecar the provenance. **Nothing has been fit yet** — no bundle exists on disk |
 
    All three are fit on the **well-anchored stop cohort**, the same population as the
    rate and content ladders, and an unsuffixed PFC artifact is that cohort; `_allstops`
@@ -192,11 +199,14 @@ Three tiers:
    `Processed-Data/_pre_ridge_backup_20260915/`. The before/after is audited in
    [audits/2026-09-18-pfc-ridge-heldout.md](audits/2026-09-18-pfc-ridge-heldout.md):
    non-converged fits fall from 14.8% of shipped model fits to **0.28%** (432 of 155,952,
-   over 48 neurons); the prior binds on 1.2–2.8% of well-posed units per curve; and the
+   over 48 neurons). On the descriptive population of **17,280 units with four finite
+   primary curves**, the prior binds on 2.5–5.0% of well-posed units per curve; neither
+   the former 1 Hz threshold nor availability/value of a p-value, held-out score or model
+   choice controls inclusion. The
    two inferences call comparable fractions of a comparable population, which are **not**
    comparable test by test. That audit also carries the null's geometry
    (`scripts/qa/measure_pfc_null_geometry.py`): the engagement null's draws land on the
-   shipped control they are entered beside on a median 11.0% of their windows, 7–10% of
+   shipped control they are entered beside on a median 11.0% of their windows, 6.2–8.4% of
    the units called at raw p < .05 have no positive held-out improvement of their own,
    and 0.3–1.4% of a class's events have no legal within-bout control and enter neither
    side of its test. Figure 4 is regenerated from these bundles; claim 20 is requoted from

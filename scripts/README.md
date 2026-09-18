@@ -145,6 +145,22 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
   host. A batch runs as one process per card — `--n_workers 1 --gpu N --sessions
   <partition file>` — because one card handed to several workers is refused, and the
   same card handed twice to one process is ignored.
+- `run_pfc_marked_kernels.py` fits the content-marked extension of those unit GLMs
+  (`docs/design/pfc_marked_event_kernels.md`): per replay class an ordinary kernel, a
+  log-duration nuisance kernel and a content kernel, all jointly, scored out of fold
+  against a mark-label shuffle. It takes `--scientific-mark`
+  (`current_arm_fraction`, the default, or `current_arm_fraction_posterior`),
+  `--nuisance-marks` (log event duration by default; pass the flag with no values to
+  drop it), `--n-shuffles` with `--shuffle-seed` (default 100, giving 1/101 tail
+  resolution — 0 skips the reference, and any other value must be at least the 20-draw
+  floor), `--design-batch-size` for how many permuted designs are scored at once, and
+  `--event-arm-table` for the table the mark is read from. It shares
+  `--penalty-sigma`, `--n-folds`, `--fold-seed`, `--brain-area`, the session
+  selectors (`--animal` / `--date` / `--epoch` / `--sessions` / `--max-sessions`),
+  `--gpu` / `--allow-cpu`, `--output-dir` (default
+  `Processed-Data/pfc_marked_kernels/`) and `--overwrite` with the canonical runner.
+  It has no `--stop-cohort`: it always fits the well-anchored cohort.
+  **No bundle has been produced yet.**
 
 ## `exploratory/` — unsupported one-offs
 Scratch scripts (`_*.py`): diagnostics, ad-hoc plots, verification checks. Not part of the
