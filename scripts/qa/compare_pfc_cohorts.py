@@ -1687,6 +1687,8 @@ def sigma_sensitivity_table(after_dir: Path, artifact_suffix: str = "") -> pd.Da
                 {
                     "sigma": sigma.replace("p", "."),
                     "event_class": name,
+                    "n_sessions": len(shared),
+                    "sessions": ", ".join(shared),
                     "n_units": int(finite.sum()),
                     "median_abs_delta_peak": round(
                         float(np.median(np.abs(stacked[finite]))), 4
@@ -2457,12 +2459,26 @@ def build_estimator_report(
             "`run_pfc_analysis_bandit.py --penalty-sigma <value>`.\n"
         )
     else:
+        covered = sorted(
+            {
+                session
+                for row in sigma_table["sessions"]
+                for session in str(row).split(", ")
+                if session
+            }
+        )
         add(
             "Peak log-modulation at each sensitivity prior against the "
             "canonical one, unit by unit. A curve the spikes determine barely "
             "moves; one the prior determines moves with it.\n"
         )
-        add(_md(sigma_table))
+        add(
+            f"**This is {len(covered)} session(s), not the corpus**: "
+            f"{', '.join(covered)}. A sensitivity bundle is a separate fit of "
+            "the whole session at another prior, so the table says how far the "
+            "curves of those units move -- not how far the corpus's would.\n"
+        )
+        add(_md(sigma_table.drop(columns=["sessions"])))
 
     add("## The population that reaches Figure 4\n")
     add(
