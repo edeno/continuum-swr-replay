@@ -8,6 +8,8 @@ equivalence audit is gated on.
 
 from __future__ import annotations
 
+from functools import partial
+
 import jax
 import numpy as np
 import pytest
@@ -25,6 +27,14 @@ from continuum_swr_replay.analysis.pfc.batched_glm import (
     poisson_deviance_from_params,
     prepare_heldout_response,
     score_poisson_designs_heldout,
+)
+from continuum_swr_replay.analysis.pfc.glm import (
+    convolve_event_basis,
+    event_basis_functions,
+)
+from continuum_swr_replay.analysis.pfc.heldout import (
+    assign_blocked_folds,
+    heldout_deviance,
 )
 
 # Well below the audit's gate (params 1e-5, deviance/llf 1e-6): the two fitters
@@ -676,6 +686,128 @@ class TestPredictionOnlyHeldoutBatch:
         )
         np.testing.assert_array_equal(actual.n_iter[0], expected_iterations)
         np.testing.assert_array_equal(actual.rank[0], np.full(3, 2))
+
+    def test_a_fit_that_hits_maxiter_matches_the_reference(self, monkeypatch):
+        """A unit that never settles is NaN in both paths, and only that unit.
+
+        The two scorers stop on the same rule, so an iteration cap must land on
+        the same unit x fold cells. A separating column marches its coefficient
+        down for tens of iterations while the well-posed unit settles in a
+        handful, so a low cap splits the two.
+        """
+        from continuum_swr_replay.analysis.pfc import batched_glm as batched_module
+
+        rng = np.random.default_rng(20260918)
+        n_time, maxiter = 600, 6
+        separating = np.zeros(n_time)
+        separating[:6] = 1.0
+        design = np.column_stack(
+            [np.ones(n_time), rng.normal(scale=0.3, size=n_time), separating]
+        )
+        well_posed = rng.poisson(0.3, size=n_time).astype(float)
+        separated = rng.poisson(0.3, size=n_time).astype(float)
+        separated[:6] = 0.0
+        counts = np.column_stack([well_posed, separated])
+        folds = np.arange(n_time, dtype=int) % 3
+        penalty = np.array([0.0, 0.0, 1e-12])
+
+        response = prepare_heldout_response(counts, folds)
+        actual = score_poisson_designs_heldout(
+            design, response, penalty, maxiter=maxiter
+        )
+
+        monkeypatch.setattr(
+            batched_module,
+            "fit_poisson_glms",
+            partial(fit_poisson_glms, maxiter=maxiter),
+        )
+        expected = heldout_deviance(design, counts, penalty, folds)
+
+        assert not actual.converged[0, :, 1].any(), (
+            "the separating unit was expected to hit the iteration cap"
+        )
+        assert actual.converged[0, :, 0].all(), (
+            "the well-posed unit was expected to settle inside the cap"
+        )
+        np.testing.assert_allclose(
+            actual.per_fold[0], expected.per_fold, atol=ATOL, rtol=0
+        )
+        np.testing.assert_allclose(actual.total[0], expected.total, atol=ATOL, rtol=0)
+
+    def test_a_production_shaped_design_matches_the_reference(self):
+        """The shape the batch actually scores: 23 columns, 200 units, 50k bins.
+
+        The small synthetic cases above cannot see an accumulation-order
+        difference between the two paths. This one is the production design --
+        a constant plus two convolved 11-function event blocks -- at the batch's
+        own scale.
+        """
+        rng = np.random.default_rng(902)
+        n_time, n_units, n_folds = 50_000, 200, 5
+        sampling_frequency = 500.0
+        lags = np.arange(-125, 126)
+        spline_basis, _, _ = event_basis_functions(lags, sampling_frequency)
+        assert spline_basis.shape[1] == 11
+
+        blocks = []
+        for _ in range(2):
+            onsets = np.zeros(n_time)
+            onsets[rng.choice(n_time, size=300, replace=False)] = 1.0
+            blocks.append(convolve_event_basis(onsets, spline_basis, lags))
+        design = np.column_stack([np.ones(n_time), *blocks])
+        assert design.shape[1] == 23
+
+        coefficients = rng.normal(scale=0.2, size=(n_units, design.shape[1]))
+        coefficients[:, 0] -= 3.0
+        counts = rng.poisson(np.exp(design @ coefficients.T)).astype(float)
+        folds = np.arange(n_time, dtype=int) % n_folds
+        penalty = make_ridge_penalty(design.shape[1], sigma=DEFAULT_PENALTY_SIGMA)
+
+        response = prepare_heldout_response(counts, folds)
+        actual = score_poisson_designs_heldout(design, response, penalty)
+        expected = heldout_deviance(design, counts, penalty, folds)
+
+        np.testing.assert_allclose(
+            actual.per_fold[0], expected.per_fold, atol=ATOL, rtol=0
+        )
+        np.testing.assert_allclose(actual.total[0], expected.total, atol=ATOL, rtol=0)
+
+    def test_session_shaped_blocked_folds_match_the_reference(self):
+        """Folds as a session draws them: whole immobility runs, unequal sizes.
+
+        Modulo folds interleave every bin, so they never exercise the contiguous
+        held-out blocks a real split produces.
+        """
+        rng = np.random.default_rng(4242)
+        n_time = 30_000
+        fit_mask = np.zeros(n_time, dtype=bool)
+        cursor = 0
+        while cursor < n_time:
+            run = int(rng.integers(200, 2_000))
+            gap = int(rng.integers(50, 400))
+            fit_mask[cursor : cursor + run] = True
+            cursor += run + gap
+        folds = assign_blocked_folds(fit_mask, 5, seed=7, support_radius_bins=125)
+        n_fit = int(fit_mask.sum())
+        assert folds.shape == (n_fit,)
+        assert len(np.unique(np.bincount(folds))) > 1, "folds are meant to be uneven"
+
+        design = np.column_stack(
+            [np.ones(n_fit), rng.normal(scale=0.4, size=(n_fit, 3))]
+        )
+        coefficients = rng.normal(scale=0.3, size=(12, design.shape[1]))
+        coefficients[:, 0] -= 2.0
+        counts = rng.poisson(np.exp(design @ coefficients.T)).astype(float)
+        penalty = make_ridge_penalty(design.shape[1], sigma=DEFAULT_PENALTY_SIGMA)
+
+        response = prepare_heldout_response(counts, folds)
+        actual = score_poisson_designs_heldout(design, response, penalty)
+        expected = heldout_deviance(design, counts, penalty, folds)
+
+        np.testing.assert_allclose(
+            actual.per_fold[0], expected.per_fold, atol=ATOL, rtol=0
+        )
+        np.testing.assert_allclose(actual.total[0], expected.total, atol=ATOL, rtol=0)
 
 
 class TestBackend:

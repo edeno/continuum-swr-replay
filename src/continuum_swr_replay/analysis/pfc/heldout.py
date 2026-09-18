@@ -329,6 +329,16 @@ def heldout_deviance(
 ) -> HeldoutDeviance:
     """Out-of-fold Poisson deviance of one design, for every unit at once.
 
+    This is the reference implementation the batch's scorer is held to: one
+    plain fold-by-fold loop over
+    :func:`~continuum_swr_replay.analysis.pfc.batched_glm.fit_poisson_glms`,
+    with no batching, no device residency and no shape padding. The
+    production path
+    (:func:`~continuum_swr_replay.analysis.pfc.batched_glm.score_poisson_designs_heldout`)
+    must reproduce it to 1e-8 on a production-shaped design, on
+    session-shaped folds and on fits that hit the iteration cap; where the two
+    disagree, this one is right.
+
     Parameters
     ----------
     design : NDArray, shape (n_fit_bins, n_features)
