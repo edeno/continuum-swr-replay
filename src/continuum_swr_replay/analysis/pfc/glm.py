@@ -1141,10 +1141,12 @@ def process_neuron(
         - ``run_avg_firing_rate``: Hz over every moving bin.
         - ``immobility_avg_firing_rate``: Hz over the bins the models were fit
           on -- with a stop cohort, the cohort's immobile bins, not every
-          immobile bin. This is the rate the downstream ``min_firing_rate``
-          inclusion gate screens on, so it describes the sample the estimates
-          come from; its value therefore depends on the cohort the bundle was
-          fit on (named in the bundle's provenance sidecar).
+          immobile bin. It describes the sample the estimates come from; its
+          value therefore depends on the cohort the bundle was fit on (named in
+          the bundle's provenance sidecar). Figure 4 no longer screens on it;
+          it is carried as a unit property in the population table and
+          summarized by the cohort audit. ``load_population_data`` accepts an
+          explicit threshold only for sensitivity analyses.
         - ``immobility_avg_firing_rate_all_immobile``: Hz over every immobile
           bin, cohort or not. Equal to ``immobility_avg_firing_rate`` exactly
           when no stop restriction was applied.

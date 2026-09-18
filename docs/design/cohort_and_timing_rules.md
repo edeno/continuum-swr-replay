@@ -237,15 +237,16 @@ computed by `implied_prior_sd` and recorded in every bundle's sidecar
 (`penalty_sigma_log_rate`, `implied_prior_sd`); the figures here are quoted
 from those sidecars, not restated by hand.
 
-Measured against that choice on the shipped 71-session batch (10,907 units past
-the 1 Hz gate): the corpus's own spread — the unpenalised peaks' standard
+Measured against that choice on the shipped 71-session batch (**17,280 units
+with four finite primary curves**, with no firing-rate or inferential inclusion
+screen): the corpus's own spread — the unpenalised peaks' standard
 deviation with their estimation error deconvolved, divided by what one unit of σ
-buys at one lag — implies **σ = 1.05** (SWR), **1.15** (non-SWR), **1.28**
-(SWR-coupled replay) and **1.12** (the replay-split non-SWR curve) per
-coefficient, and **0.66** for the matched control. The shipped prior is about
-three times wider, which is the intent: it binds on **1.7 / 2.1 / 2.8 / 1.8 /
-1.2 %** of well-posed units for those five curves, and the median peak moves by
-0.009–0.028 on the log-rate scale against a standard error near 0.20–0.31. The audit reports that table beside the chosen value for whatever
+buys at one lag — implies **σ = 1.25** (SWR), **1.19** (non-SWR), **1.41**
+(SWR-coupled replay) and **1.26** (the replay-split non-SWR curve) per
+coefficient, and **0.93** for the matched control. The shipped prior remains
+substantially wider, which is the intent: it binds on **3.6 / 4.2 / 5.0 / 3.5 /
+2.5 %** of well-posed units for those five curves, and the median peak moves by
+0.016–0.044 on the log-rate scale against a standard error near 0.25–0.36. The audit reports that table beside the chosen value for whatever
 tree it is run on. Under the prior every unit x
 model converges; a unit that still fails is non-estimable and reported as NaN
 everywhere, counted. Sensitivity bundles at other priors are written under
@@ -330,9 +331,9 @@ sessions, one draw as high as 59.4 %, worst session `senor20201101_14_r7`). That
 much of the added regressor is a copy of its own baseline, so the engagement
 p-value is anti-conservative by about that much. *Units called without a gain.*
 A one-sided empirical p-value can be small while the unit's own held-out
-improvement is zero or negative — the draws simply did worse: **7.0–10.0 %** of
-the units at raw p < .05 are in that state per class (engagement 9.3 %, 250 of
-2,696). They are evidence against a content-free regressor of the same size, not
+improvement is zero or negative — the draws simply did worse: **6.2–8.4 %** of
+the units at raw p < .05 are in that state per class (engagement 7.5 %, 259 of
+3,444). They are evidence against a content-free regressor of the same size, not
 evidence of out-of-fold prediction. *Events the test could not use.* Corpus-wide
 **0.3–1.4 %** of a class's events have no legal within-bout control and enter
 neither the observed nor the null side; the worst single session/class is
@@ -346,6 +347,13 @@ them; the population inference that aggregates neuron → session → animal is 
 separate, still-pending analysis. `analysis/pfc/load_population.py` refuses a bundle carrying
 likelihood-ratio columns or a sidecar that does not state the corrected plus-one
 Monte Carlo method and usable-draw floor.
+
+Figure 4's population is defined independently of those inferential values. A
+unit is included when all four primary modulation curves are finite; firing
+rate, p-value presence or magnitude, held-out score and best-model availability
+do not select it. The raw-p bars and best-model bars use their own finite tested
+denominators, so an unavailable statistic is omitted from that statistic only,
+not counted as a negative and not removed from the descriptive curves.
 
 **The replay-split curves were swapped until 2026-09-15.** The replay-split
 design is concatenated `[constant, non_local_no_SWR, non_local_SWR]` — the

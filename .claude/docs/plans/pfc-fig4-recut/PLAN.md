@@ -31,7 +31,10 @@ every worker exit 0 — and the maximum-likelihood tree is kept at
 fits to 0.28 %. The before/after audit is `docs/audits/2026-09-18-pfc-ridge-heldout.md`, Figure 4 is
 regenerated from these bundles, claim 20 is requoted from that audit, and the null's geometry is
 measured (`scripts/qa/measure_pfc_null_geometry.py`): engagement-null/control overlap median 11.0 %,
-7–10 % of called units with no positive held-out improvement, 0.3–1.4 % of events unmatchable.
+6.2–8.4 % of called units with no positive held-out improvement, 0.3–1.4 % of events unmatchable.
+The 2026-09-18 descriptive-population revision removes the 1 Hz and inferential-availability
+screens: Figure 4 now contains all 17,280 units with four finite primary curves; each p-value or
+best-model summary uses only its own finite tested denominator.
 Population inference (neuron → session → animal) remains Phase 4. The original smoke selected
 σ = 3, K = 5 and R = 40. A
 follow-up GPU optimization gate reduced that smoke's null phase from 8:26 to 1:49 and made

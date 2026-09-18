@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import scripts.qa.compare_pfc_cohorts as cohort_audit
 from continuum_swr_replay.analysis.pfc.glm import MATCHED_CONTROL_PLACEMENT_METHOD
 from continuum_swr_replay.analysis.pfc.heldout import (
     CONTROL_NULL_EVENT_POLICY,
@@ -472,17 +473,41 @@ class TestSidecarTables:
 
 
 class TestPopulation:
+    def test_primary_statistic_count_requires_a_finite_value(
+        self, monkeypatch, tmp_path
+    ):
+        frame = pd.DataFrame(
+            {
+                "immobility_avg_firing_rate": [1.0, 1.0, 1.0],
+                "SWR: heldout_deviance": [1.0, np.inf, np.nan],
+            }
+        )
+        monkeypatch.setattr(
+            cohort_audit,
+            "load_population_data",
+            lambda *_args, **_kwargs: (frame, {}, np.array([])),
+        )
+
+        counts = cohort_audit.gate_counts(
+            tmp_path, min_firing_rate=None, inference="heldout"
+        )
+
+        assert counts["n_units_with_finite_curves"] == 3
+        assert counts["n_with_primary_statistic"] == 1
+
     def test_gate_counts_separate_the_two_rate_columns(self, bundle_trees):
         before, after = bundle_trees
 
         before_gate = gate_counts(before, min_firing_rate=1.0)
-        assert before_gate["n_neurons_with_fit"] == 9
+        assert before_gate["n_units_with_finite_curves"] == 9
+        assert before_gate["n_with_primary_statistic"] == 9
         assert before_gate["n_passing_fit_bin_rate"] == 9
         # The pre-cohort bundles do not carry the unrestricted twin.
         assert before_gate["n_passing_all_immobile_rate"] is None
 
         after_gate = gate_counts(after, min_firing_rate=1.0)
-        assert after_gate["n_neurons_with_fit"] == 5
+        assert after_gate["n_units_with_finite_curves"] == 5
+        assert after_gate["n_with_primary_statistic"] == 5
         # The three chimi neurons fall below the gate on the fit-bin rate only.
         assert after_gate["n_passing_fit_bin_rate"] == 2
         assert after_gate["n_passing_all_immobile_rate"] == 5
@@ -516,7 +541,10 @@ class TestPopulation:
 
 
 class TestReport:
-    def test_report_announces_a_session_only_one_tree_has(self, bundle_trees):
+    @pytest.mark.parametrize("min_firing_rate", [1.0, None])
+    def test_report_announces_a_session_only_one_tree_has(
+        self, bundle_trees, min_firing_rate
+    ):
         before, after = bundle_trees
         assert bundle_sessions(before) - bundle_sessions(after) == {"j1620210706_10_r5"}
 
@@ -525,20 +553,20 @@ class TestReport:
         )
 
         before_frame, _, _ = load_population_data(
-            before, min_firing_rate=1.0, inference="legacy"
+            before, min_firing_rate=min_firing_rate, inference="legacy"
         )
         after_frame, _, _ = load_population_data(
-            after, min_firing_rate=1.0, inference="legacy"
+            after, min_firing_rate=min_firing_rate, inference="legacy"
         )
         report = build_report(
             sidecars=read_sidecars(after),
             before=before_frame,
             after=after_frame,
-            before_gate=gate_counts(before, 1.0),
-            after_gate=gate_counts(after, 1.0),
+            before_gate=gate_counts(before, min_firing_rate),
+            after_gate=gate_counts(after, min_firing_rate),
             before_dir=before,
             after_dir=after,
-            min_firing_rate=1.0,
+            min_firing_rate=min_firing_rate,
             alpha=0.05,
             notes=["A note the caller supplied."],
             command="uv run python scripts/qa/compare_pfc_cohorts.py",
@@ -551,6 +579,12 @@ class TestReport:
         # The headline restriction, computed from the sidecars.
         assert "1,900 of 3,000" in report
         assert "240 of 300" in report
+        if min_firing_rate is None:
+            # No rate screen ran, so nothing about a gate may be reported.
+            assert "do not control population membership" in report
+            assert "n_passing_" not in report
+        else:
+            assert "n_passing_all_immobile_rate" in report
 
 
 def test_provenance_marks_no_alignment_block_when_no_sidecar_has_one():
@@ -1295,7 +1329,9 @@ class TestPeakShrinkage:
 
         assert set(table["units"]) == {"separated", "well posed"}
         assert (table["n_prior_binds"] <= table["n_units"]).all()
-        assert not [warning for warning in recwarn if warning.category is RuntimeWarning]
+        assert not [
+            warning for warning in recwarn if warning.category is RuntimeWarning
+        ]
 
 
 class TestEstimatorTables:

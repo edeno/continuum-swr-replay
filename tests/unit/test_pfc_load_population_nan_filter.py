@@ -15,6 +15,7 @@ sliced with them, and may carry NaN.
 from __future__ import annotations
 
 import json
+import logging
 
 import numpy as np
 import pandas as pd
@@ -161,8 +162,8 @@ class TestLoadPopulationNanFilter:
         with pytest.raises(ValueError, match="missing held-out column"):
             load_population_data(tmp_path, min_firing_rate=0.0)
 
-    def test_a_unit_whose_fit_failed_is_dropped(self, tmp_path):
-        """Two units, one of which the fitter could not place."""
+    def test_missing_primary_fit_statistic_does_not_gate_a_finite_curve(self, tmp_path):
+        """Inferential availability must not define a descriptive population."""
         statistics = heldout_statistics(2)
         statistics["SWR: heldout_deviance"] = [100.0, np.nan]
         write_bundle(
@@ -172,10 +173,67 @@ class TestLoadPopulationNanFilter:
             statistics=statistics,
         )
 
-        df, modulations, _ = load_population_data(tmp_path, min_firing_rate=0.0)
+        df, modulations, _ = load_population_data(tmp_path)
+
+        assert len(df) == 2
+        assert df["SWR: heldout_deviance"].isna().sum() == 1
+        assert modulations["swr"].shape[1] == 2
+
+    def test_low_firing_rate_does_not_gate_the_default_population(self, tmp_path):
+        write_bundle(
+            tmp_path / "session_mPFC_modulation",
+            ["chimi20200212_.nwb"] * 2,
+            2,
+        )
+        frame_path = tmp_path / "session_mPFC_modulation.pkl"
+        frame = pd.read_pickle(frame_path)
+        frame["immobility_avg_firing_rate"] = [0.0, 10.0]
+        frame.to_pickle(frame_path)
+
+        descriptive, modulations, _ = load_population_data(tmp_path)
+        sensitivity, _, _ = load_population_data(tmp_path, min_firing_rate=1.0)
+
+        assert len(descriptive) == 2
+        assert modulations["swr"].shape[1] == 2
+        assert len(sensitivity) == 1
+
+    def test_the_rate_screen_counts_what_it_dropped_and_what_had_no_rate(
+        self, tmp_path, caplog
+    ):
+        """A NaN rate fails the comparison silently; the count must be logged."""
+        write_bundle(
+            tmp_path / "session_mPFC_modulation",
+            ["chimi20200212_.nwb"] * 3,
+            3,
+        )
+        frame_path = tmp_path / "session_mPFC_modulation.pkl"
+        frame = pd.read_pickle(frame_path)
+        frame["immobility_avg_firing_rate"] = [0.0, np.nan, 10.0]
+        frame.to_pickle(frame_path)
+
+        with caplog.at_level(
+            logging.INFO, logger="continuum_swr_replay.analysis.pfc.load_population"
+        ):
+            sensitivity, _, _ = load_population_data(tmp_path, min_firing_rate=1.0)
+
+        assert len(sensitivity) == 1
+        assert "n_dropped_by_rate=2" in caplog.text
+        assert "n_nan_rate=1" in caplog.text
+
+    def test_infinite_primary_curve_value_is_not_descriptive_data(self, tmp_path):
+        swr = np.zeros((N_LAG_TIMES, 2))
+        swr[10, 1] = np.inf
+        write_bundle(
+            tmp_path / "session_mPFC_modulation",
+            ["chimi20200212_.nwb"] * 2,
+            2,
+            arrays={"SWR_modulation": swr},
+        )
+
+        df, modulations, _ = load_population_data(tmp_path)
 
         assert len(df) == 1
-        assert modulations["swr"].shape[1] == 1
+        assert np.isfinite(modulations["swr"]).all()
 
     def test_a_unit_with_nan_in_the_replay_split_curve_is_dropped(self, tmp_path):
         nl_swr = np.zeros((N_LAG_TIMES, 2))

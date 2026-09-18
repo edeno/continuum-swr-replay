@@ -415,13 +415,20 @@ def overlap_section(data_dir: Path) -> tuple[str, pd.DataFrame]:
 
 
 def non_positive_section(
-    data_dir: Path, alpha: float, min_firing_rate: float
+    data_dir: Path, alpha: float, min_firing_rate: float | None
 ) -> tuple[str, pd.DataFrame]:
     """Units at ``p < alpha`` whose observed improvement is not positive.
 
-    The population is the one the audit and the figure read -- the same
-    firing-rate gate and the same held-out provenance contract -- so the
-    fractions here sit beside the called fractions quoted elsewhere.
+    The population is the one the audit and the figure read -- four finite
+    primary modulation curves and the same held-out provenance contract. A
+    rate screen is used only when explicitly supplied for a sensitivity audit.
+
+    Raises
+    ------
+    KeyError
+        If the population table is missing a class's p-value or observed
+        statistic. Every class in :data:`PVALUE_COLUMN` gets a row or the
+        section is refused.
     """
     from continuum_swr_replay.analysis.pfc.load_population import load_population_data
 
@@ -429,17 +436,28 @@ def non_positive_section(
     rows = []
     for name, pvalue_column in PVALUE_COLUMN.items():
         observed_column = OBSERVED_COLUMN[name]
-        if pvalue_column not in table or observed_column not in table:
-            continue
-        pvalues = pd.to_numeric(table[pvalue_column], errors="coerce")
-        observed = pd.to_numeric(table[observed_column], errors="coerce")
-        called = pvalues < alpha
+        for column in (pvalue_column, observed_column):
+            if column not in table:
+                # Skipping the class would drop it from the report without
+                # saying so, and read as "nothing to report" for that class.
+                raise KeyError(
+                    f"population table has no column {column!r}, needed to "
+                    f"count units called for {name!r}"
+                )
+        pvalues = pd.to_numeric(table[pvalue_column], errors="coerce").to_numpy(
+            dtype=float
+        )
+        observed = pd.to_numeric(table[observed_column], errors="coerce").to_numpy(
+            dtype=float
+        )
+        finite_pvalue = np.isfinite(pvalues)
+        called = finite_pvalue & (pvalues < alpha)
         non_positive = called & (observed <= 0)
         rows.append(
             {
                 "class": name,
                 "n_units": int(len(table)),
-                "n_tested": int(pvalues.notna().sum()),
+                "n_tested": int(finite_pvalue.sum()),
                 "n_called": int(called.sum()),
                 "n_called_with_non_positive_gain": int(non_positive.sum()),
                 "frac_of_called": float(
@@ -552,8 +570,11 @@ def main() -> None:
     parser.add_argument(
         "--min-firing-rate",
         type=float,
-        default=1.0,
-        help="Inclusion gate on the immobility firing rate, as the audit uses.",
+        default=None,
+        help=(
+            "Optional sensitivity screen on immobility firing rate. Omitted "
+            "by default, matching the descriptive Figure 4 population."
+        ),
     )
     parser.add_argument("--out", type=Path, default=None, help="Write the report here.")
     args = parser.parse_args()

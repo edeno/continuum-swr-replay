@@ -16,10 +16,10 @@ Composite figure with 4 panels in 3 rows:
     Row 3 (panels c, d):
         c: Population average modulation curves (mean ± SEM) for SWR vs
            non-SWR replay.
-        d: Consolidated statistics — fraction of neurons whose event
-           regressor improves held-out deviance beyond the matched
-           non-event control's null, and the distribution of the best
-           model by held-out deviance across the population.
+        d: Consolidated diagnostics — fraction of tested units below the raw
+           empirical-p threshold against the matched non-event control null,
+           and the distribution of the best model by held-out deviance among
+           units for which that choice is available.
 
 Every fitted quantity in the figure comes from the same estimator the
 bundles were fit with: a Poisson GLM with a Gaussian prior on the
@@ -309,9 +309,9 @@ def plot_population_average(modulations, lag_time, ax):
 #: from the same bouts?
 SIGNIFICANCE_BARS = (
     ("SWR", "SWR", "SWR"),
-    ("Replay", "non_local", "Non-Local"),
-    ("no-SWR", "non_local_no_SWR", "Non-Local"),
-    ("Beyond\ncontrol", "engagement", "Combined"),
+    ("All replay", "non_local", "Non-Local"),
+    ("Non-SWR", "non_local_no_SWR", "Non-Local"),
+    ("Beyond ctrl.", "engagement", "Combined"),
 )
 
 
@@ -348,31 +348,42 @@ def plot_significance(df, ax, alpha=0.05, n_control_draws=DEFAULT_CONTROL_DRAWS)
             )
 
     ax.axhline(100 * alpha, color="gray", linewidth=0.5, linestyle="--")
-    ax.set_ylabel("% units")
+    ax.set_ylabel("% tested units")
     finite_fractions = np.asarray(fracs, dtype=float)
     finite_fractions = finite_fractions[np.isfinite(finite_fractions)]
     observed_max = float(finite_fractions.max()) if finite_fractions.size else 0.0
     ax.set_ylim(0, max(100 * alpha * 1.2, observed_max * 1.3))
-    ax.tick_params(axis="x", labelsize=5)
+    ax.tick_params(axis="x", labelsize=4.5, labelrotation=35)
+    for tick in ax.get_xticklabels():
+        tick.set_ha("right")
     # Say both the raw-p threshold and R on the panel: this is a descriptive
     # preview, and its Monte Carlo resolution is part of what the bars mean.
+    tested_counts = [fractions[name][1] for _, name, _ in SIGNIFICANCE_BARS]
+    tested_range = (
+        f"n={min(tested_counts):,}–{max(tested_counts):,} tested"
+        if tested_counts
+        else "n=0 tested"
+    )
     ax.set_title(
-        "Raw empirical p < "
-        f"{alpha:g} (descriptive)\n"
-        f"R={n_control_draws}, min p={1 / (n_control_draws + 1):.3f}",
-        fontsize=7,
+        f"Raw p < {alpha:g} (descriptive)\n"
+        f"R={n_control_draws}; min p={1 / (n_control_draws + 1):.3f}\n"
+        f"{tested_range}",
+        fontsize=6.5,
     )
 
 
 def plot_best_model_selection(df, ax):
     """Distribution of the best model per unit, by held-out deviance."""
-    n_total = len(df)
     model_order = ["constant", "SWR", "non_local", "SWR + non_local_no_SWR"]
-    model_labels = ["Const.", "SWR", "Replay", "SWR+\nno-SWR"]
+    model_labels = ["Const.", "SWR", "Replay", "SWR+non-SWR"]
     model_colors = ["gray", COLORS["SWR"], COLORS["Non-Local"], COLORS["Combined"]]
 
-    counts = df["min_heldout_model"].value_counts()
-    vals = [100 * counts.get(m, 0) / n_total for m in model_order]
+    choices = df["min_heldout_model"].dropna()
+    n_tested = len(choices)
+    counts = choices.value_counts()
+    vals = [
+        100 * counts.get(m, 0) / n_tested if n_tested else np.nan for m in model_order
+    ]
 
     bars = ax.bar(model_labels, vals, color=model_colors, alpha=0.7, edgecolor="none")
     for bar, val in zip(bars, vals, strict=True):
@@ -384,9 +395,14 @@ def plot_best_model_selection(df, ax):
                 ha="center",
                 fontsize=5,
             )
-    ax.set_ylabel("% units")
-    ax.tick_params(axis="x", labelsize=5)
-    ax.set_title("Best model\n(held-out deviance)", fontsize=7)
+    ax.set_ylabel("% tested units")
+    ax.tick_params(axis="x", labelsize=4.5, labelrotation=35)
+    for tick in ax.get_xticklabels():
+        tick.set_ha("right")
+    ax.set_title(
+        f"Best model\n(held-out deviance; n={n_tested:,})",
+        fontsize=7,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -399,6 +415,13 @@ def plot_best_model_selection(df, ax):
 #: neuron is fit the same way and its curve trimmed to match.
 FIT_LAGS = np.arange(-125, 126, 1)
 REPORT_LAGS = np.arange(-100, 101, 1)
+
+# Panel d's label is placed in the left sub-axes' own coordinates but drawn well
+# outside it, so these three are hand-tuned together: change the width ratios or
+# the spacing and the "d" no longer lands on the panel's left margin.
+PANEL_D_WIDTH_RATIOS = (1.15, 1.0)
+PANEL_D_WSPACE = 0.55
+PANEL_D_LABEL_OFFSET = (-0.72, 1.16)
 
 
 def generate_figure(
@@ -564,7 +587,6 @@ def generate_figure(
     )
     pop_df, modulations, pop_lag_time = load_population_data(
         data_dir,
-        min_firing_rate=1.0,
         artifact_suffix=stop_cohort_suffix(stop_cohort),
     )
 
@@ -634,14 +656,16 @@ def generate_figure(
     cbar.set_ticklabels(["0.5x", "1x", "2x"])
 
     # ── Row 3: panel c (population average) + panel d (stats) ──
-    gs_cd = gs[2].subgridspec(1, 2, width_ratios=[1.0, 1.3], wspace=0.25)
+    gs_cd = gs[2].subgridspec(1, 2, width_ratios=[0.85, 1.55], wspace=0.3)
 
     # Panel c: population average modulation
     ax_c = fig.add_subplot(gs_cd[0])
     plot_population_average(modulations, pop_lag_time, ax_c)
 
     # Panel d: consolidated stats — % beating the control null + best model
-    gs_d = gs_cd[1].subgridspec(1, 2, wspace=0.3)
+    gs_d = gs_cd[1].subgridspec(
+        1, 2, width_ratios=list(PANEL_D_WIDTH_RATIOS), wspace=PANEL_D_WSPACE
+    )
     ax_d1 = fig.add_subplot(gs_d[0])
     ax_d2 = fig.add_subplot(gs_d[1])
     plot_significance(pop_df, ax_d1)
@@ -649,11 +673,20 @@ def generate_figure(
 
     # ── Panel Labels ──
     label_panels(
-        [ax_a_mod, ax_b1, ax_c, ax_d1],
-        labels=["a", "b", "c", "d"],
+        [ax_a_mod, ax_b1, ax_c],
+        labels=["a", "b", "c"],
         xpos=-0.08,
         ypos=1.15,
         fontsize=11,
+    )
+    ax_d1.text(
+        *PANEL_D_LABEL_OFFSET,
+        "d",
+        transform=ax_d1.transAxes,
+        fontsize=11,
+        fontweight="bold",
+        va="top",
+        ha="left",
     )
 
     return fig

@@ -1,5 +1,12 @@
 ## Verdict
 
+> **Historical review.** This document describes the pre-refit artifacts it
+> inspected. The canonical-event, matched-control and ridge/held-out work has
+> since landed. As of 2026-09-18, Figure 4 is descriptive and includes all
+> 17,280 units with four finite primary curves; it applies neither the 1 Hz
+> screen recorded below nor a p-value/held-out-statistic inclusion screen. See
+> `docs/audits/2026-09-18-pfc-ridge-heldout.md` for the current audit.
+
 Changes requested before using Fig. 4 / claim #20 as publication evidence. The current PFC code supports a preliminary neuron-level association between mPFC firing and detector-defined non-SWR events, but it does not yet implement the canonical replay-table `is_swr` definition, the matched immobile non-event control promised in the claims table, or animal/session-level inference needed for a cross-area claim.
 
 ## Main Findings

@@ -15,9 +15,10 @@ the artifacts themselves:
 - the leading-edge coverage diagnostic (dropped events whose regressor basis
   would still have covered fitted bins);
 - the population that reaches Figure 4, loaded from both bundle trees with
-  ``load_population_data`` -- neurons passing the firing-rate gate and the
-  legacy FDR-significant fraction or the held-out analysis's descriptive raw-p
-  fraction per test, overall and per animal.
+  ``load_population_data`` -- units with finite descriptive curves, without a
+  firing-rate or p-value inclusion screen -- and the legacy FDR-significant
+  fraction or the held-out analysis's descriptive raw-p fraction per test,
+  overall and per animal.
 
 Usage::
 
@@ -62,6 +63,7 @@ from numpy.typing import NDArray
 from scipy.stats import false_discovery_control
 
 from continuum_swr_replay.analysis.pfc.load_population import (
+    HELDOUT_FIT_COLUMN,
     load_population_data,
     significant_fraction,
 )
@@ -462,13 +464,15 @@ def alignment_prose(sidecars: pd.DataFrame) -> str:
 
 def gate_counts(
     data_dir: Path,
-    min_firing_rate: float,
+    min_firing_rate: float | None,
     suffix: str = "",
     inference: str = "legacy",
 ) -> dict:
-    """How many neurons survive the loader, and the firing-rate gate.
+    """Describe curve availability and any explicitly requested rate screen.
 
-    The gate is applied to whichever rate column the bundle carries under
+    A firing-rate threshold is not part of the canonical Figure 4 population.
+    When one is supplied for a sensitivity analysis, it is applied to whichever
+    rate column the bundle carries under
     ``immobility_avg_firing_rate``. For a cohort-restricted bundle that is the
     mean rate over the bins fit; the pre-cohort bundles carry the same name for
     the rate over every immobile bin. Both are counted here when the bundle has
@@ -477,22 +481,29 @@ def gate_counts(
     """
     frame, _, _ = load_population_data(
         data_dir,
-        min_firing_rate=0.0,
         artifact_suffix=suffix,
         inference=inference,
     )
+    primary_statistic = (
+        HELDOUT_FIT_COLUMN if inference == "heldout" else "SWR vs. constant: pval"
+    )
+    primary_values = pd.to_numeric(frame[primary_statistic], errors="coerce").to_numpy(
+        dtype=float
+    )
     counts = {
-        "n_neurons_with_fit": int(len(frame)),
-        "n_passing_fit_bin_rate": int(
-            (frame[FIT_RATE_COLUMN] >= min_firing_rate).sum()
-        ),
+        "n_units_with_finite_curves": int(len(frame)),
+        "n_with_primary_statistic": int(np.isfinite(primary_values).sum()),
     }
-    if ALL_IMMOBILE_RATE_COLUMN in frame.columns:
-        counts["n_passing_all_immobile_rate"] = int(
-            (frame[ALL_IMMOBILE_RATE_COLUMN] >= min_firing_rate).sum()
+    if min_firing_rate is not None:
+        counts["n_passing_fit_bin_rate"] = int(
+            (frame[FIT_RATE_COLUMN] >= min_firing_rate).sum()
         )
-    else:
-        counts["n_passing_all_immobile_rate"] = None
+        if ALL_IMMOBILE_RATE_COLUMN in frame.columns:
+            counts["n_passing_all_immobile_rate"] = int(
+                (frame[ALL_IMMOBILE_RATE_COLUMN] >= min_firing_rate).sum()
+            )
+        else:
+            counts["n_passing_all_immobile_rate"] = None
     return counts
 
 
@@ -1983,7 +1994,7 @@ def build_report(
     after_gate: dict,
     before_dir: Path,
     after_dir: Path,
-    min_firing_rate: float,
+    min_firing_rate: float | None,
     alpha: float,
     notes: list[str],
     command: str,
@@ -2022,8 +2033,9 @@ def build_report(
         else "no cohort restriction, no provenance sidecars (these bundles predate them).\n"
     )
     add(
-        f"- before: `{before_dir}` -- {before_gate['n_neurons_with_fit']} neurons "
-        f"with a usable fit, {before_sidecar_clause}"
+        f"- before: `{before_dir}` -- "
+        f"{before_gate['n_units_with_finite_curves']} units with finite primary "
+        f"modulation curves, {before_sidecar_clause}"
         f"- after: `{after_dir}` -- {len(sidecars)} bundles, each with a "
         "provenance sidecar (a bundle without one is refused, so the tables "
         "below and the population summary describe one session set), every one "
@@ -2129,12 +2141,22 @@ def build_report(
     add(_md(affected))
 
     add("## The population that reaches Figure 4\n")
-    add(
-        f"Loaded with `load_population_data(min_firing_rate={min_firing_rate})` "
-        "from each tree. A neuron enters when its GLM produced a finite primary "
-        "p-value, its four modulation traces are NaN-free, and its "
-        f"`{FIT_RATE_COLUMN}` clears the gate.\n"
-    )
+    if min_firing_rate is None:
+        add(
+            "Loaded with `load_population_data()` from each tree. A unit enters "
+            "when all four primary modulation traces are finite. Firing rate, "
+            "p-values, held-out scores and model choices do not control "
+            "population membership. Missing inferential values reduce only the "
+            "denominator of the statistic that needs them.\n"
+        )
+    else:
+        add(
+            "This historical/sensitivity report explicitly calls "
+            f"`load_population_data(min_firing_rate={min_firing_rate})`. The "
+            "optional rate screen is applied after requiring four finite "
+            "primary curves; p-values and other inferential values do not "
+            "control membership.\n"
+        )
     gate = pd.DataFrame(
         [
             {"side": "before", **before_gate},
@@ -2145,7 +2167,7 @@ def build_report(
         gate[column] = gate[column].astype("Int64")
     add(_md(gate))
     matched = after_gate.get("n_passing_all_immobile_rate")
-    if matched is not None:
+    if min_firing_rate is not None and matched is not None:
         shipped_before = before_gate["n_passing_fit_bin_rate"]
         shipped_after = after_gate["n_passing_fit_bin_rate"]
         add(
@@ -2160,16 +2182,17 @@ def build_report(
             f"threshold their whole-epoch rate cleared. Net "
             f"{shipped_after - shipped_before:+,}.\n"
         )
-    add(
-        f"The gated column means different things on the two sides. "
-        f"`{FIT_RATE_COLUMN}` is the mean rate over the bins the bundle was fit "
-        "on, so before the change it was the rate over every immobile bin and "
-        "after it is the rate over the cohort's immobile bins. The new bundles "
-        f"also carry `{ALL_IMMOBILE_RATE_COLUMN}`, the unrestricted rate, and "
-        "`n_passing_all_immobile_rate` counts the neurons the *old* quantity "
-        "would have admitted -- so the gate's contribution to any change in n "
-        "is separable from the cohort's.\n"
-    )
+    if min_firing_rate is not None:
+        add(
+            f"The gated column means different things on the two sides. "
+            f"`{FIT_RATE_COLUMN}` is the mean rate over the bins the bundle was "
+            "fit on, so before the change it was the rate over every immobile "
+            "bin and after it is the rate over the cohort's immobile bins. The "
+            f"new bundles also carry `{ALL_IMMOBILE_RATE_COLUMN}`, the "
+            "unrestricted rate, and `n_passing_all_immobile_rate` counts the "
+            "neurons the *old* quantity would have admitted -- so the gate's "
+            "contribution to any change in n is separable from the cohort's.\n"
+        )
 
     add("### Neurons per animal\n")
     per_animal = (
@@ -2237,7 +2260,7 @@ def build_estimator_report(
     after_gate: dict,
     before_dir: Path,
     after_dir: Path,
-    min_firing_rate: float,
+    min_firing_rate: float | None,
     alpha: float,
     notes: list[str],
     command: str,
@@ -2288,11 +2311,13 @@ def build_estimator_report(
 
     add("## Inputs\n")
     add(
-        f"- before: `{before_dir}` -- {before_gate['n_neurons_with_fit']} units "
-        "with a usable fit, maximum likelihood, likelihood-ratio tests, AIC "
+        f"- before: `{before_dir}` -- "
+        f"{before_gate['n_units_with_finite_curves']} units with finite primary "
+        "modulation curves, maximum likelihood, likelihood-ratio tests, AIC "
         "selection.\n"
         f"- after: `{after_dir}` -- {len(sidecars)} bundles, "
-        f"{after_gate['n_neurons_with_fit']} units with a usable fit, "
+        f"{after_gate['n_units_with_finite_curves']} units with finite primary "
+        "modulation curves, "
         "penalised fits scored out of fold.\n"
     )
     before_sessions = bundle_sessions(before_dir)
@@ -2481,12 +2506,22 @@ def build_estimator_report(
         add(_md(sigma_table.drop(columns=["sessions"])))
 
     add("## The population that reaches Figure 4\n")
-    add(
-        f"Loaded with `load_population_data(min_firing_rate={min_firing_rate})` "
-        "from each tree. A unit enters when its fit exists, its four shipped "
-        f"modulation traces are NaN-free, and its `{FIT_RATE_COLUMN}` clears "
-        "the gate.\n"
-    )
+    if min_firing_rate is None:
+        add(
+            "Loaded with `load_population_data()` from each tree. A unit enters "
+            "when all four primary modulation traces are finite. Firing rate, "
+            "p-values, held-out scores and model choices do not control "
+            "population membership. Missing inferential values reduce only the "
+            "denominator of the statistic that needs them.\n"
+        )
+    else:
+        add(
+            "This historical/sensitivity report explicitly calls "
+            f"`load_population_data(min_firing_rate={min_firing_rate})`. The "
+            "optional rate screen is applied after requiring four finite "
+            "primary curves; p-values and other inferential values do not "
+            "control membership.\n"
+        )
     gate = pd.DataFrame(
         [{"side": "before", **before_gate}, {"side": "after", **after_gate}]
     )
@@ -2566,7 +2601,16 @@ def main() -> None:
             "describe."
         ),
     )
-    parser.add_argument("--min-firing-rate", type=float, default=1.0)
+    parser.add_argument(
+        "--min-firing-rate",
+        type=float,
+        default=None,
+        help=(
+            "Optional rate screen for a sensitivity or historical audit. "
+            "Omitted by default: the canonical Figure 4 population is "
+            "descriptive and is not selected by firing rate."
+        ),
+    )
     parser.add_argument("--alpha", type=float, default=0.05)
     parser.add_argument(
         "--note",
