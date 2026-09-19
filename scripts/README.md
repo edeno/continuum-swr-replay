@@ -179,6 +179,10 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
   10 per class). Output
   goes to `Processed-Data/pfc_marked_model_family/`; the 71-session corpus
   was fit 2026-09-19 (`docs/audits/2026-09-19-pfc-marked-family-corpus.md`).
+- `summarize_pfc_marked_family.py` aggregates those bundles unit → session →
+  animal (fraction of units with a positive held-out gain, population mean
+  slope kernels with pre- and post-onset means, one figure per model); no
+  p-values. `--out <markdown>`, `--figure-dir`, `--blowup` (default 1000).
 
 ## `exploratory/` — unsupported one-offs
 Scratch scripts (`_*.py`): diagnostics, ad-hoc plots, verification checks. Not part of the
