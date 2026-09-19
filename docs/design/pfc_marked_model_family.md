@@ -200,5 +200,6 @@ model under `Processed-Data/pfc_marked_model_family/`:
   ranks, timing, device, eligibility, and NaN/convergence counts.
 
 The provenance file is written last and is the bundle commit marker. A stale,
-partial, or mismatched bundle is removed before refitting. **No production
-bundle has been fit yet.**
+partial, or mismatched bundle is removed before refitting. **The 71-session
+corpus was fit 2026-09-19** at git `4d69b83` (816 bundles, 36 ineligible
+markers): [audits/2026-09-19-pfc-marked-family-corpus.md](../audits/2026-09-19-pfc-marked-family-corpus.md).

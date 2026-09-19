@@ -177,8 +177,8 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
   penalty, fold, output, overwrite, and event-arm-table options as the
   single-mark runner plus `--event-table` and `--min-marked-events` (default
   10 per class). Output
-  goes to `Processed-Data/pfc_marked_model_family/`. **No bundle has been
-  produced yet.**
+  goes to `Processed-Data/pfc_marked_model_family/`; the 71-session corpus
+  was fit 2026-09-19 (`docs/audits/2026-09-19-pfc-marked-family-corpus.md`).
 
 ## `exploratory/` — unsupported one-offs
 Scratch scripts (`_*.py`): diagnostics, ad-hoc plots, verification checks. Not part of the
