@@ -292,6 +292,22 @@ def test_event_without_an_occupancy_arm_stays_in_base_population():
     assert standardized.current_arm_fraction_z.iloc[0] == 0.0
 
 
+def test_explicitly_constant_nuisance_standardizes_to_a_zero_block():
+    events = pd.DataFrame({"event_id": [1, 2, 3], "context": [1.0, 1.0, 1.0]})
+
+    standardized, scales = standardize_event_marks(
+        events,
+        ("context",),
+        allow_constant=("context",),
+        min_marked_events=2,
+    )
+
+    np.testing.assert_array_equal(standardized.context_z, 0.0)
+    assert scales["context"].std == 0.0
+    with pytest.raises(ValueError, match="no within-class variation"):
+        standardize_event_marks(events, ("context",), min_marked_events=2)
+
+
 def test_mark_permutations_never_move_undefined_events():
     available = np.array([True, False, True, True, False])
 

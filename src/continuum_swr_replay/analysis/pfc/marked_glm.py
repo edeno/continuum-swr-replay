@@ -85,7 +85,9 @@ class MarkScale(NamedTuple):
     std : float
         Population standard deviation (``ddof=0``) of the mark over its finite
         events, in the mark's raw units. One unit of the standardized
-        regressor is this many raw units.
+        regressor is this many raw units. Zero is recorded only when a caller
+        explicitly permits a constant nuisance mark; its standardized block
+        is then identically zero.
     n_events : int
         Finite events the mean and SD were computed from.
     n_missing : int
@@ -785,6 +787,7 @@ def standardize_event_marks(
     marks: tuple[str, ...],
     *,
     allow_missing: tuple[str, ...] = (),
+    allow_constant: tuple[str, ...] = (),
     min_marked_events: int = MIN_MARKED_EVENTS_PER_CLASS,
 ) -> tuple[pd.DataFrame, dict[str, MarkScale]]:
     """Append within-frame, population-SD z scores for event marks.
@@ -807,6 +810,10 @@ def standardize_event_marks(
         Raw mark columns to standardize.
     allow_missing : tuple[str, ...]
         Marks permitted to be undefined for some events.
+    allow_constant : tuple[str, ...]
+        Nuisance marks permitted to have zero within-class variation. Their
+        standardized values are all zero. Scientific target marks should not
+        be included here.
     min_marked_events : int
         Fewest finite events a mark may be standardized from, at least two.
 
@@ -847,12 +854,13 @@ def standardize_event_marks(
             )
         mean = float(values[finite].mean())
         std = float(values[finite].std(ddof=0))
-        if not np.isfinite(std) or std <= 0:
+        if not np.isfinite(std) or (std <= 0 and mark not in allow_constant):
             raise ValueError(
                 f"event mark {mark!r} has no within-class variation (std={std})"
             )
         standardized = np.zeros(len(values), dtype=float)
-        standardized[finite] = (values[finite] - mean) / std
+        if std > 0:
+            standardized[finite] = (values[finite] - mean) / std
         out[f"{mark}_z"] = standardized
         out[f"{mark}_available"] = finite
         references[mark] = MarkScale(

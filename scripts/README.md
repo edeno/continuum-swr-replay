@@ -161,6 +161,23 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
   `Processed-Data/pfc_marked_kernels/`) and `--overwrite` with the canonical runner.
   It has no `--stop-cohort`: it always fits the well-anchored cohort.
   **No bundle has been produced yet.**
+- `run_pfc_marked_model_family.py` fits the recommended descriptive extension
+  without decoding mPFC activity or computing p-values. Its nine default core
+  families jointly characterize spatial role, content-weighted uncertainty and
+  value, reward memory/recency, trajectory geometry, within-stop timing,
+  switch/reward context, and graded ripple/MUA/theta coupling. Pass
+  `--include-interactions` for the three current-arm/uncertainty interactions
+  with exploration, reward, and ripple power, or select explicit `--models`.
+  Every target is compared out of fold with the otherwise identical joint model
+  lacking only that target's temporal block. Session loading and folds are
+  shared across models; the six compact core models share the 155-column tier,
+  while the three content horse-races and three interactions share the 221-column
+  tier for JAX compilation reuse. Wide-design microbatches are bounded by
+  the measured single-mark memory workload. It supports the same session/GPU,
+  penalty, fold, output, overwrite, and event-arm-table options as the
+  single-mark runner plus `--min-marked-events` (default 10 per class). Output
+  goes to `Processed-Data/pfc_marked_model_family/`. **No bundle has been
+  produced yet.**
 
 ## `exploratory/` — unsupported one-offs
 Scratch scripts (`_*.py`): diagnostics, ad-hoc plots, verification checks. Not part of the

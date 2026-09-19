@@ -65,6 +65,12 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     content kernels, the nested held-out comparison per replay class, and why
     the mark-label shuffle is a descriptive reference rather than a calibrated
     conditional test. Nothing has been fit yet.
+  - [design/pfc_marked_model_family.md](design/pfc_marked_model_family.md)
+    — the recommended no-mPFC-decoder extension: nine core marked temporal
+    models for spatial role, uncertainty/value/reward memory, trajectory
+    geometry, within-stop timing, switch/reward context and graded coupling,
+    plus three optional content interactions; exact leaf-only aggregation,
+    adjustment sets, missingness, held-out comparison and GPU-memory contracts.
 - [known_issues/](known_issues/) — *reference*: documented data/pipeline issues.
   - [three_sessions_blocked_by_nwb_checksum.md](known_issues/three_sessions_blocked_by_nwb_checksum.md)
     — the canonical cohort is 215 of 218; three sessions fail an upstream NWB
@@ -139,6 +145,7 @@ Three tiers:
    | `replay_content/stop_replay_summary.pkl`, `stage6_is_stay_{logistic,pooled_gee}{,_swr,_non_swr,_mua}.pkl` | `scripts/pfc/run_stage6_learning.py` | the per-stop replay summary and the stay/leave models (claim 19e) |
    | `replay_content/stage5b_retrospective{,_swr_only,_non_swr_only}.pkl` | `scripts/pfc/run_stage5b_retrospective.py` | the retrospective/prospective event-grain metrics against their visit-context shuffle |
    | `pfc_marked_kernels/{epoch_identifier}_{mark}_marked_kernels.pkl` + `.lag_time.npy`, `.{class}.typical.npy`, `.{class}.mark_slope.npy`, `.mark_label_shuffle_reference.npz`, `.provenance.json` | `scripts/pfc/run_pfc_marked_kernels.py` | the content-marked kernels of [design/pfc_marked_event_kernels.md](design/pfc_marked_event_kernels.md). One bundle per session × mark (`current_arm_fraction`, or `current_arm_fraction_posterior` as a sensitivity): the pickle holds the per-neuron statistics (held-out deviance of the joint full model and of each class's reduced model, the class's held-out improvement, the label-shuffle tail fraction and usable-shuffle count, convergence flags); the `.npy` companions hold the reported lag axis and, per replay class (`non_local_SWR`, `non_local_no_SWR`), the typical-event kernel and the content mark-slope kernel; the `.npz` holds that class's shuffled held-out improvements; the sidecar the provenance. **Nothing has been fit yet** — no bundle exists on disk |
+   | `pfc_marked_model_family/{epoch_identifier}_{model}_marked_family.pkl` + `.lag_time.npy`, `.{class}.typical.npy`, `.{class}.{target}.slope.npy`, `.provenance.json` | `scripts/pfc/run_pfc_marked_model_family.py` | the no-p-value descriptive family in [design/pfc_marked_model_family.md](design/pfc_marked_model_family.md): one bundle per session × eligible model, with all recorded units, target-specific blocked-held-out deviance changes, typical-event and one-SD target kernels, exact mark scales/ranks/device/timing in provenance, and sidecar-only markers for ineligible or no-unit sessions. **Nothing has been fit yet** |
 
    All three are fit on the **well-anchored stop cohort**, the same population as the
    rate and content ladders, and an unsuffixed PFC artifact is that cohort; `_allstops`
