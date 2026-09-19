@@ -676,6 +676,12 @@ Freeze the current canonical tables and model outputs as a read-only baseline.
 
 `freeze`, `main`
 
+### `scripts/qa/measure_pfc_mark_context.py`
+
+What the marked-kernel content mark is entangled with, session by session.
+
+`load_current_arm_marks`, `group_context_table`, `summarize`, `build_report`, `main`
+
 ### `scripts/qa/measure_pfc_null_geometry.py`
 
 What the mPFC held-out null's windows look like, beside the real events.
