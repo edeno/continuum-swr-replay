@@ -166,6 +166,18 @@ curves. The current 221-column `coupling_content_interaction` model used about 3
 scored held-out data in 460 s and fit the full data in 34 s; its design was full
 rank (221/221). This cost is why interactions are opt-in.
 
+## What the first smoke showed
+
+The three-session GPU smoke
+([audits/2026-09-18-pfc-marked-family-smoke.md](../audits/2026-09-18-pfc-marked-family-smoke.md))
+ran end to end, but it also showed that a family bundle's `typical` curve is
+**not** the Figure 4 kernel: with the base kernels alone the family reproduces
+the canonical curves exactly, and adding the mark blocks under the σ = 3 prior
+inflates the base peaks by about 25 % (IQR 1.0–1.6) whether the marks are
+real or permuted within class. Read target slopes only with their held-out
+delta, never quote a `typical` curve as a Figure 4 modulation, and treat a
+width-aware prior as the open item before a corpus run.
+
 ## Artifacts
 
 `scripts/pfc/run_pfc_marked_model_family.py` writes one bundle per session ×
