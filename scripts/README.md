@@ -175,7 +175,8 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
   tier for JAX compilation reuse. Wide-design microbatches are bounded by
   the measured single-mark memory workload. It supports the same session/GPU,
   penalty, fold, output, overwrite, and event-arm-table options as the
-  single-mark runner plus `--min-marked-events` (default 10 per class). Output
+  single-mark runner plus `--event-table` and `--min-marked-events` (default
+  10 per class). Output
   goes to `Processed-Data/pfc_marked_model_family/`. **No bundle has been
   produced yet.**
 

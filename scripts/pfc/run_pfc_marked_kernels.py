@@ -35,7 +35,6 @@ its selected card and reuses compiled equal-width scorers within each session.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import os
@@ -52,7 +51,6 @@ os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
 
 import numpy as np
-import pandas as pd
 
 from continuum_swr_replay.analysis.pfc.batched_glm import (
     DEFAULT_NULL_DESIGN_BATCH_SIZE,
@@ -80,6 +78,15 @@ from continuum_swr_replay.analysis.pfc.marked_glm import (
     fit_marked_kernel_ladder,
     prepare_marked_session_context,
 )
+from continuum_swr_replay.analysis.pfc.runner_support import (
+    MAX_NONCONVERGED_UNIT_FRACTION,
+    REPORT_HALF_WINDOW_S,
+    STOP_COHORT,
+    filter_epoch_info,
+    is_nonempty_file,
+    json_safe,
+    session_seed,
+)
 from continuum_swr_replay.analysis.replay.fit_provenance import (
     fit_provenance_path,
     record_inputs,
@@ -102,12 +109,6 @@ SHUFFLE_POLICY = "permute_scientific_mark_among_events_within_session_and_class"
 LABEL_SHUFFLE_TAIL_METHOD = EMPIRICAL_PVALUE_METHOD
 BUNDLE_CONTRACT_VERSION = 1
 FIT_HALF_WINDOW_S = 0.25
-REPORT_HALF_WINDOW_S = 0.2
-STOP_COHORT = "at_well"
-# A session whose full-data fit fails to converge for more than this fraction
-# of units is not certified: its held-out deltas and curves would be a
-# mixture of converged and unconverged units with no way to tell them apart.
-MAX_NONCONVERGED_UNIT_FRACTION = 0.1
 
 MARK_DESCRIPTIONS = {
     "current_arm_fraction": (
@@ -122,29 +123,6 @@ MARK_DESCRIPTIONS = {
 NUISANCE_MARK_DESCRIPTIONS = {
     EVENT_DURATION_MARK: "natural log of event duration in seconds",
 }
-
-
-def session_seed(stream: str, nwb_file_name: str, epoch_name: str) -> int:
-    """Return a deterministic seed for one session and random stream.
-
-    Parameters
-    ----------
-    stream : str
-        Name of the random stream (e.g. ``"marked_folds"``), so two streams of
-        the same session never share a seed.
-    nwb_file_name : str
-        Session NWB file name.
-    epoch_name : str
-        Session epoch (interval list) name.
-
-    Returns
-    -------
-    int
-        The first 64 bits of the SHA-256 digest of
-        ``"<stream>|<nwb_file_name>|<epoch_name>"``, little-endian.
-    """
-    key = f"{stream}|{nwb_file_name}|{epoch_name}".encode()
-    return int.from_bytes(hashlib.sha256(key).digest()[:8], "little")
 
 
 def marked_artifact_path(
@@ -195,22 +173,6 @@ def marked_companion_paths(artifact: Path) -> tuple[Path, ...]:
         *curves,
         artifact.with_suffix(".mark_label_shuffle_reference.npz"),
     )
-
-
-def _is_nonempty_file(path: Path) -> bool:
-    """Return whether an artifact component was completely materialized.
-
-    Parameters
-    ----------
-    path : Path
-        Component to test.
-
-    Returns
-    -------
-    bool
-        True when the path is a regular file of non-zero size.
-    """
-    return path.is_file() and path.stat().st_size > 0
 
 
 def build_fit_contract(
@@ -318,7 +280,7 @@ def _bundle_is_current(
     if overwrite:
         return False
     sidecar = fit_provenance_path(artifact)
-    if not _is_nonempty_file(sidecar):
+    if not is_nonempty_file(sidecar):
         return False
     try:
         record = json.loads(sidecar.read_text())
@@ -330,8 +292,8 @@ def _bundle_is_current(
         return False
     if record.get("n_units") == 0:
         return True
-    return _is_nonempty_file(artifact) and all(
-        _is_nonempty_file(path) for path in marked_companion_paths(artifact)
+    return is_nonempty_file(artifact) and all(
+        is_nonempty_file(path) for path in marked_companion_paths(artifact)
     )
 
 
@@ -582,15 +544,17 @@ def run_analysis(
                 input_records,
                 estimator=ESTIMATOR,
                 cli=sys.argv,
-                extra={
-                    **contract_extra,
-                    "n_units": 0,
-                    "cohort_report": cohort_report,
-                    "cohort_info": context.cohort_info,
-                    "nwb_file_name": nwb_file_name,
-                    "epoch_name": epoch_name,
-                    **context.input_provenance,
-                },
+                extra=json_safe(
+                    {
+                        **contract_extra,
+                        "n_units": 0,
+                        "cohort_report": cohort_report,
+                        "cohort_info": context.cohort_info,
+                        "nwb_file_name": nwb_file_name,
+                        "epoch_name": epoch_name,
+                        **context.input_provenance,
+                    }
+                ),
             )
             return True
 
@@ -677,56 +641,61 @@ def run_analysis(
             input_records,
             estimator=ESTIMATOR,
             cli=sys.argv,
-            extra={
-                **contract_extra,
-                "scientific_mark_definition": MARK_DESCRIPTIONS[scientific_mark],
-                "nuisance_mark_definitions": {
-                    mark: NUISANCE_MARK_DESCRIPTIONS[mark] for mark in nuisance_marks
-                },
-                "joint_scientific_mark_fit": True,
-                "shuffle_interpretation": (
-                    "unrestricted label-randomization reference under a strong "
-                    "exchangeability assumption; not a calibrated conditional "
-                    "p-value and never used to filter units or events"
-                ),
-                "label_shuffle_exchangeability_warning": (
-                    "content labels are not generally exchangeable over duration, "
-                    "occupied arm, stop context, or session time"
-                ),
-                "fold_sizes": np.bincount(folds, minlength=n_folds).tolist(),
-                "fold_support_radius_bins": int(np.abs(context.lags).max()),
-                "n_basis_per_kernel": int(context.spline_basis.shape[1]),
-                "n_units": int(context.counts.shape[1]),
-                "n_fit_bins": int(context.counts.shape[0]),
-                "n_events_by_class": {
-                    name: int(len(context.events[name]))
-                    for name in MARKED_EVENT_CLASSES
-                },
-                "n_events_with_scientific_mark_by_class": {
-                    name: int(ladder.events[name][f"{scientific_mark}_available"].sum())
-                    for name in MARKED_EVENT_CLASSES
-                },
-                "undefined_mark_event_policy": (
-                    "retain in ordinary and nuisance kernels; assign zero only "
-                    "to the centered scientific-mark regressor; never permute "
-                    "into or out of unavailable events"
-                ),
-                "runner_timing_seconds": {
-                    "session_preparation": preparation_seconds,
-                    "design_construction": design_seconds,
-                    "fit_and_shuffle": fit_seconds,
-                },
-                "marked_diagnostics": fitted.diagnostics,
-                "cohort_report": cohort_report,
-                "cohort_info": context.cohort_info,
-                "nwb_file_name": nwb_file_name,
-                "epoch_name": epoch_name,
-                "jax_backend": gpu_record["jax_backend"],
-                "gpu_index": gpu_record["gpu_index"],
-                "gpu_uuid": gpu_record["gpu_uuid"],
-                "gpu_name": gpu_record["gpu_name"],
-                **context.input_provenance,
-            },
+            extra=json_safe(
+                {
+                    **contract_extra,
+                    "scientific_mark_definition": MARK_DESCRIPTIONS[scientific_mark],
+                    "nuisance_mark_definitions": {
+                        mark: NUISANCE_MARK_DESCRIPTIONS[mark]
+                        for mark in nuisance_marks
+                    },
+                    "joint_scientific_mark_fit": True,
+                    "shuffle_interpretation": (
+                        "unrestricted label-randomization reference under a strong "
+                        "exchangeability assumption; not a calibrated conditional "
+                        "p-value and never used to filter units or events"
+                    ),
+                    "label_shuffle_exchangeability_warning": (
+                        "content labels are not generally exchangeable over duration, "
+                        "occupied arm, stop context, or session time"
+                    ),
+                    "fold_sizes": np.bincount(folds, minlength=n_folds).tolist(),
+                    "fold_support_radius_bins": int(np.abs(context.lags).max()),
+                    "n_basis_per_kernel": int(context.spline_basis.shape[1]),
+                    "n_units": int(context.counts.shape[1]),
+                    "n_fit_bins": int(context.counts.shape[0]),
+                    "n_events_by_class": {
+                        name: int(len(context.events[name]))
+                        for name in MARKED_EVENT_CLASSES
+                    },
+                    "n_events_with_scientific_mark_by_class": {
+                        name: int(
+                            ladder.events[name][f"{scientific_mark}_available"].sum()
+                        )
+                        for name in MARKED_EVENT_CLASSES
+                    },
+                    "undefined_mark_event_policy": (
+                        "retain in ordinary and nuisance kernels; assign zero only "
+                        "to the centered scientific-mark regressor; never permute "
+                        "into or out of unavailable events"
+                    ),
+                    "runner_timing_seconds": {
+                        "session_preparation": preparation_seconds,
+                        "design_construction": design_seconds,
+                        "fit_and_shuffle": fit_seconds,
+                    },
+                    "marked_diagnostics": fitted.diagnostics,
+                    "cohort_report": cohort_report,
+                    "cohort_info": context.cohort_info,
+                    "nwb_file_name": nwb_file_name,
+                    "epoch_name": epoch_name,
+                    "jax_backend": gpu_record["jax_backend"],
+                    "gpu_index": gpu_record["gpu_index"],
+                    "gpu_uuid": gpu_record["gpu_uuid"],
+                    "gpu_name": gpu_record["gpu_name"],
+                    **context.input_provenance,
+                }
+            ),
         )
         logger.info("Saved %s and provenance %s", artifact, sidecar)
         return True
@@ -742,112 +711,6 @@ def run_analysis(
         if failure_sink is not None:
             failure_sink.append((type(error).__name__, str(error)[:120]))
         return False
-
-
-def read_session_list(path: Path) -> list[tuple[str, str]]:
-    """Read unique ``nwb_file_name epoch_name`` pairs in file order.
-
-    Parameters
-    ----------
-    path : Path
-        Text file with one whitespace- or comma-separated session per line;
-        ``#`` starts a comment.
-
-    Returns
-    -------
-    list of tuple of str
-        ``(nwb_file_name, epoch_name)`` pairs, de-duplicated, in file order.
-
-    Raises
-    ------
-    ValueError
-        If a line does not hold exactly two fields, or the file names no
-        sessions.
-    """
-    pairs: list[tuple[str, str]] = []
-    seen: set[tuple[str, str]] = set()
-    for number, raw in enumerate(path.read_text().splitlines(), start=1):
-        line = raw.split("#", 1)[0].strip()
-        if not line:
-            continue
-        fields = line.replace(",", " ").split()
-        if len(fields) != 2:
-            raise ValueError(
-                f"{path}:{number}: expected '<nwb_file_name> <epoch_name>', "
-                f"got {raw.strip()!r}"
-            )
-        key = (fields[0], fields[1])
-        if key not in seen:
-            seen.add(key)
-            pairs.append(key)
-    if not pairs:
-        raise ValueError(f"{path} names no sessions")
-    return pairs
-
-
-def _filter_epoch_info(epoch_info: pd.DataFrame, args: Namespace) -> pd.DataFrame:
-    """Apply CLI session filters without changing the source row order.
-
-    Parameters
-    ----------
-    epoch_info : pd.DataFrame
-        Session table indexed by ``(nwb_file_name, interval_list_name)``.
-    args : Namespace
-        Parsed CLI arguments; ``sessions``, ``animal``, ``date`` and ``epoch``
-        are read.
-
-    Returns
-    -------
-    pd.DataFrame
-        The selected rows, in ``--sessions`` order when that file is given and
-        in source order otherwise.
-
-    Raises
-    ------
-    ValueError
-        If ``--sessions`` names a session that is not available.
-    """
-    keep = np.ones(len(epoch_info), dtype=bool)
-    keys = list(
-        zip(
-            epoch_info.index.get_level_values("nwb_file_name"),
-            epoch_info.index.get_level_values("interval_list_name"),
-            strict=True,
-        )
-    )
-    requested_order = (
-        read_session_list(args.sessions) if args.sessions is not None else None
-    )
-    if requested_order is not None:
-        available = set(keys)
-        missing = [key for key in requested_order if key not in available]
-        if missing:
-            raise ValueError(
-                f"{args.sessions} names unavailable session(s): {missing[:10]}"
-            )
-        requested = set(requested_order)
-        keep &= np.array([key in requested for key in keys], dtype=bool)
-    if args.animal is not None:
-        keep &= epoch_info.animal.to_numpy() == args.animal
-    if args.date is not None:
-        keep &= epoch_info.date.to_numpy() == args.date
-    if args.epoch is not None:
-        keep &= (
-            epoch_info.index.get_level_values("interval_list_name").to_numpy()
-            == args.epoch
-        )
-    filtered = epoch_info.loc[keep]
-    if requested_order is not None:
-        order = {key: index for index, key in enumerate(requested_order)}
-        filtered_keys = list(
-            zip(
-                filtered.index.get_level_values("nwb_file_name"),
-                filtered.index.get_level_values("interval_list_name"),
-                strict=True,
-            )
-        )
-        filtered = filtered.iloc[np.argsort([order[key] for key in filtered_keys])]
-    return filtered
 
 
 def get_command_line_arguments() -> Namespace:
@@ -944,7 +807,13 @@ def main() -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     args.log_directory.mkdir(parents=True, exist_ok=True)
 
-    epoch_info = _filter_epoch_info(get_epoch_info(), args)
+    epoch_info = filter_epoch_info(
+        get_epoch_info(),
+        sessions=args.sessions,
+        animal=args.animal,
+        date=args.date,
+        epoch=args.epoch,
+    )
     if args.max_sessions is not None:
         epoch_info = epoch_info.iloc[: args.max_sessions]
     if epoch_info.empty:

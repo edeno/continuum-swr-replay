@@ -232,26 +232,6 @@ def test_cli_refuses_underresolved_nonzero_null(monkeypatch, draws):
         runner.get_command_line_arguments()
 
 
-def test_session_file_order_is_preserved(tmp_path):
-    index = pd.MultiIndex.from_tuples(
-        [("a_.nwb", "01_r1"), ("b_.nwb", "02_r1"), ("c_.nwb", "03_r1")],
-        names=["nwb_file_name", "interval_list_name"],
-    )
-    epochs = pd.DataFrame({"animal": ["a", "b", "c"], "date": [1, 2, 3]}, index=index)
-    session_file = tmp_path / "sessions.txt"
-    session_file.write_text("c_.nwb 03_r1\na_.nwb 01_r1\n")
-    args = SimpleNamespace(
-        sessions=session_file,
-        animal=None,
-        date=None,
-        epoch=None,
-    )
-
-    selected = runner._filter_epoch_info(epochs, args)
-
-    assert list(selected.index) == [("c_.nwb", "03_r1"), ("a_.nwb", "01_r1")]
-
-
 def test_bundle_is_current_requires_every_companion_file(tmp_path):
     artifact = tmp_path / f"session_{MARK}_marked_kernels.pkl"
     artifact.write_bytes(b"complete")
