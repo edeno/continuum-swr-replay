@@ -63,7 +63,15 @@ The last five marks divide by represented **leaf** mass. Trunk arms are excluded
 before the numerator and denominator are formed; their structural zeros never
 become zero uncertainty, value, reward, or recency. An all-trunk event has an
 undefined leaf-content mark and stays in the ordinary event population while
-contributing zero to that centered marked regressor. `leaf_content_fraction`
+contributing zero to that centered marked regressor. All-trunk events are the
+dominant missing source (7,315 of 59,843 well-anchored events, 12.2 %); a
+leaf-weighted mark is also undefined, rarely, when the arm-level source is
+itself undefined for the event on every leaf (32 well-anchored events with
+leaf content for the Beta belief, 0.05 %), so not every missing value is an
+all-trunk event.
+`content_weighted_recent_reward` uses the source column's convention for a
+never-visited arm, which is `0.0` (zero rewards from zero visits); the novelty
+mark carries the never-visited state separately. `leaf_content_fraction`
 is included separately so the model can distinguish *which leaf content* was
 represented from *how much leaf content* the event contained.
 
@@ -88,11 +96,17 @@ posterior entropy is a decode-quality adjustment, not a decoded mPFC response.
 | `reward_context` | latest known outcome was rewarded | duration, current-arm content, value, posterior entropy, switch context | Does reward change the average response beyond exploration? |
 | `graded_coupling` | ripple power, hippocampal MUA, theta power | duration, leaf mass, posterior entropy | Is the binary SWR split a thresholded view of continuous coupling? |
 
-A binary adjustment that is constant within a session/class is represented by
-an all-zero nuisance block: there is no within-class confounding variation to
-adjust. A **target** must have at least ten finite events and nonzero variation
-in both replay classes. An ineligible session × model gets a provenance marker,
-not a partial fit.
+An adjustment that is constant within a session/class is represented by an
+all-zero nuisance block: there is no within-class confounding variation to
+adjust. Every mark in a model, adjustment or target, must have at least ten
+finite events in both replay classes, and a **target** must additionally have
+nonzero variation in both. An ineligible session × model gets a provenance
+marker, not a partial fit.
+
+In `spatial_role`, `current_patch_fraction` contains `current_arm_fraction` by
+construction (median within-session × class r = 0.68 on the canonical table),
+so its two leave-one-block-out comparisons are not independent evidence and
+must be read together.
 
 Three optional interaction sensitivities are available with
 `--include-interactions`:
@@ -103,9 +117,13 @@ Three optional interaction sensitivities are available with
 - `coupling_content_interaction`: the analogous ripple-power interactions.
 
 Each interaction includes both constituent main-effect kernels plus duration,
-leaf mass, value, and posterior entropy. The context/coupling modifier is
-required to vary; this prevents an interaction that collapses onto its content
-main effect from being interpreted as separately identified.
+leaf mass, value, and posterior entropy. The interaction mark is the product of
+the two raw marks, standardized afterwards; with a 0/1 modifier the content
+main-effect kernel in an interaction model is therefore the response at
+modifier = 0 (non-switch, unrewarded), not at the class mean. The
+context/coupling modifier is required to vary; this prevents an interaction
+that collapses onto its content main effect from being interpreted as
+separately identified.
 
 ## Missing values and denominators
 
@@ -137,7 +155,10 @@ fold labels and spike-count response are transferred once and kept resident on
 the device across every requested family. There are no
 permutation refits in this family.
 
-On the 344-unit Wilbur 2021-03-29 `02_r1` real-session gate, a four-comparison
+The following profile is a one-off measurement from the development session;
+no preflight script or log for it is in the repository, so it is not
+reproducible from the tree and no production bundle exists yet. On the 344-unit
+Wilbur 2021-03-29 `02_r1` real-session gate, a four-comparison
 155-column compact-tier preflight used about 33.7 GB on an otherwise idle 80 GB
 A100; held-out scoring took 206 s and the full-data fit 22 s (first call
 includes JIT compilation). Batch size 1 and 2 produced bit-identical tables and
