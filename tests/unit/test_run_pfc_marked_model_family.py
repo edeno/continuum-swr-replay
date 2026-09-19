@@ -54,6 +54,7 @@ def _contract(spec=SPEC, **overrides):
     """Build the runner's fit contract with the fixtures' values."""
     kwargs = {
         "penalty_sigma": 3.0,
+        "mark_penalty_sigma": 1.0,
         "n_folds": 2,
         "fold_seed": 3,
         "design_batch_size": 4,
@@ -187,6 +188,7 @@ def _run(tmp_path, **overrides):
         "model_names": (MODEL,),
         "output_dir": tmp_path,
         "log_directory": tmp_path / "logs",
+        "mark_penalty_sigma": 1.0,
         "n_folds": 2,
         "fold_seed": 3,
         "gpu_record": GPU_RECORD,
@@ -226,6 +228,11 @@ def test_current_marker_requires_valid_mapping_and_exact_contract(tmp_path):
         artifact, SPEC, overwrite=False, fit_contract=contract
     )
     changed = {**contract, "penalty_sigma_log_rate": 4.0}
+    assert not runner._bundle_is_current(
+        artifact, SPEC, overwrite=False, fit_contract=changed
+    )
+    assert contract["mark_penalty_sigma_log_rate"] == 1.0
+    changed = {**contract, "mark_penalty_sigma_log_rate": None}
     assert not runner._bundle_is_current(
         artifact, SPEC, overwrite=False, fit_contract=changed
     )

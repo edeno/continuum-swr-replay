@@ -74,6 +74,7 @@ from continuum_swr_replay.analysis.pfc.marked_model_family import (
     CORE_MODEL_NAMES,
     DEFAULT_EVENT_ARM_TABLE_PATH,
     DEFAULT_EVENT_TABLE_PATH,
+    DEFAULT_MARK_PENALTY_SIGMA,
     INTERACTION_MODEL_NAMES,
     MARK_DESCRIPTIONS,
     PROFILED_BATCH_FEATURE_BUDGET,
@@ -166,6 +167,7 @@ def build_fit_contract(
     spec: MarkedFamilySpec,
     *,
     penalty_sigma: float,
+    mark_penalty_sigma: float | None,
     n_folds: int,
     fold_seed: int,
     design_batch_size: int,
@@ -221,6 +223,9 @@ def build_fit_contract(
         ),
         "neuron_inclusion": "all recorded units; no firing-rate or p-value screen",
         "penalty_sigma_log_rate": float(penalty_sigma),
+        "mark_penalty_sigma_log_rate": (
+            None if mark_penalty_sigma is None else float(mark_penalty_sigma)
+        ),
         "n_folds": int(n_folds),
         "fold_seed": int(fold_seed),
         "requested_design_batch_size": int(design_batch_size),
@@ -446,6 +451,7 @@ def run_analysis(
     log_directory: Path = Path("logs"),
     overwrite: bool = False,
     penalty_sigma: float = DEFAULT_PENALTY_SIGMA,
+    mark_penalty_sigma: float | None = DEFAULT_MARK_PENALTY_SIGMA,
     n_folds: int = 5,
     fold_seed: int | None = None,
     design_batch_size: int = DEFAULT_NULL_DESIGN_BATCH_SIZE,
@@ -480,6 +486,8 @@ def run_analysis(
         Refit even when a bundle under the same contract already exists.
     penalty_sigma : float, optional
         Ridge prior SD on the log-rate coefficients.
+    mark_penalty_sigma : float or None, optional
+        Ridge prior SD for the marked blocks; ``None`` shares ``penalty_sigma``.
     n_folds : int, optional
         Number of blocked held-out folds.
     fold_seed : int or None, optional
@@ -554,6 +562,7 @@ def run_analysis(
             name: build_fit_contract(
                 spec,
                 penalty_sigma=penalty_sigma,
+                mark_penalty_sigma=mark_penalty_sigma,
                 n_folds=n_folds,
                 fold_seed=fold_seed,
                 design_batch_size=design_batch_size,
@@ -684,6 +693,7 @@ def run_analysis(
                     context.counts,
                     folds,
                     penalty_sigma=penalty_sigma,
+                    mark_penalty_sigma=mark_penalty_sigma,
                     design_batch_size=design_batch_size,
                     prepared_response=prepared_response,
                 )
@@ -827,6 +837,17 @@ def get_command_line_arguments() -> Namespace:
         help="Add exploration, reward, and ripple-power content interactions.",
     )
     parser.add_argument("--penalty-sigma", type=float, default=DEFAULT_PENALTY_SIGMA)
+    parser.add_argument(
+        "--mark-penalty-sigma",
+        type=float,
+        default=DEFAULT_MARK_PENALTY_SIGMA,
+        help=(
+            "Ridge prior SD for the marked blocks (log-rate units); the base "
+            "kernels keep --penalty-sigma. Default: the module's "
+            "DEFAULT_MARK_PENALTY_SIGMA, chosen by held-out deviance on the "
+            "2026-09-18 smoke sessions."
+        ),
+    )
     parser.add_argument("--n-folds", type=int, default=5)
     parser.add_argument("--fold-seed", type=int)
     parser.add_argument(
@@ -840,6 +861,10 @@ def get_command_line_arguments() -> Namespace:
         args.models = list(dict.fromkeys([*args.models, *INTERACTION_MODEL_NAMES]))
     if args.penalty_sigma <= 0 or not np.isfinite(args.penalty_sigma):
         parser.error("--penalty-sigma must be finite and positive")
+    if args.mark_penalty_sigma is not None and (
+        args.mark_penalty_sigma <= 0 or not np.isfinite(args.mark_penalty_sigma)
+    ):
+        parser.error("--mark-penalty-sigma must be finite and positive")
     if args.n_folds < 2:
         parser.error("--n-folds must be at least 2")
     if args.design_batch_size < 1:
@@ -929,6 +954,7 @@ def main() -> None:
             log_directory=args.log_directory,
             overwrite=args.overwrite,
             penalty_sigma=args.penalty_sigma,
+            mark_penalty_sigma=args.mark_penalty_sigma,
             n_folds=args.n_folds,
             fold_seed=args.fold_seed,
             design_batch_size=args.design_batch_size,

@@ -406,8 +406,15 @@ def test_single_target_family_is_numerically_identical_to_single_mark_estimator(
         seed=9,
         support_radius_bins=int(np.abs(family.lags).max()),
     )
+    # The single-mark estimator has one prior for every block, so the family
+    # is asked to share it here; the shipped family default is tighter.
     family_result = fit_marked_family_ladder(
-        family, counts, folds, penalty_sigma=3.0, design_batch_size=2
+        family,
+        counts,
+        folds,
+        penalty_sigma=3.0,
+        mark_penalty_sigma=None,
+        design_batch_size=2,
     )
     single_result = fit_marked_kernel_ladder(
         single,
@@ -757,8 +764,40 @@ def test_planted_content_kernel_is_recovered_only_on_its_own_target_and_class():
     # neither target of the other class was, and the unmodulated unit buys
     # essentially nothing from the planted comparison. The flat unit's other
     # comparisons are pure noise and are deliberately not pinned.
-    assert delta(driven_class, PREVIOUS_ARM_FRACTION)[0] <= 0
-    assert delta("non_local_SWR", CURRENT_ARM_FRACTION)[0] <= 0
-    assert delta("non_local_SWR", PREVIOUS_ARM_FRACTION)[0] <= 0
-    assert planted[1] < 1.0
+    # Under the shipped mark prior (0.5) an unplanted block costs little out of
+    # fold either way, so its delta sits near zero on both sides; the bound is
+    # a tenth of the planted gain (measured: planted +30, unplanted +1.8 and
+    # the two SWR-class comparisons within a few units of zero).
+    noise_bound = max(2.0, 0.1 * planted[0])
+    assert delta(driven_class, PREVIOUS_ARM_FRACTION)[0] < noise_bound
+    assert delta("non_local_SWR", CURRENT_ARM_FRACTION)[0] < noise_bound
+    assert delta("non_local_SWR", PREVIOUS_ARM_FRACTION)[0] < noise_bound
+    assert planted[1] < noise_bound
     assert np.nanmax(np.abs(unplanted[:, 0])) < 0.6
+
+
+def test_family_ridge_penalty_gives_marked_blocks_their_own_prior():
+    from continuum_swr_replay.analysis.pfc.batched_glm import make_ridge_penalty
+    from continuum_swr_replay.analysis.pfc.marked_model_family import (
+        family_ridge_penalty,
+    )
+
+    fit_mask, basis, lags, events = _eligibility_inputs()
+    spec = MarkedFamilySpec(
+        name="penalty_probe",
+        scientific_marks=(CURRENT_ARM_FRACTION,),
+        nuisance_marks=(EVENT_DURATION_MARK,),
+        question="which columns carry which prior",
+    )
+    design = build_marked_family_ladder(events, fit_mask, basis, lags, spec).full
+    shared = family_ridge_penalty(design, 3.0)
+    np.testing.assert_array_equal(
+        shared, make_ridge_penalty(design.matrix.shape[1], 3.0)
+    )
+    split = family_ridge_penalty(design, 3.0, 1.0)
+    assert split[0] == 0.0
+    for block in design.blocks:
+        expected = 1.0 if block.mark_column is not None else 1.0 / 9.0
+        np.testing.assert_allclose(split[design.block_slices[block.name]], expected)
+    with pytest.raises(ValueError, match="mark_penalty_sigma"):
+        family_ridge_penalty(design, 3.0, 0.0)

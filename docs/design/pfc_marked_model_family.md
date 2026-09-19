@@ -174,9 +174,17 @@ ran end to end, but it also showed that a family bundle's `typical` curve is
 **not** the Figure 4 kernel: with the base kernels alone the family reproduces
 the canonical curves exactly, and adding the mark blocks under the σ = 3 prior
 inflates the base peaks by about 25 % (IQR 1.0–1.6) whether the marks are
-real or permuted within class. Read target slopes only with their held-out
-delta, never quote a `typical` curve as a Figure 4 modulation, and treat a
-width-aware prior as the open item before a corpus run.
+real or permuted within class, and lets held-out predictions blow up on
+dozens to hundreds of units per model on the larger sessions. The marked
+blocks therefore carry their own prior, `DEFAULT_MARK_PENALTY_SIGMA = 0.5`
+(`--mark-penalty-sigma`), while the base kernels keep σ = 3. Total held-out
+deviance improves monotonically as that prior tightens and never beats the
+base-only model on the smoke sessions, so 0.5 is a stated operating point
+rather than an optimum: it restores the canonical base kernels within 2 %,
+removes the blow-ups, and still admits a per-SD modulation of roughly ×0.7 to
+×1.4. Read target slopes only with their held-out delta and never quote a
+`typical` curve as a Figure 4 modulation; the two now agree closely but are
+not the same fit.
 
 ## Artifacts
 

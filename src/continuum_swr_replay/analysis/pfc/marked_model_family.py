@@ -1119,20 +1119,69 @@ def bounded_design_batch_size(
     return min(requested, max(1, feature_budget // n_features))
 
 
+#: Default prior SD (log-rate units per coefficient) for the marked blocks;
+#: the base kernels keep the canonical σ = 3. The three-session smoke of
+#: 2026-09-18 showed that one loose prior over a 155- or 221-column design
+#: inflates the base kernels by about a quarter whether or not the marks carry
+#: content and lets held-out predictions blow up on many units. Total held-out
+#: deviance improves monotonically as this prior tightens and is never better
+#: than the base-only model, so there is no interior optimum: 0.5 is the
+#: operating point that restores the canonical base kernels within 2 %, ends
+#: the blow-ups, and still admits a per-SD modulation of roughly ×0.7 to ×1.4
+#: (``docs/audits/2026-09-18-pfc-marked-family-smoke.md``).
+DEFAULT_MARK_PENALTY_SIGMA: float | None = 0.5
+
+
+def family_ridge_penalty(
+    design: KernelDesign,
+    penalty_sigma: float,
+    mark_penalty_sigma: float | None = None,
+) -> NDArray:
+    """Per-column ridge penalty with a separate prior for the marked blocks.
+
+    Parameters
+    ----------
+    design : KernelDesign
+        The design whose blocks set which columns are marked.
+    penalty_sigma : float
+        Prior SD on the ordinary (base) kernel coefficients, log-rate units.
+    mark_penalty_sigma : float, optional
+        Prior SD on every marked block's coefficients. ``None`` uses
+        ``penalty_sigma`` for them too.
+
+    Returns
+    -------
+    NDArray, shape (n_columns,)
+        ``0`` for the intercept, ``1 / penalty_sigma**2`` for base columns and
+        ``1 / mark_penalty_sigma**2`` for marked columns.
+    """
+    penalty = make_ridge_penalty(design.matrix.shape[1], penalty_sigma)
+    if mark_penalty_sigma is None:
+        return penalty
+    if mark_penalty_sigma <= 0 or not np.isfinite(mark_penalty_sigma):
+        raise ValueError("mark_penalty_sigma must be finite and positive")
+    for block in design.blocks:
+        if block.mark_column is not None:
+            penalty[design.block_slices[block.name]] = 1.0 / mark_penalty_sigma**2
+    return penalty
+
+
 def _score(
     designs: NDArray,
     response: PreparedHeldoutResponse,
-    penalty_sigma: float,
+    penalty: NDArray,
     *,
     requested_batch_size: int,
 ) -> BatchedHeldoutResults:
-    """Score equal-width designs under one ridge prior and the batch bound."""
+    """Score equal-width designs under one penalty vector and the batch bound."""
     width = np.asarray(designs).shape[-1]
+    if np.asarray(penalty).shape != (width,):
+        raise ValueError("penalty must have one value per design column")
     batch_size = bounded_design_batch_size(requested_batch_size, width)
     return score_poisson_designs_heldout(
         designs,
         response,
-        make_ridge_penalty(width, penalty_sigma),
+        np.asarray(penalty, dtype=float),
         design_batch_size=batch_size,
     )
 
@@ -1183,6 +1232,7 @@ def fit_marked_family_ladder(
     folds: NDArray,
     *,
     penalty_sigma: float,
+    mark_penalty_sigma: float | None = DEFAULT_MARK_PENALTY_SIGMA,
     design_batch_size: int = DEFAULT_NULL_DESIGN_BATCH_SIZE,
     prepared_response: PreparedHeldoutResponse | None = None,
 ) -> MarkedFamilyResults:
@@ -1201,7 +1251,10 @@ def fit_marked_family_ladder(
     folds : NDArray of int, shape (n_fit_bins,)
         Held-out fold label of each fitted bin.
     penalty_sigma : float
-        Ridge prior SD applied to every non-intercept column.
+        Ridge prior SD on the base kernels' coefficients.
+    mark_penalty_sigma : float, optional
+        Ridge prior SD on every marked block's coefficients; ``None`` shares
+        ``penalty_sigma``. See :data:`DEFAULT_MARK_PENALTY_SIGMA`.
     design_batch_size : int
         Designs scored per device batch, before the width bound of
         :func:`bounded_design_batch_size`.
@@ -1224,6 +1277,10 @@ def fit_marked_family_ladder(
     """
     if penalty_sigma <= 0 or not np.isfinite(penalty_sigma):
         raise ValueError("penalty_sigma must be finite and positive")
+    if mark_penalty_sigma is not None and (
+        mark_penalty_sigma <= 0 or not np.isfinite(mark_penalty_sigma)
+    ):
+        raise ValueError("mark_penalty_sigma must be finite and positive")
     fit_counts = np.asarray(counts, dtype=float)
     if fit_counts.ndim == 1:
         fit_counts = fit_counts[:, None]
@@ -1259,16 +1316,22 @@ def fit_marked_family_ladder(
     comparison_order = tuple(ladder.reduced)
     reduced_designs = np.stack([ladder.reduced[key].matrix for key in comparison_order])
     started = time.perf_counter()
+    # Every reduced design of one spec lays out intercept, base blocks, then
+    # marked blocks in the same order, so one penalty vector serves the batch.
+    reduced_penalty = family_ridge_penalty(
+        ladder.reduced[comparison_order[0]], penalty_sigma, mark_penalty_sigma
+    )
+    full_penalty = family_ridge_penalty(ladder.full, penalty_sigma, mark_penalty_sigma)
     reduced_score = _score(
         reduced_designs,
         response,
-        penalty_sigma,
+        reduced_penalty,
         requested_batch_size=design_batch_size,
     )
     full_score = _score(
         ladder.full.matrix[None, :, :],
         response,
-        penalty_sigma,
+        full_penalty,
         requested_batch_size=design_batch_size,
     )
     heldout_seconds = time.perf_counter() - started
@@ -1277,7 +1340,7 @@ def fit_marked_family_ladder(
     fitted = fit_poisson_glms(
         ladder.full.matrix,
         fit_counts,
-        penalty=make_ridge_penalty(ladder.full.matrix.shape[1], penalty_sigma),
+        penalty=full_penalty,
         compute_covariance=False,
     )
     full_fit_seconds = time.perf_counter() - fit_started
@@ -1321,6 +1384,10 @@ def fit_marked_family_ladder(
 
     diagnostics: dict[str, Any] = {
         "model_name": ladder.spec.name,
+        "penalty_sigma_log_rate": float(penalty_sigma),
+        "mark_penalty_sigma_log_rate": (
+            None if mark_penalty_sigma is None else float(mark_penalty_sigma)
+        ),
         "tier": ladder.spec.tier,
         "scientific_marks": list(ladder.spec.scientific_marks),
         "nuisance_marks": list(ladder.spec.nuisance_marks),

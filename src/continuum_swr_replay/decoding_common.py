@@ -118,7 +118,7 @@ def setup_logger(
             "file": {
                 "class": "logging.FileHandler",
                 "filename": str(log_path),
-                "mode": "w",
+                "mode": "a",
                 "encoding": "utf-8",
                 "formatter": "standard",
                 "filters": ["skip_checksum"],
@@ -270,14 +270,10 @@ def run_batch(
         n_total = len(outcomes)
 
         if failures:
-            sys.stderr.write(
-                f"\n{len(failures)}/{n_total} session(s) FAILED:\n"
-            )
+            sys.stderr.write(f"\n{len(failures)}/{n_total} session(s) FAILED:\n")
             for ident in failures:
                 sys.stderr.write(f"  - {ident}\n")
-            sys.stderr.write(
-                "See logs/<epoch_identifier>.log for tracebacks.\n"
-            )
+            sys.stderr.write("See logs/<epoch_identifier>.log for tracebacks.\n")
             sys.exit(1)
 
         print(f"\nAll {n_total} session(s) completed.")

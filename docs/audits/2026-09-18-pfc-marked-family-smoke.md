@@ -89,11 +89,48 @@ Consequences:
   block count) is the natural fix and is left as a follow-up; nothing here
   changes a shipped number, since no production family bundle exists.
 
+## Choosing the marked blocks' prior
+
+At σ = 3 the held-out deltas explode on many units: |Δ| > 1000 for 12 of 74
+units in `belief_content` on the small session, 58 of 276 in
+`trajectory_geometry` on the median one, and 177 of 511 in `spatial_role` on
+the largest, with single-unit values up to 10^7. Those smoke bundles are kept
+only as evidence, under `Processed-Data/pfc_marked_model_family_smoke_20260918_sigma3_superseded/`.
+
+The marked blocks were then given their own prior σ_mark with the base
+kernels held at σ = 3, and σ_mark was scanned on the three sessions for
+`spatial_role` and `belief_content` (fold seed 7, K = 5). Total held-out
+deviance of the full model, and the median ratio of the base-kernel peak to
+the canonical Figure 4 peak:
+
+| σ_mark | j16 spatial (dev, ratio) | senor spatial | wilbur spatial | j16 belief | senor belief | wilbur belief |
+|---|---|---|---|---|---|---|
+| base only | 1,354,660 | 2,969,793 | — | 1,354,660 | 2,969,793 | — |
+| 0.15 | 1,354,464 | 2,970,052 | — | 1,354,580 | 2,970,277 | — |
+| 0.25 | 1,354,919 | 2,971,565 | — | 1,355,142 | 2,972,505 | — |
+| 0.35 | 1,355,544 | 2,973,588 | — | 1,355,897 | 2,975,460 | — |
+| 0.5 | 1,356,531 (1.02) | 2,976,912 (1.02) | 9,411,294 (1.01) | 1,357,111 (1.03) | 2,980,331 (1.03) | 9,411,810 (1.01) |
+| 1.0 | 1,359,397 (1.09) | 2,987,368 (1.10) | 9,431,062 (1.05) | 1,360,838 (1.11) | 2,996,364 (1.17) | 9,432,545 (1.09) |
+| 2.0 | 1,363,251 (1.17) | 3,003,916 (1.27) | 9,503,146 (1.20) | 1,435,174 (1.22) | 3,144,697 (1.39) | 9,521,379 (1.27) |
+| 3.0 | 1,365,801 (1.23) | 3,019,412 (1.37) | 9,880,102 (1.31) | 5.2 × 10^10 (1.27) | 9.0 × 10^7 (1.55) | 5.9 × 10^7 (1.39) |
+
+Two things follow. The marks carry no out-of-fold predictive value in
+aggregate on these sessions: every marked model is at best level with the
+base-only model and total deviance improves monotonically as σ_mark shrinks,
+so there is no interior optimum and the per-unit deltas will be mostly
+negative with a right tail. And σ = 3 was simply too loose for the width.
+`DEFAULT_MARK_PENALTY_SIGMA = 0.5` is therefore a stated operating point:
+it restores the canonical base kernels within 2 % on all three sessions,
+removes the blow-ups, and still admits a per-SD modulation of roughly ×0.7
+to ×1.4 (implied per-lag prior SD 0.35 log-rate). It is exposed as
+`--mark-penalty-sigma` and recorded in the fit contract, so a corpus at
+another value is a separate, non-skippable set of bundles.
+
 ## Follow-ups
 
-1. Empirical-Bayes or width-scaled σ for the family designs, then a repeat of
-   the isolation table.
-2. `setup_logger` should append, not truncate, so a skipped rerun does not
-   erase the fit log.
-3. Run the 71-session corpus only after (1) is decided; the runner and
-   provenance are ready as they stand.
+1. A per-unit empirical-Bayes σ_mark would replace the fixed operating point;
+   the sensitivity table above is the baseline for it.
+2. `setup_logger` now appends (changed with this audit), so a skipped rerun
+   no longer erases the fit log.
+3. The 71-session corpus runs at σ_mark = 0.5 with the nine core models and
+   the three interactions.
