@@ -27,30 +27,30 @@ from numpy.typing import NDArray
 
 from continuum_swr_replay.analysis.pfc.batched_glm import (
     DEFAULT_NULL_DESIGN_BATCH_SIZE,
+    BatchedHeldoutResults,
     PreparedHeldoutResponse,
     fit_poisson_glms,
     make_ridge_penalty,
     prepare_heldout_response,
     score_poisson_designs_heldout,
 )
+from continuum_swr_replay.analysis.pfc.canonical_events import DEFAULT_EVENT_TABLE_PATH
 from continuum_swr_replay.analysis.pfc.marked_glm import (
+    DEFAULT_EVENT_ARM_TABLE_PATH,
     EVENT_DURATION_MARK,
     MARKED_EVENT_CLASSES,
+    MIN_MARKED_EVENTS_PER_CLASS,
     EventKernelBlock,
     KernelDesign,
     MarkScale,
+    _block_name,
+    _without_block,
     build_kernel_design,
     standardize_event_marks,
 )
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
 from continuum_swr_replay.table_io import read_table, resolved_table_path, sha256_file
-
-DEFAULT_EVENT_ARM_TABLE_PATH = (
-    PROCESSED_DATA_DIR / "replay_content" / "event_arm_table.parquet"
-)
-DEFAULT_EVENT_TABLE_PATH = PROCESSED_DATA_DIR / "replay_content" / "event_table.parquet"
 
 CURRENT_ARM_FRACTION = "current_arm_fraction"
 PREVIOUS_ARM_FRACTION = "previous_arm_fraction"
@@ -139,6 +139,26 @@ class MarkedFamilySpec:
     ``nuisance_marks`` remain in every comparison.  Every mark still has a
     fitted temporal kernel, so a nuisance adjustment is not forced to be
     instantaneous or constant over the peri-event window.
+
+    Attributes
+    ----------
+    name : str
+        Model name; keys the shipped family and every output artifact.
+    scientific_marks : tuple[str, ...]
+        Target marks, each compared with the design lacking only its own
+        per-class temporal block.
+    nuisance_marks : tuple[str, ...]
+        Marks kept in the full design and in every reduced design.
+    question : str
+        One-sentence scientific question the comparison answers.
+    tier : str
+        ``"core"`` or ``"interaction"``; interaction models carry product
+        marks and their two constituent main effects.
+    required_varying_nuisance_marks : tuple[str, ...]
+        Nuisance marks that must vary within every class. They are the
+        modifiers of an interaction target, whose product mark is otherwise
+        identically zero; a session that lacks their variation is refused
+        rather than fit.
     """
 
     name: str
@@ -168,41 +188,33 @@ class MarkedFamilySpec:
         return (*self.nuisance_marks, *self.scientific_marks)
 
 
-def _spec(
-    name: str,
-    scientific: tuple[str, ...],
-    nuisance: tuple[str, ...],
-    question: str,
-    *,
-    tier: str = "core",
-    required_varying_nuisance_marks: tuple[str, ...] = (),
-) -> MarkedFamilySpec:
-    return MarkedFamilySpec(
-        name,
-        scientific,
-        nuisance,
-        question,
-        tier,
-        required_varying_nuisance_marks,
-    )
-
-
 # Six compact core designs carry six marked predictors per class. The three
 # content horse-races and all three interaction sensitivities carry nine. Thus
 # the full family uses only two compiled widths (155 and 221 columns with the
 # shipped 11-function basis) while retaining the controls each question needs.
 RECOMMENDED_MODEL_SPECS: Mapping[str, MarkedFamilySpec] = MappingProxyType(
     {
-        "spatial_role": _spec(
-            "spatial_role",
-            (CURRENT_ARM_FRACTION, PREVIOUS_ARM_FRACTION, CURRENT_PATCH_FRACTION),
-            (EVENT_DURATION_MARK, LEAF_CONTENT_FRACTION, DECODE_ENTROPY),
-            "Does response timing vary with current, previous, or same-patch content?",
+        "spatial_role": MarkedFamilySpec(
+            name="spatial_role",
+            scientific_marks=(
+                CURRENT_ARM_FRACTION,
+                PREVIOUS_ARM_FRACTION,
+                CURRENT_PATCH_FRACTION,
+            ),
+            nuisance_marks=(
+                EVENT_DURATION_MARK,
+                LEAF_CONTENT_FRACTION,
+                DECODE_ENTROPY,
+            ),
+            question=(
+                "Does response timing vary with current, previous, or same-patch "
+                "content?"
+            ),
         ),
-        "belief_content": _spec(
-            "belief_content",
-            (CONTENT_UNCERTAINTY, CONTENT_VALUE),
-            (
+        "belief_content": MarkedFamilySpec(
+            name="belief_content",
+            scientific_marks=(CONTENT_UNCERTAINTY, CONTENT_VALUE),
+            nuisance_marks=(
                 EVENT_DURATION_MARK,
                 LEAF_CONTENT_FRACTION,
                 CURRENT_ARM_FRACTION,
@@ -211,12 +223,15 @@ RECOMMENDED_MODEL_SPECS: Mapping[str, MarkedFamilySpec] = MappingProxyType(
                 CONTENT_NOVELTY,
                 DECODE_ENTROPY,
             ),
-            "Does mPFC track represented-arm uncertainty beyond value and reward history?",
+            question=(
+                "Does mPFC track represented-arm uncertainty beyond value and "
+                "reward history?"
+            ),
         ),
-        "reward_memory": _spec(
-            "reward_memory",
-            (CONTENT_RECENT_REWARD, CONTENT_RECENCY),
-            (
+        "reward_memory": MarkedFamilySpec(
+            name="reward_memory",
+            scientific_marks=(CONTENT_RECENT_REWARD, CONTENT_RECENCY),
+            nuisance_marks=(
                 EVENT_DURATION_MARK,
                 LEAF_CONTENT_FRACTION,
                 CURRENT_ARM_FRACTION,
@@ -225,12 +240,14 @@ RECOMMENDED_MODEL_SPECS: Mapping[str, MarkedFamilySpec] = MappingProxyType(
                 DECODE_ENTROPY,
                 CONTENT_NOVELTY,
             ),
-            "Do recent reward and recency explain responses beyond belief state?",
+            question=(
+                "Do recent reward and recency explain responses beyond belief state?"
+            ),
         ),
-        "novelty_content": _spec(
-            "novelty_content",
-            (CONTENT_NOVELTY,),
-            (
+        "novelty_content": MarkedFamilySpec(
+            name="novelty_content",
+            scientific_marks=(CONTENT_NOVELTY,),
+            nuisance_marks=(
                 EVENT_DURATION_MARK,
                 LEAF_CONTENT_FRACTION,
                 CURRENT_ARM_FRACTION,
@@ -240,65 +257,83 @@ RECOMMENDED_MODEL_SPECS: Mapping[str, MarkedFamilySpec] = MappingProxyType(
                 CONTENT_RECENCY,
                 DECODE_ENTROPY,
             ),
-            "Does represented never-visited content matter beyond graded recency?",
+            question=(
+                "Does represented never-visited content matter beyond graded recency?"
+            ),
         ),
-        "trajectory_geometry": _spec(
-            "trajectory_geometry",
-            (
+        "trajectory_geometry": MarkedFamilySpec(
+            name="trajectory_geometry",
+            scientific_marks=(
                 LOG_SPATIAL_EXTENT,
                 LOG_REVERSALS,
                 PAUSE_FRACTION,
                 RETROSPECTIVE_BIAS,
             ),
-            (EVENT_DURATION_MARK, DECODE_ENTROPY),
-            "Does response timing vary with extent, reversals, pauses, or direction?",
+            nuisance_marks=(EVENT_DURATION_MARK, DECODE_ENTROPY),
+            question=(
+                "Does response timing vary with extent, reversals, pauses, or "
+                "direction?"
+            ),
         ),
-        "within_stop_timing": _spec(
-            "within_stop_timing",
-            (LOG_STOP_TIME,),
-            (
+        "within_stop_timing": MarkedFamilySpec(
+            name="within_stop_timing",
+            scientific_marks=(LOG_STOP_TIME,),
+            nuisance_marks=(
                 EVENT_DURATION_MARK,
                 CURRENT_ARM_FRACTION,
                 LEAF_CONTENT_FRACTION,
                 CONTENT_VALUE,
                 DECODE_ENTROPY,
             ),
-            "Does the replay response change over the course of an immobility stop?",
+            question=(
+                "Does the replay response change over the course of an immobility stop?"
+            ),
         ),
-        "switch_context": _spec(
-            "switch_context",
-            (SWITCH_CONTEXT,),
-            (
+        "switch_context": MarkedFamilySpec(
+            name="switch_context",
+            scientific_marks=(SWITCH_CONTEXT,),
+            nuisance_marks=(
                 EVENT_DURATION_MARK,
                 CURRENT_ARM_FRACTION,
                 CONTENT_VALUE,
                 DECODE_ENTROPY,
                 REWARDED_CONTEXT,
             ),
-            "Does patch-switch context change the response beyond known reward?",
+            question=(
+                "Does patch-switch context change the response beyond known reward?"
+            ),
         ),
-        "reward_context": _spec(
-            "reward_context",
-            (REWARDED_CONTEXT,),
-            (
+        "reward_context": MarkedFamilySpec(
+            name="reward_context",
+            scientific_marks=(REWARDED_CONTEXT,),
+            nuisance_marks=(
                 EVENT_DURATION_MARK,
                 CURRENT_ARM_FRACTION,
                 CONTENT_VALUE,
                 DECODE_ENTROPY,
                 SWITCH_CONTEXT,
             ),
-            "Does known reward change the response beyond patch-switch context?",
+            question=(
+                "Does known reward change the response beyond patch-switch context?"
+            ),
         ),
-        "graded_coupling": _spec(
-            "graded_coupling",
-            (RIPPLE_POWER, MUA_RATE, THETA_POWER),
-            (EVENT_DURATION_MARK, LEAF_CONTENT_FRACTION, DECODE_ENTROPY),
-            "Is binary SWR membership hiding a graded hippocampal coupling continuum?",
+        "graded_coupling": MarkedFamilySpec(
+            name="graded_coupling",
+            scientific_marks=(RIPPLE_POWER, MUA_RATE, THETA_POWER),
+            nuisance_marks=(
+                EVENT_DURATION_MARK,
+                LEAF_CONTENT_FRACTION,
+                DECODE_ENTROPY,
+            ),
+            question=(
+                "Is binary SWR membership hiding a graded hippocampal coupling "
+                "continuum?"
+            ),
         ),
-        "exploration_content_interaction": _spec(
-            "exploration_content_interaction",
-            (CURRENT_X_SWITCH, UNCERTAINTY_X_SWITCH),
-            (
+        "exploration_content_interaction": MarkedFamilySpec(
+            name="exploration_content_interaction",
+            scientific_marks=(CURRENT_X_SWITCH, UNCERTAINTY_X_SWITCH),
+            nuisance_marks=(
                 EVENT_DURATION_MARK,
                 CURRENT_ARM_FRACTION,
                 CONTENT_UNCERTAINTY,
@@ -307,14 +342,14 @@ RECOMMENDED_MODEL_SPECS: Mapping[str, MarkedFamilySpec] = MappingProxyType(
                 CONTENT_VALUE,
                 DECODE_ENTROPY,
             ),
-            "Does exploration change current-arm or uncertainty modulation?",
+            question="Does exploration change current-arm or uncertainty modulation?",
             tier="interaction",
             required_varying_nuisance_marks=(SWITCH_CONTEXT,),
         ),
-        "reward_content_interaction": _spec(
-            "reward_content_interaction",
-            (CURRENT_X_REWARD, UNCERTAINTY_X_REWARD),
-            (
+        "reward_content_interaction": MarkedFamilySpec(
+            name="reward_content_interaction",
+            scientific_marks=(CURRENT_X_REWARD, UNCERTAINTY_X_REWARD),
+            nuisance_marks=(
                 EVENT_DURATION_MARK,
                 CURRENT_ARM_FRACTION,
                 CONTENT_UNCERTAINTY,
@@ -323,14 +358,14 @@ RECOMMENDED_MODEL_SPECS: Mapping[str, MarkedFamilySpec] = MappingProxyType(
                 CONTENT_VALUE,
                 DECODE_ENTROPY,
             ),
-            "Does known reward change current-arm or uncertainty modulation?",
+            question="Does known reward change current-arm or uncertainty modulation?",
             tier="interaction",
             required_varying_nuisance_marks=(REWARDED_CONTEXT,),
         ),
-        "coupling_content_interaction": _spec(
-            "coupling_content_interaction",
-            (CURRENT_X_RIPPLE, UNCERTAINTY_X_RIPPLE),
-            (
+        "coupling_content_interaction": MarkedFamilySpec(
+            name="coupling_content_interaction",
+            scientific_marks=(CURRENT_X_RIPPLE, UNCERTAINTY_X_RIPPLE),
+            nuisance_marks=(
                 EVENT_DURATION_MARK,
                 CURRENT_ARM_FRACTION,
                 CONTENT_UNCERTAINTY,
@@ -339,7 +374,9 @@ RECOMMENDED_MODEL_SPECS: Mapping[str, MarkedFamilySpec] = MappingProxyType(
                 CONTENT_VALUE,
                 DECODE_ENTROPY,
             ),
-            "Does graded ripple power change current-arm or uncertainty modulation?",
+            question=(
+                "Does graded ripple power change current-arm or uncertainty modulation?"
+            ),
             tier="interaction",
             required_varying_nuisance_marks=(RIPPLE_POWER,),
         ),
@@ -355,7 +392,32 @@ INTERACTION_MODEL_NAMES = tuple(
 
 @dataclass(frozen=True)
 class MarkedFamilyLadder:
-    """One joint full design and every leave-one-target-block-out design."""
+    """One joint full design and every leave-one-target-block-out design.
+
+    Attributes
+    ----------
+    spec : MarkedFamilySpec
+        The question this ladder was built for.
+    reduced : dict[tuple[str, str], KernelDesign]
+        Keyed by ``(event_class, scientific_mark)``: the full design minus
+        only that class's block for that target mark.
+    full : KernelDesign
+        The joint design holding every class's ordinary, nuisance and target
+        block, of shape ``(n_fit_bins, 1 + n_blocks * n_basis)``.
+    events : dict[str, pd.DataFrame]
+        Per event class, the standardized event frame the design was built
+        from, carrying ``<mark>_z`` and ``<mark>_available`` columns.
+    scales : dict[str, dict[str, MarkScale]]
+        Per event class and mark, the centering and scaling reference.
+    classes : tuple[str, ...]
+        Event classes, in design-block and comparison order.
+    fit_mask : pd.Series of bool
+        Fitted-bin mask indexed by session time, shape ``(n_time,)``.
+    spline_basis : NDArray, shape (n_lags, n_basis)
+        Basis functions evaluated at ``lags``.
+    lags : NDArray of int, shape (n_lags,)
+        Lag indices in samples, ascending by one sample.
+    """
 
     spec: MarkedFamilySpec
     reduced: dict[tuple[str, str], KernelDesign]
@@ -370,7 +432,27 @@ class MarkedFamilyLadder:
 
 @dataclass(frozen=True)
 class MarkedFamilyResults:
-    """Per-unit comparisons and full-data temporal kernels for one spec."""
+    """Per-unit comparisons and full-data temporal kernels for one spec.
+
+    Attributes
+    ----------
+    statistics : pd.DataFrame
+        One row per unit, with the shared ``family_full_heldout_deviance``
+        and ``full_all_folds_converged`` columns and, per
+        ``"<event_class>:<mark>"`` comparison, its reduced deviance, delta,
+        per-fold deltas and reduced convergence.
+    typical_curves : dict[str, NDArray]
+        ``typical_curves[c]``, shape ``(n_lags, n_units)``: class ``c``'s
+        ordinary log-rate kernel at typical mark values. Non-converged units
+        are ``nan``.
+    mark_curves : dict[str, dict[str, NDArray]]
+        ``mark_curves[c][mark]``, shape ``(n_lags, n_units)``: the change in
+        class ``c``'s log-rate kernel per within-session, within-class SD of
+        that target mark. Non-converged units are ``nan``.
+    diagnostics : dict[str, Any]
+        JSON-serializable audit record: mark scales, design widths, ranks,
+        mark geometry, NaN-channel counts and timings.
+    """
 
     statistics: pd.DataFrame
     typical_curves: dict[str, NDArray]
@@ -383,10 +465,12 @@ class ModelIneligibleError(ValueError):
 
 
 def _numeric(frame: pd.DataFrame, column: str) -> NDArray:
+    """Read one column as float, coercing non-numeric entries to ``nan``."""
     return pd.to_numeric(frame[column], errors="coerce").to_numpy(dtype=float)
 
 
 def _validate_event_arm_geometry(event_arm_table: pd.DataFrame) -> None:
+    """Refuse an arm table that is not nine arms of unit total weight per event."""
     counts = event_arm_table.groupby("event_id", sort=False).size()
     if not (counts == 9).all():
         event_id = counts.index[counts.ne(9)][0]
@@ -418,6 +502,7 @@ def _role_fraction(
     *,
     allow_undefined: bool,
 ) -> pd.Series:
+    """Sum each event's arm weight over the arms flagged by one role column."""
     raw = event_arm_table[role].astype("boolean")
     groups = event_arm_table["event_id"]
     n_defined = raw.notna().groupby(groups, sort=False).sum()
@@ -544,6 +629,31 @@ def build_recommended_event_mark_table(
     never-visited mass itself is still carried by
     ``content_weighted_novelty_fraction``, and ``content_weighted_recent_reward``
     keeps every finite leaf row because its never-visited entry is a true 0.0.
+
+    Parameters
+    ----------
+    event_arm_table : pd.DataFrame, shape (9 * n_events, ...)
+        One session's canonical nine-row-per-event arm table.
+    event_table : pd.DataFrame, shape (n_events, ...)
+        The same session's canonical one-row-per-event table.
+
+    Returns
+    -------
+    pd.DataFrame, shape (n_events, ...)
+        One row per event, keyed by ``event_id`` in the arm table's
+        first-appearance order, carrying the event metadata columns and every
+        mark named in :data:`MARK_DESCRIPTIONS`. Undefined marks are ``nan``.
+
+    Raises
+    ------
+    KeyError
+        If either table lacks a required column.
+    ValueError
+        If the tables are empty, disagree on the event set, timing or
+        ``is_swr``, if the arm geometry is not nine unit-summing arms per
+        event, if a leaf quantity is only partially available within an
+        event, or if a duration, time, extent or reversal count is not a
+        finite non-negative value.
     """
     arm_required = {
         "event_id",
@@ -694,7 +804,34 @@ def attach_recommended_event_marks(
     *,
     classes: tuple[str, ...] = MARKED_EVENT_CLASSES,
 ) -> dict[str, pd.DataFrame]:
-    """Join one-row-per-event recommended marks to canonical class frames."""
+    """Join one-row-per-event recommended marks to canonical class frames.
+
+    Parameters
+    ----------
+    events : dict[str, pd.DataFrame]
+        Per event class, the cohort-restricted canonical events carrying
+        ``event_id``, ``start_time`` and ``end_time``.
+    mark_table : pd.DataFrame, shape (n_events, ...)
+        Output of :func:`build_recommended_event_mark_table`.
+    classes : tuple[str, ...]
+        Event classes to mark; each must be present in ``events``.
+
+    Returns
+    -------
+    dict[str, pd.DataFrame]
+        Copies of the input frames, in their original row order, with every
+        available mark column appended.
+
+    Raises
+    ------
+    KeyError
+        If ``mark_table`` lacks a required column or a class is missing.
+    ValueError
+        If an ``event_id`` is duplicated or unmarked, if the marks' ``is_swr``
+        or timing disagree with a class frame, if an already-present mark
+        column disagrees with the family table, or if the join changes a
+        frame's row order.
+    """
     required = {"event_id", "event_start_s", "event_end_s", "is_swr"}
     missing = sorted(required - set(mark_table))
     if missing:
@@ -774,7 +911,38 @@ def load_session_recommended_event_marks(
     event_arm_table_path: str | Path = DEFAULT_EVENT_ARM_TABLE_PATH,
     event_table_path: str | Path = DEFAULT_EVENT_TABLE_PATH,
 ) -> tuple[dict[str, pd.DataFrame], dict[str, str]]:
-    """Read, derive and attach all recommended marks for one session."""
+    """Read, derive and attach all recommended marks for one session.
+
+    Parameters
+    ----------
+    nwb_file_name : str
+        Session NWB file, e.g. ``"chimi20200212_.nwb"``.
+    epoch_name : str
+        Epoch within that file, e.g. ``"02_r1"``.
+    events : dict[str, pd.DataFrame]
+        Per event class, the canonical events to mark.
+    event_arm_table_path : str or Path, optional
+        Canonical event-arm table to read. Defaults to
+        :data:`DEFAULT_EVENT_ARM_TABLE_PATH`.
+    event_table_path : str or Path, optional
+        Canonical event table to read. Defaults to
+        :data:`DEFAULT_EVENT_TABLE_PATH`.
+
+    Returns
+    -------
+    marked : dict[str, pd.DataFrame]
+        ``events`` with every recommended mark attached.
+    provenance : dict[str, str]
+        SHA-256 digests of the two tables the marks were derived from.
+
+    Raises
+    ------
+    KeyError
+        If either table lacks the canonical session columns.
+    ValueError
+        If the session has no rows in either table, or if mark derivation or
+        attachment refuses the session's tables.
+    """
     arm_path = Path(event_arm_table_path)
     event_path = Path(event_table_path)
     arm_table = read_table(arm_path)
@@ -809,26 +977,6 @@ def load_session_recommended_event_marks(
     )
 
 
-def _block_name(event_class: str, mark: str | None = None) -> str:
-    return f"{event_class}:event" if mark is None else f"{event_class}:{mark}"
-
-
-def _without_block(design: KernelDesign, block_name: str) -> KernelDesign:
-    if block_name not in design.block_slices:
-        raise KeyError(f"design has no block {block_name!r}")
-    span = design.block_slices[block_name]
-    keep = np.ones(design.matrix.shape[1], dtype=bool)
-    keep[span] = False
-    blocks = tuple(block for block in design.blocks if block.name != block_name)
-    width = span.stop - span.start
-    slices: dict[str, slice] = {}
-    for block in blocks:
-        old = design.block_slices[block.name]
-        shift = width if old.start > span.start else 0
-        slices[block.name] = slice(old.start - shift, old.stop - shift)
-    return KernelDesign(design.matrix[:, keep], slices, blocks)
-
-
 def build_marked_family_ladder(
     events: dict[str, pd.DataFrame],
     fit_mask: pd.Series,
@@ -837,9 +985,46 @@ def build_marked_family_ladder(
     spec: MarkedFamilySpec,
     *,
     classes: tuple[str, ...] = MARKED_EVENT_CLASSES,
-    min_marked_events: int = 10,
+    min_marked_events: int = MIN_MARKED_EVENTS_PER_CLASS,
 ) -> MarkedFamilyLadder:
-    """Build one joint family design and every target-specific reduced design."""
+    """Build one joint family design and every target-specific reduced design.
+
+    Every mark is standardized within session and event class. Nuisance marks
+    other than ``spec.required_varying_nuisance_marks`` may be constant, in
+    which case their standardized block is identically zero; a constant target
+    or required-varying modifier makes the session ineligible for the model.
+
+    Parameters
+    ----------
+    events : dict[str, pd.DataFrame]
+        Per event class, the events carrying every raw mark column.
+    fit_mask : pd.Series of bool, shape (n_time,)
+        Fitted-bin mask indexed by session time.
+    spline_basis : NDArray, shape (n_lags, n_basis)
+        Basis functions evaluated at ``lags``.
+    lags : NDArray of int, shape (n_lags,)
+        Lag indices in samples, ascending by one sample.
+    spec : MarkedFamilySpec
+        The question whose full and reduced designs are built.
+    classes : tuple[str, ...]
+        Event classes, in design-block order; each must be in ``events``.
+    min_marked_events : int
+        Fewest finite events a class may contribute to a marked kernel.
+
+    Returns
+    -------
+    MarkedFamilyLadder
+
+    Raises
+    ------
+    KeyError
+        If an event class is missing from ``events``.
+    ModelIneligibleError
+        If a class cannot support the spec: a mark is non-finite, has fewer
+        than ``min_marked_events`` finite events, or is constant when the spec
+        does not permit it. The message names the model, the class and the
+        mark.
+    """
     standardized: dict[str, pd.DataFrame] = {}
     scales: dict[str, dict[str, MarkScale]] = {}
     for event_class in classes:
@@ -906,7 +1091,29 @@ def bounded_design_batch_size(
     *,
     feature_budget: int = PROFILED_BATCH_FEATURE_BUDGET,
 ) -> int:
-    """Bound scorer microbatches by the profiled batch×feature workload."""
+    """Bound scorer microbatches by the profiled batch×feature workload.
+
+    Parameters
+    ----------
+    requested : int
+        Designs per device batch the caller asked for.
+    n_features : int
+        Columns of one design in the batch.
+    feature_budget : int
+        Batched feature columns the profiled device tolerates. Defaults to
+        :data:`PROFILED_BATCH_FEATURE_BUDGET`.
+
+    Returns
+    -------
+    int
+        ``min(requested, feature_budget // n_features)``, floored at one so a
+        design wider than the whole budget is still scored, one at a time.
+
+    Raises
+    ------
+    ValueError
+        If any argument is below one.
+    """
     if requested < 1 or n_features < 1 or feature_budget < 1:
         raise ValueError("requested, n_features and feature_budget must be positive")
     return min(requested, max(1, feature_budget // n_features))
@@ -918,7 +1125,8 @@ def _score(
     penalty_sigma: float,
     *,
     requested_batch_size: int,
-):
+) -> BatchedHeldoutResults:
+    """Score equal-width designs under one ridge prior and the batch bound."""
     width = np.asarray(designs).shape[-1]
     batch_size = bounded_design_batch_size(requested_batch_size, width)
     return score_poisson_designs_heldout(
@@ -978,7 +1186,42 @@ def fit_marked_family_ladder(
     design_batch_size: int = DEFAULT_NULL_DESIGN_BATCH_SIZE,
     prepared_response: PreparedHeldoutResponse | None = None,
 ) -> MarkedFamilyResults:
-    """Fit one model family without p-values, shuffles, or response filtering."""
+    """Fit one model family without p-values, shuffles, or response filtering.
+
+    The full design is fit and scored once and shared by every comparison, so
+    each target's held-out delta is the deviance the model loses when only
+    that class's block for that mark is removed from the common design.
+
+    Parameters
+    ----------
+    ladder : MarkedFamilyLadder
+        The joint full design and every leave-one-target-block-out design.
+    counts : NDArray, shape (n_fit_bins, n_units) or (n_fit_bins,)
+        Spike counts on the ladder's fitted bins.
+    folds : NDArray of int, shape (n_fit_bins,)
+        Held-out fold label of each fitted bin.
+    penalty_sigma : float
+        Ridge prior SD applied to every non-intercept column.
+    design_batch_size : int
+        Designs scored per device batch, before the width bound of
+        :func:`bounded_design_batch_size`.
+    prepared_response : PreparedHeldoutResponse, optional
+        A response already transferred to the device, to be reused across the
+        models of one session. It must have been prepared from exactly these
+        counts and this fold assignment.
+
+    Returns
+    -------
+    MarkedFamilyResults
+
+    Raises
+    ------
+    ValueError
+        If ``penalty_sigma`` is not finite and positive, if ``counts`` do not
+        match the design rows or are not finite and non-negative, if ``folds``
+        do not label every fitted row, or if ``prepared_response`` was built
+        from different counts or a different fold assignment.
+    """
     if penalty_sigma <= 0 or not np.isfinite(penalty_sigma):
         raise ValueError("penalty_sigma must be finite and positive")
     fit_counts = np.asarray(counts, dtype=float)
@@ -1004,8 +1247,15 @@ def fit_marked_family_ladder(
                 "prepared_response shape does not match counts: "
                 f"{(response.n_time, response.n_units)} versus {fit_counts.shape}"
             )
-        if response.n_folds != np.unique(fold_array).size:
-            raise ValueError("prepared_response fold count does not match folds")
+        # A response prepared from a different fold assignment would score
+        # every design on the wrong held-out rows, silently and without a
+        # shape error, so the stored labels themselves are compared.
+        if not np.array_equal(
+            np.asarray(response.folds), np.asarray(fold_array, dtype=np.int64)
+        ):
+            raise ValueError(
+                "prepared_response was built from a different fold assignment"
+            )
     comparison_order = tuple(ladder.reduced)
     reduced_designs = np.stack([ladder.reduced[key].matrix for key in comparison_order])
     started = time.perf_counter()
@@ -1036,6 +1286,9 @@ def fit_marked_family_ladder(
         "family_full: converged": usable,
         "family_full: n_iter": np.asarray(fitted.n_iter, dtype=int),
         "family_full_heldout_deviance": full_score.total[0],
+        # The full model is fit once and shared, so its per-fold convergence
+        # is one column, not one copy per comparison.
+        "full_all_folds_converged": np.all(full_score.converged[0], axis=0),
     }
     nan_deltas: dict[str, int] = {}
     for comparison_index, (event_class, mark) in enumerate(comparison_order):
@@ -1046,9 +1299,6 @@ def fit_marked_family_ladder(
         statistics[f"{prefix}: heldout_delta_deviance"] = delta
         statistics[f"{prefix}: heldout_delta_deviance_folds"] = list(
             (reduced_score.per_fold[comparison_index] - full_score.per_fold[0]).T
-        )
-        statistics[f"{prefix}: full_all_folds_converged"] = np.all(
-            full_score.converged[0], axis=0
         )
         statistics[f"{prefix}: reduced_all_folds_converged"] = np.all(
             reduced_score.converged[comparison_index], axis=0

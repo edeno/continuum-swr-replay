@@ -794,13 +794,16 @@ def standardize_event_marks(
 
     The mean and SD define the scientific unit of the marked kernel.  They are
     computed separately for each session and event class by the ladder builder.
-    Infinite or constant marks fail explicitly. Missing values also fail by
-    default. A mark named in ``allow_missing`` is standardized over its finite
-    events, while unavailable events receive zero *only in the marked
-    regressor* and carry an explicit ``<mark>_available`` flag. They therefore
-    remain in the ordinary event kernel but contribute nothing to a content
-    slope whose predictor is genuinely undefined (for example, a mixed stop
-    with no current arm).
+    Infinite marks always fail. A mark with no within-class variation fails
+    too, unless it is named in ``allow_constant``, in which case its SD is
+    recorded as zero and its standardized block is identically zero -- the
+    mark is then carried without contributing anything to the fit. Missing
+    values also fail by default. A mark named in ``allow_missing`` is
+    standardized over its finite events, while unavailable events receive zero
+    *only in the marked regressor* and carry an explicit ``<mark>_available``
+    flag. They therefore remain in the ordinary event kernel but contribute
+    nothing to a content slope whose predictor is genuinely undefined (for
+    example, a mixed stop with no current arm).
 
     Parameters
     ----------
