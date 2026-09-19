@@ -50,7 +50,12 @@ family.
 - `content_weighted_recent_reward`: the replay-weighted recent rewarded
   fraction for represented leaf arms.
 - `content_weighted_relative_recency`: the replay-weighted, within-event
-  leaf-centered visit recency.
+  leaf-centered visit recency. Never-visited leaf arms are excluded from this
+  mean (numerator and denominator): their recency column carries the
+  right-censoring fill, not a measured recency, exactly as
+  `center_visit_recency_within_event` excludes them upstream. An event whose
+  represented leaf mass is entirely on never-visited arms has undefined
+  recency; `content_weighted_novelty_fraction` carries that mass.
 - `content_weighted_novelty_fraction`: represented leaf mass on never-visited
   arms.
 

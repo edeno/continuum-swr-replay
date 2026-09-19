@@ -104,7 +104,11 @@ MARK_DESCRIPTIONS: Mapping[str, str] = MappingProxyType(
         CONTENT_RECENT_REWARD: (
             "leaf-content-weighted reward fraction over each arm's last ten visits"
         ),
-        CONTENT_RECENCY: ("leaf-content-weighted within-event relative visit recency"),
+        CONTENT_RECENCY: (
+            "leaf-content-weighted within-event relative visit recency, averaged "
+            "over visited leaf arms only; undefined when the represented leaf "
+            "content is entirely on never-visited arms"
+        ),
         CONTENT_NOVELTY: "fraction of represented leaf content on never-visited arms",
         LOG_STOP_TIME: "log(1 + seconds from stop onset to replay onset)",
         SWITCH_CONTEXT: "whether the last completed trip switched patch",
@@ -437,7 +441,48 @@ def _role_fraction(
     return result
 
 
-def _leaf_weighted_mark(event_arm_table: pd.DataFrame, source: str) -> pd.Series:
+def _leaf_weighted_mark(
+    event_arm_table: pd.DataFrame,
+    source: str,
+    *,
+    exclude: NDArray | None = None,
+) -> pd.Series:
+    """Average ``source`` over leaf arms, weighted by represented content.
+
+    The average runs over the six reward-bearing leaf arms whose ``source``
+    value is finite, weighted by ``arm_fraction`` and renormalized by the
+    represented leaf mass, so trunk arms' structural entries never enter.
+    ``exclude`` additionally removes rows from *both* the numerator and the
+    denominator; it is for sources whose per-arm entry can be a structural fill
+    rather than a measurement, where including the row would displace the
+    average by an arbitrary amount rather than merely reweight it. The
+    "0 or 6 finite leaf rows per event" availability invariant is enforced on
+    the finite mask *before* ``exclude`` is applied, so excluding rows never
+    masquerades as partially missing data.
+
+    Parameters
+    ----------
+    event_arm_table : pd.DataFrame
+        Canonical nine-row-per-event arm table, shape ``(9 * n_events, ...)``.
+        Needs ``event_id``, ``candidate_arm``, ``arm_fraction`` and ``source``.
+    source : str
+        Per-arm column to average.
+    exclude : NDArray or None, shape (9 * n_events,), optional
+        Boolean row mask of entries to drop from numerator and denominator.
+        Default ``None`` keeps every finite leaf row.
+
+    Returns
+    -------
+    pd.Series
+        One value per ``event_id`` in first-appearance order. NaN where the
+        retained leaf mass is zero, i.e. where the quantity is undefined.
+
+    Raises
+    ------
+    ValueError
+        If an event has some but not all six leaf values finite, or if
+        ``exclude`` does not have one entry per table row.
+    """
     values = _numeric(event_arm_table, source)
     candidate = pd.to_numeric(
         event_arm_table["candidate_arm"], errors="coerce"
@@ -453,14 +498,23 @@ def _leaf_weighted_mark(event_arm_table: pd.DataFrame, source: str) -> pd.Series
         raise ValueError(
             f"event_id {event_id!r} has partially available leaf values for {source}"
         )
+    retained = finite_leaf
+    if exclude is not None:
+        excluded = np.asarray(exclude, dtype=bool)
+        if excluded.shape != finite_leaf.shape:
+            raise ValueError(
+                f"exclude must have one entry per arm row; got {excluded.shape} "
+                f"for {finite_leaf.shape}"
+            )
+        retained = finite_leaf & ~excluded
     weights = _numeric(event_arm_table, "arm_fraction")
     numerator = (
-        pd.Series(np.where(finite_leaf, weights * values, 0.0))
+        pd.Series(np.where(retained, weights * values, 0.0))
         .groupby(groups.to_numpy(), sort=False)
         .sum()
     )
     denominator = (
-        pd.Series(np.where(finite_leaf, weights, 0.0))
+        pd.Series(np.where(retained, weights, 0.0))
         .groupby(groups.to_numpy(), sort=False)
         .sum()
     )
@@ -477,6 +531,19 @@ def build_recommended_event_mark_table(
     leaf-arm content and renormalized by represented leaf mass.  Trunk arms'
     structural zeros therefore never masquerade as zero uncertainty or value.
     ``leaf_content_fraction`` remains in the model as a separate adjustment.
+
+    ``content_weighted_relative_recency`` additionally drops never-visited leaf
+    arms from both numerator and denominator.  Their recency entry is the
+    right-censoring fill ``n_completed + 1`` (up to ~165 trials on the shipped
+    table), a property of the censoring rule rather than a measured recency, so
+    admitting it would set the mark off the censoring rule; the upstream
+    producer ``center_visit_recency_within_event`` excludes them for the same
+    reason.  An event whose represented leaf content sits entirely on
+    never-visited arms therefore has no recency estimand and is NaN, which the
+    ``allow_missing`` regressor path zero-fills after standardization.  The
+    never-visited mass itself is still carried by
+    ``content_weighted_novelty_fraction``, and ``content_weighted_recent_reward``
+    keeps every finite leaf row because its never-visited entry is a true 0.0.
     """
     arm_required = {
         "event_id",
@@ -580,14 +647,17 @@ def build_recommended_event_mark_table(
         .sum()
         .reindex(arm_ids)
     )
-    for source, output in (
-        ("reward_belief_variance_candidate_arm_preoutcome", CONTENT_UNCERTAINTY),
-        ("reward_belief_mean_candidate_arm_preoutcome", CONTENT_VALUE),
-        ("reward_fraction_candidate_arm_last10_visits", CONTENT_RECENT_REWARD),
-        ("visit_recency_trials_event_leaf_centered", CONTENT_RECENCY),
-        ("is_candidate_arm_never_visited", CONTENT_NOVELTY),
+    never_visited = _numeric(event_arm_table, "is_candidate_arm_never_visited") == 1.0
+    for source, output, exclude in (
+        ("reward_belief_variance_candidate_arm_preoutcome", CONTENT_UNCERTAINTY, None),
+        ("reward_belief_mean_candidate_arm_preoutcome", CONTENT_VALUE, None),
+        ("reward_fraction_candidate_arm_last10_visits", CONTENT_RECENT_REWARD, None),
+        ("visit_recency_trials_event_leaf_centered", CONTENT_RECENCY, never_visited),
+        ("is_candidate_arm_never_visited", CONTENT_NOVELTY, None),
     ):
-        marks[output] = _leaf_weighted_mark(event_arm_table, source).reindex(arm_ids)
+        marks[output] = _leaf_weighted_mark(
+            event_arm_table, source, exclude=exclude
+        ).reindex(arm_ids)
 
     scalar_columns = sorted(event_required - {"event_id"})
     event_scalars = event_table.set_index("event_id").loc[arm_ids, scalar_columns]

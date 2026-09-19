@@ -15,6 +15,9 @@ from continuum_swr_replay.analysis.pfc.marked_glm import (
     fit_marked_kernel_ladder,
 )
 from continuum_swr_replay.analysis.pfc.marked_model_family import (
+    CONTENT_NOVELTY,
+    CONTENT_RECENCY,
+    CONTENT_RECENT_REWARD,
     CONTENT_UNCERTAINTY,
     CONTENT_VALUE,
     CURRENT_ARM_FRACTION,
@@ -43,6 +46,8 @@ def _tables() -> tuple[pd.DataFrame, pd.DataFrame]:
     weights_by_event = {
         "e1": np.array([0.10, 0.20, 0.10, 0.10, 0.05, 0.05, 0.10, 0.15, 0.15]),
         "e2": np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.3, 0.4, 0.3]),
+        # All represented leaf content sits on the never-visited arm 5.
+        "e3": np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.4, 0.2, 0.2, 0.2]),
     }
     for event_index, (event_id, weights) in enumerate(weights_by_event.items()):
         for arm, weight in enumerate(weights):
@@ -52,9 +57,9 @@ def _tables() -> tuple[pd.DataFrame, pd.DataFrame]:
                     "event_id": event_id,
                     "candidate_arm": arm,
                     "arm_fraction": weight,
-                    "event_start_s": (1.0, 2.0)[event_index],
-                    "event_end_s": (1.04, 2.08)[event_index],
-                    "event_duration_s": (0.042, 0.082)[event_index],
+                    "event_start_s": (1.0, 2.0, 3.0)[event_index],
+                    "event_end_s": (1.04, 2.08, 3.05)[event_index],
+                    "event_duration_s": (0.042, 0.082, 0.052)[event_index],
                     "is_swr": bool(event_index),
                     "is_current_arm": (arm == 1) if has_context else np.nan,
                     "is_prev_arm": arm == 2,
@@ -72,8 +77,10 @@ def _tables() -> tuple[pd.DataFrame, pd.DataFrame]:
                     "reward_fraction_candidate_arm_last10_visits": (
                         0.05 * arm if arm < 6 else 99.0
                     ),
+                    # Arm 5 was never visited, so its recency entry is the
+                    # right-censoring fill, not a measured recency.
                     "visit_recency_trials_event_leaf_centered": (
-                        float(arm - 2) if arm < 6 else 99.0
+                        150.0 if arm == 5 else (float(arm - 2) if arm < 6 else 99.0)
                     ),
                     "is_candidate_arm_never_visited": (
                         float(arm == 5) if arm < 6 else 0.0
@@ -82,23 +89,23 @@ def _tables() -> tuple[pd.DataFrame, pd.DataFrame]:
             )
     event_rows = pd.DataFrame(
         {
-            "event_id": ["e1", "e2"],
-            "event_start_s": [1.0, 2.0],
-            "event_end_s": [1.04, 2.08],
-            "event_duration_s": [0.042, 0.082],
-            "is_swr": [False, True],
-            "time_since_stop_start_s": [0.5, 1.5],
-            "did_last_completed_trip_switch_patch": [1.0, 0.0],
-            "is_rewarded_outcome": [0.0, 1.0],
-            "spatial_extent_cm": [20.0, 80.0],
-            "n_reversals": [2, 8],
-            "pause_fraction": [0.1, 0.3],
-            "max_ahead_cm": [10.0, 20.0],
-            "max_behind_cm": [40.0, 100.0],
-            "ripple_power_z": [-0.5, 2.0],
-            "mua_rate_z": [0.2, 1.4],
-            "theta_z": [0.1, -0.2],
-            "posterior_entropy_mean": [0.4, 0.8],
+            "event_id": ["e1", "e2", "e3"],
+            "event_start_s": [1.0, 2.0, 3.0],
+            "event_end_s": [1.04, 2.08, 3.05],
+            "event_duration_s": [0.042, 0.082, 0.052],
+            "is_swr": [False, True, True],
+            "time_since_stop_start_s": [0.5, 1.5, 2.5],
+            "did_last_completed_trip_switch_patch": [1.0, 0.0, 1.0],
+            "is_rewarded_outcome": [0.0, 1.0, 0.0],
+            "spatial_extent_cm": [20.0, 80.0, 50.0],
+            "n_reversals": [2, 8, 4],
+            "pause_fraction": [0.1, 0.3, 0.2],
+            "max_ahead_cm": [10.0, 20.0, 15.0],
+            "max_behind_cm": [40.0, 100.0, 60.0],
+            "ripple_power_z": [-0.5, 2.0, 1.0],
+            "mua_rate_z": [0.2, 1.4, 0.6],
+            "theta_z": [0.1, -0.2, 0.3],
+            "posterior_entropy_mean": [0.4, 0.8, 0.5],
         }
     )
     return pd.DataFrame(arm_rows), event_rows
@@ -127,6 +134,53 @@ def test_recommended_marks_exclude_structural_trunk_zeros_and_preserve_leaf_mass
     assert np.isnan(marks.loc["e2", CONTENT_UNCERTAINTY])
     assert np.isnan(marks.loc["e2", CONTENT_VALUE])
     assert np.isnan(marks.loc["e2", CURRENT_ARM_FRACTION])
+
+
+def test_content_recency_excludes_never_visited_right_censoring_fill():
+    arm, event = _tables()
+
+    marks = build_recommended_event_mark_table(arm, event).set_index("event_id")
+
+    # Arms 0-4 were visited (centered recency -2..+2); arm 5 carries the
+    # right-censoring fill 150.0 and must not enter either sum.
+    visited_weights = np.array([0.10, 0.20, 0.10, 0.10, 0.05])
+    visited_recency = np.array([-2.0, -1.0, 0.0, 1.0, 2.0])
+    expected_recency = np.sum(visited_weights * visited_recency) / visited_weights.sum()
+    assert expected_recency == pytest.approx(-0.2 / 0.55)
+    assert marks.loc["e1", CONTENT_RECENCY] == pytest.approx(expected_recency)
+    # The censored fill would have dominated a mean taken over all leaf arms.
+    all_leaf_mean = (-0.2 + 0.05 * 150.0) / 0.60
+    assert marks.loc["e1", CONTENT_RECENCY] != pytest.approx(all_leaf_mean)
+
+    # The never-visited arm's represented mass is still carried by the novelty
+    # mark, and recent reward still averages over every finite leaf row.
+    assert marks.loc["e1", CONTENT_NOVELTY] == pytest.approx(0.05 / 0.60)
+    expected_recent_reward = (
+        np.sum(np.array([0.10, 0.20, 0.10, 0.10, 0.05, 0.05]) * (0.05 * np.arange(6)))
+        / 0.60
+    )
+    assert expected_recent_reward == pytest.approx(0.0575 / 0.60)
+    assert marks.loc["e1", CONTENT_RECENT_REWARD] == pytest.approx(
+        expected_recent_reward
+    )
+
+    # An event whose represented leaf content is entirely never-visited has no
+    # recency estimand at all, while novelty and value remain defined.
+    assert marks.loc["e3", LEAF_CONTENT_FRACTION] == pytest.approx(0.40)
+    assert np.isnan(marks.loc["e3", CONTENT_RECENCY])
+    assert marks.loc["e3", CONTENT_NOVELTY] == pytest.approx(1.0)
+    assert marks.loc["e3", CONTENT_VALUE] == pytest.approx(0.6)
+
+
+def test_recency_availability_invariant_is_checked_before_exclusion():
+    arm, event = _tables()
+    arm.loc[
+        (arm.event_id == "e1") & (arm.candidate_arm == 5),
+        "visit_recency_trials_event_leaf_centered",
+    ] = np.nan
+
+    with pytest.raises(ValueError, match="partially available leaf values"):
+        build_recommended_event_mark_table(arm, event)
 
 
 def test_recommended_marks_refuse_partial_leaf_covariates():
