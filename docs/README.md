@@ -59,6 +59,13 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     Dirichlet-multinomial, on one 218-session cohort: what each assumes,
     simulation recovery, which conclusions are estimator-dependent, and the
     `log_phi_is_swr` concentration result. Not yet reflected in the claims table.
+  - [design/2026-09-20-memoryless-sequence-detection.md](design/2026-09-20-memoryless-sequence-detection.md)
+    — *design spec*: port of the Widloski & Foster (2025) memoryless sliding-window
+    replay detector, to compare our non-local cohort (with and without SWRs) against
+    an independent detection method. Carries the decisions and deviations registers
+    the methods section will draw on. Reference source vendored at
+    [reference/widloski_foster_2025/](../reference/widloski_foster_2025/).
+    Approved, not yet implemented.
 - [known_issues/](known_issues/) — *reference*: documented data/pipeline issues.
   - [three_sessions_blocked_by_nwb_checksum.md](known_issues/three_sessions_blocked_by_nwb_checksum.md)
     — the canonical cohort is 215 of 218; three sessions fail an upstream NWB
