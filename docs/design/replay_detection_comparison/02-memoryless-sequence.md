@@ -1,7 +1,13 @@
-# Comparing state-space events with Widloski & Foster sequence detection
+# Memoryless sliding-window sequence detection (Widloski & Foster 2025)
 
 *Design spec. Status: revised after review and clarification of the scientific goal;
-not yet implemented. The revisions below are proposed analysis commitments, not results.*
+not yet implemented. The commitments below are proposed analyses, not results.*
+*Governing rule and cross-cutting decisions: [overview.md](overview.md).*
+
+Inventory 6 of six: the posterior-sequence trigger. How this cohort is compared against
+the other five is [03-inventory-comparison.md](03-inventory-comparison.md); the
+event-feature and selection diagnostics that were previously drafted here are deferred to
+[04](04-event-features.md) and [05](05-validation.md).
 
 ## Purpose
 
@@ -57,34 +63,6 @@ parameters from the actual run and record them. A 2 ms grid is not a demonstrate
 2 ms effective resolution: our acausal smoother can also shift or extend boundaries.
 Likewise, overlapping memoryless windows reuse spikes and induce temporal dependence;
 "memoryless" does not imply an absence of smoothing in the resulting trajectory.
-
-## Reviewer questions and discriminating analyses
-
-| Concern | Analysis | What would support the claimed advantage |
-|---|---|---|
-| Are the extra events just shorter or less spatially extended by definition? | Separate duration, dispersion, and continuity failures; report both native cohorts and a comparison within common duration/extent ranges | Additional evidence-supported events within comparable ranges, or a clearly stated expansion to a different representational target |
-| Does the state-space prior manufacture non-local events? | Prior-excluded spike-evidence diagnostics, transition-prior sensitivity, and held-out evidence or simulation where available | Remote evidence persists without selecting and scoring on the same posterior; conclusions survive reasonable prior changes |
-| Does the sliding window manufacture smoothness or combine distinct events? | Window/stride and merge-rule sensitivity; boundary and split/merge analysis | Observed changes follow the predicted temporal operation; simulations establish which boundaries are recovered correctly |
-| Are comparator-only events real sequences our model rejects? | Inspect all four state probabilities and spike evidence on those intervals, including well-supported counterexamples | Explain rejection without assuming our labels are truth; document failures of our Local model or temporal prior if found |
-| Is the apparent benefit driven by encoding or threshold choices? | Hold encoding fixed in the main comparison; vary detector thresholds and, separately, fit both procedures on the same running-only training mask | The relevant differences persist under these controls; if they do not, narrow the claim accordingly |
-| Does a detector difference explain the non-SWR finding? | Use identical qualified SWRs; show duration-stratified non-SWR fractions and boundary-related label disagreements | Non-SWR conclusions persist beyond differences in interval duration or boundary placement |
-
-**Two levels of evidence.** The first deliverable is a descriptive event comparison
-and a record of algorithmic selection differences. Claims about better sensitivity,
-specificity, or calibration additionally require a validation study. Use simulations
-with planted traveling, stationary remote, fragmented, local, and no-sequence activity,
-varying spike counts and durations; include generators that do not reproduce our
-transition assumptions. Score non-local representation and extended traveling sequences
-as separate targets, so a method is not penalized for omitting events outside its remit.
-
-A possible real-data validation is detection on a discovery set of tetrodes followed
-by scoring neural evidence on held-out tetrodes, with encoding and threshold tuning
-kept separate from evaluation. This requires rerunning **both** detectors on the
-discovery set; scoring held-out channels after using all channels to select events
-does not qualify. Define a common predictive scoring rule before performing that
-study. Prior-excluded likelihood evaluated on the discovery spikes remains a useful
-diagnostic, but is not independent validation. The initial comparison does not wait
-for this study; its interpretation remains descriptive until validation is available.
 
 ## The original method
 
@@ -236,7 +214,7 @@ not a reassurance.
 | # | Original | Ours | Why | Effect |
 |---|---|---|---|---|
 | **V12** | Per-bin speed < 5 cm/s | Per-bin < 4 cm/s for candidacy, then our canonical whole-event rule | D3 | Slightly stricter than theirs. Shared with our cohort by construction |
-| **V13** | Paper's ripple detection and ripple-less classification | Canonical speed-qualified, sampled `SWR_event` intervals and strict positive-duration overlap | Both cohorts must use the identical SWR population and overlap convention | Both ripple detection and replay/ripple association differ from the paper. Absolute non-SWR fractions cannot reproduce its headline percentages; within-recording detector comparisons are the target |
+| **V13** | Paper's ripple detection and ripple-less classification | This cohort is labelled under **each** SWR definition in the comparison (Kay, Karlsson, Yu 2017), each speed-qualified and sampled the same way, with strict positive-duration overlap. No single definition is imposed (overview X6) | Imposing one SWR definition on a sequence cohort would blend methods; reporting the matrix also supplies label sensitivity without a separate sweep | Both ripple detection and replay/ripple association differ from the paper, so absolute non-SWR fractions cannot reproduce its headline percentages. The reported non-SWR fraction is a function of the SWR definition as well as the events, and must always be quoted with the definition attached |
 
 ### Retained settings and adapted thresholds
 
@@ -368,88 +346,6 @@ Retain per-window statistics and individual gate masks, pre/post-merge candidate
 and candidate rejection flags in diagnostic outputs; accepted events alone cannot
 explain why a detector rejected activity. These outputs are scientific diagnostics,
 not additional acceptance criteria.
-
-## Comparison artifact
-
-### Matching and counting
-
-Use complete native cohorts from the same available epochs. Neither cohort is a
-truth set. Present the comparison against both the unfiltered candidates and the
-shuffle-filtered comparator, clearly labeled. Our state-space cohort stays fixed.
-Build a table of **every** strict positive-duration overlap pair, carrying
-`event_id`, `ms_event_id`, intersection duration, temporal intersection-over-union,
-the fraction of each event covered by the other, signed onset/offset differences
-(`memoryless - state_space`), and both events' SWR labels. The existing
-`event_strict_overlap_keys` can check membership using timebin labels, but returns
-neither pairs nor overlap lengths; pairing must operate on the canonical intervals.
-
-Report separately the proportion of state-space events overlapping any comparator
-event and the reverse proportion. Each event contributes once to its own denominator,
-regardless of its number of matches. Show overlap-length distributions to distinguish
-small edge contacts from substantial agreement. Also report time coverage of the
-intersection and union of the two cohorts; this limits dependence on segmentation.
-Summarize connected components of the bipartite overlap graph as one-to-one,
-one-state-space-to-many-comparator, the reverse, or many-to-many. Do not turn these
-components into replacement event intervals.
-
-Use **state-space only / comparator only / matched** as display groups, with matched
-events still counted separately by detector. Compute non-SWR fractions within each
-detector and its own matched subset. Keep a separate table of paired SWR-label
-agreement/disagreement; a pair's two labels can differ solely because of its bounds.
-Pair counts describe the matching relation and are not independent event counts.
-
-### What differs about the events
-
-Report duration/span, spike count, active tetrode count, spike rate, spatial extent,
-distance from the animal, continuous/fragmented state occupancy, posterior uncertainty
-and multimodality, trajectory reversals/pauses, ripple power, and task context (well,
-time in stop, reward/patch context where available). Use existing trajectory and
-spike-evidence helpers where their timing and definitions apply. Compute summaries
-for both detectors' intervals from the same underlying traces. Namespace summaries
-that depend on a particular posterior (`ss_*`, `ms_*`); differences in posterior
-confidence or smoothness partly follow from the procedures that generated them.
-
-For state-space-only events, retain whether comparator window gates fail, no candidate
-is assembled, or an assembled candidate fails duration/dispersion or whole-event
-speed. Relate each event to nearby rejected candidates as well as accepted candidates.
-Retain every failing criterion, not a single assumed cause. Gate-failure summaries
-explain selection; they do not independently validate our extra events. Confirm
-claimed effects of a gate by rerunning with only that gate changed.
-
-For comparator-only events, examine the state-space probability trace and the Local
-and No-Spike alternatives across the same interval, plus prior-excluded spatial
-evidence and shorter constituent events. Distinguish boundary/segmentation differences
-from a sustained disagreement about representation. Treat credible missed sequences
-as limitations of our model, not errors of the comparator by definition.
-
-All main group summaries show per-session values and animal-level consistency.
-Use animal-level resampling for uncertainty where justified, with sessions nested
-within animal; report pooled event summaries as descriptive. Show native duration
-distributions first, then duration-stratified comparisons, since longer intervals
-have more opportunity to overlap a ripple. Report missing features and skipped epochs
-explicitly; model/data availability defines the paired analysis population.
-
-### Controlled changes and deliverables
-
-Start with the default same-encoding comparison. Then vary one operation at a time:
-window width/stride, gap merging, spread/jump gates, and duration/dispersion cutoffs.
-Include sensitivity to our non-local probability cutoff and fitted temporal priors.
-Freeze the sensitivity configurations before inspecting cohort differences, retain
-each run's configuration, and report all tested settings. The main comparison changes
-multiple algorithmic choices together; it cannot isolate the contribution of the
-temporal prior without these additional controls. Running-only encoding is a separate
-control applied to both procedures, not an asymmetric improvement to one comparator.
-
-The initial report contains:
-
-1. The modeling/selection comparison table and deviations from the published method.
-2. Event and time-overlap summaries, split/merge counts, and boundary/SWR-label changes.
-3. Event-feature distributions and selection diagnostics for unmatched and matched groups.
-4. Reproducibly selected examples from each group and failure type, displaying spikes,
-   both posterior representations, state probabilities, gate masks, speed, and LFP on
-   a shared time axis; include counterexamples and show the sampling rule.
-5. The sensitivity results needed to support the stated interpretation. Better
-   sensitivity, specificity, or calibration remains a separate validation claim.
 
 ## Testing
 

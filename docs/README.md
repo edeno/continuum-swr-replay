@@ -59,14 +59,25 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     Dirichlet-multinomial, on one 218-session cohort: what each assumes,
     simulation recovery, which conclusions are estimator-dependent, and the
     `log_phi_is_swr` concentration result. Not yet reflected in the claims table.
-  - [design/2026-09-20-memoryless-sequence-detection.md](design/2026-09-20-memoryless-sequence-detection.md)
-    — *design spec*: comparison of state-space events with a Widloski & Foster (2025)
-    sliding-window adaptation using the same encoding model. Defines event agreement,
-    selection differences, reviewer concerns, and validation needed for claims of
-    improved detection. Includes a simple clusterless encoding-pair shuffle adaptation
-    and comparison of candidates before and after significance filtering. Reference source vendored at
+  - [design/replay_detection_comparison/](design/replay_detection_comparison/) —
+    *design spec set*: running several published replay-detection methods on the same
+    recordings and comparing which events each finds. Start at
+    [overview.md](design/replay_detection_comparison/overview.md), which carries the
+    governing rule (harmonize substrate, never method internals), the six detection
+    inventories, the clusterless scope boundary, and the cross-cutting decisions the
+    methods section will draw on. Component specs:
+    [01](design/replay_detection_comparison/01-yu-swr-detector.md) SWR detection with a
+    noise-percentile threshold (Yu et al. 2017);
+    [02](design/replay_detection_comparison/02-memoryless-sequence.md) the Widloski &
+    Foster (2025) sliding-window sequence detector, including the clusterless
+    encoding-pair shuffle;
+    [03](design/replay_detection_comparison/03-inventory-comparison.md) the N-way overlap
+    accounting and the cohort × SWR-definition matrix;
+    [04](design/replay_detection_comparison/04-event-features.md) and
+    [05](design/replay_detection_comparison/05-validation.md) deferred.
+    Reference source vendored at
     [reference/widloski_foster_2025/](../reference/widloski_foster_2025/).
-    Revised after review and goal clarification; not yet implemented.
+    Not yet implemented.
 - [known_issues/](known_issues/) — *reference*: documented data/pipeline issues.
   - [three_sessions_blocked_by_nwb_checksum.md](known_issues/three_sessions_blocked_by_nwb_checksum.md)
     — the canonical cohort is 215 of 218; three sessions fail an upstream NWB
