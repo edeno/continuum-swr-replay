@@ -60,12 +60,13 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     simulation recovery, which conclusions are estimator-dependent, and the
     `log_phi_is_swr` concentration result. Not yet reflected in the claims table.
   - [design/2026-09-20-memoryless-sequence-detection.md](design/2026-09-20-memoryless-sequence-detection.md)
-    — *design spec*: port of the Widloski & Foster (2025) memoryless sliding-window
-    replay detector, to compare our non-local cohort (with and without SWRs) against
-    an independent detection method. Carries the decisions and deviations registers
-    the methods section will draw on. Reference source vendored at
+    — *design spec*: comparison of state-space events with a Widloski & Foster (2025)
+    sliding-window adaptation using the same encoding model. Defines event agreement,
+    selection differences, reviewer concerns, and validation needed for claims of
+    improved detection. Includes a simple clusterless encoding-pair shuffle adaptation
+    and comparison of candidates before and after significance filtering. Reference source vendored at
     [reference/widloski_foster_2025/](../reference/widloski_foster_2025/).
-    Approved, not yet implemented.
+    Revised after review and goal clarification; not yet implemented.
 - [known_issues/](known_issues/) — *reference*: documented data/pipeline issues.
   - [three_sessions_blocked_by_nwb_checksum.md](known_issues/three_sessions_blocked_by_nwb_checksum.md)
     — the canonical cohort is 215 of 218; three sessions fail an upstream NWB
