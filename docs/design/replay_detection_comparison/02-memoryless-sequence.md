@@ -11,42 +11,46 @@ event-feature and selection diagnostics that were previously drafted here are de
 
 ## Purpose
 
-Anticipate reviewer concerns by determining **which events the two methods detect,
-how those events differ, and which modeling choices explain the differences**.
-The non-SWR fraction is one outcome, alongside event duration, spatial extent,
-trajectory structure, spike evidence, and event boundaries.
+Port the Widloski & Foster sliding-window sequence detector so that it runs on our
+recordings, producing inventory 6 of the six in [overview.md](overview.md).
 
-The central comparison uses the same recordings and fitted encoding model. It changes
-the temporal inference and event-selection procedure. Agreement is evidence of
-robustness to those choices; it is not independent validation of the recordings or
-encoding model. Disagreement can reflect different scientific targets as well as
-different sensitivity or false detections.
+The detector is memoryless by construction: each 80 ms window is decoded independently
+under a uniform spatial prior, and sequences are assembled afterwards from continuity
+criteria. That is the substantive contrast with our state-space procedure, which infers
+position and representational state jointly across time. Holding the encoding model fixed
+(overview X5) means the two differ in temporal inference and event selection, not in what
+the spikes are taken to mean.
 
-Our claim to a more principled treatment is specific: joint inference of position
-and representational state, explicit Local and No-Spike alternatives, and propagation
-of spatial and state uncertainty through time. Whether those features improve detection
-must be tested. More events, smoother trajectories, or larger model posteriors do not
-by themselves establish superiority. The implementation should be reusable across
-sessions; HPC clusterless decoding is the initial comparison, with other likelihood
-backends needed before extending it to other brain areas.
+Why this particular port matters for the ripple-less question: posterior-triggered
+detection is the only family that *can* find replay without a ripple, and this is the
+published instance of that family. If two posterior-triggered detectors built on the same
+encoding model disagree about the non-SWR population, that is a fact about detection
+rather than about hippocampus.
 
-The comparison method is Widloski & Foster (2025), *Replay without sharp wave ripples
+Implementation targets reuse across sessions. HPC clusterless decoding is the initial
+case; extending to other brain areas needs other likelihood backends.
+
+The method is Widloski & Foster (2025), *Replay without sharp wave ripples
 in a spatial memory task*, Nature Communications 16.
 doi:[10.1038/s41467-025-65181-5](https://www.nature.com/articles/s41467-025-65181-5) ·
 [open full text](https://pmc.ncbi.nlm.nih.gov/articles/PMC12639102/) ·
 [preprint](https://www.biorxiv.org/content/10.1101/2024.05.13.593931v1).
 
 Source code for the original is vendored at
-[reference/widloski_foster_2025/](../../reference/widloski_foster_2025/); that
+[reference/widloski_foster_2025/](../../../reference/widloski_foster_2025/); that
 directory's README records provenance, licences, pinned commit, and the functions that
 exist in neither published source. File references below of the form
 `foster_lab_matlab/x.m` and `zenodo_15199609/x.m` point into it.
 
-## What the methods select
+## What this detector selects, relative to ours
 
-Both methods use Bayesian spatial decoding and threshold-based event selection.
-The distinction to test is how temporal structure, competing explanations, and
-uncertainty enter that selection.
+Both this detector and our state-space procedure use Bayesian spatial decoding and
+threshold-based event selection; the distinction to test is how temporal structure,
+competing explanations, and uncertainty enter that selection. The contrast is drawn
+against our cohort specifically because those two are the pairing where the encoding
+model is shared and only inference and selection differ. The corresponding contrasts
+against the LFP- and rate-triggered inventories are in
+[03-inventory-comparison.md](03-inventory-comparison.md).
 
 | Aspect | Widloski & Foster procedure | Our current state-space procedure | Comparison to make |
 |---|---|---|---|
