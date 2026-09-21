@@ -37,7 +37,7 @@ Karlsson (inventory 2) needs only a Spyglass populate with the existing
 ## Phase 0: package state (`~/Documents/GitHub/ripple_detection`)
 
 Local clone; run tests with `.venv/bin/python -m pytest -q --no-cov` (not `uv run`, which
-drops a stray `uv.lock`). Package `master` at **b0431a4** (2026-09-21) carries every
+drops a stray `uv.lock`). Package `master` at **7245c16** (2026-09-21) carries every
 detector the comparison needs and is the commit Phase 1 pins. Merged in this order, each
 after an independent Opus review whose findings were fixed before merge:
 
@@ -49,13 +49,17 @@ after an independent Opus review whose findings were fixed before merge:
 | #16 | `Zugaro_ripple_detector`, `Long_sharp_wave_ripple_detector`; edge rule and FIR rewritten in prose/reflect-convolution (licensing), upfront length check, `*_local_percentile` output columns, odd `smoothing_window` enforced | merged after fixes; no discrepancy vs the MATLAB |
 | #17 | `Carey_candidate_detector` | merged as-is; no discrepancy vs the MATLAB |
 | #19 | README "Choosing a detector" table, docstring NaN policies, `__all__`, changelog regroup, Carey theta filter order | merged |
+| #20 | Correctness pass after four more reviews: per-event speed lookup, tap count scaled with the sampling rate, close-event chaining, unified duration and immobility rules, Kay trace across gaps, Long `max_thresh`, verified DOIs, American spelling | merged |
 
-Unresolved after the pass (need a decision, recorded in the README table rather than
-changed): `minimum_duration` semantics differ (sample count vs elapsed time, inclusive vs
-strict); immobility is `<=` in most detectors but `<` in Yu's noise mask and Carey's state
-intervals; `close_event_threshold` (HSE) vs `close_ripple_threshold` (Spyglass hard-codes
-the latter). Pre-existing and untouched: `exclude_close_events` compares gaps from the
-original list, so in a chain of three the third is judged against a dropped second.
+Resolved in #20: duration limits are one inclusive round-half-up sample-count rule
+(`sample_count_within`) and immobility is `speed <= speed_threshold` everywhere; the
+close-event chaining bug is fixed. Still open: `close_event_threshold` (the multiunit
+detector) versus `close_ripple_threshold` (everything else, and the name Spyglass
+hard-codes), which needs a deprecation alias rather than a rename.
+
+**#20 changes event counts.** The filter tap count, the duration rule, and the immobility
+comparison all move marginal events. Anything detected with an earlier commit must be
+re-run before it is compared with output from this one.
 
 Standing decisions for package work (from the user, this session):
 
