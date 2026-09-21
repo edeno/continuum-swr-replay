@@ -39,7 +39,7 @@ posterior-triggered, or joint. Nothing here ranks the methods; that is what
 ## Literature parameter survey
 
 [literature_detection_parameters.csv](literature_detection_parameters.csv) is a lab-compiled
-table of 54 replay papers (1999–2025; source: the shared Google Sheet
+table of 57 replay papers that decode replay content (1999–2025; source: the shared Google Sheet
 `12mMgiYWO7tKRhs5qhMXMZ5RggGi1J24wxIkcs4knTUI`, exported 2026-09-21; column headers
 flattened to one line). **The values have been checked against the papers and corrected;
 see [literature_parameter_corrections.md](literature_parameter_corrections.md)** for the
@@ -48,8 +48,10 @@ could not be retrieved, and the systematic issues (sliding-window width recorded
 time bin, smoothing width against standard deviation, analysis restrictions recorded as
 detection gates). The Google Sheet this came from still holds the uncorrected values.
 It records each paper's trigger
-(MUA 22, SWR 17, both 12, decoding 3), thresholds, smoothing, bands, durations, and
-decoding settings. Two uses here:
+(MUA 23, SWR 17, both 13, decoding 4), thresholds, smoothing, bands, durations, and
+decoding settings, and since 2026-09-21 also the shuffle and significance procedure, the
+sliding-window step, whether decoding was sorted or clusterless, the denominator behind
+"% decoded", and the bin at which reconstruction error was measured. Two uses here:
 
 **Sweep values for 04's threshold robustness.** The literature range bounds what a
 "modest relaxation and tightening" means. Reported values after correction (count with a value, then min / median / max;

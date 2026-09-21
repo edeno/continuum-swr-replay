@@ -100,6 +100,55 @@ are not cited without a check.
 | 37 | Jadhav & Frank 2016 | 5 decoding cells | Bayes, 15, 2, 4, linear regression | The retrieved main text contains no decoding analysis at all: zero occurrences of "decod", "Bayes" or "linear regression". The supplement could not be retrieved |
 | 16 | Igata 2021 | Min. duration | 60 | May be 50 ms, with 60 ms a sustained-sequence length. Methods are in an unreachable SI Appendix |
 
+## Papers added
+
+Three papers that decode replay were missing and have been added as data rows 55 to 57
+(sheet rows 56 to 58), at the end rather than in year order:
+
+| Paper | Why it belongs | Source |
+|---|---|---|
+| Widloski & Foster 2025, *Nat Commun* 16:10287 | The sequence detector [02](02-memoryless-sequence.md) ports. Decodes replay with no ripple or burst requirement | [10.1038/s41467-025-65181-5](https://doi.org/10.1038/s41467-025-65181-5) |
+| Maboudi et al. 2018, *eLife* 7:e34467 | Hidden-Markov and Bayesian decoding of replay; already cited in the overview's scope table | [10.7554/eLife.34467](https://doi.org/10.7554/eLife.34467) |
+| Ólafsdóttir et al. 2016, *Nat Neurosci* 19:792-794 | Multiunit-triggered events with Bayesian decoding and trajectory fitting; the only grid-cell replay entry | [10.1038/nn.4291](https://doi.org/10.1038/nn.4291) |
+
+Two candidates were checked and left out, because the sheet is for papers that decode
+replay and neither does. **Kay et al. 2016** contains no instance of "decode", "Bayes" or
+"posterior". **Yu et al. 2017** explicitly declines: "We chose this method to examine the
+content of SWRs instead of trajectory decoding methods because the latter enriches for
+SWRs that contain multiple place cells and decode to trajectories matching predefined
+templates... SWRs that do not meet these criteria... are classified as non-replay events
+and excluded." That is the selection bias [03](03-inventory-comparison.md) sets out to
+measure, stated by the author of the detector [01](01-yu-swr-detector.md) builds, so it
+belongs in the design documents rather than in this sheet. Yu et al. 2018 and Kay et al.
+2020 were also checked and left out: the first does no decoding, and the second decodes
+sub-second theta cycling rather than replay.
+
+## Columns added
+
+Seven columns (AC to AI) record things the table could not express. Each was filled from
+the papers, with a quote required for every value and `#N/A` where the paper does not say:
+
+| Column | Why | Filled |
+|---|---|---|
+| Spike sorting | Sorted against clusterless was free text in five rows and absent elsewhere | 56 of 57 (50 sorted, 5 clusterless, 1 both) |
+| Time bin step (ms) | "Time bin" often holds a sliding-window width whose step is shorter, so two rows with the same value could mean different things | 43 |
+| Shuffle Method | The central omission for a sheet about decoding replay: the surrogate largely determines the "% Decoded" the sheet already tracks | 54 |
+| Shuffles (#) | " | 35 |
+| Sig. Thresh. | " | 38 |
+| % Decoded denom. | That percentage is variously of ripples, candidate events, putative events or multiunit bursts | 14 |
+| Reconst. Error bin (ms) | Error depends on the window it was measured in, which ranges from 2 ms to 500 ms across rows presented as comparable | 11 |
+
+The shuffle columns show that "none" is a real methodological position, not missing text:
+ten rows select events by a score, posterior or confidence threshold rather than by a
+surrogate test: Widloski 2022, Krause 2022, Berners-Lee 2021, Denovellis 2021, Gillespie
+2021, Gridchyn 2020, Ambrose 2016 (for its primary criterion), Pfeiffer & Foster 2015,
+Bendor & Wilson 2012 and Kudrimoti 1999.
+
+Filling these also settled a duplication: the word "Clusterless" was removed from
+`Decoding notes` for the five rows that carried it, so the fact now lives only in
+`Spike sorting`. That column also caught one the notes had missed, Yamamoto 2017, which
+used an unsorted decoder for its CA3 inhibition experiment and a sorted one elsewhere.
+
 ## Deliberately not filled
 
 Two values the papers state were left out of the sheet on purpose, because writing them
