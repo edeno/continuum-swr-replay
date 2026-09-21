@@ -10,6 +10,14 @@ follows the trigger taxonomy in the overview: LFP-triggered, rate-triggered,
 posterior-triggered, or joint. Nothing here ranks the methods; that is what
 [04](04-event-features.md) is for.
 
+Tingley & Peyrache (2020) argue that the field's central methodological problem is not
+any one method but "the degree of variability in how they are applied, both at the level
+of data preprocessing and in the assumptions that each method makes with respect to the
+data", with discrepancies in methodology contributing to differences in interpretation.
+Their suggested remedies are direct comparison of multiple methods, a shared code base,
+and a taxonomy of methods. This table is the taxonomy, `ripple_detection` is the shared
+code base, and [03](03-inventory-comparison.md) is the direct comparison.
+
 | method | family | reference | input | signal | normalization | threshold rule | duration / merge | speed / state | needs | status |
 |---|---|---|---|---|---|---|---|---|---|---|
 | **Kay** (`Kay_ripple_detector`) | LFP, consensus | Kay et al. 2016, [doi:10.1038/nature17144](https://doi.org/10.1038/nature17144) | ripple-band LFP, all CA1 tetrodes | √(smoothed Σ envelope²), 4 ms Gaussian | z-score, whole epoch or mask | ≥ 2 SD sustained, extended to the mean | ≥ 15 ms; no merge | endpoints ≤ 4 cm/s | multiple tetrodes helpful, one suffices | in package; inventory exists (`SWR_event`) |
@@ -43,10 +51,11 @@ table of 57 replay papers that decode replay content (1999–2025; source: the s
 `12mMgiYWO7tKRhs5qhMXMZ5RggGi1J24wxIkcs4knTUI`, exported 2026-09-21; column headers
 flattened to one line). **The values have been checked against the papers and corrected;
 see [literature_parameter_corrections.md](literature_parameter_corrections.md)** for the
-26 applied corrections with their evidence, the cells still flagged, the five papers that
-could not be retrieved, and the systematic issues (sliding-window width recorded as a
-time bin, smoothing width against standard deviation, analysis restrictions recorded as
-detection gates). The Google Sheet this came from still holds the uncorrected values.
+corrections with their evidence, the cells still flagged, the papers that could not be
+retrieved, and the systematic issues (sliding-window width recorded as a time bin,
+smoothing width against standard deviation, analysis restrictions recorded as detection
+gates). The Sheet and the CSV carry the same values and were compared cell by cell; the
+Sheet is sorted by year, so cite a row by paper rather than by position.
 It records each paper's trigger
 (MUA 23, SWR 17, both 13, decoding 4), thresholds, smoothing, bands, durations, and
 decoding settings, and since 2026-09-21 also the shuffle and significance procedure, the
@@ -58,17 +67,22 @@ sliding-window step, whether decoding was sorted or clusterless, the denominator
 `#N/A` and "not reported" excluded). Several speed values gate analysis rather than
 detection, so that row overstates how many papers gate detection on speed:
 
+Counts are of rows holding a bare number, so entries such as ">4", "33%" and
+"lower quartile" are excluded rather than coerced; an earlier version of this table
+counted ">1" as 1 and "33%" as 33.
+
 | parameter | n | min | median | max | most common |
 |---|---|---|---|---|---|
-| SWR z-score threshold (SD) | 26 | 1 | 3 | 8 | 3, 2, 4 |
+| SWR z-score threshold (SD) | 27 | 1 | 3 | 8 | 3, 2, 4 |
 | MUA z-score threshold (SD) | 27 | 2 | 3 | 4 | 3, 2, 4 |
-| speed gate (cm/s) | 41 | 0.05 | 5 | 10 | 5, 4, 2 |
-| SWR smoothing (ms) | 17 | 4 | 12.5 | 100 | 4, 12.5, 100 |
-| MUA smoothing (ms) | 25 | 5 | 15 | 30 | 15, 10, 5 |
-| ripple band (Hz) | 29 | 80–180 low, 200–300 high | 150–250 | | 150–250 |
-| minimum duration (ms) | 38 | 15 | 50 | 100 | 50, 100, 15 |
-| maximum duration (ms) | 23 | 400 | 500 | 2000 | 500, 750, 2000 |
-| merge gap (ms) | 12 | 20 | 50 | 100 | 50, 40, 20 |
+| speed gate (cm/s) | 42 | 0.05 | 5 | 10 | 5, 4, 2 |
+| SWR smoothing (ms) | 18 | 4 | 12.5 | 100 | 4, 12.5, 15 |
+| MUA smoothing (ms) | 28 | 5 | 15 | 30 | 15, 10, 5 |
+| ripple band (Hz) | 30 | 80–180 low, 200–300 high | 150–250 | | 150–250 (16 rows) |
+| minimum duration (ms) | 41 | 15 | 50 | 100 | 50, 100, 15 |
+| maximum duration (ms) | 25 | 400 | 600 | 2000 | 500, 2000, 750 |
+| merge gap (ms) | 14 | 20 | 50 | 100 | 50, 20, 40 |
+| minimum active cells | 27 | 3 | 5 | 10 | 5, 4, 3 |
 
 Our retained settings (Kay z = 2, 4 ms smoothing, 15 ms minimum, 4 cm/s; HSE z = 2,
 15 ms minimum) sit at the permissive end on threshold and minimum duration, so the
@@ -85,18 +99,21 @@ algorithms: Liu & Fernandez-Ruiz 2023 (k-means on ripple power and radiatum shar
 sheet. Recurring rules the package does **not** express, in order of how often they
 appear:
 
-| rule | papers | nearest package parameter | status |
+| rule | papers | package | status |
 |---|---|---|---|
+| Maximum event duration | 25 papers, 400–2000 ms | `maximum_duration` on every detector | **added** (PR #21); applies to the reported event, while `minimum_duration` still applies to the run above threshold |
+| Minimum active cells | 27 papers, 3–10 | `minimum_active_units` on `multiunit_HSE_detector` and Carey | **added** (PR #21); every burst now reports `n_active_units` |
+| A ripple band other than 150–250 Hz | 14 of the 30 papers stating one | `band` on `filter_ripple_band` and `ripple_bandpass_filter` | **added** (PR #21) |
+| Merge events separated by a short gap | 14 papers, 20–100 ms | `merge_close_events` | **added** (PR #21); `exclude_close_events` remains the drop-the-later convention |
+| Require a ripple and a burst together | 13 papers (trigger "SWR, MUA") | `require_overlap` | **added** (PR #21); composes any two inventories |
 | Extend the event from the detection threshold down to a lower boundary threshold (1 SD, 0.5, 0.15 of peak) | Harvey 2023, Yamamoto 2017, Bhattarai 2020, Michon 2021, Mou 2022 | Kay extends to 0; Yu extends to the immobility mean; Zugaro uses `low_threshold` | not settable on Kay/Karlsson/HSE |
 | Theta/delta ratio or manual NREM scoring as the state gate | Lee 2002, Wikenheiser 2014, Grosmark 2016, Drieu 2018, Farooq 2019, Liu 2019, Muessig 2019, Yang 2024 | Carey's optional `theta_lfp` z < 2 | no theta/delta helper |
-| Maximum event duration | 23 papers, 400–2000 ms | Zugaro `maximum_duration`, Long `maximum_sharp_wave_duration` | absent on Kay/Karlsson/HSE |
 | Burst preceded by a silent period | Diba 2007, Ólafsdóttir 2015, Liu 2019, Bhattarai 2020 | none | absent |
 | Adaptive threshold tuned to a target event rate | Gridchyn 2020 (1 event/s) | Yu's noise-percentile is data-driven but rate-agnostic | absent |
-| Minimum active cells | 28 papers, 3–33 | Carey `minimum_active_units` | absent on HSE |
 
-The first three are parameter additions to existing detectors, not new algorithms; they
-are the cheapest way to make the package reproduce more of this table and are candidates
-for the package after the open PRs merge. None is needed for the six inventories.
+The five added rules were parameter additions to existing detectors rather than new
+algorithms, and every default is unchanged, so no inventory built before PR #21 is
+affected. The four remaining rules are open; none is needed for the six inventories.
 
 ## Public detector code surveyed (2026-09-21)
 
@@ -164,6 +181,8 @@ DOI are code with no accompanying publication, and are cited by file and commit.
 | Zeng & Eden (2026) *IEEE Trans Biomed Eng* 73(1):153-167 | [10.1109/TBME.2025.3578583](https://doi.org/10.1109/TBME.2025.3578583) |
 | Norman et al. (2019) *Science* 365(6454):eaax1030 | [10.1126/science.aax1030](https://doi.org/10.1126/science.aax1030) |
 | Tingley & Buzsáki (2020) *Neuron* 105(1):138-149 | [10.1016/j.neuron.2019.10.012](https://doi.org/10.1016/j.neuron.2019.10.012) |
+| Tingley & Peyrache (2020) *Phil Trans R Soc B* 375:20190231 | [10.1098/rstb.2019.0231](https://doi.org/10.1098/rstb.2019.0231) |
+| van der Meer, Kemere & Diba (2020) *Phil Trans R Soc B* 375:20190238 | [10.1098/rstb.2019.0238](https://doi.org/10.1098/rstb.2019.0238) |
 | Fernández-Ruiz et al. (2019) *Science* 364(6445):1082-1086 | [10.1126/science.aax0758](https://doi.org/10.1126/science.aax0758) |
 | neurocode release (AYA lab, 2023) | [10.5281/zenodo.7819979](https://doi.org/10.5281/zenodo.7819979) |
 | Widloski & Foster code release (2025) | [10.5281/zenodo.15199609](https://doi.org/10.5281/zenodo.15199609) |
