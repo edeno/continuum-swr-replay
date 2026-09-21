@@ -22,8 +22,9 @@ position and representational state jointly across time. Holding the encoding mo
 the spikes are taken to mean.
 
 Why this particular port matters for the ripple-less question: posterior-triggered
-detection is the only family that *can* find replay without a ripple, and this is the
-published instance of that family. If two posterior-triggered detectors built on the same
+detection is the only family that can find replay with neither a ripple nor a population
+burst (an MUA trigger can find ripple-less replay, but only when a burst is present), and
+this is the published instance of that family. If two posterior-triggered detectors built on the same
 encoding model disagree about the non-SWR population, that is a fact about detection
 rather than about hippocampus.
 
@@ -63,8 +64,10 @@ against the LFP- and rate-triggered inventories are in
 The current state-space contract comes from `get_data_over_time`,
 `get_confident_times`, and `build_speed_eligible_event_cohort`, not from a new
 definition written for this comparison. Read thresholds and fitted transition
-parameters from the actual run and record them. A 2 ms grid is not a demonstrated
-2 ms effective resolution: our acausal smoother can also shift or extend boundaries.
+parameters from the actual run and record them. The 15 ms minimum is a bare default of
+`get_confident_times` that `get_data_over_time` never passes and no run config records,
+so the manifest must state it explicitly rather than derive it from saved parameters.
+A 2 ms grid is not a demonstrated 2 ms effective resolution: our acausal smoother can also shift or extend boundaries.
 Likewise, overlapping memoryless windows reuse spikes and induce temporal dependence;
 "memoryless" does not imply an absence of smoothing in the resulting trajectory.
 
@@ -75,7 +78,8 @@ disagree, the disagreement is recorded in the deviations register rather than si
 resolved.
 
 1. **Rate maps.** 2 cm bins over a 90 × 90 cm arena; occupancy-normalized spike counts
-   from running periods (> 10 cm/s); smoothed with an isotropic Gaussian, 8 cm SD.
+   from running periods (> 10 cm/s); smoothed with an isotropic Gaussian, 8 cm SD per
+   the paper (the vendored Mallory code gives 4 cm — see the discrepancies table).
    Cluster inclusion: noise overlap < 0.03, isolation > 0.95, peak SNR > 1.5. Place-cell
    inclusion: rate > 0.01 Hz, spatial information > 0.5 bits/spike.
    (`foster_lab_matlab/compute_rateMap.m`, `load_AnalysisInformation_cm.m`)
@@ -84,7 +88,11 @@ resolved.
    (`foster_lab_matlab/compute_BayesianDecoding_fast.m`)
 3. **Per-window statistics.** Posterior centre of mass; *posterior spread* as the square
    root of the second central image moment; *jump size* as the L2 norm between
-   consecutive COMs. (`compute_centerOfMass.m`, `compute_imageSpread.m`)
+   consecutive COMs. The reference pads the jump vector at the end
+   (`jumps = [jumps; jumps(end)]`, driver line 82), so window k carries the **forward**
+   jump to window k+1 and the last window repeats its predecessor's; the Mallory `_cm`
+   filter pads a zero at the front instead (backward jump). The port uses the forward
+   convention. (`compute_centerOfMass.m`, `compute_imageSpread.m`)
 4. **Bin filter.** Keep windows with spread < 10 cm, jump < 20 cm, speed < 5 cm/s.
    Rejected windows become NaN. (`compute_filtering_binDecoding_cm.m`)
 5. **Sequence assembly.** Contiguous non-NaN runs; merge neighbours separated by
@@ -122,6 +130,17 @@ resolved.
   as implementation discrepancies, not evidence that the paper omitted significance.
   `load_replayEvents_cellIDshuffle_sameEvents.m` computes jumps from the posterior COM.
   The clusterless adaptation below uses a simpler encoding-pair permutation.
+- **Run lengths are index differences.** `compute_allSequences_NaNseparated_merge.m`
+  recomputes `lengths = boundaries(:,2) − boundaries(:,1)` for every run, merged or not,
+  so the 100 ms filter (`lengths < sequence_durationThr/shiftSizeDecoding`, driver line
+  96) drops runs of index length below 20: a surviving run has at least 21 windows,
+  spanning ≥ 100 ms between first and last midpoint. At our 4 ms stride that is index
+  length 25, i.e. 26 windows (V10). The *pre-merge* length convention comes from
+  `seqle`, which is vendored nowhere (see the reference README); the port defines run
+  length as an index difference throughout and does not depend on it.
+- **Forward-jump consequence.** Because window k's jump is to k+1, a window whose
+  successor was rejected by the speed gate (NaN centre) carries a NaN jump and is itself
+  rejected. Sequences therefore end one window before the first speed-rejected window.
 
 ### Clusterless shuffle: permute encoding pairs
 
@@ -203,7 +222,7 @@ not a reassurance.
 | **V5** | 2D open field, 90 × 90 cm | 1D linearized three-legged track graph, 9 arms | The task's geometry | Sequences are constrained to the graph; "direction" is along-arm rather than an angle |
 | **V6** | Euclidean distance for jump and dispersion | Track-graph distance | On a linearized branched track, `abs(Δlinear_position)` is not the distance between two places — bins on different arms can be adjacent in linear coordinate | Using linear differences would under-count jumps at arm boundaries, producing spuriously smooth and spuriously long sequences. Track distance avoids this; it also makes our jumps non-comparable in absolute terms to an open-field jump |
 | **V7** | Posterior COM | Discrete Fréchet mean over track distance (D4) | Linearized-coordinate COM does not respect branching | On straight segments the centre is quantized to a bin; near junctions geometry also changes it |
-| **V8** | Unvisited arena bins excluded | Junction placeholder bins (`edge_id == -1`) excluded before normalization | These bins are linearization artifacts from `edge_spacing > 0`, not places | If not excluded, probability mass lands on non-places and drags the centre toward gaps. Same hazard `map_estimate_to_arm` guards against |
+| **V8** | Unvisited arena bins excluded | Junction placeholder bins (`edge_id == -1`) excluded before normalization | These bins are linearization artifacts from `edge_spacing > 0`, not places. In `get_track_grid` the `-1` rows are built from `place_bin_centers[~is_track_interior]`, so they are non-interior by construction and the primary likelihood path never returns them; the guard matters on the `results.nc` path, where `log_likelihood` is re-expanded to every `state_bins` column | If not excluded, probability mass lands on non-places and drags the centre toward gaps. Same hazard `map_estimate_to_arm` guards against |
 | **V9** | Spread is a 2D product moment (area-like, bin units) | Graph-distance RMS spread (a length, cm) | Provides a spread measure on our geometry, approximating SD on a straight segment | The 10 cm cutoff is an adapted choice requiring sensitivity analysis; these spreads are not numerically comparable to the paper's 2D spreads |
 
 ### Forced by our sampling grid
@@ -237,6 +256,7 @@ Report sensitivity to these choices alongside the default comparison.
 | Ripple band | 100–220 Hz | — | `[150,250]`, comment says "John used 120-170" | N/A (V13) |
 | Ripple merge gap | merge if < 50 ms | `eventMergeThr = 0` (no merge) | — | N/A (V13) |
 | Spike-density smoothing | 80 ms SD | 100 ms SD | — | N/A (bursts not ported) |
+| Rate-map smoothing | 8 cm SD Gaussian | — | `compute_rateMap.m` passes `numSpatialBins_smoothing/binSize = 4` to `setUp_gaussFilt`, which uses it as the `mvnpdf` *covariance*: SD 2 bins = 4 cm | N/A (V1: no rate maps) |
 | Sequence / replay duration | 100 ms | 100 ms | 50 ms in the commented "John's criterion" block | 100 ms |
 | Significance | Required for replay | Detection driver filters by both p-values, with the bugs noted above; downstream usage varies | `load_ind_replayEvents` alone selects duration/dispersion candidates | Encoding-pair shuffle adaptation, with candidates retained for comparison (D2/V2) |
 
@@ -261,11 +281,16 @@ Named for what it does; the citation lives in docstrings, not the module path.
 
 1. Load `encoding_model_[("", 0)]` from `{epoch}_detector.pkl`; compute prior-excluded
    log-likelihood once at 2 ms via `predict_clusterless_kde_log_likelihood(is_local=False)`.
-2. Drop junction bins (`place_bin_centers_nodes_df_.edge_id == -1`) **before** normalizing (V8).
+2. Restrict to interior bins **before** normalizing (V8). `predict_clusterless_kde_log_likelihood`
+   already returns only `is_track_interior_` bins, and junction placeholders are
+   non-interior by construction, so this is a no-op on the primary path. On the
+   `results.nc` path (D7) `log_likelihood` carries every `state_bins` column with masked
+   fill, so the interior mask must be applied there explicitly.
 3. Sliding 80 ms windows as a float64 cumulative sum over 40 rows, stride 2 rows;
    normalize across real bins under a uniform prior. Validate uniform 2 ms spacing
    and model sampling units; do not aggregate across missing samples or epoch bounds.
-4. Per-window centre, spread, jump (D4, V6, V7).
+4. Per-window centre, spread, jump (D4, V6, V7). Jumps are forward (window k to k+1),
+   with the last window repeating the previous jump, as in the reference driver.
 5. Keep windows with spread < 10 cm, jump < 20 cm, per-bin speed < 4 cm/s.
 6. Contiguous runs of kept windows → merge across gaps < 20 cm and < 50 ms → drop runs
    shorter than 100 ms.
@@ -314,13 +339,19 @@ adds a per-row `-summed_ground_process_intensity` and per-spike mark terms. Thus
 row sums give a window likelihood when the sample duration and spike support match.
 Validate those units for the saved model as well as the current library version.
 
-The direct-call test must respect the library's edge convention: a call on 40
-timestamps spans only 78 ms between its first and last timestamp, and the likelihood
-function clips spikes at the last timestamp. An interior 40-row slice of a full-epoch
-likelihood can contain spikes from the following 2 ms interval. Compare against a
-direct marked-process sum over the explicit half-open 80 ms support, with 40
-ground-process contributions; test boundary spikes and epoch tails. A naive call on
-the sliced timestamp vector is not a valid reference. Also check long-epoch numerical
+The direct-call test must respect the library's edge convention. In
+`predict_clusterless_kde_log_likelihood` spikes are kept if `time[0] <= t <= time[-1]`
+(inclusive at both ends), and `get_spike_time_bin_ind` assigns them with
+`np.digitize(spike_times, time[1:-1])`, so the last row index is never produced: every
+spike with `t >= time[-2]`, including one exactly at `time[-1]`, folds into the
+penultimate row, and every spike before `time[1]` lands in row 0. A call on 40
+timestamps therefore spans 78 ms of edges with the two end rows absorbing the boundary
+spikes. An interior 40-row slice of a full-epoch likelihood has no such fold: row k
+holds the spikes in `[time[k], time[k+1])`, so the slice includes spikes from the 2 ms
+after its last timestamp. Compare against a direct marked-process sum over the explicit
+half-open 80 ms support, with 40 ground-process contributions; test boundary spikes,
+the end-row fold, and epoch tails. A naive call on the sliced timestamp vector is not a
+valid reference. Also check long-epoch numerical
 accuracy, because float32 cumulative sums can lose precision when subtracted.
 
 ## Output schema
@@ -358,7 +389,8 @@ not additional acceptance criteria.
 | **Additivity** — cumsum-window log-likelihood equals a direct marked-process sum on identical half-open spike support, including boundary spikes, epoch tails, and long traces | Correct exposure and spike assignment, as well as numerical stability |
 | Statistics against hand-constructed posteriors with closed-form answers | Centre / spread / jump / dispersion correctness |
 | Discrete Fréchet mean matches a brute-force minimum and approaches COM/SD as a straight-segment grid is refined; deterministic tie cases | Quantization and the precise D4 contract |
-| Sequence assembly against the vendored MATLAB semantics, including its dropping of index-length-0 runs | Off-by-one and merge behaviour |
+| Sequence assembly against the reference semantics: run length is an index difference, a single-window run has length 0 and is dropped, and the 100 ms filter keeps runs of ≥ 21 windows at a 5 ms stride and ≥ 26 at 4 ms | Off-by-one and merge behaviour |
+| Jump alignment: window k's jump is to k+1, the last window repeats it, and a window before a NaN centre is rejected | Forward-jump convention; boundaries would shift by one stride under the backward convention |
 | Junction-bin test: mass on an `edge_id == -1` bin must not move the centre | V8 |
 | Stride-derived thresholds: changing the stride must change bin-count thresholds | V10 — the constant that would silently become a 50 ms threshold |
 | Window midpoints determine duration and overlap; outer support is separate; rejected merged gaps still participate in speed eligibility | Temporal conventions do not change the cohort silently |
@@ -373,8 +405,10 @@ not additional acceptance criteria.
 
 No silent fallbacks. Missing `detector.pkl` or a missing `("", 0)` encoding key raises,
 following `scripts/qa/analyze_event_spike_evidence.py`. An epoch with no eligible
-immobility returns an empty frame with correct columns, matching
-`build_classified_nonlocal_event_table`. The `results.nc` fast path is never substituted
+immobility returns an empty frame with correct columns **and explicit dtypes** —
+`build_classified_nonlocal_event_table`'s empty return is all-object, and concatenating
+such frames across epochs silently yields object columns; the memoryless table must not
+inherit that. The `results.nc` fast path is never substituted
 automatically (D7).
 
 ## Unverified assumptions
@@ -383,9 +417,11 @@ Carried deliberately; each must be checked against real data before results are 
 
 1. **`log_likelihood` layout in `results.nc`** — its `(n_time, n_state_bins)` column
    structure is inferred from the writing code, not from a file. Gates D7 only.
-2. **Junction bins are inside `is_track_interior_`** — inferred from the CLAUDE.md
-   warning and `map_estimate_to_arm`. If they are already excluded, step 2 is a no-op;
-   if they are not, omitting it corrupts every centre estimate.
+2. **The saved environments were built with `edge_spacing > 0`** — junction
+   placeholders exist only then; with zero spacing every bin is interior and there is
+   nothing to exclude. Check `environment.pkl` for the epochs used. (Whether the
+   placeholders are interior is no longer open: `get_track_grid` builds the `-1` rows
+   from `~is_track_interior`, so they are excluded by construction.)
 3. **Which epochs' decodes carry `log_likelihood`** — depends on when each was last run
    relative to 2026-06-26.
 4. **Window likelihoods match direct computation for saved models and long epochs** —

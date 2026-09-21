@@ -62,8 +62,14 @@ assembler, and the parameter file.
 - `load_replayEvents_cm.m` carries Widloski's parameters verbatim in a commented
   "John's criterion" block, but with `sequence_durationThr`/`replay_durationThr` of
   0.05 s. The Zenodo script and the paper both use 0.1 s — an older revision.
+- `compute_rateMap.m` passes `numSpatialBins_smoothing/binSize` (= 4) to
+  `setUp_gaussFilt`, which uses it as the `mvnpdf` **covariance** — an SD of 2 bins
+  (4 cm), not the paper's 8 cm SD. Rate maps are not ported (clusterless), so this only
+  matters when reading the vendored code as documentation of the paper.
 - Files suffixed `_cm` are the Mallory variants; where an unsuffixed original exists,
-  the unsuffixed one is closer to Widloski's.
+  the unsuffixed one is closer to Widloski's. The Zenodo driver calls the unsuffixed
+  `load_timeBins`, `load_rateMapsForDecoding_2D`, and `compute_filtering_binDecoding`;
+  only the `_cm` variants are vendored.
 
 ### Still missing everywhere
 
@@ -78,3 +84,4 @@ call signatures; the port reconstructs them:
 | `compute_sequenceDistance(COM)` | path length along the COM trajectory |
 | `compute_events_times(ts_z, zThr, mergeThr, durThr)` | threshold-crossing intervals; returns `[start, end, peakTime, …]` |
 | `compute_replaysConcatenation(decoder, ind)` | concatenates per-event COM traces into one array |
+| `seqle(y)` | run-length encoding of a logical vector, returning `{identities, lengths, boundaries}`; called by `compute_allSequences_NaNseparated.m`. Its length convention is unknown, but the merge step recomputes lengths as `end − start` index differences, so the port defines run length that way throughout and does not reconstruct `seqle` |

@@ -66,7 +66,9 @@ The cells of most interest are the ones no pairwise table reaches:
   asks. It is only computable because SWR inventories are first-class here rather than
   labels attached to someone else's events.
 - **Sequences matched by no LFP- or rate-triggered inventory** — events the standard
-  field pipelines would not have found at all.
+  field pipelines would not have found at all. This is the neither-ripple-nor-burst
+  cell, distinct from ripple-less (overview): an MUA-matched, SWR-unmatched sequence is
+  ripple-less but not in this cell.
 - **Time accounted for by no detector**, as the denominator that makes the rest legible.
 
 ## The SWR label matrix
@@ -116,6 +118,7 @@ model and data availability define the paired analysis population.
 | Coverage and count summaries disagree as expected on a constructed split/merge case | That both are reported because they answer different questions |
 | `interval_span_s` is computed identically for every inventory, and native duration fields are never substituted for it | The convention mismatch between cohorts |
 | An event at an epoch boundary is not matched across epochs | Session scoping |
+| Empty inventories carry the schema's dtypes, not object, so concatenation across epochs preserves column types | The canonical builder's empty return is all-object |
 
 ## Deliverables
 
