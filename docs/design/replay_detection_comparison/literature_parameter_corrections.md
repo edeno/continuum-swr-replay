@@ -5,12 +5,13 @@
 changed, and what remains unverified. Checked 2026-09-21 against the papers' Methods.*
 
 Both the CSV in this directory and the Google Sheet it came from carry the 63
-corrections below. They were compared cell by cell afterwards and agree exactly across
-all 54 rows and 28 columns.
+corrections below, the three papers and seven columns added afterwards, and the
+blank-cell pass at the end. They were compared cell by cell and agree exactly across
+all 57 rows and 35 columns.
 
 ## Method
 
-All 54 rows were checked. Every row's DOI was resolved through the CrossRef API and checked against the stated
+All 57 rows were checked. Every row's DOI was resolved through the CrossRef API and checked against the stated
 first author, last author, year, and journal. Each parameter cell that was not `#N/A`
 or "Not reported" was checked against the paper's Methods, retrieved through Europe PMC
 full text, the NCBI `efetch` service, the PMC article page, or the lab's own PDF
@@ -173,6 +174,26 @@ into those columns would change what the column means:
 - **Pfeiffer & Foster 2015's 80 place units** is a session-inclusion criterion ("only
   rats in which we obtained at least 80 simultaneously recorded place units"), not a
   per-event active-cell count like the rest of the "Min. Cells" column.
+
+## Blank cells
+
+A final pass looked at every cell in the sheet that was empty rather than `#N/A`, because
+the two are read differently: `#N/A` says the paper does not state the value, while a
+blank is ambiguous between that and never having been checked. Seventy-three cells were
+blank. Fifty-three of them are in free-text columns (`Decoding notes`, `Trajectory`)
+where a blank is the established convention and carries no claim.
+
+The remaining twenty sat in parameter columns that otherwise use `#N/A`. Each was checked
+against its paper. One was fillable: Ji & Wilson 2007's `MUA smooth (ms)` is 30, from
+"Spikes from a recording area were combined and counted in 10 ms time bins. Spike counts
+were then smoothed using a gaussian window with s = 30 ms." Its `Time bin (ms)` stays
+`#N/A`, since the 10 ms bin counts multiunit spikes rather than decoding a position, the
+same convention the other template-matching and rank-order rows follow. The other
+nineteen state no value and were made explicit `#N/A`: `Min. Cells` for Berners-Lee 2022,
+Krause 2022, Stella 2019, Ambrose 2016 and Pfeiffer 2015; `Combine Events Thresh.` for
+Igata 2021, Xu 2019, Pfeiffer 2015 and Ji 2007; `SWR electrodes` for Huelin Gorriz 2023
+and Berners-Lee 2022; reconstruction error and percent decoded for Mou 2022 and Chenani
+2019; and Ji 2007's speed and duration limits.
 
 ## Systematic issues, not single-cell errors
 
