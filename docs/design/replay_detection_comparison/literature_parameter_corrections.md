@@ -4,7 +4,7 @@
 [literature_detection_parameters.csv](literature_detection_parameters.csv), what was
 changed, and what remains unverified. Checked 2026-09-21 against the papers' Methods.*
 
-Both the CSV in this directory and the Google Sheet it came from carry the 45
+Both the CSV in this directory and the Google Sheet it came from carry the 63
 corrections below. They were compared cell by cell afterwards and agree exactly across
 all 54 rows and 28 columns.
 
@@ -60,6 +60,18 @@ paper that could not be retrieved.
 | 46 | Gupta 2010 | Max duration (ms) | #N/A | 600 | Same sentence; the window grows until five steps pass without a score increase, or it reaches 600 ms |
 | 16 | Igata 2021 | Min. duration (ms) | 60 | 50 | "Candidate synchronous events in which the duration was less than 50 ms or more than 2000 ms were excluded". The 60 ms belongs to a later stage: "Trajectory sequences covering more than 4 time bins (60 ms) and a cumulative distance of more than 20 cm were included" |
 | 16 | Igata 2021 | Min. cells | 4 | >4 | "Candidate synchronous events were detected when the z-scored spike rates exceeded 2 and the number of active neurons exceeded 4", so the minimum is five |
+| 10 | Krause 2022 | Max duration (ms) | #N/A | 2000 | "Only SWRs longer than 50 ms and shorter than 2 s ... were included" |
+| 10 | Krause 2022 | % decoded | Not reported | 89.7% | "89.7% +/- 2.0% of SWR were identified to encode trajectories", against 22.8% by the traditional method |
+| 17 | Gridchyn 2020 | MUA z-score (SD) | 3.5 | #N/A | "a threshold of 3.5 times the baseline mean established in the pre-rest session". It is a multiple of the mean spike count, not of a standard deviation, so it does not belong in an SD column |
+| 17 | Gridchyn 2020 | Detection notes | "3.5 SD initial" | "3.5x the baseline mean spike count, not a SD multiple" | Same sentence; the adaptive adjustment to about 1 event/s was already right, and a 150 ms detection refractory is now noted |
+| 21 | Xu 2019 | Min. cells | 5 | 4 | "Events containing fewer than five spikes, four cells or with less than 10% of the population of neurons active were rejected". The 5 is the spike minimum |
+| 25 | Michon 2019 | Detection | MUA | SWR, MUA | "Candidate replay events were defined as mua bursts that overlapped with a ripple event" |
+| 25 | Michon 2019 | % decoded | 5-15% | 3.2-15.5% | "amounted to 8.75% +/- 2.52% of all SWR bursts (range: 3.2%-15.5%)" |
+| 25 | Michon 2019 | SWR z-score (SD), smooth, band, electrodes; MUA smooth | #N/A | 8; 15; 140-225; 1-3; 15 | "a high threshold of m + 8 x s" with a 0.5 SD boundary; envelope "smoothed with a Gaussian kernel (bandwidth 15 ms)"; "filtered in the ripple frequency band (140-225 Hz)"; "recorded from 1-3 tetrodes"; multiunit histogram "Gaussian kernel with 15 ms bandwidth" |
+| 40 | Pfeiffer & Foster 2015 | Trajectory | MAP | Posterior center of mass | "truncated to the longest sequence of time frames with a weighted mean posterior probability less than 50 cm from that of the previous frame". The paper never uses MAP |
+| 40 | Pfeiffer & Foster 2015 | Decoding notes | cumulative distance (<80 cm) | start-to-end distance (<80 cm) | "a start-to-end distance less than 80 cm were eliminated", the same error as the 2013 row |
+| 52 | Lee & Wilson 2002 | Detection notes | "theta/delta ratio"; "grouped by spike times exceeding max ISI from any cell" | theta-to-total-power ratio identifying REM; max_isi within a cell, max_gap between cells | "REM was identified as periods with an elevated ratio ... of hippocampal EEG power in the theta band (5-12 Hz) to overall power (1-475 Hz). The remainder was classified as SWS"; "for each cell, each set of consecutive spikes with interspike intervals less than max_isi ... broken between every pair of adjacent letters separated by more than max_gap" |
+| 52 | Lee & Wilson 2002 | Combine events (ms) | #N/A | 100 | "max_isi = 50 ms and max_gap = 100 ms"; max_gap is the event-separation threshold |
 | 27 | Shin & Jadhav 2019 | SWR electrodes | >1 | 1 | "the envelope stayed above 3 SD of the mean on at least one tetrode" |
 | 2 | Yang 2024 | Reconstruction error (cm) | 1.51 | Not reported | "1.51, 4.07, and 5.34 mean error for real, simulated, and shuffled data" is trial-decoding error in trial blocks, not a position error in cm |
 | 15 | Michon 2021 | Position bin (cm) | 1 | 4 | "the posterior probability distribution over position (sampled at a regular grid with 4 cm spacing)"; 1 cm is the sorted-unit tuning-curve bin |
@@ -87,6 +99,18 @@ are not cited without a check.
 | 2 | Yang 2024 | 12 detection cells | as listed | Identical to the Grosmark 2016 row; possibly inherited rather than read from the supplement |
 | 37 | Jadhav & Frank 2016 | 5 decoding cells | Bayes, 15, 2, 4, linear regression | The retrieved main text contains no decoding analysis at all: zero occurrences of "decod", "Bayes" or "linear regression". The supplement could not be retrieved |
 | 16 | Igata 2021 | Min. duration | 60 | May be 50 ms, with 60 ms a sustained-sequence length. Methods are in an unreachable SI Appendix |
+
+## Deliberately not filled
+
+Two values the papers state were left out of the sheet on purpose, because writing them
+into those columns would change what the column means:
+
+- **Gridchyn 2020's 150 ms detection refractory** is not a merge threshold. Every other
+  entry in "Combine Events Thresh." merges nearby events; a refractory suppresses the
+  later detection outright. It is recorded in the detection notes instead.
+- **Pfeiffer & Foster 2015's 80 place units** is a session-inclusion criterion ("only
+  rats in which we obtained at least 80 simultaneously recorded place units"), not a
+  per-event active-cell count like the rest of the "Min. Cells" column.
 
 ## Systematic issues, not single-cell errors
 
