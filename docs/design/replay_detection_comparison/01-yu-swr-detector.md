@@ -77,7 +77,7 @@ It supplies implementation evidence where the paper is underspecified. In this w
 |---|---|
 | Envelope | per-tetrode amplitude envelope from input column 3; the upstream `filtereeg2.m` stores `abs(hilbert(filtered_data))` there, without squaring |
 | Artifact handling | samples with absolute envelope > 2000 are zeroed if their total duration is at most 5 s (calculated assuming 1.5 kHz). Above that, the code enters `keyboard`; if execution resumes, `continue` skips the current tetrode, not the entire epoch |
-| Smoothing | 4 ms Gaussian **per tetrode** before aggregation |
+| Smoothing | 4 ms Gaussian **per tetrode** before aggregation: `gaussian(0.004·Fs, ceil(8·0.004·Fs))` is an area-normalized kernel with σ in samples and length 8σ (±4σ), applied by `smoothvect` as a same-length convolution — the same truncation the package's `gaussian_smooth` uses, so the two smoothers agree |
 | Per-tetrode normalization | each tetrode's smoothed envelope **z-scored over the whole epoch** before the median |
 | Consensus | `nanmedian` across tetrodes |
 | Noise sample | consensus values during immobility (`kk_get2dstate`, velocity < 4, no buffer), pooled across all run epochs of the day |
@@ -105,10 +105,27 @@ paths, modification dates (2017-09-04 and 2017-09-22), md5 sums, and licence sta
   flags (`useenvelope`, `normeachtet`, `adaptivefilt`) from `varargin` with **no defaults
   in the file**, so the flag values used for the paper are not recoverable from source.
   The 2019 wrapper's hard-coded choices — envelope, per-tetrode z-scoring, no adaptive
-  filter — are the retained reading. The driver also carries an optional slow-baseline
+  filter — are the retained reading. The driver has **no caller anywhere** in the trees
+  searched; the lab's production path is `Trodes_dayprocess.m` (line 316, Anna
+  Gillespie's tree) calling `AG_extractRipplesJY` with `nstd = []` (data-driven
+  threshold) and `ripmindur = 0.015`. That 15 ms minimum is the lab's later production
+  setting and differs from the paper's 20 ms; the port retains the paper's value and
+  records the discrepancy (below). The envelope reaching the wrapper is stored as
+  `int16(abs(hilbert(...)))` by `DR_filtereeg2.m`, i.e. integer-quantized and unsquared;
+  the quantization is absorbed by the per-tetrode z-scoring and is not reproduced. The driver also carries an optional slow-baseline
   rejection (`adaptivefilt`: a 0–0.5 Hz low-pass of the sub-2z trace; events whose start
   sits above that baseline's mean + 2 SD are dropped) that the paper does not describe
   and the wrapper does not use; it is **not** ported.
+
+### Discrepancies between the paper and the lab code
+
+| item | paper | lab code | we use |
+|---|---|---|---|
+| Minimum duration | 20 ms | `AG_extractRipplesJY` doc default and `Trodes_dayprocess.m` production call: 0.015 s | 20 ms — the published value; 15 ms is a later production setting, and Kay already runs at 15 ms |
+| Noise estimate scope | per day | per day, pooled over the day's run epochs | per epoch (Y6) |
+| Immobility rule | events at speed < 4 cm/s | both endpoints in immobility | endpoint rule for package parity, then whole-event (Y5) |
+| Left-flank reflection | mirror about the mode | `abs(b) + 2m` | `2m − b`, warn if mode > 0 (Y3, V-Y2) |
+| Flags (`useenvelope`, `normeachtet`, `adaptivefilt`) | not described | driver: caller-supplied, no defaults; wrapper: envelope, z-score, no adaptive filter | the wrapper's values, as a flag for `zscore_per_tetrode` (Y7) |
 
 ## Mapping onto the existing package
 
