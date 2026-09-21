@@ -28,10 +28,10 @@ them.
 
 ## Simulation with planted activity
 
-Plant travelling sequences, stationary remote representation, fragmented activity,
+Plant traveling sequences, stationary remote representation, fragmented activity,
 local representation, and no-sequence activity, varying duration and spike counts.
 Include generators that do not reproduce our transition assumptions. Score non-local
-representation and extended travelling sequences separately so methods are not penalized
+representation and extended traveling sequences separately so methods are not penalized
 for activity outside their stated target.
 
 Known event timing allows boundary errors, merges, and splits to be measured; known

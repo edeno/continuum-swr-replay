@@ -74,7 +74,7 @@ and these are live hazards rather than hypotheticals:
 - Yu's noise-threshold estimator does **not** adopt Widloski's five-bin robustified mode,
   even though both implement a mode-mirroring noise model. Yu's mode is Yu's mode; the
   robustified variant is a sensitivity check inside 01, not the default.
-- No single SWR definition is imposed on the sequence cohorts. Each cohort is labelled
+- No single SWR definition is imposed on the sequence cohorts. Each cohort is labeled
   under **each** SWR definition and the matrix is reported (03). This also makes the
   label-sensitivity analysis fall out of the design rather than needing a separate sweep.
 - Deviations that are *forced* — clusterless rather than sorted units, a 1-D branched
@@ -90,7 +90,7 @@ Detection pipelines in the literature vary on three axes:
 3. **Label** — what counts as "has a ripple."
 
 **This design covers level 1**, with level 3 riding along because each cohort is
-labelled under every SWR definition. Level 2 is deferred to 04.
+labeled under every SWR definition. Level 2 is deferred to 04.
 
 The structural fact that organizes level 1: **a triggered method cannot detect replay
 outside its own trigger, by construction.** SWR-triggered methods cannot find replay
@@ -113,7 +113,7 @@ Each produces an event table over the same epochs and the same speed-eligible po
 | # | Trigger | Family | Method | Status |
 |---|---|---|---|---|
 | 1 | SWR, consensus trace | LFP | `Kay_ripple_detector` | exists (`SWR_event`) |
-| 2 | SWR, per-channel with merging | LFP | `Karlsson_ripple_detector` (Karlsson et al. 2009) | in package; needs a run |
+| 2 | SWR, per-channel with merging | LFP | `Karlsson_ripple_detector` (Karlsson & Frank 2009) | in package; needs a run |
 | 3 | SWR, noise-percentile threshold | LFP | `Yu_ripple_detector` (Yu et al. 2017) | in package; project wiring pending — [01](01-yu-swr-detector.md) |
 | 4 | MUA high-synchrony events | population rate | `multiunit_HSE_detector` | exists (`MUA_event`) |
 | 5 | Posterior threshold | decoding | our state-space non-local detection | exists (`non_local_event`) |
@@ -180,5 +180,5 @@ Method-specific decisions live in the component specs. These apply across the co
 
 Vendored source for the Widloski method is at
 [reference/widloski_foster_2025/](../../../reference/widloski_foster_2025/), whose README
-records provenance, licences, the pinned commit, and the functions absent from every
+records provenance, licenses, the pinned commit, and the functions absent from every
 published source.

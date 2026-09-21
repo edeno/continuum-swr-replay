@@ -97,7 +97,7 @@ one detector splitting an event into three does not change the time it accounts 
 
 **Overlap is not transitive.** A can overlap B and B overlap C without A overlapping C.
 Membership in "all six" is therefore not well-defined by pairwise overlap alone.
-Summarize connected components of the multipartite overlap graph, labelled by which
+Summarize connected components of the multipartite overlap graph, labeled by which
 detectors contribute to each component, and report component size and span as
 diagnostics — a long chain can fuse events that do not individually overlap.
 **Do not turn components into replacement event intervals.**
@@ -124,7 +124,7 @@ separately. No-detector time is shared exposure minus the union of detected inte
 ## The SWR label matrix
 
 Distinct from the inventory comparison above, and the reason level 3 needs no separate
-sweep (overview X6). Each *sequence* cohort — ours and the memoryless one — is labelled
+sweep (overview X6). Each *sequence* cohort — ours and the memoryless one — is labeled
 under each of the three SWR definitions, giving a cohort × SWR-definition matrix of
 non-SWR fractions.
 
@@ -137,7 +137,7 @@ unknown labels never count as non-SWR.
 
 A non-SWR fraction is a function of the SWR definition as much as of the events, so it is
 never reported without its definition attached. Where the three definitions disagree
-about a given event, that disagreement is itself reported: an event labelled ripple-less
+about a given event, that disagreement is itself reported: an event labeled ripple-less
 by one algorithm and ripple-bearing by another describes dependence on the detection
 rule; it does not establish which label is correct.
 
@@ -159,9 +159,9 @@ requires it, label the analysis as secondary, and retain the primary cohorts and
 3. **Reference-channel ripple power** (deferred). The vandermeerlab workflow thresholds
    the z-scored difference between the ripple channel's ripple-band power and a control
    channel's, and the consensus statement (Liu et al. 2022) recommends difference or
-   re-referenced derivations to remove far-field artefacts. Artefact handling is excluded
+   re-referenced derivations to remove far-field artifacts. Artifact handling is excluded
    from the detector package by decision, but the corpus-callosum reference tetrodes make
-   the derivation available here; reopen it only if artefact-driven SWR events are
+   the derivation available here; reopen it only if artifact-driven SWR events are
    suspected in a specific disagreement.
 
 Threshold robustness has a separate staged plan in [04](04-event-features.md): first

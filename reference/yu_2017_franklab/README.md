@@ -25,7 +25,7 @@ against the original md5 sums:
 | `jy_variableripthreshold_corecalculation.m` | `/home/anna/Src/Matlab/DayProcess/` | 2017-09-22 17:14:07 -0700 | 5606 | `2c2968b646cb9fe7afeabcc94ad84754` | byte-exact |
 | `kk_extractconsensus2.m` | `/home/anna/Src/oldMatlabstuff/Functions/` | 2017-09-04 13:38:07 -0700 | 31103 | `fca0d5527b60fa086bb3f93a2984f779` | byte-exact |
 
-**Licence: none stated.** Lab-internal code, vendored at the project owner's direction
+**License: none stated.** Lab-internal code, vendored at the project owner's direction
 (the project owner is a member of the lab). Do not redistribute without the authors'
 permission.
 

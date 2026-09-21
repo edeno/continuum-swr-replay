@@ -50,7 +50,7 @@ In the paper the SWR band is sampled at 1.5 kHz. Our ripple-band LFP is at 1 kHz
 (`data_loaders/lfp.py`, `filter_sampling_rate`); the band is the same 150–250 Hz.
 The paper includes only days with at least three tetrodes in or near the CA1 cell
 layer. Record whether our selected recording sites satisfy that condition (see Producing
-the inventory), rather than assuming any CA1-labelled group does.
+the inventory), rather than assuming any CA1-labeled group does.
 
 The consensus statement on SWR detection (Liu et al. 2022, *Nat Commun* 13:6000, their
 ref. 81) names this method as the data-driven alternative to arbitrary SD thresholds —
@@ -79,7 +79,7 @@ implementation of the pipeline is public:
   (commit `f69ed5a`, `develop`; also in the `filterframework_shared_open` mirror and in
   [pinned FFPhy wrapper](https://github.com/droumis/FFPhy/blob/fce2048379d942c07f79d9192265ddf44f279d88/DFFunctions/AG_extractRipplesJY.m)). Added June 2019 by
   Demetris Roumis; header: "based on jai's version of kk_extractconsensus2". Not
-  vendored: the repository states no licence.
+  vendored: the repository states no license.
 
 This is a later derivative, not an archived copy of the code used for the 2017 paper.
 It supplies implementation evidence where the paper is underspecified. In this wrapper:
@@ -89,7 +89,7 @@ It supplies implementation evidence where the paper is underspecified. In this w
 | Envelope | per-tetrode amplitude envelope from input column 3; the upstream `DR_filtereeg2.m` stores `int16(abs(hilbert(filtfilt(kernel, 1, raw))))` there, without squaring |
 | Band filter | `ripplefilter.mat` (2008-01-25, 1982 bytes, md5 `ed158b07…`), applied with `filtfilt`. **Byte-identical to the `ripplefilter.mat` shipped in `ripple_detection`** and used by `filter_ripple_band`, so the band is the same FIR, not merely the same nominal 150–250 Hz |
 | Artifact handling | samples with absolute envelope > 2000 are zeroed if their total duration is at most 5 s (calculated assuming 1.5 kHz). Above that, the code enters `keyboard`; if execution resumes, `continue` skips the current tetrode, not the entire epoch |
-| Smoothing | 4 ms Gaussian **per tetrode** before aggregation: `gaussian(0.004·Fs, ceil(8·0.004·Fs))` is an area-normalized kernel with σ in samples and length 8σ (±4σ; N = 48 at 1.5 kHz, 32 at 1 kHz), centred at `mean(1:N)`, so an even N carries a half-sample offset, applied by `smoothvect` as a full convolution cropped from `round(N/2)`. The package's `gaussian_smooth` uses the same ±4σ truncation with a symmetric kernel; the half-sample offset is not reproduced |
+| Smoothing | 4 ms Gaussian **per tetrode** before aggregation: `gaussian(0.004·Fs, ceil(8·0.004·Fs))` is an area-normalized kernel with σ in samples and length 8σ (±4σ; N = 48 at 1.5 kHz, 32 at 1 kHz), centered at `mean(1:N)`, so an even N carries a half-sample offset, applied by `smoothvect` as a full convolution cropped from `round(N/2)`. The package's `gaussian_smooth` truncates at ±8σ, not ±4σ, and uses a symmetric kernel; measured on a positive envelope the difference is under 1e-4 relative, and the half-sample offset is not reproduced |
 | Per-tetrode normalization | each tetrode's smoothed envelope **z-scored over the whole epoch** before the median |
 | Consensus | `nanmedian` across tetrodes |
 | Noise sample | consensus values during immobility (`kk_get2dstate`, velocity < 4, no buffer), pooled across all run epochs of the day |
@@ -108,12 +108,12 @@ are not a specification to copy; the retained timing rules are explicit below.
 **Both original functions have since been recovered** (2026-09-21) from Anna Gillespie's
 home directory on the lab server and are vendored verbatim at
 [reference/yu_2017_franklab/](../../../reference/yu_2017_franklab/), whose README records
-paths, modification dates (2017-09-04 and 2017-09-22), md5 sums, and licence status:
+paths, modification dates (2017-09-04 and 2017-09-22), md5 sums, and license status:
 
 - `jy_variableripthreshold_corecalculation.m` — Jai Yu's threshold estimator. It is the
   authoritative reference for Algorithm step 2 and is transcribed there.
 - `kk_extractconsensus2.m` — the consensus-and-extraction driver, in Anna Gillespie's
-  2017 edit, from which the 2019 wrapper above was consolidated. It reads its behaviour
+  2017 edit, from which the 2019 wrapper above was consolidated. It reads its behavior
   flags (`useenvelope`, `normeachtet`, `adaptivefilt`) from `varargin` with **no defaults
   in the file**, so the flag values used for the paper are not recoverable from source.
   The 2019 wrapper's hard-coded choices — envelope, per-tetrode z-scoring, no adaptive
@@ -338,8 +338,8 @@ patch and `nanmedian` handling and is part of the shared-input adaptation.
    normalization. Transliterating `jy_variableripthreshold_corecalculation`:
    a. `edges = -10:0.01:50`; `counts = histc(values, edges)` — left-closed bins, the
       last bin counting values exactly equal to 50; values outside the grid are
-      dropped, and their fraction is recorded (Failure behaviour);
-   b. `smoothed = smooth(counts, 11)` — centred 11-point moving average with shrinking
+      dropped, and their fraction is recorded (Failure behavior);
+   b. `smoothed = smooth(counts, 11)` — centered 11-point moving average with shrinking
       symmetric windows at the ends; `j = first argmax(smoothed)`; `m = edges[j]`;
    c. mirrored histogram: the bins with `edges ≤ m` keep their **raw** counts; each bin
       with `edges < m` is reflected to `2m − edges` with its raw count (Y3, V-Y2); the
@@ -407,7 +407,7 @@ rather than a degraded estimate (see below).
 | At 1 kHz, 19 consecutive qualifying samples fail and 20/21 pass; at 1.5 kHz, 29 fail and 30 pass; fractional-sample durations use the declared positive rounding | The sample-count convention, including the package/MEX difference |
 | Qualifying exceedances sharing one above-mean run produce one event; equality to the mean ends the run; native sample timestamps define bounds and clipped block edges are flagged | Mean-crossing extension and explicit timestamp conventions |
 | An upstream artifact mask removes coverage without zero-filling or changing the montage; its absence is recorded and adds no 2000-unit clipping | The declared project artifact policy, separate from the later wrapper |
-| Degenerate inputs: all-NaN channels, no immobility samples, too few immobility samples to resolve the percentile, mode at the histogram edge, more than the stated fraction of values outside the grid | Failure behaviour below |
+| Degenerate inputs: all-NaN channels, no immobility samples, too few immobility samples to resolve the percentile, mode at the histogram edge, more than the stated fraction of values outside the grid | Failure behavior below |
 | Grid semantics: default edges equal `-10:0.01:50`; a value of exactly 50 is counted and a value of 50.001 is dropped; tied smoothed maxima select the first; the threshold is one bin past the crossing | V-Y3, V-Y4 — `histc`, `smooth`, and `find(..., 1, 'first') + 1` transliterated |
 | Spyglass pass-through: the parameter dict with `percentile` and `zscore_per_tetrode` yields the same frame as a direct call | The signature contract and configuration path |
 | Missing-LFP gap: two sub-minimum exceedances separated by a NaN gap or timestamp gap yield **no** event, and an exceedance that reaches a gap edge ends there | Block-wise processing; no event spans missing LFP |

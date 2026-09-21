@@ -22,7 +22,7 @@ is stale.
 
 | phase | spec | deliverable | status |
 |---|---|---|---|
-| 0 | [01](../../../docs/design/replay_detection_comparison/01-yu-swr-detector.md) §Architecture, [table](../../../docs/design/replay_detection_comparison/detector_comparison.md) | Detectors implemented in `ripple_detection` with tests, README, changelog | Yu merged to package `master`; four detector/fix PRs + one CI PR open (below) |
+| 0 | [01](../../../docs/design/replay_detection_comparison/01-yu-swr-detector.md) §Architecture, [table](../../../docs/design/replay_detection_comparison/detector_comparison.md) | Detectors implemented in `ripple_detection` with tests, README, changelog | **done** 2026-09-21: PRs #14–#19 merged to package `master` (b0431a4) after independent review |
 | 1 | [01](../../../docs/design/replay_detection_comparison/01-yu-swr-detector.md) §Producing the inventory, steps 2–6 | Yu SWR inventory for every epoch via Spyglass: pin the package, register the algorithm, `RippleParameters` row `yu_2017`, populate, `get_ripple("Yu")`, Y5 speed gate, observation-availability table | not started |
 | 2 | [02](../../../docs/design/replay_detection_comparison/02-memoryless-sequence.md) | Memoryless sliding-window sequence detector on the clusterless posterior; shuffle null; adapted cohort before/after shuffle | not started |
 | 3 | [03](../../../docs/design/replay_detection_comparison/03-inventory-comparison.md) | Six inventories on the common schema, observation-availability tables, all-pairs overlap table, single/no-detector cells, SWR label matrix, sampled examples | not started |
@@ -37,45 +37,36 @@ Karlsson (inventory 2) needs only a Spyglass populate with the existing
 ## Phase 0: package state (`~/Documents/GitHub/ripple_detection`)
 
 Local clone; run tests with `.venv/bin/python -m pytest -q --no-cov` (not `uv run`, which
-drops a stray `uv.lock`). Package `master` at `659cc91` carries the Yu detector
-(`Yu_ripple_detector`, `get_Yu_ripple_consensus_trace`, `estimate_noise_threshold`). That
-is the commit Phase 1 pins unless the PRs below are merged first, in which case pin the
-merge.
+drops a stray `uv.lock`). Package `master` at **b0431a4** (2026-09-21) carries every
+detector the comparison needs and is the commit Phase 1 pins. Merged in this order, each
+after an independent Opus review whose findings were fixed before merge:
 
-| PR | branch | what | depends on |
-|---|---|---|---|
-| #14 | `fix/detector-conventions` | ripple-band filter designed for the actual sampling rate; `minimum_sample_count` duration convention; Karlsson statistics on the per-channel max; HSE input validation | — |
-| #15 | `simulator-realism` | `simulate_LFP` ripple size in ripple-band units, per-ripple frequency/duration ranges | — |
-| #16 | `zugaro-and-long-detectors` | `Zugaro_ripple_detector` (FMAToolbox FindRipples rule), `Long_sharp_wave_ripple_detector` (neurocode DetectSWR rule) | — |
-| #17 | `carey-joint-detector` | `Carey_candidate_detector` (vandermeerlab GenCandidateEvents rule) | — |
-| #18 | `ci-ruff-format` | Replace black with `ruff format` in CI; drop black/flake8 pins. Fixes the Code Quality job, which failed on `master` too | merge **first** |
+| PR | what | review outcome |
+|---|---|---|
+| #18 | ruff is the single formatter/linter; black and flake8 removed; ruff pinned to a minor version | merged after three one-line fixes |
+| #14 | ripple-band filter designed for the actual rate; `minimum_sample_count` duration convention (23 not 24 samples at 1500 Hz/15 ms, about 20 % more marginal noise-only events, **detection-affecting**); `max_thresh` redefined as the largest threshold that still detects the event (greedy peak expansion could return 0.1); Karlsson stats on per-channel max; HSE validates inputs incl. NaN speed | merged after fixes |
+| #15 | `simulate_LFP` `ripple_snr` (per-ripple, from each burst's filtered peak; unit-gain assumption was 40-47 % off at band edges), frequency/duration ranges; docs no longer state a z-score mapping | merged after fixes |
+| #16 | `Zugaro_ripple_detector`, `Long_sharp_wave_ripple_detector`; edge rule and FIR rewritten in prose/reflect-convolution (licensing), upfront length check, `*_local_percentile` output columns, odd `smoothing_window` enforced | merged after fixes; no discrepancy vs the MATLAB |
+| #17 | `Carey_candidate_detector` | merged as-is; no discrepancy vs the MATLAB |
+| #19 | README "Choosing a detector" table, docstring NaN policies, `__all__`, changelog regroup, Carey theta filter order | merged |
 
-Merge notes:
-
-- Each PR adds bullets under `## [Unreleased]` in `CHANGELOG.md` and a section to
-  `README.md`, so every merge after the first conflicts there. Resolve by keeping both
-  sets of bullets; nothing else overlaps.
-- After #18 merges, rebase #14–#17 to get a green Code Quality job; no code change needed.
-- Codecov patch/project pass on #15–#17 after the 2026-09-21 coverage tests; only the
-  Code Quality job fails, and only because those branches still run black. Rebase after #18.
-- Branch `consistency-pass` (pushed, no PR) merges all five and adds the README
-  "Choosing a detector" table, per-detector missing-sample notes, `__all__` with a
-  public-surface test, and a regrouped changelog. Open its PR after #14–#18 merge, or
-  merge it directly if the five are merged in any order first (its merge commits resolve
-  the changelog/README conflicts).
-- #16 is the only branch defining `_boolean_run_bounds`; `master` has `_boolean_runs`. If
-  #16 lands after #17, keep one helper.
+Unresolved after the pass (need a decision, recorded in the README table rather than
+changed): `minimum_duration` semantics differ (sample count vs elapsed time, inclusive vs
+strict); immobility is `<=` in most detectors but `<` in Yu's noise mask and Carey's state
+intervals; `close_event_threshold` (HSE) vs `close_ripple_threshold` (Spyglass hard-codes
+the latter). Pre-existing and untouched: `exclude_close_events` compares gaps from the
+original list, so in a chain of three the third is judged against a dropped second.
 
 Standing decisions for package work (from the user, this session):
 
-- No artefact, EMG, or noise-channel exclusion logic in the package. Artefact handling is
+- No artifact, EMG, or noise-channel exclusion logic in the package. Artifact handling is
   the project's job (03 lists the reference-channel control as deferred).
 - Detectors are named after the algorithm's author and cite the paper and the lab code
   they follow in the docstring and changelog. GPL (FMAToolbox) and unlicensed (neurocode)
   code is reimplemented from the algorithm, never transcribed.
 - Yu noise threshold is estimated **per epoch**, not per day as the lab code did; a
   histogram mode above zero raises a warning, not an error.
-- Package code is written test-first.
+- Package code is written test-first; commits are gated on the pytest exit code.
 
 ## Phase 1 details not in the spec
 
@@ -93,7 +84,7 @@ Standing decisions for package work (from the user, this session):
 | # | question | current position |
 |---|---|---|
 | D1 | Do Zugaro, Long, and Carey get project inventories, or stay as package-only comparison rows? | The six inventories in overview are Kay, Karlsson, Yu, MUA HSE, ours, Widloski. The three newer detectors are in the table as "in package, no run". Long needs a raw stratum-radiatum channel, which this dataset may not have; check before scheduling. |
-| D2 | Pin `ripple_detection` at `master` 659cc91 or wait for #14–#18? | Wait if the merges land within days; #14 changes the duration convention, which changes Yu event counts at exact-boundary durations. |
+| D2 | Which `ripple_detection` commit to pin | `master` b0431a4 (all PRs merged). No release tag yet; the changelog marks the duration change as minor-version, so a `v1.8.0` tag before pinning would be cleaner. |
 | D3 | Spyglass PR for the registration line? | Optional cleanup after Phase 1 produces results (spec 01 step 6). |
 | D4 | Widloski adaptation choices (02 §deviations) | Documented in 02; not re-decided here. |
 
