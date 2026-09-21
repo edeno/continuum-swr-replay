@@ -140,7 +140,16 @@ Spyglass fixtures required.
 
 1. Consensus envelope via `yu_consensus_trace`: per-tetrode Hilbert envelope of the
    150–250 Hz band, each smoothed with a 4 ms Gaussian, then the median across tetrodes.
-   Rows with any NaN channel are dropped first, as the package does.
+   **Missing LFP is handled by block, not by row-dropping.** The package's
+   `_preprocess_detector_inputs` drops every row with a NaN channel and hands the
+   compressed time axis downstream, so smoothing runs across the gap and
+   `segment_boolean_series` measures duration across it as if it were contiguous: two
+   short exceedances on either side of missing data can merge into one qualifying event.
+   Instead, split the epoch into maximal contiguous blocks of valid samples, run steps
+   1, 4 and 5 within each block, and never let an event span missing LFP. The noise
+   threshold (step 3) is estimated once per epoch from the immobility samples of all
+   blocks. The same row-dropping applies to the existing Kay inventory as run through
+   Spyglass; see the note under Unverified assumptions.
 2. Normalize with `normalize_signal(..., normalization_mask=speed < 4)` — z-scored to
    immobility.
 3. `estimate_noise_threshold` on the immobility-restricted values:
@@ -177,6 +186,7 @@ rather than a degraded estimate (see below).
 | Pure-noise LFP: false-positive rate consistent with the nominal percentile and the 20 ms duration requirement | That the threshold means what it claims |
 | Boundaries extend to mean crossings, not to threshold crossings; 20 ms minimum applies to the **exceedance**, not the extended event | Convention parity with the published rule |
 | Degenerate inputs: all-NaN channels, no immobility samples, too few immobility samples to resolve the percentile, mode at the histogram edge | Failure behaviour below |
+| Missing-LFP gap: two sub-minimum exceedances separated by a NaN gap yield **no** event, and an exceedance that reaches a gap edge ends there | Block-wise processing; no event spans missing LFP |
 
 A side-by-side run against Kay and Karlsson on the same session is a **sanity check, not
 a test** — there is no ground truth, and disagreement is the object of study.
@@ -207,7 +217,13 @@ quietly convert the Yu inventory into a second Kay inventory and corrupt the com
    it, but does not state it outright. The alternative — estimating over all time — would
    shift the mode. Both are cheap to run; the design assumes immobility-restricted and the
    comparison should report the other as a sensitivity check.
-3. **How the paper handles multiple recording days per animal.** "Distinct noise
+3. **Whether the existing Kay inventory is affected by row-dropping.** `RippleTimesV1`
+   calls `Kay_ripple_detector`, which drops NaN rows before smoothing and segmentation.
+   Whether the ripple-band LFP handed to it contains interior NaN runs in our sessions
+   is not established. If it does, some `SWR_event` intervals may bridge missing data
+   and should be flagged in 03; if it does not, the issue is moot for inventory 1.
+   Check by counting interior NaN runs per session in the ripple-band LFP.
+4. **How the paper handles multiple recording days per animal.** "Distinct noise
    distributions for immobility periods for each day" implies per-day estimation; our
    epochs are finer-grained than days. The design estimates per epoch, which is a
    plausible reading but not a verified one.

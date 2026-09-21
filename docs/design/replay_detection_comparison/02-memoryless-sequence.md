@@ -289,9 +289,15 @@ Named for what it does; the citation lives in docstrings, not the module path.
 3. Sliding 80 ms windows as a float64 cumulative sum over 40 rows, stride 2 rows;
    normalize across real bins under a uniform prior. Validate uniform 2 ms spacing
    and model sampling units; do not aggregate across missing samples or epoch bounds.
-4. Per-window centre, spread, jump (D4, V6, V7). Jumps are forward (window k to k+1),
-   with the last window repeating the previous jump, as in the reference driver.
-5. Keep windows with spread < 10 cm, jump < 20 cm, per-bin speed < 4 cm/s.
+4. Per-window centre and spread (D4, V7). Then, **before any jump is computed**, set
+   the centre of every window whose midpoint speed is not below 4 cm/s to NaN, as the
+   reference does by decoding only speed-eligible windows. Then forward jumps (V6):
+   window k's jump is to window k+1, the last window repeats the previous jump, and a
+   window whose successor has a NaN centre gets a NaN jump. The ordering is load-bearing:
+   taking jumps before the speed gate lets a sequence extend one window further into the
+   speed-rejected region and can turn a rejected 100 ms candidate into an accepted one.
+5. Keep windows with spread < 10 cm and finite jump < 20 cm (the speed gate has already
+   been applied through the NaN centres).
 6. Contiguous runs of kept windows → merge across gaps < 20 cm and < 50 ms → drop runs
    shorter than 100 ms.
 7. Keep events with duration > 100 ms and dispersion > 12 cm.
@@ -312,7 +318,7 @@ merged gaps, not just retained window centres. Step 9 uses an identical SWR inte
 table on both sides; calling the same overlap helper alone would not ensure parity.
 
 **Window and event timing.** A window with support `[t, t + 0.080)` is timestamped at
-`t + 0.040`. Interpolate speed at that midpoint for step 5. Event start/end are the
+`t + 0.040`. Interpolate speed at that midpoint for the step 4 gate. Event start/end are the
 first/last retained midpoint, and the duration criterion is their difference, as in
 the reference driver. Save the outer decoding support separately; it is not the
 event interval used for overlap or speed eligibility. Do not add the 80 ms window
@@ -328,8 +334,8 @@ bridge between retained pieces; report bridge distances separately. This makes
 merging inspectable instead of silently treating rejected windows as decoded paths.
 
 **Why the speed rule is two-stage.** A whole-event rule cannot gate bins before events
-exist. Step 5 establishes candidacy; step 8 governs. Step 8 is not redundant: merging at
-step 6 can span windows that step 5 rejected.
+exist. Step 4 establishes candidacy; step 8 governs. Step 8 is not redundant: merging at
+step 6 can span windows that step 4 rejected.
 
 **The efficiency claim.** In the `uv.lock` version of `non_local_detector`
 (`2d730c3a86ad0c62a817d0356b9248d43b6c32f8`),
@@ -391,6 +397,7 @@ not additional acceptance criteria.
 | Discrete Fréchet mean matches a brute-force minimum and approaches COM/SD as a straight-segment grid is refined; deterministic tie cases | Quantization and the precise D4 contract |
 | Sequence assembly against the reference semantics: run length is an index difference, a single-window run has length 0 and is dropped, and the 100 ms filter keeps runs of ≥ 21 windows at a 5 ms stride and ≥ 26 at 4 ms | Off-by-one and merge behaviour |
 | Jump alignment: window k's jump is to k+1, the last window repeats it, and a window before a NaN centre is rejected | Forward-jump convention; boundaries would shift by one stride under the backward convention |
+| Speed gate precedes jumps: a candidate whose last eligible window precedes a speed-rejected window is one window shorter than it would be with jumps taken first; construct the case where that changes acceptance | The ordering in data-flow step 4 |
 | Junction-bin test: mass on an `edge_id == -1` bin must not move the centre | V8 |
 | Stride-derived thresholds: changing the stride must change bin-count thresholds | V10 — the constant that would silently become a 50 ms threshold |
 | Window midpoints determine duration and overlap; outer support is separate; rejected merged gaps still participate in speed eligibility | Temporal conventions do not change the cohort silently |

@@ -94,14 +94,32 @@ D's trajectory:
    animal reference so local content can score; still spike-count scaled.
 3. **Held-out posterior probability of the discovery trajectory relative to uniform** —
    decode H alone with a memoryless uniform-prior decoder, then take the mean over bins
-   of `log P_H(x̂_D(t)) − log(1/n_bins)`. Bounded, per-bin normalized, so a bin with no H
-   spikes contributes near zero rather than an artefact, and no bin can dominate.
+   of `log P_H(x̂_D(t)) − log(1/n_bins)`. Per-bin normalized, so a high-spike bin cannot
+   dominate. But it has two defects that a first draft of this spec got wrong: it is
+   bounded above by `log n_bins` and **unbounded below**, since `P_H → 0` sends it to
+   `−∞`; and it is **not neutral to silence**, because with no H spikes the posterior is
+   proportional to `exp(−GPI_H(x))`, so normalization preserves the spatial bias of
+   silence rather than removing it.
 4. Per-spike version of 1: fixes scale only.
 
-If reopened, freeze 3 as primary with a circular-shift null (same event, same H spikes,
-same D trajectory, shifted over the session's immobility time), and report each pipeline
-over all its events and over the subset whose D-trajectory is non-local, so the SWR
-pipelines are not penalized for local content the score was never meant to reward.
+If reopened, the score to freeze is a **silence-referenced, floored** version of 3:
+
+- **Silence reference.** For every bin also compute `P_H^0`, the posterior H would give
+  that bin with its spikes removed (the zero-spike posterior, `∝ exp(−GPI_H)`). Score
+  the bin as `log(P_H(x̂_D) + ε) − log(P_H^0(x̂_D) + ε)`. With no H spikes the two terms
+  are identical and the bin contributes exactly zero, so silence is neutral by
+  construction; with spikes, the score is the spike-attributable shift in the
+  probability H places on D's trajectory.
+- **Floor.** `ε = 1/n_bins` bounds every bin's contribution to
+  `[−log(1 + n_bins·max P_H^0), log(1 + n_bins·max P_H)]`; alternatively use a bounded
+  transform, the probability mass within a stated track distance of `x̂_D`, minus the
+  same mass under `P_H^0`. Pick one in the pilot and record it.
+- **Null.** Circular shift of D's trajectory over the session's immobility time, same
+  event, same H spikes; the shifted score uses the same silence reference.
+
+Report each pipeline over all its events and over the subset whose D-trajectory is
+non-local, so the SWR pipelines are not penalized for local content the score was never
+meant to reward.
 
 ### Alternatives considered
 

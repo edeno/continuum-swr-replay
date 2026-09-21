@@ -30,7 +30,9 @@ The comparison is objective to the extent that its predictions precede its resul
 ## The predictions table
 
 Each row names the method, the predicted weakness, the analysis that tests it (defined in
-the next section), and the result that would count against the prediction.
+the next section), and the result that would count against the prediction. The last
+column is always evidence **against the prediction**, so for the rows about our own
+detector it is the outcome that would *favour* our detector; read it that way.
 
 | # | method | predicted weakness | tested by | evidence against |
 |---|---|---|---|---|
@@ -42,9 +44,9 @@ the next section), and the result that would count against the prediction.
 | **P6** | Widloski | The 80 ms window blurs onsets and merges close events | A4 boundary differences and split/merge counts on matched pairs | No systematic widening; one-to-many counts match ours |
 | **P7** | Widloski | The 100 ms duration and 12 cm dispersion criteria reject short and stationary remote representation that our detector counts | A1 duration and dispersion features on ours-only events | Ours-only events are mostly above both cutoffs |
 | **P8** | Widloski | A flat memoryless posterior under sparse spiking fails the spread gate, so low-spike events are lost | A1 spike-count and tetrode-engagement features, ours-only vs Widloski-only; A6 gate-failure diagnostics | No spike-count difference; gate failures are not dominated by spread |
-| **P9** | **Ours** | The temporal prior manufactures non-local states when spikes are sparse | A3 prior-excluded spike evidence on ours-only events, against the matched immobility baseline | Ours-only events show no likelihood support for the decoded position |
-| **P10** | **Ours** | A position-tracking error turns local activity into "non-local" | A1 distance-from-animal on ours-only events; relation to tracking confidence where available | Ours-only events cluster at small distances or at low tracking confidence |
-| **P11** | **Ours** | The 0.8 probability threshold and 15 ms minimum fragment one replay into several events, inflating counts | A4 one-to-many overlaps; 03's fragment-merge recount | Counts agree with SWR and Widloski once fragments within a stated gap are merged |
+| **P9** | **Ours** | The temporal prior manufactures non-local states when spikes are sparse | A3 prior-excluded spike evidence on ours-only events, against the matched immobility baseline | Ours-only events show likelihood support for the decoded position above the baseline, at a rate comparable to shared events |
+| **P10** | **Ours** | A position-tracking error turns local activity into "non-local" | A1 distance-from-animal on ours-only events; relation to tracking confidence where available | Ours-only events are distributed across distances like shared events and show no association with low tracking confidence |
+| **P11** | **Ours** | The 0.8 probability threshold and 15 ms minimum fragment one replay into several events, inflating counts | A4 one-to-many overlaps; 03's fragment-merge recount | The count excess over SWR and Widloski persists after fragments within a stated gap are merged, i.e. it is not segmentation |
 | **P12** | **Ours** | Acausal smoothing shifts event boundaries | A4 onset relative to ripple onset and MUA onset on matched pairs | Offsets near zero, no sign bias |
 | **P13** | **Ours** | The Fragmented state admits noise | A1 state composition of ours-only events; A3 spike evidence for fragmented-dominated events | Fragmented-dominated events carry support comparable to continuous ones |
 | **P14** | **Ours** | Content is scored on the posterior that selected it, so selection inflates every within-event statistic | Not testable by the analyses here; see [05](05-validation.md) | — |
