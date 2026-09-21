@@ -13,10 +13,11 @@ register invites the cross-method blending this design forbids.
 | [01-yu-swr-detector.md](01-yu-swr-detector.md) | SWR detector with a noise-percentile threshold (Yu et al. 2017) | design complete |
 | [02-memoryless-sequence.md](02-memoryless-sequence.md) | Memoryless sliding-window sequence detector (Widloski & Foster 2025) | design complete |
 | [03-inventory-comparison.md](03-inventory-comparison.md) | Six inventories → common schema → N-way overlap accounting | design complete |
-| [04-event-features.md](04-event-features.md) | What differs about the events; selection diagnostics | deferred |
-| [05-validation.md](05-validation.md) | Simulation and held-out-tetrode validation | deferred |
+| [04-event-features.md](04-event-features.md) | Frozen predictions about every method's weaknesses, ours included, and the diagnostics that test them | design complete |
+| [05-validation.md](05-validation.md) | Simulation and held-out-tetrode validation: what a performance claim would need | parked |
 
-01 and 02 are independent and can proceed in parallel. 03 depends on both.
+01 and 02 are independent and can proceed in parallel. 03 depends on both; 04 depends on
+03 and its predictions table must be committed before 03 runs.
 
 ## Purpose
 
@@ -29,6 +30,13 @@ The immediate motivation is our own non-local event cohort and its SWR-overlap s
 Agreement across methods is evidence of robustness to detection choices. It is not
 independent validation of the recordings or of the encoding model, and disagreement
 can reflect a different scientific target as much as different sensitivity.
+
+The comparison characterizes the strengths and weaknesses of every method, **ours
+included**, and it does so against predictions written down before any cross-method
+result is inspected (04). Where a prediction comes out against our detector, it is
+reported as a limitation with the same prominence as one that comes out against another
+method. There is no ground truth in this design; what would license a sensitivity or
+specificity claim is recorded in 05 and is not scheduled.
 
 ## The governing rule
 
@@ -148,6 +156,7 @@ Method-specific decisions live in the component specs. These apply across the co
 | **X6** | Label every cohort under every SWR definition; report the matrix | Imposing one definition would blend methods, and the matrix delivers label sensitivity for free |
 | **X7** | Clusterless compatibility bounds the factorial | See the scope boundary above; stated so the exclusions are legible |
 | **X8** | Each cohort gets its own key; cohorts relate only by temporal overlap, never by shared ids | `event_id` hashes are cohort-dependent, so a shared key would mis-join silently (CLAUDE.md on atomic regeneration) |
+| **X9** | The predictions table in 04 is frozen — committed, hash recorded in the run manifest — before 03 produces its first matched cohort; every row is reported whichever way it comes out | A comparison whose questions are chosen after the answers is a case for the defence. Freezing the predictions is what makes the descriptive result objective |
 
 ## Reference material
 

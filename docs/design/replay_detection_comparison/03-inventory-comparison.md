@@ -45,6 +45,12 @@ Each event contributes once to its own denominator regardless of how many matche
 has. Show overlap-length and IoU distributions so a one-sample edge contact is not
 counted as agreement with a fully coincident event.
 
+**Fragment-merge recount.** Our detector can split one replay into several events when
+the non-local probability dips below threshold. Provide a recount in which our events
+separated by less than a stated gap (a fixed grid: 0, 10, 20, 50 ms) are merged before
+overlap is computed, alongside the native count. The native count remains primary; the
+recount is what 04 uses to test whether count differences are segmentation (P11).
+
 **Also report time coverage** of the intersection and union of each pair of cohorts.
 Coverage is less sensitive to segmentation than event counts, and the two can disagree —
 one detector splitting an event into three does not change the time it accounts for.
@@ -116,6 +122,7 @@ model and data availability define the paired analysis population.
 | Disjoint cohorts, empty cohorts, and single-event cohorts | Degenerate inputs |
 | Connected components: a chain A–B–C where A and C do not overlap is reported as one component with its span, and is not collapsed into an interval | Non-transitivity |
 | Coverage and count summaries disagree as expected on a constructed split/merge case | That both are reported because they answer different questions |
+| Fragment-merge recount at gap 0 reproduces the native counts; at a gap larger than every inter-event interval it yields one event per contiguous run | The recount is anchored at both ends |
 | `interval_span_s` is computed identically for every inventory, and native duration fields are never substituted for it | The convention mismatch between cohorts |
 | An event at an epoch boundary is not matched across epochs | Session scoping |
 | Empty inventories carry the schema's dtypes, not object, so concatenation across epochs preserves column types | The canonical builder's empty return is all-object |

@@ -73,8 +73,10 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     encoding-pair shuffle;
     [03](design/replay_detection_comparison/03-inventory-comparison.md) the N-way overlap
     accounting and the cohort × SWR-definition matrix;
-    [04](design/replay_detection_comparison/04-event-features.md) and
-    [05](design/replay_detection_comparison/05-validation.md) deferred.
+    [04](design/replay_detection_comparison/04-event-features.md) the frozen
+    predictions about every method's weaknesses, ours included, and the diagnostics
+    that test them; [05](design/replay_detection_comparison/05-validation.md) the parked
+    simulation and held-out-tetrode designs that a performance claim would need.
     Reference source vendored at
     [reference/widloski_foster_2025/](../reference/widloski_foster_2025/).
     Not yet implemented.
