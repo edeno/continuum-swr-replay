@@ -4,7 +4,7 @@
 [literature_detection_parameters.csv](literature_detection_parameters.csv), what was
 changed, and what remains unverified. Checked 2026-09-21 against the papers' Methods.*
 
-Both the CSV in this directory and the Google Sheet it came from carry the 66
+Both the CSV in this directory and the Google Sheet it came from carry the 67
 corrections below, the three papers and seven columns added afterwards, and the
 blank-cell and trajectory passes at the end. They were compared cell by cell and agree exactly across
 all 57 rows and 35 columns.
