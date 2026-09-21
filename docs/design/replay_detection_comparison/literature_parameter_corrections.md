@@ -113,10 +113,12 @@ are not cited without a check.
 ## Papers that could not be retrieved
 
 Every cell in these rows is unverified, which is not the same as confirmed: Krause 2022 (10), Gridchyn 2020 (17), Xu 2019 (21), Michon 2019 (25), Berners-Lee
-2021 (12), Pfeiffer & Foster 2015 (40), Lee & Wilson 2002 (52). Diba 2007 (49), Bhattarai 2020 (19) and
-Farooq 2019 (23) have their detection parameters in supplements that could not be
-retrieved. Igata 2021 (16) and Gupta 2010 (46) were settled once their supplements
-were supplied. Igata's confirmed the 2 SD spike-rate threshold, the 15 ms multiunit and
+2021 (12), Pfeiffer & Foster 2015 (40), Lee & Wilson 2002 (52). Bhattarai 2020 (19) and Farooq 2019 (23) have their
+detection parameters in supplements that could not be retrieved. Igata 2021 (16), Gupta 2010 (46) and Diba 2007 (49) were settled once their
+supplements were supplied. Diba's row needed no correction at all: the supplement gives
+"the animal's speed was <= 10 cm s-1", events "detected by searching for silent periods
+>= 60 ms", the "≥ 5 or ≥ 30 percent of place-cells (whichever was greater) ... within the
+next 300 ms" rule, and the rank-order correlation, all exactly as recorded. Igata's confirmed the 2 SD spike-rate threshold, the 15 ms multiunit and
 4 ms ripple smoothing, the 150-250 Hz band across thirteen tetrodes, the 5 cm/s stop
 criterion, the 2000 ms maximum, the Mahalanobis-distance ripple power with its
 Gaussian-mixture split, and the MAP trajectory with its 40 cm jump and 20 cm length
