@@ -80,7 +80,8 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     studies needed for performance claims. Broad refits and robustness studies do not
     block the initial descriptive report.
     Reference source vendored at
-    [reference/widloski_foster_2025/](../reference/widloski_foster_2025/).
+    [reference/widloski_foster_2025/](../reference/widloski_foster_2025/) and
+    [reference/yu_2017_franklab/](../reference/yu_2017_franklab/).
     Not yet implemented.
 - [known_issues/](known_issues/) — *reference*: documented data/pipeline issues.
   - [three_sessions_blocked_by_nwb_checksum.md](known_issues/three_sessions_blocked_by_nwb_checksum.md)

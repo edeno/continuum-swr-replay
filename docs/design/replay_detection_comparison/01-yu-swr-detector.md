@@ -46,6 +46,9 @@ Also from the Methods, on how the consensus is formed:
 
 In the paper the SWR band is sampled at 1.5 kHz. Our ripple-band LFP is at 1 kHz
 (`data_loaders/lfp.py`, `filter_sampling_rate`); the band is the same 150–250 Hz.
+The paper includes only days with at least three tetrodes in or near the CA1 cell
+layer. Record whether our selected recording sites satisfy that condition (see Producing
+the inventory), rather than assuming any CA1-labelled group does.
 
 **Why the noise model.** A z-score threshold is contaminated by the very events it means
 to detect: ripples inflate the variance used to normalize, so the threshold moves with
@@ -57,49 +60,70 @@ a distinct algorithm rather than a parameter choice.
 ## The lab's own implementation
 
 The published code trail was searched on 2026-09-21. The paper's data-availability
-statement points only to CRCNS hc-13; no code link. One Frank lab implementation of the
-pipeline is public:
+statement points to CRCNS dataset records rather than source code. A later Frank lab
+implementation of the pipeline is public:
 
 - `DFFunctions/AG_extractRipplesJY.m` in
   [bitbucket.org/franklab/filterframework_shared](https://bitbucket.org/franklab/filterframework_shared)
   (commit `f69ed5a`, `develop`; also in the `filterframework_shared_open` mirror and in
-  [github.com/droumis/FFPhy](https://github.com/droumis/FFPhy)). Added June 2019 by
+  [pinned FFPhy wrapper](https://github.com/droumis/FFPhy/blob/fce2048379d942c07f79d9192265ddf44f279d88/DFFunctions/AG_extractRipplesJY.m)). Added June 2019 by
   Demetris Roumis; header: "based on jai's version of kk_extractconsensus2". Not
   vendored: the repository states no licence.
 
-What it settles, beyond the paper text:
+This is a later derivative, not an archived copy of the code used for the 2017 paper.
+It supplies implementation evidence where the paper is underspecified. In this wrapper:
 
 | step | as implemented in the wrapper |
 |---|---|
-| Envelope | per-tetrode ripple envelope; samples above 2000 zeroed as "wild noise", epoch abandoned above 5 s of them |
+| Envelope | per-tetrode amplitude envelope from input column 3; the upstream `filtereeg2.m` stores `abs(hilbert(filtered_data))` there, without squaring |
+| Artifact handling | samples with absolute envelope > 2000 are zeroed if their total duration is at most 5 s (calculated assuming 1.5 kHz). Above that, the code enters `keyboard`; if execution resumes, `continue` skips the current tetrode, not the entire epoch |
 | Smoothing | 4 ms Gaussian **per tetrode** before aggregation |
 | Per-tetrode normalization | each tetrode's smoothed envelope **z-scored over the whole epoch** before the median |
 | Consensus | `nanmedian` across tetrodes |
 | Noise sample | consensus values during immobility (`kk_get2dstate`, velocity < 4, no buffer), pooled across all run epochs of the day |
 | Baseline | mean of that immobility sample; `extractevents(trace, thresh, baseline, 0, mindur, 0)` ends events where the trace returns to it |
+| Minimum duration | `mindur = round(min_suprathresh_duration * Fs)`; the MEX routine counts consecutive samples at or above threshold |
 | Threshold | `jy_variableripthreshold_corecalculation({powervals}, ...)`, returning the threshold and a histogram pdf |
 | Immobility rule | keep an event only if **both endpoints** fall in immobility |
 
-What is still missing everywhere: `jy_variableripthreshold_corecalculation` (the
-histogram → mode → mirror → percentile step) and `kk_extractconsensus2`. Neither is on
-any branch or in the history of the two public Bitbucket repositories or the FFPhy
-fork, GitHub code search finds only the call site, and no public Bitbucket workspace
-carries them (a workspace `jyu` exists but is deactivated for inactivity). The MEX
-source `extractevents.cpp` is in `droumis/FFPhy` and fixes the boundary semantics.
-The threshold estimator is therefore reconstructed from the paper text (Algorithm
-step 3); obtaining the original from the authors would let it be checked line by line.
+The relevant supporting sources are
+[`filtereeg2.m`](https://github.com/droumis/FFPhy/blob/fce2048379d942c07f79d9192265ddf44f279d88/DFFunctions/filtereeg2.m#L138-L159)
+and [`extractevents.cpp`](https://github.com/droumis/FFPhy/blob/fce2048379d942c07f79d9192265ddf44f279d88/DFFunctions/extractevents.cpp#L113-L169).
+Together they support unsquared amplitude and a sample-count duration rule for this
+code lineage. Its debugger, trace-duplication workaround, and index-to-time conversion
+are not a specification to copy; the retained timing rules are explicit below.
+
+**Both original functions have since been recovered** (2026-09-21) from Anna Gillespie's
+home directory on the lab server and are vendored verbatim at
+[reference/yu_2017_franklab/](../../../reference/yu_2017_franklab/), whose README records
+paths, modification dates (2017-09-04 and 2017-09-22), md5 sums, and licence status:
+
+- `jy_variableripthreshold_corecalculation.m` — Jai Yu's threshold estimator. It is the
+  authoritative reference for Algorithm step 2 and is transcribed there.
+- `kk_extractconsensus2.m` — the consensus-and-extraction driver, in Anna Gillespie's
+  2017 edit, from which the 2019 wrapper above was consolidated. It reads its behaviour
+  flags (`useenvelope`, `normeachtet`, `adaptivefilt`) from `varargin` with **no defaults
+  in the file**, so the flag values used for the paper are not recoverable from source.
+  The 2019 wrapper's hard-coded choices — envelope, per-tetrode z-scoring, no adaptive
+  filter — are the retained reading. The driver also carries an optional slow-baseline
+  rejection (`adaptivefilt`: a 0–0.5 Hz low-pass of the sub-2z trace; events whose start
+  sits above that baseline's mean + 2 SD are dropped) that the paper does not describe
+  and the wrapper does not use; it is **not** ported.
 
 ## Mapping onto the existing package
 
 `Kay_ripple_detector` already runs: NaN-row drop → consensus trace → `normalize_signal`
-→ `threshold_by_zscore` → `exclude_movement` → `exclude_close_events` → stats. Two parts
-of Yu's method are already implemented there:
+→ `threshold_by_zscore` → `exclude_movement` → `exclude_close_events` → stats. Reuse its
+normalization and post-detection utilities, with a separate Yu event-extraction helper:
 
 - `normalize_signal` accepts a `normalization_mask`, which is exactly "normalize to
   immobility."
-- `threshold_by_zscore` applies the minimum duration to the above-threshold run and then
-  returns the whole containing above-mean segment — Yu's boundary rule and duration
-  rule, already written.
+- `threshold_by_zscore` also extends qualifying threshold runs to mean crossings, but
+  qualifies duration using `last_sample_time - first_sample_time`. At 1 kHz, its
+  0.020 s setting requires 21 samples; the lab MEX rule accepts 20. The Yu helper uses
+  integer run lengths and the boundary convention in Algorithm step 4. Do not adjust
+  the duration by subtracting a floating-point sample interval or change Kay/Karlsson's
+  shared helper to implement this convention.
 
 Two parts are **not** shared and must be written:
 
@@ -112,20 +136,22 @@ Two parts are **not** shared and must be written:
   import another method's internals, the hazard the governing rule names.
 - **The threshold estimator**, the method's defining piece.
 
-Plus a thin detector that assembles those two around the shared parts. Yu's 4 cm/s speed
-threshold matches our canonical rule; `minimum_duration` changes from 15 ms to 20 ms.
+Plus a thin detector and private sample-count extraction helper that assemble those
+pieces around the shared utilities. The retained speed cutoff is 4 cm/s and the
+minimum above-threshold sample duration is 20 ms.
 
 ## Decisions register
 
 | # | Decision | Reasoning |
 |---|---|---|
 | **Y1** | Implement in `ripple_detection` first (the lab's own package, local clone at `~/Documents/GitHub/ripple_detection`), pin the project to that commit, and produce the inventory through `RippleTimesV1` by registering the detector in Spyglass's algorithm dict from the project | Puts the third SWR algorithm beside the two it is compared with, under that package's tests and naming. Spyglass dispatches by name through a module-level dict, so no Spyglass change is needed to run it; a two-line Spyglass PR is optional cleanup that removes the registration line (see Producing the inventory) |
-| **Y2** | Estimate the percentile from **mirrored data**, not a mirrored histogram | See V-Y2 below; this is a numerical convenience, not a correction of the noise model |
-| **Y3** | Use the mode as stated (histogram argmax). The robustified multi-bin mode is a sensitivity check, not the default | The multi-bin mode is another method's choice (it appears in the vendored Widloski code). Importing it would violate the governing rule |
-| **Y4** | Reuse the package's normalization, thresholding, and close-event exclusion; implement Yu's median consensus trace and the threshold estimator locally | Normalization to a mask and mean-crossing extension are written identically in Yu's text and in the package, so sharing them introduces no difference to misattribute. The consensus aggregation is *not* shared (median vs root-sum-of-squares) and must be Yu's own |
+| **Y2** | Implement the threshold estimator as the original does: fixed histogram grid, mode from a smoothed histogram, mirrored **histogram**, threshold one bin past the CDF crossing (Algorithm step 2) | The original is now in hand (`reference/yu_2017_franklab/`). Under the governing rule its internals are Yu's, not ours to redesign; every earlier guess (sample mirroring, a bin rule, a single-bin mode) is retired |
+| **Y3** | Reflect left bins as `2m − b`, and record that the original writes `|b| + 2m` | The two agree whenever every left-of-mode bin is ≤ 0, which holds for a z-scored right-skewed envelope; they diverge for a positive mode. Implementing the intended reflection and warning on `m > 0` keeps ours equal to the original where the original was run, without copying a latent defect, and makes any divergence on our data visible per epoch (V-Y2) |
+| **Y4** | Reuse normalization and post-detection utilities; implement Yu's consensus, noise estimator, and a private sample-count event extractor | The package's existing duration test needs 21 samples for 20 ms at 1 kHz. Yu retains the lab routine's count rule, accepting 20; mean-crossing bounds use native timestamps as specified below |
 | **Y5** | Apply the canonical whole-event immobility rule (`event_speeds_are_immobile`) to every event before export; the package's `exclude_movement` is not sufficient | `exclude_movement` tests speed only at the two endpoints, with `<=`, so it admits interior movement, interior NaN speed, and an endpoint at exactly 4 cm/s — all rejected by the canonical rule (overview X4). The lab wrapper's own rule is also endpoint-only, so this is a deliberate substrate departure from Yu, applied after detection as for the other inventories |
-| **Y6** | Estimate the noise distribution and threshold **per epoch**, not per day | Matches how every other inventory is produced (one epoch, one run). The paper and the lab wrapper pool a day's run epochs; our epochs carry enough immobility to resolve the percentile on their own (Algorithm step 3), and a per-epoch estimate lets the threshold track within-day drift. Report the within-day spread of thresholds as a diagnostic |
-| **Y7** | Z-score each tetrode's smoothed envelope over the epoch before taking the median, as the lab wrapper does; expose it as a flag so the text-only reading (median of raw envelopes) can be run | The paper text does not say whether tetrodes are equalized before the median; the only concrete implementation does, and it changes which tetrodes dominate the consensus. Following the implementation is the closer reading; the flag keeps the alternative one run away |
+| **Y6** | Estimate the noise distribution and threshold **per epoch**, not per day | Matches how every other inventory is produced (one epoch, one run). The paper and the lab wrapper pool a day's run epochs; our epochs carry enough immobility to resolve the percentile on their own (Algorithm step 2), and a per-epoch estimate lets the threshold track within-day drift. Report the within-day spread of thresholds as a diagnostic |
+| **Y7** | Smooth within valid blocks, then z-score each tetrode using all valid samples across the epoch before taking the median; expose the z-scoring as a flag | Follows the later lab wrapper's epoch-wide equalization. A data gap must not create a new normalization population. Median raw envelopes remain a deferred alternative |
+| **Y8** | Apply available upstream artifact masks from the shared LFP substrate; add no fixed 2000-unit cutoff or automatic tetrode dropping | The wrapper's amplitude units and manual intervention do not define a transferable artifact policy. Record mask provenance or its absence, keep the selected montage fixed, and handle masked samples as unavailable data |
 
 ## Deviations register
 
@@ -139,9 +165,9 @@ threshold matches our canonical rule; `minimum_duration` changes from 15 ms to 2
 
 | # | Underspecified | Our choice | Effect |
 |---|---|---|---|
-| **V-Y2** | How the percentile is taken from the mirrored distribution | Mirror the **samples**, not the histogram: estimate the mode from a histogram, then form the reflected sample `{x : x ≤ m} ∪ {2m − x : x ≤ m}` and take `np.percentile` on it | Removes bin-width dependence from the tail estimate; the mode is the only quantity that still depends on binning. This is a numerical convenience, **not** a correction of the method's support: the reflected distribution ends at `2m − min(x)` whichever way it is built (see the inherited assumptions), and a histogram mirrored at the same mode converges to the same percentile as bins are refined |
-| **V-Y3** | Histogram bin rule for locating the mode | `bins="fd"` (Freedman–Diaconis), passed explicitly through the detector and Spyglass parameters. Use equal-width bins over the full finite immobility sample range; take the midpoint of the highest-count bin, breaking ties toward the lowest bin | This is our implementation choice, not a published default. Mode location still shifts the whole reflected distribution. Characterize bin sensitivity synthetically; a real-data control belongs to the follow-ups in 04 |
-| **V-Y4** | Whether "the mode" is a single bin or a robust estimate | Single-bin argmax, per Y3 | Mode-estimation variability propagates to the threshold. A robustified estimate is a possible follow-up, not the retained method |
+| **V-Y2** | Reflection of the left flank | `2m − b` for every left bin `b` (Y3) | The original's `abs(b) + 2m` equals this only for `b ≤ 0`. Inactive difference when the mode is ≤ 0; the implementation warns when it is not and records the mode per epoch |
+| **V-Y3** | None: histogram grid, mode smoothing, and percentile rule are all fixed by the original | `-10:0.01:50` (left-closed bins, in median-of-z units), 11-point moving-average mode, `1 − 1e-4` CDF crossing plus one bin | Not a choice. Sensitivity of the threshold to grid width (0.005, 0.02) is a characterization for 04, not a design freedom |
+| **V-Y4** | MATLAB `smooth(x, 11)` edge handling and `histc` binning | Centred 11-point mean with shrinking symmetric windows at the ends; left-closed bins with the final bin counting values exactly equal to 50 | Edge handling cannot affect an interior mode; documented so the transliteration is exact rather than approximate |
 
 ### Assumptions the method makes, which we inherit
 
@@ -160,15 +186,17 @@ threshold matches our canonical rule; `minimum_duration` changes from 15 ms to 2
 
 ## Architecture
 
-Three additions to `ripple_detection`, following its naming (`Kay_ripple_detector`,
+Three public additions to `ripple_detection`, plus a private event-extraction helper,
+following its naming (`Kay_ripple_detector`,
 `get_Kay_ripple_consensus_trace`) and its idioms (`ValueError` on bad input, pandas
 `DataFrame` of event stats out).
 
 | function | file | responsibility |
 |---|---|---|
-| `estimate_noise_threshold(values, percentile=99.99, bins="fd")` | `core.py` | mode → reflected sample → percentile. Pure, array-in/scalar-out, no LFP concepts; `bins` accepts a positive integer or a NumPy equal-width bin-rule name |
-| `get_Yu_ripple_consensus_trace(filtered_lfps, sampling_frequency, smoothing_sigma=0.004, zscore_per_tetrode=True)` | `detectors.py` | per-tetrode Hilbert envelope → per-tetrode Gaussian smoothing → per-tetrode z-score over the epoch (Y7, flag) → median across tetrodes. `(n_time, n_tetrodes)` in, `(n_time,)` out; sibling of the Kay trace |
-| `Yu_ripple_detector(time, filtered_lfps, speed, sampling_frequency, speed_threshold=4.0, minimum_duration=0.020, percentile=99.99, smoothing_sigma=0.004, close_ripple_threshold=0.0, normalization_mask=None, normalization_time_range=None, bins="fd", zscore_per_tetrode=True)` | `detectors.py` | Kay's keyword interface with `percentile` in place of `zscore_threshold` and additional `bins` and `zscore_per_tetrode` parameters, so Spyglass can pass `ripple_detection_params` straight through. Forward `bins` unchanged to the estimator. Block-wise over contiguous valid LFP (Algorithm step 1); threshold estimated once per call |
+| `estimate_noise_threshold(values, percentile=99.99, histogram_edges=None, mode_smoothing_window=11)` | `core.py` | transliteration of `jy_variableripthreshold_corecalculation`: fixed-grid histogram → smoothed-histogram mode → mirrored histogram → threshold one bin past the CDF crossing. Pure, array-in/scalar-out, no LFP concepts. `histogram_edges=None` means the original grid `np.arange(-10, 50 + 0.01/2, 0.01)`; returns the threshold and, on request, the diagnostic (edges, counts, mode) |
+| `get_Yu_ripple_consensus_trace(filtered_lfps, sampling_frequency, smoothing_sigma=0.004, zscore_per_tetrode=True, *, time=None)` | `detectors.py` | One call per epoch: envelope and smoothing within valid blocks, then pooled epoch-wide tetrode z-scores (Y7), then median. `(n_time, n_tetrodes)` in, `(n_time,)` out with unavailable rows retained as NaN. `time` identifies timestamp gaps; omission declares a regular sample grid |
+| `Yu_ripple_detector(time, filtered_lfps, speed, sampling_frequency, speed_threshold=4.0, minimum_duration=0.020, percentile=99.99, smoothing_sigma=0.004, close_ripple_threshold=0.0, normalization_mask=None, normalization_time_range=None, zscore_per_tetrode=True)` | `detectors.py` | Kay's keyword interface with `percentile` in place of `zscore_threshold` and an additional `zscore_per_tetrode` parameter, so Spyglass can pass `ripple_detection_params` straight through. The histogram grid and mode smoothing are method constants, not parameters. Pass the full epoch and `time` to the consensus helper; estimate the threshold on the raw consensus (Algorithm step 2); extract events separately within valid blocks |
+| `_extract_Yu_ripple_events(trace, time, sampling_frequency, minimum_duration, threshold)` | `detectors.py` | Private helper for one contiguous block of normalized consensus: integer run-length qualification and mean-crossing extension under Algorithm step 4; leaves existing detectors' duration conventions intact |
 
 The canonical whole-event immobility rule (Y5) is **not** part of the package function:
 it is substrate applied to every inventory after detection and lives in
@@ -182,7 +210,7 @@ the package's own test suite, with no Spyglass fixtures required.
 ## Producing the inventory
 
 1. **Package.** Branch the local clone from its current development head, add the three
-   functions and their tests, and record the commit.
+   public functions, private extraction helper, and their tests, and record the commit.
 2. **Pin.** Add `ripple_detection` as a direct git dependency of the project at that
    commit. Today the project only receives it transitively through Spyglass at 1.7.0;
    the pin also picks up the commits the clone is ahead by, which is a deliberate
@@ -208,11 +236,11 @@ the package's own test suite, with no Spyglass fixtures required.
 4. **Parameter row.** Insert `ripple_param_name = "yu_2017"` with
    `ripple_detection_algorithm = "Yu_ripple_detector"`, `speed_name = "head_speed"`, and
    `ripple_detection_params = {"speed_threshold": 4.0, "minimum_duration": 0.020,
-   "percentile": 99.99, "smoothing_sigma": 0.004, "bins": "fd",
-   "zscore_per_tetrode": True}`. Record the bin rule,
-   realized histogram edges, selected mode, threshold, and NumPy version in the epoch's
-   diagnostic artifact/manifest. Any sensitivity variant (V-Y3, the robustified mode,
-   the squared-envelope check) is its own named row.
+   "percentile": 99.99, "smoothing_sigma": 0.004, "zscore_per_tetrode": True}`.
+   Record the histogram grid,
+   realized histogram edges, selected mode, threshold, tetrode normalization statistics,
+   normalization population, and NumPy version in the epoch's diagnostic artifact/manifest.
+   Any later sensitivity variant uses its own named row.
 5. **Populate and read back.** Populate `RippleTimesV1` for the CA1 group with that
    parameter name; extend `get_ripple` to accept `ripple_detector_name = "Yu"` mapped to
    that row, alongside the existing Kay mapping. Then apply Y5 project-side and key the
@@ -223,65 +251,120 @@ the package's own test suite, with no Spyglass fixtures required.
 One check when wiring step 5: assert that the `LFPBandV1` frame handed to the detector
 carries exactly the `RippleLFPSelection` electrodes for the CA1 group, since the Kay path
 in the loader has assumed so without asserting it.
+Record electrode/tetrode identities, the number of distinct detecting tetrodes, and
+whether anatomical metadata verifies at least three in or near the CA1 cell layer.
+Use `true`, `false`, or `unknown` for `meets_published_tetrode_criterion`; a CA1 group
+name alone is insufficient verification. Report any departure from that published
+recording condition alongside the inventory, without silently changing the shared cohort.
+
+Under Y8, propagate available upstream artifact masks into LFP availability before
+processing and record their provenance. Without such a mask, record its absence and
+retain finite samples; the initial detector adds no numerical amplitude clipping.
+Any row invalid on a selected channel is unavailable for the consensus. Do not zero-fill
+it or change the montage within the epoch. This differs from the wrapper's artifact
+patch and `nanmedian` handling and is part of the shared-input adaptation.
 
 ## Algorithm
 
-1. Consensus envelope via `get_Yu_ripple_consensus_trace`: per-tetrode Hilbert envelope
-   of the 150–250 Hz band, each smoothed with a 4 ms Gaussian and z-scored over the
-   epoch (Y7), then the median across tetrodes.
+1. Call `get_Yu_ripple_consensus_trace` **once for the entire epoch**, passing `time`.
+   Within each contiguous valid block, take each tetrode's Hilbert amplitude envelope
+   of the 150–250 Hz band and smooth it with a 4 ms Gaussian. Retain the smoothed
+   per-tetrode arrays on the original time axis. Then compute each tetrode's mean and
+   sample standard deviation (`ddof=1`, matching the wrapper) across **all valid blocks
+   of the epoch**, including movement. Apply those same statistics to every block
+   before taking the median across tetrodes (Y7). With `zscore_per_tetrode=False`, take
+   the median of the smoothed envelopes directly. Invalid rows stay NaN in both cases.
    **Missing LFP is handled by block, not by row-dropping.** The package's
    `_preprocess_detector_inputs` drops every row with a NaN channel and hands the
    compressed time axis downstream, so smoothing runs across the gap and
    `segment_boolean_series` measures duration across it as if it were contiguous: two
    short exceedances on either side of missing data can merge into one qualifying event.
-   Instead, split the epoch into maximal contiguous blocks of valid samples, run steps
-   1, 4 and 5 within each block, and never let an event span missing LFP. Detect both
+   Split the epoch into maximal contiguous blocks for envelope calculation, smoothing,
+   and event extraction (steps 4 and 5), never for separate normalization. Detect both
    non-finite rows and timestamp gaps, including disjoint intervals concatenated by
    Spyglass; retained adjacent rows need not be adjacent samples. The noise
-   threshold (step 3) is estimated once per epoch from the immobility samples of all
+   threshold (step 2) is estimated once per epoch from the immobility samples of all
    blocks. The same row-dropping applies to the existing Kay inventory as run through
    Spyglass; see the note under Unverified assumptions.
-2. Normalize with `normalize_signal(..., normalization_mask=speed < 4)` — z-scored to
-   immobility.
-3. `estimate_noise_threshold(..., percentile=percentile, bins=bins)` on the
-   immobility-restricted values:
-   a. `counts, edges = np.histogram(values, bins=bins)`, with no range clipping;
-      `j = np.argmax(counts)` and `m = (edges[j] + edges[j + 1]) / 2` (V-Y3);
-   b. reflected sample `{x : x ≤ m} ∪ {2m − x : x ≤ m}` (V-Y2);
-   c. return `np.percentile(reflected, percentile, method="linear")`, with 99.99 retained.
-4. `threshold_by_zscore(trace, time, minimum_duration=0.020, zscore_threshold=threshold)`
-   — exceedance for ≥ 20 ms, boundaries extended to mean crossings.
+2. `estimate_noise_threshold` on the **raw** consensus values (median of per-tetrode
+   z-scores, step 1) at all finite samples with finite speed < 4 cm/s, across all
+   blocks. This is the original's `powervals` and its units; the grid below is only
+   meaningful in those units, so the estimator must run **before** any further
+   normalization. Transliterating `jy_variableripthreshold_corecalculation`:
+   a. `edges = -10:0.01:50`; `counts = histc(values, edges)` — left-closed bins, the
+      last bin counting values exactly equal to 50; values outside the grid are
+      dropped, and their fraction is recorded (Failure behaviour);
+   b. `smoothed = smooth(counts, 11)` — centred 11-point moving average with shrinking
+      symmetric windows at the ends; `j = first argmax(smoothed)`; `m = edges[j]`;
+   c. mirrored histogram: the bins with `edges ≤ m` keep their **raw** counts; each bin
+      with `edges < m` is reflected to `2m − edges` with its raw count (Y3, V-Y2); the
+      union is sorted by position;
+   d. `cdf = cumsum(mirrored counts) / total`; `k = first index with cdf ≥ 1 − 1e-4`;
+      the threshold is the position of bin `k + 1`, i.e. one bin past the crossing;
+   e. also record the immobility mean `baseline` and sample SD `stdev` of `values`, as
+      the original does for `extractevents` and `maxthresh`.
+   The original also computes and discards two alternatives (the last empty mirrored
+   bin; a Gaussian fit at 2.5758 SD); neither is ported.
+3. Normalize the consensus with `normalize_signal` once across the epoch, using the same
+   immobility sample as step 2, so the immobility mean is zero and the SD is one for the
+   package's boundary extension. Convert the threshold to those units,
+   `threshold_z = (threshold − baseline) / stdev`, and use it as `zscore_threshold`.
+   Thresholding the raw trace at `threshold` with a return to `baseline` and
+   thresholding the normalized trace at `threshold_z` with a return to zero select
+   identical samples, so the package's `threshold_by_zscore` is reused unchanged.
+   Preserve the time axis and unavailable rows.
+4. Run `_extract_Yu_ripple_events` within each valid block. Set
+   `n_min = max(1, floor(minimum_duration * sampling_frequency + 0.5))`, matching the
+   lab wrapper's positive-number rounding. Qualify a consecutive run at or above the
+   threshold when its sample count is at least `n_min`: 20 samples at 1 kHz or 30 at
+   1.5 kHz for the retained 20 ms setting. Extend to the containing run strictly above
+   the immobility mean (zero after step 2), and emit that containing run only once if
+   several qualifying exceedances share it. Use the first and last included samples'
+   native timestamps as event bounds. A return to or below the mean ends a run.
+   At an epoch or missing-data edge, truncate to the available block and flag the
+   clipped boundary. Require a finite threshold strictly above the baseline; otherwise
+   the threshold/mean-crossing rule is not well-defined and the run fails explicitly.
+   Record the longest qualifying run's sample count and its duration
+   `count / sampling_frequency` separately from `event_end_s - event_start_s`; do not
+   add a sample width to overlap bounds or reproduce the MATLAB wrapper's
+   one-based-index timestamp offset.
 5. `exclude_movement` at 4 cm/s (package parity), then `exclude_close_events`, then
-   event stats.
+   event stats. Any duration-dependent Yu statistics, including `max_thresh`, use
+   the same sample-count convention as selection; shared package stats must not
+   silently reintroduce the first-to-last duration test.
 6. Canonical whole-event immobility (Y5): drop any event with a non-finite speed sample
    or a sample at or above 4 cm/s anywhere inside it, via `event_speeds_are_immobile` on
    the speed trace over the event interval. Record how many events step 5 passed and
    step 6 removed.
 
-Step 3's sample size matters and is worth stating: at our 1 kHz, an epoch with 20
-minutes of immobility gives ~1.2 M samples, roughly half below the mode, so the reflected
-sample has ~1.2 M values and the 99.99th percentile is its ~120th largest — comfortably
-resolved. Epochs with little immobility will not resolve it, which is a failure condition
+Step 2's sample size matters and is worth stating: at our 1 kHz, an epoch with 20
+minutes of immobility gives ~1.2 M samples, roughly half below the mode, so the mirrored
+histogram holds ~1.2 M counts and the `1 − 1e-4` crossing sits ~120 counts from its top —
+comfortably resolved. Epochs with little immobility will not resolve it, which is a failure condition
 rather than a degraded estimate (see below).
 
 ## Testing
 
 | test | what it protects |
 |---|---|
-| Threshold recovery: on a **symmetric** synthetic distribution with no signal component, `estimate_noise_threshold` returns the true analytic percentile | The estimator itself, independent of LFP |
-| Mirroring a histogram vs mirroring samples converge to the same percentile as bins are refined, on both a symmetric and a skewed distribution | V-Y2 is a numerical choice, not a change of estimate |
+| Threshold recovery: on a **symmetric** synthetic distribution with no signal component, `estimate_noise_threshold` returns the true analytic percentile to within one grid bin | The estimator itself, independent of LFP |
+| Parity with the original: on a stored immobility sample, the Python estimator returns the same threshold as `jy_variableripthreshold_corecalculation` run in MATLAB (reference value stored with the fixture; the discarded Gaussian-fit branch is the only Curve-Fitting-Toolbox dependency and does not affect the returned threshold) | Y2 — the transliteration is exact, not approximate |
+| Reflection: with every left bin ≤ 0, `2m − b` and the original's `abs(b) + 2m` give identical thresholds; with a positive mode they differ, and the implementation warns on `m > 0` and returns the correctly reflected threshold | Y3 / V-Y2 — ours equals the original where the original was run |
 | Support bound: on a Rayleigh sample with no signal, the estimate lies below `2m − min(x)` and far below the true percentile; record the ratio | The inherited assumption. A characterization test that records the bias, not a pass/fail |
 | Consensus trace: median across tetrodes of individually smoothed envelopes; a large ripple on one of N tetrodes moves the median far less than it moves the Kay root-sum-of-squares trace | Y4 — the aggregation is Yu's, not Kay's |
 | Per-tetrode z-scoring: with one tetrode's envelope scaled by 10×, the flag on gives the same consensus as with unit scaling, the flag off does not | Y7 — the flag does what it claims |
+| Blocks with different means/variances use one pooled epoch mean and sample SD per tetrode, matching a reference built from separately smoothed blocks; movement contributes to these statistics but not the subsequent immobility normalization | Gaps cannot silently change the normalization population |
 | Whole-event immobility: an event with one interior sample ≥ 4 cm/s, or a NaN speed sample, or an endpoint at exactly 4 cm/s, passes `exclude_movement` and is removed by step 6 | Y5 — parity with the canonical rule the other inventories use |
 | Contaminated left flank: record how below-mode contamination changes the mode and threshold | The noise-only-flank assumption; the direction is measured rather than prescribed |
-| Mode sensitivity: threshold as a function of bin rule, across plausible defaults | V-Y3, V-Y4 |
+| Grid sensitivity: threshold at grid widths 0.005, 0.01, 0.02 on synthetic noise, recorded not asserted; the smoothed-histogram mode differs from the raw argmax on a noisy histogram and matches it on a smooth one | V-Y3, V-Y4 — characterization of fixed choices |
 | Synthetic LFP with planted ripples at known times and amplitudes: recovery and false-positive rate | End-to-end detection |
 | Pure-noise LFP: characterize detections after median aggregation, smoothing, reflection, and the duration rule | The nominal percentile of a reflected distribution is not a guaranteed event false-positive rate |
-| Boundaries extend to mean crossings, not to threshold crossings; 20 ms minimum applies to the **exceedance**, not the extended event | Convention parity with the published rule |
-| Degenerate inputs: all-NaN channels, no immobility samples, too few immobility samples to resolve the percentile, mode at the histogram edge | Failure behaviour below |
-| Histogram configuration: default and explicit `bins="fd"` agree; fixed inputs reproduce edges, midpoint mode, and threshold, including tied maxima | V-Y3 is a reproducible choice |
-| Spyglass pass-through: the parameter dict with `percentile` and `bins` yields the same frame as a direct call; a non-default bin count reaches the estimator unchanged | The signature contract and configuration path |
+| At 1 kHz, 19 consecutive qualifying samples fail and 20/21 pass; at 1.5 kHz, 29 fail and 30 pass; fractional-sample durations use the declared positive rounding | The sample-count convention, including the package/MEX difference |
+| Qualifying exceedances sharing one above-mean run produce one event; equality to the mean ends the run; native sample timestamps define bounds and clipped block edges are flagged | Mean-crossing extension and explicit timestamp conventions |
+| An upstream artifact mask removes coverage without zero-filling or changing the montage; its absence is recorded and adds no 2000-unit clipping | The declared project artifact policy, separate from the later wrapper |
+| Degenerate inputs: all-NaN channels, no immobility samples, too few immobility samples to resolve the percentile, mode at the histogram edge, more than the stated fraction of values outside the grid | Failure behaviour below |
+| Grid semantics: default edges equal `-10:0.01:50`; a value of exactly 50 is counted and a value of 50.001 is dropped; tied smoothed maxima select the first; the threshold is one bin past the crossing | V-Y3, V-Y4 — `histc`, `smooth`, and `find(..., 1, 'first') + 1` transliterated |
+| Spyglass pass-through: the parameter dict with `percentile` and `zscore_per_tetrode` yields the same frame as a direct call | The signature contract and configuration path |
 | Missing-LFP gap: two sub-minimum exceedances separated by a NaN gap or timestamp gap yield **no** event, and an exceedance that reaches a gap edge ends there | Block-wise processing; no event spans missing LFP |
 
 Tests live in the package: `tests/test_core.py` for the estimator, `tests/test_detectors.py`
@@ -302,17 +385,30 @@ loader raises if the `"Yu"` parameter row is absent rather than substituting Kay
   before estimating.
 - Mode at the first or last histogram bin: raise. A mode at the edge means the reflected
   distribution is degenerate and the threshold is meaningless.
+- Positive mode: **warn** and proceed with the correct reflection `2m − b`. This is the
+  one case where the original's `abs(b) + 2m` would have given a different (higher)
+  threshold; the warning names the epoch and the mode, the manifest records both, and
+  04 reports how often it occurred. Ours is then the method as intended, not what the
+  original code would have produced on that epoch (V-Y2).
+- Values outside the `[-10, 50]` grid: the original drops them silently. Record their
+  fraction per epoch and raise above a stated ceiling (1e-3), since a heavy out-of-grid
+  tail means the trace is not in the units the grid assumes.
+- Non-finite or non-positive tetrode SD when z-scoring is enabled, or too few valid
+  samples to compute it: raise rather than silently dropping the tetrode.
+- A non-finite threshold or one at or below the immobility baseline: raise and record
+  the diagnostic values; do not substitute a different threshold or baseline.
 - No immobility at all in the epoch: return an empty event table with correct columns,
   matching the convention elsewhere in the pipeline.
 
 ## Unverified assumptions
 
-1. **"Envelope power."** The consensus is a median of Hilbert *envelopes*; the threshold
-   is then set on "consensus envelope power." Whether "power" means the envelope or its
-   square is not stated. The design uses the envelope. Squaring is monotone but
-   non-linear, so it moves the mode and the mirrored support bound; retain it as a
-   possible later sensitivity check. (The 150–250 Hz band and the 4 ms per-tetrode
-   smoothing are stated in the paper and are no longer assumptions.)
+1. **Which flags the 2017 analysis ran with.** The recovered driver takes `useenvelope`,
+   `normeachtet`, and `adaptivefilt` from its caller with no defaults, so the paper's
+   settings are not recoverable from source. The retained reading — unsquared envelope,
+   per-tetrode z-scoring, no adaptive filter — is the 2019 wrapper's, supported by the
+   preprocessing code (`filtereeg2.m` stores `abs(hilbert(...))`). The threshold
+   estimator itself is no longer a reconstruction: it is transliterated from the
+   recovered `jy_variableripthreshold_corecalculation.m` (Algorithm step 2).
 2. **Whether the existing Kay inventory is affected by row-dropping.** `RippleTimesV1`
    calls `Kay_ripple_detector`, which drops NaN rows before smoothing and segmentation.
    Whether the ripple-band LFP handed to it contains interior NaN runs or timestamp
@@ -320,6 +416,7 @@ loader raises if the `"Yu"` parameter row is absent rather than substituting Kay
    bridge missing data and are flagged and excluded from comparison matches under 03's
    availability rule; if it does not, the issue is moot for inventory 1. Check both
    interior NaN runs and departures from the expected sample spacing per session.
-The lab wrapper resolves two earlier entries: the noise sample is taken from
-immobility-restricted consensus values only, and the paper's per-day estimation is
-what the lab code does; per-epoch is our decision (Y6), not a reading of the paper.
+
+The wrapper uses immobility-restricted consensus values for its noise sample and pools
+them across run epochs of a day, consistent with the paper's per-day description.
+Per-epoch estimation is our adaptation (Y6), not a reading of the paper.
