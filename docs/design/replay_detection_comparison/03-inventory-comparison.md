@@ -28,6 +28,40 @@ and are never compared across detectors as if they meant the same thing.
 
 **No inventory is a truth set.** The word "detected" is always qualified by which detector.
 
+## Observation availability
+
+Each inventory also exports an observation-interval table, keyed by `animal`, `day`,
+`epoch`, `brain_area`, `detector`, and `run_id`, with interval bounds, availability,
+and an exclusion reason where unavailable. It partitions the epoch into observed and
+unavailable intervals independently of whether any events were detected. A successfully
+evaluated interval with no detections is observed; a missing artifact or failed run is
+unavailable. Zero spikes during a verified recording interval are valid observations.
+
+Construct availability from the required recordings, timestamps, position/speed, and
+model outputs. Split at both non-finite samples and timestamp gaps; do not interpolate
+availability across missing data. Include each detector's required input support: an
+80 ms window is evaluable at its midpoint only if its full support is available, so
+window edges and gaps can reduce observation time. A failed amplitude, probability,
+sequence, or significance criterion is a detection outcome, not missing coverage.
+Record the source masks and timing conventions in the manifest.
+
+Intersect each detector's observed intervals with the shared finite-speed < 4 cm/s
+eligibility mask to obtain its comparison exposure, `E_d`. A comparison involving a
+set of detectors uses the intersection of their exposures. Pairwise summaries use
+`E_A ∩ E_B`; six-detector exclusivity and no-detector time use all six exposures.
+Report the exposure duration and excluded time by reason for each comparison. Empty
+shared exposure produces an unavailable summary, not a zero rate or zero overlap.
+
+For event-count denominators, require the source event's entire native interval to lie
+within the shared exposure. Retain excluded events with an availability flag; do not
+clip, split, or re-detect them to qualify. A confirmed overlap can still use a valid
+counterpart event that extends beyond the shared exposure, since that event was
+observed; it need not qualify for the reverse direction's denominator. Cached events
+that bridge their own detector's unavailable data are flagged and excluded from
+comparison matches; mark their full spans unavailable pending corrected detection,
+so discarding a corrupt event cannot create an apparent non-detection. Clip event
+unions to shared exposure only for **time coverage**.
+
 ## Matching and counting
 
 Build a table of **every** strict positive-duration overlap pair between every pair of
@@ -41,9 +75,10 @@ neither pairs nor overlap lengths, so pairing operates on the canonical interval
 
 **Denominators are per-detector.** Report, for each ordered pair of detectors, the
 proportion of detector A's events overlapping any event of detector B, and the reverse.
-Each event contributes once to its own denominator regardless of how many matches it
-has. Show overlap-length and IoU distributions so a one-sample edge contact is not
-counted as agreement with a fully coincident event.
+Each fully observed source event contributes once to its direction's denominator
+regardless of how many matches it has. Keep availability flags on the pair table and
+report excluded event counts. Show overlap-length and IoU distributions so a one-sample
+edge contact is not counted as agreement with a fully coincident event.
 
 **Fragment-merge recount.** Our detector can split one replay into several events when
 the non-local probability dips below threshold. Provide a recount in which our events
@@ -56,6 +91,7 @@ do not bridge movement or missing samples. These are secondary accounting interv
 not a replacement detected cohort.
 
 **Also report time coverage** of the intersection and union of each pair of cohorts.
+Express fractions relative to that pair's shared exposure, with its duration shown.
 Coverage is less sensitive to segmentation than event counts, and the two can disagree —
 one detector splitting an event into three does not change the time it accounts for.
 
@@ -79,7 +115,11 @@ The cells of most interest are the ones no pairwise table reaches:
   field pipelines would not have found at all. This is the neither-ripple-nor-burst
   cell, distinct from ripple-less (overview): an MUA-matched, SWR-unmatched sequence is
   ripple-less but not in this cell.
-- **Time accounted for by no detector**, as the denominator that makes the rest legible.
+- **Time accounted for by no detector**, with total shared exposure as its denominator.
+
+These cells require observation by every detector whose absence is asserted. Incomplete
+coverage yields unknown membership, not an unmatched or no-detector result; report it
+separately. No-detector time is shared exposure minus the union of detected intervals.
 
 ## The SWR label matrix
 
@@ -87,6 +127,13 @@ Distinct from the inventory comparison above, and the reason level 3 needs no se
 sweep (overview X6). Each *sequence* cohort — ours and the memoryless one — is labelled
 under each of the three SWR definitions, giving a cohort × SWR-definition matrix of
 non-SWR fractions.
+
+Labels are `SWR`, `non-SWR`, or `unknown`. Incomplete observation over a sequence's
+native interval yields `unknown`, with any observed overlap retained in the pair table
+for diagnostics. For the matrix, restrict each sequence cohort to events fully within
+its exposure intersected with all three SWR exposures, so all three fractions use the
+same events. Report the eligible denominator and exclusions alongside the fractions;
+unknown labels never count as non-SWR.
 
 A non-SWR fraction is a function of the SWR definition as much as of the events, so it is
 never reported without its definition attached. Where the three definitions disagree
@@ -120,8 +167,10 @@ not substitute for threshold robustness.
 All main summaries show per-session values and animal-level consistency, with sessions
 nested within animal; pooled event summaries are descriptive. Report native duration
 distributions before any duration-stratified comparison, since longer intervals have more
-opportunity to overlap anything. Report missing features and skipped epochs explicitly —
-model and data availability define the paired analysis population.
+opportunity to overlap anything. Report native counts alongside comparison-eligible
+counts, missing features, and skipped epochs. Rates use counts qualified for their
+corresponding observation exposure; availability within epochs also defines the paired
+population.
 
 ## Testing
 
@@ -136,10 +185,16 @@ model and data availability define the paired analysis population.
 | `interval_span_s` is computed identically for every inventory, and native duration fields are never substituted for it | The convention mismatch between cohorts |
 | An event at an epoch boundary is not matched across epochs | Session scoping |
 | Empty inventories carry the schema's dtypes, not object, so concatenation across epochs preserves column types | The canonical builder's empty return is all-object |
+| A sequence during missing LFP has unknown SWR status and exclusivity; NaN runs and missing timestamps both remove coverage | Missing observations cannot masquerade as non-detection |
+| Complete data with zero detections remains observed; missing outputs and zero shared exposure yield unavailable summaries | Empty inventories differ from failed or unobserved runs |
+| An event crossing a coverage boundary is excluded from its count denominator without changing its bounds; a valid counterpart crossing that boundary still supplies an overlap for an eligible source event | Directional denominators and native timing remain consistent |
+| An 80 ms window overlapping a data gap has unavailable midpoint coverage; no-detector time and baseline windows exclude it | Observation support includes the detector's input window |
+| The SWR matrix uses the same eligible sequence events across its three columns and excludes unknown labels | Definition changes are not confounded with differing availability |
 
 ## Deliverables
 
-1. The six inventories on the common schema, with per-detector counts and rates.
+1. The six inventories and their observation-interval tables, with native and eligible
+   counts, exposure durations, rates, and exclusions.
 2. The all-pairs overlap table and the per-detector denominators.
 3. The single-detector and no-detector cells, including SWRs with no detected sequence and
    sequences no triggered pipeline found.

@@ -61,6 +61,10 @@ under our canonical whole-event rule (< 4 cm/s), retaining the per-bin gates nee
 candidate assembly. Running each method under its native speed gate is a **deferred
 control** (03) if needed to explain a particular difference.
 
+Shared epochs alone do not guarantee shared observation time. Every inventory carries
+the availability intervals defined in 03; comparison denominators use shared valid,
+speed-eligible exposure. Missing coverage produces unknown labels, not non-detections.
+
 Everything downstream of that is method-internal and must not be blended. Concretely,
 and these are live hazards rather than hypotheticals:
 
@@ -167,6 +171,7 @@ Method-specific decisions live in the component specs. These apply across the co
 | **X8** | Each cohort gets its own key; cohorts relate only by temporal overlap, never by shared ids | `event_id` hashes are cohort-dependent, so a shared key would mis-join silently (CLAUDE.md on atomic regeneration) |
 | **X9** | Record the primary configuration and analyses; report all primary contrasts symmetrically and label subsequent exploratory analyses | Objectivity depends on fair measurements and reporting, not on a frozen list of expected weaknesses. Keep original results and any changes traceable |
 | **X10** | Retain threshold robustness as a planned follow-up after the default-setting report, beginning with a small cost pilot | Reuse valid cached work, measure the expensive re-decoding/shuffle costs, and choose a limited scope before expanding. Until run, robustness to thresholds is unassessed |
+| **X11** | Record observation availability for every detector and use shared exposure for comparisons (03) | Missing recordings, window support, or outputs must not create apparent detector-only events or ripple-less labels |
 
 ## Reference material
 

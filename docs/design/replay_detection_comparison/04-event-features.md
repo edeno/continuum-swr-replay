@@ -47,7 +47,8 @@ original report and settings identifiable; do not silently replace unfavorable r
 ### Event features
 
 For shared events, each method's unmatched events, and sequences matched by neither SWR
-nor MUA, report:
+nor MUA, determine membership using shared observation time as in 03. Report unavailable
+comparisons separately. For these populations, report:
 
 - **Timing:** interval span, native duration, and separation from nearby events.
 - **Population engagement:** spike count, active tetrode count, and spike rate.
@@ -86,10 +87,12 @@ all intervals where it is defined. Do not compare a remote maximum for SWRs agai
 trajectory-constrained score for our events as if they were the same statistic.
 
 Score baseline windows with the same rule. Select them outside the union of the default
-inventories during eligible immobility, matching session, duration, and animal location
-where feasible; report matching failures. Do not reuse the QA script's low non-local
-probability condition as a model-neutral definition of baseline. These windows are a
-reference population, not known negatives. Both the remote maximum and event selection
+inventories within all six detectors' shared observation exposure during eligible
+immobility, with each full baseline window contained in that exposure. Match session,
+duration, and animal location where feasible; report matching failures. Do not reuse the
+QA script's low non-local probability condition as a model-neutral definition of
+baseline. These windows are a reference population, not known negatives. Both the remote
+maximum and event selection
 can favor large scores, and silence can carry likelihood structure: a positive score or
 an excess over baseline is not a calibrated declaration of replay.
 
@@ -101,9 +104,10 @@ not known true boundaries of a representation.
 
 For ours-only activity, retain every comparator rejection reason: window gates, failure
 to assemble a candidate, duration or dispersion, whole-event speed, or shuffle failure
-or untestability. Report the adapted memoryless cohort before and after shuffle filtering
-as required by 02; its graph statistics and encoding-pair null do not reproduce the
-published sorted-cell method exactly.
+or untestability. Unavailable comparator inputs or outputs are recorded separately as
+unknown comparisons, not rejection reasons. Report the adapted memoryless cohort before
+and after shuffle filtering as required by 02; its graph statistics and encoding-pair
+null do not reproduce the published sorted-cell method exactly.
 
 For comparator-only activity, examine our state probabilities, common spike evidence,
 and any shorter constituent events. Distinguish boundary/segmentation differences from

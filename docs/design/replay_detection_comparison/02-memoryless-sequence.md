@@ -381,7 +381,8 @@ Table `memoryless_event_table`, one row per detected candidate sequence (D2).
   reported, not used as a criterion)
 - **Speed (cm/s)** — `max_speed`, `mean_speed`, `whole_event_speed_eligible`
 - **SWR** — `is_swr`, `overlap_class`, `overlap_subclass`, `n_swrs_overlapping`,
-  `matched_swr_event`, `matched_swr_start`, `matched_swr_end`
+  `matched_swr_event`, `matched_swr_start`, `matched_swr_end`; nullable under 03's
+  observation-availability rule, with unavailable labels recorded as unknown
 - **Shuffle** — `shuffle_observed_spread_cm`, `shuffle_observed_jump_cm`,
   `p_spread`, `p_jump`, `shuffle_testable`, `shuffle_pass`, `n_shuffles`;
   retain each draw's two scores in a sidecar for the pilot/null-distribution audit
@@ -390,6 +391,9 @@ Timing column names mirror the canonical event table so comparison code is symme
 `ms_event_id` is deliberately a different key from `event_id` (D6).
 The run manifest records model/artifact hashes, code versions, thresholds, time grid,
 encoding/training provenance, shuffle definition/seeds/scoring conventions, and any skipped epochs.
+Export 03's observation intervals from input and output availability before applying
+detection gates, accounting for full window support at edges and gaps. An empty event
+table alone cannot distinguish an observed interval from a failed or unavailable run.
 Retain per-window statistics and individual gate masks, pre/post-merge candidates,
 and candidate rejection flags in diagnostic outputs; accepted events alone cannot
 explain why a detector rejected activity. These outputs are scientific diagnostics,
