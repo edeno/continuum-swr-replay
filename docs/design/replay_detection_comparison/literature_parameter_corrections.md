@@ -4,7 +4,7 @@
 [literature_detection_parameters.csv](literature_detection_parameters.csv), what was
 changed, and what remains unverified. Checked 2026-09-21 against the papers' Methods.*
 
-Both the CSV in this directory and the Google Sheet it came from carry the 43
+Both the CSV in this directory and the Google Sheet it came from carry the 45
 corrections below. They were compared cell by cell afterwards and agree exactly across
 all 54 rows and 28 columns.
 
@@ -58,6 +58,8 @@ paper that could not be retrieved.
 | 1 | Mallory 2025 | Trajectory | MAP | Posterior center of mass | The authors' code takes the decoded position as `binDecoding.posteriorCOM` (`compute_filtering_binDecoding_cm.m`); `posteriorPeak` is a separate quantity used for filtering |
 | 46 | Gupta 2010 | Min. duration (ms) | #N/A | 40 | "the sequence score of place cell activity within a flexible time window (40 ms to 600 ms, to accommodate longer sequences)" |
 | 46 | Gupta 2010 | Max duration (ms) | #N/A | 600 | Same sentence; the window grows until five steps pass without a score increase, or it reaches 600 ms |
+| 16 | Igata 2021 | Min. duration (ms) | 60 | 50 | "Candidate synchronous events in which the duration was less than 50 ms or more than 2000 ms were excluded". The 60 ms belongs to a later stage: "Trajectory sequences covering more than 4 time bins (60 ms) and a cumulative distance of more than 20 cm were included" |
+| 16 | Igata 2021 | Min. cells | 4 | >4 | "Candidate synchronous events were detected when the z-scored spike rates exceeded 2 and the number of active neurons exceeded 4", so the minimum is five |
 | 27 | Shin & Jadhav 2019 | SWR electrodes | >1 | 1 | "the envelope stayed above 3 SD of the mean on at least one tetrode" |
 | 2 | Yang 2024 | Reconstruction error (cm) | 1.51 | Not reported | "1.51, 4.07, and 5.34 mean error for real, simulated, and shuffled data" is trial-decoding error in trial blocks, not a position error in cm |
 | 15 | Michon 2021 | Position bin (cm) | 1 | 4 | "the posterior probability distribution over position (sampled at a regular grid with 4 cm spacing)"; 1 cm is the sorted-unit tuning-curve bin |
@@ -101,17 +103,24 @@ are not cited without a check.
   search in at least Muessig 2019, Drieu 2018, Ólafsdóttir 2017, Yamamoto 2017, and
   Ólafsdóttir 2015. None of those papers uses the word. If that is the intended
   shorthand, define it in the sheet.
-- **Stage mixing.** Where a paper detects a sharp wave and a ripple separately, the row
+- **Stage mixing.** Igata 2021 is a second case: its minimum duration had been taken
+  from the trajectory-sequence stage rather than the event stage.
+
+- **Stage mixing, continued.** Where a paper detects a sharp wave and a ripple separately, the row
   can take its minimum duration from one stage and its maximum from the other, as in
   Harvey 2023.
 
 ## Papers that could not be retrieved
 
 Every cell in these rows is unverified, which is not the same as confirmed: Krause 2022 (10), Gridchyn 2020 (17), Xu 2019 (21), Michon 2019 (25), Berners-Lee
-2021 (12), Pfeiffer & Foster 2015 (40), Lee & Wilson 2002 (52). Diba 2007 (49), Igata 2021 (16),
-Bhattarai 2020 (19) and Farooq 2019 (23) have their detection parameters in supplements
-that could not be retrieved. Gupta 2010 (46) was settled once its supplement was
-supplied: its 2 SD threshold, three active cells, 180-220 Hz band, 3.5 cm pixels, 10 ms
+2021 (12), Pfeiffer & Foster 2015 (40), Lee & Wilson 2002 (52). Diba 2007 (49), Bhattarai 2020 (19) and
+Farooq 2019 (23) have their detection parameters in supplements that could not be
+retrieved. Igata 2021 (16) and Gupta 2010 (46) were settled once their supplements
+were supplied. Igata's confirmed the 2 SD spike-rate threshold, the 15 ms multiunit and
+4 ms ripple smoothing, the 150-250 Hz band across thirteen tetrodes, the 5 cm/s stop
+criterion, the 2000 ms maximum, the Mahalanobis-distance ripple power with its
+Gaussian-mixture split, and the MAP trajectory with its 40 cm jump and 20 cm length
+limits. Gupta's confirmed its 2 SD threshold, three active cells, 180-220 Hz band, 3.5 cm pixels, 10 ms
 stepping, and roughly 10 % of events becoming replays (1719 of 17,593) all check out,
 and the flexible 40-600 ms detection window supplied the two durations above. Michon 2021 (15) and Carey 2019
 (28) were checked against preprints, so the published versions may have drifted.

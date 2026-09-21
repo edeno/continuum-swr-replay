@@ -34,7 +34,7 @@ Michon,Kloosterman,2021,https://doi.org/10.1016/j.cub.2021.07.058,Current Biolog
 extended to 0.5",4,8,5,15,15,#N/A,1-3,140,225,80,#N/A,20,Bayes,10,4,5,Weighted isotonic regression,Clusterless,<30,Not reported
 Igata,Sasaki,2021,https://doi.org/10.1073/pnas.2011266118,PNAS,Rats,"SWR, MUA","MUA and SWR
 Mahalanobis distance used for overall ripple power
-GMM used for ripple power",2,Adaptive,5,15,4,4,>1,150,250,60,2000,,Bayes,20,2,5,MAP,"demarcate events based on:
+GMM used for ripple power",2,Adaptive,5,15,4,>4,>1,150,250,50,2000,,Bayes,20,2,5,MAP,"demarcate events based on:
 MAP distance (<40 cm)
 Trajectory length (>20 cm)",Not reported,Not reported
 Gridchyn,Csicsvari,2020,https://doi.org/10.1016/j.neuron.2020.01.021,Neuron,Rats,MUA,"MUA
