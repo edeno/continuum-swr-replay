@@ -4,7 +4,7 @@
 [literature_detection_parameters.csv](literature_detection_parameters.csv), what was
 changed, and what remains unverified. Checked 2026-09-21 against the papers' Methods.*
 
-Both the CSV in this directory and the Google Sheet it came from carry the 39
+Both the CSV in this directory and the Google Sheet it came from carry the 41
 corrections below. They were compared cell by cell afterwards and agree exactly across
 all 54 rows and 28 columns.
 
@@ -53,7 +53,9 @@ paper that could not be retrieved.
 | 53 | Nádasdy 1999 | Max duration (ms) | 200 | #N/A | 200 ms is the sequence-search template window, not an event duration limit |
 | 19 | Bhattarai 2020 | First author | Bhattari | Bhattarai | CrossRef author: Baburam Bhattarai |
 | 24 | Chenani 2019 | Journal | Nature Communication | Nature Communications | CrossRef container title |
-| 24 | Chenani 2019 | Detection notes | "remained above 3 SD"; "immobility visually inspected" | peak reached 3 SD, boundaries below 1 SD; reward zones defined by visual judgement | "the place cell rate remained at least one standard deviation (SD) above its average during a period when the peak firing rate reached at least three SD"; the visual judgement defined the reward zones, not immobility |
+| 24 | Chenani 2019 | Detection notes | "remained above 3 SD"; "immobility visually inspected" | peak reached 3 SD, boundaries below 1 SD; reward zones defined by visual judgment | "the place cell rate remained at least one standard deviation (SD) above its average during a period when the peak firing rate reached at least three SD"; the visual judgment defined the reward zones, not immobility |
+| 1 | Mallory 2025 | Reconstruction error (cm) | #N/A | 2.9 (track), 3.4 (arena) | "mean +/- SEM positional decoding error per session, linear track: 2.9 +/- 0.1 cm; open arena: 3.4 +/- 0.2 cm" |
+| 1 | Mallory 2025 | Trajectory | MAP | Posterior center of mass | The authors' code takes the decoded position as `binDecoding.posteriorCOM` (`compute_filtering_binDecoding_cm.m`); `posteriorPeak` is a separate quantity used for filtering |
 | 27 | Shin & Jadhav 2019 | SWR electrodes | >1 | 1 | "the envelope stayed above 3 SD of the mean on at least one tetrode" |
 | 2 | Yang 2024 | Reconstruction error (cm) | 1.51 | Not reported | "1.51, 4.07, and 5.34 mean error for real, simulated, and shuffled data" is trial-decoding error in trial blocks, not a position error in cm |
 | 15 | Michon 2021 | Position bin (cm) | 1 | 4 | "the posterior probability distribution over position (sampled at a regular grid with 4 cm spacing)"; 1 cm is the sorted-unit tuning-curve bin |
@@ -103,12 +105,21 @@ are not cited without a check.
 
 ## Papers that could not be retrieved
 
-Every cell in these rows is unverified, which is not the same as confirmed: Mallory 2025
-(row 1), Krause 2022 (10), Gridchyn 2020 (17), Xu 2019 (21), Michon 2019 (25), Berners-Lee
+Every cell in these rows is unverified, which is not the same as confirmed: Krause 2022 (10), Gridchyn 2020 (17), Xu 2019 (21), Michon 2019 (25), Berners-Lee
 2021 (12), Pfeiffer & Foster 2015 (40), Lee & Wilson 2002 (52). Gupta 2010 (46), Diba 2007
 (49), Igata 2021 (16), Bhattarai 2020 (19) and Farooq 2019 (23) have their detection
 parameters in supplements that could not be retrieved. Michon 2021 (15) and Carey 2019
-(28) were checked against preprints, so the published versions may have drifted. Science, Cell Press and the Journal of
+(28) were checked against preprints, so the published versions may have drifted.
+
+Mallory 2025 (row 1) was checked against the paper and the authors' code at
+https://github.com/caitlinmallory/TimeCourseOrganizationOfHippocampalReplay (commit
+`128513a`), which sets every detection parameter explicitly and confirmed all of them:
+`speedThr = 5` cm/s, `num_cells_participating_thr = 10`, `sequence_durationThr = 0.05`,
+`sequence_deltThr = 0.05` for the merge, `windowSizeDecoding_replay = 0.08` with
+`shiftSizeDecoding = 0.005`, `binSize = 2` cm, `sequence_delxThr = 0.4 * maze_size`,
+`replay_weighted_r_thr = 0.6`, `replay_coverage_thr = 0.2`, and
+`replay_posterior_diff_thr = 0.33`, which is the ">66% of the posterior in one
+directional map" criterion. Its 80 ms time bin is a sliding window with a 5 ms step. Science, Cell Press and the Journal of
 Neuroscience all refuse automated requests.
 
 ## How the Sheet was updated

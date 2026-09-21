@@ -148,7 +148,7 @@ Two of these deserve their reasons recorded rather than a bare exclusion:
 
 - **Maboudi et al. 2018** ("Uncovering temporal structure in hippocampal output
   patterns") fits an HMM with 30–50 latent states to population burst events themselves,
-  with no place fields and no behavioural training data, then scores replay as model
+  with no place fields and no behavioral training data, then scores replay as model
   congruence against a transition-matrix shuffle. It is a genuinely different family —
   unsupervised sequence structure with no spatial template — and reports 60.9% event-level
   agreement with Bayesian replay detection. **Deferred, not rejected**: it could run on
