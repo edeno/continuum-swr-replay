@@ -4,9 +4,9 @@
 [literature_detection_parameters.csv](literature_detection_parameters.csv), what was
 changed, and what remains unverified. Checked 2026-09-21 against the papers' Methods.*
 
-Both the CSV in this directory and the Google Sheet it came from carry the 63
+Both the CSV in this directory and the Google Sheet it came from carry the 66
 corrections below, the three papers and seven columns added afterwards, and the
-blank-cell pass at the end. They were compared cell by cell and agree exactly across
+blank-cell and trajectory passes at the end. They were compared cell by cell and agree exactly across
 all 57 rows and 35 columns.
 
 ## Method
@@ -79,10 +79,13 @@ paper that could not be retrieved.
 | 19 | Bhattarai 2020 | Trajectory | Linear regression | Weighted correlation | "We then calculated a weighted correlation (r) ... for each significant replay event"; the paper never uses linear regression |
 | 22 | Farooq 2019 (Neuron) | Reconstruction error (cm) | ~5 cm (inferred from Figure 1J) | 7.6 | "median error in decoded location: 7.6 cm versus 54.3 cm in shuffled datasets" |
 | 28 | Carey 2019 | Place field smooth (cm) | 2 | 3 | "Raw firing rates were smoothed with a sigma = 1 bin kernel" on "approximately 3 cm per bin"; 2 ms is the temporal spike kernel |
-| 42 | Wu & Foster 2014 | Trajectory | MAP | Weighted correlation, MAP | The replay criterion is "absolute weighted correlation > 0.5"; the MAP function cuts the subregion the score is computed on, so both belong |
+| 42 | Wu & Foster 2014 | Trajectory | MAP | Weighted correlation | The replay criterion is "absolute weighted correlation > 0.5". The MAP function only cuts the subregion the score is computed over, so the score itself is the weighted correlation |
 | 44 | Carr & Frank 2012 | SWR electrodes | >1 | 1 | "ripple power (150-250 Hz) on any CA1 tetrode exceeded 3 SD above the mean" |
 | 50 | Ji & Wilson 2007 | Min. cells | 5 | 4 | "a replaying frame necessarily contained at least four active cells"; candidate frames are "those containing at least four active template cells" |
 | 51 | Foster & Wilson 2006 | Animal speed (cm/s) | 5.4 | #N/A | "Fields were velocity-filtered to exclude times when the speed of the animal was below 5.4 cm s-1" is a place-field filter that keeps running periods, not a detection gate |
+| 23 | Farooq 2019 (Science) | Shuffle method | Shuffle (type not stated) | Time-bin shuffle; rate-matched Poisson surrogate; circular space-bin shuffle (stationary frames) | "the time bins within a frame were randomly permuted (time bin shuffle for theta sequences and trajectory sequences)"; the space-bin shuffle "circularly shifted by a random amount between 1 and track length minus 1" is for stationary frames |
+| 23 | Farooq 2019 (Science) | Shuffles | #N/A | 500 | "time-bin shuffles (n=500)", used throughout |
+| 23 | Farooq 2019 (Science) | Significance threshold | #N/A | 97.5th percentile | "significant if the weighted correlation exceeded the 97.5th percentile or was below the 2.5th percentile (for reverse sequences) of the shuffled distributions" |
 
 The Karlsson row matters to this project directly: `Karlsson_ripple_detector`'s 4 cm/s
 default is the package's own, not the paper's, and the paper thresholds on one tetrode,
@@ -195,6 +198,37 @@ Igata 2021, Xu 2019, Pfeiffer 2015 and Ji 2007; `SWR electrodes` for Huelin Gorr
 and Berners-Lee 2022; reconstruction error and percent decoded for Mou 2022 and Chenani
 2019; and Ji 2007's speed and duration limits.
 
+## Trajectory chips
+
+Twelve cells in the Trajectory column were empty. A blank is not a convention there: the
+column is a dropdown, and its options include an explicit `=NA()` entry, so an empty
+trajectory cell asserted nothing. Each of the twelve was checked against its paper.
+
+Three name a method the column can express:
+
+| Row | Paper | Now | Evidence |
+|---|---|---|---|
+| 21 | Xu 2019 | Viterbi | "we then ran an optimization procedure to see which arm produces the maximum summed probabilities across the probability maps representing different time windows", allowing "a jump of up to 20 spatial bins across probability maps of neighboring time windows" |
+| 23 | Farooq 2019 (Science) | Weighted correlation | "a product-moment linear correlation between time and location was computed, weighted by the associated posterior probabilities" |
+| 56 | Maboudi 2018 | Radon transform | "Many (35,000) lines with different slopes and intercepts were sampled randomly... The Bayesian replay score for a given event was the maximum score obtained from all candidate lines, where the score for a particular line was defined as the mean probability mass under the line, within a bandwidth (of 3 cm)" |
+
+Xu's label is ours, not the paper's. The authors call it an optimization procedure, and it
+maximizes a sum of posterior probabilities rather than a sum of log probabilities, but it
+is a best-path search through the posterior under a hard transition bound, which is what
+this column's Viterbi entry distinguishes from a per-bin MAP. Maboudi's line sampling is
+the Davidson and Kloosterman line-finding procedure that the column already records as a
+Radon transform elsewhere, including for Davidson 2009 itself.
+
+The other nine estimate no trajectory from a posterior, so they are now `#N/A`: Chenani
+2019, Liu 2019, Diba 2007 and Foster 2006 score rank-order correlations; Ji 2007, Lee 2002
+and Nadasdy 1999 match templates; Kudrimoti 1999 correlates population vectors. None of
+them decodes a position. Gupta 2010 is the one judgment call. It does reconstruct a
+trajectory, but from spike pairs rather than a posterior, "by cumulating the
+score-maximizing place field from each spike contributing positively to the sequence
+score". Its Bayesian control classifies each replay by which side of the maze holds "the
+largest cumulative probability", which is a side label rather than a trajectory estimate,
+so no entry in this column describes what the paper did.
+
 ## Systematic issues, not single-cell errors
 
 - **Window versus step.** Several "time bin" cells give a sliding-window width whose
@@ -219,9 +253,17 @@ and Berners-Lee 2022; reconstruction error and percent decoded for Mou 2022 and 
 
 ## Papers that could not be retrieved
 
-Every cell in these rows is unverified, which is not the same as confirmed: Krause 2022 (10), Gridchyn 2020 (17), Xu 2019 (21), Michon 2019 (25), Berners-Lee
-2021 (12), Pfeiffer & Foster 2015 (40), Lee & Wilson 2002 (52). Bhattarai 2020 (19) and Farooq 2019 (23) have their
-detection parameters in supplements that could not be retrieved. Igata 2021 (16), Gupta 2010 (46) and Diba 2007 (49) were settled once their
+Every cell in these rows is unverified, which is not the same as confirmed: Krause 2022
+(10), Gridchyn 2020 (17), Michon 2019 (25), Berners-Lee 2021 (12), and Pfeiffer & Foster
+2015 (40). Bhattarai 2020 (19) still has its detection parameters in a supplement that
+could not be retrieved. Xu 2019 (21), Farooq 2019 (23) and Lee & Wilson 2002 (52) were on
+this list until the lab's PDF library supplied them, and the trajectory pass above read
+all three: Xu's 3 SD threshold, 15 ms multiunit kernel, four-cell minimum, 75-750 ms
+duration window, 20 ms windows stepped by 10 ms, 1 cm decoding bins, 6 cm field smoothing
+on its 2 x 2 cm maps, and its hundred place-field-rotation shuffles scored by z-score all
+check out, as do Lee's 50 ms `max_isi`, 100 ms `max_gap`, and the 1/24 match probability
+that is "1/4!, the probability of a perfect four-letter match". Farooq's three shuffle
+cells are corrected above. Igata 2021 (16), Gupta 2010 (46) and Diba 2007 (49) were settled once their
 supplements were supplied. Diba's row needed no correction at all: the supplement gives
 "the animal's speed was <= 10 cm s-1", events "detected by searching for silent periods
 >= 60 ms", the "≥ 5 or ≥ 30 percent of place-cells (whichever was greater) ... within the
@@ -252,14 +294,23 @@ Sheet was edited through a browser session driven by Playwright, anonymously, on
 at a time by cell reference. The edits appear in the Sheet's version history as
 anonymous and can be reverted there.
 
-Three cells sit in columns with chip validation, `Detection` and `Trajectory`. Typing a
-value into those cleared the cell instead of setting it, so they were restored by
-copying a cell that already held the wanted value: `G3` to `G7`, and `Y4` to `Y20` and
-`Y43`. Anyone editing those columns by script should copy an existing chip rather than
-type.
+Five columns carry dropdown chips: `Last Author`, `Journal`, `Species`, `Detection` and
+`Trajectory`. Typing into one of those does not edit the cell. The keystrokes go to a
+search box that filters the dropdown, and committing with nothing selected clears the
+cell instead, which is how `G7`, `Y20` and `Y43` were blanked in an early pass. Two ways
+work. Copying a cell that already holds the wanted value restored those three, from `G3`
+and `Y4`. For the trajectory pass a general method was used instead: clear the cell, type
+enough of the option to leave one match, then press the down arrow to highlight it and
+Enter to commit. The filter matches from the start of a word, so `Radon` reaches "Radon
+transform" and `correlation` reaches "Weighted correlation". The not-applicable option is
+labeled `=NA()` and is reached by typing `NA`; neither `N/A` nor `=NA()` matches it,
+since a leading `=` starts formula entry and the label has no slash.
 
-Two values are recorded slightly differently from the quoted text, because the column is
-numeric: Ólafsdóttir 2015's reconstruction error reads 10 rather than 10.0, and Wu &
-Foster 2014's trajectory reads "Weighted correlation" alone, since the vocabulary has no
-"Weighted correlation, MAP" entry. The MAP function there cuts the subregion that the
-weighted correlation is computed over; the score itself is the weighted correlation.
+One value is recorded slightly differently from the quoted text, because the column is
+numeric: Ólafsdóttir 2015's reconstruction error reads 10 rather than 10.0.
+
+An earlier version of this record claimed that Wu & Foster 2014's trajectory could not be
+written as "Weighted correlation, MAP" because the dropdown has no combined entry. That
+reason was wrong, since a trajectory cell holds as many chips as apply and several rows
+carry two. The cell still reads "Weighted correlation" alone, on the argument given in
+its table row.
