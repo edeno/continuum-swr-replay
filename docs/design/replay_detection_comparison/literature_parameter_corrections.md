@@ -130,13 +130,26 @@ the papers, with a quote required for every value and `#N/A` where the paper doe
 
 | Column | Why | Filled |
 |---|---|---|
-| Spike sorting | Sorted against clusterless was free text in five rows and absent elsewhere | 56 of 57 (50 sorted, 5 clusterless, 1 both) |
+| Spike sorting | Sorted against clusterless was free text in five rows and absent elsewhere | 57 of 57 (51 sorted, 5 clusterless, 1 both) |
 | Time bin step (ms) | "Time bin" often holds a sliding-window width whose step is shorter, so two rows with the same value could mean different things | 43 |
 | Shuffle Method | The central omission for a sheet about decoding replay: the surrogate largely determines the "% Decoded" the sheet already tracks | 54 |
 | Shuffles (#) | " | 35 |
 | Sig. Thresh. | " | 38 |
 | % Decoded denom. | That percentage is variously of ripples, candidate events, putative events or multiunit bursts | 14 |
 | Reconst. Error bin (ms) | Error depends on the window it was measured in, which ranges from 2 ms to 500 ms across rows presented as comparable | 11 |
+
+Two of the seven are sparse by construction rather than by omission. A denominator for
+"% decoded" and a bin for the reconstruction error only exist where the parent value does,
+and only 15 and 16 rows report those. Every row that reports one now carries its
+qualifier, apart from Kaefer 2020, whose "~45%" matches no sentence in the paper, and
+Stella 2019, whose error is a curve against window length rather than a figure at one bin.
+
+The genuine gaps are concentrated where a supplement could not be read: Bhattarai 2020,
+Farooq & Dragoi 2019 (Science) and Drieu 2018 keep their shuffle and significance
+procedures in supplements that no route would serve. Bush 2022 was filled once its PDF
+was supplied, and it reported a replay percentage the sheet had as absent: 13.9 % of
+candidate events, shuffled by cell identity 100 times against the 95th percentile, with
+its decoding error measured in 500 ms bins.
 
 The shuffle columns show that "none" is a real methodological position, not missing text:
 ten rows select events by a score, posterior or confidence threshold rather than by a
