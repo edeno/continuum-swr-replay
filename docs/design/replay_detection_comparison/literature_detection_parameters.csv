@@ -98,7 +98,7 @@ start-to-end distance (<40 cm)",Not reported,25.3-43.9%
 Carr,Frank,2012,https://doi.org/10.1016/j.neuron.2012.06.014,Neuron,Rats,SWR,SWR,#N/A,3,4,#N/A,4,#N/A,1,150,250,#N/A,#N/A,#N/A,Bayes,15,2,4,Linear regression,,Not reported,Not reported
 Bendor,Wilson,2012,https://doi.org/10.1038/nn.3203,Nature Neuroscience,Rats,MUA,MUA,4,#N/A,"lower
 quartile",15,#N/A,#N/A,#N/A,#N/A,#N/A,50,#N/A,50,Bayes,10,Not reported,Not reported,Weighted average,,Not reported,Not reported
-Gupta,Redish,2010,https://doi.org/10.1016/j.neuron.2010.01.034,Neuron,Rats,SWR,SWR,#N/A,2,Not reported,#N/A,#N/A,3,>1,180,220,#N/A,#N/A,#N/A,"Custom Sequence
+Gupta,Redish,2010,https://doi.org/10.1016/j.neuron.2010.01.034,Neuron,Rats,SWR,SWR,#N/A,2,Not reported,#N/A,#N/A,3,>1,180,220,40,600,#N/A,"Custom Sequence
  detection
 Bayes",10,3.5,#N/A,,,Not reported,10%
 Karlsson,Frank,2009,https://doi.org/10.1038/nn.2344,Nature Neuroscience,Rats,SWR,SWR,#N/A,3,2,#N/A,4,5,1,150,250,15,#N/A,#N/A,Bayes,15,2,4,Linear regression,,Not reported,47%
