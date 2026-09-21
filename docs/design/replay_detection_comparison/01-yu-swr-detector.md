@@ -1,6 +1,8 @@
 # SWR detection with a noise-percentile threshold (Yu et al. 2017)
 
-*Design spec. Status: revised after review; not yet implemented.*
+*Design spec. Status: revised after review. Package side implemented
+(`ripple_detection` `master` 659cc91: `Yu_ripple_detector`); project-side inventory
+(§Producing the inventory, steps 2–6) not yet started.*
 *Governing rule and cross-cutting decisions: [overview.md](overview.md).*
 
 Inventory 3 of six. Supplies a third SWR detection *algorithm* alongside

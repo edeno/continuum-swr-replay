@@ -1,6 +1,8 @@
 # Replay detection method comparison — overview
 
-*Design spec, cross-cutting. Status: approved, not yet implemented.*
+*Design spec, cross-cutting. Status: approved; detector package work implemented, project
+work not yet started. Execution status and open decisions:
+[`.claude/docs/plans/replay_detection_comparison/PLAN.md`](../../../.claude/docs/plans/replay_detection_comparison/PLAN.md).*
 
 This directory holds the design for comparing replay-detection methods on our data.
 This file carries the purpose, the governing rule, the scope boundary, and the
@@ -10,7 +12,7 @@ register invites the cross-method blending this design forbids.
 
 | spec | scope | status |
 |---|---|---|
-| [01-yu-swr-detector.md](01-yu-swr-detector.md) | SWR detector with a noise-percentile threshold (Yu et al. 2017) | design complete |
+| [01-yu-swr-detector.md](01-yu-swr-detector.md) | SWR detector with a noise-percentile threshold (Yu et al. 2017) | package side implemented; project wiring pending |
 | [02-memoryless-sequence.md](02-memoryless-sequence.md) | Memoryless sliding-window sequence detector (Widloski & Foster 2025) | design complete |
 | [03-inventory-comparison.md](03-inventory-comparison.md) | Six inventories → common schema → N-way overlap accounting | design complete |
 | [04-event-features.md](04-event-features.md) | Symmetric event characterization and selection diagnostics; threshold robustness as a later follow-up | initial scope agreed |
@@ -112,7 +114,7 @@ Each produces an event table over the same epochs and the same speed-eligible po
 |---|---|---|---|---|
 | 1 | SWR, consensus trace | LFP | `Kay_ripple_detector` | exists (`SWR_event`) |
 | 2 | SWR, per-channel with merging | LFP | `Karlsson_ripple_detector` (Karlsson et al. 2009) | in package; needs a run |
-| 3 | SWR, noise-percentile threshold | LFP | Yu et al. 2017 | **build in `ripple_detection` — [01](01-yu-swr-detector.md)** |
+| 3 | SWR, noise-percentile threshold | LFP | `Yu_ripple_detector` (Yu et al. 2017) | in package; project wiring pending — [01](01-yu-swr-detector.md) |
 | 4 | MUA high-synchrony events | population rate | `multiunit_HSE_detector` | exists (`MUA_event`) |
 | 5 | Posterior threshold | decoding | our state-space non-local detection | exists (`non_local_event`) |
 | 6 | Posterior sequence | decoding | Widloski & Foster 2025 | **build — [02](02-memoryless-sequence.md)** |
