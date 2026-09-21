@@ -47,7 +47,7 @@ excluding trajectories under 20 cm/s
 windows were adjusted for number of spikes or cells",#N/A,#N/A,5,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,Bayes,25.6,10,10,"MAP, Radon transform","Adapative bin sizes
 No jumps (> 60 cm)
 Absolute speed (>20 cm/s)",Not reported,~45%
-Bhattari,Jung,2020,https://doi.org/10.1073/pnas.1912533117,PNAS,Rats,SWR,"SWR
+Bhattarai,Jung,2020,https://doi.org/10.1073/pnas.1912533117,PNAS,Rats,SWR,"SWR
 preceded by 60 ms of silence
 extended to 1 STD",#N/A,3,4,#N/A,50,5,2,100,250,20,#N/A,100,Bayes,20,2,6,Linear regression,,6.56,52%
 Stella,Csicsvari,2019,https://doi.org/10.1016/j.neuron.2019.01.052,Neuron,Rats,SWR,SWR,#N/A,5,#N/A,#N/A,#N/A,,>1,150,250,40,#N/A,#N/A,Bayes,8,4,20,MAP,Adaptive time bin size (# spikes),~9 cm (Figure S2),Not reported
@@ -56,15 +56,15 @@ Adaptive time bin size (# spikes)",Not reported,Not reported
 Farooq,Dragoi,2019,https://doi.org/10.1016/j.neuron.2019.05.040,Neuron,Rats,"SWR, MUA",MUA and SWR,2,Not reported,1,15,#N/A,5,Not reported,175,225,100,800,#N/A,Bayes,20,1,5,"Weighted correlation, Radon transform",,~5 cm (inferred from Figure 1J),~10%
 Farooq,Dragoi,2019,https://doi.org/10.1126/science.aav0502,Science,Rats,MUA,"MUA
 theta/delta ratio",2,#N/A,2,15,#N/A,5,#N/A,#N/A,#N/A,100,800,#N/A,Bayes,20,1,5,,,~5 cm,Not reported
-Chenani,Leibold,2019,https://doi.org/10.1038/s41467-019-09280-0,Nature Communication,Rats,MUA,"Place cell remained above 3 SD and 5 or more active cells
-Immobility visually inspected for times at reward zones",3,#N/A,#N/A,30,#N/A,5,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,Rank order correlation,#N/A,#N/A,#N/A,,,,
+Chenani,Leibold,2019,https://doi.org/10.1038/s41467-019-09280-0,Nature Communications,Rats,MUA,"Place cell rate peak reached 3 SD, boundaries where it fell below 1 SD, and 5 or more active cells
+Reward zones defined by visual judgement of the speed distribution",3,#N/A,#N/A,30,#N/A,5,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,Rank order correlation,#N/A,#N/A,#N/A,,,,
 Michon,Kloosterman,2019,https://doi.org/10.1016/j.cub.2019.03.048,Current Biology,Rats,MUA,MUA,4,#N/A,5,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,80,#N/A,20,Bayes,10,4,5,Weighted isotonic regression,"Clusterless
 Real-time",Not reported,5-15%
 Liu,Dragoi,2019,https://doi.org/10.1002/hipo.23034,Hippocampus,Rats,MUA,"MUA
 preceded by 100 ms of silence
 theta/delta ratio
 SWR control",#N/A,#N/A,2,#N/A,#N/A,4,#N/A,#N/A,#N/A,80,1200,#N/A,Rank order correlation,#N/A,#N/A,#N/A,,,#N/A,#N/A
-Shin,Jadhav,2019,https://doi.org/10.1016/j.neuron.2019.09.012,Neuron,Rats,SWR,SWR,#N/A,3,4,#N/A,#N/A,5,>1,150,250,50,#N/A,#N/A,Bayes,10,2,4,Linear regression,,3.81 cm,~40%
+Shin,Jadhav,2019,https://doi.org/10.1016/j.neuron.2019.09.012,Neuron,Rats,SWR,SWR,#N/A,3,4,#N/A,#N/A,5,1,150,250,50,#N/A,#N/A,Bayes,10,2,4,Linear regression,,3.81 cm,~40%
 Carey,van der Meer,2019,https://doi.org/10.1038/s41593-019-0464-6,Nature Neuroscience,Rats,"SWR, MUA","MUA and SWR
 Adaptive thresholding of MUA",#N/A,#N/A,4,20,60,4,1,Not reported,Not reported,50,#N/A,#N/A,Bayes,25,3,2,MAP,,Not reported,Not reported
 Muessig,Wills,2019,https://doi.org/10.1016/j.cub.2019.01.005,Current Biology,Rats,"SWR, MUA","MUA and SWR
