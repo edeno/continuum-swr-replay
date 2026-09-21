@@ -16,12 +16,13 @@ Recovered on 2026-09-21 from Anna Gillespie's home directory on `zephyr.cin.ucsf
 (Frank lab). Neither file is in any git repository there or in any public Frank lab
 repository (Bitbucket `franklab/filterframework_shared`, its `_open` mirror, or the
 `droumis/FFPhy` fork on GitHub); the only public trace is the call site in
-`DFFunctions/AG_extractRipplesJY.m`. The files were relayed as text through a Claude
-Remote Control session, then checked against the original md5 sums:
+`DFFunctions/AG_extractRipplesJY.m`. The files were relayed through a Claude Remote
+Control session (the driver as text, the estimator as an artifact file) and verified
+against the original md5 sums:
 
 | file | original path | mtime | bytes | original md5 | this copy |
 |---|---|---|---|---|---|
-| `jy_variableripthreshold_corecalculation.m` | `/home/anna/Src/Matlab/DayProcess/` | 2017-09-22 17:14:07 -0700 | 5606 | `2c2968b646cb9fe7afeabcc94ad84754` | NOT byte-exact (5605 bytes here vs 5606; whitespace lost in transit) |
+| `jy_variableripthreshold_corecalculation.m` | `/home/anna/Src/Matlab/DayProcess/` | 2017-09-22 17:14:07 -0700 | 5606 | `2c2968b646cb9fe7afeabcc94ad84754` | byte-exact |
 | `kk_extractconsensus2.m` | `/home/anna/Src/oldMatlabstuff/Functions/` | 2017-09-04 13:38:07 -0700 | 31103 | `fca0d5527b60fa086bb3f93a2984f779` | byte-exact |
 
 **Licence: none stated.** Lab-internal code, vendored at the project owner's direction
@@ -46,10 +47,17 @@ permission.
 
 - `kk_extractconsensus2.m` reads `useenvelope`, `normeachtet`, `adaptivefilt`,
   `masterfolder`, and the `*text` cell arrays from `assign(varargin)`; **none has a
-  default in the file**, so the flag values used for the 2017 paper are not recoverable
-  from this source. The 2019 wrapper committed to Bitbucket, `AG_extractRipplesJY.m`,
-  hard-codes the envelope, per-tetrode z-scoring, no adaptive filter, and endpoint-only
-  immobility; it is the lab's consolidated version and pairs with the threshold function.
+  default in the file**, and no caller of it exists anywhere in the trees searched, so
+  the flag values used for the 2017 paper are not recoverable from this source. The
+  2019 wrapper committed to Bitbucket, `AG_extractRipplesJY.m`, hard-codes the
+  envelope, per-tetrode z-scoring, no adaptive filter, and endpoint-only immobility; it
+  is the lab's consolidated version and pairs with the threshold function. The lab's
+  production driver (`Trodes_dayprocess.m`) calls it with `nstd = []` and a 15 ms
+  minimum duration, but every per-animal run script sets `extractRipplesJY = 0`, so
+  the path is switched off in later production.
+- The band filter those pipelines apply, `ripplefilter.mat` (2008-01-25, md5
+  `ed158b07d679a38356b78e1e10e244da`), is byte-identical to the file shipped in
+  `ripple_detection`.
 - The reflection in the threshold function is written `abs(b) + 2m` for left bins `b`
   and mode `m`; that equals `2m - b` only when `b <= 0`. With a z-scored right-skewed
   envelope the mode is at or below zero and the formula is correct; a positive mode would

@@ -75,9 +75,10 @@ It supplies implementation evidence where the paper is underspecified. In this w
 
 | step | as implemented in the wrapper |
 |---|---|
-| Envelope | per-tetrode amplitude envelope from input column 3; the upstream `filtereeg2.m` stores `abs(hilbert(filtered_data))` there, without squaring |
+| Envelope | per-tetrode amplitude envelope from input column 3; the upstream `DR_filtereeg2.m` stores `int16(abs(hilbert(filtfilt(kernel, 1, raw))))` there, without squaring |
+| Band filter | `ripplefilter.mat` (2008-01-25, 1982 bytes, md5 `ed158b07…`), applied with `filtfilt`. **Byte-identical to the `ripplefilter.mat` shipped in `ripple_detection`** and used by `filter_ripple_band`, so the band is the same FIR, not merely the same nominal 150–250 Hz |
 | Artifact handling | samples with absolute envelope > 2000 are zeroed if their total duration is at most 5 s (calculated assuming 1.5 kHz). Above that, the code enters `keyboard`; if execution resumes, `continue` skips the current tetrode, not the entire epoch |
-| Smoothing | 4 ms Gaussian **per tetrode** before aggregation: `gaussian(0.004·Fs, ceil(8·0.004·Fs))` is an area-normalized kernel with σ in samples and length 8σ (±4σ), applied by `smoothvect` as a same-length convolution — the same truncation the package's `gaussian_smooth` uses, so the two smoothers agree |
+| Smoothing | 4 ms Gaussian **per tetrode** before aggregation: `gaussian(0.004·Fs, ceil(8·0.004·Fs))` is an area-normalized kernel with σ in samples and length 8σ (±4σ; N = 48 at 1.5 kHz, 32 at 1 kHz), centred at `mean(1:N)`, so an even N carries a half-sample offset, applied by `smoothvect` as a full convolution cropped from `round(N/2)`. The package's `gaussian_smooth` uses the same ±4σ truncation with a symmetric kernel; the half-sample offset is not reproduced |
 | Per-tetrode normalization | each tetrode's smoothed envelope **z-scored over the whole epoch** before the median |
 | Consensus | `nanmedian` across tetrodes |
 | Noise sample | consensus values during immobility (`kk_get2dstate`, velocity < 4, no buffer), pooled across all run epochs of the day |
@@ -110,7 +111,9 @@ paths, modification dates (2017-09-04 and 2017-09-22), md5 sums, and licence sta
   Gillespie's tree) calling `AG_extractRipplesJY` with `nstd = []` (data-driven
   threshold) and `ripmindur = 0.015`. That 15 ms minimum is the lab's later production
   setting and differs from the paper's 20 ms; the port retains the paper's value and
-  records the discrepancy (below). The envelope reaching the wrapper is stored as
+  records the discrepancy (below). Every per-animal driver in that tree sets
+  `extractRipplesJY = 0`, so the JY path is present but switched off in the lab's
+  later production runs; the code lineage is dormant, not maintained. The envelope reaching the wrapper is stored as
   `int16(abs(hilbert(...)))` by `DR_filtereeg2.m`, i.e. integer-quantized and unsquared;
   the quantization is absorbed by the per-tetrode z-scoring and is not reproduced. The driver also carries an optional slow-baseline
   rejection (`adaptivefilt`: a 0–0.5 Hz low-pass of the sub-2z trace; events whose start
