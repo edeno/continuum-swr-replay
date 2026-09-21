@@ -126,6 +126,18 @@ distributions, which are log-normal, be reported rather than means. The robustne
 below and the per-cell distributions above are the second half of that; the detector
 table ([detector_comparison.md](detector_comparison.md)) is the first.
 
+Tingley & Peyrache's `RnR_methods`
+(https://github.com/DavidTingley/RnR_methods, GPL-3, accompanying
+[doi:10.1098/rstb.2019.0231](https://doi.org/10.1098/rstb.2019.0231)) is the nearest
+precedent for the sweeps below. It ships the replay scores this project also uses,
+Bayesian Radon and weighted correlation and rank-order correlation, together with
+scripts that compare those scores against each other, across decoding bin sizes, under
+added noise, and for rank-order false positives as a function of sequence length and
+shuffle. Two things to take from it: bin size and shuffle choice move a score enough to
+deserve their own arm of any sweep, and a false-positive rate is a property of the
+score-and-shuffle pair rather than of the detector. It is GPL-3 MATLAB, so it is a
+reference for what to vary, not code to port.
+
 This remains part of the comparison, but is **deferred until after the default-setting
 report**. Do not launch broad sweeps with the first run. Until it is performed, state
 that threshold robustness has not been assessed; do not call the default results robust
