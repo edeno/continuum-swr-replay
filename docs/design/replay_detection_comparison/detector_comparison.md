@@ -41,28 +41,32 @@ posterior-triggered, or joint. Nothing here ranks the methods; that is what
 [literature_detection_parameters.csv](literature_detection_parameters.csv) is a lab-compiled
 table of 54 replay papers (1999–2025; source: the shared Google Sheet
 `12mMgiYWO7tKRhs5qhMXMZ5RggGi1J24wxIkcs4knTUI`, exported 2026-09-21; column headers
-flattened to one line, values otherwise untouched). **The parameter values are the
-lab's transcription and are being checked against the papers; treat any single cell as
-unverified until that check lands.** One error is already known: the Jadhav & Frank 2016
-row carries the DOI of Yamamoto & Tonegawa 2017. It records each paper's trigger
-(MUA 23, SWR 17, both 11, decoding 3), thresholds, smoothing, bands, durations, and
+flattened to one line). **The values have been checked against the papers and corrected;
+see [literature_parameter_corrections.md](literature_parameter_corrections.md)** for the
+26 applied corrections with their evidence, the cells still flagged, the five papers that
+could not be retrieved, and the systematic issues (sliding-window width recorded as a
+time bin, smoothing width against standard deviation, analysis restrictions recorded as
+detection gates). The Google Sheet this came from still holds the uncorrected values.
+It records each paper's trigger
+(MUA 22, SWR 17, both 12, decoding 3), thresholds, smoothing, bands, durations, and
 decoding settings. Two uses here:
 
 **Sweep values for 04's threshold robustness.** The literature range bounds what a
-"modest relaxation and tightening" means. Reported values (count with a value, then
-min / median / max; `#N/A` and "not reported" excluded):
+"modest relaxation and tightening" means. Reported values after correction (count with a value, then min / median / max;
+`#N/A` and "not reported" excluded). Several speed values gate analysis rather than
+detection, so that row overstates how many papers gate detection on speed:
 
 | parameter | n | min | median | max | most common |
 |---|---|---|---|---|---|
-| SWR z-score threshold (SD) | 25 | 1 | 3 | 8 | 3, 2, 2.5 |
+| SWR z-score threshold (SD) | 26 | 1 | 3 | 8 | 3, 2, 4 |
 | MUA z-score threshold (SD) | 27 | 2 | 3 | 4 | 3, 2, 4 |
 | speed gate (cm/s) | 41 | 0.05 | 5 | 10 | 5, 4, 2 |
 | SWR smoothing (ms) | 17 | 4 | 12.5 | 100 | 4, 12.5, 100 |
-| MUA smoothing (ms) | 24 | 5 | 15 | 30 | 15, 10, 5 |
+| MUA smoothing (ms) | 25 | 5 | 15 | 30 | 15, 10, 5 |
 | ripple band (Hz) | 29 | 80–180 low, 200–300 high | 150–250 | | 150–250 |
 | minimum duration (ms) | 38 | 15 | 50 | 100 | 50, 100, 15 |
-| maximum duration (ms) | 23 | 200 | 500 | 2000 | 500, 750, 2000 |
-| merge gap (ms) | 11 | 20 | 50 | 100 | 50, 20, 40 |
+| maximum duration (ms) | 23 | 400 | 500 | 2000 | 500, 750, 2000 |
+| merge gap (ms) | 12 | 20 | 50 | 100 | 50, 40, 20 |
 
 Our retained settings (Kay z = 2, 4 ms smoothing, 15 ms minimum, 4 cm/s; HSE z = 2,
 15 ms minimum) sit at the permissive end on threshold and minimum duration, so the

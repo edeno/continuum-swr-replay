@@ -4,15 +4,15 @@ Yang,Buzsáki,2024,https://doi.org/10.1126/science.adk8261,Science,"Rats, Mice",
 MUA with at least one LFP w/ SWR
 during NREM (manually scored)",3,3,#N/A,15,#N/A,5,1,150,250,50,500,#N/A,"UMAP
 Bayes",20,5,10,KNN,,1.51,Not reported
-Huelin Gorriz,Bendor,2023,https://doi.org/10.1038/s41467-023-43939-z,Nature Communication,Rats,"SWR, MUA",MUA and SWR,3,3,5,5,100,5,,125,300,100,750,50,Bayes,20,10,0,Weighted correlation,,Not reported,Not reported
+Huelin Gorriz,Bendor,2023,https://doi.org/10.1038/s41467-023-43939-z,Nature Communications,Rats,"SWR, MUA",MUA and SWR,3,3,5,5,100,5,,125,300,100,750,50,Bayes,20,10,0,Weighted correlation,,Not reported,Not reported
 Harvey,Fernandez-Ruiz,2023,https://doi.org/10.1016/j.neuron.2023.04.015,Neuron,Rats,SWR,"SWR
 Ripple with a simultaneous
 sharp wave from radiatum
-events with 50%> empty time bins removed",#N/A,2.5,4,#N/A,#N/A,5,1,80,250,15,400,#N/A,Bayes,20,3,3,Weighted correlation,,Not reported,Not reported
+events with 50%> empty time bins removed",#N/A,4,4,#N/A,#N/A,5,1,80,250,15,400,#N/A,Bayes,20,3,3,Weighted correlation,,Not reported,Not reported
 Liu,Fernandez-Ruiz,2023,https://doi.org/10.1126/science.adi8237,Science,Rats,"SWR, MUA","MUA and SWR
 k-means clustering of ripple power
 sharp wave detected from radiatum",2,Adaptive,4,10,#N/A,#N/A,1,80,250,100,500,#N/A,Bayes,20,3,3,Radon transform,,Not reported,Not reported
-Tirole,Bendor,2022,https://doi.org/10.7554/eLife.79031,eLife,Rats,MUA,MUA,3,3,5,5,100,5,1,125,300,100,750,50,Bayes,20,10,0,Weighted correlation,,Not reported,Not reported
+Tirole,Bendor,2022,https://doi.org/10.7554/eLife.79031,eLife,Rats,"SWR, MUA",MUA,3,3,5,5,100,5,1,125,300,100,750,50,Bayes,20,10,0,Weighted correlation,,Not reported,Not reported
 Bush,Burgess,2022,https://doi.org/10.1016/j.cub.2021.10.033,Current Biology,Rats,MUA,"MUA or SWR
 median speed used for immobility,
 event start time is considered first spike",3,3,10,5,5,5,1,150,250,40,500,40,Bayes,10,2,10,Radon transform,,"outbound (13.7cm)
@@ -28,7 +28,7 @@ Berners-Lee,Foster,2021,https://doi.org/10.1523/JNEUROSCI.1158-20.2021,Journal o
 length of subregion in time (>50 ms)
 arm coverage (>50% of the arm)
  weighted correlation (abs. value > .3)",Not reported,Not reported
-Denovellis,Frank,2021,https://doi.org/10.7554/eLife.64505,eLife,Rats,SWR,SWR,#N/A,2,4,#N/A,4,#N/A,>1,150,250,15,#N/A,#N/A,State Space,2,3,6,MAP,Clusterless,Not reported,Not reported
+Denovellis,Frank,2021,https://doi.org/10.7554/eLife.64505,eLife,Rats,SWR,SWR,#N/A,2,4,#N/A,4,#N/A,>1,150,250,15,#N/A,#N/A,State Space,2,3,6,MAP,Clusterless,7,Not reported
 Gillespie,Frank,2021,https://doi.org/10.1016/j.neuron.2021.07.029,Neuron,Rats,SWR,MUA done as control,3,2,4,15,4,#N/A,>1,150,250,15,#N/A,#N/A,State Space,2,5,5,MAP,Clusterless,5,Not reported
 Michon,Kloosterman,2021,https://doi.org/10.1016/j.cub.2021.07.058,Current Biology,Rats,"SWR, MUA","MUA/SWR detrended with median filter
 extended to 0.5",4,8,5,15,15,#N/A,1-3,140,225,80,#N/A,20,Bayes,10,1,5,Weighted isotonic regression,Clusterless,<30,Not reported
@@ -68,40 +68,40 @@ Shin,Jadhav,2019,https://doi.org/10.1016/j.neuron.2019.09.012,Neuron,Rats,SWR,SW
 Carey,van der Meer,2019,https://doi.org/10.1038/s41593-019-0464-6,Nature Neuroscience,Rats,"SWR, MUA","MUA and SWR
 Adaptive thresholding of MUA",#N/A,#N/A,4,20,60,4,1,Not reported,Not reported,50,#N/A,#N/A,Bayes,25,3,2,MAP,,Not reported,Not reported
 Muessig,Wills,2019,https://doi.org/10.1016/j.cub.2019.01.005,Current Biology,Rats,"SWR, MUA","MUA and SWR
-theta/delta ratio",3,4,2.5,10,#N/A,#N/A,>1,100,250,100,750,#N/A,Bayes,20,2.5,5,Radon transform,,<10 cm median,Not reported
+theta/delta ratio",3,4,2.5,10,#N/A,#N/A,1,100,250,100,750,#N/A,Bayes,20,2.5,5,Radon transform,,<10 cm median,Not reported
 Drieu,Zugaro,2018,https://doi.org/10.1126/science.aat2952,Science,Rats,MUA,"MUA
 theta/delta ratio",3,#N/A,0.05,10,#N/A,3,#N/A,#N/A,#N/A,60,500,#N/A,Bayes,20,2.4,4.5,Radon transform,,Not reported,Not reported
-Ólafsdóttir,Barry,2017,https://doi.org/10.1016/j.neuron.2017.09.035,Neuron,Rats,MUA,MUA,3,#N/A,3,5,#N/A,5,#N/A,#N/A,#N/A,40,#N/A,#N/A,Bayes,10,2,10,Radon transform,,17.5 cm,Not reported
-Wu,Ji,2017,https://doi.org/10.1038/nn.4507,Nature Neuroscience,Rats,MUA,MUA,4,#N/A,3,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,50,400,#N/A,Bayes,20,3.1,6.2,Linear regression,,Not reported,Not reported
-Yamamoto,Tonegawa,2017,https://doi.org/10.1016/j.neuron.2017.09.017,Neuron,Mice,"SWR, MUA",extend to 1 STD,3,3,2,#N/A,#N/A,#N/A,1,140,200,#N/A,#N/A,70,Bayes,10,Not reported,Not reported,Radon transform,Clusterless,Not reported,12-15%
+Ólafsdóttir,Barry,2017,https://doi.org/10.1016/j.neuron.2017.09.035,Neuron,Rats,MUA,MUA,3,2.5,3,5,#N/A,5,#N/A,#N/A,#N/A,40,500,40,Bayes,10,2,10,Radon transform,,17.5 cm,36.9-38.6%
+Wu,Ji,2017,https://doi.org/10.1038/nn.4507,Nature Neuroscience,Rats,MUA,MUA,4,#N/A,3,#N/A,#N/A,4,#N/A,#N/A,#N/A,50,400,#N/A,Bayes,20,3.1,6.2,Linear regression,,Not reported,Not reported
+Yamamoto,Tonegawa,2017,https://doi.org/10.1016/j.neuron.2017.09.017,Neuron,Mice,"SWR, MUA",extend to 1 STD,3,3,2,#N/A,#N/A,#N/A,1,100,200,#N/A,#N/A,70,Bayes,10,Not reported,Not reported,Radon transform,,Not reported,12-15%
 Tang,Jadhav,2017,https://doi.org/10.1523/JNEUROSCI.2291-17.2017,Journal of Neuroscience,Rats,SWR,SWR,#N/A,3,4,#N/A,#N/A,5,>1,150,250,#N/A,#N/A,#N/A,Bayes,10,2,8,Linear regression,,Not reported,~40%
-Grossmark,Buzsáki,2016,https://doi.org/10.1126/science.aad1935,Science,Rats,"SWR, MUA","MUA and SWR
+Grosmark,Buzsáki,2016,https://doi.org/10.1126/science.aad1935,Science,Rats,"SWR, MUA","MUA and SWR
 MUA with at least one LFP w/ SWR
 during NREM (manually scored)",3,3,#N/A,15,15,5,1,150,250,50,500,#N/A,Bayes,20,2,5,Weighted regression,,5.14 cm,Not reported
-Ambrose,Foster,2016,https://doi.org/10.1016/j.neuron.2016.07.047,Neuron,Rats,SWR,SWR,#N/A,3,5,#N/A,12.5,,>1,150,250,50,500,#N/A,Bayes,10,1.8,3,Weighted correlation,weighted correlation (>0.6),Not reported,10-15%
-Jadhav,Frank,2016,https://doi.org/10.1016/j.neuron.2017.09.017,Neuron,Rats,SWR,SWR,#N/A,3,4,#N/A,4,4,>1,150,250,15,#N/A,#N/A,Bayes,15,2,4,Linear regression,,Not reported,Not reported
-Silva,Foster,2015,https://doi.org/10.1038/nn.4151,Nature Neuroscience,Rats,MUA,MUA,3,#N/A,5,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,100,500,#N/A,Bayes,20,2.5,5,"Weighted correlation, Linear regression, MAP",,4.34,Not reported
+Ambrose,Foster,2016,https://doi.org/10.1016/j.neuron.2016.07.047,Neuron,Rats,SWR,SWR,#N/A,3,5,#N/A,12.5,,>1,150,250,50,500,#N/A,Bayes,20,1.8,3,Weighted correlation,weighted correlation (>0.6),Not reported,15-20%
+Jadhav,Frank,2016,https://doi.org/10.1016/j.neuron.2016.02.010,Neuron,Rats,SWR,SWR,#N/A,3,4,#N/A,4,4,>1,150,250,15,#N/A,#N/A,Bayes,15,2,4,Linear regression,,Not reported,Not reported
+Silva,Foster,2015,https://doi.org/10.1038/nn.4151,Nature Neuroscience,Rats,MUA,MUA,3,#N/A,5,10,#N/A,#N/A,#N/A,#N/A,#N/A,100,500,#N/A,Bayes,20,2.5,5,"Weighted correlation, Linear regression, MAP",,4.34,Not reported
 Ólafsdóttir,Spiers,2015,https://doi.org/10.7554/eLife.06063,eLife,Rats,MUA,"MUA
 Deteected 50 ms of silence
 If 15% of cells within 300 ms, then event",#N/A,#N/A,10,#N/A,#N/A,7,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,"
 Template Matching
-Bayes",5,1,2,Radon transform,,,Not reported
+Bayes",5,1,2,Radon transform,,10.0,Not reported
 Pfeiffer,Foster,2015,https://doi.org/10.1126/science.aaa9633,Science,Rats,SWR,SWR,#N/A,3,5,#N/A,12.5,,>1,150,250,50,2000,,Bayes,20,2,4,MAP,"Exclude events:
 steps (<10)
 cumulative distance (<80 cm)",Not reported,Not reported
-Wikenheiser,Reddish,2014,https://doi.org/10.1002/hipo.22049,Hippocampus,Rats,SWR,"150 ms window centered on crossing
+Wikenheiser,Redish,2013,https://doi.org/10.1002/hipo.22049,Hippocampus,Rats,SWR,"150 ms window centered on crossing
 theta/delta ratio",#N/A,1,2,#N/A,#N/A,3,#N/A,140,220,#N/A,#N/A,#N/A,Bayes,10,4,#N/A,Linear regression,Only time steps with 1 spike included,Not reported,28%
 Wu,Foster,2014,https://doi.org/10.1523/JNEUROSCI.3414-13.2014,Journal of Neuroscience,Rats,MUA,MUA,2,#N/A,5,15,#N/A,#N/A,#N/A,#N/A,#N/A,50,#N/A,#N/A,Bayes,10,1.8,9,MAP,,Not reported,Not reported
 Pfeiffer,Foster,2013,https://doi.org/10.1038/nature12112,Nature,Rats,MUA,MUA,3,#N/A,5,10,#N/A,#N/A,#N/A,#N/A,#N/A,50,2000,#N/A,Bayes,20,2,4,MAP,"Exclude events:
 steps (<10)
-cumulative distance (<40 cm)",Not reported,25-49%
+start-to-end distance (<40 cm)",Not reported,25.3-43.9%
 Carr,Frank,2012,https://doi.org/10.1016/j.neuron.2012.06.014,Neuron,Rats,SWR,SWR,#N/A,3,4,#N/A,4,#N/A,>1,150,250,#N/A,#N/A,#N/A,Bayes,15,2,4,Linear regression,,Not reported,Not reported
 Bendor,Wilson,2012,https://doi.org/10.1038/nn.3203,Nature Neuroscience,Rats,MUA,MUA,4,#N/A,"lower
 quartile",15,#N/A,#N/A,#N/A,#N/A,#N/A,50,#N/A,50,Bayes,10,Not reported,Not reported,Weighted average,,Not reported,Not reported
 Gupta,Redish,2010,https://doi.org/10.1016/j.neuron.2010.01.034,Neuron,Rats,SWR,SWR,#N/A,2,Not reported,#N/A,#N/A,3,>1,180,220,#N/A,#N/A,#N/A,"Custom Sequence
  detection
 Bayes",10,3.5,#N/A,,,Not reported,10%
-Karlsson,Frank,2009,https://doi.org/10.1038/nn.2344,Neuron,Rats,SWR,SWR,#N/A,3,4,#N/A,4,5,>1,150,250,15,#N/A,#N/A,Bayes,15,2,4,Linear regression,,Not reported,47%
+Karlsson,Frank,2009,https://doi.org/10.1038/nn.2344,Nature Neuroscience,Rats,SWR,SWR,#N/A,3,2,#N/A,4,5,1,150,250,15,#N/A,#N/A,Bayes,15,2,4,Linear regression,,Not reported,47%
 Davidson,Wilson,2009,https://doi.org/10.1016/j.neuron.2009.07.027,Neuron,Rats,MUA,MUA,3,#N/A,5,15,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,Bayes,20,10,5,Radon transform,,"7 cm, 9 cm, 8 cm, 8 cm for each rat",16%
 Diba,Buzsáki,2007,https://doi.org/10.1038/nn1961,Nature Neuroscience,Rats,MUA,"MUA
 Detected spiking silent periods (>=60 ms)
@@ -116,6 +116,6 @@ Lee,Wilson,2002,https://doi.org/10.1016/S0896-6273(02)01096-6,Neuron,Rats,MUA,"M
 grouped by spike times exceeding max ISI from any cell
 theta/delta ratio
 visual inspection of animal state",#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,Template matching,#N/A,#N/A,#N/A,,,#N/A,#N/A
-Nádasdy,Buzsáki,1999,https://doi.org/10.1523/JNEUROSCI.19-21-09497.1999,Journal of Neuroscience,Rats,SWR,SWR,#N/A,7,#N/A,#N/A,#N/A,#N/A,#N/A,150,250,#N/A,200,#N/A,Template matching,10,#N/A,#N/A,,,#N/A,#N/A
+Nádasdy,Buzsáki,1999,https://doi.org/10.1523/JNEUROSCI.19-21-09497.1999,Journal of Neuroscience,Rats,SWR,SWR,#N/A,7,#N/A,#N/A,#N/A,#N/A,#N/A,150,250,#N/A,#N/A,#N/A,Template matching,10,#N/A,#N/A,,,#N/A,#N/A
 Kudrimoti,McNaughton,1999,https://doi.org/10.1523/JNEUROSCI.19-10-04090.1999,Journal of Neuroscience,Rats,SWR,"SWR
 visual inspection of animal state",#N/A,Not reported,#N/A,#N/A,#N/A,#N/A,1,100,300,25,#N/A,#N/A,"Correlation, 100 ms bins",100,#N/A,#N/A,,,#N/A,#N/A
