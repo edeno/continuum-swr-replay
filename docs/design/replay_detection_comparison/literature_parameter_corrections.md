@@ -22,70 +22,77 @@ paper before it was applied, and the supporting sentence is quoted.
 Nothing was changed on the strength of a single pass, and nothing was changed for a
 paper that could not be retrieved.
 
+Rows are identified by paper, never by position. The Sheet is a table that can be
+re-sorted, and it now runs from 2025 down to 1999, so a row number recorded here would
+go stale. Anything written back to the Sheet by script should resolve its cell from a
+fresh export keyed on first author and year. Two rows share a first author and year,
+Farooq & Dragoi's 2019 Neuron and Science papers, and are named by journal throughout.
+
 ## Applied corrections
 
-| Row | Paper | Column | Was | Now | Evidence |
-|---|---|---|---|---|---|
-| 3 | Huelin Gorriz 2023 | Journal | Nature Communication | Nature Communications | CrossRef container title |
-| 4 | Harvey 2023 | SWR z-score (SD) | 2.5 | 4 | "all events exceeding 4 SD from the mean were detected", then expanded to 1 SD. The 2.5 SD belongs to the separate sharp-wave stage |
-| 6 | Tirole 2022 | Detection | MUA | SWR, MUA | "a threshold over 3 was set for the z-scored ripple power, and used as an additional criterion for candidate replay events" |
-| 13 | Denovellis 2021 | Reconstruction error (cm) | Not reported | 7 | "7 cm median difference, 5-9 cm 95% CI" |
-| 29 | Muessig 2019 | SWR electrodes | >1 | 1 | "the LFP whose power estimate had the highest standard deviation was then used to define ripple events" |
-| 31 | Ólafsdóttir 2017 | SWR z-score (SD) | #N/A | 2.5 | "we identified periods where the ripple power exceeded 2.5std above the mean" |
-| 31 | Ólafsdóttir 2017 | Max duration (ms) | #N/A | 500 | "Events lasting less than 40ms or more than 500ms were excluded" |
-| 31 | Ólafsdóttir 2017 | Combine events (ms) | #N/A | 40 | "events separated by less than 40ms were joined together" |
-| 31 | Ólafsdóttir 2017 | % decoded | Not reported | 36.9-38.6% | "36.88% versus 38.60%" of putative events qualified as replay |
-| 32 | Wu & Ji 2017 | Min. cells | #N/A | 4 | "We defined those PBEs with at least four active template cells as candidate events" |
-| 33 | Yamamoto 2017 | SWR low band (Hz) | 140 | 100 | "we used both ripple band power (100-200 Hz) and multi-unit activities" |
-| 33 | Yamamoto 2017 | Decoding notes | Clusterless | (blank) | "we first performed standard spike sorting"; the word clusterless never appears |
-| 35 | Grosmark 2016 | First author | Grossmark | Grosmark | CrossRef author: Andres D. Grosmark |
-| 36 | Ambrose 2016 | Time bin (ms) | 10 | 20 | "Time windows of 20ms, overlapping by 10ms"; 10 ms is the step |
-| 36 | Ambrose 2016 | % decoded | 10-15% | 15-20% | "On average, 15-20% of SWRs were determined to contain significant trajectory replay" |
-| 37 | Jadhav & Frank 2016 | DOI | 10.1016/j.neuron.2017.09.017 | 10.1016/j.neuron.2016.02.010 | The old DOI is Yamamoto & Tonegawa 2017, already row 33. CrossRef: Jadhav to Frank, Neuron 90:113-127 (2016) |
-| 38 | Silva 2015 | MUA smooth (ms) | #N/A | 10 | "the smoothed histogram (Gaussian kernel, standard deviation of 10 ms)" |
-| 39 | Ólafsdóttir 2015 | Reconstruction error (cm) | (blank) | 10.0 | "median error for both arms = 10.0 cm" |
-| 41 | Wikenheiser 2013 | Year | 2014 | 2013 | CrossRef: Hippocampus 23:22-29, issued 2012-06-27, print 2013 |
-| 41 | Wikenheiser 2013 | Last author | Reddish | Redish | CrossRef author: A. David Redish |
-| 43 | Pfeiffer 2013 | Detection notes | cumulative distance (<40 cm) | start-to-end distance (<40 cm) | "a start-to-end distance less than 40 cm were eliminated" |
-| 43 | Pfeiffer 2013 | % decoded | 25-49% | 25.3-43.9% | "between 25.3% and 43.9% of candidate events" |
-| 47 | Karlsson & Frank 2009 | Journal | Neuron | Nature Neuroscience | CrossRef container title |
-| 47 | Karlsson & Frank 2009 | Animal speed (cm/s) | 4 | 2 | "we examined SWRs that occurred when animals were moving less than 2 cm/sec" |
-| 47 | Karlsson & Frank 2009 | SWR electrodes | >1 | 1 | "the smoothed envelope stayed above 3 standard deviations of the mean for at least 15 ms on at least one tetrode" |
-| 53 | Nádasdy 1999 | Max duration (ms) | 200 | #N/A | 200 ms is the sequence-search template window, not an event duration limit |
-| 19 | Bhattarai 2020 | First author | Bhattari | Bhattarai | CrossRef author: Baburam Bhattarai |
-| 24 | Chenani 2019 | Journal | Nature Communication | Nature Communications | CrossRef container title |
-| 24 | Chenani 2019 | Detection notes | "remained above 3 SD"; "immobility visually inspected" | peak reached 3 SD, boundaries below 1 SD; reward zones defined by visual judgment | "the place cell rate remained at least one standard deviation (SD) above its average during a period when the peak firing rate reached at least three SD"; the visual judgment defined the reward zones, not immobility |
-| 1 | Mallory 2025 | Reconstruction error (cm) | #N/A | 2.9 (track), 3.4 (arena) | "mean +/- SEM positional decoding error per session, linear track: 2.9 +/- 0.1 cm; open arena: 3.4 +/- 0.2 cm" |
-| 1 | Mallory 2025 | Trajectory | MAP | Posterior center of mass | The authors' code takes the decoded position as `binDecoding.posteriorCOM` (`compute_filtering_binDecoding_cm.m`); `posteriorPeak` is a separate quantity used for filtering |
-| 46 | Gupta 2010 | Min. duration (ms) | #N/A | 40 | "the sequence score of place cell activity within a flexible time window (40 ms to 600 ms, to accommodate longer sequences)" |
-| 46 | Gupta 2010 | Max duration (ms) | #N/A | 600 | Same sentence; the window grows until five steps pass without a score increase, or it reaches 600 ms |
-| 16 | Igata 2021 | Min. duration (ms) | 60 | 50 | "Candidate synchronous events in which the duration was less than 50 ms or more than 2000 ms were excluded". The 60 ms belongs to a later stage: "Trajectory sequences covering more than 4 time bins (60 ms) and a cumulative distance of more than 20 cm were included" |
-| 16 | Igata 2021 | Min. cells | 4 | >4 | "Candidate synchronous events were detected when the z-scored spike rates exceeded 2 and the number of active neurons exceeded 4", so the minimum is five |
-| 10 | Krause 2022 | Max duration (ms) | #N/A | 2000 | "Only SWRs longer than 50 ms and shorter than 2 s ... were included" |
-| 10 | Krause 2022 | % decoded | Not reported | 89.7% | "89.7% +/- 2.0% of SWR were identified to encode trajectories", against 22.8% by the traditional method |
-| 17 | Gridchyn 2020 | MUA z-score (SD) | 3.5 | #N/A | "a threshold of 3.5 times the baseline mean established in the pre-rest session". It is a multiple of the mean spike count, not of a standard deviation, so it does not belong in an SD column |
-| 17 | Gridchyn 2020 | Detection notes | "3.5 SD initial" | "3.5x the baseline mean spike count, not a SD multiple" | Same sentence; the adaptive adjustment to about 1 event/s was already right, and a 150 ms detection refractory is now noted |
-| 21 | Xu 2019 | Min. cells | 5 | 4 | "Events containing fewer than five spikes, four cells or with less than 10% of the population of neurons active were rejected". The 5 is the spike minimum |
-| 25 | Michon 2019 | Detection | MUA | SWR, MUA | "Candidate replay events were defined as mua bursts that overlapped with a ripple event" |
-| 25 | Michon 2019 | % decoded | 5-15% | 3.2-15.5% | "amounted to 8.75% +/- 2.52% of all SWR bursts (range: 3.2%-15.5%)" |
-| 25 | Michon 2019 | SWR z-score (SD), smooth, band, electrodes; MUA smooth | #N/A | 8; 15; 140-225; 1-3; 15 | "a high threshold of m + 8 x s" with a 0.5 SD boundary; envelope "smoothed with a Gaussian kernel (bandwidth 15 ms)"; "filtered in the ripple frequency band (140-225 Hz)"; "recorded from 1-3 tetrodes"; multiunit histogram "Gaussian kernel with 15 ms bandwidth" |
-| 40 | Pfeiffer & Foster 2015 | Trajectory | MAP | Posterior center of mass | "truncated to the longest sequence of time frames with a weighted mean posterior probability less than 50 cm from that of the previous frame". The paper never uses MAP |
-| 40 | Pfeiffer & Foster 2015 | Decoding notes | cumulative distance (<80 cm) | start-to-end distance (<80 cm) | "a start-to-end distance less than 80 cm were eliminated", the same error as the 2013 row |
-| 52 | Lee & Wilson 2002 | Detection notes | "theta/delta ratio"; "grouped by spike times exceeding max ISI from any cell" | theta-to-total-power ratio identifying REM; max_isi within a cell, max_gap between cells | "REM was identified as periods with an elevated ratio ... of hippocampal EEG power in the theta band (5-12 Hz) to overall power (1-475 Hz). The remainder was classified as SWS"; "for each cell, each set of consecutive spikes with interspike intervals less than max_isi ... broken between every pair of adjacent letters separated by more than max_gap" |
-| 52 | Lee & Wilson 2002 | Combine events (ms) | #N/A | 100 | "max_isi = 50 ms and max_gap = 100 ms"; max_gap is the event-separation threshold |
-| 27 | Shin & Jadhav 2019 | SWR electrodes | >1 | 1 | "the envelope stayed above 3 SD of the mean on at least one tetrode" |
-| 2 | Yang 2024 | Reconstruction error (cm) | 1.51 | Not reported | "1.51, 4.07, and 5.34 mean error for real, simulated, and shuffled data" is trial-decoding error in trial blocks, not a position error in cm |
-| 15 | Michon 2021 | Position bin (cm) | 1 | 4 | "the posterior probability distribution over position (sampled at a regular grid with 4 cm spacing)"; 1 cm is the sorted-unit tuning-curve bin |
-| 19 | Bhattarai 2020 | Trajectory | Linear regression | Weighted correlation | "We then calculated a weighted correlation (r) ... for each significant replay event"; the paper never uses linear regression |
-| 22 | Farooq 2019 (Neuron) | Reconstruction error (cm) | ~5 cm (inferred from Figure 1J) | 7.6 | "median error in decoded location: 7.6 cm versus 54.3 cm in shuffled datasets" |
-| 28 | Carey 2019 | Place field smooth (cm) | 2 | 3 | "Raw firing rates were smoothed with a sigma = 1 bin kernel" on "approximately 3 cm per bin"; 2 ms is the temporal spike kernel |
-| 42 | Wu & Foster 2014 | Trajectory | MAP | Weighted correlation | The replay criterion is "absolute weighted correlation > 0.5". The MAP function only cuts the subregion the score is computed over, so the score itself is the weighted correlation |
-| 44 | Carr & Frank 2012 | SWR electrodes | >1 | 1 | "ripple power (150-250 Hz) on any CA1 tetrode exceeded 3 SD above the mean" |
-| 50 | Ji & Wilson 2007 | Min. cells | 5 | 4 | "a replaying frame necessarily contained at least four active cells"; candidate frames are "those containing at least four active template cells" |
-| 51 | Foster & Wilson 2006 | Animal speed (cm/s) | 5.4 | #N/A | "Fields were velocity-filtered to exclude times when the speed of the animal was below 5.4 cm s-1" is a place-field filter that keeps running periods, not a detection gate |
-| 23 | Farooq 2019 (Science) | Shuffle method | Shuffle (type not stated) | Time-bin shuffle; rate-matched Poisson surrogate; circular space-bin shuffle (stationary frames) | "the time bins within a frame were randomly permuted (time bin shuffle for theta sequences and trajectory sequences)"; the space-bin shuffle "circularly shifted by a random amount between 1 and track length minus 1" is for stationary frames |
-| 23 | Farooq 2019 (Science) | Shuffles | #N/A | 500 | "time-bin shuffles (n=500)", used throughout |
-| 23 | Farooq 2019 (Science) | Significance threshold | #N/A | 97.5th percentile | "significant if the weighted correlation exceeded the 97.5th percentile or was below the 2.5th percentile (for reverse sequences) of the shuffled distributions" |
+| Paper | Column | Was | Now | Evidence |
+|---|---|---|---|---|
+| Huelin Gorriz 2023 | Journal | Nature Communication | Nature Communications | CrossRef container title |
+| Harvey 2023 | SWR z-score (SD) | 2.5 | 4 | "all events exceeding 4 SD from the mean were detected", then expanded to 1 SD. The 2.5 SD belongs to the separate sharp-wave stage |
+| Tirole 2022 | Detection | MUA | SWR, MUA | "a threshold over 3 was set for the z-scored ripple power, and used as an additional criterion for candidate replay events" |
+| Denovellis 2021 | Reconstruction error (cm) | Not reported | 7 | "7 cm median difference, 5-9 cm 95% CI" |
+| Muessig 2019 | SWR electrodes | >1 | 1 | "the LFP whose power estimate had the highest standard deviation was then used to define ripple events" |
+| Ólafsdóttir 2017 | SWR z-score (SD) | #N/A | 2.5 | "we identified periods where the ripple power exceeded 2.5std above the mean" |
+| Ólafsdóttir 2017 | Max duration (ms) | #N/A | 500 | "Events lasting less than 40ms or more than 500ms were excluded" |
+| Ólafsdóttir 2017 | Combine events (ms) | #N/A | 40 | "events separated by less than 40ms were joined together" |
+| Ólafsdóttir 2017 | % decoded | Not reported | 36.9-38.6% | "36.88% versus 38.60%" of putative events qualified as replay |
+| Wu & Ji 2017 | Min. cells | #N/A | 4 | "We defined those PBEs with at least four active template cells as candidate events" |
+| Yamamoto 2017 | SWR low band (Hz) | 140 | 100 | "we used both ripple band power (100-200 Hz) and multi-unit activities" |
+| Yamamoto 2017 | Decoding notes | Clusterless | (blank) | "we first performed standard spike sorting"; the word clusterless never appears |
+| Grosmark 2016 | First author | Grossmark | Grosmark | CrossRef author: Andres D. Grosmark |
+| Ambrose 2016 | Time bin (ms) | 10 | 20 | "Time windows of 20ms, overlapping by 10ms"; 10 ms is the step |
+| Ambrose 2016 | % decoded | 10-15% | 15-20% | "On average, 15-20% of SWRs were determined to contain significant trajectory replay" |
+| Jadhav & Frank 2016 | DOI | 10.1016/j.neuron.2017.09.017 | 10.1016/j.neuron.2016.02.010 | The old DOI is Yamamoto & Tonegawa 2017, already row 33. CrossRef: Jadhav to Frank, Neuron 90:113-127 (2016) |
+| Silva 2015 | MUA smooth (ms) | #N/A | 10 | "the smoothed histogram (Gaussian kernel, standard deviation of 10 ms)" |
+| Ólafsdóttir 2015 | Reconstruction error (cm) | (blank) | 10.0 | "median error for both arms = 10.0 cm" |
+| Wikenheiser 2013 | Year | 2014 | 2013 | CrossRef: Hippocampus 23:22-29, issued 2012-06-27, print 2013 |
+| Wikenheiser 2013 | Last author | Reddish | Redish | CrossRef author: A. David Redish |
+| Pfeiffer 2013 | Detection notes | cumulative distance (<40 cm) | start-to-end distance (<40 cm) | "a start-to-end distance less than 40 cm were eliminated" |
+| Pfeiffer 2013 | % decoded | 25-49% | 25.3-43.9% | "between 25.3% and 43.9% of candidate events" |
+| Karlsson & Frank 2009 | Journal | Neuron | Nature Neuroscience | CrossRef container title |
+| Karlsson & Frank 2009 | Animal speed (cm/s) | 4 | 2 | "we examined SWRs that occurred when animals were moving less than 2 cm/sec" |
+| Karlsson & Frank 2009 | SWR electrodes | >1 | 1 | "the smoothed envelope stayed above 3 standard deviations of the mean for at least 15 ms on at least one tetrode" |
+| Nádasdy 1999 | Max duration (ms) | 200 | #N/A | 200 ms is the sequence-search template window, not an event duration limit |
+| Bhattarai 2020 | First author | Bhattari | Bhattarai | CrossRef author: Baburam Bhattarai |
+| Chenani 2019 | Journal | Nature Communication | Nature Communications | CrossRef container title |
+| Chenani 2019 | Detection notes | "remained above 3 SD"; "immobility visually inspected" | peak reached 3 SD, boundaries below 1 SD; reward zones defined by visual judgment | "the place cell rate remained at least one standard deviation (SD) above its average during a period when the peak firing rate reached at least three SD"; the visual judgment defined the reward zones, not immobility |
+| Mallory 2025 | Reconstruction error (cm) | #N/A | 2.9 (track), 3.4 (arena) | "mean +/- SEM positional decoding error per session, linear track: 2.9 +/- 0.1 cm; open arena: 3.4 +/- 0.2 cm" |
+| Mallory 2025 | Trajectory | MAP | Posterior center of mass | The authors' code takes the decoded position as `binDecoding.posteriorCOM` (`compute_filtering_binDecoding_cm.m`); `posteriorPeak` is a separate quantity used for filtering |
+| Gupta 2010 | Min. duration (ms) | #N/A | 40 | "the sequence score of place cell activity within a flexible time window (40 ms to 600 ms, to accommodate longer sequences)" |
+| Gupta 2010 | Max duration (ms) | #N/A | 600 | Same sentence; the window grows until five steps pass without a score increase, or it reaches 600 ms |
+| Igata 2021 | Min. duration (ms) | 60 | 50 | "Candidate synchronous events in which the duration was less than 50 ms or more than 2000 ms were excluded". The 60 ms belongs to a later stage: "Trajectory sequences covering more than 4 time bins (60 ms) and a cumulative distance of more than 20 cm were included" |
+| Igata 2021 | Min. cells | 4 | >4 | "Candidate synchronous events were detected when the z-scored spike rates exceeded 2 and the number of active neurons exceeded 4", so the minimum is five |
+| Krause 2022 | Max duration (ms) | #N/A | 2000 | "Only SWRs longer than 50 ms and shorter than 2 s ... were included" |
+| Krause 2022 | % decoded | Not reported | 89.7% | "89.7% +/- 2.0% of SWR were identified to encode trajectories", against 22.8% by the traditional method |
+| Gridchyn 2020 | MUA z-score (SD) | 3.5 | #N/A | "a threshold of 3.5 times the baseline mean established in the pre-rest session". It is a multiple of the mean spike count, not of a standard deviation, so it does not belong in an SD column |
+| Gridchyn 2020 | Detection notes | "3.5 SD initial" | "3.5x the baseline mean spike count, not a SD multiple" | Same sentence; the adaptive adjustment to about 1 event/s was already right, and a 150 ms detection refractory is now noted |
+| Xu 2019 | Min. cells | 5 | 4 | "Events containing fewer than five spikes, four cells or with less than 10% of the population of neurons active were rejected". The 5 is the spike minimum |
+| Michon 2019 | Detection | MUA | SWR, MUA | "Candidate replay events were defined as mua bursts that overlapped with a ripple event" |
+| Michon 2019 | % decoded | 5-15% | 3.2-15.5% | "amounted to 8.75% +/- 2.52% of all SWR bursts (range: 3.2%-15.5%)" |
+| Michon 2019 | SWR z-score (SD), smooth, band, electrodes; MUA smooth | #N/A | 8; 15; 140-225; 1-3; 15 | "a high threshold of m + 8 x s" with a 0.5 SD boundary; envelope "smoothed with a Gaussian kernel (bandwidth 15 ms)"; "filtered in the ripple frequency band (140-225 Hz)"; "recorded from 1-3 tetrodes"; multiunit histogram "Gaussian kernel with 15 ms bandwidth" |
+| Pfeiffer & Foster 2015 | Trajectory | MAP | Posterior center of mass | "truncated to the longest sequence of time frames with a weighted mean posterior probability less than 50 cm from that of the previous frame". The paper never uses MAP |
+| Pfeiffer & Foster 2015 | Decoding notes | cumulative distance (<80 cm) | start-to-end distance (<80 cm) | "a start-to-end distance less than 80 cm were eliminated", the same error as the 2013 row |
+| Lee & Wilson 2002 | Detection notes | "theta/delta ratio"; "grouped by spike times exceeding max ISI from any cell" | theta-to-total-power ratio identifying REM; max_isi within a cell, max_gap between cells | "REM was identified as periods with an elevated ratio ... of hippocampal EEG power in the theta band (5-12 Hz) to overall power (1-475 Hz). The remainder was classified as SWS"; "for each cell, each set of consecutive spikes with interspike intervals less than max_isi ... broken between every pair of adjacent letters separated by more than max_gap" |
+| Lee & Wilson 2002 | Combine events (ms) | #N/A | 100 | "max_isi = 50 ms and max_gap = 100 ms"; max_gap is the event-separation threshold |
+| Shin & Jadhav 2019 | SWR electrodes | >1 | 1 | "the envelope stayed above 3 SD of the mean on at least one tetrode" |
+| Yang 2024 | Reconstruction error (cm) | 1.51 | Not reported | "1.51, 4.07, and 5.34 mean error for real, simulated, and shuffled data" is trial-decoding error in trial blocks, not a position error in cm |
+| Michon 2021 | Position bin (cm) | 1 | 4 | "the posterior probability distribution over position (sampled at a regular grid with 4 cm spacing)"; 1 cm is the sorted-unit tuning-curve bin |
+| Bhattarai 2020 | Trajectory | Linear regression | Weighted correlation | "We then calculated a weighted correlation (r) ... for each significant replay event"; the paper never uses linear regression |
+| Farooq 2019 (Neuron) | Reconstruction error (cm) | ~5 cm (inferred from Figure 1J) | 7.6 | "median error in decoded location: 7.6 cm versus 54.3 cm in shuffled datasets" |
+| Carey 2019 | Place field smooth (cm) | 2 | 3 | "Raw firing rates were smoothed with a sigma = 1 bin kernel" on "approximately 3 cm per bin"; 2 ms is the temporal spike kernel |
+| Wu & Foster 2014 | Trajectory | MAP | Weighted correlation | The replay criterion is "absolute weighted correlation > 0.5". The MAP function only cuts the subregion the score is computed over, so the score itself is the weighted correlation |
+| Carr & Frank 2012 | SWR electrodes | >1 | 1 | "ripple power (150-250 Hz) on any CA1 tetrode exceeded 3 SD above the mean" |
+| Ji & Wilson 2007 | Min. cells | 5 | 4 | "a replaying frame necessarily contained at least four active cells"; candidate frames are "those containing at least four active template cells" |
+| Foster & Wilson 2006 | Animal speed (cm/s) | 5.4 | #N/A | "Fields were velocity-filtered to exclude times when the speed of the animal was below 5.4 cm s-1" is a place-field filter that keeps running periods, not a detection gate |
+| Xu 2019 | Decoding notes | Custom optimization procedure; adaptive time bin size (# spikes) | Custom optimization procedure; jump-constrained best path (<=20 bins per step) | The paper bins every event the same way, "subdivided into 20ms windows, with a 10 ms overlap", and the word "adaptive" does not appear in it. The line belongs to the Stella 2019 row, which does bin by spike count |
+| Farooq 2019 (Science) | Shuffle method | Shuffle (type not stated) | Time-bin shuffle; rate-matched Poisson surrogate; circular space-bin shuffle (stationary frames) | "the time bins within a frame were randomly permuted (time bin shuffle for theta sequences and trajectory sequences)"; the space-bin shuffle "circularly shifted by a random amount between 1 and track length minus 1" is for stationary frames |
+| Farooq 2019 (Science) | Shuffles | #N/A | 500 | "time-bin shuffles (n=500)", used throughout |
+| Farooq 2019 (Science) | Significance threshold | #N/A | 97.5th percentile | "significant if the weighted correlation exceeded the 97.5th percentile or was below the 2.5th percentile (for reverse sequences) of the shuffled distributions" |
 
 The Karlsson row matters to this project directly: `Karlsson_ripple_detector`'s 4 cm/s
 default is the package's own, not the paper's, and the paper thresholds on one tetrode,
@@ -98,11 +105,11 @@ not be retrieved a second time to quote the sentence. The rest of the first pass
 disputes were resolved once the lab's PDF library was available; only these remain. They are recorded so the numbers
 are not cited without a check.
 
-| Row | Paper | Column | Value | Concern |
-|---|---|---|---|---|
-| 2 | Yang 2024 | 12 detection cells | as listed | Identical to the Grosmark 2016 row; possibly inherited rather than read from the supplement |
-| 37 | Jadhav & Frank 2016 | 5 decoding cells | Bayes, 15, 2, 4, linear regression | The retrieved main text contains no decoding analysis at all: zero occurrences of "decod", "Bayes" or "linear regression". The supplement could not be retrieved |
-| 16 | Igata 2021 | Min. duration | 60 | May be 50 ms, with 60 ms a sustained-sequence length. Methods are in an unreachable SI Appendix |
+| Paper | Column | Value | Concern |
+|---|---|---|---|
+| Yang 2024 | 12 detection cells | as listed | Identical to the Grosmark 2016 row; possibly inherited rather than read from the supplement |
+| Jadhav & Frank 2016 | 5 decoding cells | Bayes, 15, 2, 4, linear regression | The retrieved main text contains no decoding analysis at all: zero occurrences of "decod", "Bayes" or "linear regression". The supplement could not be retrieved |
+| Igata 2021 | Min. duration | 60 | May be 50 ms, with 60 ms a sustained-sequence length. Methods are in an unreachable SI Appendix |
 
 ## Papers added
 
@@ -206,18 +213,24 @@ trajectory cell asserted nothing. Each of the twelve was checked against its pap
 
 Three name a method the column can express:
 
-| Row | Paper | Now | Evidence |
-|---|---|---|---|
-| 21 | Xu 2019 | Viterbi | "we then ran an optimization procedure to see which arm produces the maximum summed probabilities across the probability maps representing different time windows", allowing "a jump of up to 20 spatial bins across probability maps of neighboring time windows" |
-| 23 | Farooq 2019 (Science) | Weighted correlation | "a product-moment linear correlation between time and location was computed, weighted by the associated posterior probabilities" |
-| 56 | Maboudi 2018 | Radon transform | "Many (35,000) lines with different slopes and intercepts were sampled randomly... The Bayesian replay score for a given event was the maximum score obtained from all candidate lines, where the score for a particular line was defined as the mean probability mass under the line, within a bandwidth (of 3 cm)" |
+| Paper | Now | Evidence |
+|---|---|---|
+| Xu 2019 | MAP | "we then ran an optimization procedure to see which arm produces the maximum summed probabilities across the probability maps", allowing "a jump of up to 20 spatial bins across probability maps of neighboring time windows"; "the positions were extracted from the probability map positions that yielded the maximum summed probabilities" |
+| Farooq 2019 (Science) | Weighted correlation | "a product-moment linear correlation between time and location was computed, weighted by the associated posterior probabilities" |
+| Maboudi 2018 | Radon transform | "Many (35,000) lines with different slopes and intercepts were sampled randomly... The Bayesian replay score for a given event was the maximum score obtained from all candidate lines, where the score for a particular line was defined as the mean probability mass under the line, within a bandwidth (of 3 cm)" |
 
-Xu's label is ours, not the paper's. The authors call it an optimization procedure, and it
-maximizes a sum of posterior probabilities rather than a sum of log probabilities, but it
-is a best-path search through the posterior under a hard transition bound, which is what
-this column's Viterbi entry distinguishes from a per-bin MAP. Maboudi's line sampling is
-the Davidson and Kloosterman line-finding procedure that the column already records as a
-Radon transform elsewhere, including for Davidson 2009 itself.
+Xu's cell first read Viterbi and was corrected. The procedure does search for a best path
+under a hard 20-bin step bound, but Viterbi names a maximum-likelihood state sequence
+under a transition model, and this paper has neither an HMM nor a transition probability.
+Its objective is the mean posterior probability along the recovered trajectory, the score
+Davidson 2009 introduced, which the paper cites for exactly that purpose; its only
+departure is that the trajectory may bend within the step bound rather than being a
+straight line. MAP records what the column can say truthfully, that the reported positions
+are the ones maximizing posterior probability, and the constrained search is in the
+decoding notes. Igata 2021 is recorded the same way, MAP with its jump limit noted
+separately. Maboudi's line sampling is the Davidson and Kloosterman line-finding procedure
+that the column already records as a Radon transform elsewhere, including for Davidson
+2009 itself.
 
 The other nine estimate no trajectory from a posterior, so they are now `#N/A`: Chenani
 2019, Liu 2019, Diba 2007 and Foster 2006 score rank-order correlations; Ji 2007, Lee 2002
@@ -254,16 +267,16 @@ so no entry in this column describes what the paper did.
 ## Papers that could not be retrieved
 
 Every cell in these rows is unverified, which is not the same as confirmed: Krause 2022
-(10), Gridchyn 2020 (17), Michon 2019 (25), Berners-Lee 2021 (12), and Pfeiffer & Foster
-2015 (40). Bhattarai 2020 (19) still has its detection parameters in a supplement that
-could not be retrieved. Xu 2019 (21), Farooq 2019 (23) and Lee & Wilson 2002 (52) were on
+(10), Gridchyn 2020, Michon 2019, Berners-Lee 2021, and Pfeiffer & Foster
+2015 (40). Bhattarai 2020 still has its detection parameters in a supplement that
+could not be retrieved. Xu 2019, Farooq 2019 and Lee & Wilson 2002 were on
 this list until the lab's PDF library supplied them, and the trajectory pass above read
 all three: Xu's 3 SD threshold, 15 ms multiunit kernel, four-cell minimum, 75-750 ms
 duration window, 20 ms windows stepped by 10 ms, 1 cm decoding bins, 6 cm field smoothing
 on its 2 x 2 cm maps, and its hundred place-field-rotation shuffles scored by z-score all
 check out, as do Lee's 50 ms `max_isi`, 100 ms `max_gap`, and the 1/24 match probability
 that is "1/4!, the probability of a perfect four-letter match". Farooq's three shuffle
-cells are corrected above. Igata 2021 (16), Gupta 2010 (46) and Diba 2007 (49) were settled once their
+cells are corrected above. Igata 2021, Gupta 2010 and Diba 2007 were settled once their
 supplements were supplied. Diba's row needed no correction at all: the supplement gives
 "the animal's speed was <= 10 cm s-1", events "detected by searching for silent periods
 >= 60 ms", the "≥ 5 or ≥ 30 percent of place-cells (whichever was greater) ... within the
@@ -273,10 +286,10 @@ criterion, the 2000 ms maximum, the Mahalanobis-distance ripple power with its
 Gaussian-mixture split, and the MAP trajectory with its 40 cm jump and 20 cm length
 limits. Gupta's confirmed its 2 SD threshold, three active cells, 180-220 Hz band, 3.5 cm pixels, 10 ms
 stepping, and roughly 10 % of events becoming replays (1719 of 17,593) all check out,
-and the flexible 40-600 ms detection window supplied the two durations above. Michon 2021 (15) and Carey 2019
+and the flexible 40-600 ms detection window supplied the two durations above. Michon 2021 and Carey 2019
 (28) were checked against preprints, so the published versions may have drifted.
 
-Mallory 2025 (row 1) was checked against the paper and the authors' code at
+Mallory 2025 was checked against the paper and the authors' code at
 https://github.com/caitlinmallory/TimeCourseOrganizationOfHippocampalReplay (commit
 `128513a`), which sets every detection parameter explicitly and confirmed all of them:
 `speedThr = 5` cm/s, `num_cells_participating_thr = 10`, `sequence_durationThr = 0.05`,

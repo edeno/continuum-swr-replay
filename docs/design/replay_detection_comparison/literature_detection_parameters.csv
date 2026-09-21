@@ -1,5 +1,9 @@
 First Author,Last Author,Year,DOI,Journal,Species,Detection,Detection Notes,MUA Z-score Thresh. (STD),SWR Z-score Thresh. (STD),Animal Speed (cm/s),MUA smooth (ms),SWR smooth (ms),Min. Cells (#),SWR electrodes (#),SWR Low Band (Hz),SWR High Band (Hz),Min. Duration (ms),Max Duration (ms),Combine Events Thresh. (ms),Decoding,Time bin (ms),Position bin (cm),Place field smooth (cm),Trajectory,Decoding notes,Reconst. Error (cm),% Decoded,Spike sorting,Time bin step (ms),Shuffle Method,Shuffles (#),Sig. Thresh.,% Decoded denom.,Reconst. Error bin (ms)
 Mallory,Foster,2025,https://doi.org/10.1126/science.ads4760,Science,Rats,Decoding,">66% of the posterior probability located in one of the directional maps, weighted correlation >0.6, max. jump distance<40% of the track, spatial coverage > 20% of the track",#N/A,#N/A,5,#N/A,#N/A,10,#N/A,#N/A,#N/A,50,#N/A,50,Bayes,80,2,#N/A,Posterior center of mass,,"2.9 (track), 3.4 (arena)",#N/A,Sorted,5,"none (criteria-based: weighted correlation, coverage, posterior difference, jump)",#N/A,#N/A,#N/A,#N/A
+Widloski,Foster,2025,https://doi.org/10.1038/s41467-025-65181-5,Nature Communications,Rats,Decoding,"Decoded replay with no ripple or burst requirement
+candidate = continuous epoch >=100 ms of smoothly changing decoded position
+merged if gap <20 cm and <50 ms; kept if duration >100 ms and dispersion >12 cm
+ripples (2 SD, >=15 ms) and bursts (3 SD, >=50 ms) label events after detection",#N/A,#N/A,5,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,100,#N/A,50,Bayes,80,#N/A,#N/A,Posterior center of mass,Memory-less Bayesian decoding with a uniform prior,#N/A,#N/A,Sorted,5,Place cell-ID shuffle,100,p<0.05,#N/A,#N/A
 Yang,Buzsáki,2024,https://doi.org/10.1126/science.adk8261,Science,"Rats, Mice","SWR, MUA","MUA and SWR
 MUA with at least one LFP w/ SWR
 during NREM (manually scored)",3,3,#N/A,15,#N/A,5,1,150,250,50,500,#N/A,"UMAP
@@ -50,8 +54,8 @@ Bhattarai,Jung,2020,https://doi.org/10.1073/pnas.1912533117,PNAS,Rats,SWR,"SWR
 preceded by 60 ms of silence
 extended to 1 STD",#N/A,3,4,#N/A,50,5,2,100,250,20,#N/A,100,Bayes,20,2,6,Weighted correlation,,6.56,52%,Sorted,#N/A,Permutation test (type not stated),#N/A,#N/A,candidate events,#N/A
 Stella,Csicsvari,2019,https://doi.org/10.1016/j.neuron.2019.01.052,Neuron,Rats,SWR,SWR,#N/A,5,#N/A,#N/A,#N/A,#N/A,>1,150,250,40,#N/A,#N/A,Bayes,8,4,20,MAP,Adaptive time bin size (# spikes),~9 cm (Figure S2),Not reported,Sorted,8,Cell-ID reassignment; place-field rotation; spike jittering,#N/A,Decoding-confidence threshold 0.1,#N/A,#N/A
-Xu,Csicsvari,2019,https://doi.org/10.1016/j.neuron.2018.11.015,Neuron,Rats,MUA,MUA,3,#N/A,#N/A,15,#N/A,4,#N/A,#N/A,#N/A,75,750,#N/A,Bayes,20,1,6,Viterbi,"Custom optimization procedure
-Adaptive time bin size (# spikes)",Not reported,Not reported,Sorted,10,Place-field rotation,100,none (z-score vs shuffles),#N/A,#N/A
+Xu,Csicsvari,2019,https://doi.org/10.1016/j.neuron.2018.11.015,Neuron,Rats,MUA,MUA,3,#N/A,#N/A,15,#N/A,4,#N/A,#N/A,#N/A,75,750,#N/A,Bayes,20,1,6,MAP,"Custom optimization procedure
+Jump-constrained best path (<=20 bins per step)",Not reported,Not reported,Sorted,10,Place-field rotation,100,none (z-score vs shuffles),#N/A,#N/A
 Farooq,Dragoi,2019,https://doi.org/10.1016/j.neuron.2019.05.040,Neuron,Rats,"SWR, MUA",MUA and SWR,2,Not reported,1,15,#N/A,5,Not reported,175,225,100,800,#N/A,Bayes,20,1,5,"Weighted correlation, Radon transform",,7.6,~10%,Sorted,20,Time-bin shuffle; rate-matched Poisson surrogate; weighted circular-shift space-bin shuffle,500,97.5th percentile,MUA frames,250
 Farooq,Dragoi,2019,https://doi.org/10.1126/science.aav0502,Science,Rats,MUA,"MUA
 theta/delta ratio",2,#N/A,2,15,#N/A,5,#N/A,#N/A,#N/A,100,800,#N/A,Bayes,20,1,5,Weighted correlation,,~5 cm,Not reported,Sorted,#N/A,Time-bin shuffle; rate-matched Poisson surrogate; circular space-bin shuffle (stationary frames),500,97.5th percentile,#N/A,#N/A
@@ -69,6 +73,8 @@ Muessig,Wills,2019,https://doi.org/10.1016/j.cub.2019.01.005,Current Biology,Rat
 theta/delta ratio",3,4,2.5,10,#N/A,#N/A,1,100,250,100,750,#N/A,Bayes,20,2.5,5,Radon transform,,<10 cm median,Not reported,Sorted,10,Cell-ID shuffle; map shuffle,500,95th percentile,#N/A,300
 Drieu,Zugaro,2018,https://doi.org/10.1126/science.aat2952,Science,Rats,MUA,"MUA
 theta/delta ratio",3,#N/A,0.05,10,#N/A,3,#N/A,#N/A,#N/A,60,500,#N/A,Bayes,20,2.4,4.5,Radon transform,,Not reported,Not reported,Sorted,20,#N/A,#N/A,#N/A,#N/A,#N/A
+Maboudi,Kemere,2018,https://doi.org/10.7554/eLife.34467,eLife,Rats,MUA,"PBEs from pooled multiunit activity
+hidden Markov model over 20 ms bins; replay scored without place fields",#N/A,#N/A,5,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,Bayes,20,#N/A,#N/A,Radon transform,#N/A,#N/A,#N/A,Sorted,20,Temporal shuffle (per-neuron circular permutation); time-swap; Poisson surrogate,#N/A,#N/A,#N/A,#N/A
 Ólafsdóttir,Barry,2017,https://doi.org/10.1016/j.neuron.2017.09.035,Neuron,Rats,MUA,MUA,3,2.5,3,5,#N/A,5,#N/A,#N/A,#N/A,40,500,40,Bayes,10,2,10,Radon transform,,17.5 cm,36.9-38.6%,Sorted,10,Place-field rotation,100,p<0.025,putative events,500
 Wu,Ji,2017,https://doi.org/10.1038/nn.4507,Nature Neuroscience,Rats,MUA,MUA,4,#N/A,3,#N/A,#N/A,4,#N/A,#N/A,#N/A,50,400,#N/A,Bayes,20,3.1,6.2,Linear regression,,Not reported,Not reported,Sorted,10,Time-bin shuffle,1000,p<0.05,#N/A,#N/A
 Yamamoto,Tonegawa,2017,https://doi.org/10.1016/j.neuron.2017.09.017,Neuron,Mice,"SWR, MUA",extend to 1 STD,3,3,2,#N/A,#N/A,#N/A,1,100,200,#N/A,#N/A,70,Bayes,10,Not reported,Not reported,Radon transform,,Not reported,12-15%,Both,#N/A,Column shuffle of the posterior,2000,#N/A,replay candidates,#N/A
@@ -78,6 +84,9 @@ MUA with at least one LFP w/ SWR
 during NREM (manually scored)",3,3,#N/A,15,15,5,1,150,250,50,500,#N/A,Bayes,20,2,5,Weighted regression,,5.14 cm,Not reported,Sorted,20,Circular place-field shuffle; time-bin shuffle; Poisson surrogate,1000,#N/A,#N/A,500
 Ambrose,Foster,2016,https://doi.org/10.1016/j.neuron.2016.07.047,Neuron,Rats,SWR,SWR,#N/A,3,5,#N/A,12.5,#N/A,>1,150,250,50,500,#N/A,Bayes,20,1.8,3,Weighted correlation,weighted correlation (>0.6),Not reported,15-20%,Sorted,10,none for the primary criterion; Monte Carlo shuffle of the posterior for verification,1500,weighted correlation >0.6 (p<0.05 in verification),SWRs,#N/A
 Jadhav,Frank,2016,https://doi.org/10.1016/j.neuron.2016.02.010,Neuron,Rats,SWR,SWR,#N/A,3,4,#N/A,4,4,>1,150,250,15,#N/A,#N/A,Bayes,15,2,4,Linear regression,,Not reported,Not reported,Sorted,15,Time-bin shuffle,500,p<0.05,#N/A,#N/A
+Ólafsdóttir,Barry,2016,https://doi.org/10.1038/nn.4291,Nature Neuroscience,Rats,MUA,"MU activity from place cells, 1 ms bins, Gaussian 5 ms
+peak >3 SD above the mean, boundaries where activity returns to the mean
+events <40 ms or using <15% of the place-cell ensemble rejected",3,#N/A,#N/A,5,#N/A,15% of ensemble,#N/A,#N/A,#N/A,40,#N/A,#N/A,Bayes,#N/A,2,10,Radon transform,Exhaustive line-fit search over velocity and intercept,#N/A,#N/A,Sorted,#N/A,Place cell-ID shuffle,#N/A,P<0.2 vs own shuffle,#N/A,#N/A
 Silva,Foster,2015,https://doi.org/10.1038/nn.4151,Nature Neuroscience,Rats,MUA,MUA,3,#N/A,5,10,#N/A,#N/A,#N/A,#N/A,#N/A,100,500,#N/A,Bayes,20,2.5,5,"Weighted correlation, Linear regression, MAP",,4.34,Not reported,Sorted,20,Column-cycle shuffle; Poisson simulation; time swap,5000,p<0.05,#N/A,250
 Ólafsdóttir,Spiers,2015,https://doi.org/10.7554/eLife.06063,eLife,Rats,MUA,"MUA
 Deteected 50 ms of silence
@@ -87,9 +96,9 @@ Bayes",5,1,2,Radon transform,,10,Not reported,Sorted,5,Cell-ID shuffle,1000,95th
 Pfeiffer,Foster,2015,https://doi.org/10.1126/science.aaa9633,Science,Rats,SWR,SWR,#N/A,3,5,#N/A,12.5,#N/A,>1,150,250,50,2000,#N/A,Bayes,20,2,4,Posterior center of mass,"Exclude events:
 steps (<10)
 start-to-end distance (<80 cm)",Not reported,Not reported,Sorted,5,none (jump and start-to-end distance criteria),#N/A,#N/A,#N/A,#N/A
+Wu,Foster,2014,https://doi.org/10.1523/JNEUROSCI.3414-13.2014,Journal of Neuroscience,Rats,MUA,MUA,2,#N/A,5,15,#N/A,#N/A,#N/A,#N/A,#N/A,50,#N/A,#N/A,Bayes,10,1.8,9,Weighted correlation,,Not reported,Not reported,Sorted,10,"Place-field circular shift (on cumulative counts, not per event)",5000,|weighted correlation|>0.5 per event; p<0.05 on counts,#N/A,#N/A
 Wikenheiser,Redish,2013,https://doi.org/10.1002/hipo.22049,Hippocampus,Rats,SWR,"150 ms window centered on crossing
 theta/delta ratio",#N/A,1,2,#N/A,#N/A,3,#N/A,140,220,#N/A,#N/A,#N/A,Bayes,10,4,#N/A,Linear regression,Only time steps with 1 spike included,Not reported,28%,Sorted,10,Bootstrap of Karlsson & Frank 2009 (not described),#N/A,p<0.05,candidate ripples,#N/A
-Wu,Foster,2014,https://doi.org/10.1523/JNEUROSCI.3414-13.2014,Journal of Neuroscience,Rats,MUA,MUA,2,#N/A,5,15,#N/A,#N/A,#N/A,#N/A,#N/A,50,#N/A,#N/A,Bayes,10,1.8,9,Weighted correlation,,Not reported,Not reported,Sorted,10,"Place-field circular shift (on cumulative counts, not per event)",5000,|weighted correlation|>0.5 per event; p<0.05 on counts,#N/A,#N/A
 Pfeiffer,Foster,2013,https://doi.org/10.1038/nature12112,Nature,Rats,MUA,MUA,3,#N/A,5,10,#N/A,#N/A,#N/A,#N/A,#N/A,50,2000,#N/A,Bayes,20,2,4,MAP,"Exclude events:
 steps (<10)
 start-to-end distance (<40 cm)",Not reported,25.3-43.9%,Sorted,5,Cell-ID shuffle; place-field shift,5000,#N/A,candidate events,#N/A
@@ -117,12 +126,3 @@ visual inspection of animal state",#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,
 Nádasdy,Buzsáki,1999,https://doi.org/10.1523/JNEUROSCI.19-21-09497.1999,Journal of Neuroscience,Rats,SWR,SWR,#N/A,7,#N/A,#N/A,#N/A,#N/A,#N/A,150,250,#N/A,#N/A,#N/A,Template matching,10,#N/A,#N/A,#N/A,,#N/A,#N/A,Sorted,#N/A,ISI shuffle; temporal jitter; across-train shuffle; phase-invariant shuffle,100,p<0.01,#N/A,#N/A
 Kudrimoti,McNaughton,1999,https://doi.org/10.1523/JNEUROSCI.19-10-04090.1999,Journal of Neuroscience,Rats,SWR,"SWR
 visual inspection of animal state",#N/A,Not reported,#N/A,#N/A,#N/A,#N/A,1,100,300,25,#N/A,#N/A,"Correlation, 100 ms bins",100,#N/A,#N/A,#N/A,,#N/A,#N/A,Sorted,100,none,#N/A,#N/A,#N/A,#N/A
-Widloski,Foster,2025,https://doi.org/10.1038/s41467-025-65181-5,Nature Communications,Rats,Decoding,"Decoded replay with no ripple or burst requirement
-candidate = continuous epoch >=100 ms of smoothly changing decoded position
-merged if gap <20 cm and <50 ms; kept if duration >100 ms and dispersion >12 cm
-ripples (2 SD, >=15 ms) and bursts (3 SD, >=50 ms) label events after detection",#N/A,#N/A,5,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,100,#N/A,50,Bayes,80,#N/A,#N/A,Posterior center of mass,Memory-less Bayesian decoding with a uniform prior,#N/A,#N/A,Sorted,5,Place cell-ID shuffle,100,p<0.05,#N/A,#N/A
-Maboudi,Kemere,2018,https://doi.org/10.7554/eLife.34467,eLife,Rats,MUA,"PBEs from pooled multiunit activity
-hidden Markov model over 20 ms bins; replay scored without place fields",#N/A,#N/A,5,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,Bayes,20,#N/A,#N/A,Radon transform,#N/A,#N/A,#N/A,Sorted,20,Temporal shuffle (per-neuron circular permutation); time-swap; Poisson surrogate,#N/A,#N/A,#N/A,#N/A
-Ólafsdóttir,Barry,2016,https://doi.org/10.1038/nn.4291,Nature Neuroscience,Rats,MUA,"MU activity from place cells, 1 ms bins, Gaussian 5 ms
-peak >3 SD above the mean, boundaries where activity returns to the mean
-events <40 ms or using <15% of the place-cell ensemble rejected",3,#N/A,#N/A,5,#N/A,15% of ensemble,#N/A,#N/A,#N/A,40,#N/A,#N/A,Bayes,#N/A,2,10,Radon transform,Exhaustive line-fit search over velocity and intercept,#N/A,#N/A,Sorted,#N/A,Place cell-ID shuffle,#N/A,P<0.2 vs own shuffle,#N/A,#N/A
