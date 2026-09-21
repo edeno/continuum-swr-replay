@@ -4,7 +4,7 @@
 [literature_detection_parameters.csv](literature_detection_parameters.csv), what was
 changed, and what remains unverified. Checked 2026-09-21 against the papers' Methods.*
 
-The CSV in this directory carries the 30 corrections below. **The Google Sheet it was
+The CSV in this directory carries the 39 corrections below. **The Google Sheet it was
 exported from does not**, and has to be edited by hand; the "Sheet edits" table is
 written for that.
 
@@ -13,7 +13,8 @@ written for that.
 All 54 rows were checked. Every row's DOI was resolved through the CrossRef API and checked against the stated
 first author, last author, year, and journal. Each parameter cell that was not `#N/A`
 or "Not reported" was checked against the paper's Methods, retrieved through Europe PMC
-full text, the NCBI `efetch` service, or the PMC article page. A first pass was made per
+full text, the NCBI `efetch` service, the PMC article page, or the lab's own PDF
+library, which supplied the papers no public route would serve. A first pass was made per
 block of rows; every correction below was then re-checked independently against the
 paper before it was applied, and the supporting sentence is quoted.
 
@@ -54,6 +55,15 @@ paper that could not be retrieved.
 | 24 | Chenani 2019 | Journal | Nature Communication | Nature Communications | CrossRef container title |
 | 24 | Chenani 2019 | Detection notes | "remained above 3 SD"; "immobility visually inspected" | peak reached 3 SD, boundaries below 1 SD; reward zones defined by visual judgement | "the place cell rate remained at least one standard deviation (SD) above its average during a period when the peak firing rate reached at least three SD"; the visual judgement defined the reward zones, not immobility |
 | 27 | Shin & Jadhav 2019 | SWR electrodes | >1 | 1 | "the envelope stayed above 3 SD of the mean on at least one tetrode" |
+| 2 | Yang 2024 | Reconstruction error (cm) | 1.51 | Not reported | "1.51, 4.07, and 5.34 mean error for real, simulated, and shuffled data" is trial-decoding error in trial blocks, not a position error in cm |
+| 15 | Michon 2021 | Position bin (cm) | 1 | 4 | "the posterior probability distribution over position (sampled at a regular grid with 4 cm spacing)"; 1 cm is the sorted-unit tuning-curve bin |
+| 19 | Bhattarai 2020 | Trajectory | Linear regression | Weighted correlation | "We then calculated a weighted correlation (r) ... for each significant replay event"; the paper never uses linear regression |
+| 22 | Farooq 2019 (Neuron) | Reconstruction error (cm) | ~5 cm (inferred from Figure 1J) | 7.6 | "median error in decoded location: 7.6 cm versus 54.3 cm in shuffled datasets" |
+| 28 | Carey 2019 | Place field smooth (cm) | 2 | 3 | "Raw firing rates were smoothed with a sigma = 1 bin kernel" on "approximately 3 cm per bin"; 2 ms is the temporal spike kernel |
+| 42 | Wu & Foster 2014 | Trajectory | MAP | Weighted correlation, MAP | The replay criterion is "absolute weighted correlation > 0.5"; the MAP function cuts the subregion the score is computed on, so both belong |
+| 44 | Carr & Frank 2012 | SWR electrodes | >1 | 1 | "ripple power (150-250 Hz) on any CA1 tetrode exceeded 3 SD above the mean" |
+| 50 | Ji & Wilson 2007 | Min. cells | 5 | 4 | "a replaying frame necessarily contained at least four active cells"; candidate frames are "those containing at least four active template cells" |
+| 51 | Foster & Wilson 2006 | Animal speed (cm/s) | 5.4 | #N/A | "Fields were velocity-filtered to exclude times when the speed of the animal was below 5.4 cm s-1" is a place-field filter that keeps running periods, not a detection gate |
 
 The Karlsson row matters to this project directly: `Karlsson_ripple_detector`'s 4 cm/s
 default is the package's own, not the paper's, and the paper thresholds on one tetrode,
@@ -62,23 +72,15 @@ which the package already does.
 ## Flagged but not changed
 
 These were disputed in the first pass and are **not** applied, because the paper could
-not be retrieved a second time to quote the sentence. They are recorded so the numbers
+not be retrieved a second time to quote the sentence. The rest of the first pass's
+disputes were resolved once the lab's PDF library was available; only these remain. They are recorded so the numbers
 are not cited without a check.
 
 | Row | Paper | Column | Value | Concern |
 |---|---|---|---|---|
-| 2 | Yang 2024 | Reconstruction error | 1.51 | May be a trial-block decoding error rather than a position error in cm. Supplement paywalled |
 | 2 | Yang 2024 | 12 detection cells | as listed | Identical to the Grosmark 2016 row; possibly inherited rather than read from the supplement |
-| 42 | Wu & Foster 2014 | Trajectory | MAP | The reported score may be weighted correlation |
-| 44 | Carr & Frank 2012 | SWR electrodes | >1 | May be one tetrode, as in Karlsson & Frank |
-| 50 | Ji & Wilson 2007 | Min. cells | 5 | May be 4 |
-| 51 | Foster & Wilson 2006 | Animal speed | 5.4 | May be a place-field construction filter rather than a detection gate |
 | 37 | Jadhav & Frank 2016 | 5 decoding cells | Bayes, 15, 2, 4, linear regression | The retrieved main text contains no decoding analysis at all: zero occurrences of "decod", "Bayes" or "linear regression". The supplement could not be retrieved |
-| 15 | Michon 2021 | Position bin | 1 | The preprint decodes on a 4 cm grid; 1 cm may be the sorted-unit tuning-curve bin. Published version paywalled |
 | 16 | Igata 2021 | Min. duration | 60 | May be 50 ms, with 60 ms a sustained-sequence length. Methods are in an unreachable SI Appendix |
-| 19 | Bhattarai 2020 | Trajectory | Linear regression | May be weighted correlation. Methods are in an unreachable SI Appendix |
-| 22 | Farooq 2019 (Neuron) | Reconstruction error | ~5 cm | May be 7.6 cm median. Paper not retrievable |
-| 28 | Carey 2019 | Place field smooth | 2 | May be a 1-bin kernel on ~3 cm bins, with 2 ms being the temporal spike kernel. Paper not retrievable |
 
 ## Systematic issues, not single-cell errors
 
