@@ -85,13 +85,13 @@ Silva,Foster,2015,https://doi.org/10.1038/nn.4151,Nature Neuroscience,Rats,MUA,M
 Deteected 50 ms of silence
 If 15% of cells within 300 ms, then event",#N/A,#N/A,10,#N/A,#N/A,7,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,"
 Template Matching
-Bayes",5,1,2,Radon transform,,10.0,Not reported
+Bayes",5,1,2,Radon transform,,10,Not reported
 Pfeiffer,Foster,2015,https://doi.org/10.1126/science.aaa9633,Science,Rats,SWR,SWR,#N/A,3,5,#N/A,12.5,,>1,150,250,50,2000,,Bayes,20,2,4,MAP,"Exclude events:
 steps (<10)
 cumulative distance (<80 cm)",Not reported,Not reported
 Wikenheiser,Redish,2013,https://doi.org/10.1002/hipo.22049,Hippocampus,Rats,SWR,"150 ms window centered on crossing
 theta/delta ratio",#N/A,1,2,#N/A,#N/A,3,#N/A,140,220,#N/A,#N/A,#N/A,Bayes,10,4,#N/A,Linear regression,Only time steps with 1 spike included,Not reported,28%
-Wu,Foster,2014,https://doi.org/10.1523/JNEUROSCI.3414-13.2014,Journal of Neuroscience,Rats,MUA,MUA,2,#N/A,5,15,#N/A,#N/A,#N/A,#N/A,#N/A,50,#N/A,#N/A,Bayes,10,1.8,9,"Weighted correlation, MAP",,Not reported,Not reported
+Wu,Foster,2014,https://doi.org/10.1523/JNEUROSCI.3414-13.2014,Journal of Neuroscience,Rats,MUA,MUA,2,#N/A,5,15,#N/A,#N/A,#N/A,#N/A,#N/A,50,#N/A,#N/A,Bayes,10,1.8,9,Weighted correlation,,Not reported,Not reported
 Pfeiffer,Foster,2013,https://doi.org/10.1038/nature12112,Nature,Rats,MUA,MUA,3,#N/A,5,10,#N/A,#N/A,#N/A,#N/A,#N/A,50,2000,#N/A,Bayes,20,2,4,MAP,"Exclude events:
 steps (<10)
 start-to-end distance (<40 cm)",Not reported,25.3-43.9%

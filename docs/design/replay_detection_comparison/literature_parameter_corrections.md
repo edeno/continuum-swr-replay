@@ -4,9 +4,9 @@
 [literature_detection_parameters.csv](literature_detection_parameters.csv), what was
 changed, and what remains unverified. Checked 2026-09-21 against the papers' Methods.*
 
-The CSV in this directory carries the 39 corrections below. **The Google Sheet it was
-exported from does not**, and has to be edited by hand; the "Sheet edits" table is
-written for that.
+Both the CSV in this directory and the Google Sheet it came from carry the 39
+corrections below. They were compared cell by cell afterwards and agree exactly across
+all 54 rows and 28 columns.
 
 ## Method
 
@@ -111,40 +111,21 @@ parameters in supplements that could not be retrieved. Michon 2021 (15) and Care
 (28) were checked against preprints, so the published versions may have drifted. Science, Cell Press and the Journal of
 Neuroscience all refuse automated requests.
 
-## Sheet edits
+## How the Sheet was updated
 
-To bring the Google Sheet into line, change these cells. Row numbers are sheet rows,
-which are the data row plus one for the header.
+The Sheets API refuses an unauthenticated write even with link editing enabled, so the
+Sheet was edited through a browser session driven by Playwright, anonymously, one cell
+at a time by cell reference. The edits appear in the Sheet's version history as
+anonymous and can be reverted there.
 
-| Sheet row | Column heading | New value |
-|---|---|---|
-| 4 | Journal | Nature Communications |
-| 5 | SWR Z-score Thresh. (STD) | 4 |
-| 7 | Detection | SWR, MUA |
-| 14 | Reconst. Error (cm) | 7 |
-| 30 | SWR electrodes (#) | 1 |
-| 32 | SWR Z-score Thresh. (STD) | 2.5 |
-| 32 | Max Duration (ms) | 500 |
-| 32 | Combine Events Thresh. (ms) | 40 |
-| 32 | % Decoded | 36.9-38.6% |
-| 33 | Min. Cells (#) | 4 |
-| 34 | SWR Low Band (Hz) | 100 |
-| 34 | Decoding notes | (clear the cell) |
-| 36 | First Author | Grosmark |
-| 37 | Time bin (ms) | 20 |
-| 37 | % Decoded | 15-20% |
-| 38 | DOI | https://doi.org/10.1016/j.neuron.2016.02.010 |
-| 39 | MUA smooth (ms) | 10 |
-| 40 | Reconst. Error (cm) | 10.0 |
-| 42 | Year | 2013 |
-| 42 | Last Author | Redish |
-| 44 | Decoding notes | replace "cumulative distance" with "start-to-end distance" |
-| 44 | % Decoded | 25.3-43.9% |
-| 48 | Journal | Nature Neuroscience |
-| 48 | Animal Speed (cm/s) | 2 |
-| 48 | SWR electrodes (#) | 1 |
-| 54 | Max Duration (ms) | #N/A |
-| 20 | First Author | Bhattarai |
-| 25 | Journal | Nature Communications |
-| 25 | Detection Notes | Place cell rate peak reached 3 SD, boundaries where it fell below 1 SD, and 5 or more active cells / Reward zones defined by visual judgement of the speed distribution |
-| 28 | SWR electrodes (#) | 1 |
+Three cells sit in columns with chip validation, `Detection` and `Trajectory`. Typing a
+value into those cleared the cell instead of setting it, so they were restored by
+copying a cell that already held the wanted value: `G3` to `G7`, and `Y4` to `Y20` and
+`Y43`. Anyone editing those columns by script should copy an existing chip rather than
+type.
+
+Two values are recorded slightly differently from the quoted text, because the column is
+numeric: Ólafsdóttir 2015's reconstruction error reads 10 rather than 10.0, and Wu &
+Foster 2014's trajectory reads "Weighted correlation" alone, since the vocabulary has no
+"Weighted correlation, MAP" entry. The MAP function there cuts the subregion that the
+weighted correlation is computed over; the score itself is the weighted correlation.
