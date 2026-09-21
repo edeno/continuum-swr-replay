@@ -13,11 +13,13 @@ register invites the cross-method blending this design forbids.
 | [01-yu-swr-detector.md](01-yu-swr-detector.md) | SWR detector with a noise-percentile threshold (Yu et al. 2017) | design complete |
 | [02-memoryless-sequence.md](02-memoryless-sequence.md) | Memoryless sliding-window sequence detector (Widloski & Foster 2025) | design complete |
 | [03-inventory-comparison.md](03-inventory-comparison.md) | Six inventories → common schema → N-way overlap accounting | design complete |
-| [04-event-features.md](04-event-features.md) | Frozen predictions about every method's weaknesses, ours included, and the diagnostics that test them | design complete |
+| [04-event-features.md](04-event-features.md) | Symmetric event characterization and selection diagnostics; threshold robustness as a later follow-up | initial scope agreed |
 | [05-validation.md](05-validation.md) | Simulation and held-out-tetrode validation: what a performance claim would need | parked |
 
-01 and 02 are independent and can proceed in parallel. 03 depends on both; 04 depends on
-03 and its predictions table must be committed before 03 runs.
+01 and 02 are independent and can proceed in parallel. 03 depends on both; the initial
+diagnostics in 04 follow 03. Record the primary settings and analyses before running the
+comparison. Threshold robustness follows the default-setting report, starting with a
+small cost pilot; it does not block that report.
 
 ## Purpose
 
@@ -31,12 +33,19 @@ Agreement across methods is evidence of robustness to detection choices. It is n
 independent validation of the recordings or of the encoding model, and disagreement
 can reflect a different scientific target as much as different sensitivity.
 
-The comparison characterizes the strengths and weaknesses of every method, **ours
-included**, and it does so against predictions written down before any cross-method
-result is inspected (04). Where a prediction comes out against our detector, it is
-reported as a limitation with the same prominence as one that comes out against another
-method. There is no ground truth in this design; what would license a sensitivity or
-specificity claim is recorded in 05 and is not scheduled.
+The comparison characterizes the strengths and limitations of every method, **ours
+included**, for the question being asked. Record a short set of expected tradeoffs (04),
+use the same primary diagnostics for all inventories, and report disagreements in both
+directions. Additional questions prompted by the results are allowed and identified as
+exploratory. There is no ground truth in this design; accuracy, sensitivity, precision,
+and calibration claims require validation such as the studies parked in 05.
+
+The initial report contains overlap and time coverage, event differences, boundary and
+segmentation summaries, selection diagnostics, and reproducibly sampled examples at the
+retained default settings. It can be completed before threshold robustness. Leave-one-
+tetrode-out studies, encoding refits, native-speed controls, and task-model refits are
+follow-ups motivated by particular findings, not requirements for the initial report.
+No method is designated the reference detector against which others are judged.
 
 ## The governing rule
 
@@ -47,10 +56,10 @@ specificity claim is recorded in 05 and is not scheduled.
 | **Substrate** — same recordings, epochs, speed-eligible population, and the fitted encoding model where a method needs one | ✅ | |
 | **Method internals** — thresholds, noise models, summary statistics, event assembly, scoring rules | | ✅ |
 
-The speed/immobility gate is substrate: it defines which time is eligible, upstream of
-any detection, so every method runs under our canonical whole-event rule (< 4 cm/s).
-Running each method under its own native gate is a **secondary** analysis (03), reported
-to show how much of any difference the gate accounts for.
+The speed/immobility rule is shared eligibility: every method's candidates are qualified
+under our canonical whole-event rule (< 4 cm/s), retaining the per-bin gates needed for
+candidate assembly. Running each method under its native speed gate is a **deferred
+control** (03) if needed to explain a particular difference.
 
 Everything downstream of that is method-internal and must not be blended. Concretely,
 and these are live hazards rather than hypotheticals:
@@ -98,16 +107,16 @@ Each produces an event table over the same epochs and the same speed-eligible po
 |---|---|---|---|---|
 | 1 | SWR, consensus trace | LFP | `Kay_ripple_detector` | exists (`SWR_event`) |
 | 2 | SWR, per-channel with merging | LFP | `Karlsson_ripple_detector` (Karlsson et al. 2009) | in package; needs a run |
-| 3 | SWR, noise-percentile threshold | LFP | Yu et al. 2017 | **build — [01](01-yu-swr-detector.md)** |
+| 3 | SWR, noise-percentile threshold | LFP | Yu et al. 2017 | **build in `ripple_detection` — [01](01-yu-swr-detector.md)** |
 | 4 | MUA high-synchrony events | population rate | `multiunit_HSE_detector` | exists (`MUA_event`) |
 | 5 | Posterior threshold | decoding | our state-space non-local detection | exists (`non_local_event`) |
 | 6 | Posterior sequence | decoding | Widloski & Foster 2025 | **build — [02](02-memoryless-sequence.md)** |
 
 1, 2 and 3 are three different SWR *algorithms*, not three thresholds on one algorithm:
-Kay thresholds a consensus trace averaged across tetrodes, Karlsson detects per channel
-and merges, Yu estimates a per-day noise distribution and takes a percentile of it. They
-disagree structurally — Kay can miss an event confined to one tetrode that Karlsson
-catches; Karlsson can fragment an event Kay sees whole.
+Kay thresholds a root-sum-of-squares consensus trace, Karlsson detects per channel and
+merges, and Yu uses a median consensus with a noise-percentile threshold. Their
+aggregation and event-assembly rules can produce different populations and boundaries;
+the comparison measures those differences rather than assuming an ordering of sensitivity.
 
 The `ripple_detection` package supplying 1, 2 and 4 is
 [Eden-Kramer-Lab/ripple_detection](https://github.com/Eden-Kramer-Lab/ripple_detection);
@@ -151,12 +160,13 @@ Method-specific decisions live in the component specs. These apply across the co
 | **X1** | Compare detection *triggers* (level 1); defer scoring (level 2) to 04 | The trigger is upstream of everything else and determines which of the ripple-less and neither-ripple-nor-burst questions each inventory can ask at all |
 | **X2** | Six inventories, not two | A within-family comparison of two posterior-triggered methods cannot say what the standard SWR/MUA pipelines would have found |
 | **X3** | Harmonize substrate, not method internals | Comparability without blending; see the governing rule above |
-| **X4** | Speed/immobility gate is substrate — our whole-event < 4 cm/s for every method; native gates are a secondary analysis | The gate is upstream of detection and defines the eligible population. Keeps a cohort difference attributable to the algorithm |
-| **X5** | Hold the fitted encoding model fixed for both decoding-based methods; running-only refit is a secondary control applied to **both** | Substrate under X3. Also means the encoding model is not a free variable distinguishing them |
+| **X4** | Shared whole-event < 4 cm/s eligibility for every method; native-speed controls are deferred | Apply the same eligibility criterion to each method's candidates. Different event boundaries can still affect qualification |
+| **X5** | Hold the fitted encoding model fixed for both decoding-based methods; any later running-only control applies to **both** | Substrate under X3. An encoding refit is not an initial deliverable |
 | **X6** | Label every cohort under every SWR definition; report the matrix | Imposing one definition would blend methods, and the matrix delivers label sensitivity for free |
 | **X7** | Clusterless compatibility bounds the factorial | See the scope boundary above; stated so the exclusions are legible |
 | **X8** | Each cohort gets its own key; cohorts relate only by temporal overlap, never by shared ids | `event_id` hashes are cohort-dependent, so a shared key would mis-join silently (CLAUDE.md on atomic regeneration) |
-| **X9** | The predictions table in 04 is frozen — committed, hash recorded in the run manifest — before 03 produces its first matched cohort; every row is reported whichever way it comes out | A comparison whose questions are chosen after the answers is a case for the defence. Freezing the predictions is what makes the descriptive result objective |
+| **X9** | Record the primary configuration and analyses; report all primary contrasts symmetrically and label subsequent exploratory analyses | Objectivity depends on fair measurements and reporting, not on a frozen list of expected weaknesses. Keep original results and any changes traceable |
+| **X10** | Retain threshold robustness as a planned follow-up after the default-setting report, beginning with a small cost pilot | Reuse valid cached work, measure the expensive re-decoding/shuffle costs, and choose a limited scope before expanding. Until run, robustness to thresholds is unassessed |
 
 ## Reference material
 

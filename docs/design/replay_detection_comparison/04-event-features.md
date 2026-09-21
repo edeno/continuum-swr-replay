@@ -1,198 +1,181 @@
-# Predictions and diagnostics: how the events differ, and why
+# Event differences, selection diagnostics, and threshold robustness
 
-*Design spec. Status: approved, not yet implemented. Do not begin the analyses until
-[03](03-inventory-comparison.md) has produced matched cohorts; do not edit the
-predictions table after it has.*
+*Design spec. Status: agreed, not yet implemented. Default-setting diagnostics follow
+[03](03-inventory-comparison.md). Threshold robustness is planned for a later stage and
+does not block the initial report.*
 *Governing rule and cross-cutting decisions: [overview.md](overview.md).*
 
-[03](03-inventory-comparison.md) establishes *which* events each detector found and where
-they coincide. This spec covers what the events are like, why a given detector accepted
-or rejected them, and what that says about each method's strengths and weaknesses —
-ours included. It has no ground truth and claims none; what it offers instead is a set of
-predictions written before the results exist, each with the observation that would count
-against it.
+The initial comparison asks which events each method finds, how the overlapping and
+non-overlapping populations differ, and which selection rules account for disagreement.
+It describes strengths and limitations for the scientific question being asked; it does
+not rank detectors against an assumed truth set.
 
-## Principle
+## Expectations and interpretation
 
-The comparison is objective to the extent that its predictions precede its results.
+Record these expectations before inspecting the comparison, but treat them as possible
+tradeoffs rather than a checklist of predictions that must receive binary verdicts.
 
-- The predictions table below is **frozen** (overview X9): committed, hash recorded in
-  the run manifest, before 03 produces its first matched cohort. No row is added,
-  removed, or reworded after that point. A prediction that turns out to be badly posed
-  is reported as badly posed, not replaced.
-- **Every row is reported**, whichever way it comes out. Rows that come out against our
-  state-space detector become stated limitations in the methods and discussion, with the
-  same prominence as rows that come out against the other methods.
-- A prediction that is confirmed for a method is a *characterization* of that method,
-  not a demonstration that another method is better. Whether a difference is a flaw or
-  a different scientific target is argued per row, in the text, from the evidence.
-
-## The predictions table
-
-Each row names the method, the predicted weakness, the analysis that tests it (defined in
-the next section), and the result that would count against the prediction. The last
-column is always evidence **against the prediction**, so for the rows about our own
-detector it is the outcome that would *favour* our detector; read it that way.
-
-| # | method | predicted weakness | tested by | evidence against |
-|---|---|---|---|---|
-| **P1** | SWR (Kay, Karlsson, Yu) | Ripple power is continuous, not bimodal, so the threshold discards a lower-power tail whose events carry real spatial content | A2 threshold sweep; A1 ripple-power feature on ours-only events | Ours-only events have ripple power indistinguishable from non-event immobility |
-| **P2** | SWR | Admits events whose spatial content is local or absent | A1 state-occupancy and distance features on SWR-only events; A3 spike evidence | SWR-only events carry non-local spike evidence at the rate shared events do |
-| **P3** | SWR | Boundaries follow the LFP envelope, not the content | A4 onset/offset differences on matched pairs | Offsets are small and symmetric |
-| **P4** | SWR | The three SWR algorithms disagree with each other about the lower-power tail | 03's SWR-label matrix; A2 sweep per algorithm | The algorithms' unique cells are empty or tiny |
-| **P5** | MUA | As P1 and P2, and the event set depends on which tetrodes are present | A1, A2, A3 as for SWR; A5 leave-one-tetrode-out stability | Stable event sets under tetrode removal |
-| **P6** | Widloski | The 80 ms window blurs onsets and merges close events | A4 boundary differences and split/merge counts on matched pairs | No systematic widening; one-to-many counts match ours |
-| **P7** | Widloski | The 100 ms duration and 12 cm dispersion criteria reject short and stationary remote representation that our detector counts | A1 duration and dispersion features on ours-only events | Ours-only events are mostly above both cutoffs |
-| **P8** | Widloski | A flat memoryless posterior under sparse spiking fails the spread gate, so low-spike events are lost | A1 spike-count and tetrode-engagement features, ours-only vs Widloski-only; A6 gate-failure diagnostics | No spike-count difference; gate failures are not dominated by spread |
-| **P9** | **Ours** | The temporal prior manufactures non-local states when spikes are sparse | A3 prior-excluded spike evidence on ours-only events, against the matched immobility baseline | Ours-only events show likelihood support for the decoded position above the baseline, at a rate comparable to shared events |
-| **P10** | **Ours** | A position-tracking error turns local activity into "non-local" | A1 distance-from-animal on ours-only events; relation to tracking confidence where available | Ours-only events are distributed across distances like shared events and show no association with low tracking confidence |
-| **P11** | **Ours** | The 0.8 probability threshold and 15 ms minimum fragment one replay into several events, inflating counts | A4 one-to-many overlaps; 03's fragment-merge recount | The count excess over SWR and Widloski persists after fragments within a stated gap are merged, i.e. it is not segmentation |
-| **P12** | **Ours** | Acausal smoothing shifts event boundaries | A4 onset relative to ripple onset and MUA onset on matched pairs | Offsets near zero, no sign bias |
-| **P13** | **Ours** | The Fragmented state admits noise | A1 state composition of ours-only events; A3 spike evidence for fragmented-dominated events | Fragmented-dominated events carry support comparable to continuous ones |
-| **P14** | **Ours** | Content is scored on the posterior that selected it, so selection inflates every within-event statistic | Not testable by the analyses here; see [05](05-validation.md) | — |
-| **P15** | All | Removing one tetrode changes the event set more for spike-triggered and posterior-triggered methods than for LFP-triggered ones | A5 | Comparable stability across families |
-
-P14 is listed so that its absence from the results is deliberate rather than an oversight.
-
-## Analyses
-
-Six analyses. Each is computed for **every** inventory from the **same underlying
-traces**, so a feature never differs across inventories because of how it was computed.
-Anything derived from a particular posterior is namespaced (`ss_*` for the state-space
-posterior, `ms_*` for the memoryless one, `cf_*` for ContFrag). Existing trajectory and
-spike-evidence helpers are reused where their timing conventions apply.
-
-### A1 — Feature contrasts on the cells
-
-For each cell of the overlap accounting in 03 — shared, unique-to-one, and the
-neither-ripple-nor-burst cell — report the distribution of:
-
-- **Timing:** `interval_span_s`, native duration, gap to the nearest event of each other
-  inventory.
-- **Population engagement:** spike count, active tetrode count, spike rate, all from the
-  raw marks over the interval.
-- **LFP:** ripple consensus power (Kay trace, z-scored to immobility) and its peak;
-  reported for events of every inventory, including the SWR ones, so that "ripple power
-  of an ours-only event" and "ripple power of an SWR event" are on one axis.
-- **MUA:** population rate z-score, same convention.
-- **Spatial content:** distance of the decoded position from the animal, spatial extent,
-  trajectory reversals and pauses, posterior spread; namespaced per posterior.
-- **State composition:** `ss_*` occupancy of Local, No-Spike, Continuous, Fragmented over
-  the interval; reported for every inventory's events, which is what tests P2 and P13.
-- **Task context:** well, time in stop, reward and patch context where the stop table
-  supplies them.
-
-Feature distributions are shown per cell with per-session values and animal-level
-consistency, never pooled only.
-
-### A2 — Threshold sweeps
-
-For each method, sweep its own defining threshold over a stated grid and re-run only
-that method:
-
-| method | swept parameter | grid |
+| method | expected selection properties | what remains an empirical question |
 |---|---|---|
-| Kay, Karlsson | z-score threshold | 1.0–4.0 in 0.25 |
-| Yu | percentile | 99, 99.9, 99.99, 99.999 |
-| MUA | z-score threshold | 1.0–4.0 in 0.25 |
-| Widloski | spread, jump, duration, dispersion — one at a time | ±50 % of the retained value in 5 steps |
-| Ours | non-local probability; minimum duration — one at a time | 0.5–0.95 in 0.05; 5–30 ms in 5 |
+| SWR and MUA triggers | Select LFP or population-rate events; do not explicitly distinguish local, non-local, or absent spatial coding; thresholds exclude lower-amplitude activity | How much spatial evidence the admitted and excluded intervals carry, and how often their bounds differ from decoded representations |
+| Widloski-style sequence detector | Accumulates evidence in overlapping 80 ms windows and selects extended, concentrated, continuous sequences | How much evidence the longer windows recover, which representations the criteria exclude, and how boundaries and segmentation differ |
+| Our state-space detector | Compares Local, No-Spike, Continuous, and Fragmented explanations with temporal inference | Whether additional events have prior-excluded evidence; whether tracking uncertainty, sparse activity, priors, or probability thresholding explain apparent non-locality, boundary shifts, or fragmentation |
 
-For each setting report two things against each other inventory at *its* retained
-setting: the fraction of that inventory's events now captured, and the total event time
-now admitted. The yardstick is therefore model-free — time, not any model's labels. The
-spike evidence (A3) of the events admitted at each relaxation is reported alongside, so a
-reader can see whether a lower SWR threshold captures ours-only events or merely admits
-more time. The sweep is what tests P1, P4, and P5 directly.
+A duration or dispersion cutoff excludes events by definition. The useful measurement
+is how many intervals it excludes and what those intervals contain. Exclusion alone
+does not establish poor sensitivity to the method's intended target. Likewise, an SWR
+with local coding is not an incorrectly detected SWR; it may be a poor proxy for
+non-local representation.
 
-### A3 — Prior-excluded spike evidence
+Distinguish **temporal boundary differences** from **the proportion of events carrying
+the content of interest**. Neither becomes boundary accuracy or detection precision
+without a defensible reference. A continuous amplitude distribution motivates examining
+threshold dependence; it does not establish that its lower tail contains replay.
 
-`scripts/qa/analyze_event_spike_evidence.py` already computes, for our events, the
-clusterless spike log-likelihood over track bins with the temporal prior removed, and
-scores whether it favours the decoded position over the animal's own, against a matched
-non-event immobility baseline. Extend it to every inventory's events and to every cell of
-03. For events without a decoded position (SWR, MUA), score the maximum over remote bins
-(beyond the QA script's `REMOTE_CM` track distance from the animal) against the
-animal's position, and report that this is a weaker statistic.
+Use the same primary diagnostics for every inventory. Our model's Local or No-Spike
+probability is a model-dependent description, not an independent verdict on another
+detector's event. Prior-excluded likelihood uses the same encoding and spikes that
+contributed to selection, so it is also a diagnostic rather than independent validation.
 
-This analysis tests P2, P9, and P13. Its caveat is P14 and is stated with every use: the
-same spikes selected the event, so support is necessary, not sufficient. The baseline
-comparison, not the raw statistic, is the reported quantity.
+Record the initial analysis configuration and report all primary contrasts, including
+those unfavorable to our method. Additional analyses prompted by the results are allowed:
+label them exploratory and record their motivation, configuration, and outcome. Keep the
+original report and settings identifiable; do not silently replace unfavorable results.
 
-### A4 — Boundaries and segmentation
+## Initial report: default settings
 
-On the matched-pair table from 03: signed onset and offset differences per pair of
-inventories, one-to-many and many-to-one counts, and the fragment-merge recount (merge
-our events separated by less than a stated gap, then recount overlaps). Onsets are also
-referred to two independent markers, ripple onset and MUA onset, for every inventory,
-including the ones that were not triggered by that marker. Tests P3, P6, P11, P12.
+### Event features
 
-### A5 — Robustness to recording
+For shared events, each method's unmatched events, and sequences matched by neither SWR
+nor MUA, report:
 
-Leave one tetrode out and recompute the event set; report the overlap (interval
-Jaccard and event-count change) between the full and reduced event sets, per tetrode,
-per method. For the triggered and memoryless methods this needs no full re-decode: MUA
-recomputes the population rate, the SWR consensus drops a channel, the memoryless
-likelihood drops a tetrode's terms. For our state-space detector it needs a re-decode per
-tetrode, so it runs on a stated subset — the two sessions per animal with the most CA1
-tetrodes carrying spikes, chosen before the analysis — and that restriction is reported. Tests P5 and P15.
+- **Timing:** interval span, native duration, and separation from nearby events.
+- **Population engagement:** spike count, active tetrode count, and spike rate.
+- **LFP and MUA:** ripple consensus amplitude and population rate, using a common trace
+  and normalization for each feature across inventories. Identify the Kay trace when it
+  supplies the common ripple feature; each SWR detector still uses its own detection trace.
+- **Spatial representation:** extent, distance from the animal, posterior uncertainty,
+  and continuous/fragmented or local/no-spike composition where defined.
+- **Context:** animal position and tracking confidence where available; well, time in
+  stop, reward, and patch context from existing tables.
 
-### A6 — Selection diagnostics
+Compute each feature with the same rule on every inventory's intervals. Namespace
+posterior-derived features (`ss_*`, `ms_*`, and `cf_*` if ContFrag results are used),
+and compute each available posterior's features for all inventories rather than choosing
+a posterior according to which detector selected the event. Missing features remain
+missing and their frequency is reported.
 
-For events only our detector found, retain which comparator stage rejected them: window
-gates failing (and which), no candidate assembled, or an assembled candidate failing
-duration, dispersion, or whole-event speed. Retain *every* failing criterion, not a
-single assumed cause. For events only the comparator found, examine the state-space
-probability trace with the Local and No-Spike alternatives over the same interval, plus
-the prior-excluded evidence, and distinguish a segmentation difference from a sustained
-disagreement about what is represented. Credible missed sequences are limitations of our
-model, not errors of the comparator by definition. Gate-failure summaries explain
-selection; any claimed effect of a particular gate is confirmed by re-running with only
-that gate changed (A2). Tests P7 and P8.
+Show per-session values and animal-level consistency. Keep native populations primary,
+with duration-stratified views so differences in opportunity to accumulate spikes or
+overlap an event remain visible. Examples follow 03's reproducible sampling rule and
+include supported comparator-only activity as well as questionable ours-only activity.
 
-### Task validity (secondary)
+### Common spike-evidence diagnostic
 
-Re-run the primary rate and content contrasts with each inventory in turn as the event
-definition, using the existing ladders unchanged. Report whether the reward and patch
-effects appear under every definition. This is reported as **robustness**: an effect
-that is stronger under our events could be either sensitivity or selection, and this
-analysis cannot tell them apart, so it is never cited as superiority.
+Reuse the likelihood backend and spatial mapping in
+`scripts/qa/analyze_event_spike_evidence.py`, applying a common diagnostic to every
+inventory: mean native-bin log-likelihood difference between the best remote real bin
+and the animal's position. Define remote bins using the same track-distance cutoff
+(`REMOTE_CM`, currently 100 cm) for every interval and record it in the configuration.
+Use identical timing, valid-bin, and spike-support conventions throughout. Report
+spike counts and valid-bin coverage alongside the score; intervals with no valid remote
+bin or missing position are explicitly unscorable.
 
-## Level 2 — scoring (deferred)
+If trajectory-specific likelihood is also reported, evaluate each named trajectory on
+all intervals where it is defined. Do not compare a remote maximum for SWRs against a
+trajectory-constrained score for our events as if they were the same statistic.
 
-Holding the candidate set fixed and varying the trajectory score (MAP, weighted
-correlation, Radon transform, linear regression, spread/jump/dispersion) asks how much of
-"replay" is a scoring convention rather than a property of the data. It belongs here and
-is deferred until the level 1 comparison above is complete.
+Score baseline windows with the same rule. Select them outside the union of the default
+inventories during eligible immobility, matching session, duration, and animal location
+where feasible; report matching failures. Do not reuse the QA script's low non-local
+probability condition as a model-neutral definition of baseline. These windows are a
+reference population, not known negatives. Both the remote maximum and event selection
+can favor large scores, and silence can carry likelihood structure: a positive score or
+an excess over baseline is not a calibrated declaration of replay.
 
-## Reporting
+### Boundaries and reasons for disagreement
 
-All summaries show per-session values and animal-level consistency, sessions nested
-within animal. Each prediction row gets one figure or table that answers it and one
-sentence of verdict in the results, in the row order above. Every sweep setting tested is
-reported, not the ones that worked. Missing features and skipped sessions are reported
-explicitly.
+From 03's matched pairs, report signed onset/offset differences, one-to-many matches,
+and the fragment-merge recount. Ripple and MUA onsets are additional reference times,
+not known true boundaries of a representation.
 
-## Testing
+For ours-only activity, retain every comparator rejection reason: window gates, failure
+to assemble a candidate, duration or dispersion, whole-event speed, or shuffle failure
+or untestability. Report the adapted memoryless cohort before and after shuffle filtering
+as required by 02; its graph statistics and encoding-pair null do not reproduce the
+published sorted-cell method exactly.
 
-| test | what it protects |
-|---|---|
-| Every feature is computed from the same traces for all inventories; two inventories with an identical interval get identical feature values | The contrasts measure the events, not the pipelines |
-| Namespaced posterior features cannot be joined across posteriors by name | No silent `ss_`/`ms_` mix |
-| Threshold sweep at the retained setting reproduces the primary inventory exactly | The sweep is anchored |
-| Fragment-merge recount at gap 0 reproduces the unmerged counts | The recount is anchored |
-| Leave-one-tetrode-out with a tetrode that has no spikes reproduces the full event set | A5 measures the tetrode, not the recompute |
-| Selection diagnostics agree with a gate-specific re-run on synthetic examples | Explanations follow the actual pipeline |
-| The predictions table in the committed spec matches the hash in the run manifest | X9 |
+For comparator-only activity, examine our state probabilities, common spike evidence,
+and any shorter constituent events. Distinguish boundary/segmentation differences from
+sustained disagreement. Retain counterexamples to our method's expected advantages.
 
-## Deliverables
+Gate diagnostics describe what happened under the default settings. Attribution of a
+change in the cohort to one parameter requires a controlled rerun; such reruns belong
+to the follow-up below and are not needed to release the descriptive report.
 
-1. The frozen predictions table with its commit hash.
-2. Feature-contrast figures per cell (A1).
-3. Sweep curves per method with spike evidence of admitted events (A2).
-4. Spike-evidence distributions per inventory and per cell (A3).
-5. Boundary and segmentation summaries, including the fragment-merge recount (A4).
-6. Tetrode-stability table (A5), with the session subset stated.
-7. Selection-diagnostic tables for both unique cells (A6).
-8. The task-validity robustness table.
-9. A verdict per prediction row, in order.
+## Planned follow-up: threshold robustness
+
+This remains part of the comparison, but is **deferred until after the default-setting
+report**. Do not launch broad sweeps with the first run. Until it is performed, state
+that threshold robustness has not been assessed; do not call the default results robust
+to threshold choice.
+
+Start with a small cost pilot on a declared session subset, using the same subset for
+the methods being compared. Measure runtime, peak memory, and new shuffle work before
+choosing the scope of a larger run. Specify the subset, parameter values, and compute
+budget before examining the pilot's cohort differences. A limited pilot supports claims
+only about those settings and sessions.
+
+Begin with the retained setting and one modest relaxation and tightening of a selected
+threshold, one parameter at a time. Prioritize our probability threshold, SWR/MUA
+amplitude thresholds, and the memoryless detector's adapted spread cutoff; choose exact
+values before that analysis. Additional duration, jump, dispersion, or other sweeps
+follow only when needed to answer a stated question. There is no mandatory exhaustive
+grid or factorial combination.
+
+Reuse work only where the changed parameter leaves it valid:
+
+| change | reusable work | work that must be repeated |
+|---|---|---|
+| Our probability or minimum-duration cutoff, with fitted model fixed | Saved state probabilities | Event extraction, whole-event speed qualification, features, and overlap accounting |
+| SWR/MUA detection threshold, with preprocessing and normalization fixed | Consensus/per-channel traces or population-rate trace and normalization | Thresholding, event assembly, qualification, and downstream summaries |
+| Memoryless spread/jump/duration/dispersion cutoff, with encoding, window, and stride fixed | Window likelihoods and statistics; valid fixed-bound shuffle results | Gate/assembly/selection stages affected by the change, qualification, and shuffles for new or changed candidate bounds |
+| Encoding, temporal model, decoding window, or stride | Only artifacts whose inputs remain identical | Refit or re-decode and downstream calculations as required; these are separate controls, not cheap threshold changes |
+
+Cache keys must include the relevant input/model hashes, timing support, configuration,
+and shuffle seeds. Do not reuse a shuffle score for an event whose bounds changed.
+Record all settings attempted and any computations not completed.
+
+For each setting, compare with every other inventory at its retained setting: report
+the fraction of its events captured and total time admitted, with the same spike-evidence
+diagnostic where computed. Show native counts and segmentation effects. This describes
+the tradeoff between coverage and evidence; another inventory is not a truth set and
+these curves are not sensitivity/specificity curves.
+
+## Other follow-ups: not initial deliverables
+
+- **Recording robustness:** leave-one-tetrode-out re-detection/re-decoding if engagement
+  diagnostics suggest that conclusions depend on a few tetrodes. Compare methods on the
+  same declared session subset.
+- **Alternative eligibility or encoding:** native speed gates and running-only encoding
+  controls in 03, only when a specific disagreement warrants them.
+- **Task-effect robustness:** refit rate/content models with alternative inventories if
+  needed to assess dependence of a paper conclusion on the event definition.
+- **Scoring and model controls:** fixed-candidate trajectory-score comparisons, window
+  changes, or temporal-prior changes when needed to isolate an explanation.
+- **Performance validation:** simulation or held-out evidence in [05](05-validation.md)
+  if the intended claim extends to accuracy, sensitivity, precision, or calibration.
+
+## Testing and deliverables
+
+Initial implementation checks cover identical features and common scores for identical
+intervals, posterior namespaces, missing data, baseline selection, overlap/segmentation
+accounting, and agreement between rejection diagnostics and synthetic gate failures.
+Method implementation tests in 01 and 02 still apply; deferring scientific sweeps does
+not defer correctness checks.
+
+The initial deliverables are the default-inventory feature and evidence summaries,
+boundary/segmentation summaries, rejection diagnostics, and reproducibly selected
+examples, with configuration and availability recorded. The later robustness run must
+reproduce the primary inventory at its retained setting and preserve correct cache
+invalidation. Its cost pilot, sweep results, and limitations are separate deliverables.

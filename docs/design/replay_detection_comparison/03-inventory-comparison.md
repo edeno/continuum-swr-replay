@@ -49,7 +49,11 @@ counted as agreement with a fully coincident event.
 the non-local probability dips below threshold. Provide a recount in which our events
 separated by less than a stated gap (a fixed grid: 0, 10, 20, 50 ms) are merged before
 overlap is computed, alongside the native count. The native count remains primary; the
-recount is what 04 uses to test whether count differences are segmentation (P11).
+recount diagnoses how much count differences depend on segmentation (04). It uses
+existing intervals and requires no re-decoding. Keep merges within an epoch and a
+continuous eligible immobility bout, checking speed throughout each intervening gap;
+do not bridge movement or missing samples. These are secondary accounting intervals,
+not a replacement detected cohort.
 
 **Also report time coverage** of the intersection and union of each pair of cohorts.
 Coverage is less sensitive to segmentation than event counts, and the two can disagree —
@@ -67,10 +71,10 @@ diagnostics — a long chain can fuse events that do not individually overlap.
 The cells of most interest are the ones no pairwise table reaches:
 
 - **Events found by exactly one detector**, per detector.
-- **SWRs matched by no sequence detector** — ripples with no decodable replay content.
-  This is the reciprocal of the ripple-less-replay claim and the first thing a referee
-  asks. It is only computable because SWR inventories are first-class here rather than
-  labels attached to someone else's events.
+- **SWRs matched by neither decoding-based detector** — absence of a detected match,
+  not proof that the ripple has no spatial content. Characterize their activity with
+  the same diagnostics as every other inventory. This is computable because SWR
+  inventories are first-class here rather than labels attached to someone else's events.
 - **Sequences matched by no LFP- or rate-triggered inventory** — events the standard
   field pipelines would not have found at all. This is the neither-ripple-nor-burst
   cell, distinct from ripple-less (overview): an MUA-matched, SWR-unmatched sequence is
@@ -87,15 +91,16 @@ non-SWR fractions.
 A non-SWR fraction is a function of the SWR definition as much as of the events, so it is
 never reported without its definition attached. Where the three definitions disagree
 about a given event, that disagreement is itself reported: an event labelled ripple-less
-by one algorithm and ripple-bearing by another is a finding about detector sensitivity,
-not noise to be averaged away.
+by one algorithm and ripple-bearing by another describes dependence on the detection
+rule; it does not establish which label is correct.
 
 Keep a separate table of paired label agreement. A matched pair's two events can carry
 different SWR labels purely because their bounds differ.
 
-## Secondary analyses
+## Deferred eligibility and encoding controls
 
-Both are clearly labelled as secondary and never substituted for the primary cohorts.
+Neither is an initial deliverable. Reopen a control when a particular disagreement
+requires it, label the analysis as secondary, and retain the primary cohorts and results.
 
 1. **Native speed gates** (overview X4). Re-run each method under its own published
    gate — Widloski's per-bin < 5 cm/s, ours whole-event < 4 cm/s, Yu's < 4 cm/s — and
@@ -104,6 +109,11 @@ Both are clearly labelled as secondary and never substituted for the primary coh
    running periods only and re-run **both** decoding-based methods on it. Applied to both
    or neither; applying it to one would make the encoding model a free variable
    distinguishing them.
+
+Threshold robustness has a separate staged plan in [04](04-event-features.md): first
+complete the default inventories and report, then measure costs on a small pilot before
+choosing a broader scope. The SWR-label matrix above uses the retained settings and does
+not substitute for threshold robustness.
 
 ## Reporting
 
@@ -122,7 +132,7 @@ model and data availability define the paired analysis population.
 | Disjoint cohorts, empty cohorts, and single-event cohorts | Degenerate inputs |
 | Connected components: a chain A–B–C where A and C do not overlap is reported as one component with its span, and is not collapsed into an interval | Non-transitivity |
 | Coverage and count summaries disagree as expected on a constructed split/merge case | That both are reported because they answer different questions |
-| Fragment-merge recount at gap 0 reproduces the native counts; at a gap larger than every inter-event interval it yields one event per contiguous run | The recount is anchored at both ends |
+| Fragment-merge recount at gap 0 reproduces native counts; a large gap merges all events within each continuous eligible bout but never across movement, missing samples, or epochs | The recount changes segmentation without changing eligibility |
 | `interval_span_s` is computed identically for every inventory, and native duration fields are never substituted for it | The convention mismatch between cohorts |
 | An event at an epoch boundary is not matched across epochs | Session scoping |
 | Empty inventories carry the schema's dtypes, not object, so concatenation across epochs preserves column types | The canonical builder's empty return is all-object |
@@ -131,10 +141,12 @@ model and data availability define the paired analysis population.
 
 1. The six inventories on the common schema, with per-detector counts and rates.
 2. The all-pairs overlap table and the per-detector denominators.
-3. The single-detector and no-detector cells, including SWRs with no sequence and
+3. The single-detector and no-detector cells, including SWRs with no detected sequence and
    sequences no triggered pipeline found.
 4. The cohort × SWR-definition non-SWR matrix, with paired label disagreement.
-5. The two secondary analyses.
-6. Reproducibly sampled examples from each cell, on a shared time axis showing spikes,
+5. Reproducibly sampled examples from each cell, on a shared time axis showing spikes,
    both posterior representations, gate masks, speed, and LFP — with the sampling rule
-   stated and counterexamples included.
+   stated and counterexamples included in both directions.
+
+The eligibility and encoding controls are conditional follow-ups, not prerequisites
+for these deliverables.

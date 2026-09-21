@@ -7,6 +7,11 @@ Inventory 3 of six. Supplies a third SWR detection *algorithm* alongside
 `Kay_ripple_detector` and `Karlsson_ripple_detector` — not a third threshold on one
 algorithm.
 
+The initial comparison uses the retained settings below. Scientific sensitivity checks
+are follow-ups under [04](04-event-features.md), beginning with a cost pilot after the
+default-setting report; they are not prerequisites for that report. Implementation
+correctness and the synthetic checks below still precede use of this detector.
+
 ## The method as published
 
 Yu JY, Kay K, Liu DF, Grossrubatscher I, Loback A, Sosa M, Chung JE, Karlsson MP,
@@ -79,8 +84,8 @@ threshold matches our canonical rule; `minimum_duration` changes from 15 ms to 2
 
 | # | Decision | Reasoning |
 |---|---|---|
-| **Y1** | Implement locally in `continuum_swr_replay` first; upstream to `ripple_detection` once behaviour is settled | Keeps the three SWR detectors comparable in one place while the implementation is in flux. Upstreaming later also requires a Spyglass change before it reaches us via `ripple_detector_name` |
-| **Y2** | Estimate the percentile from **mirrored data**, not a mirrored histogram | See V-Y2 below; this is a numerical correction, not a change of method |
+| **Y1** | Implement in `ripple_detection` first (the lab's own package, local clone at `~/Documents/GitHub/ripple_detection`), pin the project to that commit, and produce the inventory through `RippleTimesV1` by registering the detector in Spyglass's algorithm dict from the project | Puts the third SWR algorithm beside the two it is compared with, under that package's tests and naming. Spyglass dispatches by name through a module-level dict, so no Spyglass change is needed to run it; a two-line Spyglass PR is optional cleanup that removes the registration line (see Producing the inventory) |
+| **Y2** | Estimate the percentile from **mirrored data**, not a mirrored histogram | See V-Y2 below; this is a numerical convenience, not a correction of the noise model |
 | **Y3** | Use the mode as stated (histogram argmax). The robustified multi-bin mode is a sensitivity check, not the default | The multi-bin mode is another method's choice (it appears in the vendored Widloski code). Importing it would violate the governing rule |
 | **Y4** | Reuse the package's normalization, thresholding, and close-event exclusion; implement Yu's median consensus trace and the threshold estimator locally | Normalization to a mask and mean-crossing extension are written identically in Yu's text and in the package, so sharing them introduces no difference to misattribute. The consensus aggregation is *not* shared (median vs root-sum-of-squares) and must be Yu's own |
 | **Y5** | Apply the canonical whole-event immobility rule (`event_speeds_are_immobile`) to every event before export; the package's `exclude_movement` is not sufficient | `exclude_movement` tests speed only at the two endpoints, with `<=`, so it admits interior movement, interior NaN speed, and an endpoint at exactly 4 cm/s — all rejected by the canonical rule (overview X4). Applied after detection, as for the other inventories |
@@ -98,43 +103,86 @@ threshold matches our canonical rule; `minimum_duration` changes from 15 ms to 2
 | # | Underspecified | Our choice | Effect |
 |---|---|---|---|
 | **V-Y2** | How the percentile is taken from the mirrored distribution | Mirror the **samples**, not the histogram: estimate the mode from a histogram, then form the reflected sample `{x : x ≤ m} ∪ {2m − x : x ≤ m}` and take `np.percentile` on it | Removes bin-width dependence from the tail estimate; the mode is the only quantity that still depends on binning. This is a numerical convenience, **not** a correction of the method's support: the reflected distribution ends at `2m − min(x)` whichever way it is built (see the inherited assumptions), and a histogram mirrored at the same mode converges to the same percentile as bins are refined |
-| **V-Y3** | Histogram bin rule for locating the mode | Fixed default, recorded in config; mode location is the only thing it affects under V-Y2 | Mode location still shifts the whole reflected distribution, so bin sensitivity must be reported even though the tail no longer depends on binning |
-| **V-Y4** | Whether "the mode" is a single bin or a robust estimate | Single-bin argmax, per Y3 | Noisier than a robustified mode, and the noise propagates to the threshold. Quantified by the sensitivity check rather than pre-empted |
+| **V-Y3** | Histogram bin rule for locating the mode | Fixed default, recorded in config; mode location is the only thing it affects under V-Y2 | Mode location still shifts the whole reflected distribution. Characterize bin sensitivity synthetically; a real-data control belongs to the follow-ups in 04 |
+| **V-Y4** | Whether "the mode" is a single bin or a robust estimate | Single-bin argmax, per Y3 | Mode-estimation variability propagates to the threshold. A robustified estimate is a possible follow-up, not the retained method |
 
 ### Assumptions the method makes, which we inherit
 
-- **The left flank is noise-only.** If ripples or artifacts contribute below the mode,
-  the noise distribution is overestimated and the threshold is conservative.
-- **Noise is symmetric about its mode, with a left flank long enough to reach the
-  requested percentile.** The consensus envelope is strictly positive, so its noise
-  distribution is bounded below and right-skewed (Rayleigh-like) even without ripples.
-  Mirroring the left flank yields a distribution whose support ends at `2m − min(x)` —
-  about twice the mode in raw units — so the "99.99th percentile" cannot exceed that
-  bound whatever the true tail does. On a Rayleigh(σ = 1) sample the true 99.99th
-  percentile is 4.29 and the mirrored estimate is ≈ 1.97, for the histogram and the
-  sample variant alike (checked at 2 M samples, 100–10 000 bins). The threshold is
-  therefore biased **low** by a large factor, and in practice the method behaves like
-  "twice the mode of the immobility envelope" rather than like a tail percentile. This
-  is inherent to the published method, not to our implementation. It must be
-  characterized (see testing) and stated, not silently corrected — correcting it would
-  make the detector no longer Yu's. After z-scoring the bound is `2m − min(z)` with
-  `m < 0`, so the threshold in z-units is small; report its value next to Kay's 2 SD so
-  the difference in stringency is visible.
+- **The left flank is noise-only.** Ripples or artifacts below the mode can distort
+  both the mode estimate and reflected distribution. The resulting threshold change
+  depends on the contamination and must be measured rather than assumed conservative.
+- **Noise is symmetric about its mode.** Mirroring yields a distribution whose support
+  ends at `2m − min(x)`, whether built from samples or a histogram. On a single
+  Rayleigh(σ = 1) distribution the true 99.99th percentile is 4.29 and the reflected
+  estimate is about 2, illustrating possible underestimation of a skewed noise tail.
+  That example does not establish the size or direction of error for the median of
+  smoothed tetrode envelopes in these recordings. Characterize the actual consensus
+  operation in synthetic checks and report its estimated thresholds. Do not assume that
+  Yu is more permissive than Kay from the Rayleigh example or from thresholds expressed
+  in different traces' z-score units.
 
 ## Architecture
 
-Module `src/continuum_swr_replay/analysis/hippocampus/swr_detectors.py`, written so the
-threshold estimator can be lifted into `ripple_detection` unchanged when upstreamed (Y1).
+Three additions to `ripple_detection`, following its naming (`Kay_ripple_detector`,
+`get_Kay_ripple_consensus_trace`) and its idioms (`ValueError` on bad input, pandas
+`DataFrame` of event stats out).
 
-| function | responsibility |
-|---|---|
-| `yu_consensus_trace(filtered_lfps, sampling_frequency, smoothing_sigma=0.004)` | per-tetrode Hilbert envelope → per-tetrode Gaussian smoothing → median across tetrodes. Pure, `(n_time, n_tetrodes)` in, `(n_time,)` out |
-| `estimate_noise_threshold(values, percentile, bins)` | mode → reflected sample → percentile. Pure, array-in/scalar-out, no LFP concepts |
-| `Yu_ripple_detector(time, filtered_lfps, speed, sampling_frequency, ...)` | assembles the two functions above with the package's normalization, thresholding, and exclusions, then applies the canonical whole-event immobility rule (Y5) |
+| function | file | responsibility |
+|---|---|---|
+| `estimate_noise_threshold(values, percentile, bins)` | `core.py` | mode → reflected sample → percentile. Pure, array-in/scalar-out, no LFP concepts |
+| `get_Yu_ripple_consensus_trace(filtered_lfps, sampling_frequency, smoothing_sigma=0.004)` | `detectors.py` | per-tetrode Hilbert envelope → per-tetrode Gaussian smoothing → median across tetrodes. `(n_time, n_tetrodes)` in, `(n_time,)` out; sibling of the Kay trace |
+| `Yu_ripple_detector(time, filtered_lfps, speed, sampling_frequency, speed_threshold=4.0, minimum_duration=0.020, percentile=99.99, smoothing_sigma=0.004, close_ripple_threshold=0.0, normalization_mask=None, normalization_time_range=None)` | `detectors.py` | Kay's keyword signature with `percentile` in place of `zscore_threshold`, so Spyglass can pass `ripple_detection_params` straight through. Block-wise over contiguous valid LFP (Algorithm step 1); threshold estimated once per call |
+
+The canonical whole-event immobility rule (Y5) is **not** part of the package function:
+it is substrate applied to every inventory after detection and lives in
+`continuum_swr_replay`. The package's newer `exclude_movement_by_majority` does not match
+the canonical rule either and is not used.
 
 Splitting them this way keeps the two novel pieces independently testable — the estimator
-against closed-form distributions and the consensus against synthetic envelopes, with no
-Spyglass fixtures required.
+against closed-form distributions and the consensus against synthetic envelopes — inside
+the package's own test suite, with no Spyglass fixtures required.
+
+## Producing the inventory
+
+1. **Package.** Branch the local clone from its current development head, add the three
+   functions and their tests, and record the commit.
+2. **Pin.** Add `ripple_detection` as a direct git dependency of the project at that
+   commit. Today the project only receives it transitively through Spyglass at 1.7.0;
+   the pin also picks up the commits the clone is ahead by, which is a deliberate
+   version bump to note in the changelog, not a side effect.
+3. **Register.** Spyglass's `RippleTimesV1.make` looks the algorithm up by name in the
+   module-level dict `spyglass.ripple.v1.ripple.RIPPLE_DETECTION_ALGORITHMS`, which
+   holds only Kay and Karlsson. A `RippleParameters` row can name `"Yu_ripple_detector"`
+   (the field is a blob), but populate raises `KeyError` until the name is registered.
+   The project registers it in `data_loaders/lfp.py`, next to where `ripple_detector_name`
+   is validated, before any populate:
+
+   ```python
+   from ripple_detection import Yu_ripple_detector
+   from spyglass.ripple.v1 import ripple as sg_ripple
+
+   sg_ripple.RIPPLE_DETECTION_ALGORITHMS.setdefault("Yu_ripple_detector", Yu_ripple_detector)
+   ```
+
+   This is module state, not a private API, but a fresh Spyglass install re-populating
+   the row fails until the same line runs. That is the reproducibility cost, and it is
+   carried explicitly: the registration lives in the loader, and the run manifest records
+   the `ripple_detection` commit that provides the function.
+4. **Parameter row.** Insert `ripple_param_name = "yu_2017"` with
+   `ripple_detection_algorithm = "Yu_ripple_detector"`, `speed_name = "head_speed"`, and
+   `ripple_detection_params = {"speed_threshold": 4.0, "minimum_duration": 0.020,
+   "percentile": 99.99, "smoothing_sigma": 0.004}`. Any sensitivity variant (V-Y3, the
+   robustified mode, the squared-envelope check) is its own named row.
+5. **Populate and read back.** Populate `RippleTimesV1` for the CA1 group with that
+   parameter name; extend `get_ripple` to accept `ripple_detector_name = "Yu"` mapped to
+   that row, alongside the existing Kay mapping. Then apply Y5 project-side and key the
+   inventory as 03 requires.
+6. **Follow-up, optional.** A two-line Spyglass PR (import plus dict entry) makes the
+   registration line unnecessary. It is cleanup, not a prerequisite.
+
+One check when wiring step 5: assert that the `LFPBandV1` frame handed to the detector
+carries exactly the `RippleLFPSelection` electrodes for the CA1 group, since the Kay path
+in the loader has assumed so without asserting it.
 
 ## Algorithm
 
@@ -180,13 +228,17 @@ rather than a degraded estimate (see below).
 | Support bound: on a Rayleigh sample with no signal, the estimate lies below `2m − min(x)` and far below the true percentile; record the ratio | The inherited assumption. A characterization test that records the bias, not a pass/fail |
 | Consensus trace: median across tetrodes of individually smoothed envelopes; a large ripple on one of N tetrodes moves the median far less than it moves the Kay root-sum-of-squares trace | Y4 — the aggregation is Yu's, not Kay's |
 | Whole-event immobility: an event with one interior sample ≥ 4 cm/s, or a NaN speed sample, or an endpoint at exactly 4 cm/s, passes `exclude_movement` and is removed by step 6 | Y5 — parity with the canonical rule the other inventories use |
-| Contaminated left flank: adding signal below the mode raises the threshold | The other inherited assumption |
+| Contaminated left flank: record how below-mode contamination changes the mode and threshold | The noise-only-flank assumption; the direction is measured rather than prescribed |
 | Mode sensitivity: threshold as a function of bin rule, across plausible defaults | V-Y3, V-Y4 |
 | Synthetic LFP with planted ripples at known times and amplitudes: recovery and false-positive rate | End-to-end detection |
-| Pure-noise LFP: false-positive rate consistent with the nominal percentile and the 20 ms duration requirement | That the threshold means what it claims |
+| Pure-noise LFP: characterize detections after median aggregation, smoothing, reflection, and the duration rule | The nominal percentile of a reflected distribution is not a guaranteed event false-positive rate |
 | Boundaries extend to mean crossings, not to threshold crossings; 20 ms minimum applies to the **exceedance**, not the extended event | Convention parity with the published rule |
 | Degenerate inputs: all-NaN channels, no immobility samples, too few immobility samples to resolve the percentile, mode at the histogram edge | Failure behaviour below |
+| Spyglass pass-through: calling the detector with the Kay keyword set plus `percentile`, as `RippleTimesV1.make` does, yields the same frame as a direct call | The signature contract that step 3 relies on |
 | Missing-LFP gap: two sub-minimum exceedances separated by a NaN gap yield **no** event, and an exceedance that reaches a gap edge ends there | Block-wise processing; no event spans missing LFP |
+
+Tests live in the package: `tests/test_core.py` for the estimator, `tests/test_detectors.py`
+for the consensus trace and the detector, alongside the Kay and Karlsson cases.
 
 A side-by-side run against Kay and Karlsson on the same session is a **sanity check, not
 a test** — there is no ground truth, and disagreement is the object of study.
@@ -195,6 +247,8 @@ a test** — there is no ground truth, and disagreement is the object of study.
 
 No silent fallbacks, and in particular no falling back to an SD threshold — that would
 quietly convert the Yu inventory into a second Kay inventory and corrupt the comparison.
+Package functions raise `ValueError`, as the existing detectors do; the project-side
+loader raises if the `"Yu"` parameter row is absent rather than substituting Kay.
 
 - Too few immobility samples to resolve the requested percentile: raise, naming the epoch
   and the sample count. The required count follows from the percentile and is checkable
@@ -209,14 +263,14 @@ quietly convert the Yu inventory into a second Kay inventory and corrupt the com
 1. **"Envelope power."** The consensus is a median of Hilbert *envelopes*; the threshold
    is then set on "consensus envelope power." Whether "power" means the envelope or its
    square is not stated. The design uses the envelope. Squaring is monotone but
-   non-linear, so it moves the mode and the mirrored support bound, and must be run as a
-   sensitivity check. (The 150–250 Hz band and the 4 ms per-tetrode smoothing are stated
-   in the paper and are no longer assumptions.)
+   non-linear, so it moves the mode and the mirrored support bound; retain it as a
+   possible later sensitivity check. (The 150–250 Hz band and the 4 ms per-tetrode
+   smoothing are stated in the paper and are no longer assumptions.)
 2. **Whether the percentile is taken over immobility-restricted values only.** The
    Methods normalize to immobility and report per-day noise distributions, which implies
    it, but does not state it outright. The alternative — estimating over all time — would
-   shift the mode. Both are cheap to run; the design assumes immobility-restricted and the
-   comparison should report the other as a sensitivity check.
+   shift the mode. The initial design assumes immobility-restricted; the alternative
+   is a follow-up if interpretation of the Yu inventory depends on this choice.
 3. **Whether the existing Kay inventory is affected by row-dropping.** `RippleTimesV1`
    calls `Kay_ripple_detector`, which drops NaN rows before smoothing and segmentation.
    Whether the ripple-band LFP handed to it contains interior NaN runs in our sessions

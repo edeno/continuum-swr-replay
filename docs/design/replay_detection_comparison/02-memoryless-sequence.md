@@ -6,8 +6,9 @@ not yet implemented. The commitments below are proposed analyses, not results.*
 
 Inventory 6 of six: the posterior-sequence trigger. How this cohort is compared against
 the other five is [03-inventory-comparison.md](03-inventory-comparison.md); the
-event-feature and selection diagnostics that were previously drafted here are deferred to
-[04](04-event-features.md) and [05](05-validation.md).
+initial event-feature and selection diagnostics are in [04](04-event-features.md).
+Threshold robustness is a planned later stage in 04, and performance validation remains
+parked in [05](05-validation.md). Neither blocks the default-setting comparison.
 
 ## Purpose
 
@@ -56,10 +57,10 @@ against the LFP- and rate-triggered inventories are in
 | Aspect | Widloski & Foster procedure | Our current state-space procedure | Comparison to make |
 |---|---|---|---|
 | Target | Extended, smooth decoded sequences | High-probability non-local representation, continuous or fragmented | Report the full populations and a secondary comparison restricted to extended trajectories; stationary or fragmented events are outside the original sequence target |
-| Time | Independent spatial decoding in overlapping 80 ms windows, followed by continuity and merge rules | Inference on the native 2 ms grid with state and position transitions and acausal smoothing | Measure boundary shifts, splits/merges, short-event recovery, and sensitivity to smoothing assumptions |
+| Time | Independent spatial decoding in overlapping 80 ms windows, followed by continuity and merge rules | Inference on the native 2 ms grid with state and position transitions and acausal smoothing | Describe boundary differences, splits/merges, and short-event populations; smoothing controls are follow-ups, and recovery accuracy needs a reference |
 | Alternatives | Spatial posterior followed by sequence criteria; no explicit Local/No-Spike state competition | Local, No-Spike, Non-Local Continuous, Non-Local Fragmented | For comparator-only events, inspect local coding, sparse activity, and non-local evidence; allow that our model may miss supported sequences |
 | Uncertainty | Posterior compressed to centre, spread, and jump statistics for selection | Joint state/position posterior; non-local state probability is thresholded | Examine diffuse or multimodal events without treating our own posterior confidence as validation |
-| Event selection | Duration > 100 ms, dispersion > 12 cm, spread/jump/merge criteria, and published shuffle significance | Combined non-local probability > 0.8, the current 15 ms minimum confidence-run duration, then whole-event immobility | Attribute expected selection differences before making sensitivity claims; our probability/duration thresholds also require sensitivity analysis |
+| Event selection | Duration > 100 ms, dispersion > 12 cm, spread/jump/merge criteria, and published shuffle significance | Combined non-local probability > 0.8, the current 15 ms minimum confidence-run duration, then whole-event immobility | Describe exclusions under both definitions; robustness of either cohort to its thresholds remains unassessed until the follow-up in 04 |
 
 The current state-space contract comes from `get_data_over_time`,
 `get_confident_times`, and `build_speed_eligible_event_cohort`, not from a new
@@ -70,6 +71,8 @@ so the manifest must state it explicitly rather than derive it from saved parame
 A 2 ms grid is not a demonstrated 2 ms effective resolution: our acausal smoother can also shift or extend boundaries.
 Likewise, overlapping memoryless windows reuse spikes and induce temporal dependence;
 "memoryless" does not imply an absence of smoothing in the resulting trajectory.
+Longer windows also accumulate evidence. Neither their temporal averaging nor our
+temporal prior establishes better detection without examining the resulting events.
 
 ## The original method
 
@@ -223,7 +226,7 @@ not a reassurance.
 | **V6** | Euclidean distance for jump and dispersion | Track-graph distance | On a linearized branched track, `abs(Δlinear_position)` is not the distance between two places — bins on different arms can be adjacent in linear coordinate | Using linear differences would under-count jumps at arm boundaries, producing spuriously smooth and spuriously long sequences. Track distance avoids this; it also makes our jumps non-comparable in absolute terms to an open-field jump |
 | **V7** | Posterior COM | Discrete Fréchet mean over track distance (D4) | Linearized-coordinate COM does not respect branching | On straight segments the centre is quantized to a bin; near junctions geometry also changes it |
 | **V8** | Unvisited arena bins excluded | Junction placeholder bins (`edge_id == -1`) excluded before normalization | These bins are linearization artifacts from `edge_spacing > 0`, not places. In `get_track_grid` the `-1` rows are built from `place_bin_centers[~is_track_interior]`, so they are non-interior by construction and the primary likelihood path never returns them; the guard matters on the `results.nc` path, where `log_likelihood` is re-expanded to every `state_bins` column | If not excluded, probability mass lands on non-places and drags the centre toward gaps. Same hazard `map_estimate_to_arm` guards against |
-| **V9** | Spread is a 2D product moment (area-like, bin units) | Graph-distance RMS spread (a length, cm) | Provides a spread measure on our geometry, approximating SD on a straight segment | The 10 cm cutoff is an adapted choice requiring sensitivity analysis; these spreads are not numerically comparable to the paper's 2D spreads |
+| **V9** | Spread is a 2D product moment (area-like, bin units) | Graph-distance RMS spread (a length, cm) | Provides a spread measure on our geometry, approximating SD on a straight segment | The 10 cm cutoff is an adapted choice prioritized in the later threshold-robustness study (04); its robustness is not established by the initial report, and these spreads are not numerically comparable to the paper's 2D spreads |
 
 ### Forced by our sampling grid
 
@@ -247,7 +250,11 @@ thresholds (20 cm / 50 ms), minimum duration (100 ms), dispersion threshold (12 
 
 Their application changes with track distance and the 4 ms stride. The spread cutoff
 of 10 cm is an additional adapted setting (V9), not an exactly preserved criterion.
-Report sensitivity to these choices alongside the default comparison.
+The initial comparison reports these retained settings and their adaptations explicitly.
+Sensitivity to them is deferred to 04's cost pilot and limited robustness study. Preserve
+window statistics, gate masks, candidate bounds, and shuffle provenance so valid work can
+be reused later; changes that produce new candidate bounds require corresponding shuffle
+calculations. Do not imply that robustness has been established before that study runs.
 
 ### Discrepancies within the original, and how we resolved them
 
