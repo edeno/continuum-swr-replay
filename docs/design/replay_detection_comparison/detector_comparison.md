@@ -36,6 +36,89 @@ posterior-triggered, or joint. Nothing here ranks the methods; that is what
 | `find_HSE`, `find_rippleHSE` | neurocode | parameter variants of the MUA detector (peak ≥ 3 SD, 50–500 ms) and an overlap cell 03 already produces |
 | Maboudi et al. 2018 HMM, Yu & Frank 2021 theta coactivity | — | need sorted units or the wrong epochs (overview scope table) |
 
+## Literature parameter survey
+
+[literature_detection_parameters.csv](literature_detection_parameters.csv) is a lab-compiled
+table of 54 replay papers (1999–2025; source: the shared Google Sheet
+`12mMgiYWO7tKRhs5qhMXMZ5RggGi1J24wxIkcs4knTUI`, exported 2026-09-21; column headers
+flattened to one line, values otherwise untouched). It records each paper's trigger
+(MUA 23, SWR 17, both 11, decoding 3), thresholds, smoothing, bands, durations, and
+decoding settings. Two uses here:
+
+**Sweep values for 04's threshold robustness.** The literature range bounds what a
+"modest relaxation and tightening" means. Reported values (count with a value, then
+min / median / max; `#N/A` and "not reported" excluded):
+
+| parameter | n | min | median | max | most common |
+|---|---|---|---|---|---|
+| SWR z-score threshold (SD) | 25 | 1 | 3 | 8 | 3, 2, 2.5 |
+| MUA z-score threshold (SD) | 27 | 2 | 3 | 4 | 3, 2, 4 |
+| speed gate (cm/s) | 41 | 0.05 | 5 | 10 | 5, 4, 2 |
+| SWR smoothing (ms) | 17 | 4 | 12.5 | 100 | 4, 12.5, 100 |
+| MUA smoothing (ms) | 24 | 5 | 15 | 30 | 15, 10, 5 |
+| ripple band (Hz) | 29 | 80–180 low, 200–300 high | 150–250 | | 150–250 |
+| minimum duration (ms) | 38 | 15 | 50 | 100 | 50, 100, 15 |
+| maximum duration (ms) | 23 | 200 | 500 | 2000 | 500, 750, 2000 |
+| merge gap (ms) | 11 | 20 | 50 | 100 | 50, 20, 40 |
+
+Our retained settings (Kay z = 2, 4 ms smoothing, 15 ms minimum, 4 cm/s; HSE z = 2,
+15 ms minimum) sit at the permissive end on threshold and minimum duration, so the
+"tightening" arm of the robustness plan (z = 3, 50 ms) is the literature's median, not an
+extreme. The 04 pilot should draw its values from this table and say so.
+
+**Coverage of the literature by the package.** Most rows are parameter variants of
+rules already in `ripple_detection`: a z-score on a ripple-band envelope, single or
+consensus channel (Kay / Karlsson family), or a z-score on smoothed population rate
+(`multiunit_HSE_detector`), gated by speed. Rows the package covers as distinct
+algorithms: Liu & Fernandez-Ruiz 2023 (k-means on ripple power and radiatum sharp wave,
+`Long_sharp_wave_ripple_detector`), Carey 2019 (`Carey_candidate_detector`), Widloski
+2022 and Mallory 2025 (posterior-triggered, the memoryless port). Yu 2017 is not in the
+sheet. Recurring rules the package does **not** express, in order of how often they
+appear:
+
+| rule | papers | nearest package parameter | status |
+|---|---|---|---|
+| Extend the event from the detection threshold down to a lower boundary threshold (1 SD, 0.5, 0.15 of peak) | Yamamoto 2017, Bhattarai 2020, Michon 2021, Mou 2022 | Kay extends to 0; Yu extends to the immobility mean; Zugaro uses `low_threshold` | not settable on Kay/Karlsson/HSE |
+| Theta/delta ratio or manual NREM scoring as the state gate | Lee 2002, Wikenheiser 2014, Grosmark 2016, Drieu 2018, Farooq 2019, Liu 2019, Muessig 2019, Yang 2024 | Carey's optional `theta_lfp` z < 2 | no theta/delta helper |
+| Maximum event duration | 23 papers, 200–2000 ms | Zugaro `maximum_duration`, Long `maximum_sharp_wave_duration` | absent on Kay/Karlsson/HSE |
+| Burst preceded by a silent period | Diba 2007, Ólafsdóttir 2015, Liu 2019, Bhattarai 2020 | none | absent |
+| Adaptive threshold tuned to a target event rate | Gridchyn 2020 (1 event/s) | Yu's noise-percentile is data-driven but rate-agnostic | absent |
+| Minimum active cells | 28 papers, 3–33 | Carey `minimum_active_units` | absent on HSE |
+
+The first three are parameter additions to existing detectors, not new algorithms; they
+are the cheapest way to make the package reproduce more of this table and are candidates
+for the package after the open PRs merge. None is needed for the six inventories.
+
+## Public detector code surveyed (2026-09-21)
+
+A web survey of published or widely used SWR detectors, made to decide what else the
+package should carry. Verdicts: **duplicate** of a package rule, **not portable** (trained
+weights, GPL transcription only, manual template, online-only), or **candidate** (a
+distinct rule worth reimplementing from its description). Nothing below is required for
+the six inventories.
+
+| detector | source | verdict | reason |
+|---|---|---|---|
+| RippleNet (Hagen 2021), cnn-ripple / rippl-AI (Navas-Olive 2022, 2024), ripple-detector-CNN | CINPLA, PridaLab, ywatanabe1989 | not portable | value is in trained weights; cnn-ripple and ripple-detector-CNN are GPL-3 |
+| bz_FindRipples, CellExplorer `ce_FindRipples`, Tingley & Buzsáki 2020, Fernández-Ruiz 2019, pynacollada tutorial | buzcode, CellExplorer, Peyrache lab | duplicate | parameter variants of the Zugaro rule (bz defaults 130–200 Hz, 20 ms minimum); artefact parts excluded by decision |
+| neurodsp `detect_bursts_dual_threshold` (Feingold 2015) | neurodsp | duplicate | dual threshold on median-normalized amplitude; only novelty is a minimum in cycles |
+| buzcode `detect_swr.m` (the path Liu et al. 2022 cite) | buzcode | duplicate | the path is dead; the surviving copy is neurocode `DetectSWR.m`, already the Long detector |
+| Norman / LBCN-Stanford `ripple_detection` (human iEEG) | LBCN | not portable | Zugaro-like core; distinctive parts are IED and noise-channel artefact rejection |
+| Falcon (Ciliberti & Kloosterman 2017), Open Ephys ripple-detector plugin (de Sousa 2022) | kloostermannerflab, open-ephys-plugins | not portable as-is | online-only, GPL / unlicensed C++; block-RMS with calibration baseline is a threshold variant |
+| Zeng & Eden 2025 state-space ripple-replay detector | arXiv 2502.05394 | not portable | needs a decoder; no code released |
+| Sebastian 2023 `Topological_SWR` | PridaLab | not a detector | waveform classifier |
+| RIPPLELAB / mne-hfo HFO detectors (Staba, Gardner line-length, Crépon, MNI) | epilepsy tools | low priority | different features (line length, rectified-peak count); mne-hfo is BSD-3 if ever wanted |
+| `eventSpikingTreshold.m` (Valero 2019) | neurocode | **candidate** | post-hoc unit-firing validation of ripples (z-scored 10 ms population rate ≥ 0.5 around the peak); the spike check Liu et al. 2022 recommend; composes with any detector |
+| `find_rippleHSE.m` (Grosmark & Buzsáki 2016 definition) | neurocode | **candidate** | HSE ∩ ripple by interval intersection; the sheet's "MUA with at least one LFP with SWR" rows (Grosmark 2016, Yang 2024); differs from Carey's geometric-mean score |
+| Consensus-vote wrapper (Ruelas 2026, Front Syst Neurosci) | no code released | **candidate** | keep events flagged by ≥ k of several detectors, union bounds; licence-free idea |
+| Sharp-wave-gated threshold with amplitude ceiling (Campbell & Murphy 2025) | AngCamp/CampbellMurphy2024 | **candidate** | radiatum sharp-wave z > 1 **and** 3 < ripple z < 10; threshold-only counterpart to Long's k-means; the sheet's Harvey 2023 row |
+| Offline emulation of causal detectors (Dutta, Ackermann & Kemere 2019; de Sousa 2022) | shayokdutta/RippleDetectionAnalysis, SpikeGadgets/RippleDetector (GPL-3) | **candidate, low** | causal FIR envelope, N-of-M channels within 15 ms, lockout; only for online-vs-offline benchmarking |
+
+The survey also flagged two citation risks; both were checked and are already handled:
+the Long docstring cites neurocode `SharpWaveRipples/DetectSWR.m` alongside the buzcode
+path, and the Zugaro defaults (2/5 SD, 30 ms inter-ripple interval, 20–100 ms) are the
+FMAToolbox `FindRipples` values it cites first.
+
 ## Reading the table
 
 - **Signal** and **threshold rule** are where the methods differ structurally; two rows with

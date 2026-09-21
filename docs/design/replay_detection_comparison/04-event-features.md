@@ -138,7 +138,9 @@ budget before examining the pilot's cohort differences. A limited pilot supports
 only about those settings and sessions.
 
 Begin with the retained setting and one modest relaxation and tightening of a selected
-threshold, one parameter at a time. Prioritize our probability threshold, SWR/MUA
+threshold, one parameter at a time. Take the candidate values from the literature
+parameter survey in [detector_comparison.md](detector_comparison.md), so "modest" is
+defined by the published range rather than by us. Prioritize our probability threshold, SWR/MUA
 amplitude thresholds, and the memoryless detector's adapted spread cutoff; choose exact
 values before that analysis. Additional duration, jump, dispersion, or other sweeps
 follow only when needed to answer a stated question. There is no mandatory exhaustive
