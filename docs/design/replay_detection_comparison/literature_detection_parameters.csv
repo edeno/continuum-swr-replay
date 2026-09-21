@@ -122,7 +122,7 @@ candidate = continuous epoch >=100 ms of smoothly changing decoded position
 merged if gap <20 cm and <50 ms; kept if duration >100 ms and dispersion >12 cm
 ripples (2 SD, >=15 ms) and bursts (3 SD, >=50 ms) label events after detection",#N/A,#N/A,5,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,100,#N/A,50,Bayes,80,#N/A,#N/A,Posterior center of mass,Memory-less Bayesian decoding with a uniform prior,#N/A,#N/A,Sorted,5,Place cell-ID shuffle,100,p<0.05,#N/A,#N/A
 Maboudi,Kemere,2018,https://doi.org/10.7554/eLife.34467,eLife,Rats,MUA,"PBEs from pooled multiunit activity
-hidden Markov model over 20 ms bins; replay scored without place fields",#N/A,#N/A,5,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,Bayes,20,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,Sorted,20,Temporal shuffle (per-neuron circular permutation); time-swap; Poisson surrogate,#N/A,#N/A,#N/A,#N/A
+hidden Markov model over 20 ms bins; replay scored without place fields",#N/A,#N/A,5,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,Bayes,20,#N/A,#N/A,,#N/A,#N/A,#N/A,Sorted,20,Temporal shuffle (per-neuron circular permutation); time-swap; Poisson surrogate,#N/A,#N/A,#N/A,#N/A
 Ólafsdóttir,Barry,2016,https://doi.org/10.1038/nn.4291,Nature Neuroscience,Rats,MUA,"MU activity from place cells, 1 ms bins, Gaussian 5 ms
 peak >3 SD above the mean, boundaries where activity returns to the mean
 events <40 ms or using <15% of the place-cell ensemble rejected",3,#N/A,#N/A,5,#N/A,15% of ensemble,#N/A,#N/A,#N/A,40,#N/A,#N/A,Bayes,#N/A,2,10,Radon transform,Exhaustive line-fit search over velocity and intercept,#N/A,#N/A,Sorted,#N/A,Place cell-ID shuffle,#N/A,P<0.2 vs own shuffle,#N/A,#N/A
