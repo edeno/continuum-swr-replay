@@ -67,5 +67,9 @@ permission.
   applies the minimum duration to the above-threshold run, then extends the event from
   the sample after the last at-or-below-baseline sample to the last above-baseline
   sample; with `allowstartend = 0` an event touching either end of the data is dropped.
+- `jy_variableripthreshold.m`, which the estimator's header names as its caller, does not
+  survive: a full case-insensitive search of the lab server's home tree (2026-09-21)
+  returns only the `_corecalculation` file. `AG_extractRipplesJY.m` is the only surviving
+  wrapper; do not repeat the search.
 - The 0-0.5 Hz FIR used by `adaptivefilt` (`Hz0_5.mat`, `designeegfilt.m`) is not
   vendored; it is not needed for the port because the adaptive filter is not used.
