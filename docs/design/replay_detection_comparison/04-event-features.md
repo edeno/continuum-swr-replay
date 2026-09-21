@@ -119,6 +119,13 @@ to the follow-up below and are not needed to release the descriptive report.
 
 ## Planned follow-up: threshold robustness
 
+The consensus statement on SWR detection (Liu et al. 2022, *Nat Commun* 13:6000) asks
+that published methods detail their detection criteria in full and "report how their
+results manifest under a range of SWR detection parameters," and that feature
+distributions, which are log-normal, be reported rather than means. The robustness plan
+below and the per-cell distributions above are the second half of that; the detector
+table ([detector_comparison.md](detector_comparison.md)) is the first.
+
 This remains part of the comparison, but is **deferred until after the default-setting
 report**. Do not launch broad sweeps with the first run. Until it is performed, state
 that threshold robustness has not been assessed; do not call the default results robust

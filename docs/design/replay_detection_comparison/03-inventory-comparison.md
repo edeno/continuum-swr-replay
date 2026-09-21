@@ -156,6 +156,13 @@ requires it, label the analysis as secondary, and retain the primary cohorts and
    running periods only and re-run **both** decoding-based methods on it. Applied to both
    or neither; applying it to one would make the encoding model a free variable
    distinguishing them.
+3. **Reference-channel ripple power** (deferred). The vandermeerlab workflow thresholds
+   the z-scored difference between the ripple channel's ripple-band power and a control
+   channel's, and the consensus statement (Liu et al. 2022) recommends difference or
+   re-referenced derivations to remove far-field artefacts. Artefact handling is excluded
+   from the detector package by decision, but the corpus-callosum reference tetrodes make
+   the derivation available here; reopen it only if artefact-driven SWR events are
+   suspected in a specific disagreement.
 
 Threshold robustness has a separate staged plan in [04](04-event-features.md): first
 complete the default inventories and report, then measure costs on a small pilot before

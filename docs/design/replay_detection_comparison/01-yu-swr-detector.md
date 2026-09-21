@@ -50,6 +50,15 @@ The paper includes only days with at least three tetrodes in or near the CA1 cel
 layer. Record whether our selected recording sites satisfy that condition (see Producing
 the inventory), rather than assuming any CA1-labelled group does.
 
+The consensus statement on SWR detection (Liu et al. 2022, *Nat Commun* 13:6000, their
+ref. 81) names this method as the data-driven alternative to arbitrary SD thresholds —
+"the distribution of ripple frequency events exceeding 20 ms can be modeled against
+background 'noise' and the termination of the SPW-R envelope occurs with return to the
+session mean" — with the caveat that even this is "inadequate if quantitative SPW-R
+counts are compared across sleep and wake because these states have different background
+LFP power." Our comparison is within-epoch and within-state, so the caveat bears on
+cross-epoch rate comparisons, not on the inventory itself.
+
 **Why the noise model.** A z-score threshold is contaminated by the very events it means
 to detect: ripples inflate the variance used to normalize, so the threshold moves with
 ripple rate and amplitude, and its effective stringency differs between days and animals.
