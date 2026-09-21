@@ -68,13 +68,19 @@ Detection pipelines in the literature vary on three axes:
 **This design covers level 1**, with level 3 riding along because each cohort is
 labelled under every SWR definition. Level 2 is deferred to 04.
 
-The structural fact that organizes level 1: **SWR- and MUA-triggered methods cannot
-detect replay without a ripple or without a burst, by construction.** The trigger is the
-filter. Questions about ripple-less replay are therefore only askable from posterior-
-triggered methods, which is why that family exists and why our own pipeline is in it.
-Worth noting that our lab lineage moved families without measuring the cost: Denovellis
-et al. 2021 and Gillespie et al. 2021 are state-space but SWR-*triggered*, where our
-current pipeline is posterior-triggered.
+The structural fact that organizes level 1: **a triggered method cannot detect replay
+outside its own trigger, by construction.** SWR-triggered methods cannot find replay
+without a ripple; MUA-triggered methods cannot find replay without a population burst.
+Those are two different exclusions. An MUA-triggered inventory *can* find ripple-less
+replay — a burst with no ripple — so the ripple-less question is askable from
+inventories 4, 5, and 6. The question only posterior-triggered methods can ask is replay
+with **neither** a ripple **nor** a burst, the cell Widloski & Foster report as
+"neither." Keep the two questions separate wherever a non-SWR fraction is reported: the
+inventory comparison (03) yields both cells, and they must not be conflated under the
+label "ripple-less." That neither-cell is why the posterior-triggered family exists and
+why our own pipeline is in it. Worth noting that our lab lineage moved families without
+measuring the cost: Denovellis et al. 2021 and Gillespie et al. 2021 are state-space but
+SWR-*triggered*, where our current pipeline is posterior-triggered.
 
 ## The six inventories
 
@@ -134,7 +140,7 @@ Method-specific decisions live in the component specs. These apply across the co
 
 | # | Decision | Reasoning |
 |---|---|---|
-| **X1** | Compare detection *triggers* (level 1); defer scoring (level 2) to 04 | The trigger is upstream of everything else and is what makes the ripple-less question askable at all |
+| **X1** | Compare detection *triggers* (level 1); defer scoring (level 2) to 04 | The trigger is upstream of everything else and determines which of the ripple-less and neither-ripple-nor-burst questions each inventory can ask at all |
 | **X2** | Six inventories, not two | A within-family comparison of two posterior-triggered methods cannot say what the standard SWR/MUA pipelines would have found |
 | **X3** | Harmonize substrate, not method internals | Comparability without blending; see the governing rule above |
 | **X4** | Speed/immobility gate is substrate — our whole-event < 4 cm/s for every method; native gates are a secondary analysis | The gate is upstream of detection and defines the eligible population. Keeps a cohort difference attributable to the algorithm |
