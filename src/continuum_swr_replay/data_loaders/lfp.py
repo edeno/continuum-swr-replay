@@ -312,7 +312,6 @@ def get_multiunit_hse(
         minimum_duration=HSE_MINIMUM_DURATION_SEC,
         zscore_threshold=HSE_ZSCORE_THRESHOLD,
         close_event_threshold=HSE_CLOSE_EVENT_THRESHOLD_SEC,
-        use_speed_threshold_for_zscore=False,
     )
 
     return hse_times, multiunit_firing_rate, multiunit_rate_zscore
