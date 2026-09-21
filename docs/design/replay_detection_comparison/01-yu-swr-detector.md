@@ -203,6 +203,20 @@ minimum above-threshold sample duration is 20 ms.
   operation in synthetic checks and report its estimated thresholds. Do not assume that
   Yu is more permissive than Kay from the Rayleigh example or from thresholds expressed
   in different traces' z-score units.
+- **Ripples must not dominate the immobility variance.** The mirrored distribution
+  reaches at most `2m − min(x)`, and the event rule extends events to the immobility
+  *mean*, so the method is only defined when the left flank is wider than the
+  mode-to-mean distance: `(m − min) > (mean − m)`. Large or frequent ripples inflate the
+  immobility SD and drag the mean above the noise ceiling, and the ratio falls below 1.
+  Measured on the package's simulated LFPs (2026-09-21; 20 s, four tetrodes, six planted
+  ripples): pure noise gives a threshold of 2.9 SD with one false event; ripples up to
+  ~30× the in-band background give ratios of 2–8, full recovery, and thresholds of
+  0.2–1.1 SD; ~70× background gives a ratio of 0.96 and a threshold at the mean; ~135×
+  (the simulator's default amplitude) gives 0.56 and no defined threshold. The original
+  MATLAB runs regardless and produces ill-defined events; the port raises.
+  `estimate_noise_threshold` reports the ratio as `flank_ratio` in its diagnostics; the
+  per-epoch manifest must record it so an epoch in this regime is visible rather than
+  silently absent from the inventory.
 
 ## Architecture
 
