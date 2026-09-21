@@ -15,6 +15,7 @@ register invites the cross-method blending this design forbids.
 | [03-inventory-comparison.md](03-inventory-comparison.md) | Six inventories → common schema → N-way overlap accounting | design complete |
 | [04-event-features.md](04-event-features.md) | Symmetric event characterization and selection diagnostics; threshold robustness as a later follow-up | initial scope agreed |
 | [05-validation.md](05-validation.md) | Simulation and held-out-tetrode validation: what a performance claim would need | parked |
+| [detector_comparison.md](detector_comparison.md) | One row per detection method considered: input, signal, normalization, threshold rule, durations, state handling, requirements, status | reference, kept current |
 
 01 and 02 are independent and can proceed in parallel. 03 depends on both; the initial
 diagnostics in 04 follow 03. Record the primary settings and analyses before running the

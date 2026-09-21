@@ -79,7 +79,8 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     [05](design/replay_detection_comparison/05-validation.md) the parked validation
     studies needed for performance claims. Broad refits and robustness studies do not
     block the initial descriptive report.
-    Reference source vendored at
+    [detector_comparison.md](design/replay_detection_comparison/detector_comparison.md)
+    tabulates every detection method considered. Reference source vendored at
     [reference/widloski_foster_2025/](../reference/widloski_foster_2025/) and
     [reference/yu_2017_franklab/](../reference/yu_2017_franklab/).
     Not yet implemented.
