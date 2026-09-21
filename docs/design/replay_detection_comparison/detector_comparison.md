@@ -85,9 +85,9 @@ appear:
 
 | rule | papers | nearest package parameter | status |
 |---|---|---|---|
-| Extend the event from the detection threshold down to a lower boundary threshold (1 SD, 0.5, 0.15 of peak) | Yamamoto 2017, Bhattarai 2020, Michon 2021, Mou 2022 | Kay extends to 0; Yu extends to the immobility mean; Zugaro uses `low_threshold` | not settable on Kay/Karlsson/HSE |
+| Extend the event from the detection threshold down to a lower boundary threshold (1 SD, 0.5, 0.15 of peak) | Harvey 2023, Yamamoto 2017, Bhattarai 2020, Michon 2021, Mou 2022 | Kay extends to 0; Yu extends to the immobility mean; Zugaro uses `low_threshold` | not settable on Kay/Karlsson/HSE |
 | Theta/delta ratio or manual NREM scoring as the state gate | Lee 2002, Wikenheiser 2014, Grosmark 2016, Drieu 2018, Farooq 2019, Liu 2019, Muessig 2019, Yang 2024 | Carey's optional `theta_lfp` z < 2 | no theta/delta helper |
-| Maximum event duration | 23 papers, 200–2000 ms | Zugaro `maximum_duration`, Long `maximum_sharp_wave_duration` | absent on Kay/Karlsson/HSE |
+| Maximum event duration | 23 papers, 400–2000 ms | Zugaro `maximum_duration`, Long `maximum_sharp_wave_duration` | absent on Kay/Karlsson/HSE |
 | Burst preceded by a silent period | Diba 2007, Ólafsdóttir 2015, Liu 2019, Bhattarai 2020 | none | absent |
 | Adaptive threshold tuned to a target event rate | Gridchyn 2020 (1 event/s) | Yu's noise-percentile is data-driven but rate-agnostic | absent |
 | Minimum active cells | 28 papers, 3–33 | Carey `minimum_active_units` | absent on HSE |
