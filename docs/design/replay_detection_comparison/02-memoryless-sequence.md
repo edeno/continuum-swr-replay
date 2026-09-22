@@ -306,8 +306,11 @@ not mistaken for a result.
 | by design | remote place held still | decoded confidently, assembled, declined for going nowhere | measured |
 | miss | one unusable window inside a replay | removes its predecessor too and splits the run | from the criteria |
 | miss | gap over 50 ms, or bridge over 20 cm | merge blocked, each piece must clear 100 ms alone | from the criteria |
+| miss | replay broken by a pause longer than the merge gap | the halves stay apart, and neither travels far enough alone; the same replay with a 40 ms pause is found | measured |
 | over-call | local coding beside a replay | absorbed, 5.8x and 4.3x duration inflation | measured |
 | neither | spurious events with no replay in them | none in 65 s of simulation | measured |
+
+**The state-space model finds every one of these.** Run on the same recording, with the same encoding settings, it reports all six labeled events at P(non-local) = 1.00 and stays silent through the silent stretch (peak 0.04). Its bounds sit within about 20 ms of the truth, it splits the paused replay into its two halves, and all seven of its intervals are real events. So these cases are limits of the sliding-window criteria, not limits of the data or of decoding in general. Note what this does and does not show: both procedures read the same encoding model, but the state-space model was given the labeled events as its held-out set, exactly as the sliding-window port was, and no threshold on either side was tuned for this comparison.
 
 **The over-call is a boundary error, not a spurious event.** In the one
 simulation tested end to end the detector accepted two events and both were

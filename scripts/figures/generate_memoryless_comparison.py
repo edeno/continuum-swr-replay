@@ -61,6 +61,7 @@ from continuum_swr_replay.figure_utilities import (
     save_figure,
     set_figure_defaults,
 )
+from continuum_swr_replay.parameters import LOCAL_POSITION_STD
 
 TRACK_HEIGHT_CM = 170
 DECODE_BIN_STRIDE = 3
@@ -74,23 +75,32 @@ EVENT_LABELS = [
     "local",
     "remote\nstationary",
     "short path\n30 cm",
-    "few spikes",
+    "brief pause",
 ]
 
 FIELD_STD_CM = np.sqrt(12.5)
 """Place field width the package simulates."""
 
-INJECTED = (
-    # start_cm, path_cm, duration_s, peak_rate_hz, which pause to put it in
-    (40.0, 30.0, 0.300, 40.0, 20.50),
-    (20.0, 120.0, 0.300, 6.0, 44.40),
-)
-"""Two replays the detector should find but does not.
+SHORT_PATH = (40.0, 30.0, 0.300, 40.0, 20.50)
+"""start_cm, path_cm, duration_s, peak_rate_hz, time.
 
-The first travels only 30 cm. The dispersion criterion needs a path of about
-42 cm, so no short replay can pass it. The second travels far enough, but
-fires about one spike per window, which is too few to hold a narrow posterior.
+A replay that travels only 30 cm. The detector decodes it well, but the
+dispersion criterion needs a path of about 42 cm, so it rejects the candidate.
 """
+
+PAUSED_PATH = (40.0, 30.0, 0.100, 0.060, 40.0, 44.40)
+"""start_cm, piece_cm, piece_s, pause_s, peak_rate_hz, time.
+
+A replay that travels 60 cm in two halves, with a short silence between them.
+The merge rule joins two runs only when less than 50 ms separates them. With a
+40 ms pause the detector finds this replay and gives it a dispersion of about
+17 cm. With a 60 ms pause it keeps the halves apart, and neither half travels
+far enough on its own.
+"""
+
+NON_LOCAL_PROB_THRESHOLD = 0.8
+DISCRETE_TRANSITION_STICKINESS = np.array([30.0, 100000.0, 30.0, 200.0])
+"""Settings Figure 1 uses for the switching state-space model."""
 
 REMOTE_STATIONARY_CM = 42.5
 """The place a remote stationary event holds, far from the animal's 170 cm."""
@@ -190,19 +200,37 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
 
     # two replays the detector should find but does not
     place_field_means = np.linspace(0, TRACK_HEIGHT_CM, n_neurons)
-    for seed, (start_cm, path_cm, duration_s, rate_hz, at_s) in enumerate(INJECTED):
-        spike_times, bounds = inject_replay(
+
+    start_cm, path_cm, duration_s, rate_hz, at_s = SHORT_PATH
+    spike_times, bounds = inject_replay(
+        spike_times,
+        place_field_means,
+        start_cm,
+        path_cm,
+        duration_s,
+        rate_hz,
+        at_s,
+        seed=0,
+    )
+    event_times = np.vstack([event_times, bounds])
+    is_event |= (time >= bounds[0]) & (time <= bounds[1])
+
+    # one replay in two halves: the same path, broken by a silence
+    start_cm, piece_cm, piece_s, pause_s, rate_hz, at_s = PAUSED_PATH
+    for half in (0, 1):
+        spike_times, _ = inject_replay(
             spike_times,
             place_field_means,
-            start_cm,
-            path_cm,
-            duration_s,
+            start_cm + half * piece_cm,
+            piece_cm,
+            piece_s,
             rate_hz,
-            at_s,
-            seed=seed,
+            at_s + half * (piece_s + pause_s),
+            seed=1 + half,
         )
-        event_times = np.vstack([event_times, bounds])
-        is_event |= (time >= bounds[0]) & (time <= bounds[1])
+    paused_bounds = (at_s, at_s + 2 * piece_s + pause_s)
+    event_times = np.vstack([event_times, paused_bounds])
+    is_event |= (time >= paused_bounds[0]) & (time <= paused_bounds[1])
 
     time, position, speed, is_event = (
         array[::DECODE_BIN_STRIDE] for array in (time, position, speed, is_event)
@@ -244,6 +272,7 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
 
     return {
         "time": result.time,
+        "is_event": is_event[: result.time.size],
         "position": position,
         "speed": speed,
         "spike_times": spike_times,
@@ -260,6 +289,47 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
             config,
         ),
     }
+
+
+def state_space_intervals(decoded: dict) -> list[tuple[float, float]]:
+    """When the switching state-space model calls the representation non-local.
+
+    The comparison needs this. Every event the sliding-window detector misses
+    has to be an event some detector can find, or the figure shows the limits
+    of the data rather than the limits of the method.
+    """
+    from non_local_detector import NonLocalSortedSpikesDetector
+
+    time, is_event = decoded["time"], decoded["is_event"]
+    detector = NonLocalSortedSpikesDetector(
+        sorted_spikes_algorithm="sorted_spikes_kde",
+        sorted_spikes_algorithm_params={"position_std": 6.0, "block_size": int(2**8)},
+        local_position_std=LOCAL_POSITION_STD,
+        discrete_transition_stickiness=DISCRETE_TRANSITION_STICKINESS,
+    )
+    results = detector.estimate_parameters(
+        position_time=time,
+        position=decoded["position"],
+        spike_times=decoded["spike_times"],
+        time=time,
+        is_training=~is_event,
+    )
+    probability = np.asarray(
+        results.acausal_state_probabilities.sel(
+            states=["Non-Local Continuous", "Non-Local Fragmented"]
+        )
+        .sum("states")
+        .values
+    ).squeeze()
+
+    above = probability > NON_LOCAL_PROB_THRESHOLD
+    edges = np.diff(above.astype(np.int8), prepend=0, append=0)
+    return [
+        (time[start], time[stop])
+        for start, stop in zip(
+            np.flatnonzero(edges == 1), np.flatnonzero(edges == -1) - 1, strict=True
+        )
+    ]
 
 
 def decoded_center_cm(decoded: dict) -> np.ndarray:
@@ -324,6 +394,16 @@ def plot_overview(ax, decoded: dict, config: MemorylessSequenceConfig) -> None:
     )
     ax.scatter(midpoint_s[kept], center_cm[kept], s=0.6, color=SKY, lw=0, zorder=3)
 
+    for start_s, end_s in decoded["state_space_intervals"]:
+        ax.plot(
+            [start_s, end_s],
+            [-22, -22],
+            color=BLUE,
+            lw=2.4,
+            solid_capstyle="butt",
+            zorder=4,
+        )
+
     for sequence, (start, stop) in enumerate(candidates.runs):
         accepted = candidates.is_replay[sequence]
         ax.plot(
@@ -352,12 +432,13 @@ def plot_overview(ax, decoded: dict, config: MemorylessSequenceConfig) -> None:
         Patch(color=YELLOW, alpha=0.6, label="labeled event"),
         Line2D([], [], color=VERMILION, lw=2.4, label="sequence, meets criteria"),
         Line2D([], [], color="0.6", lw=1.2, label="sequence, rejected"),
+        Line2D([], [], color=BLUE, lw=2.4, label="our state-space detector"),
     ]
     ax.legend(
         handles=handles,
         loc="lower left",
         bbox_to_anchor=(0.0, 1.01),
-        ncol=6,
+        ncol=4,
         fontsize=5,
         frameon=False,
         handlelength=1.4,
@@ -366,7 +447,7 @@ def plot_overview(ax, decoded: dict, config: MemorylessSequenceConfig) -> None:
         borderpad=0.0,
     )
 
-    ax.set_ylim(-24, 268)
+    ax.set_ylim(-30, 268)
     ax.set_xlim(decoded["time"][0], decoded["time"][-1])
     ax.set_yticks([0, 50, 100, 150])
     ax.set_ylabel("position (cm)")
@@ -437,6 +518,19 @@ def plot_event(ax, decoded: dict, event: int, config: MemorylessSequenceConfig) 
         zorder=2,
     )
 
+    for start_s, end_s in decoded["state_space_intervals"]:
+        if start_s > window_hi or end_s < window_lo:
+            continue
+        ax.plot(
+            [start_s, end_s],
+            [-16, -16],
+            color=BLUE,
+            lw=2.6,
+            solid_capstyle="butt",
+            clip_on=False,
+            zorder=4,
+        )
+
     for i in overlapping:
         start, stop = candidates.runs[i]
         accepted = candidates.is_replay[i]
@@ -451,7 +545,7 @@ def plot_event(ax, decoded: dict, event: int, config: MemorylessSequenceConfig) 
         )
 
     ax.set_xlim(window_lo, window_hi)
-    ax.set_ylim(-14, 178)
+    ax.set_ylim(-20, 178)
     ax.set_xlabel("time (s)")
     ax.set_title(EVENT_LABELS[event].replace("\n", " "), fontsize=6)
 
@@ -484,9 +578,8 @@ def plot_criterion_space(ax, decoded: dict, config: MemorylessSequenceConfig) ->
         0: ("continuous replay", VERMILION),
         2: ("continuous replay", VERMILION),
         6: ("short path, 30 cm", BLUE),
+        7: ("paused replay, each half", GREEN),
         5: ("remote place", PURPLE),
-        1: ("fragmented", ORANGE),
-        3: ("no spike", SKY),
     }
     seen = set()
     for event, (name, color) in highlight.items():
@@ -517,7 +610,7 @@ def plot_criterion_space(ax, decoded: dict, config: MemorylessSequenceConfig) ->
     ax.set_xlabel("event duration (s)")
     ax.set_ylabel("dispersion (cm)")
     ax.set_title(
-        "filled = meets both criteria; the shaded box is where replay must land",
+        "every candidate sequence against the two criteria that accept it",
         fontsize=5.5,
     )
     ax.legend(
@@ -547,10 +640,22 @@ def plot_criterion_space(ax, decoded: dict, config: MemorylessSequenceConfig) ->
         ha="right",
         va="bottom",
     )
+    ax.annotate(
+        "join these two and the replay is found:\nwith a 40 ms pause it reaches 17 cm",
+        xy=(0.28, 5.0),
+        xytext=(0.5, 28),
+        fontsize=5,
+        color="0.35",
+        ha="left",
+        va="center",
+        linespacing=1.3,
+        arrowprops={"arrowstyle": "-", "lw": 0.5, "color": "0.6"},
+    )
 
 
 def make_figure(n_neurons: int, config: MemorylessSequenceConfig):
     decoded = simulate_and_decode(n_neurons, config)
+    decoded["state_space_intervals"] = state_space_intervals(decoded)
 
     set_figure_defaults(context="paper")
     # this project's defaults turn constrained layout on, so the grid must not
@@ -566,8 +671,8 @@ def make_figure(n_neurons: int, config: MemorylessSequenceConfig):
 
     outcomes = (
         (0, "continuous replay", "found, but 5.8x too long"),
-        (6, "short path, 30 cm", "missed: it does not spread far enough"),
-        (7, "few spikes", "missed: the posterior is too wide"),
+        (6, "short path, 30 cm", "missed: the path is too short"),
+        (7, "one replay, paused for 60 ms", "missed: the halves do not join"),
         (5, "remote place, held still", "declined: it does not travel"),
     )
     zooms = []
