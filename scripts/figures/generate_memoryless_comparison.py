@@ -1214,7 +1214,8 @@ same known answer. The sliding-window detector reports
 {pct(overall["sliding_matches"])} of the replays under the published
 definition: {pct(overall["sliding_matches_before_shuffle"])} before its
 significance test, and {pct(overall["sliding_matches_spread_only"])} with the
-spread half of it alone, which is all the reference's own script applied. Of
+spread half alone, the only half the detection script's own filter could fail;
+the paper's analyses read both halves, from a corrected script. Of
 the replays it reported before the test,
 {pct(overall["sliding_shuffle_spread_pass_rate"])} pass the spread half and
 {pct(overall["sliding_shuffle_jump_pass_rate"])} the jump half; a short, fast

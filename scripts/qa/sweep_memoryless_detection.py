@@ -240,12 +240,15 @@ def memoryless_outcome(
     """What the sliding-window detector reports for one injected event.
 
     Scored three ways, because the published definition has three parts and
-    the reference's driver applied only some of them. ``sliding_matches`` is
-    the whole published definition: a candidate that meets the duration and
-    dispersion criteria, is the injected replay, and beats the place-cell
-    identity shuffle on both mean spread and mean jump. The driver as written
-    computed its jump p-values from an all-NaN vector, so every event passed
-    that half; ``sliding_matches_spread_only`` is what it applied.
+    the reference's detection script applied only some of them.
+    ``sliding_matches`` is the whole published definition: a candidate that
+    meets the duration and dispersion criteria, is the injected replay, and
+    beats the place-cell identity shuffle on both mean spread and mean jump.
+    That is what the paper's analyses read, from the corrected
+    ``load_replayEvents_cellIDshuffle_sameEvents.m``. The detection script
+    itself computed its jump p-values from an all-NaN vector, so every event
+    passed that half; ``sliding_matches_spread_only`` is what its own filter
+    applied.
     ``sliding_matches_before_shuffle`` leaves the shuffle out.
     """
     time, position, speed = window
