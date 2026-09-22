@@ -32,6 +32,8 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.event_table i
     SequenceIdentity,
     build_memoryless_event_table,
     build_shuffle_draw_table,
+    canonical_swr_intervals,
+    observed_label_intervals,
     shuffle_eligible,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
@@ -450,3 +452,88 @@ class TestEmptyEpoch:
 
         for column, dtype in MEMORYLESS_EVENT_TABLE_DTYPES.items():
             assert combined[column].dtype == dtype, column
+
+
+def data_over_time(n: int = 60, **columns) -> pd.DataFrame:
+    """A minimal time-indexed frame with the columns the SWR helpers read."""
+    frame = pd.DataFrame(
+        {
+            "animal": "sim",
+            "day": 1,
+            "epoch": "02_r1",
+            "head_speed": np.zeros(n),
+            "SWR_event": np.zeros(n, dtype=int),
+        },
+        index=pd.Index(START_S + np.arange(n) / 500.0, name="time"),
+    )
+    for name, values in columns.items():
+        frame[name] = values
+    return frame
+
+
+class TestCanonicalSwrIntervals:
+    def test_bounds_are_the_first_and_last_labeled_sample(self):
+        labels = np.zeros(60, dtype=int)
+        labels[10:20] = 1
+        frame = data_over_time(SWR_event=labels)
+
+        intervals = canonical_swr_intervals(frame, speed_threshold=4.0)
+
+        assert intervals.SWR_event.tolist() == [1]
+        assert intervals.start_time.iloc[0] == pytest.approx(frame.index[10])
+        assert intervals.end_time.iloc[0] == pytest.approx(frame.index[19])
+
+    def test_an_swr_during_movement_is_dropped_whole(self):
+        """The same speed qualification the canonical table applies."""
+        labels = np.zeros(60, dtype=int)
+        labels[10:20], labels[30:40] = 1, 2
+        speed = np.zeros(60)
+        speed[35] = 9.0
+        frame = data_over_time(SWR_event=labels, head_speed=speed)
+
+        intervals = canonical_swr_intervals(frame, speed_threshold=4.0)
+
+        assert intervals.SWR_event.tolist() == [1]
+
+    def test_a_time_column_is_the_time_axis(self):
+        labels = np.zeros(60, dtype=int)
+        labels[10:20] = 1
+        frame = data_over_time(SWR_event=labels).reset_index()
+
+        intervals = canonical_swr_intervals(frame, speed_threshold=4.0)
+
+        assert intervals.start_time.iloc[0] == pytest.approx(frame.time.iloc[10])
+
+    def test_more_than_one_epoch_is_refused(self):
+        frame = pd.concat([data_over_time(), data_over_time().assign(epoch="04_r2")])
+
+        with pytest.raises(ValueError, match="one epoch"):
+            canonical_swr_intervals(frame, speed_threshold=4.0)
+
+
+class TestObservedLabelIntervals:
+    def test_a_complete_label_column_is_observed_throughout(self):
+        frame = data_over_time()
+
+        observed = observed_label_intervals(frame, "SWR_event")
+
+        np.testing.assert_allclose(observed, [[frame.index[0], frame.index[-1]]])
+
+    def test_missing_labels_split_the_coverage(self):
+        labels = np.zeros(60)
+        labels[20:30] = np.nan
+        frame = data_over_time(SWR_event=labels)
+
+        observed = observed_label_intervals(frame, "SWR_event")
+
+        np.testing.assert_allclose(
+            observed,
+            [[frame.index[0], frame.index[19]], [frame.index[30], frame.index[59]]],
+        )
+
+    def test_no_labels_at_all_is_no_coverage(self):
+        frame = data_over_time(SWR_event=np.full(60, np.nan))
+
+        observed = observed_label_intervals(frame, "SWR_event")
+
+        assert observed.shape == (0, 2)

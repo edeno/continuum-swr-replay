@@ -37,6 +37,8 @@ from continuum_swr_replay.analysis.hippocampus.event_detection import (
 )
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     event_speeds_are_immobile,
+    filter_event_labels_by_speed,
+    intervals_from_labels,
 )
 
 # the canonical matched-SWR rule itself, not a copy that could drift from it
@@ -47,6 +49,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
     ShuffleResult,
 )
+from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 
 __all__ = [
     "MEMORYLESS_EVENT_TABLE_DTYPES",
@@ -55,6 +58,8 @@ __all__ = [
     "SequenceIdentity",
     "build_memoryless_event_table",
     "build_shuffle_draw_table",
+    "canonical_swr_intervals",
+    "observed_label_intervals",
     "shuffle_eligible",
 ]
 
@@ -362,6 +367,70 @@ def _ms_event_id(identity: SequenceIdentity, runs: NDArray) -> NDArray:
     )
     hashed = pd.util.hash_pandas_object(keys, index=False) % (2**63)
     return np.asarray(hashed, dtype=np.int64)
+
+
+def _time_indexed(data_over_time: pd.DataFrame) -> pd.DataFrame:
+    """Read time from a ``time`` column when there is one, as the canonical table does."""
+    if "time" in data_over_time.columns:
+        return data_over_time.set_index("time")
+    return data_over_time
+
+
+def canonical_swr_intervals(
+    data_over_time: pd.DataFrame, *, speed_threshold: float
+) -> pd.DataFrame:
+    """The SWR intervals the canonical event table classifies against.
+
+    The same two steps ``build_classified_nonlocal_event_table`` takes, in the
+    same order: every ``SWR_event`` label during which the animal moves is
+    zeroed whole, then each surviving label's bounds are its first and last
+    sample. The two cohorts are then labeled against one interval table, which
+    calling the same classifier on different intervals would not give.
+
+    Parameters
+    ----------
+    data_over_time : DataFrame
+        One epoch, time-indexed or with a ``time`` column, carrying
+        ``SWR_event``, ``head_speed`` and the session columns.
+    speed_threshold : float
+        cm/s; the canonical immobility threshold.
+
+    Returns
+    -------
+    swr_intervals : DataFrame
+        Columns ``SWR_event``, ``start_time``, ``end_time``.
+
+    """
+    frame = _time_indexed(data_over_time)
+    if frame.groupby(list(SESSION_COLUMNS_DAY)).ngroups != 1:
+        raise ValueError("canonical_swr_intervals reads one epoch at a time.")
+    qualified = filter_event_labels_by_speed(
+        frame, ["SWR_event"], speed_threshold=speed_threshold
+    )
+    return intervals_from_labels(qualified, "SWR_event")
+
+
+def observed_label_intervals(data_over_time: pd.DataFrame, label_col: str) -> NDArray:
+    """Closed intervals over which ``label_col`` holds a value.
+
+    A sample whose label is NaN was not observed. This is only as complete as
+    the upstream coding: a label written as 0 where the LFP was missing reads
+    as observed and not an SWR, which is the hazard spec 03's
+    observation-availability rule exists for.
+
+    Returns
+    -------
+    observed : ndarray, shape (n_intervals, 2)
+        First and last sample time of each run of observed samples.
+
+    """
+    frame = _time_indexed(data_over_time)
+    time = frame.index.to_numpy(dtype=np.float64)
+    observed = np.isfinite(frame[label_col].to_numpy(dtype=np.float64))
+    edges = np.diff(observed.astype(np.int8), prepend=0, append=0)
+    first = np.flatnonzero(edges == 1)
+    last = np.flatnonzero(edges == -1) - 1
+    return np.column_stack([time[first], time[last]]).reshape(-1, 2)
 
 
 def build_memoryless_event_table(
