@@ -456,13 +456,13 @@ duration:
 
 | path (cm) | 40 ms | 60 ms | 80 ms | 120 ms | 200 ms | 300 ms | 500 ms |
 |---|---|---|---|---|---|---|---|
-| 10 | 0 | 0 | 0 | 0 | 1 | 1 | 1 |
-| 20 | 0 | 0 | 0 | 2 | 2 | 2 | 7 |
-| 30 | 0 | 0 | 0 | 2 | 3 | 4 | 9 |
-| 45 | 1 | 1 | 5 | 8 | 15 | 20 | 34 |
-| 60 | 4 | 3 | 12 | 18 | 28 | 41 | 46 |
-| 90 | 1 | 11 | 14 | 35 | 43 | 64 | 71 |
-| 130 | 4 | 8 | 21 | 50 | 79 | 79 | 88 |
+| 10 | 0 | 0 | 0 | 1 | 1 | 1 | 2 |
+| 20 | 0 | 1 | 0 | 2 | 3 | 2 | 8 |
+| 30 | 0 | 0 | 0 | 2 | 3 | 6 | 9 |
+| 45 | 0 | 1 | 4 | 8 | 15 | 21 | 36 |
+| 60 | 3 | 3 | 11 | 16 | 28 | 42 | 47 |
+| 90 | 1 | 6 | 12 | 35 | 40 | 64 | 69 |
+| 130 | 4 | 8 | 12 | 42 | 71 | 79 | 88 |
 | any path (state-space) | 62-74 | 78-96 | 86-92 | 88-97 | 98-100 | 100 | 100 |
 
 And before the significance test:
@@ -499,17 +499,18 @@ half, by duration:
 | true duration | 40 ms | 60 ms | 80 ms | 120 ms | 200 ms | 300 ms | 500 ms |
 |---|---|---|---|---|---|---|---|
 | spread half | 79% | 64% | 63% | 62% | 56% | 67% | 70% |
-| jump half | 29% | 43% | 66% | 78% | 91% | 91% | 95% |
+| jump half | 21% | 33% | 54% | 74% | 90% | 93% | 97% |
 
 A short replay covers its path in few windows, so its own non-zero jumps are large,
 and the shuffled posteriors, sharp but hopping between swapped fields, do not jump
 further. The spread half passes about two thirds of replays at every duration, as a
-swapped field still gives a sharp posterior. Overall 65% pass the spread half and 83%
+swapped field still gives a sharp posterior. Overall 65% pass the spread half and 82%
 the jump half (`shuffle_pass_rate_by_duration`, and `sliding_shuffle_*_pass_rate` in
-`overall`). Under this port's earlier conventions, which kept zero jumps in the mean,
-the jump half read 21% at 40 ms against 98% at 500 ms; setting zero jumps aside as the
-reference does, which raises a slow replay's observed jump mean, softens the trend to
-what the table shows without removing it.
+`overall`). The trend does not depend on how the reference's zero-jump rule is read:
+with the pairs no spike entered or left set aside, which is what the rule does to a
+continuous center, the jump half reads 21% at 40 ms against 97% at 500 ms; an earlier
+revision that kept every zero jump read 21% against 98%, and one that set aside every
+pair whose binned center stayed put read 29% against 95%.
 
 **More than a third (36%) of the sliding window's accepted events are not the
 injected event.** They are absorbed local coding that overlaps it. This is the
@@ -537,8 +538,8 @@ read 94% rather than 91%. About 4% of the state-space detector's reports come
 as more than one interval, and the best of them answers for the cell, as the
 best of several accepted sliding-window sequences does (0.5% of cells).
 
-**One cell in 4536 was found by the sliding window and missed by the
-state-space model** under the published definition, six before the significance
+**No cell in 4536 was found by the sliding window and missed by the
+state-space model** under the published definition, and six before the significance
 test (`found_by_sliding_window_only` and its `_before_shuffle` partner in
 `overall`). 80% of cells went the other way. Of those, 55% built a
 candidate that then failed dispersion, 17% built no candidate at all, and 13% were

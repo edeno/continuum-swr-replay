@@ -32,8 +32,10 @@ puts a floor under any duration it can report. It passes the significance test
 cm replay and another from the remote stationary event and declines both for
 too little dispersion (6 and 2 cm against the 12 cm it requires). The
 state-space detector reports all four, with every bound within 42 ms of the
-truth. Both continuous replays pass the significance test, though most of each
-reported event is the animal's own place: the test asks whether a sequence is
+truth. The outbound continuous replay fails it (p = 0.010 on spread and 0.079
+on jump), 3 draws from passing, and the inbound continuous replay passes it (p
+= 0.010 on spread and 0.020 on jump). Most of each reported continuous replay
+is the animal's own place either way: the test asks whether a sequence is
 spatially coherent, not whether it is somewhere other than the animal.
 
 **(f-i) 4536 replays of chosen shape.** Made-up replays were written into the
@@ -51,14 +53,14 @@ answer. The sliding-window detector reports 11% of the replays under the
 published definition: 22% before its significance test, and 14% with the spread
 half alone, the only half the detection script's own filter could fail; the
 paper's analyses read both halves, from a corrected script. Of the replays it
-reported before the test, 65% pass the spread half and 83% the jump half; a
+reported before the test, 65% pass the spread half and 82% the jump half; a
 short replay covers its path in few windows, so its own jumps are large, and
-the jump half passes 29% of 40 ms replays against 95% of 500 ms ones. The test
+the jump half passes 21% of 40 ms replays against 97% of 500 ms ones. The test
 is the reference's, convention for convention: zero jumps set aside, only draws
 strictly below the observed value counted, both halves at p ≤ 0.05. The
 state-space detector reports 91%. 80% were reported by the state-space detector
 and not by the sliding-window detector, counting the 13% it reported and then
-failed on the significance test; 0.02% went the other way (0.13% before the
+failed on the significance test; 0.00% went the other way (0.13% before the
 significance test).
 
 The two detectors reach their limits on different quantities. The state-space
