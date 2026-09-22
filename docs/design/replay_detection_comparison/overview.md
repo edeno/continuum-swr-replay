@@ -3,8 +3,8 @@
 *Design spec, cross-cutting. Status: approved; the Yu detector exists in the
 `ripple_detection` package and the memoryless sequence detector's core is implemented
 and tested in this project; the shuffle, the event table, and the inventory comparison
-are not started. Execution status and open decisions:
-[`.claude/docs/plans/replay_detection_comparison/PLAN.md`](../../../.claude/docs/plans/replay_detection_comparison/PLAN.md).*
+are not started. Each spec's own header carries its status; the per-spec sections
+below carry the open decisions.*
 
 This directory holds the design for comparing replay-detection methods on our data.
 This file carries the purpose, the governing rule, the scope boundary, and the
