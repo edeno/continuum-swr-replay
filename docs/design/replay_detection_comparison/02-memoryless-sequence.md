@@ -339,10 +339,12 @@ a silent fallback then kept the last one: all 4536 cells landed in a single
 2.2 s window of one pause.
 
 A detector counts as finding an event only when what it reports **is** the
-injected event, not merely something overlapping it in time. It must sit on the
-injected path while the path is being replayed, and it must not cover far more
-ground than the path does. The rule is one function,
-`memoryless_sequence/scoring.py:score_against_injection`, unit-tested on its own.
+injected event, not merely something overlapping it in time. Over the whole
+reported event its decoded positions must sit on the injected path (the path's
+nearer end, outside the injection, so an event that only runs long in time still
+counts), and it must not cover far more ground than the path does. The rule is
+one function, `memoryless_sequence/scoring.py:score_against_injection`,
+unit-tested on its own.
 Every reported event of either detector that overlaps the injection is scored,
 one event at a time over its whole extent, and the best-scoring one answers for
 the cell, so an absorbed sequence that happens to start earlier cannot hide a true
@@ -388,12 +390,15 @@ over-call the figure shows, measured as a rate.
 **What is being compared, and what is not.** Each procedure runs as published,
 with its own acceptance criteria; those criteria are part of the method and are
 not harmonised. What is held identical is the scoring: both detectors are asked
-whether the injected replay came back, and a reported event counts only when its
-decoded position tracks the injection during the injection and its whole
-reported event does not cover far more ground than the injected path. Span is
-measured over each detector's whole reported event on both sides. Measuring it
-over only the overlapping part on one side credits an event that tracks the
-injection and then runs off elsewhere, which is the very thing the test is for.
+whether the injected replay came back, and a reported event counts only when,
+over its whole extent, its decoded positions track the injected path and it does
+not cover far more ground than that path. Both are measured over each detector's
+whole reported event, on both sides, and over the windows the detector kept.
+Measuring either over only the overlapping part credits an event that tracks the
+injection and then sits elsewhere, which is the very thing the test is for; the
+span allowance alone (two 20 cm tolerances) is looser than a path under 30 cm, so
+the position test over the whole event is what excludes an absorbed sequence
+beside a short injection.
 The state-space model runs on the library's default discrete transitions:
 `discrete_transition_stickiness` is a Dirichlet concentration read only by the
 EM M-step, and this sweep calls `fit`, so setting one would change nothing.

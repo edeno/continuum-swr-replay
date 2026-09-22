@@ -1,17 +1,20 @@
 """Score what a detector reports against a replay of known shape.
 
 One rule, applied to every detector the same way. A reported event counts as
-the injected replay only when two things hold: its decoded position tracks
-the injected path while the path is being replayed, and the whole reported
-event does not cover far more ground than the path does. The second test is
-what separates a detection from an over-call. A sequence built out of the
-local coding beside an injection tracks the injection during the injection
-and then runs off to the animal's own place, and the span over the whole
-event is where that shows.
+the injected replay only when it overlaps the injection in time and two
+things hold over the *whole* reported event: its decoded positions sit on the
+injected path, and it does not cover far more ground than the path does.
+Outside the injection the reference position is the path's nearer end, where
+the replay began or ended, so an event that merely runs on in time while
+staying where the replay stopped still counts, and one that runs off to the
+animal's own place does not. That second case is what separates a detection
+from an over-call: a sequence built out of the local coding beside an
+injection tracks the injection during the injection and then sits somewhere
+else, and only the whole event shows it.
 
-Both halves read the whole reported event, whichever detector produced it.
-Measuring the span over only the part that overlaps the injection would hide
-what the event does outside it, which is the very thing the test is for.
+Both tests read the whole reported event, whichever detector produced it.
+Reading only the part that overlaps the injection would hide what the event
+does outside it, which is the very thing the tests are for.
 """
 
 from collections.abc import Callable
@@ -33,9 +36,10 @@ class InjectionScore:
         The event is the injected replay under the rule in the module
         docstring.
     position_error_cm : float
-        Median distance between the decoded position and the injected path,
-        over the part of the event that overlaps the injection. NaN when the
-        event has no decoded position inside the injection.
+        Median distance between the decoded position and the injected path
+        over the whole reported event, the path's nearer end standing in for
+        the path outside the injection. NaN when the event has no decoded
+        position inside the injection.
     span_cm : float
         Range of the decoded position over the whole reported event. NaN
         when the event has no decoded position at all.
@@ -66,7 +70,7 @@ def score_against_injection(
         The decoded position at each of those times.
     true_position_cm : callable
         Where the injected replay says the animal is, at the times it is
-        given.
+        given; before the replay begins its start, after it ends its end.
     bounds : tuple of float
         When the injected replay begins and ends.
     path_cm : float
@@ -93,9 +97,7 @@ def score_against_injection(
     if not during.any():
         return InjectionScore(False, float("nan"), span_cm)
 
-    error_cm = float(
-        np.median(np.abs(decoded[during] - true_position_cm(times[during])))
-    )
+    error_cm = float(np.median(np.abs(decoded - true_position_cm(times))))
     return InjectionScore(
         matches=bool(error_cm < tolerance_cm and span_cm <= path_cm + 2 * tolerance_cm),
         position_error_cm=error_cm,

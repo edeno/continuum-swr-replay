@@ -15,7 +15,7 @@ TOLERANCE_CM = 20.0
 
 
 def injected_path(at):
-    """A 60 cm path from 40 cm to 100 cm over the event."""
+    """A 60 cm path from 40 cm to 100 cm over the event, held at its ends outside it."""
     fraction = np.clip((np.asarray(at) - BOUNDS[0]) / (BOUNDS[1] - BOUNDS[0]), 0, 1)
     return 40.0 + PATH_CM * fraction
 
@@ -49,10 +49,10 @@ class TestTheRule:
         assert not result.matches
         assert result.position_error_cm == pytest.approx(50.0)
 
-    def test_the_span_is_read_over_the_whole_event_not_the_overlap(self):
+    def test_the_whole_event_is_read_not_the_overlap(self):
         """An absorbed sequence tracks the injection during the injection and
         then runs off to the animal's own place. Scored on the overlap alone
-        it would pass; scored on the whole event it must not."""
+        it would pass; scored on the whole event it fails on both counts."""
         during = np.linspace(1.0, 1.2, 11)
         after = np.linspace(1.21, 1.6, 40)
         times = np.concatenate([during, after])
@@ -63,8 +63,44 @@ class TestTheRule:
 
         assert overlap_only.matches
         assert not whole.matches
-        assert whole.position_error_cm == pytest.approx(0.0)
+        assert whole.position_error_cm > TOLERANCE_CM
         assert whole.span_cm > PATH_CM + 2 * TOLERANCE_CM
+
+    def test_running_on_in_time_at_the_path_s_end_still_matches(self):
+        """The window floor: a short replay reported longer than it is, with
+        its decoded position parked where the replay stopped. That is the
+        injected event, mis-measured in time, and must count."""
+        during = np.linspace(1.0, 1.2, 11)
+        after = np.linspace(1.21, 1.5, 30)
+        times = np.concatenate([during, after])
+        decoded = np.concatenate([injected_path(during), np.full(after.size, 100.0)])
+
+        result = score(times, decoded)
+
+        assert result.matches
+        assert result.position_error_cm == pytest.approx(0.0)
+
+    def test_a_short_path_absorbed_into_nearby_local_coding_does_not_match(self):
+        """The span allowance is two tolerances, which for a 10 cm path is
+        looser than the path itself; the position test over the whole event
+        is what catches a sequence that is mostly local coding 30 cm away."""
+        short_bounds, short_path = (1.0, 1.1), 10.0
+
+        def short(at):
+            f = np.clip((np.asarray(at) - 1.0) / 0.1, 0, 1)
+            return 120.0 + short_path * f
+
+        during = np.linspace(1.0, 1.1, 6)
+        before = np.linspace(0.6, 0.99, 40)
+        times = np.concatenate([before, during])
+        decoded = np.concatenate([np.full(before.size, 150.0), short(during)])
+
+        result = score_against_injection(
+            times, decoded, short, short_bounds, short_path, TOLERANCE_CM
+        )
+
+        assert result.span_cm <= short_path + 2 * TOLERANCE_CM
+        assert not result.matches
 
     def test_an_event_with_no_decoded_position_inside_the_injection_cannot_match(
         self,

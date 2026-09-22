@@ -1080,8 +1080,8 @@ replays were written into the spike trains of a simulated linear-track
 recording, one at a time, each with a path length, duration, firing rate and
 distance from the animal's own place that we chose. Because the right answer is known, what each
 detector reports can be scored against it. A detector counts as reporting a
-replay only when what it returns is that replay: on its path, and not covering
-far more ground.
+replay only when what it returns is that replay: on its path throughout, and
+not covering far more ground than the path does.
 
 **(f, g)** Percent of those {int(overall["n_cells"])} replays reported, by the
 path the replay travels and how long it lasts. Each detector runs as published,

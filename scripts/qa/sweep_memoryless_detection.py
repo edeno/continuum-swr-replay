@@ -13,10 +13,12 @@ A detector counts as finding an event only when what it reports is *the
 injected event*. Overlapping it in time is not enough: a sequence built from
 the local coding beside the injection overlaps it too, and scoring that as a
 detection turns the over-call into an apparent detection floor. The rule is
-one function, ``scoring.score_against_injection``, applied to every reported
-event of either detector that overlaps the injection; the best-scoring one
-answers for the cell, so an absorbed sequence that happens to start earlier
-cannot hide a true detection behind it.
+one function, ``scoring.score_against_injection``: over the whole reported
+event the decoded positions must sit on the injected path (its nearer end,
+outside the injection) and must not cover far more ground than the path. It
+is applied to every reported event of either detector that overlaps the
+injection, and the best-scoring one answers for the cell, so an absorbed
+sequence that happens to start earlier cannot hide a true detection behind it.
 
 The point is to separate limits of a method from limits of the data. A replay
 that neither detector finds says something about the recording; one that only
@@ -277,11 +279,11 @@ def memoryless_outcome(recording, injected, window, bounds, true_position_cm, pa
         return out
 
     # Every accepted sequence that overlaps the injection is scored, and the
-    # best answers for the cell. Two things have to hold for a match. The
-    # sequence must sit on the path while the path is being replayed, and it
-    # must not cover far more ground than the path does: an absorbed sequence
-    # tracks the injection during the injection and then runs off to the
-    # animal's own place, which is where its dispersion comes from.
+    # best answers for the cell. Two things have to hold over the whole
+    # sequence for a match: its decoded positions sit on the path, and it does
+    # not cover far more ground than the path does. An absorbed sequence
+    # tracks the injection during the injection and then sits at the animal's
+    # own place, which is where its dispersion comes from.
     # The event's decoded positions are its kept windows, as the detector's own
     # dispersion reads them: a window inside a merged gap was rejected and is
     # not a decoded position, whatever center its wide posterior happens to
