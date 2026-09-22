@@ -13,14 +13,15 @@ Each inventory produces one table, one row per event, over the same epochs and t
 speed-eligible population (overview X4). Every table carries:
 
 - **Identity** — `animal`, `day`, `epoch`, `brain_area`, `detector`, `event_index`,
-  and a detector-scoped key. Keys are never shared across inventories (overview X8).
+  and a detector-scoped key, `event_key` (`"<detector>:<native key>"`). Keys are never shared across inventories (overview X8).
 - **Timing (seconds)** — `event_start_s`, `event_end_s`, `interval_span_s`,
   `event_midpoint_s`. `interval_span_s` is defined identically everywhere as
   `event_end_s - event_start_s`, because the native duration conventions differ: our
   canonical cohort's duration includes a sample-width convention that the sequence
   detector's first-to-last-midpoint duration does not. Native duration fields are
   retained alongside it, never substituted for it.
-- **Speed** — `max_speed`, `mean_speed`, `whole_event_speed_eligible`.
+- **Speed** — `animal_max_speed_cm_s`, `animal_mean_speed_cm_s`,
+  `whole_event_speed_eligible`, named as the canonical classified table names them.
 - **Provenance** — `run_id` joining to the frozen configuration and artifact manifest.
 
 Detector-specific statistics stay in detector-specific columns, namespaced by detector,
