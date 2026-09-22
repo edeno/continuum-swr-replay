@@ -75,10 +75,20 @@ EVENT_LABELS = [
     "local",
     "remote\nstationary",
     "short path\n30 cm",
+    "short replay\n80 ms",
 ]
 
 FIELD_STD_CM = np.sqrt(12.5)
 """Place field width the package simulates."""
+
+SHORT_REPLAY = (35.0, 100.0, 0.080, 120.0, 44.40)
+"""start_cm, path_cm, duration_s, peak_rate_hz, time.
+
+A replay that travels far but lasts only 80 ms, firing strongly enough that
+spike count is not the issue. The detector finds it every time, and reports it
+about 1.8 times too long: the window sets a floor of roughly 160 ms under any
+duration it can report.
+"""
 
 SHORT_PATH = (40.0, 30.0, 0.300, 40.0, 20.50)
 """start_cm, path_cm, duration_s, peak_rate_hz, time.
@@ -204,6 +214,20 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
     event_times = np.vstack([event_times, bounds])
     is_event |= (time >= bounds[0]) & (time <= bounds[1])
 
+    start_cm, path_cm, duration_s, rate_hz, at_s = SHORT_REPLAY
+    spike_times, bounds = inject_replay(
+        spike_times,
+        place_field_means,
+        start_cm,
+        path_cm,
+        duration_s,
+        rate_hz,
+        at_s,
+        seed=1,
+    )
+    event_times = np.vstack([event_times, bounds])
+    is_event |= (time >= bounds[0]) & (time <= bounds[1])
+
     time, position, speed, is_event = (
         array[::DECODE_BIN_STRIDE] for array in (time, position, speed, is_event)
     )
@@ -304,6 +328,23 @@ def state_space_intervals(decoded: dict) -> list[tuple[float, float]]:
     ]
 
 
+def duration_ratio(decoded: dict, event: int) -> float | None:
+    """How much longer the detector calls an event than the event really is.
+
+    Read from the data, so a panel title cannot drift away from the panel.
+    """
+    candidates = decoded["candidates"]
+    event_start, event_end = decoded["event_times"][event]
+    for i in np.flatnonzero(candidates.is_replay):
+        start, stop = candidates.runs[i]
+        if (
+            decoded["midpoint_s"][start] < event_end
+            and event_start < decoded["midpoint_s"][stop]
+        ):
+            return float(candidates.duration_s[i] / (event_end - event_start))
+    return None
+
+
 def decoded_center_cm(decoded: dict) -> np.ndarray:
     """Center of each window, NaN where the window has none."""
     center = decoded["candidates"].decisions.center_index
@@ -311,6 +352,20 @@ def decoded_center_cm(decoded: dict) -> np.ndarray:
     present = center >= 0
     out[present] = decoded["place_bin_centers_cm"][center[present]]
     return out
+
+
+def local_fraction_of_event(decoded: dict, event: int) -> float:
+    """Share of the accepted event overlapping ``event`` that is local coding."""
+    candidates = decoded["candidates"]
+    event_start, event_end = decoded["event_times"][event]
+    for i in np.flatnonzero(candidates.is_replay):
+        start, stop = candidates.runs[i]
+        if (
+            decoded["midpoint_s"][start] < event_end
+            and event_start < decoded["midpoint_s"][stop]
+        ):
+            return local_fraction(decoded, i)
+    return float("nan")
 
 
 def local_fraction(decoded: dict, sequence: int, tolerance_cm: float = 15.0) -> float:
@@ -549,7 +604,8 @@ def plot_criterion_space(ax, decoded: dict, config: MemorylessSequenceConfig) ->
 
     # each case from panels b to d, marked and named where it lands
     annotated = (
-        (0, "continuous replay\nfound", VERMILION, True, (18, 6)),
+        (0, "continuous replay\nfound", VERMILION, True, (10, 6)),
+        (7, "short replay\nfound", VERMILION, True, (14, 24)),
         (6, "short path\nmissed", BLUE, False, (48, 22)),
         (5, "remote place\ndeclined", PURPLE, False, (108, 2)),
     )
@@ -591,8 +647,8 @@ def plot_criterion_space(ax, decoded: dict, config: MemorylessSequenceConfig) ->
     ax.set_xlabel("event duration (s)")
     ax.set_ylabel("dispersion (cm)")
     ax.set_title(
-        f"all {len(candidates.runs)} candidate sequences. Only the two continuous "
-        "replays\nreach the shaded box, where both criteria are met.",
+        f"all {len(candidates.runs)} candidate sequences. Only "
+        f"{int(accepted.sum())} reach the shaded box,\nwhere both criteria are met.",
         fontsize=5.5,
         linespacing=1.4,
     )
@@ -627,13 +683,24 @@ def make_figure(n_neurons: int, config: MemorylessSequenceConfig):
         figsize=(TWO_COLUMN, TWO_COLUMN * 0.82), dpi=450, constrained_layout=True
     )
     fig.set_constrained_layout_pads(w_pad=0.02, h_pad=0.02, wspace=0.05, hspace=0.09)
-    grid = GridSpec(3, 6, figure=fig, height_ratios=[1.0, 1.15, 0.95])
+    grid = GridSpec(3, 8, figure=fig, height_ratios=[1.0, 1.15, 0.95])
 
     ax_overview = fig.add_subplot(grid[0, :])
     plot_overview(ax_overview, decoded, config)
 
     outcomes = (
-        (0, "continuous replay", "found, but 5.8x too long"),
+        (
+            0,
+            "continuous replay",
+            f"found, but {duration_ratio(decoded, 0):.1f}x too long:\n"
+            f"{100 * local_fraction_of_event(decoded, 0):.0f}% of it is the animal's own place",
+        ),
+        (
+            7,
+            "short replay, 80 ms",
+            f"found, but {duration_ratio(decoded, 7):.1f}x too long:\n"
+            "the window sets a floor under any duration",
+        ),
         (6, "short path, 30 cm", "missed: the path is too short"),
         (5, "remote place, held still", "declined: it does not travel"),
     )
@@ -647,10 +714,12 @@ def make_figure(n_neurons: int, config: MemorylessSequenceConfig):
         zooms.append(ax)
     zooms[0].set_ylabel("position (cm)")
 
-    ax_criteria = fig.add_subplot(grid[2, 2:4])
+    ax_criteria = fig.add_subplot(grid[2, 3:5])
     plot_criterion_space(ax_criteria, decoded, config)
 
-    label_panels([ax_overview, *zooms, ax_criteria], xpos=-0.08, ypos=1.12)
+    label_panels([ax_overview], labels=["a"], xpos=-0.05, ypos=1.14)
+    label_panels(zooms, labels=["b", "c", "d", "e"], xpos=-0.10, ypos=1.34)
+    label_panels([ax_criteria], labels=["f"], xpos=-0.20, ypos=1.02)
 
     fig.suptitle(
         "Memoryless sliding-window detection on the Figure 1 simulation", fontsize=7

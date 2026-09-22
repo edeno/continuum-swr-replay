@@ -275,14 +275,20 @@ only duration varies:
 | detection rate | 0.00 | 0.00 | 0.12 | 0.38 | 0.25 | 0.50 | 0.88 | 1.00 | 1.00 |
 | reported duration | - | - | 0.20 s | 0.17 s | 0.16 s | 0.17 s | 0.21 s | 0.31 s | 0.89 s |
 
-The reported duration has a floor near 160 ms, about twice the window width, and
-no accepted event in any test came in below it. A real 60 ms replay is reported
-as 200 ms. **The duration distribution this detector produces is therefore
-truncated from below and inflated near the truncation**, and it must not be
-compared with our own event durations as though both measured the same thing.
-Accuracy is worst at both ends: short events are padded by the window, and slow
-events are padded by absorbed local coding, so the 500 ms case is 1.8x too long
-for a different reason than the 60 ms case.
+The 100 ms filter puts a floor under the reported duration by construction, and
+the window width lifts events off it: a real 60 ms replay is reported as 200 ms
+and a real 80 ms replay as 110 to 170 ms, depending on firing rate and on where
+the event falls against the window grid. No accepted event in any test here came
+in below about 110 ms. **The duration distribution this detector produces is
+therefore truncated from below and inflated near the truncation**, and it must
+not be compared with our own event durations as though both measured the same
+thing.
+Accuracy is worst at both ends, for two independent reasons. Short events are
+padded by the window: the 80 ms replay in the figure holds no local coding at
+all, 0% of its windows decode the animal's own place, and it is still reported
+1.3x too long. Slow events are padded by absorbed local coding instead, which is
+why the 500 ms case is 1.8x too long. Removing either cause would not fix the
+other.
 
 The 20 and 40 ms rows are not evidence about the criteria. At this firing rate
 such an event holds about one spike, so nothing could decode it.
@@ -328,7 +334,7 @@ not mistaken for a result.
 | miss | path shorter than about 42 cm | never reported, at any duration or firing rate | measured |
 | miss | replay that changes arm without passing the junction | cut at the switch, and neither half then clears dispersion | measured |
 | miss | sparse ensembles, about one spike per window | erratic, 0-50% where dense spiking gives 100% | measured |
-| over-call | any event shorter than about 150 ms | reported 1.6x to 3.3x too long; the detector cannot report a short event as short | measured |
+| over-call | any event shorter than about 150 ms | reported 1.3x to 3.3x too long; the detector cannot report a short event as short | measured |
 | miss | whole path inside one window (~4300 cm/s over 130 cm) | posterior smears, spread rejects | measured |
 | miss | replay overlapping the onset of movement | truncated one window *before* the first moving window | measured |
 | by design | remote place held still | decoded confidently, assembled, declined for going nowhere | measured |
