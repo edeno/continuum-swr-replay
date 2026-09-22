@@ -1,9 +1,9 @@
 # Replay detection method comparison — overview
 
 *Design spec, cross-cutting. Status: approved; the Yu detector exists in the
-`ripple_detection` package and the memoryless sequence detector's core is implemented
-and tested in this project; the shuffle, the event table, and the inventory comparison
-are not started. Each spec's own header carries its status; the per-spec sections
+`ripple_detection` package, and the memoryless sequence detector, its shuffle, its event
+table and a per-epoch runner are implemented and tested in this project but not yet run
+on recorded data; the inventory comparison is not started. Each spec's own header carries its status; the per-spec sections
 below carry the open decisions.*
 
 This directory holds the design for comparing replay-detection methods on our data.
@@ -15,7 +15,7 @@ register invites the cross-method blending this design forbids.
 | spec | scope | status |
 |---|---|---|
 | [01-yu-swr-detector.md](01-yu-swr-detector.md) | SWR detector with a noise-percentile threshold (Yu et al. 2017) | package side implemented; project wiring pending |
-| [02-memoryless-sequence.md](02-memoryless-sequence.md) | Memoryless sliding-window sequence detector (Widloski & Foster 2025) | detector core implemented and tested; shuffle, event table and comparison pending |
+| [02-memoryless-sequence.md](02-memoryless-sequence.md) | Memoryless sliding-window sequence detector (Widloski & Foster 2025) | implemented and tested, shuffle and event table included; not yet run on recorded data |
 | [03-inventory-comparison.md](03-inventory-comparison.md) | Six inventories → common schema → N-way overlap accounting | design complete |
 | [04-event-features.md](04-event-features.md) | Symmetric event characterization and selection diagnostics; threshold robustness as a later follow-up | initial scope agreed |
 | [05-validation.md](05-validation.md) | Simulation and held-out-tetrode validation: what a performance claim would need | parked |
@@ -119,7 +119,7 @@ Each produces an event table over the same epochs and the same speed-eligible po
 | 3 | SWR, noise-percentile threshold | LFP | `Yu_ripple_detector` (Yu et al. 2017) | in package; project wiring pending — [01](01-yu-swr-detector.md) |
 | 4 | MUA high-synchrony events | population rate | `multiunit_HSE_detector` | exists (`MUA_event`) |
 | 5 | Posterior threshold | decoding | our state-space non-local detection | exists (`non_local_event`) |
-| 6 | Posterior sequence | decoding | Widloski & Foster 2025 | detector core implemented (`memoryless_sequence/`); shuffle and event table pending — [02](02-memoryless-sequence.md) |
+| 6 | Posterior sequence | decoding | Widloski & Foster 2025 | implemented (`memoryless_sequence/`, `scripts/decoding/run_memoryless_detection.py`); real-data pilot next — [02](02-memoryless-sequence.md) |
 
 1, 2 and 3 are three different SWR *algorithms*, not three thresholds on one algorithm:
 Kay thresholds a root-sum-of-squares consensus trace, Karlsson detects per channel and

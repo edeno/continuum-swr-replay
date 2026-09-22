@@ -1,9 +1,13 @@
 # Memoryless sliding-window sequence detection (Widloski & Foster 2025)
 
-*Design spec, now part implemented. `config.py`, `statistics.py`, `detect.py`,
-`likelihood.py`, `simulation.py` and `scoring.py` exist and are tested; `shuffle.py` and
-`compare.py` and the `memoryless_event_table` of the output schema do not. The sections on what the
-port does on simulated data are results; everything else is a proposed analysis.*
+*Design spec, now implemented; not yet run on recorded data. `config.py`, `statistics.py`,
+`detect.py`, `likelihood.py`, `simulation.py`, `scoring.py`, `shuffle.py`,
+`event_table.py` and `epoch.py` exist and are tested, and
+`scripts/decoding/run_memoryless_detection.py` runs them per recorded epoch. The decodes
+are not on the development machine, so the real-data pilot is the next step. `compare.py`
+belongs to the inventory comparison ([03](03-inventory-comparison.md)). The sections on
+what the port does on simulated data are results; everything else is a proposed
+analysis.*
 *Governing rule and cross-cutting decisions: [overview.md](overview.md).*
 
 Inventory 6 of six: the posterior-sequence trigger. How this cohort is compared against
@@ -201,6 +205,48 @@ rather than assuming this shuffle is uniformly more permissive or more stringent
 Report the comparator cohort both before and after this filter; retain our native
 state-space definition. No component model or general detector-calibration study is
 required to implement this adaptation.
+
+**As built** (`shuffle.py`). The shuffle is run on the candidates that meet both replay
+criteria and are still over their whole interval, as the reference tests only its
+duration- and dispersion-accepted events. It permutes the encoding marks by the inverse
+permutation rather than the positions: pairing `M` with `X[pi]` and `M[pi^-1]` with `X`
+give the same set of pairs, and the joint mark intensity is a sum over pairs, so this is
+exact and avoids permuting the `(n_encoding, n_bins)` position kernel. The per-spike
+joint mark intensity is the library's own `block_estimate_log_joint_mark_intensity`, and
+spikes are binned by its own `get_spike_time_bin_ind` on the full epoch grid, so the
+unshuffled re-decode is the epoch decode restricted to the candidate's rows; tests pin
+both facts against the library. Seeds come from the run seed, the epoch identifier, the
+candidate's first window, the draw and the electrode, so draw `k` does not depend on how
+many draws there are. The reference passes at `p <= 0.05` and the paper says `p < 0.05`;
+at 100 draws the p-values are multiples of 1/101 and the two agree.
+
+**What the jump half of the test does on simulated data.** Measured before any real
+data, and the reason the pilot must inspect both nulls:
+
+- *One tetrode, five units, fields tiling a linear track, decoded in-sample.* The decode
+  follows the animal to within a bin. The spread test separates at once: observed mean
+  spread 3.5 cm, every one of 50 draws above 13.7 cm. The jump test does not: observed
+  mean jump 0.72 cm against a null median of 0.86 cm at 80 Hz (p about 0.25), and 0.58 cm
+  at 40 Hz (p about 0.8). Breaking which mark goes with which place leaves a broad
+  posterior, whose center sits near the middle of the track and barely moves, so the
+  null's mean jump falls below that of a trajectory that really moves. "Observed jump
+  below the shuffled" then favours a decode that stands still.
+- *`non_local_detector`'s clusterless simulation, a continuous replay spliced into a
+  silent epoch.* Spread passes (observed below all 40 draws); jump fails (observed above
+  all 40). That simulation gives each electrode one stretch of track, a within-electrode
+  shuffle keeps it, so a shuffled decode still sweeps the track, and for a sweep the mean
+  jump is close to path length over window count: 160 cm over 135 windows, where the null
+  sits.
+
+The first is a property of the jump statistic against a broad null; the second, of
+permuting within electrodes when an electrode's identity carries position. CA1 tetrodes
+are not topographic, so the second should matter less on real data than in that
+simulation, but how much position a tetrode's identity carries has to be measured, not
+assumed. Whether the reference's cell-ID shuffle shows the first behaviour on its own
+data is not known. Both are pinned in the tests
+(`tests/unit/test_memoryless_shuffle.py`,
+`tests/integration/test_memoryless_simulated_replay.py`) so a change to either statistic
+has to confront them.
 
 ## What the port does on simulated data
 
@@ -617,10 +663,15 @@ Named for what it does; the citation lives in docstrings, not the module path.
 | `simulation.py` | inject a replay of known shape into a simulated recording; place it clear of movement | numpy |
 | `scoring.py` | the one rule both detectors are scored by against an injected replay | numpy |
 | `shuffle.py` | encoding-pair permutations, re-decoding fixed candidate windows, spread/jump p-values | encoding arrays, event marks, likelihood and statistics helpers |
+| `event_table.py` | one row per candidate: timing, jumps within pieces and bridges between them, speed eligibility, SWR labels against the canonical intervals, shuffle columns; the shuffle-draw sidecar | the canonical SWR classifier and matcher, the immobility rule |
+| `epoch.py` | `run_epoch`: the whole detector over one epoch, arrays in and tables out, in the one fixed order | all of the above |
 | `compare.py` | interval-pair table, event summaries, selection diagnostics, and per-session/animal comparisons | both event tables, diagnostic traces, canonical SWRs |
 
 `likelihood.py` exposes one function with two implementations behind it, so the
 `results.nc` fast path (D7) is a swap, not a fork in the caller.
+
+`scripts/decoding/run_memoryless_detection.py` is the per-epoch runner: it reads each
+epoch's saved decode, calls `run_epoch`, and writes the tables and a run manifest.
 
 ## Data flow, per epoch
 
@@ -707,23 +758,42 @@ accuracy, because float32 cumulative sums can lose precision when subtracted.
 
 ## Output schema
 
-Table `memoryless_event_table`, one row per detected candidate sequence (D2).
+Table `memoryless_event_table`, one row per candidate sequence, accepted or not (D2),
+built by `event_table.build_memoryless_event_table`. Its columns and dtypes are declared
+once, in `MEMORYLESS_EVENT_TABLE_DTYPES`, and held for an empty epoch too.
 
-- **Identity** — `animal`, `day`, `epoch`, `brain_area`, `sequence_label`, `ms_event_id`,
-  `run_id` (joins to the frozen configuration and source-artifact manifest)
-- **Timing (seconds)** — `event_start_s`, `event_end_s`, `event_duration_s`, `event_midpoint_s`
-- **Decoding support (seconds)** — `support_start_s`, `support_end_s`, separate from event bounds
-- **Detector statistics** — `n_windows`, `mean_posterior_spread_cm`, `max_jump_cm`,
-  `mean_jump_cm`, `dispersion_cm`, `path_distance_cm` (summed track-graph distance
-  along the center trajectory, the analogue of the original's `compute_sequenceDistance`;
-  reported, not used as a criterion)
-- **Speed (cm/s)** — `max_speed`, `mean_speed`, `whole_event_speed_eligible`
-- **SWR** — `is_swr`, `overlap_class`, `overlap_subclass`, `n_swrs_overlapping`,
-  `matched_swr_event`, `matched_swr_start`, `matched_swr_end`; nullable under 03's
-  observation-availability rule, with unavailable labels recorded as unknown
-- **Shuffle** — `shuffle_observed_spread_cm`, `shuffle_observed_jump_cm`,
-  `p_spread`, `p_jump`, `shuffle_testable`, `shuffle_pass`, `n_shuffles`;
-  retain each draw's two scores in a sidecar for the pilot/null-distribution audit
+- **Identity** — `animal`, `day`, `epoch`, `brain_area`, `run_id` (joins to the run
+  manifest), `swr_definition` (the ripple detector the SWR labels come from, read from
+  the epoch identifier), `sequence_label` (1-based, in time order), `ms_event_id`
+- **Timing (seconds)** — `event_start_s`, `event_end_s`, `event_duration_s`,
+  `event_midpoint_s`: the first and last retained window midpoint
+- **Decoding support (seconds)** — `support_start_s`, `support_end_s`, half a window wider
+  at each end, separate from the event bounds
+- **Detector statistics** — `n_windows` (every window spanned, merged gaps included),
+  `n_pieces` (pre-merge runs), `mean_posterior_spread_cm` (over retained windows),
+  `max_jump_cm` and `mean_jump_cm` (consecutive-window jumps within pieces only),
+  `max_bridge_cm` (between the facing centers of adjacent pieces; NaN for one piece),
+  `dispersion_cm`, `path_distance_cm` (summed track-graph distance along the retained
+  centers, bridges included; the analogue of the original's `compute_sequenceDistance`,
+  reported and not used as a criterion), `is_replay` (both replay criteria)
+- **Speed (cm/s)** — `animal_max_speed_cm_s`, `animal_mean_speed_cm_s`,
+  `whole_event_speed_eligible`, over every native speed sample between the endpoints.
+  Named as the canonical classified table names them.
+- **SWR** — `is_swr` (nullable), `overlap_class`, `overlap_subclass`,
+  `n_swrs_overlapping`, `matched_swr_event`, `matched_swr_start`, `matched_swr_end`,
+  against `canonical_swr_intervals`. An event not wholly inside an interval where the
+  labels were observed (`observed_label_intervals`) has `overlap_class = "unknown"`, never
+  `non_swr`.
+- **Shuffle** — `shuffle_observed_spread_cm`, `shuffle_observed_jump_cm`, `p_spread`,
+  `p_jump`, `shuffle_testable`, `shuffle_pass`, `n_shuffles`. `n_shuffles == 0` marks a
+  candidate that was not tested, apart from one tested and untestable. Because only
+  replay-criteria, whole-event-still candidates are tested, `shuffle_pass` alone selects
+  the published replay definition.
+
+Sidecar `memoryless_shuffle_draws`: `ms_event_id`, `draw`, `null_spread_cm`,
+`null_jump_cm`, one row per draw, for the null-distribution audit. The per-window
+statistics and gates, and the pre- and post-merge runs, are saved as the
+`CandidateSequences` object itself.
 
 Timing column names mirror the canonical event table so comparison code is symmetric.
 `ms_event_id` is deliberately a different key from `event_id` (D6).
@@ -783,3 +853,13 @@ Carried deliberately; each must be checked against real data before results are 
 4. **Window likelihoods match direct computation for saved models and long epochs** —
    the additive algebra depends on matching sample units, spike support, and boundary
    conventions; numerical accuracy still needs the explicit tests above.
+5. **Missing LFP is coded as a missing `SWR_event` label** — `observed_label_intervals`
+   treats a NaN label as unobserved. If `data_over_time` writes 0 where the LFP was
+   missing, an event there reads as observed and non-SWR. Check how the labels are
+   written before any non-SWR fraction is quoted.
+6. **`data_over_time` sits on the decode's uniform 500 Hz grid, without gaps** — the
+   runner uses its index as the decode grid, and `validate_time_grid` refuses anything
+   else, so a violation stops the run rather than passing silently.
+7. **How much position a tetrode's identity carries** — it decides how weak the
+   within-electrode shuffle is (see "What the jump half of the test does on simulated
+   data"). Measure it on the pilot epochs.
