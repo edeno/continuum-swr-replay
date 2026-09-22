@@ -1,9 +1,10 @@
 """Put a replay of known shape into a simulated recording.
 
 Used to ask what a detector does to an event whose true path, duration and
-firing rate are known. The recording itself comes from ``non_local_detector``'s
-simulation; these helpers add an event to it and say where an event may safely
-go.
+firing rate are known. The recording itself comes from
+``non_local_detector.simulate.sorted_spikes_simulation.make_simulated_data``,
+which is also what ``scripts/figures/generate_figure01.py`` uses; these helpers
+add an event to it and say where an event may safely go.
 
 Placement is not a detail. A window straddling the end of an immobile stretch
 loses its center to the speed gate, and because jumps are forward the sequence

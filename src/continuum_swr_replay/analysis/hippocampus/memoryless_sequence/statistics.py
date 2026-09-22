@@ -14,6 +14,9 @@ approach the ordinary center of mass and standard deviation.
 
 A missing center is carried as the sentinel ``NO_CENTER`` rather than NaN, so
 centers stay an integer index into the bins.
+
+Deviation numbers (V6, V8, V10 ...), decision numbers (D1 ...) and the
+data-flow steps cited below are in ``docs/design/replay_detection_comparison/02-memoryless-sequence.md``.
 """
 
 import numpy as np

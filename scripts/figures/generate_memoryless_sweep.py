@@ -100,8 +100,8 @@ def plot_duration_bias(ax, summary: pd.DataFrame):
     rows = summary[summary["summary"] == "median_duration_ratio_by_duration"]
     ax.axhline(1.0, color="0.6", lw=0.7, ls=":")
     for measure, color, label in (
-        ("ml_duration_ratio", VERMILION, SLIDING),
-        ("ss_duration_ratio", BLUE, STATE_SPACE),
+        ("sliding_duration_ratio", VERMILION, SLIDING),
+        ("state_space_duration_ratio", BLUE, STATE_SPACE),
     ):
         series = rows[rows.measure == measure].sort_values("duration_s")
         ax.plot(
@@ -145,9 +145,13 @@ def plot_absorption(ax, summary: pd.DataFrame):
         return np.array([indexed[bin_name] for bin_name in order])
 
     ax.axhline(1.0, color="0.6", lw=0.7, ls=":")
-    ax.plot(at, series("ml_duration_ratio"), color=VERMILION, lw=1.0, marker="o", ms=3)
-    ax.plot(at, series("ss_duration_ratio"), color=BLUE, lw=1.0, marker="o", ms=3)
-    for x, local in zip(at, series("ml_local_fraction"), strict=True):
+    ax.plot(
+        at, series("sliding_duration_ratio"), color=VERMILION, lw=1.0, marker="o", ms=3
+    )
+    ax.plot(
+        at, series("state_space_duration_ratio"), color=BLUE, lw=1.0, marker="o", ms=3
+    )
+    for x, local in zip(at, series("sliding_local_fraction"), strict=True):
         ax.annotate(
             f"{100 * local:.0f}% of windows\non the animal's place",
             xy=(x, 1.0),
@@ -181,14 +185,14 @@ def make_figure(summary: pd.DataFrame):
     ax_state = fig.add_subplot(inner[1])
     image = plot_detection(
         ax_sliding,
-        detection_grid(summary, "ml_matches"),
-        f"{SLIDING}: reported {100 * overall['ml_matches']:.0f}% of them",
+        detection_grid(summary, "sliding_matches"),
+        f"{SLIDING}: reported {100 * overall['sliding_matches']:.0f}% of them",
         show_y=True,
     )
     plot_detection(
         ax_state,
-        detection_grid(summary, "ss_matches"),
-        f"{STATE_SPACE}: reported {100 * overall['ss_matches']:.0f}%",
+        detection_grid(summary, "state_space_matches"),
+        f"{STATE_SPACE}: reported {100 * overall['state_space_matches']:.0f}%",
         show_y=False,
     )
     bar = fig.colorbar(image, ax=[ax_sliding, ax_state], fraction=0.03, pad=0.01)
@@ -208,7 +212,7 @@ def make_figure(summary: pd.DataFrame):
         f"{100 * overall['found_by_state_space_only']:.0f}% were reported by the "
         f"state-space model alone and "
         f"{100 * overall['found_by_sliding_window_only']:.0f}% by the sliding window "
-        f"alone. {100 * overall['ml_accepted_but_not_the_injection']:.0f}% of the "
+        f"alone. {100 * overall['sliding_accepted_but_not_the_injection']:.0f}% of the "
         "sliding window's accepted events are not the injected replay.",
         fontsize=6.5,
     )

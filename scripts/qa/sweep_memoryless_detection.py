@@ -30,7 +30,9 @@ Usage:
 
 import argparse
 import os
+import subprocess
 import time as clock
+from datetime import UTC, datetime
 from pathlib import Path
 
 os.environ.setdefault("JAX_PLATFORMS", "cpu")
@@ -221,29 +223,29 @@ def memoryless_outcome(recording, injected, window, bounds, true_position_cm, pa
     accepted = [i for i in overlapping if candidates.is_replay[i]]
 
     out = {
-        "ml_found": bool(accepted),
-        "ml_any_candidate": bool(overlapping),
-        "ml_n_candidates": len(overlapping),
-        "ml_has_center": (
+        "sliding_found": bool(accepted),
+        "sliding_any_candidate": bool(overlapping),
+        "sliding_n_candidates": len(overlapping),
+        "sliding_has_center": (
             float(gates.has_center[inside].mean()) if inside.any() else np.nan
         ),
-        "ml_spread_ok": (
+        "sliding_spread_ok": (
             float(gates.spread_below_threshold[inside].mean())
             if inside.any()
             else np.nan
         ),
-        "ml_jump_ok": (
+        "sliding_jump_ok": (
             float(gates.jump_below_threshold[inside].mean()) if inside.any() else np.nan
         ),
-        "ml_best_dispersion_cm": max(
+        "sliding_best_dispersion_cm": max(
             (candidates.dispersion_cm[i] for i in overlapping), default=np.nan
         ),
-        "ml_best_duration_s": max(
+        "sliding_best_duration_s": max(
             (candidates.duration_s[i] for i in overlapping), default=np.nan
         ),
-        "ml_matches": False,
-        "ml_position_error_cm": np.nan,
-        "ml_span_cm": np.nan,
+        "sliding_matches": False,
+        "sliding_position_error_cm": np.nan,
+        "sliding_span_cm": np.nan,
     }
     if not accepted:
         return out
@@ -262,14 +264,14 @@ def memoryless_outcome(recording, injected, window, bounds, true_position_cm, pa
     # off to the animal's own place, which is where its dispersion comes from.
     during = present & (times >= start_s) & (times <= end_s)
     span_cm = float(np.ptp(decoded_cm)) if decoded_cm.size else np.nan
-    out["ml_span_cm"] = span_cm
+    out["sliding_span_cm"] = span_cm
     if during.any():
         error_cm = np.abs(
             recording["place_bin_centers_cm"][centers[during]]
             - true_position_cm(times[during])
         )
-        out["ml_position_error_cm"] = float(np.median(error_cm))
-        out["ml_matches"] = bool(
+        out["sliding_position_error_cm"] = float(np.median(error_cm))
+        out["sliding_matches"] = bool(
             np.median(error_cm) < MATCH_TOLERANCE_CM
             and span_cm <= path_cm + 2 * MATCH_TOLERANCE_CM
         )
@@ -280,12 +282,12 @@ def memoryless_outcome(recording, injected, window, bounds, true_position_cm, pa
         recording["position"][recording["window_mask"]][: result.time.size],
     )
     out |= {
-        "ml_duration_s": float(candidates.duration_s[i]),
-        "ml_dispersion_cm": float(candidates.dispersion_cm[i]),
-        "ml_start_error_s": float(midpoint_s[run_start] - start_s),
-        "ml_end_error_s": float(midpoint_s[run_stop] - end_s),
-        "ml_n_pieces": int(candidates.pieces[i].size),
-        "ml_local_fraction": float(
+        "sliding_duration_s": float(candidates.duration_s[i]),
+        "sliding_dispersion_cm": float(candidates.dispersion_cm[i]),
+        "sliding_start_error_s": float(midpoint_s[run_start] - start_s),
+        "sliding_end_error_s": float(midpoint_s[run_stop] - end_s),
+        "sliding_n_pieces": int(candidates.pieces[i].size),
+        "sliding_local_fraction": float(
             np.mean(np.abs(decoded_cm - animal_cm) < SAME_PLACE_CM)
         ),
     }
@@ -327,17 +329,17 @@ def state_space_outcome(recording, injected, window, bounds, true_position_cm, p
     inside = (time >= start_s) & (time <= end_s)
 
     out = {
-        "ss_found": bool(hits),
-        "ss_n_intervals": len(hits),
-        "ss_peak_probability": (
+        "state_space_found": bool(hits),
+        "state_space_n_intervals": len(hits),
+        "state_space_peak_probability": (
             float(probability[inside].max()) if inside.any() else np.nan
         ),
-        "ss_duration_s": float(hits[-1][1] - hits[0][0]) if hits else np.nan,
-        "ss_start_error_s": float(hits[0][0] - start_s) if hits else np.nan,
-        "ss_end_error_s": float(hits[-1][1] - end_s) if hits else np.nan,
-        "ss_matches": False,
-        "ss_position_error_cm": np.nan,
-        "ss_span_cm": np.nan,
+        "state_space_duration_s": float(hits[-1][1] - hits[0][0]) if hits else np.nan,
+        "state_space_start_error_s": float(hits[0][0] - start_s) if hits else np.nan,
+        "state_space_end_error_s": float(hits[-1][1] - end_s) if hits else np.nan,
+        "state_space_matches": False,
+        "state_space_position_error_cm": np.nan,
+        "state_space_span_cm": np.nan,
     }
     if not hits:
         return out
@@ -355,11 +357,11 @@ def state_space_outcome(recording, injected, window, bounds, true_position_cm, p
     if reported.any():
         decoded_cm = bin_position_cm[np.argmax(non_local[reported], axis=1)]
         error_cm = np.abs(decoded_cm - true_position_cm(time[reported]))
-        out["ss_position_error_cm"] = float(np.median(error_cm))
-        out["ss_span_cm"] = float(np.ptp(decoded_cm))
-        out["ss_matches"] = bool(
+        out["state_space_position_error_cm"] = float(np.median(error_cm))
+        out["state_space_span_cm"] = float(np.ptp(decoded_cm))
+        out["state_space_matches"] = bool(
             np.median(error_cm) < MATCH_TOLERANCE_CM
-            and out["ss_span_cm"] <= path_cm + 2 * MATCH_TOLERANCE_CM
+            and out["state_space_span_cm"] <= path_cm + 2 * MATCH_TOLERANCE_CM
         )
     return out
 
@@ -422,22 +424,44 @@ def run_cell(recording, means, path_cm, midpoint_cm, duration_s, rate_hz, at_s, 
     return row
 
 
+def git_commit() -> str:
+    """The commit this ran from, so a saved table can be tied back to the code."""
+    try:
+        described = subprocess.run(
+            ["git", "describe", "--always", "--dirty", "--abbrev=12"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+    return described.stdout.strip()
+
+
 def summarize(table: pd.DataFrame) -> pd.DataFrame:
     """The aggregates the spec quotes, in one long-format table.
 
     Built here so the numbers in the write-up and the numbers in the sweep
     cannot drift apart.
     """
-    found = table[table.ml_matches & table.ss_matches].copy()
-    found["ml_duration_ratio"] = found.ml_duration_s / found.duration_s
-    found["ss_duration_ratio"] = found.ss_duration_s / found.duration_s
-    missed = table[table.ss_matches & ~table.ml_matches]
+    found = table[table.sliding_matches & table.state_space_matches].copy()
+    found["sliding_duration_ratio"] = found.sliding_duration_s / found.duration_s
+    found["state_space_duration_ratio"] = (
+        found.state_space_duration_s / found.duration_s
+    )
+    missed = table[table.state_space_matches & ~table.sliding_matches]
 
     parts = []
 
     by_path_duration = (
         table.groupby(["path_cm", "duration_s"])[
-            ["ml_found", "ml_matches", "ml_any_candidate", "ss_found", "ss_matches"]
+            [
+                "sliding_found",
+                "sliding_matches",
+                "sliding_any_candidate",
+                "state_space_found",
+                "state_space_matches",
+            ]
         ]
         .mean()
         .reset_index()
@@ -447,7 +471,9 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
     parts.append(by_path_duration)
 
     by_duration = (
-        found.groupby("duration_s")[["ml_duration_ratio", "ss_duration_ratio"]]
+        found.groupby("duration_s")[
+            ["sliding_duration_ratio", "state_space_duration_ratio"]
+        ]
         .median()
         .reset_index()
         .melt(id_vars="duration_s", var_name="measure", value_name="value")
@@ -460,7 +486,11 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
     ).astype(str)
     by_distance = (
         found.groupby("distance_bin_cm", observed=True)[
-            ["ml_duration_ratio", "ml_local_fraction", "ss_duration_ratio"]
+            [
+                "sliding_duration_ratio",
+                "sliding_local_fraction",
+                "state_space_duration_ratio",
+            ]
         ]
         .median()
         .reset_index()
@@ -473,41 +503,41 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
         {
             "measure": [
                 "n_cells",
-                "ml_found",
-                "ml_matches",
-                "ml_any_candidate",
-                "ss_found",
-                "ss_matches",
+                "sliding_found",
+                "sliding_matches",
+                "sliding_any_candidate",
+                "state_space_found",
+                "state_space_matches",
                 "found_by_state_space_only",
                 "found_by_sliding_window_only",
-                "ml_accepted_but_not_the_injection",
+                "sliding_accepted_but_not_the_injection",
                 "missed_with_candidate_below_dispersion",
                 "missed_with_no_candidate",
                 "missed_median_spread_pass_rate",
             ],
             "value": [
                 float(len(table)),
-                float(table.ml_found.mean()),
-                float(table.ml_matches.mean()),
-                float(table.ml_any_candidate.mean()),
-                float(table.ss_found.mean()),
-                float(table.ss_matches.mean()),
-                float((table.ss_matches & ~table.ml_matches).mean()),
-                float((table.ml_matches & ~table.ss_matches).mean()),
+                float(table.sliding_found.mean()),
+                float(table.sliding_matches.mean()),
+                float(table.sliding_any_candidate.mean()),
+                float(table.state_space_found.mean()),
+                float(table.state_space_matches.mean()),
+                float((table.state_space_matches & ~table.sliding_matches).mean()),
+                float((table.sliding_matches & ~table.state_space_matches).mean()),
                 float(
-                    (table.ml_found & ~table.ml_matches).sum()
-                    / max(table.ml_found.sum(), 1)
+                    (table.sliding_found & ~table.sliding_matches).sum()
+                    / max(table.sliding_found.sum(), 1)
                 ),
                 float(
                     (
-                        missed.ml_n_candidates.gt(0)
-                        & missed.ml_best_dispersion_cm.lt(
+                        missed.sliding_n_candidates.gt(0)
+                        & missed.sliding_best_dispersion_cm.lt(
                             CONFIG.dispersion_threshold_cm
                         )
                     ).mean()
                 ),
-                float(missed.ml_n_candidates.eq(0).mean()),
-                float(missed.ml_spread_ok.median()),
+                float(missed.sliding_n_candidates.eq(0).mean()),
+                float(missed.sliding_spread_ok.median()),
             ],
         }
     )
@@ -517,8 +547,18 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
     # the grouping column is not called "aggregate": that name shadows
     # DataFrame.aggregate, so frame.aggregate == "x" compares a method and
     # quietly selects nothing
-    return pd.concat(parts, ignore_index=True)[
-        ["summary", "measure", "path_cm", "duration_s", "distance_bin_cm", "value"]
+    table = pd.concat(parts, ignore_index=True)
+    table["note"] = ""
+    return table[
+        [
+            "summary",
+            "measure",
+            "path_cm",
+            "duration_s",
+            "distance_bin_cm",
+            "value",
+            "note",
+        ]
     ]
 
 
@@ -598,6 +638,10 @@ def main() -> None:
 
     table = pd.DataFrame(rows)
     table.attrs = {
+        "produced_by": "scripts/qa/sweep_memoryless_detection.py",
+        "produced_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "git_commit": git_commit(),
+        "design_spec": "docs/design/replay_detection_comparison/02-memoryless-sequence.md",
         "n_seeds": args.n_seeds,
         "n_neurons": N_NEURONS,
         "path_cm": list(PATH_CM),
@@ -613,20 +657,38 @@ def main() -> None:
     }
     write_table(table, args.out)
     summary = summarize(table)
+    for key in ("produced_by", "produced_at", "git_commit", "n_cells_total"):
+        summary.loc[len(summary)] = {
+            "summary": "provenance",
+            "measure": key,
+            "value": np.nan,
+            "note": {
+                "produced_by": table.attrs["produced_by"],
+                "produced_at": table.attrs["produced_at"],
+                "git_commit": table.attrs["git_commit"],
+                "n_cells_total": str(len(table)),
+            }[key],
+        }
     SUMMARY_PATH.parent.mkdir(parents=True, exist_ok=True)
     summary.to_csv(SUMMARY_PATH, index=False)
 
     print(f"\n{len(table)} cells in {(clock.time() - started) / 60:.1f} min")
     print(f"  raw      -> {args.out}")
     print(f"  summary  -> {SUMMARY_PATH}")
-    print(f"\n  sliding window, native criterion : {table.ml_found.mean():.3f}")
-    print(f"  sliding window, and it is the event: {table.ml_matches.mean():.3f}")
-    print(f"  sliding window, any candidate      : {table.ml_any_candidate.mean():.3f}")
-    print(f"  state space, native criterion      : {table.ss_found.mean():.3f}")
-    print(f"  state space, and it is the event   : {table.ss_matches.mean():.3f}")
+    print(f"\n  sliding window, native criterion : {table.sliding_found.mean():.3f}")
+    print(f"  sliding window, and it is the event: {table.sliding_matches.mean():.3f}")
+    print(
+        f"  sliding window, any candidate      : {table.sliding_any_candidate.mean():.3f}"
+    )
+    print(
+        f"  state space, native criterion      : {table.state_space_found.mean():.3f}"
+    )
+    print(
+        f"  state space, and it is the event   : {table.state_space_matches.mean():.3f}"
+    )
     print(
         "  of the sliding window's accepted events, the share that are not the "
-        f"injection: {(table.ml_found & ~table.ml_matches).sum() / max(table.ml_found.sum(), 1):.3f}"
+        f"injection: {(table.sliding_found & ~table.sliding_matches).sum() / max(table.sliding_found.sum(), 1):.3f}"
     )
 
 

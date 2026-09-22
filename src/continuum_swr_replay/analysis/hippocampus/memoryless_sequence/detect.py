@@ -19,6 +19,9 @@ systematic rather than rare here: a 20 cm jump is exactly ten 2 cm bins, and
 this project's 4 ms one. The comparisons therefore treat a value within a
 relative tolerance of its threshold as equal to it, so float representation
 does not decide the outcome.
+
+Deviation numbers (V6, V8, V10 ...), decision numbers (D1 ...) and the
+data-flow steps cited below are in ``docs/design/replay_detection_comparison/02-memoryless-sequence.md``.
 """
 
 from dataclasses import dataclass

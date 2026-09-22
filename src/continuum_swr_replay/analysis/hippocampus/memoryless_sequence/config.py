@@ -3,6 +3,9 @@
 The equivalent of the original's ``Analysis_Information.mat``. Spec 02 records
 which settings are retained from Widloski & Foster (2025) and which are adapted
 to this project's track geometry and sampling grid.
+
+Deviation numbers (V6, V8, V10 ...), decision numbers (D1 ...) and the
+data-flow steps cited below are in ``docs/design/replay_detection_comparison/02-memoryless-sequence.md``.
 """
 
 from dataclasses import dataclass

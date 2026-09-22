@@ -23,6 +23,9 @@ are excluded here by construction (spec 02, V8). Reading a saved decode's
 ``log_likelihood`` instead would carry every ``state_bins`` column and would
 need the interior mask applied explicitly; that path is deliberately not
 implemented until it can be checked against a real file (D7).
+
+Deviation numbers (V6, V8, V10 ...), decision numbers (D1 ...) and the
+data-flow steps cited below are in ``docs/design/replay_detection_comparison/02-memoryless-sequence.md``.
 """
 
 from dataclasses import dataclass
