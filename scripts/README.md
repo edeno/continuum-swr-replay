@@ -9,7 +9,9 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
 - `run_decoding_contfrag.py` — decoding for the ContFrag (SWR/MUA) event sources.
 - `run_memoryless_detection.py` — the Widloski & Foster sliding-window detector
   on each HPC epoch's saved decode, with its encoding-pair shuffle; one row per
-  candidate sequence (spec 02). Needs the Spyglass database for the marks.
+  candidate sequence (spec 02). Loads the marks from the Spyglass database
+  unless `--cache-dir` already holds them; a failing epoch is recorded and the
+  rest run; `run.log` and `manifest.json` sit beside the outputs.
 - `prepare_replay_content_data.py` — build the canonical replay-content tables
   (event / event-arm / event-patch / event-sequence / stop) across all sessions.
 - `regenerate_stop_table.py` — rebuild the per-stop immobility table.

@@ -22,7 +22,13 @@ Each epoch writes, under ``Processed-Data/replay_detection_comparison/memoryless
 time grid, a hash of every input and of the marks, the encoding model's
 settings, and the outcome. It is rewritten atomically after each epoch, so a
 run that stops part way still says what it did, and a rerun under the same
-run id refuses to continue with different settings or code.
+run id refuses to continue with different settings or code. An epoch that
+fails is recorded as ``failed`` with its error and the run goes on to the
+next; the run then exits non-zero, and a rerun retries the failed epochs.
+``run.log`` beside the manifest keeps everything printed.
+
+The marks come from ``load_data``, which needs the Spyglass database, unless
+``--cache-dir`` already holds them from an earlier run.
 
 Epoch identifiers name the decode: ``chimi20200212_02_r1_HPC`` is the
 canonical one (Kay's SWRs, trained on ``no_ripple``, stationary). A decode
@@ -46,8 +52,10 @@ Usage:
 import argparse
 import hashlib
 import json
+import logging
 import os
 import sys
+import traceback
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -77,6 +85,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
     DEFAULT_N_SHUFFLES,
+    MINIMUM_N_SHUFFLES,
     SIGNIFICANCE_LEVEL,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import git_hash
@@ -92,7 +101,10 @@ DEFAULT_SWR_DEFINITION = "Kay"
 """A decode run with the default ripple detector adds no suffix to its identifier."""
 
 OTHER_RIPPLE_DETECTORS = ("Karlsson", "Yu")
-"""The ripple detectors whose name a decode would append; Kay's it does not."""
+"""The ripple detectors whose name a decode would append; Kay's it does not.
+
+No decode carries ``_Yu`` yet; it is listed so the day one does, the runner
+reads it as a ripple detector and not as a name no decode writes."""
 
 DEFAULT_TRAINING_TYPE = "no_ripple"
 """The training type a decode does not append to its identifier."""
@@ -333,12 +345,14 @@ def run_one(
     check_marks_match_encoding(encoding_model, spike_times, spike_waveform_features)
 
     time = data_over_time.index.to_numpy(dtype=np.float64)
+    speed = data_over_time["head_speed"].to_numpy(dtype=np.float64)
+    midpoint_s = window_midpoints_s(time[:-1], config)
     # SWR_event is an integer and never NaN; SWR_zscore is NaN where the LFP is missing
     swr_observed = observed_intervals(data_over_time, "SWR_zscore")
     detection = run_epoch(
         time,
         data_over_time["linear_position"].to_numpy(dtype=np.float64),
-        data_over_time["head_speed"].to_numpy(dtype=np.float64),
+        speed,
         spike_times,
         spike_waveform_features,
         encoding_model,
@@ -364,6 +378,7 @@ def run_one(
     joblib.dump(detection.candidates, outputs["candidates"])
 
     table = detection.table
+    gates = detection.candidates.decisions.gates
     return {
         "status": "ok",
         "git_commit": provenance["git_commit"],
@@ -390,9 +405,19 @@ def run_one(
             "waveform_std": np.asarray(encoding_model["waveform_std"]).tolist(),
             "block_size": int(encoding_model["block_size"]),
         },
+        "n_windows": int(gates.speed_eligible.size),
+        # a window whose speed was NaN is rejected as not still; how many
+        # says whether a quiet epoch was quiet or untracked
+        "n_windows_speed_unknown": int(
+            np.count_nonzero(~np.isfinite(np.interp(midpoint_s, time, speed)))
+        ),
         "n_candidates": int(len(table)),
         "n_replay": int(table.is_replay.sum()),
+        "n_swr_unknown": int((table.overlap_class == "unknown").sum()),
         "n_shuffled": int((table.n_shuffles > 0).sum()),
+        "n_shuffle_untestable": int(
+            ((table.n_shuffles > 0) & ~table.shuffle_testable).sum()
+        ),
         "n_shuffle_pass": int(table.shuffle_pass.sum()),
         "inputs": {
             name: {"path": str(path), "sha256": sha256_file(path)}
@@ -424,9 +449,9 @@ def run_settings(
             "tested": "candidates meeting the replay criteria and still over "
             "their whole interval",
             "statistics": "mean posterior spread and mean forward jump over every "
-            "window, zero jumps kept",
-            "p_value": "(1 + count(null <= observed)) / (n_shuffles + 1)",
-            "passes": f"both p-values below {SIGNIFICANCE_LEVEL}",
+            "window, zero jumps set aside and NaN skipped, as the reference",
+            "p_value": "(1 + count(null < observed)) / (n_shuffles + 1), as the reference",
+            "passes": f"both p-values at or below {SIGNIFICANCE_LEVEL}, as the reference",
         },
     }
 
@@ -464,22 +489,36 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--overwrite", action="store_true", help="Redo epochs already written."
     )
+    parser.add_argument(
+        "--keep-single-window-runs",
+        action="store_true",
+        help="The sensitivity setting: do not drop runs of one kept window "
+        "before merging. Recorded in the manifest's config.",
+    )
     args = parser.parse_args(argv)
 
-    commit = git_hash()
-    if commit.endswith("-dirty"):
-        print(
-            f"warning: uncommitted changes ({commit}); this run cannot be tied "
-            f"to a commit",
-            file=sys.stderr,
-        )
     shuffle = not args.no_shuffle
+    if shuffle and args.n_shuffles < MINIMUM_N_SHUFFLES:
+        parser.error(
+            f"--n-shuffles must be at least {MINIMUM_N_SHUFFLES}, so that a "
+            f"p-value at or below {SIGNIFICANCE_LEVEL} is possible."
+        )
+    commit = git_hash()
     run_id = args.run_id or (
         f"{commit[:12]}{'-dirty' if commit.endswith('-dirty') else ''}"
         f"-seed{args.run_seed}{'' if shuffle else '-noshuffle'}"
+        f"{'-singles' if args.keep_single_window_runs else ''}"
     )
     output_dir = args.output_root / run_id
-    config = MemorylessSequenceConfig()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    log = _logger(output_dir / "run.log")
+    if commit.endswith("-dirty"):
+        log.warning(
+            "uncommitted changes (%s); this run cannot be tied to a commit", commit
+        )
+    config = MemorylessSequenceConfig(
+        drop_single_window_runs=not args.keep_single_window_runs
+    )
     settings = run_settings(args.run_seed, shuffle, args.n_shuffles, config, commit)
     provenance = {
         "produced_by": "scripts/decoding/run_memoryless_detection.py",
@@ -496,11 +535,12 @@ def main(argv: list[str] | None = None) -> None:
             args.root,
             include_variants=args.include_variants,
         )
+    for epoch_id, why in sorted(skipped.items()):
+        log.info("left out %s: %s", epoch_id, why)
+    if skipped:
+        log.info("%d epochs left out; %d to run", len(skipped), len(epoch_ids))
     if not epoch_ids:
-        sys.exit(
-            f"No HPC decodes to run under {args.root}; left out: "
-            f"{json.dumps(skipped, indent=2)}"
-        )
+        sys.exit(f"No HPC decodes to run under {args.root}.")
 
     manifest_path = output_dir / "manifest.json"
     epochs: dict[str, dict] = {}
@@ -513,7 +553,10 @@ def main(argv: list[str] | None = None) -> None:
             )
         epochs = previous["epochs"]
     for epoch_id, why in skipped.items():
-        epochs[epoch_id] = {"status": "skipped", "reason": why}
+        # an epoch already written under this run stays written; a skip only
+        # says why it was not run this time
+        if epochs.get(epoch_id, {}).get("status") != "ok":
+            epochs[epoch_id] = {"status": "skipped", "reason": why}
 
     def manifest() -> dict:
         return {
@@ -529,31 +572,74 @@ def main(argv: list[str] | None = None) -> None:
         }
 
     write_manifest(manifest_path, manifest())
+    failed = []
     for number, epoch_id in enumerate(epoch_ids, start=1):
         done = epochs.get(epoch_id, {}).get("status") == "ok"
         if done and not args.overwrite:
-            print(f"[{number}/{len(epoch_ids)}] {epoch_id}: already written")
+            log.info("[%d/%d] %s: already written", number, len(epoch_ids), epoch_id)
             continue
-        print(f"[{number}/{len(epoch_ids)}] {epoch_id}", flush=True)
-        epochs[epoch_id] = run_one(
-            epoch_id,
-            root=args.root,
-            output_dir=output_dir,
-            cache_dir=args.cache_dir,
-            run_id=run_id,
-            run_seed=args.run_seed,
-            shuffle=shuffle,
-            n_shuffles=args.n_shuffles,
-            config=config,
-            provenance=provenance,
-        )
-        record = epochs[epoch_id]
-        print(
-            f"    {record['n_candidates']} candidates, {record['n_replay']} replay, "
-            f"{record['n_shuffle_pass']} passing the shuffle"
-        )
+        log.info("[%d/%d] %s", number, len(epoch_ids), epoch_id)
+        try:
+            epochs[epoch_id] = run_one(
+                epoch_id,
+                root=args.root,
+                output_dir=output_dir,
+                cache_dir=args.cache_dir,
+                run_id=run_id,
+                run_seed=args.run_seed,
+                shuffle=shuffle,
+                n_shuffles=args.n_shuffles,
+                config=config,
+                provenance=provenance,
+            )
+        except Exception as error:  # noqa: BLE001 - one epoch must not stop the rest
+            # recorded, not swallowed: the manifest says which epoch failed and
+            # why, the run exits non-zero, and a rerun retries it
+            failed.append(epoch_id)
+            epochs[epoch_id] = {
+                "status": "failed",
+                "git_commit": commit,
+                "produced_at": datetime.now(UTC).isoformat(timespec="seconds"),
+                "error": f"{type(error).__name__}: {error}",
+                "traceback": traceback.format_exc(),
+            }
+            log.error("    failed: %s: %s", type(error).__name__, error)
+        else:
+            record = epochs[epoch_id]
+            log.info(
+                "    %d windows (%d with unknown speed), %d candidates, %d replay, "
+                "%d unknown SWR coverage, %d shuffled (%d untestable), "
+                "%d passing the shuffle",
+                record["n_windows"],
+                record["n_windows_speed_unknown"],
+                record["n_candidates"],
+                record["n_replay"],
+                record["n_swr_unknown"],
+                record["n_shuffled"],
+                record["n_shuffle_untestable"],
+                record["n_shuffle_pass"],
+            )
         write_manifest(manifest_path, manifest())
-    print(f"manifest -> {manifest_path}")
+    log.info("manifest -> %s", manifest_path)
+    if failed:
+        sys.exit(
+            f"{len(failed)} epochs failed: {', '.join(failed)}; see {manifest_path}"
+        )
+
+
+def _logger(path: Path) -> logging.Logger:
+    """Everything the run says, on the console and in ``run.log`` beside the manifest."""
+    log = logging.getLogger("run_memoryless_detection")
+    log.setLevel(logging.INFO)
+    log.propagate = False
+    for handler in list(log.handlers):
+        log.removeHandler(handler)
+        handler.close()
+    formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
+    for handler in (logging.StreamHandler(sys.stdout), logging.FileHandler(path)):
+        handler.setFormatter(formatter)
+        log.addHandler(handler)
+    return log
 
 
 if __name__ == "__main__":

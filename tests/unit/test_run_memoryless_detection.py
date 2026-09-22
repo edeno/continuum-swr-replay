@@ -36,8 +36,8 @@ from tests.unit._memoryless_clusterless_epoch import (
 )
 
 EPOCH_ID = "sim20200101_02_r1_HPC"
-N_SHUFFLES = 20
-"""The fewest draws at which p < 0.05 is possible."""
+N_SHUFFLES = 19
+"""The fewest draws at which p <= 0.05 is possible."""
 CONFIG = MemorylessSequenceConfig(sampling_frequency=SAMPLING_FREQUENCY)
 
 
@@ -145,6 +145,33 @@ class TestFindEpochs:
         assert epochs == ["b20200101_02_r1_HPC"]
 
 
+def write_epoch(root, epoch, epoch_id=EPOCH_ID, *, swr_zscore=None, corrupt=False):
+    """Save one epoch as the decode saves it."""
+    paths = input_paths(epoch_id, root)
+    joblib.dump(
+        _StandInDetector({ENCODING_KEY: epoch.encoding_model}), paths["detector"]
+    )
+    if corrupt:
+        paths["data_over_time"].write_bytes(b"not a pickle")
+        return
+    swr = np.zeros(epoch.time.size, dtype=int)
+    swr[50:90] = 1
+    pd.DataFrame(
+        {
+            "animal": "sim",
+            "day": 20200101,
+            "epoch": epoch_id.split("_")[1] + "_" + epoch_id.split("_")[2],
+            "linear_position": epoch.linear_position,
+            "head_speed": np.zeros(epoch.time.size),
+            "SWR_event": swr,
+            "SWR_zscore": (
+                np.zeros(epoch.time.size) if swr_zscore is None else swr_zscore
+            ),
+        },
+        index=pd.Index(epoch.time, name="time"),
+    ).to_pickle(paths["data_over_time"])
+
+
 @pytest.fixture(scope="module")
 def decode_root(tmp_path_factory):
     """One simulated epoch saved as the decode saves it.
@@ -155,25 +182,7 @@ def decode_root(tmp_path_factory):
     """
     root = tmp_path_factory.mktemp("processed")
     epoch = build_tiling_tetrode()
-    paths = input_paths(EPOCH_ID, root)
-    joblib.dump(
-        _StandInDetector({ENCODING_KEY: epoch.encoding_model}), paths["detector"]
-    )
-
-    swr = np.zeros(epoch.time.size, dtype=int)
-    swr[50:90] = 1
-    pd.DataFrame(
-        {
-            "animal": "sim",
-            "day": 20200101,
-            "epoch": "02_r1",
-            "linear_position": epoch.linear_position,
-            "head_speed": np.zeros(epoch.time.size),
-            "SWR_event": swr,
-            "SWR_zscore": np.zeros(epoch.time.size),
-        },
-        index=pd.Index(epoch.time, name="time"),
-    ).to_pickle(paths["data_over_time"])
+    write_epoch(root, epoch)
     return root, epoch
 
 
@@ -310,6 +319,42 @@ class TestRunOne:
         assert record["git_commit"] == "test"
         assert record["decode"]["swr_definition"] == "Kay"
 
+    def test_the_record_counts_what_the_table_cannot_show(self, decode_root, tmp_path):
+        """Unknown speed, unknown SWR coverage and untestable shuffles are
+        counted per epoch, so a quiet epoch can be told from an untracked one."""
+        record = run(decode_root, tmp_path)
+
+        assert record["n_windows"] > 0
+        assert record["n_windows_speed_unknown"] == 0
+        assert record["n_swr_unknown"] == 0
+        assert record["n_shuffle_untestable"] == 0
+
+    def test_missing_lfp_reaches_the_table_as_unknown(self, tmp_path):
+        """A NaN stretch of SWR_zscore is missing LFP: every candidate touching
+        it is ``unknown``, never ``non_swr``, and the observed table says so."""
+        epoch = build_tiling_tetrode()
+        root = tmp_path / "processed"
+        root.mkdir()
+        zscore = np.zeros(epoch.time.size)
+        zscore[: epoch.time.size // 2] = np.nan
+        write_epoch(root, epoch, swr_zscore=zscore)
+
+        record = run((root, epoch), tmp_path)
+        table = read_table(record["outputs"]["events"])
+        observed = read_table(record["outputs"]["observed"])
+
+        assert record["n_swr_unknown"] == int((table.overlap_class == "unknown").sum())
+        assert record["n_swr_unknown"] > 0
+        assert (
+            not (table.overlap_class == "non_swr").any()
+            or (
+                table[table.overlap_class == "non_swr"].event_start_s
+                >= epoch.time[epoch.time.size // 2]
+            ).all()
+        )
+        swr = observed[observed.kind == "swr_labels"]
+        assert swr.start_s.min() >= epoch.time[epoch.time.size // 2]
+
 
 class TestMain:
     def cli(self, decode_root, tmp_path, *extra):
@@ -335,7 +380,7 @@ class TestMain:
         }
         for flag, value in zip(extra[::2], extra[1::2], strict=True):
             arguments[flag] = value
-        main([item for pair in arguments.items() for item in pair])
+        main([item for pair in arguments.items() for item in pair if item != ""])
         return json.loads((output_root / "cli-run" / "manifest.json").read_text())
 
     def test_a_run_writes_its_manifest_from_cached_marks(self, decode_root, tmp_path):
@@ -349,11 +394,27 @@ class TestMain:
         assert manifest["settings"]["git_commit"]
         assert "non_local_detector" in manifest["libraries"]
 
-    def test_a_rerun_with_the_same_settings_resumes(self, decode_root, tmp_path):
+    def test_a_rerun_with_the_same_settings_resumes(
+        self, decode_root, tmp_path, capsys
+    ):
         first = self.cli(decode_root, tmp_path)
+        capsys.readouterr()
+
         again = self.cli(decode_root, tmp_path)
 
+        assert "already written" in capsys.readouterr().out
         assert again["epochs"][EPOCH_ID] == first["epochs"][EPOCH_ID]
+
+    def test_overwrite_redoes_a_written_epoch(self, decode_root, tmp_path, capsys):
+        self.cli(decode_root, tmp_path)
+        capsys.readouterr()
+
+        again = self.cli(decode_root, tmp_path, "--overwrite", "")
+
+        out = capsys.readouterr().out
+        assert "already written" not in out
+        assert "candidates" in out
+        assert again["epochs"][EPOCH_ID]["status"] == "ok"
 
     def test_a_rerun_with_other_settings_is_refused(self, decode_root, tmp_path):
         """The manifest would otherwise record settings the finished epochs
@@ -362,3 +423,97 @@ class TestMain:
 
         with pytest.raises(SystemExit, match="other settings"):
             self.cli(decode_root, tmp_path, "--n-shuffles", str(N_SHUFFLES + 10))
+
+    def test_too_few_shuffles_are_refused_before_anything_runs(
+        self, decode_root, tmp_path
+    ):
+        with pytest.raises(SystemExit):
+            self.cli(decode_root, tmp_path, "--n-shuffles", str(N_SHUFFLES - 1))
+
+    def test_the_sensitivity_switch_is_recorded(self, decode_root, tmp_path):
+        manifest = self.cli(decode_root, tmp_path, "--keep-single-window-runs", "")
+
+        assert manifest["settings"]["config"]["drop_single_window_runs"] is False
+
+    def test_one_failing_epoch_does_not_stop_the_others(self, tmp_path, capsys):
+        """The second epoch's data_over_time is unreadable: it is recorded as
+        failed with its error, the first is written, and the run exits non-zero."""
+        epoch = build_tiling_tetrode()
+        root = tmp_path / "processed"
+        root.mkdir()
+        write_epoch(root, epoch, "sim20200101_02_r1_HPC")
+        write_epoch(root, epoch, "sim20200101_04_r2_HPC", corrupt=True)
+        cache_dir = tmp_path / "cache"
+        cache_dir.mkdir()
+        key = parse_epoch_identifier(EPOCH_ID)
+        joblib.dump(
+            (epoch.spike_times, epoch.spike_waveform_features),
+            cache_dir
+            / f"{key.nwb_file_name}_{key.epoch_name}_{key.brain_area}_marks.pkl",
+        )
+        output_root = tmp_path / "memoryless"
+
+        with pytest.raises(SystemExit, match="1 epochs failed"):
+            main(
+                [
+                    "--animal",
+                    "sim",
+                    "--run-seed",
+                    "7",
+                    "--n-shuffles",
+                    str(N_SHUFFLES),
+                    "--run-id",
+                    "cli-run",
+                    "--root",
+                    str(root),
+                    "--output-root",
+                    str(output_root),
+                    "--cache-dir",
+                    str(cache_dir),
+                ]
+            )
+
+        manifest = json.loads((output_root / "cli-run" / "manifest.json").read_text())
+        assert manifest["epochs"]["sim20200101_02_r1_HPC"]["status"] == "ok"
+        failed = manifest["epochs"]["sim20200101_04_r2_HPC"]
+        assert failed["status"] == "failed"
+        assert "Error" in failed["error"]
+        assert "failed" in capsys.readouterr().out
+        assert (output_root / "cli-run" / "run.log").exists()
+
+    def test_a_skipped_epoch_is_told_on_the_console(self, tmp_path, capsys):
+        epoch = build_tiling_tetrode()
+        root = tmp_path / "processed"
+        root.mkdir()
+        write_epoch(root, epoch, "sim20200101_02_r1_HPC")
+        input_paths("sim20200101_04_r2_HPC", root)["detector"].write_bytes(b"")
+        cache_dir = tmp_path / "cache"
+        cache_dir.mkdir()
+        key = parse_epoch_identifier(EPOCH_ID)
+        joblib.dump(
+            (epoch.spike_times, epoch.spike_waveform_features),
+            cache_dir
+            / f"{key.nwb_file_name}_{key.epoch_name}_{key.brain_area}_marks.pkl",
+        )
+
+        main(
+            [
+                "--animal",
+                "sim",
+                "--run-seed",
+                "7",
+                "--n-shuffles",
+                str(N_SHUFFLES),
+                "--run-id",
+                "cli-run",
+                "--root",
+                str(root),
+                "--output-root",
+                str(tmp_path / "memoryless"),
+                "--cache-dir",
+                str(cache_dir),
+            ]
+        )
+
+        out = capsys.readouterr().out
+        assert "left out sim20200101_04_r2_HPC: missing data_over_time" in out
