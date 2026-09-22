@@ -236,6 +236,60 @@ no driver gates on it.
 - One simulation is not a calibration study. What transfers is that boundary agreement,
   not event count, is where the two procedures should be expected to differ.
 
+### How it fails to find a replay that is there
+
+Measured by injecting replays of controlled path length, duration and firing
+rate into a silent pause of the same simulation, and asking whether an accepted
+sequence overlaps the injection (8 seeds per cell).
+
+**Short-path replay is invisible, and this dominates everything else.** The
+dispersion criterion is a "replay must travel" rule: a uniform traverse of path
+length `L` has dispersion `L / sqrt(12)`, so `dispersion > 12 cm` needs
+`L > 41.6 cm`. Measured detection rate, 40 Hz peak rate:
+
+| path (cm) | 80 ms | 150 ms | 300 ms | 800 ms |
+|---|---|---|---|---|
+| 20 | 0.00 | 0.00 | 0.00 | 0.00 |
+| 30 | 0.00 | 0.00 | 0.00 | 0.00 |
+| 40 | 0.00 | 0.00 | 0.38 | 0.12 |
+| 60 | 0.25 | 0.50 | 0.88 | 0.75 |
+| 90 | 0.00 | 0.50 | 0.88 | 1.00 |
+| 130 | 0.62 | 0.88 | 1.00 | 1.00 |
+
+A replay covering less than about a quarter of this 170 cm track is not
+reported at any duration or firing rate. **Before attributing any cohort
+difference to temporal inference, measure the decoded path length of our
+state-space events against this bound.** On a branched track a within-arm
+replay may be excluded by construction.
+
+**Duration is secondary, and cuts the opposite way to expectation.** Sub-100 ms
+replays are sometimes found, because windows that only partly overlap the event
+still decode it and pad the run past the 100 ms filter. That is the same
+over-extension that inflates boundaries, working in the detector's favor.
+
+**Spike density gates everything else.** At a 10 Hz peak (about one spike per
+window) detection is erratic even where the geometry is favorable (0.00-0.50);
+at 160 Hz it is 1.00. Cell yield therefore changes the cohort, and any
+comparison across sessions with different yields confounds detection with
+biology.
+
+**Other ways a real sequence is lost**, from the criteria rather than from
+measurement, and worth checking on real data:
+
+- Movement. A window whose midpoint speed is not below the threshold loses its
+  center, and because jumps are forward the sequence ends one window *before*
+  it. A replay overlapping the start of movement is truncated, not just
+  trimmed. This is easy to induce accidentally: the first version of the sweep
+  above placed injections across the end of a pause and measured the speed gate
+  instead of what it intended.
+- A single unusable window inside a replay removes its predecessor as well, and
+  splits the run in two.
+- Splitting. A gap longer than 50 ms, or a bridge longer than 20 cm, blocks the
+  merge, and each piece must then clear 100 ms on its own.
+- Arm switches. On a branched track a jump to a non-adjacent arm is a large
+  graph distance and fails the jump criterion, so a replay that changes arm is
+  cut at the switch. Untested here; this simulation is a single linear track.
+
 ## Decisions register
 
 Decisions taken during design, with the reasoning, so the methods section can state them
@@ -275,7 +329,7 @@ not a reassurance.
 | **V6** | Euclidean distance for jump and dispersion | Track-graph distance | On a linearized branched track, `abs(Δlinear_position)` is not the distance between two places — bins on different arms can be adjacent in linear coordinate | Using linear differences would under-count jumps at arm boundaries, producing spuriously smooth and spuriously long sequences. Track distance avoids this; it also makes our jumps non-comparable in absolute terms to an open-field jump |
 | **V7** | Posterior COM | Discrete Fréchet mean over track distance (D4) | Linearized-coordinate COM does not respect branching | On straight segments the center is quantized to a bin; near junctions geometry also changes it |
 | **V8** | Unvisited arena bins excluded | Junction placeholder bins (`edge_id == -1`) excluded before normalization | These bins are linearization artifacts from `edge_spacing > 0`, not places. In `get_track_grid` the `-1` rows are built from `place_bin_centers[~is_track_interior]`, so they are non-interior by construction and the primary likelihood path never returns them; the guard matters on the `results.nc` path, where `log_likelihood` is re-expanded to every `state_bins` column | If not excluded, probability mass lands on non-places and drags the center toward gaps. Same hazard `map_estimate_to_arm` guards against |
-| **V9** | Spread is a 2D product moment (area-like, bin units) | Graph-distance RMS spread (a length, cm) | Provides a spread measure on our geometry, approximating SD on a straight segment | The 10 cm cutoff is an adapted choice prioritized in the later threshold-robustness study (04); its robustness is not established by the initial report, and these spreads are not numerically comparable to the paper's 2D spreads. It also caps detectable replay speed: a window whose spread must stay below the cutoff cannot span much more than `spread_threshold * sqrt(12)` of track, about 35 cm, which over an 80 ms window is roughly 430 cm/s. On `non_local_detector`'s simulated continuous replay the detector returns one accepted sequence at 375 cm/s and breaks the same trajectory into rejected pieces at 450 cm/s and above (`tests/integration/test_memoryless_simulated_replay.py`). Faster trajectories are still decoded; they stop surviving as sequences. Whether our events fall below that bound is unmeasured, and a cohort difference attributed to temporal inference could instead be this cap. Note the direction of the adaptation: the helper library's own 1D branch (`compute_imageSpread.m:20-30`) computes the same COM-based RMS this port does, and `load_replayEvents_cm.m:32` gates it at **20 cm**, so 10 cm is twice as strict as the only 1D precedent in the reference. That branch also uses a 50 ms duration and a `0.4 * maze_size` jump, both looser than what this port takes from the paper |
+| **V9** | Spread is a 2D product moment (area-like, bin units) | Graph-distance RMS spread (a length, cm) | Provides a spread measure on our geometry, approximating SD on a straight segment | The 10 cm cutoff is an adapted choice prioritized in the later threshold-robustness study (04); its robustness is not established by the initial report, and these spreads are not numerically comparable to the paper's 2D spreads. It also limits which replays survive, but **not through speed alone**. A window's spread grows only when its posterior actually smears over the swept path, and whether it does depends on spike density and field overlap. On `non_local_detector`'s sparse clusterless simulation, where each of 20 units fires once, a window straddling several fields is multimodal and the detector returns one accepted sequence at 375 cm/s but breaks the same trajectory into rejected pieces at 450 cm/s and above (`tests/integration/test_memoryless_simulated_replay.py`). With denser spiking the posterior stays peaked and there is no such cap: injected replays are found at 1625 cm/s with a median spread of 3.6 cm, and spread only breaks down near 4300 cm/s, where the whole path fits inside one window. The binding quantity is how far the path travels *within a window* relative to how well the spikes localize it, not the speed as such. An earlier version of this entry gave a flat 430 cm/s cap; that was a measurement on the sparse simulation, over-generalized. Note the direction of the adaptation: the helper library's own 1D branch (`compute_imageSpread.m:20-30`) computes the same COM-based RMS this port does, and `load_replayEvents_cm.m:32` gates it at **20 cm**, so 10 cm is twice as strict as the only 1D precedent in the reference. That branch also uses a 50 ms duration and a `0.4 * maze_size` jump, both looser than what this port takes from the paper |
 
 ### Forced by our sampling grid
 
