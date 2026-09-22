@@ -139,6 +139,7 @@ def test_swr_content_assembly_rejects_legacy_uncertainty_reference(
             "epoch": ["01_r1", "01_r1"],
             "event_id": [1, 1],
             "candidate_arm": [0, 1],
+            "occupancy_state": ["at_well", "at_well"],
             "reward_belief_variance_candidate_arm_preoutcome": [1.0, 2.0],
             "reward_belief_variance_candidate_arm_preoutcome_z": [-1.0, 1.0],
         }
@@ -156,6 +157,10 @@ def test_swr_content_assembly_rejects_legacy_uncertainty_reference(
         )
     )
     monkeypatch.setattr(mod, "RC", tmp_path)
+    # the table is read through FIT_INPUTS, which was built from RC at import
+    monkeypatch.setitem(
+        mod.FIT_INPUTS, "event_arm_table", tmp_path / "event_arm_table.pkl"
+    )
 
     with pytest.raises(ValueError, match="stale or invalid"):
         mod._assemble_arm()
