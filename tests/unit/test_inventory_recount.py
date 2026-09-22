@@ -44,6 +44,31 @@ def events(detector, spans, session=EPOCH):
     )
 
 
+class GridSpan:
+    """Events and full coverage on one clock, for the rounding test."""
+
+    def __init__(self, time):
+        self.time = time
+        self.coverage = {
+            (*KEY, "A"): Coverage(
+                observed=np.array([[time[0], time[-1]]]),
+                exposure=np.array([[time[0], time[-1]]]),
+            )
+        }
+
+    def events(self, spans):
+        return inventory_from_intervals(
+            np.array([a for a, _ in spans]),
+            np.array([b for _, b in spans]),
+            native_keys=np.arange(len(spans)),
+            detector="A",
+            session=EPOCH,
+            run_id="run",
+            speed_time_s=self.time[:2],
+            speed_cm_per_s=np.zeros(2),
+        )
+
+
 def coverage(*detectors, exposure=((0.0, 100.0),), session_key=KEY):
     exposure = np.array(exposure)
     return {
@@ -61,7 +86,9 @@ def test_the_grid_is_the_stated_one():
 def test_gap_zero_reproduces_the_native_events():
     inventory = events("A", FRAGMENTS)
 
-    merged = merge_fragments(inventory, coverage("A"), detector="A", gap_s=0.0)
+    merged = merge_fragments(
+        inventory, coverage("A"), detector="A", gap_s=0.0, sample_interval_s=0.001
+    )
 
     assert merged.event_key.tolist() == inventory.event_key.tolist()
     np.testing.assert_array_equal(merged.event_start_s, inventory.event_start_s)
@@ -79,21 +106,66 @@ def test_gap_zero_reproduces_the_native_events():
 )
 def test_fragments_closer_than_the_gap_merge(gap_s, expected):
     merged = merge_fragments(
-        events("A", FRAGMENTS), coverage("A"), detector="A", gap_s=gap_s
+        events("A", FRAGMENTS),
+        coverage("A"),
+        detector="A",
+        gap_s=gap_s,
+        sample_interval_s=0.001,
     )
 
     assert list(zip(merged.event_start_s, merged.event_end_s, strict=True)) == expected
     assert merged.n_fragments.sum() == len(FRAGMENTS)
 
 
-def test_a_separation_equal_to_the_gap_is_not_merged():
-    """ "Separated by less than" the gap: exact binary values, no rounding."""
-    inventory = events("A", [(10.0, 10.5), (11.0, 12.0)])
+@pytest.mark.parametrize("gap_s", FRAGMENT_GAPS_S[1:])
+def test_a_gap_of_exactly_the_setting_never_merges_on_a_real_clock(gap_s):
+    """Gaps on the 500 Hz grid land exactly on 10, 20 and 50 ms; whether they
+    count as "less than" must not depend on how the clock rounds."""
+    time = 1234.5678 + np.arange(200_000) / 500.0
+    n_gap = round(gap_s * 500.0)
+    starts = np.arange(100, 199_000, 997)
+    pairs = [
+        [(time[a], time[a + 20]), (time[a + 20 + n_gap], time[a + 40 + n_gap])]
+        for a in starts
+    ]
+    grid = GridSpan(time)
 
-    assert len(merge_fragments(inventory, coverage("A"), detector="A", gap_s=0.5)) == 2
-    assert (
-        len(merge_fragments(inventory, coverage("A"), detector="A", gap_s=0.625)) == 1
-    )
+    at_setting = [
+        len(
+            merge_fragments(
+                grid.events(p),
+                grid.coverage,
+                detector="A",
+                gap_s=gap_s,
+                sample_interval_s=0.002,
+            )
+        )
+        for p in pairs
+    ]
+    one_short = [
+        len(
+            merge_fragments(
+                grid.events([p[0], (p[1][0] - 0.002, p[1][1])]),
+                grid.coverage,
+                detector="A",
+                gap_s=gap_s,
+                sample_interval_s=0.002,
+            )
+        )
+        for p in pairs
+    ]
+
+    assert set(at_setting) == {2}
+    assert set(one_short) == {1}
+
+
+def test_gaps_off_the_sample_grid_are_refused():
+    inventory = events("A", [(10.0, 11.0), (11.0055, 12.0)])
+
+    with pytest.raises(ValueError, match="grid"):
+        merge_fragments(
+            inventory, coverage("A"), detector="A", gap_s=0.01, sample_interval_s=0.001
+        )
 
 
 @pytest.mark.parametrize(
@@ -112,7 +184,11 @@ def test_never_merges_outside_one_continuous_eligible_bout(exposure):
     inventory = events("A", [(10.0, 11.0), (11.005, 12.0)])
 
     merged = merge_fragments(
-        inventory, coverage("A", exposure=exposure), detector="A", gap_s=0.05
+        inventory,
+        coverage("A", exposure=exposure),
+        detector="A",
+        gap_s=0.05,
+        sample_interval_s=0.001,
     )
 
     assert len(merged) == 2
@@ -125,7 +201,14 @@ def test_never_merges_across_epochs():
     )
     both = coverage("A") | coverage("A", session_key=OTHER_KEY)
 
-    assert len(merge_fragments(inventory, both, detector="A", gap_s=0.05)) == 2
+    assert (
+        len(
+            merge_fragments(
+                inventory, both, detector="A", gap_s=0.05, sample_interval_s=0.001
+            )
+        )
+        == 2
+    )
 
 
 def test_other_detectors_pass_through_untouched():
@@ -133,7 +216,9 @@ def test_other_detectors_pass_through_untouched():
         [events("A", FRAGMENTS), events("B", FRAGMENTS)], ignore_index=True
     )
 
-    merged = merge_fragments(inventory, coverage("A", "B"), detector="A", gap_s=0.05)
+    merged = merge_fragments(
+        inventory, coverage("A", "B"), detector="A", gap_s=0.05, sample_interval_s=0.001
+    )
 
     b = merged[merged.detector == "B"]
     assert b.event_key.tolist() == [key("B", i) for i in range(len(FRAGMENTS))]
@@ -155,7 +240,11 @@ def test_the_recount_feeds_the_same_agreement_accounting():
         ]
 
     native = a_to_b(inventory)
-    merged = a_to_b(merge_fragments(inventory, cover, detector="A", gap_s=0.05))
+    merged = a_to_b(
+        merge_fragments(
+            inventory, cover, detector="A", gap_s=0.05, sample_interval_s=0.001
+        )
+    )
 
     assert (native.n_eligible, native.n_matched) == (4, 4)
     assert (merged.n_eligible, merged.n_matched) == (1, 1)
@@ -163,7 +252,11 @@ def test_the_recount_feeds_the_same_agreement_accounting():
 
 def test_merged_keys_name_their_fragments():
     merged = merge_fragments(
-        events("A", FRAGMENTS[:2]), coverage("A"), detector="A", gap_s=0.05
+        events("A", FRAGMENTS[:2]),
+        coverage("A"),
+        detector="A",
+        gap_s=0.05,
+        sample_interval_s=0.001,
     )
 
     assert merged.event_key.tolist() == [f"{key('A', 0)}|{key('A', 1)}"]
@@ -174,7 +267,9 @@ def test_row_order_does_not_matter():
     inventory = events("A", FRAGMENTS).sample(frac=1.0, random_state=0)
     assert inventory.event_key.tolist() != sorted(inventory.event_key)
 
-    merged = merge_fragments(inventory, coverage("A"), detector="A", gap_s=0.010)
+    merged = merge_fragments(
+        inventory, coverage("A"), detector="A", gap_s=0.010, sample_interval_s=0.001
+    )
 
     assert list(zip(merged.event_start_s, merged.event_end_s, strict=True)) == [
         (10.0, 12.0),
