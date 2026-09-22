@@ -138,3 +138,9 @@ def test_a_minimum_duration_between_strides_rounds_up_never_down(
 def test_a_minimum_duration_shorter_than_one_stride_raises():
     with pytest.raises(ValueError, match="minimum_duration_s"):
         MemorylessSequenceConfig(minimum_duration_s=0.001, stride_s=0.004)
+
+
+def test_a_window_of_an_odd_number_of_samples_is_refused():
+    """Its midpoint would fall between two samples, and event bounds are samples."""
+    with pytest.raises(ValueError, match="even"):
+        MemorylessSequenceConfig(window_duration_s=0.082)

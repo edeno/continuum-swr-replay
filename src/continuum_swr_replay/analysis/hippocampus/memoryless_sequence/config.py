@@ -109,6 +109,12 @@ class MemorylessSequenceConfig:
                     f"{field} ({seconds} s) is {samples} samples at "
                     f"{self.sampling_frequency} Hz, which is not a whole number."
                 )
+        if round(self.window_duration_s * self.sampling_frequency) % 2:
+            raise ValueError(
+                f"window_duration_s ({self.window_duration_s} s) must be an even "
+                f"number of samples, so its midpoint is a sample; event bounds are "
+                f"samples."
+            )
         if self.minimum_duration_s < self.stride_s:
             raise ValueError(
                 f"minimum_duration_s ({self.minimum_duration_s} s) is shorter than "

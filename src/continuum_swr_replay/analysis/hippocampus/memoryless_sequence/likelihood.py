@@ -83,8 +83,15 @@ SORTED_SPIKES_LIKELIHOOD_KEYS = (
 )
 """The entries of a sorted-spikes encoding model that its likelihood takes."""
 
-_GRID_TOLERANCE = 1e-6
-"""Relative tolerance on the spacing of the decoding grid."""
+_SAMPLE_TOLERANCE = 1e-3
+"""How far, in samples, a timestamp may sit from its place on a uniform grid.
+
+Checked in samples rather than as a relative spread of the spacing, because a
+recording's clock counts seconds since 1970: near 1.6e9 s a float64 step is
+2.4e-7 s, so the 2 ms spacings come out as 1.99986 or 2.00009 ms, a spread
+no relative tolerance on the spacing could accept without also accepting a
+real error. The same rounding moves a timestamp by 1.2e-4 of a sample at most.
+"""
 
 
 @dataclass(frozen=True)
@@ -216,18 +223,20 @@ def validate_time_grid(time: NDArray, config: MemorylessSequenceConfig) -> None:
             f"{config.window_n_samples} after the final row, which no spike can "
             "reach, is dropped."
         )
-    spacing = np.diff(time)
-    if not np.allclose(spacing, spacing[0], rtol=_GRID_TOLERANCE, atol=0.0):
+    step = float(np.median(np.diff(time)))
+    if abs(step * config.sampling_frequency - 1.0) > _SAMPLE_TOLERANCE:
         raise ValueError(
-            "The decoding grid is not uniform: its spacing ranges from "
-            f"{spacing.min()} to {spacing.max()} s. Windows summed over it "
-            "would cover unequal spans."
+            f"The grid is sampled every {step} s, not the "
+            f"{1.0 / config.sampling_frequency} s of the configured "
+            f"{config.sampling_frequency} Hz."
         )
-    expected = 1.0 / config.sampling_frequency
-    if not np.isclose(spacing[0], expected, rtol=_GRID_TOLERANCE, atol=0.0):
+    offset = (time - time[0]) * config.sampling_frequency - np.arange(time.size)
+    worst = int(np.argmax(np.abs(offset)))
+    if abs(offset[worst]) > _SAMPLE_TOLERANCE:
         raise ValueError(
-            f"The grid is sampled every {spacing[0]} s, not the "
-            f"{expected} s of the configured {config.sampling_frequency} Hz."
+            f"The decoding grid is not uniform: sample {worst} sits "
+            f"{offset[worst]:.3g} samples from where a uniform grid puts it. "
+            "Windows summed over it would cover unequal spans."
         )
 
 
@@ -297,12 +306,16 @@ def clusterless_epoch_log_likelihood(
 
 
 def window_midpoints_s(time: NDArray, config: MemorylessSequenceConfig) -> NDArray:
-    """Timestamp of each window, half a window after its support begins.
+    """Timestamp of each window: the grid sample half a window into its support.
 
-    A window supporting ``[t, t + 0.080)`` is timestamped at ``t + 0.040``, the
-    time whose speed decides the window's eligibility and the time that bounds
-    the events assembled from it. The decoding support is a separate quantity
-    and the window width is never added to an event's duration.
+    A window supporting rows ``[k, k + 40)`` is timestamped at row ``k + 20``,
+    0.040 s after it begins, the time whose speed decides the window's
+    eligibility and the time that bounds the events assembled from it. It is
+    the sample itself, not ``time[k] + 0.040``: on a recording's clock the
+    sum misses the sample by up to 2.4e-7 s, and an event bound must sit on
+    the samples that speed and SWR labels are recorded at. The decoding
+    support is a separate quantity and the window width is never added to an
+    event's duration.
 
     Parameters
     ----------
@@ -321,7 +334,7 @@ def window_midpoints_s(time: NDArray, config: MemorylessSequenceConfig) -> NDArr
         0, 1 + (time.size - config.window_n_samples) // config.stride_n_samples
     )
     starts = np.arange(n_windows) * config.stride_n_samples
-    midpoint_s: NDArray = time[starts] + 0.5 * config.window_duration_s
+    midpoint_s: NDArray = time[starts + config.window_n_samples // 2]
     return midpoint_s
 
 

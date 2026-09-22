@@ -237,6 +237,25 @@ class TestValidateTimeGrid:
 
         validate_time_grid(time, self.config)
 
+    UNIX_START_S = 1581532345.123
+    """A recording's clock: seconds since 1970, where a float64 step is 2.4e-7 s."""
+
+    def test_a_grid_on_a_recording_clock_passes(self):
+        """At 1.6e9 s the 2 ms spacings come out as 1.99986 or 2.00009 ms."""
+        validate_time_grid(self.UNIX_START_S + np.arange(5000) / 500.0, self.config)
+
+    def test_a_gap_on_a_recording_clock_raises(self):
+        time = np.delete(self.UNIX_START_S + np.arange(5000) / 500.0, 2500)
+
+        with pytest.raises(ValueError, match="uniform"):
+            validate_time_grid(time, self.config)
+
+    def test_a_different_rate_on_a_recording_clock_raises(self):
+        with pytest.raises(ValueError, match="sampled every"):
+            validate_time_grid(
+                self.UNIX_START_S + np.arange(5000) / 250.0, self.config
+            )
+
 
 class TestEpochLogLikelihood:
     def test_one_column_per_interior_bin(self, epoch, decoded):
@@ -505,6 +524,19 @@ class TestWindowMidpoints:
         midpoints = window_midpoints_s(time, self.config)
 
         np.testing.assert_allclose(np.diff(midpoints), self.config.stride_s, rtol=1e-9)
+
+    def test_a_midpoint_is_a_sample_of_the_grid(self):
+        """Not a sample time plus 0.040 s: on a recording's clock the two differ
+        by up to 2.4e-7 s, enough for an event bound to miss the speed sample
+        it sits on or to touch an SWR it does not overlap."""
+        time = 1581532345.123 + np.arange(5000) / 500.0
+
+        midpoints = window_midpoints_s(time, self.config)
+
+        starts = np.arange(midpoints.size) * self.config.stride_n_samples
+        np.testing.assert_array_equal(
+            midpoints, time[starts + self.config.window_n_samples // 2]
+        )
 
     def test_a_grid_too_short_for_one_window_gives_none(self):
         midpoints = window_midpoints_s(np.arange(20) / 500.0, self.config)
