@@ -9,9 +9,11 @@ spikes (40-41 s) and a gap in the LFP (50-52 s):
 - the SWR detector ``K`` needs the LFP.
 
 Shared exposure, worked by hand: still [0, 20) and [25, 60]; SS observes
-[0, 40] and [41, 60]; MS observes [0.04, 39.96] and [41.04, 59.96] and loses
-[41.0, 41.2] to its bridging event; K observes [0, 50] and [52, 60]. Their
-intersection is [0.04, 19.998], [25, 39.96], [41.2, 50] and [52, 59.96].
+[0, 40] and [41, 60]; MS, whose 40-sample windows are stamped 20 samples in,
+observes [0.04, 39.962] and [41.04, 59.962] and loses [41.0, 41.2] to its
+bridging event; K observes [0, 50] and [52, 60]. Their intersection is
+[0.04, 19.998], [25, 39.962], [41.2, 50] and [52, 59.962]. SS's event during
+the movement bout is set aside before any comparison.
 """
 
 import numpy as np
@@ -22,7 +24,7 @@ from continuum_swr_replay.analysis.inventory_comparison.availability import (
     exposure,
     sample_runs,
     still_intervals,
-    with_window_support,
+    window_supported,
 )
 from continuum_swr_replay.analysis.inventory_comparison.cells import (
     membership_against,
@@ -39,6 +41,7 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import (
     MEMORYLESS,
     STATE_SPACE,
     SessionIdentity,
+    combine_inventories,
     inventory_from_intervals,
 )
 from continuum_swr_replay.analysis.inventory_comparison.swr_matrix import (
@@ -65,19 +68,19 @@ def key(detector, native):
 
 @pytest.fixture(scope="module")
 def comparison():
-    spikes = sample_runs(TIME, ~((TIME > 40.0) & (TIME < 41.0)))
-    lfp = sample_runs(TIME, ~((TIME > 50.0) & (TIME < 52.0)))
+    spikes = ~((TIME > 40.0) & (TIME < 41.0))
+    lfp = ~((TIME > 50.0) & (TIME < 52.0))
     observed = {
-        STATE_SPACE: spikes,
-        MEMORYLESS: with_window_support(spikes, 0.04),
-        KAY: lfp,
+        STATE_SPACE: sample_runs(TIME, spikes),
+        MEMORYLESS: sample_runs(TIME, window_supported(TIME, spikes, 40)),
+        KAY: sample_runs(TIME, lfp),
     }
     still = still_intervals(TIME, SPEED)
     coverage = {
         (*KEY, d): Coverage(observed=o, exposure=exposure(o, still))
         for d, o in observed.items()
     }
-    inventory = pd.concat(
+    inventory, moving = combine_inventories(
         [
             inventory_from_intervals(
                 np.array([a for a, _ in spans]),
@@ -90,9 +93,9 @@ def comparison():
                 speed_cm_per_s=SPEED,
             )
             for detector, spans in EVENTS.items()
-        ],
-        ignore_index=True,
+        ]
     )
+    assert moving.event_key.tolist() == [key(STATE_SPACE, 4)]
     kept, coverage = remove_bridging_events(inventory, coverage)
     pairs = overlap_pairs(kept)
     return kept, coverage, pairs, event_matches(kept, pairs, coverage)
@@ -102,9 +105,9 @@ def test_only_the_event_across_its_own_window_gap_is_set_aside(comparison):
     kept, coverage, _, _ = comparison
 
     assert key(MEMORYLESS, 1) not in set(kept.event_key)
-    assert len(kept) == sum(map(len, EVENTS.values())) - 1
+    assert len(kept) == sum(map(len, EVENTS.values())) - 2  # and SS:4, moving
     np.testing.assert_allclose(
-        coverage[(*KEY, MEMORYLESS)].observed, [[0.04, 39.96], [41.2, 59.96]]
+        coverage[(*KEY, MEMORYLESS)].observed, [[0.04, 39.962], [41.2, 59.962]]
     )
 
 
@@ -116,9 +119,9 @@ def test_denominators_leave_out_movement_and_unobserved_time(comparison):
     )
 
     ss_to_ms = agreement.loc[(STATE_SPACE, MEMORYLESS)]
-    # SS:2 lies where MS did not observe, SS:4 during movement
+    # SS:2 lies where MS did not observe; SS:4, during movement, never entered
     assert (ss_to_ms.n_source_events, ss_to_ms.n_eligible, ss_to_ms.n_matched) == (
-        5,
+        4,
         3,
         1,
     )
@@ -141,7 +144,6 @@ def test_the_cells_separate_unmatched_from_unknown(comparison):
         key(STATE_SPACE, 1): "unmatched",
         key(STATE_SPACE, 2): "unknown",  # MS lost this time to its bridging event
         key(STATE_SPACE, 3): "unknown",  # the LFP is missing
-        key(STATE_SPACE, 4): "unknown",  # the animal is moving
         key(MEMORYLESS, 0): "matched",
         key(KAY, 0): "matched",
         key(KAY, 1): "unmatched",
@@ -157,7 +159,6 @@ def test_the_cells_separate_unmatched_from_unknown(comparison):
         key(STATE_SPACE, 1): "unmatched",
         key(STATE_SPACE, 2): "unmatched",
         key(STATE_SPACE, 3): "unknown",
-        key(STATE_SPACE, 4): "unknown",
     }
 
 
@@ -170,7 +171,7 @@ def test_no_detector_time_is_the_hand_worked_shared_exposure_less_detections(
         kept, coverage, detectors=[STATE_SPACE, MEMORYLESS, KAY]
     ).iloc[0]
 
-    shared = (19.998 - 0.04) + (39.96 - 25.0) + (50.0 - 41.2) + (59.96 - 52.0)
+    shared = (19.998 - 0.04) + (39.962 - 25.0) + (50.0 - 41.2) + (59.962 - 52.0)
     # SS:0/MS:0/K:0 cover 5.0-5.4, SS:1 0.2 s, K:1 0.1 s; the rest is outside
     assert row.shared_exposure_s == pytest.approx(shared)
     assert row.detected_s == pytest.approx(0.7)
@@ -191,4 +192,4 @@ def test_missing_lfp_leaves_the_matrix_rather_than_reading_as_non_swr(comparison
 
     assert labels.set_index("event_key").loc[key(STATE_SPACE, 3), "label"] == "unknown"
     ss = matrix.loc[STATE_SPACE]
-    assert (ss.n_events, ss.n_eligible, ss.n_swr, ss.n_non_swr) == (5, 3, 1, 2)
+    assert (ss.n_events, ss.n_eligible, ss.n_swr, ss.n_non_swr) == (4, 3, 1, 2)

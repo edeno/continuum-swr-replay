@@ -10,9 +10,18 @@ from continuum_swr_replay.analysis.inventory_comparison.availability import (
     observation_table,
     sample_runs,
     still_intervals,
-    with_window_support,
+    window_supported,
 )
-from continuum_swr_replay.analysis.inventory_comparison.intervals import total_duration
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import (
+    MemorylessSequenceConfig,
+)
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
+    window_midpoints_s,
+)
+from continuum_swr_replay.analysis.inventory_comparison.intervals import (
+    contains,
+    total_duration,
+)
 from continuum_swr_replay.analysis.inventory_comparison.schema import SessionIdentity
 
 SESSION = SessionIdentity(animal="sim", day=20200101, epoch="02_r1", brain_area="HPC")
@@ -54,33 +63,61 @@ class TestSampleRuns:
     def test_no_valid_sample_is_no_coverage(self):
         assert sample_runs(grid(), np.zeros(1000, bool)).shape == (0, 2)
 
+    def test_a_non_finite_timestamp_splits_the_run_rather_than_erasing_it(self):
+        time = np.array([0.0, 0.002, np.nan, 0.006, 0.008])
+
+        runs = sample_runs(time, np.ones(time.size, bool))
+
+        np.testing.assert_array_equal(runs, [[0.0, 0.002], [0.006, 0.008]])
+
+
+WINDOW = MemorylessSequenceConfig().window_n_samples
+
 
 class TestWindowSupport:
     def test_a_window_overlapping_a_data_gap_has_no_midpoint_coverage(self):
-        """An 80 ms window is evaluable at its midpoint only with its whole
-        support; within 40 ms of a gap or an edge it is not."""
+        """A window over samples [k, k + 40) is stamped at k + 20, so a sample
+        is covered only with 20 valid samples before it and 19 after."""
         time = grid()
         valid = np.ones(time.size, bool)
         valid[400:450] = False
 
-        observed = with_window_support(sample_runs(time, valid), half_window_s=0.040)
+        observed = sample_runs(time, window_supported(time, valid, WINDOW))
 
-        np.testing.assert_allclose(
-            observed,
-            [
-                [time[0] + 0.040, time[399] - 0.040],
-                [time[450] + 0.040, time[-1] - 0.040],
-            ],
+        np.testing.assert_array_equal(
+            observed, [[time[20], time[380]], [time[470], time[980]]]
         )
+
+    def test_a_gap_in_the_timestamps_inside_a_window_removes_its_support(self):
+        time = np.delete(grid(), np.arange(400, 450))
+
+        observed = sample_runs(
+            time, window_supported(time, np.ones(time.size, bool), WINDOW)
+        )
+
+        np.testing.assert_array_equal(
+            observed, [[time[20], time[380]], [time[420], time[-20]]]
+        )
+
+    def test_covers_every_midpoint_the_detector_stamps_on_a_real_clock(self):
+        """On a clock 1 ppm off nominal, a fixed trim in seconds misses the
+        first or last window; counting samples cannot."""
+        time = 1234.5678 + np.arange(5000) / FS * (1 + 1e-6)
+
+        observed = sample_runs(
+            time, window_supported(time, np.ones(time.size, bool), WINDOW)
+        )
+        midpoints = window_midpoints_s(time, MemorylessSequenceConfig())
+
+        assert contains(observed, midpoints, midpoints).all()
+        np.testing.assert_array_equal(observed, [[midpoints[0], time[-20]]])
 
     def test_a_run_shorter_than_one_window_observes_nothing(self):
         time = grid(30)  # 58 ms
 
-        observed = with_window_support(
-            sample_runs(time, np.ones(30, bool)), half_window_s=0.040
-        )
+        supported = window_supported(time, np.ones(30, bool), WINDOW)
 
-        assert observed.shape == (0, 2)
+        assert not supported.any()
 
 
 class TestExposure:

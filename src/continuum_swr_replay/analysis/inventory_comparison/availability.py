@@ -36,7 +36,7 @@ __all__ = [
     "observation_table",
     "sample_runs",
     "still_intervals",
-    "with_window_support",
+    "window_supported",
 ]
 
 OBSERVATION_DTYPES: Mapping[str, object] = MappingProxyType(
@@ -58,19 +58,41 @@ GAP_FACTOR = 1.5
 """A spacing more than this many median sample intervals is a gap."""
 
 
+def _joined(time: NDArray, valid: NDArray, max_gap_s: float | None) -> NDArray:
+    """Whether each sample continues the run of the one before it.
+
+    Returns
+    -------
+    joined : ndarray of bool, shape (n_samples - 1,)
+        False at an invalid sample, a non-finite timestamp, or a spacing more
+        than ``max_gap_s`` (1.5 median sample intervals by default).
+    """
+    if time.shape != valid.shape or time.ndim != 1:
+        raise ValueError("time and valid must be 1-D and the same length.")
+    finite = time[np.isfinite(time)]
+    if np.any(np.diff(finite) <= 0):
+        raise ValueError("time must be strictly increasing.")
+    if max_gap_s is None:
+        max_gap_s = GAP_FACTOR * float(np.median(np.diff(finite)))
+    with np.errstate(invalid="ignore"):
+        close = np.diff(time) <= max_gap_s
+    # a non-finite timestamp fails the spacing test on both sides
+    return valid[1:] & valid[:-1] & close
+
+
 def sample_runs(
     time: NDArray, valid: NDArray, max_gap_s: float | None = None
 ) -> NDArray:
     """Stretches of consecutive valid samples, from first to last sample.
 
-    A run ends at an invalid sample and at any gap in the timestamps longer
-    than ``max_gap_s`` (1.5 median sample intervals by default). A single
-    isolated sample covers no time and is dropped.
+    A run ends at an invalid sample, a non-finite timestamp, and any gap in
+    the timestamps longer than ``max_gap_s`` (1.5 median sample intervals by
+    default). A single isolated sample covers no time and is dropped.
 
     Parameters
     ----------
     time : ndarray, shape (n_samples,)
-        Strictly increasing.
+        Strictly increasing where finite.
     valid : ndarray of bool, shape (n_samples,)
     max_gap_s : float, optional
 
@@ -81,25 +103,56 @@ def sample_runs(
     """
     time = np.asarray(time, dtype=np.float64)
     valid = np.asarray(valid, dtype=bool)
-    if time.shape != valid.shape or time.ndim != 1:
-        raise ValueError("time and valid must be 1-D and the same length.")
     if time.size < 2:
         return np.empty((0, 2))
-    if np.any(np.diff(time) <= 0):
-        raise ValueError("time must be strictly increasing.")
-    if max_gap_s is None:
-        max_gap_s = GAP_FACTOR * float(np.median(np.diff(time)))
+    joined = _joined(time, valid, max_gap_s)
+    valid = valid & np.isfinite(time)
     # a new run begins at a valid sample after an invalid one or after a gap
-    joined = valid[1:] & valid[:-1] & (np.diff(time) <= max_gap_s)
     begins = valid & np.r_[True, ~joined]
     ends = valid & np.r_[~joined, True]
     return normalize(np.column_stack([time[begins], time[ends]]))
 
 
-def with_window_support(runs: NDArray, half_window_s: float) -> NDArray:
-    """Moments at which a window centered there lies wholly inside a run."""
-    runs = normalize(runs)
-    return normalize(runs + np.array([half_window_s, -half_window_s]))
+def window_supported(
+    time: NDArray,
+    valid: NDArray,
+    window_n_samples: int,
+    max_gap_s: float | None = None,
+) -> NDArray:
+    """Samples at which a window stamped there has its whole support.
+
+    A window over samples ``[k, k + window_n_samples)`` is stamped at sample
+    ``k + window_n_samples // 2``, as the memoryless detector stamps it, so
+    a sample is covered when the window around it is valid without a break.
+    Counted in samples, not seconds, so the coverage edges are the first and
+    last stamps on any clock.
+
+    Parameters
+    ----------
+    time : ndarray, shape (n_samples,)
+    valid : ndarray of bool, shape (n_samples,)
+    window_n_samples : int
+    max_gap_s : float, optional
+        As for ``sample_runs``.
+
+    Returns
+    -------
+    supported : ndarray of bool, shape (n_samples,)
+        Pass to ``sample_runs`` with ``time`` for the observed intervals.
+
+    """
+    time = np.asarray(time, dtype=np.float64)
+    valid = np.asarray(valid, dtype=bool)
+    supported = np.zeros(time.size, dtype=bool)
+    if time.size < max(window_n_samples, 2):
+        return supported
+    # samples share a run id exactly when no break lies between them
+    run = np.r_[0, np.cumsum(~_joined(time, valid, max_gap_s))]
+    first = np.arange(time.size - window_n_samples + 1)
+    last = first + window_n_samples - 1
+    stamp = first + window_n_samples // 2
+    supported[stamp] = valid[stamp] & (run[first] == run[last])
+    return supported
 
 
 def still_intervals(
