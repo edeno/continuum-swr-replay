@@ -290,6 +290,44 @@ measurement, and worth checking on real data:
   graph distance and fails the jump criterion, so a replay that changes arm is
   cut at the switch. Untested here; this simulation is a single linear track.
 
+### Summary: what the port misses, and what it over-calls
+
+Everything marked *measured* comes from a test in this repository. The rest
+follows from the criteria and is not yet demonstrated; it is listed so it is
+not mistaken for a result.
+
+| direction | case | outcome | status |
+|---|---|---|---|
+| miss | path shorter than about 42 cm | never reported, at any duration or firing rate | measured |
+| miss | replay that changes arm without passing the junction | cut at the switch, and neither half then clears dispersion | measured |
+| miss | sparse ensembles, about one spike per window | erratic, 0-50% where dense spiking gives 100% | measured |
+| miss | whole path inside one window (~4300 cm/s over 130 cm) | posterior smears, spread rejects | measured |
+| miss | replay overlapping the onset of movement | truncated one window *before* the first moving window | measured |
+| by design | remote place held still | decoded confidently, assembled, declined for going nowhere | measured |
+| miss | one unusable window inside a replay | removes its predecessor too and splits the run | from the criteria |
+| miss | gap over 50 ms, or bridge over 20 cm | merge blocked, each piece must clear 100 ms alone | from the criteria |
+| over-call | local coding beside a replay | absorbed, 5.8x and 4.3x duration inflation | measured |
+| neither | spurious events with no replay in them | none in 65 s of simulation | measured |
+
+**The over-call is a boundary error, not a spurious event.** In the one
+simulation tested end to end the detector accepted two events and both were
+real replays; nothing was invented. What is wrong is the extent: about three
+quarters of each accepted event is the animal's own place. Any per-event
+content summary computed over those bounds - represented distance, arm,
+ahead/behind - is therefore dominated by local coding rather than by the
+replay, so for downstream content analysis the event behaves as a false
+positive over most of its duration even though the event itself is real.
+
+**The same mechanism cuts both ways.** Absorbing neighbouring windows is also
+what lets a sub-100 ms replay clear the duration criterion at all. Removing the
+over-extension would lose those events. Sensitivity and boundary accuracy are
+not independent knobs here.
+
+**The two directions do not cancel.** A missed short-path replay and an
+over-extended long one are different errors: the first removes events from the
+cohort, the second corrupts the timing and content of the events that remain.
+Reporting a single agreement rate against our cohort would hide both.
+
 ## Decisions register
 
 Decisions taken during design, with the reasoning, so the methods section can state them
