@@ -441,13 +441,13 @@ duration:
 
 | path (cm) | 40 ms | 60 ms | 80 ms | 120 ms | 200 ms | 300 ms | 500 ms |
 |---|---|---|---|---|---|---|---|
-| 10 | 0 | 0 | 0 | 1 | 1 | 1 | 2 |
-| 20 | 0 | 1 | 0 | 2 | 2 | 2 | 8 |
-| 30 | 0 | 0 | 0 | 2 | 4 | 6 | 9 |
-| 45 | 0 | 1 | 2 | 6 | 18 | 18 | 35 |
-| 60 | 3 | 5 | 10 | 15 | 23 | 43 | 58 |
-| 90 | 0 | 6 | 11 | 33 | 40 | 60 | 71 |
-| 130 | 4 | 12 | 8 | 42 | 71 | 79 | 88 |
+| 10 | 0 | 0 | 0 | 0 | 1 | 1 | 1 |
+| 20 | 0 | 0 | 0 | 2 | 2 | 2 | 7 |
+| 30 | 0 | 0 | 0 | 2 | 3 | 4 | 9 |
+| 45 | 1 | 1 | 5 | 8 | 15 | 20 | 34 |
+| 60 | 4 | 3 | 12 | 18 | 28 | 41 | 46 |
+| 90 | 1 | 11 | 14 | 35 | 43 | 64 | 71 |
+| 130 | 4 | 8 | 21 | 50 | 79 | 79 | 88 |
 | any path (state-space) | 62-74 | 78-96 | 86-92 | 88-97 | 98-100 | 100 | 100 |
 
 And before the significance test:
@@ -483,14 +483,18 @@ half, by duration:
 
 | true duration | 40 ms | 60 ms | 80 ms | 120 ms | 200 ms | 300 ms | 500 ms |
 |---|---|---|---|---|---|---|---|
-| spread half | 83% | 66% | 60% | 62% | 58% | 65% | 74% |
-| jump half | 21% | 36% | 48% | 72% | 87% | 92% | 98% |
+| spread half | 79% | 64% | 63% | 62% | 56% | 67% | 70% |
+| jump half | 29% | 43% | 66% | 78% | 91% | 91% | 95% |
 
-A short replay covers its path in few windows, so its own jumps are large, and the
-shuffled posteriors, sharp but hopping between swapped fields, do not jump further. The
-spread half passes about two thirds of replays at every duration, as a swapped field
-still gives a sharp posterior. Overall 66% pass the spread half and 81% the jump half
-(`shuffle_pass_rate_by_duration`, and `sliding_shuffle_*_pass_rate` in `overall`).
+A short replay covers its path in few windows, so its own non-zero jumps are large,
+and the shuffled posteriors, sharp but hopping between swapped fields, do not jump
+further. The spread half passes about two thirds of replays at every duration, as a
+swapped field still gives a sharp posterior. Overall 65% pass the spread half and 83%
+the jump half (`shuffle_pass_rate_by_duration`, and `sliding_shuffle_*_pass_rate` in
+`overall`). Under this port's earlier conventions, which kept zero jumps in the mean,
+the jump half read 21% at 40 ms against 98% at 500 ms; setting zero jumps aside as the
+reference does, which raises a slow replay's observed jump mean, softens the trend to
+what the table shows without removing it.
 
 **More than a third (36%) of the sliding window's accepted events are not the
 injected event.** They are absorbed local coding that overlaps it. This is the
@@ -518,9 +522,10 @@ read 94% rather than 91%. About 4% of the state-space detector's reports come
 as more than one interval, and the best of them answers for the cell, as the
 best of several accepted sliding-window sequences does (0.5% of cells).
 
-**No cell in the sweep was found by the sliding window and missed by the
-state-space model** under the published definition (six of 4536 before the
-significance test). 80% of cells went the other way. Of those, 55% built a
+**One cell in 4536 was found by the sliding window and missed by the
+state-space model** under the published definition, six before the significance
+test (`found_by_sliding_window_only` and its `_before_shuffle` partner in
+`overall`). 80% of cells went the other way. Of those, 55% built a
 candidate that then failed dispersion, 17% built no candidate at all, and 13% were
 the injected replay but failed the significance test, while the median share of
 windows passing the spread criterion inside the event was 1.00. The spread gate is
@@ -542,7 +547,7 @@ published, against the injected event.
 
 **Where the published criteria can accept an event at all** — path over about
 42 cm and duration over 100 ms, 25% of the grid — the sliding window reports 37%
-under the whole published definition (64% before its significance test, 41% with the
+under the whole published definition (64% before its significance test, 40% with the
 spread half alone) and the state-space model 99% (`overall_in_domain`). The remaining three
 quarters of the grid are events the published method is defined not to call
 replays. That is a property of the method worth measuring, and it is why the

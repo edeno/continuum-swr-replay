@@ -1072,6 +1072,16 @@ def check_summary_claims(summary: pd.DataFrame) -> None:
             "The caption says the state-space detector, held to the published "
             "replay definition, reports nothing below 45 cm; the summary disagrees."
         )
+    passes = (
+        summary[summary["summary"] == "shuffle_pass_rate_by_duration"]
+        .pivot(index="duration_s", columns="measure", values="value")
+        .sort_index()
+    )
+    if not passes.sliding_jump_pass.iloc[0] < passes.sliding_jump_pass.iloc[-1]:
+        raise RuntimeError(
+            "The caption says the jump half passes fewer of the shortest replays "
+            "than of the longest; the summary's pass rates by duration disagree."
+        )
     by_distance = summary[summary["summary"] == "median_by_distance_from_animal"]
     local = (
         by_distance[by_distance.measure == "sliding_local_fraction"]
@@ -1142,6 +1152,12 @@ def write_caption(
         & (summary.measure == "sliding_duration_ratio")
     ].sort_values("duration_s")
     shortest = ratio.iloc[0]
+    passes = summary[summary["summary"] == "shuffle_pass_rate_by_duration"]
+    jump_pass = (
+        passes[passes.measure == "sliding_jump_pass"]
+        .set_index("duration_s")
+        .value.sort_index()
+    )
     check_summary_claims(summary)
 
     path.write_text(
@@ -1212,10 +1228,13 @@ spread half alone, the only half the detection script's own filter could fail;
 the paper's analyses read both halves, from a corrected script. Of
 the replays it reported before the test,
 {pct(overall["sliding_shuffle_spread_pass_rate"])} pass the spread half and
-{pct(overall["sliding_shuffle_jump_pass_rate"])} the jump half. The test is
-the reference's, convention for convention: zero jumps set aside, only draws
-strictly below the observed value counted, both halves at p ≤ 0.05. The
-state-space detector reports {pct(overall["state_space_matches"])}.
+{pct(overall["sliding_shuffle_jump_pass_rate"])} the jump half; a short replay
+covers its path in few windows, so its own jumps are large, and the jump half
+passes {pct(jump_pass.iloc[0])} of {1000 * jump_pass.index[0]:.0f} ms replays
+against {pct(jump_pass.iloc[-1])} of {1000 * jump_pass.index[-1]:.0f} ms ones.
+The test is the reference's, convention for convention: zero jumps set aside,
+only draws strictly below the observed value counted, both halves at p ≤ 0.05.
+The state-space detector reports {pct(overall["state_space_matches"])}.
 {pct(overall["found_by_state_space_only"])} were reported by the
 state-space detector and not by the sliding-window detector, counting the
 {pct(overall["missed_failed_shuffle"])} it reported and then failed on the

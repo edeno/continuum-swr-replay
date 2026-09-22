@@ -27,10 +27,9 @@ is drawn as rejected. The sliding-window detector finds the continuous replay
 and gives it 5.8 times its true length, because 81% of the event it reports is
 the animal's own place, absorbed by the merge rule. It also accepts the 80 ms
 replay, at 1.3 times its length with 0% local coding in it: the window alone
-puts a floor under any duration it can report. The significance test rejects it
-(p = 0.079 on spread and 0.020 on jump, against 0.05), 3 draws from passing,
-and the published method would not report it. It assembles a candidate from the
-30 cm replay and another from the remote stationary event and declines both for
+puts a floor under any duration it can report. It passes the significance test
+(p = 0.040 on spread and 0.020 on jump). It assembles a candidate from the 30
+cm replay and another from the remote stationary event and declines both for
 too little dispersion (6 and 2 cm against the 12 cm it requires). The
 state-space detector reports all four, with every bound within 42 ms of the
 truth. Both continuous replays pass the significance test, though most of each
@@ -52,10 +51,15 @@ answer. The sliding-window detector reports 11% of the replays under the
 published definition: 22% before its significance test, and 14% with the spread
 half alone, the only half the detection script's own filter could fail; the
 paper's analyses read both halves, from a corrected script. Of the replays it
-reported before the test, 66% pass the spread half and 81% the jump half; a
-short, fast replay jumps far between windows and fails the second. The
+reported before the test, 65% pass the spread half and 83% the jump half; a
+short replay covers its path in few windows, so its own jumps are large, and
+the jump half passes 29% of 40 ms replays against 95% of 500 ms ones. The test
+is the reference's, convention for convention: zero jumps set aside, only draws
+strictly below the observed value counted, both halves at p ≤ 0.05. The
 state-space detector reports 91%. 80% were reported by the state-space detector
-and missed by the sliding-window detector; 0.00% went the other way.
+and not by the sliding-window detector, counting the 13% it reported and then
+failed on the significance test; 0.02% went the other way (0.13% before the
+significance test).
 
 The two detectors reach their limits on different quantities. The state-space
 detector is limited by duration, which is spike count, which is the data. The
