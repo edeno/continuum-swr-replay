@@ -34,7 +34,10 @@ from non_local_detector.environment import Environment
 from non_local_detector.likelihoods.sorted_spikes_kde import (
     fit_sorted_spikes_kde_encoding_model,
 )
-from non_local_detector.simulate.sorted_spikes_simulation import make_simulated_data
+from non_local_detector.simulate.sorted_spikes_simulation import (
+    SAMPLING_FREQUENCY,
+    make_simulated_data,
+)
 
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import (
     MemorylessSequenceConfig,
@@ -70,7 +73,24 @@ EVENT_LABELS = [
     "no spike",
     "local",
     "remote\nstationary",
+    "short path\n30 cm",
+    "few spikes",
 ]
+
+FIELD_STD_CM = np.sqrt(12.5)
+"""Place field width the package simulates."""
+
+INJECTED = (
+    # start_cm, path_cm, duration_s, peak_rate_hz, which pause to put it in
+    (40.0, 30.0, 0.300, 40.0, 20.50),
+    (20.0, 120.0, 0.300, 6.0, 44.40),
+)
+"""Two replays the detector should find but does not.
+
+The first travels only 30 cm. The dispersion criterion needs a path of about
+42 cm, so no short replay can pass it. The second travels far enough, but
+fires about one spike per window, which is too few to hold a narrow posterior.
+"""
 
 REMOTE_STATIONARY_CM = 42.5
 """The place a remote stationary event holds, far from the animal's 170 cm."""
@@ -111,6 +131,40 @@ def splice_remote_stationary(
 BLACK, ORANGE, SKY, GREEN, YELLOW, BLUE, VERMILION, PURPLE = WONG[:8]
 
 
+def inject_replay(
+    spike_times: list[np.ndarray],
+    place_field_means: np.ndarray,
+    start_cm: float,
+    path_cm: float,
+    duration_s: float,
+    peak_rate_hz: float,
+    start_s: float,
+    seed: int = 0,
+) -> tuple[list[np.ndarray], tuple[float, float]]:
+    """Add a replay that travels a given distance in a given time.
+
+    Each cell fires as a Poisson process. Its rate follows its own place field,
+    read at the position the replay represents at that moment. This is how the
+    package builds its own replays, with the distance and the rate under
+    control.
+    """
+    n_samples = max(2, int(duration_s * SAMPLING_FREQUENCY))
+    step_s = duration_s / (n_samples - 1)
+    at_s = start_s + np.arange(n_samples) * step_s
+    at_cm = start_cm + path_cm * np.arange(n_samples) / (n_samples - 1)
+
+    rate_hz = peak_rate_hz * np.exp(
+        -0.5 * ((at_cm[:, None] - place_field_means[None, :]) / FIELD_STD_CM) ** 2
+    )
+    fired = np.random.default_rng(seed).random(rate_hz.shape) < rate_hz * step_s
+
+    injected = []
+    for neuron, neuron_times in enumerate(spike_times):
+        kept = neuron_times[(neuron_times < at_s[0]) | (neuron_times > at_s[-1])]
+        injected.append(np.sort(np.concatenate([kept, at_s[fired[:, neuron]]])))
+    return injected, (at_s[0], at_s[-1])
+
+
 def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dict:
     """Decode the Figure 1 simulation window by window under a uniform prior."""
     (
@@ -133,6 +187,22 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
     )
     event_times = np.vstack([event_times, remote_stationary])
     is_event |= (time >= remote_stationary[0]) & (time <= remote_stationary[1])
+
+    # two replays the detector should find but does not
+    place_field_means = np.linspace(0, TRACK_HEIGHT_CM, n_neurons)
+    for seed, (start_cm, path_cm, duration_s, rate_hz, at_s) in enumerate(INJECTED):
+        spike_times, bounds = inject_replay(
+            spike_times,
+            place_field_means,
+            start_cm,
+            path_cm,
+            duration_s,
+            rate_hz,
+            at_s,
+            seed=seed,
+        )
+        event_times = np.vstack([event_times, bounds])
+        is_event |= (time >= bounds[0]) & (time <= bounds[1])
 
     time, position, speed, is_event = (
         array[::DECODE_BIN_STRIDE] for array in (time, position, speed, is_event)
@@ -220,17 +290,21 @@ def plot_overview(ax, decoded: dict, config: MemorylessSequenceConfig) -> None:
     center_cm = decoded_center_cm(decoded)
     kept = candidates.decisions.gates.kept
 
-    for (start_s, end_s), label in zip(
-        decoded["event_times"], EVENT_LABELS, strict=True
-    ):
-        if end_s <= start_s:
-            # the package's "local" entry is a zero-width marker for an
-            # unmanipulated pause; the remote stationary event sits there now
-            continue
+    # the package's "local" entry is a zero-width marker for an unmanipulated
+    # pause; the remote stationary event sits there now
+    labelled = [
+        (start_s, end_s, label)
+        for (start_s, end_s), label in zip(
+            decoded["event_times"], EVENT_LABELS, strict=True
+        )
+        if end_s > start_s
+    ]
+    # two rows, alternating in time order, so neighbours never share a row
+    for row, (start_s, end_s, label) in enumerate(sorted(labelled)):
         ax.axvspan(start_s, end_s, color=YELLOW, alpha=0.6, lw=0)
         ax.text(
             0.5 * (start_s + end_s),
-            190,
+            190 if row % 2 else 234,
             label,
             fontsize=5,
             ha="center",
@@ -281,9 +355,9 @@ def plot_overview(ax, decoded: dict, config: MemorylessSequenceConfig) -> None:
     ]
     ax.legend(
         handles=handles,
-        loc="upper left",
-        bbox_to_anchor=(0.0, 1.02),
-        ncol=3,
+        loc="lower left",
+        bbox_to_anchor=(0.0, 1.01),
+        ncol=6,
         fontsize=5,
         frameon=False,
         handlelength=1.4,
@@ -292,7 +366,7 @@ def plot_overview(ax, decoded: dict, config: MemorylessSequenceConfig) -> None:
         borderpad=0.0,
     )
 
-    ax.set_ylim(-24, 262)
+    ax.set_ylim(-24, 268)
     ax.set_xlim(decoded["time"][0], decoded["time"][-1])
     ax.set_yticks([0, 50, 100, 150])
     ax.set_ylabel("position (cm)")
@@ -382,115 +456,137 @@ def plot_event(ax, decoded: dict, event: int, config: MemorylessSequenceConfig) 
     ax.set_title(EVENT_LABELS[event].replace("\n", " "), fontsize=6)
 
 
-def plot_window_statistics(ax_spread, ax_jump, decoded, event, config) -> None:
-    """The two window criteria across the same stretch of time."""
-    candidates = decoded["candidates"]
-    midpoint_s = decoded["midpoint_s"]
-    true_start, true_end = decoded["event_times"][event]
-    window_lo, window_hi, _ = zoom_window(decoded, event)
-    shown = (midpoint_s >= window_lo) & (midpoint_s <= window_hi)
+def plot_criterion_space(ax, decoded: dict, config: MemorylessSequenceConfig) -> None:
+    """Every candidate sequence against the two criteria that accept it.
 
-    for ax, values, threshold, name in (
-        (
-            ax_spread,
-            candidates.decisions.spread_cm,
-            config.spread_threshold_cm,
-            "spread",
-        ),
-        (ax_jump, candidates.decisions.jump_cm, config.jump_threshold_cm, "jump"),
-    ):
-        ax.axvspan(
-            true_start, max(true_end, true_start + 0.02), color=YELLOW, alpha=0.45, lw=0
-        )
-        ax.plot(midpoint_s[shown], values[shown], color=BLACK, lw=0.5)
-        ax.axhline(threshold, color=VERMILION, lw=0.7, ls=":")
-        ax.set_xlim(window_lo, window_hi)
-        ax.set_ylim(0, threshold * 2.6)
-        ax.set_ylabel(f"{name} (cm)")
-    ax_jump.set_xlabel("time (s)")
+    A sequence is replay only if it lands in the upper right box: longer than
+    the minimum duration and spread wider than the minimum dispersion. Reading
+    the rejected cases off this panel shows which criterion stopped each one.
+    """
+    candidates = decoded["candidates"]
+    duration_s, dispersion_cm = candidates.duration_s, candidates.dispersion_cm
+
+    ax.axhspan(
+        config.dispersion_threshold_cm,
+        1e3,
+        xmin=0,
+        xmax=1,
+        color=GREEN,
+        alpha=0.05,
+        lw=0,
+    )
+    ax.axvline(config.minimum_duration_s, color="0.55", lw=0.7, ls=":")
+    ax.axhline(config.dispersion_threshold_cm, color="0.55", lw=0.7, ls=":")
+
+    ax.scatter(duration_s, dispersion_cm, s=5, color="0.7", lw=0, zorder=2)
+
+    highlight = {
+        0: ("continuous replay", VERMILION),
+        2: ("continuous replay", VERMILION),
+        6: ("short path, 30 cm", BLUE),
+        5: ("remote place", PURPLE),
+        1: ("fragmented", ORANGE),
+        3: ("no spike", SKY),
+    }
+    seen = set()
+    for event, (name, color) in highlight.items():
+        event_start, event_end = decoded["event_times"][event]
+        for i in range(len(candidates.runs)):
+            start, stop = candidates.runs[i]
+            if not (
+                decoded["midpoint_s"][start] < event_end
+                and event_start < decoded["midpoint_s"][stop]
+            ):
+                continue
+            accepted = bool(candidates.is_replay[i])
+            ax.scatter(
+                duration_s[i],
+                dispersion_cm[i],
+                s=26,
+                zorder=3,
+                facecolor=color if accepted else "none",
+                edgecolor=color,
+                lw=1.0,
+                label=name if name not in seen else None,
+            )
+            seen.add(name)
+
+    ax.set_xscale("log")
+    ax.set_xlim(0.02, 2.5)
+    ax.set_ylim(-2, 58)
+    ax.set_xlabel("event duration (s)")
+    ax.set_ylabel("dispersion (cm)")
+    ax.set_title(
+        "filled = meets both criteria; the shaded box is where replay must land",
+        fontsize=5.5,
+    )
+    ax.legend(
+        loc="upper left",
+        fontsize=5,
+        frameon=False,
+        handletextpad=0.2,
+        borderpad=0.0,
+        labelspacing=0.25,
+    )
+    ax.text(
+        0.104,
+        54,
+        "minimum\nduration",
+        fontsize=5,
+        color="0.45",
+        ha="left",
+        va="top",
+        linespacing=1.1,
+    )
+    ax.text(
+        2.4,
+        config.dispersion_threshold_cm + 1.2,
+        "minimum dispersion",
+        fontsize=5,
+        color="0.45",
+        ha="right",
+        va="bottom",
+    )
 
 
 def make_figure(n_neurons: int, config: MemorylessSequenceConfig):
     decoded = simulate_and_decode(n_neurons, config)
-    candidates = decoded["candidates"]
 
     set_figure_defaults(context="paper")
-    fig = plt.figure(figsize=(TWO_COLUMN, TWO_COLUMN * 0.92), dpi=450)
-    grid = GridSpec(
-        3,
-        4,
-        figure=fig,
-        height_ratios=[1.0, 1.05, 0.7],
-        hspace=0.6,
-        wspace=0.42,
-        left=0.075,
-        right=0.985,
-        top=0.885,
-        bottom=0.165,
+    # this project's defaults turn constrained layout on, so the grid must not
+    # also set its own margins: the two fight and the panels collapse
+    fig = plt.figure(
+        figsize=(TWO_COLUMN, TWO_COLUMN * 0.82), dpi=450, constrained_layout=True
     )
+    fig.set_constrained_layout_pads(w_pad=0.02, h_pad=0.02, wspace=0.05, hspace=0.09)
+    grid = GridSpec(3, 4, figure=fig, height_ratios=[1.0, 1.15, 0.95])
 
     ax_overview = fig.add_subplot(grid[0, :])
     plot_overview(ax_overview, decoded, config)
 
+    outcomes = (
+        (0, "continuous replay", "found, but 5.8x too long"),
+        (6, "short path, 30 cm", "missed: it does not spread far enough"),
+        (7, "few spikes", "missed: the posterior is too wide"),
+        (5, "remote place, held still", "declined: it does not travel"),
+    )
     zooms = []
-    for column, event in enumerate((0, 5, 1, 3)):
+    for column, (event, name, outcome) in enumerate(outcomes):
         ax = fig.add_subplot(grid[1, column])
         plot_event(ax, decoded, event, config)
+        ax.set_title(f"{name}\n{outcome}", fontsize=5.5, linespacing=1.4)
         if column:
             ax.set_yticklabels([])
         zooms.append(ax)
     zooms[0].set_ylabel("position (cm)")
 
-    ax_spread = fig.add_subplot(grid[2, :2])
-    ax_jump = fig.add_subplot(grid[2, 2:])
-    plot_window_statistics(ax_spread, ax_jump, decoded, 0, config)
-    ax_spread.set_title("posterior spread, continuous outbound", fontsize=6)
-    ax_jump.set_title("jump to the next window", fontsize=6)
+    ax_criteria = fig.add_subplot(grid[2, 1:3])
+    plot_criterion_space(ax_criteria, decoded, config)
 
-    label_panels([ax_overview, *zooms, ax_spread, ax_jump], xpos=-0.08, ypos=1.12)
+    label_panels([ax_overview, *zooms, ax_criteria], xpos=-0.08, ypos=1.12)
 
     fig.suptitle(
-        "Memoryless sliding-window detection on the Figure 1 simulation",
-        fontsize=7,
-        y=0.975,
-    )
-    lines = []
-    for sequence in np.flatnonzero(candidates.is_replay):
-        start, stop = candidates.runs[sequence]
-        midpoints = decoded["midpoint_s"][start : stop + 1]
-        overlapped = [
-            j
-            for j, (event_start, event_end) in enumerate(decoded["event_times"])
-            if decoded["midpoint_s"][start] < event_end
-            and event_start < decoded["midpoint_s"][stop]
-        ]
-        names = ", ".join(EVENT_LABELS[j].replace("\n", " ") for j in overlapped)
-        event_start, event_end = decoded["event_times"][overlapped[0]]
-        outside = 1.0 - np.mean((midpoints >= event_start) & (midpoints <= event_end))
-        lines.append(
-            f"{names} — detected {candidates.duration_s[sequence]:.2f} s for a "
-            f"{event_end - event_start:.2f} s event; {100 * outside:.0f}% of it lies "
-            f"outside the labeled event, and {100 * local_fraction(decoded, sequence):.0f}% "
-            "of its windows decode the animal's own position."
-        )
-    lines.append(
-        "The merge rule is most of it: with merging off the same data gives 1.4x and "
-        "2.1x inflation rather than 5.8x and 4.3x. A stationary representation is "
-        "absorbed when it sits near a travelling one, as here, where the replay begins "
-        "at the animal's own place; the remote stationary event in c has no travelling "
-        "neighbour and is declined for going nowhere, which is the method working as "
-        "designed."
-    )
-    fig.text(
-        0.5,
-        0.012,
-        "\n".join(lines),
-        fontsize=5.5,
-        ha="center",
-        va="bottom",
-        linespacing=1.7,
-        color="0.2",
-        wrap=True,
+        "Memoryless sliding-window detection on the Figure 1 simulation", fontsize=7
     )
     return fig, decoded
 
