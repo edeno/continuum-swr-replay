@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation import (
+    InjectedReplay,
     immobile_intervals,
     inject_replay,
     place_field_means,
@@ -33,19 +34,21 @@ class TestInjectReplay:
         self.means = place_field_means(25, 170.0)
         self.spike_times = [np.arange(0.0, 10.0, 0.05) for _ in range(25)]
 
-    def inject(self, **kwargs):
+    def inject(self, sampling_frequency=SAMPLING_FREQUENCY, **kwargs):
         defaults = {
-            "spike_times": self.spike_times,
-            "place_field_means": self.means,
             "start_cm": 20.0,
             "path_cm": 100.0,
             "duration_s": 0.200,
             "peak_rate_hz": 80.0,
             "at_s": 4.0,
-            "sampling_frequency": SAMPLING_FREQUENCY,
             "seed": 0,
         }
-        return inject_replay(**(defaults | kwargs))
+        return inject_replay(
+            self.spike_times,
+            self.means,
+            InjectedReplay(**(defaults | kwargs)),
+            sampling_frequency=sampling_frequency,
+        )
 
     def test_the_event_spans_the_requested_time(self):
         _, (start_s, end_s) = self.inject()
@@ -112,6 +115,44 @@ class TestInjectReplay:
 
         for original, unchanged in zip(self.spike_times, before, strict=True):
             np.testing.assert_array_equal(original, unchanged)
+
+    def test_a_rate_that_would_fire_at_every_sample_is_refused(self):
+        """Bernoulli-per-sample firing saturates; the rate would silently be
+        lower than asked."""
+        with pytest.raises(ValueError, match="every sample"):
+            self.inject(peak_rate_hz=600.0, sampling_frequency=500.0)
+
+
+class TestInjectedReplay:
+    def test_a_replay_knows_when_it_ends(self):
+        replay = InjectedReplay(0.0, 50.0, duration_s=0.2, peak_rate_hz=40.0, at_s=1.0)
+
+        assert replay.end_s == pytest.approx(1.2)
+
+    @pytest.mark.parametrize(
+        ("field", "value", "message"),
+        [
+            ("duration_s", 0.0, "duration_s"),
+            ("duration_s", -0.1, "duration_s"),
+            ("peak_rate_hz", -5.0, "peak_rate_hz"),
+            ("at_s", float("nan"), "finite"),
+            ("path_cm", float("inf"), "finite"),
+            ("seed", 0.5, "seed"),
+        ],
+    )
+    def test_an_impossible_replay_raises(self, field, value, message):
+        replay = {
+            "start_cm": 0.0,
+            "path_cm": 50.0,
+            "duration_s": 0.2,
+            "peak_rate_hz": 40.0,
+            "at_s": 1.0,
+            "seed": 0,
+        }
+        replay[field] = value
+
+        with pytest.raises(ValueError, match=message):
+            InjectedReplay(**replay)
 
 
 class TestImmobileIntervals:

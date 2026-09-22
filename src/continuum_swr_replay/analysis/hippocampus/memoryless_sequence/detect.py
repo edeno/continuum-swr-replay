@@ -1,10 +1,10 @@
 """Turn per-window statistics into candidate sequences.
 
-The order of the steps follows the original (spec 02, data-flow steps 4-7):
-gate each window on its speed, then its posterior spread and its jump to the
-next window; collect contiguous runs of surviving windows; merge runs that are
-close in both space and time; drop runs shorter than the minimum duration; and
-keep the sequences that are long enough and travel far enough to be replay.
+The order of the steps follows the original: gate each window on its speed,
+then its posterior spread and its jump to the next window; collect contiguous
+runs of surviving windows; merge runs that are close in both space and time;
+drop runs shorter than the minimum duration; and keep the sequences that are
+long enough and travel far enough to be replay.
 
 Taking the speed gate before the jumps is load-bearing. A window whose
 successor was rejected on speed has no forward jump and is itself rejected, so
@@ -13,18 +13,23 @@ jumps first would let it run one window further, which is enough to move a
 candidate across the duration filter. :func:`window_decisions` applies the four
 steps in the one correct order so a caller cannot reorder them.
 
-Every threshold is a strict inequality, as in the reference. Ties are
-systematic rather than rare here: a 20 cm jump is exactly ten 2 cm bins, and
-100 ms and 50 ms are whole multiples of both the original's 5 ms stride and
-this project's 4 ms one. The comparisons therefore treat a value within a
-relative tolerance of its threshold as equal to it, so float representation
-does not decide the outcome.
+The per-window, merge and replay thresholds are strict inequalities, as in the
+reference. The duration filter in :func:`assemble_sequences` is inclusive
+(``>=``), matching the reference's removal of runs with ``lengths < thr``; a
+candidate of exactly the minimum duration therefore survives assembly and is
+then declined as replay. Ties are systematic rather than rare here: a 20 cm
+jump is exactly ten 2 cm bins, and 100 ms is a whole number of strides at both
+the original's 5 ms and this project's 4 ms (the 50 ms merge gap can tie only
+at 5 ms). The comparisons therefore treat a value within a relative tolerance
+of its threshold as equal to it, so float representation does not decide the
+outcome.
 
-Deviation numbers (V6, V8, V10 ...), decision numbers (D1 ...) and the
-data-flow steps cited below are in ``docs/design/replay_detection_comparison/02-memoryless-sequence.md``.
+The design, including every departure from the original, is in
+``docs/design/replay_detection_comparison/02-memoryless-sequence.md``.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
@@ -59,11 +64,14 @@ __all__ = [
 _THRESHOLD_TOLERANCE = 1e-9
 """Relative tolerance at which a value counts as equal to a threshold."""
 
+_MASS_TOLERANCE = 1e-6
+"""How far a usable posterior row may be from summing to one."""
+
 
 def _is_below(value: NDArray, threshold: float) -> NDArray:
     """Strictly below ``threshold``, treating a value within tolerance as equal.
 
-    A non-finite value is never below a threshold.
+    NaN and ``+inf`` are never below a threshold.
     """
     value = np.asarray(value, dtype=np.float64)
     return (value < threshold) & ~np.isclose(
@@ -72,47 +80,117 @@ def _is_below(value: NDArray, threshold: float) -> NDArray:
 
 
 def _is_above(value: NDArray, threshold: float) -> NDArray:
-    """Strictly above ``threshold``, treating a value within tolerance as equal."""
+    """Strictly above ``threshold``, treating a value within tolerance as equal.
+
+    NaN and ``-inf`` are never above a threshold.
+    """
     value = np.asarray(value, dtype=np.float64)
     return (value > threshold) & ~np.isclose(
         value, threshold, rtol=_THRESHOLD_TOLERANCE, atol=0.0
     )
 
 
-@dataclass(frozen=True)
+def _as_window_arrays(instance: Any, dtype: type) -> None:
+    """Coerce every array field to ``dtype`` and require one shared 1-D shape."""
+    shapes = {}
+    for field in fields(instance):
+        if field.type is not NDArray:
+            continue
+        array: NDArray = np.asarray(getattr(instance, field.name), dtype=dtype)
+        if array.ndim != 1:
+            raise ValueError(
+                f"{field.name} must be one-dimensional, got {array.shape}."
+            )
+        object.__setattr__(instance, field.name, array)
+        shapes[field.name] = array.shape
+    if len(set(shapes.values())) > 1:
+        raise ValueError(f"Per-window arrays disagree in length: {shapes}.")
+
+
+@dataclass(frozen=True, eq=False)
 class WindowGates:
     """Which criterion each window met, kept separately so rejections explain themselves.
 
     Attributes
     ----------
-    has_center : ndarray of bool, shape (n_windows,)
-        The posterior was usable and the speed gate did not blank it.
+    posterior_usable : ndarray of bool, shape (n_windows,)
+        The window's posterior gave it a center before any gate was applied.
+    speed_eligible : ndarray of bool, shape (n_windows,)
+        The speed at the window's midpoint was known and below the threshold.
     spread_below_threshold : ndarray of bool, shape (n_windows,)
     jump_below_threshold : ndarray of bool, shape (n_windows,)
         False where the forward jump is undefined, which happens when the next
         window has no center.
-    kept : ndarray of bool, shape (n_windows,)
-        All three together.
 
     """
 
-    has_center: NDArray
+    posterior_usable: NDArray
+    speed_eligible: NDArray
     spread_below_threshold: NDArray
     jump_below_threshold: NDArray
-    kept: NDArray
+
+    def __post_init__(self) -> None:
+        _as_window_arrays(self, bool)
+
+    @property
+    def has_center(self) -> NDArray:
+        """The posterior was usable and the speed gate did not blank it."""
+        has_center: NDArray = self.posterior_usable & self.speed_eligible
+        return has_center
+
+    @property
+    def kept(self) -> NDArray:
+        """Every criterion together: the windows sequences are assembled from."""
+        kept: NDArray = (
+            self.has_center & self.spread_below_threshold & self.jump_below_threshold
+        )
+        return kept
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class WindowDecisions:
-    """Per-window statistics and gates in the order the detector computes them."""
+    """Per-window statistics and gates in the order the detector computes them.
+
+    Attributes
+    ----------
+    center_index : ndarray of int, shape (n_windows,)
+        Bin index of each window's center after the speed gate, ``NO_CENTER``
+        where the window has none. Agrees with ``gates.has_center``.
+    spread_cm : ndarray, shape (n_windows,)
+        ``nan`` where the posterior was unusable.
+    jump_cm : ndarray, shape (n_windows,)
+        Forward jump, ``nan`` where undefined.
+    gates : WindowGates
+
+    """
 
     center_index: NDArray
     spread_cm: NDArray
     jump_cm: NDArray
     gates: WindowGates
 
+    def __post_init__(self) -> None:
+        center = np.asarray(self.center_index, dtype=int)
+        spread = np.asarray(self.spread_cm, dtype=np.float64)
+        jump = np.asarray(self.jump_cm, dtype=np.float64)
+        n_windows = self.gates.posterior_usable.shape
+        if not center.shape == spread.shape == jump.shape == n_windows:
+            raise ValueError(
+                "Per-window arrays disagree in length: "
+                f"center {center.shape}, spread {spread.shape}, jump {jump.shape}, "
+                f"gates {n_windows}."
+            )
+        if not np.array_equal(center != NO_CENTER, self.gates.has_center):
+            raise ValueError(
+                "center_index and gates.has_center disagree about which windows "
+                "have a center."
+            )
+        object.__setattr__(self, "center_index", center)
+        object.__setattr__(self, "spread_cm", spread)
+        object.__setattr__(self, "jump_cm", jump)
 
-@dataclass(frozen=True)
+
+@dataclass(frozen=True, eq=False)
 class SequenceAssembly:
     """Candidate sequences, with the intermediate stages kept for inspection.
 
@@ -120,7 +198,7 @@ class SequenceAssembly:
     ----------
     runs : ndarray of int, shape (n_sequences, 2)
         Inclusive first and last window index of each surviving sequence.
-    pieces : list of ndarray
+    pieces : tuple of ndarray
         For each sequence, the indices into ``pre_merge_runs`` that it absorbed.
         A sequence with more than one piece spans a merged gap.
     pre_merge_runs : ndarray of int, shape (n_runs, 2)
@@ -132,9 +210,36 @@ class SequenceAssembly:
     """
 
     runs: NDArray
-    pieces: list[NDArray]
+    pieces: tuple[NDArray, ...]
     pre_merge_runs: NDArray
     kept: NDArray
+
+    def __post_init__(self) -> None:
+        runs = np.asarray(self.runs, dtype=int).reshape(-1, 2)
+        pre_merge = np.asarray(self.pre_merge_runs, dtype=int).reshape(-1, 2)
+        kept = np.asarray(self.kept, dtype=bool)
+        pieces = tuple(np.asarray(piece, dtype=int) for piece in self.pieces)
+        if len(pieces) != len(runs):
+            raise ValueError(f"{len(runs)} sequences but {len(pieces)} piece lists.")
+        if runs.size and (runs[:, 0] >= runs[:, 1]).any():
+            raise ValueError("Every sequence must span at least two windows.")
+        if runs.size and runs.max() >= kept.size:
+            raise ValueError(
+                f"A sequence reaches window {runs.max()} but there are only "
+                f"{kept.size} windows."
+            )
+        for run, piece in zip(runs, pieces, strict=True):
+            if piece.size == 0 or not (
+                run[0] == pre_merge[piece[0], 0] and run[1] == pre_merge[piece[-1], 1]
+            ):
+                raise ValueError(
+                    f"Sequence {run.tolist()} is not bounded by the pre-merge runs "
+                    f"it lists as its pieces, {piece.tolist()}."
+                )
+        object.__setattr__(self, "runs", runs)
+        object.__setattr__(self, "pieces", pieces)
+        object.__setattr__(self, "pre_merge_runs", pre_merge)
+        object.__setattr__(self, "kept", kept)
 
 
 def apply_speed_gate(
@@ -176,29 +281,38 @@ def gate_windows(
     spread_cm: NDArray,
     jump_cm: NDArray,
     config: MemorylessSequenceConfig,
+    speed_eligible: NDArray | None = None,
 ) -> WindowGates:
     """Apply the per-window criteria, recording each one separately.
 
     Parameters
     ----------
     center_index : ndarray of int, shape (n_windows,)
-        Already gated on speed.
+        Center of each window before the speed gate; ``NO_CENTER`` where the
+        posterior gave none.
     spread_cm, jump_cm : ndarray, shape (n_windows,)
+        The jump must already reflect the speed gate, since a window whose
+        successor was blanked has none.
     config : MemorylessSequenceConfig
+    speed_eligible : ndarray of bool, shape (n_windows,), optional
+        Which windows the speed gate let through. Every window, when omitted.
 
     Returns
     -------
     gates : WindowGates
 
     """
-    has_center = np.asarray(center_index, dtype=int) != NO_CENTER
-    spread_ok = _is_below(spread_cm, config.spread_threshold_cm)
-    jump_ok = _is_below(jump_cm, config.jump_threshold_cm)
+    usable = np.asarray(center_index, dtype=int) != NO_CENTER
+    eligible = (
+        np.ones_like(usable)
+        if speed_eligible is None
+        else np.asarray(speed_eligible, dtype=bool)
+    )
     return WindowGates(
-        has_center=has_center,
-        spread_below_threshold=spread_ok,
-        jump_below_threshold=jump_ok,
-        kept=has_center & spread_ok & jump_ok,
+        posterior_usable=usable,
+        speed_eligible=eligible,
+        spread_below_threshold=_is_below(spread_cm, config.spread_threshold_cm),
+        jump_below_threshold=_is_below(jump_cm, config.jump_threshold_cm),
     )
 
 
@@ -224,16 +338,24 @@ def window_decisions(
     decisions : WindowDecisions
 
     """
-    center, spread = window_center_and_spread(posterior, bin_distance_cm)
+    raw_center, spread = window_center_and_spread(posterior, bin_distance_cm)
     center = apply_speed_gate(
-        center, window_speed_cm_per_s, config.speed_threshold_cm_per_s
+        raw_center, window_speed_cm_per_s, config.speed_threshold_cm_per_s
     )
     jump = forward_jumps_cm(center, bin_distance_cm)
     return WindowDecisions(
         center_index=center,
         spread_cm=spread,
         jump_cm=jump,
-        gates=gate_windows(center, spread, jump, config),
+        gates=gate_windows(
+            raw_center,
+            spread,
+            jump,
+            config,
+            speed_eligible=_is_below(
+                window_speed_cm_per_s, config.speed_threshold_cm_per_s
+            ),
+        ),
     )
 
 
@@ -273,7 +395,7 @@ def merge_runs(
     Parameters
     ----------
     runs : ndarray of int, shape (n_runs, 2)
-        Inclusive bounds, in order.
+        Inclusive bounds, in order. Every endpoint must have a center.
     center_index : ndarray of int, shape (n_windows,)
     window_time_s : ndarray, shape (n_windows,)
         Window midpoints.
@@ -286,14 +408,25 @@ def merge_runs(
     pieces : list of ndarray
         For each merged run, the indices into ``runs`` that it absorbed.
 
+    Raises
+    ------
+    ValueError
+        A run endpoint has no center. ``NO_CENTER`` is ``-1``, which would
+        otherwise index the last bin and measure a gap that does not exist.
+
     """
     runs = np.asarray(runs, dtype=int).reshape(-1, 2)
     if len(runs) == 0:
         return runs.copy(), []
+    center = np.asarray(center_index, dtype=int)
+    if (center[runs] == NO_CENTER).any():
+        raise ValueError(
+            "A run endpoint has no center; runs must be built from windows that "
+            "survived the gates."
+        )
     if len(runs) == 1:
         return runs.copy(), [np.array([0])]
 
-    center = np.asarray(center_index, dtype=int)
     time_s = np.asarray(window_time_s, dtype=np.float64)
     distance = np.asarray(bin_distance_cm, dtype=np.float64)
 
@@ -353,7 +486,9 @@ def assemble_sequences(
     long_enough = (merged[:, 1] - merged[:, 0]) >= config.minimum_run_index_length
     return SequenceAssembly(
         runs=merged[long_enough],
-        pieces=[piece for piece, keep in zip(pieces, long_enough, strict=True) if keep],
+        pieces=tuple(
+            piece for piece, keep in zip(pieces, long_enough, strict=True) if keep
+        ),
         pre_merge_runs=runs,
         kept=kept,
     )
@@ -363,7 +498,7 @@ def sequence_duration_s(runs: NDArray, window_time_s: NDArray) -> NDArray:
     """Time from each sequence's first window midpoint to its last.
 
     The 80 ms window width is not added: the decoding support is a separate
-    quantity from the event interval (spec 02, "Window and event timing").
+    quantity from the event interval.
 
     Parameters
     ----------
@@ -377,7 +512,8 @@ def sequence_duration_s(runs: NDArray, window_time_s: NDArray) -> NDArray:
     """
     runs = np.asarray(runs, dtype=int).reshape(-1, 2)
     time_s = np.asarray(window_time_s, dtype=np.float64)
-    return time_s[runs[:, 1]] - time_s[runs[:, 0]]
+    duration: NDArray = time_s[runs[:, 1]] - time_s[runs[:, 0]]
+    return duration
 
 
 def sequence_dispersion_cm(
@@ -437,12 +573,13 @@ def replay_mask(
     is_replay : ndarray of bool, shape (n_sequences,)
 
     """
-    return _is_above(duration_s, config.minimum_duration_s) & _is_above(
+    mask: NDArray = _is_above(duration_s, config.minimum_duration_s) & _is_above(
         dispersion_cm, config.dispersion_threshold_cm
     )
+    return mask
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class CandidateSequences:
     """Every sequence one epoch yields, with the evidence for each decision.
 
@@ -456,9 +593,13 @@ class CandidateSequences:
         detector's rejections are as much a result as its detections.
     decisions : WindowDecisions
         Per-window centers, spreads, jumps, and gates.
-    pieces : list of ndarray
-        For each sequence, the indices into ``pre_merge_runs`` it absorbed.
-    pre_merge_runs : ndarray of int, shape (n_runs, 2)
+    assembly : SequenceAssembly
+        The runs before merging and which of them each sequence absorbed.
+    midpoint_s : ndarray, shape (n_windows,)
+        When each window is timestamped, so durations can be re-derived.
+    config : MemorylessSequenceConfig
+        The thresholds these decisions were made under, so ``is_replay`` can
+        be re-derived and a saved result says what produced it.
 
     """
 
@@ -467,8 +608,52 @@ class CandidateSequences:
     dispersion_cm: NDArray
     is_replay: NDArray
     decisions: WindowDecisions
-    pieces: list[NDArray]
-    pre_merge_runs: NDArray
+    assembly: SequenceAssembly
+    midpoint_s: NDArray
+    config: MemorylessSequenceConfig
+
+    def __post_init__(self) -> None:
+        runs = np.asarray(self.runs, dtype=int).reshape(-1, 2)
+        duration = np.asarray(self.duration_s, dtype=np.float64)
+        dispersion = np.asarray(self.dispersion_cm, dtype=np.float64)
+        is_replay = np.asarray(self.is_replay, dtype=bool)
+        midpoint = np.asarray(self.midpoint_s, dtype=np.float64)
+        n_sequences = len(runs)
+        if not (
+            duration.shape == dispersion.shape == is_replay.shape == (n_sequences,)
+        ):
+            raise ValueError(
+                f"{n_sequences} sequences carry {duration.shape} durations, "
+                f"{dispersion.shape} dispersions and {is_replay.shape} verdicts."
+            )
+        if midpoint.shape != self.decisions.center_index.shape:
+            raise ValueError(
+                f"{midpoint.shape} midpoints for "
+                f"{self.decisions.center_index.shape} windows."
+            )
+        if not np.array_equal(runs, self.assembly.runs):
+            raise ValueError("runs and assembly.runs disagree.")
+        if not np.allclose(duration, sequence_duration_s(runs, midpoint)):
+            raise ValueError("duration_s does not follow from runs and midpoint_s.")
+        if not np.array_equal(
+            is_replay, replay_mask(duration, dispersion, self.config)
+        ):
+            raise ValueError("is_replay does not follow from the criteria and config.")
+        object.__setattr__(self, "runs", runs)
+        object.__setattr__(self, "duration_s", duration)
+        object.__setattr__(self, "dispersion_cm", dispersion)
+        object.__setattr__(self, "is_replay", is_replay)
+        object.__setattr__(self, "midpoint_s", midpoint)
+
+    @property
+    def pieces(self) -> tuple[NDArray, ...]:
+        """For each sequence, the indices into ``pre_merge_runs`` it absorbed."""
+        return self.assembly.pieces
+
+    @property
+    def pre_merge_runs(self) -> NDArray:
+        """Runs before merging, after single-window runs were dropped."""
+        return self.assembly.pre_merge_runs
 
 
 def detect_candidate_sequences(
@@ -488,9 +673,10 @@ def detect_candidate_sequences(
     Parameters
     ----------
     posterior : ndarray, shape (n_windows, n_bins)
-        One normalized window per row, over real place bins.
+        One normalized window per row, over real place bins. A row that is
+        all NaN is a window the decoder could not evaluate.
     midpoint_s : ndarray, shape (n_windows,)
-        When each window is timestamped.
+        When each window is timestamped, strictly increasing.
     bin_distance_cm : ndarray, shape (n_bins, n_bins)
     window_speed_cm_per_s : ndarray, shape (n_windows,)
         Speed at each window's midpoint.
@@ -500,6 +686,12 @@ def detect_candidate_sequences(
     -------
     candidates : CandidateSequences
 
+    Raises
+    ------
+    ValueError
+        The arrays disagree in length, the midpoints are not increasing, or a
+        finite posterior row does not sum to one.
+
     """
     posterior = np.asarray(posterior, dtype=np.float64)
     midpoint_s = np.asarray(midpoint_s, dtype=np.float64)
@@ -507,6 +699,15 @@ def detect_candidate_sequences(
         raise ValueError(
             f"{posterior.shape[0]} windows carry {midpoint_s.shape} midpoint "
             "times; every window needs exactly one."
+        )
+    if midpoint_s.size > 1 and not (np.diff(midpoint_s) > 0).all():
+        raise ValueError("midpoint_s must be strictly increasing.")
+    finite = np.isfinite(posterior).all(axis=1)
+    mass = posterior[finite].sum(axis=1)
+    if not np.allclose(mass, 1.0, rtol=0.0, atol=_MASS_TOLERANCE):
+        raise ValueError(
+            f"A posterior row sums to {mass[np.argmax(np.abs(mass - 1.0))]}, not "
+            "one; normalize the windows first."
         )
 
     decisions = window_decisions(
@@ -520,15 +721,16 @@ def detect_candidate_sequences(
         config,
     )
     duration_s = sequence_duration_s(assembly.runs, midpoint_s)
-    dispersion_cm = sequence_dispersion_cm(
+    dispersion = sequence_dispersion_cm(
         assembly.runs, assembly.kept, decisions.center_index, bin_distance_cm
     )
     return CandidateSequences(
         runs=assembly.runs,
         duration_s=duration_s,
-        dispersion_cm=dispersion_cm,
-        is_replay=replay_mask(duration_s, dispersion_cm, config),
+        dispersion_cm=dispersion,
+        is_replay=replay_mask(duration_s, dispersion, config),
         decisions=decisions,
-        pieces=assembly.pieces,
-        pre_merge_runs=assembly.pre_merge_runs,
+        assembly=assembly,
+        midpoint_s=midpoint_s,
+        config=config,
     )

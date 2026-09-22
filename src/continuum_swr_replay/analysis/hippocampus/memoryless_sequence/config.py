@@ -1,16 +1,22 @@
 """Every threshold the memoryless sequence detector uses, in one place.
 
-The equivalent of the original's ``Analysis_Information.mat``. Spec 02 records
-which settings are retained from Widloski & Foster (2025) and which are adapted
-to this project's track geometry and sampling grid.
-
-Deviation numbers (V6, V8, V10 ...), decision numbers (D1 ...) and the
-data-flow steps cited below are in ``docs/design/replay_detection_comparison/02-memoryless-sequence.md``.
+The equivalent of the original's ``Analysis_Information.mat``. The design
+spec, ``docs/design/replay_detection_comparison/02-memoryless-sequence.md``,
+records which settings are retained from Widloski & Foster (2025) and which
+are adapted to this project's track geometry and sampling grid.
 """
 
+import math
 from dataclasses import dataclass
 
+from continuum_swr_replay.analysis.constants import (
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+)
+
 __all__ = ["MemorylessSequenceConfig"]
+
+_WHOLE_NUMBER_TOLERANCE = 1e-9
+"""How far a derived count may sit from an integer before it is not one."""
 
 
 @dataclass(frozen=True)
@@ -18,10 +24,11 @@ class MemorylessSequenceConfig:
     """Thresholds for one detection run.
 
     Counts of windows are derived from `stride_s`, never carried over from the
-    original as literal constants (spec 02, V10). At the reference's 5 ms stride
-    the 100 ms duration filter keeps runs of index length 20, meaning 21
-    windows; at this project's 4 ms stride the same 100 ms keeps index length
-    25, meaning 26 windows.
+    original as literal constants. At the reference's 5 ms stride the 100 ms
+    duration filter keeps runs of index length 20, meaning 21 windows; at this
+    project's 4 ms stride the same 100 ms keeps index length 25, meaning 26
+    windows. ``minimum_duration_s`` must therefore be a whole number of
+    strides, or rounding would silently move the filter to another duration.
 
     Attributes
     ----------
@@ -29,29 +36,38 @@ class MemorylessSequenceConfig:
         Decoding window, 0.080 s. Retained from the original.
     stride_s : float
         Step between window starts, 0.004 s. The original uses 0.005 s, which is
-        2.5 samples on this project's 500 Hz grid (V10).
+        2.5 samples on this project's 500 Hz grid.
     sampling_frequency : float
         Samples per second of the likelihood's time grid.
     place_bin_size_cm : float
-        Spatial bin width, 2.0 cm. Retained.
+        Spatial bin width, 2.0 cm. Retained. The detector reads its geometry
+        from the bin-distance matrix it is handed, so whoever builds the
+        environment must build it at this size.
     spread_threshold_cm : float
         A window is kept when its posterior spread is below this. The original's
         statistic is an area-like product moment in bin units; this port uses a
         graph-distance RMS spread in cm, so 10 cm is an adapted threshold rather
-        than the same criterion (V9).
+        than the same criterion.
     jump_threshold_cm : float
         A window is kept when the track-graph distance to the next window's
-        center is below this, 20.0 cm. Retained, measured on the graph (V6).
+        center is below this, 20.0 cm. Retained, measured on the graph.
     speed_threshold_cm_per_s : float
         A window is kept when the speed at its midpoint is below this. This
-        project uses 4.0 cm/s, its canonical immobility rule, where the original
-        uses 5.0 (D3, V12).
+        project's canonical immobility rule, 4.0 cm/s, shared with every other
+        event cohort through
+        :data:`~continuum_swr_replay.analysis.constants.DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC`.
+        The original uses 5.0.
     merge_gap_cm, merge_gap_s : float
         Neighboring runs merge when separated by less than both, 20.0 cm and
-        0.050 s. Retained.
+        0.050 s. Retained. Two distinct runs are always at least two strides
+        apart, so a ``merge_gap_s`` of ``2 * stride_s`` or less turns merging
+        off.
     minimum_duration_s : float
-        Shortest sequence, 0.100 s between the first and last window midpoint.
-        Retained.
+        0.100 s between a sequence's first and last window midpoint. Retained.
+        A candidate survives assembly when it spans at least this much
+        (``>=``, matching the reference's ``lengths < thr`` removal) and is
+        replay only when it spans strictly more (``>``), so a candidate of
+        exactly 0.100 s is kept with ``is_replay`` False.
     dispersion_threshold_cm : float
         Smallest spatial dispersion of a replay event, 12.0 cm. Retained.
 
@@ -63,7 +79,7 @@ class MemorylessSequenceConfig:
     place_bin_size_cm: float = 2.0
     spread_threshold_cm: float = 10.0
     jump_threshold_cm: float = 20.0
-    speed_threshold_cm_per_s: float = 4.0
+    speed_threshold_cm_per_s: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
     merge_gap_cm: float = 20.0
     merge_gap_s: float = 0.050
     minimum_duration_s: float = 0.100
@@ -84,20 +100,29 @@ class MemorylessSequenceConfig:
             "dispersion_threshold_cm",
         ):
             value = getattr(self, field)
-            if not value > 0:
-                raise ValueError(f"{field} must be positive, got {value}.")
+            if isinstance(value, bool) or not (math.isfinite(value) and value > 0):
+                raise ValueError(
+                    f"{field} must be a positive finite number, got {value!r}."
+                )
         if self.stride_s > self.window_duration_s:
             raise ValueError(
                 f"stride_s ({self.stride_s}) is longer than window_duration_s "
-                f"({self.window_duration_s}); the windows would not overlap."
+                f"({self.window_duration_s}); the windows would leave gaps."
             )
         for field in ("window_duration_s", "stride_s"):
             samples = getattr(self, field) * self.sampling_frequency
-            if abs(samples - round(samples)) > 1e-9:
+            if abs(samples - round(samples)) > _WHOLE_NUMBER_TOLERANCE:
                 raise ValueError(
                     f"{field} ({getattr(self, field)} s) is {samples} samples at "
                     f"{self.sampling_frequency} Hz, which is not a whole number."
                 )
+        strides = self.minimum_duration_s / self.stride_s
+        if abs(strides - round(strides)) > _WHOLE_NUMBER_TOLERANCE or strides < 1:
+            raise ValueError(
+                f"minimum_duration_s ({self.minimum_duration_s} s) is {strides} "
+                f"strides of {self.stride_s} s, which is not a whole number of at "
+                "least one; the duration filter would round it to another duration."
+            )
 
     @property
     def window_n_samples(self) -> int:
@@ -114,6 +139,7 @@ class MemorylessSequenceConfig:
         """Shortest run that the duration filter keeps, as an index difference.
 
         A run of index length ``n`` holds ``n + 1`` windows and spans
-        ``n * stride_s`` between its first and last midpoint.
+        ``n * stride_s`` between its first and last midpoint. Exact, because
+        ``__post_init__`` requires the ratio to be a whole number.
         """
         return round(self.minimum_duration_s / self.stride_s)

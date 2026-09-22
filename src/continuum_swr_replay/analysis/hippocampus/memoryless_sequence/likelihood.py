@@ -12,24 +12,26 @@ tested against a direct marked-process sum rather than assumed.
 ``np.digitize(spike_times, time[1:-1])``, whose largest index is ``n_time - 2``.
 The last row therefore carries a ground-process contribution that no spike can
 ever offset. Summing a window that contains it would charge 80 ms of exposure
-against fewer than 80 ms of spikes, so :func:`epoch_log_likelihood` drops it.
+against fewer than 80 ms of spikes, so :func:`clusterless_epoch_log_likelihood`
+and :func:`sorted_spikes_epoch_log_likelihood` both drop it.
 What remains is exact: row ``k`` holds the spikes in ``[time[k], time[k + 1])``,
 and the last surviving row also absorbs a spike landing exactly on the epoch's
 final timestamp.
 
 **Junction bins.** The library returns only ``is_track_interior_`` columns, and
 the ``edge_id == -1`` placeholders are built from the non-interior bins, so they
-are excluded here by construction (spec 02, V8). Reading a saved decode's
+are excluded here by construction. Reading a saved decode's
 ``log_likelihood`` instead would carry every ``state_bins`` column and would
 need the interior mask applied explicitly; that path is deliberately not
-implemented until it can be checked against a real file (D7).
+implemented until it can be checked against a real file.
 
-Deviation numbers (V6, V8, V10 ...), decision numbers (D1 ...) and the
-data-flow steps cited below are in ``docs/design/replay_detection_comparison/02-memoryless-sequence.md``.
+The design, including every departure from the original, is in
+``docs/design/replay_detection_comparison/02-memoryless-sequence.md``.
 """
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, cast
 
 import joblib
 import numpy as np
@@ -103,6 +105,24 @@ class EpochLikelihood:
     log_likelihood: NDArray
     place_bin_centers_cm: NDArray
 
+    def __post_init__(self) -> None:
+        time = np.asarray(self.time, dtype=np.float64)
+        log_likelihood = np.asarray(self.log_likelihood)
+        centers = np.asarray(self.place_bin_centers_cm, dtype=np.float64)
+        if time.ndim != 1 or log_likelihood.ndim != 2 or centers.ndim != 1:
+            raise ValueError(
+                f"time {time.shape}, log_likelihood {log_likelihood.shape} and "
+                f"place_bin_centers_cm {centers.shape} must be 1-D, 2-D and 1-D."
+            )
+        if log_likelihood.shape != (time.size, centers.size):
+            raise ValueError(
+                f"log_likelihood is {log_likelihood.shape} but there are "
+                f"{time.size} times and {centers.size} bins."
+            )
+        object.__setattr__(self, "time", time)
+        object.__setattr__(self, "log_likelihood", log_likelihood)
+        object.__setattr__(self, "place_bin_centers_cm", centers)
+
 
 def load_clusterless_encoding_model(detector_path: str | Path) -> dict:
     """Read the fitted encoding model out of a saved detector.
@@ -115,7 +135,9 @@ def load_clusterless_encoding_model(detector_path: str | Path) -> dict:
     Returns
     -------
     encoding_model : dict
-        The entries in :data:`CLUSTERLESS_LIKELIHOOD_KEYS`, plus ``block_size``.
+        The entries in :data:`CLUSTERLESS_LIKELIHOOD_KEYS`, plus whatever else
+        the library stored (``block_size``, ``disable_progress_bar``), which
+        this module does not read.
 
     Raises
     ------
@@ -123,6 +145,9 @@ def load_clusterless_encoding_model(detector_path: str | Path) -> dict:
         There is no detector at that path. Nothing is substituted for it.
     KeyError
         The detector holds no :data:`ENCODING_KEY` group.
+    ValueError
+        The environment has no place grid, or ``waveform_std`` differs between
+        features, which the per-electrode expansion below could not honor.
 
     """
     detector_path = Path(detector_path)
@@ -139,15 +164,28 @@ def load_clusterless_encoding_model(detector_path: str | Path) -> dict:
 
     # a detector saved by an older library version carries no fitted flag,
     # though its grid is intact; the track-distance methods refuse to run
-    # without one
-    encoding_model["environment"]._is_fitted = True
+    # without one. Only a grid that is actually there is vouched for.
+    environment = encoding_model["environment"]
+    if (
+        getattr(environment, "place_bin_centers_", None) is None
+        or getattr(environment, "is_track_interior_", None) is None
+    ):
+        raise ValueError(
+            f"The environment in {detector_path} has no fitted place grid."
+        )
+    environment._is_fitted = True
 
     # electrodes can differ in how many waveform features they have, so a
     # per-feature vector cannot be shared between them; the library expands a
-    # scalar to each electrode's own feature count
-    encoding_model["waveform_std"] = float(
-        np.asarray(encoding_model["waveform_std"]).ravel()[0]
-    )
+    # scalar to each electrode's own feature count. That is only the same
+    # model when every feature had the same bandwidth to begin with.
+    waveform_std = np.asarray(encoding_model["waveform_std"], dtype=np.float64).ravel()
+    if not np.allclose(waveform_std, waveform_std[0]):
+        raise ValueError(
+            f"waveform_std differs between features ({waveform_std.tolist()}); "
+            "a single bandwidth cannot stand in for them."
+        )
+    encoding_model["waveform_std"] = float(waveform_std[0])
     return encoding_model
 
 
@@ -168,14 +206,15 @@ def validate_time_grid(time: NDArray, config: MemorylessSequenceConfig) -> None:
     ------
     ValueError
         The grid is not uniform, is not at the configured rate, or is too short
-        to hold one window.
+        to hold one window once its final row is dropped.
 
     """
     time = np.asarray(time, dtype=np.float64)
-    if time.size < config.window_n_samples:
+    if time.size < config.window_n_samples + 1:
         raise ValueError(
-            f"The grid has {time.size} samples, fewer than the "
-            f"{config.window_n_samples} one window needs."
+            f"The grid has {time.size} samples; one window needs "
+            f"{config.window_n_samples} after the final row, which no spike can "
+            "reach, is dropped."
         )
     spacing = np.diff(time)
     if not np.allclose(spacing, spacing[0], rtol=_GRID_TOLERANCE, atol=0.0):
@@ -235,11 +274,11 @@ def clusterless_epoch_log_likelihood(
 
     log_likelihood = np.asarray(
         predict_clusterless_kde_log_likelihood(
-            time,
-            time,
-            position,
-            spike_times,
-            spike_waveform_features,
+            cast(Any, time),
+            cast(Any, time),
+            cast(Any, position),
+            cast(Any, spike_times),
+            cast(Any, spike_waveform_features),
             **{key: encoding_model[key] for key in CLUSTERLESS_LIKELIHOOD_KEYS},
             is_local=False,
             disable_progress_bar=True,
@@ -274,14 +313,15 @@ def window_midpoints_s(time: NDArray, config: MemorylessSequenceConfig) -> NDArr
         0, 1 + (time.size - config.window_n_samples) // config.stride_n_samples
     )
     starts = np.arange(n_windows) * config.stride_n_samples
-    return time[starts] + 0.5 * config.window_duration_s
+    midpoint_s: NDArray = time[starts] + 0.5 * config.window_duration_s
+    return midpoint_s
 
 
-def interior_bin_distances_cm(environment) -> NDArray:
+def interior_bin_distances_cm(environment: Any) -> NDArray:
     """Track-graph distance between every pair of real place bins.
 
     Two bins adjacent in linearized coordinate can sit on different arms, so
-    the detector measures jumps and dispersion on the graph (spec 02, V6).
+    the detector measures jumps and dispersion on the graph.
 
     Parameters
     ----------
@@ -295,7 +335,11 @@ def interior_bin_distances_cm(environment) -> NDArray:
     """
     interior = np.asarray(environment.is_track_interior_).ravel()
     centers = np.asarray(environment.place_bin_centers_).ravel()[interior]
-    return np.asarray(environment.get_distances_to_interior_bins(centers[:, None]))
+    distance: NDArray = np.asarray(
+        environment.get_distances_to_interior_bins(centers[:, None]),
+        dtype=np.float64,
+    )
+    return distance
 
 
 def _drop_the_unreachable_row(
@@ -305,12 +349,27 @@ def _drop_the_unreachable_row(
 
     No spike can be assigned to the final row, so it carries exposure that
     nothing offsets; see the module docstring.
+
+    Raises
+    ------
+    ValueError
+        A surviving row holds a NaN or infinite value. The library clips its
+        place fields away from zero, so this means the encoding model or the
+        spikes are broken, and summing windows over it would turn every
+        window the row touches into a silent rejection.
     """
     environment = encoding_model["environment"]
     interior = np.asarray(environment.is_track_interior_).ravel()
+    values = np.asarray(log_likelihood)[:-1]
+    bad_rows = np.flatnonzero(~np.isfinite(values).all(axis=1))
+    if bad_rows.size:
+        raise ValueError(
+            f"{bad_rows.size} rows of the log-likelihood hold non-finite values "
+            f"(first at sample {bad_rows[0]}, t = {np.asarray(time)[bad_rows[0]]} s)."
+        )
     return EpochLikelihood(
         time=np.asarray(time, dtype=np.float64)[:-1],
-        log_likelihood=np.asarray(log_likelihood)[:-1],
+        log_likelihood=values,
         place_bin_centers_cm=np.asarray(environment.place_bin_centers_).ravel()[
             interior
         ],
@@ -364,10 +423,10 @@ def sorted_spikes_epoch_log_likelihood(
 
     log_likelihood = np.asarray(
         predict_sorted_spikes_kde_log_likelihood(
-            time,
-            time,
-            position,
-            spike_times,
+            cast(Any, time),
+            cast(Any, time),
+            cast(Any, position),
+            cast(Any, spike_times),
             **{key: encoding_model[key] for key in SORTED_SPIKES_LIKELIHOOD_KEYS},
             is_local=False,
             disable_progress_bar=True,

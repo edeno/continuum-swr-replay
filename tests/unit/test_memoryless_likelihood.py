@@ -23,8 +23,10 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import
     MemorylessSequenceConfig,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
-    ENCODING_KEY,
     CLUSTERLESS_LIKELIHOOD_KEYS,
+    ENCODING_KEY,
+    EpochLikelihood,
+    _drop_the_unreachable_row,
     clusterless_epoch_log_likelihood,
     interior_bin_distances_cm,
     load_clusterless_encoding_model,
@@ -288,6 +290,31 @@ class TestLoadEncodingModel:
         assert isinstance(loaded["waveform_std"], float)
         assert loaded["waveform_std"] == 24.0
 
+    def test_a_waveform_deviation_that_differs_between_features_raises(
+        self, epoch, tmp_path
+    ):
+        """One bandwidth cannot stand in for several; decoding with the first
+        would be a different model with no message."""
+        model = dict(epoch.encoding_model)
+        model["waveform_std"] = np.array([24.0, 10.0])
+        path = tmp_path / "ragged_detector.pkl"
+        joblib.dump(_StandInDetector({ENCODING_KEY: model}), path)
+
+        with pytest.raises(ValueError, match="waveform_std"):
+            load_clusterless_encoding_model(path)
+
+    def test_an_environment_with_no_place_grid_raises(self, epoch, tmp_path):
+        """Restoring the fitted flag must not vouch for a grid that is not there."""
+        model = dict(epoch.encoding_model)
+        environment = copy.deepcopy(model["environment"])
+        environment.place_bin_centers_ = None  # the class default: never fitted
+        model["environment"] = environment
+        path = tmp_path / "unfitted_detector.pkl"
+        joblib.dump(_StandInDetector({ENCODING_KEY: model}), path)
+
+        with pytest.raises(ValueError, match="place grid"):
+            load_clusterless_encoding_model(path)
+
 
 class TestValidateTimeGrid:
     config = MemorylessSequenceConfig()
@@ -308,6 +335,14 @@ class TestValidateTimeGrid:
     def test_a_grid_too_short_for_one_window_raises(self):
         with pytest.raises(ValueError, match="window"):
             validate_time_grid(np.arange(10) / 500.0, self.config)
+
+    def test_a_grid_of_exactly_one_window_raises(self):
+        """Its final row is dropped, leaving no complete window at all."""
+        with pytest.raises(ValueError, match="final row"):
+            validate_time_grid(np.arange(40) / 500.0, self.config)
+
+    def test_a_grid_of_one_window_plus_the_dropped_row_passes(self):
+        validate_time_grid(np.arange(41) / 500.0, self.config)
 
     def test_float_jitter_within_tolerance_passes(self):
         time = np.cumsum(np.full(100, 1 / 500.0))
@@ -587,6 +622,35 @@ class TestWindowMidpoints:
         midpoints = window_midpoints_s(np.arange(20) / 500.0, self.config)
 
         assert midpoints.shape == (0,)
+
+
+class TestEpochLikelihoodInvariants:
+    def test_times_and_rows_must_agree(self):
+        with pytest.raises(ValueError, match="log_likelihood is"):
+            EpochLikelihood(
+                time=np.arange(5) / 500.0,
+                log_likelihood=np.zeros((4, 3)),
+                place_bin_centers_cm=np.arange(3.0),
+            )
+
+    def test_columns_and_bins_must_agree(self):
+        with pytest.raises(ValueError, match="log_likelihood is"):
+            EpochLikelihood(
+                time=np.arange(4) / 500.0,
+                log_likelihood=np.zeros((4, 3)),
+                place_bin_centers_cm=np.arange(2.0),
+            )
+
+    def test_a_non_finite_row_raises_rather_than_becoming_a_rejection(self, epoch):
+        """Summed into windows, one NaN row would silently reject every window
+        it touches; the decoder is meant never to produce one."""
+        values = np.zeros((6, int(np.sum(epoch.environment.is_track_interior_))))
+        values[2, 0] = np.nan
+
+        with pytest.raises(ValueError, match="non-finite"):
+            _drop_the_unreachable_row(
+                values, np.arange(6) / 500.0, epoch.encoding_model
+            )
 
 
 class TestInteriorBinDistances:

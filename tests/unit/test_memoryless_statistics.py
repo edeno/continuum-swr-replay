@@ -1,5 +1,7 @@
 """Per-window statistics for the memoryless sequence detector."""
 
+import warnings
+
 import numpy as np
 import pytest
 
@@ -100,8 +102,50 @@ class TestNormalizeWindows:
         assert np.isfinite(posterior).all()
         assert posterior[0, 0] > posterior[0, 1]
 
+    def test_a_bin_of_zero_likelihood_gets_zero_mass(self):
+        posterior = normalize_windows(np.array([[0.0, -np.inf, 0.0]]))
+
+        np.testing.assert_allclose(posterior, [[0.5, 0.0, 0.5]])
+
+    @pytest.mark.parametrize(
+        "row",
+        [
+            [np.nan, np.nan, np.nan],
+            [-np.inf, -np.inf, -np.inf],
+            [0.0, np.nan, 1.0],  # one NaN spoils the window
+            [0.0, np.inf, 1.0],  # so does an infinite likelihood
+        ],
+    )
+    def test_a_window_the_decoder_could_not_evaluate_is_all_nan(self, row):
+        """Not uniform: uninformative and unevaluable are different things."""
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            posterior = normalize_windows(np.array([row, [0.0, 1.0, 2.0]]))
+
+        assert np.isnan(posterior[0]).all()
+        np.testing.assert_allclose(posterior[1].sum(), 1.0)
+
 
 class TestCenterAndSpread:
+    def test_the_answer_does_not_depend_on_the_block_size(self, monkeypatch):
+        """The search runs in blocks of windows to bound memory."""
+        from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
+            statistics,
+        )
+
+        rng = np.random.default_rng(0)
+        posterior = rng.random((300, 12))
+        posterior /= posterior.sum(axis=1, keepdims=True)
+        posterior[[5, 77], :] = np.nan
+        distance = straight_track(12)
+        whole = window_center_and_spread(posterior, distance)
+
+        monkeypatch.setattr(statistics, "_WINDOW_CHUNK", 7)
+        blocked = window_center_and_spread(posterior, distance)
+
+        np.testing.assert_array_equal(blocked[0], whole[0])
+        np.testing.assert_allclose(blocked[1], whole[1], rtol=1e-12)
+
     def test_a_posterior_on_one_bin_has_that_center_and_no_spread(self):
         distance = straight_track(5)
         posterior = np.array([[0.0, 0.0, 1.0, 0.0, 0.0]])
@@ -236,6 +280,18 @@ class TestDispersion:
 
         # bins 0 and 4 are 8 cm apart; either endpoint minimizes at 4 cm
         np.testing.assert_allclose(value, 4.0)
+
+    def test_centers_on_disconnected_pieces_of_track_have_no_dispersion(self):
+        """Not inf, which the replay criterion would accept."""
+        distance = straight_track(4)
+        distance[:2, 2:] = np.inf
+        distance[2:, :2] = np.inf
+
+        assert np.isnan(dispersion_cm(np.array([0, 3]), distance))
+        # bins 0 and 1 are 2 cm apart: RMS distance to either endpoint is sqrt(2)
+        np.testing.assert_allclose(
+            dispersion_cm(np.array([0, 1]), distance), np.sqrt(2.0)
+        )
 
     def test_a_stationary_sequence_has_no_dispersion(self):
         value = dispersion_cm(np.array([2, 2, 2]), straight_track(5))

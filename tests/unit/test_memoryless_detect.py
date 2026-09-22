@@ -7,6 +7,9 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import
     MemorylessSequenceConfig,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (
+    SequenceAssembly,
+    WindowDecisions,
+    WindowGates,
     apply_speed_gate,
     assemble_sequences,
     contiguous_runs,
@@ -156,6 +159,73 @@ class TestGateWindows:
         assert gates.jump_below_threshold.tolist() == [False]
         assert gates.has_center.tolist() == [True]
 
+    def test_a_speed_rejection_is_told_apart_from_an_unusable_posterior(self):
+        """Real tracking has gaps; the output must say which windows were lost
+        to speed and which to the decoder, not fold both into one flag."""
+        gates = gate_windows(
+            np.array([5, NO_CENTER, 5]),
+            np.array([2.0, np.nan, 2.0]),
+            np.array([3.0, np.nan, 3.0]),
+            self.config,
+            speed_eligible=np.array([False, True, True]),
+        )
+
+        assert gates.posterior_usable.tolist() == [True, False, True]
+        assert gates.speed_eligible.tolist() == [False, True, True]
+        assert gates.has_center.tolist() == [False, False, True]
+        assert gates.kept.tolist() == [False, False, True]
+
+
+class TestWindowGatesInvariants:
+    def test_arrays_of_different_lengths_raise(self):
+        with pytest.raises(ValueError, match="length"):
+            WindowGates(
+                np.ones(3, bool), np.ones(4, bool), np.ones(3, bool), np.ones(3, bool)
+            )
+
+    def test_kept_cannot_disagree_with_its_parts(self):
+        """``kept`` is derived, so there is no way to store a contradiction."""
+        gates = WindowGates(
+            np.ones(2, bool),
+            np.ones(2, bool),
+            np.ones(2, bool),
+            np.array([True, False]),
+        )
+
+        assert gates.kept.tolist() == [True, False]
+        assert not hasattr(gates, "__dict__") or "kept" not in vars(gates)
+
+    def test_a_center_that_the_gates_deny_raises(self):
+        gates = WindowGates(
+            np.array([True, False]),
+            np.ones(2, bool),
+            np.ones(2, bool),
+            np.ones(2, bool),
+        )
+
+        with pytest.raises(ValueError, match="has_center"):
+            WindowDecisions(np.array([3, 4]), np.zeros(2), np.zeros(2), gates)
+
+
+class TestSequenceAssemblyInvariants:
+    def test_a_sequence_must_be_bounded_by_its_pieces(self):
+        with pytest.raises(ValueError, match="pieces"):
+            SequenceAssembly(
+                runs=np.array([[0, 9]]),
+                pieces=(np.array([0]),),
+                pre_merge_runs=np.array([[0, 5]]),
+                kept=np.ones(10, bool),
+            )
+
+    def test_a_sequence_beyond_the_windows_raises(self):
+        with pytest.raises(ValueError, match="only 5 windows"):
+            SequenceAssembly(
+                runs=np.array([[0, 9]]),
+                pieces=(np.array([0]),),
+                pre_merge_runs=np.array([[0, 9]]),
+                kept=np.ones(5, bool),
+            )
+
 
 class TestContiguousRuns:
     def test_no_windows_kept_gives_no_runs(self):
@@ -272,6 +342,14 @@ class TestMergeRuns:
         )
 
         np.testing.assert_array_equal(merged, [[0, 0], [10, 10]])
+
+    def test_a_run_endpoint_without_a_center_raises(self):
+        """NO_CENTER is -1, which would silently index the last bin and measure
+        a gap that does not exist."""
+        center = np.array([1, NO_CENTER, NO_CENTER, 40, 40])
+
+        with pytest.raises(ValueError, match="no center"):
+            self.merge([[0, 1], [3, 4]], center)
 
     def test_no_runs_gives_no_runs(self):
         merged, pieces = merge_runs(
@@ -639,3 +717,65 @@ class TestDetectCandidateSequences:
         assert found.runs.shape == (0, 2)
         assert found.duration_s.dtype == np.float64
         assert found.is_replay.dtype == np.bool_
+
+    def test_midpoints_out_of_order_raise(self):
+        midpoints = window_times(40)
+        midpoints[10] = 5.0
+
+        with pytest.raises(ValueError, match="increasing"):
+            detect_candidate_sequences(
+                self.moving_posterior(np.arange(40)),
+                midpoints,
+                self.distance,
+                np.zeros(40),
+                self.config,
+            )
+
+    def test_an_unnormalized_posterior_raises(self):
+        """Scaling a row leaves its center alone and inflates its spread, so
+        it would flip the spread gate silently."""
+        posterior = self.moving_posterior(np.arange(40))
+        posterior[3] *= 10.0
+
+        with pytest.raises(ValueError, match="normalize"):
+            detect_candidate_sequences(
+                posterior, window_times(40), self.distance, np.zeros(40), self.config
+            )
+
+    def test_a_window_the_decoder_could_not_evaluate_splits_the_run(self):
+        """It has no center, so it and its predecessor are rejected, and the
+        two halves must each clear the duration filter on their own."""
+        posterior = self.moving_posterior(np.arange(60))
+        posterior[30] = np.nan
+
+        found = detect_candidate_sequences(
+            posterior, window_times(60), self.distance, np.zeros(60), self.config
+        )
+
+        gates = found.decisions.gates
+        assert not gates.posterior_usable[30]
+        assert gates.speed_eligible[30]
+        assert gates.kept[29:31].tolist() == [False, False]
+        np.testing.assert_array_equal(found.pre_merge_runs, [[0, 28], [31, 59]])
+        # the gap is 8 ms and 6 cm, so the merge rule bridges it again
+        np.testing.assert_array_equal(found.runs, [[0, 59]])
+        assert [piece.tolist() for piece in found.pieces] == [[0, 1]]
+
+    def test_the_result_carries_what_produced_it(self):
+        found = detect_candidate_sequences(
+            self.moving_posterior(np.arange(40)),
+            window_times(40),
+            self.distance,
+            np.zeros(40),
+            self.config,
+        )
+
+        assert found.config is self.config
+        np.testing.assert_allclose(
+            found.duration_s,
+            found.midpoint_s[found.runs[:, 1]] - found.midpoint_s[found.runs[:, 0]],
+        )
+        np.testing.assert_array_equal(
+            found.is_replay,
+            replay_mask(found.duration_s, found.dispersion_cm, found.config),
+        )

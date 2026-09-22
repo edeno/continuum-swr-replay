@@ -7,16 +7,16 @@ window, and the dispersion of a whole sequence.
 
 Distances are measured on the track graph, not as differences of the linear
 coordinate, because two bins that are adjacent in linear position can sit on
-different arms (spec 02, V6). The center is the discrete Fréchet mean over real
-bins under that distance, and the spread is the square root of the minimized
-expected squared distance (D4). On a straight segment with a fine grid both
-approach the ordinary center of mass and standard deviation.
+different arms. The center is the discrete Fréchet mean over real bins under
+that distance, and the spread is the square root of the minimized expected
+squared distance. On a straight segment with a fine grid both approach the
+ordinary center of mass and standard deviation.
 
 A missing center is carried as the sentinel ``NO_CENTER`` rather than NaN, so
 centers stay an integer index into the bins.
 
-Deviation numbers (V6, V8, V10 ...), decision numbers (D1 ...) and the
-data-flow steps cited below are in ``docs/design/replay_detection_comparison/02-memoryless-sequence.md``.
+The design, including every departure from the original, is in
+``docs/design/replay_detection_comparison/02-memoryless-sequence.md``.
 """
 
 import numpy as np
@@ -33,6 +33,14 @@ __all__ = [
 
 NO_CENTER = -1
 """Center index of a window with no usable posterior, or one the speed gate rejected."""
+
+_WINDOW_CHUNK = 4096
+"""Windows per block in the Fréchet-mean search.
+
+The search holds three ``(n_windows, n_bins)`` float64 arrays at once. Over a
+30-minute epoch at a 4 ms stride that is 450 000 windows, so it runs in
+blocks; the result does not depend on the block size.
+"""
 
 
 def aggregate_windows(
@@ -80,7 +88,8 @@ def aggregate_windows(
     cumulative = np.zeros((n_time + 1, n_bins), dtype=np.float64)
     np.cumsum(values, axis=0, out=cumulative[1:])
     starts = np.arange(n_windows) * stride_n_samples
-    return cumulative[starts + window_n_samples] - cumulative[starts]
+    windows: NDArray = cumulative[starts + window_n_samples] - cumulative[starts]
+    return windows
 
 
 def normalize_windows(window_log_likelihood: NDArray) -> NDArray:
@@ -93,18 +102,28 @@ def normalize_windows(window_log_likelihood: NDArray) -> NDArray:
     Returns
     -------
     posterior : ndarray, shape (n_windows, n_bins)
-        Each row sums to one. A row whose values are all non-finite stays
-        non-finite rather than becoming a uniform posterior.
+        Each usable row sums to one. A row is usable when it holds at least
+        one finite value and no NaN or ``+inf``; ``-inf`` entries are bins of
+        zero likelihood and get zero mass. Any other row is returned as all
+        NaN rather than as a uniform posterior, so a window the decoder could
+        not evaluate is never mistaken for one it found uninformative.
 
     """
     values = np.asarray(window_log_likelihood, dtype=np.float64)
+    finite = np.isfinite(values)
+    usable = finite.any(axis=1) & ~(np.isnan(values) | np.isposinf(values)).any(axis=1)
+
+    posterior = np.full(values.shape, np.nan, dtype=np.float64)
+    if not usable.any():
+        return posterior
+
+    rows = values[usable]
     # subtract the row maximum before exponentiating, so a large log-likelihood
     # does not overflow; the prior is uniform, so this cancels in the ratio
-    shifted = values - np.nanmax(values, axis=1, keepdims=True)
+    shifted = rows - np.max(np.where(finite[usable], rows, -np.inf), axis=1)[:, None]
     weights = np.exp(shifted)
-    total = weights.sum(axis=1, keepdims=True)
-    with np.errstate(invalid="ignore", divide="ignore"):
-        return weights / total
+    posterior[usable] = weights / weights.sum(axis=1, keepdims=True)
+    return posterior
 
 
 def window_center_and_spread(
@@ -120,8 +139,7 @@ def window_center_and_spread(
     Parameters
     ----------
     posterior : ndarray, shape (n_windows, n_bins)
-        Rows sum to one. Junction placeholder bins must already be excluded
-        (spec 02, V8).
+        Rows sum to one. Junction placeholder bins must already be excluded.
     bin_distance_cm : ndarray, shape (n_bins, n_bins)
         Track-graph distance between bin centers.
 
@@ -155,19 +173,25 @@ def window_center_and_spread(
     # otherwise be nan and send argmin to the first nan rather than to a center.
     squared = distance**2
     reaches = np.isfinite(squared)
-    cost = posterior[usable] @ np.where(reaches, squared, 0.0)
+    reachable_cost = np.where(reaches, squared, 0.0)
+    blocks = (~reaches).astype(np.float64)
 
-    # a bin can only be the center if every bin holding mass can reach it
-    holds_mass = posterior[usable] > 0.0
-    reachable = (holds_mass.astype(np.float64) @ (~reaches).astype(np.float64)) == 0.0
-    has_center = reachable.any(axis=1)
+    rows = np.flatnonzero(usable)
+    for start in range(0, rows.size, _WINDOW_CHUNK):
+        block = rows[start : start + _WINDOW_CHUNK]
+        mass = posterior[block]
+        cost = mass @ reachable_cost
 
-    best = np.argmin(np.where(reachable, cost, np.inf), axis=1)
-    found = np.flatnonzero(usable)[has_center]
-    center[found] = best[has_center]
-    spread[found] = np.sqrt(
-        np.take_along_axis(cost[has_center], best[has_center, None], axis=1).ravel()
-    )
+        # a bin can only be the center if every bin holding mass can reach it
+        reachable = ((mass > 0.0).astype(np.float64) @ blocks) == 0.0
+        has_center = reachable.any(axis=1)
+
+        best = np.argmin(np.where(reachable, cost, np.inf), axis=1)
+        found = block[has_center]
+        center[found] = best[has_center]
+        spread[found] = np.sqrt(
+            np.take_along_axis(cost[has_center], best[has_center, None], axis=1).ravel()
+        )
     return center, spread
 
 
@@ -176,10 +200,10 @@ def forward_jumps_cm(center_index: NDArray, bin_distance_cm: NDArray) -> NDArray
 
     Window ``k`` carries the jump to window ``k + 1``, and the last window
     repeats its predecessor's, matching the reference driver's
-    ``jumps = [jumps; jumps(end)]`` (spec 02, step 3). A window whose successor
-    has no center therefore has no jump, which is why the speed gate must blank
-    centers before this is called: a sequence ends one window before the first
-    speed-rejected window.
+    ``jumps = [jumps; jumps(end)]`` (``load_replayEvents_cellIDshuffle.m``,
+    line 82). A window whose successor has no center therefore has no jump,
+    which is why the speed gate must blank centers before this is called: a
+    sequence ends one window before the first speed-rejected window.
 
     Parameters
     ----------
@@ -211,8 +235,10 @@ def dispersion_cm(center_index: NDArray, bin_distance_cm: NDArray) -> float:
     """How far a sequence's centers spread around their own center.
 
     The same minimization as :func:`window_center_and_spread`, with the
-    sequence's retained centers weighted equally. Windows with no center, such
-    as those inside a merged gap, take no part.
+    sequence's retained centers weighted equally: only bins that every
+    retained center can reach are candidates for the center, and the
+    dispersion is the RMS distance to the best of them. Windows with no
+    center, such as those inside a merged gap, take no part.
 
     Parameters
     ----------
@@ -222,7 +248,8 @@ def dispersion_cm(center_index: NDArray, bin_distance_cm: NDArray) -> float:
     Returns
     -------
     dispersion_cm : float
-        ``nan`` when no window has a center.
+        ``nan`` when no window has a center, or when the centers lie on
+        disconnected pieces of the track so that no bin can reach them all.
 
     """
     center = np.asarray(center_index, dtype=int)
@@ -230,5 +257,9 @@ def dispersion_cm(center_index: NDArray, bin_distance_cm: NDArray) -> float:
     present = center[center != NO_CENTER]
     if present.size == 0:
         return float("nan")
-    cost = (distance[present] ** 2).mean(axis=0)
+    squared = distance[present] ** 2
+    reachable = np.isfinite(squared).all(axis=0)
+    if not reachable.any():
+        return float("nan")
+    cost = squared[:, reachable].mean(axis=0)
     return float(np.sqrt(cost.min()))

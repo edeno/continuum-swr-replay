@@ -4,6 +4,9 @@ import dataclasses
 
 import pytest
 
+from continuum_swr_replay.analysis.constants import (
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import (
     MemorylessSequenceConfig,
 )
@@ -26,13 +29,21 @@ def test_adapted_settings_are_ours_not_theirs():
     """Two settings depart from the paper and spec 02 says why."""
     config = MemorylessSequenceConfig()
 
-    assert config.stride_s == 0.004  # V10: 5 ms is 2.5 samples at 500 Hz
-    assert config.speed_threshold_cm_per_s == 4.0  # D3/V12: theirs is 5
-    assert config.spread_threshold_cm == 10.0  # V9: adapted, not equivalent
+    assert config.stride_s == 0.004  # 5 ms is 2.5 samples at 500 Hz
+    assert config.speed_threshold_cm_per_s == 4.0  # theirs is 5
+    assert config.spread_threshold_cm == 10.0  # adapted, not equivalent
+
+
+def test_the_speed_threshold_is_the_project_s_immobility_rule():
+    """One rule for every cohort, read from one constant rather than copied."""
+    assert (
+        MemorylessSequenceConfig().speed_threshold_cm_per_s
+        == DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
+    )
 
 
 def test_bin_counts_follow_the_stride():
-    """V10: a threshold in windows must be derived, never carried over."""
+    """A threshold in windows must be derived, never carried over."""
     config = MemorylessSequenceConfig(sampling_frequency=500.0)
 
     assert config.window_n_samples == 40
@@ -74,9 +85,12 @@ def test_config_is_frozen():
         ("sampling_frequency", 0.0),
         ("place_bin_size_cm", -1.0),
         ("minimum_duration_s", -0.1),
+        ("window_duration_s", float("inf")),
+        ("jump_threshold_cm", float("nan")),
+        ("jump_threshold_cm", True),
     ],
 )
-def test_non_positive_settings_raise(field, value):
+def test_non_positive_or_non_finite_settings_raise(field, value):
     with pytest.raises(ValueError, match=field):
         MemorylessSequenceConfig(**{field: value})
 
@@ -90,3 +104,29 @@ def test_a_stride_longer_than_the_window_raises():
 def test_a_window_that_is_not_a_whole_number_of_samples_raises():
     with pytest.raises(ValueError, match="window_duration_s"):
         MemorylessSequenceConfig(window_duration_s=0.081, sampling_frequency=500.0)
+
+
+def test_the_reference_stride_on_the_project_grid_raises():
+    """5 ms is 2.5 samples at 500 Hz; the reason the stride was adapted."""
+    with pytest.raises(ValueError, match="stride_s"):
+        MemorylessSequenceConfig(stride_s=0.005, sampling_frequency=500.0)
+
+
+@pytest.mark.parametrize(
+    ("minimum_duration_s", "stride_s"),
+    [
+        (0.101, 0.004),  # 25.25 strides; round() would make it 100 ms
+        (0.100, 0.003),  # 33.3 strides; round() would make it 99 ms
+        (0.001, 0.004),  # a quarter stride; round() would make it 0
+    ],
+)
+def test_a_minimum_duration_that_is_not_a_whole_number_of_strides_raises(
+    minimum_duration_s, stride_s
+):
+    """The constant that would silently become another threshold."""
+    with pytest.raises(ValueError, match="minimum_duration_s"):
+        MemorylessSequenceConfig(
+            minimum_duration_s=minimum_duration_s,
+            stride_s=stride_s,
+            sampling_frequency=1000.0,
+        )

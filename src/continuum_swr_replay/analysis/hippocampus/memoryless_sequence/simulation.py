@@ -12,6 +12,7 @@ ends one window earlier still, so an event placed too near the edge measures
 the speed gate rather than whatever it was meant to measure.
 """
 
+import math
 from dataclasses import dataclass
 
 import numpy as np
@@ -39,10 +40,13 @@ class InjectedReplay:
     start_cm : float
         Where the represented path begins.
     path_cm : float
-        How far it travels. Its speed is this over ``duration_s``.
+        How far it travels, signed: negative runs toward lower positions. Its
+        speed is this over ``duration_s``.
     duration_s : float
+        Positive.
     peak_rate_hz : float
-        Firing rate of a cell whose field the path passes over exactly.
+        Firing rate of a cell whose field the path passes over exactly. Not
+        negative.
     at_s : float
         When the event begins.
     seed : int
@@ -56,6 +60,25 @@ class InjectedReplay:
     at_s: float
     seed: int = 0
 
+    def __post_init__(self) -> None:
+        for field in ("start_cm", "path_cm", "duration_s", "peak_rate_hz", "at_s"):
+            if not math.isfinite(getattr(self, field)):
+                raise ValueError(
+                    f"{field} must be finite, got {getattr(self, field)!r}."
+                )
+        if self.duration_s <= 0:
+            raise ValueError(f"duration_s must be positive, got {self.duration_s}.")
+        if self.peak_rate_hz < 0:
+            raise ValueError(
+                f"peak_rate_hz must not be negative, got {self.peak_rate_hz}."
+            )
+        if isinstance(self.seed, bool) or not isinstance(self.seed, int | np.integer):
+            raise ValueError(f"seed must be an integer, got {self.seed!r}.")
+
+    @property
+    def end_s(self) -> float:
+        return self.at_s + self.duration_s
+
 
 def place_field_means(n_neurons: int, track_height_cm: float) -> NDArray:
     """Field centers tiled evenly along the track."""
@@ -65,31 +88,29 @@ def place_field_means(n_neurons: int, track_height_cm: float) -> NDArray:
 def inject_replay(
     spike_times: list[NDArray],
     place_field_means: NDArray,
-    start_cm: float,
-    path_cm: float,
-    duration_s: float,
-    peak_rate_hz: float,
-    at_s: float,
+    replay: InjectedReplay,
     sampling_frequency: float,
-    seed: int = 0,
 ) -> tuple[list[NDArray], tuple[float, float]]:
     """Add a replay that travels a given distance in a given time.
 
-    Each cell fires as a Poisson process whose rate follows its own place
-    field, read at the position the replay represents at that moment. Spikes
-    already inside the event's window are removed first, so the event is not
-    read on top of whatever the recording was doing.
+    Each cell fires at a rate that follows its own place field, read at the
+    position the replay represents at that moment. Spikes already inside the
+    event's window are removed first, so the event is not read on top of
+    whatever the recording was doing.
+
+    Firing is drawn once per sample: a cell fires at a sample with probability
+    ``rate * step``, so it fires at most once per sample. That is a Poisson
+    process only while ``rate * step`` is small, and it is refused outright
+    when the probability would saturate.
 
     Parameters
     ----------
     spike_times : list of ndarray
         One array per cell. Not modified.
     place_field_means : ndarray, shape (n_neurons,)
-    start_cm, path_cm, duration_s, peak_rate_hz, at_s : float
-        The replay, as in :class:`InjectedReplay`.
+    replay : InjectedReplay
     sampling_frequency : float
         Rate at which the trajectory is sampled.
-    seed : int
 
     Returns
     -------
@@ -98,13 +119,27 @@ def inject_replay(
     bounds : tuple of float
         When the event begins and ends.
 
-    """
-    n_samples = max(2, int(duration_s * sampling_frequency))
-    step_s = duration_s / (n_samples - 1)
-    at = at_s + np.arange(n_samples) * step_s
-    position_cm = start_cm + path_cm * np.arange(n_samples) / (n_samples - 1)
+    Raises
+    ------
+    ValueError
+        ``peak_rate_hz / sampling_frequency`` is 1 or more, so the per-sample
+        firing probability would saturate and the rate would silently be
+        lower than asked.
 
-    rate_hz = peak_rate_hz * np.exp(
+    """
+    n_samples = max(2, int(replay.duration_s * sampling_frequency))
+    step_s = replay.duration_s / (n_samples - 1)
+    if replay.peak_rate_hz * step_s >= 1.0:
+        raise ValueError(
+            f"A peak rate of {replay.peak_rate_hz} Hz sampled every {step_s} s "
+            "would fire at every sample; raise the sampling frequency."
+        )
+    at = replay.at_s + np.arange(n_samples) * step_s
+    position_cm = replay.start_cm + replay.path_cm * np.arange(n_samples) / (
+        n_samples - 1
+    )
+
+    rate_hz = replay.peak_rate_hz * np.exp(
         -0.5
         * (
             (position_cm[:, None] - np.asarray(place_field_means)[None, :])
@@ -112,7 +147,7 @@ def inject_replay(
         )
         ** 2
     )
-    fired = np.random.default_rng(seed).random(rate_hz.shape) < rate_hz * step_s
+    fired = np.random.default_rng(replay.seed).random(rate_hz.shape) < rate_hz * step_s
 
     injected = []
     for neuron, neuron_times in enumerate(spike_times):
@@ -133,6 +168,7 @@ def immobile_intervals(
     ----------
     time : ndarray, shape (n_time,)
     speed_cm_per_s : ndarray, shape (n_time,)
+        A NaN speed does not establish stillness, so it breaks a stretch.
     threshold_cm_per_s : float
     minimum_duration_s : float
 
