@@ -981,4 +981,5 @@ Carried deliberately; each must be checked against real data before results are 
    to our state-space cohort as well, since both read one encoding model. Two remedies
    are open: leave-event-out encoding, dropping encoding spikes inside the candidate's
    decoding support from the kernel sums; or the running-only refit spec 03 already
-   defers. Decide before any non-SWR fraction is quoted.
+   defers. **Decided 2026-09-22: accepted for now.** Both cohorts carry the asymmetry
+   equally; revisit if a non-SWR fraction becomes a headline claim.
