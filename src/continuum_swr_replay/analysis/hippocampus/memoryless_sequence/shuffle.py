@@ -37,6 +37,7 @@ section "Clusterless shuffle: permute encoding pairs".
 import zlib
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -356,8 +357,8 @@ def _decode_draws(
             per_spike = np.asarray(
                 block_estimate_log_joint_mark_intensity(
                     decoding_marks,
-                    marks,
-                    waveform_std,
+                    cast(Any, marks),
+                    cast(Any, waveform_std),
                     encoding_model["occupancy"],
                     encoding_model["mean_rates"][electrode],
                     position_distance,
@@ -437,7 +438,7 @@ def candidate_window_log_likelihood(
             return None
         return _validated_permutation(permutations[electrode], n, electrode)
 
-    return _decode_draws(
+    windows = _decode_draws(
         first_window,
         last_window,
         time,
@@ -447,7 +448,8 @@ def candidate_window_log_likelihood(
         config,
         n_draws=1,
         permutation_for=permutation_for,
-    )[0]
+    )
+    return np.asarray(windows[0])
 
 
 def shuffle_candidate(
