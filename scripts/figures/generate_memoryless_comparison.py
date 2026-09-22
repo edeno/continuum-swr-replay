@@ -604,7 +604,7 @@ def plot_criterion_space(ax, decoded: dict, config: MemorylessSequenceConfig) ->
         (0, "continuous replay\nfound", VERMILION, True, (10, 6)),
         (7, "short replay\nfound", VERMILION, True, (14, 24)),
         (6, "short path\nmissed", BLUE, False, (48, 22)),
-        (5, "remote place\ndeclined", PURPLE, False, (95, -4)),
+        (5, "remote place\ndeclined", PURPLE, False, (88, 6)),
     )
     for event, name, color, filled, offset in annotated:
         event_start, event_end = decoded["event_times"][event]
@@ -644,12 +644,8 @@ def plot_criterion_space(ax, decoded: dict, config: MemorylessSequenceConfig) ->
     ax.set_xlabel("event duration (s)")
     ax.set_ylabel("dispersion (cm)")
     ax.set_title(
-        f"every one of the {len(candidates.runs)} candidate sequences the "
-        f"{SLIDING} built. Only {int(accepted.sum())} reach the shaded box.\n"
-        "Dispersion is how far the decoded path spreads about its own centre, so "
-        "the box means lasted long enough and travelled far enough.",
-        fontsize=5.5,
-        linespacing=1.4,
+        f"all {len(candidates.runs)} candidates; {int(accepted.sum())} accepted",
+        fontsize=6,
     )
     ax.text(
         config.minimum_duration_s + 0.03,
@@ -691,17 +687,15 @@ def make_figure(n_neurons: int, config: MemorylessSequenceConfig):
         (
             0,
             "continuous replay",
-            f"found, but {duration_ratio(decoded, 0):.1f}x too long:\n"
-            f"{100 * local_fraction_of_event(decoded, 0):.0f}% of it is the animal's own place",
+            f"found, {duration_ratio(decoded, 0):.1f}x too long",
         ),
         (
             7,
             "short replay, 80 ms",
-            f"found, but {duration_ratio(decoded, 7):.1f}x too long:\n"
-            "the window sets a floor under any duration",
+            f"found, {duration_ratio(decoded, 7):.1f}x too long",
         ),
-        (6, "short path, 30 cm", "missed: too little dispersion"),
-        (5, "remote place, held still", "declined: too little dispersion"),
+        (6, "short path, 30 cm", "missed"),
+        (5, "remote place, held still", "declined"),
     )
     zooms = []
     for column, (event, name, outcome) in enumerate(outcomes):
@@ -720,17 +714,52 @@ def make_figure(n_neurons: int, config: MemorylessSequenceConfig):
     label_panels(zooms, labels=["b", "c", "d", "e"], xpos=-0.10, ypos=1.34)
     label_panels([ax_criteria], labels=["f"], xpos=-0.20, ypos=1.02)
 
-    fig.suptitle(
-        "Two replay detectors on one simulated recording with known events\n"
-        "Sliding-window detector: each 80 ms window is decoded on its own, with no "
-        "model of how one window follows the next,\nand windows are kept or dropped "
-        "on the spread of their posterior and the jump to the next window.\n"
-        "Events marked * are ones we wrote into the spike trains ourselves; the rest\n"
-        "come with the simulation.",
-        fontsize=6.5,
-        linespacing=1.6,
-    )
     return fig, decoded
+
+
+def write_caption(decoded: dict, config: MemorylessSequenceConfig, path: Path) -> None:
+    """Save the caption beside the figure, with its numbers read from the data."""
+    candidates = decoded["candidates"]
+    accepted = int(candidates.is_replay.sum())
+    path.write_text(
+        f"""# {path.stem}
+
+**Two replay detectors on one simulated recording with known events.** The
+simulation carries a continuous outbound replay, a fragmented replay, a
+continuous inbound replay and a silent stretch; a remote stationary event, a
+30 cm replay and an 80 ms replay were written into the spike trains here and
+are marked with a star. Both detectors read one encoding model, fitted once.
+The sliding-window detector decodes each 80 ms window on its own, with no model
+of how one window follows the next, and keeps or drops windows on the spread of
+their posterior and on the jump to the next window.
+
+**(a)** The whole recording. Green is where the animal is; dots are the decoded
+place of each window, kept or rejected; yellow marks a labeled event; bars below
+the axis are the events each detector reports and the candidates the
+sliding-window detector rejected.
+
+**(b-e)** Four events, with the posterior in grey. The sliding-window detector
+finds the continuous replay and gives it
+{duration_ratio(decoded, 0):.1f} times its true length, because
+{100 * local_fraction_of_event(decoded, 0):.0f}% of the event it reports is the
+animal's own place, absorbed by the merge rule. It also finds the 80 ms replay
+and reports it {duration_ratio(decoded, 7):.1f} times too long, this time with
+no local coding in it at all: the window alone puts a floor under any duration
+it can report. It misses the 30 cm replay and declines the remote stationary
+event, both for too little dispersion. The state-space detector reports all
+four with bounds within about 20 ms.
+
+**(f)** Every candidate sequence the sliding-window detector built, against the
+two criteria that accept one. Dispersion is how far the decoded path spreads
+about its own centre, so the shaded box means an event lasted long enough and
+travelled far enough. {accepted} of {len(candidates.runs)} reach it.
+
+**Caveats.** One simulation, sorted spikes, a linear track, no artifacts. The
+significance test the published method requires is not applied here.
+
+Produced by `scripts/figures/generate_memoryless_comparison.py`.
+"""
+    )
 
 
 def main() -> None:
@@ -747,6 +776,7 @@ def main() -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     save_figure("memoryless_comparison", base_dir=args.output_dir)
     plt.close(fig)
+    write_caption(decoded, config, args.output_dir / "memoryless_comparison_caption.md")
 
     candidates = decoded["candidates"]
     print(
