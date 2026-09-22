@@ -655,7 +655,16 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
     # the published replay definition applied to the state-space detector's
     # own events, by path, so the dispersion floor can be read off the file
     by_path = (
-        table.groupby("path_cm")[["sliding_matches", "state_space_replay_matches"]]
+        # before the shuffle, sliding_matches_before_shuffle is the like-for-like
+        # partner of state_space_replay_matches: both are the duration and
+        # dispersion criteria alone
+        table.groupby("path_cm")[
+            [
+                "sliding_matches",
+                "sliding_matches_before_shuffle",
+                "state_space_replay_matches",
+            ]
+        ]
         .mean()
         .join(
             table[table.state_space_matches]
