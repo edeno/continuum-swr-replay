@@ -187,6 +187,55 @@ Report the comparator cohort both before and after this filter; retain our nativ
 state-space definition. No component model or general detector-calibration study is
 required to implement this adaptation.
 
+## What the port does on simulated data
+
+Run on the simulation this project's Figure 1 uses to explain the state-space model
+(`scripts/figures/generate_memoryless_comparison.py`, pinned by
+`tests/integration/test_memoryless_figure_one_simulation.py`). The simulation labels a
+continuous outbound replay, a fragmented replay, a continuous inbound replay, a silent
+stretch and an unmanipulated pause; a remote stationary event is added here, because the
+package simulates no such case.
+
+**It detects the right events and mis-times them.** Of 29 candidate sequences over 65 s,
+exactly two meet both replay criteria, and those two are the continuous replays. No
+silent, fragmented, local or remote stationary event is accepted. But the two accepted
+events run 1.58 s and 1.18 s for replays that are 0.27 s: 83% and 77% of each detected
+interval lies outside the labeled event, and about three quarters of their windows decode
+the animal's own position rather than a replayed one.
+
+**Why.** The method scores a window on posterior spread and on the jump to the next
+window, and carries no hypothesis that competes with a replay for a window. Local coding
+during immobility is smooth, narrow and slow, so it passes both criteria. The merge rule
+then does most of the work: with merging disabled the same data gives 1.4x and 2.1x
+inflation instead of 5.8x and 4.3x. Absorption needs a travelling event *spatially near*
+the stationary one — here the replay begins at the animal's own place, which is the usual
+geometry for awake replay. The added remote stationary event has no travelling neighbour,
+and is declined for going nowhere; that is the method working as designed, since extended
+trajectories are its stated target.
+
+**What this is not.** It is not an artifact of the adaptations. The finding is unchanged
+under the original's running-only encoding convention, and for any spread cutoff from
+7.5 cm to the 20 cm the reference's own 1D branch uses. The original contains no
+local/non-local comparison, no distance-from-animal criterion, no minimum spike or active
+cell count, and no ripple or burst trigger; it decodes every speed-eligible bin; and the
+merge is ported unchanged. `load_replayEvents_cm.m:218` computes a `startDistFromRat` and
+no driver gates on it.
+
+**Hedges to carry with the numbers.**
+
+- The simulation's place fields are driven by position alone, so its immobile pauses
+  emit running-strength local coding. Real immobility is sparser and would break the
+  local stretch more often. Treat the magnitudes as an upper bound and the mechanism as
+  the finding.
+- Read the spread cutoff as the strict 2D-equivalent (about 4-5 cm) and the inflation
+  falls to 1.2-1.7x. The plateau from 7.5 to 20 cm is what makes the result robust, not
+  any single choice.
+- These are pre-shuffle candidates. The encoding-pair shuffle would not rescue the
+  boundaries: a sequence that is mostly stationary local coding has *low* mean spread and
+  *low* mean jump, so it passes such a test more easily than a travelling replay does.
+- One simulation is not a calibration study. What transfers is that boundary agreement,
+  not event count, is where the two procedures should be expected to differ.
+
 ## Decisions register
 
 Decisions taken during design, with the reasoning, so the methods section can state them
@@ -226,7 +275,7 @@ not a reassurance.
 | **V6** | Euclidean distance for jump and dispersion | Track-graph distance | On a linearized branched track, `abs(Δlinear_position)` is not the distance between two places — bins on different arms can be adjacent in linear coordinate | Using linear differences would under-count jumps at arm boundaries, producing spuriously smooth and spuriously long sequences. Track distance avoids this; it also makes our jumps non-comparable in absolute terms to an open-field jump |
 | **V7** | Posterior COM | Discrete Fréchet mean over track distance (D4) | Linearized-coordinate COM does not respect branching | On straight segments the center is quantized to a bin; near junctions geometry also changes it |
 | **V8** | Unvisited arena bins excluded | Junction placeholder bins (`edge_id == -1`) excluded before normalization | These bins are linearization artifacts from `edge_spacing > 0`, not places. In `get_track_grid` the `-1` rows are built from `place_bin_centers[~is_track_interior]`, so they are non-interior by construction and the primary likelihood path never returns them; the guard matters on the `results.nc` path, where `log_likelihood` is re-expanded to every `state_bins` column | If not excluded, probability mass lands on non-places and drags the center toward gaps. Same hazard `map_estimate_to_arm` guards against |
-| **V9** | Spread is a 2D product moment (area-like, bin units) | Graph-distance RMS spread (a length, cm) | Provides a spread measure on our geometry, approximating SD on a straight segment | The 10 cm cutoff is an adapted choice prioritized in the later threshold-robustness study (04); its robustness is not established by the initial report, and these spreads are not numerically comparable to the paper's 2D spreads. It also caps detectable replay speed: a window whose spread must stay below the cutoff cannot span much more than `spread_threshold * sqrt(12)` of track, about 35 cm, which over an 80 ms window is roughly 430 cm/s. On `non_local_detector`'s simulated continuous replay the detector returns one accepted sequence at 375 cm/s and breaks the same trajectory into rejected pieces at 450 cm/s and above (`tests/integration/test_memoryless_simulated_replay.py`). Faster trajectories are still decoded; they stop surviving as sequences. Whether our events fall below that bound is unmeasured, and a cohort difference attributed to temporal inference could instead be this cap |
+| **V9** | Spread is a 2D product moment (area-like, bin units) | Graph-distance RMS spread (a length, cm) | Provides a spread measure on our geometry, approximating SD on a straight segment | The 10 cm cutoff is an adapted choice prioritized in the later threshold-robustness study (04); its robustness is not established by the initial report, and these spreads are not numerically comparable to the paper's 2D spreads. It also caps detectable replay speed: a window whose spread must stay below the cutoff cannot span much more than `spread_threshold * sqrt(12)` of track, about 35 cm, which over an 80 ms window is roughly 430 cm/s. On `non_local_detector`'s simulated continuous replay the detector returns one accepted sequence at 375 cm/s and breaks the same trajectory into rejected pieces at 450 cm/s and above (`tests/integration/test_memoryless_simulated_replay.py`). Faster trajectories are still decoded; they stop surviving as sequences. Whether our events fall below that bound is unmeasured, and a cohort difference attributed to temporal inference could instead be this cap. Note the direction of the adaptation: the helper library's own 1D branch (`compute_imageSpread.m:20-30`) computes the same COM-based RMS this port does, and `load_replayEvents_cm.m:32` gates it at **20 cm**, so 10 cm is twice as strict as the only 1D precedent in the reference. That branch also uses a 50 ms duration and a `0.4 * maze_size` jump, both looser than what this port takes from the paper |
 
 ### Forced by our sampling grid
 
@@ -264,7 +313,7 @@ calculations. Do not imply that robustness has been established before that stud
 | Ripple merge gap | merge if < 50 ms | `eventMergeThr = 0` (no merge) | — | N/A (V13) |
 | Spike-density smoothing | 80 ms SD | 100 ms SD | — | N/A (bursts not ported) |
 | Rate-map smoothing | 8 cm SD Gaussian | — | `compute_rateMap.m` passes `numSpatialBins_smoothing/binSize = 4` to `setUp_gaussFilt`, which uses it as the `mvnpdf` *covariance*: SD 2 bins = 4 cm | N/A (V1: no rate maps) |
-| Sequence / replay duration | 100 ms | 100 ms | 50 ms in the commented "John's criterion" block | 100 ms |
+| Sequence / replay duration | 100 ms | 100 ms | 50 ms, in the **live** `spatialDim==1` branch of `load_replayEvents_cm.m:38-39`, not only in the commented "John's criterion" block | 100 ms, following the paper |
 | Significance | Required for replay | Detection driver filters by both p-values, with the bugs noted above; downstream usage varies | `load_ind_replayEvents` alone selects duration/dispersion candidates | Encoding-pair shuffle adaptation, with candidates retained for comparison (D2/V2) |
 
 ## Architecture
