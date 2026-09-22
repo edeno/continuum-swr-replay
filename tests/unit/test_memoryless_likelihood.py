@@ -24,6 +24,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
     ENCODING_KEY,
     EpochLikelihood,
     _drop_the_unreachable_row,
+    check_marks_match_encoding,
     clusterless_epoch_log_likelihood,
     interior_bin_distances_cm,
     load_clusterless_encoding_model,
@@ -252,9 +253,7 @@ class TestValidateTimeGrid:
 
     def test_a_different_rate_on_a_recording_clock_raises(self):
         with pytest.raises(ValueError, match="sampled every"):
-            validate_time_grid(
-                self.UNIX_START_S + np.arange(5000) / 250.0, self.config
-            )
+            validate_time_grid(self.UNIX_START_S + np.arange(5000) / 250.0, self.config)
 
 
 class TestEpochLogLikelihood:
@@ -597,3 +596,63 @@ class TestInteriorBinDistances:
         linear_gap = np.abs(centers[:, None] - centers[None, :])
 
         assert (distance > linear_gap + 1e-9).any()
+
+
+class TestMarksMatchEncoding:
+    """The marks decoded must be the marks the encoding model was fitted on.
+
+    The runner reloads marks through ``load_data`` long after the decode. A
+    change to the spike loader, or electrodes in another order, would decode
+    the wrong marks against the right model without any error; the library
+    only checks the electrode count.
+    """
+
+    def test_the_marks_the_model_was_fitted_on_pass(self, epoch):
+        check_marks_match_encoding(
+            epoch.encoding_model, epoch.spike_times, epoch.spike_waveform_features
+        )
+
+    def test_electrodes_in_another_order_are_refused(self, epoch):
+        order = [1, 0, 2]
+        with pytest.raises(ValueError, match="Electrode 0"):
+            check_marks_match_encoding(
+                epoch.encoding_model,
+                [epoch.spike_times[i] for i in order],
+                [epoch.spike_waveform_features[i] for i in order],
+            )
+
+    def test_a_changed_mark_is_refused(self, epoch):
+        features = [np.array(f) for f in epoch.spike_waveform_features]
+        features[2][5, 0] += 1.0
+
+        with pytest.raises(ValueError, match="Electrode 2"):
+            check_marks_match_encoding(
+                epoch.encoding_model, epoch.spike_times, features
+            )
+
+    def test_a_missing_electrode_is_refused(self, epoch):
+        with pytest.raises(ValueError, match="electrodes"):
+            check_marks_match_encoding(
+                epoch.encoding_model,
+                epoch.spike_times[:2],
+                epoch.spike_waveform_features[:2],
+            )
+
+    def test_a_different_number_of_features_is_refused(self, epoch):
+        features = list(epoch.spike_waveform_features)
+        features[1] = features[1][:, :1]
+
+        with pytest.raises(ValueError, match="features"):
+            check_marks_match_encoding(
+                epoch.encoding_model, epoch.spike_times, features
+            )
+
+    def test_extra_spikes_beyond_the_encoding_ones_are_allowed(self, epoch):
+        """The encoding set is the training span's spikes, a subset."""
+        times = [np.append(t, t[-1] + 1.0) for t in epoch.spike_times]
+        features = [
+            np.vstack([f, np.full((1, f.shape[1]), 999.0)])
+            for f in epoch.spike_waveform_features
+        ]
+
+        check_marks_match_encoding(epoch.encoding_model, times, features)

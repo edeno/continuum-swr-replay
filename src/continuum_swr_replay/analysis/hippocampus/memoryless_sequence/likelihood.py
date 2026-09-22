@@ -46,6 +46,7 @@ __all__ = [
     "ENCODING_KEY",
     "SORTED_SPIKES_LIKELIHOOD_KEYS",
     "EpochLikelihood",
+    "check_marks_match_encoding",
     "clusterless_epoch_log_likelihood",
     "interior_bin_distances_cm",
     "load_clusterless_encoding_model",
@@ -194,6 +195,59 @@ def load_clusterless_encoding_model(detector_path: str | Path) -> dict:
         )
     encoding_model["waveform_std"] = float(waveform_std[0])
     return encoding_model
+
+
+def check_marks_match_encoding(
+    encoding_model: dict,
+    spike_times: list[NDArray],
+    spike_waveform_features: list[NDArray],
+) -> None:
+    """Refuse marks that are not the ones the encoding model was fitted on.
+
+    Every encoding mark must be one of the reloaded marks of the same
+    electrode. The encoding set is the training span's spikes, so it is a
+    subset rather than the whole; the reloaded marks are cast to the model's
+    dtype first, as the fit cast them.
+
+    Raises
+    ------
+    ValueError
+        A different number of electrodes, of features on an electrode, or of
+        spike times and marks on one; or an encoding mark missing from its
+        electrode's reloaded marks, which means the spike loader changed since
+        the decode or the electrodes arrive in another order.
+    """
+    encoded_marks = encoding_model["encoding_spike_waveform_features"]
+    if not len(spike_times) == len(spike_waveform_features) == len(encoded_marks):
+        raise ValueError(
+            f"{len(spike_times)} spike trains and {len(spike_waveform_features)} "
+            f"mark arrays for {len(encoded_marks)} encoding electrodes."
+        )
+    for electrode, (encoded, marks, times) in enumerate(
+        zip(encoded_marks, spike_waveform_features, spike_times, strict=True)
+    ):
+        encoded = np.asarray(encoded)
+        marks = np.asarray(marks)
+        if marks.ndim != 2 or marks.shape[1] != encoded.shape[1]:
+            raise ValueError(
+                f"Electrode {electrode} has marks of shape {marks.shape}; the "
+                f"encoding model has {encoded.shape[1]} features there."
+            )
+        if len(times) != marks.shape[0]:
+            raise ValueError(
+                f"Electrode {electrode} has {len(times)} spike times for "
+                f"{marks.shape[0]} marks."
+            )
+        row = np.dtype((np.void, encoded.dtype.itemsize * encoded.shape[1]))
+        reloaded = np.ascontiguousarray(marks.astype(encoded.dtype)).view(row).ravel()
+        fitted = np.ascontiguousarray(encoded).view(row).ravel()
+        missing = int(np.count_nonzero(~np.isin(fitted, reloaded)))
+        if missing:
+            raise ValueError(
+                f"Electrode {electrode}: {missing} of its {fitted.size} encoding "
+                "marks are not among the reloaded marks. The spike loader has "
+                "changed since the decode, or the electrodes are in another order."
+            )
 
 
 def validate_time_grid(time: NDArray, config: MemorylessSequenceConfig) -> None:
