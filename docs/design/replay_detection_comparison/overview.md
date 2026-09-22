@@ -3,7 +3,8 @@
 *Design spec, cross-cutting. Status: approved; the Yu detector exists in the
 `ripple_detection` package, and the memoryless sequence detector, its shuffle, its event
 table and a per-epoch runner are implemented and tested in this project but not yet run
-on recorded data; the inventory comparison is not started. Each spec's own header carries its status; the per-spec sections
+on recorded data; the inventory comparison's accounting is implemented and tested on
+synthetic inventories but not yet run on recorded data. Each spec's own header carries its status; the per-spec sections
 below carry the open decisions.*
 
 This directory holds the design for comparing replay-detection methods on our data.
@@ -16,7 +17,7 @@ register invites the cross-method blending this design forbids.
 |---|---|---|
 | [01-yu-swr-detector.md](01-yu-swr-detector.md) | SWR detector with a noise-percentile threshold (Yu et al. 2017) | package side implemented; project wiring pending |
 | [02-memoryless-sequence.md](02-memoryless-sequence.md) | Memoryless sliding-window sequence detector (Widloski & Foster 2025) | implemented and tested, shuffle and event table included; not yet run on recorded data |
-| [03-inventory-comparison.md](03-inventory-comparison.md) | Six inventories → common schema → N-way overlap accounting | design complete |
+| [03-inventory-comparison.md](03-inventory-comparison.md) | Six inventories → common schema → N-way overlap accounting | accounting implemented and tested on synthetic inventories; recorded-data adapters and runner pending |
 | [04-event-features.md](04-event-features.md) | Symmetric event characterization and selection diagnostics; threshold robustness as a later follow-up | initial scope agreed |
 | [05-validation.md](05-validation.md) | Simulation and held-out-tetrode validation: what a performance claim would need | parked |
 | [detector_comparison.md](detector_comparison.md) | One row per detection method considered: input, signal, normalization, threshold rule, durations, state handling, requirements, status | reference, kept current |

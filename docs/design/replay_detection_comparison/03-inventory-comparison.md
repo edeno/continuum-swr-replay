@@ -1,6 +1,10 @@
 # Inventory comparison: six detectors over one substrate
 
-*Design spec. Status: approved, not yet implemented.*
+*Design spec. Status: approved; the accounting — schema, availability, overlap, components,
+fragment-merge recount, cells and SWR label matrix — is implemented in
+`src/continuum_swr_replay/analysis/inventory_comparison/` and tested on synthetic
+inventories. Not yet run on recorded data: the per-detector adapters that build coverage
+from recordings, the runner, and the sampled examples remain.*
 *Governing rule and cross-cutting decisions: [overview.md](overview.md).*
 
 Depends on [01](01-yu-swr-detector.md) and [02](02-memoryless-sequence.md). Covers how the

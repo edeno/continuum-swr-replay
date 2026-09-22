@@ -2,8 +2,9 @@
 
 **Status (2026-09-22):** Phase 0 done. Phase 2 implemented and tested, including the
 shuffle, the event table and a per-epoch runner, but not yet run on recorded data: the
-decodes are not on the development machine. Phases 1, 3 and 4 not started. Phase 5
-deferred, Phase 6 parked.
+decodes are not on the development machine. Phase 3's accounting is implemented and
+tested on synthetic inventories; its recorded-data side waits on Phases 1 and 2. Phases 1
+and 4 not started. Phase 5 deferred, Phase 6 parked.
 
 The scientific design lives in
 [docs/design/replay_detection_comparison/](../../../docs/design/replay_detection_comparison/)
@@ -27,7 +28,7 @@ is stale.
 | 0 | [01](../../../docs/design/replay_detection_comparison/01-yu-swr-detector.md) §Architecture, [table](../../../docs/design/replay_detection_comparison/detector_comparison.md) | Detectors implemented in `ripple_detection` with tests, README, changelog | **done** 2026-09-21: PRs #14–#19 merged to package `master` (b0431a4) after independent review |
 | 1 | [01](../../../docs/design/replay_detection_comparison/01-yu-swr-detector.md) §Producing the inventory, steps 2–6 | Yu SWR inventory for every epoch via Spyglass: pin the package, register the algorithm, `RippleParameters` row `yu_2017`, populate, `get_ripple("Yu")`, Y5 speed gate, observation-availability table | not started |
 | 2 | [02](../../../docs/design/replay_detection_comparison/02-memoryless-sequence.md) | Memoryless sliding-window sequence detector on the clusterless posterior; shuffle null; adapted cohort before/after shuffle | code done and independently reviewed twice, review fixes in (2026-09-22); the sweep and figure apply the paper's place-cell identity shuffle, with the reference's own conventions (zero jumps set aside, strict-below count, p ≤ 0.05; a third review found the port's "conservative" departures were manufacturing the by-duration jump trend, and they were reverted 2026-09-22 so the comparator is the method as published); **next: real-data pilot on one epoch**, then inspect both shuffle nulls (02 §"What the encoding-pair test does on simulated data") and unverified assumptions 6–7. 02 assumption 8 (non-SWR events decoded partly from their own spikes) accepted for now, 2026-09-22 |
-| 3 | [03](../../../docs/design/replay_detection_comparison/03-inventory-comparison.md) | Six inventories on the common schema, observation-availability tables, all-pairs overlap table, single/no-detector cells, SWR label matrix, sampled examples | not started |
+| 3 | [03](../../../docs/design/replay_detection_comparison/03-inventory-comparison.md) | Six inventories on the common schema, observation-availability tables, all-pairs overlap table, single/no-detector cells, SWR label matrix, sampled examples | accounting done 2026-09-22 in `analysis/inventory_comparison/` (`intervals`, `schema`, `availability`, `overlap`, `components`, `recount`, `cells`, `swr_matrix`), test-first with mutation checks and an end-to-end simulated epoch; **remaining, needs recorded data:** per-detector adapters (Kay/Karlsson/Yu from `RippleTimesV1`, MUA HSE, the canonical classified table, the memoryless table) that also build each detector's coverage from its inputs, a runner writing the tables per epoch, per-session/animal reporting, and the sampled examples |
 | 4 | [04](../../../docs/design/replay_detection_comparison/04-event-features.md) §Initial report | Event features, common spike-evidence diagnostic, boundary and rejection diagnostics, at default settings | not started |
 | 5 | [04](../../../docs/design/replay_detection_comparison/04-event-features.md) §Planned follow-up | Threshold robustness: cost pilot, then one-at-a-time relax/tighten | deferred until Phase 4 is reported |
 | 6 | [05](../../../docs/design/replay_detection_comparison/05-validation.md) | Simulation or held-out validation | parked; reopen only for a performance claim |
@@ -96,8 +97,8 @@ Standing decisions for package work (from the user, this session):
 
 ## Branch state (project repo)
 
-Work is on `memoryless-sequence-detection`, ahead of `master`, pushed, no PR. Phase 2's
-code is on it (see the phase table); Phases 1, 3 and 4 have no code yet.
+Work is on `memoryless-sequence-detection`, ahead of `master`, no PR. Phase 2's code and
+Phase 3's accounting are on it (see the phase table); Phases 1 and 4 have no code yet.
 
 Phase 2 pilot, on the machine that has the decodes and Spyglass:
 
