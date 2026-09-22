@@ -667,6 +667,23 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
     )
     parts.append(melted(by_path, ["path_cm"], "by_path"))
 
+    # each half of the significance test, among the replays reported before
+    # it, by duration: a short replay covers its path in few windows, so its
+    # jumps are large and the jump half is where it fails
+    reported = table[table.sliding_matches_before_shuffle]
+    shuffle_by_duration = (
+        reported.assign(
+            sliding_spread_pass=reported.sliding_p_spread.lt(SIGNIFICANCE_LEVEL),
+            sliding_jump_pass=reported.sliding_p_jump.lt(SIGNIFICANCE_LEVEL),
+        )
+        .groupby("duration_s")[["sliding_spread_pass", "sliding_jump_pass"]]
+        .mean()
+        .reset_index()
+    )
+    parts.append(
+        melted(shuffle_by_duration, ["duration_s"], "shuffle_pass_rate_by_duration")
+    )
+
     by_duration = (
         found.groupby("duration_s")[
             ["sliding_duration_ratio", "state_space_duration_ratio"]

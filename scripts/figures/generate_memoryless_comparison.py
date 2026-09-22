@@ -57,6 +57,11 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
     sorted_spikes_epoch_log_likelihood,
     window_midpoints_s,
 )
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
+    DEFAULT_N_SHUFFLES,
+    ShuffleSeed,
+    shuffle_candidate_sorted,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation import (
     InjectedReplay,
     inject_replay,
@@ -132,9 +137,13 @@ dispersion criterion needs a path of about 42 cm, so it is expected to reject
 the candidate."""
 
 SHORT_PATH_EVENT, SHORT_REPLAY_EVENT = 6, 7
-CONTINUOUS_OUTBOUND_EVENT, REMOTE_STATIONARY_EVENT = 0, 5
+CONTINUOUS_OUTBOUND_EVENT, CONTINUOUS_INBOUND_EVENT = 0, 2
+REMOTE_STATIONARY_EVENT = 5
 """Rows of ``event_times`` in :func:`simulate_and_decode`, in the order the
 events are added."""
+
+SHUFFLE_RUN_SEED = 20260922
+"""Seeds the place-cell identity shuffle, as in the sweep."""
 
 NON_LOCAL_PROB_THRESHOLD = 0.8
 NON_LOCAL_MINIMUM_DURATION_S = 0.015
@@ -270,6 +279,26 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
     )
     midpoint_s = window_midpoints_s(result.time, config)
     window_speed = np.interp(midpoint_s, result.time, speed)
+    bin_distance_cm = interior_bin_distances_cm(environment)
+    candidates = detect_candidate_sequences(
+        posterior, midpoint_s, bin_distance_cm, window_speed, config
+    )
+    # the reference's own significance test, on the full decode grid: the
+    # likelihood's grid has lost the final row, which spikes are binned against
+    shuffles = {
+        int(i): shuffle_candidate_sorted(
+            int(candidates.runs[i, 0]),
+            int(candidates.runs[i, 1]),
+            time,
+            spike_times,
+            encoding_model,
+            bin_distance_cm,
+            config,
+            seed=ShuffleSeed(run=SHUFFLE_RUN_SEED, session="figure-one-simulation"),
+            n_shuffles=DEFAULT_N_SHUFFLES,
+        )
+        for i in np.flatnonzero(candidates.is_replay)
+    }
 
     return {
         "detector": detector,
@@ -283,13 +312,8 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
         "posterior": posterior,
         "midpoint_s": midpoint_s,
         "window_speed": window_speed,
-        "candidates": detect_candidate_sequences(
-            posterior,
-            midpoint_s,
-            interior_bin_distances_cm(environment),
-            window_speed,
-            config,
-        ),
+        "candidates": candidates,
+        "shuffles": shuffles,
     }
 
 
@@ -348,21 +372,41 @@ def candidates_overlapping(decoded: dict, event: int) -> list[int]:
 
 
 def accepted_overlapping(decoded: dict, event: int) -> list[int]:
-    """The subset the detector called replay."""
+    """The subset that met the duration and dispersion criteria."""
     is_replay = decoded["candidates"].is_replay
     return [i for i in candidates_overlapping(decoded, event) if is_replay[i]]
+
+
+def is_reported(decoded: dict) -> np.ndarray:
+    """Per candidate: replay under the whole published definition."""
+    reported = np.zeros(len(decoded["candidates"].runs), dtype=bool)
+    for i, result in decoded["shuffles"].items():
+        reported[i] = result.passes
+    return reported
+
+
+def reported_overlapping(decoded: dict, event: int) -> list[int]:
+    """The subset that also beat the place-cell identity shuffle: replay under
+    the whole published definition."""
+    return [
+        i for i in accepted_overlapping(decoded, event) if decoded["shuffles"][i].passes
+    ]
 
 
 def verdict(decoded: dict, event: int) -> str:
     """What the sliding-window detector did with one labeled event.
 
-    ``found`` when an accepted sequence overlaps it; ``declined`` when a
+    ``found`` when a sequence overlapping it meets the whole published
+    definition; ``failed the shuffle`` when one met the duration and
+    dispersion criteria but not the significance test; ``declined`` when a
     candidate was assembled but none was accepted; ``missed`` when no
     candidate overlaps it at all. Read from the data, so a panel title cannot
     drift away from the panel.
     """
-    if accepted_overlapping(decoded, event):
+    if reported_overlapping(decoded, event):
         return "found"
+    if accepted_overlapping(decoded, event):
+        return "failed the shuffle"
     if candidates_overlapping(decoded, event):
         return "declined"
     return "missed"
@@ -371,8 +415,10 @@ def verdict(decoded: dict, event: int) -> str:
 def duration_ratio(decoded: dict, event: int) -> float:
     """How much longer the detector calls an event than the event really is.
 
-    Over the longest accepted sequence overlapping it. Raises when there is
-    none, so a title cannot be formatted from a detection that did not happen.
+    Over the longest accepted sequence overlapping it, whether or not it then
+    passes the shuffle, which never moves a sequence's bounds. Raises when
+    there is none, so a title cannot be formatted from a detection that did
+    not happen.
     """
     accepted = accepted_overlapping(decoded, event)
     if not accepted:
@@ -393,7 +439,30 @@ def outcome_title(decoded: dict, event: int, label: str) -> str:
     what = verdict(decoded, event)
     if what == "found":
         return f"{label}: {duration_ratio(decoded, event):.1f}x too long"
+    if what == "failed the shuffle":
+        return f"{label}: {duration_ratio(decoded, event):.1f}x too long, fails shuffle"
     return f"{label}: {what}"
+
+
+def shuffle_of(decoded: dict, event: int):
+    """The shuffle result of the longest accepted sequence overlapping ``event``."""
+    accepted = accepted_overlapping(decoded, event)
+    longest = max(accepted, key=lambda i: decoded["candidates"].duration_s[i])
+    return decoded["shuffles"][longest]
+
+
+def draws_from_passing(result) -> int:
+    """How many more draws at or below the observed value than a pass allows.
+
+    A half passes with at most 4 of 100 draws at or below it (p = 5/101).
+    Zero means the candidate passes; one means a single draw decided it.
+    """
+    allowed = int(np.floor(0.05 * (result.n_shuffles + 1) - 1e-9)) - 1
+    worst = max(
+        int(np.count_nonzero(result.null_spread_cm <= result.observed_spread_cm)),
+        int(np.count_nonzero(result.null_jump_cm <= result.observed_jump_cm)),
+    )
+    return max(0, worst - allowed)
 
 
 def decoded_center_cm(decoded: dict) -> np.ndarray:
@@ -437,10 +506,15 @@ def check_caption_claims(decoded: dict, config: MemorylessSequenceConfig) -> Non
     """
     expected = {
         CONTINUOUS_OUTBOUND_EVENT: "found",
-        SHORT_REPLAY_EVENT: "found",
+        CONTINUOUS_INBOUND_EVENT: "found",
         SHORT_PATH_EVENT: "declined",
         REMOTE_STATIONARY_EVENT: "declined",
     }
+    if not accepted_overlapping(decoded, SHORT_REPLAY_EVENT):
+        raise RuntimeError(
+            "The caption says the 80 ms replay meets the duration and dispersion "
+            "criteria; no accepted sequence overlaps it. Rewrite the caption."
+        )
     for event, want in expected.items():
         got = verdict(decoded, event)
         if got != want:
@@ -455,7 +529,13 @@ def check_caption_claims(decoded: dict, config: MemorylessSequenceConfig) -> Non
                 "little dispersion, but a candidate overlapping it clears the "
                 "threshold. Rewrite the caption."
             )
-    if not np.isfinite(bound_error_ms(decoded, tuple(expected))):
+    zoomed = (
+        CONTINUOUS_OUTBOUND_EVENT,
+        SHORT_REPLAY_EVENT,
+        SHORT_PATH_EVENT,
+        REMOTE_STATIONARY_EVENT,
+    )
+    if not np.isfinite(bound_error_ms(decoded, zoomed)):
         raise RuntimeError(
             "The caption says the state-space detector reports all four zoomed "
             "events; it does not. Rewrite the caption."
@@ -553,8 +633,9 @@ def plot_overview(ax, decoded: dict) -> None:
             zorder=4,
         )
 
+    reported = is_reported(decoded)
     for sequence, (start, stop) in enumerate(candidates.runs):
-        accepted = candidates.is_replay[sequence]
+        accepted = reported[sequence]
         ax.plot(
             midpoint_s[[start, stop]],
             [-14, -14],
@@ -689,9 +770,10 @@ def plot_event(ax, decoded: dict, event: int) -> None:
             zorder=4,
         )
 
+    reported = is_reported(decoded)
     for i in overlapping:
         start, stop = candidates.runs[i]
-        accepted = candidates.is_replay[i]
+        accepted = reported[i]
         ax.plot(
             midpoint_s[[start, stop]],
             [-9, -9],
@@ -982,6 +1064,20 @@ def check_summary_claims(summary: pd.DataFrame) -> None:
             "The caption says the state-space detector, held to the published "
             "replay definition, reports nothing below 45 cm; the summary disagrees."
         )
+    passes = (
+        summary[summary["summary"] == "shuffle_pass_rate_by_duration"]
+        .pivot(index="duration_s", columns="measure", values="value")
+        .sort_index()
+    )
+    shortest, longest = passes.iloc[:2], passes.iloc[-2:]
+    if not (
+        shortest.sliding_jump_pass.max() < longest.sliding_jump_pass.min()
+        and shortest.sliding_jump_pass.max() < shortest.sliding_spread_pass.min()
+    ):
+        raise RuntimeError(
+            "The caption says short, fast replays fail the jump half of the "
+            "significance test; the summary's pass rates by duration disagree."
+        )
     by_distance = summary[summary["summary"] == "median_by_distance_from_animal"]
     local = (
         by_distance[by_distance.measure == "sliding_local_fraction"]
@@ -1015,6 +1111,24 @@ def pct(value: float, digits: int = 0) -> str:
     return f"{100 * value:.{digits}f}%"
 
 
+def short_replay_shuffle_sentence(decoded: dict) -> str:
+    """What the significance test did with the 80 ms replay, from the data."""
+    result = shuffle_of(decoded, SHORT_REPLAY_EVENT)
+    p = f"p = {result.p_spread:.3f} on spread and {result.p_jump:.3f} on jump"
+    if result.passes:
+        return f"It passes the significance test ({p})."
+    margin = draws_from_passing(result)
+    closeness = (
+        "one draw from passing, so another seed could pass it"
+        if margin == 1
+        else f"{margin} draws from passing"
+    )
+    return (
+        f"The significance test rejects it ({p}, against 0.05), {closeness}, "
+        "and the published method would not report it."
+    )
+
+
 def write_caption(
     decoded: dict, summary: pd.DataFrame, config: MemorylessSequenceConfig, path: Path
 ) -> None:
@@ -1045,7 +1159,11 @@ detector decodes each 80 ms window on its own, with no model of how one window
 follows the next, and keeps or drops windows on the spread of their posterior
 and on the jump to the next window. The state-space detector infers the whole
 event at once and carries the animal's own place as a competing hypothesis.
-Throughout, both detectors read one encoding model, fitted once.
+Throughout, both detectors read one encoding model, fitted once, and the
+sliding-window detector is held to the whole published definition, its
+significance test included: each accepted sequence is decoded again
+{DEFAULT_N_SHUFFLES} times with the place fields swapped between cells, and
+must beat those draws on both its mean posterior spread and its mean jump.
 
 **(a-e) One recording with labeled events.** The simulation carries a
 continuous outbound replay, a fragmented replay, a continuous inbound replay
@@ -1057,15 +1175,18 @@ place of each window, kept or rejected; yellow marks a labeled event; bars below
 the axis are the events each detector reports and the candidates the
 sliding-window detector rejected.
 
-**(b-e)** Four events, with the posterior in grey. The sliding-window
-detector finds the continuous replay and gives it
+**(b-e)** Four events, with the posterior in grey; bars below the axis are
+the events each detector reports, and a sequence that fails the significance
+test is drawn as rejected. The sliding-window detector finds the continuous
+replay and gives it
 {duration_ratio(decoded, CONTINUOUS_OUTBOUND_EVENT):.1f} times its true length,
 because {100 * local_fraction_of_event(decoded, CONTINUOUS_OUTBOUND_EVENT):.0f}%
 of the event it reports is the animal's own place, absorbed by the merge rule.
-It also finds the 80 ms replay and reports it
-{duration_ratio(decoded, SHORT_REPLAY_EVENT):.1f} times too long, with
+It also accepts the 80 ms replay, at
+{duration_ratio(decoded, SHORT_REPLAY_EVENT):.1f} times its length with
 {100 * local_fraction_of_event(decoded, SHORT_REPLAY_EVENT):.0f}% local coding
-in it: the window alone puts a floor under any duration it can report. It
+in it: the window alone puts a floor under any duration it can report.
+{short_replay_shuffle_sentence(decoded)} It
 assembles a candidate from the 30 cm replay and another from the remote
 stationary event and declines both for too little dispersion
 ({best_dispersion_cm(decoded, SHORT_PATH_EVENT):.0f} and
@@ -1073,7 +1194,10 @@ stationary event and declines both for too little dispersion
 {config.dispersion_threshold_cm:.0f} cm it requires). The state-space detector
 reports all four, with every bound within
 {bound_error_ms(decoded, (CONTINUOUS_OUTBOUND_EVENT, SHORT_REPLAY_EVENT, SHORT_PATH_EVENT, REMOTE_STATIONARY_EVENT)):.0f} ms
-of the truth.
+of the truth. Both continuous replays pass the significance test, though most
+of each reported event is the animal's own place: the test asks whether a
+sequence is spatially coherent, not whether it is somewhere other than the
+animal.
 
 **(f-i) {int(overall["n_cells"])} replays of chosen shape.** Made-up
 replays were written into the spike trains of a simulated linear-track
@@ -1087,8 +1211,15 @@ not covering far more ground than the path does.
 path the replay travels and how long it lasts. Each detector runs as published,
 with its own acceptance criteria, and both are scored the same way against the
 same known answer. The sliding-window detector reports
-{pct(overall["sliding_matches"])} of the replays and the state-space
-detector {pct(overall["state_space_matches"])}.
+{pct(overall["sliding_matches"])} of the replays under the published
+definition: {pct(overall["sliding_matches_before_shuffle"])} before its
+significance test, and {pct(overall["sliding_matches_spread_only"])} with the
+spread half of it alone, which is all the reference's own script applied. Of
+the replays it reported before the test,
+{pct(overall["sliding_shuffle_spread_pass_rate"])} pass the spread half and
+{pct(overall["sliding_shuffle_jump_pass_rate"])} the jump half; a short, fast
+replay jumps far between windows and fails the second. The state-space
+detector reports {pct(overall["state_space_matches"])}.
 {pct(overall["found_by_state_space_only"])} were reported by the
 state-space detector and missed by the sliding-window detector;
 {pct(overall["found_by_sliding_window_only"], 2)} went the other way.
@@ -1102,11 +1233,13 @@ Held to that same criterion our state-space detector also reports nothing below
 45 cm, so this is the published replay definition acting, not the window-by-window
 inference. On the part of the grid that definition can accept at all — a path
 over about 42 cm and a duration over 100 ms, {pct(domain["n_cells"] / overall["n_cells"])}
-of the cells — the two read {pct(domain["sliding_matches"])} and
-{pct(domain["state_space_matches"])}.
+of the cells — the two read {pct(domain["sliding_matches"])}
+({pct(domain["sliding_matches_before_shuffle"])} before the significance test)
+and {pct(domain["state_space_matches"])}.
 
 **(h)** Reported duration over actual duration, for replays both detectors
-reported. A {1000 * shortest.duration_s:.0f} ms replay is reported as about
+reported, the sliding window's before its significance test, which never
+moves a sequence's bounds. A {1000 * shortest.duration_s:.0f} ms replay is reported as about
 {1000 * shortest.duration_s * shortest.value:.0f} ms — the same floor that panel
 (c) shows for one event.
 
@@ -1124,8 +1257,9 @@ rests at one end of the track and pauses nowhere else, so distance from its
 place is fixed by where the replay is put and cannot be varied independently.
 Replays run at constant speed with Poisson firing from the same place fields
 the encoding model was fitted on, so there is no model mismatch and the picture
-is optimistic. The significance test the published method requires is not
-applied here.
+is optimistic. The significance test is the reference's place-cell identity
+shuffle, which needs sorted cells; recorded data, decoded clusterless, are
+tested with the encoding-pair shuffle of spec 02 instead.
 
 Produced by `scripts/figures/generate_memoryless_comparison.py` from
 `docs/design/replay_detection_comparison/detection_sweep_summary.csv`.
