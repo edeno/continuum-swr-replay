@@ -19,6 +19,7 @@ from non_local_detector.likelihoods.clusterless_kde import (
 
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
     ENCODING_KEY,
+    interior_bin_distances_cm,
 )
 
 SAMPLING_FREQUENCY = 500.0
@@ -99,6 +100,14 @@ def build_simulated_epoch(directory: Path) -> SimulatedEpoch:
 
     Saves it as a stand-in detector in ``directory`` so the loader is
     exercised too.
+
+    For arithmetic tests only: its decode is not a faithful place estimate.
+    Position is passed 1-D with a track graph, and the library then fits the
+    occupancy on the 1-D values but re-linearizes the positions at spike times
+    through the graph (``get_position_at_time``), so the two sit in different
+    coordinates; the simulated animal also runs past the last bin. The
+    additivity and bin-assignment tests compare the library with itself on the
+    same model and do not depend on either.
     """
     time = np.arange(N_TIME) / SAMPLING_FREQUENCY
     # the animal runs back and forth across the linearized track
@@ -146,4 +155,70 @@ def build_simulated_epoch(directory: Path) -> SimulatedEpoch:
         spike_times=spike_times,
         spike_waveform_features=spike_waveform_features,
         detector_path=str(detector_path),
+    )
+
+
+@dataclass
+class TilingTetrode:
+    time: np.ndarray
+    linear_position: np.ndarray
+    spike_times: list[np.ndarray]
+    spike_waveform_features: list[np.ndarray]
+    encoding_model: dict
+    bin_distance_cm: np.ndarray
+
+
+MOVING_WINDOWS = (115, 265)
+"""Windows over which the animal runs from about 69 cm down to about 6 cm."""
+
+
+def build_tiling_tetrode() -> TilingTetrode:
+    """One electrode, five units, each its own waveform and a field of its own.
+
+    The mark is the only thing that says where the animal is, so a shuffle of
+    which mark goes with which place removes all of it. Decoded in-sample on a
+    plain linear track, the posterior follows the animal to within a bin.
+    """
+    n_time = 2000
+    time = np.arange(n_time) / SAMPLING_FREQUENCY
+    linear_position = 38.0 + 34.0 * np.sin(2 * np.pi * time / 1.6)
+    # a plain linear track: with a track graph the library would re-linearize
+    # the 1-D positions at spike times but not the occupancy
+    environment = Environment(place_bin_size=4.0).fit_place_grid(
+        linear_position[:, None]
+    )
+
+    rng = np.random.default_rng(7)
+    times, marks = [], []
+    for center, amplitude in zip(
+        [8.0, 24.0, 40.0, 56.0, 72.0], [50.0, 100.0, 150.0, 200.0, 250.0], strict=True
+    ):
+        intensity = 80.0 * np.exp(-0.5 * ((linear_position - center) / 8.0) ** 2)
+        sample = np.repeat(
+            np.arange(n_time), rng.poisson(intensity / SAMPLING_FREQUENCY)
+        )
+        times.append(
+            time[sample] + rng.uniform(0.0, 1.0 / SAMPLING_FREQUENCY, sample.size)
+        )
+        marks.append(rng.normal(amplitude, 8.0, size=(sample.size, 2)))
+    times, marks = np.concatenate(times), np.concatenate(marks)
+    order = np.argsort(times)
+    spike_times, features = [times[order]], [marks[order]]
+
+    encoding_model = fit_clusterless_kde_encoding_model(
+        time,
+        linear_position[:, None],
+        spike_times,
+        features,
+        environment,
+        sampling_frequency=int(SAMPLING_FREQUENCY),
+        disable_progress_bar=True,
+    )
+    return TilingTetrode(
+        time=time,
+        linear_position=linear_position,
+        spike_times=spike_times,
+        spike_waveform_features=features,
+        encoding_model=encoding_model,
+        bin_distance_cm=interior_bin_distances_cm(environment),
     )

@@ -9,21 +9,15 @@ are drawn independently of position, so a shuffle there changes nothing.
 """
 
 import copy
-from dataclasses import dataclass
 
 import numpy as np
 import pytest
-from non_local_detector.environment import Environment
-from non_local_detector.likelihoods.clusterless_kde import (
-    fit_clusterless_kde_encoding_model,
-)
 
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import (
     MemorylessSequenceConfig,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
     clusterless_epoch_log_likelihood,
-    interior_bin_distances_cm,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
     ShuffleResult,
@@ -37,11 +31,14 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle impor
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
     aggregate_windows,
     normalize_windows,
+    window_center_and_spread,
 )
 from tests.unit._memoryless_clusterless_epoch import (
+    MOVING_WINDOWS,
     SAMPLING_FREQUENCY,
-    _y_track,
+    TilingTetrode,
     build_simulated_epoch,
+    build_tiling_tetrode,
 )
 
 CONFIG = MemorylessSequenceConfig(sampling_frequency=SAMPLING_FREQUENCY)
@@ -58,77 +55,9 @@ def epoch(tmp_path_factory):
     return build_simulated_epoch(tmp_path_factory.mktemp("shuffle"))
 
 
-@dataclass
-class TilingTetrode:
-    time: np.ndarray
-    linear_position: np.ndarray
-    spike_times: list[np.ndarray]
-    spike_waveform_features: list[np.ndarray]
-    encoding_model: dict
-    bin_distance_cm: np.ndarray
-
-
-MOVING_WINDOWS = (115, 265)
-"""Windows over which the animal runs from about 71 cm down to about 5 cm."""
-
-
 @pytest.fixture(scope="module")
 def tetrode() -> TilingTetrode:
-    """One electrode, five units, each its own waveform and a field of its own.
-
-    The animal stays on the track (its bins span 2 to 74 cm): a position past
-    the last bin pins the decode to that bin and makes every jump zero. Two
-    things this fixture avoids, because each hides the association the shuffle
-    is meant to break. With several electrodes, which electrode fired still says
-    where the animal is after a shuffle. And at a lower rate, 40 Hz rather
-    than 80, a shuffled posterior is broad, its center barely moves, and its
-    mean jump falls below a real trajectory's; that is a property of the
-    method the real-data pilot has to measure, not something to test here.
-    """
-    n_time = 2000
-    time = np.arange(n_time) / SAMPLING_FREQUENCY
-    linear_position = 38.0 + 34.0 * np.sin(2 * np.pi * time / 1.6)
-    environment = Environment(
-        place_bin_size=4.0,
-        track_graph=_y_track(),
-        edge_order=[(0, 3), (3, 1), (3, 2)],
-        edge_spacing=8.0,
-    ).fit_place_grid(linear_position[:, None], infer_track_interior=True)
-
-    rng = np.random.default_rng(7)
-    times, marks = [], []
-    for center, amplitude in zip(
-        [8.0, 24.0, 40.0, 56.0, 72.0], [50.0, 100.0, 150.0, 200.0, 250.0], strict=True
-    ):
-        intensity = 80.0 * np.exp(-0.5 * ((linear_position - center) / 8.0) ** 2)
-        sample = np.repeat(
-            np.arange(n_time), rng.poisson(intensity / SAMPLING_FREQUENCY)
-        )
-        times.append(
-            time[sample] + rng.uniform(0.0, 1.0 / SAMPLING_FREQUENCY, sample.size)
-        )
-        marks.append(rng.normal(amplitude, 8.0, size=(sample.size, 2)))
-    times, marks = np.concatenate(times), np.concatenate(marks)
-    order = np.argsort(times)
-    spike_times, features = [times[order]], [marks[order]]
-
-    encoding_model = fit_clusterless_kde_encoding_model(
-        time,
-        linear_position[:, None],
-        spike_times,
-        features,
-        environment,
-        sampling_frequency=int(SAMPLING_FREQUENCY),
-        disable_progress_bar=True,
-    )
-    return TilingTetrode(
-        time=time,
-        linear_position=linear_position,
-        spike_times=spike_times,
-        spike_waveform_features=features,
-        encoding_model=encoding_model,
-        bin_distance_cm=interior_bin_distances_cm(environment),
-    )
+    return build_tiling_tetrode()
 
 
 class TestPValue:
@@ -454,9 +383,47 @@ class TestShuffledLikelihood:
 class TestShuffleCandidate:
     WINDOWS = MOVING_WINDOWS
 
-    def test_a_decoded_trajectory_is_significant(self, tetrode):
-        """In-sample, the observed decode tracks the animal; a shuffle that
-        breaks which mark goes with which place must blur and scatter it."""
+    def test_the_decode_follows_the_animal(self, tetrode):
+        """The premise of the next test, checked rather than assumed."""
+        first, last = self.WINDOWS
+        windows = candidate_window_log_likelihood(
+            first,
+            last,
+            tetrode.time,
+            tetrode.spike_times,
+            tetrode.spike_waveform_features,
+            tetrode.encoding_model,
+            CONFIG,
+        )
+        center, _ = window_center_and_spread(
+            normalize_windows(windows), tetrode.bin_distance_cm
+        )
+        environment = tetrode.encoding_model["environment"]
+        interior = np.asarray(environment.is_track_interior_).ravel()
+        decoded_cm = np.asarray(environment.place_bin_centers_).ravel()[interior][
+            center
+        ]
+        midpoint_s = (
+            tetrode.time[0]
+            + CONFIG.window_duration_s / 2
+            + CONFIG.stride_s * np.arange(first, last + 1)
+        )
+        animal_cm = np.interp(midpoint_s, tetrode.time, tetrode.linear_position)
+
+        assert np.median(np.abs(decoded_cm - animal_cm)) <= 4.0  # one bin
+        assert np.ptp(decoded_cm) > 50.0  # and it travels
+
+    def test_the_spread_test_separates_and_the_jump_test_cannot(self, tetrode):
+        """A property of the method, recorded so it is on file for the pilot.
+
+        Breaking which mark goes with which place leaves a broad posterior,
+        and the center of a broad posterior sits near the middle of the track
+        and barely moves. The shuffled mean jump is then smaller than that of
+        a trajectory that really moves, so "observed jump below the shuffled"
+        favours a decode that stands still. Measured here at 80 Hz; at 40 Hz
+        the null's jumps are smaller still. Whether the reference's cell-ID
+        shuffle behaves the same way on its own data is not known.
+        """
         result = shuffle_candidate(
             *self.WINDOWS,
             tetrode.time,
@@ -470,9 +437,10 @@ class TestShuffleCandidate:
         )
 
         assert result.testable
-        # the decode must actually move, or a zero jump would pass trivially
-        assert result.observed_jump_cm > 0.0
-        assert result.passes
+        assert result.observed_spread_cm < result.null_spread_cm.min()
+        assert result.p_spread < 0.05
+        assert result.p_jump > 0.05
+        assert not result.passes
 
     def test_the_observed_statistics_are_the_unshuffled_decode(self, tetrode):
         first, last = self.WINDOWS
