@@ -1,0 +1,615 @@
+"""Prior-excluded log-likelihood on the native grid, and its additivity.
+
+The fixture fits a real clusterless KDE encoding model from ``non_local_detector``
+on simulated spikes over a small Y-shaped track, so the tests run against the
+library's own conventions rather than a stand-in for them.
+"""
+
+import copy
+from dataclasses import dataclass, replace
+
+import joblib
+import networkx as nx
+import numpy as np
+import pytest
+from non_local_detector.environment import Environment
+from non_local_detector.likelihoods.clusterless_kde import (
+    block_estimate_log_joint_mark_intensity,
+    fit_clusterless_kde_encoding_model,
+    kde_distance,
+)
+
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import (
+    MemorylessSequenceConfig,
+)
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
+    ENCODING_KEY,
+    LIKELIHOOD_ARGUMENT_KEYS,
+    epoch_log_likelihood,
+    interior_bin_distances_cm,
+    load_encoding_model,
+    validate_time_grid,
+    window_midpoints_s,
+)
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
+    aggregate_windows,
+)
+
+SAMPLING_FREQUENCY = 500.0
+N_TIME = 600
+N_FEATURES = 2
+BOUNDARY_SAMPLES = (100, 140)
+"""Samples that start a window, so a spike there tests the half-open support."""
+
+
+@dataclass
+class SimulatedEpoch:
+    """Everything a decode needs, from a fitted encoding model."""
+
+    environment: Environment
+    encoding_model: dict
+    time: np.ndarray
+    linear_position: np.ndarray
+    spike_times: list[np.ndarray]
+    spike_waveform_features: list[np.ndarray]
+    detector_path: str
+
+
+class _StandInDetector:
+    """Carries the one attribute the loader reads from a saved detector."""
+
+    def __init__(self, encoding_model: dict) -> None:
+        self.encoding_model_ = encoding_model
+
+
+def _y_track() -> nx.Graph:
+    """Three 20 cm arms meeting at a center node."""
+    graph = nx.Graph()
+    graph.add_edges_from([(0, 3), (1, 3), (2, 3)])
+    nx.set_edge_attributes(
+        graph, {(0, 3): 20.0, (1, 3): 20.0, (2, 3): 20.0}, "distance"
+    )
+    nx.set_edge_attributes(graph, {(0, 3): 0, (1, 3): 1, (2, 3): 2}, "edge_id")
+    nx.set_node_attributes(
+        graph,
+        {0: (0.0, 0.0), 1: (40.0, 0.0), 2: (20.0, 20.0), 3: (20.0, 0.0)},
+        "pos",
+    )
+    return graph
+
+
+def _add_spikes_at(
+    spike_times: np.ndarray, features: np.ndarray, at: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """Insert spikes at exact times, keeping the arrays sorted and aligned."""
+    times = np.concatenate([spike_times, at])
+    features = np.concatenate([features, np.full((at.size, N_FEATURES), 100.0)])
+    order = np.argsort(times, kind="stable")
+    return times[order], features[order]
+
+
+def _simulate_electrode(
+    linear_position: np.ndarray,
+    time: np.ndarray,
+    field_center_cm: float,
+    peak_rate_hz: float,
+    seed: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Place-tuned spikes with Gaussian waveform features."""
+    rng = np.random.default_rng(seed)
+    intensity = peak_rate_hz * np.exp(
+        -0.5 * ((linear_position - field_center_cm) / 10.0) ** 2
+    )
+    counts = rng.poisson(intensity / SAMPLING_FREQUENCY)
+    sample = np.repeat(np.arange(time.size), counts)
+    spike_times = time[sample] + rng.uniform(0.0, 1.0 / SAMPLING_FREQUENCY, sample.size)
+    features = rng.normal(100.0, 20.0, size=(sample.size, N_FEATURES))
+    order = np.argsort(spike_times)
+    return spike_times[order], features[order]
+
+
+@pytest.fixture(scope="module")
+def epoch(tmp_path_factory) -> SimulatedEpoch:
+    time = np.arange(N_TIME) / SAMPLING_FREQUENCY
+    # the animal runs back and forth across the linearized track
+    linear_position = np.clip(48.0 + 46.0 * np.sin(2 * np.pi * time / 0.6), 0.0, 95.0)
+
+    environment = Environment(
+        place_bin_size=4.0,
+        track_graph=_y_track(),
+        edge_order=[(0, 3), (3, 1), (3, 2)],
+        edge_spacing=8.0,  # above zero, so junction placeholder bins exist
+    ).fit_place_grid(linear_position[:, None], infer_track_interior=True)
+
+    spike_times, spike_waveform_features = [], []
+    for seed, field_center in enumerate([15.0, 50.0, 80.0]):
+        times, features = _simulate_electrode(
+            linear_position, time, field_center, 400.0, seed + 1
+        )
+        spike_times.append(times)
+        spike_waveform_features.append(features)
+
+    # random times never land on a sample exactly, so put the edge cases in the
+    # data: two window boundaries and the epoch's final timestamp
+    spike_times[0], spike_waveform_features[0] = _add_spikes_at(
+        spike_times[0], spike_waveform_features[0], time[[*BOUNDARY_SAMPLES, -1]]
+    )
+
+    encoding_model = fit_clusterless_kde_encoding_model(
+        time,
+        linear_position[:, None],
+        spike_times,
+        spike_waveform_features,
+        environment,
+        sampling_frequency=int(SAMPLING_FREQUENCY),
+        disable_progress_bar=True,
+    )
+
+    detector_path = tmp_path_factory.mktemp("decode") / "epoch_detector.pkl"
+    joblib.dump(_StandInDetector({ENCODING_KEY: encoding_model}), detector_path)
+
+    return SimulatedEpoch(
+        environment=environment,
+        encoding_model=encoding_model,
+        time=time,
+        linear_position=linear_position,
+        spike_times=spike_times,
+        spike_waveform_features=spike_waveform_features,
+        detector_path=str(detector_path),
+    )
+
+
+@pytest.fixture(scope="module")
+def decoded(epoch) -> tuple[np.ndarray, np.ndarray]:
+    """The epoch's log-likelihood and its time axis."""
+    result = epoch_log_likelihood(
+        epoch.time,
+        epoch.linear_position,
+        epoch.spike_times,
+        epoch.spike_waveform_features,
+        load_encoding_model(epoch.detector_path),
+    )
+    return result.time, result.log_likelihood
+
+
+@pytest.fixture(scope="module")
+def position_distances(epoch) -> list:
+    """Encoding-spike to bin kernel distances, which do not depend on a window."""
+    interior = np.asarray(epoch.environment.is_track_interior_).ravel()
+    bin_centers = np.asarray(epoch.environment.place_bin_centers_)[interior]
+    return [
+        kde_distance(
+            bin_centers, encoding_positions, std=epoch.encoding_model["position_std"]
+        )
+        for encoding_positions in epoch.encoding_model["encoding_positions"]
+    ]
+
+
+def direct_window_log_likelihood(
+    epoch: SimulatedEpoch,
+    position_distances: list,
+    start_s: float,
+    end_s: float,
+    include_end: bool = False,
+) -> np.ndarray:
+    """A marked-process sum over an explicit support.
+
+    Independent of the library's time-bin assignment and of the sliding-window
+    cumulative sum: the exposure is one ground-process contribution per sample,
+    and every spike in ``[start_s, end_s)`` contributes its own
+    log joint mark intensity.
+
+    Both bounds are grid samples rather than a start plus a duration: adding
+    0.080 to a sample does not land on the sample 40 rows later, and a spike on
+    that boundary would then fall inside the support either way.
+
+    ``include_end`` closes the support at its right end. Only the epoch's final
+    row needs it: every other row hands a spike on its right edge to the row
+    after it, and the final row has no row after it.
+    """
+    model = epoch.encoding_model
+    n_samples = round((end_s - start_s) * SAMPLING_FREQUENCY)
+
+    total = -n_samples * np.asarray(
+        model["summed_ground_process_intensity"], dtype=np.float64
+    )
+    for electrode, position_distance in enumerate(position_distances):
+        times = epoch.spike_times[electrode]
+        in_window = (times >= start_s) & (
+            (times <= end_s) if include_end else (times < end_s)
+        )
+        if not in_window.any():
+            continue
+        total += np.asarray(
+            block_estimate_log_joint_mark_intensity(
+                epoch.spike_waveform_features[electrode][in_window],
+                model["encoding_spike_waveform_features"][electrode],
+                np.full(
+                    N_FEATURES, float(np.asarray(model["waveform_std"]).ravel()[0])
+                ),
+                model["occupancy"],
+                model["mean_rates"][electrode],
+                position_distance,
+                model["block_size"],
+            ),
+            dtype=np.float64,
+        ).sum(axis=0)
+    return total
+
+
+class TestLoadEncodingModel:
+    def test_returns_the_arguments_the_likelihood_call_needs(self, epoch):
+        model = load_encoding_model(epoch.detector_path)
+
+        assert set(LIKELIHOOD_ARGUMENT_KEYS) <= set(model)
+
+    def test_a_missing_file_raises(self, tmp_path):
+        with pytest.raises(FileNotFoundError, match="detector"):
+            load_encoding_model(tmp_path / "absent_detector.pkl")
+
+    def test_a_missing_encoding_key_names_the_keys_that_are_there(self, tmp_path):
+        path = tmp_path / "other_detector.pkl"
+        joblib.dump(_StandInDetector({("other", 7): {}}), path)
+
+        with pytest.raises(KeyError, match=r"other.*7"):
+            load_encoding_model(path)
+
+    def test_an_environment_saved_without_the_fitted_flag_is_restored(
+        self, epoch, tmp_path
+    ):
+        """Detectors saved by older library versions carry no flag, and the
+        track-distance methods refuse to run without one."""
+        model = dict(epoch.encoding_model)
+        environment = copy.deepcopy(model["environment"])
+        del environment._is_fitted
+        model["environment"] = environment
+        path = tmp_path / "old_detector.pkl"
+        joblib.dump(_StandInDetector({ENCODING_KEY: model}), path)
+
+        loaded = load_encoding_model(path)
+
+        distances = loaded["environment"].get_distances_to_interior_bins(
+            np.array([[10.0]])
+        )
+        assert np.isfinite(np.asarray(distances)).all()
+
+    def test_a_per_feature_waveform_deviation_is_reduced_to_a_scalar(
+        self, epoch, tmp_path
+    ):
+        """Electrodes differ in how many features they have, so a vector cannot
+        be shared between them; the library expands a scalar per electrode."""
+        model = dict(epoch.encoding_model)
+        model["waveform_std"] = np.full(N_FEATURES, 24.0)
+        path = tmp_path / "vector_detector.pkl"
+        joblib.dump(_StandInDetector({ENCODING_KEY: model}), path)
+
+        loaded = load_encoding_model(path)
+
+        assert isinstance(loaded["waveform_std"], float)
+        assert loaded["waveform_std"] == 24.0
+
+
+class TestValidateTimeGrid:
+    config = MemorylessSequenceConfig()
+
+    def test_a_uniform_grid_at_the_stated_rate_passes(self):
+        validate_time_grid(np.arange(100) / 500.0, self.config)
+
+    def test_a_gap_raises(self):
+        time = np.delete(np.arange(100) / 500.0, 50)
+
+        with pytest.raises(ValueError, match="uniform"):
+            validate_time_grid(time, self.config)
+
+    def test_a_different_sampling_rate_raises(self):
+        with pytest.raises(ValueError, match="sampled every"):
+            validate_time_grid(np.arange(100) / 250.0, self.config)
+
+    def test_a_grid_too_short_for_one_window_raises(self):
+        with pytest.raises(ValueError, match="window"):
+            validate_time_grid(np.arange(10) / 500.0, self.config)
+
+    def test_float_jitter_within_tolerance_passes(self):
+        time = np.cumsum(np.full(100, 1 / 500.0))
+
+        validate_time_grid(time, self.config)
+
+
+class TestEpochLogLikelihood:
+    def test_one_column_per_interior_bin(self, epoch, decoded):
+        _, log_likelihood = decoded
+        interior = np.asarray(epoch.environment.is_track_interior_).ravel()
+
+        assert log_likelihood.shape[1] == interior.sum()
+        assert log_likelihood.shape[1] < interior.size  # placeholders were dropped
+
+    def test_junction_placeholder_bins_are_absent(self, epoch, decoded):
+        """The centers that survive are exactly the interior ones (V8)."""
+        _, log_likelihood = decoded
+        interior = np.asarray(epoch.environment.is_track_interior_).ravel()
+        centers = np.asarray(epoch.environment.place_bin_centers_).ravel()
+        nodes = epoch.environment.place_bin_centers_nodes_df_
+        junction_centers = np.asarray(nodes.linear_position[nodes.edge_id == -1])
+
+        assert junction_centers.size > 0
+        assert not np.isin(centers[interior], junction_centers).any()
+        assert log_likelihood.shape[1] == interior.sum()
+
+    def test_the_final_row_is_dropped(self, epoch, decoded):
+        """It carries exposure but can never be assigned a spike."""
+        time, log_likelihood = decoded
+
+        assert log_likelihood.shape[0] == epoch.time.size - 1
+        assert time.size == log_likelihood.shape[0]
+        np.testing.assert_array_equal(time, epoch.time[:-1])
+
+    def test_the_bin_centers_label_the_columns(self, epoch):
+        """Every downstream statistic indexes bins by column, so the two must agree."""
+        result = epoch_log_likelihood(
+            epoch.time,
+            epoch.linear_position,
+            epoch.spike_times,
+            epoch.spike_waveform_features,
+            load_encoding_model(epoch.detector_path),
+        )
+        interior = np.asarray(epoch.environment.is_track_interior_).ravel()
+        centers = np.asarray(epoch.environment.place_bin_centers_).ravel()
+
+        assert result.place_bin_centers_cm.size == result.log_likelihood.shape[1]
+        np.testing.assert_array_equal(result.place_bin_centers_cm, centers[interior])
+
+    def test_the_columns_match_the_distance_matrix(self, epoch, decoded):
+        """The statistics index the posterior and the distances with one index."""
+        _, log_likelihood = decoded
+
+        distance = interior_bin_distances_cm(epoch.environment)
+
+        assert distance.shape[0] == log_likelihood.shape[1]
+
+    def test_every_value_is_finite(self, decoded):
+        _, log_likelihood = decoded
+
+        assert np.isfinite(log_likelihood).all()
+
+    def test_a_grid_that_fails_validation_raises(self, epoch):
+        with pytest.raises(ValueError, match="uniform"):
+            epoch_log_likelihood(
+                np.delete(epoch.time, 100),
+                np.delete(epoch.linear_position, 100),
+                epoch.spike_times,
+                epoch.spike_waveform_features,
+                load_encoding_model(epoch.detector_path),
+            )
+
+
+class TestAdditivity:
+    """A window sum must equal a direct marked-process sum over its support."""
+
+    config = MemorylessSequenceConfig()
+
+    def direct_for(self, epoch, position_distances, time, window: int) -> np.ndarray:
+        """The direct sum over window ``window``, bounded by grid samples."""
+        start = window * self.config.stride_n_samples
+        return direct_window_log_likelihood(
+            epoch,
+            position_distances,
+            time[start],
+            epoch.time[start + self.config.window_n_samples],
+        )
+
+    def windows(self, decoded) -> np.ndarray:
+        _, log_likelihood = decoded
+        return aggregate_windows(
+            log_likelihood,
+            self.config.window_n_samples,
+            self.config.stride_n_samples,
+        )
+
+    def test_an_interior_window_matches_the_direct_sum(
+        self, epoch, decoded, position_distances
+    ):
+        time, _ = decoded
+        windows = self.windows(decoded)
+        window = 40
+
+        direct = self.direct_for(epoch, position_distances, time, window)
+
+        np.testing.assert_allclose(windows[window], direct, rtol=1e-5, atol=1e-4)
+
+    def test_every_window_matches_the_direct_sum(
+        self, epoch, decoded, position_distances
+    ):
+        time, _ = decoded
+        windows = self.windows(decoded)
+        direct = np.stack(
+            [
+                self.direct_for(epoch, position_distances, time, window)
+                for window in range(len(windows))
+            ]
+        )
+
+        np.testing.assert_allclose(windows, direct, rtol=1e-5, atol=1e-4)
+
+    def test_the_windows_together_carry_every_spike(
+        self, epoch, decoded, position_distances
+    ):
+        """Every row that survives trimming carries the spikes of its own interval."""
+        time, log_likelihood = decoded
+
+        whole = log_likelihood.sum(axis=0)
+        direct = direct_window_log_likelihood(
+            epoch, position_distances, time[0], epoch.time[-1], include_end=True
+        )
+
+        assert log_likelihood.shape[0] == round(
+            (epoch.time[-1] - epoch.time[0]) * SAMPLING_FREQUENCY
+        )
+        np.testing.assert_allclose(whole, direct, rtol=1e-5, atol=1e-3)
+
+    def test_a_spike_sits_exactly_on_a_window_boundary(self, epoch):
+        """Otherwise the half-open support is never actually exercised."""
+        spikes = epoch.spike_times[0]
+
+        for sample in BOUNDARY_SAMPLES:
+            assert (spikes == epoch.time[sample]).any()
+        assert (spikes == epoch.time[-1]).any()
+
+    def test_a_boundary_spike_belongs_to_the_later_window_only(
+        self, epoch, decoded, position_distances
+    ):
+        """It opens the window that starts there and closes none before it."""
+        time, _ = decoded
+        windows = self.windows(decoded)
+        sample = BOUNDARY_SAMPLES[0]
+        opens = sample // self.config.stride_n_samples
+        # the last window whose support ends exactly at this spike's time
+        ends = opens - self.config.window_n_samples // self.config.stride_n_samples
+
+        for window in (ends, opens):
+            direct = self.direct_for(epoch, position_distances, time, window)
+            np.testing.assert_allclose(windows[window], direct, rtol=1e-5, atol=1e-4)
+
+    def test_a_spike_on_the_final_timestamp_is_carried(
+        self, epoch, decoded, position_distances
+    ):
+        """The library folds it into the last row that survives trimming.
+
+        That row's support is closed at its right end, unlike every other row.
+        Treating it as half-open drops the spike and leaves the epoch sum short.
+        """
+        time, log_likelihood = decoded
+        assert (epoch.spike_times[0] == epoch.time[-1]).any()
+        half_open = direct_window_log_likelihood(
+            epoch, position_distances, time[0], epoch.time[-1]
+        )
+        closed = direct_window_log_likelihood(
+            epoch, position_distances, time[0], epoch.time[-1], include_end=True
+        )
+
+        assert not np.allclose(half_open, closed)
+        np.testing.assert_allclose(
+            log_likelihood.sum(axis=0), closed, rtol=1e-5, atol=1e-3
+        )
+
+    def test_the_last_window_of_the_epoch_matches(
+        self, epoch, decoded, position_distances
+    ):
+        """The tail is where the library's end-row fold would show up."""
+        time, _ = decoded
+        windows = self.windows(decoded)
+
+        direct = self.direct_for(epoch, position_distances, time, len(windows) - 1)
+
+        np.testing.assert_allclose(windows[-1], direct, rtol=1e-5, atol=1e-4)
+
+    def test_a_window_holding_the_final_row_closes_its_support(
+        self, epoch, position_distances
+    ):
+        """Whether one does depends on how the epoch length divides the stride.
+
+        The final row has no row after it to hand a spike on its right edge to,
+        so it keeps that spike. A window containing that row inherits the
+        closed end; every other window is half-open.
+        """
+        # one sample shorter, so the final row falls inside the last window
+        time = epoch.time[:-1]
+        spike_times = list(epoch.spike_times)
+        features = list(epoch.spike_waveform_features)
+        spike_times[1], features[1] = _add_spikes_at(
+            spike_times[1], features[1], time[[-1]]
+        )
+
+        result = epoch_log_likelihood(
+            time,
+            epoch.linear_position[: time.size],
+            spike_times,
+            features,
+            load_encoding_model(epoch.detector_path),
+        )
+        windows = aggregate_windows(
+            result.log_likelihood,
+            self.config.window_n_samples,
+            self.config.stride_n_samples,
+        )
+        last_start = (len(windows) - 1) * self.config.stride_n_samples
+        assert last_start + self.config.window_n_samples == result.time.size
+
+        epoch_with_extra = replace(
+            epoch, spike_times=spike_times, spike_waveform_features=features
+        )
+        window_end_s = time[last_start + self.config.window_n_samples]
+        half_open = direct_window_log_likelihood(
+            epoch_with_extra, position_distances, result.time[last_start], window_end_s
+        )
+        closed = direct_window_log_likelihood(
+            epoch_with_extra,
+            position_distances,
+            result.time[last_start],
+            window_end_s,
+            include_end=True,
+        )
+
+        assert not np.allclose(half_open, closed)
+        np.testing.assert_allclose(windows[-1], closed, rtol=1e-5, atol=1e-4)
+
+
+class TestWindowMidpoints:
+    config = MemorylessSequenceConfig()
+
+    def test_one_midpoint_per_window(self, decoded):
+        time, log_likelihood = decoded
+        windows = aggregate_windows(
+            log_likelihood, self.config.window_n_samples, self.config.stride_n_samples
+        )
+
+        midpoints = window_midpoints_s(time, self.config)
+
+        assert midpoints.size == len(windows)
+
+    def test_a_midpoint_is_half_a_window_after_its_start(self, decoded):
+        time, _ = decoded
+
+        midpoints = window_midpoints_s(time, self.config)
+
+        np.testing.assert_allclose(midpoints[0], time[0] + 0.040)
+        np.testing.assert_allclose(
+            midpoints[1], time[self.config.stride_n_samples] + 0.040
+        )
+
+    def test_midpoints_are_one_stride_apart(self, decoded):
+        time, _ = decoded
+
+        midpoints = window_midpoints_s(time, self.config)
+
+        np.testing.assert_allclose(np.diff(midpoints), self.config.stride_s, rtol=1e-9)
+
+    def test_a_grid_too_short_for_one_window_gives_none(self):
+        midpoints = window_midpoints_s(np.arange(20) / 500.0, self.config)
+
+        assert midpoints.shape == (0,)
+
+
+class TestInteriorBinDistances:
+    def test_a_square_matrix_over_the_interior_bins(self, epoch):
+        interior = np.asarray(epoch.environment.is_track_interior_).ravel()
+
+        distance = interior_bin_distances_cm(epoch.environment)
+
+        assert distance.shape == (interior.sum(), interior.sum())
+
+    def test_the_diagonal_is_zero_and_the_matrix_is_symmetric(self, epoch):
+        distance = interior_bin_distances_cm(epoch.environment)
+
+        np.testing.assert_allclose(np.diag(distance), 0.0, atol=1e-9)
+        np.testing.assert_allclose(distance, distance.T, atol=1e-9)
+
+    def test_bins_on_different_arms_are_further_apart_than_in_linear_position(
+        self, epoch
+    ):
+        """The reason jumps are measured on the graph and not on the coordinate (V6)."""
+        interior = np.asarray(epoch.environment.is_track_interior_).ravel()
+        centers = np.asarray(epoch.environment.place_bin_centers_).ravel()[interior]
+        distance = interior_bin_distances_cm(epoch.environment)
+        linear_gap = np.abs(centers[:, None] - centers[None, :])
+
+        assert (distance > linear_gap + 1e-9).any()
