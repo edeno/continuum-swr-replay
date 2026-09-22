@@ -456,7 +456,8 @@ def assemble_sequences(
     """Collect kept windows into candidate sequences.
 
     Runs of a single window are dropped first, as in the original: their index
-    length is zero. Surviving runs are merged, and then the duration filter
+    length is zero. ``config.drop_single_window_runs`` turns that off, for the
+    sensitivity to the reference's unvendored ``seqle``. Surviving runs are merged, and then the duration filter
     drops those whose index length is below the stride-derived minimum. Length
     is an index difference throughout, so a run of index length ``n`` holds
     ``n + 1`` windows and spans ``n`` strides.
@@ -476,7 +477,8 @@ def assemble_sequences(
     """
     kept = np.asarray(kept, dtype=bool)
     runs = contiguous_runs(kept)
-    runs = runs[runs[:, 1] > runs[:, 0]]
+    if config.drop_single_window_runs:
+        runs = runs[runs[:, 1] > runs[:, 0]]
 
     merged, pieces = merge_runs(
         runs, center_index, window_time_s, bin_distance_cm, config

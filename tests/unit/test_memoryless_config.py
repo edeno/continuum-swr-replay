@@ -144,3 +144,11 @@ def test_a_window_of_an_odd_number_of_samples_is_refused():
     """Its midpoint would fall between two samples, and event bounds are samples."""
     with pytest.raises(ValueError, match="even"):
         MemorylessSequenceConfig(window_duration_s=0.082)
+
+
+def test_single_window_runs_are_dropped_unless_asked_otherwise():
+    assert MemorylessSequenceConfig().drop_single_window_runs is True
+    assert (
+        MemorylessSequenceConfig(drop_single_window_runs=False).drop_single_window_runs
+        is False
+    )

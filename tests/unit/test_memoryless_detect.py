@@ -389,6 +389,32 @@ class TestAssembleSequences:
 
         np.testing.assert_array_equal(assembly.pre_merge_runs, [[20, 49]])
 
+    def linked_by_one_window(self) -> np.ndarray:
+        """Two 15-window runs 56 ms apart, and one kept window 28 ms from each."""
+        kept = np.zeros(50, dtype=bool)
+        kept[0:15] = True
+        kept[21] = True
+        kept[28:43] = True
+        return kept
+
+    def test_by_default_a_single_window_cannot_link_two_runs(self):
+        assembly = self.assemble(self.linked_by_one_window())
+
+        np.testing.assert_array_equal(assembly.pre_merge_runs, [[0, 14], [28, 42]])
+        assert assembly.runs.shape == (0, 2)  # too far apart, too short alone
+
+    def test_keeping_single_window_runs_lets_one_link_a_merge(self):
+        """The sensitivity setting for the reference's unvendored ``seqle``,
+        whose length convention decides whether such a window survives."""
+        config = MemorylessSequenceConfig(drop_single_window_runs=False)
+
+        assembly = self.assemble(self.linked_by_one_window(), config=config)
+
+        np.testing.assert_array_equal(
+            assembly.pre_merge_runs, [[0, 14], [21, 21], [28, 42]]
+        )
+        np.testing.assert_array_equal(assembly.runs, [[0, 42]])
+
     def test_the_duration_filter_keeps_twenty_six_windows_at_a_four_ms_stride(self):
         kept = np.zeros(40, dtype=bool)
         kept[:26] = True

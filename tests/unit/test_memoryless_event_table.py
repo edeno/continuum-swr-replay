@@ -619,3 +619,38 @@ class TestSampledBoundaries:
 
         assert table.overlap_class.iloc[0] == "swr_contained"
         assert (table.overlap_class.iloc[1:] == "unknown").all()
+
+
+def test_a_sequence_merged_from_single_windows_has_no_consecutive_jump():
+    """With single-window runs kept, a sequence can be made of them alone; its
+    jumps are all bridges, and there is no consecutive-window jump to report."""
+    config = MemorylessSequenceConfig(drop_single_window_runs=False)
+    posterior = np.array([delta(20) if k % 3 == 0 else blurred(20) for k in range(60)])
+    grid = (START_S - 0.04) + np.arange(
+        60 * config.stride_n_samples + config.window_n_samples
+    ) / config.sampling_frequency
+    midpoint_s = grid[
+        config.window_n_samples // 2 + config.stride_n_samples * np.arange(60)
+    ]
+    centers = np.arange(N_BINS) * BIN_CM
+    distance = np.abs(centers[:, None] - centers[None, :])
+    candidates = detect_candidate_sequences(
+        posterior, midpoint_s, distance, np.zeros(60), config
+    )
+
+    table = build_memoryless_event_table(
+        candidates,
+        IDENTITY,
+        speed_time_s=grid,
+        speed_cm_per_s=np.zeros(grid.size),
+        bin_distance_cm=distance,
+        swr_intervals=None,
+        swr_observed_intervals=None,
+        swr_definition="none",
+        shuffle_results={},
+    )
+
+    assert len(table) == 1
+    assert table.n_pieces.iloc[0] == 20
+    assert np.isnan(table.max_jump_cm.iloc[0])
+    assert table.max_bridge_cm.iloc[0] == 0.0

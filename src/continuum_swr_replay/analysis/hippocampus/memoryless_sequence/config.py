@@ -72,6 +72,11 @@ class MemorylessSequenceConfig:
         exactly 0.100 s is kept with ``is_replay`` False.
     dispersion_threshold_cm : float
         Smallest spatial dispersion of a replay event, 12.0 cm. Retained.
+    drop_single_window_runs : bool
+        Drop runs of one kept window before merging, True. Whether the
+        reference does depends on the length convention of ``seqle``, which is
+        vendored nowhere; False is the sensitivity setting, in which a lone
+        window can link two runs into one merge.
 
     """
 
@@ -86,12 +91,17 @@ class MemorylessSequenceConfig:
     merge_gap_s: float = 0.050
     minimum_duration_s: float = 0.100
     dispersion_threshold_cm: float = 12.0
+    drop_single_window_runs: bool = True
 
     def __post_init__(self) -> None:
         # every setting is a duration, a rate or a threshold, so every one
         # must be a positive number
         for setting in fields(self):
             value = getattr(self, setting.name)
+            if setting.name == "drop_single_window_runs":
+                if not isinstance(value, bool):
+                    raise TypeError(f"{setting.name} must be True or False.")
+                continue
             if isinstance(value, bool) or not (math.isfinite(value) and value > 0):
                 raise ValueError(
                     f"{setting.name} must be a positive finite number, got {value!r}."

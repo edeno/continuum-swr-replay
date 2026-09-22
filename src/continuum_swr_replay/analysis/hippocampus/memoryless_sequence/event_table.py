@@ -268,8 +268,9 @@ def _path_statistics(
         "mean_posterior_spread_cm": float(
             np.mean(candidates.decisions.spread_cm[retained])
         ),
-        "max_jump_cm": float(jumps.max()),
-        "mean_jump_cm": float(jumps.mean()),
+        # a sequence merged from single windows alone has no consecutive jump
+        "max_jump_cm": float(jumps.max()) if jumps.size else float("nan"),
+        "mean_jump_cm": float(jumps.mean()) if jumps.size else float("nan"),
         "max_bridge_cm": float(bridges.max()) if bridges.size else float("nan"),
         "path_distance_cm": float(jumps.sum() + bridges.sum()),
     }
