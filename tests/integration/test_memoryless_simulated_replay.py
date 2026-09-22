@@ -34,10 +34,19 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import
     CandidateSequences,
     detect_candidate_sequences,
 )
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.epoch import (
+    run_epoch,
+)
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.event_table import (
+    SequenceIdentity,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
     clusterless_epoch_log_likelihood,
     interior_bin_distances_cm,
     window_midpoints_s,
+)
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
+    ShuffleSeed,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
     aggregate_windows,
@@ -385,3 +394,99 @@ class TestSilence:
 
         assert gates.has_center.all()
         assert not gates.spread_below_threshold.any()
+
+
+class TestWholeEpoch:
+    """``run_epoch`` strings every step together, the shuffle included.
+
+    Its table must be the detector's output, row for row, and the shuffle must
+    run on exactly the candidates the published definition would test.
+    """
+
+    N_SHUFFLES = 40
+    IDENTITY = SequenceIdentity(
+        animal="sim", day=1, epoch="02_r1", brain_area="HPC", run_id="integration"
+    )
+    SEED = ShuffleSeed(run=1, session="sim_02_r1_HPC")
+
+    def run(self, simulation, seed):
+        replay_time_s, multiunits, _ = continuous(SLOW_SPEEDUP)
+        spike_times, features = as_spike_lists(
+            replay_time_s, multiunits, REPLAY_START_S
+        )
+        time = np.arange(round(EPOCH_S * SAMPLING_FREQUENCY)) / SAMPLING_FREQUENCY
+        return run_epoch(
+            time,
+            np.full(time.size, TRACK_HEIGHT_CM / 2.0),  # parked, as in detect()
+            np.zeros(time.size),  # and still throughout
+            spike_times,
+            features,
+            simulation.encoding_model,
+            self.IDENTITY,
+            swr_intervals=None,
+            swr_observed_intervals=None,
+            swr_definition="none",
+            seed=seed,
+            config=CONFIG,
+            n_shuffles=self.N_SHUFFLES,
+        )
+
+    @pytest.fixture(scope="class")
+    def epoch_run(self, simulation):
+        return self.run(simulation, self.SEED)
+
+    def test_the_table_is_the_detector_output(self, epoch_run, simulation):
+        direct = detect(simulation, *continuous(SLOW_SPEEDUP)).candidates
+
+        np.testing.assert_array_equal(epoch_run.candidates.runs, direct.runs)
+        np.testing.assert_array_equal(epoch_run.table.is_replay, direct.is_replay)
+        np.testing.assert_allclose(epoch_run.table.dispersion_cm, direct.dispersion_cm)
+
+    def test_every_replay_of_a_still_animal_is_shuffled(self, epoch_run):
+        table = epoch_run.table
+        tested = table[table.n_shuffles > 0]
+
+        assert table.is_replay.any()
+        np.testing.assert_array_equal(table.n_shuffles > 0, table.is_replay)
+        assert (tested.n_shuffles == self.N_SHUFFLES).all()
+
+    def test_every_draw_is_kept_against_its_event(self, epoch_run):
+        tested = epoch_run.table[epoch_run.table.n_shuffles > 0]
+        draws = epoch_run.shuffle_draws
+
+        assert len(draws) == self.N_SHUFFLES * len(tested)
+        assert set(draws.ms_event_id) == set(tested.ms_event_id)
+
+    def test_the_spread_test_separates_and_the_jump_test_cannot(
+        self, epoch_run, simulation
+    ):
+        """A property of the shuffle on this simulation, recorded so the
+        mechanism is on file before the real-data pilot.
+
+        The simulation gives each electrode one stretch of track. A shuffle
+        within an electrode keeps that stretch, so a shuffled decode still
+        knows roughly where the replay is and its center still sweeps the
+        track. For a sweep the mean jump is close to the path length over the
+        number of windows, so it survives the shuffle; the spread, which does
+        depend on which mark goes with which place, does not. CA1 tetrodes are
+        not topographic and should keep less position in their identity, but
+        how much less has to be measured, not assumed.
+        """
+        footprints = [
+            (float(np.min(positions)), float(np.max(positions)))
+            for positions in simulation.encoding_model["encoding_positions"]
+        ]
+        replay = epoch_run.table[epoch_run.table.is_replay].iloc[0]
+
+        # each electrode covers well under half of the 175 cm track
+        assert all(high - low < TRACK_HEIGHT_CM / 2 for low, high in footprints)
+        assert replay.shuffle_testable
+        assert replay.p_spread < 0.05
+        assert replay.p_jump > 0.05
+        assert not replay.shuffle_pass
+
+    def test_no_seed_runs_no_shuffle(self, simulation):
+        unshuffled = self.run(simulation, seed=None)
+
+        assert (unshuffled.table.n_shuffles == 0).all()
+        assert unshuffled.shuffle_draws.empty

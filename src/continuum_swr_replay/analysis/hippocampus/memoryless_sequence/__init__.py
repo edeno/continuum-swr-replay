@@ -17,7 +17,8 @@ to timestamp them; ``interior_bin_distances_cm`` for the track geometry; and
 ``detect_candidate_sequences`` for everything downstream of decoding. Then
 ``shuffle_eligible`` picks the candidates to test, ``shuffle_candidate`` tests
 each against encoding-pair shuffles, and ``build_memoryless_event_table``
-writes one row per candidate.
+writes one row per candidate. ``run_epoch`` does all of it, in that order, for
+one epoch.
 """
 
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import (
@@ -26,6 +27,10 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (
     CandidateSequences,
     detect_candidate_sequences,
+)
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.epoch import (
+    EpochDetection,
+    run_epoch,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.event_table import (
     MEMORYLESS_EVENT_TABLE_DTYPES,
@@ -55,6 +60,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics im
 __all__ = [
     "MEMORYLESS_EVENT_TABLE_DTYPES",
     "CandidateSequences",
+    "EpochDetection",
     "EpochLikelihood",
     "MemorylessSequenceConfig",
     "SequenceIdentity",
@@ -68,6 +74,7 @@ __all__ = [
     "interior_bin_distances_cm",
     "load_clusterless_encoding_model",
     "normalize_windows",
+    "run_epoch",
     "shuffle_candidate",
     "shuffle_eligible",
     "sorted_spikes_epoch_log_likelihood",
