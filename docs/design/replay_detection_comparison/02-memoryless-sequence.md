@@ -131,14 +131,18 @@ resolved.
   explicit adaptation, not an equivalence between the 2D statistic and a 1D SD. In
   the reference driver the raw spread is compared with `sequence_posteriorSpreadThr /
   binSize`, so even the raw numerical threshold must be distinguished from its label.
-- **Two bugs in the published shuffle script** (`zenodo_15199609/load_replayEvents_cellIDshuffle.m`),
-  which affect that script's significance-filtered outputs: line 137 passes the all-NaN p-value
-  vector to `compute_sequenceJumps` instead of the posterior COM, so that script's
-  jump-size p-values are meaningless; and lines 122–123 index `timeBins_sub{i}` by loop
-  counter while writing to `ind_replay(i)`, re-decoding the wrong candidate. Recorded
-  as implementation discrepancies, not evidence that the paper omitted significance.
-  `load_replayEvents_cellIDshuffle_sameEvents.m` computes jumps from the posterior COM.
-  The clusterless adaptation below uses a simpler encoding-pair permutation.
+- **Two bugs in the published detection script** (`zenodo_15199609/load_replayEvents_cellIDshuffle.m`),
+  which affect that script's own significance filter: line 137 passes the all-NaN p-value
+  vector to `compute_sequenceJumps` instead of the posterior COM, so every jump mean is
+  NaN, `nansum(NaN < NaN)` is 0, and every event gets p = 1/101 on jump and passes that
+  half; and lines 122–123 index `timeBins_sub{i}` by loop counter while writing to
+  `ind_replay(i)`, re-decoding the wrong candidate. That script's filter was therefore
+  spread-only, on the wrong windows. The paper's analyses do not use it:
+  `plot_replayEvents_rippleStats_allSessions.m` loads `replayEvents_cellIDshuffle_sameEvents`
+  (line 673) and requires both p-values `<= 0.05` (lines 926–927), from
+  `load_replayEvents_cellIDshuffle_sameEvents.m`, which computes jumps from the posterior
+  COM on the saved events. The port follows that corrected script, and the sweep reports a
+  spread-only rate beside it to bracket the difference.
 - **Run lengths are index differences.** `compute_allSequences_NaNseparated_merge.m`
   recomputes `lengths = boundaries(:,2) − boundaries(:,1)` for every run, merged or not,
   so the 100 ms filter (`lengths < sequence_durationThr/shiftSizeDecoding`, driver line
@@ -220,8 +224,20 @@ candidate's first window, the draw and the electrode, so draw `k` does not depen
 many draws there are. The reference passes at `p <= 0.05` and the paper says `p < 0.05`;
 at 100 draws the p-values are multiples of 1/101 and the two agree.
 
-**What the jump half of the test does on simulated data.** Measured before any real
-data, and the reason the pilot must inspect both nulls:
+**For sorted cells, the reference's own shuffle** (`shuffle_candidate_sorted`): whole
+place fields are swapped between cells, `rateMap(ind_rand, :)`, so each cell's spikes
+are decoded with another cell's field. The row likelihood is
+`sum_n count_n log field_n(x) - sum_n field_n(x)` and a draw permutes only the first
+term, which the code computes as `counts @ log(fields[pi])`; tests pin it to the
+library run on swapped fields. The simulations, which are sorted, use it; recorded data,
+decoded clusterless, use the encoding-pair shuffle. On a correctly decoded moving
+trajectory it is the mirror image of the encoding-pair shuffle: the jump test separates
+(observed below every one of 100 draws) and the spread test does not (p 0.3 to 0.5 at 15
+and 30 Hz), because a swapped field still gives a sharp posterior, but one that hops
+between fields. Its effect on the sweep is under "Parameter sweep over injected replays".
+
+**What the jump half of the encoding-pair test does on simulated data.** Measured before
+any real data, and the reason the pilot must inspect both nulls:
 
 - *One tetrode, five units, fields tiling a linear track, decoded in-sample.* The decode
   follows the animal to within a bin. The spread test separates at once: observed mean
@@ -371,7 +387,7 @@ scored against it. The text below calls these injected replays. 4536 cells, sort
 spikes on a linear track. Every number below comes from
 [detection_sweep_summary.csv](detection_sweep_summary.csv), which that script
 writes; the full per-cell table goes to `Processed-Data` and is not tracked.
-The sweep takes about five minutes to reproduce, and
+The sweep takes about four minutes to reproduce, and
 `scripts/figures/generate_memoryless_comparison.py` draws the lower panels of
 the supplemental figure from the same file.
 
@@ -401,8 +417,30 @@ sliding-window detector for sequences built out of the local coding beside the
 injection: those reach 38 to 162 cm of decoded track for injections of 10 to
 30 cm.
 
+The sliding window is held to the whole published definition, its significance test
+included: every accepted sequence that overlaps the injection meets 100 draws of the
+reference's place-cell identity shuffle, and counts as the injected replay only if it
+beats them on both halves. `sliding_matches` is that rate;
+`sliding_matches_before_shuffle` leaves the test out, and `sliding_matches_spread_only`
+applies its spread half alone, which is what the detection script's own filter could
+fail.
+
 **Detection depends on different things for the two procedures.** Percent of
-injected replays found, by path length and duration:
+injected replays found under the whole published definition, by path length and
+duration:
+
+| path (cm) | 40 ms | 60 ms | 80 ms | 120 ms | 200 ms | 300 ms | 500 ms |
+|---|---|---|---|---|---|---|---|
+| 10 | 0 | 0 | 0 | 1 | 1 | 1 | 2 |
+| 20 | 0 | 1 | 0 | 2 | 2 | 2 | 8 |
+| 30 | 0 | 0 | 0 | 2 | 4 | 6 | 9 |
+| 45 | 0 | 1 | 2 | 6 | 18 | 18 | 35 |
+| 60 | 3 | 5 | 10 | 15 | 23 | 43 | 58 |
+| 90 | 0 | 6 | 11 | 33 | 40 | 60 | 71 |
+| 130 | 4 | 12 | 8 | 42 | 71 | 79 | 88 |
+| any path (state-space) | 62-74 | 78-96 | 86-92 | 88-97 | 98-100 | 100 | 100 |
+
+And before the significance test:
 
 | path (cm) | 40 ms | 60 ms | 80 ms | 120 ms | 200 ms | 300 ms | 500 ms |
 |---|---|---|---|---|---|---|---|
@@ -413,21 +451,36 @@ injected replays found, by path length and duration:
 | 60 | 10 | 21 | 38 | 52 | 65 | 72 | 80 |
 | 90 | 8 | 24 | 42 | 60 | 69 | 74 | 88 |
 | 130 | 21 | 33 | 42 | 67 | 88 | 96 | 96 |
-| any path (state-space) | 62-74 | 78-96 | 86-92 | 88-97 | 98-100 | 100 | 100 |
 
 The sliding window is governed by path length, which is one of its criteria.
 The state-space model is governed by duration, which is spike count, which is
 the data. Below about 45 cm the sliding window finds a few percent of
 injections at any duration and any firing rate.
 
-**Three rates, not one, because they answer different questions.** Over all
+**Several rates, not one, because they answer different questions.** Over all
 4536 cells the sliding window built an overlapping candidate 84% of the time,
-accepted one under the published replay definition 34% of the time, and
-reported the injected event 22% of the time. The state-space model reported
-non-local activity 91% of the time, and it was the injected event 91% of the
-time. Quoting 34% against 91% compares "replay, classified" with "non-local,
-detected"; 84% against 91% is the nearer comparison of whether anything was
-seen at all.
+accepted one on duration and dispersion 34% of the time, and that sequence was
+the injected event 22% of the time. The significance test then halves that: 11%
+under the whole published definition, 14% with its spread half alone. The
+state-space model reported non-local activity 91% of the time, and it was the
+injected event 91% of the time. Quoting 34% against 91% compares "replay,
+classified" with "non-local, detected"; 84% against 91% is the nearer comparison of
+whether anything was seen at all.
+
+**The significance test fails short, fast replays on its jump half.** Among the
+injected replays the sliding window reported before the test, the share passing each
+half, by duration:
+
+| true duration | 40 ms | 60 ms | 80 ms | 120 ms | 200 ms | 300 ms | 500 ms |
+|---|---|---|---|---|---|---|---|
+| spread half | 83% | 66% | 60% | 62% | 58% | 65% | 74% |
+| jump half | 21% | 36% | 48% | 72% | 87% | 92% | 98% |
+
+A short replay covers its path in few windows, so its own jumps are large, and the
+shuffled posteriors, sharp but hopping between swapped fields, do not jump further. The
+spread half passes about two thirds of replays at every duration, as a swapped field
+still gives a sharp posterior. Overall 66% pass the spread half and 81% the jump half
+(`shuffle_pass_rate_by_duration`, and `sliding_shuffle_*_pass_rate` in `overall`).
 
 **More than a third (36%) of the sliding window's accepted events are not the
 injected event.** They are absorbed local coding that overlaps it. This is the
@@ -455,12 +508,13 @@ read 94% rather than 91%. About 4% of the state-space detector's reports come
 as more than one interval, and the best of them answers for the cell, as the
 best of several accepted sliding-window sequences does (0.5% of cells).
 
-**Almost no cell in the sweep was found by the sliding window and missed by the
-state-space model** — six of 4536, 0.13%. 69% of cells went the other way. Of
-those, 63% built a candidate that then failed dispersion and 19% built no
-candidate at all, while the median share of windows passing the spread criterion
-inside the event was 1.00. The spread gate is not what loses these events;
-dispersion is.
+**No cell in the sweep was found by the sliding window and missed by the
+state-space model** under the published definition (six of 4536 before the
+significance test). 80% of cells went the other way. Of those, 55% built a
+candidate that then failed dispersion, 17% built no candidate at all, and 13% were
+the injected replay but failed the significance test, while the median share of
+windows passing the spread criterion inside the event was 1.00. The spread gate is
+not what loses these events; dispersion is, and after it the significance test.
 
 **The path-length limit belongs to the replay definition, not to the inference.**
 A uniform traverse of length L has dispersion L/sqrt(12), so the published 12 cm
@@ -469,20 +523,23 @@ decoded. Scoring our own state-space events under that same criterion confirms
 it: their median dispersion is 2.5, 4.5 and 6.5 cm for injected paths of 10, 20
 and 30 cm, and the rule would reject 100% of them. Above the floor the two are
 of the same order under that rule — 31% against 26% at 45 cm, 48% against 43% at
-60 cm, 63% against 46% at 130 cm (sliding window first; `by_path` in the
-summary). This is recorded as `state_space_replay_matches` in the
+60 cm, 63% against 46% at 130 cm (the sliding window first, before its significance
+test, since the state-space events are held to duration and dispersion alone;
+`by_path` in the summary). This is recorded as `state_space_replay_matches` in the
 summary. It is a diagnostic of *why* the sliding window misses short paths, not
 a rate to quote against `sliding_matches`: the two procedures are compared as
 published, against the injected event.
 
 **Where the published criteria can accept an event at all** — path over about
-42 cm and duration over 100 ms, 25% of the grid — the sliding window reports 64%
-and the state-space model 99% (`overall_in_domain`). The remaining three
+42 cm and duration over 100 ms, 25% of the grid — the sliding window reports 37%
+under the whole published definition (64% before its significance test, 41% with the
+spread half alone) and the state-space model 99% (`overall_in_domain`). The remaining three
 quarters of the grid are events the published method is defined not to call
 replays. That is a property of the method worth measuring, and it is why the
 whole-grid rate is much lower than the in-domain rate.
 
-**Reported duration, among events both procedures reported:**
+**Reported duration, among events both procedures reported** (the sliding window's
+before its significance test, which never moves a sequence's bounds):
 
 | true duration | 40 ms | 60 ms | 80 ms | 120 ms | 200 ms | 300 ms | 500 ms |
 |---|---|---|---|---|---|---|---|
@@ -762,9 +819,12 @@ Table `memoryless_event_table`, one row per candidate sequence, accepted or not 
 built by `event_table.build_memoryless_event_table`. Its columns and dtypes are declared
 once, in `MEMORYLESS_EVENT_TABLE_DTYPES`, and held for an empty epoch too.
 
-- **Identity** — `animal`, `day`, `epoch`, `brain_area`, `run_id` (joins to the run
+- **Identity** — `animal`, `day`, `epoch`, `brain_area`, `epoch_id` (the decode's full
+  identifier; one epoch can be decoded more than one way), `run_id` (joins to the run
   manifest), `swr_definition` (the ripple detector the SWR labels come from, read from
   the epoch identifier), `sequence_label` (1-based, in time order), `ms_event_id`
+  (hashed from the decode's identifier, the run and the sequence's windows, so two
+  decodes or two runs never share a key)
 - **Timing (seconds)** — `event_start_s`, `event_end_s`, `event_duration_s`,
   `event_midpoint_s`: the first and last retained window midpoint
 - **Decoding support (seconds)** — `support_start_s`, `support_end_s`, half a window wider
@@ -782,13 +842,14 @@ once, in `MEMORYLESS_EVENT_TABLE_DTYPES`, and held for an empty epoch too.
 - **SWR** — `is_swr` (nullable), `overlap_class`, `overlap_subclass`,
   `n_swrs_overlapping`, `matched_swr_event`, `matched_swr_start`, `matched_swr_end`,
   against `canonical_swr_intervals`. An event not wholly inside an interval where the
-  labels were observed (`observed_label_intervals`) has `overlap_class = "unknown"`, never
+  labels were observed (`observed_intervals` on `SWR_zscore`) has `overlap_class = "unknown"`, never
   `non_swr`.
 - **Shuffle** — `shuffle_observed_spread_cm`, `shuffle_observed_jump_cm`, `p_spread`,
   `p_jump`, `shuffle_testable`, `shuffle_pass`, `n_shuffles`. `n_shuffles == 0` marks a
   candidate that was not tested, apart from one tested and untestable. Because only
   replay-criteria, whole-event-still candidates are tested, `shuffle_pass` alone selects
-  the published replay definition.
+  the published replay definition together with this project's whole-event immobility
+  rule.
 
 Sidecar `memoryless_shuffle_draws`: `ms_event_id`, `draw`, `null_spread_cm`,
 `null_jump_cm`, one row per draw, for the null-distribution audit. The per-window
@@ -853,13 +914,25 @@ Carried deliberately; each must be checked against real data before results are 
 4. **Window likelihoods match direct computation for saved models and long epochs** —
    the additive algebra depends on matching sample units, spike support, and boundary
    conventions; numerical accuracy still needs the explicit tests above.
-5. **Missing LFP is coded as a missing `SWR_event` label** — `observed_label_intervals`
-   treats a NaN label as unobserved. If `data_over_time` writes 0 where the LFP was
-   missing, an event there reads as observed and non-SWR. Check how the labels are
-   written before any non-SWR fraction is quoted.
+5. **Resolved: missing LFP is not visible in `SWR_event`.** The label is written as an
+   integer and is never NaN, so an event during missing LFP would read as observed and
+   non-SWR. Coverage is read from `SWR_zscore` instead, which `get_data_over_time`
+   reindexes onto the grid with a 4 ms tolerance and leaves NaN where there is no LFP
+   (`observed_intervals`). The canonical event table has the same gap.
 6. **`data_over_time` sits on the decode's uniform 500 Hz grid, without gaps** — the
    runner uses its index as the decode grid, and `validate_time_grid` refuses anything
    else, so a violation stops the run rather than passing silently.
 7. **How much position a tetrode's identity carries** — it decides how weak the
    within-electrode shuffle is (see "What the jump half of the test does on simulated
    data"). Measure it on the pilot epochs.
+8. **Open decision: non-SWR events are decoded partly from their own spikes.** The
+   decode trains on `no_ripple`, which excludes only ripple times
+   (`data_loaders/utils.py:get_training_timepoints`), so the spikes of an immobile
+   non-SWR event are also encoding spikes, while an SWR event's are not. In the observed
+   decode each such spike's own mark-position pair puts weight at the animal's place;
+   the shuffle removes it. The reference is out-of-sample throughout (rate maps from
+   running above 10 cm/s). The asymmetry falls on the SWR/non-SWR split, and it applies
+   to our state-space cohort as well, since both read one encoding model. Two remedies
+   are open: leave-event-out encoding, dropping encoding spikes inside the candidate's
+   decoding support from the kernel sums; or the running-only refit spec 03 already
+   defers. Decide before any non-SWR fraction is quoted.
