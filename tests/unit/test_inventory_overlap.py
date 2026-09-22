@@ -27,6 +27,11 @@ OTHER = SessionIdentity(animal="sim", day=20200101, epoch="04_r2", brain_area="H
 KEY = ("sim", 20200101, "02_r1")
 
 
+def key(detector, native):
+    """The event key of an event in the test epoch."""
+    return f"{detector}:sim20200101_02_r1:{native}"
+
+
 def events(detector, spans, session=EPOCH):
     starts = np.array([a for a, _ in spans], dtype=float)
     ends = np.array([b for _, b in spans], dtype=float)
@@ -164,10 +169,10 @@ class TestDirectionalAgreement:
             1,
         )
         crossing = matches[
-            (matches.event_key == "A:1") & (matches.other_detector == "B")
+            (matches.event_key == key("A", 1)) & (matches.other_detector == "B")
         ]
         assert crossing.membership.item() == "unknown"
-        assert inventory.set_index("event_key").loc["A:1", "event_end_s"] == 55.0
+        assert inventory.set_index("event_key").loc[key("A", 1), "event_end_s"] == 55.0
 
     def test_a_counterpart_crossing_the_boundary_still_confirms_an_overlap(self):
         """The counterpart was observed; it need not qualify for the reverse
@@ -238,6 +243,35 @@ class TestDirectionalAgreement:
 
 
 class TestEventMatches:
+    def test_native_keys_repeating_across_epochs_never_match_across_them(self):
+        """SWR labels restart in every epoch; an overlap in one epoch must not
+        mark the same-numbered events of another."""
+        inventory = pd.concat(
+            [
+                events("A", [(10, 20)]),
+                events("K", [(12, 14)]),
+                events("A", [(50, 60)], session=OTHER),
+                events("K", [(80, 90)], session=OTHER),
+            ],
+            ignore_index=True,
+        )
+        coverage = everywhere("A", "K") | everywhere(
+            "A", "K", session_key=("sim", 20200101, "04_r2")
+        )
+
+        matches = event_matches(inventory, overlap_pairs(inventory), coverage)
+        agreement = directional_agreement(inventory, overlap_pairs(inventory), coverage)
+
+        by_epoch = matches.groupby("epoch").membership.agg(sorted).to_dict()
+        assert by_epoch == {
+            "02_r1": ["matched", "matched"],
+            "04_r2": ["unmatched", "unmatched"],
+        }
+        assert agreement.groupby("epoch").n_matched.sum().to_dict() == {
+            "02_r1": 2,
+            "04_r2": 0,
+        }
+
     def test_one_row_per_event_and_other_detector(self):
         inventory = pd.concat(
             [events("A", [(10, 20), (30, 40)]), events("B", [(12, 18)])],
@@ -251,9 +285,9 @@ class TestEventMatches:
         assert list(matches.columns) == list(MATCH_DTYPES)
         assert len(matches) == 3
         by_key = matches.set_index("event_key")
-        assert by_key.loc["A:0", "membership"] == "matched"
-        assert by_key.loc["A:1", "membership"] == "unmatched"
-        assert by_key.loc["A:0", "n_counterparts"] == 1
+        assert by_key.loc[key("A", 0), "membership"] == "matched"
+        assert by_key.loc[key("A", 1), "membership"] == "unmatched"
+        assert by_key.loc[key("A", 0), "n_counterparts"] == 1
 
 
 class TestBridgingEvents:
@@ -273,13 +307,15 @@ class TestBridgingEvents:
 
         kept, adjusted = remove_bridging_events(inventory, coverage)
 
-        assert kept.event_key.tolist() == ["A:1", "B:0"]
+        assert kept.event_key.tolist() == [key("A", 1), key("B", 0)]
         np.testing.assert_array_equal(
             adjusted[(*KEY, "A")].exposure, [[0.0, 10.0], [30.0, 100.0]]
         )
         # B's event now sits in time A did not observe: unknown, not unmatched
         matches = event_matches(kept, overlap_pairs(kept), adjusted)
-        assert matches.set_index("event_key").loc["B:0", "membership"] == "unknown"
+        assert (
+            matches.set_index("event_key").loc[key("B", 0), "membership"] == "unknown"
+        )
 
     def test_an_event_across_movement_it_observed_is_kept(self):
         """Movement is observed time: such an event is not bridging, it just
@@ -296,7 +332,7 @@ class TestBridgingEvents:
 
         kept, adjusted = remove_bridging_events(inventory, coverage)
 
-        assert kept.event_key.tolist() == ["A:0", "B:0"]
+        assert kept.event_key.tolist() == [key("A", 0), key("B", 0)]
         assert adjusted[(*KEY, "A")] is coverage[(*KEY, "A")]
 
 

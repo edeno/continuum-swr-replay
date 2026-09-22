@@ -5,14 +5,16 @@ The span of an event is ``event_end_s - event_start_s`` for every detector,
 because the native durations follow different conventions: our canonical
 table adds one sample width to the span, the memoryless detector does not.
 The native duration is kept beside the span and never stands in for it.
-Keys are namespaced by detector, ``"<detector>:<native key>"``, so two
-inventories never share one.
+Keys name the detector and the epoch, ``"<detector>:<animal><day>_<epoch>:<native
+key>"``, so no two events of any comparison share one: an SWR detector's native
+keys restart in every epoch, and a join on a key that repeated across epochs
+would match events that never overlapped.
 
 Detector-specific statistics stay in each detector's own table; this schema
 carries only what every detector has.
 """
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 
@@ -27,6 +29,7 @@ from continuum_swr_replay.analysis.hippocampus.event_immobility import (
 __all__ = [
     "INVENTORY_DTYPES",
     "SessionIdentity",
+    "combine_inventories",
     "empty_inventory",
     "from_classified_nonlocal_table",
     "from_memoryless_table",
@@ -102,8 +105,60 @@ def validate_inventory(inventory: pd.DataFrame) -> pd.DataFrame:
     if not np.allclose(table.event_midpoint_s.to_numpy(), (start + end) / 2):
         raise ValueError("event_midpoint_s must be halfway between the bounds.")
     if not table.event_key.is_unique:
-        raise ValueError("An event key repeats; keys are namespaced by detector.")
+        raise ValueError("An event key repeats; keys name the detector and epoch.")
     return table
+
+
+def combine_inventories(
+    inventories: Iterable[pd.DataFrame],
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Every inventory in one table, split by whole-event speed eligibility.
+
+    Only speed-eligible events are compared: an event during movement cannot
+    mark a still one as matched, as the canonical SWR labels are speed-gated
+    before they mark a non-local event.
+
+    Parameters
+    ----------
+    inventories : iterable of DataFrame
+        Each in the common schema.
+
+    Returns
+    -------
+    eligible : DataFrame
+        The speed-eligible events, in the common schema.
+    moving : DataFrame
+        The rest, kept so native counts can be reported beside eligible ones.
+
+    Raises
+    ------
+    ValueError
+        A key repeats across the inventories.
+
+    """
+    combined = validate_inventory(
+        pd.concat([empty_inventory(), *inventories], ignore_index=True)
+    )
+    eligible = combined.whole_event_speed_eligible
+    return (
+        combined[eligible].reset_index(drop=True),
+        combined[~eligible].reset_index(drop=True),
+    )
+
+
+def _event_keys(
+    detector: str, animal: object, day: object, epoch: object, native: object
+) -> list[str]:
+    """``"<detector>:<animal><day>_<epoch>:<native key>"`` for each event.
+
+    ``animal``, ``day`` and ``epoch`` are one value or one per event.
+    """
+    n_events = len(native)
+    columns = [
+        np.broadcast_to(np.asarray(values, dtype=object), (n_events,))
+        for values in (animal, day, epoch, native)
+    ]
+    return [f"{detector}:{a}{d}_{e}:{k}" for a, d, e, k in zip(*columns, strict=True)]
 
 
 def _finish(frame: pd.DataFrame) -> pd.DataFrame:
@@ -175,7 +230,9 @@ def inventory_from_intervals(
             "epoch": session.epoch,
             "brain_area": session.brain_area,
             "detector": detector,
-            "event_key": [f"{detector}:{key}" for key in keys],
+            "event_key": _event_keys(
+                detector, session.animal, session.day, session.epoch, keys
+            ),
             "run_id": run_id,
             "event_start_s": starts,
             "event_end_s": ends,
@@ -203,7 +260,13 @@ def from_classified_nonlocal_table(
             "epoch": classified.epoch,
             "brain_area": brain_area,
             "detector": STATE_SPACE,
-            "event_key": [f"{STATE_SPACE}:{key}" for key in classified.event_id],
+            "event_key": _event_keys(
+                STATE_SPACE,
+                classified.animal,
+                classified.day,
+                classified.epoch,
+                classified.event_id,
+            ),
             "run_id": run_id,
             "event_start_s": classified.event_start,
             "event_end_s": classified.event_end,
@@ -225,7 +288,9 @@ def from_memoryless_table(table: pd.DataFrame) -> pd.DataFrame:
             "epoch": table.epoch,
             "brain_area": table.brain_area,
             "detector": MEMORYLESS,
-            "event_key": [f"{MEMORYLESS}:{key}" for key in table.ms_event_id],
+            "event_key": _event_keys(
+                MEMORYLESS, table.animal, table.day, table.epoch, table.ms_event_id
+            ),
             "run_id": table.run_id,
             "event_start_s": table.event_start_s,
             "event_end_s": table.event_end_s,

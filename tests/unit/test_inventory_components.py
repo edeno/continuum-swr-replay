@@ -19,6 +19,11 @@ EPOCH = SessionIdentity(animal="sim", day=20200101, epoch="02_r1", brain_area="H
 OTHER = SessionIdentity(animal="sim", day=20200101, epoch="04_r2", brain_area="HPC")
 
 
+def key(detector, native):
+    """The event key of an event in the test epoch."""
+    return f"{detector}:sim20200101_02_r1:{native}"
+
+
 def events(detector, spans, session=EPOCH):
     return inventory_from_intervals(
         np.array([a for a, _ in spans], dtype=float),
@@ -48,7 +53,7 @@ def test_a_chain_is_one_component_with_its_span_not_an_interval():
     assert (chain.n_events, chain.n_pairs, chain.detectors) == (3, 2, "A+B+C")
     assert (chain.span_start_s, chain.span_end_s, chain.span_s) == (0, 30, 30)
     # each event keeps its own bounds; the component only labels them
-    assert events_table.set_index("event_key").loc["A:0", "event_end_s"] == 10
+    assert events_table.set_index("event_key").loc[key("A", 0), "event_end_s"] == 10
     assert events_table.component_id.nunique() == 1
     assert "event_start_s" not in components.columns
 
@@ -88,8 +93,8 @@ def test_components_are_numbered_by_onset_within_each_epoch():
     events_table, _ = components_of(events("A", [(50, 60), (0, 10)]))
 
     assert events_table.set_index("event_key").component_id.to_dict() == {
-        "A:1": 0,
-        "A:0": 1,
+        key("A", 1): 0,
+        key("A", 0): 1,
     }
 
 

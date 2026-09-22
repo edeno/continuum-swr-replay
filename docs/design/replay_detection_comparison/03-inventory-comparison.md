@@ -17,7 +17,9 @@ Each inventory produces one table, one row per event, over the same epochs and t
 speed-eligible population (overview X4). Every table carries:
 
 - **Identity** — `animal`, `day`, `epoch`, `brain_area`, `detector`, `event_index`,
-  and a detector-scoped key, `event_key` (`"<detector>:<native key>"`). Keys are never shared across inventories (overview X8).
+  and a key, `event_key` (`"<detector>:<animal><day>_<epoch>:<native key>"`), unique
+  across every inventory and epoch compared (overview X8): SWR and MUA native keys
+  restart in each epoch, so a key without the epoch would join events that never met.
 - **Timing (seconds)** — `event_start_s`, `event_end_s`, `interval_span_s`,
   `event_midpoint_s`. `interval_span_s` is defined identically everywhere as
   `event_end_s - event_start_s`, because the native duration conventions differ: our

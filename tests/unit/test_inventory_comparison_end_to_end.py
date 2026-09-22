@@ -58,6 +58,11 @@ EVENTS = {
 }
 
 
+def key(detector, native):
+    """The event key of an event in the test epoch."""
+    return f"{detector}:sim20200101_02_r1:{native}"
+
+
 @pytest.fixture(scope="module")
 def comparison():
     spikes = sample_runs(TIME, ~((TIME > 40.0) & (TIME < 41.0)))
@@ -96,7 +101,7 @@ def comparison():
 def test_only_the_event_across_its_own_window_gap_is_set_aside(comparison):
     kept, coverage, _, _ = comparison
 
-    assert f"{MEMORYLESS}:1" not in set(kept.event_key)
+    assert key(MEMORYLESS, 1) not in set(kept.event_key)
     assert len(kept) == sum(map(len, EVENTS.values())) - 1
     np.testing.assert_allclose(
         coverage[(*KEY, MEMORYLESS)].observed, [[0.04, 39.96], [41.2, 59.96]]
@@ -132,27 +137,27 @@ def test_the_cells_separate_unmatched_from_unknown(comparison):
     neither = membership_against(kept, matches, sources=[STATE_SPACE], against=[KAY])
 
     assert only_one.set_index("event_key").membership.to_dict() == {
-        f"{STATE_SPACE}:0": "matched",
-        f"{STATE_SPACE}:1": "unmatched",
-        f"{STATE_SPACE}:2": "unknown",  # MS lost this time to its bridging event
-        f"{STATE_SPACE}:3": "unknown",  # the LFP is missing
-        f"{STATE_SPACE}:4": "unknown",  # the animal is moving
-        f"{MEMORYLESS}:0": "matched",
-        f"{KAY}:0": "matched",
-        f"{KAY}:1": "unmatched",
+        key(STATE_SPACE, 0): "matched",
+        key(STATE_SPACE, 1): "unmatched",
+        key(STATE_SPACE, 2): "unknown",  # MS lost this time to its bridging event
+        key(STATE_SPACE, 3): "unknown",  # the LFP is missing
+        key(STATE_SPACE, 4): "unknown",  # the animal is moving
+        key(MEMORYLESS, 0): "matched",
+        key(KAY, 0): "matched",
+        key(KAY, 1): "unmatched",
     }
     assert swr_without_sequence.set_index("event_key").membership.to_dict() == {
-        f"{KAY}:0": "matched",
-        f"{KAY}:1": "unmatched",
+        key(KAY, 0): "matched",
+        key(KAY, 1): "unmatched",
     }
     # SS:2 is where MS lost coverage, but K observed it: the neither cell is
     # asked of the triggered inventory alone
     assert neither.set_index("event_key").membership.to_dict() == {
-        f"{STATE_SPACE}:0": "matched",
-        f"{STATE_SPACE}:1": "unmatched",
-        f"{STATE_SPACE}:2": "unmatched",
-        f"{STATE_SPACE}:3": "unknown",
-        f"{STATE_SPACE}:4": "unknown",
+        key(STATE_SPACE, 0): "matched",
+        key(STATE_SPACE, 1): "unmatched",
+        key(STATE_SPACE, 2): "unmatched",
+        key(STATE_SPACE, 3): "unknown",
+        key(STATE_SPACE, 4): "unknown",
     }
 
 
@@ -184,6 +189,6 @@ def test_missing_lfp_leaves_the_matrix_rather_than_reading_as_non_swr(comparison
     )
     matrix = swr_label_matrix(labels).set_index("cohort")
 
-    assert labels.set_index("event_key").loc[f"{STATE_SPACE}:3", "label"] == "unknown"
+    assert labels.set_index("event_key").loc[key(STATE_SPACE, 3), "label"] == "unknown"
     ss = matrix.loc[STATE_SPACE]
     assert (ss.n_events, ss.n_eligible, ss.n_swr, ss.n_non_swr) == (5, 3, 1, 2)

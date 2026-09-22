@@ -7,6 +7,7 @@ import pytest
 from continuum_swr_replay.analysis.inventory_comparison.schema import (
     INVENTORY_DTYPES,
     SessionIdentity,
+    combine_inventories,
     empty_inventory,
     from_classified_nonlocal_table,
     from_memoryless_table,
@@ -56,7 +57,10 @@ class TestInventoryFromIntervals:
     def test_keys_are_namespaced_by_detector_and_indexed_in_time_order(self):
         inventory = swr_inventory([GRID[100], GRID[10]], [GRID[140], GRID[30]])
 
-        assert inventory.event_key.tolist() == ["Kay:2", "Kay:1"]
+        assert inventory.event_key.tolist() == [
+            "Kay:sim20200101_02_r1:2",
+            "Kay:sim20200101_02_r1:1",
+        ]
         assert inventory.event_start_s.is_monotonic_increasing
         assert inventory.event_index.tolist() == [0, 1]
         assert all(key.startswith("Kay:") for key in inventory.event_key)
@@ -87,6 +91,53 @@ class TestInventoryFromIntervals:
                 speed_time_s=GRID,
                 speed_cm_per_s=still(),
             )
+
+
+class TestCombine:
+    """Keys must be unique across every epoch compared, or joins mis-match."""
+
+    def test_the_same_native_key_in_two_epochs_gives_two_keys(self):
+        other = SessionIdentity(
+            animal="sim", day=20200101, epoch="04_r2", brain_area="HPC"
+        )
+        first = swr_inventory([GRID[10]], [GRID[30]])
+        second = inventory_from_intervals(
+            np.array([GRID[10]]),
+            np.array([GRID[30]]),
+            native_keys=np.array([1]),
+            detector="Kay",
+            session=other,
+            run_id="run",
+            speed_time_s=GRID,
+            speed_cm_per_s=still(),
+        )
+
+        eligible, _ = combine_inventories([first, second])
+
+        assert eligible.event_key.tolist() == [
+            "Kay:sim20200101_02_r1:1",
+            "Kay:sim20200101_04_r2:1",
+        ]
+
+    def test_a_repeated_key_is_refused(self):
+        inventory = swr_inventory([GRID[10]], [GRID[30]])
+
+        with pytest.raises(ValueError, match="repeats"):
+            combine_inventories([inventory, inventory])
+
+    def test_events_during_movement_are_set_apart(self):
+        """A movement-spanning event cannot mark an immobile one."""
+        speed = still()
+        speed[20] = 9.0
+        inventory = swr_inventory([GRID[10], GRID[100]], [GRID[30], GRID[140]], speed)
+
+        eligible, moving = combine_inventories([inventory, empty_inventory()])
+
+        assert eligible.event_key.tolist() == ["Kay:sim20200101_02_r1:2"]
+        assert moving.event_key.tolist() == ["Kay:sim20200101_02_r1:1"]
+        for column, dtype in INVENTORY_DTYPES.items():
+            assert eligible[column].dtype == dtype, column
+            assert moving[column].dtype == dtype, column
 
 
 class TestEmpty:
@@ -126,7 +177,10 @@ class TestAdapters:
         )
 
         assert (inventory.detector == "state_space").all()
-        assert inventory.event_key.tolist() == ["state_space:111", "state_space:222"]
+        assert inventory.event_key.tolist() == [
+            "state_space:sim20200101_02_r1:111",
+            "state_space:sim20200101_02_r1:222",
+        ]
         np.testing.assert_allclose(
             inventory.native_duration_s - inventory.interval_span_s, 0.002
         )
@@ -151,6 +205,6 @@ class TestAdapters:
 
         inventory = from_memoryless_table(table)
 
-        assert inventory.event_key.tolist() == ["memoryless:42"]
+        assert inventory.event_key.tolist() == ["memoryless:sim20200101_02_r1:42"]
         assert inventory.run_id.tolist() == ["run"]
         assert list(inventory.columns) == list(INVENTORY_DTYPES)

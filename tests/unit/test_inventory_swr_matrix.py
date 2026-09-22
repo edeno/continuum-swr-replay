@@ -28,6 +28,11 @@ COHORTS = ["S1", "S2"]
 DEFINITIONS = ["K", "Y"]
 
 
+def key(detector, native):
+    """The event key of an event in the test epoch."""
+    return f"{detector}:sim20200101_02_r1:{native}"
+
+
 def events(detector, spans):
     return inventory_from_intervals(
         np.array([a for a, _ in spans], dtype=float),
@@ -78,12 +83,12 @@ def label_of(labels, key, definition):
 def test_labels_follow_strict_overlap_and_coverage(labelled):
     _, labels = labelled
 
-    assert label_of(labels, "S1:0", "K").label == "SWR"
-    assert label_of(labels, "S1:1", "K").label == "SWR"
-    assert label_of(labels, "S1:1", "Y").label == "non-SWR"
-    assert label_of(labels, "S1:2", "K").label == "SWR"
+    assert label_of(labels, key("S1", 0), "K").label == "SWR"
+    assert label_of(labels, key("S1", 1), "K").label == "SWR"
+    assert label_of(labels, key("S1", 1), "Y").label == "non-SWR"
+    assert label_of(labels, key("S1", 2), "K").label == "SWR"
     # during missing LFP the status is unknown, never non-SWR
-    assert label_of(labels, "S1:2", "Y").label == "unknown"
+    assert label_of(labels, key("S1", 2), "Y").label == "unknown"
 
 
 def test_the_matrix_uses_the_same_events_in_every_column(labelled):
@@ -133,16 +138,16 @@ def test_a_matched_pair_may_carry_different_labels_and_the_table_keeps_it(labell
         ["event_key_a", "event_key_b", "swr_definition"]
     )
 
-    first = paired.loc[("S1:0", "S2:0", "K")]
+    first = paired.loc[(key("S1", 0), key("S2", 0), "K")]
     assert (first.label_a, first.label_b, first.agreement) == (
         "SWR",
         "non-SWR",
         "disagree",
     )
-    assert paired.loc[("S1:0", "S2:0", "Y")].agreement == "disagree"
-    assert paired.loc[("S1:2", "S2:1", "K")].agreement == "agree"
+    assert paired.loc[(key("S1", 0), key("S2", 0), "Y")].agreement == "disagree"
+    assert paired.loc[(key("S1", 2), key("S2", 1), "K")].agreement == "agree"
     # inside Y's gap neither label is known, so neither is their agreement
-    assert paired.loc[("S1:2", "S2:1", "Y")].agreement == "unknown"
+    assert paired.loc[(key("S1", 2), key("S2", 1), "Y")].agreement == "unknown"
     assert len(paired) == 4
 
 
@@ -151,11 +156,11 @@ def test_where_definitions_disagree_about_an_event_it_is_reported(labelled):
 
     disagreement = definition_disagreement(labels).set_index("event_key")
 
-    assert disagreement.loc["S1:0", "definitions_disagree"] == False  # noqa: E712
-    assert disagreement.loc["S1:1", "definitions_disagree"] == True  # noqa: E712
+    assert disagreement.loc[key("S1", 0), "definitions_disagree"] == False  # noqa: E712
+    assert disagreement.loc[key("S1", 1), "definitions_disagree"] == True  # noqa: E712
     # an unknown label is not a disagreement
-    assert disagreement.loc["S1:2", "definitions_disagree"] == False  # noqa: E712
-    assert disagreement.loc["S1:2", ["n_swr", "n_unknown"]].tolist() == [1, 1]
+    assert disagreement.loc[key("S1", 2), "definitions_disagree"] == False  # noqa: E712
+    assert disagreement.loc[key("S1", 2), ["n_swr", "n_unknown"]].tolist() == [1, 1]
 
 
 def test_a_definition_that_did_not_run_labels_nothing_non_swr():

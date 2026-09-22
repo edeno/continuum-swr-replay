@@ -26,6 +26,11 @@ OTHER_KEY = ("sim", 20200101, "04_r2")
 FRAGMENTS = [(10.0, 11.0), (11.005, 12.0), (12.015, 13.0), (13.04, 14.0)]
 
 
+def key(detector, native):
+    """The event key of an event in the test epoch."""
+    return f"{detector}:sim20200101_02_r1:{native}"
+
+
 def events(detector, spans, session=EPOCH):
     return inventory_from_intervals(
         np.array([a for a, _ in spans], dtype=float),
@@ -131,7 +136,7 @@ def test_other_detectors_pass_through_untouched():
     merged = merge_fragments(inventory, coverage("A", "B"), detector="A", gap_s=0.05)
 
     b = merged[merged.detector == "B"]
-    assert b.event_key.tolist() == [f"B:{i}" for i in range(len(FRAGMENTS))]
+    assert b.event_key.tolist() == [key("B", i) for i in range(len(FRAGMENTS))]
     assert (b.n_fragments == 1).all()
 
 
@@ -161,7 +166,7 @@ def test_merged_keys_name_their_fragments():
         events("A", FRAGMENTS[:2]), coverage("A"), detector="A", gap_s=0.05
     )
 
-    assert merged.event_key.tolist() == ["A:0|A:1"]
+    assert merged.event_key.tolist() == [f"{key('A', 0)}|{key('A', 1)}"]
     assert merged.interval_span_s.tolist() == [2.0]
 
 

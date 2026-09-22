@@ -25,6 +25,11 @@ EPOCH = SessionIdentity(animal="sim", day=20200101, epoch="02_r1", brain_area="H
 KEY = ("sim", 20200101, "02_r1")
 
 
+def key(detector, native):
+    """The event key of an event in the test epoch."""
+    return f"{detector}:sim20200101_02_r1:{native}"
+
+
 def events(detector, spans):
     return inventory_from_intervals(
         np.array([a for a, _ in spans], dtype=float),
@@ -70,12 +75,12 @@ class TestMembershipAgainst:
         )
 
         assert found.membership.to_dict() == {
-            "A:0": "matched",
-            "A:1": "unmatched",
-            "B:0": "matched",
-            "C:0": "unmatched",
+            key("A", 0): "matched",
+            key("A", 1): "unmatched",
+            key("B", 0): "matched",
+            key("C", 0): "unmatched",
         }
-        assert found.loc["A:1", "n_against"] == 2
+        assert found.loc[key("A", 1), "n_against"] == 2
 
     def test_matched_by_one_of_the_set_is_matched_even_if_another_is_unknown(self):
         inventory = pd.concat(
@@ -85,7 +90,7 @@ class TestMembershipAgainst:
 
         found = cells(inventory, coverage, sources=["S"], against=["D1", "D2"])
 
-        assert found.loc["S:0", "membership"] == "matched"
+        assert found.loc[key("S", 0), "membership"] == "matched"
 
     def test_unmatched_needs_every_detector_of_the_set_to_have_looked(self):
         """An SWR no decoding detector matched: only if both decoders looked."""
@@ -107,9 +112,9 @@ class TestMembershipAgainst:
             against=["D1", "D2"],
         )
 
-        assert missing_run.loc["SWR:0", "membership"] == "unknown"
-        assert not_exposed.loc["SWR:0", "membership"] == "unknown"
-        assert both_looked.loc["SWR:0", "membership"] == "unmatched"
+        assert missing_run.loc[key("SWR", 0), "membership"] == "unknown"
+        assert not_exposed.loc[key("SWR", 0), "membership"] == "unknown"
+        assert both_looked.loc[key("SWR", 0), "membership"] == "unmatched"
 
     def test_only_source_events_are_classified_and_only_against_the_set(self):
         """A sequence matched by a decoder but by no triggered inventory is in
@@ -130,8 +135,8 @@ class TestMembershipAgainst:
             against=["SWR"],
         )
 
-        assert found.index.tolist() == ["SEQ:0"]
-        assert found.loc["SEQ:0", "membership"] == "unmatched"
+        assert found.index.tolist() == [key("SEQ", 0)]
+        assert found.loc[key("SEQ", 0), "membership"] == "unmatched"
 
     def test_a_source_is_never_tested_against_itself(self):
         with pytest.raises(ValueError, match="other than"):
