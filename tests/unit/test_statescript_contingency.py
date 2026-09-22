@@ -17,11 +17,14 @@ import pytest
 from continuum_swr_replay.analysis.replay.covariate_registry import (
     require_covariate_schema,
 )
-from continuum_swr_replay.table_io import read_table
+from continuum_swr_replay.table_io import read_table, table_exists
 
 _SPEC = importlib.util.spec_from_file_location(
     "_statescript_contingency",
-    Path(__file__).resolve().parents[2] / "scripts" / "exploratory" / "_statescript_contingency.py",
+    Path(__file__).resolve().parents[2]
+    / "scripts"
+    / "exploratory"
+    / "_statescript_contingency.py",
 )
 ssc = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(ssc)
@@ -123,11 +126,17 @@ def test_value_invariants():
     # the behavioral model's reward prediction error.
     by_id = table.set_index("stop_id")
     assert by_id.loc[10, "task_reward_probability_chosen_arm"] == 0.8  # block 0, port 0
-    assert by_id.loc[10, "task_reward_probability_error_chosen_arm_postoutcome"] == pytest.approx(1.0 - 0.8)
+    assert by_id.loc[
+        10, "task_reward_probability_error_chosen_arm_postoutcome"
+    ] == pytest.approx(1.0 - 0.8)
     assert by_id.loc[11, "task_reward_probability_chosen_arm"] == 0.2  # block 0, port 2
-    assert by_id.loc[11, "task_reward_probability_error_chosen_arm_postoutcome"] == pytest.approx(0.0 - 0.2)
+    assert by_id.loc[
+        11, "task_reward_probability_error_chosen_arm_postoutcome"
+    ] == pytest.approx(0.0 - 0.2)
     assert by_id.loc[12, "task_reward_probability_chosen_arm"] == 0.8  # block 1, port 2
-    assert by_id.loc[12, "task_reward_probability_error_chosen_arm_postoutcome"] == pytest.approx(1.0 - 0.8)
+    assert by_id.loc[
+        12, "task_reward_probability_error_chosen_arm_postoutcome"
+    ] == pytest.approx(1.0 - 0.8)
     # trials_since_block_change resets at the block boundary
     assert by_id.loc[10, "trials_since_block_change"] == 0
     assert by_id.loc[11, "trials_since_block_change"] == 1
@@ -178,9 +187,10 @@ def test_stop_before_first_block_is_dropped():
 def test_real_session_parse():
     from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
-    stop_table = read_table(
-        PROCESSED_DATA_DIR / "replay_content" / "stop_table.pkl"
-    )
+    stop_table_path = PROCESSED_DATA_DIR / "replay_content" / "stop_table.pkl"
+    if not table_exists(stop_table_path):
+        pytest.skip("canonical stop table not materialized")
+    stop_table = read_table(stop_table_path)
     try:
         require_covariate_schema(stop_table, table="stop")
     except ValueError as exc:
