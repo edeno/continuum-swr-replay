@@ -16,6 +16,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.table_io import write_table
+
 _SPEC = importlib.util.spec_from_file_location(
     "run_pfc_analysis_bandit",
     Path(__file__).resolve().parents[2]
@@ -204,9 +206,15 @@ def test_an_allstops_bundle_matches_when_no_stop_table_was_read(tmp_path):
 
 
 @pytest.fixture
-def fake_session(monkeypatch):
+def fake_session(monkeypatch, tmp_path):
     """Replace the per-session fit and the cohort load with recorded stubs."""
     calls: dict[str, object] = {}
+
+    # The sidecar hashes the stop table the cohort was cut from; give it one
+    # here rather than read the shared Processed-Data tree.
+    stop_table = tmp_path / "stop_table.parquet"
+    write_table(pd.DataFrame({"stop_start": [10.0], "stop_end": [11.0]}), stop_table)
+    monkeypatch.setattr(runner, "DEFAULT_STOP_TABLE_PATH", stop_table)
 
     # These tests are about what the runner writes, not about which card it
     # fits on; without this they would claim a real GPU on a shared host.
