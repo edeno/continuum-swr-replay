@@ -352,7 +352,7 @@ detection behind it. The state-space detector's events are the project's own
 definition, non-local probability above 0.8 for at least 15 ms, as the sliding
 window's are the published one. Scoring temporal overlap alone credits the
 sliding-window detector for sequences built out of the local coding beside the
-injection: those reach 51 to 162 cm of decoded track for injections of 10 to
+injection: those reach 38 to 162 cm of decoded track for injections of 10 to
 30 cm.
 
 **Detection depends on different things for the two procedures.** Percent of
@@ -360,13 +360,13 @@ injected replays found, by path length and duration:
 
 | path (cm) | 40 ms | 60 ms | 80 ms | 120 ms | 200 ms | 300 ms | 500 ms |
 |---|---|---|---|---|---|---|---|
-| 10 | 2 | 6 | 3 | 2 | 2 | 2 | 2 |
-| 20 | 1 | 4 | 3 | 5 | 8 | 3 | 7 |
-| 30 | 2 | 4 | 7 | 7 | 7 | 6 | 9 |
-| 45 | 9 | 12 | 23 | 39 | 60 | 59 | 67 |
-| 60 | 8 | 21 | 39 | 56 | 67 | 74 | 80 |
-| 90 | 3 | 24 | 53 | 74 | 82 | 81 | 93 |
-| 130 | 0 | 8 | 8 | 62 | 88 | 96 | 96 |
+| 10 | 1 | 4 | 1 | 1 | 3 | 3 | 3 |
+| 20 | 0 | 2 | 0 | 2 | 5 | 4 | 11 |
+| 30 | 0 | 2 | 0 | 2 | 4 | 8 | 11 |
+| 45 | 2 | 3 | 10 | 29 | 51 | 54 | 67 |
+| 60 | 10 | 21 | 38 | 52 | 65 | 72 | 80 |
+| 90 | 8 | 24 | 42 | 60 | 69 | 74 | 88 |
+| 130 | 21 | 33 | 42 | 67 | 88 | 96 | 96 |
 | any path (state-space) | 62-74 | 78-96 | 86-92 | 88-97 | 98-100 | 100 | 100 |
 
 The sliding window is governed by path length, which is one of its criteria.
@@ -377,15 +377,15 @@ injections at any duration and any firing rate.
 **Three rates, not one, because they answer different questions.** Over all
 4536 cells the sliding window built an overlapping candidate 84% of the time,
 accepted one under the published replay definition 34% of the time, and
-reported the injected event 24% of the time. The state-space model reported
+reported the injected event 22% of the time. The state-space model reported
 non-local activity 91% of the time, and it was the injected event 91% of the
 time. Quoting 34% against 91% compares "replay, classified" with "non-local,
 detected"; 84% against 91% is the nearer comparison of whether anything was
 seen at all.
 
-**Three in ten of the sliding window's accepted events are not the injected
-event.** They are absorbed local coding that overlaps it. This is the same
-over-call the figure shows, measured as a rate.
+**More than a third (36%) of the sliding window's accepted events are not the
+injected event.** They are absorbed local coding that overlaps it. This is the
+same over-call the figure shows, measured as a rate.
 
 **What is being compared, and what is not.** Each procedure runs as published,
 with its own acceptance criteria; those criteria are part of the method and are
@@ -410,8 +410,8 @@ as more than one interval, and the best of them answers for the cell, as the
 best of several accepted sliding-window sequences does (0.5% of cells).
 
 **Almost no cell in the sweep was found by the sliding window and missed by the
-state-space model** — two of 4536, 0.04%. 67% of cells went the other way. Of
-those, 66% built a candidate that then failed dispersion and 20% built no
+state-space model** — six of 4536, 0.13%. 69% of cells went the other way. Of
+those, 63% built a candidate that then failed dispersion and 19% built no
 candidate at all, while the median share of windows passing the spread criterion
 inside the event was 1.00. The spread gate is not what loses these events;
 dispersion is.
@@ -421,15 +421,16 @@ A uniform traverse of length L has dispersion L/sqrt(12), so the published 12 cm
 dispersion criterion cannot accept a path under about 42 cm however well it is
 decoded. Scoring our own state-space events under that same criterion confirms
 it: their median dispersion is 2.5, 4.5 and 6.5 cm for injected paths of 10, 20
-and 30 cm, and the rule would reject 100% of them. Above the floor the two run
-close under that rule — 39% against 26% at 45 cm, 49% against 43% at 60 cm, 51%
-against 43% at 130 cm (sliding window first). This is recorded as `state_space_replay_matches` in the
+and 30 cm, and the rule would reject 100% of them. Above the floor the two are
+of the same order under that rule — 31% against 26% at 45 cm, 48% against 43% at
+60 cm, 63% against 46% at 130 cm (sliding window first; `by_path` in the
+summary). This is recorded as `state_space_replay_matches` in the
 summary. It is a diagnostic of *why* the sliding window misses short paths, not
 a rate to quote against `sliding_matches`: the two procedures are compared as
 published, against the injected event.
 
 **Where the published criteria can accept an event at all** — path over about
-42 cm and duration over 100 ms, 25% of the grid — the sliding window reports 70%
+42 cm and duration over 100 ms, 25% of the grid — the sliding window reports 64%
 and the state-space model 99% (`overall_in_domain`). The remaining three
 quarters of the grid are events the published method is defined not to call
 replays. That is a property of the method worth measuring, and it is why the
@@ -439,20 +440,23 @@ whole-grid rate is much lower than the in-domain rate.
 
 | true duration | 40 ms | 60 ms | 80 ms | 120 ms | 200 ms | 300 ms | 500 ms |
 |---|---|---|---|---|---|---|---|
-| sliding window | 5.8x | 3.1x | 3.5x | 1.7x | 1.3x | 1.2x | 1.1x |
-| state-space | 1.00x | 1.00x | 0.95x | 0.98x | 0.95x | 0.98x | 0.98x |
+| sliding window | 4.7x | 2.5x | 1.9x | 1.5x | 1.2x | 1.2x | 1.1x |
+| state-space | 1.05x | 1.00x | 0.95x | 0.98x | 0.95x | 0.98x | 0.98x |
 
 Medians over firing rate, path length and placement. A single event can do
 better than its row: the 80 ms replay in the figure, which fires strongly and
-travels 100 cm, comes in at 1.3x rather than 3.5x.
+travels 100 cm, comes in at 1.3x rather than 1.9x. An absorbed sequence whose
+local stretch sits more than 20 cm from the path fails the position test and is
+counted among the 36% above rather than here, so this table is the window floor
+plus whatever absorption falls within the tolerance.
 
 **Absorption reaches about 80 cm.** Among events both reported, by the distance
 between the replay and the animal's own place:
 
 | distance | 40-80 cm | 80-120 cm | over 120 cm |
 |---|---|---|---|
-| duration ratio | 2.12x | 1.17x | 1.12x |
-| share of windows on the animal's place | 0.44 | 0.00 | 0.00 |
+| duration ratio | 1.81x | 1.16x | 1.12x |
+| share of windows on the animal's place | 0.36 | 0.00 | 0.00 |
 
 **What the sweep cannot say.** The animal rests at one end of the track and
 pauses nowhere else, so distance from its place is a deterministic function of
@@ -489,7 +493,7 @@ reproduced from this repository and should be re-run before being cited.
 | miss | path shorter than about 42 cm | reported in a few percent of injections at any duration or firing rate, against 71-100% for the state-space model | measured |
 | miss | replay that changes arm without passing the junction | cut at the switch, and neither half then clears dispersion | measured |
 | miss | sparse ensembles, about one spike per window | erratic, 0-50% where dense spiking gives 100% | measured elsewhere |
-| over-call | any event shorter than about 150 ms | reported 1.7x to 5.8x too long in the sweep, and 1.3x for a strongly firing 80 ms replay; the detector cannot report a short event as short | measured |
+| over-call | any event shorter than about 150 ms | reported 1.5x to 4.7x too long in the sweep, and 1.3x for a strongly firing 80 ms replay; the detector cannot report a short event as short | measured |
 | miss | whole path inside one window | posterior smears, spread rejects. The sweep's fastest cell is 3250 cm/s and is still found sometimes, so the threshold is above that | measured elsewhere |
 | miss | replay overlapping the onset of movement | truncated one window *before* the first moving window | measured |
 | by design | remote place held still | decoded confidently, assembled, declined for going nowhere | measured |
