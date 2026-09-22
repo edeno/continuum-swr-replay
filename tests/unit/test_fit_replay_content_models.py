@@ -37,6 +37,10 @@ from continuum_swr_replay.data_loaders.constants import (
 from continuum_swr_replay.table_io import write_table
 from scripts.content import fit_replay_content_models as mod
 
+# the runner resolves its directories, and /tmp is itself a symlink on macOS
+CONTENT_IN = Path("/tmp/content-in").resolve()
+STAGING = Path("/tmp/staging").resolve()
+
 
 def _args(**overrides) -> argparse.Namespace:
     defaults = {
@@ -52,7 +56,7 @@ def _args(**overrides) -> argparse.Namespace:
         "grain": "timebin",
         "response": "fraction",
         "leaf_only": False,
-        "input_dir": Path("/tmp/content-in"),
+        "input_dir": CONTENT_IN,
         "output_dir": None,
         "models": None,
     }
@@ -62,7 +66,7 @@ def _args(**overrides) -> argparse.Namespace:
 
 def test_default_run_writes_the_canonical_directory() -> None:
     config = mod._resolve_run_config(_args())
-    assert config.output_dir == Path("/tmp/content-in/models")
+    assert config.output_dir == CONTENT_IN / "models"
     assert list(config.model_names) == list(
         default_content_model_names(config.hierarchy)
     )
@@ -72,41 +76,39 @@ def test_explicit_full_ladder_still_writes_the_canonical_directory() -> None:
     """Naming every default rung is the canonical run, not a subset."""
     names = default_content_model_names(mod.MODEL_HIERARCHY)
     config = mod._resolve_run_config(_args(models=",".join(names)))
-    assert config.output_dir == Path("/tmp/content-in/models")
+    assert config.output_dir == CONTENT_IN / "models"
 
 
 def test_subset_run_is_keyed_by_its_rungs() -> None:
     config = mod._resolve_run_config(_args(models="M4,Mv,Mu,Mvu"))
-    assert config.output_dir == Path("/tmp/content-in/models_M4-Mv-Mu-Mvu")
+    assert config.output_dir == CONTENT_IN / "models_M4-Mv-Mu-Mvu"
     assert list(config.model_names) == ["M4", "Mv", "Mu", "Mvu"]
 
 
 def test_patch_subset_run_is_keyed_off_the_patch_directory() -> None:
     config = mod._resolve_run_config(_args(hierarchy="patch", models="P3,Pv"))
-    assert config.output_dir == Path("/tmp/content-in/models_patch_P3-Pv")
+    assert config.output_dir == CONTENT_IN / "models_patch_P3-Pv"
 
 
 def test_subset_models_do_not_write_canonical_dir() -> None:
     """An explicit --output-dir cannot aim a subset at the canonical bundle."""
     with pytest.raises(ValueError, match="models"):
-        mod._resolve_run_config(
-            _args(models="M4,Mv", output_dir=Path("/tmp/content-in/models"))
-        )
+        mod._resolve_run_config(_args(models="M4,Mv", output_dir=CONTENT_IN / "models"))
     with pytest.raises(ValueError, match="models_patch"):
         mod._resolve_run_config(
             _args(
                 hierarchy="patch",
                 models="P3,Pv",
-                output_dir=Path("/tmp/content-in/models_patch"),
+                output_dir=CONTENT_IN / "models_patch",
             )
         )
 
 
 def test_subset_run_may_be_sent_to_an_explicit_non_canonical_directory() -> None:
     config = mod._resolve_run_config(
-        _args(models="M4,Mv", output_dir=Path("/tmp/staging/models_belief"))
+        _args(models="M4,Mv", output_dir=STAGING / "models_belief")
     )
-    assert config.output_dir == Path("/tmp/staging/models_belief")
+    assert config.output_dir == STAGING / "models_belief"
 
 
 def test_subset_may_not_target_another_configurations_canonical_bundle() -> None:
@@ -121,7 +123,7 @@ def test_subset_may_not_target_another_configurations_canonical_bundle() -> None
             _args(
                 hierarchy="patch",
                 models="P3,Pv",
-                output_dir=Path("/tmp/content-in/models"),
+                output_dir=CONTENT_IN / "models",
             )
         )
     with pytest.raises(ValueError, match="canonical models/ bundle"):
@@ -129,7 +131,7 @@ def test_subset_may_not_target_another_configurations_canonical_bundle() -> None
             _args(
                 swr_subset="T",
                 models="M0,M1",
-                output_dir=Path("/tmp/content-in/models"),
+                output_dir=CONTENT_IN / "models",
             )
         )
 
@@ -152,7 +154,7 @@ def test_canonical_bundle_names_cover_every_suffix_variant() -> None:
 
 def test_swr_subset_run_keeps_its_own_suffixed_bundle() -> None:
     config = mod._resolve_run_config(_args(swr_subset="T", grain="event"))
-    assert config.output_dir == Path("/tmp/content-in/models_swr_T_event_grain")
+    assert config.output_dir == CONTENT_IN / "models_swr_T_event_grain"
 
 
 # ── Response selection ──
@@ -343,7 +345,7 @@ def test_undecoded_events_are_reported_as_zero_response_drops() -> None:
 
 def test_hard_count_runs_publish_to_their_own_bundle() -> None:
     config = mod._resolve_run_config(_args(response="hard_count"))
-    assert config.output_dir == Path("/tmp/content-in/models_hard_count")
+    assert config.output_dir == CONTENT_IN / "models_hard_count"
     assert "models_hard_count" in mod.canonical_output_subdirs()
     assert "models_patch_hard_count" in mod.canonical_output_subdirs()
 
@@ -467,8 +469,8 @@ def test_scale_label_refuses_to_claim_a_scale_it_does_not_know() -> None:
 
 
 def test_fit_inputs_name_the_table_the_ladder_reads() -> None:
-    inputs = mod.content_fit_inputs(Path("/tmp/content-in"), "event_arm_table")
-    assert inputs == {"event_arm_table": Path("/tmp/content-in/event_arm_table.pkl")}
+    inputs = mod.content_fit_inputs(CONTENT_IN, "event_arm_table")
+    assert inputs == {"event_arm_table": CONTENT_IN / "event_arm_table.pkl"}
 
 
 def test_bundle_writes_a_provenance_sidecar_beside_every_pickle(tmp_path) -> None:
@@ -522,7 +524,7 @@ def test_zero_response_events_cover_undefined_and_empty_allocations() -> None:
 def test_leaf_only_run_publishes_to_its_own_bundle() -> None:
     """A six-arm fit is a different likelihood, so it gets a different bundle."""
     config = mod._resolve_run_config(_args(leaf_only=True))
-    assert config.output_dir == Path("/tmp/content-in/models_leaf")
+    assert config.output_dir == CONTENT_IN / "models_leaf"
     assert "models_leaf" in mod.canonical_output_subdirs()
     assert "models_swr_T_leaf" in mod.canonical_output_subdirs()
     assert "models_hard_count_leaf" in mod.canonical_output_subdirs()
@@ -596,7 +598,7 @@ def test_leaf_only_subset_may_not_target_a_canonical_bundle() -> None:
             _args(
                 leaf_only=True,
                 models="M4,Mv",
-                output_dir=Path("/tmp/content-in/models_leaf"),
+                output_dir=CONTENT_IN / "models_leaf",
             )
         )
 
@@ -605,9 +607,7 @@ def test_leaf_only_subset_run_is_keyed_off_the_leaf_directory() -> None:
     config = mod._resolve_run_config(
         _args(leaf_only=True, models="M0,M0a,M1,M2,M3,M4,Mv,Mu,Mvu")
     )
-    assert config.output_dir == Path(
-        "/tmp/content-in/models_leaf_M0-M0a-M1-M2-M3-M4-Mv-Mu-Mvu"
-    )
+    assert config.output_dir == CONTENT_IN / "models_leaf_M0-M0a-M1-M2-M3-M4-Mv-Mu-Mvu"
 
 
 def test_parser_defaults_to_the_nine_arm_candidate_set() -> None:
@@ -758,8 +758,8 @@ def test_leaf_only_ladder_fits_six_categories_on_the_rescaled_response() -> None
 
     config = mod._RunConfig(
         hierarchy=_ARM_LADDER,
-        input_dir=Path("/tmp/content-in"),
-        output_dir=Path("/tmp/content-in/models_leaf"),
+        input_dir=CONTENT_IN,
+        output_dir=CONTENT_IN / "models_leaf",
         table_name="event_arm_table",
         model_names=["X"],
     )
@@ -831,7 +831,7 @@ def test_dm_run_resolves_the_count_response_and_its_own_directory() -> None:
         _args(estimator="dirichlet_multinomial", response=None)
     )
     assert config.response == "hard_count"
-    assert config.output_dir == Path("/tmp/content-in/models_dm")
+    assert config.output_dir == CONTENT_IN / "models_dm"
 
 
 def test_dm_refuses_the_fraction_response_naming_both_flags() -> None:
