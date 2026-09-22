@@ -63,7 +63,10 @@ For event-count denominators, require the source event's entire native interval 
 within the shared exposure. Retain excluded events with an availability flag; do not
 clip, split, or re-detect them to qualify. A confirmed overlap can still use a valid
 counterpart event that extends beyond the shared exposure, since that event was
-observed; it need not qualify for the reverse direction's denominator. Cached events
+observed; it need not qualify for the reverse direction's denominator. Every
+inventory is first restricted to its speed-eligible events, so no counterpart spans
+movement: a movement-spanning SWR cannot mark a still sequence, as the canonical
+SWR labels are speed-gated before they mark a non-local event. Cached events
 that bridge their own detector's unavailable data are flagged and excluded from
 comparison matches; mark their full spans unavailable pending corrected detection,
 so discarding a corrupt event cannot create an apparent non-detection. Clip event
@@ -90,7 +93,9 @@ edge contact is not counted as agreement with a fully coincident event.
 **Fragment-merge recount.** Our detector can split one replay into several events when
 the non-local probability dips below threshold. Provide a recount in which our events
 separated by less than a stated gap (a fixed grid: 0, 10, 20, 50 ms) are merged before
-overlap is computed, alongside the native count. The native count remains primary; the
+overlap is computed, alongside the native count. The gap is end-to-start — from the
+last sample of one event to the first of the next — counted in whole samples, so a gap
+of exactly a grid value never merges. The native count remains primary; the
 recount diagnoses how much count differences depend on segmentation (04). It uses
 existing intervals and requires no re-decoding. Keep merges within an epoch and a
 continuous eligible immobility bout, checking speed throughout each intervening gap;
