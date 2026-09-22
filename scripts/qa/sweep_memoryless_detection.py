@@ -4,12 +4,10 @@
 Injects replays of controlled path length, duration, firing rate and distance
 from the animal's own place into a simulated recording, and records what the
 memoryless sliding-window detector and this project's switching state-space
-model each report.
-
-Each detector fits its own encoding model, from the same recording, the same
-non-event training mask and the same hyperparameters. They are separate fits
-and differ by a few percent of peak firing rate; they are not one shared
-object.
+model each report. Both read the same encoding model: the state-space detector
+fits it, and the sliding-window likelihood is handed the same object, so the
+two differ in how they use the place fields and not in what the place fields
+are.
 
 A detector counts as finding an event only when what it reports is *the
 injected event*. Overlapping it in time is not enough: a sequence built from
@@ -41,9 +39,6 @@ import numpy as np
 import pandas as pd
 from non_local_detector import NonLocalSortedSpikesDetector
 from non_local_detector.environment import Environment
-from non_local_detector.likelihoods.sorted_spikes_kde import (
-    fit_sorted_spikes_kde_encoding_model,
-)
 from non_local_detector.simulate.sorted_spikes_simulation import (
     SAMPLING_FREQUENCY,
     TRACK_HEIGHT,
@@ -57,6 +52,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import
     detect_candidate_sequences,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
+    ENCODING_KEY,
     interior_bin_distances_cm,
     sorted_spikes_epoch_log_likelihood,
     window_midpoints_s,
@@ -141,19 +137,6 @@ def build_recording():
         position[:, None]
     )
     is_training = ~is_event
-    training_spikes = [
-        neuron[np.interp(neuron, time, is_training.astype(float)) > 0.5]
-        for neuron in spike_times
-    ]
-    encoding_model = fit_sorted_spikes_kde_encoding_model(
-        position_time=time[is_training],
-        position=position[is_training, None],
-        spike_times=training_spikes,
-        environment=environment,
-        sampling_frequency=round(CONFIG.sampling_frequency),
-        position_std=6.0,
-        disable_progress_bar=True,
-    )
 
     detector = NonLocalSortedSpikesDetector(
         sorted_spikes_algorithm="sorted_spikes_kde",
@@ -172,6 +155,13 @@ def build_recording():
         spike_times=spike_times,
         is_training=is_training,
     )
+
+    # One set of place fields, not two. The detector's own encoding model holds
+    # every entry the sliding-window likelihood needs, so handing it over makes
+    # the two procedures read the same object rather than two fits of the same
+    # data, which differed by about 4% of peak firing rate.
+    encoding_model = detector.encoding_model_[ENCODING_KEY]
+    environment = encoding_model["environment"]
 
     return {
         "time": time,

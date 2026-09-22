@@ -386,7 +386,9 @@ def plot_position_animal_vs_replay(
     dpi : int
         DPI for raster formats
     """
-    fig, axes = plt.subplots(1, 2, figsize=FIGURE_TWO_PANEL_HORIZONTAL, sharex=True, sharey=True)
+    fig, axes = plt.subplots(
+        1, 2, figsize=FIGURE_TWO_PANEL_HORIZONTAL, sharex=True, sharey=True
+    )
 
     for event_type, ax in zip(
         ("non_local_immobile", "non_local_immobile_no_overlap_SWR"), axes
@@ -524,12 +526,16 @@ def plot_triggered_averages(
         )
 
         ax.plot(
-            time, no_overlap_mean.values,
-            label="No SWR Overlap", color=COLORS["Non-Local"],
+            time,
+            no_overlap_mean.values,
+            label="No SWR Overlap",
+            color=COLORS["Non-Local"],
         )
         ax.plot(
-            time, overlap_mean.values,
-            label="SWR Overlap", color=COLORS["SWR"],
+            time,
+            overlap_mean.values,
+            label="SWR Overlap",
+            color=COLORS["SWR"],
         )
 
         # Set ylabel based on signal type
@@ -538,7 +544,9 @@ def plot_triggered_averages(
             if name == "Theta Power":
                 name = "Theta"
             ax.set_ylabel(f"{name}\nZ-score")
-            ax.axhline(2.0, color="lightgrey", linestyle="--", alpha=0.5, linewidth=0.75)
+            ax.axhline(
+                2.0, color="lightgrey", linestyle="--", alpha=0.5, linewidth=0.75
+            )
         elif signal_type == "Non-Local_prob":
             ax.set_ylabel("Non-Local\nProb.")
             ax.axhline(

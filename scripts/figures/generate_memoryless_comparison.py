@@ -35,10 +35,8 @@ import numpy as np
 from matplotlib.gridspec import GridSpec
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
+from non_local_detector import NonLocalSortedSpikesDetector
 from non_local_detector.environment import Environment
-from non_local_detector.likelihoods.sorted_spikes_kde import (
-    fit_sorted_spikes_kde_encoding_model,
-)
 from non_local_detector.simulate.sorted_spikes_simulation import (
     SAMPLING_FREQUENCY,
     make_simulated_data,
@@ -51,6 +49,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import
     detect_candidate_sequences,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
+    ENCODING_KEY,
     interior_bin_distances_cm,
     sorted_spikes_epoch_log_likelihood,
     window_midpoints_s,
@@ -81,10 +80,12 @@ EVENT_LABELS = [
     "continuous\ninbound",
     "no spike",
     "local",
-    "remote\nstationary",
-    "short path\n30 cm",
-    "short replay\n80 ms",
+    "remote\nstationary*",
+    "short path\n30 cm*",
+    "short replay\n80 ms*",
 ]
+"""Labels for the simulation's events. A star marks one added here; the rest
+come with the package's simulation."""
 
 SHORT_REPLAY = (35.0, 100.0, 0.080, 120.0, 44.40)
 """start_cm, path_cm, duration_s, peak_rate_hz, time.
@@ -143,6 +144,11 @@ def splice_remote_stationary(
 
 
 BLACK, ORANGE, SKY, GREEN, YELLOW, BLUE, VERMILION, PURPLE = WONG[:8]
+
+SLIDING = "sliding-window detector"
+STATE_SPACE = "state-space detector"
+"""One name each, used in both figures. Neither says "our": a figure should
+name a method, not a side."""
 
 
 def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dict:
@@ -212,19 +218,27 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
     # encode on non-event data only, the analogue of this project's no-ripple
     # training mask; spikes inside an event must not shape the place fields
     is_training = ~is_event
-    training_spikes = [
-        neuron[np.interp(neuron, time, is_training.astype(float)) > 0.5]
-        for neuron in spike_times
-    ]
-    encoding_model = fit_sorted_spikes_kde_encoding_model(
-        position_time=time[is_training],
-        position=position[is_training, None],
-        spike_times=training_spikes,
-        environment=environment,
-        sampling_frequency=round(config.sampling_frequency),
-        position_std=6.0,
-        disable_progress_bar=True,
+
+    detector = NonLocalSortedSpikesDetector(
+        sorted_spikes_algorithm="sorted_spikes_kde",
+        sorted_spikes_algorithm_params={"position_std": 6.0, "block_size": int(2**8)},
+        local_position_std=LOCAL_POSITION_STD,
+        discrete_transition_stickiness=DISCRETE_TRANSITION_STICKINESS,
     )
+    # fit rather than estimate_parameters, matching the sweep: EM would
+    # re-estimate the place fields and the transitions on the data it is then
+    # read on, and the two scripts should not differ in that.
+    detector.fit(
+        position_time=time,
+        position=position,
+        spike_times=spike_times,
+        is_training=is_training,
+    )
+
+    # one set of place fields for both procedures, read from the detector that
+    # fitted them
+    encoding_model = detector.encoding_model_[ENCODING_KEY]
+    environment = encoding_model["environment"]
 
     result = sorted_spikes_epoch_log_likelihood(
         time, position, spike_times, encoding_model, config
@@ -240,6 +254,7 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
     window_speed = np.interp(midpoint_s, result.time, speed)
 
     return {
+        "detector": detector,
         "time": result.time,
         "is_event": is_event[: result.time.size],
         "position": position,
@@ -266,22 +281,17 @@ def state_space_intervals(decoded: dict) -> list[tuple[float, float]]:
     The comparison needs this. Every event the sliding-window detector misses
     has to be an event some detector can find, or the figure shows the limits
     of the data rather than the limits of the method.
-    """
-    from non_local_detector import NonLocalSortedSpikesDetector
 
-    time, is_event = decoded["time"], decoded["is_event"]
-    detector = NonLocalSortedSpikesDetector(
-        sorted_spikes_algorithm="sorted_spikes_kde",
-        sorted_spikes_algorithm_params={"position_std": 6.0, "block_size": int(2**8)},
-        local_position_std=LOCAL_POSITION_STD,
-        discrete_transition_stickiness=DISCRETE_TRANSITION_STICKINESS,
-    )
-    results = detector.estimate_parameters(
+    Reads the detector fitted in :func:`simulate_and_decode`, which is also the
+    one whose place fields the sliding-window likelihood was given, so the two
+    procedures differ in how they use the encoding model and not in what it is.
+    """
+    time = decoded["time"]
+    results = decoded["detector"].predict(
         position_time=time,
         position=decoded["position"],
         spike_times=decoded["spike_times"],
         time=time,
-        is_training=~is_event,
     )
     probability = np.asarray(
         results.acausal_state_probabilities.sel(
@@ -290,6 +300,11 @@ def state_space_intervals(decoded: dict) -> list[tuple[float, float]]:
         .sum("states")
         .values
     ).squeeze()
+    if not np.isfinite(probability).all() or probability.max() <= 0.0:
+        raise RuntimeError(
+            "The state-space model returned no probability mass; its state "
+            "probabilities must sum to one at every time."
+        )
 
     above = probability > NON_LOCAL_PROB_THRESHOLD
     edges = np.diff(above.astype(np.int8), prepend=0, append=0)
@@ -416,9 +431,15 @@ def plot_overview(ax, decoded: dict, config: MemorylessSequenceConfig) -> None:
         )
 
     handles = [
-        Line2D([], [], color=GREEN, lw=1.0, label="animal position"),
+        Line2D([], [], color=GREEN, lw=1.0, label="where the animal is"),
         Line2D(
-            [], [], color=SKY, marker="o", ms=2.0, lw=0, label="window center, kept"
+            [],
+            [],
+            color=SKY,
+            marker="o",
+            ms=2.0,
+            lw=0,
+            label="decoded place, window kept",
         ),
         Line2D(
             [],
@@ -427,12 +448,13 @@ def plot_overview(ax, decoded: dict, config: MemorylessSequenceConfig) -> None:
             marker="o",
             ms=2.0,
             lw=0,
-            label="window center, rejected",
+            label="decoded place, window rejected",
         ),
         Patch(color=YELLOW, alpha=0.6, label="labeled event"),
-        Line2D([], [], color=VERMILION, lw=2.4, label="sequence, meets criteria"),
-        Line2D([], [], color="0.6", lw=1.2, label="sequence, rejected"),
-        Line2D([], [], color=BLUE, lw=2.4, label="our state-space detector"),
+        Patch(color="0.75", label="posterior, panels b-e"),
+        Line2D([], [], color=VERMILION, lw=2.4, label=f"event, {SLIDING}"),
+        Line2D([], [], color="0.6", lw=1.2, label="candidate, rejected"),
+        Line2D([], [], color=BLUE, lw=2.4, label=f"event, {STATE_SPACE}"),
     ]
     ax.legend(
         handles=handles,
@@ -493,6 +515,7 @@ def plot_event(ax, decoded: dict, event: int, config: MemorylessSequenceConfig) 
         decoded["place_bin_centers_cm"][0],
         decoded["place_bin_centers_cm"][-1],
     )
+    # the grey wash is the posterior itself; panel b's label says so once
     ax.imshow(
         decoded["posterior"][shown].T,
         aspect="auto",
@@ -516,6 +539,7 @@ def plot_event(ax, decoded: dict, event: int, config: MemorylessSequenceConfig) 
         lw=1.0,
         ls="--",
         zorder=2,
+        label="where the animal is",
     )
 
     for start_s, end_s in decoded["state_space_intervals"]:
@@ -580,7 +604,7 @@ def plot_criterion_space(ax, decoded: dict, config: MemorylessSequenceConfig) ->
         (0, "continuous replay\nfound", VERMILION, True, (10, 6)),
         (7, "short replay\nfound", VERMILION, True, (14, 24)),
         (6, "short path\nmissed", BLUE, False, (48, 22)),
-        (5, "remote place\ndeclined", PURPLE, False, (108, 2)),
+        (5, "remote place\ndeclined", PURPLE, False, (95, -4)),
     )
     for event, name, color, filled, offset in annotated:
         event_start, event_end = decoded["event_times"][event]
@@ -620,8 +644,10 @@ def plot_criterion_space(ax, decoded: dict, config: MemorylessSequenceConfig) ->
     ax.set_xlabel("event duration (s)")
     ax.set_ylabel("dispersion (cm)")
     ax.set_title(
-        f"all {len(candidates.runs)} candidate sequences. Only "
-        f"{int(accepted.sum())} reach the shaded box,\nwhere both criteria are met.",
+        f"every one of the {len(candidates.runs)} candidate sequences the "
+        f"{SLIDING} built. Only {int(accepted.sum())} reach the shaded box.\n"
+        "Dispersion is how far the decoded path spreads about its own centre, so "
+        "the box means lasted long enough and travelled far enough.",
         fontsize=5.5,
         linespacing=1.4,
     )
@@ -674,8 +700,8 @@ def make_figure(n_neurons: int, config: MemorylessSequenceConfig):
             f"found, but {duration_ratio(decoded, 7):.1f}x too long:\n"
             "the window sets a floor under any duration",
         ),
-        (6, "short path, 30 cm", "missed: the path is too short"),
-        (5, "remote place, held still", "declined: it does not travel"),
+        (6, "short path, 30 cm", "missed: too little dispersion"),
+        (5, "remote place, held still", "declined: too little dispersion"),
     )
     zooms = []
     for column, (event, name, outcome) in enumerate(outcomes):
@@ -685,7 +711,7 @@ def make_figure(n_neurons: int, config: MemorylessSequenceConfig):
         if column:
             ax.set_yticklabels([])
         zooms.append(ax)
-    zooms[0].set_ylabel("position (cm)")
+    zooms[0].set_ylabel("decoded place (cm)")
 
     ax_criteria = fig.add_subplot(grid[2, 3:5])
     plot_criterion_space(ax_criteria, decoded, config)
@@ -695,7 +721,14 @@ def make_figure(n_neurons: int, config: MemorylessSequenceConfig):
     label_panels([ax_criteria], labels=["f"], xpos=-0.20, ypos=1.02)
 
     fig.suptitle(
-        "Memoryless sliding-window detection on the Figure 1 simulation", fontsize=7
+        "Two replay detectors on one simulated recording with known events\n"
+        "Sliding-window detector: each 80 ms window is decoded on its own, with no "
+        "model of how one window follows the next,\nand windows are kept or dropped "
+        "on the spread of their posterior and the jump to the next window.\n"
+        "Events marked * are ones we wrote into the spike trains ourselves; the rest\n"
+        "come with the simulation.",
+        fontsize=6.5,
+        linespacing=1.6,
     )
     return fig, decoded
 

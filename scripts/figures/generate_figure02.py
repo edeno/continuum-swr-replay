@@ -159,9 +159,7 @@ def pick_example_events(
 # ---------------------------------------------------------------------------
 
 
-def _figure02_cache_path(
-    nwb_file_name: str, epoch_name: str, data_dir: Path
-) -> Path:
+def _figure02_cache_path(nwb_file_name: str, epoch_name: str, data_dir: Path) -> Path:
     """Path for the cached Figure-2 render inputs (joblib bundle).
 
     A single joblib bundle is used rather than netCDF because the bundle
@@ -292,7 +290,10 @@ def _compute_figure_inputs(
 
     logging.info("Computing triggered-average curves (panel c)...")
     triggered_curves = compute_triggered_average_curves(
-        data_over_time, event_types, TRIGGERED_SIGNALS, time_col="start_time",
+        data_over_time,
+        event_types,
+        TRIGGERED_SIGNALS,
+        time_col="start_time",
     )
 
     logging.info("Computing per-session decoding error (panel e)...")

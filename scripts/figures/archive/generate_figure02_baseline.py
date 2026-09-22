@@ -1619,7 +1619,7 @@ non_local_events_in_SWR = (
     .set_index(["animal", "day", "epoch", "SWR_event"])
     .join(swr_start_time)
     .reset_index()
-    .assign(time_diff=lambda df: (df["non_local_start_time"] - df["swr_start_time"]))
+    .assign(time_diff=lambda df: df["non_local_start_time"] - df["swr_start_time"])
 )
 
 # %%

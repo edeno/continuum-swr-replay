@@ -108,28 +108,50 @@ def plot_aic_model_selection(
     counts_swr = df["min_aic_model"].value_counts()
     vals_swr = [100 * counts_swr.get(m, 0) / n_total for m in model_order_swr]
 
-    bars1 = ax1.bar(model_labels_swr, vals_swr, color=model_colors_swr, alpha=0.7, edgecolor="none")
+    bars1 = ax1.bar(
+        model_labels_swr, vals_swr, color=model_colors_swr, alpha=0.7, edgecolor="none"
+    )
     for bar, val in zip(bars1, vals_swr):
         if val > 2:
-            ax1.text(bar.get_x() + bar.get_width() / 2, val + 1, f"{val:.0f}%",
-                     ha="center", fontsize=7)
+            ax1.text(
+                bar.get_x() + bar.get_width() / 2,
+                val + 1,
+                f"{val:.0f}%",
+                ha="center",
+                fontsize=7,
+            )
     ax1.set_ylabel("% of neurons")
     ax1.set_title("Best model (SWR-controlled)")
     sns.despine(ax=ax1)
 
     # Replay-split decomposition
     model_order_split = ["constant", "non_local", "non_local_SWR + non_local_no_SWR"]
-    model_labels_split = ["Constant", "Replay\n(unified)", "SWR-replay +\nnon-SWR replay"]
+    model_labels_split = [
+        "Constant",
+        "Replay\n(unified)",
+        "SWR-replay +\nnon-SWR replay",
+    ]
     model_colors_split = ["gray", COLORS["Non-Local"], "#e6ab02"]
 
     counts_split = df["min_aic_model_replay_split"].value_counts()
     vals_split = [100 * counts_split.get(m, 0) / n_total for m in model_order_split]
 
-    bars2 = ax2.bar(model_labels_split, vals_split, color=model_colors_split, alpha=0.7, edgecolor="none")
+    bars2 = ax2.bar(
+        model_labels_split,
+        vals_split,
+        color=model_colors_split,
+        alpha=0.7,
+        edgecolor="none",
+    )
     for bar, val in zip(bars2, vals_split):
         if val > 2:
-            ax2.text(bar.get_x() + bar.get_width() / 2, val + 1, f"{val:.0f}%",
-                     ha="center", fontsize=7)
+            ax2.text(
+                bar.get_x() + bar.get_width() / 2,
+                val + 1,
+                f"{val:.0f}%",
+                ha="center",
+                fontsize=7,
+            )
     ax2.set_ylabel("% of neurons")
     ax2.set_title("Best model (replay-split)")
     sns.despine(ax=ax2)
@@ -146,8 +168,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("--output-dir", type=Path, default=Path("paper/figures/figure04"))
-    parser.add_argument("--format", type=str, choices=["pdf", "png", "svg"], default=None)
+    parser.add_argument(
+        "--output-dir", type=Path, default=Path("paper/figures/figure04")
+    )
+    parser.add_argument(
+        "--format", type=str, choices=["pdf", "png", "svg"], default=None
+    )
     parser.add_argument("--dpi", type=int, default=300)
     parser.add_argument("--min-firing-rate", type=float, default=1.0)
     parser.add_argument("--data-dir", type=Path, default=PROCESSED_DATA_DIR)
@@ -159,10 +185,18 @@ def main() -> None:
     df, _, _ = load_population_data(args.data_dir, min_firing_rate=args.min_firing_rate)
 
     plot_significance_bars(
-        df, args.output_dir, "fig04f_significance_bars", formats, args.dpi,
+        df,
+        args.output_dir,
+        "fig04f_significance_bars",
+        formats,
+        args.dpi,
     )
     plot_aic_model_selection(
-        df, args.output_dir, "fig04f_aic_model_selection", formats, args.dpi,
+        df,
+        args.output_dir,
+        "fig04f_aic_model_selection",
+        formats,
+        args.dpi,
     )
 
 

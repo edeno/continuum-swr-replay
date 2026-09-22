@@ -343,9 +343,11 @@ measurement, and worth checking on real data:
 
 ### Parameter sweep over injected replays
 
-`scripts/qa/sweep_memoryless_detection.py` injects replays of controlled path
-length, duration, firing rate and distance from the animal's own place into the
-simulated recording, and records what each detector reports. 4536 cells, sorted
+`scripts/qa/sweep_memoryless_detection.py` writes made-up replays into the
+spike trains of the simulated recording, one at a time, each with a path
+length, duration, firing rate and distance from the animal's own place that we
+choose. Because the right answer is known, what each detector reports can be
+scored against it. The text below calls these injected replays. 4536 cells, sorted
 spikes on a linear track. Every number below comes from
 [detection_sweep_summary.csv](detection_sweep_summary.csv), which that script
 writes; the full per-cell table goes to `Processed-Data` and is not tracked.
@@ -378,10 +380,10 @@ injected replays found, by path length and duration:
 | 10 | 2 | 6 | 3 | 2 | 2 | 2 | 2 |
 | 20 | 1 | 4 | 3 | 5 | 8 | 3 | 7 |
 | 30 | 2 | 4 | 7 | 7 | 7 | 6 | 9 |
-| 45 | 10 | 12 | 23 | 39 | 60 | 58 | 67 |
-| 60 | 10 | 22 | 39 | 57 | 65 | 74 | 79 |
-| 90 | 3 | 29 | 53 | 72 | 82 | 79 | 92 |
-| 130 | 0 | 8 | 8 | 67 | 88 | 96 | 96 |
+| 45 | 9 | 12 | 23 | 39 | 60 | 58 | 67 |
+| 60 | 8 | 21 | 39 | 56 | 65 | 73 | 79 |
+| 90 | 3 | 24 | 51 | 72 | 82 | 79 | 92 |
+| 130 | 0 | 8 | 8 | 62 | 88 | 96 | 96 |
 | any path (state-space) | 67-85 | 88-96 | 92-97 | 92-99 | 99-100 | 100 | 100 |
 
 The sliding window is governed by path length, which is one of its criteria.
@@ -403,8 +405,8 @@ event.** They are absorbed local coding that overlaps it. This is the same
 over-call the figure shows, measured as a rate.
 
 **No cell in the sweep was found by the sliding window and missed by the
-state-space model.** 70% of cells went the other way. Of those, 64% built a
-candidate that then failed dispersion and 22% built no candidate at all, while
+state-space model.** 71% of cells went the other way. Of those, 65% built a
+candidate that then failed dispersion and 21% built no candidate at all, while
 the median share of windows passing the spread criterion inside the event was
 1.00. The spread gate is not what loses these events; dispersion is.
 
@@ -412,19 +414,19 @@ the median share of windows passing the spread criterion inside the event was
 
 | true duration | 40 ms | 60 ms | 80 ms | 120 ms | 200 ms | 300 ms | 500 ms |
 |---|---|---|---|---|---|---|---|
-| sliding window | 5.6x | 3.2x | 3.5x | 1.7x | 1.3x | 1.2x | 1.1x |
+| sliding window | 5.8x | 3.1x | 3.3x | 1.7x | 1.3x | 1.2x | 1.1x |
 | state-space | 1.00x | 1.00x | 0.95x | 0.98x | 0.96x | 0.99x | 0.98x |
 
 Medians over firing rate, path length and placement. A single event can do
 better than its row: the 80 ms replay in the figure, which fires strongly and
-travels 100 cm, comes in at 1.3x rather than 3.5x.
+travels 100 cm, comes in at 1.3x rather than 3.3x.
 
 **Absorption reaches about 80 cm.** Among events both reported, by the distance
 between the replay and the animal's own place:
 
 | distance | 40-80 cm | 80-120 cm | over 120 cm |
 |---|---|---|---|
-| duration ratio | 2.16x | 1.17x | 1.12x |
+| duration ratio | 2.12x | 1.17x | 1.12x |
 | share of windows on the animal's place | 0.44 | 0.00 | 0.00 |
 
 **What the sweep cannot say.** The animal rests at one end of the track and
@@ -441,11 +443,12 @@ mismatch and the surface is optimistic. Sorted spikes on a linear track:
 neither the clusterless likelihood nor the jump criterion of a branched track
 is exercised.
 
-**On the encoding model.** Each detector fits its own, from the same recording,
-the same non-event training mask and the same hyperparameters. They are
-separate fits and their place fields differ by about 4% of peak firing rate.
-They are not one shared object, and earlier drafts of this document and of both
-scripts said they were.
+**On the encoding model.** Both procedures read one set of place fields. The
+state-space detector fits them, and the sliding-window likelihood is handed the
+same object, so the two differ in how they use the encoding model and not in
+what it is. An earlier version fitted the model twice, once for each side;
+those two fits differed by about 4% of peak firing rate, and the sweep's
+answers were the same either way.
 
 ### Summary: what the port misses, and what it over-calls
 

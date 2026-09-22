@@ -36,8 +36,8 @@ SUMMARY_PATH = Path(
 )
 BLACK, ORANGE, SKY, GREEN, YELLOW, BLUE, VERMILION, PURPLE = WONG[:8]
 
-SLIDING = "memoryless sliding window"
-STATE_SPACE = "state-space model"
+SLIDING = "sliding-window detector"
+STATE_SPACE = "state-space detector"
 DISTANCE_ORDER = ("(40, 80]", "(80, 120]", "(120, 200]")
 
 
@@ -73,9 +73,9 @@ def plot_detection(ax, grid: pd.DataFrame, title: str, show_y: bool):
     ax.set_xticklabels([f"{1000 * c:.0f}" for c in grid.columns], fontsize=5)
     ax.set_yticks(range(grid.shape[0]))
     ax.set_yticklabels([f"{r:.0f}" for r in grid.index], fontsize=5)
-    ax.set_xlabel("true duration (ms)")
+    ax.set_xlabel("how long the replay really lasted (ms)")
     if show_y:
-        ax.set_ylabel("path length (cm)")
+        ax.set_ylabel("path the replay travels (cm)")
     else:
         ax.set_yticklabels([])
     ax.set_title(title, fontsize=6)
@@ -116,9 +116,12 @@ def plot_duration_bias(ax, summary: pd.DataFrame):
     ax.set_yscale("log")
     ax.set_yticks([1, 2, 5, 10])
     ax.set_yticklabels(["1x", "2x", "5x", "10x"])
-    ax.set_xlabel("true duration (ms)")
-    ax.set_ylabel("reported / true")
-    ax.set_title("how long each calls the events it found", fontsize=6)
+    ax.set_xlabel("how long the replay really lasted (ms)")
+    ax.set_ylabel("reported duration / actual duration")
+    ax.set_title(
+        "how long each detector says an event lasted,\nagainst how long it was",
+        fontsize=6,
+    )
     ax.legend(fontsize=5, frameon=False, loc="upper right", handlelength=1.3)
     ax.text(
         250,
@@ -153,9 +156,10 @@ def plot_absorption(ax, summary: pd.DataFrame):
     )
     for x, local in zip(at, series("sliding_local_fraction"), strict=True):
         ax.annotate(
-            f"{100 * local:.0f}% of windows\non the animal's place",
+            f"{100 * local:.0f}% of the event's 80 ms windows\n"
+            "decode the animal's own place",
             xy=(x, 1.0),
-            xytext=(x + (0.22 if x == 0 else 0.0), 1.85 if x == 0 else 1.45),
+            xytext=(x + (0.42 if x == 0 else 0.0), 1.62 if x == 0 else 1.32),
             fontsize=4.5,
             color="0.35",
             ha="center",
@@ -166,8 +170,12 @@ def plot_absorption(ax, summary: pd.DataFrame):
     ax.set_xticklabels([bin_name.replace(", ", "-").strip("(]") for bin_name in order])
     ax.set_ylim(0.85, 2.6)
     ax.set_xlabel("replay's distance from the animal's place (cm)")
-    ax.set_ylabel("reported / true")
-    ax.set_title("the over-call reaches about 80 cm and stops", fontsize=6)
+    ax.set_ylabel("reported duration / actual duration")
+    ax.set_title(
+        "events are reported too long only when the replay is near\n"
+        "the animal's own place, where local coding is absorbed into them",
+        fontsize=6,
+    )
 
 
 def make_figure(summary: pd.DataFrame):
@@ -186,17 +194,18 @@ def make_figure(summary: pd.DataFrame):
     image = plot_detection(
         ax_sliding,
         detection_grid(summary, "sliding_matches"),
-        f"{SLIDING}: reported {100 * overall['sliding_matches']:.0f}% of them",
+        f"{SLIDING}\nreported {100 * overall['sliding_matches']:.0f}% of the "
+        "replays that were put in",
         show_y=True,
     )
     plot_detection(
         ax_state,
         detection_grid(summary, "state_space_matches"),
-        f"{STATE_SPACE}: reported {100 * overall['state_space_matches']:.0f}%",
+        f"{STATE_SPACE}\nreported {100 * overall['state_space_matches']:.0f}% of them",
         show_y=False,
     )
     bar = fig.colorbar(image, ax=[ax_sliding, ax_state], fraction=0.03, pad=0.01)
-    bar.set_label("replays found (%)", fontsize=5.5)
+    bar.set_label("replays reported (%)", fontsize=5.5)
     bar.ax.tick_params(labelsize=5)
 
     ax_duration = fig.add_subplot(grid[1, 0])
@@ -208,13 +217,18 @@ def make_figure(summary: pd.DataFrame):
         [ax_sliding, ax_state, ax_duration, ax_distance], xpos=-0.09, ypos=1.10
     )
     fig.suptitle(
-        f"{int(overall['n_cells'])} injected replays through both detectors. "
+        f"{int(overall['n_cells'])} made-up replays, each with a path, a duration and "
+        "a firing rate we chose, written into the spike trains\nof a simulated "
+        "recording one at a time, so that the right answer is known\n"
+        "A detector counts as reporting a replay only when what it returns is that "
+        "replay: on its path, and not covering far more ground.\n"
         f"{100 * overall['found_by_state_space_only']:.0f}% were reported by the "
-        f"state-space model alone and "
-        f"{100 * overall['found_by_sliding_window_only']:.0f}% by the sliding window "
-        f"alone. {100 * overall['sliding_accepted_but_not_the_injection']:.0f}% of the "
-        "sliding window's accepted events are not the injected replay.",
-        fontsize=6.5,
+        f"{STATE_SPACE} alone, "
+        f"{100 * overall['found_by_sliding_window_only']:.0f}% by the {SLIDING} "
+        f"alone. {100 * overall['sliding_accepted_but_not_the_injection']:.0f}% of "
+        f"the {SLIDING}'s accepted events are not the replay that was put in.",
+        fontsize=6,
+        linespacing=1.6,
     )
     return fig
 

@@ -66,7 +66,8 @@ from continuum_swr_replay.visualization.figure_panels import (
 )
 
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s %(message)s",
+    level=logging.INFO,
+    format="%(asctime)s %(message)s",
     datefmt="%d-%b-%y %H:%M:%S",
 )
 figure_utilities.set_figure_defaults(context="paper")
@@ -77,14 +78,13 @@ warnings.filterwarnings("ignore")
 # Panel a — Threshold distribution (inline; only used here)
 # ---------------------------------------------------------------------------
 
+
 def plot_non_local_prob_distribution(data_over_time, ax) -> None:
     """Bimodal non-local probability distribution during immobility.
 
     Used to justify the 0.8 threshold applied throughout the paper.
     """
-    is_immobile = (
-        data_over_time.head_speed < DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
-    )
+    is_immobile = data_over_time.head_speed < DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
     ax.hist(
         data_over_time.loc[is_immobile, "Non-Local_prob"],
         bins=50,
@@ -96,7 +96,9 @@ def plot_non_local_prob_distribution(data_over_time, ax) -> None:
     )
     ax.axvline(
         DEFAULT_NON_LOCAL_THRESHOLD,
-        color="black", linewidth=0.8, linestyle="--",
+        color="black",
+        linewidth=0.8,
+        linestyle="--",
         label=f"{DEFAULT_NON_LOCAL_THRESHOLD} threshold",
     )
     ax.set_xlabel("Non-local probability\n(immobile timepoints)")
@@ -109,6 +111,7 @@ def plot_non_local_prob_distribution(data_over_time, ax) -> None:
 # Main figure
 # ---------------------------------------------------------------------------
 
+
 def generate_figure(data_dir: Path = PROCESSED_DATA_DIR):
     logging.info("Loading aggregated data...")
     data_over_time = load_data_over_time(data_dir)
@@ -116,13 +119,17 @@ def generate_figure(data_dir: Path = PROCESSED_DATA_DIR):
 
     fig_height = min(9.0, PAGE_HEIGHT)
     fig = plt.figure(
-        figsize=(TWO_COLUMN, fig_height), dpi=450, constrained_layout=True,
+        figsize=(TWO_COLUMN, fig_height),
+        dpi=450,
+        constrained_layout=True,
     )
     # Row 1: a (threshold) | b (state fractions)
     # Row 2: c (calibration) | d (durations)
     # Row 3: e (full 4-signal triggered averages, stacked sub-rows)
     outer = GridSpec(
-        3, 1, figure=fig,
+        3,
+        1,
+        figure=fig,
         height_ratios=[1.0, 1.0, 1.6],
         hspace=0.4,
     )
@@ -177,10 +184,12 @@ def generate_figure(data_dir: Path = PROCESSED_DATA_DIR):
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--output-dir", type=Path,
+        "--output-dir",
+        type=Path,
         default=Path("paper/figures/supp_decoder_validation"),
     )
     parser.add_argument("--data-dir", type=Path, default=PROCESSED_DATA_DIR)

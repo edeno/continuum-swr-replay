@@ -1422,18 +1422,14 @@ data_over_time.loc[data_over_time["SWR_event"] > 0].groupby(
     ["animal", "day", "epoch", "SWR_event"]
 ).filter(lambda g: (g["non_local_event"] == 0).all()).groupby(
     ["animal", "day", "epoch", "SWR_event"]
-)[
-    "Local_prob"
-].mean().mean()
+)["Local_prob"].mean().mean()
 
 # %%
 data_over_time.loc[data_over_time["MUA_event"] > 0].groupby(
     ["animal", "day", "epoch", "MUA_event"]
 ).filter(lambda g: (g["non_local_event"] == 0).all()).groupby(
     ["animal", "day", "epoch", "MUA_event"]
-)[
-    "Local_prob"
-].mean().mean()
+)["Local_prob"].mean().mean()
 
 # %%
 immobile_non_local_events.map_speed.hist(
@@ -1601,7 +1597,7 @@ non_local_events_in_SWR = (
     .set_index(["animal", "day", "epoch", "SWR_event"])
     .join(swr_start_time)
     .reset_index()
-    .assign(time_diff=lambda df: (df["non_local_start_time"] - df["swr_start_time"]))
+    .assign(time_diff=lambda df: df["non_local_start_time"] - df["swr_start_time"])
 )
 
 # %%
