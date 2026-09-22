@@ -134,11 +134,9 @@ see the note under "Systematic issues". The nearest figures are the 58% and 60% 
 five-window events that passed shuffling in the HPC and mPFC, which is a different
 quantity.
 
-**The Google Sheet has not been updated for these three cells.** Playwright is not
-installed in the current environment, so the Sheet and the CSV now differ for
-Kaefer 2020 in `Trajectory`, `Reconst. Error (cm)` and `Decoding notes`. `Trajectory`
-is one of the five dropdown columns, so it needs the clear-type-arrow-Enter method
-described under "How the Sheet was updated" rather than a plain paste.
+**The Google Sheet carries these three cells** as of 2026-09-22, written by the method
+under "How the Sheet was updated". A fresh export and the CSV then agreed in all 1995
+cells, compared exactly.
 
 ## Papers added
 
@@ -349,6 +347,21 @@ Enter to commit. The filter matches from the start of a word, so `Radon` reaches
 transform" and `correlation` reaches "Weighted correlation". The not-applicable option is
 labeled `=NA()` and is reached by typing `NA`; neither `N/A` nor `=NA()` matches it,
 since a leading `=` starts formula entry and the label has no slash.
+
+`Trajectory` holds several choices per cell. Its dropdown ticks each one, and the cell
+lists them in the order they were ticked, not in the list's order. Two further hazards
+came up writing Kaefer 2020's cell, and one of them broke it. **The popup commits on any
+close**, Escape and a closing browser included, so a script that stops with the popup open
+writes whatever is ticked at that moment: an aborted run left the cell reading `MAP`
+alone. And the formula bar reads back the old value for a few seconds after a commit, so a
+read-back there cannot confirm a write. What worked: open the dropdown, untick every
+ticked choice, tick the wanted ones in order, check every `aria-checked` state while the
+popup is still open, and only then close it by clicking outside it. Confirm from a fresh
+CSV export, not from the formula bar.
+
+A multi-line cell has one hazard of its own. Typing into `Decoding notes` after selecting
+it appended to the old text instead of replacing it. Pressing Delete first, which clears
+the selected cell, and then typing the lines with Alt+Enter between them, wrote it cleanly.
 
 One value is recorded slightly differently from the quoted text, because the column is
 numeric: Ólafsdóttir 2015's reconstruction error reads 10 rather than 10.0.
