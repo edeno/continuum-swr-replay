@@ -332,7 +332,9 @@ detectors reading one encoding model fitted once, sorted spikes on a linear
 track. Every number below comes from
 [detection_sweep_summary.csv](detection_sweep_summary.csv), which that script
 writes; the full per-cell table goes to `Processed-Data` and is not tracked.
-The sweep takes about two minutes to reproduce. Placement inside an immobile stretch, the sub-window phase and the
+The sweep takes about two minutes to reproduce, and
+`scripts/figures/generate_memoryless_sweep.py` draws the summary figure from
+the same file. Placement inside an immobile stretch, the sub-window phase and the
 Poisson draw are randomized rather than fixed, because each of them changes the
 answer on its own.
 
