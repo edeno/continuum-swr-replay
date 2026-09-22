@@ -404,11 +404,44 @@ seen at all.
 event.** They are absorbed local coding that overlaps it. This is the same
 over-call the figure shows, measured as a rate.
 
-**No cell in the sweep was found by the sliding window and missed by the
-state-space model.** 71% of cells went the other way. Of those, 65% built a
-candidate that then failed dispersion and 21% built no candidate at all, while
-the median share of windows passing the spread criterion inside the event was
-1.00. The spread gate is not what loses these events; dispersion is.
+**What is being compared, and what is not.** Each procedure runs as published,
+with its own acceptance criteria; those criteria are part of the method and are
+not harmonised. What is held identical is the scoring: both detectors are asked
+whether the injected replay came back, and a reported event counts only when its
+decoded position tracks the injection during the injection and its whole
+reported event does not cover far more ground than the injected path. Span is
+measured over each detector's whole reported event on both sides. Measuring it
+over only the overlapping part on one side credits an event that tracks the
+injection and then runs off elsewhere, which is the very thing the test is for.
+The state-space model runs on the library's default discrete transitions:
+`discrete_transition_stickiness` is a Dirichlet concentration read only by the
+EM M-step, and this sweep calls `fit`, so setting one would change nothing.
+
+**Almost no cell in the sweep was found by the sliding window and missed by the
+state-space model** — one of 4536, 0.02%. 71% of cells went the other way. Of
+those, 65% built a candidate that then failed dispersion and 21% built no
+candidate at all, while the median share of windows passing the spread criterion
+inside the event was 1.00. The spread gate is not what loses these events;
+dispersion is.
+
+**The path-length limit belongs to the replay definition, not to the inference.**
+A uniform traverse of length L has dispersion L/sqrt(12), so the published 12 cm
+dispersion criterion cannot accept a path under about 42 cm however well it is
+decoded. Scoring our own state-space events under that same criterion confirms
+it: their median dispersion is 2.5, 4.5 and 6.5 cm for injected paths of 10, 20
+and 30 cm, and the rule would reject 100% of them. Above the floor the two run
+close under that rule — 38% against 28% at 45 cm, 49% against 48% at 60 cm, 51%
+against 51% at 130 cm. This is recorded as `state_space_replay_matches` in the
+summary. It is a diagnostic of *why* the sliding window misses short paths, not
+a rate to quote against `sliding_matches`: the two procedures are compared as
+published, against the injected event.
+
+**Where the published criteria can accept an event at all** — path over about
+42 cm and duration over 100 ms, 25% of the grid — the sliding window reports 69%
+and the state-space model 99% (`overall_in_domain`). The remaining three
+quarters of the grid are events the published method is defined not to call
+replays. That is a property of the method worth measuring, and it is why the
+whole-grid rate is much lower than the in-domain rate.
 
 **Reported duration, among events both procedures reported:**
 

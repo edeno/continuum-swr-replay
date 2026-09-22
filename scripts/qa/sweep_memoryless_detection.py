@@ -66,6 +66,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation im
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
     aggregate_windows,
+    dispersion_cm,
     normalize_windows,
 )
 from continuum_swr_replay.parameters import LOCAL_POSITION_STD
@@ -96,8 +97,17 @@ pieces left after cutting out the recording's own events can still hold an
 event."""
 
 NON_LOCAL_PROB_THRESHOLD = 0.8
-DISCRETE_TRANSITION_STICKINESS = np.array([30.0, 100000.0, 30.0, 200.0])
 SAME_PLACE_CM = 15.0
+
+IN_DOMAIN_PATH_CM = 45.0
+IN_DOMAIN_DURATION_S = 0.12
+"""The smallest swept path and duration the published replay definition can
+accept. Dispersion must exceed 12 cm and a uniform traverse of length L has
+dispersion L / sqrt(12), so a path under about 42 cm cannot qualify however
+well it is decoded; duration must exceed 100 ms. Three quarters of the grid
+lies outside this, by design, to show where each procedure's limit is -- but
+the aggregate over the whole grid is not a rate of anything the published
+method claims to detect."""
 
 MATCH_TOLERANCE_CM = 20.0
 """How far a detector's decoded position may sit from the injected one.
@@ -142,13 +152,14 @@ def build_recording():
         sorted_spikes_algorithm="sorted_spikes_kde",
         sorted_spikes_algorithm_params={"position_std": 6.0, "block_size": int(2**8)},
         local_position_std=LOCAL_POSITION_STD,
-        discrete_transition_stickiness=DISCRETE_TRANSITION_STICKINESS,
     )
     # fit, not estimate_parameters. After EM the detector returns an all-zero
     # posterior when predict is given a different time grid from the one it was
-    # fitted on, silently, so every sweep cell would read as "not found". Plain
-    # fit uses the stickiness given above instead of estimating it, which also
-    # removes a source of variation between cells.
+    # fitted on, silently, so every sweep cell would read as "not found". The
+    # state-space model therefore runs on the library's default discrete
+    # transitions: discrete_transition_stickiness is a Dirichlet concentration
+    # read only by the EM M-step, so passing one here would change nothing and
+    # would read as tuning.
     detector.fit(
         position_time=time,
         position=position,
@@ -284,6 +295,19 @@ def memoryless_outcome(recording, injected, window, bounds, true_position_cm, pa
     return out
 
 
+def nearest_bin(recording, position_cm: np.ndarray) -> np.ndarray:
+    """Interior place bin nearest each decoded position.
+
+    The state-space posterior carries one position axis per state, so its
+    argmax is an index into a concatenation. Mapping back to interior bins
+    lets the state-space trajectory be measured with the same
+    `dispersion_cm` over the same track-graph distances as the sliding
+    window's.
+    """
+    centers = recording["place_bin_centers_cm"]
+    return np.abs(centers[None, :] - np.asarray(position_cm)[:, None]).argmin(axis=1)
+
+
 def state_space_outcome(recording, injected, window, bounds, true_position_cm, path_cm):
     """What the switching state-space model reports for the same event."""
     time, position = window
@@ -328,8 +352,10 @@ def state_space_outcome(recording, injected, window, bounds, true_position_cm, p
         "state_space_start_error_s": float(hits[0][0] - start_s) if hits else np.nan,
         "state_space_end_error_s": float(hits[-1][1] - end_s) if hits else np.nan,
         "state_space_matches": False,
+        "state_space_replay_matches": False,
         "state_space_position_error_cm": np.nan,
         "state_space_span_cm": np.nan,
+        "state_space_dispersion_cm": np.nan,
     }
     if not hits:
         return out
@@ -343,15 +369,35 @@ def state_space_outcome(recording, injected, window, bounds, true_position_cm, p
     bin_position_cm = np.asarray(posterior.coords["position"].values)[is_non_local]
     non_local = np.asarray(posterior.values)[:, is_non_local]
 
-    reported = inside & above
-    if reported.any():
-        decoded_cm = bin_position_cm[np.argmax(non_local[reported], axis=1)]
-        error_cm = np.abs(decoded_cm - true_position_cm(time[reported]))
+    # Scored exactly as the sliding window is: position error over the part of
+    # the event that overlaps the injection, span over the whole event. Taking
+    # the span over the overlap only would hide whatever the event does outside
+    # it, which is the very thing the span test is for, and would hold the two
+    # detectors to different rules.
+    whole = above & (time >= hits[0][0]) & (time <= hits[-1][1])
+    decoded_cm = bin_position_cm[np.argmax(non_local[whole], axis=1)]
+    out["state_space_span_cm"] = float(np.ptp(decoded_cm))
+    out["state_space_dispersion_cm"] = dispersion_cm(
+        nearest_bin(recording, decoded_cm), recording["bin_distance_cm"]
+    )
+
+    during = inside & above
+    if during.any():
+        error_cm = np.abs(
+            bin_position_cm[np.argmax(non_local[during], axis=1)]
+            - true_position_cm(time[during])
+        )
         out["state_space_position_error_cm"] = float(np.median(error_cm))
-        out["state_space_span_cm"] = float(np.ptp(decoded_cm))
         out["state_space_matches"] = bool(
             np.median(error_cm) < MATCH_TOLERANCE_CM
             and out["state_space_span_cm"] <= path_cm + 2 * MATCH_TOLERANCE_CM
+        )
+        # and again under the published replay definition the sliding window is
+        # held to, so the two rates can be read against each other
+        out["state_space_replay_matches"] = bool(
+            out["state_space_matches"]
+            and out["state_space_duration_s"] > CONFIG.minimum_duration_s
+            and out["state_space_dispersion_cm"] > CONFIG.dispersion_threshold_cm
         )
     return out
 
@@ -498,6 +544,7 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
                 "sliding_any_candidate",
                 "state_space_found",
                 "state_space_matches",
+                "state_space_replay_matches",
                 "found_by_state_space_only",
                 "found_by_sliding_window_only",
                 "sliding_accepted_but_not_the_injection",
@@ -512,6 +559,7 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
                 float(table.sliding_any_candidate.mean()),
                 float(table.state_space_found.mean()),
                 float(table.state_space_matches.mean()),
+                float(table.state_space_replay_matches.mean()),
                 float((table.state_space_matches & ~table.sliding_matches).mean()),
                 float((table.sliding_matches & ~table.state_space_matches).mean()),
                 float(
@@ -533,6 +581,29 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
     )
     overall["summary"] = "overall"
     parts.append(overall)
+
+    in_domain = table[
+        (table.path_cm >= IN_DOMAIN_PATH_CM)
+        & (table.duration_s >= IN_DOMAIN_DURATION_S)
+    ]
+    domain = pd.DataFrame(
+        {
+            "measure": [
+                "n_cells",
+                "sliding_matches",
+                "state_space_matches",
+                "state_space_replay_matches",
+            ],
+            "value": [
+                float(len(in_domain)),
+                float(in_domain.sliding_matches.mean()),
+                float(in_domain.state_space_matches.mean()),
+                float(in_domain.state_space_replay_matches.mean()),
+            ],
+        }
+    )
+    domain["summary"] = "overall_in_domain"
+    parts.append(domain)
 
     # the grouping column is not called "aggregate": that name shadows
     # DataFrame.aggregate, so frame.aggregate == "x" compares a method and

@@ -118,8 +118,14 @@ dispersion criterion needs a path of about 42 cm, so it rejects the candidate.
 """
 
 NON_LOCAL_PROB_THRESHOLD = 0.8
-DISCRETE_TRANSITION_STICKINESS = np.array([30.0, 100000.0, 30.0, 200.0])
-"""Settings Figure 1 uses for the switching state-space model."""
+"""The project's standard non-local threshold, as in `run_decoding_bandit.py`.
+
+The state-space model is otherwise left on the library's defaults. Figure 1
+sets a discrete transition stickiness, but stickiness is a Dirichlet
+concentration read only by the EM M-step, and this comparison calls `fit`
+rather than `estimate_parameters`, so passing one would change nothing here
+and would read as tuning.
+"""
 
 REMOTE_STATIONARY_CM = 42.5
 """The place a remote stationary event holds, far from the animal's 170 cm."""
@@ -237,7 +243,6 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
         sorted_spikes_algorithm="sorted_spikes_kde",
         sorted_spikes_algorithm_params={"position_std": 6.0, "block_size": int(2**8)},
         local_position_std=LOCAL_POSITION_STD,
-        discrete_transition_stickiness=DISCRETE_TRANSITION_STICKINESS,
     )
     # fit rather than estimate_parameters, matching the sweep: EM would
     # re-estimate the place fields and the transitions on the data it is then
@@ -380,6 +385,30 @@ def local_fraction(decoded: dict, sequence: int, tolerance_cm: float = 15.0) -> 
     )
     usable = np.isfinite(center_cm)
     return float(np.mean(np.abs(center_cm[usable] - animal_cm[usable]) < tolerance_cm))
+
+
+def bound_error_ms(decoded: dict, events: tuple[int, ...]) -> float:
+    """Largest error in either bound of the state-space model's reports.
+
+    The caption used to state a round number for this. It is read off the
+    data now, over exactly the events the figure shows.
+    """
+    worst = 0.0
+    for event in events:
+        start_s, end_s = decoded["event_times"][event]
+        overlapping = [
+            (a, b)
+            for a, b in decoded["state_space_intervals"]
+            if a <= end_s and start_s <= b
+        ]
+        if not overlapping:
+            return float("nan")
+        worst = max(
+            worst,
+            abs(overlapping[0][0] - start_s),
+            abs(overlapping[-1][1] - end_s),
+        )
+    return 1000 * worst
 
 
 def plot_overview(ax, decoded: dict, config: MemorylessSequenceConfig) -> None:
@@ -832,6 +861,9 @@ def write_caption(decoded: dict, summary: pd.DataFrame, path: Path) -> None:
     drift apart.
     """
     overall = summary[summary["summary"] == "overall"].set_index("measure").value
+    domain = (
+        summary[summary["summary"] == "overall_in_domain"].set_index("measure").value
+    )
     ratio = summary[
         (summary["summary"] == "median_duration_ratio_by_duration")
         & (summary.measure == "sliding_duration_ratio")
@@ -867,7 +899,8 @@ It also finds the 80 ms replay and reports it {duration_ratio(decoded, 7):.1f}
 times too long, this time with no local coding in it at all: the window alone
 puts a floor under any duration it can report. It misses the 30 cm replay and declines the remote stationary
 event, both for too little dispersion. The state-space detector reports all
-four with bounds within about 20 ms.
+four, with every bound within {bound_error_ms(decoded, (0, 7, 6, 5)):.0f} ms of
+the truth.
 
 **(f-i) {int(overall["n_cells"])} replays of chosen shape.** Made-up
 replays were written into the spike trains of a simulated linear-track
@@ -877,16 +910,27 @@ detector reports can be scored against it. A detector counts as reporting a
 replay only when what it returns is that replay: on its path, and not covering
 far more ground.
 
-**(f, g)** Percent of those {int(overall["n_cells"])} replays reported, by
-the path the replay travels and how long it lasts. Taken together the
-sliding-window detector reports {100 * overall["sliding_matches"]:.0f}% of them
-and the state-space detector {100 * overall["state_space_matches"]:.0f}%. The
-sliding-window detector is limited by path length, which is one of its
-criteria: below about 45 cm it reports a few percent at any duration and any
-firing rate. The state-space detector is limited by duration, which is spike
-count, which is the data. No replay was reported by the sliding-window detector
-and missed by the state-space detector;
-{100 * overall["found_by_state_space_only"]:.0f}% went the other way.
+**(f, g)** Percent of those {int(overall["n_cells"])} replays reported, by the
+path the replay travels and how long it lasts. Each detector runs as published,
+with its own acceptance criteria, and both are scored the same way against the
+same known answer. The sliding-window detector reports
+{100 * overall["sliding_matches"]:.0f}% of the replays and the state-space
+detector {100 * overall["state_space_matches"]:.0f}%.
+{100 * overall["found_by_state_space_only"]:.0f}% were reported by the
+state-space detector and missed by the sliding-window detector;
+{100 * overall["found_by_sliding_window_only"]:.2f}% went the other way.
+
+The two detectors reach their limits on different quantities. The state-space
+detector is limited by duration, which is spike count, which is the data. The
+sliding-window detector is limited by path length, through its own dispersion
+criterion: a replay must spread more than 12 cm about its own centre, and a
+30 cm path cannot, however well it is decoded.
+Held to that same criterion our state-space detector also reports nothing below
+45 cm, so this is the published replay definition acting, not the window-by-window
+inference. On the part of the grid that definition can accept at all — a path
+over about 42 cm and a duration over 100 ms, {100 * domain["n_cells"] / overall["n_cells"]:.0f}%
+of the cells — the two read {100 * domain["sliding_matches"]:.0f}% and
+{100 * domain["state_space_matches"]:.0f}%.
 
 **(h)** Reported duration over actual duration, for replays both detectors
 reported. A {1000 * shortest.duration_s:.0f} ms replay is reported as about
@@ -895,9 +939,10 @@ reported. A {1000 * shortest.duration_s:.0f} ms replay is reported as about
 
 **(i)** The same ratio against how far the replay sits from the animal's own
 place. Numbers give the share of the reported event's 80 ms windows that
-decode the animal's place rather than a replayed one. Over-reporting happens
-only within about 80 cm of the animal, where local coding is absorbed into the
-event, as in panel (b). Over the whole sweep,
+decode the animal's place rather than a replayed one. That absorption of local
+coding reaches about 80 cm from the animal and is what drives the largest
+over-reporting, as in panel (b); beyond it the window floor of panel (h) still
+leaves the reported duration too long. Over the whole sweep,
 {100 * overall["sliding_accepted_but_not_the_injection"]:.0f}% of the
 sliding-window detector's accepted events are not the replay that was put in.
 
