@@ -45,6 +45,7 @@ __all__ = [
     "Coverage",
     "directional_agreement",
     "event_matches",
+    "flag_pairs",
     "overlap_pairs",
     "remove_bridging_events",
     "time_coverage",
@@ -324,6 +325,37 @@ def event_matches(
                     }
                 )
     return _frame(rows, MATCH_DTYPES)
+
+
+def flag_pairs(pairs: pd.DataFrame, matches: pd.DataFrame) -> pd.DataFrame:
+    """The pair table, with whether each event lies within the shared exposure.
+
+    Every overlap stays in the pair table however its events sit; the flags
+    say which of the two could enter its direction's denominator.
+
+    Parameters
+    ----------
+    pairs : DataFrame
+        From ``overlap_pairs``.
+    matches : DataFrame
+        ``event_matches`` over the same inventory.
+
+    Returns
+    -------
+    DataFrame
+        ``pairs`` with ``a_within_shared_exposure`` and
+        ``b_within_shared_exposure`` appended.
+
+    """
+    within = matches.set_index(["event_key", "other_detector"]).within_shared_exposure
+    return pairs.assign(
+        a_within_shared_exposure=within.loc[
+            list(zip(pairs.event_key_a, pairs.detector_b, strict=True))
+        ].to_numpy(dtype=bool),
+        b_within_shared_exposure=within.loc[
+            list(zip(pairs.event_key_b, pairs.detector_a, strict=True))
+        ].to_numpy(dtype=bool),
+    )
 
 
 def directional_agreement(

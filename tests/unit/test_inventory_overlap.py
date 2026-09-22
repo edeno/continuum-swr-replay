@@ -12,6 +12,7 @@ from continuum_swr_replay.analysis.inventory_comparison.overlap import (
     Coverage,
     directional_agreement,
     event_matches,
+    flag_pairs,
     overlap_pairs,
     remove_bridging_events,
     time_coverage,
@@ -262,6 +263,30 @@ class TestDirectionalAgreement:
 
         with pytest.raises(ValueError, match="no coverage"):
             directional_agreement(inventory, overlap_pairs(inventory), everywhere("A"))
+
+
+class TestFlagPairs:
+    def test_each_side_says_whether_it_lies_within_the_shared_exposure(self):
+        """A pair is kept however its events sit; the flags say which of its
+        two events could enter a denominator."""
+        inventory = pd.concat(
+            [events("A", [(10, 20)]), events("B", [(15, 30)])], ignore_index=True
+        )
+        coverage = everywhere("A") | {
+            (*KEY, "B"): Coverage(np.array([[0.0, 25.0]]), np.array([[0.0, 25.0]]))
+        }
+        pairs = overlap_pairs(inventory)
+
+        flagged = flag_pairs(pairs, event_matches(inventory, pairs, coverage))
+
+        assert list(flagged.columns) == [
+            *pairs.columns,
+            "a_within_shared_exposure",
+            "b_within_shared_exposure",
+        ]
+        assert flagged[
+            ["a_within_shared_exposure", "b_within_shared_exposure"]
+        ].values.tolist() == [[True, False]]
 
 
 class TestEventMatches:
