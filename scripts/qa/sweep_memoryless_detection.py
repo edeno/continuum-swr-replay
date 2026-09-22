@@ -68,6 +68,12 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.scoring impor
     best_scored,
     score_against_injection,
 )
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
+    DEFAULT_N_SHUFFLES,
+    SIGNIFICANCE_LEVEL,
+    ShuffleSeed,
+    shuffle_candidate_sorted,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation import (
     InjectedReplay,
     immobile_intervals,
@@ -126,6 +132,9 @@ well it is decoded; duration must exceed 100 ms. Three quarters of the grid
 lies outside this, by design, to show where each procedure's limit is -- but
 the aggregate over the whole grid is not a rate of anything the published
 method claims to detect."""
+
+SHUFFLE_RUN_SEED = 20260922
+"""Seeds the place-cell identity shuffle; each cell's draws are keyed on the cell too."""
 
 MATCH_TOLERANCE_CM = 20.0
 """How far a detector's decoded position may sit from the injected one.
@@ -225,8 +234,20 @@ def best_entry(scored: list[tuple]) -> tuple:
     return scored[best_scored([entry[1] for entry in scored])]
 
 
-def memoryless_outcome(recording, injected, window, bounds, true_position_cm, path_cm):
-    """What the sliding-window detector reports for one injected event."""
+def memoryless_outcome(
+    recording, injected, window, bounds, true_position_cm, path_cm, cell_key
+):
+    """What the sliding-window detector reports for one injected event.
+
+    Scored three ways, because the published definition has three parts and
+    the reference's driver applied only some of them. ``sliding_matches`` is
+    the whole published definition: a candidate that meets the duration and
+    dispersion criteria, is the injected replay, and beats the place-cell
+    identity shuffle on both mean spread and mean jump. The driver as written
+    computed its jump p-values from an all-NaN vector, so every event passed
+    that half; ``sliding_matches_spread_only`` is what it applied.
+    ``sliding_matches_before_shuffle`` leaves the shuffle out.
+    """
     time, position, speed = window
     result = sorted_spikes_epoch_log_likelihood(
         time, position, injected, recording["encoding_model"], CONFIG
@@ -272,11 +293,31 @@ def memoryless_outcome(recording, injected, window, bounds, true_position_cm, pa
             (candidates.duration_s[i] for i in overlapping), default=np.nan
         ),
         "sliding_matches": False,
+        "sliding_matches_before_shuffle": False,
+        "sliding_matches_spread_only": False,
+        "sliding_p_spread": np.nan,
+        "sliding_p_jump": np.nan,
         "sliding_position_error_cm": np.nan,
         "sliding_span_cm": np.nan,
     }
     if not accepted:
         return out
+
+    # the reference's own shuffle, for every accepted candidate
+    shuffles = {
+        i: shuffle_candidate_sorted(
+            int(candidates.runs[i, 0]),
+            int(candidates.runs[i, 1]),
+            time,
+            injected,
+            recording["encoding_model"],
+            recording["bin_distance_cm"],
+            CONFIG,
+            seed=ShuffleSeed(run=SHUFFLE_RUN_SEED, session=cell_key),
+            n_shuffles=DEFAULT_N_SHUFFLES,
+        )
+        for i in accepted
+    }
 
     # Every accepted sequence that overlaps the injection is scored, and the
     # best answers for the cell. Two things have to hold over the whole
@@ -310,12 +351,22 @@ def memoryless_outcome(recording, injected, window, bounds, true_position_cm, pa
                 times[present],
             )
         )
+
+    def any_match(keep) -> bool:
+        return any(entry[1].matches for entry in scored if keep(entry[0]))
+
     i, score, decoded_cm, times = best_entry(scored)
     run_start, run_stop = candidates.runs[i]
 
     animal_cm = np.interp(times, result.time, position[: result.time.size])
     out |= {
-        "sliding_matches": score.matches,
+        "sliding_matches_before_shuffle": score.matches,
+        "sliding_matches": any_match(lambda j: shuffles[j].passes),
+        "sliding_matches_spread_only": any_match(
+            lambda j: shuffles[j].p_spread < SIGNIFICANCE_LEVEL
+        ),
+        "sliding_p_spread": shuffles[i].p_spread,
+        "sliding_p_jump": shuffles[i].p_jump,
         "sliding_position_error_cm": score.position_error_cm,
         "sliding_span_cm": score.span_cm,
         "sliding_duration_s": float(candidates.duration_s[i]),
@@ -509,8 +560,11 @@ def run_cell(recording, means, path_cm, midpoint_cm, duration_s, rate_hz, at_s, 
         fraction = np.clip((np.asarray(at) - start_s) / (end_s - start_s), 0, 1)
         return midpoint_cm - path_cm / 2 + path_cm * fraction
 
+    cell_key = (
+        f"path{path_cm}-mid{midpoint_cm}-dur{duration_s}-rate{rate_hz}-seed{seed}"
+    )
     row |= memoryless_outcome(
-        recording, injected, window, bounds, true_position_cm, path_cm
+        recording, injected, window, bounds, true_position_cm, path_cm, cell_key
     )
     row |= state_space_outcome(
         recording, injected, window, bounds, true_position_cm, path_cm
@@ -561,7 +615,11 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
     Built here so the numbers in the write-up and the numbers in the sweep
     cannot drift apart.
     """
-    found = table[table.sliding_matches & table.state_space_matches].copy()
+    # the shuffle never moves a sequence's bounds, so the duration panels read
+    # every accepted sequence that is the injection, before the shuffle
+    found = table[
+        table.sliding_matches_before_shuffle & table.state_space_matches
+    ].copy()
     found["sliding_duration_ratio"] = found.sliding_duration_s / found.duration_s
     found["state_space_duration_ratio"] = (
         found.state_space_duration_s / found.duration_s
@@ -575,6 +633,8 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
             [
                 "sliding_found",
                 "sliding_matches",
+                "sliding_matches_before_shuffle",
+                "sliding_matches_spread_only",
                 "sliding_any_candidate",
                 "state_space_found",
                 "state_space_matches",
@@ -642,6 +702,11 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
                 "n_cells",
                 "sliding_found",
                 "sliding_matches",
+                "sliding_matches_before_shuffle",
+                "sliding_matches_spread_only",
+                "sliding_shuffle_spread_pass_rate",
+                "sliding_shuffle_jump_pass_rate",
+                "missed_failed_shuffle",
                 "sliding_any_candidate",
                 "state_space_found",
                 "state_space_matches",
@@ -659,6 +724,21 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
                 float(len(table)),
                 float(table.sliding_found.mean()),
                 float(table.sliding_matches.mean()),
+                float(table.sliding_matches_before_shuffle.mean()),
+                float(table.sliding_matches_spread_only.mean()),
+                # each half's pass rate among the injected replays the
+                # detector reported before the shuffle
+                float(
+                    table[table.sliding_matches_before_shuffle]
+                    .sliding_p_spread.lt(SIGNIFICANCE_LEVEL)
+                    .mean()
+                ),
+                float(
+                    table[table.sliding_matches_before_shuffle]
+                    .sliding_p_jump.lt(SIGNIFICANCE_LEVEL)
+                    .mean()
+                ),
+                float(missed.sliding_matches_before_shuffle.mean()),
                 float(table.sliding_any_candidate.mean()),
                 float(table.state_space_found.mean()),
                 float(table.state_space_matches.mean()),
@@ -666,7 +746,7 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
                 float((table.state_space_matches & ~table.sliding_matches).mean()),
                 float((table.sliding_matches & ~table.state_space_matches).mean()),
                 share(
-                    (table.sliding_found & ~table.sliding_matches).sum(),
+                    (table.sliding_found & ~table.sliding_matches_before_shuffle).sum(),
                     table.sliding_found.sum(),
                 ),
                 float(table.sliding_n_accepted.gt(1).mean()),
@@ -699,12 +779,16 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
             "measure": [
                 "n_cells",
                 "sliding_matches",
+                "sliding_matches_before_shuffle",
+                "sliding_matches_spread_only",
                 "state_space_matches",
                 "state_space_replay_matches",
             ],
             "value": [
                 float(len(in_domain)),
                 float(in_domain.sliding_matches.mean()),
+                float(in_domain.sliding_matches_before_shuffle.mean()),
+                float(in_domain.sliding_matches_spread_only.mean()),
                 float(in_domain.state_space_matches.mean()),
                 float(in_domain.state_space_replay_matches.mean()),
             ],
@@ -831,6 +915,9 @@ def main() -> None:
         "non_local_prob_threshold": NON_LOCAL_PROB_THRESHOLD,
         "non_local_minimum_duration_s": NON_LOCAL_MINIMUM_DURATION_S,
         "spikes": "sorted",
+        "shuffle": "place-cell identity (the reference's rateMap(ind_rand, :))",
+        "n_shuffles": DEFAULT_N_SHUFFLES,
+        "shuffle_run_seed": SHUFFLE_RUN_SEED,
         "track": "linear",
     }
     write_table(table, args.out)
@@ -858,6 +945,11 @@ def main() -> None:
     for label, rate in (
         ("sliding window, native criterion", table.sliding_found.mean()),
         ("sliding window, and it is the event", table.sliding_matches.mean()),
+        (
+            "  the same, before the shuffle",
+            table.sliding_matches_before_shuffle.mean(),
+        ),
+        ("  the same, spread test only", table.sliding_matches_spread_only.mean()),
         ("sliding window, any candidate", table.sliding_any_candidate.mean()),
         ("state space, native criterion", table.state_space_found.mean()),
         ("state space, and it is the event", table.state_space_matches.mean()),
@@ -865,7 +957,7 @@ def main() -> None:
         print(f"  {label:<35}: {rate:.3f}")
     print(
         "  of the sliding window's accepted events, the share that are not the "
-        f"injection: {share((table.sliding_found & ~table.sliding_matches).sum(), table.sliding_found.sum()):.3f}"
+        f"injection: {share((table.sliding_found & ~table.sliding_matches_before_shuffle).sum(), table.sliding_found.sum()):.3f}"
     )
 
 
