@@ -47,9 +47,9 @@ adaptively adjusted to ~1 event/s; 150 ms detection refractory",#N/A,#N/A,#N/A,#
 Kaefer,Csicsvari,2020,https://doi.org/10.1016/j.neuron.2020.01.015,Neuron,Rats,Decoding,"Decoded all immobility in 256 ms windows
 detected non-local activity
 excluding trajectories under 20 cm/s
-windows were adjusted for number of spikes or cells",#N/A,#N/A,5,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,Bayes,25.6,10,10,"MAP, Radon transform","Adapative bin sizes
+windows were adjusted for number of spikes or cells",#N/A,#N/A,5,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,#N/A,Bayes,25.6,10,10,"MAP, Linear regression, Radon transform","Adaptive bin sizes: spikes per window set per session as the fewest that decode running position within 30 cm
 No jumps (> 60 cm)
-Absolute speed (>20 cm/s)",Not reported,~45%,Sorted,25.6,Place-field rotation; cell-ID shuffle,200,95th percentile,#N/A,#N/A
+Absolute speed (>20 cm/s)","16 (mPFC), 14 (HPC)",~45%,Sorted,25.6,Place-field rotation; cell-ID shuffle,200,95th percentile,#N/A,#N/A
 Bhattarai,Jung,2020,https://doi.org/10.1073/pnas.1912533117,PNAS,Rats,SWR,"SWR
 preceded by 60 ms of silence
 extended to 1 STD",#N/A,3,4,#N/A,50,5,2,100,250,20,#N/A,100,Bayes,20,2,6,Weighted correlation,,6.56,52%,Sorted,#N/A,Permutation test (type not stated),#N/A,#N/A,candidate events,#N/A

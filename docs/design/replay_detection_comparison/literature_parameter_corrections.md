@@ -111,6 +111,35 @@ are not cited without a check.
 | Jadhav & Frank 2016 | 5 decoding cells | Bayes, 15, 2, 4, linear regression | The retrieved main text contains no decoding analysis at all: zero occurrences of "decod", "Bayes" or "linear regression". The supplement could not be retrieved |
 | Igata 2021 | Min. duration | 60 | May be 50 ms, with 60 ms a sustained-sequence length. Methods are in an unreachable SI Appendix |
 
+## Kaefer 2020, re-checked against the full Methods
+
+Checked 2026-09-22 against the paper's STAR Methods, read from the lab's PDF library.
+The row was filled before the Methods were available in full.
+
+| Paper | Column | Was | Now | Evidence |
+|---|---|---|---|---|
+| Kaefer 2020 | Trajectory | MAP, Radon transform | MAP, Linear regression, Radon transform | Their statistic is a trajectory score, and its decoding-probability half moves the posterior by "a velocity given by the slope of a line fitted over the four decoded positions". The line fit over MAP positions was missing. Radon is retained for the Davidson-style analysis they report under "Additional Quantification of Linear Replay Quality", which is a secondary check, not the detector |
+| Kaefer 2020 | Reconst. Error (cm) | Not reported | 16 (mPFC), 14 (HPC) | "mean decoding error: 2D = 46 ± 3 cm; 1D = 16 ± 3 cm" for the mPFC and "2D = 14 ± 1 cm; 1D = 14 ± 1 cm" for the HPC. The 1D values are quoted, since all replay analysis uses the linearized maps |
+| Kaefer 2020 | Decoding notes | Adapative bin sizes / No jumps (> 60 cm) / Absolute speed (>20 cm/s) | Adaptive bin sizes: spikes per window set per session as the fewest that decode running position within 30 cm / (rest unchanged) | "we computed the average decoding error during running periods ... and determined the minimum number of spikes that allowed us to decode the position of the animal with a decoding error of less than 30 cm". Also corrects the spelling of "Adaptive" |
+
+**What the single-number columns cannot hold.** The paper uses three different window
+definitions and the table has one `Time bin (ms)` cell. Spikes are binned at 25.6 ms
+and aligned to the tracking; non-local position detection uses fixed 256 ms windows;
+and the trajectory analysis uses non-overlapping windows of a fixed **spike count**,
+following Stella et al. 2019. The cell keeps 25.6 ms, which is the underlying bin, and
+the notes carry the rest.
+
+**Still unresolved.** `% Decoded` reads `~45%`, which matches no sentence in the paper;
+see the note under "Systematic issues". The nearest figures are the 58% and 60% of
+five-window events that passed shuffling in the HPC and mPFC, which is a different
+quantity.
+
+**The Google Sheet has not been updated for these three cells.** Playwright is not
+installed in the current environment, so the Sheet and the CSV now differ for
+Kaefer 2020 in `Trajectory`, `Reconst. Error (cm)` and `Decoding notes`. `Trajectory`
+is one of the five dropdown columns, so it needs the clear-type-arrow-Enter method
+described under "How the Sheet was updated" rather than a plain paste.
+
 ## Papers added
 
 Three papers that decode replay were missing and have been added as data rows 55 to 57
