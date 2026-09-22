@@ -51,6 +51,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle impor
     ShuffleResult,
     ShuffleSeed,
     shuffle_candidate,
+    shuffle_candidate_sorted,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
     aggregate_windows,
@@ -76,6 +77,7 @@ __all__ = [
     "normalize_windows",
     "run_epoch",
     "shuffle_candidate",
+    "shuffle_candidate_sorted",
     "shuffle_eligible",
     "sorted_spikes_epoch_log_likelihood",
     "window_midpoints_s",

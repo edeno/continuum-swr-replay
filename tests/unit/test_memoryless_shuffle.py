@@ -18,15 +18,20 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
     clusterless_epoch_log_likelihood,
+    sorted_spikes_epoch_log_likelihood,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
+    MINIMUM_N_SHUFFLES,
     ShuffleResult,
     ShuffleSeed,
     candidate_window_log_likelihood,
+    cell_identity_permutation,
     encoding_permutation,
     shuffle_candidate,
+    shuffle_candidate_sorted,
     shuffle_p_value,
     shuffle_statistics,
+    sorted_candidate_window_log_likelihood,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
     aggregate_windows,
@@ -36,8 +41,10 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics im
 from tests.unit._memoryless_clusterless_epoch import (
     MOVING_WINDOWS,
     SAMPLING_FREQUENCY,
+    SortedTrack,
     TilingTetrode,
     build_simulated_epoch,
+    build_sorted_track,
     build_tiling_tetrode,
 )
 
@@ -467,7 +474,7 @@ class TestShuffleCandidate:
             tetrode.bin_distance_cm,
             CONFIG,
             seed=SEED,
-            n_shuffles=3,
+            n_shuffles=MINIMUM_N_SHUFFLES,
         )
 
         assert result.observed_spread_cm == pytest.approx(spread)
@@ -484,10 +491,12 @@ class TestShuffleCandidate:
             CONFIG,
         )
 
-        first = shuffle_candidate(*args, seed=SEED, n_shuffles=5)
-        again = shuffle_candidate(*args, seed=SEED, n_shuffles=5)
+        first = shuffle_candidate(*args, seed=SEED, n_shuffles=MINIMUM_N_SHUFFLES)
+        again = shuffle_candidate(*args, seed=SEED, n_shuffles=MINIMUM_N_SHUFFLES)
         other = shuffle_candidate(
-            *args, seed=ShuffleSeed(run=1, session=SEED.session), n_shuffles=5
+            *args,
+            seed=ShuffleSeed(run=1, session=SEED.session),
+            n_shuffles=MINIMUM_N_SHUFFLES,
         )
 
         np.testing.assert_array_equal(first.null_spread_cm, again.null_spread_cm)
@@ -507,12 +516,18 @@ class TestShuffleCandidate:
             CONFIG,
         )
 
-        short = shuffle_candidate(*args, seed=SEED, n_shuffles=3)
-        longer = shuffle_candidate(*args, seed=SEED, n_shuffles=6)
+        short = shuffle_candidate(*args, seed=SEED, n_shuffles=MINIMUM_N_SHUFFLES)
+        longer = shuffle_candidate(*args, seed=SEED, n_shuffles=MINIMUM_N_SHUFFLES + 3)
 
-        np.testing.assert_array_equal(short.null_spread_cm, longer.null_spread_cm[:3])
+        np.testing.assert_array_equal(
+            short.null_spread_cm, longer.null_spread_cm[:MINIMUM_N_SHUFFLES]
+        )
 
-    def test_needs_at_least_one_draw(self, tetrode):
+    def test_needs_enough_draws_for_p_below_005_to_be_possible(self, tetrode):
+        """With n draws the smallest p is 1 / (n + 1); below 20 draws no
+        candidate could pass, and a run that passed nothing would look like
+        a result."""
+        assert MINIMUM_N_SHUFFLES == 20
         with pytest.raises(ValueError, match="n_shuffles"):
             shuffle_candidate(
                 *self.WINDOWS,
@@ -523,5 +538,166 @@ class TestShuffleCandidate:
                 tetrode.bin_distance_cm,
                 CONFIG,
                 seed=SEED,
-                n_shuffles=0,
+                n_shuffles=MINIMUM_N_SHUFFLES - 1,
+            )
+
+
+@pytest.fixture(scope="module")
+def sorted_track() -> SortedTrack:
+    return build_sorted_track()
+
+
+class TestCellIdentityShuffle:
+    """The reference's own shuffle, for sorted cells: swap whole place fields.
+
+    ``rateMap(ind_rand, :)`` in ``load_replayEvents_cellIDshuffle_sameEvents.m``.
+    Each cell's spikes are decoded with another cell's field; every field is
+    kept intact, and the fields summed over cells, which is the term for the
+    spikes that did not arrive, is unchanged.
+    """
+
+    WINDOWS = (60, 260)
+
+    def args(self, sorted_track):
+        return (
+            *self.WINDOWS,
+            sorted_track.time,
+            sorted_track.spike_times,
+            sorted_track.encoding_model,
+            CONFIG,
+        )
+
+    def test_the_identity_reproduces_the_epoch_decode(self, sorted_track):
+        first, last = self.WINDOWS
+        whole = sorted_spikes_epoch_log_likelihood(
+            sorted_track.time,
+            sorted_track.linear_position,
+            sorted_track.spike_times,
+            sorted_track.encoding_model,
+            CONFIG,
+        )
+        expected = aggregate_windows(
+            whole.log_likelihood, CONFIG.window_n_samples, CONFIG.stride_n_samples
+        )[first : last + 1]
+
+        windows = sorted_candidate_window_log_likelihood(*self.args(sorted_track))
+
+        np.testing.assert_allclose(windows, expected, rtol=1e-5, atol=1e-3)
+
+    def test_a_permutation_equals_the_library_on_swapped_fields(self, sorted_track):
+        first, last = self.WINDOWS
+        n_cells = len(sorted_track.spike_times)
+        permutation = np.random.default_rng(3).permutation(n_cells)
+        swapped = copy.copy(sorted_track.encoding_model)
+        swapped["place_fields"] = np.asarray(
+            sorted_track.encoding_model["place_fields"]
+        )[permutation]
+        library = sorted_spikes_epoch_log_likelihood(
+            sorted_track.time,
+            sorted_track.linear_position,
+            sorted_track.spike_times,
+            swapped,
+            CONFIG,
+        )
+        expected = aggregate_windows(
+            library.log_likelihood, CONFIG.window_n_samples, CONFIG.stride_n_samples
+        )[first : last + 1]
+
+        windows = sorted_candidate_window_log_likelihood(
+            *self.args(sorted_track), permutation=permutation
+        )
+
+        np.testing.assert_allclose(windows, expected, rtol=1e-5, atol=1e-3)
+
+    def test_spike_trains_must_match_the_cells_one_for_one(self, sorted_track):
+        """The library zips them with strict=False and would decode quietly."""
+        first, last = self.WINDOWS
+        with pytest.raises(ValueError, match="cells"):
+            sorted_candidate_window_log_likelihood(
+                first,
+                last,
+                sorted_track.time,
+                sorted_track.spike_times[:-1],
+                sorted_track.encoding_model,
+                CONFIG,
+            )
+
+    def test_the_decode_follows_the_animal(self, sorted_track):
+        """The premise of the next test, checked rather than assumed."""
+        first, last = self.WINDOWS
+        windows = sorted_candidate_window_log_likelihood(*self.args(sorted_track))
+        center, _ = window_center_and_spread(
+            normalize_windows(windows), sorted_track.bin_distance_cm
+        )
+        environment = sorted_track.encoding_model["environment"]
+        interior = np.asarray(environment.is_track_interior_).ravel()
+        decoded_cm = np.asarray(environment.place_bin_centers_).ravel()[interior][
+            center
+        ]
+        midpoint_s = sorted_track.time[
+            CONFIG.window_n_samples // 2
+            + CONFIG.stride_n_samples * np.arange(first, last + 1)
+        ]
+        animal_cm = np.interp(
+            midpoint_s, sorted_track.time, sorted_track.linear_position
+        )
+
+        assert np.median(np.abs(decoded_cm - animal_cm)) <= 2.5  # one bin
+        assert np.ptp(decoded_cm) > 70.0
+
+    def test_the_jump_test_separates_and_the_spread_test_cannot(self, sorted_track):
+        """The mirror image of the encoding-pair shuffle, recorded on file.
+
+        Swapping whole fields leaves each shuffled posterior sharp, since each
+        spike still points at one field, so the spread null sits where the
+        observed spread does. The sharp, wrong posterior hops between fields,
+        so the jump null lies above a trajectory that moves smoothly. Measured
+        here at 30 Hz peak rate; the same at 15 Hz.
+        """
+        result = shuffle_candidate_sorted(
+            *self.args(sorted_track)[:5],
+            sorted_track.bin_distance_cm,
+            CONFIG,
+            seed=SEED,
+            n_shuffles=100,
+        )
+
+        assert result.testable
+        assert result.observed_jump_cm < result.null_jump_cm.min()
+        assert result.p_jump < 0.05
+        assert result.p_spread > 0.05
+        assert not result.passes
+
+    def test_a_cell_permutation_is_seeded_apart_from_the_electrode_ones(self):
+        cells = cell_identity_permutation(SEED, candidate=3, draw=1, n=50)
+        electrodes = encoding_permutation(SEED, candidate=3, draw=1, electrode=0, n=50)
+
+        assert sorted(cells.tolist()) == list(range(50))
+        assert not np.array_equal(cells, electrodes)
+
+    def test_is_reproducible_and_a_prefix_of_a_longer_run(self, sorted_track):
+        args = (
+            *self.args(sorted_track)[:5],
+            sorted_track.bin_distance_cm,
+            CONFIG,
+        )
+        short = shuffle_candidate_sorted(
+            *args, seed=SEED, n_shuffles=MINIMUM_N_SHUFFLES
+        )
+        longer = shuffle_candidate_sorted(
+            *args, seed=SEED, n_shuffles=MINIMUM_N_SHUFFLES + 5
+        )
+
+        np.testing.assert_array_equal(
+            short.null_jump_cm, longer.null_jump_cm[:MINIMUM_N_SHUFFLES]
+        )
+
+    def test_needs_enough_draws(self, sorted_track):
+        with pytest.raises(ValueError, match="n_shuffles"):
+            shuffle_candidate_sorted(
+                *self.args(sorted_track)[:5],
+                sorted_track.bin_distance_cm,
+                CONFIG,
+                seed=SEED,
+                n_shuffles=MINIMUM_N_SHUFFLES - 1,
             )

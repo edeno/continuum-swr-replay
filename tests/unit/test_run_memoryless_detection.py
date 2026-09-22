@@ -36,6 +36,8 @@ from tests.unit._memoryless_clusterless_epoch import (
 )
 
 EPOCH_ID = "sim20200101_02_r1_HPC"
+N_SHUFFLES = 20
+"""The fewest draws at which p < 0.05 is possible."""
 CONFIG = MemorylessSequenceConfig(sampling_frequency=SAMPLING_FREQUENCY)
 
 
@@ -127,7 +129,7 @@ def run(decode_root, tmp_path, **overrides):
         "run_id": "test-run",
         "run_seed": 7,
         "shuffle": True,
-        "n_shuffles": 3,
+        "n_shuffles": N_SHUFFLES,
         "config": CONFIG,
         "provenance": {"git_commit": "test"},
         "marks_loader": lambda key, cache: (
@@ -157,7 +159,7 @@ class TestRunOne:
         draws = read_table(record["outputs"]["shuffle_draws"])
         shuffled = table[table.n_shuffles > 0]
 
-        assert len(draws) == 3 * len(shuffled)
+        assert len(draws) == N_SHUFFLES * len(shuffled)
         assert set(draws.ms_event_id) == set(shuffled.ms_event_id)
 
     def test_no_shuffle_writes_an_untested_table(self, decode_root, tmp_path):
@@ -199,7 +201,7 @@ class TestRunOne:
             run_id="test-run",
             run_seed=7,
             shuffle=True,
-            n_shuffles=3,
+            n_shuffles=N_SHUFFLES,
             config=CONFIG,
             provenance={},
         )
@@ -232,7 +234,7 @@ class TestMain:
                 "--run-seed",
                 "7",
                 "--n-shuffles",
-                "3",
+                str(N_SHUFFLES),
                 "--run-id",
                 "cli-run",
                 "--root",
@@ -247,7 +249,7 @@ class TestMain:
         manifest = json.loads((output_root / "cli-run" / "manifest.json").read_text())
         assert manifest["run_id"] == "cli-run"
         assert manifest["epochs"][EPOCH_ID]["status"] == "ok"
-        assert manifest["shuffle"]["n_shuffles"] == 3
+        assert manifest["shuffle"]["n_shuffles"] == N_SHUFFLES
         assert manifest["shuffle"]["run_seed"] == 7
         assert manifest["config"]["dispersion_threshold_cm"] == 12.0
         assert "non_local_detector" in manifest["libraries"]

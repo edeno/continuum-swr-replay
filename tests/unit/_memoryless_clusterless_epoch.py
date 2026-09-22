@@ -222,3 +222,62 @@ def build_tiling_tetrode() -> TilingTetrode:
         encoding_model=encoding_model,
         bin_distance_cm=interior_bin_distances_cm(environment),
     )
+
+
+@dataclass
+class SortedTrack:
+    time: np.ndarray
+    linear_position: np.ndarray
+    spike_times: list[np.ndarray]
+    encoding_model: dict
+    bin_distance_cm: np.ndarray
+
+
+def build_sorted_track(peak_rate_hz: float = 30.0) -> SortedTrack:
+    """Twenty sorted cells whose fields tile a plain linear track.
+
+    For the place-cell identity shuffle the reference uses: each cell's spikes
+    say where the animal is only through which field they came from, so
+    swapping fields between cells removes that. No track graph, so the
+    occupancy and the positions at spike times share one coordinate.
+    """
+    from non_local_detector.likelihoods.sorted_spikes_kde import (
+        fit_sorted_spikes_kde_encoding_model,
+    )
+
+    n_time = 2000
+    time = np.arange(n_time) / SAMPLING_FREQUENCY
+    linear_position = 50.0 + 45.0 * np.sin(2 * np.pi * time / 1.6)
+    environment = Environment(place_bin_size=2.5).fit_place_grid(
+        linear_position[:, None]
+    )
+    rng = np.random.default_rng(11)
+    spike_times = []
+    for center in np.linspace(5.0, 95.0, 20):
+        intensity = peak_rate_hz * np.exp(
+            -0.5 * ((linear_position - center) / 6.0) ** 2
+        )
+        sample = np.repeat(
+            np.arange(n_time), rng.poisson(intensity / SAMPLING_FREQUENCY)
+        )
+        spike_times.append(
+            np.sort(
+                time[sample] + rng.uniform(0.0, 1.0 / SAMPLING_FREQUENCY, sample.size)
+            )
+        )
+    encoding_model = fit_sorted_spikes_kde_encoding_model(
+        time,
+        linear_position[:, None],
+        spike_times,
+        environment,
+        sampling_frequency=int(SAMPLING_FREQUENCY),
+        position_std=6.0,
+        disable_progress_bar=True,
+    )
+    return SortedTrack(
+        time=time,
+        linear_position=linear_position,
+        spike_times=spike_times,
+        encoding_model=encoding_model,
+        bin_distance_cm=interior_bin_distances_cm(environment),
+    )

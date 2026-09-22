@@ -30,6 +30,13 @@ counts against the candidate, because centers on a discrete track graph can
 repeat exactly. A candidate whose observed or shuffled statistic is not finite
 is untestable, and an untestable candidate does not pass.
 
+For sorted cells the reference's own shuffle is used instead: whole place
+fields are swapped between cells (``rateMap(ind_rand, :)``), so each cell's
+spikes are decoded with another cell's field. The fields summed over cells,
+which is the term for the spikes that did not arrive, does not change.
+``shuffle_candidate_sorted`` runs it; the simulations use it, and recorded
+data, decoded clusterless, uses the encoding-pair shuffle.
+
 The design is in ``docs/design/replay_detection_comparison/02-memoryless-sequence.md``,
 section "Clusterless shuffle: permute encoding pairs".
 """
@@ -57,14 +64,18 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics im
 
 __all__ = [
     "DEFAULT_N_SHUFFLES",
+    "MINIMUM_N_SHUFFLES",
     "SIGNIFICANCE_LEVEL",
     "ShuffleResult",
     "ShuffleSeed",
     "candidate_window_log_likelihood",
+    "cell_identity_permutation",
     "encoding_permutation",
     "shuffle_candidate",
+    "shuffle_candidate_sorted",
     "shuffle_p_value",
     "shuffle_statistics",
+    "sorted_candidate_window_log_likelihood",
 ]
 
 DEFAULT_N_SHUFFLES = 100
@@ -76,6 +87,17 @@ SIGNIFICANCE_LEVEL = 0.05
 The reference compares with ``<=``, the paper says ``p < 0.05``. At 100 draws
 the p-values are multiples of 1/101, none of which is 0.05, so the two agree.
 """
+
+MINIMUM_N_SHUFFLES = 20
+"""The fewest draws at which a p-value below 0.05 is possible.
+
+With ``n`` draws the smallest p is ``1 / (n + 1)``. Below 20 draws no
+candidate could pass, and a run in which nothing passed would still look like
+a result.
+"""
+
+_CELL_IDENTITY_STREAM = 2**32 - 1
+"""Seeds the cell-identity shuffle apart from any electrode's stream."""
 
 
 @dataclass(frozen=True)
@@ -131,17 +153,38 @@ def encoding_permutation(
         ``permutation[i]``.
 
     """
+    return _seeded_permutation(seed, candidate, draw, electrode, n)
+
+
+def cell_identity_permutation(
+    seed: ShuffleSeed, *, candidate: int, draw: int, n: int
+) -> NDArray:
+    """The permutation of sorted cells' place fields for one draw.
+
+    Returns
+    -------
+    permutation : ndarray of int, shape (n,)
+        Cell ``i``'s spikes are decoded with the field of cell
+        ``permutation[i]``.
+
+    """
+    return _seeded_permutation(seed, candidate, draw, _CELL_IDENTITY_STREAM, n)
+
+
+def _seeded_permutation(
+    seed: ShuffleSeed, candidate: int, draw: int, stream: int, n: int
+) -> NDArray:
     if draw < 1:
         raise ValueError(
             f"draw must be 1 or more; draw 0 is the observed decode, got {draw}."
         )
-    for name, value in (("candidate", candidate), ("electrode", electrode), ("n", n)):
+    for name, value in (("candidate", candidate), ("stream", stream), ("n", n)):
         if value < 0:
             raise ValueError(f"{name} must be non-negative, got {value}.")
     # crc32 rather than hash(): hash() of a str changes between interpreters
     session_code = zlib.crc32(seed.session.encode("utf-8"))
     sequence = np.random.SeedSequence(
-        entropy=seed.run, spawn_key=(session_code, candidate, draw, electrode)
+        entropy=seed.run, spawn_key=(session_code, candidate, draw, stream)
     )
     return np.random.default_rng(sequence).permutation(n)
 
@@ -258,6 +301,53 @@ def shuffle_statistics(
     return float(np.mean(spread)), float(np.mean(jumps))
 
 
+def _candidate_rows(
+    first_window: int,
+    last_window: int,
+    time: NDArray,
+    config: MemorylessSequenceConfig,
+) -> tuple[NDArray, int, int]:
+    """Validate the grid and return the rows a candidate's windows cover."""
+    time = np.asarray(time, dtype=np.float64)
+    validate_time_grid(time, config)
+    # the final sample is a row no spike can reach, and the epoch decode drops it
+    n_decodable = (
+        1 + (time.size - 1 - config.window_n_samples) // config.stride_n_samples
+    )
+    if not 0 <= first_window <= last_window < n_decodable:
+        raise ValueError(
+            f"Windows {first_window} to {last_window} are not within the "
+            f"{n_decodable} windows this grid decodes."
+        )
+    row_start = first_window * config.stride_n_samples
+    row_stop = last_window * config.stride_n_samples + config.window_n_samples
+    return time, row_start, row_stop
+
+
+def _check_n_shuffles(n_shuffles: int) -> None:
+    if n_shuffles < MINIMUM_N_SHUFFLES:
+        raise ValueError(
+            f"n_shuffles must be at least {MINIMUM_N_SHUFFLES}, so that a p-value "
+            f"below {SIGNIFICANCE_LEVEL} is possible; got {n_shuffles}."
+        )
+
+
+def _result_from_draws(windows: NDArray, bin_distance_cm: NDArray) -> ShuffleResult:
+    """Draw 0 is the observed decode; the rest are the null."""
+    statistics = np.array(
+        [
+            shuffle_statistics(normalize_windows(draw), bin_distance_cm)
+            for draw in windows
+        ]
+    )
+    return ShuffleResult(
+        observed_spread_cm=statistics[0, 0],
+        observed_jump_cm=statistics[0, 1],
+        null_spread_cm=statistics[1:, 0],
+        null_jump_cm=statistics[1:, 1],
+    )
+
+
 def _electrode_waveform_std(waveform_std: object, n_features: int) -> NDArray:
     """Expand a scalar bandwidth to one per feature, as the library does."""
     std = np.asarray(waveform_std, dtype=np.float64)
@@ -292,17 +382,7 @@ def _decode_draws(
     )
     from non_local_detector.likelihoods.common import get_spike_time_bin_ind
 
-    time = np.asarray(time, dtype=np.float64)
-    validate_time_grid(time, config)
-    # the final sample is a row no spike can reach, and the epoch decode drops it
-    n_decodable = (
-        1 + (time.size - 1 - config.window_n_samples) // config.stride_n_samples
-    )
-    if not 0 <= first_window <= last_window < n_decodable:
-        raise ValueError(
-            f"Windows {first_window} to {last_window} are not within the "
-            f"{n_decodable} windows this grid decodes."
-        )
+    time, row_start, row_stop = _candidate_rows(first_window, last_window, time, config)
 
     encoding_positions = encoding_model["encoding_positions"]
     n_electrodes = len(encoding_positions)
@@ -311,9 +391,6 @@ def _decode_draws(
             f"{len(spike_times)} spike trains and {len(spike_waveform_features)} "
             f"feature arrays for {n_electrodes} encoding electrodes."
         )
-
-    row_start = first_window * config.stride_n_samples
-    row_stop = last_window * config.stride_n_samples + config.window_n_samples
 
     environment = encoding_model["environment"]
     interior = np.asarray(environment.is_track_interior_).ravel()
@@ -484,8 +561,7 @@ def shuffle_candidate(
     result : ShuffleResult
 
     """
-    if n_shuffles < 1:
-        raise ValueError(f"n_shuffles must be at least 1, got {n_shuffles}.")
+    _check_n_shuffles(n_shuffles)
 
     def permutation_for(draw: int, electrode: int, n: int) -> NDArray | None:
         if draw == 0:
@@ -505,15 +581,145 @@ def shuffle_candidate(
         n_draws=n_shuffles + 1,
         permutation_for=permutation_for,
     )
-    statistics = np.array(
+    return _result_from_draws(windows, bin_distance_cm)
+
+
+def _decode_draws_sorted(
+    first_window: int,
+    last_window: int,
+    time: NDArray,
+    spike_times: list[NDArray],
+    encoding_model: dict,
+    config: MemorylessSequenceConfig,
+    permutations: list[NDArray | None],
+) -> NDArray:
+    """Window log-likelihoods of one candidate under each draw's cell pairing.
+
+    The row log-likelihood is ``sum_n count_n log field_n(x) - sum_n field_n(x)``,
+    as ``predict_sorted_spikes_kde_log_likelihood`` computes it; a draw
+    permutes which field each cell's counts meet, which is the first term only.
+
+    Returns
+    -------
+    window_log_likelihood : ndarray, shape (n_draws, n_windows, n_bins)
+    """
+    from non_local_detector.likelihoods.common import get_spike_time_bin_ind
+
+    time, row_start, row_stop = _candidate_rows(first_window, last_window, time, config)
+    environment = encoding_model["environment"]
+    interior = np.asarray(environment.is_track_interior_).ravel()
+    fields = np.asarray(encoding_model["place_fields"], dtype=np.float64)[:, interior]
+    if len(spike_times) != fields.shape[0]:
+        raise ValueError(
+            f"{len(spike_times)} spike trains for {fields.shape[0]} cells; they "
+            f"must match one for one."
+        )
+    counts = np.zeros((row_stop - row_start, fields.shape[0]))
+    for cell, cell_times in enumerate(spike_times):
+        cell_times = np.asarray(cell_times, dtype=np.float64)
+        # the library keeps spikes on the closed grid, then bins them
+        cell_times = cell_times[(cell_times >= time[0]) & (cell_times <= time[-1])]
+        rows = get_spike_time_bin_ind(cell_times, time)
+        rows = rows[(rows >= row_start) & (rows < row_stop)] - row_start
+        np.add.at(counts[:, cell], rows, 1.0)
+    # the fit clips every field away from zero, so the log is finite
+    log_fields = np.log(fields)
+    absent = np.asarray(
+        encoding_model["no_spike_part_log_likelihood"], dtype=np.float64
+    )[interior]
+    return np.stack(
         [
-            shuffle_statistics(normalize_windows(draw), bin_distance_cm)
-            for draw in windows
+            aggregate_windows(
+                counts
+                @ (log_fields if permutation is None else log_fields[permutation])
+                - absent,
+                config.window_n_samples,
+                config.stride_n_samples,
+            )
+            for permutation in permutations
         ]
     )
-    return ShuffleResult(
-        observed_spread_cm=statistics[0, 0],
-        observed_jump_cm=statistics[0, 1],
-        null_spread_cm=statistics[1:, 0],
-        null_jump_cm=statistics[1:, 1],
+
+
+def sorted_candidate_window_log_likelihood(
+    first_window: int,
+    last_window: int,
+    time: NDArray,
+    spike_times: list[NDArray],
+    encoding_model: dict,
+    config: MemorylessSequenceConfig,
+    permutation: NDArray | None = None,
+) -> NDArray:
+    """Re-decode a candidate's windows from sorted cells, fields optionally swapped.
+
+    With no permutation this is the epoch decode's window log-likelihood over
+    windows ``first_window`` to ``last_window``.
+
+    Parameters
+    ----------
+    first_window, last_window : int
+        Inclusive window indices.
+    time : ndarray, shape (n_time,)
+        The full decode grid.
+    spike_times : list of ndarray
+        One per cell, in the encoding model's cell order.
+    encoding_model : dict
+        A sorted-spikes KDE encoding model. Not modified.
+    config : MemorylessSequenceConfig
+    permutation : ndarray of int, shape (n_cells,), optional
+        Cell ``i`` is decoded with the field of cell ``permutation[i]``.
+
+    Returns
+    -------
+    window_log_likelihood : ndarray, shape (n_windows, n_bins)
+
+    """
+    if permutation is not None:
+        n_cells = np.asarray(encoding_model["place_fields"]).shape[0]
+        permutation = _validated_permutation(permutation, n_cells, 0)
+    return np.asarray(
+        _decode_draws_sorted(
+            first_window,
+            last_window,
+            time,
+            spike_times,
+            encoding_model,
+            config,
+            [permutation],
+        )[0]
     )
+
+
+def shuffle_candidate_sorted(
+    first_window: int,
+    last_window: int,
+    time: NDArray,
+    spike_times: list[NDArray],
+    encoding_model: dict,
+    bin_distance_cm: NDArray,
+    config: MemorylessSequenceConfig,
+    *,
+    seed: ShuffleSeed,
+    n_shuffles: int = DEFAULT_N_SHUFFLES,
+) -> ShuffleResult:
+    """Test one candidate against the reference's place-cell identity shuffle.
+
+    Parameters are as for :func:`shuffle_candidate`, with one spike train per
+    sorted cell and a sorted-spikes encoding model.
+    """
+    _check_n_shuffles(n_shuffles)
+    n_cells = np.asarray(encoding_model["place_fields"]).shape[0]
+    permutations: list[NDArray | None] = [None] + [
+        cell_identity_permutation(seed, candidate=first_window, draw=draw, n=n_cells)
+        for draw in range(1, n_shuffles + 1)
+    ]
+    windows = _decode_draws_sorted(
+        first_window,
+        last_window,
+        time,
+        spike_times,
+        encoding_model,
+        config,
+        permutations,
+    )
+    return _result_from_draws(windows, bin_distance_cm)
