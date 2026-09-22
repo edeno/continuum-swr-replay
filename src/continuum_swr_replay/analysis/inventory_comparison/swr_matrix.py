@@ -2,9 +2,10 @@
 
 Spec 03, "The SWR label matrix". A sequence event is ``SWR`` under a
 definition when an event of that SWR inventory overlaps it with positive
-duration, ``non-SWR`` when it lies wholly within both detectors' exposure
-and nothing overlaps it, and ``unknown`` otherwise: missing LFP is never a
-missing ripple.
+duration and ``non-SWR`` when nothing does, but only for an event lying
+wholly within both detectors' exposure; otherwise it is ``unknown``: missing
+LFP is never a missing ripple, and an overlap in the observed part cannot
+say what the rest held.
 
 The matrix restricts each cohort to its events lying wholly within its own
 exposure intersected with every SWR definition's, so every column counts the
@@ -145,9 +146,16 @@ def swr_labels(
     labels = base.merge(
         pd.DataFrame({"swr_definition": list(swr_definitions)}), how="cross"
     )
-    membership = matches.set_index(["event_key", "other_detector"]).membership
-    found = pd.MultiIndex.from_arrays([labels.event_key, labels.swr_definition])
-    labels["label"] = membership.reindex(found).map(LABEL).fillna("unknown").to_numpy()
+    # a label needs the whole event observed by both: an overlap in the part
+    # the SWR detector saw cannot say what the rest held
+    found = matches.set_index(["event_key", "other_detector"]).reindex(
+        pd.MultiIndex.from_arrays([labels.event_key, labels.swr_definition])
+    )
+    labels["label"] = np.where(
+        found.within_shared_exposure.eq(True).to_numpy(),
+        found.membership.map(LABEL).to_numpy(),
+        "unknown",
+    )
     return labels[list(LABEL_DTYPES)].astype(dict(LABEL_DTYPES))
 
 

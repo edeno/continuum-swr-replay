@@ -174,3 +174,24 @@ def test_a_definition_that_did_not_run_labels_nothing_non_swr():
 
     assert labels.label.tolist() == ["unknown"]
     assert not labels.in_matrix.any()
+
+
+def test_a_sequence_only_partly_observed_by_the_swr_detector_is_unknown():
+    """An overlap in the observed part cannot tell what the rest held; the
+    pair table keeps the overlap."""
+    inventory = pd.concat(
+        [events("S1", [(49, 51)]), events("K", [(49.5, 49.8)])], ignore_index=True
+    )
+    coverage = {
+        (*KEY, "S1"): cover(),
+        (*KEY, "K"): Coverage(np.array([[0.0, 50.0]]), np.array([[0.0, 50.0]])),
+    }
+    pairs = overlap_pairs(inventory)
+    matches = event_matches(inventory, pairs, coverage)
+
+    labels = swr_labels(
+        inventory, matches, coverage, cohorts=["S1"], swr_definitions=["K"]
+    )
+
+    assert len(pairs) == 1
+    assert labels.label.tolist() == ["unknown"]
