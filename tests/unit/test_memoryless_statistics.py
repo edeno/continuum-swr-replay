@@ -187,7 +187,7 @@ class TestCenterAndSpread:
         assert center.tolist() == [0, 0]
 
     def test_mass_off_the_track_cannot_move_the_center(self):
-        """Junction placeholder bins are excluded before this is called (V8)."""
+        """Junction placeholder bins are excluded before this is called."""
         distance = straight_track(4)
         on_track = np.array([True, True, True, False])
         posterior = np.array([[0.1, 0.1, 0.1, 0.7]])
@@ -208,7 +208,7 @@ class TestCenterAndSpread:
         assert np.isnan(spread[0])
 
     def test_the_center_approaches_the_mean_as_the_grid_refines(self):
-        """D4: bin restriction approximates the center of mass.
+        """Bin restriction approximates the center of mass.
 
         The center is quantized to a bin, so it sits within half a bin of the
         center of mass. Once the grid is fine enough the remaining error is

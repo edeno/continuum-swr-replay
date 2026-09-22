@@ -46,11 +46,19 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
 - `generate_supp_*.py`, `generate_event_gallery.py`, `run_event_gallery.sh`.
 - `plot_swr_contrast_coefs.py` — per-animal coefficient forest plots for the is_swr
   rate + content contrast ladders (standardized effect sizes, all sessions + animal 95% CI) → `paper/figures/swr_contrast/`.
+- `generate_memoryless_comparison.py` — supplemental figure: the ported Widloski & Foster
+  sliding-window detector against the state-space detector on the Figure 1 simulation, with
+  the sweep summary below; every verdict in its titles and caption is read from the data
+  → `paper/figures/memoryless_comparison/`.
 - `archive/` — retired figure scripts (not linted; kept for provenance).
 
 ## `qa/` — diagnostics / validation
 - `check_data_availability.py`, `diagnose_trial_detection.py`, `compute_hpc_raw_stats.py`,
   `run_quality_metrics.py`, `analyze_event_spike_evidence.py` (spike-evidence reality check).
+- `sweep_memoryless_detection.py` — injects replays of chosen path, duration, rate and
+  distance into a simulated recording and scores both detectors by one rule; writes the raw
+  table to `Processed-Data/` and the aggregates to
+  `docs/design/replay_detection_comparison/detection_sweep_summary.csv` (about six minutes).
 - `compare_fits.py` — compares old vs new fitted rate artifacts (Family B, Family A
   and the `is_swr`-contrast ladder) on the quantities that survive a respecification
   — joint reward step, reward-free goodness of fit, frozen-cohort size, per-rung

@@ -3,7 +3,7 @@
 Two bins that are adjacent in linearized coordinate can sit on different arms,
 and two bins far apart in that coordinate can be neighbours through a junction.
 The detector measures jumps and dispersion on the track graph for that reason
-(spec 02, V6). These tests build a posterior that walks a chosen path over a
+(spec 02). These tests build a posterior that walks a chosen path over a
 real Y-shaped ``Environment`` and check what the detector makes of it, with no
 encoding model in the way.
 """
@@ -192,7 +192,7 @@ class TestAcrossAJunction:
         assert found.is_replay.tolist() == [True]
 
     def test_the_same_path_would_be_cut_by_a_linear_metric(self, track):
-        """What V6 is for: in linearized coordinate the junction is a long
+        """What graph distance is for: in linearized coordinate the junction is a long
         step, so a detector differencing that coordinate would reject it."""
         path = np.concatenate([arm_bins(track, 0)[:14][::-1], arm_bins(track, 1)[:14]])
         posterior, midpoint_s, visited = walk(track, path, 0.25)

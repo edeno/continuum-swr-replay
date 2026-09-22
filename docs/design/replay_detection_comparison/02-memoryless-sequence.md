@@ -1,8 +1,8 @@
 # Memoryless sliding-window sequence detection (Widloski & Foster 2025)
 
 *Design spec, now part implemented. `config.py`, `statistics.py`, `detect.py`,
-`likelihood.py` and `simulation.py` exist and are tested; `shuffle.py` and `compare.py`
-and the `memoryless_event_table` of the output schema do not. The sections on what the
+`likelihood.py`, `simulation.py` and `scoring.py` exist and are tested; `shuffle.py` and
+`compare.py` and the `memoryless_event_table` of the output schema do not. The sections on what the
 port does on simulated data are results; everything else is a proposed analysis.*
 *Governing rule and cross-cutting decisions: [overview.md](overview.md).*
 
@@ -211,11 +211,11 @@ continuous outbound replay, a fragmented replay, a continuous inbound replay, a 
 stretch and an unmanipulated pause; a remote stationary event is added here, because the
 package simulates no such case.
 
-**It detects the right events and mis-times them.** The test fixture, which adds only
-the remote stationary event, gives 29 candidate sequences over 65 s of which exactly two
-meet both replay criteria, and those two are the continuous replays. The figure injects
-two more events and so reports 32 candidates and three accepted; the third is the 80 ms
-replay of its panel c. No
+**It detects the right events and mis-times them.** On the figure's recording, which
+is also the integration test's fixture, the detector assembles 32 candidate sequences
+over 65 s of which three meet both replay criteria: the two continuous replays and the
+80 ms replay of panel c. The test pins which events are accepted and how each is
+mis-measured, not the candidate count. No
 silent, fragmented, local or remote stationary event is accepted. But the two accepted
 events run 1.58 s and 1.18 s for replays that are 0.27 s: 83% and 77% of each detected
 interval lies outside the labeled event, and about three quarters of their windows decode
@@ -256,60 +256,34 @@ no driver gates on it.
 
 ### How it fails to find a replay that is there
 
-Measured by injecting replays of controlled path length, duration and firing
-rate into a silent pause of the same simulation, and asking whether an accepted
-sequence overlaps the injection (8 seeds per cell).
+The sweep in the next section is the measured source for every rate quoted in this
+document. An earlier version of this section carried two tables from scratch scripts
+that were not kept (a 40 Hz grid over 20–130 cm and 80–800 ms, and a duration grid at
+100 cm); they could not be regenerated from the repository and have been removed rather
+than cited.
 
 **Short-path replay is invisible, and this dominates everything else.** The
 dispersion criterion is a "replay must travel" rule: a uniform traverse of path
 length `L` has dispersion `L / sqrt(12)`, so `dispersion > 12 cm` needs
-`L > 41.6 cm`. Measured detection rate, 40 Hz peak rate:
-
-| path (cm) | 80 ms | 150 ms | 300 ms | 800 ms |
-|---|---|---|---|---|
-| 20 | 0.00 | 0.00 | 0.00 | 0.00 |
-| 30 | 0.00 | 0.00 | 0.00 | 0.00 |
-| 40 | 0.00 | 0.00 | 0.38 | 0.12 |
-| 60 | 0.25 | 0.50 | 0.88 | 0.75 |
-| 90 | 0.00 | 0.50 | 0.88 | 1.00 |
-| 130 | 0.62 | 0.88 | 1.00 | 1.00 |
-
-A replay covering less than about a quarter of this 170 cm track is not
-reported at any duration or firing rate. **Before attributing any cohort
-difference to temporal inference, measure the decoded path length of our
-state-space events against this bound.** On a branched track a within-arm
-replay may be excluded by construction.
+`L > 41.6 cm`. A replay covering less than about a quarter of this 170 cm track
+is not reported at any duration or firing rate (sweep table below). **Before
+attributing any cohort difference to temporal inference, measure the decoded path
+length of our state-space events against this bound.** On a branched track a
+within-arm replay may be excluded by construction.
 
 **Duration is secondary for detection, and decisive for measurement.** Sub-100 ms
 replays are sometimes found, because windows that only partly overlap the event
 still decode it and pad the run past the 100 ms filter. That is the same
-over-extension that inflates boundaries, working in the detector's favor.
-
-What it costs is the duration itself. With path length held at 100 cm, so that
-only duration varies:
-
-| true duration | 20 ms | 40 ms | 60 ms | 80 ms | 100 ms | 150 ms | 200 ms | 300 ms | 500 ms |
-|---|---|---|---|---|---|---|---|---|---|
-| detection rate | 0.00 | 0.00 | 0.12 | 0.38 | 0.25 | 0.50 | 0.88 | 1.00 | 1.00 |
-| reported duration | - | - | 0.20 s | 0.17 s | 0.16 s | 0.17 s | 0.21 s | 0.31 s | 0.89 s |
-
-The 100 ms filter puts a floor under the reported duration by construction, and
-the window width lifts events off it: a real 60 ms replay is reported as 200 ms
-and a real 80 ms replay as 110 to 170 ms, depending on firing rate and on where
-the event falls against the window grid. No accepted event in any test here came
-in below about 110 ms. **The duration distribution this detector produces is
-therefore truncated from below and inflated near the truncation**, and it must
-not be compared with our own event durations as though both measured the same
-thing.
-Accuracy is worst at both ends, for two independent reasons. Short events are
-padded by the window: the 80 ms replay in the figure holds no local coding at
-all, 0% of its windows decode the animal's own place, and it is still reported
-1.3x too long. Slow events are padded by absorbed local coding instead, which is
-why the 500 ms case is 1.8x too long. Removing either cause would not fix the
-other.
-
-The 20 and 40 ms rows are not evidence about the criteria. At this firing rate
-such an event holds about one spike, so nothing could decode it.
+over-extension that inflates boundaries, working in the detector's favor. What it
+costs is the duration itself: the 100 ms filter puts a floor under the reported
+duration by construction, and the window width lifts events off it, so **the
+duration distribution this detector produces is truncated from below and inflated
+near the truncation**, and it must not be compared with our own event durations as
+though both measured the same thing. Accuracy is worst at both ends, for two
+independent reasons. Short events are padded by the window: the 80 ms replay in
+the figure holds no local coding at all, 0% of its windows decode the animal's own
+place, and it is still reported too long. Slow events are padded by absorbed local
+coding instead. Removing either cause would not fix the other.
 
 **Spike density gates everything else.** At a 10 Hz peak (about one spike per
 window) detection is erratic even where the geometry is favorable (0.00-0.50);
@@ -367,7 +341,14 @@ a silent fallback then kept the last one: all 4536 cells landed in a single
 A detector counts as finding an event only when what it reports **is** the
 injected event, not merely something overlapping it in time. It must sit on the
 injected path while the path is being replayed, and it must not cover far more
-ground than the path does. Scoring temporal overlap alone credits the
+ground than the path does. The rule is one function,
+`memoryless_sequence/scoring.py:score_against_injection`, unit-tested on its own.
+Every reported event of either detector that overlaps the injection is scored,
+one event at a time over its whole extent, and the best-scoring one answers for
+the cell, so an absorbed sequence that happens to start earlier cannot hide a true
+detection behind it. The state-space detector's events are the project's own
+definition, non-local probability above 0.8 for at least 15 ms, as the sliding
+window's are the published one. Scoring temporal overlap alone credits the
 sliding-window detector for sequences built out of the local coding beside the
 injection: those reach 45 to 162 cm of decoded track for injections of 10 to
 30 cm.
@@ -618,6 +599,8 @@ Named for what it does; the citation lives in docstrings, not the module path.
 | `likelihood.py` | prior-excluded `(n_time, n_interior_bins)` log-likelihood on the native 2 ms grid | `detector.pkl` (primary), `results.nc` (opt-in) |
 | `statistics.py` | pure functions: window aggregation, normalization, center / spread / jump / dispersion | numpy, bin-distance matrix |
 | `detect.py` | bin filter → sequence assembly → merge → criteria → event table, retaining rejection diagnostics | the above, plus existing repo helpers |
+| `simulation.py` | inject a replay of known shape into a simulated recording; place it clear of movement | numpy |
+| `scoring.py` | the one rule both detectors are scored by against an injected replay | numpy |
 | `shuffle.py` | encoding-pair permutations, re-decoding fixed candidate windows, spread/jump p-values | encoding arrays, event marks, likelihood and statistics helpers |
 | `compare.py` | interval-pair table, event summaries, selection diagnostics, and per-session/animal comparisons | both event tables, diagnostic traces, canonical SWRs |
 

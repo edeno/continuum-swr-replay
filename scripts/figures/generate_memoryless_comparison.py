@@ -2,9 +2,9 @@
 """Supplemental figure: two replay detectors on replays whose shape is known.
 
 Upper panels run the ported Widloski & Foster sliding-window detector and this
-project's switching state-space model over one simulated recording, the same
-one Figure 1 uses, so the two procedures can be read against a handful of
-labeled events.
+project's switching state-space model over the Figure 1 simulation (25 neurons
+here where Figure 1 uses 30, and a plain fit rather than EM), so the two
+procedures can be read against a handful of labeled events.
 
 Lower panels summarize the sweep in `scripts/qa/sweep_memoryless_detection.py`,
 which wrote replays of chosen path length, duration, firing rate and distance

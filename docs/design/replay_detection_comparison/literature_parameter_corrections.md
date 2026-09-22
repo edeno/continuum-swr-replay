@@ -142,8 +142,10 @@ described under "How the Sheet was updated" rather than a plain paste.
 
 ## Papers added
 
-Three papers that decode replay were missing and have been added as data rows 55 to 57
-(sheet rows 56 to 58), at the end rather than in year order:
+Three papers that decode replay were missing and have been added. In the exported
+CSV, which is sorted by year, they sit in year order (Widloski 2025 at data row 2,
+Maboudi 2018 at 32, Ólafsdóttir 2016 at 40); in the Sheet they were appended as rows
+56 to 58. Rows are identified by paper, never by position:
 
 | Paper | Why it belongs | Source |
 |---|---|---|
@@ -171,12 +173,12 @@ the papers, with a quote required for every value and `#N/A` where the paper doe
 | Column | Why | Filled |
 |---|---|---|
 | Spike sorting | Sorted against clusterless was free text in five rows and absent elsewhere | 57 of 57 (51 sorted, 5 clusterless, 1 both) |
-| Time bin step (ms) | "Time bin" often holds a sliding-window width whose step is shorter, so two rows with the same value could mean different things | 43 |
-| Shuffle Method | The central omission for a sheet about decoding replay: the surrogate largely determines the "% Decoded" the sheet already tracks | 54 |
-| Shuffles (#) | " | 35 |
-| Sig. Thresh. | " | 38 |
-| % Decoded denom. | That percentage is variously of ripples, candidate events, putative events or multiunit bursts | 14 |
-| Reconst. Error bin (ms) | Error depends on the window it was measured in, which ranges from 2 ms to 500 ms across rows presented as comparable | 11 |
+| Time bin step (ms) | "Time bin" often holds a sliding-window width whose step is shorter, so two rows with the same value could mean different things | 45 |
+| Shuffle Method | The central omission for a sheet about decoding replay: the surrogate largely determines the "% Decoded" the sheet already tracks | 56 |
+| Shuffles (#) | " | 37 |
+| Sig. Thresh. | " | 40 |
+| % Decoded denom. | That percentage is variously of ripples, candidate events, putative events or multiunit bursts | 15 |
+| Reconst. Error bin (ms) | Error depends on the window it was measured in, which ranges from 2 ms to 500 ms across rows presented as comparable | 12 |
 
 Two of the seven are sparse by construction rather than by omission. A denominator for
 "% decoded" and a bin for the reconstruction error only exist where the parent value does,

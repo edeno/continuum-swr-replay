@@ -83,14 +83,17 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     tabulates every detection method considered, with a verified DOI for every work
     cited;
     [literature_detection_parameters.csv](design/replay_detection_comparison/literature_detection_parameters.csv)
-    holds the lab's 54-paper survey of detection and decoding settings, corrected
+    holds the lab's 57-paper survey of detection and decoding settings, corrected
     against the papers, with
     [literature_parameter_corrections.md](design/replay_detection_comparison/literature_parameter_corrections.md)
     recording each change, the cells still flagged, and the papers that could not be
     retrieved. Reference source vendored at
     [reference/widloski_foster_2025/](../reference/widloski_foster_2025/) and
     [reference/yu_2017_franklab/](../reference/yu_2017_franklab/).
-    Not yet implemented.
+    Status: the memoryless sequence detector of spec 02 is implemented and tested
+    (`analysis/hippocampus/memoryless_sequence/`), with its simulated-replay sweep
+    and supplemental figure; its shuffle and comparison stages, the Yu detector's
+    project wiring, and the inventory comparison of specs 03–05 are not.
 - [known_issues/](known_issues/) — *reference*: documented data/pipeline issues.
   - [three_sessions_blocked_by_nwb_checksum.md](known_issues/three_sessions_blocked_by_nwb_checksum.md)
     — the canonical cohort is 215 of 218; three sessions fail an upstream NWB

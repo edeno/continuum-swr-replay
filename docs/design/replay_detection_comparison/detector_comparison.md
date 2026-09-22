@@ -1,7 +1,10 @@
 # Detector comparison table
 
 *Reference table for the replay-detection comparison. Kept current with what is
-implemented in `ripple_detection` and in this project; a row's status says which.*
+implemented in `ripple_detection` and in this project; a row's status says which.
+"In package" means the `ripple_detection` development head, not the 1.7.0 release
+this project's environment resolves transitively through Spyglass, which ships only
+the Kay, Karlsson, Roumis and multiunit-HSE detectors.*
 *Governing rule and cross-cutting decisions: [overview.md](overview.md).*
 
 One row per detection method considered for the comparison, including the ones excluded,
@@ -30,7 +33,7 @@ code base, and [03](03-inventory-comparison.md) is the direct comparison.
 | **MUA HSE** (`multiunit_HSE_detector`) | rate | this package's convention; Davidson et al. 2009 ([doi:10.1016/j.neuron.2009.07.027](https://doi.org/10.1016/j.neuron.2009.07.027)) and Grosmark & Buzsáki 2016 ([doi:10.1126/science.aad1935](https://doi.org/10.1126/science.aad1935)) as parameter variants | multiunit spike matrix | summed rate, 15 ms Gaussian | z-score, all samples or mask | ≥ 2 SD sustained, extended to the mean | ≥ 15 ms | endpoints ≤ 4 cm/s | spikes, sorted or clusterless | in package; inventory exists (`MUA_event`) |
 | **Carey candidate** (`Carey_candidate_detector`) | joint LFP × rate | Carey, Tanaka & van der Meer 2019, [doi:10.1038/s41593-019-0464-6](https://doi.org/10.1038/s41593-019-0464-6) (vandermeerlab `GenCandidateEvents`) | ripple-band LFP + multiunit matrix; optional theta channel | geometric mean of a ripple envelope score (10 ms Gaussian, rescaled to mean 1) and a capped, baseline-subtracted multiunit score | z-score of the joint score | bounded at 1 SD, kept if peak > 3 SD | ≥ 20 ms | event contained in low-speed and low-theta intervals; ≥ 5 active units | spikes and LFP | in package (PR #17) |
 | **State-space non-local** (ours) | posterior | Denovellis et al. 2021 lineage, [doi:10.7554/eLife.64505](https://doi.org/10.7554/eLife.64505); this project | clusterless marks + position | 4-state posterior on the 2 ms grid | — | non-local probability > 0.8 for ≥ 15 ms | whole-event immobility | canonical rule | encoding model | exists (`non_local_event`) |
-| **Memoryless sequence** (Widloski port) | posterior | Widloski & Foster 2025, [doi:10.1038/s41467-025-65181-5](https://doi.org/10.1038/s41467-025-65181-5) | clusterless marks | 80 ms uniform-prior windows, 4 ms stride | — | spread < 10 cm, jump < 20 cm, duration > 100 ms, dispersion > 12 cm, encoding-pair shuffle p < 0.05 | merge < 20 cm and < 50 ms | per-bin < 4 cm/s then whole-event | encoding model | to build ([02](02-memoryless-sequence.md)) |
+| **Memoryless sequence** (Widloski port) | posterior | Widloski & Foster 2025, [doi:10.1038/s41467-025-65181-5](https://doi.org/10.1038/s41467-025-65181-5) | clusterless marks | 80 ms uniform-prior windows, 4 ms stride | — | spread < 10 cm, jump < 20 cm, duration > 100 ms, dispersion > 12 cm, encoding-pair shuffle p < 0.05 | merge < 20 cm and < 50 ms | per-bin < 4 cm/s then whole-event | encoding model | detector core implemented in this project (`memoryless_sequence/`); shuffle pending ([02](02-memoryless-sequence.md)) |
 
 ## Methods considered and not ported
 

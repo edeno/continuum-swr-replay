@@ -359,7 +359,7 @@ class TestEpochLogLikelihood:
         assert log_likelihood.shape[1] < interior.size  # placeholders were dropped
 
     def test_junction_placeholder_bins_are_absent(self, epoch, decoded):
-        """The centers that survive are exactly the interior ones (V8)."""
+        """The centers that survive are exactly the interior ones."""
         _, log_likelihood = decoded
         interior = np.asarray(epoch.environment.is_track_interior_).ravel()
         centers = np.asarray(epoch.environment.place_bin_centers_).ravel()
@@ -670,7 +670,7 @@ class TestInteriorBinDistances:
     def test_bins_on_different_arms_are_further_apart_than_in_linear_position(
         self, epoch
     ):
-        """The reason jumps are measured on the graph and not on the coordinate (V6)."""
+        """The reason jumps are measured on the graph and not on the coordinate."""
         interior = np.asarray(epoch.environment.is_track_interior_).ravel()
         centers = np.asarray(epoch.environment.place_bin_centers_).ravel()[interior]
         distance = interior_bin_distances_cm(epoch.environment)
