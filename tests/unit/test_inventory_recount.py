@@ -1,4 +1,4 @@
-"""The fragment-merge recount (spec 03, "Fragment-merge recount")."""
+"""The fragment-merge recount."""
 
 import numpy as np
 import pandas as pd

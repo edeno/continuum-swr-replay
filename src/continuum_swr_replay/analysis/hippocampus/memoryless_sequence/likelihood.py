@@ -24,9 +24,6 @@ are excluded here by construction. Reading a saved decode's
 ``log_likelihood`` instead would carry every ``state_bins`` column and would
 need the interior mask applied explicitly; that path is deliberately not
 implemented until it can be checked against a real file.
-
-The design, including every departure from the original, is in
-``docs/design/replay_detection_comparison/02-memoryless-sequence.md``.
 """
 
 from dataclasses import dataclass

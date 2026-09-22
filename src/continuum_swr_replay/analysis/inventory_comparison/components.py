@@ -1,6 +1,6 @@
 """Connected components of the overlap graph, as a diagnostic.
 
-Spec 03, "Overlap is not transitive". A can overlap B and B overlap C while A
+Overlap is not transitive: A can overlap B and B overlap C while A
 and C share no time, so membership in "found by all" is not defined by the
 pairs alone. Each component is labelled by which detectors contribute to it,
 with its size and span, so a long chain fusing events that do not individually

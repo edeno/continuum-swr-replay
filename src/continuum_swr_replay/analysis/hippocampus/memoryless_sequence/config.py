@@ -1,9 +1,9 @@
 """Every threshold the memoryless sequence detector uses, in one place.
 
-The equivalent of the original's ``Analysis_Information.mat``. The design
-spec, ``docs/design/replay_detection_comparison/02-memoryless-sequence.md``,
-records which settings are retained from Widloski & Foster (2025) and which
-are adapted to this project's track geometry and sampling grid.
+The equivalent of the original's ``Analysis_Information.mat``. Most settings
+are retained from Widloski & Foster (2025); the stride, the speed threshold
+and the spread threshold are adapted to this project's sampling grid,
+immobility rule and track geometry, as each field's description says.
 """
 
 import math

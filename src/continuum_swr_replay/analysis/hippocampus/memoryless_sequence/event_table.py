@@ -35,9 +35,6 @@ from our own cohort, and a table sharing it would join to the wrong events
 without any error. It is hashed from the decode and the sequence's window
 bounds, not from ``run_id``, so two runs of one decode (a sensitivity run
 against its baseline, say) can be joined on it; ``run_id`` is a column.
-
-The design is in ``docs/design/replay_detection_comparison/02-memoryless-sequence.md``,
-sections "Data flow, per epoch" and "Output schema".
 """
 
 from collections.abc import Mapping

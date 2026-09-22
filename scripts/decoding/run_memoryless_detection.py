@@ -41,8 +41,6 @@ training type (``_all``). ``--animal`` and ``--all`` run canonical decodes
 only unless ``--include-variants`` is given; ``--epoch-id`` runs whatever it
 names.
 
-The design is in ``docs/design/replay_detection_comparison/02-memoryless-sequence.md``.
-
 Usage:
     python scripts/decoding/run_memoryless_detection.py --run-seed 20260922 \\
         --epoch-id chimi20200212_02_r1_HPC

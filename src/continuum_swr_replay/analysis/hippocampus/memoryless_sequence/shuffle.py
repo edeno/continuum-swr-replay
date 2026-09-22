@@ -52,9 +52,6 @@ spikes are decoded with another cell's field. The fields summed over cells,
 which is the term for the spikes that did not arrive, does not change.
 ``shuffle_candidate_sorted`` runs it; the simulations use it, and recorded
 data, decoded clusterless, uses the encoding-pair shuffle.
-
-The design is in ``docs/design/replay_detection_comparison/02-memoryless-sequence.md``,
-section "Clusterless shuffle: permute encoding pairs".
 """
 
 import hashlib

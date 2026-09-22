@@ -1,5 +1,4 @@
-"""Connected components of the overlap graph (spec 03, "Overlap is not
-transitive")."""
+"""Connected components of the overlap graph, where overlap is not transitive."""
 
 import numpy as np
 import pandas as pd

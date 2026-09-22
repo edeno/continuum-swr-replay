@@ -1,4 +1,4 @@
-"""The cohort x SWR-definition label matrix (spec 03, "The SWR label matrix")."""
+"""The cohort x SWR-definition label matrix."""
 
 import numpy as np
 import pandas as pd

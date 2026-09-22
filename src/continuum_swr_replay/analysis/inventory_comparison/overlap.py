@@ -1,6 +1,6 @@
 """Every overlap between inventories, and the counts built on it.
 
-Spec 03, "Matching and counting". Two events overlap when they share time of
+Two events overlap when they share time of
 positive duration within one epoch; touching at an instant is not agreement,
 and nothing is matched across epochs. The pair table keeps every such pair,
 so one event can appear in many; the counts built on it take each event once.

@@ -1,4 +1,4 @@
-"""One table per detector, in one schema (spec 03, "Common schema").
+"""One table per detector, in one schema.
 
 Each inventory is one row per event, over the same epochs and speed trace.
 The span of an event is ``event_end_s - event_start_s`` for every detector,

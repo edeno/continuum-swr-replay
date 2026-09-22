@@ -1,6 +1,6 @@
 """Each sequence cohort labelled under each SWR definition.
 
-Spec 03, "The SWR label matrix". A sequence event is ``SWR`` under a
+A sequence event is ``SWR`` under a
 definition when an event of that SWR inventory overlaps it with positive
 duration and ``non-SWR`` when nothing does, but only for an event lying
 wholly within both detectors' exposure; otherwise it is ``unknown``: missing

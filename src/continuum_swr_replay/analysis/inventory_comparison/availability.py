@@ -1,6 +1,6 @@
 """What each detector observed, apart from what it detected.
 
-Spec 03, "Observation availability". A detector that looked and found nothing
+A detector that looked and found nothing
 observed that time; a detector whose inputs were missing did not, and an
 empty event table alone cannot tell the two apart. Coverage is built from the
 samples a detector needed, split at every non-finite sample and every gap in

@@ -618,7 +618,7 @@ class TestWindowDecisions:
         return gate_windows(center, spread, jump, self.config)
 
     def test_jumps_taken_before_the_speed_gate_would_keep_one_more_window(self):
-        """Pins the ordering in the spec's data-flow step 4."""
+        """The speed gate removes a window before its jump is measured."""
         bins = np.array([10, 11, 12, 13])
         speed = np.array([0.0, 0.0, 0.0, 9.0])
         posterior = self.posterior_at(bins)

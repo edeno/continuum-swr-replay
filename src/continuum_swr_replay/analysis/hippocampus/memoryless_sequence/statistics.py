@@ -14,9 +14,6 @@ ordinary center of mass and standard deviation.
 
 A missing center is carried as the sentinel ``NO_CENTER`` rather than NaN, so
 centers stay an integer index into the bins.
-
-The design, including every departure from the original, is in
-``docs/design/replay_detection_comparison/02-memoryless-sequence.md``.
 """
 
 import numpy as np

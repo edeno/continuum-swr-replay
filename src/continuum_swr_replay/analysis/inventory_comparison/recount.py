@@ -1,6 +1,6 @@
 """The fragment-merge recount: how much a count owes to segmentation.
 
-Spec 03, "Fragment-merge recount". Our detector can split one replay into
+Our detector can split one replay into
 several events where the non-local probability dips below threshold. Here one
 detector's events closer than a stated gap are merged, so the same overlap
 accounting can be rerun on the merged intervals beside the native ones.

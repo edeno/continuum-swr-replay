@@ -1,6 +1,6 @@
 """The cells no pairwise table reaches.
 
-Spec 03, "The cells that pairwise counting misses". Each event cell asks
+Each event cell asks
 whether an event was found by none of a set of detectors:
 
 - events found by exactly one detector: every detector against all the others;

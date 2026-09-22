@@ -5,9 +5,6 @@ the tests and under the per-epoch runner. The order is fixed here rather than
 left to callers: decode every window under a uniform prior, gate and assemble
 sequences, shuffle every candidate that meets the replay criteria, as the
 reference tests every such candidate, and write one row per candidate.
-
-The design is in ``docs/design/replay_detection_comparison/02-memoryless-sequence.md``,
-section "Data flow, per epoch".
 """
 
 from dataclasses import dataclass

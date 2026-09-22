@@ -1,4 +1,4 @@
-"""One schema for every detector's events (spec 03, "Common schema")."""
+"""One schema for every detector's events."""
 
 import numpy as np
 import pandas as pd

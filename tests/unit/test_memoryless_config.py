@@ -13,7 +13,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import
 
 
 def test_defaults_are_the_retained_settings():
-    """The settings spec 02 keeps from Widloski & Foster 2025."""
+    """The settings kept from Widloski & Foster 2025."""
     config = MemorylessSequenceConfig()
 
     assert config.window_duration_s == 0.080
@@ -26,7 +26,7 @@ def test_defaults_are_the_retained_settings():
 
 
 def test_adapted_settings_are_ours_not_theirs():
-    """Two settings depart from the paper and spec 02 says why."""
+    """The settings adapted to this project's grid, immobility rule and track."""
     config = MemorylessSequenceConfig()
 
     assert config.stride_s == 0.004  # 5 ms is 2.5 samples at 500 Hz

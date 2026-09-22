@@ -23,9 +23,6 @@ the original's 5 ms and this project's 4 ms (the 50 ms merge gap can tie only
 at 5 ms). The comparisons therefore treat a value within a relative tolerance
 of its threshold as equal to it, so float representation does not decide the
 outcome.
-
-The design, including every departure from the original, is in
-``docs/design/replay_detection_comparison/02-memoryless-sequence.md``.
 """
 
 from dataclasses import dataclass, fields

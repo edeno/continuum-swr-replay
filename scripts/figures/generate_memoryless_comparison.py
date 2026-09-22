@@ -10,8 +10,8 @@ Lower panels summarize the sweep in `scripts/qa/sweep_memoryless_detection.py`,
 which wrote replays of chosen path length, duration, firing rate and distance
 from the animal one at a time into a simulated recording and recorded what each
 detector reported. Those panels read the aggregates the sweep saves, so the
-figure and `docs/design/replay_detection_comparison/02-memoryless-sequence.md`
-cannot disagree; re-run the sweep to change them.
+figure and the numbers quoted from the sweep cannot disagree; re-run the sweep
+to change them.
 
 Every outcome the titles and caption state is read from the data. Where the
 prose commits to a verdict -- an event missed, declined, or found -- the script
@@ -1297,7 +1297,7 @@ Replays run at constant speed with Poisson firing from the same place fields
 the encoding model was fitted on, so there is no model mismatch and the picture
 is optimistic. The significance test is the reference's place-cell identity
 shuffle, which needs sorted cells; recorded data, decoded clusterless, are
-tested with the encoding-pair shuffle of spec 02 instead.
+tested with an encoding-pair shuffle instead.
 
 Produced by `scripts/figures/generate_memoryless_comparison.py` from
 `docs/design/replay_detection_comparison/detection_sweep_summary.csv`.

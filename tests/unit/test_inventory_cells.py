@@ -1,5 +1,4 @@
-"""The cells pairwise counting misses (spec 03, "The cells that pairwise
-counting misses")."""
+"""The cells pairwise counting misses."""
 
 import numpy as np
 import pandas as pd

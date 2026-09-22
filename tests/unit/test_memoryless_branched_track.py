@@ -2,8 +2,8 @@
 
 Two bins that are adjacent in linearized coordinate can sit on different arms,
 and two bins far apart in that coordinate can be neighbours through a junction.
-The detector measures jumps and dispersion on the track graph for that reason
-(spec 02). These tests build a posterior that walks a chosen path over a
+The detector measures jumps and dispersion on the track graph for that
+reason. These tests build a posterior that walks a chosen path over a
 real Y-shaped ``Environment`` and check what the detector makes of it, with no
 encoding model in the way.
 """

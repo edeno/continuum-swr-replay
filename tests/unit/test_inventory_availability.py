@@ -1,4 +1,4 @@
-"""What each detector observed (spec 03, "Observation availability")."""
+"""What each detector observed."""
 
 import numpy as np
 import pytest

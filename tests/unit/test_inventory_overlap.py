@@ -1,5 +1,4 @@
-"""Every overlap between inventories, and the counts built on it (spec 03,
-"Matching and counting")."""
+"""Every overlap between inventories, and the counts built on it."""
 
 import numpy as np
 import pandas as pd

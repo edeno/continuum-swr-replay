@@ -148,9 +148,9 @@ SUMMARY_PATH = Path(
 )
 """Aggregated results, small enough to keep in the repository.
 
-The raw sweep goes under ``Processed-Data``, which is not tracked. The numbers
-quoted in the spec come from this file, so that nobody has to transcribe them
-out of a one-off script.
+The raw sweep goes under ``Processed-Data``, which is not tracked. Quoted
+numbers come from this file, so that nobody has to transcribe them out of a
+one-off script.
 """
 
 
@@ -613,7 +613,7 @@ def melted(frame: pd.DataFrame, id_vars: list[str], summary: str) -> pd.DataFram
 
 
 def summarize(table: pd.DataFrame) -> pd.DataFrame:
-    """The aggregates the spec quotes, in one long-format table.
+    """The aggregates quoted from the sweep, in one long-format table.
 
     Built here so the numbers in the write-up and the numbers in the sweep
     cannot drift apart.
