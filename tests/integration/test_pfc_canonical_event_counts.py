@@ -36,7 +36,6 @@ pytestmark = pytest.mark.slow
 
 def test_the_event_sets_are_the_shipped_tables_rows_for_that_session():
     from continuum_swr_replay.analysis.hippocampus import load_results
-    from continuum_swr_replay.data_loaders import load_data
 
     sessions = [s for s in pdm.find_sessions(max_per_animal=1) if s["results_file"]]
     if not sessions:
@@ -52,6 +51,9 @@ def test_the_event_sets_are_the_shipped_tables_rows_for_that_session():
         pytest.skip(f"canonical inputs unavailable for {nwb_file_name}: {exc}")
 
     try:
+        # importing the loader already needs Spyglass
+        from continuum_swr_replay.data_loaders import load_data
+
         results, _, _ = load_results(
             nwb_file_name, epoch_name, decoding_brain_area="HPC", load_detector=False
         )
