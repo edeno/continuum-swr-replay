@@ -12,7 +12,11 @@ are.
 A detector counts as finding an event only when what it reports is *the
 injected event*. Overlapping it in time is not enough: a sequence built from
 the local coding beside the injection overlaps it too, and scoring that as a
-detection turns the over-call into an apparent detection floor.
+detection turns the over-call into an apparent detection floor. The rule is
+one function, ``scoring.score_against_injection``, applied to every reported
+event of either detector that overlaps the injection; the best-scoring one
+answers for the cell, so an absorbed sequence that happens to start earlier
+cannot hide a true detection behind it.
 
 The point is to separate limits of a method from limits of the data. A replay
 that neither detector finds says something about the recording; one that only
@@ -29,6 +33,7 @@ Usage:
 import argparse
 import os
 import subprocess
+import sys
 import time as clock
 from datetime import UTC, datetime
 from pathlib import Path
@@ -57,7 +62,12 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
     sorted_spikes_epoch_log_likelihood,
     window_midpoints_s,
 )
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.scoring import (
+    best_scored,
+    score_against_injection,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation import (
+    InjectedReplay,
     immobile_intervals,
     inject_replay,
     place_field_means,
@@ -97,6 +107,12 @@ pieces left after cutting out the recording's own events can still hold an
 event."""
 
 NON_LOCAL_PROB_THRESHOLD = 0.8
+NON_LOCAL_MINIMUM_DURATION_S = 0.015
+"""The project's non-local event definition, as in
+``analysis/hippocampus/event_detection.get_confident_times``: non-local
+probability above 0.8 for at least 15 ms. The state-space detector is held to
+its own published rule here, as the sliding window is held to its."""
+
 SAME_PLACE_CM = 15.0
 
 IN_DOMAIN_PATH_CM = 45.0
@@ -143,12 +159,13 @@ def build_recording():
         array[::DECODE_BIN_STRIDE] for array in (time, position, speed, is_event)
     )
 
-    environment = Environment(place_bin_size=CONFIG.place_bin_size_cm).fit_place_grid(
-        position[:, None]
-    )
     is_training = ~is_event
 
+    # the grid both procedures decode on comes from the config, so the jump
+    # and spread thresholds in cm and the bins they are measured over cannot
+    # drift apart
     detector = NonLocalSortedSpikesDetector(
+        environments=[Environment(place_bin_size=CONFIG.place_bin_size_cm)],
         sorted_spikes_algorithm="sorted_spikes_kde",
         sorted_spikes_algorithm_params={"position_std": 6.0, "block_size": int(2**8)},
         local_position_std=LOCAL_POSITION_STD,
@@ -191,9 +208,14 @@ def build_recording():
     }
 
 
+def overlaps(reported: tuple[float, float], bounds: tuple[float, float]) -> bool:
+    """Strict, positive-duration overlap. The same rule for both detectors."""
+    return reported[0] < bounds[1] and bounds[0] < reported[1]
+
+
 def memoryless_outcome(recording, injected, window, bounds, true_position_cm, path_cm):
     """What the sliding-window detector reports for one injected event."""
-    time, position = window
+    time, position, speed = window
     result = sorted_spikes_epoch_log_likelihood(
         time, position, injected, recording["encoding_model"], CONFIG
     )
@@ -203,13 +225,9 @@ def memoryless_outcome(recording, injected, window, bounds, true_position_cm, pa
         )
     )
     midpoint_s = window_midpoints_s(result.time, CONFIG)
-    speed = np.interp(
-        midpoint_s,
-        result.time,
-        recording["speed"][recording["window_mask"]][: result.time.size],
-    )
+    window_speed = np.interp(midpoint_s, result.time, speed[: result.time.size])
     candidates = detect_candidate_sequences(
-        posterior, midpoint_s, recording["bin_distance_cm"], speed, CONFIG
+        posterior, midpoint_s, recording["bin_distance_cm"], window_speed, CONFIG
     )
 
     start_s, end_s = bounds
@@ -217,27 +235,24 @@ def memoryless_outcome(recording, injected, window, bounds, true_position_cm, pa
     gates = candidates.decisions.gates
     overlapping = [
         i
-        for i in range(len(candidates.runs))
-        if midpoint_s[candidates.runs[i][0]] < end_s
-        and start_s < midpoint_s[candidates.runs[i][1]]
+        for i, (run_start, run_stop) in enumerate(candidates.runs)
+        if overlaps((midpoint_s[run_start], midpoint_s[run_stop]), bounds)
     ]
     accepted = [i for i in overlapping if candidates.is_replay[i]]
+
+    def inside_rate(flag):
+        return float(flag[inside].mean()) if inside.any() else np.nan
 
     out = {
         "sliding_found": bool(accepted),
         "sliding_any_candidate": bool(overlapping),
         "sliding_n_candidates": len(overlapping),
-        "sliding_has_center": (
-            float(gates.has_center[inside].mean()) if inside.any() else np.nan
-        ),
-        "sliding_spread_ok": (
-            float(gates.spread_below_threshold[inside].mean())
-            if inside.any()
-            else np.nan
-        ),
-        "sliding_jump_ok": (
-            float(gates.jump_below_threshold[inside].mean()) if inside.any() else np.nan
-        ),
+        "sliding_n_accepted": len(accepted),
+        "sliding_has_center": inside_rate(gates.has_center),
+        "sliding_posterior_usable": inside_rate(gates.posterior_usable),
+        "sliding_speed_eligible": inside_rate(gates.speed_eligible),
+        "sliding_spread_ok": inside_rate(gates.spread_below_threshold),
+        "sliding_jump_ok": inside_rate(gates.jump_below_threshold),
         "sliding_best_dispersion_cm": max(
             (candidates.dispersion_cm[i] for i in overlapping), default=np.nan
         ),
@@ -251,38 +266,42 @@ def memoryless_outcome(recording, injected, window, bounds, true_position_cm, pa
     if not accepted:
         return out
 
-    i = accepted[0]
+    # Every accepted sequence that overlaps the injection is scored, and the
+    # best answers for the cell. Two things have to hold for a match. The
+    # sequence must sit on the path while the path is being replayed, and it
+    # must not cover far more ground than the path does: an absorbed sequence
+    # tracks the injection during the injection and then runs off to the
+    # animal's own place, which is where its dispersion comes from.
+    scored = []
+    for i in accepted:
+        run_start, run_stop = candidates.runs[i]
+        centers = candidates.decisions.center_index[run_start : run_stop + 1]
+        times = midpoint_s[run_start : run_stop + 1]
+        present = centers >= 0
+        decoded_cm = recording["place_bin_centers_cm"][centers[present]]
+        scored.append(
+            (
+                i,
+                score_against_injection(
+                    times[present],
+                    decoded_cm,
+                    true_position_cm,
+                    bounds,
+                    path_cm,
+                    MATCH_TOLERANCE_CM,
+                ),
+                decoded_cm,
+                times[present],
+            )
+        )
+    i, score, decoded_cm, times = scored[best_scored([item[1] for item in scored])]
     run_start, run_stop = candidates.runs[i]
-    centers = candidates.decisions.center_index[run_start : run_stop + 1]
-    times = midpoint_s[run_start : run_stop + 1]
-    present = centers >= 0
-    decoded_cm = recording["place_bin_centers_cm"][centers[present]]
 
-    # Does the accepted sequence report the injected path, or something else?
-    # Two things have to hold. It must sit on the path while the path is being
-    # replayed, and it must not cover far more ground than the path does: an
-    # absorbed sequence tracks the injection during the injection and then runs
-    # off to the animal's own place, which is where its dispersion comes from.
-    during = present & (times >= start_s) & (times <= end_s)
-    span_cm = float(np.ptp(decoded_cm)) if decoded_cm.size else np.nan
-    out["sliding_span_cm"] = span_cm
-    if during.any():
-        error_cm = np.abs(
-            recording["place_bin_centers_cm"][centers[during]]
-            - true_position_cm(times[during])
-        )
-        out["sliding_position_error_cm"] = float(np.median(error_cm))
-        out["sliding_matches"] = bool(
-            np.median(error_cm) < MATCH_TOLERANCE_CM
-            and span_cm <= path_cm + 2 * MATCH_TOLERANCE_CM
-        )
-
-    animal_cm = np.interp(
-        times[present],
-        result.time,
-        recording["position"][recording["window_mask"]][: result.time.size],
-    )
+    animal_cm = np.interp(times, result.time, position[: result.time.size])
     out |= {
+        "sliding_matches": score.matches,
+        "sliding_position_error_cm": score.position_error_cm,
+        "sliding_span_cm": score.span_cm,
         "sliding_duration_s": float(candidates.duration_s[i]),
         "sliding_dispersion_cm": float(candidates.dispersion_cm[i]),
         "sliding_start_error_s": float(midpoint_s[run_start] - start_s),
@@ -308,9 +327,29 @@ def nearest_bin(recording, position_cm: np.ndarray) -> np.ndarray:
     return np.abs(centers[None, :] - np.asarray(position_cm)[:, None]).argmin(axis=1)
 
 
+def non_local_intervals(
+    time: np.ndarray, probability: np.ndarray
+) -> list[tuple[int, int]]:
+    """The state-space detector's events: index bounds of every stretch above
+    threshold that lasts the project's minimum duration."""
+    above = probability > NON_LOCAL_PROB_THRESHOLD
+    edges = np.diff(above.astype(np.int8), prepend=0, append=0)
+    starts, stops = np.flatnonzero(edges == 1), np.flatnonzero(edges == -1) - 1
+    return [
+        (a, b)
+        for a, b in zip(starts, stops, strict=True)
+        if time[b] - time[a] >= NON_LOCAL_MINIMUM_DURATION_S
+    ]
+
+
 def state_space_outcome(recording, injected, window, bounds, true_position_cm, path_cm):
-    """What the switching state-space model reports for the same event."""
-    time, position = window
+    """What the switching state-space model reports for the same event.
+
+    Scored by the same rule as the sliding window: every reported event that
+    overlaps the injection is scored on its own, over its whole extent, and
+    the best answers for the cell.
+    """
+    time, position, _speed = window
     results = recording["detector"].predict(
         position_time=time, position=position, spike_times=injected, time=time
     )
@@ -330,15 +369,11 @@ def state_space_outcome(recording, injected, window, bounds, true_position_cm, p
         .values
     ).squeeze()
 
-    above = probability > NON_LOCAL_PROB_THRESHOLD
-    edges = np.diff(above.astype(np.int8), prepend=0, append=0)
-    starts, stops = np.flatnonzero(edges == 1), np.flatnonzero(edges == -1) - 1
-
     start_s, end_s = bounds
     hits = [
-        (time[a], time[b])
-        for a, b in zip(starts, stops, strict=True)
-        if time[a] <= end_s and start_s <= time[b]
+        (a, b)
+        for a, b in non_local_intervals(time, probability)
+        if overlaps((time[a], time[b]), bounds)
     ]
     inside = (time >= start_s) & (time <= end_s)
 
@@ -348,9 +383,6 @@ def state_space_outcome(recording, injected, window, bounds, true_position_cm, p
         "state_space_peak_probability": (
             float(probability[inside].max()) if inside.any() else np.nan
         ),
-        "state_space_duration_s": float(hits[-1][1] - hits[0][0]) if hits else np.nan,
-        "state_space_start_error_s": float(hits[0][0] - start_s) if hits else np.nan,
-        "state_space_end_error_s": float(hits[-1][1] - end_s) if hits else np.nan,
         "state_space_matches": False,
         "state_space_replay_matches": False,
         "state_space_position_error_cm": np.nan,
@@ -369,36 +401,43 @@ def state_space_outcome(recording, injected, window, bounds, true_position_cm, p
     bin_position_cm = np.asarray(posterior.coords["position"].values)[is_non_local]
     non_local = np.asarray(posterior.values)[:, is_non_local]
 
-    # Scored exactly as the sliding window is: position error over the part of
-    # the event that overlaps the injection, span over the whole event. Taking
-    # the span over the overlap only would hide whatever the event does outside
-    # it, which is the very thing the span test is for, and would hold the two
-    # detectors to different rules.
-    whole = above & (time >= hits[0][0]) & (time <= hits[-1][1])
-    decoded_cm = bin_position_cm[np.argmax(non_local[whole], axis=1)]
-    out["state_space_span_cm"] = float(np.ptp(decoded_cm))
-    out["state_space_dispersion_cm"] = dispersion_cm(
-        nearest_bin(recording, decoded_cm), recording["bin_distance_cm"]
-    )
+    scored = []
+    for a, b in hits:
+        decoded_cm = bin_position_cm[np.argmax(non_local[a : b + 1], axis=1)]
+        scored.append(
+            (
+                (a, b),
+                score_against_injection(
+                    time[a : b + 1],
+                    decoded_cm,
+                    true_position_cm,
+                    bounds,
+                    path_cm,
+                    MATCH_TOLERANCE_CM,
+                ),
+                decoded_cm,
+            )
+        )
+    (a, b), score, decoded_cm = scored[best_scored([item[1] for item in scored])]
 
-    during = inside & above
-    if during.any():
-        error_cm = np.abs(
-            bin_position_cm[np.argmax(non_local[during], axis=1)]
-            - true_position_cm(time[during])
-        )
-        out["state_space_position_error_cm"] = float(np.median(error_cm))
-        out["state_space_matches"] = bool(
-            np.median(error_cm) < MATCH_TOLERANCE_CM
-            and out["state_space_span_cm"] <= path_cm + 2 * MATCH_TOLERANCE_CM
-        )
-        # and again under the published replay definition the sliding window is
-        # held to, so the two rates can be read against each other
-        out["state_space_replay_matches"] = bool(
-            out["state_space_matches"]
-            and out["state_space_duration_s"] > CONFIG.minimum_duration_s
-            and out["state_space_dispersion_cm"] > CONFIG.dispersion_threshold_cm
-        )
+    out |= {
+        "state_space_matches": score.matches,
+        "state_space_position_error_cm": score.position_error_cm,
+        "state_space_span_cm": score.span_cm,
+        "state_space_duration_s": float(time[b] - time[a]),
+        "state_space_start_error_s": float(time[a] - start_s),
+        "state_space_end_error_s": float(time[b] - end_s),
+        "state_space_dispersion_cm": dispersion_cm(
+            nearest_bin(recording, decoded_cm), recording["bin_distance_cm"]
+        ),
+    }
+    # and again under the published replay definition the sliding window is
+    # held to, so the two rates can be read against each other
+    out["state_space_replay_matches"] = bool(
+        score.matches
+        and out["state_space_duration_s"] > CONFIG.minimum_duration_s
+        and out["state_space_dispersion_cm"] > CONFIG.dispersion_threshold_cm
+    )
     return out
 
 
@@ -407,20 +446,25 @@ def run_cell(recording, means, path_cm, midpoint_cm, duration_s, rate_hz, at_s, 
     injected, bounds = inject_replay(
         recording["spike_times"],
         means,
-        start_cm=midpoint_cm - path_cm / 2,
-        path_cm=path_cm,
-        duration_s=duration_s,
-        peak_rate_hz=rate_hz,
-        at_s=at_s,
+        InjectedReplay(
+            start_cm=midpoint_cm - path_cm / 2,
+            path_cm=path_cm,
+            duration_s=duration_s,
+            peak_rate_hz=rate_hz,
+            at_s=at_s,
+            seed=seed,
+        ),
         sampling_frequency=SAMPLING_FREQUENCY,
-        seed=seed,
     )
     start_s, end_s = bounds
     mask = (recording["time"] >= start_s - DECODE_MARGIN_S) & (
         recording["time"] <= end_s + DECODE_MARGIN_S
     )
-    recording["window_mask"] = mask
-    window = (recording["time"][mask], recording["position"][mask])
+    window = (
+        recording["time"][mask],
+        recording["position"][mask],
+        recording["speed"][mask],
+    )
 
     original = np.concatenate(recording["spike_times"])
     added = np.concatenate(injected)
@@ -446,9 +490,7 @@ def run_cell(recording, means, path_cm, midpoint_cm, duration_s, rate_hz, at_s, 
 
     def true_position_cm(at):
         """Where the injected replay says the animal is, at these times."""
-        fraction = np.clip(
-            (np.asarray(at) - start_s) / max(end_s - start_s, 1e-9), 0, 1
-        )
+        fraction = np.clip((np.asarray(at) - start_s) / (end_s - start_s), 0, 1)
         return midpoint_cm - path_cm / 2 + path_cm * fraction
 
     row |= memoryless_outcome(
@@ -469,9 +511,25 @@ def git_commit() -> str:
             text=True,
             check=True,
         )
-    except (OSError, subprocess.CalledProcessError):
+    except (OSError, subprocess.CalledProcessError) as error:
+        print(
+            f"warning: git commit unknown ({error}); recording 'unknown'",
+            file=sys.stderr,
+        )
         return "unknown"
-    return described.stdout.strip()
+    commit = described.stdout.strip()
+    if commit.endswith("-dirty"):
+        print(
+            f"warning: the working tree has uncommitted changes ({commit}); the "
+            "numbers this run saves cannot be tied to a commit",
+            file=sys.stderr,
+        )
+    return commit
+
+
+def share(numerator: float, denominator: float) -> float:
+    """A rate that is undefined, not zero, when nothing was counted."""
+    return float(numerator / denominator) if denominator > 0 else np.nan
 
 
 def summarize(table: pd.DataFrame) -> pd.DataFrame:
@@ -548,6 +606,7 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
                 "found_by_state_space_only",
                 "found_by_sliding_window_only",
                 "sliding_accepted_but_not_the_injection",
+                "sliding_cells_with_several_accepted_overlaps",
                 "missed_with_candidate_below_dispersion",
                 "missed_with_no_candidate",
                 "missed_median_spread_pass_rate",
@@ -562,10 +621,11 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
                 float(table.state_space_replay_matches.mean()),
                 float((table.state_space_matches & ~table.sliding_matches).mean()),
                 float((table.sliding_matches & ~table.state_space_matches).mean()),
-                float(
-                    (table.sliding_found & ~table.sliding_matches).sum()
-                    / max(table.sliding_found.sum(), 1)
+                share(
+                    (table.sliding_found & ~table.sliding_matches).sum(),
+                    table.sliding_found.sum(),
                 ),
+                float(table.sliding_n_accepted.gt(1).mean()),
                 float(
                     (
                         missed.sliding_n_candidates.gt(0)
@@ -631,6 +691,13 @@ def main() -> None:
         type=Path,
         default=Path("Processed-Data/replay_detection_comparison")
         / "memoryless_detection_sweep.parquet",
+    )
+    parser.add_argument(
+        "--summary",
+        type=Path,
+        default=SUMMARY_PATH,
+        help="Where the aggregates go. Point a pilot elsewhere so it does not "
+        "overwrite the committed summary.",
     )
     args = parser.parse_args()
 
@@ -713,6 +780,8 @@ def main() -> None:
         "placement_margin_s": PLACEMENT_MARGIN_S,
         "match_tolerance_cm": MATCH_TOLERANCE_CM,
         "same_place_cm": SAME_PLACE_CM,
+        "non_local_prob_threshold": NON_LOCAL_PROB_THRESHOLD,
+        "non_local_minimum_duration_s": NON_LOCAL_MINIMUM_DURATION_S,
         "spikes": "sorted",
         "track": "linear",
     }
@@ -730,12 +799,12 @@ def main() -> None:
                 "n_cells_total": str(len(table)),
             }[key],
         }
-    SUMMARY_PATH.parent.mkdir(parents=True, exist_ok=True)
-    summary.to_csv(SUMMARY_PATH, index=False)
+    args.summary.parent.mkdir(parents=True, exist_ok=True)
+    summary.to_csv(args.summary, index=False)
 
     print(f"\n{len(table)} cells in {(clock.time() - started) / 60:.1f} min")
     print(f"  raw      -> {args.out}")
-    print(f"  summary  -> {SUMMARY_PATH}")
+    print(f"  summary  -> {args.summary}")
     print(f"\n  sliding window, native criterion : {table.sliding_found.mean():.3f}")
     print(f"  sliding window, and it is the event: {table.sliding_matches.mean():.3f}")
     print(
@@ -749,7 +818,7 @@ def main() -> None:
     )
     print(
         "  of the sliding window's accepted events, the share that are not the "
-        f"injection: {(table.sliding_found & ~table.sliding_matches).sum() / max(table.sliding_found.sum(), 1):.3f}"
+        f"injection: {share((table.sliding_found & ~table.sliding_matches).sum(), table.sliding_found.sum()):.3f}"
     )
 
 

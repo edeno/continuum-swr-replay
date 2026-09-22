@@ -7,11 +7,15 @@ one Figure 1 uses, so the two procedures can be read against a handful of
 labeled events.
 
 Lower panels summarize the sweep in `scripts/qa/sweep_memoryless_detection.py`,
-which wrote 4536 replays of chosen path length, duration, firing rate and
-distance from the animal one at a time into a simulated recording and recorded
-what each detector reported. Those panels read the aggregates the sweep saves,
-so the figure and `docs/design/replay_detection_comparison/02-memoryless-sequence.md`
+which wrote replays of chosen path length, duration, firing rate and distance
+from the animal one at a time into a simulated recording and recorded what each
+detector reported. Those panels read the aggregates the sweep saves, so the
+figure and `docs/design/replay_detection_comparison/02-memoryless-sequence.md`
 cannot disagree; re-run the sweep to change them.
+
+Every outcome the titles and caption state is read from the data. Where the
+prose commits to a verdict -- an event missed, declined, or found -- the script
+checks it and stops rather than write a caption the panels contradict.
 
 In both halves the two detectors read one encoding model, fitted once.
 
@@ -37,6 +41,7 @@ from non_local_detector import NonLocalSortedSpikesDetector
 from non_local_detector.environment import Environment
 from non_local_detector.simulate.sorted_spikes_simulation import (
     SAMPLING_FREQUENCY,
+    TRACK_HEIGHT,
     make_simulated_data,
 )
 
@@ -53,6 +58,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
     window_midpoints_s,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation import (
+    InjectedReplay,
     inject_replay,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
@@ -72,7 +78,9 @@ SUMMARY_PATH = Path(
 )
 """Aggregates of the parameter sweep, drawn in the lower panels."""
 
-DISTANCE_ORDER = ("(40, 80]", "(80, 120]", "(120, 200]")
+DISTANCE_ORDER = ("(0, 40]", "(40, 80]", "(80, 120]", "(120, 200]")
+"""Every bin the sweep's `pd.cut` can produce, in order. Panel (i) draws the
+ones the summary holds and refuses a summary holding any other."""
 
 ROW_HEIGHTS = [0.80, 0.95, 1.05, 0.75]
 """Relative heights of the figure's four rows: overview, events, sweep, sweep."""
@@ -84,7 +92,9 @@ so letter and title share a line."""
 LETTER_GAP_PT = 4.0
 """And this far left of whatever the panel draws furthest left."""
 
-TRACK_HEIGHT_CM = 170
+TRACK_HEIGHT_CM = float(TRACK_HEIGHT)
+"""The simulation package's own track length, read rather than restated."""
+
 DECODE_BIN_STRIDE = 3
 """Figure 1 strides the 1500 Hz simulation to the project's 500 Hz decode grid."""
 
@@ -101,24 +111,36 @@ EVENT_LABELS = [
 """Labels for the simulation's events. A star marks one added here; the rest
 come with the package's simulation."""
 
-SHORT_REPLAY = (35.0, 100.0, 0.080, 120.0, 44.40)
-"""start_cm, path_cm, duration_s, peak_rate_hz, time.
+SHORT_REPLAY = InjectedReplay(
+    start_cm=35.0,
+    path_cm=100.0,
+    duration_s=0.080,
+    peak_rate_hz=120.0,
+    at_s=44.40,
+    seed=1,
+)
+"""A replay that travels far but lasts only 80 ms, firing strongly enough that
+spike count is not the issue. The detector is expected to find it and report
+it too long; the panel title reads the ratio off the data rather than stating
+it here. The window puts a floor under any duration the method can report."""
 
-A replay that travels far but lasts only 80 ms, firing strongly enough that
-spike count is not the issue. The detector finds it and reports it too long;
-the panel title reads the ratio off the data rather than stating it here. The
-window puts a floor under any duration the method can report.
-"""
+SHORT_PATH = InjectedReplay(
+    start_cm=40.0, path_cm=30.0, duration_s=0.300, peak_rate_hz=40.0, at_s=20.50, seed=0
+)
+"""A replay that travels only 30 cm. The detector decodes it well, but the
+dispersion criterion needs a path of about 42 cm, so it is expected to reject
+the candidate."""
 
-SHORT_PATH = (40.0, 30.0, 0.300, 40.0, 20.50)
-"""start_cm, path_cm, duration_s, peak_rate_hz, time.
-
-A replay that travels only 30 cm. The detector decodes it well, but the
-dispersion criterion needs a path of about 42 cm, so it rejects the candidate.
-"""
+SHORT_PATH_EVENT, SHORT_REPLAY_EVENT = 6, 7
+CONTINUOUS_OUTBOUND_EVENT, REMOTE_STATIONARY_EVENT = 0, 5
+"""Rows of ``event_times`` in :func:`simulate_and_decode`, in the order the
+events are added."""
 
 NON_LOCAL_PROB_THRESHOLD = 0.8
-"""The project's standard non-local threshold, as in `run_decoding_bandit.py`.
+NON_LOCAL_MINIMUM_DURATION_S = 0.015
+"""The project's non-local event definition, as in
+`analysis/hippocampus/event_detection.get_confident_times`: non-local
+probability above 0.8 for at least 15 ms.
 
 The state-space model is otherwise left on the library's defaults. Figure 1
 sets a discrete transition stickiness, but stickiness is a Dirichlet
@@ -194,52 +216,30 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
     event_times = np.vstack([event_times, remote_stationary])
     is_event |= (time >= remote_stationary[0]) & (time <= remote_stationary[1])
 
-    # two replays the detector should find but does not
+    # two replays the detector is expected to mis-report, in the order
+    # SHORT_PATH_EVENT, SHORT_REPLAY_EVENT
     place_field_means = np.linspace(0, TRACK_HEIGHT_CM, n_neurons)
-
-    start_cm, path_cm, duration_s, rate_hz, at_s = SHORT_PATH
-    spike_times, bounds = inject_replay(
-        spike_times,
-        place_field_means,
-        start_cm,
-        path_cm,
-        duration_s,
-        rate_hz,
-        at_s,
-        sampling_frequency=SAMPLING_FREQUENCY,
-        seed=0,
-    )
-    event_times = np.vstack([event_times, bounds])
-    is_event |= (time >= bounds[0]) & (time <= bounds[1])
-
-    start_cm, path_cm, duration_s, rate_hz, at_s = SHORT_REPLAY
-    spike_times, bounds = inject_replay(
-        spike_times,
-        place_field_means,
-        start_cm,
-        path_cm,
-        duration_s,
-        rate_hz,
-        at_s,
-        sampling_frequency=SAMPLING_FREQUENCY,
-        seed=1,
-    )
-    event_times = np.vstack([event_times, bounds])
-    is_event |= (time >= bounds[0]) & (time <= bounds[1])
+    for replay in (SHORT_PATH, SHORT_REPLAY):
+        spike_times, bounds = inject_replay(
+            spike_times,
+            place_field_means,
+            replay,
+            sampling_frequency=SAMPLING_FREQUENCY,
+        )
+        event_times = np.vstack([event_times, bounds])
+        is_event |= (time >= bounds[0]) & (time <= bounds[1])
 
     time, position, speed, is_event = (
         array[::DECODE_BIN_STRIDE] for array in (time, position, speed, is_event)
-    )
-
-    environment = Environment(place_bin_size=config.place_bin_size_cm).fit_place_grid(
-        position[:, None]
     )
 
     # encode on non-event data only, the analogue of this project's no-ripple
     # training mask; spikes inside an event must not shape the place fields
     is_training = ~is_event
 
+    # the grid both procedures decode on comes from the config, matching the sweep
     detector = NonLocalSortedSpikesDetector(
+        environments=[Environment(place_bin_size=config.place_bin_size_cm)],
         sorted_spikes_algorithm="sorted_spikes_kde",
         sorted_spikes_algorithm_params={"position_std": 6.0, "block_size": int(2**8)},
         local_position_std=LOCAL_POSITION_STD,
@@ -332,24 +332,69 @@ def state_space_intervals(decoded: dict) -> list[tuple[float, float]]:
         for start, stop in zip(
             np.flatnonzero(edges == 1), np.flatnonzero(edges == -1) - 1, strict=True
         )
+        if time[stop] - time[start] >= NON_LOCAL_MINIMUM_DURATION_S
     ]
 
 
-def duration_ratio(decoded: dict, event: int) -> float | None:
-    """How much longer the detector calls an event than the event really is.
-
-    Read from the data, so a panel title cannot drift away from the panel.
-    """
+def candidates_overlapping(decoded: dict, event: int) -> list[int]:
+    """Every candidate sequence that overlaps a labeled event, accepted or not."""
     candidates = decoded["candidates"]
     event_start, event_end = decoded["event_times"][event]
-    for i in np.flatnonzero(candidates.is_replay):
-        start, stop = candidates.runs[i]
-        if (
-            decoded["midpoint_s"][start] < event_end
-            and event_start < decoded["midpoint_s"][stop]
-        ):
-            return float(candidates.duration_s[i] / (event_end - event_start))
-    return None
+    return [
+        i
+        for i, (start, stop) in enumerate(candidates.runs)
+        if decoded["midpoint_s"][start] < event_end
+        and event_start < decoded["midpoint_s"][stop]
+    ]
+
+
+def accepted_overlapping(decoded: dict, event: int) -> list[int]:
+    """The subset the detector called replay."""
+    is_replay = decoded["candidates"].is_replay
+    return [i for i in candidates_overlapping(decoded, event) if is_replay[i]]
+
+
+def verdict(decoded: dict, event: int) -> str:
+    """What the sliding-window detector did with one labeled event.
+
+    ``found`` when an accepted sequence overlaps it; ``declined`` when a
+    candidate was assembled but none was accepted; ``missed`` when no
+    candidate overlaps it at all. Read from the data, so a panel title cannot
+    drift away from the panel.
+    """
+    if accepted_overlapping(decoded, event):
+        return "found"
+    if candidates_overlapping(decoded, event):
+        return "declined"
+    return "missed"
+
+
+def duration_ratio(decoded: dict, event: int) -> float:
+    """How much longer the detector calls an event than the event really is.
+
+    Over the longest accepted sequence overlapping it. Raises when there is
+    none, so a title cannot be formatted from a detection that did not happen.
+    """
+    accepted = accepted_overlapping(decoded, event)
+    if not accepted:
+        raise RuntimeError(
+            f"No accepted sequence overlaps event {event} ({EVENT_LABELS[event]!r}); "
+            "the figure's titles and caption assume one. Re-read the data before "
+            "regenerating."
+        )
+    candidates = decoded["candidates"]
+    event_start, event_end = decoded["event_times"][event]
+    return float(
+        max(candidates.duration_s[i] for i in accepted) / (event_end - event_start)
+    )
+
+
+def outcome_title(decoded: dict, event: int, label: str) -> str:
+    """One-line panel title stating what the detector did, from the data."""
+    what = verdict(decoded, event)
+    if what == "found":
+        return f"{label}: {duration_ratio(decoded, event):.1f}x too long"
+    return f"{label}: {what}"
 
 
 def decoded_center_cm(decoded: dict) -> np.ndarray:
@@ -362,17 +407,60 @@ def decoded_center_cm(decoded: dict) -> np.ndarray:
 
 
 def local_fraction_of_event(decoded: dict, event: int) -> float:
-    """Share of the accepted event overlapping ``event`` that is local coding."""
-    candidates = decoded["candidates"]
-    event_start, event_end = decoded["event_times"][event]
-    for i in np.flatnonzero(candidates.is_replay):
-        start, stop = candidates.runs[i]
-        if (
-            decoded["midpoint_s"][start] < event_end
-            and event_start < decoded["midpoint_s"][stop]
-        ):
-            return local_fraction(decoded, i)
-    return float("nan")
+    """Share of the accepted event overlapping ``event`` that is local coding.
+
+    Over the longest accepted sequence, the one :func:`duration_ratio` reads.
+    """
+    accepted = accepted_overlapping(decoded, event)
+    if not accepted:
+        raise RuntimeError(f"No accepted sequence overlaps event {event}.")
+    longest = max(accepted, key=lambda i: decoded["candidates"].duration_s[i])
+    return local_fraction(decoded, longest)
+
+
+def best_dispersion_cm(decoded: dict, event: int) -> float:
+    """The largest dispersion any candidate overlapping ``event`` reached."""
+    dispersion = decoded["candidates"].dispersion_cm
+    return max(
+        (float(dispersion[i]) for i in candidates_overlapping(decoded, event)),
+        default=float("nan"),
+    )
+
+
+def check_caption_claims(decoded: dict, config: MemorylessSequenceConfig) -> None:
+    """Stop rather than write prose the panels contradict.
+
+    The caption commits to a verdict for each of the four zoomed events and to
+    the state-space detector reporting all of them. Each is read from the
+    data here; a threshold, seed or library change that moves one turns into
+    an error naming it instead of a caption that says the opposite of its
+    figure.
+    """
+    expected = {
+        CONTINUOUS_OUTBOUND_EVENT: "found",
+        SHORT_REPLAY_EVENT: "found",
+        SHORT_PATH_EVENT: "declined",
+        REMOTE_STATIONARY_EVENT: "declined",
+    }
+    for event, want in expected.items():
+        got = verdict(decoded, event)
+        if got != want:
+            raise RuntimeError(
+                f"The caption says the sliding-window detector {want} "
+                f"{EVENT_LABELS[event]!r}; the data say {got}. Rewrite the caption."
+            )
+    for event in (SHORT_PATH_EVENT, REMOTE_STATIONARY_EVENT):
+        if not best_dispersion_cm(decoded, event) < config.dispersion_threshold_cm:
+            raise RuntimeError(
+                f"The caption says {EVENT_LABELS[event]!r} was declined for too "
+                "little dispersion, but a candidate overlapping it clears the "
+                "threshold. Rewrite the caption."
+            )
+    if not np.isfinite(bound_error_ms(decoded, tuple(expected))):
+        raise RuntimeError(
+            "The caption says the state-space detector reports all four zoomed "
+            "events; it does not. Rewrite the caption."
+        )
 
 
 def local_fraction(decoded: dict, sequence: int, tolerance_cm: float = 15.0) -> float:
@@ -693,9 +781,13 @@ def plot_duration_bias(ax, summary: pd.DataFrame):
 def plot_absorption(ax, summary: pd.DataFrame):
     """The over-call against how far the replay sits from the animal's own place."""
     rows = summary[summary["summary"] == "median_by_distance_from_animal"]
-    order = [
-        bin_name for bin_name in DISTANCE_ORDER if bin_name in set(rows.distance_bin_cm)
-    ]
+    present = set(rows.distance_bin_cm)
+    if not present <= set(DISTANCE_ORDER):
+        raise ValueError(
+            f"The sweep summary holds distance bins {sorted(present - set(DISTANCE_ORDER))} "
+            "this panel does not know how to place; update DISTANCE_ORDER."
+        )
+    order = [bin_name for bin_name in DISTANCE_ORDER if bin_name in present]
     at = np.arange(len(order))
 
     def series(measure):
@@ -770,6 +862,7 @@ def make_figure(
 ):
     decoded = simulate_and_decode(n_neurons, config)
     decoded["state_space_intervals"] = state_space_intervals(decoded)
+    check_caption_claims(decoded, config)
 
     set_figure_defaults(context="paper")
     # this project's defaults turn constrained layout on, so the grid must not
@@ -784,18 +877,19 @@ def make_figure(
     plot_overview(ax_overview, decoded, config)
 
     # one line each, so these titles sit at the same height as every other
-    # row's and the panel letters can share one offset
+    # row's and the panel letters can share one offset; the verdict in each
+    # is read from the data
     outcomes = (
-        (0, f"continuous replay: {duration_ratio(decoded, 0):.1f}x too long"),
-        (7, f"80 ms replay: {duration_ratio(decoded, 7):.1f}x too long"),
-        (6, "30 cm path: missed"),
-        (5, "remote place, held still: declined"),
+        (CONTINUOUS_OUTBOUND_EVENT, "continuous replay"),
+        (SHORT_REPLAY_EVENT, "80 ms replay"),
+        (SHORT_PATH_EVENT, "30 cm path"),
+        (REMOTE_STATIONARY_EVENT, "remote place, held still"),
     )
     zooms = []
-    for column, (event, title) in enumerate(outcomes):
+    for column, (event, label) in enumerate(outcomes):
         ax = fig.add_subplot(grid[1, 2 * column : 2 * column + 2])
         plot_event(ax, decoded, event, config)
-        ax.set_title(title, fontsize=5.5)
+        ax.set_title(outcome_title(decoded, event, label), fontsize=5.5)
         if column:
             ax.set_yticklabels([])
         zooms.append(ax)
@@ -852,7 +946,9 @@ def rewrap(text: str, width: int = 79) -> str:
     )
 
 
-def write_caption(decoded: dict, summary: pd.DataFrame, path: Path) -> None:
+def write_caption(
+    decoded: dict, summary: pd.DataFrame, config: MemorylessSequenceConfig, path: Path
+) -> None:
     """Save the caption beside the figure, with its numbers read from the data.
 
     The figure itself carries almost no words, which is what a paper figure
@@ -892,15 +988,22 @@ the axis are the events each detector reports and the candidates the
 sliding-window detector rejected.
 
 **(b-e)** Four events, with the posterior in grey. The sliding-window
-detector finds the continuous replay and gives it {duration_ratio(decoded, 0):.1f}
-times its true length, because {100 * local_fraction_of_event(decoded, 0):.0f}%
+detector finds the continuous replay and gives it
+{duration_ratio(decoded, CONTINUOUS_OUTBOUND_EVENT):.1f} times its true length,
+because {100 * local_fraction_of_event(decoded, CONTINUOUS_OUTBOUND_EVENT):.0f}%
 of the event it reports is the animal's own place, absorbed by the merge rule.
-It also finds the 80 ms replay and reports it {duration_ratio(decoded, 7):.1f}
-times too long, this time with no local coding in it at all: the window alone
-puts a floor under any duration it can report. It misses the 30 cm replay and declines the remote stationary
-event, both for too little dispersion. The state-space detector reports all
-four, with every bound within {bound_error_ms(decoded, (0, 7, 6, 5)):.0f} ms of
-the truth.
+It also finds the 80 ms replay and reports it
+{duration_ratio(decoded, SHORT_REPLAY_EVENT):.1f} times too long, with
+{100 * local_fraction_of_event(decoded, SHORT_REPLAY_EVENT):.0f}% local coding
+in it: the window alone puts a floor under any duration it can report. It
+assembles a candidate from the 30 cm replay and another from the remote
+stationary event and declines both for too little dispersion
+({best_dispersion_cm(decoded, SHORT_PATH_EVENT):.0f} and
+{best_dispersion_cm(decoded, REMOTE_STATIONARY_EVENT):.0f} cm against the
+{config.dispersion_threshold_cm:.0f} cm it requires). The state-space detector
+reports all four, with every bound within
+{bound_error_ms(decoded, (CONTINUOUS_OUTBOUND_EVENT, SHORT_REPLAY_EVENT, SHORT_PATH_EVENT, REMOTE_STATIONARY_EVENT)):.0f} ms
+of the truth.
 
 **(f-i) {int(overall["n_cells"])} replays of chosen shape.** Made-up
 replays were written into the spike trains of a simulated linear-track
@@ -988,7 +1091,7 @@ def main() -> None:
     save_figure("memoryless_comparison", base_dir=args.output_dir)
     plt.close(fig)
     write_caption(
-        decoded, summary, args.output_dir / "memoryless_comparison_caption.md"
+        decoded, summary, config, args.output_dir / "memoryless_comparison_caption.md"
     )
 
     candidates = decoded["candidates"]

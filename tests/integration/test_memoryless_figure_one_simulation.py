@@ -11,15 +11,26 @@ It scores each window on posterior spread and on the jump to the next window,
 and it carries no competing hypothesis for the animal's own position. Local
 coding is smooth, narrow and slow, so it passes every window criterion and is
 assembled into the same sequence as the replay that follows it.
+
+The fixture is the recording the supplemental figure draws
+(``scripts/figures/generate_memoryless_comparison.py``): the package's five
+events plus a remote stationary event, a 30 cm replay and an 80 ms replay,
+in that order. Both detectors read one encoding model, fitted by the
+state-space detector, as the figure and the sweep do.
 """
 
+import os
 from dataclasses import dataclass
+
+os.environ.setdefault("JAX_PLATFORMS", "cpu")
 
 import numpy as np
 import pytest
+from non_local_detector import NonLocalSortedSpikesDetector
 from non_local_detector.environment import Environment
-from non_local_detector.likelihoods.sorted_spikes_kde import (
-    fit_sorted_spikes_kde_encoding_model,
+from non_local_detector.simulate.sorted_spikes_simulation import (
+    SAMPLING_FREQUENCY,
+    TRACK_HEIGHT,
 )
 
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import (
@@ -30,29 +41,56 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import
     detect_candidate_sequences,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
+    ENCODING_KEY,
     interior_bin_distances_cm,
     sorted_spikes_epoch_log_likelihood,
     window_midpoints_s,
+)
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation import (
+    InjectedReplay,
+    inject_replay,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
     aggregate_windows,
     normalize_windows,
 )
+from continuum_swr_replay.parameters import LOCAL_POSITION_STD
+
+pytestmark = pytest.mark.integration
 
 DECODE_BIN_STRIDE = 3
 """Figure 1 strides the 1500 Hz simulation to the project's 500 Hz decode grid."""
 
 CONTINUOUS_OUTBOUND, FRAGMENTED, CONTINUOUS_INBOUND, NO_SPIKE, LOCAL = range(5)
-REMOTE_STATIONARY = 5
-"""A place held still, away from the animal. Added here; the package has none."""
+REMOTE_STATIONARY, SHORT_PATH, SHORT_REPLAY = 5, 6, 7
+"""Events added here, in the order the figure adds them: a place held still
+away from the animal, a 30 cm replay, and an 80 ms replay."""
 
-TRACK_HEIGHT_CM = 170
+TRACK_HEIGHT_CM = float(TRACK_HEIGHT)
 REMOTE_STATIONARY_CM = 42.5
 REMOTE_STATIONARY_S = 0.300
 REMOTE_SPIKE_INTERVAL_S = 0.012
+SHORT_PATH_REPLAY = InjectedReplay(
+    start_cm=40.0, path_cm=30.0, duration_s=0.300, peak_rate_hz=40.0, at_s=20.50, seed=0
+)
+SHORT_REPLAY_REPLAY = InjectedReplay(
+    start_cm=35.0,
+    path_cm=100.0,
+    duration_s=0.080,
+    peak_rate_hz=120.0,
+    at_s=44.40,
+    seed=1,
+)
 CONFIG = MemorylessSequenceConfig(sampling_frequency=500.0)
 SAME_PLACE_CM = 15.0
 """How close a decoded center must be to count as the animal's own position."""
+
+NON_LOCAL_PROB_THRESHOLD = 0.8
+NON_LOCAL_MINIMUM_DURATION_S = 0.015
+"""The project's non-local event definition, as the figure applies it."""
+
+STATE_SPACE_BOUND_TOLERANCE_S = 0.050
+"""How far a state-space event bound may sit from the labeled one."""
 
 
 @dataclass
@@ -68,6 +106,33 @@ class Decoded:
     posterior: np.ndarray
     bin_distance_cm: np.ndarray
     window_speed: np.ndarray
+    state_space_intervals: list[tuple[float, float]]
+
+
+def state_space_intervals(
+    detector, time, position, spike_times
+) -> list[tuple[float, float]]:
+    """When the state-space detector calls the representation non-local."""
+    results = detector.predict(
+        position_time=time, position=position, spike_times=spike_times, time=time
+    )
+    probability = np.asarray(
+        results.acausal_state_probabilities.sel(
+            states=["Non-Local Continuous", "Non-Local Fragmented"]
+        )
+        .sum("states")
+        .values
+    ).squeeze()
+    assert np.isfinite(probability).all() and probability.max() > 0.0
+    above = probability > NON_LOCAL_PROB_THRESHOLD
+    edges = np.diff(above.astype(np.int8), prepend=0, append=0)
+    return [
+        (float(time[start]), float(time[stop]))
+        for start, stop in zip(
+            np.flatnonzero(edges == 1), np.flatnonzero(edges == -1) - 1, strict=True
+        )
+        if time[stop] - time[start] >= NON_LOCAL_MINIMUM_DURATION_S
+    ]
 
 
 @pytest.fixture(scope="module")
@@ -114,28 +179,40 @@ def decoded() -> Decoded:
     event_times = np.vstack([event_times, [remote_start_s, remote_end_s]])
     is_event |= (time >= remote_start_s) & (time <= remote_end_s)
 
+    # the two replays the figure injects, in its order
+    place_field_means = np.linspace(0, TRACK_HEIGHT_CM, len(spike_times))
+    for replay in (SHORT_PATH_REPLAY, SHORT_REPLAY_REPLAY):
+        spike_times, bounds = inject_replay(
+            spike_times,
+            place_field_means,
+            replay,
+            sampling_frequency=SAMPLING_FREQUENCY,
+        )
+        event_times = np.vstack([event_times, bounds])
+        is_event |= (time >= bounds[0]) & (time <= bounds[1])
+
     time, position, speed, is_event = (
         array[::DECODE_BIN_STRIDE] for array in (time, position, speed, is_event)
     )
-    environment = Environment(place_bin_size=CONFIG.place_bin_size_cm).fit_place_grid(
-        position[:, None]
-    )
 
     # encode on non-event data only: spikes inside an event must not shape the
-    # place fields they are later decoded against
+    # place fields they are later decoded against. The state-space detector
+    # fits the model and the sliding window is handed the same object.
     is_training = ~is_event
-    encoding_model = fit_sorted_spikes_kde_encoding_model(
-        position_time=time[is_training],
-        position=position[is_training, None],
-        spike_times=[
-            neuron[np.interp(neuron, time, is_training.astype(float)) > 0.5]
-            for neuron in spike_times
-        ],
-        environment=environment,
-        sampling_frequency=round(CONFIG.sampling_frequency),
-        position_std=6.0,
-        disable_progress_bar=True,
+    detector = NonLocalSortedSpikesDetector(
+        environments=[Environment(place_bin_size=CONFIG.place_bin_size_cm)],
+        sorted_spikes_algorithm="sorted_spikes_kde",
+        sorted_spikes_algorithm_params={"position_std": 6.0, "block_size": int(2**8)},
+        local_position_std=LOCAL_POSITION_STD,
     )
+    detector.fit(
+        position_time=time,
+        position=position,
+        spike_times=spike_times,
+        is_training=is_training,
+    )
+    encoding_model = detector.encoding_model_[ENCODING_KEY]
+    environment = encoding_model["environment"]
 
     result = sorted_spikes_epoch_log_likelihood(
         time, position, spike_times, encoding_model, CONFIG
@@ -164,6 +241,9 @@ def decoded() -> Decoded:
         posterior=posterior,
         bin_distance_cm=bin_distance_cm,
         window_speed=window_speed,
+        state_space_intervals=state_space_intervals(
+            detector, result.time, position[: result.time.size], spike_times
+        ),
     )
 
 
@@ -204,13 +284,36 @@ def local_fraction(decoded: Decoded, sequence: int) -> float:
     return float(np.mean(np.abs(center_cm - animal_cm) < SAME_PLACE_CM))
 
 
+def candidates_overlapping(decoded: Decoded, event: int) -> list[int]:
+    return [
+        i
+        for i in range(len(decoded.candidates.runs))
+        if event in events_overlapping(decoded, i)
+    ]
+
+
+def accepted_overlapping(decoded: Decoded, event: int) -> list[int]:
+    return [
+        i
+        for i in candidates_overlapping(decoded, event)
+        if decoded.candidates.is_replay[i]
+    ]
+
+
+def true_duration_s(decoded: Decoded, event: int) -> float:
+    return float(decoded.event_times[event, 1] - decoded.event_times[event, 0])
+
+
 class TestWhatItAccepts:
-    def test_both_continuous_replays_are_found_and_nothing_else_is(self, decoded):
+    def test_the_continuous_replays_and_the_short_replay_are_found_and_nothing_else_is(
+        self, decoded
+    ):
         accepted = np.flatnonzero(decoded.candidates.is_replay)
 
         assert [events_overlapping(decoded, s) for s in accepted] == [
             [CONTINUOUS_OUTBOUND],
             [CONTINUOUS_INBOUND],
+            [SHORT_REPLAY],
         ]
 
     def test_the_silent_and_local_events_are_not_accepted(self, decoded):
@@ -226,25 +329,36 @@ class TestWhatItAccepts:
         assert end_s - start_s < CONFIG.minimum_duration_s
 
 
+def absorbed_sequences(decoded: Decoded) -> list[int]:
+    """The accepted sequences that begin at the animal's own place: the two
+    continuous replays. The short replay is far from the animal and is
+    inflated by the window alone, which the next class covers."""
+    return [
+        i
+        for i in np.flatnonzero(decoded.candidates.is_replay)
+        if events_overlapping(decoded, i)[0]
+        in (CONTINUOUS_OUTBOUND, CONTINUOUS_INBOUND)
+    ]
+
+
 class TestLocalCodingIsAbsorbed:
     """The detector has no hypothesis that competes with a replay for a window."""
 
     def test_most_of_a_detected_event_lies_outside_the_event_it_found(self, decoded):
         """The measure that needs no "same place" judgement."""
-        for sequence in np.flatnonzero(decoded.candidates.is_replay):
+        for sequence in absorbed_sequences(decoded):
             assert fraction_outside_its_event(decoded, sequence) > 0.7
 
     def test_an_accepted_event_runs_far_longer_than_the_replay_in_it(self, decoded):
-        for sequence in np.flatnonzero(decoded.candidates.is_replay):
+        for sequence in absorbed_sequences(decoded):
             event = events_overlapping(decoded, sequence)[0]
-            true_duration_s = float(
-                decoded.event_times[event, 1] - decoded.event_times[event, 0]
+
+            assert decoded.candidates.duration_s[sequence] > 3 * true_duration_s(
+                decoded, event
             )
 
-            assert decoded.candidates.duration_s[sequence] > 3 * true_duration_s
-
     def test_most_of_an_accepted_event_decodes_the_animal_s_own_position(self, decoded):
-        for sequence in np.flatnonzero(decoded.candidates.is_replay):
+        for sequence in absorbed_sequences(decoded):
             assert local_fraction(decoded, sequence) > 0.5
 
     def test_the_local_measure_does_not_turn_on_the_tolerance(self, decoded):
@@ -296,17 +410,108 @@ class TestLocalCodingIsAbsorbed:
             replace(CONFIG, merge_gap_s=1e-6, merge_gap_cm=1e-6),
         )
 
-        merged_duration_s = decoded.candidates.duration_s[
-            np.flatnonzero(decoded.candidates.is_replay)
-        ]
-        unmerged_duration_s = unmerged.duration_s[np.flatnonzero(unmerged.is_replay)]
-        assert unmerged_duration_s.size == merged_duration_s.size
+        absorbed = absorbed_sequences(decoded)
+        merged_duration_s = decoded.candidates.duration_s[absorbed]
+        unmerged_duration_s = np.array(
+            [
+                max(
+                    unmerged.duration_s[i]
+                    for i in np.flatnonzero(unmerged.is_replay)
+                    if unmerged.midpoint_s[unmerged.runs[i][0]]
+                    < decoded.event_times[events_overlapping(decoded, sequence)[0], 1]
+                    and decoded.event_times[events_overlapping(decoded, sequence)[0], 0]
+                    < unmerged.midpoint_s[unmerged.runs[i][1]]
+                )
+                for sequence in absorbed
+            ]
+        )
         assert (unmerged_duration_s < 0.5 * merged_duration_s).all()
+        assert decoded.candidates.pieces[absorbed[0]].size > 1
+
+
+class TestTheWindowPutsAFloorUnderDuration:
+    """An 80 ms replay far from the animal: found, and reported too long with
+    no local coding in it. This is the other inflation mechanism, from the
+    window alone rather than from absorption."""
+
+    def test_it_is_found(self, decoded):
+        assert accepted_overlapping(decoded, SHORT_REPLAY)
+
+    def test_it_is_reported_longer_than_it_is_but_not_absorbed(self, decoded):
+        sequence = accepted_overlapping(decoded, SHORT_REPLAY)[0]
+        ratio = decoded.candidates.duration_s[sequence] / true_duration_s(
+            decoded, SHORT_REPLAY
+        )
+
+        assert 1.0 < ratio < 2.0
+        assert decoded.candidates.pieces[sequence].size == 1
+
+    def test_none_of_it_is_the_animal_s_own_place(self, decoded):
+        sequence = accepted_overlapping(decoded, SHORT_REPLAY)[0]
+
+        assert local_fraction(decoded, sequence) == 0.0
+
+
+class TestAShortPathIsDeclined:
+    """A 30 cm replay, decoded well, declined by the dispersion criterion: a
+    uniform traverse of length L has dispersion L / sqrt(12), so 12 cm needs
+    about 42 cm of path however well the event is decoded."""
+
+    def test_it_becomes_a_candidate_that_is_not_accepted(self, decoded):
+        assert candidates_overlapping(decoded, SHORT_PATH)
+        assert not accepted_overlapping(decoded, SHORT_PATH)
+
+    def test_every_candidate_falls_short_on_dispersion_not_duration(self, decoded):
+        candidates = decoded.candidates
+        for i in candidates_overlapping(decoded, SHORT_PATH):
+            assert candidates.dispersion_cm[i] < CONFIG.dispersion_threshold_cm
         assert (
-            decoded.candidates.pieces[
-                np.flatnonzero(decoded.candidates.is_replay)[0]
-            ].size
-            > 1
+            max(
+                candidates.duration_s[i]
+                for i in candidates_overlapping(decoded, SHORT_PATH)
+            )
+            > CONFIG.minimum_duration_s
+        )
+
+    def test_its_windows_pass_the_spread_gate(self, decoded):
+        """Not a failure to decode."""
+        event_start, event_end = decoded.event_times[SHORT_PATH]
+        inside = (decoded.midpoint_s >= event_start) & (decoded.midpoint_s <= event_end)
+
+        assert (
+            decoded.candidates.decisions.gates.spread_below_threshold[inside].mean()
+            > 0.8
+        )
+
+
+class TestTheStateSpaceDetectorFindsAllFour:
+    """The comparison needs every event the sliding window mis-reports to be an
+    event some detector finds, or the figure shows the limits of the data."""
+
+    @pytest.mark.parametrize(
+        "event", [CONTINUOUS_OUTBOUND, SHORT_REPLAY, SHORT_PATH, REMOTE_STATIONARY]
+    )
+    def test_it_reports_the_event_with_both_bounds_close(self, decoded, event):
+        event_start, event_end = decoded.event_times[event]
+        overlapping = [
+            (a, b)
+            for a, b in decoded.state_space_intervals
+            if a < event_end and event_start < b
+        ]
+
+        assert overlapping
+        assert abs(overlapping[0][0] - event_start) < STATE_SPACE_BOUND_TOLERANCE_S
+        assert abs(overlapping[-1][1] - event_end) < STATE_SPACE_BOUND_TOLERANCE_S
+
+    def test_it_does_not_report_the_silent_stretch(self, decoded):
+        """The package's "local" entry is a zero-width marker at the pause the
+        remote stationary event was spliced into, so it is not a negative
+        control here; the silent stretch is."""
+        event_start, event_end = decoded.event_times[NO_SPIKE]
+
+        assert not any(
+            a < event_end + 0.02 and event_start - 0.02 < b
+            for a, b in decoded.state_space_intervals
         )
 
 

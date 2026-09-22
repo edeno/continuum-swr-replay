@@ -52,6 +52,8 @@ EPOCH_S = 1.6
 REPLAY_START_S = 0.4
 CONFIG = MemorylessSequenceConfig(sampling_frequency=float(SAMPLING_FREQUENCY))
 
+pytestmark = pytest.mark.integration
+
 SLOW_SPEEDUP = 25.0
 """375 cm/s: below the speed the spread criterion can follow."""
 
@@ -246,7 +248,14 @@ class TestContinuousReplay:
             < slow_continuous.midpoint_s[start]
             <= REPLAY_START_S
         )
-        assert slow_continuous.midpoint_s[stop] > replay_end_s - 0.050
+        # bounded from both sides: it must not run on into the silence after
+        # the replay, where the ground process still gives every window a
+        # center at one place
+        assert (
+            replay_end_s - 0.050
+            < slow_continuous.midpoint_s[stop]
+            <= replay_end_s + CONFIG.window_duration_s
+        )
 
     def test_the_decoded_path_follows_the_simulated_one(
         self, simulation, slow_continuous
@@ -350,16 +359,29 @@ class TestReplaySpeedLimit:
         found = detect(simulation, *continuous(FAST_SPEEDUP)).candidates
 
         assert not found.is_replay.any()
+        assert found.decisions.gates.posterior_usable.all()
         assert found.decisions.gates.spread_below_threshold.any()
 
 
 class TestSilence:
-    def test_an_epoch_with_no_spikes_yields_nothing(self, simulation):
-        found = detect(
+    @pytest.fixture(scope="class")
+    def silent(self, simulation):
+        return detect(
             simulation,
             np.arange(10) / SAMPLING_FREQUENCY,
             np.full((10, 4, N_ELECTRODES), np.nan),
         ).candidates
 
-        assert found.runs.shape == (0, 2)
-        assert not found.decisions.gates.kept.any()
+    def test_an_epoch_with_no_spikes_yields_nothing(self, silent):
+        assert silent.runs.shape == (0, 2)
+        assert not silent.decisions.gates.kept.any()
+
+    def test_silence_is_rejected_by_the_spread_gate_alone(self, silent):
+        """Every silent window has a center, all at one place, because the
+        ground process gives silence a spatially varying likelihood. Only the
+        spread gate stands between that and a stationary run; a more peaked
+        ground process could pass it. Recorded so the mechanism is on file."""
+        gates = silent.decisions.gates
+
+        assert gates.has_center.all()
+        assert not gates.spread_below_threshold.any()
