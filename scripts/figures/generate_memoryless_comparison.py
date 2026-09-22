@@ -75,7 +75,6 @@ EVENT_LABELS = [
     "local",
     "remote\nstationary",
     "short path\n30 cm",
-    "brief pause",
 ]
 
 FIELD_STD_CM = np.sqrt(12.5)
@@ -86,16 +85,6 @@ SHORT_PATH = (40.0, 30.0, 0.300, 40.0, 20.50)
 
 A replay that travels only 30 cm. The detector decodes it well, but the
 dispersion criterion needs a path of about 42 cm, so it rejects the candidate.
-"""
-
-PAUSED_PATH = (40.0, 30.0, 0.100, 0.060, 40.0, 44.40)
-"""start_cm, piece_cm, piece_s, pause_s, peak_rate_hz, time.
-
-A replay that travels 60 cm in two halves, with a short silence between them.
-The merge rule joins two runs only when less than 50 ms separates them. With a
-40 ms pause the detector finds this replay and gives it a dispersion of about
-17 cm. With a 60 ms pause it keeps the halves apart, and neither half travels
-far enough on its own.
 """
 
 NON_LOCAL_PROB_THRESHOLD = 0.8
@@ -214,23 +203,6 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
     )
     event_times = np.vstack([event_times, bounds])
     is_event |= (time >= bounds[0]) & (time <= bounds[1])
-
-    # one replay in two halves: the same path, broken by a silence
-    start_cm, piece_cm, piece_s, pause_s, rate_hz, at_s = PAUSED_PATH
-    for half in (0, 1):
-        spike_times, _ = inject_replay(
-            spike_times,
-            place_field_means,
-            start_cm + half * piece_cm,
-            piece_cm,
-            piece_s,
-            rate_hz,
-            at_s + half * (piece_s + pause_s),
-            seed=1 + half,
-        )
-    paused_bounds = (at_s, at_s + 2 * piece_s + pause_s)
-    event_times = np.vstack([event_times, paused_bounds])
-    is_event |= (time >= paused_bounds[0]) & (time <= paused_bounds[1])
 
     time, position, speed, is_event = (
         array[::DECODE_BIN_STRIDE] for array in (time, position, speed, is_event)
@@ -578,7 +550,6 @@ def plot_criterion_space(ax, decoded: dict, config: MemorylessSequenceConfig) ->
         0: ("continuous replay", VERMILION),
         2: ("continuous replay", VERMILION),
         6: ("short path, 30 cm", BLUE),
-        7: ("paused replay, each half", GREEN),
         5: ("remote place", PURPLE),
     }
     seen = set()
@@ -610,7 +581,7 @@ def plot_criterion_space(ax, decoded: dict, config: MemorylessSequenceConfig) ->
     ax.set_xlabel("event duration (s)")
     ax.set_ylabel("dispersion (cm)")
     ax.set_title(
-        "every candidate sequence against the two criteria that accept it",
+        "candidates against the two criteria that accept them",
         fontsize=5.5,
     )
     ax.legend(
@@ -623,7 +594,7 @@ def plot_criterion_space(ax, decoded: dict, config: MemorylessSequenceConfig) ->
     )
     ax.text(
         0.104,
-        54,
+        22,
         "minimum\nduration",
         fontsize=5,
         color="0.45",
@@ -640,17 +611,6 @@ def plot_criterion_space(ax, decoded: dict, config: MemorylessSequenceConfig) ->
         ha="right",
         va="bottom",
     )
-    ax.annotate(
-        "join these two and the replay is found:\nwith a 40 ms pause it reaches 17 cm",
-        xy=(0.28, 5.0),
-        xytext=(0.5, 28),
-        fontsize=5,
-        color="0.35",
-        ha="left",
-        va="center",
-        linespacing=1.3,
-        arrowprops={"arrowstyle": "-", "lw": 0.5, "color": "0.6"},
-    )
 
 
 def make_figure(n_neurons: int, config: MemorylessSequenceConfig):
@@ -664,7 +624,7 @@ def make_figure(n_neurons: int, config: MemorylessSequenceConfig):
         figsize=(TWO_COLUMN, TWO_COLUMN * 0.82), dpi=450, constrained_layout=True
     )
     fig.set_constrained_layout_pads(w_pad=0.02, h_pad=0.02, wspace=0.05, hspace=0.09)
-    grid = GridSpec(3, 4, figure=fig, height_ratios=[1.0, 1.15, 0.95])
+    grid = GridSpec(3, 6, figure=fig, height_ratios=[1.0, 1.15, 0.95])
 
     ax_overview = fig.add_subplot(grid[0, :])
     plot_overview(ax_overview, decoded, config)
@@ -672,12 +632,11 @@ def make_figure(n_neurons: int, config: MemorylessSequenceConfig):
     outcomes = (
         (0, "continuous replay", "found, but 5.8x too long"),
         (6, "short path, 30 cm", "missed: the path is too short"),
-        (7, "one replay, paused for 60 ms", "missed: the halves do not join"),
         (5, "remote place, held still", "declined: it does not travel"),
     )
     zooms = []
     for column, (event, name, outcome) in enumerate(outcomes):
-        ax = fig.add_subplot(grid[1, column])
+        ax = fig.add_subplot(grid[1, 2 * column : 2 * column + 2])
         plot_event(ax, decoded, event, config)
         ax.set_title(f"{name}\n{outcome}", fontsize=5.5, linespacing=1.4)
         if column:
@@ -685,7 +644,7 @@ def make_figure(n_neurons: int, config: MemorylessSequenceConfig):
         zooms.append(ax)
     zooms[0].set_ylabel("position (cm)")
 
-    ax_criteria = fig.add_subplot(grid[2, 1:3])
+    ax_criteria = fig.add_subplot(grid[2, 2:4])
     plot_criterion_space(ax_criteria, decoded, config)
 
     label_panels([ax_overview, *zooms, ax_criteria], xpos=-0.08, ypos=1.12)
