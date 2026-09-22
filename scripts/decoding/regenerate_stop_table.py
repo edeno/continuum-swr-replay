@@ -34,7 +34,6 @@ from continuum_swr_replay.analysis.replay.prepare_data import find_sessions
 from continuum_swr_replay.analysis.replay.tables_stop import (  # noqa: E402
     add_nonlocal_swr_split,
 )
-from continuum_swr_replay.data_loaders import load_data  # noqa: E402
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
 from continuum_swr_replay.session_keys import session_key_set
 from continuum_swr_replay.table_io import (
@@ -54,6 +53,10 @@ RC = PROCESSED_DATA_DIR / "replay_content"
 
 def build_one(session: dict) -> pd.DataFrame | None:
     """Load dot + trials for one session and build its stop table."""
+    # imported here: loading data needs Spyglass, and the module's guards
+    # must import without it
+    from continuum_swr_replay.data_loaders import load_data
+
     dot = pd.read_pickle(session["dot_file"])
     data = load_data(
         session["nwb_file_name"],
@@ -68,9 +71,7 @@ def build_one(session: dict) -> pd.DataFrame | None:
     return build_stop_table(dot, trials, port_experiences, track_graph)
 
 
-def _assert_matches_event_table(
-    stop: pd.DataFrame, event_table: pd.DataFrame
-) -> None:
+def _assert_matches_event_table(stop: pd.DataFrame, event_table: pd.DataFrame) -> None:
     """Refuse to write a stop table that does not cover the event table's scope.
 
     ``stop_id`` is the join key for every stop-level covariate, and the whole
