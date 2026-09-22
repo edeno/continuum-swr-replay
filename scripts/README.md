@@ -7,6 +7,9 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
 ## `decoding/` — produce the decoded data + event/stop tables
 - `run_decoding_bandit.py` — continuum decoding for the bandit task (HPC/mPFC/OFC).
 - `run_decoding_contfrag.py` — decoding for the ContFrag (SWR/MUA) event sources.
+- `run_memoryless_detection.py` — the Widloski & Foster sliding-window detector
+  on each HPC epoch's saved decode, with its encoding-pair shuffle; one row per
+  candidate sequence (spec 02). Needs the Spyglass database for the marks.
 - `prepare_replay_content_data.py` — build the canonical replay-content tables
   (event / event-arm / event-patch / event-sequence / stop) across all sessions.
 - `regenerate_stop_table.py` — rebuild the per-stop immobility table.
