@@ -20,15 +20,15 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.inventory_comparison.intervals import contains
 from continuum_swr_replay.analysis.inventory_comparison.overlap import Coverage
+from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 
 __all__ = ["FRAGMENT_GAPS_S", "merge_fragments"]
 
 FRAGMENT_GAPS_S = (0.0, 0.010, 0.020, 0.050)
 """The stated grid of merge gaps, in seconds."""
 
-SESSION = ["animal", "day", "epoch"]
 COLUMNS = [
-    *SESSION,
+    *SESSION_COLUMNS_DAY,
     "detector",
     "event_key",
     "event_start_s",
@@ -71,7 +71,9 @@ def merge_fragments(
     """
     kept = inventory[inventory.detector != detector].assign(n_fragments=1)
     merged = [kept[[c for c in COLUMNS if c != "interval_span_s"]]]
-    for session, group in inventory[inventory.detector == detector].groupby(SESSION):
+    for session, group in inventory[inventory.detector == detector].groupby(
+        list(SESSION_COLUMNS_DAY)
+    ):
         group = group.sort_values("event_start_s")
         start = group.event_start_s.to_numpy()
         end = group.event_end_s.to_numpy()
@@ -95,7 +97,10 @@ def merge_fragments(
                 event_end_s=("event_end_s", "max"),
                 n_fragments=("event_key", "size"),
             )
-            .assign(**dict(zip(SESSION, session, strict=True)), detector=detector)
+            .assign(
+                **dict(zip(SESSION_COLUMNS_DAY, session, strict=True)),
+                detector=detector,
+            )
         )
     out = pd.concat(merged, ignore_index=True)
     out["interval_span_s"] = out.event_end_s - out.event_start_s

@@ -30,6 +30,7 @@ from continuum_swr_replay.analysis.inventory_comparison.intervals import (
     union,
 )
 from continuum_swr_replay.analysis.inventory_comparison.overlap import Coverage
+from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 
 __all__ = [
     "CELL_DTYPES",
@@ -37,8 +38,6 @@ __all__ = [
     "membership_against",
     "no_detector_time",
 ]
-
-SESSION = ["animal", "day", "epoch"]
 
 CELL_DTYPES: Mapping[str, object] = MappingProxyType(
     {
@@ -102,7 +101,8 @@ def membership_against(
                 f"{source} must be tested against a detector other than itself."
             )
     events = inventory.loc[
-        inventory.detector.isin(sources), [*SESSION, "detector", "event_key"]
+        inventory.detector.isin(sources),
+        [*SESSION_COLUMNS_DAY, "detector", "event_key"],
     ]
     relevant = matches[matches.other_detector.isin(against)]
     tally = relevant.groupby("event_key").agg(
@@ -156,13 +156,16 @@ def no_detector_time(
             ],
         )
         mask = inventory.detector.isin(detectors) & np.logical_and.reduce(
-            [inventory[c] == v for c, v in zip(SESSION, session, strict=True)]
+            [
+                inventory[c] == v
+                for c, v in zip(SESSION_COLUMNS_DAY, session, strict=True)
+            ]
         )
         found = union(inventory.loc[mask, ["event_start_s", "event_end_s"]].to_numpy())
         shared_s = total_duration(shared)
         detected_s = total_duration(intersect(found, shared))
         rows.append(
-            dict(zip(SESSION, session, strict=True))
+            dict(zip(SESSION_COLUMNS_DAY, session, strict=True))
             | {
                 "shared_exposure_s": shared_s,
                 "available": shared_s > 0,

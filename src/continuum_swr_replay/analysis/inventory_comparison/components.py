@@ -16,9 +16,9 @@ import pandas as pd
 from scipy.sparse import coo_array
 from scipy.sparse.csgraph import connected_components
 
-__all__ = ["COMPONENT_DTYPES", "overlap_components"]
+from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 
-SESSION = ["animal", "day", "epoch"]
+__all__ = ["COMPONENT_DTYPES", "overlap_components"]
 
 COMPONENT_DTYPES: Mapping[str, object] = MappingProxyType(
     {
@@ -62,7 +62,7 @@ def overlap_components(
 
     """
     events = inventory.sort_values(
-        SESSION + ["event_start_s", "event_key"]
+        [*SESSION_COLUMNS_DAY, "event_start_s", "event_key"]
     ).reset_index(drop=True)
     position = pd.Series(np.arange(len(events)), index=events.event_key)
     graph = coo_array(
@@ -83,19 +83,19 @@ def overlap_components(
     first_seen[pd.unique(label)] = np.arange(len(pd.unique(label)))
     ordinal = pd.Series(first_seen[label])
     events["component_id"] = ordinal - ordinal.groupby(
-        [events[c] for c in SESSION]
+        [events[c] for c in SESSION_COLUMNS_DAY]
     ).transform("min")
 
     pair_component = events.set_index("event_key").component_id.loc[pairs.event_key_a]
     n_pairs = (
         pd.DataFrame(
-            {c: pairs[c].to_numpy() for c in SESSION}
+            {c: pairs[c].to_numpy() for c in SESSION_COLUMNS_DAY}
             | {"component_id": pair_component.to_numpy()}
         )
-        .groupby(SESSION + ["component_id"])
+        .groupby([*SESSION_COLUMNS_DAY, "component_id"])
         .size()
     )
-    grouped = events.groupby(SESSION + ["component_id"])
+    grouped = events.groupby([*SESSION_COLUMNS_DAY, "component_id"])
     components = pd.DataFrame(
         {
             "n_events": grouped.size(),

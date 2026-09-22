@@ -35,6 +35,7 @@ from continuum_swr_replay.analysis.inventory_comparison.intervals import (
     total_duration,
     union,
 )
+from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 
 __all__ = [
     "DIRECTIONAL_DTYPES",
@@ -48,8 +49,6 @@ __all__ = [
     "remove_bridging_events",
     "time_coverage",
 ]
-
-SESSION = ("animal", "day", "epoch")
 
 PAIR_DTYPES: Mapping[str, object] = MappingProxyType(
     {
@@ -161,7 +160,7 @@ def _sessions(inventory: pd.DataFrame, coverage: CoverageMap) -> dict[tuple, lis
     detectors: dict[tuple, set[str]] = {}
     for *session, detector in coverage:
         detectors.setdefault(tuple(session), set()).add(detector)
-    for key, group in inventory.groupby(list(SESSION), sort=False):
+    for key, group in inventory.groupby(list(SESSION_COLUMNS_DAY), sort=False):
         for detector in group.detector.unique():
             if detector not in detectors.get(tuple(key), set()):
                 raise ValueError(
@@ -174,7 +173,7 @@ def _events(inventory: pd.DataFrame, session: tuple, detector: str) -> pd.DataFr
     mask = (inventory.detector == detector) & np.logical_and.reduce(
         [
             inventory[column] == value
-            for column, value in zip(SESSION, session, strict=True)
+            for column, value in zip(SESSION_COLUMNS_DAY, session, strict=True)
         ]
     )
     return inventory[mask]
@@ -203,7 +202,8 @@ def remove_bridging_events(
     adjusted = dict(coverage)
     bridging = np.zeros(len(inventory), dtype=bool)
     for (session, detector), group in inventory.groupby(
-        [inventory[list(SESSION)].apply(tuple, axis=1), "detector"], sort=False
+        [inventory[list(SESSION_COLUMNS_DAY)].apply(tuple, axis=1), "detector"],
+        sort=False,
     ):
         own = coverage.get((*session, detector))
         if own is None:
@@ -229,7 +229,7 @@ def overlap_pairs(inventory: pd.DataFrame) -> pd.DataFrame:
     Within each epoch only. Returns columns and dtypes as ``PAIR_DTYPES``.
     """
     rows = []
-    for session, group in inventory.groupby(list(SESSION), sort=False):
+    for session, group in inventory.groupby(list(SESSION_COLUMNS_DAY), sort=False):
         for detector_a, detector_b in combinations(sorted(group.detector.unique()), 2):
             a = group[group.detector == detector_a]
             b = group[group.detector == detector_b]
@@ -242,7 +242,7 @@ def overlap_pairs(inventory: pd.DataFrame) -> pd.DataFrame:
                 shared = inter[i, j]
                 span_a, span_b = a_end[i] - a_start[i], b_end[j] - b_start[j]
                 rows.append(
-                    dict(zip(SESSION, session, strict=True))
+                    dict(zip(SESSION_COLUMNS_DAY, session, strict=True))
                     | {
                         "detector_a": detector_a,
                         "event_key_a": a.event_key.iloc[i],
@@ -297,7 +297,7 @@ def event_matches(
             for key, inside in zip(source.event_key, within, strict=True):
                 n = counterparts.get((key, other), 0)
                 rows.append(
-                    dict(zip(SESSION, session, strict=True))
+                    dict(zip(SESSION_COLUMNS_DAY, session, strict=True))
                     | {
                         "detector": detector,
                         "event_key": key,
@@ -337,7 +337,10 @@ def directional_agreement(
                 (matches.detector == source)
                 & (matches.other_detector == target)
                 & np.logical_and.reduce(
-                    [matches[c] == v for c, v in zip(SESSION, session, strict=True)]
+                    [
+                        matches[c] == v
+                        for c, v in zip(SESSION_COLUMNS_DAY, session, strict=True)
+                    ]
                 )
             ]
             eligible = these[these.within_shared_exposure]
@@ -345,7 +348,7 @@ def directional_agreement(
             n_matched = int(eligible.matched.sum())
             available = shared > 0
             rows.append(
-                dict(zip(SESSION, session, strict=True))
+                dict(zip(SESSION_COLUMNS_DAY, session, strict=True))
                 | {
                     "source_detector": source,
                     "target_detector": target,
@@ -385,7 +388,7 @@ def time_coverage(inventory: pd.DataFrame, coverage: CoverageMap) -> pd.DataFram
             inter_s = total_duration(intersect(intersect(a, b), shared))
             available = shared_s > 0
             rows.append(
-                dict(zip(SESSION, session, strict=True))
+                dict(zip(SESSION_COLUMNS_DAY, session, strict=True))
                 | {
                     "detector_a": detector_a,
                     "detector_b": detector_b,

@@ -27,6 +27,7 @@ from continuum_swr_replay.analysis.inventory_comparison.intervals import (
     intersect,
 )
 from continuum_swr_replay.analysis.inventory_comparison.overlap import Coverage
+from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 
 __all__ = [
     "LABEL_DTYPES",
@@ -38,7 +39,6 @@ __all__ = [
     "swr_labels",
 ]
 
-SESSION = ["animal", "day", "epoch"]
 LABEL = {"matched": "SWR", "unmatched": "non-SWR", "unknown": "unknown"}
 
 LABEL_DTYPES: Mapping[str, object] = MappingProxyType(
@@ -123,7 +123,7 @@ def swr_labels(
     empty = np.empty((0, 2))
     events = inventory[inventory.detector.isin(cohorts)]
     in_matrix = np.zeros(len(events), dtype=bool)
-    for (*session, cohort), group in events.groupby([*SESSION, "detector"]):
+    for (*session, cohort), group in events.groupby([*SESSION_COLUMNS_DAY, "detector"]):
         shared = reduce(
             intersect,
             [
@@ -136,7 +136,7 @@ def swr_labels(
         )
     base = pd.DataFrame(
         {
-            **{c: events[c].to_numpy() for c in SESSION},
+            **{c: events[c].to_numpy() for c in SESSION_COLUMNS_DAY},
             "cohort": events.detector.to_numpy(),
             "event_key": events.event_key.to_numpy(),
             "in_matrix": in_matrix,
@@ -172,7 +172,7 @@ def swr_label_matrix(labels: pd.DataFrame) -> pd.DataFrame:
             is_swr=eligible & (labels.label == "SWR"),
             is_non_swr=eligible & (labels.label == "non-SWR"),
         )
-        .groupby([*SESSION, "cohort", "swr_definition"])
+        .groupby([*SESSION_COLUMNS_DAY, "cohort", "swr_definition"])
         .agg(
             n_events=("event_key", "size"),
             n_eligible=("in_matrix", "sum"),
@@ -234,7 +234,9 @@ def definition_disagreement(labels: pd.DataFrame) -> pd.DataFrame:
             n_non_swr=labels.label == "non-SWR",
             n_unknown=labels.label == "unknown",
         )
-        .groupby([*SESSION, "cohort", "event_key"])[["n_swr", "n_non_swr", "n_unknown"]]
+        .groupby([*SESSION_COLUMNS_DAY, "cohort", "event_key"])[
+            ["n_swr", "n_non_swr", "n_unknown"]
+        ]
         .sum()
         .astype(np.int64)
         .reset_index()
