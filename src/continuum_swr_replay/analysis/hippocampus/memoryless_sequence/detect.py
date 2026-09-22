@@ -90,6 +90,12 @@ def _is_above(value: NDArray, threshold: float) -> NDArray:
     )
 
 
+def _freeze(instance: Any, **values: Any) -> None:
+    """Store coerced values on a frozen dataclass, which cannot assign them itself."""
+    for name, value in values.items():
+        object.__setattr__(instance, name, value)
+
+
 def _as_window_arrays(instance: Any, dtype: type) -> None:
     """Coerce every array field to ``dtype`` and require one shared 1-D shape."""
     shapes = {}
@@ -185,9 +191,7 @@ class WindowDecisions:
                 "center_index and gates.has_center disagree about which windows "
                 "have a center."
             )
-        object.__setattr__(self, "center_index", center)
-        object.__setattr__(self, "spread_cm", spread)
-        object.__setattr__(self, "jump_cm", jump)
+        _freeze(self, center_index=center, spread_cm=spread, jump_cm=jump)
 
 
 @dataclass(frozen=True, eq=False)
@@ -236,10 +240,7 @@ class SequenceAssembly:
                     f"Sequence {run.tolist()} is not bounded by the pre-merge runs "
                     f"it lists as its pieces, {piece.tolist()}."
                 )
-        object.__setattr__(self, "runs", runs)
-        object.__setattr__(self, "pieces", pieces)
-        object.__setattr__(self, "pre_merge_runs", pre_merge)
-        object.__setattr__(self, "kept", kept)
+        _freeze(self, runs=runs, pieces=pieces, pre_merge_runs=pre_merge, kept=kept)
 
 
 def apply_speed_gate(
@@ -424,9 +425,6 @@ def merge_runs(
             "A run endpoint has no center; runs must be built from windows that "
             "survived the gates."
         )
-    if len(runs) == 1:
-        return runs.copy(), [np.array([0])]
-
     time_s = np.asarray(window_time_s, dtype=np.float64)
     distance = np.asarray(bin_distance_cm, dtype=np.float64)
 
@@ -639,11 +637,14 @@ class CandidateSequences:
             is_replay, replay_mask(duration, dispersion, self.config)
         ):
             raise ValueError("is_replay does not follow from the criteria and config.")
-        object.__setattr__(self, "runs", runs)
-        object.__setattr__(self, "duration_s", duration)
-        object.__setattr__(self, "dispersion_cm", dispersion)
-        object.__setattr__(self, "is_replay", is_replay)
-        object.__setattr__(self, "midpoint_s", midpoint)
+        _freeze(
+            self,
+            runs=runs,
+            duration_s=duration,
+            dispersion_cm=dispersion,
+            is_replay=is_replay,
+            midpoint_s=midpoint,
+        )
 
     @property
     def pieces(self) -> tuple[NDArray, ...]:

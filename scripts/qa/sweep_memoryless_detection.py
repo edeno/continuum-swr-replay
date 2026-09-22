@@ -213,6 +213,16 @@ def overlaps(reported: tuple[float, float], bounds: tuple[float, float]) -> bool
     return reported[0] < bounds[1] and bounds[0] < reported[1]
 
 
+def best_entry(scored: list[tuple]) -> tuple:
+    """The scored event that answers for the injection.
+
+    Both detectors score every reported event that overlaps the injection and
+    keep whatever else they need beside it; each entry carries its score
+    second.
+    """
+    return scored[best_scored([entry[1] for entry in scored])]
+
+
 def memoryless_outcome(recording, injected, window, bounds, true_position_cm, path_cm):
     """What the sliding-window detector reports for one injected event."""
     time, position, speed = window
@@ -298,7 +308,7 @@ def memoryless_outcome(recording, injected, window, bounds, true_position_cm, pa
                 times[present],
             )
         )
-    i, score, decoded_cm, times = scored[best_scored([item[1] for item in scored])]
+    i, score, decoded_cm, times = best_entry(scored)
     run_start, run_stop = candidates.runs[i]
 
     animal_cm = np.interp(times, result.time, position[: result.time.size])
@@ -430,13 +440,11 @@ def state_space_outcome(recording, injected, window, bounds, true_position_cm, p
             and dispersion > CONFIG.dispersion_threshold_cm
         )
         scored.append(((a, b), score, duration_s, dispersion, meets_replay_definition))
-    (a, b), score, duration_s, dispersion, _ = scored[
-        best_scored([item[1] for item in scored])
-    ]
+    (a, b), score, duration_s, dispersion, _ = best_entry(scored)
 
     out |= {
         "state_space_matches": score.matches,
-        "state_space_replay_matches": any(item[4] for item in scored),
+        "state_space_replay_matches": any(entry[4] for entry in scored),
         "state_space_position_error_cm": score.position_error_cm,
         "state_space_span_cm": score.span_cm,
         "state_space_duration_s": duration_s,
@@ -538,6 +546,13 @@ def share(numerator: float, denominator: float) -> float:
     return float(numerator / denominator) if denominator > 0 else np.nan
 
 
+def melted(frame: pd.DataFrame, id_vars: list[str], summary: str) -> pd.DataFrame:
+    """One block of the long-format summary, its grouping columns kept."""
+    return frame.melt(id_vars=id_vars, var_name="measure", value_name="value").assign(
+        summary=summary
+    )
+
+
 def summarize(table: pd.DataFrame) -> pd.DataFrame:
     """The aggregates the spec quotes, in one long-format table.
 
@@ -566,10 +581,14 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
         ]
         .mean()
         .reset_index()
-        .melt(id_vars=["path_cm", "duration_s"], var_name="measure", value_name="value")
     )
-    by_path_duration["summary"] = "detection_rate_by_path_and_duration"
-    parts.append(by_path_duration)
+    parts.append(
+        melted(
+            by_path_duration,
+            ["path_cm", "duration_s"],
+            "detection_rate_by_path_and_duration",
+        )
+    )
 
     # the published replay definition applied to the state-space detector's
     # own events, by path, so the dispersion floor can be read off the file
@@ -583,10 +602,8 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
             .rename("state_space_median_dispersion_cm")
         )
         .reset_index()
-        .melt(id_vars="path_cm", var_name="measure", value_name="value")
     )
-    by_path["summary"] = "by_path"
-    parts.append(by_path)
+    parts.append(melted(by_path, ["path_cm"], "by_path"))
 
     by_duration = (
         found.groupby("duration_s")[
@@ -594,10 +611,10 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
         ]
         .median()
         .reset_index()
-        .melt(id_vars="duration_s", var_name="measure", value_name="value")
     )
-    by_duration["summary"] = "median_duration_ratio_by_duration"
-    parts.append(by_duration)
+    parts.append(
+        melted(by_duration, ["duration_s"], "median_duration_ratio_by_duration")
+    )
 
     found["distance_bin_cm"] = pd.cut(
         found.distance_from_animal_cm, [0, 40, 80, 120, 200]
@@ -612,10 +629,10 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
         ]
         .median()
         .reset_index()
-        .melt(id_vars="distance_bin_cm", var_name="measure", value_name="value")
     )
-    by_distance["summary"] = "median_by_distance_from_animal"
-    parts.append(by_distance)
+    parts.append(
+        melted(by_distance, ["distance_bin_cm"], "median_by_distance_from_animal")
+    )
 
     overall = pd.DataFrame(
         {
@@ -816,17 +833,18 @@ def main() -> None:
     }
     write_table(table, args.out)
     summary = summarize(table)
-    for key in ("produced_by", "produced_at", "git_commit", "n_cells_total"):
+    provenance = {
+        "produced_by": table.attrs["produced_by"],
+        "produced_at": table.attrs["produced_at"],
+        "git_commit": table.attrs["git_commit"],
+        "n_cells_total": str(len(table)),
+    }
+    for measure, note in provenance.items():
         summary.loc[len(summary)] = {
             "summary": "provenance",
-            "measure": key,
+            "measure": measure,
             "value": np.nan,
-            "note": {
-                "produced_by": table.attrs["produced_by"],
-                "produced_at": table.attrs["produced_at"],
-                "git_commit": table.attrs["git_commit"],
-                "n_cells_total": str(len(table)),
-            }[key],
+            "note": note,
         }
     args.summary.parent.mkdir(parents=True, exist_ok=True)
     summary.to_csv(args.summary, index=False)
@@ -834,17 +852,15 @@ def main() -> None:
     print(f"\n{len(table)} cells in {(clock.time() - started) / 60:.1f} min")
     print(f"  raw      -> {args.out}")
     print(f"  summary  -> {args.summary}")
-    print(f"\n  sliding window, native criterion : {table.sliding_found.mean():.3f}")
-    print(f"  sliding window, and it is the event: {table.sliding_matches.mean():.3f}")
-    print(
-        f"  sliding window, any candidate      : {table.sliding_any_candidate.mean():.3f}"
-    )
-    print(
-        f"  state space, native criterion      : {table.state_space_found.mean():.3f}"
-    )
-    print(
-        f"  state space, and it is the event   : {table.state_space_matches.mean():.3f}"
-    )
+    print()
+    for label, rate in (
+        ("sliding window, native criterion", table.sliding_found.mean()),
+        ("sliding window, and it is the event", table.sliding_matches.mean()),
+        ("sliding window, any candidate", table.sliding_any_candidate.mean()),
+        ("state space, native criterion", table.state_space_found.mean()),
+        ("state space, and it is the event", table.state_space_matches.mean()),
+    ):
+        print(f"  {label:<35}: {rate:.3f}")
     print(
         "  of the sliding window's accepted events, the share that are not the "
         f"injection: {share((table.sliding_found & ~table.sliding_matches).sum(), table.sliding_found.sum()):.3f}"

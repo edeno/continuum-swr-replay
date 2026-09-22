@@ -206,19 +206,18 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
         _place_fields,
     ) = make_simulated_data(n_neurons=n_neurons)
 
+    place_field_means = np.linspace(0, TRACK_HEIGHT_CM, n_neurons)
+
     # the package has no remote stationary event; add one in the last pause,
     # and hold it out of training like every other event
     spike_times, remote_stationary = splice_remote_stationary(
-        spike_times,
-        np.linspace(0, TRACK_HEIGHT_CM, n_neurons),
-        float(event_times[4, 0]),
+        spike_times, place_field_means, float(event_times[4, 0])
     )
     event_times = np.vstack([event_times, remote_stationary])
     is_event |= (time >= remote_stationary[0]) & (time <= remote_stationary[1])
 
     # two replays the detector is expected to mis-report, in the order
     # SHORT_PATH_EVENT, SHORT_REPLAY_EVENT
-    place_field_means = np.linspace(0, TRACK_HEIGHT_CM, n_neurons)
     for replay in (SHORT_PATH, SHORT_REPLAY):
         spike_times, bounds = inject_replay(
             spike_times,
@@ -503,7 +502,7 @@ def bound_error_ms(decoded: dict, events: tuple[int, ...]) -> float:
     return 1000 * worst
 
 
-def plot_overview(ax, decoded: dict, config: MemorylessSequenceConfig) -> None:
+def plot_overview(ax, decoded: dict) -> None:
     """The whole recording: what was decoded, and what the detector kept."""
     candidates = decoded["candidates"]
     midpoint_s = decoded["midpoint_s"]
@@ -634,7 +633,7 @@ def zoom_window(decoded: dict, event: int) -> tuple[float, float, list[int]]:
     )
 
 
-def plot_event(ax, decoded: dict, event: int, config: MemorylessSequenceConfig) -> None:
+def plot_event(ax, decoded: dict, event: int) -> None:
     """One labeled event, with the sequence the detector built around it."""
     candidates = decoded["candidates"]
     midpoint_s = decoded["midpoint_s"]
@@ -894,7 +893,7 @@ def make_figure(
     grid = GridSpec(4, 8, figure=fig, height_ratios=ROW_HEIGHTS)
 
     ax_overview = fig.add_subplot(grid[0, :])
-    plot_overview(ax_overview, decoded, config)
+    plot_overview(ax_overview, decoded)
 
     # one line each, so these titles sit at the same height as every other
     # row's and the panel letters can share one offset; the verdict in each
@@ -908,7 +907,7 @@ def make_figure(
     zooms = []
     for column, (event, label) in enumerate(outcomes):
         ax = fig.add_subplot(grid[1, 2 * column : 2 * column + 2])
-        plot_event(ax, decoded, event, config)
+        plot_event(ax, decoded, event)
         ax.set_title(outcome_title(decoded, event, label), fontsize=5.5)
         if column:
             ax.set_yticklabels([])

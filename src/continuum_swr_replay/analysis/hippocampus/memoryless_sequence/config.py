@@ -7,7 +7,7 @@ are adapted to this project's track geometry and sampling grid.
 """
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
@@ -88,23 +88,13 @@ class MemorylessSequenceConfig:
     dispersion_threshold_cm: float = 12.0
 
     def __post_init__(self) -> None:
-        for field in (
-            "window_duration_s",
-            "stride_s",
-            "sampling_frequency",
-            "place_bin_size_cm",
-            "spread_threshold_cm",
-            "jump_threshold_cm",
-            "speed_threshold_cm_per_s",
-            "merge_gap_cm",
-            "merge_gap_s",
-            "minimum_duration_s",
-            "dispersion_threshold_cm",
-        ):
-            value = getattr(self, field)
+        # every setting is a duration, a rate or a threshold, so every one
+        # must be a positive number
+        for setting in fields(self):
+            value = getattr(self, setting.name)
             if isinstance(value, bool) or not (math.isfinite(value) and value > 0):
                 raise ValueError(
-                    f"{field} must be a positive finite number, got {value!r}."
+                    f"{setting.name} must be a positive finite number, got {value!r}."
                 )
         if self.stride_s > self.window_duration_s:
             raise ValueError(
@@ -112,10 +102,11 @@ class MemorylessSequenceConfig:
                 f"({self.window_duration_s}); the windows would leave gaps."
             )
         for field in ("window_duration_s", "stride_s"):
-            samples = getattr(self, field) * self.sampling_frequency
+            seconds = getattr(self, field)
+            samples = seconds * self.sampling_frequency
             if abs(samples - round(samples)) > _WHOLE_NUMBER_TOLERANCE:
                 raise ValueError(
-                    f"{field} ({getattr(self, field)} s) is {samples} samples at "
+                    f"{field} ({seconds} s) is {samples} samples at "
                     f"{self.sampling_frequency} Hz, which is not a whole number."
                 )
         if self.minimum_duration_s < self.stride_s:

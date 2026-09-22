@@ -62,10 +62,9 @@ class InjectedReplay:
 
     def __post_init__(self) -> None:
         for field in ("start_cm", "path_cm", "duration_s", "peak_rate_hz", "at_s"):
-            if not math.isfinite(getattr(self, field)):
-                raise ValueError(
-                    f"{field} must be finite, got {getattr(self, field)!r}."
-                )
+            value = getattr(self, field)
+            if not math.isfinite(value):
+                raise ValueError(f"{field} must be finite, got {value!r}.")
         if self.duration_s <= 0:
             raise ValueError(f"duration_s must be positive, got {self.duration_s}.")
         if self.peak_rate_hz < 0:

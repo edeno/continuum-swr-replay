@@ -231,6 +231,18 @@ def validate_time_grid(time: NDArray, config: MemorylessSequenceConfig) -> None:
         )
 
 
+def _validated_time_and_position(
+    time: NDArray, linear_position: NDArray, config: MemorylessSequenceConfig
+) -> tuple[NDArray, NDArray]:
+    """The checked time grid, and the position as the column the library wants."""
+    time = np.asarray(time, dtype=np.float64)
+    validate_time_grid(time, config)
+    position = np.asarray(linear_position, dtype=np.float64)
+    if position.ndim == 1:
+        position = position[:, None]
+    return time, position
+
+
 def clusterless_epoch_log_likelihood(
     time: NDArray,
     linear_position: NDArray,
@@ -264,13 +276,9 @@ def clusterless_epoch_log_likelihood(
         predict_clusterless_kde_log_likelihood,
     )
 
-    config = config or MemorylessSequenceConfig()
-    time = np.asarray(time, dtype=np.float64)
-    validate_time_grid(time, config)
-
-    position = np.asarray(linear_position, dtype=np.float64)
-    if position.ndim == 1:
-        position = position[:, None]
+    time, position = _validated_time_and_position(
+        time, linear_position, config or MemorylessSequenceConfig()
+    )
 
     log_likelihood = np.asarray(
         predict_clusterless_kde_log_likelihood(
@@ -413,13 +421,9 @@ def sorted_spikes_epoch_log_likelihood(
         predict_sorted_spikes_kde_log_likelihood,
     )
 
-    config = config or MemorylessSequenceConfig()
-    time = np.asarray(time, dtype=np.float64)
-    validate_time_grid(time, config)
-
-    position = np.asarray(linear_position, dtype=np.float64)
-    if position.ndim == 1:
-        position = position[:, None]
+    time, position = _validated_time_and_position(
+        time, linear_position, config or MemorylessSequenceConfig()
+    )
 
     log_likelihood = np.asarray(
         predict_sorted_spikes_kde_log_likelihood(

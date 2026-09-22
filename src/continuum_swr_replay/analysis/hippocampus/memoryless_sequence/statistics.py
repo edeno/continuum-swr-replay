@@ -77,12 +77,8 @@ def aggregate_windows(
             f"window_n_samples ({window_n_samples}) and stride_n_samples "
             f"({stride_n_samples}) must both be at least 1."
         )
-    n_windows = (
-        1 + (n_time - window_n_samples) // stride_n_samples
-        if n_time >= window_n_samples
-        else 0
-    )
-    if n_windows <= 0:
+    n_windows = max(0, 1 + (n_time - window_n_samples) // stride_n_samples)
+    if n_windows == 0:
         return np.empty((0, n_bins), dtype=np.float64)
 
     cumulative = np.zeros((n_time + 1, n_bins), dtype=np.float64)
