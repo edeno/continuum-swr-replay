@@ -46,6 +46,9 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle impor
 )
 
 CONFIG = MemorylessSequenceConfig()
+GOLDEN_FIRST_KEY = 8743206764492520302
+"""ms_event_id of the fixture's first sequence, as first computed; a change here
+means tables already on disk no longer join."""
 N_BINS = 200
 BIN_CM = 2.0
 START_S = 10.0
@@ -53,7 +56,7 @@ START_S = 10.0
 
 IDENTITY = SequenceIdentity(
     animal="sim",
-    day=1,
+    day=20200101,
     epoch="02_r1",
     brain_area="HPC",
     epoch_id="sim20200101_02_r1_HPC",
@@ -180,7 +183,7 @@ class TestColumns:
         table = build(recording)
 
         assert (table.animal == "sim").all()
-        assert (table.day == 1).all()
+        assert (table.day == 20200101).all()
         assert (table.epoch == "02_r1").all()
         assert (table.brain_area == "HPC").all()
         assert (table.run_id == "test-run").all()
@@ -188,35 +191,59 @@ class TestColumns:
         assert (table.swr_definition == "Kay").all()
 
     def test_carries_its_own_key_and_never_the_state_space_one(self, recording):
-        """D6: a cohort-specific event_id would mis-join silently."""
+        """A cohort-specific event_id would mis-join silently."""
         table = build(recording)
 
         assert "event_id" not in table.columns
         assert table.ms_event_id.is_unique
 
-    @pytest.mark.parametrize(
-        "change", [{"run_id": "other"}, {"epoch_id": "sim20200101_02_r1_HPC_all"}]
-    )
-    def test_the_key_is_stable_and_names_the_run_and_the_decode(
-        self, recording, change
-    ):
-        """Two decodes of one epoch, or two runs, must never share a key."""
+    def test_the_key_names_the_decode_and_the_windows_not_the_run(self, recording):
+        """Two decodes of one epoch never share a key; two runs of one decode
+        do, so a sensitivity run joins to its baseline on it."""
         first = build(recording)
         again = build(recording)
-        other = build_memoryless_event_table(
-            recording["candidates"],
-            replace(IDENTITY, **change),
-            speed_time_s=recording["speed_time_s"],
-            speed_cm_per_s=recording["speed"],
-            bin_distance_cm=recording["distance"],
-            swr_intervals=recording["swr_intervals"],
-            swr_observed_intervals=recording["observed"],
-            swr_definition="Kay",
-            shuffle_results={0: passing_result()},
-        )
+
+        def with_identity(**change):
+            return build_memoryless_event_table(
+                recording["candidates"],
+                replace(IDENTITY, **change),
+                speed_time_s=recording["speed_time_s"],
+                speed_cm_per_s=recording["speed"],
+                bin_distance_cm=recording["distance"],
+                swr_intervals=recording["swr_intervals"],
+                swr_observed_intervals=recording["observed"],
+                swr_definition="Kay",
+                shuffle_results={0: passing_result()},
+            )
 
         np.testing.assert_array_equal(first.ms_event_id, again.ms_event_id)
-        assert not set(first.ms_event_id) & set(other.ms_event_id)
+        np.testing.assert_array_equal(
+            first.ms_event_id, with_identity(run_id="other").ms_event_id
+        )
+        other_decode = with_identity(epoch_id="sim20200101_02_r1_HPC_all")
+        assert not set(first.ms_event_id) & set(other_decode.ms_event_id)
+
+    def test_the_key_is_the_same_across_processes(self, recording):
+        """Pinned as a literal: a pandas hashing change or a reordered key
+        column would otherwise break joins to tables already on disk."""
+        table = build(recording)
+
+        assert table.first_window.tolist() == [10, 70, 153]
+        assert table.last_window.tolist() == [49, 132, 192]
+        assert table.ms_event_id.iloc[0] == GOLDEN_FIRST_KEY
+
+    @pytest.mark.parametrize(
+        ("change", "message"),
+        [
+            ({"brain_area": "hpc"}, "brain_area"),
+            ({"day": 0}, "day"),
+            ({"epoch_id": "wilbur20210301_04_r2_OFC"}, "epoch_id"),
+            ({"epoch": " "}, "epoch"),
+        ],
+    )
+    def test_an_identity_whose_parts_disagree_is_refused(self, change, message):
+        with pytest.raises(ValueError, match=message):
+            replace(IDENTITY, **change)
 
 
 class TestTiming:

@@ -206,7 +206,8 @@ class SequenceAssembly:
         For each sequence, the indices into ``pre_merge_runs`` that it absorbed.
         A sequence with more than one piece spans a merged gap.
     pre_merge_runs : ndarray of int, shape (n_runs, 2)
-        Runs before merging, after single-window runs were dropped.
+        Runs before merging, after single-window runs were dropped (unless
+        ``config.drop_single_window_runs`` is False).
     kept : ndarray of bool, shape (n_windows,)
         The window keep mask the sequences were assembled from. Windows inside
         a merged gap stay False here; they are not decoded positions.
@@ -455,12 +456,13 @@ def assemble_sequences(
 ) -> SequenceAssembly:
     """Collect kept windows into candidate sequences.
 
-    Runs of a single window are dropped first, as in the original: their index
-    length is zero. ``config.drop_single_window_runs`` turns that off, for the
-    sensitivity to the reference's unvendored ``seqle``. Surviving runs are merged, and then the duration filter
-    drops those whose index length is below the stride-derived minimum. Length
-    is an index difference throughout, so a run of index length ``n`` holds
-    ``n + 1`` windows and spans ``n`` strides.
+    Runs of a single window are dropped first: as the port defines run length,
+    an index difference, theirs is zero. Whether the reference does the same
+    depends on its unvendored ``seqle``; ``config.drop_single_window_runs``
+    turns the drop off for that sensitivity. Surviving runs are merged, and
+    then the duration filter drops those whose index length is below the
+    stride-derived minimum. Length is an index difference throughout, so a run
+    of index length ``n`` holds ``n + 1`` windows and spans ``n`` strides.
 
     Parameters
     ----------
@@ -655,7 +657,7 @@ class CandidateSequences:
 
     @property
     def pre_merge_runs(self) -> NDArray:
-        """Runs before merging, after single-window runs were dropped."""
+        """Runs before merging; see ``SequenceAssembly.pre_merge_runs``."""
         return self.assembly.pre_merge_runs
 
 

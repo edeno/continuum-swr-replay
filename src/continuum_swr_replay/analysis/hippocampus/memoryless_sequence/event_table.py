@@ -1,7 +1,7 @@
 """One row per candidate sequence the memoryless detector builds.
 
 Every candidate is kept, accepted or not, because a detector's rejections are
-as much a result as its detections. Four flags then select the cohorts:
+as much a result as its detections. Three flags then select the cohorts:
 ``is_replay`` (the duration and dispersion criteria), ``whole_event_speed_eligible``
 (this project's canonical immobility rule over every native speed sample
 between the endpoints, merged gaps included), and ``shuffle_pass`` (the
@@ -9,8 +9,18 @@ encoding-pair shuffle). The shuffle is run only on candidates that pass the
 first two, so ``shuffle_pass`` alone selects the published replay definition
 together with this project's whole-event immobility rule, which is stricter
 than the reference's per-window gate.
-A candidate that was not shuffled has ``n_shuffles == 0``, which keeps it
-apart from one that was shuffled and could not be tested.
+A candidate that was not shuffled has ``n_shuffles == 0``.
+
+Three columns average three different window sets, each right for its
+purpose: ``n_windows`` counts every window of the span, merged gaps included;
+``mean_posterior_spread_cm``, ``mean_jump_cm`` and ``max_jump_cm`` read the
+retained windows only, with jumps taken within pieces; and
+``shuffle_observed_spread_cm`` / ``shuffle_observed_jump_cm`` are the
+reference's test statistics over every window of the span, zero jumps set
+aside. The SWR columns classify against the speed-qualified SWR intervals the
+canonical table uses, so on a row that is not ``whole_event_speed_eligible``
+``is_swr == False`` means no *speed-qualified* SWR overlapped, not that no
+SWR was detected there.
 
 Column names follow the tables this one is compared against: timing as the
 shipped event table spells it (``event_start_s`` ...), speed as the canonical
@@ -21,7 +31,9 @@ were not fully observed is ``unknown``, never ``non_swr``.
 
 The key is ``ms_event_id``, deliberately not ``event_id``: that key is hashed
 from our own cohort, and a table sharing it would join to the wrong events
-without any error.
+without any error. It is hashed from the decode and the sequence's window
+bounds, not from ``run_id``, so two runs of one decode (a sensitivity run
+against its baseline, say) can be joined on it; ``run_id`` is a column.
 
 The design is in ``docs/design/replay_detection_comparison/02-memoryless-sequence.md``,
 sections "Data flow, per epoch" and "Output schema".
@@ -29,6 +41,7 @@ sections "Data flow, per epoch" and "Output schema".
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
 
 import numpy as np
 import pandas as pd
@@ -56,6 +69,7 @@ from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 __all__ = [
     "MEMORYLESS_EVENT_TABLE_DTYPES",
     "SHUFFLE_DRAW_TABLE_DTYPES",
+    "BRAIN_AREAS",
     "UNKNOWN",
     "SequenceIdentity",
     "build_memoryless_event_table",
@@ -69,64 +83,75 @@ UNKNOWN = "unknown"
 """SWR label of an event whose SWR labels were not fully observed."""
 
 
-MEMORYLESS_EVENT_TABLE_DTYPES: dict[str, object] = {
-    # identity
-    "animal": object,
-    "day": np.int64,
-    "epoch": object,
-    "brain_area": object,
-    "epoch_id": object,
-    "run_id": object,
-    "swr_definition": object,
-    "sequence_label": np.int64,
-    "ms_event_id": np.int64,
-    # timing, seconds: first and last retained window midpoint
-    "event_start_s": np.float64,
-    "event_end_s": np.float64,
-    "event_duration_s": np.float64,
-    "event_midpoint_s": np.float64,
-    # the decoding support, half a window wider at each end
-    "support_start_s": np.float64,
-    "support_end_s": np.float64,
-    # detector statistics
-    "n_windows": np.int64,
-    "n_pieces": np.int64,
-    "mean_posterior_spread_cm": np.float64,
-    "max_jump_cm": np.float64,
-    "mean_jump_cm": np.float64,
-    "max_bridge_cm": np.float64,
-    "dispersion_cm": np.float64,
-    "path_distance_cm": np.float64,
-    "is_replay": np.bool_,
-    # speed
-    "animal_max_speed_cm_s": np.float64,
-    "animal_mean_speed_cm_s": np.float64,
-    "whole_event_speed_eligible": np.bool_,
-    # SWR
-    "is_swr": pd.BooleanDtype(),
-    "overlap_class": object,
-    "overlap_subclass": object,
-    "n_swrs_overlapping": pd.Int64Dtype(),
-    "matched_swr_event": pd.Int64Dtype(),
-    "matched_swr_start": np.float64,
-    "matched_swr_end": np.float64,
-    # shuffle
-    "shuffle_observed_spread_cm": np.float64,
-    "shuffle_observed_jump_cm": np.float64,
-    "p_spread": np.float64,
-    "p_jump": np.float64,
-    "shuffle_testable": np.bool_,
-    "shuffle_pass": np.bool_,
-    "n_shuffles": np.int64,
-}
+MEMORYLESS_EVENT_TABLE_DTYPES: Mapping[str, object] = MappingProxyType(
+    {
+        # identity
+        "animal": object,
+        "day": np.int64,
+        "epoch": object,
+        "brain_area": object,
+        "epoch_id": object,
+        "run_id": object,
+        "swr_definition": object,
+        "sequence_label": np.int64,
+        "ms_event_id": np.int64,
+        # the sequence's first and last window index, which with the decode key
+        # the event id; n_windows is their difference plus one
+        "first_window": np.int64,
+        "last_window": np.int64,
+        # timing, seconds: first and last retained window midpoint
+        "event_start_s": np.float64,
+        "event_end_s": np.float64,
+        "event_duration_s": np.float64,
+        "event_midpoint_s": np.float64,
+        # the decoding support, half a window wider at each end
+        "support_start_s": np.float64,
+        "support_end_s": np.float64,
+        # detector statistics
+        "n_windows": np.int64,
+        "n_pieces": np.int64,
+        "mean_posterior_spread_cm": np.float64,
+        "max_jump_cm": np.float64,
+        "mean_jump_cm": np.float64,
+        "max_bridge_cm": np.float64,
+        "dispersion_cm": np.float64,
+        "path_distance_cm": np.float64,
+        "is_replay": np.bool_,
+        # speed
+        "animal_max_speed_cm_s": np.float64,
+        "animal_mean_speed_cm_s": np.float64,
+        "whole_event_speed_eligible": np.bool_,
+        # SWR
+        "is_swr": pd.BooleanDtype(),
+        "overlap_class": object,
+        "overlap_subclass": object,
+        "n_swrs_overlapping": pd.Int64Dtype(),
+        "matched_swr_event": pd.Int64Dtype(),
+        "matched_swr_start": np.float64,
+        "matched_swr_end": np.float64,
+        # shuffle
+        "shuffle_observed_spread_cm": np.float64,
+        "shuffle_observed_jump_cm": np.float64,
+        "p_spread": np.float64,
+        "p_jump": np.float64,
+        "shuffle_testable": np.bool_,
+        "shuffle_pass": np.bool_,
+        "n_shuffles": np.int64,
+    }
+)
 """Every column, in order, with the dtype it always has, even when empty."""
 
-SHUFFLE_DRAW_TABLE_DTYPES: dict[str, object] = {
-    "ms_event_id": np.int64,
-    "draw": np.int64,
-    "null_spread_cm": np.float64,
-    "null_jump_cm": np.float64,
-}
+SHUFFLE_DRAW_TABLE_DTYPES: Mapping[str, object] = MappingProxyType(
+    {
+        "ms_event_id": np.int64,
+        "draw": np.int64,
+        "null_spread_cm": np.float64,
+        "null_jump_cm": np.float64,
+    }
+)
+
+BRAIN_AREAS = ("HPC", "mPFC", "OFC")
+"""The project's brain-area names; capitalization matters throughout."""
 
 
 @dataclass(frozen=True)
@@ -157,13 +182,27 @@ class SequenceIdentity:
     def __post_init__(self) -> None:
         for name in ("animal", "epoch", "brain_area", "epoch_id", "run_id"):
             value = getattr(self, name)
-            if not isinstance(value, str) or not value:
+            if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"{name} must be a non-empty string, got {value!r}.")
         if isinstance(self.day, bool) or not isinstance(self.day, int | np.integer):
             raise TypeError(f"day must be an integer, got {self.day!r}.")
+        if self.day <= 0:
+            raise ValueError(f"day must be positive, got {self.day}.")
+        if self.brain_area not in BRAIN_AREAS:
+            raise ValueError(
+                f"brain_area must be one of {BRAIN_AREAS}, got {self.brain_area!r}."
+            )
+        # the identifier names the same epoch as the parts do
+        if not self.epoch_id.startswith(self.animal) or (
+            f"_{self.epoch}_{self.brain_area}" not in self.epoch_id
+        ):
+            raise ValueError(
+                f"epoch_id {self.epoch_id!r} does not name animal {self.animal!r}, "
+                f"epoch {self.epoch!r} and brain area {self.brain_area!r}."
+            )
 
 
-def _empty(dtypes: dict[str, object]) -> pd.DataFrame:
+def _empty(dtypes: Mapping[str, object]) -> pd.DataFrame:
     return pd.DataFrame(
         {name: pd.Series(dtype=dtype) for name, dtype in dtypes.items()}
     )
@@ -362,17 +401,23 @@ def _shuffle_columns(
 
 
 def _ms_event_id(identity: SequenceIdentity, runs: NDArray) -> NDArray:
-    """63-bit stable hash of the decode, the run and the sequence's windows."""
+    """63-bit stable hash of the decode and the sequence's window bounds.
+
+    Not of ``run_id``: the same sequence found by two runs of one decode gets
+    one key, so a sensitivity run joins to its baseline on it. Two decodes of
+    one epoch differ in ``epoch_id`` and never share a key. Uniqueness is
+    asserted within an epoch; across the corpus it holds to about one in
+    ``2**63 / n**2``.
+    """
     keys = pd.DataFrame(
         {
             "animal": identity.animal,
-            "day": identity.day,
+            "day": np.int64(identity.day),
             "epoch": identity.epoch,
             "brain_area": identity.brain_area,
             "epoch_id": identity.epoch_id,
-            "run_id": identity.run_id,
-            "first_window": runs[:, 0],
-            "last_window": runs[:, 1],
+            "first_window": np.asarray(runs[:, 0], dtype=np.int64),
+            "last_window": np.asarray(runs[:, 1], dtype=np.int64),
         }
     )
     hashed = pd.util.hash_pandas_object(keys, index=False) % (2**63)
@@ -523,6 +568,8 @@ def build_memoryless_event_table(
         "swr_definition": swr_definition,
         "sequence_label": np.arange(1, n + 1),
         "ms_event_id": _ms_event_id(identity, candidates.runs),
+        "first_window": candidates.runs[:, 0],
+        "last_window": candidates.runs[:, 1],
         "event_start_s": starts,
         "event_end_s": ends,
         "event_duration_s": ends - starts,
@@ -542,7 +589,7 @@ def build_memoryless_event_table(
         **shuffle,
     }
     table = pd.DataFrame(columns)[list(MEMORYLESS_EVENT_TABLE_DTYPES)].astype(
-        MEMORYLESS_EVENT_TABLE_DTYPES
+        dict(MEMORYLESS_EVENT_TABLE_DTYPES)
     )
     if not table.ms_event_id.is_unique:
         raise RuntimeError("ms_event_id collided within one epoch.")
@@ -581,4 +628,4 @@ def build_shuffle_draw_table(
         )
         for index, result in sorted(shuffle_results.items())
     ]
-    return pd.concat(parts, ignore_index=True).astype(SHUFFLE_DRAW_TABLE_DTYPES)
+    return pd.concat(parts, ignore_index=True).astype(dict(SHUFFLE_DRAW_TABLE_DTYPES))

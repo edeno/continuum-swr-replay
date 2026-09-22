@@ -24,6 +24,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import
     detect_candidate_sequences,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.event_table import (
+    MEMORYLESS_EVENT_TABLE_DTYPES,
     SequenceIdentity,
     build_memoryless_event_table,
     build_shuffle_draw_table,
@@ -47,25 +48,49 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics im
 __all__ = ["EpochDetection", "run_epoch"]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class EpochDetection:
     """What one epoch yields.
 
     Attributes
     ----------
+    identity : SequenceIdentity
+        Which epoch, and which run; kept here so an epoch with no candidate
+        is still identifiable.
     candidates : CandidateSequences
         Every window's statistics and gates, and the runs before and after
         merging: the diagnostics that explain each rejection.
     table : DataFrame
-        One row per candidate, from ``build_memoryless_event_table``.
+        One row per candidate, from ``build_memoryless_event_table``. Row
+        ``i`` is candidate ``i``.
     shuffle_draws : DataFrame
-        Every shuffled draw's statistics, from ``build_shuffle_draw_table``.
+        Every shuffled draw's statistics, from ``build_shuffle_draw_table``;
+        one row per draw of every shuffled candidate, keyed on the table.
 
     """
 
+    identity: SequenceIdentity
     candidates: CandidateSequences
     table: pd.DataFrame
     shuffle_draws: pd.DataFrame
+
+    def __post_init__(self) -> None:
+        if len(self.table) != len(self.candidates.runs):
+            raise ValueError(
+                f"{len(self.table)} table rows for {len(self.candidates.runs)} "
+                "candidates; row i must be candidate i."
+            )
+        if list(self.table.columns) != list(MEMORYLESS_EVENT_TABLE_DTYPES):
+            raise ValueError("The table does not carry the declared columns in order.")
+        keyed = set(self.shuffle_draws.ms_event_id)
+        if not keyed <= set(self.table.ms_event_id):
+            raise ValueError("A shuffle draw is keyed to an event not in the table.")
+        drawn = self.shuffle_draws.groupby("ms_event_id").size()
+        declared = self.table.set_index("ms_event_id").n_shuffles
+        if not drawn.eq(declared.loc[drawn.index]).all():
+            raise ValueError(
+                "The draws per event disagree with the table's n_shuffles."
+            )
 
 
 def run_epoch(
@@ -103,8 +128,9 @@ def run_epoch(
     swr_intervals, swr_observed_intervals, swr_definition
         As for ``build_memoryless_event_table``.
     seed : ShuffleSeed or None
-        None runs no shuffle, and the table then records every candidate as
-        untested.
+        Its ``session`` must be ``identity.epoch_id``, so a manifest that says
+        the draws are keyed on the epoch is telling the truth. None runs no
+        shuffle, and the table then records every candidate as untested.
     config : MemorylessSequenceConfig
     n_shuffles : int, default 100
 
@@ -118,6 +144,11 @@ def run_epoch(
     if speed.shape != time.shape:
         raise ValueError(
             f"speed_cm_per_s {speed.shape} must be on the decode grid {time.shape}."
+        )
+    if seed is not None and seed.session != identity.epoch_id:
+        raise ValueError(
+            f"The shuffle seed names session {seed.session!r} but the epoch is "
+            f"{identity.epoch_id!r}; draws must be keyed on the epoch they test."
         )
 
     likelihood = clusterless_epoch_log_likelihood(
@@ -176,6 +207,7 @@ def run_epoch(
         shuffle_results=shuffle_results,
     )
     return EpochDetection(
+        identity=identity,
         candidates=candidates,
         table=table,
         shuffle_draws=build_shuffle_draw_table(table, shuffle_results or {}),
