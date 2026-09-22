@@ -114,8 +114,3 @@ class MemorylessSequenceConfig:
         ``n * stride_s`` between its first and last midpoint.
         """
         return round(self.minimum_duration_s / self.stride_s)
-
-    @property
-    def merge_gap_index_length(self) -> int:
-        """Largest gap between runs that still merges, as an index difference."""
-        return round(self.merge_gap_s / self.stride_s)

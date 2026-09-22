@@ -40,7 +40,6 @@ def test_bin_counts_follow_the_stride():
     # a surviving run spans at least minimum_duration between first and last
     # midpoint, so its index length is minimum_duration / stride
     assert config.minimum_run_index_length == 25
-    assert config.merge_gap_index_length == 12
 
 
 def test_a_different_stride_moves_the_window_counts():
