@@ -152,21 +152,28 @@ def _frame(rows: list[dict], dtypes: Mapping[str, object]) -> pd.DataFrame:
 
 
 def _sessions(inventory: pd.DataFrame, coverage: CoverageMap) -> dict[tuple, list[str]]:
-    """Every session and the detectors that looked at it.
+    """Every session, each with every detector of the comparison.
 
-    A detector with events but no coverage is refused: whether it looked is
-    exactly what the counts need to know.
+    A detector with no coverage entry for a session observed none of it, so
+    its summaries there are unavailable rather than missing. A detector with
+    events but no coverage is refused: whether it looked is exactly what the
+    counts need to know.
     """
-    detectors: dict[tuple, set[str]] = {}
-    for *session, detector in coverage:
-        detectors.setdefault(tuple(session), set()).add(detector)
+    sessions = {tuple(key[:3]) for key in coverage}
+    detectors = sorted({key[3] for key in coverage})
     for key, group in inventory.groupby(list(SESSION_COLUMNS_DAY), sort=False):
         for detector in group.detector.unique():
-            if detector not in detectors.get(tuple(key), set()):
+            if (*key, detector) not in coverage:
                 raise ValueError(
                     f"{detector} has events in {key} but no coverage there."
                 )
-    return {key: sorted(names) for key, names in detectors.items()}
+    return dict.fromkeys(sorted(sessions), detectors)
+
+
+def _exposure(coverage: CoverageMap, session: tuple, detector: str) -> NDArray:
+    """A detector's exposure in a session; none where it has no entry."""
+    entry = coverage.get((*session, detector))
+    return np.empty((0, 2)) if entry is None else entry.exposure
 
 
 def _events(inventory: pd.DataFrame, session: tuple, detector: str) -> pd.DataFrame:
@@ -288,8 +295,8 @@ def event_matches(
         for detector, other in permutations(detectors, 2):
             source = _events(inventory, session, detector)
             shared = intersect(
-                coverage[(*session, detector)].exposure,
-                coverage[(*session, other)].exposure,
+                _exposure(coverage, session, detector),
+                _exposure(coverage, session, other),
             )
             within = contains(
                 shared, source.event_start_s.to_numpy(), source.event_end_s.to_numpy()
@@ -329,8 +336,8 @@ def directional_agreement(
         for source, target in permutations(detectors, 2):
             shared = total_duration(
                 intersect(
-                    coverage[(*session, source)].exposure,
-                    coverage[(*session, target)].exposure,
+                    _exposure(coverage, session, source),
+                    _exposure(coverage, session, target),
                 )
             )
             these = matches[
@@ -378,8 +385,8 @@ def time_coverage(inventory: pd.DataFrame, coverage: CoverageMap) -> pd.DataFram
     for session, detectors in _sessions(inventory, coverage).items():
         for detector_a, detector_b in combinations(detectors, 2):
             shared = intersect(
-                coverage[(*session, detector_a)].exposure,
-                coverage[(*session, detector_b)].exposure,
+                _exposure(coverage, session, detector_a),
+                _exposure(coverage, session, detector_b),
             )
             shared_s = total_duration(shared)
             a = _event_time(inventory, session, detector_a)

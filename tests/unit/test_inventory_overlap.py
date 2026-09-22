@@ -208,6 +208,28 @@ class TestDirectionalAgreement:
         assert agreement.proportion_matched.isna().all()
         assert (agreement.shared_exposure_s == 0).all()
 
+    def test_a_detector_that_did_not_run_in_an_epoch_is_unavailable_there(self):
+        """Its absence is reported, not left out of the pooled counts."""
+        inventory = pd.concat(
+            [events("A", [(10, 20)]), events("A", [(10, 20)], session=OTHER)],
+            ignore_index=True,
+        )
+        coverage = everywhere("A", "B") | everywhere(
+            "A", session_key=("sim", 20200101, "04_r2")
+        )
+        pairs = overlap_pairs(inventory)
+
+        agreement = directional_agreement(inventory, pairs, coverage)
+        covered = time_coverage(inventory, coverage)
+        matches = event_matches(inventory, pairs, coverage)
+
+        missing = agreement[(agreement.epoch == "04_r2")].set_index("source_detector")
+        assert not missing.loc["A", "available"]
+        assert missing.loc["A", "n_source_events"] == 1
+        assert np.isnan(missing.loc["A", "proportion_matched"])
+        assert not covered.set_index("epoch").loc["04_r2", "available"]
+        assert matches[matches.epoch == "04_r2"].membership.tolist() == ["unknown"]
+
     def test_a_detector_that_found_nothing_but_looked_counts_as_looked(self):
         """B observed the whole epoch and found nothing: A's events are
         unmatched, not unknown, and the proportion is zero, not missing."""
