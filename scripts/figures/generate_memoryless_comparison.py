@@ -50,6 +50,9 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
     sorted_spikes_epoch_log_likelihood,
     window_midpoints_s,
 )
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation import (
+    inject_replay,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
     aggregate_windows,
     normalize_windows,
@@ -77,9 +80,6 @@ EVENT_LABELS = [
     "short path\n30 cm",
     "short replay\n80 ms",
 ]
-
-FIELD_STD_CM = np.sqrt(12.5)
-"""Place field width the package simulates."""
 
 SHORT_REPLAY = (35.0, 100.0, 0.080, 120.0, 44.40)
 """start_cm, path_cm, duration_s, peak_rate_hz, time.
@@ -140,40 +140,6 @@ def splice_remote_stationary(
 BLACK, ORANGE, SKY, GREEN, YELLOW, BLUE, VERMILION, PURPLE = WONG[:8]
 
 
-def inject_replay(
-    spike_times: list[np.ndarray],
-    place_field_means: np.ndarray,
-    start_cm: float,
-    path_cm: float,
-    duration_s: float,
-    peak_rate_hz: float,
-    start_s: float,
-    seed: int = 0,
-) -> tuple[list[np.ndarray], tuple[float, float]]:
-    """Add a replay that travels a given distance in a given time.
-
-    Each cell fires as a Poisson process. Its rate follows its own place field,
-    read at the position the replay represents at that moment. This is how the
-    package builds its own replays, with the distance and the rate under
-    control.
-    """
-    n_samples = max(2, int(duration_s * SAMPLING_FREQUENCY))
-    step_s = duration_s / (n_samples - 1)
-    at_s = start_s + np.arange(n_samples) * step_s
-    at_cm = start_cm + path_cm * np.arange(n_samples) / (n_samples - 1)
-
-    rate_hz = peak_rate_hz * np.exp(
-        -0.5 * ((at_cm[:, None] - place_field_means[None, :]) / FIELD_STD_CM) ** 2
-    )
-    fired = np.random.default_rng(seed).random(rate_hz.shape) < rate_hz * step_s
-
-    injected = []
-    for neuron, neuron_times in enumerate(spike_times):
-        kept = neuron_times[(neuron_times < at_s[0]) | (neuron_times > at_s[-1])]
-        injected.append(np.sort(np.concatenate([kept, at_s[fired[:, neuron]]])))
-    return injected, (at_s[0], at_s[-1])
-
-
 def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dict:
     """Decode the Figure 1 simulation window by window under a uniform prior."""
     (
@@ -209,6 +175,7 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
         duration_s,
         rate_hz,
         at_s,
+        sampling_frequency=SAMPLING_FREQUENCY,
         seed=0,
     )
     event_times = np.vstack([event_times, bounds])
@@ -223,6 +190,7 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
         duration_s,
         rate_hz,
         at_s,
+        sampling_frequency=SAMPLING_FREQUENCY,
         seed=1,
     )
     event_times = np.vstack([event_times, bounds])

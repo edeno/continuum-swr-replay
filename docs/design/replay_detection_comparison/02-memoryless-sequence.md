@@ -323,6 +323,72 @@ measurement, and worth checking on real data:
   graph distance and fails the jump criterion, so a replay that changes arm is
   cut at the switch. Untested here; this simulation is a single linear track.
 
+### Parameter sweep over injected replays
+
+`scripts/qa/sweep_memoryless_detection.py` injects replays of controlled path
+length, duration, firing rate and distance from the animal's own place into the
+simulated recording, and records what each detector reports. 4536 cells, both
+detectors reading one encoding model fitted once, sorted spikes on a linear
+track. Placement inside an immobile stretch, the sub-window phase and the
+Poisson draw are randomized rather than fixed, because each of them changes the
+answer on its own.
+
+**Detection depends on different things for the two procedures.** Percent of
+injected replays found:
+
+| path (cm) | 40 ms | 60 ms | 80 ms | 120 ms | 200 ms | 300 ms | 500 ms |
+|---|---|---|---|---|---|---|---|
+| 10-30 (sliding window) | 8-9 | 9-12 | 10-11 | 8-17 | 8-13 | 12-14 | 12-14 |
+| 45 | 8 | 14 | 24 | 44 | 61 | 70 | 79 |
+| 60 | 12 | 21 | 45 | 62 | 80 | 84 | 88 |
+| 90 | 14 | 31 | 54 | 71 | 88 | 86 | 92 |
+| 130 | 21 | 38 | 46 | 58 | 88 | 96 | 96 |
+| any path (state-space) | 67-86 | 88-100 | 92-97 | 92-99 | 99-100 | 100 | 100 |
+
+The sliding window is governed by path length, which is a criterion. The
+state-space model is governed by duration, which is spike count, which is the
+data. Below about 45 cm the sliding window's detection rate is flat at roughly
+one in ten whatever the duration or the firing rate, which is the dispersion
+floor and not a gradual loss of sensitivity.
+
+**No cell in the sweep was found by the sliding window and missed by the
+state-space model.** 2915 cells went the other way. Of those, 74% built a
+candidate that then failed dispersion and 25% built no candidate at all, while
+the median share of windows passing the spread criterion inside the event was
+1.00. The spread gate is not what loses these events; dispersion is.
+
+**Reported duration, among events both procedures found:**
+
+| true duration | 40 ms | 60 ms | 80 ms | 120 ms | 200 ms | 300 ms | 500 ms |
+|---|---|---|---|---|---|---|---|
+| sliding window | 7.5x | 4.4x | 3.2x | 2.1x | 1.3x | 1.2x | 1.1x |
+| state-space | 1.00x | 0.97x | 0.95x | 0.98x | 0.96x | 0.98x | 0.98x |
+
+These are medians over firing rate, path length and placement. A single event
+can do much better than its row: the 80 ms replay in the figure, which fires
+strongly and travels 100 cm, comes in at 1.3x rather than 3.2x.
+
+**Absorption reaches about 80 cm.** Among events both found, by the distance
+between the replay and the animal's own place:
+
+| distance | 40-80 cm | 80-120 cm | over 120 cm |
+|---|---|---|---|
+| duration ratio | 2.33x | 1.20x | 1.11x |
+| share of windows on the animal's place | 0.44 | 0.00 | 0.00 |
+
+Beyond about 80 cm there is no absorption and the remaining inflation is the
+window. This is the clearest statement of the mechanism: the over-call is not a
+property of the event but of where the event sits relative to the animal.
+
+**What the sweep cannot say.** The track geometry ties distance from the animal
+to available path length, since the animal rests at one end, so the cells
+closest to its place are exactly the short paths the detector cannot find.
+Absorption under 40 cm away is therefore unmeasured. Injected replays also run
+at constant speed with Poisson firing from the same fields the encoding model
+was fitted on, so there is no model mismatch and the surface is optimistic.
+Sorted spikes on a linear track: neither the clusterless likelihood nor the
+jump criterion of a branched track is exercised.
+
 ### Summary: what the port misses, and what it over-calls
 
 Everything marked *measured* comes from a test in this repository. The rest
