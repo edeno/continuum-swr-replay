@@ -523,37 +523,37 @@ def plot_event(ax, decoded: dict, event: int, config: MemorylessSequenceConfig) 
 
 
 def plot_criterion_space(ax, decoded: dict, config: MemorylessSequenceConfig) -> None:
-    """Every candidate sequence against the two criteria that accept it.
+    """Every candidate sequence, against the two criteria that accept it.
 
-    A sequence is replay only if it lands in the upper right box: longer than
-    the minimum duration and spread wider than the minimum dispersion. Reading
-    the rejected cases off this panel shows which criterion stopped each one.
+    Panels b to d show three cases. This panel shows that they are not special:
+    of every candidate the detector built, only the two continuous replays
+    reach the box, and nothing else comes near the dispersion line.
     """
     candidates = decoded["candidates"]
     duration_s, dispersion_cm = candidates.duration_s, candidates.dispersion_cm
 
-    ax.axhspan(
-        config.dispersion_threshold_cm,
-        1e3,
-        xmin=0,
-        xmax=1,
-        color=GREEN,
-        alpha=0.05,
-        lw=0,
-    )
+    ax.axhspan(config.dispersion_threshold_cm, 1e3, color=GREEN, alpha=0.06, lw=0)
     ax.axvline(config.minimum_duration_s, color="0.55", lw=0.7, ls=":")
     ax.axhline(config.dispersion_threshold_cm, color="0.55", lw=0.7, ls=":")
+    ax.scatter(duration_s, dispersion_cm, s=7, color="0.72", lw=0, zorder=2)
+    accepted = candidates.is_replay
+    ax.scatter(
+        duration_s[accepted],
+        dispersion_cm[accepted],
+        s=30,
+        zorder=3,
+        facecolor=VERMILION,
+        edgecolor=VERMILION,
+        lw=1.1,
+    )
 
-    ax.scatter(duration_s, dispersion_cm, s=5, color="0.7", lw=0, zorder=2)
-
-    highlight = {
-        0: ("continuous replay", VERMILION),
-        2: ("continuous replay", VERMILION),
-        6: ("short path, 30 cm", BLUE),
-        5: ("remote place", PURPLE),
-    }
-    seen = set()
-    for event, (name, color) in highlight.items():
+    # each case from panels b to d, marked and named where it lands
+    annotated = (
+        (0, "continuous replay\nfound", VERMILION, True, (18, 6)),
+        (6, "short path\nmissed", BLUE, False, (48, 22)),
+        (5, "remote place\ndeclined", PURPLE, False, (108, 2)),
+    )
+    for event, name, color, filled, offset in annotated:
         event_start, event_end = decoded["event_times"][event]
         for i in range(len(candidates.runs)):
             start, stop = candidates.runs[i]
@@ -562,49 +562,52 @@ def plot_criterion_space(ax, decoded: dict, config: MemorylessSequenceConfig) ->
                 and event_start < decoded["midpoint_s"][stop]
             ):
                 continue
-            accepted = bool(candidates.is_replay[i])
+            if bool(candidates.is_replay[i]) != filled:
+                continue
             ax.scatter(
                 duration_s[i],
                 dispersion_cm[i],
-                s=26,
-                zorder=3,
-                facecolor=color if accepted else "none",
+                s=30,
+                zorder=4,
+                facecolor=color if filled else "none",
                 edgecolor=color,
-                lw=1.0,
-                label=name if name not in seen else None,
+                lw=1.1,
             )
-            seen.add(name)
+            ax.annotate(
+                name,
+                xy=(duration_s[i], dispersion_cm[i]),
+                xytext=(duration_s[i] + offset[0] / 100, dispersion_cm[i] + offset[1]),
+                fontsize=5.5,
+                color=color,
+                ha="center",
+                va="bottom",
+                linespacing=1.25,
+                arrowprops={"arrowstyle": "-", "lw": 0.5, "color": color},
+            )
+            break
 
-    ax.set_xscale("log")
-    ax.set_xlim(0.02, 2.5)
-    ax.set_ylim(-2, 58)
+    ax.set_xlim(0, 1.85)
+    ax.set_ylim(-3, 62)
     ax.set_xlabel("event duration (s)")
     ax.set_ylabel("dispersion (cm)")
     ax.set_title(
-        "candidates against the two criteria that accept them",
+        f"all {len(candidates.runs)} candidate sequences. Only the two continuous "
+        "replays\nreach the shaded box, where both criteria are met.",
         fontsize=5.5,
-    )
-    ax.legend(
-        loc="upper left",
-        fontsize=5,
-        frameon=False,
-        handletextpad=0.2,
-        borderpad=0.0,
-        labelspacing=0.25,
+        linespacing=1.4,
     )
     ax.text(
-        0.104,
-        22,
-        "minimum\nduration",
+        config.minimum_duration_s + 0.03,
+        59,
+        "minimum duration",
         fontsize=5,
         color="0.45",
         ha="left",
         va="top",
-        linespacing=1.1,
     )
     ax.text(
-        2.4,
-        config.dispersion_threshold_cm + 1.2,
+        1.8,
+        config.dispersion_threshold_cm + 1.5,
         "minimum dispersion",
         fontsize=5,
         color="0.45",
