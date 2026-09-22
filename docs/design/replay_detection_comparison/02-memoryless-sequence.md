@@ -852,7 +852,10 @@ once, in `MEMORYLESS_EVENT_TABLE_DTYPES`, and held for an empty epoch too.
   rule.
 
 Sidecar `memoryless_shuffle_draws`: `ms_event_id`, `draw`, `null_spread_cm`,
-`null_jump_cm`, one row per draw, for the null-distribution audit. The per-window
+`null_jump_cm`, one row per draw, for the null-distribution audit. Sidecar
+`memoryless_observed`: `kind`, `start_s`, `end_s`, what each epoch observed independent
+of what it detected: the span its windows cover (`decoded_windows`) and the stretches
+where SWR labels were observed (`swr_labels`), for 03's availability accounting. The per-window
 statistics and gates, and the pre- and post-merge runs, are saved as the
 `CandidateSequences` object itself.
 

@@ -6,23 +6,31 @@ The Widloski & Foster sliding-window detector, ported in
 epoch's saved clusterless decode: the encoding model from
 ``{epoch_id}_detector.pkl``, the decode grid, position, speed and SWR labels
 from ``{epoch_id}_80_data_over_time.pkl``, and the spike marks from
-``load_data``. Both procedures therefore read one encoding model.
+``load_data``, checked against the marks the encoding model was fitted on.
+Both procedures therefore read one encoding model.
 
 Each epoch writes, under ``Processed-Data/replay_detection_comparison/memoryless/<run_id>/``:
 
 - ``{epoch_id}_memoryless_events.parquet``, one row per candidate sequence;
 - ``{epoch_id}_memoryless_shuffle_draws.parquet``, every shuffled draw;
+- ``{epoch_id}_memoryless_observed.parquet``, what was observed: the span the
+  windows cover, and the stretches where SWR labels were observed;
 - ``{epoch_id}_memoryless_candidates.pkl``, the per-window statistics, gates
   and pre-merge runs that explain each rejection.
 
-``manifest.json`` records the configuration, the shuffle definition and seed,
-the code and library versions, every input's hash, and every epoch's outcome,
-including those skipped for a missing input. It is rewritten after each epoch,
-so a run that stops part way still says what it did.
+``manifest.json`` records the run's settings and, per epoch, the commit, the
+time grid, a hash of every input and of the marks, the encoding model's
+settings, and the outcome. It is rewritten atomically after each epoch, so a
+run that stops part way still says what it did, and a rerun under the same
+run id refuses to continue with different settings or code.
 
-The SWR labels are whichever ripple detector the decode used, read from the
-epoch identifier: ``chimi20200212_02_r1_HPC`` is Kay's, and a decode with
-another detector carries its name, ``..._HPC_Karlsson``.
+Epoch identifiers name the decode: ``chimi20200212_02_r1_HPC`` is the
+canonical one (Kay's SWRs, trained on ``no_ripple``, stationary). A decode
+made another way carries suffixes in the order the decode appends them:
+``_contfrag``, a ripple detector (``_Karlsson``), ``_non_stationary``, and a
+training type (``_all``). ``--animal`` and ``--all`` run canonical decodes
+only unless ``--include-variants`` is given; ``--epoch-id`` runs whatever it
+names.
 
 The design is in ``docs/design/replay_detection_comparison/02-memoryless-sequence.md``.
 
@@ -36,7 +44,9 @@ Usage:
 """
 
 import argparse
+import hashlib
 import json
+import os
 import sys
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
@@ -56,10 +66,14 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
     ShuffleSeed,
     load_clusterless_encoding_model,
     run_epoch,
+    window_midpoints_s,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.event_table import (
     canonical_swr_intervals,
     observed_intervals,
+)
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
+    check_marks_match_encoding,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
     DEFAULT_N_SHUFFLES,
@@ -77,6 +91,12 @@ NON_LOCAL_THRESHOLD_PERCENT = round(100 * DEFAULT_NON_LOCAL_THRESHOLD)
 DEFAULT_SWR_DEFINITION = "Kay"
 """A decode run with the default ripple detector adds no suffix to its identifier."""
 
+OTHER_RIPPLE_DETECTORS = ("Karlsson", "Yu")
+"""The ripple detectors whose name a decode would append; Kay's it does not."""
+
+DEFAULT_TRAINING_TYPE = "no_ripple"
+"""The training type a decode does not append to its identifier."""
+
 
 @dataclass(frozen=True)
 class EpochKey:
@@ -87,27 +107,60 @@ class EpochKey:
     epoch_name: str
     brain_area: str
     swr_definition: str
+    contfrag: bool
+    non_stationary: bool
+    training_type: str
+
+    @property
+    def is_canonical(self) -> bool:
+        """The decode the comparison uses: Kay's SWRs, no_ripple, stationary."""
+        return (
+            not self.contfrag
+            and self.swr_definition == DEFAULT_SWR_DEFINITION
+            and not self.non_stationary
+            and self.training_type == DEFAULT_TRAINING_TYPE
+        )
 
 
 def parse_epoch_identifier(epoch_id: str) -> EpochKey:
-    """Split ``{animal}{date}_{epoch}_{brain_area}[_{ripple_detector}]``.
+    """Split ``{animal}{date}_{epoch}_{brain_area}`` and any decode suffixes.
 
-    ``"chimi20200212_02_r1_HPC"`` is ``chimi20200212_.nwb``, epoch ``02_r1``,
-    HPC, Kay's SWRs; ``"chimi20200212_02_r1_HPC_Karlsson"`` is the same epoch
-    decoded with Karlsson's.
+    Suffixes come in the order ``run_decoding_bandit.py`` and
+    ``run_decoding_contfrag.py`` append them: ``_contfrag``, a ripple detector
+    other than Kay, ``_non_stationary``, and a training type other than
+    ``no_ripple``. Anything else is refused rather than read as, say, a
+    ripple detector called ``all``.
     """
     parts = epoch_id.split("_")
-    if len(parts) not in (4, 5) or not all(parts):
+    if len(parts) < 4 or not all(parts):
         raise ValueError(
             f"{epoch_id!r} is not {{animal}}{{date}}_{{epoch}}_{{brain_area}} with "
-            f"an optional _{{ripple_detector}}."
+            f"optional decode suffixes."
+        )
+    stem, number, replicate, brain_area, *rest = parts
+    contfrag = rest[:1] == ["contfrag"]
+    rest = rest[1:] if contfrag else rest
+    swr_definition = DEFAULT_SWR_DEFINITION
+    if rest and rest[0] in OTHER_RIPPLE_DETECTORS:
+        swr_definition, rest = rest[0], rest[1:]
+    non_stationary = rest[:2] == ["non", "stationary"]
+    rest = rest[2:] if non_stationary else rest
+    training_type = DEFAULT_TRAINING_TYPE
+    if rest[:1] == ["all"]:
+        training_type, rest = "all", rest[1:]
+    if rest:
+        raise ValueError(
+            f"{epoch_id!r} ends in {'_'.join(rest)!r}, which no decode appends."
         )
     return EpochKey(
         epoch_id=epoch_id,
-        nwb_file_name=f"{parts[0]}_.nwb",
-        epoch_name=f"{parts[1]}_{parts[2]}",
-        brain_area=parts[3],
-        swr_definition=parts[4] if len(parts) == 5 else DEFAULT_SWR_DEFINITION,
+        nwb_file_name=f"{stem}_.nwb",
+        epoch_name=f"{number}_{replicate}",
+        brain_area=brain_area,
+        swr_definition=swr_definition,
+        contfrag=contfrag,
+        non_stationary=non_stationary,
+        training_type=training_type,
     )
 
 
@@ -120,20 +173,45 @@ def input_paths(epoch_id: str, root: Path) -> dict[str, Path]:
     }
 
 
-def find_epochs(animal: str | None, root: Path) -> list[str]:
-    """HPC epochs with both a saved detector and a ``data_over_time`` file.
+def find_epochs(
+    animal: str | None, root: Path, *, include_variants: bool = False
+) -> tuple[list[str], dict[str, str]]:
+    """HPC decodes with both artifacts saved, and why every other one was left out.
 
-    HPC only: this port reads a clusterless encoding model.
+    HPC only: this port reads a clusterless encoding model. A name no decode
+    writes, or a missing artifact, is recorded rather than raised, so one
+    stray file cannot stop a run over many epochs.
+
+    Returns
+    -------
+    epochs : list of str
+    skipped : dict of str to str
+        Epoch identifier to the reason it was left out.
     """
     pattern = f"{animal}*_HPC*_detector.pkl" if animal else "*_HPC*_detector.pkl"
-    epochs = []
+    epochs, skipped = [], {}
     for detector in sorted(root.glob(pattern)):
         epoch_id = detector.name.removesuffix("_detector.pkl")
-        if parse_epoch_identifier(epoch_id).brain_area != "HPC":
+        missing = [
+            name
+            for name, path in input_paths(epoch_id, root).items()
+            if not path.exists()
+        ]
+        if missing:
+            skipped[epoch_id] = f"missing {', '.join(missing)}"
             continue
-        if all(path.exists() for path in input_paths(epoch_id, root).values()):
+        try:
+            key = parse_epoch_identifier(epoch_id)
+        except ValueError as error:
+            skipped[epoch_id] = str(error)
+            continue
+        if key.brain_area != "HPC":
+            skipped[epoch_id] = f"brain area {key.brain_area}, not HPC"
+        elif not key.is_canonical and not include_variants:
+            skipped[epoch_id] = "a decode variant; pass --include-variants to run it"
+        else:
             epochs.append(epoch_id)
-    return epochs
+    return epochs, skipped
 
 
 def load_marks(key: EpochKey, cache_dir: Path) -> tuple[list, list]:
@@ -141,7 +219,7 @@ def load_marks(key: EpochKey, cache_dir: Path) -> tuple[list, list]:
 
     ``load_data`` is slow and needs the Spyglass database; the marks do not
     depend on the ripple detector, so one cache serves every decode of an
-    epoch.
+    epoch. A stale cache is caught by ``check_marks_match_encoding``.
     """
     cache = (
         cache_dir / f"{key.nwb_file_name}_{key.epoch_name}_{key.brain_area}_marks.pkl"
@@ -161,6 +239,15 @@ def load_marks(key: EpochKey, cache_dir: Path) -> tuple[list, list]:
     return marks
 
 
+def marks_sha256(spike_times: list, spike_waveform_features: list) -> str:
+    """One hash of every electrode's spike times and marks, in order."""
+    digest = hashlib.sha256()
+    for times, features in zip(spike_times, spike_waveform_features, strict=True):
+        digest.update(np.ascontiguousarray(times, dtype=np.float64).tobytes())
+        digest.update(np.ascontiguousarray(features, dtype=np.float64).tobytes())
+    return digest.hexdigest()
+
+
 def _one_value(frame: pd.DataFrame, column: str) -> Any:
     values = pd.unique(frame[column])
     if len(values) != 1:
@@ -174,8 +261,28 @@ def output_paths(epoch_id: str, output_dir: Path) -> dict[str, Path]:
     return {
         "events": output_dir / f"{epoch_id}_memoryless_events.parquet",
         "shuffle_draws": output_dir / f"{epoch_id}_memoryless_shuffle_draws.parquet",
+        "observed": output_dir / f"{epoch_id}_memoryless_observed.parquet",
         "candidates": output_dir / f"{epoch_id}_memoryless_candidates.pkl",
     }
+
+
+def observation_table(
+    time: np.ndarray, swr_observed: np.ndarray, config: MemorylessSequenceConfig
+) -> pd.DataFrame:
+    """The stretches this epoch observed, independent of what it detected.
+
+    ``decoded_windows`` spans the first and last window midpoint the grid
+    supports, the final row, which no spike can reach, excluded;
+    ``swr_labels`` are the stretches where SWR labels were observed.
+    """
+    midpoints = window_midpoints_s(time[:-1], config)
+    rows = []
+    if midpoints.size:
+        rows.append(("decoded_windows", midpoints[0], midpoints[-1]))
+    rows += [("swr_labels", start, end) for start, end in swr_observed]
+    return pd.DataFrame(rows, columns=["kind", "start_s", "end_s"]).astype(
+        {"kind": object, "start_s": np.float64, "end_s": np.float64}
+    )
 
 
 def run_one(
@@ -194,14 +301,21 @@ def run_one(
 ) -> dict:
     """Detect, test and save one epoch; return what the manifest records for it.
 
-    A missing input is a skip, recorded with its reason. Anything else that
-    goes wrong raises: a silent skip would shrink the cohort without saying so.
+    Raises
+    ------
+    FileNotFoundError
+        An input is missing. A run over many epochs never asks for one:
+        :func:`find_epochs` leaves such epochs out and records why.
+    ValueError
+        The marks are not the ones the encoding model was fitted on, or the
+        grid, the identifier or ``data_over_time`` is not what the detector
+        needs.
     """
     key = parse_epoch_identifier(epoch_id)
     inputs = input_paths(epoch_id, root)
     missing = [name for name, path in inputs.items() if not path.exists()]
     if missing:
-        return {"status": "skipped", "reason": f"missing {', '.join(missing)}"}
+        raise FileNotFoundError(f"{epoch_id}: missing {', '.join(missing)}.")
 
     encoding_model = load_clusterless_encoding_model(inputs["detector"])
     data_over_time = pd.read_pickle(inputs["data_over_time"])
@@ -216,9 +330,13 @@ def run_one(
         run_id=run_id,
     )
     spike_times, spike_waveform_features = marks_loader(key, cache_dir)
+    check_marks_match_encoding(encoding_model, spike_times, spike_waveform_features)
 
+    time = data_over_time.index.to_numpy(dtype=np.float64)
+    # SWR_event is an integer and never NaN; SWR_zscore is NaN where the LFP is missing
+    swr_observed = observed_intervals(data_over_time, "SWR_zscore")
     detection = run_epoch(
-        data_over_time.index.to_numpy(dtype=np.float64),
+        time,
         data_over_time["linear_position"].to_numpy(dtype=np.float64),
         data_over_time["head_speed"].to_numpy(dtype=np.float64),
         spike_times,
@@ -228,8 +346,7 @@ def run_one(
         swr_intervals=canonical_swr_intervals(
             data_over_time, speed_threshold=config.speed_threshold_cm_per_s
         ),
-        # SWR_event is an integer and never NaN; SWR_zscore is NaN where the LFP is missing
-        swr_observed_intervals=observed_intervals(data_over_time, "SWR_zscore"),
+        swr_observed_intervals=swr_observed,
         swr_definition=key.swr_definition,
         seed=ShuffleSeed(run=run_seed, session=epoch_id) if shuffle else None,
         config=config,
@@ -238,16 +355,41 @@ def run_one(
 
     outputs = output_paths(epoch_id, output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    for frame in (detection.table, detection.shuffle_draws):
+    observed = observation_table(time, swr_observed, config)
+    for frame in (detection.table, detection.shuffle_draws, observed):
         frame.attrs = provenance | {"epoch_id": epoch_id}
     write_table(detection.table, outputs["events"])
     write_table(detection.shuffle_draws, outputs["shuffle_draws"])
+    write_table(observed, outputs["observed"])
     joblib.dump(detection.candidates, outputs["candidates"])
 
     table = detection.table
     return {
         "status": "ok",
-        "swr_definition": key.swr_definition,
+        "git_commit": provenance["git_commit"],
+        "produced_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "decode": {
+            "swr_definition": key.swr_definition,
+            "contfrag": key.contfrag,
+            "non_stationary": key.non_stationary,
+            "training_type": key.training_type,
+        },
+        "time_grid": {
+            "start_s": float(time[0]),
+            "end_s": float(time[-1]),
+            "n_samples": int(time.size),
+            "sampling_frequency": config.sampling_frequency,
+        },
+        "encoding": {
+            "n_electrodes": len(encoding_model["encoding_positions"]),
+            "n_encoding_spikes": [
+                int(np.asarray(p).shape[0])
+                for p in encoding_model["encoding_positions"]
+            ],
+            "position_std": np.asarray(encoding_model["position_std"]).tolist(),
+            "waveform_std": np.asarray(encoding_model["waveform_std"]).tolist(),
+            "block_size": int(encoding_model["block_size"]),
+        },
         "n_candidates": int(len(table)),
         "n_replay": int(table.is_replay.sum()),
         "n_shuffled": int((table.n_shuffles > 0).sum()),
@@ -256,22 +398,21 @@ def run_one(
             name: {"path": str(path), "sha256": sha256_file(path)}
             for name, path in inputs.items()
         },
+        "marks_sha256": marks_sha256(spike_times, spike_waveform_features),
         "outputs": {name: str(path) for name, path in outputs.items()},
     }
 
 
-def run_manifest(
-    run_id: str,
+def run_settings(
     run_seed: int,
     shuffle: bool,
     n_shuffles: int,
     config: MemorylessSequenceConfig,
-    provenance: dict,
-    epochs: dict[str, dict],
+    git_commit: str,
 ) -> dict:
-    return provenance | {
-        "run_id": run_id,
-        "design_spec": DESIGN_SPEC,
+    """What every epoch of one run must share; a resume must match it."""
+    return {
+        "git_commit": git_commit,
         "config": asdict(config),
         "shuffle": {
             "run": shuffle,
@@ -287,11 +428,15 @@ def run_manifest(
             "p_value": "(1 + count(null <= observed)) / (n_shuffles + 1)",
             "passes": f"both p-values below {SIGNIFICANCE_LEVEL}",
         },
-        "libraries": {
-            name: version(name) for name in ("non_local_detector", "numpy", "pandas")
-        },
-        "epochs": epochs,
     }
+
+
+def write_manifest(path: Path, manifest: dict) -> None:
+    """Write through a temporary file, so a stopped run never leaves half a manifest."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(".json.tmp")
+    temporary.write_text(json.dumps(manifest, indent=2))
+    os.replace(temporary, path)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -300,13 +445,18 @@ def main(argv: list[str] | None = None) -> None:
     )
     which = parser.add_mutually_exclusive_group(required=True)
     which.add_argument("--epoch-id", action="append", help="One epoch; repeatable.")
-    which.add_argument("--animal", help="Every HPC epoch of this animal.")
-    which.add_argument("--all", action="store_true", help="Every HPC epoch.")
+    which.add_argument("--animal", help="Every canonical HPC decode of this animal.")
+    which.add_argument("--all", action="store_true", help="Every canonical HPC decode.")
     parser.add_argument(
         "--run-seed", type=int, required=True, help="Recorded in the manifest."
     )
     parser.add_argument("--n-shuffles", type=int, default=DEFAULT_N_SHUFFLES)
     parser.add_argument("--no-shuffle", action="store_true")
+    parser.add_argument(
+        "--include-variants",
+        action="store_true",
+        help="Also run decodes made another way (_all, _non_stationary, ...).",
+    )
     parser.add_argument("--run-id", help="Defaults to the commit and the seed.")
     parser.add_argument("--root", type=Path, default=PROCESSED_DATA_DIR)
     parser.add_argument("--output-root", type=Path, default=OUTPUT_ROOT)
@@ -330,25 +480,55 @@ def main(argv: list[str] | None = None) -> None:
     )
     output_dir = args.output_root / run_id
     config = MemorylessSequenceConfig()
+    settings = run_settings(args.run_seed, shuffle, args.n_shuffles, config, commit)
     provenance = {
         "produced_by": "scripts/decoding/run_memoryless_detection.py",
-        "produced_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "git_commit": commit,
         "run_id": run_id,
     }
 
+    skipped: dict[str, str] = {}
     if args.epoch_id:
         epoch_ids = list(args.epoch_id)
     else:
-        epoch_ids = find_epochs(None if args.all else args.animal, args.root)
+        epoch_ids, skipped = find_epochs(
+            None if args.all else args.animal,
+            args.root,
+            include_variants=args.include_variants,
+        )
     if not epoch_ids:
-        sys.exit(f"No HPC epochs with a detector and data_over_time under {args.root}.")
+        sys.exit(
+            f"No HPC decodes to run under {args.root}; left out: "
+            f"{json.dumps(skipped, indent=2)}"
+        )
 
     manifest_path = output_dir / "manifest.json"
     epochs: dict[str, dict] = {}
     if manifest_path.exists():
-        epochs = json.loads(manifest_path.read_text())["epochs"]
+        previous = json.loads(manifest_path.read_text())
+        if previous.get("settings") != settings:
+            sys.exit(
+                f"{manifest_path} was written with other settings or code; a run "
+                "must not mix them. Start a new --run-id."
+            )
+        epochs = previous["epochs"]
+    for epoch_id, why in skipped.items():
+        epochs[epoch_id] = {"status": "skipped", "reason": why}
 
+    def manifest() -> dict:
+        return {
+            "produced_by": provenance["produced_by"],
+            "run_id": run_id,
+            "design_spec": DESIGN_SPEC,
+            "settings": settings,
+            "libraries": {
+                name: version(name)
+                for name in ("non_local_detector", "numpy", "pandas")
+            },
+            "epochs": epochs,
+        }
+
+    write_manifest(manifest_path, manifest())
     for number, epoch_id in enumerate(epoch_ids, start=1):
         done = epochs.get(epoch_id, {}).get("status") == "ok"
         if done and not args.overwrite:
@@ -367,22 +547,12 @@ def main(argv: list[str] | None = None) -> None:
             config=config,
             provenance=provenance,
         )
-        print(f"    {epochs[epoch_id]['status']}: {epochs[epoch_id]}"[:200])
-        output_dir.mkdir(parents=True, exist_ok=True)
-        manifest_path.write_text(
-            json.dumps(
-                run_manifest(
-                    run_id,
-                    args.run_seed,
-                    shuffle,
-                    args.n_shuffles,
-                    config,
-                    provenance,
-                    epochs,
-                ),
-                indent=2,
-            )
+        record = epochs[epoch_id]
+        print(
+            f"    {record['n_candidates']} candidates, {record['n_replay']} replay, "
+            f"{record['n_shuffle_pass']} passing the shuffle"
         )
+        write_manifest(manifest_path, manifest())
     print(f"manifest -> {manifest_path}")
 
 

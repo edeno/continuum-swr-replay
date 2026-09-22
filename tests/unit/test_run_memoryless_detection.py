@@ -42,23 +42,56 @@ CONFIG = MemorylessSequenceConfig(sampling_frequency=SAMPLING_FREQUENCY)
 
 
 class TestParseEpochIdentifier:
-    def test_a_default_decode_carries_kay_swrs(self):
+    def test_the_canonical_decode_carries_kay_swrs(self):
         key = parse_epoch_identifier("chimi20200212_02_r1_HPC")
 
         assert key.nwb_file_name == "chimi20200212_.nwb"
         assert key.epoch_name == "02_r1"
         assert key.brain_area == "HPC"
         assert key.swr_definition == DEFAULT_SWR_DEFINITION == "Kay"
+        assert key.is_canonical
 
-    def test_another_ripple_detector_is_read_from_the_suffix(self):
-        key = parse_epoch_identifier("chimi20200212_02_r1_HPC_Karlsson")
+    @pytest.mark.parametrize(
+        ("suffix", "expected"),
+        [
+            ("_Karlsson", {"swr_definition": "Karlsson"}),
+            ("_all", {"training_type": "all"}),
+            ("_non_stationary", {"non_stationary": True}),
+            ("_contfrag", {"contfrag": True}),
+            (
+                "_contfrag_Karlsson_non_stationary_all",
+                {
+                    "contfrag": True,
+                    "swr_definition": "Karlsson",
+                    "non_stationary": True,
+                    "training_type": "all",
+                },
+            ),
+        ],
+    )
+    def test_each_decode_suffix_is_read_in_the_order_it_is_appended(
+        self, suffix, expected
+    ):
+        """As run_decoding_bandit.py and run_decoding_contfrag.py append them."""
+        key = parse_epoch_identifier("chimi20200212_02_r1_HPC" + suffix)
 
-        assert key.swr_definition == "Karlsson"
+        assert {name: getattr(key, name) for name in expected} == expected
         assert key.brain_area == "HPC"
+        assert not key.is_canonical
 
-    @pytest.mark.parametrize("bad", ["chimi20200212_02", "a_b_c_d_e_f", "a__c_d"])
-    def test_a_malformed_identifier_is_refused(self, bad):
-        with pytest.raises(ValueError, match="brain_area"):
+    @pytest.mark.parametrize(
+        "bad",
+        [
+            "chimi20200212_02",
+            "a__c_d",
+            "chimi20200212_02_r1_HPC_Kay",
+            "x_02_r1_HPC_all_Karlsson",
+        ],
+    )
+    def test_a_name_no_decode_writes_is_refused(self, bad):
+        """Including suffixes out of order, and an explicit Kay, which no
+        decode appends."""
+        with pytest.raises(ValueError):
             parse_epoch_identifier(bad)
 
 
@@ -67,25 +100,49 @@ def touch(path):
 
 
 class TestFindEpochs:
-    def test_only_hpc_epochs_with_both_artifacts(self, tmp_path):
-        for epoch_id in ("a20200101_02_r1_HPC", "a20200101_04_r2_HPC"):
-            for path in input_paths(epoch_id, tmp_path).values():
-                touch(path)
-        touch(input_paths("a20200101_06_r3_HPC", tmp_path)["detector"])  # no dot
-        for path in input_paths("a20200101_02_r1_mPFC", tmp_path).values():
-            touch(path)
+    def write_decode(self, root, epoch_id, *, data_over_time=True):
+        paths = input_paths(epoch_id, root)
+        touch(paths["detector"])
+        if data_over_time:
+            touch(paths["data_over_time"])
 
-        assert find_epochs(None, tmp_path) == [
-            "a20200101_02_r1_HPC",
-            "a20200101_04_r2_HPC",
-        ]
+    def test_canonical_hpc_decodes_with_both_artifacts(self, tmp_path):
+        for epoch_id in ("a20200101_02_r1_HPC", "a20200101_04_r2_HPC"):
+            self.write_decode(tmp_path, epoch_id)
+
+        epochs, skipped = find_epochs(None, tmp_path)
+
+        assert epochs == ["a20200101_02_r1_HPC", "a20200101_04_r2_HPC"]
+        assert skipped == {}
+
+    def test_what_is_left_out_is_recorded_with_its_reason(self, tmp_path):
+        self.write_decode(tmp_path, "a20200101_02_r1_HPC")
+        self.write_decode(tmp_path, "a20200101_04_r2_HPC", data_over_time=False)
+        self.write_decode(tmp_path, "a20200101_06_r3_HPC_all")
+        self.write_decode(tmp_path, "a20200101_08_r4_HPC_bogus")
+
+        epochs, skipped = find_epochs(None, tmp_path)
+
+        assert epochs == ["a20200101_02_r1_HPC"]
+        assert skipped["a20200101_04_r2_HPC"] == "missing data_over_time"
+        assert "variant" in skipped["a20200101_06_r3_HPC_all"]
+        assert "no decode appends" in skipped["a20200101_08_r4_HPC_bogus"]
+
+    def test_variants_can_be_asked_for(self, tmp_path):
+        self.write_decode(tmp_path, "a20200101_02_r1_HPC")
+        self.write_decode(tmp_path, "a20200101_02_r1_HPC_all")
+
+        epochs, _ = find_epochs(None, tmp_path, include_variants=True)
+
+        assert sorted(epochs) == ["a20200101_02_r1_HPC", "a20200101_02_r1_HPC_all"]
 
     def test_an_animal_restricts_the_search(self, tmp_path):
         for epoch_id in ("a20200101_02_r1_HPC", "b20200101_02_r1_HPC"):
-            for path in input_paths(epoch_id, tmp_path).values():
-                touch(path)
+            self.write_decode(tmp_path, epoch_id)
 
-        assert find_epochs("b", tmp_path) == ["b20200101_02_r1_HPC"]
+        epochs, _ = find_epochs("b", tmp_path)
+
+        assert epochs == ["b20200101_02_r1_HPC"]
 
 
 @pytest.fixture(scope="module")
@@ -141,11 +198,16 @@ def run(decode_root, tmp_path, **overrides):
 
 
 class TestRunOne:
-    def test_writes_the_three_outputs_and_reports_them(self, decode_root, tmp_path):
+    def test_writes_its_outputs_and_reports_them(self, decode_root, tmp_path):
         record = run(decode_root, tmp_path)
 
         assert record["status"] == "ok"
-        assert set(record["outputs"]) == {"events", "shuffle_draws", "candidates"}
+        assert set(record["outputs"]) == {
+            "events",
+            "shuffle_draws",
+            "observed",
+            "candidates",
+        }
         table = read_table(record["outputs"]["events"])
         assert list(table.columns) == list(MEMORYLESS_EVENT_TABLE_DTYPES)
         assert record["n_candidates"] == len(table)
@@ -192,33 +254,69 @@ class TestRunOne:
         assert attrs["git_commit"] == "test"
         assert attrs["epoch_id"] == EPOCH_ID
 
-    def test_a_missing_input_is_a_recorded_skip(self, decode_root, tmp_path):
-        record = run_one(
-            "sim20200101_04_r2_HPC",
-            root=decode_root[0],
-            output_dir=tmp_path / "out",
-            cache_dir=tmp_path / "cache",
-            run_id="test-run",
-            run_seed=7,
-            shuffle=True,
-            n_shuffles=N_SHUFFLES,
-            config=CONFIG,
-            provenance={},
-        )
+    def test_a_missing_input_raises(self, decode_root, tmp_path):
+        """Named explicitly, a missing decode is an error, not a quiet skip."""
+        with pytest.raises(FileNotFoundError, match="missing detector"):
+            run_one(
+                "sim20200101_04_r2_HPC",
+                root=decode_root[0],
+                output_dir=tmp_path / "out",
+                cache_dir=tmp_path / "cache",
+                run_id="test-run",
+                run_seed=7,
+                shuffle=True,
+                n_shuffles=N_SHUFFLES,
+                config=CONFIG,
+                provenance={"git_commit": "test"},
+            )
 
-        assert record == {
-            "status": "skipped",
-            "reason": "missing detector, data_over_time",
-        }
+    def test_marks_that_are_not_the_encoded_ones_are_refused(
+        self, decode_root, tmp_path
+    ):
+        _, epoch = decode_root
+        changed = [np.array(f) for f in epoch.spike_waveform_features]
+        changed[0][10, 0] += 1.0
+
+        with pytest.raises(ValueError, match="encoding marks"):
+            run(
+                decode_root,
+                tmp_path,
+                marks_loader=lambda key, cache: (epoch.spike_times, changed),
+            )
+
+    def test_what_was_observed_is_written_apart_from_what_was_found(
+        self, decode_root, tmp_path
+    ):
+        _, epoch = decode_root
+        observed = read_table(run(decode_root, tmp_path)["outputs"]["observed"])
+
+        assert observed.kind.tolist() == ["decoded_windows", "swr_labels"]
+        swr = observed[observed.kind == "swr_labels"].iloc[0]
+        assert swr.start_s == epoch.time[0]
+        assert swr.end_s == epoch.time[-1]
+        windows = observed[observed.kind == "decoded_windows"].iloc[0]
+        assert windows.start_s == epoch.time[CONFIG.window_n_samples // 2]
+
+    def test_the_record_carries_the_grid_the_marks_and_the_encoding(
+        self, decode_root, tmp_path
+    ):
+        _, epoch = decode_root
+        record = run(decode_root, tmp_path)
+
+        assert record["time_grid"]["n_samples"] == epoch.time.size
+        assert record["time_grid"]["start_s"] == epoch.time[0]
+        assert len(record["marks_sha256"]) == 64
+        assert record["encoding"]["n_electrodes"] == len(epoch.spike_times)
+        assert record["git_commit"] == "test"
+        assert record["decode"]["swr_definition"] == "Kay"
 
 
 class TestMain:
-    def test_a_run_writes_its_manifest_from_cached_marks(
-        self, decode_root, tmp_path, capsys
-    ):
+    def cli(self, decode_root, tmp_path, *extra):
+        """The runner through its command line, its marks already cached."""
         root, epoch = decode_root
         cache_dir = tmp_path / "cache"
-        cache_dir.mkdir()
+        cache_dir.mkdir(exist_ok=True)
         key = parse_epoch_identifier(EPOCH_ID)
         joblib.dump(
             (epoch.spike_times, epoch.spike_waveform_features),
@@ -226,30 +324,41 @@ class TestMain:
             / f"{key.nwb_file_name}_{key.epoch_name}_{key.brain_area}_marks.pkl",
         )
         output_root = tmp_path / "memoryless"
+        arguments = {
+            "--epoch-id": EPOCH_ID,
+            "--run-seed": "7",
+            "--n-shuffles": str(N_SHUFFLES),
+            "--run-id": "cli-run",
+            "--root": str(root),
+            "--output-root": str(output_root),
+            "--cache-dir": str(cache_dir),
+        }
+        for flag, value in zip(extra[::2], extra[1::2], strict=True):
+            arguments[flag] = value
+        main([item for pair in arguments.items() for item in pair])
+        return json.loads((output_root / "cli-run" / "manifest.json").read_text())
 
-        main(
-            [
-                "--epoch-id",
-                EPOCH_ID,
-                "--run-seed",
-                "7",
-                "--n-shuffles",
-                str(N_SHUFFLES),
-                "--run-id",
-                "cli-run",
-                "--root",
-                str(root),
-                "--output-root",
-                str(output_root),
-                "--cache-dir",
-                str(cache_dir),
-            ]
-        )
+    def test_a_run_writes_its_manifest_from_cached_marks(self, decode_root, tmp_path):
+        manifest = self.cli(decode_root, tmp_path)
 
-        manifest = json.loads((output_root / "cli-run" / "manifest.json").read_text())
         assert manifest["run_id"] == "cli-run"
         assert manifest["epochs"][EPOCH_ID]["status"] == "ok"
-        assert manifest["shuffle"]["n_shuffles"] == N_SHUFFLES
-        assert manifest["shuffle"]["run_seed"] == 7
-        assert manifest["config"]["dispersion_threshold_cm"] == 12.0
+        assert manifest["settings"]["shuffle"]["n_shuffles"] == N_SHUFFLES
+        assert manifest["settings"]["shuffle"]["run_seed"] == 7
+        assert manifest["settings"]["config"]["dispersion_threshold_cm"] == 12.0
+        assert manifest["settings"]["git_commit"]
         assert "non_local_detector" in manifest["libraries"]
+
+    def test_a_rerun_with_the_same_settings_resumes(self, decode_root, tmp_path):
+        first = self.cli(decode_root, tmp_path)
+        again = self.cli(decode_root, tmp_path)
+
+        assert again["epochs"][EPOCH_ID] == first["epochs"][EPOCH_ID]
+
+    def test_a_rerun_with_other_settings_is_refused(self, decode_root, tmp_path):
+        """The manifest would otherwise record settings the finished epochs
+        were not made with."""
+        self.cli(decode_root, tmp_path)
+
+        with pytest.raises(SystemExit, match="other settings"):
+            self.cli(decode_root, tmp_path, "--n-shuffles", str(N_SHUFFLES + 10))
