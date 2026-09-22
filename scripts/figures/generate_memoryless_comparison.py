@@ -59,6 +59,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
     DEFAULT_N_SHUFFLES,
+    SIGNIFICANCE_LEVEL,
     ShuffleSeed,
     shuffle_candidate_sorted,
 )
@@ -452,15 +453,16 @@ def shuffle_of(decoded: dict, event: int):
 
 
 def draws_from_passing(result) -> int:
-    """How many more draws at or below the observed value than a pass allows.
+    """How many more draws below the observed value than a pass allows.
 
-    A half passes with at most 4 of 100 draws at or below it (p = 5/101).
+    As the reference tests it, a half passes when ``(1 + k) / (n + 1) <= 0.05``
+    with ``k`` the draws strictly below the observed value: at most 4 of 100.
     Zero means the candidate passes; one means a single draw decided it.
     """
-    allowed = int(np.floor(0.05 * (result.n_shuffles + 1) - 1e-9)) - 1
+    allowed = int(np.floor(SIGNIFICANCE_LEVEL * (result.n_shuffles + 1) + 1e-9)) - 1
     worst = max(
-        int(np.count_nonzero(result.null_spread_cm <= result.observed_spread_cm)),
-        int(np.count_nonzero(result.null_jump_cm <= result.observed_jump_cm)),
+        int(np.count_nonzero(result.null_spread_cm < result.observed_spread_cm)),
+        int(np.count_nonzero(result.null_jump_cm < result.observed_jump_cm)),
     )
     return max(0, worst - allowed)
 
@@ -540,6 +542,12 @@ def check_caption_claims(decoded: dict, config: MemorylessSequenceConfig) -> Non
             "The caption says the state-space detector reports all four zoomed "
             "events; it does not. Rewrite the caption."
         )
+    for event in (CONTINUOUS_OUTBOUND_EVENT, CONTINUOUS_INBOUND_EVENT):
+        if not local_fraction_of_event(decoded, event) > 0.5:
+            raise RuntimeError(
+                "The caption says most of each reported continuous replay is the "
+                f"animal's own place; {EVENT_LABELS[event]!r} is not. Rewrite it."
+            )
 
 
 def local_fraction(decoded: dict, sequence: int, tolerance_cm: float = 15.0) -> float:
@@ -1064,20 +1072,6 @@ def check_summary_claims(summary: pd.DataFrame) -> None:
             "The caption says the state-space detector, held to the published "
             "replay definition, reports nothing below 45 cm; the summary disagrees."
         )
-    passes = (
-        summary[summary["summary"] == "shuffle_pass_rate_by_duration"]
-        .pivot(index="duration_s", columns="measure", values="value")
-        .sort_index()
-    )
-    shortest, longest = passes.iloc[:2], passes.iloc[-2:]
-    if not (
-        shortest.sliding_jump_pass.max() < longest.sliding_jump_pass.min()
-        and shortest.sliding_jump_pass.max() < shortest.sliding_spread_pass.min()
-    ):
-        raise RuntimeError(
-            "The caption says short, fast replays fail the jump half of the "
-            "significance test; the summary's pass rates by duration disagree."
-        )
     by_distance = summary[summary["summary"] == "median_by_distance_from_animal"]
     local = (
         by_distance[by_distance.measure == "sliding_local_fraction"]
@@ -1218,12 +1212,16 @@ spread half alone, the only half the detection script's own filter could fail;
 the paper's analyses read both halves, from a corrected script. Of
 the replays it reported before the test,
 {pct(overall["sliding_shuffle_spread_pass_rate"])} pass the spread half and
-{pct(overall["sliding_shuffle_jump_pass_rate"])} the jump half; a short, fast
-replay jumps far between windows and fails the second. The state-space
-detector reports {pct(overall["state_space_matches"])}.
+{pct(overall["sliding_shuffle_jump_pass_rate"])} the jump half. The test is
+the reference's, convention for convention: zero jumps set aside, only draws
+strictly below the observed value counted, both halves at p ≤ 0.05. The
+state-space detector reports {pct(overall["state_space_matches"])}.
 {pct(overall["found_by_state_space_only"])} were reported by the
-state-space detector and missed by the sliding-window detector;
-{pct(overall["found_by_sliding_window_only"], 2)} went the other way.
+state-space detector and not by the sliding-window detector, counting the
+{pct(overall["missed_failed_shuffle"])} it reported and then failed on the
+significance test; {pct(overall["found_by_sliding_window_only"], 2)} went the
+other way ({pct(overall["found_by_sliding_window_only_before_shuffle"], 2)}
+before the significance test).
 
 The two detectors reach their limits on different quantities. The state-space
 detector is limited by duration, which is spike count, which is the data. The

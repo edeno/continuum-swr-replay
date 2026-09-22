@@ -366,7 +366,7 @@ def memoryless_outcome(
         "sliding_matches_before_shuffle": score.matches,
         "sliding_matches": any_match(lambda j: shuffles[j].passes),
         "sliding_matches_spread_only": any_match(
-            lambda j: shuffles[j].p_spread < SIGNIFICANCE_LEVEL
+            lambda j: shuffles[j].p_spread <= SIGNIFICANCE_LEVEL
         ),
         "sliding_p_spread": shuffles[i].p_spread,
         "sliding_p_jump": shuffles[i].p_jump,
@@ -685,8 +685,8 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
     reported = table[table.sliding_matches_before_shuffle]
     shuffle_by_duration = (
         reported.assign(
-            sliding_spread_pass=reported.sliding_p_spread.lt(SIGNIFICANCE_LEVEL),
-            sliding_jump_pass=reported.sliding_p_jump.lt(SIGNIFICANCE_LEVEL),
+            sliding_spread_pass=reported.sliding_p_spread.le(SIGNIFICANCE_LEVEL),
+            sliding_jump_pass=reported.sliding_p_jump.le(SIGNIFICANCE_LEVEL),
         )
         .groupby("duration_s")[["sliding_spread_pass", "sliding_jump_pass"]]
         .mean()
@@ -742,6 +742,7 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
                 "state_space_replay_matches",
                 "found_by_state_space_only",
                 "found_by_sliding_window_only",
+                "found_by_sliding_window_only_before_shuffle",
                 "sliding_accepted_but_not_the_injection",
                 "sliding_cells_with_several_accepted_overlaps",
                 "state_space_reports_in_several_intervals",
@@ -759,12 +760,12 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
                 # detector reported before the shuffle
                 float(
                     table[table.sliding_matches_before_shuffle]
-                    .sliding_p_spread.lt(SIGNIFICANCE_LEVEL)
+                    .sliding_p_spread.le(SIGNIFICANCE_LEVEL)
                     .mean()
                 ),
                 float(
                     table[table.sliding_matches_before_shuffle]
-                    .sliding_p_jump.lt(SIGNIFICANCE_LEVEL)
+                    .sliding_p_jump.le(SIGNIFICANCE_LEVEL)
                     .mean()
                 ),
                 float(missed.sliding_matches_before_shuffle.mean()),
@@ -774,6 +775,12 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
                 float(table.state_space_replay_matches.mean()),
                 float((table.state_space_matches & ~table.sliding_matches).mean()),
                 float((table.sliding_matches & ~table.state_space_matches).mean()),
+                float(
+                    (
+                        table.sliding_matches_before_shuffle
+                        & ~table.state_space_matches
+                    ).mean()
+                ),
                 share(
                     (table.sliding_found & ~table.sliding_matches_before_shuffle).sum(),
                     table.sliding_found.sum(),
@@ -944,7 +951,8 @@ def main() -> None:
         "non_local_prob_threshold": NON_LOCAL_PROB_THRESHOLD,
         "non_local_minimum_duration_s": NON_LOCAL_MINIMUM_DURATION_S,
         "spikes": "sorted",
-        "shuffle": "place-cell identity (the reference's rateMap(ind_rand, :))",
+        "shuffle": "place-cell identity (the reference's rateMap(ind_rand, :)); "
+        "zero jumps set aside, strict-below count, p <= 0.05, as the reference",
         "n_shuffles": DEFAULT_N_SHUFFLES,
         "shuffle_run_seed": SHUFFLE_RUN_SEED,
         "track": "linear",
