@@ -8,6 +8,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation im
     inject_replay,
     place_field_means,
     placements,
+    without,
 )
 
 SAMPLING_FREQUENCY = 500.0
@@ -53,17 +54,16 @@ class TestInjectReplay:
         assert end_s == pytest.approx(4.2, abs=0.005)
 
     def test_spikes_already_there_are_cleared_from_the_event(self):
+        """Comparing against the original spikes, not against the output: the
+        output trivially contains itself."""
         injected, (start_s, end_s) = self.inject()
 
         original = np.concatenate(self.spike_times)
-        assert ((original >= start_s) & (original <= end_s)).sum() > 0
-        for neuron in injected:
-            during = neuron[(neuron > start_s) & (neuron < end_s)]
-            # every remaining spike in the window must be one this call added
-            assert np.isin(during, self.injected_times(injected)).all()
+        inside = original[(original > start_s) & (original < end_s)]
+        assert inside.size > 0
 
-    def injected_times(self, injected):
-        return np.unique(np.concatenate(injected))
+        survivors = sum(int(np.isin(inside, neuron).sum()) for neuron in injected)
+        assert survivors == 0
 
     def test_spikes_outside_the_event_are_untouched(self):
         injected, (start_s, end_s) = self.inject()
@@ -158,8 +158,11 @@ class TestPlacements:
 
     def test_every_placement_leaves_room_for_the_margin(self):
         chosen = placements(
-            self.intervals, duration_s=0.100, margin_s=1.0,
-            n=200, rng=np.random.default_rng(0),
+            self.intervals,
+            duration_s=0.100,
+            margin_s=1.0,
+            n=200,
+            rng=np.random.default_rng(0),
         )
 
         assert chosen.size == 200
@@ -169,16 +172,22 @@ class TestPlacements:
     def test_an_interval_too_short_for_the_margin_is_not_used(self):
         """The second interval cannot hold the event plus its margins."""
         chosen = placements(
-            self.intervals, duration_s=0.100, margin_s=1.0,
-            n=200, rng=np.random.default_rng(0),
+            self.intervals,
+            duration_s=0.100,
+            margin_s=1.0,
+            n=200,
+            rng=np.random.default_rng(0),
         )
 
         assert not ((chosen >= 20.0) & (chosen <= 20.5)).any()
 
     def test_placements_are_spread_through_the_usable_interval(self):
         chosen = placements(
-            self.intervals, duration_s=0.100, margin_s=1.0,
-            n=400, rng=np.random.default_rng(0),
+            self.intervals,
+            duration_s=0.100,
+            margin_s=1.0,
+            n=400,
+            rng=np.random.default_rng(0),
         )
 
         assert chosen.max() - chosen.min() > 0.7 * (13.0 - 10.0 - 2.0 - 0.100)
@@ -186,6 +195,48 @@ class TestPlacements:
     def test_no_usable_interval_raises(self):
         with pytest.raises(ValueError, match="margin"):
             placements(
-                self.intervals, duration_s=0.100, margin_s=5.0,
-                n=10, rng=np.random.default_rng(0),
+                self.intervals,
+                duration_s=0.100,
+                margin_s=5.0,
+                n=10,
+                rng=np.random.default_rng(0),
             )
+
+
+class TestWithout:
+    def test_an_excluded_span_splits_an_interval(self):
+        kept = without(np.array([[0.0, 10.0]]), np.array([[4.0, 6.0]]))
+
+        np.testing.assert_allclose(kept, [[0.0, 4.0], [6.0, 10.0]])
+
+    def test_a_margin_widens_what_is_removed(self):
+        kept = without(np.array([[0.0, 10.0]]), np.array([[4.0, 6.0]]), margin_s=1.0)
+
+        np.testing.assert_allclose(kept, [[0.0, 3.0], [7.0, 10.0]])
+
+    def test_a_zero_width_span_still_removes_its_margin(self):
+        """The simulation's "local" entry has no width, and it still sits in a pause."""
+        kept = without(np.array([[0.0, 10.0]]), np.array([[5.0, 5.0]]), margin_s=0.5)
+
+        np.testing.assert_allclose(kept, [[0.0, 4.5], [5.5, 10.0]])
+
+    def test_an_interval_swallowed_whole_disappears(self):
+        kept = without(np.array([[4.0, 6.0]]), np.array([[0.0, 10.0]]))
+
+        assert kept.shape == (0, 2)
+
+    def test_other_intervals_are_untouched(self):
+        kept = without(np.array([[0.0, 10.0], [20.0, 30.0]]), np.array([[4.0, 6.0]]))
+
+        np.testing.assert_allclose(kept, [[0.0, 4.0], [6.0, 10.0], [20.0, 30.0]])
+
+    def test_every_excluded_span_is_applied(self):
+        """Removing one span must not stop the rest from being removed."""
+        kept = without(np.array([[0.0, 30.0]]), np.array([[4.0, 6.0], [14.0, 16.0]]))
+
+        np.testing.assert_allclose(kept, [[0.0, 4.0], [6.0, 14.0], [16.0, 30.0]])
+
+    def test_nothing_excluded_returns_what_it_was_given(self):
+        kept = without(np.array([[0.0, 10.0]]), np.zeros((0, 2)))
+
+        np.testing.assert_allclose(kept, [[0.0, 10.0]])

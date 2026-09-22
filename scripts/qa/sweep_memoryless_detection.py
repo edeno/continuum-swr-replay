@@ -4,7 +4,17 @@
 Injects replays of controlled path length, duration, firing rate and distance
 from the animal's own place into a simulated recording, and records what the
 memoryless sliding-window detector and this project's switching state-space
-model each report. Both read the same encoding model, fitted once.
+model each report.
+
+Each detector fits its own encoding model, from the same recording, the same
+non-event training mask and the same hyperparameters. They are separate fits
+and differ by a few percent of peak firing rate; they are not one shared
+object.
+
+A detector counts as finding an event only when what it reports is *the
+injected event*. Overlapping it in time is not enough: a sequence built from
+the local coding beside the injection overlaps it too, and scoring that as a
+detection turns the over-call into an apparent detection floor.
 
 The point is to separate limits of a method from limits of the data. A replay
 that neither detector finds says something about the recording; one that only
@@ -54,6 +64,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation im
     inject_replay,
     place_field_means,
     placements,
+    without,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
     aggregate_windows,
@@ -72,12 +83,30 @@ PEAK_RATE_HZ = (20.0, 60.0, 160.0)
 MIDPOINT_CM = (30.0, 60.0, 90.0, 120.0, 150.0)
 """Where the represented path is centered, which sets its distance from the animal."""
 
-MARGIN_S = 0.5
-"""Room left on each side of an injected event, inside one immobile stretch."""
+DECODE_MARGIN_S = 1.0
+"""How much time each side of an injected event is decoded.
+
+Wide, so that the window does not cap how long an over-called event can be
+reported as. It may reach past the immobile stretch; the speed gate rejects
+those windows, which is what it is for."""
+
+PLACEMENT_MARGIN_S = 0.25
+"""How much immobile room the injection needs on each side.
+
+Enough for a window of full support plus context, and small enough that the
+pieces left after cutting out the recording's own events can still hold an
+event."""
 
 NON_LOCAL_PROB_THRESHOLD = 0.8
 DISCRETE_TRANSITION_STICKINESS = np.array([30.0, 100000.0, 30.0, 200.0])
 SAME_PLACE_CM = 15.0
+
+MATCH_TOLERANCE_CM = 20.0
+"""How far a detector's decoded position may sit from the injected one.
+
+Generous against a 2 cm grid and a 6 cm smoothing kernel, so it separates
+"reported the injected path" from "reported somewhere else entirely" rather
+than grading accuracy."""
 
 SUMMARY_PATH = Path(
     "docs/design/replay_detection_comparison/detection_sweep_summary.csv"
@@ -159,7 +188,7 @@ def build_recording():
     }
 
 
-def memoryless_outcome(recording, injected, window, bounds):
+def memoryless_outcome(recording, injected, window, bounds, true_position_cm, path_cm):
     """What the sliding-window detector reports for one injected event."""
     time, position = window
     result = sorted_spikes_epoch_log_likelihood(
@@ -193,10 +222,11 @@ def memoryless_outcome(recording, injected, window, bounds):
 
     out = {
         "ml_found": bool(accepted),
+        "ml_any_candidate": bool(overlapping),
         "ml_n_candidates": len(overlapping),
-        "ml_has_center": float(gates.has_center[inside].mean())
-        if inside.any()
-        else np.nan,
+        "ml_has_center": (
+            float(gates.has_center[inside].mean()) if inside.any() else np.nan
+        ),
         "ml_spread_ok": (
             float(gates.spread_below_threshold[inside].mean())
             if inside.any()
@@ -205,42 +235,64 @@ def memoryless_outcome(recording, injected, window, bounds):
         "ml_jump_ok": (
             float(gates.jump_below_threshold[inside].mean()) if inside.any() else np.nan
         ),
-        "ml_best_dispersion_cm": (
-            max((candidates.dispersion_cm[i] for i in overlapping), default=np.nan)
+        "ml_best_dispersion_cm": max(
+            (candidates.dispersion_cm[i] for i in overlapping), default=np.nan
         ),
-        "ml_best_duration_s": (
-            max((candidates.duration_s[i] for i in overlapping), default=np.nan)
+        "ml_best_duration_s": max(
+            (candidates.duration_s[i] for i in overlapping), default=np.nan
+        ),
+        "ml_matches": False,
+        "ml_position_error_cm": np.nan,
+        "ml_span_cm": np.nan,
+    }
+    if not accepted:
+        return out
+
+    i = accepted[0]
+    run_start, run_stop = candidates.runs[i]
+    centers = candidates.decisions.center_index[run_start : run_stop + 1]
+    times = midpoint_s[run_start : run_stop + 1]
+    present = centers >= 0
+    decoded_cm = recording["place_bin_centers_cm"][centers[present]]
+
+    # Does the accepted sequence report the injected path, or something else?
+    # Two things have to hold. It must sit on the path while the path is being
+    # replayed, and it must not cover far more ground than the path does: an
+    # absorbed sequence tracks the injection during the injection and then runs
+    # off to the animal's own place, which is where its dispersion comes from.
+    during = present & (times >= start_s) & (times <= end_s)
+    span_cm = float(np.ptp(decoded_cm)) if decoded_cm.size else np.nan
+    out["ml_span_cm"] = span_cm
+    if during.any():
+        error_cm = np.abs(
+            recording["place_bin_centers_cm"][centers[during]]
+            - true_position_cm(times[during])
+        )
+        out["ml_position_error_cm"] = float(np.median(error_cm))
+        out["ml_matches"] = bool(
+            np.median(error_cm) < MATCH_TOLERANCE_CM
+            and span_cm <= path_cm + 2 * MATCH_TOLERANCE_CM
+        )
+
+    animal_cm = np.interp(
+        times[present],
+        result.time,
+        recording["position"][recording["window_mask"]][: result.time.size],
+    )
+    out |= {
+        "ml_duration_s": float(candidates.duration_s[i]),
+        "ml_dispersion_cm": float(candidates.dispersion_cm[i]),
+        "ml_start_error_s": float(midpoint_s[run_start] - start_s),
+        "ml_end_error_s": float(midpoint_s[run_stop] - end_s),
+        "ml_n_pieces": int(candidates.pieces[i].size),
+        "ml_local_fraction": float(
+            np.mean(np.abs(decoded_cm - animal_cm) < SAME_PLACE_CM)
         ),
     }
-    if accepted:
-        i = accepted[0]
-        run_start, run_stop = candidates.runs[i]
-        centers = candidates.decisions.center_index[run_start : run_stop + 1]
-        present = centers >= 0
-        animal_cm = np.interp(
-            midpoint_s[run_start : run_stop + 1][present],
-            result.time,
-            recording["position"][recording["window_mask"]][: result.time.size],
-        )
-        out |= {
-            "ml_duration_s": float(candidates.duration_s[i]),
-            "ml_dispersion_cm": float(candidates.dispersion_cm[i]),
-            "ml_start_error_s": float(midpoint_s[run_start] - start_s),
-            "ml_end_error_s": float(midpoint_s[run_stop] - end_s),
-            "ml_n_pieces": int(candidates.pieces[i].size),
-            "ml_local_fraction": float(
-                np.mean(
-                    np.abs(
-                        recording["place_bin_centers_cm"][centers[present]] - animal_cm
-                    )
-                    < SAME_PLACE_CM
-                )
-            ),
-        }
     return out
 
 
-def state_space_outcome(recording, injected, window, bounds):
+def state_space_outcome(recording, injected, window, bounds, true_position_cm, path_cm):
     """What the switching state-space model reports for the same event."""
     time, position = window
     results = recording["detector"].predict(
@@ -261,6 +313,7 @@ def state_space_outcome(recording, injected, window, bounds):
         .sum("states")
         .values
     ).squeeze()
+
     above = probability > NON_LOCAL_PROB_THRESHOLD
     edges = np.diff(above.astype(np.int8), prepend=0, append=0)
     starts, stops = np.flatnonzero(edges == 1), np.flatnonzero(edges == -1) - 1
@@ -272,16 +325,43 @@ def state_space_outcome(recording, injected, window, bounds):
         if time[a] <= end_s and start_s <= time[b]
     ]
     inside = (time >= start_s) & (time <= end_s)
-    return {
+
+    out = {
         "ss_found": bool(hits),
         "ss_n_intervals": len(hits),
-        "ss_peak_probability": float(probability[inside].max())
-        if inside.any()
-        else np.nan,
+        "ss_peak_probability": (
+            float(probability[inside].max()) if inside.any() else np.nan
+        ),
         "ss_duration_s": float(hits[-1][1] - hits[0][0]) if hits else np.nan,
         "ss_start_error_s": float(hits[0][0] - start_s) if hits else np.nan,
         "ss_end_error_s": float(hits[-1][1] - end_s) if hits else np.nan,
+        "ss_matches": False,
+        "ss_position_error_cm": np.nan,
+        "ss_span_cm": np.nan,
     }
+    if not hits:
+        return out
+
+    # where the non-local states put the animal, to score this the same way
+    posterior = results["acausal_posterior"]
+    is_non_local = np.isin(
+        np.asarray(posterior.coords["state"].values),
+        ["Non-Local Continuous", "Non-Local Fragmented"],
+    )
+    bin_position_cm = np.asarray(posterior.coords["position"].values)[is_non_local]
+    non_local = np.asarray(posterior.values)[:, is_non_local]
+
+    reported = inside & above
+    if reported.any():
+        decoded_cm = bin_position_cm[np.argmax(non_local[reported], axis=1)]
+        error_cm = np.abs(decoded_cm - true_position_cm(time[reported]))
+        out["ss_position_error_cm"] = float(np.median(error_cm))
+        out["ss_span_cm"] = float(np.ptp(decoded_cm))
+        out["ss_matches"] = bool(
+            np.median(error_cm) < MATCH_TOLERANCE_CM
+            and out["ss_span_cm"] <= path_cm + 2 * MATCH_TOLERANCE_CM
+        )
+    return out
 
 
 def run_cell(recording, means, path_cm, midpoint_cm, duration_s, rate_hz, at_s, seed):
@@ -298,8 +378,8 @@ def run_cell(recording, means, path_cm, midpoint_cm, duration_s, rate_hz, at_s, 
         seed=seed,
     )
     start_s, end_s = bounds
-    mask = (recording["time"] >= start_s - MARGIN_S) & (
-        recording["time"] <= end_s + MARGIN_S
+    mask = (recording["time"] >= start_s - DECODE_MARGIN_S) & (
+        recording["time"] <= end_s + DECODE_MARGIN_S
     )
     recording["window_mask"] = mask
     window = (recording["time"][mask], recording["position"][mask])
@@ -325,8 +405,20 @@ def run_cell(recording, means, path_cm, midpoint_cm, duration_s, rate_hz, at_s, 
         "n_spikes": n_spikes,
         "spikes_per_window": n_spikes * CONFIG.window_duration_s / duration_s,
     }
-    row |= memoryless_outcome(recording, injected, window, bounds)
-    row |= state_space_outcome(recording, injected, window, bounds)
+
+    def true_position_cm(at):
+        """Where the injected replay says the animal is, at these times."""
+        fraction = np.clip(
+            (np.asarray(at) - start_s) / max(end_s - start_s, 1e-9), 0, 1
+        )
+        return midpoint_cm - path_cm / 2 + path_cm * fraction
+
+    row |= memoryless_outcome(
+        recording, injected, window, bounds, true_position_cm, path_cm
+    )
+    row |= state_space_outcome(
+        recording, injected, window, bounds, true_position_cm, path_cm
+    )
     return row
 
 
@@ -336,15 +428,17 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
     Built here so the numbers in the write-up and the numbers in the sweep
     cannot drift apart.
     """
-    found = table[table.ml_found & table.ss_found].copy()
+    found = table[table.ml_matches & table.ss_matches].copy()
     found["ml_duration_ratio"] = found.ml_duration_s / found.duration_s
     found["ss_duration_ratio"] = found.ss_duration_s / found.duration_s
-    missed = table[table.ss_found & ~table.ml_found]
+    missed = table[table.ss_matches & ~table.ml_matches]
 
     parts = []
 
     by_path_duration = (
-        table.groupby(["path_cm", "duration_s"])[["ml_found", "ss_found"]]
+        table.groupby(["path_cm", "duration_s"])[
+            ["ml_found", "ml_matches", "ml_any_candidate", "ss_found", "ss_matches"]
+        ]
         .mean()
         .reset_index()
         .melt(id_vars=["path_cm", "duration_s"], var_name="measure", value_name="value")
@@ -380,9 +474,13 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
             "measure": [
                 "n_cells",
                 "ml_found",
+                "ml_matches",
+                "ml_any_candidate",
                 "ss_found",
+                "ss_matches",
                 "found_by_state_space_only",
                 "found_by_sliding_window_only",
+                "ml_accepted_but_not_the_injection",
                 "missed_with_candidate_below_dispersion",
                 "missed_with_no_candidate",
                 "missed_median_spread_pass_rate",
@@ -390,9 +488,16 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
             "value": [
                 float(len(table)),
                 float(table.ml_found.mean()),
+                float(table.ml_matches.mean()),
+                float(table.ml_any_candidate.mean()),
                 float(table.ss_found.mean()),
-                float((table.ss_found & ~table.ml_found).mean()),
-                float((table.ml_found & ~table.ss_found).mean()),
+                float(table.ss_matches.mean()),
+                float((table.ss_matches & ~table.ml_matches).mean()),
+                float((table.ml_matches & ~table.ss_matches).mean()),
+                float(
+                    (table.ml_found & ~table.ml_matches).sum()
+                    / max(table.ml_found.sum(), 1)
+                ),
                 float(
                     (
                         missed.ml_n_candidates.gt(0)
@@ -437,13 +542,19 @@ def main() -> None:
         CONFIG.speed_threshold_cm_per_s,
         minimum_duration_s=1.0,
     )
-    # keep the labeled events of the recording out of the way
-    for event_start, event_end in recording["event_times"]:
-        keep = (intervals[:, 1] < event_start - 0.5) | (
-            intervals[:, 0] > event_end + 0.5
-        )
-        intervals = intervals[keep] if keep.any() else intervals
-    print(f"setup {clock.time() - started:.1f}s; {len(intervals)} usable stretches")
+    # cut the recording's own labeled events out of the stretches rather than
+    # discarding whole stretches. Every stretch holds one, so discarding them
+    # leaves nothing, and a silent fallback then kept whichever happened to be
+    # last -- one stretch, at one animal position, for every cell of the sweep.
+    intervals = without(
+        intervals, recording["event_times"], margin_s=PLACEMENT_MARGIN_S
+    )
+    if len(intervals) == 0:
+        raise RuntimeError("No immobile stretch survives excluding the labeled events.")
+    print(
+        f"setup {clock.time() - started:.1f}s; {len(intervals)} usable stretches "
+        f"spanning {np.diff(intervals, axis=1).sum():.1f}s"
+    )
 
     combinations = [
         (path_cm, midpoint_cm, duration_s, rate_hz)
@@ -462,7 +573,7 @@ def main() -> None:
     rng = np.random.default_rng(0)
     rows, started = [], clock.time()
     for index, (path_cm, midpoint_cm, duration_s, rate_hz) in enumerate(combinations):
-        at_s = placements(intervals, duration_s, MARGIN_S, args.n_seeds, rng)
+        at_s = placements(intervals, duration_s, PLACEMENT_MARGIN_S, args.n_seeds, rng)
         for seed in range(args.n_seeds):
             rows.append(
                 run_cell(
@@ -493,7 +604,9 @@ def main() -> None:
         "duration_s": list(DURATION_S),
         "peak_rate_hz": list(PEAK_RATE_HZ),
         "midpoint_cm": list(MIDPOINT_CM),
-        "margin_s": MARGIN_S,
+        "decode_margin_s": DECODE_MARGIN_S,
+        "placement_margin_s": PLACEMENT_MARGIN_S,
+        "match_tolerance_cm": MATCH_TOLERANCE_CM,
         "same_place_cm": SAME_PLACE_CM,
         "spikes": "sorted",
         "track": "linear",
@@ -506,10 +619,15 @@ def main() -> None:
     print(f"\n{len(table)} cells in {(clock.time() - started) / 60:.1f} min")
     print(f"  raw      -> {args.out}")
     print(f"  summary  -> {SUMMARY_PATH}")
-    print(f"\n  sliding-window found: {table.ml_found.mean():.3f}")
-    print(f"  state-space found:    {table.ss_found.mean():.3f}")
-    print(f"  found by ours only:   {(table.ss_found & ~table.ml_found).mean():.3f}")
-    print(f"  found by theirs only: {(table.ml_found & ~table.ss_found).mean():.3f}")
+    print(f"\n  sliding window, native criterion : {table.ml_found.mean():.3f}")
+    print(f"  sliding window, and it is the event: {table.ml_matches.mean():.3f}")
+    print(f"  sliding window, any candidate      : {table.ml_any_candidate.mean():.3f}")
+    print(f"  state space, native criterion      : {table.ss_found.mean():.3f}")
+    print(f"  state space, and it is the event   : {table.ss_matches.mean():.3f}")
+    print(
+        "  of the sliding window's accepted events, the share that are not the "
+        f"injection: {(table.ml_found & ~table.ml_matches).sum() / max(table.ml_found.sum(), 1):.3f}"
+    )
 
 
 if __name__ == "__main__":

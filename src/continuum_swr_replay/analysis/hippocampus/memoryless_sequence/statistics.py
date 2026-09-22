@@ -147,11 +147,24 @@ def window_center_and_spread(
     if not usable.any():
         return center, spread
 
-    # cost[w, b] is the expected squared distance from bin b under window w
-    cost = posterior[usable] @ (distance**2)
-    best = np.argmin(cost, axis=1)  # argmin takes the first minimum: the lowest bin
-    center[usable] = best
-    spread[usable] = np.sqrt(np.take_along_axis(cost, best[:, None], axis=1).ravel())
+    # A track graph in pieces has inf between bins with no path between them.
+    # Zeroing those before the sum keeps 0 * inf out of the cost, which would
+    # otherwise be nan and send argmin to the first nan rather than to a center.
+    squared = distance**2
+    reaches = np.isfinite(squared)
+    cost = posterior[usable] @ np.where(reaches, squared, 0.0)
+
+    # a bin can only be the center if every bin holding mass can reach it
+    holds_mass = posterior[usable] > 0.0
+    reachable = (holds_mass.astype(np.float64) @ (~reaches).astype(np.float64)) == 0.0
+    has_center = reachable.any(axis=1)
+
+    best = np.argmin(np.where(reachable, cost, np.inf), axis=1)
+    found = np.flatnonzero(usable)[has_center]
+    center[found] = best[has_center]
+    spread[found] = np.sqrt(
+        np.take_along_axis(cost[has_center], best[has_center, None], axis=1).ravel()
+    )
     return center, spread
 
 

@@ -15,6 +15,11 @@ stretch of local coding is smooth, narrow and slow, so it passes every window
 criterion and is assembled into the same sequence as the replay that follows
 it. The detected event therefore begins long before the replay does.
 
+Both detectors fit their own encoding model, from the same recording, the same
+training mask and the same hyperparameters. They are separate fits, and the
+state-space model's call re-estimates its place fields as well, so the two are
+close but not one shared object.
+
 Usage:
     python scripts/figures/generate_memoryless_comparison.py
 """
@@ -85,9 +90,9 @@ SHORT_REPLAY = (35.0, 100.0, 0.080, 120.0, 44.40)
 """start_cm, path_cm, duration_s, peak_rate_hz, time.
 
 A replay that travels far but lasts only 80 ms, firing strongly enough that
-spike count is not the issue. The detector finds it every time, and reports it
-about 1.8 times too long: the window sets a floor of roughly 160 ms under any
-duration it can report.
+spike count is not the issue. The detector finds it and reports it too long;
+the panel title reads the ratio off the data rather than stating it here. The
+window puts a floor under any duration the method can report.
 """
 
 SHORT_PATH = (40.0, 30.0, 0.300, 40.0, 20.50)

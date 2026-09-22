@@ -1,8 +1,10 @@
 """Per-window statistics for the memoryless sequence detector."""
 
 import numpy as np
+import pytest
 
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
+    NO_CENTER,
     aggregate_windows,
     dispersion_cm,
     forward_jumps_cm,
@@ -251,3 +253,47 @@ class TestDispersion:
 
     def test_no_finite_centers_gives_nan(self):
         assert np.isnan(dispersion_cm(np.array([-1, -1]), straight_track(5)))
+
+
+class TestUnreachableBins:
+    """A track graph in pieces puts inf in the distance matrix."""
+
+    def disconnected(self) -> np.ndarray:
+        """Two arms of three bins each, with no path between them."""
+        distance = np.full((6, 6), np.inf)
+        for block in (slice(0, 3), slice(3, 6)):
+            centers = np.arange(3) * 2.0
+            distance[block, block] = np.abs(centers[:, None] - centers[None, :])
+        return distance
+
+    def test_a_window_spanning_unreachable_bins_gets_no_center(self):
+        """0 * inf is nan, so the cost row is all nan and argmin would pick
+        the first nan rather than report no center."""
+        posterior = np.zeros((1, 6))
+        posterior[0, [0, 4]] = 0.5
+
+        center, spread = window_center_and_spread(posterior, self.disconnected())
+
+        assert center.tolist() == [NO_CENTER]
+        assert np.isnan(spread[0])
+
+    def test_a_window_inside_one_piece_still_works(self):
+        posterior = np.zeros((1, 6))
+        posterior[0, [0, 2]] = 0.5
+
+        center, spread = window_center_and_spread(posterior, self.disconnected())
+
+        assert center[0] == 1
+        assert spread[0] == pytest.approx(2.0)
+
+    def test_a_missing_center_leaves_its_neighbour_without_a_jump(self):
+        """Otherwise the preceding window measures a jump to bin 0."""
+        posterior = np.zeros((2, 6))
+        posterior[0, 1] = 1.0
+        posterior[1, [0, 4]] = 0.5
+
+        center, _ = window_center_and_spread(posterior, self.disconnected())
+        jumps = forward_jumps_cm(center, self.disconnected())
+
+        assert center.tolist() == [1, NO_CENTER]
+        assert np.isnan(jumps).all()

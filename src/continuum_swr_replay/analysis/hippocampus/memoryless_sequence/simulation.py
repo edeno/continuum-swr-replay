@@ -22,6 +22,7 @@ __all__ = [
     "inject_replay",
     "place_field_means",
     "placements",
+    "without",
 ]
 
 FIELD_STD_CM = np.sqrt(12.5)
@@ -197,3 +198,43 @@ def placements(
     width = latest - earliest
     chosen = rng.choice(earliest.size, size=n, p=width / width.sum())
     return earliest[chosen] + rng.random(n) * width[chosen]
+
+
+def without(intervals: NDArray, excluded: NDArray, margin_s: float = 0.0) -> NDArray:
+    """Remove spans from a set of intervals, splitting them where needed.
+
+    Used to keep an injected event away from whatever the recording already
+    holds without discarding the whole stretch it sits in. Dropping the whole
+    stretch instead leaves very few places to inject, and if every stretch
+    holds something the result is nothing at all.
+
+    Parameters
+    ----------
+    intervals : ndarray, shape (n_intervals, 2)
+    excluded : ndarray, shape (n_excluded, 2)
+        Spans to remove. A zero-width span still removes its margin.
+    margin_s : float
+        Widens each excluded span on both sides.
+
+    Returns
+    -------
+    kept : ndarray, shape (n_kept, 2)
+        In order. An interval covered entirely is gone.
+
+    """
+    kept = [
+        tuple(row) for row in np.asarray(intervals, dtype=np.float64).reshape(-1, 2)
+    ]
+    for start_s, end_s in np.asarray(excluded, dtype=np.float64).reshape(-1, 2):
+        low, high = start_s - margin_s, end_s + margin_s
+        split = []
+        for interval_start, interval_end in kept:
+            if high <= interval_start or low >= interval_end:
+                split.append((interval_start, interval_end))
+                continue
+            if interval_start < low:
+                split.append((interval_start, low))
+            if high < interval_end:
+                split.append((high, interval_end))
+        kept = split
+    return np.array(kept, dtype=np.float64).reshape(-1, 2)

@@ -181,14 +181,14 @@ def make_figure(summary: pd.DataFrame):
     ax_state = fig.add_subplot(inner[1])
     image = plot_detection(
         ax_sliding,
-        detection_grid(summary, "ml_found"),
-        f"{SLIDING}: found {100 * overall['ml_found']:.0f}% of them",
+        detection_grid(summary, "ml_matches"),
+        f"{SLIDING}: reported {100 * overall['ml_matches']:.0f}% of them",
         show_y=True,
     )
     plot_detection(
         ax_state,
-        detection_grid(summary, "ss_found"),
-        f"{STATE_SPACE}: found {100 * overall['ss_found']:.0f}%",
+        detection_grid(summary, "ss_matches"),
+        f"{STATE_SPACE}: reported {100 * overall['ss_matches']:.0f}%",
         show_y=False,
     )
     bar = fig.colorbar(image, ax=[ax_sliding, ax_state], fraction=0.03, pad=0.01)
@@ -205,10 +205,11 @@ def make_figure(summary: pd.DataFrame):
     )
     fig.suptitle(
         f"{int(overall['n_cells'])} injected replays through both detectors. "
-        f"{100 * overall['found_by_state_space_only']:.0f}% were found by the "
-        f"state-space model alone; "
+        f"{100 * overall['found_by_state_space_only']:.0f}% were reported by the "
+        f"state-space model alone and "
         f"{100 * overall['found_by_sliding_window_only']:.0f}% by the sliding window "
-        "alone.",
+        f"alone. {100 * overall['ml_accepted_but_not_the_injection']:.0f}% of the "
+        "sliding window's accepted events are not the injected replay.",
         fontsize=6.5,
     )
     return fig

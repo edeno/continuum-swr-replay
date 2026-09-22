@@ -1,7 +1,9 @@
 # Memoryless sliding-window sequence detection (Widloski & Foster 2025)
 
-*Design spec. Status: revised after review and clarification of the scientific goal;
-not yet implemented. The commitments below are proposed analyses, not results.*
+*Design spec, now part implemented. `config.py`, `statistics.py`, `detect.py`,
+`likelihood.py` and `simulation.py` exist and are tested; `shuffle.py` and `compare.py`
+and the `memoryless_event_table` of the output schema do not. The sections on what the
+port does on simulated data are results; everything else is a proposed analysis.*
 *Governing rule and cross-cutting decisions: [overview.md](overview.md).*
 
 Inventory 6 of six: the posterior-sequence trigger. How this cohort is compared against
@@ -144,6 +146,19 @@ resolved.
 - **Forward-jump consequence.** Because window k's jump is to k+1, a window whose
   successor was rejected by the speed gate (NaN center) carries a NaN jump and is itself
   rejected. Sequences therefore end one window before the first speed-rejected window.
+- **The two reference implementations order the speed gate and the jumps
+  differently, and the port follows the driver.** In
+  `zenodo_15199609/load_replayEvents_cellIDshuffle.m` the speed gate is
+  `ind_good` at line 54, decoding is restricted to it at line 64
+  (`numSpks = numSpks(:,ind_good)`), the results are scattered back into a
+  NaN-initialised `posteriorCOM` at lines 79-80, and only then are jumps taken
+  from that NaN-padded trajectory at line 82. Speed therefore reaches a
+  neighbour's jump. The helper library does the opposite:
+  `compute_filtering_binDecoding_cm.m:12` computes `jumps` from the raw
+  ungated centre of mass and line 54 applies speed, spread and jump in one
+  `find`, so speed never propagates. A reader who checks only the helper will
+  conclude this port invented the ordering; it did not, but the disagreement is
+  real and worth stating.
 
 ### Clusterless shuffle: permute encoding pairs
 
@@ -196,8 +211,11 @@ continuous outbound replay, a fragmented replay, a continuous inbound replay, a 
 stretch and an unmanipulated pause; a remote stationary event is added here, because the
 package simulates no such case.
 
-**It detects the right events and mis-times them.** Of 29 candidate sequences over 65 s,
-exactly two meet both replay criteria, and those two are the continuous replays. No
+**It detects the right events and mis-times them.** The test fixture, which adds only
+the remote stationary event, gives 29 candidate sequences over 65 s of which exactly two
+meet both replay criteria, and those two are the continuous replays. The figure injects
+two more events and so reports 32 candidates and three accepted; the third is the 80 ms
+replay of its panel c. No
 silent, fragmented, local or remote stationary event is accepted. But the two accepted
 events run 1.58 s and 1.18 s for replays that are 0.27 s: 83% and 77% of each detected
 interval lies outside the labeled event, and about three quarters of their windows decode
@@ -327,86 +345,124 @@ measurement, and worth checking on real data:
 
 `scripts/qa/sweep_memoryless_detection.py` injects replays of controlled path
 length, duration, firing rate and distance from the animal's own place into the
-simulated recording, and records what each detector reports. 4536 cells, both
-detectors reading one encoding model fitted once, sorted spikes on a linear
-track. Every number below comes from
+simulated recording, and records what each detector reports. 4536 cells, sorted
+spikes on a linear track. Every number below comes from
 [detection_sweep_summary.csv](detection_sweep_summary.csv), which that script
 writes; the full per-cell table goes to `Processed-Data` and is not tracked.
-The sweep takes about two minutes to reproduce, and
+The sweep takes about three minutes to reproduce, and
 `scripts/figures/generate_memoryless_sweep.py` draws the summary figure from
-the same file. Placement inside an immobile stretch, the sub-window phase and the
-Poisson draw are randomized rather than fixed, because each of them changes the
-answer on its own.
+the same file.
+
+**Two things the sweep is careful about**, both because getting them wrong
+produced a wrong answer here first.
+
+Injections are spread over every immobile stretch of the recording, with the
+recording's own labeled events cut out of them. An earlier version discarded a
+whole stretch whenever it held a labeled event, which discards all of them, and
+a silent fallback then kept the last one: all 4536 cells landed in a single
+2.2 s window of one pause.
+
+A detector counts as finding an event only when what it reports **is** the
+injected event, not merely something overlapping it in time. It must sit on the
+injected path while the path is being replayed, and it must not cover far more
+ground than the path does. Scoring temporal overlap alone credits the
+sliding-window detector for sequences built out of the local coding beside the
+injection: those reach 45 to 162 cm of decoded track for injections of 10 to
+30 cm.
 
 **Detection depends on different things for the two procedures.** Percent of
-injected replays found:
+injected replays found, by path length and duration:
 
 | path (cm) | 40 ms | 60 ms | 80 ms | 120 ms | 200 ms | 300 ms | 500 ms |
 |---|---|---|---|---|---|---|---|
-| 10-30 (sliding window) | 8-9 | 9-12 | 10-11 | 8-17 | 8-13 | 12-14 | 12-14 |
-| 45 | 8 | 14 | 24 | 44 | 61 | 70 | 79 |
-| 60 | 12 | 21 | 45 | 62 | 80 | 84 | 88 |
-| 90 | 14 | 31 | 54 | 71 | 88 | 86 | 92 |
-| 130 | 21 | 38 | 46 | 58 | 88 | 96 | 96 |
-| any path (state-space) | 67-86 | 88-100 | 92-97 | 92-99 | 99-100 | 100 | 100 |
+| 10 | 2 | 6 | 3 | 2 | 2 | 2 | 2 |
+| 20 | 1 | 4 | 3 | 5 | 8 | 3 | 7 |
+| 30 | 2 | 4 | 7 | 7 | 7 | 6 | 9 |
+| 45 | 10 | 12 | 23 | 39 | 60 | 58 | 67 |
+| 60 | 10 | 22 | 39 | 57 | 65 | 74 | 79 |
+| 90 | 3 | 29 | 53 | 72 | 82 | 79 | 92 |
+| 130 | 0 | 8 | 8 | 67 | 88 | 96 | 96 |
+| any path (state-space) | 67-85 | 88-96 | 92-97 | 92-99 | 99-100 | 100 | 100 |
 
-The sliding window is governed by path length, which is a criterion. The
-state-space model is governed by duration, which is spike count, which is the
-data. Below about 45 cm the sliding window's detection rate is flat at roughly
-one in ten whatever the duration or the firing rate, which is the dispersion
-floor and not a gradual loss of sensitivity.
+The sliding window is governed by path length, which is one of its criteria.
+The state-space model is governed by duration, which is spike count, which is
+the data. Below about 45 cm the sliding window finds a few percent of
+injections at any duration and any firing rate.
+
+**Three rates, not one, because they answer different questions.** Over all
+4536 cells the sliding window built an overlapping candidate 84% of the time,
+accepted one under the published replay definition 34% of the time, and
+reported the injected event 24% of the time. The state-space model reported
+non-local activity 94% of the time, and it was the injected event 94% of the
+time. Quoting 34% against 94% compares "replay, classified" with "non-local,
+detected"; 84% against 94% is the nearer comparison of whether anything was
+seen at all.
+
+**Three in ten of the sliding window's accepted events are not the injected
+event.** They are absorbed local coding that overlaps it. This is the same
+over-call the figure shows, measured as a rate.
 
 **No cell in the sweep was found by the sliding window and missed by the
-state-space model.** 2915 cells went the other way. Of those, 74% built a
-candidate that then failed dispersion and 25% built no candidate at all, while
+state-space model.** 70% of cells went the other way. Of those, 64% built a
+candidate that then failed dispersion and 22% built no candidate at all, while
 the median share of windows passing the spread criterion inside the event was
 1.00. The spread gate is not what loses these events; dispersion is.
 
-**Reported duration, among events both procedures found:**
+**Reported duration, among events both procedures reported:**
 
 | true duration | 40 ms | 60 ms | 80 ms | 120 ms | 200 ms | 300 ms | 500 ms |
 |---|---|---|---|---|---|---|---|
-| sliding window | 7.5x | 4.4x | 3.2x | 2.1x | 1.3x | 1.2x | 1.1x |
-| state-space | 1.00x | 0.97x | 0.95x | 0.98x | 0.96x | 0.98x | 0.98x |
+| sliding window | 5.6x | 3.2x | 3.5x | 1.7x | 1.3x | 1.2x | 1.1x |
+| state-space | 1.00x | 1.00x | 0.95x | 0.98x | 0.96x | 0.99x | 0.98x |
 
-These are medians over firing rate, path length and placement. A single event
-can do much better than its row: the 80 ms replay in the figure, which fires
-strongly and travels 100 cm, comes in at 1.3x rather than 3.2x.
+Medians over firing rate, path length and placement. A single event can do
+better than its row: the 80 ms replay in the figure, which fires strongly and
+travels 100 cm, comes in at 1.3x rather than 3.5x.
 
-**Absorption reaches about 80 cm.** Among events both found, by the distance
+**Absorption reaches about 80 cm.** Among events both reported, by the distance
 between the replay and the animal's own place:
 
 | distance | 40-80 cm | 80-120 cm | over 120 cm |
 |---|---|---|---|
-| duration ratio | 2.33x | 1.20x | 1.11x |
+| duration ratio | 2.16x | 1.17x | 1.12x |
 | share of windows on the animal's place | 0.44 | 0.00 | 0.00 |
 
-Beyond about 80 cm there is no absorption and the remaining inflation is the
-window. This is the clearest statement of the mechanism: the over-call is not a
-property of the event but of where the event sits relative to the animal.
+**What the sweep cannot say.** The animal rests at one end of the track and
+pauses nowhere else, so distance from its place is a deterministic function of
+where the replay is put: the five midpoints give 20, 50, 80, 110 and 140 cm and
+nothing else. The table above is therefore a contrast across three groups of
+midpoints with the animal's position held at one value, not a distance
+contrast, and it cannot be decoupled without a recording in which the animal
+pauses in more than one place. The `(0, 40]` bin is empty because the nearest
+midpoint only admits short paths, which are the ones the detector does not
+report. Injected replays also run at constant speed with Poisson firing from
+the same fields the encoding model was fitted on, so there is no model
+mismatch and the surface is optimistic. Sorted spikes on a linear track:
+neither the clusterless likelihood nor the jump criterion of a branched track
+is exercised.
 
-**What the sweep cannot say.** The track geometry ties distance from the animal
-to available path length, since the animal rests at one end, so the cells
-closest to its place are exactly the short paths the detector cannot find.
-Absorption under 40 cm away is therefore unmeasured. Injected replays also run
-at constant speed with Poisson firing from the same fields the encoding model
-was fitted on, so there is no model mismatch and the surface is optimistic.
-Sorted spikes on a linear track: neither the clusterless likelihood nor the
-jump criterion of a branched track is exercised.
+**On the encoding model.** Each detector fits its own, from the same recording,
+the same non-event training mask and the same hyperparameters. They are
+separate fits and their place fields differ by about 4% of peak firing rate.
+They are not one shared object, and earlier drafts of this document and of both
+scripts said they were.
 
 ### Summary: what the port misses, and what it over-calls
 
-Everything marked *measured* comes from a test in this repository. The rest
-follows from the criteria and is not yet demonstrated; it is listed so it is
-not mistaken for a result.
+*measured* means a script or test in this repository produces the number:
+`scripts/qa/sweep_memoryless_detection.py` and its summary CSV, or one of the
+`test_memoryless_*` files. *from the criteria* means it follows from the
+thresholds and is not demonstrated. Rows marked *measured elsewhere* were run
+during this work but by scratch scripts that were not kept, so they cannot be
+reproduced from this repository and should be re-run before being cited.
 
 | direction | case | outcome | status |
 |---|---|---|---|
-| miss | path shorter than about 42 cm | never reported, at any duration or firing rate | measured |
+| miss | path shorter than about 42 cm | reported in a few percent of injections at any duration or firing rate, against 82-100% for the state-space model | measured |
 | miss | replay that changes arm without passing the junction | cut at the switch, and neither half then clears dispersion | measured |
-| miss | sparse ensembles, about one spike per window | erratic, 0-50% where dense spiking gives 100% | measured |
-| over-call | any event shorter than about 150 ms | reported 1.3x to 3.3x too long; the detector cannot report a short event as short | measured |
-| miss | whole path inside one window (~4300 cm/s over 130 cm) | posterior smears, spread rejects | measured |
+| miss | sparse ensembles, about one spike per window | erratic, 0-50% where dense spiking gives 100% | measured elsewhere |
+| over-call | any event shorter than about 150 ms | reported 1.7x to 5.6x too long in the sweep, and 1.3x for a strongly firing 80 ms replay; the detector cannot report a short event as short | measured |
+| miss | whole path inside one window | posterior smears, spread rejects. The sweep's fastest cell is 3250 cm/s and is still found sometimes, so the threshold is above that | measured elsewhere |
 | miss | replay overlapping the onset of movement | truncated one window *before* the first moving window | measured |
 | by design | remote place held still | decoded confidently, assembled, declined for going nowhere | measured |
 | miss | one unusable window inside a replay | removes its predecessor too and splits the run | from the criteria |
