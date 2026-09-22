@@ -10,6 +10,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import
     apply_speed_gate,
     assemble_sequences,
     contiguous_runs,
+    detect_candidate_sequences,
     gate_windows,
     merge_runs,
     replay_mask,
@@ -545,3 +546,96 @@ class TestWindowDecisions:
         np.testing.assert_array_equal(
             runs_for(wrong_order.kept, decisions.center_index), [[0, 25]]
         )
+
+
+class TestDetectCandidateSequences:
+    """The whole per-window pipeline, in the one order that is correct."""
+
+    config = MemorylessSequenceConfig()
+    distance = straight_track(60)
+
+    def moving_posterior(self, bins: np.ndarray) -> np.ndarray:
+        posterior = np.zeros((bins.size, 60))
+        posterior[np.arange(bins.size), bins] = 1.0
+        return posterior
+
+    def test_a_long_travelling_sequence_is_replay(self):
+        bins = np.arange(40)
+        midpoints = window_times(40)
+
+        found = detect_candidate_sequences(
+            self.moving_posterior(bins),
+            midpoints,
+            self.distance,
+            np.zeros(40),
+            self.config,
+        )
+
+        np.testing.assert_array_equal(found.runs, [[0, 39]])
+        np.testing.assert_allclose(found.duration_s, [39 * 0.004])
+        assert found.is_replay.tolist() == [True]
+
+    def test_a_stationary_sequence_is_not_replay(self):
+        bins = np.full(40, 20)
+
+        found = detect_candidate_sequences(
+            self.moving_posterior(bins),
+            window_times(40),
+            self.distance,
+            np.zeros(40),
+            self.config,
+        )
+
+        np.testing.assert_array_equal(found.runs, [[0, 39]])
+        np.testing.assert_allclose(found.dispersion_cm, [0.0])
+        assert found.is_replay.tolist() == [False]
+
+    def test_the_speed_gate_precedes_the_jumps(self):
+        bins = np.arange(27)
+        speed = np.zeros(27)
+        speed[-1] = 9.0
+
+        found = detect_candidate_sequences(
+            self.moving_posterior(bins),
+            window_times(27),
+            self.distance,
+            speed,
+            self.config,
+        )
+
+        assert found.decisions.gates.kept.sum() == 25
+        assert found.runs.shape == (0, 2)
+
+    def test_the_intermediate_stages_are_kept(self):
+        bins = np.arange(40)
+
+        found = detect_candidate_sequences(
+            self.moving_posterior(bins),
+            window_times(40),
+            self.distance,
+            np.zeros(40),
+            self.config,
+        )
+
+        assert found.pre_merge_runs.shape == (1, 2)
+        assert [piece.tolist() for piece in found.pieces] == [[0]]
+        assert found.decisions.spread_cm.size == 40
+
+    def test_a_posterior_and_midpoints_of_different_lengths_raise(self):
+        with pytest.raises(ValueError, match="midpoint"):
+            detect_candidate_sequences(
+                self.moving_posterior(np.arange(40)),
+                window_times(39),
+                self.distance,
+                np.zeros(40),
+                self.config,
+            )
+
+    def test_no_windows_gives_empty_results_with_the_right_types(self):
+        found = detect_candidate_sequences(
+            np.zeros((0, 60)), np.zeros(0), self.distance, np.zeros(0), self.config
+        )
+
+        assert found.runs.shape == (0, 2)
+        assert found.duration_s.dtype == np.float64
+        assert found.is_replay.dtype == np.bool_

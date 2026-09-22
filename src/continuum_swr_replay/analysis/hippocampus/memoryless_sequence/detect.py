@@ -31,17 +31,20 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
     NO_CENTER,
+    dispersion_cm,
     forward_jumps_cm,
     window_center_and_spread,
 )
 
 __all__ = [
+    "CandidateSequences",
     "SequenceAssembly",
     "WindowDecisions",
     "WindowGates",
     "apply_speed_gate",
     "assemble_sequences",
     "contiguous_runs",
+    "detect_candidate_sequences",
     "gate_windows",
     "merge_runs",
     "replay_mask",
@@ -401,14 +404,17 @@ def sequence_dispersion_cm(
     runs = np.asarray(runs, dtype=int).reshape(-1, 2)
     kept = np.asarray(kept, dtype=bool)
     center = np.asarray(center_index, dtype=int)
-    squared = np.asarray(bin_distance_cm, dtype=np.float64) ** 2
 
-    dispersion = np.full(len(runs), np.nan, dtype=np.float64)
-    for sequence, (start, stop) in enumerate(runs):
-        present = center[start : stop + 1][kept[start : stop + 1]]
-        if present.size:
-            dispersion[sequence] = np.sqrt(squared[present].mean(axis=0).min())
-    return dispersion
+    return np.array(
+        [
+            dispersion_cm(
+                np.where(kept[start : stop + 1], center[start : stop + 1], NO_CENTER),
+                bin_distance_cm,
+            )
+            for start, stop in runs
+        ],
+        dtype=np.float64,
+    ).reshape(len(runs))
 
 
 def replay_mask(
@@ -430,4 +436,96 @@ def replay_mask(
     """
     return _is_above(duration_s, config.minimum_duration_s) & _is_above(
         dispersion_cm, config.dispersion_threshold_cm
+    )
+
+
+@dataclass(frozen=True)
+class CandidateSequences:
+    """Every sequence one epoch yields, with the evidence for each decision.
+
+    Attributes
+    ----------
+    runs : ndarray of int, shape (n_sequences, 2)
+        Inclusive first and last window index of each sequence.
+    duration_s, dispersion_cm : ndarray, shape (n_sequences,)
+    is_replay : ndarray of bool, shape (n_sequences,)
+        Met both replay criteria. Sequences that did not are kept, because a
+        detector's rejections are as much a result as its detections.
+    decisions : WindowDecisions
+        Per-window centers, spreads, jumps, and gates.
+    pieces : list of ndarray
+        For each sequence, the indices into ``pre_merge_runs`` it absorbed.
+    pre_merge_runs : ndarray of int, shape (n_runs, 2)
+
+    """
+
+    runs: NDArray
+    duration_s: NDArray
+    dispersion_cm: NDArray
+    is_replay: NDArray
+    decisions: WindowDecisions
+    pieces: list[NDArray]
+    pre_merge_runs: NDArray
+
+
+def detect_candidate_sequences(
+    posterior: NDArray,
+    midpoint_s: NDArray,
+    bin_distance_cm: NDArray,
+    window_speed_cm_per_s: NDArray,
+    config: MemorylessSequenceConfig,
+) -> CandidateSequences:
+    """Run every per-window step in order and assemble what survives.
+
+    This is the whole detector downstream of decoding. It exists so the steps
+    cannot be composed in another order: the speed gate must reach the centers
+    before the jumps are measured, and the runs must be merged before their
+    length is tested.
+
+    Parameters
+    ----------
+    posterior : ndarray, shape (n_windows, n_bins)
+        One normalized window per row, over real place bins.
+    midpoint_s : ndarray, shape (n_windows,)
+        When each window is timestamped.
+    bin_distance_cm : ndarray, shape (n_bins, n_bins)
+    window_speed_cm_per_s : ndarray, shape (n_windows,)
+        Speed at each window's midpoint.
+    config : MemorylessSequenceConfig
+
+    Returns
+    -------
+    candidates : CandidateSequences
+
+    """
+    posterior = np.asarray(posterior, dtype=np.float64)
+    midpoint_s = np.asarray(midpoint_s, dtype=np.float64)
+    if midpoint_s.shape != (posterior.shape[0],):
+        raise ValueError(
+            f"{posterior.shape[0]} windows carry {midpoint_s.shape} midpoint "
+            "times; every window needs exactly one."
+        )
+
+    decisions = window_decisions(
+        posterior, bin_distance_cm, window_speed_cm_per_s, config
+    )
+    assembly = assemble_sequences(
+        decisions.gates.kept,
+        decisions.center_index,
+        midpoint_s,
+        bin_distance_cm,
+        config,
+    )
+    duration_s = sequence_duration_s(assembly.runs, midpoint_s)
+    dispersion_cm = sequence_dispersion_cm(
+        assembly.runs, assembly.kept, decisions.center_index, bin_distance_cm
+    )
+    return CandidateSequences(
+        runs=assembly.runs,
+        duration_s=duration_s,
+        dispersion_cm=dispersion_cm,
+        is_replay=replay_mask(duration_s, dispersion_cm, config),
+        decisions=decisions,
+        pieces=assembly.pieces,
+        pre_merge_runs=assembly.pre_merge_runs,
     )
