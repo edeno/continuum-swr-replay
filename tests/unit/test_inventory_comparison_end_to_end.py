@@ -17,7 +17,6 @@ the movement bout is set aside before any comparison.
 """
 
 import numpy as np
-import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.inventory_comparison.availability import (
