@@ -113,20 +113,28 @@ def test_the_reference_stride_on_the_project_grid_raises():
 
 
 @pytest.mark.parametrize(
-    ("minimum_duration_s", "stride_s"),
+    ("minimum_duration_s", "stride_s", "index_length"),
     [
-        (0.101, 0.004),  # 25.25 strides; round() would make it 100 ms
-        (0.100, 0.003),  # 33.3 strides; round() would make it 99 ms
-        (0.001, 0.004),  # a quarter stride; round() would make it 0
+        (0.101, 0.004, 26),  # 25.25 strides: 26, never 25 (100 ms)
+        (0.100, 0.003, 34),  # 33.3 strides: 34, never 33 (99 ms)
+        (0.050, 0.004, 13),  # the reference's 1D branch: 52 ms, not 48
+        (0.100, 0.004, 25),  # exact
     ],
 )
-def test_a_minimum_duration_that_is_not_a_whole_number_of_strides_raises(
-    minimum_duration_s, stride_s
+def test_a_minimum_duration_between_strides_rounds_up_never_down(
+    minimum_duration_s, stride_s, index_length
 ):
-    """The constant that would silently become another threshold."""
+    """A filter that rounded down would keep runs shorter than asked."""
+    config = MemorylessSequenceConfig(
+        minimum_duration_s=minimum_duration_s,
+        stride_s=stride_s,
+        sampling_frequency=1000.0,
+    )
+
+    assert config.minimum_run_index_length == index_length
+    assert index_length * stride_s >= minimum_duration_s - 1e-12
+
+
+def test_a_minimum_duration_shorter_than_one_stride_raises():
     with pytest.raises(ValueError, match="minimum_duration_s"):
-        MemorylessSequenceConfig(
-            minimum_duration_s=minimum_duration_s,
-            stride_s=stride_s,
-            sampling_frequency=1000.0,
-        )
+        MemorylessSequenceConfig(minimum_duration_s=0.001, stride_s=0.004)

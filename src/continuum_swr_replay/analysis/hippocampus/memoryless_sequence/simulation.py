@@ -124,9 +124,13 @@ def inject_replay(
     ValueError
         ``peak_rate_hz / sampling_frequency`` is 1 or more, so the per-sample
         firing probability would saturate and the rate would silently be
-        lower than asked.
+        lower than asked; or there is not one place field per cell.
 
     """
+    if len(spike_times) != len(place_field_means):
+        raise ValueError(
+            f"{len(spike_times)} cells but {len(place_field_means)} place fields."
+        )
     n_samples = max(2, int(replay.duration_s * sampling_frequency))
     step_s = replay.duration_s / (n_samples - 1)
     if replay.peak_rate_hz * step_s >= 1.0:

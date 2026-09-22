@@ -731,6 +731,31 @@ class TestDetectCandidateSequences:
                 self.config,
             )
 
+    @pytest.mark.parametrize("bad", [np.nan, np.inf])
+    def test_a_row_mixing_finite_and_non_finite_values_raises(self, bad):
+        """Only an all-NaN row means "not evaluated"; anything else is broken
+        input that would otherwise become a silent rejection."""
+        posterior = self.moving_posterior(np.arange(40))
+        posterior[3, 0] = bad
+
+        with pytest.raises(ValueError, match="mixes"):
+            detect_candidate_sequences(
+                posterior, window_times(40), self.distance, np.zeros(40), self.config
+            )
+
+    def test_an_infinite_midpoint_raises(self):
+        midpoints = window_times(40)
+        midpoints[-1] = np.inf
+
+        with pytest.raises(ValueError, match="finite"):
+            detect_candidate_sequences(
+                self.moving_posterior(np.arange(40)),
+                midpoints,
+                self.distance,
+                np.zeros(40),
+                self.config,
+            )
+
     def test_an_unnormalized_posterior_raises(self):
         """Scaling a row leaves its center alone and inflates its spread, so
         it would flip the spread gate silently."""

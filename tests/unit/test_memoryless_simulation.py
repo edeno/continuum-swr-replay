@@ -116,6 +116,15 @@ class TestInjectReplay:
         for original, unchanged in zip(self.spike_times, before, strict=True):
             np.testing.assert_array_equal(original, unchanged)
 
+    def test_one_place_field_per_cell_is_required(self):
+        with pytest.raises(ValueError, match="place fields"):
+            inject_replay(
+                self.spike_times[:3],
+                self.means,
+                InjectedReplay(20.0, 100.0, 0.2, 80.0, 4.0),
+                sampling_frequency=SAMPLING_FREQUENCY,
+            )
+
     def test_a_rate_that_would_fire_at_every_sample_is_refused(self):
         """Bernoulli-per-sample firing saturates; the rate would silently be
         lower than asked."""

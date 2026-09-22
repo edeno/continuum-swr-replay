@@ -464,15 +464,19 @@ def check_caption_claims(decoded: dict, config: MemorylessSequenceConfig) -> Non
 
 
 def local_fraction(decoded: dict, sequence: int, tolerance_cm: float = 15.0) -> float:
-    """Share of a sequence's windows whose center sits at the animal's own place."""
+    """Share of a sequence's kept windows whose center is the animal's own place.
+
+    Kept windows only, as the sweep scores them: a window inside a merged gap
+    was rejected and is not one of the event's decoded positions.
+    """
     candidates = decoded["candidates"]
     start, stop = candidates.runs[sequence]
     center_cm = decoded_center_cm(decoded)[start : stop + 1]
     animal_cm = np.interp(
         decoded["midpoint_s"][start : stop + 1], decoded["time"], decoded["position"]
     )
-    usable = np.isfinite(center_cm)
-    return float(np.mean(np.abs(center_cm[usable] - animal_cm[usable]) < tolerance_cm))
+    kept = candidates.assembly.kept[start : stop + 1]
+    return float(np.mean(np.abs(center_cm[kept] - animal_cm[kept]) < tolerance_cm))
 
 
 def bound_error_ms(decoded: dict, events: tuple[int, ...]) -> float:
@@ -487,7 +491,7 @@ def bound_error_ms(decoded: dict, events: tuple[int, ...]) -> float:
         overlapping = [
             (a, b)
             for a, b in decoded["state_space_intervals"]
-            if a <= end_s and start_s <= b
+            if a < end_s and start_s < b
         ]
         if not overlapping:
             return float("nan")
@@ -787,12 +791,26 @@ def plot_absorption(ax, summary: pd.DataFrame):
             f"The sweep summary holds distance bins {sorted(present - set(DISTANCE_ORDER))} "
             "this panel does not know how to place; update DISTANCE_ORDER."
         )
-    order = [bin_name for bin_name in DISTANCE_ORDER if bin_name in present]
+    order = list(DISTANCE_ORDER)
     at = np.arange(len(order))
 
     def series(measure):
         indexed = rows[rows.measure == measure].set_index("distance_bin_cm").value
-        return np.array([indexed[bin_name] for bin_name in order])
+        return np.array([indexed.get(bin_name, np.nan) for bin_name in order])
+
+    # an expected bin with no jointly reported replay is a result, not a gap
+    for x, bin_name in zip(at, order, strict=True):
+        if bin_name not in present:
+            ax.text(
+                x,
+                1.0,
+                "none\nreported\nby both",
+                fontsize=4.5,
+                color="0.45",
+                ha="center",
+                va="bottom",
+                linespacing=0.9,
+            )
 
     ax.axhline(1.0, color="0.6", lw=0.7, ls=":")
     ax.plot(
@@ -802,6 +820,8 @@ def plot_absorption(ax, summary: pd.DataFrame):
         at, series("state_space_duration_ratio"), color=BLUE, lw=1.0, marker="o", ms=3
     )
     for x, local in zip(at, series("sliding_local_fraction"), strict=True):
+        if not np.isfinite(local):
+            continue
         ax.annotate(
             f"{100 * local:.0f}%",
             xy=(x, 1.0),
@@ -946,6 +966,56 @@ def rewrap(text: str, width: int = 79) -> str:
     )
 
 
+def check_summary_claims(summary: pd.DataFrame) -> None:
+    """The caption's claims about the sweep, checked against the summary.
+
+    Companion to :func:`check_caption_claims`, which covers the decoded
+    recording. Anything the caption states about the sweep as a fact rather
+    than interpolates as a number is asserted here.
+    """
+    by_path = summary[summary["summary"] == "by_path"]
+    below = by_path[
+        (by_path.measure == "state_space_replay_matches")
+        & (by_path.path_cm < SHORT_PATH.path_cm + 15.0)
+    ]
+    if below.empty or (below.value > 0).any():
+        raise RuntimeError(
+            "The caption says the state-space detector, held to the published "
+            "replay definition, reports nothing below 45 cm; the summary disagrees."
+        )
+    by_distance = summary[summary["summary"] == "median_by_distance_from_animal"]
+    local = (
+        by_distance[by_distance.measure == "sliding_local_fraction"]
+        .set_index("distance_bin_cm")
+        .value
+    )
+    ratio = (
+        by_distance[by_distance.measure == "sliding_duration_ratio"]
+        .set_index("distance_bin_cm")
+        .value
+    )
+    near, far = "(40, 80]", ["(80, 120]", "(120, 200]"]
+    if not (local.get(near, 0.0) > 0.0 and all(local.get(b, 0.0) == 0.0 for b in far)):
+        raise RuntimeError(
+            "The caption says absorbed local coding reaches about 80 cm and no "
+            "further; the summary's local fractions disagree."
+        )
+    if not all(ratio.get(b, np.nan) > 1.0 for b in far):
+        raise RuntimeError(
+            "The caption says the window floor still leaves events too long "
+            "beyond 80 cm; the summary's duration ratios disagree."
+        )
+
+
+def pct(value: float, digits: int = 0) -> str:
+    """A percentage for the caption, refusing to print one that is not a number."""
+    if not np.isfinite(value):
+        raise RuntimeError(
+            "A caption percentage is not finite; the sweep summary is incomplete."
+        )
+    return f"{100 * value:.{digits}f}%"
+
+
 def write_caption(
     decoded: dict, summary: pd.DataFrame, config: MemorylessSequenceConfig, path: Path
 ) -> None:
@@ -965,6 +1035,7 @@ def write_caption(
         & (summary.measure == "sliding_duration_ratio")
     ].sort_values("duration_s")
     shortest = ratio.iloc[0]
+    check_summary_claims(summary)
 
     path.write_text(
         rewrap(
@@ -1017,11 +1088,11 @@ far more ground.
 path the replay travels and how long it lasts. Each detector runs as published,
 with its own acceptance criteria, and both are scored the same way against the
 same known answer. The sliding-window detector reports
-{100 * overall["sliding_matches"]:.0f}% of the replays and the state-space
-detector {100 * overall["state_space_matches"]:.0f}%.
-{100 * overall["found_by_state_space_only"]:.0f}% were reported by the
+{pct(overall["sliding_matches"])} of the replays and the state-space
+detector {pct(overall["state_space_matches"])}.
+{pct(overall["found_by_state_space_only"])} were reported by the
 state-space detector and missed by the sliding-window detector;
-{100 * overall["found_by_sliding_window_only"]:.2f}% went the other way.
+{pct(overall["found_by_sliding_window_only"], 2)} went the other way.
 
 The two detectors reach their limits on different quantities. The state-space
 detector is limited by duration, which is spike count, which is the data. The
@@ -1031,9 +1102,9 @@ criterion: a replay must spread more than 12 cm about its own centre, and a
 Held to that same criterion our state-space detector also reports nothing below
 45 cm, so this is the published replay definition acting, not the window-by-window
 inference. On the part of the grid that definition can accept at all — a path
-over about 42 cm and a duration over 100 ms, {100 * domain["n_cells"] / overall["n_cells"]:.0f}%
-of the cells — the two read {100 * domain["sliding_matches"]:.0f}% and
-{100 * domain["state_space_matches"]:.0f}%.
+over about 42 cm and a duration over 100 ms, {pct(domain["n_cells"] / overall["n_cells"])}
+of the cells — the two read {pct(domain["sliding_matches"])} and
+{pct(domain["state_space_matches"])}.
 
 **(h)** Reported duration over actual duration, for replays both detectors
 reported. A {1000 * shortest.duration_s:.0f} ms replay is reported as about
@@ -1046,7 +1117,7 @@ decode the animal's place rather than a replayed one. That absorption of local
 coding reaches about 80 cm from the animal and is what drives the largest
 over-reporting, as in panel (b); beyond it the window floor of panel (h) still
 leaves the reported duration too long. Over the whole sweep,
-{100 * overall["sliding_accepted_but_not_the_injection"]:.0f}% of the
+{pct(overall["sliding_accepted_but_not_the_injection"])} of the
 sliding-window detector's accepted events are not the replay that was put in.
 
 **Caveats.** Sorted spikes, a linear track, no artifacts. In (f-i) the animal

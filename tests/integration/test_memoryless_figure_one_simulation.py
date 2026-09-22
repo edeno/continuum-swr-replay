@@ -273,13 +273,13 @@ def fraction_outside_its_event(decoded: Decoded, sequence: int) -> float:
 
 
 def local_fraction(decoded: Decoded, sequence: int) -> float:
-    """Share of a sequence's windows whose center is the animal's own place."""
+    """Share of a sequence's kept windows whose center is the animal's own place."""
     start, stop = decoded.candidates.runs[sequence]
     center = decoded.candidates.decisions.center_index[start : stop + 1]
-    present = center >= 0
-    center_cm = decoded.place_bin_centers_cm[center[present]]
+    kept = decoded.candidates.assembly.kept[start : stop + 1]
+    center_cm = decoded.place_bin_centers_cm[center[kept]]
     animal_cm = np.interp(
-        decoded.midpoint_s[start : stop + 1][present], decoded.time, decoded.position
+        decoded.midpoint_s[start : stop + 1][kept], decoded.time, decoded.position
     )
     return float(np.mean(np.abs(center_cm - animal_cm) < SAME_PLACE_CM))
 

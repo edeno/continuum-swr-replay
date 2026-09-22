@@ -689,7 +689,8 @@ def detect_candidate_sequences(
     Raises
     ------
     ValueError
-        The arrays disagree in length, the midpoints are not increasing, or a
+        The arrays disagree in length, the midpoints are not finite and
+        increasing, a posterior row mixes finite and non-finite values, or a
         finite posterior row does not sum to one.
 
     """
@@ -700,9 +701,17 @@ def detect_candidate_sequences(
             f"{posterior.shape[0]} windows carry {midpoint_s.shape} midpoint "
             "times; every window needs exactly one."
         )
+    if not np.isfinite(midpoint_s).all():
+        raise ValueError("midpoint_s must be finite.")
     if midpoint_s.size > 1 and not (np.diff(midpoint_s) > 0).all():
         raise ValueError("midpoint_s must be strictly increasing.")
     finite = np.isfinite(posterior).all(axis=1)
+    unevaluated = np.isnan(posterior).all(axis=1)
+    if not (finite | unevaluated).all():
+        raise ValueError(
+            "A posterior row mixes finite and non-finite values; a window the "
+            "decoder could not evaluate must be all NaN."
+        )
     mass = posterior[finite].sum(axis=1)
     if not np.allclose(mass, 1.0, rtol=0.0, atol=_MASS_TOLERANCE):
         raise ValueError(

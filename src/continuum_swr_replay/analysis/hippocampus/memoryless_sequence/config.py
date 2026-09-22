@@ -27,8 +27,10 @@ class MemorylessSequenceConfig:
     original as literal constants. At the reference's 5 ms stride the 100 ms
     duration filter keeps runs of index length 20, meaning 21 windows; at this
     project's 4 ms stride the same 100 ms keeps index length 25, meaning 26
-    windows. ``minimum_duration_s`` must therefore be a whole number of
-    strides, or rounding would silently move the filter to another duration.
+    windows. A ``minimum_duration_s`` that is not a whole number of strides
+    is rounded *up* to the next stride, never down: the reference's 1D branch
+    uses 50 ms, which at a 4 ms stride keeps runs of 13 strides (52 ms), the
+    shortest run that is at least 50 ms.
 
     Attributes
     ----------
@@ -116,12 +118,10 @@ class MemorylessSequenceConfig:
                     f"{field} ({getattr(self, field)} s) is {samples} samples at "
                     f"{self.sampling_frequency} Hz, which is not a whole number."
                 )
-        strides = self.minimum_duration_s / self.stride_s
-        if abs(strides - round(strides)) > _WHOLE_NUMBER_TOLERANCE or strides < 1:
+        if self.minimum_duration_s < self.stride_s:
             raise ValueError(
-                f"minimum_duration_s ({self.minimum_duration_s} s) is {strides} "
-                f"strides of {self.stride_s} s, which is not a whole number of at "
-                "least one; the duration filter would round it to another duration."
+                f"minimum_duration_s ({self.minimum_duration_s} s) is shorter than "
+                f"one stride ({self.stride_s} s); every run of two windows would pass."
             )
 
     @property
@@ -139,7 +139,11 @@ class MemorylessSequenceConfig:
         """Shortest run that the duration filter keeps, as an index difference.
 
         A run of index length ``n`` holds ``n + 1`` windows and spans
-        ``n * stride_s`` between its first and last midpoint. Exact, because
-        ``__post_init__`` requires the ratio to be a whole number.
+        ``n * stride_s`` between its first and last midpoint. The smallest
+        ``n`` whose span is at least ``minimum_duration_s``; a ratio within
+        float tolerance of a whole number is that whole number.
         """
-        return round(self.minimum_duration_s / self.stride_s)
+        strides = self.minimum_duration_s / self.stride_s
+        if abs(strides - round(strides)) <= _WHOLE_NUMBER_TOLERANCE:
+            return round(strides)
+        return math.ceil(strides)

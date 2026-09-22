@@ -272,12 +272,16 @@ def memoryless_outcome(recording, injected, window, bounds, true_position_cm, pa
     # must not cover far more ground than the path does: an absorbed sequence
     # tracks the injection during the injection and then runs off to the
     # animal's own place, which is where its dispersion comes from.
+    # The event's decoded positions are its kept windows, as the detector's own
+    # dispersion reads them: a window inside a merged gap was rejected and is
+    # not a decoded position, whatever center its wide posterior happens to
+    # have.
     scored = []
     for i in accepted:
         run_start, run_stop = candidates.runs[i]
         centers = candidates.decisions.center_index[run_start : run_stop + 1]
         times = midpoint_s[run_start : run_stop + 1]
-        present = centers >= 0
+        present = candidates.assembly.kept[run_start : run_stop + 1]
         decoded_cm = recording["place_bin_centers_cm"][centers[present]]
         scored.append(
             (
@@ -404,40 +408,42 @@ def state_space_outcome(recording, injected, window, bounds, true_position_cm, p
     scored = []
     for a, b in hits:
         decoded_cm = bin_position_cm[np.argmax(non_local[a : b + 1], axis=1)]
-        scored.append(
-            (
-                (a, b),
-                score_against_injection(
-                    time[a : b + 1],
-                    decoded_cm,
-                    true_position_cm,
-                    bounds,
-                    path_cm,
-                    MATCH_TOLERANCE_CM,
-                ),
-                decoded_cm,
-            )
+        duration_s = float(time[b] - time[a])
+        dispersion = dispersion_cm(
+            nearest_bin(recording, decoded_cm), recording["bin_distance_cm"]
         )
-    (a, b), score, decoded_cm = scored[best_scored([item[1] for item in scored])]
+        score = score_against_injection(
+            time[a : b + 1],
+            decoded_cm,
+            true_position_cm,
+            bounds,
+            path_cm,
+            MATCH_TOLERANCE_CM,
+        )
+        # and again under the published replay definition the sliding window
+        # is held to, so the two rates can be read against each other; judged
+        # per event, as the sliding window's accepted set is, before the best
+        # is chosen
+        meets_replay_definition = bool(
+            score.matches
+            and duration_s > CONFIG.minimum_duration_s
+            and dispersion > CONFIG.dispersion_threshold_cm
+        )
+        scored.append(((a, b), score, duration_s, dispersion, meets_replay_definition))
+    (a, b), score, duration_s, dispersion, _ = scored[
+        best_scored([item[1] for item in scored])
+    ]
 
     out |= {
         "state_space_matches": score.matches,
+        "state_space_replay_matches": any(item[4] for item in scored),
         "state_space_position_error_cm": score.position_error_cm,
         "state_space_span_cm": score.span_cm,
-        "state_space_duration_s": float(time[b] - time[a]),
+        "state_space_duration_s": duration_s,
         "state_space_start_error_s": float(time[a] - start_s),
         "state_space_end_error_s": float(time[b] - end_s),
-        "state_space_dispersion_cm": dispersion_cm(
-            nearest_bin(recording, decoded_cm), recording["bin_distance_cm"]
-        ),
+        "state_space_dispersion_cm": dispersion,
     }
-    # and again under the published replay definition the sliding window is
-    # held to, so the two rates can be read against each other
-    out["state_space_replay_matches"] = bool(
-        score.matches
-        and out["state_space_duration_s"] > CONFIG.minimum_duration_s
-        and out["state_space_dispersion_cm"] > CONFIG.dispersion_threshold_cm
-    )
     return out
 
 
@@ -555,6 +561,7 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
                 "sliding_any_candidate",
                 "state_space_found",
                 "state_space_matches",
+                "state_space_replay_matches",
             ]
         ]
         .mean()
@@ -563,6 +570,23 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
     )
     by_path_duration["summary"] = "detection_rate_by_path_and_duration"
     parts.append(by_path_duration)
+
+    # the published replay definition applied to the state-space detector's
+    # own events, by path, so the dispersion floor can be read off the file
+    by_path = (
+        table.groupby("path_cm")[["sliding_matches", "state_space_replay_matches"]]
+        .mean()
+        .join(
+            table[table.state_space_matches]
+            .groupby("path_cm")
+            .state_space_dispersion_cm.median()
+            .rename("state_space_median_dispersion_cm")
+        )
+        .reset_index()
+        .melt(id_vars="path_cm", var_name="measure", value_name="value")
+    )
+    by_path["summary"] = "by_path"
+    parts.append(by_path)
 
     by_duration = (
         found.groupby("duration_s")[
@@ -607,6 +631,7 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
                 "found_by_sliding_window_only",
                 "sliding_accepted_but_not_the_injection",
                 "sliding_cells_with_several_accepted_overlaps",
+                "state_space_reports_in_several_intervals",
                 "missed_with_candidate_below_dispersion",
                 "missed_with_no_candidate",
                 "missed_median_spread_pass_rate",
@@ -626,6 +651,10 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
                     table.sliding_found.sum(),
                 ),
                 float(table.sliding_n_accepted.gt(1).mean()),
+                share(
+                    table.state_space_n_intervals.gt(1).sum(),
+                    table.state_space_found.sum(),
+                ),
                 float(
                     (
                         missed.sliding_n_candidates.gt(0)
