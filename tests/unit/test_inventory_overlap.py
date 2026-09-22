@@ -327,9 +327,11 @@ class TestBridgingEvents:
             )
         }
 
-        kept, adjusted = remove_bridging_events(inventory, coverage)
+        kept, adjusted, bridging = remove_bridging_events(inventory, coverage)
 
         assert kept.event_key.tolist() == [key("A", 1), key("B", 0)]
+        # flagged and counted, not silently dropped
+        assert bridging.event_key.tolist() == [key("A", 0)]
         np.testing.assert_array_equal(
             adjusted[(*KEY, "A")].exposure, [[0.0, 10.0], [30.0, 100.0]]
         )
@@ -352,9 +354,10 @@ class TestBridgingEvents:
             )
         }
 
-        kept, adjusted = remove_bridging_events(inventory, coverage)
+        kept, adjusted, bridging = remove_bridging_events(inventory, coverage)
 
         assert kept.event_key.tolist() == [key("A", 0), key("B", 0)]
+        assert bridging.empty
         assert adjusted[(*KEY, "A")] is coverage[(*KEY, "A")]
 
 

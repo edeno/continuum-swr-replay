@@ -194,7 +194,7 @@ def _event_time(inventory: pd.DataFrame, session: tuple, detector: str) -> NDArr
 
 def remove_bridging_events(
     inventory: pd.DataFrame, coverage: CoverageMap
-) -> tuple[pd.DataFrame, dict[tuple, Coverage]]:
+) -> tuple[pd.DataFrame, dict[tuple, Coverage], pd.DataFrame]:
     """Set aside events that span their own detector's unavailable data.
 
     Returns
@@ -204,6 +204,8 @@ def remove_bridging_events(
     coverage : dict
         Each detector's coverage with those events' spans removed, so the
         time they occupied reads as unobserved rather than as a non-detection.
+    bridging : DataFrame
+        The events set aside, to be reported with the counts.
 
     """
     adjusted = dict(coverage)
@@ -227,7 +229,11 @@ def remove_bridging_events(
                 exposure=subtract(own.exposure, spans),
             )
             bridging[inventory.index.get_indexer(group.index[crosses])] = True
-    return inventory[~bridging].reset_index(drop=True), adjusted
+    return (
+        inventory[~bridging].reset_index(drop=True),
+        adjusted,
+        inventory[bridging].reset_index(drop=True),
+    )
 
 
 def overlap_pairs(inventory: pd.DataFrame) -> pd.DataFrame:

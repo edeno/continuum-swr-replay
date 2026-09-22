@@ -95,7 +95,8 @@ def comparison():
         ]
     )
     assert moving.event_key.tolist() == [key(STATE_SPACE, 4)]
-    kept, coverage = remove_bridging_events(inventory, coverage)
+    kept, coverage, bridging = remove_bridging_events(inventory, coverage)
+    assert bridging.event_key.tolist() == [key(MEMORYLESS, 1)]
     pairs = overlap_pairs(kept)
     return kept, coverage, pairs, event_matches(kept, pairs, coverage)
 
