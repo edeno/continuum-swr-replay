@@ -37,12 +37,14 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import
 )
 
 __all__ = [
+    "CLUSTERLESS_LIKELIHOOD_KEYS",
     "ENCODING_KEY",
-    "LIKELIHOOD_ARGUMENT_KEYS",
+    "SORTED_SPIKES_LIKELIHOOD_KEYS",
     "EpochLikelihood",
-    "epoch_log_likelihood",
+    "clusterless_epoch_log_likelihood",
     "interior_bin_distances_cm",
-    "load_encoding_model",
+    "load_clusterless_encoding_model",
+    "sorted_spikes_epoch_log_likelihood",
     "validate_time_grid",
     "window_midpoints_s",
 ]
@@ -50,7 +52,7 @@ __all__ = [
 ENCODING_KEY = ("", 0)
 """The encoding group a single-environment decode is saved under."""
 
-LIKELIHOOD_ARGUMENT_KEYS = (
+CLUSTERLESS_LIKELIHOOD_KEYS = (
     "occupancy",
     "occupancy_model",
     "gpi_models",
@@ -62,7 +64,19 @@ LIKELIHOOD_ARGUMENT_KEYS = (
     "position_std",
     "waveform_std",
 )
-"""The entries of a saved encoding model that the likelihood call takes."""
+"""The entries of a saved clusterless encoding model that its likelihood takes."""
+
+SORTED_SPIKES_LIKELIHOOD_KEYS = (
+    "environment",
+    "marginal_models",
+    "occupancy_model",
+    "occupancy",
+    "mean_rates",
+    "place_fields",
+    "no_spike_part_log_likelihood",
+    "is_track_interior",
+)
+"""The entries of a sorted-spikes encoding model that its likelihood takes."""
 
 _GRID_TOLERANCE = 1e-6
 """Relative tolerance on the spacing of the decoding grid."""
@@ -87,7 +101,7 @@ class EpochLikelihood:
     place_bin_centers_cm: NDArray
 
 
-def load_encoding_model(detector_path: str | Path) -> dict:
+def load_clusterless_encoding_model(detector_path: str | Path) -> dict:
     """Read the fitted encoding model out of a saved detector.
 
     Parameters
@@ -98,7 +112,7 @@ def load_encoding_model(detector_path: str | Path) -> dict:
     Returns
     -------
     encoding_model : dict
-        The entries in :data:`LIKELIHOOD_ARGUMENT_KEYS`, plus ``block_size``.
+        The entries in :data:`CLUSTERLESS_LIKELIHOOD_KEYS`, plus ``block_size``.
 
     Raises
     ------
@@ -175,7 +189,7 @@ def validate_time_grid(time: NDArray, config: MemorylessSequenceConfig) -> None:
         )
 
 
-def epoch_log_likelihood(
+def clusterless_epoch_log_likelihood(
     time: NDArray,
     linear_position: NDArray,
     spike_times: list[NDArray],
@@ -196,7 +210,7 @@ def epoch_log_likelihood(
     spike_waveform_features : list of ndarray
         Waveform features per electrode, aligned with ``spike_times``.
     encoding_model : dict
-        From :func:`load_encoding_model`.
+        From :func:`load_clusterless_encoding_model`.
     config : MemorylessSequenceConfig, optional
 
     Returns
@@ -223,22 +237,13 @@ def epoch_log_likelihood(
             position,
             spike_times,
             spike_waveform_features,
-            **{key: encoding_model[key] for key in LIKELIHOOD_ARGUMENT_KEYS},
+            **{key: encoding_model[key] for key in CLUSTERLESS_LIKELIHOOD_KEYS},
             is_local=False,
             disable_progress_bar=True,
         )
     )
 
-    environment = encoding_model["environment"]
-    interior = np.asarray(environment.is_track_interior_).ravel()
-    centers = np.asarray(environment.place_bin_centers_).ravel()[interior]
-
-    # drop the row no spike can be assigned to; see the module docstring
-    return EpochLikelihood(
-        time=time[:-1],
-        log_likelihood=log_likelihood[:-1],
-        place_bin_centers_cm=centers,
-    )
+    return _drop_the_unreachable_row(log_likelihood, time, encoding_model)
 
 
 def window_midpoints_s(time: NDArray, config: MemorylessSequenceConfig) -> NDArray:
@@ -288,3 +293,81 @@ def interior_bin_distances_cm(environment) -> NDArray:
     interior = np.asarray(environment.is_track_interior_).ravel()
     centers = np.asarray(environment.place_bin_centers_).ravel()[interior]
     return np.asarray(environment.get_distances_to_interior_bins(centers[:, None]))
+
+
+def _drop_the_unreachable_row(
+    log_likelihood: NDArray, time: NDArray, encoding_model: dict
+) -> EpochLikelihood:
+    """Discard the final row and label the columns with their bin centers.
+
+    No spike can be assigned to the final row, so it carries exposure that
+    nothing offsets; see the module docstring.
+    """
+    environment = encoding_model["environment"]
+    interior = np.asarray(environment.is_track_interior_).ravel()
+    return EpochLikelihood(
+        time=np.asarray(time, dtype=np.float64)[:-1],
+        log_likelihood=np.asarray(log_likelihood)[:-1],
+        place_bin_centers_cm=np.asarray(environment.place_bin_centers_).ravel()[
+            interior
+        ],
+    )
+
+
+def sorted_spikes_epoch_log_likelihood(
+    time: NDArray,
+    linear_position: NDArray,
+    spike_times: list[NDArray],
+    encoding_model: dict,
+    config: MemorylessSequenceConfig | None = None,
+) -> EpochLikelihood:
+    """Decode one epoch from sorted units, on its native grid, with no prior.
+
+    The sorted-spikes likelihood adds each neuron's spike count times the log
+    of its place field, and subtracts a per-sample term for the spikes that did
+    not arrive. Both parts are per row, so the array is additive over time in
+    the same way the clusterless one is, and it assigns spikes to rows with the
+    same convention.
+
+    Parameters
+    ----------
+    time : ndarray, shape (n_time,)
+        The decode's uniform sample times.
+    linear_position : ndarray, shape (n_time,) or (n_time, 1)
+        Linearized position at each sample. The non-local likelihood does not
+        read it; it is passed through for the library's signature.
+    spike_times : list of ndarray
+        Spike times per neuron, in seconds on the same clock as ``time``.
+    encoding_model : dict
+        Carrying :data:`SORTED_SPIKES_LIKELIHOOD_KEYS`.
+    config : MemorylessSequenceConfig, optional
+
+    Returns
+    -------
+    likelihood : EpochLikelihood
+
+    """
+    from non_local_detector.likelihoods.sorted_spikes_kde import (
+        predict_sorted_spikes_kde_log_likelihood,
+    )
+
+    config = config or MemorylessSequenceConfig()
+    time = np.asarray(time, dtype=np.float64)
+    validate_time_grid(time, config)
+
+    position = np.asarray(linear_position, dtype=np.float64)
+    if position.ndim == 1:
+        position = position[:, None]
+
+    log_likelihood = np.asarray(
+        predict_sorted_spikes_kde_log_likelihood(
+            time,
+            time,
+            position,
+            spike_times,
+            **{key: encoding_model[key] for key in SORTED_SPIKES_LIKELIHOOD_KEYS},
+            is_local=False,
+            disable_progress_bar=True,
+        )
+    )
+    return _drop_the_unreachable_row(log_likelihood, time, encoding_model)

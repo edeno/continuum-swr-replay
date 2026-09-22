@@ -35,7 +35,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import
     detect_candidate_sequences,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
-    epoch_log_likelihood,
+    clusterless_epoch_log_likelihood,
     interior_bin_distances_cm,
     window_midpoints_s,
 )
@@ -158,7 +158,7 @@ def detect(
     spike_times, features = as_spike_lists(replay_time_s, multiunits, REPLAY_START_S)
     time = np.arange(round(EPOCH_S * SAMPLING_FREQUENCY)) / SAMPLING_FREQUENCY
 
-    result = epoch_log_likelihood(
+    result = clusterless_epoch_log_likelihood(
         time,
         np.full((time.size, 1), TRACK_HEIGHT_CM / 2.0),  # the animal is parked
         spike_times,

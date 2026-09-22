@@ -24,10 +24,10 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
     ENCODING_KEY,
-    LIKELIHOOD_ARGUMENT_KEYS,
-    epoch_log_likelihood,
+    CLUSTERLESS_LIKELIHOOD_KEYS,
+    clusterless_epoch_log_likelihood,
     interior_bin_distances_cm,
-    load_encoding_model,
+    load_clusterless_encoding_model,
     validate_time_grid,
     window_midpoints_s,
 )
@@ -162,12 +162,12 @@ def epoch(tmp_path_factory) -> SimulatedEpoch:
 @pytest.fixture(scope="module")
 def decoded(epoch) -> tuple[np.ndarray, np.ndarray]:
     """The epoch's log-likelihood and its time axis."""
-    result = epoch_log_likelihood(
+    result = clusterless_epoch_log_likelihood(
         epoch.time,
         epoch.linear_position,
         epoch.spike_times,
         epoch.spike_waveform_features,
-        load_encoding_model(epoch.detector_path),
+        load_clusterless_encoding_model(epoch.detector_path),
     )
     return result.time, result.log_likelihood
 
@@ -239,20 +239,20 @@ def direct_window_log_likelihood(
 
 class TestLoadEncodingModel:
     def test_returns_the_arguments_the_likelihood_call_needs(self, epoch):
-        model = load_encoding_model(epoch.detector_path)
+        model = load_clusterless_encoding_model(epoch.detector_path)
 
-        assert set(LIKELIHOOD_ARGUMENT_KEYS) <= set(model)
+        assert set(CLUSTERLESS_LIKELIHOOD_KEYS) <= set(model)
 
     def test_a_missing_file_raises(self, tmp_path):
         with pytest.raises(FileNotFoundError, match="detector"):
-            load_encoding_model(tmp_path / "absent_detector.pkl")
+            load_clusterless_encoding_model(tmp_path / "absent_detector.pkl")
 
     def test_a_missing_encoding_key_names_the_keys_that_are_there(self, tmp_path):
         path = tmp_path / "other_detector.pkl"
         joblib.dump(_StandInDetector({("other", 7): {}}), path)
 
         with pytest.raises(KeyError, match=r"other.*7"):
-            load_encoding_model(path)
+            load_clusterless_encoding_model(path)
 
     def test_an_environment_saved_without_the_fitted_flag_is_restored(
         self, epoch, tmp_path
@@ -266,7 +266,7 @@ class TestLoadEncodingModel:
         path = tmp_path / "old_detector.pkl"
         joblib.dump(_StandInDetector({ENCODING_KEY: model}), path)
 
-        loaded = load_encoding_model(path)
+        loaded = load_clusterless_encoding_model(path)
 
         distances = loaded["environment"].get_distances_to_interior_bins(
             np.array([[10.0]])
@@ -283,7 +283,7 @@ class TestLoadEncodingModel:
         path = tmp_path / "vector_detector.pkl"
         joblib.dump(_StandInDetector({ENCODING_KEY: model}), path)
 
-        loaded = load_encoding_model(path)
+        loaded = load_clusterless_encoding_model(path)
 
         assert isinstance(loaded["waveform_std"], float)
         assert loaded["waveform_std"] == 24.0
@@ -345,12 +345,12 @@ class TestEpochLogLikelihood:
 
     def test_the_bin_centers_label_the_columns(self, epoch):
         """Every downstream statistic indexes bins by column, so the two must agree."""
-        result = epoch_log_likelihood(
+        result = clusterless_epoch_log_likelihood(
             epoch.time,
             epoch.linear_position,
             epoch.spike_times,
             epoch.spike_waveform_features,
-            load_encoding_model(epoch.detector_path),
+            load_clusterless_encoding_model(epoch.detector_path),
         )
         interior = np.asarray(epoch.environment.is_track_interior_).ravel()
         centers = np.asarray(epoch.environment.place_bin_centers_).ravel()
@@ -373,12 +373,12 @@ class TestEpochLogLikelihood:
 
     def test_a_grid_that_fails_validation_raises(self, epoch):
         with pytest.raises(ValueError, match="uniform"):
-            epoch_log_likelihood(
+            clusterless_epoch_log_likelihood(
                 np.delete(epoch.time, 100),
                 np.delete(epoch.linear_position, 100),
                 epoch.spike_times,
                 epoch.spike_waveform_features,
-                load_encoding_model(epoch.detector_path),
+                load_clusterless_encoding_model(epoch.detector_path),
             )
 
 
@@ -519,12 +519,12 @@ class TestAdditivity:
             spike_times[1], features[1], time[[-1]]
         )
 
-        result = epoch_log_likelihood(
+        result = clusterless_epoch_log_likelihood(
             time,
             epoch.linear_position[: time.size],
             spike_times,
             features,
-            load_encoding_model(epoch.detector_path),
+            load_clusterless_encoding_model(epoch.detector_path),
         )
         windows = aggregate_windows(
             result.log_likelihood,
