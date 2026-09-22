@@ -405,7 +405,12 @@ class TestWholeEpoch:
 
     N_SHUFFLES = 40
     IDENTITY = SequenceIdentity(
-        animal="sim", day=1, epoch="02_r1", brain_area="HPC", run_id="integration"
+        animal="sim",
+        day=1,
+        epoch="02_r1",
+        brain_area="HPC",
+        epoch_id="sim20200101_02_r1_HPC",
+        run_id="integration",
     )
     SEED = ShuffleSeed(run=1, session="sim_02_r1_HPC")
 

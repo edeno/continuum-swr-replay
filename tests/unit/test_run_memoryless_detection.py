@@ -111,6 +111,7 @@ def decode_root(tmp_path_factory):
             "linear_position": epoch.linear_position,
             "head_speed": np.zeros(epoch.time.size),
             "SWR_event": swr,
+            "SWR_zscore": np.zeros(epoch.time.size),
         },
         index=pd.Index(epoch.time, name="time"),
     ).to_pickle(paths["data_over_time"])

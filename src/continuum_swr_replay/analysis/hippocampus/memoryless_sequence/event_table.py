@@ -6,7 +6,9 @@ as much a result as its detections. Four flags then select the cohorts:
 (this project's canonical immobility rule over every native speed sample
 between the endpoints, merged gaps included), and ``shuffle_pass`` (the
 encoding-pair shuffle). The shuffle is run only on candidates that pass the
-first two, so ``shuffle_pass`` alone selects the published replay definition.
+first two, so ``shuffle_pass`` alone selects the published replay definition
+together with this project's whole-event immobility rule, which is stricter
+than the reference's per-window gate.
 A candidate that was not shuffled has ``n_shuffles == 0``, which keeps it
 apart from one that was shuffled and could not be tested.
 
@@ -59,19 +61,13 @@ __all__ = [
     "build_memoryless_event_table",
     "build_shuffle_draw_table",
     "canonical_swr_intervals",
-    "observed_label_intervals",
+    "observed_intervals",
     "shuffle_eligible",
 ]
 
 UNKNOWN = "unknown"
 """SWR label of an event whose SWR labels were not fully observed."""
 
-_TIME_TOLERANCE_S = 1e-9
-"""Slack when a window midpoint is compared with a native sample time.
-
-A midpoint is a sample time plus 0.040 s, which need not land on the sample
-20 rows later to the last bit.
-"""
 
 MEMORYLESS_EVENT_TABLE_DTYPES: dict[str, object] = {
     # identity
@@ -79,6 +75,7 @@ MEMORYLESS_EVENT_TABLE_DTYPES: dict[str, object] = {
     "day": np.int64,
     "epoch": object,
     "brain_area": object,
+    "epoch_id": object,
     "run_id": object,
     "swr_definition": object,
     "sequence_label": np.int64,
@@ -140,6 +137,10 @@ class SequenceIdentity:
     ----------
     animal, epoch, brain_area : str
     day : int
+    epoch_id : str
+        The decode's full identifier, e.g. ``chimi20200212_02_r1_HPC_all``.
+        One epoch can be decoded more than one way, and its sequences must
+        not share keys across those decodes.
     run_id : str
         Joins the table to the run manifest that records its configuration,
         inputs and seeds.
@@ -150,10 +151,11 @@ class SequenceIdentity:
     day: int
     epoch: str
     brain_area: str
+    epoch_id: str
     run_id: str
 
     def __post_init__(self) -> None:
-        for name in ("animal", "epoch", "brain_area", "run_id"):
+        for name in ("animal", "epoch", "brain_area", "epoch_id", "run_id"):
             value = getattr(self, name)
             if not isinstance(value, str) or not value:
                 raise ValueError(f"{name} must be a non-empty string, got {value!r}.")
@@ -177,15 +179,21 @@ def _validated_speed(
             f"speed_time_s {time.shape} and speed_cm_per_s {speed.shape} must be "
             f"1-D and the same length."
         )
+    if np.any(np.diff(time) <= 0):
+        raise ValueError("speed_time_s must be strictly increasing.")
     return time, speed
 
 
 def _speed_samples(
     time: NDArray, speed: NDArray, start_s: float, end_s: float
 ) -> NDArray:
-    """Every native speed sample from the event's start to its end, inclusive."""
-    within = (time >= start_s - _TIME_TOLERANCE_S) & (time <= end_s + _TIME_TOLERANCE_S)
-    return speed[within]
+    """Every native speed sample from the event's start to its end, inclusive.
+
+    Event bounds are samples of the same grid, so the comparison is exact.
+    """
+    first = np.searchsorted(time, start_s, side="left")
+    last = np.searchsorted(time, end_s, side="right")
+    return speed[first:last]
 
 
 def _event_bounds(candidates: CandidateSequences) -> tuple[NDArray, NDArray]:
@@ -292,8 +300,8 @@ def _swr_columns(
         )
     observed = np.asarray(swr_observed_intervals, dtype=np.float64).reshape(-1, 2)
     covered = (
-        (observed[None, :, 0] <= starts[:, None] + _TIME_TOLERANCE_S)
-        & (ends[:, None] - _TIME_TOLERANCE_S <= observed[None, :, 1])
+        (observed[None, :, 0] <= starts[:, None])
+        & (ends[:, None] <= observed[None, :, 1])
     ).any(axis=1)
 
     columns = unknown
@@ -353,13 +361,14 @@ def _shuffle_columns(
 
 
 def _ms_event_id(identity: SequenceIdentity, runs: NDArray) -> NDArray:
-    """63-bit stable hash of the epoch, the run and the sequence's windows."""
+    """63-bit stable hash of the decode, the run and the sequence's windows."""
     keys = pd.DataFrame(
         {
             "animal": identity.animal,
             "day": identity.day,
             "epoch": identity.epoch,
             "brain_area": identity.brain_area,
+            "epoch_id": identity.epoch_id,
             "run_id": identity.run_id,
             "first_window": runs[:, 0],
             "last_window": runs[:, 1],
@@ -410,13 +419,14 @@ def canonical_swr_intervals(
     return intervals_from_labels(qualified, "SWR_event")
 
 
-def observed_label_intervals(data_over_time: pd.DataFrame, label_col: str) -> NDArray:
-    """Closed intervals over which ``label_col`` holds a value.
+def observed_intervals(data_over_time: pd.DataFrame, column: str) -> NDArray:
+    """Closed intervals over which ``column`` holds a finite value.
 
-    A sample whose label is NaN was not observed. This is only as complete as
-    the upstream coding: a label written as 0 where the LFP was missing reads
-    as observed and not an SWR, which is the hazard spec 03's
-    observation-availability rule exists for.
+    For SWR labels use ``SWR_zscore``, not ``SWR_event``: ``SWR_event`` is
+    written as an integer and is never NaN, so a stretch of missing LFP would
+    read as observed and not an SWR. ``SWR_zscore`` is reindexed onto the
+    decode's grid with a 4 ms tolerance and is NaN wherever no LFP sample lies
+    that close.
 
     Returns
     -------
@@ -426,7 +436,7 @@ def observed_label_intervals(data_over_time: pd.DataFrame, label_col: str) -> ND
     """
     frame = _time_indexed(data_over_time)
     time = frame.index.to_numpy(dtype=np.float64)
-    observed = np.isfinite(frame[label_col].to_numpy(dtype=np.float64))
+    observed = np.isfinite(frame[column].to_numpy(dtype=np.float64))
     edges = np.diff(observed.astype(np.int8), prepend=0, append=0)
     first = np.flatnonzero(edges == 1)
     last = np.flatnonzero(edges == -1) - 1
@@ -463,7 +473,8 @@ def build_memoryless_event_table(
         builds them (``filter_event_labels_by_speed`` then
         ``intervals_from_labels``). None when SWR labels are unavailable.
     swr_observed_intervals : ndarray, shape (n_intervals, 2), or None
-        Closed intervals over which SWR labels were observed. Required with
+        Closed intervals over which SWR labels were observed, from
+        :func:`observed_intervals` on ``SWR_zscore``. Required with
         ``swr_intervals``; an event not wholly inside one is ``unknown``.
     swr_definition : str
         Which SWR detector the labels come from, e.g. ``"Kay"``.
@@ -506,6 +517,7 @@ def build_memoryless_event_table(
         "day": identity.day,
         "epoch": identity.epoch,
         "brain_area": identity.brain_area,
+        "epoch_id": identity.epoch_id,
         "run_id": identity.run_id,
         "swr_definition": swr_definition,
         "sequence_label": np.arange(1, n + 1),

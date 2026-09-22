@@ -59,7 +59,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.event_table import (
     canonical_swr_intervals,
-    observed_label_intervals,
+    observed_intervals,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
     DEFAULT_N_SHUFFLES,
@@ -212,6 +212,7 @@ def run_one(
         day=int(_one_value(data_over_time, "day")),
         epoch=str(_one_value(data_over_time, "epoch")),
         brain_area=key.brain_area,
+        epoch_id=epoch_id,
         run_id=run_id,
     )
     spike_times, spike_waveform_features = marks_loader(key, cache_dir)
@@ -227,7 +228,8 @@ def run_one(
         swr_intervals=canonical_swr_intervals(
             data_over_time, speed_threshold=config.speed_threshold_cm_per_s
         ),
-        swr_observed_intervals=observed_label_intervals(data_over_time, "SWR_event"),
+        # SWR_event is an integer and never NaN; SWR_zscore is NaN where the LFP is missing
+        swr_observed_intervals=observed_intervals(data_over_time, "SWR_zscore"),
         swr_definition=key.swr_definition,
         seed=ShuffleSeed(run=run_seed, session=epoch_id) if shuffle else None,
         config=config,

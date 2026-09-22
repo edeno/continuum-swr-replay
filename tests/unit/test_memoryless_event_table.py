@@ -17,10 +17,15 @@ the sequence's last window and end it one window early. The fillers between
 sequences last 80 ms, beyond the 50 ms merge gap.
 """
 
+from dataclasses import replace
+
 import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.hippocampus.event_detection import (
+    classify_swr_overlap_geometry,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import (
     MemorylessSequenceConfig,
 )
@@ -33,7 +38,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.event_table i
     build_memoryless_event_table,
     build_shuffle_draw_table,
     canonical_swr_intervals,
-    observed_label_intervals,
+    observed_intervals,
     shuffle_eligible,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
@@ -47,7 +52,12 @@ START_S = 10.0
 """The first window's midpoint; nonzero so a time and an index cannot be confused."""
 
 IDENTITY = SequenceIdentity(
-    animal="sim", day=1, epoch="02_r1", brain_area="HPC", run_id="test-run"
+    animal="sim",
+    day=1,
+    epoch="02_r1",
+    brain_area="HPC",
+    epoch_id="sim20200101_02_r1_HPC",
+    run_id="test-run",
 )
 
 
@@ -77,25 +87,26 @@ def build_posterior() -> np.ndarray:
     return np.array(rows)
 
 
-@pytest.fixture(scope="module")
-def recording():
+def make_recording(start_s: float = START_S) -> dict:
+    """The recording, on one native 2 ms grid whose samples are the midpoints."""
     posterior = build_posterior()
     n_windows = posterior.shape[0]
-    midpoint_s = START_S + CONFIG.stride_s * np.arange(n_windows)
+    grid = (start_s - 0.04) + np.arange(
+        n_windows * CONFIG.stride_n_samples + CONFIG.window_n_samples
+    ) / CONFIG.sampling_frequency
+    midpoint_s = grid[
+        CONFIG.window_n_samples // 2 + CONFIG.stride_n_samples * np.arange(n_windows)
+    ]
     centers = np.arange(N_BINS) * BIN_CM
     distance = np.abs(centers[:, None] - centers[None, :])
     candidates = detect_candidate_sequences(
         posterior, midpoint_s, distance, np.zeros(n_windows), CONFIG
     )
 
-    # a native 2 ms speed trace over the whole decode, still but for one sample
-    # between the midpoints of windows 100 and 101, inside sequence 2's gap
-    speed_time_s = np.arange(
-        START_S - 0.04, midpoint_s[-1] + 0.04, 1 / CONFIG.sampling_frequency
-    )
-    speed = np.zeros(speed_time_s.size)
-    between = midpoint_s[100] + CONFIG.stride_s / 2
-    speed[np.argmin(np.abs(speed_time_s - between))] = 9.0
+    # still, but for one sample between the midpoints of windows 100 and 101,
+    # inside sequence 2's gap
+    speed = np.zeros(grid.size)
+    speed[np.searchsorted(grid, midpoint_s[100]) + 1] = 9.0
 
     swr_intervals = pd.DataFrame(
         {
@@ -105,16 +116,21 @@ def recording():
         }
     )
     # labels observed over the first two sequences only
-    observed = np.array([[START_S - 0.04, midpoint_s[145]]])
+    observed = np.array([[grid[0], midpoint_s[145]]])
     return {
         "candidates": candidates,
         "midpoint_s": midpoint_s,
         "distance": distance,
-        "speed_time_s": speed_time_s,
+        "speed_time_s": grid,
         "speed": speed,
         "swr_intervals": swr_intervals,
         "observed": observed,
     }
+
+
+@pytest.fixture(scope="module")
+def recording():
+    return make_recording()
 
 
 def passing_result() -> ShuffleResult:
@@ -168,6 +184,7 @@ class TestColumns:
         assert (table.epoch == "02_r1").all()
         assert (table.brain_area == "HPC").all()
         assert (table.run_id == "test-run").all()
+        assert (table.epoch_id == "sim20200101_02_r1_HPC").all()
         assert (table.swr_definition == "Kay").all()
 
     def test_carries_its_own_key_and_never_the_state_space_one(self, recording):
@@ -177,14 +194,18 @@ class TestColumns:
         assert "event_id" not in table.columns
         assert table.ms_event_id.is_unique
 
-    def test_the_key_is_stable_and_depends_on_the_run(self, recording):
+    @pytest.mark.parametrize(
+        "change", [{"run_id": "other"}, {"epoch_id": "sim20200101_02_r1_HPC_all"}]
+    )
+    def test_the_key_is_stable_and_names_the_run_and_the_decode(
+        self, recording, change
+    ):
+        """Two decodes of one epoch, or two runs, must never share a key."""
         first = build(recording)
         again = build(recording)
-        other_run = build_memoryless_event_table(
+        other = build_memoryless_event_table(
             recording["candidates"],
-            SequenceIdentity(
-                animal="sim", day=1, epoch="02_r1", brain_area="HPC", run_id="other"
-            ),
+            replace(IDENTITY, **change),
             speed_time_s=recording["speed_time_s"],
             speed_cm_per_s=recording["speed"],
             bin_distance_cm=recording["distance"],
@@ -195,7 +216,7 @@ class TestColumns:
         )
 
         np.testing.assert_array_equal(first.ms_event_id, again.ms_event_id)
-        assert not set(first.ms_event_id) & set(other_run.ms_event_id)
+        assert not set(first.ms_event_id) & set(other.ms_event_id)
 
 
 class TestTiming:
@@ -511,29 +532,90 @@ class TestCanonicalSwrIntervals:
             canonical_swr_intervals(frame, speed_threshold=4.0)
 
 
-class TestObservedLabelIntervals:
-    def test_a_complete_label_column_is_observed_throughout(self):
-        frame = data_over_time()
+class TestObservedIntervals:
+    """Coverage comes from a signal that is NaN where the LFP is missing.
 
-        observed = observed_label_intervals(frame, "SWR_event")
+    ``SWR_event`` is written as an integer and is never NaN, so it cannot
+    show missing LFP; ``SWR_zscore`` is NaN wherever no LFP sample lies
+    within 4 ms of the decode's grid.
+    """
+
+    def test_a_complete_signal_is_observed_throughout(self):
+        frame = data_over_time(SWR_zscore=np.zeros(60))
+
+        observed = observed_intervals(frame, "SWR_zscore")
 
         np.testing.assert_allclose(observed, [[frame.index[0], frame.index[-1]]])
 
-    def test_missing_labels_split_the_coverage(self):
-        labels = np.zeros(60)
-        labels[20:30] = np.nan
-        frame = data_over_time(SWR_event=labels)
+    def test_missing_samples_split_the_coverage(self):
+        zscore = np.zeros(60)
+        zscore[20:30] = np.nan
+        frame = data_over_time(SWR_zscore=zscore)
 
-        observed = observed_label_intervals(frame, "SWR_event")
+        observed = observed_intervals(frame, "SWR_zscore")
 
         np.testing.assert_allclose(
             observed,
             [[frame.index[0], frame.index[19]], [frame.index[30], frame.index[59]]],
         )
 
-    def test_no_labels_at_all_is_no_coverage(self):
-        frame = data_over_time(SWR_event=np.full(60, np.nan))
+    def test_no_signal_at_all_is_no_coverage(self):
+        frame = data_over_time(SWR_zscore=np.full(60, np.nan))
 
-        observed = observed_label_intervals(frame, "SWR_event")
+        observed = observed_intervals(frame, "SWR_zscore")
 
         assert observed.shape == (0, 2)
+
+
+@pytest.mark.parametrize("start_s", [START_S, 1581532345.123])
+class TestSampledBoundaries:
+    """Event bounds are grid samples, so boundary contacts are exact.
+
+    Checked on a recording's clock too, where a bound computed as a sum
+    instead of taken from the grid misses its sample by up to 2.4e-7 s.
+    """
+
+    def test_an_swr_that_only_touches_an_event_is_not_an_overlap(self, start_s):
+        """Strict positive-duration overlap, as the canonical classifier has it."""
+        recording = make_recording(start_s)
+        midpoint = recording["midpoint_s"]
+        touching = pd.DataFrame(
+            {
+                "SWR_event": [1, 2],
+                "start_time": [recording["speed_time_s"][0], midpoint[49]],
+                "end_time": [midpoint[10], midpoint[55]],
+            }
+        )
+
+        table = build(recording, swr_intervals=touching)
+        canonical = classify_swr_overlap_geometry(
+            pd.DataFrame(
+                {"start_time": table.event_start_s, "end_time": table.event_end_s}
+            ),
+            touching,
+        )
+
+        assert table.overlap_class.iloc[0] == "non_swr"
+        assert table.overlap_class.tolist()[:2] == canonical.overlap_class.tolist()[:2]
+
+    def test_the_speed_sample_on_an_event_bound_counts(self, start_s):
+        recording = make_recording(start_s)
+        speed = recording["speed"].copy()
+        last = np.searchsorted(recording["speed_time_s"], recording["midpoint_s"][49])
+        speed[last] = 9.0
+
+        table = build(recording, speed_cm_per_s=speed, shuffle_results={})
+
+        assert not table.whole_event_speed_eligible.iloc[0]
+
+    def test_an_event_observed_exactly_to_its_bounds_is_covered(self, start_s):
+        """Coverage is closed at both ends: an event whose first and last
+        samples are the first and last observed ones was observed."""
+        recording = make_recording(start_s)
+        midpoint = recording["midpoint_s"]
+        exactly = np.array([[midpoint[10], midpoint[49]]])
+
+        table = build(recording, swr_observed_intervals=exactly)
+
+        assert table.overlap_class.iloc[0] == "swr_contained"
+        assert (table.overlap_class.iloc[1:] == "unknown").all()
