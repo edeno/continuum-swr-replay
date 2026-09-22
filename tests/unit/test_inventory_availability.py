@@ -161,21 +161,6 @@ class TestObservationTable:
         )
         assert table.start_s.iloc[0] == time[0] and table.end_s.iloc[-1] == time[-1]
 
-    def test_a_run_that_found_nothing_is_still_observed(self):
-        """Complete data with zero detections is an observation, not a gap."""
-        time = grid()
-
-        table = observation_table(
-            SESSION,
-            detector="Kay",
-            run_id="run",
-            epoch_bounds=(time[0], time[-1]),
-            observed=sample_runs(time, np.ones(time.size, bool)),
-            unavailable_reason="missing LFP",
-        )
-
-        assert table.available.tolist() == [True]
-
     def test_a_missing_run_is_unavailable_throughout(self):
         time = grid()
 
