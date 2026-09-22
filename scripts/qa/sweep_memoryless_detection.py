@@ -60,6 +60,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics im
     normalize_windows,
 )
 from continuum_swr_replay.parameters import LOCAL_POSITION_STD
+from continuum_swr_replay.table_io import write_table
 
 DECODE_BIN_STRIDE = 3
 N_NEURONS = 25
@@ -77,6 +78,16 @@ MARGIN_S = 0.5
 NON_LOCAL_PROB_THRESHOLD = 0.8
 DISCRETE_TRANSITION_STICKINESS = np.array([30.0, 100000.0, 30.0, 200.0])
 SAME_PLACE_CM = 15.0
+
+SUMMARY_PATH = Path(
+    "docs/design/replay_detection_comparison/detection_sweep_summary.csv"
+)
+"""Aggregated results, small enough to keep in the repository.
+
+The raw sweep goes under ``Processed-Data``, which is not tracked. The numbers
+quoted in the spec come from this file, so that nobody has to transcribe them
+out of a one-off script.
+"""
 
 
 def build_recording():
@@ -319,6 +330,93 @@ def run_cell(recording, means, path_cm, midpoint_cm, duration_s, rate_hz, at_s, 
     return row
 
 
+def summarize(table: pd.DataFrame) -> pd.DataFrame:
+    """The aggregates the spec quotes, in one long-format table.
+
+    Built here so the numbers in the write-up and the numbers in the sweep
+    cannot drift apart.
+    """
+    found = table[table.ml_found & table.ss_found].copy()
+    found["ml_duration_ratio"] = found.ml_duration_s / found.duration_s
+    found["ss_duration_ratio"] = found.ss_duration_s / found.duration_s
+    missed = table[table.ss_found & ~table.ml_found]
+
+    parts = []
+
+    by_path_duration = (
+        table.groupby(["path_cm", "duration_s"])[["ml_found", "ss_found"]]
+        .mean()
+        .reset_index()
+        .melt(id_vars=["path_cm", "duration_s"], var_name="measure", value_name="value")
+    )
+    by_path_duration["summary"] = "detection_rate_by_path_and_duration"
+    parts.append(by_path_duration)
+
+    by_duration = (
+        found.groupby("duration_s")[["ml_duration_ratio", "ss_duration_ratio"]]
+        .median()
+        .reset_index()
+        .melt(id_vars="duration_s", var_name="measure", value_name="value")
+    )
+    by_duration["summary"] = "median_duration_ratio_by_duration"
+    parts.append(by_duration)
+
+    found["distance_bin_cm"] = pd.cut(
+        found.distance_from_animal_cm, [0, 40, 80, 120, 200]
+    ).astype(str)
+    by_distance = (
+        found.groupby("distance_bin_cm", observed=True)[
+            ["ml_duration_ratio", "ml_local_fraction", "ss_duration_ratio"]
+        ]
+        .median()
+        .reset_index()
+        .melt(id_vars="distance_bin_cm", var_name="measure", value_name="value")
+    )
+    by_distance["summary"] = "median_by_distance_from_animal"
+    parts.append(by_distance)
+
+    overall = pd.DataFrame(
+        {
+            "measure": [
+                "n_cells",
+                "ml_found",
+                "ss_found",
+                "found_by_state_space_only",
+                "found_by_sliding_window_only",
+                "missed_with_candidate_below_dispersion",
+                "missed_with_no_candidate",
+                "missed_median_spread_pass_rate",
+            ],
+            "value": [
+                float(len(table)),
+                float(table.ml_found.mean()),
+                float(table.ss_found.mean()),
+                float((table.ss_found & ~table.ml_found).mean()),
+                float((table.ml_found & ~table.ss_found).mean()),
+                float(
+                    (
+                        missed.ml_n_candidates.gt(0)
+                        & missed.ml_best_dispersion_cm.lt(
+                            CONFIG.dispersion_threshold_cm
+                        )
+                    ).mean()
+                ),
+                float(missed.ml_n_candidates.eq(0).mean()),
+                float(missed.ml_spread_ok.median()),
+            ],
+        }
+    )
+    overall["summary"] = "overall"
+    parts.append(overall)
+
+    # the grouping column is not called "aggregate": that name shadows
+    # DataFrame.aggregate, so frame.aggregate == "x" compares a method and
+    # quietly selects nothing
+    return pd.concat(parts, ignore_index=True)[
+        ["summary", "measure", "path_cm", "duration_s", "distance_bin_cm", "value"]
+    ]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--n-seeds", type=int, default=8)
@@ -388,12 +486,27 @@ def main() -> None:
             )
 
     table = pd.DataFrame(rows)
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    table.to_parquet(args.out)
-    print(
-        f"\n{len(table)} cells in {(clock.time() - started) / 60:.1f} min -> {args.out}"
-    )
-    print(f"  sliding-window found: {table.ml_found.mean():.3f}")
+    table.attrs = {
+        "n_seeds": args.n_seeds,
+        "n_neurons": N_NEURONS,
+        "path_cm": list(PATH_CM),
+        "duration_s": list(DURATION_S),
+        "peak_rate_hz": list(PEAK_RATE_HZ),
+        "midpoint_cm": list(MIDPOINT_CM),
+        "margin_s": MARGIN_S,
+        "same_place_cm": SAME_PLACE_CM,
+        "spikes": "sorted",
+        "track": "linear",
+    }
+    write_table(table, args.out)
+    summary = summarize(table)
+    SUMMARY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    summary.to_csv(SUMMARY_PATH, index=False)
+
+    print(f"\n{len(table)} cells in {(clock.time() - started) / 60:.1f} min")
+    print(f"  raw      -> {args.out}")
+    print(f"  summary  -> {SUMMARY_PATH}")
+    print(f"\n  sliding-window found: {table.ml_found.mean():.3f}")
     print(f"  state-space found:    {table.ss_found.mean():.3f}")
     print(f"  found by ours only:   {(table.ss_found & ~table.ml_found).mean():.3f}")
     print(f"  found by theirs only: {(table.ml_found & ~table.ss_found).mean():.3f}")
