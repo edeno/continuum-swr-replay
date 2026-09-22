@@ -414,16 +414,17 @@ class TestWholeEpoch:
     )
     SEED = ShuffleSeed(run=1, session="sim_02_r1_HPC")
 
-    def run(self, simulation, seed):
+    def run(self, simulation, seed, speed=None):
         replay_time_s, multiunits, _ = continuous(SLOW_SPEEDUP)
         spike_times, features = as_spike_lists(
             replay_time_s, multiunits, REPLAY_START_S
         )
         time = np.arange(round(EPOCH_S * SAMPLING_FREQUENCY)) / SAMPLING_FREQUENCY
+        speed = np.zeros(time.size) if speed is None else speed
         return run_epoch(
             time,
             np.full(time.size, TRACK_HEIGHT_CM / 2.0),  # parked, as in detect()
-            np.zeros(time.size),  # and still throughout
+            speed,  # still throughout, unless a test says otherwise
             spike_times,
             features,
             simulation.encoding_model,
@@ -489,6 +490,27 @@ class TestWholeEpoch:
         assert replay.p_spread < 0.05
         assert replay.p_jump > 0.05
         assert not replay.shuffle_pass
+
+    def test_a_replay_the_animal_moved_during_is_not_shuffled(self, simulation):
+        """One fast speed sample inside the replay, off every window midpoint:
+        each window's gate reads its midpoint and passes, and the whole-event
+        rule, which reads every sample, must still catch it."""
+        n_time = round(EPOCH_S * SAMPLING_FREQUENCY)
+        speed = np.zeros(n_time)
+        midpoints = CONFIG.window_n_samples // 2 + CONFIG.stride_n_samples * np.arange(
+            n_time
+        )
+        inside = round(0.5 * SAMPLING_FREQUENCY) + 1  # the replay runs from 0.4 s
+        assert inside not in set(midpoints.tolist())
+        speed[inside] = 9.0
+
+        moved = self.run(simulation, self.SEED, speed=speed)
+
+        replay = moved.table[moved.table.is_replay]
+        assert len(replay) == 1
+        assert not replay.whole_event_speed_eligible.iloc[0]
+        assert (moved.table.n_shuffles == 0).all()
+        assert moved.shuffle_draws.empty
 
     def test_no_seed_runs_no_shuffle(self, simulation):
         unshuffled = self.run(simulation, seed=None)
