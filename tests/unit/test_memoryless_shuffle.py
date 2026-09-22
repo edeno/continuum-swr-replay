@@ -32,6 +32,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle impor
     shuffle_p_value,
     shuffle_statistics,
     sorted_candidate_window_log_likelihood,
+    unchanged_window_pairs,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
     aggregate_windows,
@@ -186,23 +187,38 @@ class TestStatistics:
         assert spread == pytest.approx(0.0)
         assert jump == pytest.approx((2 + 4 + 4) / 3)
 
-    def test_zero_jumps_are_set_aside_as_the_reference_does(self):
-        """``jumps(jumps==0) = nan; nanmean(jumps)``: a window whose center
-        repeats the next one's drops out of the jump mean."""
+    def test_a_pair_no_spike_entered_or_left_is_set_aside(self):
+        """The reference's ``jumps(jumps==0) = nan`` on a continuous center:
+        the pairs whose posterior did not change drop out of the jump mean.
+        A zero jump between windows that did change is a real jump of zero
+        and stays, because this port's centers are bins."""
         posterior = np.zeros((4, 5))
         posterior[[0, 1, 2, 3], [0, 0, 2, 2]] = 1.0  # jumps 0, 4, 0, then 0
+        unchanged = np.array([True, False, False, False])
 
-        _, jump = shuffle_statistics(posterior, straight_track(5))
+        _, kept = shuffle_statistics(posterior, straight_track(5))
+        _, aside = shuffle_statistics(posterior, straight_track(5), unchanged)
 
-        assert jump == pytest.approx(4.0)
+        assert kept == pytest.approx(1.0)
+        assert aside == pytest.approx((4 + 0 + 0) / 3)
 
-    def test_a_stationary_candidate_has_no_jump_mean(self):
+    def test_a_stationary_candidate_whose_spikes_never_change_has_no_jump_mean(
+        self,
+    ):
         posterior = np.zeros((4, 5))
         posterior[:, 2] = 1.0
 
-        _, jump = shuffle_statistics(posterior, straight_track(5))
+        _, changing = shuffle_statistics(posterior, straight_track(5))
+        _, unchanged = shuffle_statistics(
+            posterior, straight_track(5), np.ones(4, dtype=bool)
+        )
 
-        assert np.isnan(jump)
+        assert changing == 0.0
+        assert np.isnan(unchanged)
+
+    def test_the_mask_needs_one_entry_per_window(self):
+        with pytest.raises(ValueError, match="unchanged_pairs"):
+            shuffle_statistics(np.eye(4, 5), straight_track(5), np.ones(3, dtype=bool))
 
     def test_an_unusable_window_is_skipped_as_nanmean_skips_it(self):
         posterior = np.zeros((3, 5))
@@ -460,16 +476,20 @@ class TestShuffleCandidate:
         assert np.median(np.abs(decoded_cm - animal_cm)) <= 4.0  # one bin
         assert np.ptp(decoded_cm) > 50.0  # and it travels
 
-    def test_a_real_trajectory_passes_both_halves(self, tetrode):
-        """Positive control, under the reference's conventions.
+    def test_the_spread_half_separates_and_the_jump_half_does_not(self, tetrode):
+        """A property of the encoding-pair shuffle, recorded so it is on file
+        for the pilot.
 
         Breaking which mark goes with which place leaves a broad posterior,
         so the spread half separates by a wide margin. The center of a broad
         posterior sits near the middle of the track and barely moves, so the
-        shuffled jump means are small, and the trajectory's own mean jump
-        equals the smallest of them; because the reference counts only draws
-        strictly below the observed value, that tie does not count against
-        it. Under the port's earlier tie rule the same candidate failed.
+        shuffled jump means are small, and "observed jump below the shuffled"
+        favours a decode that stands still: a trajectory that really moves
+        sits inside the null (p about 0.25 at 80 Hz) and does not pass. A
+        literal zero-jump rule on binned centers had turned this into a pass
+        by setting most of the trajectory's own pairs aside; read from the
+        spikes, as the reference's rule reads with a continuous center, the
+        verdict is the reference's.
         """
         result = shuffle_candidate(
             *self.WINDOWS,
@@ -486,9 +506,9 @@ class TestShuffleCandidate:
         assert result.testable
         assert result.observed_spread_cm < result.null_spread_cm.min()
         assert result.p_spread <= 0.05
-        assert result.observed_jump_cm <= result.null_jump_cm.min()
-        assert result.p_jump <= 0.05
-        assert result.passes
+        assert result.null_jump_cm.min() < result.observed_jump_cm
+        assert result.p_jump > 0.05
+        assert not result.passes
 
     def test_the_observed_statistics_are_the_unshuffled_decode(self, tetrode):
         first, last = self.WINDOWS
@@ -501,8 +521,11 @@ class TestShuffleCandidate:
             tetrode.encoding_model,
             CONFIG,
         )
+        unchanged = unchanged_window_pairs(
+            first, last, tetrode.time, tetrode.spike_times, CONFIG
+        )
         spread, jump = shuffle_statistics(
-            normalize_windows(windows), tetrode.bin_distance_cm
+            normalize_windows(windows), tetrode.bin_distance_cm, unchanged
         )
 
         result = shuffle_candidate(
@@ -520,6 +543,27 @@ class TestShuffleCandidate:
 
         assert result.observed_spread_cm == pytest.approx(spread)
         assert result.observed_jump_cm == pytest.approx(jump)
+
+    def test_the_pairs_set_aside_are_those_no_spike_entered_or_left(self, tetrode):
+        """Read from the spikes, so the same pairs are set aside in the
+        observed decode and in every draw, as in the reference."""
+        first, last = self.WINDOWS
+        unchanged = unchanged_window_pairs(
+            first, last, tetrode.time, tetrode.spike_times, CONFIG
+        )
+        spikes = np.concatenate(tetrode.spike_times)
+        stride_s, width_s = CONFIG.stride_s, CONFIG.window_duration_s
+
+        assert unchanged.shape == (last - first + 1,)
+        assert unchanged.any() and not unchanged.all()
+        for k in range(last - first):
+            start_s = tetrode.time[(first + k) * CONFIG.stride_n_samples]
+            leaving = (spikes >= start_s) & (spikes < start_s + stride_s)
+            entering = (spikes >= start_s + width_s) & (
+                spikes < start_s + width_s + stride_s
+            )
+            assert unchanged[k] == (not leaving.any() and not entering.any())
+        assert unchanged[-1] == unchanged[-2]
 
     def test_is_reproducible_from_its_seed(self, tetrode):
         args = (
@@ -604,7 +648,11 @@ class TestShuffleCandidate:
                 permutations=permutations,
             )
             spread, jump = shuffle_statistics(
-                normalize_windows(windows), tetrode.bin_distance_cm
+                normalize_windows(windows),
+                tetrode.bin_distance_cm,
+                unchanged_window_pairs(
+                    first, last, tetrode.time, tetrode.spike_times, CONFIG
+                ),
             )
 
             assert result.null_spread_cm[draw - 1] == pytest.approx(spread, rel=1e-6)
@@ -755,15 +803,15 @@ class TestCellIdentityShuffle:
         assert np.median(np.abs(decoded_cm - animal_cm)) <= 2.5  # one bin
         assert np.ptp(decoded_cm) > 70.0
 
-    def test_the_spread_half_cannot_separate_swapped_fields(self, sorted_track):
-        """A property of the reference's own shuffle, recorded on file.
+    def test_the_jump_half_separates_and_the_spread_half_cannot(self, sorted_track):
+        """The mirror image of the encoding-pair shuffle, recorded on file.
 
         Swapping whole fields leaves each shuffled posterior sharp, since each
         spike still points at one field, so the spread null sits where the
         observed spread does and that half cannot pass. The sharp, wrong
-        posterior hops between fields, so the trajectory's mean non-zero jump
-        sits below most draws, but on twenty tiling cells at 30 Hz not below
-        enough of them, and this smooth run does not pass the published test.
+        posterior hops between fields, so the jump null lies above a
+        trajectory that moves smoothly and that half separates outright.
+        Measured at 30 Hz peak rate on twenty tiling cells.
         """
         result = shuffle_candidate_sorted(
             *self.args(sorted_track)[:5],
@@ -774,7 +822,8 @@ class TestCellIdentityShuffle:
         )
 
         assert result.testable
-        assert result.observed_jump_cm < np.median(result.null_jump_cm)
+        assert result.observed_jump_cm < result.null_jump_cm.min()
+        assert result.p_jump <= 0.05
         assert result.p_spread > 0.05
         assert not result.passes
 

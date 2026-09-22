@@ -25,14 +25,23 @@ unshuffled re-decode is the epoch decode restricted to the candidate's rows.
 The candidate's windows are re-decoded as they stand, merged gaps included,
 without redetecting anything or reapplying the spread and jump gates. The
 statistics and the test follow the corrected reference script
-(``load_replayEvents_cellIDshuffle_sameEvents.m``, lines 72-79) exactly: a
-jump of zero is set aside before averaging (``jumps(jumps==0) = nan``), both
-means skip NaN (``nanmean``), a draw counts against the candidate only when
-its statistic is strictly below the observed one (``nansum(shuffle < observed)``,
+(``load_replayEvents_cellIDshuffle_sameEvents.m``, lines 72-79): both means
+skip NaN (``nanmean``), a draw counts against the candidate only when its
+statistic is strictly below the observed one (``nansum(shuffle < observed)``,
 so a tie or a NaN draw does not count), and a half passes at ``p <= 0.05``.
-Followed for comparability rather than because each choice is the one this
-project would make: on a discrete track graph consecutive centers can repeat
-exactly, and the reference's rule then drops those windows from the jump mean.
+
+One line of the reference needs translating rather than copying. Its center
+of mass is continuous, so ``jumps(jumps==0) = nan`` sets aside exactly the
+window pairs whose posterior did not change, which are the pairs no spike
+entered or left; and it sets aside the same pairs in the observed decode and
+in every shuffle, because which spikes fall in a window does not depend on
+the encoding. This port's centers are bins, so a literal zero test would also
+set aside every pair whose center stayed in its 2 cm bin, most pairs on a
+slow replay, and would turn the mean jump into the mean size of a bin
+crossing, with a different set of pairs in each draw. The pairs are therefore
+read from the spikes: a pair with no spike in the slice that leaves and none
+in the slice that enters is set aside, whatever its centers do.
+
 A candidate whose observed statistic is NaN passes that half trivially under
 the reference's arithmetic; that cannot happen to a candidate that meets the
 dispersion criterion, and ``ShuffleResult.testable`` records it when it does.
@@ -83,6 +92,7 @@ __all__ = [
     "shuffle_p_value",
     "shuffle_statistics",
     "sorted_candidate_window_log_likelihood",
+    "unchanged_window_pairs",
 ]
 
 DEFAULT_N_SHUFFLES = 100
@@ -307,38 +317,120 @@ class ShuffleResult:
 
 
 def shuffle_statistics(
-    posterior: NDArray, bin_distance_cm: NDArray
+    posterior: NDArray,
+    bin_distance_cm: NDArray,
+    unchanged_pairs: NDArray | None = None,
 ) -> tuple[float, float]:
-    """Mean spread and mean non-zero forward jump over a candidate's windows.
+    """Mean spread and mean forward jump over a candidate's windows.
 
     The reference's statistics, computed as ``load_replayEvents_cellIDshuffle_sameEvents.m``
     lines 72-75 compute them: every window of the candidate counts, including
     those inside merged gaps; the final window repeats the jump before it
-    (``jumps = [jumps; jumps(end)]``); a jump of zero is set aside
-    (``jumps(jumps==0) = nan``); and both means skip NaN (``nanmean``), so a
-    window with no usable posterior drops out rather than spoiling the mean.
+    (``jumps = [jumps; jumps(end)]``); the jump of a window pair whose
+    posterior did not change is set aside (``jumps(jumps==0) = nan``, which is
+    what that line does to a continuous center; see the module docstring);
+    and both means skip NaN (``nanmean``), so a window with no usable
+    posterior drops out rather than spoiling the mean.
 
     Parameters
     ----------
     posterior : ndarray, shape (n_windows, n_bins)
     bin_distance_cm : ndarray, shape (n_bins, n_bins)
+    unchanged_pairs : ndarray of bool, shape (n_windows,), optional
+        ``True`` at window ``k`` when windows ``k`` and ``k + 1`` hold the
+        same spikes; the last entry repeats the one before it, as the padded
+        jump does. Omitted, no pair is set aside.
 
     Returns
     -------
     mean_spread_cm, mean_jump_cm : float
         NaN when no window contributes: no usable posterior at all, or no
-        non-zero jump.
+        jump between windows that differ.
 
     """
     center, spread = window_center_and_spread(posterior, bin_distance_cm)
     jumps = forward_jumps_cm(center, bin_distance_cm)
-    return _nanmean(spread), _nanmean(np.where(jumps == 0.0, np.nan, jumps))
+    if unchanged_pairs is not None:
+        unchanged = np.asarray(unchanged_pairs, dtype=bool)
+        if unchanged.shape != jumps.shape:
+            raise ValueError(
+                f"unchanged_pairs {unchanged.shape} must have one entry per window "
+                f"{jumps.shape}."
+            )
+        jumps = np.where(unchanged, np.nan, jumps)
+    return _nanmean(spread), _nanmean(jumps)
 
 
 def _nanmean(values: NDArray) -> float:
-    """MATLAB's ``nanmean``: the mean of the finite values, NaN if there are none."""
-    finite = values[np.isfinite(values)]
-    return float(finite.mean()) if finite.size else float("nan")
+    """MATLAB's ``nanmean``: the mean of the non-NaN values, NaN if there are none."""
+    kept = values[~np.isnan(values)]
+    return float(kept.mean()) if kept.size else float("nan")
+
+
+def _unchanged_pairs(
+    row_spike_counts: NDArray, n_windows: int, config: MemorylessSequenceConfig
+) -> NDArray:
+    """Which consecutive window pairs hold the same spikes.
+
+    Window ``k`` covers rows ``[k S, k S + W)``; window ``k + 1`` drops the
+    first ``S`` of those rows and adds the ``S`` rows after them. The pair is
+    unchanged when neither slice holds a spike. The last window repeats the
+    entry before it, as its padded jump repeats the previous jump.
+    """
+    stride, width = config.stride_n_samples, config.window_n_samples
+    counts = np.asarray(row_spike_counts, dtype=np.float64)
+    unchanged = np.zeros(n_windows, dtype=bool)
+    for k in range(n_windows - 1):
+        leaving = counts[k * stride : k * stride + stride]
+        entering = counts[k * stride + width : k * stride + width + stride]
+        unchanged[k] = leaving.sum() == 0 and entering.sum() == 0
+    if n_windows > 1:
+        unchanged[-1] = unchanged[-2]
+    return unchanged
+
+
+def unchanged_window_pairs(
+    first_window: int,
+    last_window: int,
+    time: NDArray,
+    spike_times: list[NDArray],
+    config: MemorylessSequenceConfig,
+) -> NDArray:
+    """Which of a candidate's consecutive window pairs hold the same spikes.
+
+    The pairs whose jump the reference's ``jumps(jumps==0) = nan`` sets aside
+    (see the module docstring), read from the spikes of every electrode or
+    cell together. The same mask is used for the observed decode and every
+    shuffled draw, as it is in the reference.
+
+    Parameters
+    ----------
+    first_window, last_window : int
+        Inclusive window indices.
+    time : ndarray, shape (n_time,)
+        The full decode grid.
+    spike_times : list of ndarray
+        Per electrode or cell.
+    config : MemorylessSequenceConfig
+
+    Returns
+    -------
+    unchanged_pairs : ndarray of bool, shape (n_windows,)
+        ``True`` at window ``k`` when windows ``k`` and ``k + 1`` hold the
+        same spikes; the last entry repeats the one before it.
+
+    """
+    from non_local_detector.likelihoods.common import get_spike_time_bin_ind
+
+    time, row_start, row_stop = _candidate_rows(first_window, last_window, time, config)
+    counts = np.zeros(row_stop - row_start)
+    for times in spike_times:
+        times = np.asarray(times, dtype=np.float64)
+        times = times[(times >= time[0]) & (times <= time[-1])]
+        rows = get_spike_time_bin_ind(times, time)
+        rows = rows[(rows >= row_start) & (rows < row_stop)] - row_start
+        np.add.at(counts, rows, 1.0)
+    return _unchanged_pairs(counts, last_window - first_window + 1, config)
 
 
 def _candidate_rows(
@@ -372,11 +464,15 @@ def _check_n_shuffles(n_shuffles: int) -> None:
         )
 
 
-def _result_from_draws(windows: NDArray, bin_distance_cm: NDArray) -> ShuffleResult:
+def _result_from_draws(
+    windows: NDArray, bin_distance_cm: NDArray, unchanged_pairs: NDArray
+) -> ShuffleResult:
     """Draw 0 is the observed decode; the rest are the null."""
     statistics = np.array(
         [
-            shuffle_statistics(normalize_windows(draw), bin_distance_cm)
+            shuffle_statistics(
+                normalize_windows(draw), bin_distance_cm, unchanged_pairs
+            )
             for draw in windows
         ]
     )
@@ -404,7 +500,7 @@ def _decode_draws(
     config: MemorylessSequenceConfig,
     n_draws: int,
     permutation_for: Callable[[int, int, int], NDArray | None],
-) -> NDArray:
+) -> tuple[NDArray, NDArray]:
     """Window log-likelihoods of one candidate under each draw's encoding.
 
     ``permutation_for(draw, electrode, n_encoding)`` returns the permutation
@@ -415,6 +511,8 @@ def _decode_draws(
     Returns
     -------
     window_log_likelihood : ndarray, shape (n_draws, n_windows, n_bins)
+    unchanged_pairs : ndarray of bool, shape (n_windows,)
+        Which consecutive windows hold the same spikes; see :func:`_unchanged_pairs`.
     """
     from non_local_detector.likelihoods.clusterless_kde import (
         block_estimate_log_joint_mark_intensity,
@@ -439,6 +537,7 @@ def _decode_draws(
         encoding_model["summed_ground_process_intensity"], dtype=np.float64
     )
     rows = np.broadcast_to(-ground, (n_draws, row_stop - row_start, ground.size)).copy()
+    row_spike_counts = np.zeros(row_stop - row_start)
 
     for electrode in range(n_electrodes):
         times = np.asarray(spike_times[electrode], dtype=np.float64)
@@ -449,6 +548,7 @@ def _decode_draws(
         if not in_candidate.any():
             continue
         spike_rows = spike_rows[in_candidate] - row_start
+        np.add.at(row_spike_counts, spike_rows, 1.0)
         decoding_marks = np.asarray(spike_waveform_features[electrode])[in_bounds][
             in_candidate
         ]
@@ -485,7 +585,7 @@ def _decode_draws(
             )
             np.add.at(rows[draw], spike_rows, per_spike)
 
-    return np.stack(
+    windows = np.stack(
         [
             aggregate_windows(
                 draw_rows, config.window_n_samples, config.stride_n_samples
@@ -493,6 +593,7 @@ def _decode_draws(
             for draw_rows in rows
         ]
     )
+    return windows, _unchanged_pairs(row_spike_counts, windows.shape[1], config)
 
 
 def _validated_permutation(permutation: NDArray, n: int, electrode: int) -> NDArray:
@@ -555,7 +656,7 @@ def candidate_window_log_likelihood(
             return None
         return _validated_permutation(permutations[electrode], n, electrode)
 
-    windows = _decode_draws(
+    windows, _ = _decode_draws(
         first_window,
         last_window,
         time,
@@ -610,7 +711,7 @@ def shuffle_candidate(
             seed, candidate=first_window, draw=draw, electrode=electrode, n=n
         )
 
-    windows = _decode_draws(
+    windows, unchanged = _decode_draws(
         first_window,
         last_window,
         time,
@@ -621,7 +722,7 @@ def shuffle_candidate(
         n_draws=n_shuffles + 1,
         permutation_for=permutation_for,
     )
-    return _result_from_draws(windows, bin_distance_cm)
+    return _result_from_draws(windows, bin_distance_cm, unchanged)
 
 
 def _decode_draws_sorted(
@@ -632,7 +733,7 @@ def _decode_draws_sorted(
     encoding_model: dict,
     config: MemorylessSequenceConfig,
     permutations: list[NDArray | None],
-) -> NDArray:
+) -> tuple[NDArray, NDArray]:
     """Window log-likelihoods of one candidate under each draw's cell pairing.
 
     The row log-likelihood is ``sum_n count_n log field_n(x) - sum_n field_n(x)``,
@@ -642,6 +743,7 @@ def _decode_draws_sorted(
     Returns
     -------
     window_log_likelihood : ndarray, shape (n_draws, n_windows, n_bins)
+    unchanged_pairs : ndarray of bool, shape (n_windows,)
     """
     from non_local_detector.likelihoods.common import get_spike_time_bin_ind
 
@@ -667,7 +769,7 @@ def _decode_draws_sorted(
     absent = np.asarray(
         encoding_model["no_spike_part_log_likelihood"], dtype=np.float64
     )[interior]
-    return np.stack(
+    windows = np.stack(
         [
             aggregate_windows(
                 counts
@@ -679,6 +781,7 @@ def _decode_draws_sorted(
             for permutation in permutations
         ]
     )
+    return windows, _unchanged_pairs(counts.sum(axis=1), windows.shape[1], config)
 
 
 def sorted_candidate_window_log_likelihood(
@@ -717,17 +820,16 @@ def sorted_candidate_window_log_likelihood(
     if permutation is not None:
         n_cells = np.asarray(encoding_model["place_fields"]).shape[0]
         permutation = _validated_permutation(permutation, n_cells, 0)
-    return np.asarray(
-        _decode_draws_sorted(
-            first_window,
-            last_window,
-            time,
-            spike_times,
-            encoding_model,
-            config,
-            [permutation],
-        )[0]
+    windows, _ = _decode_draws_sorted(
+        first_window,
+        last_window,
+        time,
+        spike_times,
+        encoding_model,
+        config,
+        [permutation],
     )
+    return np.asarray(windows[0])
 
 
 def shuffle_candidate_sorted(
@@ -753,7 +855,7 @@ def shuffle_candidate_sorted(
         cell_identity_permutation(seed, candidate=first_window, draw=draw, n=n_cells)
         for draw in range(1, n_shuffles + 1)
     ]
-    windows = _decode_draws_sorted(
+    windows, unchanged = _decode_draws_sorted(
         first_window,
         last_window,
         time,
@@ -762,4 +864,4 @@ def shuffle_candidate_sorted(
         config,
         permutations,
     )
-    return _result_from_draws(windows, bin_distance_cm)
+    return _result_from_draws(windows, bin_distance_cm, unchanged)

@@ -463,20 +463,21 @@ class TestWholeEpoch:
         assert len(draws) == self.N_SHUFFLES * len(tested)
         assert set(draws.ms_event_id) == set(tested.ms_event_id)
 
-    def test_the_continuous_replay_passes_the_published_test(
+    def test_the_spread_half_separates_and_the_jump_half_cannot(
         self, epoch_run, simulation
     ):
-        """Positive control, end to end, under the reference's conventions.
+        """A property of the encoding-pair shuffle on this simulation, on file
+        for the real-data pilot.
 
         The simulation gives each electrode one stretch of track. A shuffle
         within an electrode keeps that stretch, so a shuffled decode still
-        knows roughly where the replay is; it loses which mark goes with which
-        place, so its posterior is broad and its center moves in fits. With
-        zero jumps set aside as the reference sets them aside, the replay's
-        own smooth jumps sit below the shuffled ones, and both halves pass.
-        Under the port's earlier conventions the jump half failed here. CA1
-        tetrodes are not topographic and should keep less position in their
-        identity than these electrodes do; how much less has to be measured.
+        knows roughly where the replay is and its center still sweeps the
+        track; what it loses is which mark goes with which place, so the
+        spread half separates. The replay's own jumps are no smaller than the
+        shuffled sweeps' (the observed mean sits above every draw), so the
+        jump half fails and the candidate does not pass. CA1 tetrodes are not
+        topographic and should keep less position in their identity than
+        these electrodes do; how much less has to be measured.
         """
         footprints = [
             (float(np.min(positions)), float(np.max(positions)))
@@ -488,13 +489,16 @@ class TestWholeEpoch:
         assert all(high - low < TRACK_HEIGHT_CM / 2 for low, high in footprints)
         assert replay.shuffle_testable
         assert replay.p_spread <= 0.05
-        assert replay.p_jump <= 0.05
-        assert replay.shuffle_pass
+        assert replay.p_jump > 0.05
+        assert not replay.shuffle_pass
 
-    def test_a_replay_the_animal_moved_during_is_not_shuffled(self, simulation):
+    def test_a_replay_the_animal_moved_during_is_tested_but_not_eligible(
+        self, simulation
+    ):
         """One fast speed sample inside the replay, off every window midpoint:
         each window's gate reads its midpoint and passes, and the whole-event
-        rule, which reads every sample, must still catch it."""
+        rule, which reads every sample, must still catch it. The shuffle
+        still runs, as the reference would test it; eligibility is a column."""
         n_time = round(EPOCH_S * SAMPLING_FREQUENCY)
         speed = np.zeros(n_time)
         midpoints = CONFIG.window_n_samples // 2 + CONFIG.stride_n_samples * np.arange(
@@ -509,8 +513,8 @@ class TestWholeEpoch:
         replay = moved.table[moved.table.is_replay]
         assert len(replay) == 1
         assert not replay.whole_event_speed_eligible.iloc[0]
-        assert (moved.table.n_shuffles == 0).all()
-        assert moved.shuffle_draws.empty
+        assert replay.n_shuffles.iloc[0] == self.N_SHUFFLES
+        assert not moved.shuffle_draws.empty
 
     def test_no_seed_runs_no_shuffle(self, simulation):
         unshuffled = self.run(simulation, seed=None)

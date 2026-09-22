@@ -515,13 +515,15 @@ class TestAShortPathIsDeclined:
 class TestThePublishedSignificanceTest:
     """The reference's place-cell identity shuffle, on the figure's recording.
 
-    Positive control for the whole published definition: the two continuous
-    replays, decoded from the same fields their spikes came from, must pass
-    both halves. The caption states this.
+    The inbound continuous replay and the 80 ms replay pass both halves: the
+    positive controls for the whole published definition. The outbound
+    continuous replay, 81% absorbed local coding, passes the spread half and
+    fails the jump half by a few draws. The caption reads all three from the
+    data; these pin them so a change is noticed.
     """
 
-    @pytest.mark.parametrize("event", [CONTINUOUS_OUTBOUND, CONTINUOUS_INBOUND])
-    def test_a_continuous_replay_passes_both_halves(self, decoded, event):
+    @pytest.mark.parametrize("event", [CONTINUOUS_INBOUND, SHORT_REPLAY])
+    def test_a_coherent_replay_passes_both_halves(self, decoded, event):
         sequence = accepted_overlapping(decoded, event)[0]
         result = decoded.shuffles[sequence]
 
@@ -529,6 +531,15 @@ class TestThePublishedSignificanceTest:
         assert result.p_spread <= 0.05
         assert result.p_jump <= 0.05
         assert result.passes
+
+    def test_the_absorbed_outbound_replay_fails_the_jump_half(self, decoded):
+        sequence = accepted_overlapping(decoded, CONTINUOUS_OUTBOUND)[0]
+        result = decoded.shuffles[sequence]
+
+        assert local_fraction(decoded, sequence) > 0.5
+        assert result.p_spread <= 0.05
+        assert result.p_jump > 0.05
+        assert not result.passes
 
     def test_only_accepted_candidates_are_tested(self, decoded):
         assert set(decoded.shuffles) == set(

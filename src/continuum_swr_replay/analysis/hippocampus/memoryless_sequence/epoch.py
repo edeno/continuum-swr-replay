@@ -3,8 +3,8 @@
 Arrays in, tables out, with no file access, so the same function runs under
 the tests and under the per-epoch runner. The order is fixed here rather than
 left to callers: decode every window under a uniform prior, gate and assemble
-sequences, pick the candidates the published definition would test, shuffle
-exactly those, and write one row per candidate.
+sequences, shuffle every candidate that meets the replay criteria, as the
+reference tests every such candidate, and write one row per candidate.
 
 The design is in ``docs/design/replay_detection_comparison/02-memoryless-sequence.md``,
 section "Data flow, per epoch".
@@ -192,7 +192,7 @@ def run_epoch(
                 seed=seed,
                 n_shuffles=n_shuffles,
             )
-            for index in shuffle_eligible(candidates, time, speed)
+            for index in shuffle_eligible(candidates)
         }
 
     table = build_memoryless_event_table(

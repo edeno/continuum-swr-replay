@@ -5,11 +5,12 @@ as much a result as its detections. Three flags then select the cohorts:
 ``is_replay`` (the duration and dispersion criteria), ``whole_event_speed_eligible``
 (this project's canonical immobility rule over every native speed sample
 between the endpoints, merged gaps included), and ``shuffle_pass`` (the
-encoding-pair shuffle). The shuffle is run only on candidates that pass the
-first two, so ``shuffle_pass`` alone selects the published replay definition
-together with this project's whole-event immobility rule, which is stricter
-than the reference's per-window gate.
-A candidate that was not shuffled has ``n_shuffles == 0``.
+encoding-pair shuffle). The shuffle is run on every candidate that meets the
+replay criteria, as the reference tests every such candidate, so
+``shuffle_pass`` alone selects the published replay definition, and
+``shuffle_pass & whole_event_speed_eligible`` selects this project's cohort,
+whose immobility rule is stricter than the reference's per-window gate. A
+candidate that was not shuffled has ``n_shuffles == 0``.
 
 Three columns average three different window sets, each right for its
 purpose: ``n_windows`` counts every window of the span, merged gaps included;
@@ -193,7 +194,7 @@ class SequenceIdentity:
                 f"brain_area must be one of {BRAIN_AREAS}, got {self.brain_area!r}."
             )
         # the identifier names the same epoch as the parts do
-        if not self.epoch_id.startswith(self.animal) or (
+        if not self.epoch_id.startswith(f"{self.animal}{self.day}_") or (
             f"_{self.epoch}_{self.brain_area}" not in self.epoch_id
         ):
             raise ValueError(
@@ -240,22 +241,19 @@ def _event_bounds(candidates: CandidateSequences) -> tuple[NDArray, NDArray]:
     return candidates.midpoint_s[runs[:, 0]], candidates.midpoint_s[runs[:, 1]]
 
 
-def shuffle_eligible(
-    candidates: CandidateSequences,
-    speed_time_s: NDArray,
-    speed_cm_per_s: NDArray,
-) -> NDArray:
-    """Candidates the shuffle is run on.
+def shuffle_eligible(candidates: CandidateSequences) -> NDArray:
+    """Candidates the shuffle is run on: those that meet both replay criteria.
 
-    Those that meet the replay criteria and are still over their whole
-    interval, as the reference tests only its duration- and
-    dispersion-accepted events.
+    The reference tests every duration- and dispersion-accepted event, and so
+    does the port, whether or not the animal was still over the whole event.
+    This project's whole-event immobility rule is a column,
+    ``whole_event_speed_eligible``, to filter on afterwards; running the
+    shuffle on the eligible subset only would bake that cohort choice into
+    what was computed rather than into how it is read.
 
     Parameters
     ----------
     candidates : CandidateSequences
-    speed_time_s, speed_cm_per_s : ndarray, shape (n_samples,)
-        The native speed trace, as used for the canonical immobility rule.
 
     Returns
     -------
@@ -263,19 +261,7 @@ def shuffle_eligible(
         Into ``candidates.runs``, ascending.
 
     """
-    time, speed = _validated_speed(speed_time_s, speed_cm_per_s)
-    starts, ends = _event_bounds(candidates)
-    threshold = candidates.config.speed_threshold_cm_per_s
-    still = np.array(
-        [
-            event_speeds_are_immobile(
-                _speed_samples(time, speed, start, end), speed_threshold=threshold
-            )
-            for start, end in zip(starts, ends, strict=True)
-        ],
-        dtype=bool,
-    )
-    return np.flatnonzero(candidates.is_replay & still)
+    return np.flatnonzero(candidates.is_replay)
 
 
 def _path_statistics(
@@ -386,8 +372,8 @@ def _shuffle_columns(
     if set(shuffle_results) != set(eligible.tolist()):
         raise ValueError(
             f"Shuffle results are for candidates {sorted(shuffle_results)}, but the "
-            f"eligible candidates are {eligible.tolist()}; every eligible candidate, "
-            f"and no other, must be shuffled."
+            f"candidates meeting the replay criteria are {eligible.tolist()}; every "
+            f"one of those, and no other, must be shuffled."
         )
     for index, result in shuffle_results.items():
         columns["shuffle_observed_spread_cm"][index] = result.observed_spread_cm
@@ -525,8 +511,9 @@ def build_memoryless_event_table(
     swr_definition : str
         Which SWR detector the labels come from, e.g. ``"Kay"``.
     shuffle_results : mapping of int to ShuffleResult, or None
-        Keyed by candidate index. Must cover exactly the candidates
-        :func:`shuffle_eligible` returns. None when the shuffle was not run.
+        Keyed by candidate index. Must cover exactly the candidates that meet
+        both replay criteria, as :func:`shuffle_eligible` returns them. None
+        when the shuffle was not run.
 
     Returns
     -------
@@ -545,7 +532,7 @@ def build_memoryless_event_table(
     if not swr_definition:
         raise ValueError("swr_definition must name the SWR detector.")
     n = len(candidates.runs)
-    eligible = shuffle_eligible(candidates, time, speed)
+    eligible = shuffle_eligible(candidates)
     shuffle = _shuffle_columns(n, eligible, shuffle_results)
     if n == 0:
         return _empty(MEMORYLESS_EVENT_TABLE_DTYPES)

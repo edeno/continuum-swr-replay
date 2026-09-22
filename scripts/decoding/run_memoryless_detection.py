@@ -24,7 +24,10 @@ settings, and the outcome. It is rewritten atomically after each epoch, so a
 run that stops part way still says what it did, and a rerun under the same
 run id refuses to continue with different settings or code. An epoch that
 fails is recorded as ``failed`` with its error and the run goes on to the
-next; the run then exits non-zero, and a rerun retries the failed epochs.
+next; the run then exits non-zero, and a rerun under the same run id retries
+the failed epochs. That holds for a transient failure; after a code fix the
+commit, and so the default run id, has changed, and the finished epochs are
+recomputed under the new one, which is what the settings gate is for.
 ``run.log`` beside the manifest keeps everything printed.
 
 The marks come from ``load_data``, which needs the Spyglass database, unless
@@ -446,10 +449,11 @@ def run_settings(
             "n_shuffles": n_shuffles if shuffle else 0,
             "run_seed": run_seed,
             "seeded_by": "run seed, epoch_id, candidate's first window, draw, electrode",
-            "tested": "candidates meeting the replay criteria and still over "
-            "their whole interval",
+            "tested": "every candidate meeting the replay criteria, as the reference",
             "statistics": "mean posterior spread and mean forward jump over every "
-            "window, zero jumps set aside and NaN skipped, as the reference",
+            "window; the jump of a pair no spike entered or left set aside, which "
+            "is the reference's jumps(jumps==0)=nan on a continuous center; NaN "
+            "skipped",
             "p_value": "(1 + count(null < observed)) / (n_shuffles + 1), as the reference",
             "passes": f"both p-values at or below {SIGNIFICANCE_LEVEL}, as the reference",
         },

@@ -153,7 +153,8 @@ def build(recording, **overrides) -> pd.DataFrame:
         "swr_intervals": recording["swr_intervals"],
         "swr_observed_intervals": recording["observed"],
         "swr_definition": "Kay",
-        "shuffle_results": {0: passing_result()},
+        # candidates 0 and 1 meet the replay criteria; both are tested
+        "shuffle_results": {0: passing_result(), 1: passing_result()},
     } | overrides
     return build_memoryless_event_table(recording["candidates"], IDENTITY, **arguments)
 
@@ -213,7 +214,7 @@ class TestColumns:
                 swr_intervals=recording["swr_intervals"],
                 swr_observed_intervals=recording["observed"],
                 swr_definition="Kay",
-                shuffle_results={0: passing_result()},
+                shuffle_results={0: passing_result(), 1: passing_result()},
             )
 
         np.testing.assert_array_equal(first.ms_event_id, again.ms_event_id)
@@ -323,7 +324,7 @@ class TestSpeed:
             recording,
             speed_time_s=recording["speed_time_s"][:10],
             speed_cm_per_s=recording["speed"][:10],
-            shuffle_results={},  # nothing is eligible, so nothing is shuffled
+            shuffle_results={0: passing_result(), 1: passing_result()},
         )
 
         assert not table.whole_event_speed_eligible.any()
@@ -391,16 +392,13 @@ class TestSwrLabels:
 
 
 class TestShuffleColumns:
-    def test_eligibility_needs_the_replay_criteria_and_whole_event_stillness(
-        self, recording
-    ):
-        eligible = shuffle_eligible(
-            recording["candidates"],
-            recording["speed_time_s"],
-            recording["speed"],
-        )
+    def test_every_candidate_meeting_the_replay_criteria_is_tested(self, recording):
+        """As the reference tests every duration- and dispersion-accepted
+        event; whole-event stillness is a column to filter on, not a gate on
+        what was computed. Candidate 1 is replay but not still."""
+        eligible = shuffle_eligible(recording["candidates"])
 
-        assert eligible.tolist() == [0]
+        assert eligible.tolist() == [0, 1]
 
     def test_a_tested_candidate_carries_its_statistics(self, recording):
         table = build(recording)
@@ -415,7 +413,7 @@ class TestShuffleColumns:
     def test_an_untested_candidate_is_marked_by_zero_draws(self, recording):
         """Not tested is not the same as tested and untestable."""
         table = build(recording)
-        untested = table.iloc[1:]
+        untested = table.iloc[2:]
 
         assert (untested.n_shuffles == 0).all()
         assert not untested.shuffle_pass.any()
@@ -425,8 +423,12 @@ class TestShuffleColumns:
     def test_shuffle_pass_alone_selects_the_published_definition(self, recording):
         table = build(recording)
 
-        cohort = table[table.shuffle_pass]
-        assert (cohort.is_replay & cohort.whole_event_speed_eligible).all()
+        published = table[table.shuffle_pass]
+        assert published.is_replay.all()
+        assert published.sequence_label.tolist() == [1, 2]
+        # this project's cohort adds its whole-event immobility rule
+        ours = table[table.shuffle_pass & table.whole_event_speed_eligible]
+        assert ours.sequence_label.tolist() == [1]
 
     def test_no_shuffle_run_leaves_every_candidate_untested(self, recording):
         table = build(recording, shuffle_results=None)
@@ -434,13 +436,15 @@ class TestShuffleColumns:
         assert (table.n_shuffles == 0).all()
         assert not table.shuffle_pass.any()
 
-    def test_a_result_for_an_ineligible_candidate_is_refused(self, recording):
-        with pytest.raises(ValueError, match="eligible"):
-            build(recording, shuffle_results={0: passing_result(), 1: passing_result()})
+    def test_a_result_for_a_candidate_outside_the_replay_criteria_is_refused(
+        self, recording
+    ):
+        with pytest.raises(ValueError, match="replay criteria"):
+            build(recording, shuffle_results={i: passing_result() for i in range(3)})
 
-    def test_an_eligible_candidate_without_a_result_is_refused(self, recording):
-        with pytest.raises(ValueError, match="eligible"):
-            build(recording, shuffle_results={})
+    def test_a_replay_candidate_without_a_result_is_refused(self, recording):
+        with pytest.raises(ValueError, match="replay criteria"):
+            build(recording, shuffle_results={0: passing_result()})
 
 
 class TestShuffleDrawTable:
@@ -631,7 +635,7 @@ class TestSampledBoundaries:
         last = np.searchsorted(recording["speed_time_s"], recording["midpoint_s"][49])
         speed[last] = 9.0
 
-        table = build(recording, speed_cm_per_s=speed, shuffle_results={})
+        table = build(recording, speed_cm_per_s=speed)
 
         assert not table.whole_event_speed_eligible.iloc[0]
 

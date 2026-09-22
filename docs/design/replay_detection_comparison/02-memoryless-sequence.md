@@ -195,18 +195,25 @@ repeating the final jump to match the reference's length-N jump vector.
 These are separate from the NaN-masked statistics used in candidate assembly.
 Both observed statistics must be smaller than expected under their shuffled
 distributions. The statistics and the test follow the corrected reference script
-exactly (`load_replayEvents_cellIDshuffle_sameEvents.m`, lines 72–79): zero jumps are
-set aside before averaging (`jumps(jumps==0) = nan`), both means skip NaN (`nanmean`),
-`p = (1 + nansum(null_stat < observed_stat)) / (100 + 1)` counts only draws strictly
-below the observed value (a tie or a NaN draw does not count), and each half passes at
-`p <= 0.05`. An earlier revision of this port kept zero jumps and counted ties against
-the candidate, on the argument that discrete graph centers repeat exactly; it was
-reverted, because the point of the comparison is the method as published. The
-consequence is real: on a 2 cm grid a slow replay's consecutive centers often coincide,
-the reference's rule drops those windows from its jump mean, and a tie between the
-observed jump mean and a draw's does not count against the candidate. `ShuffleResult.testable`
-records a NaN observed statistic, which the reference's arithmetic passes trivially; it
-cannot arise for a candidate that meets the dispersion criterion.
+(`load_replayEvents_cellIDshuffle_sameEvents.m`, lines 72–79): both means skip NaN
+(`nanmean`), `p = (1 + nansum(null_stat < observed_stat)) / (100 + 1)` counts only
+draws strictly below the observed value (a tie or a NaN draw does not count), and each
+half passes at `p <= 0.05`. One line is translated rather than copied. The reference's
+center of mass is continuous, so its `jumps(jumps==0) = nan` sets aside exactly the
+window pairs whose posterior did not change, which are the pairs no spike entered or
+left, and it sets aside the same pairs in the observed decode and in every draw. This
+port's centers are bins, so a literal zero test would also set aside every pair whose
+center stayed in its 2 cm bin, most pairs on a slow replay, turning the mean jump into
+the mean size of a bin crossing with a different pair set in each draw; measured on the
+fixtures, that flipped the verdict the reference's own rule gives. The port therefore
+reads the pairs from the spikes (`unchanged_window_pairs`): a pair with no spike in the
+slice that leaves and none in the slice that enters is set aside, whatever its centers
+do. Two earlier revisions of this port, one keeping zero jumps and counting ties against
+the candidate, one copying the zero test literally, were each reverted after review;
+the point of the comparison is the method as published, and this is what its rule does.
+`ShuffleResult.testable` records a NaN observed statistic, which the reference's
+arithmetic passes trivially; it cannot arise for a candidate that meets the dispersion
+criterion.
 
 **Interpretation.** This tests the association between waveform marks and encoding
 locations. It preserves spike timing and the marginal encoding distributions, but
@@ -220,9 +227,11 @@ Report the comparator cohort both before and after this filter; retain our nativ
 state-space definition. No component model or general detector-calibration study is
 required to implement this adaptation.
 
-**As built** (`shuffle.py`). The shuffle is run on the candidates that meet both replay
-criteria and are still over their whole interval, as the reference tests only its
-duration- and dispersion-accepted events. It permutes the encoding marks by the inverse
+**As built** (`shuffle.py`). The shuffle is run on every candidate that meets both
+replay criteria, as the reference tests every duration- and dispersion-accepted event;
+this project's whole-event immobility rule is a column (`whole_event_speed_eligible`) to
+filter on afterwards, so the published cohort and this project's are both readable from
+one table. It permutes the encoding marks by the inverse
 permutation rather than the positions: pairing `M` with `X[pi]` and `M[pi^-1]` with `X`
 give the same set of pairs, and the joint mark intensity is a sum over pairs, so this is
 exact and avoids permuting the `(n_encoding, n_bins)` position kernel. The per-spike
@@ -241,35 +250,41 @@ are decoded with another cell's field. The row likelihood is
 `sum_n count_n log field_n(x) - sum_n field_n(x)` and a draw permutes only the first
 term, which the code computes as `counts @ log(fields[pi])`; tests pin it to the
 library run on swapped fields. The simulations, which are sorted, use it; recorded data,
-decoded clusterless, use the encoding-pair shuffle. On twenty sorted cells tiling a
-linear track, decoded in-sample at 30 Hz, a smooth run does not pass it: the spread
-half cannot separate (p about 0.5), because a swapped field still gives a sharp
-posterior, and the jump half comes close but not under (p about 0.07) once zero jumps
-are set aside. Its effect on the sweep is under "Parameter sweep over injected replays".
+decoded clusterless, use the encoding-pair shuffle. On a correctly decoded moving
+trajectory it is the mirror image of the encoding-pair shuffle: the jump half separates
+(observed below every one of 100 draws) and the spread half does not (p about 0.5),
+because a swapped field still gives a sharp posterior, but one that hops between
+fields; twenty sorted cells tiling a linear track, 30 Hz. Its effect on the sweep is
+under "Parameter sweep over injected replays".
 
 **What the encoding-pair test does on simulated data, under the reference's
-conventions.** Measured before any real data:
+conventions.** Measured before any real data, and the reason the pilot must inspect
+both nulls:
 
 - *One tetrode, five units, fields tiling a linear track, decoded in-sample.* The decode
-  follows the animal to within a bin, and the candidate passes both halves. The spread
-  half separates by a wide margin: observed mean spread 3.5 cm, every one of 50 draws
-  above 13 cm. Breaking which mark goes with which place leaves a broad posterior, whose
-  center sits near the middle of the track and barely moves; with zero jumps set aside,
-  the null's mean non-zero jump is one bin or a little more, and the trajectory's own
-  mean non-zero jump is exactly one bin, which ties the smallest draw and, counted as the
-  reference counts, passes (p = 1/51 on both halves). Under this port's earlier tie rule
-  the same candidate failed. Marks scrambled against their spike times, so the decode
-  carries no place at all, fail the jump half (p about 0.55) and do not pass.
+  follows the animal to within a bin. The spread half separates by a wide margin:
+  observed mean spread 3.5 cm, every one of 50 draws above 13 cm. The jump half does
+  not: breaking which mark goes with which place leaves a broad posterior, whose center
+  sits near the middle of the track and barely moves, so the shuffled mean jumps are
+  small and a trajectory that really moves sits inside their distribution (p about 0.25
+  at 80 Hz). "Observed jump below the shuffled" favours a decode that stands still, and
+  the candidate does not pass. Marks scrambled against their spike times, so the decode
+  carries no place at all, fail the jump half further still (p about 0.9). A literal
+  zero-jump rule on binned centers had turned the real trajectory into a pass by setting
+  most of its own pairs aside; reading the pairs from the spikes restores the verdict a
+  continuous center gives.
 - *`non_local_detector`'s clusterless simulation, a continuous replay spliced into a
-  silent epoch.* Both halves pass (p about 0.02 on each at 40 draws). That simulation
-  gives each electrode one stretch of track, and a within-electrode shuffle keeps it, so
-  a shuffled decode still knows roughly where the replay is; what it loses is which mark
-  goes with which place, so its posterior is broad and its center moves in fits, and the
-  replay's smooth jumps sit below the shuffled ones.
+  silent epoch.* Spread passes; jump fails, the observed mean above every draw. That
+  simulation gives each electrode one stretch of track, a within-electrode shuffle keeps
+  it, so a shuffled decode still sweeps the track, and the replay's own jumps are no
+  smaller than the sweeps'.
 
-CA1 tetrodes are not topographic and should keep less position in their identity than
-these simulated electrodes do; how much less has to be measured, not assumed. Both are
-pinned in the tests
+The first is a property of the jump statistic against a broad null; the second, of
+permuting within electrodes when an electrode's identity carries position. CA1 tetrodes
+are not topographic, so the second should matter less on real data than in that
+simulation, but how much position a tetrode's identity carries has to be measured, not
+assumed. Whether the reference's cell-ID shuffle shows the first behaviour on its own
+data is not known. Both are pinned in the tests
 (`tests/unit/test_memoryless_shuffle.py`,
 `tests/integration/test_memoryless_simulated_replay.py`) so a change to either statistic
 has to confront them.
@@ -668,7 +683,7 @@ not a reassurance.
 | # | Original | Ours | Why | Effect |
 |---|---|---|---|---|
 | **V1** | Sorted units, per-cell rate maps | Clusterless KDE encoding model over waveform features × position | HPC in this project is decoded clusterless; there are no sorted units | The encoding model is not a set of place fields. Cell-level inclusion criteria (rate, spatial information, isolation, SNR) have no analogue and are not applied |
-| **V2** | Cell-ID shuffle, p <= 0.05 on spread and jump | Within-tetrode encoding-pair shuffle; the reference's statistics, count and threshold unchanged | Uses existing clusterless arrays without component fitting (D2) | Scrambling individual mark–position pairs can blur tuning; original cell-ID permutation exchanges intact curves. Null distributions and accepted cohorts can differ. Zero jumps are set aside and ties do not count, as in the reference; on a 2 cm grid both matter for slow replays |
+| **V2** | Cell-ID shuffle, p <= 0.05 on spread and jump | Within-tetrode encoding-pair shuffle; the reference's statistics, count and threshold unchanged, its zero-jump rule read from the spikes | Uses existing clusterless arrays without component fitting (D2) | Scrambling individual mark–position pairs can blur tuning; original cell-ID permutation exchanges intact curves. Null distributions and accepted cohorts can differ |
 | **V3** | Tuning curves get `+1e-3` before decoding | Clusterless KDE with its own `EPS` clipping of the ground-process intensity | Different likelihood construction | Low-occupancy bins are regularized differently. Not tunable to match; the two decoders differ in their floor behavior |
 | **V4** | Rate maps fit on running periods (> 10 cm/s) | Encoding model fit on the decode's `is_training` mask (`training_type = "no_ripple"`) | Holds encoding fixed between our two procedures | Non-ripple training includes immobility. It differs from the paper, but is shared in the main comparison; any running-only sensitivity must refit both procedures on that same mask |
 
@@ -770,15 +785,16 @@ epoch's saved decode, calls `run_epoch`, and writes the tables and a run manifes
 6. Contiguous runs of kept windows → merge across gaps < 20 cm and < 50 ms → drop runs
    shorter than 100 ms.
 7. Keep events with duration > 100 ms and dispersion > 12 cm.
-8. Re-check whole-event immobility via the existing `event_speeds_are_immobile`, over
-   every native speed sample between the endpoints.
+8. Record whole-event immobility via the existing `event_speeds_are_immobile`, over
+   every native speed sample between the endpoints, as a column; it does not gate the
+   shuffle.
 9. Use the same SWR intervals as `build_classified_nonlocal_event_table`: apply
    `filter_event_labels_by_speed` to canonical `SWR_event` labels and reconstruct
    bounds with `intervals_from_labels`. Classify with `classify_swr_overlap_geometry`
    and the canonical matched-SWR convention. Raw Kay intervals are not interchangeable
    with this qualified, sampled population.
-10. Apply the encoding-pair shuffle to eligible candidates, retaining p-values and
-    pass/testability flags on every candidate row. Derive the filtered comparator
+10. Apply the encoding-pair shuffle to every candidate that meets the replay criteria,
+    retaining p-values and pass/testability flags on every candidate row. Derive the filtered comparator
     cohort by subsetting; candidate IDs and bounds do not change.
 
 Both cohorts use the same canonical time axis and speed trace. Step 8 evaluates every
@@ -866,10 +882,10 @@ once, in `MEMORYLESS_EVENT_TABLE_DTYPES`, and held for an empty epoch too.
 - **Shuffle** — `shuffle_observed_spread_cm`, `shuffle_observed_jump_cm` (the reference's
   statistics over every window of the span, zero jumps set aside), `p_spread`, `p_jump`,
   `shuffle_testable` (both observed statistics finite; informational), `shuffle_pass`,
-  `n_shuffles`. `n_shuffles == 0` marks a candidate that was not tested. Because only
-  replay-criteria, whole-event-still candidates are tested, `shuffle_pass` alone selects
-  the published replay definition together with this project's whole-event immobility
-  rule.
+  `n_shuffles`. `n_shuffles == 0` marks a candidate that was not tested. Every candidate
+  meeting the replay criteria is tested, so `shuffle_pass` alone selects the published
+  replay definition and `shuffle_pass & whole_event_speed_eligible` this project's
+  cohort.
 - **Windows** — `first_window`, `last_window`: the sequence's window indices, which with
   the decode key the event id; `n_windows` is their difference plus one.
 
@@ -914,7 +930,7 @@ not additional acceptance criteria.
 | One-to-many/many-to-many overlaps count each event once per detector; matched events may have different SWR labels; disjoint and empty cohorts | Denominators, matching, and empty-cohort handling |
 | Rejection diagnostics and gate-specific reruns agree on synthetic examples | Explanations of selection follow the actual pipeline |
 | Encoding-pair shuffle preserves observed spike/mark arrays, encoding marginals, and ground intensity; identity permutation reproduces the original likelihood | The intended null operation and absence of accidental refitting or input mutation |
-| One permutation spans all windows in a draw; observed/null scores use identical bounds; any single draw regenerates from its key; ties, zero jumps and NaN are handled as the reference handles them; a real trajectory passes and scrambled marks do not | Reproducibility, fidelity to the reference's test, and a positive and a negative control |
+| One permutation spans all windows in a draw; observed/null scores use identical bounds; any single draw regenerates from its key; ties and NaN are handled as the reference handles them and the set-aside pairs are those no spike entered or left; each shuffle's behaviour on a real trajectory and on scrambled marks is pinned | Reproducibility, fidelity to the reference's test, and the controls |
 | Simulated-data smoke test, then one real epoch | End-to-end |
 
 ## Failure behavior

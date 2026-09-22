@@ -507,7 +507,7 @@ def check_caption_claims(decoded: dict, config: MemorylessSequenceConfig) -> Non
     figure.
     """
     expected = {
-        CONTINUOUS_OUTBOUND_EVENT: "found",
+        CONTINUOUS_OUTBOUND_EVENT: "failed the shuffle",
         CONTINUOUS_INBOUND_EVENT: "found",
         SHORT_PATH_EVENT: "declined",
         REMOTE_STATIONARY_EVENT: "declined",
@@ -1115,6 +1115,26 @@ def pct(value: float, digits: int = 0) -> str:
     return f"{100 * value:.{digits}f}%"
 
 
+def continuous_shuffle_sentence(decoded: dict) -> str:
+    """What the significance test did with the two continuous replays."""
+    parts = []
+    for event, name in (
+        (CONTINUOUS_OUTBOUND_EVENT, "outbound"),
+        (CONTINUOUS_INBOUND_EVENT, "inbound"),
+    ):
+        result = shuffle_of(decoded, event)
+        p = f"p = {result.p_spread:.3f} on spread and {result.p_jump:.3f} on jump"
+        if result.passes:
+            parts.append(f"the {name} continuous replay passes it ({p})")
+        else:
+            margin = draws_from_passing(result)
+            parts.append(
+                f"the {name} continuous replay fails it ({p}), "
+                f"{margin} draw{'s' if margin != 1 else ''} from passing"
+            )
+    return parts[0][0].upper() + parts[0][1:] + ", and " + parts[1] + "."
+
+
 def short_replay_shuffle_sentence(decoded: dict) -> str:
     """What the significance test did with the 80 ms replay, from the data."""
     result = shuffle_of(decoded, SHORT_REPLAY_EVENT)
@@ -1204,9 +1224,9 @@ stationary event and declines both for too little dispersion
 {config.dispersion_threshold_cm:.0f} cm it requires). The state-space detector
 reports all four, with every bound within
 {bound_error_ms(decoded, (CONTINUOUS_OUTBOUND_EVENT, SHORT_REPLAY_EVENT, SHORT_PATH_EVENT, REMOTE_STATIONARY_EVENT)):.0f} ms
-of the truth. Both continuous replays pass the significance test, though most
-of each reported event is the animal's own place: the test asks whether a
-sequence is spatially coherent, not whether it is somewhere other than the
+of the truth. {continuous_shuffle_sentence(decoded)} Most of each reported
+continuous replay is the animal's own place either way: the test asks whether
+a sequence is spatially coherent, not whether it is somewhere other than the
 animal.
 
 **(f-i) {int(overall["n_cells"])} replays of chosen shape.** Made-up
