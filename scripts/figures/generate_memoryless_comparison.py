@@ -21,6 +21,7 @@ Usage:
 
 import argparse
 import os
+import string
 import textwrap
 from pathlib import Path
 
@@ -61,7 +62,6 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics im
 from continuum_swr_replay.figure_utilities import (
     TWO_COLUMN,
     WONG,
-    label_panels,
     save_figure,
     set_figure_defaults,
 )
@@ -73,6 +73,16 @@ SUMMARY_PATH = Path(
 """Aggregates of the parameter sweep, drawn in the lower panels."""
 
 DISTANCE_ORDER = ("(40, 80]", "(80, 120]", "(120, 200]")
+
+ROW_HEIGHTS = [0.80, 0.95, 1.05, 0.75]
+"""Relative heights of the figure's four rows: overview, events, sweep, sweep."""
+
+LETTER_RISE_PT = 9.0
+"""Panel letters ride this far above the axes: the height of a panel title,
+so letter and title share a line."""
+
+LETTER_GAP_PT = 4.0
+"""And this far left of whatever the panel draws furthest left."""
 
 TRACK_HEIGHT_CM = 170
 DECODE_BIN_STRIDE = 3
@@ -688,6 +698,44 @@ def plot_absorption(ax, summary: pd.DataFrame):
     ax.set_title("reported duration by distance", fontsize=6)
 
 
+def place_panel_letters(fig, rows: list[list]) -> None:
+    """Draw each panel's letter on its title line, flush with a common margin.
+
+    The project's `label_panels` positions a letter in axes fractions, which
+    is right for a grid of equal panels. Here the four rows differ in height
+    and in how wide a y label each carries, so one fraction puts the letters
+    at four different heights and four different depths. This measures the
+    drawn figure instead: every letter sits on its row's title line, and the
+    first letter of each row sits on one left margin.
+
+    Constrained layout settles only when the figure is drawn, so this must
+    draw first and must run after every panel is filled in.
+    """
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    to_figure = fig.transFigure.inverted()
+    rise = LETTER_RISE_PT / (72 * fig.get_figheight())
+    gap = LETTER_GAP_PT / (72 * fig.get_figwidth())
+
+    def drawn_left(ax) -> float:
+        """Left edge of everything the panel draws, y label and ticks included."""
+        return to_figure.transform_bbox(ax.get_tightbbox(renderer)).x0
+
+    margin = min(drawn_left(row[0]) for row in rows) - gap
+    letters = iter(string.ascii_lowercase)
+    for row in rows:
+        for column, ax in enumerate(row):
+            fig.text(
+                margin if column == 0 else drawn_left(ax) - gap,
+                to_figure.transform_bbox(ax.bbox).y1 + rise,
+                next(letters),
+                fontsize=8,
+                fontweight="bold",
+                ha="left",
+                va="center",
+            )
+
+
 def make_figure(
     n_neurons: int, config: MemorylessSequenceConfig, summary: pd.DataFrame
 ):
@@ -701,30 +749,24 @@ def make_figure(
         figsize=(TWO_COLUMN, TWO_COLUMN * 1.22), dpi=450, constrained_layout=True
     )
     fig.set_constrained_layout_pads(w_pad=0.02, h_pad=0.02, wspace=0.05, hspace=0.09)
-    grid = GridSpec(4, 8, figure=fig, height_ratios=[0.80, 0.95, 1.05, 0.75])
+    grid = GridSpec(4, 8, figure=fig, height_ratios=ROW_HEIGHTS)
 
     ax_overview = fig.add_subplot(grid[0, :])
     plot_overview(ax_overview, decoded, config)
 
+    # one line each, so these titles sit at the same height as every other
+    # row's and the panel letters can share one offset
     outcomes = (
-        (
-            0,
-            "continuous replay",
-            f"found, {duration_ratio(decoded, 0):.1f}x too long",
-        ),
-        (
-            7,
-            "short replay, 80 ms",
-            f"found, {duration_ratio(decoded, 7):.1f}x too long",
-        ),
-        (6, "short path, 30 cm", "missed"),
-        (5, "remote place, held still", "declined"),
+        (0, f"continuous replay: {duration_ratio(decoded, 0):.1f}x too long"),
+        (7, f"80 ms replay: {duration_ratio(decoded, 7):.1f}x too long"),
+        (6, "30 cm path: missed"),
+        (5, "remote place, held still: declined"),
     )
     zooms = []
-    for column, (event, name, outcome) in enumerate(outcomes):
+    for column, (event, title) in enumerate(outcomes):
         ax = fig.add_subplot(grid[1, 2 * column : 2 * column + 2])
         plot_event(ax, decoded, event, config)
-        ax.set_title(f"{name}\n{outcome}", fontsize=5.5, linespacing=1.4)
+        ax.set_title(title, fontsize=5.5)
         if column:
             ax.set_yticklabels([])
         zooms.append(ax)
@@ -751,10 +793,15 @@ def make_figure(
     ax_distance = fig.add_subplot(grid[3, 4:])
     plot_absorption(ax_distance, summary)
 
-    label_panels([ax_overview], labels=["a"], xpos=-0.05, ypos=1.16)
-    label_panels(zooms, labels=["b", "c", "d", "e"], xpos=-0.10, ypos=1.36)
-    label_panels([ax_sliding, ax_state], labels=["f", "g"], xpos=-0.08, ypos=1.10)
-    label_panels([ax_duration, ax_distance], labels=["h", "i"], xpos=-0.09, ypos=1.10)
+    place_panel_letters(
+        fig,
+        [
+            [ax_overview],
+            zooms,
+            [ax_sliding, ax_state],
+            [ax_duration, ax_distance],
+        ],
+    )
 
     return fig, decoded
 
