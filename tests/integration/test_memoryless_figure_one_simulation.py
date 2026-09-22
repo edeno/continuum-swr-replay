@@ -46,6 +46,12 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
     sorted_spikes_epoch_log_likelihood,
     window_midpoints_s,
 )
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
+    DEFAULT_N_SHUFFLES,
+    ShuffleResult,
+    ShuffleSeed,
+    shuffle_candidate_sorted,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation import (
     InjectedReplay,
     inject_replay,
@@ -92,6 +98,9 @@ NON_LOCAL_MINIMUM_DURATION_S = 0.015
 STATE_SPACE_BOUND_TOLERANCE_S = 0.050
 """How far a state-space event bound may sit from the labeled one."""
 
+SHUFFLE_SEED = ShuffleSeed(run=20260922, session="figure-one-simulation")
+"""The figure's seed, so this fixture's verdicts are the figure's."""
+
 
 @dataclass
 class Decoded:
@@ -107,6 +116,7 @@ class Decoded:
     bin_distance_cm: np.ndarray
     window_speed: np.ndarray
     state_space_intervals: list[tuple[float, float]]
+    shuffles: dict[int, ShuffleResult]
 
 
 def state_space_intervals(
@@ -226,6 +236,25 @@ def decoded() -> Decoded:
 
     bin_distance_cm = interior_bin_distances_cm(environment)
     window_speed = np.interp(midpoint_s, result.time, speed[: result.time.size])
+    candidates = detect_candidate_sequences(
+        posterior, midpoint_s, bin_distance_cm, window_speed, CONFIG
+    )
+    # the reference's own significance test on every accepted candidate, on
+    # the full decode grid, as the figure runs it
+    shuffles = {
+        int(i): shuffle_candidate_sorted(
+            int(candidates.runs[i, 0]),
+            int(candidates.runs[i, 1]),
+            time,
+            spike_times,
+            encoding_model,
+            bin_distance_cm,
+            CONFIG,
+            seed=SHUFFLE_SEED,
+            n_shuffles=DEFAULT_N_SHUFFLES,
+        )
+        for i in np.flatnonzero(candidates.is_replay)
+    }
 
     return Decoded(
         time=result.time,
@@ -233,9 +262,8 @@ def decoded() -> Decoded:
         event_times=event_times,
         place_bin_centers_cm=result.place_bin_centers_cm,
         midpoint_s=midpoint_s,
-        candidates=detect_candidate_sequences(
-            posterior, midpoint_s, bin_distance_cm, window_speed, CONFIG
-        ),
+        candidates=candidates,
+        shuffles=shuffles,
         encoding_model=encoding_model,
         spike_times=spike_times,
         posterior=posterior,
@@ -481,6 +509,30 @@ class TestAShortPathIsDeclined:
         assert (
             decoded.candidates.decisions.gates.spread_below_threshold[inside].mean()
             > 0.8
+        )
+
+
+class TestThePublishedSignificanceTest:
+    """The reference's place-cell identity shuffle, on the figure's recording.
+
+    Positive control for the whole published definition: the two continuous
+    replays, decoded from the same fields their spikes came from, must pass
+    both halves. The caption states this.
+    """
+
+    @pytest.mark.parametrize("event", [CONTINUOUS_OUTBOUND, CONTINUOUS_INBOUND])
+    def test_a_continuous_replay_passes_both_halves(self, decoded, event):
+        sequence = accepted_overlapping(decoded, event)[0]
+        result = decoded.shuffles[sequence]
+
+        assert result.testable
+        assert result.p_spread <= 0.05
+        assert result.p_jump <= 0.05
+        assert result.passes
+
+    def test_only_accepted_candidates_are_tested(self, decoded):
+        assert set(decoded.shuffles) == set(
+            np.flatnonzero(decoded.candidates.is_replay)
         )
 
 

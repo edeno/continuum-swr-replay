@@ -144,8 +144,9 @@ def load_clusterless_encoding_model(detector_path: str | Path) -> dict:
     -------
     encoding_model : dict
         The entries in :data:`CLUSTERLESS_LIKELIHOOD_KEYS`, plus whatever else
-        the library stored (``block_size``, ``disable_progress_bar``), which
-        this module does not read.
+        the library stored. ``block_size`` is passed through to the decode
+        and the shuffle's re-decode; it sets how many spikes are evaluated at
+        once and does not change the result.
 
     Raises
     ------
@@ -352,6 +353,7 @@ def clusterless_epoch_log_likelihood(
             cast(Any, spike_waveform_features),
             **{key: encoding_model[key] for key in CLUSTERLESS_LIKELIHOOD_KEYS},
             is_local=False,
+            block_size=encoding_model.get("block_size", 100),
             disable_progress_bar=True,
         )
     )

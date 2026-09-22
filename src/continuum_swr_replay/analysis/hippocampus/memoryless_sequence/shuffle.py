@@ -23,12 +23,19 @@ the library's own ``get_spike_time_bin_ind`` on the full epoch grid, so the
 unshuffled re-decode is the epoch decode restricted to the candidate's rows.
 
 The candidate's windows are re-decoded as they stand, merged gaps included,
-without redetecting anything or reapplying the spread and jump gates. Two
-choices differ from the reference script, both deliberately: zero jumps are
-kept rather than dropped, and a shuffled draw that ties the observed value
-counts against the candidate, because centers on a discrete track graph can
-repeat exactly. A candidate whose observed or shuffled statistic is not finite
-is untestable, and an untestable candidate does not pass.
+without redetecting anything or reapplying the spread and jump gates. The
+statistics and the test follow the corrected reference script
+(``load_replayEvents_cellIDshuffle_sameEvents.m``, lines 72-79) exactly: a
+jump of zero is set aside before averaging (``jumps(jumps==0) = nan``), both
+means skip NaN (``nanmean``), a draw counts against the candidate only when
+its statistic is strictly below the observed one (``nansum(shuffle < observed)``,
+so a tie or a NaN draw does not count), and a half passes at ``p <= 0.05``.
+Followed for comparability rather than because each choice is the one this
+project would make: on a discrete track graph consecutive centers can repeat
+exactly, and the reference's rule then drops those windows from the jump mean.
+A candidate whose observed statistic is NaN passes that half trivially under
+the reference's arithmetic; that cannot happen to a candidate that meets the
+dispersion criterion, and ``ShuffleResult.testable`` records it when it does.
 
 For sorted cells the reference's own shuffle is used instead: whole place
 fields are swapped between cells (``rateMap(ind_rand, :)``), so each cell's
@@ -41,7 +48,7 @@ The design is in ``docs/design/replay_detection_comparison/02-memoryless-sequenc
 section "Clusterless shuffle: permute encoding pairs".
 """
 
-import zlib
+import hashlib
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, cast
@@ -82,22 +89,25 @@ DEFAULT_N_SHUFFLES = 100
 """Shuffled re-decodes per candidate, as in the reference (``numShuffles_replay``)."""
 
 SIGNIFICANCE_LEVEL = 0.05
-"""Both p-values must fall below this.
+"""Both p-values must be at or below this, as the reference compares.
 
-The reference compares with ``<=``, the paper says ``p < 0.05``. At 100 draws
-the p-values are multiples of 1/101, none of which is 0.05, so the two agree.
+The paper says ``p < 0.05``; the script tests ``<= 0.05``. At 100 draws the
+p-values are multiples of 1/101, none of which is 0.05, so the two agree.
 """
 
-MINIMUM_N_SHUFFLES = 20
-"""The fewest draws at which a p-value below 0.05 is possible.
+MINIMUM_N_SHUFFLES = 19
+"""The fewest draws at which a p-value at or below 0.05 is possible.
 
-With ``n`` draws the smallest p is ``1 / (n + 1)``. Below 20 draws no
-candidate could pass, and a run in which nothing passed would still look like
-a result.
+With ``n`` draws the smallest p is ``1 / (n + 1)``, which is 0.05 at 19.
+Below that no candidate could pass, and a run in which nothing passed would
+still look like a result.
 """
 
 _CELL_IDENTITY_STREAM = 2**32 - 1
 """Seeds the cell-identity shuffle apart from any electrode's stream."""
+
+_LIBRARY_BLOCK_SIZE = 100
+"""The library's default decoding block; the result does not depend on it."""
 
 
 @dataclass(frozen=True)
@@ -125,8 +135,10 @@ class ShuffleSeed:
             raise TypeError(f"run must be an integer, got {self.run!r}.")
         if self.run < 0:
             raise ValueError(f"run must be non-negative, got {self.run}.")
-        if not self.session:
-            raise ValueError("session must name the epoch.")
+        if not isinstance(self.session, str) or not self.session:
+            raise ValueError(
+                f"session must be a non-empty string, got {self.session!r}."
+            )
 
 
 def encoding_permutation(
@@ -181,20 +193,28 @@ def _seeded_permutation(
     for name, value in (("candidate", candidate), ("stream", stream), ("n", n)):
         if value < 0:
             raise ValueError(f"{name} must be non-negative, got {value}.")
-    # crc32 rather than hash(): hash() of a str changes between interpreters
-    session_code = zlib.crc32(seed.session.encode("utf-8"))
+    # a keyed digest rather than hash(): hash() of a str changes between
+    # interpreters. Two 32-bit words carry 64 bits of the session's identity.
+    digest = hashlib.blake2b(seed.session.encode("utf-8"), digest_size=8).digest()
+    session_code = (
+        int.from_bytes(digest[:4], "little"),
+        int.from_bytes(digest[4:], "little"),
+    )
     sequence = np.random.SeedSequence(
-        entropy=seed.run, spawn_key=(session_code, candidate, draw, stream)
+        entropy=seed.run, spawn_key=(*session_code, candidate, draw, stream)
     )
     return np.random.default_rng(sequence).permutation(n)
 
 
 def shuffle_p_value(observed: float, null: NDArray) -> float:
-    """Share of draws at least as extreme as the observed value, conservatively.
+    """The reference's p-value: ``(1 + nansum(null < observed)) / (n + 1)``.
 
-    ``(1 + count(null <= observed)) / (n + 1)``: small statistics are the
-    extreme ones, a tie counts against the candidate, and the observed decode
-    counts as one of the draws.
+    Small statistics are the extreme ones and the observed decode counts as
+    one of the draws. As in the reference, a draw counts against the candidate
+    only when it is strictly below the observed value: a tie does not, and a
+    NaN draw does not (``nansum`` skips it without shrinking the denominator).
+    A NaN observed value is below nothing, so its p is ``1 / (n + 1)``, again
+    as the reference's arithmetic has it.
 
     Parameters
     ----------
@@ -204,19 +224,17 @@ def shuffle_p_value(observed: float, null: NDArray) -> float:
     Returns
     -------
     p : float
-        NaN when the observed value or any draw is not finite. A non-finite
-        draw is not dropped: dropping it would shrink the denominator.
 
     """
     null = np.asarray(null, dtype=np.float64).ravel()
     if null.size == 0:
         raise ValueError("A p-value needs at least one shuffled draw.")
-    if not (np.isfinite(observed) and np.isfinite(null).all()):
-        return float("nan")
-    return float((1 + np.count_nonzero(null <= observed)) / (null.size + 1))
+    with np.errstate(invalid="ignore"):
+        below = np.count_nonzero(null < observed)
+    return float((1 + below) / (null.size + 1))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class ShuffleResult:
     """One candidate's observed statistics against its shuffled draws.
 
@@ -226,9 +244,11 @@ class ShuffleResult:
     Attributes
     ----------
     observed_spread_cm, observed_jump_cm : float
-        Mean posterior spread and mean forward jump of the unshuffled decode.
+        Mean posterior spread and mean non-zero forward jump of the
+        unshuffled decode, NaN skipped, as the reference computes them.
     null_spread_cm, null_jump_cm : ndarray, shape (n_shuffles,)
-        The same statistics for each shuffled draw, in draw order.
+        The same statistics for each shuffled draw, in draw order. At least
+        ``MINIMUM_N_SHUFFLES`` of them, so that a pass is possible.
 
     """
 
@@ -238,13 +258,16 @@ class ShuffleResult:
     null_jump_cm: NDArray
 
     def __post_init__(self) -> None:
-        spread = np.asarray(self.null_spread_cm, dtype=np.float64)
-        jump = np.asarray(self.null_jump_cm, dtype=np.float64)
-        if spread.ndim != 1 or spread.shape != jump.shape or spread.size == 0:
+        spread = np.array(self.null_spread_cm, dtype=np.float64, copy=True)
+        jump = np.array(self.null_jump_cm, dtype=np.float64, copy=True)
+        if spread.ndim != 1 or spread.shape != jump.shape:
             raise ValueError(
-                f"The spread and jump nulls must hold the same number of draws, "
-                f"at least one; got {spread.shape} and {jump.shape}."
+                f"The spread and jump nulls must hold the same number of draws; "
+                f"got {spread.shape} and {jump.shape}."
             )
+        _check_n_shuffles(spread.size)
+        spread.flags.writeable = False
+        jump.flags.writeable = False
         object.__setattr__(self, "observed_spread_cm", float(self.observed_spread_cm))
         object.__setattr__(self, "observed_jump_cm", float(self.observed_jump_cm))
         object.__setattr__(self, "null_spread_cm", spread)
@@ -264,26 +287,36 @@ class ShuffleResult:
 
     @property
     def testable(self) -> bool:
-        return bool(np.isfinite(self.p_spread) and np.isfinite(self.p_jump))
+        """Both observed statistics are finite.
+
+        Informational: the reference's arithmetic lets a NaN observed
+        statistic pass its half, and ``passes`` follows the reference. A
+        candidate that meets the dispersion criterion always has a finite
+        jump mean, so this is False only for a candidate no run would test.
+        """
+        return bool(
+            np.isfinite(self.observed_spread_cm) and np.isfinite(self.observed_jump_cm)
+        )
 
     @property
     def passes(self) -> bool:
+        """Both p-values at or below ``SIGNIFICANCE_LEVEL``, as the reference tests."""
         return bool(
-            self.testable
-            and self.p_spread < SIGNIFICANCE_LEVEL
-            and self.p_jump < SIGNIFICANCE_LEVEL
+            self.p_spread <= SIGNIFICANCE_LEVEL and self.p_jump <= SIGNIFICANCE_LEVEL
         )
 
 
 def shuffle_statistics(
     posterior: NDArray, bin_distance_cm: NDArray
 ) -> tuple[float, float]:
-    """Mean spread and mean forward jump over every window of a candidate.
+    """Mean spread and mean non-zero forward jump over a candidate's windows.
 
-    Unlike candidate assembly, nothing is masked: every window counts,
-    including those inside merged gaps, and a jump of zero is a jump. The
-    final window repeats the jump before it, matching the reference's
-    length-N jump vector.
+    The reference's statistics, computed as ``load_replayEvents_cellIDshuffle_sameEvents.m``
+    lines 72-75 compute them: every window of the candidate counts, including
+    those inside merged gaps; the final window repeats the jump before it
+    (``jumps = [jumps; jumps(end)]``); a jump of zero is set aside
+    (``jumps(jumps==0) = nan``); and both means skip NaN (``nanmean``), so a
+    window with no usable posterior drops out rather than spoiling the mean.
 
     Parameters
     ----------
@@ -293,12 +326,19 @@ def shuffle_statistics(
     Returns
     -------
     mean_spread_cm, mean_jump_cm : float
-        Not finite when any window has no usable posterior.
+        NaN when no window contributes: no usable posterior at all, or no
+        non-zero jump.
 
     """
     center, spread = window_center_and_spread(posterior, bin_distance_cm)
     jumps = forward_jumps_cm(center, bin_distance_cm)
-    return float(np.mean(spread)), float(np.mean(jumps))
+    return _nanmean(spread), _nanmean(np.where(jumps == 0.0, np.nan, jumps))
+
+
+def _nanmean(values: NDArray) -> float:
+    """MATLAB's ``nanmean``: the mean of the finite values, NaN if there are none."""
+    finite = values[np.isfinite(values)]
+    return float(finite.mean()) if finite.size else float("nan")
 
 
 def _candidate_rows(
@@ -439,7 +479,7 @@ def _decode_draws(
                     encoding_model["occupancy"],
                     encoding_model["mean_rates"][electrode],
                     position_distance,
-                    encoding_model["block_size"],
+                    encoding_model.get("block_size", _LIBRARY_BLOCK_SIZE),
                 ),
                 dtype=np.float64,
             )

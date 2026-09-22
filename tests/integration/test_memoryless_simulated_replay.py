@@ -406,13 +406,13 @@ class TestWholeEpoch:
     N_SHUFFLES = 40
     IDENTITY = SequenceIdentity(
         animal="sim",
-        day=1,
+        day=20200101,
         epoch="02_r1",
         brain_area="HPC",
         epoch_id="sim20200101_02_r1_HPC",
         run_id="integration",
     )
-    SEED = ShuffleSeed(run=1, session="sim_02_r1_HPC")
+    SEED = ShuffleSeed(run=1, session="sim20200101_02_r1_HPC")
 
     def run(self, simulation, seed, speed=None):
         replay_time_s, multiunits, _ = continuous(SLOW_SPEEDUP)
@@ -463,20 +463,20 @@ class TestWholeEpoch:
         assert len(draws) == self.N_SHUFFLES * len(tested)
         assert set(draws.ms_event_id) == set(tested.ms_event_id)
 
-    def test_the_spread_test_separates_and_the_jump_test_cannot(
+    def test_the_continuous_replay_passes_the_published_test(
         self, epoch_run, simulation
     ):
-        """A property of the shuffle on this simulation, recorded so the
-        mechanism is on file before the real-data pilot.
+        """Positive control, end to end, under the reference's conventions.
 
         The simulation gives each electrode one stretch of track. A shuffle
         within an electrode keeps that stretch, so a shuffled decode still
-        knows roughly where the replay is and its center still sweeps the
-        track. For a sweep the mean jump is close to the path length over the
-        number of windows, so it survives the shuffle; the spread, which does
-        depend on which mark goes with which place, does not. CA1 tetrodes are
-        not topographic and should keep less position in their identity, but
-        how much less has to be measured, not assumed.
+        knows roughly where the replay is; it loses which mark goes with which
+        place, so its posterior is broad and its center moves in fits. With
+        zero jumps set aside as the reference sets them aside, the replay's
+        own smooth jumps sit below the shuffled ones, and both halves pass.
+        Under the port's earlier conventions the jump half failed here. CA1
+        tetrodes are not topographic and should keep less position in their
+        identity than these electrodes do; how much less has to be measured.
         """
         footprints = [
             (float(np.min(positions)), float(np.max(positions)))
@@ -487,9 +487,9 @@ class TestWholeEpoch:
         # each electrode covers well under half of the 175 cm track
         assert all(high - low < TRACK_HEIGHT_CM / 2 for low, high in footprints)
         assert replay.shuffle_testable
-        assert replay.p_spread < 0.05
-        assert replay.p_jump > 0.05
-        assert not replay.shuffle_pass
+        assert replay.p_spread <= 0.05
+        assert replay.p_jump <= 0.05
+        assert replay.shuffle_pass
 
     def test_a_replay_the_animal_moved_during_is_not_shuffled(self, simulation):
         """One fast speed sample inside the replay, off every window midpoint:

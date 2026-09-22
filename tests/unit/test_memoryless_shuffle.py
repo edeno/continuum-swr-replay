@@ -68,33 +68,37 @@ def tetrode() -> TilingTetrode:
 
 
 class TestPValue:
+    """``(1 + nansum(shuffle < observed)) / (1 + numShuffles)``, as the reference
+    computes it (``load_replayEvents_cellIDshuffle_sameEvents.m``, lines 78-79)."""
+
     def test_a_null_entirely_above_the_observed_gives_the_smallest_p(self):
         p = shuffle_p_value(1.0, np.full(100, 2.0))
 
         assert p == pytest.approx(1 / 101)
 
-    def test_ties_count_against_the_candidate(self):
-        """Graph centers are discrete, so a shuffled jump can equal the observed
-        one exactly; a tie must not help the candidate."""
+    def test_a_tie_does_not_count_against_the_candidate(self):
+        """The reference counts draws strictly below the observed value, so a
+        null of exact ties gives the smallest p, not the largest."""
         p = shuffle_p_value(0.0, np.zeros(100))
 
-        assert p == pytest.approx(1.0)
+        assert p == pytest.approx(1 / 101)
 
-    def test_counts_draws_at_or_below_the_observed(self):
+    def test_counts_draws_strictly_below_the_observed(self):
         null = np.array([0.5, 1.0, 1.5, 2.0, 3.0])
 
-        assert shuffle_p_value(1.0, null) == pytest.approx((1 + 2) / 6)
+        assert shuffle_p_value(1.0, null) == pytest.approx((1 + 1) / 6)
 
-    def test_a_non_finite_observed_value_is_untestable(self):
-        assert np.isnan(shuffle_p_value(np.nan, np.ones(100)))
+    def test_a_nan_observed_value_is_below_nothing_and_passes(self):
+        """The reference's arithmetic; unreachable for a candidate that meets
+        the dispersion criterion, and recorded by ``ShuffleResult.testable``."""
+        assert shuffle_p_value(np.nan, np.ones(100)) == pytest.approx(1 / 101)
 
-    def test_a_non_finite_null_draw_makes_it_untestable_rather_than_dropped(self):
-        """Dropping the draw would shrink the denominator and could manufacture
-        a pass."""
-        null = np.full(100, 2.0)
-        null[3] = np.inf
+    def test_a_nan_draw_is_skipped_without_shrinking_the_denominator(self):
+        """``nansum`` skips it; ``1 + numShuffles`` does not change."""
+        null = np.full(100, 0.5)
+        null[3] = np.nan
 
-        assert np.isnan(shuffle_p_value(1.0, null))
+        assert shuffle_p_value(1.0, null) == pytest.approx((1 + 99) / 101)
 
     def test_an_empty_null_is_refused(self):
         with pytest.raises(ValueError, match="at least one"):
@@ -115,17 +119,26 @@ class TestVerdict:
             null_jump_cm=jump_null,
         )
 
-    def test_passes_only_when_both_p_values_are_below_005(self):
+    def test_passes_only_when_both_p_values_are_at_or_below_005(self):
         assert self.result(0, 0).passes
         assert not self.result(0, 10).passes
         assert not self.result(10, 0).passes
 
-    def test_four_draws_at_or_below_still_pass_and_five_do_not(self):
-        """5 / 101 < 0.05 < 6 / 101: at 100 draws strict and inclusive agree."""
+    def test_four_draws_below_still_pass_and_five_do_not(self):
+        """5 / 101 <= 0.05 < 6 / 101 at 100 draws."""
         assert self.result(4, 4).passes
         assert not self.result(5, 0).passes
 
-    def test_an_untestable_candidate_never_passes(self):
+    def test_exactly_005_passes_as_the_reference_compares(self):
+        """At 19 draws the smallest p is 1 / 20 = 0.05 and the reference's
+        ``<= 0.05`` passes it."""
+        result = ShuffleResult(1.0, 1.0, np.full(19, 2.0), np.full(19, 2.0))
+
+        assert result.p_spread == pytest.approx(0.05)
+        assert result.passes
+
+    def test_a_nan_observed_statistic_is_recorded_and_passes_its_half(self):
+        """Following the reference; ``testable`` says it happened."""
         result = ShuffleResult(
             observed_spread_cm=np.nan,
             observed_jump_cm=1.0,
@@ -134,7 +147,7 @@ class TestVerdict:
         )
 
         assert not result.testable
-        assert not result.passes
+        assert result.passes
 
     def test_reports_how_many_draws_it_used(self):
         assert self.result(0, 0).n_shuffles == 100
@@ -148,6 +161,19 @@ class TestVerdict:
                 null_jump_cm=np.ones(99),
             )
 
+    def test_too_few_draws_for_a_pass_are_refused(self):
+        with pytest.raises(ValueError, match="n_shuffles"):
+            ShuffleResult(1.0, 1.0, np.ones(MINIMUM_N_SHUFFLES - 1), np.ones(18))
+
+    def test_the_draws_are_copied_and_frozen(self):
+        null = np.full(100, 2.0)
+        result = ShuffleResult(1.0, 1.0, null, null.copy())
+        null[:] = 0.5
+
+        assert result.p_spread == pytest.approx(1 / 101)
+        with pytest.raises(ValueError):
+            result.null_spread_cm[0] = 0.0
+
 
 class TestStatistics:
     def test_means_the_spread_and_the_forward_jump_over_every_window(self):
@@ -160,25 +186,35 @@ class TestStatistics:
         assert spread == pytest.approx(0.0)
         assert jump == pytest.approx((2 + 4 + 4) / 3)
 
-    def test_a_stationary_candidate_keeps_its_zero_jumps(self):
-        """The reference drops zero jumps; this port keeps them, so a still
-        representation has a mean jump of zero rather than none."""
+    def test_zero_jumps_are_set_aside_as_the_reference_does(self):
+        """``jumps(jumps==0) = nan; nanmean(jumps)``: a window whose center
+        repeats the next one's drops out of the jump mean."""
+        posterior = np.zeros((4, 5))
+        posterior[[0, 1, 2, 3], [0, 0, 2, 2]] = 1.0  # jumps 0, 4, 0, then 0
+
+        _, jump = shuffle_statistics(posterior, straight_track(5))
+
+        assert jump == pytest.approx(4.0)
+
+    def test_a_stationary_candidate_has_no_jump_mean(self):
         posterior = np.zeros((4, 5))
         posterior[:, 2] = 1.0
 
         _, jump = shuffle_statistics(posterior, straight_track(5))
 
-        assert jump == 0.0
+        assert np.isnan(jump)
 
-    def test_one_unusable_window_makes_the_statistics_non_finite(self):
+    def test_an_unusable_window_is_skipped_as_nanmean_skips_it(self):
         posterior = np.zeros((3, 5))
         posterior[[0, 2], [1, 2]] = 1.0
         posterior[1] = np.nan
 
         spread, jump = shuffle_statistics(posterior, straight_track(5))
 
-        assert not np.isfinite(spread)
-        assert not np.isfinite(jump)
+        assert spread == pytest.approx(0.0)
+        # window 0's successor has no center, window 1 has none, window 2 repeats
+        # window 1's undefined jump: no jump is defined
+        assert np.isnan(jump)
 
 
 class TestPermutation:
@@ -226,6 +262,10 @@ class TestPermutation:
     def test_draw_zero_is_reserved_for_the_observed_decode(self):
         with pytest.raises(ValueError, match="draw"):
             encoding_permutation(SEED, candidate=3, draw=0, electrode=0, n=50)
+
+    def test_the_session_must_be_a_string(self):
+        with pytest.raises(ValueError, match="session"):
+            ShuffleSeed(run=1, session=5)  # type: ignore[arg-type]
 
 
 class TestShuffledLikelihood:
@@ -420,16 +460,16 @@ class TestShuffleCandidate:
         assert np.median(np.abs(decoded_cm - animal_cm)) <= 4.0  # one bin
         assert np.ptp(decoded_cm) > 50.0  # and it travels
 
-    def test_the_spread_test_separates_and_the_jump_test_cannot(self, tetrode):
-        """A property of the method, recorded so it is on file for the pilot.
+    def test_a_real_trajectory_passes_both_halves(self, tetrode):
+        """Positive control, under the reference's conventions.
 
         Breaking which mark goes with which place leaves a broad posterior,
-        and the center of a broad posterior sits near the middle of the track
-        and barely moves. The shuffled mean jump is then smaller than that of
-        a trajectory that really moves, so "observed jump below the shuffled"
-        favours a decode that stands still. Measured here at 80 Hz; at 40 Hz
-        the null's jumps are smaller still. Whether the reference's cell-ID
-        shuffle behaves the same way on its own data is not known.
+        so the spread half separates by a wide margin. The center of a broad
+        posterior sits near the middle of the track and barely moves, so the
+        shuffled jump means are small, and the trajectory's own mean jump
+        equals the smallest of them; because the reference counts only draws
+        strictly below the observed value, that tie does not count against
+        it. Under the port's earlier tie rule the same candidate failed.
         """
         result = shuffle_candidate(
             *self.WINDOWS,
@@ -445,9 +485,10 @@ class TestShuffleCandidate:
 
         assert result.testable
         assert result.observed_spread_cm < result.null_spread_cm.min()
-        assert result.p_spread < 0.05
-        assert result.p_jump > 0.05
-        assert not result.passes
+        assert result.p_spread <= 0.05
+        assert result.observed_jump_cm <= result.null_jump_cm.min()
+        assert result.p_jump <= 0.05
+        assert result.passes
 
     def test_the_observed_statistics_are_the_unshuffled_decode(self, tetrode):
         first, last = self.WINDOWS
@@ -523,11 +564,80 @@ class TestShuffleCandidate:
             short.null_spread_cm, longer.null_spread_cm[:MINIMUM_N_SHUFFLES]
         )
 
-    def test_needs_enough_draws_for_p_below_005_to_be_possible(self, tetrode):
-        """With n draws the smallest p is 1 / (n + 1); below 20 draws no
+    def test_any_single_draw_can_be_regenerated_from_its_key(self, tetrode):
+        """Draw k of the full run equals a fresh re-decode under draw k's
+        permutations alone, so the draw loop shares no state between draws."""
+        first, last = self.WINDOWS
+        result = shuffle_candidate(
+            first,
+            last,
+            tetrode.time,
+            tetrode.spike_times,
+            tetrode.spike_waveform_features,
+            tetrode.encoding_model,
+            tetrode.bin_distance_cm,
+            CONFIG,
+            seed=SEED,
+            n_shuffles=MINIMUM_N_SHUFFLES,
+        )
+        for draw in (1, 7, MINIMUM_N_SHUFFLES):
+            permutations = [
+                encoding_permutation(
+                    SEED,
+                    candidate=first,
+                    draw=draw,
+                    electrode=electrode,
+                    n=np.asarray(positions).shape[0],
+                )
+                for electrode, positions in enumerate(
+                    tetrode.encoding_model["encoding_positions"]
+                )
+            ]
+            windows = candidate_window_log_likelihood(
+                first,
+                last,
+                tetrode.time,
+                tetrode.spike_times,
+                tetrode.spike_waveform_features,
+                tetrode.encoding_model,
+                CONFIG,
+                permutations=permutations,
+            )
+            spread, jump = shuffle_statistics(
+                normalize_windows(windows), tetrode.bin_distance_cm
+            )
+
+            assert result.null_spread_cm[draw - 1] == pytest.approx(spread, rel=1e-6)
+            assert result.null_jump_cm[draw - 1] == pytest.approx(jump, rel=1e-6)
+
+    def test_a_trajectory_with_no_place_information_does_not_pass(self, tetrode):
+        """Negative control: scramble which mark goes with which spike time,
+        so the decode carries no place at all, and the published definition
+        must not call the same windows a replay."""
+        rng = np.random.default_rng(5)
+        scrambled = [
+            rng.permutation(f, axis=0) for f in tetrode.spike_waveform_features
+        ]
+
+        result = shuffle_candidate(
+            *self.WINDOWS,
+            tetrode.time,
+            tetrode.spike_times,
+            scrambled,
+            tetrode.encoding_model,
+            tetrode.bin_distance_cm,
+            CONFIG,
+            seed=SEED,
+            n_shuffles=50,
+        )
+
+        assert not result.passes
+
+    def test_needs_enough_draws_for_p_at_or_below_005_to_be_possible(self, tetrode):
+        """With n draws the smallest p is 1 / (n + 1); below 19 draws no
         candidate could pass, and a run that passed nothing would look like
         a result."""
-        assert MINIMUM_N_SHUFFLES == 20
+        assert MINIMUM_N_SHUFFLES == 19
         with pytest.raises(ValueError, match="n_shuffles"):
             shuffle_candidate(
                 *self.WINDOWS,
@@ -645,14 +755,15 @@ class TestCellIdentityShuffle:
         assert np.median(np.abs(decoded_cm - animal_cm)) <= 2.5  # one bin
         assert np.ptp(decoded_cm) > 70.0
 
-    def test_the_jump_test_separates_and_the_spread_test_cannot(self, sorted_track):
-        """The mirror image of the encoding-pair shuffle, recorded on file.
+    def test_the_spread_half_cannot_separate_swapped_fields(self, sorted_track):
+        """A property of the reference's own shuffle, recorded on file.
 
         Swapping whole fields leaves each shuffled posterior sharp, since each
         spike still points at one field, so the spread null sits where the
-        observed spread does. The sharp, wrong posterior hops between fields,
-        so the jump null lies above a trajectory that moves smoothly. Measured
-        here at 30 Hz peak rate; the same at 15 Hz.
+        observed spread does and that half cannot pass. The sharp, wrong
+        posterior hops between fields, so the trajectory's mean non-zero jump
+        sits below most draws, but on twenty tiling cells at 30 Hz not below
+        enough of them, and this smooth run does not pass the published test.
         """
         result = shuffle_candidate_sorted(
             *self.args(sorted_track)[:5],
@@ -663,8 +774,7 @@ class TestCellIdentityShuffle:
         )
 
         assert result.testable
-        assert result.observed_jump_cm < result.null_jump_cm.min()
-        assert result.p_jump < 0.05
+        assert result.observed_jump_cm < np.median(result.null_jump_cm)
         assert result.p_spread > 0.05
         assert not result.passes
 
