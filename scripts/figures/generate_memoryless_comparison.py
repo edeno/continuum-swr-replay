@@ -1,24 +1,19 @@
 #!/usr/bin/env python
-"""Supplemental figure: the memoryless sequence detector on simulated data.
+"""Supplemental figure: two replay detectors on replays whose shape is known.
 
-Runs the ported Widloski & Foster sliding-window detector over the same
-simulated recording that Figure 1 uses to explain the switching state-space
-model, so the two procedures can be read against one ground truth. The
-simulation contains five labeled events: a continuous outbound replay, a
-fragmented replay, a continuous inbound replay, a silent stretch, and a local
-event.
+Upper panels run the ported Widloski & Foster sliding-window detector and this
+project's switching state-space model over one simulated recording, the same
+one Figure 1 uses, so the two procedures can be read against a handful of
+labeled events.
 
-The point of the figure is what the memoryless detector has no way to express.
-It scores each 80 ms window on posterior spread and on the jump to the next
-window, and it has no competing hypothesis for the animal's own position. A
-stretch of local coding is smooth, narrow and slow, so it passes every window
-criterion and is assembled into the same sequence as the replay that follows
-it. The detected event therefore begins long before the replay does.
+Lower panels summarize the sweep in `scripts/qa/sweep_memoryless_detection.py`,
+which wrote 4536 replays of chosen path length, duration, firing rate and
+distance from the animal one at a time into a simulated recording and recorded
+what each detector reported. Those panels read the aggregates the sweep saves,
+so the figure and `docs/design/replay_detection_comparison/02-memoryless-sequence.md`
+cannot disagree; re-run the sweep to change them.
 
-Both detectors fit their own encoding model, from the same recording, the same
-training mask and the same hyperparameters. They are separate fits, and the
-state-space model's call re-estimates its place fields as well, so the two are
-close but not one shared object.
+In both halves the two detectors read one encoding model, fitted once.
 
 Usage:
     python scripts/figures/generate_memoryless_comparison.py
@@ -26,12 +21,14 @@ Usage:
 
 import argparse
 import os
+import textwrap
 from pathlib import Path
 
 os.environ.setdefault("JAX_PLATFORMS", "cpu")
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from matplotlib.gridspec import GridSpec
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
@@ -69,6 +66,13 @@ from continuum_swr_replay.figure_utilities import (
     set_figure_defaults,
 )
 from continuum_swr_replay.parameters import LOCAL_POSITION_STD
+
+SUMMARY_PATH = Path(
+    "docs/design/replay_detection_comparison/detection_sweep_summary.csv"
+)
+"""Aggregates of the parameter sweep, drawn in the lower panels."""
+
+DISTANCE_ORDER = ("(40, 80]", "(80, 120]", "(120, 200]")
 
 TRACK_HEIGHT_CM = 170
 DECODE_BIN_STRIDE = 3
@@ -574,100 +578,119 @@ def plot_event(ax, decoded: dict, event: int, config: MemorylessSequenceConfig) 
     ax.set_title(EVENT_LABELS[event].replace("\n", " "), fontsize=6)
 
 
-def plot_criterion_space(ax, decoded: dict, config: MemorylessSequenceConfig) -> None:
-    """Every candidate sequence, against the two criteria that accept it.
+def detection_grid(summary: pd.DataFrame, measure: str) -> pd.DataFrame:
+    """Detection rate as path length by duration."""
+    rows = summary[
+        (summary["summary"] == "detection_rate_by_path_and_duration")
+        & (summary.measure == measure)
+    ]
+    return rows.pivot(index="path_cm", columns="duration_s", values="value")
 
-    Panels b to d show three cases. This panel shows that they are not special:
-    of every candidate the detector built, only the two continuous replays
-    reach the box, and nothing else comes near the dispersion line.
-    """
-    candidates = decoded["candidates"]
-    duration_s, dispersion_cm = candidates.duration_s, candidates.dispersion_cm
 
-    ax.axhspan(config.dispersion_threshold_cm, 1e3, color=GREEN, alpha=0.06, lw=0)
-    ax.axvline(config.minimum_duration_s, color="0.55", lw=0.7, ls=":")
-    ax.axhline(config.dispersion_threshold_cm, color="0.55", lw=0.7, ls=":")
-    ax.scatter(duration_s, dispersion_cm, s=7, color="0.72", lw=0, zorder=2)
-    accepted = candidates.is_replay
-    ax.scatter(
-        duration_s[accepted],
-        dispersion_cm[accepted],
-        s=30,
-        zorder=3,
-        facecolor=VERMILION,
-        edgecolor=VERMILION,
-        lw=1.1,
+def plot_detection(ax, grid: pd.DataFrame, title: str, show_y: bool):
+    """Percent of the swept replays each detector reported, path by duration."""
+    image = ax.imshow(
+        100 * grid.to_numpy(),
+        vmin=0,
+        vmax=100,
+        cmap="magma",
+        aspect="auto",
+        origin="lower",
+        interpolation="nearest",
     )
+    ax.set_xticks(range(grid.shape[1]))
+    ax.set_xticklabels([f"{1000 * c:.0f}" for c in grid.columns], fontsize=5)
+    ax.set_yticks(range(grid.shape[0]))
+    ax.set_yticklabels([f"{r:.0f}" for r in grid.index], fontsize=5)
+    ax.set_xlabel("duration (ms)")
+    if show_y:
+        ax.set_ylabel("path length (cm)")
+    else:
+        ax.set_yticklabels([])
+    ax.set_title(title, fontsize=6)
 
-    # each case from panels b to d, marked and named where it lands
-    annotated = (
-        (0, "continuous replay\nfound", VERMILION, True, (10, 6)),
-        (7, "short replay\nfound", VERMILION, True, (14, 24)),
-        (6, "short path\nmissed", BLUE, False, (48, 22)),
-        (5, "remote place\ndeclined", PURPLE, False, (88, 6)),
-    )
-    for event, name, color, filled, offset in annotated:
-        event_start, event_end = decoded["event_times"][event]
-        for i in range(len(candidates.runs)):
-            start, stop = candidates.runs[i]
-            if not (
-                decoded["midpoint_s"][start] < event_end
-                and event_start < decoded["midpoint_s"][stop]
-            ):
-                continue
-            if bool(candidates.is_replay[i]) != filled:
-                continue
-            ax.scatter(
-                duration_s[i],
-                dispersion_cm[i],
-                s=30,
-                zorder=4,
-                facecolor=color if filled else "none",
-                edgecolor=color,
-                lw=1.1,
-            )
-            ax.annotate(
-                name,
-                xy=(duration_s[i], dispersion_cm[i]),
-                xytext=(duration_s[i] + offset[0] / 100, dispersion_cm[i] + offset[1]),
-                fontsize=5.5,
-                color=color,
+    for row in range(grid.shape[0]):
+        for column in range(grid.shape[1]):
+            percent = 100 * grid.iat[row, column]
+            ax.text(
+                column,
+                row,
+                f"{percent:.0f}",
                 ha="center",
-                va="bottom",
-                linespacing=1.25,
-                arrowprops={"arrowstyle": "-", "lw": 0.5, "color": color},
+                va="center",
+                fontsize=4.5,
+                color="white" if percent < 55 else "black",
             )
-            break
-
-    ax.set_xlim(0, 1.85)
-    ax.set_ylim(-3, 62)
-    ax.set_xlabel("event duration (s)")
-    ax.set_ylabel("dispersion (cm)")
-    ax.set_title(
-        f"all {len(candidates.runs)} candidates; {int(accepted.sum())} accepted",
-        fontsize=6,
-    )
-    ax.text(
-        config.minimum_duration_s + 0.03,
-        59,
-        "minimum duration",
-        fontsize=5,
-        color="0.45",
-        ha="left",
-        va="top",
-    )
-    ax.text(
-        1.8,
-        config.dispersion_threshold_cm + 1.5,
-        "minimum dispersion",
-        fontsize=5,
-        color="0.45",
-        ha="right",
-        va="bottom",
-    )
+    return image
 
 
-def make_figure(n_neurons: int, config: MemorylessSequenceConfig):
+def plot_duration_bias(ax, summary: pd.DataFrame):
+    """Reported duration over true duration, for events both procedures found."""
+    rows = summary[summary["summary"] == "median_duration_ratio_by_duration"]
+    ax.axhline(1.0, color="0.6", lw=0.7, ls=":")
+    for measure, color, label in (
+        ("sliding_duration_ratio", VERMILION, SLIDING),
+        ("state_space_duration_ratio", BLUE, STATE_SPACE),
+    ):
+        series = rows[rows.measure == measure].sort_values("duration_s")
+        ax.plot(
+            1000 * series.duration_s,
+            series.value,
+            color=color,
+            lw=1.0,
+            marker="o",
+            ms=2.5,
+            label=label,
+        )
+    ax.set_yscale("log")
+    ax.set_yticks([1, 2, 5, 10])
+    ax.set_yticklabels(["1x", "2x", "5x", "10x"])
+    ax.set_xlabel("duration (ms)")
+    ax.set_ylabel("reported / actual duration")
+    ax.set_title("reported duration", fontsize=6)
+    ax.legend(fontsize=5, frameon=False, loc="upper right", handlelength=1.3)
+
+
+def plot_absorption(ax, summary: pd.DataFrame):
+    """The over-call against how far the replay sits from the animal's own place."""
+    rows = summary[summary["summary"] == "median_by_distance_from_animal"]
+    order = [
+        bin_name for bin_name in DISTANCE_ORDER if bin_name in set(rows.distance_bin_cm)
+    ]
+    at = np.arange(len(order))
+
+    def series(measure):
+        indexed = rows[rows.measure == measure].set_index("distance_bin_cm").value
+        return np.array([indexed[bin_name] for bin_name in order])
+
+    ax.axhline(1.0, color="0.6", lw=0.7, ls=":")
+    ax.plot(
+        at, series("sliding_duration_ratio"), color=VERMILION, lw=1.0, marker="o", ms=3
+    )
+    ax.plot(
+        at, series("state_space_duration_ratio"), color=BLUE, lw=1.0, marker="o", ms=3
+    )
+    for x, local in zip(at, series("sliding_local_fraction"), strict=True):
+        ax.annotate(
+            f"{100 * local:.0f}%",
+            xy=(x, 1.0),
+            xytext=(x, 1.28),
+            fontsize=5,
+            color="0.35",
+            ha="center",
+            va="center",
+        )
+    ax.set_xticks(at)
+    ax.set_xticklabels([bin_name.replace(", ", "-").strip("(]") for bin_name in order])
+    ax.set_ylim(0.85, 2.6)
+    ax.set_xlabel("distance from the animal (cm)")
+    ax.set_ylabel("reported / actual duration")
+    ax.set_title("reported duration by distance", fontsize=6)
+
+
+def make_figure(
+    n_neurons: int, config: MemorylessSequenceConfig, summary: pd.DataFrame
+):
     decoded = simulate_and_decode(n_neurons, config)
     decoded["state_space_intervals"] = state_space_intervals(decoded)
 
@@ -675,10 +698,10 @@ def make_figure(n_neurons: int, config: MemorylessSequenceConfig):
     # this project's defaults turn constrained layout on, so the grid must not
     # also set its own margins: the two fight and the panels collapse
     fig = plt.figure(
-        figsize=(TWO_COLUMN, TWO_COLUMN * 0.82), dpi=450, constrained_layout=True
+        figsize=(TWO_COLUMN, TWO_COLUMN * 1.22), dpi=450, constrained_layout=True
     )
     fig.set_constrained_layout_pads(w_pad=0.02, h_pad=0.02, wspace=0.05, hspace=0.09)
-    grid = GridSpec(3, 8, figure=fig, height_ratios=[1.0, 1.15, 0.95])
+    grid = GridSpec(4, 8, figure=fig, height_ratios=[0.80, 0.95, 1.05, 0.75])
 
     ax_overview = fig.add_subplot(grid[0, :])
     plot_overview(ax_overview, decoded, config)
@@ -707,76 +730,174 @@ def make_figure(n_neurons: int, config: MemorylessSequenceConfig):
         zooms.append(ax)
     zooms[0].set_ylabel("decoded place (cm)")
 
-    ax_criteria = fig.add_subplot(grid[2, 3:5])
-    plot_criterion_space(ax_criteria, decoded, config)
+    heatmaps = grid[2, :].subgridspec(1, 2, wspace=0.06)
+    ax_sliding = fig.add_subplot(heatmaps[0])
+    ax_state = fig.add_subplot(heatmaps[1])
+    image = plot_detection(
+        ax_sliding, detection_grid(summary, "sliding_matches"), SLIDING, show_y=True
+    )
+    plot_detection(
+        ax_state,
+        detection_grid(summary, "state_space_matches"),
+        STATE_SPACE,
+        show_y=False,
+    )
+    bar = fig.colorbar(image, ax=[ax_sliding, ax_state], fraction=0.03, pad=0.01)
+    bar.set_label("replays reported (%)", fontsize=5.5)
+    bar.ax.tick_params(labelsize=5)
 
-    label_panels([ax_overview], labels=["a"], xpos=-0.05, ypos=1.14)
-    label_panels(zooms, labels=["b", "c", "d", "e"], xpos=-0.10, ypos=1.34)
-    label_panels([ax_criteria], labels=["f"], xpos=-0.20, ypos=1.02)
+    ax_duration = fig.add_subplot(grid[3, :4])
+    plot_duration_bias(ax_duration, summary)
+    ax_distance = fig.add_subplot(grid[3, 4:])
+    plot_absorption(ax_distance, summary)
+
+    label_panels([ax_overview], labels=["a"], xpos=-0.05, ypos=1.16)
+    label_panels(zooms, labels=["b", "c", "d", "e"], xpos=-0.10, ypos=1.36)
+    label_panels([ax_sliding, ax_state], labels=["f", "g"], xpos=-0.08, ypos=1.10)
+    label_panels([ax_duration, ax_distance], labels=["h", "i"], xpos=-0.09, ypos=1.10)
 
     return fig, decoded
 
 
-def write_caption(decoded: dict, config: MemorylessSequenceConfig, path: Path) -> None:
-    """Save the caption beside the figure, with its numbers read from the data."""
-    candidates = decoded["candidates"]
-    accepted = int(candidates.is_replay.sum())
-    path.write_text(
-        f"""# {path.stem}
+def rewrap(text: str, width: int = 79) -> str:
+    """Re-fill each paragraph, so interpolated numbers cannot leave ragged lines.
 
-**Two replay detectors on one simulated recording with known events.** The
-simulation carries a continuous outbound replay, a fragmented replay, a
-continuous inbound replay and a silent stretch; a remote stationary event, a
-30 cm replay and an 80 ms replay were written into the spike trains here and
-are marked with a star. Both detectors read one encoding model, fitted once.
-The sliding-window detector decodes each 80 ms window on its own, with no model
-of how one window follows the next, and keeps or drops windows on the spread of
-their posterior and on the jump to the next window.
+    The caption is prose with blank lines between paragraphs and nothing else,
+    so filling paragraph by paragraph is safe.
+    """
+    return "\n\n".join(
+        textwrap.fill(
+            " ".join(paragraph.split()),
+            width=width,
+            break_on_hyphens=False,  # keeps "state-space" on one line
+            break_long_words=False,
+        )
+        for paragraph in text.strip().split("\n\n")
+    )
+
+
+def write_caption(decoded: dict, summary: pd.DataFrame, path: Path) -> None:
+    """Save the caption beside the figure, with its numbers read from the data.
+
+    The figure itself carries almost no words, which is what a paper figure
+    should look like. Everything a reader needs is here instead, written from
+    the same arrays and the same summary the figure plots, so the two cannot
+    drift apart.
+    """
+    overall = summary[summary["summary"] == "overall"].set_index("measure").value
+    ratio = summary[
+        (summary["summary"] == "median_duration_ratio_by_duration")
+        & (summary.measure == "sliding_duration_ratio")
+    ].sort_values("duration_s")
+    shortest = ratio.iloc[0]
+
+    path.write_text(
+        rewrap(
+            f"""# {path.stem}
+
+**Two replay detectors on replays whose shape is known.** The sliding-window
+detector decodes each 80 ms window on its own, with no model of how one window
+follows the next, and keeps or drops windows on the spread of their posterior
+and on the jump to the next window. The state-space detector infers the whole
+event at once and carries the animal's own place as a competing hypothesis.
+Throughout, both detectors read one encoding model, fitted once.
+
+**(a-e) One recording with labeled events.** The simulation carries a
+continuous outbound replay, a fragmented replay, a continuous inbound replay
+and a silent stretch; a remote stationary event, a 30 cm replay and an 80 ms
+replay were written into the spike trains here and are marked with a star.
 
 **(a)** The whole recording. Green is where the animal is; dots are the decoded
 place of each window, kept or rejected; yellow marks a labeled event; bars below
 the axis are the events each detector reports and the candidates the
 sliding-window detector rejected.
 
-**(b-e)** Four events, with the posterior in grey. The sliding-window detector
-finds the continuous replay and gives it
-{duration_ratio(decoded, 0):.1f} times its true length, because
-{100 * local_fraction_of_event(decoded, 0):.0f}% of the event it reports is the
-animal's own place, absorbed by the merge rule. It also finds the 80 ms replay
-and reports it {duration_ratio(decoded, 7):.1f} times too long, this time with
-no local coding in it at all: the window alone puts a floor under any duration
-it can report. It misses the 30 cm replay and declines the remote stationary
+**(b-e)** Four events, with the posterior in grey. The sliding-window
+detector finds the continuous replay and gives it {duration_ratio(decoded, 0):.1f}
+times its true length, because {100 * local_fraction_of_event(decoded, 0):.0f}%
+of the event it reports is the animal's own place, absorbed by the merge rule.
+It also finds the 80 ms replay and reports it {duration_ratio(decoded, 7):.1f}
+times too long, this time with no local coding in it at all: the window alone
+puts a floor under any duration it can report. It misses the 30 cm replay and declines the remote stationary
 event, both for too little dispersion. The state-space detector reports all
 four with bounds within about 20 ms.
 
-**(f)** Every candidate sequence the sliding-window detector built, against the
-two criteria that accept one. Dispersion is how far the decoded path spreads
-about its own centre, so the shaded box means an event lasted long enough and
-travelled far enough. {accepted} of {len(candidates.runs)} reach it.
+**(f-i) {int(overall["n_cells"])} replays of chosen shape.** Made-up
+replays were written into the spike trains of a simulated linear-track
+recording, one at a time, each with a path length, duration, firing rate and
+distance from the animal's own place that we chose. Because the right answer is known, what each
+detector reports can be scored against it. A detector counts as reporting a
+replay only when what it returns is that replay: on its path, and not covering
+far more ground.
 
-**Caveats.** One simulation, sorted spikes, a linear track, no artifacts. The
-significance test the published method requires is not applied here.
+**(f, g)** Percent of those {int(overall["n_cells"])} replays reported, by
+the path the replay travels and how long it lasts. Taken together the
+sliding-window detector reports {100 * overall["sliding_matches"]:.0f}% of them
+and the state-space detector {100 * overall["state_space_matches"]:.0f}%. The
+sliding-window detector is limited by path length, which is one of its
+criteria: below about 45 cm it reports a few percent at any duration and any
+firing rate. The state-space detector is limited by duration, which is spike
+count, which is the data. No replay was reported by the sliding-window detector
+and missed by the state-space detector;
+{100 * overall["found_by_state_space_only"]:.0f}% went the other way.
 
-Produced by `scripts/figures/generate_memoryless_comparison.py`.
+**(h)** Reported duration over actual duration, for replays both detectors
+reported. A {1000 * shortest.duration_s:.0f} ms replay is reported as about
+{1000 * shortest.duration_s * shortest.value:.0f} ms — the same floor that panel
+(c) shows for one event.
+
+**(i)** The same ratio against how far the replay sits from the animal's own
+place. Numbers give the share of the reported event's 80 ms windows that
+decode the animal's place rather than a replayed one. Over-reporting happens
+only within about 80 cm of the animal, where local coding is absorbed into the
+event, as in panel (b). Over the whole sweep,
+{100 * overall["sliding_accepted_but_not_the_injection"]:.0f}% of the
+sliding-window detector's accepted events are not the replay that was put in.
+
+**Caveats.** Sorted spikes, a linear track, no artifacts. In (f-i) the animal
+rests at one end of the track and pauses nowhere else, so distance from its
+place is fixed by where the replay is put and cannot be varied independently.
+Replays run at constant speed with Poisson firing from the same place fields
+the encoding model was fitted on, so there is no model mismatch and the picture
+is optimistic. The significance test the published method requires is not
+applied here.
+
+Produced by `scripts/figures/generate_memoryless_comparison.py` from
+`docs/design/replay_detection_comparison/detection_sweep_summary.csv`.
 """
+        )
+        + "\n"
     )
+
+
+def read_summary(path: Path) -> pd.DataFrame:
+    if not path.exists():
+        raise FileNotFoundError(
+            f"No sweep summary at {path}. Run "
+            "`python scripts/qa/sweep_memoryless_detection.py` first."
+        )
+    return pd.read_csv(path)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--n-neurons", type=int, default=25)
+    parser.add_argument("--summary", type=Path, default=SUMMARY_PATH)
     parser.add_argument(
         "--output-dir", type=Path, default=Path("paper/figures/memoryless_comparison")
     )
     args = parser.parse_args()
 
     config = MemorylessSequenceConfig(sampling_frequency=500.0)
-    fig, decoded = make_figure(args.n_neurons, config)
+    summary = read_summary(args.summary)
+    fig, decoded = make_figure(args.n_neurons, config, summary)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     save_figure("memoryless_comparison", base_dir=args.output_dir)
     plt.close(fig)
-    write_caption(decoded, config, args.output_dir / "memoryless_comparison_caption.md")
+    write_caption(
+        decoded, summary, args.output_dir / "memoryless_comparison_caption.md"
+    )
 
     candidates = decoded["candidates"]
     print(

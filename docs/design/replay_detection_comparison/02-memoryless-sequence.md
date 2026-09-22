@@ -352,8 +352,8 @@ spikes on a linear track. Every number below comes from
 [detection_sweep_summary.csv](detection_sweep_summary.csv), which that script
 writes; the full per-cell table goes to `Processed-Data` and is not tracked.
 The sweep takes about three minutes to reproduce, and
-`scripts/figures/generate_memoryless_sweep.py` draws the summary figure from
-the same file.
+`scripts/figures/generate_memoryless_comparison.py` draws the lower panels of
+the supplemental figure from the same file.
 
 **Two things the sweep is careful about**, both because getting them wrong
 produced a wrong answer here first.
