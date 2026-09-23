@@ -90,10 +90,14 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     retrieved. Reference source vendored at
     [reference/widloski_foster_2025/](../reference/widloski_foster_2025/) and
     [reference/yu_2017_franklab/](../reference/yu_2017_franklab/).
-    Status: the memoryless sequence detector of spec 02 is implemented and tested
-    (`analysis/hippocampus/memoryless_sequence/`), with its simulated-replay sweep
-    and supplemental figure; its shuffle and comparison stages, the Yu detector's
-    project wiring, and the inventory comparison of specs 03–05 are not.
+    Status: the memoryless sequence detector of spec 02, its significance shuffle,
+    its per-epoch runner, its simulated-replay sweep and supplemental figure are
+    implemented and tested (`analysis/hippocampus/memoryless_sequence/`,
+    `scripts/decoding/run_memoryless_detection.py`); the inventory comparison's
+    accounting of spec 03 is implemented and tested on synthetic inventories
+    (`analysis/inventory_comparison/`). Not yet done: the real-data pilot, the
+    comparison's per-detector adapters and runner, the Yu detector's project
+    wiring, and specs 04–05.
 - [known_issues/](known_issues/) — *reference*: documented data/pipeline issues.
   - [three_sessions_blocked_by_nwb_checksum.md](known_issues/three_sessions_blocked_by_nwb_checksum.md)
     — the canonical cohort is 215 of 218; three sessions fail an upstream NWB

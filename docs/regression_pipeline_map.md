@@ -458,12 +458,6 @@ Run Continuous-Fragmented (ContFrag) decoding on spatial bandit task data.
 
 `create_contfrag_detector`, `perform_decoding`, `save_results_and_model`, `organize_results`, `run_decode`, `main`
 
-### `scripts/decoding/run_memoryless_detection.py`
-
-Run the memoryless sequence detector over recorded HPC epochs.
-
-`EpochKey`, `parse_epoch_identifier`, `input_paths`, `find_epochs`, `load_marks`, `marks_sha256`, `output_paths`, `observation_table`, `run_one`, `run_settings`, `write_manifest`, `main`
-
 ### `scripts/decoding/write_regeneration_manifest.py`
 
 Validate candidate covariate bundles and write a release manifest.
@@ -712,12 +706,6 @@ Print Stage 6's per-role cross-session FDR table for a saved bundle.
 
 `main`
 
-### `scripts/qa/sweep_memoryless_detection.py`
-
-What each detector does to a replay of known shape.
-
-`build_recording`, `overlaps`, `best_entry`, `memoryless_outcome`, `nearest_bin`, `non_local_intervals`, `state_space_outcome`, `run_cell`, `git_commit`, `share`, `melted`, `summarize`, `main`
-
 ### `scripts/qa/write_pipeline_map.py`
 
 Generate the symbol-anchored regression pipeline code map.
@@ -741,61 +729,3 @@ Load the conditional non-local posterior from a decoder results file.
 Centralized schema/version literals for the covariate pipeline.
 
 `assert_versions_compatible`
-
-## Unassigned
-
-Modules under a mapped root that no stage pattern claims. A module landing here means `write_pipeline_map.py` needs a stage rule, not that the module is unused.
-
-### `src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/config.py`
-
-Every threshold the memoryless sequence detector uses, in one place.
-
-`MemorylessSequenceConfig`
-
-### `src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/detect.py`
-
-Turn per-window statistics into candidate sequences.
-
-`WindowGates`, `WindowDecisions`, `SequenceAssembly`, `apply_speed_gate`, `gate_windows`, `window_decisions`, `contiguous_runs`, `merge_runs`, `assemble_sequences`, `sequence_duration_s`, `sequence_dispersion_cm`, `replay_mask`, `CandidateSequences`, `detect_candidate_sequences`
-
-### `src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/epoch.py`
-
-The whole memoryless detector over one epoch, from spikes to table.
-
-`EpochDetection`, `run_epoch`
-
-### `src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/event_table.py`
-
-One row per candidate sequence the memoryless detector builds.
-
-`SequenceIdentity`, `shuffle_eligible`, `canonical_swr_intervals`, `observed_intervals`, `build_memoryless_event_table`, `build_shuffle_draw_table`
-
-### `src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/likelihood.py`
-
-Prior-excluded log-likelihood on the native decoding grid.
-
-`EpochLikelihood`, `load_clusterless_encoding_model`, `check_marks_match_encoding`, `validate_time_grid`, `clusterless_epoch_log_likelihood`, `window_midpoints_s`, `interior_bin_distances_cm`, `sorted_spikes_epoch_log_likelihood`
-
-### `src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/scoring.py`
-
-Score what a detector reports against a replay of known shape.
-
-`InjectionScore`, `score_against_injection`, `best_scored`
-
-### `src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/shuffle.py`
-
-The encoding-pair shuffle: is a candidate sequence more than chance?
-
-`ShuffleSeed`, `encoding_permutation`, `cell_identity_permutation`, `shuffle_p_value`, `ShuffleResult`, `shuffle_statistics`, `unchanged_window_pairs`, `candidate_window_log_likelihood`, `shuffle_candidate`, `sorted_candidate_window_log_likelihood`, `shuffle_candidate_sorted`
-
-### `src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/simulation.py`
-
-Put a replay of known shape into a simulated recording.
-
-`InjectedReplay`, `place_field_means`, `inject_replay`, `immobile_intervals`, `placements`, `without`
-
-### `src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/statistics.py`
-
-Per-window statistics on a linearized track graph.
-
-`aggregate_windows`, `normalize_windows`, `window_center_and_spread`, `forward_jumps_cm`, `dispersion_cm`

@@ -4,10 +4,10 @@
 `detect.py`, `likelihood.py`, `simulation.py`, `scoring.py`, `shuffle.py`,
 `event_table.py` and `epoch.py` exist and are tested, and
 `scripts/decoding/run_memoryless_detection.py` runs them per recorded epoch. The decodes
-are not on the development machine, so the real-data pilot is the next step. `compare.py`
-belongs to the inventory comparison ([03](03-inventory-comparison.md)). The sections on
-what the port does on simulated data are results; everything else is a proposed
-analysis.*
+are not on the development machine, so the real-data pilot is the next step. The
+comparison between inventories lives in `analysis/inventory_comparison/`
+([03](03-inventory-comparison.md)). The sections on what the port does on simulated
+data are results; everything else is a proposed analysis.*
 *Governing rule and cross-cutting decisions: [overview.md](overview.md).*
 
 Inventory 6 of six: the posterior-sequence trigger. How this cohort is compared against

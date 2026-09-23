@@ -143,6 +143,16 @@ _UNASSIGNED_BLURB = (
     "the module is unused."
 )
 
+# Packages under a mapped root that carry no data from a decoded session to a
+# fitted regression: the replay-detection comparison lives beside the
+# pipeline, not on it, and is documented in docs/design/replay_detection_comparison/.
+EXCLUDED_PREFIXES: tuple[str, ...] = (
+    "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/",
+    "src/continuum_swr_replay/analysis/inventory_comparison/",
+    "scripts/decoding/run_memoryless_detection.py",
+    "scripts/qa/sweep_memoryless_detection.py",
+)
+
 
 def _iter_modules() -> list[Path]:
     """Every mapped source module, repo-relative, deduplicated and sorted."""
@@ -152,6 +162,8 @@ def _iter_modules() -> list[Path]:
             if "__pycache__" in path.parts or path.name == "__init__.py":
                 continue
             rel = path.relative_to(REPO)
+            if rel.as_posix().startswith(EXCLUDED_PREFIXES):
+                continue
             seen.setdefault(rel.as_posix(), rel)
     return [seen[key] for key in sorted(seen)]
 

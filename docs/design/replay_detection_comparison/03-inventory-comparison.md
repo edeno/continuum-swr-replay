@@ -4,7 +4,9 @@
 fragment-merge recount, cells and SWR label matrix — is implemented in
 `src/continuum_swr_replay/analysis/inventory_comparison/` and tested on synthetic
 inventories. Not yet run on recorded data: the per-detector adapters that build coverage
-from recordings, the runner, and the sampled examples remain.*
+from recordings, the runner, and the sampled examples remain, and excluded time is not
+yet reported by reason (the observation tables carry a reason per stretch; nothing
+aggregates it per comparison).*
 *Governing rule and cross-cutting decisions: [overview.md](overview.md).*
 
 Depends on [01](01-yu-swr-detector.md) and [02](02-memoryless-sequence.md). Covers how the
@@ -67,9 +69,12 @@ observed; it need not qualify for the reverse direction's denominator. Every
 inventory is first restricted to its speed-eligible events, so no counterpart spans
 movement: a movement-spanning SWR cannot mark a still sequence, as the canonical
 SWR labels are speed-gated before they mark a non-local event. Cached events
-that bridge their own detector's unavailable data are flagged and excluded from
-comparison matches; mark their full spans unavailable pending corrected detection,
-so discarding a corrupt event cannot create an apparent non-detection. Clip event
+that bridge their own detector's unavailable data are set aside into their own table
+before comparison (`remove_bridging_events`), and their full spans are marked
+unavailable pending corrected detection, so discarding a corrupt event cannot create
+an apparent non-detection. The memoryless inventory is one named cohort of that
+detector's candidate table (`published`, or `replay_criteria` before the significance
+test), never every candidate row, since that table keeps the detector's rejections. Clip event
 unions to shared exposure only for **time coverage**.
 
 ## Matching and counting
