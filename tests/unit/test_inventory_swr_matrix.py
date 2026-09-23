@@ -271,3 +271,29 @@ def test_a_definition_missing_in_an_epoch_leaves_every_column_unavailable():
 
     assert matrix.available.tolist() == [False, False]
     assert matrix.n_excluded.tolist() == [2, 2]
+
+
+def test_pairs_with_no_labels_at_all_are_refused(labelled):
+    """An empty labels table must not quietly pair nothing."""
+    pairs, labels, _ = labelled
+
+    with pytest.raises(ValueError, match="no labels"):
+        paired_labels(pairs, labels.iloc[:0], cohorts=COHORTS)
+
+
+def test_a_cohort_that_found_nothing_can_still_be_paired():
+    """It has no labels because it has no events, and so no pairs to lose."""
+    inventory = pd.concat(
+        [events("S1", [(10, 20)]), events("K", [(12, 13)])], ignore_index=True
+    )
+    coverage = {(*KEY, d): cover() for d in ["S1", "S2", "K"]}
+    pairs = overlap_pairs(inventory)
+    labels = swr_labels(
+        inventory,
+        event_matches(inventory, pairs, coverage),
+        coverage,
+        cohorts=["S1", "S2"],
+        swr_definitions=["K"],
+    )
+
+    assert paired_labels(pairs, labels, cohorts=["S1", "S2"]).empty

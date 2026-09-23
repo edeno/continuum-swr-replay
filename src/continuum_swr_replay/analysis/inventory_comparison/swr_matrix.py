@@ -303,12 +303,15 @@ def paired_labels(
 
     """
     cohorts = list(cohorts)
-    unlabelled = sorted(set(cohorts) - set(labels.cohort.unique()))
-    if unlabelled and not labels.empty:
-        raise ValueError(
-            f"{unlabelled} carry no labels; label every cohort before pairing."
-        )
     both = pairs[pairs.detector_a.isin(cohorts) & pairs.detector_b.isin(cohorts)]
+    # a cohort with no events has no labels and no pairs; one in a pair must
+    # have been labelled, or the merge below would drop its pairs unseen
+    paired_cohorts = set(both.detector_a) | set(both.detector_b)
+    unlabelled = sorted(paired_cohorts - set(labels.cohort.unique()))
+    if unlabelled:
+        raise ValueError(
+            f"{unlabelled} have pairs but no labels; label every cohort before pairing."
+        )
     label = labels[["event_key", "swr_definition", "label"]]
     paired = both.merge(
         label.rename(columns={"event_key": "event_key_a", "label": "label_a"}),
