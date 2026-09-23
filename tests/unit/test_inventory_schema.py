@@ -203,6 +203,7 @@ class TestAdapters:
                 "whole_event_speed_eligible": [True],
                 "is_replay": [True],
                 "shuffle_pass": [True],
+                "n_shuffles": [100],
             }
         )
 
@@ -231,6 +232,7 @@ class TestAdapters:
                 "whole_event_speed_eligible": [True] * 3,
                 "is_replay": [True, True, False],
                 "shuffle_pass": [True, False, False],
+                "n_shuffles": [100, 100, 0],
             }
         )
 
@@ -263,6 +265,19 @@ class TestAdapters:
             inventory.event_start_s, table[table.is_replay].event_start_s
         )
         assert inventory.whole_event_speed_eligible.tolist() == [True, False]
+
+    def test_the_published_cohort_of_an_unshuffled_run_is_refused(self):
+        """A run made without the shuffle passes nothing, and would read as a
+        detector that found no replay."""
+        from tests.unit.test_memoryless_event_table import build, make_recording
+
+        recording = make_recording()
+        unshuffled = build(recording, shuffle_results=None)
+
+        assert len(from_memoryless_table(build(recording), cohort="published")) == 2
+        assert len(from_memoryless_table(unshuffled, cohort="replay_criteria")) == 2
+        with pytest.raises(ValueError, match="shuffle"):
+            from_memoryless_table(unshuffled, cohort="published")
 
 
 class TestInvariants:

@@ -415,7 +415,8 @@ def from_memoryless_table(table: pd.DataFrame, *, cohort: str) -> pd.DataFrame:
     cohort : str
         A key of :data:`MEMORYLESS_COHORTS`: ``"published"`` for the paper's
         replay definition, ``"replay_criteria"`` for duration and dispersion
-        alone.
+        alone. ``"published"`` needs every candidate meeting the replay
+        criteria to have been shuffled.
 
     """
     if cohort not in MEMORYLESS_COHORTS:
@@ -440,9 +441,18 @@ def from_memoryless_table(table: pd.DataFrame, *, cohort: str) -> pd.DataFrame:
             "whole_event_speed_eligible",
             "is_replay",
             "shuffle_pass",
+            "n_shuffles",
         ),
         "memoryless event",
     )
+    untested = table.is_replay.to_numpy(dtype=bool) & (table.n_shuffles.to_numpy() == 0)
+    if cohort == "published" and untested.any():
+        raise ValueError(
+            f"{int(untested.sum())} candidates meeting the replay criteria were never "
+            "shuffled, so the published cohort cannot be read from this table: a "
+            "run made without the shuffle passes nothing and would read as a "
+            "detector that found no replay."
+        )
     table = table[table[flag].to_numpy(dtype=bool)]
     frame = pd.DataFrame(
         {
