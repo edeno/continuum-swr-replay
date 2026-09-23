@@ -1,10 +1,10 @@
 """Each sequence cohort labelled under each SWR definition.
 
 A sequence event is ``SWR`` under a definition when an event of that SWR
-inventory overlaps it with positive duration and ``non-SWR`` when nothing does, but only for an event lying
-wholly within both detectors' exposure; otherwise it is ``unknown``: missing
-LFP is never a missing ripple, and an overlap in the observed part cannot
-say what the rest held.
+inventory overlaps it with positive duration and ``non-SWR`` when nothing
+does, but only for an event lying wholly within both detectors' exposure;
+otherwise it is ``unknown``: missing LFP is never a missing ripple, and an
+overlap in the observed part cannot say what the rest held.
 
 The matrix restricts each cohort to its events lying wholly within its own
 exposure intersected with every SWR definition's, so every column counts the

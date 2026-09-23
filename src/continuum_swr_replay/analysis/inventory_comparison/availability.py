@@ -2,10 +2,10 @@
 
 A detector that looked and found nothing observed that time; a detector whose
 inputs were missing did not, and an empty event table alone cannot tell the
-two apart. Coverage is built from the
-samples a detector needed, split at every non-finite sample and every gap in
-the timestamps, never interpolated across either; a detector that reads a
-window of samples observes a moment only when the whole window is there.
+two apart. Coverage is built from the samples a detector needed, split at
+every non-finite sample and every gap in the timestamps, never interpolated
+across either; a detector that reads a window of samples observes a moment
+only when the whole window is there.
 
 Exposure is observed time during which the animal was known to be still:
 finite speed below the canonical threshold. Comparisons between detectors use

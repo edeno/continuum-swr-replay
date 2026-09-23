@@ -2,8 +2,8 @@
 
 Two events overlap when they share time of positive duration within one
 epoch; touching at an instant is not agreement, and nothing is matched across
-epochs. The pair table keeps every such pair,
-so one event can appear in many; the counts built on it take each event once.
+epochs. The pair table keeps every such pair, so one event can appear in many;
+the counts built on it take each event once.
 
 Membership needs coverage and a match does not. An event is ``matched`` to
 another detector when a valid event of that detector overlaps it, wherever

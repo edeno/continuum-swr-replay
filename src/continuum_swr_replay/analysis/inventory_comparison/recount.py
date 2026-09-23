@@ -1,9 +1,9 @@
 """The fragment-merge recount: how much a count owes to segmentation.
 
 Our detector can split one replay into several events where the non-local
-probability dips below threshold. Here one
-detector's events closer than a stated gap are merged, so the same overlap
-accounting can be rerun on the merged intervals beside the native ones.
+probability dips below threshold. Here one detector's events closer than a
+stated gap are merged, so the same overlap accounting can be rerun on the
+merged intervals beside the native ones.
 
 A merge never crosses an epoch, and never leaves one continuous interval of
 the detector's exposure: the fragments and the whole gap between them must lie

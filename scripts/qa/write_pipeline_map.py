@@ -145,7 +145,7 @@ _UNASSIGNED_BLURB = (
 
 # Packages under a mapped root that carry no data from a decoded session to a
 # fitted regression: the replay-detection comparison lives beside the
-# pipeline, not on it, and is documented in docs/design/replay_detection_comparison/.
+# pipeline, not on it.
 EXCLUDED_PREFIXES: tuple[str, ...] = (
     "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/",
     "src/continuum_swr_replay/analysis/inventory_comparison/",
