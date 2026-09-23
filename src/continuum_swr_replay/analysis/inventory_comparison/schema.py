@@ -25,9 +25,7 @@ from numpy.typing import NDArray
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     event_speeds_are_immobile,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.event_table import (
-    BRAIN_AREAS,
-)
+from continuum_swr_replay.data_loaders.constants import BRAIN_AREAS
 from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 
 __all__ = [

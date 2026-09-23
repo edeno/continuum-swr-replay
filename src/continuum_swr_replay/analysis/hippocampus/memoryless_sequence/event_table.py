@@ -62,12 +62,12 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
     ShuffleResult,
 )
+from continuum_swr_replay.data_loaders.constants import BRAIN_AREAS
 from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 
 __all__ = [
     "MEMORYLESS_EVENT_TABLE_DTYPES",
     "SHUFFLE_DRAW_TABLE_DTYPES",
-    "BRAIN_AREAS",
     "UNKNOWN",
     "SequenceIdentity",
     "build_memoryless_event_table",
@@ -147,9 +147,6 @@ SHUFFLE_DRAW_TABLE_DTYPES: Mapping[str, object] = MappingProxyType(
         "null_jump_cm": np.float64,
     }
 )
-
-BRAIN_AREAS = ("HPC", "mPFC", "OFC")
-"""The project's brain-area names; capitalization matters throughout."""
 
 
 @dataclass(frozen=True)

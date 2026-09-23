@@ -15,6 +15,8 @@ TRACK_SEGMENT_TO_PATCH : dict of {int: int}
     Maps track segment IDs to patch IDs (1-3).
 OMISSION_KNOWN_LATENCY_SEC : float
     Seconds after destination poke-in by which an omission is established.
+BRAIN_AREAS : tuple of str
+    The project's brain-area names; capitalization matters throughout.
 
 Notes
 -----
@@ -243,3 +245,5 @@ It lives with the loading constants, not the analysis ones, because the trial
 builders on the loading side define the outcome clock with it and must not have
 to import from ``analysis`` to do so.
 """
+
+BRAIN_AREAS: tuple[str, ...] = ("HPC", "mPFC", "OFC")
