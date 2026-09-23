@@ -21,6 +21,7 @@ from types import MappingProxyType
 
 import numpy as np
 import pandas as pd
+from numpy.typing import NDArray
 
 from continuum_swr_replay.analysis.inventory_comparison.intervals import (
     contains,
@@ -118,6 +119,27 @@ PAIRED_LABEL_DTYPES: Mapping[str, object] = MappingProxyType(
 is unknown."""
 
 
+def _matrix_exposure(
+    coverage: Mapping[tuple, Coverage],
+    session: tuple,
+    cohort: str,
+    swr_definitions: Collection[str],
+) -> NDArray:
+    """The cohort's exposure within every definition's: the matrix population.
+
+    A detector with no entry for the epoch observed none of it.
+    """
+    return reduce(
+        intersect,
+        [
+            coverage[(*session, d)].exposure
+            if (*session, d) in coverage
+            else np.empty((0, 2))
+            for d in [cohort, *swr_definitions]
+        ],
+    )
+
+
 def swr_labels(
     inventory: pd.DataFrame,
     matches: pd.DataFrame,
@@ -155,17 +177,10 @@ def swr_labels(
             f"{sorted(set(cohorts) & set(swr_definitions))} cannot be both a "
             "cohort and an SWR definition."
         )
-    empty = np.empty((0, 2))
     events = inventory[inventory.detector.isin(cohorts)]
     in_matrix = np.zeros(len(events), dtype=bool)
     for (*session, cohort), group in events.groupby([*SESSION_COLUMNS_DAY, "detector"]):
-        shared = reduce(
-            intersect,
-            [
-                coverage.get((*session, d), Coverage(empty, empty)).exposure
-                for d in [cohort, *swr_definitions]
-            ],
-        )
+        shared = _matrix_exposure(coverage, tuple(session), cohort, swr_definitions)
         in_matrix[events.index.get_indexer(group.index)] = contains(
             shared, group.event_start_s.to_numpy(), group.event_end_s.to_numpy()
         )
@@ -219,8 +234,10 @@ def swr_label_matrix(
     -------
     DataFrame
         Columns and dtypes as ``MATRIX_DTYPES``. ``available`` says whether
-        the cohort and the definition share any exposure in the epoch; the
-        fraction is over the eligible events and NaN where there are none.
+        the matrix population exists in the epoch: the cohort's exposure
+        within every definition's, the same for every column, so one
+        definition not running leaves every column unavailable. The fraction
+        is over the eligible events and NaN where there are none.
 
     """
     cohorts = validate_detectors(cohorts, coverage, "cohorts")
@@ -239,17 +256,11 @@ def swr_label_matrix(
             n_non_swr=("is_non_swr", "sum"),
         )
     )
-    empty = np.empty((0, 2))
     rows = []
     for session in sorted({tuple(key[:3]) for key in coverage}):
         for cohort in cohorts:
+            shared = _matrix_exposure(coverage, session, cohort, swr_definitions)
             for definition in swr_definitions:
-                shared = intersect(
-                    coverage.get((*session, cohort), Coverage(empty, empty)).exposure,
-                    coverage.get(
-                        (*session, definition), Coverage(empty, empty)
-                    ).exposure,
-                )
                 index = (*session, cohort, definition)
                 counts = (
                     counted.loc[index]

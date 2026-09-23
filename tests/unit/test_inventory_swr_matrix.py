@@ -247,3 +247,27 @@ def test_a_sequence_only_partly_observed_by_the_swr_detector_is_unknown():
 
     assert len(pairs) == 1
     assert labels.label.tolist() == ["unknown"]
+
+
+def test_a_definition_missing_in_an_epoch_leaves_every_column_unavailable():
+    """Every column counts the same events, those inside the cohort's
+    exposure and every definition's; one definition not running empties that
+    population for all of them."""
+    inventory = pd.concat(
+        [events("S1", [(10, 20), (30, 40)]), events("K", [(12, 13)])],
+        ignore_index=True,
+    )
+    coverage = {(*KEY, "S1"): cover(), (*KEY, "K"): cover()} | {
+        (*KEY, "Y"): Coverage(np.empty((0, 2)), np.empty((0, 2)))
+    }
+    matches = event_matches(inventory, overlap_pairs(inventory), coverage)
+    labels = swr_labels(
+        inventory, matches, coverage, cohorts=["S1"], swr_definitions=["K", "Y"]
+    )
+
+    matrix = swr_label_matrix(
+        labels, coverage, cohorts=["S1"], swr_definitions=["K", "Y"]
+    ).set_index("swr_definition")
+
+    assert matrix.available.tolist() == [False, False]
+    assert matrix.n_excluded.tolist() == [2, 2]
