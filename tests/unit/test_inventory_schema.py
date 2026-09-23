@@ -12,6 +12,7 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import (
     from_classified_nonlocal_table,
     from_memoryless_table,
     inventory_from_intervals,
+    validate_inventory,
 )
 
 SESSION = SessionIdentity(animal="sim", day=20200101, epoch="02_r1", brain_area="HPC")
@@ -200,11 +201,159 @@ class TestAdapters:
                 "animal_max_speed_cm_s": [1.0],
                 "animal_mean_speed_cm_s": [0.5],
                 "whole_event_speed_eligible": [True],
+                "is_replay": [True],
+                "shuffle_pass": [True],
             }
         )
 
-        inventory = from_memoryless_table(table)
+        inventory = from_memoryless_table(table, cohort="published")
 
         assert inventory.event_key.tolist() == ["memoryless:sim20200101_02_r1:42"]
         assert inventory.run_id.tolist() == ["run"]
         assert list(inventory.columns) == list(INVENTORY_DTYPES)
+
+    def test_the_memoryless_adapter_takes_only_the_named_cohort(self):
+        """The memoryless table is one row per candidate, accepted or not;
+        passing every row would count the detector's rejections as events."""
+        table = pd.DataFrame(
+            {
+                "animal": ["sim"] * 3,
+                "day": [20200101] * 3,
+                "epoch": ["02_r1"] * 3,
+                "brain_area": ["HPC"] * 3,
+                "run_id": ["run"] * 3,
+                "ms_event_id": [1, 2, 3],
+                "event_start_s": [GRID[10], GRID[100], GRID[200]],
+                "event_end_s": [GRID[60], GRID[160], GRID[260]],
+                "event_duration_s": [0.1, 0.12, 0.12],
+                "animal_max_speed_cm_s": [1.0] * 3,
+                "animal_mean_speed_cm_s": [0.5] * 3,
+                "whole_event_speed_eligible": [True] * 3,
+                "is_replay": [True, True, False],
+                "shuffle_pass": [True, False, False],
+            }
+        )
+
+        published = from_memoryless_table(table, cohort="published")
+        criteria = from_memoryless_table(table, cohort="replay_criteria")
+
+        assert published.event_key.tolist() == ["memoryless:sim20200101_02_r1:1"]
+        assert criteria.event_key.tolist() == [
+            "memoryless:sim20200101_02_r1:1",
+            "memoryless:sim20200101_02_r1:2",
+        ]
+        with pytest.raises(ValueError, match="cohort"):
+            from_memoryless_table(table, cohort="everything")
+        with pytest.raises(ValueError, match="lacks"):
+            from_memoryless_table(
+                table.drop(columns="shuffle_pass"), cohort="published"
+            )
+
+    def test_the_adapter_reads_what_the_memoryless_builder_writes(self):
+        """Fed a real table, so a column rename in the builder fails here and
+        not in the runner."""
+        from tests.unit.test_memoryless_event_table import build, make_recording
+
+        table = build(make_recording())
+
+        inventory = from_memoryless_table(table, cohort="replay_criteria")
+
+        assert len(inventory) == int(table.is_replay.sum()) == 2
+        np.testing.assert_allclose(
+            inventory.event_start_s, table[table.is_replay].event_start_s
+        )
+        assert inventory.whole_event_speed_eligible.tolist() == [True, False]
+
+
+class TestInvariants:
+    """What the schema refuses, so no count is silently wrong downstream."""
+
+    def test_an_identity_whose_parts_are_malformed_is_refused(self):
+        with pytest.raises(ValueError, match="brain_area"):
+            SessionIdentity(animal="sim", day=20200101, epoch="02_r1", brain_area="hpc")
+        with pytest.raises(TypeError, match="day"):
+            SessionIdentity(
+                animal="sim", day="20200101", epoch="02_r1", brain_area="HPC"
+            )  # type: ignore[arg-type]
+        with pytest.raises(ValueError, match="day"):
+            SessionIdentity(animal="sim", day=0, epoch="02_r1", brain_area="HPC")
+        with pytest.raises(ValueError, match="animal"):
+            SessionIdentity(animal=" ", day=20200101, epoch="02_r1", brain_area="HPC")
+
+    def test_overlapping_events_of_one_detector_are_refused(self):
+        """One detector's events must be disjoint for the recount's gap-zero
+        identity and for each event to count once."""
+        with pytest.raises(ValueError, match="overlap"):
+            swr_inventory([GRID[10], GRID[20]], [GRID[30], GRID[40]])
+
+    def test_a_missing_session_value_is_refused(self):
+        """Every grouped count would drop the event without a word."""
+        inventory = swr_inventory([GRID[10]], [GRID[30]])
+        inventory["epoch"] = None
+
+        with pytest.raises(ValueError, match="animal, day, epoch"):
+            validate_inventory(inventory)
+
+    def test_a_missing_eligibility_flag_is_refused(self):
+        """astype(bool) would turn NaN into True and admit the event."""
+        inventory = swr_inventory([GRID[10]], [GRID[30]]).astype(
+            {"whole_event_speed_eligible": object}
+        )
+        inventory.loc[0, "whole_event_speed_eligible"] = np.nan
+
+        with pytest.raises(ValueError, match="whole_event_speed_eligible"):
+            validate_inventory(inventory)
+
+    def test_a_key_that_does_not_name_its_own_detector_and_epoch_is_refused(self):
+        inventory = swr_inventory([GRID[10]], [GRID[30]])
+        inventory["detector"] = "other"
+
+        with pytest.raises(ValueError, match="does not name"):
+            validate_inventory(inventory)
+
+    def test_a_detector_name_holding_the_key_separator_is_refused(self):
+        with pytest.raises(ValueError, match="':'"):
+            inventory_from_intervals(
+                np.array([GRID[10]]),
+                np.array([GRID[30]]),
+                native_keys=np.array([0]),
+                detector="swr:kay",
+                session=SESSION,
+                run_id="run",
+                speed_time_s=GRID,
+                speed_cm_per_s=np.zeros(GRID.size),
+            )
+
+    def test_two_brain_areas_in_one_epoch_are_refused(self):
+        """The comparison keys on the epoch and would pair events across areas."""
+        pfc = SessionIdentity(
+            animal="sim", day=20200101, epoch="02_r1", brain_area="mPFC"
+        )
+        hpc = swr_inventory([GRID[10]], [GRID[30]])
+        other = inventory_from_intervals(
+            np.array([GRID[50]]),
+            np.array([GRID[70]]),
+            native_keys=np.array([0]),
+            detector="mua",
+            session=pfc,
+            run_id="run",
+            speed_time_s=GRID,
+            speed_cm_per_s=np.zeros(GRID.size),
+        )
+
+        with pytest.raises(ValueError, match="brain area"):
+            combine_inventories([hpc, other])
+
+    def test_an_unsorted_speed_trace_is_refused(self):
+        """searchsorted on it would read NaN speeds and mark every event moving."""
+        with pytest.raises(ValueError, match="increasing"):
+            inventory_from_intervals(
+                np.array([GRID[10]]),
+                np.array([GRID[30]]),
+                native_keys=np.array([0]),
+                detector="swr",
+                session=SESSION,
+                run_id="run",
+                speed_time_s=GRID[::-1],
+                speed_cm_per_s=np.zeros(GRID.size),
+            )

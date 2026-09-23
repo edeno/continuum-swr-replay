@@ -14,7 +14,7 @@ Detector-specific statistics stay in each detector's own table; this schema
 carries only what every detector has.
 """
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sized
 from dataclasses import dataclass
 from types import MappingProxyType
 
@@ -25,9 +25,14 @@ from numpy.typing import NDArray
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     event_speeds_are_immobile,
 )
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.event_table import (
+    BRAIN_AREAS,
+)
+from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 
 __all__ = [
     "INVENTORY_DTYPES",
+    "MEMORYLESS_COHORTS",
     "SessionIdentity",
     "combine_inventories",
     "empty_inventory",
@@ -62,15 +67,47 @@ INVENTORY_DTYPES: Mapping[str, object] = MappingProxyType(
 STATE_SPACE = "state_space"
 MEMORYLESS = "memoryless"
 
+MEMORYLESS_COHORTS: Mapping[str, str] = MappingProxyType(
+    {"published": "shuffle_pass", "replay_criteria": "is_replay"}
+)
+"""Which rows of the memoryless table make a cohort: every row of that table
+is a candidate, accepted or not, so an adapter must say which it means.
+``published`` is the paper's definition (duration, dispersion and the
+significance test); ``replay_criteria`` leaves the significance test out."""
+
 
 @dataclass(frozen=True)
 class SessionIdentity:
-    """The epoch an inventory's events come from."""
+    """The epoch an inventory's events come from.
+
+    Attributes
+    ----------
+    animal, epoch : str
+    day : int
+        The recording date as an integer, as the session columns carry it.
+    brain_area : str
+        One of the project's names; capitalization matters.
+
+    """
 
     animal: str
     day: int
     epoch: str
     brain_area: str
+
+    def __post_init__(self) -> None:
+        for name in ("animal", "epoch", "brain_area"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must be a non-empty string, got {value!r}.")
+        if isinstance(self.day, bool) or not isinstance(self.day, int | np.integer):
+            raise TypeError(f"day must be an integer, got {self.day!r}.")
+        if self.day <= 0:
+            raise ValueError(f"day must be positive, got {self.day}.")
+        if self.brain_area not in BRAIN_AREAS:
+            raise ValueError(
+                f"brain_area must be one of {BRAIN_AREAS}, got {self.brain_area!r}."
+            )
 
 
 def empty_inventory() -> pd.DataFrame:
@@ -85,13 +122,27 @@ def validate_inventory(inventory: pd.DataFrame) -> pd.DataFrame:
     Raises
     ------
     ValueError
-        A column is missing, an event has no positive duration, the span or
-        midpoint does not follow from the bounds, or a key repeats.
+        A column is missing; a session column, the eligibility flag or a
+        bound is missing or not finite; an event has no positive duration;
+        the span or midpoint does not follow from the bounds; a key repeats
+        or does not name its own detector and epoch; a detector name holds
+        the key separator; one epoch carries two brain areas; or two events
+        of one detector in one epoch overlap.
     """
     missing = [column for column in INVENTORY_DTYPES if column not in inventory]
     if missing:
         raise ValueError(f"The inventory lacks {missing}.")
+    session_columns = list(SESSION_COLUMNS_DAY)
+    if inventory[[*session_columns, "detector"]].isna().any().any():
+        raise ValueError(
+            "Every event needs its animal, day, epoch and detector; a missing one "
+            "would drop the event from every grouped count without a word."
+        )
+    if inventory.whole_event_speed_eligible.isna().any():
+        raise ValueError("whole_event_speed_eligible must be True or False, not NA.")
     table = inventory[list(INVENTORY_DTYPES)].astype(dict(INVENTORY_DTYPES))
+    if table.detector.str.contains(":").any():
+        raise ValueError("A detector name must not hold ':', the key separator.")
     start, end = table.event_start_s.to_numpy(), table.event_end_s.to_numpy()
     if not (
         np.isfinite(start).all() and np.isfinite(end).all() and (end > start).all()
@@ -100,12 +151,49 @@ def validate_inventory(inventory: pd.DataFrame) -> pd.DataFrame:
             "Every event needs finite bounds and a positive duration; an event of "
             "no duration can never overlap another under the strict rule."
         )
+    native = table.native_duration_s.to_numpy()
+    if not (np.isfinite(native).all() and (native > 0).all()):
+        raise ValueError("native_duration_s must be finite and positive.")
     if not np.array_equal(table.interval_span_s.to_numpy(), end - start):
         raise ValueError("interval_span_s must be event_end_s - event_start_s.")
     if not np.allclose(table.event_midpoint_s.to_numpy(), (start + end) / 2):
         raise ValueError("event_midpoint_s must be halfway between the bounds.")
     if not table.event_key.is_unique:
         raise ValueError("An event key repeats; keys name the detector and epoch.")
+    expected_prefix = (
+        table.detector
+        + ":"
+        + table.animal
+        + table.day.astype(str)
+        + "_"
+        + table.epoch
+        + ":"
+    )
+    mismatched = [
+        (key, prefix)
+        for key, prefix in zip(table.event_key, expected_prefix, strict=True)
+        if not key.startswith(prefix)
+    ]
+    if mismatched:
+        raise ValueError(
+            f"An event key does not name its own detector and epoch: {mismatched[0]}."
+        )
+    areas = table.groupby(session_columns, sort=False).brain_area.nunique()
+    if (areas > 1).any():
+        raise ValueError(
+            "One epoch carries more than one brain area; the comparison keys on "
+            "the epoch and would pair events across areas."
+        )
+    for key, group in table.groupby([*session_columns, "detector"], sort=False):
+        *session, detector = key
+        ordered = group.sort_values("event_start_s")
+        if (
+            ordered.event_start_s.to_numpy()[1:] < ordered.event_end_s.to_numpy()[:-1]
+        ).any():
+            raise ValueError(
+                f"Two events of {detector} in {session} overlap; one detector's "
+                "events must be disjoint for the recount and the counts to hold."
+            )
     return table
 
 
@@ -147,12 +235,14 @@ def combine_inventories(
 
 
 def _event_keys(
-    detector: str, animal: object, day: object, epoch: object, native: object
+    detector: str, animal: object, day: object, epoch: object, native: Sized
 ) -> list[str]:
     """``"<detector>:<animal><day>_<epoch>:<native key>"`` for each event.
 
     ``animal``, ``day`` and ``epoch`` are one value or one per event.
     """
+    if ":" in detector:
+        raise ValueError(f"A detector name must not hold ':', got {detector!r}.")
     n_events = len(native)
     columns = [
         np.broadcast_to(np.asarray(values, dtype=object), (n_events,))
@@ -220,6 +310,10 @@ def inventory_from_intervals(
         raise ValueError(f"A native key of {detector} repeats.")
     time = np.asarray(speed_time_s, dtype=np.float64)
     speed = np.asarray(speed_cm_per_s, dtype=np.float64)
+    if time.shape != speed.shape or np.any(np.diff(time) <= 0):
+        raise ValueError(
+            "speed_time_s must be strictly increasing and match speed_cm_per_s."
+        )
     first = np.searchsorted(time, starts, side="left")
     last = np.searchsorted(time, ends, side="right")
     samples = [speed[a:b] for a, b in zip(first, last, strict=True)]
@@ -249,10 +343,37 @@ def inventory_from_intervals(
     return _finish(frame)
 
 
+def _require_columns(frame: pd.DataFrame, columns: Iterable[str], source: str) -> None:
+    missing = [column for column in columns if column not in frame.columns]
+    if missing:
+        raise ValueError(f"The {source} table lacks {missing}.")
+
+
 def from_classified_nonlocal_table(
     classified: pd.DataFrame, *, brain_area: str, run_id: str
 ) -> pd.DataFrame:
-    """Our state-space cohort, from ``build_classified_nonlocal_event_table``."""
+    """Our state-space cohort, from ``build_classified_nonlocal_event_table``.
+
+    Every row of that table is a detected non-local event, so every row is
+    an event of the cohort; whole-event speed eligibility travels as a flag
+    and is applied to every inventory alike by :func:`combine_inventories`.
+    """
+    _require_columns(
+        classified,
+        (
+            "animal",
+            "day",
+            "epoch",
+            "event_id",
+            "event_start",
+            "event_end",
+            "event_duration",
+            "animal_max_speed_cm_s",
+            "animal_mean_speed_cm_s",
+            "whole_event_speed_eligible",
+        ),
+        "classified non-local event",
+    )
     frame = pd.DataFrame(
         {
             "animal": classified.animal,
@@ -279,8 +400,50 @@ def from_classified_nonlocal_table(
     return _finish(frame)
 
 
-def from_memoryless_table(table: pd.DataFrame) -> pd.DataFrame:
-    """The memoryless cohort, from ``build_memoryless_event_table``."""
+def from_memoryless_table(table: pd.DataFrame, *, cohort: str) -> pd.DataFrame:
+    """One memoryless cohort, from ``build_memoryless_event_table``.
+
+    That table is one row per candidate sequence, accepted or not, so this
+    adapter takes only the rows the named cohort selects; passing every row
+    would inflate the memoryless inventory with the detector's own rejections
+    and every count and denominator built on it.
+
+    Parameters
+    ----------
+    table : DataFrame
+        From ``build_memoryless_event_table``.
+    cohort : str
+        A key of :data:`MEMORYLESS_COHORTS`: ``"published"`` for the paper's
+        replay definition, ``"replay_criteria"`` for duration and dispersion
+        alone.
+
+    """
+    if cohort not in MEMORYLESS_COHORTS:
+        raise ValueError(
+            f"cohort must be one of {list(MEMORYLESS_COHORTS)}, got {cohort!r}."
+        )
+    flag = MEMORYLESS_COHORTS[cohort]
+    _require_columns(
+        table,
+        (
+            "animal",
+            "day",
+            "epoch",
+            "brain_area",
+            "run_id",
+            "ms_event_id",
+            "event_start_s",
+            "event_end_s",
+            "event_duration_s",
+            "animal_max_speed_cm_s",
+            "animal_mean_speed_cm_s",
+            "whole_event_speed_eligible",
+            "is_replay",
+            "shuffle_pass",
+        ),
+        "memoryless event",
+    )
+    table = table[table[flag].to_numpy(dtype=bool)]
     frame = pd.DataFrame(
         {
             "animal": table.animal,
