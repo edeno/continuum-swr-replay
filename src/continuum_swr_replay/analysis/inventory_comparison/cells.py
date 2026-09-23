@@ -1,7 +1,7 @@
 """The cells no pairwise table reaches.
 
-Each event cell asks
-whether an event was found by none of a set of detectors:
+Each event cell asks whether an event was found by none of a set of
+detectors:
 
 - events found by exactly one detector: every detector against all the others;
 - SWRs matched by neither decoding detector: SWR inventories against the two
@@ -29,7 +29,13 @@ from continuum_swr_replay.analysis.inventory_comparison.intervals import (
     total_duration,
     union,
 )
-from continuum_swr_replay.analysis.inventory_comparison.overlap import Coverage
+from continuum_swr_replay.analysis.inventory_comparison.overlap import (
+    MATCHED,
+    UNKNOWN,
+    UNMATCHED,
+    Coverage,
+    validate_detectors,
+)
 from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 
 __all__ = [
@@ -87,6 +93,8 @@ def membership_against(
         Detectors whose events are classified.
     against : collection of str
         The set tested against. A source in it is not tested against itself.
+        Every name must appear in ``matches`` as a detector compared against,
+        so a misspelling cannot read as a detector that never looked.
 
     Returns
     -------
@@ -94,6 +102,16 @@ def membership_against(
         Columns and dtypes as ``CELL_DTYPES``.
 
     """
+    known = set(matches.other_detector.unique()) | set(matches.detector.unique())
+    for role, names in (("sources", sources), ("against", against)):
+        if not names:
+            raise ValueError(f"{role} must name at least one detector.")
+        unknown = sorted(set(names) - known)
+        if unknown and known:
+            raise ValueError(
+                f"{role} names {unknown}, which the matches do not compare; the "
+                f"detectors compared are {sorted(known)}."
+            )
     against = set(against)
     for source in sources:
         if not against - {source}:
@@ -107,14 +125,14 @@ def membership_against(
     relevant = matches[matches.other_detector.isin(against)]
     tally = relevant.groupby("event_key").agg(
         any_matched=("matched", "any"),
-        n_unmatched=("membership", lambda m: int((m == "unmatched").sum())),
+        n_unmatched=("membership", lambda m: int((m == UNMATCHED).sum())),
     )
     out = events.join(tally, on="event_key")
     out["n_against"] = [len(against - {d}) for d in out.detector]
     out["membership"] = np.where(
-        out.any_matched.fillna(False).astype(bool),
-        "matched",
-        np.where(out.n_unmatched.eq(out.n_against), "unmatched", "unknown"),
+        out.any_matched.eq(True).to_numpy(),
+        MATCHED,
+        np.where(out.n_unmatched.eq(out.n_against), UNMATCHED, UNKNOWN),
     )
     return out[list(CELL_DTYPES)].astype(dict(CELL_DTYPES)).reset_index(drop=True)
 
@@ -145,6 +163,7 @@ def no_detector_time(
         detectors share no exposure.
 
     """
+    detectors = validate_detectors(detectors, coverage, "detectors")
     empty = np.empty((0, 2))
     rows = []
     for session in sorted({tuple(key[:3]) for key in coverage}):

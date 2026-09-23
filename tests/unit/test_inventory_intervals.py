@@ -112,3 +112,18 @@ class TestContains:
         assert contains(
             np.empty((0, 2)), np.array([1.0]), np.array([2.0])
         ).tolist() == [False]
+
+
+def test_an_inverted_query_is_refused_by_contains():
+    with pytest.raises(ValueError, match="end < start"):
+        contains(np.array([[0.0, 10.0]]), np.array([4.0]), np.array([2.0]))
+
+
+def test_strict_normalization_refuses_what_lenient_normalization_drops():
+    inverted = np.array([[5.0, 3.0], [1.0, 2.0]])
+
+    np.testing.assert_allclose(normalize(inverted), [[1.0, 2.0]])
+    with pytest.raises(ValueError, match="inverted"):
+        normalize(inverted, strict=True)
+    with pytest.raises(ValueError, match="inverted"):
+        normalize(np.array([[np.nan, 1.0]]), strict=True)

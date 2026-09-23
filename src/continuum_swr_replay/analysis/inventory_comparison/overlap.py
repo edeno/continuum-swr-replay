@@ -1,8 +1,8 @@
 """Every overlap between inventories, and the counts built on it.
 
-Two events overlap when they share time of
-positive duration within one epoch; touching at an instant is not agreement,
-and nothing is matched across epochs. The pair table keeps every such pair,
+Two events overlap when they share time of positive duration within one
+epoch; touching at an instant is not agreement, and nothing is matched across
+epochs. The pair table keeps every such pair,
 so one event can appear in many; the counts built on it take each event once.
 
 Membership needs coverage and a match does not. An event is ``matched`` to
@@ -15,10 +15,17 @@ exposure the summary is unavailable, never zero.
 
 Run :func:`remove_bridging_events` first: a cached event that spans its own
 detector's unavailable data cannot be trusted as a match, and removing it
-must not read as the other detector missing something.
+must not read as the other detector missing something. The counting
+functions refuse an inventory in which that has not been done, and a pair
+table that was not built from the inventory they are given.
+
+The detectors of a comparison are the roster: by default every detector with
+a coverage entry anywhere, or the ``detectors`` a caller names. A detector on
+the roster with no coverage in an epoch is unavailable there; a name outside
+the roster is refused, so a misspelling cannot read as "unknown" everywhere.
 """
 
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from itertools import combinations, permutations
 from types import MappingProxyType
@@ -39,17 +46,26 @@ from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 
 __all__ = [
     "DIRECTIONAL_DTYPES",
+    "MATCHED",
     "MATCH_DTYPES",
     "PAIR_DTYPES",
     "TIME_COVERAGE_DTYPES",
+    "UNKNOWN",
+    "UNMATCHED",
     "Coverage",
     "directional_agreement",
     "event_matches",
     "flag_pairs",
     "overlap_pairs",
     "remove_bridging_events",
+    "roster",
     "time_coverage",
+    "validate_detectors",
+    "validate_pairs",
 ]
+
+MATCHED, UNMATCHED, UNKNOWN = "matched", "unmatched", "unknown"
+"""The three memberships. ``unknown`` is reported apart and never counted."""
 
 PAIR_DTYPES: Mapping[str, object] = MappingProxyType(
     {
@@ -120,15 +136,17 @@ TIME_COVERAGE_DTYPES: Mapping[str, object] = MappingProxyType(
 )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class Coverage:
     """What one detector observed in one epoch, and the still part of it.
 
     Attributes
     ----------
     observed : ndarray, shape (n, 2)
+        Normalized and read-only once built.
     exposure : ndarray, shape (m, 2)
-        Observed time with finite speed below threshold.
+        Observed time with finite speed below threshold; lies within
+        ``observed``.
 
     """
 
@@ -136,14 +154,45 @@ class Coverage:
     exposure: NDArray
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "observed", normalize(self.observed))
-        object.__setattr__(self, "exposure", normalize(self.exposure))
-        if total_duration(subtract(self.exposure, self.observed)) > 0:
+        observed = normalize(self.observed, strict=True)
+        exposure = normalize(self.exposure, strict=True)
+        if total_duration(subtract(exposure, observed)) > 0:
             raise ValueError("Exposure must lie within observed time.")
+        observed.flags.writeable = False
+        exposure.flags.writeable = False
+        object.__setattr__(self, "observed", observed)
+        object.__setattr__(self, "exposure", exposure)
 
 
 CoverageMap = Mapping[tuple, Coverage]
-"""Keyed ``(animal, day, epoch, detector)``."""
+"""Keyed ``(animal, day, epoch, detector)``. A detector that ran and observed
+nothing, or did not run, is entered with empty coverage rather than left out,
+so it stays on the roster and reads as unavailable."""
+
+
+def roster(coverage: CoverageMap) -> list[str]:
+    """Every detector of the comparison, in name order."""
+    return sorted({str(key[3]) for key in coverage})
+
+
+def validate_detectors(
+    names: Collection[str], coverage: CoverageMap, role: str
+) -> list[str]:
+    """Refuse a detector name the comparison does not know.
+
+    A misspelt name would otherwise read as a detector that observed nothing
+    anywhere, and every count against it as ``unknown``.
+    """
+    names = list(names)
+    if not names:
+        raise ValueError(f"{role} must name at least one detector.")
+    unknown = sorted(set(names) - set(roster(coverage)))
+    if unknown:
+        raise ValueError(
+            f"{role} names {unknown}, which no coverage entry knows; the roster is "
+            f"{roster(coverage)}."
+        )
+    return names
 
 
 def _frame(rows: list[dict], dtypes: Mapping[str, object]) -> pd.DataFrame:
@@ -152,23 +201,86 @@ def _frame(rows: list[dict], dtypes: Mapping[str, object]) -> pd.DataFrame:
     return pd.DataFrame(rows)[list(dtypes)].astype(dict(dtypes))
 
 
-def _sessions(inventory: pd.DataFrame, coverage: CoverageMap) -> dict[tuple, list[str]]:
+def _sessions(
+    inventory: pd.DataFrame,
+    coverage: CoverageMap,
+    detectors: Collection[str] | None = None,
+) -> dict[tuple, list[str]]:
     """Every session, each with every detector of the comparison.
 
     A detector with no coverage entry for a session observed none of it, so
     its summaries there are unavailable rather than missing. A detector with
     events but no coverage is refused: whether it looked is exactly what the
-    counts need to know.
+    counts need to know. An event outside its own detector's observed time is
+    refused too: :func:`remove_bridging_events` has not been run.
     """
     sessions = {tuple(key[:3]) for key in coverage}
-    detectors = sorted({key[3] for key in coverage})
+    names = (
+        roster(coverage)
+        if detectors is None
+        else validate_detectors(detectors, coverage, "detectors")
+    )
     for key, group in inventory.groupby(list(SESSION_COLUMNS_DAY), sort=False):
-        for detector in group.detector.unique():
-            if (*key, detector) not in coverage:
+        for detector, events in group.groupby("detector", sort=False):
+            own = coverage.get((*key, detector))
+            if own is None:
                 raise ValueError(
                     f"{detector} has events in {key} but no coverage there."
                 )
-    return dict.fromkeys(sorted(sessions), detectors)
+            if detector not in names:
+                raise ValueError(
+                    f"{detector} has events but is not among the detectors compared."
+                )
+            if not contains(
+                own.observed,
+                events.event_start_s.to_numpy(),
+                events.event_end_s.to_numpy(),
+            ).all():
+                raise ValueError(
+                    f"An event of {detector} in {key} lies outside its own observed "
+                    "time; run remove_bridging_events first."
+                )
+    return dict.fromkeys(sorted(sessions), names)
+
+
+def validate_pairs(pairs: pd.DataFrame, inventory: pd.DataFrame) -> pd.DataFrame:
+    """Refuse a pair table that was not built from this inventory.
+
+    Every key must be an event of the inventory, each pair's detector columns
+    must be the keys' own detectors in name order, both events must share the
+    pair's epoch, and the overlap must be positive. A stale pair table, built
+    before bridging events were removed, would otherwise mark their neighbours
+    matched.
+    """
+    if pairs.empty:
+        return pairs
+    by_key = inventory.set_index("event_key")
+    missing = sorted(
+        (set(pairs.event_key_a) | set(pairs.event_key_b)) - set(by_key.index)
+    )
+    if missing:
+        raise ValueError(
+            f"The pair table names events not in the inventory, {missing[:3]}; it "
+            "was built from another inventory, or before bridging events were "
+            "removed."
+        )
+    a, b = by_key.loc[pairs.event_key_a], by_key.loc[pairs.event_key_b]
+    if not (
+        (a.detector.to_numpy() == pairs.detector_a.to_numpy()).all()
+        and (b.detector.to_numpy() == pairs.detector_b.to_numpy()).all()
+    ):
+        raise ValueError("A pair's detector columns are not its events' detectors.")
+    if (pairs.detector_a.to_numpy() >= pairs.detector_b.to_numpy()).any():
+        raise ValueError("Pairs must name two detectors, detector_a first by name.")
+    for column in SESSION_COLUMNS_DAY:
+        if not (
+            (a[column].to_numpy() == pairs[column].to_numpy()).all()
+            and (b[column].to_numpy() == pairs[column].to_numpy()).all()
+        ):
+            raise ValueError("A pair's two events do not share its epoch.")
+    if (pairs.intersection_s.to_numpy() <= 0).any():
+        raise ValueError("A pair has no positive overlap.")
+    return pairs
 
 
 def _exposure(coverage: CoverageMap, session: tuple, detector: str) -> NDArray:
@@ -289,17 +401,32 @@ def _counterparts(pairs: pd.DataFrame) -> dict[tuple, int]:
 
 
 def event_matches(
-    inventory: pd.DataFrame, pairs: pd.DataFrame, coverage: CoverageMap
+    inventory: pd.DataFrame,
+    pairs: pd.DataFrame,
+    coverage: CoverageMap,
+    *,
+    detectors: Collection[str] | None = None,
 ) -> pd.DataFrame:
-    """Each event against each other detector that looked at its epoch.
+    """Each event against each other detector of the comparison.
 
-    Returns columns and dtypes as ``MATCH_DTYPES``; membership is
+    A detector that did not look at the epoch leaves every event ``unknown``
+    against it. Returns columns and dtypes as ``MATCH_DTYPES``; membership is
     ``matched``, ``unmatched`` or ``unknown`` as the module docstring defines.
+
+    Parameters
+    ----------
+    inventory, pairs, coverage
+        The inventory after :func:`remove_bridging_events`, the pairs built
+        from that same inventory, and the coverage it returned.
+    detectors : collection of str, optional
+        The roster; every detector with a coverage entry when omitted.
+
     """
+    validate_pairs(pairs, inventory)
     counterparts = _counterparts(pairs)
     rows = []
-    for session, detectors in _sessions(inventory, coverage).items():
-        for detector, other in permutations(detectors, 2):
+    for session, names in _sessions(inventory, coverage, detectors).items():
+        for detector, other in permutations(names, 2):
             source = _events(inventory, session, detector)
             shared = intersect(
                 _exposure(coverage, session, detector),
@@ -319,9 +446,9 @@ def event_matches(
                         "within_shared_exposure": bool(inside),
                         "matched": n > 0,
                         "n_counterparts": n,
-                        "membership": "matched"
+                        "membership": MATCHED
                         if n > 0
-                        else ("unmatched" if inside else "unknown"),
+                        else (UNMATCHED if inside else UNKNOWN),
                     }
                 )
     return _frame(rows, MATCH_DTYPES)
@@ -359,19 +486,25 @@ def flag_pairs(pairs: pd.DataFrame, matches: pd.DataFrame) -> pd.DataFrame:
 
 
 def directional_agreement(
-    inventory: pd.DataFrame, pairs: pd.DataFrame, coverage: CoverageMap
+    inventory: pd.DataFrame,
+    pairs: pd.DataFrame,
+    coverage: CoverageMap,
+    *,
+    detectors: Collection[str] | None = None,
 ) -> pd.DataFrame:
     """For each ordered pair of detectors, the share of the source's events matched.
 
     The denominator is the source's events lying wholly inside the pair's
     shared exposure, each counted once however many events it overlaps; the
     rest are counted as excluded. Returns columns and dtypes as
-    ``DIRECTIONAL_DTYPES``.
+    ``DIRECTIONAL_DTYPES``. ``proportion_matched`` is NaN where nothing was
+    eligible; pool epochs by summing ``n_matched`` over ``n_eligible``, never
+    by averaging the proportions, which would skip those rows.
     """
-    matches = event_matches(inventory, pairs, coverage)
+    matches = event_matches(inventory, pairs, coverage, detectors=detectors)
     rows = []
-    for session, detectors in _sessions(inventory, coverage).items():
-        for source, target in permutations(detectors, 2):
+    for session, names in _sessions(inventory, coverage, detectors).items():
+        for source, target in permutations(names, 2):
             shared = total_duration(
                 intersect(
                     _exposure(coverage, session, source),
@@ -411,17 +544,23 @@ def directional_agreement(
     return _frame(rows, DIRECTIONAL_DTYPES)
 
 
-def time_coverage(inventory: pd.DataFrame, coverage: CoverageMap) -> pd.DataFrame:
+def time_coverage(
+    inventory: pd.DataFrame,
+    coverage: CoverageMap,
+    *,
+    detectors: Collection[str] | None = None,
+) -> pd.DataFrame:
     """For each pair of detectors, the time their events cover, within shared exposure.
 
     Less sensitive to segmentation than the counts: one detector splitting an
     event in three changes its count, not the time it covers. Event time
-    outside the shared exposure is clipped here, and only here. Returns
-    columns and dtypes as ``TIME_COVERAGE_DTYPES``.
+    outside the shared exposure is clipped here and in ``no_detector_time``,
+    the two time summaries, and never for a count. Returns columns and dtypes
+    as ``TIME_COVERAGE_DTYPES``.
     """
     rows = []
-    for session, detectors in _sessions(inventory, coverage).items():
-        for detector_a, detector_b in combinations(detectors, 2):
+    for session, names in _sessions(inventory, coverage, detectors).items():
+        for detector_a, detector_b in combinations(names, 2):
             shared = intersect(
                 _exposure(coverage, session, detector_a),
                 _exposure(coverage, session, detector_b),

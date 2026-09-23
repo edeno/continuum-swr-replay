@@ -50,6 +50,11 @@ def everywhere(*detectors):
     return {(*KEY, d): cover() for d in detectors}
 
 
+def nowhere(*detectors):
+    """Detectors on the roster whose run produced nothing: empty coverage."""
+    return {(*KEY, d): Coverage(np.empty((0, 2)), np.empty((0, 2))) for d in detectors}
+
+
 def cells(inventory, coverage, **kwargs):
     matches = event_matches(inventory, overlap_pairs(inventory), coverage)
     return membership_against(inventory, matches, **kwargs).set_index("event_key")
@@ -96,7 +101,10 @@ class TestMembershipAgainst:
         inventory = events("SWR", [(10, 20)])
 
         missing_run = cells(
-            inventory, everywhere("SWR", "D1"), sources=["SWR"], against=["D1", "D2"]
+            inventory,
+            everywhere("SWR", "D1") | nowhere("D2"),
+            sources=["SWR"],
+            against=["D1", "D2"],
         )
         not_exposed = cells(
             inventory,
@@ -180,11 +188,18 @@ class TestNoDetectorTime:
 
     def test_a_detector_that_did_not_run_makes_it_unavailable(self):
         row = no_detector_time(
-            events("A", []), everywhere("A"), detectors=["A", "B"]
+            events("A", []), everywhere("A") | nowhere("B"), detectors=["A", "B"]
         ).iloc[0]
 
         assert not row.available
         assert np.isnan(row.undetected_fraction)
+
+    def test_a_detector_the_comparison_does_not_know_is_refused(self):
+        """A misspelt name must not read as a detector that never looked."""
+        with pytest.raises(ValueError, match="roster"):
+            no_detector_time(events("A", []), everywhere("A"), detectors=["A", "b"])
+        with pytest.raises(ValueError, match="at least one"):
+            no_detector_time(events("A", []), everywhere("A"), detectors=[])
 
     def test_detectors_outside_the_set_are_ignored(self):
         inventory = pd.concat(

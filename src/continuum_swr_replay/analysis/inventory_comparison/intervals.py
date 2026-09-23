@@ -1,11 +1,15 @@
 """Interval sets: unions, intersections and containment of time intervals.
 
 An interval is a closed ``[start, end]`` in seconds; a set is an array of
-shape ``(n, 2)``. Every function returns a normalized set: sorted by start,
-disjoint, with overlapping or touching intervals joined into one, and with any
-interval of no duration, or with a missing or inverted bound, dropped. A
-shared endpoint therefore intersects in nothing, which is what a
-positive-duration overlap rule needs: a single sample observes no time.
+shape ``(n, 2)``. Every function that returns intervals returns a normalized
+set: sorted by start, disjoint, with overlapping or touching intervals joined
+into one, and with any interval of no duration, or with a missing or inverted
+bound, dropped. A shared endpoint therefore intersects in nothing, which is
+what a positive-duration overlap rule needs: a single sample observes no time.
+Dropping an inverted or non-finite bound is right for the outputs of interval
+arithmetic, where an empty intersection appears as an inverted pair; for an
+input a caller means to be well formed, ``normalize(..., strict=True)`` raises
+instead.
 """
 
 import numpy as np
@@ -25,12 +29,15 @@ def _pairs(intervals: NDArray) -> NDArray:
     return array
 
 
-def normalize(intervals: NDArray) -> NDArray:
+def normalize(intervals: NDArray, *, strict: bool = False) -> NDArray:
     """Sort, join overlapping or touching intervals, and drop empty ones.
 
     Parameters
     ----------
     intervals : ndarray, shape (n, 2)
+    strict : bool, default False
+        Raise on an inverted or non-finite bound instead of dropping it, for
+        an input that is supposed to be well formed.
 
     Returns
     -------
@@ -38,6 +45,10 @@ def normalize(intervals: NDArray) -> NDArray:
 
     """
     array = _pairs(intervals)
+    if strict and array.size:
+        finite = np.isfinite(array).all(axis=1)
+        if not finite.all() or (array[finite, 1] < array[finite, 0]).any():
+            raise ValueError("An interval has a non-finite or inverted bound.")
     array = array[np.isfinite(array).all(axis=1) & (array[:, 1] > array[:, 0])]
     if array.size == 0:
         return np.empty((0, 2))
@@ -100,9 +111,16 @@ def contains(intervals: NDArray, starts: NDArray, ends: NDArray) -> NDArray:
     normalized = normalize(intervals)
     starts = np.asarray(starts, dtype=np.float64)
     ends = np.asarray(ends, dtype=np.float64)
+    if starts.shape != ends.shape:
+        raise ValueError("starts and ends must be the same shape.")
+    if (ends < starts).any():
+        raise ValueError("An event has end < start; nothing contains it.")
     if normalized.size == 0:
         return np.zeros(starts.shape, dtype=bool)
     index = np.searchsorted(normalized[:, 0], starts, side="right") - 1
     found = index >= 0
     safe = np.clip(index, 0, None)
-    return found & (normalized[safe, 0] <= starts) & (ends <= normalized[safe, 1])
+    within: NDArray = (
+        found & (normalized[safe, 0] <= starts) & (ends <= normalized[safe, 1])
+    )
+    return within

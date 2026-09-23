@@ -15,6 +15,7 @@ from continuum_swr_replay.analysis.inventory_comparison.overlap import (
     overlap_pairs,
     remove_bridging_events,
     time_coverage,
+    validate_pairs,
 )
 from continuum_swr_replay.analysis.inventory_comparison.schema import (
     SessionIdentity,
@@ -81,7 +82,7 @@ class TestPairs:
         assert overlap_pairs(inventory).empty
 
     def test_events_of_one_detector_are_never_paired_with_each_other(self):
-        assert overlap_pairs(events("A", [(10, 20), (15, 25)])).empty
+        assert overlap_pairs(events("A", [(10, 20), (20, 25)])).empty
 
     def test_an_event_is_not_matched_across_epochs(self):
         """Same times, different epochs: no pair."""
@@ -131,8 +132,13 @@ class TestDirectionalAgreement:
         assert (b_to_a.n_eligible, b_to_a.n_matched) == (3, 3)
 
     def test_many_to_many_counts_each_event_once(self):
+        """A chain in which the middle events each overlap two of the other
+        detector's: four pairs, but three A events and two B events."""
         inventory = pd.concat(
-            [events("A", [(0, 10), (8, 20)]), events("B", [(5, 9), (9, 15)])],
+            [
+                events("A", [(0, 10), (10, 20), (20, 30)]),
+                events("B", [(5, 15), (15, 25)]),
+            ],
             ignore_index=True,
         )
 
@@ -141,7 +147,7 @@ class TestDirectionalAgreement:
         ).set_index(["source_detector", "target_detector"])
 
         assert len(overlap_pairs(inventory)) == 4
-        assert agreement.loc[("A", "B")].n_matched == 2
+        assert agreement.loc[("A", "B")].n_matched == 3
         assert agreement.loc[("B", "A")].n_matched == 2
 
     def test_an_event_crossing_the_coverage_boundary_leaves_the_denominator(self):
@@ -271,8 +277,10 @@ class TestFlagPairs:
         inventory = pd.concat(
             [events("A", [(10, 20)]), events("B", [(15, 30)])], ignore_index=True
         )
+        # B observed the whole epoch but was exposed (still) only to 25 s, so
+        # its event is a valid event outside the shared exposure
         coverage = everywhere("A") | {
-            (*KEY, "B"): Coverage(np.array([[0.0, 25.0]]), np.array([[0.0, 25.0]]))
+            (*KEY, "B"): Coverage(np.array([[0.0, 100.0]]), np.array([[0.0, 25.0]]))
         }
         pairs = overlap_pairs(inventory)
 
@@ -410,7 +418,7 @@ class TestTimeCoverage:
             [events("A", [(40, 60)]), events("B", [(40, 60)])], ignore_index=True
         )
         coverage = everywhere("A") | {
-            (*KEY, "B"): Coverage(np.array([[0.0, 50.0]]), np.array([[0.0, 50.0]]))
+            (*KEY, "B"): Coverage(np.array([[0.0, 100.0]]), np.array([[0.0, 50.0]]))
         }
 
         covered = time_coverage(inventory, coverage).iloc[0]
@@ -429,3 +437,171 @@ class TestTimeCoverage:
 
         assert not covered.available
         assert np.isnan(covered.union_fraction)
+
+
+class TestContracts:
+    """What the counting functions refuse, so a stale or cross-wired input
+    cannot inflate a count."""
+
+    def test_coverage_is_read_only_and_never_compares_by_accident(self):
+        coverage = Coverage(np.array([[0.0, 100.0]]), np.array([[0.0, 100.0]]))
+
+        with pytest.raises(ValueError):
+            coverage.exposure[0, 1] = 500.0
+        with pytest.raises(ValueError, match="inverted"):
+            Coverage(np.array([[10.0, 0.0]]), np.array([[0.0, 1.0]]))
+        # identity, not array truth, so comparing two never raises
+        assert coverage != Coverage(np.array([[0.0, 100.0]]), np.array([[0.0, 100.0]]))
+
+    def test_a_pair_table_built_before_bridging_events_were_removed_is_refused(self):
+        """Its neighbours would otherwise read as matched."""
+        inventory = pd.concat(
+            [events("A", [(39.9, 41.1)]), events("B", [(41.05, 41.2)])],
+            ignore_index=True,
+        )
+        coverage = everywhere("B") | {
+            (*KEY, "A"): Coverage(
+                np.array([[0.0, 40.0], [41.0, 100.0]]),
+                np.array([[0.0, 40.0], [41.0, 100.0]]),
+            )
+        }
+        stale = overlap_pairs(inventory)
+        kept, adjusted, _ = remove_bridging_events(inventory, coverage)
+
+        with pytest.raises(ValueError, match="bridging"):
+            event_matches(kept, stale, adjusted)
+        fresh = event_matches(kept, overlap_pairs(kept), adjusted)
+        assert fresh.membership.tolist() == ["unknown"]
+
+    def test_an_event_outside_its_own_observed_time_is_refused(self):
+        inventory = events("A", [(10, 20)])
+        coverage = {
+            (*KEY, "A"): Coverage(np.array([[0.0, 15.0]]), np.array([[0.0, 15.0]]))
+        }
+
+        with pytest.raises(ValueError, match="remove_bridging_events"):
+            event_matches(inventory, overlap_pairs(inventory), coverage)
+
+    def test_a_pair_between_two_events_of_one_detector_is_refused(self):
+        inventory = pd.concat(
+            [events("A", [(10, 20), (30, 40)]), events("B", [(12, 14)])],
+            ignore_index=True,
+        )
+        pairs = overlap_pairs(inventory)
+        forged = pairs.assign(
+            detector_b="A", event_key_b=key("A", 1), intersection_s=1.0
+        )
+
+        with pytest.raises(ValueError, match="detector"):
+            validate_pairs(forged, inventory)
+
+    def test_the_roster_can_be_named_and_a_name_outside_it_is_refused(self):
+        """A detector that produced nothing anywhere must not vanish: name it,
+        or register it with empty coverage, and it reads as unavailable."""
+        inventory = events("A", [(10, 20)])
+        coverage = everywhere("A")
+
+        agreement = directional_agreement(
+            inventory,
+            overlap_pairs(inventory),
+            coverage | {(*KEY, "B"): Coverage(np.empty((0, 2)), np.empty((0, 2)))},
+            detectors=["A", "B"],
+        ).set_index(["source_detector", "target_detector"])
+
+        assert not agreement.loc[("A", "B")].available
+        assert agreement.loc[("A", "B")].n_source_events == 1
+        with pytest.raises(ValueError, match="roster"):
+            event_matches(
+                inventory, overlap_pairs(inventory), coverage, detectors=["A", "b"]
+            )
+
+
+def brute_force_pairs_and_agreement(spans, exposures):
+    """Pairs and per-direction counts by double loop, independent of the code."""
+    pairs = set()
+    for a, b in ((x, y) for x in spans for y in spans if x < y):
+        for i, (s1, e1) in enumerate(spans[a]):
+            for j, (s2, e2) in enumerate(spans[b]):
+                if min(e1, e2) - max(s1, s2) > 0:
+                    pairs.add((a, i, b, j))
+
+    def inside(interval, exposure):
+        return any(lo <= interval[0] and interval[1] <= hi for lo, hi in exposure)
+
+    agreement = {}
+    for source in spans:
+        for target in spans:
+            if source == target:
+                continue
+            shared = [
+                (max(lo1, lo2), min(hi1, hi2))
+                for lo1, hi1 in exposures[source]
+                for lo2, hi2 in exposures[target]
+                if min(hi1, hi2) > max(lo1, lo2)
+            ]
+            eligible = [
+                i for i, span in enumerate(spans[source]) if inside(span, shared)
+            ]
+            matched = [
+                i
+                for i in eligible
+                if any(
+                    (source, i, target, j) in pairs or (target, j, source, i) in pairs
+                    for j in range(len(spans[target]))
+                )
+            ]
+            agreement[(source, target)] = (
+                len(spans[source]),
+                len(eligible),
+                len(matched),
+            )
+    return pairs, agreement
+
+
+@pytest.mark.parametrize("seed", range(25))
+def test_pairs_and_agreement_match_a_brute_force_double_loop(seed):
+    """The denominators are the easiest thing to get silently wrong; this
+    guards `_counterparts` and the within/matched split against a change."""
+    rng = np.random.default_rng(seed)
+    spans, exposures = {}, {}
+    for detector in ("A", "B", "C"):
+        edges = np.sort(rng.uniform(0.0, 100.0, size=2 * rng.integers(0, 8)))
+        spans[detector] = [
+            (float(a), float(b))
+            for a, b in zip(edges[::2], edges[1::2], strict=True)
+            if b > a
+        ]
+        hole = np.sort(rng.uniform(0.0, 100.0, size=2))
+        exposures[detector] = [(0.0, float(hole[0])), (float(hole[1]), 100.0)]
+    inventory = pd.concat(
+        [events(d, s) if s else events(d, []) for d, s in spans.items()],
+        ignore_index=True,
+    )
+    coverage = {
+        (*KEY, d): Coverage(np.array([[0.0, 100.0]]), np.array(exposures[d]))
+        for d in spans
+    }
+    pairs = overlap_pairs(inventory)
+    expected_pairs, expected = brute_force_pairs_and_agreement(spans, exposures)
+
+    got_pairs = {
+        (a, int(ka.rsplit(":", 1)[1]), b, int(kb.rsplit(":", 1)[1]))
+        for a, ka, b, kb in zip(
+            pairs.detector_a,
+            pairs.event_key_a,
+            pairs.detector_b,
+            pairs.event_key_b,
+            strict=True,
+        )
+    }
+    assert got_pairs == expected_pairs
+    agreement = directional_agreement(inventory, pairs, coverage).set_index(
+        ["source_detector", "target_detector"]
+    )
+    for (source, target), (n_source, n_eligible, n_matched) in expected.items():
+        row = agreement.loc[(source, target)]
+        assert (row.n_source_events, row.n_eligible, row.n_matched) == (
+            n_source,
+            n_eligible,
+            n_matched,
+        ), (source, target)

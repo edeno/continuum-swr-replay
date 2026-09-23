@@ -11,6 +11,7 @@ from continuum_swr_replay.analysis.inventory_comparison.overlap import (
 )
 from continuum_swr_replay.analysis.inventory_comparison.recount import (
     FRAGMENT_GAPS_S,
+    RECOUNT_DTYPES,
     merge_fragments,
 )
 from continuum_swr_replay.analysis.inventory_comparison.schema import (
@@ -117,11 +118,13 @@ def test_fragments_closer_than_the_gap_merge(gap_s, expected):
     assert merged.n_fragments.sum() == len(FRAGMENTS)
 
 
+@pytest.mark.parametrize("base_s", [1234.5678, 1_581_500_000.123456])
 @pytest.mark.parametrize("gap_s", FRAGMENT_GAPS_S[1:])
-def test_a_gap_of_exactly_the_setting_never_merges_on_a_real_clock(gap_s):
+def test_a_gap_of_exactly_the_setting_never_merges_on_a_real_clock(gap_s, base_s):
     """Gaps on the 500 Hz grid land exactly on 10, 20 and 50 ms; whether they
-    count as "less than" must not depend on how the clock rounds."""
-    time = 1234.5678 + np.arange(200_000) / 500.0
+    count as "less than" must not depend on how the clock rounds, at a small
+    offset or at the 1.6e9 s of an NWB timestamp."""
+    time = base_s + np.arange(200_000) / 500.0
     n_gap = round(gap_s * 500.0)
     starts = np.arange(100, 199_000, 997)
     pairs = [
@@ -276,3 +279,48 @@ def test_row_order_does_not_matter():
         (12.015, 13.0),
         (13.04, 14.0),
     ]
+
+
+class TestRecountContracts:
+    def test_a_negative_gap_is_refused(self):
+        with pytest.raises(ValueError, match="negative"):
+            merge_fragments(
+                events("A", [(10.0, 10.1)]),
+                coverage("A"),
+                detector="A",
+                gap_s=-0.01,
+                sample_interval_s=0.002,
+            )
+
+    def test_a_detector_the_comparison_does_not_know_is_refused(self):
+        with pytest.raises(ValueError, match="roster"):
+            merge_fragments(
+                events("A", [(10.0, 10.1)]),
+                coverage("A"),
+                detector="nobody",
+                gap_s=0.0,
+                sample_interval_s=0.002,
+            )
+
+    def test_events_in_an_epoch_without_coverage_are_refused_by_name(self):
+        with pytest.raises(ValueError, match="no coverage"):
+            merge_fragments(
+                events("A", [(10.0, 10.1)]),
+                coverage("A", session_key=OTHER_KEY),
+                detector="A",
+                gap_s=0.0,
+                sample_interval_s=0.002,
+            )
+
+    def test_the_merged_table_is_typed_even_when_empty(self):
+        merged = merge_fragments(
+            events("A", []),
+            coverage("A"),
+            detector="A",
+            gap_s=0.0,
+            sample_interval_s=0.002,
+        )
+
+        assert list(merged.columns) == list(RECOUNT_DTYPES)
+        for column, dtype in RECOUNT_DTYPES.items():
+            assert merged[column].dtype == dtype, column

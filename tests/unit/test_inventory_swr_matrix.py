@@ -50,6 +50,16 @@ def cover(exposure=((0.0, 100.0),)):
     return Coverage(observed=np.array([[0.0, 100.0]]), exposure=np.array(exposure))
 
 
+NOWHERE = Coverage(np.empty((0, 2)), np.empty((0, 2)))
+"""A detector on the roster whose run produced nothing in the epoch."""
+
+
+def matrix_of(labels, coverage, cohorts=COHORTS, definitions=DEFINITIONS):
+    return swr_label_matrix(
+        labels, coverage, cohorts=cohorts, swr_definitions=definitions
+    )
+
+
 @pytest.fixture
 def labelled():
     """S1: one SWR event under both definitions, one under K only, and one
@@ -72,7 +82,7 @@ def labelled():
     labels = swr_labels(
         inventory, matches, coverage, cohorts=COHORTS, swr_definitions=DEFINITIONS
     )
-    return pairs, labels
+    return pairs, labels, coverage
 
 
 def label_of(labels, key, definition):
@@ -81,7 +91,7 @@ def label_of(labels, key, definition):
 
 
 def test_labels_follow_strict_overlap_and_coverage(labelled):
-    _, labels = labelled
+    _, labels, _ = labelled
 
     assert label_of(labels, key("S1", 0), "K").label == "SWR"
     assert label_of(labels, key("S1", 1), "K").label == "SWR"
@@ -93,10 +103,11 @@ def test_labels_follow_strict_overlap_and_coverage(labelled):
 
 def test_the_matrix_uses_the_same_events_in_every_column(labelled):
     """S1:2 is observed by K but not by Y, so it leaves both columns."""
-    _, labels = labelled
+    _, labels, coverage = labelled
 
-    matrix = swr_label_matrix(labels).set_index(["cohort", "swr_definition"])
+    matrix = matrix_of(labels, coverage).set_index(["cohort", "swr_definition"])
 
+    assert matrix.available.all()
     s1_k, s1_y = matrix.loc[("S1", "K")], matrix.loc[("S1", "Y")]
     assert (s1_k.n_events, s1_k.n_eligible, s1_k.n_excluded) == (3, 2, 1)
     assert s1_y.n_eligible == s1_k.n_eligible
@@ -107,9 +118,9 @@ def test_the_matrix_uses_the_same_events_in_every_column(labelled):
 
 
 def test_the_matrix_carries_its_declared_columns(labelled):
-    _, labels = labelled
+    _, labels, coverage = labelled
 
-    matrix = swr_label_matrix(labels)
+    matrix = matrix_of(labels, coverage)
 
     assert list(matrix.columns) == list(MATRIX_DTYPES)
     for column, dtype in MATRIX_DTYPES.items():
@@ -123,16 +134,54 @@ def test_a_cohort_with_no_eligible_event_has_no_fraction():
     coverage = {(*KEY, "S1"): cover(), (*KEY, "K"): cover(((50.0, 100.0),))}
     matches = event_matches(inventory, overlap_pairs(inventory), coverage)
 
-    matrix = swr_label_matrix(
-        swr_labels(inventory, matches, coverage, cohorts=["S1"], swr_definitions=["K"])
+    matrix = matrix_of(
+        swr_labels(inventory, matches, coverage, cohorts=["S1"], swr_definitions=["K"]),
+        coverage,
+        ["S1"],
+        ["K"],
     ).iloc[0]
 
     assert (matrix.n_eligible, matrix.n_excluded) == (0, 1)
     assert np.isnan(matrix.non_swr_fraction)
 
 
+def test_a_cohort_that_looked_and_found_nothing_has_a_row_of_zeros():
+    """Zero found is not the same as not run: the row is there and available."""
+    inventory = pd.concat([events("S1", []), events("K", [(1, 2)])], ignore_index=True)
+    coverage = {(*KEY, "S1"): cover(), (*KEY, "K"): cover()}
+    matches = event_matches(inventory, overlap_pairs(inventory), coverage)
+
+    matrix = matrix_of(
+        swr_labels(inventory, matches, coverage, cohorts=["S1"], swr_definitions=["K"]),
+        coverage,
+        ["S1"],
+        ["K"],
+    ).iloc[0]
+
+    assert matrix.available
+    assert (matrix.n_events, matrix.n_eligible, matrix.n_swr, matrix.n_non_swr) == (
+        0,
+        0,
+        0,
+        0,
+    )
+
+
+def test_a_cohort_and_a_definition_must_be_different_detectors():
+    inventory = events("S1", [(10, 20)])
+    coverage = {(*KEY, "S1"): cover(), (*KEY, "K"): cover()}
+    matches = event_matches(inventory, overlap_pairs(inventory), coverage)
+
+    with pytest.raises(ValueError, match="both a cohort"):
+        swr_labels(
+            inventory, matches, coverage, cohorts=["S1"], swr_definitions=["S1", "K"]
+        )
+    with pytest.raises(ValueError, match="roster"):
+        swr_labels(inventory, matches, coverage, cohorts=["S1"], swr_definitions=["k"])
+
+
 def test_a_matched_pair_may_carry_different_labels_and_the_table_keeps_it(labelled):
-    pairs, labels = labelled
+    pairs, labels, _ = labelled
 
     paired = paired_labels(pairs, labels, cohorts=COHORTS).set_index(
         ["event_key_a", "event_key_b", "swr_definition"]
@@ -152,7 +201,7 @@ def test_a_matched_pair_may_carry_different_labels_and_the_table_keeps_it(labell
 
 
 def test_where_definitions_disagree_about_an_event_it_is_reported(labelled):
-    _, labels = labelled
+    _, labels, _ = labelled
 
     disagreement = definition_disagreement(labels).set_index("event_key")
 
@@ -164,16 +213,19 @@ def test_where_definitions_disagree_about_an_event_it_is_reported(labelled):
 
 
 def test_a_definition_that_did_not_run_labels_nothing_non_swr():
+    """On the roster with empty coverage, as a missing run is registered."""
     inventory = events("S1", [(10, 20)])
-    coverage = {(*KEY, "S1"): cover()}
+    coverage = {(*KEY, "S1"): cover(), (*KEY, "K"): NOWHERE}
     matches = event_matches(inventory, overlap_pairs(inventory), coverage)
 
     labels = swr_labels(
         inventory, matches, coverage, cohorts=["S1"], swr_definitions=["K"]
     )
+    matrix = matrix_of(labels, coverage, ["S1"], ["K"]).iloc[0]
 
     assert labels.label.tolist() == ["unknown"]
     assert not labels.in_matrix.any()
+    assert not matrix.available
 
 
 def test_a_sequence_only_partly_observed_by_the_swr_detector_is_unknown():

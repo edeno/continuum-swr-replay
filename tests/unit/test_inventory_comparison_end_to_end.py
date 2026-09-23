@@ -20,7 +20,9 @@ import numpy as np
 import pytest
 
 from continuum_swr_replay.analysis.inventory_comparison.availability import (
+    coverage_from_observations,
     exposure,
+    observation_table,
     sample_runs,
     still_intervals,
     window_supported,
@@ -29,12 +31,19 @@ from continuum_swr_replay.analysis.inventory_comparison.cells import (
     membership_against,
     no_detector_time,
 )
+from continuum_swr_replay.analysis.inventory_comparison.components import (
+    overlap_components,
+)
 from continuum_swr_replay.analysis.inventory_comparison.overlap import (
     Coverage,
     directional_agreement,
     event_matches,
     overlap_pairs,
     remove_bridging_events,
+    time_coverage,
+)
+from continuum_swr_replay.analysis.inventory_comparison.recount import (
+    merge_fragments,
 )
 from continuum_swr_replay.analysis.inventory_comparison.schema import (
     MEMORYLESS,
@@ -44,6 +53,7 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import (
     inventory_from_intervals,
 )
 from continuum_swr_replay.analysis.inventory_comparison.swr_matrix import (
+    paired_labels,
     swr_label_matrix,
     swr_labels,
 )
@@ -188,8 +198,101 @@ def test_missing_lfp_leaves_the_matrix_rather_than_reading_as_non_swr(comparison
         cohorts=[STATE_SPACE, MEMORYLESS],
         swr_definitions=[KAY],
     )
-    matrix = swr_label_matrix(labels).set_index("cohort")
+    matrix = swr_label_matrix(
+        labels, coverage, cohorts=[STATE_SPACE, MEMORYLESS], swr_definitions=[KAY]
+    ).set_index("cohort")
 
     assert labels.set_index("event_key").loc[key(STATE_SPACE, 3), "label"] == "unknown"
     ss = matrix.loc[STATE_SPACE]
     assert (ss.n_events, ss.n_eligible, ss.n_swr, ss.n_non_swr) == (4, 3, 1, 2)
+
+
+def test_time_coverage_is_clipped_to_the_shared_exposure(comparison):
+    """SS and K share exposure over [0, 20), [25, 40], [41, 50] and [52, 60]:
+    SS:0 with K:0, SS:1, SS:2 and K:1 lie inside it; SS:3, during the LFP
+    gap, does not."""
+    kept, coverage, _, _ = comparison
+
+    covered = time_coverage(kept, coverage).set_index(["detector_a", "detector_b"])
+
+    ss_k = covered.loc[(KAY, STATE_SPACE)]
+    assert ss_k.available
+    assert ss_k.union_s == pytest.approx(0.3 + 0.2 + 0.05 + 0.1)
+    assert ss_k.intersection_s == pytest.approx(0.05)
+
+
+def test_the_components_join_the_three_detectors_at_five_seconds(comparison):
+    kept, _, pairs, _ = comparison
+
+    labelled, components = overlap_components(kept, pairs)
+
+    three = components[components.n_detectors == 3]
+    assert len(three) == 1
+    assert three.iloc[0].detectors == f"{KAY}+{MEMORYLESS}+{STATE_SPACE}"
+    assert (three.iloc[0].span_start_s, three.iloc[0].span_end_s) == (5.0, 5.4)
+    assert three.iloc[0].n_pairs == 2  # SS:0-MS:0 and SS:0-K:0; MS:0 and K:0 touch
+    assert len(components) == len(kept) - 2
+
+
+def test_the_recount_leaves_this_epoch_alone_and_stays_inside_exposure(comparison):
+    """No two state-space events lie within 50 ms; the merged table is the
+    native one, and it runs on the bridging-trimmed coverage without error."""
+    kept, coverage, pairs, _ = comparison
+
+    merged = merge_fragments(
+        kept, coverage, detector=STATE_SPACE, gap_s=0.05, sample_interval_s=0.002
+    )
+
+    assert len(merged) == len(kept)
+    assert (merged.n_fragments == 1).all()
+
+
+def test_a_matched_sequence_pair_can_disagree_on_the_swr_label(comparison):
+    """SS:0 overlaps K:0; MS:0 only touches it at 5.1 s, which is not an
+    overlap, so under the same definition the two matched events carry
+    different labels and the table says so rather than resolving it."""
+    kept, coverage, pairs, matches = comparison
+    labels = swr_labels(
+        kept,
+        matches,
+        coverage,
+        cohorts=[STATE_SPACE, MEMORYLESS],
+        swr_definitions=[KAY],
+    )
+
+    paired = paired_labels(pairs, labels, cohorts=[STATE_SPACE, MEMORYLESS])
+
+    assert len(paired) == 1
+    row = paired.iloc[0]
+    assert (row.label_a, row.label_b, row.agreement) == ("non-SWR", "SWR", "disagree")
+
+
+def test_coverage_built_from_observation_tables_is_the_coverage_the_counts_read():
+    """The converter reproduces the sample-built coverage before bridging
+    events are removed, so both representations share one origin."""
+    spikes = ~((TIME > 40.0) & (TIME < 41.0))
+    observed = {
+        STATE_SPACE: sample_runs(TIME, spikes),
+        MEMORYLESS: sample_runs(TIME, window_supported(TIME, spikes, 40)),
+    }
+    still = still_intervals(TIME, SPEED)
+    tables = [
+        observation_table(
+            EPOCH,
+            detector=detector,
+            run_id="run",
+            epoch_bounds=(TIME[0], TIME[-1]),
+            observed=runs,
+            unavailable_reason="spikes missing",
+        )
+        for detector, runs in observed.items()
+    ]
+
+    coverage = coverage_from_observations(
+        __import__("pandas").concat(tables, ignore_index=True), {KEY: still}
+    )
+
+    for detector, runs in observed.items():
+        entry = coverage[(*KEY, detector)]
+        np.testing.assert_allclose(entry.observed, runs)
+        np.testing.assert_allclose(entry.exposure, exposure(runs, still))

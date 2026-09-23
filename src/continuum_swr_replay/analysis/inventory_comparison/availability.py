@@ -1,8 +1,8 @@
 """What each detector observed, apart from what it detected.
 
-A detector that looked and found nothing
-observed that time; a detector whose inputs were missing did not, and an
-empty event table alone cannot tell the two apart. Coverage is built from the
+A detector that looked and found nothing observed that time; a detector whose
+inputs were missing did not, and an empty event table alone cannot tell the
+two apart. Coverage is built from the
 samples a detector needed, split at every non-finite sample and every gap in
 the timestamps, never interpolated across either; a detector that reads a
 window of samples observes a moment only when the whole window is there.
@@ -27,10 +27,13 @@ from continuum_swr_replay.analysis.inventory_comparison.intervals import (
     normalize,
     subtract,
 )
+from continuum_swr_replay.analysis.inventory_comparison.overlap import Coverage
 from continuum_swr_replay.analysis.inventory_comparison.schema import SessionIdentity
+from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 
 __all__ = [
     "OBSERVATION_DTYPES",
+    "coverage_from_observations",
     "exposure",
     "missing_run_table",
     "observation_table",
@@ -72,12 +75,16 @@ def _joined(time: NDArray, valid: NDArray, max_gap_s: float | None) -> NDArray:
     finite = time[np.isfinite(time)]
     if np.any(np.diff(finite) <= 0):
         raise ValueError("time must be strictly increasing.")
+    if finite.size < 2:
+        # nothing can continue a run of one sample
+        return np.zeros(max(time.size - 1, 0), dtype=bool)
     if max_gap_s is None:
         max_gap_s = GAP_FACTOR * float(np.median(np.diff(finite)))
     with np.errstate(invalid="ignore"):
         close = np.diff(time) <= max_gap_s
     # a non-finite timestamp fails the spacing test on both sides
-    return valid[1:] & valid[:-1] & close
+    joined: NDArray = valid[1:] & valid[:-1] & close
+    return joined
 
 
 def sample_runs(
@@ -173,6 +180,15 @@ def exposure(observed: NDArray, still: NDArray) -> NDArray:
     return intersect(observed, still)
 
 
+def _epoch_bounds(epoch_bounds: tuple[float, float]) -> tuple[float, float]:
+    start, end = float(epoch_bounds[0]), float(epoch_bounds[1])
+    if not (np.isfinite(start) and np.isfinite(end) and start < end):
+        raise ValueError(
+            f"epoch_bounds must be finite with start < end, got {epoch_bounds}."
+        )
+    return start, end
+
+
 def _table(
     session: SessionIdentity, detector: str, run_id: str, rows: list[tuple]
 ) -> pd.DataFrame:
@@ -218,8 +234,8 @@ def observation_table(
         stretches meeting end to end.
 
     """
-    start, end = epoch_bounds
-    observed = normalize(observed)
+    start, end = _epoch_bounds(epoch_bounds)
+    observed = normalize(observed, strict=True)
     if observed.size and (observed[0, 0] < start or observed[-1, 1] > end):
         raise ValueError("Observed time must lie within the epoch.")
     unavailable = subtract(np.array([[start, end]]), observed)
@@ -238,5 +254,50 @@ def missing_run_table(
     reason: str,
 ) -> pd.DataFrame:
     """A detector that produced nothing for the epoch observed none of it."""
-    start, end = epoch_bounds
+    start, end = _epoch_bounds(epoch_bounds)
     return _table(session, detector, run_id, [(start, end, False, reason)])
+
+
+def coverage_from_observations(
+    observations: pd.DataFrame, still: Mapping[tuple, NDArray]
+) -> dict[tuple, Coverage]:
+    """The coverage map the counts read, from observation tables.
+
+    One origin for both representations of what a detector observed: the
+    ``available`` stretches become ``observed``, and their intersection with
+    the epoch's still intervals becomes ``exposure``. Every (epoch, detector)
+    in the tables gets an entry, so a detector whose run was missing, entered
+    through ``missing_run_table``, stays on the roster with empty coverage
+    and reads as unavailable rather than vanishing.
+
+    Parameters
+    ----------
+    observations : DataFrame
+        ``observation_table`` and ``missing_run_table`` rows, concatenated.
+    still : mapping
+        ``(animal, day, epoch) -> ndarray (n, 2)``, the epoch's still
+        intervals from ``still_intervals``; an epoch absent here is taken as
+        never still.
+
+    Returns
+    -------
+    coverage : dict
+        ``(animal, day, epoch, detector) -> Coverage``.
+
+    """
+    coverage = {}
+    for (session, detector), group in observations.groupby(
+        [observations[list(SESSION_COLUMNS_DAY)].apply(tuple, axis=1), "detector"],
+        sort=False,
+    ):
+        available = group[group.available]
+        observed = (
+            available[["start_s", "end_s"]].to_numpy(dtype=np.float64)
+            if len(available)
+            else np.empty((0, 2))
+        )
+        coverage[(*session, detector)] = Coverage(
+            observed=observed,
+            exposure=exposure(observed, still.get(tuple(session), np.empty((0, 2)))),
+        )
+    return coverage

@@ -1,6 +1,7 @@
 """What each detector observed."""
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import (
@@ -11,6 +12,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
 )
 from continuum_swr_replay.analysis.inventory_comparison.availability import (
     OBSERVATION_DTYPES,
+    coverage_from_observations,
     exposure,
     missing_run_table,
     observation_table,
@@ -99,10 +101,12 @@ class TestWindowSupport:
             observed, [[time[20], time[380]], [time[420], time[-20]]]
         )
 
-    def test_covers_every_midpoint_the_detector_stamps_on_a_real_clock(self):
+    @pytest.mark.parametrize("base_s", [1234.5678, 1_581_500_000.123456])
+    def test_covers_every_midpoint_the_detector_stamps_on_a_real_clock(self, base_s):
         """On a clock 1 ppm off nominal, a fixed trim in seconds misses the
-        first or last window; counting samples cannot."""
-        time = 1234.5678 + np.arange(5000) / FS * (1 + 1e-6)
+        first or last window; counting samples cannot. At the 1.6e9 s of an
+        NWB timestamp the float step is 2.4e-7 s, still far inside a sample."""
+        time = base_s + np.arange(5000) / FS * (1 + 1e-6)
 
         observed = sample_runs(
             time, window_supported(time, np.ones(time.size, bool), WINDOW)
@@ -185,3 +189,70 @@ class TestObservationTable:
                 observed=np.array([[99.0, 100.5]]),
                 unavailable_reason="missing LFP",
             )
+
+
+SESSION = SessionIdentity(animal="sim", day=20200101, epoch="02_r1", brain_area="HPC")
+
+
+class TestBoundsAndConversion:
+    def test_inverted_epoch_bounds_are_refused(self):
+        with pytest.raises(ValueError, match="epoch_bounds"):
+            missing_run_table(
+                SESSION, detector="x", run_id="r", epoch_bounds=(10.0, 0.0), reason="no"
+            )
+        with pytest.raises(ValueError, match="epoch_bounds"):
+            observation_table(
+                SESSION,
+                detector="x",
+                run_id="r",
+                epoch_bounds=(10.0, 0.0),
+                observed=np.empty((0, 2)),
+                unavailable_reason="no",
+            )
+
+    def test_a_single_sample_covers_no_time_without_a_warning(self):
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            runs = sample_runs(np.array([1.0]), np.array([True]))
+            runs_two = sample_runs(np.array([1.0, np.nan]), np.array([True, True]))
+
+        assert runs.shape == (0, 2)
+        assert runs_two.shape == (0, 2)
+
+    def test_coverage_comes_from_the_observation_tables_themselves(self):
+        """One origin for both representations of what a detector observed;
+        a missing run keeps its place on the roster with empty coverage."""
+        still = {("sim", 20200101, "02_r1"): np.array([[0.0, 30.0], [40.0, 100.0]])}
+        observations = pd.concat(
+            [
+                observation_table(
+                    SESSION,
+                    detector="x",
+                    run_id="r",
+                    epoch_bounds=(0.0, 100.0),
+                    observed=np.array([[0.0, 50.0], [60.0, 100.0]]),
+                    unavailable_reason="lfp missing",
+                ),
+                missing_run_table(
+                    SESSION,
+                    detector="y",
+                    run_id="r",
+                    epoch_bounds=(0.0, 100.0),
+                    reason="no run",
+                ),
+            ],
+            ignore_index=True,
+        )
+
+        coverage = coverage_from_observations(observations, still)
+
+        x = coverage[("sim", 20200101, "02_r1", "x")]
+        y = coverage[("sim", 20200101, "02_r1", "y")]
+        np.testing.assert_allclose(x.observed, [[0.0, 50.0], [60.0, 100.0]])
+        np.testing.assert_allclose(
+            x.exposure, [[0.0, 30.0], [40.0, 50.0], [60.0, 100.0]]
+        )
+        assert y.observed.shape == (0, 2) and y.exposure.shape == (0, 2)
+        assert sorted(k[3] for k in coverage) == ["x", "y"]

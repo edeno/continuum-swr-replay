@@ -1,8 +1,7 @@
 """Each sequence cohort labelled under each SWR definition.
 
-A sequence event is ``SWR`` under a
-definition when an event of that SWR inventory overlaps it with positive
-duration and ``non-SWR`` when nothing does, but only for an event lying
+A sequence event is ``SWR`` under a definition when an event of that SWR
+inventory overlaps it with positive duration and ``non-SWR`` when nothing does, but only for an event lying
 wholly within both detectors' exposure; otherwise it is ``unknown``: missing
 LFP is never a missing ripple, and an overlap in the observed part cannot
 say what the rest held.
@@ -26,21 +25,32 @@ import pandas as pd
 from continuum_swr_replay.analysis.inventory_comparison.intervals import (
     contains,
     intersect,
+    total_duration,
 )
-from continuum_swr_replay.analysis.inventory_comparison.overlap import Coverage
+from continuum_swr_replay.analysis.inventory_comparison.overlap import (
+    MATCHED,
+    UNKNOWN,
+    UNMATCHED,
+    Coverage,
+    validate_detectors,
+)
 from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 
 __all__ = [
+    "DISAGREEMENT_DTYPES",
     "LABEL_DTYPES",
     "MATRIX_DTYPES",
+    "NON_SWR",
     "PAIRED_LABEL_DTYPES",
+    "SWR",
     "definition_disagreement",
     "paired_labels",
     "swr_label_matrix",
     "swr_labels",
 ]
 
-LABEL = {"matched": "SWR", "unmatched": "non-SWR", "unknown": "unknown"}
+SWR, NON_SWR = "SWR", "non-SWR"
+LABEL = {MATCHED: SWR, UNMATCHED: NON_SWR, UNKNOWN: UNKNOWN}
 
 LABEL_DTYPES: Mapping[str, object] = MappingProxyType(
     {
@@ -64,12 +74,27 @@ MATRIX_DTYPES: Mapping[str, object] = MappingProxyType(
         "epoch": object,
         "cohort": object,
         "swr_definition": object,
+        "available": np.bool_,
         "n_events": np.int64,
         "n_eligible": np.int64,
         "n_excluded": np.int64,
         "n_swr": np.int64,
         "n_non_swr": np.int64,
         "non_swr_fraction": np.float64,
+    }
+)
+
+DISAGREEMENT_DTYPES: Mapping[str, object] = MappingProxyType(
+    {
+        "animal": object,
+        "day": np.int64,
+        "epoch": object,
+        "cohort": object,
+        "event_key": object,
+        "n_swr": np.int64,
+        "n_non_swr": np.int64,
+        "n_unknown": np.int64,
+        "definitions_disagree": np.bool_,
     }
 )
 
@@ -113,7 +138,9 @@ def swr_labels(
         ``(animal, day, epoch, detector) -> Coverage``. A definition with no
         entry for an epoch observed none of it.
     cohorts, swr_definitions : collection of str
-        Detector names.
+        Detector names, both on the roster and disjoint: a sequence detector
+        passed as an SWR definition would report inter-detector agreement
+        dressed as an SWR label.
 
     Returns
     -------
@@ -121,6 +148,13 @@ def swr_labels(
         Columns and dtypes as ``LABEL_DTYPES``.
 
     """
+    cohorts = validate_detectors(cohorts, coverage, "cohorts")
+    swr_definitions = validate_detectors(swr_definitions, coverage, "swr_definitions")
+    if set(cohorts) & set(swr_definitions):
+        raise ValueError(
+            f"{sorted(set(cohorts) & set(swr_definitions))} cannot be both a "
+            "cohort and an SWR definition."
+        )
     empty = np.empty((0, 2))
     events = inventory[inventory.detector.isin(cohorts)]
     in_matrix = np.zeros(len(events), dtype=bool)
@@ -154,31 +188,48 @@ def swr_labels(
     labels["label"] = np.where(
         found.within_shared_exposure.eq(True).to_numpy(),
         found.membership.map(LABEL).to_numpy(),
-        "unknown",
+        UNKNOWN,
     )
     return labels[list(LABEL_DTYPES)].astype(dict(LABEL_DTYPES))
 
 
-def swr_label_matrix(labels: pd.DataFrame) -> pd.DataFrame:
+def swr_label_matrix(
+    labels: pd.DataFrame,
+    coverage: Mapping[tuple, Coverage],
+    *,
+    cohorts: Collection[str],
+    swr_definitions: Collection[str],
+) -> pd.DataFrame:
     """Count each cohort's labels under each definition, per epoch.
+
+    One row per epoch in ``coverage``, cohort and definition, so a cohort
+    that looked and found nothing has a row of zeros, and a cohort or
+    definition that did not look in an epoch has one marked unavailable.
 
     Parameters
     ----------
     labels : DataFrame
         From ``swr_labels``.
+    coverage : mapping
+        The coverage the labels were made under.
+    cohorts, swr_definitions : collection of str
+        As given to ``swr_labels``.
 
     Returns
     -------
     DataFrame
-        Columns and dtypes as ``MATRIX_DTYPES``. The fraction is over the
-        eligible events and NaN where there are none.
+        Columns and dtypes as ``MATRIX_DTYPES``. ``available`` says whether
+        the cohort and the definition share any exposure in the epoch; the
+        fraction is over the eligible events and NaN where there are none.
 
     """
+    cohorts = validate_detectors(cohorts, coverage, "cohorts")
+    swr_definitions = validate_detectors(swr_definitions, coverage, "swr_definitions")
     eligible = labels.in_matrix
-    matrix = (
+    counted = (
         labels.assign(
-            is_swr=eligible & (labels.label == "SWR"),
-            is_non_swr=eligible & (labels.label == "non-SWR"),
+            is_swr=eligible & (labels.label == SWR),
+            is_non_swr=eligible & (labels.label == NON_SWR),
         )
         .groupby([*SESSION_COLUMNS_DAY, "cohort", "swr_definition"])
         .agg(
@@ -187,8 +238,41 @@ def swr_label_matrix(labels: pd.DataFrame) -> pd.DataFrame:
             n_swr=("is_swr", "sum"),
             n_non_swr=("is_non_swr", "sum"),
         )
-        .reset_index()
     )
+    empty = np.empty((0, 2))
+    rows = []
+    for session in sorted({tuple(key[:3]) for key in coverage}):
+        for cohort in cohorts:
+            for definition in swr_definitions:
+                shared = intersect(
+                    coverage.get((*session, cohort), Coverage(empty, empty)).exposure,
+                    coverage.get(
+                        (*session, definition), Coverage(empty, empty)
+                    ).exposure,
+                )
+                index = (*session, cohort, definition)
+                counts = (
+                    counted.loc[index]
+                    if index in counted.index
+                    else pd.Series(
+                        {"n_events": 0, "n_eligible": 0, "n_swr": 0, "n_non_swr": 0}
+                    )
+                )
+                rows.append(
+                    dict(zip(SESSION_COLUMNS_DAY, session, strict=True))
+                    | {
+                        "cohort": cohort,
+                        "swr_definition": definition,
+                        "available": total_duration(shared) > 0,
+                        **{k: int(counts[k]) for k in counts.index},
+                    }
+                )
+    matrix = pd.DataFrame(rows)
+    if (matrix.n_swr + matrix.n_non_swr != matrix.n_eligible).any():
+        raise RuntimeError(
+            "Every eligible event must be labelled SWR or non-SWR; the labels were "
+            "not made under this coverage."
+        )
     matrix["n_excluded"] = matrix.n_events - matrix.n_eligible
     matrix["non_swr_fraction"] = matrix.n_non_swr / matrix.n_eligible.where(
         matrix.n_eligible > 0
@@ -207,6 +291,12 @@ def paired_labels(
         Columns and dtypes as ``PAIRED_LABEL_DTYPES``.
 
     """
+    cohorts = list(cohorts)
+    unlabelled = sorted(set(cohorts) - set(labels.cohort.unique()))
+    if unlabelled and not labels.empty:
+        raise ValueError(
+            f"{unlabelled} carry no labels; label every cohort before pairing."
+        )
     both = pairs[pairs.detector_a.isin(cohorts) & pairs.detector_b.isin(cohorts)]
     label = labels[["event_key", "swr_definition", "label"]]
     paired = both.merge(
@@ -216,9 +306,16 @@ def paired_labels(
         label.rename(columns={"event_key": "event_key_b", "label": "label_b"}),
         on=["event_key_b", "swr_definition"],
     )
+    n_definitions = labels.swr_definition.nunique()
+    if len(paired) != len(both) * n_definitions:
+        raise ValueError(
+            f"{len(both)} sequence pairs and {n_definitions} definitions should give "
+            f"{len(both) * n_definitions} rows, not {len(paired)}; a pair's event "
+            "has no label under some definition."
+        )
     paired["agreement"] = np.where(
-        (paired.label_a == "unknown") | (paired.label_b == "unknown"),
-        "unknown",
+        (paired.label_a == UNKNOWN) | (paired.label_b == UNKNOWN),
+        UNKNOWN,
         np.where(paired.label_a == paired.label_b, "agree", "disagree"),
     )
     return paired[list(PAIRED_LABEL_DTYPES)].astype(dict(PAIRED_LABEL_DTYPES))
@@ -232,15 +329,18 @@ def definition_disagreement(labels: pd.DataFrame) -> pd.DataFrame:
     Returns
     -------
     DataFrame
-        One row per event: session, ``cohort``, ``event_key``, ``n_swr``,
-        ``n_non_swr``, ``n_unknown`` and ``definitions_disagree``.
+        One row per event; columns and dtypes as ``DISAGREEMENT_DTYPES``.
 
     """
+    if labels.empty:
+        return pd.DataFrame(
+            {k: pd.Series(dtype=v) for k, v in DISAGREEMENT_DTYPES.items()}
+        )
     counts = (
         labels.assign(
-            n_swr=labels.label == "SWR",
-            n_non_swr=labels.label == "non-SWR",
-            n_unknown=labels.label == "unknown",
+            n_swr=labels.label == SWR,
+            n_non_swr=labels.label == NON_SWR,
+            n_unknown=labels.label == UNKNOWN,
         )
         .groupby([*SESSION_COLUMNS_DAY, "cohort", "event_key"])[
             ["n_swr", "n_non_swr", "n_unknown"]
@@ -250,4 +350,4 @@ def definition_disagreement(labels: pd.DataFrame) -> pd.DataFrame:
         .reset_index()
     )
     counts["definitions_disagree"] = (counts.n_swr > 0) & (counts.n_non_swr > 0)
-    return counts
+    return counts[list(DISAGREEMENT_DTYPES)].astype(dict(DISAGREEMENT_DTYPES))

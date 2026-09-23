@@ -16,6 +16,7 @@ import pandas as pd
 from scipy.sparse import coo_array
 from scipy.sparse.csgraph import connected_components
 
+from continuum_swr_replay.analysis.inventory_comparison.overlap import validate_pairs
 from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 
 __all__ = ["COMPONENT_DTYPES", "overlap_components"]
@@ -61,6 +62,7 @@ def overlap_components(
         Columns and dtypes as ``COMPONENT_DTYPES``.
 
     """
+    validate_pairs(pairs, inventory)
     events = inventory.sort_values(
         [*SESSION_COLUMNS_DAY, "event_start_s", "event_key"]
     ).reset_index(drop=True)
@@ -77,8 +79,9 @@ def overlap_components(
     )
     _, label = connected_components(graph, directed=False)
     # events are in onset order within contiguous epochs, and pairs never
-    # cross epochs: numbering labels by first appearance numbers each epoch's
-    # components by onset, in one contiguous block per epoch
+    # cross epochs (validate_pairs checks it): numbering labels by first
+    # appearance numbers each epoch's components by onset, in one contiguous
+    # block per epoch
     first_seen = np.empty(len(events), dtype=np.int64)
     first_seen[pd.unique(label)] = np.arange(len(pd.unique(label)))
     ordinal = pd.Series(first_seen[label])
