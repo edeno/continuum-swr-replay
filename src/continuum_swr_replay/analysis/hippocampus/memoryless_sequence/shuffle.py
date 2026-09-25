@@ -31,12 +31,19 @@ statistic is strictly below the observed one (``nansum(shuffle < observed)``,
 so a tie or a NaN draw does not count), and a half passes at ``p <= 0.05``.
 
 One line of the reference needs translating rather than copying. Its center
-of mass is continuous, so ``jumps(jumps==0) = nan`` sets aside exactly the
-window pairs whose posterior did not change, which are the pairs whose slice
-leaving and slice entering hold the same spikes up to what the decode can
-tell apart; and it sets aside the same pairs in the observed decode and in
-every shuffle, because which spikes fall in a window does not depend on the
-encoding. This port's centers are bins, so a literal zero test would also
+of mass is continuous, so ``jumps(jumps==0) = nan`` sets aside the window
+pairs whose center did not move. Nearly always that is because the posterior
+did not change, because the slice leaving and the slice entering hold the
+same spikes up to what the decode can tell apart, and those pairs are the
+same in the observed decode and in every shuffle, since which spikes fall in
+a window does not depend on the encoding. The translation below sets aside
+exactly those pairs, which makes it an approximation: a change of spikes that
+is symmetric about the center, such as one more spike from the cell whose
+field sits at the center of a symmetric posterior, alters the posterior but
+leaves its continuous center where it was, and the reference sets that pair
+aside where this port keeps its jump. That needs exact symmetry; how often it
+happens is counted by ``scripts/qa/compare_memoryless_to_reference.py``. This
+port's centers are bins, so a literal zero test would also
 set aside every pair whose center stayed in its 2 cm bin, most pairs on a
 slow replay, and would turn the mean jump into the mean size of a bin
 crossing, with a different set of pairs in each draw. The pairs are therefore

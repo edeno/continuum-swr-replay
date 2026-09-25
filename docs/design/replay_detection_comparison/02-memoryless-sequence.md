@@ -199,10 +199,16 @@ distributions. The statistics and the test follow the corrected reference script
 (`nanmean`), `p = (1 + nansum(null_stat < observed_stat)) / (100 + 1)` counts only
 draws strictly below the observed value (a tie or a NaN draw does not count), and each
 half passes at `p <= 0.05`. One line is translated rather than copied. The reference's
-center of mass is continuous, so its `jumps(jumps==0) = nan` sets aside exactly the
-window pairs whose posterior did not change, which are the pairs whose slice leaving
-and slice entering hold the same spikes as the decode sees them, and it sets aside the
-same pairs in the observed decode and in every draw. This
+center of mass is continuous, so its `jumps(jumps==0) = nan` sets aside the window pairs
+whose center did not move. Nearly always those are the pairs whose posterior did not
+change, whose slice leaving and slice entering hold the same spikes as the decode sees
+them, the same pairs in the observed decode and in every draw; the port sets aside
+exactly those, so its rule is an approximation. A change of spikes symmetric about the
+center (one more spike from the cell whose field sits at the center of a symmetric
+posterior) alters the posterior without moving its continuous center: the reference sets
+that pair aside and the port keeps its jump. It needs exact symmetry, and on the
+Figure 1 simulation no pair of 16229 is of that kind; the sweep-wide count is in
+`reference_check_summary.csv`. This
 port's centers are bins, so a literal zero test would also set aside every pair whose
 center stayed in its 2 cm bin, most pairs on a slow replay, turning the mean jump into
 the mean size of a bin crossing with a different pair set in each draw; measured on the

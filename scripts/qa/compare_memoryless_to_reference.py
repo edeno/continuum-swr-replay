@@ -101,6 +101,8 @@ SWEEP_TOTALS = (
     "n_published_port",
     "n_published_reference",
     "shuffle_verdicts_differ_on_port_windows",
+    "pairs_center_unchanged_but_spikes_changed",
+    "pairs_spikes_unchanged_but_center_moved",
 )
 """Counts that add up across sweep cells; medians and quantiles do not."""
 
@@ -199,6 +201,8 @@ def compare(
     ref_spread_pass = bin_size_cm * ref.spread_bins < config.spread_threshold_cm
     ref_jump_pass = bin_size_cm * ref.jump_bins < config.jump_threshold_cm
     identical = (port.runs[:, None, :] == ref.runs[None, :, :]).all(axis=2)
+    center_unchanged = np.diff(ref.center_bins) == 0.0
+    spikes_unchanged = (counts[1:] == counts[:-1]).all(axis=1)
 
     # the reference's test on each of its own replays, and on each of the
     # port's with the port's draws
@@ -244,6 +248,14 @@ def compare(
         "n_replay_reference": int(ref.is_replay.sum()),
         "n_published_port": int(sum(r.passes for r in decoded["shuffles"].values())),
         "n_published_reference": int(sum(passes(*p) for p in ref_p.values())),
+        # the reference sets aside a pair whose continuous center did not move;
+        # the port sets aside a pair whose spikes did not change
+        "pairs_center_unchanged_but_spikes_changed": int(
+            (center_unchanged & ~spikes_unchanged).sum()
+        ),
+        "pairs_spikes_unchanged_but_center_moved": int(
+            (spikes_unchanged & ~center_unchanged).sum()
+        ),
         "shuffle_verdicts_differ_on_port_windows": int(
             sum(
                 passes(*same_windows_p[i]) != decoded["shuffles"][i].passes
