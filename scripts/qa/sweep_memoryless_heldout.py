@@ -146,22 +146,30 @@ def trials(means: np.ndarray):
 
 
 def event_truth(event, activity, recorded_events: np.ndarray) -> str:
-    """What an event's content truly is, judged by time.
+    """What an event's content truly is, judged by time spent in the activity's parts.
 
-    Half or more inside the injected activity, the activity's own label,
-    whatever local coding the event absorbed around it; some but less than
-    half, ``mixed``: mostly local coding, with part of the activity in it.
-    None of it inside: ``recorded_event`` if it overlaps one of the
+    Overlap is measured against the parts that represent places, not the
+    activity's outer bounds: a chain's silent gap represents nothing. Half or
+    more of the event inside the parts, the activity's own label, whatever
+    local coding it absorbed around them; some but less than half, ``mixed``;
+    none, but inside the activity's bounds, ``silent_gap``. Outside the
+    activity altogether: ``recorded_event`` if it overlaps one of the
     recording's own labeled events, which the decode window around an
     injection can reach and whose content is real, else ``local``. Whether
     the event also matched the injection is a separate question
     (``matches_injection``).
     """
+    duration_s = event.end_s - event.start_s
     inside_s = 0.0
     if activity is not None:
-        start_s, end_s = activity.bounds
-        inside_s = min(event.end_s, end_s) - max(event.start_s, start_s)
-    duration_s = event.end_s - event.start_s
+        inside_s = sum(
+            max(0.0, min(event.end_s, end_s) - max(event.start_s, start_s))
+            for start_s, end_s in activity.parts
+        )
+        if inside_s <= 0 and sweep.overlaps(
+            (event.start_s, event.end_s), activity.bounds
+        ):
+            return "silent_gap"
     if inside_s <= 0:
         if any(
             sweep.overlaps((event.start_s, event.end_s), (float(a), float(b)))
@@ -385,7 +393,7 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
             )
 
     kinds = {
-        "false_support_rate": ["local", "no_content"],
+        "false_support_rate": ["local", "no_content", "silent_gap"],
         "support_rate_with_content": ["continuous_replay", "non_local"],
         "support_rate_mixed": ["mixed"],
     }

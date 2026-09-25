@@ -23,9 +23,10 @@ encoding model, the same placements and scoring rule as the sweep:
   from the first's end or far from it.
 
 Each part is 60 cm and longer than 100 ms, so it can meet the published replay
-definition on its own, and each is also injected alone, at the time and with
-the seed it has inside its event: a part is lost *to* the jump or the chain
-only as far as it is recovered less often inside the event than alone. The
+definition on its own, and each is also decoded alone, with exactly the spikes it
+had inside its event and the recording's own spikes around it: a part is lost
+*to* the jump or the chain only as far as it is recovered less often inside
+the event than alone. The
 simulated animal rests at the track's 170 cm end, and absorbing local coding
 depends on how near it an event comes, so every jump and chain keeps its
 parts' far end at the same place, whatever the jump or the gap. Our detector is scored two ways throughout, canonical
@@ -52,6 +53,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.scoring import (  # noqa: E402
     SEGMENTATION_LABELS,
     bound_errors,
+    part_agreement,
     recovered_parts,
     score_against_injection,
     segmentation,
@@ -193,23 +195,35 @@ def score_trial(
         row = {"detector": detector, "called": bool(overlapping)} | shares
         if activity.truth == "continuous_replay":
             event_bounds = [(event.start_s, event.end_s) for event in overlapping]
-            matches = [
+            parts = list(activity.parts)
+            truth = truth_path(activity)
+            # right about a part: the event is the injection as a whole, and its
+            # positions over that part sit on that part's path
+            agreement = [
                 score_against_injection(
                     event.decoded_time_s,
                     event.decoded_cm,
-                    truth_path(activity),
+                    truth,
                     bounds,
                     covered_cm(activity),
                     sweep.MATCH_TOLERANCE_CM,
                 ).matches
+                & part_agreement(
+                    event.decoded_time_s,
+                    event.decoded_cm,
+                    truth,
+                    parts,
+                    sweep.MATCH_TOLERANCE_CM,
+                )
                 for event in overlapping
             ]
-            parts = list(activity.parts)
-            errors = bound_errors(event_bounds, matches, parts)
+            errors = bound_errors(event_bounds, agreement, parts)
             row |= {
                 "n_parts": len(parts),
-                "n_recovered": int(recovered_parts(event_bounds, matches, parts).sum()),
-                "segmentation": segmentation(event_bounds, matches, parts),
+                "n_recovered": int(
+                    recovered_parts(event_bounds, agreement, parts).sum()
+                ),
+                "segmentation": segmentation(event_bounds, agreement, parts),
                 "start_errors_s": errors[:, 0].tolist(),
                 "end_errors_s": errors[:, 1].tolist(),
             }
@@ -295,6 +309,31 @@ def run_detectors(recording: dict, spike_times, activity: InjectedActivity, key:
     return sliding, state
 
 
+def part_alone_spikes(
+    original: list[np.ndarray],
+    injected: list[np.ndarray],
+    part_bounds: tuple[float, float],
+) -> list[np.ndarray]:
+    """One part of an injected event on its own: the event's own spikes inside
+    the part, the recording's own spikes everywhere else.
+
+    Paired with the event, so a part's recovery alone and inside the event
+    differ only in what surrounds it, not in a new draw of its spikes.
+    """
+    start_s, end_s = part_bounds
+    return [
+        np.sort(
+            np.concatenate(
+                [
+                    before[(before < start_s) | (before > end_s)],
+                    after[(after >= start_s) & (after <= end_s)],
+                ]
+            )
+        )
+        for before, after in zip(original, injected, strict=True)
+    ]
+
+
 def condition_rng(condition: str, level: float, rate_hz: float) -> np.random.Generator:
     """Placements for one condition, apart from every other's, so adding a
     condition moves no other's."""
@@ -304,9 +343,9 @@ def condition_rng(condition: str, level: float, rate_hz: float) -> np.random.Gen
 def run_trials(recording: dict, n_seeds: int) -> list[dict]:
     """Every injected condition at every seed, placed as the sweep places replays.
 
-    Each part of a multi-part event is also injected alone, at the time and
-    with the seed it has inside the event, and its recovery alone is kept
-    beside its recovery inside the event.
+    Each part of a multi-part event is also decoded alone, with exactly the
+    spikes it had inside the event and the recording's own spikes everywhere
+    else, and its recovery alone is kept beside its recovery inside the event.
     """
     means = place_field_means(sweep.N_NEURONS, sweep.TRACK_HEIGHT)
     intervals = usable_intervals(recording)
@@ -325,12 +364,8 @@ def run_trials(recording: dict, n_seeds: int) -> list[dict]:
         for seed in range(n_seeds):
             activity = make(float(at_s[seed]), seed)
             key = f"{condition}-{level}-rate{rate_hz}-seed{seed}"
-            sliding, state = run_detectors(
-                recording,
-                inject_activity(recording["spike_times"], activity, seed),
-                activity,
-                key,
-            )
+            injected = inject_activity(recording["spike_times"], activity, seed)
+            sliding, state = run_detectors(recording, injected, activity, key)
             trial = score_trial(activity, detector_events(sliding, state), state)
             if pieces is not None:
                 alone = np.zeros(len(DETECTORS))
@@ -346,7 +381,9 @@ def run_trials(recording: dict, n_seeds: int) -> list[dict]:
                     )
                     sliding, state = run_detectors(
                         recording,
-                        inject_activity(recording["spike_times"], single, seed),
+                        part_alone_spikes(
+                            recording["spike_times"], injected, single.parts[0]
+                        ),
                         single,
                         f"{key}-part{part}",
                     )

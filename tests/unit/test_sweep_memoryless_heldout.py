@@ -5,6 +5,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation import (
+    Gap,
     Segment,
     piecewise_replay,
     place_field_means,
@@ -38,6 +39,23 @@ class TestEventTruth:
         self, bounds, truth
     ):
         assert heldout.event_truth(event(*bounds), REPLAY, RECORDED) == truth
+
+    def test_an_event_inside_a_silent_gap_is_not_replay(self):
+        """The gap is inside the activity's bounds but represents nothing."""
+        chain = piecewise_replay(
+            [Segment(0.15, 30.0, 60.0), Gap(0.2), Segment(0.15, 90.0, 60.0)],
+            2.0,
+            1000.0,
+            place_field_means(25, 170.0),
+            60.0,
+        )
+
+        assert heldout.event_truth(event(2.2, 2.3), chain, RECORDED) == "silent_gap"
+        assert heldout.event_truth(event(2.1, 2.3), chain, RECORDED) == "mixed"
+        assert (
+            heldout.event_truth(event(2.0, 2.15), chain, RECORDED)
+            == "continuous_replay"
+        )
 
     def test_without_an_injection_everything_is_local_or_recorded(self):
         assert heldout.event_truth(event(2.0, 2.2), None, RECORDED) == "local"
@@ -191,3 +209,15 @@ class TestSummary:
         assert (
             values["agreement", "estimator_agreement", "both", "both", "all", ""] == 0.5
         )
+
+    def test_an_event_in_a_silent_gap_counts_as_without_content(self):
+        table = [
+            rows(event=0, truth="silent_gap", supported=True),
+            rows(event=1, truth="no_content", supported=False),
+        ]
+
+        values = self.summary(table)
+        where = ("error_rates", "state_space", "state_space", "all", "")
+
+        assert values[where[0], "n_false_support_rate", *where[1:]] == 2
+        assert values[where[0], "false_support_rate", *where[1:]] == 0.5

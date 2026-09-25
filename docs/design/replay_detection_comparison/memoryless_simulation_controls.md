@@ -51,7 +51,7 @@ peak rates (20, 60, 160 Hz) as the injected-replay sweep.
 | Jumping burst | Represented place redrawn uniformly along the track every 15 ms; cells fire by their fields | 80, 200, 500 ms |
 | Mid-event jump | Two constant-speed segments of 60 cm; the second starts J cm behind where the first ended, with no gap in time; their far end is held at 125 cm, 45 cm from where the animal rests, for every J | J = 0 (continuous control), 20, 40, 80 cm; segment length 120 or 200 ms |
 | Chain | Two 150 ms, 60 cm replays separated by a silent gap; the second either continues from the first's end or starts >= 40 cm away | Gap 10, 30, 60, 100, 200 ms |
-| Each part alone | Every part of every jump and chain trial, injected on its own at the time and with the seed it has in its event | As the jumps and chains |
+| Each part alone | Every part of every jump and chain trial, decoded on its own with exactly the spikes it had in its event and the recording's own spikes around it | As the jumps and chains |
 
 Parts are 60 cm and longer than 100 ms, so each can meet the published definition,
 whose duration criterion is strict: a part of exactly 100 ms fails it however well it
@@ -88,7 +88,10 @@ interquartile range by true duration, over replays both detectors reported (pair
   throughout, and it does not cover far more ground than the union of the parts.
   Windows in a chain's silent gap have no true position: they are left out of the
   position check but count toward the event's time extent.
-- Part recovery: a matching event overlaps at least half of the part's duration.
+- Part recovery: an event recovers a part when it matches the whole piecewise path,
+  overlaps at least half of the part's duration, and its decoded positions over that
+  part sit on that part's path (median within the tolerance): a whole-event median can
+  hide one part decoded somewhere else.
 - Segmentation, one label per trial: one event spanning all parts; one event per part;
   parts missing; other (more pieces, or partial coverage).
 - Timing: per part when the detector reports one event per part; against the first
@@ -107,6 +110,10 @@ data and settings), the sliding window decodes that model with the reference's f
 and the evaluation cells' fields are fitted separately on the same training data. Both
 detectors then run on every injected-replay cell and every condition above, from
 discovery cells only.
+
+**Truth by the parts.** An event's truth is judged by its time inside the activity's
+parts, not its outer bounds: an event wholly inside a chain's silent gap is
+`silent_gap`, content-free, and counts toward false support.
 
 **Event classes.** In each fold, every event is shared (strictly positive overlap with
 an event of the other method, the inventory comparison's rule), ours-only, or

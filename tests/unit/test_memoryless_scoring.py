@@ -7,6 +7,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.scoring impor
     InjectionScore,
     best_scored,
     bound_errors,
+    part_agreement,
     recovered_parts,
     score_against_injection,
     segmentation,
@@ -232,75 +233,146 @@ class TestPiecewisePath:
         assert not result.matches
 
 
+def every_part(matches: list[bool], n_parts: int = 2) -> list[list[bool]]:
+    """Agreement for events that are right, or wrong, on every part."""
+    return [[matched] * n_parts for matched in matches]
+
+
+class TestPartAgreement:
+    def test_each_part_is_judged_on_its_own_positions(self):
+        """Right on the first part, 45 cm off on the second: the whole-event
+        median would hide the second part's error."""
+        times = np.concatenate([np.linspace(1.0, 1.15, 30), np.linspace(1.25, 1.4, 10)])
+        decoded = chain_path(times)
+        decoded[times >= 1.25] += 45.0
+
+        agreement = part_agreement(times, decoded, chain_path, CHAIN_PARTS, 20.0)
+
+        assert agreement.tolist() == [True, False]
+
+    def test_a_part_with_no_decoded_position_does_not_agree(self):
+        times = np.linspace(1.0, 1.15, 10)
+
+        agreement = part_agreement(
+            times, chain_path(times), chain_path, CHAIN_PARTS, 20.0
+        )
+
+        assert agreement.tolist() == [True, False]
+
+
 class TestPartRecovery:
     def test_half_a_part_is_the_boundary(self):
         # the first part is 150 ms long, so half of it is 75 ms
         just_under = [(1.0, 1.0 + 0.0749)]
         just_over = [(1.0, 1.0 + 0.0751)]
 
-        assert recovered_parts(just_under, [True], CHAIN_PARTS).tolist() == [
+        assert recovered_parts(
+            just_under, every_part([True]), CHAIN_PARTS
+        ).tolist() == [
             False,
             False,
         ]
-        assert recovered_parts(just_over, [True], CHAIN_PARTS).tolist() == [True, False]
+        assert recovered_parts(just_over, every_part([True]), CHAIN_PARTS).tolist() == [
+            True,
+            False,
+        ]
 
     def test_an_event_that_is_not_the_replay_recovers_nothing(self):
-        assert recovered_parts([(1.0, 1.4)], [False], CHAIN_PARTS).tolist() == [
-            False,
-            False,
-        ]
+        assert recovered_parts(
+            [(1.0, 1.4)], every_part([False]), CHAIN_PARTS
+        ).tolist() == [False, False]
+
+    def test_a_part_decoded_elsewhere_is_not_recovered(self):
+        """Overlapping a part is not recovering it when its positions are wrong."""
+        recovered = recovered_parts([(1.0, 1.4)], [[True, False]], CHAIN_PARTS)
+
+        assert recovered.tolist() == [True, False]
 
 
 class TestSegmentation:
     def test_one_event_over_every_part_spans(self):
-        assert segmentation([(0.98, 1.42)], [True], CHAIN_PARTS) == "spanning"
+        assert (
+            segmentation([(0.98, 1.42)], every_part([True]), CHAIN_PARTS) == "spanning"
+        )
+
+    def test_an_event_wrong_on_one_part_does_not_span(self):
+        assert (
+            segmentation([(0.98, 1.42)], [[True, False]], CHAIN_PARTS)
+            == "parts_missing"
+        )
 
     def test_one_event_per_part(self):
         events = [(1.0, 1.15), (1.25, 1.4)]
 
-        assert segmentation(events, [True, True], CHAIN_PARTS) == "one_per_part"
+        assert (
+            segmentation(events, every_part([True, True]), CHAIN_PARTS)
+            == "one_per_part"
+        )
 
     def test_a_part_no_event_recovers_is_missing(self):
-        assert segmentation([(1.0, 1.15)], [True], CHAIN_PARTS) == "parts_missing"
+        assert (
+            segmentation([(1.0, 1.15)], every_part([True]), CHAIN_PARTS)
+            == "parts_missing"
+        )
 
     def test_a_part_that_is_not_the_replay_does_not_count(self):
         events = [(1.0, 1.15), (1.25, 1.4)]
 
-        assert segmentation(events, [True, False], CHAIN_PARTS) == "parts_missing"
+        assert (
+            segmentation(events, every_part([True, False]), CHAIN_PARTS)
+            == "parts_missing"
+        )
 
     def test_one_event_over_two_of_three_parts_and_one_over_the_third_is_other(self):
         parts = [(1.0, 1.1), (1.1, 1.2), (1.2, 1.3)]
 
-        label = segmentation([(1.0, 1.2), (1.2, 1.3)], [True, True], parts)
+        label = segmentation(
+            [(1.0, 1.2), (1.2, 1.3)], every_part([True, True], 3), parts
+        )
 
         assert label == "other"
 
     def test_a_matching_event_over_no_part_does_not_count(self):
         events = [(1.0, 1.15), (1.16, 1.2), (1.25, 1.4)]
 
-        assert segmentation(events, [True, True, True], CHAIN_PARTS) == "one_per_part"
+        assert (
+            segmentation(events, every_part([True, True, True]), CHAIN_PARTS)
+            == "one_per_part"
+        )
 
     def test_a_part_split_across_two_events_is_other(self):
         events = [(1.0, 1.15), (1.25, 1.34), (1.30, 1.4)]
 
-        assert segmentation(events, [True, True, True], CHAIN_PARTS) == "other"
+        assert (
+            segmentation(events, every_part([True, True, True]), CHAIN_PARTS) == "other"
+        )
 
 
 class TestBoundErrors:
     def test_a_spanning_event_is_measured_against_the_outer_bounds(self):
-        errors = bound_errors([(0.98, 1.45)], [True], CHAIN_PARTS)
+        errors = bound_errors([(0.98, 1.45)], every_part([True]), CHAIN_PARTS)
 
         np.testing.assert_allclose(errors, [[-0.02, 0.05]])
 
     def test_one_event_per_part_is_measured_part_by_part(self):
-        errors = bound_errors([(1.25, 1.41), (0.99, 1.15)], [True, True], CHAIN_PARTS)
+        errors = bound_errors(
+            [(1.25, 1.41), (0.99, 1.15)], every_part([True, True]), CHAIN_PARTS
+        )
 
         np.testing.assert_allclose(errors, [[-0.01, 0.0], [0.0, 0.01]])
 
     def test_an_other_carving_gives_no_bound_errors(self):
         events = [(1.0, 1.15), (1.25, 1.34), (1.30, 1.4)]
 
-        assert bound_errors(events, [True, True, True], CHAIN_PARTS).shape == (0, 2)
+        assert bound_errors(
+            events, every_part([True, True, True]), CHAIN_PARTS
+        ).shape == (
+            0,
+            2,
+        )
 
     def test_a_missing_part_gives_no_bound_errors(self):
-        assert bound_errors([(1.0, 1.15)], [True], CHAIN_PARTS).shape == (0, 2)
+        assert bound_errors([(1.0, 1.15)], every_part([True]), CHAIN_PARTS).shape == (
+            0,
+            2,
+        )

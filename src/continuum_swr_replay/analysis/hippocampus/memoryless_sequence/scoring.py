@@ -20,7 +20,10 @@ An injected event may have several parts, with a jump or a silent gap between
 them. Its true path is then NaN in the gaps: decoded positions there have no
 truth to be compared with, so they take no part in the position error, but
 they still count toward the event's span. Each part is scored as a target of
-its own (``recovered_parts``), and how a detector carved the whole is one label
+its own (``recovered_parts``): an event recovers a part only when it overlaps
+at least half of it *and* its decoded positions over that part sit on that
+part's path (``part_agreement``), since a whole-event median can hide one
+part decoded somewhere else. How a detector carved the whole is one label
 (``segmentation``); neither answer is declared the correct one.
 """
 
@@ -35,6 +38,7 @@ __all__ = [
     "InjectionScore",
     "best_scored",
     "bound_errors",
+    "part_agreement",
     "recovered_parts",
     "score_against_injection",
     "segmentation",
@@ -149,21 +153,61 @@ def best_scored(scores: list[InjectionScore]) -> int:
     )
 
 
+def part_agreement(
+    decoded_time_s: NDArray,
+    decoded_cm: NDArray,
+    true_position_cm: Callable[[NDArray], NDArray],
+    part_bounds: list[tuple[float, float]],
+    tolerance_cm: float,
+) -> NDArray:
+    """Whether an event's decoded positions over each part sit on that part's path.
+
+    Parameters
+    ----------
+    decoded_time_s, decoded_cm : ndarray, shape (n_decoded,)
+        The event's decoded positions and when each was read.
+    true_position_cm : callable
+        The injected path, NaN in silent gaps.
+    part_bounds : list of (float, float)
+        When each part begins and ends.
+    tolerance_cm : float
+        How far the median decoded position may sit from the part's path.
+
+    Returns
+    -------
+    agrees : ndarray of bool, shape (n_parts,)
+        False for a part the event has no decoded position in.
+
+    """
+    times = np.asarray(decoded_time_s, dtype=np.float64)
+    decoded = np.asarray(decoded_cm, dtype=np.float64)
+    truth = np.asarray(true_position_cm(times), dtype=np.float64)
+    agrees = []
+    for start, end in part_bounds:
+        here = (times >= start) & (times <= end) & np.isfinite(truth)
+        agrees.append(
+            bool(here.any())
+            and float(np.median(np.abs(decoded[here] - truth[here]))) < tolerance_cm
+        )
+    return np.array(agrees, dtype=bool)
+
+
 def _covered_parts(
     event_bounds: list[tuple[float, float]],
-    matches: list[bool],
+    agreement: NDArray,
     part_bounds: list[tuple[float, float]],
 ) -> list[set[int]]:
-    """For each matching event, the parts it overlaps for at least half their length."""
+    """For each event right about any part, the parts it recovers."""
     covered = []
-    for (start, end), matched in zip(event_bounds, matches, strict=True):
-        if not matched:
+    for (start, end), agrees in zip(event_bounds, agreement, strict=True):
+        if not np.any(agrees):
             continue
         covered.append(
             {
                 part
                 for part, (part_start, part_end) in enumerate(part_bounds)
-                if min(end, part_end) - max(start, part_start)
+                if agrees[part]
+                and min(end, part_end) - max(start, part_start)
                 >= 0.5 * (part_end - part_start)
             }
         )
@@ -172,18 +216,19 @@ def _covered_parts(
 
 def recovered_parts(
     event_bounds: list[tuple[float, float]],
-    matches: list[bool],
+    agreement: NDArray,
     part_bounds: list[tuple[float, float]],
 ) -> NDArray:
-    """Which parts some matching event overlaps for at least half their length.
+    """Which parts some event recovers: overlaps half of it and is right about it.
 
     Parameters
     ----------
     event_bounds : list of (float, float)
         Every event the detector reported that overlaps the injection.
-    matches : list of bool
-        Whether each is the injected replay, under ``score_against_injection``
-        against the whole piecewise path.
+    agreement : array-like of bool, shape (n_events, n_parts)
+        Whether each event is right about each part: it is the injected
+        replay under ``score_against_injection`` against the whole piecewise
+        path, and ``part_agreement`` holds for that part.
     part_bounds : list of (float, float)
         When each part of the injected event begins and ends.
 
@@ -192,21 +237,21 @@ def recovered_parts(
     recovered : ndarray of bool, shape (n_parts,)
 
     """
-    covered = _covered_parts(event_bounds, matches, part_bounds)
+    covered = _covered_parts(event_bounds, agreement, part_bounds)
     recovered = set().union(*covered) if covered else set()
     return np.array([part in recovered for part in range(len(part_bounds))])
 
 
 def segmentation(
     event_bounds: list[tuple[float, float]],
-    matches: list[bool],
+    agreement: NDArray,
     part_bounds: list[tuple[float, float]],
 ) -> str:
     """How the detector carved the event, as one of ``SEGMENTATION_LABELS``.
 
     Parameters are as for :func:`recovered_parts`.
     """
-    covered = _covered_parts(event_bounds, matches, part_bounds)
+    covered = _covered_parts(event_bounds, agreement, part_bounds)
     n_parts = len(part_bounds)
     if any(len(parts) == n_parts for parts in covered):
         return "spanning"
@@ -221,7 +266,7 @@ def segmentation(
 
 def bound_errors(
     event_bounds: list[tuple[float, float]],
-    matches: list[bool],
+    agreement: NDArray,
     part_bounds: list[tuple[float, float]],
 ) -> NDArray:
     """Reported minus true start and end, where the carving makes them meaningful.
@@ -236,13 +281,13 @@ def bound_errors(
         Start error and end error, in seconds.
 
     """
-    label = segmentation(event_bounds, matches, part_bounds)
+    label = segmentation(event_bounds, agreement, part_bounds)
     matched = [
         bounds
-        for bounds, is_match in zip(event_bounds, matches, strict=True)
-        if is_match
+        for bounds, agrees in zip(event_bounds, agreement, strict=True)
+        if np.any(agrees)
     ]
-    covered = _covered_parts(event_bounds, matches, part_bounds)
+    covered = _covered_parts(event_bounds, agreement, part_bounds)
     if label == "spanning":
         start, end = next(
             bounds

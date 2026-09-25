@@ -94,6 +94,31 @@ class TestScoreTrial:
         assert [row["segmentation"] for row in rows] == ["spanning"] * 4
         assert all(row["called"] and row["n_recovered"] == 2 for row in rows)
 
+    def test_a_part_decoded_elsewhere_is_not_recovered(self):
+        """Right on the first part, over 40 cm off on the second, with more of the
+        event's positions on the first, so the whole-event median stays small."""
+        activity = chain(30.0, 90.0, gap_s=0.01)
+        (first_start, first_end), (second_start, second_end) = activity.parts
+        times = np.concatenate(
+            [
+                np.linspace(first_start, first_end, 40),
+                np.linspace(second_start, second_end, 10),
+            ]
+        )
+        second = times >= second_start
+        decoded = np.where(
+            second,
+            90.0 + 60.0 * (times - second_start) / (second_end - second_start) - 45.0,
+            30.0 + 60.0 * (times - first_start) / (first_end - first_start),
+        )
+        wrong_second = sweep.ReportedEvent(*activity.bounds, times, decoded)
+        events = {detector: [wrong_second] for detector in controls.DETECTORS}
+
+        rows = controls.score_trial(activity, events, state_run(activity))
+
+        assert [row["n_recovered"] for row in rows] == [1] * 4
+        assert {row["segmentation"] for row in rows} == {"parts_missing"}
+
     def test_an_event_off_the_path_is_called_but_recovers_nothing(self):
         activity = chain()
         wrong = event(*activity.bounds, activity, offset_cm=50.0)
@@ -140,3 +165,13 @@ class TestSummary:
         assert rows["immobile_minutes", ""] == pytest.approx(1.0)
         assert rows["events_per_minute", "state_space_canonical"] == pytest.approx(2.0)
         assert rows["time_share", "state_space_canonical"] == pytest.approx(0.01)
+
+
+class TestPartAlone:
+    def test_keeps_the_events_spikes_inside_the_part_and_the_recordings_outside(self):
+        original = [np.array([0.5, 1.05, 1.2, 1.3, 2.0])]
+        injected = [np.array([0.5, 1.01, 1.02, 1.21, 1.22, 2.0])]
+
+        alone = controls.part_alone_spikes(original, injected, (1.0, 1.15))
+
+        np.testing.assert_array_equal(alone[0], [0.5, 1.01, 1.02, 1.2, 1.3, 2.0])
