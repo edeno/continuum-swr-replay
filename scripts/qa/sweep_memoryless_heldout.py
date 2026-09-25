@@ -10,6 +10,10 @@ both detectors are fitted and run on the discovery cells alone, on every
 injected replay of the sweep and every trial of the controls; the evaluation
 cells' fields are fitted separately, on the same training data.
 
+The no-replay stretches of the controls, eight recordings of the animal
+resting with nothing injected, are run the same way in every fold, so held-out
+support on pure local coding is measured too.
+
 Every event either detector reports (our non-local events, the sliding window
 under the published definition) is classed as shared, ours only or the
 comparator's only, labelled with what it truly is, and scored by the one
@@ -68,7 +72,6 @@ from scripts.qa import sweep_memoryless_detection as sweep  # noqa: E402
 
 N_PERMUTATIONS = 100
 COVERAGE_SENSITIVITY = (2.0, COVERAGE_FLOOR, 10.0)
-ESTIMATORS = ("state_space", "sliding_window")
 PLACEMENT_SEED = 2
 
 OUT_PATH = (
@@ -83,10 +86,15 @@ def folds() -> dict:
     return interleaved_folds(sweep.N_NEURONS) | poor_coverage_fold(sweep.N_NEURONS)
 
 
-def fold_models(discovery: np.ndarray, evaluation: np.ndarray):
-    """The discovery recording, and the evaluation cells' fields per sample."""
-    found = sweep.build_recording(cells=discovery)
-    held = sweep.build_recording(cells=evaluation)
+def fold_models(discovery: np.ndarray, evaluation: np.ndarray, seed: int = 0):
+    """The discovery recording, and the evaluation cells' fields per sample.
+
+    The evaluation fields carry the reference's rate floor, so a spike from an
+    evaluation cell nearly silent at a place costs a bounded log penalty rather
+    than letting one spike decide an event.
+    """
+    found = sweep.build_recording(seed=seed, cells=discovery)
+    held = sweep.build_recording(seed=seed, cells=evaluation)
     if not np.array_equal(found["place_bin_centers_cm"], held["place_bin_centers_cm"]):
         raise RuntimeError(
             "Discovery and evaluation fits placed their bins differently."
@@ -149,8 +157,10 @@ def event_truth(event, activity, recorded_events: np.ndarray) -> str:
     the event also matched the injection is a separate question
     (``matches_injection``).
     """
-    start_s, end_s = activity.bounds
-    inside_s = min(event.end_s, end_s) - max(event.start_s, start_s)
+    inside_s = 0.0
+    if activity is not None:
+        start_s, end_s = activity.bounds
+        inside_s = min(event.end_s, end_s) - max(event.start_s, start_s)
     duration_s = event.end_s - event.start_s
     if inside_s <= 0:
         if any(
@@ -166,8 +176,10 @@ def event_truth(event, activity, recorded_events: np.ndarray) -> str:
 
 def matches_injection(event, activity) -> bool:
     """The event is the injected replay under the sweep's scoring rule."""
-    if activity.truth != "continuous_replay" or not sweep.overlaps(
-        (event.start_s, event.end_s), activity.bounds
+    if (
+        activity is None
+        or activity.truth != "continuous_replay"
+        or not sweep.overlaps((event.start_s, event.end_s), activity.bounds)
     ):
         return False
     return score_against_injection(
@@ -235,6 +247,7 @@ def score_events(
                         "fold": fold,
                         "trial": key,
                         "detector": detector,
+                        "event": index,
                         "event_class": event_class,
                         "truth": truth,
                         "matches_injection": matched,
@@ -298,113 +311,123 @@ def run_fold(fold, discovery, evaluation, n_seeds) -> list[dict]:
     return rows
 
 
+def run_no_replay_fold(fold, discovery, evaluation, n_recordings) -> list[dict]:
+    """The controls' no-replay stretches, decoded from this fold's discovery cells."""
+    rows = []
+    for recording_seed in range(n_recordings):
+        recording, fields = fold_models(discovery, evaluation, seed=recording_seed)
+        spike_times = recording["all_spike_times"]
+        for index, (start_s, end_s) in enumerate(controls.usable_intervals(recording)):
+            mask = (recording["time"] >= start_s) & (recording["time"] <= end_s)
+            window = tuple(recording[k][mask] for k in ("time", "position", "speed"))
+            key = f"no-replay-recording{recording_seed}-stretch{index}"
+            found = [spike_times[cell] for cell in discovery]
+            sliding = sweep.run_sliding_window(
+                recording, found, window, f"{fold}-{key}"
+            )
+            state = sweep.run_state_space(recording, found, window)
+            for row in score_events(
+                fold,
+                key,
+                None,
+                sliding,
+                state,
+                [spike_times[cell] for cell in evaluation],
+                fields,
+                window,
+                recording,
+            ):
+                rows.append(row | {"condition": "no_replay"})
+    return rows
+
+
 def summarize(table: pd.DataFrame) -> pd.DataFrame:
     """Support rates by fold, estimator, class and truth, and the error rates."""
     rows = []
 
-    def add(summary, measure, fold, estimator, event_class, truth, value):
+    def add(summary, measure, fold, estimator, detector, event_class, truth, value):
         rows.append(
             {
                 "summary": summary,
                 "measure": measure,
                 "fold": fold,
                 "estimator": estimator,
+                "detector": detector,
                 "event_class": event_class,
                 "truth": truth,
                 "value": float(value),
             }
         )
 
-    spatial = table.truth.isin(["continuous_replay", "non_local"])
-    empty = table.truth.isin(["local", "no_content"])
-    for floor in COVERAGE_SENSITIVITY:
-        informative = table[table.coverage >= floor]
-        suffix = "" if floor == COVERAGE_FLOOR else f"_floor{floor:g}"
-        for (fold, estimator, event_class, truth), group in informative.groupby(
-            ["fold", "estimator", "event_class", "truth"]
-        ):
-            add(
-                "by_class",
-                f"support_rate{suffix}",
-                fold,
-                estimator,
-                event_class,
-                truth,
-                group.supported.mean(),
-            )
-            add(
-                "by_class",
-                f"n_events{suffix}",
-                fold,
-                estimator,
-                event_class,
-                truth,
-                len(group),
-            )
-        for (fold, estimator), group in informative.groupby(["fold", "estimator"]):
-            chosen_sets = {
-                "false_support_rate": empty.loc[group.index],
-                "support_rate_with_content": spatial.loc[group.index],
-                "support_rate_mixed": group.truth == "mixed",
-            }
-            for measure, chosen in chosen_sets.items():
-                add(
-                    "error_rates",
-                    f"{measure}{suffix}",
-                    fold,
-                    estimator,
-                    "all",
-                    "",
-                    group[chosen].supported.mean() if chosen.any() else np.nan,
-                )
-                add(
-                    "error_rates",
-                    f"n_{measure}{suffix}",
-                    fold,
-                    estimator,
-                    "all",
-                    "",
-                    chosen.sum(),
-                )
-    for (fold, estimator, event_class, truth), group in table.groupby(
-        ["fold", "estimator", "event_class", "truth"]
+    keys = ["fold", "estimator", "detector"]
+    for (fold, estimator, detector, event_class, truth), group in table.groupby(
+        [*keys, "event_class", "truth"]
     ):
-        add(
-            "by_class",
-            "median_gain",
-            fold,
-            estimator,
-            event_class,
-            truth,
-            group.gain_vs_animal.median(),
-        )
-        add(
-            "by_class",
-            "median_coverage",
-            fold,
-            estimator,
-            event_class,
-            truth,
-            group.coverage.median(),
-        )
+        where = (fold, estimator, detector, event_class, truth)
+        add("by_class", "n_events_all", *where, len(group))
         add(
             "by_class",
             "informative_share",
-            fold,
-            estimator,
-            event_class,
-            truth,
+            *where,
             (group.coverage >= COVERAGE_FLOOR).mean(),
         )
-    # the two estimators' verdicts on the same event
+        add("by_class", "median_gain", *where, group.gain_vs_animal.median())
+        add("by_class", "median_coverage", *where, group.coverage.median())
+        for floor in COVERAGE_SENSITIVITY:
+            suffix = "" if floor == COVERAGE_FLOOR else f"_floor{floor:g}"
+            informative = group[group.coverage >= floor]
+            add("by_class", f"n_events{suffix}", *where, len(informative))
+            add(
+                "by_class",
+                f"support_rate{suffix}",
+                *where,
+                informative.supported.mean() if len(informative) else np.nan,
+            )
+
+    kinds = {
+        "false_support_rate": ["local", "no_content"],
+        "support_rate_with_content": ["continuous_replay", "non_local"],
+        "support_rate_mixed": ["mixed"],
+    }
+    for (fold, estimator, detector), group in table.groupby(keys):
+        for floor in COVERAGE_SENSITIVITY:
+            suffix = "" if floor == COVERAGE_FLOOR else f"_floor{floor:g}"
+            informative = group[group.coverage >= floor]
+            for measure, truths in kinds.items():
+                chosen = informative[informative.truth.isin(truths)]
+                where = (fold, estimator, detector, "all", "")
+                add("error_rates", f"n_{measure}{suffix}", *where, len(chosen))
+                add(
+                    "error_rates",
+                    f"{measure}{suffix}",
+                    *where,
+                    chosen.supported.mean() if len(chosen) else np.nan,
+                )
+            with_content = informative[
+                informative.truth.isin(kinds["support_rate_with_content"])
+            ]
+            add(
+                "error_rates",
+                f"under_crediting{suffix}",
+                fold,
+                estimator,
+                detector,
+                "all",
+                "",
+                1 - with_content.supported.mean() if len(with_content) else np.nan,
+            )
+
+    # the two estimators' verdicts on the same event, among events informative
+    # under both
     verdicts = (
         table[table.coverage >= COVERAGE_FLOOR]
         .pivot_table(
-            index=["fold", "trial", "detector", "event_class", "truth", "duration_s"],
+            index=["fold", "trial", "detector", "event"],
             columns="estimator",
             values="supported",
             aggfunc="first",
         )
+        .reindex(columns=["state_space", "sliding_window"])
         .dropna()
     )
     for fold, group in verdicts.groupby(level="fold"):
@@ -412,6 +435,7 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
             "agreement",
             "estimator_agreement",
             fold,
+            "both",
             "both",
             "all",
             "",
@@ -426,6 +450,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--n-seeds", type=int, default=8)
     parser.add_argument("--folds", nargs="+", default=["A", "B", "C"])
+    parser.add_argument("--n-recordings", type=int, default=controls.N_RECORDINGS)
     parser.add_argument("--out", type=Path, default=OUT_PATH)
     parser.add_argument("--summary", type=Path, default=SUMMARY_PATH)
     args = parser.parse_args()
@@ -435,6 +460,7 @@ def main() -> None:
     for fold in args.folds:
         discovery, evaluation = folds()[fold]
         rows += run_fold(fold, discovery, evaluation, args.n_seeds)
+        rows += run_no_replay_fold(fold, discovery, evaluation, args.n_recordings)
         print(
             f"fold {fold}: {len(rows)} rows, {(clock.time() - started) / 60:.1f} min",
             flush=True,
@@ -446,6 +472,7 @@ def main() -> None:
         "git_commit": sweep.git_commit(),
         "n_seeds": args.n_seeds,
         "n_permutations": N_PERMUTATIONS,
+        "n_recordings": args.n_recordings,
     }
     write_table(table, args.out)
     summary = summarize(table)
@@ -456,7 +483,7 @@ def main() -> None:
             "value": np.nan,
             "note": str(table.attrs[measure]),
         }
-    for measure in ("n_seeds", "n_permutations"):
+    for measure in ("n_seeds", "n_permutations", "n_recordings"):
         summary.loc[len(summary)] = {
             "summary": "provenance",
             "measure": measure,

@@ -88,6 +88,8 @@ All long format, with provenance rows (`summary == "provenance"`, `measure` in
   isolated_part`; `level` is the grid value (burst or part duration in s, jump in cm,
   gap in s; NaN for no replay).
 - `detection_heldout_summary.csv` (phase 4): columns
-  `summary, measure, fold, estimator, event_class, truth, value, note`. `fold` in
+  `summary, measure, fold, estimator, detector, event_class, truth, value, note`;
+  `detector` is who reported the event (`state_space`, `sliding_window`), so a shared
+  event, scored once per detector, is never counted twice. `fold` in
   `A, B, C`; `estimator` in `state_space, sliding_window`; `event_class` in
   `shared, ours_only, comparator_only`; `truth` a [truth label](#truth-labels).

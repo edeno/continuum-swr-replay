@@ -96,6 +96,9 @@ interquartile range by true duration, over replays both detectors reported (pair
 
 ## Held-out evidence
 
+**Local coding.** The controls' no-replay stretches are run in every fold too, so
+held-out support on pure local coding is measured, not only on place-less bursts.
+
 **Folds.** The 25 simulated cells, ordered by field position: fold A evaluates the
 even-indexed cells and discovers on the odd, fold B the reverse; fold C evaluates the
 even-indexed cells in one half of the track only and discovers on all the others. For
@@ -124,6 +127,9 @@ no spatial content (a place-less burst).
   (1 + number of shuffles scoring at least the observed) / 101, and an event has
   held-out support when it is at most 0.05 and its gain over the animal's position is
   positive;
+- evaluation fields carry the reference's rate floor (1e-3 Hz), so a spike from an
+  evaluation cell nearly silent at a place costs a bounded log penalty rather than
+  letting one spike decide an event;
 - coverage: expected evaluation spikes under the content over the interval. Below 5 the
   event is uninformative, not unsupported; 2 and 10 are the sensitivity. Fixed before
   any result is seen.

@@ -728,7 +728,7 @@ What each detector does with activity that is not one clean replay.
 
 Does each detector's content reproduce in cells it never saw?
 
-`folds`, `fold_models`, `trials`, `event_truth`, `matches_injection`, `permutations_for`, `score_events`, `run_fold`, `summarize`, `main`
+`folds`, `fold_models`, `trials`, `event_truth`, `matches_injection`, `permutations_for`, `score_events`, `run_fold`, `run_no_replay_fold`, `summarize`, `main`
 
 ### `scripts/qa/write_pipeline_map.py`
 
