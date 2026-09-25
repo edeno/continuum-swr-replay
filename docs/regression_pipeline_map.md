@@ -722,7 +722,13 @@ Print Stage 6's per-role cross-session FDR table for a saved bundle.
 
 What each detector does with activity that is not one clean replay.
 
-`usable_intervals`, `truth_path`, `covered_cm`, `detector_events`, `score_trial`, `trials`, `run_trials`, `run_no_replay`, `summarize`, `main`
+`usable_intervals`, `truth_path`, `covered_cm`, `detector_events`, `score_trial`, `jump_segments`, `trials`, `run_detectors`, `condition_rng`, `run_trials`, `run_no_replay`, `summarize`, `main`
+
+### `scripts/qa/sweep_memoryless_heldout.py`
+
+Does each detector's content reproduce in cells it never saw?
+
+`folds`, `fold_models`, `trials`, `event_truth`, `matches_injection`, `permutations_for`, `score_events`, `run_fold`, `summarize`, `main`
 
 ### `scripts/qa/write_pipeline_map.py`
 

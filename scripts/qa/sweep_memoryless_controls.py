@@ -20,12 +20,15 @@ encoding model, the same placements and scoring rule as the sweep:
   behind where the first ended, with no gap in time; J = 0 is a continuous
   replay of both parts;
 - a chain: two 150 ms, 60 cm replays with a silent gap, the second continuing
-  from the first's end or far from it;
-- an isolated part: one 60 cm part alone, the baseline a part inside a jump or
-  a chain is read against.
+  from the first's end or far from it.
 
 Each part is 60 cm and longer than 100 ms, so it can meet the published replay
-definition on its own. Our detector is scored two ways throughout, canonical
+definition on its own, and each is also injected alone, at the time and with
+the seed it has inside its event: a part is lost *to* the jump or the chain
+only as far as it is recovered less often inside the event than alone. The
+simulated animal rests at the track's 170 cm end, and absorbing local coding
+depends on how near it an event comes, so every jump and chain keeps its
+parts' far end at the same place, whatever the jump or the gap. Our detector is scored two ways throughout, canonical
 (continuous plus fragmented) and continuous-only; the sliding window before and
 after its significance test.
 
@@ -37,6 +40,7 @@ Usage:
 import argparse
 import sys
 import time as clock
+import zlib
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -73,16 +77,17 @@ JUMP_CM = (0.0, 20.0, 40.0, 80.0)
 SEGMENT_S = (0.12, 0.20)
 CHAIN_GAP_S = (0.01, 0.03, 0.06, 0.10, 0.20)
 CHAIN_PART_S = 0.15
-ISOLATED_PART_S = (0.12, 0.15, 0.20)
 PART_CM = 60.0
 
-JUMP_START_CM = 40.0
-"""The first part runs 40 to 100 cm; the second starts J cm behind 100 cm and
-runs on 60 cm, so every J fits on the 170 cm track: J = 80 runs 20 to 80 cm."""
+FAR_END_CM = 125.0
+"""Where a jump's parts reach nearest the animal, 45 cm from where it rests,
+whatever the jump: the second part starts J cm behind the first's end, and the
+first starts wherever puts the far end of the two here."""
 
-CHAIN_STARTS_CM = {"chain_continuing": (30.0, 90.0), "chain_elsewhere": (100.0, 20.0)}
-"""Where each chain's two parts start. Continuing: the second picks up where the
-first ended. Elsewhere: the second starts 140 cm from the first's end."""
+CHAIN_STARTS_CM = {"chain_continuing": (30.0, 90.0), "chain_elsewhere": (90.0, 10.0)}
+"""Where each chain's two parts start; both reach 150 cm at most. Continuing: the
+second picks up where the first ended. Elsewhere: the second starts 140 cm
+from the first's end."""
 
 DETECTORS = (
     "sliding_accepted",
@@ -91,8 +96,9 @@ DETECTORS = (
     "state_space_continuous",
 )
 N_RECORDINGS = 8
-PLACEMENT_SEED = 1
-"""Placements draw from their own generator, apart from the sweep's."""
+"""Recordings for the no-replay control. The simulator's seed changes the
+spikes, not the trajectory, so every recording pauses in the same places and
+the control reads local coding at the track's end, over eight draws of it."""
 
 OUT_PATH = (
     Path("Processed-Data/replay_detection_comparison") / "memoryless_controls.parquet"
@@ -141,9 +147,18 @@ def truth_path(activity: InjectedActivity):
 
 
 def covered_cm(activity: InjectedActivity) -> float:
-    """The ground the activity's parts cover together."""
-    position = activity.position_cm[np.isfinite(activity.position_cm)]
-    return float(position.max() - position.min())
+    """The ground the activity's parts cover together: the union of their paths."""
+    spans = []
+    for start_s, end_s in activity.parts:
+        here = (activity.time_s >= start_s) & (activity.time_s <= end_s)
+        position = activity.position_cm[here]
+        position = position[np.isfinite(position)]
+        spans.append((position.min(), position.max()))
+    covered, reach = 0.0, -np.inf
+    for low, high in sorted(spans):
+        covered += max(0.0, high - max(low, reach))
+        reach = max(reach, high)
+    return float(covered)
 
 
 def detector_events(sliding: sweep.SlidingWindowRun, state: sweep.StateSpaceRun):
@@ -202,8 +217,22 @@ def score_trial(
     return rows
 
 
+def jump_segments(segment_s: float, jump_cm: float) -> list[Segment]:
+    """Two 60 cm parts, the second starting ``jump_cm`` behind the first's end,
+    their far end at ``FAR_END_CM``."""
+    first_start = FAR_END_CM - max(PART_CM, 2 * PART_CM - jump_cm)
+    return [
+        Segment(segment_s, first_start, PART_CM),
+        Segment(segment_s, first_start + PART_CM - jump_cm, PART_CM),
+    ]
+
+
 def trials(means: np.ndarray, sampling_frequency: float):
-    """Every injected condition: its name, grid level, peak rate and builder."""
+    """Every injected condition: name, grid level, peak rate, builder, and pieces.
+
+    ``pieces`` is the multi-part event's list of segments and gaps, None for a
+    burst.
+    """
     track_cm = sweep.TRACK_HEIGHT
 
     def burst(builder, duration_s, rate_hz):
@@ -215,86 +244,119 @@ def trials(means: np.ndarray, sampling_frequency: float):
 
         return make
 
-    def pieces(parts, rate_hz):
+    def replay(pieces, rate_hz):
         def make(at_s, seed):
-            return piecewise_replay(parts, at_s, sampling_frequency, means, rate_hz)
+            return piecewise_replay(pieces, at_s, sampling_frequency, means, rate_hz)
 
         return make
 
     for rate_hz in sweep.PEAK_RATE_HZ:
         for duration_s in BURST_DURATION_S:
-            yield (
-                "placeless_burst",
-                duration_s,
-                rate_hz,
-                burst(placeless_burst, duration_s, rate_hz),
-            )
-            yield (
-                "jumping_burst",
-                duration_s,
-                rate_hz,
-                burst(jumping_burst, duration_s, rate_hz),
-            )
+            for name, builder in (
+                ("placeless_burst", placeless_burst),
+                ("jumping_burst", jumping_burst),
+            ):
+                yield (
+                    name,
+                    duration_s,
+                    rate_hz,
+                    burst(builder, duration_s, rate_hz),
+                    None,
+                )
         for segment_s in SEGMENT_S:
             for jump_cm in JUMP_CM:
-                second_start = JUMP_START_CM + PART_CM - jump_cm
+                pieces = jump_segments(segment_s, jump_cm)
                 yield (
                     f"jump_{1000 * segment_s:.0f}ms",
                     jump_cm,
                     rate_hz,
-                    pieces(
-                        [
-                            Segment(segment_s, JUMP_START_CM, PART_CM),
-                            Segment(segment_s, second_start, PART_CM),
-                        ],
-                        rate_hz,
-                    ),
+                    replay(pieces, rate_hz),
+                    pieces,
                 )
         for condition, (first, second) in CHAIN_STARTS_CM.items():
             for gap_s in CHAIN_GAP_S:
-                yield (
-                    condition,
-                    gap_s,
-                    rate_hz,
-                    pieces(
-                        [
-                            Segment(CHAIN_PART_S, first, PART_CM),
-                            Gap(gap_s),
-                            Segment(CHAIN_PART_S, second, PART_CM),
-                        ],
-                        rate_hz,
-                    ),
-                )
-        for duration_s in ISOLATED_PART_S:
-            yield (
-                "isolated_part",
-                duration_s,
-                rate_hz,
-                pieces([Segment(duration_s, JUMP_START_CM, PART_CM)], rate_hz),
-            )
+                pieces = [
+                    Segment(CHAIN_PART_S, first, PART_CM),
+                    Gap(gap_s),
+                    Segment(CHAIN_PART_S, second, PART_CM),
+                ]
+                yield condition, gap_s, rate_hz, replay(pieces, rate_hz), pieces
+
+
+def run_detectors(recording: dict, spike_times, activity: InjectedActivity, key: str):
+    """Both detectors over the activity and a margin either side, from these spikes."""
+    start_s, end_s = activity.bounds
+    mask = (recording["time"] >= start_s - sweep.DECODE_MARGIN_S) & (
+        recording["time"] <= end_s + sweep.DECODE_MARGIN_S
+    )
+    window = tuple(recording[k][mask] for k in ("time", "position", "speed"))
+    sliding = sweep.run_sliding_window(recording, spike_times, window, key)
+    state = sweep.run_state_space(recording, spike_times, window)
+    return sliding, state
+
+
+def condition_rng(condition: str, level: float, rate_hz: float) -> np.random.Generator:
+    """Placements for one condition, apart from every other's, so adding a
+    condition moves no other's."""
+    return np.random.default_rng(zlib.crc32(f"{condition}-{level}-{rate_hz}".encode()))
 
 
 def run_trials(recording: dict, n_seeds: int) -> list[dict]:
-    """Every injected condition at every seed, placed as the sweep places replays."""
+    """Every injected condition at every seed, placed as the sweep places replays.
+
+    Each part of a multi-part event is also injected alone, at the time and
+    with the seed it has inside the event, and its recovery alone is kept
+    beside its recovery inside the event.
+    """
     means = place_field_means(sweep.N_NEURONS, sweep.TRACK_HEIGHT)
     intervals = usable_intervals(recording)
-    rng = np.random.default_rng(PLACEMENT_SEED)
     rows = []
-    for condition, level, rate_hz, make in trials(means, sweep.SAMPLING_FREQUENCY):
+    for condition, level, rate_hz, make, pieces in trials(
+        means, sweep.SAMPLING_FREQUENCY
+    ):
         span_s = make(0.0, 0).bounds[1]
-        at_s = placements(intervals, span_s, sweep.PLACEMENT_MARGIN_S, n_seeds, rng)
+        at_s = placements(
+            intervals,
+            span_s,
+            sweep.PLACEMENT_MARGIN_S,
+            n_seeds,
+            condition_rng(condition, level, rate_hz),
+        )
         for seed in range(n_seeds):
             activity = make(float(at_s[seed]), seed)
-            injected = inject_activity(recording["spike_times"], activity, seed)
-            start_s, end_s = activity.bounds
-            mask = (recording["time"] >= start_s - sweep.DECODE_MARGIN_S) & (
-                recording["time"] <= end_s + sweep.DECODE_MARGIN_S
-            )
-            window = tuple(recording[k][mask] for k in ("time", "position", "speed"))
             key = f"{condition}-{level}-rate{rate_hz}-seed{seed}"
-            sliding = sweep.run_sliding_window(recording, injected, window, key)
-            state = sweep.run_state_space(recording, injected, window)
-            for row in score_trial(activity, detector_events(sliding, state), state):
+            sliding, state = run_detectors(
+                recording,
+                inject_activity(recording["spike_times"], activity, seed),
+                activity,
+                key,
+            )
+            trial = score_trial(activity, detector_events(sliding, state), state)
+            if pieces is not None:
+                alone = np.zeros(len(DETECTORS))
+                for part, ((part_start, _), segment) in enumerate(
+                    zip(
+                        activity.parts,
+                        [piece for piece in pieces if isinstance(piece, Segment)],
+                        strict=True,
+                    )
+                ):
+                    single = piecewise_replay(
+                        [segment], part_start, sweep.SAMPLING_FREQUENCY, means, rate_hz
+                    )
+                    sliding, state = run_detectors(
+                        recording,
+                        inject_activity(recording["spike_times"], single, seed),
+                        single,
+                        f"{key}-part{part}",
+                    )
+                    for index, row in enumerate(
+                        score_trial(single, detector_events(sliding, state), state)
+                    ):
+                        alone[index] += row["n_recovered"]
+                for index, row in enumerate(trial):
+                    row["n_recovered_alone"] = int(alone[index])
+            for row in trial:
                 rows.append(
                     {
                         "condition": condition,
@@ -398,6 +460,15 @@ def summarize(trial_table: pd.DataFrame, no_replay: pd.DataFrame) -> pd.DataFram
                 add("bursts", share, condition, level, detector, group[share].mean())
     for (condition, detector), group in bursts.groupby(["condition", "detector"]):
         add("bursts", "called_rate", condition, np.nan, detector, group.called.mean())
+        for rate_hz, at_rate in group.groupby("peak_rate_hz"):
+            add(
+                "bursts",
+                f"called_rate_at_{rate_hz:g}hz",
+                condition,
+                np.nan,
+                detector,
+                at_rate.called.mean(),
+            )
 
     multi = trial_table[~trial_table.condition.str.endswith("burst")]
     for (condition, level, detector), group in multi.groupby(
@@ -411,6 +482,14 @@ def summarize(trial_table: pd.DataFrame, no_replay: pd.DataFrame) -> pd.DataFram
             detector,
             (group.n_recovered / group.n_parts).mean(),
         )
+        add(
+            "parts",
+            "part_recovery_alone",
+            condition,
+            level,
+            detector,
+            (group.n_recovered_alone / group.n_parts).mean(),
+        )
         for label in SEGMENTATION_LABELS:
             add(
                 "parts",
@@ -420,20 +499,6 @@ def summarize(trial_table: pd.DataFrame, no_replay: pd.DataFrame) -> pd.DataFram
                 detector,
                 (group.segmentation == label).mean(),
             )
-        for edge in ("start", "end"):
-            errors = np.concatenate(
-                [np.asarray(e, dtype=np.float64) for e in group[f"{edge}_errors_s"]]
-                or [np.zeros(0)]
-            )
-            add(
-                "parts",
-                f"{edge}_error_ms_median",
-                condition,
-                level,
-                detector,
-                1000 * np.median(errors) if errors.size else np.nan,
-            )
-
     table = pd.DataFrame(rows)
     table["note"] = ""
     return table
