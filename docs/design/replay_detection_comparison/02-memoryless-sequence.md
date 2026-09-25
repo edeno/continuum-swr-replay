@@ -206,9 +206,11 @@ them, the same pairs in the observed decode and in every draw; the port sets asi
 exactly those, so its rule is an approximation. A change of spikes symmetric about the
 center (one more spike from the cell whose field sits at the center of a symmetric
 posterior) alters the posterior without moving its continuous center: the reference sets
-that pair aside and the port keeps its jump. It needs exact symmetry, and on the
-Figure 1 simulation no pair of 16229 is of that kind; the sweep-wide count is in
-`reference_check_summary.csv`. This
+that pair aside and the port keeps its jump. It needs exact symmetry: on the Figure 1
+simulation no pair of 16229 is of that kind, and over every sweep cell 181 of about 2.4
+million window pairs are (`pairs_center_unchanged_but_spikes_changed` in
+`reference_check_summary.csv`), against which the significance-test counts still agree
+to within one. This
 port's centers are bins, so a literal zero test would also set aside every pair whose
 center stayed in its 2 cm bin, most pairs on a slow replay, turning the mean jump into
 the mean size of a bin crossing with a different pair set in each draw; measured on the
