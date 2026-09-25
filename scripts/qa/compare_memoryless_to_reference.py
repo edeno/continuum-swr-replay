@@ -7,10 +7,10 @@ the way the reference's MATLAB does, from the same place fields, the same
 window spike counts and the same thresholds, and with the same cell
 permutations in the significance test. What differs is only what the port
 adapts: continuous center of mass against a place-bin center, spread about
-that center, zero jumps set aside by value against pairs read from the
-spikes, and the reference's ``+1e-3`` Hz floor on every rate map. The
-reference runs twice, as published and on the port's own fields, so the floor
-and the binned center can be told apart.
+that center, and zero jumps set aside by value against pairs read from the
+spikes. The port decodes sorted cells with the reference's ``+1e-3`` Hz floor
+under every field, as the reference does; the reference also runs without it,
+to show what the floor does.
 
 Two inputs. The Figure 1 simulation of
 ``scripts/figures/generate_memoryless_comparison.py`` is compared step by
@@ -142,10 +142,10 @@ def overlap(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 
 VARIANTS = {
     "reference": reference.RATE_MAP_BASELINE_HZ,
-    "reference_on_port_fields": 0.0,
+    "reference_without_floor": 0.0,
 }
-"""The reference as published, and with the port's fields in place of its
-``+1e-3`` floor, so what remains in the second is the binned center alone."""
+"""The reference as published, which the port matches apart from the binned
+center, and without its ``+1e-3`` floor, to show what the floor does."""
 
 
 def p_values(
@@ -362,7 +362,7 @@ def decode_sweep_cell(recording: dict, injected: list, window: tuple, key: str) 
     time, _, speed = window
     config = sweep.CONFIG
     result = sorted_spikes_epoch_log_likelihood(
-        time, window[1], injected, recording["encoding_model"], config
+        time, window[1], injected, recording["sliding_encoding_model"], config
     )
     posterior = normalize_windows(
         aggregate_windows(
@@ -381,7 +381,7 @@ def decode_sweep_cell(recording: dict, injected: list, window: tuple, key: str) 
             int(candidates.runs[i, 1]),
             time,
             injected,
-            recording["encoding_model"],
+            recording["sliding_encoding_model"],
             recording["bin_distance_cm"],
             config,
             seed=seed,

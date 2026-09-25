@@ -56,6 +56,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
     interior_bin_distances_cm,
     sorted_spikes_epoch_log_likelihood,
     window_midpoints_s,
+    with_reference_rate_floor,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
     DEFAULT_N_SHUFFLES,
@@ -264,8 +265,11 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
     )
 
     # one set of place fields for both procedures, read from the detector that
-    # fitted them
-    encoding_model = detector.encoding_model_[ENCODING_KEY]
+    # fitted them; the sliding window decodes them as the reference does, with
+    # its floor under every field
+    encoding_model = with_reference_rate_floor(
+        detector.encoding_model_[ENCODING_KEY], config
+    )
     environment = encoding_model["environment"]
 
     result = sorted_spikes_epoch_log_likelihood(
@@ -1189,8 +1193,9 @@ detector decodes each 80 ms window on its own, with no model of how one window
 follows the next, and keeps or drops windows on the spread of their posterior
 and on the jump to the next window. The state-space detector infers the whole
 event at once and carries the animal's own place as a competing hypothesis.
-Throughout, both detectors read one encoding model, fitted once, and the
-sliding-window detector is held to the published definition as adapted here,
+Throughout, both detectors read one encoding model, fitted once; the
+sliding-window detector decodes it as the reference does, with 1e-3 Hz added to
+every place field, and is held to the published definition as adapted here,
 its significance test included: each accepted sequence is decoded again
 {DEFAULT_N_SHUFFLES} times with the place fields swapped between cells, and
 must beat those draws on both its mean posterior spread and its mean jump. The

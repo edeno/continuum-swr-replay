@@ -12,6 +12,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
     sorted_spikes_epoch_log_likelihood,
     window_midpoints_s,
+    with_reference_rate_floor,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
     aggregate_windows,
@@ -127,11 +128,10 @@ def sorted_track():
 
 
 class TestPortAgreesWithTheReference:
-    """On the port's own fields the two decide alike.
+    """The port, decoding with the reference's floor, decides as the reference does.
 
-    With the reference's ``+1e-3`` floor left out, what remains between them is
-    the binned center, which on this fixture changes no gate, candidate or
-    verdict.
+    What remains between them is the binned center, which on this fixture
+    changes no gate, candidate or verdict.
     """
 
     @pytest.fixture(scope="class")
@@ -140,7 +140,7 @@ class TestPortAgreesWithTheReference:
             sorted_track.time,
             sorted_track.linear_position,
             sorted_track.spike_times,
-            sorted_track.encoding_model,
+            with_reference_rate_floor(sorted_track.encoding_model, CONFIG),
             CONFIG,
         )
         posterior = normalize_windows(
@@ -160,7 +160,7 @@ class TestPortAgreesWithTheReference:
             sorted_track.spike_times, sorted_track.time, result.time.size, CONFIG
         )
         reference_posterior = reference.decode_windows(
-            counts, rate_hz, CONFIG.window_duration_s, baseline_hz=0.0
+            counts, rate_hz, CONFIG.window_duration_s
         )
         ref = reference.detect(reference_posterior, midpoint_s, speed, thresholds)
         return posterior, port, reference_posterior, ref

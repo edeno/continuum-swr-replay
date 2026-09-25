@@ -60,9 +60,11 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
     ENCODING_KEY,
+    REFERENCE_RATE_FLOOR_HZ,
     interior_bin_distances_cm,
     sorted_spikes_epoch_log_likelihood,
     window_midpoints_s,
+    with_reference_rate_floor,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.scoring import (
     best_scored,
@@ -211,6 +213,9 @@ def build_recording():
         "is_event": is_event,
         "environment": environment,
         "encoding_model": encoding_model,
+        # the same fields, decoded as the reference decodes them, with its
+        # floor under every one; the state-space detector reads them as fitted
+        "sliding_encoding_model": with_reference_rate_floor(encoding_model, CONFIG),
         "bin_distance_cm": interior_bin_distances_cm(environment),
         "detector": detector,
         "place_bin_centers_cm": np.asarray(environment.place_bin_centers_).ravel()[
@@ -253,7 +258,7 @@ def memoryless_outcome(
     """
     time, position, speed = window
     result = sorted_spikes_epoch_log_likelihood(
-        time, position, injected, recording["encoding_model"], CONFIG
+        time, position, injected, recording["sliding_encoding_model"], CONFIG
     )
     posterior = normalize_windows(
         aggregate_windows(
@@ -313,7 +318,7 @@ def memoryless_outcome(
             int(candidates.runs[i, 1]),
             time,
             injected,
-            recording["encoding_model"],
+            recording["sliding_encoding_model"],
             recording["bin_distance_cm"],
             CONFIG,
             seed=ShuffleSeed(run=SHUFFLE_RUN_SEED, session=cell_key),
@@ -955,6 +960,7 @@ def main() -> None:
         "binned centers, the jump of a pair whose slices hold as many spikes of "
         "each cell set aside (the reference's zero jump on a continuous center), "
         "strict-below count, p <= 0.05",
+        "rate_floor_hz": REFERENCE_RATE_FLOOR_HZ,
         "n_shuffles": DEFAULT_N_SHUFFLES,
         "shuffle_run_seed": SHUFFLE_RUN_SEED,
         "track": "linear",
