@@ -926,6 +926,8 @@ def plot_absorption(ax, summary: pd.DataFrame):
         )
     ax.set_xticks(at)
     ax.set_xticklabels([bin_name.replace(", ", "-").strip("(]") for bin_name in order])
+    # every bin gets a full slot, so an empty one is not drawn on the spine
+    ax.set_xlim(-0.5, len(order) - 0.5)
     ax.set_ylim(0.85, 2.6)
     ax.set_xlabel("distance from the animal (cm)")
     ax.set_ylabel("reported / actual duration")
