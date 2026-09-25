@@ -1190,10 +1190,20 @@ follows the next, and keeps or drops windows on the spread of their posterior
 and on the jump to the next window. The state-space detector infers the whole
 event at once and carries the animal's own place as a competing hypothesis.
 Throughout, both detectors read one encoding model, fitted once, and the
-sliding-window detector is held to the whole published definition, its
-significance test included: each accepted sequence is decoded again
+sliding-window detector is held to the published definition as adapted here,
+its significance test included: each accepted sequence is decoded again
 {DEFAULT_N_SHUFFLES} times with the place fields swapped between cells, and
-must beat those draws on both its mean posterior spread and its mean jump.
+must beat those draws on both its mean posterior spread and its mean jump. The
+adaptations: a window's spread is a root-mean-square distance along the track
+about a place bin, cut at {config.spread_threshold_cm:.0f} cm, where the
+paper's open-field statistic is a two-dimensional image moment that a 10 cm
+cutoff does not carry over to exactly; centers are place bins, so the pairs of windows whose
+jump the original sets aside as zero are read from the spikes instead;
+windows step {1000 * config.stride_s:.0f} ms rather than 5 ms; and the
+immobility cutoff is {config.speed_threshold_cm_per_s:.0f} rather than
+5 cm/s. The figure compares the events two complete pipelines report, each with
+its own acceptance criteria, so a difference between them cannot be put down
+to how either finds candidates alone.
 
 **(a-e) One recording with labeled events.** The simulation carries a
 continuous outbound replay, a fragmented replay, a continuous inbound replay
@@ -1238,23 +1248,36 @@ replay only when what it returns is that replay: on its path throughout, and
 not covering far more ground than the path does.
 
 **(f, g)** Percent of those {int(overall["n_cells"])} replays reported, by the
-path the replay travels and how long it lasts. Each detector runs as published,
-with its own acceptance criteria, and both are scored the same way against the
-same known answer. The sliding-window detector reports
-{pct(overall["sliding_matches"])} of the replays under the published
-definition: {pct(overall["sliding_matches_before_shuffle"])} before its
-significance test, and {pct(overall["sliding_matches_spread_only"])} with the
-spread half alone, the only half the detection script's own filter could fail;
-the paper's analyses read both halves, from a corrected script. Of
-the replays it reported before the test,
+path the replay travels and how long it lasts; both detectors are scored the
+same way against the same known answer. The comparison that isolates detection
+uses a shared target: the replays the published definition can accept at all,
+a path over about 42 cm and a duration over 100 ms,
+{pct(domain["n_cells"] / overall["n_cells"])} of the cells, with both detectors
+held to that definition's duration and dispersion criteria. There the
+sliding-window detector reports {pct(domain["sliding_matches_before_shuffle"])}
+before its significance test and the state-space detector
+{pct(domain["state_space_replay_matches"])}. The significance test, which only
+the sliding-window detector is put through, brings it to
+{pct(domain["sliding_matches"])}; the state-space detector's own acceptance
+criteria, in place of the published ones, bring it to
+{pct(domain["state_space_matches"])}. Over the whole grid, each under its own
+criteria, the two read {pct(overall["sliding_matches"])} and
+{pct(overall["state_space_matches"])}; that gap combines differences in
+detection with differences in what each counts as a replay. Over the whole
+grid the sliding-window detector reports
+{pct(overall["sliding_matches_before_shuffle"])} before its significance test,
+and {pct(overall["sliding_matches_spread_only"])} with the spread half alone,
+the only half the detection script's own filter could fail; the paper's
+analyses read both halves, from a corrected script. Of the replays it reported
+before the test,
 {pct(overall["sliding_shuffle_spread_pass_rate"])} pass the spread half and
 {pct(overall["sliding_shuffle_jump_pass_rate"])} the jump half; a short replay
 covers its path in few windows, so its own jumps are large, and the jump half
 passes {pct(jump_pass.iloc[0])} of {1000 * jump_pass.index[0]:.0f} ms replays
 against {pct(jump_pass.iloc[-1])} of {1000 * jump_pass.index[-1]:.0f} ms ones.
-The test is the reference's, convention for convention: zero jumps set aside,
-only draws strictly below the observed value counted, both halves at p ≤ 0.05.
-The state-space detector reports {pct(overall["state_space_matches"])}.
+The test keeps the reference's conventions where they carry over, counting only
+draws strictly below the observed value and passing each half at p ≤ 0.05, and
+translates its zero-jump rule to binned centers.
 {pct(overall["found_by_state_space_only"])} were reported by the
 state-space detector and not by the sliding-window detector, counting the
 {pct(overall["missed_failed_shuffle"])} it reported and then failed on the
@@ -1269,11 +1292,7 @@ criterion: a replay must spread more than 12 cm about its own centre, and a
 30 cm path cannot, however well it is decoded.
 Held to that same criterion our state-space detector also reports nothing below
 45 cm, so this is the published replay definition acting, not the window-by-window
-inference. On the part of the grid that definition can accept at all — a path
-over about 42 cm and a duration over 100 ms, {pct(domain["n_cells"] / overall["n_cells"])}
-of the cells — the two read {pct(domain["sliding_matches"])}
-({pct(domain["sliding_matches_before_shuffle"])} before the significance test)
-and {pct(domain["state_space_matches"])}.
+inference.
 
 **(h)** Reported duration over actual duration, for replays both detectors
 reported, the sliding window's before its significance test, which never
@@ -1295,9 +1314,13 @@ rests at one end of the track and pauses nowhere else, so distance from its
 place is fixed by where the replay is put and cannot be varied independently.
 Replays run at constant speed with Poisson firing from the same place fields
 the encoding model was fitted on, so there is no model mismatch and the picture
-is optimistic. The significance test is the reference's place-cell identity
-shuffle, which needs sorted cells; recorded data, decoded clusterless, are
-tested with an encoding-pair shuffle instead.
+is optimistic. Every cell of (f-i) holds a replay; there is no stretch without
+one and no incoherent activity, so the sweep measures how often each detector
+reports a replay that is there and not how often it reports one that is not,
+and more detection here is not by itself better performance. The significance
+test is the reference's place-cell identity shuffle, which needs sorted cells;
+recorded data, decoded clusterless, are tested with an encoding-pair shuffle
+instead.
 
 Produced by `scripts/figures/generate_memoryless_comparison.py` from
 `docs/design/replay_detection_comparison/detection_sweep_summary.csv`.
