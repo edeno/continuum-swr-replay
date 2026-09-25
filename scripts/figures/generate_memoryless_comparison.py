@@ -86,7 +86,7 @@ SUMMARY_PATH = Path(
 """Aggregates of the parameter sweep, drawn in the lower panels."""
 
 DISTANCE_ORDER = ("(0, 40]", "(40, 80]", "(80, 120]", "(120, 200]")
-"""Every bin the sweep's `pd.cut` can produce, in order. Panel (i) draws the
+"""Every bin the sweep's `pd.cut` can produce, in order. Panel (j) draws the
 ones the summary holds and refuses a summary holding any other."""
 
 ROW_HEIGHTS = [0.80, 0.95, 1.05, 0.75]
@@ -1108,6 +1108,15 @@ def check_summary_claims(summary: pd.DataFrame) -> None:
             "The caption says the sliding window starts early and ends late at "
             "every duration; the summary's median timing errors disagree."
         )
+    _, sliding_offset_q25 = timing_series(summary, "sliding", "end", "q25")
+    _, sliding_offset_q75 = timing_series(summary, "sliding", "end", "q75")
+    if not (
+        sliding_offset_q75 - sliding_offset > sliding_offset - sliding_offset_q25
+    ).all():
+        raise RuntimeError(
+            "The caption says the sliding window's late ends carry a long tail; "
+            "its offset errors are not skewed late at every duration."
+        )
     if not (
         (sliding_onset < state_space_onset).all()
         and (sliding_offset > state_space_offset).all()
@@ -1350,10 +1359,11 @@ sliding window starts a median {-sliding_onset.max():.0f} to
 {-sliding_onset.min():.0f} ms early and ends {sliding_offset.min():.0f} to
 {sliding_offset.max():.0f} ms late, and its late ends carry a long tail, the
 upper quartile reaching {sliding_offset_q75.max():.0f} ms; panel (j) shows
-how much of a reported event is the animal's own place. A {durations_ms[0]:.0f} ms replay is reported as about
-{1000 * shortest.duration_s * shortest.value:.0f} ms: {-sliding_onset[0]:.0f} ms
-too early at the start and {sliding_offset[0]:.0f} ms too late at the end, the
-floor panel (c) shows for one event.
+how much of a reported event is the animal's own place. A {durations_ms[0]:.0f} ms
+replay's reported start is a median {-sliding_onset[0]:.0f} ms early and its end a
+median {sliding_offset[0]:.0f} ms late, and its median reported duration is about
+{1000 * shortest.duration_s * shortest.value:.0f} ms, the floor panel (c) shows for
+one event.
 
 **(j)** Reported duration over actual duration against how far the replay sits
 from the animal's own place. Numbers give the share of the reported event's

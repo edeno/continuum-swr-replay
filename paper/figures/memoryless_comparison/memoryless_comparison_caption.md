@@ -98,9 +98,9 @@ ms beyond each. The state-space detector's median start and end sit within 5 ms
 of the truth at every duration. The sliding window starts a median 18 to 28 ms
 early and ends 21 to 65 ms late, and its late ends carry a long tail, the upper
 quartile reaching 231 ms; panel (j) shows how much of a reported event is the
-animal's own place. A 40 ms replay is reported as about 132 ms: 28 ms too early
-at the start and 65 ms too late at the end, the floor panel (c) shows for one
-event.
+animal's own place. A 40 ms replay's reported start is a median 28 ms early and
+its end a median 65 ms late, and its median reported duration is about 132 ms,
+the floor panel (c) shows for one event.
 
 **(j)** Reported duration over actual duration against how far the replay sits
 from the animal's own place. Numbers give the share of the reported event's 80

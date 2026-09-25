@@ -962,9 +962,6 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
     domain["summary"] = "overall_in_domain"
     parts.append(domain)
 
-    # the grouping column is not called "aggregate": that name shadows
-    # DataFrame.aggregate, so frame.aggregate == "x" compares a method and
-    # quietly selects nothing
     # where each detector puts an event's start and end against the truth, on
     # the replays both reported: signed, so absorbed local coding shows as an
     # early start or a late end rather than only as a longer event
@@ -981,6 +978,9 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
         timing.append(row)
     parts.append(melted(pd.DataFrame(timing), ["duration_s"], "timing_by_duration"))
 
+    # the grouping column is not called "aggregate": that name shadows
+    # DataFrame.aggregate, so frame.aggregate == "x" compares a method and
+    # quietly selects nothing
     table = pd.concat(parts, ignore_index=True)
     table["note"] = ""
     return table[

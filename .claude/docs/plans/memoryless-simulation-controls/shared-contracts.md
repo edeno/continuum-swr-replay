@@ -40,6 +40,12 @@ class StateSpaceRun:
     non_local_posterior: np.ndarray       # (n_time, n_bins) p(x | non-local), rows sum to 1
 ```
 
+`non_local_posterior` is added in phase 4, which is its only reader; computing it in
+every sweep cell before then would cost time for nothing. The score steps are
+`score_sliding_window(run, bounds, true_position_cm, path_cm, position)` and
+`score_state_space(recording, run, bounds, true_position_cm, path_cm)`: the latter
+needs the recording's bins for the event's dispersion.
+
 Invariants (do not weaken): an event's decoded positions are the ones the existing
 scoring reads (sliding window: kept windows' bin centers at their midpoints; state-space:
 the non-local MAP position per bin). `accepted` is `np.flatnonzero(candidates.is_replay)`,
