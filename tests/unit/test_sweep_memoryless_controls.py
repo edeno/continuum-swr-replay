@@ -166,6 +166,29 @@ class TestSummary:
         assert rows["events_per_minute", "state_space_canonical"] == pytest.approx(2.0)
         assert rows["time_share", "state_space_canonical"] == pytest.approx(0.01)
 
+    def test_losses_to_the_context_are_counted_even_when_pooled_recovery_rises(self):
+        no_replay = pd.DataFrame(
+            columns=["recording", "stretch", "exposure_s", "detector", "n_events"]
+        )
+        trials = pd.DataFrame(
+            {
+                "condition": "chain_elsewhere",
+                "level": 0.1,
+                "detector": "sliding_published",
+                "n_parts": 2,
+                "n_recovered": [1, 2, 2],
+                "n_recovered_alone": [2, 0, 2],
+                "segmentation": "other",
+            }
+        )
+
+        summary = controls.summarize(trials, no_replay)
+        rows = summary[summary.level.isna()].set_index("measure").value
+
+        assert rows["n_trials"] == 3
+        assert rows["n_trials_fewer_in_context"] == 1
+        assert rows["n_trials_more_in_context"] == 1
+
 
 class TestPartAlone:
     def test_keeps_the_events_spikes_inside_the_part_and_the_recordings_outside(self):

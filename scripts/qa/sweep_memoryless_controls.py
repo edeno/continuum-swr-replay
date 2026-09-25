@@ -24,9 +24,10 @@ encoding model, the same placements and scoring rule as the sweep:
 
 Each part is 60 cm and longer than 100 ms, so it can meet the published replay
 definition on its own, and each is also decoded alone, with exactly the spikes it
-had inside its event and the recording's own spikes around it: a part is lost
-*to* the jump or the chain only as far as it is recovered less often inside
-the event than alone. The
+had inside its event and the recording's own spikes around it. Recovery inside
+the event and alone is compared both pooled and paired by trial, since pooled
+recovery can rise while some trials still lose a part to the jump or the chain.
+The
 simulated animal rests at the track's 170 cm end, and absorbing local coding
 depends on how near it an event comes, so every jump and chain keeps its
 parts' far end at the same place, whatever the jump or the gap. Our detector is scored two ways throughout, canonical
@@ -536,6 +537,15 @@ def summarize(trial_table: pd.DataFrame, no_replay: pd.DataFrame) -> pd.DataFram
                 detector,
                 (group.segmentation == label).mean(),
             )
+    for (condition, detector), group in multi.groupby(["condition", "detector"]):
+        # paired by trial: pooled recovery can rise while some trials lose parts
+        change = group.n_recovered - group.n_recovered_alone
+        add("parts", "n_trials", condition, np.nan, detector, len(group))
+        for measure, count in (
+            ("n_trials_fewer_in_context", (change < 0).sum()),
+            ("n_trials_more_in_context", (change > 0).sum()),
+        ):
+            add("parts", measure, condition, np.nan, detector, count)
     table = pd.DataFrame(rows)
     table["note"] = ""
     return table
