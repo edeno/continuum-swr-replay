@@ -15,6 +15,13 @@ else, and only the whole event shows it.
 Both tests read the whole reported event, whichever detector produced it.
 Reading only the part that overlaps the injection would hide what the event
 does outside it, which is the very thing the tests are for.
+
+An injected event may have several parts, with a jump or a silent gap between
+them. Its true path is then NaN in the gaps: decoded positions there have no
+truth to be compared with, so they take no part in the position error, but
+they still count toward the event's span. Each part is scored as a target of
+its own (``recovered_parts``), and how a detector carved the whole is one label
+(``segmentation``); neither answer is declared the correct one.
 """
 
 from collections.abc import Callable
@@ -23,7 +30,20 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
-__all__ = ["InjectionScore", "best_scored", "score_against_injection"]
+__all__ = [
+    "SEGMENTATION_LABELS",
+    "InjectionScore",
+    "best_scored",
+    "bound_errors",
+    "recovered_parts",
+    "score_against_injection",
+    "segmentation",
+]
+
+SEGMENTATION_LABELS = ("spanning", "one_per_part", "parts_missing", "other")
+"""How a detector carved a multi-part event: one event over every part; one
+event per part; some part not recovered; anything else, such as a part split
+across two events."""
 
 
 @dataclass(frozen=True)
@@ -70,11 +90,13 @@ def score_against_injection(
         The decoded position at each of those times.
     true_position_cm : callable
         Where the injected replay says the animal is, at the times it is
-        given; before the replay begins its start, after it ends its end.
+        given; before the replay begins its start, after it ends its end;
+        NaN in a silent gap between parts.
     bounds : tuple of float
         When the injected replay begins and ends.
     path_cm : float
-        How far the injected replay travels.
+        How far the injected replay travels; for several parts, the ground
+        they cover together.
     tolerance_cm : float
         How far the decoded position may sit from the injected one. The span
         may exceed the path by twice this, one tolerance at each end.
@@ -93,11 +115,13 @@ def score_against_injection(
     start_s, end_s = bounds
     span_cm = float(np.ptp(decoded)) if decoded.size else float("nan")
 
-    during = (times >= start_s) & (times <= end_s)
+    truth = np.asarray(true_position_cm(times), dtype=np.float64)
+    has_truth = np.isfinite(truth)
+    during = (times >= start_s) & (times <= end_s) & has_truth
     if not during.any():
         return InjectionScore(False, float("nan"), span_cm)
 
-    error_cm = float(np.median(np.abs(decoded - true_position_cm(times))))
+    error_cm = float(np.median(np.abs(decoded[has_truth] - truth[has_truth])))
     return InjectionScore(
         matches=bool(error_cm < tolerance_cm and span_cm <= path_cm + 2 * tolerance_cm),
         position_error_cm=error_cm,
@@ -123,3 +147,117 @@ def best_scored(scores: list[InjectionScore]) -> int:
             scores[i].position_error_cm,
         ),
     )
+
+
+def _covered_parts(
+    event_bounds: list[tuple[float, float]],
+    matches: list[bool],
+    part_bounds: list[tuple[float, float]],
+) -> list[set[int]]:
+    """For each matching event, the parts it overlaps for at least half their length."""
+    covered = []
+    for (start, end), matched in zip(event_bounds, matches, strict=True):
+        if not matched:
+            continue
+        covered.append(
+            {
+                part
+                for part, (part_start, part_end) in enumerate(part_bounds)
+                if min(end, part_end) - max(start, part_start)
+                >= 0.5 * (part_end - part_start)
+            }
+        )
+    return covered
+
+
+def recovered_parts(
+    event_bounds: list[tuple[float, float]],
+    matches: list[bool],
+    part_bounds: list[tuple[float, float]],
+) -> NDArray:
+    """Which parts some matching event overlaps for at least half their length.
+
+    Parameters
+    ----------
+    event_bounds : list of (float, float)
+        Every event the detector reported that overlaps the injection.
+    matches : list of bool
+        Whether each is the injected replay, under ``score_against_injection``
+        against the whole piecewise path.
+    part_bounds : list of (float, float)
+        When each part of the injected event begins and ends.
+
+    Returns
+    -------
+    recovered : ndarray of bool, shape (n_parts,)
+
+    """
+    covered = _covered_parts(event_bounds, matches, part_bounds)
+    recovered = set().union(*covered) if covered else set()
+    return np.array([part in recovered for part in range(len(part_bounds))])
+
+
+def segmentation(
+    event_bounds: list[tuple[float, float]],
+    matches: list[bool],
+    part_bounds: list[tuple[float, float]],
+) -> str:
+    """How the detector carved the event, as one of ``SEGMENTATION_LABELS``.
+
+    Parameters are as for :func:`recovered_parts`.
+    """
+    covered = _covered_parts(event_bounds, matches, part_bounds)
+    n_parts = len(part_bounds)
+    if any(len(parts) == n_parts for parts in covered):
+        return "spanning"
+    recovered = set().union(*covered) if covered else set()
+    if len(recovered) < n_parts:
+        return "parts_missing"
+    covering = [parts for parts in covered if parts]
+    if len(covering) == n_parts and all(len(parts) == 1 for parts in covering):
+        return "one_per_part"
+    return "other"
+
+
+def bound_errors(
+    event_bounds: list[tuple[float, float]],
+    matches: list[bool],
+    part_bounds: list[tuple[float, float]],
+) -> NDArray:
+    """Reported minus true start and end, where the carving makes them meaningful.
+
+    One row per part when the detector reported one event per part, against
+    that part; one row when it reported one spanning event, against the first
+    part's start and the last part's end; no rows otherwise.
+
+    Returns
+    -------
+    errors_s : ndarray, shape (n_rows, 2)
+        Start error and end error, in seconds.
+
+    """
+    label = segmentation(event_bounds, matches, part_bounds)
+    matched = [
+        bounds
+        for bounds, is_match in zip(event_bounds, matches, strict=True)
+        if is_match
+    ]
+    covered = _covered_parts(event_bounds, matches, part_bounds)
+    if label == "spanning":
+        start, end = next(
+            bounds
+            for bounds, parts in zip(matched, covered, strict=True)
+            if len(parts) == len(part_bounds)
+        )
+        return np.array([[start - part_bounds[0][0], end - part_bounds[-1][1]]])
+    if label == "one_per_part":
+        rows = []
+        for part, (part_start, part_end) in enumerate(part_bounds):
+            start, end = next(
+                bounds
+                for bounds, parts in zip(matched, covered, strict=True)
+                if parts == {part}
+            )
+            rows.append([start - part_start, end - part_end])
+        return np.array(rows)
+    return np.zeros((0, 2))

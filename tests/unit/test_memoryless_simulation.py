@@ -4,10 +4,18 @@ import numpy as np
 import pytest
 
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation import (
+    Gap,
+    InjectedActivity,
     InjectedReplay,
+    Segment,
+    field_rates,
     immobile_intervals,
+    inject_activity,
     inject_replay,
+    jumping_burst,
+    piecewise_replay,
     place_field_means,
+    placeless_burst,
     placements,
     without,
 )
@@ -290,3 +298,131 @@ class TestWithout:
         kept = without(np.array([[0.0, 10.0]]), np.zeros((0, 2)))
 
         np.testing.assert_allclose(kept, [[0.0, 10.0]])
+
+
+class TestInjectReplayDraws:
+    def test_a_small_replay_draws_the_spikes_it_always_has(self):
+        """Pinned: rebuilding the injector must not change a replay's spikes."""
+        spike_times = [np.array([0.0, 0.5, 2.0]) for _ in range(3)]
+
+        injected, bounds = inject_replay(
+            spike_times,
+            np.array([0.0, 10.0, 20.0]),
+            InjectedReplay(0.0, 20.0, 0.2, 40.0, 1.0, seed=4),
+            sampling_frequency=100.0,
+        )
+
+        assert bounds == (1.0, 1.2)
+        np.testing.assert_allclose(injected[0], [0.0, 0.5, 1.01052632, 2.0])
+        np.testing.assert_allclose(injected[1], [0.0, 0.5, 1.09473684, 1.11578947, 2.0])
+        np.testing.assert_allclose(injected[2], [0.0, 0.5, 1.18947368, 2.0])
+
+
+class TestPiecewiseReplay:
+    means = place_field_means(25, 170.0)
+
+    def test_a_jump_leaves_one_place_and_starts_at_another_without_a_gap(self):
+        activity = piecewise_replay(
+            [Segment(0.12, 20.0, 60.0), Segment(0.12, 120.0, 60.0)],
+            at_s=1.0,
+            sampling_frequency=1000.0,
+            place_field_means=self.means,
+            peak_rate_hz=60.0,
+        )
+
+        (first_start, first_end), (second_start, second_end) = activity.parts
+        assert first_end == pytest.approx(second_start)
+        assert np.isfinite(activity.position_cm).all()
+        first = activity.time_s <= first_end
+        np.testing.assert_allclose(
+            activity.position_cm[first][[0, -1]], [20.0, 80.0], atol=0.6
+        )
+        np.testing.assert_allclose(
+            activity.position_cm[~first][[0, -1]], [120.0, 180.0], atol=0.6
+        )
+
+    def test_a_chain_is_silent_in_its_gap(self):
+        activity = piecewise_replay(
+            [Segment(0.15, 20.0, 60.0), Gap(0.06), Segment(0.15, 80.0, 60.0)],
+            at_s=1.0,
+            sampling_frequency=1000.0,
+            place_field_means=self.means,
+            peak_rate_hz=160.0,
+        )
+        (_, first_end), (second_start, _) = activity.parts
+        in_gap = (activity.time_s > first_end) & (activity.time_s < second_start)
+
+        injected = inject_activity(
+            [np.array([1.1, 1.18, 1.3]) for _ in range(25)], activity, seed=0
+        )
+
+        assert second_start - first_end == pytest.approx(0.06)
+        assert np.isnan(activity.position_cm[in_gap]).all()
+        assert (activity.rate_hz[in_gap] == 0).all()
+        spikes = np.concatenate(injected)
+        assert not ((spikes > first_end) & (spikes < second_start)).any()
+
+    def test_a_replay_must_begin_and_end_with_a_segment(self):
+        with pytest.raises(ValueError, match="segment"):
+            piecewise_replay(
+                [Gap(0.05), Segment(0.1, 0.0, 10.0)], 0.0, 1000.0, self.means, 20.0
+            )
+
+
+class TestBursts:
+    means = place_field_means(25, 170.0)
+
+    def test_a_placeless_burst_fires_every_cell_at_one_rate(self):
+        activity = placeless_burst(0.2, 1.0, 1000.0, self.means, 60.0, 170.0)
+
+        assert np.unique(activity.rate_hz).size == 1
+        assert np.isnan(activity.position_cm).all()
+        assert activity.truth == "no_content"
+
+    def test_a_placeless_burst_holds_as_many_spikes_as_a_replay_there(self):
+        activity = placeless_burst(0.2, 1.0, 1000.0, self.means, 60.0, 170.0)
+        held_at_mid_track = field_rates(
+            np.full(activity.time_s.size, 85.0), self.means, 60.0
+        )
+
+        np.testing.assert_allclose(
+            activity.rate_hz.sum(), held_at_mid_track.sum(), rtol=1e-12
+        )
+
+    def test_a_jumping_burst_holds_each_place_for_its_hold(self):
+        activity = jumping_burst(0.2, 1.0, 1000.0, self.means, 60.0, 170.0, seed=2)
+        hold = np.floor((activity.time_s - 1.0) / 0.015)
+
+        for index in np.unique(hold):
+            assert np.unique(activity.position_cm[hold == index]).size == 1
+        assert np.unique(activity.position_cm).size == np.unique(hold).size
+        assert activity.truth == "non_local"
+
+    def test_a_jumping_burst_draws_places_along_the_whole_track(self):
+        places = np.concatenate(
+            [
+                np.unique(
+                    jumping_burst(
+                        0.5, 0.0, 1000.0, self.means, 60.0, 170.0, seed=seed
+                    ).position_cm
+                )
+                for seed in range(20)
+            ]
+        )
+
+        assert places.min() >= 0.0 and places.max() <= 170.0
+        assert abs(places.mean() - 85.0) < 10.0
+
+
+class TestInjectedActivity:
+    def test_an_unknown_truth_is_refused(self):
+        with pytest.raises(ValueError, match="truth"):
+            InjectedActivity(
+                np.arange(3.0), np.zeros(3), np.zeros((3, 2)), ((0.0, 2.0),), "replay"
+            )
+
+    def test_rates_for_the_wrong_number_of_samples_are_refused(self):
+        with pytest.raises(ValueError, match="samples"):
+            InjectedActivity(
+                np.arange(3.0), np.zeros(3), np.zeros((4, 2)), ((0.0, 2.0),), "local"
+            )

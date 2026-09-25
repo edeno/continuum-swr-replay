@@ -6,7 +6,10 @@ import pytest
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.scoring import (
     InjectionScore,
     best_scored,
+    bound_errors,
+    recovered_parts,
     score_against_injection,
+    segmentation,
 )
 
 BOUNDS = (1.0, 1.2)
@@ -164,3 +167,123 @@ class TestBestScored:
     def test_nothing_to_choose_from_raises(self):
         with pytest.raises(ValueError):
             best_scored([])
+
+
+CHAIN_PARTS = [(1.0, 1.15), (1.25, 1.4)]
+"""Two 150 ms parts with a 100 ms silent gap: 20 to 80 cm, then 80 to 140 cm."""
+
+
+def chain_path(at):
+    """Where the chain says the replay is; NaN in its gap."""
+    at = np.asarray(at, dtype=np.float64)
+    first = 20.0 + 60.0 * np.clip((at - 1.0) / 0.15, 0, 1)
+    second = 80.0 + 60.0 * np.clip((at - 1.25) / 0.15, 0, 1)
+    in_gap = (at > 1.15) & (at < 1.25)
+    return np.where(at <= 1.15, first, np.where(in_gap, np.nan, second))
+
+
+class TestPiecewisePath:
+    def score(self, times, decoded):
+        return score_against_injection(
+            np.asarray(times), np.asarray(decoded), chain_path, (1.0, 1.4), 120.0, 20.0
+        )
+
+    def test_positions_in_the_gap_are_not_compared_with_a_truth(self):
+        times = np.linspace(1.0, 1.4, 41)
+        decoded = np.where(np.isnan(chain_path(times)), 30.0, chain_path(times))
+
+        result = self.score(times, decoded)
+
+        assert result.matches
+        assert result.position_error_cm == pytest.approx(0.0)
+
+    def test_positions_in_the_gap_still_count_toward_the_span(self):
+        times = np.linspace(1.0, 1.4, 41)
+        decoded = np.where(np.isnan(chain_path(times)), 400.0, chain_path(times))
+
+        result = self.score(times, decoded)
+
+        assert not result.matches
+        assert result.span_cm == pytest.approx(380.0)
+
+    def test_the_error_is_read_only_where_there_is_a_truth(self):
+        """Mostly gap, so gap positions compared with anything would set the median."""
+        times = np.linspace(1.12, 1.28, 17)
+        truth = chain_path(times)
+        decoded = np.where(np.isnan(truth), 50.0, truth + 3.0)
+
+        result = self.score(times, decoded)
+
+        assert result.position_error_cm == pytest.approx(3.0)
+
+    def test_being_on_the_path_only_outside_the_injection_is_not_the_replay(self):
+        """Held at the start before the injection, then silent through its gap."""
+        times = np.concatenate([np.linspace(0.9, 0.99, 10), np.linspace(1.17, 1.23, 7)])
+
+        result = self.score(times, np.full(times.size, 20.0))
+
+        assert not result.matches
+
+    def test_an_event_only_in_the_gap_is_not_the_replay(self):
+        times = np.linspace(1.17, 1.23, 7)
+
+        result = self.score(times, np.full(times.size, 80.0))
+
+        assert not result.matches
+
+
+class TestPartRecovery:
+    def test_half_a_part_is_the_boundary(self):
+        # the first part is 150 ms long, so half of it is 75 ms
+        just_under = [(1.0, 1.0 + 0.0749)]
+        just_over = [(1.0, 1.0 + 0.0751)]
+
+        assert recovered_parts(just_under, [True], CHAIN_PARTS).tolist() == [
+            False,
+            False,
+        ]
+        assert recovered_parts(just_over, [True], CHAIN_PARTS).tolist() == [True, False]
+
+    def test_an_event_that_is_not_the_replay_recovers_nothing(self):
+        assert recovered_parts([(1.0, 1.4)], [False], CHAIN_PARTS).tolist() == [
+            False,
+            False,
+        ]
+
+
+class TestSegmentation:
+    def test_one_event_over_every_part_spans(self):
+        assert segmentation([(0.98, 1.42)], [True], CHAIN_PARTS) == "spanning"
+
+    def test_one_event_per_part(self):
+        events = [(1.0, 1.15), (1.25, 1.4)]
+
+        assert segmentation(events, [True, True], CHAIN_PARTS) == "one_per_part"
+
+    def test_a_part_no_event_recovers_is_missing(self):
+        assert segmentation([(1.0, 1.15)], [True], CHAIN_PARTS) == "parts_missing"
+
+    def test_a_part_that_is_not_the_replay_does_not_count(self):
+        events = [(1.0, 1.15), (1.25, 1.4)]
+
+        assert segmentation(events, [True, False], CHAIN_PARTS) == "parts_missing"
+
+    def test_a_part_split_across_two_events_is_other(self):
+        events = [(1.0, 1.15), (1.25, 1.34), (1.30, 1.4)]
+
+        assert segmentation(events, [True, True, True], CHAIN_PARTS) == "other"
+
+
+class TestBoundErrors:
+    def test_a_spanning_event_is_measured_against_the_outer_bounds(self):
+        errors = bound_errors([(0.98, 1.45)], [True], CHAIN_PARTS)
+
+        np.testing.assert_allclose(errors, [[-0.02, 0.05]])
+
+    def test_one_event_per_part_is_measured_part_by_part(self):
+        errors = bound_errors([(1.25, 1.41), (0.99, 1.15)], [True, True], CHAIN_PARTS)
+
+        np.testing.assert_allclose(errors, [[-0.01, 0.0], [0.0, 0.01]])
+
+    def test_a_missing_part_gives_no_bound_errors(self):
+        assert bound_errors([(1.0, 1.15)], [True], CHAIN_PARTS).shape == (0, 2)
