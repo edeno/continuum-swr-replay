@@ -123,6 +123,14 @@ OUTPUTS = (
 )
 """The four scored outputs of the controls, with their bar opacity."""
 
+MULTIPART_CONDITIONS = (
+    "jump_120ms",
+    "jump_200ms",
+    "chain_continuing",
+    "chain_elsewhere",
+)
+"""The controls conditions whose events have two parts."""
+
 SEGMENTATION_STYLE = (
     ("spanning", "0.2", "one event over all parts"),
     ("one_per_part", "0.55", "one event per part"),
@@ -980,6 +988,24 @@ def output_color(detector: str) -> str:
     return VERMILION if detector.startswith("sliding") else BLUE
 
 
+def paired_part_changes(controls: pd.DataFrame, detector: str) -> tuple[int, int, int]:
+    """Trials, over every jump and chain, where a detector recovers fewer and more
+    parts inside the event than alone, and all trials."""
+    return tuple(
+        int(
+            sum(
+                controls_value(controls, "parts", measure, condition, None, detector)
+                for condition in MULTIPART_CONDITIONS
+            )
+        )
+        for measure in (
+            "n_trials_fewer_in_context",
+            "n_trials_more_in_context",
+            "n_trials",
+        )
+    )
+
+
 def controls_value(
     controls: pd.DataFrame,
     summary: str,
@@ -1614,23 +1640,27 @@ def check_controls_claims(controls: pd.DataFrame) -> None:
                 "The caption says both detectors report one event over a chain at "
                 "the shortest gap; the controls summary disagrees."
             )
-    multipart = ("jump_120ms", "jump_200ms", "chain_continuing", "chain_elsewhere")
     for detector in ("sliding_published", "state_space_canonical"):
         within, alone = (
             np.mean(
                 [
                     controls_value(controls, "parts", measure, c, level, detector)
-                    for c in multipart
+                    for c in MULTIPART_CONDITIONS
                     for level in controls_levels(controls, c)
                 ]
             )
             for measure in ("part_recovery", "part_recovery_alone")
         )
-        if within < alone - 0.05:
+        if within <= alone:
             raise RuntimeError(
-                "The caption says neither detector loses parts to the jump or the "
-                "chain; the controls summary shows parts recovered less often "
-                "inside the event than alone."
+                "The caption says pooled recovery is higher inside the event than "
+                "alone; the controls summary disagrees."
+            )
+        fewer, more, _ = paired_part_changes(controls, detector)
+        if more <= fewer:
+            raise RuntimeError(
+                "The caption says more trials gain parts inside the event than "
+                "lose them; the controls summary disagrees."
             )
     longest = controls_levels(controls, "chain_continuing")[-1]
     for detector in ("sliding_published", "state_space_canonical"):
@@ -1841,17 +1871,20 @@ def write_caption(
             (controls["summary"] == "provenance") & (controls.measure == "n_recordings")
         ].value.iloc[0]
     )
-    multipart = ("jump_120ms", "jump_200ms", "chain_continuing", "chain_elsewhere")
 
     def mean_recovery(detector, measure):
         return np.mean(
             [
                 controls_value(controls, "parts", measure, c, level, detector)
-                for c in multipart
+                for c in MULTIPART_CONDITIONS
                 for level in controls_levels(controls, c)
             ]
         )
 
+    sliding_fewer, sliding_more, sliding_trials = paired_part_changes(
+        controls, "sliding_published"
+    )
+    ours_fewer, ours_more, _ = paired_part_changes(controls, "state_space_canonical")
     fragmented_low, fragmented_high = burst_share("fragmented_share")
     jumps = ("jump_120ms", "jump_200ms")
     spanning_jumps = carving(jumps, "spanning", "state_space_canonical")
@@ -2061,13 +2094,16 @@ detector reports one event per part in {pct(elsewhere_split[0])} of trials at a
 {gaps_ms[0]:.0f} ms gap and {pct(elsewhere_split[-1])} at {gaps_ms[-1]:.0f} ms.
 Each part is also decoded alone, with exactly the spikes it had in its event
 and the recording's own spikes around it; a part counts as recovered only where
-the event's positions over that part sit on its path. Across jumps and chains
-the sliding window recovers
-{pct(mean_recovery("sliding_published", "part_recovery"))} of parts inside the
-event against {pct(mean_recovery("sliding_published", "part_recovery_alone"))}
-alone, and ours {pct(mean_recovery("state_space_canonical", "part_recovery"))}
-against {pct(mean_recovery("state_space_canonical", "part_recovery_alone"))}, so
-neither loses parts to the jump or the chain itself.
+the event's positions over that part sit on its path. Across jumps and chains,
+pooled recovery is higher inside the event than alone: the sliding window
+recovers {pct(mean_recovery("sliding_published", "part_recovery"))} of parts
+inside the event against
+{pct(mean_recovery("sliding_published", "part_recovery_alone"))} alone, and ours
+{pct(mean_recovery("state_space_canonical", "part_recovery"))} against
+{pct(mean_recovery("state_space_canonical", "part_recovery_alone"))}. Paired by
+trial, the gain is not uniform: the sliding window recovers fewer parts inside
+the event than alone in {sliding_fewer} of {sliding_trials} trials and more in
+{sliding_more}, ours fewer in {ours_fewer} and more in {ours_more}.
 
 **(o, p) Held-out evidence.** The simulated cells are split into discovery and
 evaluation cells three ways: two interleaved folds with their roles swapped (A,

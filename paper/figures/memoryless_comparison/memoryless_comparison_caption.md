@@ -147,9 +147,11 @@ trials; our detector reports one event per part in 17% of trials at a 10 ms gap
 and 83% at 200 ms. Each part is also decoded alone, with exactly the spikes it
 had in its event and the recording's own spikes around it; a part counts as
 recovered only where the event's positions over that part sit on its path.
-Across jumps and chains the sliding window recovers 72% of parts inside the
-event against 61% alone, and ours 89% against 86%, so neither loses parts to
-the jump or the chain itself.
+Across jumps and chains, pooled recovery is higher inside the event than alone:
+the sliding window recovers 72% of parts inside the event against 61% alone,
+and ours 89% against 86%. Paired by trial, the gain is not uniform: the sliding
+window recovers fewer parts inside the event than alone in 15 of 432 trials and
+more in 95, ours fewer in 2 and more in 22.
 
 **(o, p) Held-out evidence.** The simulated cells are split into discovery and
 evaluation cells three ways: two interleaved folds with their roles swapped (A,

@@ -697,10 +697,14 @@ continuous state alone.
   and misses a part in 38-58% of trials; our detector reports one event per part in
   17% of trials at 10 ms and 83% at 200 ms.
 - **Each part alone**, decoded with exactly the spikes it had in its event and the
-  recording's own spikes around it: the sliding window recovers 72% of parts inside
-  jumps and chains against 61% alone, ours 89% against 86%. Neither loses parts to the
-  jump or the chain itself; the sliding window gains, since a merged event can clear
-  the duration criterion a lone part misses. A part counts as recovered only where the
+  recording's own spikes around it. Pooled over jumps and chains, recovery is higher
+  inside the event than alone: the sliding window 72% against 61%, ours 89% against
+  86%. The pooled gain hides losses. Paired by trial, the sliding window recovers fewer
+  parts inside the event than alone in 15 of 432 trials and more in 95; ours fewer in 2
+  and more in 22 (`n_trials_fewer_in_context`, `n_trials_more_in_context`). The sliding
+  window's losses fall most in chains far apart (8 of 120 trials, against 1-3 of 96-120
+  elsewhere), and its gains most at a 120 ms jump (32 of 96), where a merged event can
+  clear the duration criterion a lone part misses. A part counts as recovered only where the
   event's decoded positions over that part sit on its path, not merely where the event
   as a whole matches; that stricter rule changed no result here.
 
