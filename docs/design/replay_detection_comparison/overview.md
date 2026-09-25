@@ -104,7 +104,12 @@ inventories 4, 5, and 6. The question only posterior-triggered methods can ask i
 with **neither** a ripple **nor** a burst, the cell Widloski & Foster report as
 "neither." Keep the two questions separate wherever a non-SWR fraction is reported: the
 inventory comparison (03) yields both cells, and they must not be conflated under the
-label "ripple-less." That neither-cell is why the posterior-triggered family exists and
+label "ripple-less." Nor is either the paper's own classification: in this design a
+ripple-less event is one with no detected SWR overlap under a stated SWR definition,
+whereas Widloski & Foster also compared each event's ripple power against
+duration-matched background snippets, which this design does not reproduce. Report "no
+detected SWR under these definitions", with the definition attached, never "ripple-less"
+as the paper uses it. That neither-cell is why the posterior-triggered family exists and
 why our own pipeline is in it. Worth noting that our lab lineage moved families without
 measuring the cost: Denovellis et al. 2021 and Gillespie et al. 2021 are state-space but
 SWR-*triggered*, where our current pipeline is posterior-triggered.
@@ -167,7 +172,7 @@ Method-specific decisions live in the component specs. These apply across the co
 
 | # | Decision | Reasoning |
 |---|---|---|
-| **X1** | Compare detection *triggers* (level 1); defer scoring (level 2) to 04 | The trigger is upstream of everything else and determines which of the ripple-less and neither-ripple-nor-burst questions each inventory can ask at all |
+| **X1** | Compare detection *triggers* (level 1); defer scoring (level 2) to 04 | The trigger is upstream of everything else and determines which of the ripple-less and neither-ripple-nor-burst questions each inventory can ask at all. What level 1 actually compares, though, is the event inventories of complete pipelines: acceptance criteria, significance filters and boundary rules differ between them too, so a disagreement between two inventories is not attributable to the trigger alone |
 | **X2** | Six inventories, not two | A within-family comparison of two posterior-triggered methods cannot say what the standard SWR/MUA pipelines would have found |
 | **X3** | Harmonize substrate, not method internals | Comparability without blending; see the governing rule above |
 | **X4** | Shared whole-event < 4 cm/s eligibility for every method; native-speed controls are deferred | Apply the same eligibility criterion to each method's candidates. Different event boundaries can still affect qualification |
