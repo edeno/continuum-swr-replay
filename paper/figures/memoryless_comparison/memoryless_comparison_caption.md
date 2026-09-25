@@ -37,7 +37,7 @@ and gives it 5.8 times its true length, because 81% of the event it reports is
 the animal's own place, absorbed by the merge rule. It also accepts the 80 ms
 replay, at 1.6 times its length with 0% local coding in it: the window alone
 puts a floor under any duration it can report. It passes the significance test
-(p = 0.010 on spread and 0.050 on jump). It assembles a candidate from the 30
+(p = 0.010 on spread and 0.030 on jump). It assembles a candidate from the 30
 cm replay and another from the remote stationary event and declines both for
 too little dispersion (6 and 0 cm against the 12 cm it requires). The
 state-space detector reports all four, with every bound within 42 ms of the
