@@ -411,6 +411,7 @@ class TestBursts:
         )
 
         assert places.min() >= 0.0 and places.max() <= 170.0
+        assert places.min() < 10.0 and places.max() > 160.0
         assert abs(places.mean() - 85.0) < 10.0
 
 
@@ -418,11 +419,21 @@ class TestInjectedActivity:
     def test_an_unknown_truth_is_refused(self):
         with pytest.raises(ValueError, match="truth"):
             InjectedActivity(
-                np.arange(3.0), np.zeros(3), np.zeros((3, 2)), ((0.0, 2.0),), "replay"
+                np.arange(3.0),
+                1.0,
+                np.zeros(3),
+                np.zeros((3, 2)),
+                ((0.0, 2.0),),
+                "replay",
             )
 
     def test_rates_for_the_wrong_number_of_samples_are_refused(self):
         with pytest.raises(ValueError, match="samples"):
             InjectedActivity(
-                np.arange(3.0), np.zeros(3), np.zeros((4, 2)), ((0.0, 2.0),), "local"
+                np.arange(3.0),
+                1.0,
+                np.zeros(3),
+                np.zeros((4, 2)),
+                ((0.0, 2.0),),
+                "local",
             )

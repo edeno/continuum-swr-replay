@@ -119,6 +119,9 @@ class InjectedActivity:
     ----------
     time_s : ndarray, shape (n_samples,)
         Evenly spaced sample times.
+    step_s : float
+        The spacing, as it was chosen rather than as the times' difference,
+        which rounds.
     position_cm : ndarray, shape (n_samples,)
         The place represented at each sample; NaN where the activity is
         silent or represents no place.
@@ -132,6 +135,7 @@ class InjectedActivity:
     """
 
     time_s: NDArray
+    step_s: float
     position_cm: NDArray
     rate_hz: NDArray
     parts: tuple[tuple[float, float], ...]
@@ -170,11 +174,13 @@ class Gap:
     duration_s: float
 
 
-def _sample_times(at_s: float, duration_s: float, sampling_frequency: float) -> NDArray:
-    """Evenly spaced samples from ``at_s`` to ``at_s + duration_s``, both included."""
+def _sample_times(
+    at_s: float, duration_s: float, sampling_frequency: float
+) -> tuple[NDArray, float]:
+    """Evenly spaced samples from ``at_s`` to ``at_s + duration_s``, and their step."""
     n_samples = max(2, int(duration_s * sampling_frequency))
     step_s = duration_s / (n_samples - 1)
-    return at_s + np.arange(n_samples) * step_s
+    return at_s + np.arange(n_samples) * step_s, step_s
 
 
 def field_rates(
@@ -233,7 +239,7 @@ def inject_activity(
     at, rate = activity.time_s, activity.rate_hz
     if len(spike_times) != rate.shape[1]:
         raise ValueError(f"{len(spike_times)} cells but {rate.shape[1]} rates.")
-    step_s = float(at[1] - at[0])
+    step_s = activity.step_s
     if (rate * step_s).max(initial=0.0) >= 1.0:
         raise ValueError(
             f"A rate of {rate.max()} Hz sampled every {step_s} s would fire at "
@@ -287,8 +293,7 @@ def inject_replay(
         raise ValueError(
             f"{len(spike_times)} cells but {len(place_field_means)} place fields."
         )
-    at = _sample_times(replay.at_s, replay.duration_s, sampling_frequency)
-    step_s = float(at[1] - at[0])
+    at, step_s = _sample_times(replay.at_s, replay.duration_s, sampling_frequency)
     if replay.peak_rate_hz * step_s >= 1.0:
         raise ValueError(
             f"A peak rate of {replay.peak_rate_hz} Hz sampled every {step_s} s "
@@ -297,6 +302,7 @@ def inject_replay(
     position_cm = replay.start_cm + replay.path_cm * np.arange(at.size) / (at.size - 1)
     activity = InjectedActivity(
         time_s=at,
+        step_s=step_s,
         position_cm=position_cm,
         rate_hz=field_rates(position_cm, place_field_means, replay.peak_rate_hz),
         parts=((float(at[0]), float(at[-1])),),
@@ -342,7 +348,7 @@ def piecewise_replay(
         raise ValueError("A piecewise replay must begin and end with a segment.")
     ends = at_s + np.cumsum([piece.duration_s for piece in pieces])
     starts = ends - [piece.duration_s for piece in pieces]
-    at = _sample_times(at_s, float(ends[-1] - at_s), sampling_frequency)
+    at, step_s = _sample_times(at_s, float(ends[-1] - at_s), sampling_frequency)
     # the piece each sample falls in, a boundary sample going to the earlier
     piece_index = np.minimum(np.searchsorted(ends, at, side="left"), len(pieces) - 1)
     position_cm = np.full(at.size, np.nan)
@@ -354,6 +360,7 @@ def piecewise_replay(
         position_cm[here] = piece.start_cm + piece.path_cm * fraction
     return InjectedActivity(
         time_s=at,
+        step_s=step_s,
         position_cm=position_cm,
         rate_hz=field_rates(position_cm, place_field_means, peak_rate_hz),
         parts=tuple(
@@ -379,13 +386,14 @@ def placeless_burst(
     at mid-track divided evenly among the cells, so the burst holds as many
     spikes as a replay of the same duration and peak rate there.
     """
-    at = _sample_times(at_s, duration_s, sampling_frequency)
+    at, step_s = _sample_times(at_s, duration_s, sampling_frequency)
     population_hz = field_rates(
         np.array([track_cm / 2]), place_field_means, peak_rate_hz
     ).sum()
     n_neurons = len(place_field_means)
     return InjectedActivity(
         time_s=at,
+        step_s=step_s,
         position_cm=np.full(at.size, np.nan),
         rate_hz=np.full((at.size, n_neurons), population_hz / n_neurons),
         parts=((float(at[0]), float(at[-1])),),
@@ -409,12 +417,13 @@ def jumping_burst(
     spatial information but no sequence. The places are drawn from their own
     stream of ``seed``, apart from the one that draws the spikes.
     """
-    at = _sample_times(at_s, duration_s, sampling_frequency)
+    at, step_s = _sample_times(at_s, duration_s, sampling_frequency)
     hold = np.floor((at - at_s) / hold_s).astype(int)
     places = np.random.default_rng([seed, 1]).uniform(0.0, track_cm, hold.max() + 1)
     position_cm = places[hold]
     return InjectedActivity(
         time_s=at,
+        step_s=step_s,
         position_cm=position_cm,
         rate_hz=field_rates(position_cm, place_field_means, peak_rate_hz),
         parts=((float(at[0]), float(at[-1])),),

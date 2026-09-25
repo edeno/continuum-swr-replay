@@ -65,8 +65,9 @@ All return `InjectedActivity`; rates follow `FIELD_STD_CM` Gaussians of
 `memoryless_sequence/scoring.py`.
 
 - `score_against_injection` gains NaN-in-gap support: the position error is the median
-  over decoded times that are inside the injection *and* where the true path is finite;
-  no such time means no match. `path_cm` for a multi-part event is the ground its parts
+  over every decoded time where the true path is finite (outside the injection the
+  truth is the path's nearer end, as before); an event needs at least one decoded time
+  inside the injection where the truth is finite, or it does not match. `path_cm` for a multi-part event is the ground its parts
   cover together, `max - min` over every part's positions. Single-part behavior is
   unchanged (its truth is never NaN).
 - `recovered_parts(event_bounds, matches, part_bounds) -> NDArray[bool]` — part `j` is

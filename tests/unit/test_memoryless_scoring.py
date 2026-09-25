@@ -268,6 +268,18 @@ class TestSegmentation:
 
         assert segmentation(events, [True, False], CHAIN_PARTS) == "parts_missing"
 
+    def test_one_event_over_two_of_three_parts_and_one_over_the_third_is_other(self):
+        parts = [(1.0, 1.1), (1.1, 1.2), (1.2, 1.3)]
+
+        label = segmentation([(1.0, 1.2), (1.2, 1.3)], [True, True], parts)
+
+        assert label == "other"
+
+    def test_a_matching_event_over_no_part_does_not_count(self):
+        events = [(1.0, 1.15), (1.16, 1.2), (1.25, 1.4)]
+
+        assert segmentation(events, [True, True, True], CHAIN_PARTS) == "one_per_part"
+
     def test_a_part_split_across_two_events_is_other(self):
         events = [(1.0, 1.15), (1.25, 1.34), (1.30, 1.4)]
 
@@ -284,6 +296,11 @@ class TestBoundErrors:
         errors = bound_errors([(1.25, 1.41), (0.99, 1.15)], [True, True], CHAIN_PARTS)
 
         np.testing.assert_allclose(errors, [[-0.01, 0.0], [0.0, 0.01]])
+
+    def test_an_other_carving_gives_no_bound_errors(self):
+        events = [(1.0, 1.15), (1.25, 1.34), (1.30, 1.4)]
+
+        assert bound_errors(events, [True, True, True], CHAIN_PARTS).shape == (0, 2)
 
     def test_a_missing_part_gives_no_bound_errors(self):
         assert bound_errors([(1.0, 1.15)], [True], CHAIN_PARTS).shape == (0, 2)
