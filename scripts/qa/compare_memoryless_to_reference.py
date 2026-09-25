@@ -201,8 +201,10 @@ def compare(
     ref_spread_pass = bin_size_cm * ref.spread_bins < config.spread_threshold_cm
     ref_jump_pass = bin_size_cm * ref.jump_bins < config.jump_threshold_cm
     identical = (port.runs[:, None, :] == ref.runs[None, :, :]).all(axis=2)
-    center_unchanged = np.diff(ref.center_bins) == 0.0
-    spikes_unchanged = (counts[1:] == counts[:-1]).all(axis=1)
+    # only pairs whose windows both have a center; speed-gated ones have none
+    both = np.isfinite(ref.center_bins[:-1]) & np.isfinite(ref.center_bins[1:])
+    center_unchanged = both & (np.diff(ref.center_bins) == 0.0)
+    spikes_unchanged = both & (counts[1:] == counts[:-1]).all(axis=1)
 
     # the reference's test on each of its own replays, and on each of the
     # port's with the port's draws
