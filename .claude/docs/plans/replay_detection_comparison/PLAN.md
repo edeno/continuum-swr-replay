@@ -27,7 +27,7 @@ is stale.
 |---|---|---|---|
 | 0 | [01](../../../docs/design/replay_detection_comparison/01-yu-swr-detector.md) §Architecture, [table](../../../docs/design/replay_detection_comparison/detector_comparison.md) | Detectors implemented in `ripple_detection` with tests, README, changelog | **done** 2026-09-21: PRs #14–#19 merged to package `master` (b0431a4) after independent review |
 | 1 | [01](../../../docs/design/replay_detection_comparison/01-yu-swr-detector.md) §Producing the inventory, steps 2–6 | Yu SWR inventory for every epoch via Spyglass: pin the package, register the algorithm, `RippleParameters` row `yu_2017`, populate, `get_ripple("Yu")`, Y5 speed gate, observation-availability table | not started |
-| 2 | [02](../../../docs/design/replay_detection_comparison/02-memoryless-sequence.md) | Memoryless sliding-window sequence detector on the clusterless posterior; shuffle null; adapted cohort before/after shuffle | code done and independently reviewed twice, review fixes in (2026-09-22); the sweep and figure apply the paper's place-cell identity shuffle, with the reference's own conventions (zero jumps set aside, strict-below count, p ≤ 0.05; a third review found the port's "conservative" departures were manufacturing the by-duration jump trend, and they were reverted 2026-09-22 so the comparator is the method as published); **next: real-data pilot on one epoch**, then inspect both shuffle nulls (02 §"What the encoding-pair test does on simulated data") and unverified assumptions 6–7. 02 assumption 8 (non-SWR events decoded partly from their own spikes) accepted for now, 2026-09-22 |
+| 2 | [02](../../../docs/design/replay_detection_comparison/02-memoryless-sequence.md) | Memoryless sliding-window sequence detector on the clusterless posterior; shuffle null; adapted cohort before/after shuffle | code done and independently reviewed twice, review fixes in (2026-09-22); the sweep and figure apply the paper's place-cell identity shuffle, with the reference's conventions where they carry over (zero jumps set aside, strict-below count, p ≤ 0.05; a third review found the port's "conservative" departures were manufacturing the by-duration jump trend, and they were reverted 2026-09-22). A fourth review (2026-09-25) led to the sorted zero-jump fix and a check against the reference's own arithmetic (02 §"Against the reference's own arithmetic"): the port reproduces the reference's decisions apart from the `+1e-3` Hz rate-map floor, which moves the significance-test pass rate from 69% to 88% on the sweep. So the port is a documented adaptation, not a validated reproduction; claims of reproduction or detector superiority wait for the pilot checks below. **Next: real-data pilot**, with the checks under "Phase 2 pilot". 02 assumption 8 (non-SWR events decoded partly from their own spikes) accepted for now, 2026-09-22; see D6 |
 | 3 | [03](../../../docs/design/replay_detection_comparison/03-inventory-comparison.md) | Six inventories on the common schema, observation-availability tables, all-pairs overlap table, single/no-detector cells, SWR label matrix, sampled examples | accounting done 2026-09-22 in `analysis/inventory_comparison/` (`intervals`, `schema`, `availability`, `overlap`, `components`, `recount`, `cells`, `swr_matrix`), test-first with mutation checks and an end-to-end simulated epoch; **remaining, needs recorded data:** per-detector adapters (Kay/Karlsson/Yu from `RippleTimesV1`, MUA HSE, the canonical classified table, the memoryless table) that also build each detector's coverage from its inputs, a runner writing the tables per epoch, per-session/animal reporting, and the sampled examples. An independent review (2026-09-22) found cross-epoch key collisions, a partial-observation SWR label, float-rounded recount gaps, window support off by one sample, and dropped missing-run rows, all fixed test-first. Still open from it: excluded time by reason (the `observation_table` reasons are not yet joined to `Coverage`); an event ending between the last still and first moving sample is speed-eligible yet outside exposure, so it reads unknown; throughput at 221 epochs x 6 detectors unmeasured |
 | 4 | [04](../../../docs/design/replay_detection_comparison/04-event-features.md) §Initial report | Event features, common spike-evidence diagnostic, boundary and rejection diagnostics, at default settings | not started |
 | 5 | [04](../../../docs/design/replay_detection_comparison/04-event-features.md) §Planned follow-up | Threshold robustness: cost pilot, then one-at-a-time relax/tighten | deferred until Phase 4 is reported |
@@ -94,6 +94,8 @@ Standing decisions for package work (from the user, this session):
 | D2 | Which `ripple_detection` commit to pin | `master` b0431a4 (all PRs merged). No release tag yet; the changelog marks the duration change as minor-version, so a `v1.8.0` tag before pinning would be cleaner. |
 | D3 | Spyglass PR for the registration line? | Optional cleanup after Phase 1 produces results (spec 01 step 6). |
 | D4 | Widloski adaptation choices (02 §deviations) | Documented in 02; not re-decided here. |
+| D5 | Add the reference's `+1e-3` Hz floor to the sorted path of the sweep and figure? | Open. It would make the simulated comparator match the reference's significance test (02 V3), but the sliding window would then no longer read exactly the encoding model the state-space detector reads (X5). Recorded data, decoded clusterless, have no equivalent either way. |
+| D6 | Run the running-only encoding refit for both procedures on the pilot, rather than after a non-SWR fraction becomes a headline claim? | Open. 02 assumption 8 accepted the `no_ripple` asymmetry on 2026-09-22 until a headline non-SWR claim; the 2026-09-25 review asks for the refit on the pilot, for both methods, before any such claim. It needs a refit of the pilot decodes on the server. |
 
 ## Branch state (project repo)
 
@@ -111,3 +113,27 @@ python scripts/decoding/run_memoryless_detection.py --run-seed 20260922 \
 
 Measure the runtime of the second before running an animal: the shuffle re-decodes each
 tested candidate's spikes 100 times.
+
+Checks the pilot carries, from the 2026-09-25 review. None needs the full dataset; all
+come before a reproduction or superiority claim, not before the descriptive comparison:
+
+1. **Validate the encoding-pair null** (02 D2, assumption 7). On a few pilot epochs from
+   different animals and tetrode counts, inject known moving sequences, stationary
+   events, and incoherent activity (marks scrambled against spike times), and run the
+   detector with the shuffle. Inspect both null statistics, spread and jump, for each,
+   and report the cohorts before and after the shuffle. On simulations the jump half
+   fails real moving trajectories against a broad null (02 §"What the encoding-pair test
+   does on simulated data"); measure how much position a tetrode's identity carries. A
+   failure here is a failure of the adapted null, not of the published algorithm, and is
+   reported as such.
+2. **Running-only encoding control** (D6, awaiting a decision): refit the pilot decodes'
+   encoding on running periods and run *both* procedures on it, beside the shared
+   `no_ripple` model, comparing each cohort and its SWR/non-SWR split.
+3. **Two adaptation sensitivities, not a search** (02 V9 and the singleton convention):
+   the spread cutoff at 10 cm and at 20 cm (the reference's only 1D precedent,
+   `load_replayEvents_cm.m:32`), and `--keep-single-window-runs`. Run on the simulation
+   sweep and the pilot epoch; report whether conclusions change. Do not tune either
+   setting toward agreement with our detector.
+4. **Reference-output check stays green.** Rerun
+   `scripts/qa/compare_memoryless_to_reference.py` after any change to the detector or
+   the shuffle and compare against `reference_check_summary.csv`.
