@@ -28,13 +28,14 @@ straight, constant-speed replay. Three things a reader needs are missing:
 | # | Decision | Reasoning |
 |---|---|---|
 | C1 | Our detector is scored two ways throughout: canonical (Non-Local Continuous + Fragmented > 0.8 for >= 15 ms, the project's event definition) and continuous-only (same thresholds on Non-Local Continuous alone) | An incoherent burst decoded as fragmented is a correct non-local call under our model but not replay; reporting both separates the two |
-| C2 | Two kinds of incoherent activity: a place-less burst and a jumping burst | They test different criteria: the place-less burst gives a broad posterior (spread gate), the jumping burst sharp posteriors that hop (jump gate, and our fragmented state) |
+| C2 | Two kinds of burst: a place-less burst and a jumping burst | They test different criteria: the place-less burst gives a broad posterior (spread gate), the jumping burst sharp posteriors that hop (jump gate, and our fragmented state) |
+| C2a | Truth has two targets, scored separately: *non-local representation* and *continuous replay*. A continuous replay is both; a jumping burst is non-local representation but not continuous replay; local coding and a place-less burst are neither | A jumping burst represents real places every 15 ms, so calling it non-local, or finding held-out spatial information in it, is correct; only calling it a sequence is an error. A single "negative" label would score correct answers as false |
 | C3 | Multi-part events are scored per part and by segmentation, with no outcome declared correct | Whether a jump or a chain is one event or several is a question of definition; the figure shows how each method carves the same activity |
 | C4 | Everything goes in the existing comparison figure, which grows from four rows to six | Keeps the comparison in one place |
 | C5 | Today's panel (h), reported/actual duration by true duration, is replaced by signed onset and offset error | The two errors decompose the ratio and show strictly more |
 | C6 | Held-out evidence: detect on discovery cells, assess content with evaluation cells excluded from detection and tuning; identical folds and evaluation rule for every method; comparator-only events tested too | Tests whether our additional detections carry reproducible spatial information in independent neurons |
-| C7 | Content for every event, whichever method found it, is our decoder's non-local posterior p(x \| non-local, discovery spikes) on the native 2 ms grid, from a refit on discovery cells | Our decoder already pools over time through its transition model, so no re-binning is needed; a prior-free decode at 2 ms is mostly empty bins, and rebinning trades resolution for spikes arbitrarily. The evaluation cells take no part in detection, decoding or tuning, so this is not circular |
-| C8 | The known bias of C7, under-crediting a comparator event that our model decodes as local, is measured in simulation and reported beside the false-support rate | The truth is known there; comparator-only true replays that fail to get support are that bias |
+| C7 | Every event, whichever method found it, is evaluated under **both** discovery-derived content estimates: our decoder's non-local posterior p(x \| non-local, discovery spikes) on the native 2 ms grid, and the sliding window's own posterior (80 ms windows, uniform prior, the reference's floor), each 2 ms bin taking the window whose midpoint is nearest. Both come from refits on discovery cells only | Holding out neurons prevents reusing data but does not remove the asymmetry of letting one method's decoder judge every method's content: a correct comparator event our decoder mis-estimates would be under-credited, and calibration in one simulator does not establish fairness on recordings. Using both estimators on every inventory makes the dependence visible |
+| C8 | A conclusion about held-out support is stated only when it holds under both content estimators; where they disagree, the disagreement is the result. In simulation each estimator's bias is also measured: true events of either class that fail to get support under it | The truth is known there, so under-crediting by either estimator is measurable |
 | C9 | Folds: two interleaved (alternate cells by field position, roles swapped), both covering the track, plus one whose evaluation cells cover only half the track | Shows the score at good coverage and how it misleads at poor coverage |
 | C10 | Held-out support is read with the simulation's error estimates, never alone | Held-out support does not reveal missed events or establish real-data sensitivity |
 
@@ -48,11 +49,15 @@ peak rates (20, 60, 160 Hz) as the injected-replay sweep.
 | No replay | Nothing: each usable immobile stretch is decoded as it is, holding only local coding | All usable immobile time |
 | Place-less burst | Every cell fires at one rate unrelated to its field; population spike count matched to a replay of the same duration and peak rate | 80, 200, 500 ms |
 | Jumping burst | Represented place redrawn uniformly along the track every 15 ms; cells fire by their fields | 80, 200, 500 ms |
-| Mid-event jump | Two constant-speed segments of 60 cm; the second starts J cm from where the first ended, with no gap in time | J = 0 (continuous control), 20, 40, 80 cm; segment length 100 or 200 ms |
+| Mid-event jump | Two constant-speed segments of 60 cm; the second starts J cm from where the first ended, with no gap in time | J = 0 (continuous control), 20, 40, 80 cm; segment length 120 or 200 ms |
 | Chain | Two 150 ms, 60 cm replays separated by a silent gap; the second either continues from the first's end or starts >= 40 cm away | Gap 10, 30, 60, 100, 200 ms |
+| Isolated part | One part of each multi-part geometry on its own: a 60 cm replay of 120, 150 or 200 ms, at the same placements | The three part lengths |
 
-Parts are 60 cm and at least 100 ms, inside what the published definition can accept,
-so a missed part reflects the jump or chain structure and not the path-length limit.
+Parts are 60 cm and longer than 100 ms, so each can meet the published definition,
+whose duration criterion is strict: a part of exactly 100 ms fails it however well it
+is decoded. The isolated parts are the baseline: a part is lost *to the jump or the
+chain* only as far as it is recovered less often inside the multi-part event than on
+its own.
 
 ## Scoring
 
@@ -61,11 +66,15 @@ dispersion (before its significance test) and published (after it; the place-cel
 identity shuffle runs on every accepted candidate, as in the sweep); our detector
 canonical and continuous-only (C1).
 
-**Negative controls.** No replay: reported events per minute of eligible immobility and
-the share of immobile time they cover; an event belongs to the stretch holding its
+**Controls.** No replay: reported events per minute of eligible immobility and the
+share of immobile time they cover; an event belongs to the stretch holding its
 midpoint. Bursts: share of bursts with at least one reported event overlapping them;
 for our detector, also the share of burst time in the continuous and in the fragmented
-state.
+state. Read against C2a: an event reported on local coding or a place-less burst is a
+false positive for either target; an event reported on a jumping burst is correct for
+non-local representation and a false positive only as continuous replay, so the
+sliding window's and our continuous-only calls on it are the replay false positives,
+and our canonical call is not.
 
 **Timing.** Signed onset error (reported start - true start) and offset error (reported
 end - true end), in ms, from the event that answers for the cell under the existing
@@ -98,13 +107,14 @@ discovery cells only.
 
 **Event classes.** In each fold, every event is shared (strictly positive overlap with
 an event of the other method, the inventory comparison's rule), ours-only, or
-comparator-only; and, from the simulation's truth, a true replay, local coding (not the
-injection, or absorbed), or a control false positive.
+comparator-only; and, from the simulation's truth (C2a), continuous replay, non-local
+but not a sequence (a jumping burst), local coding (not the injection, or absorbed), or
+no spatial content (a place-less burst).
 
 **Evaluation rule, identical for every event.** Over the event's own interval, on the
 2 ms grid:
 
-- content: p(x | non-local, discovery spikes) from the fold's discovery decoder (C7);
+- content: each of the two discovery estimates of C7, scored separately;
 - score: the evaluation spikes' expected log-likelihood under that content,
   sum over bins of sum_x p(x) sum over evaluation cells of [k log(f(x) dt) - f(x) dt],
   kept as a spike term and a silence term;
@@ -118,11 +128,14 @@ injection, or absorbed), or a control false positive.
   event is uninformative, not unsupported; 2 and 10 are the sensitivity. Fixed before
   any result is seen.
 
-**What the simulation reports.** Per fold and event class: the false-support rate
-(share of local-coding and control events with held-out support), the true-support rate
-(share of true replays with it), and the C8 bias (comparator-only true replays without
-support), with fold C beside A and B. These are the error estimates the real-data
-held-out results will be read with.
+**What the simulation reports.** Per fold, event class and content estimator: the
+false-support rate (share of local-coding and place-less events with held-out support),
+the support rate for events with spatial content (continuous replays and jumping bursts,
+reported separately), and each estimator's under-crediting (events with spatial content
+it fails to support, by which method found them), with fold C beside A and B, and the
+agreement between the two estimators event by event. Held-out support tests spatial
+information, not sequence structure, so it is expected for jumping bursts. These are
+the error estimates the real-data held-out results will be read with.
 
 ## Code layout
 
@@ -143,8 +156,8 @@ held-out results will be read with.
   0.045 s per cell, measured on one seed before the full run. A condition that cannot
   be placed raises; nothing is dropped silently.
 - `analysis/inventory_comparison/heldout.py` (new, src, unit-tested): the fold builder
-  and the evaluation rule as pure functions of event intervals, spike times, the content
-  posterior and the evaluation fields, so the real-data pilot applies the same rule
+  and the evaluation rule as pure functions of event intervals, spike times, a content
+  posterior on the decode grid (either estimator) and the evaluation fields, so the real-data pilot applies the same rule
   unchanged.
 - `scripts/qa/sweep_memoryless_heldout.py` (new): the three folds over the injected
   replays and the conditions above; raw table to `Processed-Data`, aggregates to
@@ -161,7 +174,7 @@ held-out results will be read with.
 | 3 | (f, g) detection heatmaps, unchanged |
 | 4 | (h) onset error by true duration; (i) offset error by true duration; (j) reported duration by distance from the animal (today's panel i) |
 | 5 | (k) negative controls; (l) mid-event jumps; (m) chains |
-| 6 | (n) held-out gain by event class (shared, ours-only, comparator-only) split by truth, fold C hatched; (o) false-support and true-support rates by class and fold |
+| 6 | (n) held-out gain by event class (shared, ours-only, comparator-only) split by truth, under each content estimator, fold C hatched; (o) false-support and support rates by class, fold and estimator |
 
 (h, i): signed median with interquartile band, one line per detector, zero marked.
 (k): no replay as events per minute and the two bursts as share called, grouped by
