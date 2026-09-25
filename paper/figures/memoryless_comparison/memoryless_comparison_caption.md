@@ -118,29 +118,36 @@ state alone. **(k)** Share of bursts with an event reported on them. A
 place-less burst, every cell firing at one rate unrelated to its field, carries
 no spatial content, so any event on it is false; a jumping burst represents a
 random place every 15 ms, so calling it non-local is right and calling it a
-sequence is not. Our detector's non-local events cover 93% of place-less
-bursts, which spend 61% to 80% of their time in the fragmented state; the
-continuous state alone covers 0%, and the sliding window 6% (10% before its
-significance test). On jumping bursts our non-local events cover 97%, which is
-right; the continuous state alone covers 46% and the sliding window 8% (14%
-before its test), each calling a sequence that is not there. Over 1.7 minutes
-of immobility with no replay, from eight simulated recordings, no output
-reported any event. **(l)** Two 60 cm parts, the second starting the given
-distance behind where the first ended, with no gap in time, pooled over 120 and
-200 ms parts; bars give how each detector carved the event (vermilion outline
-the sliding window under the published definition, blue our non-local events),
-and the numbers above them the share of parts recovered. Our detector reports
-one event over both parts in 71% to 81% of trials at every jump; the sliding
-window does so in up to 77% of trials for jumps up to 40 cm and never across 80
-cm. **(m, n)** Two 150 ms, 60 cm replays with a silent gap, the second
-continuing from the first's end (m) or starting 140 cm away from it (n).
-Continuing, at a 10 ms gap both detectors report one event over both parts (75%
-of trials for the sliding window, 88% for ours); at 200 ms neither does, and
-they report one event per part in 58% and 79%. Far apart, the sliding window
-never reports one event over both, and misses a part in 42% to 62% of trials;
-our detector reports one event per part in 29% of trials at a 10 ms gap and 71%
-at 200 ms. Isolated 60 cm parts of 120 to 200 ms are recovered in 54% to 96% of
-trials by the sliding window and 75% to 96% by ours.
+sequence is not. Our detector's non-local events cover 90% of place-less
+bursts, which spend 59% to 80% of their time in the fragmented state; the
+continuous state alone covers 1%, and the sliding window 8% (15% before its
+significance test). These pool the three peak rates, 20, 60 and 160 Hz; at 20
+Hz a place-less burst fires about as fast as the local coding it replaces, and
+our non-local events still cover 75% of them. On jumping bursts our non-local
+events cover 97%, which is right; the continuous state alone covers 50% and the
+sliding window 7% (12% before its test), each calling a sequence that is not
+there. Over 1.7 minutes of immobility with no replay, from 8 simulated
+recordings that pause in the same places at the track's end, no output reported
+any event: fewer than 1.8 per minute, at 95% confidence, and only there.
+**(l)** Two 60 cm parts, the second starting the given distance behind where
+the first ended, with no gap in time, pooled over 120 and 200 ms parts, their
+far end held 45 cm from where the animal rests whatever the jump; bars give how
+each detector carved the event (vermilion outline the sliding window under the
+published definition, blue our non-local events), and the numbers above them
+the share of parts recovered. Our detector reports one event over both parts in
+73% to 85% of trials at every jump; the sliding window does so in up to 79% of
+trials for jumps up to 40 cm and never across 80 cm. **(m, n)** Two 150 ms, 60
+cm replays with a silent gap, the second continuing from the first's end (m) or
+starting 140 cm away from it (n), both reaching no nearer the animal than 20
+cm. Continuing, at a 10 ms gap both detectors report one event over both parts
+(71% of trials for the sliding window, 88% for ours); at 200 ms neither does,
+and they report one event per part in 54% and 79%. Far apart, the sliding
+window never reports one event over both, and misses a part in 38% to 58% of
+trials; our detector reports one event per part in 17% of trials at a 10 ms gap
+and 83% at 200 ms. Each part is also injected alone, at the time and with the
+seed it has in its event: across jumps and chains the sliding window recovers
+72% of parts inside the event against 62% alone, and ours 89% against 87%, so
+neither loses parts to the jump or the chain itself.
 
 **Caveats.** Sorted spikes, a linear track, no artifacts. In (f-j) the animal
 rests at one end of the track and pauses nowhere else, so distance from its

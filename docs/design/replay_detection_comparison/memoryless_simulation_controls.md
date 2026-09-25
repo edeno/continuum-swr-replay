@@ -46,12 +46,12 @@ peak rates (20, 60, 160 Hz) as the injected-replay sweep.
 
 | Condition | What is injected | Grid |
 |---|---|---|
-| No replay | Nothing: each usable immobile stretch is decoded as it is, holding only local coding | All usable immobile time of eight simulated recordings, the sweep's and seven more (one holds only 12.6 s) |
+| No replay | Nothing: each usable immobile stretch is decoded as it is, holding only local coding | All usable immobile time of eight simulated recordings, the sweep's and seven more: 12.6 s each, in the same places, since the simulator's seed changes the spikes and not the trajectory |
 | Place-less burst | Every cell fires at one rate unrelated to its field; population spike count matched to a replay of the same duration and peak rate | 80, 200, 500 ms |
 | Jumping burst | Represented place redrawn uniformly along the track every 15 ms; cells fire by their fields | 80, 200, 500 ms |
-| Mid-event jump | Two constant-speed segments of 60 cm; the second starts J cm from where the first ended, with no gap in time | J = 0 (continuous control), 20, 40, 80 cm; segment length 120 or 200 ms |
+| Mid-event jump | Two constant-speed segments of 60 cm; the second starts J cm behind where the first ended, with no gap in time; their far end is held at 125 cm, 45 cm from where the animal rests, for every J | J = 0 (continuous control), 20, 40, 80 cm; segment length 120 or 200 ms |
 | Chain | Two 150 ms, 60 cm replays separated by a silent gap; the second either continues from the first's end or starts >= 40 cm away | Gap 10, 30, 60, 100, 200 ms |
-| Isolated part | One part of each multi-part geometry on its own: a 60 cm replay of 120, 150 or 200 ms, at the same placements | The three part lengths |
+| Each part alone | Every part of every jump and chain trial, injected on its own at the time and with the seed it has in its event | As the jumps and chains |
 
 Parts are 60 cm and longer than 100 ms, so each can meet the published definition,
 whose duration criterion is strict: a part of exactly 100 ms fails it however well it

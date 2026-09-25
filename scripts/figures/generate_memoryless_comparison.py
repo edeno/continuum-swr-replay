@@ -991,6 +991,13 @@ def controls_value(
     return float(rows.value.iloc[0])
 
 
+def no_replay_minutes(controls: pd.DataFrame) -> float:
+    rows = controls[
+        (controls["summary"] == "no_replay") & (controls.measure == "immobile_minutes")
+    ]
+    return float(rows.value.iloc[0])
+
+
 def controls_levels(controls: pd.DataFrame, condition: str) -> list[float]:
     rows = controls[
         (controls["summary"] == "parts") & (controls.condition == condition)
@@ -1016,10 +1023,21 @@ def plot_bursts(ax, controls: pd.DataFrame) -> None:
             )
     ax.set_xticks([0, 1])
     ax.set_xticklabels(["place-less\nburst", "jumping\nburst"])
-    ax.set_ylim(0, 135)
+    # headroom: the no-replay note above the bars, the legend above it
+    ax.set_ylim(0, 165)
     ax.set_yticks([0, 25, 50, 75, 100])
     ax.set_ylabel("bursts called (%)")
     ax.set_title("bursts", fontsize=6)
+    minutes = no_replay_minutes(controls)
+    ax.text(
+        0.5,
+        118,
+        f"no replay: no event from any\noutput in {minutes:.1f} min of rest",
+        ha="center",
+        va="center",
+        fontsize=4.5,
+        color="0.3",
+    )
     ax.legend(fontsize=4.5, frameon=False, loc="upper left", handlelength=1.0, ncol=2)
 
 
@@ -1442,6 +1460,41 @@ def check_controls_claims(controls: pd.DataFrame) -> None:
                     "The caption says the state-space detector reports one event over "
                     "both parts of most jumps at every size; the summary disagrees."
                 )
+    shortest = controls_levels(controls, "chain_continuing")[0]
+    for detector in ("sliding_published", "state_space_canonical"):
+        if (
+            controls_value(
+                controls,
+                "parts",
+                "segmentation_spanning",
+                "chain_continuing",
+                shortest,
+                detector,
+            )
+            < 0.5
+        ):
+            raise RuntimeError(
+                "The caption says both detectors report one event over a chain at "
+                "the shortest gap; the controls summary disagrees."
+            )
+    multipart = ("jump_120ms", "jump_200ms", "chain_continuing", "chain_elsewhere")
+    for detector in ("sliding_published", "state_space_canonical"):
+        within, alone = (
+            np.mean(
+                [
+                    controls_value(controls, "parts", measure, c, level, detector)
+                    for c in multipart
+                    for level in controls_levels(controls, c)
+                ]
+            )
+            for measure in ("part_recovery", "part_recovery_alone")
+        )
+        if within < alone - 0.05:
+            raise RuntimeError(
+                "The caption says neither detector loses parts to the jump or the "
+                "chain; the controls summary shows parts recovered less often "
+                "inside the event than alone."
+            )
     longest = controls_levels(controls, "chain_continuing")[-1]
     for detector in ("sliding_published", "state_space_canonical"):
         if controls_value(
@@ -1556,9 +1609,23 @@ def write_caption(
             ]
         )
 
-    minutes = controls[
-        (controls["summary"] == "no_replay") & (controls.measure == "immobile_minutes")
-    ].value.iloc[0]
+    minutes = no_replay_minutes(controls)
+    n_recordings = int(
+        controls[
+            (controls["summary"] == "provenance") & (controls.measure == "n_recordings")
+        ].value.iloc[0]
+    )
+    multipart = ("jump_120ms", "jump_200ms", "chain_continuing", "chain_elsewhere")
+
+    def mean_recovery(detector, measure):
+        return np.mean(
+            [
+                controls_value(controls, "parts", measure, c, level, detector)
+                for c in multipart
+                for level in controls_levels(controls, c)
+            ]
+        )
+
     fragmented_low, fragmented_high = burst_share("fragmented_share")
     jumps = ("jump_120ms", "jump_200ms")
     spanning_jumps = carving(jumps, "spanning", "state_space_canonical")
@@ -1731,15 +1798,22 @@ time in the fragmented state; the continuous state alone covers
 {pct(called("placeless_burst", "state_space_continuous"))}, and the sliding
 window {pct(called("placeless_burst", "sliding_published"))}
 ({pct(called("placeless_burst", "sliding_accepted"))} before its significance
-test). On jumping bursts our non-local events cover
+test). These pool the three peak rates, 20, 60 and 160 Hz; at 20 Hz a
+place-less burst fires about as fast as the local coding it replaces, and our
+non-local events still cover
+{pct(controls_value(controls, "bursts", "called_rate_at_20hz", "placeless_burst", None, "state_space_canonical"))}
+of them. On jumping bursts our non-local events cover
 {pct(called("jumping_burst", "state_space_canonical"))}, which is right; the
 continuous state alone covers {pct(called("jumping_burst", "state_space_continuous"))}
 and the sliding window {pct(called("jumping_burst", "sliding_published"))}
 ({pct(called("jumping_burst", "sliding_accepted"))} before its test), each
 calling a sequence that is not there. Over {minutes:.1f} minutes of immobility
-with no replay, from eight simulated recordings, no output reported any event.
+with no replay, from {n_recordings} simulated recordings that pause in the same
+places at the track's end, no output reported any event: fewer than
+{3 / minutes:.1f} per minute, at 95% confidence, and only there.
 **(l)** Two 60 cm parts, the second starting the given distance behind where
-the first ended, with no gap in time, pooled over 120 and 200 ms parts; bars
+the first ended, with no gap in time, pooled over 120 and 200 ms parts, their
+far end held 45 cm from where the animal rests whatever the jump; bars
 give how each detector carved the event (vermilion outline the sliding window
 under the published definition, blue our non-local events), and the numbers
 above them the share of parts recovered. Our detector reports one event over
@@ -1747,7 +1821,8 @@ both parts in {pct(spanning_jumps.min())} to {pct(spanning_jumps.max())} of
 trials at every jump; the sliding window does so in up to
 {pct(sliding_spanning.max())} of trials for jumps up to 40 cm and never across
 80 cm. **(m, n)** Two 150 ms, 60 cm replays with a silent gap, the second
-continuing from the first's end (m) or starting 140 cm away from it (n).
+continuing from the first's end (m) or starting 140 cm away from it (n), both
+reaching no nearer the animal than 20 cm.
 Continuing, at a {gaps_ms[0]:.0f} ms gap both detectors report one event over
 both parts ({pct(continuing["spanning", "sliding_published"][0])} of trials
 for the sliding window, {pct(continuing["spanning", "state_space_canonical"][0])}
@@ -1758,11 +1833,13 @@ sliding window never reports one event over both, and misses a part in
 {pct(elsewhere_missing.min())} to {pct(elsewhere_missing.max())} of trials; our
 detector reports one event per part in {pct(elsewhere_split[0])} of trials at a
 {gaps_ms[0]:.0f} ms gap and {pct(elsewhere_split[-1])} at {gaps_ms[-1]:.0f} ms.
-Isolated 60 cm parts of 120 to 200 ms are recovered in
-{pct(recovery("isolated_part", "sliding_published").min())} to
-{pct(recovery("isolated_part", "sliding_published").max())} of trials by the
-sliding window and {pct(recovery("isolated_part", "state_space_canonical").min())}
-to {pct(recovery("isolated_part", "state_space_canonical").max())} by ours.
+Each part is also injected alone, at the time and with the seed it has in its
+event: across jumps and chains the sliding window recovers
+{pct(mean_recovery("sliding_published", "part_recovery"))} of parts inside the
+event against {pct(mean_recovery("sliding_published", "part_recovery_alone"))}
+alone, and ours {pct(mean_recovery("state_space_canonical", "part_recovery"))}
+against {pct(mean_recovery("state_space_canonical", "part_recovery_alone"))}, so
+neither loses parts to the jump or the chain itself.
 
 **Caveats.** Sorted spikes, a linear track, no artifacts. In (f-j) the animal
 rests at one end of the track and pauses nowhere else, so distance from its
@@ -1784,12 +1861,9 @@ Produced by `scripts/figures/generate_memoryless_comparison.py` from
     )
 
 
-def read_summary(path: Path) -> pd.DataFrame:
+def read_summary(path: Path, producer: str) -> pd.DataFrame:
     if not path.exists():
-        raise FileNotFoundError(
-            f"No sweep summary at {path}. Run "
-            "`python scripts/qa/sweep_memoryless_detection.py` first."
-        )
+        raise FileNotFoundError(f"No summary at {path}. Run `python {producer}` first.")
     return pd.read_csv(path)
 
 
@@ -1804,8 +1878,10 @@ def main() -> None:
     args = parser.parse_args()
 
     config = MemorylessSequenceConfig(sampling_frequency=500.0)
-    summary = read_summary(args.summary)
-    controls = read_summary(args.controls_summary)
+    summary = read_summary(args.summary, "scripts/qa/sweep_memoryless_detection.py")
+    controls = read_summary(
+        args.controls_summary, "scripts/qa/sweep_memoryless_controls.py"
+    )
     fig, decoded = make_figure(args.n_neurons, config, summary, controls)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)

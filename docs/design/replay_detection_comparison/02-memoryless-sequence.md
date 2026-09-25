@@ -673,25 +673,34 @@ in `detection_controls_summary.csv`. Our detector is read two ways: its non-loca
 continuous state alone.
 
 - **No replay.** Over 1.7 minutes of immobility with no replay, from eight simulated
-  recordings, no output reported any event.
+  recordings, no output reported any event: fewer than 1.8 per minute at 95%
+  confidence. The simulator's seed changes the spikes, not the trajectory, so all of
+  it is local coding at the track's end, where the animal pauses.
 - **Place-less bursts** (every cell at one rate unrelated to its field; no spatial
-  content). Our non-local events cover 93% of them, the bursts spending 61-80% of their
-  time in the fragmented state; the continuous state alone covers none; the sliding
-  window 6% (10% before its significance test). A population burst with no place in it
-  is therefore a non-local event under the project's definition: the fragmented state
-  takes activity it cannot place as well as activity that hops.
+  content), pooled over peak rates of 20, 60 and 160 Hz. Our non-local events cover
+  90% of them, the bursts spending 59-80% of their time in the fragmented state; 75%
+  even at 20 Hz, where such a burst fires about as fast as the local coding it
+  replaces. The continuous state alone covers 1%; the sliding window 8% (15% before
+  its significance test). A burst with no place in it is therefore a non-local event
+  under the project's definition, which counts the fragmented state; what in it the
+  fragmented state takes up, incoherence or merely a departure from the local pattern,
+  these simulations do not separate.
 - **Jumping bursts** (a random place every 15 ms). Our non-local events cover 97%,
-  which is right; the continuous state alone 46% and the sliding window 8% (14% before
+  which is right; the continuous state alone 50% and the sliding window 7% (12% before
   its test), each calling a sequence that is not there.
-- **Mid-event jumps.** Our detector reports one event over both parts in 71-81% of
-  trials at every jump up to 80 cm; the sliding window does so for jumps up to 40 cm
-  and never across 80 cm.
-- **Chains.** With the second part continuing from the first, both report one event
-  over both at a 10 ms gap and one per part at 200 ms. With it 140 cm away, the sliding
-  window never bridges the gap and misses a part in 42-62% of trials; our detector
-  reports one event per part in 29% of trials at 10 ms and 71% at 200 ms.
-- **Isolated parts**, the baseline: 60 cm parts of 120-200 ms are recovered in 54-96% of
-  trials by the sliding window and 75-96% by ours.
+- **Mid-event jumps**, their far end held 45 cm from where the animal rests. Our
+  detector reports one event over both parts in 73-85% of trials at every jump up to
+  80 cm; the sliding window does so for jumps up to 40 cm and never across 80 cm.
+- **Chains**, reaching no nearer the animal than 20 cm. With the second part
+  continuing from the first, both report one event over both at a 10 ms gap and one
+  per part at 200 ms. With it 140 cm away, the sliding window never bridges the gap
+  and misses a part in 38-58% of trials; our detector reports one event per part in
+  17% of trials at 10 ms and 83% at 200 ms.
+- **Each part alone**, injected at the time and with the seed it has in its event: the
+  sliding window recovers 72% of parts inside jumps and chains against 62% alone, ours
+  89% against 87%. Neither loses parts to the jump or the chain itself; the sliding
+  window gains, since a merged event can clear the duration criterion a lone part
+  misses.
 
 ### Against the reference's own arithmetic
 
