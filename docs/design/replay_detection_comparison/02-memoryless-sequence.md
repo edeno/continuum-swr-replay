@@ -1040,4 +1040,5 @@ Carried deliberately; each must be checked against real data before results are 
    are open: leave-event-out encoding, dropping encoding spikes inside the candidate's
    decoding support from the kernel sums; or the running-only refit spec 03 already
    defers. **Decided 2026-09-22: accepted for now.** Both cohorts carry the asymmetry
-   equally; revisit if a non-SWR fraction becomes a headline claim.
+   equally; revisit if a non-SWR fraction becomes a headline claim. Reconfirmed
+   2026-09-25: no running-only refit on the pilot.
