@@ -94,9 +94,26 @@ CONTROLS_SUMMARY_PATH = Path(
 )
 """Aggregates of the controls sweep: no replay, bursts, jumps, chains."""
 
-ROW_HEIGHTS = [0.80, 0.95, 1.05, 0.75, 0.75]
+HELDOUT_SUMMARY_PATH = Path(
+    "docs/design/replay_detection_comparison/detection_heldout_summary.csv"
+)
+"""Aggregates of the held-out sweep: support by fold, estimator, class and truth."""
+
+ROW_HEIGHTS = [0.80, 0.95, 1.05, 0.75, 0.75, 0.70]
 """Relative heights of the figure's rows: overview, events, sweep, timing,
-controls."""
+controls, held-out evidence."""
+
+HELDOUT_GROUPS = (
+    ("replay,\nours only", ("ours_only",), "continuous_replay"),
+    ("replay,\nshared", ("shared",), "continuous_replay"),
+    ("jumping\nburst", ("ours_only", "shared"), "non_local"),
+    ("place-less\nburst", ("ours_only", "shared"), "no_content"),
+)
+"""The kinds of event the held-out panels compare: by which detectors found
+them and what they truly are."""
+
+FOLD_HATCH = {"A": None, "B": None, "C": "////"}
+"""Fold C's evaluation cells cover only half the track."""
 
 OUTPUTS = (
     ("sliding_accepted", "sliding, before test", 0.4),
@@ -1121,6 +1138,95 @@ def plot_carving(
         )
 
 
+def heldout_rate(
+    heldout: pd.DataFrame,
+    fold: str,
+    estimator: str,
+    classes: tuple[str, ...],
+    truth: str,
+    measure: str = "support_rate",
+) -> tuple[float, int]:
+    """A held-out rate pooled over event classes, and how many events it rests on."""
+    rows = heldout[
+        (heldout["summary"] == "by_class")
+        & (heldout.fold == fold)
+        & (heldout.estimator == estimator)
+        & heldout.event_class.isin(classes)
+        & (heldout.truth == truth)
+    ].pivot_table(index="event_class", columns="measure", values="value")
+    if rows.empty or "n_events" not in rows or rows.n_events.sum() == 0:
+        return float("nan"), 0
+    n = rows.n_events.fillna(0)
+    return float((rows[measure].fillna(0) * n).sum() / n.sum()), int(n.sum())
+
+
+def plot_heldout_support(ax, heldout: pd.DataFrame) -> None:
+    """Share of informative events with held-out support, by kind and fold."""
+    width = 0.26
+    for group, (_, classes, truth) in enumerate(HELDOUT_GROUPS):
+        for offset, (fold, hatch) in enumerate(FOLD_HATCH.items()):
+            x = group + (offset - 1) * width
+            rate, n = heldout_rate(heldout, fold, "state_space", classes, truth)
+            other, _ = heldout_rate(heldout, fold, "sliding_window", classes, truth)
+            if not n:
+                ax.text(x, 3, "-", ha="center", va="bottom", fontsize=4.5, color="0.5")
+                continue
+            ax.bar(
+                x,
+                100 * rate,
+                width=width,
+                color=BLUE,
+                alpha=0.35 + 0.25 * offset,
+                hatch=hatch,
+                edgecolor="white" if hatch else None,
+                linewidth=0,
+                label=f"fold {fold}" if group == 0 else None,
+            )
+            ax.plot(
+                x,
+                100 * other,
+                "o",
+                color=VERMILION,
+                ms=2.2,
+                label="sliding window's content"
+                if group == 0 and offset == 0
+                else None,
+            )
+            ax.text(x, 100 * rate + 3, f"{n}", ha="center", va="bottom", fontsize=3.8)
+    ax.set_xticks(range(len(HELDOUT_GROUPS)))
+    ax.set_xticklabels([label for label, _, _ in HELDOUT_GROUPS])
+    ax.set_ylim(0, 150)
+    ax.set_yticks([0, 25, 50, 75, 100])
+    ax.set_ylabel("held-out support (%)")
+    ax.set_title("held-out support, informative events", fontsize=6)
+    ax.legend(fontsize=4.5, frameon=False, loc="upper right", handlelength=1.0, ncol=2)
+
+
+def plot_heldout_coverage(ax, heldout: pd.DataFrame) -> None:
+    """Share of each kind of replay the evaluation cells can judge at all."""
+    width = 0.26
+    for group, (_, classes, truth) in enumerate(HELDOUT_GROUPS[:2]):
+        for offset, (fold, hatch) in enumerate(FOLD_HATCH.items()):
+            share, _ = heldout_rate(
+                heldout, fold, "state_space", classes, truth, "informative_share"
+            )
+            ax.bar(
+                group + (offset - 1) * width,
+                100 * share,
+                width=width,
+                color=BLUE,
+                alpha=0.35 + 0.25 * offset,
+                hatch=hatch,
+                edgecolor="white" if hatch else None,
+                linewidth=0,
+            )
+    ax.set_xticks(range(2))
+    ax.set_xticklabels([label for label, _, _ in HELDOUT_GROUPS[:2]])
+    ax.set_ylim(0, 100)
+    ax.set_ylabel("informative (%)")
+    ax.set_title("events the evaluation cells can judge", fontsize=6)
+
+
 def place_panel_letters(fig, rows: list[list]) -> None:
     """Draw each panel's letter on its title line, flush with a common margin.
 
@@ -1164,6 +1270,7 @@ def make_figure(
     config: MemorylessSequenceConfig,
     summary: pd.DataFrame,
     controls: pd.DataFrame,
+    heldout: pd.DataFrame,
 ):
     decoded = simulate_and_decode(n_neurons, config)
     decoded["state_space_intervals"] = state_space_intervals(decoded)
@@ -1173,7 +1280,7 @@ def make_figure(
     # this project's defaults turn constrained layout on, so the grid must not
     # also set its own margins: the two fight and the panels collapse
     fig = plt.figure(
-        figsize=(TWO_COLUMN, TWO_COLUMN * 1.48), dpi=450, constrained_layout=True
+        figsize=(TWO_COLUMN, TWO_COLUMN * 1.72), dpi=450, constrained_layout=True
     )
     fig.set_constrained_layout_pads(w_pad=0.02, h_pad=0.02, wspace=0.05, hspace=0.09)
     # one column of rows, each row with its own columns, so the layout solves
@@ -1253,6 +1360,11 @@ def make_figure(
         legend=False,
         show_y=False,
     )
+    evidence = grid[5].subgridspec(1, 2, width_ratios=[2.2, 1])
+    ax_support = fig.add_subplot(evidence[0])
+    plot_heldout_support(ax_support, heldout)
+    ax_coverage = fig.add_subplot(evidence[1])
+    plot_heldout_coverage(ax_coverage, heldout)
     ax_elsewhere = fig.add_subplot(carving[3])
     plot_carving(
         ax_elsewhere,
@@ -1273,6 +1385,7 @@ def make_figure(
             [ax_sliding, ax_state],
             [ax_onset, ax_offset, ax_distance],
             [ax_bursts, ax_jumps, ax_continuing, ax_elsewhere],
+            [ax_support, ax_coverage],
         ],
     )
 
@@ -1381,6 +1494,12 @@ def pct(value: float, digits: int = 0) -> str:
             "A caption percentage is not finite; the sweep summary is incomplete."
         )
     return f"{100 * value:.{digits}f}%"
+
+
+def pct_range(values) -> str:
+    """A range of percentages for the caption, one value when both ends agree."""
+    low, high = pct(min(values)), pct(max(values))
+    return low if low == high else f"{low} to {high}"
 
 
 def continuous_shuffle_sentence(decoded: dict) -> str:
@@ -1524,10 +1643,40 @@ def check_controls_claims(controls: pd.DataFrame) -> None:
             )
 
 
+def check_heldout_claims(heldout: pd.DataFrame) -> None:
+    """The caption's claims about held-out evidence, checked against its summary."""
+    by_class = heldout[heldout["summary"] == "by_class"]
+    if (by_class.event_class == "comparator_only").any():
+        raise RuntimeError(
+            "The caption says the sliding window reported no event our detector "
+            "missed; the held-out summary holds comparator-only events."
+        )
+    empty = by_class[
+        (by_class.truth == "no_content") & (by_class.measure == "support_rate")
+    ]
+    if (empty.value > 0).any():
+        raise RuntimeError(
+            "The caption says no informative place-less burst event has held-out "
+            "support; the held-out summary disagrees."
+        )
+    for fold in FOLD_HATCH:
+        for estimator in ("state_space", "sliding_window"):
+            rate, n = heldout_rate(
+                heldout, fold, estimator, ("ours_only",), "continuous_replay"
+            )
+            if n and rate < 0.8:
+                raise RuntimeError(
+                    "The caption says most informative replays only our detector "
+                    "reported have held-out support in every fold; the summary "
+                    "disagrees."
+                )
+
+
 def write_caption(
     decoded: dict,
     summary: pd.DataFrame,
     controls: pd.DataFrame,
+    heldout: pd.DataFrame,
     config: MemorylessSequenceConfig,
     path: Path,
 ) -> None:
@@ -1564,6 +1713,31 @@ def write_caption(
     )
     check_summary_claims(summary)
     check_controls_claims(controls)
+    check_heldout_claims(heldout)
+
+    def support(fold, classes, truth, estimator="state_space"):
+        return heldout_rate(heldout, fold, estimator, classes, truth)[0]
+
+    ours_support = [support(f, ("ours_only",), "continuous_replay") for f in "AB"]
+    shared_support = [support(f, ("shared",), "continuous_replay") for f in "ABC"]
+    jumping_support = [support(f, ("ours_only", "shared"), "non_local") for f in "AB"]
+    informative = {
+        name: [
+            heldout_rate(
+                heldout,
+                f,
+                "state_space",
+                classes,
+                "continuous_replay",
+                "informative_share",
+            )[0]
+            for f in "AB"
+        ]
+        for name, classes in (("ours", ("ours_only",)), ("shared", ("shared",)))
+    }
+    agreement = heldout[
+        (heldout["summary"] == "agreement") & (heldout.measure == "estimator_agreement")
+    ].value
 
     def called(condition, detector):
         return controls_value(
@@ -1841,6 +2015,32 @@ alone, and ours {pct(mean_recovery("state_space_canonical", "part_recovery"))}
 against {pct(mean_recovery("state_space_canonical", "part_recovery_alone"))}, so
 neither loses parts to the jump or the chain itself.
 
+**(o, p) Held-out evidence.** The simulated cells are split into discovery and
+evaluation cells three ways: two interleaved folds with their roles swapped (A,
+B), each half tiling the track, and one whose evaluation cells cover only its
+lower half (C, hatched). Both detectors are fitted and run on the discovery
+cells alone, over every injected replay and control. Each event's content,
+estimated from the discovery cells by our decoder (bars) or by the sliding
+window (dots), is scored on the evaluation cells against the animal's own
+position and against 100 permutations of the evaluation fields, spikes and
+silence both counting, and has support when it beats both (p ≤ 0.05). **(o)**
+Share of events with support, among those along whose content the evaluation
+cells are expected to fire at least 5 spikes; numbers give how many. True
+replays that only our detector reported have support in
+{pct_range(ours_support)} of cases in folds A and B
+and {pct(support("C", ("ours_only",), "continuous_replay"))} in fold C; shared
+ones in {pct_range(shared_support)}. No
+place-less burst event has support; jumping bursts, which do represent places,
+in {pct_range(jumping_support)}. The two content
+estimates agree on {pct(agreement.min())} of events or more. The sliding window
+reported no event our detector missed, so there is no comparator-only class to
+test. **(p)** Share of each kind of replay the evaluation cells can judge at
+all: {pct_range(informative["ours"])} of those only our detector reported,
+{pct_range(informative["shared"])} of shared ones, in folds A and B. The rest are too short or too
+sparse for a dozen evaluation cells, so an event without support is mostly one
+that cannot be judged, not one shown false. Held-out support tests spatial
+information, not sequence, and is read with these error rates, not alone.
+
 **Caveats.** Sorted spikes, a linear track, no artifacts. In (f-j) the animal
 rests at one end of the track and pauses nowhere else, so distance from its
 place is fixed by where the replay is put and cannot be varied independently.
@@ -1872,6 +2072,7 @@ def main() -> None:
     parser.add_argument("--n-neurons", type=int, default=25)
     parser.add_argument("--summary", type=Path, default=SUMMARY_PATH)
     parser.add_argument("--controls-summary", type=Path, default=CONTROLS_SUMMARY_PATH)
+    parser.add_argument("--heldout-summary", type=Path, default=HELDOUT_SUMMARY_PATH)
     parser.add_argument(
         "--output-dir", type=Path, default=Path("paper/figures/memoryless_comparison")
     )
@@ -1882,7 +2083,10 @@ def main() -> None:
     controls = read_summary(
         args.controls_summary, "scripts/qa/sweep_memoryless_controls.py"
     )
-    fig, decoded = make_figure(args.n_neurons, config, summary, controls)
+    heldout = read_summary(
+        args.heldout_summary, "scripts/qa/sweep_memoryless_heldout.py"
+    )
+    fig, decoded = make_figure(args.n_neurons, config, summary, controls, heldout)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     save_figure("memoryless_comparison", base_dir=args.output_dir)
@@ -1891,6 +2095,7 @@ def main() -> None:
         decoded,
         summary,
         controls,
+        heldout,
         config,
         args.output_dir / "memoryless_comparison_caption.md",
     )

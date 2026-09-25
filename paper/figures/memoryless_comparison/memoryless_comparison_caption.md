@@ -149,6 +149,29 @@ seed it has in its event: across jumps and chains the sliding window recovers
 72% of parts inside the event against 62% alone, and ours 89% against 87%, so
 neither loses parts to the jump or the chain itself.
 
+**(o, p) Held-out evidence.** The simulated cells are split into discovery and
+evaluation cells three ways: two interleaved folds with their roles swapped (A,
+B), each half tiling the track, and one whose evaluation cells cover only its
+lower half (C, hatched). Both detectors are fitted and run on the discovery
+cells alone, over every injected replay and control. Each event's content,
+estimated from the discovery cells by our decoder (bars) or by the sliding
+window (dots), is scored on the evaluation cells against the animal's own
+position and against 100 permutations of the evaluation fields, spikes and
+silence both counting, and has support when it beats both (p ≤ 0.05). **(o)**
+Share of events with support, among those along whose content the evaluation
+cells are expected to fire at least 5 spikes; numbers give how many. True
+replays that only our detector reported have support in 93% to 97% of cases in
+folds A and B and 87% in fold C; shared ones in 100%. No place-less burst event
+has support; jumping bursts, which do represent places, in 62%. The two content
+estimates agree on 99% of events or more. The sliding window reported no event
+our detector missed, so there is no comparator-only class to test. **(p)**
+Share of each kind of replay the evaluation cells can judge at all: 6% to 7% of
+those only our detector reported, 19% to 25% of shared ones, in folds A and B.
+The rest are too short or too sparse for a dozen evaluation cells, so an event
+without support is mostly one that cannot be judged, not one shown false.
+Held-out support tests spatial information, not sequence, and is read with
+these error rates, not alone.
+
 **Caveats.** Sorted spikes, a linear track, no artifacts. In (f-j) the animal
 rests at one end of the track and pauses nowhere else, so distance from its
 place is fixed by where the replay is put and cannot be varied independently.

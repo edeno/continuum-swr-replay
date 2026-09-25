@@ -702,6 +702,34 @@ continuous state alone.
   window gains, since a merged event can clear the duration criterion a lone part
   misses.
 
+### Held-out evidence on simulated data
+
+`scripts/qa/sweep_memoryless_heldout.py` tries the held-out test of spec 05 where the
+truth is known: both detectors run on discovery cells alone, in three folds (two
+interleaved with the roles swapped, one whose evaluation cells cover half the track),
+over every injected replay and controls trial, and every event is scored on the
+evaluation cells by `inventory_comparison.heldout` under both content estimates, ours
+and the sliding window's. Numbers are in `detection_heldout_summary.csv`; the rule and
+its choices are in [memoryless_simulation_controls.md](memoryless_simulation_controls.md).
+
+- **Our additional detections carry spatial information in cells they never saw.**
+  Among informative events (at least 5 evaluation spikes expected along the content),
+  true replays only our detector reported have held-out support in 93-97% of cases in
+  the interleaved folds and 87% in the half-coverage fold; shared replays in 100%.
+- **The test does not support events without content.** No informative place-less
+  burst event has support; jumping bursts, which do represent places, 62%.
+- **The content estimate barely matters here.** Ours and the sliding window's agree on
+  99% of informative events or more.
+- **The sliding window reported no event our detector missed**, so there is no
+  comparator-only class to test.
+- **Power is the limit.** Only 6-7% of the replays only our detector reported are
+  informative at all, against 19-25% of shared ones: most additional detections are
+  too short or too sparse for a dozen evaluation cells to judge, so an event without
+  support is mostly one that cannot be judged, not one shown false.
+- Events are labelled by time: half or more inside an injection, its truth; partly
+  inside, mixed; on the recording's own labeled events, kept apart. No event fell on
+  pure local coding, so the false-support rate rests on the place-less bursts alone.
+
 ### Against the reference's own arithmetic
 
 Passing tests show the port is consistent with itself; they do not show it decides

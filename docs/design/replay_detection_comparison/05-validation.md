@@ -52,6 +52,16 @@ Positive held-out evidence tests generalization across recorded neurons; its abs
 does not establish a false event when held-out spatial coverage is poor. This study
 alone does not supply real-data sensitivity without known missed events.
 
+A first version of the rule has been tried on simulated data, where the truth is known
+(02 §"Held-out evidence on simulated data"; design in
+[memoryless_simulation_controls.md](memoryless_simulation_controls.md)): expected
+Poisson log-likelihood of the evaluation spikes under a discovery content posterior,
+spike and silence terms apart, against the animal's own position and permuted
+evaluation fields, with a coverage floor. It is implemented as
+`inventory_comparison.heldout` and can be applied to recorded tetrodes unchanged. On the
+simulation it supports events with content and not those without, and most short
+events are uninformative.
+
 Before scheduling a study, resolve these issues on a pilot:
 
 - Reduced discovery data change the detected population, so results do not transfer
