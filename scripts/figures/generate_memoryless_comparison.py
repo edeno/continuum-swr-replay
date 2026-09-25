@@ -89,8 +89,30 @@ DISTANCE_ORDER = ("(0, 40]", "(40, 80]", "(80, 120]", "(120, 200]")
 """Every bin the sweep's `pd.cut` can produce, in order. Panel (j) draws the
 ones the summary holds and refuses a summary holding any other."""
 
-ROW_HEIGHTS = [0.80, 0.95, 1.05, 0.75]
-"""Relative heights of the figure's four rows: overview, events, sweep, sweep."""
+CONTROLS_SUMMARY_PATH = Path(
+    "docs/design/replay_detection_comparison/detection_controls_summary.csv"
+)
+"""Aggregates of the controls sweep: no replay, bursts, jumps, chains."""
+
+ROW_HEIGHTS = [0.80, 0.95, 1.05, 0.75, 0.75]
+"""Relative heights of the figure's rows: overview, events, sweep, timing,
+controls."""
+
+OUTPUTS = (
+    ("sliding_accepted", "sliding, before test", 0.4),
+    ("sliding_published", "sliding, published", 1.0),
+    ("state_space_canonical", "ours, non-local", 1.0),
+    ("state_space_continuous", "ours, continuous", 0.4),
+)
+"""The four scored outputs of the controls, with their bar opacity."""
+
+SEGMENTATION_STYLE = (
+    ("spanning", "0.2", "one event over all parts"),
+    ("one_per_part", "0.55", "one event per part"),
+    ("other", "0.8", "other"),
+    ("parts_missing", "1.0", "a part missed"),
+)
+"""How a multi-part event was carved, as the stacked bars shade it."""
 
 LETTER_RISE_PT = 9.0
 """Panel letters ride this far above the axes: the height of a panel title,
@@ -937,6 +959,150 @@ def plot_absorption(ax, summary: pd.DataFrame):
     ax.set_title("reported duration by distance", fontsize=6)
 
 
+def output_color(detector: str) -> str:
+    return VERMILION if detector.startswith("sliding") else BLUE
+
+
+def controls_value(
+    controls: pd.DataFrame,
+    summary: str,
+    measure: str,
+    condition: str,
+    level: float | None,
+    detector: str,
+) -> float:
+    """One value of the controls summary, refusing to guess between several."""
+    rows = controls[
+        (controls["summary"] == summary)
+        & (controls.measure == measure)
+        & (controls.condition == condition)
+        & (controls.detector == detector)
+    ]
+    rows = (
+        rows[rows.level.isna()]
+        if level is None
+        else rows[np.isclose(rows.level, level)]
+    )
+    if len(rows) != 1:
+        raise RuntimeError(
+            f"The controls summary holds {len(rows)} rows for {summary}, {measure}, "
+            f"{condition}, {level}, {detector}; expected one."
+        )
+    return float(rows.value.iloc[0])
+
+
+def controls_levels(controls: pd.DataFrame, condition: str) -> list[float]:
+    rows = controls[
+        (controls["summary"] == "parts") & (controls.condition == condition)
+    ]
+    return sorted(rows.level.dropna().unique())
+
+
+def plot_bursts(ax, controls: pd.DataFrame) -> None:
+    """Share of bursts with an event reported on them, for each output."""
+    width = 0.2
+    for group, condition in enumerate(("placeless_burst", "jumping_burst")):
+        for offset, (detector, label, alpha) in enumerate(OUTPUTS):
+            share = controls_value(
+                controls, "bursts", "called_rate", condition, None, detector
+            )
+            ax.bar(
+                group + (offset - 1.5) * width,
+                100 * share,
+                width=width,
+                color=output_color(detector),
+                alpha=alpha,
+                label=label if group == 0 else None,
+            )
+    ax.set_xticks([0, 1])
+    ax.set_xticklabels(["place-less\nburst", "jumping\nburst"])
+    ax.set_ylim(0, 135)
+    ax.set_yticks([0, 25, 50, 75, 100])
+    ax.set_ylabel("bursts called (%)")
+    ax.set_title("bursts", fontsize=6)
+    ax.legend(fontsize=4.5, frameon=False, loc="upper left", handlelength=1.0, ncol=2)
+
+
+def plot_carving(
+    ax,
+    controls: pd.DataFrame,
+    conditions: tuple[str, ...],
+    xlabel: str,
+    title: str,
+    tick,
+    legend: bool,
+    show_y: bool = True,
+) -> None:
+    """How each detector carved multi-part events, pooled over ``conditions``."""
+    levels = controls_levels(controls, conditions[0])
+    width = 0.36
+    for group, level in enumerate(levels):
+        for offset, detector in enumerate(
+            ("sliding_published", "state_space_canonical")
+        ):
+            x = group + (offset - 0.5) * width
+            bottom = 0.0
+            for label, shade, name in SEGMENTATION_STYLE:
+                share = np.mean(
+                    [
+                        controls_value(
+                            controls,
+                            "parts",
+                            f"segmentation_{label}",
+                            c,
+                            level,
+                            detector,
+                        )
+                        for c in conditions
+                    ]
+                )
+                ax.bar(
+                    x,
+                    100 * share,
+                    bottom=100 * bottom,
+                    width=width,
+                    color=shade,
+                    edgecolor=output_color(detector),
+                    linewidth=0.8,
+                    label=name if legend and group == 0 and offset == 0 else None,
+                )
+                bottom += share
+            recovery = np.mean(
+                [
+                    controls_value(
+                        controls, "parts", "part_recovery", c, level, detector
+                    )
+                    for c in conditions
+                ]
+            )
+            # the two detectors' numbers at two heights, so neighbours do not run
+            # together
+            ax.text(
+                x,
+                102 + 9 * offset,
+                f"{100 * recovery:.0f}",
+                ha="center",
+                va="bottom",
+                fontsize=4,
+                color=output_color(detector),
+            )
+    ax.set_xticks(range(len(levels)))
+    ax.set_xticklabels([tick(level) for level in levels])
+    # headroom for the recovery numbers and, above them, the legend
+    ax.set_ylim(0, 162)
+    ax.set_yticks([0, 25, 50, 75, 100])
+    ax.set_xlabel(xlabel)
+    if show_y:
+        ax.set_ylabel("trials (%)")
+    else:
+        ax.set_yticklabels([])
+    ax.set_title(title, fontsize=6)
+    if legend:
+        ax.legend(
+            fontsize=4.5, frameon=False, loc="upper left", handlelength=1.0, ncol=2
+        )
+
+
 def place_panel_letters(fig, rows: list[list]) -> None:
     """Draw each panel's letter on its title line, flush with a common margin.
 
@@ -976,7 +1142,10 @@ def place_panel_letters(fig, rows: list[list]) -> None:
 
 
 def make_figure(
-    n_neurons: int, config: MemorylessSequenceConfig, summary: pd.DataFrame
+    n_neurons: int,
+    config: MemorylessSequenceConfig,
+    summary: pd.DataFrame,
+    controls: pd.DataFrame,
 ):
     decoded = simulate_and_decode(n_neurons, config)
     decoded["state_space_intervals"] = state_space_intervals(decoded)
@@ -986,7 +1155,7 @@ def make_figure(
     # this project's defaults turn constrained layout on, so the grid must not
     # also set its own margins: the two fight and the panels collapse
     fig = plt.figure(
-        figsize=(TWO_COLUMN, TWO_COLUMN * 1.22), dpi=450, constrained_layout=True
+        figsize=(TWO_COLUMN, TWO_COLUMN * 1.48), dpi=450, constrained_layout=True
     )
     fig.set_constrained_layout_pads(w_pad=0.02, h_pad=0.02, wspace=0.05, hspace=0.09)
     # one column of rows, each row with its own columns, so the layout solves
@@ -1042,6 +1211,42 @@ def make_figure(
     ax_distance = fig.add_subplot(timing[2])
     plot_absorption(ax_distance, summary)
 
+    carving = grid[4].subgridspec(1, 4)
+    ax_bursts = fig.add_subplot(carving[0])
+    plot_bursts(ax_bursts, controls)
+    ax_jumps = fig.add_subplot(carving[1])
+    plot_carving(
+        ax_jumps,
+        controls,
+        ("jump_120ms", "jump_200ms"),
+        "jump (cm)",
+        "mid-event jump",
+        lambda level: f"{level:.0f}",
+        legend=True,
+    )
+    ax_continuing = fig.add_subplot(carving[2])
+    plot_carving(
+        ax_continuing,
+        controls,
+        ("chain_continuing",),
+        "gap (ms)",
+        "chain, continuing",
+        lambda level: f"{1000 * level:.0f}",
+        legend=False,
+        show_y=False,
+    )
+    ax_elsewhere = fig.add_subplot(carving[3])
+    plot_carving(
+        ax_elsewhere,
+        controls,
+        ("chain_elsewhere",),
+        "gap (ms)",
+        "chain, elsewhere",
+        lambda level: f"{1000 * level:.0f}",
+        legend=False,
+        show_y=False,
+    )
+
     place_panel_letters(
         fig,
         [
@@ -1049,6 +1254,7 @@ def make_figure(
             zooms,
             [ax_sliding, ax_state],
             [ax_onset, ax_offset, ax_distance],
+            [ax_bursts, ax_jumps, ax_continuing, ax_elsewhere],
         ],
     )
 
@@ -1197,8 +1403,80 @@ def short_replay_shuffle_sentence(decoded: dict) -> str:
     )
 
 
+def check_controls_claims(controls: pd.DataFrame) -> None:
+    """The caption's claims about the controls, checked against their summary."""
+    no_replay = controls[
+        (controls["summary"] == "no_replay") & (controls.measure == "n_events")
+    ]
+    if len(no_replay) != len(OUTPUTS) or (no_replay.value != 0).any():
+        raise RuntimeError(
+            "The caption says no output reported an event where there was no "
+            "replay; the controls summary disagrees."
+        )
+    for condition in ("jump_120ms", "jump_200ms"):
+        if controls_value(
+            controls,
+            "parts",
+            "segmentation_spanning",
+            condition,
+            80.0,
+            "sliding_published",
+        ):
+            raise RuntimeError(
+                "The caption says the sliding window never reports one event across "
+                "an 80 cm jump; the controls summary disagrees."
+            )
+        for level in controls_levels(controls, condition):
+            if (
+                controls_value(
+                    controls,
+                    "parts",
+                    "segmentation_spanning",
+                    condition,
+                    level,
+                    "state_space_canonical",
+                )
+                < 0.5
+            ):
+                raise RuntimeError(
+                    "The caption says the state-space detector reports one event over "
+                    "both parts of most jumps at every size; the summary disagrees."
+                )
+    longest = controls_levels(controls, "chain_continuing")[-1]
+    for detector in ("sliding_published", "state_space_canonical"):
+        if controls_value(
+            controls,
+            "parts",
+            "segmentation_spanning",
+            "chain_continuing",
+            longest,
+            detector,
+        ):
+            raise RuntimeError(
+                "The caption says neither detector reports one event over a chain "
+                "at the longest gap; the controls summary disagrees."
+            )
+    for level in controls_levels(controls, "chain_elsewhere"):
+        if controls_value(
+            controls,
+            "parts",
+            "segmentation_spanning",
+            "chain_elsewhere",
+            level,
+            "sliding_published",
+        ):
+            raise RuntimeError(
+                "The caption says the sliding window never reports one event over a "
+                "chain whose parts are far apart; the controls summary disagrees."
+            )
+
+
 def write_caption(
-    decoded: dict, summary: pd.DataFrame, config: MemorylessSequenceConfig, path: Path
+    decoded: dict,
+    summary: pd.DataFrame,
+    controls: pd.DataFrame,
+    config: MemorylessSequenceConfig,
+    path: Path,
 ) -> None:
     """Save the caption beside the figure, with its numbers read from the data.
 
@@ -1232,6 +1510,71 @@ def write_caption(
         .value.sort_index()
     )
     check_summary_claims(summary)
+    check_controls_claims(controls)
+
+    def called(condition, detector):
+        return controls_value(
+            controls, "bursts", "called_rate", condition, None, detector
+        )
+
+    def burst_share(share):
+        rows = controls[
+            (controls["summary"] == "bursts")
+            & (controls.measure == share)
+            & (controls.condition == "placeless_burst")
+        ]
+        return float(rows.value.min()), float(rows.value.max())
+
+    def carving(conditions, label, detector):
+        """Share of trials carved this way at each level, pooled over conditions."""
+        return np.array(
+            [
+                np.mean(
+                    [
+                        controls_value(
+                            controls,
+                            "parts",
+                            f"segmentation_{label}",
+                            c,
+                            level,
+                            detector,
+                        )
+                        for c in conditions
+                    ]
+                )
+                for level in controls_levels(controls, conditions[0])
+            ]
+        )
+
+    def recovery(condition, detector):
+        return np.array(
+            [
+                controls_value(
+                    controls, "parts", "part_recovery", condition, level, detector
+                )
+                for level in controls_levels(controls, condition)
+            ]
+        )
+
+    minutes = controls[
+        (controls["summary"] == "no_replay") & (controls.measure == "immobile_minutes")
+    ].value.iloc[0]
+    fragmented_low, fragmented_high = burst_share("fragmented_share")
+    jumps = ("jump_120ms", "jump_200ms")
+    spanning_jumps = carving(jumps, "spanning", "state_space_canonical")
+    sliding_spanning = carving(jumps, "spanning", "sliding_published")
+    elsewhere_missing = carving(
+        ("chain_elsewhere",), "parts_missing", "sliding_published"
+    )
+    elsewhere_split = carving(
+        ("chain_elsewhere",), "one_per_part", "state_space_canonical"
+    )
+    continuing = {
+        (label, detector): carving(("chain_continuing",), label, detector)
+        for label in ("spanning", "one_per_part")
+        for detector in ("sliding_published", "state_space_canonical")
+    }
+    gaps_ms = 1000 * np.array(controls_levels(controls, "chain_continuing"))
 
     path.write_text(
         rewrap(
@@ -1374,15 +1717,61 @@ floor of panels (h, i) still leaves the reported duration too long. Over the who
 {pct(overall["sliding_accepted_but_not_the_injection"])} of the
 sliding-window detector's accepted events are not the replay that was put in.
 
+**(k-n) Activity that is not one clean replay**, written into the same recording
+and scored by the same rule; our detector is read both ways, its non-local
+events (continuous and fragmented states together) and the continuous state
+alone. **(k)** Share of bursts with an event reported on them. A place-less
+burst, every cell firing at one rate unrelated to its field, carries no
+spatial content, so any event on it is false; a jumping burst represents a
+random place every 15 ms, so calling it non-local is right and calling it a
+sequence is not. Our detector's non-local events cover
+{pct(called("placeless_burst", "state_space_canonical"))} of place-less
+bursts, which spend {pct(fragmented_low)} to {pct(fragmented_high)} of their
+time in the fragmented state; the continuous state alone covers
+{pct(called("placeless_burst", "state_space_continuous"))}, and the sliding
+window {pct(called("placeless_burst", "sliding_published"))}
+({pct(called("placeless_burst", "sliding_accepted"))} before its significance
+test). On jumping bursts our non-local events cover
+{pct(called("jumping_burst", "state_space_canonical"))}, which is right; the
+continuous state alone covers {pct(called("jumping_burst", "state_space_continuous"))}
+and the sliding window {pct(called("jumping_burst", "sliding_published"))}
+({pct(called("jumping_burst", "sliding_accepted"))} before its test), each
+calling a sequence that is not there. Over {minutes:.1f} minutes of immobility
+with no replay, from eight simulated recordings, no output reported any event.
+**(l)** Two 60 cm parts, the second starting the given distance behind where
+the first ended, with no gap in time, pooled over 120 and 200 ms parts; bars
+give how each detector carved the event (vermilion outline the sliding window
+under the published definition, blue our non-local events), and the numbers
+above them the share of parts recovered. Our detector reports one event over
+both parts in {pct(spanning_jumps.min())} to {pct(spanning_jumps.max())} of
+trials at every jump; the sliding window does so in up to
+{pct(sliding_spanning.max())} of trials for jumps up to 40 cm and never across
+80 cm. **(m, n)** Two 150 ms, 60 cm replays with a silent gap, the second
+continuing from the first's end (m) or starting 140 cm away from it (n).
+Continuing, at a {gaps_ms[0]:.0f} ms gap both detectors report one event over
+both parts ({pct(continuing["spanning", "sliding_published"][0])} of trials
+for the sliding window, {pct(continuing["spanning", "state_space_canonical"][0])}
+for ours); at {gaps_ms[-1]:.0f} ms neither does, and they report one event per
+part in {pct(continuing["one_per_part", "sliding_published"][-1])} and
+{pct(continuing["one_per_part", "state_space_canonical"][-1])}. Far apart, the
+sliding window never reports one event over both, and misses a part in
+{pct(elsewhere_missing.min())} to {pct(elsewhere_missing.max())} of trials; our
+detector reports one event per part in {pct(elsewhere_split[0])} of trials at a
+{gaps_ms[0]:.0f} ms gap and {pct(elsewhere_split[-1])} at {gaps_ms[-1]:.0f} ms.
+Isolated 60 cm parts of 120 to 200 ms are recovered in
+{pct(recovery("isolated_part", "sliding_published").min())} to
+{pct(recovery("isolated_part", "sliding_published").max())} of trials by the
+sliding window and {pct(recovery("isolated_part", "state_space_canonical").min())}
+to {pct(recovery("isolated_part", "state_space_canonical").max())} by ours.
+
 **Caveats.** Sorted spikes, a linear track, no artifacts. In (f-j) the animal
 rests at one end of the track and pauses nowhere else, so distance from its
 place is fixed by where the replay is put and cannot be varied independently.
 Replays run at constant speed with Poisson firing from the same place fields
 the encoding model was fitted on, so there is no model mismatch and the picture
-is optimistic. Every cell of (f-j) holds a replay; there is no stretch without
-one and no incoherent activity, so the sweep measures how often each detector
-reports a replay that is there and not how often it reports one that is not,
-and more detection here is not by itself better performance. The significance
+is optimistic. Every cell of (f-j) holds a replay, so those panels measure how
+often each detector reports a replay that is there; (k) is where they are tested
+on activity that holds none. The significance
 test is the reference's place-cell identity shuffle, which needs sorted cells;
 recorded data, decoded clusterless, are tested with an encoding-pair shuffle
 instead.
@@ -1408,6 +1797,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--n-neurons", type=int, default=25)
     parser.add_argument("--summary", type=Path, default=SUMMARY_PATH)
+    parser.add_argument("--controls-summary", type=Path, default=CONTROLS_SUMMARY_PATH)
     parser.add_argument(
         "--output-dir", type=Path, default=Path("paper/figures/memoryless_comparison")
     )
@@ -1415,13 +1805,18 @@ def main() -> None:
 
     config = MemorylessSequenceConfig(sampling_frequency=500.0)
     summary = read_summary(args.summary)
-    fig, decoded = make_figure(args.n_neurons, config, summary)
+    controls = read_summary(args.controls_summary)
+    fig, decoded = make_figure(args.n_neurons, config, summary, controls)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     save_figure("memoryless_comparison", base_dir=args.output_dir)
     plt.close(fig)
     write_caption(
-        decoded, summary, config, args.output_dir / "memoryless_comparison_caption.md"
+        decoded,
+        summary,
+        controls,
+        config,
+        args.output_dir / "memoryless_comparison_caption.md",
     )
 
     candidates = decoded["candidates"]

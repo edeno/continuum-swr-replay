@@ -111,18 +111,47 @@ of panels (h, i) still leaves the reported duration too long. Over the whole
 sweep, 23% of the sliding-window detector's accepted events are not the replay
 that was put in.
 
+**(k-n) Activity that is not one clean replay**, written into the same
+recording and scored by the same rule; our detector is read both ways, its
+non-local events (continuous and fragmented states together) and the continuous
+state alone. **(k)** Share of bursts with an event reported on them. A
+place-less burst, every cell firing at one rate unrelated to its field, carries
+no spatial content, so any event on it is false; a jumping burst represents a
+random place every 15 ms, so calling it non-local is right and calling it a
+sequence is not. Our detector's non-local events cover 93% of place-less
+bursts, which spend 61% to 80% of their time in the fragmented state; the
+continuous state alone covers 0%, and the sliding window 6% (10% before its
+significance test). On jumping bursts our non-local events cover 97%, which is
+right; the continuous state alone covers 46% and the sliding window 8% (14%
+before its test), each calling a sequence that is not there. Over 1.7 minutes
+of immobility with no replay, from eight simulated recordings, no output
+reported any event. **(l)** Two 60 cm parts, the second starting the given
+distance behind where the first ended, with no gap in time, pooled over 120 and
+200 ms parts; bars give how each detector carved the event (vermilion outline
+the sliding window under the published definition, blue our non-local events),
+and the numbers above them the share of parts recovered. Our detector reports
+one event over both parts in 71% to 81% of trials at every jump; the sliding
+window does so in up to 77% of trials for jumps up to 40 cm and never across 80
+cm. **(m, n)** Two 150 ms, 60 cm replays with a silent gap, the second
+continuing from the first's end (m) or starting 140 cm away from it (n).
+Continuing, at a 10 ms gap both detectors report one event over both parts (75%
+of trials for the sliding window, 88% for ours); at 200 ms neither does, and
+they report one event per part in 58% and 79%. Far apart, the sliding window
+never reports one event over both, and misses a part in 42% to 62% of trials;
+our detector reports one event per part in 29% of trials at a 10 ms gap and 71%
+at 200 ms. Isolated 60 cm parts of 120 to 200 ms are recovered in 54% to 96% of
+trials by the sliding window and 75% to 96% by ours.
+
 **Caveats.** Sorted spikes, a linear track, no artifacts. In (f-j) the animal
 rests at one end of the track and pauses nowhere else, so distance from its
 place is fixed by where the replay is put and cannot be varied independently.
 Replays run at constant speed with Poisson firing from the same place fields
 the encoding model was fitted on, so there is no model mismatch and the picture
-is optimistic. Every cell of (f-j) holds a replay; there is no stretch without
-one and no incoherent activity, so the sweep measures how often each detector
-reports a replay that is there and not how often it reports one that is not,
-and more detection here is not by itself better performance. The significance
-test is the reference's place-cell identity shuffle, which needs sorted cells;
-recorded data, decoded clusterless, are tested with an encoding-pair shuffle
-instead.
+is optimistic. Every cell of (f-j) holds a replay, so those panels measure how
+often each detector reports a replay that is there; (k) is where they are
+tested on activity that holds none. The significance test is the reference's
+place-cell identity shuffle, which needs sorted cells; recorded data, decoded
+clusterless, are tested with an encoding-pair shuffle instead.
 
 Produced by `scripts/figures/generate_memoryless_comparison.py` from
 `docs/design/replay_detection_comparison/detection_sweep_summary.csv`.

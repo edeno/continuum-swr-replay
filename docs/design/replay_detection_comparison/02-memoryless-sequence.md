@@ -663,6 +663,36 @@ what it is. An earlier version fitted the model twice, once for each side;
 those two fits differed by about 4% of peak firing rate, and the sweep's
 answers were the same either way.
 
+### Activity that is not one clean replay
+
+`scripts/qa/sweep_memoryless_controls.py` runs both detectors, through the sweep's own
+run steps, on activity designed in
+[memoryless_simulation_controls.md](memoryless_simulation_controls.md); every number is
+in `detection_controls_summary.csv`. Our detector is read two ways: its non-local events
+(continuous and fragmented states together, the project's definition) and the
+continuous state alone.
+
+- **No replay.** Over 1.7 minutes of immobility with no replay, from eight simulated
+  recordings, no output reported any event.
+- **Place-less bursts** (every cell at one rate unrelated to its field; no spatial
+  content). Our non-local events cover 93% of them, the bursts spending 61-80% of their
+  time in the fragmented state; the continuous state alone covers none; the sliding
+  window 6% (10% before its significance test). A population burst with no place in it
+  is therefore a non-local event under the project's definition: the fragmented state
+  takes activity it cannot place as well as activity that hops.
+- **Jumping bursts** (a random place every 15 ms). Our non-local events cover 97%,
+  which is right; the continuous state alone 46% and the sliding window 8% (14% before
+  its test), each calling a sequence that is not there.
+- **Mid-event jumps.** Our detector reports one event over both parts in 71-81% of
+  trials at every jump up to 80 cm; the sliding window does so for jumps up to 40 cm
+  and never across 80 cm.
+- **Chains.** With the second part continuing from the first, both report one event
+  over both at a 10 ms gap and one per part at 200 ms. With it 140 cm away, the sliding
+  window never bridges the gap and misses a part in 42-62% of trials; our detector
+  reports one event per part in 29% of trials at 10 ms and 71% at 200 ms.
+- **Isolated parts**, the baseline: 60 cm parts of 120-200 ms are recovered in 54-96% of
+  trials by the sliding window and 75-96% by ours.
+
 ### Against the reference's own arithmetic
 
 Passing tests show the port is consistent with itself; they do not show it decides

@@ -46,7 +46,7 @@ peak rates (20, 60, 160 Hz) as the injected-replay sweep.
 
 | Condition | What is injected | Grid |
 |---|---|---|
-| No replay | Nothing: each usable immobile stretch is decoded as it is, holding only local coding | All usable immobile time |
+| No replay | Nothing: each usable immobile stretch is decoded as it is, holding only local coding | All usable immobile time of eight simulated recordings, the sweep's and seven more (one holds only 12.6 s) |
 | Place-less burst | Every cell fires at one rate unrelated to its field; population spike count matched to a replay of the same duration and peak rate | 80, 200, 500 ms |
 | Jumping burst | Represented place redrawn uniformly along the track every 15 ms; cells fire by their fields | 80, 200, 500 ms |
 | Mid-event jump | Two constant-speed segments of 60 cm; the second starts J cm from where the first ended, with no gap in time | J = 0 (continuous control), 20, 40, 80 cm; segment length 120 or 200 ms |
@@ -173,8 +173,8 @@ the error estimates the real-data held-out results will be read with.
 | 2 | (b-e) four events, unchanged |
 | 3 | (f, g) detection heatmaps, unchanged |
 | 4 | (h) onset error by true duration; (i) offset error by true duration; (j) reported duration by distance from the animal (today's panel i) |
-| 5 | (k) negative controls; (l) mid-event jumps; (m) chains |
-| 6 | (n) held-out gain by event class (shared, ours-only, comparator-only) split by truth, under each content estimator, fold C hatched; (o) false-support and support rates by class, fold and estimator |
+| 5 | (k) bursts, with the no-replay result stated on the panel; (l) mid-event jumps; (m) chains continuing; (n) chains elsewhere |
+| 6 | (o) held-out gain by event class (shared, ours-only, comparator-only) split by truth, under each content estimator, fold C hatched; (p) false-support and support rates by class, fold and estimator |
 
 (h, i): signed median with interquartile band, one line per detector, zero marked.
 (k): no replay as events per minute and the two bursts as share called, grouped by
