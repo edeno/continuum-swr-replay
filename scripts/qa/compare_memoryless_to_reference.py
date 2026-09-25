@@ -49,6 +49,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
     ENCODING_KEY,
     sorted_spikes_epoch_log_likelihood,
     window_midpoints_s,
+    with_reference_rate_floor,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
     DEFAULT_N_SHUFFLES,
@@ -56,6 +57,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle impor
     ShuffleSeed,
     cell_identity_permutation,
     shuffle_candidate_sorted,
+    sorted_candidate_set_aside_pairs,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation import (
     InjectedReplay,
@@ -101,8 +103,10 @@ SWEEP_TOTALS = (
     "n_published_port",
     "n_published_reference",
     "shuffle_verdicts_differ_on_port_windows",
-    "pairs_center_unchanged_but_spikes_changed",
-    "pairs_spikes_unchanged_but_center_moved",
+    "zero_jump_pairs_observed",
+    "zero_jump_disagreements_observed",
+    "zero_jump_pairs_shuffled",
+    "zero_jump_disagreements_shuffled",
 )
 """Counts that add up across sweep cells; medians and quantiles do not."""
 
@@ -150,13 +154,18 @@ VARIANTS = {
 center, and without its ``+1e-3`` floor, to show what the floor does."""
 
 
+def shuffle_permutations(seed: ShuffleSeed, first: int, n_cells: int) -> list:
+    """The shuffle's draws for one candidate, as the port draws them."""
+    return [
+        cell_identity_permutation(seed, candidate=first, draw=draw, n=n_cells)
+        for draw in range(1, DEFAULT_N_SHUFFLES + 1)
+    ]
+
+
 def p_values(
     counts, rate_hz, config, first, last, baseline_hz, seed
 ) -> tuple[float, float]:
-    permutations = [
-        cell_identity_permutation(seed, candidate=first, draw=draw, n=rate_hz.shape[0])
-        for draw in range(1, DEFAULT_N_SHUFFLES + 1)
-    ]
+    permutations = shuffle_permutations(seed, first, rate_hz.shape[0])
     return reference.shuffle_p_values(
         counts[first : last + 1],
         rate_hz,
@@ -179,8 +188,13 @@ def compare(
     config: MemorylessSequenceConfig,
     baseline_hz: float,
     seed: ShuffleSeed,
+    port_set_aside: dict,
 ) -> tuple[dict, pd.DataFrame]:
-    """Every step of the port against one variant of the reference."""
+    """Every step of the port against one variant of the reference.
+
+    ``port_set_aside`` maps each tested candidate to the pairs the port's
+    shuffle set aside in each draw, observed first.
+    """
     port = decoded["candidates"]
     bin_size_cm = thresholds.bin_size_cm
     posterior = reference.decode_windows(
@@ -201,10 +215,24 @@ def compare(
     ref_spread_pass = bin_size_cm * ref.spread_bins < config.spread_threshold_cm
     ref_jump_pass = bin_size_cm * ref.jump_bins < config.jump_threshold_cm
     identical = (port.runs[:, None, :] == ref.runs[None, :, :]).all(axis=2)
-    # only pairs whose windows both have a center; speed-gated ones have none
-    both = np.isfinite(ref.center_bins[:-1]) & np.isfinite(ref.center_bins[1:])
-    center_unchanged = both & (np.diff(ref.center_bins) == 0.0)
-    spikes_unchanged = both & (counts[1:] == counts[:-1]).all(axis=1)
+    # the zero-jump rule, in the observed decode and every shuffled draw of
+    # every tested candidate, merged gaps included
+    zero_jump = {"observed": [0, 0], "shuffled": [0, 0]}
+    for i, port_masks in port_set_aside.items():
+        first, last = port.runs[i]
+        for draw, permutation in enumerate(
+            [None, *shuffle_permutations(seed, first, rate_hz.shape[0])]
+        ):
+            ref_mask = reference.set_aside_pairs(
+                counts[first : last + 1],
+                rate_hz if permutation is None else rate_hz[permutation],
+                config.window_duration_s,
+                baseline_hz,
+            )
+            tally = zero_jump["observed" if draw == 0 else "shuffled"]
+            # the last entry only repeats the one before it
+            tally[0] += ref_mask.size - 1
+            tally[1] += int((ref_mask[:-1] != port_masks[draw][:-1]).sum())
 
     # the reference's test on each of its own replays, and on each of the
     # port's with the port's draws
@@ -250,14 +278,10 @@ def compare(
         "n_replay_reference": int(ref.is_replay.sum()),
         "n_published_port": int(sum(r.passes for r in decoded["shuffles"].values())),
         "n_published_reference": int(sum(passes(*p) for p in ref_p.values())),
-        # the reference sets aside a pair whose continuous center did not move;
-        # the port sets aside a pair whose spikes did not change
-        "pairs_center_unchanged_but_spikes_changed": int(
-            (center_unchanged & ~spikes_unchanged).sum()
-        ),
-        "pairs_spikes_unchanged_but_center_moved": int(
-            (spikes_unchanged & ~center_unchanged).sum()
-        ),
+        "zero_jump_pairs_observed": zero_jump["observed"][0],
+        "zero_jump_disagreements_observed": zero_jump["observed"][1],
+        "zero_jump_pairs_shuffled": zero_jump["shuffled"][0],
+        "zero_jump_disagreements_shuffled": zero_jump["shuffled"][1],
         "shuffle_verdicts_differ_on_port_windows": int(
             sum(
                 passes(*same_windows_p[i]) != decoded["shuffles"][i].passes
@@ -361,10 +385,36 @@ def compare_variants(
             f"{counts.shape[0]} windows of counts for "
             f"{decoded['posterior'].shape[0]} decoded windows."
         )
+    sliding_model = with_reference_rate_floor(encoding_model, config)
+    port_set_aside = {
+        i: sorted_candidate_set_aside_pairs(
+            int(decoded["candidates"].runs[i, 0]),
+            int(decoded["candidates"].runs[i, 1]),
+            decoded.get("binning_time", decoded["time"]),
+            decoded["spike_times"],
+            sliding_model,
+            config,
+            [
+                None,
+                *shuffle_permutations(
+                    seed, int(decoded["candidates"].runs[i, 0]), rate_hz.shape[0]
+                ),
+            ],
+        )
+        for i in decoded["shuffles"]
+    }
     summaries, tables = {}, []
     for variant, baseline_hz in VARIANTS.items():
         summary, table = compare(
-            decoded, counts, rate_hz, centers_cm, thresholds, config, baseline_hz, seed
+            decoded,
+            counts,
+            rate_hz,
+            centers_cm,
+            thresholds,
+            config,
+            baseline_hz,
+            seed,
+            port_set_aside,
         )
         summaries[variant] = summary
         tables.append(table.assign(variant=variant))

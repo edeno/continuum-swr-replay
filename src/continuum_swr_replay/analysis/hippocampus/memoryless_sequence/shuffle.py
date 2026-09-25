@@ -30,28 +30,30 @@ skip NaN (``nanmean``), a draw counts against the candidate only when its
 statistic is strictly below the observed one (``nansum(shuffle < observed)``,
 so a tie or a NaN draw does not count), and a half passes at ``p <= 0.05``.
 
-One line of the reference needs translating rather than copying. Its center
-of mass is continuous, so ``jumps(jumps==0) = nan`` sets aside the window
-pairs whose center did not move. Nearly always that is because the posterior
-did not change, because the slice leaving and the slice entering hold the
-same spikes up to what the decode can tell apart, and those pairs are the
-same in the observed decode and in every shuffle, since which spikes fall in
-a window does not depend on the encoding. The translation below sets aside
-exactly those pairs, which makes it an approximation: a change of spikes that
-is symmetric about the center, such as one more spike from the cell whose
-field sits at the center of a symmetric posterior, alters the posterior but
-leaves its continuous center where it was, and the reference sets that pair
-aside where this port keeps its jump. That needs exact symmetry; how often it
-happens is counted by ``scripts/qa/compare_memoryless_to_reference.py``. This
-port's centers are bins, so a literal zero test would also
-set aside every pair whose center stayed in its 2 cm bin, most pairs on a
-slow replay, and would turn the mean jump into the mean size of a bin
-crossing, with a different set of pairs in each draw. The pairs are therefore
-read from the spikes, whatever the centers do. The decode cannot tell two
-spikes of one sorted cell apart, so a cell's spike leaving as another of its
-spikes enters changes nothing and the pair is set aside. Clusterless spikes
-carry continuous marks, so no spike can stand in for another, and a pair is
-set aside only when no spike leaves or enters.
+One line of the reference, ``jumps(jumps==0) = nan``, sets aside every pair
+of windows whose continuous center of mass did not move, and it does so in
+each draw, since whether a center moves can depend on the fields a draw
+assigns. This port's centers are bins, so a literal zero test on them would
+also set aside every pair whose center stayed in its 2 cm bin, most pairs on a
+slow replay, turning the mean jump into the mean size of a bin crossing. The
+set-aside pairs therefore come from a continuous center, separately from the
+binned centers whose jumps are averaged.
+
+For sorted cells the rule is the reference's exactly
+(:func:`unmoved_center_pairs`): each window is decoded from its own whole-number
+spike counts, as the reference decodes window by window, so windows holding
+the same spikes get the same center to the last bit, and a pair is set aside
+in a draw when that draw's continuous center of mass, ``nansum((1:n) .* X) /
+nansum(X)`` in bin units, is unchanged up to rounding (:data:`CENTER_TIE_BINS`). That includes a change of
+spikes that leaves the center where it was, such as a posterior saturated in
+one bin gaining a spike.
+
+For clusterless marks, on a track graph, there is no continuous center, and
+the rule is an approximation read from the spikes (:func:`unchanged_window_pairs`):
+a pair is set aside, in every draw alike, when no spike enters or leaves.
+Marks are continuous, so no spike can stand in for another, but a change of
+spikes that leaves the center exactly unmoved is kept where the reference
+would set it aside.
 
 A candidate whose observed statistic is NaN passes that half trivially under
 the reference's arithmetic; that cannot happen to a candidate that meets the
@@ -87,6 +89,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics im
 )
 
 __all__ = [
+    "CENTER_TIE_BINS",
     "DEFAULT_N_SHUFFLES",
     "MINIMUM_N_SHUFFLES",
     "SIGNIFICANCE_LEVEL",
@@ -100,7 +103,9 @@ __all__ = [
     "shuffle_p_value",
     "shuffle_statistics",
     "sorted_candidate_window_log_likelihood",
+    "sorted_candidate_set_aside_pairs",
     "unchanged_window_pairs",
+    "unmoved_center_pairs",
 ]
 
 DEFAULT_N_SHUFFLES = 100
@@ -369,6 +374,56 @@ def shuffle_statistics(
     return _nanmean(spread), _nanmean(jumps)
 
 
+CENTER_TIE_BINS = 1e-9
+"""How far a continuous center may move, in bins, and still count as unmoved.
+
+The reference tests ``jumps == 0`` exactly, which in floating point also
+depends on rounding: two windows whose centers agree in exact arithmetic can
+differ by about 1e-14 bins, and two implementations of the same arithmetic
+disagree there. Far above that rounding and far below any movement (1e-9 bins
+is about 2e-9 cm), this reads the reference's rule as exact arithmetic would."""
+
+
+def unmoved_center_pairs(window_log_likelihood: NDArray) -> NDArray:
+    """Which jumps the reference sets aside, on a continuous center of mass.
+
+    ``jumps(jumps==0) = nan`` in ``load_replayEvents_cellIDshuffle_sameEvents.m``,
+    with the center as ``compute_centerOfMass_1D.m`` computes it,
+    ``nansum((1:n) .* X) / nansum(X)`` in bin units. A pair is set aside when
+    the center of window ``k + 1`` is exactly that of window ``k``; the last
+    window repeats the entry before it, as its padded jump does.
+
+    Each distinct window is normalized once and its center computed once, so
+    windows holding the same spikes, whose log-likelihood rows are identical,
+    get the same center to the last bit wherever they sit; the reference
+    decodes window by window and gets that for free. "Exactly" means to within
+    :data:`CENTER_TIE_BINS`, rounding and nothing more.
+
+    Parameters
+    ----------
+    window_log_likelihood : ndarray, shape (n_windows, n_bins)
+        Bins in track order along a straight track.
+
+    Returns
+    -------
+    set_aside : ndarray of bool, shape (n_windows,)
+
+    """
+    rows, inverse = np.unique(
+        np.asarray(window_log_likelihood, dtype=np.float64),
+        axis=0,
+        return_inverse=True,
+    )
+    posterior = normalize_windows(rows)
+    center = (posterior @ np.arange(posterior.shape[1])) / posterior.sum(axis=1)
+    center = center[inverse.ravel()]
+    set_aside = np.zeros(center.size, dtype=bool)
+    if center.size > 1:
+        set_aside[:-1] = np.abs(center[1:] - center[:-1]) <= CENTER_TIE_BINS
+        set_aside[-1] = set_aside[-2]
+    return set_aside
+
+
 def _nanmean(values: NDArray) -> float:
     """MATLAB's ``nanmean``: the mean of the non-NaN values, NaN if there are none."""
     kept = values[~np.isnan(values)]
@@ -376,25 +431,19 @@ def _nanmean(values: NDArray) -> float:
 
 
 def _unchanged_pairs(
-    spike_rows: NDArray,
-    spike_units: NDArray,
-    n_windows: int,
-    config: MemorylessSequenceConfig,
+    spike_rows: NDArray, n_windows: int, config: MemorylessSequenceConfig
 ) -> NDArray:
-    """Which consecutive window pairs hold the same spikes, as the decode sees them.
+    """Which consecutive window pairs no spike entered or left.
 
     Window ``k`` covers rows ``[k S, k S + W)``; window ``k + 1`` drops the
     first ``S`` of those rows and adds the ``S`` rows after them. The pair is
-    unchanged when the slice leaving and the slice entering hold as many
-    spikes of each unit, a unit being whatever the decode cannot tell apart:
-    a sorted cell, or, for marks, each spike on its own. The last window
-    repeats the entry before it, as its padded jump repeats the previous jump.
+    unchanged when neither slice holds a spike. The last window repeats the
+    entry before it, as its padded jump repeats the previous jump.
 
     Parameters
     ----------
     spike_rows : ndarray of int, shape (n_spikes,)
         Each spike's row, counted from the candidate's first row.
-    spike_units : ndarray of int, shape (n_spikes,)
     n_windows : int
     config : MemorylessSequenceConfig
 
@@ -404,18 +453,16 @@ def _unchanged_pairs(
 
     """
     stride, width = config.stride_n_samples, config.window_n_samples
-    order = np.argsort(spike_rows, kind="stable")
-    rows = np.asarray(spike_rows)[order]
-    units = np.asarray(spike_units)[order]
+    rows = np.sort(np.asarray(spike_rows))
     first_row = stride * np.arange(max(n_windows - 1, 0))
-    leaving = np.searchsorted(rows, [first_row, first_row + stride])
-    entering = np.searchsorted(rows, [first_row + width, first_row + width + stride])
+    leaving = np.searchsorted(rows, first_row + stride) - np.searchsorted(
+        rows, first_row
+    )
+    entering = np.searchsorted(rows, first_row + width + stride) - np.searchsorted(
+        rows, first_row + width
+    )
     unchanged = np.zeros(n_windows, dtype=bool)
-    for k in range(n_windows - 1):
-        unchanged[k] = np.array_equal(
-            np.sort(units[leaving[0, k] : leaving[1, k]]),
-            np.sort(units[entering[0, k] : entering[1, k]]),
-        )
+    unchanged[: n_windows - 1] = (leaving == 0) & (entering == 0)
     if n_windows > 1:
         unchanged[-1] = unchanged[-2]
     return unchanged
@@ -462,10 +509,7 @@ def unchanged_window_pairs(
         rows = get_spike_time_bin_ind(times, time)
         spike_rows.append(rows[(rows >= row_start) & (rows < row_stop)] - row_start)
     rows = np.concatenate([np.zeros(0, dtype=int), *spike_rows])
-    # marks are continuous, so every spike is its own unit
-    return _unchanged_pairs(
-        rows, np.arange(rows.size), last_window - first_window + 1, config
-    )
+    return _unchanged_pairs(rows, last_window - first_window + 1, config)
 
 
 def _candidate_rows(
@@ -500,15 +544,18 @@ def _check_n_shuffles(n_shuffles: int) -> None:
 
 
 def _result_from_draws(
-    windows: NDArray, bin_distance_cm: NDArray, unchanged_pairs: NDArray
+    windows: NDArray, bin_distance_cm: NDArray, set_aside: NDArray
 ) -> ShuffleResult:
-    """Draw 0 is the observed decode; the rest are the null."""
+    """Draw 0 is the observed decode; the rest are the null.
+
+    ``set_aside`` is one mask for every draw, shape ``(n_windows,)``, or one
+    per draw, shape ``(n_draws, n_windows)``.
+    """
+    masks = np.broadcast_to(np.asarray(set_aside, dtype=bool), windows.shape[:2])
     statistics = np.array(
         [
-            shuffle_statistics(
-                normalize_windows(draw), bin_distance_cm, unchanged_pairs
-            )
-            for draw in windows
+            shuffle_statistics(normalize_windows(draw), bin_distance_cm, mask)
+            for draw, mask in zip(windows, masks, strict=True)
         ]
     )
     return ShuffleResult(
@@ -629,10 +676,7 @@ def _decode_draws(
         ]
     )
     rows = np.concatenate([np.zeros(0, dtype=int), *candidate_rows])
-    # marks are continuous, so every spike is its own unit
-    return windows, _unchanged_pairs(
-        rows, np.arange(rows.size), windows.shape[1], config
-    )
+    return windows, _unchanged_pairs(rows, windows.shape[1], config)
 
 
 def _validated_permutation(permutation: NDArray, n: int, electrode: int) -> NDArray:
@@ -778,11 +822,16 @@ def _decode_draws_sorted(
     The row log-likelihood is ``sum_n count_n log field_n(x) - sum_n field_n(x)``,
     as ``predict_sorted_spikes_kde_log_likelihood`` computes it; a draw
     permutes which field each cell's counts meet, which is the first term only.
+    As the reference does, each window is decoded from its own spike counts,
+    which are whole numbers, so windows holding the same spikes get the same
+    log-likelihood to the last bit and :func:`unmoved_center_pairs` finds their
+    centers equal; a running sum over rows would not.
 
     Returns
     -------
     window_log_likelihood : ndarray, shape (n_draws, n_windows, n_bins)
-    unchanged_pairs : ndarray of bool, shape (n_windows,)
+    set_aside : ndarray of bool, shape (n_draws, n_windows)
+        Each draw's pairs whose continuous center did not move.
     """
     from non_local_detector.likelihoods.common import get_spike_time_bin_ind
 
@@ -795,36 +844,40 @@ def _decode_draws_sorted(
             f"{len(spike_times)} spike trains for {fields.shape[0]} cells; they "
             f"must match one for one."
         )
-    counts = np.zeros((row_stop - row_start, fields.shape[0]))
+    counts = np.zeros((row_stop - row_start, fields.shape[0]), dtype=np.int64)
     for cell, cell_times in enumerate(spike_times):
         cell_times = np.asarray(cell_times, dtype=np.float64)
         # the library keeps spikes on the closed grid, then bins them
         cell_times = cell_times[(cell_times >= time[0]) & (cell_times <= time[-1])]
         rows = get_spike_time_bin_ind(cell_times, time)
         rows = rows[(rows >= row_start) & (rows < row_stop)] - row_start
-        np.add.at(counts[:, cell], rows, 1.0)
+        np.add.at(counts[:, cell], rows, 1)
     # the fit clips every field away from zero, so the log is finite
     log_fields = np.log(fields)
     absent = np.asarray(
         encoding_model["no_spike_part_log_likelihood"], dtype=np.float64
     )[interior]
+
+    width, stride = config.window_n_samples, config.stride_n_samples
+    cumulative = np.concatenate(
+        [np.zeros((1, counts.shape[1]), dtype=np.int64), np.cumsum(counts, axis=0)]
+    )
+    start = stride * np.arange((counts.shape[0] - width) // stride + 1)
+    window_counts = cumulative[start + width] - cumulative[start]
+    distinct, inverse = np.unique(window_counts, axis=0, return_inverse=True)
+    distinct = distinct.astype(np.float64)
     windows = np.stack(
         [
-            aggregate_windows(
-                counts
+            (
+                distinct
                 @ (log_fields if permutation is None else log_fields[permutation])
-                - absent,
-                config.window_n_samples,
-                config.stride_n_samples,
-            )
+                - width * absent
+            )[inverse.ravel()]
             for permutation in permutations
         ]
     )
-    row, cell = np.nonzero(counts)
-    n_spikes = counts[row, cell].astype(int)
-    return windows, _unchanged_pairs(
-        np.repeat(row, n_spikes), np.repeat(cell, n_spikes), windows.shape[1], config
-    )
+    set_aside = np.stack([unmoved_center_pairs(draw) for draw in windows])
+    return windows, set_aside
 
 
 def sorted_candidate_window_log_likelihood(
@@ -873,6 +926,57 @@ def sorted_candidate_window_log_likelihood(
         [permutation],
     )
     return np.asarray(windows[0])
+
+
+def sorted_candidate_set_aside_pairs(
+    first_window: int,
+    last_window: int,
+    time: NDArray,
+    spike_times: list[NDArray],
+    encoding_model: dict,
+    config: MemorylessSequenceConfig,
+    permutations: list[NDArray | None],
+) -> NDArray:
+    """The jumps each draw of the cell-identity shuffle sets aside.
+
+    What :func:`shuffle_candidate_sorted` sets aside in each of its draws,
+    for checking against the reference.
+
+    Parameters
+    ----------
+    first_window, last_window : int
+        Inclusive window indices.
+    time : ndarray, shape (n_time,)
+        The full decode grid.
+    spike_times : list of ndarray
+        One per cell, in the encoding model's cell order.
+    encoding_model : dict
+        A sorted-spikes KDE encoding model. Not modified.
+    config : MemorylessSequenceConfig
+    permutations : list
+        Per draw, None for the observed pairing or a permutation of the cells.
+
+    Returns
+    -------
+    set_aside : ndarray of bool, shape (n_draws, n_windows)
+
+    """
+    n_cells = np.asarray(encoding_model["place_fields"]).shape[0]
+    _, set_aside = _decode_draws_sorted(
+        first_window,
+        last_window,
+        time,
+        spike_times,
+        encoding_model,
+        config,
+        [
+            None
+            if permutation is None
+            else _validated_permutation(permutation, n_cells, 0)
+            for permutation in permutations
+        ],
+    )
+    return set_aside
 
 
 def shuffle_candidate_sorted(

@@ -38,6 +38,13 @@ from scipy.special import logsumexp
 RATE_MAP_BASELINE_HZ = 1e-3
 """Added to every tuning curve before decoding, as the reference does."""
 
+ZERO_JUMP_BINS = 1e-9
+"""A jump no larger than this, in bins, is the reference's ``jumps == 0``.
+
+MATLAB's exact test also turns on its own rounding, which no other
+implementation reproduces; centers equal in exact arithmetic differ by about
+1e-14 bins after rounding, so this reads the test as exact arithmetic would."""
+
 
 @dataclass(frozen=True)
 class ReferenceThresholds:
@@ -76,14 +83,24 @@ def decode_windows(
 
     """
     rate = np.asarray(rate_map_hz, dtype=np.float64) + baseline_hz
-    log_likelihood = np.asarray(window_counts, dtype=np.float64) @ np.log(
-        rate
-    ) - window_s * rate.sum(axis=0)
-    return np.exp(log_likelihood - logsumexp(log_likelihood, axis=1, keepdims=True))
+    # the reference decodes window by window, so the same counts give the same
+    # posterior to the last bit; decode each distinct window once to match
+    counts, inverse = np.unique(
+        np.asarray(window_counts, dtype=np.float64), axis=0, return_inverse=True
+    )
+    log_likelihood = counts @ np.log(rate) - window_s * rate.sum(axis=0)
+    posterior = np.exp(
+        log_likelihood - logsumexp(log_likelihood, axis=1, keepdims=True)
+    )
+    return posterior[inverse.ravel()]
 
 
 def center_and_spread(posterior: NDArray) -> tuple[NDArray, NDArray]:
     """Continuous center of mass and the spread about it, both in bins.
+
+    The center is ``nansum((1:n) .* X) / nansum(X)``, as
+    ``compute_centerOfMass_1D.m`` computes it, divided by the posterior's own
+    sum rather than assuming it is exactly one.
 
     Returns
     -------
@@ -92,7 +109,7 @@ def center_and_spread(posterior: NDArray) -> tuple[NDArray, NDArray]:
     """
     posterior = np.asarray(posterior, dtype=np.float64)
     bins = np.arange(posterior.shape[1])
-    center = posterior @ bins
+    center = (posterior @ bins) / posterior.sum(axis=1)
     spread = np.sqrt(((bins[None, :] - center[:, None]) ** 2 * posterior).sum(axis=1))
     return center, spread
 
@@ -237,6 +254,26 @@ def detect(
     )
 
 
+def set_aside_pairs(
+    window_counts: NDArray,
+    rate_map_hz: NDArray,
+    window_s: float,
+    baseline_hz: float = RATE_MAP_BASELINE_HZ,
+) -> NDArray:
+    """Which jumps ``jumps(jumps==0) = nan`` sets aside, after the forward pad.
+
+    Returns
+    -------
+    set_aside : ndarray of bool, shape (n_windows,)
+
+    """
+    center, _ = center_and_spread(
+        decode_windows(window_counts, rate_map_hz, window_s, baseline_hz)
+    )
+    set_aside: NDArray = forward_jumps(center) <= ZERO_JUMP_BINS
+    return set_aside
+
+
 def shuffle_statistics(
     window_counts: NDArray,
     rate_map_hz: NDArray,
@@ -252,7 +289,7 @@ def shuffle_statistics(
         decode_windows(window_counts, rate_map_hz, window_s, baseline_hz)
     )
     jumps = forward_jumps(center)
-    jumps[jumps == 0] = np.nan
+    jumps[jumps <= ZERO_JUMP_BINS] = np.nan
     return float(np.nanmean(spread)), float(np.nanmean(jumps))
 
 

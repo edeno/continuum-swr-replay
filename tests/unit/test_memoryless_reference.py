@@ -14,6 +14,12 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
     window_midpoints_s,
     with_reference_rate_floor,
 )
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
+    ShuffleSeed,
+    cell_identity_permutation,
+    sorted_candidate_window_log_likelihood,
+    unmoved_center_pairs,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
     aggregate_windows,
     normalize_windows,
@@ -182,3 +188,60 @@ class TestPortAgreesWithTheReference:
         assert len(port.runs) > 0 and port.is_replay.any()
         np.testing.assert_array_equal(ref.runs, port.runs)
         np.testing.assert_array_equal(ref.is_replay, port.is_replay)
+
+
+class TestZeroJumpRuleMatchesTheReference:
+    """The pairs set aside are the reference's, in the observed decode and every draw.
+
+    The reference decodes each window from its own counts and sets aside a
+    jump that is exactly zero on its continuous center of mass; the port must
+    set aside the same pairs, including under permuted fields, where the
+    pairs can differ from the observed decode's.
+    """
+
+    WINDOWS = (60, 260)
+    N_DRAWS = 20
+
+    def test_the_same_pairs_are_set_aside_in_every_draw(self, sorted_track):
+        first, last = self.WINDOWS
+        floored = with_reference_rate_floor(sorted_track.encoding_model, CONFIG)
+        rate_hz, _, _ = fields_and_thresholds(sorted_track.encoding_model, CONFIG)
+        n_rows = sorted_spikes_epoch_log_likelihood(
+            sorted_track.time,
+            sorted_track.linear_position,
+            sorted_track.spike_times,
+            floored,
+            CONFIG,
+        ).time.size
+        counts = window_counts(
+            sorted_track.spike_times, sorted_track.time, n_rows, CONFIG
+        )[first : last + 1]
+        seed = ShuffleSeed(run=1, session="zero-jump")
+        permutations = [None] + [
+            cell_identity_permutation(
+                seed, candidate=first, draw=draw, n=rate_hz.shape[0]
+            )
+            for draw in range(1, self.N_DRAWS + 1)
+        ]
+
+        set_aside_somewhere = False
+        for permutation in permutations:
+            port = unmoved_center_pairs(
+                sorted_candidate_window_log_likelihood(
+                    first,
+                    last,
+                    sorted_track.time,
+                    sorted_track.spike_times,
+                    floored,
+                    CONFIG,
+                    permutation=permutation,
+                )
+            )
+            ref = reference.set_aside_pairs(
+                counts,
+                rate_hz if permutation is None else rate_hz[permutation],
+                CONFIG.window_duration_s,
+            )
+            np.testing.assert_array_equal(port, ref)
+            set_aside_somewhere |= bool(ref.any())
+        assert set_aside_somewhere

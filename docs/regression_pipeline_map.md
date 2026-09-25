@@ -638,7 +638,7 @@ Compare a backed-up rate fit against the current one and write a markdown audit.
 
 Run the port and the reference's own arithmetic on one input, and compare.
 
-`window_counts`, `overlap`, `p_values`, `passes`, `compare`, `reference_row`, `fields_and_thresholds`, `compare_variants`, `decode_sweep_cell`, `sweep_totals`, `main`
+`window_counts`, `overlap`, `shuffle_permutations`, `p_values`, `passes`, `compare`, `reference_row`, `fields_and_thresholds`, `compare_variants`, `decode_sweep_cell`, `sweep_totals`, `main`
 
 ### `scripts/qa/compare_pfc_cohorts.py`
 
@@ -692,7 +692,7 @@ What the mPFC held-out null's windows look like, beside the real events.
 
 The Widloski & Foster detector as its MATLAB computes it, for a sorted 1-D track.
 
-`ReferenceThresholds`, `decode_windows`, `center_and_spread`, `forward_jumps`, `runs_of_kept`, `merge_runs`, `dispersion_bins`, `ReferenceDetection`, `detect`, `shuffle_statistics`, `shuffle_p_values`
+`ReferenceThresholds`, `decode_windows`, `center_and_spread`, `forward_jumps`, `runs_of_kept`, `merge_runs`, `dispersion_bins`, `ReferenceDetection`, `detect`, `set_aside_pairs`, `shuffle_statistics`, `shuffle_p_values`
 
 ### `scripts/qa/mutation_check.py`
 

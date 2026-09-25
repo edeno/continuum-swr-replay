@@ -33,6 +33,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle impor
     shuffle_statistics,
     sorted_candidate_window_log_likelihood,
     unchanged_window_pairs,
+    unmoved_center_pairs,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
     aggregate_windows,
@@ -231,6 +232,64 @@ class TestStatistics:
         # window 0's successor has no center, window 1 has none, window 2 repeats
         # window 1's undefined jump: no jump is defined
         assert np.isnan(jump)
+
+
+class TestUnmovedCenterPairs:
+    """The reference's ``jumps(jumps==0) = nan`` on a continuous center of mass."""
+
+    def test_a_window_the_same_as_the_next_is_set_aside(self):
+        row = np.array([-3.0, -1.0, 0.0, -2.0, -4.0])
+
+        set_aside = unmoved_center_pairs(np.stack([row, row, row + [0, 0, 0, 3, 0]]))
+
+        assert set_aside.tolist() == [True, False, False]
+
+    def test_different_windows_with_the_same_center_are_set_aside(self):
+        """Both posteriors hold all their mass in bin 2 to machine precision."""
+        log_likelihood = np.array(
+            [
+                [-900.0, -900.0, 0.0, -900.0, -900.0],
+                [-700.0, -800.0, 0.0, -750.0, -900.0],
+                [-900.0, -900.0, -900.0, 0.0, -900.0],
+            ]
+        )
+
+        set_aside = unmoved_center_pairs(log_likelihood)
+
+        assert set_aside.tolist() == [True, False, False]
+
+    def test_a_center_moved_only_by_rounding_is_unmoved(self):
+        """1e-14 bins is rounding; 1e-6 bins is a move."""
+        bins = np.arange(5.0)
+        # a tilt t on a posterior symmetric about bin 2 moves its center by
+        # about t times its variance
+        base = np.log(np.array([0.1, 0.2, 0.4, 0.2, 0.1]))
+        variance = float(np.exp(base) @ (bins - 2.0) ** 2)
+        log_likelihood = np.stack(
+            [base + shift / variance * (bins - 2.0) for shift in (0.0, 1e-14, 1e-6)]
+        )
+
+        set_aside = unmoved_center_pairs(log_likelihood)
+
+        assert set_aside.tolist() == [True, False, False]
+
+    def test_the_last_window_repeats_the_one_before(self):
+        row = np.array([0.0, -1.0, -2.0])
+
+        set_aside = unmoved_center_pairs(np.stack([row, row[::-1], row[::-1]]))
+
+        assert set_aside.tolist() == [False, True, True]
+
+    def test_identical_windows_are_identical_wherever_they_sit(self):
+        """Rows at different offsets must not round differently."""
+        rng = np.random.default_rng(3)
+        row = rng.normal(size=97)
+        log_likelihood = rng.normal(size=(40, 97))
+        log_likelihood[[5, 6, 17, 18, 31, 32]] = row
+
+        set_aside = unmoved_center_pairs(log_likelihood)
+
+        assert set_aside[[5, 17, 31]].all()
 
 
 class TestPermutation:
