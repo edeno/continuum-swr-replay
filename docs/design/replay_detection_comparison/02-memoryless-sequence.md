@@ -325,7 +325,9 @@ trajectories are its stated target.
 
 **What this is not.** It is not an artifact of the adaptations. The finding is unchanged
 under the original's running-only encoding convention, and for any spread cutoff from
-7.5 cm to the 20 cm the reference's own 1D branch uses. The original contains no
+7.5 cm to the 20 cm the reference's own 1D branch uses (both measured before the port
+decoded with the reference's rate-map floor; the durations above, merged and unmerged,
+are the same with it). The original contains no
 local/non-local comparison, no distance-from-animal criterion, no minimum spike or active
 cell count, and no ripple or burst trigger; it decodes every speed-eligible bin; and the
 merge is ported unchanged. `load_replayEvents_cm.m:218` computes a `startDistFromRat` and
@@ -447,8 +449,9 @@ sliding-window detector for sequences built out of the local coding beside the
 injection: those reach 38 to 162 cm of decoded track for injections of 10 to
 30 cm.
 
-The sliding window is held to the whole published definition, its significance test
-included: every accepted sequence that overlaps the injection meets 100 draws of the
+The sliding window decodes the one fitted encoding model with the reference's
+`+1e-3` Hz floor under every place field (`with_reference_rate_floor`), and is held to
+the whole published definition as adapted here, its significance test included: every accepted sequence that overlaps the injection meets 100 draws of the
 reference's place-cell identity shuffle, and counts as the injected replay only if it
 beats them on both halves. `sliding_matches` is that rate;
 `sliding_matches_before_shuffle` leaves the test out, and `sliding_matches_spread_only`
@@ -461,26 +464,26 @@ duration:
 
 | path (cm) | 40 ms | 60 ms | 80 ms | 120 ms | 200 ms | 300 ms | 500 ms |
 |---|---|---|---|---|---|---|---|
-| 10 | 0 | 0 | 0 | 1 | 1 | 1 | 2 |
-| 20 | 0 | 1 | 0 | 2 | 3 | 2 | 8 |
-| 30 | 0 | 0 | 0 | 2 | 3 | 6 | 9 |
-| 45 | 0 | 1 | 4 | 8 | 15 | 21 | 36 |
-| 60 | 3 | 3 | 11 | 16 | 28 | 42 | 47 |
-| 90 | 1 | 6 | 12 | 35 | 40 | 64 | 69 |
-| 130 | 4 | 8 | 12 | 42 | 71 | 79 | 88 |
+| 10 | 0 | 0 | 0 | 0 | 1 | 0 | 0 |
+| 20 | 0 | 0 | 0 | 2 | 1 | 1 | 5 |
+| 30 | 0 | 2 | 1 | 3 | 5 | 6 | 9 |
+| 45 | 1 | 3 | 8 | 29 | 54 | 62 | 71 |
+| 60 | 4 | 9 | 21 | 44 | 71 | 76 | 84 |
+| 90 | 0 | 1 | 11 | 36 | 61 | 76 | 85 |
+| 130 | 0 | 8 | 8 | 25 | 67 | 83 | 92 |
 | any path (state-space) | 62-74 | 78-96 | 86-92 | 88-97 | 98-100 | 100 | 100 |
 
 And before the significance test:
 
 | path (cm) | 40 ms | 60 ms | 80 ms | 120 ms | 200 ms | 300 ms | 500 ms |
 |---|---|---|---|---|---|---|---|
-| 10 | 1 | 4 | 1 | 1 | 3 | 3 | 3 |
-| 20 | 0 | 2 | 0 | 2 | 5 | 4 | 11 |
-| 30 | 0 | 2 | 0 | 2 | 4 | 8 | 11 |
-| 45 | 2 | 3 | 10 | 29 | 51 | 54 | 67 |
-| 60 | 10 | 21 | 38 | 52 | 65 | 72 | 80 |
-| 90 | 8 | 24 | 42 | 60 | 69 | 74 | 88 |
-| 130 | 21 | 33 | 42 | 67 | 88 | 96 | 96 |
+| 10 | 1 | 0 | 0 | 0 | 1 | 0 | 0 |
+| 20 | 0 | 0 | 0 | 2 | 2 | 4 | 5 |
+| 30 | 0 | 3 | 1 | 4 | 5 | 6 | 9 |
+| 45 | 2 | 3 | 14 | 31 | 54 | 62 | 71 |
+| 60 | 11 | 20 | 35 | 58 | 75 | 82 | 86 |
+| 90 | 1 | 6 | 28 | 47 | 74 | 78 | 88 |
+| 130 | 4 | 25 | 29 | 38 | 79 | 96 | 96 |
 
 The sliding window is governed by path length, which is one of its criteria.
 The state-space model is governed by duration, which is spike count, which is
@@ -488,38 +491,44 @@ the data. Below about 45 cm the sliding window finds a few percent of
 injections at any duration and any firing rate.
 
 **Several rates, not one, because they answer different questions.** Over all
-4536 cells the sliding window built an overlapping candidate 84% of the time,
-accepted one on duration and dispersion 34% of the time, and that sequence was
-the injected event 22% of the time. The significance test then halves that: 11%
-under the whole published definition, 14% with its spread half alone. The
+4536 cells the sliding window built an overlapping candidate 81% of the time,
+accepted one on duration and dispersion 27% of the time, and that sequence was
+the injected event 21% of the time. The significance test then removes few: 18%
+under the whole published definition, 20% with its spread half alone. The
 state-space model reported non-local activity 91% of the time, and it was the
-injected event 91% of the time. Quoting 34% against 91% compares "replay,
-classified" with "non-local, detected"; 84% against 91% is the nearer comparison of
+injected event 91% of the time. Quoting 27% against 91% compares "replay,
+classified" with "non-local, detected"; 81% against 91% is the nearer comparison of
 whether anything was seen at all.
 
-**The significance test fails short, fast replays on its jump half.** Among the
+**The significance test fails short replays on its jump half.** Among the
 injected replays the sliding window reported before the test, the share passing each
 half, by duration:
 
 | true duration | 40 ms | 60 ms | 80 ms | 120 ms | 200 ms | 300 ms | 500 ms |
 |---|---|---|---|---|---|---|---|
-| spread half | 79% | 64% | 63% | 62% | 56% | 67% | 70% |
-| jump half | 21% | 33% | 54% | 74% | 90% | 93% | 97% |
+| spread half | 75% | 83% | 88% | 97% | 98% | 98% | 99% |
+| jump half | 31% | 53% | 55% | 79% | 93% | 95% | 98% |
 
 A short replay covers its path in few windows, so its own non-zero jumps are large,
-and the shuffled posteriors, sharp but hopping between swapped fields, do not jump
-further. The spread half passes about two thirds of replays at every duration, as a
-swapped field still gives a sharp posterior. Overall 65% pass the spread half and 82%
-the jump half (`shuffle_pass_rate_by_duration`, and `sliding_shuffle_*_pass_rate` in
-`overall`). Re-derived after the sorted path began setting aside a cell's spike
-leaving as another of its spikes enters, no value in the summary moved: on the Figure 1
-simulation that rule sets aside 24 of 3313 window pairs the earlier one kept, and no
-p-value there changed. The trend does not depend on how the reference's zero-jump rule is read: with
-the pairs no spike entered or left set aside, the jump half reads 21% at 40 ms against 97% at 500 ms; an earlier
-revision that kept every zero jump read 21% against 98%, and one that set aside every
-pair whose binned center stayed put read 29% against 95%.
+and the shuffled posteriors, hopping between swapped fields, do not jump further.
+Overall 97% pass the spread half and 87% the jump half (`shuffle_pass_rate_by_duration`,
+and `sliding_shuffle_*_pass_rate` in `overall`).
 
-**More than a third (36%) of the sliding window's accepted events are not the
+The reference's rate-map floor is what moved the spread half. Without it the spread
+half passed about two thirds of replays at every duration (65% overall; 82% the jump
+half), and the whole published definition reported 11% of injected replays rather
+than 18%. The likely reason, not separately measured: without a floor a spike from a
+cell whose swapped field is nearly silent at a place rules that place out almost
+entirely, so a shuffled posterior stays sharp and its spread does not exceed the
+observed one; the floor bounds that. Without the floor, the jump-half trend did not
+depend on how the reference's zero-jump rule is read: with the pairs no spike entered
+or left set aside it read 21% at 40 ms against 97% at 500 ms, keeping every zero jump
+21% against 98%, and setting aside every pair whose binned center stayed put 29%
+against 95%. Setting aside, in addition, a sorted cell's spike leaving as another of
+its spikes enters moved no value in the summary: on the Figure 1 simulation that rule
+sets aside 24 of 3313 window pairs, and no p-value there changed.
+
+**Nearly a quarter (23%) of the sliding window's accepted events are not the
 injected event.** They are absorbed local coding that overlaps it. This is the
 same over-call the figure shows, measured as a rate.
 
@@ -550,13 +559,14 @@ as more than one interval, and the best of them answers for the cell, as the
 best of several accepted sliding-window sequences does (0.5% of cells).
 
 **No cell in 4536 was found by the sliding window and missed by the
-state-space model** under the published definition, and six before the significance
+state-space model** under the published definition, and five before the significance
 test (`found_by_sliding_window_only` and its `_before_shuffle` partner in
-`overall`). 80% of cells went the other way. Of those, 55% built a
-candidate that then failed dispersion, 17% built no candidate at all, and 13% were
+`overall`). 73% of cells went the other way. Of those, 65% built a
+candidate that then failed dispersion, 23% built no candidate at all, and 4% were
 the injected replay but failed the significance test, while the median share of
 windows passing the spread criterion inside the event was 1.00. The spread gate is
-not what loses these events; dispersion is, and after it the significance test.
+not what loses these events; dispersion is, then building no candidate at all, and
+only a few are lost to the significance test.
 
 **The path-length limit belongs to the replay definition, not to the inference.**
 A uniform traverse of length L has dispersion L/sqrt(12), so the published 12 cm
@@ -564,8 +574,8 @@ dispersion criterion cannot accept a path under about 42 cm however well it is
 decoded. Scoring our own state-space events under that same criterion confirms
 it: their median dispersion is 2.5, 4.5 and 6.5 cm for injected paths of 10, 20
 and 30 cm, and the rule would reject 100% of them. Above the floor the two are
-of the same order under that rule — 31% against 26% at 45 cm, 48% against 43% at
-60 cm, 63% against 46% at 130 cm (the sliding window first, before its significance
+of the same order under that rule — 34% against 26% at 45 cm, 53% against 43% at
+60 cm, 52% against 46% at 130 cm (the sliding window first, before its significance
 test, since the state-space events are held to duration and dispersion alone;
 `by_path` in the summary). This is recorded as `state_space_replay_matches` in the
 summary. It is a diagnostic of *why* the sliding window misses short paths, not
@@ -573,9 +583,11 @@ a rate to quote against `sliding_matches`: the two procedures are compared as
 published, against the injected event.
 
 **Where the published criteria can accept an event at all** — path over about
-42 cm and duration over 100 ms, 25% of the grid — the sliding window reports 37%
-under the whole published definition (64% before its significance test, 40% with the
-spread half alone) and the state-space model 99% (`overall_in_domain`). The remaining three
+42 cm and duration over 100 ms, 25% of the grid — the sliding window reports 63%
+under the whole published definition (68% before its significance test, 67% with the
+spread half alone) and the state-space model 99% (`overall_in_domain`); held to the
+published duration and dispersion criteria, the state-space model reports 68%, the
+same as the sliding window before its test. The remaining three
 quarters of the grid are events the published method is defined not to call
 replays. That is a property of the method worth measuring, and it is why the
 whole-grid rate is much lower than the in-domain rate.
@@ -585,14 +597,14 @@ before its significance test, which never moves a sequence's bounds):
 
 | true duration | 40 ms | 60 ms | 80 ms | 120 ms | 200 ms | 300 ms | 500 ms |
 |---|---|---|---|---|---|---|---|
-| sliding window | 4.7x | 2.5x | 1.9x | 1.5x | 1.2x | 1.2x | 1.1x |
-| state-space | 1.05x | 1.00x | 0.95x | 0.98x | 0.95x | 0.98x | 0.98x |
+| sliding window | 3.3x | 2.2x | 1.7x | 1.5x | 1.2x | 1.2x | 1.1x |
+| state-space | 1.10x | 1.00x | 0.97x | 0.98x | 0.96x | 0.98x | 0.98x |
 
 Medians over firing rate, path length and placement. A single event can do
 better than its row: the 80 ms replay in the figure, which fires strongly and
-travels 100 cm, comes in at 1.3x rather than 1.9x. An absorbed sequence whose
+travels 100 cm, comes in at 1.6x rather than 1.7x. An absorbed sequence whose
 local stretch sits more than 20 cm from the path fails the position test and is
-counted among the 36% above rather than here, so this table is the window floor
+counted among the 23% above rather than here, so this table is the window floor
 plus whatever absorption falls within the tolerance.
 
 **Absorption reaches about 80 cm.** Among events both reported, by the distance
@@ -600,8 +612,8 @@ between the replay and the animal's own place:
 
 | distance | 40-80 cm | 80-120 cm | over 120 cm |
 |---|---|---|---|
-| duration ratio | 1.81x | 1.16x | 1.12x |
-| share of windows on the animal's place | 0.36 | 0.00 | 0.00 |
+| duration ratio | 1.65x | 1.16x | 1.13x |
+| share of windows on the animal's place | 0.30 | 0.00 | 0.00 |
 
 **What the sweep cannot say.** The animal rests at one end of the track and
 pauses nowhere else, so distance from its place is a deterministic function of
@@ -634,23 +646,21 @@ jumps, zero jumps set aside by value in the significance test, the merge of
 `compute_allSequences_NaNseparated_merge.m`, and dispersion as the RMS distance of the
 retained centers from their mean. `scripts/qa/compare_memoryless_to_reference.py` runs
 it beside the port on the same place fields, window spike counts, thresholds and cell
-permutations, once as published and once on the port's own fields (no floor), so the
-two adaptations that remain can be told apart. Results are in
+permutations, once as published and once without its floor. Results are in
 `reference_check_summary.csv`.
 
-- **The binned center (V7) changes almost nothing.** On the port's own fields the
-  posteriors agree to 2e-6. Over every sweep cell (4536 cells, 17428 candidates,
-  2.4 million windows) 17378 candidates have identical bounds, the reference calls
-  2473 of them replay against the port's 2471, and 1705 pass its significance test
-  against 1703; 48 cells (1%) differ in either count. On the Figure 1 simulation every
-  gate, candidate and verdict agrees, and the one p-value that moves does so by a draw.
-- **The rate-map floor (V3) is not negligible.** With the reference's `+1e-3` Hz, the
-  posteriors of 5% of sweep windows move by more than 0.001, and the reference calls
-  2198 candidates replay against the port's 2471 but passes 1938 through the test
-  against 1703: 88% of its replay candidates pass, against the port's 69%. The counts
-  differ in 458 cells (10%). On the Figure 1 simulation the verdicts still agree, but 8
-  of 32 candidates change bounds. The sweep and the figure run without the floor, so
-  their significance-test rates are the port's, not the reference's.
+- **The port decides as the reference does.** It decodes sorted cells with the
+  reference's floor (`with_reference_rate_floor`), so the posteriors agree to 1e-6 and
+  what remains is the binned center (V7). On the Figure 1 simulation every gate,
+  candidate and verdict agrees. Over every sweep cell (4536 cells, 17632 candidates,
+  2.4 million windows) 17512 candidates have identical bounds, the reference calls
+  2198 of them replay against the port's 2205, and 1938 pass its significance test
+  against 1939; 37 cells (0.8%) differ in either count.
+- **The floor is not a detail.** Without it (V3) the posteriors of 5% of sweep windows
+  move by more than 0.001, the reference calls 2473 candidates replay and passes 1705,
+  and 465 cells (10%) differ from the reference as published. The port ran without
+  the floor until 2026-09-25; its sweep then reported 11% of injected replays under
+  the whole published definition, against 18% with it.
 
 What this does not establish: it covers the sorted path on a simulated linear track,
 not the clusterless encoding-pair null used on recorded data (see "What the
@@ -674,7 +684,7 @@ reproduced from this repository and should be re-run before being cited.
 | miss | path shorter than about 42 cm | reported in a few percent of injections at any duration or firing rate, against 71-100% for the state-space model | measured |
 | miss | replay that changes arm without passing the junction | cut at the switch, and neither half then clears dispersion | measured |
 | miss | sparse ensembles, about one spike per window | erratic, 0-50% where dense spiking gives 100% | measured elsewhere |
-| over-call | any event shorter than about 150 ms | reported 1.5x to 4.7x too long in the sweep, and 1.3x for a strongly firing 80 ms replay; the detector cannot report a short event as short | measured |
+| over-call | any event shorter than about 150 ms | reported 1.5x to 3.3x too long in the sweep, and 1.6x for a strongly firing 80 ms replay; the detector cannot report a short event as short | measured |
 | miss | whole path inside one window | posterior smears, spread rejects. The sweep's fastest cell is 3250 cm/s and is still found sometimes, so the threshold is above that | measured elsewhere |
 | miss | replay overlapping the onset of movement | truncated one window *before* the first moving window | measured |
 | by design | remote place held still | decoded confidently, assembled, declined for going nowhere | measured |
@@ -732,7 +742,7 @@ not a reassurance.
 |---|---|---|---|---|
 | **V1** | Sorted units, per-cell rate maps | Clusterless KDE encoding model over waveform features × position | HPC in this project is decoded clusterless; there are no sorted units | The encoding model is not a set of place fields. Cell-level inclusion criteria (rate, spatial information, isolation, SNR) have no analogue and are not applied |
 | **V2** | Cell-ID shuffle, p <= 0.05 on spread and jump | Within-tetrode encoding-pair shuffle; the reference's statistics, count and threshold unchanged, its zero-jump rule read from the spikes | Uses existing clusterless arrays without component fitting (D2) | Scrambling individual mark–position pairs can blur tuning; original cell-ID permutation exchanges intact curves. Null distributions and accepted cohorts can differ |
-| **V3** | Tuning curves get `+1e-3` before decoding | Clusterless KDE with its own `EPS` clipping of the ground-process intensity | Different likelihood construction | Low-occupancy bins are regularized differently. Not tunable to match for the clusterless decode. For sorted cells, as in the sweep and the figure, it could be matched exactly and is not: measured against the reference's own arithmetic, with the floor the reference calls 11% fewer candidates replay and passes 88% of them through the significance test, against the port's 69% ("Against the reference's own arithmetic") |
+| **V3** | Tuning curves get `+1e-3` before decoding | Clusterless KDE with its own `EPS` clipping of the ground-process intensity | Different likelihood construction | Low-occupancy bins are regularized differently. Not tunable to match for the clusterless decode. For sorted cells, as in the sweep and the figure, it is matched: the sliding window decodes with the floor (`with_reference_rate_floor`), and the state-space detector reads the fields as fitted. It matters: without it the sweep's significance test passed 69% of replay candidates rather than 88%, and the published-definition rate read 11% rather than 18% ("Against the reference's own arithmetic") |
 | **V4** | Rate maps fit on running periods (> 10 cm/s) | Encoding model fit on the decode's `is_training` mask (`training_type = "no_ripple"`) | Holds encoding fixed between our two procedures | Non-ripple training includes immobility. It differs from the paper, but is shared in the main comparison; any running-only sensitivity must refit both procedures on that same mask |
 
 ### Forced by track geometry
@@ -741,7 +751,7 @@ not a reassurance.
 |---|---|---|---|---|
 | **V5** | 2D open field, 90 × 90 cm | 1D linearized three-legged track graph, 9 arms | The task's geometry | Sequences are constrained to the graph; "direction" is along-arm rather than an angle |
 | **V6** | Euclidean distance for jump and dispersion | Track-graph distance | On a linearized branched track, `abs(Δlinear_position)` is not the distance between two places — bins on different arms can be adjacent in linear coordinate | Using linear differences would under-count jumps at arm boundaries, producing spuriously smooth and spuriously long sequences. Track distance avoids this; it also makes our jumps non-comparable in absolute terms to an open-field jump. Note the asymmetry this creates with the encoding model: `Environment` exposes graph distances (`get_manifold_distances`, `_bin_distance_matrix_`) and this detector uses them, but `KDEModel` smooths with a Euclidean kernel in whatever coordinate it is given, which for a linearized track is the linear one. Measured on a Y track with 20 cm edge spacing: a kernel fitted at one bin gives a density at a second bin 6 cm away on the graph and 26 cm away in linear coordinate of 8.4e-05 of its peak, matching `exp(-0.5*(26/6)^2)` rather than `exp(-0.5*(6/6)^2)`. Place fields therefore do not wrap through a junction. Both procedures in this comparison read the same encoding model (X5, D5), so this does not bias the contrast between them; it is a caveat on absolute decoding near junctions for either |
-| **V7** | Posterior COM | Discrete Fréchet mean over track distance (D4) | Linearized-coordinate COM does not respect branching | On straight segments the center is quantized to a bin; near junctions geometry also changes it. Against a continuous center on the simulated linear track, 99.7% of candidates keep identical bounds and the replay and significance counts move by 2 in about 2470 and 1700 ("Against the reference's own arithmetic") |
+| **V7** | Posterior COM | Discrete Fréchet mean over track distance (D4) | Linearized-coordinate COM does not respect branching | On straight segments the center is quantized to a bin; near junctions geometry also changes it. Against a continuous center on the simulated linear track, 99.3% of candidates keep identical bounds and the replay and significance counts move by 7 in about 2200 and by 1 in about 1940 ("Against the reference's own arithmetic") |
 | **V8** | Unvisited arena bins excluded | Junction placeholder bins (`edge_id == -1`) excluded before normalization | These bins are linearization artifacts from `edge_spacing > 0`, not places. In `get_track_grid` the `-1` rows are built from `place_bin_centers[~is_track_interior]`, so they are non-interior by construction and the primary likelihood path never returns them; the guard matters on the `results.nc` path, where `log_likelihood` is re-expanded to every `state_bins` column | If not excluded, probability mass lands on non-places and drags the center toward gaps. Same hazard `map_estimate_to_arm` guards against |
 | **V9** | Spread is a 2D product moment (area-like, bin units) | Graph-distance RMS spread (a length, cm) | Provides a spread measure on our geometry, approximating SD on a straight segment | The 10 cm cutoff is an adapted choice prioritized in the later threshold-robustness study (04); its robustness is not established by the initial report, and these spreads are not numerically comparable to the paper's 2D spreads. It also limits which replays survive, but **not through speed alone**. A window's spread grows only when its posterior actually smears over the swept path, and whether it does depends on spike density and field overlap. On `non_local_detector`'s sparse clusterless simulation, where each of 20 units fires once, a window straddling several fields is multimodal and the detector returns one accepted sequence at 375 cm/s but breaks the same trajectory into rejected pieces at 450 cm/s and above (`tests/integration/test_memoryless_simulated_replay.py`). With denser spiking the posterior stays peaked and there is no such cap: injected replays are found at 1625 cm/s with a median spread of 3.6 cm, and spread only breaks down near 4300 cm/s, where the whole path fits inside one window. The binding quantity is how far the path travels *within a window* relative to how well the spikes localize it, not the speed as such. An earlier version of this entry gave a flat 430 cm/s cap; that was a measurement on the sparse simulation, over-generalized. Note the direction of the adaptation: the helper library's own 1D branch (`compute_imageSpread.m:20-30`) computes the same COM-based RMS this port does, and `load_replayEvents_cm.m:32` gates it at **20 cm**, so 10 cm is twice as strict as the only 1D precedent in the reference. That branch also uses a 50 ms duration and a `0.4 * maze_size` jump, both looser than what this port takes from the paper |
 
