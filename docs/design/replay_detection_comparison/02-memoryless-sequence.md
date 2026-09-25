@@ -200,15 +200,20 @@ distributions. The statistics and the test follow the corrected reference script
 draws strictly below the observed value (a tie or a NaN draw does not count), and each
 half passes at `p <= 0.05`. One line is translated rather than copied. The reference's
 center of mass is continuous, so its `jumps(jumps==0) = nan` sets aside exactly the
-window pairs whose posterior did not change, which are the pairs no spike entered or
-left, and it sets aside the same pairs in the observed decode and in every draw. This
+window pairs whose posterior did not change, which are the pairs whose slice leaving
+and slice entering hold the same spikes as the decode sees them, and it sets aside the
+same pairs in the observed decode and in every draw. This
 port's centers are bins, so a literal zero test would also set aside every pair whose
 center stayed in its 2 cm bin, most pairs on a slow replay, turning the mean jump into
 the mean size of a bin crossing with a different pair set in each draw; measured on the
 fixtures, that flipped the verdict the reference's own rule gives. The port therefore
-reads the pairs from the spikes (`unchanged_window_pairs`): a pair with no spike in the
-slice that leaves and none in the slice that enters is set aside, whatever its centers
-do. Two earlier revisions of this port, one keeping zero jumps and counting ties against
+reads the pairs from the spikes, whatever its centers do. The decode cannot tell two
+spikes of one sorted cell apart, so a pair whose slices hold as many spikes of each cell
+is set aside, including a cell's spike leaving as another of its spikes enters; an
+earlier revision set aside only pairs no spike entered or left, which kept that zero
+jump and, in the pinning test, halved the mean jump. Clusterless marks are continuous,
+so no spike stands in for another and a pair is set aside only when no spike leaves or
+enters (`unchanged_window_pairs`). Two earlier revisions of this port, one keeping zero jumps and counting ties against
 the candidate, one copying the zero test literally, were each reverted after review;
 the point of the comparison is the method as published, and this is what its rule does.
 `ShuffleResult.testable` records a NaN observed statistic, which the reference's
@@ -506,9 +511,10 @@ and the shuffled posteriors, sharp but hopping between swapped fields, do not ju
 further. The spread half passes about two thirds of replays at every duration, as a
 swapped field still gives a sharp posterior. Overall 65% pass the spread half and 82%
 the jump half (`shuffle_pass_rate_by_duration`, and `sliding_shuffle_*_pass_rate` in
-`overall`). The trend does not depend on how the reference's zero-jump rule is read:
-with the pairs no spike entered or left set aside, which is what the rule does to a
-continuous center, the jump half reads 21% at 40 ms against 97% at 500 ms; an earlier
+`overall`). These rates were measured before the sorted path set aside a cell's
+spike leaving as another of its spikes enters, and must be re-derived before they are
+cited. The trend does not depend on how the reference's zero-jump rule is read: with
+the pairs no spike entered or left set aside, the jump half reads 21% at 40 ms against 97% at 500 ms; an earlier
 revision that kept every zero jump read 21% against 98%, and one that set aside every
 pair whose binned center stayed put read 29% against 95%.
 
@@ -931,7 +937,7 @@ not additional acceptance criteria.
 | One-to-many/many-to-many overlaps count each event once per detector; matched events may have different SWR labels; disjoint and empty cohorts | Denominators, matching, and empty-cohort handling |
 | Rejection diagnostics and gate-specific reruns agree on synthetic examples | Explanations of selection follow the actual pipeline |
 | Encoding-pair shuffle preserves observed spike/mark arrays, encoding marginals, and ground intensity; identity permutation reproduces the original likelihood | The intended null operation and absence of accidental refitting or input mutation |
-| One permutation spans all windows in a draw; observed/null scores use identical bounds; any single draw regenerates from its key; ties and NaN are handled as the reference handles them and the set-aside pairs are those no spike entered or left; each shuffle's behaviour on a real trajectory and on scrambled marks is pinned | Reproducibility, fidelity to the reference's test, and the controls |
+| One permutation spans all windows in a draw; observed/null scores use identical bounds; any single draw regenerates from its key; ties and NaN are handled as the reference handles them and the set-aside pairs are those whose slices hold the same spikes as the decode sees them; each shuffle's behaviour on a real trajectory and on scrambled marks is pinned | Reproducibility, fidelity to the reference's test, and the controls |
 | Simulated-data smoke test, then one real epoch | End-to-end |
 
 ## Failure behavior

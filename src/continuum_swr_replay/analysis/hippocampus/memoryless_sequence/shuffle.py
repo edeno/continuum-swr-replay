@@ -32,15 +32,19 @@ so a tie or a NaN draw does not count), and a half passes at ``p <= 0.05``.
 
 One line of the reference needs translating rather than copying. Its center
 of mass is continuous, so ``jumps(jumps==0) = nan`` sets aside exactly the
-window pairs whose posterior did not change, which are the pairs no spike
-entered or left; and it sets aside the same pairs in the observed decode and
-in every shuffle, because which spikes fall in a window does not depend on
-the encoding. This port's centers are bins, so a literal zero test would also
+window pairs whose posterior did not change, which are the pairs whose slice
+leaving and slice entering hold the same spikes up to what the decode can
+tell apart; and it sets aside the same pairs in the observed decode and in
+every shuffle, because which spikes fall in a window does not depend on the
+encoding. This port's centers are bins, so a literal zero test would also
 set aside every pair whose center stayed in its 2 cm bin, most pairs on a
 slow replay, and would turn the mean jump into the mean size of a bin
 crossing, with a different set of pairs in each draw. The pairs are therefore
-read from the spikes: a pair with no spike in the slice that leaves and none
-in the slice that enters is set aside, whatever its centers do.
+read from the spikes, whatever the centers do. The decode cannot tell two
+spikes of one sorted cell apart, so a cell's spike leaving as another of its
+spikes enters changes nothing and the pair is set aside. Clusterless spikes
+carry continuous marks, so no spike can stand in for another, and a pair is
+set aside only when no spike leaves or enters.
 
 A candidate whose observed statistic is NaN passes that half trivially under
 the reference's arithmetic; that cannot happen to a candidate that meets the
@@ -365,22 +369,46 @@ def _nanmean(values: NDArray) -> float:
 
 
 def _unchanged_pairs(
-    row_spike_counts: NDArray, n_windows: int, config: MemorylessSequenceConfig
+    spike_rows: NDArray,
+    spike_units: NDArray,
+    n_windows: int,
+    config: MemorylessSequenceConfig,
 ) -> NDArray:
-    """Which consecutive window pairs hold the same spikes.
+    """Which consecutive window pairs hold the same spikes, as the decode sees them.
 
     Window ``k`` covers rows ``[k S, k S + W)``; window ``k + 1`` drops the
     first ``S`` of those rows and adds the ``S`` rows after them. The pair is
-    unchanged when neither slice holds a spike. The last window repeats the
-    entry before it, as its padded jump repeats the previous jump.
+    unchanged when the slice leaving and the slice entering hold as many
+    spikes of each unit, a unit being whatever the decode cannot tell apart:
+    a sorted cell, or, for marks, each spike on its own. The last window
+    repeats the entry before it, as its padded jump repeats the previous jump.
+
+    Parameters
+    ----------
+    spike_rows : ndarray of int, shape (n_spikes,)
+        Each spike's row, counted from the candidate's first row.
+    spike_units : ndarray of int, shape (n_spikes,)
+    n_windows : int
+    config : MemorylessSequenceConfig
+
+    Returns
+    -------
+    unchanged_pairs : ndarray of bool, shape (n_windows,)
+
     """
     stride, width = config.stride_n_samples, config.window_n_samples
-    counts = np.asarray(row_spike_counts, dtype=np.float64)
+    order = np.argsort(spike_rows, kind="stable")
+    rows = np.asarray(spike_rows)[order]
+    units = np.asarray(spike_units)[order]
+    first_row = stride * np.arange(max(n_windows - 1, 0))
+    leaving = np.searchsorted(rows, [first_row, first_row + stride])
+    entering = np.searchsorted(rows, [first_row + width, first_row + width + stride])
     unchanged = np.zeros(n_windows, dtype=bool)
     for k in range(n_windows - 1):
-        leaving = counts[k * stride : k * stride + stride]
-        entering = counts[k * stride + width : k * stride + width + stride]
-        unchanged[k] = leaving.sum() == 0 and entering.sum() == 0
+        unchanged[k] = np.array_equal(
+            np.sort(units[leaving[0, k] : leaving[1, k]]),
+            np.sort(units[entering[0, k] : entering[1, k]]),
+        )
     if n_windows > 1:
         unchanged[-1] = unchanged[-2]
     return unchanged
@@ -393,12 +421,12 @@ def unchanged_window_pairs(
     spike_times: list[NDArray],
     config: MemorylessSequenceConfig,
 ) -> NDArray:
-    """Which of a candidate's consecutive window pairs hold the same spikes.
+    """Which of a candidate's consecutive window pairs hold the same marks.
 
     The pairs whose jump the reference's ``jumps(jumps==0) = nan`` sets aside
-    (see the module docstring), read from the spikes of every electrode or
-    cell together. The same mask is used for the observed decode and every
-    shuffled draw, as it is in the reference.
+    (see the module docstring) for a clusterless decode: those no spike of
+    any electrode entered or left. The same mask is used for the observed
+    decode and every shuffled draw, as it is in the reference.
 
     Parameters
     ----------
@@ -407,7 +435,7 @@ def unchanged_window_pairs(
     time : ndarray, shape (n_time,)
         The full decode grid.
     spike_times : list of ndarray
-        Per electrode or cell.
+        Per electrode.
     config : MemorylessSequenceConfig
 
     Returns
@@ -420,14 +448,17 @@ def unchanged_window_pairs(
     from non_local_detector.likelihoods.common import get_spike_time_bin_ind
 
     time, row_start, row_stop = _candidate_rows(first_window, last_window, time, config)
-    counts = np.zeros(row_stop - row_start)
+    spike_rows = []
     for times in spike_times:
         times = np.asarray(times, dtype=np.float64)
         times = times[(times >= time[0]) & (times <= time[-1])]
         rows = get_spike_time_bin_ind(times, time)
-        rows = rows[(rows >= row_start) & (rows < row_stop)] - row_start
-        np.add.at(counts, rows, 1.0)
-    return _unchanged_pairs(counts, last_window - first_window + 1, config)
+        spike_rows.append(rows[(rows >= row_start) & (rows < row_stop)] - row_start)
+    rows = np.concatenate([np.zeros(0, dtype=int), *spike_rows])
+    # marks are continuous, so every spike is its own unit
+    return _unchanged_pairs(
+        rows, np.arange(rows.size), last_window - first_window + 1, config
+    )
 
 
 def _candidate_rows(
@@ -534,7 +565,7 @@ def _decode_draws(
         encoding_model["summed_ground_process_intensity"], dtype=np.float64
     )
     rows = np.broadcast_to(-ground, (n_draws, row_stop - row_start, ground.size)).copy()
-    row_spike_counts = np.zeros(row_stop - row_start)
+    candidate_rows = []
 
     for electrode in range(n_electrodes):
         times = np.asarray(spike_times[electrode], dtype=np.float64)
@@ -545,7 +576,7 @@ def _decode_draws(
         if not in_candidate.any():
             continue
         spike_rows = spike_rows[in_candidate] - row_start
-        np.add.at(row_spike_counts, spike_rows, 1.0)
+        candidate_rows.append(spike_rows)
         decoding_marks = np.asarray(spike_waveform_features[electrode])[in_bounds][
             in_candidate
         ]
@@ -590,7 +621,11 @@ def _decode_draws(
             for draw_rows in rows
         ]
     )
-    return windows, _unchanged_pairs(row_spike_counts, windows.shape[1], config)
+    rows = np.concatenate([np.zeros(0, dtype=int), *candidate_rows])
+    # marks are continuous, so every spike is its own unit
+    return windows, _unchanged_pairs(
+        rows, np.arange(rows.size), windows.shape[1], config
+    )
 
 
 def _validated_permutation(permutation: NDArray, n: int, electrode: int) -> NDArray:
@@ -778,7 +813,11 @@ def _decode_draws_sorted(
             for permutation in permutations
         ]
     )
-    return windows, _unchanged_pairs(counts.sum(axis=1), windows.shape[1], config)
+    row, cell = np.nonzero(counts)
+    n_spikes = counts[row, cell].astype(int)
+    return windows, _unchanged_pairs(
+        np.repeat(row, n_spikes), np.repeat(cell, n_spikes), windows.shape[1], config
+    )
 
 
 def sorted_candidate_window_log_likelihood(

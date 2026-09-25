@@ -827,6 +827,53 @@ class TestCellIdentityShuffle:
         assert result.p_spread > 0.05
         assert not result.passes
 
+    def test_the_pairs_set_aside_are_those_whose_posterior_did_not_change(
+        self, sorted_track
+    ):
+        """The reference's ``jumps(jumps==0) = nan`` on a continuous center.
+
+        A cell's spike leaving as another of its spikes enters leaves every
+        count, and so the posterior, as it was: that pair is set aside although
+        spikes moved. A different cell's spike entering moves the center.
+        """
+        first, n_windows = 100, 4
+        start, width = first * CONFIG.stride_n_samples, CONFIG.window_n_samples
+        time = sorted_track.time
+        spike_times = [np.array([]) for _ in sorted_track.spike_times]
+        # cell 5 loses the spike at start and gains one at start + width
+        spike_times[5] = time[[start, start + 10, start + 20, start + width]]
+        spike_times[6] = time[[start + 15]]
+        spike_times[16] = time[[start + width + CONFIG.stride_n_samples]]
+        args = (
+            first,
+            first + n_windows - 1,
+            time,
+            spike_times,
+            sorted_track.encoding_model,
+        )
+        posterior = normalize_windows(
+            sorted_candidate_window_log_likelihood(*args, CONFIG)
+        )
+        same = [
+            np.allclose(posterior[k], posterior[k + 1]) for k in range(n_windows - 1)
+        ]
+        same.append(same[-1])
+        assert same == [True, False, True, True]
+        _, expected_jump = shuffle_statistics(
+            posterior, sorted_track.bin_distance_cm, np.array(same)
+        )
+        assert expected_jump > 0
+
+        result = shuffle_candidate_sorted(
+            *args,
+            sorted_track.bin_distance_cm,
+            CONFIG,
+            seed=SEED,
+            n_shuffles=MINIMUM_N_SHUFFLES,
+        )
+
+        assert result.observed_jump_cm == pytest.approx(expected_jump)
+
     def test_a_cell_permutation_is_seeded_apart_from_the_electrode_ones(self):
         cells = cell_identity_permutation(SEED, candidate=3, draw=1, n=50)
         electrodes = encoding_permutation(SEED, candidate=3, draw=1, electrode=0, n=50)
