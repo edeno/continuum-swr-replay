@@ -696,11 +696,13 @@ continuous state alone.
   per part at 200 ms. With it 140 cm away, the sliding window never bridges the gap
   and misses a part in 38-58% of trials; our detector reports one event per part in
   17% of trials at 10 ms and 83% at 200 ms.
-- **Each part alone**, injected at the time and with the seed it has in its event: the
-  sliding window recovers 72% of parts inside jumps and chains against 62% alone, ours
-  89% against 87%. Neither loses parts to the jump or the chain itself; the sliding
-  window gains, since a merged event can clear the duration criterion a lone part
-  misses.
+- **Each part alone**, decoded with exactly the spikes it had in its event and the
+  recording's own spikes around it: the sliding window recovers 72% of parts inside
+  jumps and chains against 61% alone, ours 89% against 86%. Neither loses parts to the
+  jump or the chain itself; the sliding window gains, since a merged event can clear
+  the duration criterion a lone part misses. A part counts as recovered only where the
+  event's decoded positions over that part sit on its path, not merely where the event
+  as a whole matches; that stricter rule changed no result here.
 
 ### Held-out evidence on simulated data
 
@@ -733,8 +735,9 @@ shared events are in the summary under their own `detector`.
   informative at all, against 16-23% of shared ones: most additional detections are
   too short or too sparse for a dozen evaluation cells to judge, so an event without
   support is mostly one that cannot be judged, not one shown false.
-- Events are labelled by time: half or more inside an injection, its truth; partly
-  inside, mixed; on the recording's own labeled events, kept apart.
+- Events are labelled by their time inside the injected activity's parts: half or
+  more, its truth; partly, mixed; wholly inside a chain's silent gap, content-free
+  (none occurred); on the recording's own labeled events, kept apart.
 
 ### Against the reference's own arithmetic
 

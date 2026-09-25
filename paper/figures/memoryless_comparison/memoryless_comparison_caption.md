@@ -144,10 +144,12 @@ cm. Continuing, at a 10 ms gap both detectors report one event over both parts
 and they report one event per part in 54% and 79%. Far apart, the sliding
 window never reports one event over both, and misses a part in 38% to 58% of
 trials; our detector reports one event per part in 17% of trials at a 10 ms gap
-and 83% at 200 ms. Each part is also injected alone, at the time and with the
-seed it has in its event: across jumps and chains the sliding window recovers
-72% of parts inside the event against 62% alone, and ours 89% against 87%, so
-neither loses parts to the jump or the chain itself.
+and 83% at 200 ms. Each part is also decoded alone, with exactly the spikes it
+had in its event and the recording's own spikes around it; a part counts as
+recovered only where the event's positions over that part sit on its path.
+Across jumps and chains the sliding window recovers 72% of parts inside the
+event against 61% alone, and ours 89% against 86%, so neither loses parts to
+the jump or the chain itself.
 
 **(o, p) Held-out evidence.** The simulated cells are split into discovery and
 evaluation cells three ways: two interleaved folds with their roles swapped (A,

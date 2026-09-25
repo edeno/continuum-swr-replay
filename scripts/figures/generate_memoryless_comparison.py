@@ -2059,8 +2059,10 @@ sliding window never reports one event over both, and misses a part in
 {pct(elsewhere_missing.min())} to {pct(elsewhere_missing.max())} of trials; our
 detector reports one event per part in {pct(elsewhere_split[0])} of trials at a
 {gaps_ms[0]:.0f} ms gap and {pct(elsewhere_split[-1])} at {gaps_ms[-1]:.0f} ms.
-Each part is also injected alone, at the time and with the seed it has in its
-event: across jumps and chains the sliding window recovers
+Each part is also decoded alone, with exactly the spikes it had in its event
+and the recording's own spikes around it; a part counts as recovered only where
+the event's positions over that part sit on its path. Across jumps and chains
+the sliding window recovers
 {pct(mean_recovery("sliding_published", "part_recovery"))} of parts inside the
 event against {pct(mean_recovery("sliding_published", "part_recovery_alone"))}
 alone, and ours {pct(mean_recovery("state_space_canonical", "part_recovery"))}
