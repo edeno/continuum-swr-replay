@@ -199,31 +199,35 @@ distributions. The statistics and the test follow the corrected reference script
 (`nanmean`), `p = (1 + nansum(null_stat < observed_stat)) / (100 + 1)` counts only
 draws strictly below the observed value (a tie or a NaN draw does not count), and each
 half passes at `p <= 0.05`. One line is translated rather than copied. The reference's
-center of mass is continuous, so its `jumps(jumps==0) = nan` sets aside the window pairs
-whose center did not move. Nearly always those are the pairs whose posterior did not
-change, whose slice leaving and slice entering hold the same spikes as the decode sees
-them, the same pairs in the observed decode and in every draw; the port sets aside
-exactly those, so its rule is an approximation. A change of spikes symmetric about the
-center (one more spike from the cell whose field sits at the center of a symmetric
-posterior) alters the posterior without moving its continuous center: the reference sets
-that pair aside and the port keeps its jump. It needs exact symmetry: on the Figure 1
-simulation no pair of 16229 is of that kind, and over every sweep cell 181 of about 2.4
-million window pairs are (`pairs_center_unchanged_but_spikes_changed` in
-`reference_check_summary.csv`), against which the significance-test counts still agree
-to within one. This
-port's centers are bins, so a literal zero test would also set aside every pair whose
-center stayed in its 2 cm bin, most pairs on a slow replay, turning the mean jump into
-the mean size of a bin crossing with a different pair set in each draw; measured on the
-fixtures, that flipped the verdict the reference's own rule gives. The port therefore
-reads the pairs from the spikes, whatever its centers do. The decode cannot tell two
-spikes of one sorted cell apart, so a pair whose slices hold as many spikes of each cell
-is set aside, including a cell's spike leaving as another of its spikes enters; an
-earlier revision set aside only pairs no spike entered or left, which kept that zero
-jump and, in the pinning test, halved the mean jump. Clusterless marks are continuous,
-so no spike stands in for another and a pair is set aside only when no spike leaves or
-enters (`unchanged_window_pairs`). Two earlier revisions of this port, one keeping zero jumps and counting ties against
-the candidate, one copying the zero test literally, were each reverted after review;
-the point of the comparison is the method as published, and this is what its rule does.
+`jumps(jumps==0) = nan` sets aside, in each draw, the window pairs whose continuous
+center of mass did not move. This port's jump sizes come from binned centers, and a
+literal zero test on those would also set aside every pair whose center stayed in its
+2 cm bin, most pairs on a slow replay, turning the mean jump into the mean size of a bin
+crossing; measured on the fixtures, that flipped the verdict the reference's own rule
+gives. The set-aside pairs therefore come from a continuous center, kept apart from the
+binned centers whose jumps are averaged.
+
+- **Sorted cells: the reference's rule** (`unmoved_center_pairs`). As the reference
+  does, each window is decoded from its own whole-number spike counts, so windows with
+  the same spikes get the same posterior to the last bit, and in every draw a pair is
+  set aside when the continuous center of mass, `nansum((1:n).*X) / nansum(X)` in bin
+  units, did not move. "Did not move" is read to within 1e-9 bins
+  (`CENTER_TIE_BINS`): the exact test also turns on rounding, and at every
+  disagreement between the port and the reference module before that tolerance the
+  center had moved by at most 2.8e-14 bins, which MATLAB would round in its own way.
+  Over every sweep cell the port and the reference module set aside the same pairs in
+  all 292072 window pairs of the tested candidates' observed decodes and all 29.2
+  million of their shuffled draws (`zero_jump_*` in `reference_check_summary.csv`).
+- **Clusterless marks: an approximation** (`unchanged_window_pairs`). On a track graph
+  there is no continuous center, so a pair is set aside, in every draw alike, when no
+  spike enters or leaves it. Marks are continuous, so no spike stands in for another,
+  but a change of spikes that leaves the center unmoved is kept where the reference
+  would set it aside.
+
+Earlier revisions of this port kept zero jumps and counted ties against the candidate,
+copied the zero test literally onto binned centers, and read the pairs from spikes on
+sorted cells too; each was replaced after review. The comparator is the reference's
+test, as far as a binned center allows.
 `ShuffleResult.testable` records a NaN observed statistic, which the reference's
 arithmetic passes trivially; it cannot arise for a candidate that meets the dispersion
 criterion.
@@ -476,9 +480,9 @@ duration:
 | 20 | 0 | 0 | 0 | 2 | 1 | 1 | 5 |
 | 30 | 0 | 2 | 1 | 3 | 5 | 6 | 9 |
 | 45 | 1 | 3 | 8 | 29 | 54 | 62 | 71 |
-| 60 | 4 | 9 | 21 | 44 | 71 | 76 | 84 |
+| 60 | 4 | 9 | 22 | 44 | 72 | 76 | 84 |
 | 90 | 0 | 1 | 11 | 36 | 61 | 76 | 85 |
-| 130 | 0 | 8 | 8 | 25 | 67 | 83 | 92 |
+| 130 | 0 | 4 | 8 | 25 | 67 | 83 | 92 |
 | any path (state-space) | 62-74 | 78-96 | 86-92 | 88-97 | 98-100 | 100 | 100 |
 
 And before the significance test:
@@ -515,7 +519,7 @@ half, by duration:
 | true duration | 40 ms | 60 ms | 80 ms | 120 ms | 200 ms | 300 ms | 500 ms |
 |---|---|---|---|---|---|---|---|
 | spread half | 75% | 83% | 88% | 97% | 98% | 98% | 99% |
-| jump half | 31% | 53% | 55% | 79% | 93% | 95% | 98% |
+| jump half | 31% | 50% | 57% | 79% | 93% | 95% | 98% |
 
 A short replay covers its path in few windows, so its own non-zero jumps are large,
 and the shuffled posteriors, hopping between swapped fields, do not jump further.
@@ -657,13 +661,17 @@ it beside the port on the same place fields, window spike counts, thresholds and
 permutations, once as published and once without its floor. Results are in
 `reference_check_summary.csv`.
 
-- **The port decides as the reference does.** It decodes sorted cells with the
-  reference's floor (`with_reference_rate_floor`), so the posteriors agree to 1e-6 and
-  what remains is the binned center (V7). On the Figure 1 simulation every gate,
-  candidate and verdict agrees. Over every sweep cell (4536 cells, 17632 candidates,
-  2.4 million windows) 17512 candidates have identical bounds, the reference calls
-  2198 of them replay against the port's 2205, and 1938 pass its significance test
-  against 1939; 37 cells (0.8%) differ in either count.
+- **The port decides as the reference does, apart from its binned center.** It decodes
+  sorted cells with the reference's floor (`with_reference_rate_floor`), so the
+  posteriors agree to 1e-6, and applies the reference's zero-jump rule, so the
+  set-aside pairs agree in every observed and shuffled draw; what remains is the binned
+  center (V7). On the Figure 1 simulation every gate, candidate and verdict agrees. Over
+  every sweep cell (4536 cells, 17632 candidates, 2.4 million windows) 17512 candidates
+  have identical bounds, the reference calls 2198 of them replay against the port's
+  2205, and 1945 pass its significance test against 1949; 34 cells (0.7%) differ in
+  either count. Near-equal totals can hide changes in opposite directions: tested on
+  the same candidate windows, 17 of the 2205 significance verdicts differ, all from
+  the binned center, since the posteriors and the set-aside pairs are the reference's.
 - **The floor is not a detail.** Without it (V3) the posteriors of 5% of sweep windows
   move by more than 0.001, the reference calls 2473 candidates replay and passes 1705,
   and 465 cells (10%) differ from the reference as published. The port ran without
@@ -759,7 +767,7 @@ not a reassurance.
 |---|---|---|---|---|
 | **V5** | 2D open field, 90 × 90 cm | 1D linearized three-legged track graph, 9 arms | The task's geometry | Sequences are constrained to the graph; "direction" is along-arm rather than an angle |
 | **V6** | Euclidean distance for jump and dispersion | Track-graph distance | On a linearized branched track, `abs(Δlinear_position)` is not the distance between two places — bins on different arms can be adjacent in linear coordinate | Using linear differences would under-count jumps at arm boundaries, producing spuriously smooth and spuriously long sequences. Track distance avoids this; it also makes our jumps non-comparable in absolute terms to an open-field jump. Note the asymmetry this creates with the encoding model: `Environment` exposes graph distances (`get_manifold_distances`, `_bin_distance_matrix_`) and this detector uses them, but `KDEModel` smooths with a Euclidean kernel in whatever coordinate it is given, which for a linearized track is the linear one. Measured on a Y track with 20 cm edge spacing: a kernel fitted at one bin gives a density at a second bin 6 cm away on the graph and 26 cm away in linear coordinate of 8.4e-05 of its peak, matching `exp(-0.5*(26/6)^2)` rather than `exp(-0.5*(6/6)^2)`. Place fields therefore do not wrap through a junction. Both procedures in this comparison read the same encoding model (X5, D5), so this does not bias the contrast between them; it is a caveat on absolute decoding near junctions for either |
-| **V7** | Posterior COM | Discrete Fréchet mean over track distance (D4) | Linearized-coordinate COM does not respect branching | On straight segments the center is quantized to a bin; near junctions geometry also changes it. Against a continuous center on the simulated linear track, 99.3% of candidates keep identical bounds and the replay and significance counts move by 7 in about 2200 and by 1 in about 1940 ("Against the reference's own arithmetic") |
+| **V7** | Posterior COM | Discrete Fréchet mean over track distance (D4) | Linearized-coordinate COM does not respect branching | On straight segments the center is quantized to a bin; near junctions geometry also changes it. Against a continuous center on the simulated linear track, 99.3% of candidates keep identical bounds, the replay count moves by 7 in about 2200, and 17 of 2205 significance verdicts differ on the same windows ("Against the reference's own arithmetic") |
 | **V8** | Unvisited arena bins excluded | Junction placeholder bins (`edge_id == -1`) excluded before normalization | These bins are linearization artifacts from `edge_spacing > 0`, not places. In `get_track_grid` the `-1` rows are built from `place_bin_centers[~is_track_interior]`, so they are non-interior by construction and the primary likelihood path never returns them; the guard matters on the `results.nc` path, where `log_likelihood` is re-expanded to every `state_bins` column | If not excluded, probability mass lands on non-places and drags the center toward gaps. Same hazard `map_estimate_to_arm` guards against |
 | **V9** | Spread is a 2D product moment (area-like, bin units) | Graph-distance RMS spread (a length, cm) | Provides a spread measure on our geometry, approximating SD on a straight segment | The 10 cm cutoff is an adapted choice prioritized in the later threshold-robustness study (04); its robustness is not established by the initial report, and these spreads are not numerically comparable to the paper's 2D spreads. It also limits which replays survive, but **not through speed alone**. A window's spread grows only when its posterior actually smears over the swept path, and whether it does depends on spike density and field overlap. On `non_local_detector`'s sparse clusterless simulation, where each of 20 units fires once, a window straddling several fields is multimodal and the detector returns one accepted sequence at 375 cm/s but breaks the same trajectory into rejected pieces at 450 cm/s and above (`tests/integration/test_memoryless_simulated_replay.py`). With denser spiking the posterior stays peaked and there is no such cap: injected replays are found at 1625 cm/s with a median spread of 3.6 cm, and spread only breaks down near 4300 cm/s, where the whole path fits inside one window. The binding quantity is how far the path travels *within a window* relative to how well the spikes localize it, not the speed as such. An earlier version of this entry gave a flat 430 cm/s cap; that was a measurement on the sparse simulation, over-generalized. Note the direction of the adaptation: the helper library's own 1D branch (`compute_imageSpread.m:20-30`) computes the same COM-based RMS this port does, and `load_replayEvents_cm.m:32` gates it at **20 cm**, so 10 cm is twice as strict as the only 1D precedent in the reference. That branch also uses a 50 ms duration and a `0.4 * maze_size` jump, both looser than what this port takes from the paper |
 
@@ -996,7 +1004,7 @@ not additional acceptance criteria.
 | One-to-many/many-to-many overlaps count each event once per detector; matched events may have different SWR labels; disjoint and empty cohorts | Denominators, matching, and empty-cohort handling |
 | Rejection diagnostics and gate-specific reruns agree on synthetic examples | Explanations of selection follow the actual pipeline |
 | Encoding-pair shuffle preserves observed spike/mark arrays, encoding marginals, and ground intensity; identity permutation reproduces the original likelihood | The intended null operation and absence of accidental refitting or input mutation |
-| One permutation spans all windows in a draw; observed/null scores use identical bounds; any single draw regenerates from its key; ties and NaN are handled as the reference handles them and the set-aside pairs are those whose slices hold the same spikes as the decode sees them; each shuffle's behaviour on a real trajectory and on scrambled marks is pinned | Reproducibility, fidelity to the reference's test, and the controls |
+| One permutation spans all windows in a draw; observed/null scores use identical bounds; any single draw regenerates from its key; ties and NaN are handled as the reference handles them; on sorted cells the set-aside pairs are the reference's, windows whose continuous center did not move, in every draw, and on clusterless marks those no spike entered or left; each shuffle's behaviour on a real trajectory and on scrambled marks is pinned | Reproducibility, fidelity to the reference's test, and the controls |
 | The reference's sorted-cell arithmetic on hand-worked cases, and the port pinned to it on a sorted fixture: same posteriors on the port's fields, same kept windows, same candidates and verdicts (`test_memoryless_reference.py`) | That the port decides as the reference would, apart from the documented adaptations |
 | Simulated-data smoke test, then one real epoch | End-to-end |
 
