@@ -159,10 +159,13 @@ one-off script.
 """
 
 
-def build_recording(seed: int = 0):
+def build_recording(seed: int = 0, cells: np.ndarray | None = None):
     """One simulated recording, with both detectors fitted on its non-event data.
 
-    ``seed`` is the simulator's; 0 is the recording every sweep reads.
+    ``seed`` is the simulator's; 0 is the recording every sweep reads. With
+    ``cells``, the detectors are fitted on those cells alone, in that order,
+    and the recording's ``spike_times`` are theirs; ``all_spike_times`` keeps
+    every cell's.
     """
     (
         speed,
@@ -174,6 +177,9 @@ def build_recording(seed: int = 0):
         is_event,
         _place_fields,
     ) = make_simulated_data(n_neurons=N_NEURONS, seed=seed)
+    all_spike_times = spike_times
+    if cells is not None:
+        spike_times = [all_spike_times[cell] for cell in cells]
     time, position, speed, is_event = (
         array[::DECODE_BIN_STRIDE] for array in (time, position, speed, is_event)
     )
@@ -215,6 +221,7 @@ def build_recording(seed: int = 0):
         "position": position,
         "speed": speed,
         "spike_times": spike_times,
+        "all_spike_times": all_spike_times,
         "event_times": event_times,
         "is_event": is_event,
         "environment": environment,
@@ -504,6 +511,9 @@ class StateSpaceRun:
         at least the minimum duration.
     continuous_only : list of ReportedEvent
         The same rule on the continuous state alone.
+    non_local_posterior : ndarray, shape (n_time, n_bins)
+        Where the non-local states put the replay: the two states summed at
+        each interior place bin, each row renormalized to one.
     """
 
     time: np.ndarray
@@ -511,6 +521,7 @@ class StateSpaceRun:
     p_fragmented: np.ndarray
     canonical: list[ReportedEvent]
     continuous_only: list[ReportedEvent]
+    non_local_posterior: np.ndarray
 
 
 def run_state_space(recording, injected, window) -> StateSpaceRun:
@@ -555,12 +566,17 @@ def run_state_space(recording, injected, window) -> StateSpaceRun:
             for a, b in non_local_intervals(time, probability)
         ]
 
+    # each non-local state's columns onto the interior bins they stand for
+    to_bin = np.zeros((bin_position_cm.size, recording["place_bin_centers_cm"].size))
+    to_bin[np.arange(bin_position_cm.size), nearest_bin(recording, bin_position_cm)] = 1
+    content = non_local @ to_bin
     return StateSpaceRun(
         time=time,
         p_continuous=p_continuous,
         p_fragmented=p_fragmented,
         canonical=events(p_continuous + p_fragmented),
         continuous_only=events(p_continuous),
+        non_local_posterior=content / content.sum(axis=1, keepdims=True),
     )
 
 
