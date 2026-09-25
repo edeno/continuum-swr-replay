@@ -1145,19 +1145,37 @@ def heldout_rate(
     classes: tuple[str, ...],
     truth: str,
     measure: str = "support_rate",
+    suffix: str = "",
 ) -> tuple[float, int]:
-    """A held-out rate pooled over event classes, and how many events it rests on."""
+    """A held-out rate over our detector's events, pooled over event classes.
+
+    Each event is counted once, as our detector bounds it: a shared event is
+    also scored as the sliding window bounds it, and pooling both would count
+    it twice. A rate over informative events is weighted by how many are
+    informative, a share of all events by how many there are.
+
+    Returns
+    -------
+    rate : float
+        NaN when no event counts.
+    n : int
+        The events the rate rests on.
+    """
     rows = heldout[
         (heldout["summary"] == "by_class")
         & (heldout.fold == fold)
         & (heldout.estimator == estimator)
+        & (heldout.detector == "state_space")
         & heldout.event_class.isin(classes)
         & (heldout.truth == truth)
     ].pivot_table(index="event_class", columns="measure", values="value")
-    if rows.empty or "n_events" not in rows or rows.n_events.sum() == 0:
+    weight = "n_events_all" if measure == "informative_share" else f"n_events{suffix}"
+    if rows.empty or weight not in rows or rows[weight].sum() == 0:
         return float("nan"), 0
-    n = rows.n_events.fillna(0)
-    return float((rows[measure].fillna(0) * n).sum() / n.sum()), int(n.sum())
+    n = rows[weight].fillna(0)
+    return float((rows[f"{measure}{suffix}"].fillna(0) * n).sum() / n.sum()), int(
+        n.sum()
+    )
 
 
 def plot_heldout_support(ax, heldout: pd.DataFrame) -> None:
@@ -1651,13 +1669,31 @@ def check_heldout_claims(heldout: pd.DataFrame) -> None:
             "The caption says the sliding window reported no event our detector "
             "missed; the held-out summary holds comparator-only events."
         )
-    empty = by_class[
-        (by_class.truth == "no_content") & (by_class.measure == "support_rate")
-    ]
-    if (empty.value > 0).any():
+    for fold in FOLD_HATCH:
+        for estimator in ("state_space", "sliding_window"):
+            rate, n = heldout_rate(
+                heldout, fold, estimator, ("ours_only", "shared"), "no_content"
+            )
+            if n and rate > 0:
+                raise RuntimeError(
+                    "The caption says no informative place-less burst event has "
+                    "held-out support; the held-out summary disagrees."
+                )
+    local = by_class[(by_class.truth == "local") & (by_class.measure == "n_events_all")]
+    if local.value.sum() > 0:
         raise RuntimeError(
-            "The caption says no informative place-less burst event has held-out "
-            "support; the held-out summary disagrees."
+            "The caption says no event of pure local coding reached the held-out "
+            "test; the held-out summary holds some."
+        )
+    if not sum(
+        heldout_rate(
+            heldout, fold, "state_space", ("ours_only", "shared"), "no_content"
+        )[1]
+        for fold in FOLD_HATCH
+    ):
+        raise RuntimeError(
+            "The caption states a place-less burst result; no place-less burst "
+            "event is informative, so there is none to state."
         )
     for fold in FOLD_HATCH:
         for estimator in ("state_space", "sliding_window"):
@@ -1738,6 +1774,22 @@ def write_caption(
     agreement = heldout[
         (heldout["summary"] == "agreement") & (heldout.measure == "estimator_agreement")
     ].value
+    placeless = [
+        heldout_rate(heldout, f, "state_space", ("ours_only", "shared"), "no_content")
+        for f in FOLD_HATCH
+    ]
+    placeless_loose = [
+        heldout_rate(
+            heldout,
+            f,
+            "state_space",
+            ("ours_only", "shared"),
+            "no_content",
+            suffix="_floor2",
+        )
+        for f in FOLD_HATCH
+    ]
+    loose_supported = sum(round(rate * n) for rate, n in placeless_loose if n)
 
     def called(condition, detector):
         return controls_value(
@@ -2019,7 +2071,8 @@ neither loses parts to the jump or the chain itself.
 evaluation cells three ways: two interleaved folds with their roles swapped (A,
 B), each half tiling the track, and one whose evaluation cells cover only its
 lower half (C, hatched). Both detectors are fitted and run on the discovery
-cells alone, over every injected replay and control. Each event's content,
+cells alone, over every injected replay, controls trial and no-replay stretch.
+Events are counted once each, as our detector bounds them. An event's content,
 estimated from the discovery cells by our decoder (bars) or by the sliding
 window (dots), is scored on the evaluation cells against the animal's own
 position and against 100 permutations of the evaluation fields, spikes and
@@ -2030,9 +2083,13 @@ replays that only our detector reported have support in
 {pct_range(ours_support)} of cases in folds A and B
 and {pct(support("C", ("ours_only",), "continuous_replay"))} in fold C; shared
 ones in {pct_range(shared_support)}. No
-place-less burst event has support; jumping bursts, which do represent places,
-in {pct_range(jumping_support)}. The two content
-estimates agree on {pct(agreement.min())} of events or more. The sliding window
+informative place-less burst event has support
+({sum(n for _, n in placeless)} of them), and at a floor of 2 expected spikes
+{loose_supported} of {sum(n for _, n in placeless_loose)} do; jumping bursts,
+which do represent places, have support in {pct_range(jumping_support)}. Neither
+detector reported an event from discovery cells on the no-replay stretches, so
+no event of pure local coding reached the test. The two content estimates agree
+on {pct(agreement.min())} of the events informative under both, or more. The sliding window
 reported no event our detector missed, so there is no comparator-only class to
 test. **(p)** Share of each kind of replay the evaluation cells can judge at
 all: {pct_range(informative["ours"])} of those only our detector reported,

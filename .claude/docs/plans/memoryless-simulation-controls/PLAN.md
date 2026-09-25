@@ -1,6 +1,6 @@
 # Memoryless simulation controls — Implementation Plan
 
-**Status:** Phases 1-4 implemented (4a5d519 to b568cea); phase 4 review pending.
+**Status:** Done. Phases 1-4 implemented and independently reviewed; review fixes in (through the commit that records this status).
 
 Extends the simulated comparison between the memoryless sliding-window detector and our
 state-space detector, as designed in

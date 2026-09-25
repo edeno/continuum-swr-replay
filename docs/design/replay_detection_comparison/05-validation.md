@@ -59,8 +59,9 @@ Poisson log-likelihood of the evaluation spikes under a discovery content poster
 spike and silence terms apart, against the animal's own position and permuted
 evaluation fields, with a coverage floor. It is implemented as
 `inventory_comparison.heldout` and can be applied to recorded tetrodes unchanged. On the
-simulation it supports events with content and not those without, and most short
-events are uninformative.
+simulation it supports 87-97% of informative true replays and none of 19 informative
+place-less bursts (4 of 75 at a looser coverage floor); no event of pure local coding
+reached it, and most short events are uninformative.
 
 Before scheduling a study, resolve these issues on a pilot:
 

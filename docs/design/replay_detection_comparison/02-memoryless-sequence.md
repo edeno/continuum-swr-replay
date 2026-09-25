@@ -712,23 +712,29 @@ evaluation cells by `inventory_comparison.heldout` under both content estimates,
 and the sliding window's. Numbers are in `detection_heldout_summary.csv`; the rule and
 its choices are in [memoryless_simulation_controls.md](memoryless_simulation_controls.md).
 
+Each event is counted once, as our detector bounds it; the sliding window's bounds on
+shared events are in the summary under their own `detector`.
+
 - **Our additional detections carry spatial information in cells they never saw.**
   Among informative events (at least 5 evaluation spikes expected along the content),
   true replays only our detector reported have held-out support in 93-97% of cases in
   the interleaved folds and 87% in the half-coverage fold; shared replays in 100%.
-- **The test does not support events without content.** No informative place-less
-  burst event has support; jumping bursts, which do represent places, 62%.
+- **The test did not support events without content, on few of them.** None of the 19
+  informative place-less burst events has support; at a floor of 2 expected spikes, 4
+  of 75 do. Jumping bursts, which do represent places, 57-62%. On the no-replay
+  stretches neither detector reported an event from discovery cells, so no event of
+  pure local coding reached the test: the false-support rate rests on place-less
+  bursts alone.
 - **The content estimate barely matters here.** Ours and the sliding window's agree on
-  99% of informative events or more.
+  99% or more of the events informative under both.
 - **The sliding window reported no event our detector missed**, so there is no
   comparator-only class to test.
 - **Power is the limit.** Only 6-7% of the replays only our detector reported are
-  informative at all, against 19-25% of shared ones: most additional detections are
+  informative at all, against 16-23% of shared ones: most additional detections are
   too short or too sparse for a dozen evaluation cells to judge, so an event without
   support is mostly one that cannot be judged, not one shown false.
 - Events are labelled by time: half or more inside an injection, its truth; partly
-  inside, mixed; on the recording's own labeled events, kept apart. No event fell on
-  pure local coding, so the false-support rate rests on the place-less bursts alone.
+  inside, mixed; on the recording's own labeled events, kept apart.
 
 ### Against the reference's own arithmetic
 

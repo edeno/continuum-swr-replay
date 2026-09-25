@@ -153,7 +153,8 @@ neither loses parts to the jump or the chain itself.
 evaluation cells three ways: two interleaved folds with their roles swapped (A,
 B), each half tiling the track, and one whose evaluation cells cover only its
 lower half (C, hatched). Both detectors are fitted and run on the discovery
-cells alone, over every injected replay and control. Each event's content,
+cells alone, over every injected replay, controls trial and no-replay stretch.
+Events are counted once each, as our detector bounds them. An event's content,
 estimated from the discovery cells by our decoder (bars) or by the sliding
 window (dots), is scored on the evaluation cells against the animal's own
 position and against 100 permutations of the evaluation fields, spikes and
@@ -161,16 +162,20 @@ silence both counting, and has support when it beats both (p ≤ 0.05). **(o)**
 Share of events with support, among those along whose content the evaluation
 cells are expected to fire at least 5 spikes; numbers give how many. True
 replays that only our detector reported have support in 93% to 97% of cases in
-folds A and B and 87% in fold C; shared ones in 100%. No place-less burst event
-has support; jumping bursts, which do represent places, in 62%. The two content
-estimates agree on 99% of events or more. The sliding window reported no event
-our detector missed, so there is no comparator-only class to test. **(p)**
-Share of each kind of replay the evaluation cells can judge at all: 6% to 7% of
-those only our detector reported, 19% to 25% of shared ones, in folds A and B.
-The rest are too short or too sparse for a dozen evaluation cells, so an event
-without support is mostly one that cannot be judged, not one shown false.
-Held-out support tests spatial information, not sequence, and is read with
-these error rates, not alone.
+folds A and B and 87% in fold C; shared ones in 100%. No informative place-less
+burst event has support (19 of them), and at a floor of 2 expected spikes 4 of
+75 do; jumping bursts, which do represent places, have support in 57% to 62%.
+Neither detector reported an event from discovery cells on the no-replay
+stretches, so no event of pure local coding reached the test. The two content
+estimates agree on 99% of the events informative under both, or more. The
+sliding window reported no event our detector missed, so there is no
+comparator-only class to test. **(p)** Share of each kind of replay the
+evaluation cells can judge at all: 6% to 7% of those only our detector
+reported, 16% to 23% of shared ones, in folds A and B. The rest are too short
+or too sparse for a dozen evaluation cells, so an event without support is
+mostly one that cannot be judged, not one shown false. Held-out support tests
+spatial information, not sequence, and is read with these error rates, not
+alone.
 
 **Caveats.** Sorted spikes, a linear track, no artifacts. In (f-j) the animal
 rests at one end of the track and pauses nowhere else, so distance from its
