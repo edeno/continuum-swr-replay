@@ -64,6 +64,12 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
   distance into a simulated recording and scores both detectors by one rule; writes the raw
   table to `Processed-Data/` and the aggregates to
   `docs/design/replay_detection_comparison/detection_sweep_summary.csv` (about six minutes).
+- `compare_memoryless_to_reference.py` — runs the memoryless port beside
+  `memoryless_reference.py`, an independent re-implementation of the Widloski & Foster
+  reference's sorted-cell arithmetic, on the Figure 1 simulation step by step and on
+  every sweep cell; writes
+  `docs/design/replay_detection_comparison/reference_check_summary.csv` (about ten
+  minutes; `--n-seeds 1` for a one-minute check).
 - `compare_fits.py` — compares old vs new fitted rate artifacts (Family B, Family A
   and the `is_swr`-contrast ladder) on the quantities that survive a respecification
   — joint reward step, reward-free goodness of fit, frozen-cohort size, per-rung

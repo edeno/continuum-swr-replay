@@ -634,6 +634,12 @@ Compare a backed-up rate fit against the current one and write a markdown audit.
 
 `delta_aic`, `n_bins_table`, `reward_quantities`, `arrival_clock_cv_table`, `arrival_clock_shape_table`, `cv_nan_share_table`, `arrival_cohort_table`, `outcome_boundary_shift_cohort`, `reward_boundary_shift_table`, `session_counts_by`, `rung_session_counts`, `cv_validity_table`, `per_stop_validity_table`, `contrast_fit_flag_table`, `term_separation_table`, `audited_row_table`, `audited_term_drop_table`, `drop_mechanism_table`, `build_report`, `ContentFraming`, `content_term_table`, `content_scale_table`, `content_rung_session_counts`, `content_delta_aic_table`, `content_separation_table`, `rung_sort_key`, `contrast_audited_table`, `contrast_design_delta_table`, `contrast_stratum_table`, `build_content_report`, `collect_content_inputs`, `run_content_mode`, `rate_rung_sort_key`, `cohort_size_table`, `reward_kernel_lag1`, `cohort_reward_rr_table`, `cohort_paired_swr_table`, `cohort_delta_aic_table`, `cohort_per_stop_delta_aic_table`, `cohort_arrival_shape_table`, `per_stop_source_note`, `cohort_burst_peak_table`, `cohort_arrival_retention_table`, `cohort_contrast_rung_table`, `cohort_provenance_table`, `cohort_provenance_note`, `in_transit_power_note`, `build_cohort_report`, `collect_cohort_inputs`, `run_cohort_contrast_mode`, `build_parser`, `main`
 
+### `scripts/qa/compare_memoryless_to_reference.py`
+
+Run the port and the reference's own arithmetic on one input, and compare.
+
+`window_counts`, `overlap`, `p_values`, `passes`, `compare`, `reference_row`, `fields_and_thresholds`, `compare_variants`, `decode_sweep_cell`, `sweep_totals`, `main`
+
 ### `scripts/qa/compare_pfc_cohorts.py`
 
 Write the before/after audit of the mPFC unit-GLM stop cohort.
@@ -681,6 +687,12 @@ Freeze the current canonical tables and model outputs as a read-only baseline.
 What the mPFC held-out null's windows look like, beside the real events.
 
 `bundle_paths`, `session_of`, `read_sidecar`, `spacing_summary`, `draw_spacing_summary`, `session_window_sets`, `spacing_section`, `overlap_section`, `non_positive_section`, `excluded_section`, `main`
+
+### `scripts/qa/memoryless_reference.py`
+
+The Widloski & Foster detector as its MATLAB computes it, for a sorted 1-D track.
+
+`ReferenceThresholds`, `decode_windows`, `center_and_spread`, `forward_jumps`, `runs_of_kept`, `merge_runs`, `dispersion_bins`, `ReferenceDetection`, `detect`, `shuffle_statistics`, `shuffle_p_values`
 
 ### `scripts/qa/mutation_check.py`
 
