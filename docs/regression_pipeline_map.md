@@ -718,6 +718,12 @@ Print Stage 6's per-role cross-session FDR table for a saved bundle.
 
 `main`
 
+### `scripts/qa/sweep_memoryless_controls.py`
+
+What each detector does with activity that is not one clean replay.
+
+`usable_intervals`, `truth_path`, `covered_cm`, `detector_events`, `score_trial`, `trials`, `run_trials`, `run_no_replay`, `summarize`, `main`
+
 ### `scripts/qa/write_pipeline_map.py`
 
 Generate the symbol-anchored regression pipeline code map.

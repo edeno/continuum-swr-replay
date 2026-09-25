@@ -159,8 +159,11 @@ one-off script.
 """
 
 
-def build_recording():
-    """One simulated recording, with both detectors fitted on its non-event data."""
+def build_recording(seed: int = 0):
+    """One simulated recording, with both detectors fitted on its non-event data.
+
+    ``seed`` is the simulator's; 0 is the recording every sweep reads.
+    """
     (
         speed,
         position,
@@ -170,7 +173,7 @@ def build_recording():
         _sampling_frequency,
         is_event,
         _place_fields,
-    ) = make_simulated_data(n_neurons=N_NEURONS)
+    ) = make_simulated_data(n_neurons=N_NEURONS, seed=seed)
     time, position, speed, is_event = (
         array[::DECODE_BIN_STRIDE] for array in (time, position, speed, is_event)
     )
