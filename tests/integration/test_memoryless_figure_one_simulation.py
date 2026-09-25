@@ -45,6 +45,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
     interior_bin_distances_cm,
     sorted_spikes_epoch_log_likelihood,
     window_midpoints_s,
+    with_reference_rate_floor,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
     DEFAULT_N_SHUFFLES,
@@ -221,7 +222,10 @@ def decoded() -> Decoded:
         spike_times=spike_times,
         is_training=is_training,
     )
-    encoding_model = detector.encoding_model_[ENCODING_KEY]
+    # decoded as the figure decodes it, with the reference's floor
+    encoding_model = with_reference_rate_floor(
+        detector.encoding_model_[ENCODING_KEY], CONFIG
+    )
     environment = encoding_model["environment"]
 
     result = sorted_spikes_epoch_log_likelihood(
