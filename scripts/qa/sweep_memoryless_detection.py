@@ -37,6 +37,7 @@ import os
 import subprocess
 import sys
 import time as clock
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -56,6 +57,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import
     MemorylessSequenceConfig,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (
+    CandidateSequences,
     detect_candidate_sequences,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
@@ -73,6 +75,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.scoring impor
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
     DEFAULT_N_SHUFFLES,
     SIGNIFICANCE_LEVEL,
+    ShuffleResult,
     ShuffleSeed,
     shuffle_candidate_sorted,
 )
@@ -239,23 +242,48 @@ def best_entry(scored: list[tuple]) -> tuple:
     return scored[best_scored([entry[1] for entry in scored])]
 
 
-def memoryless_outcome(
-    recording, injected, window, bounds, true_position_cm, path_cm, cell_key
-):
-    """What the sliding-window detector reports for one injected event.
+@dataclass(frozen=True)
+class ReportedEvent:
+    """One event a detector reports, with the decoded positions it is scored on.
 
-    Scored three ways, because the published definition has three parts and
-    the reference's detection script applied only some of them.
-    ``sliding_matches`` is the whole published definition: a candidate that
-    meets the duration and dispersion criteria, is the injected replay, and
-    beats the place-cell identity shuffle on both mean spread and mean jump.
-    That is what the paper's analyses read, from the corrected
-    ``load_replayEvents_cellIDshuffle_sameEvents.m``. The detection script
-    itself computed its jump p-values from an all-NaN vector, so every event
-    passed that half; ``sliding_matches_spread_only`` is what its own filter
-    applied.
-    ``sliding_matches_before_shuffle`` leaves the shuffle out.
+    Attributes
+    ----------
+    start_s, end_s : float
+        Its bounds: first and last window midpoint for the sliding window,
+        first and last sample for the state-space detector.
+    decoded_time_s, decoded_cm : ndarray, shape (n_decoded,)
+        Where the event puts the replay, and when: the kept windows' centers
+        at their midpoints, or the non-local posterior's most probable place
+        at each sample.
     """
+
+    start_s: float
+    end_s: float
+    decoded_time_s: np.ndarray
+    decoded_cm: np.ndarray
+
+
+@dataclass(frozen=True)
+class SlidingWindowRun:
+    """What the sliding-window detector reports over one decoded stretch.
+
+    Every candidate meeting the duration and dispersion criteria is
+    ``accepted`` and tested against the place-cell identity shuffle; a
+    candidate's draws are seeded by the stretch's key and its first window,
+    so which other candidates are tested does not change its result.
+    """
+
+    time: np.ndarray
+    midpoint_s: np.ndarray
+    posterior: np.ndarray
+    candidates: CandidateSequences
+    accepted: list[int]
+    events: dict[int, ReportedEvent]
+    shuffles: dict[int, ShuffleResult]
+
+
+def run_sliding_window(recording, injected, window, cell_key) -> SlidingWindowRun:
+    """Decode a stretch window by window, assemble, and test every accepted sequence."""
     time, position, speed = window
     result = sorted_spikes_epoch_log_likelihood(
         time, position, injected, recording["sliding_encoding_model"], CONFIG
@@ -270,7 +298,69 @@ def memoryless_outcome(
     candidates = detect_candidate_sequences(
         posterior, midpoint_s, recording["bin_distance_cm"], window_speed, CONFIG
     )
+    accepted = [int(i) for i in np.flatnonzero(candidates.is_replay)]
 
+    # The event's decoded positions are its kept windows, as the detector's own
+    # dispersion reads them: a window inside a merged gap was rejected and is
+    # not a decoded position, whatever center its wide posterior happens to
+    # have.
+    events = {}
+    for i in accepted:
+        run_start, run_stop = candidates.runs[i]
+        centers = candidates.decisions.center_index[run_start : run_stop + 1]
+        times = midpoint_s[run_start : run_stop + 1]
+        present = candidates.assembly.kept[run_start : run_stop + 1]
+        events[i] = ReportedEvent(
+            start_s=float(midpoint_s[run_start]),
+            end_s=float(midpoint_s[run_stop]),
+            decoded_time_s=times[present],
+            decoded_cm=recording["place_bin_centers_cm"][centers[present]],
+        )
+
+    # the reference's own shuffle, for every accepted candidate
+    shuffles = {
+        i: shuffle_candidate_sorted(
+            int(candidates.runs[i, 0]),
+            int(candidates.runs[i, 1]),
+            time,
+            injected,
+            recording["sliding_encoding_model"],
+            recording["bin_distance_cm"],
+            CONFIG,
+            seed=ShuffleSeed(run=SHUFFLE_RUN_SEED, session=cell_key),
+            n_shuffles=DEFAULT_N_SHUFFLES,
+        )
+        for i in accepted
+    }
+    return SlidingWindowRun(
+        time=result.time,
+        midpoint_s=midpoint_s,
+        posterior=posterior,
+        candidates=candidates,
+        accepted=accepted,
+        events=events,
+        shuffles=shuffles,
+    )
+
+
+def score_sliding_window(
+    run: SlidingWindowRun, bounds, true_position_cm, path_cm, position
+) -> dict:
+    """What the sliding-window detector reports for one injected event.
+
+    Scored three ways, because the published definition has three parts and
+    the reference's detection script applied only some of them.
+    ``sliding_matches`` is the whole published definition: a candidate that
+    meets the duration and dispersion criteria, is the injected replay, and
+    beats the place-cell identity shuffle on both mean spread and mean jump.
+    That is what the paper's analyses read, from the corrected
+    ``load_replayEvents_cellIDshuffle_sameEvents.m``. The detection script
+    itself computed its jump p-values from an all-NaN vector, so every event
+    passed that half; ``sliding_matches_spread_only`` is what its own filter
+    applied.
+    ``sliding_matches_before_shuffle`` leaves the shuffle out.
+    """
+    candidates, midpoint_s = run.candidates, run.midpoint_s
     start_s, end_s = bounds
     inside = (midpoint_s >= start_s) & (midpoint_s <= end_s)
     gates = candidates.decisions.gates
@@ -311,62 +401,34 @@ def memoryless_outcome(
     if not accepted:
         return out
 
-    # the reference's own shuffle, for every accepted candidate
-    shuffles = {
-        i: shuffle_candidate_sorted(
-            int(candidates.runs[i, 0]),
-            int(candidates.runs[i, 1]),
-            time,
-            injected,
-            recording["sliding_encoding_model"],
-            recording["bin_distance_cm"],
-            CONFIG,
-            seed=ShuffleSeed(run=SHUFFLE_RUN_SEED, session=cell_key),
-            n_shuffles=DEFAULT_N_SHUFFLES,
-        )
-        for i in accepted
-    }
-
     # Every accepted sequence that overlaps the injection is scored, and the
     # best answers for the cell. Two things have to hold over the whole
     # sequence for a match: its decoded positions sit on the path, and it does
     # not cover far more ground than the path does. An absorbed sequence
     # tracks the injection during the injection and then sits at the animal's
     # own place, which is where its dispersion comes from.
-    # The event's decoded positions are its kept windows, as the detector's own
-    # dispersion reads them: a window inside a merged gap was rejected and is
-    # not a decoded position, whatever center its wide posterior happens to
-    # have.
-    scored = []
-    for i in accepted:
-        run_start, run_stop = candidates.runs[i]
-        centers = candidates.decisions.center_index[run_start : run_stop + 1]
-        times = midpoint_s[run_start : run_stop + 1]
-        present = candidates.assembly.kept[run_start : run_stop + 1]
-        decoded_cm = recording["place_bin_centers_cm"][centers[present]]
-        scored.append(
-            (
-                i,
-                score_against_injection(
-                    times[present],
-                    decoded_cm,
-                    true_position_cm,
-                    bounds,
-                    path_cm,
-                    MATCH_TOLERANCE_CM,
-                ),
-                decoded_cm,
-                times[present],
-            )
+    scored = [
+        (
+            i,
+            score_against_injection(
+                run.events[i].decoded_time_s,
+                run.events[i].decoded_cm,
+                true_position_cm,
+                bounds,
+                path_cm,
+                MATCH_TOLERANCE_CM,
+            ),
         )
+        for i in accepted
+    ]
+    shuffles = run.shuffles
 
     def any_match(keep) -> bool:
         return any(entry[1].matches for entry in scored if keep(entry[0]))
 
-    i, score, decoded_cm, times = best_entry(scored)
-    run_start, run_stop = candidates.runs[i]
-
-    animal_cm = np.interp(times, result.time, position[: result.time.size])
+    i, score = best_entry(scored)
+    event = run.events[i]
+    animal_cm = np.interp(event.decoded_time_s, run.time, position[: run.time.size])
     out |= {
         "sliding_matches_before_shuffle": score.matches,
         "sliding_matches": any_match(lambda j: shuffles[j].passes),
@@ -379,14 +441,22 @@ def memoryless_outcome(
         "sliding_span_cm": score.span_cm,
         "sliding_duration_s": float(candidates.duration_s[i]),
         "sliding_dispersion_cm": float(candidates.dispersion_cm[i]),
-        "sliding_start_error_s": float(midpoint_s[run_start] - start_s),
-        "sliding_end_error_s": float(midpoint_s[run_stop] - end_s),
+        "sliding_start_error_s": float(event.start_s - start_s),
+        "sliding_end_error_s": float(event.end_s - end_s),
         "sliding_n_pieces": int(candidates.pieces[i].size),
         "sliding_local_fraction": float(
-            np.mean(np.abs(decoded_cm - animal_cm) < SAME_PLACE_CM)
+            np.mean(np.abs(event.decoded_cm - animal_cm) < SAME_PLACE_CM)
         ),
     }
     return out
+
+
+def memoryless_outcome(
+    recording, injected, window, bounds, true_position_cm, path_cm, cell_key
+):
+    """The sliding-window detector run over the window and scored against the event."""
+    run = run_sliding_window(recording, injected, window, cell_key)
+    return score_sliding_window(run, bounds, true_position_cm, path_cm, window[1])
 
 
 def nearest_bin(recording, position_cm: np.ndarray) -> np.ndarray:
@@ -417,13 +487,31 @@ def non_local_intervals(
     ]
 
 
-def state_space_outcome(recording, injected, window, bounds, true_position_cm, path_cm):
-    """What the switching state-space model reports for the same event.
+@dataclass(frozen=True)
+class StateSpaceRun:
+    """What the switching state-space model reports over one decoded stretch.
 
-    Scored by the same rule as the sliding window: every reported event that
-    overlaps the injection is scored on its own, over its whole extent, and
-    the best answers for the cell.
+    Attributes
+    ----------
+    time : ndarray, shape (n_time,)
+    p_continuous, p_fragmented : ndarray, shape (n_time,)
+        Probability of each non-local state.
+    canonical : list of ReportedEvent
+        The project's events: continuous plus fragmented above threshold for
+        at least the minimum duration.
+    continuous_only : list of ReportedEvent
+        The same rule on the continuous state alone.
     """
+
+    time: np.ndarray
+    p_continuous: np.ndarray
+    p_fragmented: np.ndarray
+    canonical: list[ReportedEvent]
+    continuous_only: list[ReportedEvent]
+
+
+def run_state_space(recording, injected, window) -> StateSpaceRun:
+    """Decode a stretch with the state-space model and read off its events."""
     time, position, _speed = window
     results = recording["detector"].predict(
         position_time=time, position=position, spike_times=injected, time=time
@@ -436,19 +524,59 @@ def state_space_outcome(recording, injected, window, bounds, true_position_cm, p
             "estimate_parameters does this silently when predict is given another "
             "time grid."
         )
-    probability = np.asarray(
-        results.acausal_state_probabilities.sel(
-            states=["Non-Local Continuous", "Non-Local Fragmented"]
-        )
-        .sum("states")
-        .values
+    states = results.acausal_state_probabilities
+    p_continuous = np.asarray(
+        states.sel(states="Non-Local Continuous").values
+    ).squeeze()
+    p_fragmented = np.asarray(
+        states.sel(states="Non-Local Fragmented").values
     ).squeeze()
 
+    # where the non-local states put the animal, to score this the same way
+    posterior = results["acausal_posterior"]
+    is_non_local = np.isin(
+        np.asarray(posterior.coords["state"].values),
+        ["Non-Local Continuous", "Non-Local Fragmented"],
+    )
+    bin_position_cm = np.asarray(posterior.coords["position"].values)[is_non_local]
+    non_local = np.asarray(posterior.values)[:, is_non_local]
+
+    def events(probability) -> list[ReportedEvent]:
+        return [
+            ReportedEvent(
+                start_s=float(time[a]),
+                end_s=float(time[b]),
+                decoded_time_s=time[a : b + 1],
+                decoded_cm=bin_position_cm[np.argmax(non_local[a : b + 1], axis=1)],
+            )
+            for a, b in non_local_intervals(time, probability)
+        ]
+
+    return StateSpaceRun(
+        time=time,
+        p_continuous=p_continuous,
+        p_fragmented=p_fragmented,
+        canonical=events(p_continuous + p_fragmented),
+        continuous_only=events(p_continuous),
+    )
+
+
+def score_state_space(
+    recording, run: StateSpaceRun, bounds, true_position_cm, path_cm
+) -> dict:
+    """What the switching state-space model reports for the same event.
+
+    Scored by the same rule as the sliding window: every reported event that
+    overlaps the injection is scored on its own, over its whole extent, and
+    the best answers for the cell.
+    """
+    time = run.time
+    probability = run.p_continuous + run.p_fragmented
     start_s, end_s = bounds
     hits = [
-        (a, b)
-        for a, b in non_local_intervals(time, probability)
-        if overlaps((time[a], time[b]), bounds)
+        event
+        for event in run.canonical
+        if overlaps((event.start_s, event.end_s), bounds)
     ]
     inside = (time >= start_s) & (time <= end_s)
 
@@ -467,25 +595,15 @@ def state_space_outcome(recording, injected, window, bounds, true_position_cm, p
     if not hits:
         return out
 
-    # where the non-local states put the animal, to score this the same way
-    posterior = results["acausal_posterior"]
-    is_non_local = np.isin(
-        np.asarray(posterior.coords["state"].values),
-        ["Non-Local Continuous", "Non-Local Fragmented"],
-    )
-    bin_position_cm = np.asarray(posterior.coords["position"].values)[is_non_local]
-    non_local = np.asarray(posterior.values)[:, is_non_local]
-
     scored = []
-    for a, b in hits:
-        decoded_cm = bin_position_cm[np.argmax(non_local[a : b + 1], axis=1)]
-        duration_s = float(time[b] - time[a])
+    for event in hits:
+        duration_s = event.end_s - event.start_s
         dispersion = dispersion_cm(
-            nearest_bin(recording, decoded_cm), recording["bin_distance_cm"]
+            nearest_bin(recording, event.decoded_cm), recording["bin_distance_cm"]
         )
         score = score_against_injection(
-            time[a : b + 1],
-            decoded_cm,
+            event.decoded_time_s,
+            event.decoded_cm,
             true_position_cm,
             bounds,
             path_cm,
@@ -500,8 +618,8 @@ def state_space_outcome(recording, injected, window, bounds, true_position_cm, p
             and duration_s > CONFIG.minimum_duration_s
             and dispersion > CONFIG.dispersion_threshold_cm
         )
-        scored.append(((a, b), score, duration_s, dispersion, meets_replay_definition))
-    (a, b), score, duration_s, dispersion, _ = best_entry(scored)
+        scored.append((event, score, duration_s, dispersion, meets_replay_definition))
+    event, score, duration_s, dispersion, _ = best_entry(scored)
 
     out |= {
         "state_space_matches": score.matches,
@@ -509,11 +627,17 @@ def state_space_outcome(recording, injected, window, bounds, true_position_cm, p
         "state_space_position_error_cm": score.position_error_cm,
         "state_space_span_cm": score.span_cm,
         "state_space_duration_s": duration_s,
-        "state_space_start_error_s": float(time[a] - start_s),
-        "state_space_end_error_s": float(time[b] - end_s),
+        "state_space_start_error_s": float(event.start_s - start_s),
+        "state_space_end_error_s": float(event.end_s - end_s),
         "state_space_dispersion_cm": dispersion,
     }
     return out
+
+
+def state_space_outcome(recording, injected, window, bounds, true_position_cm, path_cm):
+    """The state-space model run over the window and scored against the event."""
+    run = run_state_space(recording, injected, window)
+    return score_state_space(recording, run, bounds, true_position_cm, path_cm)
 
 
 def run_cell(recording, means, path_cm, midpoint_cm, duration_s, rate_hz, at_s, seed):
@@ -841,6 +965,22 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
     # the grouping column is not called "aggregate": that name shadows
     # DataFrame.aggregate, so frame.aggregate == "x" compares a method and
     # quietly selects nothing
+    # where each detector puts an event's start and end against the truth, on
+    # the replays both reported: signed, so absorbed local coding shows as an
+    # early start or a late end rather than only as a longer event
+    timing = []
+    for duration_s, group in found.groupby("duration_s"):
+        row = {"duration_s": duration_s}
+        for detector in ("sliding", "state_space"):
+            for edge in ("start", "end"):
+                error_ms = 1000.0 * group[f"{detector}_{edge}_error_s"]
+                for name, quantile in (("q25", 0.25), ("median", 0.5), ("q75", 0.75)):
+                    row[f"{detector}_{edge}_error_ms_{name}"] = float(
+                        error_ms.quantile(quantile)
+                    )
+        timing.append(row)
+    parts.append(melted(pd.DataFrame(timing), ["duration_s"], "timing_by_duration"))
+
     table = pd.concat(parts, ignore_index=True)
     table["note"] = ""
     return table[
