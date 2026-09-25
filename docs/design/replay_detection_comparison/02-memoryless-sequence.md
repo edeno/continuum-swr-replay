@@ -511,9 +511,10 @@ and the shuffled posteriors, sharp but hopping between swapped fields, do not ju
 further. The spread half passes about two thirds of replays at every duration, as a
 swapped field still gives a sharp posterior. Overall 65% pass the spread half and 82%
 the jump half (`shuffle_pass_rate_by_duration`, and `sliding_shuffle_*_pass_rate` in
-`overall`). These rates were measured before the sorted path set aside a cell's
-spike leaving as another of its spikes enters, and must be re-derived before they are
-cited. The trend does not depend on how the reference's zero-jump rule is read: with
+`overall`). Re-derived after the sorted path began setting aside a cell's spike
+leaving as another of its spikes enters, no value in the summary moved: on the Figure 1
+simulation that rule sets aside 24 of 3313 window pairs the earlier one kept, and no
+p-value there changed. The trend does not depend on how the reference's zero-jump rule is read: with
 the pairs no spike entered or left set aside, the jump half reads 21% at 40 ms against 97% at 500 ms; an earlier
 revision that kept every zero jump read 21% against 98%, and one that set aside every
 pair whose binned center stayed put read 29% against 95%.
@@ -522,9 +523,13 @@ pair whose binned center stayed put read 29% against 95%.
 injected event.** They are absorbed local coding that overlaps it. This is the
 same over-call the figure shows, measured as a rate.
 
-**What is being compared, and what is not.** Each procedure runs as published,
-with its own acceptance criteria; those criteria are part of the method and are
-not harmonised. What is held identical is the scoring: both detectors are asked
+**What is being compared, and what is not.** Each procedure runs with its own
+acceptance criteria, the sliding window's as adapted here (graph RMS spread, binned
+centers, a 4 ms stride, a 4 cm/s immobility cutoff); those criteria are part of each
+pipeline and are not harmonised, so the sweep compares the event inventories of two
+complete pipelines, and a disagreement cannot be put down to the triggers alone. The
+figure caption leads with the shared target, where both are held to the published
+duration and dispersion criteria (`overall_in_domain`, `state_space_replay_matches`). What is held identical is the scoring: both detectors are asked
 whether the injected replay came back, and a reported event counts only when,
 over its whole extent, its decoded positions track the injected path and it does
 not cover far more ground than that path. Both are measured over each detector's

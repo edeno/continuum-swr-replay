@@ -484,6 +484,6 @@ overall_in_domain,sliding_matches_spread_only,,,,0.4036458333333333,
 overall_in_domain,state_space_matches,,,,0.9869791666666666,
 overall_in_domain,state_space_replay_matches,,,,0.6762152777777778,
 provenance,produced_by,,,,,scripts/qa/sweep_memoryless_detection.py
-provenance,produced_at,,,,,2026-09-22T21:21:38+00:00
-provenance,git_commit,,,,,5f258f429bf1
+provenance,produced_at,,,,,2026-09-25T12:33:29+00:00
+provenance,git_commit,,,,,1627cdd7a06b
 provenance,n_cells_total,,,,,4536
