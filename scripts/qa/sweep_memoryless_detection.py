@@ -952,7 +952,9 @@ def main() -> None:
         "non_local_minimum_duration_s": NON_LOCAL_MINIMUM_DURATION_S,
         "spikes": "sorted",
         "shuffle": "place-cell identity (the reference's rateMap(ind_rand, :)); "
-        "zero jumps set aside, strict-below count, p <= 0.05, as the reference",
+        "binned centers, the jump of a pair whose slices hold as many spikes of "
+        "each cell set aside (the reference's zero jump on a continuous center), "
+        "strict-below count, p <= 0.05",
         "n_shuffles": DEFAULT_N_SHUFFLES,
         "shuffle_run_seed": SHUFFLE_RUN_SEED,
         "track": "linear",
