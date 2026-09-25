@@ -556,15 +556,23 @@ def sequence_dispersion_cm(
 
 
 def replay_mask(
-    duration_s: NDArray,
+    runs: NDArray,
     dispersion_cm: NDArray,
     config: MemorylessSequenceConfig,
 ) -> NDArray:
     """Which candidate sequences meet the replay criteria.
 
+    Duration is judged in strides, not by subtracting midpoint times: windows
+    sit on a uniform grid, so a run's stride count is exact, whereas two
+    midpoints on a recording clock of ~1e9 s subtract to within only ~1e-7 s
+    of their true span, enough to pass a run of exactly
+    ``minimum_duration_s``.
+
     Parameters
     ----------
-    duration_s, dispersion_cm : ndarray, shape (n_sequences,)
+    runs : ndarray of int, shape (n_sequences, 2)
+        Inclusive first and last window index of each sequence.
+    dispersion_cm : ndarray, shape (n_sequences,)
     config : MemorylessSequenceConfig
 
     Returns
@@ -572,9 +580,11 @@ def replay_mask(
     is_replay : ndarray of bool, shape (n_sequences,)
 
     """
-    mask: NDArray = _is_above(duration_s, config.minimum_duration_s) & _is_above(
-        dispersion_cm, config.dispersion_threshold_cm
-    )
+    runs = np.asarray(runs, dtype=int).reshape(-1, 2)
+    n_strides = runs[:, 1] - runs[:, 0]
+    mask: NDArray = _is_above(
+        n_strides, config.minimum_duration_s / config.stride_s
+    ) & _is_above(dispersion_cm, config.dispersion_threshold_cm)
     return mask
 
 
@@ -634,9 +644,7 @@ class CandidateSequences:
             raise ValueError("runs and assembly.runs disagree.")
         if not np.allclose(duration, sequence_duration_s(runs, midpoint)):
             raise ValueError("duration_s does not follow from runs and midpoint_s.")
-        if not np.array_equal(
-            is_replay, replay_mask(duration, dispersion, self.config)
-        ):
+        if not np.array_equal(is_replay, replay_mask(runs, dispersion, self.config)):
             raise ValueError("is_replay does not follow from the criteria and config.")
         _freeze(
             self,
@@ -739,7 +747,7 @@ def detect_candidate_sequences(
         runs=assembly.runs,
         duration_s=duration_s,
         dispersion_cm=dispersion,
-        is_replay=replay_mask(duration_s, dispersion, config),
+        is_replay=replay_mask(assembly.runs, dispersion, config),
         decisions=decisions,
         assembly=assembly,
         midpoint_s=midpoint_s,

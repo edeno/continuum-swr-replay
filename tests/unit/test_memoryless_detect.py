@@ -539,43 +539,40 @@ class TestReplayMask:
     config = MemorylessSequenceConfig()
 
     def test_a_long_and_dispersed_sequence_is_replay(self):
-        mask = replay_mask(np.array([0.2]), np.array([20.0]), self.config)
+        mask = replay_mask(np.array([[0, 50]]), np.array([20.0]), self.config)
 
         assert mask.tolist() == [True]
 
     def test_a_short_sequence_is_not_replay(self):
-        mask = replay_mask(np.array([0.05]), np.array([20.0]), self.config)
+        mask = replay_mask(np.array([[0, 12]]), np.array([20.0]), self.config)
 
         assert mask.tolist() == [False]
 
     def test_a_compact_sequence_is_not_replay(self):
-        mask = replay_mask(np.array([0.2]), np.array([5.0]), self.config)
+        mask = replay_mask(np.array([[0, 50]]), np.array([5.0]), self.config)
 
         assert mask.tolist() == [False]
 
     def test_the_thresholds_are_strict(self):
-        """A duration of exactly 100 ms fails, as in the reference driver."""
-        mask = replay_mask(np.array([0.100, 0.2]), np.array([20.0, 12.0]), self.config)
+        """25 strides is exactly 100 ms and fails, as in the reference driver."""
+        mask = replay_mask(
+            np.array([[0, 25], [0, 50]]), np.array([20.0, 12.0]), self.config
+        )
 
         assert mask.tolist() == [False, False]
 
-    def test_a_hundred_millisecond_run_fails_on_an_accumulated_time_vector(self):
-        """A time vector built by accumulation overshoots 100 ms by rounding."""
-        time_s = np.cumsum(np.full(30, 0.004))
-        duration = sequence_duration_s(np.array([[0, 25]]), time_s)
+    def test_one_stride_past_the_duration_threshold_is_replay(self):
+        mask = replay_mask(np.array([[3, 29]]), np.array([20.0]), self.config)
 
-        assert duration[0] > 0.100  # 0.10000000000000006
-        mask = replay_mask(duration, np.array([20.0]), self.config)
+        assert mask.tolist() == [True]
 
-        assert mask.tolist() == [False]
+    def test_a_duration_between_strides_is_rounded_up(self):
+        """50 ms is 12.5 strides of 4 ms: 13 strides is strictly longer."""
+        config = MemorylessSequenceConfig(minimum_duration_s=0.050)
 
-    def test_a_duration_of_exactly_one_hundred_milliseconds_fails_on_the_grid(self):
-        """The 100 ms threshold lands on a window boundary at a 4 ms stride."""
-        duration = sequence_duration_s(np.array([[0, 25]]), window_times(30))
+        mask = replay_mask(np.array([[0, 12], [0, 13]]), np.array([20.0, 20.0]), config)
 
-        mask = replay_mask(duration, np.array([20.0]), self.config)
-
-        assert mask.tolist() == [False]
+        assert mask.tolist() == [False, True]
 
 
 class TestWindowDecisions:
@@ -678,6 +675,25 @@ class TestDetectCandidateSequences:
         np.testing.assert_array_equal(found.runs, [[0, 39]])
         np.testing.assert_allclose(found.duration_s, [39 * 0.004])
         assert found.is_replay.tolist() == [True]
+
+    @pytest.mark.parametrize("origin_s", [0.0, 1.58e9])
+    def test_a_hundred_millisecond_sequence_fails_whatever_the_clock(self, origin_s):
+        """On a recording clock 100 ms of midpoints subtracts to 0.100000143 s."""
+        # every second sample of a 500 Hz grid, from the second window on
+        midpoints = origin_s + np.arange(2, 54, 2) / 500.0
+        assert origin_s == 0.0 or midpoints[-1] - midpoints[0] > 0.100
+
+        found = detect_candidate_sequences(
+            self.moving_posterior(np.arange(26)),
+            midpoints,
+            self.distance,
+            np.zeros(26),
+            self.config,
+        )
+
+        np.testing.assert_array_equal(found.runs, [[0, 25]])
+        assert found.dispersion_cm[0] > self.config.dispersion_threshold_cm
+        assert found.is_replay.tolist() == [False]
 
     def test_a_stationary_sequence_is_not_replay(self):
         bins = np.full(40, 20)
@@ -828,5 +844,5 @@ class TestDetectCandidateSequences:
         )
         np.testing.assert_array_equal(
             found.is_replay,
-            replay_mask(found.duration_s, found.dispersion_cm, found.config),
+            replay_mask(found.runs, found.dispersion_cm, found.config),
         )
