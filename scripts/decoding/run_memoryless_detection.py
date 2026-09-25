@@ -22,10 +22,10 @@ Each epoch writes, under ``Processed-Data/replay_detection_comparison/memoryless
 time grid, a hash of every input and of the marks, the encoding model's
 settings, and the outcome. It is rewritten atomically after each epoch, so a
 run that stops part way still says what it did, and a rerun under the same
-run id refuses to continue with different settings or code. An epoch that
-fails is recorded as ``failed`` with its error and the run goes on to the
-next; the run then exits non-zero, and a rerun under the same run id retries
-the failed epochs. That holds for a transient failure; after a code fix the
+run id refuses to continue with different settings, code or library
+versions. An epoch that fails is recorded as ``failed`` with its error and the
+run goes on to the next; the run then exits non-zero, and a rerun under the
+same run id retries the failed epochs. That holds for a transient failure; after a code fix the
 commit, and so the default run id, has changed, and the finished epochs are
 recomputed under the new one, which is what the settings gate is for.
 ``run.log`` beside the manifest keeps everything printed.
@@ -439,6 +439,9 @@ def run_settings(
     """What every epoch of one run must share; a resume must match it."""
     return {
         "git_commit": git_commit,
+        "libraries": {
+            name: version(name) for name in ("non_local_detector", "numpy", "pandas")
+        },
         "config": asdict(config),
         "shuffle": {
             "run": shuffle,
@@ -550,8 +553,8 @@ def main(argv: list[str] | None = None) -> None:
         previous = json.loads(manifest_path.read_text())
         if previous.get("settings") != settings:
             sys.exit(
-                f"{manifest_path} was written with other settings or code; a run "
-                "must not mix them. Start a new --run-id."
+                f"{manifest_path} was written with other settings, code or "
+                "library versions; a run must not mix them. Start a new --run-id."
             )
         epochs = previous["epochs"]
     for epoch_id, why in skipped.items():
@@ -566,10 +569,6 @@ def main(argv: list[str] | None = None) -> None:
             "run_id": run_id,
             "design_spec": DESIGN_SPEC,
             "settings": settings,
-            "libraries": {
-                name: version(name)
-                for name in ("non_local_detector", "numpy", "pandas")
-            },
             "epochs": epochs,
         }
 

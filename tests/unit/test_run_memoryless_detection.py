@@ -392,7 +392,7 @@ class TestMain:
         assert manifest["settings"]["shuffle"]["run_seed"] == 7
         assert manifest["settings"]["config"]["dispersion_threshold_cm"] == 12.0
         assert manifest["settings"]["git_commit"]
-        assert "non_local_detector" in manifest["libraries"]
+        assert "non_local_detector" in manifest["settings"]["libraries"]
 
     def test_a_rerun_with_the_same_settings_resumes(
         self, decode_root, tmp_path, capsys
@@ -423,6 +423,20 @@ class TestMain:
 
         with pytest.raises(SystemExit, match="other settings"):
             self.cli(decode_root, tmp_path, "--n-shuffles", str(N_SHUFFLES + 10))
+
+    def test_a_rerun_under_another_library_version_is_refused(
+        self, decode_root, tmp_path, monkeypatch
+    ):
+        """The finished epochs were made with the first versions; the rest
+        must not be made with others under the same run."""
+        self.cli(decode_root, tmp_path)
+        monkeypatch.setattr(
+            "scripts.decoding.run_memoryless_detection.version",
+            lambda name: "0.0.0-upgraded",
+        )
+
+        with pytest.raises(SystemExit, match="other settings"):
+            self.cli(decode_root, tmp_path)
 
     def test_too_few_shuffles_are_refused_before_anything_runs(
         self, decode_root, tmp_path
