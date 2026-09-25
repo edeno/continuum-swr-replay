@@ -624,6 +624,42 @@ what it is. An earlier version fitted the model twice, once for each side;
 those two fits differed by about 4% of peak firing rate, and the sweep's
 answers were the same either way.
 
+### Against the reference's own arithmetic
+
+Passing tests show the port is consistent with itself; they do not show it decides
+as the reference would. `scripts/qa/memoryless_reference.py` re-implements the
+reference's sorted-cell path as its MATLAB computes it: a Poisson decode with `+1e-3`
+Hz on every rate map, a continuous center of mass, the 1D spread about it, forward
+jumps, zero jumps set aside by value in the significance test, the merge of
+`compute_allSequences_NaNseparated_merge.m`, and dispersion as the RMS distance of the
+retained centers from their mean. `scripts/qa/compare_memoryless_to_reference.py` runs
+it beside the port on the same place fields, window spike counts, thresholds and cell
+permutations, once as published and once on the port's own fields (no floor), so the
+two adaptations that remain can be told apart. Results are in
+`reference_check_summary.csv`.
+
+- **The binned center (V7) changes almost nothing.** On the port's own fields the
+  posteriors agree to 2e-6. Over every sweep cell (4536 cells, 17428 candidates,
+  2.4 million windows) 17378 candidates have identical bounds, the reference calls
+  2473 of them replay against the port's 2471, and 1705 pass its significance test
+  against 1703; 48 cells (1%) differ in either count. On the Figure 1 simulation every
+  gate, candidate and verdict agrees, and the one p-value that moves does so by a draw.
+- **The rate-map floor (V3) is not negligible.** With the reference's `+1e-3` Hz, the
+  posteriors of 5% of sweep windows move by more than 0.001, and the reference calls
+  2198 candidates replay against the port's 2471 but passes 1938 through the test
+  against 1703: 88% of its replay candidates pass, against the port's 69%. The counts
+  differ in 458 cells (10%). On the Figure 1 simulation the verdicts still agree, but 8
+  of 32 candidates change bounds. The sweep and the figure run without the floor, so
+  their significance-test rates are the port's, not the reference's.
+
+What this does not establish: it covers the sorted path on a simulated linear track,
+not the clusterless encoding-pair null used on recorded data (see "What the
+encoding-pair test does on simulated data"); `seqle` and `compute_sequenceDispersion`
+are not vendored, so the run-length convention and the dispersion are taken from the
+driver's arithmetic and the paper's Methods; and it holds the thresholds at the port's
+adapted values (10 cm spread, 4 ms stride, 4 cm/s), so it checks implementation, not
+parameter choice.
+
 ### Summary: what the port misses, and what it over-calls
 
 *measured* means a script or test in this repository produces the number:
@@ -696,7 +732,7 @@ not a reassurance.
 |---|---|---|---|---|
 | **V1** | Sorted units, per-cell rate maps | Clusterless KDE encoding model over waveform features × position | HPC in this project is decoded clusterless; there are no sorted units | The encoding model is not a set of place fields. Cell-level inclusion criteria (rate, spatial information, isolation, SNR) have no analogue and are not applied |
 | **V2** | Cell-ID shuffle, p <= 0.05 on spread and jump | Within-tetrode encoding-pair shuffle; the reference's statistics, count and threshold unchanged, its zero-jump rule read from the spikes | Uses existing clusterless arrays without component fitting (D2) | Scrambling individual mark–position pairs can blur tuning; original cell-ID permutation exchanges intact curves. Null distributions and accepted cohorts can differ |
-| **V3** | Tuning curves get `+1e-3` before decoding | Clusterless KDE with its own `EPS` clipping of the ground-process intensity | Different likelihood construction | Low-occupancy bins are regularized differently. Not tunable to match; the two decoders differ in their floor behavior |
+| **V3** | Tuning curves get `+1e-3` before decoding | Clusterless KDE with its own `EPS` clipping of the ground-process intensity | Different likelihood construction | Low-occupancy bins are regularized differently. Not tunable to match for the clusterless decode. For sorted cells, as in the sweep and the figure, it could be matched exactly and is not: measured against the reference's own arithmetic, with the floor the reference calls 11% fewer candidates replay and passes 88% of them through the significance test, against the port's 69% ("Against the reference's own arithmetic") |
 | **V4** | Rate maps fit on running periods (> 10 cm/s) | Encoding model fit on the decode's `is_training` mask (`training_type = "no_ripple"`) | Holds encoding fixed between our two procedures | Non-ripple training includes immobility. It differs from the paper, but is shared in the main comparison; any running-only sensitivity must refit both procedures on that same mask |
 
 ### Forced by track geometry
@@ -705,7 +741,7 @@ not a reassurance.
 |---|---|---|---|---|
 | **V5** | 2D open field, 90 × 90 cm | 1D linearized three-legged track graph, 9 arms | The task's geometry | Sequences are constrained to the graph; "direction" is along-arm rather than an angle |
 | **V6** | Euclidean distance for jump and dispersion | Track-graph distance | On a linearized branched track, `abs(Δlinear_position)` is not the distance between two places — bins on different arms can be adjacent in linear coordinate | Using linear differences would under-count jumps at arm boundaries, producing spuriously smooth and spuriously long sequences. Track distance avoids this; it also makes our jumps non-comparable in absolute terms to an open-field jump. Note the asymmetry this creates with the encoding model: `Environment` exposes graph distances (`get_manifold_distances`, `_bin_distance_matrix_`) and this detector uses them, but `KDEModel` smooths with a Euclidean kernel in whatever coordinate it is given, which for a linearized track is the linear one. Measured on a Y track with 20 cm edge spacing: a kernel fitted at one bin gives a density at a second bin 6 cm away on the graph and 26 cm away in linear coordinate of 8.4e-05 of its peak, matching `exp(-0.5*(26/6)^2)` rather than `exp(-0.5*(6/6)^2)`. Place fields therefore do not wrap through a junction. Both procedures in this comparison read the same encoding model (X5, D5), so this does not bias the contrast between them; it is a caveat on absolute decoding near junctions for either |
-| **V7** | Posterior COM | Discrete Fréchet mean over track distance (D4) | Linearized-coordinate COM does not respect branching | On straight segments the center is quantized to a bin; near junctions geometry also changes it |
+| **V7** | Posterior COM | Discrete Fréchet mean over track distance (D4) | Linearized-coordinate COM does not respect branching | On straight segments the center is quantized to a bin; near junctions geometry also changes it. Against a continuous center on the simulated linear track, 99.7% of candidates keep identical bounds and the replay and significance counts move by 2 in about 2470 and 1700 ("Against the reference's own arithmetic") |
 | **V8** | Unvisited arena bins excluded | Junction placeholder bins (`edge_id == -1`) excluded before normalization | These bins are linearization artifacts from `edge_spacing > 0`, not places. In `get_track_grid` the `-1` rows are built from `place_bin_centers[~is_track_interior]`, so they are non-interior by construction and the primary likelihood path never returns them; the guard matters on the `results.nc` path, where `log_likelihood` is re-expanded to every `state_bins` column | If not excluded, probability mass lands on non-places and drags the center toward gaps. Same hazard `map_estimate_to_arm` guards against |
 | **V9** | Spread is a 2D product moment (area-like, bin units) | Graph-distance RMS spread (a length, cm) | Provides a spread measure on our geometry, approximating SD on a straight segment | The 10 cm cutoff is an adapted choice prioritized in the later threshold-robustness study (04); its robustness is not established by the initial report, and these spreads are not numerically comparable to the paper's 2D spreads. It also limits which replays survive, but **not through speed alone**. A window's spread grows only when its posterior actually smears over the swept path, and whether it does depends on spike density and field overlap. On `non_local_detector`'s sparse clusterless simulation, where each of 20 units fires once, a window straddling several fields is multimodal and the detector returns one accepted sequence at 375 cm/s but breaks the same trajectory into rejected pieces at 450 cm/s and above (`tests/integration/test_memoryless_simulated_replay.py`). With denser spiking the posterior stays peaked and there is no such cap: injected replays are found at 1625 cm/s with a median spread of 3.6 cm, and spread only breaks down near 4300 cm/s, where the whole path fits inside one window. The binding quantity is how far the path travels *within a window* relative to how well the spikes localize it, not the speed as such. An earlier version of this entry gave a flat 430 cm/s cap; that was a measurement on the sparse simulation, over-generalized. Note the direction of the adaptation: the helper library's own 1D branch (`compute_imageSpread.m:20-30`) computes the same COM-based RMS this port does, and `load_replayEvents_cm.m:32` gates it at **20 cm**, so 10 cm is twice as strict as the only 1D precedent in the reference. That branch also uses a 50 ms duration and a `0.4 * maze_size` jump, both looser than what this port takes from the paper |
 
@@ -943,6 +979,7 @@ not additional acceptance criteria.
 | Rejection diagnostics and gate-specific reruns agree on synthetic examples | Explanations of selection follow the actual pipeline |
 | Encoding-pair shuffle preserves observed spike/mark arrays, encoding marginals, and ground intensity; identity permutation reproduces the original likelihood | The intended null operation and absence of accidental refitting or input mutation |
 | One permutation spans all windows in a draw; observed/null scores use identical bounds; any single draw regenerates from its key; ties and NaN are handled as the reference handles them and the set-aside pairs are those whose slices hold the same spikes as the decode sees them; each shuffle's behaviour on a real trajectory and on scrambled marks is pinned | Reproducibility, fidelity to the reference's test, and the controls |
+| The reference's sorted-cell arithmetic on hand-worked cases, and the port pinned to it on a sorted fixture: same posteriors on the port's fields, same kept windows, same candidates and verdicts (`test_memoryless_reference.py`) | That the port decides as the reference would, apart from the documented adaptations |
 | Simulated-data smoke test, then one real epoch | End-to-end |
 
 ## Failure behavior
