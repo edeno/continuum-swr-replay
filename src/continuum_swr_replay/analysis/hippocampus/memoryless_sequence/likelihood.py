@@ -41,6 +41,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import
 __all__ = [
     "CLUSTERLESS_LIKELIHOOD_KEYS",
     "ENCODING_KEY",
+    "REFERENCE_RATE_FLOOR_HZ",
     "SORTED_SPIKES_LIKELIHOOD_KEYS",
     "EpochLikelihood",
     "check_marks_match_encoding",
@@ -50,6 +51,7 @@ __all__ = [
     "sorted_spikes_epoch_log_likelihood",
     "validate_time_grid",
     "window_midpoints_s",
+    "with_reference_rate_floor",
 ]
 
 ENCODING_KEY = ("", 0)
@@ -80,6 +82,13 @@ SORTED_SPIKES_LIKELIHOOD_KEYS = (
     "is_track_interior",
 )
 """The entries of a sorted-spikes encoding model that its likelihood takes."""
+
+REFERENCE_RATE_FLOOR_HZ = 1e-3
+"""What the reference adds to every rate map before decoding.
+
+``rateMap = rateMap + 1e-3`` in ``compute_BayesianDecoding_fast.m``. It bounds
+how strongly a spike from a cell that is nearly silent at a place can rule that
+place out."""
 
 _SAMPLE_TOLERANCE = 1e-3
 """How far, in samples, a timestamp may sit from its place on a uniform grid.
@@ -448,6 +457,42 @@ def _drop_the_unreachable_row(
             interior
         ],
     )
+
+
+def with_reference_rate_floor(
+    encoding_model: dict, config: MemorylessSequenceConfig
+) -> dict:
+    """A sorted-spikes encoding model with the reference's floor under every field.
+
+    The library clips its fields only at a numerical epsilon, so a spike from a
+    cell that is nearly silent somewhere rules that place out almost entirely;
+    the reference's :data:`REFERENCE_RATE_FLOOR_HZ` bounds that. The fields are
+    per sample of the decode grid, so the floor is divided by its rate, and the
+    term for the spikes that did not arrive, the fields summed over cells, is
+    recomputed to match. There is no equivalent for a clusterless model.
+
+    Parameters
+    ----------
+    encoding_model : dict
+        Carrying :data:`SORTED_SPIKES_LIKELIHOOD_KEYS`. Not modified.
+    config : MemorylessSequenceConfig
+        Its ``sampling_frequency`` is the rate the fields are per sample of.
+
+    Returns
+    -------
+    floored : dict
+        A shallow copy with ``place_fields`` and
+        ``no_spike_part_log_likelihood`` replaced.
+
+    """
+    fields = (
+        np.asarray(encoding_model["place_fields"], dtype=np.float64)
+        + REFERENCE_RATE_FLOOR_HZ / config.sampling_frequency
+    )
+    return encoding_model | {
+        "place_fields": fields,
+        "no_spike_part_log_likelihood": fields.sum(axis=0),
+    }
 
 
 def sorted_spikes_epoch_log_likelihood(

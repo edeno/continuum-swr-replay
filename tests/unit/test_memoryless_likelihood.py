@@ -28,8 +28,10 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
     clusterless_epoch_log_likelihood,
     interior_bin_distances_cm,
     load_clusterless_encoding_model,
+    sorted_spikes_epoch_log_likelihood,
     validate_time_grid,
     window_midpoints_s,
+    with_reference_rate_floor,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
     aggregate_windows,
@@ -42,6 +44,7 @@ from tests.unit._memoryless_clusterless_epoch import (
     _add_spikes_at,
     _StandInDetector,
     build_simulated_epoch,
+    build_sorted_track,
 )
 
 
@@ -570,6 +573,64 @@ class TestEpochLikelihoodInvariants:
             _drop_the_unreachable_row(
                 values, np.arange(6) / 500.0, epoch.encoding_model
             )
+
+
+class TestReferenceRateFloor:
+    """The reference adds 1e-3 Hz to every rate map before it decodes."""
+
+    config = MemorylessSequenceConfig(sampling_frequency=SAMPLING_FREQUENCY)
+
+    @pytest.fixture(scope="class")
+    def track(self):
+        return build_sorted_track()
+
+    def test_every_field_is_raised_by_the_floor_per_sample(self, track):
+        floored = with_reference_rate_floor(track.encoding_model, self.config)
+
+        np.testing.assert_allclose(
+            np.asarray(floored["place_fields"])
+            - np.asarray(track.encoding_model["place_fields"]),
+            1e-3 / SAMPLING_FREQUENCY,
+            rtol=1e-6,
+        )
+
+    def test_decodes_as_poisson_on_the_floored_fields(self, track):
+        """``sum_n k_n log(f_n + b) - sum_n (f_n + b)`` per row, every term floored."""
+        from non_local_detector.likelihoods.common import get_spikecount_per_time_bin
+
+        floored = with_reference_rate_floor(track.encoding_model, self.config)
+        result = sorted_spikes_epoch_log_likelihood(
+            track.time, track.linear_position, track.spike_times, floored, self.config
+        )
+
+        interior = np.asarray(track.encoding_model["is_track_interior"]).ravel()
+        fields = (
+            np.asarray(track.encoding_model["place_fields"], dtype=np.float64)[
+                :, interior
+            ]
+            + 1e-3 / SAMPLING_FREQUENCY
+        )
+        counts = np.stack(
+            [get_spikecount_per_time_bin(t, track.time) for t in track.spike_times],
+            axis=1,
+        )[: result.time.size]
+        expected = counts @ np.log(fields) - fields.sum(axis=0)
+        np.testing.assert_allclose(
+            result.log_likelihood, expected, rtol=1e-4, atol=1e-3
+        )
+
+    def test_the_model_it_was_given_is_unchanged(self, track):
+        before = copy.deepcopy(
+            {
+                key: np.asarray(track.encoding_model[key])
+                for key in ("place_fields", "no_spike_part_log_likelihood")
+            }
+        )
+
+        with_reference_rate_floor(track.encoding_model, self.config)
+
+        for key, value in before.items():
+            np.testing.assert_array_equal(np.asarray(track.encoding_model[key]), value)
 
 
 class TestInteriorBinDistances:
