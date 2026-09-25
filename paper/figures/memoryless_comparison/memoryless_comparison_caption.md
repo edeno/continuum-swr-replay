@@ -47,7 +47,7 @@ on jump), 3 draws from passing, and the inbound continuous replay passes it (p
 is the animal's own place either way: the test asks whether a sequence is
 spatially coherent, not whether it is somewhere other than the animal.
 
-**(f-i) 4536 replays of chosen shape.** Made-up replays were written into the
+**(f-j) 4536 replays of chosen shape.** Made-up replays were written into the
 spike trains of a simulated linear-track recording, one at a time, each with a
 path length, duration, firing rate and distance from the animal's own place
 that we chose. Because the right answer is known, what each detector reports
@@ -89,25 +89,34 @@ cm path cannot, however well it is decoded. Held to that same criterion our
 state-space detector also reports nothing below 45 cm, so this is the published
 replay definition acting, not the window-by-window inference.
 
-**(h)** Reported duration over actual duration, for replays both detectors
-reported, the sliding window's before its significance test, which never moves
-a sequence's bounds. A 40 ms replay is reported as about 132 ms — the same
-floor that panel (c) shows for one event.
+**(h, i)** Where each detector puts a replay's start (h) and end (i): reported
+minus true, in ms, median line and interquartile band by true duration, over
+the replays both detectors reported, the sliding window's before its
+significance test, which never moves a sequence's bounds. The sliding window's
+bounds are its first and last window midpoints, and its 80 ms windows reach 40
+ms beyond each. The state-space detector's median start and end sit within 5 ms
+of the truth at every duration. The sliding window starts a median 18 to 28 ms
+early and ends 21 to 65 ms late, and its late ends carry a long tail, the upper
+quartile reaching 231 ms; panel (j) shows how much of a reported event is the
+animal's own place. A 40 ms replay is reported as about 132 ms: 28 ms too early
+at the start and 65 ms too late at the end, the floor panel (c) shows for one
+event.
 
-**(i)** The same ratio against how far the replay sits from the animal's own
-place. Numbers give the share of the reported event's 80 ms windows that decode
-the animal's place rather than a replayed one. That absorption of local coding
-reaches about 80 cm from the animal and is what drives the largest
-over-reporting, as in panel (b); beyond it the window floor of panel (h) still
-leaves the reported duration too long. Over the whole sweep, 23% of the
-sliding-window detector's accepted events are not the replay that was put in.
+**(j)** Reported duration over actual duration against how far the replay sits
+from the animal's own place. Numbers give the share of the reported event's 80
+ms windows that decode the animal's place rather than a replayed one. That
+absorption of local coding reaches about 80 cm from the animal and is what
+drives the largest over-reporting, as in panel (b); beyond it the window floor
+of panels (h, i) still leaves the reported duration too long. Over the whole
+sweep, 23% of the sliding-window detector's accepted events are not the replay
+that was put in.
 
-**Caveats.** Sorted spikes, a linear track, no artifacts. In (f-i) the animal
+**Caveats.** Sorted spikes, a linear track, no artifacts. In (f-j) the animal
 rests at one end of the track and pauses nowhere else, so distance from its
 place is fixed by where the replay is put and cannot be varied independently.
 Replays run at constant speed with Poisson firing from the same place fields
 the encoding model was fitted on, so there is no model mismatch and the picture
-is optimistic. Every cell of (f-i) holds a replay; there is no stretch without
+is optimistic. Every cell of (f-j) holds a replay; there is no stretch without
 one and no incoherent activity, so the sweep measures how often each detector
 reports a replay that is there and not how often it reports one that is not,
 and more detection here is not by itself better performance. The significance

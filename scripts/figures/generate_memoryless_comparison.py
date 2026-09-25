@@ -848,31 +848,34 @@ def plot_detection(ax, grid: pd.DataFrame, title: str, show_y: bool):
     return image
 
 
-def plot_duration_bias(ax, summary: pd.DataFrame):
-    """Reported duration over true duration, for events both procedures found."""
-    rows = summary[summary["summary"] == "median_duration_ratio_by_duration"]
-    ax.axhline(1.0, color="0.6", lw=0.7, ls=":")
-    for measure, color, label in (
-        ("sliding_duration_ratio", VERMILION, SLIDING),
-        ("state_space_duration_ratio", BLUE, STATE_SPACE),
+def timing_series(
+    summary: pd.DataFrame, detector: str, edge: str, statistic: str
+) -> tuple[np.ndarray, np.ndarray]:
+    """One timing curve: true duration in ms, and the error statistic in ms."""
+    rows = summary[
+        (summary["summary"] == "timing_by_duration")
+        & (summary.measure == f"{detector}_{edge}_error_ms_{statistic}")
+    ].sort_values("duration_s")
+    return 1000 * rows.duration_s.to_numpy(), rows.value.to_numpy()
+
+
+def plot_edge_error(ax, summary: pd.DataFrame, edge: str) -> None:
+    """Reported minus true start or end, for replays both procedures found."""
+    ax.axhline(0.0, color="0.6", lw=0.7, ls=":")
+    for detector, color, label in (
+        ("sliding", VERMILION, SLIDING),
+        ("state_space", BLUE, STATE_SPACE),
     ):
-        series = rows[rows.measure == measure].sort_values("duration_s")
+        duration_ms, median = timing_series(summary, detector, edge, "median")
+        _, low = timing_series(summary, detector, edge, "q25")
+        _, high = timing_series(summary, detector, edge, "q75")
+        ax.fill_between(duration_ms, low, high, color=color, alpha=0.2, lw=0)
         ax.plot(
-            1000 * series.duration_s,
-            series.value,
-            color=color,
-            lw=1.0,
-            marker="o",
-            ms=2.5,
-            label=label,
+            duration_ms, median, color=color, lw=1.0, marker="o", ms=2.5, label=label
         )
-    ax.set_yscale("log")
-    ax.set_yticks([1, 2, 5, 10])
-    ax.set_yticklabels(["1x", "2x", "5x", "10x"])
     ax.set_xlabel("duration (ms)")
-    ax.set_ylabel("reported / actual duration")
-    ax.set_title("reported duration", fontsize=6)
-    ax.legend(fontsize=5, frameon=False, loc="upper right", handlelength=1.3)
+    ax.set_ylabel(f"{edge} error (ms)")
+    ax.set_title("onset" if edge == "start" else "offset", fontsize=6)
 
 
 def plot_absorption(ax, summary: pd.DataFrame):
@@ -986,9 +989,12 @@ def make_figure(
         figsize=(TWO_COLUMN, TWO_COLUMN * 1.22), dpi=450, constrained_layout=True
     )
     fig.set_constrained_layout_pads(w_pad=0.02, h_pad=0.02, wspace=0.05, hspace=0.09)
-    grid = GridSpec(4, 8, figure=fig, height_ratios=ROW_HEIGHTS)
+    # one column of rows, each row with its own columns, so the layout solves
+    # each row's widths on its own; one shared grid couples every row's
+    # decorations and collapses
+    grid = GridSpec(len(ROW_HEIGHTS), 1, figure=fig, height_ratios=ROW_HEIGHTS)
 
-    ax_overview = fig.add_subplot(grid[0, :])
+    ax_overview = fig.add_subplot(grid[0])
     plot_overview(ax_overview, decoded)
 
     # one line each, so these titles sit at the same height as every other
@@ -1001,8 +1007,9 @@ def make_figure(
         (REMOTE_STATIONARY_EVENT, "remote place, held still"),
     )
     zooms = []
+    events = grid[1].subgridspec(1, len(outcomes))
     for column, (event, label) in enumerate(outcomes):
-        ax = fig.add_subplot(grid[1, 2 * column : 2 * column + 2])
+        ax = fig.add_subplot(events[column])
         plot_event(ax, decoded, event)
         ax.set_title(outcome_title(decoded, event, label), fontsize=5.5)
         if column:
@@ -1010,7 +1017,7 @@ def make_figure(
         zooms.append(ax)
     zooms[0].set_ylabel("decoded place (cm)")
 
-    heatmaps = grid[2, :].subgridspec(1, 2, wspace=0.06)
+    heatmaps = grid[2].subgridspec(1, 2, wspace=0.06)
     ax_sliding = fig.add_subplot(heatmaps[0])
     ax_state = fig.add_subplot(heatmaps[1])
     image = plot_detection(
@@ -1026,9 +1033,13 @@ def make_figure(
     bar.set_label("replays reported (%)", fontsize=5.5)
     bar.ax.tick_params(labelsize=5)
 
-    ax_duration = fig.add_subplot(grid[3, :4])
-    plot_duration_bias(ax_duration, summary)
-    ax_distance = fig.add_subplot(grid[3, 4:])
+    timing = grid[3].subgridspec(1, 3)
+    ax_onset = fig.add_subplot(timing[0])
+    plot_edge_error(ax_onset, summary, "start")
+    ax_onset.legend(fontsize=5, frameon=False, loc="center right", handlelength=1.3)
+    ax_offset = fig.add_subplot(timing[1])
+    plot_edge_error(ax_offset, summary, "end")
+    ax_distance = fig.add_subplot(timing[2])
     plot_absorption(ax_distance, summary)
 
     place_panel_letters(
@@ -1037,7 +1048,7 @@ def make_figure(
             [ax_overview],
             zooms,
             [ax_sliding, ax_state],
-            [ax_duration, ax_distance],
+            [ax_onset, ax_offset, ax_distance],
         ],
     )
 
@@ -1087,6 +1098,24 @@ def check_summary_claims(summary: pd.DataFrame) -> None:
         raise RuntimeError(
             "The caption says the jump half passes fewer of the shortest replays "
             "than of the longest; the summary's pass rates by duration disagree."
+        )
+    _, sliding_onset = timing_series(summary, "sliding", "start", "median")
+    _, state_space_onset = timing_series(summary, "state_space", "start", "median")
+    _, sliding_offset = timing_series(summary, "sliding", "end", "median")
+    _, state_space_offset = timing_series(summary, "state_space", "end", "median")
+    if not ((sliding_onset < 0).all() and (sliding_offset > 0).all()):
+        raise RuntimeError(
+            "The caption says the sliding window starts early and ends late at "
+            "every duration; the summary's median timing errors disagree."
+        )
+    if not (
+        (sliding_onset < state_space_onset).all()
+        and (sliding_offset > state_space_offset).all()
+    ):
+        raise RuntimeError(
+            "The caption contrasts the sliding window's early starts and late ends "
+            "with the state-space detector's; at some duration they do not differ "
+            "that way."
         )
     by_distance = summary[summary["summary"] == "median_by_distance_from_animal"]
     local = (
@@ -1178,6 +1207,15 @@ def write_caption(
         & (summary.measure == "sliding_duration_ratio")
     ].sort_values("duration_s")
     shortest = ratio.iloc[0]
+    durations_ms, sliding_onset = timing_series(summary, "sliding", "start", "median")
+    _, sliding_offset = timing_series(summary, "sliding", "end", "median")
+    _, sliding_offset_q75 = timing_series(summary, "sliding", "end", "q75")
+    state_space_edges = np.concatenate(
+        [
+            timing_series(summary, "state_space", edge, "median")[1]
+            for edge in ("start", "end")
+        ]
+    )
     passes = summary[summary["summary"] == "shuffle_pass_rate_by_duration"]
     jump_pass = (
         passes[passes.measure == "sliding_jump_pass"]
@@ -1246,7 +1284,7 @@ continuous replay is the animal's own place either way: the test asks whether
 a sequence is spatially coherent, not whether it is somewhere other than the
 animal.
 
-**(f-i) {int(overall["n_cells"])} replays of chosen shape.** Made-up
+**(f-j) {int(overall["n_cells"])} replays of chosen shape.** Made-up
 replays were written into the spike trains of a simulated linear-track
 recording, one at a time, each with a path length, duration, firing rate and
 distance from the animal's own place that we chose. Because the right answer is known, what each
@@ -1301,27 +1339,37 @@ Held to that same criterion our state-space detector also reports nothing below
 45 cm, so this is the published replay definition acting, not the window-by-window
 inference.
 
-**(h)** Reported duration over actual duration, for replays both detectors
-reported, the sliding window's before its significance test, which never
-moves a sequence's bounds. A {1000 * shortest.duration_s:.0f} ms replay is reported as about
-{1000 * shortest.duration_s * shortest.value:.0f} ms — the same floor that panel
-(c) shows for one event.
+**(h, i)** Where each detector puts a replay's start (h) and end (i): reported
+minus true, in ms, median line and interquartile band by true duration, over
+the replays both detectors reported, the sliding window's before its
+significance test, which never moves a sequence's bounds. The sliding window's
+bounds are its first and last window midpoints, and its 80 ms windows reach
+40 ms beyond each. The state-space detector's median start and end sit within
+{np.abs(state_space_edges).max():.0f} ms of the truth at every duration. The
+sliding window starts a median {-sliding_onset.max():.0f} to
+{-sliding_onset.min():.0f} ms early and ends {sliding_offset.min():.0f} to
+{sliding_offset.max():.0f} ms late, and its late ends carry a long tail, the
+upper quartile reaching {sliding_offset_q75.max():.0f} ms; panel (j) shows
+how much of a reported event is the animal's own place. A {durations_ms[0]:.0f} ms replay is reported as about
+{1000 * shortest.duration_s * shortest.value:.0f} ms: {-sliding_onset[0]:.0f} ms
+too early at the start and {sliding_offset[0]:.0f} ms too late at the end, the
+floor panel (c) shows for one event.
 
-**(i)** The same ratio against how far the replay sits from the animal's own
-place. Numbers give the share of the reported event's 80 ms windows that
-decode the animal's place rather than a replayed one. That absorption of local
-coding reaches about 80 cm from the animal and is what drives the largest
-over-reporting, as in panel (b); beyond it the window floor of panel (h) still
-leaves the reported duration too long. Over the whole sweep,
+**(j)** Reported duration over actual duration against how far the replay sits
+from the animal's own place. Numbers give the share of the reported event's
+80 ms windows that decode the animal's place rather than a replayed one. That
+absorption of local coding reaches about 80 cm from the animal and is what
+drives the largest over-reporting, as in panel (b); beyond it the window
+floor of panels (h, i) still leaves the reported duration too long. Over the whole sweep,
 {pct(overall["sliding_accepted_but_not_the_injection"])} of the
 sliding-window detector's accepted events are not the replay that was put in.
 
-**Caveats.** Sorted spikes, a linear track, no artifacts. In (f-i) the animal
+**Caveats.** Sorted spikes, a linear track, no artifacts. In (f-j) the animal
 rests at one end of the track and pauses nowhere else, so distance from its
 place is fixed by where the replay is put and cannot be varied independently.
 Replays run at constant speed with Poisson firing from the same place fields
 the encoding model was fitted on, so there is no model mismatch and the picture
-is optimistic. Every cell of (f-i) holds a replay; there is no stretch without
+is optimistic. Every cell of (f-j) holds a replay; there is no stretch without
 one and no incoherent activity, so the sweep measures how often each detector
 reports a replay that is there and not how often it reports one that is not,
 and more detection here is not by itself better performance. The significance

@@ -619,6 +619,21 @@ local stretch sits more than 20 cm from the path fails the position test and is
 counted among the 23% above rather than here, so this table is the window floor
 plus whatever absorption falls within the tolerance.
 
+**Where the extra length goes.** The same events' signed bound errors, reported minus
+true, median (`timing_by_duration`):
+
+| true duration | 40 ms | 60 ms | 80 ms | 120 ms | 200 ms | 300 ms | 500 ms |
+|---|---|---|---|---|---|---|---|
+| sliding window, start (ms) | -28 | -28 | -23 | -22 | -22 | -22 | -18 |
+| sliding window, end (ms) | +65 | +57 | +33 | +30 | +21 | +26 | +25 |
+| state-space, start (ms) | -4 | -3 | -1 | 0 | +1 | +1 | +2 |
+| state-space, end (ms) | +1 | -2 | -2 | -1 | -5 | -3 | -5 |
+
+The sliding window starts early and ends late at every duration; its bounds are window
+midpoints, and its 80 ms windows reach 40 ms past each. Its late ends carry a long tail,
+the upper quartile reaching 231 ms at 80 ms. The state-space detector's medians sit
+within 5 ms of the truth throughout.
+
 **Absorption reaches about 80 cm.** Among events both reported, by the distance
 between the replay and the animal's own place:
 
