@@ -157,10 +157,19 @@ corrected rule.
 peak RSS, 295,369 windows, 198 candidates, 4 meeting duration > 100 ms and
 dispersion > 12 cm (2 SWR, 2 not). Median candidate dispersion 1.1 cm: most
 candidates are stationary, and only 38 of 198 overlap one of our 248
-non-local events (41 of ours overlap a candidate). Open before the shuffle
-run: candidate 28 reports dispersion 18.6 cm with a 2 cm path over two pieces
-and a 0 cm bridge — check whether dispersion is measured on linear position
-across a junction's `edge_spacing` gap rather than along the track graph.
+non-local events (41 of ours overlap a candidate). Candidate 28 (dispersion 18.6 cm,
+2 cm path) was checked the same day: not a port defect. Dispersion is on the
+track graph; it counts a kept window inside the merged gap that was dropped as
+a single-window run, exactly as the reference does (`load_replayEvents_cm.m`
+takes `compute_sequenceDispersion` over the merged span of `x_NaN`, where a
+dropped singleton is not NaN; spec 02 §Merged gaps). That one window decodes
+108 cm away; from the pieces alone dispersion is 0.6 cm. 2 of the 4 replay
+calls depend on such a window (the other at 102 cm, pieces-only 1.7 cm), and
+36 of 198 candidates have one. This is a property of the published definition,
+kept as the default; it needs a diagnostic column (pieces-only dispersion,
+count of out-of-piece windows) for Phase 4, and the port's `path_distance_cm`,
+which counts pieces and bridges only, does not describe the same windows as
+`dispersion_cm`.
 
 ```bash
 python scripts/decoding/run_memoryless_detection.py --run-seed 20260922 \
