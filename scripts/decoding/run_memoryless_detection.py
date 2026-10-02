@@ -5,8 +5,10 @@ The Widloski & Foster sliding-window detector, ported in
 ``continuum_swr_replay.analysis.hippocampus.memoryless_sequence``, run on each
 epoch's saved clusterless decode: the encoding model from
 ``{epoch_id}_detector.pkl``, the decode grid, position, speed and SWR labels
-from ``{epoch_id}_80_data_over_time.pkl``, and the spike marks from
-``load_data``, checked against the marks the encoding model was fitted on.
+from ``{epoch_id}_80_data_over_time.pkl``, and the spike marks rebuilt from the raw
+``UnitMarks`` as the decode filtered them (``memoryless_sequence.decode_marks``;
+``load_data`` now filters coincident spikes differently), checked against the
+marks the encoding model was fitted on.
 Both procedures therefore read one encoding model.
 
 Each epoch writes, under ``Processed-Data/replay_detection_comparison/memoryless/<run_id>/``:
@@ -30,8 +32,8 @@ commit, and so the default run id, has changed, and the finished epochs are
 recomputed under the new one, which is what the settings gate is for.
 ``run.log`` beside the manifest keeps everything printed.
 
-The marks come from ``load_data``, which needs the Spyglass database, unless
-``--cache-dir`` already holds them from an earlier run.
+The raw marks come from the Spyglass database unless ``--cache-dir`` already
+holds this decode's marks from an earlier run.
 
 Epoch identifiers name the decode: ``chimi20200212_02_r1_HPC`` is the
 canonical one (Kay's SWRs, trained on ``no_ripple``, stationary). A decode
@@ -76,6 +78,11 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
     load_clusterless_encoding_model,
     run_epoch,
     window_midpoints_s,
+)
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.decode_marks import (
+    COINCIDENT_RULE,
+    DECODE_COMMIT,
+    decode_time_marks,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.event_table import (
     canonical_swr_intervals,
@@ -227,26 +234,57 @@ def find_epochs(
     return epochs, skipped
 
 
-def load_marks(key: EpochKey, cache_dir: Path) -> tuple[list, list]:
-    """The epoch's clusterless spike times and waveform features, cached.
+def marks_cache_path(key: EpochKey, cache_dir: Path) -> Path:
+    """Where one decode's decode-time marks are cached."""
+    return cache_dir / f"{key.epoch_id}_decode_time_marks.pkl"
 
-    ``load_data`` is slow and needs the Spyglass database; the marks do not
-    depend on the ripple detector, so one cache serves every decode of an
-    epoch. A stale cache is caught by ``check_marks_match_encoding``.
+
+def fetch_raw_hpc_unit_marks(nwb_file_name: str) -> tuple[list, list]:
+    """Every HPC ``UnitMarks`` sort group of a session, before any filtering.
+
+    The restriction is ``get_hpc_marks``'s at the decode commit
+    (:data:`~continuum_swr_replay.analysis.hippocampus.memoryless_sequence.decode_marks.DECODE_COMMIT`),
+    without the tetrode-only filter that came after it.
     """
-    cache = (
-        cache_dir / f"{key.nwb_file_name}_{key.epoch_name}_{key.brain_area}_marks.pkl"
+    from spyglass.decoding.v0.clusterless import UnitMarks
+
+    restriction = {
+        "nwb_file_name": nwb_file_name,
+        "curation_id": 0,
+        "sort_interval_name": "runs_noPrePostTrialTimes raw data valid times",
+        "preproc_params_name": "franklab_tetrode_hippocampus",
+        "team_name": "ac_em_xs",
+        "sorter": "clusterless_thresholder",
+        "mark_param_name": "default",
+        "sorter_params_name": "clusterless_fixed",
+    }
+    if len(UnitMarks & restriction) == 0:
+        restriction["sorter_params_name"] = "default_clusterless"
+    marks = (UnitMarks & restriction).fetch_dataframe()
+    if len(marks) == 0:
+        raise ValueError(f"No HPC UnitMarks for {nwb_file_name!r}.")
+    return (
+        [mark.index.to_numpy() for mark in marks],
+        [mark.to_numpy() for mark in marks],
     )
+
+
+def load_marks(
+    key: EpochKey, cache_dir: Path, span_s: tuple[float, float]
+) -> tuple[list, list]:
+    """The spike times and marks this decode was fitted on, cached per decode.
+
+    The saved decodes predate a correction to the coincident-spike filter, so
+    ``load_data`` no longer returns their marks; they are rebuilt from the raw
+    ``UnitMarks`` with the decode-time filtering (see ``decode_marks``) over
+    the decode's own time span. A stale cache is caught by
+    ``check_marks_match_encoding``.
+    """
+    cache = marks_cache_path(key, cache_dir)
     if cache.exists():
         cached: tuple[list, list] = joblib.load(cache)
         return cached
-    from continuum_swr_replay.data_loaders import load_data
-
-    data = load_data(key.nwb_file_name, key.epoch_name)
-    marks = (
-        data["spike_times"][key.brain_area],
-        data["spike_waveform_features"][key.brain_area],
-    )
+    marks = decode_time_marks(*fetch_raw_hpc_unit_marks(key.nwb_file_name), span_s)
     cache_dir.mkdir(parents=True, exist_ok=True)
     joblib.dump(marks, cache)
     return marks
@@ -310,7 +348,9 @@ def run_one(
     n_shuffles: int,
     config: MemorylessSequenceConfig,
     provenance: dict,
-    marks_loader: Callable[[EpochKey, Path], tuple[list, list]] = load_marks,
+    marks_loader: Callable[
+        [EpochKey, Path, tuple[float, float]], tuple[list, list]
+    ] = load_marks,
 ) -> dict:
     """Detect, test and save one epoch; return what the manifest records for it.
 
@@ -342,10 +382,12 @@ def run_one(
         epoch_id=epoch_id,
         run_id=run_id,
     )
-    spike_times, spike_waveform_features = marks_loader(key, cache_dir)
+    time = data_over_time.index.to_numpy(dtype=np.float64)
+    spike_times, spike_waveform_features = marks_loader(
+        key, cache_dir, (float(time[0]), float(time[-1]))
+    )
     check_marks_match_encoding(encoding_model, spike_times, spike_waveform_features)
 
-    time = data_over_time.index.to_numpy(dtype=np.float64)
     speed = data_over_time["head_speed"].to_numpy(dtype=np.float64)
     midpoint_s = window_midpoints_s(time[:-1], config)
     # SWR_event is an integer and never NaN; SWR_zscore is NaN where the LFP is missing
@@ -423,6 +465,11 @@ def run_one(
         "inputs": {
             name: {"path": str(path), "sha256": sha256_file(path)}
             for name, path in inputs.items()
+        },
+        "marks": {
+            "source": "raw HPC UnitMarks with the decode-time filtering",
+            "decode_commit": DECODE_COMMIT,
+            "coincident_rule": COINCIDENT_RULE,
         },
         "marks_sha256": marks_sha256(spike_times, spike_waveform_features),
         "outputs": {name: str(path) for name, path in outputs.items()},

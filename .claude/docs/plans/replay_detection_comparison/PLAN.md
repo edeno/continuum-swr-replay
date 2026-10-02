@@ -141,6 +141,16 @@ model):
 | `peanut20201202_10_r5_HPC` | 202 | 0.41 | 20 | |
 | `senor20201101_06_r3_HPC` | 229 | 0.43 | 21 | |
 
+**Decode-time marks (2026-10-02).** The first pilot attempt failed the
+encoding-mark check: the decodes (2026-04-01, 0820d39d) predate 64bf585, which
+made `detect_coincident_spikes` count each cluster's leading spike, so
+`load_data` now drops 259 more of chimi20200225's ~358k marks than the decode
+saw. The runner now rebuilds the decode's marks from raw `UnitMarks` with the
+0820d39d rule (`memoryless_sequence/decode_marks.py`), bounded to the decode's
+span; on chimi20200225_02_r1 and wilbur20210329_12_r6 the kept indices equal
+the 0820d39d code's and every encoding mark is found. `load_data` keeps the
+corrected rule.
+
 ```bash
 python scripts/decoding/run_memoryless_detection.py --run-seed 20260922 \
     --epoch-id chimi20200225_02_r1_HPC --no-shuffle   # detector alone, fast

@@ -26,6 +26,7 @@ from scripts.decoding.run_memoryless_detection import (
     find_epochs,
     input_paths,
     main,
+    marks_cache_path,
     parse_epoch_identifier,
     run_one,
 )
@@ -198,7 +199,7 @@ def run(decode_root, tmp_path, **overrides):
         "n_shuffles": N_SHUFFLES,
         "config": CONFIG,
         "provenance": {"git_commit": "test"},
-        "marks_loader": lambda key, cache: (
+        "marks_loader": lambda key, cache, span: (
             epoch.spike_times,
             epoch.spike_waveform_features,
         ),
@@ -290,7 +291,7 @@ class TestRunOne:
             run(
                 decode_root,
                 tmp_path,
-                marks_loader=lambda key, cache: (epoch.spike_times, changed),
+                marks_loader=lambda key, cache, span: (epoch.spike_times, changed),
             )
 
     def test_what_was_observed_is_written_apart_from_what_was_found(
@@ -356,6 +357,44 @@ class TestRunOne:
         assert swr.start_s.min() >= epoch.time[epoch.time.size // 2]
 
 
+class TestLoadMarks:
+    def test_raw_marks_are_filtered_as_the_decode_was_and_cached(
+        self, tmp_path, monkeypatch
+    ):
+        import scripts.decoding.run_memoryless_detection as runner
+
+        raw_times = [
+            np.array([1.0, 2.0, 99.0]),
+            np.array([1.00001, 3.0]),
+            np.array([1.00002, 4.0]),
+            np.array([5.0]),
+        ]
+        raw_marks = [np.arange(t.size, dtype=float)[:, None] for t in raw_times]
+        calls = []
+
+        def fetch(nwb_file_name):
+            calls.append(nwb_file_name)
+            return raw_times, raw_marks
+
+        monkeypatch.setattr(runner, "fetch_raw_hpc_unit_marks", fetch)
+        key = parse_epoch_identifier(EPOCH_ID)
+
+        times, marks = runner.load_marks(key, tmp_path, (0.0, 10.0))
+        again = runner.load_marks(key, tmp_path, (0.0, 10.0))
+
+        # the three-tetrode cluster at 1 s goes; 99 s is outside the decode
+        assert [t.tolist() for t in times] == [[2.0], [3.0], [4.0], [5.0]]
+        assert [m[:, 0].tolist() for m in marks] == [[1.0], [1.0], [1.0], [0.0]]
+        assert calls == [key.nwb_file_name]
+        assert [t.tolist() for t in again[0]] == [t.tolist() for t in times]
+        assert marks_cache_path(key, tmp_path).exists()
+
+    def test_the_record_names_the_marks_rule(self, decode_root, tmp_path):
+        record = run(decode_root, tmp_path, shuffle=False)
+
+        assert record["marks"]["decode_commit"] == "0820d39d"
+
+
 class TestMain:
     def cli(self, decode_root, tmp_path, *extra):
         """The runner through its command line, its marks already cached."""
@@ -365,8 +404,7 @@ class TestMain:
         key = parse_epoch_identifier(EPOCH_ID)
         joblib.dump(
             (epoch.spike_times, epoch.spike_waveform_features),
-            cache_dir
-            / f"{key.nwb_file_name}_{key.epoch_name}_{key.brain_area}_marks.pkl",
+            marks_cache_path(key, cache_dir),
         )
         output_root = tmp_path / "memoryless"
         arguments = {
@@ -462,8 +500,7 @@ class TestMain:
         key = parse_epoch_identifier(EPOCH_ID)
         joblib.dump(
             (epoch.spike_times, epoch.spike_waveform_features),
-            cache_dir
-            / f"{key.nwb_file_name}_{key.epoch_name}_{key.brain_area}_marks.pkl",
+            marks_cache_path(key, cache_dir),
         )
         output_root = tmp_path / "memoryless"
 
@@ -506,8 +543,7 @@ class TestMain:
         key = parse_epoch_identifier(EPOCH_ID)
         joblib.dump(
             (epoch.spike_times, epoch.spike_waveform_features),
-            cache_dir
-            / f"{key.nwb_file_name}_{key.epoch_name}_{key.brain_area}_marks.pkl",
+            marks_cache_path(key, cache_dir),
         )
 
         main(
