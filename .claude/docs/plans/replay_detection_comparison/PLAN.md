@@ -169,7 +169,11 @@ calls depend on such a window (the other at 102 cm, pieces-only 1.7 cm), and
 kept as the default; it needs a diagnostic column (pieces-only dispersion,
 count of out-of-piece windows) for Phase 4, and the port's `path_distance_cm`,
 which counts pieces and bridges only, does not describe the same windows as
-`dispersion_cm`.
+`dispersion_cm`. Both diagnostics were added the same day (df6f48f); rerun
+`df6f48fb2873-seed20260922-noshuffle` reproduces 0.6 / 1.7 cm and 36 of 198.
+Between that rerun and the first, every column but `run_id` is identical except
+`mean_posterior_spread_cm`, which moves by at most 1.5e-5 cm (3e-6 relative) on
+43 rows: GPU run-to-run variation in the likelihood, below any decision.
 
 ```bash
 python scripts/decoding/run_memoryless_detection.py --run-seed 20260922 \
