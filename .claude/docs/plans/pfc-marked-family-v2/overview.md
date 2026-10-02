@@ -2,7 +2,7 @@
 
 [← back to PLAN.md](PLAN.md)
 
-Everything below is on branch `feature/pfc-marked-event-kernels` at commit `55c55d9` (14 commits over master, unpushed). Line numbers were verified against that commit; if the branch has moved, re-grep the named function before editing.
+Everything below is on branch `feature/pfc-marked-event-kernels` at commit `55c55d9` (the plan itself is `5dac575`; the branch is now pushed, 14 commits over master). Line numbers were verified against that commit; if the branch has moved, re-grep the named function before editing.
 
 ## Current codebase integration points
 
