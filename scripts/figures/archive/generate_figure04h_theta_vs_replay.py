@@ -47,22 +47,12 @@ def plot_theta_vs_replay(
 
     # Plot non-significant in gray, significant in green
     ax.scatter(
-        x[~sig],
-        y[~sig],
-        s=1,
-        alpha=0.1,
-        color="gray",
-        rasterized=True,
-        label=f"Not sig. (n={(~sig).sum():,})",
+        x[~sig], y[~sig], s=1, alpha=0.1, color="gray",
+        rasterized=True, label=f"Not sig. (n={(~sig).sum():,})",
     )
     ax.scatter(
-        x[sig],
-        y[sig],
-        s=2,
-        alpha=0.2,
-        color=COLORS["Non-Local"],
-        rasterized=True,
-        label=f"Replay sig. (n={sig.sum():,})",
+        x[sig], y[sig], s=2, alpha=0.2, color=COLORS["Non-Local"],
+        rasterized=True, label=f"Replay sig. (n={sig.sum():,})",
     )
 
     ax.set_xlabel("Theta modulation depth (running)")
@@ -82,12 +72,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument(
-        "--output-dir", type=Path, default=Path("paper/figures/figure04")
-    )
-    parser.add_argument(
-        "--format", type=str, choices=["pdf", "png", "svg"], default=None
-    )
+    parser.add_argument("--output-dir", type=Path, default=Path("paper/figures/figure04"))
+    parser.add_argument("--format", type=str, choices=["pdf", "png", "svg"], default=None)
     parser.add_argument("--dpi", type=int, default=300)
     parser.add_argument("--min-firing-rate", type=float, default=1.0)
     parser.add_argument("--data-dir", type=Path, default=PROCESSED_DATA_DIR)
@@ -99,11 +85,7 @@ def main() -> None:
     df, _, _ = load_population_data(args.data_dir, min_firing_rate=args.min_firing_rate)
 
     plot_theta_vs_replay(
-        df,
-        args.output_dir,
-        "fig04h_theta_vs_replay",
-        formats,
-        args.dpi,
+        df, args.output_dir, "fig04h_theta_vs_replay", formats, args.dpi,
     )
 
 

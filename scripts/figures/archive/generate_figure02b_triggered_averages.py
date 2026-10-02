@@ -114,9 +114,7 @@ def plot_triggered_average_mean(
     dpi : int
         DPI for raster formats
     """
-    fig, axes = plt.subplots(
-        4, 1, figsize=get_figure_size(4, 1), sharex=True, constrained_layout=True
-    )
+    fig, axes = plt.subplots(4, 1, figsize=get_figure_size(4, 1), sharex=True, constrained_layout=True)
 
     for i, (signal, title) in enumerate(zip(signals, titles, strict=True)):
         ax = axes[i]
@@ -208,9 +206,7 @@ def plot_triggered_average_percentiles(
     dpi : int
         DPI for raster formats
     """
-    fig, axes = plt.subplots(
-        4, 1, figsize=get_figure_size(4, 1), sharex=True, constrained_layout=True
-    )
+    fig, axes = plt.subplots(4, 1, figsize=get_figure_size(4, 1), sharex=True, constrained_layout=True)
 
     for i, (signal, title) in enumerate(zip(signals, titles, strict=True)):
         ax = axes[i]

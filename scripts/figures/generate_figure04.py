@@ -82,6 +82,7 @@ from continuum_swr_replay.analysis.pfc.load_population import (
     significant_fraction,
 )
 from continuum_swr_replay.analysis.replay.cohort_selection import stop_cohort_suffix
+from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.figure_utilities import (
     PAGE_HEIGHT,
     TWO_COLUMN,
@@ -439,10 +440,6 @@ def generate_figure(
     fig : matplotlib.figure.Figure
     """
     # --- Load single-neuron data ---
-    # imported here: loading data needs Spyglass, and the panel helpers must
-    # import without it
-    from continuum_swr_replay.data_loaders import load_data
-
     print(f"Loading data for {nwb_file_name}, {epoch_name}...")
     results_hpc, _, _ = load_results(
         nwb_file_name, epoch_name, decoding_brain_area="HPC"

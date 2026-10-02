@@ -1,8 +1,9 @@
 # SWR detection with a noise-percentile threshold (Yu et al. 2017)
 
-*Design spec. Status: revised after review. Package side implemented
-(`ripple_detection` at commit 659cc91 and later: `Yu_ripple_detector`); project-side inventory
-(§Producing the inventory, steps 2–6) not yet started.*
+*Design spec. Status (2026-10-02): revised after review. Package side implemented
+(`ripple_detection` at commit 659cc91 and later: `Yu_ripple_detector`). The project-side
+inventory is computed directly from the package (§Producing the inventory, direct path),
+not yet started; the Spyglass steps are deferred to the end.*
 *Governing rule and cross-cutting decisions: [overview.md](overview.md).*
 
 Inventory 3 of six. Supplies a third SWR detection *algorithm* alongside
@@ -254,18 +255,38 @@ the package's own test suite, with no Spyglass fixtures required.
 
 ## Producing the inventory
 
-1. **Package.** Branch the local clone from its current development head, add the three
-   public functions, private extraction helper, and their tests, and record the commit.
-2. **Pin.** Add `ripple_detection` as a direct git dependency of the project at that
-   commit. Today the project only receives it transitively through Spyglass at 1.7.0;
-   the pin also picks up the commits the clone is ahead by, which is a deliberate
-   version bump to note in the changelog, not a side effect.
-3. **Register.** Spyglass's `RippleTimesV1.make` looks the algorithm up by name in the
+**Decided 2026-10-02:** for the comparison the inventory is computed directly by calling
+the package; Spyglass is not altered until the final product. The direct path and the
+deferred Spyglass integration produce the same events from the same inputs and
+parameters, and the Spyglass path is accepted only if it reproduces the direct inventory.
+
+### Direct path (now)
+
+1. **Package.** Done: `Yu_ripple_detector` and its tests are on the package's `master`.
+2. **Pin.** Add `ripple_detection` as a direct git dependency of the project at one
+   tagged commit. Today the project only receives it transitively through Spyglass at
+   1.7.0, which lacks the detector; the pin is a deliberate version bump, noted in the
+   changelog. Spyglass imports only the Kay and Karlsson detectors and two `core`
+   helpers from the package, so the existing Kay reads keep working.
+3. **Read inputs.** Fetch the CA1 ripple-band `LFPBandV1` frame, its
+   `RippleLFPSelection` electrodes and head speed through the same read-only queries
+   `get_ripple` already makes. No Spyglass row is inserted or populated.
+4. **Detect.** Call `Yu_ripple_detector` with `speed_threshold = 4.0`,
+   `minimum_duration = 0.020`, `percentile = 99.99`, `smoothing_sigma = 0.004`,
+   `zscore_per_tetrode = True`, and `Karlsson_ripple_detector` at its package
+   defaults. Record in the epoch's manifest the package commit, the histogram grid,
+   realized histogram edges, selected mode, threshold, tetrode normalization statistics,
+   normalization population, and NumPy version. Any later sensitivity variant gets its
+   own named parameter set in the manifest.
+5. **Gate and key.** Apply Y5 project-side, then key the inventory and observation
+   availability as 03 requires, and write one parquet per epoch.
+
+### Spyglass integration (final product, deferred)
+
+6. **Register.** Spyglass's `RippleTimesV1.make` looks the algorithm up by name in the
    module-level dict `spyglass.ripple.v1.ripple.RIPPLE_DETECTION_ALGORITHMS`, which
-   holds only Kay and Karlsson. A `RippleParameters` row can name `"Yu_ripple_detector"`
-   (the field is a blob), but populate raises `KeyError` until the name is registered.
-   The project registers it in `data_loaders/lfp.py`, next to where `ripple_detector_name`
-   is validated, before any populate:
+   holds only Kay and Karlsson. Either upstream a two-line Spyglass PR (import plus dict
+   entry) or register it in `data_loaders/lfp.py` before any populate:
 
    ```python
    from ripple_detection import Yu_ripple_detector
@@ -274,26 +295,17 @@ the package's own test suite, with no Spyglass fixtures required.
    sg_ripple.RIPPLE_DETECTION_ALGORITHMS.setdefault("Yu_ripple_detector", Yu_ripple_detector)
    ```
 
-   This is module state, not a private API, but a fresh Spyglass install re-populating
-   the row fails until the same line runs. That is the reproducibility cost, and it is
-   carried explicitly: the registration lives in the loader, and the run manifest records
-   the `ripple_detection` commit that provides the function.
-4. **Parameter row.** Insert `ripple_param_name = "yu_2017"` with
+   Module-level registration means a fresh Spyglass install fails to re-populate until
+   the same line runs; the upstream PR removes that cost.
+7. **Parameter row.** Insert `ripple_param_name = "yu_2017"` with
    `ripple_detection_algorithm = "Yu_ripple_detector"`, `speed_name = "head_speed"`, and
-   `ripple_detection_params = {"speed_threshold": 4.0, "minimum_duration": 0.020,
-   "percentile": 99.99, "smoothing_sigma": 0.004, "zscore_per_tetrode": True}`.
-   Record the histogram grid,
-   realized histogram edges, selected mode, threshold, tetrode normalization statistics,
-   normalization population, and NumPy version in the epoch's diagnostic artifact/manifest.
-   Any later sensitivity variant uses its own named row.
-5. **Populate and read back.** Populate `RippleTimesV1` for the CA1 group with that
-   parameter name; extend `get_ripple` to accept `ripple_detector_name = "Yu"` mapped to
-   that row, alongside the existing Kay mapping. Then apply Y5 project-side and key the
-   inventory and observation availability as 03 requires.
-6. **Follow-up, optional.** A two-line Spyglass PR (import plus dict entry) makes the
-   registration line unnecessary. It is cleanup, not a prerequisite.
+   the step-4 parameters.
+8. **Populate, read back and check.** Populate `RippleTimesV1` for the CA1 group with
+   that parameter name; extend `get_ripple` to accept `ripple_detector_name = "Yu"`.
+   Check that the populated events equal the direct inventory before switching any
+   reader over.
 
-One check when wiring step 5: assert that the `LFPBandV1` frame handed to the detector
+One check when reading the inputs (step 3): assert that the `LFPBandV1` frame handed to the detector
 carries exactly the `RippleLFPSelection` electrodes for the CA1 group, since the Kay path
 in the loader has assumed so without asserting it.
 Record electrode/tetrode identities, the number of distinct detecting tetrodes, and

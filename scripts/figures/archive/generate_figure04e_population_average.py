@@ -78,12 +78,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument(
-        "--output-dir", type=Path, default=Path("paper/figures/figure04")
-    )
-    parser.add_argument(
-        "--format", type=str, choices=["pdf", "png", "svg"], default=None
-    )
+    parser.add_argument("--output-dir", type=Path, default=Path("paper/figures/figure04"))
+    parser.add_argument("--format", type=str, choices=["pdf", "png", "svg"], default=None)
     parser.add_argument("--dpi", type=int, default=300)
     parser.add_argument("--min-firing-rate", type=float, default=1.0)
     parser.add_argument("--data-dir", type=Path, default=PROCESSED_DATA_DIR)
@@ -97,12 +93,8 @@ def main() -> None:
     )
 
     plot_population_average(
-        modulations,
-        lag_time,
-        args.output_dir,
-        "fig04e_population_average",
-        formats,
-        args.dpi,
+        modulations, lag_time, args.output_dir,
+        "fig04e_population_average", formats, args.dpi,
     )
 
 

@@ -114,9 +114,7 @@ def plot_glm_results(
     fig, axes = plt.subplots(
         nrows=3,
         ncols=len(model_list),
-        figsize=get_figure_size(
-            3, len(model_list), base_width=ONE_COLUMN * len(model_list) * 0.7
-        ),
+        figsize=get_figure_size(3, len(model_list), base_width=ONE_COLUMN * len(model_list) * 0.7),
         sharex=True,
         sharey=False,
         constrained_layout=True,
@@ -139,7 +137,8 @@ def plot_glm_results(
     model_names = [model_list_to_mode_names[model_name] for model_name in model_list]
 
     event_start_times = [
-        event_times[model_name].start_time for model_name in model_list
+        event_times[model_name].start_time
+        for model_name in model_list
     ]
 
     # Row 1: GLM modulation coefficients
@@ -306,9 +305,7 @@ def main() -> None:
         event_times,
         model_list=["non_local_no_SWR"],
     )
-    save_figure(
-        "figure04_panel_a", base_dir=args.output_dir, dpi=args.dpi, formats=formats
-    )
+    save_figure("figure04_panel_a", base_dir=args.output_dir, dpi=args.dpi, formats=formats)
     print("Saved: figure04_panel_a")
     if not args.show_plots:
         plt.close(fig1)
@@ -322,9 +319,7 @@ def main() -> None:
         event_times,
         model_list=["non_local_no_SWR", "SWR"],
     )
-    save_figure(
-        "figure04_panel_b", base_dir=args.output_dir, dpi=args.dpi, formats=formats
-    )
+    save_figure("figure04_panel_b", base_dir=args.output_dir, dpi=args.dpi, formats=formats)
     print("Saved: figure04_panel_b")
     if not args.show_plots:
         plt.close(fig2)
@@ -337,9 +332,7 @@ def main() -> None:
         "non_local",
     ]
     fig3, _ = plot_AICs(glm_results, model_list=model_list_for_aic)
-    save_figure(
-        "figure04_panel_c", base_dir=args.output_dir, dpi=args.dpi, formats=formats
-    )
+    save_figure("figure04_panel_c", base_dir=args.output_dir, dpi=args.dpi, formats=formats)
     print("Saved: figure04_panel_c")
     if not args.show_plots:
         plt.close(fig3)

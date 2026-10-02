@@ -54,15 +54,10 @@ ALL_MODELS_INPUTS = {"event_arm_table": RC / "event_arm_table.pkl"}
 # arms 0-1 = patch 1 (blues), 2-3 = patch 2 (greens), 4-5 = patch 3 (reds),
 # 6-8 = trunks (greys).
 ARM_COLORS = {
-    0: "#1f77b4",
-    1: "#5ba3d8",
-    2: "#2ca02c",
-    3: "#7fc97f",
-    4: "#d62728",
-    5: "#e87a7a",
-    6: "#5a5a5a",
-    7: "#7a7a7a",
-    8: "#9a9a9a",
+    0: "#1f77b4", 1: "#5ba3d8",
+    2: "#2ca02c", 3: "#7fc97f",
+    4: "#d62728", 5: "#e87a7a",
+    6: "#5a5a5a", 7: "#7a7a7a", 8: "#9a9a9a",
 }
 
 
@@ -136,7 +131,9 @@ def make_figure(
         "coef_is_prev_arm",
         "coef_reward_fraction_candidate_arm_last10_visits",
     ]
-    coef_long = m3_fits[coef_cols].rename(columns=lambda c: c.removeprefix("coef_"))
+    coef_long = m3_fits[coef_cols].rename(
+        columns=lambda c: c.removeprefix("coef_")
+    )
 
     # ── Layout: 3 rows × 2 cols ──
     fig = plt.figure(figsize=(13, 11), constrained_layout=True)
@@ -172,9 +169,7 @@ def make_figure(
         lw=1,
         label="Non-Local_prob",
     )
-    ax2.axhline(
-        DEFAULT_NON_LOCAL_THRESHOLD, color="#a55a3b", ls="--", lw=0.8, alpha=0.6
-    )
+    ax2.axhline(DEFAULT_NON_LOCAL_THRESHOLD, color="#a55a3b", ls="--", lw=0.8, alpha=0.6)
     ax2.set_ylabel("Non-Local prob", color="#a55a3b")
     ax2.tick_params(axis="y", labelcolor="#a55a3b")
     ax2.set_ylim(0, 1.05)
@@ -185,20 +180,14 @@ def make_figure(
         e = g.index.max() - t_start
         is_featured = ev_in_win == local_event
         ax.axvspan(
-            s,
-            e,
-            color="#3b6ea5" if is_featured else "#cccccc",
+            s, e, color="#3b6ea5" if is_featured else "#cccccc",
             alpha=0.4 if is_featured else 0.25,
             zorder=0,
         )
     ax.text(
-        0.02,
-        0.95,
+        0.02, 0.95,
         f"event {event_id}",
-        transform=ax.transAxes,
-        fontsize=9,
-        color="#3b6ea5",
-        fontweight="bold",
+        transform=ax.transAxes, fontsize=9, color="#3b6ea5", fontweight="bold",
         va="top",
     )
 
@@ -233,7 +222,7 @@ def make_figure(
 
     # ── (C) Per-timebin replay_arm sequence for the featured event ──
     ax = ax_c
-    ev_t = ev_rows.index.values - t_start
+    ev_t = (ev_rows.index.values - t_start)
     ev_arms = ev_rows["replay_arm"].fillna(-1).astype(int).values
     for arm in range(9):
         mask = ev_arms == arm

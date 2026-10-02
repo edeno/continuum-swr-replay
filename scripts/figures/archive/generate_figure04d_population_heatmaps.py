@@ -49,8 +49,7 @@ def plot_population_heatmaps(
     lag_ms = lag_time * 1000
 
     fig, (ax1, ax2) = plt.subplots(
-        1,
-        2,
+        1, 2,
         figsize=(TWO_COLUMN, TWO_COLUMN * 0.4),
         sharey=True,
         constrained_layout=True,
@@ -104,13 +103,9 @@ def main() -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
-        "--output-dir",
-        type=Path,
-        default=Path("paper/figures/figure04"),
+        "--output-dir", type=Path, default=Path("paper/figures/figure04"),
     )
-    parser.add_argument(
-        "--format", type=str, choices=["pdf", "png", "svg"], default=None
-    )
+    parser.add_argument("--format", type=str, choices=["pdf", "png", "svg"], default=None)
     parser.add_argument("--dpi", type=int, default=300)
     parser.add_argument("--min-firing-rate", type=float, default=1.0)
     parser.add_argument("--data-dir", type=Path, default=PROCESSED_DATA_DIR)

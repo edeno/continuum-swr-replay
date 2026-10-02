@@ -1,10 +1,12 @@
 # Replay detection method comparison — overview
 
-*Design spec, cross-cutting. Status: approved; the Yu detector exists in the
+*Design spec, cross-cutting. Status (2026-10-02): approved; the Yu detector exists in the
 `ripple_detection` package, and the memoryless sequence detector, its shuffle, its event
 table and a per-epoch runner are implemented and tested in this project but not yet run
-on recorded data; the inventory comparison's accounting is implemented and tested on
-synthetic inventories but not yet run on recorded data. Each spec's own header carries its status; the per-spec sections
+on recorded data (real-data pilot next); the inventory comparison's accounting is
+implemented and tested on synthetic inventories but not yet run on recorded data. The
+Karlsson and Yu SWR inventories are computed directly from the package for now; Spyglass
+integration is the last step. Each spec's own header carries its status; the per-spec sections
 below carry the open decisions.*
 
 This directory holds the design for comparing replay-detection methods on our data.
@@ -15,12 +17,12 @@ register invites the cross-method blending this design forbids.
 
 | spec | scope | status |
 |---|---|---|
-| [01-yu-swr-detector.md](01-yu-swr-detector.md) | SWR detector with a noise-percentile threshold (Yu et al. 2017) | package side implemented; project wiring pending |
-| [02-memoryless-sequence.md](02-memoryless-sequence.md) | Memoryless sliding-window sequence detector (Widloski & Foster 2025) | implemented and tested, shuffle and event table included; not yet run on recorded data |
+| [01-yu-swr-detector.md](01-yu-swr-detector.md) | SWR detector with a noise-percentile threshold (Yu et al. 2017) | package side implemented; direct project inventory pending; Spyglass integration last |
+| [02-memoryless-sequence.md](02-memoryless-sequence.md) | Memoryless sliding-window sequence detector (Widloski & Foster 2025) | implemented and tested, shuffle and event table included; not yet run on recorded data (pilot next) |
 | [03-inventory-comparison.md](03-inventory-comparison.md) | Six inventories → common schema → N-way overlap accounting | accounting implemented and tested on synthetic inventories; recorded-data adapters and runner pending |
 | [04-event-features.md](04-event-features.md) | Symmetric event characterization and selection diagnostics; threshold robustness as a later follow-up | initial scope agreed |
 | [05-validation.md](05-validation.md) | Simulation and held-out-tetrode validation: what a performance claim would need | parked |
-| [memoryless_simulation_controls.md](memoryless_simulation_controls.md) | Simulated timing, false positives, multi-part events and a first held-out test, extending 02's comparison figure | designed 2026-09-25 |
+| [memoryless_simulation_controls.md](memoryless_simulation_controls.md) | Simulated timing, false positives, multi-part events and a first held-out test, extending 02's comparison figure | implemented 2026-09-25 |
 | [detector_comparison.md](detector_comparison.md) | One row per detection method considered: input, signal, normalization, threshold rule, durations, state handling, requirements, status | reference, kept current |
 
 01 and 02 are independent and can proceed in parallel. 03 depends on both; the initial
@@ -122,8 +124,8 @@ Each produces an event table over the same epochs and the same speed-eligible po
 | # | Trigger | Family | Method | Status |
 |---|---|---|---|---|
 | 1 | SWR, consensus trace | LFP | `Kay_ripple_detector` | exists (`SWR_event`) |
-| 2 | SWR, per-channel with merging | LFP | `Karlsson_ripple_detector` (Karlsson & Frank 2009) | in package; needs a run |
-| 3 | SWR, noise-percentile threshold | LFP | `Yu_ripple_detector` (Yu et al. 2017) | in package; project wiring pending — [01](01-yu-swr-detector.md) |
+| 2 | SWR, per-channel with merging | LFP | `Karlsson_ripple_detector` (Karlsson & Frank 2009) | in package; computed directly in the project (pending) |
+| 3 | SWR, noise-percentile threshold | LFP | `Yu_ripple_detector` (Yu et al. 2017) | in package; computed directly in the project (pending) — [01](01-yu-swr-detector.md) |
 | 4 | MUA high-synchrony events | population rate | `multiunit_HSE_detector` | exists (`MUA_event`) |
 | 5 | Posterior threshold | decoding | our state-space non-local detection | exists (`non_local_event`) |
 | 6 | Posterior sequence | decoding | Widloski & Foster 2025 | implemented (`memoryless_sequence/`, `scripts/decoding/run_memoryless_detection.py`); real-data pilot next — [02](02-memoryless-sequence.md) |
@@ -136,7 +138,9 @@ the comparison measures those differences rather than assuming an ordering of se
 
 The `ripple_detection` package supplying 1, 2 and 4 is
 [Eden-Kramer-Lab/ripple_detection](https://github.com/Eden-Kramer-Lab/ripple_detection);
-Spyglass reaches 1 and 2 through `RippleTimesV1`.
+Spyglass reaches 1 and 2 through `RippleTimesV1`. For the comparison, 2 and 3 are
+computed directly by calling the package on the same ripple-band LFP; populating them
+through Spyglass is deferred to the end and must reproduce the direct inventories.
 
 ## Scope boundary: clusterless compatibility
 

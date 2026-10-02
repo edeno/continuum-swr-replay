@@ -203,7 +203,9 @@ def sessions(df, mod, pop, term):
     # the ladder null beside them, so a rung name alone can match two rows per
     # session. Keep the cohort the rung's coefficients are reported from.
     if "cohort" in g.columns:
-        home = POST_OUTCOME_COHORT if mod in POST_OUTCOME_RATE_RUNGS else PRIMARY_COHORT
+        home = (
+            POST_OUTCOME_COHORT if mod in POST_OUTCOME_RATE_RUNGS else PRIMARY_COHORT
+        )
         g = g[g.cohort == home]
     c = f"coef_{term}"
     if c not in g.columns:
@@ -227,9 +229,7 @@ def sessions(df, mod, pop, term):
     )
     g = g[~runaway & ~separated_for_term(g, term)]
     f, _ = std_factor(term)
-    return {
-        a: g.loc[g.animal == a, c].to_numpy() * f for a in ANIM if (g.animal == a).any()
-    }
+    return {a: g.loc[g.animal == a, c].to_numpy() * f for a in ANIM if (g.animal == a).any()}
 
 
 def animal_ci(medians, n_boot=4000):
@@ -255,15 +255,8 @@ def forest(ax, df, rows, title):
                 amed.append(np.nan)
                 continue
             allv.append(v)
-            ax.scatter(
-                v,
-                yi + RNG.uniform(-0.28, 0.28, len(v)),
-                s=6,
-                color=CMAP[a],
-                alpha=0.20,
-                edgecolors="none",
-                zorder=2,
-            )
+            ax.scatter(v, yi + RNG.uniform(-0.28, 0.28, len(v)), s=6, color=CMAP[a],
+                       alpha=0.20, edgecolors="none", zorder=2)
             m = np.median(v)
             amed.append(m)
             ax.plot(m, yi, "o", ms=7, color=CMAP[a], mec="k", mew=0.6, zorder=5)
@@ -298,65 +291,18 @@ rate_rows = [
     ("immediate reward history · nonSWR", "G0_base", NON, "reward_history_rcos_0"),
     ("RPE (beta) · SWR", "G5_rpe", SWR, "rpe_postoutcome"),
     ("RPE (beta) · nonSWR", "G5_rpe", NON, "rpe_postoutcome"),
-    (
-        "rel. value (beta) · SWR",
-        "G4_value",
-        SWR,
-        "relative_value_switch_minus_stay_preoutcome",
-    ),
-    (
-        "rel. value (beta) · nonSWR",
-        "G4_value",
-        NON,
-        "relative_value_switch_minus_stay_preoutcome",
-    ),
-    (
-        "belief-entropy (beta) · SWR",
-        "G6_uncert",
-        SWR,
-        "reward_belief_differential_entropy_leaf_mean_preoutcome",
-    ),
-    (
-        "belief-entropy (beta) · nonSWR",
-        "G6_uncert",
-        NON,
-        "reward_belief_differential_entropy_leaf_mean_preoutcome",
-    ),
-    (
-        "value-update (beta) · SWR",
-        "G7_update",
-        SWR,
-        "reward_belief_mean_update_l1_all_ports_postoutcome",
-    ),
-    (
-        "value-update (beta) · nonSWR",
-        "G7_update",
-        NON,
-        "reward_belief_mean_update_l1_all_ports_postoutcome",
-    ),
-    (
-        "switch-rate · SWR",
-        "G3_switchrate",
-        SWR,
-        "patch_switch_fraction_last5_completed_trips",
-    ),
-    (
-        "switch-rate · nonSWR",
-        "G3_switchrate",
-        NON,
-        "patch_switch_fraction_last5_completed_trips",
-    ),
+    ("rel. value (beta) · SWR", "G4_value", SWR, "relative_value_switch_minus_stay_preoutcome"),
+    ("rel. value (beta) · nonSWR", "G4_value", NON, "relative_value_switch_minus_stay_preoutcome"),
+    ("belief-entropy (beta) · SWR", "G6_uncert", SWR, "reward_belief_differential_entropy_leaf_mean_preoutcome"),
+    ("belief-entropy (beta) · nonSWR", "G6_uncert", NON, "reward_belief_differential_entropy_leaf_mean_preoutcome"),
+    ("value-update (beta) · SWR", "G7_update", SWR, "reward_belief_mean_update_l1_all_ports_postoutcome"),
+    ("value-update (beta) · nonSWR", "G7_update", NON, "reward_belief_mean_update_l1_all_ports_postoutcome"),
+    ("switch-rate · SWR", "G3_switchrate", SWR, "patch_switch_fraction_last5_completed_trips"),
+    ("switch-rate · nonSWR", "G3_switchrate", NON, "patch_switch_fraction_last5_completed_trips"),
 ]
 fig, ax = plt.subplots(figsize=(8.5, 6.6))
-forest(
-    ax,
-    R,
-    rate_rows,
-    "Rate ladder — is_swr contrast (standardized; all sessions + animal 95% CI)",
-)
-ax.legend(
-    handles=handles, fontsize=8, loc="lower right", title="animal", framealpha=0.95
-)
+forest(ax, R, rate_rows, "Rate ladder — is_swr contrast (standardized; all sessions + animal 95% CI)")
+ax.legend(handles=handles, fontsize=8, loc="lower right", title="animal", framealpha=0.95)
 fig.tight_layout()
 fig.savefig(OUT / "rate_swr_contrast_coefs.png", dpi=150)
 
@@ -364,55 +310,15 @@ fig.savefig(OUT / "rate_swr_contrast_coefs.png", dpi=150)
 C = pd.read_pickle(SWR_CONTRAST_CONTENT_ARM)
 mod_rows = [
     ("current-arm (C1)", "C1_current", "all", "is_current_arm"),
-    (
-        "reward_rate_arm (C3)",
-        "C3_armreward",
-        "all",
-        "reward_fraction_candidate_arm_last10_visits",
-    ),
-    (
-        "value q_arm (C4)",
-        "C4_armvalue",
-        "all",
-        "reward_belief_mean_candidate_arm_preoutcome",
-    ),
+    ("reward_rate_arm (C3)", "C3_armreward", "all", "reward_fraction_candidate_arm_last10_visits"),
+    ("value q_arm (C4)", "C4_armvalue", "all", "reward_belief_mean_candidate_arm_preoutcome"),
     ("RPE×current (C6)", "C6_rpe", "all", "rpe_postoutcome_z_x_is_current_arm"),
-    (
-        "rel.value×current (C7)",
-        "C7_value",
-        "all",
-        "relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm",
-    ),
-    (
-        "entropy×current (C8)",
-        "C8_uncert",
-        "all",
-        "reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm",
-    ),
-    (
-        "update×current (C9)",
-        "C9_update",
-        "all",
-        "reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm",
-    ),
-    (
-        "periswitch×current (C10)",
-        "C10_periswitch",
-        "all",
-        "periswitch_index_trials_z_x_is_current_arm",
-    ),
-    (
-        "block×current (C11)",
-        "C11_block",
-        "all",
-        "trials_since_block_change_z_x_is_current_arm",
-    ),
-    (
-        "switch fraction×current (C12)",
-        "C12_switchrate",
-        "all",
-        "patch_switch_fraction_last5_completed_trips_z_x_is_current_arm",
-    ),
+    ("rel.value×current (C7)", "C7_value", "all", "relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm"),
+    ("entropy×current (C8)", "C8_uncert", "all", "reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm"),
+    ("update×current (C9)", "C9_update", "all", "reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm"),
+    ("periswitch×current (C10)", "C10_periswitch", "all", "periswitch_index_trials_z_x_is_current_arm"),
+    ("block×current (C11)", "C11_block", "all", "trials_since_block_change_z_x_is_current_arm"),
+    ("switch fraction×current (C12)", "C12_switchrate", "all", "patch_switch_fraction_last5_completed_trips_z_x_is_current_arm"),
 ]
 con_rows = [
     ("swr × current (CS1)", "CS1_current", "all", "swr_x_is_current_arm"),
@@ -437,13 +343,9 @@ con_rows = [
     ),
 ]
 fig, axes = plt.subplots(1, 2, figsize=(14, 5.4))
-forest(
-    axes[0], C, mod_rows, "Content (arm) — dimension effects (all events, standardized)"
-)
+forest(axes[0], C, mod_rows, "Content (arm) — dimension effects (all events, standardized)")
 forest(axes[1], C, con_rows, "Content (arm) — SWR contrasts (swr_x_*, standardized)")
-axes[1].legend(
-    handles=handles, fontsize=8, loc="lower left", title="animal", framealpha=0.95
-)
+axes[1].legend(handles=handles, fontsize=8, loc="lower left", title="animal", framealpha=0.95)
 fig.tight_layout()
 fig.savefig(OUT / "content_swr_contrast_coefs.png", dpi=150)
 
@@ -452,39 +354,17 @@ P = pd.read_pickle(SWR_CONTRAST_CONTENT_PATCH)
 patch_mod_rows = [
     ("current-patch (CP0)", "CP0_base", "all", "is_current_patch"),
     ("last-rew-patch (CP1)", "CP1_lastrew", "all", "is_last_rewarded_noncurrent_patch"),
-    (
-        "current patch×peri-switch (CP3)",
-        "CP3_newgrowth",
-        "all",
-        "periswitch_index_trials_z_x_is_current_patch",
-    ),
-    (
-        "current patch×switch fraction (CP4)",
-        "CP4_switchrate",
-        "all",
-        "patch_switch_fraction_last5_completed_trips_z_x_is_current_patch",
-    ),
+    ("current patch×peri-switch (CP3)", "CP3_newgrowth", "all", "periswitch_index_trials_z_x_is_current_patch"),
+    ("current patch×switch fraction (CP4)", "CP4_switchrate", "all", "patch_switch_fraction_last5_completed_trips_z_x_is_current_patch"),
 ]
 patch_con_rows = [
     ("swr × current-patch (CPS1)", "CPS1_current", "all", "swr_x_is_current_patch"),
-    (
-        "swr × lastrew-patch (CPS2)",
-        "CPS2_lastrew",
-        "all",
-        "swr_x_is_last_rewarded_noncurrent_patch",
-    ),
+    ("swr × lastrew-patch (CPS2)", "CPS2_lastrew", "all", "swr_x_is_last_rewarded_noncurrent_patch"),
 ]
 fig, axes = plt.subplots(1, 2, figsize=(14, 3.6))
-forest(
-    axes[0],
-    P,
-    patch_mod_rows,
-    "Content (patch) — dimension effects (all events, standardized)",
-)
+forest(axes[0], P, patch_mod_rows, "Content (patch) — dimension effects (all events, standardized)")
 forest(axes[1], P, patch_con_rows, "Content (patch) — SWR contrasts (standardized)")
-axes[1].legend(
-    handles=handles, fontsize=8, loc="lower left", title="animal", framealpha=0.95
-)
+axes[1].legend(handles=handles, fontsize=8, loc="lower left", title="animal", framealpha=0.95)
 fig.tight_layout()
 fig.savefig(OUT / "content_patch_swr_contrast_coefs.png", dpi=150)
 

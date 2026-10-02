@@ -172,10 +172,7 @@ def plot_per_animal_distributions(
     # Set up the grid for small multiples (5 animals = full page width)
     n_animals = len(animals)
     fig, axes = plt.subplots(
-        1,
-        n_animals,
-        figsize=get_figure_size(1, n_animals, base_width=TWO_COLUMN),
-        sharey=True,
+        1, n_animals, figsize=get_figure_size(1, n_animals, base_width=TWO_COLUMN), sharey=True
     )
 
     if n_animals == 1:
@@ -238,10 +235,7 @@ def plot_per_animal_running_distributions(
     # Set up the grid for small multiples (5 animals = full page width)
     n_animals = len(animals)
     fig, axes = plt.subplots(
-        1,
-        n_animals,
-        figsize=get_figure_size(1, n_animals, base_width=TWO_COLUMN),
-        sharey=True,
+        1, n_animals, figsize=get_figure_size(1, n_animals, base_width=TWO_COLUMN), sharey=True
     )
 
     if n_animals == 1:

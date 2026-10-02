@@ -175,14 +175,10 @@ def _example_matrices(
     if selected.empty:
         raise ValueError("representative session is absent from trial_leaf_table")
     uncertainty = selected.pivot(
-        index="candidate_arm",
-        columns="trial_number_by_epoch",
-        values="reward_belief_variance_candidate_arm_preoutcome",
+        index="candidate_arm", columns="trial_number_by_epoch", values="reward_belief_variance_candidate_arm_preoutcome"
     ).sort_index()
     content = selected.pivot(
-        index="candidate_arm",
-        columns="trial_number_by_epoch",
-        values="posterior_event_share",
+        index="candidate_arm", columns="trial_number_by_epoch", values="posterior_event_share"
     ).reindex(index=uncertainty.index, columns=uncertainty.columns)
     context = selected.drop_duplicates("trial_number_by_epoch").set_index(
         "trial_number_by_epoch"
@@ -818,11 +814,7 @@ def _plot_horserace(ax: plt.Axes, horserace_summary: pd.DataFrame) -> None:
         if predictor not in table.index:
             continue
         row = table.loc[predictor]
-        color = (
-            "#CC6677"
-            if predictor == "reward_belief_variance_candidate_arm_preoutcome_z"
-            else "#999999"
-        )
+        color = "#CC6677" if predictor == "reward_belief_variance_candidate_arm_preoutcome_z" else "#999999"
         ax.barh(yi, row["median"], color=color, height=0.62, zorder=2)
         stars = (
             "***"
