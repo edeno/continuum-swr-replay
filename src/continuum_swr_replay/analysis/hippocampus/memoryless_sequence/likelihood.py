@@ -98,6 +98,16 @@ recording's clock counts seconds since 1970: near 1.6e9 s a float64 step is
 2.4e-7 s, so the 2 ms spacings come out as 1.99986 or 2.00009 ms, a spread
 no relative tolerance on the spacing could accept without also accepting a
 real error. The same rounding moves a timestamp by 1.2e-4 of a sample at most.
+It is measured about the grid's own rate, not the configured one: a clock a
+few ppm fast is uniform yet drifts from an exact 500 Hz grid by most of a
+sample over an epoch.
+"""
+
+_RATE_TOLERANCE = 1e-4
+"""How far, as a fraction, the grid's own rate may sit from the configured one.
+
+The decodes' clocks run 0.4-1.7 ppm fast of 500 Hz. At 1e-4 an 80 ms window is
+off by at most 8 us, 0.004 of a sample, while a grid at another rate is refused.
 """
 
 
@@ -263,7 +273,9 @@ def validate_time_grid(time: NDArray, config: MemorylessSequenceConfig) -> None:
     Sliding a window over the rows assumes every row covers the same span, and
     the window and stride sample counts come from the configured rate, so a
     grid at another rate would make windows of the wrong duration without
-    changing any array shape.
+    changing any array shape. Uniformity is judged about the grid's own mean
+    rate, which must itself sit within ``_RATE_TOLERANCE`` of the configured
+    one; a recording clock a few ppm fast passes.
 
     Parameters
     ----------
@@ -284,20 +296,20 @@ def validate_time_grid(time: NDArray, config: MemorylessSequenceConfig) -> None:
             f"{config.window_n_samples} after the final row, which no spike can "
             "reach, is dropped."
         )
-    step = float(np.median(np.diff(time)))
-    if abs(step * config.sampling_frequency - 1.0) > _SAMPLE_TOLERANCE:
-        raise ValueError(
-            f"The grid is sampled every {step} s, not the "
-            f"{1.0 / config.sampling_frequency} s of the configured "
-            f"{config.sampling_frequency} Hz."
-        )
-    offset = (time - time[0]) * config.sampling_frequency - np.arange(time.size)
+    step = (time[-1] - time[0]) / (time.size - 1)
+    offset = (time - time[0]) / step - np.arange(time.size)
     worst = int(np.argmax(np.abs(offset)))
     if abs(offset[worst]) > _SAMPLE_TOLERANCE:
         raise ValueError(
             f"The decoding grid is not uniform: sample {worst} sits "
             f"{offset[worst]:.3g} samples from where a uniform grid puts it. "
             "Windows summed over it would cover unequal spans."
+        )
+    if abs(step * config.sampling_frequency - 1.0) > _RATE_TOLERANCE:
+        raise ValueError(
+            f"The grid is sampled every {step} s on average, not the "
+            f"{1.0 / config.sampling_frequency} s of the configured "
+            f"{config.sampling_frequency} Hz."
         )
 
 

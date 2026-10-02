@@ -1136,7 +1136,11 @@ Carried deliberately; each must be checked against real data before results are 
    where there is no LFP (`observed_intervals`). The canonical event table has the same gap.
 6. **`data_over_time` sits on the decode's uniform 500 Hz grid, without gaps** — the
    runner uses its index as the decode grid, and `validate_time_grid` refuses anything
-   else, so a violation stops the run rather than passing silently.
+   else, so a violation stops the run rather than passing silently. Checked on the five
+   pilot epochs (2026-10-02): every grid is uniform to 1.1e-4 of a sample about its own
+   rate, and that rate is 0.4-1.7 ppm fast of 500 Hz, which over an epoch drifts most
+   of a sample from an exact 500 Hz grid. Uniformity is therefore judged about the
+   grid's own mean rate, and that rate must be within 1e-4 of the configured one.
 7. **How much position a tetrode's identity carries** — it decides how weak the
    within-electrode shuffle is (see "What the jump half of the test does on simulated
    data"). Measure it on the pilot epochs.

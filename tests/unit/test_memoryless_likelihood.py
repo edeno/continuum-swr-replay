@@ -258,6 +258,29 @@ class TestValidateTimeGrid:
         with pytest.raises(ValueError, match="sampled every"):
             validate_time_grid(self.UNIX_START_S + np.arange(5000) / 250.0, self.config)
 
+    def test_a_long_recording_whose_clock_runs_a_few_ppm_fast_passes(self):
+        """The decodes' clocks run 0.4-1.7 ppm fast of 500 Hz, uniformly.
+
+        Over a 27-minute epoch that puts the last samples most of a sample
+        from a grid at exactly 500 Hz, though every row spans the same time.
+        """
+        rate = 500.0 * (1 + 1.7e-6)
+        validate_time_grid(self.UNIX_START_S + np.arange(800_000) / rate, self.config)
+
+    def test_a_rate_off_by_more_than_the_rate_tolerance_raises(self):
+        """A uniform grid at 500.25 Hz has 80 ms windows 40 us short."""
+        rate = 500.0 * (1 + 5e-4)
+        with pytest.raises(ValueError, match="sampled every"):
+            validate_time_grid(self.UNIX_START_S + np.arange(5000) / rate, self.config)
+
+    def test_jitter_about_a_fast_clock_raises(self):
+        rate = 500.0 * (1 + 1.7e-6)
+        time = self.UNIX_START_S + np.arange(5000) / rate
+        time[2500] += 0.01 / 500.0
+
+        with pytest.raises(ValueError, match="uniform"):
+            validate_time_grid(time, self.config)
+
 
 class TestEpochLogLikelihood:
     def test_one_column_per_interior_bin(self, epoch, decoded):
