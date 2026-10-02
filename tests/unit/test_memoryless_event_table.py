@@ -685,3 +685,51 @@ def test_a_sequence_merged_from_single_windows_has_no_consecutive_jump():
     assert table.n_pieces.iloc[0] == 20
     assert np.isnan(table.max_jump_cm.iloc[0])
     assert table.max_bridge_cm.iloc[0] == 0.0
+
+
+def test_a_dropped_single_window_inside_a_merged_gap_is_reported():
+    """The reference's dispersion reads every kept window of the merged span,
+    so a single window dropped before the merge still counts; the pieces-only
+    dispersion and the outside-window count say when a verdict rests on it.
+
+    Two still pieces at bin 20 with one window at bin 150 in the 16 ms gap
+    between them: pieces-only dispersion is 0, but the one window 260 cm away
+    lifts the whole span's to about 33 cm, over the 12 cm criterion.
+    """
+    rows = [delta(20)] * 30
+    rows += [blurred(20), delta(150), blurred(150), blurred(20)]
+    rows += [delta(20)] * 30
+    posterior = np.array(rows)
+    n_windows = len(rows)
+    grid = (START_S - 0.04) + np.arange(
+        n_windows * CONFIG.stride_n_samples + CONFIG.window_n_samples
+    ) / CONFIG.sampling_frequency
+    midpoint_s = grid[
+        CONFIG.window_n_samples // 2 + CONFIG.stride_n_samples * np.arange(n_windows)
+    ]
+    centers = np.arange(N_BINS) * BIN_CM
+    distance = np.abs(centers[:, None] - centers[None, :])
+    candidates = detect_candidate_sequences(
+        posterior, midpoint_s, distance, np.zeros(n_windows), CONFIG
+    )
+    assert candidates.decisions.gates.kept[31]
+    np.testing.assert_array_equal(candidates.runs, [[0, 63]])
+    assert len(candidates.pieces[0]) == 2
+
+    table = build_memoryless_event_table(
+        candidates,
+        IDENTITY,
+        speed_time_s=grid,
+        speed_cm_per_s=np.zeros(grid.size),
+        bin_distance_cm=distance,
+        swr_intervals=None,
+        swr_observed_intervals=None,
+        swr_definition="none",
+        shuffle_results={0: passing_result()},
+    )
+
+    row = table.iloc[0]
+    assert row.dispersion_cm > 30.0
+    assert row.is_replay
+    assert row.pieces_dispersion_cm == pytest.approx(0.0)
+    assert row.n_kept_windows_outside_pieces == 1

@@ -1037,7 +1037,13 @@ once, in `MEMORYLESS_EVENT_TABLE_DTYPES`, and held for an empty epoch too.
   `n_pieces` (pre-merge runs), `mean_posterior_spread_cm` (over retained windows),
   `max_jump_cm` and `mean_jump_cm` (consecutive-window jumps within pieces only),
   `max_bridge_cm` (between the facing centers of adjacent pieces; NaN for one piece),
-  `dispersion_cm`, `path_distance_cm` (summed track-graph distance along the retained
+  `dispersion_cm` (over every kept window of the merged span, as the reference's
+  NaN-masked trajectory, so a single window dropped before the merge still counts),
+  `pieces_dispersion_cm` and `n_kept_windows_outside_pieces` (the same dispersion from
+  the pieces' windows alone, and how many kept windows lie outside every piece: added
+  2026-10-02 after the first pilot, where 2 of 4 replay calls on chimi20200225_02_r1
+  rested on one such window about a meter away; diagnostics, not criteria),
+  `path_distance_cm` (summed track-graph distance along the retained
   centers, bridges included; the analogue of the original's `compute_sequenceDistance`,
   reported and not used as a criterion), `is_replay` (both replay criteria)
 - **Speed (cm/s)** — `animal_max_speed_cm_s`, `animal_mean_speed_cm_s`,

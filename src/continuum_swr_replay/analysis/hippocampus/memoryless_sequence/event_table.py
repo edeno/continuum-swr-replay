@@ -62,6 +62,9 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
     ShuffleResult,
 )
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
+    dispersion_cm,
+)
 from continuum_swr_replay.data_loaders.constants import BRAIN_AREAS
 from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 
@@ -113,6 +116,11 @@ MEMORYLESS_EVENT_TABLE_DTYPES: Mapping[str, object] = MappingProxyType(
         "mean_jump_cm": np.float64,
         "max_bridge_cm": np.float64,
         "dispersion_cm": np.float64,
+        # the same dispersion from the pieces' windows alone, and how many kept
+        # windows of the span lie outside every piece; a verdict that rests on
+        # those windows has a dispersion well above its pieces-only one
+        "pieces_dispersion_cm": np.float64,
+        "n_kept_windows_outside_pieces": np.int64,
         "path_distance_cm": np.float64,
         "is_replay": np.bool_,
         # speed
@@ -265,6 +273,9 @@ def _path_statistics(
 
     Read from the retained centers through the distance matrix, so a jump out
     of a piece's last window is never counted as a jump inside the sequence.
+    Also the pieces-only dispersion and the count of kept windows outside the
+    pieces: ``dispersion_cm`` follows the reference over every kept window of
+    the merged span, a single window dropped before the merge included.
     """
     center = candidates.decisions.center_index
     pieces = [candidates.pre_merge_runs[piece] for piece in candidates.pieces[sequence]]
@@ -282,6 +293,8 @@ def _path_statistics(
         dtype=np.float64,
     )
     retained = np.concatenate([np.arange(first, last + 1) for first, last in pieces])
+    start, stop = candidates.runs[sequence]
+    kept = np.flatnonzero(candidates.decisions.gates.kept[start : stop + 1]) + start
     return {
         "n_pieces": len(pieces),
         "mean_posterior_spread_cm": float(
@@ -291,6 +304,8 @@ def _path_statistics(
         "max_jump_cm": float(jumps.max()) if jumps.size else float("nan"),
         "mean_jump_cm": float(jumps.mean()) if jumps.size else float("nan"),
         "max_bridge_cm": float(bridges.max()) if bridges.size else float("nan"),
+        "pieces_dispersion_cm": dispersion_cm(center[retained], bin_distance_cm),
+        "n_kept_windows_outside_pieces": int(np.setdiff1d(kept, retained).size),
         "path_distance_cm": float(jumps.sum() + bridges.sum()),
     }
 
