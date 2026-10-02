@@ -175,6 +175,14 @@ Between that rerun and the first, every column but `run_id` is identical except
 `mean_posterior_spread_cm`, which moves by at most 1.5e-5 cm (3e-6 relative) on
 43 rows: GPU run-to-run variation in the likelihood, below any decision.
 
+**Shuffle pilot (2026-10-02, 0c2548c, run `0c2548cacf2d-seed20260922`, 100
+draws):** 4 min 48 s wall (vs 2 min without), 7.4 GB peak RSS, so about 42 s
+per tested candidate on one A100. All 4 replay calls are testable and all 4
+pass (p_spread / p_jump 0.01-0.03; 0.0099 is the floor at 100 draws),
+including both whose dispersion rests on one window outside their pieces
+(candidates 28 and 195): the shuffle does not catch that pattern. All 4 are
+whole-event speed eligible; 2 overlap a speed-qualified SWR.
+
 ```bash
 python scripts/decoding/run_memoryless_detection.py --run-seed 20260922 \
     --epoch-id chimi20200225_02_r1_HPC --no-shuffle   # detector alone, fast
