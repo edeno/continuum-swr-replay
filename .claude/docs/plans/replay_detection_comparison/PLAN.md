@@ -3,7 +3,8 @@
 **Status (2026-10-02):** Phase 0 done. Phase 2 implemented, tested and reviewed four
 times (through 2026-09-25), including the shuffle, the event table, a per-epoch runner and
 the simulation controls ([memoryless-simulation-controls](../memoryless-simulation-controls/PLAN.md),
-done); not yet run on recorded data. The work has moved to a machine that holds all 218
+done); first real-data pilot ran without the shuffle on 2026-10-02 after two input fixes
+(decode-time marks, grid rate); see "Phase 2 pilot" below. The work has moved to a machine that holds all 218
 canonical HPC decodes, so the real-data pilot is unblocked; pilot epochs are chosen below.
 Phase 1 is **re-scoped (2026-10-02): the SWR inventories are computed directly** by calling
 the pinned `ripple_detection` detectors on the ripple-band LFP, with no Spyglass
@@ -150,6 +151,16 @@ saw. The runner now rebuilds the decode's marks from raw `UnitMarks` with the
 span; on chimi20200225_02_r1 and wilbur20210329_12_r6 the kept indices equal
 the 0820d39d code's and every encoding mark is found. `load_data` keeps the
 corrected rule.
+
+**First pilot run (2026-10-02, 6d03535, `--no-shuffle`, run
+`6d035353e0d7-seed20260922-noshuffle`):** chimi20200225_02_r1, 2 min, 7.5 GB
+peak RSS, 295,369 windows, 198 candidates, 4 meeting duration > 100 ms and
+dispersion > 12 cm (2 SWR, 2 not). Median candidate dispersion 1.1 cm: most
+candidates are stationary, and only 38 of 198 overlap one of our 248
+non-local events (41 of ours overlap a candidate). Open before the shuffle
+run: candidate 28 reports dispersion 18.6 cm with a 2 cm path over two pieces
+and a 0 cm bridge — check whether dispersion is measured on linear position
+across a junction's `edge_spacing` gap rather than along the track graph.
 
 ```bash
 python scripts/decoding/run_memoryless_detection.py --run-seed 20260922 \
