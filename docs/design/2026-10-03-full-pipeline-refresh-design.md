@@ -240,8 +240,46 @@ ours and Widloski's included: speed finite and below 4 cm/s for the whole event.
 
 ### The Zugaro filter
 
-The settings were specified by the project lead on 2026-10-03: `butter(3, [120, 180])` with
-`filtfilt`, from the buzcode/FMAToolbox `FindRipples` lineage. Their source is still to be cited.
+**Lineage and settings.** There is no single standard, but there is one lineage. Nearly
+every Buzsáki-lab ripple inventory comes from the `FindRipples` two-threshold rule. It
+descends from Csicsvari et al. 1999, was written up in FMAToolbox by Hirase and Zugaro, and
+was carried into buzcode `bz_FindRipples`, then neurocode and CellExplorer; the package
+implements it as `Zugaro_ripple_detector`. The settings differ by repository and by who ran
+it (compiled by the project lead, 2026-10-03):
+
+| Source | Thresholds (SD) | Merge gap / max (ms) | Min (ms) | Band (Hz) | Filter |
+|---|---|---|---|---|---|
+| buzcode `bz_FindRipples` defaults (`0969ddf`) | 2 / 5 | 30 / 100 | 20 | 130–200 | Butterworth order 3, zero-phase |
+| **Buzsáki-lab Databank files: Petersen MS10, Girardeau Rat09, McKenzie PV8** | **2 / 5** | **50 / 150** | **none stored** | **120–180** | **Butterworth order 3** (Petersen's copy: Chebyshev order 4) |
+| CellExplorer `ce_FindRipples` defaults | 2 / 5 | 20 / 150 | 20 | 130–200 | Chebyshev order 4, zero-phase |
+| neurocode `FindRipples` defaults (`d166a67`, Oliva lab) | 0.5 / 2.5 | 50 / 500 | 25 | 80–250 | Butterworth order 3 |
+| Harvey 2023's released callers | 1 / 3 | 50 / 300 | 20 | 100–250 | Butterworth order 3 |
+
+This comparison runs the Databank files' settings, the row in bold. Every row shares the
+core steps:
+
+1. filter the ripple band with a zero-phase filter;
+2. square, and average over 11 samples at 1250 Hz;
+3. z-score over the whole recording or a chosen interval;
+4. bound each event at the low-threshold crossings, and require its peak to exceed the high
+   threshold;
+5. merge events closer than the gap. The buzcode lineage merges with no cap, then drops
+   events over the maximum.
+
+An optional sixth step rejects events by an EMG signal and a noise channel. The package
+implements neither, so neither runs here.
+
+**Where this run departs from the lineage,** each recorded in the manifest:
+
+- **Channels.** All CA1 channels are squared and summed (R3), where the lineage's callers
+  usually pass one pyramidal-layer channel.
+- **Speed.** The shared 4 cm/s endpoint rule applies. The lineage has no speed criterion.
+- **Package conventions:**
+  - the peak is the maximum of the normalized power;
+  - an event cut off by a gap or the recording edge is kept and flagged;
+  - the moving average is set in seconds, 11/1250 s, which is 9 samples or 9 ms at 1000 Hz
+    against 8.8 ms at 1250 Hz;
+  - duration limits are counted in samples.
 
 - **Design rate.** The filter is designed at the LFP's 1000 Hz. The 1250 Hz in the original
   snippet is buzcode's LFP rate; the same coefficients run on 1000 Hz data would pass
