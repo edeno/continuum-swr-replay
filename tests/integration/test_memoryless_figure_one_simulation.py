@@ -77,8 +77,9 @@ REMOTE_STATIONARY, SHORT_PATH, SHORT_REPLAY, STRAY_WINDOW = 5, 6, 7, 8
 away from the animal, a 30 cm replay, an 80 ms replay, and a still event with
 one window decoded far away."""
 
-STRAY_WINDOW_AT_S = 31.40
-"""Where the figure puts the hand-placed stray-window event."""
+STRAY_WINDOW_AT_S, STRAY_WINDOW_STILL_S, STRAY_WINDOW_N_LOCAL = 31.40, 0.120, 2
+"""Where the figure puts the hand-placed stray-window event, how long its still
+parts last and how many cells carry them."""
 
 TRACK_HEIGHT_CM = float(TRACK_HEIGHT)
 REMOTE_STATIONARY_CM = 42.5
@@ -216,6 +217,8 @@ def decoded() -> Decoded:
         place_field_means,
         STRAY_WINDOW_AT_S,
         local_cm=float(np.interp(STRAY_WINDOW_AT_S, time, position)),
+        still_s=STRAY_WINDOW_STILL_S,
+        n_local=STRAY_WINDOW_N_LOCAL,
         window_s=CONFIG.window_duration_s,
         stride_s=CONFIG.stride_s,
     )
@@ -703,6 +706,21 @@ class TestOneWindowFarAway:
             decoded.candidates.dispersion_cm[sequence] > CONFIG.dispersion_threshold_cm
         )
         assert pieces_only < CONFIG.dispersion_threshold_cm
+
+    def test_every_window_in_its_pieces_is_the_animals_own_place(
+        self, decoded, sequence
+    ):
+        _, in_piece = self.outside(decoded, sequence)
+        start, stop = decoded.candidates.runs[sequence]
+        windows = np.arange(start, stop + 1)[in_piece]
+        center_cm = decoded.place_bin_centers_cm[
+            decoded.candidates.decisions.center_index[windows]
+        ]
+        animal_cm = np.interp(
+            decoded.midpoint_s[windows], decoded.time, decoded.position
+        )
+
+        assert np.abs(center_cm - animal_cm).max() < SAME_PLACE_CM
 
 
 class TestSortedSpikesLikelihood:

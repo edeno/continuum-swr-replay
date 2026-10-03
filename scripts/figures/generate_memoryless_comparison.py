@@ -227,6 +227,15 @@ inbound replay, among candidates of local coding that no caption claim reads.
 The stillness before the outbound replay is no good: that replay's candidate
 absorbs the local coding before it, so an event there changes its verdict."""
 
+STRAY_WINDOW_N_LOCAL = 2
+STRAY_WINDOW_STILL_S = 0.120
+"""The still parts are carried by the two cells whose fields lie nearest the
+animal, firing in turn for 120 ms either side of the far window. Cells further
+along the track would pull the decode away from the animal, and the
+state-space detector then reads those parts as non-local. The parts are as
+long as the dispersion allows: the one far window keeps the event above 12 cm
+however long the still parts around it run, until about 180 ms each."""
+
 STRAY_WINDOW_PLACEMENT_MARGIN_S = 0.4
 """How far the event's cleared span must sit from every other event."""
 
@@ -322,6 +331,8 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
         place_field_means,
         STRAY_WINDOW_AT_S,
         local_cm=stray_local_cm,
+        still_s=STRAY_WINDOW_STILL_S,
+        n_local=STRAY_WINDOW_N_LOCAL,
         window_s=config.window_duration_s,
         stride_s=config.stride_s,
     )
@@ -2150,7 +2161,12 @@ a sequence is spatially coherent, not whether it is somewhere other than the
 animal. **(f)** A still event at the animal's own place, with spikes placed by
 hand so that one 80 ms window holds only two spikes of a cell
 {abs(decoded["stray_window_remote_cm"] - decoded["stray_window_local_cm"]):.0f} cm
-away (star). The windows either side of it are too broad to keep, but the one
+away (star). The still parts, {1000 * STRAY_WINDOW_STILL_S:.0f} ms either side,
+come from the {("one", "two", "three")[STRAY_WINDOW_N_LOCAL - 1]} cells whose fields lie nearest the animal, and
+{100 * local_fraction_of_event(decoded, STRAY_WINDOW_EVENT):.0f}% of the
+reported event's kept windows decode within 15 cm of it; the event is reported
+{1000 * decoded["candidates"].duration_s[stray_window_dispersions(decoded)[2]]:.0f} ms
+long. The windows either side of the far one are too broad to keep, but the one
 after it centres near it, so it passes the jump rule; as a run of one window it
 is dropped before the merge, and the still parts either side merge across it.
 Its dispersion still counts toward the merged event's, as in the reference:

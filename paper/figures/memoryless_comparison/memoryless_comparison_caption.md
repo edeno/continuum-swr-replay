@@ -48,17 +48,19 @@ on jump), 3 draws from passing, and the inbound continuous replay passes it (p
 is the animal's own place either way: the test asks whether a sequence is
 spatially coherent, not whether it is somewhere other than the animal. **(f)**
 A still event at the animal's own place, with spikes placed by hand so that one
-80 ms window holds only two spikes of a cell 149 cm away (star). The windows
-either side of it are too broad to keep, but the one after it centres near it,
-so it passes the jump rule; as a run of one window it is dropped before the
-merge, and the still parts either side merge across it. Its dispersion still
-counts toward the merged event's, as in the reference: 16.6 cm with it and 3.3
-cm without, against the 12 cm required, so a still event is called replay on
-the strength of one window. Put through the significance test it passes the
-spread half and fails the jump half (p = 0.02 on spread and 0.11 on jump). The
-state-space detector reports 2 short non-local events over it, 124 ms of its
-201 ms in all. On the first recorded pilot epoch this pattern decided 2 of its
-4 replay calls, both of which passed the test; the event table now carries the
+80 ms window holds only two spikes of a cell 149 cm away (star). The still
+parts, 120 ms either side, come from the two cells whose fields lie nearest the
+animal, and 99% of the reported event's kept windows decode within 15 cm of it;
+the event is reported 396 ms long. The windows either side of the far one are
+too broad to keep, but the one after it centres near it, so it passes the jump
+rule; as a run of one window it is dropped before the merge, and the still
+parts either side merge across it. Its dispersion still counts toward the
+merged event's, as in the reference: 14.4 cm with it and 0.5 cm without,
+against the 12 cm required, so a still event is called replay on the strength
+of one window. Put through the significance test it fails it (p = 0.41 on
+spread and 0.32 on jump). The state-space detector reports no non-local event
+over it. On the first recorded pilot epoch this pattern decided 2 of its 4
+replay calls, both of which passed the test; the event table now carries the
 dispersion without such windows beside the published one.
 
 **(g-k) 4536 replays of chosen shape.** Made-up replays were written into the
