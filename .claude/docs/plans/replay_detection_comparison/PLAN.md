@@ -183,6 +183,26 @@ including both whose dispersion rests on one window outside their pieces
 (candidates 28 and 195): the shuffle does not catch that pattern. All 4 are
 whole-event speed eligible; 2 overlap a speed-qualified SWR.
 
+**Five-epoch pilot (2026-10-02, shuffle, seed 20260922; chimi at 0c2548c, the
+other four at 6f79548 in one 25 min 47 s run, 11.4 GB peak RSS):**
+
+| epoch | candidates | with a stray kept window | replay | replay resting on it | pass shuffle | replay overlapping SWR |
+|---|---|---|---|---|---|---|
+| chimi20200225_02_r1 | 198 | 36 | 4 | 2 | 4 | 2 |
+| wilbur20210329_12_r6 | 169 | 21 | 5 | 0 | 5 | 5 |
+| j1620210707_06_r3 | 126 | 11 | 8 | 0 | 6 | 8 |
+| peanut20201202_10_r5 | 268 | 21 | 2 | 0 | 2 | 2 |
+| senor20201101_06_r3 | 648 | 55 | 9 | 0 | 9 | 9 |
+| total | 1409 | 144 | 28 | 2 | 26 | 26 |
+
+The stray-window replay call is chimi-only on this pilot (2 of 28 calls).
+Every replay call is whole-event speed eligible. A spike-level reproduction in
+the sorted 25-cell simulation (about 1,200 trials of remote bursts and of
+remote spikes inside a one-window silence) produced no stray kept window: the
+jump gate needs the next window broad yet centered on the same remote place,
+which the simulator's likelihood rarely gives. Scratch in
+`.claude/research/memoryless_stray_window/`.
+
 ```bash
 python scripts/decoding/run_memoryless_detection.py --run-seed 20260922 \
     --epoch-id chimi20200225_02_r1_HPC --no-shuffle   # detector alone, fast
