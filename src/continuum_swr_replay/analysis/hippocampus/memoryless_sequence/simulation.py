@@ -10,7 +10,8 @@ Besides a single straight replay, the same machinery writes the activity the
 detectors should not call replay, or should split: a burst whose firing carries
 no place (``placeless_burst``), a burst whose represented place jumps at random
 (``jumping_burst``), and replays made of several parts with a jump or a silent
-gap between them (``piecewise_replay``). Each is an ``InjectedActivity``: when
+gap between them (``piecewise_replay``). ``stray_window_spikes`` places spikes
+by hand rather than drawing them, to produce one window pattern exactly. Each is an ``InjectedActivity``: when
 it happens, which place it represents at each moment, how fast every cell fires,
 which spans are its spatial parts, and what it truly is, as one of
 ``TRUTH_LABELS``: a continuous replay is non-local representation and a
@@ -44,6 +45,7 @@ __all__ = [
     "place_field_means",
     "placeless_burst",
     "placements",
+    "stray_window_spikes",
     "without",
 ]
 
@@ -428,6 +430,128 @@ def jumping_burst(
         rate_hz=field_rates(position_cm, place_field_means, peak_rate_hz),
         parts=((float(at[0]), float(at[-1])),),
         truth="non_local",
+    )
+
+
+@dataclass(frozen=True)
+class StrayWindowEvent:
+    """Where :func:`stray_window_spikes` put its event, and with which cells.
+
+    Attributes
+    ----------
+    bounds : tuple of float
+        First and last placed spike's span: the labeled event.
+    cleared : tuple of float
+        The span emptied of the recording's own spikes; hold it out of training.
+    stray_window_start_s : float
+        Where window W, the one decoded far away, begins.
+    local_cells, remote_cell, flank_cells
+        Which cells were made to fire.
+
+    """
+
+    bounds: tuple[float, float]
+    cleared: tuple[float, float]
+    stray_window_start_s: float
+    local_cells: tuple[int, ...]
+    remote_cell: int
+    flank_cells: tuple[int, int]
+
+
+def stray_window_spikes(
+    spike_times: list[NDArray],
+    place_field_means: NDArray,
+    at_s: float,
+    local_cm: float,
+    *,
+    remote_cm: float = 21.0,
+    flank_cm: tuple[float, float] = (0.0, 42.5),
+    still_s: float = 0.060,
+    n_local: int = 5,
+    local_interval_s: float = 0.005,
+    window_s: float = 0.080,
+    stride_s: float = 0.004,
+    clear_margin_s: float = 0.3,
+) -> tuple[list[NDArray], StrayWindowEvent]:
+    """A still event at the animal's place with one window decoded far away.
+
+    Hand-placed, not drawn: the spikes are put exactly where a window pattern
+    first seen on recorded data needs them. Window W, ``[t_w, t_w + window_s)``,
+    holds two spikes of the cell at ``remote_cm`` and nothing else, so it is
+    sharp and far from the animal. W - 1 adds two local spikes, a tie that
+    decodes broad and between the places. W + 1 has lost the remote spikes and
+    gained one spike from each flank cell, either side of ``remote_cm``, so it
+    is broad but centered near W: W passes the jump gate and W + 1 fails the
+    spread gate. W is then a run of one window, dropped before the merge, and
+    the still parts either side merge across it. Local cells fire in turn
+    every ``local_interval_s`` for ``still_s`` either side.
+
+    Parameters
+    ----------
+    spike_times : list of ndarray
+        One array per cell. Not modified.
+    place_field_means : ndarray, shape (n_neurons,)
+    at_s : float
+        When the first still part begins.
+    local_cm : float
+        The animal's place; the ``n_local`` cells nearest it fire there.
+    remote_cm, flank_cm : float
+        The far place, and the two places either side of it whose cells
+        broaden W + 1.
+    still_s, n_local, local_interval_s
+        Each still part's length, cells and spacing.
+    window_s, stride_s : float
+        The detector's window and step; W + 1 starts ``stride_s`` after W.
+    clear_margin_s : float
+        The recording's own spikes are removed this far either side.
+
+    Returns
+    -------
+    spike_times : list of ndarray
+    event : StrayWindowEvent
+
+    """
+    means = np.asarray(place_field_means, dtype=np.float64)
+
+    def nearest(place_cm: float, n: int = 1) -> list[int]:
+        return [int(i) for i in np.argsort(np.abs(means - place_cm))[:n]]
+
+    local_cells = nearest(local_cm, n_local)
+    remote = nearest(remote_cm)[0]
+    flanks = (nearest(flank_cm[0])[0], nearest(flank_cm[1])[0])
+    if len({remote, *flanks} | set(local_cells)) != n_local + 3:
+        raise ValueError("The local, remote and flank cells must be distinct.")
+    if not 0 < stride_s < window_s:
+        raise ValueError(f"stride_s must lie in (0, {window_s}), got {stride_s}.")
+
+    t_w = at_s + still_s
+    # W - 1 begins one stride before W; its two local spikes go there
+    before = np.arange(at_s, t_w - stride_s, local_interval_s)
+    before = np.concatenate([before, [t_w - 0.75 * stride_s, t_w - 0.25 * stride_s]])
+    # local firing resumes after W + 1 ends, so no window up to W + 1 holds it
+    resume_s = t_w + window_s + 1.5 * stride_s
+    after = np.arange(resume_s, resume_s + still_s, local_interval_s)
+    end_s = float(after[-1])
+    lo, hi = at_s - clear_margin_s, end_s + clear_margin_s
+    placed = [np.asarray(t)[(t < lo) | (t > hi)] for t in spike_times]
+
+    def add(cell: int, times) -> None:
+        placed[cell] = np.sort(np.concatenate([placed[cell], np.asarray(times, float)]))
+
+    for k, cell in enumerate(local_cells):
+        add(cell, np.concatenate([before[k::n_local], after[k::n_local]]))
+    # inside W's first stride, so W + 1 holds neither
+    add(remote, [t_w + 0.25 * stride_s, t_w + 0.5 * stride_s])
+    # inside W + 1's last stride, so W does not hold them
+    for cell in flanks:
+        add(cell, [t_w + window_s + 0.25 * stride_s])
+    return placed, StrayWindowEvent(
+        bounds=(float(at_s), end_s),
+        cleared=(float(lo), float(hi)),
+        stray_window_start_s=float(t_w),
+        local_cells=tuple(local_cells),
+        remote_cell=remote,
+        flank_cells=flanks,
     )
 
 

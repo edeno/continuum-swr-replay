@@ -17,6 +17,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation im
     place_field_means,
     placeless_burst,
     placements,
+    stray_window_spikes,
     without,
 )
 
@@ -436,4 +437,68 @@ class TestInjectedActivity:
                 np.zeros((4, 2)),
                 ((0.0, 2.0),),
                 "local",
+            )
+
+
+class TestStrayWindowSpikes:
+    """Which spikes each window around the stray one holds, by construction."""
+
+    MEANS = np.linspace(0.0, 170.0, 25)
+    WINDOW_S, STRIDE_S = 0.080, 0.004
+
+    def build(self):
+        background = [np.arange(0.0, 10.0, 0.05) + 0.001 * i for i in range(25)]
+        return stray_window_spikes(
+            background,
+            self.MEANS,
+            at_s=4.0,
+            local_cm=170.0,
+            window_s=self.WINDOW_S,
+            stride_s=self.STRIDE_S,
+        )
+
+    def window(self, spikes, start_s):
+        """(cell, time) of every spike in [start_s, start_s + window)."""
+        return sorted(
+            (cell, float(t))
+            for cell, times in enumerate(spikes)
+            for t in times[(times >= start_s) & (times < start_s + self.WINDOW_S)]
+        )
+
+    def test_w_holds_two_remote_spikes_and_nothing_else(self):
+        spikes, event = self.build()
+        cells = {cell for cell, _ in self.window(spikes, event.stray_window_start_s)}
+
+        assert cells == {event.remote_cell}
+        assert len(self.window(spikes, event.stray_window_start_s)) == 2
+
+    def test_w_minus_one_ties_two_local_spikes_against_the_remote_two(self):
+        spikes, event = self.build()
+        held = self.window(spikes, event.stray_window_start_s - self.STRIDE_S)
+
+        assert sum(cell == event.remote_cell for cell, _ in held) == 2
+        assert sum(cell in event.local_cells for cell, _ in held) == 2
+        assert len(held) == 4
+
+    def test_w_plus_one_holds_one_spike_of_each_flank_cell_only(self):
+        spikes, event = self.build()
+        held = self.window(spikes, event.stray_window_start_s + self.STRIDE_S)
+
+        assert sorted(cell for cell, _ in held) == sorted(event.flank_cells)
+
+    def test_the_recording_is_cleared_around_the_event(self):
+        spikes, event = self.build()
+        lo, hi = event.cleared
+        placed = {event.remote_cell, *event.flank_cells, *event.local_cells}
+
+        for cell, times in enumerate(spikes):
+            inside = times[(times >= lo) & (times <= hi)]
+            if cell not in placed:
+                assert inside.size == 0
+            assert ((inside >= event.bounds[0]) & (inside <= event.bounds[1])).all()
+
+    def test_overlapping_cells_are_refused(self):
+        with pytest.raises(ValueError, match="distinct"):
+            stray_window_spikes(
+                [np.array([])] * 25, self.MEANS, at_s=1.0, local_cm=21.0
             )

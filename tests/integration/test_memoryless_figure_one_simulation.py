@@ -14,8 +14,10 @@ assembled into the same sequence as the replay that follows it.
 
 The fixture is the recording the supplemental figure draws
 (``scripts/figures/generate_memoryless_comparison.py``): the package's five
-events plus a remote stationary event, a 30 cm replay and an 80 ms replay,
-in that order. Both detectors read one encoding model, fitted by the
+events plus a remote stationary event, a 30 cm replay, an 80 ms replay and a
+hand-placed still event with one window decoded far away, in that order. The
+last is written into the decoded spikes only; the encoding model is fitted on
+the recording without it, as the figure fits it. Both detectors read one encoding model, fitted by the
 state-space detector, as the figure and the sweep do.
 """
 
@@ -56,6 +58,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle impor
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation import (
     InjectedReplay,
     inject_replay,
+    stray_window_spikes,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
     aggregate_windows,
@@ -69,9 +72,13 @@ DECODE_BIN_STRIDE = 3
 """Figure 1 strides the 1500 Hz simulation to the project's 500 Hz decode grid."""
 
 CONTINUOUS_OUTBOUND, FRAGMENTED, CONTINUOUS_INBOUND, NO_SPIKE, LOCAL = range(5)
-REMOTE_STATIONARY, SHORT_PATH, SHORT_REPLAY = 5, 6, 7
+REMOTE_STATIONARY, SHORT_PATH, SHORT_REPLAY, STRAY_WINDOW = 5, 6, 7, 8
 """Events added here, in the order the figure adds them: a place held still
-away from the animal, a 30 cm replay, and an 80 ms replay."""
+away from the animal, a 30 cm replay, an 80 ms replay, and a still event with
+one window decoded far away."""
+
+STRAY_WINDOW_AT_S = 31.40
+"""Where the figure puts the hand-placed stray-window event."""
 
 TRACK_HEIGHT_CM = float(TRACK_HEIGHT)
 REMOTE_STATIONARY_CM = 42.5
@@ -202,6 +209,18 @@ def decoded() -> Decoded:
         event_times = np.vstack([event_times, bounds])
         is_event |= (time >= bounds[0]) & (time <= bounds[1])
 
+    # the hand-placed stray-window event, in the decoded spikes only
+    training_spike_times = spike_times
+    spike_times, stray = stray_window_spikes(
+        spike_times,
+        place_field_means,
+        STRAY_WINDOW_AT_S,
+        local_cm=float(np.interp(STRAY_WINDOW_AT_S, time, position)),
+        window_s=CONFIG.window_duration_s,
+        stride_s=CONFIG.stride_s,
+    )
+    event_times = np.vstack([event_times, stray.bounds])
+
     time, position, speed, is_event = (
         array[::DECODE_BIN_STRIDE] for array in (time, position, speed, is_event)
     )
@@ -219,7 +238,7 @@ def decoded() -> Decoded:
     detector.fit(
         position_time=time,
         position=position,
-        spike_times=spike_times,
+        spike_times=training_spike_times,
         is_training=is_training,
     )
     # decoded as the figure decodes it, with the reference's floor
@@ -344,6 +363,7 @@ class TestWhatItAccepts:
 
         assert [events_overlapping(decoded, s) for s in accepted] == [
             [CONTINUOUS_OUTBOUND],
+            [STRAY_WINDOW],
             [CONTINUOUS_INBOUND],
             [SHORT_REPLAY],
         ]
@@ -629,6 +649,60 @@ class TestRemoteStationaryIsDeclined:
         ]
 
         assert set(absorbed).isdisjoint(remote)
+
+
+class TestOneWindowFarAway:
+    """A still event called replay on the strength of one far window.
+
+    The window is kept, dropped before the merge as a run of one, and still
+    counted in the merged event's dispersion, as the reference counts it.
+    """
+
+    @pytest.fixture
+    def sequence(self, decoded):
+        accepted = [
+            i
+            for i in np.flatnonzero(decoded.candidates.is_replay)
+            if STRAY_WINDOW in events_overlapping(decoded, i)
+        ]
+        assert len(accepted) == 1
+        return accepted[0]
+
+    def outside(self, decoded, sequence):
+        start, stop = decoded.candidates.runs[sequence]
+        in_piece = np.zeros(stop - start + 1, dtype=bool)
+        for piece in decoded.candidates.pieces[sequence]:
+            first, last = decoded.candidates.pre_merge_runs[piece]
+            in_piece[first - start : last - start + 1] = True
+        kept = decoded.candidates.decisions.gates.kept[start : stop + 1]
+        return start + np.flatnonzero(kept & ~in_piece), in_piece
+
+    def test_exactly_one_kept_window_lies_outside_the_pieces_and_it_is_far(
+        self, decoded, sequence
+    ):
+        outside, _ = self.outside(decoded, sequence)
+        center = decoded.candidates.decisions.center_index[outside]
+
+        assert outside.size == 1
+        assert decoded.place_bin_centers_cm[center[0]] < 40.0
+
+    def test_the_call_rests_on_that_window(self, decoded, sequence):
+        from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
+            NO_CENTER,
+            dispersion_cm,
+        )
+
+        _, in_piece = self.outside(decoded, sequence)
+        start, stop = decoded.candidates.runs[sequence]
+        center = decoded.candidates.decisions.center_index[start : stop + 1]
+        pieces_only = dispersion_cm(
+            np.where(in_piece, center, NO_CENTER), decoded.bin_distance_cm
+        )
+
+        assert (
+            decoded.candidates.dispersion_cm[sequence] > CONFIG.dispersion_threshold_cm
+        )
+        assert pieces_only < CONFIG.dispersion_threshold_cm
 
 
 class TestSortedSpikesLikelihood:

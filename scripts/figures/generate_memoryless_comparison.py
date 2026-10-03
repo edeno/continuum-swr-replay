@@ -66,10 +66,15 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle impor
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation import (
     InjectedReplay,
+    immobile_intervals,
     inject_replay,
+    stray_window_spikes,
+    without,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
+    NO_CENTER,
     aggregate_windows,
+    dispersion_cm,
     normalize_windows,
 )
 from continuum_swr_replay.figure_utilities import (
@@ -86,7 +91,7 @@ SUMMARY_PATH = Path(
 """Aggregates of the parameter sweep, drawn in the lower panels."""
 
 DISTANCE_ORDER = ("(0, 40]", "(40, 80]", "(80, 120]", "(120, 200]")
-"""Every bin the sweep's `pd.cut` can produce, in order. Panel (j) draws the
+"""Every bin the sweep's `pd.cut` can produce, in order. Panel (k) draws the
 ones the summary holds and refuses a summary holding any other."""
 
 CONTROLS_SUMMARY_PATH = Path(
@@ -161,6 +166,7 @@ EVENT_LABELS = [
     "remote\nstationary*",
     "short path\n30 cm*",
     "short replay\n80 ms*",
+    "one window\nfar away*",
 ]
 """Labels for the simulation's events. A star marks one added here; the rest
 come with the package's simulation."""
@@ -188,6 +194,7 @@ the candidate."""
 SHORT_PATH_EVENT, SHORT_REPLAY_EVENT = 6, 7
 CONTINUOUS_OUTBOUND_EVENT, CONTINUOUS_INBOUND_EVENT = 0, 2
 REMOTE_STATIONARY_EVENT = 5
+STRAY_WINDOW_EVENT = 8
 """Rows of ``event_times`` in :func:`simulate_and_decode`, in the order the
 events are added."""
 
@@ -213,6 +220,15 @@ REMOTE_STATIONARY_CM = 42.5
 REMOTE_STATIONARY_S = 0.300
 REMOTE_SPIKE_INTERVAL_S = 0.012
 """One neuron firing at ~83 Hz, matching the other events' spike density."""
+
+STRAY_WINDOW_AT_S = 31.40
+"""Where the hand-placed stray-window event begins: in the stillness before the
+inbound replay, among candidates of local coding that no caption claim reads.
+The stillness before the outbound replay is no good: that replay's candidate
+absorbs the local coding before it, so an event there changes its verdict."""
+
+STRAY_WINDOW_PLACEMENT_MARGIN_S = 0.4
+"""How far the event's cleared span must sit from every other event."""
 
 
 def splice_remote_stationary(
@@ -286,13 +302,47 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
         event_times = np.vstack([event_times, bounds])
         is_event |= (time >= bounds[0]) & (time <= bounds[1])
 
-    time, position, speed, is_event = (
-        array[::DECODE_BIN_STRIDE] for array in (time, position, speed, is_event)
+    # a still event at the animal's place with one window decoded far away,
+    # hand-placed in the first stillness clear of every other event. It is
+    # written into the spikes that are decoded and nowhere else: the encoding
+    # model is fitted on the recording as it was before, so adding this event
+    # leaves every other panel exactly as it was
+    training_spike_times, is_training_event = spike_times, is_event.copy()
+    clear = without(
+        immobile_intervals(
+            time, speed, config.speed_threshold_cm_per_s, minimum_duration_s=1.0
+        ),
+        event_times,
+        margin_s=STRAY_WINDOW_PLACEMENT_MARGIN_S,
+    )
+
+    stray_local_cm = float(np.interp(STRAY_WINDOW_AT_S, time, position))
+    spike_times, stray = stray_window_spikes(
+        spike_times,
+        place_field_means,
+        STRAY_WINDOW_AT_S,
+        local_cm=stray_local_cm,
+        window_s=config.window_duration_s,
+        stride_s=config.stride_s,
+    )
+    if not (
+        (clear[:, 0] <= stray.cleared[0]) & (stray.cleared[1] <= clear[:, 1])
+    ).any():
+        raise RuntimeError(
+            f"The stray-window event at {STRAY_WINDOW_AT_S} s does not sit in "
+            "stillness clear of every other event; move STRAY_WINDOW_AT_S."
+        )
+    event_times = np.vstack([event_times, stray.bounds])
+    is_event |= (time >= stray.bounds[0]) & (time <= stray.bounds[1])
+
+    time, position, speed, is_event, is_training_event = (
+        array[::DECODE_BIN_STRIDE]
+        for array in (time, position, speed, is_event, is_training_event)
     )
 
     # encode on non-event data only, the analogue of this project's no-ripple
     # training mask; spikes inside an event must not shape the place fields
-    is_training = ~is_event
+    is_training = ~is_training_event
 
     # the grid both procedures decode on comes from the config, matching the sweep
     detector = NonLocalSortedSpikesDetector(
@@ -307,7 +357,7 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
     detector.fit(
         position_time=time,
         position=position,
-        spike_times=spike_times,
+        spike_times=training_spike_times,
         is_training=is_training,
     )
 
@@ -366,6 +416,10 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
         "window_speed": window_speed,
         "candidates": candidates,
         "shuffles": shuffles,
+        "bin_distance_cm": bin_distance_cm,
+        "stray_window": stray,
+        "stray_window_local_cm": stray_local_cm,
+        "stray_window_remote_cm": float(place_field_means[stray.remote_cell]),
     }
 
 
@@ -490,9 +544,9 @@ def outcome_title(decoded: dict, event: int, label: str) -> str:
     """One-line panel title stating what the detector did, from the data."""
     what = verdict(decoded, event)
     if what == "found":
-        return f"{label}: {duration_ratio(decoded, event):.1f}x too long"
+        return f"{label}: {duration_ratio(decoded, event):.1f}x long"
     if what == "failed the shuffle":
-        return f"{label}: {duration_ratio(decoded, event):.1f}x too long, fails shuffle"
+        return f"{label}: {duration_ratio(decoded, event):.1f}x long, fails shuffle"
     return f"{label}: {what}"
 
 
@@ -548,6 +602,89 @@ def best_dispersion_cm(decoded: dict, event: int) -> float:
     )
 
 
+def outside_pieces(decoded: dict, sequence: int) -> np.ndarray:
+    """Windows of a sequence that were kept but belong to none of its pieces.
+
+    A single kept window between two runs is dropped before the merge, as the
+    reference drops it, yet still counts toward the merged sequence's
+    dispersion. Returns window indices.
+    """
+    candidates = decoded["candidates"]
+    start, stop = candidates.runs[sequence]
+    in_piece = np.zeros(stop - start + 1, dtype=bool)
+    for piece in candidates.pieces[sequence]:
+        first, last = candidates.pre_merge_runs[piece]
+        in_piece[first - start : last - start + 1] = True
+    kept = candidates.decisions.gates.kept[start : stop + 1]
+    return start + np.flatnonzero(kept & ~in_piece)
+
+
+def stray_window_dispersions(decoded: dict) -> tuple[float, float, int]:
+    """The stray-window event's dispersion with and without the windows
+    outside its pieces, and the sequence they come from.
+
+    Over the longest accepted sequence overlapping it, the one the panel shows.
+    """
+    accepted = accepted_overlapping(decoded, STRAY_WINDOW_EVENT)
+    if not accepted:
+        raise RuntimeError(
+            "The caption says the stray-window event is called replay; no "
+            "accepted sequence overlaps it. Rewrite the caption."
+        )
+    candidates = decoded["candidates"]
+    sequence = max(accepted, key=lambda i: candidates.duration_s[i])
+    start, stop = candidates.runs[sequence]
+    center = candidates.decisions.center_index[start : stop + 1].copy()
+    center[np.isin(np.arange(start, stop + 1), outside_pieces(decoded, sequence))] = (
+        NO_CENTER
+    )
+    center[~candidates.decisions.gates.kept[start : stop + 1]] = NO_CENTER
+    return (
+        float(candidates.dispersion_cm[sequence]),
+        dispersion_cm(center, decoded["bin_distance_cm"]),
+        sequence,
+    )
+
+
+def stray_window_shuffle_sentence(decoded: dict) -> str:
+    """What the significance test made of the stray-window event, from the data."""
+    _, _, sequence = stray_window_dispersions(decoded)
+    result = decoded["shuffles"][sequence]
+    halves = (
+        "passes both halves"
+        if result.passes
+        else "fails it"
+        if not (
+            result.p_spread <= SIGNIFICANCE_LEVEL or result.p_jump <= SIGNIFICANCE_LEVEL
+        )
+        else "passes the spread half and fails the jump half"
+        if result.p_spread <= SIGNIFICANCE_LEVEL
+        else "passes the jump half and fails the spread half"
+    )
+    return (
+        f"Put through the significance test it {halves} (p = "
+        f"{result.p_spread:.2f} on spread and {result.p_jump:.2f} on jump)"
+    )
+
+
+def stray_window_state_space_sentence(decoded: dict) -> str:
+    """What the state-space detector reported over the stray-window event."""
+    start_s, end_s = decoded["event_times"][STRAY_WINDOW_EVENT]
+    overlapping = [
+        (max(a, start_s), min(b, end_s))
+        for a, b in decoded["state_space_intervals"]
+        if a < end_s and start_s < b
+    ]
+    if not overlapping:
+        return "The state-space detector reports no non-local event over it."
+    total_ms = 1000 * sum(b - a for a, b in overlapping)
+    return (
+        f"The state-space detector reports {len(overlapping)} short non-local "
+        f"event{'s' if len(overlapping) > 1 else ''} over it, {total_ms:.0f} ms "
+        f"of its {1000 * (end_s - start_s):.0f} ms in all."
+    )
+
+
 def check_caption_claims(decoded: dict, config: MemorylessSequenceConfig) -> None:
     """Stop rather than write prose the panels contradict.
 
@@ -588,6 +725,24 @@ def check_caption_claims(decoded: dict, config: MemorylessSequenceConfig) -> Non
         SHORT_PATH_EVENT,
         REMOTE_STATIONARY_EVENT,
     )
+    full, pieces, sequence = stray_window_dispersions(decoded)
+    stray_start = decoded["stray_window"].stray_window_start_s
+    stray_index = int(
+        np.argmin(
+            np.abs(decoded["midpoint_s"] - stray_start - config.window_duration_s / 2)
+        )
+    )
+    if not (
+        full > config.dispersion_threshold_cm > pieces
+        and outside_pieces(decoded, sequence).tolist() == [stray_index]
+    ):
+        raise RuntimeError(
+            "The caption says the stray-window event is called replay only "
+            "because of its one window outside every piece; the data say "
+            f"dispersion {full:.1f} cm with it, {pieces:.1f} cm without, and "
+            f"windows {outside_pieces(decoded, sequence).tolist()} outside the "
+            f"pieces against the placed one, {stray_index}. Rewrite the caption."
+        )
     if not np.isfinite(bound_error_ms(decoded, zoomed)):
         raise RuntimeError(
             "The caption says the state-space detector reports all four zoomed "
@@ -725,7 +880,16 @@ def plot_overview(ax, decoded: dict) -> None:
             label="decoded place, window rejected",
         ),
         Patch(color=YELLOW, alpha=0.6, label="labeled event"),
-        Patch(color="0.75", label="posterior, panels b-e"),
+        Patch(color="0.75", label="posterior, panels b-f"),
+        Line2D(
+            [],
+            [],
+            color=VERMILION,
+            marker="*",
+            ms=4.0,
+            lw=0,
+            label="kept window outside every piece",
+        ),
         Line2D([], [], color=VERMILION, lw=2.4, label=f"event, {SLIDING}"),
         Line2D([], [], color="0.6", lw=1.2, label="candidate, rejected"),
         Line2D([], [], color=BLUE, lw=2.4, label=f"event, {STATE_SPACE}"),
@@ -734,7 +898,7 @@ def plot_overview(ax, decoded: dict) -> None:
         handles=handles,
         loc="lower left",
         bbox_to_anchor=(0.0, 1.01),
-        ncol=4,
+        ncol=5,
         fontsize=5,
         frameon=False,
         handlelength=1.4,
@@ -806,6 +970,19 @@ def plot_event(ax, decoded: dict, event: int) -> None:
 
     kept = candidates.decisions.gates.kept & shown
     ax.scatter(midpoint_s[kept], center_cm[kept], s=1.6, color=SKY, lw=0, zorder=3)
+    # a kept window outside every piece still counts toward dispersion
+    stray = np.concatenate(
+        [outside_pieces(decoded, i) for i in overlapping] or [np.array([], int)]
+    )
+    ax.scatter(
+        midpoint_s[stray],
+        center_cm[stray],
+        s=22,
+        marker="*",
+        color=VERMILION,
+        lw=0,
+        zorder=5,
+    )
     ax.plot(
         decoded["time"],
         decoded["position"],
@@ -1339,17 +1516,26 @@ def make_figure(
     # row's and the panel letters can share one offset; the verdict in each
     # is read from the data
     outcomes = (
-        (CONTINUOUS_OUTBOUND_EVENT, "continuous replay"),
+        (CONTINUOUS_OUTBOUND_EVENT, "continuous"),
         (SHORT_REPLAY_EVENT, "80 ms replay"),
         (SHORT_PATH_EVENT, "30 cm path"),
-        (REMOTE_STATIONARY_EVENT, "remote place, held still"),
+        (REMOTE_STATIONARY_EVENT, "remote, held still"),
+        (STRAY_WINDOW_EVENT, "one far window"),
     )
     zooms = []
     events = grid[1].subgridspec(1, len(outcomes))
     for column, (event, label) in enumerate(outcomes):
         ax = fig.add_subplot(events[column])
         plot_event(ax, decoded, event)
-        ax.set_title(outcome_title(decoded, event, label), fontsize=5.5)
+        title = (
+            f"{label}: "
+            + {"found": "found", "failed the shuffle": "fails shuffle"}.get(
+                verdict(decoded, event), verdict(decoded, event)
+            )
+            if event == STRAY_WINDOW_EVENT
+            else outcome_title(decoded, event, label)
+        )
+        ax.set_title(title, fontsize=5)
         if column:
             ax.set_yticklabels([])
         zooms.append(ax)
@@ -1928,17 +2114,18 @@ immobility cutoff is {config.speed_threshold_cm_per_s:.0f} rather than
 its own acceptance criteria, so a difference between them cannot be put down
 to how either finds candidates alone.
 
-**(a-e) One recording with labeled events.** The simulation carries a
+**(a-f) One recording with labeled events.** The simulation carries a
 continuous outbound replay, a fragmented replay, a continuous inbound replay
-and a silent stretch; a remote stationary event, a 30 cm replay and an 80 ms
-replay were written into the spike trains here and are marked with a star.
+and a silent stretch; a remote stationary event, a 30 cm replay, an 80 ms
+replay and a still event with one window decoded far away were written into
+the spike trains here and are marked with a star.
 
 **(a)** The whole recording. Green is where the animal is; dots are the decoded
 place of each window, kept or rejected; yellow marks a labeled event; bars below
 the axis are the events each detector reports and the candidates the
 sliding-window detector rejected.
 
-**(b-e)** Four events, with the posterior in grey; bars below the axis are
+**(b-f)** Five events, with the posterior in grey; bars below the axis are
 the events each detector reports, and a sequence that fails the significance
 test is drawn as rejected. The sliding-window detector finds the continuous
 replay and gives it
@@ -1960,9 +2147,23 @@ reports all four, with every bound within
 of the truth. {continuous_shuffle_sentence(decoded)} Most of each reported
 continuous replay is the animal's own place either way: the test asks whether
 a sequence is spatially coherent, not whether it is somewhere other than the
-animal.
+animal. **(f)** A still event at the animal's own place, with spikes placed by
+hand so that one 80 ms window holds only two spikes of a cell
+{abs(decoded["stray_window_remote_cm"] - decoded["stray_window_local_cm"]):.0f} cm
+away (star). The windows either side of it are too broad to keep, but the one
+after it centres near it, so it passes the jump rule; as a run of one window it
+is dropped before the merge, and the still parts either side merge across it.
+Its dispersion still counts toward the merged event's, as in the reference:
+{stray_window_dispersions(decoded)[0]:.1f} cm with it and
+{stray_window_dispersions(decoded)[1]:.1f} cm without, against the
+{config.dispersion_threshold_cm:.0f} cm required, so a still event is called
+replay on the strength of one window. {stray_window_shuffle_sentence(decoded)}.
+{stray_window_state_space_sentence(decoded)}
+On the first recorded pilot epoch this pattern decided 2 of its 4 replay calls,
+both of which passed the test; the event table now carries the dispersion
+without such windows beside the published one.
 
-**(f-j) {int(overall["n_cells"])} replays of chosen shape.** Made-up
+**(g-k) {int(overall["n_cells"])} replays of chosen shape.** Made-up
 replays were written into the spike trains of a simulated linear-track
 recording, one at a time, each with a path length, duration, firing rate and
 distance from the animal's own place that we chose. Because the right answer is known, what each
@@ -1970,7 +2171,7 @@ detector reports can be scored against it. A detector counts as reporting a
 replay only when what it returns is that replay: on its path throughout, and
 not covering far more ground than the path does.
 
-**(f, g)** Percent of those {int(overall["n_cells"])} replays reported, by the
+**(g, h)** Percent of those {int(overall["n_cells"])} replays reported, by the
 path the replay travels and how long it lasts; both detectors are scored the
 same way against the same known answer. The comparison that isolates detection
 uses a shared target: the replays the published definition can accept at all,
@@ -2017,7 +2218,7 @@ Held to that same criterion our state-space detector also reports nothing below
 45 cm, so this is the published replay definition acting, not the window-by-window
 inference.
 
-**(h, i)** Where each detector puts a replay's start (h) and end (i): reported
+**(i, j)** Where each detector puts a replay's start (i) and end (j): reported
 minus true, in ms, median line and interquartile band by true duration, over
 the replays both detectors reported, the sliding window's before its
 significance test, which never moves a sequence's bounds. The sliding window's
@@ -2027,26 +2228,26 @@ bounds are its first and last window midpoints, and its 80 ms windows reach
 sliding window starts a median {-sliding_onset.max():.0f} to
 {-sliding_onset.min():.0f} ms early and ends {sliding_offset.min():.0f} to
 {sliding_offset.max():.0f} ms late, and its late ends carry a long tail, the
-upper quartile reaching {sliding_offset_q75.max():.0f} ms; panel (j) shows
+upper quartile reaching {sliding_offset_q75.max():.0f} ms; panel (k) shows
 how much of a reported event is the animal's own place. A {durations_ms[0]:.0f} ms
 replay's reported start is a median {-sliding_onset[0]:.0f} ms early and its end a
 median {sliding_offset[0]:.0f} ms late, and its median reported duration is about
 {1000 * shortest.duration_s * shortest.value:.0f} ms, the floor panel (c) shows for
 one event.
 
-**(j)** Reported duration over actual duration against how far the replay sits
+**(k)** Reported duration over actual duration against how far the replay sits
 from the animal's own place. Numbers give the share of the reported event's
 80 ms windows that decode the animal's place rather than a replayed one. That
 absorption of local coding reaches about 80 cm from the animal and is what
 drives the largest over-reporting, as in panel (b); beyond it the window
-floor of panels (h, i) still leaves the reported duration too long. Over the whole sweep,
+floor of panels (i, j) still leaves the reported duration too long. Over the whole sweep,
 {pct(overall["sliding_accepted_but_not_the_injection"])} of the
 sliding-window detector's accepted events are not the replay that was put in.
 
-**(k-n) Activity that is not one clean replay**, written into the same recording
+**(l-o) Activity that is not one clean replay**, written into the same recording
 and scored by the same rule; our detector is read both ways, its non-local
 events (continuous and fragmented states together) and the continuous state
-alone. **(k)** Share of bursts with an event reported on them. A place-less
+alone. **(l)** Share of bursts with an event reported on them. A place-less
 burst, every cell firing at one rate unrelated to its field, carries no
 spatial content, so any event on it is false; a jumping burst represents a
 random place every 15 ms, so calling it non-local is right and calling it a
@@ -2070,7 +2271,7 @@ calling a sequence that is not there. Over {minutes:.1f} minutes of immobility
 with no replay, from {n_recordings} simulated recordings that pause in the same
 places at the track's end, no output reported any event: fewer than
 {3 / minutes:.1f} per minute, at 95% confidence, and only there.
-**(l)** Two 60 cm parts, the second starting the given distance behind where
+**(m)** Two 60 cm parts, the second starting the given distance behind where
 the first ended, with no gap in time, pooled over 120 and 200 ms parts, their
 far end held 45 cm from where the animal rests whatever the jump; bars
 give how each detector carved the event (vermilion outline the sliding window
@@ -2079,8 +2280,8 @@ above them the share of parts recovered. Our detector reports one event over
 both parts in {pct(spanning_jumps.min())} to {pct(spanning_jumps.max())} of
 trials at every jump; the sliding window does so in up to
 {pct(sliding_spanning.max())} of trials for jumps up to 40 cm and never across
-80 cm. **(m, n)** Two 150 ms, 60 cm replays with a silent gap, the second
-continuing from the first's end (m) or starting 140 cm away from it (n), both
+80 cm. **(n, o)** Two 150 ms, 60 cm replays with a silent gap, the second
+continuing from the first's end (n) or starting 140 cm away from it (o), both
 reaching no nearer the animal than 20 cm.
 Continuing, at a {gaps_ms[0]:.0f} ms gap both detectors report one event over
 both parts ({pct(continuing["spanning", "sliding_published"][0])} of trials
@@ -2105,7 +2306,7 @@ trial, the gain is not uniform: the sliding window recovers fewer parts inside
 the event than alone in {sliding_fewer} of {sliding_trials} trials and more in
 {sliding_more}, ours fewer in {ours_fewer} and more in {ours_more}.
 
-**(o, p) Held-out evidence.** The simulated cells are split into discovery and
+**(p, q) Held-out evidence.** The simulated cells are split into discovery and
 evaluation cells three ways: two interleaved folds with their roles swapped (A,
 B), each half tiling the track, and one whose evaluation cells cover only its
 lower half (C, hatched). Both detectors are fitted and run on the discovery
@@ -2114,7 +2315,7 @@ Events are counted once each, as our detector bounds them. An event's content,
 estimated from the discovery cells by our decoder (bars) or by the sliding
 window (dots), is scored on the evaluation cells against the animal's own
 position and against 100 permutations of the evaluation fields, spikes and
-silence both counting, and has support when it beats both (p ≤ 0.05). **(o)**
+silence both counting, and has support when it beats both (p ≤ 0.05). **(p)**
 Share of events with support, among those along whose content the evaluation
 cells are expected to fire at least 5 spikes; numbers give how many. True
 replays that only our detector reported have support in
@@ -2129,20 +2330,20 @@ detector reported an event from discovery cells on the no-replay stretches, so
 no event of pure local coding reached the test. The two content estimates agree
 on {pct(agreement.min())} of the events informative under both, or more. The sliding window
 reported no event our detector missed, so there is no comparator-only class to
-test. **(p)** Share of each kind of replay the evaluation cells can judge at
+test. **(q)** Share of each kind of replay the evaluation cells can judge at
 all: {pct_range(informative["ours"])} of those only our detector reported,
 {pct_range(informative["shared"])} of shared ones, in folds A and B. The rest are too short or too
 sparse for a dozen evaluation cells, so an event without support is mostly one
 that cannot be judged, not one shown false. Held-out support tests spatial
 information, not sequence, and is read with these error rates, not alone.
 
-**Caveats.** Sorted spikes, a linear track, no artifacts. In (f-j) the animal
+**Caveats.** Sorted spikes, a linear track, no artifacts. In (g-k) the animal
 rests at one end of the track and pauses nowhere else, so distance from its
 place is fixed by where the replay is put and cannot be varied independently.
 Replays run at constant speed with Poisson firing from the same place fields
 the encoding model was fitted on, so there is no model mismatch and the picture
-is optimistic. Every cell of (f-j) holds a replay, so those panels measure how
-often each detector reports a replay that is there; (k) is where they are tested
+is optimistic. Every cell of (g-k) holds a replay, so those panels measure how
+often each detector reports a replay that is there; (l) is where they are tested
 on activity that holds none. The significance
 test is the reference's place-cell identity shuffle, which needs sorted cells;
 recorded data, decoded clusterless, are tested with an encoding-pair shuffle
