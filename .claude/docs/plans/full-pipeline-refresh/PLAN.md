@@ -48,7 +48,7 @@ Read it first. This plan argues from it, and where the two disagree the spec win
 
 **Scientific settings**
 - Non-local events (R9): the package's minimum, `round(0.015 s / step)` samples. Every
-  epoch's minimum must be the same (8 at our 500 Hz grids); a different one stops the run.
+  epoch's minimum must be the same (7 at our 500 Hz grids, as the package computes on absolute timestamps); a different one stops the run.
 - Speed: every SWR detector runs with `speed_threshold=4.0`.
 - Sampling rate: the nominal 1000 Hz is passed to every SWR detector and filter design.
 - Zugaro:
@@ -1071,7 +1071,7 @@ Before Task 1's pin, run Task 1 Step 1. After Task 1:
   per decoder.
 - [ ] **Pilot.** The five pilot epochs, the same way. Record:
   - non-local events per epoch, old (canonical) against new (staged);
-  - each epoch's `minimum_sample_count(time, 0.015)`, which must be 8 for all (R9).
+  - each epoch's `minimum_sample_count(time, 0.015)`, which must be 7 for all (R9).
 - [ ] **STOP:** report the smoke and pilot numbers and a full-run estimate. Ask for the
   go-ahead to launch both full batches.
 - [ ] **Full.** Two tmux sessions, on disjoint idle cards:
@@ -1089,7 +1089,7 @@ Before Task 1's pin, run Task 1 Step 1. After Task 1:
      and senor20201105 09_r4.
   2. Every staged log has a `PROVENANCE` line with `commit == C0` and `dirty == false`.
   3. Every `data_over_time` grid passes `validate_time_grid`.
-  4. Every epoch's minimum sample count is 8. If not, STOP and report (R9).
+  4. Every epoch's minimum sample count is 7. If not, STOP and report (R9).
   5. NonLocal and ContFrag share time grid and position per epoch: Task 10's
      `check_grids_match`, or the same comparison inline before the merge.
   6. The non-local events-per-epoch table is written, with outliers listed.

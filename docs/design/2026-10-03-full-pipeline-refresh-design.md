@@ -58,7 +58,7 @@ Dates written `YYYYMMDD` in paths below are the day that stage runs.
 | R6 | Re-decode all 218 epochs, including the three once blocked by an NWB checksum | All three load fully as of 2026-10-03. An epoch that still fails has its April files moved to the backup and is listed, so the canonical folder holds one decode version |
 | R7 | Rebuild the ContFrag decodes and everything downstream, including model refits and figures | Nothing is left on April data, so every comparison and every quoted number shares inputs |
 | R8 | A lean implementation plan: code tasks with acceptance criteria, plus a runbook per long run | The runs span days and several sessions |
-| R9 | Non-local events take the pinned package's minimum-duration rule: a run needs `round(0.015 s / step)` samples, so 8 bins at our 500 Hz grids, where 1.7.0 needed 9 | The project lead's choice, after review found the pin changes `segment_boolean_series` (`event_detection.py:78`). It matches the duration rule the four SWR detectors use at the same version. The rule is knife-edge at 500 Hz, since 15 ms is exactly 7.5 samples, and a grid more than about 0.13 ppm slow gets 7. Stage 1 therefore records each epoch's minimum and stops if they differ |
+| R9 | Non-local events take the pinned package's minimum-duration rule as it computes on our timestamps: `minimum_sample_count(time, 0.015)` is **7** at our 500 Hz grids, where 1.7.0 needed 9 bins | The project lead's choice (2026-10-03), made after review found the pin changes `segment_boolean_series` (`event_detection.py:78`), and after measuring the pilot epochs on the April posteriors: 2,365 events under 1.7.0 (9 bins), 2,382 at 8 bins, and 2,405 at 7 bins (+1.7%; j16 +4%). It matches the duration rule the four SWR detectors use at the same version. 15 ms is exactly 7.5 samples at 500 Hz, and absolute Unix timestamps make the median float64 step 2.0000935 ms, so the count rounds to 7. Every session shares that float spacing, so every epoch should compute 7; Stage 1 records each epoch's count and stops if any differs |
 
 ## What the re-decode changes
 
@@ -77,7 +77,7 @@ Measured on 2026-10-03 from `chimi20200225_02_r1_HPC_detector.pkl`, the git hist
 | No-Spike transition row during fitting | updated | frozen |
 | `results.nc` contents | posterior | posterior and the per-bin `log_likelihood` (added 2026-06-26) |
 | `ripple_detection` | 1.7.0 | `68e1784`: the changelog's 2.0.0 (2026-09-22), never tagged, so `git describe` gives `v1.7.1-365-g68e1784` |
-| Non-local event minimum duration (`segment_boolean_series`) | the last bin minus the first is at least 15 ms, so 9 bins at 500 Hz | at least `round(0.015 / step)` samples, so 8 bins (R9). The changelog marks it breaking, with about 20% more events |
+| Non-local event minimum duration (`segment_boolean_series`) | the last bin minus the first is at least 15 ms, so 9 bins at 500 Hz | at least `round(0.015 / step)` samples, so 7 bins at our grids (R9). The changelog marks it breaking; on the pilot epochs it adds 1.7% |
 | MUA burst events (`multiunit_HSE_detector`) | 1.7.0 rules | the 2.0 rules: duration counted in samples, one missing-sample policy, and a NaN speed that fails the speed rule |
 | Speed smoothing (`gaussian_smooth`) and the SWR consensus trace | kernel not renormalized at the ends | kernel renormalized at the ends of the data, so edge samples change |
 
@@ -212,7 +212,7 @@ GPUs, from one commit.
      review.
   5. Every staged log names `C0` with a clean tree.
   6. Every epoch's minimum non-local sample count, `minimum_sample_count(time, 0.015)`, is
-     the same (8 expected). If one differs, stop and report (R9).
+     the same (7 expected). If one differs, stop and report (R9).
 
 ## Stage 2: swap
 
