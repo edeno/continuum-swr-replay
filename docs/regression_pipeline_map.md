@@ -426,7 +426,7 @@ Convert the materialized canonical tables from pickle to parquet.
 
 Build canonical replay-content tables from ContFrag decoding results.
 
-`contfrag_table_basenames`, `find_sessions`, `main`
+`contfrag_table_basenames`, `find_sessions`, `build_parser`, `configure_paths`, `main`
 
 ### `scripts/decoding/prepare_replay_content_data.py`
 

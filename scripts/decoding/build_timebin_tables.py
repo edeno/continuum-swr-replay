@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import logging
 import time
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -34,7 +35,9 @@ from continuum_swr_replay.session_keys import n_sessions  # noqa: E402
 from continuum_swr_replay.table_io import publish_canonical  # noqa: E402
 from continuum_swr_replay.types import SessionDataKeys  # noqa: E402
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S"
+)
 logger = logging.getLogger(__name__)
 RC = PROCESSED_DATA_DIR / "replay_content"
 
@@ -42,14 +45,19 @@ RC = PROCESSED_DATA_DIR / "replay_content"
 def build_one(session: dict) -> tuple[pd.DataFrame, pd.DataFrame] | None:
     dot = pd.read_pickle(session["dot_file"])
     data = load_data(
-        session["nwb_file_name"], session["epoch_name"],
+        session["nwb_file_name"],
+        session["epoch_name"],
         include=frozenset({SessionDataKeys.PUMP_EVENTS}),
     )
     pumps = data.get("pump_events")
     pump_times = (
-        pumps["start_time"].to_numpy() if pumps is not None and len(pumps) else np.array([])
+        pumps["start_time"].to_numpy()
+        if pumps is not None and len(pumps)
+        else np.array([])
     )
-    return build_event_onset_table(dot, pump_times), build_stop_timebin_table(dot, pump_times)
+    return build_event_onset_table(dot, pump_times), build_stop_timebin_table(
+        dot, pump_times
+    )
 
 
 def validate(onset: pd.DataFrame, dense: pd.DataFrame) -> None:
@@ -85,6 +93,16 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--max-per-animal", type=int, default=None)
     ap.add_argument("--no-save", action="store_true")
+    ap.add_argument(
+        "--output-dir",
+        type=Path,
+        default=RC,
+        help=(
+            "Directory both tables are written to. Defaults to the canonical "
+            "replay_content root; pass a staging directory to build without "
+            "overwriting it."
+        ),
+    )
     args = ap.parse_args()
 
     sessions = find_sessions(max_per_animal=args.max_per_animal)
@@ -124,15 +142,22 @@ def main() -> None:
     validate(onset, dense)
 
     if args.no_save:
-        logger.info("--no-save: onsets=%d, dense bins=%d, not written", len(onset), len(dense))
+        logger.info(
+            "--no-save: onsets=%d, dense bins=%d, not written", len(onset), len(dense)
+        )
         return
     # publish_canonical stamps + writes atomically; the one canonical write door.
-    publish_canonical(onset, RC, table="event_onset", basename="event_onset_table")
-    publish_canonical(dense, RC, table="stop_timebin", basename="stop_timebin_table")
+    publish_canonical(
+        onset, args.output_dir, table="event_onset", basename="event_onset_table"
+    )
+    publish_canonical(
+        dense, args.output_dir, table="stop_timebin", basename="stop_timebin_table"
+    )
     logger.info(
         "saved %d onsets -> event_onset_table.parquet, "
         "%d bins -> stop_timebin_table.parquet",
-        len(onset), len(dense),
+        len(onset),
+        len(dense),
     )
 
 

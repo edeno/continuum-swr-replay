@@ -279,7 +279,8 @@ def _process_session(
     }
 
 
-def main():
+def build_parser() -> argparse.ArgumentParser:
+    """Return the command-line parser for this script."""
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -337,14 +338,57 @@ def main():
         type=Path,
         default=PROCESSED_DATA_DIR / "replay_content",
         help=(
-            "Replay-content root providing qvals and the version-matched "
-            "behavioral cache."
+            "Replay-content root providing qvals and, unless "
+            "--behavior-cache-dir is given, the version-matched behavioral "
+            "cache."
         ),
     )
-    args = parser.parse_args()
+    parser.add_argument(
+        "--behavior-cache-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Behavioral-cache root. Defaults to <--replay-content-dir>/"
+            "_session_cache; set it to keep reading the canonical cache "
+            "while --replay-content-dir points at a staged qvals table."
+        ),
+    )
+    return parser
+
+
+def configure_paths(args: argparse.Namespace) -> tuple[Path, Path]:
+    """Resolve the output and replay-content roots, and set the behavioral cache.
+
+    Sets ``replay_prepare_data.SESSION_CACHE_DIR``, the cache that
+    ``_process_session`` reads trials and the track graph from, to the
+    resolved ``--behavior-cache-dir`` when given, else to
+    ``<replay_content_dir>/_session_cache``.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed arguments from :func:`build_parser`.
+
+    Returns
+    -------
+    output_dir : Path
+        The resolved ``--output-dir``.
+    replay_content_dir : Path
+        The resolved ``--replay-content-dir``, which supplies the qvals table.
+    """
     output_dir = args.output_dir.resolve()
     replay_content_dir = args.replay_content_dir.resolve()
-    replay_prepare_data.SESSION_CACHE_DIR = replay_content_dir / "_session_cache"
+    replay_prepare_data.SESSION_CACHE_DIR = (
+        args.behavior_cache_dir.resolve()
+        if args.behavior_cache_dir is not None
+        else replay_content_dir / "_session_cache"
+    )
+    return output_dir, replay_content_dir
+
+
+def main():
+    args = build_parser().parse_args()
+    output_dir, replay_content_dir = configure_paths(args)
 
     max_per_animal = 2 if args.test else args.max_per_animal
     sessions = find_sessions(max_per_animal=max_per_animal, brain_area=args.brain_area)

@@ -9,9 +9,21 @@ session with two immobility bouts separated by a movement gap:
 * ``isi_within_stop`` resets at the stop boundary (first onset of a bout is NaN),
 * an absent event column (older decodes without ``MUA_event``) is tolerated,
 * a session with no immobility returns the empty schema.
+
+It also covers ``scripts/decoding/build_timebin_tables.py --output-dir``, which
+sends both tables to a staging directory instead of ``replay_content/``. The
+script is imported offline with ``spyglass`` stubbed, as
+``test_decoding_save_dir.py`` does, and its ``find_sessions``, ``build_one``,
+``validate`` and ``publish_canonical`` are replaced, so nothing is read from or
+written to ``Processed-Data``.
 """
 
 from __future__ import annotations
+
+import importlib
+import sys
+import types
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -24,6 +36,7 @@ from continuum_swr_replay.analysis.replay.timebin_tables import (
     build_event_onset_table,
     build_stop_timebin_table,
 )
+from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
 # All sources require whole-event head speed to be finite and < 4 cm/s.
 # Non-Local onsets additionally require every event bin's probability > 0.8.
@@ -96,7 +109,9 @@ def test_t_since_pump_bridges_movement_gap(two_bout_dot):
     """A pump in bout 0 carries forward to an onset in bout 1 across the gap."""
     dot, pumps = two_bout_dot  # pump at t=0.05
     onset = build_event_onset_table(dot, pumps)
-    bout1 = onset[(onset.event_type == "non_local") & np.isclose(onset.onset_time, 0.32)]
+    bout1 = onset[
+        (onset.event_type == "non_local") & np.isclose(onset.onset_time, 0.32)
+    ]
     assert len(bout1) == 1
     # 0.32 - 0.05 = 0.27, even though a movement gap intervenes.
     assert bout1["t_since_pump"].iloc[0] == pytest.approx(0.27)
@@ -144,10 +159,15 @@ def test_invalid_nonlocal_probability_labels_fail_loud():
     speed[5] = 10.0  # probability validation must happen before speed filtering
     dot = pd.DataFrame(
         {
-            "animal": "x", "day": 1, "epoch": "02_r1",
+            "animal": "x",
+            "day": 1,
+            "epoch": "02_r1",
             "head_speed": speed,
-            "SWR_event": swr, "non_local_event": nl, "MUA_event": 0,
-            "Non-Local_Continuous_prob": nlprob, "Non-Local_Fragmented_prob": 0.0,
+            "SWR_event": swr,
+            "non_local_event": nl,
+            "MUA_event": 0,
+            "Non-Local_Continuous_prob": nlprob,
+            "Non-Local_Fragmented_prob": 0.0,
         },
         index=t,
     )
@@ -171,10 +191,15 @@ def test_custom_nonlocal_threshold_accepts_labels_built_at_that_threshold():
     nlprob[5:7] = 0.6  # valid at 0.5, invalid at the 0.8 default
     dot = pd.DataFrame(
         {
-            "animal": "x", "day": 1, "epoch": "02_r1",
+            "animal": "x",
+            "day": 1,
+            "epoch": "02_r1",
             "head_speed": np.full(20, 1.0),
-            "SWR_event": 0, "non_local_event": nl, "MUA_event": 0,
-            "Non-Local_Continuous_prob": nlprob, "Non-Local_Fragmented_prob": 0.0,
+            "SWR_event": 0,
+            "non_local_event": nl,
+            "MUA_event": 0,
+            "Non-Local_Continuous_prob": nlprob,
+            "Non-Local_Fragmented_prob": 0.0,
         },
         index=t,
     )
@@ -239,5 +264,101 @@ def test_empty_session_returns_schema(two_bout_dot):
     assert len(dense) == 0
     for col in ("stop_id", "event_type", "onset_time", "t_since_pump"):
         assert col in onset.columns
-    for col in ("stop_id", "n_swr_events", "n_nonlocal_events", "n_mua_events", "head_speed"):
+    for col in (
+        "stop_id",
+        "n_swr_events",
+        "n_nonlocal_events",
+        "n_mua_events",
+        "head_speed",
+    ):
         assert col in dense.columns
+
+
+#: Modules that bind the Spyglass stub when imported under it.
+_STUB_BOUND_MODULES = (
+    "continuum_swr_replay.data_loaders.bandit_task",
+    "scripts.decoding.build_timebin_tables",
+)
+#: Two synthetic sessions: no real decode has these names.
+_SESSIONS = [
+    {"nwb_file_name": "testrat20990101_.nwb", "epoch_name": "02_r1"},
+    {"nwb_file_name": "testrat20990101_.nwb", "epoch_name": "04_r2"},
+]
+
+
+@pytest.fixture
+def timebin_script(monkeypatch):
+    """``build_timebin_tables.py``, imported offline with ``spyglass`` stubbed.
+
+    The script imports ``load_data``, whose ``bandit_task`` imports
+    ``spyglass.common.PositionIntervalMap`` at import time, which opens a
+    DataJoint connection. The modules imported here that bind the stub are
+    forgotten afterwards, so a later import gets the real ones.
+    """
+    common = types.ModuleType("spyglass.common")
+    common.PositionIntervalMap = type("PositionIntervalMap", (), {})
+    monkeypatch.setitem(sys.modules, "spyglass", types.ModuleType("spyglass"))
+    monkeypatch.setitem(sys.modules, "spyglass.common", common)
+
+    data_loaders = importlib.import_module("continuum_swr_replay.data_loaders")
+    fresh = [name for name in _STUB_BOUND_MODULES if name not in sys.modules]
+    load_data_was_cached = "load_data" in vars(data_loaders)
+
+    yield importlib.import_module("scripts.decoding.build_timebin_tables")
+
+    for name in fresh:
+        sys.modules.pop(name, None)
+        parent, _, child = name.rpartition(".")
+        vars(sys.modules[parent]).pop(child, None)
+    if not load_data_was_cached:
+        vars(data_loaders).pop("load_data", None)
+
+
+def _small_tables(session: dict) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Stand in for ``build_one``: one onset row and one stop bin for `session`."""
+    key = {
+        "animal": "testrat",
+        "session_date": "20990101",
+        "epoch": session["epoch_name"],
+    }
+    onset = pd.DataFrame([{**key, "event_type": "SWR"}])
+    dense = pd.DataFrame([{**key, "n_swr_events": 1}])
+    return onset, dense
+
+
+def test_output_dir_receives_both_tables(timebin_script, monkeypatch, tmp_path):
+    """``--output-dir`` receives both tables; without it they go to ``RC``.
+
+    The sessions are synthetic, ``build_one`` returns small frames instead of
+    reading a decode and calling ``load_data``, ``validate`` is a no-op, and
+    ``publish_canonical`` records the directory it is given instead of writing,
+    refusing any directory outside ``tmp_path``. For the default case ``RC`` is
+    pointed at a folder under ``tmp_path``, after checking its real value.
+    """
+    script = timebin_script
+    assert script.RC == PROCESSED_DATA_DIR / "replay_content"
+    monkeypatch.setattr(script, "find_sessions", lambda max_per_animal: _SESSIONS)
+    monkeypatch.setattr(script, "build_one", _small_tables)
+    monkeypatch.setattr(script, "validate", lambda onset, dense: None)
+    published: list[tuple[Path, str]] = []
+
+    def record(frame: pd.DataFrame, path: Path, *, table: str, basename: str) -> Path:
+        if not Path(path).resolve().is_relative_to(tmp_path.resolve()):
+            raise AssertionError(f"refusing to publish outside the test folder: {path}")
+        published.append((Path(path), table))
+        return Path(path) / f"{basename}.parquet"
+
+    monkeypatch.setattr(script, "publish_canonical", record)
+
+    monkeypatch.setattr(
+        sys, "argv", ["build_timebin_tables.py", "--output-dir", str(tmp_path)]
+    )
+    script.main()
+    assert published == [(tmp_path, "event_onset"), (tmp_path, "stop_timebin")]
+
+    canonical = tmp_path / "canonical"
+    monkeypatch.setattr(script, "RC", canonical)
+    published.clear()
+    monkeypatch.setattr(sys, "argv", ["build_timebin_tables.py"])
+    script.main()
+    assert published == [(canonical, "event_onset"), (canonical, "stop_timebin")]
