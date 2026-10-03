@@ -52,7 +52,7 @@ Dates written `YYYYMMDD` in paths below are the day that stage runs.
 |---|---|---|
 | R1 | Re-decode on current code as it stands; replace the canonical decodes after backing them up | The fixes since April are wanted. A spikes-only re-decode could not reproduce April's model on a library 79 commits newer |
 | R2 | Pin `ripple_detection` at `68e1784` before any decode | The decode's MUA burst events and SWR z-score then come from the same package version as the four SWR inventories |
-| R3 | Zugaro reads the same CA1 electrodes and references as Kay, Karlsson and Yu | The electrode set is shared input; only the band and filter differ between the four |
+| R3 | Zugaro reads one channel, picked per epoch by buzcode's `bz_GetBestRippleChan` from the same CA1 electrodes and references Kay, Karlsson and Yu read | The candidate set and referencing are shared input. Using one channel, and choosing it by the lineage's own rule, is the method's practice (revised 2026-10-03 from "all CA1 channels summed") |
 | R4 | Direct Kay at `68e1784` is the comparison's Kay inventory. The canonical `SWR_event` stays as an extra SWR definition and as the version check | Kay then matches the other three in package, band, electrodes and speed |
 | R5 | The Widloski runner reloads marks through the project's loader; the decoder records nothing extra | The project lead's choice. The loader is the code that fed the decode, and the audit confirms one commit (Stage 8). The guard's limits are stated under Stage 4 |
 | R6 | Re-decode all 218 epochs, including the three once blocked by an NWB checksum | All three load fully as of 2026-10-03. An epoch that still fails has its April files moved to the backup and is listed, so the canonical folder holds one decode version |
@@ -209,12 +209,12 @@ speed trace and time span.
     chimi20200225_02_r1), so each column is mapped to its electrode through the LFP's
     electrode table, as Spyglass does.
   - Each channel then has its reference subtracted, in float64.
-  - These referenced channels feed Zugaro.
+  - These referenced channels are Zugaro's candidates, from which it picks one.
 - **Input check.** Spyglass's own FIR filter (`FirFilterParameters`, `ripple_150_250` at
   1000 Hz: 535 taps, band edges 140/150/250/260 Hz) is applied through
   `FirFilterParameters().filter_data` to the referenced LFP, as `LFPBandV1.make` does. The
-  result must reproduce the stored band to the stored precision. This shows Zugaro reads the
-  same channels and referencing as the other three. The largest difference goes in the
+  result must reproduce the stored band to the stored precision. This shows Zugaro's
+  candidates are the channels the other three read, with the same referencing. The largest difference goes in the
   manifest, and a mismatch stops that epoch.
 - **Speed and span.** `head_speed` comes from `get_position_info`, the source and span the
   new decode uses, linearly interpolated onto LFP times. The LFP is restricted to the
@@ -231,7 +231,7 @@ speed trace and time span.
 | Kay | stored 150–250 Hz band | Spyglass's canonical settings, equal to the package defaults: z ≥ 2 for 15 ms, 4 ms Gaussian smoothing, z-score over all valid samples, no close-event exclusion |
 | Karlsson | stored band | package defaults: z ≥ 3 on any tetrode for 15 ms, 4 ms smoothing, z-score over all valid samples |
 | Yu | stored band | spec 01, step 4: threshold at the 99.99th percentile of the mirrored immobility noise, 20 ms above it, 4 ms smoothing, per-tetrode z-score (`zscore_per_channel=True`). Threshold diagnostics go in the manifest |
-| Zugaro | raw referenced LFP, filtered as below | squared and summed over channels; moving average of 11/1250 s (9 samples at 1000 Hz); z-score over all valid samples, which excludes the stretch edges below; boundaries strictly above 2 SD; peak strictly above 5 SD; events closer than 50 ms merged, with no length cap; no minimum duration. Events longer than 150 ms are then dropped (kept at exactly 150 ms) |
+| Zugaro | one raw referenced channel, chosen and filtered as below | squared; moving average of 11/1250 s (9 samples at 1000 Hz); z-score over all valid samples, which excludes the stretch edges below; boundaries strictly above 2 SD; peak strictly above 5 SD; events closer than 50 ms merged, with no length cap; no minimum duration. Events longer than 150 ms are then dropped (kept at exactly 150 ms) |
 
 **Speed rule.** All four run with `speed_threshold = 4.0`, Zugaro included: an event is
 kept only if speed at its first and last sample is at most 4 cm/s, and unknown speed fails.
@@ -269,10 +269,34 @@ core steps:
 An optional sixth step rejects events by an EMG signal and a noise channel. The package
 implements neither, so neither runs here.
 
+**Channel selection,** following buzcode `bz_GetBestRippleChan` (`0969ddf`), per epoch, over
+the CA1 candidates' referenced raw LFP:
+
+1. Band-pass 140–180 Hz with a Butterworth filter of order 4, zero-phase. As for detection,
+   it is designed at 1000 Hz in second-order sections, and filtered per gap-free stretch with
+   the same padding and edge exclusion.
+2. Compute a moving RMS over 12 ms: the original's 15 samples at 1250 Hz, given in seconds
+   as the package gives the 11-sample average, so 12 samples at 1000 Hz.
+3. Score each channel as mean RMS ÷ median RMS over its valid samples. A channel with
+   occasional large ripple bursts over a low baseline scores high.
+4. Leave out channels whose mean or median RMS is below 1, buzcode's dead-channel guard. It
+   applies in the stored LFP units, which the manifest names.
+5. The highest score wins, and an exact tie goes to the lowest electrode id.
+
+The original's own comment calls it a placeholder ("eventually this will detect which lfp
+channel has the highest SNR"). The other automated rules in the lineage are set aside:
+- Harvey 2023's power ratio (100–250 Hz over total power) uses a band from other settings
+  than the Databank ones.
+- neurocode's `swrChannels` asks interactive questions, so it can't be reproduced faithfully.
+
+The manifest records every candidate's score, the excluded channels and the winner. The
+report says how often the same channel wins across a day's run epochs.
+
 **Where this run departs from the lineage,** each recorded in the manifest:
 
-- **Channels.** All CA1 channels are squared and summed (R3), where the lineage's callers
-  usually pass one pyramidal-layer channel.
+- **Channel choice.** The channel is picked automatically by `bz_GetBestRippleChan`. The
+  Databank files store theirs as a tag (`channelTags.Ripple` in `session.mat`), often set by
+  hand in CellExplorer's session GUI, and the files don't record how it was chosen.
 - **Speed.** The shared 4 cm/s endpoint rule applies. The lineage has no speed criterion.
 - **Package conventions:**
   - the peak is the maximum of the normalized power;
@@ -359,6 +383,12 @@ a decode either.
   - padding and edge exclusion behave as stated;
   - a stretch too short to filter is unobserved;
   - the 150 ms cut keeps an event of exactly 150 ms.
+- **Channel selection:**
+  - a channel with sparse large bursts over a low baseline wins over a channel with steady
+    power;
+  - a flat or near-dead channel is excluded;
+  - a tie goes to the lowest electrode id;
+  - the 12 ms window and the 140–180 Hz order-4 band are pinned.
 - **Other units:**
   - the electrode assertion;
   - the pinned settings for all four detectors;
