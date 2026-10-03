@@ -28,6 +28,8 @@ Load results only (without detector):
 
 """
 
+from pathlib import Path
+
 import xarray as xr
 from non_local_detector import NonLocalClusterlessDetector
 from non_local_detector.environment import Environment
@@ -43,6 +45,7 @@ def load_results(
     non_stationary: bool = False,
     ripple_detector_name: str = "Kay",
     training_type: str = "no_ripple",
+    root: Path = PROCESSED_DATA_DIR,
 ) -> tuple[xr.Dataset, NonLocalClusterlessDetector | None, Environment | None]:
     """Load saved decoding results and detector model.
 
@@ -67,6 +70,9 @@ def load_results(
         Training regime used for the saved run. Must match the value passed to
         ``run_decoding_bandit.py`` so the ``_{training_type}`` suffix is
         reconstructed correctly. The default ``"no_ripple"`` appends no suffix.
+    root : Path, optional
+        Folder every file is read from, by default ``PROCESSED_DATA_DIR``. A
+        decode resuming from a staging folder passes that folder.
 
     Returns
     -------
@@ -89,7 +95,7 @@ def load_results(
         epoch_identifier += f"_{training_type}"
 
     results = xr.open_dataset(
-        PROCESSED_DATA_DIR / f"{epoch_identifier}_results.nc",
+        root / f"{epoch_identifier}_results.nc",
         engine="h5netcdf",
     )
     state_bin_coord_names = list(results["state_bins"].coords)
@@ -97,7 +103,7 @@ def load_results(
 
     if load_detector:
         detector = NonLocalClusterlessDetector.load_model(
-            PROCESSED_DATA_DIR / f"{epoch_identifier}_detector.pkl"
+            root / f"{epoch_identifier}_detector.pkl"
         )
         env = detector.environments[0]
     else:

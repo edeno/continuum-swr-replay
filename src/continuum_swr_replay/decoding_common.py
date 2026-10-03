@@ -5,9 +5,13 @@ Contains the common infrastructure used by both ``run_decoding_bandit.py``
 2-state classifier).
 """
 
+import hashlib
+import importlib.metadata
+import json
 import logging
 import logging.config
 import os
+import subprocess
 import sys
 from argparse import ArgumentParser, Namespace
 from collections.abc import Callable
@@ -32,6 +36,7 @@ from continuum_swr_replay.parameters import (
     BLOCK_SIZE,
     LOCAL_POSITION_STD,
     POSITION_STD,
+    PROCESSED_DATA_DIR,
     WAVEFORM_STD,
 )
 from continuum_swr_replay.types import ClusterlessParams, SortedSpikesParams
@@ -167,6 +172,58 @@ def results_exist(
     return all(f.exists() for f in required_files)
 
 
+def provenance_record(repo: Path) -> dict[str, Any]:
+    """Record the code and environment a decode runs from.
+
+    Each decoder logs this once per epoch, after START, as ``PROVENANCE `` plus
+    ``json.dumps(record, sort_keys=True)``.
+
+    Parameters
+    ----------
+    repo : Path
+        The git work tree the decode runs from. ``uv.lock`` is read from its root.
+
+    Returns
+    -------
+    dict
+        - ``commit``: ``git rev-parse HEAD``.
+        - ``dirty``: True when ``git status --porcelain --untracked-files=no``
+          lists anything. Untracked files are not counted, because the work
+          tree holds untracked files from unrelated work.
+        - ``uv_lock_sha256``: the sha256 of ``repo / "uv.lock"``.
+        - ``ripple_detection_commit``: the git commit ``ripple_detection`` was
+          installed from, read from its ``direct_url.json``, or None when that
+          names no commit. Its version string comes from the last tag, so it
+          does not identify the commit.
+        - ``non_local_detector_version``: the installed version.
+        - ``cuda_plugin_version``: the installed ``jax-cuda12-plugin`` version,
+          or None when it is not installed.
+    """
+
+    def git(*args: str) -> str:
+        return subprocess.run(
+            ["git", *args], cwd=repo, capture_output=True, text=True, check=True
+        ).stdout.strip()
+
+    direct_url = importlib.metadata.distribution("ripple-detection").read_text(
+        "direct_url.json"
+    )
+    vcs_info = json.loads(direct_url).get("vcs_info", {}) if direct_url else {}
+    try:
+        cuda_plugin_version = importlib.metadata.version("jax-cuda12-plugin")
+    except importlib.metadata.PackageNotFoundError:
+        cuda_plugin_version = None
+
+    return {
+        "commit": git("rev-parse", "HEAD"),
+        "dirty": bool(git("status", "--porcelain", "--untracked-files=no")),
+        "uv_lock_sha256": hashlib.sha256((repo / "uv.lock").read_bytes()).hexdigest(),
+        "ripple_detection_commit": vcs_info.get("commit_id"),
+        "non_local_detector_version": importlib.metadata.version("non-local-detector"),
+        "cuda_plugin_version": cuda_plugin_version,
+    }
+
+
 def filter_epoch_info(epoch_info: pd.DataFrame, args: Namespace) -> pd.DataFrame:
     """Filter the epoch_info DataFrame based on command line arguments."""
     is_epoch = np.ones(len(epoch_info), dtype=bool)
@@ -203,6 +260,19 @@ def add_common_args(parser: ArgumentParser) -> ArgumentParser:
     parser.add_argument("--animal", type=str)
     parser.add_argument("--date", type=int)
     parser.add_argument("--epoch", type=str)
+    parser.add_argument(
+        "--save_dir",
+        type=Path,
+        default=PROCESSED_DATA_DIR,
+        help="Folder the decodes are written to, and resumed from "
+        "(default: Processed-Data). Created if missing.",
+    )
+    parser.add_argument(
+        "--allow_cpu",
+        action="store_true",
+        help="Decode on a CPU cluster when dask_cuda is not importable, "
+        "instead of refusing to start.",
+    )
     return parser
 
 
@@ -224,7 +294,20 @@ def run_batch(
     extra_kwargs : dict, optional
         Additional keyword arguments to pass to ``run_decode_fn`` beyond
         the common ones.
+
+    Raises
+    ------
+    RuntimeError
+        If ``dask_cuda`` is not importable and ``--allow_cpu`` was not given.
+        Without this check the batch would silently decode on a CPU cluster.
     """
+    if not HAS_CUDA and not args.allow_cpu:
+        raise RuntimeError(
+            "dask_cuda is not importable, so this batch would decode on a CPU "
+            "cluster. Install dask-cuda by hand (see docs/README.md), or pass "
+            "--allow_cpu to decode on CPU."
+        )
+
     if extra_kwargs is None:
         extra_kwargs = {}
 
@@ -257,6 +340,7 @@ def run_batch(
                 brain_area=args.brain_area,
                 non_stationary=args.non_stationary,
                 ripple_detector_name=args.ripple_detector_name,
+                save_dir=args.save_dir,
                 **extra_kwargs,
             )
             for epoch in epoch_info.itertuples()
@@ -270,14 +354,10 @@ def run_batch(
         n_total = len(outcomes)
 
         if failures:
-            sys.stderr.write(
-                f"\n{len(failures)}/{n_total} session(s) FAILED:\n"
-            )
+            sys.stderr.write(f"\n{len(failures)}/{n_total} session(s) FAILED:\n")
             for ident in failures:
                 sys.stderr.write(f"  - {ident}\n")
-            sys.stderr.write(
-                "See logs/<epoch_identifier>.log for tracebacks.\n"
-            )
+            sys.stderr.write("See logs/<epoch_identifier>.log for tracebacks.\n")
             sys.exit(1)
 
         print(f"\nAll {n_total} session(s) completed.")

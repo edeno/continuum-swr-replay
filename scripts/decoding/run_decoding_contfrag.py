@@ -20,9 +20,12 @@ python run_decoding_contfrag.py --animal chimi --date 20200212 --epoch 02_r1
 # With non-stationary model
 python run_decoding_contfrag.py --animal chimi --non_stationary
 
+# Write to (and resume from) a staging folder instead of Processed-Data
+python run_decoding_contfrag.py --animal chimi --save_dir Processed-Data/_staging_redecode_20261003
+
 Output Files
 ------------
-Saved to PROCESSED_DATA_DIR with ``_contfrag`` suffix:
+Saved to ``--save_dir`` (default PROCESSED_DATA_DIR) with ``_contfrag`` suffix:
 
 {epoch_identifier}_contfrag_results.nc
 {epoch_identifier}_contfrag_detector.pkl
@@ -30,8 +33,8 @@ Saved to PROCESSED_DATA_DIR with ``_contfrag`` suffix:
 {epoch_identifier}_contfrag_data_over_time.pkl
 """
 
+import json
 import logging
-import subprocess
 import warnings
 from argparse import ArgumentParser
 from pathlib import Path
@@ -58,6 +61,7 @@ from continuum_swr_replay.data_loaders import (
 from continuum_swr_replay.decoding_common import (
     DecodingConfig,
     add_common_args,
+    provenance_record,
     results_exist,
     run_batch,
     setup_logger,
@@ -67,6 +71,7 @@ from continuum_swr_replay.parameters import (
     PLACE_BIN_SIZE_1D,
     PLACE_BIN_SIZE_2D,
     PROCESSED_DATA_DIR,
+    ROOT_DIR,
 )
 from continuum_swr_replay.types import SessionData
 
@@ -189,19 +194,27 @@ def save_results_and_model(
     data_over_time: pd.DataFrame,
     save_folder: Path,
     epoch_identifier: str,
+    *,
+    resumed: bool,
 ) -> None:
-    """Save ContFrag decoding results."""
-    logger.info("Saving results...")
-    results.reset_index("state_bins").to_netcdf(
-        save_folder / f"{epoch_identifier}_results.nc",
-        engine="h5netcdf",
-    )
-    detector.save_model(save_folder / f"{epoch_identifier}_detector.pkl")
-    env.save_environment(save_folder / f"{epoch_identifier}_environment.pkl")
+    """Save ContFrag decoding results.
 
-    data_over_time.to_pickle(
-        save_folder / f"{epoch_identifier}_data_over_time.pkl"
-    )
+    When ``resumed`` is True the results, classifier and environment were read
+    back from ``save_folder``, and ``results`` is still open lazily on its
+    file there, so only ``data_over_time`` is written.
+    """
+    if resumed:
+        logger.info("Resumed: saving data_over_time only...")
+    else:
+        logger.info("Saving results...")
+        results.reset_index("state_bins").to_netcdf(
+            save_folder / f"{epoch_identifier}_results.nc",
+            engine="h5netcdf",
+        )
+        detector.save_model(save_folder / f"{epoch_identifier}_detector.pkl")
+        env.save_environment(save_folder / f"{epoch_identifier}_environment.pkl")
+
+    data_over_time.to_pickle(save_folder / f"{epoch_identifier}_data_over_time.pkl")
 
 
 def organize_results(
@@ -255,8 +268,13 @@ def run_decode(
     non_stationary: bool = False,
     ripple_detector_name: str = "Kay",
     brain_area: str = "HPC",
+    save_dir: Path = PROCESSED_DATA_DIR,
 ) -> str | None:
     """Run ContFrag decoding for a single session.
+
+    Results are written to ``save_dir``. If they are already there (and
+    ``overwrite`` is False), the decode resumes: it reads them back from
+    ``save_dir`` and rewrites only ``data_over_time``.
 
     Returns
     -------
@@ -265,8 +283,7 @@ def run_decode(
         on caught exception so ``run_batch`` can aggregate failures.
     """
     epoch_identifier = (
-        f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}"
-        f"_{brain_area}_contfrag"
+        f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{brain_area}_contfrag"
     )
     if ripple_detector_name != "Kay":
         epoch_identifier += f"_{ripple_detector_name}"
@@ -275,8 +292,6 @@ def run_decode(
     if training_type != "no_ripple":
         epoch_identifier += f"_{training_type}"
 
-    save_folder = PROCESSED_DATA_DIR
-
     logger = setup_logger(
         name_logfile=epoch_identifier,
         path_logfile=Path(log_directory) / f"{epoch_identifier}.log",
@@ -284,18 +299,16 @@ def run_decode(
 
     try:
         logger.info(" START (ContFrag) ".center(50, "#"))
-
-        git_hash = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            stdout=subprocess.PIPE,
-            text=True,
-        ).stdout
-        logger.info(f"Git Hash: {git_hash.rstrip()}")
+        provenance = provenance_record(ROOT_DIR)
+        logger.info("PROVENANCE " + json.dumps(provenance, sort_keys=True))
+        logger.info(f"Git Hash: {provenance['commit']}")
         logger.info("model: ContFrag (2-state: Continuous, Fragmented)")
         logger.info(f"training type: {training_type}")
         logger.info(f"non_stationary: {non_stationary}")
         logger.info(f"ripple_detector_name: {ripple_detector_name}")
         logger.info(f"brain_area: {brain_area}")
+        logger.info(f"save_dir: {save_dir}")
+        save_dir.mkdir(parents=True, exist_ok=True)
         logger.info("Loading data...")
         data = load_data(
             nwb_file_name,
@@ -312,7 +325,8 @@ def run_decode(
             logger.warning(f"No spike data available for {brain_area}. Skipping...")
             return
 
-        if results_exist(save_folder, epoch_identifier, overwrite):
+        resumed = results_exist(save_dir, epoch_identifier, overwrite)
+        if resumed:
             logger.info(
                 f"ContFrag results already exist for {brain_area}. Skipping decoding..."
             )
@@ -323,6 +337,7 @@ def run_decode(
                 non_stationary=non_stationary,
                 ripple_detector_name=ripple_detector_name,
                 training_type=training_type,
+                root=save_dir,
             )
         else:
             is_training = get_training_timepoints(data, training_type=training_type)
@@ -346,12 +361,23 @@ def run_decode(
 
         logger.info("Organizing results...")
         data_over_time, posterior = organize_results(
-            data, results, env, nwb_file_name, epoch_name, brain_area,
+            data,
+            results,
+            env,
+            nwb_file_name,
+            epoch_name,
+            brain_area,
         )
 
         save_results_and_model(
-            logger, results, detector, env,
-            data_over_time, save_folder, epoch_identifier,
+            logger,
+            results,
+            detector,
+            env,
+            data_over_time,
+            save_dir,
+            epoch_identifier,
+            resumed=resumed,
         )
 
         logger.info("Done!")
