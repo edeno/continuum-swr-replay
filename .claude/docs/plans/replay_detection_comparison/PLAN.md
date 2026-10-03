@@ -1,10 +1,14 @@
 # Replay detection comparison — implementation plan
 
-**Status (2026-10-02):** Phase 0 done. Phase 2 implemented, tested and reviewed four
+**Status (2026-10-03):** Phase 0 done. Phase 2 implemented, tested and reviewed four
 times (through 2026-09-25), including the shuffle, the event table, a per-epoch runner and
 the simulation controls ([memoryless-simulation-controls](../memoryless-simulation-controls/PLAN.md),
-done); first real-data pilot ran without the shuffle on 2026-10-02 after two input fixes
-(decode-time marks, grid rate); see "Phase 2 pilot" below. The work has moved to a machine that holds all 218
+done). The descriptive real-data pilot is done (2026-10-02, five epochs, with the shuffle,
+after two input fixes: decode-time marks, grid rate): 28 of 1,409 candidates meet duration
+and dispersion, 26 pass the shuffle, 26 overlap an SWR, and 2 rest on one kept window
+outside their pieces (now panel f of the comparison figure). The pilot's three checks
+(null validation, two sensitivities, reference-output rerun) are **not done** and are
+Phase 2's next step; see "Phase 2 pilot" below. The work has moved to a machine that holds all 218
 canonical HPC decodes, so the real-data pilot is unblocked; pilot epochs are chosen below.
 Phase 1 is **re-scoped (2026-10-02): the SWR inventories are computed directly** by calling
 the pinned `ripple_detection` detectors on the ripple-band LFP, with no Spyglass
@@ -209,6 +213,27 @@ shuffle passes (p = 0.01) and the jump half does not (p = 0.12), unlike
 chimi's candidate 28 (0.02 / 0.03). Figure beside candidate 28:
 `stray_window_outputs/stray_window_figure.png` (`plot_stray_window.py`). The
 research directory is gitignored, so these stay local.
+
+**The construction as a figure example (2026-10-03, 53b4b72 then 5db999a).** The
+builder is `stray_window_spikes` in `memoryless_sequence/simulation.py`, and the
+event is panel f of `generate_memoryless_comparison.py`, placed at 31.40 s (the
+stillness before the inbound replay; placed before the outbound replay it
+flipped that replay's verdict) and written into the decoded spikes only, so the
+encoding model is fitted as before. The first version (five local cells,
+142-170 cm) decoded its still parts at about 155 cm against the animal's 170 cm,
+and the state-space detector read 124 of its 201 ms as non-local. The current
+version carries the still parts with the two cells nearest the animal for 120
+ms either side: 99% of the kept windows decode within 15 cm of the animal, the
+state-space detector reports no non-local time, and dispersion is 14.4 cm with
+the far window against 0.5 cm without. It fails the shuffle on both halves
+(p = 0.41 spread, 0.32 jump). A scratch sweep of 25+ local-cell variants found
+none that both decodes at the animal and passes the jump half: with only the
+170 and 163 cm cells covering the animal's place, about one shuffle draw in five
+puts the pair close together and the shuffled event is as still as the real one
+(read from individual draws; not a caption claim). Variants with cells further
+back pass the spread half but move the decode off the animal, and the
+state-space detector then reports up to 169 ms non-local. On recorded data,
+where many cells fire, both stray-window calls passed the shuffle.
 
 ```bash
 python scripts/decoding/run_memoryless_detection.py --run-seed 20260922 \
