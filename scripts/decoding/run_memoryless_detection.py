@@ -5,11 +5,15 @@ The Widloski & Foster sliding-window detector, ported in
 ``continuum_swr_replay.analysis.hippocampus.memoryless_sequence``, run on each
 epoch's saved clusterless decode: the encoding model from
 ``{epoch_id}_detector.pkl``, the decode grid, position, speed and SWR labels
-from ``{epoch_id}_80_data_over_time.pkl``, and the spike marks rebuilt from the raw
-``UnitMarks`` as the decode filtered them (``memoryless_sequence.decode_marks``;
-``load_data`` now filters coincident spikes differently), checked against the
-marks the encoding model was fitted on.
+from ``{epoch_id}_80_data_over_time.pkl``, and the spike marks read as
+``load_data`` read them for the decode (``MARKS_RULE``): ``get_hpc_marks``,
+then ``filter_spike_times`` over the decode's time span.
 Both procedures therefore read one encoding model.
+``check_marks_match_encoding`` refuses them unless every mark the encoding
+model was fitted on is among them. Those are the training span's, so it cannot
+see a spike the reload adds, or one dropped only during SWRs, which
+``no_ripple`` training leaves out; the refresh design leaves that gap to its
+Stage 8 one-commit check (``docs/design/2026-10-03-full-pipeline-refresh-design.md``).
 
 Each epoch writes, under ``Processed-Data/replay_detection_comparison/memoryless/<run_id>/``:
 
@@ -21,7 +25,7 @@ Each epoch writes, under ``Processed-Data/replay_detection_comparison/memoryless
   and pre-merge runs that explain each rejection.
 
 ``manifest.json`` records the run's settings and, per epoch, the commit, the
-time grid, a hash of every input and of the marks, the encoding model's
+time grid, a hash of every input, the marks' rule and hash, the encoding model's
 settings, and the outcome. It is rewritten atomically after each epoch, so a
 run that stops part way still says what it did, and a rerun under the same
 run id refuses to continue with different settings, code or library
@@ -32,8 +36,13 @@ commit, and so the default run id, has changed, and the finished epochs are
 recomputed under the new one, which is what the settings gate is for.
 ``run.log`` beside the manifest keeps everything printed.
 
-The raw marks come from the Spyglass database unless ``--cache-dir`` already
-holds this decode's marks from an earlier run.
+The marks come from the Spyglass database unless ``--cache-dir`` already holds
+this decode's from an earlier run. A cache file is named for the epoch, the
+rule (``MARKS_RULE_TAG``) and the first 16 hex digits of the decode's
+``_detector.pkl`` sha256, so it serves only marks read under this rule for this
+decode file: one made for another decode of the epoch is never read, and
+neither is the pilot's ``{epoch_id}_decode_time_marks.pkl``, made under the
+April decodes' rule.
 
 Epoch identifiers name the decode: ``chimi20200212_02_r1_HPC`` is the
 canonical one (Kay's SWRs, trained on ``no_ripple``, stationary). A decode
@@ -69,6 +78,7 @@ from typing import Any
 import joblib
 import numpy as np
 import pandas as pd
+from numpy.typing import NDArray
 
 from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
@@ -78,11 +88,6 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
     load_clusterless_encoding_model,
     run_epoch,
     window_midpoints_s,
-)
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.decode_marks import (
-    COINCIDENT_RULE,
-    DECODE_COMMIT,
-    decode_time_marks,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.event_table import (
     canonical_swr_intervals,
@@ -97,6 +102,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle impor
     SIGNIFICANCE_LEVEL,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import git_hash
+from continuum_swr_replay.data_loaders.spikes import filter_spike_times, get_hpc_marks
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.table_io import sha256_file, write_table
 
@@ -116,6 +122,15 @@ reads it as a ripple detector and not as a name no decode writes."""
 
 DEFAULT_TRAINING_TYPE = "no_ripple"
 """The training type a decode does not append to its identifier."""
+
+MARKS_RULE = (
+    "load_data: get_hpc_marks (tetrode sort groups; coincident spikes counted) "
+    "then filter_spike_times over the decode's time span"
+)
+"""How the marks are read, for the manifest: as ``load_data`` read them."""
+
+MARKS_RULE_TAG = "loader"
+""":data:`MARKS_RULE`'s name in a marks cache file; another rule needs another tag."""
 
 
 @dataclass(frozen=True)
@@ -234,57 +249,59 @@ def find_epochs(
     return epochs, skipped
 
 
-def marks_cache_path(key: EpochKey, cache_dir: Path) -> Path:
-    """Where one decode's decode-time marks are cached."""
-    return cache_dir / f"{key.epoch_id}_decode_time_marks.pkl"
+def marks_cache_path(key: EpochKey, cache_dir: Path, detector_sha256: str) -> Path:
+    """Where one decode's marks are cached under :data:`MARKS_RULE`.
 
-
-def fetch_raw_hpc_unit_marks(nwb_file_name: str) -> tuple[list, list]:
-    """Every HPC ``UnitMarks`` sort group of a session, before any filtering.
-
-    The restriction is ``get_hpc_marks``'s at the decode commit
-    (:data:`~continuum_swr_replay.analysis.hippocampus.memoryless_sequence.decode_marks.DECODE_COMMIT`),
-    without the tetrode-only filter that came after it.
+    The name carries the rule's tag and the first 16 hex digits of the decode's
+    ``_detector.pkl`` sha256, so a cache made for another decode of the epoch,
+    or under another rule, is never read.
     """
-    from spyglass.decoding.v0.clusterless import UnitMarks
-
-    restriction = {
-        "nwb_file_name": nwb_file_name,
-        "curation_id": 0,
-        "sort_interval_name": "runs_noPrePostTrialTimes raw data valid times",
-        "preproc_params_name": "franklab_tetrode_hippocampus",
-        "team_name": "ac_em_xs",
-        "sorter": "clusterless_thresholder",
-        "mark_param_name": "default",
-        "sorter_params_name": "clusterless_fixed",
-    }
-    if len(UnitMarks & restriction) == 0:
-        restriction["sorter_params_name"] = "default_clusterless"
-    marks = (UnitMarks & restriction).fetch_dataframe()
-    if len(marks) == 0:
-        raise ValueError(f"No HPC UnitMarks for {nwb_file_name!r}.")
     return (
-        [mark.index.to_numpy() for mark in marks],
-        [mark.to_numpy() for mark in marks],
+        cache_dir / f"{key.epoch_id}_{MARKS_RULE_TAG}_{detector_sha256[:16]}_marks.pkl"
     )
 
 
 def load_marks(
-    key: EpochKey, cache_dir: Path, span_s: tuple[float, float]
-) -> tuple[list, list]:
-    """The spike times and marks this decode was fitted on, cached per decode.
+    key: EpochKey,
+    cache_dir: Path,
+    span_s: tuple[float, float],
+    detector_sha256: str,
+) -> tuple[list[NDArray], list[NDArray]]:
+    """A decode's HPC spike times and marks, read as ``load_data`` read them.
 
-    The saved decodes predate a correction to the coincident-spike filter, so
-    ``load_data`` no longer returns their marks; they are rebuilt from the raw
-    ``UnitMarks`` with the decode-time filtering (see ``decode_marks``) over
-    the decode's own time span. A stale cache is caught by
-    ``check_marks_match_encoding``.
+    ``get_hpc_marks``, then ``filter_spike_times`` over the decode's time span:
+    ``load_data`` filters over the position grid, which is the decode's grid.
+    Cached per decode file (:func:`marks_cache_path`).
+
+    Parameters
+    ----------
+    key : EpochKey
+        The decode.
+    cache_dir : Path
+        Where the marks are cached.
+    span_s : tuple of float
+        First and last time of the decode's grid, in seconds; spikes on either
+        end are kept.
+    detector_sha256 : str
+        sha256 of the decode's ``_detector.pkl``, which keys the cache.
+
+    Returns
+    -------
+    spike_times : list of ndarray, each shape (n_spikes,)
+    spike_waveform_features : list of ndarray, each shape (n_spikes, n_features)
+        One per tetrode with a spike in ``span_s``, in ``get_hpc_marks``'s order.
     """
-    cache = marks_cache_path(key, cache_dir)
+    cache = marks_cache_path(key, cache_dir, detector_sha256)
     if cache.exists():
-        cached: tuple[list, list] = joblib.load(cache)
+        cached: tuple[list[NDArray], list[NDArray]] = joblib.load(cache)
         return cached
-    marks = decode_time_marks(*fetch_raw_hpc_unit_marks(key.nwb_file_name), span_s)
+    spike_times, spike_waveform_features = get_hpc_marks(key.nwb_file_name)
+    in_span_times, in_span_features = filter_spike_times(
+        {"HPC": spike_times},
+        {"HPC": spike_waveform_features},
+        np.asarray(span_s, dtype=np.float64),
+    )
+    marks = (in_span_times["HPC"], in_span_features["HPC"])
     cache_dir.mkdir(parents=True, exist_ok=True)
     joblib.dump(marks, cache)
     return marks
@@ -349,7 +366,8 @@ def run_one(
     config: MemorylessSequenceConfig,
     provenance: dict,
     marks_loader: Callable[
-        [EpochKey, Path, tuple[float, float]], tuple[list, list]
+        [EpochKey, Path, tuple[float, float], str],
+        tuple[list[NDArray], list[NDArray]],
     ] = load_marks,
 ) -> dict:
     """Detect, test and save one epoch; return what the manifest records for it.
@@ -369,6 +387,7 @@ def run_one(
     missing = [name for name, path in inputs.items() if not path.exists()]
     if missing:
         raise FileNotFoundError(f"{epoch_id}: missing {', '.join(missing)}.")
+    input_sha256 = {name: sha256_file(path) for name, path in inputs.items()}
 
     encoding_model = load_clusterless_encoding_model(inputs["detector"])
     data_over_time = pd.read_pickle(inputs["data_over_time"])
@@ -384,7 +403,7 @@ def run_one(
     )
     time = data_over_time.index.to_numpy(dtype=np.float64)
     spike_times, spike_waveform_features = marks_loader(
-        key, cache_dir, (float(time[0]), float(time[-1]))
+        key, cache_dir, (float(time[0]), float(time[-1])), input_sha256["detector"]
     )
     check_marks_match_encoding(encoding_model, spike_times, spike_waveform_features)
 
@@ -463,15 +482,15 @@ def run_one(
         ),
         "n_shuffle_pass": int(table.shuffle_pass.sum()),
         "inputs": {
-            name: {"path": str(path), "sha256": sha256_file(path)}
+            name: {"path": str(path), "sha256": input_sha256[name]}
             for name, path in inputs.items()
         },
         "marks": {
-            "source": "raw HPC UnitMarks with the decode-time filtering",
-            "decode_commit": DECODE_COMMIT,
-            "coincident_rule": COINCIDENT_RULE,
+            "rule": MARKS_RULE,
+            "detector_sha256": input_sha256["detector"],
+            "cache": marks_cache_path(key, cache_dir, input_sha256["detector"]).name,
+            "sha256": marks_sha256(spike_times, spike_waveform_features),
         },
-        "marks_sha256": marks_sha256(spike_times, spike_waveform_features),
         "outputs": {name: str(path) for name, path in outputs.items()},
     }
 

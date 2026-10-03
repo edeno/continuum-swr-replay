@@ -933,6 +933,20 @@ is not part of this subpackage.
 `scripts/decoding/run_memoryless_detection.py` is the per-epoch runner: it reads each
 epoch's saved decode, calls `run_epoch`, and writes the tables and a run manifest.
 
+**Spike marks.** The runner reads them through the project's loader, with the two
+functions `load_data` uses: `get_hpc_marks` (tetrode sort groups, coincident spikes
+counted), then `filter_spike_times` over the decode's time span, which is the position
+grid `load_data` filtered over when the decode ran. `check_marks_match_encoding` refuses
+them unless every mark the encoding model was fitted on is among them. Those are the
+training span's, so the check cannot see a spike the reload adds, or one dropped only
+during SWRs, which `no_ripple` training leaves out; the
+[full-pipeline refresh](../2026-10-03-full-pipeline-refresh-design.md) leaves that gap to
+its Stage 8 one-commit check. The marks are cached per decode file: a cache file is named
+for the epoch, the rule (`loader`) and the first 16 hex digits of the decode's
+`_detector.pkl` sha256. A cache made for another decode of the epoch is therefore never
+read, and neither is the pilot's `{epoch_id}_decode_time_marks.pkl`, made under the April
+decodes' rule, which keeps more spikes and so could pass the guard.
+
 ## Data flow, per epoch
 
 1. Load `encoding_model_[("", 0)]` from `{epoch}_detector.pkl`; compute prior-excluded
@@ -1083,7 +1097,8 @@ statistics and gates, and the pre- and post-merge runs, are saved as the
 Timing column names mirror the canonical event table so comparison code is symmetric.
 `ms_event_id` is deliberately a different key from `event_id` (D6).
 The run manifest records model/artifact hashes, code versions, thresholds, time grid,
-encoding/training provenance, shuffle definition/seeds/scoring conventions, and any skipped epochs.
+encoding/training provenance, the marks' rule, cache file and hash,
+shuffle definition/seeds/scoring conventions, and any skipped epochs.
 Export 03's observation intervals from input and output availability before applying
 detection gates, accounting for full window support at edges and gaps. An empty event
 table alone cannot distinguish an observed interval from a failed or unavailable run.

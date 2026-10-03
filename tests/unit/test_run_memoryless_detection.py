@@ -6,6 +6,7 @@ the decode saves, and its marks go into the runner's cache, where a second real
 run would find them.
 """
 
+import hashlib
 import json
 
 import joblib
@@ -13,6 +14,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import scripts.decoding.run_memoryless_detection as runner
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
     MEMORYLESS_EVENT_TABLE_DTYPES,
     MemorylessSequenceConfig,
@@ -20,6 +22,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
     ENCODING_KEY,
 )
+from continuum_swr_replay.data_loaders import spikes
 from continuum_swr_replay.table_io import read_table
 from scripts.decoding.run_memoryless_detection import (
     DEFAULT_SWR_DEFINITION,
@@ -98,6 +101,20 @@ class TestParseEpochIdentifier:
 
 def touch(path):
     path.write_bytes(b"")
+
+
+def file_sha256(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def cache_marks(root, epoch, cache_dir, epoch_id=EPOCH_ID):
+    """Cache an epoch's marks where the runner looks for its decode's."""
+    cache_dir.mkdir(exist_ok=True)
+    detector_sha256 = file_sha256(input_paths(epoch_id, root)["detector"])
+    joblib.dump(
+        (epoch.spike_times, epoch.spike_waveform_features),
+        marks_cache_path(parse_epoch_identifier(epoch_id), cache_dir, detector_sha256),
+    )
 
 
 class TestFindEpochs:
@@ -199,7 +216,7 @@ def run(decode_root, tmp_path, **overrides):
         "n_shuffles": N_SHUFFLES,
         "config": CONFIG,
         "provenance": {"git_commit": "test"},
-        "marks_loader": lambda key, cache, span: (
+        "marks_loader": lambda key, cache, span, detector_sha256: (
             epoch.spike_times,
             epoch.spike_waveform_features,
         ),
@@ -291,7 +308,10 @@ class TestRunOne:
             run(
                 decode_root,
                 tmp_path,
-                marks_loader=lambda key, cache, span: (epoch.spike_times, changed),
+                marks_loader=lambda key, cache, span, detector_sha256: (
+                    epoch.spike_times,
+                    changed,
+                ),
             )
 
     def test_what_was_observed_is_written_apart_from_what_was_found(
@@ -315,7 +335,7 @@ class TestRunOne:
 
         assert record["time_grid"]["n_samples"] == epoch.time.size
         assert record["time_grid"]["start_s"] == epoch.time[0]
-        assert len(record["marks_sha256"]) == 64
+        assert len(record["marks"]["sha256"]) == 64
         assert record["encoding"]["n_electrodes"] == len(epoch.spike_times)
         assert record["git_commit"] == "test"
         assert record["decode"]["swr_definition"] == "Kay"
@@ -357,55 +377,130 @@ class TestRunOne:
         assert swr.start_s.min() >= epoch.time[epoch.time.size // 2]
 
 
-class TestLoadMarks:
-    def test_raw_marks_are_filtered_as_the_decode_was_and_cached(
-        self, tmp_path, monkeypatch
-    ):
-        import scripts.decoding.run_memoryless_detection as runner
+KEY = parse_epoch_identifier(EPOCH_ID)
+SPAN_S = (10.0, 20.0)
+"""A decode's first and last time, in seconds."""
 
+
+class TestLoadMarks:
+    def test_marks_come_from_the_project_loader(self, tmp_path, monkeypatch):
+        """``get_hpc_marks``, then ``filter_spike_times`` over the decode's
+        span, both as ``load_data`` calls them: a spike outside the span goes,
+        an electrode left with none is dropped, and each mark keeps its spike."""
+        assert runner.get_hpc_marks is spikes.get_hpc_marks
+        assert runner.filter_spike_times is spikes.filter_spike_times
         raw_times = [
-            np.array([1.0, 2.0, 99.0]),
-            np.array([1.00001, 3.0]),
-            np.array([1.00002, 4.0]),
-            np.array([5.0]),
+            np.array([5.0, 12.0, 15.0]),  # one spike before the span
+            np.array([1.0, 25.0]),  # every spike outside it
+            np.array([10.0, 18.0, 20.0]),  # all inside, on both ends too
         ]
-        raw_marks = [np.arange(t.size, dtype=float)[:, None] for t in raw_times]
+        # each mark row holds its spike's time and its electrode
+        raw_marks = [
+            np.column_stack([times, np.full(times.size, float(electrode))])
+            for electrode, times in enumerate(raw_times)
+        ]
         calls = []
 
-        def fetch(nwb_file_name):
+        def get_hpc_marks(nwb_file_name):
             calls.append(nwb_file_name)
             return raw_times, raw_marks
 
-        monkeypatch.setattr(runner, "fetch_raw_hpc_unit_marks", fetch)
-        key = parse_epoch_identifier(EPOCH_ID)
+        monkeypatch.setattr(runner, "get_hpc_marks", get_hpc_marks)
 
-        times, marks = runner.load_marks(key, tmp_path, (0.0, 10.0))
-        again = runner.load_marks(key, tmp_path, (0.0, 10.0))
+        times, marks = runner.load_marks(KEY, tmp_path, SPAN_S, "a" * 64)
 
-        # the three-tetrode cluster at 1 s goes; 99 s is outside the decode
-        assert [t.tolist() for t in times] == [[2.0], [3.0], [4.0], [5.0]]
-        assert [m[:, 0].tolist() for m in marks] == [[1.0], [1.0], [1.0], [0.0]]
-        assert calls == [key.nwb_file_name]
-        assert [t.tolist() for t in again[0]] == [t.tolist() for t in times]
-        assert marks_cache_path(key, tmp_path).exists()
+        assert calls == [KEY.nwb_file_name]
+        assert [t.tolist() for t in times] == [[12.0, 15.0], [10.0, 18.0, 20.0]]
+        assert [m[:, 1].tolist() for m in marks] == [[0.0, 0.0], [2.0, 2.0, 2.0]]
+        for electrode_times, electrode_marks in zip(times, marks, strict=True):
+            np.testing.assert_array_equal(electrode_marks[:, 0], electrode_times)
+
+    def test_a_cache_from_another_decode_is_not_read(self, tmp_path, monkeypatch):
+        """Review Focus 2. Two decodes of one epoch have different detector
+        files, so neither reads the marks cached for the other; a decode still
+        reads its own cache rather than the database."""
+        calls = []
+
+        def get_hpc_marks(nwb_file_name):
+            calls.append(nwb_file_name)
+            # each load's marks say which load made them
+            return [np.array([15.0])], [np.full((1, 4), float(len(calls)))]
+
+        monkeypatch.setattr(runner, "get_hpc_marks", get_hpc_marks)
+
+        first = runner.load_marks(KEY, tmp_path, SPAN_S, "a" * 64)
+        second = runner.load_marks(KEY, tmp_path, SPAN_S, "b" * 64)
+        first_again = runner.load_marks(KEY, tmp_path, SPAN_S, "a" * 64)
+
+        assert len(calls) == 2
+        assert first[1][0][0, 0] == 1.0
+        assert second[1][0][0, 0] == 2.0
+        assert first_again[1][0][0, 0] == 1.0
+
+    def test_an_april_rule_cache_is_never_read(self, tmp_path, monkeypatch):
+        """Review Focus 2. The pilot cached marks made under the April decodes'
+        rule as ``{epoch_id}_decode_time_marks.pkl``. They keep more spikes than
+        the loader, so the encoding-mark guard could pass them; they are never
+        read."""
+        joblib.dump(
+            ([np.array([12.0, 15.0])], [np.full((2, 4), -1.0)]),
+            tmp_path / f"{EPOCH_ID}_decode_time_marks.pkl",
+        )
+        calls = []
+
+        def get_hpc_marks(nwb_file_name):
+            calls.append(nwb_file_name)
+            return [np.array([15.0])], [np.full((1, 4), 7.0)]
+
+        monkeypatch.setattr(runner, "get_hpc_marks", get_hpc_marks)
+
+        times, marks = runner.load_marks(KEY, tmp_path, SPAN_S, "a" * 64)
+
+        assert calls == [KEY.nwb_file_name]
+        assert [t.tolist() for t in times] == [[15.0]]
+        np.testing.assert_array_equal(marks[0], np.full((1, 4), 7.0))
 
     def test_the_record_names_the_marks_rule(self, decode_root, tmp_path):
-        record = run(decode_root, tmp_path, shuffle=False)
+        """The loader is given the decode file's hash, and the record names the
+        rule, that hash, the cache file and the marks' own hash."""
+        root, epoch = decode_root
+        detector_sha256 = file_sha256(input_paths(EPOCH_ID, root)["detector"])
+        given = []
 
-        assert record["marks"]["decode_commit"] == "0820d39d"
+        def marks_loader(key, cache_dir, span_s, sha256):
+            given.append(sha256)
+            return epoch.spike_times, epoch.spike_waveform_features
+
+        record = run(decode_root, tmp_path, shuffle=False, marks_loader=marks_loader)
+
+        assert given == [detector_sha256]
+        assert record["inputs"]["detector"]["sha256"] == detector_sha256
+        assert record["marks"] == {
+            "rule": runner.MARKS_RULE,
+            "detector_sha256": detector_sha256,
+            "cache": f"{EPOCH_ID}_loader_{detector_sha256[:16]}_marks.pkl",
+            "sha256": runner.marks_sha256(
+                epoch.spike_times, epoch.spike_waveform_features
+            ),
+        }
 
 
 class TestMain:
+    @pytest.fixture(autouse=True)
+    def marks_only_from_the_cache(self, monkeypatch):
+        """Every run here finds its marks cached; a miss fails the epoch
+        instead of reaching the database."""
+
+        def get_hpc_marks(nwb_file_name):
+            raise AssertionError(f"the marks cache missed for {nwb_file_name}")
+
+        monkeypatch.setattr(runner, "get_hpc_marks", get_hpc_marks)
+
     def cli(self, decode_root, tmp_path, *extra):
         """The runner through its command line, its marks already cached."""
         root, epoch = decode_root
         cache_dir = tmp_path / "cache"
-        cache_dir.mkdir(exist_ok=True)
-        key = parse_epoch_identifier(EPOCH_ID)
-        joblib.dump(
-            (epoch.spike_times, epoch.spike_waveform_features),
-            marks_cache_path(key, cache_dir),
-        )
+        cache_marks(root, epoch, cache_dir)
         output_root = tmp_path / "memoryless"
         arguments = {
             "--epoch-id": EPOCH_ID,
@@ -496,12 +591,7 @@ class TestMain:
         write_epoch(root, epoch, "sim20200101_02_r1_HPC")
         write_epoch(root, epoch, "sim20200101_04_r2_HPC", corrupt=True)
         cache_dir = tmp_path / "cache"
-        cache_dir.mkdir()
-        key = parse_epoch_identifier(EPOCH_ID)
-        joblib.dump(
-            (epoch.spike_times, epoch.spike_waveform_features),
-            marks_cache_path(key, cache_dir),
-        )
+        cache_marks(root, epoch, cache_dir)
         output_root = tmp_path / "memoryless"
 
         with pytest.raises(SystemExit, match="1 epochs failed"):
@@ -539,12 +629,7 @@ class TestMain:
         write_epoch(root, epoch, "sim20200101_02_r1_HPC")
         input_paths("sim20200101_04_r2_HPC", root)["detector"].write_bytes(b"")
         cache_dir = tmp_path / "cache"
-        cache_dir.mkdir()
-        key = parse_epoch_identifier(EPOCH_ID)
-        joblib.dump(
-            (epoch.spike_times, epoch.spike_waveform_features),
-            marks_cache_path(key, cache_dir),
-        )
+        cache_marks(root, epoch, cache_dir)
 
         main(
             [
