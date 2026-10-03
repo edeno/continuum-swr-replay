@@ -959,9 +959,11 @@ Work in the worktree.
 **Interfaces:** every check is a pure function over paths and frames, and returns
 `{"ok": bool, "failures": list[str], "details": ...}`.
 ```python
-def decode_provenance(log_dir: Path, epoch_ids: list[str]) -> pd.DataFrame
-    # epoch_id, decoder ("nonlocal" | "contfrag"), and the fields of the first "PROVENANCE "
-    # JSON line in logs/{id}.log and logs/{id}_contfrag.log (Task 2)
+def decode_provenance(log_dir: Path, root: Path, epoch_ids: list[str]) -> pd.DataFrame
+    # epoch_id, decoder ("nonlocal" | "contfrag"), and the provenance fields: from
+    # results.nc attrs["provenance"] (written at the fresh save, Task 2) when present, else
+    # from the JSON after the first "PROVENANCE " substring in logs/{id}.log or
+    # logs/{id}_contfrag.log; a column says which source was used
 def check_one_commit(provenance: pd.DataFrame, allowed: Mapping[str, str]) -> dict
     # one commit, dirty False, and one uv_lock_sha256 across all rows, or listed exceptions
     # with reasons
@@ -1090,7 +1092,9 @@ Before Task 1's pin, run Task 1 Step 1. After Task 1:
   1. Each decoder has its four files for every decodable epoch; expect 218. Every other
      epoch has a logged reason. The known no-input epochs are senor20201104 06_r3 and 08_r4
      and senor20201105 09_r4.
-  2. Every staged log has a `PROVENANCE` line with `commit == C0` and `dirty == false`.
+  2. Every staged `results.nc` carries `attrs["provenance"]` (and every staged log a `PROVENANCE` line) with
+     `commit == C0`, `dirty == false` and a non-null `cuda_plugin_version`. A log marked `RESUMED` is checked
+     through its `results.nc` attribute, since the resume rewrote the log.
   3. Every `data_over_time` grid passes `validate_time_grid`.
   4. Every epoch's minimum sample count is 7. If not, STOP and report (R9).
   5. NonLocal and ContFrag share time grid and position per epoch: Task 10's
