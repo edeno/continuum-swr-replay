@@ -200,8 +200,15 @@ Every replay call is whole-event speed eligible. A spike-level reproduction in
 the sorted 25-cell simulation (about 1,200 trials of remote bursts and of
 remote spikes inside a one-window silence) produced no stray kept window: the
 jump gate needs the next window broad yet centered on the same remote place,
-which the simulator's likelihood rarely gives. Scratch in
-`.claude/research/memoryless_stray_window/`.
+which the simulator's likelihood rarely gives. A hand-placed construction does
+reproduce it (`hand_placed.py`): two remote spikes alone in window W, a
+local/remote tie in W-1, two flanking remote spikes in W+1 (broad, centered
+2 cm from W), and local firing either side. The event is called replay at
+16.5 cm dispersion against 3.0 cm from its pieces; the spread half of the
+shuffle passes (p = 0.01) and the jump half does not (p = 0.12), unlike
+chimi's candidate 28 (0.02 / 0.03). Figure beside candidate 28:
+`stray_window_outputs/stray_window_figure.png` (`plot_stray_window.py`). The
+research directory is gitignored, so these stay local.
 
 ```bash
 python scripts/decoding/run_memoryless_detection.py --run-seed 20260922 \
