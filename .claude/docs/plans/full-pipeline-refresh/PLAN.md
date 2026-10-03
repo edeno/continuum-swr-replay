@@ -1108,8 +1108,10 @@ Before Task 1's pin, run Task 1 Step 1. After Task 1:
 - [ ] **STOP:** ask for the go-ahead to swap.
 - [ ] **Move April out.** Write `sha256sum` of the April NonLocal and ContFrag decode files
   (8 per epoch) into `$B/SHA256SUMS`, then move them into `$B/`.
-- [ ] **Move the staged files in.** Move them into `Processed-Data/` under the canonical
-  names. Verify counts, and hashes against their staging hashes.
+- [ ] **Move the staged files in.** Move exactly the four named files per epoch per decoder into
+  `Processed-Data/` under the canonical names, never a glob or `rsync` of `$S`: a hard kill can
+  leave hidden `.<name>.<pid>.tmp` files from the atomic writes, which are deleted, not moved.
+  Verify counts, and hashes against their staging hashes.
 - [ ] **Merge.**
   1. Fast-forward the main branch to the worktree branch (`C1`).
   2. Run `uv sync --inexact`.
