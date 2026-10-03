@@ -7,7 +7,7 @@ should-fix and 11 minor findings, all addressed below), and implementation has s
 Task 1. Task 1 pinned `ripple_detection` to `68e1784`. On the five pilot epochs, 763 HSE
 events matched, 0 were missed and 62 were added; the largest SWR z-score difference was
 2.56, at a trace end (at most 8.8e-4 more than 1 s from both ends); and non-local events
-went from 2,365 under the 1.7.0 rule to 2,405 under 2.0's, with minimum sample counts {7}.
+went from 2,365 under the 1.7.0 rule to 2,405 under 2.0's, with minimum sample counts {7}. Tasks 1–3 complete and reviewed; `C0` = `de156501c05b4381714919be54a872b3ac0e58fc`, the commit both decoders launch from. R0 done (backup root `Processed-Data/_pre_redecode_backup_20261003`). An incident during Task 2 overwrote the April decode of `chimi20200212_02_r1` (accepted loss; see the backup's `MISSING_APRIL_DECODES.md`).
 
 **Goal:** rebuild every long-running computation on one set of inputs, and prove it. That
 covers:
@@ -1159,7 +1159,9 @@ CACHE=Processed-Data/replay_content/_session_cache
 ```
 
 Run `--help` on each script before its first use. Where a flag differs from below, stop and
-report. Every gate checks the written outputs and their row counts, never the exit code
+report. Every prepare call that passes `--behavior-cache-dir $CACHE` must also pass `--from-cache`:
+without it the builder refetches from Spyglass and rewrites the canonical cache entries
+(`prepare_data.py:219, 312`). Every gate checks the written outputs and their row counts, never the exit code
 alone: the cross-table check and the no-session path return 0 and write nothing
 (`prepare_data.py:971, 997-1004`; ContFrag script :463).
 
