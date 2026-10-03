@@ -5,7 +5,8 @@
 rerun over the same folder resumes from it: the results are read back from that
 folder, never the canonical one, and only ``data_over_time`` is rewritten,
 because the reopened ``results.nc`` is still open lazily (Review Focus 1 of the
-full-refresh plan).
+full-refresh plan). A fresh save stamps the epoch's provenance into
+``results.nc``, and every file is written atomically.
 
 Offline: both scripts import ``bandit_task``, which imports Spyglass at import
 time, so they are imported with ``spyglass`` stubbed in ``sys.modules``, as
@@ -13,11 +14,22 @@ time, so they are imported with ``spyglass`` stubbed in ``sys.modules``, as
 depends on ``HAS_CUDA`` sets it, since whether ``dask_cuda`` imports depends on
 the environment.
 
-No test may write outside its own ``tmp_path``. Every stand-in that saves
-refuses any other path, and each script's ``PROCESSED_DATA_DIR`` points at an
-empty temporary folder. A regression that writes to the canonical folder then
-fails the test instead of overwriting real decodes, which an unguarded version
-of these tests once did.
+Nothing here may write outside the test's own ``tmp_path``. Three things keep
+it there:
+
+- Every call passes ``save_dir`` and ``log_directory`` under ``tmp_path``. The
+  defaults bound at definition time (``run_decode``'s ``save_dir`` and the
+  loaders' ``root``) still name the real ``Processed-Data``, so no test leaves a
+  write to them.
+- Every stand-in that writes refuses any path outside ``tmp_path`` before it
+  writes.
+- The epoch is synthetic (``testrat20990101``), so even an unguarded write
+  could not land on a real decode's file.
+
+Each script's ``PROCESSED_DATA_DIR`` global also points at an empty folder under
+``tmp_path``. That catches only code that writes through the global, not
+through a default. An unguarded version of these tests once overwrote real
+decodes.
 """
 
 from __future__ import annotations
@@ -27,16 +39,19 @@ import hashlib
 import importlib
 import json
 import logging
+import os
 import pickle
 import re
 import subprocess
 import sys
 import types
 from argparse import ArgumentParser, Namespace
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import dask
 import numpy as np
 import pandas as pd
 import pytest
@@ -48,8 +63,9 @@ from continuum_swr_replay.analysis.hippocampus import result_loading as hpc_load
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-NWB_FILE_NAME = "chimi20200212_.nwb"
+NWB_FILE_NAME = "testrat20990101_.nwb"
 EPOCH_NAME = "02_r1"
+"""A synthetic epoch: no real decode has its file names."""
 PROVENANCE_KEYS = {
     "commit",
     "dirty",
@@ -80,16 +96,16 @@ DECODERS = {
     "nonlocal": Decoder(
         module_name="scripts.decoding.run_decoding_bandit",
         loader_name="load_results",
-        epoch_identifier="chimi20200212_02_r1_HPC",
-        data_over_time_name="chimi20200212_02_r1_HPC_80_data_over_time.pkl",
+        epoch_identifier="testrat20990101_02_r1_HPC",
+        data_over_time_name="testrat20990101_02_r1_HPC_80_data_over_time.pkl",
         save_kwargs={"non_local_threshold": 0.8},
         run_kwargs={"create_figurl": False},
     ),
     "contfrag": Decoder(
         module_name="scripts.decoding.run_decoding_contfrag",
         loader_name="load_contfrag_results",
-        epoch_identifier="chimi20200212_02_r1_HPC_contfrag",
-        data_over_time_name="chimi20200212_02_r1_HPC_contfrag_data_over_time.pkl",
+        epoch_identifier="testrat20990101_02_r1_HPC_contfrag",
+        data_over_time_name="testrat20990101_02_r1_HPC_contfrag_data_over_time.pkl",
     ),
 }
 
@@ -104,7 +120,7 @@ _STUB_BOUND_MODULES = (
 class Decoders:
     modules: dict[str, types.ModuleType]
     canonical: Path
-    """Where each script's ``PROCESSED_DATA_DIR`` points during the test."""
+    """Where each script's ``PROCESSED_DATA_DIR`` global points during the test."""
 
 
 @pytest.fixture
@@ -114,7 +130,11 @@ def decoders(monkeypatch, tmp_path):
     ``bandit_task`` imports ``spyglass.common.PositionIntervalMap`` at import
     time, which opens a DataJoint connection. The modules imported here that
     bind the stub are forgotten afterwards, so a later import gets the real ones.
-    Each script's ``PROCESSED_DATA_DIR`` is an empty folder under ``tmp_path``.
+
+    Each script's ``PROCESSED_DATA_DIR`` global is pointed at an empty folder under
+    ``tmp_path``. That catches code that writes through the global. It does not
+    change the defaults bound at definition time, so every test passes
+    ``save_dir`` itself.
     """
     common = types.ModuleType("spyglass.common")
     common.PositionIntervalMap = type("PositionIntervalMap", (), {})
@@ -149,9 +169,9 @@ def _parse(argv: list[str]) -> Namespace:
 
 
 def _one_epoch() -> pd.DataFrame:
-    """``get_epoch_info``'s shape, for one epoch."""
+    """``get_epoch_info``'s shape, for the synthetic epoch."""
     return pd.DataFrame(
-        {"animal": ["chimi"], "date": [20200212], "epoch": [2], "epoch_tag": ["r1"]},
+        {"animal": ["testrat"], "date": [20990101], "epoch": [2], "epoch_tag": ["r1"]},
         index=pd.MultiIndex.from_tuples(
             [(NWB_FILE_NAME, EPOCH_NAME)],
             names=["nwb_file_name", "interval_list_name"],
@@ -214,16 +234,20 @@ class _WritesPlaceholders:
     """Stands in for a fresh decode's results, detector and environment.
 
     Each save writes a few bytes to the path it is given, so saving into a folder
-    that does not exist fails, and it refuses any path outside `root`.
+    that does not exist fails, and it refuses any path outside `root`. The attrs
+    a ``to_netcdf`` call sees are kept in ``written_attrs``.
     """
 
     def __init__(self, root: Path) -> None:
         self.root = root
+        self.attrs: dict[str, str] = {}
+        self.written_attrs: dict[str, str] | None = None
 
     def reset_index(self, dim: str) -> _WritesPlaceholders:
         return self
 
     def to_netcdf(self, path: Path, engine: str) -> None:
+        self.written_attrs = dict(self.attrs)
         _inside(path, self.root).write_bytes(b"results")
 
     def save_model(self, path: Path) -> None:
@@ -233,8 +257,20 @@ class _WritesPlaceholders:
         _inside(path, self.root).write_bytes(b"environment")
 
 
+class _FailsMidWrite(_WritesPlaceholders):
+    """Writes part of the environment, then fails, as a crash or a full disk would."""
+
+    def save_environment(self, path: Path) -> None:
+        _inside(path, self.root).write_bytes(b"envir")
+        raise OSError("disk full")
+
+
 class _RefusesToSave:
     """Stands in for what a resume reloads: writing any of it back is the bug."""
+
+    @property
+    def attrs(self) -> dict[str, str]:
+        raise AssertionError("a resume stamped results.attrs")
 
     def reset_index(self, *args: Any, **kwargs: Any) -> None:
         raise AssertionError("a resume rewrote results.nc")
@@ -270,6 +306,14 @@ def _log(tmp_path: Path, decoder: Decoder) -> str:
     return (tmp_path / "logs" / f"{decoder.epoch_identifier}.log").read_text()
 
 
+def _logged_provenance(tmp_path: Path, decoder: Decoder) -> str:
+    """The JSON of the epoch log's one ``PROVENANCE`` line."""
+    (line,) = [
+        line for line in _log(tmp_path, decoder).splitlines() if "PROVENANCE " in line
+    ]
+    return line.split("PROVENANCE ", 1)[1]
+
+
 def _run_decode(module: types.ModuleType, decoder: Decoder, tmp_path: Path, **kwargs):
     return module.run_decode(
         NWB_FILE_NAME,
@@ -278,6 +322,39 @@ def _run_decode(module: types.ModuleType, decoder: Decoder, tmp_path: Path, **kw
         **decoder.run_kwargs,
         **kwargs,
     )
+
+
+def _patch_fresh_decode(
+    monkeypatch, module: types.ModuleType, tmp_path: Path, fresh: _WritesPlaceholders
+) -> None:
+    """Make ``run_decode`` decode afresh into `fresh`, with nothing real loaded."""
+    monkeypatch.setattr(module, "load_data", lambda *args, **kwargs: _session_data())
+    monkeypatch.setattr(module, "get_training_timepoints", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        module, "perform_decoding", lambda *args, **kwargs: (fresh, fresh, fresh)
+    )
+    monkeypatch.setattr(
+        module,
+        "organize_results",
+        lambda *args, **kwargs: (_GuardedFrame(tmp_path), None),
+    )
+
+
+def _git_repo(path: Path) -> Callable[..., str]:
+    """Commit a ``uv.lock`` in a new git repo at `path`; return a git runner for it."""
+
+    def git(*args: str) -> str:
+        return subprocess.run(
+            ["git", *args], cwd=path, check=True, capture_output=True, text=True
+        ).stdout.strip()
+
+    config = ["-c", "user.name=test", "-c", "user.email=test@example.com"]
+    config += ["-c", "commit.gpgsign=false"]
+    git("init", "-q")
+    (path / "uv.lock").write_text("locked")
+    git("add", "uv.lock")
+    git(*config, "commit", "-q", "-m", "lock")
+    return git
 
 
 # --------------------------------------------------------------------------
@@ -330,8 +407,15 @@ def test_run_batch_passes_save_dir(
     clusters = []
 
     def in_process_cluster(**kwargs: Any):
+        # Forward the scratch folder run_batch chose, so dask's scratch space
+        # lands under tmp_path rather than the system temp folder.
         clusters.append(
-            local_cluster(n_workers=1, processes=False, dashboard_address=":0")
+            local_cluster(
+                n_workers=1,
+                processes=False,
+                dashboard_address=":0",
+                local_directory=kwargs["local_directory"],
+            )
         )
         return clusters[-1]
 
@@ -348,26 +432,31 @@ def test_run_batch_passes_save_dir(
     monkeypatch.setenv("XLA_PYTHON_CLIENT_MEM_FRACTION", "0.99")
     monkeypatch.chdir(tmp_path)
     record = tmp_path / "run_decode_kwargs.pkl"
+    scratch = tmp_path / "scratch"
     args = _parse(
         [
             *flags,
             "--save_dir",
             str(tmp_path / "staging"),
             "--local_scratch_dir",
-            str(tmp_path / "scratch"),
+            str(scratch),
         ]
     )
 
-    try:
-        decoding_common.run_batch(functools.partial(_record_kwargs, record), args)
-    finally:
-        for cluster in clusters:
-            cluster.close()
+    # The scheduler keeps its own scratch space in dask's temporary directory
+    # (the system temp folder by default), whatever the workers are given.
+    with dask.config.set({"temporary-directory": str(tmp_path / "dask-temporary")}):
+        try:
+            decoding_common.run_batch(functools.partial(_record_kwargs, record), args)
+        finally:
+            for cluster in clusters:
+                cluster.close()
 
     kwargs = pickle.loads(record.read_bytes())
     assert kwargs["save_dir"] == args.save_dir == tmp_path / "staging"
     assert kwargs["nwb_file_name"] == NWB_FILE_NAME
     assert kwargs["epoch_name"] == EPOCH_NAME
+    assert (scratch / "dask-scratch-space").is_dir()
 
 
 # --------------------------------------------------------------------------
@@ -483,6 +572,7 @@ def test_resume_rewrites_only_data_over_time(decoders, tmp_path, key):
         decoder.epoch_identifier,
         **decoder.save_kwargs,
         resumed=True,
+        provenance='{"commit": "unused on a resume"}',
     )
 
     assert _saved_file_hashes(tmp_path, decoder.epoch_identifier) == before
@@ -493,7 +583,7 @@ def test_resume_rewrites_only_data_over_time(decoders, tmp_path, key):
 
 @pytest.mark.parametrize("key", list(DECODERS))
 def test_run_decode_resume_keeps_saved_files(decoders, monkeypatch, tmp_path, key):
-    """A rerun over a staged folder tells the save it resumed, end to end."""
+    """A rerun over a staged folder resumes, says so, and leaves the results alone."""
     decoder, module = DECODERS[key], decoders.modules[key]
     save_dir = tmp_path / "staging"
     save_dir.mkdir()
@@ -519,24 +609,18 @@ def test_run_decode_resume_keeps_saved_files(decoders, monkeypatch, tmp_path, ke
     assert _saved_file_hashes(save_dir, decoder.epoch_identifier) == before
     assert (save_dir / decoder.data_over_time_name).exists()
     assert not any(decoders.canonical.iterdir())
+    log = _log(tmp_path, decoder).splitlines()
+    resumed = [line for line in log if "RESUMED" in line]
+    assert len(resumed) == 1
+    assert resumed[0].endswith(f"RESUMED from existing results in {save_dir.resolve()}")
+    assert any(line.endswith(f"save_dir: {save_dir.resolve()}") for line in log)
 
 
 @pytest.mark.parametrize("key", list(DECODERS))
 def test_save_dir_is_created(decoders, monkeypatch, tmp_path, key):
     decoder, module = DECODERS[key], decoders.modules[key]
     save_dir = tmp_path / "staging" / "redecode"
-    fresh = _WritesPlaceholders(tmp_path)
-
-    monkeypatch.setattr(module, "load_data", lambda *args, **kwargs: _session_data())
-    monkeypatch.setattr(module, "get_training_timepoints", lambda *args, **kwargs: None)
-    monkeypatch.setattr(
-        module, "perform_decoding", lambda *args, **kwargs: (fresh, fresh, fresh)
-    )
-    monkeypatch.setattr(
-        module,
-        "organize_results",
-        lambda *args, **kwargs: (_GuardedFrame(tmp_path), None),
-    )
+    _patch_fresh_decode(monkeypatch, module, tmp_path, _WritesPlaceholders(tmp_path))
 
     failed = _run_decode(module, decoder, tmp_path, save_dir=save_dir)
 
@@ -546,6 +630,55 @@ def test_save_dir_is_created(decoders, monkeypatch, tmp_path, key):
         + [decoder.data_over_time_name]
     )
     assert not any(decoders.canonical.iterdir())
+
+
+@pytest.mark.parametrize("key", list(DECODERS))
+def test_fresh_save_stamps_provenance_into_results(
+    decoders, monkeypatch, tmp_path, key
+):
+    """The record outlives the epoch log, which a later resume rewrites."""
+    decoder, module = DECODERS[key], decoders.modules[key]
+    fresh = _WritesPlaceholders(tmp_path)
+    _patch_fresh_decode(monkeypatch, module, tmp_path, fresh)
+
+    failed = _run_decode(module, decoder, tmp_path, save_dir=tmp_path / "staging")
+
+    assert failed is None, _log(tmp_path, decoder)
+    assert fresh.written_attrs is not None  # to_netcdf was called
+    assert fresh.written_attrs["provenance"] == _logged_provenance(tmp_path, decoder)
+
+
+@pytest.mark.parametrize("key", list(DECODERS))
+def test_a_failed_write_leaves_no_final_file(decoders, monkeypatch, tmp_path, key):
+    """A write that dies part way leaves nothing ``results_exist`` would trust."""
+    decoder, module = DECODERS[key], decoders.modules[key]
+    save_dir = tmp_path / "staging"
+    _patch_fresh_decode(monkeypatch, module, tmp_path, _FailsMidWrite(tmp_path))
+
+    failed = _run_decode(module, decoder, tmp_path, save_dir=save_dir)
+
+    assert failed == decoder.epoch_identifier
+    stem = decoder.epoch_identifier
+    assert sorted(path.name for path in save_dir.iterdir()) == [
+        f"{stem}_detector.pkl",
+        f"{stem}_results.nc",
+    ]
+    assert not decoding_common.results_exist(save_dir, stem, overwrite=False)
+
+
+def test_write_atomically_keeps_the_old_file_when_a_write_fails(tmp_path):
+    path = tmp_path / "testrat20990101_02_r1_HPC_detector.pkl"
+    path.write_bytes(b"the previous run")
+
+    def half_write(temporary: Path) -> None:
+        _inside(temporary, tmp_path).write_bytes(b"trunc")
+        raise OSError("disk full")
+
+    with pytest.raises(OSError, match="disk full"):
+        decoding_common.write_atomically(path, half_write)
+
+    assert path.read_bytes() == b"the previous run"
+    assert [entry.name for entry in tmp_path.iterdir()] == [path.name]
 
 
 # --------------------------------------------------------------------------
@@ -566,18 +699,7 @@ def test_provenance_record_fields():
 
 def test_provenance_dirty_ignores_untracked_files(tmp_path):
     """The main tree holds untracked files from other work; they are not dirt."""
-
-    def git(*args: str) -> str:
-        return subprocess.run(
-            ["git", *args], cwd=tmp_path, check=True, capture_output=True, text=True
-        ).stdout.strip()
-
-    config = ["-c", "user.name=test", "-c", "user.email=test@example.com"]
-    config += ["-c", "commit.gpgsign=false"]
-    git("init", "-q")
-    (tmp_path / "uv.lock").write_text("locked")
-    git("add", "uv.lock")
-    git(*config, "commit", "-q", "-m", "lock")
+    git = _git_repo(tmp_path)
     (tmp_path / "notes.txt").write_text("untracked")
 
     clean = decoding_common.provenance_record(tmp_path)
@@ -586,6 +708,27 @@ def test_provenance_dirty_ignores_untracked_files(tmp_path):
 
     (tmp_path / "uv.lock").write_text("edited")
     assert decoding_common.provenance_record(tmp_path)["dirty"] is True
+
+
+def test_provenance_never_writes_the_git_index(tmp_path):
+    """By default ``git status`` refreshes the index and writes it back under a
+    lock. Every epoch of a multi-day batch computes the record, in a checkout
+    that other work commits in, so it must not write.
+    """
+    git = _git_repo(tmp_path)
+    lock = tmp_path / "uv.lock"
+    stat = lock.stat()
+    # A new mtime with the same content: the index's cached stat is now stale.
+    os.utime(lock, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1_000_000_000))
+    index = tmp_path / ".git" / "index"
+    before = _sha256(index)
+
+    decoding_common.provenance_record(tmp_path)
+    assert _sha256(index) == before
+
+    # The control: a plain status does refresh and rewrite this index.
+    git("status", "--porcelain")
+    assert _sha256(index) != before
 
 
 @pytest.mark.parametrize("key", list(DECODERS))
@@ -606,4 +749,10 @@ def test_epoch_log_has_one_provenance_line(decoders, monkeypatch, tmp_path, key)
     payload = lines[at[0]].split("PROVENANCE ", 1)[1]
     logged = json.loads(payload)
     assert payload == json.dumps(logged, sort_keys=True)
-    assert logged == decoding_common.provenance_record(REPO_ROOT)
+    # Other work shares this tree, so dirty can change between the two calls.
+    now = decoding_common.provenance_record(REPO_ROOT)
+    assert set(logged) == set(now) == PROVENANCE_KEYS
+    assert isinstance(logged["dirty"], bool)
+    assert {k: v for k, v in logged.items() if k != "dirty"} == {
+        k: v for k, v in now.items() if k != "dirty"
+    }

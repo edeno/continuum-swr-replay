@@ -172,11 +172,42 @@ def results_exist(
     return all(f.exists() for f in required_files)
 
 
+def write_atomically(path: Path, write: Callable[[Path], object]) -> None:
+    """Write `path` through a temporary file beside it, so it is never half-written.
+
+    ``results_exist`` trusts any file that exists, so a crash mid-write must not
+    leave a truncated file under the final name.
+
+    Parameters
+    ----------
+    path : Path
+        The final file.
+    write : Callable[[Path], object]
+        Writes the whole file to the path it is given (for example
+        ``detector.save_model``).
+
+    Notes
+    -----
+    `write` gets ``.{name}.{pid}.tmp`` in the same folder. Only after it returns is
+    that file moved onto `path` with ``os.replace``, which is atomic within a
+    filesystem. If `write` raises, the temporary file is removed and `path` is left
+    as it was. The temporary name does not end in the final suffix, so a
+    ``*_environment.pkl``-style glob never picks it up, even after a hard kill.
+    """
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        write(temporary)
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def provenance_record(repo: Path) -> dict[str, Any]:
     """Record the code and environment a decode runs from.
 
     Each decoder logs this once per epoch, after START, as ``PROVENANCE `` plus
-    ``json.dumps(record, sort_keys=True)``.
+    ``json.dumps(record, sort_keys=True)``, and a fresh save stores the same JSON
+    in ``results.nc`` as ``attrs["provenance"]``, where it outlives a resume.
 
     Parameters
     ----------
@@ -189,7 +220,10 @@ def provenance_record(repo: Path) -> dict[str, Any]:
         - ``commit``: ``git rev-parse HEAD``.
         - ``dirty``: True when ``git status --porcelain --untracked-files=no``
           lists anything. Untracked files are not counted, because the work
-          tree holds untracked files from unrelated work.
+          tree holds untracked files from unrelated work. ``status`` runs with
+          ``--no-optional-locks``: by default it refreshes the index and writes
+          it back under a lock, and a decode must not write to a live checkout
+          that other work commits in.
         - ``uv_lock_sha256``: the sha256 of ``repo / "uv.lock"``.
         - ``ripple_detection_commit``: the git commit ``ripple_detection`` was
           installed from, read from its ``direct_url.json``, or None when that
@@ -216,7 +250,9 @@ def provenance_record(repo: Path) -> dict[str, Any]:
 
     return {
         "commit": git("rev-parse", "HEAD"),
-        "dirty": bool(git("status", "--porcelain", "--untracked-files=no")),
+        "dirty": bool(
+            git("--no-optional-locks", "status", "--porcelain", "--untracked-files=no")
+        ),
         "uv_lock_sha256": hashlib.sha256((repo / "uv.lock").read_bytes()).hexdigest(),
         "ripple_detection_commit": vcs_info.get("commit_id"),
         "non_local_detector_version": importlib.metadata.version("non-local-detector"),

@@ -62,6 +62,7 @@ from continuum_swr_replay.decoding_common import (
     results_exist,
     run_batch,
     setup_logger,
+    write_atomically,
 )
 from continuum_swr_replay.parameters import (
     DETECTOR_CONFIG,
@@ -200,27 +201,41 @@ def save_results_and_model(
     non_local_threshold: float,
     *,
     resumed: bool,
+    provenance: str,
 ) -> None:
     """Save decoding results, detector model, environment, and derived data.
 
-    When ``resumed`` is True the results, detector and environment were read
-    back from ``save_folder``, and ``results`` is still open lazily on its
-    file there, so only ``data_over_time`` is written.
+    Every file goes through ``write_atomically``, so a crash never leaves a
+    truncated file that ``results_exist`` would trust on resume.
+
+    A fresh save stamps ``provenance`` (the JSON of the epoch's PROVENANCE log
+    line) into ``results.nc`` as ``attrs["provenance"]``, so the record outlives
+    the log, which a resume rewrites. When ``resumed`` is True the results,
+    detector and environment were read back from ``save_folder``, and
+    ``results`` is still open lazily on its file there, so only
+    ``data_over_time`` is written.
     """
     if resumed:
         logger.info("Resumed: saving data_over_time only...")
     else:
         logger.info("Saving results...")
-        results.reset_index("state_bins").to_netcdf(
+        stamped = results.reset_index("state_bins")
+        stamped.attrs["provenance"] = provenance
+        write_atomically(
             save_folder / f"{epoch_identifier}_results.nc",
-            engine="h5netcdf",
+            lambda path: stamped.to_netcdf(path, engine="h5netcdf"),
         )
-        detector.save_model(save_folder / f"{epoch_identifier}_detector.pkl")
-        env.save_environment(save_folder / f"{epoch_identifier}_environment.pkl")
+        write_atomically(
+            save_folder / f"{epoch_identifier}_detector.pkl", detector.save_model
+        )
+        write_atomically(
+            save_folder / f"{epoch_identifier}_environment.pkl", env.save_environment
+        )
 
     threshold_int = int(non_local_threshold * 100)
-    data_over_time.to_pickle(
-        save_folder / f"{epoch_identifier}_{threshold_int}_data_over_time.pkl"
+    write_atomically(
+        save_folder / f"{epoch_identifier}_{threshold_int}_data_over_time.pkl",
+        data_over_time.to_pickle,
     )
 
 
@@ -317,8 +332,9 @@ def run_decode(
     """Run NonLocal decoding for a single session.
 
     Results are written to ``save_dir``. If they are already there (and
-    ``overwrite`` is False), the decode resumes: it reads them back from
-    ``save_dir`` and rewrites only ``data_over_time``.
+    ``overwrite`` is False), the decode resumes: it logs ``RESUMED from existing
+    results in <save_dir>``, reads them back from ``save_dir`` and rewrites only
+    ``data_over_time``.
 
     Returns
     -------
@@ -342,14 +358,15 @@ def run_decode(
     try:
         logger.info(" START ".center(50, "#"))
         provenance = provenance_record(ROOT_DIR)
-        logger.info("PROVENANCE " + json.dumps(provenance, sort_keys=True))
+        provenance_json = json.dumps(provenance, sort_keys=True)
+        logger.info("PROVENANCE " + provenance_json)
         logger.info(f"Git Hash: {provenance['commit']}")
         logger.info(f"training type: {training_type}")
         logger.info(f"non_stationary: {non_stationary}")
         logger.info(f"non_local_threshold: {non_local_threshold}")
         logger.info(f"ripple_detector_name: {ripple_detector_name}")
         logger.info(f"brain_area: {brain_area}")
-        logger.info(f"save_dir: {save_dir}")
+        logger.info(f"save_dir: {save_dir.resolve()}")
         save_dir.mkdir(parents=True, exist_ok=True)
         logger.info("Loading data...")
         data = load_data(
@@ -369,7 +386,7 @@ def run_decode(
 
         resumed = results_exist(save_dir, epoch_identifier, overwrite)
         if resumed:
-            logger.info(f"Results already exist for {brain_area}. Skipping decoding...")
+            logger.info(f"RESUMED from existing results in {save_dir.resolve()}")
             results, detector, env = load_results(
                 nwb_file_name,
                 epoch_name,
@@ -431,6 +448,7 @@ def run_decode(
             epoch_identifier,
             non_local_threshold,
             resumed=resumed,
+            provenance=provenance_json,
         )
 
         logger.info("Done!")
