@@ -2,7 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status (2026-10-03):** the plan is written and awaits review. No task has started.
+**Status (2026-10-03):** the plan was revised after an independent review (3 blocking, 16
+should-fix and 11 minor findings, all addressed below), and implementation has started at
+Task 1.
 
 **Goal:** rebuild every long-running computation on one set of inputs, and prove it. That
 covers:
@@ -12,7 +14,8 @@ covers:
 - the tables, model refits, PFC analyses and figures.
 
 **Architecture:** the existing runners are extended rather than replaced:
-- `run_decoding_bandit.py` and `run_decoding_contfrag.py` gain a staging `--save_dir`;
+- `run_decoding_bandit.py` and `run_decoding_contfrag.py` gain a staging `--save_dir` and a
+  safe resume;
 - `run_memoryless_detection.py` gains the project's spike loader and a GPU-parallel driver;
 - a new CPU runner, `run_swr_detection.py`, calls `ripple_detection` at `68e1784` on
   read-only Spyglass inputs;
@@ -22,7 +25,7 @@ Long computations run from runbooks (Phase B), with smoke and pilot gates and st
 for the project lead's go-ahead.
 
 **Tech stack:** Python 3.11, uv, NumPy/SciPy/pandas, JAX (GPU via a hand-installed
-`jax-cuda12-plugin`), dask / dask-cuda, Spyglass (DataJoint, read-only),
+`jax-cuda12-plugin`), dask and dask-cuda, Spyglass (DataJoint, read-only),
 `ripple_detection`, `non_local_detector`, pytest, ruff.
 
 **Spec:** [docs/design/2026-10-03-full-pipeline-refresh-design.md](../../../../docs/design/2026-10-03-full-pipeline-refresh-design.md).
@@ -33,27 +36,35 @@ Read it first. This plan argues from it, and where the two disagree the spec win
 **Environment**
 - `ripple_detection` is pinned to
   `git+https://github.com/Eden-Kramer-Lab/ripple_detection.git@68e1784b183f161a568d3154325cf770730bfb83`.
-  Manifests record this commit, because the installed version string comes from the last
-  tag (1.7.x) and does not identify it.
+  Manifests and logs record this commit, because the installed version string comes from
+  the last tag (1.7.x) and does not identify it.
 - Never run a plain `uv sync` in the main tree. Use `uv sync --inexact`: the CUDA plugin
   (`jax-cuda12-plugin[with-cuda]==0.8.0`) was hand-installed and is not in `uv.lock`.
+- `dask-cuda==25.10.0`, the locked version, must be importable. Without it `run_batch`
+  silently runs on a CPU cluster. After Task 2, any device list given without `dask_cuda`
+  is refused.
+- GPU checks run with `XLA_PYTHON_CLIENT_PREALLOCATE=false` on this shared host.
 - Run everything through `uv run`. Times are in seconds.
 
-**Shared inputs and settings**
+**Scientific settings**
+- Non-local events (R9): the package's minimum, `round(0.015 s / step)` samples. Every
+  epoch's minimum must be the same (8 at our 500 Hz grids); a different one stops the run.
 - Speed: every SWR detector runs with `speed_threshold=4.0`.
 - Sampling rate: the nominal 1000 Hz is passed to every SWR detector and filter design.
 - Zugaro:
   - filter `butter(3, [120, 180], btype="bandpass", fs=1000, output="sos")` with
-    `sosfiltfilt`, padding 90 samples, odd extension;
-  - the first and last 90 ms of each gap-free stretch are unobserved;
+    `sosfiltfilt`, odd padding;
+  - padding and edge exclusion come from each filter's single-pass settling time to 1e-3,
+    rounded up to 10 ms: 90 for Zugaro, about 170 for channel selection;
   - `low_threshold=2.0`, `high_threshold=5.0`, `minimum_inter_ripple_interval=0.050`,
     `minimum_duration=0.0`, `maximum_duration=None`, then keep `duration <= 0.150`.
 - Zugaro channel choice, following `bz_GetBestRippleChan`:
   - 140–180 Hz, Butterworth order 4, zero-phase;
-  - RMS window 0.012 s;
+  - a centered RMS window of 12 ms rounded up to an odd count, so 13 samples;
   - score = mean RMS ÷ median RMS;
-  - exclude channels with mean or median RMS below 1;
-  - an exact tie goes to the lowest electrode id.
+  - exclude channels with mean or median RMS below 1, in the stored LFP units;
+  - an exact tie goes to the lowest electrode id;
+  - if every channel is excluded, the epoch fails.
 - Widloski full run: 100 shuffles, `--run-seed 20260922`.
 - Canonical decode settings: HPC, `no_ripple` training, stationary transitions,
   non-local threshold 0.8, no figurl.
@@ -65,11 +76,14 @@ Read it first. This plan argues from it, and where the two disagree the spec win
   worktree and merged only after both decoders finish (see "Branch and worktrees").
 
 **Conventions**
-- Backups are named `_pre_redecode_backup_YYYYMMDD/` and staging directories
-  `_staging_redecode_YYYYMMDD/` (tables: `_staging_redecode_tables_YYYYMMDD/`), where
-  `YYYYMMDD` is the day the stage runs.
-- GPUs: pass `--cuda_visible_devices` explicitly and name only cards idle at launch, since
-  decoders claim 99% of a card's memory and the host is shared.
+- One backup root is used throughout: `Processed-Data/_pre_redecode_backup_<R0 date>`,
+  written `$B`, dated once in R0. Staging directories are named `_staging_redecode_<date>/`.
+- Unit tests run offline. Any module that imports Spyglass at import time (for example
+  `run_decoding_bandit`, `build_timebin_tables` through `bandit_task`) is imported with
+  `spyglass` stubbed in `sys.modules`, as `tests/unit/test_events.py:330-345` does. A test
+  that needs the database or a GPU is a smoke step in a runbook, not a unit test.
+- GPUs: pass `--cuda_visible_devices` explicitly and name only cards idle at launch (≤ 2 GiB
+  used, 0% utilization), since decoders claim 99% of a card's memory and the host is shared.
 - Commit messages end with:
   ```
   Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
@@ -82,20 +96,21 @@ Read it first. This plan argues from it, and where the two disagree the spec win
 These five conditions are the ones most likely to break things, and no task would exercise
 them by accident. Each has a test in the task that owns the code.
 
-1. **A staged decode resumes after a crash.** `results_exist(staging)` is then true and
-   `load_results` reads the canonical (April) files. The reload must read the staging folder
-   (Task 2, `test_run_decode_reloads_from_save_dir`).
+1. **A staged decode resumes after a crash.** The results must be read back from the
+   staging folder, not the canonical one, and the reopened `results.nc` must not be
+   rewritten (Task 2, `test_run_decode_reloads_from_save_dir`,
+   `test_resume_rewrites_only_data_over_time`).
 2. **The marks cache holds April-rule marks for the same epoch id.** They keep more spikes,
    so they pass the encoding-mark guard. The cache must never serve marks made for another
-   decode or another rule (Task 4, `test_a_cache_from_another_decode_is_not_read` and
+   decode or another rule (Task 4, `test_a_cache_from_another_decode_is_not_read`,
    `test_an_april_rule_cache_is_never_read`).
 3. **Raw LFP columns are positions, not electrode ids.** A wrong column-to-electrode map
    references and filters the wrong channels. The band-reproduction check must fail on a
    permuted map (Task 8, `test_band_check_catches_a_permuted_channel_map`).
-4. **The LFP has NaN rows or timestamp jumps.** The Zugaro filter must never cross them,
-   and edges and short stretches must be unobserved (Task 7,
-   `test_filter_never_crosses_a_gap`, `test_edges_are_unobserved`,
-   `test_short_stretch_is_unobserved`).
+4. **The LFP has NaN rows or timestamp jumps.** The filters must never cross them, edges and
+   short stretches must be unobserved, and kept rows must be free of edge transients
+   (Task 7, `test_filter_never_crosses_a_gap`, `test_edges_are_unobserved`,
+   `test_short_stretch_is_unobserved`, `test_kept_rows_have_no_edge_transient`).
 5. **An artifact silently lacks epochs.** For example, a Widloski or SWR manifest missing an
    epoch with no recorded reason. The audit must flag it, not pass it (Task 10,
    `test_an_unexplained_absence_fails_the_audit`).
@@ -105,8 +120,10 @@ them by accident. Each has a test in the task that owns the code.
 - **Main tree.** Work happens on `memoryless-sequence-detection`, in place.
   1. Tasks 1–3 are committed in the main tree.
   2. That commit is `C0`. Both decoders launch from it (runbook R1), and the main tree must
-     not change until both finish: the package is installed editable, and each epoch's log
+     not change until both finish. The package is installed editable, and each epoch's log
      records `git rev-parse HEAD` at its start.
+  3. During R1, plan status updates are committed on the worktree branch, never in the main
+     tree.
 - **Worktree for Tasks 4–10.**
   1. Create it from `C0` with
      `git worktree add ../continuum-swr-replay-refresh-dev -b full-pipeline-refresh-code C0`.
@@ -114,36 +131,37 @@ them by accident. Each has a test in the task that owns the code.
   3. Develop and commit there.
   4. After both decoders finish, fast-forward `memoryless-sequence-detection` to the
      worktree branch (`C1`).
-  5. Run `uv sync --inexact` in the main tree, then remove the worktree.
-- **Integration steps that need the database or a GPU** (smoke runs in Tasks 6, 8 and 9) run
-  in the main tree after the merge.
+  5. Run `uv sync --inexact` in the main tree, re-check `dask_cuda` and the GPUs, then
+     remove the worktree.
+- **Database and GPU smoke steps** (Tasks 6, 8 and 9) run in the main tree after the
+  merge.
 
 ## Files
 
 | File | Responsibility | Task |
 |---|---|---|
 | `pyproject.toml`, `uv.lock` | the pin | 1 |
-| `.claude/research/refresh_version_shift/measure_version_shift.py` (gitignored) | MUA burst and SWR z-score under 1.7.0 vs `68e1784` | 1 |
-| `src/continuum_swr_replay/decoding_common.py` | `--save_dir` in `add_common_args`, passed by `run_batch` | 2 |
-| `src/continuum_swr_replay/analysis/hippocampus/result_loading.py` | `load_results(..., root=)` | 2 |
-| `src/continuum_swr_replay/analysis/contfrag/result_loading.py` | `load_contfrag_results(..., root=)` | 2 |
-| `scripts/decoding/run_decoding_bandit.py`, `scripts/decoding/run_decoding_contfrag.py` | save to and reload from `save_dir` | 2 |
+| `.claude/research/refresh_version_shift/measure_version_shift.py` (gitignored) | MUA bursts, SWR z-score and non-local events under 1.7.0 vs `68e1784` | 1 |
+| `src/continuum_swr_replay/decoding_common.py` | `--save_dir`, `--allow_cpu`, refusing a CPU fallback, the provenance line | 2 |
+| `src/continuum_swr_replay/analysis/hippocampus/result_loading.py`, `.../contfrag/result_loading.py` | a `root=` argument | 2 |
+| `scripts/decoding/run_decoding_bandit.py`, `scripts/decoding/run_decoding_contfrag.py` | save to and resume from `save_dir`; on resume, rewrite only `data_over_time` | 2 |
 | `scripts/decoding/build_timebin_tables.py` | `--output-dir` | 3 |
-| `scripts/decoding/run_memoryless_detection.py` | marks via the loader, cache key, parallel driver, filters | 4, 5 |
+| `scripts/decoding/prepare_contfrag_replay_content_data.py` | `--behavior-cache-dir` | 3 |
+| `scripts/decoding/run_memoryless_detection.py` | marks via the loader, cache key, parallel driver, filters, provenance | 4, 5 |
 | `src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/decode_marks.py`, `tests/unit/test_memoryless_decode_marks.py` | **deleted** | 4 |
 | `src/continuum_swr_replay/data_loaders/lfp.py` | `_ripple_keys`, `get_ripple_band_inputs`, `check_band_electrodes` | 6 |
-| `src/continuum_swr_replay/data_loaders/position.py`, `.../bandit_task.py` | `get_position_interval_name`, used by both | 6 |
+| `src/continuum_swr_replay/data_loaders/position.py`, `.../bandit_task.py` | `get_epoch_position_info`, used by both | 6 |
 | `src/continuum_swr_replay/types.py` | `RippleBandInputs` | 6 |
-| `src/continuum_swr_replay/analysis/hippocampus/swr_inventories.py` | filters, channel choice, detector settings, band check, Kay check | 7, 8 |
+| `src/continuum_swr_replay/analysis/hippocampus/swr_inventories.py` | filters, channel choice, detector settings, Yu diagnostics, band check, Kay checks | 7, 8 |
 | `scripts/decoding/run_swr_detection.py` | SWR runner | 9 |
-| `scripts/qa/audit_refresh_consistency.py` | Stage 8 audit | 10 |
+| `scripts/qa/audit_refresh_consistency.py` | Stage 8 audit and the Stage 5 tables manifest | 10 |
 | docs: `scripts/README.md`; `docs/design/replay_detection_comparison/{overview,detector_comparison,01-yu-swr-detector,02-memoryless-sequence}.md` | what changed | 4, 5, 9, 10 |
 
 ---
 
 # Phase A: code
 
-## Task 1: pin `ripple_detection` and measure the version shift
+## Task 1: pin `ripple_detection`, install dask-cuda, measure the version shift
 
 **Files:**
 - Modify: `pyproject.toml`, `uv.lock`
@@ -153,151 +171,214 @@ them by accident. Each has a test in the task that owns the code.
 
 **Interfaces:**
 - Consumes: `load_data(nwb_file_name, epoch_name, ripple_detector_name="Kay")`, which
-  returns `hse_times` (dict by brain area) and `zscored_ripple_consensus_trace`
-  (Series).
+  returns `hse_times` (dict by brain area) and `zscored_ripple_consensus_trace` (Series);
+  and the April `Processed-Data/{epoch_id}_80_data_over_time.pkl`, whose
+  `Non-Local_Continuous_prob` and `Non-Local_Fragmented_prob` columns feed the event count.
 - Produces: the pinned environment that every later task assumes. `Zugaro_ripple_detector`,
-  `Yu_ripple_detector` and `simulate_session` become importable from `ripple_detection`.
+  `Yu_ripple_detector`, `noise_threshold_diagnostics`, `minimum_sample_count` and
+  `simulate.simulate_session` become importable, and `dask_cuda` imports.
 
-- [ ] **Step 1: measure under 1.7.0, before pinning.** The script loops over the five pilot
-  epochs:
+The pilot epochs:
 
-  | NWB file | Epoch |
-  |---|---|
-  | `chimi20200225_.nwb` | `02_r1` |
-  | `wilbur20210329_.nwb` | `12_r6` |
-  | `j1620210707_.nwb` | `06_r3` |
-  | `peanut20201202_.nwb` | `10_r5` |
-  | `senor20201101_.nwb` | `06_r3` |
+| NWB file | Epoch |
+|---|---|
+| `chimi20200225_.nwb` | `02_r1` |
+| `wilbur20210329_.nwb` | `12_r6` |
+| `j1620210707_.nwb` | `06_r3` |
+| `peanut20201202_.nwb` | `10_r5` |
+| `senor20201101_.nwb` | `06_r3` |
 
-  For each, call `load_data` and write `outputs/<label>/<epoch_id>_hse.parquet` (columns
-  `start_time`, `end_time` of `hse_times["HPC"]`) and
-  `outputs/<label>/<epoch_id>_swr_zscore.parquet` (the consensus z-score Series). Here
-  `<label>` is `ripple_detection.__version__`, and the run also records
+- [ ] **Step 1: measure under 1.7.0, before pinning.** For each pilot epoch, call
+  `load_data` and write:
+  - `outputs/<label>/<epoch_id>_hse.parquet`: `start_time` and `end_time` of
+    `hse_times["HPC"]`;
+  - `outputs/<label>/<epoch_id>_swr_zscore.parquet`: the consensus z-score Series.
+
+  Here `<label>` is `before` or `after`. The run also records `ripple_detection.__version__`
+  and
   `importlib.metadata.distribution("ripple-detection").read_text("direct_url.json")`.
 
   Run: `uv run python .claude/research/refresh_version_shift/measure_version_shift.py --label before`.
-  Expected: five epochs written, about 1.5 min each.
-- [ ] **Step 2: pin.**
+  Expected: five epochs, about 1.5 min each.
+- [ ] **Step 2: pin, and install dask-cuda.**
   ```bash
+  cp uv.lock /tmp/uv.lock.before_pin
   uv add --no-sync "ripple_detection @ git+https://github.com/Eden-Kramer-Lab/ripple_detection.git@68e1784b183f161a568d3154325cf770730bfb83"
   uv sync --inexact
-  uv run python -c "import jax, ripple_detection; from ripple_detection import Zugaro_ripple_detector, Yu_ripple_detector; print(ripple_detection.__file__); print(jax.devices())"
+  uv pip install "dask-cuda==25.10.0"
+  XLA_PYTHON_CLIENT_PREALLOCATE=false uv run python -c "import jax, dask_cuda, ripple_detection; from ripple_detection import Zugaro_ripple_detector, Yu_ripple_detector, noise_threshold_diagnostics, minimum_sample_count; print(ripple_detection.__file__); print(jax.devices())"
+  diff <(grep -A2 'name = "non-local-detector"' /tmp/uv.lock.before_pin) <(grep -A2 'name = "non-local-detector"' uv.lock)
+  diff <(grep -A2 'name = "spyglass-neuro"' /tmp/uv.lock.before_pin) <(grep -A2 'name = "spyglass-neuro"' uv.lock)
   ```
-  Expected: `jax.devices()` lists `CudaDevice` entries. If it lists only CPU, reinstall the
-  plugin with `uv pip install "jax-cuda12-plugin[with-cuda]==0.8.0"` and check again.
+  Expected:
+  - `jax.devices()` lists `CudaDevice` entries;
+  - `dask_cuda` imports;
+  - both diffs are empty (`non_local_detector` `2d730c3`, Spyglass `18b2bff`).
+
+  If `jax.devices()` shows only CPU, run
+  `uv pip install "jax-cuda12-plugin[with-cuda]==0.8.0"` and check again. If either diff is
+  not empty, stop and report.
 - [ ] **Step 3: run the unit suite against the new package.**
-  `uv run pytest tests/unit -q -x`. Expected: everything passes. A failure here is a 2.0 API
-  change: fix the call site in the same commit, do not pin back.
+  `uv run pytest tests/unit -q -x`.
+  - A failure caused by the decided minimum-duration rule (R9) is fixed by updating the test
+    to the new rule. Note each such test in the commit message.
+  - Any other failure is a 2.0 API change: fix the call site in the same commit. Never pin
+    back.
 - [ ] **Step 4: measure under the pin.** Run the same script with `--label after`.
-- [ ] **Step 5: compare.** For HSE events, mark each matched, missed or added by strict
-  positive-duration overlap. For the SWR z-score, take the largest absolute difference on
-  shared timestamps. Write `outputs/version_shift_report.md` with one row per epoch, and
-  record the totals in this plan's status line.
-- [ ] **Step 6: commit** `pyproject.toml` and `uv.lock`, with message "Pin ripple_detection
-  to 68e1784 for the full refresh".
+- [ ] **Step 5: compare, and write `outputs/version_shift_report.md`,** one row per epoch:
+  - **HSE events:** each matched, missed or added by strict positive-duration overlap.
+  - **SWR z-score:** the largest absolute difference on shared timestamps.
+  - **Non-local events (R9):** threshold the April `Non-Local_Continuous_prob +
+    Non-Local_Fragmented_prob` at > 0.8, then count runs under both rules:
+    - 1.7.0: keep a run when its last minus first timestamp is ≥ 0.015;
+    - 2.0: keep a run of at least `minimum_sample_count(time, 0.015)` samples.
+
+    Record each epoch's `minimum_sample_count`.
+
+  Put the totals in this plan's status line.
+- [ ] **Step 6: commit** `pyproject.toml`, `uv.lock` and any test updates, with message
+  "Pin ripple_detection to 68e1784 for the full refresh". `dask-cuda` stays a manual
+  install, like the CUDA plugin; note it in `docs/README.md` beside the plugin's note.
 
 **Acceptance:**
-- the pin is in the lock;
-- the GPU is visible;
+- the pin is in the lock, and `non_local_detector` and Spyglass are unchanged;
+- the GPU is visible and `dask_cuda` imports;
 - the unit suite passes;
-- the version-shift report exists, with its numbers in the status line.
+- the report exists, with its numbers in the status line.
 
-## Task 2: staging folder for both decoders
+## Task 2: decoders write to staging, resume safely, refuse a CPU fallback, record provenance
 
 **Files:**
 - Modify:
-  - `src/continuum_swr_replay/decoding_common.py`: `add_common_args`, and the `run_batch`
-    call that builds each `dask.delayed`;
+  - `src/continuum_swr_replay/decoding_common.py`: `add_common_args`, `run_batch`, and a new
+    `provenance_record`;
   - `src/continuum_swr_replay/analysis/hippocampus/result_loading.py`: `load_results`;
   - `src/continuum_swr_replay/analysis/contfrag/result_loading.py`: `load_contfrag_results`;
-  - `scripts/decoding/run_decoding_bandit.py`: `run_decode`, where `save_folder` is
-    hard-coded;
-  - `scripts/decoding/run_decoding_contfrag.py`: `run_decode`, same.
-- Test: `tests/unit/test_decoding_save_dir.py` (new).
+  - `scripts/decoding/run_decoding_bandit.py`: `run_decode` and `save_results_and_model`;
+  - `scripts/decoding/run_decoding_contfrag.py`: the same two.
+- Test: `tests/unit/test_decoding_save_dir.py` (new, offline: stub `spyglass` before
+  importing the scripts)
 
 **Interfaces:**
 - Produces:
-  - `add_common_args` adds `--save_dir` (`type=Path`, default `PROCESSED_DATA_DIR`);
-  - `run_batch` passes `save_dir=args.save_dir` to `run_decode_fn` with the other common
-    kwargs;
-  - both `run_decode(..., save_dir: Path = PROCESSED_DATA_DIR)` call
-    `results_exist(save_dir, ...)`, save into `save_dir`, and reload through the loader with
-    `root=save_dir`;
+  - `add_common_args` adds `--save_dir` (`type=Path`, default `PROCESSED_DATA_DIR`) and
+    `--allow_cpu` (`store_true`).
+  - `run_batch` passes `save_dir=args.save_dir` to `run_decode_fn`. When `HAS_CUDA` is False
+    and `--allow_cpu` was not given, it raises `RuntimeError` naming `dask_cuda`, before any
+    cluster starts.
+  - Both `run_decode(..., save_dir: Path = PROCESSED_DATA_DIR)`:
+    - call `save_dir.mkdir(parents=True, exist_ok=True)`;
+    - check `results_exist(save_dir, ...)`;
+    - reload with the loader's `root=save_dir`;
+    - save into `save_dir`.
+  - `save_results_and_model(..., resumed: bool)`: when `resumed` is True, it writes only the
+    `data_over_time` pickle and never reopens `results.nc`, the detector or the environment
+    for writing.
   - `load_results(..., root: Path = PROCESSED_DATA_DIR)` and
     `load_contfrag_results(..., root: Path = PROCESSED_DATA_DIR)` read every file from
     `root`.
+  - `provenance_record(repo: Path) -> dict` returns:
+    - `commit` (`git rev-parse HEAD`) and `dirty` (`git status --porcelain
+      --untracked-files=no` non-empty);
+    - `uv_lock_sha256`;
+    - `ripple_detection_commit` (`commit_id` from `direct_url.json`, or None);
+    - `non_local_detector_version`;
+    - `cuda_plugin_version` (from `importlib.metadata` for `jax-cuda12-plugin`, or None).
+
+    Each `run_decode` logs it once after START as one line:
+    `PROVENANCE ` followed by `json.dumps(record, sort_keys=True)`.
 
 - [ ] **Step 1: write the failing tests.**
-  - `test_save_dir_defaults_to_processed_data_dir`: `add_common_args(ArgumentParser())` with
-    `parse_args([])` gives `args.save_dir == PROCESSED_DATA_DIR`, and
-    `parse_args(["--save_dir", "/tmp/x"])` gives `Path("/tmp/x")`.
-  - `test_run_batch_passes_save_dir`:
-    - monkeypatch `decoding_common.get_epoch_info` to a one-row frame indexed by
-      `("chimi20200225_.nwb", "02_r1")`;
-    - set `decoding_common.HAS_CUDA = False`;
-    - replace `decoding_common.LocalCluster` with
-      `lambda **kw: LocalCluster(n_workers=1, processes=False)`;
-    - pass a fake `run_decode_fn` that records its kwargs.
-
-    Assert it received `save_dir == args.save_dir`.
-  - `test_load_results_reads_from_root`: monkeypatch `xr.open_dataset` and
-    `NonLocalClusterlessDetector.load_model` to record their path arguments (return stubs
-    with the attributes used). Assert both paths are under `root`.
-  - `test_load_contfrag_results_reads_from_root`: the same, for the ContFrag loader.
-  - `test_run_decode_reloads_from_save_dir` (Review Focus 1):
-    - monkeypatch `run_decoding_bandit.load_data` to a minimal dict with HPC spikes;
+  - `test_save_dir_and_allow_cpu_defaults`: `parse_args([])` gives
+    `save_dir == PROCESSED_DATA_DIR` and `allow_cpu is False`.
+  - `test_run_batch_refuses_cpu_fallback`: with `decoding_common.HAS_CUDA = False` and no
+    `--allow_cpu`, `run_batch` raises `RuntimeError` mentioning `dask_cuda`, and no cluster
+    is constructed (monkeypatch `LocalCluster` to fail if called).
+  - `test_run_batch_passes_save_dir`: set `HAS_CUDA = False` and `--allow_cpu`, monkeypatch
+    `LocalCluster` to `lambda **kw: LocalCluster(n_workers=1, processes=False)`, and pass a
+    one-row `get_epoch_info` and a fake `run_decode_fn` that records kwargs. Assert
+    `save_dir == args.save_dir`.
+  - `test_load_results_reads_from_root` and `test_load_contfrag_results_reads_from_root`:
+    monkeypatch `xr.open_dataset` and the detector's `load_model` to record their paths.
+    Assert both paths are under `root`.
+  - `test_run_decode_reloads_from_save_dir` (Review Focus 1), for each script:
+    - monkeypatch `load_data` to a minimal dict with HPC spikes;
     - make `results_exist` return True;
-    - make `load_results` record its kwargs, then raise a sentinel exception, so the test
-      stops before organizing results.
+    - make the loader record kwargs, then raise a sentinel.
 
-    Assert `load_results` was called with `root=save_dir`, not `PROCESSED_DATA_DIR`. Repeat
-    for `run_decoding_contfrag.run_decode` and `load_contfrag_results`.
+    Assert the loader got `root=save_dir`.
+  - `test_resume_rewrites_only_data_over_time` (Review Focus 1), for each script:
+    - write placeholder `results.nc`, `detector.pkl` and `environment.pkl` files into
+      `tmp_path`;
+    - call `save_results_and_model(..., resumed=True)` with stub objects whose save methods
+      raise if called.
+
+    Assert the three files' sha256 values are unchanged and the `data_over_time` pickle was
+    written.
+  - `test_save_dir_is_created`: a `save_dir` that doesn't exist yet is created before any
+    write.
+  - `test_provenance_record_fields`: run against the repo. All six keys are present,
+    `commit` has 40 hex characters, and `uv_lock_sha256` equals the sha256 of `uv.lock`.
 - [ ] **Step 2: run them and confirm they fail.**
-  `uv run pytest tests/unit/test_decoding_save_dir.py -q`. Expected: failures naming the
-  missing `--save_dir` and `root`.
-- [ ] **Step 3: implement.** Thread `save_dir` through as the Interfaces say. Keep every
-  default identical to today's behavior.
+  `uv run pytest tests/unit/test_decoding_save_dir.py -q`.
+- [ ] **Step 3: implement.** Keep every default identical to today's behavior, except the
+  CPU-fallback refusal.
 - [ ] **Step 4: run the tests and confirm they pass.** Also run
-  `uv run pytest tests/unit -q -k "decod or result_loading"` for regressions.
-- [ ] **Step 5: lint, format and commit** ("Let both decoders write to and resume from a
-  staging folder").
+  `uv run pytest tests/unit -q -k "decod or result_loading"`.
+- [ ] **Step 5: lint, format and commit** ("Let both decoders stage, resume safely, refuse a
+  CPU fallback and log provenance").
 
 **Acceptance:**
-- the five tests pass;
+- the tests pass;
 - with no `--save_dir`, behavior is unchanged;
-- no code path reads `PROCESSED_DATA_DIR` when a `save_dir` was given.
+- no code path reads `PROCESSED_DATA_DIR` when a `save_dir` was given;
+- a resume never rewrites `results.nc`;
+- every epoch log carries one `PROVENANCE` line.
 
-## Task 3: `--output-dir` for the timebin tables
+## Task 3: staging options for the timebin and ContFrag table builders
 
 **Files:**
-- Modify: `scripts/decoding/build_timebin_tables.py` (its `main`)
-- Test: `tests/unit/test_timebin_tables.py` (extend)
+- Modify: `scripts/decoding/build_timebin_tables.py` (`main`) and
+  `scripts/decoding/prepare_contfrag_replay_content_data.py` (its argument parser, and line
+  347, where `SESSION_CACHE_DIR` is set from `--replay-content-dir`)
+- Test: `tests/unit/test_timebin_tables.py` (extend) and
+  `tests/unit/test_contfrag_prepare_cli.py` (new). Both run offline with Spyglass stubbed.
 
 **Interfaces:**
-- Produces: `--output-dir` (`type=Path`, default `RC`, which is
-  `PROCESSED_DATA_DIR / "replay_content"`). Both `publish_canonical` calls write there.
+- Produces:
+  - `build_timebin_tables.py --output-dir` (`type=Path`, default `RC`): both
+    `publish_canonical` calls write there.
+  - `prepare_contfrag_replay_content_data.py --behavior-cache-dir` (`type=Path`, default
+    `None`): when given, `replay_prepare_data.SESSION_CACHE_DIR` is set to it. When not
+    given, it stays `replay_content_dir / "_session_cache"`, as today.
 
-- [ ] **Step 1: write the failing test.** `test_output_dir_receives_both_tables`:
-  - monkeypatch `find_sessions` to two fake sessions;
-  - make `build_one` return small valid onset and dense frames;
-  - stub `validate`;
-  - make `publish_canonical` record its directory argument.
+- [ ] **Step 1: write the failing tests.**
+  - `test_output_dir_receives_both_tables`:
+    - monkeypatch `find_sessions` to two fake sessions;
+    - make `build_one` return small valid frames;
+    - stub `validate`;
+    - make `publish_canonical` record its directory.
 
-  Run `main()` with `sys.argv = ["x", "--output-dir", str(tmp_path)]` and assert both calls
-  received `tmp_path`.
-- [ ] **Step 2: run it and confirm it fails.**
-  `uv run pytest tests/unit/test_timebin_tables.py -q -k output_dir`.
-- [ ] **Step 3: implement** the option and pass `args.output_dir` to both
-  `publish_canonical` calls.
-- [ ] **Step 4: run the tests and confirm they pass,** including the file's existing tests.
-- [ ] **Step 5: lint, format and commit** ("Let the timebin tables be built into a staging
-  folder"). This commit is `C0`; record its hash in the status line before runbook R1.
+    `main()` with `--output-dir tmp_path` sends both writes to `tmp_path`.
+  - `test_behavior_cache_dir_overrides_the_replay_content_cache`: parse
+    `["--replay-content-dir", "/a", "--behavior-cache-dir", "/b"]`, apply the script's
+    configuration step, and assert `SESSION_CACHE_DIR == Path("/b")`. Without the flag it is
+    `Path("/a/_session_cache")`. If the configuration lives inside `main`, refactor it into a
+    function `configure_paths(args)` first, so it can be tested without running the build.
+- [ ] **Step 2: run them and confirm they fail.**
+- [ ] **Step 3: implement.**
+- [ ] **Step 4: run the tests and confirm they pass,** including the files' existing tests.
+- [ ] **Step 5: lint, format and commit** ("Let the timebin and ContFrag table builders work in
+  staging").
 
-**Acceptance:** the test passes, and the default output folder is unchanged.
+  This commit is `C0`. Record its hash in the status line before runbook R1, commit the
+  status line on the worktree branch, and create the worktree.
+
+**Acceptance:** both tests pass, and both defaults are unchanged.
 
 ## Task 4: Widloski runner reads marks through the project's loader
 
-Work in the worktree (see "Branch and worktrees").
+Work in the worktree.
 
 **Files:**
 - Modify: `scripts/decoding/run_memoryless_detection.py`, changing:
@@ -310,7 +391,7 @@ Work in the worktree (see "Branch and worktrees").
   `src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/decode_marks.py` and
   `tests/unit/test_memoryless_decode_marks.py`.
 - Test: `tests/unit/test_run_memoryless_detection.py`: rewrite `TestLoadMarks`, and update
-  the `marks_loader` lambdas to the new signature.
+  every `marks_loader` lambda to the new signature.
 - Docs: `docs/design/replay_detection_comparison/02-memoryless-sequence.md`, the
   paragraphs naming `decode_marks`, the April rule or the marks cache.
 
@@ -319,8 +400,8 @@ Work in the worktree (see "Branch and worktrees").
   - `continuum_swr_replay.data_loaders.spikes.get_hpc_marks(nwb_file_name)`, which returns
     `(list[NDArray], list[NDArray])`;
   - `filter_spike_times(spike_times: dict, spike_waveform_features: dict, position_time: NDArray)`,
-    which returns `(dict, dict)`, keeps spikes inside
-    `[position_time[0], position_time[-1]]`, and drops electrodes left empty.
+    which returns `(dict, dict)`, keeps spikes in `[position_time[0], position_time[-1]]`,
+    and drops electrodes left empty.
 - Produces:
   - `MARKS_RULE: str = "load_data: get_hpc_marks (tetrode sort groups; coincident spikes counted) then filter_spike_times over the decode's time span"`;
   - `MARKS_RULE_TAG: str = "loader"`;
@@ -329,40 +410,34 @@ Work in the worktree (see "Branch and worktrees").
   - `load_marks(key: EpochKey, cache_dir: Path, span_s: tuple[float, float], detector_sha256: str) -> tuple[list[NDArray], list[NDArray]]`;
   - the `marks_loader` callable signature becomes
     `(key, cache_dir, span_s, detector_sha256)`;
-  - `run_one` computes `detector_sha256` from `input_paths(epoch_id, root)["detector"]`
-    (the input hashes it already takes) and passes it;
+  - `run_one` passes the detector sha256 it already computes for its input hashes;
   - the manifest's `"marks"` record is
-    `{"rule": MARKS_RULE, "detector_sha256": ..., "cache": <path name>, "sha256": marks_sha256(...)}`.
+    `{"rule": MARKS_RULE, "detector_sha256": ..., "cache": <file name>, "sha256": marks_sha256(...)}`.
 
 - [ ] **Step 1: write the failing tests.**
-  - `test_marks_come_from_the_project_loader`:
-    - monkeypatch `get_hpc_marks` to return three electrodes: one with a spike before the
-      span, one with all spikes outside it, and one normal.
-
-    Assert the second electrode is dropped, the out-of-span spike removed, and the features
-    kept aligned with the times.
-  - `test_a_cache_from_another_decode_is_not_read` (Review Focus 2): call `load_marks` with
-    `detector_sha256="a"*64` and a counting fake loader, then with `"b"*64`. The loader runs
-    twice, and the second result is not the first cache's content.
-  - `test_an_april_rule_cache_is_never_read` (Review Focus 2): write
-    `{epoch_id}_decode_time_marks.pkl` (the old name) holding sentinel arrays into
-    `cache_dir`. `load_marks` must call the loader and return the loader's marks.
-  - Update `test_the_record_names_the_marks_rule`: `record["marks"]["rule"] == MARKS_RULE`,
-    and `record["marks"]["detector_sha256"]` equals the sha256 of the fixture's detector
-    file.
+  - `test_marks_come_from_the_project_loader`: monkeypatch `get_hpc_marks` to return three
+    electrodes: one with a spike before the span, one with all spikes outside it, and one
+    normal. Assert the second is dropped, the out-of-span spike removed, and features kept
+    aligned with times.
+  - `test_a_cache_from_another_decode_is_not_read` (Review Focus 2): with a counting fake
+    loader, `detector_sha256="a"*64` then `"b"*64` runs the loader twice, and the second
+    result is not the first cache's content.
+  - `test_an_april_rule_cache_is_never_read` (Review Focus 2): with
+    `{epoch_id}_decode_time_marks.pkl` (the old name) holding sentinel arrays in
+    `cache_dir`, `load_marks` calls the loader and returns its marks.
+  - Update `test_the_record_names_the_marks_rule`: `rule == MARKS_RULE`, and
+    `detector_sha256` equals the sha256 of the fixture's detector file.
 - [ ] **Step 2: run them and confirm they fail.**
   `uv run pytest tests/unit/test_run_memoryless_detection.py -q`.
 - [ ] **Step 3: implement.**
   - Delete `fetch_raw_hpc_unit_marks` and the `decode_marks` imports.
   - Delete the two `decode_marks` files.
   - Rewrite the docstring's marks paragraph.
-  - Update spec 02's marks text: the marks are reloaded through the project's loader, the
-    guard confirms the training-span marks, and the refresh audit confirms one loader
-    commit.
+  - Update spec 02's marks text.
 - [ ] **Step 4: run the tests and confirm they pass.** Also run
   `uv run pytest tests/unit -q -k memoryless` and
-  `git grep -n decode_marks -- src scripts tests docs`. Expected: no hits outside the plan
-  and spec history.
+  `git grep -n decode_marks -- src scripts tests docs`. Expected: no hits outside plan and
+  spec history.
 - [ ] **Step 5: lint, format and commit** ("Read the Widloski runner's marks through the
   project's loader").
 
@@ -376,51 +451,56 @@ Work in the worktree (see "Branch and worktrees").
 Work in the worktree.
 
 **Files:**
-- Modify: `scripts/decoding/run_memoryless_detection.py` (`main`, plus a new
+- Modify: `scripts/decoding/run_memoryless_detection.py` (`main`, `run_settings`, and new
   `select_epochs` and `run_epochs`)
 - Test: `tests/unit/test_run_memoryless_detection.py` (extend `TestMain`, add
   `TestSelectEpochs`)
 - Docs: spec 02's runner usage, and `scripts/README.md`'s entry for the runner
 
 **Interfaces:**
-- Consumes: `run_one(epoch_id, *, root, output_dir, cache_dir, run_id, run_seed, shuffle, n_shuffles, config, ...) -> dict`,
-  unchanged apart from Task 4.
+- Consumes: `run_one(...)`, as left by Task 4; `decoding_common.provenance_record`,
+  `setup_logger` and `HAS_CUDA`.
 - Produces:
-  - new CLI options: `--cuda_visible_devices` (str, default None, which means run serially
-    in-process as today), `--local_scratch_dir` (default `.local_scratch`), `--date` (int,
-    such as `20200225`) and `--epoch` (str, such as `02_r1`);
+  - new CLI options: `--cuda_visible_devices` (str, default None, which keeps today's serial
+    in-process run), `--local_scratch_dir` (default `.local_scratch`), `--date` (int, such as
+    `20200225`) and `--epoch` (str, such as `02_r1`);
   - `select_epochs(epoch_ids: list[str], *, date: int | None, epoch: str | None) -> list[str]`,
-    which reads date and epoch from `parse_epoch_identifier`; the date is the digits of the
-    NWB stem;
-  - `run_epochs(epoch_ids, run_one_kwargs: dict, cluster_factory: Callable[[], Cluster]) -> Iterator[tuple[str, dict]]`,
-    which submits one `run_one` per epoch to `Client(cluster_factory())` and yields
-    `(epoch_id, record)` in completion order;
-  - a failure is caught in the worker and returned as
-    `{"status": "failed", "error": repr(e)}`;
-  - each worker task logs to `logs/{epoch_id}_memoryless.log` via
-    `decoding_common.setup_logger`;
-  - only `main` writes `manifest.json`, after each yielded record;
-  - with `--cuda_visible_devices`, `cluster_factory` builds
-    `LocalCUDACluster(CUDA_VISIBLE_DEVICES=..., local_directory=args.local_scratch_dir)`;
-  - `run_settings` also records `uv_lock_sha256`, the `ripple_detection` commit (from
-    `direct_url.json`) and the installed `jax-cuda12-plugin` version. A rerun under any
-    other value is refused, as library versions already are.
+    where the date is `int(nwb_stem[-8:])`, as `prepare_data.py:135` reads it, and the epoch
+    is the key's `epoch_name`;
+  - `run_epochs(epoch_ids, run_one_kwargs: dict, cluster_factory: Callable[[], Cluster]) -> Iterator[tuple[str, dict]]`.
+    It submits one `run_one` per epoch to `Client(cluster_factory())` and yields
+    `(epoch_id, record)` in completion order.
+    - A failure is caught in the worker and returned as
+      `{"status": "failed", "error": repr(e)}`.
+    - Each task logs to `logs/{epoch_id}_memoryless.log` via `setup_logger`.
+  - Only `main` calls `write_manifest`, after each yielded record.
+  - A device list given while `HAS_CUDA` is False exits with an error naming `dask_cuda`.
+  - With a device list, `cluster_factory` builds
+    `LocalCUDACluster(CUDA_VISIBLE_DEVICES=..., local_directory=args.local_scratch_dir)`.
+  - `run_settings` also records `provenance_record(repo)` without its `dirty` field (the run
+    id already says dirty). A rerun under any other `uv_lock_sha256`,
+    `ripple_detection_commit` or `cuda_plugin_version` is refused, as library versions
+    already are.
 
 - [ ] **Step 1: write the failing tests.**
-  - `test_date_and_epoch_filters_select_epochs`: of
-    `["chimi20200225_02_r1_HPC", "chimi20200225_04_r2_HPC", "chimi20200226_02_r1_HPC"]`,
-    `date=20200225, epoch="02_r1"` selects the first only. Either filter alone works, and
-    both None return everything.
+  - `test_date_and_epoch_filters_select_epochs`: of `["chimi20200225_02_r1_HPC",
+    "chimi20200225_04_r2_HPC", "chimi20200226_02_r1_HPC", "j1620210707_06_r3_HPC"]`:
+    - `date=20200225, epoch="02_r1"` selects the first only;
+    - `date=20210707` selects the j16 epoch;
+    - both None return everything.
   - `test_parallel_run_records_each_epoch_and_a_failure`: use
-    `cluster_factory = lambda: LocalCluster(n_workers=2, processes=False)` and a
-    monkeypatched `run_one` that raises for one epoch. The manifest has `ok` for the others
-    and `failed` with the error for that one. `main` exits non-zero, and the others'
-    outputs exist.
-  - `test_settings_record_the_environment`: `run_settings(...)` contains
-    `uv_lock_sha256`, `ripple_detection_commit` and `cuda_plugin`, and changing any of
-    them makes `main` refuse the existing run id.
-  - `test_workers_never_write_the_manifest`: the fake `run_one` asserts the manifest's
-    mtime is unchanged during the call, while it changes after each yielded record.
+    `cluster_factory = lambda: LocalCluster(n_workers=2, processes=False)` and a fake
+    `run_one` that raises for one epoch. The manifest has `ok` for the rest and `failed`
+    with the error for that one, `main` exits non-zero, and the other outputs exist.
+  - `test_only_the_main_thread_writes_the_manifest`: monkeypatch `write_manifest` to record
+    `threading.current_thread().name`. Every call comes from `MainThread`, while the fake
+    `run_one` runs in worker threads.
+  - `test_a_device_list_without_dask_cuda_is_refused`: monkeypatch `HAS_CUDA=False` and pass
+    `--cuda_visible_devices 0`. `main` exits with a message naming `dask_cuda` and writes no
+    manifest.
+  - `test_settings_record_the_environment`: `run_settings(...)` contains `uv_lock_sha256`,
+    `ripple_detection_commit` and `cuda_plugin_version`. Changing any of them makes `main`
+    refuse the existing run id.
   - The existing serial-path tests stay green unchanged.
 - [ ] **Step 2: run them and confirm they fail.**
 - [ ] **Step 3: implement.**
@@ -433,20 +513,22 @@ Work in the worktree.
 - a serial run (no `--cuda_visible_devices`) behaves exactly as before;
 - the manifest has a single writer.
 
-## Task 6: ripple-band inputs from Spyglass, read-only
+## Task 6: ripple-band inputs and the shared position helper, read-only
 
 Work in the worktree for the pure parts. Do the database smoke in the main tree after the
 merge.
 
 **Files:**
 - Modify:
-  - `src/continuum_swr_replay/data_loaders/lfp.py`: refactor `get_ripple`'s two restriction
-    dicts into `_ripple_keys`, and add `get_ripple_band_inputs` and `check_band_electrodes`;
-  - `src/continuum_swr_replay/data_loaders/position.py`: add `get_position_interval_name`;
-  - `src/continuum_swr_replay/data_loaders/bandit_task.py`: use it where
-    `PositionIntervalMap` is queried;
+  - `src/continuum_swr_replay/data_loaders/lfp.py`: refactor `get_ripple`'s restriction dicts
+    into `_ripple_keys`; add `get_ripple_band_inputs` and `check_band_electrodes`;
+  - `src/continuum_swr_replay/data_loaders/position.py`: add `get_epoch_position_info`;
+  - `src/continuum_swr_replay/data_loaders/bandit_task.py`: `load_data` calls
+    `get_epoch_position_info` in place of its own `PositionIntervalMap` lookup,
+    `get_position_info` call and NaN-row drop (`bandit_task.py:335-353`);
   - `src/continuum_swr_replay/types.py`: add `RippleBandInputs`.
-- Test: `tests/unit/test_lfp.py` (extend)
+- Test: `tests/unit/test_lfp.py` and `tests/unit/test_position.py` (extend or create,
+  offline)
 
 **Interfaces:**
 - Produces:
@@ -454,65 +536,83 @@ merge.
   def _ripple_keys(nwb_file_name: str, epoch_name: str) -> tuple[dict, dict]:
       """(ripple_key, lfp_band_restriction) exactly as get_ripple builds them today."""
 
-  def get_position_interval_name(nwb_file_name: str, epoch_name: str) -> str:
-      """PositionIntervalMap lookup used by load_data."""
+  def get_epoch_position_info(nwb_file_name: str, epoch_name: str) -> PositionData:
+      """PositionIntervalMap lookup, get_position_info, then load_data's drop of rows with
+      NaN head_position_x or head_position_y, with the same log line. load_data and the
+      SWR runner both call this, so they share speed and span."""
 
   def check_band_electrodes(band_electrode_ids, selection_electrode_ids) -> None:
       """Raise ValueError naming missing and extra electrodes when the sets differ."""
 
   class RippleBandInputs(TypedDict):
-      time: NDArray[np.float64]            # (n_time,), the band's timestamps, seconds
-      ripple_band: NDArray[np.float64]     # (n_time, n_channels), stored LFPBandV1, as float64
-      raw_referenced: NDArray[np.float64]  # (n_time, n_channels), same rows and columns
-      electrode_ids: NDArray[np.int64]     # (n_channels,), column order of both arrays
-      reference_ids: NDArray[np.int64]     # (n_channels,)
-      sampling_frequency: float            # nominal: lfp_band_sampling_rate (1000)
-      band_filter_coeff: NDArray[np.float64]  # FirFilterParameters filter_coeff
-      band_filter_name: str                # "ripple_150_250"
-      band_dtype: str                      # stored dtype of the band data
-      lfp_filter_name: str                 # the LFPV1 filter that made the raw LFP
-      valid_times: NDArray[np.float64]     # (n_intervals, 2), the band's valid intervals
+      time: NDArray[np.float64]              # (n_time,), the band's timestamps, seconds
+      ripple_band: NDArray[np.float64]       # (n_time, n_channels), stored LFPBandV1 as float64
+      ripple_band_dtype: str                 # the band's stored dtype
+      raw_referenced: NDArray[np.float64]    # (n_time, n_channels), referenced raw LFP as float64
+      raw_referenced_native: NDArray         # (n_time_raw, n_channels), referenced in the stored dtype, as LFPBandV1 does it
+      raw_timestamps: NDArray[np.float64]    # (n_time_raw,), timestamps of raw_referenced_native
+      reference_overflow_count: int          # samples where native-dtype subtraction wrapped
+      electrode_ids: NDArray[np.int64]       # (n_channels,), column order of every array
+      reference_ids: NDArray[np.int64]       # (n_channels,)
+      lfp_band_elect_index: NDArray[np.int64]  # Spyglass's electrode index, for filter_data
+      band_valid_interval: object            # the Spyglass Interval make filtered over (_compute_interval_times)
+      decimation: int
+      sampling_frequency: float              # nominal: lfp_band_sampling_rate (1000)
+      band_filter_coeff: NDArray[np.float64] # FirFilterParameters filter_coeff
+      band_filter_name: str                  # "ripple_150_250"
+      lfp_filter_name: str                   # the LFPV1 filter that made the raw LFP
+      lfp_units: str                         # the electrical series' unit, for the dead-channel guard
 
   def get_ripple_band_inputs(nwb_file_name: str, epoch_name: str) -> RippleBandInputs: ...
   ```
-- Implementation requirements for `get_ripple_band_inputs`:
+- Requirements for `get_ripple_band_inputs`:
   - Take the band key from `_ripple_keys`.
-  - Read the band's electrodes and references from `LFPBandSelection.LFPBandElectrode`, and
-    call `check_band_electrodes` against
-    `RippleLFPSelection.RippleLFPElectrode & {"nwb_file_name", "group_name": "CA1"}`.
-  - Build the referenced raw LFP with the code that made the stored band:
-    `LFPBandV1()._load_lfp_data_with_referencing(lfp_object, elect_ids, ref_ids, valid_times)`
-    (Spyglass `lfp_band.py:383`), as `LFPBandV1.make` calls it. Map columns through its
-    returned electrode index, never by position. Convert to float64 afterwards.
-  - Restrict both arrays to the band's timestamps.
+  - Read the band's electrodes and references from `LFPBandSelection.LFPBandElectrode`
+    restricted by that band key.
+  - Call `check_band_electrodes` against `RippleLFPSelection.RippleLFPElectrode` restricted
+    by the same band key plus `group_name="CA1"`. `RippleLFPSelection` is keyed on
+    `LFPBandV1` (Spyglass `ripple.py:33-43`), so an unrestricted query unions every epoch.
+  - Reproduce `LFPBandV1.make`'s inputs (Spyglass `lfp_band.py:498-560`):
+    - the interval from `LFPBandV1()._compute_interval_times(key, lfp_key)`;
+    - the referenced data from
+      `LFPBandV1()._load_lfp_data_with_referencing(lfp_object, elect_ids, ref_ids, interval)`,
+      which works in the stored dtype;
+    - the electrode index and the decimation.
+  - Count overflow by comparing the native-dtype subtraction with a float64 subtraction of
+    the same columns.
+  - Restrict the float64 arrays to the band's timestamps.
   - Insert nothing.
 
-- [ ] **Step 1: write the failing tests.**
+- [ ] **Step 1: write the failing tests.** All offline.
   - `test_band_electrode_sets_must_match`: equal sets pass. A missing or extra electrode
     raises `ValueError` naming it.
   - `test_ripple_keys_are_what_get_ripple_used`: pin both dicts for `("chimi20200225_.nwb",
     "02_r1")` to the literal values `get_ripple` builds today. These are `group_name "CA1"`,
     `ripple_param_name "default"`, `filter_name "ripple_150_250"`, `filter_sampling_rate
-    1000`, and `target_interval_list_name "02_r1 noPrePostTrialTimes"`.
+    1000`, `target_interval_list_name "02_r1 noPrePostTrialTimes"`, and
+    `lfp_band_sampling_rate 1000`.
+  - `test_epoch_position_drops_nan_rows_like_load_data`: monkeypatch the two Spyglass calls
+    to return a position frame with two NaN-position rows. Both rows are dropped and the rest
+    kept exactly.
 - [ ] **Step 2: run them and confirm they fail.**
 - [ ] **Step 3: implement.**
-- [ ] **Step 4: run the tests and confirm they pass,** including all of `test_lfp.py`.
+- [ ] **Step 4: run the tests and confirm they pass,** including all of `test_lfp.py` and
+  every `load_data` unit test.
 - [ ] **Step 5: run the database smoke, in the main tree after the merge.**
   - Call `get_ripple_band_inputs("chimi20200225_.nwb", "02_r1")`. Expected: 22 channels,
-    electrode ids `[0, 4, 8, 12, 20, 24, …, 92]`, references `{16, 81}`, and
-    `sampling_frequency == 1000.0`.
-  - `get_ripple(...)` and `get_position_interval_name(...)` must return outputs identical to
-    those at `C0` for that epoch. Compare `ripple_times` and `ripple_filtered_lfps` with
-    `pandas.testing.assert_frame_equal`; pickle the `C0` output beforehand.
+    electrode ids `[0, 4, 8, 12, 20, 24, …, 92]`, references `{16, 81}`,
+    `sampling_frequency == 1000.0` and `reference_overflow_count == 0`.
+  - `get_ripple(...)` output, and `get_epoch_position_info(...)` against `load_data`'s
+    `position_info`, are identical to the `C0` reference pickled in R1. Compare with
+    `pandas.testing.assert_frame_equal`.
 
   Record both results in the status line.
-- [ ] **Step 6: lint, format and commit** ("Read the ripple-band inputs for direct SWR
-  detection").
+- [ ] **Step 6: lint, format and commit** ("Read the ripple-band inputs and share the epoch's
+  position with load_data").
 
 **Acceptance:**
 - the tests pass;
-- the refactor leaves `get_ripple` and `load_data`'s position lookup byte-identical on the
-  smoke epoch;
+- `get_ripple` and `load_data`'s position are byte-identical to `C0` on the smoke epoch;
 - the fetch writes nothing.
 
 ## Task 7: Zugaro filtering and channel choice
@@ -530,27 +630,34 @@ Work in the worktree.
   CHANNEL_SELECTION_BAND_HZ = (140.0, 180.0); CHANNEL_SELECTION_FILTER_ORDER = 4
   CHANNEL_SELECTION_RMS_WINDOW_S = 15 / 1250      # 0.012 s, bz_GetBestRippleChan's 15 samples at 1250 Hz
   DEAD_CHANNEL_RMS = 1.0                          # bz_GetBestRippleChan's guard, in stored LFP units
-  FILTER_PADLEN = 90                              # samples, odd extension
-  EDGE_EXCLUSION_S = 0.090
+  SETTLING_TOLERANCE = 1e-3
   ZUGARO_MAXIMUM_DURATION_S = 0.150
 
   def design_bandpass_sos(sampling_frequency: float, band_hz: tuple[float, float],
                           order: int) -> NDArray:
       """butter(order, band_hz, btype="bandpass", fs=sampling_frequency, output="sos")."""
 
+  def settling_samples(sos: NDArray, sampling_frequency: float,
+                       tolerance: float = SETTLING_TOLERANCE) -> int:
+      """Samples until the single-pass impulse response's magnitude stays below tolerance
+      x its peak, rounded up to a whole 10 ms. The padding and the edge exclusion."""
+
+  def odd_window_samples(window_s: float, sampling_frequency: float) -> int:
+      """round(window_s * fs), then up to an odd count (the package's convention)."""
+
   def gap_free_stretches(time: NDArray, values: NDArray) -> NDArray:
       """(n_stretches, 2) [start, stop) row indices. A row with any non-finite value, or a
       step over 1.5 x the median step (the package's rule), ends a stretch."""
 
   def zero_phase_bandpass(values: NDArray, time: NDArray, sampling_frequency: float,
-                          band_hz: tuple[float, float], order: int, *,
-                          padlen: int = FILTER_PADLEN,
-                          edge_exclusion_s: float = EDGE_EXCLUSION_S) -> NDArray:
-      """Butterworth band-pass in sos form, designed at sampling_frequency, applied with
-      sosfiltfilt (padtype="odd", padlen) per gap-free stretch, in float64. Rows outside
-      stretches, the first and last round(edge_exclusion_s * fs) rows of each stretch,
-      and every row of a stretch too short for both are NaN.
+                          band_hz: tuple[float, float], order: int) -> NDArray:
+      """design_bandpass_sos, applied with sosfiltfilt(padtype="odd",
+      padlen=settling_samples(...)) per gap-free stretch, in float64. Rows outside
+      stretches, the first and last settling_samples rows of each stretch, and every row
+      of a stretch too short for both are NaN.
       values: (n_time, n_channels); returns the same shape."""
+
+  class NoUsableChannelError(ValueError): ...
 
   @dataclass(frozen=True)
   class ChannelChoice:
@@ -560,17 +667,17 @@ Work in the worktree.
 
   def best_ripple_channel(values: NDArray, time: NDArray, sampling_frequency: float,
                           electrode_ids: NDArray) -> ChannelChoice:
-      """bz_GetBestRippleChan: filter 140-180 Hz (order 4, zero_phase_bandpass), centred
-      moving RMS over round(0.012 * fs) samples within each stretch, score mean/median
-      over finite samples, exclude mean or median < DEAD_CHANNEL_RMS, highest score
-      wins, exact ties go to the lowest electrode id."""
+      """bz_GetBestRippleChan: zero_phase_bandpass at 140-180 Hz (order 4); centered moving
+      RMS over odd_window_samples(0.012, fs) samples within each stretch; score
+      mean/median over finite samples; exclude mean or median < DEAD_CHANNEL_RMS; the
+      highest score wins; an exact tie goes to the lowest electrode id; raise
+      NoUsableChannelError when every channel is excluded."""
   ```
 
 - [ ] **Step 1: write the failing tests.** All are deterministic, with seeded RNGs.
   - `test_zugaro_band_gains`: with
-    `sos = design_bandpass_sos(1000.0, ZUGARO_BAND_HZ, ZUGARO_FILTER_ORDER)`, the design
-    `zero_phase_bandpass` uses, assert these zero-phase gains, as `abs(H)**2` of
-    `sosfreqz`:
+    `sos = design_bandpass_sos(1000.0, ZUGARO_BAND_HZ, ZUGARO_FILTER_ORDER)`, assert these
+    zero-phase gains, as `abs(H)**2` from `sosfreqz`:
 
     | Frequency (Hz) | Gain |
     |---|---|
@@ -581,28 +688,40 @@ Work in the worktree.
     | 200 | 0.0573 ± 5e-4 |
     | 250 | ≤ 0.0011 |
     | 60 | ≤ 1e-4 |
-  - `test_sos_matches_transfer_function_form`: on seeded white noise (200,000 samples), the
-    `sosfiltfilt` output and `filtfilt(*butter(3, (120, 180), "bandpass", fs=1000), x)`
-    differ by under 1e-10 relative.
+  - `test_selection_band_gains`: the 140–180 Hz order-4 design has zero-phase gain
+    0.500 ± 1e-3 at 140 and 180 Hz.
+  - `test_settling_lengths`: `settling_samples` is 90 for the Zugaro design at 1000 Hz, and
+    160–180 for the selection design (the review measured about 166 ms).
+  - `test_sos_matches_transfer_function_form`: on seeded white noise (200,000 samples),
+    `sosfiltfilt(sos, x, padtype="odd", padlen=90)` and
+    `filtfilt(b, a, x, padtype="odd", padlen=90)` with `b, a` from the same design differ by
+    under 1e-10 relative.
   - `test_passes_ripples_and_rejects_neighbors_at_1000_hz`: on a 10 s, 1000 Hz signal, a
-    150 Hz unit sinusoid keeps an interior amplitude within 1% of 1, and a 100 Hz one is
-    attenuated below 0.03.
+    150 Hz unit sinusoid keeps an interior amplitude within 1% of 1, and a 100 Hz one falls
+    below 0.03.
   - `test_stretches_split_at_nan_and_time_jump`: a time grid with one 1.6× median step and
-    one NaN row gives three stretches with exact `[start, stop)` bounds.
+    one NaN row gives three stretches with exact bounds.
   - `test_filter_never_crosses_a_gap` (Review Focus 4): a large pulse at the end of stretch
     1 leaves stretch 2's output exactly equal to filtering stretch 2 alone.
-  - `test_edges_are_unobserved` (Review Focus 4): the first and last 90 rows of each
-    stretch are NaN, and the interior is finite.
-  - `test_short_stretch_is_unobserved` (Review Focus 4): a stretch of 2 × 90 rows or fewer
-    is all NaN.
+  - `test_edges_are_unobserved` (Review Focus 4): the first and last `settling_samples`
+    rows of each stretch are NaN, and the interior is finite.
+  - `test_short_stretch_is_unobserved` (Review Focus 4): a stretch of at most
+    `2 * settling_samples` rows is all NaN.
+  - `test_kept_rows_have_no_edge_transient` (Review Focus 4): for each design, a 3 s
+    stretch cut from a 60 s seeded noise signal, filtered on its own, matches the long
+    signal's filtered output over the kept rows to within 1e-3 of the output's standard
+    deviation.
   - `test_bursty_channel_wins`: channel A carries sparse 150–170 Hz bursts over low noise;
-    channel B carries steady 160 Hz power of equal total energy. A wins.
-  - `test_dead_channel_is_excluded`: an all-zero channel and a channel scaled to RMS 0.5
-    appear in `excluded` with reasons, and neither wins.
+    channel B carries steady 160 Hz power of equal total energy. Both have a baseline RMS of
+    at least 5 after filtering. A wins.
+  - `test_dead_channel_guard_is_pinned`: a channel scaled so its filtered mean RMS is 0.99
+    is excluded, and one at 1.01 is kept.
+  - `test_all_channels_excluded_raises`: two all-zero channels raise
+    `NoUsableChannelError`.
   - `test_tie_goes_to_lowest_electrode_id`: two identical channels with ids 40 and 8 select
     8.
-  - `test_selection_settings_are_pinned`: the RMS window is 12 samples at 1000 Hz, and the
-    140–180 Hz order-4 design has zero-phase gain 0.5 ± 1e-3 at 140 and 180 Hz.
+  - `test_rms_window_is_13_samples_at_1000_hz`:
+    `odd_window_samples(0.012, 1000.0) == 13`.
 - [ ] **Step 2: run them and confirm they fail.**
   `uv run pytest tests/unit/test_swr_inventories.py -q`.
 - [ ] **Step 3: implement,** with NumPy-style docstrings giving shapes.
@@ -610,10 +729,10 @@ Work in the worktree.
 - [ ] **Step 5: lint, format and commit** ("Filter for Zugaro and pick its channel as
   bz_GetBestRippleChan does").
 
-**Acceptance:** every test passes, and every gain and setting from Global Constraints is
+**Acceptance:** every test passes, and every gain, length and setting in Global Constraints is
 pinned by a test.
 
-## Task 8: detector settings, band check, Kay version check
+## Task 8: detector settings, Yu diagnostics, band check, Kay version checks
 
 Work in the worktree.
 
@@ -623,10 +742,11 @@ Work in the worktree.
 
 **Interfaces:**
 - Consumes:
-  - from Task 7: `zero_phase_bandpass`, `best_ripple_channel`, `ZUGARO_*`;
+  - from Task 6: `RippleBandInputs`;
+  - from Task 7: everything;
   - from `ripple_detection`: `Kay_ripple_detector`, `Karlsson_ripple_detector`,
-    `Yu_ripple_detector`, `Zugaro_ripple_detector`, `filter_ripple_band`, and
-    `ripple_detection.simulate.simulate_session` / `simulate_time`;
+    `Yu_ripple_detector`, `Zugaro_ripple_detector`, `filter_ripple_band`,
+    `noise_threshold_diagnostics`, and `simulate.simulate_session` / `simulate_time`;
   - from Phase 3: `analysis.inventory_comparison.schema.inventory_from_intervals`,
     `combine_inventories`, `SessionIdentity`, and
     `analysis.inventory_comparison.overlap.overlap_pairs`.
@@ -645,56 +765,71 @@ Work in the worktree.
   })
 
   def cap_zugaro_duration(events: pd.DataFrame) -> tuple[pd.DataFrame, int]:
-      """Keep events with duration <= ZUGARO_MAXIMUM_DURATION_S; return them and the
-      number dropped."""
+      """Keep duration <= ZUGARO_MAXIMUM_DURATION_S; return the kept events and the count
+      dropped."""
 
   def run_swr_detectors(time: NDArray, ripple_band: NDArray, zugaro_lfp: NDArray,
-                        speed: NDArray, sampling_frequency: float) -> dict[str, pd.DataFrame]:
-      """Native event tables keyed "kay", "karlsson", "yu", "zugaro". ripple_band is
-      (n_time, n_channels); zugaro_lfp is (n_time, 1), already filtered by
-      zero_phase_bandpass (NaN rows unobserved). Zugaro's table is already capped."""
+                        speed: NDArray, sampling_frequency: float
+                        ) -> dict[str, pd.DataFrame | Exception]:
+      """Native event tables keyed "kay", "karlsson", "yu", "zugaro". A detector that
+      raises is returned as its exception, so the others still report. zugaro_lfp is
+      (n_time, 1), already filtered (NaN rows unobserved); Zugaro's table is capped."""
+
+  def yu_diagnostics(time: NDArray, ripple_band: NDArray, speed: NDArray,
+                     sampling_frequency: float) -> dict:
+      """noise_threshold_diagnostics on the Yu consensus over immobile samples, with the
+      settings in DETECTOR_SETTINGS["yu"]: histogram grid and edges, mode, threshold, and
+      the normalization center and scale. Computed whether or not any event is found."""
 
   def band_reproduction_error(inputs: RippleBandInputs,
                               fir_filter: Callable | None = None) -> tuple[float, float]:
-      """(max |re-filtered - stored| on shared timestamps, tolerance). fir_filter
-      defaults to spyglass FirFilterParameters().filter_data, called as LFPBandV1.make
-      calls it (decimation 1). The tolerance is 1.0 when band_dtype is an integer type,
-      else 1e-6 x the stored band's standard deviation."""
+      """(max |re-filtered - stored| on shared timestamps, tolerance). fir_filter defaults
+      to spyglass FirFilterParameters().filter_data, called with LFPBandV1.make's exact
+      arguments: raw_timestamps, raw_referenced_native, band_filter_coeff,
+      band_valid_interval.times, lfp_band_elect_index, decimation. The tolerance is 1.0
+      for an integer band dtype, else 1e-6 x the stored band's standard deviation."""
 
   def kay_version_check(direct: pd.DataFrame, canonical: pd.DataFrame, *,
                         session: SessionIdentity, run_id: str,
                         speed_time_s: NDArray, speed_cm_per_s: NDArray) -> pd.DataFrame:
       """One row per event of either set: detector ("kay" or "kay_spyglass"), event_key,
-      status ("matched", "added", or "missed"), partner_event_key (largest-overlap
-      partner when matched), start_shift_s, end_shift_s. Overlap is overlap_pairs'
-      strict positive-duration rule."""
+      status ("matched", "added" or "missed"), partner_event_key (largest-overlap partner
+      when matched), start_shift_s, end_shift_s, whole_event_speed_eligible. Overlap is
+      overlap_pairs' strict positive-duration rule. Every event is kept, eligible or not;
+      the column lets the report split them."""
   ```
 
 - [ ] **Step 1: write the failing tests.**
   - `test_detector_settings_are_pinned`: an exact equality of `DETECTOR_SETTINGS` with the
     literal above.
-  - `test_zugaro_keeps_150_ms_and_drops_longer`: durations `[0.149, 0.150, 0.151]` keep the
-    first two and drop one.
+  - `test_zugaro_keeps_150_ms_and_drops_longer`: durations `[0.149, 0.150, 0.151]` keep two
+    and drop one.
   - `test_detectors_find_injected_ripples_at_1000_hz`:
     - generate `time = simulate_time(60_000, 1000)` and
-      `session = simulate_session(time, [5, 15, 25, 35, 45], rng=0)`;
+      `simulate_session(time, [5, 15, 25, 35, 45], rng=0, ripple_frequency=(150, 175))`;
     - the band is `filter_ripple_band(session.lfps, sampling_frequency=1000)`;
     - Zugaro's input is `zero_phase_bandpass` of the raw channel chosen by
       `best_ripple_channel`.
 
-    Each of the four detectors must overlap at least 4 of the 5 injected times. If Yu cannot
-    estimate its noise threshold on simulated data, stop and report rather than loosening
-    the test.
+    Each detector overlaps at least 4 of the 5 injected times. If Yu cannot estimate its
+    threshold on simulated data, stop and report rather than loosen the test.
+  - `test_zugaro_ignores_a_230_hz_ripple`: the same, but with
+    `ripple_frequency=(229, 231)`. Zugaro detects none of the five, which confirms its band.
+  - `test_a_failing_detector_does_not_hide_the_others`: monkeypatch `Yu_ripple_detector` to
+    raise. `run_swr_detectors` returns the exception for `"yu"` and tables for the other
+    three.
+  - `test_yu_diagnostics_match_the_detector`: on the simulated session, `yu_diagnostics`
+    gives a threshold equal (to 1e-9) to the events' `detection_threshold_zscore`.
   - `test_band_check_passes_on_its_own_filter`: a fake `fir_filter` (`np.convolve` with a
-    fixed kernel) builds the stored band from fake raw input. The reported error is 0 and
-    below the tolerance.
+    fixed kernel) builds the stored band from fake raw input. The error is 0.
   - `test_band_check_catches_a_permuted_channel_map` (Review Focus 3): the same fake, but
-    with the raw columns permuted against the band. The error is far above the tolerance.
+    the raw columns are permuted against the band, so the error far exceeds the tolerance.
   - `test_kay_check_statuses`: direct `[(1.0, 1.1), (2.0, 2.1), (5.0, 5.1)]`, canonical
     `[(1.05, 1.12), (3.0, 3.1), (5.1, 5.2)]`. Expected:
     - the 1.0 event is matched both ways;
     - direct 2.0 and 5.0 are `added`, since 5.0 only touches 5.1 with zero duration;
-    - canonical 3.0 and 5.1 are `missed`.
+    - canonical 3.0 and 5.1 are `missed`;
+    - every row has `whole_event_speed_eligible`.
 - [ ] **Step 2: run them and confirm they fail.**
 - [ ] **Step 3: implement.**
 - [ ] **Step 4: run the tests and confirm they pass.**
@@ -720,58 +855,71 @@ Work in the worktree. Run the smoke in the main tree after the merge.
 
 **Interfaces:**
 - Consumes:
-  - Task 6: `get_ripple_band_inputs`, `get_position_interval_name`;
-  - `data_loaders.position.get_position_info`;
+  - Task 6: `get_ripple_band_inputs`, `get_epoch_position_info`;
   - Task 8: everything;
-  - `decoding_common.setup_logger`, `filter_epoch_info`;
+  - `decoding_common.setup_logger`, `filter_epoch_info`, `provenance_record`;
   - `data_loaders.get_epoch_info`;
-  - Spyglass `RippleTimesV1`, read through `get_ripple`'s key, for the canonical Kay
-    events.
+  - Spyglass `RippleTimesV1`, read through `_ripple_keys`. Its `fetch1_dataframe` gives
+    the canonical events, and `get_ripple_lfps_and_position_info(key)` gives Spyglass's own
+    inputs for the version-only Kay check.
 - Produces:
+  - `KNOWN_NO_INPUT_EPOCHS: Mapping[tuple[str, str], str]`, mapping
+    `(nwb_file_name, epoch_name)` to a reason. It holds the epochs documented in
+    `data_loaders/constants.py:150-162`:
+    - `senor20201104_` 06_r3 and 08_r4: no `LFPBandV1`;
+    - `senor20201105_` 09_r4: no `TrackGraph`;
+    - `wilbur20210404_` 02_r1, 04_r2, 06_r3, 08_r4 and 10_r5: no CA1 extraction.
   - `epoch_id(nwb_file_name, epoch_name) -> str`, returning `"{stem}_{epoch}_HPC"`.
-  - `run_epoch(nwb_file_name, epoch_name, *, output_dir: Path, fetch_inputs=get_ripple_band_inputs, fetch_position=..., fetch_canonical_kay=...) -> dict`.
+  - `run_epoch(nwb_file_name, epoch_name, *, output_dir: Path, fetch_inputs=get_ripple_band_inputs, fetch_position=get_epoch_position_info, fetch_canonical_kay=..., fetch_spyglass_kay_inputs=...) -> dict`.
     It writes, under `output_dir`:
-    - `{epoch_id}_{detector}_events.parquet` for each of kay, karlsson, yu and zugaro;
+    - `{epoch_id}_{detector}_events.parquet` for each detector that succeeded;
     - `{epoch_id}_swr_observed.parquet`, with columns `scope` (`"stored_band"` or
       `"zugaro"`), `start_s` and `end_s`;
-    - `{epoch_id}_kay_version_check.parquet`.
+    - `{epoch_id}_kay_version_check.parquet`, with a `comparison` column:
+      `"version_only"` or `"version_and_inputs"`.
 
     It returns the manifest record:
-    - `status`, `commit`, `uv_lock_sha256`;
-    - `ripple_detection_commit` (from `direct_url.json`), `numpy`, `scipy`, `cuda_plugin`;
+    - `status` (`ok` when every detector succeeded, `partial` when some did), and a
+      per-detector `detectors: {name: "ok" | error}`;
+    - `provenance_record(...)` and `numpy` / `scipy` versions;
     - `electrode_ids`, `reference_ids`;
     - `zugaro_channel` (`{electrode_id, scores, excluded}`);
-    - `band_check` (`{max_abs_difference, tolerance, band_dtype}`);
-    - `yu` (`{detection_threshold_zscore}`);
-    - `sampling` (`{nominal, measured}`), `lfp_filter_name`;
+    - `band_check` (`{max_abs_difference, tolerance, band_dtype, reference_overflow_count}`);
+    - `yu_diagnostics`, from `yu_diagnostics`;
+    - `sampling` (`{nominal, measured}`), `lfp_filter_name`, `lfp_units`;
     - `position_span_s`, `n_events` per detector, `zugaro_dropped_over_150ms`;
     - `n_detecting_tetrodes`, `meets_published_tetrode_criterion: "unknown"`;
     - `input_sha256` (`{time, ripple_band, raw_referenced}`).
-  - Speed: `head_speed` from `get_position_info(...)`, interpolated onto LFP times with
+  - Speed: `head_speed` from `get_epoch_position_info(...)`, interpolated onto LFP times with
     `np.interp(..., left=np.nan, right=np.nan)`. LFP rows outside
     `[position_time[0], position_time[-1]]` are dropped.
-  - Skips: no `LFPBandV1` row, or no CA1 `RippleTimesV1` row, is recorded as
-    `{"status": "skipped", "reason": ...}`. Any other exception is
-    `{"status": "failed", "error": repr(e)}`.
+  - Skips and failures:
+    - an epoch in `KNOWN_NO_INPUT_EPOCHS` is `{"status": "skipped", "reason": ...}` without
+      touching the database;
+    - `NoUsableChannelError` makes Zugaro's entry an error and the status `partial`;
+    - any other exception is `{"status": "failed", "error": repr(e)}`.
   - `main(argv)` takes `--animal`, `--date`, `--epoch`, `--overwrite`, `--n-workers`
     (default 8), `--run-id` (default `git rev-parse HEAD`[:12]) and `--output-root`
     (default `PROCESSED_DATA_DIR / "replay_detection_comparison" / "swr"`).
     - It runs a dask
       `LocalCluster(n_workers=args.n_workers, processes=True, threads_per_worker=1)`.
-    - Only `main` writes `manifest.json`, atomically, after each completion.
+    - Only the main thread writes `manifest.json`, atomically, after each completion.
     - Each epoch logs to `logs/{epoch_id}_swr.log`.
     - A rerun without `--overwrite` skips epochs already `ok`.
 
 - [ ] **Step 1: write the failing tests.** All inject fakes; none touches the database.
   - `test_outputs_and_manifest_fields`: synthetic inputs from `simulate_session` at 1000 Hz
-    and a fake position (all 2 cm/s). All six files exist, the manifest has every field
-    above, `zugaro_channel.electrode_id` is in `electrode_ids`, and the band check passes
-    with the fake filter.
-  - `test_missing_inputs_are_skipped_with_reason`: the fake fetch raises the no-row error,
-    so the record is `skipped` with a reason and no files are written.
+    with `ripple_frequency=(150, 175)`, and a fake position at 2 cm/s throughout. Expected:
+    - every file exists;
+    - the manifest has every field above;
+    - `zugaro_channel.electrode_id` is in `electrode_ids`;
+    - the band check passes with the fake filter.
+  - `test_known_no_input_epochs_are_skipped_without_fetching`: a fetch that fails if called
+    is never called for `("senor20201105_.nwb", "09_r4")`.
   - `test_a_failed_epoch_is_recorded_and_the_rest_run`: run with
     `LocalCluster(processes=False)` on two epochs, one raising. Expect one `ok`, one
     `failed`, and a non-zero exit.
+  - `test_one_detector_failing_makes_the_epoch_partial`.
   - `test_rerun_without_overwrite_skips_done_epochs`.
   - `test_lfp_outside_the_position_span_is_dropped`: a fake position spanning 2–8 s of a
     10 s LFP leaves no event or observed interval outside [2, 8].
@@ -783,12 +931,12 @@ Work in the worktree. Run the smoke in the main tree after the merge.
   `uv run python scripts/decoding/run_swr_detection.py --animal chimi --date 20200225 --epoch 02_r1 --n-workers 1`.
   Expected:
   - status `ok`;
-  - `band_check.max_abs_difference <= tolerance`;
+  - the band check is within tolerance, with zero overflow;
   - a chosen Zugaro channel;
   - event counts for all four detectors;
-  - a Kay check against canonical.
+  - both Kay comparisons written.
 
-  Then run the five pilot epochs, and record wall clock, peak RSS, event counts and Kay
+  Then run the five pilot epochs, and record wall clock, peak RSS, event counts and the Kay
   check totals in the status line.
 
 **Acceptance:**
@@ -796,7 +944,7 @@ Work in the worktree. Run the smoke in the main tree after the merge.
 - the pilot smoke passes the band check on all five epochs;
 - the docs list seven inventories.
 
-## Task 10: the same-data audit
+## Task 10: the same-data audit and the tables manifest
 
 Work in the worktree.
 
@@ -808,41 +956,49 @@ Work in the worktree.
 **Interfaces:** every check is a pure function over paths and frames, and returns
 `{"ok": bool, "failures": list[str], "details": ...}`.
 ```python
-def decode_commits(log_dir: Path, epoch_ids: list[str]) -> pd.DataFrame
-    # epoch_id, decoder ("nonlocal" | "contfrag"), commit: the first "Git Hash:" line of
-    # logs/{id}.log and logs/{id}_contfrag.log
-def check_one_commit(commits: pd.DataFrame, allowed: Mapping[str, str]) -> dict
-    # one commit across all rows, or listed exceptions with reasons
+def decode_provenance(log_dir: Path, epoch_ids: list[str]) -> pd.DataFrame
+    # epoch_id, decoder ("nonlocal" | "contfrag"), and the fields of the first "PROVENANCE "
+    # JSON line in logs/{id}.log and logs/{id}_contfrag.log (Task 2)
+def check_one_commit(provenance: pd.DataFrame, allowed: Mapping[str, str]) -> dict
+    # one commit, dirty False, and one uv_lock_sha256 across all rows, or listed exceptions
+    # with reasons
 def check_grids_match(nonlocal_dot: pd.DataFrame, contfrag_dot: pd.DataFrame) -> dict
-    # identical time index, linear_position, head_speed
+    # identical time index, linear_position and head_speed
+def check_minimum_sample_counts(times: Mapping[str, NDArray]) -> dict
+    # minimum_sample_count(time, 0.015) is the same for every epoch (R9)
 def check_widloski_hashes(manifest: dict, root: Path) -> dict
     # the recorded input sha256s equal the current files'
 def check_swr_spans(swr_manifest: dict, decode_spans: Mapping[str, tuple[float, float]],
                     tolerance_s: float = 0.002) -> dict
+def record_tables(table_dir: Path, commit: str, inputs: Mapping[str, str]) -> Path
+    # writes table_dir/tables_manifest.json: each *.parquet / *.json file's sha256, the
+    # commit, the inputs (decode commit, qvals source, cache dir)
+def check_tables_recorded(table_dirs: list[Path], decode_commit: str) -> dict
+    # each promoted directory has a tables_manifest.json whose sha256s match the files
+    # present, and whose commit descends from decode_commit (git merge-base --is-ancestor)
+def check_pfc_sidecars(sidecars: list[dict], event_table_sha256: str) -> dict
 def check_epoch_sets(sets: Mapping[str, set[str]],
                      reasons: Mapping[str, Mapping[str, str]]) -> dict
     # an epoch missing from an artifact passes only with a recorded reason for that artifact
-def check_fit_provenance(repo: Path) -> dict
-    # runs scripts/qa/check_fit_provenance.py; ok when the exit code is 0
-def check_tables_recorded(replay_content_dir: Path, decode_commit: str) -> dict
-    # either regeneration_manifest.json says the promoted tables were validated, or every
-    # canonical table has a sha256 plus the commit that built it, and that commit
-    # descends from the decode commit
-def check_pfc_sidecars(sidecars: list[dict], event_table_sha256: str) -> dict
-    # every mPFC bundle's provenance sidecar names the current event table's sha256
+def check_fit_provenance(repo: Path, roots: list[Path]) -> dict
+    # runs scripts/qa/check_fit_provenance.py on each root; ok when every exit code is 0
 def check_encoding_marks(epoch_id: str, root: Path) -> dict
     # needs the database; runs only with --check-marks. Reloads marks through get_hpc_marks
     # plus filter_spike_times, and applies check_marks_match_encoding to both decodes'
     # encoding models
 ```
-`main` writes `audit.json` (path given by `--output`) and exits non-zero if any check fails.
+`main` has two subcommands:
+- `record-tables <dir> --commit <sha> --inputs <json>`, used in R5;
+- `audit --output <path> [--check-marks]`, which writes `audit.json` and exits non-zero if
+  any check fails.
 
 - [ ] **Step 1: write the failing tests.** Each check passes a case and fails a case:
-  - two commits with no exception fail;
+  - two commits, or one dirty row, with no exception fail;
   - a one-sample-shifted ContFrag grid fails;
+  - two epochs with minimum counts 8 and 7 fail;
   - an edited decode file fails the Widloski hash check;
   - a span off by 0.01 s fails;
-  - a table with no sha256 record, under no validated manifest, fails;
+  - a file changed after `record_tables` fails `check_tables_recorded`;
   - one mPFC sidecar naming an older event-table hash fails;
   - `test_an_unexplained_absence_fails_the_audit` (Review Focus 5): an epoch absent from the
     SWR set with no reason fails, and the same epoch with the manifest's `skipped` reason
@@ -853,7 +1009,8 @@ def check_encoding_marks(epoch_id: str, root: Path) -> dict
 - [ ] **Step 5: lint, format and commit** ("Audit that the refreshed pipeline shares its
   inputs").
 
-**Acceptance:** the tests pass, and the script runs read-only.
+**Acceptance:** the tests pass, and `audit` runs read-only (`record-tables` writes only its
+manifest).
 
 ---
 
@@ -871,71 +1028,87 @@ Pilot epochs:
 - `peanut20201202_10_r5`
 - `senor20201101_06_r3`
 
-## R0: environment and baseline
+## R0: environment and backups
 
 Before Task 1's pin, run Task 1 Step 1. After Task 1:
 
+- [ ] **Set the backup root once.** `B=Processed-Data/_pre_redecode_backup_<today>`, written
+  into the status line. Every later backup goes under `$B`.
+- [ ] **Disk.** Run `du -sh` on `Processed-Data/contfrag_replay_content`,
+  `Processed-Data/replay_content/models_dm`,
+  `Processed-Data/replay_content/content_estimator_comparison` and `paper/figures`, then
+  `df -h Processed-Data`. Need room for the staged decodes of both kinds (about 1.5 TB
+  while the April ones still exist) plus these copies.
 - [ ] **Golden baseline.**
-  `uv run python scripts/qa/freeze_regression_baseline.py --label pre_redecode_YYYYMMDD`.
-  Expected: a read-only `replay_content/_golden_baseline_pre_redecode_YYYYMMDD/` with a
+  `uv run python scripts/qa/freeze_regression_baseline.py --label pre_redecode_<today>`.
+  Expected: a read-only `replay_content/_golden_baseline_pre_redecode_<today>/` with a
   sha256 manifest.
-- [ ] **Back up the April decode logs** before any decoder overwrites them.
+- [ ] **Everything else the refresh overwrites.**
   ```bash
-  B=Processed-Data/_pre_redecode_backup_YYYYMMDD
-  mkdir -p $B/logs
+  mkdir -p $B/logs $B/replay_content $B/figures
   cp -p logs/*_HPC.log logs/*_HPC_contfrag.log $B/logs/
+  cp -rp Processed-Data/replay_content/models_dm Processed-Data/replay_content/content_estimator_comparison $B/replay_content/
+  cp -rp Processed-Data/contfrag_replay_content $B/
+  cp -p Processed-Data/replay_content/stop_replay_summary.pkl Processed-Data/replay_content/stage5b_*.pkl Processed-Data/replay_content/stage6_*.pkl $B/replay_content/
+  rsync -a --include='*/' --include='*.png' --include='*.pdf' --exclude='*' paper/figures/ $B/figures/
   ```
-- [ ] **Disk.** `df -h Processed-Data`. Need about 1.5 TB free, for staged decodes of both
-  kinds while the April ones still exist.
+  Expected: each copy's file count matches its source. Record the counts.
 
 ## R1: decodes (main tree at `C0`)
 
 - [ ] **Smoke.** One epoch of each decoder, on two idle cards. Check with
-  `nvidia-smi --query-gpu=index,memory.used,utilization.gpu --format=csv` first; a card is
-  idle at ≤ 2 GiB used and 0% utilization.
+  `nvidia-smi --query-gpu=index,memory.used,utilization.gpu --format=csv` first.
   ```bash
-  S=Processed-Data/_staging_redecode_YYYYMMDD
+  S=Processed-Data/_staging_redecode_<date>
   /usr/bin/time -v uv run python scripts/decoding/run_decoding_bandit.py --brain_area HPC \
       --animal chimi --date 20200225 --epoch 02_r1 --save_dir $S --cuda_visible_devices <A>
   /usr/bin/time -v uv run python scripts/decoding/run_decoding_contfrag.py --brain_area HPC \
       --animal chimi --date 20200225 --epoch 02_r1 --save_dir $S --cuda_visible_devices <B>
   ```
-  Record wall clock, peak RSS, GPU memory and `results.nc` size. Check that both logs show
-  `C0`, and that `$S` holds four files per decoder.
-- [ ] **Pilot.** The five pilot epochs, the same way. Compare non-local events per epoch,
-  old against new (from the old and new `data_over_time`), and list the change.
-- [ ] **STOP:** report smoke and pilot numbers and a full-run estimate. Ask for the
+  While each runs, `nvidia-smi` must show its process on card A (or B) only. Record wall
+  clock, peak RSS, GPU memory and `results.nc` size. Check that both logs carry a
+  `PROVENANCE` line with `commit == C0` and `dirty == false`, and that `$S` holds four files
+  per decoder.
+- [ ] **Pilot.** The five pilot epochs, the same way. Record:
+  - non-local events per epoch, old (canonical) against new (staged);
+  - each epoch's `minimum_sample_count(time, 0.015)`, which must be 8 for all (R9).
+- [ ] **STOP:** report the smoke and pilot numbers and a full-run estimate. Ask for the
   go-ahead to launch both full batches.
 - [ ] **Full.** Two tmux sessions, on disjoint idle cards:
   ```bash
-  tmux new-session -d -s redecode "cd $PWD && uv run python scripts/decoding/run_decoding_bandit.py --brain_area HPC --save_dir $S --cuda_visible_devices <cards> > logs/redecode_YYYYMMDD.out 2>&1"
-  tmux new-session -d -s redecode_contfrag "cd $PWD && uv run python scripts/decoding/run_decoding_contfrag.py --brain_area HPC --save_dir $S --cuda_visible_devices <cards> > logs/redecode_contfrag_YYYYMMDD.out 2>&1"
+  tmux new-session -d -s redecode "cd $PWD && uv run python scripts/decoding/run_decoding_bandit.py --brain_area HPC --save_dir $S --cuda_visible_devices <cards> > logs/redecode_<date>.out 2>&1"
+  tmux new-session -d -s redecode_contfrag "cd $PWD && uv run python scripts/decoding/run_decoding_contfrag.py --brain_area HPC --save_dir $S --cuda_visible_devices <cards> > logs/redecode_contfrag_<date>.out 2>&1"
   ```
 - [ ] **Capture the `C0` reference for Task 6.** While the batches run, from the main tree
-  at `C0` (read-only), pickle `get_ripple("chimi20200225_.nwb", "02_r1", "Kay")` and the
-  `PositionIntervalMap` lookup for that epoch to `.claude/research/refresh_c0_reference/`.
+  (read-only), pickle these to `.claude/research/refresh_c0_reference/`:
+  - `get_ripple("chimi20200225_.nwb", "02_r1", "Kay")`;
+  - `load_data`'s `position_info` for that epoch.
 - [ ] **Gates.** All must hold before the swap:
   1. Each decoder has its four files for every decodable epoch; expect 218. Every other
      epoch has a logged reason. The known no-input epochs are senor20201104 06_r3 and 08_r4
      and senor20201105 09_r4.
-  2. Every `data_over_time` grid passes `validate_time_grid`.
-  3. NonLocal and ContFrag share time grid and position per epoch: `check_grids_match` from
-     Task 10, or the same comparison inline if Task 10 isn't merged yet.
-  4. The non-local events-per-epoch table is written, with outliers listed.
+  2. Every staged log has a `PROVENANCE` line with `commit == C0` and `dirty == false`.
+  3. Every `data_over_time` grid passes `validate_time_grid`.
+  4. Every epoch's minimum sample count is 8. If not, STOP and report (R9).
+  5. NonLocal and ContFrag share time grid and position per epoch: Task 10's
+     `check_grids_match`, or the same comparison inline before the merge.
+  6. The non-local events-per-epoch table is written, with outliers listed.
 
-## R2: swap
+## R2: swap and merge
 
 - [ ] **Check readers.** Confirm no other session is reading `Processed-Data/*_HPC_*`
   decode files: check `tmux ls`, and `lsof +D Processed-Data`, which can be slow.
 - [ ] **STOP:** ask for the go-ahead to swap.
-- [ ] **Move April out.** Move the April NonLocal and ContFrag decode files (8 per epoch)
-  into `$B/`, after writing `sha256sum` of each into `$B/SHA256SUMS`.
-- [ ] **Move the staged files in.** Move the staged files into `Processed-Data/` under the
-  canonical names. Verify counts, and the hashes of the moved files against their staging
-  hashes.
-- [ ] **Merge.** Fast-forward the main branch to the worktree branch (`C1`), run
-  `uv sync --inexact`, verify `jax.devices()`, and run the database smokes for Tasks 6 and
-  9.
+- [ ] **Move April out.** Write `sha256sum` of the April NonLocal and ContFrag decode files
+  (8 per epoch) into `$B/SHA256SUMS`, then move them into `$B/`.
+- [ ] **Move the staged files in.** Move them into `Processed-Data/` under the canonical
+  names. Verify counts, and hashes against their staging hashes.
+- [ ] **Merge.**
+  1. Fast-forward the main branch to the worktree branch (`C1`).
+  2. Run `uv sync --inexact`.
+  3. Check that `dask_cuda` imports and that `jax.devices()` lists the GPUs.
+  4. Run the Task 6 and Task 9 database smokes.
+  5. Remove the worktree.
 
 ## R3: SWR inventories (main tree at `C1` or later)
 
@@ -948,9 +1121,11 @@ Before Task 1's pin, run Task 1 Step 1. After Task 1:
   - 60 Hz harmonic power at 120 and 180 Hz;
   - how often the same Zugaro channel wins across a day's run epochs.
 - [ ] **Full.**
-  `tmux new-session -d -s swr_inventories "cd $PWD && uv run python scripts/decoding/run_swr_detection.py --n-workers 16 > logs/swr_inventories_YYYYMMDD.out 2>&1"`.
-- [ ] **Gate.** Every epoch is `ok` or `skipped` with a reason, and every `ok` epoch passes
-  the band check.
+  `tmux new-session -d -s swr_inventories "cd $PWD && uv run python scripts/decoding/run_swr_detection.py --n-workers 16 > logs/swr_inventories_<date>.out 2>&1"`.
+- [ ] **Gate.**
+  - Every epoch is `ok`, or `skipped` with a reason.
+  - A `partial` or `failed` epoch is diagnosed before R8.
+  - Every `ok` epoch passes the band check with zero overflow.
 
 ## R4: Widloski full run
 
@@ -959,92 +1134,112 @@ Before Task 1's pin, run Task 1 Step 1. After Task 1:
   uv run python scripts/decoding/run_memoryless_detection.py --run-seed 20260922 \
       --epoch-id chimi20200225_02_r1_HPC --cuda_visible_devices <A>
   ```
-  Compare its candidate count, replay calls and shuffle passes with the April pilot row.
-  Record time and memory.
+  `nvidia-smi` must show it on card A. Compare its candidate count, replay calls and shuffle
+  passes with the April pilot row. Record time and memory.
 - [ ] **Full.** On cards disjoint from R6's PFC run:
-  `tmux new-session -d -s memoryless_full "cd $PWD && uv run python scripts/decoding/run_memoryless_detection.py --run-seed 20260922 --all --cuda_visible_devices <cards> > logs/memoryless_full_YYYYMMDD.out 2>&1"`.
+  `tmux new-session -d -s memoryless_full "cd $PWD && uv run python scripts/decoding/run_memoryless_detection.py --run-seed 20260922 --all --cuda_visible_devices <cards> > logs/memoryless_full_<date>.out 2>&1"`.
 - [ ] **Gate.** Every canonical decode is `ok` or has a reason, and the manifest's decode
   hashes equal the canonical files'.
 
 ## R5: tables
 
-`T=Processed-Data/replay_content/_staging_redecode_tables_YYYYMMDD`. Run `--help` on each
-script before its first use. Where a flag differs from below, stop and report.
+```bash
+T=Processed-Data/replay_content/_staging_redecode_tables_<date>
+TC=Processed-Data/contfrag_replay_content/_staging_redecode_<date>
+CACHE=Processed-Data/replay_content/_session_cache
+```
+
+Run `--help` on each script before its first use. Where a flag differs from below, stop and
+report. Every gate checks the written outputs and their row counts, never the exit code
+alone: the cross-table check and the no-session path return 0 and write nothing
+(`prepare_data.py:971, 997-1004`; ContFrag script :463).
 
 - [ ] **Stop table.**
-  `uv run python scripts/decoding/prepare_replay_content_data.py --stop-only --from-cache --output-dir $T`
+  `uv run python scripts/decoding/prepare_replay_content_data.py --stop-only --from-cache --output-dir $T --behavior-cache-dir $CACHE`
+  (about 6 min). Check that `$T/stop_table.parquet` exists and holds every session.
 - [ ] **`qvals_table`.**
   `uv run python scripts/behavior/build_qvals_table.py --replay-content-dir $T --write`
-  (about 12 min). It must come after the stop table.
+  (about 12 min). It must come after the stop table. Check that the qvals table and its
+  standardization reference exist in `$T`.
 - [ ] **Replay tables.**
-  `uv run python scripts/decoding/prepare_replay_content_data.py --from-cache --output-dir $T --behavior-cache-dir Processed-Data/replay_content/_session_cache --contingency-dir $T`
-  (about 1.5 h). Alternatively, run five `--animal` shards then
-  `assemble_replay_content_shards.py --output-dir $T --contingency-dir $T --expected-sessions <n>`.
-  Built-in gates must pass:
-  - fail-closed on any failed session;
-  - the event-count reconciliation;
-  - the qvals clock and value-block checks.
+  `uv run python scripts/decoding/prepare_replay_content_data.py --from-cache --output-dir $T --behavior-cache-dir $CACHE --contingency-dir $T`
+  (about 1.5 h). Alternatively, five `--animal` shards into `$T/shard_<animal>`, then
+  `uv run python scripts/decoding/assemble_replay_content_shards.py $T/shard_* --output-dir $T --contingency-dir $T --expected-sessions <n>`.
+  Check that the event, event_arm, event_patch, event_sequence and stop tables plus
+  `standardization_reference.json` exist, and that their session counts agree.
 - [ ] **Timebin tables.**
   `uv run python scripts/decoding/build_timebin_tables.py --output-dir $T` (about 69 min).
 - [ ] **ContFrag tables.** In parallel:
-  `uv run python scripts/decoding/prepare_contfrag_replay_content_data.py --event-source SWR --from-cache --output-dir $T` and
-  the same with `--event-source MUA` (about 2.5 h each).
+  `uv run python scripts/decoding/prepare_contfrag_replay_content_data.py --event-source SWR --from-cache --output-dir $TC --replay-content-dir $T --behavior-cache-dir $CACHE`,
+  and the same with `--event-source MUA` (about 2.5 h each). Check their outputs in `$TC`.
+- [ ] **Drift summary.** A scratch script, `.claude/research/refresh_drift/summary.py`,
+  writes rows per table and session, old (canonical) against new (staged), with every
+  session present in only one side listed. `compare_to_golden_baseline.py` is not used: it
+  raises at the first drift.
 - [ ] **Regeneration manifest.** Read `scripts/decoding/write_regeneration_manifest.py`. It
-  expects `models_validation/` bundles and a clean tree. Settle how it runs here, without
-  `--baseline-replay`, and write down the decision. Run
-  `scripts/qa/compare_to_golden_baseline.py --candidate $T --baseline <golden>` as a drift
-  report only, since it raises on key drift.
+  expects `models_validation/` bundles and a clean tree. Decide whether it can run here
+  without `--baseline-replay`, and write the decision down. Either way, record both staging
+  folders with Task 10:
+  ```bash
+  uv run python scripts/qa/audit_refresh_consistency.py record-tables $T --commit $(git rev-parse HEAD) --inputs '{"decode_commit": "<C0>", "behavior_cache": "'$CACHE'"}'
+  uv run python scripts/qa/audit_refresh_consistency.py record-tables $TC --commit $(git rev-parse HEAD) --inputs '{"decode_commit": "<C0>", "qvals_from": "'$T'", "behavior_cache": "'$CACHE'"}'
+  ```
 - [ ] **Never use:** `regenerate_stop_table.py`, `refresh_contfrag_behavioral_covariates.py`,
   `scripts/exploratory/_augment_data_over_time.py`, or `python -m …prepare_data`.
-- [ ] **Check the cohort.** Does the cohort now hold 218 sessions, with the three formerly
-  blocked ones back? Record the answer.
-- [ ] **STOP:** report table counts, the drift report and the cohort. Ask for the go-ahead
+- [ ] **Check the cohort.** Does it now hold 218 sessions, with the three formerly blocked
+  ones back? Record the answer.
+- [ ] **STOP:** report table counts, the drift summary and the cohort. Ask for the go-ahead
   to promote.
-- [ ] **Promote.** Back up the current tables to
-  `Processed-Data/replay_content/_pre_redecode_backup_YYYYMMDD/`, then `cp -p` the staged
-  tables into `Processed-Data/replay_content/`.
+- [ ] **Promote.**
+  1. Write the exact file list for each target: `$T` → `Processed-Data/replay_content/`,
+     including `standardization_reference.json` and the qvals standardization reference
+     (`models_per_bin_rate/qvals_standardization_reference.json`); and `$TC` →
+     `Processed-Data/contfrag_replay_content/`.
+  2. Back up every target file that will be replaced into `$B/replay_content_tables/` and
+     `$B/contfrag_replay_content_tables/`.
+  3. `cp -p` the listed files into place.
+  4. Re-run `record-tables` on both promoted roots, and check them with
+     `check_tables_recorded`.
 
 ## R6: model refits and PFC
 
-Run `--help` before first use. The commands are the ones recorded in
-`logs/rate_refit_atwell/full_*.log`, `logs/content_refit/`, `logs/content_estimators/` and
-`logs/pfc_atwell/`. Where a log and `--help` disagree, stop and report.
-
-- [ ] **Rate.**
-  - `fit_per_bin_rate_models.py --stop-cohort at_well --workers 16`, then `all_stops`, then
-    `in_transit --workers 10`;
-  - `fit_per_stop_rate_models.py --stop-cohort at_well`;
-  - `fit_swr_contrast_rate.py --stop-cohort at_well --workers 16`, then `all_stops`, then
-    `--aggregate-only`;
-  - `fit_uncertainty_rate.py --stop-cohort at_well`;
-  - `fit_swr_power_model.py`;
-  - `fit_cross_history_rate.py --write`.
-- [ ] **Content.**
-  - `fit_replay_content_models.py` for the arm, `--hierarchy patch`, `--swr-subset T`,
-    `--swr-subset F`, the leaf chain
-    (`--leaf-only --models M0,M0a,M1,M2,M3,M4,Mv,Mu,Mvu`), and
-    `--estimator dirichlet_multinomial --n-jobs 16`;
-  - `fit_swr_contrast_content.py --outcome-stratum all`, then `rewarded`, then `omitted`;
-  - the Dirichlet-multinomial variants: the same three strata with
-    `--estimator dirichlet_multinomial --n-jobs 16`, plus one run with
-    `--concentration-length`. These are the `_dm`, `_dm_rewarded`, `_dm_omitted` and
-    `_dm_len` bundles, as recorded in `logs/content_estimators/`;
-  - `analyze_uncertainty_content.py`;
-  - `compare_content_estimators.py --n-jobs 16`;
-  - `compare_event_source_models.py`;
-  - the ContFrag content fits:
-    `fit_replay_content_models.py --event-source SWR --brain-area HPC`, then `MUA`.
-- [ ] **PFC, CPU.** `run_stage5b_retrospective.py` and `run_stage6_learning.py`, at their
-  canonical settings.
+- [ ] **Inventory the refits from what is on disk.**
+  - List every fit artifact under `Processed-Data/replay_content/models*/`,
+    `Processed-Data/contfrag_replay_content/models_*`, and the Stage 5B, Stage 6 and
+    `stop_replay_summary` artifacts at the `replay_content` root, each with its provenance
+    sidecar's recorded `cli`.
+  - Write the list into the ledger. It is the refit list.
+  - Move `*_smoke` bundles into `$B/smoke_bundles/` rather than refitting them.
+  - Run `--help` on each script before first use, and stop and report where a recorded
+    `cli` and `--help` disagree.
+- [ ] **CPU refits.** Run every listed `cli`, independent ones in parallel.
+  - These are expected, with their September runtimes:
+    - `fit_per_bin_rate_models.py --stop-cohort at_well --workers 16` (41 min), then
+      `all_stops` (57 min) and `in_transit --workers 10` (5 min);
+    - `fit_per_stop_rate_models.py`;
+    - `fit_swr_contrast_rate.py` for `at_well` and `all_stops`, then `--aggregate-only`;
+    - `fit_uncertainty_rate.py`, `fit_swr_power_model.py`, `fit_cross_history_rate.py --write`;
+    - every `fit_replay_content_models.py` ladder, including the leaf chain, the
+      Dirichlet-multinomial estimator, the patch and SWR-subset variants, and the ContFrag
+      `--event-source SWR` and `MUA` fits;
+    - `fit_swr_contrast_content.py`: `all` (3.3 h), `rewarded` (3.0 h), `omitted`, and the
+      `_dm`, `_dm_rewarded`, `_dm_omitted` and `_dm_len` variants;
+    - `analyze_uncertainty_content.py` (after the leaf chain),
+      `compare_content_estimators.py --n-jobs 16` and `compare_event_source_models.py`;
+    - three Stage 5B runs and eight Stage 6 runs, as recorded. The first Stage 6 run takes
+      `--rebuild-summary`.
+  - Anything listed but not expected is still run, and noted in the ledger.
 - [ ] **STOP:** ask for the go-ahead for the GPU unit GLM.
 - [ ] **PFC unit GLM.**
-  1. Copy `logs/pfc_ridge_heldout_20260916/launch.sh` to
-     `logs/pfc_refresh_YYYYMMDD/launch.sh`, updating `EXPECTED_HEAD`, `GPUS`, the session
-     partition files (71 sessions) and the backup check.
-  2. Move the existing `Processed-Data/*_mPFC_modulation*` files to
-     `Processed-Data/_pre_redecode_backup_YYYYMMDD/mpfc/`.
+  1. Copy `logs/pfc_ridge_heldout_20260916/launch.sh` to `logs/pfc_refresh_<date>/launch.sh`,
+     updating `EXPECTED_HEAD`, `GPUS`, the 71-session partition files and the backup check
+     (which now points at `$B/mpfc`).
+  2. Move `Processed-Data/*_mPFC_modulation*` into `$B/mpfc/`.
   3. Launch: about 14–17 h per card on 5 cards.
-- [ ] **Gate.** `uv run python scripts/qa/check_fit_provenance.py` exits 0.
+- [ ] **Gate.**
+  `uv run python scripts/qa/check_fit_provenance.py` exits 0 on the `replay_content` root
+  and, with its root argument, on `contfrag_replay_content`. The Stage 5B and Stage 6 root
+  artifacts' sidecars name the promoted tables.
 
 ## R7: figures and generated docs
 
@@ -1052,8 +1247,8 @@ Run `--help` before first use. The commands are the ones recorded in
   - `generate_figure02.py --force-recompute`;
   - `generate_figure03.py`;
   - `generate_supp_decoder_validation.py`;
-  - `generate_supp_pipeline_data_flow.py`;
-  - `run_event_gallery.sh` (about 4 h).
+  - `generate_event_gallery.py catalog`, then `run_event_gallery.sh` (about 4 h).
+- [ ] **Once R5 promotes the tables:** `generate_supp_pipeline_data_flow.py`.
 - [ ] **Once R6 is done.** Run:
   - `generate_figure04.py`;
   - `plot_per_bin_rate_models.py`, `plot_per_bin_rate_summary.py`, `plot_model_checking.py`
@@ -1068,28 +1263,30 @@ Run `--help` before first use. The commands are the ones recorded in
 ## R8: audit and report
 
 - [ ] **Audit.**
-  `uv run python scripts/qa/audit_refresh_consistency.py --output Processed-Data/_refresh_YYYYMMDD/audit.json --check-marks`.
+  `uv run python scripts/qa/audit_refresh_consistency.py audit --output Processed-Data/_refresh_<date>/audit.json --check-marks`.
   Expected: exit 0. Any failure is diagnosed, not waived.
-- [ ] **Report.** Write `docs/audits/YYYY-MM-DD-full-pipeline-refresh.md`, covering:
+- [ ] **Report.** Write `docs/audits/<date>-full-pipeline-refresh.md`, covering:
   - the audit summary;
-  - `compare_to_golden_baseline.py`, as a drift report;
-  - `compare_fits.py --old-* <backup> --new-* <current>`;
-  - `compare_pfc_cohorts.py`;
+  - the R5 drift summary, `compare_fits.py --old-* <$B copies> --new-* <current>`, and
+    `compare_pfc_cohorts.py`;
   - a headline-number table, old against new: `swr_x_q_arm`, the reward-gating rate ratios,
     CS4/CS5/CS6, the Dirichlet-multinomial `log_phi_is_swr`, and PFC engagement;
-  - the MUA version shift and the Kay version check;
+  - from Task 1: the MUA version shift and the non-local events under both rules;
+  - from R1: the minimum sample counts;
+  - both Kay version checks;
   - the probe marks removed per wilbur epoch;
   - non-local events per epoch;
   - the list of hand-maintained doc claims that need new numbers.
 - [ ] **STOP:** ask the project lead to review the report before any hand-maintained doc is
   requoted.
 - [ ] **Docs.**
-  - a new `docs/known_issues/` note on the re-decode: date, backup path, what changed;
+  - a new `docs/known_issues/` note on the re-decode: date, backup path, what changed, R9;
   - update `three_sessions_blocked_by_nwb_checksum.md` from R5's cohort answer;
   - the spec's status line;
   - `.claude/docs/plans/replay_detection_comparison/PLAN.md`;
   - the project memory notes on decode drift and the cohort.
-- [ ] **Clean up.** After every gate passes, remove the staging folders. Keep the backups.
+- [ ] **Clean up.** After every gate passes, remove the staging folders. Keep `$B` and the
+  golden baseline.
 
 ## Order at a glance
 
