@@ -216,8 +216,11 @@ binned centers whose jumps are averaged.
   disagreement between the port and the reference module before that tolerance the
   center had moved by at most 2.8e-14 bins, which MATLAB would round in its own way.
   Over every sweep cell the port and the reference module set aside the same pairs in
-  all 292072 window pairs of the tested candidates' observed decodes and all 29.2
-  million of their shuffled draws (`zero_jump_*` in `reference_check_summary.csv`).
+  all 292072 window pairs of the tested candidates' observed decodes and in all but one
+  of the 29.2 million pairs of their shuffled draws (`zero_jump_*` in
+  `reference_check_summary.csv`). The one was first seen on the 2026-10-03 rerun, on a
+  different machine from the 2026-09-25 run that found none, with every other sweep
+  measure identical and no verdict count moved; it has not been traced.
 - **Clusterless marks: an approximation** (`unchanged_window_pairs`). On a track graph
   there is no continuous center, so a pair is set aside, in every draw alike, when no
   spike enters or leaves it. Marks are continuous, so no spike stands in for another,
@@ -759,7 +762,8 @@ permutations, once as published and once without its floor. Results are in
 - **The port decides as the reference does, apart from its binned center.** It decodes
   sorted cells with the reference's floor (`with_reference_rate_floor`), so the
   posteriors agree to 1e-6, and applies the reference's zero-jump rule, so the
-  set-aside pairs agree in every observed and shuffled draw; what remains is the binned
+  set-aside pairs agree in every observed draw and all but one shuffled pair in 29.2
+  million (see above); what remains is the binned
   center (V7). On the Figure 1 simulation every gate, candidate and verdict agrees. Over
   every sweep cell (4536 cells, 17632 candidates, 2.4 million windows) 17512 candidates
   have identical bounds, the reference calls 2198 of them replay against the port's

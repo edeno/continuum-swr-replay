@@ -7,8 +7,8 @@ done). The descriptive real-data pilot is done (2026-10-02, five epochs, with th
 after two input fixes: decode-time marks, grid rate): 28 of 1,409 candidates meet duration
 and dispersion, 26 pass the shuffle, 26 overlap an SWR, and 2 rest on one kept window
 outside their pieces (now panel f of the comparison figure). The pilot's three checks
-(null validation, two sensitivities, reference-output rerun) are **not done** and are
-Phase 2's next step; see "Phase 2 pilot" below. The work has moved to a machine that holds all 218
+(null validation, two sensitivities, reference-output rerun): the reference-output
+rerun is done (2026-10-03, decisions unchanged); the other two are Phase 2's next step; see "Phase 2 pilot" below. The work has moved to a machine that holds all 218
 canonical HPC decodes, so the real-data pilot is unblocked; pilot epochs are chosen below.
 Phase 1 is **re-scoped (2026-10-02): the SWR inventories are computed directly** by calling
 the pinned `ripple_detection` detectors on the ripple-band LFP, with no Spyglass
@@ -244,6 +244,24 @@ python scripts/decoding/run_memoryless_detection.py --run-seed 20260922 \
 
 Measure the runtime of the second before running an animal: the shuffle re-decodes each
 tested candidate's spikes 100 times.
+
+**Reference-output check rerun (2026-10-03, c045526, 26 min 39 s, 1.8 GB):** every
+sweep decision count equals the 2026-09-25 baseline (17,632 candidates, 2205 / 2198
+replay, 1949 / 1945 published, 17 verdicts differing on the same windows, 34 cells
+differing). One shuffled zero-jump pair of 29.2 million now differs (was 0), untraced;
+the run is on a different machine. Figure 1 measures moved only because the figure
+gained the stray-window event (replay 3 → 4 in both port and reference, published 2 / 2,
+every gate still agreeing with the floor). `reference_check_summary.csv` replaced.
+
+**Overlap with SWRs and our non-local events (2026-10-03, five pilot epochs,
+`.claude/research/memoryless_overlap/overlap.py`, local).** Strict overlap; SWRs speed
+gated as the runner's; ours are the canonical table's speed-eligible events. Of 1,409
+candidates, 179 overlap an SWR, 202 one of ours, 1,170 neither. All 28 replay calls
+(duration + dispersion) overlap one of ours and 26 an SWR; the 26 shuffle passes, all
+ours, 24 SWR. Coverage the other way: replay calls touch 27 of 781 SWRs and 30 of 1,109
+of our events (27 of 458 SWR-overlapping, 3 of 651 not); even all candidates touch only
+204 of ours (59 of the non-SWR ones). Chimi's two stray-window calls are its two SWR
+calls; its two non-SWR calls have pieces-only dispersion 14.9 and 24.0 cm.
 
 Checks the pilot carries, from the 2026-09-25 review (its running-only encoding control
 was declined, D6). None needs the full dataset; all
