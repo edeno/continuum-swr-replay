@@ -252,7 +252,9 @@ def get_multiunit_hse(
     Returns
     -------
     tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]
-        - hse_times: pd.DataFrame with HSE start/end times
+        - hse_times: pd.DataFrame with HSE start/end times; empty, with
+          ``start_time``, ``end_time`` and ``duration`` columns, when the
+          firing rate is constant (for example, an area with no spikes)
         - multiunit_firing_rate: pd.DataFrame with population firing rate
         - multiunit_rate_zscore: pd.DataFrame with z-scored firing rate
 
@@ -300,8 +302,16 @@ def get_multiunit_hse(
             index=bin_time,
             columns=["firing_rate"],
         )
-    else:
-        multiunit_rate_zscore = (multiunit_firing_rate - mean) / std
+        # A constant rate holds no HSE. ripple_detection 2.0 raises on a rate
+        # with no scale, where 1.7.0 returned no events, so skip the detector.
+        hse_times = pd.DataFrame(
+            {"start_time": [], "end_time": [], "duration": []},
+            index=pd.Index([], dtype=np.int64, name="event_number"),
+            dtype=float,
+        )
+        return hse_times, multiunit_firing_rate, multiunit_rate_zscore
+
+    multiunit_rate_zscore = (multiunit_firing_rate - mean) / std
 
     hse_times = multiunit_HSE_detector(
         bin_time,

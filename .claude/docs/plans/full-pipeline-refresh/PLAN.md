@@ -4,7 +4,10 @@
 
 **Status (2026-10-03):** the plan was revised after an independent review (3 blocking, 16
 should-fix and 11 minor findings, all addressed below), and implementation has started at
-Task 1.
+Task 1. Task 1 pinned `ripple_detection` to `68e1784`. On the five pilot epochs, 763 HSE
+events matched, 0 were missed and 62 were added; the largest SWR z-score difference was
+2.56, at a trace end (at most 8.8e-4 more than 1 s from both ends); and non-local events
+went from 2,365 under the 1.7.0 rule to 2,405 under 2.0's, with minimum sample counts {7}.
 
 **Goal:** rebuild every long-running computation on one set of inputs, and prove it. That
 covers:

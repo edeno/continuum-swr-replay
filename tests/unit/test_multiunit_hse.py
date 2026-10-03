@@ -82,6 +82,20 @@ class TestGetMultiunitHSE:
 
         np.testing.assert_array_equal(zscore.values, 0.0)
 
+    def test_no_spikes_gives_no_hse(self, bin_time, low_speed):
+        """A spike-free area has a constant rate, so it holds no HSE.
+
+        ripple_detection 2.0 raises on a rate with no scale, so the detector
+        is skipped and an empty table comes back, as 1.7.0 returned.
+        """
+        spike_times = [np.array([]) for _ in range(5)]
+
+        hse_times, _, _ = get_multiunit_hse(spike_times, low_speed, bin_time)
+
+        assert len(hse_times) == 0
+        assert list(hse_times.columns) == ["start_time", "end_time", "duration"]
+        assert hse_times.index.name == "event_number"
+
     def test_high_speed_suppresses_hse_detection(self, bin_time, high_speed):
         """HSE events should not be detected when animal is moving fast."""
         rng = np.random.RandomState(42)

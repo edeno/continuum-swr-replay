@@ -452,8 +452,13 @@ class TestGetOverlapTimes:
 class TestEventDetectionEdgeCases:
     """Test edge cases and error conditions."""
 
-    def test_single_timepoint_no_events(self):
-        """Single timepoint returns no events (can't have duration > 0)."""
+    def test_single_timepoint_is_one_sample_event(self):
+        """A lone sample above threshold is a one-sample event (R9).
+
+        The minimum duration counts samples. With fewer than two samples no
+        step can be measured, so ``minimum_sample_count`` is 1 and the sample
+        qualifies. ripple_detection 1.7.0 compared timestamps and dropped it.
+        """
         time = np.array([0.0])
         prob = np.array([0.9])
 
@@ -465,8 +470,9 @@ class TestEventDetectionEdgeCases:
             minimum_duration=0.015
         )
 
-        # Can't have event with duration >= 15ms from single timepoint
-        assert len(events) == 0
+        assert len(events) == 1
+        assert events["start_time"].iloc[0] == events["end_time"].iloc[0] == 0.0
+        assert events["duration"].iloc[0] == 0.0
 
     def test_all_ones_probability(self):
         """All time at high probability creates single event."""

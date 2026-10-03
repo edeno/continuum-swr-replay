@@ -571,6 +571,7 @@ dependencies = [
     { name = "panel" },
     { name = "patsy" },
     { name = "pyarrow" },
+    { name = "ripple-detection" },
     { name = "scikit-learn" },
     { name = "scipy" },
     { name = "seaborn" },
@@ -631,6 +632,7 @@ requires-dist = [
     { name = "patsy", specifier = ">=0.5.3" },
     { name = "pyarrow", specifier = ">=14.0.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
+    { name = "ripple-detection", git = "https://github.com/Eden-Kramer-Lab/ripple_detection.git?rev=68e1784b183f161a568d3154325cf770730bfb83" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.4.0" },
     { name = "scikit-learn", specifier = ">=1.3.0" },
     { name = "scipy", specifier = ">=1.11.0" },
@@ -3141,16 +3143,12 @@ wheels = [
 
 [[package]]
 name = "ripple-detection"
-version = "1.7.0"
-source = { registry = "https://pypi.org/simple" }
+version = "1.7.2.dev365+g68e1784b1"
+source = { git = "https://github.com/Eden-Kramer-Lab/ripple_detection.git?rev=68e1784b183f161a568d3154325cf770730bfb83#68e1784b183f161a568d3154325cf770730bfb83" }
 dependencies = [
     { name = "numpy" },
     { name = "pandas" },
     { name = "scipy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/d2/dd/40ccb603a338c042465e1c01b225973a4b086ecc361c0aad542beef826bf/ripple_detection-1.7.0.tar.gz", hash = "sha256:5a92ec36bbffd8383dbc0954fefcf7527fa00b6d0b0e400018da5594dce33db2", size = 2280271, upload-time = "2025-10-17T12:29:04.43Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/6d/9e/4e47791c804df1fdc85a1e727fad1ceeffb403a1a841b38fe89f3845acc7/ripple_detection-1.7.0-py3-none-any.whl", hash = "sha256:7668de33dc7f494afc6b6c249d92f8e2077ba9be1bd69b1de8ac072833a27e23", size = 28240, upload-time = "2025-10-17T12:29:03.025Z" },
 ]
 
 [[package]]

@@ -28,6 +28,7 @@ dependencies = [
     # Neuroscience packages
     "non_local_detector @ git+https://github.com/LorenFrankLab/non_local_detector.git",
     "spyglass-neuro @ git+https://github.com/LorenFrankLab/spyglass.git",
+    "ripple-detection",       # pinned to a commit in [tool.uv.sources]
     "kachery",                # database access
     "kachery-client",
     "kachery-cloud>=0.4.0",
@@ -147,3 +148,8 @@ override-dependencies = [
     "scipy>=1.13",
     "jax>=0.7.2",
 ]
+
+[tool.uv.sources]
+# 68e1784 is the changelog's 2.0.0, never tagged, so the installed version string
+# (1.7.2.dev365+g68e1784b1) comes from the last tag and does not identify it.
+ripple-detection = { git = "https://github.com/Eden-Kramer-Lab/ripple_detection.git", rev = "68e1784b183f161a568d3154325cf770730bfb83" }
