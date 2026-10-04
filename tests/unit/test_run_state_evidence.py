@@ -186,6 +186,18 @@ def test_an_epoch_is_validated_and_written(simulated, tmp_path):
     for name in ("bout_stats.csv", "trend_stats.csv", "silence_stats.csv",
                  "fig_bouts_vs_matched.png", "fig_calibration.png"):  # fmt: skip
         assert (output_dir / name).exists(), name
+    # the window-level statistics only on request
+    default = pd.read_csv(output_dir / "bout_stats.csv")
+    assert not [c for c in default if c.endswith("_window_level")]
+    runner.summarize(output_dir, [EPOCH], window_level=True)
+    assert "p_signflip_window_level" in pd.read_csv(output_dir / "bout_stats.csv")
+
+
+def test_the_window_level_flag_is_off_by_default():
+    parser = runner.build_parser()
+
+    assert not parser.parse_args([]).window_level_stats
+    assert parser.parse_args(["--window-level-stats"]).window_level_stats
 
 
 def test_a_decode_missing_a_file_is_skipped_with_its_reason(simulated, tmp_path):

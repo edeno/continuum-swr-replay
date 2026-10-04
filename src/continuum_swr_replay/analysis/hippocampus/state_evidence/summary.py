@@ -4,21 +4,40 @@ The epoch is the unit of inference: about 218 epochs nested in 5 animals,
 each holding hundreds to thousands of windows that are not independent.
 
 - **Primary (inference).**
-  - Each epoch enters as one value, its mean over windows (:func:`epoch_means`)
-    or, for a calibration curve, its own slope (:func:`epoch_slopes`).
-  - CIs come from a hierarchical bootstrap (:func:`hierarchical_bootstrap_ci`):
-    animals are resampled, then epochs within each resampled animal
-    (Saravanan, Berman & Sober 2020).
+  - Each epoch enters as one value: its median over windows
+    (:func:`epoch_summaries`) or, for a calibration curve, its own slope
+    (:func:`epoch_slopes`).
+  - CIs come from a hierarchical bootstrap (:func:`hierarchical_bootstrap_ci`)
+    of the mean of the epoch values: animals are resampled, then epochs within
+    each resampled animal (Saravanan, Berman & Sober 2020).
   - Tests are two-sided sign-flip tests on the epoch values (:func:`sign_flip_p`).
   - Consistency is reported as k of N epochs and k of A animals (an animal's
     value is the mean of its epochs') with a value > 0.
-  - These columns carry ``epoch`` in their name, as do the calibration calls
-    ``rises`` and ``top_positive``.
+  - These columns carry ``epoch`` in their name, as do the calibration
+    verdicts ``rises`` and ``top_positive``.
+- **Why each epoch's median.** The per-window evidence is heavy-tailed. A burst
+  of spikes on most tetrodes scores far below zero: in one pilot chimi epoch,
+  three of 81 immobile No-Spike bouts (86 to 137 spikes on 19 to 22 tetrodes)
+  score -1641, -1407 and -1016 nats under the running-only encoding, so that
+  epoch's mean is -45 while its median is +5.4. A few windows drag an epoch's
+  mean; its median is the robust summary. The choice was made on the five
+  pilot (development) epochs, before the 218-epoch run that produces the
+  reported numbers.
+- **Secondary.** The same statistics of each epoch's *mean*: the columns named
+  ``mean`` where the primary ones say ``median``, and the counts ending
+  ``_mean``.
 - **Descriptive.** Window-level counts, medians, quartiles, shares > 0 and
   means, pooled over epochs.
-- **Secondary, not for inference.** Columns ending ``_window_level`` resample or
-  sign-flip windows as if they were independent. They ignore the nesting and
-  are kept only so the prototype's statistics can be compared.
+- **Calibration verdicts need windows.** ``rises`` and ``top_positive`` say
+  "yes" or "no" only when the top and the bottom probability bins each hold at
+  least :data:`MIN_BIN_WINDOWS` windows, pooled over epochs (otherwise
+  :data:`TOO_FEW_WINDOWS`), and when at least two epochs give the statistic
+  (otherwise :data:`TOO_FEW_EPOCHS`). An epoch's slope needs two bins of that
+  many windows.
+- **Window level: opt-in, not for inference** (``window_level=True``). Columns
+  ending ``_window_level`` resample or sign-flip windows as if they were
+  independent. They ignore the nesting, are kept only so the prototype's
+  statistics can be compared, and take most of a summary's run time.
 
 Reference: Saravanan V, Berman GJ, Sober SJ (2020). Application of the
 hierarchical bootstrap to multi-level data in neuroscience. Neurons,
@@ -94,7 +113,15 @@ CALIBRATION_METRICS: Mapping[str, tuple[str, ...]] = {
 PROBABILITY_BINS = (0.0, 0.2, 0.4, 0.6, 0.8, 1.0000001)
 PROBABILITY_BIN_LABELS = ("0-0.2", "0.2-0.4", "0.4-0.6", "0.6-0.8", "0.8-1.0")
 MIN_BIN_WINDOWS = 10
-"""A calibration bin with fewer windows is not compared."""
+"""Windows a calibration bin needs for a verdict (pooled over epochs) or to
+count toward an epoch's slope (within the epoch)."""
+
+TOO_FEW_WINDOWS = "too few windows"
+TOO_FEW_EPOCHS = "too few epochs"
+"""A calibration verdict that is neither "yes" nor "no", and why."""
+
+SUMMARIES = ("median", "mean")
+"""Each epoch's summary over its windows: primary, then secondary."""
 
 SUMMARY_SEED = 20261004
 
@@ -248,8 +275,11 @@ def _describe(values: NDArray, prefix: str = "") -> dict[str, float]:
     }
 
 
-def epoch_means(values: NDArray, epochs: NDArray, animals: NDArray) -> pd.DataFrame:
-    """Each epoch's mean over its finite values: one row per epoch.
+def epoch_summaries(values: NDArray, epochs: NDArray, animals: NDArray) -> pd.DataFrame:
+    """Each epoch's median and mean over its finite values: one row per epoch.
+
+    The median is the primary summary: a few artifact windows can drag the
+    mean (see the module notes).
 
     Parameters
     ----------
@@ -260,8 +290,8 @@ def epoch_means(values: NDArray, epochs: NDArray, animals: NDArray) -> pd.DataFr
     Returns
     -------
     pd.DataFrame
-        Indexed by epoch, sorted: ``animal``, ``mean`` and ``n`` (its finite
-        values). An epoch with no finite value is left out.
+        Indexed by epoch, sorted: ``animal``, ``median``, ``mean`` and ``n``
+        (its finite values). An epoch with no finite value is left out.
     """
     frame = pd.DataFrame(
         {
@@ -275,6 +305,7 @@ def epoch_means(values: NDArray, epochs: NDArray, animals: NDArray) -> pd.DataFr
     return pd.DataFrame(
         {
             "animal": grouped["animal"].first(),
+            "median": grouped["value"].median(),
             "mean": grouped["value"].mean(),
             "n": grouped["value"].size(),
         }
@@ -299,8 +330,9 @@ def epoch_slopes(
     -------
     pd.DataFrame
         Indexed by epoch, sorted: ``animal``, ``slope`` and ``n`` (finite
-        pairs). An epoch with fewer than three pairs or no spread in ``p`` is
-        left out.
+        pairs). An epoch enters only when at least two probability bins
+        (:data:`PROBABILITY_BINS`) each hold :data:`MIN_BIN_WINDOWS` or more of
+        its finite pairs, so no slope rests on a narrow range of ``p``.
     """
     p, x = np.asarray(p, dtype=float), np.asarray(x, dtype=float)
     finite = np.isfinite(p) & np.isfinite(x)
@@ -317,8 +349,13 @@ def epoch_slopes(
     dx = frame["x"] - grouped["x"].transform("mean")
     sums = pd.DataFrame({"sxy": dp * dx, "sxx": dp * dp}).groupby(frame["epoch"]).sum()
     out = pd.DataFrame({"animal": grouped["animal"].first(), "n": grouped["p"].size()})
-    keep = (out["n"] >= 3) & (sums["sxx"] > 0)
-    out["slope"] = (sums["sxy"] / sums["sxx"]).where(keep)
+    label = pd.cut(
+        frame["p"], PROBABILITY_BINS, right=False, labels=PROBABILITY_BIN_LABELS
+    )
+    per_bin = frame.groupby(["epoch", label], observed=True).size()
+    populated = (per_bin >= MIN_BIN_WINDOWS).groupby(level="epoch").sum()
+    keep = populated.reindex(out.index, fill_value=0) >= 2
+    out["slope"] = sums["sxy"] / sums["sxx"]
     return out[keep]
 
 
@@ -402,6 +439,72 @@ def _epoch_statistics(
     }
 
 
+def _summary_seed(seed: Seed, kind: str) -> Seed:
+    """The seed of one epoch summary's statistics.
+
+    The mean's keep ``seed``, the one they had while the mean was primary, so
+    they can be checked against those earlier outputs; the median's add
+    ``kind``.
+    """
+    return seed if kind == "mean" else _with_keys(seed, kind)
+
+
+def _level_columns(
+    values: NDArray,
+    epochs: NDArray,
+    animals: NDArray,
+    *,
+    prefix: str,
+    counts: str,
+    n_boot: int,
+    n_flips: int,
+    seed: Seed,
+) -> dict[str, Any]:
+    """The epoch-level columns of ``values``, over each epoch's median and mean.
+
+    For the median (primary): ``{prefix}epoch_median``, its CI
+    ``{prefix}epoch_median_ci_lo`` / ``_ci_hi``, ``p_{prefix}epoch_median``,
+    and ``epochs_{counts}`` / ``animals_{counts}``. For the mean (secondary):
+    the same with ``mean`` for ``median``, the counts ending ``_mean``.
+    """
+    summaries = epoch_summaries(values, epochs, animals)
+    columns: dict[str, Any] = {}
+    for kind in SUMMARIES:
+        level = _epoch_statistics(
+            summaries[kind],
+            summaries["animal"],
+            n_boot=n_boot,
+            n_flips=n_flips,
+            seed=_summary_seed(seed, kind),
+        )
+        tail = "" if kind == "median" else f"_{kind}"
+        columns[f"{prefix}epoch_{kind}"] = level["mean"]
+        columns[f"{prefix}epoch_{kind}_ci_lo"] = level["ci_lo"]
+        columns[f"{prefix}epoch_{kind}_ci_hi"] = level["ci_hi"]
+        columns[f"p_{prefix}epoch_{kind}"] = level["p"]
+        columns[f"epochs_{counts}{tail}"] = level["epochs"]
+        columns[f"animals_{counts}{tail}"] = level["animals"]
+    return columns
+
+
+def _verdict(enough: bool, holds: bool) -> str:
+    """The verdict on ``holds``: "yes" or "no", or :data:`TOO_FEW_WINDOWS`."""
+    if not enough:
+        return TOO_FEW_WINDOWS
+    return "yes" if holds else "no"
+
+
+def _epoch_verdict(enough: bool, ci_lo: float) -> str:
+    """The verdict that an epoch-level CI lies above 0, or why there is none.
+
+    :data:`TOO_FEW_WINDOWS` without ``enough`` windows; :data:`TOO_FEW_EPOCHS`
+    when fewer than two epochs give the statistic (its CI is NaN).
+    """
+    if enough and not np.isfinite(ci_lo):
+        return TOO_FEW_EPOCHS
+    return _verdict(enough, ci_lo > 0)
+
+
 def bout_statistics(
     windows: pd.DataFrame,
     *,
@@ -409,19 +512,26 @@ def bout_statistics(
     n_flips: int = 10_000,
     n_boot: int = 10_000,
     seed: Seed = SUMMARY_SEED,
+    window_level: bool = False,
 ) -> pd.DataFrame:
     """Bouts against their matched windows, per state x regime x metric.
 
-    - **Primary, epoch level** (see the module notes):
-      - ``epoch_mean``: the mean over epochs of each epoch's mean.
-      - ``epoch_ci_lo`` / ``epoch_ci_hi``: its hierarchical bootstrap CI.
-      - ``p_epoch``: the sign-flip p over the epoch means.
+    - **Primary, epoch level, over each epoch's median** (see the module notes):
+      - ``epoch_median``: the mean over epochs of each epoch's median.
+      - ``epoch_median_ci_lo`` / ``epoch_median_ci_hi``: its hierarchical
+        bootstrap CI.
+      - ``p_epoch_median``: the sign-flip p over the epoch medians.
       - ``epochs_pos`` / ``animals_pos``: k of N epochs and k of A animals
-        with a mean > 0.
-      - The paired bout - baseline difference, each epoch entering as its
-        mean paired difference: ``diff_epoch_mean``, ``diff_epoch_ci_lo`` /
-        ``diff_epoch_ci_hi``, ``p_diff_epoch``, ``epochs_above_base`` and
-        ``animals_above_base``.
+        with a median > 0.
+      - The paired bout - baseline difference, each epoch entering as the
+        median of its bouts' paired differences: ``diff_epoch_median``,
+        ``diff_epoch_median_ci_lo`` / ``_ci_hi``, ``p_diff_epoch_median``,
+        ``epochs_above_base`` and ``animals_above_base``.
+    - **Secondary, epoch level, over each epoch's mean:** ``epoch_mean``,
+      ``epoch_mean_ci_lo`` / ``_ci_hi``, ``p_epoch_mean``, ``epochs_pos_mean``
+      and ``animals_pos_mean``, and for the difference ``diff_epoch_mean``,
+      ``diff_epoch_mean_ci_lo`` / ``_ci_hi``, ``p_diff_epoch_mean``,
+      ``epochs_above_base_mean`` and ``animals_above_base_mean``.
     - **Descriptive**, windows pooled over epochs:
       - ``n``, ``n_found``, ``n_epochs`` and ``n_animals``;
       - ``median``, ``q25``, ``q75``, ``frac_pos`` and ``mean``, and the same
@@ -429,10 +539,11 @@ def bout_statistics(
       - ``diff_mean``;
       - per held-out spike: ``ps_median``, ``ps_mean`` and ``base_ps_median``;
       - the median spikes, bins and bout bins.
-    - **Secondary, not for inference** (windows as if independent):
-      ``p_signflip_window_level``, ``ci_lo_window_level`` /
-      ``ci_hi_window_level``, ``p_diff_window_level``,
-      ``diff_ci_lo_window_level`` / ``diff_ci_hi_window_level``.
+    - **Window level, only with** ``window_level`` (windows as if
+      independent, not for inference): ``p_signflip_window_level``,
+      ``ci_lo_window_level`` / ``ci_hi_window_level``,
+      ``p_diff_window_level``, ``diff_ci_lo_window_level`` /
+      ``diff_ci_hi_window_level``.
 
     Parameters
     ----------
@@ -442,6 +553,8 @@ def bout_statistics(
     metrics : mapping, optional
         State -> metric columns; default each state's :data:`PRIMARY_METRICS`
         and every :data:`SECONDARY_METRICS`.
+    window_level : bool, optional
+        Add the window-level columns (default False).
 
     Raises
     ------
@@ -491,58 +604,41 @@ def bout_statistics(
                 xb = cell[f"{metric}_base"].to_numpy(dtype=float)
                 diff = x - xb
                 row.update(_describe(x))
-                means = epoch_means(x, epochs, animals)
-                level = _epoch_statistics(
-                    means["mean"],
-                    means["animal"],
-                    n_boot=n_boot,
-                    n_flips=n_flips,
-                    seed=_with_keys(seed, *key, "epoch"),
-                )
                 row.update(
-                    epoch_mean=level["mean"],
-                    epoch_ci_lo=level["ci_lo"],
-                    epoch_ci_hi=level["ci_hi"],
-                    p_epoch=level["p"],
-                    epochs_pos=level["epochs"],
-                    animals_pos=level["animals"],
-                )
+                    _level_columns(
+                        x, epochs, animals, prefix="", counts="pos",
+                        n_boot=n_boot, n_flips=n_flips,
+                        seed=_with_keys(seed, *key, "epoch"),
+                    )
+                )  # fmt: skip
                 row.update(_describe(xb, prefix="base_"))
                 row["diff_mean"] = _describe(diff)["mean"]
-                means = epoch_means(diff, epochs, animals)
-                level = _epoch_statistics(
-                    means["mean"],
-                    means["animal"],
-                    n_boot=n_boot,
-                    n_flips=n_flips,
-                    seed=_with_keys(seed, *key, "diff", "epoch"),
-                )
                 row.update(
-                    diff_epoch_mean=level["mean"],
-                    diff_epoch_ci_lo=level["ci_lo"],
-                    diff_epoch_ci_hi=level["ci_hi"],
-                    p_diff_epoch=level["p"],
-                    epochs_above_base=level["epochs"],
-                    animals_above_base=level["animals"],
-                )
-                row["p_signflip_window_level"] = sign_flip_p(
-                    x, n_flips=n_flips, seed=_with_keys(seed, *key)
-                )
-                (
-                    row["ci_lo_window_level"],
-                    row["ci_hi_window_level"],
-                ) = stratified_bootstrap_ci(
-                    x, epochs, n_boot=n_boot, seed=_with_keys(seed, *key)
-                )
-                row["p_diff_window_level"] = sign_flip_p(
-                    diff, n_flips=n_flips, seed=_with_keys(seed, *key, "diff")
-                )
-                (
-                    row["diff_ci_lo_window_level"],
-                    row["diff_ci_hi_window_level"],
-                ) = stratified_bootstrap_ci(
-                    diff, epochs, n_boot=n_boot, seed=_with_keys(seed, *key, "diff")
-                )
+                    _level_columns(
+                        diff, epochs, animals, prefix="diff_", counts="above_base",
+                        n_boot=n_boot, n_flips=n_flips,
+                        seed=_with_keys(seed, *key, "diff", "epoch"),
+                    )
+                )  # fmt: skip
+                if window_level:
+                    row["p_signflip_window_level"] = sign_flip_p(
+                        x, n_flips=n_flips, seed=_with_keys(seed, *key)
+                    )
+                    (
+                        row["ci_lo_window_level"],
+                        row["ci_hi_window_level"],
+                    ) = stratified_bootstrap_ci(
+                        x, epochs, n_boot=n_boot, seed=_with_keys(seed, *key)
+                    )
+                    row["p_diff_window_level"] = sign_flip_p(
+                        diff, n_flips=n_flips, seed=_with_keys(seed, *key, "diff")
+                    )
+                    (
+                        row["diff_ci_lo_window_level"],
+                        row["diff_ci_hi_window_level"],
+                    ) = stratified_bootstrap_ci(
+                        diff, epochs, n_boot=n_boot, seed=_with_keys(seed, *key, "diff")
+                    )
                 if f"{metric}_ps" in cell:
                     ps = _describe(cell[f"{metric}_ps"].to_numpy(dtype=float))
                     base_ps = _describe(cell[f"{metric}_ps_base"].to_numpy(dtype=float))
@@ -570,6 +666,7 @@ def calibration_statistics(
     n_boot_window_level: int = 2000,
     n_flips: int = 10_000,
     seed: Seed = SUMMARY_SEED,
+    window_level: bool = False,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Calibration curves: evidence against each state's probability.
 
@@ -577,23 +674,31 @@ def calibration_statistics(
     ..., 0.8-1.0).
 
     - **Primary, epoch level:**
-      - A bin's ``epoch_mean`` is the mean over epochs of each epoch's mean in
-        the bin, with its hierarchical CI ``epoch_ci_lo`` / ``epoch_ci_hi``.
+      - A bin's ``epoch_median`` is the mean over epochs of each epoch's median
+        in the bin, with its hierarchical CI ``epoch_median_ci_lo`` /
+        ``epoch_median_ci_hi``.
       - A curve's ``epoch_slope`` is the mean of the epochs' own OLS slopes
-        (:func:`epoch_slopes`), with its hierarchical CI, the sign-flip
-        ``p_epoch_slope`` and ``epochs_rising`` / ``animals_rising``.
-      - A curve **rises** (``rises``) when its epoch slope's CI lies above 0.
-      - Its **top bin is > 0** (``top_positive``) when the top bin holds at
-        least :data:`MIN_BIN_WINDOWS` windows and its epoch-level CI lies
-        above 0.
+        (:func:`epoch_slopes`, which takes only epochs with two bins of
+        :data:`MIN_BIN_WINDOWS` windows), with its hierarchical CI, the
+        sign-flip ``p_epoch_slope`` and ``epochs_rising`` / ``animals_rising``.
+      - The verdicts need the top and the bottom bins to hold at least
+        :data:`MIN_BIN_WINDOWS` windows each, pooled (``n_top``,
+        ``n_bottom``); otherwise they read :data:`TOO_FEW_WINDOWS`, and
+        :data:`TOO_FEW_EPOCHS` when fewer than two epochs give the CI.
+      - ``rises`` is "yes" when the epoch slope's CI lies above 0, else "no".
+      - ``top_positive`` is "yes" when the top bin's ``epoch_median`` CI
+        (``top_epoch_median_ci_lo``) lies above 0, else "no".
+    - **Secondary, over each epoch's mean:** a bin's ``epoch_mean`` with
+      ``epoch_mean_ci_lo`` / ``epoch_mean_ci_hi``; a curve's ``top_epoch_mean``.
     - **Descriptive:** a bin's ``n``, ``n_epochs``, pooled ``mean``,
-      ``median`` and ``frac_pos``; a curve's ``n``, ``n_top``, ``top_mean`` and
+      ``median`` and ``frac_pos``; a curve's ``n``, ``top_mean`` and
       ``top_minus_bottom``.
-    - **Secondary, not for inference:**
+    - **Window level, only with** ``window_level`` (not for inference):
       - per bin, ``ci_lo_window_level`` / ``ci_hi_window_level``;
       - per curve, the pooled ``slope_window_level`` with its window-resampling
         CI, and the prototype's calls ``ci_separated_window_level``,
-        ``rises_window_level`` and ``top_positive_window_level``.
+        ``rises_window_level`` and ``top_positive_window_level``, as "yes",
+        "no" or :data:`TOO_FEW_WINDOWS` under the same pooled counts.
 
     Parameters
     ----------
@@ -604,6 +709,8 @@ def calibration_statistics(
         State -> metric columns; default :data:`CALIBRATION_METRICS`.
     n_boot, n_boot_window_level : int, optional
         Resamples of the hierarchical and of the window-level bootstraps.
+    window_level : bool, optional
+        Add the window-level columns (default False).
 
     Returns
     -------
@@ -643,34 +750,36 @@ def calibration_statistics(
                             median=float(np.median(x[m])),
                             frac_pos=float((x[m] > 0).mean()),
                         )
-                        (
-                            row["ci_lo_window_level"],
-                            row["ci_hi_window_level"],
-                        ) = stratified_bootstrap_ci(
-                            x[m],
-                            epochs[m],
-                            n_boot=n_boot_window_level,
-                            seed=_with_keys(seed, regime, state, metric, name),
+                        if window_level:
+                            (
+                                row["ci_lo_window_level"],
+                                row["ci_hi_window_level"],
+                            ) = stratified_bootstrap_ci(
+                                x[m],
+                                epochs[m],
+                                n_boot=n_boot_window_level,
+                                seed=_with_keys(seed, regime, state, metric, name),
+                            )
+                    summaries = epoch_summaries(x[m], epochs[m], animals[m])
+                    for kind in SUMMARIES:
+                        values = summaries[kind]
+                        row[f"epoch_{kind}"] = (
+                            float(values.mean()) if len(values) else float("nan")
                         )
-                    means = epoch_means(x[m], epochs[m], animals[m])
-                    row["epoch_mean"] = (
-                        float(means["mean"].mean()) if len(means) else float("nan")
-                    )
-                    row["epoch_ci_lo"], row["epoch_ci_hi"] = hierarchical_bootstrap_ci(
-                        means["mean"],
-                        means["animal"],
-                        n_boot=n_boot,
-                        seed=_with_keys(seed, regime, state, metric, name, "epoch"),
-                    )
+                        (
+                            row[f"epoch_{kind}_ci_lo"],
+                            row[f"epoch_{kind}_ci_hi"],
+                        ) = hierarchical_bootstrap_ci(
+                            values,
+                            summaries["animal"],
+                            n_boot=n_boot,
+                            seed=_summary_seed(
+                                _with_keys(seed, regime, state, metric, name, "epoch"),
+                                kind,
+                            ),
+                        )
                     curve.append(row)
                 bins += curve
-                slope, lo, hi = ols_slope_ci(
-                    p,
-                    x,
-                    epochs,
-                    n_boot=n_boot_window_level,
-                    seed=_with_keys(seed, regime, state, metric),
-                )
                 slopes = epoch_slopes(p, x, epochs, animals)
                 level = _epoch_statistics(
                     slopes["slope"],
@@ -680,47 +789,53 @@ def calibration_statistics(
                     seed=_with_keys(seed, regime, state, metric, "epoch"),
                 )
                 bottom, top = curve[0], curve[-1]
-                compared = (
-                    bottom["n"] >= MIN_BIN_WINDOWS and top["n"] >= MIN_BIN_WINDOWS
-                )
-                separated = (
-                    compared
-                    and top["ci_lo_window_level"] > bottom["ci_hi_window_level"]
-                )
-                trends.append(
-                    {
-                        "regime": regime,
-                        "state": state,
-                        "metric": metric,
-                        "n": int(np.isfinite(x).sum()),
-                        "n_epochs": len(slopes),
-                        "epoch_slope": level["mean"],
-                        "epoch_slope_ci_lo": level["ci_lo"],
-                        "epoch_slope_ci_hi": level["ci_hi"],
-                        "p_epoch_slope": level["p"],
-                        "epochs_rising": level["epochs"],
-                        "animals_rising": level["animals"],
-                        "rises": bool(level["ci_lo"] > 0),
-                        "n_top": top["n"],
-                        "top_mean": top.get("mean", np.nan),
-                        "top_epoch_mean": top["epoch_mean"],
-                        "top_positive": bool(
-                            top["n"] >= MIN_BIN_WINDOWS and top["epoch_ci_lo"] > 0
+                enough = bottom["n"] >= MIN_BIN_WINDOWS and top["n"] >= MIN_BIN_WINDOWS
+                trend: dict[str, Any] = {
+                    "regime": regime,
+                    "state": state,
+                    "metric": metric,
+                    "n": int(np.isfinite(x).sum()),
+                    "n_bottom": bottom["n"],
+                    "n_top": top["n"],
+                    "n_epochs": len(slopes),
+                    "epoch_slope": level["mean"],
+                    "epoch_slope_ci_lo": level["ci_lo"],
+                    "epoch_slope_ci_hi": level["ci_hi"],
+                    "p_epoch_slope": level["p"],
+                    "epochs_rising": level["epochs"],
+                    "animals_rising": level["animals"],
+                    "rises": _epoch_verdict(enough, level["ci_lo"]),
+                    "top_epoch_median": top["epoch_median"],
+                    "top_epoch_median_ci_lo": top["epoch_median_ci_lo"],
+                    "top_positive": _epoch_verdict(enough, top["epoch_median_ci_lo"]),
+                    "top_epoch_mean": top["epoch_mean"],
+                    "top_mean": top.get("mean", np.nan),
+                    "top_minus_bottom": (
+                        top["mean"] - bottom["mean"] if enough else np.nan
+                    ),
+                }
+                if window_level:
+                    slope, lo, hi = ols_slope_ci(
+                        p,
+                        x,
+                        epochs,
+                        n_boot=n_boot_window_level,
+                        seed=_with_keys(seed, regime, state, metric),
+                    )
+                    separated = enough and (
+                        top["ci_lo_window_level"] > bottom["ci_hi_window_level"]
+                    )
+                    trend.update(
+                        slope_window_level=slope,
+                        slope_ci_lo_window_level=lo,
+                        slope_ci_hi_window_level=hi,
+                        ci_separated_window_level=_verdict(enough, separated),
+                        rises_window_level=_verdict(enough, separated and lo > 0),
+                        top_positive_window_level=_verdict(
+                            enough, enough and top["ci_lo_window_level"] > 0
                         ),
-                        "top_minus_bottom": (
-                            top["mean"] - bottom["mean"] if compared else np.nan
-                        ),
-                        "slope_window_level": slope,
-                        "slope_ci_lo_window_level": lo,
-                        "slope_ci_hi_window_level": hi,
-                        "ci_separated_window_level": bool(separated),
-                        "rises_window_level": bool(separated and lo > 0),
-                        "top_positive_window_level": bool(
-                            top["n"] >= MIN_BIN_WINDOWS
-                            and top["ci_lo_window_level"] > 0
-                        ),
-                    }
-                )
+                    )
+                trends.append(trend)
     return pd.DataFrame(bins), pd.DataFrame(trends)
 
 
@@ -769,6 +884,7 @@ def coordinated_silence(
     n_boot_window_level: int = 2000,
     n_flips: int = 10_000,
     seed: Seed = SUMMARY_SEED,
+    window_level: bool = False,
 ) -> pd.DataFrame:
     """Held-out coordinated silence: P(C silent | S silent) against local coding.
 
@@ -779,7 +895,8 @@ def coordinated_silence(
     either encoding.
 
     - **Primary, epoch level.** Each epoch's observed ratio and local coding's
-      predicted ratio are ratios of the epoch's own sums.
+      predicted ratio are ratios of the epoch's own sums of silent-run counts
+      (no per-window evidence, so no median).
       - ``epoch_obs_given_S`` is the observed ratios' mean over epochs, with
         its hierarchical CI ``epoch_obs_given_S_ci_lo`` / ``_ci_hi``.
       - ``epoch_pred_given_S_run`` / ``_can`` are the predictions' means.
@@ -790,8 +907,9 @@ def coordinated_silence(
     - **Descriptive:** pooled ratios of sums over windows and splits:
       ``obs_C_silent_given_S_silent``, ``pred_given_S_run`` / ``_can``,
       ``obs_C_silent``, ``pred_C_silent_run`` / ``_can``.
-    - **Secondary, not for inference:** ``obs_given_ci_lo_window_level`` /
-      ``_hi`` (windows resampled within epochs).
+    - **Window level, only with** ``window_level`` (not for inference):
+      ``obs_given_ci_lo_window_level`` / ``_hi`` (windows resampled within
+      epochs).
     """
     groups: list[tuple[tuple[str, str, str, str], pd.DataFrame]] = []
     for regime in REGIMES:
@@ -838,7 +956,7 @@ def coordinated_silence(
                 row[f"pred_given_S_{prefix}"] = float(
                     d[f"{prefix}_cond_pred_C_silent"].sum() / silent_s.sum()
                 )
-            if (silent_s > 0).sum() >= 5:
+            if window_level and (silent_s > 0).sum() >= 5:
                 (
                     row["obs_given_ci_lo_window_level"],
                     row["obs_given_ci_hi_window_level"],
@@ -890,12 +1008,14 @@ def coordinated_silence(
 
 
 def summarize_state_evidence(
-    windows: pd.DataFrame, *, seed: Seed = SUMMARY_SEED
+    windows: pd.DataFrame, *, seed: Seed = SUMMARY_SEED, window_level: bool = False
 ) -> dict[str, pd.DataFrame]:
     """Every summary of the per-window table, pooled over its epochs.
 
     ``run_loc_vs_Sremote_mark`` (and ``_ps``) are added as the negatives of
     ``run_nlr_anim_mark``, so that positive supports the Local claim.
+    ``window_level`` adds the window-level columns, which take most of the run
+    time; the other columns do not depend on it.
 
     Returns
     -------
@@ -908,11 +1028,11 @@ def summarize_state_evidence(
         run_loc_vs_Sremote_mark=-windows["run_nlr_anim_mark"],
         run_loc_vs_Sremote_mark_ps=-windows["run_nlr_anim_mark_ps"],
     )
-    bins, trends = calibration_statistics(windows, seed=seed)
+    bins, trends = calibration_statistics(windows, seed=seed, window_level=window_level)
     return {
-        "bouts": bout_statistics(windows, seed=seed),
+        "bouts": bout_statistics(windows, seed=seed, window_level=window_level),
         "calibration": bins,
         "trends": trends,
         "rate_calibration": rate_calibration(windows),
-        "silence": coordinated_silence(windows, seed=seed),
+        "silence": coordinated_silence(windows, seed=seed, window_level=window_level),
     }

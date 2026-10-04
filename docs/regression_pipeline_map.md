@@ -716,7 +716,7 @@ Compute decoding quality metrics across all sessions.
 
 Held-out spike evidence for each decoder state, on every canonical HPC decode.
 
-`decode_files`, `canonical_epochs`, `load_marks_and_training_mask`, `stored_log_likelihood`, `encoding_comparison`, `refit_encoding`, `spikes_in_bins`, `relative_error`, `output_paths`, `write_json`, `epoch_table`, `run_settings`, `run_epoch`, `run_epochs`, `figure_bouts`, `figure_calibration`, `figure_silence`, `write_csv`, `readme`, `summarize`, `main`
+`decode_files`, `canonical_epochs`, `load_marks_and_training_mask`, `stored_log_likelihood`, `encoding_comparison`, `refit_encoding`, `spikes_in_bins`, `relative_error`, `output_paths`, `write_json`, `epoch_table`, `run_settings`, `run_epoch`, `run_epochs`, `figure_bouts`, `figure_calibration`, `figure_silence`, `write_csv`, `readme`, `summarize`, `build_parser`, `main`
 
 ### `scripts/qa/summarize_cohort_audits.py`
 
@@ -758,7 +758,7 @@ Held-out evidence of every window, by tetrode half (see the package notes).
 
 Summary statistics of the per-window table, over epochs nested in animals.
 
-`sign_flip_p`, `stratified_bootstrap_ci`, `ols_slope_ci`, `epoch_means`, `epoch_slopes`, `hierarchical_bootstrap_ci`, `bout_statistics`, `calibration_statistics`, `rate_calibration`, `coordinated_silence`, `summarize_state_evidence`
+`sign_flip_p`, `stratified_bootstrap_ci`, `ols_slope_ci`, `epoch_summaries`, `epoch_slopes`, `hierarchical_bootstrap_ci`, `bout_statistics`, `calibration_statistics`, `rate_calibration`, `coordinated_silence`, `summarize_state_evidence`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/state_evidence/terms.py`
 

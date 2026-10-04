@@ -76,14 +76,19 @@ Inference (:mod:`.summary`)
 The epoch is the unit of inference: epochs are nested in animals, and an
 epoch's windows are not independent.
 
-- Each epoch enters as its mean over windows (its own slope, for a calibration
-  curve).
+- Each epoch enters as its median over windows (its own slope, for a
+  calibration curve). The per-window evidence is heavy-tailed, and a few
+  artifact bursts drag an epoch's mean; the statistics of each epoch's mean
+  are reported as secondary.
 - CIs are hierarchical bootstrap CIs, resampling animals and then epochs within
   each animal (Saravanan, Berman & Sober 2020).
-- Tests are sign-flip tests on the epoch means. Each comes with k of N epochs
-  and k of A animals.
+- Tests are sign-flip tests on the epoch medians. Each comes with k of N
+  epochs and k of A animals.
+- A calibration verdict needs at least 10 windows in the top and in the
+  bottom probability bins, pooled; otherwise it reads "too few windows".
 - Window-level statistics are descriptive. The ``_window_level`` CIs and
-  p-values ignore the nesting and are not for inference.
+  p-values ignore the nesting, are not for inference and are computed only on
+  request (``window_level=True``).
 
 Modules: :mod:`.terms` (per-tetrode terms, encodings, decode files),
 :mod:`.windows` (regimes, bouts, matched and calibration windows, tetrode
@@ -103,8 +108,8 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.summary import (
     bout_statistics,
     calibration_statistics,
     coordinated_silence,
-    epoch_means,
     epoch_slopes,
+    epoch_summaries,
     hierarchical_bootstrap_ci,
     ols_slope_ci,
     rate_calibration,
@@ -154,8 +159,8 @@ __all__ = [
     "calibration_windows",
     "coordinated_silence",
     "encoding_inputs",
-    "epoch_means",
     "epoch_slopes",
+    "epoch_summaries",
     "event_likelihood",
     "hierarchical_bootstrap_ci",
     "interior_bin_mask",

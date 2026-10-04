@@ -29,7 +29,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (
     calibration_statistics,
     calibration_windows,
     coordinated_silence,
-    epoch_means,
+    epoch_summaries,
     hierarchical_bootstrap_ci,
     interior_bin_mask,
     matched_windows,
@@ -677,10 +677,22 @@ def test_summarize_state_evidence_covers_every_state_and_table():
             & (table.regime == row.regime)
         ]
         assert row.n == len(cell)
-    assert {"epoch_mean", "epoch_ci_lo", "p_epoch", "p_signflip_window_level"} <= set(
-        bouts.columns
-    )
+    assert {
+        "epoch_median", "epoch_median_ci_lo", "p_epoch_median", "epochs_pos",
+        "epoch_mean", "epoch_mean_ci_lo", "p_epoch_mean", "epochs_pos_mean",
+    } <= set(bouts.columns)  # fmt: skip
     assert set(summary["trends"].state) == set(STATES)
+    # the window-level statistics are opt-in
+    for name in ("bouts", "calibration", "trends", "silence"):
+        assert not [c for c in summary[name] if c.endswith("_window_level")], name
+    full = summarize_state_evidence(table, window_level=True)
+    for name, column in [
+        ("bouts", "p_signflip_window_level"),
+        ("calibration", "ci_lo_window_level"),
+        ("trends", "slope_window_level"),
+    ]:
+        assert column in full[name], name
+    pd.testing.assert_series_equal(full["bouts"].epoch_median, bouts.epoch_median)
 
 
 # --- statistics ---------------------------------------------------------------------
@@ -748,7 +760,7 @@ def test_the_hierarchical_bootstrap_resamples_animals_then_epochs():
 def bouts_of_six_epochs() -> tuple[pd.DataFrame, np.ndarray, np.ndarray]:
     """Local bouts and their matched windows: six epochs of three animals.
 
-    Every epoch's bout and baseline means are set exactly.
+    Every epoch's bout and baseline medians (and means) are set exactly.
     """
     rng = np.random.default_rng(10)
     bout_means = np.array([1.0, 2.0, -0.5, 3.0, 4.0, 0.5])
@@ -756,8 +768,8 @@ def bouts_of_six_epochs() -> tuple[pd.DataFrame, np.ndarray, np.ndarray]:
     frames = []
     for k, (mean, base) in enumerate(zip(bout_means, base_means, strict=True)):
         n = 30
-        noise = rng.normal(0, 1, (2, n))
-        noise -= noise.mean(1, keepdims=True)
+        half = rng.normal(0, 1, (2, n // 2))
+        noise = np.c_[half, -half]  # symmetric: median 0 and mean 0
         bout_s = np.arange(n) * 100
         animal = ["aa", "bb", "cc"][k // 2]
         epoch = f"{animal}2020010{k}_02_r1_HPC"
@@ -785,26 +797,32 @@ def bouts_of_six_epochs() -> tuple[pd.DataFrame, np.ndarray, np.ndarray]:
 def test_bout_statistics_infer_at_the_epoch_level():
     table, means, base = bouts_of_six_epochs()
 
-    stats = bout_statistics(table, metrics={"Local": ["run_loc_mark"]}, seed=(1,))
+    stats = bout_statistics(
+        table, metrics={"Local": ["run_loc_mark"]}, seed=(1,), window_level=True
+    )
     row = stats.iloc[0]
 
     patterns = np.array(list(product([1.0, -1.0], repeat=6)))
     exact = np.mean(np.abs(patterns @ means) / 6 >= abs(means.mean()) * (1 - 1e-12))
     assert row["n_epochs"] == 6 and row["n_animals"] == 3
-    assert row["epoch_mean"] == pytest.approx(means.mean())
-    assert row["epoch_ci_lo"] < means.mean() < row["epoch_ci_hi"]
-    assert row["p_epoch"] == pytest.approx(exact)
-    # animal means 1.5, 1.25 and 2.25
+    # primary: each epoch's median; secondary: its mean (equal here)
+    for kind in ("median", "mean"):
+        assert row[f"epoch_{kind}"] == pytest.approx(means.mean())
+        assert row[f"epoch_{kind}_ci_lo"] < means.mean() < row[f"epoch_{kind}_ci_hi"]
+        assert row[f"p_epoch_{kind}"] == pytest.approx(exact)
+    # animal means of the epoch values: 1.5, 1.25 and 2.25
     assert row["epochs_pos"] == "5/6" and row["animals_pos"] == "3/3"
+    assert row["epochs_pos_mean"] == "5/6" and row["animals_pos_mean"] == "3/3"
     differences = means - base  # 1, 1.5, -0.5, 3, -1, 0.5
-    assert row["diff_epoch_mean"] == pytest.approx(differences.mean())
     exact = np.mean(
         np.abs(patterns @ differences) / 6 >= abs(differences.mean()) * (1 - 1e-12)
     )
-    assert row["p_diff_epoch"] == pytest.approx(exact)
+    for kind in ("median", "mean"):
+        assert row[f"diff_epoch_{kind}"] == pytest.approx(differences.mean())
+        assert row[f"p_diff_epoch_{kind}"] == pytest.approx(exact)
     # animal means of the differences 1.25, 1.25 and -0.25
     assert row["epochs_above_base"] == "4/6" and row["animals_above_base"] == "2/3"
-    # the window-level statistics stay, labelled, and as they were
+    # the window-level statistics, opt-in, as they were
     x = table.loc[table.kind == "bout", "run_loc_mark"].to_numpy()
     assert row["p_signflip_window_level"] == sign_flip_p(
         x, seed=(1, "Local", "immobile", "run_loc_mark")
@@ -830,25 +848,115 @@ def test_epoch_slopes_are_not_fooled_by_differences_between_epochs():
     ]
     table = pd.concat(frames, ignore_index=True)
 
-    _, trends = calibration_statistics(table, metrics={"Local": ["run_loc_mark"]})
+    _, trends = calibration_statistics(
+        table, metrics={"Local": ["run_loc_mark"]}, window_level=True
+    )
     trend = trends.iloc[0]
 
-    assert trend["slope_window_level"] > 3.0 and trend["rises_window_level"]
-    assert trend["epoch_slope"] == 0.0 and trend["epochs_rising"] == "0/6"
-    assert not trend["rises"]
+    assert trend["slope_window_level"] > 3.0 and trend["rises_window_level"] == "yes"
+    # epochs 0 and 4 hold windows in one probability bin only: no slope
+    assert trend["n_epochs"] == 4 and trend["epochs_rising"] == "0/4"
+    assert trend["epoch_slope"] == 0.0 and trend["rises"] == "no"
 
 
-def test_epoch_means_drop_what_is_not_finite():
-    means = epoch_means(
-        np.array([1.0, 3.0, np.nan, 5.0, np.nan]),
-        np.array(["e1", "e1", "e1", "e2", "e3"]),
-        np.array(["a", "a", "a", "b", "b"]),
+def test_epoch_summaries_drop_what_is_not_finite():
+    summaries = epoch_summaries(
+        np.array([1.0, 3.0, 8.0, np.nan, 5.0, np.nan]),
+        np.array(["e1", "e1", "e1", "e1", "e2", "e3"]),
+        np.array(["a", "a", "a", "a", "b", "b"]),
     )
 
-    assert means.index.tolist() == ["e1", "e2"]
-    assert means["mean"].tolist() == [2.0, 5.0]
-    assert means["animal"].tolist() == ["a", "b"]
-    assert means["n"].tolist() == [2, 1]
+    assert summaries.index.tolist() == ["e1", "e2"]
+    assert summaries["median"].tolist() == [3.0, 5.0]
+    assert summaries["mean"].tolist() == [4.0, 5.0]
+    assert summaries["animal"].tolist() == ["a", "b"]
+    assert summaries["n"].tolist() == [3, 1]
+
+
+def test_epoch_medians_resist_an_artifact_burst():
+    """One burst of spikes in a No-Spike bout drags its epoch's mean, not its median."""
+    rng = np.random.default_rng(12)
+    frames = []
+    for k, animal in enumerate(["aa", "bb", "cc"]):
+        n = 40
+        values = 5.0 + rng.normal(0, 1, n)
+        if k == 2:
+            values[0] = -1641.0  # a burst on every tetrode
+        bout_s = np.arange(n) * 100
+        common = {"state": "No-Spike", "regime": "immobile", "animal": animal,
+                  "epoch_id": f"{animal}2020010{k}_02_r1_HPC"}  # fmt: skip
+        frames += [
+            pd.DataFrame({"kind": "bout", "bout_s": bout_s, "matched_bout_s": np.nan,
+                          "n_found": n, "can_ns_logratio": values, **common}),
+            pd.DataFrame({"kind": "baseline", "bout_s": np.nan, "matched_bout_s": bout_s,
+                          "n_found": np.nan, "can_ns_logratio": -100.0, **common}),
+        ]  # fmt: skip
+    table = pd.concat(frames, ignore_index=True)
+
+    row = bout_statistics(table, metrics={"No-Spike": ["can_ns_logratio"]}).iloc[0]
+
+    assert row["epochs_pos"] == "3/3" and row["epoch_median"] > 4.0
+    assert row["epochs_pos_mean"] == "2/3" and row["epoch_mean"] < 0.0
+
+
+def test_calibration_verdicts_need_enough_windows():
+    """No verdict without 10 windows in the top and the bottom bins, pooled."""
+    rng = np.random.default_rng(13)
+
+    def calibration(spans: list[tuple[float, float]], slope: float) -> pd.DataFrame:
+        frames = []
+        for k, (low, high) in enumerate(spans):
+            p = low + (high - low) * rng.random(600)
+            frames.append(
+                pd.DataFrame(
+                    {"kind": "calib", "state": "", "regime": "immobile", "p_Local": p,
+                     "run_loc_mark": slope * p + rng.normal(0, 0.05, 600),
+                     "epoch_id": f"e{k}", "animal": "abc"[k]}
+                )
+            )  # fmt: skip
+        return pd.concat(frames, ignore_index=True)
+
+    def trend(table: pd.DataFrame) -> pd.Series:
+        _, trends = calibration_statistics(
+            table, metrics={"Local": ["run_loc_mark"]}, window_level=True
+        )
+        return trends.iloc[0]
+
+    # no window reaches the top bin: a steep rise, but no verdict
+    no_top = trend(calibration([(0.0, 0.6)] * 3, slope=5.0))
+    assert no_top["n_top"] == 0 and no_top["epoch_slope_ci_lo"] > 4.0
+    for column in (
+        "rises",
+        "top_positive",
+        "rises_window_level",
+        "top_positive_window_level",
+    ):
+        assert no_top[column] == "too few windows", column
+    # a bottom bin with fewer than 10 windows, pooled
+    thin = calibration([(0.199, 1.0)] * 3, slope=5.0)
+    assert ((thin.p_Local < 0.2).sum() < 10) and ((thin.p_Local >= 0.8).sum() >= 10)
+    thin_trend = trend(thin)
+    assert thin_trend["rises"] == "too few windows"
+    assert thin_trend["top_positive"] == "too few windows"
+    # enough windows: a verdict
+    assert trend(calibration([(0.0, 1.0)] * 3, slope=5.0))["rises"] == "yes"
+    # enough windows, but one epoch gives no epoch-level CI
+    single = trend(calibration([(0.0, 1.0)], slope=5.0))
+    assert single["rises"] == "too few epochs"
+    assert single["top_positive"] == "too few epochs"
+    assert single["rises_window_level"] == "yes"
+    # an epoch in one probability bin enters no slope, however steep its own
+    with_one_bin = pd.concat(
+        [
+            calibration([(0.0, 1.0)] * 3, slope=2.0),
+            calibration([(0.45, 0.55)], slope=-50.0).assign(epoch_id="e9", animal="d"),
+        ],
+        ignore_index=True,
+    )
+    one_bin = trend(with_one_bin)
+    assert one_bin["n_epochs"] == 3 and one_bin["epoch_slope"] == pytest.approx(
+        2.0, abs=0.05
+    )
 
 
 def evidence_table() -> pd.DataFrame:
@@ -898,7 +1006,9 @@ def test_bout_statistics_pair_each_bout_with_its_matched_window():
     bouts = table[table.kind == "bout"]
     base = table[table.kind == "baseline"]
 
-    stats = bout_statistics(table, metrics={"Local": ["run_loc_mark"]})
+    stats = bout_statistics(
+        table, metrics={"Local": ["run_loc_mark"]}, window_level=True
+    )
     row = stats.set_index(["state", "regime", "metric"]).loc[
         ("Local", "immobile", "run_loc_mark")
     ]
@@ -914,8 +1024,10 @@ def test_bout_statistics_pair_each_bout_with_its_matched_window():
     )
     assert row["epochs_pos"] == "2/2" and row["epochs_above_base"] == "2/2"
     assert row["animals_pos"] == "2/2" and row["animals_above_base"] == "2/2"
-    assert row["p_epoch"] == pytest.approx(0.5)  # the smallest p two epochs allow
-    # the window-level tests are kept, labelled, for comparison only
+    assert row["p_epoch_median"] == pytest.approx(
+        0.5
+    )  # the smallest p two epochs allow
+    # the window-level tests, opt-in, for comparison only
     assert row["ci_lo_window_level"] < row["mean"] < row["ci_hi_window_level"]
     assert row["p_signflip_window_level"] == pytest.approx(1 / 10_001)
     assert row["diff_ci_lo_window_level"] < row["diff_mean"]
@@ -931,28 +1043,34 @@ def test_calibration_statistics_bin_by_probability_and_call_the_trend():
     table = evidence_table()
     cal = table[table.kind == "calib"]
 
-    bins, trends = calibration_statistics(table, metrics={"Local": ["run_loc_mark"]})
+    bins, trends = calibration_statistics(
+        table, metrics={"Local": ["run_loc_mark"]}, window_level=True
+    )
 
     top = bins[(bins.metric == "run_loc_mark") & (bins.pbin == "0.8-1.0")].iloc[0]
     in_top = cal[cal.p_Local >= 0.8]
     assert top["n"] == len(in_top)
     assert top["mean"] == pytest.approx(in_top.run_loc_mark.mean())
     assert top["ci_lo_window_level"] < top["mean"] < top["ci_hi_window_level"]
-    # two epochs: the hierarchical CI spans their two means
-    per_epoch = in_top.groupby("epoch_id").run_loc_mark.mean()
-    assert top["epoch_mean"] == pytest.approx(per_epoch.mean())
-    assert top["epoch_ci_lo"] == pytest.approx(per_epoch.min())
-    assert top["epoch_ci_hi"] == pytest.approx(per_epoch.max())
+    # two epochs: the hierarchical CI spans their two medians
+    per_epoch = in_top.groupby("epoch_id").run_loc_mark.median()
+    assert top["epoch_median"] == pytest.approx(per_epoch.mean())
+    assert top["epoch_median_ci_lo"] == pytest.approx(per_epoch.min())
+    assert top["epoch_median_ci_hi"] == pytest.approx(per_epoch.max())
+    means = in_top.groupby("epoch_id").run_loc_mark.mean()
+    assert top["epoch_mean"] == pytest.approx(means.mean())
     curve = trends.set_index(["state", "regime", "metric"]).loc[
         ("Local", "immobile", "run_loc_mark")
     ]
     assert curve["epoch_slope"] == pytest.approx(4.0, abs=0.2)
     assert curve["slope_window_level"] == pytest.approx(4.0, abs=0.2)
     assert curve["epochs_rising"] == "2/2" and curve["animals_rising"] == "2/2"
-    assert curve["rises"] and curve["top_positive"]
+    assert curve["rises"] == "yes" and curve["top_positive"] == "yes"
     flat = table.assign(run_loc_mark=np.where(table.kind == "calib", -1.0, 0.0))
     _, flat_trends = calibration_statistics(flat, metrics={"Local": ["run_loc_mark"]})
-    assert not flat_trends.rises.iloc[0] and not flat_trends.top_positive.iloc[0]
+    assert (
+        flat_trends.rises.iloc[0] == "no" and flat_trends.top_positive.iloc[0] == "no"
+    )
 
 
 def test_rate_calibration_and_coordinated_silence():
@@ -987,7 +1105,10 @@ def test_rate_calibration_and_coordinated_silence():
         "observed_over_expected"
     ] == pytest.approx(bb.run_ns_count.sum() / bb.can_ns_expected.sum())
 
-    silence = coordinated_silence(table)
+    default = coordinated_silence(table)
+    assert not [c for c in default if c.endswith("_window_level")]
+    silence = coordinated_silence(table, window_level=True)
+    pd.testing.assert_frame_equal(silence[default.columns], default)
     every = silence[(silence.kind == "calib") & (silence.state == "all windows")].iloc[
         0
     ]

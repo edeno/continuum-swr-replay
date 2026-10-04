@@ -39,6 +39,9 @@ Then, over every epoch written: ``bout_stats.csv``, ``calibration_stats.csv``,
 (``summarize_state_evidence``), three figures (bouts against matched windows,
 calibration curves, coordinated silence), ``manifest.json`` (settings,
 provenance and every epoch's record) and a ``README.md`` with the caveats.
+``--window-level-stats`` adds the window-level columns (``*_window_level``),
+which treat windows as independent and serve only to compare with the
+prototype; they take most of a summary's time (about an hour for every epoch).
 
 It writes nothing outside ``--output-dir``. Per-epoch logs go to its ``logs/``.
 
@@ -46,7 +49,7 @@ Usage:
     python scripts/qa/run_state_evidence.py --n-workers 16
     python scripts/qa/run_state_evidence.py --epochs chimi20200225_02_r1_HPC \\
         --decode-dir Processed-Data/_staging_redecode_20261004 \\
-        --output-dir /tmp/state_evidence --n-workers 1
+        --output-dir /tmp/state_evidence --n-workers 1 --window-level-stats
 """
 
 import os
@@ -142,8 +145,17 @@ CAVEATS = [
     "MAP_S's distance from the animal (mapS_dist_cm) is not a Local test.",
     "Inference is at the epoch level, epochs nested in animals: hierarchical "
     "bootstrap CIs (animals, then epochs within each; Saravanan, Berman & Sober "
-    "2020), sign-flip tests on per-epoch means (exact for 13 epochs or fewer) "
-    "and k of N epochs and k of A animals. Columns ending _window_level treat "
+    "2020), sign-flip tests on per-epoch medians (exact for 13 epochs or fewer) "
+    "and k of N epochs and k of A animals. Each epoch enters as its median over "
+    "windows because the per-window evidence is heavy-tailed: a few spike "
+    "bursts drag an epoch's mean. The same statistics of each epoch's mean are "
+    "secondary (the 'mean' columns). This choice was made on the five pilot "
+    "epochs, before the full run.",
+    "A calibration verdict (rises, top_positive) needs at least 10 windows in "
+    "the top and in the bottom probability bins, pooled over epochs, else it "
+    "reads 'too few windows' ('too few epochs' when fewer than two epochs give "
+    "its CI); an epoch's slope needs two bins of 10 or more of its windows.",
+    "Columns ending _window_level (only with --window-level-stats) treat "
     "windows as independent: they ignore the nesting, are not for inference, "
     "and are kept only to compare with the prototype.",
 ]
@@ -767,7 +779,7 @@ def _error_bars(estimate: NDArray, lo: NDArray, hi: NDArray) -> list[NDArray]:
 
 
 def figure_calibration(bins: pd.DataFrame, path: Path) -> None:
-    """Mean evidence over epochs by the state's probability, hierarchical 95 % CIs."""
+    """Epoch-median evidence by the state's probability, hierarchical 95 % CIs."""
     import matplotlib
 
     matplotlib.use("Agg")
@@ -788,11 +800,11 @@ def figure_calibration(bins: pd.DataFrame, path: Path) -> None:
                 .reindex(list(PROBABILITY_BIN_LABELS))
             )
             ok = (curve.n >= MIN_BIN_WINDOWS).to_numpy()
-            mean = curve["epoch_mean"].to_numpy(dtype=float)[ok]
-            lo = curve.epoch_ci_lo.to_numpy(dtype=float)[ok]
-            hi = curve.epoch_ci_hi.to_numpy(dtype=float)[ok]
+            median = curve.epoch_median.to_numpy(dtype=float)[ok]
+            lo = curve.epoch_median_ci_lo.to_numpy(dtype=float)[ok]
+            hi = curve.epoch_median_ci_hi.to_numpy(dtype=float)[ok]
             ax.errorbar(
-                BIN_CENTERS[ok], mean, yerr=_error_bars(mean, lo, hi),
+                BIN_CENTERS[ok], median, yerr=_error_bars(median, lo, hi),
                 color=OKABE_ITO["bout"], marker="o", ms=3, lw=1.2, capsize=2,
             )  # fmt: skip
             ax.axhline(0, color="k", lw=0.6, ls="--")
@@ -804,10 +816,10 @@ def figure_calibration(bins: pd.DataFrame, path: Path) -> None:
             if i == 0:
                 ax.set_title(title, fontsize=8)
             if j == 0:
-                ax.set_ylabel(f"{regime}\nmean held-out evidence", fontsize=8)
+                ax.set_ylabel(f"{regime}\nheld-out evidence", fontsize=8)
     fig.suptitle(
         "Calibration: held-out evidence in random 20 ms windows against the state's "
-        "mean posterior\nMean over epochs of each epoch's bin mean; 95 % hierarchical "
+        "mean posterior\nMean over epochs of each epoch's bin median; 95 % hierarchical "
         f"bootstrap CI (animals, then epochs); bins with < {MIN_BIN_WINDOWS} windows "
         "omitted",
         fontsize=9,
@@ -917,8 +929,13 @@ def readme(records: dict[str, dict], settings: dict, provenance: dict) -> str:
     return "\n".join(lines)
 
 
-def summarize(output_dir: Path, epochs: list[str]) -> None:
-    """Pool every written epoch: the summary CSVs and the three figures."""
+def summarize(
+    output_dir: Path, epochs: list[str], *, window_level: bool = False
+) -> None:
+    """Pool every written epoch: the summary CSVs and the three figures.
+
+    ``window_level`` adds the window-level columns to the CSVs.
+    """
     frames = [
         read_table(output_paths(epoch_id, output_dir)["windows"]) for epoch_id in epochs
     ]
@@ -927,7 +944,7 @@ def summarize(output_dir: Path, epochs: list[str]) -> None:
         return
     windows = pd.concat(frames, ignore_index=True)
     started = clock.perf_counter()
-    summary = summarize_state_evidence(windows)
+    summary = summarize_state_evidence(windows, window_level=window_level)
     print(f"summary of {len(epochs)} epochs in {clock.perf_counter() - started:.0f} s")
     for name, file_name in [
         ("bouts", "bout_stats.csv"),
@@ -941,13 +958,15 @@ def summarize(output_dir: Path, epochs: list[str]) -> None:
     figure_calibration(summary["calibration"], output_dir / "fig_calibration.png")
     figure_silence(summary["silence"], output_dir / "fig_coordinated_silence.png")
     primary = summary["bouts"][summary["bouts"].primary]
-    shown = ["state", "regime", "metric", "n", "n_epochs", "median", "frac_pos",
-             "epoch_mean", "epoch_ci_lo", "epoch_ci_hi", "p_epoch", "epochs_pos",
-             "animals_pos", "diff_epoch_mean", "p_diff_epoch"]  # fmt: skip
+    shown = ["state", "regime", "metric", "n", "n_epochs", "epoch_median",
+             "epoch_median_ci_lo", "epoch_median_ci_hi", "p_epoch_median",
+             "epochs_pos", "animals_pos", "diff_epoch_median",
+             "p_diff_epoch_median", "epochs_above_base", "epoch_mean"]  # fmt: skip
     print(primary[shown].to_string(index=False), flush=True)
 
 
-def main(argv: list[str] | None = None) -> None:
+def build_parser() -> argparse.ArgumentParser:
+    """The command-line arguments."""
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
@@ -981,6 +1000,18 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--overwrite", action="store_true", help="Recompute epochs already written."
     )
+    parser.add_argument(
+        "--window-level-stats",
+        action="store_true",
+        help="Also compute the window-level columns (*_window_level), which treat "
+        "windows as independent; for comparison with the prototype only, not for "
+        "inference. Adds about an hour to a summary of every epoch.",
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = build_parser()
     args = parser.parse_args(argv)
     decode_dir, output_dir = args.decode_dir.resolve(), args.output_dir.resolve()
     if output_dir == decode_dir:
@@ -1016,6 +1047,7 @@ def main(argv: list[str] | None = None) -> None:
                 "produced_by": PRODUCED_BY,
                 "provenance": provenance,
                 "settings": settings,
+                "window_level_stats": args.window_level_stats,
                 "decode_dir": str(decode_dir),
                 "epochs": {k: records[k] for k in sorted(records)},
             },
@@ -1045,7 +1077,7 @@ def main(argv: list[str] | None = None) -> None:
         write_manifest()
     write_manifest()
     ok = [k for k in sorted(records) if records[k]["status"] == "ok"]
-    summarize(output_dir, ok)
+    summarize(output_dir, ok, window_level=args.window_level_stats)
     (output_dir / "README.md").write_text(readme(records, settings, provenance))
     failed = [k for k, r in records.items() if r["status"] == "failed"]
     if failed:
