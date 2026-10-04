@@ -131,6 +131,7 @@ STAGES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "*/analysis/replay/posterior_io.py",
             "*/analysis/replay/fit_provenance.py",
             "*/analysis/replay/versions.py",
+            "*/analysis/hippocampus/state_evidence/*.py",
             "scripts/qa/*.py",
         ),
     ),

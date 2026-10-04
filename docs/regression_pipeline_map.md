@@ -82,12 +82,6 @@ Loading and managing saved decoding results.
 
 `load_results`
 
-### `src/continuum_swr_replay/analysis/hippocampus/state_evidence.py`
-
-Held-out spike evidence for each decoder state.
-
-`parse_epoch_identifier`, `load_detector`, `encoding_inputs`, `load_encoding`, `event_likelihood`, `nearest_interior_bins`, `interior_bin_mask`, `TetrodeTerms`, `per_tetrode_terms`, `keyed_rng`, `regimes`, `state_bouts`, `matched_windows`, `calibration_windows`, `build_windows`, `tetrode_halves`, `null_partners`, `window_evidence`, `sign_flip_p`, `stratified_bootstrap_ci`, `ols_slope_ci`, `bout_statistics`, `calibration_statistics`, `rate_calibration`, `coordinated_silence`, `summarize_state_evidence`
-
 ### `src/continuum_swr_replay/analysis/hippocampus/triggered_analysis.py`
 
 Event-triggered analysis utilities for extracting signal windows around events.
@@ -753,6 +747,30 @@ Does each detector's content reproduce in cells it never saw?
 Generate the symbol-anchored regression pipeline code map.
 
 `render`, `main`
+
+### `src/continuum_swr_replay/analysis/hippocampus/state_evidence/evidence.py`
+
+Held-out evidence of every window, by tetrode half (see the package notes).
+
+`window_evidence`
+
+### `src/continuum_swr_replay/analysis/hippocampus/state_evidence/summary.py`
+
+Summary statistics of the per-window table, pooled over epochs.
+
+`sign_flip_p`, `stratified_bootstrap_ci`, `ols_slope_ci`, `bout_statistics`, `calibration_statistics`, `rate_calibration`, `coordinated_silence`, `summarize_state_evidence`
+
+### `src/continuum_swr_replay/analysis/hippocampus/state_evidence/terms.py`
+
+Per-tetrode likelihood terms, and the encodings and decode files they come from.
+
+`parse_epoch_identifier`, `load_detector`, `encoding_inputs`, `load_encoding`, `event_likelihood`, `nearest_interior_bins`, `interior_bin_mask`, `TetrodeTerms`, `per_tetrode_terms`
+
+### `src/continuum_swr_replay/analysis/hippocampus/state_evidence/windows.py`
+
+Speed regimes and the windows scored: bouts, matched windows, calibration windows.
+
+`keyed_rng`, `regimes`, `state_bouts`, `matched_windows`, `calibration_windows`, `build_windows`, `tetrode_halves`, `null_partners`
 
 ### `src/continuum_swr_replay/analysis/replay/fit_provenance.py`
 
