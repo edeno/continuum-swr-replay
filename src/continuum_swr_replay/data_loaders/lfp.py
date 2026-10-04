@@ -331,8 +331,9 @@ def get_ripple_band_inputs(nwb_file_name: str, epoch_name: str) -> RippleBandInp
     ValueError
         If the band's electrodes differ from ``RippleLFPSelection``'s CA1
         electrodes for the same band key, if the stored band's columns are not
-        its electrodes in ascending order, or if the band's timestamps are not
-        among the referenced raw LFP's timestamps.
+        its electrodes in ascending order, if the stored band does not have one
+        column per electrode, or if the band's timestamps are not among the
+        referenced raw LFP's timestamps.
 
     """
     from spyglass.common import FirFilterParameters
@@ -373,6 +374,15 @@ def get_ripple_band_inputs(nwb_file_name: str, epoch_name: str) -> RippleBandInp
         )
     time = np.asarray(band_series.timestamps, dtype=np.float64)
     ripple_band_native = np.asarray(band_series.data)
+    # The electrode table maps electrode i to column i, so the data must hold
+    # exactly one column per electrode; otherwise band_reproduction_error would
+    # compare arrays of different widths.
+    n_columns = ripple_band_native.shape[1]
+    if n_columns != electrode_ids.size:
+        raise ValueError(
+            f"The stored ripple band has {n_columns} columns, not one for each of "
+            f"its {electrode_ids.size} electrodes {electrode_ids.tolist()}."
+        )
 
     # LFPBandV1.make's own steps, reused read-only.
     band_table = LFPBandV1()

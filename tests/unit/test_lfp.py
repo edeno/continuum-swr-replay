@@ -668,13 +668,18 @@ def test_ripple_band_inputs_reproduce_make_and_count_overflow(fake_spyglass):
     [
         ("ca1_selection", r"missing from the band: \[12\]"),
         ("band_columns", r"columns do not hold electrodes \[0, 4, 8\] in order"),
+        (
+            "band_column_count",
+            r"has 2 columns, not one for each of its 3 electrodes \[0, 4, 8\]",
+        ),
         ("band_timestamps", r"8 of the ripple band's 8 timestamps"),
     ],
 )
 def test_ripple_band_inputs_refuse_misaligned_inputs(fake_spyglass, breakage, message):
     """A CA1 selection that differs from the band, a stored band whose columns
-    are not its electrodes in order, and band timestamps the raw LFP lacks each
-    stop the fetch rather than mislabel a channel or a sample."""
+    are not its electrodes in order or are fewer than its electrodes, and band
+    timestamps the raw LFP lacks each stop the fetch rather than mislabel a
+    channel or a sample."""
     fakes = fake_spyglass
     if breakage == "ca1_selection":
         fakes.ripple_electrode.fetch_results[("electrode_id",)] = np.array(
@@ -682,6 +687,9 @@ def test_ripple_band_inputs_refuse_misaligned_inputs(fake_spyglass, breakage, me
         )
     elif breakage == "band_columns":
         fakes.band.electrode_ids = [4, 0, 8]
+    elif breakage == "band_column_count":
+        # the electrode table still maps all three electrodes to columns 0-2
+        fakes.band.data = fakes.band.data[:, :2]
     else:
         fakes.band.timestamps = fakes.band.timestamps + 0.0005
 
