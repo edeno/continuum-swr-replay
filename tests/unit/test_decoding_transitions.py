@@ -58,6 +58,11 @@ _DECODER_MODULES = {
     "bandit": "scripts.decoding.run_decoding_bandit",
     "contfrag": "scripts.decoding.run_decoding_contfrag",
 }
+#: The detector class each decoder's ``perform_decoding`` builds for HPC.
+_FITTED_CLASSES = {
+    "bandit": NonLocalClusterlessDetector,
+    "contfrag": ContFragClusterlessClassifier,
+}
 #: Modules that bind the Spyglass stub when imported under it.
 _STUB_BOUND_MODULES = (
     "continuum_swr_replay.data_loaders.bandit_task",
@@ -235,20 +240,21 @@ def test_hpc_detector_built_by_the_decode_carries_the_pinned_settings(
     assert detector.local_position_std == 2.5
 
 
+@pytest.mark.parametrize("decoder", sorted(_DECODER_MODULES))
 def test_non_stationary_flag_is_refused_before_any_work(
-    decoders, monkeypatch, capsys
+    decoders, decoder, monkeypatch, capsys
 ) -> None:
     """``--non_stationary`` is refused at the command line, naming #50 and #51.
 
-    The library's non-stationary transitions cannot be saved (#50) and add the
-    stickiness prior at every bin (#51).
+    The library's non-stationary transitions cannot be saved (#50) and add their
+    transition prior at every bin (#51). Both decoders refuse the flag.
     """
-    bandit = decoders["bandit"]
-    monkeypatch.setattr(bandit, "run_batch", _no_batch)
-    monkeypatch.setattr(sys, "argv", ["run_decoding_bandit.py", "--non_stationary"])
+    module = decoders[decoder]
+    monkeypatch.setattr(module, "run_batch", _no_batch)
+    monkeypatch.setattr(sys, "argv", [f"{module.__name__}.py", "--non_stationary"])
 
     with pytest.raises(SystemExit) as refused:
-        bandit.main()
+        module.main()
 
     assert refused.value.code == 2
     message = capsys.readouterr().err
@@ -256,12 +262,15 @@ def test_non_stationary_flag_is_refused_before_any_work(
     assert "#51" in message
 
 
-def test_perform_decoding_refuses_non_stationary(decoders, monkeypatch) -> None:
-    """A direct caller cannot build the non-stationary detector either."""
-    _capture_fit(monkeypatch, NonLocalClusterlessDetector)
+@pytest.mark.parametrize("decoder", sorted(_DECODER_MODULES))
+def test_perform_decoding_refuses_non_stationary(
+    decoders, decoder, monkeypatch
+) -> None:
+    """A direct caller cannot build a non-stationary detector either."""
+    _capture_fit(monkeypatch, _FITTED_CLASSES[decoder])
 
     with pytest.raises(ValueError) as refused:
-        _perform_decoding(decoders["bandit"], non_stationary=True)
+        _perform_decoding(decoders[decoder], non_stationary=True)
 
     assert "#50" in str(refused.value)
     assert "#51" in str(refused.value)

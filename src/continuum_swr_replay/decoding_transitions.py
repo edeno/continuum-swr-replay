@@ -17,8 +17,9 @@ The NonLocal detector's states, in the library's order: 0 Local, 1 No-Spike,
 2 Non-Local Continuous, 3 Non-Local Fragmented.
 
 ``non_local_detector``'s non-stationary (covariate-driven) transitions are not
-used. Such detectors cannot be saved (LorenFrankLab/non_local_detector#50), and
-their M-step adds the stickiness prior at every time bin rather than once (#51).
+used, and both decoders refuse ``--non_stationary``. Such detectors cannot be
+saved (LorenFrankLab/non_local_detector#50), and their M-step adds the Dirichlet
+transition prior at every time bin rather than once (#51).
 """
 
 from typing import Any, Final
@@ -80,11 +81,12 @@ remaining 0.04 is split equally between the two non-local states.
 NON_STATIONARY_REFUSAL: Final[str] = (
     "--non_stationary is disabled: non_local_detector's non-stationary discrete "
     "transitions cannot be saved (the fitted detector does not pickle, "
-    "LorenFrankLab/non_local_detector#50) and add the stickiness prior at every "
-    "time bin instead of once (#51). Decode with the stationary transitions "
-    "pinned in continuum_swr_replay.decoding_transitions until both are fixed."
+    "LorenFrankLab/non_local_detector#50) and add their Dirichlet transition prior "
+    "at every time bin instead of once (#51). Decode with the stationary "
+    "transitions pinned in continuum_swr_replay.decoding_transitions until both "
+    "are fixed."
 )
-"""Why the NonLocal decoder refuses ``--non_stationary``."""
+"""Why both decoders (NonLocal and ContFrag) refuse ``--non_stationary``."""
 
 
 def nonlocal_transition_settings(

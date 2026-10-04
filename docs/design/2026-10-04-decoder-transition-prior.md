@@ -25,7 +25,7 @@ the re-decode runs from the commit that adds this pin.
 
 | # | Decision | Why |
 |---|---|---|
-| R10 | The NonLocal decode uses setting **P30-B**. Each learned row has a fixed-count Dirichlet prior centred on dwell times from the literature (Local 3 s, each non-local state 100 ms), worth 30 visits per state. The No-Spike row is frozen, and its exits follow base rates. The ContFrag decode keeps the values it has always used, now written out. `--non_stationary` is refused on the NonLocal runner. | The project lead's choice (2026-10-04), after the pilot validation below, under the requirement that every value be justifiable from prior knowledge: each value has a source or a stated base-rate assumption. Against P30 (the same prior with even No-Spike exits), P30-B halves the extra events, which are mostly No-Spike-entered and weakly supported, and restores much of April's immobile regime |
+| R10 | The NonLocal decode uses setting **P30-B**. Each learned row has a fixed-count Dirichlet prior centred on dwell times from the literature (Local 3 s, each non-local state 100 ms), worth 30 visits per state. The No-Spike row is frozen, and its exits follow base rates. The ContFrag decode keeps the values it has always used, now written out. Both runners refuse `--non_stationary`. | The project lead's choice (2026-10-04), after the pilot validation below, under the requirement that every value be justifiable from prior knowledge: each value has a source or a stated base-rate assumption. Against P30 (the same prior with even No-Spike exits), P30-B halves the extra events, which are mostly No-Spike-entered and weakly supported, and restores much of April's immobile regime |
 
 ## How the library uses these values
 
@@ -80,6 +80,11 @@ Each learned row's prior mean (its normalized α − 1) equals its row of M, so 
 EM toward these dwell times with the strength of 30 visits. `tests/unit/test_decoding_transitions.py`
 pins all of the above.
 
+Against the P30-B pilot decodes (`Processed-Data/_ablation_prior_P30B_20261004/`), the
+pinned values are identical bit for bit in float32, which the HMM computes in, and agree to
+within 13 ulps in float64, because the pilot typed the non-local literals (0.98, 0.02) where
+the code derives them; compare against the ablation pickles with a relative tolerance.
+
 ### ContFrag
 
 The ContFrag classifier keeps the values it has always decoded with: the library's ContFrag
@@ -96,27 +101,28 @@ starting stay with a near-flat prior (concentration 1.1), i.e. weakly informativ
 
 ### Non-stationary transitions are disabled
 
-`run_decoding_bandit.py --non_stationary` now refuses at the command line, and
+Both runners, `run_decoding_bandit.py` and `run_decoding_contfrag.py`, refuse
+`--non_stationary` at the command line, before any cluster or GPU work, and their
 `perform_decoding(non_stationary=True)` raises. The library's non-stationary transitions
 have two problems:
 
 - **They cannot be saved.** The fitted detector does not pickle
   ([LorenFrankLab/non_local_detector#50](https://github.com/LorenFrankLab/non_local_detector/issues/50)).
 - **The prior is added at every time bin** rather than once
-  ([#51](https://github.com/LorenFrankLab/non_local_detector/issues/51)), so the stickiness
-  above would freeze every row.
+  ([#51](https://github.com/LorenFrankLab/non_local_detector/issues/51)). The NonLocal
+  stickiness above would then freeze every row, and ContFrag's concentration of 1.1 would add
+  0.1 pseudo-counts to every transition at every bin.
 
-The flag comes back when both are fixed. The ContFrag runner's `--non_stationary` path is
-unchanged; it keeps C0's values, now explicit.
+The flag comes back when both are fixed.
 
 ## Validation (five pilot epochs)
 
 Pilot epochs (HPC): peanut20201202_10_r5, j1620210707_06_r3, chimi20200225_02_r1,
 wilbur20210329_12_r6 and senor20201101_06_r3. Every setting decoded the same inputs; only
 the discrete transitions differed. The details are in
-`.claude/research/refresh_validation/variants_report.md`,
-`variants_simulation.md` and `.claude/research/refresh_ablation/ablation_report.md`
-("Ablation 5").
+`.claude/research/refresh_validation/`: `variants_report.md`, `variants_tables.md`,
+`variants_simulation.md` and `state_evidence/` (`report_tables.md`, `bout_stats.csv`); and
+in `.claude/research/refresh_ablation/ablation_report.md` ("Ablation 5", "Ablation 6").
 
 - **Events.** 245 / 236 / 264 / 195 / 223 = **1,163**. For comparison, April's discrete
   settings on the same inputs give 1,021, and today's library defaults give 1,349.
@@ -129,22 +135,53 @@ the discrete transitions differed. The details are in
     exits it was 51 %.
 - **Immobile regime.** The median non-local run is 74 ms, with 0.55 entries/s. April's
   settings give 98 ms and 0.46/s; today's defaults 26 ms and 1.07/s.
-- **EM.** No EM iteration decreased in any of the five decodes. In senor, the final E-step
-  stored in `results.nc` fell by 126, out of a log-likelihood of −1.1 × 10⁷.
-- **No takeover.** This was checked across the P settings, P30-B included.
-  - At most 9 immobile bouts (≥ 1 s) are ≥ 50 % non-local, and 1–3 are ≥ 90 %.
-  - The time-weighted running maximum is 0.163–0.170.
-  - No event is longer than 1 s (the longest is 0.74–0.80 s).
+- **Held-out evidence per state.** In all four settings tested (April's settings, W1-L, P30
+  and P30-B), held-out spikes support Local, both immobile and running, and immobile
+  Non-Local Continuous and Fragmented.
+  - In P30-B's immobile bouts the evidence is above 0 in 82 % of Local bouts. It is above 0
+    in 73 % of Non-Local Continuous bouts (remote MAP against the animal's position) and in
+    67 % of Non-Local Fragmented bouts.
+  - The evidence does not separate W1-L, P30 and P30-B.
+  - April's settings have one distinct flaw: 15 % of their immobile No-Spike bouts contain
+    held-out spikes, against 2 % for P30-B.
+- **EM.** No EM iteration decreased the log-likelihood in any of the 15 B-family pilot fits
+  (P10-B, P30-B and P100-B on the five epochs). The final E-step, stored after the last
+  M-step, fell slightly in three of them: P30-B senor −126, P10-B j16 −28 and P10-B wilbur
+  −104 nats, on totals of 5 to 11 million.
+- **No takeover.** This was checked for P10-B, P30-B and P100-B with a scratch script
+  (`nonlocal_takeover.py`, not in the repository). Values below are in that order, with
+  April's settings for comparison.
+  - **Immobile bouts ≥ 1 s:** 612 per setting. Of these, 8 / 8 / 8 are ≥ 50 % confidently
+    non-local (P(non-local) > 0.8), and 3 / 3 / 3 are ≥ 90 %. April's settings: 13 and 5.
+  - **Running bouts ≥ 1 s:** 1,002. Of these, 8 / 8 / 8 are ≥ 50 % non-local, and one in
+    each setting is ≥ 90 %. The time-weighted non-local share per epoch is at most 0.172,
+    0.169 and 0.162.
+  - **Events:** the longest is 0.726, 0.736 and 0.730 s; none is longer than 1 s. April's
+    settings have 3 events over 1 s, the longest 1.58 s.
 - **Simulation (same recordings as the earlier variants).**
   - Noise-extension recall is 169 of 242 true events (100 of 166 short ones), with
     12 false calls and no splits.
   - The silence probe gives 31 false calls. For comparison: P30 gives 55; W1-L 27; today's
     defaults 21; April's settings 1.
-- **Sensitivity to prior strength.** The P family with even No-Spike exits was decoded at
-  N = 10, 30 and 100 visits. Event counts were 1,381 / 1,390 / 1,416 (±2.5 %), pass rates were
-  flat, and only the immobile flicker eased. The No-Spike exit row, not N, is the lever.
-  The same check on P30-B's base-rate row (P10-B and P100-B, ablation 6) has been decoded on
-  the five pilot epochs but is not yet summarized here.
+- **Sensitivity to prior strength.** P30-B's prior was also decoded at 10 and 100 visits
+  (P10-B, P100-B; `variants_tables.md`, "Side-by-side, prior family", and
+  `ablation_report.md`, "Ablation 6"). Values are P10-B / P30-B / P100-B.
+  - **Events:** 1,163 / 1,163 / 1,158. Per epoch (peanut, j16, chimi, wilbur, senor):
+    243, 237, 265, 193, 225; 245, 236, 264, 195, 223; and 241, 239, 260, 197, 221.
+  - **Against April's settings** (shared / setting-only / April-only): 1,012 / 151 / 59;
+    1,015 / 148 / 57; and 1,012 / 146 / 55.
+  - **Held-out pass rate:** all events 0.78 / 0.78 / 0.77; setting-only 0.67 / 0.68 / 0.69;
+    April-only 0.29 / 0.30 / 0.31.
+  - **Logit OR** for the non-SWR additions: 0.77 / 0.78 / 0.88, all p > 0.2.
+  - **Immobile regime:** median non-local run 74 / 74 / 78 ms, and 0.55 / 0.55 / 0.53
+    entries per s.
+  - **No-Spike occupancy:** 9.0 / 8.9 / 8.6 %.
+  - **Additions entered from No-Spike:** 8 / 7 / 8 %.
+
+  So a 10x range of prior strength (10 to 100 visits) changes the event count by at most
+  0.5 %, and by at most 4 events per epoch. The P family with even No-Spike exits was just as
+  insensitive (1,381 / 1,390 / 1,416 events at N = 10 / 30 / 100, ±2.5 %); there, too, the
+  No-Spike exit row, not N, was the lever.
 
 ## Known limits
 
@@ -158,11 +195,11 @@ the discrete transitions differed. The details are in
   events. Wilbur ends with fewer events than under April's settings (195 vs 206).
 - **No awake source for the post-silence destination.** `NO_SPIKE_EXIT_TO_LOCAL` is a
   base-rate assumption.
+- **Running Non-Local Continuous is not supported by held-out spikes.** Under running-only
+  place fields, P30-B's held-out spikes favour the animal's own position in 65 % of running
+  Non-Local Continuous bouts. Our event analyses exclude these bouts through the whole-event
+  immobility rule (every sample below 4 cm/s).
 - **Five epochs.** Pooled event-level rates treat events as independent.
-- **Floating point.** The pinned values equal the P30-B pilot decode's to within 13 ulps. The
-  pilot typed 0.98 and 0.02 for the non-local rows; the code derives them from the dwell
-  times. Cast to float32, which the HMM computes in, matrix and stickiness are bitwise
-  identical.
 
 ## Sources
 

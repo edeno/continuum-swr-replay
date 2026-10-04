@@ -17,9 +17,6 @@ python run_decoding_contfrag.py --animal chimi --brain_area HPC
 # Decode specific session
 python run_decoding_contfrag.py --animal chimi --date 20200212 --epoch 02_r1
 
-# With non-stationary model
-python run_decoding_contfrag.py --animal chimi --non_stationary
-
 # Write to (and resume from) a staging folder instead of Processed-Data
 python run_decoding_contfrag.py --animal chimi --save_dir Processed-Data/_staging_redecode_20261003
 
@@ -38,7 +35,6 @@ import logging
 import warnings
 from argparse import ArgumentParser
 from pathlib import Path
-from typing import Any
 
 import networkx as nx
 import numpy as np
@@ -48,7 +44,6 @@ from non_local_detector import (
     ContFragClusterlessClassifier,
     ContFragSortedSpikesClassifier,
 )
-from non_local_detector.discrete_state_transitions import DiscreteNonStationaryDiagonal
 from non_local_detector.environment import Environment
 
 from continuum_swr_replay.analysis.contfrag import (
@@ -68,7 +63,10 @@ from continuum_swr_replay.decoding_common import (
     setup_logger,
     write_atomically,
 )
-from continuum_swr_replay.decoding_transitions import contfrag_transition_settings
+from continuum_swr_replay.decoding_transitions import (
+    NON_STATIONARY_REFUSAL,
+    contfrag_transition_settings,
+)
 from continuum_swr_replay.parameters import (
     CONTFRAG_DETECTOR_CONFIG,
     PLACE_BIN_SIZE_1D,
@@ -98,12 +96,12 @@ def create_contfrag_detector(
     brain_area: str,
     env: Environment,
     config: DecodingConfig,
-    transition_settings: dict[str, Any],
 ) -> ContFragClusterlessClassifier | ContFragSortedSpikesClassifier:
     """Factory for creating the appropriate ContFrag classifier.
 
-    ``transition_settings`` are the discrete-transition keyword arguments,
-    built from ``contfrag_transition_settings``.
+    The discrete transitions come from ``contfrag_transition_settings`` (the
+    values C0 took from the library, made explicit), never from the library's
+    defaults.
     """
     if brain_area not in CONTFRAG_DETECTOR_CLASSES:
         valid_areas = list(CONTFRAG_DETECTOR_CLASSES.keys())
@@ -118,7 +116,7 @@ def create_contfrag_detector(
     return detector_class(
         environments=env,
         **{param_key: params},
-        **transition_settings,
+        **contfrag_transition_settings(),
     )
 
 
@@ -139,7 +137,14 @@ def perform_decoding(
     ContFragClusterlessClassifier | ContFragSortedSpikesClassifier,
     Environment,
 ]:
-    """Perform ContFrag decoding for a given brain area."""
+    """Perform ContFrag decoding for a given brain area.
+
+    Raises ``ValueError`` when ``non_stationary`` is True: the library's
+    non-stationary transitions are disabled (``NON_STATIONARY_REFUSAL``).
+    """
+    if non_stationary:
+        raise ValueError(NON_STATIONARY_REFUSAL)
+
     if is_1d:
         env = Environment(
             place_bin_size=PLACE_BIN_SIZE_1D,
@@ -154,29 +159,16 @@ def perform_decoding(
 
     config = DecodingConfig()
 
-    transition_settings = contfrag_transition_settings()
-    if non_stationary:
-        discrete_transition_covariate_data = {
-            "speed": position_info["head_speed"].to_numpy()
-        }
-        # ContFrag has 2 states: [Continuous, Fragmented]
-        diagonal_values = np.array([0.98, 0.98])
-        transition_settings["discrete_transition_type"] = DiscreteNonStationaryDiagonal(
-            diagonal_values=diagonal_values,
-        )
-    else:
-        discrete_transition_covariate_data = None
-
     logger.info(f"ContFrag decoding {brain_area}...")
 
-    detector = create_contfrag_detector(brain_area, env, config, transition_settings)
+    detector = create_contfrag_detector(brain_area, env, config)
 
     estimate_params = {
         "position_time": position_info.index.to_numpy(),
         "position": position_info[["head_position_x", "head_position_y"]].to_numpy(),
         "spike_times": spike_times,
         "time": position_info.index.to_numpy(),
-        "discrete_transition_covariate_data": discrete_transition_covariate_data,
+        "discrete_transition_covariate_data": None,
     }
 
     # Apply the training mask (e.g. no_ripple) for every brain area — the
@@ -414,6 +406,8 @@ def main() -> None:
         ArgumentParser(description="Run ContFrag decoding on spatial bandit data")
     )
     args = parser.parse_args()
+    if args.non_stationary:
+        parser.error(NON_STATIONARY_REFUSAL)
     run_batch(run_decode, args)
 
 
