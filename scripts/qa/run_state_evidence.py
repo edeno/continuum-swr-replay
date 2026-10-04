@@ -117,7 +117,11 @@ LIBRARY_CHECK_BINS = 200
 STORED_MAX_REL = 1e-3
 """The decode's float32 GPU log-likelihood against these CPU terms: 3.6e-5 at
 most on the prototype's pilot; a mark the decode did not use moves it by far more."""
-LIBRARY_MAX_REL = 1e-4
+LIBRARY_MAX_REL = 1e-3
+"""The library's likelihood reads the decode's stored summed ground intensity,
+computed on its GPU; the terms recompute it on the CPU. On the pilot they
+differ by up to 7.9e-5 (canonical encoding; 2e-7 for the CPU-fit running-only
+one), so a tighter bound would fail an epoch on float error alone."""
 PROBABILITY_SUM_TOLERANCE = 1e-3
 PROBABILITY_COLUMNS = [f"{state.replace(' ', '_')}_prob" for state in STATES]
 SHARED_COLUMNS = ["n_spikes", "n_tetrodes", "animal_center_bin", "has_loc_partner"]
