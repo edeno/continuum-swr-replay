@@ -143,14 +143,21 @@ CAVEATS = [
     "test over random windows is the only held-out No-Spike test.",
     "With few spikes, S's silence term pulls MAP_S toward low-rate bins, so "
     "MAP_S's distance from the animal (mapS_dist_cm) is not a Local test.",
-    "Inference is at the epoch level, epochs nested in animals: hierarchical "
+    "Each epoch enters as one value (epoch_summary): its median over windows "
+    "for the log-likelihood ratios (loc_*, nl_*, nlr_*, ns_logratio), which are "
+    "heavy-tailed (three spike bursts in one pilot chimi epoch score -1641, "
+    "-1407 and -1016 nats), and its mean for expected counts, counts, shares "
+    "and distances (ns_expected, ns_count, silent shares, MAP_S distances), "
+    "which are bounded. The other_ columns repeat the inference over the other "
+    "summary. These rules were set on the five pilot epochs, before the full "
+    "run.",
+    "Inference takes the animal as the unit of replication: hierarchical "
     "bootstrap CIs (animals, then epochs within each; Saravanan, Berman & Sober "
-    "2020), sign-flip tests on per-epoch medians (exact for 13 epochs or fewer) "
-    "and k of N epochs and k of A animals. Each epoch enters as its median over "
-    "windows because the per-window evidence is heavy-tailed: a few spike "
-    "bursts drag an epoch's mean. The same statistics of each epoch's mean are "
-    "secondary (the 'mean' columns). This choice was made on the five pilot "
-    "epochs, before the full run.",
+    "2020), a two-sided t-test of the animal summaries, each the mean of the "
+    "animal's epoch values (p_animal_t; A - 1 degrees of freedom, so 4 with five "
+    "animals), and k of A animals and k of N epochs. The CI weights each epoch "
+    "equally, the t-test each animal. p_epoch_signflip, a sign-flip test over "
+    "epochs, ignores the animals and is secondary.",
     "A calibration verdict (rises, top_positive) needs at least 10 windows in "
     "the top and in the bottom probability bins, pooled over epochs, else it "
     "reads 'too few windows' ('too few epochs' when fewer than two epochs give "
@@ -779,7 +786,7 @@ def _error_bars(estimate: NDArray, lo: NDArray, hi: NDArray) -> list[NDArray]:
 
 
 def figure_calibration(bins: pd.DataFrame, path: Path) -> None:
-    """Epoch-median evidence by the state's probability, hierarchical 95 % CIs."""
+    """Epoch-level evidence by the state's probability, hierarchical 95 % CIs."""
     import matplotlib
 
     matplotlib.use("Agg")
@@ -800,11 +807,11 @@ def figure_calibration(bins: pd.DataFrame, path: Path) -> None:
                 .reindex(list(PROBABILITY_BIN_LABELS))
             )
             ok = (curve.n >= MIN_BIN_WINDOWS).to_numpy()
-            median = curve.epoch_median.to_numpy(dtype=float)[ok]
-            lo = curve.epoch_median_ci_lo.to_numpy(dtype=float)[ok]
-            hi = curve.epoch_median_ci_hi.to_numpy(dtype=float)[ok]
+            estimate = curve.epoch_estimate.to_numpy(dtype=float)[ok]
+            lo = curve.epoch_ci_lo.to_numpy(dtype=float)[ok]
+            hi = curve.epoch_ci_hi.to_numpy(dtype=float)[ok]
             ax.errorbar(
-                BIN_CENTERS[ok], median, yerr=_error_bars(median, lo, hi),
+                BIN_CENTERS[ok], estimate, yerr=_error_bars(estimate, lo, hi),
                 color=OKABE_ITO["bout"], marker="o", ms=3, lw=1.2, capsize=2,
             )  # fmt: skip
             ax.axhline(0, color="k", lw=0.6, ls="--")
@@ -819,7 +826,8 @@ def figure_calibration(bins: pd.DataFrame, path: Path) -> None:
                 ax.set_ylabel(f"{regime}\nheld-out evidence", fontsize=8)
     fig.suptitle(
         "Calibration: held-out evidence in random 20 ms windows against the state's "
-        "mean posterior\nMean over epochs of each epoch's bin median; 95 % hierarchical "
+        "mean posterior\nMean over epochs of each epoch's bin median (log-likelihood "
+        "ratios) or mean (shares); 95 % hierarchical "
         f"bootstrap CI (animals, then epochs); bins with < {MIN_BIN_WINDOWS} windows "
         "omitted",
         fontsize=9,
@@ -842,9 +850,9 @@ def figure_silence(silence: pd.DataFrame, path: Path) -> None:
         ]
         by_bin = by_bin.set_index("pbin").reindex(list(PROBABILITY_BIN_LABELS))
         ok = (by_bin.runs_S_silent >= 20).to_numpy()
-        y = by_bin.epoch_obs_given_S.to_numpy(dtype=float)[ok]
-        lo = by_bin.epoch_obs_given_S_ci_lo.to_numpy(dtype=float)[ok]
-        hi = by_bin.epoch_obs_given_S_ci_hi.to_numpy(dtype=float)[ok]
+        y = by_bin.obs_epoch_estimate.to_numpy(dtype=float)[ok]
+        lo = by_bin.obs_epoch_ci_lo.to_numpy(dtype=float)[ok]
+        hi = by_bin.obs_epoch_ci_hi.to_numpy(dtype=float)[ok]
         ax.errorbar(
             BIN_CENTERS[ok], y, yerr=_error_bars(y, lo, hi),
             color=OKABE_ITO["bout"], marker="o", ms=3.5, lw=1.2, capsize=2,
@@ -852,13 +860,13 @@ def figure_silence(silence: pd.DataFrame, path: Path) -> None:
         )  # fmt: skip
         for prefix, label in (("run", "running-only"), ("can", "canonical")):
             ax.plot(
-                BIN_CENTERS[ok], by_bin[f"epoch_pred_given_S_{prefix}"].to_numpy()[ok],
+                BIN_CENTERS[ok], by_bin[f"pred_{prefix}_epoch_estimate"].to_numpy()[ok],
                 color=OKABE_ITO[prefix], ls=":", lw=1.2,
                 label=f"local coding, {label}",
             )  # fmt: skip
         every = silence[(silence.regime == regime) & (silence.state == "all windows")]
         if len(every):
-            ax.axhline(every.epoch_obs_given_S.iloc[0], color="k", lw=0.8,
+            ax.axhline(every.obs_epoch_estimate.iloc[0], color="k", lw=0.8,
                        ls="--", label="all windows, observed")  # fmt: skip
             ax.axhline(every.obs_C_silent.iloc[0], color="0.5", lw=0.8, ls="-.",
                        label="all windows, P(C silent)")  # fmt: skip
@@ -958,10 +966,10 @@ def summarize(
     figure_calibration(summary["calibration"], output_dir / "fig_calibration.png")
     figure_silence(summary["silence"], output_dir / "fig_coordinated_silence.png")
     primary = summary["bouts"][summary["bouts"].primary]
-    shown = ["state", "regime", "metric", "n", "n_epochs", "epoch_median",
-             "epoch_median_ci_lo", "epoch_median_ci_hi", "p_epoch_median",
-             "epochs_pos", "animals_pos", "diff_epoch_median",
-             "p_diff_epoch_median", "epochs_above_base", "epoch_mean"]  # fmt: skip
+    shown = ["state", "regime", "metric", "n", "n_epochs", "epoch_summary",
+             "epoch_estimate", "epoch_ci_lo", "epoch_ci_hi", "p_animal_t",
+             "animals_pos", "epochs_pos", "diff_epoch_estimate", "diff_p_animal_t",
+             "diff_animals_pos"]  # fmt: skip
     print(primary[shown].to_string(index=False), flush=True)
 
 

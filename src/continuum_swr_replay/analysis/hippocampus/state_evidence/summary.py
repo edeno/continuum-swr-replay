@@ -1,31 +1,54 @@
 """Summary statistics of the per-window table, over epochs nested in animals.
 
-The epoch is the unit of inference: about 218 epochs nested in 5 animals,
-each holding hundreds to thousands of windows that are not independent.
+About 218 epochs are nested in 5 animals, and each epoch holds hundreds to
+thousands of windows that are not independent. Each epoch is reduced to one
+value, and the inference takes the animal as the unit of replication.
 
-- **Primary (inference).**
-  - Each epoch enters as one value: its median over windows
-    (:func:`epoch_summaries`) or, for a calibration curve, its own slope
-    (:func:`epoch_slopes`).
-  - CIs come from a hierarchical bootstrap (:func:`hierarchical_bootstrap_ci`)
-    of the mean of the epoch values: animals are resampled, then epochs within
-    each resampled animal (Saravanan, Berman & Sober 2020).
-  - Tests are two-sided sign-flip tests on the epoch values (:func:`sign_flip_p`).
-  - Consistency is reported as k of N epochs and k of A animals (an animal's
-    value is the mean of its epochs') with a value > 0.
-  - These columns carry ``epoch`` in their name, as do the calibration
-    verdicts ``rises`` and ``top_positive``.
-- **Why each epoch's median.** The per-window evidence is heavy-tailed. A burst
-  of spikes on most tetrodes scores far below zero: in one pilot chimi epoch,
-  three of 81 immobile No-Spike bouts (86 to 137 spikes on 19 to 22 tetrodes)
-  score -1641, -1407 and -1016 nats under the running-only encoding, so that
-  epoch's mean is -45 while its median is +5.4. A few windows drag an epoch's
-  mean; its median is the robust summary. The choice was made on the five
-  pilot (development) epochs, before the 218-epoch run that produces the
-  reported numbers.
-- **Secondary.** The same statistics of each epoch's *mean*: the columns named
-  ``mean`` where the primary ones say ``median``, and the counts ending
-  ``_mean``.
+- **Each epoch's value.**
+  - For an evidence metric, and for its paired bout - matched difference, its
+    median or its mean over windows by the kind of metric. The rule is set in
+    one place, :data:`EPOCH_SUMMARY` (read by :func:`epoch_summary_kind`):
+    - the **median** for the log-likelihood ratios: local, remote against the
+      animal or a mismatched location, local against S's best remote bin and
+      the No-Spike log-ratio, with their per-spike versions. They are
+      heavy-tailed: a burst of spikes on most tetrodes scores far below zero.
+      In one pilot chimi epoch three of 81 immobile No-Spike bouts (86 to 137
+      spikes on 19 to 22 tetrodes) score -1641, -1407 and -1016 nats under the
+      running-only encoding, so that epoch's mean is -45 while its median is
+      +5.4.
+    - the **mean** for expected counts, counts, shares and distances: E_C,
+      C's spike count, silent shares, MAP_S's distances and the
+      coordinated-silence counts. They are bounded and deterministic or nearly
+      so, and a median can sit on ties: a bout and its matched window at the
+      same position share E_C exactly.
+    - The other summary is reported as secondary. Both were chosen on the five
+      pilot (development) epochs, before the 218-epoch run that produces the
+      reported numbers.
+  - For a calibration curve, the epoch's own OLS slope (:func:`epoch_slopes`).
+  - For coordinated silence, the epoch's own ratio of sums of silent-run
+    counts.
+- **Primary inference**, respecting the animals:
+  - the hierarchical bootstrap 95 % CI of the mean of the epoch values
+    (:func:`hierarchical_bootstrap_ci`: animals, then epochs within each;
+    Saravanan, Berman & Sober 2020);
+  - a two-sided one-sample t-test of the animal summaries, each the mean of
+    the animal's epoch values, with A - 1 degrees of freedom
+    (:func:`animal_t_test`); with balanced data it is the intercept test of a
+    random-intercept model;
+  - k of A animals and k of N epochs with a value > 0.
+  - The CI's estimate weights each epoch equally, the t-test's each animal;
+    with balanced data they are equal.
+- **Secondary:** the sign-flip p over epochs (:func:`sign_flip_p`). It treats
+  the epochs as independent, so it ignores the animal grouping.
+- **Column scheme.** Every epoch-level inference is the same eight columns:
+  ``{p}epoch_estimate`` with its CI ``{p}epoch_ci_lo`` / ``{p}epoch_ci_hi``,
+  ``{p}animal_estimate`` with ``{p}p_animal_t``, ``{p}animals_pos``,
+  ``{p}epochs_pos`` and ``{p}p_epoch_signflip``. The prefix ``{p}`` says what
+  they describe: "" a bout metric, ``diff_`` its paired difference, ``other_``
+  (``other_diff_``) the same over the secondary epoch summary, ``slope_`` a
+  calibration curve, and ``excess_run_`` / ``excess_can_`` coordinated
+  silence's excess over local coding. ``epoch_summary`` names each row's
+  primary epoch summary. Calibration bins carry only the estimate and its CI.
 - **Descriptive.** Window-level counts, medians, quartiles, shares > 0 and
   means, pooled over epochs.
 - **Calibration verdicts need windows.** ``rises`` and ``top_positive`` say
@@ -52,6 +75,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
+from scipy.stats import t as student_t
 
 from continuum_swr_replay.analysis.hippocampus.state_evidence.windows import (
     REGIMES,
@@ -120,8 +144,43 @@ TOO_FEW_WINDOWS = "too few windows"
 TOO_FEW_EPOCHS = "too few epochs"
 """A calibration verdict that is neither "yes" nor "no", and why."""
 
-SUMMARIES = ("median", "mean")
-"""Each epoch's summary over its windows: primary, then secondary."""
+EPOCH_SUMMARY: Mapping[str, str] = {
+    **dict.fromkeys(
+        (
+            "loc_mark",
+            "loc_full",
+            "loc_vs_Sremote_mark",
+            "nl_anim_mark",
+            "nl_anim_full",
+            "nl_null_mark",
+            "nl_null_full",
+            "nlr_anim_mark",
+            "nlr_anim_full",
+            "ns_logratio",
+        ),
+        "median",
+    ),
+    **dict.fromkeys(
+        (
+            "ns_expected",
+            "ns_count",
+            "sel_count",
+            "ns_silent_frac",
+            "ns_pred_silent",
+            "cond_S_silent",
+            "cond_both_silent",
+            "cond_pred_C_silent",
+            "mapS_dist_cm",
+            "mapSr_dist_cm",
+        ),
+        "mean",
+    ),
+}
+"""Each evidence stem's epoch summary over windows: the median for the
+log-likelihood ratios, which are heavy-tailed, and the mean for the expected
+counts, counts, shares and distances, which are bounded (see the module notes).
+A stem is a column name without its encoding prefix (``run_``, ``can_``) or
+per-spike suffix (``_ps``); a paired difference follows its metric."""
 
 SUMMARY_SEED = 20261004
 
@@ -312,6 +371,31 @@ def epoch_summaries(values: NDArray, epochs: NDArray, animals: NDArray) -> pd.Da
     )
 
 
+def epoch_summary_kind(metric: str) -> str:
+    """The epoch summary a metric is inferred from: "median" or "mean".
+
+    Read from :data:`EPOCH_SUMMARY` by the metric's stem: its name without the
+    encoding prefix (``run_``, ``can_``) and the per-spike suffix (``_ps``).
+
+    Raises
+    ------
+    ValueError
+        No summary is set for the metric, so it is not to be summarized.
+    """
+    stem = metric.removesuffix("_ps")
+    for prefix in ENCODING_LABELS:
+        stem = stem.removeprefix(f"{prefix}_")
+    if stem not in EPOCH_SUMMARY:
+        raise ValueError(f"no epoch summary is set for {metric!r}")
+    return EPOCH_SUMMARY[stem]
+
+
+def _roles(metric: str) -> tuple[tuple[str, str], tuple[str, str]]:
+    """The metric's (column prefix, epoch summary) pairs: primary, then other."""
+    kind = epoch_summary_kind(metric)
+    return ("", kind), ("other_", "mean" if kind == "median" else "median")
+
+
 def epoch_slopes(
     p: NDArray, x: NDArray, epochs: NDArray, animals: NDArray
 ) -> pd.DataFrame:
@@ -408,6 +492,54 @@ def hierarchical_bootstrap_ci(
     return float(lo), float(hi)
 
 
+def _animal_summaries(values: NDArray, animals: NDArray) -> NDArray:
+    """Each animal's mean epoch value, by animal: shape (n_animals,)."""
+    by_animal: NDArray = (
+        pd.Series(values, dtype=float).groupby(animals, sort=True).mean().to_numpy()
+    )
+    return by_animal
+
+
+def _t_test(by_animal: NDArray) -> tuple[float, float]:
+    """The mean of the animal summaries and its two-sided t-test p (df = A - 1)."""
+    n = by_animal.size
+    if n == 0:
+        return float("nan"), float("nan")
+    estimate = float(by_animal.mean())
+    if n < 2:
+        return estimate, float("nan")
+    with np.errstate(divide="ignore", invalid="ignore"):
+        t = estimate / (by_animal.std(ddof=1) / np.sqrt(n))
+    return estimate, float(2 * student_t.sf(abs(t), df=n - 1))
+
+
+def animal_t_test(summaries: NDArray, animals: NDArray) -> tuple[float, float]:
+    """Two-sided one-sample t-test of the animal summaries against 0.
+
+    Each animal enters once, as the mean of its epochs' summaries, however
+    many epochs it has (one is enough). With A animals the test has A - 1
+    degrees of freedom; with balanced data it is the intercept test of a
+    random-intercept model of epochs within animals.
+
+    Parameters
+    ----------
+    summaries : ndarray, shape (n_epochs,)
+        One value per epoch; non-finite ones are dropped.
+    animals : ndarray, shape (n_epochs,)
+        Each epoch's animal.
+
+    Returns
+    -------
+    estimate : float
+        The mean of the animal summaries; NaN without any.
+    p : float
+        NaN with fewer than two animals.
+    """
+    values = np.asarray(summaries, dtype=float)
+    finite = np.isfinite(values)
+    return _t_test(_animal_summaries(values[finite], np.asarray(animals)[finite]))
+
+
 def _epoch_statistics(
     summaries: pd.Series | NDArray,
     animals: pd.Series | NDArray,
@@ -416,27 +548,36 @@ def _epoch_statistics(
     n_flips: int,
     seed: Seed,
 ) -> dict[str, Any]:
-    """The primary statistics of per-epoch values.
+    """The epoch-level inference on per-epoch values, keyed by column name.
 
-    Returns their mean (``mean``), its hierarchical CI (``ci_lo``, ``ci_hi``),
-    the sign-flip p over the epochs (``p``), and how many epochs and animals
-    (an animal's value is the mean of its epochs') are > 0 (``epochs``,
-    ``animals``, as "k/N").
+    ``epoch_estimate`` (their mean) with its hierarchical CI ``epoch_ci_lo`` /
+    ``epoch_ci_hi``; ``animal_estimate`` and ``p_animal_t``
+    (:func:`animal_t_test`); ``animals_pos`` and ``epochs_pos`` ("k/A" and
+    "k/N" > 0); and the secondary ``p_epoch_signflip``. Non-finite values are
+    dropped.
     """
     values = np.asarray(summaries, dtype=float)
     animal = np.asarray(animals)
     finite = np.isfinite(values)
     values, animal = values[finite], animal[finite]
-    by_animal = pd.Series(values).groupby(animal).mean()
+    by_animal = _animal_summaries(values, animal)
+    animal_estimate, p_t = _t_test(by_animal)
     lo, hi = hierarchical_bootstrap_ci(values, animal, n_boot=n_boot, seed=seed)
     return {
-        "mean": float(values.mean()) if values.size else float("nan"),
-        "ci_lo": lo,
-        "ci_hi": hi,
-        "p": sign_flip_p(values, n_flips=n_flips, seed=seed),
-        "epochs": f"{int((values > 0).sum())}/{values.size}",
-        "animals": f"{int((by_animal > 0).sum())}/{by_animal.size}",
+        "epoch_estimate": float(values.mean()) if values.size else float("nan"),
+        "epoch_ci_lo": lo,
+        "epoch_ci_hi": hi,
+        "animal_estimate": animal_estimate,
+        "p_animal_t": p_t,
+        "animals_pos": f"{int((by_animal > 0).sum())}/{by_animal.size}",
+        "epochs_pos": f"{int((values > 0).sum())}/{values.size}",
+        "p_epoch_signflip": sign_flip_p(values, n_flips=n_flips, seed=seed),
     }
+
+
+def _prefixed(level: Mapping[str, Any], prefix: str) -> dict[str, Any]:
+    """:func:`_epoch_statistics` columns under ``prefix`` (the module notes)."""
+    return {f"{prefix}{name}": value for name, value in level.items()}
 
 
 def _summary_seed(seed: Seed, kind: str) -> Seed:
@@ -447,44 +588,6 @@ def _summary_seed(seed: Seed, kind: str) -> Seed:
     ``kind``.
     """
     return seed if kind == "mean" else _with_keys(seed, kind)
-
-
-def _level_columns(
-    values: NDArray,
-    epochs: NDArray,
-    animals: NDArray,
-    *,
-    prefix: str,
-    counts: str,
-    n_boot: int,
-    n_flips: int,
-    seed: Seed,
-) -> dict[str, Any]:
-    """The epoch-level columns of ``values``, over each epoch's median and mean.
-
-    For the median (primary): ``{prefix}epoch_median``, its CI
-    ``{prefix}epoch_median_ci_lo`` / ``_ci_hi``, ``p_{prefix}epoch_median``,
-    and ``epochs_{counts}`` / ``animals_{counts}``. For the mean (secondary):
-    the same with ``mean`` for ``median``, the counts ending ``_mean``.
-    """
-    summaries = epoch_summaries(values, epochs, animals)
-    columns: dict[str, Any] = {}
-    for kind in SUMMARIES:
-        level = _epoch_statistics(
-            summaries[kind],
-            summaries["animal"],
-            n_boot=n_boot,
-            n_flips=n_flips,
-            seed=_summary_seed(seed, kind),
-        )
-        tail = "" if kind == "median" else f"_{kind}"
-        columns[f"{prefix}epoch_{kind}"] = level["mean"]
-        columns[f"{prefix}epoch_{kind}_ci_lo"] = level["ci_lo"]
-        columns[f"{prefix}epoch_{kind}_ci_hi"] = level["ci_hi"]
-        columns[f"p_{prefix}epoch_{kind}"] = level["p"]
-        columns[f"epochs_{counts}{tail}"] = level["epochs"]
-        columns[f"animals_{counts}{tail}"] = level["animals"]
-    return columns
 
 
 def _verdict(enough: bool, holds: bool) -> str:
@@ -516,22 +619,12 @@ def bout_statistics(
 ) -> pd.DataFrame:
     """Bouts against their matched windows, per state x regime x metric.
 
-    - **Primary, epoch level, over each epoch's median** (see the module notes):
-      - ``epoch_median``: the mean over epochs of each epoch's median.
-      - ``epoch_median_ci_lo`` / ``epoch_median_ci_hi``: its hierarchical
-        bootstrap CI.
-      - ``p_epoch_median``: the sign-flip p over the epoch medians.
-      - ``epochs_pos`` / ``animals_pos``: k of N epochs and k of A animals
-        with a median > 0.
-      - The paired bout - baseline difference, each epoch entering as the
-        median of its bouts' paired differences: ``diff_epoch_median``,
-        ``diff_epoch_median_ci_lo`` / ``_ci_hi``, ``p_diff_epoch_median``,
-        ``epochs_above_base`` and ``animals_above_base``.
-    - **Secondary, epoch level, over each epoch's mean:** ``epoch_mean``,
-      ``epoch_mean_ci_lo`` / ``_ci_hi``, ``p_epoch_mean``, ``epochs_pos_mean``
-      and ``animals_pos_mean``, and for the difference ``diff_epoch_mean``,
-      ``diff_epoch_mean_ci_lo`` / ``_ci_hi``, ``p_diff_epoch_mean``,
-      ``epochs_above_base_mean`` and ``animals_above_base_mean``.
+    - **Epoch level** (the module's column scheme): ``epoch_summary`` is the
+      metric's epoch summary (:func:`epoch_summary_kind`), and each epoch
+      enters as that summary of its bouts' values (no prefix) and of its
+      bouts' paired differences (``diff_``). The same statistics over the
+      other epoch summary are secondary (``other_``, ``other_diff_``).
+      ``p_epoch_signflip`` is secondary in each set.
     - **Descriptive**, windows pooled over epochs:
       - ``n``, ``n_found``, ``n_epochs`` and ``n_animals``;
       - ``median``, ``q25``, ``q75``, ``frac_pos`` and ``mean``, and the same
@@ -592,6 +685,7 @@ def bout_statistics(
                     "regime": regime,
                     "metric": metric,
                     "primary": metric in PRIMARY_METRICS.get(state, ()),
+                    "epoch_summary": epoch_summary_kind(metric),
                     "n": len(cell),
                     "n_found": n_found,
                     "n_epochs": int(cell.epoch_id.nunique()),
@@ -604,22 +698,27 @@ def bout_statistics(
                 xb = cell[f"{metric}_base"].to_numpy(dtype=float)
                 diff = x - xb
                 row.update(_describe(x))
-                row.update(
-                    _level_columns(
-                        x, epochs, animals, prefix="", counts="pos",
-                        n_boot=n_boot, n_flips=n_flips,
-                        seed=_with_keys(seed, *key, "epoch"),
-                    )
-                )  # fmt: skip
                 row.update(_describe(xb, prefix="base_"))
                 row["diff_mean"] = _describe(diff)["mean"]
-                row.update(
-                    _level_columns(
-                        diff, epochs, animals, prefix="diff_", counts="above_base",
-                        n_boot=n_boot, n_flips=n_flips,
-                        seed=_with_keys(seed, *key, "diff", "epoch"),
-                    )
-                )  # fmt: skip
+                quantities = {
+                    "": (epoch_summaries(x, epochs, animals), ("epoch",)),
+                    "diff_": (
+                        epoch_summaries(diff, epochs, animals),
+                        ("diff", "epoch"),
+                    ),
+                }
+                for role, which in _roles(metric):
+                    for quantity, (summaries, seed_keys) in quantities.items():
+                        level = _epoch_statistics(
+                            summaries[which],
+                            summaries["animal"],
+                            n_boot=n_boot,
+                            n_flips=n_flips,
+                            seed=_summary_seed(
+                                _with_keys(seed, *key, *seed_keys), which
+                            ),
+                        )
+                        row.update(_prefixed(level, f"{role}{quantity}"))
                 if window_level:
                     row["p_signflip_window_level"] = sign_flip_p(
                         x, n_flips=n_flips, seed=_with_keys(seed, *key)
@@ -674,22 +773,24 @@ def calibration_statistics(
     ..., 0.8-1.0).
 
     - **Primary, epoch level:**
-      - A bin's ``epoch_median`` is the mean over epochs of each epoch's median
-        in the bin, with its hierarchical CI ``epoch_median_ci_lo`` /
-        ``epoch_median_ci_hi``.
-      - A curve's ``epoch_slope`` is the mean of the epochs' own OLS slopes
-        (:func:`epoch_slopes`, which takes only epochs with two bins of
-        :data:`MIN_BIN_WINDOWS` windows), with its hierarchical CI, the
-        sign-flip ``p_epoch_slope`` and ``epochs_rising`` / ``animals_rising``.
+      - A bin's ``epoch_estimate`` is the mean over epochs of each epoch's
+        summary in the bin (``epoch_summary``, :func:`epoch_summary_kind`),
+        with its hierarchical CI ``epoch_ci_lo`` / ``epoch_ci_hi``.
+      - A curve's slope is each epoch's own OLS slope (:func:`epoch_slopes`,
+        which takes only epochs with two bins of :data:`MIN_BIN_WINDOWS`
+        windows), inferred under the prefix ``slope_`` (the module's column
+        scheme).
       - The verdicts need the top and the bottom bins to hold at least
         :data:`MIN_BIN_WINDOWS` windows each, pooled (``n_top``,
         ``n_bottom``); otherwise they read :data:`TOO_FEW_WINDOWS`, and
         :data:`TOO_FEW_EPOCHS` when fewer than two epochs give the CI.
-      - ``rises`` is "yes" when the epoch slope's CI lies above 0, else "no".
-      - ``top_positive`` is "yes" when the top bin's ``epoch_median`` CI
-        (``top_epoch_median_ci_lo``) lies above 0, else "no".
-    - **Secondary, over each epoch's mean:** a bin's ``epoch_mean`` with
-      ``epoch_mean_ci_lo`` / ``epoch_mean_ci_hi``; a curve's ``top_epoch_mean``.
+      - ``rises`` is "yes" when the slope's CI lies above 0, else "no".
+      - ``top_positive`` is "yes" when the top bin's CI (``top_epoch_ci_lo``)
+        lies above 0, else "no".
+    - **Secondary, over the other epoch summary:** a bin's
+      ``other_epoch_estimate`` with ``other_epoch_ci_lo`` /
+      ``other_epoch_ci_hi``; a curve's ``top_other_epoch_estimate``; and
+      ``slope_p_epoch_signflip``.
     - **Descriptive:** a bin's ``n``, ``n_epochs``, pooled ``mean``,
       ``median`` and ``frac_pos``; a curve's ``n``, ``top_mean`` and
       ``top_minus_bottom``.
@@ -732,6 +833,7 @@ def calibration_statistics(
                 labels=PROBABILITY_BIN_LABELS,
             ).to_numpy()
             for metric in state_metrics:
+                roles = _roles(metric)
                 x = cell[metric].to_numpy(dtype=float)
                 curve = []
                 for name in PROBABILITY_BIN_LABELS:
@@ -741,6 +843,7 @@ def calibration_statistics(
                         "state": state,
                         "metric": metric,
                         "pbin": name,
+                        "epoch_summary": roles[0][1],
                         "n": int(m.sum()),
                         "n_epochs": int(np.unique(epochs[m]).size),
                     }
@@ -761,22 +864,20 @@ def calibration_statistics(
                                 seed=_with_keys(seed, regime, state, metric, name),
                             )
                     summaries = epoch_summaries(x[m], epochs[m], animals[m])
-                    for kind in SUMMARIES:
-                        values = summaries[kind]
-                        row[f"epoch_{kind}"] = (
+                    bin_seed = _with_keys(seed, regime, state, metric, name, "epoch")
+                    for role, which in roles:
+                        values = summaries[which]
+                        row[f"{role}epoch_estimate"] = (
                             float(values.mean()) if len(values) else float("nan")
                         )
                         (
-                            row[f"epoch_{kind}_ci_lo"],
-                            row[f"epoch_{kind}_ci_hi"],
+                            row[f"{role}epoch_ci_lo"],
+                            row[f"{role}epoch_ci_hi"],
                         ) = hierarchical_bootstrap_ci(
                             values,
                             summaries["animal"],
                             n_boot=n_boot,
-                            seed=_summary_seed(
-                                _with_keys(seed, regime, state, metric, name, "epoch"),
-                                kind,
-                            ),
+                            seed=_summary_seed(bin_seed, which),
                         )
                     curve.append(row)
                 bins += curve
@@ -794,21 +895,17 @@ def calibration_statistics(
                     "regime": regime,
                     "state": state,
                     "metric": metric,
+                    "epoch_summary": roles[0][1],
                     "n": int(np.isfinite(x).sum()),
                     "n_bottom": bottom["n"],
                     "n_top": top["n"],
                     "n_epochs": len(slopes),
-                    "epoch_slope": level["mean"],
-                    "epoch_slope_ci_lo": level["ci_lo"],
-                    "epoch_slope_ci_hi": level["ci_hi"],
-                    "p_epoch_slope": level["p"],
-                    "epochs_rising": level["epochs"],
-                    "animals_rising": level["animals"],
-                    "rises": _epoch_verdict(enough, level["ci_lo"]),
-                    "top_epoch_median": top["epoch_median"],
-                    "top_epoch_median_ci_lo": top["epoch_median_ci_lo"],
-                    "top_positive": _epoch_verdict(enough, top["epoch_median_ci_lo"]),
-                    "top_epoch_mean": top["epoch_mean"],
+                    **_prefixed(level, "slope_"),
+                    "rises": _epoch_verdict(enough, level["epoch_ci_lo"]),
+                    "top_epoch_estimate": top["epoch_estimate"],
+                    "top_epoch_ci_lo": top["epoch_ci_lo"],
+                    "top_positive": _epoch_verdict(enough, top["epoch_ci_lo"]),
+                    "top_other_epoch_estimate": top["other_epoch_estimate"],
                     "top_mean": top.get("mean", np.nan),
                     "top_minus_bottom": (
                         top["mean"] - bottom["mean"] if enough else np.nan
@@ -895,15 +992,14 @@ def coordinated_silence(
     either encoding.
 
     - **Primary, epoch level.** Each epoch's observed ratio and local coding's
-      predicted ratio are ratios of the epoch's own sums of silent-run counts
-      (no per-window evidence, so no median).
-      - ``epoch_obs_given_S`` is the observed ratios' mean over epochs, with
-        its hierarchical CI ``epoch_obs_given_S_ci_lo`` / ``_ci_hi``.
-      - ``epoch_pred_given_S_run`` / ``_can`` are the predictions' means.
-      - ``epoch_excess_run`` / ``_can`` is the mean of each epoch's observed -
-        predicted. It comes with its hierarchical CI, the sign-flip
-        ``p_epoch_excess_*``, and ``epochs_above_pred_*`` /
-        ``animals_above_pred_*``.
+      predicted ratio are ratios of the epoch's own sums of silent-run counts:
+      counts, so a mean-type summary (:data:`EPOCH_SUMMARY`).
+      - ``obs_epoch_estimate`` is the observed ratios' mean over epochs, with
+        its hierarchical CI ``obs_epoch_ci_lo`` / ``obs_epoch_ci_hi``.
+      - ``pred_run_epoch_estimate`` / ``pred_can_epoch_estimate`` are the
+        predictions' means.
+      - Each epoch's observed - predicted is inferred under the prefixes
+        ``excess_run_`` and ``excess_can_`` (the module's column scheme).
     - **Descriptive:** pooled ratios of sums over windows and splits:
       ``obs_C_silent_given_S_silent``, ``pred_given_S_run`` / ``_can``,
       ``obs_C_silent``, ``pred_C_silent_run`` / ``_can``.
@@ -984,12 +1080,12 @@ def coordinated_silence(
                 n_flips=n_flips,
                 seed=_with_keys(seed, regime, kind, state, name, "epoch"),
             )
-            row["epoch_obs_given_S"] = level["mean"]
-            row["epoch_obs_given_S_ci_lo"] = level["ci_lo"]
-            row["epoch_obs_given_S_ci_hi"] = level["ci_hi"]
+            row["obs_epoch_estimate"] = level["epoch_estimate"]
+            row["obs_epoch_ci_lo"] = level["epoch_ci_lo"]
+            row["obs_epoch_ci_hi"] = level["epoch_ci_hi"]
             for prefix in ENCODING_LABELS:
                 predicted = sums[prefix] / sums["silent"]
-                row[f"epoch_pred_given_S_{prefix}"] = float(predicted.mean())
+                row[f"pred_{prefix}_epoch_estimate"] = float(predicted.mean())
                 level = _epoch_statistics(
                     observed - predicted,
                     sums["animal"],
@@ -997,12 +1093,7 @@ def coordinated_silence(
                     n_flips=n_flips,
                     seed=_with_keys(seed, regime, kind, state, name, prefix, "excess"),
                 )
-                row[f"epoch_excess_{prefix}"] = level["mean"]
-                row[f"epoch_excess_{prefix}_ci_lo"] = level["ci_lo"]
-                row[f"epoch_excess_{prefix}_ci_hi"] = level["ci_hi"]
-                row[f"p_epoch_excess_{prefix}"] = level["p"]
-                row[f"epochs_above_pred_{prefix}"] = level["epochs"]
-                row[f"animals_above_pred_{prefix}"] = level["animals"]
+                row.update(_prefixed(level, f"excess_{prefix}_"))
         rows.append(row)
     return pd.DataFrame(rows)
 

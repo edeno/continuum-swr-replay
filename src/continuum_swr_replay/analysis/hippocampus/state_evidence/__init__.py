@@ -73,17 +73,21 @@ What is and is not held out (properties, not defects)
 
 Inference (:mod:`.summary`)
 ---------------------------
-The epoch is the unit of inference: epochs are nested in animals, and an
-epoch's windows are not independent.
+Epochs are nested in animals, and an epoch's windows are not independent:
+each epoch enters as one value, and the animal is the unit of replication.
 
-- Each epoch enters as its median over windows (its own slope, for a
-  calibration curve). The per-window evidence is heavy-tailed, and a few
-  artifact bursts drag an epoch's mean; the statistics of each epoch's mean
-  are reported as secondary.
+- An epoch's value is its median over windows for the log-likelihood ratios,
+  which are heavy-tailed (in one pilot chimi epoch three spike bursts score
+  -1641, -1407 and -1016 nats), and its mean for expected counts, counts,
+  shares and distances, which are bounded. The rule is set in one place,
+  ``EPOCH_SUMMARY``; the other summary is reported as secondary. A calibration
+  curve's value is the epoch's own slope.
 - CIs are hierarchical bootstrap CIs, resampling animals and then epochs within
   each animal (Saravanan, Berman & Sober 2020).
-- Tests are sign-flip tests on the epoch medians. Each comes with k of N
-  epochs and k of A animals.
+- The test is a t-test of the animal summaries (each the mean of the animal's
+  epoch values) with A - 1 degrees of freedom, with k of A animals and k of N
+  epochs. The sign-flip p over epochs, which ignores the animals, is
+  secondary.
 - A calibration verdict needs at least 10 windows in the top and in the
   bottom probability bins, pooled; otherwise it reads "too few windows".
 - Window-level statistics are descriptive. The ``_window_level`` CIs and
@@ -101,15 +105,18 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.evidence import (
 from continuum_swr_replay.analysis.hippocampus.state_evidence.summary import (
     CALIBRATION_METRICS,
     ENCODING_LABELS,
+    EPOCH_SUMMARY,
     MIN_BIN_WINDOWS,
     PRIMARY_METRICS,
     PROBABILITY_BIN_LABELS,
     SECONDARY_METRICS,
+    animal_t_test,
     bout_statistics,
     calibration_statistics,
     coordinated_silence,
     epoch_slopes,
     epoch_summaries,
+    epoch_summary_kind,
     hierarchical_bootstrap_ci,
     ols_slope_ci,
     rate_calibration,
@@ -146,6 +153,7 @@ __all__ = [
     "CALIBRATION_METRICS",
     "ENCODING_KEY",
     "ENCODING_LABELS",
+    "EPOCH_SUMMARY",
     "MIN_BIN_WINDOWS",
     "PRIMARY_METRICS",
     "PROBABILITY_BIN_LABELS",
@@ -153,6 +161,7 @@ __all__ = [
     "SECONDARY_METRICS",
     "STATES",
     "TetrodeTerms",
+    "animal_t_test",
     "bout_statistics",
     "build_windows",
     "calibration_statistics",
@@ -161,6 +170,7 @@ __all__ = [
     "encoding_inputs",
     "epoch_slopes",
     "epoch_summaries",
+    "epoch_summary_kind",
     "event_likelihood",
     "hierarchical_bootstrap_ci",
     "interior_bin_mask",
