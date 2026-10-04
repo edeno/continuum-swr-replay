@@ -148,9 +148,9 @@ in `.claude/research/refresh_ablation/ablation_report.md` ("Ablation 5", "Ablati
   (P10-B, P30-B and P100-B on the five epochs). The final E-step, stored after the last
   M-step, fell slightly in three of them: P30-B senor −126, P10-B j16 −28 and P10-B wilbur
   −104 nats, on totals of 5 to 11 million.
-- **No takeover.** This was checked for P10-B, P30-B and P100-B with a scratch script
-  (`nonlocal_takeover.py`, not in the repository). Values below are in that order, with
-  April's settings for comparison.
+- **No takeover.** This was checked for P10-B, P30-B and P100-B with
+  `.claude/research/refresh_validation/nonlocal_takeover.py`. Values below are in that order,
+  with April's settings for comparison.
   - **Immobile bouts ≥ 1 s:** 612 per setting. Of these, 8 / 8 / 8 are ≥ 50 % confidently
     non-local (P(non-local) > 0.8), and 3 / 3 / 3 are ≥ 90 %. April's settings: 13 and 5.
   - **Running bouts ≥ 1 s:** 1,002. Of these, 8 / 8 / 8 are ≥ 50 % non-local, and one in

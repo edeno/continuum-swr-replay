@@ -64,7 +64,8 @@ Dates written `YYYYMMDD` in paths below are the day that stage runs.
 ## What the re-decode changes
 
 Measured on 2026-10-03 from `chimi20200225_02_r1_HPC_detector.pkl`, the git history since
-`0820d39d`, and `load_data` on three sessions.
+`0820d39d`, and `load_data` on three sessions. The three discrete-transition rows were
+updated on 2026-10-04 for R10.
 
 | Input | April (`0820d39d`) | Now |
 |---|---|---|
@@ -73,9 +74,9 @@ Measured on 2026-10-03 from `chimi20200225_02_r1_HPC_detector.pkl`, the git hist
 | Position | untrimmed DLC grid | trimmed to the valid interval (`e5a0def`); up to about 76 s shorter at an epoch's end |
 | `non_local_detector` | `5e3a086` | `2d730c3` |
 | Local state | exact position | Gaussian, `local_position_std` 2.5 cm (`ded292e`) |
-| Local and No-Spike stickiness | 1e6 | 1e5 |
-| Non-Local Continuous self-transition prior | 0.98 | 0.96 |
-| No-Spike transition row during fitting | updated | frozen |
+| Local and No-Spike stickiness | 1e6 | pinned (R10). Local 44,960 and non-local 1,460 (each row's prior mean equals its start row; 30 visits per state). The No-Spike row is frozen, so its stickiness is unused. The library's 1e5 is not used |
+| Non-Local Continuous self-transition prior | 0.98 | 0.98, a 100 ms stay, pinned (R10); the same for Non-Local Fragmented |
+| No-Spike transition row during fitting | updated | frozen at [0.0192, 0.98, 0.0004, 0.0004] (R10) |
 | `results.nc` contents | posterior | posterior and the per-bin `log_likelihood` (added 2026-06-26) |
 | `ripple_detection` | 1.7.0 | `68e1784`: the changelog's 2.0.0 (2026-09-22), never tagged, so `git describe` gives `v1.7.1-365-g68e1784` |
 | Non-local event minimum duration (`segment_boolean_series`) | the last bin minus the first is at least 15 ms, so 9 bins at 500 Hz | at least `round(0.015 / step)` samples, so 7 bins at our grids (R9). The changelog marks it breaking; on the pilot epochs it adds 1.7% |
