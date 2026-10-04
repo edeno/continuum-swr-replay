@@ -327,6 +327,8 @@ def run_batch(
         the NonLocal or ContFrag script).
     args : Namespace
         Parsed CLI arguments (must have common args from ``add_common_args``).
+        ``args.save_dir`` reaches ``run_decode_fn`` resolved against this
+        process's working directory, since a dask worker need not share it.
     extra_kwargs : dict, optional
         Additional keyword arguments to pass to ``run_decode_fn`` beyond
         the common ones.
@@ -346,6 +348,10 @@ def run_batch(
 
     if extra_kwargs is None:
         extra_kwargs = {}
+
+    # Resolved once, here, before any worker sees it: a relative --save_dir
+    # would otherwise be read against each worker's working directory.
+    save_dir = Path(args.save_dir).resolve()
 
     os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.99"
 
@@ -376,7 +382,7 @@ def run_batch(
                 brain_area=args.brain_area,
                 non_stationary=args.non_stationary,
                 ripple_detector_name=args.ripple_detector_name,
-                save_dir=args.save_dir,
+                save_dir=save_dir,
                 **extra_kwargs,
             )
             for epoch in epoch_info.itertuples()

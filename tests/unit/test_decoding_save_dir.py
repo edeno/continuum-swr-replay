@@ -459,6 +459,55 @@ def test_run_batch_passes_save_dir(
     assert (scratch / "dask-scratch-space").is_dir()
 
 
+class _Client:
+    """Stands in for ``dask.distributed.Client``: it connects to nothing."""
+
+    def __init__(self, cluster: object) -> None:
+        pass
+
+    def __enter__(self) -> _Client:
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        return None
+
+
+def test_run_batch_resolves_a_relative_save_dir(monkeypatch, tmp_path):
+    """A relative ``--save_dir`` reaches each epoch's decode as an absolute path.
+
+    A dask worker need not share the driver's working directory, so the
+    folder is resolved before any task is built. The cluster, the client and
+    dask itself are stand-ins: each epoch's call runs here, as it is built.
+    """
+    calls: list[dict[str, Any]] = []
+    monkeypatch.setattr(decoding_common, "HAS_CUDA", False)
+    monkeypatch.setattr(decoding_common, "LocalCluster", lambda **kwargs: object())
+    monkeypatch.setattr(decoding_common, "LocalCUDACluster", _no_cluster, raising=False)
+    monkeypatch.setattr(decoding_common, "Client", _Client)
+    monkeypatch.setattr(
+        decoding_common,
+        "dask",
+        types.SimpleNamespace(
+            delayed=lambda function: function, compute=lambda *outcomes: outcomes
+        ),
+    )
+    monkeypatch.setattr(decoding_common, "get_epoch_info", _one_epoch)
+    # run_batch sets this variable and makes logs/ in the working directory;
+    # monkeypatch restores both after the test.
+    monkeypatch.setenv("XLA_PYTHON_CLIENT_MEM_FRACTION", "0.99")
+    monkeypatch.chdir(tmp_path)
+    args = _parse(
+        ["--allow_cpu", "--save_dir", "staging", "--local_scratch_dir", "scratch"]
+    )
+
+    decoding_common.run_batch(lambda **kwargs: calls.append(kwargs), args)
+
+    (kwargs,) = calls
+    assert kwargs["save_dir"].is_absolute()
+    assert kwargs["save_dir"] == (tmp_path / "staging").resolve()
+    assert kwargs["epoch_name"] == EPOCH_NAME
+
+
 # --------------------------------------------------------------------------
 # The loaders
 # --------------------------------------------------------------------------
