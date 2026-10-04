@@ -40,8 +40,15 @@ the running-only encoding fit on every running bin and ``can_*`` for the
 canonical one; ``cv_fold`` and ``cv_insample_share``) and
 ``per_epoch/{epoch}_validation.json``. An epoch whose decode files are
 missing is recorded as skipped with that reason; one that fails a check, or
-any step, as failed with its error, and the rest run. A rerun reuses an
-epoch already written with the same settings unless ``--overwrite``.
+any step, as failed with its error, and the rest run. Each epoch's record
+holds the code's commit and dirty flag and every decode file's path, size and
+``mtime_ns``. A rerun reuses an epoch only when all of them match, the run
+settings match and neither tree has uncommitted changes (``reuse_reason``);
+otherwise, or with ``--overwrite``, it recomputes it and logs why.
+
+Without ``--epochs`` the epochs are every ``*_HPC`` epoch with a canonical
+decode file in ``--decode-dir`` (``canonical_epochs``); coverage against the
+canonical epoch list is the audit's job, not this script's.
 
 Then, over every epoch written: ``bout_stats.csv``, ``calibration_stats.csv``,
 ``trend_stats.csv``, ``rate_calibration.csv`` and ``silence_stats.csv``
@@ -203,6 +210,56 @@ def decode_files(epoch_id: str, decode_dir: Path) -> dict[str, Path]:
         "detector": decode_dir / f"{epoch_id}_detector.pkl",
         "results": decode_dir / f"{epoch_id}_results.nc",
     }
+
+
+def decode_file_stats(epoch_id: str, decode_dir: Path) -> dict[str, dict]:
+    """Each present decode file's path, size and ``mtime_ns``, by file name."""
+    stats = {}
+    for name, path in decode_files(epoch_id, decode_dir).items():
+        if path.exists():
+            info = path.stat()
+            stats[name] = {
+                "path": str(path.resolve()),
+                "size": info.st_size,
+                "mtime_ns": info.st_mtime_ns,
+            }
+    return stats
+
+
+def code_version(provenance: dict) -> dict:
+    """A provenance record's commit and dirty flag."""
+    return {"commit": provenance["commit"], "dirty": bool(provenance["dirty"])}
+
+
+def reuse_reason(
+    previous: dict | None,
+    *,
+    settings: dict,
+    code: dict,
+    decode_stats: dict,
+    windows_written: bool,
+) -> str | None:
+    """Why an epoch written before must be recomputed, or None to reuse it.
+
+    It is reused only when its record is "ok" with its windows table present,
+    and its run settings, code commit and decode files (path, size and
+    ``mtime_ns``) all match this run's, with no uncommitted changes in either
+    tree (then the commit does not identify the code).
+    """
+    if previous is None:
+        return "not written before"
+    if previous.get("status") != "ok" or not windows_written:
+        return "no complete earlier output"
+    if previous.get("settings") != settings:
+        return "the run settings differ"
+    earlier = previous.get("code") or {}
+    if earlier.get("commit") != code["commit"]:
+        return f"code commit {str(earlier.get('commit'))[:9]} -> {code['commit'][:9]}"
+    if code["dirty"] or earlier.get("dirty", True):
+        return "uncommitted changes, so the commit does not identify the code"
+    if previous.get("decode_files") != decode_stats:
+        return "a decode file's path, size or mtime_ns differs"
+    return None
 
 
 def canonical_epochs(decode_dir: Path) -> list[str]:
@@ -724,6 +781,7 @@ def run_epoch(
     *,
     decode_dir: Path,
     output_dir: Path,
+    code: dict | None = None,
     load_inputs: Callable[[str], dict] = load_marks_and_training_mask,
     log: Callable[[str], None] = print,
 ) -> dict:
@@ -732,7 +790,13 @@ def run_epoch(
     ``status`` is ``"skipped"`` with ``reason`` when a decode file is missing,
     ``"failed"`` with ``error`` and ``traceback`` when any step or check fails
     (its outputs are then removed), else ``"ok"`` with the validation record.
+    Every record holds ``code`` (the commit and dirty flag; default this
+    work tree's) and ``decode_files`` (``decode_file_stats``, taken before the
+    files are read).
     """
+    if code is None:
+        code = code_version(provenance_record(ROOT_DIR))
+    stamp = {"code": code, "decode_files": decode_file_stats(epoch_id, decode_dir)}
     paths = output_paths(epoch_id, output_dir)
     missing = [name for name, path in decode_files(epoch_id, decode_dir).items()
                if not path.exists()]  # fmt: skip
@@ -742,13 +806,14 @@ def run_epoch(
         return {
             "status": "skipped",
             "reason": f"no {', '.join(missing)} in {decode_dir}",
+            **stamp,
         }
     started = clock.perf_counter()
     before = resource.getrusage(resource.RUSAGE_SELF)
     try:
         table, checks = epoch_table(epoch_id, decode_dir, load_inputs, log)
         write_table(table, paths["windows"])
-        record = {"status": "ok", "settings": run_settings(), **checks}
+        record = {"status": "ok", "settings": run_settings(), **stamp, **checks}
     except Exception as error:  # noqa: BLE001 - recorded; the run goes on
         for path in paths.values():
             path.unlink(missing_ok=True)
@@ -756,6 +821,7 @@ def run_epoch(
             "status": "failed",
             "error": repr(error),
             "traceback": traceback.format_exc(),
+            **stamp,
         }
     usage = resource.getrusage(resource.RUSAGE_SELF)
     record["wall_clock_s"] = clock.perf_counter() - started
@@ -1034,9 +1100,16 @@ def write_csv(table: pd.DataFrame, path: Path) -> None:
     write_atomically(path, write)
 
 
-def readme(records: dict[str, dict], settings: dict, provenance: dict) -> str:
+def readme(
+    records: dict[str, dict],
+    settings: dict,
+    provenance: dict,
+    discovery: dict,
+    recomputed: dict[str, str],
+) -> str:
     """The output folder's README: what was run, coverage and the caveats."""
     status = pd.Series({k: r["status"] for k, r in records.items()}, dtype=object)
+    reused = sorted(set(records) - set(recomputed))
     lines = [
         "# Held-out spike evidence per decoder state",
         "",
@@ -1044,9 +1117,16 @@ def readme(records: dict[str, dict], settings: dict, provenance: dict) -> str:
         f"{' (uncommitted changes)' if provenance['dirty'] else ''}. Method and "
         "column definitions: `continuum_swr_replay.analysis.hippocampus.state_evidence`.",
         "",
-        f"Epochs: {len(records)}; " + ", ".join(
+        f"Epochs: {discovery['rule']}; {discovery['n_epochs']} listed"
+        + (f", {discovery['n_with_all_files']} with all three decode files"
+           if "n_with_all_files" in discovery else "")
+        + f". {discovery['coverage']}",
+        "",
+        "Status: " + ", ".join(
             f"{k} {v}" for k, v in status.value_counts().sort_index().items()
-        ) + ".",
+        ) + f". Computed in this run: {len(recomputed)}; reused from an earlier "
+        f"run with the same commit, settings and decode files: {len(reused)}"
+        + (f" ({', '.join(reused)})" if reused else "") + ".",
         "",
     ]  # fmt: skip
     not_ok = {k: r for k, r in records.items() if r["status"] != "ok"}
@@ -1166,26 +1246,54 @@ def main(argv: list[str] | None = None) -> None:
     epochs = args.epochs or canonical_epochs(decode_dir)
     if not epochs:
         sys.exit(f"No HPC decodes in {decode_dir}.")
+    discovery: dict[str, Any] = {
+        "rule": (
+            "the epochs given with --epochs"
+            if args.epochs
+            else f"every *_HPC epoch with a canonical decode file in {decode_dir}"
+        ),
+        "n_epochs": len(epochs),
+        "coverage": "Coverage against the canonical epoch list is the audit's "
+        "job; this script does not check it.",
+    }
+    if not args.epochs:
+        discovery["n_with_all_files"] = sum(
+            all(path.exists() for path in decode_files(e, decode_dir).values())
+            for e in epochs
+        )
 
     provenance = provenance_record(ROOT_DIR)
+    code = code_version(provenance)
     settings = run_settings()
     output_dir.mkdir(parents=True, exist_ok=True)
     records: dict[str, dict] = {}
+    recomputed: dict[str, str] = {}
     to_run = []
     for epoch_id in epochs:
-        validation = output_paths(epoch_id, output_dir)["validation"]
-        previous = json.loads(validation.read_text()) if validation.exists() else None
-        reusable = (
-            previous is not None
-            and previous.get("settings") == settings
-            and previous["decode"]["decode_dir"] == str(decode_dir)
-            and output_paths(epoch_id, output_dir)["windows"].exists()
+        paths = output_paths(epoch_id, output_dir)
+        previous = (
+            json.loads(paths["validation"].read_text())
+            if paths["validation"].exists()
+            else None
         )
-        if reusable and not args.overwrite and previous is not None:
+        reason = (
+            "--overwrite"
+            if args.overwrite
+            else reuse_reason(
+                previous,
+                settings=settings,
+                code=code,
+                decode_stats=decode_file_stats(epoch_id, decode_dir),
+                windows_written=paths["windows"].exists(),
+            )
+        )
+        if reason is None and previous is not None:
             records[epoch_id] = previous
-            print(f"{epoch_id}: already written", flush=True)
+            print(f"{epoch_id}: reused (same commit, settings and decode files)")
         else:
+            recomputed[epoch_id] = str(reason)
             to_run.append(epoch_id)
+            print(f"{epoch_id}: to compute ({reason})", flush=True)
 
     def write_manifest() -> None:
         write_json(
@@ -1196,6 +1304,9 @@ def main(argv: list[str] | None = None) -> None:
                 "settings": settings,
                 "window_level_stats": args.window_level_stats,
                 "decode_dir": str(decode_dir),
+                "discovery": discovery,
+                "reused": sorted(set(records) - set(recomputed)),
+                "recomputed": dict(sorted(recomputed.items())),
                 "epochs": {k: records[k] for k in sorted(records)},
             },
         )
@@ -1205,7 +1316,7 @@ def main(argv: list[str] | None = None) -> None:
         f"logs in {output_dir / 'logs'}",
         flush=True,
     )
-    kwargs = {"decode_dir": decode_dir, "output_dir": output_dir}
+    kwargs = {"decode_dir": decode_dir, "output_dir": output_dir, "code": code}
     for number, (epoch_id, record) in enumerate(
         run_epochs(to_run, kwargs, args.n_workers), start=1
     ):
@@ -1225,7 +1336,9 @@ def main(argv: list[str] | None = None) -> None:
     write_manifest()
     ok = [k for k in sorted(records) if records[k]["status"] == "ok"]
     summarize(output_dir, ok, window_level=args.window_level_stats)
-    (output_dir / "README.md").write_text(readme(records, settings, provenance))
+    (output_dir / "README.md").write_text(
+        readme(records, settings, provenance, discovery, recomputed)
+    )
     failed = [k for k, r in records.items() if r["status"] == "failed"]
     if failed:
         sys.exit(f"{len(failed)} epochs failed: {', '.join(sorted(failed))}")

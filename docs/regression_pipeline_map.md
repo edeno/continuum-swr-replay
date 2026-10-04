@@ -716,7 +716,7 @@ Compute decoding quality metrics across all sessions.
 
 Held-out spike evidence for each decoder state, on every canonical HPC decode.
 
-`decode_files`, `canonical_epochs`, `load_marks_and_training_mask`, `stored_log_likelihood`, `encoding_comparison`, `refit_encoding`, `spikes_in_bins`, `relative_error`, `output_paths`, `write_json`, `epoch_table`, `running_only_masks`, `run_settings`, `run_epoch`, `run_epochs`, `figure_bouts`, `figure_calibration`, `figure_silence`, `write_csv`, `readme`, `summarize`, `build_parser`, `main`
+`decode_files`, `decode_file_stats`, `code_version`, `reuse_reason`, `canonical_epochs`, `load_marks_and_training_mask`, `stored_log_likelihood`, `encoding_comparison`, `refit_encoding`, `spikes_in_bins`, `relative_error`, `output_paths`, `write_json`, `epoch_table`, `running_only_masks`, `run_settings`, `run_epoch`, `run_epochs`, `figure_bouts`, `figure_calibration`, `figure_silence`, `write_csv`, `readme`, `summarize`, `build_parser`, `main`
 
 ### `scripts/qa/summarize_cohort_audits.py`
 
