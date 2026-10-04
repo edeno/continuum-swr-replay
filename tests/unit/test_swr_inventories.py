@@ -18,6 +18,7 @@ All signals are synthetic and seeded; nothing is read or written.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from functools import cache
 from types import MappingProxyType, SimpleNamespace
@@ -26,7 +27,11 @@ import numpy as np
 import pandas as pd
 import pytest
 from numpy.typing import NDArray
-from ripple_detection import Yu_ripple_detector, filter_ripple_band
+from ripple_detection import (
+    Yu_ripple_detector,
+    filter_ripple_band,
+    noise_threshold_diagnostics,
+)
 from ripple_detection.core import _contiguous_valid_blocks
 from ripple_detection.simulate import simulate_session, simulate_time
 from scipy.ndimage import uniform_filter1d
@@ -671,6 +676,10 @@ def test_detector_settings_are_pinned():
             "maximum_duration": None,
         },
     }
+    for settings in DETECTOR_SETTINGS.values():
+        assert isinstance(settings, MappingProxyType)
+    with pytest.raises(TypeError):
+        DETECTOR_SETTINGS["kay"]["zscore_threshold"] = 3.0
 
 
 def test_zugaro_keeps_150_ms_and_drops_longer():
@@ -810,7 +819,44 @@ def test_yu_diagnostics_match_the_detector():
         rel=1e-12,
     )
     assert len(diagnostics["counts"]) == len(diagnostics["histogram_edges"])
-    json.dumps(diagnostics)
+    json.dumps(diagnostics, allow_nan=False)
+
+
+def test_yu_diagnostics_write_a_non_finite_scalar_as_none(monkeypatch):
+    """An infinite ``flank_ratio`` (mean at or below the mode) comes back as None.
+
+    The dict then serializes as strict JSON.
+    """
+
+    def infinite_flank_ratio(*args, **kwargs):
+        diagnostics = noise_threshold_diagnostics(*args, **kwargs)
+        return dataclasses.replace(diagnostics, flank_ratio=np.inf)
+
+    monkeypatch.setattr(
+        swr_inventories, "noise_threshold_diagnostics", infinite_flank_ratio
+    )
+    epoch = _simulated_epoch((150, 175))
+
+    diagnostics = yu_diagnostics(epoch.time, epoch.band, epoch.speed, FS)
+
+    assert diagnostics["flank_ratio"] is None
+    assert np.isfinite(diagnostics["threshold_zscore"])
+    json.dumps(diagnostics, allow_nan=False)
+
+
+def test_yu_diagnostics_refuse_a_zscore_per_channel_they_do_not_follow(monkeypatch):
+    """With ``zscore_per_channel`` False the diagnostics raise rather than diverge.
+
+    The detector then estimates its threshold on the immobility-normalized
+    trace, not on the median of per-channel z-scores.
+    """
+    settings = dict(DETECTOR_SETTINGS)
+    settings["yu"] = {**DETECTOR_SETTINGS["yu"], "zscore_per_channel": False}
+    monkeypatch.setattr(swr_inventories, "DETECTOR_SETTINGS", settings)
+    epoch = _simulated_epoch((150, 175))
+
+    with pytest.raises(ValueError, match="zscore_per_channel"):
+        yu_diagnostics(epoch.time, epoch.band, epoch.speed, FS)
 
 
 # ---------------------------------------------------------------------------
@@ -940,6 +986,31 @@ def test_band_check_catches_a_permuted_channel_map(swapped_columns):
 
     assert tolerance == 1.0
     assert error > 100 * tolerance
+
+
+@pytest.mark.parametrize("n_shared", [5, 0], ids=["sliver", "none"])
+def test_band_check_refuses_a_partial_reproduction(n_shared):
+    """A re-filter missing stored timestamps raises, naming both counts.
+
+    The re-filter keeps only the stored band's first ``n_shared`` timestamps,
+    and every other stored row is off by 10,000 counts. Compared on shared
+    timestamps alone, the sliver would pass with an error of 0; with none
+    shared there would be nothing to compare.
+    """
+    inputs = _band_inputs("int16")
+    n_stored = len(inputs["time"])
+    inputs["ripple_band"][n_shared:] += 10_000
+
+    def partial_filter(*args):
+        filtered, timestamps = _fake_filter_data(*args)
+        kept = np.isin(timestamps, inputs["time"][:n_shared])
+        return filtered[kept], timestamps[kept]
+
+    with pytest.raises(
+        ValueError,
+        match=f"Only {n_shared} of the stored band's {n_stored} timestamps",
+    ):
+        band_reproduction_error(inputs, fir_filter=partial_filter)
 
 
 # ---------------------------------------------------------------------------
@@ -1072,3 +1143,31 @@ def test_kay_check_partner_is_the_longest_overlap():
     np.testing.assert_allclose(
         rows.end_shift_s[[d0, c0, c3]], [1.2 - 1.3, 1.2 - 1.05, 3.25 - 3.5]
     )
+
+
+@pytest.mark.parametrize(
+    "canonical_bounds",
+    [[(2.0, 2.1)], []],
+    ids=["disjoint", "no_canonical_events"],
+)
+def test_kay_check_partner_keys_stay_object_when_nothing_matches(canonical_bounds):
+    """With no match, ``partner_event_key`` is still object, every entry missing."""
+    direct = pd.DataFrame({"start_time": [1.0], "end_time": [1.1]})
+    canonical = pd.DataFrame(
+        canonical_bounds, columns=["start_time", "end_time"], dtype=float
+    )
+    speed_time = np.arange(3_000) / 1000.0
+
+    check = kay_version_check(
+        direct,
+        canonical,
+        session=KAY_CHECK_SESSION,
+        run_id="test",
+        speed_time_s=speed_time,
+        speed_cm_per_s=np.zeros_like(speed_time),
+    )
+
+    assert check.partner_event_key.dtype == object
+    assert check.partner_event_key.isna().all()
+    assert check.status.tolist() == ["added"] + ["missed"] * len(canonical_bounds)
+    assert check[["start_shift_s", "end_shift_s"]].isna().all().all()

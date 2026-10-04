@@ -514,39 +514,48 @@ def best_ripple_channel(
 
 DETECTOR_SETTINGS: Mapping[str, Mapping[str, object]] = MappingProxyType(
     {
-        "kay": {
-            "speed_threshold": 4.0,
-            "minimum_duration": 0.015,
-            "zscore_threshold": 2.0,
-            "smoothing_sigma": 0.004,
-            "close_ripple_threshold": 0.0,
-        },
-        "karlsson": {
-            "speed_threshold": 4.0,
-            "minimum_duration": 0.015,
-            "zscore_threshold": 3.0,
-            "smoothing_sigma": 0.004,
-            "close_ripple_threshold": 0.0,
-        },
-        "yu": {
-            "speed_threshold": 4.0,
-            "minimum_duration": 0.020,
-            "percentile": 99.99,
-            "smoothing_sigma": 0.004,
-            "close_ripple_threshold": 0.0,
-            "zscore_per_channel": True,
-        },
-        "zugaro": {
-            "speed_threshold": 4.0,
-            "low_threshold": 2.0,
-            "high_threshold": 5.0,
-            "minimum_inter_ripple_interval": 0.050,
-            "minimum_duration": 0.0,
-            "maximum_duration": None,
-        },
+        "kay": MappingProxyType(
+            {
+                "speed_threshold": 4.0,
+                "minimum_duration": 0.015,
+                "zscore_threshold": 2.0,
+                "smoothing_sigma": 0.004,
+                "close_ripple_threshold": 0.0,
+            }
+        ),
+        "karlsson": MappingProxyType(
+            {
+                "speed_threshold": 4.0,
+                "minimum_duration": 0.015,
+                "zscore_threshold": 3.0,
+                "smoothing_sigma": 0.004,
+                "close_ripple_threshold": 0.0,
+            }
+        ),
+        "yu": MappingProxyType(
+            {
+                "speed_threshold": 4.0,
+                "minimum_duration": 0.020,
+                "percentile": 99.99,
+                "smoothing_sigma": 0.004,
+                "close_ripple_threshold": 0.0,
+                "zscore_per_channel": True,
+            }
+        ),
+        "zugaro": MappingProxyType(
+            {
+                "speed_threshold": 4.0,
+                "low_threshold": 2.0,
+                "high_threshold": 5.0,
+                "minimum_inter_ripple_interval": 0.050,
+                "minimum_duration": 0.0,
+                "maximum_duration": None,
+            }
+        ),
     }
 )
-"""Each detector's keyword settings, from the design spec's Stage 3 table.
+"""Each detector's keyword settings, read-only at both levels, from the design
+spec's Stage 3 table.
 
 - Kay: Spyglass's canonical settings, equal to the package defaults.
 - Karlsson: the package defaults.
@@ -665,8 +674,10 @@ def yu_diagnostics(
     consensus over the detector's noise sample, the valid samples whose speed
     is at or below the speed threshold (an unknown speed is not), with the
     percentile. The threshold is converted to the detector's units with the
-    mean and standard deviation (ddof=0) of that same sample. Nothing depends
-    on the events, so an epoch with none still has its diagnostics.
+    mean and standard deviation (ddof=0) of that same sample. This is the
+    detector's ``zscore_per_channel=True`` path, the only one followed here.
+    Nothing depends on the events, so an epoch with none still has its
+    diagnostics.
 
     Parameters
     ----------
@@ -682,11 +693,12 @@ def yu_diagnostics(
     Returns
     -------
     diagnostics : dict
-        JSON-ready, in Python scalars and lists. Every field of
-        ``NoiseThresholdDiagnostics``: ``threshold`` (in the consensus
-        trace's units, the median of per-channel z-scored envelopes),
-        ``mode``, ``mode_index``, ``mean``, ``min``, ``flank_ratio`` (may be
-        infinite), ``histogram_edges``, ``counts``, ``smoothed_counts``,
+        Strict JSON-ready: Python scalars and lists, with None for a
+        non-finite scalar. Every field of ``NoiseThresholdDiagnostics``:
+        ``threshold`` (in the consensus trace's units, the median of
+        per-channel z-scored envelopes), ``mode``, ``mode_index``, ``mean``,
+        ``min``, ``flank_ratio`` (None when infinite, i.e. the mean is not
+        above the mode), ``histogram_edges``, ``counts``, ``smoothed_counts``,
         ``mirrored_positions``, ``mirrored_counts``, ``out_of_grid_fraction``,
         ``n_values`` and ``n_in_grid``. Then ``normalization_center`` and
         ``normalization_scale``, and ``threshold_zscore``, ``(threshold -
@@ -695,11 +707,21 @@ def yu_diagnostics(
     Raises
     ------
     ValueError
-        Where the detector cannot estimate its threshold either: no valid
-        sample at or below the speed threshold, or a noise histogram that
-        does not resolve the percentile.
+        If ``DETECTOR_SETTINGS["yu"]`` turns ``zscore_per_channel`` off, since
+        the detector then estimates on another trace. Also where the detector
+        cannot estimate its threshold either: no valid sample at or below the
+        speed threshold, or a noise histogram that does not resolve the
+        percentile.
     """
     settings: Mapping[str, Any] = DETECTOR_SETTINGS["yu"]
+    if not settings["zscore_per_channel"]:
+        msg = (
+            "yu_diagnostics follows Yu_ripple_detector's zscore_per_channel=True "
+            "path, which estimates the threshold on the median of per-channel "
+            f"z-scores; DETECTOR_SETTINGS['yu'] has zscore_per_channel="
+            f"{settings['zscore_per_channel']!r}."
+        )
+        raise ValueError(msg)
     time = np.asarray(time, dtype=float)
     band = np.asarray(ripple_band, dtype=float)
     speed = np.asarray(speed, dtype=float)
@@ -727,14 +749,22 @@ def yu_diagnostics(
     diagnostics = noise_threshold_diagnostics(noise, percentile=settings["percentile"])
     center = float(np.mean(noise))
     scale = float(np.std(noise))
-    return {
-        field.name: np.asarray(getattr(diagnostics, field.name)).tolist()
-        for field in fields(diagnostics)
+    record = {
+        field.name: getattr(diagnostics, field.name) for field in fields(diagnostics)
     } | {
         "normalization_center": center,
         "normalization_scale": scale,
         "threshold_zscore": (diagnostics.threshold - center) / scale,
     }
+    return {name: _json_ready(value) for name, value in record.items()}
+
+
+def _json_ready(value: object) -> object:
+    """``value`` in JSON types: an array as a list, a non-finite float as None."""
+    plain = np.asarray(value).tolist()
+    if isinstance(plain, float) and not math.isfinite(plain):
+        return None
+    return plain
 
 
 def band_reproduction_error(
@@ -767,11 +797,18 @@ def band_reproduction_error(
     -------
     max_abs_difference : float
         The largest ``|re-filtered - stored|`` over every channel and every
-        timestamp the two share, in the stored band's units. A timestamp held
-        by only one of the two is not compared.
+        stored timestamp, in the stored band's units. The re-filtered band
+        may hold timestamps the stored band lacks; those are not compared.
     tolerance : float
         1.0 for an integer band dtype, else 1e-6 times the stored band's
         standard deviation.
+
+    Raises
+    ------
+    ValueError
+        If the re-filtered band lacks any of the stored band's timestamps,
+        naming how many of them it holds: the re-filter must reproduce the
+        whole stored band, not a part of it.
     """
     if fir_filter is None:
         from spyglass.common import FirFilterParameters
@@ -791,6 +828,13 @@ def band_reproduction_error(
     _, refiltered_rows, stored_rows = np.intersect1d(
         np.asarray(refiltered_time), inputs["time"], return_indices=True
     )
+    n_stored = len(inputs["time"])
+    if stored_rows.size != n_stored:
+        msg = (
+            f"Only {stored_rows.size} of the stored band's {n_stored} timestamps "
+            "are in the re-filtered band, so it does not reproduce the whole band."
+        )
+        raise ValueError(msg)
     difference = refiltered[refiltered_rows] - stored[stored_rows]
     if np.issubdtype(np.dtype(inputs["ripple_band_dtype"]), np.integer):
         tolerance = 1.0
@@ -843,7 +887,8 @@ def kay_version_check(
         - ``event_key``: ``"<detector>:<animal><day>_<epoch>:<event id>"``,
           as ``inventory_from_intervals`` makes it;
         - ``status``: ``"matched"``, ``"added"`` or ``"missed"``;
-        - ``partner_event_key``: the partner's key; NaN unless matched;
+        - ``partner_event_key``: the partner's key, always of object dtype;
+          NaN unless matched;
         - ``start_shift_s``, ``end_shift_s``: the direct event's bound minus
           the canonical one's, over the event and its partner, so both rows
           of a mutual pair agree; NaN unless matched;
@@ -886,7 +931,8 @@ def kay_version_check(
     partners = longest.set_index("event_key")["partner_event_key"]
 
     check = events[["detector", "event_key", "whole_event_speed_eligible"]].copy()
-    check["partner_event_key"] = check["event_key"].map(partners)
+    # object even when nothing matches, where map alone would give float64 NaN
+    check["partner_event_key"] = check["event_key"].map(partners).astype(object)
     is_direct = (check["detector"] == _DIRECT_KAY).to_numpy()
     check["status"] = np.where(
         check["partner_event_key"].notna(),
