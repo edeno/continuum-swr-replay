@@ -215,6 +215,34 @@ def test_an_epoch_is_validated_and_written(simulated, tmp_path):
     assert "p_signflip_window_level" in pd.read_csv(output_dir / "bout_stats.csv")
 
 
+def test_the_runner_holds_jax_to_the_cpu(monkeypatch):
+    """Importing it sets the CPU whatever the environment said; run_epoch checks."""
+    import importlib
+
+    monkeypatch.setenv("JAX_PLATFORMS", "cuda")
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "0")
+    importlib.reload(runner)
+
+    assert os.environ["JAX_PLATFORMS"] == "cpu"
+    assert os.environ["CUDA_VISIBLE_DEVICES"] == ""
+    runner.require_cpu()
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "3")
+    with pytest.raises(RuntimeError, match="CPU only"):
+        runner.require_cpu()
+    with pytest.raises(RuntimeError, match="CPU only"):
+        runner.run_epoch(EPOCH, decode_dir=Path("."), output_dir=Path("."))
+
+
+def test_points_without_an_interval_get_no_bar():
+    estimate = np.array([1.0, 2.0, 3.0])
+    has, (below, above) = runner._error_bars(
+        estimate, np.array([0.5, np.nan, 2.0]), np.array([1.5, np.nan, 4.0])
+    )
+
+    assert has.tolist() == [True, False, True]
+    assert below.tolist() == [0.5, 1.0] and above.tolist() == [0.5, 1.0]
+
+
 def test_the_window_level_flag_is_off_by_default():
     parser = runner.build_parser()
 
@@ -417,6 +445,12 @@ def test_main_reuses_an_epoch_only_while_nothing_changed(
     assert "1 listed, 1 with all three decode files" in readme
     assert "Computed in this run: 1; reused" in readme
     assert (output_dir / "bout_stats.csv").exists()
+    # the No-Spike cost at the decoder's own rate
+    rate, bin_s = record["decode"]["no_spike_rate"], record["decode"]["bin_s"]
+    assert (
+        f"One spike costs {-np.log(rate * bin_s):.1f} nats (log({rate:g} Hz" in readme
+    )
+    assert "1e-10 Hz x 2 ms" not in "\n".join(runner.CAVEATS)
 
     # the same commit, settings and decode files: reused, not rewritten
     windows = runner.output_paths(EPOCH, output_dir)["windows"]

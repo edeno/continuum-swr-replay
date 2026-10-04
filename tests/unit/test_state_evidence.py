@@ -31,6 +31,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (
     STATES,
     TetrodeTerms,
     animal_t_test,
+    bout_animal_summaries,
     bout_statistics,
     build_windows,
     calibration_statistics,
@@ -1015,6 +1016,21 @@ def test_bout_statistics_infer_at_the_epoch_level():
     assert row["p_signflip_window_level"] == sign_flip_p(
         x, seed=(1, "Local", "immobile", "run_loc_mark")
     )
+
+
+def test_bout_animal_summaries_are_what_the_animal_level_inference_averages():
+    table, _, _ = bouts_of_six_epochs()
+    metrics = {"Local": ["run_loc_mark"]}
+
+    summaries = bout_animal_summaries(table, metrics=metrics)
+
+    assert summaries.animal.tolist() == ["aa", "bb", "cc"]
+    # each animal's mean of its two epochs' medians, and of their differences
+    assert summaries.value.to_numpy() == pytest.approx([1.5, 1.25, 2.25])
+    assert summaries["diff"].to_numpy() == pytest.approx([1.25, 1.25, -0.25])
+    row = bout_statistics(table, metrics=metrics, seed=(1,)).iloc[0]
+    assert row["animal_estimate"] == pytest.approx(summaries.value.mean())
+    assert row["diff_animal_estimate"] == pytest.approx(summaries["diff"].mean())
 
 
 def test_epoch_slopes_are_not_fooled_by_differences_between_epochs():

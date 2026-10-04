@@ -70,9 +70,11 @@ Usage:
 
 import os
 
-# a CPU job: it must never take a GPU from the decodes
-os.environ.setdefault("JAX_PLATFORMS", "cpu")
-os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
+# a CPU job: it must never take a GPU from the decodes. Set here, before any
+# JAX import, whatever the environment said; run_epoch checks it again
+# (require_cpu), in every worker.
+os.environ["JAX_PLATFORMS"] = "cpu"
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 import argparse  # noqa: E402
 import copy  # noqa: E402
@@ -102,6 +104,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: 
     PRIMARY_ENCODING,
     PROBABILITY_BIN_LABELS,
     STATES,
+    bout_animal_summaries,
     build_windows,
     encoding_inputs,
     event_likelihood,
@@ -110,6 +113,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: 
     keyed_rng,
     load_detector,
     nearest_interior_bins,
+    paired_bouts,
     parse_epoch_identifier,
     per_tetrode_terms,
     regimes,
@@ -167,10 +171,6 @@ CAVEATS = [
     "Run-averaged Local and No-Spike values (loc_*, ns_*) equal half the "
     "all-tetrode, in-sample values: no half chooses the animal's position, and "
     "each tetrode scores in exactly half of the 20 runs.",
-    "One spike costs about 29 nats under No-Spike (log(1e-10 Hz x 2 ms)), so a "
-    "confident No-Spike label forces both halves silent; only the size of E_C "
-    "(ns_expected) is informative in No-Spike bouts. The coordinated-silence "
-    "test over random windows is the only held-out No-Spike test.",
     "With few spikes, S's silence term pulls MAP_S toward low-rate bins, so "
     "MAP_S's distance from the animal (mapS_dist_cm) is not a Local test.",
     "Each epoch enters as one value (epoch_summary): its median over windows "
@@ -202,7 +202,63 @@ CAVEATS = [
 ]
 
 
+def caveats(records: dict[str, dict]) -> list[str]:
+    """:data:`CAVEATS`, and the No-Spike one at the decoders' own rate.
+
+    The rate and the bin come from the scored epochs' records
+    (``decode.no_spike_rate``, ``decode.bin_s``), each distinct pair listed.
+    """
+    pairs = sorted(
+        {
+            (
+                float(f"{r['decode']['no_spike_rate']:.6g}"),
+                round(r["decode"]["bin_s"], 9),
+            )
+            for r in records.values()
+            if r.get("status") == "ok"
+        }
+    )
+    if not pairs:
+        return [*CAVEATS, "No epoch was scored, so no No-Spike rate was read."]
+    costs = "; ".join(
+        f"{-np.log(rate * bin_s):.1f} nats (log({rate:g} Hz x {bin_s * 1e3:g} ms))"
+        for rate, bin_s in pairs
+    )
+    no_spike = (
+        f"One spike costs {costs} under No-Spike, at the decoders' own "
+        "no_spike_rate, so a confident No-Spike label forces both halves silent; "
+        "only the size of E_C (ns_expected) is informative in No-Spike bouts. The "
+        "coordinated-silence test over random windows is the only held-out "
+        "No-Spike test."
+    )
+    return [*CAVEATS, no_spike]
+
+
 # --- inputs ----------------------------------------------------------------------------
+def require_cpu() -> None:
+    """Refuse to compute unless JAX is held to the CPU.
+
+    Raises
+    ------
+    RuntimeError
+        ``JAX_PLATFORMS`` is not "cpu" or ``CUDA_VISIBLE_DEVICES`` is not
+        empty (the module sets both on import), or JAX's default backend is
+        not the CPU.
+    """
+    if (
+        os.environ.get("JAX_PLATFORMS") != "cpu"
+        or os.environ.get("CUDA_VISIBLE_DEVICES") != ""
+    ):
+        raise RuntimeError(
+            "this runner computes on the CPU only: JAX_PLATFORMS must be 'cpu' and "
+            "CUDA_VISIBLE_DEVICES empty"
+        )
+    import jax
+
+    if jax.default_backend() != "cpu":
+        raise RuntimeError(f"JAX's default backend is {jax.default_backend()!r}")
+
+
 def decode_files(epoch_id: str, decode_dir: Path) -> dict[str, Path]:
     """The canonical decode's three files for an epoch."""
     return {
@@ -794,6 +850,7 @@ def run_epoch(
     work tree's) and ``decode_files`` (``decode_file_stats``, taken before the
     files are read).
     """
+    require_cpu()
     if code is None:
         code = code_version(provenance_record(ROOT_DIR))
     stamp = {"code": code, "decode_files": decode_file_stats(epoch_id, decode_dir)}
@@ -933,62 +990,128 @@ CALIBRATION_FIGURE = [
 BIN_CENTERS = np.array([0.1, 0.3, 0.5, 0.7, 0.9])
 
 
-def figure_bouts(windows: pd.DataFrame, path: Path) -> None:
-    """Confident bouts against their matched windows, primary evidence."""
+def figure_bouts(windows: pd.DataFrame, bouts: pd.DataFrame, path: Path) -> None:
+    """Each state's primary evidence in its confident bouts, animal by animal.
+
+    Per state x regime, two columns: the bouts' values and their paired
+    differences from their matched windows. A dot is one animal's summary
+    (the mean of its epochs' medians or means, by metric); the diamond is the
+    mean over animals with its 95 % t-interval, hollow with no bar when there
+    is none; the faint bars are the windows' 5-95 % and 25-75 % ranges.
+
+    Parameters
+    ----------
+    windows : pd.DataFrame
+        The per-window table.
+    bouts : pd.DataFrame
+        :func:`bout_statistics` of it.
+    """
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
+    paired = paired_bouts(windows)
+    metrics: dict[str, list[str]] = {}
+    for state, metric, _ in BOUT_FIGURE:
+        metrics.setdefault(state, []).append(metric)
+    animals = bout_animal_summaries(windows, metrics=metrics)
     fig, axes = plt.subplots(
         2, len(BOUT_FIGURE), figsize=(2.4 * len(BOUT_FIGURE), 6.2), layout="constrained"
     )
     for i, regime in enumerate(("immobile", "running")):
         for j, (state, metric, title) in enumerate(BOUT_FIGURE):
             ax = axes[i, j]
-            data, labels = [], []
-            for kind in ("bout", "baseline"):
-                v = windows.loc[
-                    (windows.kind == kind)
-                    & (windows.state == state)
-                    & (windows.regime == regime),
-                    metric,
-                ].to_numpy(dtype=float)
-                v = v[np.isfinite(v)]
-                data.append(v if v.size else np.array([np.nan]))
-                labels.append(f"{kind}\nn={v.size}")
-            box = ax.boxplot(
-                data, widths=0.6, whis=(5, 95), showfliers=False, patch_artist=True,
-                showmeans=True, medianprops={"color": "k"},
-                meanprops={"marker": "D", "markersize": 3, "markerfacecolor": "white",
-                           "markeredgecolor": "k"},
-            )  # fmt: skip
-            for patch, kind in zip(box["boxes"], ("bout", "baseline"), strict=True):
-                patch.set_facecolor(OKABE_ITO[kind])
+            cell = paired[(paired.state == state) & (paired.regime == regime)]
+            value = cell[metric].to_numpy(dtype=float)
+            for x, values in ((0, value), (1, value - cell[f"{metric}_base"])):
+                finite = np.asarray(values, dtype=float)
+                finite = finite[np.isfinite(finite)]
+                if finite.size:
+                    q05, q25, q75, q95 = np.percentile(finite, [5, 25, 75, 95])
+                    ax.vlines(x, q05, q95, color="0.88", lw=1.5, zorder=0)
+                    ax.vlines(x, q25, q75, color="0.78", lw=7, zorder=0)
+            mine = animals[
+                (animals.state == state)
+                & (animals.regime == regime)
+                & (animals.metric == metric)
+            ]
+            for x, column in ((0, "value"), (1, "diff")):
+                ax.scatter(np.full(len(mine), x - 0.15), mine[column], s=12,
+                           color="k", zorder=2)  # fmt: skip
+            row = bouts[
+                (bouts.state == state)
+                & (bouts.regime == regime)
+                & (bouts.metric == metric)
+            ]
+            if len(row) and row.n.iloc[0] > 0:
+                r = row.iloc[0]
+                _plot_estimates(
+                    ax, np.array([0.15, 1.15]),
+                    np.array([r.animal_estimate, r.diff_animal_estimate], float),
+                    np.array([r.animal_ci_lo, r.diff_animal_ci_lo], float),
+                    np.array([r.animal_ci_hi, r.diff_animal_ci_hi], float),
+                    color=OKABE_ITO["bout"], line=False, marker="D", ms=5,
+                )  # fmt: skip
             ax.axhline(0, color="k", lw=0.6, ls="--")
             if state == "No-Spike":
                 ax.set_yscale("symlog", linthresh=1.0)
-            ax.set_xticks([1, 2], labels, fontsize=7)
+            ax.set_xticks([0, 1], ["bouts", "bout -\nmatched"], fontsize=7)
+            ax.set_xlim(-0.6, 1.6)
             ax.tick_params(labelsize=7)
-            if i == 0:
-                ax.set_title(title, fontsize=8)
+            ax.set_title(
+                (f"{title}\n" if i == 0 else "")
+                + f"{len(mine)} animals, {len(cell)} bouts",
+                fontsize=7,
+            )
             if j == 0:
                 ax.set_ylabel(f"{regime}\nheld-out evidence (nats)", fontsize=8)
     fig.suptitle(
-        "Held-out spike evidence: confident bouts (P > 0.8) against matched random "
-        "windows (same regime, same length)\nTime-held-out running-only encoding, "
-        "spike-mark part "
-        "unless noted; box = IQR, whiskers 5-95 %, line = median, diamond = mean; "
-        "20 tetrode splits averaged",
+        "Held-out spike evidence in confident bouts (P > 0.8), against matched "
+        "random windows (same regime, same length)\nTime-held-out running-only "
+        "encoding, spike-mark part; dot = an animal, diamond = mean over animals "
+        "with its 95 % t-interval; grey = the windows' 5-95 % and 25-75 %",
         fontsize=9,
     )
     fig.savefig(path, dpi=150)
     plt.close(fig)
 
 
-def _error_bars(estimate: NDArray, lo: NDArray, hi: NDArray) -> list[NDArray]:
-    """Error-bar lengths, zero where a CI could not be computed."""
-    return [np.nan_to_num(estimate - lo), np.nan_to_num(hi - estimate)]
+def _error_bars(
+    estimate: NDArray, lo: NDArray, hi: NDArray
+) -> tuple[NDArray[np.bool_], list[NDArray]]:
+    """Which points have an interval, and the bar lengths of those that do.
+
+    A point whose interval is NaN gets no bar, rather than a zero-length one
+    that would read as certainty.
+    """
+    has = np.isfinite(lo) & np.isfinite(hi)
+    return has, [(estimate - lo)[has], (hi - estimate)[has]]
+
+
+def _plot_estimates(
+    ax: Any,
+    x: NDArray,
+    estimate: NDArray,
+    lo: NDArray,
+    hi: NDArray,
+    *,
+    color: str,
+    label: str | None = None,
+    line: bool = True,
+    marker: str = "o",
+    ms: float = 3.0,
+) -> None:
+    """Estimates with their intervals; one without an interval is hollow, with no bar."""
+    if line:
+        ax.plot(x, estimate, color=color, lw=1.2)
+    has, yerr = _error_bars(estimate, lo, hi)
+    ax.errorbar(
+        x[has], estimate[has], yerr=yerr, color=color, ls="none", marker=marker,
+        ms=ms, capsize=2, label=label, zorder=3,
+    )  # fmt: skip
+    ax.plot(x[~has], estimate[~has], ls="none", marker=marker, ms=ms, mfc="none",
+            mec=color, zorder=3)  # fmt: skip
 
 
 def figure_calibration(bins: pd.DataFrame, path: Path) -> None:
@@ -1016,10 +1139,9 @@ def figure_calibration(bins: pd.DataFrame, path: Path) -> None:
             estimate = curve.animal_estimate.to_numpy(dtype=float)[ok]
             lo = curve.animal_ci_lo.to_numpy(dtype=float)[ok]
             hi = curve.animal_ci_hi.to_numpy(dtype=float)[ok]
-            ax.errorbar(
-                BIN_CENTERS[ok], estimate, yerr=_error_bars(estimate, lo, hi),
-                color=OKABE_ITO["bout"], marker="o", ms=3, lw=1.2, capsize=2,
-            )  # fmt: skip
+            _plot_estimates(
+                ax, BIN_CENTERS[ok], estimate, lo, hi, color=OKABE_ITO["bout"]
+            )
             ax.axhline(0, color="k", lw=0.6, ls="--")
             if metric.endswith("ns_logratio"):
                 ax.set_yscale("symlog", linthresh=1.0)
@@ -1058,10 +1180,9 @@ def figure_silence(silence: pd.DataFrame, path: Path) -> None:
         y = by_bin.obs_animal_estimate.to_numpy(dtype=float)[ok]
         lo = by_bin.obs_animal_ci_lo.to_numpy(dtype=float)[ok]
         hi = by_bin.obs_animal_ci_hi.to_numpy(dtype=float)[ok]
-        ax.errorbar(
-            BIN_CENTERS[ok], y, yerr=_error_bars(y, lo, hi),
-            color=OKABE_ITO["bout"], marker="o", ms=3.5, lw=1.2, capsize=2,
-            label="observed",
+        _plot_estimates(
+            ax, BIN_CENTERS[ok], y, lo, hi, color=OKABE_ITO["bout"],
+            label="observed", ms=3.5,
         )  # fmt: skip
         for prefix, label in ENCODING_LABELS.items():
             ax.plot(
@@ -1139,7 +1260,7 @@ def readme(
         lines.append("")
     lines += ["## Settings", "", "```json", json.dumps(settings, indent=1), "```", ""]
     lines += ["## Caveats (properties of the method, not defects)", ""]
-    lines += [f"- {c}" for c in CAVEATS]
+    lines += [f"- {c}" for c in caveats(records)]
     lines += [
         "",
         "## Files",
@@ -1181,7 +1302,7 @@ def summarize(
         ("silence", "silence_stats.csv"),
     ]:
         write_csv(summary[name], output_dir / file_name)
-    figure_bouts(windows, output_dir / "fig_bouts_vs_matched.png")
+    figure_bouts(windows, summary["bouts"], output_dir / "fig_bouts_vs_matched.png")
     figure_calibration(summary["calibration"], output_dir / "fig_calibration.png")
     figure_silence(summary["silence"], output_dir / "fig_coordinated_silence.png")
     primary = summary["bouts"][summary["bouts"].primary]

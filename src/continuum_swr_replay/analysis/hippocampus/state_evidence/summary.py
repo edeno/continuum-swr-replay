@@ -696,6 +696,78 @@ def _ci_verdict(enough: bool, ci_lo: float) -> str:
     return _verdict(enough, ci_lo > 0)
 
 
+def paired_bouts(windows: pd.DataFrame) -> pd.DataFrame:
+    """Every bout with its matched window's columns, suffixed ``_base``.
+
+    Raises
+    ------
+    ValueError
+        A bout has no matched window.
+    """
+    keys = ["epoch_id", "state", "regime"]
+    paired = windows[windows.kind == "bout"].merge(
+        windows[windows.kind == "baseline"],
+        left_on=[*keys, "bout_s"],
+        right_on=[*keys, "matched_bout_s"],
+        suffixes=("", "_base"),
+        how="left",
+        validate="one_to_one",
+        indicator=True,
+    )
+    if (paired["_merge"] != "both").any():
+        raise ValueError("a bout lacks its matched window")
+    return paired
+
+
+def bout_animal_summaries(
+    windows: pd.DataFrame, *, metrics: Mapping[str, Sequence[str]]
+) -> pd.DataFrame:
+    """Each animal's summary of bout metrics and of their paired differences.
+
+    An animal's summary is the mean of its epochs' summaries over windows, the
+    median or the mean by metric (:func:`epoch_summary_kind`): the values whose
+    mean and t-interval :func:`bout_statistics` reports as ``animal_*`` and
+    ``diff_animal_*``.
+
+    Parameters
+    ----------
+    windows : pd.DataFrame
+        The per-window table, as for :func:`bout_statistics`.
+    metrics : mapping
+        State -> metric columns.
+
+    Returns
+    -------
+    pd.DataFrame
+        ``state``, ``regime``, ``metric``, ``animal``, ``value`` (the bouts'
+        summary) and ``diff`` (the paired bout - matched summary).
+    """
+    paired = paired_bouts(windows)
+    rows = []
+    for state, state_metrics in metrics.items():
+        for regime in REGIMES:
+            cell = paired[(paired.state == state) & (paired.regime == regime)]
+            if cell.empty:
+                continue
+            epochs, animals = cell.epoch_id.to_numpy(), cell.animal.to_numpy()
+            for metric in state_metrics:
+                kind = epoch_summary_kind(metric)
+                x = cell[metric].to_numpy(dtype=float)
+                diff = x - cell[f"{metric}_base"].to_numpy(dtype=float)
+                by_animal = {
+                    name: epoch_summaries(values, epochs, animals)
+                    .groupby("animal")[kind]
+                    .mean()
+                    for name, values in (("value", x), ("diff", diff))
+                }
+                frame = pd.DataFrame(by_animal).rename_axis("animal").reset_index()
+                rows.append(frame.assign(state=state, regime=regime, metric=metric))
+    columns = ["state", "regime", "metric", "animal", "value", "diff"]
+    if not rows:
+        return pd.DataFrame(columns=columns)
+    return pd.concat(rows, ignore_index=True)[columns]
+
+
 def bout_statistics(
     windows: pd.DataFrame,
     *,
@@ -747,19 +819,8 @@ def bout_statistics(
         metrics = {
             state: (*PRIMARY_METRICS[state], *SECONDARY_METRICS) for state in STATES
         }
-    keys = ["epoch_id", "state", "regime"]
     bouts = windows[windows.kind == "bout"]
-    paired = bouts.merge(
-        windows[windows.kind == "baseline"],
-        left_on=[*keys, "bout_s"],
-        right_on=[*keys, "matched_bout_s"],
-        suffixes=("", "_base"),
-        how="left",
-        validate="one_to_one",
-        indicator=True,
-    )
-    if (paired["_merge"] != "both").any():
-        raise ValueError("a bout lacks its matched window")
+    paired = paired_bouts(windows)
     rows = []
     for state, state_metrics in metrics.items():
         for regime in REGIMES:

@@ -78,15 +78,20 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
 - `run_state_evidence.py` — held-out spike evidence for each decoder state (Local, No-Spike,
   Non-Local Continuous / Fragmented) on every canonical HPC decode: confident bouts against
   matched random windows, and calibration curves over random 20 ms windows, scored by a
-  tetrode half the choice did not see (10 seeded half-partitions x 2 directions) under a
-  running-only refit and the decode's own encoding. Method and caveats:
-  `analysis/hippocampus/state_evidence.py`. Per epoch it checks that the reloaded marks refit
-  the stored encoding exactly and that the per-tetrode terms reproduce `results.nc`, then
-  writes a per-window parquet and a validation JSON; then the summary CSVs, three figures,
-  `manifest.json` (a recorded reason for every skipped or failed epoch) and a `README.md`.
-  `--epochs`, `--decode-dir` (default `Processed-Data/`), `--output-dir` (default
+  tetrode half the choice did not see (10 seeded half-partitions x 2 directions), primarily
+  under a 2-fold time-held-out running-only refit (alternating 30 s blocks, each window scored
+  by the fold without its centre bin), and secondarily under a running-only refit on every
+  running bin and the decode's own encoding. Method and caveats: the package
+  `src/continuum_swr_replay/analysis/hippocampus/state_evidence/`. Per epoch it checks that the
+  reloaded marks refit the stored encoding exactly, that the per-tetrode terms reproduce
+  `results.nc` and the library's likelihood, and that no event bin is in a running-only fit,
+  then writes a per-window parquet and a validation JSON; then the summary CSVs, three figures,
+  `manifest.json` (a recorded reason for every skipped, failed or recomputed epoch) and a
+  `README.md`. `--epochs`, `--decode-dir` (default `Processed-Data/`; without `--epochs`, every
+  `*_HPC` epoch with a decode file there), `--output-dir` (default
   `Processed-Data/_refresh_<date>/state_evidence/`, the only place written), `--n-workers`
-  dask CPU workers; a rerun reuses the epochs already written unless `--overwrite`.
+  dask CPU workers, `--window-level-stats`; a rerun reuses an epoch only when its commit, run
+  settings and decode files (size, mtime) all match, unless `--overwrite`.
 - `sweep_memoryless_detection.py` — injects replays of chosen path, duration, rate and
   distance into a simulated recording and scores both detectors by one rule; writes the raw
   table to `Processed-Data/` and the aggregates to
