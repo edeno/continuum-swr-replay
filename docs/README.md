@@ -63,7 +63,7 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     *design spec set*: running several published replay-detection methods on the same
     recordings and comparing which events each finds. Start at
     [overview.md](design/replay_detection_comparison/overview.md), which carries the
-    governing rule (harmonize substrate, never method internals), the six detection
+    governing rule (harmonize substrate, never method internals), the seven detection
     inventories, the clusterless scope boundary, and the cross-cutting decisions the
     methods section will draw on. Component specs:
     [01](design/replay_detection_comparison/01-yu-swr-detector.md) SWR detection with a

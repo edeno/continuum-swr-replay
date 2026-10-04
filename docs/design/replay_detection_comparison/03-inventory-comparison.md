@@ -1,4 +1,4 @@
-# Inventory comparison: six detectors over one substrate
+# Inventory comparison: seven detectors over one substrate
 
 *Design spec. Status: approved; the accounting — schema, availability, overlap, components,
 fragment-merge recount, cells and SWR label matrix — is implemented in
@@ -10,7 +10,7 @@ aggregates it per comparison).*
 *Governing rule and cross-cutting decisions: [overview.md](overview.md).*
 
 Depends on [01](01-yu-swr-detector.md) and [02](02-memoryless-sequence.md). Covers how the
-six event inventories are brought onto a common schema and how their overlap is counted.
+seven event inventories are brought onto a common schema and how their overlap is counted.
 What *differs* about the events once matched is [04](04-event-features.md).
 
 ## Common schema
@@ -57,7 +57,7 @@ Record the source masks and timing conventions in the manifest.
 Intersect each detector's observed intervals with the shared finite-speed < 4 cm/s
 eligibility mask to obtain its comparison exposure, `E_d`. A comparison involving a
 set of detectors uses the intersection of their exposures. Pairwise summaries use
-`E_A ∩ E_B`; six-detector exclusivity and no-detector time use all six exposures.
+`E_A ∩ E_B`; seven-detector exclusivity and no-detector time use all seven exposures.
 Report the exposure duration and excluded time by reason for each comparison. Empty
 shared exposure produces an unavailable summary, not a zero rate or zero overlap.
 
@@ -113,7 +113,7 @@ Coverage is less sensitive to segmentation than event counts, and the two can di
 one detector splitting an event into three does not change the time it accounts for.
 
 **Overlap is not transitive.** A can overlap B and B overlap C without A overlapping C.
-Membership in "all six" is therefore not well-defined by pairwise overlap alone.
+Membership in "all seven" is therefore not well-defined by pairwise overlap alone.
 Summarize connected components of the multipartite overlap graph, labeled by which
 detectors contribute to each component, and report component size and span as
 diagnostics — a long chain can fuse events that do not individually overlap.
@@ -142,18 +142,18 @@ separately. No-detector time is shared exposure minus the union of detected inte
 
 Distinct from the inventory comparison above, and the reason level 3 needs no separate
 sweep (overview X6). Each *sequence* cohort — ours and the memoryless one — is labeled
-under each of the three SWR definitions, giving a cohort × SWR-definition matrix of
-non-SWR fractions.
+under each of the four SWR definitions (Kay, Karlsson, Yu and Zugaro), giving a
+cohort × SWR-definition matrix of non-SWR fractions.
 
 Labels are `SWR`, `non-SWR`, or `unknown`. Incomplete observation over a sequence's
 native interval yields `unknown`, with any observed overlap retained in the pair table
 for diagnostics. For the matrix, restrict each sequence cohort to events fully within
-its exposure intersected with all three SWR exposures, so all three fractions use the
+its exposure intersected with all four SWR exposures, so all four fractions use the
 same events. Report the eligible denominator and exclusions alongside the fractions;
 unknown labels never count as non-SWR.
 
 A non-SWR fraction is a function of the SWR definition as much as of the events, so it is
-never reported without its definition attached. Where the three definitions disagree
+never reported without its definition attached. Where the four definitions disagree
 about a given event, that disagreement is itself reported: an event labeled ripple-less
 by one algorithm and ripple-bearing by another describes dependence on the detection
 rule; it does not establish which label is correct.
@@ -213,11 +213,11 @@ population.
 | Complete data with zero detections remains observed; missing outputs and zero shared exposure yield unavailable summaries | Empty inventories differ from failed or unobserved runs |
 | An event crossing a coverage boundary is excluded from its count denominator without changing its bounds; a valid counterpart crossing that boundary still supplies an overlap for an eligible source event | Directional denominators and native timing remain consistent |
 | An 80 ms window overlapping a data gap has unavailable midpoint coverage; no-detector time and baseline windows exclude it | Observation support includes the detector's input window |
-| The SWR matrix uses the same eligible sequence events across its three columns and excludes unknown labels | Definition changes are not confounded with differing availability |
+| The SWR matrix uses the same eligible sequence events across its four columns and excludes unknown labels | Definition changes are not confounded with differing availability |
 
 ## Deliverables
 
-1. The six inventories and their observation-interval tables, with native and eligible
+1. The seven inventories and their observation-interval tables, with native and eligible
    counts, exposure durations, rates, and exclusions.
 2. The all-pairs overlap table and the per-detector denominators.
 3. The single-detector and no-detector cells, including SWRs with no detected sequence and

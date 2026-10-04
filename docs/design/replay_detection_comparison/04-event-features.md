@@ -87,7 +87,7 @@ all intervals where it is defined. Do not compare a remote maximum for SWRs agai
 trajectory-constrained score for our events as if they were the same statistic.
 
 Score baseline windows with the same rule. Select them outside the union of the default
-inventories within all six detectors' shared observation exposure during eligible
+inventories within all seven detectors' shared observation exposure during eligible
 immobility, with each full baseline window contained in that exposure. Match session,
 duration, and animal location where feasible; report matching failures. Do not reuse the
 QA script's low non-local probability condition as a model-neutral definition of

@@ -10,8 +10,8 @@ comparison between inventories lives in `analysis/inventory_comparison/`
 data are results; everything else is a proposed analysis.*
 *Governing rule and cross-cutting decisions: [overview.md](overview.md).*
 
-Inventory 6 of six: the posterior-sequence trigger. How this cohort is compared against
-the other five is [03-inventory-comparison.md](03-inventory-comparison.md); the
+Inventory 6 of seven: the posterior-sequence trigger. How this cohort is compared against
+the other six is [03-inventory-comparison.md](03-inventory-comparison.md); the
 initial event-feature and selection diagnostics are in [04](04-event-features.md).
 Threshold robustness is a planned later stage in 04, and performance validation remains
 parked in [05](05-validation.md). Neither blocks the default-setting comparison.
@@ -19,7 +19,7 @@ parked in [05](05-validation.md). Neither blocks the default-setting comparison.
 ## Purpose
 
 Port the Widloski & Foster sliding-window sequence detector so that it runs on our
-recordings, producing inventory 6 of the six in [overview.md](overview.md).
+recordings, producing inventory 6 of the seven in [overview.md](overview.md).
 
 The detector is memoryless by construction: each 80 ms window is decoded independently
 under a uniform spatial prior, and sequences are assembled afterwards from continuity

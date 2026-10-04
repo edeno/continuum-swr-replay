@@ -177,7 +177,7 @@ be stated in the paper, because otherwise the absences read as oversights.
 
 | method | needs sorted units? | in scope |
 |---|---|---|
-| SWR triggers — Kay, Karlsson, Yu 2017 | no (LFP) | ✅ |
+| SWR triggers — Kay, Karlsson, Yu 2017, Zugaro | no (LFP) | ✅ |
 | MUA trigger — `multiunit_HSE_detector` | no (spike times) | ✅ |
 | Posterior triggers — ours, Widloski port | no (clusterless encoding model) | ✅ |
 | HMM over units — Maboudi et al. 2018, eLife 34467 | **yes** | ❌ for HPC |
