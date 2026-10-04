@@ -758,7 +758,7 @@ Held-out evidence of every window, by tetrode half (see the package notes).
 
 Summary statistics of the per-window table, over epochs nested in animals.
 
-`sign_flip_p`, `stratified_bootstrap_ci`, `ols_slope_ci`, `epoch_summaries`, `epoch_summary_kind`, `epoch_slopes`, `hierarchical_bootstrap_ci`, `animal_t_test`, `bout_statistics`, `calibration_statistics`, `rate_calibration`, `coordinated_silence`, `summarize_state_evidence`
+`sign_flip_p`, `stratified_bootstrap_ci`, `ols_slope_ci`, `epoch_summaries`, `epoch_summary_kind`, `epoch_slopes`, `hierarchical_bootstrap_ci`, `AnimalTTest`, `animal_t_test`, `bout_statistics`, `calibration_statistics`, `rate_calibration`, `coordinated_silence`, `summarize_state_evidence`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/state_evidence/terms.py`
 

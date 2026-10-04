@@ -151,17 +151,21 @@ CAVEATS = [
     "which are bounded. The other_ columns repeat the inference over the other "
     "summary. These rules were set on the five pilot epochs, before the full "
     "run.",
-    "Inference takes the animal as the unit of replication: hierarchical "
-    "bootstrap CIs (animals, then epochs within each; Saravanan, Berman & Sober "
-    "2020), a two-sided t-test of the animal summaries, each the mean of the "
-    "animal's epoch values (p_animal_t; A - 1 degrees of freedom, so 4 with five "
-    "animals), and k of A animals and k of N epochs. The CI weights each epoch "
-    "equally, the t-test each animal. p_epoch_signflip, a sign-flip test over "
-    "epochs, ignores the animals and is secondary.",
-    "A calibration verdict (rises, top_positive) needs at least 10 windows in "
-    "the top and in the bottom probability bins, pooled over epochs, else it "
-    "reads 'too few windows' ('too few epochs' when fewer than two epochs give "
-    "its CI); an epoch's slope needs two bins of 10 or more of its windows.",
+    "Inference is at the animal level, each animal's summary being the mean of "
+    "its epochs' values: animal_estimate (the mean over animals, each weighted "
+    "equally) with its 95 % t-interval animal_ci_lo / animal_ci_hi and the "
+    "two-sided t-test p_animal_t (A - 1 degrees of freedom, so 4 with five "
+    "animals), with k of A animals and k of N epochs. Secondary: epoch_estimate "
+    "(each epoch weighted equally) with its hierarchical bootstrap CI (animals, "
+    "then epochs within each; Saravanan, Berman & Sober 2020), which under-covers "
+    "with few animals (about 0.63 times the t-interval's width with the five "
+    "pilot animals), and p_epoch_signflip, a sign-flip test over epochs that "
+    "ignores the animals.",
+    "A calibration verdict (rises, top_positive) reads the animal t-interval. "
+    "It needs at least 10 windows in the top and in the bottom probability bins, "
+    "pooled over epochs, else it reads 'too few windows' ('too few animals' when "
+    "fewer than two animals give the interval); an epoch's slope needs two bins "
+    "of 10 or more of its windows.",
     "Columns ending _window_level (only with --window-level-stats) treat "
     "windows as independent: they ignore the nesting, are not for inference, "
     "and are kept only to compare with the prototype.",
@@ -807,9 +811,9 @@ def figure_calibration(bins: pd.DataFrame, path: Path) -> None:
                 .reindex(list(PROBABILITY_BIN_LABELS))
             )
             ok = (curve.n >= MIN_BIN_WINDOWS).to_numpy()
-            estimate = curve.epoch_estimate.to_numpy(dtype=float)[ok]
-            lo = curve.epoch_ci_lo.to_numpy(dtype=float)[ok]
-            hi = curve.epoch_ci_hi.to_numpy(dtype=float)[ok]
+            estimate = curve.animal_estimate.to_numpy(dtype=float)[ok]
+            lo = curve.animal_ci_lo.to_numpy(dtype=float)[ok]
+            hi = curve.animal_ci_hi.to_numpy(dtype=float)[ok]
             ax.errorbar(
                 BIN_CENTERS[ok], estimate, yerr=_error_bars(estimate, lo, hi),
                 color=OKABE_ITO["bout"], marker="o", ms=3, lw=1.2, capsize=2,
@@ -826,10 +830,9 @@ def figure_calibration(bins: pd.DataFrame, path: Path) -> None:
                 ax.set_ylabel(f"{regime}\nheld-out evidence", fontsize=8)
     fig.suptitle(
         "Calibration: held-out evidence in random 20 ms windows against the state's "
-        "mean posterior\nMean over epochs of each epoch's bin median (log-likelihood "
-        "ratios) or mean (shares); 95 % hierarchical "
-        f"bootstrap CI (animals, then epochs); bins with < {MIN_BIN_WINDOWS} windows "
-        "omitted",
+        "mean posterior\nMean over animals of each animal's mean epoch bin median "
+        "(log-likelihood ratios) or mean (shares); 95 % t-interval over animals; "
+        f"bins with < {MIN_BIN_WINDOWS} windows omitted",
         fontsize=9,
     )
     fig.savefig(path, dpi=150)
@@ -850,9 +853,9 @@ def figure_silence(silence: pd.DataFrame, path: Path) -> None:
         ]
         by_bin = by_bin.set_index("pbin").reindex(list(PROBABILITY_BIN_LABELS))
         ok = (by_bin.runs_S_silent >= 20).to_numpy()
-        y = by_bin.obs_epoch_estimate.to_numpy(dtype=float)[ok]
-        lo = by_bin.obs_epoch_ci_lo.to_numpy(dtype=float)[ok]
-        hi = by_bin.obs_epoch_ci_hi.to_numpy(dtype=float)[ok]
+        y = by_bin.obs_animal_estimate.to_numpy(dtype=float)[ok]
+        lo = by_bin.obs_animal_ci_lo.to_numpy(dtype=float)[ok]
+        hi = by_bin.obs_animal_ci_hi.to_numpy(dtype=float)[ok]
         ax.errorbar(
             BIN_CENTERS[ok], y, yerr=_error_bars(y, lo, hi),
             color=OKABE_ITO["bout"], marker="o", ms=3.5, lw=1.2, capsize=2,
@@ -860,13 +863,13 @@ def figure_silence(silence: pd.DataFrame, path: Path) -> None:
         )  # fmt: skip
         for prefix, label in (("run", "running-only"), ("can", "canonical")):
             ax.plot(
-                BIN_CENTERS[ok], by_bin[f"pred_{prefix}_epoch_estimate"].to_numpy()[ok],
+                BIN_CENTERS[ok], by_bin[f"pred_{prefix}_animal_estimate"].to_numpy()[ok],
                 color=OKABE_ITO[prefix], ls=":", lw=1.2,
                 label=f"local coding, {label}",
             )  # fmt: skip
         every = silence[(silence.regime == regime) & (silence.state == "all windows")]
         if len(every):
-            ax.axhline(every.obs_epoch_estimate.iloc[0], color="k", lw=0.8,
+            ax.axhline(every.obs_animal_estimate.iloc[0], color="k", lw=0.8,
                        ls="--", label="all windows, observed")  # fmt: skip
             ax.axhline(every.obs_C_silent.iloc[0], color="0.5", lw=0.8, ls="-.",
                        label="all windows, P(C silent)")  # fmt: skip
@@ -878,8 +881,8 @@ def figure_silence(silence: pd.DataFrame, path: Path) -> None:
     axes[0].set_ylabel("P(held-out half C silent | S silent)", fontsize=8)
     axes[0].legend(fontsize=6.5, frameon=False, loc="upper left")
     fig.suptitle(
-        "Held-out coordinated silence (random 20 ms windows): mean over epochs, "
-        "95 % hierarchical bootstrap CI",
+        "Held-out coordinated silence (random 20 ms windows): mean over animals, "
+        "95 % t-interval",
         fontsize=9,
     )
     fig.savefig(path, dpi=150)
@@ -967,9 +970,9 @@ def summarize(
     figure_silence(summary["silence"], output_dir / "fig_coordinated_silence.png")
     primary = summary["bouts"][summary["bouts"].primary]
     shown = ["state", "regime", "metric", "n", "n_epochs", "epoch_summary",
-             "epoch_estimate", "epoch_ci_lo", "epoch_ci_hi", "p_animal_t",
-             "animals_pos", "epochs_pos", "diff_epoch_estimate", "diff_p_animal_t",
-             "diff_animals_pos"]  # fmt: skip
+             "animal_estimate", "animal_ci_lo", "animal_ci_hi", "p_animal_t",
+             "animals_pos", "epochs_pos", "diff_animal_estimate", "diff_animal_ci_lo",
+             "diff_animal_ci_hi", "diff_p_animal_t", "diff_animals_pos"]  # fmt: skip
     print(primary[shown].to_string(index=False), flush=True)
 
 

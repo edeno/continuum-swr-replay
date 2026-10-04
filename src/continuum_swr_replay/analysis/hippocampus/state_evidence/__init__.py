@@ -82,12 +82,14 @@ each epoch enters as one value, and the animal is the unit of replication.
   shares and distances, which are bounded. The rule is set in one place,
   ``EPOCH_SUMMARY``; the other summary is reported as secondary. A calibration
   curve's value is the epoch's own slope.
-- CIs are hierarchical bootstrap CIs, resampling animals and then epochs within
-  each animal (Saravanan, Berman & Sober 2020).
-- The test is a t-test of the animal summaries (each the mean of the animal's
-  epoch values) with A - 1 degrees of freedom, with k of A animals and k of N
-  epochs. The sign-flip p over epochs, which ignores the animals, is
-  secondary.
+- The primary inference is at the animal level: the mean of the animal
+  summaries (each the mean of the animal's epoch values), its t-interval and
+  its t-test, both with A - 1 degrees of freedom, with k of A animals and k of
+  N epochs.
+- Secondary: the epoch-weighted mean with its hierarchical bootstrap CI
+  (animals, then epochs within each; Saravanan, Berman & Sober 2020), which
+  under-covers with few animals, and the sign-flip p over epochs, which
+  ignores the animals.
 - A calibration verdict needs at least 10 windows in the top and in the
   bottom probability bins, pooled; otherwise it reads "too few windows".
 - Window-level statistics are descriptive. The ``_window_level`` CIs and
@@ -110,6 +112,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.summary import (
     PRIMARY_METRICS,
     PROBABILITY_BIN_LABELS,
     SECONDARY_METRICS,
+    AnimalTTest,
     animal_t_test,
     bout_statistics,
     calibration_statistics,
@@ -150,6 +153,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.windows import (
 )
 
 __all__ = [
+    "AnimalTTest",
     "CALIBRATION_METRICS",
     "ENCODING_KEY",
     "ENCODING_LABELS",

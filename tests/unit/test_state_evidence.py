@@ -685,11 +685,11 @@ def test_summarize_state_evidence_covers_every_state_and_table():
         ]
         assert row.n == len(cell)
     assert {
-        "epoch_summary", "epoch_estimate", "epoch_ci_lo", "epoch_ci_hi",
-        "animal_estimate", "p_animal_t", "animals_pos", "epochs_pos",
-        "p_epoch_signflip", "diff_epoch_estimate", "diff_p_animal_t",
-        "diff_animals_pos", "other_epoch_estimate", "other_p_animal_t",
-        "other_diff_epoch_estimate",
+        "epoch_summary", "animal_estimate", "animal_ci_lo", "animal_ci_hi",
+        "p_animal_t", "animals_pos", "epochs_pos", "epoch_estimate",
+        "epoch_ci_lo", "epoch_ci_hi", "p_epoch_signflip", "diff_animal_estimate",
+        "diff_animal_ci_lo", "diff_p_animal_t", "diff_animals_pos",
+        "other_animal_estimate", "other_p_animal_t", "other_diff_animal_ci_hi",
     } <= set(bouts.columns)  # fmt: skip
     for row in bouts.itertuples():
         assert row.epoch_summary == epoch_summary_kind(row.metric)
@@ -705,7 +705,7 @@ def test_summarize_state_evidence_covers_every_state_and_table():
         ("trends", "slope_window_level"),
     ]:
         assert column in full[name], name
-    pd.testing.assert_series_equal(full["bouts"].epoch_estimate, bouts.epoch_estimate)
+    pd.testing.assert_series_equal(full["bouts"].animal_ci_lo, bouts.animal_ci_lo)
 
 
 # --- statistics ---------------------------------------------------------------------
@@ -801,18 +801,38 @@ def test_the_animal_t_test_takes_each_animal_once():
     summaries = np.array([1.0, 3.0, 0.5, 2.0, 2.5, 3.5, np.nan])
     animals = np.array(["a", "a", "b", "c", "c", "c", "b"])  # b: one finite epoch
 
-    estimate, p = animal_t_test(summaries, animals)
+    result = animal_t_test(summaries, animals)
 
     by_animal = np.array([2.0, 0.5, 8.0 / 3.0])  # each animal's mean epoch summary
-    assert estimate == pytest.approx(by_animal.mean())
-    assert p == pytest.approx(ttest_1samp(by_animal, 0.0).pvalue)
-    t = by_animal.mean() / (by_animal.std(ddof=1) / np.sqrt(3))
-    assert p == pytest.approx(2 * student_t.sf(t, df=2))  # A - 1 degrees of freedom
+    sem = by_animal.std(ddof=1) / np.sqrt(3)
+    assert result.estimate == pytest.approx(by_animal.mean())
+    assert result.p == pytest.approx(ttest_1samp(by_animal, 0.0).pvalue)
+    t = by_animal.mean() / sem
+    assert result.p == pytest.approx(2 * student_t.sf(t, df=2))  # A - 1 df
+    assert (result.ci_lo, result.ci_hi) == pytest.approx(
+        student_t.interval(0.95, 2, loc=by_animal.mean(), scale=sem)
+    )
     # 40 more epochs of animal a at its own mean change nothing: a counts once
     more = animal_t_test(np.r_[summaries, [2.0] * 40], np.r_[animals, ["a"] * 40])
-    assert more == pytest.approx((estimate, p))
-    # one animal: nothing to test
-    assert np.isnan(animal_t_test(np.array([1.0, 2.0]), np.array(["a", "a"]))[1])
+    assert tuple(more) == pytest.approx(tuple(result))
+    # one animal: an estimate, but no interval and no test
+    single = animal_t_test(np.array([1.0, 2.0]), np.array(["a", "a"]))
+    assert single.estimate == 1.5
+    assert np.isnan([single.ci_lo, single.ci_hi, single.p]).all()
+
+
+def test_the_animal_interval_is_the_t_interval():
+    rng = np.random.default_rng(15)
+    for n_animals in (2, 5, 12):
+        by_animal = rng.normal(1.0, 2.0, n_animals)
+
+        result = animal_t_test(by_animal, np.arange(n_animals))
+
+        sem = by_animal.std(ddof=1) / np.sqrt(n_animals)
+        expected = student_t.interval(
+            0.95, n_animals - 1, loc=by_animal.mean(), scale=sem
+        )
+        assert (result.ci_lo, result.ci_hi) == pytest.approx(expected), n_animals
 
 
 def bouts_of_six_epochs() -> tuple[pd.DataFrame, np.ndarray, np.ndarray]:
@@ -871,7 +891,12 @@ def test_bout_statistics_infer_at_the_epoch_level():
         assert row[f"{role}p_epoch_signflip"] == pytest.approx(exact)
     # each animal once, as the mean of its epochs: 1.5, 1.25 and 2.25
     by_animal = np.array([1.5, 1.25, 2.25])
-    assert row["animal_estimate"] == pytest.approx(by_animal.mean())
+    sem = by_animal.std(ddof=1) / np.sqrt(3)
+    for role in ("", "other_"):
+        assert row[f"{role}animal_estimate"] == pytest.approx(by_animal.mean())
+        assert (row[f"{role}animal_ci_lo"], row[f"{role}animal_ci_hi"]) == (
+            pytest.approx(student_t.interval(0.95, 2, loc=by_animal.mean(), scale=sem))
+        )
     assert row["p_animal_t"] == pytest.approx(ttest_1samp(by_animal, 0.0).pvalue)
     assert row["epochs_pos"] == "5/6" and row["animals_pos"] == "3/3"
     differences = means - base  # 1, 1.5, -0.5, 3, -1, 0.5
@@ -881,6 +906,11 @@ def test_bout_statistics_infer_at_the_epoch_level():
     assert row["diff_epoch_estimate"] == pytest.approx(differences.mean())
     assert row["diff_p_epoch_signflip"] == pytest.approx(exact)
     by_animal = np.array([1.25, 1.25, -0.25])
+    sem = by_animal.std(ddof=1) / np.sqrt(3)
+    assert row["diff_animal_estimate"] == pytest.approx(by_animal.mean())
+    assert (row["diff_animal_ci_lo"], row["diff_animal_ci_hi"]) == pytest.approx(
+        student_t.interval(0.95, 2, loc=by_animal.mean(), scale=sem)
+    )
     assert row["diff_p_animal_t"] == pytest.approx(ttest_1samp(by_animal, 0.0).pvalue)
     assert row["diff_epochs_pos"] == "4/6" and row["diff_animals_pos"] == "2/3"
     # the window-level statistics, opt-in, as they were
@@ -917,7 +947,7 @@ def test_epoch_slopes_are_not_fooled_by_differences_between_epochs():
     assert trend["slope_window_level"] > 3.0 and trend["rises_window_level"] == "yes"
     # epochs 0 and 4 hold windows in one probability bin only: no slope
     assert trend["n_epochs"] == 4 and trend["slope_epochs_pos"] == "0/4"
-    assert trend["slope_epoch_estimate"] == 0.0 and trend["rises"] == "no"
+    assert trend["slope_animal_estimate"] == 0.0 and trend["rises"] == "no"
 
 
 def test_epoch_summaries_drop_what_is_not_finite():
@@ -957,8 +987,8 @@ def test_epoch_medians_resist_an_artifact_burst():
     row = bout_statistics(table, metrics={"No-Spike": ["can_ns_logratio"]}).iloc[0]
 
     assert row["epoch_summary"] == "median"
-    assert row["epochs_pos"] == "3/3" and row["epoch_estimate"] > 4.0
-    assert row["other_epochs_pos"] == "2/3" and row["other_epoch_estimate"] < 0.0
+    assert row["epochs_pos"] == "3/3" and row["animal_estimate"] > 4.0
+    assert row["other_epochs_pos"] == "2/3" and row["other_animal_estimate"] < 0.0
 
 
 def test_counts_and_shares_take_each_epochs_mean():
@@ -989,15 +1019,15 @@ def test_counts_and_shares_take_each_epochs_mean():
     row = bout_statistics(table, metrics={"No-Spike": ["run_ns_count"]}).iloc[0]
 
     assert row["epoch_summary"] == "mean"
-    assert row["epoch_estimate"] == pytest.approx(bouts.mean().mean())
+    assert row["animal_estimate"] == pytest.approx(bouts.mean().mean())
     assert row["epochs_pos"] == "3/3" and row["animals_pos"] == "3/3"
-    assert row["diff_epoch_estimate"] == pytest.approx(bouts.mean().mean())
-    assert row["other_epoch_estimate"] == 0.0 and row["other_epochs_pos"] == "0/3"
+    assert row["diff_animal_estimate"] == pytest.approx(bouts.mean().mean())
+    assert row["other_animal_estimate"] == 0.0 and row["other_epochs_pos"] == "0/3"
     # the top calibration bin is judged by its epoch means too
     _, trends = calibration_statistics(table, metrics={"No-Spike": ["run_ns_count"]})
     trend = trends.iloc[0]
     assert trend["epoch_summary"] == "mean" and trend["top_positive"] == "yes"
-    assert trend["top_other_epoch_estimate"] == 0.0
+    assert trend["top_other_animal_estimate"] == 0.0
 
 
 def test_calibration_verdicts_need_enough_windows():
@@ -1025,7 +1055,7 @@ def test_calibration_verdicts_need_enough_windows():
 
     # no window reaches the top bin: a steep rise, but no verdict
     no_top = trend(calibration([(0.0, 0.6)] * 3, slope=5.0))
-    assert no_top["n_top"] == 0 and no_top["slope_epoch_ci_lo"] > 4.0
+    assert no_top["n_top"] == 0 and no_top["slope_animal_ci_lo"] > 4.0
     for column in (
         "rises",
         "top_positive",
@@ -1041,10 +1071,10 @@ def test_calibration_verdicts_need_enough_windows():
     assert thin_trend["top_positive"] == "too few windows"
     # enough windows: a verdict
     assert trend(calibration([(0.0, 1.0)] * 3, slope=5.0))["rises"] == "yes"
-    # enough windows, but one epoch gives no epoch-level CI
+    # enough windows, but one animal gives no animal-level interval
     single = trend(calibration([(0.0, 1.0)], slope=5.0))
-    assert single["rises"] == "too few epochs"
-    assert single["top_positive"] == "too few epochs"
+    assert single["rises"] == "too few animals"
+    assert single["top_positive"] == "too few animals"
     assert single["rises_window_level"] == "yes"
     # an epoch in one probability bin enters no slope, however steep its own
     with_one_bin = pd.concat(
@@ -1056,7 +1086,35 @@ def test_calibration_verdicts_need_enough_windows():
     )
     one_bin = trend(with_one_bin)
     assert one_bin["n_epochs"] == 3
-    assert one_bin["slope_epoch_estimate"] == pytest.approx(2.0, abs=0.05)
+    assert one_bin["slope_animal_estimate"] == pytest.approx(2.0, abs=0.05)
+
+
+def test_the_verdicts_read_the_animal_t_interval():
+    """Five animals' slopes, all positive but one far larger than the rest.
+
+    No resample of them averages below 0.4, so the percentile bootstrap's CI
+    lies above 0; their t-interval does not, and "rises" follows it.
+    """
+    rng = np.random.default_rng(16)
+    frames = []
+    for k, slope in enumerate([0.5, 0.6, 0.4, 0.55, 5.0]):
+        p = rng.random(600)
+        frames.append(
+            pd.DataFrame(
+                {"kind": "calib", "state": "", "regime": "immobile", "p_Local": p,
+                 "run_loc_mark": slope * p + rng.normal(0, 0.05, 600),
+                 "epoch_id": f"e{k}", "animal": "abcde"[k]}
+            )
+        )  # fmt: skip
+    table = pd.concat(frames, ignore_index=True)
+
+    _, trends = calibration_statistics(table, metrics={"Local": ["run_loc_mark"]})
+    trend = trends.iloc[0]
+
+    assert trend["slope_epoch_ci_lo"] > 0.3  # the bootstrap, secondary
+    assert trend["slope_animal_ci_lo"] < 0.0 < trend["slope_animal_ci_hi"]
+    assert trend["slope_p_animal_t"] > 0.05
+    assert trend["rises"] == "no"
 
 
 def evidence_table() -> pd.DataFrame:
@@ -1153,18 +1211,24 @@ def test_calibration_statistics_bin_by_probability_and_call_the_trend():
     assert top["n"] == len(in_top)
     assert top["mean"] == pytest.approx(in_top.run_loc_mark.mean())
     assert top["ci_lo_window_level"] < top["mean"] < top["ci_hi_window_level"]
-    # two epochs: the hierarchical CI spans their two medians
+    # two animals of one epoch each: the t-interval has 1 degree of freedom
     per_epoch = in_top.groupby("epoch_id").run_loc_mark.median()
+    sem = per_epoch.std(ddof=1) / np.sqrt(2)
     assert top["epoch_summary"] == "median"
+    assert top["animal_estimate"] == pytest.approx(per_epoch.mean())
+    assert (top["animal_ci_lo"], top["animal_ci_hi"]) == pytest.approx(
+        student_t.interval(0.95, 1, loc=per_epoch.mean(), scale=sem)
+    )
+    # the secondary hierarchical bootstrap spans the two medians
     assert top["epoch_estimate"] == pytest.approx(per_epoch.mean())
     assert top["epoch_ci_lo"] == pytest.approx(per_epoch.min())
     assert top["epoch_ci_hi"] == pytest.approx(per_epoch.max())
     means = in_top.groupby("epoch_id").run_loc_mark.mean()
-    assert top["other_epoch_estimate"] == pytest.approx(means.mean())
+    assert top["other_animal_estimate"] == pytest.approx(means.mean())
     curve = trends.set_index(["state", "regime", "metric"]).loc[
         ("Local", "immobile", "run_loc_mark")
     ]
-    assert curve["slope_epoch_estimate"] == pytest.approx(4.0, abs=0.2)
+    assert curve["slope_animal_estimate"] == pytest.approx(4.0, abs=0.2)
     assert curve["slope_window_level"] == pytest.approx(4.0, abs=0.2)
     assert curve["slope_epochs_pos"] == "2/2" and curve["slope_animals_pos"] == "2/2"
     assert curve["rises"] == "yes" and curve["top_positive"] == "yes"
@@ -1225,9 +1289,18 @@ def test_rate_calibration_and_coordinated_silence():
         ["run_cond_both_silent", "run_cond_S_silent"]
     ].sum()
     ratios = sums.run_cond_both_silent / sums.run_cond_S_silent
+    assert every["obs_animal_estimate"] == pytest.approx(ratios.mean())
     assert every["obs_epoch_estimate"] == pytest.approx(ratios.mean())
-    assert every["pred_can_epoch_estimate"] == pytest.approx(0.3)
-    assert every["excess_can_epoch_estimate"] == pytest.approx(ratios.mean() - 0.3)
+    assert every["pred_can_animal_estimate"] == pytest.approx(0.3)
+    assert every["excess_can_animal_estimate"] == pytest.approx(ratios.mean() - 0.3)
+    excess = ratios - 0.3
+    assert (every["excess_can_animal_ci_lo"], every["excess_can_animal_ci_hi"]) == (
+        pytest.approx(
+            student_t.interval(
+                0.95, 1, loc=excess.mean(), scale=excess.std(ddof=1) / np.sqrt(2)
+            )
+        )
+    )
     assert every["excess_can_epochs_pos"] == f"{int((ratios > 0.3).sum())}/2"
     # one epoch per animal here: the t-test is over the two epochs' excesses
     assert every["excess_can_p_animal_t"] == pytest.approx(
