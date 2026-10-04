@@ -420,3 +420,37 @@ def null_partners(
         chosen[k_eligible == 0] = -1
         local[idx] = chosen
     return remote, local
+
+
+def window_folds(windows: pd.DataFrame, folds: NDArray) -> pd.DataFrame:
+    """Each window's own fold and how much of it its scoring model was fit on.
+
+    A window belongs to the fold of its centre bin, ``s + n_bins // 2`` (the
+    prototype's rule), and is scored by the time-held-out encoding fit on the
+    other fold (:func:`~.evidence.held_out_evidence`). A window that straddles
+    a block edge has some bins in that model's blocks.
+
+    Parameters
+    ----------
+    windows : pd.DataFrame
+        ``s``, ``e`` (inclusive decode bins).
+    folds : ndarray of int, shape (n_time,)
+        From :func:`~.terms.time_folds`.
+
+    Returns
+    -------
+    pd.DataFrame
+        Indexed like ``windows``: ``cv_fold`` (int8) and ``cv_insample_share``,
+        the share of the window's bins in the scoring model's fold.
+    """
+    s = windows["s"].to_numpy(dtype=np.int64)
+    e = windows["e"].to_numpy(dtype=np.int64)
+    folds = np.asarray(folds, dtype=np.int8)
+    n_bins = e - s + 1
+    own = folds[s + n_bins // 2]
+    in_fold_1 = np.r_[0, np.cumsum(folds == 1)]
+    n_fold_1 = in_fold_1[e + 1] - in_fold_1[s]
+    other = np.where(own == 0, n_fold_1, n_bins - n_fold_1)
+    return pd.DataFrame(
+        {"cv_fold": own, "cv_insample_share": other / n_bins}, index=windows.index
+    )

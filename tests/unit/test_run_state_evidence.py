@@ -135,6 +135,12 @@ def simulate_decode(directory: Path) -> dict:
     }
 
 
+@pytest.fixture(autouse=True)
+def short_blocks(monkeypatch):
+    """2 s time-held-out blocks: the simulated epoch is 12 s long."""
+    monkeypatch.setattr(runner, "CV_BLOCK_S", 2.0)
+
+
 @pytest.fixture(scope="module")
 def simulated(tmp_path_factory) -> tuple[Path, dict]:
     directory = tmp_path_factory.mktemp("decode")
@@ -169,16 +175,31 @@ def test_an_epoch_is_validated_and_written(simulated, tmp_path):
     refit = record["canonical_refit"]
     assert refit["same_n_encoding_spikes"] and refit["max_abs_encoding_positions"] == 0
     assert record["stored_log_likelihood"]["max_rel"] < 1e-5
-    for name in ("run", "can"):
+    for name in ("can", "run", "runcv0", "runcv1"):
         assert record["library_log_likelihood"][name]["max_rel"] < 1e-5
-    assert record["running_only"]["event_bins_in_running"] == 0
+    running_only = record["running_only"]
+    for name in ("run", "runcv0", "runcv1"):
+        assert running_only[name]["event_bins_in_library_span"] == 0
+        assert running_only[name]["training_bins"] > 0
+    assert (
+        running_only["runcv0"]["training_bins"]
+        + running_only["runcv1"]["training_bins"]
+        == running_only["run"]["training_bins"]
+    )
+    held_out = record["time_held_out"]
+    assert held_out["block_s"] == 2.0 and held_out["windows"] > 0
+    assert 0 < held_out["straddling_windows"] < held_out["windows"]
     paths = runner.output_paths(EPOCH, output_dir)
     assert json.loads(paths["validation"].read_text())["status"] == "ok"
     table = read_table(paths["windows"])
     assert (table.epoch_id == EPOCH).all() and (table.animal == "aa").all()
-    # both encodings' evidence, and one copy of what they share
-    assert {"run_loc_mark", "can_loc_mark", "run_ns_logratio", "n_spikes"} <= set(table)
-    assert not {"run_n_spikes", "can_n_spikes"} & set(table)
+    # every encoding's evidence, and one copy of what they share
+    assert {"runcv_loc_mark", "run_loc_mark", "can_loc_mark", "n_spikes"} <= set(table)
+    assert not {"runcv_n_spikes", "run_n_spikes", "can_n_spikes"} & set(table)
+    assert set(table.cv_fold) == {0, 1}
+    assert (table.cv_insample_share > 0).any() and (table.cv_insample_share < 1).all()
+    # the held-out scores differ from those of the model fit on every running bin
+    assert not np.allclose(table.runcv_loc_mark, table.run_loc_mark, equal_nan=True)
     assert set(table.kind) == {"bout", "baseline", "calib"}
     assert record["windows"]["silent_ns_logratio_identity_max_abs"] < 1e-9
 
@@ -223,7 +244,9 @@ def test_marks_that_are_not_the_decodes_fail_the_epoch(simulated, tmp_path):
     assert not paths["windows"].exists() and not paths["validation"].exists()
 
 
-def test_a_running_event_bin_fails_the_epoch(simulated, tmp_path):
+def test_an_event_bin_at_running_speed_is_left_out_of_the_running_fits(
+    simulated, tmp_path
+):
     decode_dir = decode_copy(simulated, tmp_path)
     path = decode_dir / f"{EPOCH}_80_data_over_time.pkl"
     dot = pd.read_pickle(path)
@@ -233,8 +256,39 @@ def test_a_running_event_bin_fails_the_epoch(simulated, tmp_path):
 
     record = run(decode_dir, tmp_path / "out", simulated[1])
 
-    assert record["status"] == "failed"
-    assert "1 non-local event bins are running bins" in record["error"]
+    assert record["status"] == "ok", record.get("traceback")
+    running_only = record["running_only"]
+    assert running_only["event_bins_at_running_speed"] == 1
+    assert running_only["running_bins_left_out_near_events"] == 3
+    for name in ("run", "runcv0", "runcv1"):
+        assert running_only[name]["event_bins_in_training_bins"] == 0
+        assert running_only[name]["event_bins_in_library_span"] == 0
+
+
+def test_running_only_masks_refuse_an_event_spike_in_the_library_span():
+    n = 200
+    time = np.arange(n) * 0.002
+    speed = np.full(n, 20.0)
+    position = np.c_[np.linspace(0, 100, n), np.zeros(n)]
+    folds = np.zeros(n, dtype=np.int8)
+    folds[100:] = 1
+    in_event = np.zeros(n, dtype=bool)
+    in_event[50] = True
+
+    masks, record = runner.running_only_masks(time, speed, position, in_event, folds)
+
+    # the event bin and its neighbours are left out, and the padding stops short
+    assert not masks["run"][49:52].any() and masks["run"][48] and masks["run"][52]
+    assert record["run"]["event_bins_in_library_span"] == 0
+    assert record["running_bins_left_out_near_events"] == 3
+    # no position around the event: the library joins the runs across it
+    position[49:52] = np.nan
+    with pytest.raises(ValueError, match="1 non-local event bins are in the run"):
+        runner.running_only_masks(time, speed, position, in_event, folds)
+    # a fold with no running bin
+    position[49:52] = 0.0
+    with pytest.raises(ValueError, match="runcv1 encoding has no training bin"):
+        runner.running_only_masks(time, speed, position, in_event, np.zeros(n, np.int8))
 
 
 def test_every_hpc_decode_is_listed_even_an_incomplete_one(tmp_path):

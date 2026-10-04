@@ -716,7 +716,7 @@ Compute decoding quality metrics across all sessions.
 
 Held-out spike evidence for each decoder state, on every canonical HPC decode.
 
-`decode_files`, `canonical_epochs`, `load_marks_and_training_mask`, `stored_log_likelihood`, `encoding_comparison`, `refit_encoding`, `spikes_in_bins`, `relative_error`, `output_paths`, `write_json`, `epoch_table`, `run_settings`, `run_epoch`, `run_epochs`, `figure_bouts`, `figure_calibration`, `figure_silence`, `write_csv`, `readme`, `summarize`, `build_parser`, `main`
+`decode_files`, `canonical_epochs`, `load_marks_and_training_mask`, `stored_log_likelihood`, `encoding_comparison`, `refit_encoding`, `spikes_in_bins`, `relative_error`, `output_paths`, `write_json`, `epoch_table`, `running_only_masks`, `run_settings`, `run_epoch`, `run_epochs`, `figure_bouts`, `figure_calibration`, `figure_silence`, `write_csv`, `readme`, `summarize`, `build_parser`, `main`
 
 ### `scripts/qa/summarize_cohort_audits.py`
 
@@ -752,7 +752,7 @@ Generate the symbol-anchored regression pipeline code map.
 
 Held-out evidence of every window, by tetrode half (see the package notes).
 
-`window_evidence`
+`held_out_evidence`, `window_evidence`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/state_evidence/summary.py`
 
@@ -764,13 +764,13 @@ Summary statistics of the per-window table, over epochs nested in animals.
 
 Per-tetrode likelihood terms, and the encodings and decode files they come from.
 
-`parse_epoch_identifier`, `load_detector`, `encoding_inputs`, `load_encoding`, `event_likelihood`, `nearest_interior_bins`, `interior_bin_mask`, `TetrodeTerms`, `per_tetrode_terms`
+`parse_epoch_identifier`, `load_detector`, `encoding_inputs`, `load_encoding`, `event_likelihood`, `nearest_interior_bins`, `interior_bin_mask`, `TetrodeTerms`, `per_tetrode_terms`, `time_folds`, `training_spike_bins`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/state_evidence/windows.py`
 
 Speed regimes and the windows scored: bouts, matched windows, calibration windows.
 
-`keyed_rng`, `regimes`, `state_bouts`, `matched_windows`, `calibration_windows`, `build_windows`, `tetrode_halves`, `null_partners`
+`keyed_rng`, `regimes`, `state_bouts`, `matched_windows`, `calibration_windows`, `build_windows`, `tetrode_halves`, `null_partners`, `window_folds`
 
 ### `src/continuum_swr_replay/analysis/replay/fit_provenance.py`
 

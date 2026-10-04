@@ -58,15 +58,40 @@ track interior and never enter (:func:`interior_bin_mask`).
 - ``mapS_dist_cm`` / ``mapSr_dist_cm``: track distance from the animal's
   window-centre position to MAP_S / S's best remote bin.
 
+Encodings: what scores a window, and whose spikes it was fit on
+---------------------------------------------------------------
+Every window is scored under three encodings, the column prefixes:
+
+- ``runcv_`` (primary): the running-only encoding, 2-fold time-held-out. The
+  decode axis is cut into alternating 30 s blocks (:func:`time_folds`); fold
+  f's model is the decode's detector refit on the running bins (head speed
+  >= 4 cm/s) of fold f's blocks, and a window is scored by the model of the
+  fold that does not hold its centre bin (:func:`window_folds`,
+  :func:`held_out_evidence`). A window's own spikes are not in the model that
+  scores it, but for a window straddling a block edge (``cv_insample_share``
+  of its bins; under 0.1 % of windows in the prototype). The library pads
+  every training run by one bin (:func:`training_spike_bins`), so a window's
+  edge bin next to the other fold's running bins can be in too.
+- ``run_`` (secondary): the running-only encoding fit on every running bin,
+  so it includes running windows' own spikes.
+- ``can_`` (secondary): the decode's own encoding, fit on every non-ripple
+  bin, so it includes non-ripple windows' own spikes.
+
+Running bins within one bin of a non-local event bin are left out of every
+running-only fit, so no event spike enters one even through the library's
+padding.
+
 What is and is not held out (properties, not defects)
 -----------------------------------------------------
-- Only the remote location is held out: S alone chooses MAP_S. The state
-  labels come from the all-tetrode decode, so C's spikes helped make them.
+- Only the remote location is held out by the tetrode split: S alone chooses
+  MAP_S. The state labels come from the all-tetrode decode, so C's spikes
+  helped make them.
 - Run-averaged Local and No-Spike values equal half the all-tetrode
   (in-sample) values: no half chooses the animal's position, and every
   tetrode scores in exactly half of the runs.
-- One spike costs about 29 nats under No-Spike (log(1e-10 Hz x 2 ms)), so a
-  confident No-Spike label forces both halves silent; only the size of E_C is
+- One spike costs -log(no_spike_rate x dt) nats under No-Spike, tens of nats
+  at the decoder's rate (the runner's README gives the value), so a confident
+  No-Spike label forces both halves silent; only the size of E_C is
   informative there.
 - With few spikes, S's silence term pulls MAP_S toward low-rate bins, so
   MAP_S's distance from the animal is not a Local test.
@@ -102,13 +127,16 @@ halves, partners), :mod:`.evidence` (window evidence) and :mod:`.summary`.
 """
 
 from continuum_swr_replay.analysis.hippocampus.state_evidence.evidence import (
+    held_out_evidence,
     window_evidence,
 )
 from continuum_swr_replay.analysis.hippocampus.state_evidence.summary import (
     CALIBRATION_METRICS,
+    ENCODING_HELD_OUT,
     ENCODING_LABELS,
     EPOCH_SUMMARY,
     MIN_BIN_WINDOWS,
+    PRIMARY_ENCODING,
     PRIMARY_METRICS,
     PROBABILITY_BIN_LABELS,
     SECONDARY_METRICS,
@@ -128,6 +156,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.summary import (
     summarize_state_evidence,
 )
 from continuum_swr_replay.analysis.hippocampus.state_evidence.terms import (
+    CV_BLOCK_S,
     ENCODING_KEY,
     TetrodeTerms,
     encoding_inputs,
@@ -138,6 +167,8 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.terms import (
     nearest_interior_bins,
     parse_epoch_identifier,
     per_tetrode_terms,
+    time_folds,
+    training_spike_bins,
 )
 from continuum_swr_replay.analysis.hippocampus.state_evidence.windows import (
     REGIMES,
@@ -150,15 +181,19 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.windows import (
     regimes,
     state_bouts,
     tetrode_halves,
+    window_folds,
 )
 
 __all__ = [
     "AnimalTTest",
     "CALIBRATION_METRICS",
+    "CV_BLOCK_S",
+    "ENCODING_HELD_OUT",
     "ENCODING_KEY",
     "ENCODING_LABELS",
     "EPOCH_SUMMARY",
     "MIN_BIN_WINDOWS",
+    "PRIMARY_ENCODING",
     "PRIMARY_METRICS",
     "PROBABILITY_BIN_LABELS",
     "REGIMES",
@@ -176,6 +211,7 @@ __all__ = [
     "epoch_summaries",
     "epoch_summary_kind",
     "event_likelihood",
+    "held_out_evidence",
     "hierarchical_bootstrap_ci",
     "interior_bin_mask",
     "keyed_rng",
@@ -194,5 +230,8 @@ __all__ = [
     "stratified_bootstrap_ci",
     "summarize_state_evidence",
     "tetrode_halves",
+    "time_folds",
+    "training_spike_bins",
     "window_evidence",
+    "window_folds",
 ]

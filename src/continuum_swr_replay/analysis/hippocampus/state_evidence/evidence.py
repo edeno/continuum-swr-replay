@@ -17,6 +17,44 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.windows import (
 )
 
 _PER_RUN_SUMMED = ("cond_S_silent", "cond_both_silent", "cond_pred_C_silent")
+
+
+def held_out_evidence(
+    per_fold: Sequence[pd.DataFrame], window_fold: NDArray
+) -> pd.DataFrame:
+    """Each window's evidence from the time-held-out model of the other fold.
+
+    The prototype's ``runcv`` columns: every window is scored by both folds'
+    models (:func:`window_evidence`, with the same windows, partners and
+    halves), and keeps the score of the model fit without its own block.
+
+    Parameters
+    ----------
+    per_fold : sequence of two pd.DataFrame
+        ``per_fold[f]``: every window's evidence under the model fit on fold f;
+        indexed and columned alike.
+    window_fold : ndarray of int, shape (n_windows,)
+        Each window's own fold, 0 or 1 (:func:`~.windows.window_folds`).
+
+    Returns
+    -------
+    pd.DataFrame
+        Row i from ``per_fold[1 - window_fold[i]]``.
+    """
+    first, second = per_fold
+    window_fold = np.asarray(window_fold)
+    if not np.isin(window_fold, (0, 1)).all():
+        raise ValueError("every window's fold must be 0 or 1")
+    if not (first.index.equals(second.index) and first.columns.equals(second.columns)):
+        raise ValueError(
+            "the two folds' evidence must cover the same windows and columns"
+        )
+    held_out = second.copy()  # fold-0 windows take fold 1's model
+    in_fold_1 = window_fold == 1
+    held_out.loc[in_fold_1] = first.loc[in_fold_1]
+    return held_out
+
+
 _PER_SPIKE = ("loc_mark", "loc_full", "nl_anim_mark", "nl_null_mark", "nlr_anim_mark")
 
 

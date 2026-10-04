@@ -54,8 +54,9 @@ value, and the inference takes the animal as the unit of replication.
 - **Column scheme.** The prefix ``{p}`` says what the columns describe: "" a
   bout metric, ``diff_`` its paired difference, ``other_`` (``other_diff_``)
   the same over the secondary epoch summary, ``slope_`` a calibration curve,
-  and ``excess_run_`` / ``excess_can_`` coordinated silence's excess over
-  local coding. ``epoch_summary`` names each row's primary epoch summary.
+  and ``excess_{e}_`` coordinated silence's excess over local coding under
+  encoding ``e`` (:data:`ENCODING_LABELS`). ``epoch_summary`` names each row's
+  primary epoch summary.
   Calibration bins carry only the estimates and their intervals.
 - **Descriptive.** Window-level counts, medians, quartiles, shares > 0 and
   means, pooled over epochs.
@@ -93,47 +94,83 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.windows import (
     keyed_rng,
 )
 
-PRIMARY_METRICS: Mapping[str, tuple[str, ...]] = {
-    "Local": ("run_loc_mark",),
-    "No-Spike": ("run_ns_logratio", "can_ns_logratio"),
-    "Non-Local Continuous": ("run_nl_null_mark", "run_nl_anim_mark"),
-    "Non-Local Fragmented": ("run_nl_null_mark", "run_nl_anim_mark"),
+ENCODING_LABELS = {
+    "runcv": "running-only, time-held-out",
+    "run": "running-only",
+    "can": "canonical",
 }
-"""The evidence each state's claim is judged by (``run_`` = running-only
-encoding, ``can_`` = the decode's own)."""
+"""The evidence columns' prefixes, one per encoding (:data:`ENCODING_HELD_OUT`)."""
+
+PRIMARY_ENCODING = "runcv"
+
+ENCODING_HELD_OUT = {
+    "runcv": "primary: fit on the running bins of the other fold's alternating "
+    "30 s blocks, so a window's own spikes are not in it, but for the bins of a "
+    "window that straddles a block edge (cv_insample_share)",
+    "run": "secondary: fit on every running bin, so it includes running "
+    "windows' own spikes",
+    "can": "secondary: the decode's own, fit on every non-ripple bin, so it "
+    "includes non-ripple windows' own spikes",
+}
+"""What each encoding holds out."""
+
+PRIMARY_METRICS: Mapping[str, tuple[str, ...]] = {
+    "Local": ("runcv_loc_mark",),
+    "No-Spike": ("runcv_ns_logratio",),
+    "Non-Local Continuous": ("runcv_nl_null_mark", "runcv_nl_anim_mark"),
+    "Non-Local Fragmented": ("runcv_nl_null_mark", "runcv_nl_anim_mark"),
+}
+"""The evidence each state's claim is judged by, under the primary encoding."""
 
 SECONDARY_METRICS = (
-    "run_loc_vs_Sremote_mark",
-    "run_nlr_anim_mark",
+    "runcv_loc_vs_Sremote_mark",
+    "runcv_nlr_anim_mark",
+    "runcv_loc_full",
+    "runcv_nl_anim_full",
+    "runcv_ns_count",
+    "runcv_ns_silent_frac",
+    "runcv_ns_expected",
+    "runcv_mapS_dist_cm",
+    "runcv_mapSr_dist_cm",
+    "run_loc_mark",
+    "run_nl_null_mark",
+    "run_nl_anim_mark",
+    "run_ns_logratio",
+    "run_ns_expected",
     "can_loc_mark",
-    "run_loc_full",
     "can_nl_null_mark",
     "can_nl_anim_mark",
-    "run_nl_anim_full",
-    "run_ns_count",
-    "run_ns_silent_frac",
-    "run_ns_expected",
+    "can_ns_logratio",
     "can_ns_expected",
-    "run_mapS_dist_cm",
-    "run_mapSr_dist_cm",
 )
-"""Reported for the bouts of every state."""
+"""Reported for the bouts of every state: more evidence under the primary
+encoding, and the primary evidence under the two secondary encodings."""
 
 CALIBRATION_METRICS: Mapping[str, tuple[str, ...]] = {
-    "Local": ("run_loc_mark", "run_loc_vs_Sremote_mark", "can_loc_mark"),
+    "Local": (
+        "runcv_loc_mark",
+        "runcv_loc_vs_Sremote_mark",
+        "run_loc_mark",
+        "can_loc_mark",
+    ),
     "No-Spike": (
+        "runcv_ns_logratio",
+        "runcv_ns_count",
+        "runcv_ns_silent_frac",
         "run_ns_logratio",
         "can_ns_logratio",
-        "run_ns_count",
-        "run_ns_silent_frac",
     ),
     "Non-Local Continuous": (
+        "runcv_nl_null_mark",
+        "runcv_nl_anim_mark",
         "run_nl_null_mark",
         "run_nl_anim_mark",
         "can_nl_null_mark",
         "can_nl_anim_mark",
     ),
     "Non-Local Fragmented": (
+        "runcv_nl_null_mark",
+        "runcv_nl_anim_mark",
         "run_nl_null_mark",
         "run_nl_anim_mark",
         "can_nl_null_mark",
@@ -189,13 +226,12 @@ log-likelihood ratios, which are heavy-tailed, and the mean for the expected
 counts, counts, shares and distances, which are bounded (see the module notes).
 MAP_S's distances from the animal (``mapS_dist_cm``, ``mapSr_dist_cm``) are
 bounded by the track's length, so they take the mean.
-A stem is a column name without its encoding prefix (``run_``, ``can_``) or
+A stem is a column name without its encoding prefix (``runcv_``, ``run_``,
+``can_``) or
 per-spike suffix (``_ps``); a paired difference follows its metric."""
 
 SUMMARY_SEED = 20261004
 
-ENCODING_LABELS = {"run": "running-only", "can": "canonical"}
-"""The evidence columns' prefixes: the running-only refit and the decode's own."""
 
 _RESAMPLE_CELLS = 1 << 24
 """Random draws per chunk of a resampling test, so memory stays bounded."""
@@ -385,7 +421,8 @@ def epoch_summary_kind(metric: str) -> str:
     """The epoch summary a metric is inferred from: "median" or "mean".
 
     Read from :data:`EPOCH_SUMMARY` by the metric's stem: its name without the
-    encoding prefix (``run_``, ``can_``) and the per-spike suffix (``_ps``).
+    encoding prefix (``runcv_``, ``run_``, ``can_``) and the per-spike suffix
+    (``_ps``).
 
     Raises
     ------
@@ -516,12 +553,15 @@ class AnimalTTest(NamedTuple):
     ``estimate`` is the mean of the A animal summaries; ``ci_lo`` / ``ci_hi``
     its 95 % t-interval, mean +/- t(0.975, A - 1) SD / sqrt(A); ``p`` the
     two-sided one-sample t-test p against 0, with A - 1 degrees of freedom.
+    ``zero_variance``: every animal summary is the same, so the interval has
+    no width and there is no test (``p`` is NaN).
     """
 
     estimate: float
     ci_lo: float
     ci_hi: float
     p: float
+    zero_variance: bool
 
 
 def _t_inference(by_animal: NDArray) -> AnimalTTest:
@@ -529,16 +569,16 @@ def _t_inference(by_animal: NDArray) -> AnimalTTest:
     nan = float("nan")
     n = by_animal.size
     if n == 0:
-        return AnimalTTest(nan, nan, nan, nan)
+        return AnimalTTest(nan, nan, nan, nan, False)
     estimate = float(by_animal.mean())
     if n < 2:
-        return AnimalTTest(estimate, nan, nan, nan)
+        return AnimalTTest(estimate, nan, nan, nan, False)
     sem = float(by_animal.std(ddof=1) / np.sqrt(n))
+    if sem == 0:
+        return AnimalTTest(estimate, estimate, estimate, nan, True)
     half = float(student_t.ppf(0.975, n - 1)) * sem
-    with np.errstate(divide="ignore", invalid="ignore"):
-        t = np.divide(estimate, sem)
-    p = float(2 * student_t.sf(abs(t), df=n - 1))
-    return AnimalTTest(estimate, estimate - half, estimate + half, p)
+    p = float(2 * student_t.sf(abs(estimate / sem), df=n - 1))
+    return AnimalTTest(estimate, estimate - half, estimate + half, p, False)
 
 
 def animal_t_test(summaries: NDArray, animals: NDArray) -> AnimalTTest:
@@ -561,7 +601,7 @@ def animal_t_test(summaries: NDArray, animals: NDArray) -> AnimalTTest:
     -------
     AnimalTTest
         ``estimate`` (NaN without any animal), ``ci_lo``, ``ci_hi`` and ``p``
-        (NaN with fewer than two animals).
+        (NaN with fewer than two animals), and ``zero_variance``.
     """
     values = np.asarray(summaries, dtype=float)
     finite = np.isfinite(values)
@@ -580,8 +620,8 @@ def _epoch_statistics(
     """The inference on per-epoch values, keyed by column name (module notes).
 
     Primary: ``animal_estimate`` with its t-interval ``animal_ci_lo`` /
-    ``animal_ci_hi`` and ``p_animal_t`` (:func:`animal_t_test`), and
-    ``animals_pos`` / ``epochs_pos`` ("k/A" and "k/N" > 0). Secondary:
+    ``animal_ci_hi``, ``p_animal_t`` and ``zero_variance`` (:func:`animal_t_test`),
+    and ``animals_pos`` / ``epochs_pos`` ("k/A" and "k/N" > 0). Secondary:
     ``epoch_estimate`` with its hierarchical bootstrap CI ``epoch_ci_lo`` /
     ``epoch_ci_hi``, and ``p_epoch_signflip`` unless ``signflip`` is False.
     Non-finite values are dropped.
@@ -598,6 +638,7 @@ def _epoch_statistics(
         "animal_ci_lo": test.ci_lo,
         "animal_ci_hi": test.ci_hi,
         "p_animal_t": test.p,
+        "zero_variance": test.zero_variance,
         "animals_pos": f"{int((by_animal > 0).sum())}/{by_animal.size}",
         "epochs_pos": f"{int((values > 0).sum())}/{values.size}",
         "epoch_estimate": float(values.mean()) if values.size else float("nan"),
@@ -613,6 +654,7 @@ _INTERVALS = (
     "animal_estimate",
     "animal_ci_lo",
     "animal_ci_hi",
+    "zero_variance",
     "epoch_estimate",
     "epoch_ci_lo",
     "epoch_ci_hi",
@@ -987,8 +1029,12 @@ def rate_calibration(windows: pd.DataFrame) -> pd.DataFrame:
 
     Per regime and encoding, pooled (``animal == "all"``) and per animal:
     C's spike count summed over windows against E_C summed over windows,
-    with the observed and predicted shares of silent C. Descriptive.
+    with the observed and predicted shares of silent C. The observed counts
+    are the same under every encoding; they are read from the primary one.
+    Descriptive.
     """
+    observed_count = f"{PRIMARY_ENCODING}_ns_count"
+    observed_silent = f"{PRIMARY_ENCODING}_ns_silent_frac"
     calibration = windows[windows.kind == "calib"]
     rows = []
     for regime in REGIMES:
@@ -998,7 +1044,7 @@ def rate_calibration(windows: pd.DataFrame) -> pd.DataFrame:
                 (str(animal), g) for animal, g in cell.groupby("animal", sort=True)
             ]
             for animal, g in groups:
-                observed = float(g.run_ns_count.sum())
+                observed = float(g[observed_count].sum())
                 expected = float(g[f"{prefix}_ns_expected"].sum())
                 rows.append(
                     {
@@ -1011,7 +1057,7 @@ def rate_calibration(windows: pd.DataFrame) -> pd.DataFrame:
                         "observed_over_expected": (
                             observed / expected if expected > 0 else np.nan
                         ),
-                        "obs_silent_share": float(g.run_ns_silent_frac.mean()),
+                        "obs_silent_share": float(g[observed_silent].mean()),
                         "pred_silent_share": float(
                             g[f"{prefix}_ns_pred_silent"].mean()
                         ),
@@ -1044,18 +1090,20 @@ def coordinated_silence(
         its t-interval ``obs_animal_ci_lo`` / ``obs_animal_ci_hi``; the
         secondary ``obs_epoch_*`` are their epoch-weighted mean and bootstrap
         CI.
-      - ``pred_run_animal_estimate`` / ``pred_can_animal_estimate`` are the
-        predictions' means over animals (``pred_*_epoch_estimate``, over
-        epochs).
-      - Each epoch's observed - predicted is inferred under the prefixes
-        ``excess_run_`` and ``excess_can_`` (the module's column scheme).
+      - ``pred_{e}_animal_estimate`` is encoding ``e``'s prediction, its mean
+        over animals (``pred_{e}_epoch_estimate``, over epochs).
+      - Each epoch's observed - predicted is inferred under the prefix
+        ``excess_{e}_`` (the module's column scheme).
+      - The observed silences are the same under every encoding; they are read
+        from the primary one's columns.
     - **Descriptive:** pooled ratios of sums over windows and splits:
-      ``obs_C_silent_given_S_silent``, ``pred_given_S_run`` / ``_can``,
-      ``obs_C_silent``, ``pred_C_silent_run`` / ``_can``.
+      ``obs_C_silent_given_S_silent``, ``pred_given_S_{e}``, ``obs_C_silent``
+      and ``pred_C_silent_{e}``.
     - **Window level, only with** ``window_level`` (not for inference):
       ``obs_given_ci_lo_window_level`` / ``_hi`` (windows resampled within
       epochs).
     """
+    primary = PRIMARY_ENCODING  # the observed silences: the same under every encoding
     groups: list[tuple[tuple[str, str, str, str], pd.DataFrame]] = []
     for regime in REGIMES:
         for kind in ("bout", "baseline"):
@@ -1082,8 +1130,8 @@ def coordinated_silence(
     for (regime, kind, state, name), d in groups:
         if len(d) == 0:
             continue
-        silent_s = d.run_cond_S_silent.to_numpy(dtype=float)
-        both = d.run_cond_both_silent.to_numpy(dtype=float)
+        silent_s = d[f"{primary}_cond_S_silent"].to_numpy(dtype=float)
+        both = d[f"{primary}_cond_both_silent"].to_numpy(dtype=float)
         row: dict[str, Any] = {
             "regime": regime,
             "kind": kind,
@@ -1091,9 +1139,11 @@ def coordinated_silence(
             "pbin": name,
             "n_windows": len(d),
             "runs_S_silent": int(silent_s.sum()),
-            "obs_C_silent": float(d.run_ns_silent_frac.mean()),
-            "pred_C_silent_run": float(d.run_ns_pred_silent.mean()),
-            "pred_C_silent_can": float(d.can_ns_pred_silent.mean()),
+            "obs_C_silent": float(d[f"{primary}_ns_silent_frac"].mean()),
+            **{
+                f"pred_C_silent_{prefix}": float(d[f"{prefix}_ns_pred_silent"].mean())
+                for prefix in ENCODING_LABELS
+            },
         }
         if silent_s.sum() > 0:
             row["obs_C_silent_given_S_silent"] = float(both.sum() / silent_s.sum())
@@ -1114,10 +1164,12 @@ def coordinated_silence(
                 )
             sums = d.groupby("epoch_id", sort=True).agg(
                 animal=("animal", "first"),
-                silent=("run_cond_S_silent", "sum"),
-                both=("run_cond_both_silent", "sum"),
-                run=("run_cond_pred_C_silent", "sum"),
-                can=("can_cond_pred_C_silent", "sum"),
+                silent=(f"{primary}_cond_S_silent", "sum"),
+                both=(f"{primary}_cond_both_silent", "sum"),
+                **{
+                    prefix: (f"{prefix}_cond_pred_C_silent", "sum")
+                    for prefix in ENCODING_LABELS
+                },
             )
             sums = sums[sums["silent"] > 0]
             observed = sums["both"] / sums["silent"]
@@ -1156,8 +1208,9 @@ def summarize_state_evidence(
 ) -> dict[str, pd.DataFrame]:
     """Every summary of the per-window table, pooled over its epochs.
 
-    ``run_loc_vs_Sremote_mark`` (and ``_ps``) are added as the negatives of
-    ``run_nlr_anim_mark``, so that positive supports the Local claim.
+    ``{p}_loc_vs_Sremote_mark`` (and ``_ps``) are added as the negatives of
+    ``{p}_nlr_anim_mark``, for each encoding prefix ``p`` the table has, so
+    that positive supports the Local claim.
     ``window_level`` adds the window-level columns, which take most of the run
     time; the other columns do not depend on it.
 
@@ -1169,8 +1222,14 @@ def summarize_state_evidence(
         ``silence`` (:func:`coordinated_silence`).
     """
     windows = windows.assign(
-        run_loc_vs_Sremote_mark=-windows["run_nlr_anim_mark"],
-        run_loc_vs_Sremote_mark_ps=-windows["run_nlr_anim_mark_ps"],
+        **{
+            f"{prefix}_loc_vs_Sremote_mark{tail}": -windows[
+                f"{prefix}_nlr_anim_mark{tail}"
+            ]
+            for prefix in ENCODING_LABELS
+            if f"{prefix}_nlr_anim_mark" in windows
+            for tail in ("", "_ps")
+        }
     )
     bins, trends = calibration_statistics(windows, seed=seed, window_level=window_level)
     return {

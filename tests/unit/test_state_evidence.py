@@ -25,6 +25,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
 )
 from continuum_swr_replay.analysis.hippocampus.state_evidence import (
     CALIBRATION_METRICS,
+    ENCODING_LABELS,
     PRIMARY_METRICS,
     SECONDARY_METRICS,
     STATES,
@@ -37,6 +38,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (
     coordinated_silence,
     epoch_summaries,
     epoch_summary_kind,
+    held_out_evidence,
     hierarchical_bootstrap_ci,
     interior_bin_mask,
     matched_windows,
@@ -51,7 +53,10 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (
     stratified_bootstrap_ci,
     summarize_state_evidence,
     tetrode_halves,
+    time_folds,
+    training_spike_bins,
     window_evidence,
+    window_folds,
 )
 from tests.unit._memoryless_clusterless_epoch import build_simulated_epoch
 
@@ -333,6 +338,82 @@ def test_a_junction_bin_is_never_chosen(tmp_path):
 
 
 # --- regimes and windows ----------------------------------------------------------
+def test_time_folds_alternate_30_s_blocks_from_the_first_bin():
+    time = 100.0 + np.arange(0.0, 95.0, 0.5)
+
+    folds = time_folds(time)
+
+    assert folds.dtype == np.int8
+    np.testing.assert_array_equal(
+        folds, np.floor((time - time[0]) / 30.0).astype(int) % 2
+    )
+    assert folds[time.searchsorted(129.5)] == 0 and folds[time.searchsorted(130.0)] == 1
+    assert folds[time.searchsorted(160.0)] == 0
+
+
+def test_training_spike_bins_are_the_bins_the_library_trains_on():
+    """The library keeps spikes from one bin before to one bin after each run."""
+    from non_local_detector.models.base import ClusterlessDetector
+
+    def library_bins(time, position, is_training, spikes):
+        valid = ~np.isnan(position).any(axis=1)
+        kept, _ = ClusterlessDetector._get_group_spike_data(
+            None, [spikes], [np.zeros((spikes.size, 1))], is_training[valid],
+            time[valid],
+        )  # fmt: skip
+        return np.unique(np.digitize(kept[0], time[1:-1]))
+
+    n = 400
+    position = np.random.default_rng(17).normal(size=(n, 2))
+    position[[50, 51, 200, 250], 0] = np.nan  # NaN positions, some inside runs
+    is_training = np.zeros(n, dtype=bool)
+    is_training[[*range(40, 60), *range(195, 205), 249, 251, 300, *range(350, n)]] = (
+        True
+    )
+    # bins of 1/16 s keep the library's arithmetic exact; a spike at the start
+    # and the middle of every bin
+    time = 10.0 + np.arange(n) / 16
+    spikes = np.sort(np.r_[time, time + 1 / 32])
+
+    covered = training_spike_bins(time, position, is_training)
+
+    np.testing.assert_array_equal(
+        np.flatnonzero(covered), library_bins(time, position, is_training, spikes)
+    )
+    # one bin before a run, and the start of the one after it
+    assert covered[39] and covered[60] and not covered[38] and not covered[61]
+    # bins 249 and 251 are one run once the NaN-position bin 250 is dropped
+    assert covered[250]
+    # on the decoder's 2 ms grid, rounding can add a sliver of the bin before;
+    # the bins stay a superset of the library's, by at most that bin
+    time = 10.0 + np.arange(n) * 0.002
+    spikes = np.sort(np.r_[time, time + 0.001])
+    covered = np.flatnonzero(training_spike_bins(time, position, is_training))
+    library = library_bins(time, position, is_training, spikes)
+    extra = np.setdiff1d(covered, library)
+    assert np.isin(library, covered).all() and np.isin(extra + 1, library).all()
+
+
+def test_each_window_is_scored_by_the_fold_without_its_centre_bin():
+    folds = np.repeat([0, 1, 0, 1], 10).astype(np.int8)  # blocks of 10 bins
+    windows = pd.DataFrame({"s": [0, 8, 15, 25], "e": [4, 12, 19, 34]})
+
+    cv = window_folds(windows, folds)
+
+    # centre bins 2, 10, 17 and 30
+    assert cv.cv_fold.tolist() == [0, 1, 1, 1]
+    # the share of a window's bins in the blocks its scoring model was fit on
+    assert cv.cv_insample_share.tolist() == pytest.approx([0.0, 2 / 5, 0.0, 5 / 10])
+    first = pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0], "k": [1, 1, 1, 1]})
+    second = pd.DataFrame({"x": [10.0, 20.0, 30.0, 40.0], "k": [2, 2, 2, 2]})
+    held_out = held_out_evidence([first, second], cv.cv_fold.to_numpy())
+    # a window in fold 0 takes the model fit on fold 1, and the other way round
+    assert held_out.x.tolist() == [10.0, 2.0, 3.0, 4.0]
+    assert held_out.k.tolist() == [2, 1, 1, 1]
+    with pytest.raises(ValueError, match="fold"):
+        held_out_evidence([first, second], np.array([0, 1, 2, 0]))
+
+
 def test_regimes_split_speed_at_four_and_ten_cm_per_s():
     speed = np.array([np.nan, 0.0, 3.99, 4.0, 7.0, 10.0, 10.01, 30.0])
     np.testing.assert_array_equal(
@@ -602,7 +683,7 @@ def test_planted_content_gives_evidence_for_the_planted_claim():
 
 # --- the runner's chain, reproducibility and the summary ------------------------------
 def synthetic_epoch_table(seed: int, epoch_id: str) -> pd.DataFrame:
-    """One epoch's windows and evidence under two encodings, as the runner builds them."""
+    """One epoch's windows and evidence under three encodings, as the runner builds them."""
     rng = np.random.default_rng(99)
     n_time, n_pos, n_tet = 4000, 30, 6
     # 100-bin stretches of immobility, running and the speeds between them
@@ -616,14 +697,14 @@ def synthetic_epoch_table(seed: int, epoch_id: str) -> pd.DataFrame:
     animal = rng.integers(0, n_pos, n_time)
     halves = tetrode_halves(n_tet, n_partitions=4, seed=seed)
     columns = [windows]
-    for prefix, terms_seed in [("run", 7), ("can", 8)]:
+    for prefix, terms_seed in [("runcv", 9), ("run", 7), ("can", 8)]:
         evidence = window_evidence(
             random_terms(n_time, n_pos, n_tet, rate=0.3, seed=terms_seed),
             windows, animal, linear_distance(n_pos), halves,
             n_partners=5, no_spike_rate=NO_SPIKE_RATE, seed=(seed, epoch_id),
         )  # fmt: skip
         shared = ["n_spikes", "n_tetrodes", "animal_center_bin", "has_loc_partner"]
-        if prefix == "run":
+        if prefix == "runcv":
             columns.append(evidence[shared])
         columns.append(evidence.drop(columns=shared).add_prefix(f"{prefix}_"))
     return pd.concat(columns, axis=1).assign(epoch_id=epoch_id, animal=epoch_id[:2])
@@ -693,6 +774,11 @@ def test_summarize_state_evidence_covers_every_state_and_table():
     } <= set(bouts.columns)  # fmt: skip
     for row in bouts.itertuples():
         assert row.epoch_summary == epoch_summary_kind(row.metric)
+    # the primary metrics are scored by the time-held-out running-only encoding
+    assert set(bouts[bouts.primary].metric) == {
+        "runcv_loc_mark", "runcv_ns_logratio", "runcv_nl_null_mark", "runcv_nl_anim_mark",
+    }  # fmt: skip
+    assert {"zero_variance", "diff_zero_variance"} <= set(bouts.columns)
     assert set(bouts.epoch_summary) == {"median", "mean"}
     assert set(summary["trends"].state) == set(STATES)
     # the window-level statistics are opt-in
@@ -819,6 +905,17 @@ def test_the_animal_t_test_takes_each_animal_once():
     single = animal_t_test(np.array([1.0, 2.0]), np.array(["a", "a"]))
     assert single.estimate == 1.5
     assert np.isnan([single.ci_lo, single.ci_hi, single.p]).all()
+    assert not result.zero_variance and not single.zero_variance
+
+
+def test_identical_animal_summaries_are_flagged_and_untested():
+    """Every animal the same: the interval has no width and there is no p."""
+    for value in (2.0, 0.0):
+        result = animal_t_test(np.full(3, value), np.array(["a", "b", "c"]))
+
+        assert result.zero_variance
+        assert np.isnan(result.p)
+        assert (result.ci_lo, result.ci_hi) == (value, value)
 
 
 def test_the_animal_interval_is_the_t_interval():
@@ -1240,6 +1337,7 @@ def test_calibration_statistics_bin_by_probability_and_call_the_trend():
 
 
 def test_rate_calibration_and_coordinated_silence():
+    """Observed spikes and silences against each encoding's prediction."""
     rng = np.random.default_rng(6)
     n = 300
     table = pd.DataFrame(
@@ -1248,28 +1346,27 @@ def test_rate_calibration_and_coordinated_silence():
             "animal": np.repeat(["aa", "bb"], n // 2),
             "kind": "calib", "state": "", "regime": "immobile",
             "p_No-Spike": rng.random(n),
-            "run_ns_count": rng.poisson(1.0, n).astype(float),
-            "run_ns_expected": rng.uniform(0.5, 2.0, n),
-            "can_ns_expected": rng.uniform(0.5, 1.5, n),
-            "run_ns_silent_frac": rng.random(n),
-            "run_ns_pred_silent": rng.random(n),
-            "can_ns_pred_silent": rng.random(n),
-            "run_cond_S_silent": rng.integers(0, 20, n).astype(float),
+            "runcv_ns_count": rng.poisson(1.0, n).astype(float),
+            "runcv_ns_silent_frac": rng.random(n),
+            "runcv_cond_S_silent": rng.integers(0, 20, n).astype(float),
         }
     )  # fmt: skip
-    table["run_cond_both_silent"] = np.floor(table.run_cond_S_silent * 0.5)
-    table["run_cond_pred_C_silent"] = table.run_cond_S_silent * 0.2
-    table["can_cond_pred_C_silent"] = table.run_cond_S_silent * 0.3
+    table["runcv_cond_both_silent"] = np.floor(table.runcv_cond_S_silent * 0.5)
+    for prefix, share in [("runcv", 0.1), ("run", 0.2), ("can", 0.3)]:
+        table[f"{prefix}_ns_expected"] = rng.uniform(0.5, 2.0, n)
+        table[f"{prefix}_ns_pred_silent"] = rng.random(n)
+        table[f"{prefix}_cond_pred_C_silent"] = table.runcv_cond_S_silent * share
 
     rate = rate_calibration(table).set_index(["regime", "encoding", "animal"])
-    pooled = rate.loc[("immobile", "running-only", "all")]
+    assert set(rate.index.get_level_values("encoding")) == set(ENCODING_LABELS.values())
+    pooled = rate.loc[("immobile", ENCODING_LABELS["runcv"], "all")]
     assert pooled["observed_over_expected"] == pytest.approx(
-        table.run_ns_count.sum() / table.run_ns_expected.sum()
+        table.runcv_ns_count.sum() / table.runcv_ns_expected.sum()
     )
     bb = table[table.animal == "bb"]
-    assert rate.loc[("immobile", "canonical", "bb")][
+    assert rate.loc[("immobile", ENCODING_LABELS["can"], "bb")][
         "observed_over_expected"
-    ] == pytest.approx(bb.run_ns_count.sum() / bb.can_ns_expected.sum())
+    ] == pytest.approx(bb.runcv_ns_count.sum() / bb.can_ns_expected.sum())
 
     default = coordinated_silence(table)
     assert not [c for c in default if c.endswith("_window_level")]
@@ -1279,19 +1376,19 @@ def test_rate_calibration_and_coordinated_silence():
         0
     ]
     assert every["obs_C_silent_given_S_silent"] == pytest.approx(
-        table.run_cond_both_silent.sum() / table.run_cond_S_silent.sum()
+        table.runcv_cond_both_silent.sum() / table.runcv_cond_S_silent.sum()
     )
-    assert every["pred_given_S_can"] == pytest.approx(0.3)
-    assert every["pred_given_S_run"] == pytest.approx(0.2)
+    for prefix, share in [("runcv", 0.1), ("run", 0.2), ("can", 0.3)]:
+        assert every[f"pred_given_S_{prefix}"] == pytest.approx(share)
+        assert every[f"pred_{prefix}_animal_estimate"] == pytest.approx(share)
     assert every["obs_given_ci_lo_window_level"] < every["obs_C_silent_given_S_silent"]
     assert every["obs_C_silent_given_S_silent"] < every["obs_given_ci_hi_window_level"]
     sums = table.groupby("epoch_id")[
-        ["run_cond_both_silent", "run_cond_S_silent"]
+        ["runcv_cond_both_silent", "runcv_cond_S_silent"]
     ].sum()
-    ratios = sums.run_cond_both_silent / sums.run_cond_S_silent
+    ratios = sums.runcv_cond_both_silent / sums.runcv_cond_S_silent
     assert every["obs_animal_estimate"] == pytest.approx(ratios.mean())
     assert every["obs_epoch_estimate"] == pytest.approx(ratios.mean())
-    assert every["pred_can_animal_estimate"] == pytest.approx(0.3)
     assert every["excess_can_animal_estimate"] == pytest.approx(ratios.mean() - 0.3)
     excess = ratios - 0.3
     assert (every["excess_can_animal_ci_lo"], every["excess_can_animal_ci_hi"]) == (
@@ -1306,7 +1403,7 @@ def test_rate_calibration_and_coordinated_silence():
     assert every["excess_can_p_animal_t"] == pytest.approx(
         ttest_1samp(ratios - 0.3, 0.0).pvalue
     )
-    assert np.isfinite(every["excess_can_p_epoch_signflip"])
+    assert np.isfinite(every["excess_runcv_p_epoch_signflip"])
     by_bin = silence[silence.state == "P(No-Spike) bin"]
     assert by_bin.n_windows.sum() == n
 

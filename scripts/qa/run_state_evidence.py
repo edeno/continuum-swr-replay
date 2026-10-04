@@ -18,18 +18,27 @@ Per epoch (a dask CPU worker each):
    project's loader (``load_data``; read-only Spyglass). Its time axis must be
    the decode's, and refitting the encoding model on it with that mask must
    reproduce the stored one exactly, so the marks are the decode's.
-4. **Encodings.** Primary: a running-only refit (head speed >= 4 cm/s); no
-   event bin may be in it. Secondary: the decode's own.
-5. **Per-tetrode terms** for the spikes in the scored bins, under both
-   encodings. Checked twice: summed over all tetrodes they reproduce the stored
-   ``results.nc`` log-likelihood on 2000 sampled bins (canonical), and the
-   library's own likelihood (``event_likelihood``) on a 200-bin block (both).
-6. **Evidence** under both encodings (``window_evidence``), 10 seeded tetrode
-   half-partitions x 2 directions.
+4. **Encodings** (``running_only_masks``): running-only refits (head speed
+   >= 4 cm/s), on every running bin and on each fold of alternating 30 s
+   blocks (``time_folds``), leaving out running bins within one bin of a
+   non-local event bin; no event bin may be in the library's padded training
+   span of any of them (``training_spike_bins``). The canonical encoding is the
+   decode's own.
+5. **Per-tetrode terms** for the spikes in the scored bins, one encoding at a
+   time. Checked twice: summed over all tetrodes the canonical terms reproduce
+   the stored ``results.nc`` log-likelihood on 2000 sampled bins, and every
+   encoding's terms reproduce the library's own likelihood
+   (``event_likelihood``) on a 200-bin block.
+6. **Evidence** under every encoding (``window_evidence``), 10 seeded tetrode
+   half-partitions x 2 directions. The primary, ``runcv_``, takes each window
+   from the fold model without its centre bin (``held_out_evidence``), so a
+   window's own spikes are not in the model that scores it.
 
-It writes ``per_epoch/{epoch}_windows.parquet`` (one row per window, columns
-``run_*`` for the running-only encoding and ``can_*`` for the canonical one)
-and ``per_epoch/{epoch}_validation.json``. An epoch whose decode files are
+It writes ``per_epoch/{epoch}_windows.parquet`` (one row per window; columns
+``runcv_*`` for the primary, time-held-out running-only encoding, ``run_*`` for
+the running-only encoding fit on every running bin and ``can_*`` for the
+canonical one; ``cv_fold`` and ``cv_insample_share``) and
+``per_epoch/{epoch}_validation.json``. An epoch whose decode files are
 missing is recorded as skipped with that reason; one that fails a check, or
 any step, as failed with its error, and the rest run. A rerun reuses an
 epoch already written with the same settings unless ``--overwrite``.
@@ -78,14 +87,18 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
     interior_bin_distances_cm,
 )
 from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: E402
+    CV_BLOCK_S,
+    ENCODING_HELD_OUT,
     ENCODING_KEY,
+    ENCODING_LABELS,
     MIN_BIN_WINDOWS,
+    PRIMARY_ENCODING,
     PROBABILITY_BIN_LABELS,
     STATES,
-    TetrodeTerms,
     build_windows,
     encoding_inputs,
     event_likelihood,
+    held_out_evidence,
     interior_bin_mask,
     keyed_rng,
     load_detector,
@@ -95,7 +108,10 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: 
     regimes,
     summarize_state_evidence,
     tetrode_halves,
+    time_folds,
+    training_spike_bins,
     window_evidence,
+    window_folds,
 )
 from continuum_swr_replay.data_loaders.utils import (  # noqa: E402
     get_training_timepoints,
@@ -128,10 +144,17 @@ one), so a tighter bound would fail an epoch on float error alone."""
 PROBABILITY_SUM_TOLERANCE = 1e-3
 PROBABILITY_COLUMNS = [f"{state.replace(' ', '_')}_prob" for state in STATES]
 SHARED_COLUMNS = ["n_spikes", "n_tetrodes", "animal_center_bin", "has_loc_partner"]
-ENCODINGS = ("run", "can")
+ENCODINGS = tuple(ENCODING_LABELS)
+"""The evidence column prefixes, the primary (time-held-out) encoding first."""
 
 CAVEATS = [
-    "Only the remote location is held out: S alone chooses MAP_S. The bouts and "
+    "Encodings, by column prefix: "
+    + "; ".join(f"{prefix}_ {text}" for prefix, text in ENCODING_HELD_OUT.items())
+    + ". Running bins within one bin of a non-local event bin are left out of "
+    "every running-only fit, so the library's padding of each training run (one "
+    "bin either side) takes in no event spike.",
+    "Only the remote location is held out by the tetrode split: S alone chooses "
+    "MAP_S. The bouts and "
     "probability bins come from the all-tetrode decode, so C's spikes helped make "
     "every state label.",
     "Run-averaged Local and No-Spike values (loc_*, ns_*) equal half the "
@@ -454,17 +477,26 @@ def epoch_table(
             f"encoding model, so the marks are not the decode's: {same}"
         )
 
-    # the running-only encoding: no event bin may be a training bin
-    running = speed >= RUNNING_ENCODING_MIN_SPEED_CM_S
-    n_event_running = int((running & in_event).sum())
-    if n_event_running:
-        raise ValueError(f"{n_event_running} non-local event bins are running bins")
-    running_only = refit_encoding(detector, time, position, spike_times, marks, running)
-    checks["running_only"] = {
-        "min_speed_cm_s": RUNNING_ENCODING_MIN_SPEED_CM_S,
-        "training_bins": int(running.sum()),
-        "event_bins_in_running": n_event_running,
-        "n_encoding_spikes": [len(x) for x in running_only["encoding_positions"]],
+    # the running-only encodings, checked against the library's padding
+    folds = time_folds(time, CV_BLOCK_S)
+    masks, checks["running_only"] = running_only_masks(
+        time, speed, position, in_event, folds
+    )
+    cv = window_folds(windows, folds)
+    in_span = {
+        f: np.r_[0, np.cumsum(training_spike_bins(time, position, masks[f"runcv{f}"]))]
+        for f in (0, 1)
+    }
+    scoring = 1 - cv.cv_fold.to_numpy()
+    touching = np.where(scoring == 0, in_span[0][e + 1] - in_span[0][s],
+                        in_span[1][e + 1] - in_span[1][s]) > 0  # fmt: skip
+    straddling = cv.cv_insample_share.to_numpy() > 0
+    checks["time_held_out"] = {
+        "block_s": CV_BLOCK_S,
+        "windows": len(windows),
+        "straddling_windows": int(straddling.sum()),
+        "straddling_share": float(straddling.mean()),
+        "windows_with_bins_in_the_scoring_models_spikes": int(touching.sum()),
     }
 
     # the spikes of every scored bin, of the stored-likelihood sample and of
@@ -475,41 +507,59 @@ def epoch_table(
     needed = in_window.copy()
     needed[block] = True
     kept_times, kept_marks = spikes_in_bins(spike_times, marks, time, needed)
-    terms: dict[str, TetrodeTerms] = {}
-    for name, encoding in (("run", running_only), ("can", stored)):
-        started = clock.perf_counter()
-        terms[name] = per_tetrode_terms(encoding, kept_times, kept_marks, time, centers)
-        log(f"{name} terms: {terms[name].time_bin.size} spikes, "
-            f"{clock.perf_counter() - started:.0f} s")  # fmt: skip
     checks["terms"] = {
-        "n_tetrodes": terms["can"].n_tetrodes,
+        "n_tetrodes": len(spike_times),
         "n_spikes_in_epoch": [int(np.asarray(x).size) for x in spike_times],
-        "n_spikes_scored": int(terms["can"].time_bin.size),
     }
 
-    # check 1: the summed canonical terms are the decode's stored likelihood
-    spiky = np.unique(terms["can"].time_bin[in_window[terms["can"].time_bin]])
-    sample = np.sort(
-        stream.choice(spiky, min(N_STORED_CHECK_BINS, spiky.size), replace=False)
-    )
-    stored_check = relative_error(
-        terms["can"].log_likelihood(sample),
-        stored_log_likelihood(files["results"], sample, interior),
-    )
-    checks["stored_log_likelihood"] = {"n_bins": int(sample.size), **stored_check}
-    if stored_check["max_rel"] > STORED_MAX_REL:
-        raise ValueError(
-            f"the summed per-tetrode terms do not reproduce results.nc: {stored_check}"
-        )
-    # check 2: each encoding's terms are the library's likelihood (the final row
-    # of a window's own decode holds no spike, so it is left out)
+    # each encoding in turn: its terms, their checks and its evidence; the
+    # canonical one first, as the stored likelihood checks the marks
+    halves = tetrode_halves(len(spike_times), seed=HALVES_SEED)
+    evidence: dict[str, pd.DataFrame] = {}
     checks["library_log_likelihood"] = {}
-    for name, encoding in (("run", running_only), ("can", stored)):
+    for name in ("can", "run", "runcv0", "runcv1"):
+        if name == "can":
+            encoding = stored
+        else:
+            encoding = refit_encoding(
+                detector, time, position, spike_times, marks, masks[name]
+            )
+            checks["running_only"][name]["n_encoding_spikes"] = [
+                len(x) for x in encoding["encoding_positions"]
+            ]
+        started = clock.perf_counter()
+        terms = per_tetrode_terms(encoding, kept_times, kept_marks, time, centers)
+        log(f"{name} terms: {terms.time_bin.size} spikes, "
+            f"{clock.perf_counter() - started:.0f} s")  # fmt: skip
+        if name == "can":
+            checks["terms"]["n_spikes_scored"] = int(terms.time_bin.size)
+            # check 1: the summed canonical terms are the decode's stored likelihood
+            spiky = np.unique(terms.time_bin[in_window[terms.time_bin]])
+            sample = np.sort(
+                stream.choice(
+                    spiky, min(N_STORED_CHECK_BINS, spiky.size), replace=False
+                )
+            )
+            stored_check = relative_error(
+                terms.log_likelihood(sample),
+                stored_log_likelihood(files["results"], sample, interior),
+            )
+            checks["stored_log_likelihood"] = {
+                "n_bins": int(sample.size),
+                **stored_check,
+            }
+            if stored_check["max_rel"] > STORED_MAX_REL:
+                raise ValueError(
+                    "the summed per-tetrode terms do not reproduce results.nc: "
+                    f"{stored_check}"
+                )
+        # check 2: the terms are the library's likelihood under this encoding
+        # (the final row of a window's own decode holds no spike, so it is left out)
         library, _, _ = event_likelihood(
             int(block[0]), int(block[-1]), time, linear, spike_times, marks,
             encoding_inputs(encoding)["encargs"],
         )  # fmt: skip
-        error = relative_error(terms[name].log_likelihood(block)[:-1], library[:-1])
+        error = relative_error(terms.log_likelihood(block)[:-1], library[:-1])
         checks["library_log_likelihood"][name] = {
             "n_bins": int(block.size - 1),
             **error,
@@ -518,24 +568,25 @@ def epoch_table(
             raise ValueError(
                 f"{name} terms differ from the library's likelihood: {error}"
             )
-
-    # evidence under both encodings
-    halves = tetrode_halves(terms["can"].n_tetrodes, seed=HALVES_SEED)
-    columns, shared = [], None
-    for name in ENCODINGS:
         started = clock.perf_counter()
-        evidence = window_evidence(
-            terms[name], windows, animal, distance, halves,
+        evidence[name] = window_evidence(
+            terms, windows, animal, distance, halves,
             no_spike_rate=no_spike_rate, seed=(SEED, epoch_id),
         )  # fmt: skip
         log(f"{name} evidence: {clock.perf_counter() - started:.0f} s")
-        if shared is None:
-            shared = evidence[SHARED_COLUMNS]
-            columns.append(shared)
-        elif not shared.equals(evidence[SHARED_COLUMNS]):
-            raise ValueError("the encodings scored different spikes or partners")
-        columns.append(evidence.drop(columns=SHARED_COLUMNS).add_prefix(f"{name}_"))
-    table = pd.concat([windows, *columns], axis=1)
+        del terms, encoding
+    # the primary: each window from the fold model without its centre bin
+    evidence["runcv"] = held_out_evidence(
+        [evidence.pop("runcv0"), evidence.pop("runcv1")], cv.cv_fold.to_numpy()
+    )
+    shared = evidence[PRIMARY_ENCODING][SHARED_COLUMNS]
+    if any(not shared.equals(evidence[name][SHARED_COLUMNS]) for name in ENCODINGS):
+        raise ValueError("the encodings scored different spikes or partners")
+    columns = [
+        evidence[name].drop(columns=SHARED_COLUMNS).add_prefix(f"{name}_")
+        for name in ENCODINGS
+    ]
+    table = pd.concat([windows, cv, shared, *columns], axis=1)
     cumulative_speed = np.r_[0.0, np.cumsum(np.where(np.isfinite(speed), speed, 0.0))]
     table.insert(0, "epoch_id", epoch_id)
     table.insert(1, "animal", parse_nwb_filename(f"{epoch_id.split('_')[0]}_.nwb")[0])
@@ -548,8 +599,9 @@ def epoch_table(
     # what the windows are, and two identities the evidence must meet
     rho = no_spike_rate * bin_s
     silent = table.n_spikes == 0
-    identity = table.run_ns_logratio - (
-        table.run_ns_expected - terms["run"].n_tetrodes / 2 * rho * table.n_bins
+    identity = table[f"{PRIMARY_ENCODING}_ns_logratio"] - (
+        table[f"{PRIMARY_ENCODING}_ns_expected"]
+        - len(spike_times) / 2 * rho * table.n_bins
     )
     no_spike_bouts = table[(table.kind == "bout") & (table.state == "No-Spike")]
     checks["windows"] = {
@@ -574,6 +626,76 @@ def epoch_table(
     return table, checks
 
 
+def running_only_masks(
+    time: NDArray,
+    speed: NDArray,
+    position: NDArray,
+    in_event: NDArray,
+    folds: NDArray,
+) -> tuple[dict[str, NDArray], dict]:
+    """The running-only encodings' training masks, and their record.
+
+    ``run`` is every running bin (head speed >= 4 cm/s); ``runcv0`` and
+    ``runcv1`` are the running bins of each fold (:func:`time_folds`). Running
+    bins within one bin of a non-local event bin are left out: the library
+    pads every training run by one bin on each side and bridges bins without a
+    position (:func:`training_spike_bins`), and no event spike may enter a
+    running-only encoding.
+
+    Parameters
+    ----------
+    time, speed : ndarray, shape (n_time,)
+    position : ndarray, shape (n_time, n_dims)
+        What the encoding is fit with.
+    in_event : ndarray of bool, shape (n_time,)
+        Non-local event bins.
+    folds : ndarray of int, shape (n_time,)
+
+    Returns
+    -------
+    masks : dict
+        ``run``, ``runcv0`` and ``runcv1``: bool, shape (n_time,).
+    record : dict
+        The counts: event bins, those at running speed, the running bins left
+        out, and per mask its training bins, the event bins among them and the
+        event bins in the library's padded span (0, or it raises).
+
+    Raises
+    ------
+    ValueError
+        An event bin is in a mask's library span, or a mask is empty.
+    """
+    at_speed = speed >= RUNNING_ENCODING_MIN_SPEED_CM_S
+    near_event = in_event | np.r_[in_event[1:], False] | np.r_[False, in_event[:-1]]
+    running = at_speed & ~near_event
+    masks = {
+        "run": running,
+        "runcv0": running & (folds == 0),
+        "runcv1": running & (folds == 1),
+    }
+    record: dict[str, Any] = {
+        "min_speed_cm_s": RUNNING_ENCODING_MIN_SPEED_CM_S,
+        "event_bins": int(in_event.sum()),
+        "event_bins_at_running_speed": int((in_event & at_speed).sum()),
+        "running_bins_left_out_near_events": int((near_event & at_speed).sum()),
+    }
+    for name, mask in masks.items():
+        if not mask.any():
+            raise ValueError(f"the {name} encoding has no training bin")
+        in_span = int((in_event & training_spike_bins(time, position, mask)).sum())
+        record[name] = {
+            "training_bins": int(mask.sum()),
+            "event_bins_in_training_bins": int((in_event & mask).sum()),
+            "event_bins_in_library_span": in_span,
+        }
+        if in_span:
+            raise ValueError(
+                f"{in_span} non-local event bins are in the {name} encoding's "
+                "training spikes (the library's padded span)"
+            )
+    return masks, record
+
+
 def run_settings() -> dict:
     """What every epoch of a run shares; a rerun reuses an epoch only on a match."""
     return {
@@ -586,8 +708,13 @@ def run_settings() -> dict:
         "calibration": "2000 random 10-bin windows per regime",
         "partners": "20 per window from its pool; Local partners >= 20 cm away",
         "encodings": {
-            "run": f"running-only refit, head_speed >= {RUNNING_ENCODING_MIN_SPEED_CM_S} cm/s",
+            "runcv": f"running-only (head_speed >= {RUNNING_ENCODING_MIN_SPEED_CM_S} "
+            f"cm/s) refit on each fold of alternating {CV_BLOCK_S:g} s blocks; a "
+            "window is scored by the fold without its centre bin",
+            "run": "running-only refit on every running bin",
             "can": "the decode's own (no_ripple training mask)",
+            "running_only_leaves_out": "running bins within one bin of a non-local "
+            "event bin",
         },
     }
 
@@ -699,35 +826,43 @@ def run_epochs(
 OKABE_ITO = {
     "bout": "#0072B2",
     "baseline": "#999999",
+    "runcv": "#009E73",
     "run": "#000000",
     "can": "#D55E00",
 }
 BOUT_FIGURE = [
-    ("Local", "run_loc_mark", "Local\nanimal vs mismatched position"),
-    ("Non-Local Continuous", "run_nl_anim_mark", "NL-Continuous\nMAP_S vs animal"),
+    ("Local", "runcv_loc_mark", "Local\nanimal vs mismatched position"),
+    ("Non-Local Continuous", "runcv_nl_anim_mark", "NL-Continuous\nMAP_S vs animal"),
     (
         "Non-Local Continuous",
-        "run_nl_null_mark",
+        "runcv_nl_null_mark",
         "NL-Continuous\nMAP_S vs mismatched MAP",
     ),
-    ("Non-Local Fragmented", "run_nl_anim_mark", "NL-Fragmented\nMAP_S vs animal"),
+    ("Non-Local Fragmented", "runcv_nl_anim_mark", "NL-Fragmented\nMAP_S vs animal"),
     (
         "Non-Local Fragmented",
-        "run_nl_null_mark",
+        "runcv_nl_null_mark",
         "NL-Fragmented\nMAP_S vs mismatched MAP",
     ),
-    ("No-Spike", "run_ns_logratio", "No-Spike\nsilence vs local, running-only"),
-    ("No-Spike", "can_ns_logratio", "No-Spike\nsilence vs local, canonical"),
+    ("No-Spike", "runcv_ns_logratio", "No-Spike\nsilence vs local coding"),
 ]
 CALIBRATION_FIGURE = [
-    ("Local", "run_loc_mark", "Local\nanimal vs mismatched"),
-    ("Local", "run_loc_vs_Sremote_mark", "Local\nanimal vs S's best remote bin"),
-    ("Non-Local Continuous", "run_nl_anim_mark", "NL-Continuous\nMAP_S vs animal"),
-    ("Non-Local Continuous", "run_nl_null_mark", "NL-Continuous\nMAP_S vs mismatched"),
-    ("Non-Local Fragmented", "run_nl_anim_mark", "NL-Fragmented\nMAP_S vs animal"),
-    ("Non-Local Fragmented", "run_nl_null_mark", "NL-Fragmented\nMAP_S vs mismatched"),
-    ("No-Spike", "can_ns_logratio", "No-Spike\nsilence vs local, canonical"),
-    ("No-Spike", "run_ns_silent_frac", "No-Spike\nheld-out half silent"),
+    ("Local", "runcv_loc_mark", "Local\nanimal vs mismatched"),
+    ("Local", "runcv_loc_vs_Sremote_mark", "Local\nanimal vs S's best remote bin"),
+    ("Non-Local Continuous", "runcv_nl_anim_mark", "NL-Continuous\nMAP_S vs animal"),
+    (
+        "Non-Local Continuous",
+        "runcv_nl_null_mark",
+        "NL-Continuous\nMAP_S vs mismatched",
+    ),
+    ("Non-Local Fragmented", "runcv_nl_anim_mark", "NL-Fragmented\nMAP_S vs animal"),
+    (
+        "Non-Local Fragmented",
+        "runcv_nl_null_mark",
+        "NL-Fragmented\nMAP_S vs mismatched",
+    ),
+    ("No-Spike", "runcv_ns_logratio", "No-Spike\nsilence vs local coding"),
+    ("No-Spike", "runcv_ns_silent_frac", "No-Spike\nheld-out half silent"),
 ]
 BIN_CENTERS = np.array([0.1, 0.3, 0.5, 0.7, 0.9])
 
@@ -775,7 +910,8 @@ def figure_bouts(windows: pd.DataFrame, path: Path) -> None:
                 ax.set_ylabel(f"{regime}\nheld-out evidence (nats)", fontsize=8)
     fig.suptitle(
         "Held-out spike evidence: confident bouts (P > 0.8) against matched random "
-        "windows (same regime, same length)\nRunning-only encoding, spike-mark part "
+        "windows (same regime, same length)\nTime-held-out running-only encoding, "
+        "spike-mark part "
         "unless noted; box = IQR, whiskers 5-95 %, line = median, diamond = mean; "
         "20 tetrode splits averaged",
         fontsize=9,
@@ -861,7 +997,7 @@ def figure_silence(silence: pd.DataFrame, path: Path) -> None:
             color=OKABE_ITO["bout"], marker="o", ms=3.5, lw=1.2, capsize=2,
             label="observed",
         )  # fmt: skip
-        for prefix, label in (("run", "running-only"), ("can", "canonical")):
+        for prefix, label in ENCODING_LABELS.items():
             ax.plot(
                 BIN_CENTERS[ok], by_bin[f"pred_{prefix}_animal_estimate"].to_numpy()[ok],
                 color=OKABE_ITO[prefix], ls=":", lw=1.2,

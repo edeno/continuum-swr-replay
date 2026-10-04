@@ -416,3 +416,83 @@ def per_tetrode_terms(
         tetrode=np.concatenate(tetrodes) if tetrodes else np.zeros(0, np.int64),
         bin_s=float(np.median(np.diff(time))),
     )
+
+
+CV_BLOCK_S = 30.0
+"""Length of the alternating time blocks of the 2-fold time-held-out encodings,
+the prototype's."""
+
+
+def time_folds(time: NDArray, block_s: float = CV_BLOCK_S) -> NDArray[np.int8]:
+    """Each decode bin's fold, 0 or 1: alternating ``block_s`` blocks from the first.
+
+    The prototype's ``cv_terms.fold_of``. The time-held-out encoding of fold f
+    is fit on the running bins of fold f only, and scores the windows of the
+    other fold (:func:`~.windows.window_folds`).
+
+    Parameters
+    ----------
+    time : ndarray, shape (n_time,)
+        The decode's time axis, s.
+    block_s : float, optional
+
+    Returns
+    -------
+    ndarray of int8, shape (n_time,)
+    """
+    time = np.asarray(time, dtype=float)
+    folds: NDArray[np.int8] = (
+        np.floor((time - time[0]) / block_s).astype(np.int64) % 2
+    ).astype(np.int8)
+    return folds
+
+
+def training_spike_bins(
+    time: NDArray, position: NDArray, is_training: NDArray
+) -> NDArray[np.bool_]:
+    """The decode bins whose spikes ``fit_encoding_model`` trains on.
+
+    The library's clusterless fit (``ClusterlessDetector._get_group_spike_data``
+    in ``non_local_detector.models.base``) drops the bins whose position has a
+    NaN, labels the runs of consecutive training bins among the rest, and keeps
+    every spike from one bin before a run's first bin time to one bin after its
+    last (``start_time -= time_delta``; ``stop_time += time_delta``). So a run
+    pads its neighbours, the bin before entirely and the bin after at its start,
+    and a run across a NaN-position bin covers that bin too. A bin counts here
+    when the decoder (``np.digitize(spike_times, time[1:-1])``) would put a
+    kept spike in it; spikes outside ``time[0]``-``time[-1]`` are not scored.
+
+    Parameters
+    ----------
+    time : ndarray, shape (n_time,)
+        The decode's time axis, s.
+    position : ndarray, shape (n_time,) or (n_time, n_dims)
+        The position the encoding is fit with.
+    is_training : ndarray of bool, shape (n_time,)
+
+    Returns
+    -------
+    ndarray of bool, shape (n_time,)
+    """
+    time = np.asarray(time, dtype=float)
+    position = np.asarray(position, dtype=float)
+    if position.ndim == 1:
+        position = position[:, np.newaxis]
+    valid = ~np.isnan(position).any(axis=1)
+    valid_time = time[valid]
+    training = np.asarray(is_training, dtype=bool)[valid]
+    covered = np.zeros(time.size, dtype=bool)
+    if not training.any():
+        return covered
+    rows = np.flatnonzero(training)
+    new_run = np.r_[True, np.diff(rows) > 1]  # consecutive among the valid bins
+    first, last = rows[new_run], rows[np.r_[new_run[1:], True]]
+    delta = valid_time[1] - valid_time[0]  # as the library takes it
+    low = np.maximum(valid_time[first] - delta, time[0])
+    high = np.minimum(valid_time[last] + delta, time[-1])
+    edges = time[1:-1]
+    change = np.zeros(time.size + 1, dtype=np.int64)
+    np.add.at(change, np.digitize(low, edges), 1)
+    np.add.at(change, np.digitize(high, edges) + 1, -1)
+    covered[:] = np.cumsum(change[:-1]) > 0
+    return covered
