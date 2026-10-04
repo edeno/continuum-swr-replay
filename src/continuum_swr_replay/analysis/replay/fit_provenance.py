@@ -77,6 +77,10 @@ def git_hash() -> str:
         ``git rev-parse HEAD``, plus ``-dirty`` when
         ``git status --porcelain --untracked-files=no`` is non-empty. Untracked
         files do not count as dirty: they cannot change how the code ran.
+        ``status`` runs with ``--no-optional-locks``, as in
+        ``decoding_common.provenance_record``: by default it refreshes the
+        index and writes it back under a lock, and the runners that record
+        this commit run in a checkout that other work commits in.
     """
     head = subprocess.run(
         ["git", "rev-parse", "HEAD"],
@@ -86,7 +90,7 @@ def git_hash() -> str:
         check=True,
     ).stdout.strip()
     porcelain = subprocess.run(
-        ["git", "status", "--porcelain", "--untracked-files=no"],
+        ["git", "--no-optional-locks", "status", "--porcelain", "--untracked-files=no"],
         cwd=_REPO_ROOT,
         capture_output=True,
         text=True,

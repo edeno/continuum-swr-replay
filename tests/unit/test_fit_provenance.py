@@ -11,14 +11,18 @@ import ast
 import hashlib
 import importlib.util
 import json
+import os
 import re
+import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
 
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.replay import fit_provenance
 from continuum_swr_replay.analysis.replay.fit_provenance import (
     check_fit_provenance,
     fit_provenance_path,
@@ -171,6 +175,45 @@ def test_sidecar_records_the_current_commit(fit_dir, inputs):
     recorded = json.loads(fit_provenance_path(fit_dir / "all_models.pkl").read_text())
     assert recorded["git_hash"] == git_hash()
     assert re.fullmatch(r"[0-9a-f]{40}(-dirty)?", recorded["git_hash"])
+
+
+def _git_repo(path: Path) -> Callable[..., str]:
+    """Commit one file in a new git repo at `path`; return a git runner for it."""
+
+    def git(*args: str) -> str:
+        return subprocess.run(
+            ["git", *args], cwd=path, check=True, capture_output=True, text=True
+        ).stdout.strip()
+
+    config = ["-c", "user.name=test", "-c", "user.email=test@example.com"]
+    config += ["-c", "commit.gpgsign=false"]
+    git("init", "-q")
+    (path / "tracked.txt").write_text("tracked")
+    git("add", "tracked.txt")
+    git(*config, "commit", "-q", "-m", "tracked")
+    return git
+
+
+def test_git_hash_never_writes_the_git_index(tmp_path, monkeypatch):
+    """By default ``git status`` refreshes the index and writes it back under a
+    lock. The Widloski runner records its commit in a checkout that other work
+    commits in, so, like ``decoding_common.provenance_record``, it must not write.
+    """
+    git = _git_repo(tmp_path)
+    tracked = tmp_path / "tracked.txt"
+    stat = tracked.stat()
+    # A new mtime with the same content: the index's cached stat is now stale.
+    os.utime(tracked, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1_000_000_000))
+    index = tmp_path / ".git" / "index"
+    before = _sha256(index)
+    monkeypatch.setattr(fit_provenance, "_REPO_ROOT", tmp_path)
+
+    assert git_hash() == git("rev-parse", "HEAD")
+    assert _sha256(index) == before
+
+    # The control: a plain status does refresh and rewrite this index.
+    git("status", "--porcelain")
+    assert _sha256(index) != before
 
 
 def test_checker_returns_no_stale_inputs_when_nothing_changed(fit_dir, inputs):
