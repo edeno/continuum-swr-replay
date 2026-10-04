@@ -13,8 +13,8 @@ python run_decoding_bandit.py --animal chimi --brain_area HPC
 # Decode specific session
 python run_decoding_bandit.py --animal chimi --date 20200212 --epoch 02_r1
 
-# With non-stationary model and interactive visualization
-python run_decoding_bandit.py --animal chimi --non_stationary --create_figurl
+# With interactive visualization
+python run_decoding_bandit.py --animal chimi --create_figurl
 
 # Overwrite existing results
 python run_decoding_bandit.py --animal chimi --overwrite
@@ -47,7 +47,6 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from non_local_detector import NonLocalClusterlessDetector, NonLocalSortedSpikesDetector
-from non_local_detector.discrete_state_transitions import DiscreteNonStationaryDiagonal
 from non_local_detector.environment import Environment
 
 from continuum_swr_replay.analysis.hippocampus import get_data_over_time, load_results
@@ -64,12 +63,17 @@ from continuum_swr_replay.decoding_common import (
     setup_logger,
     write_atomically,
 )
+from continuum_swr_replay.decoding_transitions import (
+    NON_STATIONARY_REFUSAL,
+    nonlocal_transition_settings,
+)
 from continuum_swr_replay.parameters import (
     DETECTOR_CONFIG,
     PLACE_BIN_SIZE_1D,
     PLACE_BIN_SIZE_2D,
     PROCESSED_DATA_DIR,
     ROOT_DIR,
+    SAMPLING_FREQUENCY,
 )
 from continuum_swr_replay.types import SessionData
 from continuum_swr_replay.visualization.figurl import (
@@ -96,9 +100,12 @@ def create_detector(
     brain_area: str,
     env: Environment,
     config: NonLocalDecodingConfig,
-    discrete_transition_type,
 ) -> NonLocalClusterlessDetector | NonLocalSortedSpikesDetector:
-    """Factory for creating the appropriate detector for a brain area."""
+    """Factory for creating the appropriate detector for a brain area.
+
+    The discrete transitions come from ``nonlocal_transition_settings`` (setting
+    P30-B, decision R10), never from the library's defaults.
+    """
     if brain_area not in DETECTOR_CLASSES:
         valid_areas = list(DETECTOR_CLASSES.keys())
         raise ValueError(
@@ -112,7 +119,7 @@ def create_detector(
     return detector_class(
         environments=env,
         **{param_key: params},
-        discrete_transition_type=discrete_transition_type,
+        **nonlocal_transition_settings(SAMPLING_FREQUENCY),
         local_position_std=config.local_position_std,
     )
 
@@ -132,7 +139,14 @@ def perform_decoding(
 ) -> tuple[
     xr.Dataset, NonLocalClusterlessDetector | NonLocalSortedSpikesDetector, Environment
 ]:
-    """Perform neural decoding for a given brain area."""
+    """Perform neural decoding for a given brain area.
+
+    Raises ``ValueError`` when ``non_stationary`` is True: the library's
+    non-stationary transitions are disabled (``NON_STATIONARY_REFUSAL``).
+    """
+    if non_stationary:
+        raise ValueError(NON_STATIONARY_REFUSAL)
+
     if is_1d:
         env = Environment(
             place_bin_size=PLACE_BIN_SIZE_1D,
@@ -147,29 +161,16 @@ def perform_decoding(
 
     config = NonLocalDecodingConfig()
 
-    if non_stationary:
-        discrete_transition_covariate_data = {
-            "speed": position_info["head_speed"].to_numpy()
-        }
-        # 4 states: Local, No-Spike, Non-Local Continuous, Non-Local Fragmented
-        diagonal_values = np.array([0.99, 0.98, 0.98, 0.98])
-        discrete_transition_type = DiscreteNonStationaryDiagonal(
-            diagonal_values=diagonal_values,
-        )
-    else:
-        discrete_transition_covariate_data = None
-        discrete_transition_type = None
-
     logger.info(f"Decoding {brain_area}...")
 
-    detector = create_detector(brain_area, env, config, discrete_transition_type)
+    detector = create_detector(brain_area, env, config)
 
     estimate_params = {
         "position_time": position_info.index.to_numpy(),
         "position": position_info[["head_position_x", "head_position_y"]].to_numpy(),
         "spike_times": spike_times,
         "time": position_info.index.to_numpy(),
-        "discrete_transition_covariate_data": discrete_transition_covariate_data,
+        "discrete_transition_covariate_data": None,
     }
 
     # Apply the training mask (e.g. no_ripple) for every brain area — the
@@ -463,6 +464,8 @@ def main() -> None:
     parser.add_argument("--non_local_threshold", type=float, default=0.8)
     parser.add_argument("--create_figurl", action="store_true")
     args = parser.parse_args()
+    if args.non_stationary:
+        parser.error(NON_STATIONARY_REFUSAL)
 
     run_batch(
         run_decode,
