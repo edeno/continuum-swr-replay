@@ -947,6 +947,21 @@ for the epoch, the rule (`loader`) and the first 16 hex digits of the decode's
 read, and neither is the pilot's `{epoch_id}_decode_time_marks.pkl`, made under the April
 decodes' rule, which keeps more spikes and so could pass the guard.
 
+**Running it.** `--epoch-id`, `--animal` or `--all` chooses the decodes, and `--date`
+(such as `20200225`, the last 8 characters of the NWB file's stem, so `j1620210707` is
+20210707) and `--epoch` (such as `02_r1`) narrow the choice. By default the epochs run one
+after another in one process. With `--cuda_visible_devices` they run in parallel, as the
+decoders do: a dask `LocalCUDACluster` with one worker per listed GPU runs one epoch per
+task, and its workers' scratch goes to `--local_scratch_dir`. The main process alone
+writes `manifest.json`, after each epoch finishes, and each epoch logs to
+`logs/{epoch_id}_memoryless.log`. In either mode a failed epoch is recorded and the rest
+run on. A device list is refused when `dask_cuda` is not importable. The full run:
+
+```bash
+uv run python scripts/decoding/run_memoryless_detection.py --run-seed 20260922 \
+    --all --cuda_visible_devices <cards>
+```
+
 ## Data flow, per epoch
 
 1. Load `encoding_model_[("", 0)]` from `{epoch}_detector.pkl`; compute prior-excluded
@@ -1098,7 +1113,10 @@ Timing column names mirror the canonical event table so comparison code is symme
 `ms_event_id` is deliberately a different key from `event_id` (D6).
 The run manifest records model/artifact hashes, code versions, thresholds, time grid,
 encoding/training provenance, the marks' rule, cache file and hash,
-shuffle definition/seeds/scoring conventions, and any skipped epochs.
+shuffle definition/seeds/scoring conventions, and any skipped epochs. Its settings also
+hold the environment (`uv.lock`'s sha256, the commit `ripple_detection` was installed
+from, the CUDA plugin's version), and a rerun under the same run id in another
+environment is refused, as one under another library version is.
 Export 03's observation intervals from input and output availability before applying
 detection gates, accounting for full window support at edges and gaps. An empty event
 table alone cannot distinguish an observed interval from a failed or unavailable run.

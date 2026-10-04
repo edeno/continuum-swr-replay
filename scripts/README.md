@@ -11,7 +11,11 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
   on each HPC epoch's saved decode, with its encoding-pair shuffle; one row per
   candidate sequence (spec 02). Loads the marks from the Spyglass database
   unless `--cache-dir` already holds them; a failing epoch is recorded and the
-  rest run; `run.log` and `manifest.json` sit beside the outputs.
+  rest run; `run.log` and `manifest.json` sit beside the outputs. `--date` and
+  `--epoch` narrow `--epoch-id`, `--animal` or `--all`. With
+  `--cuda_visible_devices` the epochs run in parallel on a dask
+  `LocalCUDACluster`, one epoch per GPU at a time, each logging to
+  `logs/{epoch_id}_memoryless.log`; only the main process writes the manifest.
 - `prepare_replay_content_data.py` — build the canonical replay-content tables
   (event / event-arm / event-patch / event-sequence / stop) across all sessions.
 - `regenerate_stop_table.py` — rebuild the per-stop immobility table.

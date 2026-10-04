@@ -28,13 +28,22 @@ Each epoch writes, under ``Processed-Data/replay_detection_comparison/memoryless
 time grid, a hash of every input, the marks' rule and hash, the encoding model's
 settings, and the outcome. It is rewritten atomically after each epoch, so a
 run that stops part way still says what it did, and a rerun under the same
-run id refuses to continue with different settings, code or library
-versions. An epoch that fails is recorded as ``failed`` with its error and the
-run goes on to the next; the run then exits non-zero, and a rerun under the
-same run id retries the failed epochs. That holds for a transient failure; after a code fix the
+run id refuses to continue with different settings, code, library versions or
+environment (``uv.lock``'s sha256, the commit ``ripple_detection`` was
+installed from, the CUDA plugin's version). An epoch that fails is recorded as
+``failed`` with its error and the run goes on to the next; the run then exits
+non-zero, and a rerun under the same run id retries the failed epochs. That holds for a transient failure; after a code fix the
 commit, and so the default run id, has changed, and the finished epochs are
 recomputed under the new one, which is what the settings gate is for.
 ``run.log`` beside the manifest keeps everything printed.
+
+Without ``--cuda_visible_devices`` the epochs run one after another in this
+process. With it they run in parallel, as the decoders do: a dask
+``LocalCUDACluster`` with one worker per listed GPU runs one epoch per task.
+Each epoch logs to ``logs/{epoch_id}_memoryless.log`` under the working
+directory, and only this process writes ``manifest.json``, as each epoch
+finishes, in the order they finish. A device list is refused when ``dask_cuda``
+is not importable.
 
 The marks come from the Spyglass database unless ``--cache-dir`` already holds
 this decode's from an earlier run. A cache file is named for the epoch, the
@@ -50,7 +59,9 @@ made another way carries suffixes in the order the decode appends them:
 ``_contfrag``, a ripple detector (``_Karlsson``), ``_non_stationary``, and a
 training type (``_all``). ``--animal`` and ``--all`` run canonical decodes
 only unless ``--include-variants`` is given; ``--epoch-id`` runs whatever it
-names.
+names. ``--date`` and ``--epoch`` narrow any of the three. The date is the
+last 8 characters of the NWB file's stem, so ``j1620210707`` was recorded on
+20210707; the epoch is a name such as ``02_r1``.
 
 Usage:
     python scripts/decoding/run_memoryless_detection.py --run-seed 20260922 \\
@@ -59,16 +70,21 @@ Usage:
         --animal chimi
     python scripts/decoding/run_memoryless_detection.py --run-seed 20260922 \\
         --animal chimi --no-shuffle      # the detector alone, much faster
+    python scripts/decoding/run_memoryless_detection.py --run-seed 20260922 \\
+        --animal chimi --date 20200212 --epoch 02_r1
+    python scripts/decoding/run_memoryless_detection.py --run-seed 20260922 \\
+        --all --cuda_visible_devices 0,1,2,3   # an epoch at a time on each GPU
 """
 
 import argparse
+import functools
 import hashlib
 import json
 import logging
 import os
 import sys
 import traceback
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from importlib.metadata import version
@@ -78,8 +94,11 @@ from typing import Any
 import joblib
 import numpy as np
 import pandas as pd
+from dask.distributed import Client, as_completed
+from distributed.deploy import Cluster
 from numpy.typing import NDArray
 
+from continuum_swr_replay import decoding_common
 from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
     MemorylessSequenceConfig,
@@ -103,7 +122,12 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle impor
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import git_hash
 from continuum_swr_replay.data_loaders.spikes import filter_spike_times, get_hpc_marks
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.decoding_common import (
+    provenance_record,
+    setup_logger,
+    write_atomically,
+)
+from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR
 from continuum_swr_replay.table_io import sha256_file, write_table
 
 OUTPUT_ROOT = PROCESSED_DATA_DIR / "replay_detection_comparison" / "memoryless"
@@ -249,6 +273,40 @@ def find_epochs(
     return epochs, skipped
 
 
+def select_epochs(
+    epoch_ids: list[str], *, date: int | None, epoch: str | None
+) -> list[str]:
+    """The epochs recorded on `date` and named `epoch`, in their given order.
+
+    Parameters
+    ----------
+    epoch_ids : list of str
+    date : int or None
+        Such as ``20200225``: the last 8 characters of the NWB file's stem, as
+        ``prepare_data.py`` reads them, so ``j1620210707`` is 20210707. None
+        keeps every date.
+    epoch : str or None
+        Such as ``02_r1``, the identifier's epoch name. None keeps every epoch.
+
+    Returns
+    -------
+    list of str
+    """
+    if date is None and epoch is None:
+        # nothing is parsed, so a name no decode writes still reaches run_one,
+        # which records it as failed
+        return list(epoch_ids)
+    selected = []
+    for epoch_id in epoch_ids:
+        key = parse_epoch_identifier(epoch_id)
+        stem = key.nwb_file_name.removesuffix("_.nwb")
+        if (date is None or int(stem[-8:]) == date) and (
+            epoch is None or key.epoch_name == epoch
+        ):
+            selected.append(epoch_id)
+    return selected
+
+
 def marks_cache_path(key: EpochKey, cache_dir: Path, detector_sha256: str) -> Path:
     """Where one decode's marks are cached under :data:`MARKS_RULE`.
 
@@ -271,7 +329,8 @@ def load_marks(
 
     ``get_hpc_marks``, then ``filter_spike_times`` over the decode's time span:
     ``load_data`` filters over the position grid, which is the decode's grid.
-    Cached per decode file (:func:`marks_cache_path`).
+    Cached per decode file (:func:`marks_cache_path`), written atomically, so a
+    worker stopped part way never leaves half a cache for a rerun to read.
 
     Parameters
     ----------
@@ -303,7 +362,7 @@ def load_marks(
     )
     marks = (in_span_times["HPC"], in_span_features["HPC"])
     cache_dir.mkdir(parents=True, exist_ok=True)
-    joblib.dump(marks, cache)
+    write_atomically(cache, lambda path: joblib.dump(marks, path))
     return marks
 
 
@@ -502,11 +561,22 @@ def run_settings(
     config: MemorylessSequenceConfig,
     git_commit: str,
 ) -> dict:
-    """What every epoch of one run must share; a resume must match it."""
+    """What every epoch of one run must share; a resume must match it.
+
+    ``environment`` is the decoders' provenance record (``provenance_record``)
+    without ``dirty``, which the run id and ``git_commit`` already carry: it
+    holds ``uv.lock``'s sha256, the commit ``ripple_detection`` was installed
+    from and the CUDA plugin's version.
+    """
     return {
         "git_commit": git_commit,
         "libraries": {
             name: version(name) for name in ("non_local_detector", "numpy", "pandas")
+        },
+        "environment": {
+            name: value
+            for name, value in provenance_record(ROOT_DIR).items()
+            if name != "dirty"
         },
         "config": asdict(config),
         "shuffle": {
@@ -535,6 +605,105 @@ def write_manifest(path: Path, manifest: dict) -> None:
     os.replace(temporary, path)
 
 
+def _counts(record: dict) -> str:
+    """What one epoch found, as the logs report it."""
+    return (
+        f"{record['n_windows']} windows ({record['n_windows_speed_unknown']} with "
+        f"unknown speed), {record['n_candidates']} candidates, "
+        f"{record['n_replay']} replay, {record['n_swr_unknown']} unknown SWR "
+        f"coverage, {record['n_shuffled']} shuffled "
+        f"({record['n_shuffle_untestable']} untestable), "
+        f"{record['n_shuffle_pass']} passing the shuffle"
+    )
+
+
+def _failure_record(error: BaseException, git_commit: str) -> dict:
+    """What the manifest records for an epoch that failed in a dask task."""
+    return {
+        "status": "failed",
+        "git_commit": git_commit,
+        "produced_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "error": repr(error),
+        "traceback": "".join(traceback.format_exception(error)),
+    }
+
+
+def _run_one_logged(epoch_id: str, run_one_kwargs: dict, log_directory: Path) -> dict:
+    """One dask task: :func:`run_one`, logged to the epoch's own file.
+
+    A failure is returned rather than raised, so that it is recorded and the
+    other epochs run on.
+    """
+    log = setup_logger(
+        name_logfile=f"{epoch_id}_memoryless",
+        path_logfile=log_directory / f"{epoch_id}_memoryless.log",
+    )
+    git_commit = run_one_kwargs["provenance"]["git_commit"]
+    log.info("%s: run %s, commit %s", epoch_id, run_one_kwargs["run_id"], git_commit)
+    try:
+        record = run_one(epoch_id, **run_one_kwargs)
+    except Exception as error:  # noqa: BLE001 - one epoch must not stop the rest
+        log.exception("failed")
+        return _failure_record(error, git_commit)
+    log.info("%s", _counts(record))
+    return record
+
+
+def run_epochs(
+    epoch_ids: list[str],
+    run_one_kwargs: dict,
+    cluster_factory: Callable[[], Cluster],
+) -> Iterator[tuple[str, dict]]:
+    """Run each epoch as its own dask task; yield each record as it finishes.
+
+    Each task runs :func:`run_one` and logs to ``logs/{epoch_id}_memoryless.log``
+    under the working directory. Nothing here writes the manifest: the caller
+    does, after each record, so it has a single writer.
+
+    Parameters
+    ----------
+    epoch_ids : list of str
+    run_one_kwargs : dict
+        Every argument of :func:`run_one` but the epoch.
+    cluster_factory : callable
+        Makes the cluster, which is closed once the last record is yielded;
+        none is made for no epochs. Its workers should run one task at a time,
+        as ``LocalCUDACluster``'s do: ``setup_logger`` reconfigures logging for
+        the whole worker process, which closes the log of any other task
+        running in it.
+
+    Yields
+    ------
+    epoch_id : str
+    record : dict
+        What :func:`run_one` returned, in the order the epochs finish. A
+        failure is ``status`` ``"failed"`` with ``error``, its repr, and its
+        traceback. It is caught in its worker, or here when the worker could
+        not return it, as when the worker's process died.
+    """
+    if not epoch_ids:
+        return
+    log_directory = Path.cwd() / "logs"
+    git_commit = run_one_kwargs["provenance"]["git_commit"]
+    with cluster_factory() as cluster, Client(cluster) as client:
+        futures = {
+            client.submit(
+                _run_one_logged,
+                epoch_id,
+                run_one_kwargs,
+                log_directory,
+                key=f"memoryless-{epoch_id}",
+            ): epoch_id
+            for epoch_id in epoch_ids
+        }
+        for future in as_completed(futures):
+            try:
+                record = future.result()
+            except Exception as error:  # noqa: BLE001 - the worker could not return it
+                record = _failure_record(error, git_commit)
+            yield futures[future], record
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -543,6 +712,13 @@ def main(argv: list[str] | None = None) -> None:
     which.add_argument("--epoch-id", action="append", help="One epoch; repeatable.")
     which.add_argument("--animal", help="Every canonical HPC decode of this animal.")
     which.add_argument("--all", action="store_true", help="Every canonical HPC decode.")
+    parser.add_argument(
+        "--date",
+        type=int,
+        help="Only epochs recorded on this date, such as 20200225: the last 8 "
+        "characters of the NWB file's stem.",
+    )
+    parser.add_argument("--epoch", help="Only this epoch, such as 02_r1.")
     parser.add_argument(
         "--run-seed", type=int, required=True, help="Recorded in the manifest."
     )
@@ -566,6 +742,17 @@ def main(argv: list[str] | None = None) -> None:
         help="The sensitivity setting: do not drop runs of one kept window "
         "before merging. Recorded in the manifest's config.",
     )
+    parser.add_argument(
+        "--cuda_visible_devices",
+        help="Run the epochs in parallel on these GPUs, such as 0,1,2: a dask "
+        "LocalCUDACluster with one worker per GPU and one epoch per task. "
+        "Without it the epochs run one after another in this process.",
+    )
+    parser.add_argument(
+        "--local_scratch_dir",
+        default=".local_scratch",
+        help="The dask workers' scratch folder, with --cuda_visible_devices.",
+    )
     args = parser.parse_args(argv)
 
     shuffle = not args.no_shuffle
@@ -573,6 +760,13 @@ def main(argv: list[str] | None = None) -> None:
         parser.error(
             f"--n-shuffles must be at least {MINIMUM_N_SHUFFLES}, so that a "
             f"p-value at or below {SIGNIFICANCE_LEVEL} is possible."
+        )
+    if args.cuda_visible_devices is not None and not decoding_common.HAS_CUDA:
+        sys.exit(
+            "--cuda_visible_devices needs dask_cuda, which is not importable. "
+            "Install dask-cuda by hand (see docs/README.md), or leave out "
+            "--cuda_visible_devices to run the epochs one after another in "
+            "this process."
         )
     commit = git_hash()
     run_id = args.run_id or (
@@ -606,12 +800,18 @@ def main(argv: list[str] | None = None) -> None:
             args.root,
             include_variants=args.include_variants,
         )
+    epoch_ids = select_epochs(epoch_ids, date=args.date, epoch=args.epoch)
     for epoch_id, why in sorted(skipped.items()):
         log.info("left out %s: %s", epoch_id, why)
     if skipped:
         log.info("%d epochs left out; %d to run", len(skipped), len(epoch_ids))
     if not epoch_ids:
-        sys.exit(f"No HPC decodes to run under {args.root}.")
+        sys.exit(
+            f"No HPC decodes to run under {args.root}"
+            + ("" if args.date is None else f" on --date {args.date}")
+            + ("" if args.epoch is None else f" for --epoch {args.epoch}")
+            + "."
+        )
 
     manifest_path = output_dir / "manifest.json"
     epochs: dict[str, dict] = {}
@@ -638,55 +838,83 @@ def main(argv: list[str] | None = None) -> None:
             "epochs": epochs,
         }
 
+    run_one_kwargs = {
+        "root": args.root,
+        "output_dir": output_dir,
+        "cache_dir": args.cache_dir,
+        "run_id": run_id,
+        "run_seed": args.run_seed,
+        "shuffle": shuffle,
+        "n_shuffles": args.n_shuffles,
+        "config": config,
+        "provenance": provenance,
+    }
     write_manifest(manifest_path, manifest())
     failed = []
-    for number, epoch_id in enumerate(epoch_ids, start=1):
-        done = epochs.get(epoch_id, {}).get("status") == "ok"
-        if done and not args.overwrite:
-            log.info("[%d/%d] %s: already written", number, len(epoch_ids), epoch_id)
-            continue
-        log.info("[%d/%d] %s", number, len(epoch_ids), epoch_id)
-        try:
-            epochs[epoch_id] = run_one(
-                epoch_id,
-                root=args.root,
-                output_dir=output_dir,
-                cache_dir=args.cache_dir,
-                run_id=run_id,
-                run_seed=args.run_seed,
-                shuffle=shuffle,
-                n_shuffles=args.n_shuffles,
-                config=config,
-                provenance=provenance,
-            )
-        except Exception as error:  # noqa: BLE001 - one epoch must not stop the rest
-            # recorded, not swallowed: the manifest says which epoch failed and
-            # why, the run exits non-zero, and a rerun retries it
-            failed.append(epoch_id)
-            epochs[epoch_id] = {
-                "status": "failed",
-                "git_commit": commit,
-                "produced_at": datetime.now(UTC).isoformat(timespec="seconds"),
-                "error": f"{type(error).__name__}: {error}",
-                "traceback": traceback.format_exc(),
-            }
-            log.error("    failed: %s: %s", type(error).__name__, error)
-        else:
-            record = epochs[epoch_id]
-            log.info(
-                "    %d windows (%d with unknown speed), %d candidates, %d replay, "
-                "%d unknown SWR coverage, %d shuffled (%d untestable), "
-                "%d passing the shuffle",
-                record["n_windows"],
-                record["n_windows_speed_unknown"],
-                record["n_candidates"],
-                record["n_replay"],
-                record["n_swr_unknown"],
-                record["n_shuffled"],
-                record["n_shuffle_untestable"],
-                record["n_shuffle_pass"],
-            )
-        write_manifest(manifest_path, manifest())
+    if args.cuda_visible_devices is None:
+        for number, epoch_id in enumerate(epoch_ids, start=1):
+            done = epochs.get(epoch_id, {}).get("status") == "ok"
+            if done and not args.overwrite:
+                log.info(
+                    "[%d/%d] %s: already written", number, len(epoch_ids), epoch_id
+                )
+                continue
+            log.info("[%d/%d] %s", number, len(epoch_ids), epoch_id)
+            try:
+                epochs[epoch_id] = run_one(epoch_id, **run_one_kwargs)
+            except Exception as error:  # noqa: BLE001 - one epoch must not stop the rest
+                # recorded, not swallowed: the manifest says which epoch failed
+                # and why, the run exits non-zero, and a rerun retries it
+                failed.append(epoch_id)
+                epochs[epoch_id] = {
+                    "status": "failed",
+                    "git_commit": commit,
+                    "produced_at": datetime.now(UTC).isoformat(timespec="seconds"),
+                    "error": f"{type(error).__name__}: {error}",
+                    "traceback": traceback.format_exc(),
+                }
+                log.error("    failed: %s: %s", type(error).__name__, error)
+            else:
+                log.info("    %s", _counts(epochs[epoch_id]))
+            write_manifest(manifest_path, manifest())
+    else:
+        to_run = []
+        # an epoch named twice runs once: its task is keyed by the epoch
+        for epoch_id in dict.fromkeys(epoch_ids):
+            if epochs.get(epoch_id, {}).get("status") == "ok" and not args.overwrite:
+                log.info("%s: already written", epoch_id)
+            else:
+                to_run.append(epoch_id)
+        log.info(
+            "%d epochs to run on CUDA devices %s, one per task, each logging to %s",
+            len(to_run),
+            args.cuda_visible_devices,
+            Path.cwd() / "logs" / "<epoch_id>_memoryless.log",
+        )
+        cluster_factory = functools.partial(
+            decoding_common.LocalCUDACluster,
+            CUDA_VISIBLE_DEVICES=args.cuda_visible_devices,
+            local_directory=args.local_scratch_dir,
+        )
+        # the workers only return records: this process alone writes the manifest
+        for number, (epoch_id, record) in enumerate(
+            run_epochs(to_run, run_one_kwargs, cluster_factory), start=1
+        ):
+            epochs[epoch_id] = record
+            if record["status"] == "ok":
+                log.info(
+                    "[%d/%d] %s: %s", number, len(to_run), epoch_id, _counts(record)
+                )
+            else:
+                failed.append(epoch_id)
+                log.error(
+                    "[%d/%d] %s failed: %s",
+                    number,
+                    len(to_run),
+                    epoch_id,
+                    record["error"],
+                )
+            write_manifest(manifest_path, manifest())
     log.info("manifest -> %s", manifest_path)
     if failed:
         sys.exit(

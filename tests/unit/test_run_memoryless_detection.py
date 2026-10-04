@@ -4,17 +4,29 @@ Nothing here reaches the Spyglass database. The epoch is the simulated tetrode
 the shuffle tests use, whose units tile the track, written to disk in the shapes
 the decode saves, and its marks go into the runner's cache, where a second real
 run would find them.
+
+The parallel driver runs on an in-process ``LocalCluster`` of worker threads
+standing in for ``LocalCUDACluster``; no test starts a CUDA cluster, and each
+test that depends on ``HAS_CUDA`` sets it. Nothing is written outside the
+test's ``tmp_path``: every path the runner takes is given under it, the tests
+that run ``main`` work in it, so the per-epoch ``logs/`` land there, and dask's
+scratch space is pointed into it.
 """
 
 import hashlib
 import json
+import threading
+from pathlib import Path
 
+import dask
 import joblib
 import numpy as np
 import pandas as pd
 import pytest
+from dask.distributed import LocalCluster
 
 import scripts.decoding.run_memoryless_detection as runner
+from continuum_swr_replay import decoding_common
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
     MEMORYLESS_EVENT_TABLE_DTYPES,
     MemorylessSequenceConfig,
@@ -23,6 +35,8 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
     ENCODING_KEY,
 )
 from continuum_swr_replay.data_loaders import spikes
+from continuum_swr_replay.decoding_common import provenance_record
+from continuum_swr_replay.parameters import ROOT_DIR
 from continuum_swr_replay.table_io import read_table
 from scripts.decoding.run_memoryless_detection import (
     DEFAULT_SWR_DEFINITION,
@@ -97,6 +111,26 @@ class TestParseEpochIdentifier:
         decode appends."""
         with pytest.raises(ValueError):
             parse_epoch_identifier(bad)
+
+
+class TestSelectEpochs:
+    def test_date_and_epoch_filters_select_epochs(self):
+        """The date is the NWB stem's last 8 characters, as prepare_data.py
+        reads it, so j16's own digits are not read as part of it."""
+        epoch_ids = [
+            "chimi20990225_02_r1_HPC",
+            "chimi20990225_04_r2_HPC",
+            "chimi20990226_02_r1_HPC",
+            "j1620990707_06_r3_HPC",
+        ]
+
+        assert runner.select_epochs(epoch_ids, date=20990225, epoch="02_r1") == [
+            "chimi20990225_02_r1_HPC"
+        ]
+        assert runner.select_epochs(epoch_ids, date=20990707, epoch=None) == [
+            "j1620990707_06_r3_HPC"
+        ]
+        assert runner.select_epochs(epoch_ids, date=None, epoch=None) == epoch_ids
 
 
 def touch(path):
@@ -177,7 +211,7 @@ def write_epoch(root, epoch, epoch_id=EPOCH_ID, *, swr_zscore=None, corrupt=Fals
     pd.DataFrame(
         {
             "animal": "sim",
-            "day": 20200101,
+            "day": int(epoch_id.split("_")[0][-8:]),
             "epoch": epoch_id.split("_")[1] + "_" + epoch_id.split("_")[2],
             "linear_position": epoch.linear_position,
             "head_speed": np.zeros(epoch.time.size),
@@ -460,6 +494,28 @@ class TestLoadMarks:
         assert [t.tolist() for t in times] == [[15.0]]
         np.testing.assert_array_equal(marks[0], np.full((1, 4), 7.0))
 
+    def test_an_interrupted_cache_write_leaves_no_cache(self, tmp_path, monkeypatch):
+        """A cache write cut short leaves nothing under the cache's name: half a
+        cache would be read, and fail, on every rerun of the epoch. The cache
+        is written through a temporary file, so a worker killed part way
+        leaves at most that file."""
+        monkeypatch.setattr(
+            runner,
+            "get_hpc_marks",
+            lambda nwb_file_name: ([np.array([15.0])], [np.full((1, 4), 7.0)]),
+        )
+
+        def interrupted_dump(value, filename):
+            Path(filename).write_bytes(b"half a pickle")
+            raise OSError("simulated: the write was cut short")
+
+        monkeypatch.setattr(runner.joblib, "dump", interrupted_dump)
+
+        with pytest.raises(OSError, match="cut short"):
+            runner.load_marks(KEY, tmp_path, SPAN_S, "a" * 64)
+
+        assert list(tmp_path.iterdir()) == []
+
     def test_the_record_names_the_marks_rule(self, decode_root, tmp_path):
         """The loader is given the decode file's hash, and the record names the
         rule, that hash, the cache file and the marks' own hash."""
@@ -485,6 +541,21 @@ class TestLoadMarks:
         }
 
 
+PARALLEL_EPOCH_IDS = (
+    "sim20200101_02_r1_HPC",
+    "sim20200101_04_r2_HPC",
+    "sim20200101_06_r3_HPC",
+)
+"""More epochs than the parallel driver's two workers."""
+FAILING_EPOCH_ID = PARALLEL_EPOCH_IDS[1]
+
+
+def read_manifest(tmp_path):
+    return json.loads(
+        (tmp_path / "memoryless" / "cli-run" / "manifest.json").read_text()
+    )
+
+
 class TestMain:
     @pytest.fixture(autouse=True)
     def marks_only_from_the_cache(self, monkeypatch):
@@ -495,6 +566,79 @@ class TestMain:
             raise AssertionError(f"the marks cache missed for {nwb_file_name}")
 
         monkeypatch.setattr(runner, "get_hpc_marks", get_hpc_marks)
+
+    @pytest.fixture(autouse=True)
+    def no_cuda_cluster(self, monkeypatch):
+        """No test here starts a CUDA cluster, whether or not dask_cuda imports."""
+
+        def refuse(**kwargs):
+            raise AssertionError(f"a CUDA cluster was started with {kwargs}")
+
+        monkeypatch.setattr(decoding_common, "LocalCUDACluster", refuse, raising=False)
+
+    @pytest.fixture(autouse=True)
+    def in_tmp_path(self, tmp_path, monkeypatch):
+        """What the runner writes relative to the working directory, such as
+        the per-epoch logs, lands in the test's own folder."""
+        monkeypatch.chdir(tmp_path)
+
+    @pytest.fixture
+    def parallel(self, tmp_path, monkeypatch):
+        """Three saved decodes with their marks cached, and the cluster a device
+        list asks for replaced by two worker threads in this process.
+
+        Yields the arguments each ``LocalCUDACluster`` was made with.
+        """
+        epoch = build_tiling_tetrode()
+        root = tmp_path / "processed"
+        root.mkdir()
+        for epoch_id in PARALLEL_EPOCH_IDS:
+            write_epoch(root, epoch, epoch_id)
+            cache_marks(root, epoch, tmp_path / "cache", epoch_id)
+        clusters = []
+
+        def in_process_cluster(**kwargs):
+            clusters.append(kwargs)
+            return LocalCluster(
+                n_workers=2,
+                processes=False,
+                dashboard_address=":0",
+                local_directory=kwargs["local_directory"],
+            )
+
+        monkeypatch.setattr(decoding_common, "HAS_CUDA", True)
+        monkeypatch.setattr(
+            decoding_common, "LocalCUDACluster", in_process_cluster, raising=False
+        )
+        # the scheduler keeps its scratch in dask's temporary directory,
+        # whatever the workers are given
+        with dask.config.set({"temporary-directory": str(tmp_path / "dask-temporary")}):
+            yield clusters
+
+    def parallel_cli(self, tmp_path):
+        """The runner over the three decodes, given a device list."""
+        main(
+            [
+                "--animal",
+                "sim",
+                "--run-seed",
+                "7",
+                "--n-shuffles",
+                str(N_SHUFFLES),
+                "--run-id",
+                "cli-run",
+                "--root",
+                str(tmp_path / "processed"),
+                "--output-root",
+                str(tmp_path / "memoryless"),
+                "--cache-dir",
+                str(tmp_path / "cache"),
+                "--cuda_visible_devices",
+                "0,1",
+                "--local_scratch_dir",
+                str(tmp_path / "scratch"),
+            ]
+        )
 
     def cli(self, decode_root, tmp_path, *extra):
         """The runner through its command line, its marks already cached."""
@@ -652,3 +796,213 @@ class TestMain:
 
         out = capsys.readouterr().out
         assert "left out sim20200101_04_r2_HPC: missing data_over_time" in out
+
+    def test_date_and_epoch_narrow_what_runs(self, tmp_path):
+        epoch = build_tiling_tetrode()
+        root = tmp_path / "processed"
+        root.mkdir()
+        cache_dir = tmp_path / "cache"
+        for epoch_id in (
+            "sim20200101_02_r1_HPC",
+            "sim20200102_02_r1_HPC",
+            "sim20200102_04_r2_HPC",
+        ):
+            write_epoch(root, epoch, epoch_id)
+            cache_marks(root, epoch, cache_dir, epoch_id)
+
+        main(
+            [
+                "--animal",
+                "sim",
+                "--date",
+                "20200102",
+                "--epoch",
+                "02_r1",
+                "--run-seed",
+                "7",
+                "--n-shuffles",
+                str(N_SHUFFLES),
+                "--run-id",
+                "cli-run",
+                "--root",
+                str(root),
+                "--output-root",
+                str(tmp_path / "memoryless"),
+                "--cache-dir",
+                str(cache_dir),
+            ]
+        )
+
+        epochs = read_manifest(tmp_path)["epochs"]
+        assert list(epochs) == ["sim20200102_02_r1_HPC"]
+        assert epochs["sim20200102_02_r1_HPC"]["status"] == "ok"
+
+    def test_parallel_run_records_each_epoch_and_a_failure(
+        self, parallel, tmp_path, monkeypatch
+    ):
+        """One task per epoch, on the cluster the device list asks for: the
+        failing epoch is recorded with its error, the others are written, each
+        logs to its own file, and the run exits non-zero."""
+        run_one = runner.run_one
+
+        def fails_for_one(epoch_id, **kwargs):
+            if epoch_id == FAILING_EPOCH_ID:
+                raise RuntimeError(f"simulated failure in {epoch_id}")
+            return run_one(epoch_id, **kwargs)
+
+        monkeypatch.setattr(runner, "run_one", fails_for_one)
+
+        with pytest.raises(SystemExit, match=f"1 epochs failed: {FAILING_EPOCH_ID};"):
+            self.parallel_cli(tmp_path)
+
+        assert parallel == [
+            {
+                "CUDA_VISIBLE_DEVICES": "0,1",
+                "local_directory": str(tmp_path / "scratch"),
+            }
+        ]
+        epochs = read_manifest(tmp_path)["epochs"]
+        assert set(epochs) == set(PARALLEL_EPOCH_IDS)
+        failed = epochs[FAILING_EPOCH_ID]
+        assert failed["status"] == "failed"
+        assert failed["error"] == repr(
+            RuntimeError(f"simulated failure in {FAILING_EPOCH_ID}")
+        )
+        for epoch_id in set(PARALLEL_EPOCH_IDS) - {FAILING_EPOCH_ID}:
+            assert epochs[epoch_id]["status"] == "ok"
+            outputs = epochs[epoch_id]["outputs"]
+            assert outputs and all(Path(path).exists() for path in outputs.values())
+        for epoch_id in PARALLEL_EPOCH_IDS:
+            assert (tmp_path / "logs" / f"{epoch_id}_memoryless.log").exists()
+
+    def test_only_the_main_thread_writes_the_manifest(
+        self, parallel, tmp_path, monkeypatch
+    ):
+        """Once before the epochs run and once as each finishes, while the
+        epochs themselves run in the workers' threads."""
+        writers, runners = [], []
+        write_manifest, run_one = runner.write_manifest, runner.run_one
+
+        def recording_write_manifest(path, manifest):
+            writers.append(threading.current_thread().name)
+            write_manifest(path, manifest)
+
+        def recording_run_one(epoch_id, **kwargs):
+            runners.append(threading.current_thread().name)
+            return run_one(epoch_id, **kwargs)
+
+        monkeypatch.setattr(runner, "write_manifest", recording_write_manifest)
+        monkeypatch.setattr(runner, "run_one", recording_run_one)
+
+        self.parallel_cli(tmp_path)
+
+        assert len(runners) == len(PARALLEL_EPOCH_IDS)
+        assert "MainThread" not in runners
+        assert writers == ["MainThread"] * (1 + len(PARALLEL_EPOCH_IDS))
+        assert all(
+            record["status"] == "ok"
+            for record in read_manifest(tmp_path)["epochs"].values()
+        )
+
+    def test_a_parallel_rerun_runs_only_what_is_not_written(
+        self, parallel, tmp_path, monkeypatch
+    ):
+        """As a serial rerun does: the failed epoch is retried and the written
+        ones are not run again."""
+        run_one = runner.run_one
+        attempts = []
+
+        def fails_the_first_time(epoch_id, **kwargs):
+            attempts.append(epoch_id)
+            if epoch_id == FAILING_EPOCH_ID and attempts.count(epoch_id) == 1:
+                raise RuntimeError("simulated transient failure")
+            return run_one(epoch_id, **kwargs)
+
+        monkeypatch.setattr(runner, "run_one", fails_the_first_time)
+        with pytest.raises(SystemExit, match="1 epochs failed"):
+            self.parallel_cli(tmp_path)
+        first = read_manifest(tmp_path)["epochs"]
+
+        self.parallel_cli(tmp_path)
+
+        assert sorted(attempts) == sorted([*PARALLEL_EPOCH_IDS, FAILING_EPOCH_ID])
+        again = read_manifest(tmp_path)["epochs"]
+        assert all(record["status"] == "ok" for record in again.values())
+        for epoch_id in set(PARALLEL_EPOCH_IDS) - {FAILING_EPOCH_ID}:
+            assert again[epoch_id] == first[epoch_id]
+
+    def test_a_device_list_without_dask_cuda_is_refused(
+        self, decode_root, tmp_path, monkeypatch
+    ):
+        """Before anything is written."""
+        monkeypatch.setattr(decoding_common, "HAS_CUDA", False)
+
+        with pytest.raises(SystemExit, match="dask_cuda"):
+            self.cli(decode_root, tmp_path, "--cuda_visible_devices", "0")
+
+        assert not (tmp_path / "memoryless" / "cli-run" / "manifest.json").exists()
+        assert not (tmp_path / "memoryless").exists()
+
+    @pytest.mark.parametrize(
+        "field", ["uv_lock_sha256", "ripple_detection_commit", "cuda_plugin_version"]
+    )
+    def test_settings_record_the_environment(
+        self, decode_root, tmp_path, monkeypatch, field
+    ):
+        """The decoders' provenance record without ``dirty``, which the run id
+        already carries. A rerun under another environment is refused, as one
+        under another library version is."""
+        environment = {
+            name: value
+            for name, value in provenance_record(ROOT_DIR).items()
+            if name != "dirty"
+        }
+
+        settings = runner.run_settings(7, True, N_SHUFFLES, CONFIG, "test")
+
+        assert field in settings["environment"]
+        assert settings["environment"] == environment
+
+        self.cli(decode_root, tmp_path)
+        monkeypatch.setattr(
+            runner,
+            "provenance_record",
+            lambda repo: provenance_record(repo) | {field: "changed"},
+        )
+
+        with pytest.raises(SystemExit, match="other settings"):
+            self.cli(decode_root, tmp_path)
+
+
+class TestRunEpochs:
+    def test_an_error_its_worker_cannot_return_is_recorded(self, tmp_path, monkeypatch):
+        """A worker whose process dies cannot return its epoch's failure; the
+        error its task raises is recorded instead, and the rest still finish."""
+
+        def task(epoch_id, run_one_kwargs, log_directory):
+            if epoch_id == FAILING_EPOCH_ID:
+                raise RuntimeError("simulated: the worker died")
+            return {"status": "ok"}
+
+        monkeypatch.setattr(runner, "_run_one_logged", task)
+        monkeypatch.chdir(tmp_path)
+        with dask.config.set({"temporary-directory": str(tmp_path / "dask-temporary")}):
+            records = dict(
+                runner.run_epochs(
+                    list(PARALLEL_EPOCH_IDS),
+                    {"provenance": {"git_commit": "test"}},
+                    lambda: LocalCluster(
+                        n_workers=2,
+                        processes=False,
+                        dashboard_address=":0",
+                        local_directory=str(tmp_path / "scratch"),
+                    ),
+                )
+            )
+
+        assert set(records) == set(PARALLEL_EPOCH_IDS)
+        failed = records.pop(FAILING_EPOCH_ID)
+        assert failed["status"] == "failed"
+        assert failed["error"] == repr(RuntimeError("simulated: the worker died"))
+        assert failed["git_commit"] == "test"
+        assert all(record == {"status": "ok"} for record in records.values())
