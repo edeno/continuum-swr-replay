@@ -1,13 +1,15 @@
 # Replay detection method comparison — overview
 
-*Design spec, cross-cutting. Status (2026-10-02): approved; the Yu detector exists in the
+*Design spec, cross-cutting. Status (2026-10-03): approved; the Yu detector exists in the
 `ripple_detection` package, and the memoryless sequence detector, its shuffle, its event
 table and a per-epoch runner are implemented and tested in this project but not yet run
 on recorded data (real-data pilot next); the inventory comparison's accounting is
 implemented and tested on synthetic inventories but not yet run on recorded data. The
-Karlsson and Yu SWR inventories are computed directly from the package for now; Spyglass
-integration is the last step. Each spec's own header carries its status; the per-spec sections
-below carry the open decisions.*
+Kay, Karlsson, Yu and Zugaro SWR inventories are computed directly from the package, on
+shared CA1 inputs, by `scripts/decoding/run_swr_detection.py`, which is implemented and
+tested offline but not yet run on recorded data; Spyglass integration is the last step.
+Each spec's own header carries its status; the per-spec sections below carry the open
+decisions.*
 
 This directory holds the design for comparing replay-detection methods on our data.
 This file carries the purpose, the governing rule, the scope boundary, and the
@@ -17,9 +19,9 @@ register invites the cross-method blending this design forbids.
 
 | spec | scope | status |
 |---|---|---|
-| [01-yu-swr-detector.md](01-yu-swr-detector.md) | SWR detector with a noise-percentile threshold (Yu et al. 2017) | package side implemented; direct project inventory pending; Spyglass integration last |
+| [01-yu-swr-detector.md](01-yu-swr-detector.md) | SWR detector with a noise-percentile threshold (Yu et al. 2017) | package side implemented; direct project inventory produced by `scripts/decoding/run_swr_detection.py`, not yet run on recorded data; Spyglass integration last |
 | [02-memoryless-sequence.md](02-memoryless-sequence.md) | Memoryless sliding-window sequence detector (Widloski & Foster 2025) | implemented and tested, shuffle and event table included; not yet run on recorded data (pilot next) |
-| [03-inventory-comparison.md](03-inventory-comparison.md) | Six inventories → common schema → N-way overlap accounting | accounting implemented and tested on synthetic inventories; recorded-data adapters and runner pending |
+| [03-inventory-comparison.md](03-inventory-comparison.md) | Seven inventories → common schema → N-way overlap accounting | accounting implemented and tested on synthetic inventories; recorded-data adapters and runner pending |
 | [04-event-features.md](04-event-features.md) | Symmetric event characterization and selection diagnostics; threshold robustness as a later follow-up | initial scope agreed |
 | [05-validation.md](05-validation.md) | Simulation and held-out-tetrode validation: what a performance claim would need | parked |
 | [memoryless_simulation_controls.md](memoryless_simulation_controls.md) | Simulated timing, false positives, multi-part events and a first held-out test, extending 02's comparison figure | implemented 2026-09-25 |
@@ -117,30 +119,55 @@ why our own pipeline is in it. Worth noting that our lab lineage moved families 
 measuring the cost: Denovellis et al. 2021 and Gillespie et al. 2021 are state-space but
 SWR-*triggered*, where our current pipeline is posterior-triggered.
 
-## The six inventories
+## The seven inventories
 
 Each produces an event table over the same epochs and the same speed-eligible population.
 
 | # | Trigger | Family | Method | Status |
 |---|---|---|---|---|
-| 1 | SWR, consensus trace | LFP | `Kay_ripple_detector` | exists (`SWR_event`) |
-| 2 | SWR, per-channel with merging | LFP | `Karlsson_ripple_detector` (Karlsson & Frank 2009) | in package; computed directly in the project (pending) |
-| 3 | SWR, noise-percentile threshold | LFP | `Yu_ripple_detector` (Yu et al. 2017) | in package; computed directly in the project (pending) — [01](01-yu-swr-detector.md) |
+| 1 | SWR, consensus trace | LFP | `Kay_ripple_detector` | recomputed directly at the pinned package commit (`scripts/decoding/run_swr_detection.py`, not yet run on recorded data); the canonical `SWR_event` stays as an extra SWR definition and as the version check |
+| 2 | SWR, per-channel with merging | LFP | `Karlsson_ripple_detector` (Karlsson & Frank 2009) | in package; computed directly by `scripts/decoding/run_swr_detection.py` (not yet run on recorded data) |
+| 3 | SWR, noise-percentile threshold | LFP | `Yu_ripple_detector` (Yu et al. 2017) | in package; computed directly by `scripts/decoding/run_swr_detection.py` (not yet run on recorded data) — [01](01-yu-swr-detector.md) |
 | 4 | MUA high-synchrony events | population rate | `multiunit_HSE_detector` | exists (`MUA_event`) |
 | 5 | Posterior threshold | decoding | our state-space non-local detection | exists (`non_local_event`) |
 | 6 | Posterior sequence | decoding | Widloski & Foster 2025 | implemented (`memoryless_sequence/`, `scripts/decoding/run_memoryless_detection.py`); real-data pilot next — [02](02-memoryless-sequence.md) |
+| 7 | SWR, one channel, two thresholds | LFP | `Zugaro_ripple_detector` (the `FindRipples` lineage: Hirase and Zugaro, FMAToolbox; Csicsvari et al. 1999 as ancestor) | in package; computed directly by `scripts/decoding/run_swr_detection.py` on one CA1 channel per epoch (not yet run on recorded data) — see below |
 
-1, 2 and 3 are three different SWR *algorithms*, not three thresholds on one algorithm:
+1, 2, 3 and 7 are four different SWR *algorithms*, not four thresholds on one algorithm:
 Kay thresholds a root-sum-of-squares consensus trace, Karlsson detects per channel and
-merges, and Yu uses a median consensus with a noise-percentile threshold. Their
-aggregation and event-assembly rules can produce different populations and boundaries;
-the comparison measures those differences rather than assuming an ordering of sensitivity.
+merges, Yu uses a median consensus with a noise-percentile threshold, and Zugaro bounds
+one channel's smoothed squared ripple band at 2 SD and keeps the events that peak above
+5 SD. Their aggregation and event-assembly rules can produce different populations and
+boundaries; the comparison measures those differences rather than assuming an ordering
+of sensitivity.
 
-The `ripple_detection` package supplying 1, 2 and 4 is
+The `ripple_detection` package supplying 1, 2, 3, 4 and 7 is
 [Eden-Kramer-Lab/ripple_detection](https://github.com/Eden-Kramer-Lab/ripple_detection);
-Spyglass reaches 1 and 2 through `RippleTimesV1`. For the comparison, 2 and 3 are
-computed directly by calling the package on the same ripple-band LFP; populating them
+Spyglass reaches 1 and 2 through `RippleTimesV1`. For the comparison, 1, 2, 3 and 7 are
+computed directly by calling the package at its pinned commit, one epoch at a time, in
+`scripts/decoding/run_swr_detection.py` (the refresh design's Stage 3,
+[2026-10-03-full-pipeline-refresh-design.md](../2026-10-03-full-pipeline-refresh-design.md)).
+Kay, Karlsson and Yu read the same stored CA1 ripple band; Zugaro reads one referenced
+raw channel from the same CA1 electrodes and references. All four share the epoch's
+speed trace and time span. The runner checks that the raw LFP, re-filtered as Spyglass
+filtered it, reproduces the stored band. It also checks Kay against the canonical
+`SWR_event` twice: Kay at the pinned commit on Spyglass's own inputs (the package version
+alone), and the direct Kay inventory (version and inputs together). Populating them
 through Spyglass is deferred to the end and must reproduce the direct inventories.
+
+**Inventory 7, Zugaro: open decision D1, resolved for Zugaro (2026-10-03).** D1 in the
+comparison plan (`.claude/docs/plans/replay_detection_comparison/PLAN.md`) asked whether
+Zugaro, Long and Carey get project inventories or stay as package-only comparison rows. Zugaro gets one (refresh design R3). D1 stays open for
+Long, which needs a stratum radiatum channel, and for Carey. Zugaro runs with the
+Buzsáki-lab Databank files' settings: a 120–180 Hz Butterworth band-pass of order 3,
+zero-phase; events bounded at 2 SD and kept if they peak above 5 SD; events closer than
+50 ms merged with no length cap; no minimum duration; events longer than 150 ms then
+dropped. It reads one channel per epoch, chosen by buzcode's `bz_GetBestRippleChan` rule
+from the CA1 candidates. The refresh design lists the filter design and the departures
+from the lineage (Stage 3, "Where this run departs from the lineage"). One more departure:
+channel selection's moving RMS (13 samples at 1000 Hz) truncates its window at gaps and
+stretch edges (NaN-aware), where the package's own Zugaro moving average zero-pads
+(`np.convolve(..., mode="same")`); it affects the 6 samples at each end of a stretch.
 
 ## Scope boundary: clusterless compatibility
 
@@ -178,7 +205,7 @@ Method-specific decisions live in the component specs. These apply across the co
 | # | Decision | Reasoning |
 |---|---|---|
 | **X1** | Compare detection *triggers* (level 1); defer scoring (level 2) to 04 | The trigger is upstream of everything else and determines which of the ripple-less and neither-ripple-nor-burst questions each inventory can ask at all. What level 1 actually compares, though, is the event inventories of complete pipelines: acceptance criteria, significance filters and boundary rules differ between them too, so a disagreement between two inventories is not attributable to the trigger alone |
-| **X2** | Six inventories, not two | A within-family comparison of two posterior-triggered methods cannot say what the standard SWR/MUA pipelines would have found |
+| **X2** | Seven inventories, not two | A within-family comparison of two posterior-triggered methods cannot say what the standard SWR/MUA pipelines would have found |
 | **X3** | Harmonize substrate, not method internals | Comparability without blending; see the governing rule above |
 | **X4** | Shared whole-event < 4 cm/s eligibility for every method; native-speed controls are deferred | Apply the same eligibility criterion to each method's candidates. Different event boundaries can still affect qualification |
 | **X5** | Hold the fitted encoding model fixed for both decoding-based methods; any later running-only control applies to **both** | Substrate under X3. An encoding refit is not an initial deliverable |

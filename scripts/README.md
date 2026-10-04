@@ -16,6 +16,17 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
   `--cuda_visible_devices` the epochs run in parallel on a dask
   `LocalCUDACluster`, one epoch per GPU at a time, each logging to
   `logs/{epoch_id}_memoryless.log`; only the main process writes the manifest.
+- `run_swr_detection.py` — the four SWR inventories (Kay, Karlsson, Yu and Zugaro, from
+  `ripple_detection` at its pinned commit) for every epoch, on shared CA1 inputs: the
+  stored ripple band, the referenced raw LFP behind it, and `load_data`'s speed and time
+  span (refresh design, Stage 3). Per epoch it checks that the raw LFP re-filtered as
+  Spyglass filtered it reproduces the stored band (a mismatch stops the epoch), chooses
+  Zugaro's channel by buzcode's `bz_GetBestRippleChan` rule, records Yu's threshold
+  diagnostics, and checks Kay against the canonical `SWR_event`. `--animal`, `--date` and
+  `--epoch` narrow the epochs, which run on a dask `LocalCluster` of `--n-workers`
+  processes, each logging to `logs/{epoch_id}_swr.log`; only the main process writes
+  `manifest.json`. A failing epoch is recorded and the rest run; a rerun skips the epochs
+  already `ok` unless `--overwrite` is given.
 - `prepare_replay_content_data.py` — build the canonical replay-content tables
   (event / event-arm / event-patch / event-sequence / stop) across all sessions.
 - `regenerate_stop_table.py` — rebuild the per-stop immobility table.

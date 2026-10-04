@@ -1,12 +1,14 @@
 # SWR detection with a noise-percentile threshold (Yu et al. 2017)
 
-*Design spec. Status (2026-10-02): revised after review. Package side implemented
-(`ripple_detection` at commit 659cc91 and later: `Yu_ripple_detector`). The project-side
-inventory is computed directly from the package (§Producing the inventory, direct path),
-not yet started; the Spyglass steps are deferred to the end.*
+*Design spec. Status (2026-10-03): revised after review. Package side implemented
+(`ripple_detection` at commit 659cc91 and later: `Yu_ripple_detector`; the project pins
+`68e1784`). The project-side inventory is computed directly from the package (§Producing
+the inventory, direct path) by `scripts/decoding/run_swr_detection.py`, which runs all four
+SWR detectors on shared inputs; it is implemented and tested offline, not yet run on
+recorded data. The Spyglass steps are deferred to the end.*
 *Governing rule and cross-cutting decisions: [overview.md](overview.md).*
 
-Inventory 3 of six. Supplies a third SWR detection *algorithm* alongside
+Inventory 3 of seven. Supplies a third SWR detection *algorithm* alongside
 `Kay_ripple_detector` and `Karlsson_ripple_detector` — not a third threshold on one
 algorithm.
 
@@ -140,7 +142,7 @@ paths, modification dates (2017-09-04 and 2017-09-22), md5 sums, and license sta
 | Noise estimate scope | per day | per day, pooled over the day's run epochs | per epoch (Y6) |
 | Immobility rule | events at speed < 4 cm/s | both endpoints in immobility | endpoint rule for package parity, then whole-event (Y5) |
 | Left-flank reflection | mirror about the mode | `abs(b) + 2m` | `2m − b`, warn if mode > 0 (Y3, V-Y2) |
-| Flags (`useenvelope`, `normeachtet`, `adaptivefilt`) | not described | driver: caller-supplied, no defaults; wrapper: envelope, z-score, no adaptive filter | the wrapper's values, as a flag for `zscore_per_tetrode` (Y7) |
+| Flags (`useenvelope`, `normeachtet`, `adaptivefilt`) | not described | driver: caller-supplied, no defaults; wrapper: envelope, z-score, no adaptive filter | the wrapper's values, as a flag for `zscore_per_channel` (Y7) |
 
 ## Mapping onto the existing package
 
@@ -240,8 +242,8 @@ following its naming (`Kay_ripple_detector`,
 | function | file | responsibility |
 |---|---|---|
 | `estimate_noise_threshold(values, percentile=99.99, histogram_edges=None, mode_smoothing_window=11)` | `core.py` | transliteration of `jy_variableripthreshold_corecalculation`: fixed-grid histogram → smoothed-histogram mode → mirrored histogram → threshold one bin past the CDF crossing. Pure, array-in/scalar-out, no LFP concepts. `histogram_edges=None` means the original grid `np.arange(-10, 50 + 0.01/2, 0.01)`; returns the threshold and, on request, the diagnostic (edges, counts, mode) |
-| `get_Yu_ripple_consensus_trace(filtered_lfps, sampling_frequency, smoothing_sigma=0.004, zscore_per_tetrode=True, *, time=None)` | `detectors.py` | One call per epoch: envelope and smoothing within valid blocks, then pooled epoch-wide tetrode z-scores (Y7), then median. `(n_time, n_tetrodes)` in, `(n_time,)` out with unavailable rows retained as NaN. `time` identifies timestamp gaps; omission declares a regular sample grid |
-| `Yu_ripple_detector(time, filtered_lfps, speed, sampling_frequency, speed_threshold=4.0, minimum_duration=0.020, percentile=99.99, smoothing_sigma=0.004, close_ripple_threshold=0.0, normalization_mask=None, normalization_time_range=None, zscore_per_tetrode=True)` | `detectors.py` | Kay's keyword interface with `percentile` in place of `zscore_threshold` and an additional `zscore_per_tetrode` parameter, so Spyglass can pass `ripple_detection_params` straight through. The histogram grid and mode smoothing are method constants, not parameters. Pass the full epoch and `time` to the consensus helper; estimate the threshold on the raw consensus (Algorithm step 2); extract events separately within valid blocks |
+| `get_Yu_ripple_consensus_trace(ripple_filtered_lfps, sampling_frequency, smoothing_sigma=0.004, zscore_per_channel=True, *, time=None)` | `detectors.py` | One call per epoch: envelope and smoothing within valid blocks, then pooled epoch-wide tetrode z-scores (Y7), then median. `(n_time, n_tetrodes)` in, `(n_time,)` out with unavailable rows retained as NaN. `time` identifies timestamp gaps; omission declares a regular sample grid |
+| `Yu_ripple_detector(time, filtered_lfps, speed, sampling_frequency, *, speed_threshold=4.0, minimum_duration=0.020, percentile=99.99, smoothing_sigma=0.004, close_ripple_threshold=0.0, normalization_mask=None, zscore_per_channel=True, maximum_duration=None)` | `detectors.py` | Kay's keyword interface with `percentile` in place of `zscore_threshold` and an additional `zscore_per_channel` parameter, so Spyglass can pass `ripple_detection_params` straight through. The histogram grid and mode smoothing are method constants, not parameters. Pass the full epoch and `time` to the consensus helper; estimate the threshold on the raw consensus (Algorithm step 2); extract events separately within valid blocks |
 | `_extract_Yu_ripple_events(trace, time, sampling_frequency, minimum_duration, threshold)` | `detectors.py` | Private helper for one contiguous block of normalized consensus: integer run-length qualification and mean-crossing extension under Algorithm step 4; leaves existing detectors' duration conventions intact |
 
 The canonical whole-event immobility rule (Y5) is **not** part of the package function:
@@ -262,24 +264,38 @@ parameters, and the Spyglass path is accepted only if it reproduces the direct i
 
 ### Direct path (now)
 
+`scripts/decoding/run_swr_detection.py` produces this path for all four SWR detectors at
+once (Kay, Karlsson, Yu and Zugaro) on shared inputs, as Stage 3 of the refresh design
+([2026-10-03-full-pipeline-refresh-design.md](../2026-10-03-full-pipeline-refresh-design.md))
+specifies. It is implemented and tested offline, not yet run on recorded data.
+
 1. **Package.** Done: `Yu_ripple_detector` and its tests are on the package's `master`.
-2. **Pin.** Add `ripple_detection` as a direct git dependency of the project at one
-   tagged commit. Today the project only receives it transitively through Spyglass at
-   1.7.0, which lacks the detector; the pin is a deliberate version bump, noted in the
-   changelog. Spyglass imports only the Kay and Karlsson detectors and two `core`
+2. **Pin.** Done: `ripple_detection` is a direct git dependency of the project at commit
+   `68e1784` (refresh design R2). The project used to receive it only transitively
+   through Spyglass at 1.7.0, which lacks the detector, so the pin is a deliberate
+   version bump. Spyglass imports only the Kay and Karlsson detectors and two `core`
    helpers from the package, so the existing Kay reads keep working.
-3. **Read inputs.** Fetch the CA1 ripple-band `LFPBandV1` frame, its
-   `RippleLFPSelection` electrodes and head speed through the same read-only queries
-   `get_ripple` already makes. No Spyglass row is inserted or populated.
+3. **Read inputs.** `get_ripple_band_inputs` reads the CA1 ripple-band `LFPBandV1` frame
+   and its electrodes through the read-only restrictions `get_ripple` uses, and asserts
+   that the electrodes are the `RippleLFPSelection` CA1 electrodes (the check below).
+   `get_epoch_position_info` gives the head speed and time span `load_data` uses. No
+   Spyglass row is inserted or populated.
 4. **Detect.** Call `Yu_ripple_detector` with `speed_threshold = 4.0`,
    `minimum_duration = 0.020`, `percentile = 99.99`, `smoothing_sigma = 0.004`,
-   `zscore_per_tetrode = True`, and `Karlsson_ripple_detector` at its package
+   `zscore_per_channel = True`, and `Karlsson_ripple_detector` at its package
    defaults. Record in the epoch's manifest the package commit, the histogram grid,
    realized histogram edges, selected mode, threshold, tetrode normalization statistics,
-   normalization population, and NumPy version. Any later sensitivity variant gets its
-   own named parameter set in the manifest.
+   normalization population, and NumPy version. The runner's manifest records the
+   package commit and the NumPy version, and its `yu_diagnostics` holds every field of
+   the package's `noise_threshold_diagnostics` (the histogram edges and counts, the mode,
+   the threshold and the size of the immobility sample) with that sample's mean and SD,
+   so they survive an epoch with no events. It does not record the per-tetrode z-score
+   statistics. Any later sensitivity variant gets its own named parameter set in the
+   manifest.
 5. **Gate and key.** Apply Y5 project-side, then key the inventory and observation
-   availability as 03 requires, and write one parquet per epoch.
+   availability as 03 requires. The runner writes one event parquet per epoch and
+   detector, and the epoch's observed intervals; Y5 and the keying are left to the
+   comparison's adapters, which apply the shared rule to every inventory (overview X4).
 
 ### Spyglass integration (final product, deferred)
 
@@ -329,7 +345,7 @@ patch and `nanmedian` handling and is part of the shared-input adaptation.
    per-tetrode arrays on the original time axis. Then compute each tetrode's mean and
    sample standard deviation (`ddof=1`, matching the wrapper) across **all valid blocks
    of the epoch**, including movement. Apply those same statistics to every block
-   before taking the median across tetrodes (Y7). With `zscore_per_tetrode=False`, take
+   before taking the median across tetrodes (Y7). With `zscore_per_channel=False`, take
    the median of the smoothed envelopes directly. Invalid rows stay NaN in both cases.
    **Missing LFP is handled by block, not by row-dropping.** The package's
    `_preprocess_detector_inputs` drops every row with a NaN channel and hands the
@@ -421,7 +437,7 @@ rather than a degraded estimate (see below).
 | An upstream artifact mask removes coverage without zero-filling or changing the montage; its absence is recorded and adds no 2000-unit clipping | The declared project artifact policy, separate from the later wrapper |
 | Degenerate inputs: all-NaN channels, no immobility samples, too few immobility samples to resolve the percentile, mode at the histogram edge, more than the stated fraction of values outside the grid | Failure behavior below |
 | Grid semantics: default edges equal `-10:0.01:50`; a value of exactly 50 is counted and a value of 50.001 is dropped; tied smoothed maxima select the first; the threshold is one bin past the crossing | V-Y3, V-Y4 — `histc`, `smooth`, and `find(..., 1, 'first') + 1` transliterated |
-| Spyglass pass-through: the parameter dict with `percentile` and `zscore_per_tetrode` yields the same frame as a direct call | The signature contract and configuration path |
+| Spyglass pass-through: the parameter dict with `percentile` and `zscore_per_channel` yields the same frame as a direct call | The signature contract and configuration path |
 | Missing-LFP gap: two sub-minimum exceedances separated by a NaN gap or timestamp gap yield **no** event, and an exceedance that reaches a gap edge ends there | Block-wise processing; no event spans missing LFP |
 
 Tests live in the package: `tests/test_core.py` for the estimator, `tests/test_detectors.py`
