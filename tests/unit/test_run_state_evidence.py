@@ -292,7 +292,7 @@ def test_an_event_bin_at_running_speed_is_left_out_of_the_running_fits(
     assert record["status"] == "ok", record.get("traceback")
     running_only = record["running_only"]
     assert running_only["event_bins_at_running_speed"] == 1
-    assert running_only["running_bins_left_out_near_events"] == 3
+    assert running_only["running_bins_left_out_near_events"] == 5
     for name in ("run", "runcv0", "runcv1"):
         assert running_only[name]["event_bins_in_training_bins"] == 0
         assert running_only[name]["event_bins_in_library_span"] == 0
@@ -310,18 +310,47 @@ def test_running_only_masks_refuse_an_event_spike_in_the_library_span():
 
     masks, record = runner.running_only_masks(time, speed, position, in_event, folds)
 
-    # the event bin and its neighbours are left out, and the padding stops short
-    assert not masks["run"][49:52].any() and masks["run"][48] and masks["run"][52]
+    # the event bin and two bins either side are left out, and the padding
+    # stops short of it
+    assert not masks["run"][48:53].any() and masks["run"][47] and masks["run"][53]
     assert record["run"]["event_bins_in_library_span"] == 0
-    assert record["running_bins_left_out_near_events"] == 3
+    assert record["running_bins_left_out_near_events"] == 5
     # no position around the event: the library joins the runs across it
-    position[49:52] = np.nan
+    position[48:53] = np.nan
     with pytest.raises(ValueError, match="1 non-local event bins are in the run"):
         runner.running_only_masks(time, speed, position, in_event, folds)
     # a fold with no running bin
-    position[49:52] = 0.0
+    position[48:53] = 0.0
     with pytest.raises(ValueError, match="runcv1 encoding has no training bin"):
         runner.running_only_masks(time, speed, position, in_event, np.zeros(n, np.int8))
+
+
+def test_float_rounding_of_the_bin_width_cannot_carry_the_span_into_an_event():
+    """At epoch timestamps a bin can be an ulp narrower than the first one.
+
+    The library pads a run by the first two bins' spacing, so with one bin of
+    margin its span can reach a sliver into the event bin (one j16 pilot epoch
+    did); the runner's margin of two bins cannot.
+    """
+    from continuum_swr_replay.analysis.hippocampus.state_evidence import (
+        training_spike_bins,
+    )
+
+    n = 20_000
+    time = 1625682923.263429 + np.arange(n) * 0.002
+    speed = np.full(n, 20.0)
+    position = np.c_[np.linspace(0, 100, n), np.zeros(n)]
+    in_event = np.zeros(n, dtype=bool)
+    in_event[np.arange(100, n - 100, 97)] = True
+    one_bin = ~(in_event | np.r_[in_event[1:], False] | np.r_[False, in_event[:-1]])
+    assert (in_event & training_spike_bins(time, position, one_bin)).any()
+
+    _, record = runner.running_only_masks(
+        time, speed, position, in_event, np.arange(n) // 5000 % 2
+    )
+
+    for name in ("run", "runcv0", "runcv1"):
+        assert record[name]["event_bins_in_library_span"] == 0
 
 
 def test_every_hpc_decode_is_listed_even_an_incomplete_one(tmp_path):

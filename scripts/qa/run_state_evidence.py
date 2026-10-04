@@ -20,7 +20,7 @@ Per epoch (a dask CPU worker each):
    reproduce the stored one exactly, so the marks are the decode's.
 4. **Encodings** (``running_only_masks``): running-only refits (head speed
    >= 4 cm/s), on every running bin and on each fold of alternating 30 s
-   blocks (``time_folds``), leaving out running bins within one bin of a
+   blocks (``time_folds``), leaving out running bins within two bins of a
    non-local event bin; no event bin may be in the library's padded training
    span of any of them (``training_spike_bins``). The canonical encoding is the
    decode's own.
@@ -142,6 +142,12 @@ SEED = 20261004
 HALVES_SEED = 20261003
 """The tetrode partitions' seed, the prototype's (its pilot splits are these)."""
 RUNNING_ENCODING_MIN_SPEED_CM_S = 4.0
+EVENT_MARGIN_BINS = 2
+"""Running bins this close to a non-local event bin are left out of every
+running-only fit. The library pads each training run by one bin width, the
+first two bins' spacing; at epoch timestamps (~1.6e9 s) a bin can be an ulp
+narrower, so one bin of margin can leave a sliver of the event bin in the
+span (one j16 pilot epoch did); two cannot."""
 N_STORED_CHECK_BINS = 2000
 LIBRARY_CHECK_BINS = 200
 STORED_MAX_REL = 1e-3
@@ -161,9 +167,10 @@ ENCODINGS = tuple(ENCODING_LABELS)
 CAVEATS = [
     "Encodings, by column prefix: "
     + "; ".join(f"{prefix}_ {text}" for prefix, text in ENCODING_HELD_OUT.items())
-    + ". Running bins within one bin of a non-local event bin are left out of "
-    "every running-only fit, so the library's padding of each training run (one "
-    "bin either side) takes in no event spike.",
+    + f". Running bins within {EVENT_MARGIN_BINS} bins of a non-local event bin "
+    "are left out of every running-only fit, so the library's padding of each "
+    "training run (one bin either side, with its float rounding) takes in no "
+    "event spike.",
     "Only the remote location is held out by the tetrode split: S alone chooses "
     "MAP_S. The bouts and "
     "probability bins come from the all-tetrode decode, so C's spikes helped make "
@@ -750,10 +757,10 @@ def running_only_masks(
 
     ``run`` is every running bin (head speed >= 4 cm/s); ``runcv0`` and
     ``runcv1`` are the running bins of each fold (:func:`time_folds`). Running
-    bins within one bin of a non-local event bin are left out: the library
-    pads every training run by one bin on each side and bridges bins without a
-    position (:func:`training_spike_bins`), and no event spike may enter a
-    running-only encoding.
+    bins within :data:`EVENT_MARGIN_BINS` of a non-local event bin are left
+    out: the library pads every training run by about one bin on each side and
+    bridges bins without a position (:func:`training_spike_bins`), and no
+    event spike may enter a running-only encoding.
 
     Parameters
     ----------
@@ -779,7 +786,10 @@ def running_only_masks(
         An event bin is in a mask's library span, or a mask is empty.
     """
     at_speed = speed >= RUNNING_ENCODING_MIN_SPEED_CM_S
-    near_event = in_event | np.r_[in_event[1:], False] | np.r_[False, in_event[:-1]]
+    near_event = in_event.copy()
+    for shift in range(1, EVENT_MARGIN_BINS + 1):
+        near_event[:-shift] |= in_event[shift:]
+        near_event[shift:] |= in_event[:-shift]
     running = at_speed & ~near_event
     masks = {
         "run": running,
@@ -826,8 +836,8 @@ def run_settings() -> dict:
             "window is scored by the fold without its centre bin",
             "run": "running-only refit on every running bin",
             "can": "the decode's own (no_ripple training mask)",
-            "running_only_leaves_out": "running bins within one bin of a non-local "
-            "event bin",
+            "running_only_leaves_out": f"running bins within {EVENT_MARGIN_BINS} "
+            "bins of a non-local event bin",
         },
     }
 

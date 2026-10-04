@@ -77,9 +77,9 @@ Every window is scored under three encodings, the column prefixes:
 - ``can_`` (secondary): the decode's own encoding, fit on every non-ripple
   bin, so it includes non-ripple windows' own spikes.
 
-Running bins within one bin of a non-local event bin are left out of every
+Running bins within two bins of a non-local event bin are left out of every
 running-only fit, so no event spike enters one even through the library's
-padding.
+padding (one bin width either side, with its float rounding).
 
 What is and is not held out (properties, not defects)
 -----------------------------------------------------
