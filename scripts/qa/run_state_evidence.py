@@ -140,9 +140,12 @@ CAVEATS = [
     "test over random windows is the only held-out No-Spike test.",
     "With few spikes, S's silence term pulls MAP_S toward low-rate bins, so "
     "MAP_S's distance from the animal (mapS_dist_cm) is not a Local test.",
-    "Bootstrap CIs resample windows within epochs, and sign-flip tests treat "
-    "windows as independent; the per-epoch and per-animal counts are the "
-    "check on pseudo-replication.",
+    "Inference is at the epoch level, epochs nested in animals: hierarchical "
+    "bootstrap CIs (animals, then epochs within each; Saravanan, Berman & Sober "
+    "2020), sign-flip tests on per-epoch means (exact for 13 epochs or fewer) "
+    "and k of N epochs and k of A animals. Columns ending _window_level treat "
+    "windows as independent: they ignore the nesting, are not for inference, "
+    "and are kept only to compare with the prototype.",
 ]
 
 
@@ -758,8 +761,13 @@ def figure_bouts(windows: pd.DataFrame, path: Path) -> None:
     plt.close(fig)
 
 
+def _error_bars(estimate: NDArray, lo: NDArray, hi: NDArray) -> list[NDArray]:
+    """Error-bar lengths, zero where a CI could not be computed."""
+    return [np.nan_to_num(estimate - lo), np.nan_to_num(hi - estimate)]
+
+
 def figure_calibration(bins: pd.DataFrame, path: Path) -> None:
-    """Mean evidence by the state's probability, with 95 % CIs."""
+    """Mean evidence over epochs by the state's probability, hierarchical 95 % CIs."""
     import matplotlib
 
     matplotlib.use("Agg")
@@ -780,13 +788,11 @@ def figure_calibration(bins: pd.DataFrame, path: Path) -> None:
                 .reindex(list(PROBABILITY_BIN_LABELS))
             )
             ok = (curve.n >= MIN_BIN_WINDOWS).to_numpy()
-            mean = curve["mean"].to_numpy(dtype=float)
-            lo, hi = (
-                curve.ci_lo.to_numpy(dtype=float),
-                curve.ci_hi.to_numpy(dtype=float),
-            )
+            mean = curve["epoch_mean"].to_numpy(dtype=float)[ok]
+            lo = curve.epoch_ci_lo.to_numpy(dtype=float)[ok]
+            hi = curve.epoch_ci_hi.to_numpy(dtype=float)[ok]
             ax.errorbar(
-                BIN_CENTERS[ok], mean[ok], yerr=[mean[ok] - lo[ok], hi[ok] - mean[ok]],
+                BIN_CENTERS[ok], mean, yerr=_error_bars(mean, lo, hi),
                 color=OKABE_ITO["bout"], marker="o", ms=3, lw=1.2, capsize=2,
             )  # fmt: skip
             ax.axhline(0, color="k", lw=0.6, ls="--")
@@ -801,7 +807,9 @@ def figure_calibration(bins: pd.DataFrame, path: Path) -> None:
                 ax.set_ylabel(f"{regime}\nmean held-out evidence", fontsize=8)
     fig.suptitle(
         "Calibration: held-out evidence in random 20 ms windows against the state's "
-        f"mean posterior (95 % CIs; bins with < {MIN_BIN_WINDOWS} windows omitted)",
+        "mean posterior\nMean over epochs of each epoch's bin mean; 95 % hierarchical "
+        f"bootstrap CI (animals, then epochs); bins with < {MIN_BIN_WINDOWS} windows "
+        "omitted",
         fontsize=9,
     )
     fig.savefig(path, dpi=150)
@@ -822,23 +830,23 @@ def figure_silence(silence: pd.DataFrame, path: Path) -> None:
         ]
         by_bin = by_bin.set_index("pbin").reindex(list(PROBABILITY_BIN_LABELS))
         ok = (by_bin.runs_S_silent >= 20).to_numpy()
-        y = by_bin.obs_C_silent_given_S_silent.to_numpy(dtype=float)
-        lo = by_bin.obs_given_ci_lo.to_numpy(dtype=float)
-        hi = by_bin.obs_given_ci_hi.to_numpy(dtype=float)
+        y = by_bin.epoch_obs_given_S.to_numpy(dtype=float)[ok]
+        lo = by_bin.epoch_obs_given_S_ci_lo.to_numpy(dtype=float)[ok]
+        hi = by_bin.epoch_obs_given_S_ci_hi.to_numpy(dtype=float)[ok]
         ax.errorbar(
-            BIN_CENTERS[ok], y[ok], yerr=[y[ok] - lo[ok], hi[ok] - y[ok]],
+            BIN_CENTERS[ok], y, yerr=_error_bars(y, lo, hi),
             color=OKABE_ITO["bout"], marker="o", ms=3.5, lw=1.2, capsize=2,
             label="observed",
         )  # fmt: skip
         for prefix, label in (("run", "running-only"), ("can", "canonical")):
             ax.plot(
-                BIN_CENTERS[ok], by_bin[f"pred_given_S_{prefix}"].to_numpy()[ok],
+                BIN_CENTERS[ok], by_bin[f"epoch_pred_given_S_{prefix}"].to_numpy()[ok],
                 color=OKABE_ITO[prefix], ls=":", lw=1.2,
                 label=f"local coding, {label}",
             )  # fmt: skip
         every = silence[(silence.regime == regime) & (silence.state == "all windows")]
         if len(every):
-            ax.axhline(every.obs_C_silent_given_S_silent.iloc[0], color="k", lw=0.8,
+            ax.axhline(every.epoch_obs_given_S.iloc[0], color="k", lw=0.8,
                        ls="--", label="all windows, observed")  # fmt: skip
             ax.axhline(every.obs_C_silent.iloc[0], color="0.5", lw=0.8, ls="-.",
                        label="all windows, P(C silent)")  # fmt: skip
@@ -849,7 +857,11 @@ def figure_silence(silence: pd.DataFrame, path: Path) -> None:
         ax.tick_params(labelsize=7)
     axes[0].set_ylabel("P(held-out half C silent | S silent)", fontsize=8)
     axes[0].legend(fontsize=6.5, frameon=False, loc="upper left")
-    fig.suptitle("Held-out coordinated silence (random 20 ms windows)", fontsize=9)
+    fig.suptitle(
+        "Held-out coordinated silence (random 20 ms windows): mean over epochs, "
+        "95 % hierarchical bootstrap CI",
+        fontsize=9,
+    )
     fig.savefig(path, dpi=150)
     plt.close(fig)
 
@@ -929,8 +941,9 @@ def summarize(output_dir: Path, epochs: list[str]) -> None:
     figure_calibration(summary["calibration"], output_dir / "fig_calibration.png")
     figure_silence(summary["silence"], output_dir / "fig_coordinated_silence.png")
     primary = summary["bouts"][summary["bouts"].primary]
-    shown = ["state", "regime", "metric", "n", "median", "frac_pos", "p_signflip",
-             "diff_mean", "epochs_pos", "animals_pos"]  # fmt: skip
+    shown = ["state", "regime", "metric", "n", "n_epochs", "median", "frac_pos",
+             "epoch_mean", "epoch_ci_lo", "epoch_ci_hi", "p_epoch", "epochs_pos",
+             "animals_pos", "diff_epoch_mean", "p_diff_epoch"]  # fmt: skip
     print(primary[shown].to_string(index=False), flush=True)
 
 

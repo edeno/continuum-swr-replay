@@ -9,6 +9,7 @@ on terms planted so that the answer is known.
 from __future__ import annotations
 
 import warnings
+from itertools import product
 
 import numpy as np
 import pandas as pd
@@ -28,6 +29,8 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (
     calibration_statistics,
     calibration_windows,
     coordinated_silence,
+    epoch_means,
+    hierarchical_bootstrap_ci,
     interior_bin_mask,
     matched_windows,
     nearest_interior_bins,
@@ -674,6 +677,9 @@ def test_summarize_state_evidence_covers_every_state_and_table():
             & (table.regime == row.regime)
         ]
         assert row.n == len(cell)
+    assert {"epoch_mean", "epoch_ci_lo", "p_epoch", "p_signflip_window_level"} <= set(
+        bouts.columns
+    )
     assert set(summary["trends"].state) == set(STATES)
 
 
@@ -704,6 +710,145 @@ def test_ols_slope_ci_recovers_a_known_slope():
 
     assert slope == pytest.approx(3.0, abs=0.1)
     assert lo < 3.0 < hi
+
+
+def test_sign_flip_p_is_exact_for_few_values():
+    """With no more sign patterns than flips, each pattern counts once."""
+    assert sign_flip_p(np.array([1.0, 2.0, 3.0]), seed=(1,)) == pytest.approx(2 / 8)
+    assert sign_flip_p(np.array([1.0, -1.0]), seed=(1,)) == pytest.approx(1.0)
+    assert sign_flip_p(np.array([2.0]), seed=(1,)) == pytest.approx(1.0)
+    # the smallest p five epochs allow
+    five = np.array([0.5, 1.0, 1.5, 2.0, 2.5])
+    assert sign_flip_p(five, seed=(1,)) == pytest.approx(2 / 32)
+
+
+def test_the_hierarchical_bootstrap_resamples_animals_then_epochs():
+    rng = np.random.default_rng(8)
+    animal = np.repeat(["a", "b", "c", "d"], 20)
+    summaries = np.repeat([-1.0, 0.0, 1.0, 2.0], 20) + rng.normal(0, 0.1, 80)
+
+    lo, hi = hierarchical_bootstrap_ci(summaries, animal, seed=(5,))
+    flat_lo, flat_hi = stratified_bootstrap_ci(summaries, np.zeros(80), seed=(5,))
+
+    assert lo < summaries.mean() < hi
+    # four animals, not eighty epochs, set the uncertainty
+    assert hi - lo > 3 * (flat_hi - flat_lo)
+    assert (lo, hi) == hierarchical_bootstrap_ci(summaries, animal, seed=(5,))
+    # one epoch per animal: an ordinary bootstrap over the epochs
+    one_each = summaries[::20]
+    h_lo, h_hi = hierarchical_bootstrap_ci(one_each, np.arange(4), seed=(6,))
+    f_lo, f_hi = stratified_bootstrap_ci(one_each, np.zeros(4), seed=(6,))
+    assert h_hi - h_lo == pytest.approx(f_hi - f_lo, rel=0.15)
+    # nothing varies: nothing is uncertain
+    same = hierarchical_bootstrap_ci(np.ones(6), np.repeat([0, 1, 2], 2), seed=(7,))
+    assert same == (1.0, 1.0)
+    assert np.isnan(hierarchical_bootstrap_ci(np.ones(1), np.zeros(1), seed=(7,))[0])
+
+
+def bouts_of_six_epochs() -> tuple[pd.DataFrame, np.ndarray, np.ndarray]:
+    """Local bouts and their matched windows: six epochs of three animals.
+
+    Every epoch's bout and baseline means are set exactly.
+    """
+    rng = np.random.default_rng(10)
+    bout_means = np.array([1.0, 2.0, -0.5, 3.0, 4.0, 0.5])
+    base_means = np.array([0.0, 0.5, 0.0, 0.0, 5.0, 0.0])
+    frames = []
+    for k, (mean, base) in enumerate(zip(bout_means, base_means, strict=True)):
+        n = 30
+        noise = rng.normal(0, 1, (2, n))
+        noise -= noise.mean(1, keepdims=True)
+        bout_s = np.arange(n) * 100
+        animal = ["aa", "bb", "cc"][k // 2]
+        epoch = f"{animal}2020010{k}_02_r1_HPC"
+        frames += [
+            pd.DataFrame(
+                {
+                    "kind": "bout", "state": "Local", "regime": "immobile",
+                    "bout_s": bout_s, "matched_bout_s": np.nan, "n_found": n,
+                    "run_loc_mark": mean + noise[0], "epoch_id": epoch,
+                    "animal": animal,
+                }
+            ),
+            pd.DataFrame(
+                {
+                    "kind": "baseline", "state": "Local", "regime": "immobile",
+                    "bout_s": np.nan, "matched_bout_s": bout_s, "n_found": np.nan,
+                    "run_loc_mark": base + noise[1], "epoch_id": epoch,
+                    "animal": animal,
+                }
+            ),
+        ]  # fmt: skip
+    return pd.concat(frames, ignore_index=True), bout_means, base_means
+
+
+def test_bout_statistics_infer_at_the_epoch_level():
+    table, means, base = bouts_of_six_epochs()
+
+    stats = bout_statistics(table, metrics={"Local": ["run_loc_mark"]}, seed=(1,))
+    row = stats.iloc[0]
+
+    patterns = np.array(list(product([1.0, -1.0], repeat=6)))
+    exact = np.mean(np.abs(patterns @ means) / 6 >= abs(means.mean()) * (1 - 1e-12))
+    assert row["n_epochs"] == 6 and row["n_animals"] == 3
+    assert row["epoch_mean"] == pytest.approx(means.mean())
+    assert row["epoch_ci_lo"] < means.mean() < row["epoch_ci_hi"]
+    assert row["p_epoch"] == pytest.approx(exact)
+    # animal means 1.5, 1.25 and 2.25
+    assert row["epochs_pos"] == "5/6" and row["animals_pos"] == "3/3"
+    differences = means - base  # 1, 1.5, -0.5, 3, -1, 0.5
+    assert row["diff_epoch_mean"] == pytest.approx(differences.mean())
+    exact = np.mean(
+        np.abs(patterns @ differences) / 6 >= abs(differences.mean()) * (1 - 1e-12)
+    )
+    assert row["p_diff_epoch"] == pytest.approx(exact)
+    # animal means of the differences 1.25, 1.25 and -0.25
+    assert row["epochs_above_base"] == "4/6" and row["animals_above_base"] == "2/3"
+    # the window-level statistics stay, labelled, and as they were
+    x = table.loc[table.kind == "bout", "run_loc_mark"].to_numpy()
+    assert row["p_signflip_window_level"] == sign_flip_p(
+        x, seed=(1, "Local", "immobile", "run_loc_mark")
+    )
+
+
+def test_epoch_slopes_are_not_fooled_by_differences_between_epochs():
+    """Within each epoch the evidence ignores the probability; across them it does not."""
+    rng = np.random.default_rng(11)
+    frames = [
+        pd.DataFrame(
+            {
+                "kind": "calib",
+                "state": "",
+                "regime": "immobile",
+                "p_Local": 0.15 * k + 0.2 * rng.random(300),
+                "run_loc_mark": float(k),  # constant within the epoch
+                "epoch_id": f"e{k}",
+                "animal": "abc"[k // 2],
+            }
+        )  # fmt: skip
+        for k in range(6)
+    ]
+    table = pd.concat(frames, ignore_index=True)
+
+    _, trends = calibration_statistics(table, metrics={"Local": ["run_loc_mark"]})
+    trend = trends.iloc[0]
+
+    assert trend["slope_window_level"] > 3.0 and trend["rises_window_level"]
+    assert trend["epoch_slope"] == 0.0 and trend["epochs_rising"] == "0/6"
+    assert not trend["rises"]
+
+
+def test_epoch_means_drop_what_is_not_finite():
+    means = epoch_means(
+        np.array([1.0, 3.0, np.nan, 5.0, np.nan]),
+        np.array(["e1", "e1", "e1", "e2", "e3"]),
+        np.array(["a", "a", "a", "b", "b"]),
+    )
+
+    assert means.index.tolist() == ["e1", "e2"]
+    assert means["mean"].tolist() == [2.0, 5.0]
+    assert means["animal"].tolist() == ["a", "b"]
+    assert means["n"].tolist() == [2, 1]
 
 
 def evidence_table() -> pd.DataFrame:
@@ -763,15 +908,18 @@ def test_bout_statistics_pair_each_bout_with_its_matched_window():
     assert row["q25"] == pytest.approx(bouts.run_loc_mark.quantile(0.25))
     assert row["frac_pos"] == pytest.approx((bouts.run_loc_mark > 0).mean())
     assert row["mean"] == pytest.approx(bouts.run_loc_mark.mean())
-    assert row["ci_lo"] < row["mean"] < row["ci_hi"]
-    assert row["p_signflip"] == pytest.approx(1 / 10_001)
     assert row["base_median"] == pytest.approx(base.run_loc_mark.median())
     assert row["diff_mean"] == pytest.approx(
         bouts.run_loc_mark.mean() - base.run_loc_mark.mean()
     )
-    assert row["diff_ci_lo"] < row["diff_mean"] < row["diff_ci_hi"]
     assert row["epochs_pos"] == "2/2" and row["epochs_above_base"] == "2/2"
     assert row["animals_pos"] == "2/2" and row["animals_above_base"] == "2/2"
+    assert row["p_epoch"] == pytest.approx(0.5)  # the smallest p two epochs allow
+    # the window-level tests are kept, labelled, for comparison only
+    assert row["ci_lo_window_level"] < row["mean"] < row["ci_hi_window_level"]
+    assert row["p_signflip_window_level"] == pytest.approx(1 / 10_001)
+    assert row["diff_ci_lo_window_level"] < row["diff_mean"]
+    assert row["diff_mean"] < row["diff_ci_hi_window_level"]
     # a bout whose matched window is missing is an error, not a silent drop
     with pytest.raises(ValueError, match="matched"):
         bout_statistics(
@@ -789,16 +937,20 @@ def test_calibration_statistics_bin_by_probability_and_call_the_trend():
     in_top = cal[cal.p_Local >= 0.8]
     assert top["n"] == len(in_top)
     assert top["mean"] == pytest.approx(in_top.run_loc_mark.mean())
-    assert top["ci_lo"] < top["mean"] < top["ci_hi"]
+    assert top["ci_lo_window_level"] < top["mean"] < top["ci_hi_window_level"]
+    # two epochs: the hierarchical CI spans their two means
+    per_epoch = in_top.groupby("epoch_id").run_loc_mark.mean()
+    assert top["epoch_mean"] == pytest.approx(per_epoch.mean())
+    assert top["epoch_ci_lo"] == pytest.approx(per_epoch.min())
+    assert top["epoch_ci_hi"] == pytest.approx(per_epoch.max())
     curve = trends.set_index(["state", "regime", "metric"]).loc[
         ("Local", "immobile", "run_loc_mark")
     ]
-    assert curve["slope"] == pytest.approx(4.0, abs=0.2)
+    assert curve["epoch_slope"] == pytest.approx(4.0, abs=0.2)
+    assert curve["slope_window_level"] == pytest.approx(4.0, abs=0.2)
+    assert curve["epochs_rising"] == "2/2" and curve["animals_rising"] == "2/2"
     assert curve["rises"] and curve["top_positive"]
     flat = table.assign(run_loc_mark=np.where(table.kind == "calib", -1.0, 0.0))
-    flat.loc[flat.kind == "calib", "run_loc_mark"] += np.random.default_rng(0).normal(
-        0, 0.1, (flat.kind == "calib").sum()
-    )
     _, flat_trends = calibration_statistics(flat, metrics={"Local": ["run_loc_mark"]})
     assert not flat_trends.rises.iloc[0] and not flat_trends.top_positive.iloc[0]
 
@@ -844,8 +996,16 @@ def test_rate_calibration_and_coordinated_silence():
     )
     assert every["pred_given_S_can"] == pytest.approx(0.3)
     assert every["pred_given_S_run"] == pytest.approx(0.2)
-    assert every["obs_given_ci_lo"] < every["obs_C_silent_given_S_silent"]
-    assert every["obs_C_silent_given_S_silent"] < every["obs_given_ci_hi"]
+    assert every["obs_given_ci_lo_window_level"] < every["obs_C_silent_given_S_silent"]
+    assert every["obs_C_silent_given_S_silent"] < every["obs_given_ci_hi_window_level"]
+    sums = table.groupby("epoch_id")[
+        ["run_cond_both_silent", "run_cond_S_silent"]
+    ].sum()
+    ratios = sums.run_cond_both_silent / sums.run_cond_S_silent
+    assert every["epoch_obs_given_S"] == pytest.approx(ratios.mean())
+    assert every["epoch_pred_given_S_can"] == pytest.approx(0.3)
+    assert every["epoch_excess_can"] == pytest.approx(ratios.mean() - 0.3)
+    assert every["epochs_above_pred_can"] == f"{int((ratios > 0.3).sum())}/2"
     by_bin = silence[silence.state == "P(No-Spike) bin"]
     assert by_bin.n_windows.sum() == n
 

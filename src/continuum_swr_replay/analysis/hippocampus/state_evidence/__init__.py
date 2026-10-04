@@ -70,6 +70,24 @@ What is and is not held out (properties, not defects)
   informative there.
 - With few spikes, S's silence term pulls MAP_S toward low-rate bins, so
   MAP_S's distance from the animal is not a Local test.
+
+Inference (:mod:`.summary`)
+---------------------------
+The epoch is the unit of inference: epochs are nested in animals, and an
+epoch's windows are not independent.
+
+- Each epoch enters as its mean over windows (its own slope, for a calibration
+  curve).
+- CIs are hierarchical bootstrap CIs, resampling animals and then epochs within
+  each animal (Saravanan, Berman & Sober 2020).
+- Tests are sign-flip tests on the epoch means. Each comes with k of N epochs
+  and k of A animals.
+- Window-level statistics are descriptive. The ``_window_level`` CIs and
+  p-values ignore the nesting and are not for inference.
+
+Modules: :mod:`.terms` (per-tetrode terms, encodings, decode files),
+:mod:`.windows` (regimes, bouts, matched and calibration windows, tetrode
+halves, partners), :mod:`.evidence` (window evidence) and :mod:`.summary`.
 """
 
 from continuum_swr_replay.analysis.hippocampus.state_evidence.evidence import (
@@ -85,6 +103,9 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.summary import (
     bout_statistics,
     calibration_statistics,
     coordinated_silence,
+    epoch_means,
+    epoch_slopes,
+    hierarchical_bootstrap_ci,
     ols_slope_ci,
     rate_calibration,
     sign_flip_p,
@@ -133,7 +154,10 @@ __all__ = [
     "calibration_windows",
     "coordinated_silence",
     "encoding_inputs",
+    "epoch_means",
+    "epoch_slopes",
     "event_likelihood",
+    "hierarchical_bootstrap_ci",
     "interior_bin_mask",
     "keyed_rng",
     "load_detector",
