@@ -1267,8 +1267,10 @@ R1 first ran from `C0` into `_staging_redecode_20261003` (smoke and pilot only).
   - each epoch's `minimum_sample_count(time, 0.015)`, which must be 7 for all (R9);
   - NonLocal events per epoch must equal the P30-B ablation's: peanut 245, j16 236, chimi 264,
     wilbur 195, senor 223. ContFrag's results must equal the `_staging_redecode_20261003` pilot's;
-  - Task 10's `check_decoder_settings` on the staged detectors, run from the worktree, with
-    `--expected-settings` written from `nonlocal_transition_settings()`.
+  - Task 10's `check_decoder_settings` on the staged detectors, run from the worktree,
+    against `expected_decoder_settings()`, which the audit builds from the code
+    (`nonlocal_transition_settings()` and `contfrag_transition_settings()`). An
+    `--expected-settings` file is optional, an explicit override.
 - [ ] **STOP:** report the smoke and pilot numbers and a full-run estimate. Ask for the
   go-ahead to launch both full batches.
 - [ ] **Full.** Two tmux sessions, on disjoint idle cards:
@@ -1468,7 +1470,10 @@ alone: the cross-table check and the no-session path return 0 and write nothing
 ## R8: audit and report
 
 - [ ] **Audit.**
-  `uv run python scripts/qa/audit_refresh_consistency.py audit --output Processed-Data/_refresh_<date>/audit.json --check-marks --widloski-manifest <R4 manifest> --swr-manifest <R3 manifest> --expected-settings <the R1 JSON>`.
+  `uv run python scripts/qa/audit_refresh_consistency.py audit --output Processed-Data/_refresh_<date>/audit.json --check-marks --widloski-manifest <R4 manifest> --swr-manifest <R3 manifest>`.
+  The expected decoder settings come from the code (`expected_decoder_settings()`);
+  `--expected-settings <json>` is optional, an explicit override, and `audit.json` records
+  under `expected_settings` which source it used.
   Expected: exit 0. Any failure is diagnosed, not waived.
 - [ ] **Report.** Write `docs/audits/<date>-full-pipeline-refresh.md`, covering:
   - the audit summary;

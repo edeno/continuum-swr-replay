@@ -24,8 +24,13 @@ import numpy as np
 import pandas as pd
 import pytest
 import xarray as xr
+from non_local_detector.discrete_state_transitions import DiscreteStationaryCustom
 
 import scripts.qa.audit_refresh_consistency as audit
+from continuum_swr_replay.decoding_transitions import (
+    contfrag_transition_settings,
+    nonlocal_transition_settings,
+)
 from continuum_swr_replay.table_io import sha256_file, write_table
 
 BASE_TIME_S = 1.58e9
@@ -148,6 +153,22 @@ def _detector(**overrides: object) -> SimpleNamespace:
         "frozen_discrete_transition_rows": (1,),
         "local_position_std": 2.5,
     }
+    settings.update(overrides)
+    return SimpleNamespace(**settings)
+
+
+def _pinned_detector(decoder: str, **overrides: object) -> SimpleNamespace:
+    """A stand-in for a fitted `decoder` detector, built as the decoders build it.
+
+    It carries the pinned transition settings, the NonLocal Local state's
+    2.5 cm (None for ContFrag, which has no Local state) and the library's
+    ``discrete_transition_regularization`` of 1e-10, which no decoder sets.
+    """
+    if decoder == "nonlocal":
+        settings = {**nonlocal_transition_settings(), "local_position_std": 2.5}
+    else:
+        settings = {**contfrag_transition_settings(), "local_position_std": None}
+    settings["discrete_transition_regularization"] = 1e-10
     settings.update(overrides)
     return SimpleNamespace(**settings)
 
@@ -1200,6 +1221,85 @@ def test_settings_other_than_expected_fail(tmp_path):
     assert not audit.check_decoder_settings(paths, {"stickiness": [1e5, 300.0]})["ok"]
 
 
+def test_the_default_expectation_is_the_pinned_settings():
+    """``expected_decoder_settings`` is the code's pin, in the audit's JSON form."""
+    expected = audit.expected_decoder_settings()
+
+    pinned = {
+        "nonlocal": nonlocal_transition_settings(),
+        "contfrag": contfrag_transition_settings(),
+    }
+    assert set(expected) == set(audit.DECODERS)
+    for decoder, settings in pinned.items():
+        assert set(expected[decoder]) == set(audit.DISCRETE_SETTINGS)
+        # the five pinned transition values, each exactly as _plain writes it
+        assert {name: expected[decoder][name] for name in settings} == {
+            name: audit._plain(value) for name, value in settings.items()
+        }
+    # JSON types throughout: a tuple or an array would not survive the round trip
+    assert json.loads(json.dumps(expected)) == expected
+    assert expected["nonlocal"]["discrete_transition_type"]["class"] == (
+        "DiscreteStationaryCustom"
+    )
+    assert expected["nonlocal"]["frozen_discrete_transition_rows"] == [1]
+    # the two settings the pin does not hold: the NonLocal decode's Local-state
+    # width, and the library's regularization, which no decoder sets
+    assert expected["nonlocal"]["local_position_std"] == 2.5
+    assert expected["contfrag"]["local_position_std"] is None
+    assert expected["nonlocal"]["discrete_transition_regularization"] == 1e-10
+    assert expected["contfrag"]["discrete_transition_regularization"] == 1e-10
+
+
+@pytest.mark.parametrize("decoder", audit.DECODERS)
+def test_a_detector_with_the_pinned_settings_passes(tmp_path, decoder):
+    path = tmp_path / f"{decoder}_detector.pkl"
+    joblib.dump(_pinned_detector(decoder), path)
+
+    result = audit.check_decoder_settings(
+        {EPOCHS[0]: path}, audit.expected_decoder_settings()[decoder]
+    )
+
+    assert result["ok"], result["failures"]
+
+
+def test_a_detector_with_the_library_nonlocal_defaults_fails(tmp_path):
+    """The library's own NonLocal defaults, which the decoders took before the pin."""
+    no_spike_exit = (1 - 0.98) / 3
+    non_local_exit = (1 - 0.96 - 0.005) / 2
+    library_defaults = DiscreteStationaryCustom(
+        values=np.array(
+            [
+                [0.99, 0.005, 0.0025, 0.0025],
+                [no_spike_exit, 0.98, no_spike_exit, no_spike_exit],
+                [non_local_exit, 0.005, 0.96, non_local_exit],
+                [non_local_exit, 0.005, non_local_exit, 0.96],
+            ]
+        )
+    )
+    path = tmp_path / "detector.pkl"
+    joblib.dump(
+        _pinned_detector(
+            "nonlocal",
+            discrete_transition_type=library_defaults,
+            discrete_transition_concentration=1.0,
+            discrete_transition_stickiness=np.array([1e5, 1e5, 300.0, 300.0]),
+        ),
+        path,
+    )
+
+    result = audit.check_decoder_settings(
+        {EPOCHS[0]: path}, audit.expected_decoder_settings()["nonlocal"]
+    )
+
+    assert not result["ok"]
+    (failure,) = result["failures"]
+    assert {name for name in audit.DISCRETE_SETTINGS if f"{name} is " in failure} == {
+        "discrete_transition_type",
+        "discrete_transition_concentration",
+        "discrete_transition_stickiness",
+    }
+
+
 # --------------------------------------------------------------------------
 # Nothing to check
 # --------------------------------------------------------------------------
@@ -1256,17 +1356,17 @@ def _consistent_tree(tmp_path: Path) -> Tree:
     repo, decode_commit, run_commit = history.repo, history.decode, history.later
     root, log_dir = tmp_path / "Processed-Data", tmp_path / "logs"
     for epoch_id in EPOCHS:
-        for decode_id, dot_name, settings in (
-            (epoch_id, f"{epoch_id}_80_data_over_time.pkl", {}),
+        for decode_id, dot_name, decoder in (
+            (epoch_id, f"{epoch_id}_80_data_over_time.pkl", "nonlocal"),
             (
                 f"{epoch_id}_contfrag",
                 f"{epoch_id}_contfrag_data_over_time.pkl",
-                {"local_position_std": None, "frozen_discrete_transition_rows": None},
+                "contfrag",
             ),
         ):
             record = _provenance(decode_commit)
             _stamp(root, log_dir, decode_id, record, record)
-            joblib.dump(_detector(**settings), root / f"{decode_id}_detector.pkl")
+            joblib.dump(_pinned_detector(decoder), root / f"{decode_id}_detector.pkl")
             (root / f"{decode_id}_environment.pkl").write_bytes(b"environment")
             _dot().to_pickle(root / dot_name)
 
@@ -1357,17 +1457,48 @@ def test_the_audit_passes_a_consistent_tree_and_writes_only_its_report(tmp_path)
         "replay_content/models_per_bin_rate/qvals_table.parquet",
         "contfrag_replay_content/event_table_swr_HPC.parquet",
     }
+    # without --expected-settings, every detector is held to the code's pin
+    assert report["expected_settings"] == {
+        "source": "expected_decoder_settings()",
+        "values": audit.expected_decoder_settings(),
+    }
     # and a pass says what it did not cover
     assert report["not_checked"] == [
-        "decoder_settings_nonlocal: compared across epochs only, since "
-        "--expected-settings names no nonlocal settings",
-        "decoder_settings_contfrag: compared across epochs only, since "
-        "--expected-settings names no contfrag settings",
         f"fit_provenance: no Stage 5B fit (stage5b_*.pkl) at {tree.replay}",
         "fit_provenance: no stop_replay_summary fit (stop_replay_summary*.pkl) at "
         f"{tree.replay}",
         "encoding_marks: not run; --check-marks reloads every epoch's marks from "
         "the database",
+    ]
+
+
+def test_expected_settings_from_a_file_override_the_code(tmp_path):
+    """``--expected-settings`` replaces the code's expectation, and the report says so."""
+    tree = _consistent_tree(tmp_path)
+    # the library's NonLocal stickiness, against the pinned detectors' P30-B values
+    override = {
+        "nonlocal": {"discrete_transition_stickiness": [1e5, 1e5, 300.0, 300.0]}
+    }
+    settings_file = tmp_path / "expected_settings.json"
+    settings_file.write_text(json.dumps(override))
+
+    code = audit.main([*tree.argv, "--expected-settings", str(settings_file)])
+
+    report = json.loads(tree.output.read_text())
+    assert code == 1
+    assert report["failed_checks"] == ["decoder_settings_nonlocal"]
+    (failure,) = report["checks"]["decoder_settings_nonlocal"]["failures"]
+    assert "discrete_transition_stickiness is" in failure
+    assert report["expected_settings"] == {
+        "source": str(settings_file),
+        "values": override,
+    }
+    # a decoder the file does not name is compared across epochs only
+    assert [
+        gap for gap in report["not_checked"] if gap.startswith("decoder_settings")
+    ] == [
+        "decoder_settings_contfrag: compared across epochs only, since "
+        "--expected-settings names no contfrag settings"
     ]
 
 

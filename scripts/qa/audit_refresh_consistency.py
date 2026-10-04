@@ -20,9 +20,11 @@ checks (Stage 5), and nothing else.
   commit is the decode commit the later checks compare against.
 - ``decoder_settings_nonlocal`` and ``decoder_settings_contfrag``: every
   epoch's fitted detector carries the same discrete-transition settings, and
-  those ``--expected-settings`` names when given. The decoders set none of
-  them, so a library upgrade can change them unnoticed, as one did between
-  April and the refresh (32 % more non-local events).
+  the expected ones: by default those ``expected_decoder_settings()`` builds
+  from the code, or else those an ``--expected-settings`` file names. Until
+  the pin (decision R10) the decoders left these settings to the library's
+  defaults, and a library upgrade changed them unnoticed between April and
+  the refresh (32 % more non-local events).
 - ``grids_match``: per epoch, NonLocal and ContFrag share time grid, position
   and speed, and the grid passes ``validate_time_grid``.
 - ``minimum_sample_counts``: ``minimum_sample_count(time, 0.015)``, the
@@ -47,11 +49,14 @@ checks (Stage 5), and nothing else.
   database: the marks reloaded through the project's loader hold every
   encoding mark of both decodes.
 
-``audit.json`` also lists under ``not_checked`` what the audit did not check:
-the encoding marks without ``--check-marks``, expected decoder settings when
-none were given, a table whose epochs cannot be told, and a family of fits at
-the ``replay_content`` root with no fit at all. A pass covers the checks, and
-nothing listed there. ``audit`` exits 1 if any check fails, and 0 otherwise.
+``audit.json`` records under ``expected_settings`` the decoder settings the
+detectors were held to, and their source: ``expected_decoder_settings()`` or
+the ``--expected-settings`` file. It also lists under ``not_checked`` what the
+audit did not check: the encoding marks without ``--check-marks``, a decoder
+an ``--expected-settings`` file names no settings for, a table whose epochs
+cannot be told, and a family of fits at the ``replay_content`` root with no
+fit at all. A pass covers the checks, and nothing listed there. ``audit``
+exits 1 if any check fails, and 0 otherwise.
 
 Usage:
     uv run python scripts/qa/audit_refresh_consistency.py record-tables \\
@@ -68,6 +73,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import inspect
 import json
 import math
 import re
@@ -84,6 +90,10 @@ import joblib
 import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
+from non_local_detector import (
+    ContFragClusterlessClassifier,
+    NonLocalClusterlessDetector,
+)
 from numpy.typing import NDArray
 from ripple_detection import minimum_sample_count
 
@@ -97,7 +107,14 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
     validate_time_grid,
 )
 from continuum_swr_replay.data_loaders.spikes import filter_spike_times, get_hpc_marks
-from continuum_swr_replay.decoding_common import write_atomically
+from continuum_swr_replay.decoding_common import (
+    NonLocalDecodingConfig,
+    write_atomically,
+)
+from continuum_swr_replay.decoding_transitions import (
+    contfrag_transition_settings,
+    nonlocal_transition_settings,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
 from continuum_swr_replay.table_io import resolved_table_path, sha256_file
@@ -584,6 +601,56 @@ def decoder_settings(detector: object) -> dict[str, Any]:
     return {name: _plain(getattr(detector, name, None)) for name in DISCRETE_SETTINGS}
 
 
+def _default_argument(detector_class: type, name: str) -> object:
+    """The value `detector_class` gives its argument `name` when none is passed."""
+    return inspect.signature(detector_class).parameters[name].default
+
+
+def expected_decoder_settings() -> dict[str, dict[str, object]]:
+    """The :data:`DISCRETE_SETTINGS` each decoder's detectors must carry, from the code.
+
+    The audit's default expectation, so that the check rests on the code at
+    the audit's commit rather than on a file outside git. For each decoder:
+
+    - the five pinned transition settings, from
+      ``decoding_transitions.nonlocal_transition_settings()`` and
+      ``contfrag_transition_settings()``. Their keys are the detectors'
+      attribute names, which :data:`DISCRETE_SETTINGS` uses too;
+    - ``discrete_transition_regularization``: no decoder passes it, so a
+      detector carries its class's default. It is read from the signature of
+      the class each HPC decode builds, ``NonLocalClusterlessDetector`` or
+      ``ContFragClusterlessClassifier``;
+    - ``local_position_std``: for NonLocal, the value ``run_decoding_bandit.py``
+      passes, ``NonLocalDecodingConfig().local_position_std`` (by default
+      ``parameters.LOCAL_POSITION_STD``, 2.5 cm); for ContFrag, which has no
+      Local state, None.
+
+    Returns
+    -------
+    dict of str to dict of str to object
+        ``{"nonlocal": {...}, "contfrag": {...}}``, each setting in JSON types
+        (``_plain``), the form an ``--expected-settings`` file holds.
+    """
+    regularization = "discrete_transition_regularization"
+    settings = {
+        "nonlocal": {
+            **nonlocal_transition_settings(),
+            regularization: _default_argument(
+                NonLocalClusterlessDetector, regularization
+            ),
+            "local_position_std": NonLocalDecodingConfig().local_position_std,
+        },
+        "contfrag": {
+            **contfrag_transition_settings(),
+            regularization: _default_argument(
+                ContFragClusterlessClassifier, regularization
+            ),
+            "local_position_std": None,
+        },
+    }
+    return {decoder: _plain(values) for decoder, values in settings.items()}
+
+
 def check_decoder_settings(
     detector_paths: Mapping[str, Path], expected: Mapping[str, object] | None = None
 ) -> dict:
@@ -889,6 +956,11 @@ def check_swr_spans(
     compared; such a record without ``position_span_s`` fails. An epoch the
     SWR run skipped, failed or lacks is left to ``check_epoch_sets`` and
     listed under ``details["not_compared"]``. Nothing compared at all fails.
+
+    The comparison is between the SWR runner's ``position_info`` span and the
+    decode's ``data_over_time`` span, so a failure says the two differ, not
+    which one moved. It can come from the SWR runner, or from a change to the
+    decode grid, such as ``get_data_over_time`` trimming it.
 
     Parameters
     ----------
@@ -1806,7 +1878,8 @@ def main(argv: list[str] | None = None) -> int:
         "--expected-settings",
         type=Path,
         help='A JSON file: {"nonlocal": {setting: value}, "contfrag": {...}}, the '
-        "discrete-transition settings every detector must carry.",
+        "discrete-transition settings every detector must carry. It overrides the "
+        "default, expected_decoder_settings(), which the audit builds from the code.",
     )
     args = parser.parse_args(argv)
 
@@ -1821,9 +1894,12 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(
             f"--exceptions takes only 'commit' and 'epochs', not {sorted(exceptions)}"
         )
-    expected_settings = (
-        {} if args.expected_settings is None else _read_json(args.expected_settings)
-    )
+    if args.expected_settings is None:
+        expected_settings = expected_decoder_settings()
+        expected_source = "expected_decoder_settings()"
+    else:
+        expected_settings = _read_json(args.expected_settings)
+        expected_source = str(args.expected_settings)
     if set(expected_settings) - set(DECODERS):
         parser.error(
             f"--expected-settings takes only {list(DECODERS)}, not "
@@ -1851,6 +1927,8 @@ def main(argv: list[str] | None = None) -> int:
         "failed_checks": failed,
         # a pass covers the checks above and nothing listed here
         "not_checked": not_checked,
+        # what the detectors' settings were held to, and where it came from
+        "expected_settings": {"source": expected_source, "values": expected_settings},
         "arguments": {
             name: (str(value) if isinstance(value, Path) else value)
             for name, value in vars(args).items()
