@@ -6,9 +6,10 @@ moved the non-local event count by +32 % on identical inputs. Every value now
 lives here, and only here:
 
 - :func:`nonlocal_transition_settings`: the NonLocal 4-state detector, setting
-  P30-B (decision R10). It is a fixed-count Dirichlet prior centred on dwell
-  times from the literature, with a frozen No-Spike row whose exits follow base
-  rates. Rationale, sources and validation:
+  P30-B (decision R10). It is a fixed-count Dirichlet prior whose mode (the
+  M-step's zero-data estimate) gives dwell times from the literature, with a
+  frozen No-Spike row whose exits follow base rates. Rationale, sources and
+  validation:
   ``docs/design/2026-10-04-decoder-transition-prior.md``.
 - :func:`contfrag_transition_settings`: the ContFrag 2-state classifier, at the
   values it has always decoded with, made explicit.
@@ -60,13 +61,14 @@ English et al. 2014, J Neurosci, doi:10.1523/JNEUROSCI.2600-14.2014; Buzsáki
 """
 
 PRIOR_VISITS: Final[int] = 30
-"""Prior strength: an effective sample size of 30 visits to each state.
+"""Prior strength: 30 visits to each state.
 
-A Dirichlet prior is worth its pseudo-count total in observations (Morita, Thall
-& Müller 2008, Biometrics, doi:10.1111/j.1541-0420.2007.00888.x). Each learned
-row gets ``PRIOR_VISITS / 3`` pseudo-exits to each other state, so its total
-pseudo-count is ``PRIOR_VISITS`` x its expected stay in bins. The design doc
-records the sensitivity over 10-100 visits.
+Each learned row gets ``PRIOR_VISITS / 3`` pseudo-exits to each other state, so
+the M-step adds ``sum(alpha - 1)`` = ``PRIOR_VISITS`` x its expected stay in bins
+as pseudo-counts: 45,000 for Local and 1,500 for each non-local row at 500 Hz.
+The Dirichlet's effective sample size, ``sum(alpha)`` (Morita, Thall & Müller
+2008, Biometrics, doi:10.1111/j.1541-0420.2007.00888.x), is 4 more: 45,004 and
+1,504. The design doc records the sensitivity over 10-100 visits.
 """
 
 NO_SPIKE_EXIT_TO_LOCAL: Final[float] = 0.96
@@ -123,11 +125,13 @@ def nonlocal_transition_settings(
           pseudo-exits to each destination.
         - ``discrete_transition_stickiness``: ``e (4 p_i - 1) / (1 - p_i)`` for
           each state, shape (4,). With ``alpha = concentration +
-          diag(stickiness)``, each learned row's prior mean (its normalized
-          ``alpha - 1``) is its row of M, and its total pseudo-count is
-          ``PRIOR_VISITS * dwell_i / bin``: 45,000 for Local and 1,500 for each
-          non-local state at 500 Hz. The No-Spike entry follows the same
-          formula and has no effect, because that row is frozen.
+          diag(stickiness)``, each learned row's prior mode (the M-step's
+          zero-data estimate, its normalized ``alpha - 1``) is its row of M,
+          and the M-step adds ``sum(alpha - 1) = PRIOR_VISITS * dwell_i / bin``
+          pseudo-counts to it: 45,000 for Local and 1,500 for each non-local
+          state at 500 Hz. The Dirichlet's effective sample size,
+          ``sum(alpha)``, is 45,004 and 1,504. The No-Spike entry follows the
+          same formula and has no effect, because that row is frozen.
         - ``discrete_transition_prior_weight``: ``0.0``, a fixed-count prior,
           not scaled to the amount of data.
         - ``frozen_discrete_transition_rows``: ``(1,)``. EM holds the No-Spike
@@ -173,9 +177,10 @@ def contfrag_transition_settings() -> dict[str, Any]:
     """Discrete-transition keyword arguments for the ContFrag classifiers.
 
     These are the values the ContFrag decode has always used: the library's
-    ContFrag defaults, which C0 took by passing ``discrete_transition_type=None``,
-    made explicit. They are a 100 ms starting stay with a near-flat prior
-    (concentration 1.1): weakly informative.
+    ContFrag defaults, which the decoder took before the pin (commit de15650) by
+    passing ``discrete_transition_type=None``, made explicit. They are a 100 ms
+    starting stay with a near-flat prior (concentration 1.1): weakly
+    informative.
 
     Returns
     -------

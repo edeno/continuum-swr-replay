@@ -59,13 +59,16 @@ Dates written `YYYYMMDD` in paths below are the day that stage runs.
 | R7 | Rebuild the ContFrag decodes and everything downstream, including model refits and figures | Nothing is left on April data, so every comparison and every quoted number shares inputs |
 | R8 | A lean implementation plan: code tasks with acceptance criteria, plus a runbook per long run | The runs span days and several sessions |
 | R9 | Non-local events take the pinned package's minimum-duration rule as it computes on our timestamps: `minimum_sample_count(time, 0.015)` is **7** at our 500 Hz grids, where 1.7.0 needed 9 bins | The project lead's choice (2026-10-03), made after review found the pin changes `segment_boolean_series` (`event_detection.py:78`), and after measuring the pilot epochs on the April posteriors: 2,365 events under 1.7.0 (9 bins), 2,382 at 8 bins, and 2,405 at 7 bins (+1.7%; j16 +4%). It matches the duration rule the four SWR detectors use at the same version. 15 ms is exactly 7.5 samples at 500 Hz, and absolute Unix timestamps make the median float64 step 2.0000935 ms, so the count rounds to 7. Every session shares that float spacing, so every epoch should compute 7; Stage 1 records each epoch's count and stops if any differs |
-| R10 | The decoders' discrete transitions are pinned in `src/continuum_swr_replay/decoding_transitions.py`, never left to the library's defaults. The NonLocal decode uses setting P30-B: a fixed-count Dirichlet prior centred on sourced dwell times (Local 3 s, non-local 100 ms), worth 30 visits per state, with the No-Spike row frozen at base-rate exits. The ContFrag decode keeps its values, made explicit. Both runners refuse `--non_stationary`. Details: [2026-10-04-decoder-transition-prior.md](2026-10-04-decoder-transition-prior.md) | The project lead's choice (2026-10-04), after validation on the five pilot epochs. The decoders had taken `non_local_detector`'s defaults, which changed after April and added 32% non-local events on identical inputs. The library's non-stationary transitions cannot be saved (#50) and add their prior at every time bin (#51) |
+| R10 | The decoders' discrete transitions are pinned in `src/continuum_swr_replay/decoding_transitions.py`, never left to the library's defaults. The NonLocal decode uses setting P30-B: a fixed-count Dirichlet prior whose mode (the M-step's zero-data estimate) gives sourced dwell times (Local 3 s, non-local 100 ms), worth 30 visits per state, with the No-Spike row frozen at base-rate exits. The ContFrag decode keeps its values, made explicit. Both runners refuse `--non_stationary`. Details: [2026-10-04-decoder-transition-prior.md](2026-10-04-decoder-transition-prior.md) | The project lead's choice (2026-10-04), after validation on the five pilot epochs. The decoders had taken `non_local_detector`'s defaults, which changed after April and added 32% non-local events on identical inputs. The library's non-stationary transitions cannot be saved (#50) and add their prior at every time bin (#51) |
 
 ## What the re-decode changes
 
 Measured on 2026-10-03 from `chimi20200225_02_r1_HPC_detector.pkl`, the git history since
-`0820d39d`, and `load_data` on three sessions. The three discrete-transition rows were
-updated on 2026-10-04 for R10.
+`0820d39d`, and `load_data` on three sessions. On 2026-10-04 the discrete-transition rows
+were updated for R10, and the concentration and start-row row was added. Their April values
+are the defaults of `non_local_detector` `5e3a086`
+(`src/non_local_detector/models/_defaults.py`, read with `git show` in the library clone).
+The April `chimi20200225_02_r1_HPC_detector.pkl` carries the same values.
 
 | Input | April (`0820d39d`) | Now |
 |---|---|---|
@@ -74,7 +77,8 @@ updated on 2026-10-04 for R10.
 | Position | untrimmed DLC grid | trimmed to the valid interval (`e5a0def`); up to about 76 s shorter at an epoch's end |
 | `non_local_detector` | `5e3a086` | `2d730c3` |
 | Local state | exact position | Gaussian, `local_position_std` 2.5 cm (`ded292e`) |
-| Local and No-Spike stickiness | 1e6 | pinned (R10). Local 44,960 and non-local 1,460 (each row's prior mean equals its start row; 30 visits per state). The No-Spike row is frozen, so its stickiness is unused. The library's 1e5 is not used |
+| Transition prior: concentration and Local start row | 1.0; [0.99, 0.005, 0.0025, 0.0025] | 11 and [0.99933, 0.00022 ×3], pinned (R10) |
+| Stickiness: Local and No-Spike / non-local | 1e6 / 300 | pinned (R10). Local 44,960 / non-local 1,460 (each learned row's prior mode, the M-step's zero-data estimate, equals its start row; 30 visits per state). The No-Spike row is frozen, so its stickiness is unused. The library's defaults (1e5 / 300) are not used |
 | Non-Local Continuous self-transition prior | 0.98 | 0.98, a 100 ms stay, pinned (R10); the same for Non-Local Fragmented |
 | No-Spike transition row during fitting | updated | frozen at [0.0192, 0.98, 0.0004, 0.0004] (R10) |
 | `results.nc` contents | posterior | posterior and the per-bin `log_likelihood` (added 2026-06-26) |

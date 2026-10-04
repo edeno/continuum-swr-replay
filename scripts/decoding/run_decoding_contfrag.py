@@ -99,9 +99,9 @@ def create_contfrag_detector(
 ) -> ContFragClusterlessClassifier | ContFragSortedSpikesClassifier:
     """Factory for creating the appropriate ContFrag classifier.
 
-    The discrete transitions come from ``contfrag_transition_settings`` (the
-    values C0 took from the library, made explicit), never from the library's
-    defaults.
+    The discrete transitions come from ``contfrag_transition_settings``: the
+    values the decoder took from the library before the pin (commit de15650),
+    made explicit, so the library's current defaults never reach the decode.
     """
     if brain_area not in CONTFRAG_DETECTOR_CLASSES:
         valid_areas = list(CONTFRAG_DETECTOR_CLASSES.keys())

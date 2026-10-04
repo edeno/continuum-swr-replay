@@ -4,7 +4,8 @@ The decoders used to leave these settings to ``non_local_detector``'s defaults,
 which changed after April (+32 % non-local events on identical inputs).
 ``decoding_transitions`` now holds every value: setting P30-B for the NonLocal
 detector (decision R10, ``docs/design/2026-10-04-decoder-transition-prior.md``)
-and, for the ContFrag classifier, the values C0 constructed.
+and, for the ContFrag classifier, the values C0 constructed. C0 is commit
+``de15650``, the decode code just before this pin.
 
 Offline: both decoder scripts import ``bandit_task``, which imports Spyglass at
 import time, so they are imported with ``spyglass`` stubbed, as
@@ -162,11 +163,13 @@ def test_frozen_no_spike_row_exits_by_base_rates() -> None:
     )
 
 
-def test_learned_rows_prior_mean_is_the_matrix_and_worth_30_visits() -> None:
-    """Each learned row's Dirichlet prior is centred on its starting row.
+def test_learned_rows_prior_mode_is_the_matrix_and_worth_30_visits() -> None:
+    """Each learned row's prior mode is its starting row.
 
-    Its total pseudo-count is 30 visits x the expected stay in bins: 45,000 for
-    Local (3 s) and 1,500 for each non-local state (100 ms). ``alpha`` comes
+    The mode is the M-step's zero-data estimate, the normalized ``alpha - 1``.
+    The M-step adds 30 visits x the expected stay in bins as pseudo-counts:
+    45,000 for Local (3 s) and 1,500 for each non-local state (100 ms). The
+    Dirichlet's effective sample size, ``sum(alpha)``, is 4 more. ``alpha`` comes
     from the library, so this also checks the library reads the values as meant.
     """
     settings = nonlocal_transition_settings()
@@ -184,6 +187,40 @@ def test_learned_rows_prior_mean_is_the_matrix_and_worth_30_visits() -> None:
         pseudo_counts / total[:, np.newaxis], matrix[LEARNED_ROWS], rtol=1e-12, atol=0
     )
     np.testing.assert_allclose(total, [45_000.0, 1_500.0, 1_500.0], rtol=1e-12)
+    np.testing.assert_allclose(
+        alpha[LEARNED_ROWS].sum(axis=1), [45_004.0, 1_504.0, 1_504.0], rtol=1e-12
+    )
+
+
+def test_dwell_times_and_visits_hold_at_another_sampling_frequency() -> None:
+    """At 1 kHz the bins are 1 ms, but the dwell times and prior strength hold.
+
+    The expected stays are still 3 s and 100 ms. The learned rows are still
+    worth 30 visits, now 90,000 and 3,000 pseudo-counts (30 x dwell x fs). The
+    No-Spike row is still the frozen row: a 100 ms stay, with its exits split
+    0.96 / 0.02 / 0.02.
+    """
+    settings = nonlocal_transition_settings(sampling_frequency=1000.0)
+    matrix = settings["discrete_transition_type"].values
+    alpha = get_transition_prior(
+        settings["discrete_transition_concentration"],
+        settings["discrete_transition_stickiness"],
+        4,
+    )
+
+    np.testing.assert_allclose(matrix.sum(axis=1), 1.0, rtol=0, atol=1e-12)
+    np.testing.assert_allclose(
+        0.001 / (1 - np.diag(matrix)), [3.0, 0.1, 0.1, 0.1], rtol=1e-9
+    )
+    assert settings["discrete_transition_concentration"] == 11.0
+    np.testing.assert_allclose(
+        (alpha - 1)[LEARNED_ROWS].sum(axis=1), [90_000.0, 3_000.0, 3_000.0], rtol=1e-9
+    )
+    assert settings["frozen_discrete_transition_rows"] == (1,)
+    no_spike = matrix[1]
+    np.testing.assert_allclose(
+        no_spike[[0, 2, 3]] / (1 - no_spike[1]), [0.96, 0.02, 0.02], rtol=1e-9
+    )
 
 
 def test_prior_strength_and_weight_are_pinned_literally() -> None:

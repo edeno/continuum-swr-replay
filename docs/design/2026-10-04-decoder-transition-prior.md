@@ -25,7 +25,7 @@ the re-decode runs from the commit that adds this pin.
 
 | # | Decision | Why |
 |---|---|---|
-| R10 | The NonLocal decode uses setting **P30-B**. Each learned row has a fixed-count Dirichlet prior centred on dwell times from the literature (Local 3 s, each non-local state 100 ms), worth 30 visits per state. The No-Spike row is frozen, and its exits follow base rates. The ContFrag decode keeps the values it has always used, now written out. Both runners refuse `--non_stationary`. | The project lead's choice (2026-10-04), after the pilot validation below, under the requirement that every value be justifiable from prior knowledge: each value has a source or a stated base-rate assumption. Against P30 (the same prior with even No-Spike exits), P30-B halves the extra events, which are mostly No-Spike-entered and weakly supported, and restores much of April's immobile regime |
+| R10 | The NonLocal decode uses setting **P30-B**. Each learned row has a fixed-count Dirichlet prior whose mode (the M-step's zero-data estimate) gives dwell times from the literature (Local 3 s, each non-local state 100 ms), worth 30 visits per state. The No-Spike row is frozen, and its exits follow base rates. The ContFrag decode keeps the values it has always used, now written out. Both runners refuse `--non_stationary`. | The project lead's choice (2026-10-04), after the pilot validation below, under the requirement that every value be justifiable from prior knowledge: each value has a source or a stated base-rate assumption. Against P30 (the same prior with even No-Spike exits), P30-B halves the extra events, which are mostly No-Spike-entered and weakly supported, and restores much of April's immobile regime |
 
 ## How the library uses these values
 
@@ -40,7 +40,9 @@ the re-decode runs from the commit that adds this pin.
 - **Fixed counts.** With `discrete_transition_prior_weight` 0, these pseudo-counts are fixed;
   they are not scaled to the amount of data.
 - **Frozen rows** are reset to their row of M after every M-step.
-- **Prior strength.** A Dirichlet prior is worth Σ(α − 1) observations (Morita et al. 2008).
+- **Prior strength.** The M-step adds Σ(α − 1) pseudo-counts to each learned row, and with no
+  data its estimate is the Dirichlet's mode, the normalized α − 1. The Dirichlet's effective
+  sample size is Σα (Morita et al. 2008).
 
 ## Parameters
 
@@ -53,7 +55,7 @@ each destination:
 | `LOCAL_DWELL_S` | 3.0 s, so p_L = 0.99933 | expected stay in Local: the interval between awake events during stops | Davidson, Kloosterman & Wilson 2009, *Neuron*, [doi:10.1016/j.neuron.2009.07.027](https://doi.org/10.1016/j.neuron.2009.07.027): candidate events at a "mean rate during STOP of 0.36, 0.40, 0.32, 0.40 events/s in rats 1–4", an interval of 2.5–3.1 s |
 | `NONLOCAL_DWELL_S` | 0.1 s, so p_NL = 0.98 | expected stay in each non-local state | Buzsáki 2015, *Hippocampus*, [doi:10.1002/hipo.22488](https://doi.org/10.1002/hipo.22488): SPW-Rs are transient ("mode: 50 ms in the rat"), and their duration "varies between 30 and 150 ms". Sullivan et al. 2011, *J Neurosci*, [doi:10.1523/JNEUROSCI.0294-11.2011](https://doi.org/10.1523/JNEUROSCI.0294-11.2011): ripple SPW sinks average 51.8 ms. Davidson 2009: replay "event durations ranged from 40–1018 ms". 100 ms covers single ripples and longer replays |
 | `NO_SPIKE_DWELL_S` | 0.1 s, so p_NS = 0.98 | expected stay in No-Spike (frozen row) | English et al. 2014, *J Neurosci*, [doi:10.1523/JNEUROSCI.2600-14.2014](https://doi.org/10.1523/JNEUROSCI.2600-14.2014): "Ripple events were followed by a prominent afterhyperpolarization and spike suppression", with firing still reduced 150 ms after the ripple peak. Buzsáki 2015: the "silent period after the SPW‐R" is "associated with decreased multiple unit neuronal activity" |
-| `PRIOR_VISITS` | 30 | prior strength: e = 10 pseudo-exits to each destination, so each learned row's total pseudo-count is 30 × dwell/bin, i.e. 45,000 (Local) and 1,500 (each non-local state) | Morita, Thall & Müller 2008, *Biometrics*, [doi:10.1111/j.1541-0420.2007.00888.x](https://doi.org/10.1111/j.1541-0420.2007.00888.x): a Dirichlet prior's effective sample size is its pseudo-count total ("ESS = 50 = Σ α̃j"). Sensitivity over 10–100 visits is below |
+| `PRIOR_VISITS` | 30 | prior strength: e = 10 pseudo-exits to each destination, so the M-step adds Σ(α − 1) = 30 × dwell/bin pseudo-counts to each learned row: 45,000 (Local) and 1,500 (each non-local state). The Dirichlet's effective sample size Σα is 45,004 and 1,504 | Morita, Thall & Müller 2008, *Biometrics*, [doi:10.1111/j.1541-0420.2007.00888.x](https://doi.org/10.1111/j.1541-0420.2007.00888.x), for the effective sample size Σα ("ESS = 50 = Σ α̃j"). Sensitivity over 10–100 visits is below |
 | `NO_SPIKE_EXIT_TO_LOCAL` | 0.96 | share of No-Spike exits that go to Local; 0.02 goes to each non-local state | base rates: 0.36 events/s × 0.1 s puts non-local content at about 3.6 % of immobile time (Davidson 2009). No source reports which state follows a silence in awake animals, so the next state follows the stationary distribution |
 
 Arguments passed to `NonLocalClusterlessDetector` / `NonLocalSortedSpikesDetector`:
@@ -76,9 +78,11 @@ The starting matrix M, row = from, column = to:
 | NL-Cont | 0.00667 | 0.00667 | 0.98 | 0.00667 | 100 ms |
 | NL-Frag | 0.00667 | 0.00667 | 0.00667 | 0.98 | 100 ms |
 
-Each learned row's prior mean (its normalized α − 1) equals its row of M, so the prior pulls
-EM toward these dwell times with the strength of 30 visits. `tests/unit/test_decoding_transitions.py`
-pins all of the above.
+Each learned row's prior mode (the M-step's zero-data estimate, its normalized α − 1) equals
+its row of M, so the prior pulls EM toward these dwell times with the strength of 30 visits.
+The Dirichlet's mean, α/Σα, has slightly shorter stays: 2.7 s for Local (0.99927) and 91 ms
+for each non-local state (0.978). `tests/unit/test_decoding_transitions.py` pins all of the
+above.
 
 Against the P30-B pilot decodes (`Processed-Data/_ablation_prior_P30B_20261004/`), the
 pinned values are identical bit for bit in float32, which the HMM computes in, and agree to
@@ -179,15 +183,16 @@ in `.claude/research/refresh_ablation/ablation_report.md` ("Ablation 5", "Ablati
   - **Additions entered from No-Spike:** 8 / 7 / 8 %.
 
   So a 10x range of prior strength (10 to 100 visits) changes the event count by at most
-  0.5 %, and by at most 4 events per epoch. The P family with even No-Spike exits was just as
-  insensitive (1,381 / 1,390 / 1,416 events at N = 10 / 30 / 100, ±2.5 %); there, too, the
-  No-Spike exit row, not N, was the lever.
+  0.5 %, and each epoch's count by at most 4 events from P30-B's count. The P family with
+  even No-Spike exits was also insensitive: 1,381 / 1,390 / 1,416 events at
+  N = 10 / 30 / 100, a 2.5 % range (−0.6 % to +1.9 % from P30). There, too, the No-Spike
+  exit row, not N, was the lever.
 
 ## Known limits
 
 - **Theta sequences are not captured.** A 100 ms non-local stay blends theta-scale
   excursions during running into the non-local states. The project lead accepted this when
-  setting the non-local mean to 100 ms.
+  setting the non-local stay to 100 ms.
 - **No-Spike occupancy** is 8.9 % of the epoch, against 4.7 % under April's settings. No
   setting tried brought it back down.
 - **The added events are slightly weaker than shared ones** (pass 0.68 vs 0.80; the CI of the
@@ -199,6 +204,9 @@ in `.claude/research/refresh_ablation/ablation_report.md` ("Ablation 5", "Ablati
   place fields, P30-B's held-out spikes favour the animal's own position in 65 % of running
   Non-Local Continuous bouts. Our event analyses exclude these bouts through the whole-event
   immobility rule (every sample below 4 cm/s).
+- **Validated on HPC clusterless decodes only.** `create_detector` serves every brain area in
+  `DETECTOR_CONFIG`, so mPFC and OFC sorted-spike decodes, which are not part of the refresh,
+  would also take P30-B.
 - **Five epochs.** Pooled event-level rates treat events as independent.
 
 ## Sources
