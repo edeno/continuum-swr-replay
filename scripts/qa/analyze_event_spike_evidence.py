@@ -65,6 +65,12 @@ from continuum_swr_replay.analysis.hippocampus.event_immobility import (  # noqa
     filter_event_labels_by_speed,
     validate_nonlocal_event_probability_contract,
 )
+from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: E402
+    event_likelihood,
+    load_encoding,
+    nearest_interior_bins,
+    parse_epoch_identifier,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
 
 # --- Parameters (provisional; see spec) ---------------------------------------
@@ -77,7 +83,6 @@ GPI_REMOTE_CM = 100.0  # random-reference bins must be this far from the animal
 MIN_EVENT_BINS = 3
 MAX_BASELINE_BINS = 40
 N_SAMPLE_PER_GROUP = 30
-ENCODING_KEY = ("", 0)  # (environment_name, encoding_group) for HPC detectors
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CACHE_DIR = _REPO_ROOT / "logs" / "reality_marks_cache"
@@ -93,26 +98,6 @@ GROUP_COLORS = {
 
 
 # --- Session / epoch helpers --------------------------------------------------
-def parse_epoch_identifier(epoch_id: str) -> tuple[str, str, str]:
-    """Split ``{animal}{date}_{epoch}_{brain_area}`` into load_data arguments.
-
-    Parameters
-    ----------
-    epoch_id : str
-        e.g. ``"chimi20200213_02_r1_HPC"``.
-
-    Returns
-    -------
-    nwb_file_name, epoch_name, brain_area : str
-        e.g. ``("chimi20200213_.nwb", "02_r1", "HPC")``.
-    """
-    parts = epoch_id.split("_")
-    nwb_file_name = f"{parts[0]}_.nwb"
-    epoch_name = f"{parts[1]}_{parts[2]}"
-    brain_area = parts[3]
-    return nwb_file_name, epoch_name, brain_area
-
-
 def animal_from_epoch_id(epoch_id: str) -> str:
     """``"chimi20200213_02_r1_HPC"`` -> ``"chimi"`` (leading alpha of the NWB stem)."""
     return "".join(c for c in epoch_id.split("_")[0] if c.isalpha())
@@ -227,42 +212,6 @@ def build_session_events(dot: pd.DataFrame) -> pd.DataFrame:
 
 
 # --- Encoding model + marks ---------------------------------------------------
-def load_encoding(epoch_id: str) -> dict:
-    """Load the fitted encoding model and derived position arrays.
-
-    Returns a dict with ``env`` (fitted Environment), ``encargs`` (kwargs for
-    the likelihood call, with a scalar ``waveform_std``), ``pos`` (interior bin
-    positions, cm), and ``gpi`` (summed ground-process intensity per bin).
-    """
-    det = joblib.load(PROCESSED_DATA_DIR / f"{epoch_id}_detector.pkl")
-    if ENCODING_KEY not in det.encoding_model_:
-        raise KeyError(
-            f"ENCODING_KEY {ENCODING_KEY!r} not in encoding_model_; "
-            f"available: {list(det.encoding_model_.keys())}"
-        )
-    enc = det.encoding_model_[ENCODING_KEY]
-    env = enc["environment"]
-    # The fit flag is not persisted through save/load, but the grid data is
-    # intact; set it so native track-distance methods work.
-    env._is_fitted = True
-
-    interior = np.asarray(env.is_track_interior_).reshape(-1)
-    pos = np.asarray(env.place_bin_centers_).reshape(-1)[interior]
-    gpi = np.asarray(enc["summed_ground_process_intensity"]).reshape(-1)
-
-    keys = [
-        "occupancy", "occupancy_model", "gpi_models", "encoding_spike_waveform_features",
-        "encoding_positions", "environment", "mean_rates",
-        "summed_ground_process_intensity", "position_std", "waveform_std",
-    ]
-    encargs = {k: enc[k] for k in keys}
-    # Pass waveform_std as a scalar so predict expands it per-electrode; some
-    # tetrodes have 3 (not 4) waveform features and a non-scalar std crashes
-    # the per-feature kde_distance zip.
-    encargs["waveform_std"] = float(np.asarray(enc["waveform_std"]).reshape(-1)[0])
-    return {"env": env, "encargs": encargs, "pos": pos, "gpi": gpi}
-
-
 def load_marks(epoch_id: str, cache_dir: Path) -> tuple[list, list]:
     """Load (and cache) HPC clusterless marks: spike_times, waveform_features.
 
@@ -283,39 +232,6 @@ def load_marks(epoch_id: str, cache_dir: Path) -> tuple[list, list]:
 
 
 # --- Likelihood + metrics -----------------------------------------------------
-def event_likelihood(
-    s: int, e: int, t: np.ndarray, lin: np.ndarray,
-    spike_times: list, waveform_features: list, encargs: dict,
-) -> tuple[np.ndarray, int, int]:
-    """Prior-excluded spike log-likelihood over interior bins for one window.
-
-    Returns ``(L, n_spikes, n_tetrodes)`` where ``L`` has shape
-    ``(n_time, n_interior_bins)``.
-    """
-    from non_local_detector.likelihoods.clusterless_kde import (
-        predict_clusterless_kde_log_likelihood,
-    )
-
-    time = t[s : e + 1]
-    in_win = [el[(el >= time[0]) & (el <= time[-1])] for el in spike_times]
-    wf_win = [w[(el >= time[0]) & (el <= time[-1])] for el, w in zip(spike_times, waveform_features, strict=True)]
-    L = np.asarray(
-        predict_clusterless_kde_log_likelihood(
-            time, time, lin[s : e + 1][:, None], in_win, wf_win,
-            **encargs, is_local=False, disable_progress_bar=True,
-        )
-    )
-    n_spikes = sum(len(x) for x in in_win)
-    n_tetrodes = sum(len(x) > 0 for x in in_win)
-    return L, n_spikes, n_tetrodes
-
-
-def _bins_for(env, positions: np.ndarray) -> np.ndarray:
-    """Track-distance nearest interior bin index for each position (cm)."""
-    d = np.asarray(env.get_distances_to_interior_bins(np.asarray(positions)[:, None]))
-    return d.argmin(1)
-
-
 def event_metrics(
     s: int, e: int, L: np.ndarray, n_spikes: int,
     mape: np.ndarray, lin: np.ndarray, env, pos: np.ndarray, gpi_peak_pos: float,
@@ -326,7 +242,8 @@ def event_metrics(
     if valid.sum() < 2 or n_spikes == 0:
         return None
     Lv = L[valid]
-    i_map, i_animal = _bins_for(env, mt[valid]), _bins_for(env, at[valid])
+    i_map = nearest_interior_bins(env, mt[valid])
+    i_animal = nearest_interior_bins(env, at[valid])
     n = len(i_map)
     delta = Lv[np.arange(n), i_map] - Lv[np.arange(n), i_animal]
     map_mean = float(np.nanmean(mt))

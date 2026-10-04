@@ -75,6 +75,18 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
 ## `qa/` — diagnostics / validation
 - `check_data_availability.py`, `diagnose_trial_detection.py`, `compute_hpc_raw_stats.py`,
   `run_quality_metrics.py`, `analyze_event_spike_evidence.py` (spike-evidence reality check).
+- `run_state_evidence.py` — held-out spike evidence for each decoder state (Local, No-Spike,
+  Non-Local Continuous / Fragmented) on every canonical HPC decode: confident bouts against
+  matched random windows, and calibration curves over random 20 ms windows, scored by a
+  tetrode half the choice did not see (10 seeded half-partitions x 2 directions) under a
+  running-only refit and the decode's own encoding. Method and caveats:
+  `analysis/hippocampus/state_evidence.py`. Per epoch it checks that the reloaded marks refit
+  the stored encoding exactly and that the per-tetrode terms reproduce `results.nc`, then
+  writes a per-window parquet and a validation JSON; then the summary CSVs, three figures,
+  `manifest.json` (a recorded reason for every skipped or failed epoch) and a `README.md`.
+  `--epochs`, `--decode-dir` (default `Processed-Data/`), `--output-dir` (default
+  `Processed-Data/_refresh_<date>/state_evidence/`, the only place written), `--n-workers`
+  dask CPU workers; a rerun reuses the epochs already written unless `--overwrite`.
 - `sweep_memoryless_detection.py` — injects replays of chosen path, duration, rate and
   distance into a simulated recording and scores both detectors by one rule; writes the raw
   table to `Processed-Data/` and the aggregates to

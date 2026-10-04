@@ -82,6 +82,12 @@ Loading and managing saved decoding results.
 
 `load_results`
 
+### `src/continuum_swr_replay/analysis/hippocampus/state_evidence.py`
+
+Held-out spike evidence for each decoder state.
+
+`parse_epoch_identifier`, `load_detector`, `encoding_inputs`, `load_encoding`, `event_likelihood`, `nearest_interior_bins`, `interior_bin_mask`, `TetrodeTerms`, `per_tetrode_terms`, `keyed_rng`, `regimes`, `state_bouts`, `matched_windows`, `calibration_windows`, `build_windows`, `tetrode_halves`, `null_partners`, `window_evidence`, `sign_flip_p`, `stratified_bootstrap_ci`, `ols_slope_ci`, `bout_statistics`, `calibration_statistics`, `rate_calibration`, `coordinated_silence`, `summarize_state_evidence`
+
 ### `src/continuum_swr_replay/analysis/hippocampus/triggered_analysis.py`
 
 Event-triggered analysis utilities for extracting signal windows around events.
@@ -596,7 +602,7 @@ Artifact I/O, provenance gating, and the diagnostics that check the tables and t
 
 Spike-evidence reality analysis for non-SWR non-local events.
 
-`parse_epoch_identifier`, `animal_from_epoch_id`, `find_sessions`, `build_session_events`, `load_encoding`, `load_marks`, `event_likelihood`, `event_metrics`, `analyze_session`, `render_session_figures`, `summarize`, `per_animal_medians`, `main`
+`animal_from_epoch_id`, `find_sessions`, `build_session_events`, `load_marks`, `event_metrics`, `analyze_session`, `render_session_figures`, `summarize`, `per_animal_medians`, `main`
 
 ### `scripts/qa/audit_event_patch_fraction.py`
 
@@ -711,6 +717,12 @@ Objective AST mutation check for value-critical builder logic.
 Compute decoding quality metrics across all sessions.
 
 `maybe_merge_raw_stats`, `load_all_sessions`, `print_summary`, `plot_diagnostics`, `main`
+
+### `scripts/qa/run_state_evidence.py`
+
+Held-out spike evidence for each decoder state, on every canonical HPC decode.
+
+`decode_files`, `canonical_epochs`, `load_marks_and_training_mask`, `stored_log_likelihood`, `encoding_comparison`, `refit_encoding`, `spikes_in_bins`, `relative_error`, `output_paths`, `write_json`, `epoch_table`, `run_settings`, `run_epoch`, `run_epochs`, `figure_bouts`, `figure_calibration`, `figure_silence`, `write_csv`, `readme`, `summarize`, `main`
 
 ### `scripts/qa/summarize_cohort_audits.py`
 
