@@ -1,16 +1,24 @@
 """Unit tests for position data processing.
 
 Tests position interpolation and linearization functions used in the
-data loading pipeline.
+data loading pipeline, and the epoch position helper that ``load_data`` and the
+SWR runner share. The helper's Spyglass calls are stand-ins, so these tests run
+offline.
 """
 
 from __future__ import annotations
+
+import importlib
+import logging
+import sys
+import types
 
 import numpy as np
 import pandas as pd
 import pytest
 from track_linearization import make_track_graph
 
+from continuum_swr_replay.data_loaders import position
 from continuum_swr_replay.data_loaders.position import get_interpolated_position_info
 
 # 3-node linear track shared by every test in this module; the production
@@ -178,3 +186,130 @@ class TestGetInterpolatedPositionInfo:
 
         assert result['linear_position'].min() >= 0.0
         assert result['linear_position'].max() <= 20.0  # Total track length
+
+
+# --- The epoch position that load_data and the SWR runner share -------------
+
+_NWB_FILE_NAME = "testrat20990101_.nwb"
+"""A synthetic session: no real recording has this name."""
+_EPOCH_NAME = "02_r1"
+
+
+class _FakePositionIntervalMap:
+    """``PositionIntervalMap``: records the restriction, serves one name."""
+
+    def __init__(self):
+        self.restrictions: list[dict] = []
+
+    def __and__(self, restriction):
+        self.restrictions.append(restriction)
+        return self
+
+    def fetch1(self, attribute):
+        assert attribute == "position_interval_name"
+        return "pos 1 valid times"
+
+
+def test_epoch_position_drops_nan_rows_like_load_data(monkeypatch, caplog):
+    """The ``PositionIntervalMap`` lookup, ``get_position_info``, then
+    ``load_data``'s drop of rows with NaN head x or y, with its log line.
+
+    A NaN in any other column keeps its row: the drop looks at position only.
+    """
+    interval_map = _FakePositionIntervalMap()
+    common = types.ModuleType("spyglass.common")
+    common.PositionIntervalMap = interval_map
+    monkeypatch.setitem(sys.modules, "spyglass", types.ModuleType("spyglass"))
+    monkeypatch.setitem(sys.modules, "spyglass.common", common)
+
+    time = pd.Index(100.0 + np.arange(8) / 500, name="time")
+    position_info = pd.DataFrame(
+        {
+            "head_position_x": [1.0, 2.0, np.nan, 4.0, 5.0, 6.0, 7.0, 8.0],
+            "head_position_y": [1.0, 2.0, 3.0, 4.0, 5.0, np.nan, 7.0, 8.0],
+            "head_speed": [0.5, np.nan, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0],
+            "track_segment_id": [0, 0, 0, 6, 6, 6, 1, 1],
+        },
+        index=time,
+    )
+    track_graph = object()
+    position_calls = []
+
+    def fake_get_position_info(nwb_file_name, epoch_name, pos_name):
+        position_calls.append((nwb_file_name, epoch_name, pos_name))
+        return {
+            "position_info": position_info.copy(),
+            "linear_edge_order": [(0, 6)],
+            "linear_edge_spacing": [15.0],
+            "track_graph": track_graph,
+        }
+
+    monkeypatch.setattr(position, "get_position_info", fake_get_position_info)
+
+    with caplog.at_level(logging.INFO, logger=position.__name__):
+        position_data = position.get_epoch_position_info(_NWB_FILE_NAME, _EPOCH_NAME)
+
+    assert interval_map.restrictions == [
+        {"nwb_file_name": _NWB_FILE_NAME, "interval_list_name": _EPOCH_NAME}
+    ]
+    assert position_calls == [(_NWB_FILE_NAME, _EPOCH_NAME, "pos 1 valid times")]
+    pd.testing.assert_frame_equal(
+        position_data["position_info"], position_info.drop(index=time[[2, 5]])
+    )
+    assert position_data["track_graph"] is track_graph
+    assert position_data["linear_edge_order"] == [(0, 6)]
+    assert position_data["linear_edge_spacing"] == [15.0]
+    assert "Dropped 2 time points with NaN position (25.0%)" in caplog.messages
+
+
+@pytest.fixture
+def bandit_task(monkeypatch):
+    """``bandit_task``, imported offline with ``spyglass.common`` stubbed.
+
+    It imports ``spyglass.common`` at import time, which opens a DataJoint
+    connection. A module imported here binds the stub, so it is forgotten
+    afterwards and a later import gets the real one.
+    """
+    common = types.ModuleType("spyglass.common")
+    common.PositionIntervalMap = type("PositionIntervalMap", (), {})
+    monkeypatch.setitem(sys.modules, "spyglass", types.ModuleType("spyglass"))
+    monkeypatch.setitem(sys.modules, "spyglass.common", common)
+
+    name = "continuum_swr_replay.data_loaders.bandit_task"
+    fresh = name not in sys.modules
+    yield importlib.import_module(name)
+    if fresh:
+        sys.modules.pop(name, None)
+        vars(sys.modules["continuum_swr_replay.data_loaders"]).pop("bandit_task", None)
+
+
+def test_load_data_takes_position_from_get_epoch_position_info(
+    bandit_task, monkeypatch
+):
+    """``load_data``'s position is ``get_epoch_position_info``'s, so the SWR
+    runner, which calls the same helper, shares its speed and span."""
+    position_data = {
+        "position_info": pd.DataFrame(
+            {"head_position_x": [1.0], "head_position_y": [2.0], "head_speed": [0.5]},
+            index=pd.Index([100.0], name="time"),
+        ),
+        "linear_edge_order": [(0, 6)],
+        "linear_edge_spacing": [15.0],
+        "track_graph": object(),
+    }
+    calls = []
+
+    def fake_get_epoch_position_info(nwb_file_name, epoch_name):
+        calls.append((nwb_file_name, epoch_name))
+        return position_data
+
+    monkeypatch.setattr(
+        bandit_task, "get_epoch_position_info", fake_get_epoch_position_info
+    )
+
+    result = bandit_task.load_data(_NWB_FILE_NAME, _EPOCH_NAME, include=frozenset())
+
+    assert calls == [(_NWB_FILE_NAME, _EPOCH_NAME)]
+    assert set(result) == set(position_data)
+    for key, value in position_data.items():
+        assert result[key] is value

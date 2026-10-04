@@ -440,6 +440,80 @@ class RippleData(TypedDict):
     zscored_ripple_consensus_trace: pd.Series
 
 
+class RippleBandInputs(TypedDict):
+    """Return type for get_ripple_band_inputs() in data_loaders.lfp.
+
+    The stored CA1 ripple band of one epoch, and the inputs ``LFPBandV1.make``
+    filtered to produce it, read without inserting anything.
+
+    Attributes
+    ----------
+    time : NDArray[np.float64], shape (n_time,)
+        The band's timestamps, in seconds.
+    ripple_band : NDArray[np.float64], shape (n_time, n_channels)
+        The stored ``LFPBandV1`` band, as float64.
+    ripple_band_dtype : str
+        The band's stored dtype.
+    raw_referenced : NDArray[np.float64], shape (n_time, n_channels)
+        The referenced raw LFP of the band's electrodes at the band's
+        timestamps, as float64. Referencing happened in the stored dtype, as
+        in ``raw_referenced_native``.
+    raw_referenced_native : NDArray, shape (n_time_raw, n_lfp_columns)
+        The raw LFP as ``LFPBandV1.make`` passes it to ``filter_data``: every
+        column of the LFP, in the LFP's own column order, with each band
+        electrode's reference subtracted in the stored dtype.
+        ``lfp_band_elect_index`` picks the band's electrodes from it.
+    raw_timestamps : NDArray[np.float64], shape (n_time_raw,)
+        Timestamps of ``raw_referenced_native``, in seconds.
+    reference_overflow_count : int
+        Samples (each sample of each referenced band electrode) where the
+        stored-dtype subtraction wrapped, found by comparison with a float64
+        subtraction of the same columns.
+    electrode_ids : NDArray[np.int64], shape (n_channels,)
+        The band's electrodes, ascending: the column order of ``ripple_band``
+        and ``raw_referenced``.
+    reference_ids : NDArray[np.int64], shape (n_channels,)
+        Each electrode's reference electrode; -1 for none.
+    lfp_band_elect_index : NDArray[np.int64], shape (n_channels,)
+        Spyglass's electrode index: the column of ``raw_referenced_native``
+        holding each of ``electrode_ids``, as ``filter_data`` takes it.
+    band_valid_interval : object
+        The Spyglass ``Interval`` that make filtered over, from
+        ``LFPBandV1._compute_interval_times``.
+    decimation : int
+        LFP sampling rate // band sampling rate.
+    sampling_frequency : float
+        Nominal band sampling rate, ``lfp_band_sampling_rate`` (1000 Hz).
+    band_filter_coeff : NDArray[np.float64], shape (n_taps,)
+        The band filter's ``FirFilterParameters.filter_coeff``.
+    band_filter_name : str
+        The band filter's name, "ripple_150_250".
+    lfp_filter_name : str
+        The ``LFPV1`` filter that made the raw LFP.
+    lfp_units : str
+        The LFP electrical series' unit.
+
+    """
+
+    time: NDArray[np.float64]
+    ripple_band: NDArray[np.float64]
+    ripple_band_dtype: str
+    raw_referenced: NDArray[np.float64]
+    raw_referenced_native: NDArray
+    raw_timestamps: NDArray[np.float64]
+    reference_overflow_count: int
+    electrode_ids: NDArray[np.int64]
+    reference_ids: NDArray[np.int64]
+    lfp_band_elect_index: NDArray[np.int64]
+    band_valid_interval: object
+    decimation: int
+    sampling_frequency: float
+    band_filter_coeff: NDArray[np.float64]
+    band_filter_name: str
+    lfp_filter_name: str
+    lfp_units: str
+
+
 class MultiunitData(TypedDict):
     """Return type for get_multiunit() in data_loaders.lfp.
 
@@ -489,6 +563,7 @@ __all__ = [
     "DIOEventData",
     "ThetaData",
     "RippleData",
+    "RippleBandInputs",
     "MultiunitData",
     "WellNodeData",
 ]

@@ -10,6 +10,8 @@ get_interpolated_position_info
     Interpolate position data to new time points and compute linear position.
 get_position_info
     Load and process position data for a given session and epoch.
+get_epoch_position_info
+    An epoch's position as ``load_data`` uses it, shared with the SWR runner.
 
 Notes
 -----
@@ -301,3 +303,51 @@ def get_position_info(
         "linear_edge_spacing": linear_edge_spacing,
         "track_graph": track_graph,
     }
+
+
+def get_epoch_position_info(nwb_file_name: str, epoch_name: str) -> PositionInfoDict:
+    """Load an epoch's position as ``load_data`` uses it.
+
+    Looks up the epoch's position interval in ``PositionIntervalMap``, loads it
+    with ``get_position_info``, then drops rows with NaN ``head_position_x`` or
+    ``head_position_y``. ``load_data`` and the SWR runner both call this, so
+    they share speed and span.
+
+    Parameters
+    ----------
+    nwb_file_name : str
+        Name of NWB file (e.g., "chimi20200212_.nwb").
+    epoch_name : str
+        Epoch identifier in format "NN_rM" (e.g., "02_r1").
+
+    Returns
+    -------
+    PositionInfoDict
+        ``get_position_info``'s output, its ``position_info`` without the
+        NaN-position rows.
+
+    """
+    from spyglass.common import PositionIntervalMap
+
+    position_interval_name = (
+        PositionIntervalMap
+        & {"nwb_file_name": nwb_file_name, "interval_list_name": epoch_name}
+    ).fetch1("position_interval_name")
+    position_data = get_position_info(nwb_file_name, epoch_name, position_interval_name)
+
+    # Defense in depth: get_position_info now trims the interpolation
+    # grid to the valid interval, so this dropna should be a no-op in
+    # the typical case. Kept as a safety net against per-frame DLC
+    # tracking gaps that may leave NaN x/y inside the valid window.
+    n_before = len(position_data["position_info"])
+    position_data["position_info"] = position_data["position_info"].dropna(
+        subset=["head_position_x", "head_position_y"]
+    )
+    n_dropped = n_before - len(position_data["position_info"])
+    if n_dropped > 0:
+        logger.info(
+            f"Dropped {n_dropped} time points with NaN position "
+            f"({100 * n_dropped / n_before:.1f}%)"
+        )
+
+    return position_data

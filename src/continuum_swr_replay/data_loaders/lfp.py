@@ -11,6 +11,9 @@ get_theta
     Load theta-band (5-11 Hz) filtered LFP with phase and power estimates.
 get_ripple
     Load ripple-band (150-250 Hz) filtered LFP and detected ripple events.
+get_ripple_band_inputs
+    Read the stored CA1 ripple band and the referenced raw LFP behind it,
+    read-only, for direct SWR detection.
 get_multiunit
     Compute multiunit high-synchrony events (HSE) from spike times across brain areas.
 
@@ -20,13 +23,17 @@ get_multiunit_hse
     Compute HSE detection for a single brain area's spike data.
 filter_ripple_lfp_time
     Filter ripple data to match position time bounds.
+check_band_electrodes
+    Check that a ripple band's electrodes are its ripple selection's.
 
 Data Sources
 ------------
 The module queries the following Spyglass DataJoint tables:
-- LFPBandV1: Band-pass filtered LFP data
+- LFPBandV1, LFPBandSelection: Band-pass filtered LFP data and its electrodes
 - LFPOutput: Raw LFP traces
-- RippleTimesV1: Detected ripple events using Kay detector
+- RippleTimesV1, RippleLFPSelection: Detected ripple events using Kay detector,
+  and the electrodes it read
+- FirFilterParameters: The band filter's coefficients
 
 Notes
 -----
@@ -38,7 +45,8 @@ Notes
 
 See Also
 --------
-continuum_swr_replay.types : ThetaData, RippleData, MultiunitData TypedDicts
+continuum_swr_replay.types : ThetaData, RippleData, RippleBandInputs,
+    MultiunitData TypedDicts
 continuum_swr_replay.data_loaders.spikes : Spike data loading
 
 Examples
@@ -50,6 +58,7 @@ Examples
 """
 
 import warnings
+from collections.abc import Iterable
 
 import numpy as np
 import pandas as pd
@@ -71,7 +80,7 @@ from ..parameters import (
     HSE_ZSCORE_THRESHOLD,
     MAX_SPEED_THRESHOLD_CM_PER_SEC,
 )
-from ..types import MultiunitData, RippleData, ThetaData
+from ..types import MultiunitData, RippleBandInputs, RippleData, ThetaData
 
 # Ignore warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="pynwb")
@@ -126,6 +135,46 @@ def get_theta(nwb_file_name: str, epoch_name: str) -> ThetaData:
     }
 
 
+def _ripple_keys(nwb_file_name: str, epoch_name: str) -> tuple[dict, dict]:
+    """Return the restrictions that select an epoch's CA1 ripples and band.
+
+    Parameters
+    ----------
+    nwb_file_name : str
+        NWB file name
+    epoch_name : str
+        Epoch name
+
+    Returns
+    -------
+    ripple_key : dict
+        Restriction of ``RippleTimesV1`` (and ``LFPBandSelection``) to the
+        epoch's CA1 ripples, detected with the Kay parameter set "default".
+    lfp_band_restriction : dict
+        Restriction of ``LFPBandV1`` to the epoch's 1000 Hz ripple band.
+
+    """
+    # NOTE: the primary-key field is `ripple_param_name`, not `ripple_params`.
+    # DataJoint silently drops dict keys absent from a table's heading, so the
+    # old `ripple_params` key left the parameter dimension unrestricted (it only
+    # worked because `fetch1_dataframe` requires a single matching row).
+    ripple_key = {
+        "nwb_file_name": nwb_file_name,
+        "target_interval_list_name": epoch_name + " noPrePostTrialTimes",
+        "group_name": "CA1",
+        "ripple_param_name": "default",
+        "filter_name": "ripple_150_250",
+        "filter_sampling_rate": 1000,
+    }
+    lfp_band_restriction = {
+        "nwb_file_name": nwb_file_name,
+        "filter_name": ripple_key["filter_name"],
+        "target_interval_list_name": ripple_key["target_interval_list_name"],
+        "lfp_band_sampling_rate": ripple_key["filter_sampling_rate"],
+    }
+    return ripple_key, lfp_band_restriction
+
+
 def get_ripple(
     nwb_file_name: str, epoch_name: str, ripple_detector_name: str
 ) -> RippleData:
@@ -155,30 +204,12 @@ def get_ripple(
     from spyglass.lfp.lfp_merge import LFPOutput
     from spyglass.ripple.v1 import RippleTimesV1
 
-    # Ripples
-    if ripple_detector_name == "Kay":
-        ripple_param_name = "default"
-    else:
+    # Ripples. The Kay detector's parameter set, "default", is the only one.
+    if ripple_detector_name != "Kay":
         raise ValueError("Invalid ripple detector name")
 
-    # NOTE: the primary-key field is `ripple_param_name`, not `ripple_params`.
-    # DataJoint silently drops dict keys absent from a table's heading, so the
-    # old `ripple_params` key left the parameter dimension unrestricted (it only
-    # worked because `fetch1_dataframe` requires a single matching row).
-    ripple_key = {
-        "nwb_file_name": nwb_file_name,
-        "target_interval_list_name": epoch_name + " noPrePostTrialTimes",
-        "group_name": "CA1",
-        "ripple_param_name": ripple_param_name,
-        "filter_name": "ripple_150_250",
-        "filter_sampling_rate": 1000,
-    }
-    lfp_band_restriction = {
-        "nwb_file_name": nwb_file_name,
-        "filter_name": ripple_key["filter_name"],
-        "target_interval_list_name": ripple_key["target_interval_list_name"],
-        "lfp_band_sampling_rate": ripple_key["filter_sampling_rate"],
-    }
+    ripple_key, lfp_band_restriction = _ripple_keys(nwb_file_name, epoch_name)
+    ripple_param_name = ripple_key["ripple_param_name"]
     lfp_band_key = (LFPBandV1 & lfp_band_restriction).fetch1("KEY")
 
     # Fail loudly and self-descriptively when a session has no matching CA1
@@ -230,6 +261,188 @@ def get_ripple(
         "ripple_lfps": lfp_df,
         "ripple_consensus_trace": ripple_consensus_trace,
         "zscored_ripple_consensus_trace": zscored_ripple_consensus_trace,
+    }
+
+
+def check_band_electrodes(
+    band_electrode_ids: Iterable[int], selection_electrode_ids: Iterable[int]
+) -> None:
+    """Raise unless a ripple band's electrodes are its ripple selection's.
+
+    Parameters
+    ----------
+    band_electrode_ids : Iterable[int], shape (n_band,)
+        Electrodes of the stored ripple band, from
+        ``LFPBandSelection.LFPBandElectrode``.
+    selection_electrode_ids : Iterable[int], shape (n_selection,)
+        Electrodes the ripple detection reads for the same band key, from
+        ``RippleLFPSelection.RippleLFPElectrode``.
+
+    Raises
+    ------
+    ValueError
+        If the two sets differ. The message names the selection's electrodes
+        missing from the band and the band's electrodes the selection lacks.
+
+    """
+    band = {int(electrode_id) for electrode_id in band_electrode_ids}
+    selection = {int(electrode_id) for electrode_id in selection_electrode_ids}
+    if band != selection:
+        raise ValueError(
+            "The ripple band's electrodes differ from its ripple selection's: "
+            f"missing from the band: {sorted(selection - band)}; "
+            f"extra in the band: {sorted(band - selection)}."
+        )
+
+
+def get_ripple_band_inputs(nwb_file_name: str, epoch_name: str) -> RippleBandInputs:
+    """Read an epoch's stored CA1 ripple band and the inputs that made it.
+
+    The fetch only reads: it inserts, populates and deletes nothing. It reads:
+
+    - the stored ``LFPBandV1`` band that ``_ripple_keys`` selects, with its
+      electrodes and references from ``LFPBandSelection.LFPBandElectrode``;
+    - the raw LFP behind it, through ``LFPBandV1.make``'s own steps:
+      ``_compute_interval_times`` gives the interval make filtered over, and
+      ``_load_lfp_data_with_referencing`` maps each electrode to its LFP column
+      through the LFP's electrode table and subtracts its reference in the
+      stored dtype;
+    - the band filter's coefficients and the name of the filter behind the LFP.
+
+    Parameters
+    ----------
+    nwb_file_name : str
+        NWB file name
+    epoch_name : str
+        Epoch name
+
+    Returns
+    -------
+    RippleBandInputs
+        ``ripple_band`` and ``raw_referenced`` share the band's timestamps and
+        hold ``electrode_ids`` in that order. ``raw_referenced_native`` is the
+        referenced LFP as make passes it to ``filter_data``, every column of
+        it; ``lfp_band_elect_index`` picks the same electrodes from it.
+
+    Raises
+    ------
+    ValueError
+        If the band's electrodes differ from ``RippleLFPSelection``'s CA1
+        electrodes for the same band key, if the stored band's columns are not
+        its electrodes in ascending order, or if the band's timestamps are not
+        among the referenced raw LFP's timestamps.
+
+    """
+    from spyglass.common import FirFilterParameters
+    from spyglass.lfp.analysis.v1.lfp_band import LFPBandSelection, LFPBandV1
+    from spyglass.lfp.lfp_merge import LFPOutput
+    from spyglass.ripple.v1 import RippleLFPSelection
+    from spyglass.utils.nwb_helper_fn import get_electrode_indices
+
+    ripple_key, lfp_band_restriction = _ripple_keys(nwb_file_name, epoch_name)
+    band_key = (LFPBandV1 & lfp_band_restriction).fetch1("KEY")
+
+    # The band's electrodes and references, ascending by electrode: the order
+    # LFPBandV1._fetch_and_sort_electrodes gives make.
+    electrode_ids, reference_ids = (LFPBandSelection.LFPBandElectrode & band_key).fetch(
+        "electrode_id", "reference_elect_id"
+    )
+    sort_order = np.argsort(electrode_ids)
+    electrode_ids = np.asarray(electrode_ids, dtype=np.int64)[sort_order]
+    reference_ids = np.asarray(reference_ids, dtype=np.int64)[sort_order]
+    # RippleLFPSelection is keyed on LFPBandV1, so it is restricted by the full
+    # band key: by less, it would union other epochs' selections.
+    check_band_electrodes(
+        electrode_ids,
+        (
+            RippleLFPSelection.RippleLFPElectrode
+            & {**band_key, "group_name": ripple_key["group_name"]}
+        ).fetch("electrode_id"),
+    )
+
+    band_series = (LFPBandV1 & band_key).fetch_nwb()[0]["lfp_band"]
+    band_columns = [int(c) for c in get_electrode_indices(band_series, electrode_ids)]
+    if band_columns != list(range(electrode_ids.size)):
+        raise ValueError(
+            "The stored ripple band's columns do not hold electrodes "
+            f"{electrode_ids.tolist()} in order: they sit in columns {band_columns}."
+        )
+    time = np.asarray(band_series.timestamps, dtype=np.float64)
+    ripple_band_native = np.asarray(band_series.data)
+
+    # LFPBandV1.make's own steps, reused read-only.
+    band_table = LFPBandV1()
+    lfp_key = {"merge_id": band_key["lfp_merge_id"]}
+    lfp_object = (LFPOutput & lfp_key).fetch_nwb()[0]["lfp"]
+    _, band_valid_interval, _, lfp_band_sampling_rate, decimation = (
+        band_table._compute_interval_times(band_key, lfp_key)
+    )
+    raw_timestamps, raw_referenced_native, lfp_band_elect_index = (
+        band_table._load_lfp_data_with_referencing(
+            lfp_object, electrode_ids, reference_ids, band_valid_interval
+        )
+    )
+    raw_timestamps = np.asarray(raw_timestamps, dtype=np.float64)
+    lfp_band_elect_index = np.asarray(lfp_band_elect_index, dtype=np.int64)
+
+    # The same samples with no reference subtracted, to count where the
+    # stored-dtype subtraction wrapped: for an integer dtype, exactly the
+    # samples where it differs from a float64 subtraction.
+    _, raw_unreferenced, _ = band_table._load_lfp_data_with_referencing(
+        lfp_object, electrode_ids, np.full_like(reference_ids, -1), band_valid_interval
+    )
+    is_referenced = reference_ids != -1
+    referenced_columns = lfp_band_elect_index[is_referenced]
+    reference_columns = np.asarray(
+        get_electrode_indices(lfp_object, reference_ids[is_referenced]), dtype=np.int64
+    )
+    exact = raw_unreferenced[:, referenced_columns].astype(np.float64)
+    exact -= raw_unreferenced[:, reference_columns]
+    reference_overflow_count = int(
+        np.count_nonzero(raw_referenced_native[:, referenced_columns] != exact)
+    )
+
+    # make took the band's timestamps from these raw timestamps, so each band
+    # sample has its raw sample; the float64 copy is restricted to them.
+    is_band_time = np.isin(raw_timestamps, time)
+    if not np.array_equal(raw_timestamps[is_band_time], time):
+        n_missing = int(np.count_nonzero(~np.isin(time, raw_timestamps)))
+        raise ValueError(
+            f"{n_missing} of the ripple band's {time.size} timestamps are not "
+            "among the referenced raw LFP's timestamps, or the raw timestamps "
+            "repeat or fall out of order at them."
+        )
+    raw_referenced = raw_referenced_native[
+        np.ix_(is_band_time, lfp_band_elect_index)
+    ].astype(np.float64)
+
+    band_filter_coeff = (
+        FirFilterParameters
+        & {
+            "filter_name": band_key["filter_name"],
+            "filter_sampling_rate": band_key["filter_sampling_rate"],
+        }
+    ).fetch1("filter_coeff")
+    lfp_filter_name = LFPOutput.merge_get_parent(lfp_key).fetch1("filter_name")
+
+    return {
+        "time": time,
+        "ripple_band": ripple_band_native.astype(np.float64),
+        "ripple_band_dtype": str(ripple_band_native.dtype),
+        "raw_referenced": raw_referenced,
+        "raw_referenced_native": raw_referenced_native,
+        "raw_timestamps": raw_timestamps,
+        "reference_overflow_count": reference_overflow_count,
+        "electrode_ids": electrode_ids,
+        "reference_ids": reference_ids,
+        "lfp_band_elect_index": lfp_band_elect_index,
+        "band_valid_interval": band_valid_interval,
+        "decimation": int(decimation),
+        "sampling_frequency": float(lfp_band_sampling_rate),
+        "band_filter_coeff": np.asarray(band_filter_coeff, dtype=np.float64),
+        "band_filter_name": band_key["filter_name"],
+        "lfp_filter_name": lfp_filter_name,
+        "lfp_units": lfp_object.unit,
     }
 
 

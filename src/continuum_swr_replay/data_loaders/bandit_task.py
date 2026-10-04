@@ -32,7 +32,11 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
-from spyglass.common import PositionIntervalMap
+
+# Unused here since get_epoch_position_info took over the lookup, but kept: it
+# imports Spyglass before the setLevel calls below, which Spyglass's first
+# import would otherwise undo (spyglass.utils.logging sets its logger's level).
+from spyglass.common import PositionIntervalMap  # noqa: F401
 
 # Suppress Spyglass warnings
 logging.getLogger("spyglass.utils").setLevel(logging.ERROR)
@@ -50,7 +54,7 @@ if TYPE_CHECKING:
 
 from .events import load_dios
 from .lfp import filter_ripple_lfp_time, get_multiunit, get_ripple, get_theta
-from .position import get_position_info
+from .position import get_epoch_position_info
 from .spikes import filter_spike_times, get_electrode_group_info, get_spike_data
 from .task_variables import make_task_variables
 from .trials import (
@@ -58,8 +62,6 @@ from .trials import (
     make_trials_df_from_well_visits,
     make_well_visits_df,
 )
-
-logger = logging.getLogger(__name__)
 
 
 def _process_spike_data(
@@ -240,7 +242,7 @@ def load_data(
     --------
     get_epoch_info : Get list of all available sessions
     get_training_timepoints : Select time points for decoder training
-    get_position_info : Position loading (called internally)
+    get_epoch_position_info : Position loading (called internally)
     get_spike_data : Spike loading (called internally)
 
     Examples
@@ -333,26 +335,7 @@ def load_data(
         return include is None or key in include
 
     # Always load position data (required for time bounds)
-    position_interval_name = (
-        PositionIntervalMap
-        & {"nwb_file_name": nwb_file_name, "interval_list_name": epoch_name}
-    ).fetch1("position_interval_name")
-    position_data = get_position_info(nwb_file_name, epoch_name, position_interval_name)
-
-    # Defense in depth: get_position_info now trims the interpolation
-    # grid to the valid interval, so this dropna should be a no-op in
-    # the typical case. Kept as a safety net against per-frame DLC
-    # tracking gaps that may leave NaN x/y inside the valid window.
-    n_before = len(position_data["position_info"])
-    position_data["position_info"] = position_data["position_info"].dropna(
-        subset=["head_position_x", "head_position_y"]
-    )
-    n_dropped = n_before - len(position_data["position_info"])
-    if n_dropped > 0:
-        logger.info(
-            f"Dropped {n_dropped} time points with NaN position "
-            f"({100 * n_dropped / n_before:.1f}%)"
-        )
+    position_data = get_epoch_position_info(nwb_file_name, epoch_name)
 
     # Initialize result with position data (always included)
     result: dict = {
