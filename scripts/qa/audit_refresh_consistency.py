@@ -40,12 +40,18 @@ checks (Stage 5), and nothing else.
 - ``fit_provenance``: ``check_fit_provenance.py`` passes on both table roots,
   and on the fits at the ``replay_content`` root (Stage 5B and Stage 6).
 - ``epoch_sets``: an epoch missing from any artifact (either decode, either
-  run, any table) has a reason recorded for that artifact.
+  run, any table) has a reason recorded for that artifact. A table names its
+  epochs by its session columns or, keyed by ``stop_id`` alone as the qvals
+  table is, through its folder's stop table.
 - ``encoding_marks``, with ``--check-marks`` only, since it reads the
   database: the marks reloaded through the project's loader hold every
   encoding mark of both decodes.
 
-``audit`` exits 1 if any check fails, and 0 otherwise.
+``audit.json`` also lists under ``not_checked`` what the audit did not check:
+the encoding marks without ``--check-marks``, expected decoder settings when
+none were given, a table whose epochs cannot be told, and a family of fits at
+the ``replay_content`` root with no fit at all. A pass covers the checks, and
+nothing listed there. ``audit`` exits 1 if any check fails, and 0 otherwise.
 
 Usage:
     uv run python scripts/qa/audit_refresh_consistency.py record-tables \\
@@ -295,11 +301,13 @@ def decode_provenance(log_dir: Path, root: Path, epoch_ids: list[str]) -> pd.Dat
     """Each decode's provenance record, NonLocal and ContFrag, for `epoch_ids`.
 
     The record comes from ``results.nc``'s ``attrs["provenance"]``, which the
-    fresh save wrote and a resume leaves alone. Without it, it comes from the
-    JSON after the first ``PROVENANCE `` in ``logs/{decode_id}.log``, unless
-    the log says ``RESUMED from existing results in``: a resume rewrites the
-    log, so its record describes the resume and not the decode, and the
-    decode then has no record (``source`` None).
+    fresh save wrote and a resume leaves alone. When ``results.nc`` exists
+    without it, the record comes from the JSON after the first
+    ``PROVENANCE `` in ``logs/{decode_id}.log``, unless the log says
+    ``RESUMED from existing results in``: a resume rewrites the log, so its
+    record describes the resume and not the decode, and the decode then has
+    no record (``source`` None). A decode with no ``results.nc`` was never
+    saved (``saved`` False): it has no record, whatever its log says.
 
     Parameters
     ----------
@@ -315,8 +323,9 @@ def decode_provenance(log_dir: Path, root: Path, epoch_ids: list[str]) -> pd.Dat
     pd.DataFrame
         One row per epoch and decoder: ``epoch_id``, ``decoder``
         (``"nonlocal"`` or ``"contfrag"``), ``decode_id`` (the name of its
-        files and log), ``source`` (``"results.nc"``, ``"log"`` or None),
-        ``resumed``, the provenance fields, and ``log_commit`` and
+        files and log), ``saved`` (whether ``results.nc`` exists), ``source``
+        (``"results.nc"``, ``"log"`` or None), ``resumed``, the provenance
+        fields, and ``log_commit`` and
         ``log_dirty``: what the log's own record says, which differs from the
         decode's when a later run (such as a resume, which rewrites
         ``data_over_time``) rewrote the log.
@@ -325,11 +334,13 @@ def decode_provenance(log_dir: Path, root: Path, epoch_ids: list[str]) -> pd.Dat
     for epoch_id in epoch_ids:
         for decoder in DECODERS:
             identifier = decode_id(epoch_id, decoder)
-            from_results = _results_provenance(root / f"{identifier}_results.nc")
+            results = root / f"{identifier}_results.nc"
+            saved = results.exists()
+            from_results = _results_provenance(results)
             from_log, resumed = _log_provenance(log_dir / f"{identifier}.log")
             if from_results is not None:
                 record, source = from_results, "results.nc"
-            elif from_log is not None and not resumed:
+            elif saved and from_log is not None and not resumed:
                 record, source = from_log, "log"
             else:
                 record, source = {}, None
@@ -338,6 +349,7 @@ def decode_provenance(log_dir: Path, root: Path, epoch_ids: list[str]) -> pd.Dat
                     "epoch_id": epoch_id,
                     "decoder": decoder,
                     "decode_id": identifier,
+                    "saved": saved,
                     "source": source,
                     "resumed": resumed,
                     **{field: record.get(field) for field in PROVENANCE_FIELDS},
@@ -349,6 +361,7 @@ def decode_provenance(log_dir: Path, root: Path, epoch_ids: list[str]) -> pd.Dat
         "epoch_id",
         "decoder",
         "decode_id",
+        "saved",
         "source",
         "resumed",
         *PROVENANCE_FIELDS,
@@ -358,15 +371,22 @@ def decode_provenance(log_dir: Path, root: Path, epoch_ids: list[str]) -> pd.Dat
     return pd.DataFrame(rows, columns=columns).astype(object)
 
 
-def check_one_commit(provenance: pd.DataFrame, allowed: Mapping[str, str]) -> dict:
+def check_one_commit(
+    provenance: pd.DataFrame,
+    allowed: Mapping[str, str],
+    *,
+    explained: Mapping[str, str] | None = None,
+) -> dict:
     """One commit, a clean tree and one environment across the decodes.
 
-    Passes when every decode not in `allowed` has a provenance record; every
-    field of those records has exactly one value across them (one
+    Passes when every saved decode not in `allowed` has a provenance record;
+    every field of those records has exactly one value across them (one
     ``commit``, ``uv_lock_sha256``, ``ripple_detection_commit``,
     ``non_local_detector_version`` and ``cuda_plugin_version``, none
-    missing); every ``dirty`` is False; and every log's own record, where
-    there is one, names the same commit and dirtiness as its decode's.
+    missing); every ``dirty`` is False; every log's own record, where there
+    is one, names the same commit and dirtiness as its decode's; every entry
+    of `allowed` gives a reason; and every decode that was never saved is
+    explained in `explained`.
 
     Parameters
     ----------
@@ -374,7 +394,13 @@ def check_one_commit(provenance: pd.DataFrame, allowed: Mapping[str, str]) -> di
         ``decode_provenance``'s rows.
     allowed : Mapping of str to str
         ``decode_id`` (the epoch id, or the epoch id plus ``_contfrag``) to
-        the reason it may differ. These rows are set aside and reported.
+        the reason it may differ. These rows are set aside and reported. An
+        entry without a reason is refused, and its row is checked.
+    explained : Mapping of str to str, optional
+        ``decode_id`` to the reason ``check_epoch_sets`` records for that
+        decode's absence. A decode never saved (no ``results.nc``) has no
+        provenance to check: with a reason here it is reported, not failed;
+        without one it fails, as it does in ``check_epoch_sets``.
 
     Returns
     -------
@@ -383,7 +409,18 @@ def check_one_commit(provenance: pd.DataFrame, allowed: Mapping[str, str]) -> di
         exactly one.
     """
     failures: list[str] = []
-    excepted = provenance["decode_id"].isin(list(allowed)).to_numpy(dtype=bool)
+    explained = explained or {}
+    reasonless = sorted(name for name, reason in allowed.items() if not reason)
+    if reasonless:
+        failures.append(
+            f"the exception for {_names(reasonless)} has no reason, so it is not "
+            "applied"
+        )
+    excepted = (
+        provenance["decode_id"]
+        .isin([name for name, reason in allowed.items() if reason])
+        .to_numpy(dtype=bool)
+    )
     exceptions = {
         row.decode_id: {
             "reason": allowed[row.decode_id],
@@ -396,6 +433,24 @@ def check_one_commit(provenance: pd.DataFrame, allowed: Mapping[str, str]) -> di
     rows = provenance.loc[~excepted]
     if rows.empty:
         failures.append("no decode provenance to check")
+
+    unsaved = ~rows["saved"].astype(bool)
+    absent_decodes = {
+        str(name): explained[name]
+        for name in rows.loc[unsaved, "decode_id"]
+        if explained.get(name)
+    }
+    unexplained = sorted(
+        str(name)
+        for name in rows.loc[unsaved, "decode_id"]
+        if name not in absent_decodes
+    )
+    if unexplained:
+        failures.append(
+            f"{_names(unexplained)}: no results.nc, so the decode was never saved "
+            "and has no provenance; epoch_sets records no reason for its absence"
+        )
+    rows = rows.loc[~unsaved]
 
     no_source = rows["source"].map(_missing).astype(bool)
     unread = rows.loc[no_source]
@@ -467,6 +522,10 @@ def check_one_commit(provenance: pd.DataFrame, allowed: Mapping[str, str]) -> di
         },
         "exceptions": exceptions,
         "unused_exceptions": sorted(set(allowed) - set(provenance["decode_id"])),
+        "absent": {
+            name: f"explained in epoch_sets: {why}"
+            for name, why in absent_decodes.items()
+        },
     }
     return _result(failures, details)
 
@@ -532,9 +591,12 @@ def check_decoder_settings(
 
     Passes when every detector carries identical :data:`DISCRETE_SETTINGS`
     (exactly, since one code path sets them all), and, for each setting
-    `expected` names, a value equal to it (numbers to a relative 1e-9). A
-    setting `expected` names that no detector carries fails, so a misspelled
-    name is not silently left unchecked.
+    `expected` names, a value equal to it, numbers to a relative 1e-9. That
+    tolerance only absorbs how a value was written down (0.0025 against the
+    0.0025000000000000044 a detector computes): it is far below any drift that
+    matters, such as April's 0.98 self-transition against today's 0.96, or
+    stickiness 1e6 against 1e5. A setting `expected` names that no detector
+    carries fails, so a misspelled name is not silently left unchecked.
 
     Parameters
     ----------
@@ -1037,18 +1099,22 @@ def check_tables_recorded(
                 failures.append(
                     f"{table_dir}: {relative} changed after it was recorded"
                 )
-        commit = str(manifest.get("commit"))
-        ancestry = _git(repo, "merge-base", "--is-ancestor", decode_commit, commit)
-        if ancestry.returncode == 1:
-            failures.append(
-                f"{table_dir}: built at {commit}, which does not descend from the "
-                f"decode commit {decode_commit}"
-            )
-        elif ancestry.returncode != 0:
-            failures.append(
-                f"{table_dir}: git could not tell whether {commit} descends from "
-                f"{decode_commit}: {ancestry.stderr.strip()}"
-            )
+        commit = manifest.get("commit")
+        if not commit:
+            failures.append(f"{table_dir}: the manifest records no commit")
+        else:
+            commit = str(commit)
+            ancestry = _git(repo, "merge-base", "--is-ancestor", decode_commit, commit)
+            if ancestry.returncode == 1:
+                failures.append(
+                    f"{table_dir}: built at {commit}, which does not descend from "
+                    f"the decode commit {decode_commit}"
+                )
+            elif ancestry.returncode != 0:
+                failures.append(
+                    f"{table_dir}: git could not tell whether {commit} descends "
+                    f"from {decode_commit}: {ancestry.stderr.strip()}"
+                )
         inputs = manifest.get("inputs") or {}
         named = inputs.get("decode_commit")
         if named is None or not _same_commit(repo, str(named), decode_commit):
@@ -1255,17 +1321,105 @@ def check_epoch_sets(
     return _result(failures, details)
 
 
-def table_epochs(path: Path) -> set[str] | None:
-    """The canonical epochs a table holds, or None if it has no session columns."""
-    if not set(SESSION_COLUMNS) <= set(pq.read_schema(path).names):
-        return None
-    sessions = (
-        pq.read_table(path, columns=list(SESSION_COLUMNS)).to_pandas().drop_duplicates()
+def _epoch_ids(sessions: pd.DataFrame) -> pd.Series:
+    """``{animal}{session_date}_{epoch}_HPC`` for each row of the session columns."""
+    return (
+        sessions["animal"].astype(str)
+        + sessions["session_date"].astype(str)
+        + "_"
+        + sessions["epoch"].astype(str)
+        + "_HPC"
     )
-    return {
-        f"{animal}{session_date}_{epoch}_HPC"
-        for animal, session_date, epoch in sessions.itertuples(index=False)
-    }
+
+
+def stop_epochs(stop_table: Path) -> pd.Series | None:
+    """``stop_id`` to epoch identifier, from a stop table; None if it has neither."""
+    if not stop_table.is_file():
+        return None
+    columns = ["stop_id", *SESSION_COLUMNS]
+    if not set(columns) <= set(pq.read_schema(stop_table).names):
+        return None
+    stops = pq.read_table(stop_table, columns=columns).to_pandas()
+    return pd.Series(_epoch_ids(stops).to_numpy(), index=stops["stop_id"].to_numpy())
+
+
+def table_epochs(path: Path, stops: pd.Series | None = None) -> set[str] | None:
+    """The canonical epochs a table holds.
+
+    From its session columns (``animal``, ``session_date``, ``epoch``); else,
+    for a table keyed by ``stop_id`` alone, as the qvals table is, through
+    `stops` (``stop_epochs`` of the folder's stop table).
+
+    Returns
+    -------
+    set of str, or None
+        None when the table has neither session columns nor a ``stop_id``
+        that `stops` can map.
+
+    Raises
+    ------
+    ValueError
+        If some of its ``stop_id`` values are not in `stops`.
+    """
+    names = set(pq.read_schema(path).names)
+    if set(SESSION_COLUMNS) <= names:
+        sessions = pq.read_table(path, columns=list(SESSION_COLUMNS)).to_pandas()
+        return set(_epoch_ids(sessions.drop_duplicates()))
+    if "stop_id" not in names or stops is None:
+        return None
+    stop_ids = pq.read_table(path, columns=["stop_id"]).to_pandas()["stop_id"]
+    held = stop_ids.map(stops)
+    unmapped = int(held.isna().sum())
+    if unmapped:
+        raise ValueError(
+            f"{unmapped} of its {held.size} stop_ids are not in the folder's stop "
+            "table, so their epochs cannot be told"
+        )
+    return set(held)
+
+
+def table_epoch_sets(
+    table_dirs: Sequence[Path],
+) -> tuple[dict[str, set[str]], list[str], list[str]]:
+    """Each recorded parquet table's epochs, named ``<folder>/<file>``.
+
+    A table keyed by ``stop_id`` alone is read through its folder's
+    ``stop_table.parquet``.
+
+    Returns
+    -------
+    sets : dict of str to set of str
+    failures : list of str
+        Tables some of whose stops the folder's stop table lacks.
+    not_checked : list of str
+        Tables with neither session columns nor a mappable ``stop_id``, which
+        the epoch-set check cannot cover.
+    """
+    sets: dict[str, set[str]] = {}
+    failures: list[str] = []
+    not_checked: list[str] = []
+    for table_dir in table_dirs:
+        if not table_dir.is_dir():
+            continue
+        stops = stop_epochs(table_dir / "stop_table.parquet")
+        for relative in table_files(table_dir):
+            if not relative.endswith(".parquet"):
+                continue
+            name = f"{table_dir.name}/{relative}"
+            try:
+                held = table_epochs(table_dir / relative, stops)
+            except ValueError as error:
+                failures.append(f"{name}: {error}")
+                continue
+            if held is None:
+                not_checked.append(
+                    f"epoch_sets: {name} has no session columns and no stop_id "
+                    "its folder's stop_table.parquet maps, so its epochs are not "
+                    "checked"
+                )
+            else:
+                sets[name] = held
+    return sets, failures, not_checked
 
 
 # --------------------------------------------------------------------------
@@ -1328,6 +1482,41 @@ def _run_commits(widloski: dict | None, swr: dict | None) -> dict[str, set[str]]
     return commits
 
 
+ROOT_FIT_FAMILIES = {
+    "Stage 5B": "stage5b_*.pkl",
+    "Stage 6": "stage6_*.pkl",
+    "stop_replay_summary": "stop_replay_summary*.pkl",
+}
+"""The fits at the ``replay_content`` root, outside every ``models*/`` tree."""
+
+
+def root_fits(replay_content_dir: Path) -> tuple[list[Path], list[str]]:
+    """The fits at the ``replay_content`` root, and each family with none.
+
+    Every artifact a sidecar there describes, and every ``.pkl`` of
+    :data:`ROOT_FIT_FAMILIES`, with a sidecar or without one, which
+    ``check_fit_provenance.py`` then reports as ``missing_sidecar``.
+
+    Returns
+    -------
+    artifacts : list of Path
+    not_checked : list of str
+        One entry per family with no fit at all.
+    """
+    artifacts = {
+        sidecar.with_name(sidecar.name[: -len(FIT_SIDECAR_SUFFIX)] + ".pkl")
+        for sidecar in replay_content_dir.glob(f"*{FIT_SIDECAR_SUFFIX}")
+    }
+    not_checked = []
+    for family, pattern in ROOT_FIT_FAMILIES.items():
+        artifacts |= set(replay_content_dir.glob(pattern))
+        if not any(artifact.match(pattern) for artifact in artifacts):
+            not_checked.append(
+                f"fit_provenance: no {family} fit ({pattern}) at {replay_content_dir}"
+            )
+    return sorted(artifacts), not_checked
+
+
 def run_audit(
     *,
     root: Path,
@@ -1340,17 +1529,77 @@ def run_audit(
     exceptions: Mapping[str, Any],
     expected_settings: Mapping[str, Mapping[str, object]],
     check_marks: bool,
-) -> dict[str, dict]:
-    """Run every check, reading only; return each result by name."""
+) -> tuple[dict[str, dict], list[str]]:
+    """Run every check, reading only.
+
+    Returns
+    -------
+    checks : dict of str to dict
+        Each check's result, by name.
+    not_checked : list of str
+        What the audit did not check, so that a pass is not read as covering
+        more than it did.
+    """
     checks: dict[str, dict] = {}
+    not_checked: list[str] = []
     complete: dict[str, set[str]] = {}
     incomplete: dict[str, dict[str, list[str]]] = {}
     for decoder in DECODERS:
         complete[decoder], incomplete[decoder] = find_decodes(root, decoder)
     decoded = complete["nonlocal"] | complete["contfrag"]
+    widloski = None if widloski_manifest is None else _read_json(widloski_manifest)
+    swr = None if swr_manifest is None else _read_json(swr_manifest)
+    table_dirs = [replay_content_dir, contfrag_dir]
+
+    # The epochs each artifact holds, and why it may lack one: the epoch-set
+    # check's inputs, built first so that one_commit can tell an absence
+    # epoch_sets explains from one it does not.
+    sets: dict[str, set[str]] = {
+        "nonlocal_decode": complete["nonlocal"],
+        "contfrag_decode": complete["contfrag"],
+    }
+    reasons: dict[str, dict[str, str]] = {}
+    known: set[str] = set()
+    no_input: dict[str, str] = {}
+    for run, manifest in (("widloski", widloski), ("swr", swr)):
+        present, skipped = (
+            (set(), {}) if manifest is None else run_manifest_epochs(manifest)
+        )
+        sets[run], reasons[run] = present, skipped
+    if swr is not None:
+        known = {
+            epoch_id
+            for epoch_id in swr.get("epochs", {})
+            if is_canonical_epoch_id(epoch_id)
+        }
+        # an epoch the SWR runner skipped for lack of inputs, and with no
+        # decode, can have nothing built on a decode either
+        no_input = {
+            epoch_id: f"no inputs, so no decode: {reason}"
+            for epoch_id, reason in reasons["swr"].items()
+            if epoch_id not in decoded
+        }
+    table_sets, table_failures, table_not_checked = table_epoch_sets(table_dirs)
+    sets.update(table_sets)
+    not_checked += table_not_checked
+    recorded = exceptions.get("epochs", {})
+    for artifact in sets:
+        reasons[artifact] = {
+            **no_input,
+            **reasons.get(artifact, {}),
+            **recorded.get(artifact, {}),
+        }
 
     provenance = decode_provenance(log_dir, root, sorted(decoded))
-    checks["one_commit"] = check_one_commit(provenance, exceptions.get("commit", {}))
+    explained = {
+        decode_id(epoch_id, decoder): reasons[f"{decoder}_decode"][epoch_id]
+        for decoder in DECODERS
+        for epoch_id in decoded - complete[decoder]
+        if reasons[f"{decoder}_decode"].get(epoch_id)
+    }
+    checks["one_commit"] = check_one_commit(
+        provenance, exceptions.get("commit", {}), explained=explained
+    )
     decode_commit: str | None = checks["one_commit"]["details"]["commit"]
 
     for decoder in DECODERS:
@@ -1361,6 +1610,11 @@ def run_audit(
             },
             expected_settings.get(decoder),
         )
+        if not expected_settings.get(decoder):
+            not_checked.append(
+                f"decoder_settings_{decoder}: compared across epochs only, since "
+                f"--expected-settings names no {decoder} settings"
+            )
 
     grids: dict[str, dict] = {}
     times: dict[str, NDArray] = {}
@@ -1380,8 +1634,6 @@ def run_audit(
     checks["grids_match"] = _per_epoch(grids, "no epoch has both decodes")
     checks["minimum_sample_counts"] = check_minimum_sample_counts(times)
 
-    widloski = None if widloski_manifest is None else _read_json(widloski_manifest)
-    swr = None if swr_manifest is None else _read_json(swr_manifest)
     checks["widloski_hashes"] = (
         _result(["no Widloski manifest given (--widloski-manifest)"], {})
         if widloski is None
@@ -1418,7 +1670,6 @@ def run_audit(
                 loader_details[f"{run} {commit}"] = result["details"]
     checks["spike_loader_unchanged"] = _result(loader_failures, loader_details)
 
-    table_dirs = [replay_content_dir, contfrag_dir]
     checks["tables_recorded"] = (
         _result(["no single decode commit to compare with (see one_commit)"], {})
         if decode_commit is None
@@ -1433,58 +1684,19 @@ def run_audit(
         else _result([f"no canonical event table at {event_table}"], {})
     )
 
-    named_fits = [
-        sidecar.with_name(sidecar.name[: -len(FIT_SIDECAR_SUFFIX)] + ".pkl")
-        for sidecar in sorted(replay_content_dir.glob(f"*{FIT_SIDECAR_SUFFIX}"))
-    ]
+    named_fits, missing_families = root_fits(replay_content_dir)
+    not_checked += missing_families
     checks["fit_provenance"] = check_fit_provenance(
         REPO, table_dirs, artifacts=named_fits
     )
 
-    sets: dict[str, set[str]] = {
-        "nonlocal_decode": complete["nonlocal"],
-        "contfrag_decode": complete["contfrag"],
-    }
-    reasons: dict[str, dict[str, str]] = {}
-    known: set[str] = set()
-    no_input: dict[str, str] = {}
-    for run, manifest in (("widloski", widloski), ("swr", swr)):
-        present, skipped = (
-            (set(), {}) if manifest is None else run_manifest_epochs(manifest)
-        )
-        sets[run], reasons[run] = present, skipped
-    if swr is not None:
-        known = {
-            epoch_id
-            for epoch_id in swr.get("epochs", {})
-            if is_canonical_epoch_id(epoch_id)
-        }
-        # an epoch the SWR runner skipped for lack of inputs, and with no
-        # decode, can have nothing built on a decode either
-        no_input = {
-            epoch_id: f"no inputs, so no decode: {reason}"
-            for epoch_id, reason in reasons["swr"].items()
-            if epoch_id not in decoded
-        }
-    for table_dir in table_dirs:
-        for relative in table_files(table_dir) if table_dir.is_dir() else []:
-            if relative.endswith(".parquet"):
-                held = table_epochs(table_dir / relative)
-                if held is not None:
-                    sets[f"{table_dir.name}/{relative}"] = held
-    recorded = exceptions.get("epochs", {})
-    for artifact in sets:
-        reasons[artifact] = {
-            **no_input,
-            **reasons.get(artifact, {}),
-            **recorded.get(artifact, {}),
-        }
-    checks["epoch_sets"] = check_epoch_sets(sets, reasons, known=known)
+    epoch_sets = check_epoch_sets(sets, reasons, known=known)
+    epoch_sets["failures"] = table_failures + epoch_sets["failures"]
+    epoch_sets["ok"] = not epoch_sets["failures"]
     for decoder in DECODERS:
         # which files each partly saved decode lacks
-        checks["epoch_sets"]["details"][f"{decoder}_decode"]["incomplete"] = incomplete[
-            decoder
-        ]
+        epoch_sets["details"][f"{decoder}_decode"]["incomplete"] = incomplete[decoder]
+    checks["epoch_sets"] = epoch_sets
 
     if check_marks:
         checks["encoding_marks"] = _per_epoch(
@@ -1494,7 +1706,12 @@ def run_audit(
             },
             "no epoch has both decodes",
         )
-    return checks
+    else:
+        not_checked.append(
+            "encoding_marks: not run; --check-marks reloads every epoch's marks "
+            "from the database"
+        )
+    return checks, not_checked
 
 
 def _json_default(value: object) -> object:
@@ -1612,7 +1829,7 @@ def main(argv: list[str] | None = None) -> int:
             f"--expected-settings takes only {list(DECODERS)}, not "
             f"{sorted(expected_settings)}"
         )
-    checks = run_audit(
+    checks, not_checked = run_audit(
         root=args.root,
         log_dir=args.log_dir,
         widloski_manifest=args.widloski_manifest,
@@ -1632,6 +1849,8 @@ def main(argv: list[str] | None = None) -> int:
         "repo_head": head.stdout.strip() if head.returncode == 0 else None,
         "ok": not failed,
         "failed_checks": failed,
+        # a pass covers the checks above and nothing listed here
+        "not_checked": not_checked,
         "arguments": {
             name: (str(value) if isinstance(value, Path) else value)
             for name, value in vars(args).items()
@@ -1649,6 +1868,8 @@ def main(argv: list[str] | None = None) -> int:
             else ""
         )
         print(f"{'ok  ' if check['ok'] else 'FAIL'}  {name}{first}{more}")
+    for gap in not_checked:
+        print(f"not checked  {gap}")
     print(f"audit -> {args.output}")
     return 1 if failed else 0
 

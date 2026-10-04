@@ -198,14 +198,31 @@ def _commit(git: Callable[..., str], repo: Path, files: dict[str, str]) -> str:
     return git("rev-parse", "HEAD")
 
 
+STOP_IDS = np.array([8393993873049741010, 4684575748763187657], dtype=np.uint64)
+"""One stop per made-up epoch, as uint64 hashes like the real ``stop_id``."""
+
+
 def _sessions() -> pd.DataFrame:
-    """A table holding both made-up epochs."""
+    """A table holding both made-up epochs, one stop each, as the stop table does."""
     return pd.DataFrame(
         {
             "animal": ["sim", "sim"],
             "session_date": [20200101, 20200101],
             "epoch": ["02_r1", "04_r2"],
+            "stop_id": STOP_IDS,
             "value": [1.0, 2.0],
+        }
+    )
+
+
+def _qvals(stop_ids: np.ndarray = STOP_IDS) -> pd.DataFrame:
+    """A qvals table with the real one's keys: ``stop_id`` and ``epoch`` only."""
+    epochs = dict(zip(STOP_IDS, ["02_r1", "04_r2"], strict=True))
+    return pd.DataFrame(
+        {
+            "stop_id": np.asarray(stop_ids, dtype=np.uint64),
+            "epoch": [epochs.get(stop_id, "02_r1") for stop_id in stop_ids],
+            "q_arm": np.linspace(0.0, 1.0, len(stop_ids)),
         }
     )
 
@@ -357,6 +374,52 @@ def test_a_resume_at_another_commit_fails(tmp_path):
     assert any(
         "e" * 12 in failure and EPOCHS[0] in failure for failure in result["failures"]
     )
+
+
+@pytest.mark.parametrize("reason", ["", None])
+def test_an_exception_without_a_reason_is_refused(tmp_path, reason):
+    late = f"{EPOCHS[1]}_contfrag"
+    frame = _provenance_frame(tmp_path, {late: {"commit": "f" * 40}})
+
+    result = audit.check_one_commit(frame, {late: reason})
+
+    assert not result["ok"]
+    assert (
+        f"the exception for {late} has no reason, so it is not applied"
+        in (result["failures"])
+    )
+    # and the row is checked as if it were not listed
+    assert any(
+        failure.startswith("2 values of commit") for failure in result["failures"]
+    )
+    assert result["details"]["exceptions"] == {}
+
+
+def test_an_absent_decode_is_reported_with_its_epoch_sets_reason(tmp_path):
+    root, log_dir = tmp_path / "decodes", tmp_path / "logs"
+    _stamp(root, log_dir, EPOCHS[0], _provenance(), _provenance())
+    # the ContFrag decode was never saved; its log is from a run that failed
+    _write_log(log_dir / f"{EPOCHS[0]}_contfrag.log", _provenance("f" * 40))
+    frame = audit.decode_provenance(log_dir, root, [EPOCHS[0]])
+    row = frame.set_index("decoder").loc["contfrag"]
+    assert not row["saved"]
+    assert row["source"] is None
+
+    unexplained = audit.check_one_commit(frame, {})
+    reason = "ContFrag decode failed: no HPC spikes in the position span"
+    explained = audit.check_one_commit(
+        frame, {}, explained={f"{EPOCHS[0]}_contfrag": reason}
+    )
+
+    assert unexplained["failures"] == [
+        f"{EPOCHS[0]}_contfrag: no results.nc, so the decode was never saved and has "
+        "no provenance; epoch_sets records no reason for its absence"
+    ]
+    assert explained["ok"], explained["failures"]
+    assert explained["details"]["absent"] == {
+        f"{EPOCHS[0]}_contfrag": f"explained in epoch_sets: {reason}"
+    }
+    assert explained["details"]["commit"] == "a" * 40
 
 
 def test_a_decode_without_provenance_fails(tmp_path):
@@ -566,7 +629,7 @@ def _table_dir(path: Path) -> Path:
     write_table(_sessions(), path / "event_table.parquet")
     write_table(_sessions(), path / "stop_table.parquet")
     (path / "standardization_reference.json").write_text("{}")
-    write_table(_sessions(), path / "models_per_bin_rate" / "qvals_table.parquet")
+    write_table(_qvals(), path / "models_per_bin_rate" / "qvals_table.parquet")
     (path / "models_per_bin_rate" / "qvals_standardization_reference.json").write_text(
         "{}"
     )
@@ -713,6 +776,43 @@ def test_record_tables_command_writes_only_its_manifest(tmp_path):
     assert manifest["inputs"] == {"decode_commit": "a" * 40, "behavior_cache": "cache"}
 
 
+def test_tables_with_an_unknown_or_missing_commit_fail(tmp_path):
+    history = _history(tmp_path)
+    table_dir = _table_dir(tmp_path / "replay_content")
+
+    audit.record_tables(table_dir, "f" * 40, {"decode_commit": history.decode})
+    unknown = audit.check_tables_recorded(
+        [table_dir], history.decode, repo=history.repo
+    )["failures"]
+    audit.record_tables(table_dir, "", {"decode_commit": history.decode})
+    missing = audit.check_tables_recorded(
+        [table_dir], history.decode, repo=history.repo
+    )["failures"]
+
+    # git merge-base exits 128 on a commit it does not know: neither 0 nor 1
+    assert len(unknown) == 1
+    assert unknown[0].startswith(
+        f"{table_dir}: git could not tell whether {'f' * 40} descends from "
+        f"{history.decode}: fatal"
+    )
+    assert missing == [f"{table_dir}: the manifest records no commit"]
+
+
+def test_tables_checked_outside_a_git_repository_fail(tmp_path):
+    history = _history(tmp_path)
+    table_dir = _table_dir(tmp_path / "replay_content")
+    audit.record_tables(table_dir, history.later, {"decode_commit": history.decode})
+    not_a_repository = tmp_path / "not_a_repository"
+    not_a_repository.mkdir()
+
+    failures = audit.check_tables_recorded(
+        [table_dir], history.decode, repo=not_a_repository
+    )["failures"]
+
+    assert len(failures) == 1
+    assert "git could not tell" in failures[0]
+
+
 # --------------------------------------------------------------------------
 # check_pfc_sidecars
 # --------------------------------------------------------------------------
@@ -794,6 +894,65 @@ def test_a_known_epoch_no_artifact_holds_needs_a_reason():
     assert audit.check_epoch_sets(sets, explained, known={NO_INPUT_EPOCH})["ok"]
 
 
+QVALS = "replay_content/models_per_bin_rate/qvals_table.parquet"
+
+
+def test_the_qvals_table_is_read_through_the_stop_table(tmp_path):
+    table_dir = _table_dir(tmp_path / "replay_content")
+
+    sets, failures, not_checked = audit.table_epoch_sets([table_dir])
+
+    # the real qvals table carries stop_id and epoch, not animal or session_date
+    assert sets[QVALS] == set(EPOCHS)
+    assert sets["replay_content/stop_table.parquet"] == set(EPOCHS)
+    assert failures == []
+    assert not_checked == []
+
+
+def test_a_session_missing_from_qvals_fails_the_epoch_sets(tmp_path):
+    table_dir = _table_dir(tmp_path / "replay_content")
+    qvals_path = table_dir / "models_per_bin_rate" / "qvals_table.parquet"
+    write_table(_qvals(STOP_IDS[:1]), qvals_path)
+
+    sets, failures, _ = audit.table_epoch_sets([table_dir])
+    result = audit.check_epoch_sets(sets, {})
+
+    assert failures == []
+    assert result["failures"] == [
+        f"{QVALS} lacks 1 epoch(s) with no recorded reason: {EPOCHS[1]}"
+    ]
+
+
+def test_a_qvals_stop_the_stop_table_lacks_fails(tmp_path):
+    table_dir = _table_dir(tmp_path / "replay_content")
+    stray = np.append(STOP_IDS, np.uint64(7))
+    write_table(
+        _qvals(stray), table_dir / "models_per_bin_rate" / "qvals_table.parquet"
+    )
+
+    sets, failures, not_checked = audit.table_epoch_sets([table_dir])
+
+    assert QVALS not in sets
+    assert failures == [
+        f"{QVALS}: 1 of its 3 stop_ids are not in the folder's stop table, so their "
+        "epochs cannot be told"
+    ]
+    assert not_checked == []
+
+
+def test_a_table_without_epoch_keys_is_listed_as_not_checked(tmp_path):
+    table_dir = _table_dir(tmp_path / "replay_content")
+    weights = pd.DataFrame({"arm": [0, 1], "weight": [0.5, 0.5]})
+    write_table(weights, table_dir / "arm_weights.parquet")
+
+    sets, failures, not_checked = audit.table_epoch_sets([table_dir])
+
+    assert "replay_content/arm_weights.parquet" not in sets
+    assert failures == []
+    assert len(not_checked) == 1
+    assert not_checked[0].startswith("epoch_sets: replay_content/arm_weights.parquet")
+
+
 # --------------------------------------------------------------------------
 # check_fit_provenance
 # --------------------------------------------------------------------------
@@ -830,6 +989,31 @@ def test_a_root_level_artifact_is_checked_against_its_sidecar(tmp_path):
 
     assert not result["ok"]
     assert any("stage5b_retrospective.pkl" in failure for failure in result["failures"])
+
+
+def test_root_level_fits_without_a_sidecar_fail_and_absent_families_are_listed(
+    tmp_path,
+):
+    root = tmp_path / "replay_content"
+    write_table(_sessions(), root / "stop_table.parquet")
+    _fit(root, "stage6_is_stay_logistic", {"stop_table": root / "stop_table.parquet"})
+    (root / "stage5b_retrospective.pkl").write_bytes(b"fit")  # its sidecar is gone
+
+    artifacts, not_checked = audit.root_fits(root)
+    result = audit.check_fit_provenance(audit.REPO, [], artifacts=artifacts)
+
+    assert artifacts == [
+        root / "stage5b_retrospective.pkl",
+        root / "stage6_is_stay_logistic.pkl",
+    ]
+    assert not_checked == [
+        f"fit_provenance: no stop_replay_summary fit (stop_replay_summary*.pkl) at {root}"
+    ]
+    assert not result["ok"]
+    assert any(
+        "stage5b_retrospective.pkl (missing_sidecar)" in failure
+        for failure in result["failures"]
+    )
 
 
 # --------------------------------------------------------------------------
@@ -1017,6 +1201,39 @@ def test_settings_other_than_expected_fail(tmp_path):
 
 
 # --------------------------------------------------------------------------
+# Nothing to check
+# --------------------------------------------------------------------------
+
+
+EMPTY_INPUTS: dict[str, Callable[[Path], dict]] = {
+    "one_commit": lambda tmp: audit.check_one_commit(
+        audit.decode_provenance(tmp, tmp, []), {}
+    ),
+    "decoder_settings": lambda tmp: audit.check_decoder_settings({}),
+    "grids_match": lambda tmp: audit.check_grids_match(_dot(n=0), _dot(n=0)),
+    "minimum_sample_counts": lambda tmp: audit.check_minimum_sample_counts({}),
+    "widloski_hashes": lambda tmp: audit.check_widloski_hashes({"epochs": {}}, tmp),
+    "swr_spans": lambda tmp: audit.check_swr_spans({"epochs": {}}, {}),
+    "tables_recorded": lambda tmp: audit.check_tables_recorded([], "a" * 40, repo=tmp),
+    "pfc_sidecars": lambda tmp: audit.check_pfc_sidecars([], "e" * 64),
+    "fit_provenance, no roots": lambda tmp: audit.check_fit_provenance(audit.REPO, []),
+    "fit_provenance, a root with no fit": lambda tmp: audit.check_fit_provenance(
+        audit.REPO, [tmp]
+    ),
+    "epoch_sets": lambda tmp: audit.check_epoch_sets({}, {}),
+}
+"""Each check on empty input: an audit that passes on nothing has checked nothing."""
+
+
+@pytest.mark.parametrize("check", list(EMPTY_INPUTS))
+def test_every_check_fails_on_empty_input(tmp_path, check):
+    result = EMPTY_INPUTS[check](tmp_path)
+
+    assert result["ok"] is False
+    assert result["failures"]
+
+
+# --------------------------------------------------------------------------
 # The audit command, end to end
 # --------------------------------------------------------------------------
 
@@ -1028,6 +1245,9 @@ class Tree:
     argv: list[str]
     output: Path
     swr_manifest: Path
+    root: Path
+    log_dir: Path
+    replay: Path
 
 
 def _consistent_tree(tmp_path: Path) -> Tree:
@@ -1100,7 +1320,14 @@ def _consistent_tree(tmp_path: Path) -> Tree:
         "--repo",
         str(repo),
     ]
-    return Tree(argv=argv, output=output, swr_manifest=swr_manifest)
+    return Tree(
+        argv=argv,
+        output=output,
+        swr_manifest=swr_manifest,
+        root=root,
+        log_dir=log_dir,
+        replay=replay,
+    )
 
 
 def test_the_audit_passes_a_consistent_tree_and_writes_only_its_report(tmp_path):
@@ -1119,7 +1346,8 @@ def test_the_audit_passes_a_consistent_tree_and_writes_only_its_report(tmp_path)
     assert code == 0
     assert report["ok"]
     assert _snapshot(tmp_path, tree.output) == before
-    # every artifact's epochs were checked, the tables' too
+    # every artifact's epochs were checked, the tables' too, qvals through
+    # the stop table
     assert set(report["checks"]["epoch_sets"]["details"]) >= {
         "nonlocal_decode",
         "contfrag_decode",
@@ -1129,6 +1357,18 @@ def test_the_audit_passes_a_consistent_tree_and_writes_only_its_report(tmp_path)
         "replay_content/models_per_bin_rate/qvals_table.parquet",
         "contfrag_replay_content/event_table_swr_HPC.parquet",
     }
+    # and a pass says what it did not cover
+    assert report["not_checked"] == [
+        "decoder_settings_nonlocal: compared across epochs only, since "
+        "--expected-settings names no nonlocal settings",
+        "decoder_settings_contfrag: compared across epochs only, since "
+        "--expected-settings names no contfrag settings",
+        f"fit_provenance: no Stage 5B fit (stage5b_*.pkl) at {tree.replay}",
+        "fit_provenance: no stop_replay_summary fit (stop_replay_summary*.pkl) at "
+        f"{tree.replay}",
+        "encoding_marks: not run; --check-marks reloads every epoch's marks from "
+        "the database",
+    ]
 
 
 def test_the_audit_fails_when_the_swr_manifest_silently_lacks_an_epoch(tmp_path):
@@ -1145,6 +1385,68 @@ def test_the_audit_fails_when_the_swr_manifest_silently_lacks_an_epoch(tmp_path)
     assert report["checks"]["epoch_sets"]["failures"] == [
         f"swr lacks 1 epoch(s) with no recorded reason: {EPOCHS[1]}"
     ]
+
+
+def test_the_audit_without_the_run_manifests_fails(tmp_path):
+    tree = _consistent_tree(tmp_path)
+    argv = list(tree.argv)
+    for option in ("--widloski-manifest", "--swr-manifest"):
+        del argv[argv.index(option) : argv.index(option) + 2]
+
+    code = audit.main(argv)
+
+    report = json.loads(tree.output.read_text())
+    checks = report["checks"]
+    assert code == 1
+    assert checks["widloski_hashes"]["failures"] == [
+        "no Widloski manifest given (--widloski-manifest)"
+    ]
+    assert checks["swr_spans"]["failures"] == ["no SWR manifest given (--swr-manifest)"]
+    assert checks["spike_loader_unchanged"]["failures"] == [
+        "widloski: no run commit to compare (no manifest, or no epoch run)",
+        "swr: no run commit to compare (no manifest, or no epoch run)",
+    ]
+    assert checks["epoch_sets"]["failures"] == [
+        f"widloski lacks 2 epoch(s) with no recorded reason: {', '.join(EPOCHS)}",
+        f"swr lacks 2 epoch(s) with no recorded reason: {', '.join(EPOCHS)}",
+    ]
+    assert report["failed_checks"] == [
+        "widloski_hashes",
+        "swr_spans",
+        "spike_loader_unchanged",
+        "epoch_sets",
+    ]
+
+
+def test_an_absent_decode_explained_through_exceptions_passes(tmp_path):
+    tree = _consistent_tree(tmp_path)
+    absent = f"{EPOCHS[1]}_contfrag"
+    for path in audit.decode_files(EPOCHS[1], tree.root, "contfrag").values():
+        path.unlink()
+    reason = "ContFrag decode failed: no HPC spikes in the position span"
+    exceptions = tmp_path / "exceptions.json"
+    exceptions.write_text(
+        json.dumps({"epochs": {"contfrag_decode": {EPOCHS[1]: reason}}})
+    )
+
+    code = audit.main([*tree.argv, "--exceptions", str(exceptions)])
+
+    report = json.loads(tree.output.read_text())
+    checks = report["checks"]
+    failed = {
+        name: check["failures"] for name, check in checks.items() if not check["ok"]
+    }
+    assert failed == {}
+    assert code == 0
+    assert checks["one_commit"]["details"]["absent"] == {
+        absent: f"explained in epoch_sets: {reason}"
+    }
+    explained = checks["epoch_sets"]["details"]["contfrag_decode"]["explained"]
+    assert explained == {
+        EPOCHS[1]: reason,
+        NO_INPUT_EPOCH: f"no inputs, so no decode: {NO_RIPPLE_BAND}",
+    }
+    assert checks["grids_match"]["details"]["n_epochs"] == 1
 
 
 def test_record_tables_refuses_a_folder_with_no_table(tmp_path):
