@@ -851,12 +851,13 @@ def kay_version_check(
     run_id: str,
     speed_time_s: NDArray,
     speed_cm_per_s: NDArray,
+    direct_detector: str = _DIRECT_KAY,
 ) -> pd.DataFrame:
     """Mark each event of two Kay inventories matched, added or missed.
 
     ``direct`` is Kay at the pinned ``ripple_detection`` commit (detector
-    ``"kay"``) and ``canonical`` the canonical Spyglass events
-    (``"kay_spyglass"``). Two events match when they share time of positive
+    ``direct_detector``, by default ``"kay"``) and ``canonical`` the
+    canonical Spyglass events (``"kay_spyglass"``). Two events match when they share time of positive
     duration, ``overlap_pairs``' strict rule; touching at an instant is no
     match. A direct event that matches nothing is ``added``, a canonical one
     ``missed``. A matched event's partner is the event of the other set it
@@ -877,13 +878,17 @@ def kay_version_check(
     speed_time_s, speed_cm_per_s : NDArray, shape (n_samples,)
         The speed trace eligibility is read from, with strictly increasing
         times.
+    direct_detector : str, optional
+        The direct inventory's name in the rows and event keys; default
+        ``"kay"``. Kay run on another input takes another name, so that its
+        keys differ from the direct Kay's when the two share a table.
 
     Returns
     -------
     check : pd.DataFrame
         One row per event, the direct events first, each set in start order:
 
-        - ``detector``: ``"kay"`` or ``"kay_spyglass"``;
+        - ``detector``: ``direct_detector`` or ``"kay_spyglass"``;
         - ``event_key``: ``"<detector>:<animal><day>_<epoch>:<event id>"``,
           as ``inventory_from_intervals`` makes it;
         - ``status``: ``"matched"``, ``"added"`` or ``"missed"``;
@@ -908,7 +913,10 @@ def kay_version_check(
                 speed_time_s=speed_time_s,
                 speed_cm_per_s=speed_cm_per_s,
             )
-            for detector, table in ((_DIRECT_KAY, direct), (_CANONICAL_KAY, canonical))
+            for detector, table in (
+                (direct_detector, direct),
+                (_CANONICAL_KAY, canonical),
+            )
         ],
         ignore_index=True,
     )
@@ -933,7 +941,7 @@ def kay_version_check(
     check = events[["detector", "event_key", "whole_event_speed_eligible"]].copy()
     # object even when nothing matches, where map alone would give float64 NaN
     check["partner_event_key"] = check["event_key"].map(partners).astype(object)
-    is_direct = (check["detector"] == _DIRECT_KAY).to_numpy()
+    is_direct = (check["detector"] == direct_detector).to_numpy()
     check["status"] = np.where(
         check["partner_event_key"].notna(),
         "matched",

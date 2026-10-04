@@ -301,13 +301,15 @@ def get_ripple_band_inputs(nwb_file_name: str, epoch_name: str) -> RippleBandInp
     The fetch only reads: it inserts, populates and deletes nothing. It reads:
 
     - the stored ``LFPBandV1`` band that ``_ripple_keys`` selects, with its
-      electrodes and references from ``LFPBandSelection.LFPBandElectrode``;
+      electrodes, references and electrode groups from
+      ``LFPBandSelection.LFPBandElectrode``;
     - the raw LFP behind it, through ``LFPBandV1.make``'s own steps:
       ``_compute_interval_times`` gives the interval make filtered over, and
       ``_load_lfp_data_with_referencing`` maps each electrode to its LFP column
       through the LFP's electrode table and subtracts its reference in the
       stored dtype;
-    - the band filter's coefficients and the name of the filter behind the LFP.
+    - the band filter's coefficients, and the name, units and conversion of
+      the LFP behind it.
 
     Parameters
     ----------
@@ -342,14 +344,16 @@ def get_ripple_band_inputs(nwb_file_name: str, epoch_name: str) -> RippleBandInp
     ripple_key, lfp_band_restriction = _ripple_keys(nwb_file_name, epoch_name)
     band_key = (LFPBandV1 & lfp_band_restriction).fetch1("KEY")
 
-    # The band's electrodes and references, ascending by electrode: the order
-    # LFPBandV1._fetch_and_sort_electrodes gives make.
-    electrode_ids, reference_ids = (LFPBandSelection.LFPBandElectrode & band_key).fetch(
-        "electrode_id", "reference_elect_id"
-    )
+    # The band's electrodes, references and electrode groups, ascending by
+    # electrode: the order LFPBandV1._fetch_and_sort_electrodes gives make. The
+    # group is part of the electrode's key, so the same fetch carries it.
+    electrode_ids, reference_ids, electrode_group_names = (
+        LFPBandSelection.LFPBandElectrode & band_key
+    ).fetch("electrode_id", "reference_elect_id", "electrode_group_name")
     sort_order = np.argsort(electrode_ids)
     electrode_ids = np.asarray(electrode_ids, dtype=np.int64)[sort_order]
     reference_ids = np.asarray(reference_ids, dtype=np.int64)[sort_order]
+    electrode_group_names = np.asarray(electrode_group_names, dtype=str)[sort_order]
     # RippleLFPSelection is keyed on LFPBandV1, so it is restricted by the full
     # band key: by less, it would union other epochs' selections.
     check_band_electrodes(
@@ -435,6 +439,7 @@ def get_ripple_band_inputs(nwb_file_name: str, epoch_name: str) -> RippleBandInp
         "reference_overflow_count": reference_overflow_count,
         "electrode_ids": electrode_ids,
         "reference_ids": reference_ids,
+        "electrode_group_names": electrode_group_names,
         "lfp_band_elect_index": lfp_band_elect_index,
         "band_valid_interval": band_valid_interval,
         "decimation": int(decimation),
@@ -443,6 +448,7 @@ def get_ripple_band_inputs(nwb_file_name: str, epoch_name: str) -> RippleBandInp
         "band_filter_name": band_key["filter_name"],
         "lfp_filter_name": lfp_filter_name,
         "lfp_units": lfp_object.unit,
+        "lfp_conversion": float(lfp_object.conversion),
     }
 
 

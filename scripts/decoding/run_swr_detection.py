@@ -22,19 +22,29 @@ Per epoch:
    ``bz_GetBestRippleChan``) chooses one of the band's CA1 electrodes from their
    referenced raw LFP, and ``zero_phase_bandpass`` filters it. A candidate with
    no finite sample is excluded with that reason, so it costs the others no
-   samples. If no channel is usable, Zugaro's entry is that error.
+   samples. If the channel cannot be chosen or filtered (no channel passes the
+   dead-channel guard, say), Zugaro's entry is that error.
 4. **Detectors.** ``run_swr_detectors`` runs the four; Kay, Karlsson and Yu read
    the stored band. A detector's error is recorded and the rest still report:
    the epoch is ``ok`` when all four succeed, ``partial`` when some do, and
    ``failed`` when none does.
-5. **Yu's diagnostics**, recomputed by ``yu_diagnostics``.
+5. **Yu's diagnostics**, recomputed by ``yu_diagnostics``: the scalars in the
+   manifest, the histogram arrays in the epoch's sidecar.
 6. **Kay version check** against the canonical Spyglass events
-   (``RippleTimesV1``), in two comparisons. ``version_only`` runs Kay at the
-   pinned commit on Spyglass's own inputs
-   (``RippleTimesV1.get_ripple_lfps_and_position_info``); ``version_and_inputs``
-   takes the direct Kay inventory. The canonical events and the version-only
-   events are kept only inside the position span, by ``filter_ripple_lfp_time``'s
-   rule, as ``load_data`` keeps ``SWR_event``.
+   (``RippleTimesV1``), in two comparisons.
+
+   - ``version_only`` runs Kay at the pinned commit on Spyglass's own inputs
+     (``RippleTimesV1.get_ripple_lfps_and_position_info``) with Spyglass's
+     stored parameters (``RippleParameters``), so only the package version
+     differs. Its events are named ``kay_spyglass_inputs``, so that an event key
+     names one event across both comparisons.
+   - ``version_and_inputs`` takes the direct Kay inventory, run with
+     ``DETECTOR_SETTINGS["kay"]``. The record flags a mismatch between those and
+     Spyglass's stored parameters, which then also separates this comparison.
+
+   The canonical events and the version-only events are kept only inside the
+   position span, by ``filter_ripple_lfp_time``'s rule, as ``load_data`` keeps
+   ``SWR_event``.
 
 Each epoch writes, under ``Processed-Data/replay_detection_comparison/swr/<run_id>/``:
 
@@ -45,20 +55,27 @@ Each epoch writes, under ``Processed-Data/replay_detection_comparison/swr/<run_i
   read) or ``"zugaro"`` (Zugaro's filtered channel, less its filter's edges),
   with ``start_s`` and ``end_s``, the stretch's first and last sample;
 - ``{epoch_id}_kay_version_check.parquet``: ``kay_version_check``'s rows, with a
-  ``comparison`` column, ``"version_only"`` or ``"version_and_inputs"``.
+  ``comparison`` column, ``"version_only"`` or ``"version_and_inputs"``;
+- ``{epoch_id}_yu_diagnostics.json``: every field of Yu's threshold
+  diagnostics, the histogram arrays included, when Yu's threshold could be
+  estimated.
 
 An epoch's other outputs, left by an earlier run, are removed, so the folder
-always matches the manifest.
+always matches the manifest; a failed epoch keeps none.
 
 ``manifest.json`` beside them holds the run's settings (the package commit,
 every detector's settings, the Zugaro filter and channel choice) and one record
 per epoch: its status and, for an epoch that ran, every detector's outcome, the
 provenance, the electrodes and references, Zugaro's channel with every score,
-the band check, Yu's diagnostics, the sampling rates, the position span, event
-counts and input hashes. Only this process writes it, atomically, after each
-epoch finishes. A rerun under the same run id skips the epochs already ``ok``
-unless ``--overwrite`` is given, and refuses settings other than the ones the
-manifest was written with.
+the band check, Yu's diagnostic scalars, the sampling rates, the LFP's units and
+conversion, the position span, event counts, the Kay check's counts, input
+hashes, and each output's path and sha256. Only this process writes it,
+atomically, after each epoch finishes. A rerun under the same run id skips the
+epochs already ``ok`` unless ``--overwrite`` is given, removes the record of
+each epoch it redoes before starting it, and refuses settings other than the
+ones the manifest was written with. A run holds an exclusive lock on its
+folder's ``.lock`` throughout, so a second run under the same run id exits at
+once instead of overwriting the first one's records.
 
 The epochs come from ``get_epoch_info``, narrowed by ``--animal``, ``--date`` and
 ``--epoch``. The documented epochs with no inputs (``KNOWN_NO_INPUT_EPOCHS``) are
@@ -75,15 +92,19 @@ Usage:
 """
 
 import argparse
+import errno
+import fcntl
 import functools
 import hashlib
 import json
 import math
+import re
 import resource
 import sys
 import time as clock
 import traceback
 from collections.abc import Callable, Iterator, Mapping
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from types import MappingProxyType
@@ -128,11 +149,17 @@ from continuum_swr_replay.decoding_common import (
     write_atomically,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR
-from continuum_swr_replay.table_io import write_table
+from continuum_swr_replay.table_io import sha256_file, write_table
 
 OUTPUT_ROOT = PROCESSED_DATA_DIR / "replay_detection_comparison" / "swr"
 PRODUCED_BY = "scripts/decoding/run_swr_detection.py"
 DESIGN_SPEC = "docs/design/2026-10-03-full-pipeline-refresh-design.md"
+
+RUN_ID_PATTERN = re.compile(r"[A-Za-z0-9._-]+")
+"""A run id names one folder under ``--output-root``: no path separator."""
+
+SPYGLASS_INPUTS_KAY = "kay_spyglass_inputs"
+"""The Kay check's name for Kay run on Spyglass's own inputs (version only)."""
 
 _NO_RIPPLE_BAND = "no LFPBandV1 ripple band"
 _NO_TRACK_GRAPH = "no TrackGraph, so its position cannot be loaded"
@@ -173,6 +200,7 @@ def output_paths(identifier: str, output_dir: Path) -> dict[str, Path]:
     }
     paths["swr_observed"] = output_dir / f"{identifier}_swr_observed.parquet"
     paths["kay_version_check"] = output_dir / f"{identifier}_kay_version_check.parquet"
+    paths["yu_diagnostics"] = output_dir / f"{identifier}_yu_diagnostics.json"
     return paths
 
 
@@ -190,11 +218,12 @@ def canonical_kay_events(nwb_file_name: str, epoch_name: str) -> pd.DataFrame:
 
 def spyglass_kay_inputs(
     nwb_file_name: str, epoch_name: str
-) -> tuple[pd.Series, pd.DataFrame, float]:
-    """The inputs ``RippleTimesV1.make`` gave Kay for the canonical events.
+) -> tuple[pd.Series, pd.DataFrame, float, dict]:
+    """The inputs and parameters ``RippleTimesV1.make`` gave Kay for the
+    canonical events, read only, as ``make`` reads them.
 
     ``RippleTimesV1.get_ripple_lfps_and_position_info`` on the epoch's full
-    ``RippleTimesV1`` key, which only reads.
+    ``RippleTimesV1`` key, and that key's ``RippleParameters`` row.
 
     Returns
     -------
@@ -204,31 +233,53 @@ def spyglass_kay_inputs(
         The stored ripple band, indexed by time in seconds.
     sampling_frequency : float
         The band's nominal rate in Hz.
+    ripple_param_dict : dict
+        The stored parameters: ``speed_name``, ``ripple_detection_algorithm``
+        and ``ripple_detection_params``.
     """
-    from spyglass.ripple.v1 import RippleTimesV1
+    from spyglass.ripple.v1 import RippleParameters, RippleTimesV1
 
     ripple_key, _ = _ripple_keys(nwb_file_name, epoch_name)
     key = (RippleTimesV1 & ripple_key).fetch1("KEY")
-    inputs: tuple[pd.Series, pd.DataFrame, float] = (
+    speed, ripple_lfps, sampling_frequency = (
         RippleTimesV1.get_ripple_lfps_and_position_info(key)
     )
-    return inputs
+    ripple_param_dict: dict = (
+        RippleParameters & {"ripple_param_name": key["ripple_param_name"]}
+    ).fetch1("ripple_param_dict")
+    return speed, ripple_lfps, sampling_frequency, ripple_param_dict
 
 
 def kay_on_spyglass_inputs(
-    speed: pd.Series, ripple_lfps: pd.DataFrame, sampling_frequency: float
+    speed: pd.Series,
+    ripple_lfps: pd.DataFrame,
+    sampling_frequency: float,
+    ripple_param_dict: Mapping[str, Any],
 ) -> pd.DataFrame:
     """Kay at the pinned commit on Spyglass's own inputs, as ``make`` calls it.
 
-    With ``DETECTOR_SETTINGS["kay"]``, which equal Spyglass's ``"default"``
-    parameter set, so only the package version differs from the canonical run.
+    With Spyglass's stored ``ripple_detection_params``, so only the package
+    version differs from the canonical run.
+
+    Raises
+    ------
+    ValueError
+        If the stored algorithm is not ``Kay_ripple_detector``: the canonical
+        events then cannot check Kay's version.
     """
+    algorithm = ripple_param_dict["ripple_detection_algorithm"]
+    if algorithm != "Kay_ripple_detector":
+        msg = (
+            f"Spyglass's canonical events come from {algorithm!r}, not "
+            "Kay_ripple_detector, so they cannot check Kay's version."
+        )
+        raise ValueError(msg)
     return Kay_ripple_detector(
         time=np.asarray(ripple_lfps.index),
         filtered_lfps=np.asarray(ripple_lfps),
         speed=np.asarray(speed),
         sampling_frequency=sampling_frequency,
-        **DETECTOR_SETTINGS["kay"],
+        **ripple_param_dict["ripple_detection_params"],
     )
 
 
@@ -324,12 +375,14 @@ def choose_zugaro_channel(
     time: NDArray,
     sampling_frequency: float,
     electrode_ids: NDArray,
-) -> tuple[dict, NDArray, NoUsableChannelError | None]:
+) -> tuple[dict, NDArray, Exception | None]:
     """Choose and filter Zugaro's channel among the band's CA1 electrodes.
 
     A candidate with no finite sample is excluded with that reason before
     ``best_ripple_channel`` runs on the rest, which treats a row with any NaN
-    as unobserved on every channel.
+    as unobserved on every channel. Any error in choosing or filtering the
+    channel is Zugaro's alone: it is returned, not raised, so the other
+    detectors still run.
 
     Parameters
     ----------
@@ -345,18 +398,23 @@ def choose_zugaro_channel(
     Returns
     -------
     channel : dict
-        ``electrode_id`` (None with no usable channel), ``scores`` (every
+        ``electrode_id`` (None when no channel was chosen), ``scores`` (every
         candidate's, NaN where it has none) and ``excluded`` (with reasons),
-        plus ``error`` with no usable channel.
+        plus ``error`` when the channel could not be chosen or filtered.
     zugaro_lfp : NDArray, shape (n_time, 1)
         The chosen channel band-passed by ``zero_phase_bandpass`` at
-        ``ZUGARO_BAND_HZ``; all NaN with no usable channel.
-    error : NoUsableChannelError or None
-        Why there is no channel, or None.
+        ``ZUGARO_BAND_HZ``; all NaN after an error.
+    error : Exception or None
+        The error, such as ``NoUsableChannelError``, or None.
     """
     has_finite = np.isfinite(raw_referenced).any(axis=0)
     excluded = {int(e): "no finite sample" for e in electrode_ids[~has_finite]}
     scores: dict[int, float] = dict.fromkeys(excluded, math.nan)
+    channel: dict[str, Any] = {
+        "electrode_id": None,
+        "scores": scores,
+        "excluded": excluded,
+    }
     try:
         if not has_finite.any():
             raise NoUsableChannelError("No candidate channel has a finite sample.")
@@ -366,28 +424,42 @@ def choose_zugaro_channel(
         choice = best_ripple_channel(
             candidates, time, sampling_frequency, electrode_ids[has_finite]
         )
-    except NoUsableChannelError as error:
         channel = {
-            "electrode_id": None,
-            "scores": scores,
-            "excluded": excluded,
-            "error": repr(error),
+            "electrode_id": choice.electrode_id,
+            "scores": dict(sorted((choice.scores | scores).items())),
+            "excluded": dict(sorted((choice.excluded | excluded).items())),
         }
-        return channel, np.full((time.size, 1), np.nan), error
-    column = int(np.flatnonzero(electrode_ids == choice.electrode_id)[0])
-    channel = {
-        "electrode_id": choice.electrode_id,
-        "scores": dict(sorted((choice.scores | scores).items())),
-        "excluded": dict(sorted((choice.excluded | excluded).items())),
-    }
-    zugaro_lfp = zero_phase_bandpass(
-        raw_referenced[:, [column]],
-        time,
-        sampling_frequency,
-        ZUGARO_BAND_HZ,
-        ZUGARO_FILTER_ORDER,
-    )
+        column = int(np.flatnonzero(electrode_ids == choice.electrode_id)[0])
+        zugaro_lfp = zero_phase_bandpass(
+            raw_referenced[:, [column]],
+            time,
+            sampling_frequency,
+            ZUGARO_BAND_HZ,
+            ZUGARO_FILTER_ORDER,
+        )
+    except Exception as error:  # noqa: BLE001 - Zugaro's failure, not the epoch's
+        unobserved = np.full((time.size, 1), np.nan)
+        return channel | {"error": repr(error)}, unobserved, error
     return channel, zugaro_lfp, None
+
+
+def kay_check_counts(kay_check: pd.DataFrame) -> dict:
+    """The Kay check's events by comparison, detector and status.
+
+    Each count is taken over every event (``"all"``) and over the whole-event
+    speed-eligible ones (``"speed_eligible"``). An eligible event keeps the
+    status it got against every event of the other set, eligible or not.
+    """
+    counts: dict[str, dict[str, dict[str, dict[str, int]]]] = {}
+    for (comparison, detector), rows in kay_check.groupby(
+        ["comparison", "detector"], sort=False
+    ):
+        eligible = rows["whole_event_speed_eligible"].to_numpy(dtype=bool)
+        counts.setdefault(comparison, {})[detector] = {
+            "all": rows["status"].value_counts().to_dict(),
+            "speed_eligible": rows.loc[eligible, "status"].value_counts().to_dict(),
+        }
+    return counts
 
 
 def _detect(
@@ -400,8 +472,9 @@ def _detect(
     fetch_canonical_kay: Callable,
     fetch_spyglass_kay_inputs: Callable,
     fir_filter: Callable | None,
-) -> tuple[dict, dict[str, pd.DataFrame]]:
-    """One epoch's record, and the tables to write (none for a failed epoch)."""
+) -> tuple[dict, dict[str, pd.DataFrame | dict]]:
+    """One epoch's record, and the outputs to write (none for a failed epoch):
+    tables by name, and the Yu sidecar's content."""
     inputs = fetch_inputs(nwb_file_name, epoch_name)
     band_check: dict[str, Any] = {
         "max_abs_difference": None,
@@ -411,8 +484,8 @@ def _detect(
     }
     try:
         difference, tolerance = band_reproduction_error(inputs, fir_filter)
-    except ValueError as error:  # the re-filter does not cover the whole band
-        reason = f"The band check could not compare the whole stored band: {error}"
+    except ValueError as error:  # such as a re-filter missing stored timestamps
+        reason = f"The band check could not be completed: {error}"
         return {"status": "failed", "reason": reason, "band_check": band_check}, {}
     band_check["max_abs_difference"], band_check["tolerance"] = difference, tolerance
     if not difference <= tolerance:  # NaN fails too
@@ -444,6 +517,10 @@ def _detect(
     results = run_swr_detectors(
         time, ripple_band, zugaro_lfp, speed, sampling_frequency
     )
+    if channel_error is not None:
+        # Zugaro was given an unobserved channel, which it refuses; its entry
+        # is the error that left it without a filtered channel instead
+        results["zugaro"] = channel_error
     zugaro_events = results["zugaro"]
     # read at once: pandas attrs do not reliably survive a copy or a concat
     zugaro_dropped = (
@@ -451,10 +528,6 @@ def _detect(
         if isinstance(zugaro_events, pd.DataFrame)
         else None
     )
-    if channel_error is not None:
-        # Zugaro was given an unobserved channel, which it refuses; its entry
-        # says why there was no channel instead
-        results["zugaro"] = channel_error
     succeeded = [
         name for name, events in results.items() if isinstance(events, pd.DataFrame)
     ]
@@ -484,23 +557,26 @@ def _detect(
         "reference_ids": inputs["reference_ids"],
         "zugaro_channel": zugaro_channel,
         "band_check": band_check,
-        "yu_diagnostics": yu,
+        # the scalars; the histogram arrays go to the epoch's Yu sidecar
+        "yu_diagnostics": {
+            name: value for name, value in yu.items() if not isinstance(value, list)
+        },
         "sampling": {
             "nominal": sampling_frequency,
             "measured": measured_rate(time, ripple_band),
         },
         "lfp_filter_name": inputs["lfp_filter_name"],
         "lfp_units": inputs["lfp_units"],
+        "lfp_conversion": inputs["lfp_conversion"],
         "position_span_s": span_s,
         "n_events": {
-            name: len(events) if name in succeeded else None
+            name: len(events) if isinstance(events, pd.DataFrame) else None
             for name, events in results.items()
         },
         "zugaro_dropped_over_150ms": zugaro_dropped,
-        # the band's electrodes, taking the CA1 ripple selection to hold one
-        # per tetrode, as its electrode ids suggest; neither that nor the
-        # tetrodes' anatomy is checked here, hence "unknown" below
-        "n_detecting_tetrodes": int(electrode_ids.size),
+        # the distinct electrode groups (tetrodes) of the band's electrodes;
+        # their anatomy is not checked here, hence "unknown" below
+        "n_detecting_tetrodes": int(np.unique(inputs["electrode_group_names"]).size),
         "meets_published_tetrode_criterion": "unknown",
         "input_sha256": {
             "time": array_sha256(time),
@@ -517,16 +593,24 @@ def _detect(
         animal=animal, day=day, epoch=epoch_name, brain_area="HPC"
     )
     canonical = within_span(fetch_canonical_kay(nwb_file_name, epoch_name), span_s)
+    spyglass_speed, spyglass_lfps, spyglass_rate, spyglass_parameters = (
+        fetch_spyglass_kay_inputs(nwb_file_name, epoch_name)
+    )
+    # Kay on Spyglass's inputs is named apart from the direct Kay, so that an
+    # event key names one event across both comparisons
     compared = {
-        "version_only": within_span(
-            kay_on_spyglass_inputs(
-                *fetch_spyglass_kay_inputs(nwb_file_name, epoch_name)
+        "version_only": (
+            SPYGLASS_INPUTS_KAY,
+            within_span(
+                kay_on_spyglass_inputs(
+                    spyglass_speed, spyglass_lfps, spyglass_rate, spyglass_parameters
+                ),
+                span_s,
             ),
-            span_s,
         )
     }
     if "kay" in succeeded:
-        compared["version_and_inputs"] = results["kay"]
+        compared["version_and_inputs"] = ("kay", results["kay"])
     kay_check = pd.concat(
         [
             kay_version_check(
@@ -536,51 +620,90 @@ def _detect(
                 run_id=run_id,
                 speed_time_s=position_time,
                 speed_cm_per_s=head_speed,
+                direct_detector=name,
             ).assign(comparison=comparison)
-            for comparison, direct in compared.items()
+            for comparison, (name, direct) in compared.items()
         ],
         ignore_index=True,
     )
-    counts: dict[str, dict[str, dict[str, int]]] = {}
-    for (comparison, detector, status), n in (
-        kay_check.groupby(["comparison", "detector", "status"]).size().items()
-    ):
-        counts.setdefault(comparison, {}).setdefault(detector, {})[status] = int(n)
-    record["kay_version_check"] = counts
+    settings_mismatch = dict(spyglass_parameters["ripple_detection_params"]) != dict(
+        DETECTOR_SETTINGS["kay"]
+    )
+    differences = {
+        "version_only": ["package version"],
+        "version_and_inputs": ["package version", "inputs"]
+        + (["settings"] if settings_mismatch else []),
+    }
+    record["kay_version_check"] = {
+        "spyglass_parameters": spyglass_parameters,
+        "settings_mismatch": settings_mismatch,
+        # what each comparison's events differ from the canonical ones in
+        "differences": {name: differences[name] for name in compared},
+        "counts": kay_check_counts(kay_check),
+    }
 
-    tables = {name: results[name] for name in succeeded}
-    tables["swr_observed"] = observation_table(time, ripple_band, zugaro_lfp)
-    tables["kay_version_check"] = kay_check
+    frames = {
+        name: events
+        for name, events in results.items()
+        if isinstance(events, pd.DataFrame)
+    }
+    frames["swr_observed"] = observation_table(time, ripple_band, zugaro_lfp)
+    frames["kay_version_check"] = kay_check
     stamp = {
         "produced_by": PRODUCED_BY,
         "run_id": run_id,
         "epoch_id": epoch_id(nwb_file_name, epoch_name),
         "commit": record["provenance"]["commit"],
     }
-    for table in tables.values():
-        table.attrs = table.attrs | stamp
+    for frame in frames.values():
+        frame.attrs = frame.attrs | stamp
+    tables: dict[str, pd.DataFrame | dict] = dict(frames)
+    if "error" not in yu:
+        tables["yu_diagnostics"] = stamp | {"yu_diagnostics": yu}
     return record, tables
 
 
-def replace_outputs(
-    identifier: str, output_dir: Path, tables: dict[str, pd.DataFrame]
-) -> dict[str, str]:
-    """Write an epoch's tables and remove its other outputs.
+def write_json(path: Path, content: object) -> None:
+    """Write strict JSON (no NaN or infinity) through a temporary file."""
+    text = json.dumps(content, allow_nan=False)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_atomically(path, lambda temporary: temporary.write_text(text))
 
-    The folder then matches the manifest: a detector that failed this time
-    keeps no file from an earlier run.
+
+def replace_outputs(
+    identifier: str, output_dir: Path, outputs: Mapping[str, pd.DataFrame | dict]
+) -> dict[str, dict[str, str]]:
+    """Write an epoch's outputs and remove its others.
+
+    The folder then matches the manifest: a detector that failed this time,
+    or a Yu sidecar that was not made, keeps no file from an earlier run.
+
+    Parameters
+    ----------
+    identifier : str
+        The epoch's ``epoch_id``.
+    output_dir : Path
+        The run's folder.
+    outputs : Mapping
+        By ``output_paths`` name: a table, written as parquet with its
+        ``attrs``, or the Yu sidecar's content, written as strict JSON.
 
     Returns
     -------
     dict
-        Each written table's path, by name.
+        Each written file's ``path`` and ``sha256``, by name.
     """
     written = {}
     for name, path in output_paths(identifier, output_dir).items():
-        if name in tables:
-            written[name] = str(write_table(tables[name], path))
-        else:
+        if name not in outputs:
             path.unlink(missing_ok=True)
+            continue
+        content = outputs[name]
+        if isinstance(content, pd.DataFrame):
+            write_table(content, path)
+        else:
+            write_json(path, content)
+        written[name] = {"path": str(path), "sha256": sha256_file(path)}
     return written
 
 
@@ -613,7 +736,8 @@ def run_epoch(
         ``(nwb_file_name, epoch_name) -> pd.DataFrame`` of canonical events.
     fetch_spyglass_kay_inputs : Callable, optional
         ``(nwb_file_name, epoch_name) -> (speed, ripple_lfps,
-        sampling_frequency)``, as ``spyglass_kay_inputs`` returns them.
+        sampling_frequency, ripple_param_dict)``, as ``spyglass_kay_inputs``
+        returns them.
     fir_filter : Callable, optional
         The band check's filter, passed to ``band_reproduction_error``; None
         is Spyglass's own ``FirFilterParameters().filter_data``.
@@ -656,8 +780,11 @@ def run_epoch(
             "traceback": traceback.format_exc(),
         }
     record["wall_clock_s"] = clock.perf_counter() - started
-    # the worker process's peak so far (ru_maxrss is in KiB on Linux)
-    record["peak_rss_gib"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 2**20
+    # the worker process's peak resident set over its whole life so far, so
+    # every epoch it ran before counts too (ru_maxrss is in KiB on Linux)
+    record["worker_peak_rss_gib"] = (
+        resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 2**20
+    )
     ready: dict = json_ready(record)
     return ready
 
@@ -679,12 +806,23 @@ def summary(record: dict) -> str:
         f"Zugaro channel {record['zugaro_channel']['electrode_id']}",
     ]
     if "kay_version_check" in record:
-        parts.append(f"Kay check {record['kay_version_check']}")
+        checks = record["kay_version_check"]["counts"]
+        parts.append(
+            "Kay check "
+            + " | ".join(
+                f"{comparison}: "
+                + ", ".join(
+                    f"{detector} {counts['all']}"
+                    for detector, counts in detectors.items()
+                )
+                for comparison, detectors in checks.items()
+            )
+        )
     if "reason" in record:
         parts.append(record["reason"])
     parts.append(
         f"{record['wall_clock_s']:.0f} s, worker peak RSS "
-        f"{record['peak_rss_gib']:.1f} GiB"
+        f"{record['worker_peak_rss_gib']:.1f} GiB"
     )
     return "; ".join(parts)
 
@@ -803,6 +941,31 @@ def run_settings(provenance: dict) -> dict:
     return settings
 
 
+@contextmanager
+def run_lock(output_dir: Path) -> Iterator[None]:
+    """Hold the run folder's lock for the block, or exit if another run has it.
+
+    A non-blocking exclusive ``fcntl.lockf`` on ``output_dir / ".lock"``. Two
+    runs sharing a run id would each rewrite the manifest from their own
+    records, and the last to write would drop the other's. Only a lock held
+    elsewhere stops the run with that message; any other failure to lock, such
+    as a network file system without a lock manager, raises as itself.
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+    path = output_dir / ".lock"
+    with path.open("a") as handle:
+        try:
+            fcntl.lockf(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as error:
+            if error.errno not in (errno.EACCES, errno.EAGAIN):
+                raise
+            sys.exit(
+                f"Another run holds {path}: run {output_dir.name} is being "
+                "written. Wait for it to finish, or pick another --run-id."
+            )
+        yield  # the lock goes when the file closes
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -823,25 +986,49 @@ def main(argv: list[str] | None = None) -> None:
     )
     parser.add_argument(
         "--run-id",
-        help="The run's folder under --output-root; defaults to the first 12 "
-        "characters of git rev-parse HEAD.",
+        help="The run's folder under --output-root: letters, digits, '.', '_' "
+        "and '-'. Defaults to the first 12 characters of git rev-parse HEAD.",
     )
     parser.add_argument("--output-root", type=Path, default=OUTPUT_ROOT)
     args = parser.parse_args(argv)
+    if args.run_id is not None and (
+        not RUN_ID_PATTERN.fullmatch(args.run_id) or args.run_id in {".", ".."}
+    ):
+        parser.error(
+            f"--run-id {args.run_id!r} must name one folder: letters, digits, '.', "
+            "'_' and '-', and not '.' or '..'."
+        )
 
     provenance = provenance_record(ROOT_DIR)
-    run_id = args.run_id or provenance["commit"][:12]
+    run_id = provenance["commit"][:12] if args.run_id is None else args.run_id
     if provenance["dirty"]:
         print(
             f"warning: uncommitted changes; run {run_id} cannot be tied to a commit",
             flush=True,
         )
+    output_dir = args.output_root / run_id
+    with run_lock(output_dir):
+        run(args, provenance, output_dir)
+
+
+def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
+    """``main``'s run, under the run folder's lock.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        ``main``'s arguments.
+    provenance : dict
+        ``provenance_record``'s, for the settings.
+    output_dir : Path
+        The run's folder, named for its run id.
+    """
+    run_id = output_dir.name
     settings = run_settings(provenance)
     epochs = list(dict.fromkeys(filter_epoch_info(get_epoch_info(), args).index))
     if not epochs:
         sys.exit("No epochs match --animal, --date and --epoch.")
 
-    output_dir = args.output_root / run_id
     manifest_path = output_dir / "manifest.json"
     records: dict[str, dict] = {}
     if manifest_path.exists():
@@ -873,8 +1060,11 @@ def main(argv: list[str] | None = None) -> None:
         if records.get(identifier, {}).get("status") == "ok" and not args.overwrite:
             print(f"{identifier}: already written", flush=True)
         else:
+            # A record says what the folder holds for its epoch. One about to
+            # be redone goes first, so a run stopped part way cannot leave new
+            # files under an old record.
+            records.pop(identifier, None)
             to_run.append((nwb_file_name, epoch_name))
-    output_dir.mkdir(parents=True, exist_ok=True)
     write_manifest()
     print(
         f"{len(to_run)} epochs to run on {args.n_workers} worker processes, each "

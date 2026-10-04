@@ -531,6 +531,7 @@ def _raw_lfp() -> SimpleNamespace:
         data=data,
         timestamps=100.0 + np.arange(10) / 1000,
         unit="volts",
+        conversion=1.95e-7,
         electrode_ids=[8, 0, 5, 4],
     )
 
@@ -558,9 +559,10 @@ def fake_spyglass(monkeypatch):
         ),
         band_electrode=_FakeTable(
             fetch={
-                ("electrode_id", "reference_elect_id"): (
+                ("electrode_id", "reference_elect_id", "electrode_group_name"): (
                     np.array([8, 0, 4]),
                     np.array([-1, 5, 5]),
+                    np.array(["2", "0", "1"]),
                 )
             }
         ),
@@ -627,6 +629,7 @@ def test_ripple_band_inputs_reproduce_make_and_count_overflow(fake_spyglass):
 
     np.testing.assert_array_equal(inputs["electrode_ids"], [0, 4, 8])
     np.testing.assert_array_equal(inputs["reference_ids"], [5, 5, -1])
+    np.testing.assert_array_equal(inputs["electrode_group_names"], ["0", "1", "2"])
     np.testing.assert_array_equal(inputs["lfp_band_elect_index"], [1, 3, 0])
 
     raw = fakes.raw.data
@@ -656,6 +659,7 @@ def test_ripple_band_inputs_reproduce_make_and_count_overflow(fake_spyglass):
     assert inputs["band_filter_name"] == "ripple_150_250"
     assert inputs["lfp_filter_name"] == "LFP 0-400 Hz"
     assert inputs["lfp_units"] == "volts"
+    assert inputs["lfp_conversion"] == 1.95e-7
     assert set(inputs) == set(project_types.RippleBandInputs.__annotations__)
 
 

@@ -285,13 +285,15 @@ specifies. It is implemented and tested offline, not yet run on recorded data.
    `zscore_per_channel = True`, and `Karlsson_ripple_detector` at its package
    defaults. Record in the epoch's manifest the package commit, the histogram grid,
    realized histogram edges, selected mode, threshold, tetrode normalization statistics,
-   normalization population, and NumPy version. The runner's manifest records the
-   package commit and the NumPy version, and its `yu_diagnostics` holds every field of
-   the package's `noise_threshold_diagnostics` (the histogram edges and counts, the mode,
-   the threshold and the size of the immobility sample) with that sample's mean and SD,
-   so they survive an epoch with no events. It does not record the per-tetrode z-score
-   statistics. Any later sensitivity variant gets its own named parameter set in the
-   manifest.
+   normalization population, and NumPy version. The runner records the package
+   commit and the NumPy version in its manifest, and every field of the package's
+   `noise_threshold_diagnostics` with the immobility sample's mean and SD, so they
+   survive an epoch with no events. The scalars (the threshold, mode, flank ratio,
+   out-of-grid fraction and sample counts, and the mean and SD) go in the manifest;
+   every field, with the histogram arrays (edges, counts, smoothed and mirrored
+   counts), goes in the epoch's `{epoch_id}_yu_diagnostics.json`. The per-tetrode
+   z-score statistics are not recorded. Any later sensitivity variant gets its own
+   named parameter set in the manifest.
 5. **Gate and key.** Apply Y5 project-side, then key the inventory and observation
    availability as 03 requires. The runner writes one event parquet per epoch and
    detector, and the epoch's observed intervals; Y5 and the keying are left to the

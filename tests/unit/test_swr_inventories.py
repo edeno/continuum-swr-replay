@@ -1096,6 +1096,48 @@ def test_kay_check_statuses():
     }
 
 
+def test_kay_check_names_the_direct_inventory():
+    """A named direct inventory carries its name in its rows and keys.
+
+    The statuses, partners and shifts are those of the default name, so Kay
+    run on another input can share one table with the direct Kay without a
+    key naming two events.
+    """
+    direct = pd.DataFrame(
+        {"start_time": [1.0, 2.0], "end_time": [1.1, 2.1]},
+        index=pd.Index([1, 2], name="event_number"),
+    )
+    canonical = pd.DataFrame({"start_time": [1.05, 3.0], "end_time": [1.12, 3.1]})
+    speed_time = np.arange(4_000) / 1000.0
+    arguments = {
+        "session": KAY_CHECK_SESSION,
+        "run_id": "test",
+        "speed_time_s": speed_time,
+        "speed_cm_per_s": np.zeros_like(speed_time),
+    }
+
+    named = kay_version_check(
+        direct, canonical, direct_detector="kay_spyglass_inputs", **arguments
+    )
+    default = kay_version_check(direct, canonical, **arguments)
+
+    d1, d2 = (f"kay_spyglass_inputs:simrat20990101_02_r1:{key}" for key in (1, 2))
+    c0 = "kay_spyglass:simrat20990101_02_r1:0"
+    rows = named.set_index("event_key")
+    assert rows.detector[[d1, d2]].tolist() == ["kay_spyglass_inputs"] * 2
+    assert rows.status[[d1, d2, c0]].tolist() == ["matched", "added", "matched"]
+    assert rows.partner_event_key[c0] == d1
+    renamed = default.replace({"detector": {"kay": "kay_spyglass_inputs"}}).assign(
+        event_key=lambda t: t.event_key.str.replace(
+            "^kay:", "kay_spyglass_inputs:", regex=True
+        ),
+        partner_event_key=lambda t: t.partner_event_key.str.replace(
+            "^kay:", "kay_spyglass_inputs:", regex=True
+        ),
+    )
+    pd.testing.assert_frame_equal(named, renamed)
+
+
 def test_kay_check_partner_is_the_longest_overlap():
     """A matched event's partner is its longest overlap, the earlier on a tie.
 

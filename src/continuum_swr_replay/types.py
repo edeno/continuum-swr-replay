@@ -474,6 +474,9 @@ class RippleBandInputs(TypedDict):
         and ``raw_referenced``.
     reference_ids : NDArray[np.int64], shape (n_channels,)
         Each electrode's reference electrode; -1 for none.
+    electrode_group_names : NDArray[np.str_], shape (n_channels,)
+        Each electrode's electrode group (its tetrode), in ``electrode_ids``'s
+        order.
     lfp_band_elect_index : NDArray[np.int64], shape (n_channels,)
         Spyglass's electrode index: the column of ``raw_referenced_native``
         holding each of ``electrode_ids``, as ``filter_data`` takes it.
@@ -492,6 +495,9 @@ class RippleBandInputs(TypedDict):
         The ``LFPV1`` filter that made the raw LFP.
     lfp_units : str
         The LFP electrical series' unit.
+    lfp_conversion : float
+        The LFP electrical series' ``conversion``: a stored value times it is
+        in ``lfp_units``.
 
     """
 
@@ -504,6 +510,7 @@ class RippleBandInputs(TypedDict):
     reference_overflow_count: int
     electrode_ids: NDArray[np.int64]
     reference_ids: NDArray[np.int64]
+    electrode_group_names: NDArray[np.str_]
     lfp_band_elect_index: NDArray[np.int64]
     band_valid_interval: object
     decimation: int
@@ -512,6 +519,7 @@ class RippleBandInputs(TypedDict):
     band_filter_name: str
     lfp_filter_name: str
     lfp_units: str
+    lfp_conversion: float
 
 
 class MultiunitData(TypedDict):

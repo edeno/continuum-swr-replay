@@ -270,7 +270,7 @@ speed trace and time span.
 |---|---|---|
 | Kay | stored 150–250 Hz band | Spyglass's canonical settings, equal to the package defaults: z ≥ 2 for 15 ms, 4 ms Gaussian smoothing, z-score over all valid samples, no close-event exclusion |
 | Karlsson | stored band | package defaults: z ≥ 3 on any tetrode for 15 ms, 4 ms smoothing, z-score over all valid samples |
-| Yu | stored band | spec 01, step 4: threshold at the 99.99th percentile of the mirrored immobility noise, 20 ms above it, 4 ms smoothing, per-tetrode z-score (`zscore_per_channel=True`). Threshold diagnostics from `noise_threshold_diagnostics` go in the manifest (histogram grid, edges, mode, normalization statistics), so they survive an epoch with no events |
+| Yu | stored band | spec 01, step 4: threshold at the 99.99th percentile of the mirrored immobility noise, 20 ms above it, 4 ms smoothing, per-tetrode z-score (`zscore_per_channel=True`). Threshold diagnostics from `noise_threshold_diagnostics` are kept per epoch, so they survive an epoch with no events: the scalars (threshold, mode, flank ratio, sample counts, normalization statistics) in the manifest, and every field with the histogram arrays (edges, counts, smoothed and mirrored counts) in the epoch's `{epoch_id}_yu_diagnostics.json` |
 | Zugaro | one raw referenced channel, chosen and filtered as below | squared; moving average of 11/1250 s (9 samples at 1000 Hz); z-score over all valid samples, which excludes the stretch edges below; boundaries strictly above 2 SD; peak strictly above 5 SD; events closer than 50 ms merged, with no length cap; no minimum duration. Events longer than 150 ms are then dropped (kept at exactly 150 ms) |
 
 **Speed rule.** All four run with `speed_threshold = 4.0`, Zugaro included: an event is
@@ -399,15 +399,20 @@ from the commit:
   either set matched, missed or added by positive-duration overlap (the project's `is_swr`
   rule), with the boundary differences of the matched ones.
   1. **Version only.** Kay at `68e1784` on Spyglass's own inputs, from the read-only
-     `RippleTimesV1.get_ripple_lfps_and_position_info(key)`, against canonical `SWR_event`.
+     `RippleTimesV1.get_ripple_lfps_and_position_info(key)`, with Spyglass's stored
+     `RippleParameters` for that key, against canonical `SWR_event`. The manifest records
+     the stored parameters and flags any mismatch with the direct Kay's settings, which
+     would also separate the second comparison.
   2. **Version and inputs.** The direct Kay inventory against canonical `SWR_event`.
 
   Both are reported over all events and over speed-eligible events only.
+- **Per epoch,** Yu's threshold diagnostics with their histogram arrays,
+  `{epoch_id}_yu_diagnostics.json`, when Yu's threshold could be estimated.
 - **Status per detector,** so one detector's failure doesn't hide the others' results.
 - **`manifest.json`**, with:
   - the package commit, every parameter, and the Zugaro filter design;
   - the electrodes and references, and the input-check result;
-  - Yu's threshold diagnostics;
+  - Yu's threshold diagnostics, as scalars; the arrays are in the epoch's sidecar;
   - `meets_published_tetrode_criterion` (true, false or unknown);
   - input hashes and library versions.
 

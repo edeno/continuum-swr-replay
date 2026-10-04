@@ -16,8 +16,12 @@ space is pointed into it.
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
+import subprocess
+import sys
+from collections.abc import Callable
 from functools import cache
 from types import MappingProxyType, SimpleNamespace
 
@@ -37,7 +41,12 @@ from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
     best_ripple_channel,
 )
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
-from continuum_swr_replay.table_io import read_attrs, read_table, write_table
+from continuum_swr_replay.table_io import (
+    read_attrs,
+    read_table,
+    sha256_file,
+    write_table,
+)
 from scripts.decoding.run_swr_detection import (
     KNOWN_NO_INPUT_EPOCHS,
     epoch_id,
@@ -58,6 +67,35 @@ ELECTRODE_IDS = np.array([0, 4, 8, 12])
 
 BAND_COLUMNS = np.array([5, 1, 2, 4])
 """Each band electrode's column in the six-column raw LFP."""
+
+ELECTRODE_GROUP_NAMES = np.array(["0", "1", "2", "2"])
+"""Each band electrode's group: the last two share one, so three tetrodes."""
+
+LFP_CONVERSION = 1.95e-7
+"""Volts per stored count, the LFP series' ``conversion``."""
+
+SPYGLASS_KAY_PARAMETERS = {
+    "speed_name": "head_speed",
+    "ripple_detection_algorithm": "Kay_ripple_detector",
+    "ripple_detection_params": dict(swr_inventories.DETECTOR_SETTINGS["kay"]),
+}
+"""Spyglass's stored ``"default"`` ripple parameters, equal to the direct Kay's."""
+
+YU_SCALARS = {
+    "threshold",
+    "mode",
+    "mode_index",
+    "mean",
+    "min",
+    "flank_ratio",
+    "out_of_grid_fraction",
+    "n_values",
+    "n_in_grid",
+    "normalization_center",
+    "normalization_scale",
+    "threshold_zscore",
+}
+"""The Yu diagnostics the record keeps; the histogram arrays go to the sidecar."""
 
 COUNTS_PER_SIMULATED_UNIT = 1_000.0
 """Scale from ``simulate_session``'s units to int16 counts. Unscaled, every
@@ -158,6 +196,7 @@ def _band_inputs(epoch: SimpleNamespace) -> dict:
         "reference_overflow_count": 0,
         "electrode_ids": ELECTRODE_IDS,
         "reference_ids": np.array([16, 16, 81, 81]),
+        "electrode_group_names": ELECTRODE_GROUP_NAMES,
         "lfp_band_elect_index": BAND_COLUMNS,
         "band_valid_interval": interval,
         "decimation": 1,
@@ -166,6 +205,7 @@ def _band_inputs(epoch: SimpleNamespace) -> dict:
         "band_filter_name": "ripple_150_250",
         "lfp_filter_name": "LFP 0-400 Hz",
         "lfp_units": "volts",
+        "lfp_conversion": LFP_CONVERSION,
     }
 
 
@@ -175,6 +215,8 @@ def _fetchers(
     position_span_s: tuple[float, float] | None = None,
     inputs: dict | None = None,
     calls: list | None = None,
+    head_speed: Callable[[NDArray], NDArray] | None = None,
+    spyglass_parameters: dict | None = None,
 ) -> dict:
     """``run_epoch``'s fetch arguments, every one a fake.
 
@@ -189,6 +231,12 @@ def _fetchers(
         The ripple-band inputs; by default ``_band_inputs(epoch)``.
     calls : list, optional
         Each fetch appends ``(name, nwb_file_name, epoch_name)`` to it.
+    head_speed : Callable, optional
+        Speed in cm/s as a function of seconds after the first sample; by
+        default 2 cm/s throughout.
+    spyglass_parameters : dict, optional
+        Spyglass's stored ripple parameters; by default
+        ``SPYGLASS_KAY_PARAMETERS``.
     """
     inputs = _band_inputs(epoch) if inputs is None else inputs
     time = inputs["time"]
@@ -197,8 +245,13 @@ def _fetchers(
     else:
         start, end = (BASE_TIME_S + bound for bound in position_span_s)
     position_time = np.linspace(start, end, round((end - start) * POSITION_RATE_HZ) + 1)
+    speed = (
+        np.full(position_time.size, SPEED_CM_PER_S)
+        if head_speed is None
+        else head_speed(position_time - time[0])
+    )
     position_info = pd.DataFrame(
-        {"head_position_x": 0.0, "head_position_y": 0.0, "head_speed": SPEED_CM_PER_S},
+        {"head_position_x": 0.0, "head_position_y": 0.0, "head_speed": speed},
         index=pd.Index(position_time, name="time"),
     )
     canonical = pd.DataFrame(
@@ -210,6 +263,7 @@ def _fetchers(
         pd.Series(SPEED_CM_PER_S, index=lfp_time),
         pd.DataFrame(inputs["ripple_band"], index=lfp_time),
         FS,
+        SPYGLASS_KAY_PARAMETERS if spyglass_parameters is None else spyglass_parameters,
     )
     calls = [] if calls is None else calls
 
@@ -248,6 +302,7 @@ def _outputs(output_dir, identifier) -> dict:
     }
     paths["swr_observed"] = output_dir / f"{identifier}_swr_observed.parquet"
     paths["kay_version_check"] = output_dir / f"{identifier}_kay_version_check.parquet"
+    paths["yu_diagnostics"] = output_dir / f"{identifier}_yu_diagnostics.json"
     return paths
 
 
@@ -313,6 +368,45 @@ def test_outputs_and_manifest_fields(tmp_path):
     kay_check = read_table(paths["kay_version_check"])
     assert set(kay_check.comparison) == {"version_only", "version_and_inputs"}
     assert (kay_check.detector == "kay_spyglass").sum() == 2 * len(epoch.windows)
+    by_comparison = kay_check.groupby("comparison").detector.unique().map(set)
+    assert by_comparison.to_dict() == {
+        "version_only": {"kay_spyglass_inputs", "kay_spyglass"},
+        "version_and_inputs": {"kay", "kay_spyglass"},
+    }
+    # a key names one event: Kay on Spyglass's inputs and the direct Kay differ
+    assert not kay_check.duplicated(["comparison", "event_key"]).any()
+    keys = kay_check.groupby("detector").event_key.agg(set)
+    assert not keys["kay"] & keys["kay_spyglass_inputs"]
+    version_check = record["kay_version_check"]
+    assert version_check["spyglass_parameters"] == SPYGLASS_KAY_PARAMETERS
+    assert version_check["settings_mismatch"] is False
+    assert version_check["differences"] == {
+        "version_only": ["package version"],
+        "version_and_inputs": ["package version", "inputs"],
+    }
+    for comparison, detectors in version_check["counts"].items():
+        for detector, counts in detectors.items():
+            rows = kay_check[
+                (kay_check.comparison == comparison) & (kay_check.detector == detector)
+            ]
+            assert counts["all"] == rows.status.value_counts().to_dict()
+            # at 2 cm/s throughout every event is speed-eligible
+            assert counts["speed_eligible"] == counts["all"]
+
+    yu = record["yu_diagnostics"]
+    assert set(yu) == YU_SCALARS
+    sidecar = json.loads(paths["yu_diagnostics"].read_text())
+    assert sidecar["epoch_id"] == identifier
+    assert sidecar["run_id"] == output_dir.name
+    assert {name: sidecar["yu_diagnostics"][name] for name in YU_SCALARS} == yu
+    for name in ("histogram_edges", "counts", "smoothed_counts", "mirrored_counts"):
+        assert len(sidecar["yu_diagnostics"][name]) > 1000, name
+    assert set(record["outputs"]) == set(paths)
+    for name, path in paths.items():
+        assert record["outputs"][name] == {
+            "path": str(path),
+            "sha256": sha256_file(path),
+        }
 
     for field in ("commit", "dirty", "ripple_detection_commit", "uv_lock_sha256"):
         assert field in record["provenance"], field
@@ -341,13 +435,15 @@ def test_outputs_and_manifest_fields(tmp_path):
     assert record["sampling"]["measured"] == pytest.approx(FS, rel=1e-6)
     assert record["lfp_filter_name"] == "LFP 0-400 Hz"
     assert record["lfp_units"] == "volts"
+    assert record["lfp_conversion"] == LFP_CONVERSION
     assert record["position_span_s"] == [epoch.time[0], epoch.time[-1]]
     assert (
         record["zugaro_dropped_over_150ms"]
         == read_attrs(paths["zugaro"])["n_dropped_over_maximum_duration"]
     )
     assert isinstance(record["zugaro_dropped_over_150ms"], int)
-    assert record["n_detecting_tetrodes"] == ELECTRODE_IDS.size
+    assert record["n_detecting_tetrodes"] == 3  # four electrodes on three tetrodes
+    assert record["worker_peak_rss_gib"] > 0
     assert record["meets_published_tetrode_criterion"] == "unknown"
     assert set(record["input_sha256"]) == {"time", "ripple_band", "raw_referenced"}
     assert (
@@ -481,8 +577,9 @@ def test_an_exception_fails_the_epoch_and_clears_its_outputs(tmp_path):
 
     fetchers["fetch_position"] = fetch_position
     output_dir = tmp_path / "out"
-    stale = _outputs(output_dir, epoch_id(NWB_FILE_NAME, EPOCH_NAME))["kay"]
-    write_table(pd.DataFrame({"start_time": [1.0]}), stale)
+    paths = _outputs(output_dir, epoch_id(NWB_FILE_NAME, EPOCH_NAME))
+    write_table(pd.DataFrame({"start_time": [1.0]}), paths["kay"])
+    paths["yu_diagnostics"].write_text("{}")
 
     record = run_epoch(NWB_FILE_NAME, EPOCH_NAME, output_dir=output_dir, **fetchers)
 
@@ -490,7 +587,7 @@ def test_an_exception_fails_the_epoch_and_clears_its_outputs(tmp_path):
     assert record["status"] == "failed"
     assert record["error"] == repr(error)
     assert "fetch_position" in record["traceback"]
-    assert not stale.exists()
+    assert not any(path.exists() for path in paths.values())
 
 
 @pytest.mark.parametrize("fault", ["mismatch", "partial_coverage"])
@@ -526,6 +623,7 @@ def test_a_band_check_failure_stops_the_epoch(tmp_path, fault):
         assert "tolerance" in record["reason"]
     else:
         assert record["band_check"]["max_abs_difference"] is None
+        assert record["reason"].startswith("The band check could not be completed:")
         assert "Only 100" in record["reason"]
     assert [name for name, _, _ in calls] == ["inputs"]
     assert not (tmp_path / "out").exists()
@@ -616,7 +714,7 @@ def test_lfp_outside_the_position_span_is_dropped(tmp_path):
     )
     # Kay on Spyglass's inputs, which span the whole LFP, keeps only its events
     # inside the span
-    speed, ripple_lfps, sampling_frequency = fetchers["fetch_spyglass_kay_inputs"](
+    speed, ripple_lfps, sampling_frequency, _ = fetchers["fetch_spyglass_kay_inputs"](
         NWB_FILE_NAME, EPOCH_NAME
     )
     on_spyglass_inputs = Kay_ripple_detector(
@@ -630,10 +728,14 @@ def test_lfp_outside_the_position_span_is_dropped(tmp_path):
         on_spyglass_inputs.end_time <= span[1]
     )
     assert 0 < inside.sum() < len(on_spyglass_inputs)
-    version_only = (kay_check.detector == "kay") & (
+    version_only = (kay_check.detector == "kay_spyglass_inputs") & (
         kay_check.comparison == "version_only"
     )
     assert version_only.sum() == inside.sum()
+    # 6 s of LFP is too little for Yu's threshold: no Yu events and no sidecar
+    assert set(record["yu_diagnostics"]) == {"error"}
+    assert not paths["yu"].exists()
+    assert not paths["yu_diagnostics"].exists()
 
 
 def test_zugaro_events_over_150_ms_are_counted(tmp_path, monkeypatch):
@@ -672,13 +774,14 @@ def test_version_only_kay_reads_spyglass_inputs(tmp_path):
     2 cm/s, keeps its own.
     """
     fetchers = _fetchers(_main_epoch())
-    speed, ripple_lfps, sampling_frequency = fetchers["fetch_spyglass_kay_inputs"](
-        NWB_FILE_NAME, EPOCH_NAME
-    )
+    speed, ripple_lfps, sampling_frequency, parameters = fetchers[
+        "fetch_spyglass_kay_inputs"
+    ](NWB_FILE_NAME, EPOCH_NAME)
     fetchers["fetch_spyglass_kay_inputs"] = lambda nwb_file_name, epoch_name: (
         5 * speed,
         ripple_lfps,
         sampling_frequency,
+        parameters,
     )
     output_dir = tmp_path / "out"
 
@@ -686,12 +789,195 @@ def test_version_only_kay_reads_spyglass_inputs(tmp_path):
 
     paths = _outputs(output_dir, epoch_id(NWB_FILE_NAME, EPOCH_NAME))
     kay_check = read_table(paths["kay_version_check"])
-    direct = kay_check.loc[kay_check.detector == "kay", "comparison"]
-    assert (direct == "version_only").sum() == 0
-    assert (direct == "version_and_inputs").sum() == record["n_events"]["kay"] > 0
-    assert record["kay_version_check"]["version_only"] == {
-        "kay_spyglass": {"missed": len(_main_epoch().windows)}
+    assert not (kay_check.detector == "kay_spyglass_inputs").any()
+    direct = kay_check.detector == "kay"
+    assert (direct & (kay_check.comparison == "version_and_inputs")).sum() == (
+        record["n_events"]["kay"]
+    )
+    assert record["n_events"]["kay"] > 0
+    n_canonical = len(_main_epoch().windows)
+    assert record["kay_version_check"]["counts"]["version_only"] == {
+        "kay_spyglass": {
+            "all": {"missed": n_canonical},
+            "speed_eligible": {"missed": n_canonical},
+        }
     }
+
+
+def test_version_only_kay_runs_with_spyglass_stored_parameters(tmp_path):
+    """Kay on Spyglass's inputs takes Spyglass's stored parameters.
+
+    The stored z-score threshold here is 3, the direct Kay's 2. The
+    version-only events are Kay's at 3 on Spyglass's inputs, and the record
+    flags the mismatch, which the version-and-inputs comparison then also
+    carries.
+    """
+    parameters = {
+        **SPYGLASS_KAY_PARAMETERS,
+        "ripple_detection_params": {
+            **SPYGLASS_KAY_PARAMETERS["ripple_detection_params"],
+            "zscore_threshold": 3.0,
+        },
+    }
+    fetchers = _fetchers(_main_epoch(), spyglass_parameters=parameters)
+    output_dir = tmp_path / "out"
+
+    record = run_epoch(NWB_FILE_NAME, EPOCH_NAME, output_dir=output_dir, **fetchers)
+
+    speed, ripple_lfps, sampling_frequency, _ = fetchers["fetch_spyglass_kay_inputs"](
+        NWB_FILE_NAME, EPOCH_NAME
+    )
+    expected = {
+        threshold: len(
+            Kay_ripple_detector(
+                np.asarray(ripple_lfps.index),
+                np.asarray(ripple_lfps),
+                np.asarray(speed),
+                sampling_frequency,
+                **{
+                    **parameters["ripple_detection_params"],
+                    "zscore_threshold": threshold,
+                },
+            )
+        )
+        for threshold in (2.0, 3.0)
+    }
+    assert expected[3.0] < expected[2.0]
+    kay_check = read_table(
+        _outputs(output_dir, epoch_id(NWB_FILE_NAME, EPOCH_NAME))["kay_version_check"]
+    )
+    assert (kay_check.detector == "kay_spyglass_inputs").sum() == expected[3.0]
+    version_check = record["kay_version_check"]
+    assert version_check["spyglass_parameters"] == parameters
+    assert version_check["settings_mismatch"] is True
+    assert version_check["differences"] == {
+        "version_only": ["package version"],
+        "version_and_inputs": ["package version", "inputs", "settings"],
+    }
+
+
+def test_a_version_check_of_another_algorithm_fails_the_epoch(tmp_path):
+    """Canonical events that another algorithm made cannot check Kay."""
+    parameters = {
+        **SPYGLASS_KAY_PARAMETERS,
+        "ripple_detection_algorithm": "Karlsson_ripple_detector",
+    }
+
+    record = run_epoch(
+        NWB_FILE_NAME,
+        EPOCH_NAME,
+        output_dir=tmp_path / "out",
+        **_fetchers(_main_epoch(), spyglass_parameters=parameters),
+    )
+
+    assert record["status"] == "failed"
+    assert "Karlsson_ripple_detector" in record["error"]
+    assert not (tmp_path / "out").exists() or not list((tmp_path / "out").glob("*"))
+
+
+def test_a_failed_zugaro_preparation_leaves_the_epoch_partial(tmp_path, monkeypatch):
+    """A Zugaro filter that raises is Zugaro's own error; the rest report.
+
+    The channel was chosen, so the record keeps it beside the error.
+    """
+    error = RuntimeError("simulated: the Zugaro filter failed")
+    monkeypatch.setattr(runner, "zero_phase_bandpass", _raise(error))
+    output_dir = tmp_path / "out"
+
+    record = run_epoch(
+        NWB_FILE_NAME, EPOCH_NAME, output_dir=output_dir, **_fetchers(_main_epoch())
+    )
+
+    assert record["status"] == "partial"
+    assert record["detectors"] == {
+        "kay": "ok",
+        "karlsson": "ok",
+        "yu": "ok",
+        "zugaro": repr(error),
+    }
+    assert record["zugaro_channel"]["electrode_id"] in ELECTRODE_IDS.tolist()
+    assert record["zugaro_channel"]["error"] == repr(error)
+    paths = _outputs(output_dir, epoch_id(NWB_FILE_NAME, EPOCH_NAME))
+    assert not paths["zugaro"].exists()
+    assert set(read_table(paths["swr_observed"]).scope) == {"stored_band"}
+
+
+def test_zugaro_dropped_count_is_read_after_the_channel_error(tmp_path, monkeypatch):
+    """With no usable channel Zugaro has no events, so no dropped count either,
+    whatever Zugaro returns for the unobserved channel it is given."""
+    error = NoUsableChannelError("simulated: every channel is below the guard")
+    monkeypatch.setattr(runner, "best_ripple_channel", _raise(error))
+
+    def zugaro(time, signal, speed, sampling_frequency, **settings):
+        start = time[1_000] + np.arange(2)
+        durations = [0.100, 0.200]
+        return pd.DataFrame(
+            {"start_time": start, "end_time": start + durations, "duration": durations}
+        )
+
+    monkeypatch.setattr(swr_inventories, "Zugaro_ripple_detector", zugaro)
+
+    record = run_epoch(
+        NWB_FILE_NAME,
+        EPOCH_NAME,
+        output_dir=tmp_path / "out",
+        **_fetchers(_main_epoch()),
+    )
+
+    assert record["detectors"]["zugaro"] == repr(error)
+    assert record["n_events"]["zugaro"] is None
+    assert record["zugaro_dropped_over_150ms"] is None
+
+
+def _varying_speed(seconds: NDArray) -> NDArray:
+    """cm/s: 0.5 to 4.5, a 20 s cycle, at its fastest 5, 25 and 45 s in."""
+    return 2.5 + 2.0 * np.sin(2 * np.pi * seconds / 20.0)
+
+
+def test_head_speed_varying_over_time_is_interpolated(tmp_path):
+    """Speed reaches the detectors linearly interpolated onto the LFP times.
+
+    Each event's speed at its first and last sample is the position speed
+    interpolated at that sample's time. The canonical ripples at 5, 25 and
+    45 s fall where the speed tops 4 cm/s, so only the two at 15 and 35 s are
+    speed-eligible, and the record's counts say so.
+    """
+    epoch = _main_epoch()
+    fetchers = _fetchers(epoch, head_speed=_varying_speed)
+    output_dir = tmp_path / "out"
+
+    record = run_epoch(NWB_FILE_NAME, EPOCH_NAME, output_dir=output_dir, **fetchers)
+
+    position_info = fetchers["fetch_position"](NWB_FILE_NAME, EPOCH_NAME)[
+        "position_info"
+    ]
+    position_time = position_info.index.to_numpy()
+    head_speed = position_info.head_speed.to_numpy()
+    paths = _outputs(output_dir, epoch_id(NWB_FILE_NAME, EPOCH_NAME))
+    for name in ("kay", "karlsson", "zugaro"):
+        events = read_table(paths[name])
+        assert len(events) > 0, name
+        for bound in ("start", "end"):
+            np.testing.assert_allclose(
+                events[f"speed_at_{bound}"],
+                np.interp(events[f"{bound}_time"], position_time, head_speed),
+                rtol=0,
+                atol=1e-12,
+                err_msg=f"{name} {bound}",
+            )
+    counts = record["kay_version_check"]["counts"]["version_and_inputs"]
+    canonical = counts["kay_spyglass"]
+    assert sum(canonical["all"].values()) == len(epoch.windows)
+    assert sum(canonical["speed_eligible"].values()) == 2
+    kay_check = read_table(paths["kay_version_check"])
+    for comparison, detectors in record["kay_version_check"]["counts"].items():
+        for detector, by_scope in detectors.items():
+            rows = kay_check[
+                (kay_check.comparison == comparison)
+                & (kay_check.detector == detector)
+                & kay_check.whole_event_speed_eligible
+            ]
+            assert by_scope["speed_eligible"] == rows.status.value_counts().to_dict()
 
 
 # ---------------------------------------------------------------------------
@@ -828,9 +1114,22 @@ def test_rerun_without_overwrite_skips_done_epochs(
     assert len(in_process_cluster) == 1
     assert again == first
 
-    _cli(tmp_path, "--overwrite")
+    # an epoch about to be redone loses its record first, so a run stopped
+    # part way cannot leave new files under the old record
+    on_fakes, seen = runner.run_epoch, []
+
+    def seeing_the_manifest(nwb_file_name, epoch_name, **kwargs):
+        manifest = json.loads((kwargs["output_dir"] / "manifest.json").read_text())
+        seen.append(set(manifest["epochs"]))
+        return on_fakes(nwb_file_name, epoch_name, **kwargs)
+
+    monkeypatch.setattr(runner, "run_epoch", seeing_the_manifest)
+
+    overwritten = _cli(tmp_path, "--overwrite")
 
     assert ran == [EPOCH_NAME, EPOCH_NAME]
+    assert seen == [set()]
+    assert overwritten["epochs"][epoch_id(NWB_FILE_NAME, EPOCH_NAME)]["status"] == "ok"
 
 
 def test_a_rerun_with_other_settings_is_refused(
@@ -882,3 +1181,86 @@ def test_an_error_its_worker_cannot_return_is_recorded(tmp_path, monkeypatch):
     assert failed["status"] == "failed"
     assert failed["error"] == repr(RuntimeError("simulated: the worker died"))
     assert records == {epoch_id(NWB_FILE_NAME, "02_r1"): {"status": "ok"}}
+
+
+_HOLD_LOCK = """
+import fcntl, sys, time
+handle = open(sys.argv[1], "a")
+fcntl.lockf(handle, fcntl.LOCK_EX)
+print("locked", flush=True)
+time.sleep(120)
+"""
+"""Another process's run: it holds the run folder's lock until killed."""
+
+
+def test_a_second_run_under_the_same_run_id_is_refused(
+    tmp_path, monkeypatch, in_tmp_path, in_process_cluster
+):
+    """While another process holds the run's lock, a run under the same run
+    id stops at once, before reading any epoch or writing the manifest; once
+    the lock is free the run goes ahead and frees it again."""
+    output_dir = tmp_path / "swr" / "test-run"
+    output_dir.mkdir(parents=True)
+    lock = output_dir / ".lock"
+
+    def no_epochs_while_locked():
+        raise AssertionError("epochs were read without the run's lock")
+
+    monkeypatch.setattr(runner, "get_epoch_info", no_epochs_while_locked)
+    holder = subprocess.Popen(
+        [sys.executable, "-c", _HOLD_LOCK, str(lock)],
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert holder.stdout.readline().strip() == "locked"
+        with pytest.raises(SystemExit) as stopped:
+            _cli(tmp_path)
+    finally:
+        holder.kill()
+        holder.wait()
+
+    assert "Another run" in str(stopped.value.code)
+    assert not (output_dir / "manifest.json").exists()
+
+    monkeypatch.setattr(
+        runner, "get_epoch_info", lambda: _epoch_info((NWB_FILE_NAME, EPOCH_NAME))
+    )
+    _with_fakes(monkeypatch)
+    manifest = _cli(tmp_path)
+
+    assert manifest["epochs"][epoch_id(NWB_FILE_NAME, EPOCH_NAME)]["status"] == "ok"
+    take_lock = "import fcntl, sys; fcntl.lockf(open(sys.argv[1], 'a'), fcntl.LOCK_EX | fcntl.LOCK_NB)"
+    subprocess.run([sys.executable, "-c", take_lock, str(lock)], check=True)
+
+
+def test_a_lock_that_cannot_be_taken_raises_as_itself(
+    tmp_path, monkeypatch, in_tmp_path
+):
+    """Only a lock held by another run reads as one; a file system that cannot
+    lock at all raises its own error."""
+
+    def no_locks(handle, operation):
+        raise OSError(errno.ENOLCK, "No locks available")
+
+    monkeypatch.setattr(runner.fcntl, "lockf", no_locks)
+
+    with pytest.raises(OSError, match="No locks available"):
+        _cli(tmp_path)
+
+
+@pytest.mark.parametrize("run_id", ["../escape", ".", "..", "a/b", "with space", ""])
+def test_run_id_must_be_a_plain_name(tmp_path, monkeypatch, in_tmp_path, run_id):
+    """A run id names one folder under the output root, nothing else."""
+
+    def must_not_read(*args):
+        raise AssertionError("the run started")
+
+    monkeypatch.setattr(runner, "get_epoch_info", must_not_read)
+
+    with pytest.raises(SystemExit) as stopped:
+        main(["--run-id", run_id, "--output-root", str(tmp_path / "swr")])
+
+    assert stopped.value.code == 2
+    assert not (tmp_path / "swr").exists()
+    assert not (tmp_path / "escape").exists()
