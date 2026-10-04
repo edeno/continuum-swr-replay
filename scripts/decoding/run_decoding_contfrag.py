@@ -38,6 +38,7 @@ import logging
 import warnings
 from argparse import ArgumentParser
 from pathlib import Path
+from typing import Any
 
 import networkx as nx
 import numpy as np
@@ -67,6 +68,7 @@ from continuum_swr_replay.decoding_common import (
     setup_logger,
     write_atomically,
 )
+from continuum_swr_replay.decoding_transitions import contfrag_transition_settings
 from continuum_swr_replay.parameters import (
     CONTFRAG_DETECTOR_CONFIG,
     PLACE_BIN_SIZE_1D,
@@ -96,9 +98,13 @@ def create_contfrag_detector(
     brain_area: str,
     env: Environment,
     config: DecodingConfig,
-    discrete_transition_type,
+    transition_settings: dict[str, Any],
 ) -> ContFragClusterlessClassifier | ContFragSortedSpikesClassifier:
-    """Factory for creating the appropriate ContFrag classifier."""
+    """Factory for creating the appropriate ContFrag classifier.
+
+    ``transition_settings`` are the discrete-transition keyword arguments,
+    built from ``contfrag_transition_settings``.
+    """
     if brain_area not in CONTFRAG_DETECTOR_CLASSES:
         valid_areas = list(CONTFRAG_DETECTOR_CLASSES.keys())
         raise ValueError(
@@ -112,7 +118,7 @@ def create_contfrag_detector(
     return detector_class(
         environments=env,
         **{param_key: params},
-        discrete_transition_type=discrete_transition_type,
+        **transition_settings,
     )
 
 
@@ -148,24 +154,22 @@ def perform_decoding(
 
     config = DecodingConfig()
 
+    transition_settings = contfrag_transition_settings()
     if non_stationary:
         discrete_transition_covariate_data = {
             "speed": position_info["head_speed"].to_numpy()
         }
         # ContFrag has 2 states: [Continuous, Fragmented]
         diagonal_values = np.array([0.98, 0.98])
-        discrete_transition_type = DiscreteNonStationaryDiagonal(
+        transition_settings["discrete_transition_type"] = DiscreteNonStationaryDiagonal(
             diagonal_values=diagonal_values,
         )
     else:
         discrete_transition_covariate_data = None
-        discrete_transition_type = None
 
     logger.info(f"ContFrag decoding {brain_area}...")
 
-    detector = create_contfrag_detector(
-        brain_area, env, config, discrete_transition_type
-    )
+    detector = create_contfrag_detector(brain_area, env, config, transition_settings)
 
     estimate_params = {
         "position_time": position_info.index.to_numpy(),
