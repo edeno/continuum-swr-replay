@@ -1,4 +1,7 @@
-"""Tests for the Zugaro filter and its channel choice in ``swr_inventories``.
+"""Tests for ``swr_inventories``: the Zugaro filter and its channel choice, the
+four detectors' settings and run, Yu's threshold diagnostics, the check that
+the stored ripple band reproduces from its raw input, and the Kay version
+check.
 
 The filter is the Buzsaki-lab Databank files' ``FindRipples`` band, a
 Butterworth band-pass of order 3 at 120-180 Hz applied forward and backward.
@@ -15,31 +18,46 @@ All signals are synthetic and seeded; nothing is read or written.
 
 from __future__ import annotations
 
+import json
+from functools import cache
+from types import MappingProxyType, SimpleNamespace
+
 import numpy as np
+import pandas as pd
 import pytest
 from numpy.typing import NDArray
+from ripple_detection import Yu_ripple_detector, filter_ripple_band
 from ripple_detection.core import _contiguous_valid_blocks
+from ripple_detection.simulate import simulate_session, simulate_time
 from scipy.ndimage import uniform_filter1d
 from scipy.signal import butter, filtfilt, sosfilt, sosfiltfilt, sosfreqz
 
+from continuum_swr_replay.analysis.hippocampus import swr_inventories
 from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
     CHANNEL_SELECTION_BAND_HZ,
     CHANNEL_SELECTION_FILTER_ORDER,
     CHANNEL_SELECTION_RMS_WINDOW_S,
     DEAD_CHANNEL_RMS,
+    DETECTOR_SETTINGS,
     SETTLING_TOLERANCE,
     ZUGARO_BAND_HZ,
     ZUGARO_FILTER_ORDER,
     ZUGARO_MAXIMUM_DURATION_S,
     NoUsableChannelError,
     _centered_moving_rms,
+    band_reproduction_error,
     best_ripple_channel,
+    cap_zugaro_duration,
     design_bandpass_sos,
     gap_free_stretches,
+    kay_version_check,
     odd_window_samples,
+    run_swr_detectors,
     settling_samples,
+    yu_diagnostics,
     zero_phase_bandpass,
 )
+from continuum_swr_replay.analysis.inventory_comparison.schema import SessionIdentity
 
 FS = 1000.0
 """The nominal LFP rate every filter is designed at, in Hz."""
@@ -535,3 +553,522 @@ def test_tie_goes_to_lowest_electrode_id():
 
     assert choice.scores[40] == choice.scores[8]
     assert choice.electrode_id == 8
+
+
+# ---------------------------------------------------------------------------
+# The four detectors on shared inputs
+# ---------------------------------------------------------------------------
+
+INJECTED_RIPPLE_TIMES = [5, 15, 25, 35, 45]
+"""Seconds: the five ripples ``simulate_session`` injects into 60 s."""
+
+SIMULATED_ELECTRODE_IDS = np.array([11, 12, 13, 14])
+"""Electrode ids of the four simulated channels, unlike their column numbers."""
+
+COUNTS_PER_SIMULATED_UNIT = 1_000.0
+"""Scale from ``simulate_session``'s units to int16-count-like stored units.
+
+Unscaled, the simulated channels have about 0.09 RMS in the 140-180 Hz
+selection band, below ``DEAD_CHANNEL_RMS`` (1, in the stored units: int16
+counts for Spyglass LFP), so every channel would be excluded. The scaled LFP
+feeds both the ripple band and Zugaro's channel. Every detector thresholds a
+z-score or a percentile of its own trace, so the scale does not change what
+it detects.
+"""
+
+
+@cache
+def _simulated_epoch(ripple_frequency: tuple[float, float]) -> SimpleNamespace:
+    """A 60 s simulated session at 1000 Hz, as ``run_swr_detectors`` takes it.
+
+    Cached, so the arrays are shared: copy before changing them.
+
+    Returns
+    -------
+    SimpleNamespace
+        ``time`` (n_time,); ``band``, the ripple band of every channel
+        (n_time, 4); ``zugaro_lfp``, the chosen channel Zugaro-filtered
+        (n_time, 1); ``speed`` (n_time,), 0 throughout; and ``windows``
+        (5, 2), each injected ripple's start and end.
+    """
+    time = simulate_time(60_000, 1000)
+    session = simulate_session(
+        time, INJECTED_RIPPLE_TIMES, rng=0, ripple_frequency=ripple_frequency
+    )
+    lfps = COUNTS_PER_SIMULATED_UNIT * session.lfps
+    choice = best_ripple_channel(lfps, time, FS, SIMULATED_ELECTRODE_IDS)
+    column = np.flatnonzero(SIMULATED_ELECTRODE_IDS == choice.electrode_id)
+    return SimpleNamespace(
+        time=time,
+        band=filter_ripple_band(lfps, sampling_frequency=1000),
+        zugaro_lfp=zero_phase_bandpass(
+            lfps[:, column], time, FS, ZUGARO_BAND_HZ, ZUGARO_FILTER_ORDER
+        ),
+        speed=session.speed,
+        windows=session.ripple_windows,
+    )
+
+
+def _run_on(epoch: SimpleNamespace) -> dict:
+    """``run_swr_detectors`` on a simulated epoch."""
+    return run_swr_detectors(epoch.time, epoch.band, epoch.zugaro_lfp, epoch.speed, FS)
+
+
+def _n_ripples_found(events: pd.DataFrame, windows: NDArray) -> int:
+    """Count the injected ripples an event shares positive duration with."""
+    start = events.start_time.to_numpy()[:, None]
+    end = events.end_time.to_numpy()[:, None]
+    shared = np.minimum(end, windows[:, 1]) - np.maximum(start, windows[:, 0])
+    return int(np.count_nonzero((shared > 0).any(axis=0)))
+
+
+def _events_with_durations(durations: list[float]) -> pd.DataFrame:
+    """A detector-like event table with these durations, a second apart."""
+    start = 1.0 + np.arange(len(durations))
+    return pd.DataFrame(
+        {
+            "start_time": start,
+            "end_time": start + np.asarray(durations),
+            "duration": durations,
+            "max_zscore": 6.0 + np.arange(len(durations)),
+        },
+        index=pd.Index(np.arange(1, len(durations) + 1), name="event_number"),
+    )
+
+
+def test_detector_settings_are_pinned():
+    """Spec Stage 3's four detector settings, verbatim and read-only."""
+    assert isinstance(DETECTOR_SETTINGS, MappingProxyType)
+    assert DETECTOR_SETTINGS == {
+        "kay": {
+            "speed_threshold": 4.0,
+            "minimum_duration": 0.015,
+            "zscore_threshold": 2.0,
+            "smoothing_sigma": 0.004,
+            "close_ripple_threshold": 0.0,
+        },
+        "karlsson": {
+            "speed_threshold": 4.0,
+            "minimum_duration": 0.015,
+            "zscore_threshold": 3.0,
+            "smoothing_sigma": 0.004,
+            "close_ripple_threshold": 0.0,
+        },
+        "yu": {
+            "speed_threshold": 4.0,
+            "minimum_duration": 0.020,
+            "percentile": 99.99,
+            "smoothing_sigma": 0.004,
+            "close_ripple_threshold": 0.0,
+            "zscore_per_channel": True,
+        },
+        "zugaro": {
+            "speed_threshold": 4.0,
+            "low_threshold": 2.0,
+            "high_threshold": 5.0,
+            "minimum_inter_ripple_interval": 0.050,
+            "minimum_duration": 0.0,
+            "maximum_duration": None,
+        },
+    }
+
+
+def test_zugaro_keeps_150_ms_and_drops_longer():
+    """0.149 and 0.150 s are kept with their rows intact; 0.151 s is dropped."""
+    events = _events_with_durations([0.149, 0.150, 0.151])
+
+    kept, n_dropped = cap_zugaro_duration(events)
+
+    assert n_dropped == 1
+    pd.testing.assert_frame_equal(kept, events.loc[[1, 2]])
+
+
+def test_detectors_find_injected_ripples_at_1000_hz():
+    """Each detector overlaps at least 4 of the 5 injected 150-175 Hz ripples."""
+    epoch = _simulated_epoch((150, 175))
+
+    results = _run_on(epoch)
+
+    assert set(results) == {"kay", "karlsson", "yu", "zugaro"}
+    for name, events in results.items():
+        assert isinstance(events, pd.DataFrame), (name, events)
+        assert _n_ripples_found(events, epoch.windows) >= 4, name
+
+
+def test_zugaro_ignores_a_230_hz_ripple():
+    """Zugaro's 120-180 Hz band finds none of five 229-231 Hz ripples.
+
+    Kay's 150-250 Hz band finds them in the same run, so the ripples are
+    there to find.
+    """
+    epoch = _simulated_epoch((229, 231))
+
+    results = _run_on(epoch)
+
+    assert _n_ripples_found(results["zugaro"], epoch.windows) == 0
+    assert _n_ripples_found(results["kay"], epoch.windows) >= 4
+
+
+def test_a_failing_detector_does_not_hide_the_others(monkeypatch):
+    """Yu raising is returned as its exception; the other three still report."""
+    failure = ValueError("no immobility noise to estimate the threshold from")
+
+    def failing_yu(*args, **kwargs):
+        raise failure
+
+    monkeypatch.setattr(swr_inventories, "Yu_ripple_detector", failing_yu)
+    epoch = _simulated_epoch((150, 175))
+
+    results = _run_on(epoch)
+
+    assert results["yu"] is failure
+    for name in ("kay", "karlsson", "zugaro"):
+        assert isinstance(results[name], pd.DataFrame), name
+        assert _n_ripples_found(results[name], epoch.windows) >= 4, name
+
+
+def test_each_detector_reads_its_own_input_and_settings(monkeypatch):
+    """Kay, Karlsson and Yu read the band, Zugaro its channel, each with its settings.
+
+    Only Zugaro's table is capped at 150 ms, with the count dropped in its
+    ``attrs``; Kay keeps its 200 ms event.
+    """
+    calls = {}
+
+    def recorder(name, events):
+        def detector(time, signal, speed, sampling_frequency, **settings):
+            calls[name] = (time, signal, speed, sampling_frequency, settings)
+            return events
+
+        return detector
+
+    detectors = {
+        "kay": "Kay_ripple_detector",
+        "karlsson": "Karlsson_ripple_detector",
+        "yu": "Yu_ripple_detector",
+        "zugaro": "Zugaro_ripple_detector",
+    }
+    zugaro_events = _events_with_durations([0.149, 0.150, 0.151])
+    for name, attribute in detectors.items():
+        events = zugaro_events if name == "zugaro" else _events_with_durations([0.2])
+        monkeypatch.setattr(swr_inventories, attribute, recorder(name, events))
+    time = _regular_time(100)
+    band = np.ones((100, 3))
+    zugaro_lfp = np.ones((100, 1))
+    speed = np.zeros(100)
+
+    results = run_swr_detectors(time, band, zugaro_lfp, speed, FS)
+
+    assert set(calls) == set(detectors)
+    for name, (got_time, signal, got_speed, rate, settings) in calls.items():
+        assert got_time is time and got_speed is speed and rate == FS, name
+        assert signal is (zugaro_lfp if name == "zugaro" else band), name
+        assert settings == DETECTOR_SETTINGS[name], name
+    pd.testing.assert_frame_equal(results["zugaro"], zugaro_events.loc[[1, 2]])
+    assert results["zugaro"].attrs["n_dropped_over_maximum_duration"] == 1
+    assert len(results["kay"]) == 1
+
+
+# ---------------------------------------------------------------------------
+# Yu's threshold diagnostics
+# ---------------------------------------------------------------------------
+
+
+def test_yu_diagnostics_match_the_detector():
+    """The diagnostics' threshold is the events' ``detection_threshold_zscore``.
+
+    The simulated session gets what changes Yu's noise sample: a running bout
+    after the last ripple and a stretch of unknown speed, both left out; and
+    NaN rows followed by a timestamp jump, which leave a 10-sample block
+    between them, shorter than the 20 samples of Yu's minimum duration, so
+    the detector treats it as missing.
+    """
+    epoch = _simulated_epoch((150, 175))
+    time, band, speed = epoch.time.copy(), epoch.band.copy(), epoch.speed.copy()
+    speed[(time >= 50.0) & (time < 56.0)] = 10.0
+    speed[20_000:20_100] = np.nan
+    band[39_985:39_990] = np.nan
+    time[40_000:] += 0.5
+
+    with pytest.warns(UserWarning, match="shorter than the 20 samples"):
+        events = Yu_ripple_detector(time, band, speed, FS, **DETECTOR_SETTINGS["yu"])
+    diagnostics = yu_diagnostics(time, band, speed, FS)
+
+    assert len(events) > 0
+    np.testing.assert_allclose(
+        events.detection_threshold_zscore,
+        diagnostics["threshold_zscore"],
+        rtol=0,
+        atol=1e-9,
+    )
+    noise = np.isfinite(band).all(axis=1) & (speed <= 4.0)
+    noise[39_990:40_000] = False
+    assert diagnostics["n_values"] == np.count_nonzero(noise)
+    assert diagnostics["threshold_zscore"] == pytest.approx(
+        (diagnostics["threshold"] - diagnostics["normalization_center"])
+        / diagnostics["normalization_scale"],
+        rel=1e-12,
+    )
+    assert len(diagnostics["counts"]) == len(diagnostics["histogram_edges"])
+    json.dumps(diagnostics)
+
+
+# ---------------------------------------------------------------------------
+# The stored band reproduces from its raw input (Review Focus 3)
+# ---------------------------------------------------------------------------
+
+BAND_KERNEL = np.array([-0.25, 0.5, -0.25])
+"""A fixed kernel standing in for the 535-tap ``ripple_150_250`` filter."""
+
+
+def _fake_filter_data(
+    timestamps, data, filter_coeff, valid_times, electrodes, decimation
+):
+    """``filter_data``'s contract, by ``np.convolve``.
+
+    The ``electrodes`` columns of ``data`` within the valid times, each
+    convolved with ``filter_coeff``, decimated, and returned in ``data``'s
+    dtype with their timestamps.
+    """
+    rows = np.zeros(len(timestamps), dtype=bool)
+    for start, stop in valid_times:
+        rows |= (timestamps >= start) & (timestamps <= stop)
+    columns = data[rows][:, electrodes].astype(np.float64)
+    filtered = np.column_stack(
+        [np.convolve(column, filter_coeff, mode="same") for column in columns.T]
+    )
+    return filtered[::decimation].astype(data.dtype), timestamps[rows][::decimation]
+
+
+def _band_inputs(dtype: str) -> dict:
+    """``RippleBandInputs`` whose stored band is ``_fake_filter_data``'s output.
+
+    The LFP has six columns, and the band's three electrodes sit in columns
+    4, 1 and 2, so a column number is not an electrode id. It runs at twice
+    the band's rate, so the decimation is 2, and its samples run one past each
+    end of the valid interval, as make's padded read does. The stored band
+    lacks the filter's first three rows, as one made by another Spyglass
+    version might, so only shared timestamps can be compared.
+    """
+    rng = np.random.default_rng(11)
+    decimation = 2
+    raw_timestamps = 1.6e9 + np.arange(3_000) / (decimation * FS)
+    raw = (300.0 * rng.standard_normal((3_000, 6))).astype(dtype)
+    electrode_index = np.array([4, 1, 2])
+    interval = SimpleNamespace(
+        times=np.array([[raw_timestamps[1], raw_timestamps[-2]]])
+    )
+    band, time = _fake_filter_data(
+        raw_timestamps, raw, BAND_KERNEL, interval.times, electrode_index, decimation
+    )
+    band, time = band[3:], time[3:]
+    return {
+        "time": time,
+        "ripple_band": band.astype(np.float64),
+        "ripple_band_dtype": str(band.dtype),
+        "raw_referenced": raw[np.isin(raw_timestamps, time)][:, electrode_index].astype(
+            np.float64
+        ),
+        "raw_referenced_native": raw,
+        "raw_timestamps": raw_timestamps,
+        "reference_overflow_count": 0,
+        "electrode_ids": np.array([3, 7, 9]),
+        "reference_ids": np.full(3, -1),
+        "lfp_band_elect_index": electrode_index,
+        "band_valid_interval": interval,
+        "decimation": decimation,
+        "sampling_frequency": FS,
+        "band_filter_coeff": BAND_KERNEL,
+        "band_filter_name": "ripple_150_250",
+        "lfp_filter_name": "LFP 0-400 Hz",
+        "lfp_units": "volts",
+    }
+
+
+@pytest.mark.parametrize("dtype", ["int16", "float64"])
+def test_band_check_passes_on_its_own_filter(dtype):
+    """Re-filtering with the filter that made the band gives an error of 0.
+
+    The filter receives ``LFPBandV1.make``'s six arguments, in make's order,
+    and the tolerance is 1 for an integer band, else 1e-6 of its SD.
+    """
+    inputs = _band_inputs(dtype)
+    calls = []
+
+    def recording_filter(*args):
+        calls.append(args)
+        return _fake_filter_data(*args)
+
+    error, tolerance = band_reproduction_error(inputs, fir_filter=recording_filter)
+
+    assert error == 0.0
+    expected_tolerance = (
+        1.0 if dtype == "int16" else 1e-6 * np.std(inputs["ripple_band"])
+    )
+    assert tolerance == pytest.approx(expected_tolerance, rel=1e-12)
+    (args,) = calls
+    assert len(args) == 6
+    expected = [
+        inputs["raw_timestamps"],
+        inputs["raw_referenced_native"],
+        inputs["band_filter_coeff"],
+        inputs["band_valid_interval"].times,
+        inputs["lfp_band_elect_index"],
+    ]
+    for position, (got, want) in enumerate(zip(args[:5], expected, strict=True)):
+        assert got is want, position
+    assert args[5] == inputs["decimation"]
+
+
+@pytest.mark.parametrize(
+    "swapped_columns", [(4, 5), (2, 3)], ids=["first_electrode", "last_electrode"]
+)
+def test_band_check_catches_a_permuted_channel_map(swapped_columns):
+    """Raw columns permuted against the band put the error far past tolerance.
+
+    Swapping one band column with a column outside the band moves that one
+    electrode onto another channel, as a column-to-electrode map that took
+    positions for ids would. The band's first electrode sits in column 4 and
+    its last in column 2, so either one alone is caught.
+    """
+    inputs = _band_inputs("int16")
+    order = np.arange(6)
+    order[list(swapped_columns)] = swapped_columns[::-1]
+    inputs["raw_referenced_native"] = inputs["raw_referenced_native"][:, order]
+
+    error, tolerance = band_reproduction_error(inputs, fir_filter=_fake_filter_data)
+
+    assert tolerance == 1.0
+    assert error > 100 * tolerance
+
+
+# ---------------------------------------------------------------------------
+# Kay version check
+# ---------------------------------------------------------------------------
+
+KAY_CHECK_SESSION = SessionIdentity(
+    animal="simrat", day=20990101, epoch="02_r1", brain_area="HPC"
+)
+"""A synthetic epoch for the Kay check's event keys."""
+
+
+def test_kay_check_statuses():
+    """Matched, added and missed events by strict positive-duration overlap.
+
+    The direct 1.0 s event and the canonical 1.05 s event match each other.
+    Direct 2.0 overlaps nothing, and direct 5.0 only touches canonical 5.1 at
+    one instant, so both are added; canonical 3.0 and 5.1 are missed. The
+    direct 2.0 event lies in a running bout, and is kept, flagged ineligible.
+    """
+    direct = pd.DataFrame(
+        {"start_time": [1.0, 2.0, 5.0], "end_time": [1.1, 2.1, 5.1]},
+        index=pd.Index([1, 2, 3], name="event_number"),
+    )
+    canonical = pd.DataFrame(
+        {"start_time": [1.05, 3.0, 5.1], "end_time": [1.12, 3.1, 5.2]}
+    )
+    speed_time = np.arange(6_000) / 1000.0
+    speed = np.where((speed_time >= 1.95) & (speed_time <= 2.15), 10.0, 0.0)
+
+    check = kay_version_check(
+        direct,
+        canonical,
+        session=KAY_CHECK_SESSION,
+        run_id="test",
+        speed_time_s=speed_time,
+        speed_cm_per_s=speed,
+    )
+
+    assert list(check.columns) == [
+        "detector",
+        "event_key",
+        "status",
+        "partner_event_key",
+        "start_shift_s",
+        "end_shift_s",
+        "whole_event_speed_eligible",
+    ]
+    rows = check.set_index("event_key")
+    d1, d2, d3 = (f"kay:simrat20990101_02_r1:{key}" for key in (1, 2, 3))
+    c0, c1, c2 = (f"kay_spyglass:simrat20990101_02_r1:{key}" for key in (0, 1, 2))
+    assert rows.detector.to_dict() == {
+        d1: "kay",
+        d2: "kay",
+        d3: "kay",
+        c0: "kay_spyglass",
+        c1: "kay_spyglass",
+        c2: "kay_spyglass",
+    }
+    assert rows.status.to_dict() == {
+        d1: "matched",
+        d2: "added",
+        d3: "added",
+        c0: "matched",
+        c1: "missed",
+        c2: "missed",
+    }
+    assert rows.partner_event_key[d1] == c0
+    assert rows.partner_event_key[c0] == d1
+    assert rows.partner_event_key.drop([d1, c0]).isna().all()
+    # direct minus canonical, the same on both rows of the pair
+    np.testing.assert_allclose(rows.start_shift_s[[d1, c0]], [-0.05, -0.05])
+    np.testing.assert_allclose(rows.end_shift_s[[d1, c0]], [-0.02, -0.02])
+    assert rows[["start_shift_s", "end_shift_s"]].drop([d1, c0]).isna().all().all()
+    assert check.whole_event_speed_eligible.dtype == bool
+    assert rows.whole_event_speed_eligible.to_dict() == {
+        d1: True,
+        d2: False,
+        d3: True,
+        c0: True,
+        c1: True,
+        c2: True,
+    }
+
+
+def test_kay_check_partner_is_the_longest_overlap():
+    """A matched event's partner is its longest overlap, the earlier on a tie.
+
+    Direct 1.0-1.2 s overlaps canonical 0.95-1.05 for 0.05 s and 1.1-1.3 for
+    0.1 s, so its partner is the second, and each canonical event's partner
+    is the direct one. Direct 3.0-3.25 overlaps two canonical events for
+    exactly 0.125 s each, and takes the earlier. Shifts are taken against
+    each row's own partner.
+    """
+    direct = pd.DataFrame({"start_time": [1.0, 3.0], "end_time": [1.2, 3.25]})
+    canonical = pd.DataFrame(
+        {
+            "start_time": [0.95, 1.1, 2.875, 3.125],
+            "end_time": [1.05, 1.3, 3.125, 3.5],
+        }
+    )
+    speed_time = np.arange(5_000) / 1000.0
+
+    check = kay_version_check(
+        direct,
+        canonical,
+        session=KAY_CHECK_SESSION,
+        run_id="test",
+        speed_time_s=speed_time,
+        speed_cm_per_s=np.zeros_like(speed_time),
+    )
+
+    rows = check.set_index("event_key")
+    d0, d1 = (f"kay:simrat20990101_02_r1:{key}" for key in (0, 1))
+    c0, c1, c2, c3 = (
+        f"kay_spyglass:simrat20990101_02_r1:{key}" for key in (0, 1, 2, 3)
+    )
+    assert (rows.status == "matched").all()
+    assert rows.partner_event_key.to_dict() == {
+        d0: c1,
+        d1: c2,
+        c0: d0,
+        c1: d0,
+        c2: d1,
+        c3: d1,
+    }
+    np.testing.assert_allclose(
+        rows.start_shift_s[[d0, c0, c3]], [1.0 - 1.1, 1.0 - 0.95, 3.0 - 3.125]
+    )
+    np.testing.assert_allclose(
+        rows.end_shift_s[[d0, c0, c3]], [1.2 - 1.3, 1.2 - 1.05, 3.25 - 3.5]
+    )
