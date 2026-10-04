@@ -260,8 +260,12 @@ speed trace and time span.
   times. The LFP is restricted to the
   position span, as `filter_ripple_lfp_time` does.
 - **Rate.** The nominal 1000 Hz is passed to every detector and to the Zugaro filter design,
-  as Spyglass passes it to canonical Kay. The measured rate (1000.07 Hz on chimi) goes in
-  the manifest; it shifts Zugaro's band by about 0.01 Hz. The LFP's anti-aliasing filter is
+  as Spyglass passes it to canonical Kay. The measured rate, steps over elapsed time within
+  gap-free stretches, goes in the manifest (about 999.99 Hz on chimi20200225_02_r1). The
+  1000.07 Hz that the median timestamp step suggests is float64 rounding of absolute Unix
+  timestamps, not the clock: near 1.58e9 s a float64 resolves 2^-22 s, so each 1 ms step
+  is stored as 4194 or 4195 (rarely 4196) of those units, and 2^22/4194 = 1000.0725. The
+  true rate is 1000 Hz, so Zugaro's band does not shift. The LFP's anti-aliasing filter is
   recorded too.
 
 ### The four detectors, package at `68e1784`

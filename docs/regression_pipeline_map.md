@@ -604,6 +604,12 @@ Audit a candidate event-patch table against its pre-change reference.
 
 `sha256`, `assert_row_and_column_order`, `real_arm_bins`, `assert_fraction_definition`, `assert_matches_arm_fractions`, `main`
 
+### `scripts/qa/audit_refresh_consistency.py`
+
+Audit that the refreshed pipeline's artifacts share their inputs.
+
+`is_canonical_epoch_id`, `decode_id`, `decode_files`, `find_decodes`, `decode_provenance`, `check_one_commit`, `decoder_settings`, `check_decoder_settings`, `check_grids_match`, `check_minimum_sample_counts`, `check_encoding_marks`, `check_widloski_hashes`, `check_swr_spans`, `check_spike_loader_unchanged`, `table_files`, `record_tables`, `check_tables_recorded`, `check_pfc_sidecars`, `check_fit_provenance`, `run_manifest_epochs`, `check_epoch_sets`, `table_epochs`, `run_audit`, `main`
+
 ### `scripts/qa/audit_stop_table_reward_history.py`
 
 Audit a candidate stop table against its pre-change reference.
