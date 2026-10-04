@@ -9,6 +9,8 @@ events matched, 0 were missed and 62 were added; the largest SWR z-score differe
 2.56, at a trace end (at most 8.8e-4 more than 1 s from both ends); and non-local events
 went from 2,365 under the 1.7.0 rule to 2,405 under 2.0's, with minimum sample counts {7}. Tasks 1–3 complete and reviewed; `C0` = `de156501c05b4381714919be54a872b3ac0e58fc`, the commit both decoders launch from. R0 done (backup root `Processed-Data/_pre_redecode_backup_20261003`). An incident during Task 2 overwrote the April decode of `chimi20200212_02_r1` (accepted loss; see the backup's `MISSING_APRIL_DECODES.md`).
 
+**Status (2026-10-04):** the decoders' discrete-transition settings had silently followed changed library defaults (+32% non-local events on identical inputs). After validation the project lead chose setting P30-B (decision R10). Task 11 pins it. Its commit `C0'` replaces `C0` as the commit both decoders launch from, and R1 restarts from `C0'` into a new staging folder. Tasks 12 and 13 (held-out spike evidence per decoder state) were added at the project lead's request.
+
 **Goal:** rebuild every long-running computation on one set of inputs, and prove it. That
 covers:
 - the NonLocal and ContFrag HPC decodes;
@@ -1017,6 +1019,190 @@ def check_encoding_marks(epoch_id: str, root: Path) -> dict
 **Acceptance:** the tests pass, and `audit` runs read-only (`record-tables` writes only its
 manifest).
 
+## Task 11: pin the decoders' transition settings (added 2026-10-04, decision R10)
+
+Work in the worktree `../continuum-swr-replay-pin` (branch `pin-transition-settings`, from
+`C0`). After review, the main branch fast-forwards to it. That commit is `C0'`, and R1
+restarts from it.
+
+**Why:** neither decoder set its discrete-transition values, so both took
+non_local_detector's defaults, which changed after April: +32% non-local events on
+identical inputs. After validation on the pilot epochs (held-out spike evidence, simulations,
+takeover checks, prior-strength sensitivity), the project lead chose setting P30-B
+([docs/design/2026-10-04-decoder-transition-prior.md](../../../../docs/design/2026-10-04-decoder-transition-prior.md)).
+
+**Files:**
+- Create: `src/continuum_swr_replay/decoding_transitions.py`, the only place the values live
+- Modify: `scripts/decoding/run_decoding_bandit.py`, `scripts/decoding/run_decoding_contfrag.py`
+- Test: `tests/unit/test_decoding_transitions.py`
+- Docs: the design doc above; R10 in the spec's decisions table
+
+**Interfaces:**
+```python
+LOCAL_DWELL_S = 3.0; NONLOCAL_DWELL_S = 0.1; NO_SPIKE_DWELL_S = 0.1   # each with its source
+PRIOR_VISITS = 30; NO_SPIKE_EXIT_TO_LOCAL = 0.96
+def nonlocal_transition_settings(sampling_frequency: float = 500.0) -> dict
+    # DiscreteStationaryCustom start matrix from the dwell times; concentration
+    # 1 + PRIOR_VISITS / 3; per-state stickiness, so each learned row's prior mean is its start
+    # row, worth PRIOR_VISITS x dwell / bin pseudo-counts; prior_weight 0.0; the No-Spike row
+    # frozen at [0.0192, 0.98, 0.0004, 0.0004]
+def contfrag_transition_settings() -> dict
+    # ContFrag's values at C0, made explicit: DiscreteStationaryDiagonal([0.98, 0.98]),
+    # concentration 1.1, stickiness [0, 0], prior_weight 0.0, no frozen rows
+```
+Both runners refuse `--non_stationary`: the library's non-stationary detector cannot be saved
+(non_local_detector #50) and applies the prior per bin (#51).
+
+**Acceptance:**
+- The tests pass:
+  - row sums;
+  - expected stays of 3 s and 0.1 s;
+  - the frozen row;
+  - prior means, and pseudo-count totals of 45,000 and 1,500;
+  - literal pins: concentration 11, stickiness [44960, 1460, 1460, 1460];
+  - the detectors both runners build carry these values;
+  - ContFrag equals C0's construction;
+  - both refusals.
+- The pinned NonLocal values equal the P30-B ablation detector's, bit for bit in float32.
+  ContFrag's equal the C0 staging detector's, bit for bit.
+- Nothing else in the decode path changes.
+
+## Task 12: held-out spike evidence per decoder state (added 2026-10-04)
+
+Work in the worktree. The run happens after R2, on the swapped-in canonical decodes. Its
+figure and table go into the R8 report and the paper.
+
+**Why:** the paper must show that each decoder state captures what it claims, judged by
+spikes that did not choose the location:
+- Local: the animal's position;
+- Non-Local: a remote location;
+- No-Spike: silence.
+
+A prototype on the five pilot epochs found:
+- Local and immobile Non-Local supported;
+- running Non-Local Continuous unsupported;
+- No-Spike untestable by a tetrode split, but supported by population-wide silence.
+
+The prototype's scripts and method are in `.claude/research/refresh_validation/state_evidence/`.
+This task turns them into tested code.
+
+**Files:**
+- Create: `src/continuum_swr_replay/analysis/hippocampus/state_evidence.py` (pure functions)
+- Create: `scripts/qa/run_state_evidence.py` (runner)
+- Test: `tests/unit/test_state_evidence.py`
+- Docs: a `scripts/README.md` entry
+
+**Reuse:**
+- The encoding, mark loading and per-spike likelihood code in
+  `scripts/qa/analyze_event_spike_evidence.py`. Move what both need into the new module rather
+  than copying it.
+- The junction-bin rule: `edge_id == -1` is excluded, as in `map_estimate_to_arm`.
+
+**Interfaces:**
+```python
+def per_tetrode_terms(encoding, spike_times, marks, time, interior_bins) -> TetrodeTerms
+    # per spike: log joint mark intensity over the interior bins; per tetrode: ground
+    # intensity; spikes binned with the decoder's np.digitize rule
+def regimes(head_speed: NDArray) -> NDArray      # "immobile" < 4 cm/s, "running" > 10, else ""
+def state_bouts(probability, regime, *, threshold=0.8, min_bins=5, max_scored_bins=50,
+                cap=1500, seed) -> pd.DataFrame
+def matched_windows(bouts, regime, *, seed) -> pd.DataFrame   # same regime, same length
+def calibration_windows(regime, *, n_per_regime=2000, n_bins=10, seed) -> pd.DataFrame
+def tetrode_halves(n_tetrodes, *, n_partitions=10, seed=0) -> list[tuple[NDArray, NDArray]]
+def window_evidence(terms, windows, animal_bins, track_distance, halves, *,
+                    partner_min_cm=20.0, n_partners=20, no_spike_rate) -> pd.DataFrame
+    # local: logL_C(animal) - mean logL_C(partners' animal bins, >= 20 cm away)
+    # remote: logL_C(MAP_S) - logL_C(animal), and - mean logL_C(partners' MAP_S)
+    # local vs S's best bin >= 20 cm from the animal
+    # No-Spike: log P(C counts | no_spike_rate) - log P(C counts | g(animal)), C's count,
+    #   E_C, silent share, P(C silent | S silent) vs exp(-E_C)
+    # spike-mark part primary, full log-likelihood secondary
+def summarize_state_evidence(windows: pd.DataFrame) -> dict[str, pd.DataFrame]
+    # bouts: median, IQR, share > 0, mean with a sign-flip p (10,000 seeded flips) and an
+    #   epoch-stratified bootstrap CI, per-spike evidence, paired bout - baseline, per-epoch
+    #   and per-animal consistency
+    # calibration: per-bin means with CIs, window-level OLS slope with CI, top bin > 0
+    # rate calibration (observed / expected held-out spikes); coordinated silence
+```
+
+**Encodings:**
+- Primary: a running-only refit (speed >= 4 cm/s), asserting that no event bin is in it.
+- Secondary: the decode's own encoding.
+
+**Runner:**
+- Arguments: `--epochs` (default: every canonical HPC decode), `--output-dir` (default
+  `Processed-Data/_refresh_<date>/state_evidence/`) and `--n-workers`.
+- Dask CPU workers. Per epoch, it writes one per-window parquet and a validation JSON.
+- It then writes the summary CSVs and three figures: bouts vs matched windows, calibration
+  curves and coordinated silence.
+- It is read-only except for the output directory.
+
+- [ ] **Step 1: write the failing tests**, on synthetic inputs:
+  - summed per-tetrode terms reproduce the decoder's log-likelihood;
+  - a junction bin is never chosen;
+  - a partner is never the window itself and is at least 20 cm away;
+  - run-averaged Local and No-Spike values equal half the all-tetrode values (documenting that
+    they are not held out);
+  - an independent per-window loop matches the vectorized evidence;
+  - planted remote content gives remote evidence > 0; a planted local window gives local
+    evidence > 0;
+  - bouts respect the threshold, the regime, the minimum length, the cap and the seed;
+  - fixed seeds give identical reruns.
+- [ ] **Step 2: run them and confirm they fail.**
+- [ ] **Step 3: implement.**
+- [ ] **Step 4: run the tests and confirm they pass.** On the five pilot epochs (the
+  swapped-in decodes, identical to the prototype's P30-B inputs), compare the P30-B bout and
+  calibration statistics with the prototype's, and explain every difference.
+- [ ] **Step 5: lint, format and commit** ("Add held-out spike evidence per decoder state").
+
+**Run (after R2):**
+`tmux new-session -d -s state_evidence "cd $PWD && uv run python scripts/qa/run_state_evidence.py --n-workers 16 > logs/state_evidence_<date>.out 2>&1"`.
+
+**Acceptance:**
+- the tests pass;
+- the pilot statistics match the prototype's;
+- the full run covers every canonical decode, with a recorded reason for any epoch it skips.
+
+## Task 13: held-out state labels on the pilot epochs (added 2026-10-04)
+
+Work in the worktree. The decodes need a GPU. Run them after R1's full batches, on idle cards.
+
+**Why:** in Task 12 the bouts and probabilities come from the all-tetrode decode. The state
+labels are therefore not held out; only the remote location is. Here, the labels come from a
+decode that sees one tetrode half, and the other half scores them.
+
+**Files:**
+- Create: `scripts/qa/run_half_tetrode_decodes.py`
+- Modify: `state_evidence.py`, so it accepts labels from a half decode
+- Test: `tests/unit/test_half_tetrode_decodes.py`
+
+**Method:**
+- Use each pilot epoch and the first two partitions of `tetrode_halves`, both directions: four
+  decodes per epoch.
+- Fit the encoding model on half S's tetrodes only, at the canonical decode's training times,
+  with no weights from any all-tetrode posterior.
+- Keep the canonical fit's discrete transitions and initial conditions fixed, with no EM. That
+  is 12 numbers, an aggregate leak the report states.
+- Decode with S's spikes, then score with half C as in Task 12.
+
+- [ ] **Step 1: write the failing tests.**
+  - On a small simulated session, the fixed-transition decode equals the library's standard
+    decode with the same transitions.
+  - The half encoding model holds only S's electrodes.
+  - No EM iteration runs.
+- [ ] **Step 2: run them and confirm they fail.**
+- [ ] **Step 3: implement.**
+- [ ] **Step 4: run the tests and confirm they pass.** Then decode one pilot epoch with
+  S = all tetrodes and report its agreement with the canonical decode: state-probability
+  differences and shared events.
+- [ ] **Step 5: lint, format and commit** ("Decode with half the tetrodes to hold out the state
+  labels").
+
+**Acceptance:**
+- the tests pass;
+- 20 decodes;
+- the half-label summary sits beside the all-tetrode one in the R8 report.
+
 ---
 
 # Phase B: runbooks
@@ -1059,7 +1245,9 @@ Before Task 1's pin, run Task 1 Step 1. After Task 1:
   ```
   Expected: each copy's file count matches its source. Record the counts.
 
-## R1: decodes (main tree at `C0`)
+## R1: decodes (main tree at `C0'`)
+
+R1 first ran from `C0` into `_staging_redecode_20261003` (smoke and pilot only). After R10 it restarts from `C0'` into `_staging_redecode_20261004`. The old staging folder is left as it is.
 
 - [ ] **Smoke.** One epoch of each decoder, on two idle cards. Check with
   `nvidia-smi --query-gpu=index,memory.used,utilization.gpu --format=csv` first.
@@ -1072,11 +1260,15 @@ Before Task 1's pin, run Task 1 Step 1. After Task 1:
   ```
   While each runs, `nvidia-smi` must show its process on card A (or B) only. Record wall
   clock, peak RSS, GPU memory and `results.nc` size. Check that both logs carry a
-  `PROVENANCE` line with `commit == C0` and `dirty == false`, and that `$S` holds four files
+  `PROVENANCE` line with `commit == C0'` and `dirty == false`, and that `$S` holds four files
   per decoder.
 - [ ] **Pilot.** The five pilot epochs, the same way. Record:
   - non-local events per epoch, old (canonical) against new (staged);
-  - each epoch's `minimum_sample_count(time, 0.015)`, which must be 7 for all (R9).
+  - each epoch's `minimum_sample_count(time, 0.015)`, which must be 7 for all (R9);
+  - NonLocal events per epoch must equal the P30-B ablation's: peanut 245, j16 236, chimi 264,
+    wilbur 195, senor 223. ContFrag's results must equal the `_staging_redecode_20261003` pilot's;
+  - Task 10's `check_decoder_settings` on the staged detectors, run from the worktree, with
+    `--expected-settings` written from `nonlocal_transition_settings()`.
 - [ ] **STOP:** report the smoke and pilot numbers and a full-run estimate. Ask for the
   go-ahead to launch both full batches.
 - [ ] **Full.** Two tmux sessions, on disjoint idle cards:
@@ -1093,7 +1285,7 @@ Before Task 1's pin, run Task 1 Step 1. After Task 1:
      epoch has a logged reason. The known no-input epochs are senor20201104 06_r3 and 08_r4
      and senor20201105 09_r4.
   2. Every staged `results.nc` carries `attrs["provenance"]` (and every staged log a `PROVENANCE` line) with
-     `commit == C0`, `dirty == false` and a non-null `cuda_plugin_version`. A log marked `RESUMED` is checked
+     `commit == C0'`, `dirty == false` and a non-null `cuda_plugin_version`. A log marked `RESUMED` is checked
      through its `results.nc` attribute, since the resume rewrote the log.
   3. Every `data_over_time` grid passes `validate_time_grid`.
   4. Every epoch's minimum sample count is 7. If not, STOP and report (R9).
@@ -1113,7 +1305,9 @@ Before Task 1's pin, run Task 1 Step 1. After Task 1:
   leave hidden `.<name>.<pid>.tmp` files from the atomic writes, which are deleted, not moved.
   Verify counts, and hashes against their staging hashes.
 - [ ] **Merge.**
-  1. Fast-forward the main branch to the worktree branch (`C1`).
+  1. Merge `C0'` into the worktree branch (a merge commit, not a rebase: the ledger names the
+     worktree's commit hashes), resolve any conflict, and run the unit suite there. Then
+     fast-forward the main branch to the worktree branch (`C1`).
   2. Run `uv sync --inexact`.
   3. Check that `dask_cuda` imports and that `jax.devices()` lists the GPUs.
   4. Run the Task 6 and Task 9 database smokes.
@@ -1274,7 +1468,7 @@ alone: the cross-table check and the no-session path return 0 and write nothing
 ## R8: audit and report
 
 - [ ] **Audit.**
-  `uv run python scripts/qa/audit_refresh_consistency.py audit --output Processed-Data/_refresh_<date>/audit.json --check-marks`.
+  `uv run python scripts/qa/audit_refresh_consistency.py audit --output Processed-Data/_refresh_<date>/audit.json --check-marks --widloski-manifest <R4 manifest> --swr-manifest <R3 manifest> --expected-settings <the R1 JSON>`.
   Expected: exit 0. Any failure is diagnosed, not waived.
 - [ ] **Report.** Write `docs/audits/<date>-full-pipeline-refresh.md`, covering:
   - the audit summary;
@@ -1287,6 +1481,7 @@ alone: the cross-table check and the no-session path return 0 and write nothing
   - both Kay version checks;
   - the probe marks removed per wilbur epoch;
   - non-local events per epoch;
+  - held-out spike evidence per decoder state (Task 12), with the half-tetrode labels (Task 13);
   - the list of hand-maintained doc claims that need new numbers.
 - [ ] **STOP:** ask the project lead to review the report before any hand-maintained doc is
   requoted.
@@ -1305,7 +1500,9 @@ alone: the cross-table check and the no-session path return 0 and write nothing
 2. Task 1.
 3. R0.
 4. Tasks 2–3, ending in commit `C0`.
-5. R1. Tasks 4–10 run in the worktree meanwhile.
+5. R1: smoke and pilot from `C0`; then R10 (Task 11 pins the transition settings, `C0'`); then
+   R1 again from `C0'`. Tasks 4–10 run in the worktree meanwhile, and Tasks 12–13 are
+   implemented there while the batches run.
 6. R2, which includes the merge to `C1`.
 7. R3 and R4.
 8. R5.
@@ -1313,4 +1510,6 @@ alone: the cross-table check and the no-session path return 0 and write nothing
 10. R7.
 11. R8.
 
-R3 can start right after the merge, while the decode gates are still being checked.
+R3 can start right after the merge, while the decode gates are still being checked. Task 12's
+run (CPU) starts after R2, alongside R3–R5. Task 13's decodes run on idle cards after R1's full
+batches.
