@@ -137,6 +137,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: 
 )
 from continuum_swr_replay.decoding_common import (  # noqa: E402
     provenance_record,
+    raise_open_file_limit,
     setup_logger,
     write_atomically,
 )
@@ -1128,6 +1129,10 @@ def main(argv: list[str] | None = None) -> None:
     decode_dir, output_dir = args.decode_dir.resolve(), args.output_dir.resolve()
     if output_dir == decode_dir:
         parser.error("--output-dir must not be the decode folder itself")
+    # before score's workers start: they inherit this limit. Their epochs close
+    # the NWB files Spyglass opened (Task 12's _run_epoch_logged); decode reads
+    # no NWB file through Spyglass.
+    old_soft, new_soft = raise_open_file_limit()
     if args.command == "decode":
         device = configure_devices(args.cuda_visible_devices)  # before JAX loads
         if current_device() != device:
@@ -1136,6 +1141,7 @@ def main(argv: list[str] | None = None) -> None:
             name_logfile="half_tetrode_decode",
             path_logfile=output_dir / "logs" / f"decode_{os.getpid()}.log",
         )
+        logger.info("open-file soft limit %d -> %d", old_soft, new_soft)
         logger.info("decoding %s on %s", ", ".join(args.epochs), device)
         failed = []
         for epoch_id in args.epochs:
@@ -1164,6 +1170,7 @@ def main(argv: list[str] | None = None) -> None:
 
     from scripts.qa import run_state_evidence as task12  # holds JAX to the CPU
 
+    print(f"open-file soft limit {old_soft} -> {new_soft}", flush=True)
     provenance = provenance_record(ROOT_DIR)
     evidence_dir = output_dir / "evidence"
     evidence_dir.mkdir(parents=True, exist_ok=True)

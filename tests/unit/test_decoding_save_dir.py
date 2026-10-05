@@ -805,3 +805,154 @@ def test_epoch_log_has_one_provenance_line(decoders, monkeypatch, tmp_path, key)
     assert {k: v for k, v in logged.items() if k != "dirty"} == {
         k: v for k, v in now.items() if k != "dirty"
     }
+
+
+# --------------------------------------------------------------------------
+# Open files: Spyglass's NWB cache and the open-file limit
+# --------------------------------------------------------------------------
+
+
+class _ReleaseRecorder:
+    """Stands in for ``release_nwb_files``: counts its calls, returns `n_closed`."""
+
+    def __init__(self, n_closed: int = 14) -> None:
+        self.n_closed = n_closed
+        self.calls = 0
+
+    def __call__(self) -> int:
+        self.calls += 1
+        return self.n_closed
+
+
+@pytest.mark.parametrize("outcome", ["ok", "fails"])
+@pytest.mark.parametrize("key", list(DECODERS))
+def test_run_decode_closes_spyglass_nwb_files_when_asked(
+    decoders, monkeypatch, tmp_path, key, outcome
+):
+    """With ``release_nwb`` an epoch closes the NWB files Spyglass cached, pass or
+    fail, and its log ends with how many."""
+    decoder, module = DECODERS[key], decoders.modules[key]
+    release = _ReleaseRecorder()
+    monkeypatch.setattr(module, "release_nwb_files", release)
+    if outcome == "ok":
+        _patch_fresh_decode(
+            monkeypatch, module, tmp_path, _WritesPlaceholders(tmp_path)
+        )
+    else:
+
+        def load_data(*args: Any, **kwargs: Any) -> None:
+            raise RuntimeError("simulated: an NWB file could not be read")
+
+        monkeypatch.setattr(module, "load_data", load_data)
+
+    failed = _run_decode(
+        module, decoder, tmp_path, save_dir=tmp_path / "staging", release_nwb=True
+    )
+
+    assert failed == (None if outcome == "ok" else decoder.epoch_identifier)
+    assert release.calls == 1
+    log = _log(tmp_path, decoder).splitlines()
+    assert log[-1].endswith("closed 14 NWB files Spyglass held open")
+
+
+@pytest.mark.parametrize("key", list(DECODERS))
+def test_run_decode_leaves_spyglass_nwb_files_open_by_default(
+    decoders, monkeypatch, tmp_path, key
+):
+    """Called on its own, an epoch may share its process with other readers."""
+    decoder, module = DECODERS[key], decoders.modules[key]
+    release = _ReleaseRecorder()
+    monkeypatch.setattr(module, "release_nwb_files", release)
+    _patch_fresh_decode(monkeypatch, module, tmp_path, _WritesPlaceholders(tmp_path))
+
+    failed = _run_decode(module, decoder, tmp_path, save_dir=tmp_path / "staging")
+
+    assert failed is None, _log(tmp_path, decoder)
+    assert release.calls == 0
+    assert "NWB files" not in _log(tmp_path, decoder)
+
+
+def _stand_in_batch(monkeypatch, tmp_path, *, has_cuda: bool, cluster: Callable):
+    """``run_batch`` with `cluster` for the path `has_cuda` picks and no dask.
+
+    Each epoch's call runs here, as it is built. The open-file limit is left
+    alone unless the test replaces ``raise_open_file_limit`` itself.
+    """
+    used, unused = (
+        ("LocalCUDACluster", "LocalCluster")
+        if has_cuda
+        else ("LocalCluster", "LocalCUDACluster")
+    )
+    monkeypatch.setattr(decoding_common, "HAS_CUDA", has_cuda)
+    monkeypatch.setattr(decoding_common, used, cluster, raising=False)
+    monkeypatch.setattr(decoding_common, unused, _no_cluster, raising=False)
+    monkeypatch.setattr(decoding_common, "Client", _Client)
+    monkeypatch.setattr(
+        decoding_common,
+        "dask",
+        types.SimpleNamespace(
+            delayed=lambda function: function, compute=lambda *outcomes: outcomes
+        ),
+    )
+    monkeypatch.setattr(decoding_common, "get_epoch_info", _one_epoch)
+    monkeypatch.setattr(decoding_common, "raise_open_file_limit", lambda: (1024, 65536))
+    # run_batch sets this variable and makes logs/ in the working directory;
+    # monkeypatch restores both after the test.
+    monkeypatch.setenv("XLA_PYTHON_CLIENT_MEM_FRACTION", "0.99")
+    monkeypatch.chdir(tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("has_cuda", "flags"),
+    [(True, []), (False, ["--allow_cpu"])],
+    ids=["cuda", "cpu_allowed"],
+)
+def test_run_batch_closes_nwb_files_only_on_one_task_workers(
+    monkeypatch, tmp_path, has_cuda, flags
+):
+    """dask_cuda's workers run one epoch at a time, so each epoch closes the files
+    it opened. LocalCluster's default workers run several epochs at once in
+    threads that share Spyglass's cache, so their epochs leave it open."""
+    clusters: list[dict[str, Any]] = []
+    calls: list[dict[str, Any]] = []
+
+    def cluster(**kwargs: Any) -> object:
+        clusters.append(kwargs)
+        return object()
+
+    _stand_in_batch(monkeypatch, tmp_path, has_cuda=has_cuda, cluster=cluster)
+    args = _parse([*flags, "--save_dir", "staging", "--local_scratch_dir", "scratch"])
+
+    decoding_common.run_batch(lambda **kwargs: calls.append(kwargs), args)
+
+    (kwargs,) = calls
+    assert kwargs["release_nwb"] is has_cuda
+    (cluster_kwargs,) = clusters
+    if has_cuda:
+        assert cluster_kwargs["threads_per_worker"] == 1
+    else:
+        assert "threads_per_worker" not in cluster_kwargs  # LocalCluster's default
+
+
+def test_run_batch_raises_the_open_file_limit_before_its_cluster(
+    monkeypatch, tmp_path, capsys
+):
+    """Worker processes inherit the limit only if it is raised before they start."""
+    order: list[str] = []
+
+    def cluster(**kwargs: Any) -> object:
+        order.append("cluster")
+        return object()
+
+    def raise_open_file_limit() -> tuple[int, int]:
+        order.append("limit")
+        return 1024, 65536
+
+    _stand_in_batch(monkeypatch, tmp_path, has_cuda=True, cluster=cluster)
+    monkeypatch.setattr(decoding_common, "raise_open_file_limit", raise_open_file_limit)
+    args = _parse(["--save_dir", "staging", "--local_scratch_dir", "scratch"])
+
+    decoding_common.run_batch(lambda **kwargs: None, args)
+
+    assert order == ["limit", "cluster"]
+    assert "open-file soft limit 1024 -> 65536" in capsys.readouterr().out

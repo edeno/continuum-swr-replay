@@ -531,3 +531,71 @@ def test_main_exits_with_an_error_when_an_epoch_fails(simulated, tmp_path, monke
     readme = (output_dir / "README.md").read_text()
     assert f"| {EPOCH} | failed |" in readme
     assert "does not reproduce the stored encoding model" in readme
+
+
+# --- open files: Spyglass's NWB cache and the open-file limit ------------------------
+@pytest.mark.parametrize("outcome", ["ok", "raises"])
+def test_each_epoch_task_closes_the_nwb_files_spyglass_opened(
+    tmp_path, monkeypatch, outcome
+):
+    """A worker runs one epoch at a time, so when its epoch ends, pass or fail,
+    it closes the NWB files ``load_data`` opened through Spyglass and logs how
+    many."""
+    closed = []
+
+    def release_nwb_files():
+        closed.append(True)
+        return 14
+
+    def run_epoch(epoch_id, **kwargs):
+        if outcome == "raises":
+            raise RuntimeError("simulated: the task itself failed")
+        return {"status": "ok"}
+
+    monkeypatch.setattr(runner, "run_epoch", run_epoch)
+    monkeypatch.setattr(runner, "release_nwb_files", release_nwb_files)
+
+    def task():
+        return runner._run_epoch_logged(EPOCH, {}, tmp_path / "logs")
+
+    if outcome == "raises":
+        with pytest.raises(RuntimeError, match="the task itself failed"):
+            task()
+    else:
+        assert task() == {"status": "ok"}
+
+    assert closed == [True]
+    log = (tmp_path / "logs" / f"{EPOCH}.log").read_text().splitlines()
+    assert any(line.endswith("closed 14 NWB files Spyglass held open") for line in log)
+
+
+class _WorkersStarted(Exception):
+    """Raised where the run would start its workers."""
+
+
+def test_main_raises_the_open_file_limit_before_its_workers_start(
+    tmp_path, monkeypatch, capsys
+):
+    """The worker processes inherit the limit only if it is raised before they
+    start; the run says what it was raised from and to."""
+    events = []
+
+    def raise_open_file_limit():
+        events.append("limit")
+        return 1024, 65536
+
+    def run_epochs(epochs, kwargs, n_workers):
+        events.append("workers")
+        raise _WorkersStarted
+
+    monkeypatch.setattr(runner, "raise_open_file_limit", raise_open_file_limit)
+    monkeypatch.setattr(runner, "run_epochs", run_epochs)
+    monkeypatch.setattr(runner, "provenance_record", provenance("a" * 40))
+    (tmp_path / "decode").mkdir()
+
+    with pytest.raises(_WorkersStarted):
+        runner.main(["--epochs", EPOCH, "--decode-dir", str(tmp_path / "decode"),
+                     "--output-dir", str(tmp_path / "out")])  # fmt: skip
+
+    assert events == ["limit", "workers"]
+    assert "open-file soft limit 1024 -> 65536" in capsys.readouterr().out

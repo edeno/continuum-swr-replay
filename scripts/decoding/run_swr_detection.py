@@ -145,6 +145,8 @@ from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.decoding_common import (
     filter_epoch_info,
     provenance_record,
+    raise_open_file_limit,
+    release_nwb_files,
     setup_logger,
     write_atomically,
 )
@@ -830,14 +832,22 @@ def summary(record: dict) -> str:
 def _run_epoch_logged(
     nwb_file_name: str, epoch_name: str, run_epoch_kwargs: dict, log_directory: Path
 ) -> dict:
-    """One dask task: ``run_epoch``, logged to ``logs/{epoch_id}_swr.log``."""
+    """One dask task: ``run_epoch``, logged to ``logs/{epoch_id}_swr.log``.
+
+    When the epoch ends, pass or fail, the NWB files Spyglass opened for it are
+    closed (``release_nwb_files``): ``main``'s workers run one task at a time
+    (``threads_per_worker=1``), so no other epoch in the process reads them.
+    """
     identifier = epoch_id(nwb_file_name, epoch_name)
     log = setup_logger(
         name_logfile=f"{identifier}_swr",
         path_logfile=log_directory / f"{identifier}_swr.log",
     )
     log.info("%s: run %s", identifier, run_epoch_kwargs)
-    record = run_epoch(nwb_file_name, epoch_name, **run_epoch_kwargs)
+    try:
+        record = run_epoch(nwb_file_name, epoch_name, **run_epoch_kwargs)
+    finally:
+        log.info("closed %d NWB files Spyglass held open", release_nwb_files())
     if "provenance" in record:
         log.info("PROVENANCE %s", json.dumps(record["provenance"], sort_keys=True))
     if record["status"] == "failed":
@@ -999,6 +1009,9 @@ def main(argv: list[str] | None = None) -> None:
             "'_' and '-', and not '.' or '..'."
         )
 
+    # before the cluster starts: its worker processes inherit this limit
+    old_soft, new_soft = raise_open_file_limit()
+    print(f"open-file soft limit {old_soft} -> {new_soft}", flush=True)
     provenance = provenance_record(ROOT_DIR)
     run_id = provenance["commit"][:12] if args.run_id is None else args.run_id
     if provenance["dirty"]:

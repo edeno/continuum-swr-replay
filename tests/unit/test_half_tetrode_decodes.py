@@ -919,3 +919,61 @@ def test_half_labels_are_decoded_and_scored_end_to_end(
     )  # fmt: skip
     assert stale["status"] == "failed"
     assert "another canonical detector file" in stale["error"]
+
+
+# --- the open-file limit ------------------------------------------------------------------
+class _Started(Exception):
+    """Raised where the run would start its work."""
+
+
+def test_decode_raises_the_open_file_limit_first(tmp_path, monkeypatch):
+    """Before the devices are chosen; the decode log says what it was raised to."""
+    events = []
+
+    def raise_open_file_limit():
+        events.append("limit")
+        return 1024, 65536
+
+    def configure_devices(cuda_visible_devices):
+        events.append("devices")
+        return "cpu"
+
+    monkeypatch.setattr(runner, "raise_open_file_limit", raise_open_file_limit)
+    monkeypatch.setattr(runner, "configure_devices", configure_devices)
+    monkeypatch.setattr(runner, "current_device", lambda: "cpu")
+    monkeypatch.setattr(runner, "decode_epoch", lambda epoch_id, **kwargs: [])
+    output_dir = tmp_path / "out"
+
+    runner.main(["decode", "--epochs", EPOCH, "--decode-dir", str(tmp_path / "decode"),
+                 "--output-dir", str(output_dir)])  # fmt: skip
+
+    assert events == ["limit", "devices"]
+    (log,) = (output_dir / "logs").glob("decode_*.log")
+    assert "open-file soft limit 1024 -> 65536" in log.read_text()
+
+
+def test_score_raises_the_open_file_limit_before_its_workers_start(
+    tmp_path, monkeypatch, capsys
+):
+    """Its epochs run on Task 12's worker processes, which inherit the limit only
+    if it is raised before they start."""
+    events = []
+
+    def raise_open_file_limit():
+        events.append("limit")
+        return 1024, 65536
+
+    def run_epochs(epochs, kwargs, n_workers):
+        events.append("workers")
+        raise _Started
+
+    monkeypatch.setattr(runner, "raise_open_file_limit", raise_open_file_limit)
+    monkeypatch.setattr(runner, "provenance_record", lambda _root: PROVENANCE)
+    monkeypatch.setattr(run_state_evidence, "run_epochs", run_epochs)
+
+    with pytest.raises(_Started):
+        runner.main(["score", "--epochs", EPOCH, "--decode-dir",
+                     str(tmp_path / "decode"), "--output-dir", str(tmp_path / "out")])  # fmt: skip
+
+    assert events == ["limit", "workers"]
+    assert "open-file soft limit 1024 -> 65536" in capsys.readouterr().out

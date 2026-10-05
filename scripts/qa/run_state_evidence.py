@@ -140,6 +140,8 @@ from continuum_swr_replay.data_loaders.utils import (  # noqa: E402
 )
 from continuum_swr_replay.decoding_common import (  # noqa: E402
     provenance_record,
+    raise_open_file_limit,
+    release_nwb_files,
     setup_logger,
     write_atomically,
 )
@@ -1031,13 +1033,21 @@ def run_epoch(
 
 
 def _run_epoch_logged(epoch_id: str, kwargs: dict, log_dir: Path) -> dict:
-    """One dask task: ``run_epoch``, logged to ``logs/{epoch_id}.log``."""
+    """One dask task: ``run_epoch``, logged to ``logs/{epoch_id}.log``.
+
+    When the epoch ends, pass or fail, the NWB files ``load_data`` opened through
+    Spyglass are closed (``release_nwb_files``): ``run_epochs``'s workers run one
+    task at a time (``threads_per_worker=1``), so no other epoch reads them.
+    """
     logger = setup_logger(
         name_logfile=f"{epoch_id}_state_evidence",
         path_logfile=log_dir / f"{epoch_id}.log",
     )
     logger.info("%s: start", epoch_id)
-    record = run_epoch(epoch_id, log=logger.info, **kwargs)
+    try:
+        record = run_epoch(epoch_id, log=logger.info, **kwargs)
+    finally:
+        logger.info("closed %d NWB files Spyglass held open", release_nwb_files())
     if record["status"] == "failed":
         logger.error("%s\n%s", record["error"], record["traceback"])
     else:
@@ -1500,6 +1510,9 @@ def main(argv: list[str] | None = None) -> None:
     decode_dir, output_dir = args.decode_dir.resolve(), args.output_dir.resolve()
     if output_dir == decode_dir:
         parser.error("--output-dir must not be the decode folder itself")
+    # before the workers start: they inherit this limit
+    old_soft, new_soft = raise_open_file_limit()
+    print(f"open-file soft limit {old_soft} -> {new_soft}", flush=True)
     epochs = args.epochs or canonical_epochs(decode_dir)
     if not epochs:
         sys.exit(f"No HPC decodes in {decode_dir}.")

@@ -124,6 +124,8 @@ from continuum_swr_replay.analysis.replay.fit_provenance import git_hash
 from continuum_swr_replay.data_loaders.spikes import filter_spike_times, get_hpc_marks
 from continuum_swr_replay.decoding_common import (
     provenance_record,
+    raise_open_file_limit,
+    release_nwb_files,
     setup_logger,
     write_atomically,
 )
@@ -632,7 +634,10 @@ def _run_one_logged(epoch_id: str, run_one_kwargs: dict, log_directory: Path) ->
     """One dask task: :func:`run_one`, logged to the epoch's own file.
 
     A failure is returned rather than raised, so that it is recorded and the
-    other epochs run on.
+    other epochs run on. Either way the epoch ends by closing the NWB files
+    Spyglass opened for its marks (``release_nwb_files``): a
+    ``LocalCUDACluster`` worker runs one task at a time, so no other epoch in
+    the process reads them.
     """
     log = setup_logger(
         name_logfile=f"{epoch_id}_memoryless",
@@ -645,6 +650,8 @@ def _run_one_logged(epoch_id: str, run_one_kwargs: dict, log_directory: Path) ->
     except Exception as error:  # noqa: BLE001 - one epoch must not stop the rest
         log.exception("failed")
         return _failure_record(error, git_commit)
+    finally:
+        log.info("closed %d NWB files Spyglass held open", release_nwb_files())
     log.info("%s", _counts(record))
     return record
 
@@ -777,6 +784,8 @@ def main(argv: list[str] | None = None) -> None:
     output_dir = args.output_root / run_id
     output_dir.mkdir(parents=True, exist_ok=True)
     log = _logger(output_dir / "run.log")
+    # before any cluster starts: its worker processes inherit this limit
+    log.info("open-file soft limit %d -> %d", *raise_open_file_limit())
     if commit.endswith("-dirty"):
         log.warning(
             "uncommitted changes (%s); this run cannot be tied to a commit", commit
@@ -876,6 +885,11 @@ def main(argv: list[str] | None = None) -> None:
                 log.error("    failed: %s: %s", type(error).__name__, error)
             else:
                 log.info("    %s", _counts(epochs[epoch_id]))
+            finally:
+                # one epoch at a time in this process: nothing else reads them
+                log.info(
+                    "    closed %d NWB files Spyglass held open", release_nwb_files()
+                )
             write_manifest(manifest_path, manifest())
     else:
         to_run = []

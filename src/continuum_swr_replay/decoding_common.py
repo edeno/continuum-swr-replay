@@ -11,6 +11,7 @@ import json
 import logging
 import logging.config
 import os
+import resource
 import subprocess
 import sys
 from argparse import ArgumentParser, Namespace
@@ -260,6 +261,62 @@ def provenance_record(repo: Path) -> dict[str, Any]:
     }
 
 
+def release_nwb_files() -> int:
+    """Close every NWB file Spyglass holds open in this process; return how many.
+
+    Spyglass caches each NWB file it opens, in ``spyglass.utils.nwb_helper_fn``'s
+    module-level ``__open_nwb_files``, and never closes one. A long-lived worker
+    therefore keeps one file descriptor per distinct file it has read (28 after
+    one epoch's full ``load_data``), until it runs out (``[Errno 24] Too many
+    open files``; Spyglass issue #1442). This closes them all with Spyglass's
+    ``close_nwb_files``.
+
+    Call it only where nothing else in this process can still be reading one of
+    those files: data read lazily from a closed file cannot be read. The batch
+    runners call it when an epoch ends, on workers that run one epoch at a time.
+
+    Returns
+    -------
+    int
+        How many files the cache held; all are now closed.
+    """
+    # Imported here so that importing this module does not need Spyglass.
+    from spyglass.utils import nwb_helper_fn
+
+    n_open = len(vars(nwb_helper_fn)["__open_nwb_files"])
+    nwb_helper_fn.close_nwb_files()
+    return n_open
+
+
+def raise_open_file_limit(target: int = 65536) -> tuple[int, int]:
+    """Raise this process's soft limit on open files to `target`, at most the hard limit.
+
+    A tmux session hands its processes a soft limit of 1024 open files, which a
+    batch's long-lived workers can exhaust. Processes started afterwards,
+    including dask's worker processes, inherit the raised limit, so call this
+    before any cluster starts. A soft limit already at or above the new value is
+    left as it is: this never lowers it.
+
+    Parameters
+    ----------
+    target : int, optional
+        The soft limit wanted. It is capped at the hard limit, which an
+        unprivileged process cannot raise.
+
+    Returns
+    -------
+    old_soft : int
+    new_soft : int
+        The soft limit before and after; equal when it was not raised.
+    """
+    old_soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    new_soft = min(target, hard)
+    if old_soft >= new_soft:
+        return old_soft, old_soft
+    resource.setrlimit(resource.RLIMIT_NOFILE, (new_soft, hard))
+    return old_soft, new_soft
+
+
 def filter_epoch_info(epoch_info: pd.DataFrame, args: Namespace) -> pd.DataFrame:
     """Filter the epoch_info DataFrame based on command line arguments."""
     is_epoch = np.ones(len(epoch_info), dtype=bool)
@@ -333,6 +390,15 @@ def run_batch(
         Additional keyword arguments to pass to ``run_decode_fn`` beyond
         the common ones.
 
+    Notes
+    -----
+    Before the cluster starts, the soft open-file limit is raised
+    (``raise_open_file_limit``), so that the worker processes inherit it.
+    ``run_decode_fn`` is also given ``release_nwb``: True on the GPU cluster,
+    whose workers run one epoch at a time, so each epoch closes the NWB files
+    Spyglass opened for it (``release_nwb_files``); False on the CPU cluster,
+    whose workers run several epochs at once.
+
     Raises
     ------
     RuntimeError
@@ -355,15 +421,30 @@ def run_batch(
 
     os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.99"
 
+    # Before the cluster starts: its worker processes inherit this limit.
+    old_soft, new_soft = raise_open_file_limit()
+    print(f"open-file soft limit {old_soft} -> {new_soft}", flush=True)
+
     Path(args.local_scratch_dir).mkdir(exist_ok=True, parents=True)
 
     if HAS_CUDA:
+        # One worker per GPU, one thread each: a worker process runs one epoch
+        # at a time, so an epoch can close the NWB files Spyglass opened for it
+        # without closing a file another epoch is reading.
         cluster = LocalCUDACluster(
             CUDA_VISIBLE_DEVICES=args.cuda_visible_devices,
             local_directory=args.local_scratch_dir,
+            threads_per_worker=1,
         )
+        release_nwb = True
     else:
+        # LocalCluster's default workers run several epochs at once in threads
+        # (for example 12 workers x 8 threads on 96 cores), and those threads share
+        # Spyglass's per-process cache of open NWB files. Closing it after one
+        # epoch could close a file another is still reading, so these epochs
+        # leave their files open and rely on the raised open-file limit.
         cluster = LocalCluster(local_directory=args.local_scratch_dir)
+        release_nwb = False
 
     with Client(cluster):
         log_directory = Path.cwd() / "logs"
@@ -383,6 +464,7 @@ def run_batch(
                 non_stationary=args.non_stationary,
                 ripple_detector_name=args.ripple_detector_name,
                 save_dir=save_dir,
+                release_nwb=release_nwb,
                 **extra_kwargs,
             )
             for epoch in epoch_info.itertuples()

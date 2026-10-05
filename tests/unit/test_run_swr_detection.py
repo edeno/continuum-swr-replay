@@ -1264,3 +1264,69 @@ def test_run_id_must_be_a_plain_name(tmp_path, monkeypatch, in_tmp_path, run_id)
     assert stopped.value.code == 2
     assert not (tmp_path / "swr").exists()
     assert not (tmp_path / "escape").exists()
+
+
+@pytest.mark.parametrize("outcome", ["ok", "raises"])
+def test_each_epoch_task_closes_the_nwb_files_spyglass_opened(
+    tmp_path, monkeypatch, outcome
+):
+    """A worker runs one epoch at a time, so when its epoch ends, pass or fail,
+    it closes the NWB files Spyglass cached for it and logs how many."""
+    closed = []
+
+    def release_nwb_files():
+        closed.append(True)
+        return 14
+
+    def run_epoch(nwb_file_name, epoch_name, **kwargs):
+        if outcome == "raises":
+            raise RuntimeError("simulated: the task itself failed")
+        return {"status": "skipped", "reason": "simulated"}
+
+    monkeypatch.setattr(runner, "run_epoch", run_epoch)
+    monkeypatch.setattr(runner, "release_nwb_files", release_nwb_files)
+
+    def task():
+        return runner._run_epoch_logged(
+            NWB_FILE_NAME,
+            EPOCH_NAME,
+            {"output_dir": tmp_path / "out"},
+            tmp_path / "logs",
+        )
+
+    if outcome == "raises":
+        with pytest.raises(RuntimeError, match="the task itself failed"):
+            task()
+    else:
+        assert task()["status"] == "skipped"
+
+    assert closed == [True]
+    log = tmp_path / "logs" / f"{epoch_id(NWB_FILE_NAME, EPOCH_NAME)}_swr.log"
+    assert any(
+        line.endswith("closed 14 NWB files Spyglass held open")
+        for line in log.read_text().splitlines()
+    )
+
+
+def test_main_raises_the_open_file_limit_before_its_cluster(
+    tmp_path, monkeypatch, capsys, in_tmp_path, in_process_cluster
+):
+    """The worker processes inherit the limit only if it is raised before they
+    start; the run says what it was raised from and to."""
+    clusters_at_raise = []
+
+    def raise_open_file_limit():
+        clusters_at_raise.append(len(in_process_cluster))
+        return 1024, 65536
+
+    monkeypatch.setattr(runner, "raise_open_file_limit", raise_open_file_limit)
+    monkeypatch.setattr(
+        runner, "get_epoch_info", lambda: _epoch_info((NWB_FILE_NAME, EPOCH_NAME))
+    )
+    _with_fakes(monkeypatch)
+
+    _cli(tmp_path)
+
+    assert clusters_at_raise == [0]
+    assert len(in_process_cluster) == 1
+    assert "open-file soft limit 1024 -> 65536" in capsys.readouterr().out

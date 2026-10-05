@@ -58,6 +58,7 @@ from continuum_swr_replay.decoding_common import (
     NonLocalDecodingConfig,
     add_common_args,
     provenance_record,
+    release_nwb_files,
     results_exist,
     run_batch,
     setup_logger,
@@ -329,6 +330,7 @@ def run_decode(
     ripple_detector_name: str = "Kay",
     brain_area: str = "HPC",
     save_dir: Path = PROCESSED_DATA_DIR,
+    release_nwb: bool = False,
 ) -> str | None:
     """Run NonLocal decoding for a single session.
 
@@ -336,6 +338,11 @@ def run_decode(
     ``overwrite`` is False), the decode resumes: it logs ``RESUMED from existing
     results in <save_dir>``, reads them back from ``save_dir`` and rewrites only
     ``data_over_time``.
+
+    With ``release_nwb``, the epoch ends, pass or fail, by closing the NWB files
+    Spyglass holds open in this process (``release_nwb_files``) and logging how
+    many. Only for a process that runs one epoch at a time, as ``run_batch``'s
+    GPU workers do: another task in the process could still be reading them.
 
     Returns
     -------
@@ -456,6 +463,9 @@ def run_decode(
     except Exception as e:
         logger.exception(e)
         return epoch_identifier  # Sentinel: run_batch treats non-None as failure.
+    finally:
+        if release_nwb:
+            logger.info(f"closed {release_nwb_files()} NWB files Spyglass held open")
 
 
 def main() -> None:

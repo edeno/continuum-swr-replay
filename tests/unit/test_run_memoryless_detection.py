@@ -973,6 +973,126 @@ class TestMain:
         with pytest.raises(SystemExit, match="other settings"):
             self.cli(decode_root, tmp_path)
 
+    # --- open files: Spyglass's NWB cache and the open-file limit --------------
+    COUNTS = dict.fromkeys(
+        (
+            "n_windows",
+            "n_windows_speed_unknown",
+            "n_candidates",
+            "n_replay",
+            "n_swr_unknown",
+            "n_shuffled",
+            "n_shuffle_untestable",
+            "n_shuffle_pass",
+        ),
+        0,
+    )
+
+    @staticmethod
+    def recording_release(monkeypatch) -> list[bool]:
+        """Replace ``release_nwb_files``; return the list each call appends to."""
+        closed: list[bool] = []
+
+        def release_nwb_files() -> int:
+            closed.append(True)
+            return 14
+
+        monkeypatch.setattr(runner, "release_nwb_files", release_nwb_files)
+        return closed
+
+    @pytest.mark.parametrize("outcome", ["ok", "raises"])
+    def test_each_epoch_task_closes_the_nwb_files_spyglass_opened(
+        self, tmp_path, monkeypatch, outcome
+    ):
+        """A GPU worker runs one epoch at a time, so when its epoch ends, pass or
+        fail, it closes the NWB files Spyglass cached for it and logs how many."""
+        closed = self.recording_release(monkeypatch)
+
+        def run_one(epoch_id, **kwargs):
+            if outcome == "raises":
+                raise RuntimeError("simulated: the marks could not be read")
+            return {"status": "ok", **self.COUNTS}
+
+        monkeypatch.setattr(runner, "run_one", run_one)
+
+        record = runner._run_one_logged(
+            EPOCH_ID,
+            {"provenance": {"git_commit": "test"}, "run_id": "test-run"},
+            tmp_path / "logs",
+        )
+
+        assert record["status"] == ("ok" if outcome == "ok" else "failed")
+        assert closed == [True]
+        log = (tmp_path / "logs" / f"{EPOCH_ID}_memoryless.log").read_text()
+        assert any(
+            line.endswith("closed 14 NWB files Spyglass held open")
+            for line in log.splitlines()
+        )
+
+    def test_each_epoch_run_in_this_process_closes_the_nwb_files(
+        self, tmp_path, monkeypatch
+    ):
+        """Without a device list the epochs run one after another here, so each
+        closes what Spyglass opened for it, whether it is written or fails."""
+        closed = self.recording_release(monkeypatch)
+        failing = "sim20200101_04_r2_HPC"
+
+        def run_one(epoch_id, **kwargs):
+            if epoch_id == failing:
+                raise RuntimeError("simulated: the marks could not be read")
+            return {"status": "ok", **self.COUNTS}
+
+        monkeypatch.setattr(runner, "run_one", run_one)
+        output_root = tmp_path / "memoryless"
+
+        with pytest.raises(SystemExit, match=f"1 epochs failed: {failing};"):
+            main(
+                [
+                    "--epoch-id",
+                    EPOCH_ID,
+                    "--epoch-id",
+                    failing,
+                    "--run-seed",
+                    "7",
+                    "--n-shuffles",
+                    str(N_SHUFFLES),
+                    "--run-id",
+                    "cli-run",
+                    "--root",
+                    str(tmp_path / "processed"),
+                    "--output-root",
+                    str(output_root),
+                    "--cache-dir",
+                    str(tmp_path / "cache"),
+                ]
+            )
+
+        assert closed == [True, True]
+        log = (output_root / "cli-run" / "run.log").read_text().splitlines()
+        assert sum(line.endswith("closed 14 NWB files Spyglass held open")
+                   for line in log) == 2  # fmt: skip
+
+    def test_main_raises_the_open_file_limit_before_its_cluster(
+        self, parallel, tmp_path, monkeypatch
+    ):
+        """The workers inherit the limit only if it is raised before they start;
+        the run log says what it was raised from and to."""
+        self.recording_release(monkeypatch)
+        clusters_at_raise = []
+
+        def raise_open_file_limit():
+            clusters_at_raise.append(len(parallel))
+            return 1024, 65536
+
+        monkeypatch.setattr(runner, "raise_open_file_limit", raise_open_file_limit)
+
+        self.parallel_cli(tmp_path)
+
+        assert clusters_at_raise == [0]
+        assert len(parallel) == 1
+        run_log = (tmp_path / "memoryless" / "cli-run" / "run.log").read_text()
+        assert "open-file soft limit 1024 -> 65536" in run_log
+
 
 class TestRunEpochs:
     def test_an_error_its_worker_cannot_return_is_recorded(self, tmp_path, monkeypatch):
