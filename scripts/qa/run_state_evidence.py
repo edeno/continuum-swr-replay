@@ -112,11 +112,13 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: 
     STATES,
     bout_animal_summaries,
     build_windows,
+    code_version,
     encoding_comparison,
     encoding_inputs,
     event_likelihood,
     held_out_evidence,
     interior_bin_mask,
+    json_ready,
     keyed_rng,
     load_detector,
     nearest_interior_bins,
@@ -130,6 +132,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: 
     training_spike_bins,
     window_evidence,
     window_folds,
+    write_json,
 )
 from continuum_swr_replay.data_loaders.utils import (  # noqa: E402
     get_training_timepoints,
@@ -294,11 +297,6 @@ def decode_file_stats(epoch_id: str, decode_dir: Path) -> dict[str, dict]:
     return stats
 
 
-def code_version(provenance: dict) -> dict:
-    """A provenance record's commit and dirty flag."""
-    return {"commit": provenance["commit"], "dirty": bool(provenance["dirty"])}
-
-
 def reuse_reason(
     previous: dict | None,
     *,
@@ -451,25 +449,6 @@ def output_paths(epoch_id: str, output_dir: Path) -> dict[str, Path]:
         "windows": output_dir / "per_epoch" / f"{epoch_id}_windows.parquet",
         "validation": output_dir / "per_epoch" / f"{epoch_id}_validation.json",
     }
-
-
-def write_json(path: Path, content: object) -> None:
-    text = json.dumps(content, indent=1, allow_nan=False, default=str)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    write_atomically(path, lambda temporary: temporary.write_text(text))
-
-
-def _json_ready(value: Any) -> Any:
-    """``value`` with numpy scalars as Python ones and NaN as None."""
-    if isinstance(value, dict):
-        return {str(k): _json_ready(v) for k, v in value.items()}
-    if isinstance(value, list | tuple):
-        return [_json_ready(v) for v in value]
-    if isinstance(value, np.generic):
-        value = value.item()
-    if isinstance(value, float) and not np.isfinite(value):
-        return None
-    return value
 
 
 @dataclass(frozen=True)
@@ -1045,7 +1024,7 @@ def run_epoch(
     # the worker's peak resident set over its life so far, so an epoch it ran
     # before counts too (ru_maxrss is in KiB on Linux)
     record["worker_peak_rss_gib"] = usage.ru_maxrss / 2**20
-    ready: dict = _json_ready(record)
+    ready: dict = json_ready(record)
     if ready["status"] == "ok":
         write_json(paths["validation"], ready)
     return ready

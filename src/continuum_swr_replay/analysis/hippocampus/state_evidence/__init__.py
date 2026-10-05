@@ -129,7 +129,7 @@ Modules: :mod:`.terms` (per-tetrode terms, encodings, decode files),
 :mod:`.windows` (regimes, bouts, matched and calibration windows, tetrode
 halves, partners), :mod:`.evidence` (window evidence), :mod:`.summary` and
 :mod:`.half_decode` (decodes that see one tetrode half, and how their labels
-agree with the canonical decode's).
+agree with the canonical decode's); :mod:`.io` writes the runners' JSON records.
 """
 
 from continuum_swr_replay.analysis.hippocampus.state_evidence.evidence import (
@@ -137,14 +137,22 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.evidence import (
     window_evidence,
 )
 from continuum_swr_replay.analysis.hippocampus.state_evidence.half_decode import (
+    GROUND_MAX_REL,
     HALF_PARTITIONS,
+    OCCUPANCY_MAX_REL,
     Split,
     decode_inputs,
+    encoding_subset_check,
     fixed_transition_detector,
     half_splits,
     half_tetrode_decode,
     label_agreement,
     non_local_event_labels,
+)
+from continuum_swr_replay.analysis.hippocampus.state_evidence.io import (
+    code_version,
+    json_ready,
+    write_json,
 )
 from continuum_swr_replay.analysis.hippocampus.state_evidence.summary import (
     CALIBRATION_METRICS,
@@ -213,9 +221,11 @@ __all__ = [
     "ENCODING_KEY",
     "ENCODING_LABELS",
     "EPOCH_SUMMARY",
+    "GROUND_MAX_REL",
     "HALF_PARTITIONS",
     "HALVES_SEED",
     "MIN_BIN_WINDOWS",
+    "OCCUPANCY_MAX_REL",
     "PRIMARY_ENCODING",
     "PRIMARY_METRICS",
     "PROBABILITY_BIN_LABELS",
@@ -231,10 +241,12 @@ __all__ = [
     "build_windows",
     "calibration_statistics",
     "calibration_windows",
+    "code_version",
     "coordinated_silence",
     "decode_inputs",
     "encoding_comparison",
     "encoding_inputs",
+    "encoding_subset_check",
     "epoch_slopes",
     "epoch_summaries",
     "epoch_summary_kind",
@@ -245,6 +257,7 @@ __all__ = [
     "held_out_evidence",
     "hierarchical_bootstrap_ci",
     "interior_bin_mask",
+    "json_ready",
     "keyed_rng",
     "label_agreement",
     "load_detector",
@@ -268,4 +281,5 @@ __all__ = [
     "training_spike_bins",
     "window_evidence",
     "window_folds",
+    "write_json",
 ]

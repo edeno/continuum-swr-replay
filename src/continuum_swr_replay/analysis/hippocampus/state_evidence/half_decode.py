@@ -60,10 +60,28 @@ PROBABILITY_DIFF_THRESHOLD = 1e-3
 """A bin's state probability "differs" from the reference's above this."""
 _OVER = "share_bins_over_1e-3"
 
+OCCUPANCY_MAX_REL = 1e-2
+"""The half encoding's occupancy against the canonical one's, as a share of its
+maximum. The two are the same KDE of the same training positions, but its
+float32 sums over about 600,000 positions differ between the CPU and the
+canonical decode's GPU: by 5.1e-4 (peanut) and 1.4e-4 (chimi) of the maximum on
+the pilot. Training spikes, marks, mean rates and ground-intensity models must
+match exactly, which catches any change of training bins."""
 
-@dataclass(frozen=True)
+GROUND_MAX_REL = 1e-6
+"""The half encoding's summed ground intensity against the sum of the canonical
+per-electrode ground intensities over S, elementwise relative: the tolerance of
+the unit tests. Both are evaluated on this platform, with the half encoding's
+own occupancy; a CPU-fitted half encoding is within 1.5e-7 to 2.2e-7 of the
+pilot's GPU-fitted canonical models (peanut, chimi)."""
+
+
+@dataclass(frozen=True, eq=False)
 class Split:
     """One half decode: half S decodes and selects, half C scores.
+
+    Compared by identity (``eq=False``): its fields are arrays, which have no
+    single truth value.
 
     Attributes
     ----------
@@ -276,6 +294,125 @@ def half_tetrode_decode(
     return results, detector
 
 
+def _ground_intensity(
+    rate: float, model: Any, centers: NDArray, occupancy: NDArray
+) -> NDArray:
+    """One electrode's ground intensity per bin, as the clusterless KDE fit sums it."""
+    from non_local_detector.likelihoods.common import EPS
+
+    density = np.asarray(model.predict(centers), dtype=float)
+    positive = occupancy > 0.0
+    ratio = np.where(positive, density / np.where(positive, occupancy, 1.0), EPS)
+    return np.clip(rate * ratio, EPS, None)
+
+
+def _same_kde(first: Any, second: Any) -> bool:
+    """Whether two fitted ``KDEModel`` hold the same samples, weights and settings."""
+    if type(first) is not type(second) or set(vars(first)) != set(vars(second)):
+        return False
+    return all(
+        np.array_equal(np.asarray(value), np.asarray(vars(second)[name]))
+        for name, value in vars(first).items()
+    )
+
+
+def encoding_subset_check(
+    half: dict, canonical: dict, tetrodes: NDArray
+) -> dict[str, Any]:
+    """Whether a half encoding is the canonical encoding restricted to ``tetrodes``.
+
+    The canonical encoding is unweighted (see the module notes), so the half
+    encoding fit at the same training bins must hold the canonical one's
+    per-electrode models for ``tetrodes`` and nothing of the other tetrodes.
+
+    Parameters
+    ----------
+    half, canonical : dict
+        Clusterless KDE encoding models (``encoding_model_[ENCODING_KEY]``).
+    tetrodes : ndarray of int
+        Half S's tetrode indices into the canonical encoding.
+
+    Returns
+    -------
+    dict
+        - :func:`~.terms.encoding_comparison`'s: the training spikes' counts,
+          positions and marks and the mean rates against the canonical ones of
+          ``tetrodes``, which must match exactly;
+        - ``same_keys``: the two encodings hold the same entries;
+        - ``same_ground_models``: each electrode's ground-intensity KDE
+          (``gpi_models``) is the canonical one's, samples and settings;
+        - ``max_rel_occupancy`` (and ``max_abs_occupancy``): against the
+          canonical occupancy, as a share of its maximum, at most
+          :data:`OCCUPANCY_MAX_REL`;
+        - ``max_rel_ground``: the summed ground intensity against the sum of
+          the canonical per-electrode ground intensities over ``tetrodes``
+          alone, elementwise, at most :data:`GROUND_MAX_REL`;
+        - ``n_electrodes`` and ``same_as_canonical_subset``, all of the above.
+    """
+    from continuum_swr_replay.analysis.hippocampus.state_evidence.terms import (
+        encoding_comparison,
+    )
+
+    tetrodes = np.asarray(tetrodes, dtype=np.int64)
+    subset = {
+        key: [canonical[key][i] for i in tetrodes]
+        for key in (
+            "encoding_positions",
+            "encoding_spike_waveform_features",
+            "mean_rates",
+        )
+    }
+    check: dict[str, Any] = {
+        "n_electrodes": int(tetrodes.size),
+        **encoding_comparison(half, subset),
+        "same_keys": set(half) == set(canonical),
+    }
+    check["same_ground_models"] = len(half["gpi_models"]) == tetrodes.size and all(
+        _same_kde(model, canonical["gpi_models"][i])
+        for model, i in zip(half["gpi_models"], tetrodes, strict=False)
+    )
+    occupancy = np.asarray(canonical["occupancy"], dtype=float)
+    check["max_abs_occupancy"] = float(
+        np.max(np.abs(np.asarray(half["occupancy"], dtype=float) - occupancy))
+    )
+    check["max_rel_occupancy"] = check["max_abs_occupancy"] / float(
+        np.max(np.abs(occupancy))
+    )
+    environment = canonical["environment"]
+    interior = np.asarray(environment.is_track_interior_).ravel()
+    centers = np.asarray(environment.place_bin_centers_)[interior]
+    own_occupancy = np.asarray(half["occupancy"], dtype=float)
+    expected = np.sum(
+        [
+            _ground_intensity(
+                canonical["mean_rates"][i],
+                canonical["gpi_models"][i],
+                centers,
+                own_occupancy,
+            )
+            for i in tetrodes
+        ],
+        axis=0,
+    )
+    ground = np.asarray(half["summed_ground_process_intensity"], dtype=float)
+    check["max_rel_ground"] = (
+        float(np.max(np.abs(ground - expected) / np.abs(expected)))
+        if ground.shape == expected.shape
+        else float("inf")
+    )
+    check["same_as_canonical_subset"] = bool(
+        check["same_n_encoding_spikes"]
+        and check["max_abs_encoding_positions"] == 0.0
+        and check["max_abs_encoding_marks"] == 0.0
+        and check["max_abs_mean_rates"] == 0.0
+        and check["same_keys"]
+        and check["same_ground_models"]
+        and check["max_rel_occupancy"] <= OCCUPANCY_MAX_REL
+        and check["max_rel_ground"] <= GROUND_MAX_REL
+    )
+    return check
+
+
 def non_local_event_labels(
     probabilities: NDArray,
     speed: NDArray,
@@ -331,7 +468,18 @@ def non_local_event_labels(
 
 
 def _event_bounds(labels: NDArray) -> set[tuple[int, int]]:
-    """Each event's first and last bin."""
+    """Each event's first and last bin.
+
+    Parameters
+    ----------
+    labels : ndarray of int, shape (n_time,)
+        0 outside events, else the event's number (:func:`non_local_event_labels`).
+
+    Returns
+    -------
+    set of (int, int)
+        One (first bin, last bin) pair per event.
+    """
     bins = np.flatnonzero(labels > 0)
     if bins.size == 0:
         return set()

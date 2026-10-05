@@ -99,7 +99,9 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
   training bins, the canonical fit's discrete transitions and initial conditions fixed, no
   EM; `--all-tetrodes` checks that the pipeline reproduces the canonical decode. `score`
   (CPU): the state evidence with each half decode's labels scored by its own C, beside the
-  canonical labels scored by the same runs; summaries per label source and side by side.
+  canonical labels scored by the same runs (the same scoring runs, not the same bouts: each
+  source's labels select their own); summaries per label source, side by side, and how far
+  the two selections differ (`half_vs_all_agreement.csv`).
   Writes only under `--output-dir` (default `Processed-Data/_refresh_<date>/half_tetrode/`).
 - `sweep_memoryless_detection.py` — injects replays of chosen path, duration, rate and
   distance into a simulated recording and scores both detectors by one rule; writes the raw

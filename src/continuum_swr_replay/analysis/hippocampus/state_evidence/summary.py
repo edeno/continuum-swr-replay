@@ -237,7 +237,12 @@ SUMMARY_SEED = 20261004
 SPLIT_COLUMN = "split"
 """Names the half decode a window's labels come from, when an epoch's table
 holds several (:mod:`.half_decode`): a bout is paired with its matched window
-within its split, and its epoch's value pools the splits' windows."""
+within its split, and its epoch's value pools the splits' windows. The counts
+then count window x split: ``n`` sums each split's bouts, so labels shared by
+the splits (the canonical decode's, scored by each split's own half) count each
+bout once per split, and the calibration verdicts' window gate
+(:data:`MIN_BIN_WINDOWS`) counts calibration windows once per split. The
+inference does not change: each epoch still enters as one value."""
 
 
 def _split_keys(windows: pd.DataFrame) -> list[str]:

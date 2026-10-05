@@ -710,7 +710,7 @@ Objective AST mutation check for value-critical builder logic.
 
 Held-out state labels: decode with one tetrode half, score with the other.
 
-`gpu_usage`, `configure_devices`, `current_device`, `decode_paths`, `canonical_detector_stamp`, `reusable`, `decode_epoch`, `evidence_paths`, `half_label_sets`, `score_epoch`, `summarize_label_sources`, `readme`, `build_parser`, `main`
+`bout_column`, `gpu_usage`, `configure_devices`, `current_device`, `Job`, `decode_jobs`, `decode_paths`, `canonical_detector_stamp`, `reuse_reason`, `CanonicalEpoch`, `load_canonical`, `decode_split`, `decode_epoch`, `evidence_paths`, `half_label_sets`, `score_epoch`, `agreement_table`, `summarize_label_sources`, `agreement_markdown`, `score_manifest`, `readme`, `build_parser`, `main`
 
 ### `scripts/qa/run_quality_metrics.py`
 
@@ -722,7 +722,7 @@ Compute decoding quality metrics across all sessions.
 
 Held-out spike evidence for each decoder state, on every canonical HPC decode.
 
-`caveats`, `require_cpu`, `decode_files`, `decode_file_stats`, `code_version`, `reuse_reason`, `canonical_epochs`, `load_marks_and_training_mask`, `stored_log_likelihood`, `refit_encoding`, `spikes_in_bins`, `relative_error`, `output_paths`, `write_json`, `LabelSet`, `label_probabilities`, `checked_halves`, `time_held_out_record`, `epoch_table`, `label_set_table`, `running_only_masks`, `run_settings`, `run_epoch`, `run_epochs`, `figure_bouts`, `figure_calibration`, `figure_silence`, `write_csv`, `readme`, `summarize`, `build_parser`, `main`
+`caveats`, `require_cpu`, `decode_files`, `decode_file_stats`, `reuse_reason`, `canonical_epochs`, `load_marks_and_training_mask`, `stored_log_likelihood`, `refit_encoding`, `spikes_in_bins`, `relative_error`, `output_paths`, `LabelSet`, `label_probabilities`, `checked_halves`, `time_held_out_record`, `epoch_table`, `label_set_table`, `running_only_masks`, `run_settings`, `run_epoch`, `run_epochs`, `figure_bouts`, `figure_calibration`, `figure_silence`, `write_csv`, `readme`, `summarize`, `build_parser`, `main`
 
 ### `scripts/qa/summarize_cohort_audits.py`
 
@@ -764,7 +764,13 @@ Held-out evidence of every window, by tetrode half (see the package notes).
 
 Decodes that see one tetrode half, so that the state labels are held out too.
 
-`Split`, `half_splits`, `decode_inputs`, `fixed_transition_detector`, `half_tetrode_decode`, `non_local_event_labels`, `label_agreement`
+`Split`, `half_splits`, `decode_inputs`, `fixed_transition_detector`, `half_tetrode_decode`, `encoding_subset_check`, `non_local_event_labels`, `label_agreement`
+
+### `src/continuum_swr_replay/analysis/hippocampus/state_evidence/io.py`
+
+Strict JSON records and code versions, shared by the state-evidence runners.
+
+`json_ready`, `write_json`, `code_version`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/state_evidence/summary.py`
 

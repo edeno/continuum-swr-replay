@@ -10,13 +10,13 @@ Two steps, two subcommands:
 
 ``decode`` (a GPU, or the CPU for a smoke test). Per epoch, the first two of
 Task 12's tetrode partitions, each in both directions: four decodes, ``p0d0``,
-``p0d1``, ``p1d0`` and ``p1d1``. Each one:
+``p0d1``, ``p1d0`` and ``p1d1``. Each one (``decode_split``):
 
 1. fits the encoding model on S's tetrodes alone, at the canonical decode's own
    training bins (the inputs its fitted detector keeps), with no weights: the
    canonical encoding is the plain fit, because the library's clusterless KDE
    ignores EM's weights, and the record checks that the half encoding is the
-   canonical one restricted to S;
+   canonical one restricted to S (``encoding_subset_check``);
 2. keeps the canonical fit's discrete transitions (12 numbers) and initial
    conditions fixed, and runs no EM;
 3. decodes S's spikes.
@@ -24,11 +24,15 @@ Task 12's tetrode partitions, each in both directions: four decodes, ``p0d0``,
 ``--all-tetrodes`` decodes with every tetrode instead (split ``all``), to check
 that the pipeline reproduces the canonical decode. Each decode writes
 ``decodes/{epoch}_{split}.nc`` (the four state probabilities, float32, on the
-decode's time axis, with S, C and the fixed transitions in its attributes) and
-``decodes/{epoch}_{split}.json``, its record: the half encoding's check, the
-agreement of its states and non-local events with the canonical decode's, the
-device and the run time. A decode already written is kept unless
-``--overwrite``.
+decode's time axis, with S, C, the fixed transitions and the canonical detector
+file's stamp in its attributes) and ``decodes/{epoch}_{split}.json``, its
+record: the half encoding's check, the agreement of its states and non-local
+events with the canonical decode's, the device and the run time. A decode
+written before is kept only when it is complete (or as long as ``--max-bins``
+asks), was made from the same canonical detector file (name, size and
+``mtime_ns``) and by the same code commit, with neither tree dirty; otherwise
+it is redone and the log says why (``reuse_reason``). ``--overwrite`` redoes
+every one.
 
 A GPU must be named, one card, idle at launch (at most 2 GiB in use and 0 %
 utilization by nvidia-smi): ``--cuda_visible_devices N``. Without it, JAX is
@@ -42,16 +46,25 @@ with ``both_directions=False``):
 
 - ``label_source`` "half": each half decode's labels, scored by its own C;
 - ``label_source`` "all": the canonical decode's labels, scored by the same
-  four runs: the matched comparison, which differs from the half labels only
-  in where the labels come from. (Task 12's own summary averages 20 runs per
-  window, so its window values are less spread.)
+  four (S, C) runs. (Task 12's own summary averages 20 runs per window, so its
+  window values are less spread.)
+
+**The two sources share their scoring runs, not their bouts.** The same splits
+and the same C score both, but each source's labels select their own bouts,
+matched windows and calibration bins. A difference between the sources is
+therefore partly which bouts are scored (for the half labels, those S alone is
+confident about), not only how the same bouts score.
+``half_vs_all_agreement.csv`` gives how far the selections differ.
 
 ``split`` names the run. It writes ``evidence/per_epoch/{epoch}_windows.parquet``
 and ``{epoch}_validation.json``; then, per label source, Task 12's summary
 tables and figures (``evidence/half/``, ``evidence/all/``), with each epoch's
 value pooling its four splits' windows; ``evidence/half_vs_all_bouts.csv``
-(the primary bout statistics side by side); ``evidence/manifest.json`` and a
-``README.md``.
+(the primary bout statistics side by side); ``evidence/half_vs_all_agreement.csv``
+(per epoch, split and source: the bouts found per state and regime, the
+non-local events, the events shared with the other source and their bins'
+Jaccard index); ``evidence/manifest.json`` (with the same agreement) and a
+``README.md`` (with it as a table).
 
 It writes nothing outside ``--output-dir``.
 
@@ -82,6 +95,10 @@ them. Run the check (1) first, then the half decodes (2), then score (3)::
     JAX_PLATFORMS=cpu CUDA_VISIBLE_DEVICES= .venv/bin/python \\
         scripts/qa/run_half_tetrode_decodes.py score \\
         --decode-dir $DEC --output-dir $OUT --n-workers 5
+
+The decodes' canonical detector files may move (from the staging folder into
+the canonical one, say) before ``score``: the stamp is the file's name, size
+and ``mtime_ns``, which a move keeps.
 """
 
 from __future__ import annotations
@@ -94,18 +111,30 @@ import sys
 import time as clock
 import traceback
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import date
 from functools import partial
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 import numpy as np
 import pandas as pd
 
 # the sibling Task 12 runner, imported only by ``score``: importing it holds JAX
-# to the CPU, and the decodes may run on a GPU
+# to the CPU, and the decodes may run on a GPU. Nothing imported at this level
+# loads JAX, so ``configure_devices`` can still choose its device.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: E402
+    HALVES_SEED,
+    REGIMES,
+    SPLIT_COLUMN,
+    STATES,
+    code_version,
+    half_splits,
+    json_ready,
+    write_json,
+)
 from continuum_swr_replay.decoding_common import (  # noqa: E402
     provenance_record,
     setup_logger,
@@ -124,19 +153,43 @@ PILOT_EPOCHS = (
 IDLE_MAX_MIB = 2048
 IDLE_MAX_UTILIZATION = 0
 ALL_TETRODES = "all"
-OCCUPANCY_MAX_REL = 1e-2
-"""The half encoding's occupancy against the canonical one's, as a share of its
-maximum. The two are the same KDE of the same training positions, but its
-float32 sums over about 600,000 positions differ between the CPU and the
-canonical decode's GPU: by 5.1e-4 (peanut) and 1.4e-4 (chimi) of the maximum on
-the pilot. Training spikes, marks and mean rates must match exactly, which
-catches any change of training bins."""
-HALF_SPLIT_NAMES = ("p0d0", "p0d1", "p1d0", "p1d1")
-"""``Split.name`` of ``half_splits``'s four splits, in its order."""
+HALF_SPLIT_NAMES = tuple(split.name for split in half_splits(2, seed=HALVES_SEED))
+"""``p0d0``, ``p0d1``, ``p1d0``, ``p1d1``: ``half_splits``'s names, in its order
+(they depend on the number of partitions only)."""
 LABEL_SOURCES = {
-    "half": "a decode that saw S alone, scored by C",
-    "all": "the canonical all-tetrode decode, scored by the same (S, C) runs",
+    "half": "a decode that saw half S alone; scored by C",
+    "all": "the canonical all-tetrode decode; scored by the same (S, C) runs, "
+    "which matches the scoring runs, not the bouts",
 }
+SELECTION_CAVEAT = (
+    "The two label sources share their scoring runs (the same splits, the same "
+    "scoring half C), not their bouts: each source's labels select their own "
+    "bouts, matched windows and calibration bins. A difference between them is "
+    "therefore partly which bouts are scored (for the half labels, those S alone "
+    "is confident about), not only how the same bouts score. "
+    "half_vs_all_agreement.csv gives, per epoch, split and source, the bouts found "
+    "per state and regime, the non-local events, the events shared with the other "
+    "source and the Jaccard index of their bins."
+)
+COUNT_CAVEAT = (
+    "Counts are per split: for source all, n counts bout x split, since each "
+    "canonical bout appears once per split, scored by that split's C; for source "
+    "half, n sums the four decodes' own bouts. The calibration verdicts' window "
+    "gate likewise counts window x split. The inference is unchanged: each epoch "
+    "enters as one value, pooling its splits' windows."
+)
+_SHORT_STATES = {
+    "Local": "Local",
+    "No-Spike": "No-Spike",
+    "Non-Local Continuous": "NL-Cont",
+    "Non-Local Fragmented": "NL-Frag",
+}
+
+
+def bout_column(state: str, regime: str) -> str:
+    """The agreement table's column of a state x regime's bouts found."""
+    slug = _SHORT_STATES[state].lower().replace("-", "_")
+    return f"bouts_{slug}_{regime}"
 
 
 # --- devices ------------------------------------------------------------------------------
@@ -224,7 +277,14 @@ def configure_devices(
 
 
 def current_device() -> str:
-    """Where JAX computes: ``"cpu"`` or ``"gpu:{CUDA_VISIBLE_DEVICES}"``."""
+    """Where JAX computes: ``"cpu"`` or ``"gpu:{CUDA_VISIBLE_DEVICES}"``.
+
+    It confirms only that JAX's backend is or is not the CPU; the index it
+    reports is read back from ``CUDA_VISIBLE_DEVICES``, not from the card. What
+    ties that index to the physical card nvidia-smi checked is
+    ``CUDA_DEVICE_ORDER=PCI_BUS_ID``, set by :func:`configure_devices`, with
+    which CUDA numbers the cards as nvidia-smi does.
+    """
     import jax
 
     if jax.default_backend() == "cpu":
@@ -233,51 +293,308 @@ def current_device() -> str:
 
 
 # --- decode -------------------------------------------------------------------------------
+class Job(NamedTuple):
+    """One decode: its split's name, partition and direction, S and C."""
+
+    name: str
+    partition: int | None
+    direction: int | None
+    selecting: np.ndarray
+    scoring: np.ndarray
+
+
+def decode_jobs(n_tetrodes: int, *, all_tetrodes: bool = False) -> list[Job]:
+    """The four half splits' decodes, or the one with every tetrode."""
+    if all_tetrodes:
+        every = np.arange(n_tetrodes)
+        return [Job(ALL_TETRODES, None, None, every, every[:0])]
+    return [
+        Job(s.name, s.partition, s.direction, s.selecting, s.scoring)
+        for s in half_splits(n_tetrodes, seed=HALVES_SEED)
+    ]
+
+
 def decode_paths(epoch_id: str, split: str, output_dir: Path) -> dict[str, Path]:
     """One decode's probabilities (``decode``) and record (``record``)."""
     stem = Path(output_dir) / "decodes" / f"{epoch_id}_{split}"
     return {"decode": stem.with_suffix(".nc"), "record": stem.with_suffix(".json")}
 
 
-def _write_json(path: Path, content: object) -> None:
-    text = json.dumps(content, indent=1, allow_nan=False, default=str)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    write_atomically(path, lambda temporary: temporary.write_text(text))
-
-
-def _finite_or_none(value: Any) -> Any:
-    """``value`` with every non-finite float as None, for strict JSON."""
-    if isinstance(value, dict):
-        return {k: _finite_or_none(v) for k, v in value.items()}
-    if isinstance(value, list):
-        return [_finite_or_none(v) for v in value]
-    if isinstance(value, float) and not np.isfinite(value):
-        return None
-    return value
-
-
 def canonical_detector_stamp(epoch_id: str, decode_dir: Path) -> dict:
-    """The canonical detector file's path, size and ``mtime_ns``."""
-    path = (Path(decode_dir) / f"{epoch_id}_detector.pkl").resolve()
+    """The canonical detector file's name, size and ``mtime_ns``.
+
+    Not its folder: moving the file (from a staging folder into the canonical
+    one, say) keeps its size and modification time, so its decodes stay valid;
+    an edit changes them.
+    """
+    path = Path(decode_dir) / f"{epoch_id}_detector.pkl"
     info = path.stat()
-    return {"path": str(path), "size": info.st_size, "mtime_ns": info.st_mtime_ns}
+    return {"name": path.name, "size": info.st_size, "mtime_ns": info.st_mtime_ns}
 
 
-def reusable(epoch_id: str, split: str, output_dir: Path, n_bins: int | None) -> bool:
-    """Whether a decode written before can stand: ok, and of the length asked for.
+def reuse_reason(
+    epoch_id: str,
+    split: str,
+    output_dir: Path,
+    n_bins: int | None,
+    *,
+    stamp: dict,
+    code: dict,
+) -> str | None:
+    """Why a decode written before must be redone, or None to keep it.
 
-    A smoke test's decode of the first bins (``--max-bins``) never stands in for
-    a whole epoch's, nor the reverse.
+    It is kept only when its record is "ok" beside its decode file, it covers
+    the bins asked for (every bin when ``n_bins`` is None, so a ``--max-bins``
+    smoke test never stands in for a whole epoch, nor the reverse), it was made
+    from the same canonical detector file (``stamp``) and by the same code
+    commit, and neither tree had uncommitted changes (then the commit does not
+    identify the code).
+
+    Parameters
+    ----------
+    epoch_id, split : str
+    output_dir : Path
+    n_bins : int or None
+        The bins asked for (``--max-bins``).
+    stamp : dict
+        :func:`canonical_detector_stamp` now.
+    code : dict
+        :func:`code_version` now.
     """
     paths = decode_paths(epoch_id, split, output_dir)
     if not all(path.exists() for path in paths.values()):
-        return False
+        return "not written before"
     record = json.loads(paths["record"].read_text())
     if record.get("status") != "ok":
-        return False
-    if n_bins is None:
-        return bool(record.get("complete"))
-    return record.get("n_bins") == n_bins and not record.get("complete")
+        return "the earlier decode failed"
+    if n_bins is None and not record.get("complete"):
+        return f"the earlier decode covers only the first {record.get('n_bins')} bins"
+    if n_bins is not None and (
+        record.get("complete") or record.get("n_bins") != n_bins
+    ):
+        return f"the earlier decode covers {record.get('n_bins')} bins, not {n_bins}"
+    if record.get("canonical_detector") != stamp:
+        return "the canonical detector file changed (name, size or mtime_ns)"
+    earlier = record.get("code") or {}
+    if earlier.get("commit") != code["commit"]:
+        return f"code commit {str(earlier.get('commit'))[:9]} -> {code['commit'][:9]}"
+    if code["dirty"] or earlier.get("dirty", True):
+        return "uncommitted changes, so the commit does not identify the code"
+    return None
+
+
+@dataclass
+class CanonicalEpoch:
+    """What every decode of one epoch reads from its canonical decode.
+
+    Attributes
+    ----------
+    epoch_id : str
+    decode_dir : Path
+    detector : NonLocalClusterlessDetector
+        The canonical fitted detector.
+    time, speed : ndarray, shape (n_time,)
+        The decode's time axis (s) and the head speed (cm/s).
+    probabilities : ndarray, shape (n_time, 4)
+        The canonical state probabilities, float32 as the decode wrote them.
+    labels : ndarray of int, shape (n_time,)
+        The canonical ``non_local_event`` labels.
+    labels_reproduced : bool
+        Whether :func:`non_local_event_labels` remakes them from the
+        probabilities exactly.
+    stamp : dict
+        :func:`canonical_detector_stamp`, taken before the detector is read.
+    n_tetrodes : int
+        The tetrodes the canonical decode used.
+    """
+
+    epoch_id: str
+    decode_dir: Path
+    detector: Any
+    time: np.ndarray
+    speed: np.ndarray
+    probabilities: np.ndarray
+    labels: np.ndarray
+    labels_reproduced: bool
+    stamp: dict
+    n_tetrodes: int
+
+
+def load_canonical(epoch_id: str, decode_dir: Path) -> CanonicalEpoch:
+    """The canonical decode's detector, states, events and speed for one epoch.
+
+    Raises
+    ------
+    ValueError
+        The detector's decode inputs are not on ``data_over_time``'s axis.
+    """
+    from continuum_swr_replay.analysis.hippocampus.state_evidence import (
+        decode_inputs,
+        load_detector,
+        non_local_event_labels,
+    )
+
+    stamp = canonical_detector_stamp(epoch_id, decode_dir)
+    detector = load_detector(epoch_id, decode_dir)
+    inputs = decode_inputs(detector)
+    dot = pd.read_pickle(Path(decode_dir) / f"{epoch_id}_80_data_over_time.pkl")
+    time = dot.index.to_numpy(dtype=float)
+    if not np.array_equal(time, np.asarray(inputs["position_time"], dtype=float)):
+        raise ValueError(
+            "the detector's decode inputs are not on data_over_time's axis"
+        )
+    columns = [f"{state.replace(' ', '_')}_prob" for state in STATES]
+    probabilities = dot[columns].to_numpy()
+    labels = dot["non_local_event"].to_numpy(dtype=np.int64)
+    speed = dot["head_speed"].to_numpy(dtype=float)
+    return CanonicalEpoch(
+        epoch_id=epoch_id,
+        decode_dir=Path(decode_dir),
+        detector=detector,
+        time=time,
+        speed=speed,
+        probabilities=probabilities,
+        labels=labels,
+        labels_reproduced=bool(
+            np.array_equal(non_local_event_labels(probabilities, speed, time), labels)
+        ),
+        stamp=stamp,
+        n_tetrodes=len(inputs["spike_times"]),
+    )
+
+
+def decode_split(
+    canonical: CanonicalEpoch,
+    job: Job,
+    *,
+    output_dir: Path,
+    provenance: dict,
+    n_bins: int | None = None,
+) -> dict:
+    """Decode one split, check it, write its decode and record; return the record.
+
+    Parameters
+    ----------
+    canonical : CanonicalEpoch
+    job : Job
+        Its tetrodes S decode.
+    output_dir : Path
+        The decode goes to ``decodes/{epoch}_{split}.nc``, the record beside it.
+    provenance : dict
+        ``provenance_record`` of the code.
+    n_bins : int, optional
+        Decode only the first bins.
+
+    Returns
+    -------
+    dict
+        ``status`` "ok", or "failed" with ``error`` and ``traceback`` (then no
+        decode file is left, so a rerun redoes it). An "ok" record holds the
+        half encoding's check (``encoding_subset_check``; it fails the split
+        unless the half encoding is the canonical one restricted to S), the
+        agreement of the states and events with the canonical decode
+        (``label_agreement``), the fixed transitions, the device and timings.
+    """
+    import xarray as xr
+
+    from continuum_swr_replay.analysis.hippocampus.state_evidence import (
+        ENCODING_KEY,
+        encoding_subset_check,
+        half_tetrode_decode,
+        label_agreement,
+        non_local_event_labels,
+    )
+
+    paths = decode_paths(canonical.epoch_id, job.name, output_dir)
+    record: dict[str, Any] = {
+        "epoch_id": canonical.epoch_id,
+        "split": job.name,
+        "partition": job.partition,
+        "direction": job.direction,
+        "selecting_tetrodes": np.asarray(job.selecting).tolist(),
+        "scoring_tetrodes": np.asarray(job.scoring).tolist(),
+        "decode_dir": str(canonical.decode_dir),
+        "canonical_detector": canonical.stamp,
+        "code": code_version(provenance),
+    }
+    began = clock.perf_counter()
+    try:
+        results, half = half_tetrode_decode(
+            canonical.detector, job.selecting, n_bins=n_bins
+        )
+        probabilities = results.acausal_state_probabilities.values
+        decoded = probabilities.shape[0]
+        time = canonical.time[:decoded]
+        if list(results.states.values) != list(STATES) or not np.array_equal(
+            results.time.values, time
+        ):
+            raise ValueError("the decode's states or time axis are not the canonical")
+        record["device"] = current_device()
+        record["decode_s"] = clock.perf_counter() - began
+        check = encoding_subset_check(
+            half.encoding_model_[ENCODING_KEY],
+            canonical.detector.encoding_model_[ENCODING_KEY],
+            job.selecting,
+        )
+        record["half_encoding"] = check
+        if not check["same_as_canonical_subset"]:
+            raise ValueError(
+                "the half encoding is not the canonical encoding restricted to "
+                f"its tetrodes: {check}"
+            )
+        labels = non_local_event_labels(probabilities, canonical.speed[:decoded], time)
+        record["agreement"] = label_agreement(
+            canonical.probabilities[:decoded],
+            canonical.labels[:decoded],
+            probabilities,
+            labels,
+        )
+        record["agreement"]["reference_labels_reproduced"] = canonical.labels_reproduced
+        record["n_bins"] = int(decoded)
+        record["complete"] = bool(decoded == canonical.time.size)
+        transitions = np.asarray(canonical.detector.discrete_state_transitions_)
+        record["fixed"] = {
+            "discrete_state_transitions": transitions.tolist(),
+            "initial_conditions": "the canonical fit's: its smoother's posterior "
+            "at the first bin, over every state bin",
+        }
+        record["marginal_log_likelihood"] = float(
+            results.attrs["marginal_log_likelihoods"]
+        )
+        dataset = xr.Dataset(
+            {
+                "acausal_state_probabilities": (
+                    ("time", "states"),
+                    np.asarray(probabilities, dtype=np.float32),
+                )
+            },
+            coords={"time": time, "states": list(STATES)},
+            attrs={
+                "epoch_id": canonical.epoch_id,
+                "split": job.name,
+                "selecting_tetrodes": json.dumps(record["selecting_tetrodes"]),
+                "scoring_tetrodes": json.dumps(record["scoring_tetrodes"]),
+                "discrete_state_transitions": json.dumps(transitions.tolist()),
+                "canonical_detector": json.dumps(canonical.stamp),
+                "marginal_log_likelihood": record["marginal_log_likelihood"],
+                "n_bins": int(decoded),
+                "complete": int(record["complete"]),
+                "produced_by": PRODUCED_BY,
+                "provenance": json.dumps(provenance, sort_keys=True),
+            },
+        )
+        paths["decode"].parent.mkdir(parents=True, exist_ok=True)
+        write_atomically(paths["decode"], partial(dataset.to_netcdf, engine="h5netcdf"))
+        record["status"] = "ok"
+    except Exception as error:  # noqa: BLE001 - recorded; the next split runs
+        paths["decode"].unlink(missing_ok=True)
+        record.update(
+            status="failed", error=repr(error), traceback=traceback.format_exc()
+        )
+    record["wall_clock_s"] = clock.perf_counter() - began
+    ready: dict = json_ready(record)
+    write_json(paths["record"], ready)
+    return ready
 
 
 def decode_epoch(
@@ -295,193 +612,46 @@ def decode_epoch(
     Returns
     -------
     list of dict
-        One record per split, also written beside its decode: ``status`` "ok",
-        "exists" (kept from an earlier run that decoded as many bins, every bin
-        when ``n_bins`` is None; not rewritten) or "failed" (with ``error`` and
-        ``traceback``; no decode is written, so a rerun redoes it).
+        One record per split (:func:`decode_split`), or ``status`` "exists" for
+        a decode kept from an earlier run (:func:`reuse_reason`; not rewritten).
     """
-    import xarray as xr
-
-    from continuum_swr_replay.analysis.hippocampus.state_evidence import (
-        ENCODING_KEY,
-        HALVES_SEED,
-        STATES,
-        decode_inputs,
-        encoding_comparison,
-        half_splits,
-        half_tetrode_decode,
-        label_agreement,
-        load_detector,
-        non_local_event_labels,
-    )
-
     names = [ALL_TETRODES] if all_tetrodes else list(HALF_SPLIT_NAMES)
-    kept = (
-        set()
+    stamp = canonical_detector_stamp(epoch_id, decode_dir)
+    provenance = provenance_record(ROOT_DIR)
+    code = code_version(provenance)
+    reasons = {
+        name: "--overwrite"
         if overwrite
-        else {name for name in names if reusable(epoch_id, name, output_dir, n_bins)}
-    )
-    for name in names:
-        if name in kept:
-            log(f"{epoch_id} {name}: written before; kept")
-    if kept == set(names):
+        else reuse_reason(epoch_id, name, output_dir, n_bins, stamp=stamp, code=code)
+        for name in names
+    }
+    for name, reason in reasons.items():
+        log(f"{epoch_id} {name}: " + ("written before; kept" if reason is None
+                                       else f"to decode ({reason})"))  # fmt: skip
+    if all(reason is None for reason in reasons.values()):
         return [
             {"epoch_id": epoch_id, "split": name, "status": "exists"} for name in names
         ]
 
     started = clock.perf_counter()
-    stamp = canonical_detector_stamp(epoch_id, decode_dir)
-    canonical = load_detector(epoch_id, decode_dir)
-    inputs = decode_inputs(canonical)
-    dot = pd.read_pickle(Path(decode_dir) / f"{epoch_id}_80_data_over_time.pkl")
-    time = dot.index.to_numpy(dtype=float)
-    if not np.array_equal(time, np.asarray(inputs["position_time"], dtype=float)):
-        raise ValueError(
-            "the detector's decode inputs are not on data_over_time's axis"
-        )
-    columns = [f"{state.replace(' ', '_')}_prob" for state in STATES]
-    reference = dot[columns].to_numpy()  # float32, as the decode wrote them
-    reference_labels = dot["non_local_event"].to_numpy(dtype=np.int64)
-    speed = dot["head_speed"].to_numpy(dtype=float)
-    del dot
-    # the event labels here are made as the canonical pipeline makes them
-    labels_reproduced = bool(
-        np.array_equal(non_local_event_labels(reference, speed, time), reference_labels)
-    )
+    canonical = load_canonical(epoch_id, decode_dir)
     log(f"{epoch_id}: inputs read in {clock.perf_counter() - started:.0f} s")
-
-    n_tetrodes = len(inputs["spike_times"])
-    every = np.arange(n_tetrodes)
-    jobs = (
-        [(ALL_TETRODES, None, None, every, every[:0])]
-        if all_tetrodes
-        else [
-            (s.name, s.partition, s.direction, s.selecting, s.scoring)
-            for s in half_splits(n_tetrodes, seed=HALVES_SEED)
-        ]
-    )
-    if [job[0] for job in jobs] != names:
-        raise ValueError(f"the splits are {[job[0] for job in jobs]}, not {names}")
-    stored = canonical.encoding_model_[ENCODING_KEY]
-    provenance = provenance_record(ROOT_DIR)
+    jobs = decode_jobs(canonical.n_tetrodes, all_tetrodes=all_tetrodes)
+    if [job.name for job in jobs] != names:
+        raise ValueError(f"the splits are {[job.name for job in jobs]}, not {names}")
     records = []
-    for split, partition, direction, selecting, scoring in jobs:
-        paths = decode_paths(epoch_id, split, output_dir)
-        if split in kept:
-            records.append({"epoch_id": epoch_id, "split": split, "status": "exists"})
+    for job in jobs:
+        if reasons[job.name] is None:
+            records.append(
+                {"epoch_id": epoch_id, "split": job.name, "status": "exists"}
+            )
             continue
-        record: dict[str, Any] = {
-            "epoch_id": epoch_id,
-            "split": split,
-            "partition": partition,
-            "direction": direction,
-            "selecting_tetrodes": selecting.tolist(),
-            "scoring_tetrodes": scoring.tolist(),
-            "decode_dir": str(decode_dir),
-            "canonical_detector": stamp,
-            "code": {k: provenance[k] for k in ("commit", "dirty")},
-        }
-        began = clock.perf_counter()
-        try:
-            results, half = half_tetrode_decode(canonical, selecting, n_bins=n_bins)
-            probabilities = results.acausal_state_probabilities.values
-            decoded = probabilities.shape[0]
-            if list(results.states.values) != list(STATES) or not np.array_equal(
-                results.time.values, time[:decoded]
-            ):
-                raise ValueError(
-                    "the decode's states or time axis are not the canonical"
-                )
-            record["device"] = current_device()
-            record["decode_s"] = clock.perf_counter() - began
-            encoding = half.encoding_model_[ENCODING_KEY]
-            subset = {
-                key: [stored[key][i] for i in selecting]
-                for key in (
-                    "encoding_positions",
-                    "encoding_spike_waveform_features",
-                    "mean_rates",
-                )
-            }
-            check = encoding_comparison(encoding, subset)
-            occupancy = np.asarray(stored["occupancy"], dtype=float)
-            check["max_abs_occupancy"] = float(
-                np.max(np.abs(np.asarray(encoding["occupancy"]) - occupancy))
-            )
-            check["max_rel_occupancy"] = check["max_abs_occupancy"] / float(
-                np.max(np.abs(occupancy))
-            )
-            check["same_as_canonical_subset"] = bool(
-                check["same_n_encoding_spikes"]
-                and check["max_abs_encoding_positions"] == 0.0
-                and check["max_abs_encoding_marks"] == 0.0
-                and check["max_abs_mean_rates"] == 0.0
-                and check["max_rel_occupancy"] <= OCCUPANCY_MAX_REL
-            )
-            record["half_encoding"] = {
-                "n_electrodes": len(subset["mean_rates"]),
-                **check,
-            }
-            if not check["same_as_canonical_subset"]:
-                raise ValueError(
-                    "the half encoding is not the canonical encoding restricted to "
-                    f"its tetrodes: {check}"
-                )
-            labels = non_local_event_labels(
-                probabilities, speed[:decoded], time[:decoded]
-            )
-            record["agreement"] = label_agreement(
-                reference[:decoded], reference_labels[:decoded], probabilities, labels
-            )
-            record["agreement"]["reference_labels_reproduced"] = labels_reproduced
-            record["n_bins"] = int(decoded)
-            record["complete"] = bool(decoded == time.size)
-            transitions = np.asarray(canonical.discrete_state_transitions_).tolist()
-            record["fixed"] = {
-                "discrete_state_transitions": transitions,
-                "initial_conditions": "the canonical fit's: its smoother's posterior "
-                "at the first bin, over every state bin",
-            }
-            record["marginal_log_likelihood"] = float(
-                results.attrs["marginal_log_likelihoods"]
-            )
-            dataset = xr.Dataset(
-                {
-                    "acausal_state_probabilities": (
-                        ("time", "states"),
-                        np.asarray(probabilities, dtype=np.float32),
-                    )
-                },
-                coords={"time": time[:decoded], "states": list(STATES)},
-                attrs={
-                    "epoch_id": epoch_id,
-                    "split": split,
-                    "selecting_tetrodes": json.dumps(record["selecting_tetrodes"]),
-                    "scoring_tetrodes": json.dumps(record["scoring_tetrodes"]),
-                    "discrete_state_transitions": json.dumps(transitions),
-                    "canonical_detector": json.dumps(stamp),
-                    "marginal_log_likelihood": record["marginal_log_likelihood"],
-                    "n_bins": int(decoded),
-                    "complete": int(record["complete"]),
-                    "produced_by": PRODUCED_BY,
-                    "provenance": json.dumps(provenance, sort_keys=True),
-                },
-            )
-            paths["decode"].parent.mkdir(parents=True, exist_ok=True)
-            write_atomically(
-                paths["decode"], partial(dataset.to_netcdf, engine="h5netcdf")
-            )
-            record["status"] = "ok"
-            del results, half
-        except Exception as error:  # noqa: BLE001 - recorded; the next split runs
-            paths["decode"].unlink(missing_ok=True)
-            record.update(
-                status="failed", error=repr(error), traceback=traceback.format_exc()
-            )
-        record["wall_clock_s"] = clock.perf_counter() - began
-        _write_json(paths["record"], _finite_or_none(record))
+        record = decode_split(
+            canonical, job, output_dir=output_dir, provenance=provenance, n_bins=n_bins
+        )
         log(
-            f"{epoch_id} {split}: {record['status']} in {record['wall_clock_s']:.0f} s"
+            f"{epoch_id} {job.name}: {record['status']} in "
+            f"{record['wall_clock_s']:.0f} s"
             + (f" ({record['error']})" if record["status"] == "failed" else "")
         )
         records.append(record)
@@ -500,23 +670,18 @@ def half_label_sets(epoch_id: str, *, output_dir: Path, decode_dir: Path) -> lis
     """An epoch's eight label sets: its four half decodes', and the canonical decode's.
 
     Each half decode's labels are scored by its own C only; the canonical
-    labels are scored by the same four (S, C) runs.
+    labels are scored by the same four (S, C) runs (the same runs, not the
+    same bouts: each source's labels select their own).
 
     Raises
     ------
     ValueError
         A half decode is missing, incomplete (``--max-bins``), not on the first
         two partitions' tetrodes, or made from another canonical detector file
-        (path, size or ``mtime_ns``) than the one in ``decode_dir``.
+        (name, size or ``mtime_ns``) than the one in ``decode_dir``.
     """
     import xarray as xr
 
-    from continuum_swr_replay.analysis.hippocampus.state_evidence import (
-        HALVES_SEED,
-        SPLIT_COLUMN,
-        STATES,
-        half_splits,
-    )
     from scripts.qa.run_state_evidence import LabelSet
 
     stamp = canonical_detector_stamp(epoch_id, decode_dir)
@@ -596,11 +761,87 @@ def score_epoch(
     return run_state_evidence.run_epoch(epoch_id, **kwargs)
 
 
-def summarize_label_sources(output_dir: Path, epochs: list[str]) -> None:
+def agreement_table(output_dir: Path, windows: pd.DataFrame) -> pd.DataFrame:
+    """How far the two label sources' selections differ, per epoch, split and source.
+
+    Parameters
+    ----------
+    output_dir : Path
+        Holds the decodes' records (``decodes/{epoch}_{split}.json``), whose
+        ``agreement`` compares each half decode with the canonical decode.
+    windows : pd.DataFrame
+        The scored per-window tables (``label_source``, ``split``, ...).
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per epoch x split x ``label_source``:
+
+        - ``bouts_{state}_{regime}``: the bouts its labels found in each state
+          and regime (``n_found``, before the cap of 1500 scored per cell);
+        - ``events``: its non-local events; ``events_shared``: those overlapping
+          an event of the other source in at least one bin;
+        - ``events_identical`` (the same first and last bin) and
+          ``event_bin_jaccard`` (bins in both sources' events over bins in
+          either's), the same for both sources.
+    """
+    bouts = windows[windows.kind == "bout"]
+    found = (
+        bouts.groupby(["epoch_id", SPLIT_COLUMN, "label_source", "state", "regime"])
+        .n_found.first()
+        .to_dict()
+    )
+    rows = []
+    pairs = windows[["epoch_id", SPLIT_COLUMN]].drop_duplicates()
+    for epoch_id, split in sorted(pairs.itertuples(index=False, name=None)):
+        record = json.loads(
+            decode_paths(epoch_id, split, output_dir)["record"].read_text()
+        )
+        agreement = record["agreement"]
+        for source in LABEL_SOURCES:
+            mine, shared = (
+                ("events_other", "other_events_shared")
+                if source == "half"
+                else ("events_reference", "reference_events_shared")
+            )
+            row: dict[str, Any] = {
+                "epoch_id": epoch_id,
+                SPLIT_COLUMN: split,
+                "label_source": source,
+                "events": agreement[mine],
+                "events_shared": agreement[shared],
+                "events_identical": agreement["events_identical"],
+                "event_bin_jaccard": agreement["event_bin_jaccard"],
+            }
+            for state in STATES:
+                for regime in REGIMES:
+                    row[bout_column(state, regime)] = int(
+                        found.get((epoch_id, split, source, state, regime), 0)
+                    )
+            rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def summarize_label_sources(output_dir: Path, epochs: list[str]) -> pd.DataFrame:
     """Per label source, Task 12's summary tables and figures; then side by side.
 
     Each epoch's value pools its four splits' windows (Task 12's epoch summary),
-    and bouts pair with their matched windows within their split.
+    and bouts pair with their matched windows within their split. Counts are per
+    split: for source "all", ``n`` counts bout x split, since each canonical bout
+    appears once per split, scored by that split's C; for source "half", ``n``
+    sums the four decodes' own bouts. The calibration verdicts' window gate
+    likewise counts window x split. The inference is unchanged: the epoch is the
+    unit.
+
+    The two sources share their scoring runs, not their bouts (each source's
+    labels select their own), so the side-by-side table compares partly
+    different bouts; :func:`agreement_table` says how different, and is written
+    beside it.
+
+    Returns
+    -------
+    pd.DataFrame
+        :func:`agreement_table` of the epochs (empty when there are none).
     """
     from continuum_swr_replay.analysis.hippocampus.state_evidence import (
         summarize_state_evidence,
@@ -615,7 +856,7 @@ def summarize_label_sources(output_dir: Path, epochs: list[str]) -> None:
     ]
     if not frames:
         print("no epoch scored; no summary", flush=True)
-        return
+        return pd.DataFrame()
     windows = pd.concat(frames, ignore_index=True)
     bouts = {}
     for source in LABEL_SOURCES:
@@ -656,11 +897,83 @@ def summarize_label_sources(output_dir: Path, epochs: list[str]) -> None:
         validate="one_to_one",
     )
     task12.write_csv(side_by_side, evidence_dir / "half_vs_all_bouts.csv")
+    agreement = agreement_table(output_dir, windows)
+    task12.write_csv(agreement, evidence_dir / "half_vs_all_agreement.csv")
     print(side_by_side.to_string(index=False), flush=True)
+    return agreement
 
 
-def readme(records: dict[str, dict], provenance: dict, decode_dir: Path) -> str:
-    """The evidence folder's README: what was run and what is held out."""
+def agreement_markdown(agreement: pd.DataFrame) -> list[str]:
+    """:func:`agreement_table` as a Markdown table, one row per epoch x split."""
+    if agreement.empty:
+        return ["No epoch was scored, so there is no agreement table."]
+    cells = [(state, regime) for regime in REGIMES for state in STATES]
+    header = (
+        "| epoch | split | events all / half | shared all / half | identical "
+        "| Jaccard | "
+        + " | ".join(f"{_SHORT_STATES[s]} {r} all / half" for s, r in cells)
+        + " |"
+    )
+    lines = [header, "|" + "---|" * (6 + len(cells))]
+    for (epoch_id, split), rows in agreement.groupby(["epoch_id", SPLIT_COLUMN]):
+        by_source = rows.set_index("label_source")
+        every, half = by_source.loc["all"], by_source.loc["half"]
+        jaccard = every["event_bin_jaccard"]
+        lines.append(
+            f"| {epoch_id} | {split} | {every['events']} / {half['events']} | "
+            f"{every['events_shared']} / {half['events_shared']} | "
+            f"{every['events_identical']} | "
+            + ("-" if pd.isna(jaccard) else f"{jaccard:.2f}")
+            + " | "
+            + " | ".join(
+                f"{every[bout_column(s, r)]} / {half[bout_column(s, r)]}"
+                for s, r in cells
+            )
+            + " |"
+        )
+    return lines
+
+
+def score_manifest(
+    records: dict[str, dict],
+    provenance: dict,
+    decode_dir: Path,
+    agreement: pd.DataFrame,
+) -> dict:
+    """The score's manifest: provenance, settings, records and the agreement."""
+    from scripts.qa import run_state_evidence as task12
+
+    by_epoch = (
+        {
+            epoch_id: rows.drop(columns="epoch_id").to_dict(orient="records")
+            for epoch_id, rows in agreement.groupby("epoch_id")
+        }
+        if not agreement.empty
+        else {}
+    )
+    manifest: dict = json_ready(
+        {
+            "produced_by": PRODUCED_BY,
+            "provenance": provenance,
+            "settings": task12.run_settings(),
+            "label_sources": LABEL_SOURCES,
+            "selection_caveat": SELECTION_CAVEAT,
+            "count_caveat": COUNT_CAVEAT,
+            "decode_dir": str(decode_dir),
+            "agreement": by_epoch,
+            "epochs": {k: records[k] for k in sorted(records)},
+        }
+    )
+    return manifest
+
+
+def readme(
+    records: dict[str, dict],
+    provenance: dict,
+    decode_dir: Path,
+    agreement: pd.DataFrame,
+) -> str:
+    """The evidence folder's README: what was run, what is held out, the agreement."""
     from scripts.qa import run_state_evidence as task12
 
     status = pd.Series({k: r["status"] for k, r in records.items()}, dtype=object)
@@ -697,9 +1010,11 @@ def readme(records: dict[str, dict], provenance: dict, decode_dir: Path) -> str:
         "first bin): the only information from C's spikes in the labels. C alone "
         "scores them (one run per window).",
         "- `label_source` all: the canonical decode's labels, scored by the same "
-        "four (S, C) runs, one per window: the matched comparison. Task 12's own "
-        "summary averages 20 runs per window, so its window values are less "
-        "spread and its medians are not directly comparable with these.",
+        "four (S, C) runs, one per window. Task 12's own summary averages 20 runs "
+        "per window, so its window values are less spread and its medians are not "
+        "directly comparable with these.",
+        f"- **Not the same bouts.** {SELECTION_CAVEAT}",
+        f"- {COUNT_CAVEAT}",
         "- `split` p{partition}d{direction}: the first two of Task 12's tetrode "
         "partitions, each in both directions. An epoch's value pools its four "
         "splits' windows, and bouts pair with their matched windows within their "
@@ -710,6 +1025,17 @@ def readme(records: dict[str, dict], provenance: dict, decode_dir: Path) -> str:
         "- Inference as in Task 12: each epoch enters as one value and the animal "
         "is the unit of replication (`run_state_evidence.py`'s README).",
         "",
+        "## How far the two sources' selections differ",
+        "",
+        "Per epoch and split: the non-local events of each source (all = the "
+        "canonical decode, half = the split's half decode), those shared with the "
+        "other source, those identical in both, the Jaccard index of their bins, "
+        "and the bouts each source found per state and regime (before the cap of "
+        "1500 scored per cell). Also in `half_vs_all_agreement.csv` and "
+        "`manifest.json`.",
+        "",
+        *agreement_markdown(agreement),
+        "",
         "## Files",
         "",
         "- `per_epoch/{epoch}_windows.parquet`, `per_epoch/{epoch}_validation.json`",
@@ -717,7 +1043,8 @@ def readme(records: dict[str, dict], provenance: dict, decode_dir: Path) -> str:
         "`trend_stats.csv`, `rate_calibration.csv`, `silence_stats.csv` and "
         "the three figures",
         "- `half_vs_all_bouts.csv`: the primary bout statistics, side by side",
-        "- `manifest.json`: provenance and every epoch's record",
+        "- `half_vs_all_agreement.csv`: the selections' agreement, above",
+        "- `manifest.json`: provenance, every epoch's record and the agreement",
         "",
     ]
     return "\n".join(lines)
@@ -725,6 +1052,16 @@ def readme(records: dict[str, dict], provenance: dict, decode_dir: Path) -> str:
 
 # --- command line -------------------------------------------------------------------------
 def build_parser() -> argparse.ArgumentParser:
+    """The command line: the ``decode`` and ``score`` subcommands.
+
+    Returns
+    -------
+    argparse.ArgumentParser
+        Both take ``--epochs`` (default the five pilot epochs), ``--decode-dir``
+        and ``--output-dir``; ``decode`` also ``--cuda_visible_devices``,
+        ``--all-tetrodes``, ``--max-bins`` and ``--overwrite``; ``score``
+        ``--n-workers``.
+    """
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
@@ -828,13 +1165,12 @@ def main(argv: list[str] | None = None) -> None:
     from scripts.qa import run_state_evidence as task12  # holds JAX to the CPU
 
     provenance = provenance_record(ROOT_DIR)
-    code = task12.code_version(provenance)
     evidence_dir = output_dir / "evidence"
     evidence_dir.mkdir(parents=True, exist_ok=True)
     kwargs = {
         "decode_dir": decode_dir,
         "output_dir": evidence_dir,
-        "code": code,
+        "code": code_version(provenance),
         "label_sets": partial(
             half_label_sets, output_dir=output_dir, decode_dir=decode_dir
         ),
@@ -843,20 +1179,15 @@ def main(argv: list[str] | None = None) -> None:
     for epoch_id, record in task12.run_epochs(args.epochs, kwargs, args.n_workers):
         records[epoch_id] = record
         print(f"{epoch_id}: {record['status']}", flush=True)
-    _write_json(
-        evidence_dir / "manifest.json",
-        {
-            "produced_by": PRODUCED_BY,
-            "provenance": provenance,
-            "settings": task12.run_settings(),
-            "label_sources": LABEL_SOURCES,
-            "decode_dir": str(decode_dir),
-            "epochs": {k: records[k] for k in sorted(records)},
-        },
-    )
     ok = [k for k in sorted(records) if records[k]["status"] == "ok"]
-    summarize_label_sources(output_dir, ok)
-    (evidence_dir / "README.md").write_text(readme(records, provenance, decode_dir))
+    agreement = summarize_label_sources(output_dir, ok)
+    write_json(
+        evidence_dir / "manifest.json",
+        score_manifest(records, provenance, decode_dir, agreement),
+    )
+    (evidence_dir / "README.md").write_text(
+        readme(records, provenance, decode_dir, agreement)
+    )
     failed = [k for k, r in records.items() if r["status"] != "ok"]
     if failed:
         sys.exit(f"{len(failed)} epochs not scored: {', '.join(sorted(failed))}")

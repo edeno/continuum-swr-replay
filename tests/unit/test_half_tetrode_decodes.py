@@ -14,6 +14,8 @@ from __future__ import annotations
 import copy
 import json
 import os
+import subprocess
+import sys
 import warnings
 from collections import Counter
 from dataclasses import dataclass
@@ -35,6 +37,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (
     STATES,
     bout_statistics,
     decode_inputs,
+    encoding_subset_check,
     half_splits,
     half_tetrode_decode,
     label_agreement,
@@ -81,6 +84,9 @@ CLUSTERLESS_PARAMS = {
     "disable_progress_bar": True,
 }
 SELECTING = np.array([0, 2, 5])
+PROVENANCE = {"commit": "c" * 40, "dirty": False}
+"""A clean tree's provenance, so that decodes written in a test can be kept."""
+REPO = Path(__file__).resolve().parents[2]
 
 
 def environment() -> Environment:
@@ -307,6 +313,11 @@ def test_the_half_encoding_holds_only_the_selecting_halfs_electrodes(canonical):
         np.sum([per_electrode[i] for i in SELECTING], axis=0),
         rtol=1e-6,
     )
+    # the runtime check says the same
+    check = encoding_subset_check(encoding, stored, SELECTING)
+    assert check["same_as_canonical_subset"]
+    assert check["same_keys"] and check["same_ground_models"]
+    assert check["max_rel_occupancy"] == 0.0 and check["max_rel_ground"] <= 1e-6
 
 
 def test_the_half_decode_reads_nothing_of_the_scoring_half(canonical):
@@ -613,49 +624,167 @@ def test_a_named_gpu_must_be_one_idle_card(device_environment):
             runner.configure_devices(devices, query=query)
 
 
-def test_a_smoke_decode_never_stands_in_for_a_whole_epoch(tmp_path):
-    paths = runner.decode_paths(EPOCH, "p0d0", tmp_path)
-    paths["decode"].parent.mkdir(parents=True)
+def test_importing_the_runner_does_not_load_jax():
+    """So ``configure_devices`` still chooses the device before JAX starts."""
+    probe = (
+        "import sys; import scripts.qa.run_half_tetrode_decodes; "
+        "print('jax' in sys.modules)"
+    )
+    out = subprocess.run(
+        [sys.executable, "-c", probe],
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        check=True,
+        env={**os.environ, "JAX_PLATFORMS": "cpu"},
+    )
+    assert out.stdout.strip() == "False"
+
+
+def written_record(paths: dict, **record) -> None:
+    """A decode file and its record, as an earlier run would leave them."""
+    paths["decode"].parent.mkdir(parents=True, exist_ok=True)
     paths["decode"].touch()
+    paths["record"].write_text(json.dumps(record))
 
-    def written(**record):
-        paths["record"].write_text(json.dumps(record))
 
-    written(status="ok", n_bins=3000, complete=False)
-    assert runner.reusable(EPOCH, "p0d0", tmp_path, 3000)
-    assert not runner.reusable(EPOCH, "p0d0", tmp_path, None)
-    assert not runner.reusable(EPOCH, "p0d0", tmp_path, 2000)
-    written(status="ok", n_bins=N_TIME, complete=True)
-    assert runner.reusable(EPOCH, "p0d0", tmp_path, None)
-    assert not runner.reusable(EPOCH, "p0d0", tmp_path, 3000)
-    written(status="failed", n_bins=N_TIME, complete=True)
-    assert not runner.reusable(EPOCH, "p0d0", tmp_path, None)
+def test_a_decode_is_kept_only_while_its_length_detector_and_code_match(tmp_path):
+    paths = runner.decode_paths(EPOCH, "p0d0", tmp_path)
+    stamp = {"name": f"{EPOCH}_detector.pkl", "size": 10, "mtime_ns": 5}
+    code = {"commit": "a" * 40, "dirty": False}
+
+    def reason(n_bins=None, *, now_stamp=stamp, now_code=code):
+        return runner.reuse_reason(
+            EPOCH, "p0d0", tmp_path, n_bins, stamp=now_stamp, code=now_code
+        )
+
+    assert reason() == "not written before"
+    good = {
+        "status": "ok",
+        "n_bins": N_TIME,
+        "complete": True,
+        "canonical_detector": stamp,
+        "code": code,
+    }
+    written_record(paths, **good)
+    assert reason() is None
+    assert reason(3000) == f"the earlier decode covers {N_TIME} bins, not 3000"
+    # a smoke test's decode never stands in for a whole epoch's, nor the reverse
+    written_record(paths, **{**good, "n_bins": 3000, "complete": False})
+    assert reason(3000) is None
+    assert reason() == "the earlier decode covers only the first 3000 bins"
+    assert reason(2000) == "the earlier decode covers 3000 bins, not 2000"
+    written_record(paths, **{**good, "status": "failed"})
+    assert reason() == "the earlier decode failed"
+    written_record(paths, **good)
+    assert reason(now_stamp={**stamp, "mtime_ns": 6}) == (
+        "the canonical detector file changed (name, size or mtime_ns)"
+    )
+    assert reason(now_code={"commit": "b" * 40, "dirty": False}) == (
+        "code commit aaaaaaaaa -> bbbbbbbbb"
+    )
+    dirty = "uncommitted changes, so the commit does not identify the code"
+    assert reason(now_code={**code, "dirty": True}) == dirty
+    written_record(paths, **{**good, "code": {**code, "dirty": True}})
+    assert reason() == dirty
     paths["decode"].unlink()
-    written(status="ok", n_bins=N_TIME, complete=True)
-    assert not runner.reusable(EPOCH, "p0d0", tmp_path, None)
+    assert reason() == "not written before"
 
 
-def test_a_canonical_encoding_that_is_not_the_plain_fit_fails_every_split(
-    canonical, tmp_path
-):
-    """What a posterior-weighted canonical encoding would do to the check."""
+def test_the_detector_stamp_survives_a_move_but_not_an_edit(tmp_path):
+    staging, canonical_dir = tmp_path / "staging", tmp_path / "canonical"
+    staging.mkdir()
+    canonical_dir.mkdir()
+    path = staging / f"{EPOCH}_detector.pkl"
+    path.write_bytes(b"detector")
+    stamp = runner.canonical_detector_stamp(EPOCH, staging)
+
+    os.rename(path, canonical_dir / path.name)  # a move keeps size and mtime
+
+    moved = canonical_dir / path.name
+    assert runner.canonical_detector_stamp(EPOCH, canonical_dir) == stamp
+    info = moved.stat()
+    moved.write_bytes(b"detecto2")  # the same size, edited
+    os.utime(moved, ns=(info.st_atime_ns, info.st_mtime_ns + 1))
+    assert runner.canonical_detector_stamp(EPOCH, canonical_dir) != stamp
+    moved.write_bytes(b"a longer detector")
+    os.utime(moved, ns=(info.st_atime_ns, info.st_mtime_ns))  # the old mtime
+    assert runner.canonical_detector_stamp(EPOCH, canonical_dir) != stamp
+
+
+def test_one_split_is_decoded_checked_and_written(canonical, tmp_path):
     decode_dir = tmp_path / "decode"
     write_canonical_decode(canonical, decode_dir)
-    weighted = copy.deepcopy(canonical.detector)
-    stored = weighted.encoding_model_[ENCODING_KEY]
-    stored["mean_rates"] = [rate * 1.01 for rate in stored["mean_rates"]]
-    weighted.save_model(str(decode_dir / f"{EPOCH}_detector.pkl"))
+    loaded = runner.load_canonical(EPOCH, decode_dir)
+    assert loaded.labels_reproduced and loaded.n_tetrodes == len(FIELD_CENTERS_CM)
+    job = runner.decode_jobs(loaded.n_tetrodes)[1]
+    output_dir = tmp_path / "out"
 
-    records = runner.decode_epoch(
-        EPOCH, decode_dir=decode_dir, output_dir=tmp_path / "out", log=lambda _: None
+    record = runner.decode_split(
+        loaded, job, output_dir=output_dir, provenance=PROVENANCE
     )
 
-    assert {r["status"] for r in records} == {"failed"}
-    assert all("not the canonical encoding restricted" in r["error"] for r in records)
-    assert not any(
-        runner.decode_paths(EPOCH, r["split"], tmp_path / "out")["decode"].exists()
-        for r in records
+    assert record["status"] == "ok", record.get("traceback")
+    assert (record["split"], record["partition"], record["direction"]) == (
+        "p0d1",
+        0,
+        1,
     )
+    assert record["selecting_tetrodes"] == job.selecting.tolist()
+    assert record["code"] == PROVENANCE and record["canonical_detector"] == loaded.stamp
+    check = record["half_encoding"]
+    assert check["same_as_canonical_subset"] and check["n_electrodes"] == 3
+    assert check["max_rel_ground"] <= 1e-6 and check["same_ground_models"]
+    assert record["n_bins"] == N_TIME and record["complete"]
+    assert record["agreement"]["reference_labels_reproduced"]
+    paths = runner.decode_paths(EPOCH, "p0d1", output_dir)
+    assert json.loads(paths["record"].read_text()) == record
+    expected, _ = half_tetrode_decode(canonical.detector, job.selecting)
+    with xr.open_dataset(paths["decode"], engine="h5netcdf") as decoded:
+        # stored as float32, which the decode already is unless another test
+        # module has turned on JAX's x64 mode
+        np.testing.assert_array_equal(
+            decoded.acausal_state_probabilities.values,
+            expected.acausal_state_probabilities.values.astype(np.float32),
+        )
+        assert json.loads(decoded.attrs["canonical_detector"]) == loaded.stamp
+        assert decoded.attrs["complete"] == 1
+
+    # a split that cannot be decoded is recorded, and leaves no decode file
+    bad = job._replace(name="p9d9", selecting=np.array([99]))
+    failed = runner.decode_split(
+        loaded, bad, output_dir=output_dir, provenance=PROVENANCE
+    )
+    assert failed["status"] == "failed" and "distinct indices" in failed["error"]
+    bad_paths = runner.decode_paths(EPOCH, "p9d9", output_dir)
+    assert not bad_paths["decode"].exists() and bad_paths["record"].exists()
+
+
+@pytest.mark.parametrize("alteration", ["mean_rates", "ground_models", "keys"])
+def test_a_canonical_encoding_that_is_not_the_plain_fit_fails_the_split(
+    canonical, tmp_path, alteration
+):
+    """What a posterior-weighted canonical encoding, say, would do to the check."""
+    decode_dir = tmp_path / "decode"
+    write_canonical_decode(canonical, decode_dir)
+    loaded = runner.load_canonical(EPOCH, decode_dir)
+    job = runner.decode_jobs(loaded.n_tetrodes)[0]
+    stored = loaded.detector.encoding_model_[ENCODING_KEY]
+    if alteration == "mean_rates":
+        stored["mean_rates"] = [rate * 1.01 for rate in stored["mean_rates"]]
+    elif alteration == "ground_models":
+        model = stored["gpi_models"][job.selecting[0]]
+        model.std = model.std * 2
+    else:
+        stored["an_extra_entry"] = None
+
+    record = runner.decode_split(
+        loaded, job, output_dir=tmp_path / "out", provenance=PROVENANCE
+    )
+
+    assert record["status"] == "failed"
+    assert "not the canonical encoding restricted" in record["error"]
+    assert not runner.decode_paths(EPOCH, job.name, tmp_path / "out")["decode"].exists()
 
 
 def test_half_labels_are_decoded_and_scored_end_to_end(
@@ -665,6 +794,7 @@ def test_half_labels_are_decoded_and_scored_end_to_end(
     write_canonical_decode(canonical, decode_dir)
     output_dir = tmp_path / "half_tetrode"
     monkeypatch.setattr(run_state_evidence, "CV_BLOCK_S", 2.0)  # a 12 s epoch
+    monkeypatch.setattr(runner, "provenance_record", lambda _root: PROVENANCE)
 
     records = runner.decode_epoch(
         EPOCH, decode_dir=decode_dir, output_dir=output_dir, log=lambda _: None
@@ -737,7 +867,7 @@ def test_half_labels_are_decoded_and_scored_end_to_end(
         p[int(row.s) : int(row.e) + 1].mean(0),
     )
 
-    runner.summarize_label_sources(output_dir, [EPOCH])
+    agreement = runner.summarize_label_sources(output_dir, [EPOCH])
     for source in ("half", "all"):
         for name in ("bout_stats.csv", "trend_stats.csv", "silence_stats.csv"):
             assert (output_dir / "evidence" / source / name).exists(), (source, name)
@@ -745,12 +875,46 @@ def test_half_labels_are_decoded_and_scored_end_to_end(
     assert {"animal_estimate_half", "animal_estimate_all"} <= set(side_by_side)
     assert side_by_side.primary.all()
 
-    # half decodes made from another canonical detector file are refused
-    detector = decode_dir / f"{EPOCH}_detector.pkl"
+    # how far the two sources' selections differ, per split and source
+    written = pd.read_csv(output_dir / "evidence" / "half_vs_all_agreement.csv")
+    assert len(written) == len(agreement) == 8
+    by_split = {r["split"]: r["agreement"] for r in records}
+    for row in agreement.itertuples(index=False):
+        events = by_split[row.split]
+        mine = "events_other" if row.label_source == "half" else "events_reference"
+        assert row.events == events[mine]
+        assert row.event_bin_jaccard == pytest.approx(events["event_bin_jaccard"])
+        bouts = table[
+            (table.kind == "bout")
+            & (table.split == row.split)
+            & (table.label_source == row.label_source)
+            & (table.state == "Non-Local Continuous")
+            & (table.regime == "immobile")
+        ]
+        assert row.bouts_nl_cont_immobile == (
+            bouts.n_found.iloc[0] if len(bouts) else 0
+        )
+    assert agreement[agreement.label_source == "all"].bouts_nl_cont_immobile.min() > 0
+    text = runner.readme({EPOCH: record}, PROVENANCE, decode_dir, agreement)
+    assert "share their scoring runs" in text and "not their bouts" in text
+    assert "counts bout x split" in text
+    assert sum(line.startswith(f"| {EPOCH} | p") for line in text.splitlines()) == 4
+    manifest = runner.score_manifest({EPOCH: record}, PROVENANCE, decode_dir, agreement)
+    assert len(manifest["agreement"][EPOCH]) == 8
+    json.dumps(manifest, allow_nan=False)
+
+    # a canonical detector file moved to another folder still stands for its
+    # decodes; an edited one does not
+    moved = tmp_path / "canonical"
+    decode_dir.rename(moved)
+    assert (
+        len(runner.half_label_sets(EPOCH, output_dir=output_dir, decode_dir=moved)) == 8
+    )
+    detector = moved / f"{EPOCH}_detector.pkl"
     info = detector.stat()
     os.utime(detector, ns=(info.st_atime_ns, info.st_mtime_ns + 10**9))
     stale = runner.score_epoch(
-        EPOCH, decode_dir=decode_dir, output_dir=output_dir,
+        EPOCH, decode_dir=moved, output_dir=output_dir,
         load_inputs=lambda _epoch_id: stand_in_loader(canonical), log=lambda _: None,
     )  # fmt: skip
     assert stale["status"] == "failed"
