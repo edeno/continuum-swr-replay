@@ -37,7 +37,6 @@ from __future__ import annotations
 import argparse
 import logging
 import pickle
-import re
 import time
 from pathlib import Path
 
@@ -57,7 +56,7 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
 from continuum_swr_replay.analysis.replay import build_event_patch_table
 from continuum_swr_replay.analysis.replay import prepare_data as replay_prepare_data
 from continuum_swr_replay.analysis.replay.covariates import load_contingency
-from continuum_swr_replay.data_loaders.constants import NWB_FILES
+from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.table_io import publish_canonical
 
@@ -90,71 +89,82 @@ OUTPUT_DIR = PROCESSED_DATA_DIR / "contfrag_replay_content"
 
 def find_sessions(
     max_per_animal: int | None = None,
-    brain_area: str | None = None,
-):
-    """Yield sessions that have ContFrag ``data_over_time.pkl`` and ``environment.pkl``.
+    brain_area: str = "HPC",
+) -> list[dict]:
+    """The epoch register's analysed epochs, each with its ContFrag decode files.
 
-    When ``brain_area`` is provided, only sessions for that area are
-    returned. Without filtering, the prep script would silently merge
-    HPC + mPFC + OFC sessions into a single combined output even
-    though ``run_decoding_contfrag.py`` writes per-area files; the
-    saved tables would also collide on event_id / stop_id because
-    the canonical hashes do not include brain_area
-    (see ``analysis.replay.event_ids.hash_event_id`` /
-    ``hash_stop_id``).
+    One brain area at a time: ``run_decoding_contfrag.py`` writes per-area files,
+    and the saved tables would collide on event_id / stop_id across areas,
+    because the canonical hashes do not include brain_area (see
+    ``analysis.replay.event_ids.hash_event_id`` / ``hash_stop_id``).
+
+    The sessions are ``analysed_epochs()``, in ``session_id`` order within each
+    animal, the animals in order. For HPC, recorded in every analysed epoch, an
+    analysed epoch without its decode stops the build. mPFC and OFC are recorded
+    in some sessions only, so an analysed epoch with no decode for the area is
+    outside that area's cohort and is left out.
+
+    Parameters
+    ----------
+    max_per_animal : int, optional
+        Only each animal's first epochs, for a smoke run.
+    brain_area : str, optional
+        ``HPC`` (default), ``mPFC`` or ``OFC``.
+
+    Returns
+    -------
+    list of dict
+        ``nwb_file_name``, ``epoch_name``, ``brain_area``, ``dot_file``,
+        ``env_file`` and ``results_file`` per session.
+
+    Raises
+    ------
+    FileNotFoundError
+        If, for HPC, a selected epoch has no ContFrag ``data_over_time.pkl`` or
+        ``environment.pkl`` under ``PROCESSED_DATA_DIR``.
     """
-    dot_files = sorted(PROCESSED_DATA_DIR.glob("*_contfrag_data_over_time.pkl"))
-    env_files = {
-        f.stem.replace("_environment", ""): f
-        for f in PROCESSED_DATA_DIR.glob("*_contfrag_environment.pkl")
-    }
-
     by_animal: dict[str, list] = {}
-    for f in dot_files:
-        match = re.match(
-            r"(\w+\d{8})_(\d+_r\d+)_(\w+)_contfrag_data_over_time\.pkl", f.name
-        )
-        if not match:
-            continue
-        animal_date, epoch, file_brain_area = (
-            match.group(1),
-            match.group(2),
-            match.group(3),
-        )
-        if brain_area is not None and file_brain_area != brain_area:
-            continue
-        # animal_date is captured as ``\w+\d{8}`` so the animal id is
-        # everything before the trailing 8-digit date. ``re.match(r"[a-z]+", ...)``
-        # would collapse digit-bearing ids (``j162021...`` → ``j``).
+    for nwb_file_name, epoch in analysed_epochs().index:
+        animal_date = nwb_file_name.removesuffix("_.nwb")
+        # The NWB stem ends in an 8-digit date, so the animal id is everything
+        # before it (``j16`` keeps its digits).
         animal = animal_date[:-8]
-        session_id = f"{animal_date}_{epoch}_{file_brain_area}_contfrag"
-        if session_id not in env_files:
+        session_id = f"{animal_date}_{epoch}_{brain_area}_contfrag"
+        dot_file = PROCESSED_DATA_DIR / f"{session_id}_data_over_time.pkl"
+        env_file = PROCESSED_DATA_DIR / f"{session_id}_environment.pkl"
+        if brain_area != "HPC" and not (dot_file.exists() and env_file.exists()):
             continue
-
-        nwb_match = [nwb for nwb in NWB_FILES if animal_date in nwb]
-        if not nwb_match:
-            continue
-
         results_path = PROCESSED_DATA_DIR / f"{session_id}_results.nc"
-
         by_animal.setdefault(animal, []).append(
             {
-                "nwb_file_name": nwb_match[0],
+                "nwb_file_name": nwb_file_name,
                 "epoch_name": epoch,
-                "brain_area": file_brain_area,
-                "dot_file": f,
-                "env_file": env_files[session_id],
+                "brain_area": brain_area,
+                "dot_file": dot_file,
+                "env_file": env_file,
                 "results_file": results_path if results_path.exists() else None,
             }
         )
 
     selected = []
     for animal in sorted(by_animal):
-        sessions = by_animal[animal]
+        sessions = sorted(by_animal[animal], key=lambda session: session["dot_file"])
         if max_per_animal is not None:
             sessions = sessions[:max_per_animal]
         selected.extend(sessions)
 
+    missing = [
+        path.name
+        for session in selected
+        for path in (session["dot_file"], session["env_file"])
+        if not path.exists()
+    ]
+    if missing:
+        raise FileNotFoundError(
+            f"{len(missing)} ContFrag decode file(s) of the epoch register's "
+            f"analysed epochs are not under {PROCESSED_DATA_DIR}: "
+            f"{', '.join(missing[:10])}" + (", ..." if len(missing) > 10 else "")
+        )
     return selected
 
 

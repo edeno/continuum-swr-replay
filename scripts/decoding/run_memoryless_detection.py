@@ -57,8 +57,13 @@ Epoch identifiers name the decode: ``chimi20200212_02_r1_HPC`` is the
 canonical one (Kay's SWRs, trained on ``no_ripple``, stationary). A decode
 made another way carries suffixes in the order the decode appends them:
 ``_contfrag``, a ripple detector (``_Karlsson``), ``_non_stationary``, and a
-training type (``_all``). ``--animal`` and ``--all`` run canonical decodes
-only unless ``--include-variants`` is given; ``--epoch-id`` runs whatever it
+training type (``_all``). ``--animal`` and ``--all`` run the epoch register's
+analysed epochs (``analysed_epochs``) of that animal, or of every animal: each
+one's canonical decode, and with ``--include-variants`` also the variants of it
+found under ``--root``. An analysed epoch whose decode is missing is run, and
+recorded as failed, so a run never covers fewer epochs than the register
+without saying so; a decode under ``--root`` whose epoch the register does not
+analyse is left out, and recorded as skipped. ``--epoch-id`` runs whatever it
 names. ``--date`` and ``--epoch`` narrow any of the three. The date is the
 last 8 characters of the NWB file's stem, so ``j1620210707`` was recorded on
 20210707; the epoch is a name such as ``02_r1``.
@@ -84,7 +89,7 @@ import logging
 import os
 import sys
 import traceback
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from importlib.metadata import version
@@ -121,7 +126,9 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle impor
     SIGNIFICANCE_LEVEL,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import git_hash
+from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
 from continuum_swr_replay.data_loaders.spikes import filter_spike_times, get_hpc_marks
+from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.decoding_common import (
     provenance_record,
     raise_open_file_limit,
@@ -234,45 +241,81 @@ def input_paths(epoch_id: str, root: Path) -> dict[str, Path]:
     }
 
 
-def find_epochs(
-    animal: str | None, root: Path, *, include_variants: bool = False
-) -> tuple[list[str], dict[str, str]]:
-    """HPC decodes with both artifacts saved, and why every other one was left out.
+NOT_ANALYSED = "not an analysed epoch in the epoch register"
+"""Why a decode under ``--root`` is left out when the register does not analyse
+its epoch."""
 
-    HPC only: this port reads a clusterless encoding model. A name no decode
-    writes, or a missing artifact, is recorded rather than raised, so one
-    stray file cannot stop a run over many epochs.
+
+def find_epochs(
+    animal: str | None,
+    root: Path,
+    analysed: Iterable[tuple[str, str]],
+    *,
+    include_variants: bool = False,
+) -> tuple[list[str], dict[str, str]]:
+    """The analysed epochs' HPC decodes, and why every other decode was left out.
+
+    Every analysed epoch's canonical decode is listed, whether or not its files
+    are under `root`: ``run_one`` then records a missing one as failed. HPC
+    only: this port reads a clusterless encoding model. A decode under `root`
+    that is not an analysed epoch's canonical one is recorded rather than
+    raised, so one stray file cannot stop a run over many epochs.
+
+    Parameters
+    ----------
+    animal : str or None
+        Only this animal's epochs; None for every animal's.
+    root : Path
+        Where the decodes are.
+    analysed : Iterable of (str, str)
+        ``(nwb_file_name, epoch_name)`` of the epochs the register analyses,
+        ``analysed_epochs().index``.
+    include_variants : bool, optional
+        Also list the analysed epochs' decode variants found under `root`.
 
     Returns
     -------
     epochs : list of str
+        Sorted.
     skipped : dict of str to str
         Epoch identifier to the reason it was left out.
     """
+    keys = {
+        (nwb_file_name, epoch_name)
+        for nwb_file_name, epoch_name in analysed
+        if animal is None or parse_nwb_filename(nwb_file_name)[0] == animal
+    }
+    epochs = {
+        f"{nwb_file_name.removesuffix('_.nwb')}_{epoch_name}_HPC"
+        for nwb_file_name, epoch_name in keys
+    }
+    skipped = {}
     pattern = f"{animal}*_HPC*_detector.pkl" if animal else "*_HPC*_detector.pkl"
-    epochs, skipped = [], {}
     for detector in sorted(root.glob(pattern)):
         epoch_id = detector.name.removesuffix("_detector.pkl")
-        missing = [
-            name
-            for name, path in input_paths(epoch_id, root).items()
-            if not path.exists()
-        ]
-        if missing:
-            skipped[epoch_id] = f"missing {', '.join(missing)}"
+        if epoch_id in epochs:
             continue
         try:
             key = parse_epoch_identifier(epoch_id)
         except ValueError as error:
             skipped[epoch_id] = str(error)
             continue
+        missing = [
+            name
+            for name, path in input_paths(epoch_id, root).items()
+            if not path.exists()
+        ]
         if key.brain_area != "HPC":
             skipped[epoch_id] = f"brain area {key.brain_area}, not HPC"
-        elif not key.is_canonical and not include_variants:
+        elif (key.nwb_file_name, key.epoch_name) not in keys:
+            skipped[epoch_id] = NOT_ANALYSED
+        elif not include_variants:
             skipped[epoch_id] = "a decode variant; pass --include-variants to run it"
+        elif missing:
+            skipped[epoch_id] = f"missing {', '.join(missing)}"
         else:
-            epochs.append(epoch_id)
-    return epochs, skipped
+            epochs.add(epoch_id)
+    return sorted(epochs), skipped
 
 
 def select_epochs(
@@ -436,8 +479,9 @@ def run_one(
     Raises
     ------
     FileNotFoundError
-        An input is missing. A run over many epochs never asks for one:
-        :func:`find_epochs` leaves such epochs out and records why.
+        An input is missing. A run over the register asks for one when an
+        analysed epoch's decode is missing, and records the epoch as failed;
+        :func:`find_epochs` leaves out a variant with a missing input.
     ValueError
         The marks are not the ones the encoding model was fitted on, or the
         grid, the identifier or ``data_over_time`` is not what the detector
@@ -807,6 +851,7 @@ def main(argv: list[str] | None = None) -> None:
         epoch_ids, skipped = find_epochs(
             None if args.all else args.animal,
             args.root,
+            analysed_epochs().index,
             include_variants=args.include_variants,
         )
     epoch_ids = select_epochs(epoch_ids, date=args.date, epoch=args.epoch)

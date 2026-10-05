@@ -39,7 +39,7 @@ from continuum_swr_replay.analysis.hippocampus.hpc_raw_stats import (
     extract_discrete_transition_matrix,
 )
 from continuum_swr_replay.data_loaders.bandit_task import load_data
-from continuum_swr_replay.data_loaders.utils import get_epoch_info
+from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.types import DataLoadingPreset
 
@@ -116,8 +116,11 @@ def _compute_one_session(
 
 
 def _build_session_list(animal: str | None, limit: int | None) -> pd.DataFrame:
-    """Return a DataFrame with one row per epoch, columns animal/day/epoch/nwb."""
-    ei = get_epoch_info().reset_index()  # index: (nwb_file_name, interval_list_name)
+    """Return a DataFrame with one row per epoch, columns animal/day/epoch/nwb.
+
+    The epochs are the epoch register's analysed ones.
+    """
+    ei = analysed_epochs().reset_index()  # index: (nwb_file_name, interval_list_name)
     df = pd.DataFrame({
         "nwb_file_name": ei["nwb_file_name"],
         "animal": ei["animal"],

@@ -1,0 +1,558 @@
+nwb_file_name,epoch,status,reason,evidence
+chimi20200212_.nwb,02_r1,pending,PENDING_POPULATE,"First-exposure session (200 trials, p(R) 100% then 50%). No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on chimi20200217, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 1 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+chimi20200213_.nwb,02_r1,analysed,,
+chimi20200213_.nwb,04_r2,analysed,,
+chimi20200213_.nwb,06_r3,analysed,,
+chimi20200214_.nwb,02_r1,analysed,,
+chimi20200214_.nwb,04_r2,analysed,,
+chimi20200214_.nwb,06_r3,analysed,,
+chimi20200215_.nwb,02_r1,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+chimi20200215_.nwb,04_r2,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+chimi20200215_.nwb,06_r3,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+chimi20200215_.nwb,07_r3,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+chimi20200216_.nwb,02_r1,analysed,,
+chimi20200216_.nwb,04_r2,analysed,,
+chimi20200216_.nwb,06_r3,analysed,,
+chimi20200217_.nwb,02_r1,analysed,,
+chimi20200217_.nwb,04_r2,analysed,,
+chimi20200217_.nwb,06_r3,analysed,,
+chimi20200218_.nwb,02_r1,analysed,,
+chimi20200218_.nwb,04_r2,analysed,,
+chimi20200218_.nwb,06_r3,analysed,,
+chimi20200219_.nwb,02_r1,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+chimi20200219_.nwb,04_r2,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+chimi20200219_.nwb,06_r3,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+chimi20200220_.nwb,02_r1,analysed,,
+chimi20200220_.nwb,04_r2,analysed,,
+chimi20200220_.nwb,06_r3,analysed,,
+chimi20200221_.nwb,02_r1,analysed,,
+chimi20200221_.nwb,04_r2,analysed,,
+chimi20200221_.nwb,06_r3,analysed,,
+chimi20200221_.nwb,08_r4,analysed,,
+chimi20200222_.nwb,02_r1,analysed,,
+chimi20200222_.nwb,04_r2,analysed,,
+chimi20200222_.nwb,06_r3,analysed,,
+chimi20200222_.nwb,08_r4,analysed,,
+chimi20200223_.nwb,02_r1,analysed,,
+chimi20200223_.nwb,04_r2,analysed,,
+chimi20200223_.nwb,06_r3,analysed,,
+chimi20200223_.nwb,08_r4,analysed,,
+chimi20200224_.nwb,02_r1,analysed,,
+chimi20200224_.nwb,04_r2,analysed,,
+chimi20200224_.nwb,06_r3,analysed,,
+chimi20200224_.nwb,08_r4,analysed,,
+chimi20200225_.nwb,02_r1,analysed,,
+chimi20200225_.nwb,04_r2,analysed,,
+chimi20200225_.nwb,06_r3,analysed,,
+chimi20200225_.nwb,08_r4,analysed,,
+chimi20200226_.nwb,02_r1,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+chimi20200226_.nwb,04_r2,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+chimi20200226_.nwb,06_r3,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+chimi20200227_.nwb,02_r1,analysed,,
+chimi20200227_.nwb,04_r2,analysed,,
+chimi20200227_.nwb,06_r3,analysed,,
+chimi20200227_.nwb,08_r4,analysed,,
+chimi20200228_.nwb,02_r1,analysed,,
+chimi20200228_.nwb,04_r2,analysed,,
+chimi20200228_.nwb,06_r3,analysed,,
+chimi20200301_.nwb,*,excluded,NO_RUN_EPOCH,"The raw NWB (/stelmo/nwb/raw/chimi20200301.nwb) holds one epoch, 01_s1 (sleep), so no run epoch exists; never ingested (Spyglass Session: 0 rows)."
+chimi20200302_.nwb,*,excluded,NO_NWB,"No chimi20200302*.nwb in /stelmo/nwb/raw or /nimbus/nwb/raw2, and no Spyglass Nwbfile or Session row. Whether a raw .rec exists elsewhere is unknown."
+chimi20200303_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; no alison_behav.TrialsInfoByEpoch row for the epoch. Also no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (trial parsing incomplete; listed as excluded since c39f0e9).
+chimi20200303_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; no alison_behav.TrialsInfoByEpoch row for the epoch. Also no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (trial parsing incomplete; listed as excluded since c39f0e9).
+chimi20200303_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80. Also no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (trial parsing incomplete; listed as excluded since c39f0e9).
+chimi20200304_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+chimi20200304_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+chimi20200305_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+chimi20200305_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+chimi20200305_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+chimi20200306_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+chimi20200306_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+chimi20200306_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+chimi20200307_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80. Also no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (trial parsing incomplete; listed as excluded since c39f0e9).
+chimi20200307_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; no alison_behav.TrialsInfoByEpoch row for the epoch. Also no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (trial parsing incomplete; listed as excluded since c39f0e9).
+chimi20200307_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; no alison_behav.TrialsInfoByEpoch row for the epoch. Also no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (trial parsing incomplete; listed as excluded since c39f0e9).
+chimi20200308_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+chimi20200308_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+chimi20200308_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+chimi20200310_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+chimi20200310_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+chimi20200311_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+chimi20200311_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+chimi20200311_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+chimi20200311_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+chimi20200312_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+chimi20200312_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+chimi20200312_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+chimi20200312_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+chimi20200313_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+chimi20200313_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+chimi20200313_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+chimi20200313_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210706_.nwb,02_r1,analysed,,"First-exposure session (200 trials, p(R) 100% then 50%)."
+j1620210706_.nwb,04_r2,analysed,,
+j1620210706_.nwb,06_r3,analysed,,
+j1620210706_.nwb,08_r4,analysed,,
+j1620210706_.nwb,10_r5,analysed,,
+j1620210706_.nwb,12_r6,analysed,,
+j1620210707_.nwb,02_r1,analysed,,
+j1620210707_.nwb,04_r2,analysed,,
+j1620210707_.nwb,06_r3,analysed,,
+j1620210707_.nwb,08_r4,analysed,,
+j1620210707_.nwb,10_r5,analysed,,
+j1620210707_.nwb,12_r6,analysed,,"Formerly blocked by an NWB checksum failure; resolved 2026-08-19, when its analysis file was rewritten and its DataJoint hash matched again."
+j1620210707_.nwb,14_r7,analysed,,
+j1620210707_.nwb,16_r8,analysed,,
+j1620210708_.nwb,02_r1,analysed,,
+j1620210708_.nwb,04_r2,analysed,,
+j1620210708_.nwb,06_r3,analysed,,
+j1620210708_.nwb,08_r4,analysed,,
+j1620210708_.nwb,10_r5,analysed,,
+j1620210708_.nwb,12_r6,analysed,,
+j1620210708_.nwb,14_r7,analysed,,
+j1620210708_.nwb,16_r8,analysed,,
+j1620210709_.nwb,02_r1,analysed,,
+j1620210709_.nwb,04_r2,analysed,,
+j1620210709_.nwb,06_r3,analysed,,
+j1620210709_.nwb,08_r4,analysed,,
+j1620210709_.nwb,10_r5,analysed,,
+j1620210709_.nwb,12_r6,analysed,,
+j1620210709_.nwb,14_r7,analysed,,
+j1620210710_.nwb,02_r1,analysed,,
+j1620210710_.nwb,04_r2,analysed,,
+j1620210710_.nwb,06_r3,analysed,,
+j1620210710_.nwb,08_r4,analysed,,
+j1620210710_.nwb,10_r5,analysed,,
+j1620210710_.nwb,12_r6,analysed,,
+j1620210710_.nwb,14_r7,analysed,,
+j1620210711_.nwb,02_r1,analysed,,
+j1620210711_.nwb,04_r2,analysed,,
+j1620210711_.nwb,06_r3,analysed,,
+j1620210711_.nwb,08_r4,analysed,,
+j1620210711_.nwb,10_r5,analysed,,
+j1620210711_.nwb,12_r6,analysed,,
+j1620210711_.nwb,14_r7,analysed,,
+j1620210712_.nwb,02_r1,analysed,,
+j1620210712_.nwb,04_r2,analysed,,
+j1620210712_.nwb,06_r3,analysed,,
+j1620210712_.nwb,08_r4,analysed,,
+j1620210712_.nwb,10_r5,analysed,,
+j1620210712_.nwb,12_r6,analysed,,
+j1620210712_.nwb,14_r7,analysed,,
+j1620210713_.nwb,02_r1,analysed,,
+j1620210713_.nwb,04_r2,analysed,,
+j1620210713_.nwb,06_r3,analysed,,
+j1620210713_.nwb,08_r4,analysed,,
+j1620210713_.nwb,10_r5,analysed,,
+j1620210713_.nwb,12_r6,analysed,,
+j1620210713_.nwb,14_r7,analysed,,
+j1620210713_.nwb,16_r8,analysed,,
+j1620210714_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210714_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210714_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210714_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210714_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210714_.nwb,12_r6,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210715_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210715_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210715_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210715_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210715_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210716_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210716_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210716_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210716_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210716_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210717_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210717_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210717_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210717_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210717_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210718_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210718_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210718_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210718_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210718_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210719_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210719_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210719_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210719_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210719_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210720_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210720_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210720_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210720_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210720_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210721_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210721_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210721_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210721_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210721_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+j1620210721_.nwb,12_r6,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+peanut20201124_.nwb,02_r1,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+peanut20201124_.nwb,04_r2,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+peanut20201124_.nwb,06_r3,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+peanut20201124_.nwb,07_r4,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+peanut20201124_.nwb,09_r5,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+peanut20201125_.nwb,02_r1,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 1 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201125_.nwb,04_r2,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 3 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201125_.nwb,06_r3,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 5 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201125_.nwb,08_r4,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 7 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201125_.nwb,10_r5,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 9 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201125_.nwb,12_r6,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 11 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201125_.nwb,14_r7,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 13 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201126_.nwb,*,excluded,NO_NWB,"No peanut20201126*.nwb in /stelmo/nwb/raw or /nimbus/nwb/raw2, and no Spyglass Nwbfile or Session row. Whether a raw .rec exists elsewhere is unknown."
+peanut20201127_.nwb,02_r1,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 1 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201127_.nwb,04_r2,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 3 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201127_.nwb,06_r3,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 5 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201127_.nwb,08_r4,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 7 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201127_.nwb,10_r5,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 9 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201127_.nwb,12_r6,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 11 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201127_.nwb,14_r7,analysed,,
+peanut20201128_.nwb,02_r1,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 1 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201128_.nwb,04_r2,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 3 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201128_.nwb,06_r3,analysed,,
+peanut20201128_.nwb,08_r4,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 7 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201128_.nwb,10_r5,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 9 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201128_.nwb,12_r6,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 11 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201128_.nwb,14_r7,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 13 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201128_.nwb,16_r8,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 15 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201129_.nwb,02_r1,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201129, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 1 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201129_.nwb,04_r2,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201129, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 3 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201129_.nwb,06_r3,analysed,,
+peanut20201129_.nwb,08_r4,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201129, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 7 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201129_.nwb,10_r5,analysed,,
+peanut20201129_.nwb,12_r6,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201129, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 11 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201129_.nwb,14_r7,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201129, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 13 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201129_.nwb,16_r8,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201129, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 15 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201130_.nwb,02_r1,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+peanut20201130_.nwb,04_r2,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+peanut20201130_.nwb,06_r3,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+peanut20201130_.nwb,08_r4,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+peanut20201130_.nwb,10_r5,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+peanut20201130_.nwb,12_r6,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+peanut20201130_.nwb,14_r7,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+peanut20201130_.nwb,16_r8,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+peanut20201201_.nwb,02_r1,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 1 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201201_.nwb,04_r2,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 3 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201201_.nwb,06_r3,analysed,,
+peanut20201201_.nwb,08_r4,analysed,,
+peanut20201201_.nwb,10_r5,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 9 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201201_.nwb,12_r6,analysed,,
+peanut20201201_.nwb,14_r7,analysed,,
+peanut20201202_.nwb,02_r1,analysed,,
+peanut20201202_.nwb,04_r2,analysed,,
+peanut20201202_.nwb,06_r3,analysed,,
+peanut20201202_.nwb,08_r4,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 7 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201202_.nwb,10_r5,analysed,,
+peanut20201202_.nwb,12_r6,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 11 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201202_.nwb,14_r7,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 13 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+peanut20201202_.nwb,16_r8,analysed,,
+peanut20201203_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+peanut20201203_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+peanut20201203_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+peanut20201203_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+peanut20201203_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+peanut20201204_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+peanut20201204_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+peanut20201204_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+peanut20201204_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+peanut20201204_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+peanut20201205_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+peanut20201205_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+peanut20201205_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+peanut20201205_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+peanut20201205_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+peanut20201206_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+peanut20201206_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+peanut20201206_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+peanut20201206_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+peanut20201206_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+peanut20201207_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; no alison_behav.TrialsInfoByEpoch row for the epoch. Also no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (trial parsing incomplete; listed as excluded since c39f0e9).
+peanut20201207_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; no alison_behav.TrialsInfoByEpoch row for the epoch. Also no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (trial parsing incomplete; listed as excluded since c39f0e9).
+peanut20201207_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; no alison_behav.TrialsInfoByEpoch row for the epoch. Also no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (trial parsing incomplete; listed as excluded since c39f0e9).
+peanut20201207_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; no alison_behav.TrialsInfoByEpoch row for the epoch. Also no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (trial parsing incomplete; listed as excluded since c39f0e9).
+peanut20201207_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; no alison_behav.TrialsInfoByEpoch row for the epoch. Also no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (trial parsing incomplete; listed as excluded since c39f0e9).
+peanut20201207_.nwb,12_r6,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; no alison_behav.TrialsInfoByEpoch row for the epoch. Also no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (trial parsing incomplete; listed as excluded since c39f0e9).
+peanut20201208_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+peanut20201208_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+peanut20201208_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+peanut20201208_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+peanut20201208_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+peanut20201209_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+peanut20201209_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+peanut20201209_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+peanut20201209_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+peanut20201209_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201027_.nwb,02_r1,analysed,,"First-exposure session (200 trials, p(R) 100% then 50%)."
+senor20201028_.nwb,02_r1,analysed,,
+senor20201028_.nwb,04_r2,analysed,,
+senor20201028_.nwb,06_r3,analysed,,
+senor20201028_.nwb,08_r4,analysed,,
+senor20201029_.nwb,02_r1,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+senor20201029_.nwb,04_r2,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+senor20201029_.nwb,06_r3,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+senor20201029_.nwb,08_r4,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+senor20201029_.nwb,10_r5,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+senor20201030_.nwb,02_r1,analysed,,
+senor20201030_.nwb,04_r2,analysed,,
+senor20201030_.nwb,06_r3,analysed,,
+senor20201030_.nwb,08_r4,analysed,,
+senor20201030_.nwb,10_r5,analysed,,
+senor20201030_.nwb,12_r6,analysed,,
+senor20201030_.nwb,14_r7,analysed,,
+senor20201031_.nwb,02_r1,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+senor20201031_.nwb,04_r2,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+senor20201031_.nwb,06_r3,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+senor20201031_.nwb,08_r4,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+senor20201031_.nwb,10_r5,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+senor20201031_.nwb,12_r6,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+senor20201031_.nwb,14_r7,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+senor20201101_.nwb,02_r1,analysed,,
+senor20201101_.nwb,04_r2,analysed,,
+senor20201101_.nwb,06_r3,analysed,,
+senor20201101_.nwb,08_r4,analysed,,
+senor20201101_.nwb,10_r5,analysed,,
+senor20201101_.nwb,12_r6,analysed,,
+senor20201101_.nwb,14_r7,analysed,,
+senor20201101_.nwb,16_r8,analysed,,
+senor20201102_.nwb,02_r1,analysed,,"Formerly blocked by an NWB checksum failure; resolved 2026-08-19, when its analysis file was rewritten and its DataJoint hash matched again."
+senor20201102_.nwb,04_r2,analysed,,
+senor20201102_.nwb,06_r3,analysed,,
+senor20201102_.nwb,08_r4,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on senor20201030, LFPBandV1 ripple and theta, 22 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 7 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+senor20201102_.nwb,10_r5,analysed,,
+senor20201102_.nwb,12_r6,analysed,,
+senor20201102_.nwb,14_r7,analysed,,
+senor20201102_.nwb,16_r8,analysed,,
+senor20201103_.nwb,02_r1,analysed,,
+senor20201103_.nwb,04_r2,analysed,,
+senor20201103_.nwb,06_r3,analysed,,
+senor20201103_.nwb,08_r4,analysed,,
+senor20201103_.nwb,10_r5,analysed,,
+senor20201103_.nwb,12_r6,analysed,,
+senor20201103_.nwb,14_r7,analysed,,
+senor20201104_.nwb,02_r1,analysed,,
+senor20201104_.nwb,04_r2,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on senor20201030, LFPBandV1 ripple and theta, 22 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 10 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+senor20201104_.nwb,06_r3,pending,PENDING_POPULATE,"LFPV1 was never populated for its LFPSelection (lfp_tets_senor, '06_r3 noPrePostTrialTimes'), so it has no LFPBandV1 ripple or theta band and no CA1 RippleTimesV1; its decode failed at get_ripple (logs/senor20201104_06_r3_HPC.log). Planned fix (populate_plan.py phases 3-6): LFPV1, LFPBandV1 ripple and theta, CA1 RippleLFPSelection, RippleTimesV1."
+senor20201104_.nwb,08_r4,pending,PENDING_POPULATE,"LFPV1 was never populated for its LFPSelection (lfp_tets_senor, '08_r4 noPrePostTrialTimes'), so it has no LFPBandV1 ripple or theta band and no CA1 RippleTimesV1; its decode failed at get_ripple (logs/senor20201104_08_r4_HPC.log). Planned fix (populate_plan.py phases 3-6): LFPV1, LFPBandV1 ripple and theta, CA1 RippleLFPSelection, RippleTimesV1."
+senor20201104_.nwb,10_r5,analysed,,
+senor20201104_.nwb,12_r6,analysed,,
+senor20201104_.nwb,14_r7,analysed,,
+senor20201104_.nwb,16_r8,analysed,,
+senor20201105_.nwb,02_r1,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on senor20201030, LFPBandV1 ripple and theta, 22 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 1 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
+senor20201105_.nwb,04_r2,analysed,,
+senor20201105_.nwb,06_r3,analysed,,
+senor20201105_.nwb,09_r4,pending,PENDING_POPULATE,"IntervalLinearizedPosition was never populated for its selection ('pos 8 valid times', default_decoding, track graph senor20201030), so get_position_info falls back to a TrackGraph 'senor20201105' that does not exist; its CA1 RippleTimesV1 is also unpopulated although its CA1 RippleLFPSelection exists. Planned fix (populate_plan.py phases 2 and 6): IntervalLinearizedPosition, RippleTimesV1."
+senor20201105_.nwb,11_r5,analysed,,
+senor20201105_.nwb,13_r6,analysed,,
+senor20201105_.nwb,15_r7,analysed,,
+senor20201106_.nwb,02_r1,analysed,,
+senor20201106_.nwb,04_r2,analysed,,
+senor20201106_.nwb,06_r3,analysed,,
+senor20201106_.nwb,08_r4,analysed,,
+senor20201106_.nwb,10_r5,analysed,,
+senor20201106_.nwb,12_r6,analysed,,
+senor20201106_.nwb,14_r7,analysed,,
+senor20201106_.nwb,16_r8,analysed,,
+senor20201107_.nwb,02_r1,analysed,,
+senor20201107_.nwb,04_r2,analysed,,
+senor20201107_.nwb,06_r3,analysed,,
+senor20201107_.nwb,08_r4,analysed,,
+senor20201107_.nwb,10_r5,analysed,,
+senor20201107_.nwb,12_r6,analysed,,
+senor20201108_.nwb,*,excluded,NO_NWB,"No senor20201108*.nwb in /stelmo/nwb/raw or /nimbus/nwb/raw2, and no Spyglass Nwbfile or Session row. Whether a raw .rec exists elsewhere is unknown."
+senor20201109_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201109_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201109_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201109_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201109_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201110_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201110_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201110_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201110_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201110_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201111_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201111_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201111_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201111_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201111_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201112_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201112_.nwb,03_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201112_.nwb,05_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201112_.nwb,07_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201112_.nwb,09_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201112_.nwb,11_r6,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201113_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201113_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201113_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201113_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201113_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201114_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201114_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201114_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201114_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201114_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201115_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201115_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201115_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201115_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201115_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201116_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201116_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201116_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201116_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201116_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201117_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201117_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201117_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201117_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201117_.nwb,09_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201117_.nwb,11_r6,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201118_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201118_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201118_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201118_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201118_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201119_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; no alison_behav.TrialsInfoByEpoch row for the epoch. Also no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (trial parsing incomplete; listed as excluded since c39f0e9).
+senor20201119_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; no alison_behav.TrialsInfoByEpoch row for the epoch. Also no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (trial parsing incomplete; listed as excluded since c39f0e9).
+senor20201119_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; no alison_behav.TrialsInfoByEpoch row for the epoch. Also no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (trial parsing incomplete; listed as excluded since c39f0e9).
+senor20201119_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; no alison_behav.TrialsInfoByEpoch row for the epoch. Also no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (trial parsing incomplete; listed as excluded since c39f0e9).
+senor20201119_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; no alison_behav.TrialsInfoByEpoch row for the epoch. Also no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (trial parsing incomplete; listed as excluded since c39f0e9).
+senor20201120_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201120_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201120_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201120_.nwb,07_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201120_.nwb,09_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201120_.nwb,11_r6,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201121_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201121_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201121_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201121_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+senor20201121_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210326_.nwb,03_r1,pending,PENDING_POPULATE,"First-exposure session (200 trials, p(R) 100% then 50%). Its description, 'Spatial bandit task (regular) - exploration session', is admitted by FIRST_EXPOSURE_DESCRIPTIONS. No CA1 RippleLFPSelection or RippleTimesV1; every other input exists. Planned fix (populate_plan.py phases 5-6): CA1 RippleLFPSelection on the 14-electrode ripple band (decision D2), RippleTimesV1."
+wilbur20210327_.nwb,02_r1,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+wilbur20210327_.nwb,04_r2,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+wilbur20210327_.nwb,06_r3,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+wilbur20210327_.nwb,08_r4,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+wilbur20210327_.nwb,10_r5,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+wilbur20210327_.nwb,12_r6,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+wilbur20210327_.nwb,14_r7,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'."
+wilbur20210328_.nwb,02_r1,analysed,,
+wilbur20210328_.nwb,04_r2,analysed,,
+wilbur20210328_.nwb,06_r3,analysed,,
+wilbur20210328_.nwb,08_r4,analysed,,
+wilbur20210328_.nwb,10_r5,analysed,,
+wilbur20210328_.nwb,12_r6,analysed,,
+wilbur20210328_.nwb,14_r7,analysed,,
+wilbur20210328_.nwb,16_r8,analysed,,
+wilbur20210329_.nwb,02_r1,analysed,,
+wilbur20210329_.nwb,04_r2,analysed,,
+wilbur20210329_.nwb,06_r3,analysed,,
+wilbur20210329_.nwb,08_r4,analysed,,
+wilbur20210329_.nwb,10_r5,analysed,,
+wilbur20210329_.nwb,12_r6,analysed,,
+wilbur20210329_.nwb,14_r7,analysed,,
+wilbur20210329_.nwb,16_r8,analysed,,
+wilbur20210330_.nwb,02_r1,analysed,,
+wilbur20210330_.nwb,04_r2,analysed,,
+wilbur20210330_.nwb,06_r3,analysed,,
+wilbur20210330_.nwb,08_r4,analysed,,
+wilbur20210330_.nwb,10_r5,analysed,,
+wilbur20210330_.nwb,12_r6,analysed,,
+wilbur20210330_.nwb,14_r7,analysed,,
+wilbur20210331_.nwb,02_r1,analysed,,
+wilbur20210331_.nwb,04_r2,analysed,,
+wilbur20210331_.nwb,06_r3,analysed,,
+wilbur20210331_.nwb,08_r4,analysed,,
+wilbur20210331_.nwb,10_r5,analysed,,
+wilbur20210331_.nwb,12_r6,analysed,,"Formerly blocked by an NWB checksum failure; resolved 2026-08-19, when its analysis file was rewritten and its DataJoint hash matched again."
+wilbur20210331_.nwb,14_r7,analysed,,
+wilbur20210331_.nwb,16_r8,analysed,,
+wilbur20210401_.nwb,02_r1,excluded,NOT_INGESTED_BLOCKED,"The raw NWB (/nimbus/nwb/raw2/wilbur20210401.nwb) is a regular session with 8 run epochs, but Spyglass holds only its Nwbfile row (no Session, IntervalList or trials) and its tracked copy /stelmo/nwb/raw/wilbur20210401_.nwb is missing. Blocked: re-ingestion needs a destructive reinsert (or a hash-identical regenerated copy), Comrie's alison_behav trial parsing, and a refit of Comrie's RL model, without which wilbur's q-value coverage falls below the 90 % gate (populate_report.md B1-B3)."
+wilbur20210401_.nwb,04_r2,excluded,NOT_INGESTED_BLOCKED,"The raw NWB (/nimbus/nwb/raw2/wilbur20210401.nwb) is a regular session with 8 run epochs, but Spyglass holds only its Nwbfile row (no Session, IntervalList or trials) and its tracked copy /stelmo/nwb/raw/wilbur20210401_.nwb is missing. Blocked: re-ingestion needs a destructive reinsert (or a hash-identical regenerated copy), Comrie's alison_behav trial parsing, and a refit of Comrie's RL model, without which wilbur's q-value coverage falls below the 90 % gate (populate_report.md B1-B3)."
+wilbur20210401_.nwb,06_r3,excluded,NOT_INGESTED_BLOCKED,"The raw NWB (/nimbus/nwb/raw2/wilbur20210401.nwb) is a regular session with 8 run epochs, but Spyglass holds only its Nwbfile row (no Session, IntervalList or trials) and its tracked copy /stelmo/nwb/raw/wilbur20210401_.nwb is missing. Blocked: re-ingestion needs a destructive reinsert (or a hash-identical regenerated copy), Comrie's alison_behav trial parsing, and a refit of Comrie's RL model, without which wilbur's q-value coverage falls below the 90 % gate (populate_report.md B1-B3)."
+wilbur20210401_.nwb,08_r4,excluded,NOT_INGESTED_BLOCKED,"The raw NWB (/nimbus/nwb/raw2/wilbur20210401.nwb) is a regular session with 8 run epochs, but Spyglass holds only its Nwbfile row (no Session, IntervalList or trials) and its tracked copy /stelmo/nwb/raw/wilbur20210401_.nwb is missing. Blocked: re-ingestion needs a destructive reinsert (or a hash-identical regenerated copy), Comrie's alison_behav trial parsing, and a refit of Comrie's RL model, without which wilbur's q-value coverage falls below the 90 % gate (populate_report.md B1-B3)."
+wilbur20210401_.nwb,10_r5,excluded,NOT_INGESTED_BLOCKED,"The raw NWB (/nimbus/nwb/raw2/wilbur20210401.nwb) is a regular session with 8 run epochs, but Spyglass holds only its Nwbfile row (no Session, IntervalList or trials) and its tracked copy /stelmo/nwb/raw/wilbur20210401_.nwb is missing. Blocked: re-ingestion needs a destructive reinsert (or a hash-identical regenerated copy), Comrie's alison_behav trial parsing, and a refit of Comrie's RL model, without which wilbur's q-value coverage falls below the 90 % gate (populate_report.md B1-B3)."
+wilbur20210401_.nwb,12_r6,excluded,NOT_INGESTED_BLOCKED,"The raw NWB (/nimbus/nwb/raw2/wilbur20210401.nwb) is a regular session with 8 run epochs, but Spyglass holds only its Nwbfile row (no Session, IntervalList or trials) and its tracked copy /stelmo/nwb/raw/wilbur20210401_.nwb is missing. Blocked: re-ingestion needs a destructive reinsert (or a hash-identical regenerated copy), Comrie's alison_behav trial parsing, and a refit of Comrie's RL model, without which wilbur's q-value coverage falls below the 90 % gate (populate_report.md B1-B3)."
+wilbur20210401_.nwb,14_r7,excluded,NOT_INGESTED_BLOCKED,"The raw NWB (/nimbus/nwb/raw2/wilbur20210401.nwb) is a regular session with 8 run epochs, but Spyglass holds only its Nwbfile row (no Session, IntervalList or trials) and its tracked copy /stelmo/nwb/raw/wilbur20210401_.nwb is missing. Blocked: re-ingestion needs a destructive reinsert (or a hash-identical regenerated copy), Comrie's alison_behav trial parsing, and a refit of Comrie's RL model, without which wilbur's q-value coverage falls below the 90 % gate (populate_report.md B1-B3)."
+wilbur20210401_.nwb,16_r8,excluded,NOT_INGESTED_BLOCKED,"The raw NWB (/nimbus/nwb/raw2/wilbur20210401.nwb) is a regular session with 8 run epochs, but Spyglass holds only its Nwbfile row (no Session, IntervalList or trials) and its tracked copy /stelmo/nwb/raw/wilbur20210401_.nwb is missing. Blocked: re-ingestion needs a destructive reinsert (or a hash-identical regenerated copy), Comrie's alison_behav trial parsing, and a refit of Comrie's RL model, without which wilbur's q-value coverage falls below the 90 % gate (populate_report.md B1-B3)."
+wilbur20210402_.nwb,02_r1,analysed,,
+wilbur20210402_.nwb,04_r2,analysed,,
+wilbur20210402_.nwb,06_r3,analysed,,
+wilbur20210402_.nwb,08_r4,analysed,,
+wilbur20210402_.nwb,10_r5,analysed,,
+wilbur20210402_.nwb,12_r6,analysed,,
+wilbur20210402_.nwb,14_r7,analysed,,
+wilbur20210402_.nwb,16_r8,analysed,,
+wilbur20210403_.nwb,02_r1,analysed,,
+wilbur20210403_.nwb,04_r2,analysed,,
+wilbur20210403_.nwb,06_r3,analysed,,
+wilbur20210403_.nwb,08_r4,analysed,,
+wilbur20210403_.nwb,10_r5,analysed,,
+wilbur20210404_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80. Also no CA1 RippleTimesV1 (only group sb_wilbur_ripple); decoding never attempted it.
+wilbur20210404_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80. Also no CA1 RippleTimesV1 (only group sb_wilbur_ripple); decoding never attempted it.
+wilbur20210404_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80. Also no CA1 RippleTimesV1 (only group sb_wilbur_ripple); decoding never attempted it.
+wilbur20210404_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80. Also no CA1 RippleTimesV1 (only group sb_wilbur_ripple); decoding never attempted it.
+wilbur20210404_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80. Also no CA1 RippleTimesV1 (only group sb_wilbur_ripple); decoding never attempted it.
+wilbur20210405_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210405_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210405_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210405_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; no alison_behav.TrialsInfoByEpoch row for the epoch.
+wilbur20210405_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210405_.nwb,12_r6,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210406_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210406_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210406_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210406_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210406_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210407_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210407_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210407_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210407_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210407_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210408_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210408_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210408_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210408_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210408_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210409_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210409_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210409_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210409_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210409_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210410_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210410_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210410_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210410_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210410_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210411_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210411_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210411_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210411_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210411_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210412_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210412_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210412_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210412_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210412_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210413_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210413_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210413_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210413_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210413_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210414_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210414_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210414_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210414_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210414_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210415_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210415_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210415_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210415_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210415_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.
+wilbur20210416_.nwb,02_r1,excluded,DEPLETION_TASK,"Raw NWB (/stelmo/nwb/raw/wilbur20210416.nwb) session_description 'Spatial bandit task (regular) - after depletion', the session run after the depletion block; never ingested (Spyglass Session: 0 rows)."
+wilbur20210416_.nwb,04_r2,excluded,DEPLETION_TASK,"Raw NWB (/stelmo/nwb/raw/wilbur20210416.nwb) session_description 'Spatial bandit task (regular) - after depletion', the session run after the depletion block; never ingested (Spyglass Session: 0 rows)."
+wilbur20210416_.nwb,06_r3,excluded,DEPLETION_TASK,"Raw NWB (/stelmo/nwb/raw/wilbur20210416.nwb) session_description 'Spatial bandit task (regular) - after depletion', the session run after the depletion block; never ingested (Spyglass Session: 0 rows)."
+wilbur20210416_.nwb,08_r4,excluded,DEPLETION_TASK,"Raw NWB (/stelmo/nwb/raw/wilbur20210416.nwb) session_description 'Spatial bandit task (regular) - after depletion', the session run after the depletion block; never ingested (Spyglass Session: 0 rows)."
+wilbur20210416_.nwb,10_r5,excluded,DEPLETION_TASK,"Raw NWB (/stelmo/nwb/raw/wilbur20210416.nwb) session_description 'Spatial bandit task (regular) - after depletion', the session run after the depletion block; never ingested (Spyglass Session: 0 rows)."
+wilbur20210416_.nwb,12_r6,excluded,DEPLETION_TASK,"Raw NWB (/stelmo/nwb/raw/wilbur20210416.nwb) session_description 'Spatial bandit task (regular) - after depletion', the session run after the depletion block; never ingested (Spyglass Session: 0 rows)."
+wilbur20210416_.nwb,14_r7,excluded,DEPLETION_TASK,"Raw NWB (/stelmo/nwb/raw/wilbur20210416.nwb) session_description 'Spatial bandit task (regular) - after depletion', the session run after the depletion block; never ingested (Spyglass Session: 0 rows)."

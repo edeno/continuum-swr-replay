@@ -1,13 +1,19 @@
 # Three sessions blocked by an upstream NWB checksum failure
 
-**Status:** external, outside our control. Proceed with the 215-session cohort;
-do not gate on recovery.
+**Status:** resolved on 2026-08-19. All 218 analysed epochs are in every table. The
+cohort is 218, not 215. Found resolved by the exclusion audit of 2026-10-05
+(`.claude/research/refresh_exclusions/exclusions_report.md`, section 3.8). The
+cohort is now the epoch register's ([../epoch_register.md](../epoch_register.md)),
+where these three epochs are `analysed`.
 
-## What
+## What it was
 
-Three sessions are absent from the canonical replay-content tables
-(`event_table`, `event_arm_table`, `event_patch_table`, `event_sequence_table`,
-`stop_table`, and the qvals join), leaving **215 of 218** sessions:
+From 2026-08-17 to 2026-08-19, three sessions were absent from the canonical
+replay-content tables:
+
+- the tables: `event_table`, `event_arm_table`, `event_patch_table`,
+  `event_sequence_table`, `stop_table`, and the qvals join;
+- the count: **215 of 218** sessions.
 
 | animal | day | epoch |
 |---|---|---|
@@ -15,35 +21,39 @@ Three sessions are absent from the canonical replay-content tables
 | senor | 20201102 | 02_r1 |
 | wilbur | 20210331 | 12_r6 |
 
-`event_onset_table` still carries all 218 (it is built by a lighter pipeline
-that does not hit the failing fetch), which is why
-`attach_is_swr_to_onsets` scopes to the shared sessions and warns.
+`prepare_data` pulled each session's `trials` and track graph from Spyglass. That
+downloaded the source analysis NWB through DataJoint, and for these three the
+download failed DataJoint's checksum, for example:
 
-## Why
+`'/stelmo/nwb/analysis/j1620210707_0VZUCNY9K0.nwb' downloaded but did not pass checksum`
 
-`prepare_data` pulls each session's `trials` and track graph from Spyglass even
-though the decodes are cached, so it downloads the source NWB via DataJoint.
-For these three the download fails a **checksum** verification —
-e.g. `'/stelmo/nwb/analysis/j1620210707_0VZUCNY9K0.nwb' downloaded but did not
-pass checksum` (see `logs/regen_noncache_20260817.log`). `prepare_data`'s broad
-`except` records the failure and skips the session, so the table build completes
-with 215.
+(`logs/regen_noncache_20260817.log`). The build recorded the failure and skipped
+the session.
 
-This is an **upstream data-store issue we do not control.** It may be repaired
-eventually (a re-ingest / checksum reset on the Spyglass side), but the analysis
-must not depend on that.
+## How it was resolved
 
-## Decision
+On 2026-08-19, between 21:04 and 21:05, users `alison` and `sambray` rewrote the
+three analysis files:
 
-- The canonical cohort is **215 sessions**. Every downstream count, figure, and
-  claim is stated over 215, not 218.
-- The harmonization parity gate correctly reports the 218→215 drop; that FAIL is
-  the *expected* state for these three keys, not a regression. Do not "fix" it by
-  weakening the gate — recognise these three keys specifically.
-- If the upstream checksums are later resolved, regenerate the atomic set to pick
-  the three back up (they need no code change, only a clean fetch).
+- `j1620210707_0VZUCNY9K0`;
+- `senor20201102_5JRRG78UDM`;
+- `wilbur20210331_7EIP36CASJ`.
 
-## Related
+Their hash (`uuid_from_file`) now matches `~external_analysis.contents_hash`. All
+three epochs are decoded, by both the April decode and the October 2026 re-decode,
+and have rows in all seven canonical tables:
 
-- `attach_is_swr_to_onsets` session-scoping + warning (analysis/replay/per_bin_design.py).
-- `model_specs.py` already annotates "215 of 218 had fitted before".
+- `event_table` has 157, 309 and 118 rows;
+- `qvals_table` covers them through `stop_id`;
+- so do the ContFrag tables.
+
+`docs/audits/2026-08-25-covariate-regen-staging-audit.md` recorded the recovery in
+the Replay and ContFrag tables.
+
+## What no longer applies
+
+- Every count is over the 218 analysed epochs, not 215.
+- A parity gate that reports a 218→215 drop for these keys is now reporting a real
+  regression, not the expected state.
+- `model_specs.py`'s note that "215 of 218 had fitted before" describes fits made
+  before the recovery.

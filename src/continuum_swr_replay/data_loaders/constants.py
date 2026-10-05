@@ -6,8 +6,13 @@ including NWB file lists, spatial mappings, and task structure definitions.
 Attributes
 ----------
 NWB_FILES : list of str
-    Complete list of NWB file names for all animals and sessions in the dataset.
-    Includes data from 5 animals: chimi, j16, peanut, senor, and wilbur.
+    The 91 NWB files ``get_epoch_info`` searches, from 5 animals: chimi, j16,
+    peanut, senor, and wilbur. Which of their epochs are analysed is the epoch
+    register's to say (``data_loaders/epoch_register.py``).
+REGULAR_SESSION_DESCRIPTION : str
+    The ``Session.session_description`` of a regular spatial-bandit session.
+FIRST_EXPOSURE_DESCRIPTIONS : dict of {str: str}
+    First-exposure sessions ``get_epoch_info`` admits under another description.
 WELL_PATCH_MAPPING : dict of {int: int}
     Maps well node IDs (0-5) to patch IDs (1-3).
     Wells 0-1 are in patch 1, wells 2-3 in patch 2, wells 4-5 in patch 3.
@@ -132,7 +137,7 @@ NWB_FILES = [
     "wilbur20210414_.nwb",
     "wilbur20210415_.nwb",
 ]
-"""Complete list of 91 NWB files from 5 animals performing the spatial bandit task.
+"""The 91 NWB files ``get_epoch_info`` searches, from 5 animals.
 
 Animals and session counts:
 - chimi: 22 sessions (Feb-Mar 2020)
@@ -141,22 +146,57 @@ Animals and session counts:
 - senor: 22 sessions (Oct-Nov 2020)
 - wilbur: 19 sessions (Mar-Apr 2021)
 
-Excluded sessions (no noPrePostTrialTimes intervals due to trial parsing issues):
-chimi20200215, chimi20200219, chimi20200226, chimi20200301, chimi20200302,
-chimi20200303, chimi20200307, peanut20201124, peanut20201126, peanut20201130,
-peanut20201207, senor20201029, senor20201031, senor20201108, senor20201119,
-wilbur20210327, wilbur20210401, wilbur20210416
+Not every file is analysed. 46 are depletion sessions ("Spatial bandit task
+(depletion)", a decaying reward schedule), a different task variant that
+``get_epoch_info`` leaves out by their description. Of the other 45, 44 are
+regular sessions and one, wilbur20210326, is a first-exposure session admitted
+through ``FIRST_EXPOSURE_DESCRIPTIONS``. Which run epochs are analysed, and why
+every other run epoch of these files and of the sessions listed below is not,
+is recorded in one place, the epoch register
+(``data_loaders/epoch_register.py``, ``epoch_register.csv``, documented in
+``docs/epoch_register.md``), which every stage reads.
 
-Epochs with missing Spyglass pipeline entries (fail during HPC decoding):
-- senor20201104_06_r3: missing LFPBandV1 entry (no ripple detection data)
-- senor20201104_08_r4: missing LFPBandV1 entry (no ripple detection data)
-- senor20201105_09_r4: missing TrackGraph entry (no linearized position data)
-- wilbur20210404 (all run epochs 02_r1, 04_r2, 06_r3, 08_r4, 10_r5): no CA1
-  RippleTimesV1 extraction — ripples exist only under group_name
-  "sb_wilbur_ripple", a different extraction than the CA1 one used for every
-  other session. get_ripple raises a clear error and these epochs are excluded
-  rather than mixing ripple definitions. See
-  docs/known_issues/wilbur20210404_missing_ca1_ripples.md.
+Sessions left out of this list (each with its register entry):
+- trial parsing incomplete, no ``noPrePostTrialTimes`` intervals
+  (``NO_TRIAL_INTERVALS``; experimenter-confirmed, commit c39f0e9):
+  chimi20200215, chimi20200219, chimi20200226, peanut20201124, peanut20201130,
+  senor20201029, senor20201031, wilbur20210327;
+- depletion sessions whose trial parsing is also incomplete
+  (``DEPLETION_TASK``): chimi20200303, chimi20200307, peanut20201207,
+  senor20201119;
+- wilbur20210416, "Spatial bandit task (regular) - after depletion", never
+  ingested (``DEPLETION_TASK``);
+- chimi20200301, whose raw NWB holds only a sleep epoch (``NO_RUN_EPOCH``);
+- chimi20200302, peanut20201126 and senor20201108, with no NWB file in either
+  raw store and no Spyglass entry (``NO_NWB``);
+- wilbur20210401, a regular session with 8 run epochs that Spyglass ingested
+  only in part, whose re-ingestion is blocked (``NOT_INGESTED_BLOCKED``).
+
+Run epochs of these files that a Spyglass populate will make decodable are
+``PENDING_POPULATE`` in the register: 36 with no ``PositionIntervalMap`` row and
+no CA1 ``RippleTimesV1`` (32 of peanut's, chimi20200212_02_r1,
+senor20201102_08_r4, senor20201104_04_r2, senor20201105_02_r1);
+senor20201104_06_r3 and 08_r4, whose ``LFPV1`` was never populated, so they
+have no ripple band; senor20201105_09_r4, with no ``IntervalLinearizedPosition``
+and no CA1 ``RippleTimesV1``; and wilbur20210326_03_r1, with no CA1
+``RippleTimesV1``. wilbur20210404 is a depletion session: it has no CA1 ripple
+extraction either, but that is not why it is left out.
+"""
+
+REGULAR_SESSION_DESCRIPTION = "Spatial bandit task (regular)"
+"""``Session.session_description`` of a regular spatial-bandit session."""
+
+FIRST_EXPOSURE_DESCRIPTIONS: dict[str, str] = {
+    "wilbur20210326_.nwb": "Spatial bandit task (regular) - exploration session",
+}
+"""First-exposure sessions ``get_epoch_info`` admits under their own description.
+
+Four epochs are an animal's first exposure to the task (200 trials, p(R) 100 %
+then 50 %): j1620210706_02_r1, senor20201027_02_r1, chimi20200212_02_r1 and
+wilbur20210326_03_r1. The project analyses all four. Three sessions carry the
+regular description; wilbur20210326's is "Spatial bandit task (regular) -
+exploration session", so it is admitted here, by name and description. Nothing
+else is.
 """
 
 WELL_PATCH_MAPPING = {

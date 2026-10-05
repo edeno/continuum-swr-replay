@@ -2,7 +2,8 @@
 
 Nothing here reaches the Spyglass database, a GPU or a real ``Processed-Data``
 tree. Every artifact is made up under the test's ``tmp_path``, for made-up
-epochs (``sim20200101_*``). Every git check runs in a throwaway repository
+epochs (``sim20200101_*``), and so is the epoch register the audit reads
+(``--register``); ``get_epoch_info`` is replaced by a frame of named epochs. Every git check runs in a throwaway repository
 there, and ``check_encoding_marks`` reads its marks and encoding models through
 fakes. ``check_fit_provenance`` runs the repository's real
 ``scripts/qa/check_fit_provenance.py`` on roots under ``tmp_path``; that script
@@ -27,6 +28,7 @@ import xarray as xr
 from non_local_detector.discrete_state_transitions import DiscreteStationaryCustom
 
 import scripts.qa.audit_refresh_consistency as audit
+from continuum_swr_replay.data_loaders.epoch_register import read_register
 from continuum_swr_replay.decoding_transitions import (
     contfrag_transition_settings,
     nonlocal_transition_settings,
@@ -41,6 +43,52 @@ EPOCHS = ("sim20200101_02_r1_HPC", "sim20200101_04_r2_HPC")
 NO_INPUT_EPOCH = "sim20200101_06_r3_HPC"
 NO_RIPPLE_BAND = "no LFPBandV1 ripple band"
 SPIKE_LOADER = "src/continuum_swr_replay/data_loaders/spikes.py"
+
+
+REGISTER_COLUMNS = ["nwb_file_name", "epoch", "status", "reason", "evidence"]
+DEPLETION = "a depletion session"
+
+
+def _key(epoch_id: str) -> tuple[str, str]:
+    """``sim20200101_02_r1_HPC`` -> ``("sim20200101_.nwb", "02_r1")``."""
+    stem, number, replicate, _ = epoch_id.split("_")
+    return f"{stem}_.nwb", f"{number}_{replicate}"
+
+
+def _write_register(
+    path: Path,
+    *,
+    analysed: tuple[str, ...] = EPOCHS,
+    pending: tuple[str, ...] = (NO_INPUT_EPOCH,),
+    excluded: tuple[str, ...] = (),
+) -> Path:
+    """An epoch register: `pending` waits on a populate, `excluded` is depletion."""
+    rows = [[*_key(epoch_id), "analysed", "", ""] for epoch_id in analysed]
+    rows += [
+        [*_key(epoch_id), "pending", "PENDING_POPULATE", NO_RIPPLE_BAND]
+        for epoch_id in pending
+    ]
+    rows += [
+        [*_key(epoch_id), "excluded", "DEPLETION_TASK", DEPLETION]
+        for epoch_id in excluded
+    ]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(rows, columns=REGISTER_COLUMNS).to_csv(path, index=False)
+    return path
+
+
+def _register(tmp_path: Path, **statuses: tuple[str, ...]) -> pd.DataFrame:
+    return read_register(_write_register(tmp_path / "epoch_register.csv", **statuses))
+
+
+def _epoch_info(*epoch_ids: str) -> pd.DataFrame:
+    """``get_epoch_info``'s index for these epochs."""
+    return pd.DataFrame(
+        index=pd.MultiIndex.from_tuples(
+            [_key(epoch_id) for epoch_id in epoch_ids],
+            names=["nwb_file_name", "interval_list_name"],
+        )
+    )
 
 
 # --------------------------------------------------------------------------
@@ -871,48 +919,176 @@ def test_an_mpfc_sidecar_naming_an_older_event_table_fails():
 # --------------------------------------------------------------------------
 
 
-def test_an_unexplained_absence_fails_the_audit():
+def test_an_analysed_epoch_an_artifact_lacks_fails_unless_recorded(tmp_path):
+    register = _register(tmp_path)
     span = (BASE_TIME_S, BASE_TIME_S + 600.0)
     swr_manifest = _swr_manifest({EPOCHS[0]: span})
     decodes = set(EPOCHS)
 
-    present, reasons = audit.run_manifest_epochs(swr_manifest)
+    present, named = audit.run_manifest_epochs(swr_manifest)
     result = audit.check_epoch_sets(
-        {"nonlocal_decode": decodes, "swr": present}, {"swr": reasons}
+        {"nonlocal_decode": decodes, "swr": present}, {}, register=register, named=named
     )
 
-    assert not result["ok"]
     assert result["failures"] == [
-        f"swr lacks 1 epoch(s) with no recorded reason: {EPOCHS[1]}"
+        f"swr lacks 1 analysed epoch(s) with no recorded reason: {EPOCHS[1]}"
     ]
 
-    # a failed epoch is not explained by its error
-    swr_manifest["epochs"][EPOCHS[1]] = {"status": "failed", "error": "ValueError()"}
-    present, reasons = audit.run_manifest_epochs(swr_manifest)
-    result = audit.check_epoch_sets(
-        {"nonlocal_decode": decodes, "swr": present}, {"swr": reasons}
-    )
-    assert not result["ok"]
+    # neither a failed nor a skipped record explains it
+    for record in (
+        {"status": "failed", "error": "ValueError()"},
+        {"status": "skipped", "reason": NO_RIPPLE_BAND},
+    ):
+        swr_manifest["epochs"][EPOCHS[1]] = record
+        present, named = audit.run_manifest_epochs(swr_manifest)
+        result = audit.check_epoch_sets(
+            {"nonlocal_decode": decodes, "swr": present},
+            {},
+            register=register,
+            named=named,
+        )
+        assert not result["ok"]
 
-    # the manifest's own skipped reason explains it
-    swr_manifest["epochs"][EPOCHS[1]] = {"status": "skipped", "reason": NO_RIPPLE_BAND}
-    present, reasons = audit.run_manifest_epochs(swr_manifest)
+    # a reason recorded for that artifact (--exceptions) does
     result = audit.check_epoch_sets(
-        {"nonlocal_decode": decodes, "swr": present}, {"swr": reasons}
+        {"nonlocal_decode": decodes, "swr": present},
+        {"swr": {EPOCHS[1]: "recorded"}},
+        register=register,
+        named=named,
     )
     assert result["ok"], result["failures"]
-    assert result["details"]["swr"]["explained"] == {EPOCHS[1]: NO_RIPPLE_BAND}
+    assert result["details"]["swr"]["explained"] == {EPOCHS[1]: "recorded"}
 
 
-def test_a_known_epoch_no_artifact_holds_needs_a_reason():
-    sets = {"nonlocal_decode": {EPOCHS[0]}, "swr": {EPOCHS[0]}}
+def test_an_analysed_epoch_no_artifact_holds_fails_every_artifact(tmp_path):
+    unheld = "sim20200101_08_r4_HPC"
+    register = _register(tmp_path, analysed=(*EPOCHS, unheld))
+    sets = {"nonlocal_decode": set(EPOCHS), "swr": set(EPOCHS)}
 
-    result = audit.check_epoch_sets(sets, {}, known={EPOCHS[0], NO_INPUT_EPOCH})
+    result = audit.check_epoch_sets(sets, {}, register=register)
 
-    assert not result["ok"]
-    assert all(NO_INPUT_EPOCH in failure for failure in result["failures"])
-    explained = {name: {NO_INPUT_EPOCH: NO_RIPPLE_BAND} for name in sets}
-    assert audit.check_epoch_sets(sets, explained, known={NO_INPUT_EPOCH})["ok"]
+    assert result["failures"] == [
+        f"{name} lacks 1 analysed epoch(s) with no recorded reason: {unheld}"
+        for name in sets
+    ]
+
+
+def test_an_epoch_the_register_does_not_analyse_must_not_be_held(tmp_path):
+    depleted = "sim20200101_10_r5_HPC"
+    register = _register(tmp_path, excluded=(depleted,))
+    sets = {
+        "nonlocal_decode": {*EPOCHS, NO_INPUT_EPOCH},
+        "replay_content/event_table.parquet": {*EPOCHS, depleted},
+    }
+
+    result = audit.check_epoch_sets(sets, {}, register=register)
+
+    assert result["failures"] == [
+        "nonlocal_decode holds 1 epoch(s) the register does not analyse: "
+        f"{NO_INPUT_EPOCH} (pending, PENDING_POPULATE)",
+        "replay_content/event_table.parquet holds 1 epoch(s) the register does not "
+        f"analyse: {depleted} (excluded, DEPLETION_TASK)",
+    ]
+    assert result["details"]["nonlocal_decode"]["not_analysed"] == {
+        NO_INPUT_EPOCH: f"pending, PENDING_POPULATE: {NO_RIPPLE_BAND}"
+    }
+
+
+def test_an_unregistered_epoch_fails_wherever_it_is_named(tmp_path):
+    register = _register(tmp_path)
+    stray = "sim20200101_12_r6_HPC"
+
+    held = audit.check_epoch_sets(
+        {"nonlocal_decode": {*EPOCHS, stray}}, {}, register=register
+    )
+    named = audit.check_epoch_sets(
+        {"nonlocal_decode": set(EPOCHS)}, {}, register=register, named={stray}
+    )
+
+    for result in (held, named):
+        assert (
+            f"1 epoch(s) are not in the epoch register: {stray}" in (result["failures"])
+        )
+
+
+def test_a_skipped_record_of_an_unanalysed_epoch_passes(tmp_path):
+    span = (BASE_TIME_S, BASE_TIME_S + 600.0)
+    swr_manifest = _swr_manifest(
+        dict.fromkeys(EPOCHS, span), skipped={NO_INPUT_EPOCH: NO_RIPPLE_BAND}
+    )
+    present, named = audit.run_manifest_epochs(swr_manifest)
+
+    result = audit.check_epoch_sets(
+        {"nonlocal_decode": set(EPOCHS), "swr": present},
+        {},
+        register=_register(tmp_path),
+        named=named,
+    )
+
+    assert named == {*EPOCHS, NO_INPUT_EPOCH}
+    assert result["ok"], result["failures"]
+
+
+# --------------------------------------------------------------------------
+# check_epochs_registered and check_pending_epochs
+# --------------------------------------------------------------------------
+
+
+def test_every_epoch_spyglass_lists_is_registered(tmp_path):
+    register = _register(tmp_path)
+
+    ok = audit.check_epochs_registered(lambda: _epoch_info(*EPOCHS), register)
+    # a pending epoch Spyglass already lists is registered too
+    listed = audit.check_epochs_registered(
+        lambda: _epoch_info(*EPOCHS, NO_INPUT_EPOCH), register
+    )
+
+    assert ok["ok"] and listed["ok"], (ok["failures"], listed["failures"])
+    assert listed["details"]["by_status"] == {"analysed": 2, "pending": 1}
+
+
+def test_an_epoch_spyglass_lists_but_the_register_does_not_fails(tmp_path):
+    stray = "sim20200101_12_r6_HPC"
+
+    result = audit.check_epochs_registered(
+        lambda: _epoch_info(*EPOCHS, stray), _register(tmp_path)
+    )
+
+    assert result["failures"] == [
+        "get_epoch_info lists 1 epoch(s) the register does not: sim20200101_.nwb 12_r6"
+    ]
+
+
+def test_an_analysed_epoch_spyglass_no_longer_lists_fails(tmp_path):
+    result = audit.check_epochs_registered(
+        lambda: _epoch_info(EPOCHS[0]), _register(tmp_path)
+    )
+
+    assert result["failures"] == [
+        "1 analysed epoch(s) are not in get_epoch_info: sim20200101_.nwb 04_r2"
+    ]
+
+
+def test_an_unreadable_get_epoch_info_fails(tmp_path):
+    def unreachable():
+        raise ConnectionError("no database")
+
+    result = audit.check_epochs_registered(unreachable, _register(tmp_path))
+
+    assert result["failures"] == [
+        "get_epoch_info could not be read, so no epoch it lists was checked: "
+        "ConnectionError('no database')"
+    ]
+
+
+def test_the_pending_epochs_are_reported(tmp_path):
+    result = audit.check_pending_epochs(_register(tmp_path))
+
+    assert result["ok"]
+    assert result["details"] == {
+        "n_pending": 1,
+        "epochs": {NO_INPUT_EPOCH: f"PENDING_POPULATE: {NO_RIPPLE_BAND}"},
+    }
 
 
 QVALS = "replay_content/models_per_bin_rate/qvals_table.parquet"
@@ -936,11 +1112,11 @@ def test_a_session_missing_from_qvals_fails_the_epoch_sets(tmp_path):
     write_table(_qvals(STOP_IDS[:1]), qvals_path)
 
     sets, failures, _ = audit.table_epoch_sets([table_dir])
-    result = audit.check_epoch_sets(sets, {})
+    result = audit.check_epoch_sets(sets, {}, register=_register(tmp_path))
 
     assert failures == []
     assert result["failures"] == [
-        f"{QVALS} lacks 1 epoch(s) with no recorded reason: {EPOCHS[1]}"
+        f"{QVALS} lacks 1 analysed epoch(s) with no recorded reason: {EPOCHS[1]}"
     ]
 
 
@@ -1320,7 +1496,12 @@ EMPTY_INPUTS: dict[str, Callable[[Path], dict]] = {
     "fit_provenance, a root with no fit": lambda tmp: audit.check_fit_provenance(
         audit.REPO, [tmp]
     ),
-    "epoch_sets": lambda tmp: audit.check_epoch_sets({}, {}),
+    "epoch_sets": lambda tmp: audit.check_epoch_sets(
+        {}, {}, register=_register(tmp, analysed=(), pending=())
+    ),
+    "epochs_registered": lambda tmp: audit.check_epochs_registered(
+        _epoch_info, _register(tmp, analysed=(), pending=())
+    ),
 }
 """Each check on empty input: an audit that passes on nothing has checked nothing."""
 
@@ -1350,8 +1531,10 @@ class Tree:
     replay: Path
 
 
-def _consistent_tree(tmp_path: Path) -> Tree:
-    """Decodes, logs, both run manifests, tables, fits and PFC sidecars that agree."""
+def _consistent_tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Tree:
+    """Decodes, logs, both run manifests, tables, fits and PFC sidecars that agree,
+    with an epoch register analysing their epochs and ``get_epoch_info`` listing
+    them."""
     history = _history(tmp_path)
     repo, decode_commit, run_commit = history.repo, history.decode, history.later
     root, log_dir = tmp_path / "Processed-Data", tmp_path / "logs"
@@ -1400,11 +1583,16 @@ def _consistent_tree(tmp_path: Path) -> Tree:
             json.dumps(_pfc_sidecar(epoch_name, event_table_sha256))
         )
 
+    register = _write_register(tmp_path / "register" / "epoch_register.csv")
+    monkeypatch.setattr(audit, "get_epoch_info", lambda: _epoch_info(*EPOCHS))
+
     output = tmp_path / "refresh" / "audit.json"
     argv = [
         "audit",
         "--output",
         str(output),
+        "--register",
+        str(register),
         "--root",
         str(root),
         "--log-dir",
@@ -1430,8 +1618,10 @@ def _consistent_tree(tmp_path: Path) -> Tree:
     )
 
 
-def test_the_audit_passes_a_consistent_tree_and_writes_only_its_report(tmp_path):
-    tree = _consistent_tree(tmp_path)
+def test_the_audit_passes_a_consistent_tree_and_writes_only_its_report(
+    tmp_path, monkeypatch
+):
+    tree = _consistent_tree(tmp_path, monkeypatch)
     before = _snapshot(tmp_path, tree.output)
 
     code = audit.main(tree.argv)
@@ -1462,19 +1652,29 @@ def test_the_audit_passes_a_consistent_tree_and_writes_only_its_report(tmp_path)
         "source": "expected_decoder_settings()",
         "values": audit.expected_decoder_settings(),
     }
+    # every epoch Spyglass lists is registered, and the pending ones are named
+    assert report["checks"]["epochs_registered"]["details"]["by_status"] == {
+        "analysed": 2
+    }
+    assert report["checks"]["pending_epochs"]["details"]["epochs"] == {
+        NO_INPUT_EPOCH: f"PENDING_POPULATE: {NO_RIPPLE_BAND}"
+    }
     # and a pass says what it did not cover
     assert report["not_checked"] == [
         f"fit_provenance: no Stage 5B fit (stage5b_*.pkl) at {tree.replay}",
         "fit_provenance: no stop_replay_summary fit (stop_replay_summary*.pkl) at "
         f"{tree.replay}",
+        "pending_epochs: 1 epoch(s) pending a Spyglass populate are outside the "
+        "analysed cohort, so no artifact is checked for them (checks.pending_epochs "
+        "lists them)",
         "encoding_marks: not run; --check-marks reloads every epoch's marks from "
         "the database",
     ]
 
 
-def test_expected_settings_from_a_file_override_the_code(tmp_path):
+def test_expected_settings_from_a_file_override_the_code(tmp_path, monkeypatch):
     """``--expected-settings`` replaces the code's expectation, and the report says so."""
-    tree = _consistent_tree(tmp_path)
+    tree = _consistent_tree(tmp_path, monkeypatch)
     # the library's NonLocal stickiness, against the pinned detectors' P30-B values
     override = {
         "nonlocal": {"discrete_transition_stickiness": [1e5, 1e5, 300.0, 300.0]}
@@ -1502,8 +1702,10 @@ def test_expected_settings_from_a_file_override_the_code(tmp_path):
     ]
 
 
-def test_the_audit_fails_when_the_swr_manifest_silently_lacks_an_epoch(tmp_path):
-    tree = _consistent_tree(tmp_path)
+def test_the_audit_fails_when_the_swr_manifest_silently_lacks_an_epoch(
+    tmp_path, monkeypatch
+):
+    tree = _consistent_tree(tmp_path, monkeypatch)
     manifest = json.loads(tree.swr_manifest.read_text())
     del manifest["epochs"][EPOCHS[1]]
     tree.swr_manifest.write_text(json.dumps(manifest))
@@ -1514,12 +1716,12 @@ def test_the_audit_fails_when_the_swr_manifest_silently_lacks_an_epoch(tmp_path)
     assert code == 1
     assert not report["ok"]
     assert report["checks"]["epoch_sets"]["failures"] == [
-        f"swr lacks 1 epoch(s) with no recorded reason: {EPOCHS[1]}"
+        f"swr lacks 1 analysed epoch(s) with no recorded reason: {EPOCHS[1]}"
     ]
 
 
-def test_the_audit_without_the_run_manifests_fails(tmp_path):
-    tree = _consistent_tree(tmp_path)
+def test_the_audit_without_the_run_manifests_fails(tmp_path, monkeypatch):
+    tree = _consistent_tree(tmp_path, monkeypatch)
     argv = list(tree.argv)
     for option in ("--widloski-manifest", "--swr-manifest"):
         del argv[argv.index(option) : argv.index(option) + 2]
@@ -1538,8 +1740,9 @@ def test_the_audit_without_the_run_manifests_fails(tmp_path):
         "swr: no run commit to compare (no manifest, or no epoch run)",
     ]
     assert checks["epoch_sets"]["failures"] == [
-        f"widloski lacks 2 epoch(s) with no recorded reason: {', '.join(EPOCHS)}",
-        f"swr lacks 2 epoch(s) with no recorded reason: {', '.join(EPOCHS)}",
+        f"widloski lacks 2 analysed epoch(s) with no recorded reason: "
+        f"{', '.join(EPOCHS)}",
+        f"swr lacks 2 analysed epoch(s) with no recorded reason: {', '.join(EPOCHS)}",
     ]
     assert report["failed_checks"] == [
         "widloski_hashes",
@@ -1549,8 +1752,8 @@ def test_the_audit_without_the_run_manifests_fails(tmp_path):
     ]
 
 
-def test_an_absent_decode_explained_through_exceptions_passes(tmp_path):
-    tree = _consistent_tree(tmp_path)
+def test_an_absent_decode_explained_through_exceptions_passes(tmp_path, monkeypatch):
+    tree = _consistent_tree(tmp_path, monkeypatch)
     absent = f"{EPOCHS[1]}_contfrag"
     for path in audit.decode_files(EPOCHS[1], tree.root, "contfrag").values():
         path.unlink()
@@ -1573,11 +1776,45 @@ def test_an_absent_decode_explained_through_exceptions_passes(tmp_path):
         absent: f"explained in epoch_sets: {reason}"
     }
     explained = checks["epoch_sets"]["details"]["contfrag_decode"]["explained"]
-    assert explained == {
-        EPOCHS[1]: reason,
-        NO_INPUT_EPOCH: f"no inputs, so no decode: {NO_RIPPLE_BAND}",
-    }
+    assert explained == {EPOCHS[1]: reason}
     assert checks["grids_match"]["details"]["n_epochs"] == 1
+
+
+def test_the_audit_fails_on_an_epoch_spyglass_lists_but_the_register_does_not(
+    tmp_path, monkeypatch
+):
+    tree = _consistent_tree(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        audit, "get_epoch_info", lambda: _epoch_info(*EPOCHS, "sim20200101_12_r6_HPC")
+    )
+
+    code = audit.main(tree.argv)
+
+    report = json.loads(tree.output.read_text())
+    assert code == 1
+    assert report["failed_checks"] == ["epochs_registered"]
+    assert report["checks"]["epochs_registered"]["failures"] == [
+        "get_epoch_info lists 1 epoch(s) the register does not: sim20200101_.nwb 12_r6"
+    ]
+
+
+def test_the_audit_fails_on_a_decode_of_an_epoch_it_does_not_analyse(
+    tmp_path, monkeypatch
+):
+    """A decode of a pending epoch, saved before the register says it is
+    analysed, is outside the cohort every other artifact covers."""
+    tree = _consistent_tree(tmp_path, monkeypatch)
+    for path in audit.decode_files(EPOCHS[1], tree.root, "nonlocal").values():
+        path.rename(path.with_name(path.name.replace("04_r2", "06_r3")))
+
+    code = audit.main(tree.argv)
+
+    report = json.loads(tree.output.read_text())
+    assert code == 1
+    assert (
+        "nonlocal_decode holds 1 epoch(s) the register does not analyse: "
+        f"{NO_INPUT_EPOCH} (pending, PENDING_POPULATE)"
+    ) in report["checks"]["epoch_sets"]["failures"]
 
 
 def test_record_tables_refuses_a_folder_with_no_table(tmp_path):

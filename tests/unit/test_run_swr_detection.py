@@ -48,7 +48,6 @@ from continuum_swr_replay.table_io import (
     write_table,
 )
 from scripts.decoding.run_swr_detection import (
-    KNOWN_NO_INPUT_EPOCHS,
     epoch_id,
     main,
     run_epoch,
@@ -307,7 +306,8 @@ def _outputs(output_dir, identifier) -> dict:
 
 
 def _epoch_info(*epochs: tuple[str, str]) -> pd.DataFrame:
-    """``get_epoch_info``'s frame for these (nwb_file_name, epoch_name) pairs."""
+    """``analysed_epochs``'s frame (``get_epoch_info``'s shape) for these
+    (nwb_file_name, epoch_name) pairs."""
     animal_date = [parse_nwb_filename(nwb_file_name) for nwb_file_name, _ in epochs]
     return pd.DataFrame(
         {
@@ -450,39 +450,6 @@ def test_outputs_and_manifest_fields(tmp_path):
         record["input_sha256"]["time"]
         == hashlib.sha256(epoch.time.astype(np.float64).tobytes()).hexdigest()
     )
-
-
-def test_known_no_input_epochs_are_skipped_without_fetching(tmp_path):
-    """A documented epoch with no inputs is skipped before any fetch."""
-
-    def must_not_fetch(*args, **kwargs):
-        raise AssertionError(f"fetched {args}")
-
-    record = run_epoch(
-        "senor20201105_.nwb",
-        "09_r4",
-        output_dir=tmp_path / "out",
-        fetch_inputs=must_not_fetch,
-        fetch_position=must_not_fetch,
-        fetch_canonical_kay=must_not_fetch,
-        fetch_spyglass_kay_inputs=must_not_fetch,
-        fir_filter=must_not_fetch,
-    )
-
-    assert record == {
-        "status": "skipped",
-        "reason": KNOWN_NO_INPUT_EPOCHS[("senor20201105_.nwb", "09_r4")],
-    }
-    assert not (tmp_path / "out").exists()
-    assert set(KNOWN_NO_INPUT_EPOCHS) == {
-        ("senor20201104_.nwb", "06_r3"),
-        ("senor20201104_.nwb", "08_r4"),
-        ("senor20201105_.nwb", "09_r4"),
-        *(
-            ("wilbur20210404_.nwb", name)
-            for name in ("02_r1", "04_r2", "06_r3", "08_r4", "10_r5")
-        ),
-    }
 
 
 def _raise(error):
@@ -1064,7 +1031,7 @@ def test_a_failed_epoch_is_recorded_and_the_rest_run(
     """Two epochs, one of which raises: one ok, one failed, a non-zero exit."""
     monkeypatch.setattr(
         runner,
-        "get_epoch_info",
+        "analysed_epochs",
         lambda: _epoch_info((NWB_FILE_NAME, "02_r1"), (NWB_FILE_NAME, "04_r2")),
     )
     _with_fakes(monkeypatch, failing_epoch="04_r2")
@@ -1096,12 +1063,34 @@ def test_a_failed_epoch_is_recorded_and_the_rest_run(
         assert (tmp_path / "logs" / f"{identifier}_swr.log").exists()
 
 
+def test_the_run_takes_its_epochs_from_the_epoch_register(
+    tmp_path, monkeypatch, in_tmp_path, in_process_cluster
+):
+    """The epochs run are the register's analysed ones, narrowed by the flags:
+    the runner keeps no list of epochs to skip, and no epoch the register does
+    not analyse reaches it, so its manifest records none."""
+    monkeypatch.setattr(
+        runner,
+        "analysed_epochs",
+        lambda: _epoch_info((NWB_FILE_NAME, "02_r1"), ("other20200101_.nwb", "02_r1")),
+    )
+    ran = _with_fakes(monkeypatch)
+
+    manifest = _cli(tmp_path)
+
+    assert ran == ["02_r1"]
+    assert set(manifest["epochs"]) == {epoch_id(NWB_FILE_NAME, "02_r1")}
+    assert manifest["epochs"][epoch_id(NWB_FILE_NAME, "02_r1")]["status"] == "ok"
+    assert not hasattr(runner, "KNOWN_NO_INPUT_EPOCHS")
+    assert not hasattr(runner, "get_epoch_info")
+
+
 def test_rerun_without_overwrite_skips_done_epochs(
     tmp_path, monkeypatch, capsys, in_tmp_path, in_process_cluster
 ):
     """A finished epoch is not run again unless ``--overwrite`` is given."""
     monkeypatch.setattr(
-        runner, "get_epoch_info", lambda: _epoch_info((NWB_FILE_NAME, EPOCH_NAME))
+        runner, "analysed_epochs", lambda: _epoch_info((NWB_FILE_NAME, EPOCH_NAME))
     )
     ran = _with_fakes(monkeypatch)
     first = _cli(tmp_path)
@@ -1138,7 +1127,7 @@ def test_a_rerun_with_other_settings_is_refused(
     """A run's epochs share one set of settings; a rerun under the same run
     id with other detector settings stops before running anything."""
     monkeypatch.setattr(
-        runner, "get_epoch_info", lambda: _epoch_info((NWB_FILE_NAME, EPOCH_NAME))
+        runner, "analysed_epochs", lambda: _epoch_info((NWB_FILE_NAME, EPOCH_NAME))
     )
     ran = _with_fakes(monkeypatch)
     _cli(tmp_path)
@@ -1206,7 +1195,7 @@ def test_a_second_run_under_the_same_run_id_is_refused(
     def no_epochs_while_locked():
         raise AssertionError("epochs were read without the run's lock")
 
-    monkeypatch.setattr(runner, "get_epoch_info", no_epochs_while_locked)
+    monkeypatch.setattr(runner, "analysed_epochs", no_epochs_while_locked)
     holder = subprocess.Popen(
         [sys.executable, "-c", _HOLD_LOCK, str(lock)],
         stdout=subprocess.PIPE,
@@ -1224,7 +1213,7 @@ def test_a_second_run_under_the_same_run_id_is_refused(
     assert not (output_dir / "manifest.json").exists()
 
     monkeypatch.setattr(
-        runner, "get_epoch_info", lambda: _epoch_info((NWB_FILE_NAME, EPOCH_NAME))
+        runner, "analysed_epochs", lambda: _epoch_info((NWB_FILE_NAME, EPOCH_NAME))
     )
     _with_fakes(monkeypatch)
     manifest = _cli(tmp_path)
@@ -1256,7 +1245,7 @@ def test_run_id_must_be_a_plain_name(tmp_path, monkeypatch, in_tmp_path, run_id)
     def must_not_read(*args):
         raise AssertionError("the run started")
 
-    monkeypatch.setattr(runner, "get_epoch_info", must_not_read)
+    monkeypatch.setattr(runner, "analysed_epochs", must_not_read)
 
     with pytest.raises(SystemExit) as stopped:
         main(["--run-id", run_id, "--output-root", str(tmp_path / "swr")])
@@ -1321,7 +1310,7 @@ def test_main_raises_the_open_file_limit_before_its_cluster(
 
     monkeypatch.setattr(runner, "raise_open_file_limit", raise_open_file_limit)
     monkeypatch.setattr(
-        runner, "get_epoch_info", lambda: _epoch_info((NWB_FILE_NAME, EPOCH_NAME))
+        runner, "analysed_epochs", lambda: _epoch_info((NWB_FILE_NAME, EPOCH_NAME))
     )
     _with_fakes(monkeypatch)
 

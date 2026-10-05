@@ -608,7 +608,7 @@ Audit a candidate event-patch table against its pre-change reference.
 
 Audit that the refreshed pipeline's artifacts share their inputs.
 
-`is_canonical_epoch_id`, `decode_id`, `decode_files`, `find_decodes`, `decode_provenance`, `check_one_commit`, `decoder_settings`, `expected_decoder_settings`, `check_decoder_settings`, `check_grids_match`, `check_minimum_sample_counts`, `check_encoding_marks`, `check_widloski_hashes`, `check_swr_spans`, `check_spike_loader_unchanged`, `table_files`, `record_tables`, `check_tables_recorded`, `check_pfc_sidecars`, `check_fit_provenance`, `run_manifest_epochs`, `check_epoch_sets`, `stop_epochs`, `table_epochs`, `table_epoch_sets`, `root_fits`, `run_audit`, `main`
+`is_canonical_epoch_id`, `decode_id`, `decode_files`, `find_decodes`, `decode_provenance`, `check_one_commit`, `decoder_settings`, `expected_decoder_settings`, `check_decoder_settings`, `check_grids_match`, `check_minimum_sample_counts`, `check_encoding_marks`, `check_widloski_hashes`, `check_swr_spans`, `check_spike_loader_unchanged`, `table_files`, `record_tables`, `check_tables_recorded`, `check_pfc_sidecars`, `check_fit_provenance`, `run_manifest_epochs`, `register_key`, `register_epoch_id`, `check_epoch_sets`, `check_epochs_registered`, `check_pending_epochs`, `stop_epochs`, `table_epochs`, `table_epoch_sets`, `root_fits`, `run_audit`, `main`
 
 ### `scripts/qa/audit_stop_table_reward_history.py`
 

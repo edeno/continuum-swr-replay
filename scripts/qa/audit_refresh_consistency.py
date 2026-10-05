@@ -41,10 +41,20 @@ checks (Stage 5), and nothing else.
 - ``pfc_sidecars``: every mPFC bundle names the canonical event table.
 - ``fit_provenance``: ``check_fit_provenance.py`` passes on both table roots,
   and on the fits at the ``replay_content`` root (Stage 5B and Stage 6).
-- ``epoch_sets``: an epoch missing from any artifact (either decode, either
-  run, any table) has a reason recorded for that artifact. A table names its
-  epochs by its session columns or, keyed by ``stop_id`` alone as the qvals
-  table is, through its folder's stop table.
+- ``epoch_sets``: every artifact (either decode, either run, any table) holds
+  exactly the epoch register's analysed epochs. An analysed epoch an artifact
+  lacks fails unless ``--exceptions`` records why for that artifact; an epoch
+  an artifact holds that the register does not analyse fails, named with its
+  register status and reason; and every epoch an artifact holds or a run
+  manifest names must be registered. A table names its epochs by its session
+  columns or, keyed by ``stop_id`` alone as the qvals table is, through its
+  folder's stop table.
+- ``epochs_registered``: every epoch ``get_epoch_info`` lists is in the
+  register, and every epoch the register analyses is listed. This reads the
+  database; if it cannot, the check fails.
+- ``pending_epochs``: the register's pending epochs, with their evidence. It
+  never fails; ``not_checked`` names them, since no artifact is expected of
+  them.
 - ``encoding_marks``, with ``--check-marks`` only, since it reads the
   database: the marks reloaded through the project's loader hold every
   encoding mark of both decodes.
@@ -52,7 +62,8 @@ checks (Stage 5), and nothing else.
 ``audit.json`` records under ``expected_settings`` the decoder settings the
 detectors were held to, and their source: ``expected_decoder_settings()`` or
 the ``--expected-settings`` file. It also lists under ``not_checked`` what the
-audit did not check: the encoding marks without ``--check-marks``, a decoder
+audit did not check: the pending epochs, the encoding marks without
+``--check-marks``, a decoder
 an ``--expected-settings`` file names no settings for, a table whose epochs
 cannot be told, and a family of fits at the ``replay_content`` root with no
 fit at all. A pass covers the checks, and nothing listed there. ``audit``
@@ -106,7 +117,16 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
     load_clusterless_encoding_model,
     validate_time_grid,
 )
+from continuum_swr_replay.data_loaders.epoch_register import (
+    REGISTER_PATH,
+    EpochRegisterError,
+    Status,
+    read_register,
+    register_entry,
+    registration_gaps,
+)
 from continuum_swr_replay.data_loaders.spikes import filter_spike_times, get_hpc_marks
+from continuum_swr_replay.data_loaders.utils import get_epoch_info
 from continuum_swr_replay.decoding_common import (
     NonLocalDecodingConfig,
     write_atomically,
@@ -1314,83 +1334,194 @@ def check_fit_provenance(
 # --------------------------------------------------------------------------
 
 
-def run_manifest_epochs(manifest: dict) -> tuple[set[str], dict[str, str]]:
-    """A run manifest's canonical epochs that are ``ok``, and why others were skipped.
+def run_manifest_epochs(manifest: dict) -> tuple[set[str], set[str]]:
+    """A run manifest's canonical epochs that are ``ok``, and every one it names.
 
-    Only ``skipped`` records carry a reason that explains an absence; a
-    ``failed`` or ``partial`` epoch is neither present nor explained.
+    A ``skipped``, ``failed`` or ``partial`` record is named but not present:
+    it explains nothing, since the register alone says why an epoch is not
+    analysed.
 
     Returns
     -------
     present : set of str
-    reasons : dict of str to str
-        Epoch identifier to its ``skipped`` record's reason.
+    named : set of str
     """
     records = manifest.get("epochs", {})
+    named = {epoch_id for epoch_id in records if is_canonical_epoch_id(epoch_id)}
     present = {
-        epoch_id
-        for epoch_id, record in records.items()
-        if is_canonical_epoch_id(epoch_id) and record.get("status") == "ok"
+        epoch_id for epoch_id in named if records[epoch_id].get("status") == "ok"
     }
-    reasons = {
-        epoch_id: str(record["reason"])
-        for epoch_id, record in records.items()
-        if is_canonical_epoch_id(epoch_id)
-        and record.get("status") == "skipped"
-        and record.get("reason")
+    return present, named
+
+
+def register_key(epoch_id: str) -> tuple[str, str]:
+    """``chimi20200225_02_r1_HPC`` -> ``("chimi20200225_.nwb", "02_r1")``."""
+    stem, number, replicate, _ = epoch_id.split("_")
+    return f"{stem}_.nwb", f"{number}_{replicate}"
+
+
+def register_epoch_id(nwb_file_name: str, epoch: str) -> str:
+    """``("chimi20200225_.nwb", "02_r1")`` -> ``chimi20200225_02_r1_HPC``."""
+    return f"{nwb_file_name.removesuffix('_.nwb')}_{epoch}_HPC"
+
+
+def _registered(register: pd.DataFrame, status: Status) -> dict[str, pd.Series]:
+    """The register's epoch entries of `status`, by canonical epoch id."""
+    rows = register[register["status"] == status]
+    return {
+        register_epoch_id(name, epoch): row
+        for (name, epoch), row in rows.iterrows()
+        if epoch != "*"
     }
-    return present, reasons
 
 
 def check_epoch_sets(
     sets: Mapping[str, set[str]],
     reasons: Mapping[str, Mapping[str, str]],
     *,
-    known: Iterable[str] = (),
+    register: pd.DataFrame,
+    named: Iterable[str] = (),
 ) -> dict:
-    """Every artifact holds every epoch, or a recorded reason says why not.
+    """Every artifact holds exactly the register's analysed epochs.
 
-    The epochs expected of every artifact are those any artifact holds, plus
-    `known` (the epochs the SWR runner recorded, which cover
-    ``get_epoch_info``), so an epoch no artifact holds is not overlooked. An
-    epoch missing from an artifact passes only with a non-empty reason in
-    ``reasons[artifact]``.
+    An analysed epoch an artifact lacks passes only with a non-empty reason in
+    ``reasons[artifact]``. An epoch an artifact holds that the register does
+    not analyse fails, named with its status and reason. Every epoch an
+    artifact holds, or `named`, must be registered.
 
     Parameters
     ----------
     sets : Mapping of str to set of str
         Artifact name to the epoch identifiers it holds.
     reasons : Mapping of str to Mapping of str to str
-        Artifact name to epoch identifier to why the artifact lacks it.
-    known : Iterable of str, optional
-        Further epochs every artifact should hold.
+        Artifact name to epoch identifier to why the artifact lacks it, from
+        ``--exceptions``.
+    register : pd.DataFrame
+        ``read_register``'s frame.
+    named : Iterable of str, optional
+        Further epochs that must be registered: those a run manifest names,
+        whatever their status.
     """
-    expected = set(known).union(*sets.values())
+    analysed = set(_registered(register, Status.ANALYSED))
     failures: list[str] = []
-    if not expected:
-        failures.append("no epochs to check")
+    if not analysed:
+        failures.append("the register analyses no epoch")
+    entries: dict[str, str] = {}
+    unregistered: list[str] = []
+    for epoch_id in sorted(set(named).union(*sets.values()) - analysed):
+        try:
+            entry = register_entry(*register_key(epoch_id), register)
+        except EpochRegisterError:
+            unregistered.append(epoch_id)
+            continue
+        reason = "" if entry.reason is None else entry.reason.value
+        entries[epoch_id] = f"{entry.status.value}, {reason}"
+    if unregistered:
+        failures.append(
+            f"{len(unregistered)} epoch(s) are not in the epoch register: "
+            + ", ".join(unregistered)
+        )
     details: dict[str, dict] = {}
     for artifact, present in sets.items():
         recorded = reasons.get(artifact, {})
-        missing = sorted(expected - present)
+        missing = sorted(analysed - present)
         explained = {
             epoch_id: recorded[epoch_id]
             for epoch_id in missing
             if recorded.get(epoch_id)
         }
         unexplained = [epoch_id for epoch_id in missing if epoch_id not in explained]
+        not_analysed = {
+            epoch_id: entries[epoch_id]
+            for epoch_id in sorted(present - analysed)
+            if epoch_id in entries
+        }
         if unexplained:
             failures.append(
-                f"{artifact} lacks {len(unexplained)} epoch(s) with no recorded "
-                f"reason: {', '.join(unexplained)}"
+                f"{artifact} lacks {len(unexplained)} analysed epoch(s) with no "
+                f"recorded reason: {', '.join(unexplained)}"
+            )
+        if not_analysed:
+            failures.append(
+                f"{artifact} holds {len(not_analysed)} epoch(s) the register does "
+                "not analyse: "
+                + ", ".join(
+                    f"{epoch_id} ({entry})" for epoch_id, entry in not_analysed.items()
+                )
             )
         details[artifact] = {
             "n_present": len(present),
-            "n_expected": len(expected),
+            "n_expected": len(analysed),
             "explained": explained,
             "unexplained": unexplained,
+            "not_analysed": {
+                epoch_id: f"{entry}: "
+                + register_entry(*register_key(epoch_id), register).evidence
+                for epoch_id, entry in not_analysed.items()
+            },
         }
     return _result(failures, details)
+
+
+def check_epochs_registered(
+    load_epoch_info: Callable[[], pd.DataFrame], register: pd.DataFrame
+) -> dict:
+    """Every epoch ``get_epoch_info`` lists is registered, and every analysed
+    epoch is listed.
+
+    Parameters
+    ----------
+    load_epoch_info : Callable
+        ``get_epoch_info``, which reads the database. If it raises, the check
+        fails with its error.
+    register : pd.DataFrame
+        ``read_register``'s frame.
+    """
+    try:
+        keys = list(load_epoch_info().index)
+    except Exception as error:  # noqa: BLE001 - reported as the check's failure
+        return _result(
+            [
+                "get_epoch_info could not be read, so no epoch it lists was "
+                f"checked: {error!r}"
+            ],
+            {},
+        )
+    unregistered, absent = registration_gaps(keys, register, {Status.ANALYSED})
+    failures = []
+    if not keys:
+        failures.append("get_epoch_info lists no epoch")
+    if unregistered:
+        failures.append(
+            f"get_epoch_info lists {len(unregistered)} epoch(s) the register does "
+            "not: " + ", ".join(f"{name} {epoch}" for name, epoch in unregistered)
+        )
+    if len(absent):
+        failures.append(
+            f"{len(absent)} analysed epoch(s) are not in get_epoch_info: "
+            + ", ".join(f"{name} {epoch}" for name, epoch in absent.index)
+        )
+    by_status = Counter(
+        register_entry(name, epoch, register).status.value
+        for name, epoch in keys
+        if (name, epoch) not in unregistered
+    )
+    return _result(
+        failures, {"n_listed": len(keys), "by_status": dict(sorted(by_status.items()))}
+    )
+
+
+def check_pending_epochs(register: pd.DataFrame) -> dict:
+    """The register's pending epochs, each with its reason and evidence.
+
+    It never fails: a pending epoch is outside the analysed cohort, so no
+    artifact is expected of it, and ``not_checked`` says so.
+    """
+    pending = {
+        epoch_id: f"{row['reason']}: {row['evidence']}"
+        for epoch_id, row in sorted(_registered(register, Status.PENDING).items())
+    }
+    return _result([], {"n_pending": len(pending), "epochs": pending})
 
 
 def _epoch_ids(sessions: pd.DataFrame) -> pd.Series:
@@ -1601,8 +1732,14 @@ def run_audit(
     exceptions: Mapping[str, Any],
     expected_settings: Mapping[str, Mapping[str, object]],
     check_marks: bool,
+    register: pd.DataFrame,
+    load_epoch_info: Callable[[], pd.DataFrame],
 ) -> tuple[dict[str, dict], list[str]]:
     """Run every check, reading only.
+
+    `register` is ``read_register``'s frame, the epochs every artifact must
+    hold; `load_epoch_info` is ``get_epoch_info``, whose epochs must all be
+    registered.
 
     Returns
     -------
@@ -1623,44 +1760,26 @@ def run_audit(
     swr = None if swr_manifest is None else _read_json(swr_manifest)
     table_dirs = [replay_content_dir, contfrag_dir]
 
-    # The epochs each artifact holds, and why it may lack one: the epoch-set
-    # check's inputs, built first so that one_commit can tell an absence
-    # epoch_sets explains from one it does not.
+    # The epochs each artifact holds, and why it may lack an analysed one: the
+    # epoch-set check's inputs, built first so that one_commit can tell an
+    # absence epoch_sets explains from one it does not. Why an epoch is not
+    # analysed is the register's to say, not a run's.
     sets: dict[str, set[str]] = {
         "nonlocal_decode": complete["nonlocal"],
         "contfrag_decode": complete["contfrag"],
     }
-    reasons: dict[str, dict[str, str]] = {}
-    known: set[str] = set()
-    no_input: dict[str, str] = {}
+    named: set[str] = set()
     for run, manifest in (("widloski", widloski), ("swr", swr)):
-        present, skipped = (
-            (set(), {}) if manifest is None else run_manifest_epochs(manifest)
+        present, mentioned = (
+            (set(), set()) if manifest is None else run_manifest_epochs(manifest)
         )
-        sets[run], reasons[run] = present, skipped
-    if swr is not None:
-        known = {
-            epoch_id
-            for epoch_id in swr.get("epochs", {})
-            if is_canonical_epoch_id(epoch_id)
-        }
-        # an epoch the SWR runner skipped for lack of inputs, and with no
-        # decode, can have nothing built on a decode either
-        no_input = {
-            epoch_id: f"no inputs, so no decode: {reason}"
-            for epoch_id, reason in reasons["swr"].items()
-            if epoch_id not in decoded
-        }
+        sets[run] = present
+        named |= mentioned
     table_sets, table_failures, table_not_checked = table_epoch_sets(table_dirs)
     sets.update(table_sets)
     not_checked += table_not_checked
     recorded = exceptions.get("epochs", {})
-    for artifact in sets:
-        reasons[artifact] = {
-            **no_input,
-            **reasons.get(artifact, {}),
-            **recorded.get(artifact, {}),
-        }
+    reasons = {artifact: dict(recorded.get(artifact, {})) for artifact in sets}
 
     provenance = decode_provenance(log_dir, root, sorted(decoded))
     explained = {
@@ -1762,7 +1881,16 @@ def run_audit(
         REPO, table_dirs, artifacts=named_fits
     )
 
-    epoch_sets = check_epoch_sets(sets, reasons, known=known)
+    checks["epochs_registered"] = check_epochs_registered(load_epoch_info, register)
+    checks["pending_epochs"] = check_pending_epochs(register)
+    n_pending = checks["pending_epochs"]["details"]["n_pending"]
+    if n_pending:
+        not_checked.append(
+            f"pending_epochs: {n_pending} epoch(s) pending a Spyglass populate are "
+            "outside the analysed cohort, so no artifact is checked for them "
+            "(checks.pending_epochs lists them)"
+        )
+    epoch_sets = check_epoch_sets(sets, reasons, register=register, named=named)
     epoch_sets["failures"] = table_failures + epoch_sets["failures"]
     epoch_sets["ok"] = not epoch_sets["failures"]
     for decoder in DECODERS:
@@ -1865,11 +1993,19 @@ def main(argv: list[str] | None = None) -> int:
         help="The git repository the recorded commits are looked up in.",
     )
     run.add_argument(
+        "--register",
+        type=Path,
+        default=REGISTER_PATH,
+        help="The epoch register every artifact is held to (default: the "
+        "committed data_loaders/epoch_register.csv).",
+    )
+    run.add_argument(
         "--exceptions",
         type=Path,
         help='A JSON file: {"commit": {decode_id: reason}, "epochs": {artifact: '
         "{epoch_id: reason}}}, the decodes the one-commit check sets aside and "
-        "the absences the epoch-set check accepts, each with its reason. "
+        "the absences of analysed epochs the epoch-set check accepts, each with "
+        "its reason. "
         "Artifacts are named as audit.json's epoch_sets details name them: "
         "nonlocal_decode, contfrag_decode, widloski, swr, and each table as "
         "<folder>/<file>, such as replay_content/event_table.parquet.",
@@ -1916,6 +2052,8 @@ def main(argv: list[str] | None = None) -> int:
         exceptions=exceptions,
         expected_settings=expected_settings,
         check_marks=args.check_marks,
+        register=read_register(args.register),
+        load_epoch_info=get_epoch_info,
     )
     failed = [name for name, check in checks.items() if not check["ok"]]
     head = _git(args.repo, "rev-parse", "HEAD")

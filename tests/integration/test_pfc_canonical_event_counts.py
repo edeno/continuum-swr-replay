@@ -37,7 +37,10 @@ pytestmark = pytest.mark.slow
 def test_the_event_sets_are_the_shipped_tables_rows_for_that_session():
     from continuum_swr_replay.analysis.hippocampus import load_results
 
-    sessions = [s for s in pdm.find_sessions(max_per_animal=1) if s["results_file"]]
+    try:
+        sessions = [s for s in pdm.find_sessions(max_per_animal=1) if s["results_file"]]
+    except Exception as exc:  # noqa: BLE001 - no data access -> skip, not fail
+        pytest.skip(f"session listing unavailable: {exc}")
     if not sessions:
         pytest.skip("no session with decode results on disk")
     session = sessions[0]

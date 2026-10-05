@@ -32,7 +32,7 @@ try:
 except ImportError:
     HAS_CUDA = False
 
-from continuum_swr_replay.data_loaders import get_epoch_info
+from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
 from continuum_swr_replay.parameters import (
     BLOCK_SIZE,
     LOCAL_POSITION_STD,
@@ -396,6 +396,13 @@ def add_common_args(parser: ArgumentParser) -> ArgumentParser:
         help="Decode on a CPU cluster when dask_cuda is not importable, "
         "instead of refusing to start.",
     )
+    parser.add_argument(
+        "--include-pending",
+        action="store_true",
+        help="Also decode the epochs the epoch register holds pending a Spyglass "
+        "populate (the incremental update, run after the populates). By default "
+        "only its analysed epochs are decoded.",
+    )
     return parser
 
 
@@ -422,6 +429,10 @@ def run_batch(
 
     Notes
     -----
+    The epochs are the epoch register's analysed ones (``analysed_epochs``), and
+    its pending ones too with ``--include-pending``, narrowed by ``--animal``,
+    ``--date`` and ``--epoch``.
+
     Before the cluster starts, the soft open-file limit is raised
     (``raise_open_file_limit``), so that the worker processes inherit it.
     ``run_decode_fn`` is also given ``release_nwb``: True on the GPU cluster,
@@ -448,6 +459,12 @@ def run_batch(
     # Resolved once, here, before any worker sees it: a relative --save_dir
     # would otherwise be read against each worker's working directory.
     save_dir = Path(args.save_dir).resolve()
+
+    # Before any cluster starts: a register that does not match Spyglass stops
+    # the batch here, with no GPU worker started.
+    epoch_info = filter_epoch_info(
+        analysed_epochs(include_pending=args.include_pending), args
+    )
 
     os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.99"
 
@@ -479,9 +496,6 @@ def run_batch(
     with Client(cluster):
         log_directory = Path.cwd() / "logs"
         log_directory.mkdir(exist_ok=True, parents=True)
-
-        epoch_info = get_epoch_info()
-        epoch_info = filter_epoch_info(epoch_info, args)
 
         delayed = [
             dask.delayed(run_decode_fn)(

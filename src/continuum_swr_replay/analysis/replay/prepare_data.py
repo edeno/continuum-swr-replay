@@ -19,7 +19,6 @@ import argparse
 import logging
 import os
 import pickle
-import re
 import tempfile
 import time
 from pathlib import Path
@@ -70,7 +69,8 @@ from continuum_swr_replay.analysis.replay.tables_stop import (
     add_nonlocal_swr_split,
     build_stop_table,
 )
-from continuum_swr_replay.data_loaders.constants import NWB_FILES, WELL_ARMS
+from continuum_swr_replay.data_loaders.constants import WELL_ARMS
+from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
 from continuum_swr_replay.data_loaders.trials import (
     validate_port_experience_pump_audit,
 )
@@ -107,60 +107,72 @@ PORT_EXPERIENCE_CACHE_COLUMNS = (
 )
 
 
-def find_sessions(max_per_animal: int | None = None):
-    """Yield every session that has ``data_over_time.pkl`` and ``environment.pkl`` on disk.
+def find_sessions(max_per_animal: int | None = None) -> list[dict]:
+    """The epoch register's analysed epochs, each with its decode files.
 
-    ``results.nc`` absence is recorded here as ``results_file=None`` and
-    acted on in :func:`_process_session`, which refuses the session — without
-    a posterior there is no ``event_sequence_table`` and no retrospective
-    metrics.
+    The sessions are ``analysed_epochs()``, in ``session_id`` order within each
+    animal, the animals in order; a decode on disk whose epoch the register does
+    not analyse is not one. ``results.nc`` absence is recorded here as
+    ``results_file=None`` and acted on in :func:`_process_session`, which
+    refuses the session: without a posterior there is no
+    ``event_sequence_table`` and no retrospective metrics.
+
+    Parameters
+    ----------
+    max_per_animal : int, optional
+        Only each animal's first epochs, for a smoke run.
+
+    Returns
+    -------
+    list of dict
+        ``nwb_file_name``, ``epoch_name``, ``session_id``, ``dot_file``,
+        ``env_file`` and ``results_file`` per session.
+
+    Raises
+    ------
+    FileNotFoundError
+        If a selected epoch has no ``data_over_time.pkl`` or ``environment.pkl``
+        under ``PROCESSED_DATA_DIR``: the tables would otherwise cover fewer
+        epochs than the register analyses.
     """
-    dot_files = sorted(PROCESSED_DATA_DIR.glob("*_HPC_80_data_over_time.pkl"))
-    env_files = {
-        f.stem.replace("_environment", ""): f
-        for f in PROCESSED_DATA_DIR.glob("*_HPC_environment.pkl")
-    }
-
     by_animal: dict[str, list] = {}
-    for f in dot_files:
-        match = re.match(r"(\w+\d{8})_(\d+_r\d+)_HPC_80_data_over_time\.pkl", f.name)
-        if not match:
-            continue
-        animal_date, epoch = match.group(1), match.group(2)
-        # The outer regex enforces exactly 8 trailing digits (the date),
-        # so the animal id is everything before them. The previous
-        # ``re.match(r"([a-z]+)", animal_date)`` collapsed digit-bearing
-        # ids — e.g. ``j162021...`` matched only ``j``, merging j16
-        # sessions under ``j``.
+    for nwb_file_name, epoch in analysed_epochs().index:
+        animal_date = nwb_file_name.removesuffix("_.nwb")
+        # The NWB stem ends in an 8-digit date, so the animal id is everything
+        # before it (``j16`` keeps its digits).
         animal = animal_date[:-8]
         session_id = f"{animal_date}_{epoch}_HPC"
-        if session_id not in env_files:
-            continue
-
-        nwb_match = [nwb for nwb in NWB_FILES if animal_date in nwb]
-        if not nwb_match:
-            continue
-
         results_path = PROCESSED_DATA_DIR / f"{session_id}_results.nc"
-
         by_animal.setdefault(animal, []).append(
             {
-                "nwb_file_name": nwb_match[0],
+                "nwb_file_name": nwb_file_name,
                 "epoch_name": epoch,
                 "session_id": session_id,
-                "dot_file": f,
-                "env_file": env_files[session_id],
+                "dot_file": PROCESSED_DATA_DIR / f"{session_id}_80_data_over_time.pkl",
+                "env_file": PROCESSED_DATA_DIR / f"{session_id}_environment.pkl",
                 "results_file": results_path if results_path.exists() else None,
             }
         )
 
     selected = []
     for animal in sorted(by_animal):
-        sessions = by_animal[animal]
+        sessions = sorted(by_animal[animal], key=lambda session: session["session_id"])
         if max_per_animal is not None:
             sessions = sessions[:max_per_animal]
         selected.extend(sessions)
 
+    missing = [
+        path.name
+        for session in selected
+        for path in (session["dot_file"], session["env_file"])
+        if not path.exists()
+    ]
+    if missing:
+        raise FileNotFoundError(
+            f"{len(missing)} decode file(s) of the epoch register's analysed epochs "
+            f"are not under {PROCESSED_DATA_DIR}: {', '.join(missing[:10])}"
+            + (", ..." if len(missing) > 10 else "")
+        )
     return selected
 
 

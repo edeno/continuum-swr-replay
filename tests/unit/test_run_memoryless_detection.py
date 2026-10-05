@@ -151,6 +151,25 @@ def cache_marks(root, epoch, cache_dir, epoch_id=EPOCH_ID):
     )
 
 
+def analysed_keys(*epoch_ids: str) -> list[tuple[str, str]]:
+    """The register's (nwb_file_name, epoch) keys of these canonical epochs."""
+    return [
+        (key.nwb_file_name, key.epoch_name)
+        for key in map(parse_epoch_identifier, epoch_ids)
+    ]
+
+
+def analysed_frame(*epoch_ids: str) -> pd.DataFrame:
+    """``analysed_epochs``'s frame (``get_epoch_info``'s shape) for these epochs."""
+    keys = analysed_keys(*epoch_ids)
+    return pd.DataFrame(
+        {"epoch": [int(epoch.split("_")[0]) for _, epoch in keys]},
+        index=pd.MultiIndex.from_tuples(
+            keys, names=["nwb_file_name", "interval_list_name"]
+        ),
+    )
+
+
 class TestFindEpochs:
     def write_decode(self, root, epoch_id, *, data_over_time=True):
         paths = input_paths(epoch_id, root)
@@ -158,43 +177,88 @@ class TestFindEpochs:
         if data_over_time:
             touch(paths["data_over_time"])
 
-    def test_canonical_hpc_decodes_with_both_artifacts(self, tmp_path):
+    def test_the_analysed_epochs_canonical_decodes(self, tmp_path):
         for epoch_id in ("a20200101_02_r1_HPC", "a20200101_04_r2_HPC"):
             self.write_decode(tmp_path, epoch_id)
 
-        epochs, skipped = find_epochs(None, tmp_path)
+        epochs, skipped = find_epochs(
+            None,
+            tmp_path,
+            analysed_keys("a20200101_02_r1_HPC", "a20200101_04_r2_HPC"),
+        )
 
         assert epochs == ["a20200101_02_r1_HPC", "a20200101_04_r2_HPC"]
         assert skipped == {}
 
+    def test_an_analysed_epoch_is_kept_without_its_decode(self, tmp_path):
+        """Kept, so that ``run_one`` records it as failed, never left out."""
+        self.write_decode(tmp_path, "a20200101_04_r2_HPC", data_over_time=False)
+
+        epochs, skipped = find_epochs(
+            None,
+            tmp_path,
+            analysed_keys(
+                "a20200101_02_r1_HPC", "a20200101_04_r2_HPC", "a20200101_06_r3_HPC"
+            ),
+        )
+
+        assert epochs == [
+            "a20200101_02_r1_HPC",
+            "a20200101_04_r2_HPC",
+            "a20200101_06_r3_HPC",
+        ]
+        assert skipped == {}
+
     def test_what_is_left_out_is_recorded_with_its_reason(self, tmp_path):
         self.write_decode(tmp_path, "a20200101_02_r1_HPC")
-        self.write_decode(tmp_path, "a20200101_04_r2_HPC", data_over_time=False)
-        self.write_decode(tmp_path, "a20200101_06_r3_HPC_all")
+        self.write_decode(tmp_path, "a20200101_04_r2_HPC")
+        self.write_decode(tmp_path, "a20200101_02_r1_HPC_all")
         self.write_decode(tmp_path, "a20200101_08_r4_HPC_bogus")
 
-        epochs, skipped = find_epochs(None, tmp_path)
+        epochs, skipped = find_epochs(
+            None, tmp_path, analysed_keys("a20200101_02_r1_HPC")
+        )
 
         assert epochs == ["a20200101_02_r1_HPC"]
-        assert skipped["a20200101_04_r2_HPC"] == "missing data_over_time"
-        assert "variant" in skipped["a20200101_06_r3_HPC_all"]
+        assert skipped["a20200101_04_r2_HPC"] == (
+            "not an analysed epoch in the epoch register"
+        )
+        assert "variant" in skipped["a20200101_02_r1_HPC_all"]
         assert "no decode appends" in skipped["a20200101_08_r4_HPC_bogus"]
 
-    def test_variants_can_be_asked_for(self, tmp_path):
+    def test_variants_of_analysed_epochs_can_be_asked_for(self, tmp_path):
         self.write_decode(tmp_path, "a20200101_02_r1_HPC")
         self.write_decode(tmp_path, "a20200101_02_r1_HPC_all")
+        self.write_decode(tmp_path, "a20200101_04_r2_HPC_all")
+        self.write_decode(
+            tmp_path, "a20200101_02_r1_HPC_non_stationary", data_over_time=False
+        )
 
-        epochs, _ = find_epochs(None, tmp_path, include_variants=True)
+        epochs, skipped = find_epochs(
+            None,
+            tmp_path,
+            analysed_keys("a20200101_02_r1_HPC"),
+            include_variants=True,
+        )
 
-        assert sorted(epochs) == ["a20200101_02_r1_HPC", "a20200101_02_r1_HPC_all"]
+        assert epochs == ["a20200101_02_r1_HPC", "a20200101_02_r1_HPC_all"]
+        assert skipped == {
+            "a20200101_04_r2_HPC_all": "not an analysed epoch in the epoch register",
+            "a20200101_02_r1_HPC_non_stationary": "missing data_over_time",
+        }
 
     def test_an_animal_restricts_the_search(self, tmp_path):
         for epoch_id in ("a20200101_02_r1_HPC", "b20200101_02_r1_HPC"):
             self.write_decode(tmp_path, epoch_id)
 
-        epochs, _ = find_epochs("b", tmp_path)
+        epochs, skipped = find_epochs(
+            "b",
+            tmp_path,
+            analysed_keys("a20200101_02_r1_HPC", "b20200101_02_r1_HPC"),
+        )
 
         assert epochs == ["b20200101_02_r1_HPC"]
+        assert skipped == {}
 
 
 def write_epoch(root, epoch, epoch_id=EPOCH_ID, *, swr_zscore=None, corrupt=False):
@@ -577,6 +641,23 @@ class TestMain:
         monkeypatch.setattr(decoding_common, "LocalCUDACluster", refuse, raising=False)
 
     @pytest.fixture(autouse=True)
+    def no_register(self, monkeypatch):
+        """``--all`` and ``--animal`` read the epoch register, which reads the
+        database; a test that runs them names its analysed epochs instead."""
+
+        def analysed_epochs():
+            raise AssertionError("this test did not say which epochs are analysed")
+
+        monkeypatch.setattr(runner, "analysed_epochs", analysed_epochs)
+
+    @staticmethod
+    def analyse(monkeypatch, *epoch_ids):
+        """The register analyses these epochs and no other."""
+        monkeypatch.setattr(
+            runner, "analysed_epochs", lambda: analysed_frame(*epoch_ids)
+        )
+
+    @pytest.fixture(autouse=True)
     def in_tmp_path(self, tmp_path, monkeypatch):
         """What the runner writes relative to the working directory, such as
         the per-epoch logs, lands in the test's own folder."""
@@ -595,6 +676,7 @@ class TestMain:
         for epoch_id in PARALLEL_EPOCH_IDS:
             write_epoch(root, epoch, epoch_id)
             cache_marks(root, epoch, tmp_path / "cache", epoch_id)
+        self.analyse(monkeypatch, *PARALLEL_EPOCH_IDS)
         clusters = []
 
         def in_process_cluster(**kwargs):
@@ -726,9 +808,12 @@ class TestMain:
 
         assert manifest["settings"]["config"]["drop_single_window_runs"] is False
 
-    def test_one_failing_epoch_does_not_stop_the_others(self, tmp_path, capsys):
+    def test_one_failing_epoch_does_not_stop_the_others(
+        self, tmp_path, capsys, monkeypatch
+    ):
         """The second epoch's data_over_time is unreadable: it is recorded as
         failed with its error, the first is written, and the run exits non-zero."""
+        self.analyse(monkeypatch, "sim20200101_02_r1_HPC", "sim20200101_04_r2_HPC")
         epoch = build_tiling_tetrode()
         root = tmp_path / "processed"
         root.mkdir()
@@ -766,15 +851,7 @@ class TestMain:
         assert "failed" in capsys.readouterr().out
         assert (output_root / "cli-run" / "run.log").exists()
 
-    def test_a_skipped_epoch_is_told_on_the_console(self, tmp_path, capsys):
-        epoch = build_tiling_tetrode()
-        root = tmp_path / "processed"
-        root.mkdir()
-        write_epoch(root, epoch, "sim20200101_02_r1_HPC")
-        input_paths("sim20200101_04_r2_HPC", root)["detector"].write_bytes(b"")
-        cache_dir = tmp_path / "cache"
-        cache_marks(root, epoch, cache_dir)
-
+    def cli_over_sim(self, root, tmp_path):
         main(
             [
                 "--animal",
@@ -790,14 +867,64 @@ class TestMain:
                 "--output-root",
                 str(tmp_path / "memoryless"),
                 "--cache-dir",
-                str(cache_dir),
+                str(tmp_path / "cache"),
             ]
         )
 
-        out = capsys.readouterr().out
-        assert "left out sim20200101_04_r2_HPC: missing data_over_time" in out
+    def test_a_decode_the_register_does_not_analyse_is_left_out_and_told(
+        self, tmp_path, capsys, monkeypatch
+    ):
+        self.analyse(monkeypatch, "sim20200101_02_r1_HPC")
+        epoch = build_tiling_tetrode()
+        root = tmp_path / "processed"
+        root.mkdir()
+        for epoch_id in ("sim20200101_02_r1_HPC", "sim20200101_04_r2_HPC"):
+            write_epoch(root, epoch, epoch_id)
+            cache_marks(root, epoch, tmp_path / "cache", epoch_id)
 
-    def test_date_and_epoch_narrow_what_runs(self, tmp_path):
+        self.cli_over_sim(root, tmp_path)
+
+        out = capsys.readouterr().out
+        assert (
+            "left out sim20200101_04_r2_HPC: not an analysed epoch in the epoch "
+            "register"
+        ) in out
+        epochs = read_manifest(tmp_path)["epochs"]
+        assert epochs["sim20200101_02_r1_HPC"]["status"] == "ok"
+        assert epochs["sim20200101_04_r2_HPC"] == {
+            "status": "skipped",
+            "reason": "not an analysed epoch in the epoch register",
+        }
+
+    def test_an_analysed_epoch_without_its_decode_fails_the_run(
+        self, tmp_path, capsys, monkeypatch
+    ):
+        """It is recorded as failed, so a run never covers fewer epochs than the
+        register analyses without saying so."""
+        self.analyse(monkeypatch, "sim20200101_02_r1_HPC", "sim20200101_04_r2_HPC")
+        epoch = build_tiling_tetrode()
+        root = tmp_path / "processed"
+        root.mkdir()
+        write_epoch(root, epoch, "sim20200101_02_r1_HPC")
+        cache_marks(root, epoch, tmp_path / "cache", "sim20200101_02_r1_HPC")
+        input_paths("sim20200101_04_r2_HPC", root)["detector"].write_bytes(b"")
+
+        with pytest.raises(SystemExit, match="1 epochs failed: sim20200101_04_r2_HPC"):
+            self.cli_over_sim(root, tmp_path)
+
+        epochs = read_manifest(tmp_path)["epochs"]
+        assert epochs["sim20200101_02_r1_HPC"]["status"] == "ok"
+        failed = epochs["sim20200101_04_r2_HPC"]
+        assert failed["status"] == "failed"
+        assert "missing data_over_time" in failed["error"]
+
+    def test_date_and_epoch_narrow_what_runs(self, tmp_path, monkeypatch):
+        self.analyse(
+            monkeypatch,
+            "sim20200101_02_r1_HPC",
+            "sim20200102_02_r1_HPC",
+            "sim20200102_04_r2_HPC",
+        )
         epoch = build_tiling_tetrode()
         root = tmp_path / "processed"
         root.mkdir()

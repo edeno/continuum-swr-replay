@@ -214,9 +214,8 @@ def get_ripple(
 
     # Fail loudly and self-descriptively when a session has no matching CA1
     # ripple extraction, rather than the opaque `fetch1` "0 tuples found" error.
-    # One project session (wilbur20210404) only has an `sb_wilbur_ripple`
-    # extraction and no CA1, so it is a documented exclusion — see
-    # docs/known_issues/wilbur20210404_missing_ca1_ripples.md.
+    # The epochs with none (wilbur20210404, a depletion session, and those
+    # pending a populate) are not analysed: see docs/epoch_register.md.
     ripple_query = RippleTimesV1 & ripple_key
     if len(ripple_query) != 1:
         available_group_names = sorted(
@@ -237,8 +236,8 @@ def get_ripple(
             f"{epoch_name} (group_name='CA1', "
             f"ripple_param_name='{ripple_param_name}'), found {len(ripple_query)}. "
             f"group_name(s) present for this session: {available_group_names}. "
-            "This session has no CA1 ripple extraction and is a documented "
-            "exclusion — see docs/known_issues/wilbur20210404_missing_ca1_ripples.md."
+            "An epoch with no CA1 ripple extraction is not analysed; the epoch "
+            "register (docs/epoch_register.md) records why."
         )
     ripple_times = ripple_query.fetch1_dataframe()
     ripple_filtered_lfp = (LFPBandV1 & lfp_band_key).fetch1_dataframe()

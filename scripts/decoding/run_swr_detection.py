@@ -77,9 +77,11 @@ ones the manifest was written with. A run holds an exclusive lock on its
 folder's ``.lock`` throughout, so a second run under the same run id exits at
 once instead of overwriting the first one's records.
 
-The epochs come from ``get_epoch_info``, narrowed by ``--animal``, ``--date`` and
-``--epoch``. The documented epochs with no inputs (``KNOWN_NO_INPUT_EPOCHS``) are
-recorded as skipped without a database read. The epochs run in parallel on a
+The epochs are the epoch register's analysed ones (``analysed_epochs``, read
+against ``get_epoch_info``), narrowed by ``--animal``, ``--date`` and
+``--epoch``. An epoch the register does not analyse (no inputs, another task,
+and so on: ``docs/epoch_register.md``) never reaches the runner, so the manifest
+records none. The epochs run in parallel on a
 dask ``LocalCluster`` of ``--n-workers`` processes, one epoch per worker at a
 time, each logging to ``logs/{epoch_id}_swr.log`` under the working directory.
 An epoch that fails is recorded with its error and the run goes on; the run
@@ -107,7 +109,6 @@ from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
-from types import MappingProxyType
 from typing import Any
 
 import numpy as np
@@ -138,7 +139,7 @@ from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
     zero_phase_bandpass,
 )
 from continuum_swr_replay.analysis.inventory_comparison.schema import SessionIdentity
-from continuum_swr_replay.data_loaders import get_epoch_info
+from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
 from continuum_swr_replay.data_loaders.lfp import _ripple_keys, get_ripple_band_inputs
 from continuum_swr_replay.data_loaders.position import get_epoch_position_info
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
@@ -162,28 +163,6 @@ RUN_ID_PATTERN = re.compile(r"[A-Za-z0-9._-]+")
 
 SPYGLASS_INPUTS_KAY = "kay_spyglass_inputs"
 """The Kay check's name for Kay run on Spyglass's own inputs (version only)."""
-
-_NO_RIPPLE_BAND = "no LFPBandV1 ripple band"
-_NO_TRACK_GRAPH = "no TrackGraph, so its position cannot be loaded"
-_NO_CA1_EXTRACTION = (
-    "no CA1 ripple extraction: RippleTimesV1 holds only group sb_wilbur_ripple"
-)
-KNOWN_NO_INPUT_EPOCHS: Mapping[tuple[str, str], str] = MappingProxyType(
-    {
-        ("senor20201104_.nwb", "06_r3"): _NO_RIPPLE_BAND,
-        ("senor20201104_.nwb", "08_r4"): _NO_RIPPLE_BAND,
-        ("senor20201105_.nwb", "09_r4"): _NO_TRACK_GRAPH,
-        **dict.fromkeys(
-            (
-                ("wilbur20210404_.nwb", epoch_name)
-                for epoch_name in ("02_r1", "04_r2", "06_r3", "08_r4", "10_r5")
-            ),
-            _NO_CA1_EXTRACTION,
-        ),
-    }
-)
-"""The epochs with no inputs, documented in ``data_loaders/constants.py``, each
-with its reason: skipped without a database read. None of them has a decode."""
 
 
 def epoch_id(nwb_file_name: str, epoch_name: str) -> str:
@@ -750,16 +729,12 @@ def run_epoch(
     -------
     dict
         The epoch's manifest record, in strict JSON types. ``status`` is
-        ``"skipped"`` (with ``reason``) for an epoch in
-        ``KNOWN_NO_INPUT_EPOCHS``, fetched nothing; ``"failed"`` with
+        ``"failed"`` with
         ``reason`` and ``band_check`` when the band check fails, with
         ``reason`` and every detector's error when all four fail, or with
         ``error`` (and ``traceback``) for any other exception; else ``"ok"``
         or ``"partial"``, with every field the module docstring lists.
     """
-    reason = KNOWN_NO_INPUT_EPOCHS.get((nwb_file_name, epoch_name))
-    if reason is not None:
-        return {"status": "skipped", "reason": reason}
     started = clock.perf_counter()
     identifier = epoch_id(nwb_file_name, epoch_name)
     try:
@@ -1038,7 +1013,7 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
     """
     run_id = output_dir.name
     settings = run_settings(provenance)
-    epochs = list(dict.fromkeys(filter_epoch_info(get_epoch_info(), args).index))
+    epochs = list(dict.fromkeys(filter_epoch_info(analysed_epochs(), args).index))
     if not epochs:
         sys.exit("No epochs match --animal, --date and --epoch.")
 

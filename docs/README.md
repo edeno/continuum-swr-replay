@@ -13,6 +13,7 @@ it stops drifting; add new docs to the matching home.
 | methods | `docs/rate_models.md` | how the model families work (not results) |
 | results | `docs/per_bin_rate_results.md` (auto-generated), `docs/replay_rate_content_swr_synthesis.md` (living note) | fitted effects + integrative findings |
 | reference | `docs/task_description.md`, `docs/cached_trials_for_testing.md`, `docs/known_issues/` | task/data background |
+| cohort | `docs/epoch_register.md` | which run epochs are analysed, and the reason for every other one (mirrors `data_loaders/epoch_register.py`) |
 | **design spec** (scientific/methodological) | **`docs/design/`** | analysis designs — human-discoverable for collaborators/reviewers |
 | implementation plan (agent process) | `.claude/docs/plans/` | phased execution plans |
 | review (code/methods output) | `.claude/docs/reviews/` | point-in-time review reports |
@@ -32,6 +33,9 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
 - [per_bin_rate_results.md](per_bin_rate_results.md) — *results*: fitted Family-B effects (auto-generated).
 - [replay_rate_content_swr_synthesis.md](replay_rate_content_swr_synthesis.md) — *results*: integrative rate × content × SWR synthesis (living note).
 - [task_description.md](task_description.md) — *reference*: behavioral task / recording setup.
+- [epoch_register.md](epoch_register.md) — *cohort*: the exclusion rule, its reason
+  codes, and every excluded or pending epoch with its evidence; every stage reads the
+  register (`data_loaders/epoch_register.py`), and the audit checks it.
 - [cached_trials_for_testing.md](cached_trials_for_testing.md) — *reference*: test-fixture trial cache.
 - [regression_pipeline_map.md](regression_pipeline_map.md) — *code map*: every module
   from decoded session to fitted regression, grouped by stage, with the public symbols
@@ -100,8 +104,11 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     wiring, and specs 04–05.
 - [known_issues/](known_issues/) — *reference*: documented data/pipeline issues.
   - [three_sessions_blocked_by_nwb_checksum.md](known_issues/three_sessions_blocked_by_nwb_checksum.md)
-    — the canonical cohort is 215 of 218; three sessions fail an upstream NWB
-    checksum we don't control. Proceed with 215; don't gate on recovery.
+    — *resolved 2026-08-19*: three sessions once failed an upstream NWB checksum;
+    their files were rewritten and all 218 analysed epochs are in every table.
+  - [wilbur20210404_missing_ca1_ripples.md](known_issues/wilbur20210404_missing_ca1_ripples.md)
+    — wilbur20210404 has no CA1 ripple extraction, but it is a depletion session,
+    never in the cohort; its register entry is `DEPLETION_TASK`.
   - [swr_mua_count_conventions.md](known_issues/swr_mua_count_conventions.md) — don't
     cross-substitute the stop-level vs bin-level `n_swr_events`/`n_mua_events` count.
   - [current_arm_trunk_fallback.md](known_issues/current_arm_trunk_fallback.md) —

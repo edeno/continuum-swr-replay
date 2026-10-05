@@ -118,7 +118,7 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
     fit_provenance_path,
     write_fit_provenance,
 )
-from continuum_swr_replay.data_loaders import get_epoch_info
+from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
 from continuum_swr_replay.decoding_common import (
     raise_open_file_limit,
     release_nwb_files,
@@ -1569,8 +1569,8 @@ def _filter_epoch_info(epoch_info: pd.DataFrame, args: Namespace) -> pd.DataFram
         missing = [key for key in wanted if key not in set(keys)]
         if missing:
             raise ValueError(
-                f"{args.sessions} names {len(missing)} session(s) that do not "
-                "exist: "
+                f"{args.sessions} names {len(missing)} session(s) that are not "
+                "analysed epochs of the epoch register: "
                 + ", ".join(f"{name} {epoch}" for name, epoch in missing[:10])
                 + (", ..." if len(missing) > 10 else "")
             )
@@ -1597,6 +1597,13 @@ def _filter_epoch_info(epoch_info: pd.DataFrame, args: Namespace) -> pd.DataFram
         epoch_info = epoch_info.to_frame().T
 
     return epoch_info
+
+
+NO_SORTED_UNITS_REASON = (
+    "the session has no curated cortical spike sorting (CuratedSpikeSorting, "
+    "mountainsort4), a PFC-level condition, not an epoch exclusion"
+)
+"""Why an analysed epoch is outside the PFC cohort."""
 
 
 def _filter_to_sorted_sessions(epoch_info: pd.DataFrame) -> pd.DataFrame:
@@ -1660,9 +1667,17 @@ def main() -> None:
         text=True,
     ).stdout.rstrip()
 
-    epoch_info = get_epoch_info()
-    epoch_info = _filter_epoch_info(epoch_info, args)
-    epoch_info = _filter_to_sorted_sessions(epoch_info)
+    # The PFC cohort: the register's analysed epochs, whose session has sorted
+    # units. An analysed epoch without them is left out here, with that reason.
+    analysed = _filter_epoch_info(analysed_epochs(), args)
+    epoch_info = _filter_to_sorted_sessions(analysed)
+    unsorted = analysed.index.difference(epoch_info.index, sort=False)
+    if len(unsorted):
+        print(
+            f"{len(unsorted)} analysed epoch(s) left out at the PFC level, "
+            f"{NO_SORTED_UNITS_REASON}: "
+            + ", ".join(f"{name} {epoch}" for name, epoch in unsorted)
+        )
     if args.max_sessions is not None:
         epoch_info = epoch_info.iloc[: args.max_sessions]
 

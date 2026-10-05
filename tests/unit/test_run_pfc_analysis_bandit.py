@@ -1282,7 +1282,7 @@ def test_main_raises_the_limit_first_and_closes_each_sessions_files(
         ],
     )
     monkeypatch.setattr(runner, "raise_open_file_limit", raise_open_file_limit)
-    monkeypatch.setattr(runner, "get_epoch_info", lambda: _epoch_info(keys))
+    monkeypatch.setattr(runner, "analysed_epochs", lambda: _epoch_info(keys))
     monkeypatch.setattr(runner, "_filter_to_sorted_sessions", lambda info: info)
     monkeypatch.setattr(runner, "run_analysis", run_analysis)
     monkeypatch.setattr(runner, "release_nwb_files", release_nwb_files)
@@ -1301,3 +1301,55 @@ def test_main_raises_the_limit_first_and_closes_each_sessions_files(
     sessions = ["run 02_r1", "release", "run 04_r2", "release"]
     assert events == ["limit", *(["cluster"] if n_workers > 1 else []), *sessions]
     assert "open-file soft limit 1024 -> 65536" in capsys.readouterr().out
+
+
+def test_main_takes_the_registers_analysed_epochs_less_those_without_sorting(
+    tmp_path, monkeypatch, capsys
+):
+    """The PFC cohort is the register's analysed epochs whose session has curated
+    spike sorting. An analysed epoch without it is left out at the PFC level,
+    with that reason, and is not an epoch exclusion."""
+    keys = [
+        ("chimi20200223_.nwb", "02_r1"),
+        ("chimi20200223_.nwb", "04_r2"),
+        ("chimi20200224_.nwb", "02_r1"),
+    ]
+    ran: list[tuple[str, str]] = []
+
+    def run_analysis(nwb_file_name, epoch_name, **kwargs):
+        ran.append((nwb_file_name, epoch_name))
+
+    def sorted_sessions_only(epoch_info):
+        names = epoch_info.index.get_level_values("nwb_file_name")
+        return epoch_info[names == "chimi20200223_.nwb"]
+
+    monkeypatch.setattr(
+        runner.sys,
+        "argv",
+        [
+            "run_pfc_analysis_bandit.py",
+            "--n_workers",
+            "1",
+            "--local_scratch_dir",
+            str(tmp_path / "scratch"),
+            "--log_directory",
+            str(tmp_path / "logs"),
+            "--output-dir",
+            str(tmp_path / "out"),
+        ],
+    )
+    monkeypatch.setattr(runner, "raise_open_file_limit", lambda: (1024, 65536))
+    monkeypatch.setattr(runner, "analysed_epochs", lambda: _epoch_info(keys))
+    monkeypatch.setattr(runner, "_filter_to_sorted_sessions", sorted_sessions_only)
+    monkeypatch.setattr(runner, "run_analysis", run_analysis)
+    monkeypatch.setattr(runner, "release_nwb_files", lambda: 0)
+
+    runner.main()
+
+    assert ran == keys[:2]
+    out = capsys.readouterr().out
+    assert (
+        "1 analysed epoch(s) left out at the PFC level, "
+        f"{runner.NO_SORTED_UNITS_REASON}: chimi20200224_.nwb 02_r1"
+    ) in out
+    assert not hasattr(runner, "get_epoch_info")

@@ -233,6 +233,8 @@ def main():
     args = parser.parse_args()
 
     print("Loading epoch info...")
+    # Every epoch Spyglass lists, not only the epoch register's analysed ones:
+    # this script diagnoses which inputs load, pending epochs included.
     epoch_info = get_epoch_info()
 
     if args.animal:

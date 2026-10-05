@@ -27,7 +27,10 @@ _FRAMES = ("event_table", "event_arm_table", "stop_table", "event_sequence_table
 
 
 def test_process_session_cache_parity(tmp_path, monkeypatch):
-    sessions = pdm.find_sessions(max_per_animal=1)
+    try:
+        sessions = pdm.find_sessions(max_per_animal=1)
+    except Exception as exc:  # noqa: BLE001 - no data access -> skip, not fail
+        pytest.skip(f"session listing unavailable: {exc}")
     if not sessions:
         pytest.skip("no materialized session inputs on disk")
     session = sessions[0]

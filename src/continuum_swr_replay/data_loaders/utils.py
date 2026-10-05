@@ -77,7 +77,11 @@ if TYPE_CHECKING:
     from ..types import SessionData
 
 from ..parameters import TrainingType
-from .constants import NWB_FILES
+from .constants import (
+    FIRST_EXPOSURE_DESCRIPTIONS,
+    NWB_FILES,
+    REGULAR_SESSION_DESCRIPTION,
+)
 
 # Ignore warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="pynwb")
@@ -135,6 +139,27 @@ def parse_nwb_filename(filename: str) -> tuple[str, int]:
     return animal, date
 
 
+def session_restriction() -> list[dict[str, str]]:
+    """The ``Session`` rows ``get_epoch_info`` admits, as a DataJoint restriction.
+
+    Every ``NWB_FILES`` session described as the regular spatial-bandit task,
+    then each first-exposure session of ``FIRST_EXPOSURE_DESCRIPTIONS`` under its
+    own description (wilbur20210326's "... - exploration session").
+
+    Returns
+    -------
+    list of dict
+        ``{"nwb_file_name", "session_description"}`` per admitted session.
+    """
+    return [
+        {"nwb_file_name": name, "session_description": REGULAR_SESSION_DESCRIPTION}
+        for name in NWB_FILES
+    ] + [
+        {"nwb_file_name": name, "session_description": description}
+        for name, description in FIRST_EXPOSURE_DESCRIPTIONS.items()
+    ]
+
+
 @cache
 def get_epoch_info() -> pd.DataFrame:
     """Get information about all available epochs across all animals.
@@ -142,6 +167,14 @@ def get_epoch_info() -> pd.DataFrame:
     This function queries the Spyglass database, which is expensive. Results
     are cached for the lifetime of the Python process to avoid redundant
     database queries.
+
+    It lists every run epoch (``^[0-9]+_r[0-9]+$``) with a
+    ``PositionIntervalMap`` row of the sessions ``session_restriction`` admits:
+    the regular sessions of ``NWB_FILES`` and, since 2026-10-05, the listed
+    first-exposure sessions. That is what Spyglass holds, not the cohort: a stage
+    that enumerates epochs to analyse reads
+    ``epoch_register.analysed_epochs()``, which keeps the epochs the epoch
+    register analyses and raises on one it does not list.
 
     Returns
     -------
@@ -165,19 +198,7 @@ def get_epoch_info() -> pd.DataFrame:
     from spyglass.common import IntervalList, PositionIntervalMap, Session
 
     epoch_info = (
-        pd.DataFrame(
-            (
-                Session
-                & [
-                    {
-                        "nwb_file_name": nwb_file_name,
-                        "session_description": "Spatial bandit task (regular)",
-                    }
-                    for nwb_file_name in NWB_FILES
-                ]
-            )
-            * PositionIntervalMap
-        )
+        pd.DataFrame((Session & session_restriction()) * PositionIntervalMap)
         .set_index(["nwb_file_name", "interval_list_name"])
         .sort_index()
     )
@@ -319,9 +340,7 @@ def get_training_timepoints(
         return np.ones((n_time,), dtype=bool)
 
     elif training_type == TrainingType.NO_RIPPLE:
-        ripple_labels = get_labels(
-            data["ripple_times"], data["position_info"].index
-        )
+        ripple_labels = get_labels(data["ripple_times"], data["position_info"].index)
         is_ripple = ripple_labels > 0
         not_ripple = ~np.asarray(is_ripple).squeeze()
 
