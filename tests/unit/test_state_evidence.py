@@ -910,13 +910,18 @@ def test_the_animal_t_test_takes_each_animal_once():
 
 
 def test_identical_animal_summaries_are_flagged_and_untested():
-    """Every animal the same: the interval has no width and there is no p."""
-    for value in (2.0, 0.0):
+    """Every animal the same: the interval has no width and there is no p.
+
+    0.1 and 0.7 are not exact in binary, so three of them have an SD of about
+    1e-17 rather than 0; they are still identical.
+    """
+    for value in (2.0, 0.0, 0.1, 0.7):
         result = animal_t_test(np.full(3, value), np.array(["a", "b", "c"]))
 
-        assert result.zero_variance
-        assert np.isnan(result.p)
-        assert (result.ci_lo, result.ci_hi) == (value, value)
+        assert result.zero_variance, value
+        assert np.isnan(result.p), value
+        assert result.estimate == pytest.approx(value)
+        assert (result.ci_lo, result.ci_hi) == (result.estimate, result.estimate)
 
 
 def test_the_animal_interval_is_the_t_interval():

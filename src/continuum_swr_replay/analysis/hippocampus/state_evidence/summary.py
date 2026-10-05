@@ -106,7 +106,9 @@ PRIMARY_ENCODING = "runcv"
 ENCODING_HELD_OUT = {
     "runcv": "primary: fit on the running bins of the other fold's alternating "
     "30 s blocks, so a window's own spikes are not in it, but for the bins of a "
-    "window that straddles a block edge (cv_insample_share)",
+    "window that straddles a block edge (cv_insample_share), and an edge bin "
+    "next to the other fold's running bins, which the library's padding of each "
+    "training run by about one bin can reach",
     "run": "secondary: fit on every running bin, so it includes running "
     "windows' own spikes",
     "can": "secondary: the decode's own, fit on every non-ripple bin, so it "
@@ -573,9 +575,9 @@ def _t_inference(by_animal: NDArray) -> AnimalTTest:
     estimate = float(by_animal.mean())
     if n < 2:
         return AnimalTTest(estimate, nan, nan, nan, False)
-    sem = float(by_animal.std(ddof=1) / np.sqrt(n))
-    if sem == 0:
+    if np.ptp(by_animal) == 0:  # identical: their float SD can be ~1e-17, not 0
         return AnimalTTest(estimate, estimate, estimate, nan, True)
+    sem = float(by_animal.std(ddof=1) / np.sqrt(n))
     half = float(student_t.ppf(0.975, n - 1)) * sem
     p = float(2 * student_t.sf(abs(estimate / sem), df=n - 1))
     return AnimalTTest(estimate, estimate - half, estimate + half, p, False)
