@@ -872,6 +872,38 @@ def test_run_decode_leaves_spyglass_nwb_files_open_by_default(
     assert "NWB files" not in _log(tmp_path, decoder)
 
 
+@pytest.mark.parametrize("key", list(DECODERS))
+def test_a_failed_release_leaves_the_epochs_result(
+    decoders, monkeypatch, tmp_path, key
+):
+    """The release is cleanup in a ``finally``: had it raised there, it would
+    replace the epoch's return value and abort ``dask.compute``, and with it
+    the batch. Spyglass's real ``release_nwb_files`` path runs here, against a
+    stub whose ``close_nwb_files`` fails."""
+    decoder, module = DECODERS[key], decoders.modules[key]
+    helper = types.ModuleType("spyglass.utils.nwb_helper_fn")
+    vars(helper)["__open_nwb_files"] = {"/data/file_0.nwb": ("io", "nwbfile")}
+
+    def close_nwb_files() -> None:
+        raise OSError("simulated: close failed")
+
+    helper.close_nwb_files = close_nwb_files
+    utils = types.ModuleType("spyglass.utils")
+    utils.nwb_helper_fn = helper
+    monkeypatch.setitem(sys.modules, "spyglass.utils", utils)
+    monkeypatch.setitem(sys.modules, "spyglass.utils.nwb_helper_fn", helper)
+    save_dir = tmp_path / "staging"
+    _patch_fresh_decode(monkeypatch, module, tmp_path, _WritesPlaceholders(tmp_path))
+
+    failed = _run_decode(module, decoder, tmp_path, save_dir=save_dir, release_nwb=True)
+
+    assert failed is None, _log(tmp_path, decoder)
+    assert (save_dir / f"{decoder.epoch_identifier}_results.nc").exists()
+    log = _log(tmp_path, decoder).splitlines()
+    assert any(line.endswith("Done!") for line in log)
+    assert log[-1].endswith("closed -1 NWB files Spyglass held open")
+
+
 def _stand_in_batch(monkeypatch, tmp_path, *, has_cuda: bool, cluster: Callable):
     """``run_batch`` with `cluster` for the path `has_cuda` picks and no dask.
 

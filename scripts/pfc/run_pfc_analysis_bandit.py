@@ -65,6 +65,7 @@ os.environ.setdefault("MKL_NUM_THREADS", "1")
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
 from pathlib import Path
+from typing import Any
 
 import dask
 import numpy as np
@@ -118,7 +119,11 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
     write_fit_provenance,
 )
 from continuum_swr_replay.data_loaders import get_epoch_info
-from continuum_swr_replay.decoding_common import setup_logger
+from continuum_swr_replay.decoding_common import (
+    raise_open_file_limit,
+    release_nwb_files,
+    setup_logger,
+)
 from continuum_swr_replay.parameters import (
     MAX_SPEED_THRESHOLD_CM_PER_SEC,
     PROCESSED_DATA_DIR,
@@ -817,6 +822,11 @@ def drop_retired_statistics(neuron_stats: pd.DataFrame) -> pd.DataFrame:
     return neuron_stats.drop(columns=retired)
 
 
+def session_identifier(nwb_file_name: str, epoch_name: str, brain_area: str) -> str:
+    """The session's name in its artifacts and its log: ``wilbur20210329_02_r1_mPFC``."""
+    return f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{brain_area}"
+
+
 def run_analysis(
     nwb_file_name: str,
     epoch_name: str,
@@ -907,7 +917,7 @@ def run_analysis(
     batch that hits them should stop rather than work through 70 more sessions
     failing the same way.
     """
-    epoch_identifier = f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{brain_area}"
+    epoch_identifier = session_identifier(nwb_file_name, epoch_name, brain_area)
     save_file = modulation_path(
         output_dir, epoch_identifier, stop_cohort, penalty_sigma
     )
@@ -1235,6 +1245,27 @@ def run_analysis(
         logger.info("Done!")
     except Exception as e:
         logger.exception(f"Error processing {epoch_identifier}: {e}")
+
+
+def run_analysis_then_release(
+    nwb_file_name: str, epoch_name: str, brain_area: str = "mPFC", **kwargs: Any
+) -> None:
+    """``run_analysis``, then close the NWB files Spyglass opened for it.
+
+    ``main``'s workers run one session at a time (``threads_per_worker=1``), and
+    its serial path runs them one after another, so no other session in the
+    process can still be reading those files (``release_nwb_files``). The release
+    wraps ``run_analysis`` rather than living in it because that returns early
+    and turns most failures into a log line: here it runs whether the session
+    is fit, skipped, failed or raised. How many files were closed goes to the
+    session's log.
+    """
+    try:
+        run_analysis(nwb_file_name, epoch_name, brain_area=brain_area, **kwargs)
+    finally:
+        logging.getLogger(
+            session_identifier(nwb_file_name, epoch_name, brain_area)
+        ).info("closed %d NWB files Spyglass held open", release_nwb_files())
 
 
 def get_command_line_arguments() -> Namespace:
@@ -1614,6 +1645,9 @@ def _filter_to_sorted_sessions(epoch_info: pd.DataFrame) -> pd.DataFrame:
 def main() -> None:
     """Main entry point for batch PFC GLM analysis."""
     args = get_command_line_arguments()
+    # before any cluster starts: its worker processes inherit this limit
+    old_soft, new_soft = raise_open_file_limit()
+    print(f"open-file soft limit {old_soft} -> {new_soft}", flush=True)
 
     Path(args.local_scratch_dir).mkdir(exist_ok=True, parents=True)
     Path(args.log_directory).mkdir(exist_ok=True, parents=True)
@@ -1641,7 +1675,7 @@ def main() -> None:
 
     if args.n_workers <= 1 or len(epoch_info) <= 1:
         for epoch in epoch_info.itertuples():
-            run_analysis(
+            run_analysis_then_release(
                 nwb_file_name=epoch.Index[0],
                 epoch_name=epoch.Index[1],
                 brain_area=args.brain_area,
@@ -1673,7 +1707,7 @@ def main() -> None:
 
         with Client(cluster):
             results = [
-                dask.delayed(run_analysis)(
+                dask.delayed(run_analysis_then_release)(
                     nwb_file_name=epoch.Index[0],
                     epoch_name=epoch.Index[1],
                     brain_area=args.brain_area,

@@ -42,6 +42,10 @@ from continuum_swr_replay.parameters import (
 )
 from continuum_swr_replay.types import ClusterlessParams, SortedSpikesParams
 
+_logger = logging.getLogger(__name__)
+_warned_cache_name_missing = False
+"""Whether ``release_nwb_files`` has said Spyglass's cache name is gone."""
+
 
 @dataclass(frozen=True)
 class DecodingConfig:
@@ -275,16 +279,40 @@ def release_nwb_files() -> int:
     those files: data read lazily from a closed file cannot be read. The batch
     runners call it when an epoch ends, on workers that run one epoch at a time.
 
+    It is cleanup, called from a ``finally``, so it never raises: an exception
+    there would replace the epoch's own result, and in ``run_batch`` abort the
+    whole batch. A failure is logged as a WARNING instead.
+
     Returns
     -------
     int
-        How many files the cache held; all are now closed.
+        How many files the cache held; all are now closed. -1 when the release
+        failed (WARNING logged with the error), or when the count could not be
+        read because Spyglass no longer names its cache ``__open_nwb_files``
+        (WARNING logged once per process; the files are still closed).
     """
-    # Imported here so that importing this module does not need Spyglass.
-    from spyglass.utils import nwb_helper_fn
+    global _warned_cache_name_missing
+    try:
+        # Imported here so that importing this module does not need Spyglass.
+        from spyglass.utils import nwb_helper_fn
 
-    n_open = len(vars(nwb_helper_fn)["__open_nwb_files"])
-    nwb_helper_fn.close_nwb_files()
+        open_files = vars(nwb_helper_fn).get("__open_nwb_files")
+        if open_files is None:
+            n_open = -1
+            if not _warned_cache_name_missing:
+                _warned_cache_name_missing = True
+                _logger.warning(
+                    "spyglass.utils.nwb_helper_fn has no __open_nwb_files: cannot "
+                    "count the NWB files it holds open; closing them anyway"
+                )
+        else:
+            n_open = len(open_files)
+        nwb_helper_fn.close_nwb_files()
+    except Exception as error:  # noqa: BLE001 - cleanup must not replace the result
+        _logger.warning(
+            "could not close the NWB files Spyglass held open: %r", error, exc_info=True
+        )
+        return -1
     return n_open
 
 
@@ -301,17 +329,19 @@ def raise_open_file_limit(target: int = 65536) -> tuple[int, int]:
     ----------
     target : int, optional
         The soft limit wanted. It is capped at the hard limit, which an
-        unprivileged process cannot raise.
+        unprivileged process cannot raise, unless that is unlimited.
 
     Returns
     -------
     old_soft : int
     new_soft : int
         The soft limit before and after; equal when it was not raised.
+        ``resource.RLIM_INFINITY`` (-1 on Linux) stands for unlimited.
     """
     old_soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
-    new_soft = min(target, hard)
-    if old_soft >= new_soft:
+    # RLIM_INFINITY is -1 here, so it must not take part in a min or a comparison.
+    new_soft = target if hard == resource.RLIM_INFINITY else min(target, hard)
+    if old_soft == resource.RLIM_INFINITY or old_soft >= new_soft:
         return old_soft, old_soft
     resource.setrlimit(resource.RLIMIT_NOFILE, (new_soft, hard))
     return old_soft, new_soft

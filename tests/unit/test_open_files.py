@@ -16,7 +16,9 @@ this process's own limit is untouched.
 from __future__ import annotations
 
 import json
+import logging
 import os
+import resource
 import subprocess
 import sys
 import types
@@ -30,19 +32,27 @@ from continuum_swr_replay import decoding_common
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-def _stub_spyglass(monkeypatch, open_files: dict) -> list[str]:
+def _stub_spyglass(
+    monkeypatch, open_files: dict | None, close_error: Exception | None = None
+) -> list[str]:
     """Stub ``spyglass.utils.nwb_helper_fn`` with `open_files` as its cache.
 
-    Returns the list ``close_nwb_files`` appends to on each call.
+    `open_files` None leaves the cache's name out, as a Spyglass that renamed
+    it would; `close_error` is raised by ``close_nwb_files``. Returns the list
+    ``close_nwb_files`` appends to on each call.
     """
     calls: list[str] = []
     helper = types.ModuleType("spyglass.utils.nwb_helper_fn")
-    # Set through vars(): at module level the name is not mangled, as in Spyglass.
-    vars(helper)["__open_nwb_files"] = open_files
+    if open_files is not None:
+        # Set through vars(): at module level the name is not mangled, as in Spyglass.
+        vars(helper)["__open_nwb_files"] = open_files
 
     def close_nwb_files() -> None:
         calls.append("close_nwb_files")
-        open_files.clear()
+        if close_error is not None:
+            raise close_error
+        if open_files is not None:
+            open_files.clear()
 
     helper.close_nwb_files = close_nwb_files
     utils = types.ModuleType("spyglass.utils")
@@ -65,6 +75,74 @@ def test_release_closes_spyglass_cache_and_returns_how_many(monkeypatch):
 
     assert decoding_common.release_nwb_files() == 0
     assert calls == ["close_nwb_files"] * 2
+
+
+def test_a_release_that_fails_warns_and_returns_minus_one(monkeypatch, caplog):
+    """Cleanup: its failure is logged, never raised over the epoch's result."""
+    open_files = {"/data/file_0.nwb": ("io", "nwbfile")}
+    calls = _stub_spyglass(
+        monkeypatch, open_files, close_error=OSError("simulated: close failed")
+    )
+
+    with caplog.at_level(logging.WARNING, logger=decoding_common.__name__):
+        assert decoding_common.release_nwb_files() == -1
+
+    assert calls == ["close_nwb_files"]
+    (record,) = caplog.records
+    assert record.levelno == logging.WARNING
+    assert "simulated: close failed" in record.getMessage()
+
+
+def test_a_missing_cache_name_warns_once_and_still_closes(monkeypatch, caplog):
+    """If Spyglass renames its private cache, the count is unknown (-1), but the
+    files are still closed through its public ``close_nwb_files``."""
+    monkeypatch.setattr(decoding_common, "_warned_cache_name_missing", False)
+    calls = _stub_spyglass(monkeypatch, None)
+
+    with caplog.at_level(logging.WARNING, logger=decoding_common.__name__):
+        assert decoding_common.release_nwb_files() == -1
+        assert decoding_common.release_nwb_files() == -1
+
+    assert calls == ["close_nwb_files"] * 2
+    (record,) = caplog.records
+    assert "__open_nwb_files" in record.getMessage()
+
+
+def _limits_after(monkeypatch, soft: int, hard: int, target: int) -> tuple:
+    """``raise_open_file_limit(target)`` against stand-in limits; nothing is set.
+
+    Returns what it returned and what it asked ``setrlimit`` for (None if it
+    did not ask).
+    """
+    asked = []
+    monkeypatch.setattr(
+        decoding_common.resource, "getrlimit", lambda resource: (soft, hard)
+    )
+    monkeypatch.setattr(
+        decoding_common.resource,
+        "setrlimit",
+        lambda resource, limits: asked.append(limits),
+    )
+    returned = decoding_common.raise_open_file_limit(target)
+    return returned, (asked[0] if asked else None)
+
+
+def test_an_unlimited_hard_limit_raises_the_soft_limit_to_the_target(monkeypatch):
+    infinity = resource.RLIM_INFINITY
+
+    assert _limits_after(monkeypatch, 1024, infinity, 65536) == (
+        (1024, 65536),
+        (65536, infinity),
+    )
+
+
+def test_an_unlimited_soft_limit_is_never_lowered(monkeypatch):
+    infinity = resource.RLIM_INFINITY
+
+    assert _limits_after(monkeypatch, infinity, infinity, 65536) == (
+        (infinity, infinity),
+        None,
+    )
 
 
 def _open_descriptors_to(path: Path) -> int:

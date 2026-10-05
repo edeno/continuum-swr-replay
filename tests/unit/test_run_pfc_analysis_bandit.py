@@ -10,6 +10,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import logging
+import types
 from pathlib import Path
 
 import numpy as np
@@ -1159,3 +1160,144 @@ def test_a_nonconverged_mle_is_not_used_for_the_prior_audit(monkeypatch):
         assert np.isnan(columns[f"{curve}: peak_log_modulation_mle"][0])
         assert np.isfinite(columns[f"{curve}: peak_log_modulation_mle"][1])
         assert not columns[f"{curve}: prior_binds"][0]
+
+
+# ---------------------------------------------------------------------------
+# Open files: Spyglass's NWB cache and the open-file limit
+# ---------------------------------------------------------------------------
+
+
+def _recording_release(monkeypatch) -> list[bool]:
+    """Replace ``release_nwb_files``; return the list each call appends to."""
+    closed: list[bool] = []
+
+    def release_nwb_files() -> int:
+        closed.append(True)
+        return 14
+
+    monkeypatch.setattr(runner, "release_nwb_files", release_nwb_files)
+    return closed
+
+
+@pytest.mark.parametrize("outcome", ["fit", "fit_fails", "raises"])
+def test_each_session_closes_the_nwb_files_spyglass_opened(
+    tmp_path, fake_session, monkeypatch, outcome
+):
+    """A worker runs one session at a time, so when its session ends -- fit,
+    failed inside ``run_analysis`` (which logs and returns) or raised out of it
+    (no free card) -- it closes the NWB files Spyglass cached and logs how many."""
+    monkeypatch.setattr(runner.sys, "argv", ["run_pfc_analysis_bandit.py"])
+    closed = _recording_release(monkeypatch)
+    if outcome == "fit_fails":
+
+        def run_session(*args, **kwargs):
+            raise RuntimeError("simulated: the fit failed")
+
+        monkeypatch.setattr(runner, "run_session", run_session)
+    elif outcome == "raises":
+
+        def configure_jax_gpu(**kwargs):
+            raise RuntimeError("simulated: no free card")
+
+        monkeypatch.setattr(runner, "configure_jax_gpu", configure_jax_gpu)
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+
+    def session():
+        runner.run_analysis_then_release(
+            nwb_file_name="wilbur20210329_.nwb",
+            epoch_name="02_r1",
+            log_directory=tmp_path / "logs",
+            output_dir=output_dir,
+        )
+
+    if outcome == "raises":
+        with pytest.raises(RuntimeError, match="no free card"):
+            session()
+    else:
+        session()
+
+    assert closed == [True]
+    artifact = output_dir / "wilbur20210329_02_r1_mPFC_modulation.pkl"
+    assert artifact.exists() == (outcome == "fit")
+    log = (tmp_path / "logs" / "wilbur20210329_02_r1_mPFC.log").read_text()
+    assert log.splitlines()[-1].endswith("closed 14 NWB files Spyglass held open")
+
+
+class _Client:
+    """Stands in for ``dask.distributed.Client``: it connects to nothing."""
+
+    def __init__(self, cluster: object) -> None:
+        pass
+
+    def __enter__(self) -> _Client:
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        return None
+
+
+@pytest.mark.parametrize("n_workers", [1, 2], ids=["serial", "dask"])
+def test_main_raises_the_limit_first_and_closes_each_sessions_files(
+    tmp_path, monkeypatch, capsys, n_workers
+):
+    """The limit is raised before any cluster starts, so the workers inherit
+    it, and every session, on either path, ends by closing its files.
+
+    The cluster, the client and dask are stand-ins: each session's call runs
+    here, as it is built.
+    """
+    keys = [("chimi20200223_.nwb", "02_r1"), ("chimi20200223_.nwb", "04_r2")]
+    events: list[str] = []
+
+    def raise_open_file_limit():
+        events.append("limit")
+        return 1024, 65536
+
+    def local_cluster(**kwargs):
+        events.append("cluster")
+        assert kwargs["threads_per_worker"] == 1 and kwargs["processes"] is True
+        return object()
+
+    def run_analysis(nwb_file_name, epoch_name, **kwargs):
+        events.append(f"run {epoch_name}")
+
+    def release_nwb_files():
+        events.append("release")
+        return 14
+
+    monkeypatch.setattr(
+        runner.sys,
+        "argv",
+        [
+            "run_pfc_analysis_bandit.py",
+            "--n_workers",
+            str(n_workers),
+            "--local_scratch_dir",
+            str(tmp_path / "scratch"),
+            "--log_directory",
+            str(tmp_path / "logs"),
+            "--output-dir",
+            str(tmp_path / "out"),
+        ],
+    )
+    monkeypatch.setattr(runner, "raise_open_file_limit", raise_open_file_limit)
+    monkeypatch.setattr(runner, "get_epoch_info", lambda: _epoch_info(keys))
+    monkeypatch.setattr(runner, "_filter_to_sorted_sessions", lambda info: info)
+    monkeypatch.setattr(runner, "run_analysis", run_analysis)
+    monkeypatch.setattr(runner, "release_nwb_files", release_nwb_files)
+    monkeypatch.setattr(runner, "LocalCluster", local_cluster)
+    monkeypatch.setattr(runner, "Client", _Client)
+    monkeypatch.setattr(
+        runner,
+        "dask",
+        types.SimpleNamespace(
+            delayed=lambda function: function, compute=lambda *outcomes: outcomes
+        ),
+    )
+
+    runner.main()
+
+    sessions = ["run 02_r1", "release", "run 04_r2", "release"]
+    assert events == ["limit", *(["cluster"] if n_workers > 1 else []), *sessions]
+    assert "open-file soft limit 1024 -> 65536" in capsys.readouterr().out
