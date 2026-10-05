@@ -23,6 +23,10 @@ RUNNING_ABOVE_CM_S = 10.0
 Seed = int | Sequence[int | str]
 """A random stream's name: a base seed, optionally followed by keys."""
 
+HALVES_SEED = 20261003
+"""The tetrode partitions' seed (:func:`tetrode_halves`), the prototype's: its
+pilot splits are these. The half decodes use the first two partitions."""
+
 
 def keyed_rng(seed: Seed, *keys: int | str) -> np.random.Generator:
     """A reproducible random stream named by ``seed`` and ``keys``.

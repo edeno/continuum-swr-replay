@@ -34,6 +34,10 @@ Per epoch (a dask CPU worker each):
    from the fold model without its centre bin (``held_out_evidence``), so a
    window's own spikes are not in the model that scores it.
 
+``epoch_table`` and ``run_epoch`` also take other label sets (``LabelSet``):
+labels from another decode, scored by chosen tetrode pairs, their rows stacked;
+``run_half_tetrode_decodes.py score`` gives each epoch its half decodes' labels.
+
 It writes ``per_epoch/{epoch}_windows.parquet`` (one row per window; columns
 ``runcv_*`` for the primary, time-held-out running-only encoding, ``run_*`` for
 the running-only encoding fit on every running bin and ``can_*`` for the
@@ -83,7 +87,8 @@ import resource  # noqa: E402
 import sys  # noqa: E402
 import time as clock  # noqa: E402
 import traceback  # noqa: E402
-from collections.abc import Callable, Iterator  # noqa: E402
+from collections.abc import Callable, Iterator, Mapping, Sequence  # noqa: E402
+from dataclasses import dataclass, field  # noqa: E402
 from datetime import date  # noqa: E402
 from pathlib import Path  # noqa: E402
 from typing import Any  # noqa: E402
@@ -100,12 +105,14 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: 
     ENCODING_HELD_OUT,
     ENCODING_KEY,
     ENCODING_LABELS,
+    HALVES_SEED,
     MIN_BIN_WINDOWS,
     PRIMARY_ENCODING,
     PROBABILITY_BIN_LABELS,
     STATES,
     bout_animal_summaries,
     build_windows,
+    encoding_comparison,
     encoding_inputs,
     event_likelihood,
     held_out_evidence,
@@ -139,8 +146,6 @@ from continuum_swr_replay.table_io import read_table, write_table  # noqa: E402
 PRODUCED_BY = "scripts/qa/run_state_evidence.py"
 SEED = 20261004
 """Names every window and partner draw, with the epoch id."""
-HALVES_SEED = 20261003
-"""The tetrode partitions' seed, the prototype's (its pilot splits are these)."""
 RUNNING_ENCODING_MIN_SPEED_CM_S = 4.0
 EVENT_MARGIN_BINS = 2
 """Running bins this close to a non-local event bin are left out of every
@@ -391,48 +396,6 @@ def stored_log_likelihood(
     return np.asarray(stored, dtype=np.float64)[:, interior]
 
 
-def encoding_comparison(refit: dict, stored: dict) -> dict:
-    """How a refit encoding model differs from the stored one."""
-
-    def max_abs(a: list, b: list) -> float:
-        return max(
-            (
-                float(np.max(np.abs(np.asarray(x, float) - np.asarray(y, float))))
-                for x, y in zip(a, b, strict=True)
-                if np.size(x)
-            ),
-            default=0.0,
-        )
-
-    n_refit = [len(x) for x in refit["encoding_positions"]]
-    n_stored = [len(x) for x in stored["encoding_positions"]]
-    same = n_refit == n_stored
-    return {
-        "same_n_encoding_spikes": same,
-        "n_encoding_spikes": n_stored,
-        "max_abs_encoding_positions": (
-            max_abs(refit["encoding_positions"], stored["encoding_positions"])
-            if same
-            else None
-        ),
-        "max_abs_encoding_marks": (
-            max_abs(
-                refit["encoding_spike_waveform_features"],
-                stored["encoding_spike_waveform_features"],
-            )
-            if same
-            else None
-        ),
-        "max_abs_mean_rates": float(
-            np.max(
-                np.abs(
-                    np.asarray(refit["mean_rates"]) - np.asarray(stored["mean_rates"])
-                )
-            )
-        ),
-    }
-
-
 def refit_encoding(
     detector: Any,
     time: NDArray,
@@ -509,19 +472,128 @@ def _json_ready(value: Any) -> Any:
     return value
 
 
+@dataclass(frozen=True)
+class LabelSet:
+    """Where one set of windows' state labels comes from, and which runs score it.
+
+    The default is Task 12's: the canonical decode's labels, scored by every
+    seeded partition in both directions. Labels from a decode that saw one half
+    S alone (``scripts/qa/run_half_tetrode_decodes.py``) are scored by its own
+    half C only: ``halves=[(S, C)]`` and ``both_directions=False``.
+
+    Attributes
+    ----------
+    name : str
+        Keys the set's checks in the validation record.
+    probabilities : ndarray, shape (n_time, 4), optional
+        State probabilities in ``STATES`` order; None for the canonical
+        decode's own.
+    time : ndarray, shape (n_time,), optional
+        Their time axis, which must be the decode's; required with
+        ``probabilities``.
+    halves : sequence of (ndarray, ndarray), optional
+        The tetrode pairs that score; None for the seeded partitions,
+        ``tetrode_halves(n_tetrodes, seed=HALVES_SEED)``.
+    both_directions : bool
+        ``window_evidence``'s: False when each pair's first half made the labels.
+    columns : mapping
+        Constant columns put on the set's rows, after ``animal``.
+    """
+
+    name: str = "all"
+    probabilities: NDArray | None = None
+    time: NDArray | None = None
+    halves: Sequence[tuple[NDArray, NDArray]] | None = None
+    both_directions: bool = True
+    columns: Mapping[str, Any] = field(default_factory=dict)
+
+
+def label_probabilities(label_set: LabelSet, time: NDArray) -> NDArray:
+    """A label set's state probabilities, checked against the decode's time axis.
+
+    Raises
+    ------
+    ValueError
+        Its axis is not the decode's, or its probabilities are not finite rows
+        of four summing to 1.
+    """
+    if label_set.time is None or not np.array_equal(
+        np.asarray(label_set.time, dtype=float), time
+    ):
+        raise ValueError(f"{label_set.name}: its time axis is not the decode's")
+    probabilities = np.asarray(label_set.probabilities, dtype=float)
+    if probabilities.shape != (time.size, len(STATES)):
+        raise ValueError(f"{label_set.name}: probabilities are {probabilities.shape}")
+    worst = float(np.max(np.abs(probabilities.sum(1) - 1.0)))
+    if not np.isfinite(probabilities).all() or worst > PROBABILITY_SUM_TOLERANCE:
+        raise ValueError(
+            f"{label_set.name}: state probabilities are invalid (max |sum - 1| {worst})"
+        )
+    return probabilities
+
+
+def checked_halves(
+    halves: Sequence[tuple[NDArray, NDArray]], n_tetrodes: int
+) -> list[tuple[NDArray, NDArray]]:
+    """Tetrode pairs as int arrays: each two disjoint, non-empty sets of tetrodes."""
+    out = []
+    for first, second in halves:
+        pair = (np.asarray(first, dtype=np.int64), np.asarray(second, dtype=np.int64))
+        joined = np.concatenate(pair)
+        if (
+            not (pair[0].size and pair[1].size)
+            or np.unique(joined).size != joined.size
+            or joined.min() < 0
+            or joined.max() >= n_tetrodes
+        ):
+            raise ValueError(
+                f"a tetrode pair must be two disjoint, non-empty sets below {n_tetrodes}"
+            )
+        out.append(pair)
+    return out
+
+
+def time_held_out_record(
+    windows: pd.DataFrame, cv: pd.DataFrame, in_span: dict[int, NDArray]
+) -> dict:
+    """How much of each window the time-held-out model that scores it was fit on."""
+    s, e = windows.s.to_numpy(), windows.e.to_numpy()
+    scoring = 1 - cv.cv_fold.to_numpy()
+    touching = np.where(scoring == 0, in_span[0][e + 1] - in_span[0][s],
+                        in_span[1][e + 1] - in_span[1][s]) > 0  # fmt: skip
+    straddling = cv.cv_insample_share.to_numpy() > 0
+    return {
+        "block_s": CV_BLOCK_S,
+        "windows": len(windows),
+        "straddling_windows": int(straddling.sum()),
+        "straddling_share": float(straddling.mean()),
+        "windows_with_bins_in_the_scoring_models_spikes": int(touching.sum()),
+    }
+
+
 def epoch_table(
     epoch_id: str,
     decode_dir: Path,
     load_inputs: Callable[[str], dict],
     log: Callable[[str], None],
+    label_sets: Sequence[LabelSet] | None = None,
 ) -> tuple[pd.DataFrame, dict]:
     """One epoch's per-window table and its validation record.
+
+    Each of ``label_sets`` (default: the canonical decode's labels,
+    ``LabelSet()``) has its own windows and evidence, and the rows of every set
+    are stacked. The encodings, their terms and their checks are shared. With
+    the default the record holds ``time_held_out`` and ``windows`` at its top
+    level; otherwise it holds them per set, under ``label_sets``.
 
     Raises
     ------
     ValueError
         A check failed; the message says which.
     """
+    sets = [LabelSet()] if label_sets is None else list(label_sets)
+    if not sets or len({label_set.name for label_set in sets}) != len(sets):
+        raise ValueError("the label sets need distinct names")
     checks: dict[str, Any] = {}
     files = decode_files(epoch_id, decode_dir)
     dot = pd.read_pickle(files["data_over_time"])
@@ -546,8 +618,15 @@ def epoch_table(
     # windows: a bin with no finite position is in no regime
     regime = regimes(speed)
     regime[~np.isfinite(linear)] = ""
-    windows = build_windows(probabilities, regime, seed=(SEED, epoch_id))
-    log(f"{len(windows)} windows")
+    windows: dict[str, pd.DataFrame] = {}
+    for label_set in sets:
+        labels = (
+            probabilities
+            if label_set.probabilities is None
+            else label_probabilities(label_set, time)
+        )
+        windows[label_set.name] = build_windows(labels, regime, seed=(SEED, epoch_id))
+        log(f"{label_set.name}: {len(windows[label_set.name])} windows")
 
     detector = load_detector(epoch_id, decode_dir)
     stored = detector.encoding_model_[ENCODING_KEY]
@@ -563,11 +642,11 @@ def epoch_table(
         n_real_place_bins=int(interior.sum()),
     )
 
-    # every bin a window scores, and its animal position
-    s, e = windows.s.to_numpy(), windows.e.to_numpy()
+    # every bin a window of any set scores, and its animal position
     scored = np.zeros(time.size + 1, dtype=np.int64)
-    np.add.at(scored, s, 1)
-    np.add.at(scored, e + 1, -1)
+    for table in windows.values():
+        np.add.at(scored, table.s.to_numpy(), 1)
+        np.add.at(scored, table.e.to_numpy() + 1, -1)
     in_window = np.cumsum(scored[:-1]) > 0
     animal = np.full(time.size, -1, dtype=np.int64)
     animal[in_window] = nearest_interior_bins(environment, linear[in_window])
@@ -602,22 +681,16 @@ def epoch_table(
     masks, checks["running_only"] = running_only_masks(
         time, speed, position, in_event, folds
     )
-    cv = window_folds(windows, folds)
     in_span = {
         f: np.r_[0, np.cumsum(training_spike_bins(time, position, masks[f"runcv{f}"]))]
         for f in (0, 1)
     }
-    scoring = 1 - cv.cv_fold.to_numpy()
-    touching = np.where(scoring == 0, in_span[0][e + 1] - in_span[0][s],
-                        in_span[1][e + 1] - in_span[1][s]) > 0  # fmt: skip
-    straddling = cv.cv_insample_share.to_numpy() > 0
-    checks["time_held_out"] = {
-        "block_s": CV_BLOCK_S,
-        "windows": len(windows),
-        "straddling_windows": int(straddling.sum()),
-        "straddling_share": float(straddling.mean()),
-        "windows_with_bins_in_the_scoring_models_spikes": int(touching.sum()),
+    cv = {name: window_folds(table, folds) for name, table in windows.items()}
+    held_out = {
+        name: time_held_out_record(windows[name], cv[name], in_span) for name in windows
     }
+    if label_sets is None:
+        checks["time_held_out"] = held_out[sets[0].name]
 
     # the spikes of every scored bin, of the stored-likelihood sample and of
     # the library check's block
@@ -632,10 +705,17 @@ def epoch_table(
         "n_spikes_in_epoch": [int(np.asarray(x).size) for x in spike_times],
     }
 
-    # each encoding in turn: its terms, their checks and its evidence; the
-    # canonical one first, as the stored likelihood checks the marks
-    halves = tetrode_halves(len(spike_times), seed=HALVES_SEED)
-    evidence: dict[str, pd.DataFrame] = {}
+    # each encoding in turn: its terms, their checks and every set's evidence;
+    # the canonical one first, as the stored likelihood checks the marks
+    halves = {
+        label_set.name: (
+            tetrode_halves(len(spike_times), seed=HALVES_SEED)
+            if label_set.halves is None
+            else checked_halves(label_set.halves, len(spike_times))
+        )
+        for label_set in sets
+    }
+    evidence: dict[str, dict[str, pd.DataFrame]] = {name: {} for name in windows}
     checks["library_log_likelihood"] = {}
     for name in ("can", "run", "runcv0", "runcv1"):
         if name == "can":
@@ -689,13 +769,71 @@ def epoch_table(
                 f"{name} terms differ from the library's likelihood: {error}"
             )
         started = clock.perf_counter()
-        evidence[name] = window_evidence(
-            terms, windows, animal, distance, halves,
-            no_spike_rate=no_spike_rate, seed=(SEED, epoch_id),
-        )  # fmt: skip
+        for label_set in sets:
+            evidence[label_set.name][name] = window_evidence(
+                terms, windows[label_set.name], animal, distance,
+                halves[label_set.name], both_directions=label_set.both_directions,
+                no_spike_rate=no_spike_rate, seed=(SEED, epoch_id),
+            )  # fmt: skip
         log(f"{name} evidence: {clock.perf_counter() - started:.0f} s")
         del terms, encoding
-    # the primary: each window from the fold model without its centre bin
+
+    tables, per_set = [], {}
+    for label_set in sets:
+        table, record = label_set_table(
+            epoch_id,
+            label_set,
+            windows[label_set.name],
+            cv[label_set.name],
+            evidence.pop(label_set.name),
+            halves=halves[label_set.name],
+            time=time,
+            speed=speed,
+            centers_cm=np.asarray(environment.place_bin_centers_).ravel()[interior],
+            rho=no_spike_rate * bin_s,
+        )
+        tables.append(table)
+        per_set[label_set.name] = record
+    if label_sets is None:
+        checks["windows"] = per_set[sets[0].name]
+        return tables[0], checks
+    checks["label_sets"] = {
+        label_set.name: {
+            "columns": dict(label_set.columns),
+            "both_directions": label_set.both_directions,
+            "halves": [
+                [first.tolist(), second.tolist()]
+                for first, second in halves[label_set.name]
+            ],
+            "time_held_out": held_out[label_set.name],
+            "windows": per_set[label_set.name],
+        }
+        for label_set in sets
+    }
+    return pd.concat(tables, ignore_index=True), checks
+
+
+def label_set_table(
+    epoch_id: str,
+    label_set: LabelSet,
+    windows: pd.DataFrame,
+    cv: pd.DataFrame,
+    evidence: dict[str, pd.DataFrame],
+    *,
+    halves: Sequence[tuple[NDArray, NDArray]],
+    time: NDArray,
+    speed: NDArray,
+    centers_cm: NDArray,
+    rho: float,
+) -> tuple[pd.DataFrame, dict]:
+    """One label set's rows, and what its windows are.
+
+    The primary ``runcv`` evidence takes each window from the fold model
+    without its centre bin (``held_out_evidence``). Two identities the evidence
+    must meet are recorded: every encoding scored the same spikes and partners,
+    and a silent window's No-Spike log-ratio is E_C minus the scoring halves'
+    silence rate (their mean size over the runs times rho times the bins).
+    """
     evidence["runcv"] = held_out_evidence(
         [evidence.pop("runcv0"), evidence.pop("runcv1")], cv.cv_fold.to_numpy()
     )
@@ -707,24 +845,27 @@ def epoch_table(
         for name in ENCODINGS
     ]
     table = pd.concat([windows, cv, shared, *columns], axis=1)
+    s, e = windows.s.to_numpy(), windows.e.to_numpy()
     cumulative_speed = np.r_[0.0, np.cumsum(np.where(np.isfinite(speed), speed, 0.0))]
     table.insert(0, "epoch_id", epoch_id)
     table.insert(1, "animal", parse_nwb_filename(f"{epoch_id.split('_')[0]}_.nwb")[0])
+    for k, (column, value) in enumerate(label_set.columns.items()):
+        table.insert(2 + k, column, value)
     table["start_time"] = time[s]
     table["mean_speed"] = (cumulative_speed[e + 1] - cumulative_speed[s]) / (e - s + 1)
-    table["animal_center_cm"] = np.asarray(environment.place_bin_centers_).ravel()[
-        interior
-    ][table.animal_center_bin.to_numpy()]
+    table["animal_center_cm"] = centers_cm[table.animal_center_bin.to_numpy()]
 
-    # what the windows are, and two identities the evidence must meet
-    rho = no_spike_rate * bin_s
+    # what the windows are, and the No-Spike identity
+    scoring_sizes = [len(second) for _, second in halves]
+    if label_set.both_directions:
+        scoring_sizes += [len(first) for first, _ in halves]
     silent = table.n_spikes == 0
     identity = table[f"{PRIMARY_ENCODING}_ns_logratio"] - (
         table[f"{PRIMARY_ENCODING}_ns_expected"]
-        - len(spike_times) / 2 * rho * table.n_bins
+        - np.mean(scoring_sizes) * rho * table.n_bins
     )
     no_spike_bouts = table[(table.kind == "bout") & (table.state == "No-Spike")]
-    checks["windows"] = {
+    record = {
         "n": table.groupby(["kind", "state", "regime"]).size().to_dict(),
         "n_found": (
             table[table.kind == "bout"]
@@ -739,11 +880,9 @@ def epoch_table(
             float(identity[silent].abs().max()) if silent.any() else None
         ),
     }
-    checks["windows"]["n"] = {"|".join(k): v for k, v in checks["windows"]["n"].items()}
-    checks["windows"]["n_found"] = {
-        "|".join(k): v for k, v in checks["windows"]["n_found"].items()
-    }
-    return table, checks
+    record["n"] = {"|".join(k): v for k, v in record["n"].items()}
+    record["n_found"] = {"|".join(k): v for k, v in record["n_found"].items()}
+    return table, record
 
 
 def running_only_masks(
@@ -850,6 +989,7 @@ def run_epoch(
     code: dict | None = None,
     load_inputs: Callable[[str], dict] = load_marks_and_training_mask,
     log: Callable[[str], None] = print,
+    label_sets: Callable[[str], Sequence[LabelSet]] | None = None,
 ) -> dict:
     """Compute and write one epoch; return its record (strict JSON types).
 
@@ -858,7 +998,8 @@ def run_epoch(
     (its outputs are then removed), else ``"ok"`` with the validation record.
     Every record holds ``code`` (the commit and dirty flag; default this
     work tree's) and ``decode_files`` (``decode_file_stats``, taken before the
-    files are read).
+    files are read). ``label_sets`` gives an epoch's label sets
+    (``epoch_table``'s); default the canonical decode's labels alone.
     """
     require_cpu()
     if code is None:
@@ -878,7 +1019,13 @@ def run_epoch(
     started = clock.perf_counter()
     before = resource.getrusage(resource.RUSAGE_SELF)
     try:
-        table, checks = epoch_table(epoch_id, decode_dir, load_inputs, log)
+        table, checks = epoch_table(
+            epoch_id,
+            decode_dir,
+            load_inputs,
+            log,
+            None if label_sets is None else label_sets(epoch_id),
+        )
         write_table(table, paths["windows"])
         record = {"status": "ok", "settings": run_settings(), **stamp, **checks}
     except Exception as error:  # noqa: BLE001 - recorded; the run goes on

@@ -67,6 +67,7 @@ def window_evidence(
     *,
     partner_min_cm: float = 20.0,
     n_partners: int = 20,
+    both_directions: bool = True,
     no_spike_rate: float,
     seed: Seed,
 ) -> pd.DataFrame:
@@ -87,6 +88,11 @@ def window_evidence(
         From :func:`tetrode_halves`; each half selects once and scores once.
     partner_min_cm, n_partners : optional
         :func:`null_partners`'s.
+    both_directions : bool, optional
+        True (default): each pair is two runs, each half selecting once. False:
+        one run per pair, its first half selecting and its second scoring, for
+        labels decoded from the first half alone (:mod:`.half_decode`), which
+        must not score them.
     no_spike_rate : float
         The decoder's No-Spike rate, Hz.
     seed : int or sequence
@@ -177,7 +183,10 @@ def window_evidence(
         "sel_count", "mapS_dist_cm", *_PER_RUN_SUMMED,
         *(f"{name}_ps" for name in _PER_SPIKE),
     ]  # fmt: skip
-    values = {name: np.full((2 * len(halves), n_win), np.nan) for name in names}
+    directions = ((0, 1), (1, 0)) if both_directions else ((0, 1),)
+    values = {
+        name: np.full((len(directions) * len(halves), n_win), np.nan) for name in names
+    }
     first_choice: dict[str, NDArray] = {}
     tetrode_ids = np.arange(n_tet)
     base = rows * n_pos  # each concatenated row's offset into a flattened half
@@ -185,8 +194,9 @@ def window_evidence(
         masks = [np.isin(tetrode_ids, half) for half in pair]
         sums = [half_terms(mask) for mask in masks]
         # run 2p: the first half selects and the second scores; run 2p + 1 swaps
-        for direction, (si, ci) in enumerate(((0, 1), (1, 0))):
-            run = 2 * partition + direction
+        # (one direction: run p, the first half selecting)
+        for direction, (si, ci) in enumerate(directions):
+            run = len(directions) * partition + direction
             (sel_mark, sel_ground), (sco_mark, sco_ground) = sums[si], sums[ci]
             pooled = (
                 np.asarray(window_sum @ sel_mark) - lens[:, None] * sel_ground[None, :]

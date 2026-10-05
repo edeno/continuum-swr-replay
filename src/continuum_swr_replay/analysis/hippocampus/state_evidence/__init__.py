@@ -85,7 +85,11 @@ What is and is not held out (properties, not defects)
 -----------------------------------------------------
 - Only the remote location is held out by the tetrode split: S alone chooses
   MAP_S. The state labels come from the all-tetrode decode, so C's spikes
-  helped make them.
+  helped make them. Labels from a decode that saw S alone (:mod:`.half_decode`)
+  hold them out too, but for the canonical fit's discrete transitions and
+  initial conditions; such labels are scored by their own C only
+  (``window_evidence(..., both_directions=False)``), and a table holding
+  several splits names each in :data:`~.summary.SPLIT_COLUMN`.
 - Run-averaged Local and No-Spike values equal half the all-tetrode
   (in-sample) values: no half chooses the animal's position, and every
   tetrode scores in exactly half of the runs.
@@ -123,12 +127,24 @@ each epoch enters as one value, and the animal is the unit of replication.
 
 Modules: :mod:`.terms` (per-tetrode terms, encodings, decode files),
 :mod:`.windows` (regimes, bouts, matched and calibration windows, tetrode
-halves, partners), :mod:`.evidence` (window evidence) and :mod:`.summary`.
+halves, partners), :mod:`.evidence` (window evidence), :mod:`.summary` and
+:mod:`.half_decode` (decodes that see one tetrode half, and how their labels
+agree with the canonical decode's).
 """
 
 from continuum_swr_replay.analysis.hippocampus.state_evidence.evidence import (
     held_out_evidence,
     window_evidence,
+)
+from continuum_swr_replay.analysis.hippocampus.state_evidence.half_decode import (
+    HALF_PARTITIONS,
+    Split,
+    decode_inputs,
+    fixed_transition_detector,
+    half_splits,
+    half_tetrode_decode,
+    label_agreement,
+    non_local_event_labels,
 )
 from continuum_swr_replay.analysis.hippocampus.state_evidence.summary import (
     CALIBRATION_METRICS,
@@ -140,6 +156,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.summary import (
     PRIMARY_METRICS,
     PROBABILITY_BIN_LABELS,
     SECONDARY_METRICS,
+    SPLIT_COLUMN,
     AnimalTTest,
     animal_t_test,
     bout_animal_summaries,
@@ -161,6 +178,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.terms import (
     CV_BLOCK_S,
     ENCODING_KEY,
     TetrodeTerms,
+    encoding_comparison,
     encoding_inputs,
     event_likelihood,
     interior_bin_mask,
@@ -173,6 +191,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.terms import (
     training_spike_bins,
 )
 from continuum_swr_replay.analysis.hippocampus.state_evidence.windows import (
+    HALVES_SEED,
     REGIMES,
     STATES,
     build_windows,
@@ -194,13 +213,17 @@ __all__ = [
     "ENCODING_KEY",
     "ENCODING_LABELS",
     "EPOCH_SUMMARY",
+    "HALF_PARTITIONS",
+    "HALVES_SEED",
     "MIN_BIN_WINDOWS",
     "PRIMARY_ENCODING",
     "PRIMARY_METRICS",
     "PROBABILITY_BIN_LABELS",
     "REGIMES",
     "SECONDARY_METRICS",
+    "SPLIT_COLUMN",
     "STATES",
+    "Split",
     "TetrodeTerms",
     "animal_t_test",
     "bout_animal_summaries",
@@ -209,19 +232,26 @@ __all__ = [
     "calibration_statistics",
     "calibration_windows",
     "coordinated_silence",
+    "decode_inputs",
+    "encoding_comparison",
     "encoding_inputs",
     "epoch_slopes",
     "epoch_summaries",
     "epoch_summary_kind",
     "event_likelihood",
+    "fixed_transition_detector",
+    "half_splits",
+    "half_tetrode_decode",
     "held_out_evidence",
     "hierarchical_bootstrap_ci",
     "interior_bin_mask",
     "keyed_rng",
+    "label_agreement",
     "load_detector",
     "load_encoding",
     "matched_windows",
     "nearest_interior_bins",
+    "non_local_event_labels",
     "null_partners",
     "ols_slope_ci",
     "paired_bouts",

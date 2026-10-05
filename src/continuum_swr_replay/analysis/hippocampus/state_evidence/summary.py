@@ -234,6 +234,16 @@ per-spike suffix (``_ps``); a paired difference follows its metric."""
 
 SUMMARY_SEED = 20261004
 
+SPLIT_COLUMN = "split"
+"""Names the half decode a window's labels come from, when an epoch's table
+holds several (:mod:`.half_decode`): a bout is paired with its matched window
+within its split, and its epoch's value pools the splits' windows."""
+
+
+def _split_keys(windows: pd.DataFrame) -> list[str]:
+    """``[SPLIT_COLUMN]`` when the table has one, else nothing."""
+    return [SPLIT_COLUMN] if SPLIT_COLUMN in windows else []
+
 
 _RESAMPLE_CELLS = 1 << 24
 """Random draws per chunk of a resampling test, so memory stays bounded."""
@@ -701,12 +711,14 @@ def _ci_verdict(enough: bool, ci_lo: float) -> str:
 def paired_bouts(windows: pd.DataFrame) -> pd.DataFrame:
     """Every bout with its matched window's columns, suffixed ``_base``.
 
+    Within its epoch and, when the table has one, its :data:`SPLIT_COLUMN`.
+
     Raises
     ------
     ValueError
         A bout has no matched window.
     """
-    keys = ["epoch_id", "state", "regime"]
+    keys = ["epoch_id", *_split_keys(windows), "state", "regime"]
     paired = windows[windows.kind == "bout"].merge(
         windows[windows.kind == "baseline"],
         left_on=[*keys, "bout_s"],
@@ -828,7 +840,9 @@ def bout_statistics(
         for regime in REGIMES:
             cell = paired[(paired.state == state) & (paired.regime == regime)]
             found = bouts[(bouts.state == state) & (bouts.regime == regime)]
-            n_found = int(found.groupby("epoch_id").n_found.first().sum())
+            n_found = int(
+                found.groupby(["epoch_id", *_split_keys(found)]).n_found.first().sum()
+            )
             epochs, animals = cell.epoch_id.to_numpy(), cell.animal.to_numpy()
             for metric in state_metrics:
                 key = (state, regime, metric)

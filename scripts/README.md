@@ -92,6 +92,15 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
   `Processed-Data/_refresh_<date>/state_evidence/`, the only place written), `--n-workers`
   dask CPU workers, `--window-level-stats`; a rerun reuses an epoch only when its commit, run
   settings and decode files (size, mtime) all match, unless `--overwrite`.
+- `run_half_tetrode_decodes.py` — held-out state labels for `run_state_evidence.py`'s
+  evidence. `decode` (one idle GPU named by `--cuda_visible_devices`, else the CPU): per
+  epoch (default the five pilot epochs), the first two tetrode partitions in both
+  directions, four decodes that each see half S alone: S's encoding at the canonical
+  training bins, the canonical fit's discrete transitions and initial conditions fixed, no
+  EM; `--all-tetrodes` checks that the pipeline reproduces the canonical decode. `score`
+  (CPU): the state evidence with each half decode's labels scored by its own C, beside the
+  canonical labels scored by the same runs; summaries per label source and side by side.
+  Writes only under `--output-dir` (default `Processed-Data/_refresh_<date>/half_tetrode/`).
 - `sweep_memoryless_detection.py` — injects replays of chosen path, duration, rate and
   distance into a simulated recording and scores both detectors by one rule; writes the raw
   table to `Processed-Data/` and the aggregates to

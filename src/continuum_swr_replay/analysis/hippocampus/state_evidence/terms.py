@@ -99,6 +99,48 @@ def load_encoding(epoch_id: str, decode_dir: Path = PROCESSED_DATA_DIR) -> dict:
     return encoding_inputs(detector.encoding_model_[ENCODING_KEY])
 
 
+def encoding_comparison(refit: dict, stored: dict) -> dict:
+    """How a refit encoding model differs from the stored one."""
+
+    def max_abs(a: list, b: list) -> float:
+        return max(
+            (
+                float(np.max(np.abs(np.asarray(x, float) - np.asarray(y, float))))
+                for x, y in zip(a, b, strict=True)
+                if np.size(x)
+            ),
+            default=0.0,
+        )
+
+    n_refit = [len(x) for x in refit["encoding_positions"]]
+    n_stored = [len(x) for x in stored["encoding_positions"]]
+    same = n_refit == n_stored
+    return {
+        "same_n_encoding_spikes": same,
+        "n_encoding_spikes": n_stored,
+        "max_abs_encoding_positions": (
+            max_abs(refit["encoding_positions"], stored["encoding_positions"])
+            if same
+            else None
+        ),
+        "max_abs_encoding_marks": (
+            max_abs(
+                refit["encoding_spike_waveform_features"],
+                stored["encoding_spike_waveform_features"],
+            )
+            if same
+            else None
+        ),
+        "max_abs_mean_rates": float(
+            np.max(
+                np.abs(
+                    np.asarray(refit["mean_rates"]) - np.asarray(stored["mean_rates"])
+                )
+            )
+        ),
+    }
+
+
 def event_likelihood(
     s: int,
     e: int,
