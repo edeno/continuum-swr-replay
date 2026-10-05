@@ -9,7 +9,7 @@ events matched, 0 were missed and 62 were added; the largest SWR z-score differe
 2.56, at a trace end (at most 8.8e-4 more than 1 s from both ends); and non-local events
 went from 2,365 under the 1.7.0 rule to 2,405 under 2.0's, with minimum sample counts {7}. Tasks 1–3 complete and reviewed; `C0` = `de156501c05b4381714919be54a872b3ac0e58fc`, the commit both decoders launch from. R0 done (backup root `Processed-Data/_pre_redecode_backup_20261003`). An incident during Task 2 overwrote the April decode of `chimi20200212_02_r1` (accepted loss; see the backup's `MISSING_APRIL_DECODES.md`).
 
-**Status (2026-10-04):** the decoders' discrete-transition settings had silently followed changed library defaults (+32% non-local events on identical inputs). After validation the project lead chose setting P30-B (decision R10). Task 11 pins it. Its commit `C0'` replaces `C0` as the commit both decoders launch from, and R1 restarts from `C0'` into a new staging folder. Tasks 12 and 13 (held-out spike evidence per decoder state) were added at the project lead's request.
+**Status (2026-10-04):** the decoders' discrete-transition settings had silently followed changed library defaults (+32% non-local events on identical inputs). After validation the project lead chose setting P30-B (decision R10). Task 11 pins it. Its commit `C0'` replaces `C0` as the commit both decoders launch from, and R1 restarts from `C0'` into a new staging folder. Tasks 12 and 13 (held-out spike evidence per decoder state) were added at the project lead's request. **2026-10-05:** an exclusion audit led to Task 14 (one epoch register); 40 restorable epochs are populated and decoded as an incremental update after the 218-epoch analysis, which proceeds now. wilbur20210401 is registered as blocked.
 
 **Goal:** rebuild every long-running computation on one set of inputs, and prove it. That
 covers:
@@ -1202,6 +1202,126 @@ decode that sees one tetrode half, and the other half scores them.
 - the tests pass;
 - 20 decodes;
 - the half-label summary sits beside the all-tetrode one in the R8 report.
+
+## Task 14: one epoch register with reason codes, read by every stage (added 2026-10-05)
+
+Work in the worktree `/cumulus/edeno/continuum-swr-replay-refresh-dev`, branch
+`full-pipeline-refresh-code`, after the R2 merge. Leave the main tree untouched: long
+runs (R3 and R4) import from it.
+
+**Why.** The project lead requires a consistent exclusion rule with a good reason for
+every exclusion. An audit found:
+- the cohort is 218 epochs at every stage, but 36 regular epochs, the depletion filter,
+  and several documented reasons were wrong or undocumented;
+- each stage keeps its own skip list (for example `KNOWN_NO_INPUT_EPOCHS` in the SWR
+  runner).
+
+The audit is in `.claude/research/refresh_exclusions/`: read `exclusions_report.md` first,
+then `exclusions_table.csv` (557 rows, one per run epoch, with evidence). The populate plan
+for 40 restorable epochs is in `.claude/research/refresh_populate/`
+(`populate_report.md`, `populate_matrix.csv`).
+
+**The lead's decisions this task implements:**
+- 40 epochs become analysable after Spyglass populates, which the controller runs after this
+  task lands:
+  - 36 with no `PositionIntervalMap` and no CA1 ripple times;
+  - senor20201104 06_r3 and 08_r4;
+  - senor20201105_09_r4;
+  - wilbur20210326_03_r1.
+
+  Until their decodes exist and the update is approved, they are PENDING. The analysis
+  proceeds now on the 218 already decoded.
+- All four first-exposure epochs are included: j1620210706_02_r1, senor20201027_02_r1,
+  chimi20200212_02_r1 and wilbur20210326_03_r1. wilbur20210326's session description is
+  "exploration session", not "Spatial bandit task (regular)", so admit it through an explicit,
+  documented allowlist of first-exposure sessions.
+- wilbur20210401 (8 run epochs) is excluded as BLOCKED: half ingested; re-ingestion needs a
+  destructive reinsert, Comrie's trial parsing and an RL refit. Record that evidence.
+- Depletion sessions (46 files, a decaying reward schedule) stay excluded as a different task
+  variant. Document this; today it is undocumented.
+
+**The rule** (state it verbatim in the module docstring and in the doc):
+> An epoch is analysed if and only if it is a run epoch (`^[0-9]+_r[0-9]+$`) of a regular
+> spatial-bandit session in Spyglass (or of a listed first-exposure session), with parsed
+> trials (`noPrePostTrialTimes`), and every decode input resolves to exactly one row:
+> position map, position info and linearization, ripple band, CA1 ripple times, HPC marks.
+> Every other run epoch of a project session is excluded with exactly one enumerated
+> reason code and its evidence, in one register that every stage reads and the audit
+> checks.
+
+**Files:**
+- Create `src/continuum_swr_replay/data_loaders/epoch_register.py`:
+  - a `Reason` enum. Suggested codes, refined from the audit's classes:
+    - `NO_RUN_EPOCH`;
+    - `NO_TRIAL_INTERVALS` (trial parsing failed; holds for 12 sessions);
+    - `NO_NWB` (files absent);
+    - `DEPLETION_TASK`;
+    - `NOT_INGESTED_BLOCKED`;
+    - `PENDING_POPULATE` (with the planned fix);
+    - `MISSING_INPUT` (a decode input absent with no fix planned).
+
+    Keep the set small. Every code needs a one-line definition.
+  - the register itself: a version-controlled table (CSV beside the module, or a Python
+    mapping) of `(nwb_file_name, epoch or "*", status, reason, evidence)`. Status is
+    `analysed`, `pending` or `excluded`. It is generated once from `exclusions_table.csv`
+    and the populate matrix, then hand-maintained.
+  - `analysed_epochs(include_pending: bool = False) -> pd.DataFrame`: `get_epoch_info()` rows
+    whose register status is `analysed` (plus `pending` when asked). It must raise if
+    `get_epoch_info()` returns an epoch with no register entry. An unregistered epoch is an
+    error, never silently included.
+  - `register_reason(nwb_file_name, epoch) -> Reason | None`.
+- Modify `get_epoch_info()` (`data_loaders/utils.py`): admit the listed first-exposure
+  sessions' descriptions. Keep its other behaviour, because other callers use it. Document
+  the change.
+- Every stage that enumerates epochs uses `analysed_epochs()`:
+  - both decoders' `run_batch` epoch list (add an `--include-pending` flag for the
+    incremental update);
+  - the SWR runner, which replaces `KNOWN_NO_INPUT_EPOCHS` with register lookups;
+  - the Widloski runner;
+  - the table builders (`prepare_replay_content_data.py`, `build_timebin_tables.py`,
+    `regenerate_stop_table.py`, and any other `get_epoch_info()` caller that builds
+    analysis tables);
+  - the PFC runner (mPFC adds its own unit-availability condition; record that as a
+    PFC-level reason, not an HPC exclusion).
+
+  Grep for every `get_epoch_info(` caller and list each with your decision in the report.
+- The audit (`scripts/qa/audit_refresh_consistency.py`):
+  - `check_epoch_sets` takes its reasons from the register;
+  - add a check that every `get_epoch_info()` epoch is registered;
+  - add a check that every `analysed` epoch has every artifact;
+  - add a check that the PENDING set is reported.
+- Create `docs/epoch_register.md`: the rule, the reason codes, counts per status and reason,
+  and the full table of excluded and pending epochs with evidence. Add a test that the doc
+  mirrors the module, following `tests/unit/test_models_table_mirrors_specs.py`.
+- Doc fixes:
+  - `constants.py` docstring: point it to the register, and fix the 18-session text, which
+    has 6 entries the audit found mis-described;
+  - `docs/known_issues/wilbur20210404_missing_ca1_ripples.md`: a depletion session, never in
+    the cohort;
+  - `docs/known_issues/three_sessions_blocked_by_nwb_checksum.md`: resolved 2026-08-19; all
+    218 are in every table;
+  - `docs/README.md:103-104`.
+
+  Do NOT edit CLAUDE.md. Instead write the proposed replacement text for its "91 NWB files
+  and 221 total epochs" claim into the report; the lead approves the wording first.
+
+**Tests (write them first):**
+- the register covers every row of `exclusions_table.csv`, and no epoch has two statuses;
+- every non-analysed entry has exactly one reason and non-empty evidence;
+- `analysed_epochs()` raises on an unregistered epoch;
+- `analysed_epochs()` gives exactly the 218 decoded epoch ids today (pinned list), and 258
+  with `include_pending=True`. Verify the 40 count against the populate matrix;
+- the first-exposure allowlist admits wilbur20210326 and nothing else new;
+- each runner selects epochs through the register (stub the register in the runners' unit
+  tests);
+- the doc mirrors the module.
+
+**Acceptance:**
+- tests pass;
+- no stage keeps its own epoch skip list;
+- the audit fails on an unregistered or unexplained epoch;
+- with the current Spyglass state, `analysed_epochs()` equals the 218 staged and swapped-in
+  decodes.
 
 ---
 
