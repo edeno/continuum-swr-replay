@@ -30,7 +30,9 @@ this file is its command line.
 
 **Skipping Spyglass for covariate-only changes** (``--from-cache``): the
 only per-session Spyglass fetch is ``trials`` + ``track_graph`` (the ~3 h
-cost of a full run). Every normal run pickles those to
+cost of a full run). Every run, ``--from-cache`` included, still reads the
+database once: the sessions are the epoch register's analysed epochs, which
+``find_sessions`` checks against ``get_epoch_info``. Every normal run pickles those to
 ``replay_content/_session_cache/<cache-version>/<session_id>.pkl``. With ``--from-cache``
 the driver reads them back instead of querying Spyglass and re-runs the
 *same* table builders — so a change that only touches covariate code

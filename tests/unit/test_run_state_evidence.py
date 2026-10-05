@@ -353,18 +353,37 @@ def test_float_rounding_of_the_bin_width_cannot_carry_the_span_into_an_event():
         assert record[name]["event_bins_in_library_span"] == 0
 
 
-def test_every_hpc_decode_is_listed_even_an_incomplete_one(tmp_path):
+def test_every_analysed_hpc_decode_is_listed_even_an_incomplete_one(
+    tmp_path, monkeypatch
+):
+    """Only epochs the register analyses: a pending epoch's decode in the folder
+    is not one."""
+    from continuum_swr_replay.data_loaders import epoch_register
+
+    register = tmp_path / "epoch_register.csv"
+    pd.DataFrame(
+        [
+            ["aa20200101_.nwb", "02_r1", "analysed", "", ""],
+            ["bb20200101_.nwb", "04_r2", "analysed", "", ""],
+            ["bb20200101_.nwb", "06_r3", "pending", "PENDING_POPULATE", "no PIM"],
+        ],
+        columns=["nwb_file_name", "epoch", "status", "reason", "evidence"],
+    ).to_csv(register, index=False)
+    monkeypatch.setattr(epoch_register, "REGISTER_PATH", register)
+    decodes = tmp_path / "decodes"
+    decodes.mkdir()
     for name in [
         "aa20200101_02_r1_HPC_detector.pkl",
         "aa20200101_02_r1_HPC_results.nc",
         "aa20200101_02_r1_HPC_80_data_over_time.pkl",
         "bb20200101_04_r2_HPC_detector.pkl",  # no results or data_over_time
+        "bb20200101_06_r3_HPC_detector.pkl",  # pending
         "aa20200101_02_r1_HPC_contfrag_detector.pkl",  # another decoder's
         "aa20200101_02_r1_mPFC_detector.pkl",
     ]:
-        (tmp_path / name).touch()
+        (decodes / name).touch()
 
-    assert runner.canonical_epochs(tmp_path) == [
+    assert runner.canonical_epochs(decodes) == [
         "aa20200101_02_r1_HPC",
         "bb20200101_04_r2_HPC",
     ]
@@ -442,9 +461,22 @@ def test_reuse_reason_names_what_changed():
         )
 
 
+def _register_analysing(tmp_path: Path, monkeypatch, *keys: tuple[str, str]) -> None:
+    """``REGISTER_PATH`` at a register that analyses these (nwb, epoch) keys."""
+    from continuum_swr_replay.data_loaders import epoch_register
+
+    path = tmp_path / "epoch_register.csv"
+    pd.DataFrame(
+        [[name, epoch, "analysed", "", ""] for name, epoch in keys],
+        columns=["nwb_file_name", "epoch", "status", "reason", "evidence"],
+    ).to_csv(path, index=False)
+    monkeypatch.setattr(epoch_register, "REGISTER_PATH", path)
+
+
 def test_main_reuses_an_epoch_only_while_nothing_changed(
     simulated, tmp_path, monkeypatch
 ):
+    _register_analysing(tmp_path, monkeypatch, ("aa20200101_.nwb", "02_r1"))
     decode_dir = decode_copy(simulated, tmp_path)
     output_dir = tmp_path / "out"
     monkeypatch.setattr(runner, "run_epochs", serial_epochs(simulated[1]))
@@ -470,7 +502,9 @@ def test_main_reuses_an_epoch_only_while_nothing_changed(
     assert discovery["n_epochs"] == 1 and discovery["n_with_all_files"] == 1
     assert "the audit's job" in discovery["coverage"]
     readme = (output_dir / "README.md").read_text()
-    assert "every *_HPC epoch with a canonical decode file" in readme
+    assert (
+        "every epoch the epoch register analyses with a canonical HPC decode file"
+    ) in readme
     assert "1 listed, 1 with all three decode files" in readme
     assert "Computed in this run: 1; reused" in readme
     assert (output_dir / "bout_stats.csv").exists()

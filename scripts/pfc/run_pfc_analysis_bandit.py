@@ -123,6 +123,7 @@ from continuum_swr_replay.decoding_common import (
     raise_open_file_limit,
     release_nwb_files,
     setup_logger,
+    write_atomically,
 )
 from continuum_swr_replay.parameters import (
     MAX_SPEED_THRESHOLD_CM_PER_SEC,
@@ -1606,6 +1607,35 @@ NO_SORTED_UNITS_REASON = (
 """Why an analysed epoch is outside the PFC cohort."""
 
 
+def write_cohort_record(
+    path: Path,
+    *,
+    n_analysed: int,
+    pfc_cohort: pd.DataFrame,
+    ran: pd.DataFrame,
+    left_out: pd.Index,
+    git_hash: str,
+) -> None:
+    """Record the PFC cohort beside the bundles: what ran, and why the rest of
+    the register's analysed epochs did not.
+
+    Every partition of a run computes the same cohort, so the record is the
+    same whichever writes it last; ``ran`` is this invocation's share.
+    """
+    record = {
+        "produced_by": "scripts/pfc/run_pfc_analysis_bandit.py",
+        "git_hash": git_hash,
+        "n_analysed": n_analysed,
+        "n_pfc_cohort": len(pfc_cohort),
+        "ran": [f"{name} {epoch}" for name, epoch in ran.index],
+        "left_out": {
+            f"{name} {epoch}": NO_SORTED_UNITS_REASON for name, epoch in left_out
+        },
+    }
+    text = json.dumps(record, indent=2) + "\n"
+    write_atomically(path, lambda temporary: temporary.write_text(text))
+
+
 def _filter_to_sorted_sessions(epoch_info: pd.DataFrame) -> pd.DataFrame:
     """Filter to sessions that have curated spike sorting results.
 
@@ -1668,18 +1698,29 @@ def main() -> None:
     ).stdout.rstrip()
 
     # The PFC cohort: the register's analysed epochs, whose session has sorted
-    # units. An analysed epoch without them is left out here, with that reason.
-    analysed = _filter_epoch_info(analysed_epochs(), args)
-    epoch_info = _filter_to_sorted_sessions(analysed)
-    unsorted = analysed.index.difference(epoch_info.index, sort=False)
+    # units. An analysed epoch without them is left out here, with that reason,
+    # which pfc_cohort_<area>.json records beside the bundles.
+    analysed = analysed_epochs()
+    pfc_cohort = _filter_to_sorted_sessions(analysed)
+    unsorted = analysed.index.difference(pfc_cohort.index, sort=False)
     if len(unsorted):
         print(
             f"{len(unsorted)} analysed epoch(s) left out at the PFC level, "
             f"{NO_SORTED_UNITS_REASON}: "
             + ", ".join(f"{name} {epoch}" for name, epoch in unsorted)
         )
+    epoch_info = _filter_epoch_info(analysed, args)
+    epoch_info = epoch_info[epoch_info.index.isin(pfc_cohort.index)]
     if args.max_sessions is not None:
         epoch_info = epoch_info.iloc[: args.max_sessions]
+    write_cohort_record(
+        args.output_dir / f"pfc_cohort_{args.brain_area}.json",
+        n_analysed=len(analysed),
+        pfc_cohort=pfc_cohort,
+        ran=epoch_info,
+        left_out=unsorted,
+        git_hash=git_hash,
+    )
 
     print(
         f"Processing {len(epoch_info)} sessions for {args.brain_area} "

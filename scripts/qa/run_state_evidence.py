@@ -134,6 +134,9 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: 
     window_folds,
     write_json,
 )
+from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
+    analysed_decode_files,
+)
 from continuum_swr_replay.data_loaders.utils import (  # noqa: E402
     get_training_timepoints,
     parse_nwb_filename,
@@ -331,14 +334,15 @@ def reuse_reason(
 
 
 def canonical_epochs(decode_dir: Path) -> list[str]:
-    """Every HPC epoch with any canonical decode file in ``decode_dir``.
+    """Every analysed HPC epoch with any canonical decode file in ``decode_dir``.
 
-    An epoch missing one of its files is still listed, so that the run records
-    why it skips it.
+    The epoch register's analysed epochs (``analysed_decode_files``), never a
+    glob, so a pending epoch's decode there is not read. An epoch missing one of
+    its files is still listed, so that the run records why it skips it.
     """
     stems = set()
     for suffix in ("_80_data_over_time.pkl", "_detector.pkl", "_results.nc"):
-        for path in decode_dir.glob(f"*_HPC{suffix}"):
+        for path in analysed_decode_files(decode_dir, suffix):
             stems.add(path.name.removesuffix(suffix))
     return sorted(stems)
 
@@ -1515,12 +1519,13 @@ def main(argv: list[str] | None = None) -> None:
     print(f"open-file soft limit {old_soft} -> {new_soft}", flush=True)
     epochs = args.epochs or canonical_epochs(decode_dir)
     if not epochs:
-        sys.exit(f"No HPC decodes in {decode_dir}.")
+        sys.exit(f"No analysed epoch's HPC decode in {decode_dir}.")
     discovery: dict[str, Any] = {
         "rule": (
             "the epochs given with --epochs"
             if args.epochs
-            else f"every *_HPC epoch with a canonical decode file in {decode_dir}"
+            else "every epoch the epoch register analyses with a canonical HPC "
+            f"decode file in {decode_dir}"
         ),
         "n_epochs": len(epochs),
         "coverage": "Coverage against the canonical epoch list is the audit's "

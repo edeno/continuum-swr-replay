@@ -308,7 +308,10 @@ def load_behavioral_context(
 
     # Imported lazily: `data_loaders` imports `spyglass.common` at module top
     # level, which opens a DataJoint connection. Keeping this out of module
-    # scope lets --from-cache (with a warm cache), --help, and tests run offline.
+    # scope lets --help and tests run offline, and --from-cache (with a warm
+    # cache) fetch nothing per session. Every run still reads the database
+    # once, when find_sessions checks the epoch register against
+    # get_epoch_info.
     from continuum_swr_replay.data_loaders import load_data
 
     data = load_data(

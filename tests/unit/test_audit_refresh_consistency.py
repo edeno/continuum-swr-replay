@@ -1029,6 +1029,47 @@ def test_a_skipped_record_of_an_unanalysed_epoch_passes(tmp_path):
     assert result["ok"], result["failures"]
 
 
+def _touch_decodes(root: Path, epoch_id: str, decoders=("nonlocal", "contfrag")):
+    """Empty stand-ins for every file of `epoch_id`'s decodes under `root`."""
+    root.mkdir(parents=True, exist_ok=True)
+    for decoder in decoders:
+        for path in audit.decode_files(epoch_id, root, decoder).values():
+            path.touch()
+
+
+def test_a_decode_folder_of_analysed_epochs_alone_passes(tmp_path):
+    root = tmp_path / "decodes"
+    for epoch_id in EPOCHS:
+        _touch_decodes(root, epoch_id)
+    # a variant decode is not a canonical one, so it is not the folder's concern
+    (root / f"{NO_INPUT_EPOCH}_all_detector.pkl").touch()
+
+    result = audit.check_decode_folder(root, _register(tmp_path))
+
+    assert result["ok"], result["failures"]
+    assert result["details"]["n_epochs"] == 2
+
+
+def test_any_decode_file_of_an_unanalysed_epoch_fails_the_decode_folder(tmp_path):
+    """Even one file of a partly saved decode: a reader that globs the folder
+    would read it."""
+    root = tmp_path / "decodes"
+    for epoch_id in EPOCHS:
+        _touch_decodes(root, epoch_id)
+    stray = "sim20200101_12_r6_HPC"
+    (root / f"{NO_INPUT_EPOCH}_results.nc").touch()  # a pending epoch's
+    (root / f"{stray}_contfrag_detector.pkl").touch()  # an unregistered one's
+
+    result = audit.check_decode_folder(root, _register(tmp_path))
+
+    assert result["failures"] == [
+        "the decode folder holds files of 1 epoch(s) the register does not "
+        f"analyse: {NO_INPUT_EPOCH} (pending, PENDING_POPULATE)",
+        f"the decode folder holds files of 1 epoch(s) not in the epoch register: "
+        f"{stray}",
+    ]
+
+
 # --------------------------------------------------------------------------
 # check_epochs_registered and check_pending_epochs
 # --------------------------------------------------------------------------
@@ -1502,6 +1543,7 @@ EMPTY_INPUTS: dict[str, Callable[[Path], dict]] = {
     "epochs_registered": lambda tmp: audit.check_epochs_registered(
         _epoch_info, _register(tmp, analysed=(), pending=())
     ),
+    "decode_folder": lambda tmp: audit.check_decode_folder(tmp, _register(tmp)),
 }
 """Each check on empty input: an audit that passes on nothing has checked nothing."""
 
@@ -1815,6 +1857,10 @@ def test_the_audit_fails_on_a_decode_of_an_epoch_it_does_not_analyse(
         "nonlocal_decode holds 1 epoch(s) the register does not analyse: "
         f"{NO_INPUT_EPOCH} (pending, PENDING_POPULATE)"
     ) in report["checks"]["epoch_sets"]["failures"]
+    assert report["checks"]["decode_folder"]["failures"] == [
+        "the decode folder holds files of 1 epoch(s) the register does not "
+        f"analyse: {NO_INPUT_EPOCH} (pending, PENDING_POPULATE)"
+    ]
 
 
 def test_record_tables_refuses_a_folder_with_no_table(tmp_path):

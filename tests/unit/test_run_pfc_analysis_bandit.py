@@ -1353,3 +1353,11 @@ def test_main_takes_the_registers_analysed_epochs_less_those_without_sorting(
         f"{runner.NO_SORTED_UNITS_REASON}: chimi20200224_.nwb 02_r1"
     ) in out
     assert not hasattr(runner, "get_epoch_info")
+    # and written down beside the bundles, not only printed
+    cohort = json.loads((tmp_path / "out" / "pfc_cohort_mPFC.json").read_text())
+    assert cohort["n_analysed"] == 3
+    assert cohort["n_pfc_cohort"] == 2
+    assert cohort["ran"] == ["chimi20200223_.nwb 02_r1", "chimi20200223_.nwb 04_r2"]
+    assert cohort["left_out"] == {
+        "chimi20200224_.nwb 02_r1": runner.NO_SORTED_UNITS_REASON
+    }

@@ -80,9 +80,10 @@ ones the manifest was written with. A run holds an exclusive lock on its
 folder's ``.lock`` throughout, so a second run under the same run id exits at
 once instead of overwriting the first one's records.
 
-The epochs are the epoch register's analysed ones (``analysed_epochs``, read
-against ``get_epoch_info``), narrowed by ``--animal``, ``--date`` and
-``--epoch``. An epoch the register does not analyse (no inputs, another task,
+The epochs are the epoch register's analysed ones, or with ``--pending-only``
+its pending ones alone, for the incremental update after their populates
+(``epochs_to_run``, read against ``get_epoch_info``), narrowed by ``--animal``,
+``--date`` and ``--epoch``. An epoch the register does not analyse (no inputs, another task,
 and so on: ``docs/epoch_register.md``) never reaches the runner, so the manifest
 records none. The epochs run in parallel on a
 dask ``LocalCluster`` of ``--n-workers`` processes, one epoch per worker at a
@@ -142,7 +143,7 @@ from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
     zero_phase_bandpass,
 )
 from continuum_swr_replay.analysis.inventory_comparison.schema import SessionIdentity
-from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
+from continuum_swr_replay.data_loaders.epoch_register import epochs_to_run
 from continuum_swr_replay.data_loaders.lfp import _ripple_keys, get_ripple_band_inputs
 from continuum_swr_replay.data_loaders.position import get_epoch_position_info
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
@@ -622,9 +623,9 @@ def _detect(
         if compared
         else None
     )
-    # unknown (None) when Spyglass's stored parameters could not be read
-    settings_mismatch = (
-        None
+    # "unknown" when Spyglass's stored parameters could not be read
+    settings_mismatch: bool | str = (
+        "unknown"
         if spyglass_parameters is None
         else dict(spyglass_parameters["ripple_detection_params"])
         != dict(DETECTOR_SETTINGS["kay"])
@@ -632,7 +633,13 @@ def _detect(
     differences = {
         "version_only": ["package version"],
         "version_and_inputs": ["package version", "inputs"]
-        + (["settings"] if settings_mismatch else []),
+        + (
+            ["settings unknown"]
+            if settings_mismatch == "unknown"
+            else ["settings"]
+            if settings_mismatch
+            else []
+        ),
     }
     record["kay_version_check"] = {
         "spyglass_parameters": spyglass_parameters,
@@ -809,8 +816,8 @@ def summary(record: dict) -> str:
         f"{band['reference_overflow_count']} overflows)",
         f"Zugaro channel {record['zugaro_channel']['electrode_id']}",
     ]
-    if "kay_version_check" in record:
-        checks = record["kay_version_check"]["counts"]
+    checks = record.get("kay_version_check", {}).get("counts")
+    if checks:  # none when neither comparison could run
         parts.append(
             "Kay check "
             + " | ".join(
@@ -988,6 +995,12 @@ def main(argv: list[str] | None = None) -> None:
     )
     parser.add_argument("--epoch", help="Only this epoch, such as 02_r1.")
     parser.add_argument(
+        "--pending-only",
+        action="store_true",
+        help="Run only the epochs the epoch register holds pending a Spyglass "
+        "populate, after their populates, instead of its analysed epochs.",
+    )
+    parser.add_argument(
         "--overwrite", action="store_true", help="Redo epochs already written."
     )
     parser.add_argument(
@@ -1040,7 +1053,8 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
     """
     run_id = output_dir.name
     settings = run_settings(provenance)
-    epochs = list(dict.fromkeys(filter_epoch_info(analysed_epochs(), args).index))
+    selected = epochs_to_run(args.pending_only)
+    epochs = list(dict.fromkeys(filter_epoch_info(selected, args).index))
     if not epochs:
         sys.exit("No epochs match --animal, --date and --epoch.")
 

@@ -64,6 +64,9 @@ from continuum_swr_replay.analysis.hippocampus.event_immobility import (  # noqa
 from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
     require_covariate_schema,
 )
+from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
+    analysed_decode_files,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
 from continuum_swr_replay.table_io import read_table, table_exists  # noqa: E402
 
@@ -101,12 +104,17 @@ def animal_from_epoch_id(epoch_id: str) -> str:
 
 
 def find_sessions(animal: str | None) -> list[str]:
-    """HPC epoch identifiers with data_over_time + environment present."""
+    """Analysed HPC epoch identifiers with data_over_time + environment present.
+
+    The epoch register's analysed epochs (``analysed_decode_files``), never a
+    glob, so a pending epoch's decode in the folder is not read.
+    """
     thr_int = int(round(NON_LOCAL_THRESHOLD * 100))
-    pattern = f"{animal}*_HPC_environment.pkl" if animal else "*_HPC_environment.pkl"
     out = []
-    for env in sorted(PROCESSED_DATA_DIR.glob(pattern)):
+    for env in analysed_decode_files(PROCESSED_DATA_DIR, "_environment.pkl"):
         epoch_id = env.name.removesuffix("_environment.pkl")
+        if animal is not None and not epoch_id.startswith(animal):
+            continue
         if (PROCESSED_DATA_DIR / f"{epoch_id}_{thr_int}_data_over_time.pkl").exists():
             out.append(epoch_id)
     return out

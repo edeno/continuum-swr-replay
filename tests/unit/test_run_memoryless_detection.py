@@ -160,7 +160,7 @@ def analysed_keys(*epoch_ids: str) -> list[tuple[str, str]]:
 
 
 def analysed_frame(*epoch_ids: str) -> pd.DataFrame:
-    """``analysed_epochs``'s frame (``get_epoch_info``'s shape) for these epochs."""
+    """``epochs_to_run``'s frame (``get_epoch_info``'s shape) for these epochs."""
     keys = analysed_keys(*epoch_ids)
     return pd.DataFrame(
         {"epoch": [int(epoch.split("_")[0]) for _, epoch in keys]},
@@ -245,6 +245,22 @@ class TestFindEpochs:
         assert skipped == {
             "a20200101_04_r2_HPC_all": "not an analysed epoch in the epoch register",
             "a20200101_02_r1_HPC_non_stationary": "missing data_over_time",
+        }
+
+    def test_a_pending_run_says_why_it_left_an_analysed_decode_out(self, tmp_path):
+        self.write_decode(tmp_path, "a20200101_02_r1_HPC")  # analysed
+        self.write_decode(tmp_path, "a20200101_04_r2_HPC")  # pending
+
+        epochs, skipped = find_epochs(
+            None,
+            tmp_path,
+            analysed_keys("a20200101_04_r2_HPC"),
+            left_out=runner.NOT_PENDING,
+        )
+
+        assert epochs == ["a20200101_04_r2_HPC"]
+        assert skipped == {
+            "a20200101_02_r1_HPC": "not a pending epoch in the epoch register"
         }
 
     def test_an_animal_restricts_the_search(self, tmp_path):
@@ -645,17 +661,20 @@ class TestMain:
         """``--all`` and ``--animal`` read the epoch register, which reads the
         database; a test that runs them names its analysed epochs instead."""
 
-        def analysed_epochs():
+        def epochs_to_run(pending_only=False):
             raise AssertionError("this test did not say which epochs are analysed")
 
-        monkeypatch.setattr(runner, "analysed_epochs", analysed_epochs)
+        monkeypatch.setattr(runner, "epochs_to_run", epochs_to_run)
 
     @staticmethod
-    def analyse(monkeypatch, *epoch_ids):
-        """The register analyses these epochs and no other."""
-        monkeypatch.setattr(
-            runner, "analysed_epochs", lambda: analysed_frame(*epoch_ids)
-        )
+    def analyse(monkeypatch, *epoch_ids, pending=()):
+        """The register analyses these epochs, holds `pending` pending, and no
+        other: ``epochs_to_run`` returns one or the other."""
+
+        def epochs_to_run(pending_only=False):
+            return analysed_frame(*(pending if pending_only else epoch_ids))
+
+        monkeypatch.setattr(runner, "epochs_to_run", epochs_to_run)
 
     @pytest.fixture(autouse=True)
     def in_tmp_path(self, tmp_path, monkeypatch):
@@ -851,9 +870,10 @@ class TestMain:
         assert "failed" in capsys.readouterr().out
         assert (output_root / "cli-run" / "run.log").exists()
 
-    def cli_over_sim(self, root, tmp_path):
+    def cli_over_sim(self, root, tmp_path, *extra):
         main(
             [
+                *extra,
                 "--animal",
                 "sim",
                 "--run-seed",
@@ -917,6 +937,30 @@ class TestMain:
         failed = epochs["sim20200101_04_r2_HPC"]
         assert failed["status"] == "failed"
         assert "missing data_over_time" in failed["error"]
+
+    def test_pending_only_runs_the_pending_epochs_from_their_staged_decodes(
+        self, tmp_path, capsys, monkeypatch
+    ):
+        """``--pending-only --root <staging>``: the staged pending decode runs; an
+        analysed decode under the same root is left out, with why."""
+        self.analyse(
+            monkeypatch, "sim20200101_02_r1_HPC", pending=("sim20200101_04_r2_HPC",)
+        )
+        epoch = build_tiling_tetrode()
+        root = tmp_path / "processed"
+        root.mkdir()
+        for epoch_id in ("sim20200101_02_r1_HPC", "sim20200101_04_r2_HPC"):
+            write_epoch(root, epoch, epoch_id)
+            cache_marks(root, epoch, tmp_path / "cache", epoch_id)
+
+        self.cli_over_sim(root, tmp_path, "--pending-only")
+
+        epochs = read_manifest(tmp_path)["epochs"]
+        assert epochs["sim20200101_04_r2_HPC"]["status"] == "ok"
+        assert epochs["sim20200101_02_r1_HPC"] == {
+            "status": "skipped",
+            "reason": "not a pending epoch in the epoch register",
+        }
 
     def test_date_and_epoch_narrow_what_runs(self, tmp_path, monkeypatch):
         self.analyse(

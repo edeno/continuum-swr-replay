@@ -34,6 +34,7 @@ from continuum_swr_replay.analysis.hippocampus.quality_metrics import (
     compute_non_local_event_context,
     compute_session_quality_summary,
 )
+from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
 from continuum_swr_replay.parameters import (
     FIGURE_DIR,
     PROCESSED_DATA_DIR,
@@ -90,13 +91,17 @@ def load_all_sessions(
     animal: str | None = None,
     threshold: int = 80,
 ) -> pd.DataFrame:
-    """Load and concatenate all data_over_time pickle files."""
-    pattern = f"*_HPC_{threshold}_data_over_time.pkl"
-    paths = sorted(PROCESSED_DATA_DIR.glob(pattern))
+    """Load and concatenate the analysed epochs' data_over_time pickle files.
+
+    The epoch register's analysed epochs (``analysed_decode_files``), never a
+    glob, so a pending epoch's decode in the folder is not read.
+    """
+    suffix = f"_{threshold}_data_over_time.pkl"
+    paths = analysed_decode_files(PROCESSED_DATA_DIR, suffix)
 
     if not paths:
         raise FileNotFoundError(
-            f"No files matching {pattern} found in {PROCESSED_DATA_DIR}"
+            f"No analysed epoch's *{suffix} found in {PROCESSED_DATA_DIR}"
         )
 
     if animal is not None:

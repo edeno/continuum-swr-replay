@@ -71,6 +71,9 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: 
     nearest_interior_bins,
     parse_epoch_identifier,
 )
+from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
+    analysed_decode_files,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
 
 # --- Parameters (provisional; see spec) ---------------------------------------
@@ -104,12 +107,17 @@ def animal_from_epoch_id(epoch_id: str) -> str:
 
 
 def find_sessions(animal: str | None) -> list[str]:
-    """Return HPC epoch identifiers that have detector + results + data_over_time."""
+    """Return analysed HPC epoch identifiers with detector + results + data_over_time.
+
+    The epoch register's analysed epochs (``analysed_decode_files``), never a
+    glob, so a pending epoch's decode in the folder is not read.
+    """
     thr_int = int(round(NON_LOCAL_THRESHOLD * 100))
-    pattern = f"{animal}*_HPC_detector.pkl" if animal else "*_HPC_detector.pkl"
     out = []
-    for det in sorted(PROCESSED_DATA_DIR.glob(pattern)):
+    for det in analysed_decode_files(PROCESSED_DATA_DIR, "_detector.pkl"):
         epoch_id = det.name.removesuffix("_detector.pkl")
+        if animal is not None and not epoch_id.startswith(animal):
+            continue
         has_results = (PROCESSED_DATA_DIR / f"{epoch_id}_results.nc").exists()
         has_dot = (PROCESSED_DATA_DIR / f"{epoch_id}_{thr_int}_data_over_time.pkl").exists()
         if has_results and has_dot:

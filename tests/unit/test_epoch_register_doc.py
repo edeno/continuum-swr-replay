@@ -2,15 +2,16 @@
 
 The doc restates the module's rule, its reason codes with their definitions,
 the counts per status and reason, and every excluded and pending entry with its
-evidence. Each is a hand-kept copy of ``data_loaders/epoch_register.py`` and its
-``epoch_register.csv``, so this test fails as soon as one of them changes and
-the doc does not.
+evidence. ``scripts/qa/write_epoch_register_doc.py`` generates those parts from
+``data_loaders/epoch_register.py`` and its ``epoch_register.csv``; the first
+test fails when the committed doc is not the generator's output, and the rest
+read the doc itself, so they also hold the generator to the register.
 
-The machine-readable contract, also stated in the doc: the rule is the
-blockquote under ``## The rule``; ``## Reason codes`` holds one table row per
-code (``| `CODE` | status | definition |``); ``## Counts`` one row per status
-and reason, then a total; ``## Excluded and pending epochs`` one row per
-session and evidence (``| session | epochs | status | `REASON` | evidence |``),
+The machine-readable contract: the rule is the blockquote under ``## The rule``;
+``## Reason codes`` holds one table row per code
+(``| `CODE` | status | definition |``); ``## Counts`` starts with one row per
+status and reason, then a total; ``## Excluded and pending epochs`` holds one row
+per session and evidence (``| session | epochs | status | `REASON` | evidence |``),
 its epochs comma-separated, ``*`` for a session-wide entry. A literal ``|``
 inside a cell is written ``\\|``.
 """
@@ -23,6 +24,7 @@ from pathlib import Path
 
 import pytest
 
+import scripts.qa.write_epoch_register_doc as generator
 from continuum_swr_replay.data_loaders import epoch_register
 from continuum_swr_replay.data_loaders.epoch_register import (
     REASON_DEFINITIONS,
@@ -55,7 +57,12 @@ def _sections() -> dict[str, list[str]]:
 
 def _rows(lines: list[str]) -> list[list[str]]:
     """The body rows of the section's first table, as unescaped, stripped cells."""
-    table = [line for line in lines if line.startswith("|")]
+    table: list[str] = []
+    for line in lines:
+        if line.startswith("|"):
+            table.append(line)
+        elif table:
+            break  # the first table ends at its first non-table line
     rows = []
     for line in table[2:]:  # past the header and its separator
         cells = _CELL_SPLIT.split(line.strip())[1:-1]
@@ -69,6 +76,13 @@ def _code(cell: str) -> str:
 
 def _words(text: str) -> str:
     return " ".join(text.split())
+
+
+def test_the_committed_doc_is_the_generators_output():
+    """Regenerate with ``uv run python scripts/qa/write_epoch_register_doc.py``."""
+    committed = DOC_PATH.read_text(encoding="utf-8")
+
+    assert generator.render(committed) == committed
 
 
 def test_the_doc_states_the_rule_verbatim():

@@ -58,12 +58,15 @@ canonical one (Kay's SWRs, trained on ``no_ripple``, stationary). A decode
 made another way carries suffixes in the order the decode appends them:
 ``_contfrag``, a ripple detector (``_Karlsson``), ``_non_stationary``, and a
 training type (``_all``). ``--animal`` and ``--all`` run the epoch register's
-analysed epochs (``analysed_epochs``) of that animal, or of every animal: each
-one's canonical decode, and with ``--include-variants`` also the variants of it
-found under ``--root``. An analysed epoch whose decode is missing is run, and
-recorded as failed, so a run never covers fewer epochs than the register
-without saying so; a decode under ``--root`` whose epoch the register does not
-analyse is left out, and recorded as skipped. ``--epoch-id`` runs whatever it
+analysed epochs of that animal, or of every animal, or with ``--pending-only``
+its pending ones alone (``epochs_to_run``): each one's canonical decode, and
+with ``--include-variants`` also the variants of it found under ``--root``. An
+epoch so selected whose decode is missing is run, and recorded as failed, so a
+run never covers fewer epochs than the register without saying so; a decode
+under ``--root`` of any other epoch is left out, and recorded as skipped. The
+pending epochs' decodes are staged outside the canonical folder until they are
+analysed (``docs/epoch_register.md``), so a ``--pending-only`` run takes
+``--root`` at that staging folder. ``--epoch-id`` runs whatever it
 names. ``--date`` and ``--epoch`` narrow any of the three. The date is the
 last 8 characters of the NWB file's stem, so ``j1620210707`` was recorded on
 20210707; the epoch is a name such as ``02_r1``.
@@ -126,7 +129,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle impor
     SIGNIFICANCE_LEVEL,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import git_hash
-from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
+from continuum_swr_replay.data_loaders.epoch_register import epochs_to_run
 from continuum_swr_replay.data_loaders.spikes import filter_spike_times, get_hpc_marks
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.decoding_common import (
@@ -244,21 +247,24 @@ def input_paths(epoch_id: str, root: Path) -> dict[str, Path]:
 NOT_ANALYSED = "not an analysed epoch in the epoch register"
 """Why a decode under ``--root`` is left out when the register does not analyse
 its epoch."""
+NOT_PENDING = "not a pending epoch in the epoch register"
+"""Why a ``--pending-only`` run leaves out a decode under ``--root``."""
 
 
 def find_epochs(
     animal: str | None,
     root: Path,
-    analysed: Iterable[tuple[str, str]],
+    selected: Iterable[tuple[str, str]],
     *,
     include_variants: bool = False,
+    left_out: str = NOT_ANALYSED,
 ) -> tuple[list[str], dict[str, str]]:
-    """The analysed epochs' HPC decodes, and why every other decode was left out.
+    """The selected epochs' HPC decodes, and why every other decode was left out.
 
-    Every analysed epoch's canonical decode is listed, whether or not its files
+    Every selected epoch's canonical decode is listed, whether or not its files
     are under `root`: ``run_one`` then records a missing one as failed. HPC
     only: this port reads a clusterless encoding model. A decode under `root`
-    that is not an analysed epoch's canonical one is recorded rather than
+    that is not a selected epoch's canonical one is recorded rather than
     raised, so one stray file cannot stop a run over many epochs.
 
     Parameters
@@ -267,11 +273,15 @@ def find_epochs(
         Only this animal's epochs; None for every animal's.
     root : Path
         Where the decodes are.
-    analysed : Iterable of (str, str)
-        ``(nwb_file_name, epoch_name)`` of the epochs the register analyses,
-        ``analysed_epochs().index``.
+    selected : Iterable of (str, str)
+        ``(nwb_file_name, epoch_name)`` of the epochs this run covers:
+        ``epochs_to_run().index``, the register's analysed epochs or its
+        pending ones.
     include_variants : bool, optional
-        Also list the analysed epochs' decode variants found under `root`.
+        Also list the selected epochs' decode variants found under `root`.
+    left_out : str, optional
+        Why a decode of another epoch is left out: ``NOT_ANALYSED``, or
+        ``NOT_PENDING`` for a ``--pending-only`` run.
 
     Returns
     -------
@@ -282,7 +292,7 @@ def find_epochs(
     """
     keys = {
         (nwb_file_name, epoch_name)
-        for nwb_file_name, epoch_name in analysed
+        for nwb_file_name, epoch_name in selected
         if animal is None or parse_nwb_filename(nwb_file_name)[0] == animal
     }
     epochs = {
@@ -308,7 +318,7 @@ def find_epochs(
         if key.brain_area != "HPC":
             skipped[epoch_id] = f"brain area {key.brain_area}, not HPC"
         elif (key.nwb_file_name, key.epoch_name) not in keys:
-            skipped[epoch_id] = NOT_ANALYSED
+            skipped[epoch_id] = left_out
         elif not include_variants:
             skipped[epoch_id] = "a decode variant; pass --include-variants to run it"
         elif missing:
@@ -776,6 +786,13 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--n-shuffles", type=int, default=DEFAULT_N_SHUFFLES)
     parser.add_argument("--no-shuffle", action="store_true")
     parser.add_argument(
+        "--pending-only",
+        action="store_true",
+        help="With --all or --animal: run only the epochs the epoch register holds "
+        "pending, from their staged decodes under --root, instead of its "
+        "analysed epochs.",
+    )
+    parser.add_argument(
         "--include-variants",
         action="store_true",
         help="Also run decodes made another way (_all, _non_stationary, ...).",
@@ -806,6 +823,8 @@ def main(argv: list[str] | None = None) -> None:
     )
     args = parser.parse_args(argv)
 
+    if args.pending_only and args.epoch_id:
+        parser.error("--pending-only selects from the register: use --all or --animal")
     shuffle = not args.no_shuffle
     if shuffle and args.n_shuffles < MINIMUM_N_SHUFFLES:
         parser.error(
@@ -851,8 +870,9 @@ def main(argv: list[str] | None = None) -> None:
         epoch_ids, skipped = find_epochs(
             None if args.all else args.animal,
             args.root,
-            analysed_epochs().index,
+            epochs_to_run(args.pending_only).index,
             include_variants=args.include_variants,
+            left_out=NOT_PENDING if args.pending_only else NOT_ANALYSED,
         )
     epoch_ids = select_epochs(epoch_ids, date=args.date, epoch=args.epoch)
     for epoch_id, why in sorted(skipped.items()):

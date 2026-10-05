@@ -16,25 +16,34 @@ The register is ``epoch_register.csv`` beside this module, one row per
 ``epoch`` of ``*`` covers every epoch of a session none of whose run epochs is
 known (no NWB file, or no run epoch in it). The register was generated once, on
 2026-10-05, from the exclusion audit (``.claude/research/refresh_exclusions/
-exclusions_table.csv``, 557 run epochs) and the populate plan
-(``.claude/research/refresh_populate/populate_matrix.csv``); it is
-hand-maintained from then on. ``docs/epoch_register.md`` mirrors it, and a unit
-test holds the two together.
+exclusions_table.csv``: 553 run epochs and 4 sessions with none, 557 rows) and
+the populate plan (``.claude/research/refresh_populate/populate_matrix.csv``);
+it is hand-maintained from then on. ``docs/epoch_register.md`` is generated from
+it (``scripts/qa/write_epoch_register_doc.py``), and a unit test holds the two
+together.
 
 When several reasons hold for one epoch, the register records the first in the
 rule's order: no data (``NO_NWB``, ``NO_RUN_EPOCH``), then the task
-(``DEPLETION_TASK``), then Spyglass (``NOT_INGESTED_BLOCKED``,
-``NO_TRIAL_INTERVALS``), then the decode inputs (``PENDING_POPULATE``,
-``MISSING_INPUT``). The evidence names the others.
+(``DEPLETION_TASK``), then Spyglass (``NOT_INGESTED``, ``NO_TRIAL_INTERVALS``),
+then the decode inputs (``PENDING_POPULATE``, ``MISSING_INPUT``). The evidence
+names the others.
 
 The cohort is pinned here, not in Spyglass. A populate that makes a pending
 epoch decodable lists it in ``get_epoch_info``, but it is analysed only once its
 decodes exist and its entry is changed to ``analysed``. Every stage that
-enumerates epochs reads :func:`analysed_epochs`: the decoders (with
-``--include-pending`` for that incremental decode), the SWR runner, the Widloski
-runner, the table builders and the PFC runner. ``get_epoch_info`` listing an
-epoch the register does not, or not listing one the register analyses, stops
-them: the cohort never changes silently.
+enumerates epochs from Spyglass reads :func:`analysed_epochs` (the decoders, the
+SWR runner, the Widloski runner, the table builders, the PFC runner), and every
+reader of a decode folder reads :func:`analysed_decode_files` instead of a glob.
+``get_epoch_info`` listing an epoch the register does not, or not listing one
+the register analyses, stops them: the cohort never changes silently.
+
+The incremental update of the pending epochs: after their populates, decode them
+alone with ``--pending-only`` (:func:`pending_epochs`) into a staging
+``--save_dir``, and run the SWR and Widloski runners with ``--pending-only``
+(the Widloski runner with ``--root`` at that staging folder). Then promote the
+staged decodes into the canonical folder in the same change that flips their
+entries to ``analysed`` and regenerates the doc. The canonical folder only ever
+holds analysed epochs' decodes, which the audit checks (``decode_folder``).
 """
 
 from __future__ import annotations
@@ -76,8 +85,9 @@ class Status(StrEnum):
     ANALYSED = "analysed"
     """In the cohort: every stage processes it."""
     PENDING = "pending"
-    """Not yet analysed: its reason is ``PENDING_POPULATE``. Only the decoders,
-    given ``--include-pending``, process it."""
+    """Not yet analysed: its reason is ``PENDING_POPULATE``. Only a
+    ``--pending-only`` run of the decoders, the SWR runner or the Widloski runner
+    processes it."""
     EXCLUDED = "excluded"
     """Never analysed, for its reason."""
 
@@ -88,7 +98,7 @@ class Reason(StrEnum):
     NO_NWB = "NO_NWB"
     NO_RUN_EPOCH = "NO_RUN_EPOCH"
     DEPLETION_TASK = "DEPLETION_TASK"
-    NOT_INGESTED_BLOCKED = "NOT_INGESTED_BLOCKED"
+    NOT_INGESTED = "NOT_INGESTED"
     NO_TRIAL_INTERVALS = "NO_TRIAL_INTERVALS"
     PENDING_POPULATE = "PENDING_POPULATE"
     MISSING_INPUT = "MISSING_INPUT"
@@ -100,13 +110,10 @@ REASON_DEFINITIONS: dict[Reason, str] = {
     ),
     Reason.NO_RUN_EPOCH: "The session's NWB file holds no run epoch.",
     Reason.DEPLETION_TASK: (
-        "A depletion session (a decaying reward schedule) or the session run "
-        "after the depletion block: a task variant, not the regular spatial bandit."
+        "A depletion session: a decaying reward schedule, a task variant, not the "
+        "regular spatial bandit."
     ),
-    Reason.NOT_INGESTED_BLOCKED: (
-        "A regular session that Spyglass ingested only in part, whose "
-        "re-ingestion is blocked."
-    ),
+    Reason.NOT_INGESTED: "The session is not (fully) ingested in Spyglass.",
     Reason.NO_TRIAL_INTERVALS: (
         "Trial parsing failed: the epoch has no `noPrePostTrialTimes` interval."
     ),
@@ -189,13 +196,13 @@ def _problems(frame: pd.DataFrame) -> list[str]:
     return problems
 
 
-def read_register(path: Path = REGISTER_PATH) -> pd.DataFrame:
+def read_register(path: Path | None = None) -> pd.DataFrame:
     """Read and check an epoch register.
 
     Parameters
     ----------
     path : Path, optional
-        A register CSV; the committed one by default.
+        A register CSV; ``REGISTER_PATH``, the committed one, by default.
 
     Returns
     -------
@@ -211,6 +218,8 @@ def read_register(path: Path = REGISTER_PATH) -> pd.DataFrame:
         a reason that does not match the status, or an unanalysed entry with no
         evidence.
     """
+    if path is None:
+        path = REGISTER_PATH
     frame = pd.read_csv(path, dtype=str, keep_default_na=False)
     if tuple(frame.columns) != COLUMNS:
         raise ValueError(f"{path}: columns {list(frame.columns)}, not {list(COLUMNS)}")
@@ -346,7 +355,8 @@ def analysed_epochs(include_pending: bool = False) -> pd.DataFrame:
     Parameters
     ----------
     include_pending : bool, optional
-        Also the pending epochs, for the decoders' incremental decode of them.
+        Also the pending epochs. No stage asks for both at once: an incremental
+        run takes :func:`pending_epochs` alone.
 
     Returns
     -------
@@ -365,3 +375,89 @@ def analysed_epochs(include_pending: bool = False) -> pd.DataFrame:
     if include_pending:
         statuses.add(Status.PENDING)
     return select_epochs(get_epoch_info(), statuses, read_register())
+
+
+def pending_epochs() -> pd.DataFrame:
+    """``get_epoch_info``'s epochs that the register holds pending, and no other.
+
+    For an incremental run over the pending epochs alone (``--pending-only``),
+    after their populates.
+
+    Returns
+    -------
+    pd.DataFrame
+        ``get_epoch_info``'s rows and columns for those epochs, in its order.
+
+    Raises
+    ------
+    EpochRegisterError
+        If the register holds no pending epoch, so there is nothing to run; if
+        ``get_epoch_info`` does not list one of them, so its populate has not
+        happened; or if it lists an epoch the register does not.
+    """
+    register = read_register()
+    if not (register["status"] == Status.PENDING).any():
+        raise EpochRegisterError("the epoch register holds no pending epoch to run")
+    return select_epochs(get_epoch_info(), {Status.PENDING}, register)
+
+
+def epochs_to_run(pending_only: bool = False) -> pd.DataFrame:
+    """The epochs a stage runs: the analysed ones, or with `pending_only` the
+    pending ones alone (:func:`analysed_epochs`, :func:`pending_epochs`)."""
+    return pending_epochs() if pending_only else analysed_epochs()
+
+
+def analysed_epoch_ids(register: pd.DataFrame | None = None) -> list[str]:
+    """``{stem}_{epoch}_HPC`` of every analysed epoch, sorted.
+
+    The name every HPC decode file of the epoch starts with. Read from the
+    register alone, not from Spyglass, so a reader of decode files needs no
+    database.
+    """
+    if register is None:
+        register = read_register()
+    analysed = register.index[register["status"] == Status.ANALYSED]
+    return sorted(
+        f"{name.removesuffix('_.nwb')}_{epoch}_HPC" for name, epoch in analysed
+    )
+
+
+def analysed_decode_files(
+    directory: Path, suffix: str, *, require_all: bool = False
+) -> list[Path]:
+    """The analysed epochs' decode files ``{epoch_id}{suffix}`` in `directory`.
+
+    The register's replacement for globbing a decode folder: a file of an epoch
+    the register does not analyse (pending, excluded or unregistered) is never
+    returned, whatever else the folder holds.
+
+    Parameters
+    ----------
+    directory : Path
+        A decode folder, such as ``PROCESSED_DATA_DIR``.
+    suffix : str
+        What follows the epoch id, such as ``"_80_data_over_time.pkl"`` or
+        ``"_contfrag_data_over_time.pkl"``.
+    require_all : bool, optional
+        Raise if an analysed epoch's file is missing, rather than leave it out.
+
+    Returns
+    -------
+    list of Path
+        Sorted by epoch id; only files that exist.
+
+    Raises
+    ------
+    FileNotFoundError
+        With `require_all`, if an analysed epoch's file is not in `directory`.
+    """
+    paths = [directory / f"{epoch_id}{suffix}" for epoch_id in analysed_epoch_ids()]
+    present = [path for path in paths if path.exists()]
+    if require_all and len(present) < len(paths):
+        missing = [path.name for path in paths if not path.exists()]
+        raise FileNotFoundError(
+            f"{len(missing)} of the {len(paths)} analysed epochs have no "
+            f"*{suffix} in {directory}: {', '.join(missing[:10])}"
+            + (", ..." if len(missing) > 10 else "")
+        )
+    return present

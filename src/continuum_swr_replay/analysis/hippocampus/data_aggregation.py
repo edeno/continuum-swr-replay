@@ -116,6 +116,7 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
+from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 
 from ...types import SessionData
@@ -703,31 +704,33 @@ def get_data_over_time(
 
 
 def load_data_over_time(data_dir: Path) -> pd.DataFrame:
-    """Load and concatenate all NonLocal processed session data.
+    """Load and concatenate the analysed epochs' NonLocal processed data.
 
     This loads data from the 4-state NonLocal detector only. For
     ContFrag (2-state) data, use
     :func:`continuum_swr_replay.analysis.contfrag.load_contfrag_data_over_time`.
 
+    The epochs are the epoch register's analysed ones
+    (``epoch_register.analysed_decode_files``), never a glob of `data_dir`, so a
+    pending or excluded epoch's decode there is not read.
+
     Parameters
     ----------
     data_dir : Path
-        Directory containing ``*_HPC_80_data_over_time.pkl`` files.
+        Directory containing the ``{epoch_id}_80_data_over_time.pkl`` files.
 
     Returns
     -------
     pd.DataFrame
         Concatenated data with derived Non-Local_prob and distance columns.
 
+    Raises
+    ------
+    FileNotFoundError
+        If an analysed epoch's file is not in `data_dir`.
+
     """
-    # Sort and check explicitly so an empty directory raises a
-    # targeted FileNotFoundError instead of pandas' generic
-    # "No objects to concatenate" — matches the contfrag loader.
-    files = sorted(data_dir.glob("*_HPC_80_data_over_time.pkl"))
-    if not files:
-        raise FileNotFoundError(
-            f"No *_HPC_80_data_over_time.pkl files found in {data_dir}"
-        )
+    files = analysed_decode_files(data_dir, "_80_data_over_time.pkl", require_all=True)
     data_over_time = pd.concat([pd.read_pickle(p) for p in files])
     data_over_time["Non-Local_prob"] = (
         data_over_time["Non-Local_Continuous_prob"]

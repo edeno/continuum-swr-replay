@@ -49,6 +49,10 @@ checks (Stage 5), and nothing else.
   manifest names must be registered. A table names its epochs by its session
   columns or, keyed by ``stop_id`` alone as the qvals table is, through its
   folder's stop table.
+- ``decode_folder``: the decode folder (``--root``) holds HPC NonLocal and
+  ContFrag decode files only of the register's analysed epochs. A file of a
+  pending, excluded or unregistered epoch fails, even one of a partly saved
+  decode: a reader that globs the folder would read it.
 - ``epochs_registered``: every epoch ``get_epoch_info`` lists is in the
   register, and every epoch the register analyses is listed. This reads the
   database; if it cannot, the check fails.
@@ -1463,6 +1467,61 @@ def check_epoch_sets(
     return _result(failures, details)
 
 
+def check_decode_folder(root: Path, register: pd.DataFrame) -> dict:
+    """The decode folder holds canonical HPC decode files of analysed epochs only.
+
+    Every epoch with any NonLocal or ContFrag decode file under `root`
+    (``find_decodes``, complete or not) must be one the register analyses. That
+    an analysed epoch has both of its decodes is ``epoch_sets``' to check.
+
+    Parameters
+    ----------
+    root : Path
+        The decode folder.
+    register : pd.DataFrame
+        ``read_register``'s frame.
+    """
+    held: set[str] = set()
+    for decoder in DECODERS:
+        complete, incomplete = find_decodes(root, decoder)
+        held |= complete | set(incomplete)
+    analysed = set(_registered(register, Status.ANALYSED))
+    not_analysed: dict[str, str] = {}
+    unregistered: list[str] = []
+    for epoch_id in sorted(held - analysed):
+        try:
+            entry = register_entry(*register_key(epoch_id), register)
+        except EpochRegisterError:
+            unregistered.append(epoch_id)
+            continue
+        reason = "" if entry.reason is None else entry.reason.value
+        not_analysed[epoch_id] = f"{entry.status.value}, {reason}"
+    failures = []
+    if not held:
+        failures.append(f"no decode file under {root}")
+    if not_analysed:
+        failures.append(
+            f"the decode folder holds files of {len(not_analysed)} epoch(s) the "
+            "register does not analyse: "
+            + ", ".join(
+                f"{epoch_id} ({entry})" for epoch_id, entry in not_analysed.items()
+            )
+        )
+    if unregistered:
+        failures.append(
+            f"the decode folder holds files of {len(unregistered)} epoch(s) not in "
+            f"the epoch register: {', '.join(unregistered)}"
+        )
+    return _result(
+        failures,
+        {
+            "n_epochs": len(held),
+            "not_analysed": not_analysed,
+            "unregistered": unregistered,
+        },
+    )
+
+
 def check_epochs_registered(
     load_epoch_info: Callable[[], pd.DataFrame], register: pd.DataFrame
 ) -> dict:
@@ -1881,6 +1940,7 @@ def run_audit(
         REPO, table_dirs, artifacts=named_fits
     )
 
+    checks["decode_folder"] = check_decode_folder(root, register)
     checks["epochs_registered"] = check_epochs_registered(load_epoch_info, register)
     checks["pending_epochs"] = check_pending_epochs(register)
     n_pending = checks["pending_epochs"]["details"]["n_pending"]

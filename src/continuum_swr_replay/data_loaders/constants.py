@@ -165,12 +165,12 @@ Sessions left out of this list (each with its register entry):
   (``DEPLETION_TASK``): chimi20200303, chimi20200307, peanut20201207,
   senor20201119;
 - wilbur20210416, "Spatial bandit task (regular) - after depletion", never
-  ingested (``DEPLETION_TASK``);
+  ingested (``NOT_INGESTED``);
 - chimi20200301, whose raw NWB holds only a sleep epoch (``NO_RUN_EPOCH``);
 - chimi20200302, peanut20201126 and senor20201108, with no NWB file in either
   raw store and no Spyglass entry (``NO_NWB``);
 - wilbur20210401, a regular session with 8 run epochs that Spyglass ingested
-  only in part, whose re-ingestion is blocked (``NOT_INGESTED_BLOCKED``).
+  only in part, whose re-ingestion is blocked (``NOT_INGESTED``).
 
 Run epochs of these files that a Spyglass populate will make decodable are
 ``PENDING_POPULATE`` in the register: 36 with no ``PositionIntervalMap`` row and

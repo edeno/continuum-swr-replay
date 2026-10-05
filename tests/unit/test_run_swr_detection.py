@@ -306,7 +306,7 @@ def _outputs(output_dir, identifier) -> dict:
 
 
 def _epoch_info(*epochs: tuple[str, str]) -> pd.DataFrame:
-    """``analysed_epochs``'s frame (``get_epoch_info``'s shape) for these
+    """``epochs_to_run``'s frame (``get_epoch_info``'s shape) for these
     (nwb_file_name, epoch_name) pairs."""
     animal_date = [parse_nwb_filename(nwb_file_name) for nwb_file_name, _ in epochs]
     return pd.DataFrame(
@@ -850,12 +850,44 @@ def test_spyglass_kay_inputs_that_cannot_be_read_leave_the_epoch_partial(tmp_pat
     version_check = record["kay_version_check"]
     assert version_check["version_only"] == {"error": repr(error)}
     assert version_check["spyglass_parameters"] is None
-    assert version_check["settings_mismatch"] is None
-    assert set(version_check["differences"]) == {"version_and_inputs"}
+    # Spyglass's stored parameters could not be read, so whether the direct
+    # Kay's settings match them is unknown, and said to be
+    assert version_check["settings_mismatch"] == "unknown"
+    assert version_check["differences"] == {
+        "version_and_inputs": ["package version", "inputs", "settings unknown"]
+    }
     assert set(version_check["counts"]) == {"version_and_inputs"}
     kay_check = read_table(paths["kay_version_check"])
     assert set(kay_check.comparison) == {"version_and_inputs"}
     assert "version-only Kay check" in runner.summary(record)
+
+
+def test_with_no_kay_comparison_left_the_summary_claims_none(tmp_path, monkeypatch):
+    """The direct Kay fails and Spyglass's inputs cannot be read: no comparison
+    is left, no Kay-check table is written, and the summary prints no Kay check."""
+    monkeypatch.setattr(
+        swr_inventories,
+        "Kay_ripple_detector",
+        _raise(RuntimeError("simulated Kay failure")),
+    )
+
+    def unreadable(nwb_file_name, epoch_name):
+        raise ValueError("Found 2 potential parents")
+
+    fetchers = _fetchers(_main_epoch())
+    fetchers["fetch_spyglass_kay_inputs"] = unreadable
+    output_dir = tmp_path / "out"
+
+    record = run_epoch(NWB_FILE_NAME, EPOCH_NAME, output_dir=output_dir, **fetchers)
+
+    assert record["status"] == "partial"
+    assert record["kay_version_check"]["counts"] == {}
+    assert record["kay_version_check"]["differences"] == {}
+    paths = _outputs(output_dir, epoch_id(NWB_FILE_NAME, EPOCH_NAME))
+    assert not paths["kay_version_check"].exists()
+    parts = runner.summary(record).split("; ")
+    assert not any(part.startswith("Kay check") for part in parts)
+    assert any("version-only Kay check did not run" in part for part in parts)
 
 
 def test_a_version_check_of_another_algorithm_fails_the_epoch(tmp_path):
@@ -1066,8 +1098,10 @@ def test_a_failed_epoch_is_recorded_and_the_rest_run(
     """Two epochs, one of which raises: one ok, one failed, a non-zero exit."""
     monkeypatch.setattr(
         runner,
-        "analysed_epochs",
-        lambda: _epoch_info((NWB_FILE_NAME, "02_r1"), (NWB_FILE_NAME, "04_r2")),
+        "epochs_to_run",
+        lambda pending_only=False: _epoch_info(
+            (NWB_FILE_NAME, "02_r1"), (NWB_FILE_NAME, "04_r2")
+        ),
     )
     _with_fakes(monkeypatch, failing_epoch="04_r2")
 
@@ -1106,8 +1140,10 @@ def test_the_run_takes_its_epochs_from_the_epoch_register(
     not analyse reaches it, so its manifest records none."""
     monkeypatch.setattr(
         runner,
-        "analysed_epochs",
-        lambda: _epoch_info((NWB_FILE_NAME, "02_r1"), ("other20200101_.nwb", "02_r1")),
+        "epochs_to_run",
+        lambda pending_only=False: _epoch_info(
+            (NWB_FILE_NAME, "02_r1"), ("other20200101_.nwb", "02_r1")
+        ),
     )
     ran = _with_fakes(monkeypatch)
 
@@ -1120,12 +1156,35 @@ def test_the_run_takes_its_epochs_from_the_epoch_register(
     assert not hasattr(runner, "get_epoch_info")
 
 
+@pytest.mark.parametrize(
+    ("flags", "pending_only"), [([], False), (["--pending-only"], True)]
+)
+def test_pending_only_runs_the_registers_pending_epochs_alone(
+    tmp_path, monkeypatch, in_tmp_path, in_process_cluster, flags, pending_only
+):
+    asked = []
+
+    def epochs_to_run(pending_only=False):
+        asked.append(pending_only)
+        return _epoch_info((NWB_FILE_NAME, EPOCH_NAME))
+
+    monkeypatch.setattr(runner, "epochs_to_run", epochs_to_run)
+    _with_fakes(monkeypatch)
+
+    manifest = _cli(tmp_path, *flags)
+
+    assert asked == [pending_only]
+    assert set(manifest["epochs"]) == {epoch_id(NWB_FILE_NAME, EPOCH_NAME)}
+
+
 def test_rerun_without_overwrite_skips_done_epochs(
     tmp_path, monkeypatch, capsys, in_tmp_path, in_process_cluster
 ):
     """A finished epoch is not run again unless ``--overwrite`` is given."""
     monkeypatch.setattr(
-        runner, "analysed_epochs", lambda: _epoch_info((NWB_FILE_NAME, EPOCH_NAME))
+        runner,
+        "epochs_to_run",
+        lambda pending_only=False: _epoch_info((NWB_FILE_NAME, EPOCH_NAME)),
     )
     ran = _with_fakes(monkeypatch)
     first = _cli(tmp_path)
@@ -1162,7 +1221,9 @@ def test_a_rerun_with_other_settings_is_refused(
     """A run's epochs share one set of settings; a rerun under the same run
     id with other detector settings stops before running anything."""
     monkeypatch.setattr(
-        runner, "analysed_epochs", lambda: _epoch_info((NWB_FILE_NAME, EPOCH_NAME))
+        runner,
+        "epochs_to_run",
+        lambda pending_only=False: _epoch_info((NWB_FILE_NAME, EPOCH_NAME)),
     )
     ran = _with_fakes(monkeypatch)
     _cli(tmp_path)
@@ -1227,10 +1288,10 @@ def test_a_second_run_under_the_same_run_id_is_refused(
     output_dir.mkdir(parents=True)
     lock = output_dir / ".lock"
 
-    def no_epochs_while_locked():
+    def no_epochs_while_locked(pending_only=False):
         raise AssertionError("epochs were read without the run's lock")
 
-    monkeypatch.setattr(runner, "analysed_epochs", no_epochs_while_locked)
+    monkeypatch.setattr(runner, "epochs_to_run", no_epochs_while_locked)
     holder = subprocess.Popen(
         [sys.executable, "-c", _HOLD_LOCK, str(lock)],
         stdout=subprocess.PIPE,
@@ -1248,7 +1309,9 @@ def test_a_second_run_under_the_same_run_id_is_refused(
     assert not (output_dir / "manifest.json").exists()
 
     monkeypatch.setattr(
-        runner, "analysed_epochs", lambda: _epoch_info((NWB_FILE_NAME, EPOCH_NAME))
+        runner,
+        "epochs_to_run",
+        lambda pending_only=False: _epoch_info((NWB_FILE_NAME, EPOCH_NAME)),
     )
     _with_fakes(monkeypatch)
     manifest = _cli(tmp_path)
@@ -1280,7 +1343,7 @@ def test_run_id_must_be_a_plain_name(tmp_path, monkeypatch, in_tmp_path, run_id)
     def must_not_read(*args):
         raise AssertionError("the run started")
 
-    monkeypatch.setattr(runner, "analysed_epochs", must_not_read)
+    monkeypatch.setattr(runner, "epochs_to_run", must_not_read)
 
     with pytest.raises(SystemExit) as stopped:
         main(["--run-id", run_id, "--output-root", str(tmp_path / "swr")])
@@ -1345,7 +1408,9 @@ def test_main_raises_the_open_file_limit_before_its_cluster(
 
     monkeypatch.setattr(runner, "raise_open_file_limit", raise_open_file_limit)
     monkeypatch.setattr(
-        runner, "analysed_epochs", lambda: _epoch_info((NWB_FILE_NAME, EPOCH_NAME))
+        runner,
+        "epochs_to_run",
+        lambda pending_only=False: _epoch_info((NWB_FILE_NAME, EPOCH_NAME)),
     )
     _with_fakes(monkeypatch)
 

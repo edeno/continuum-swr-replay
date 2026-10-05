@@ -32,7 +32,7 @@ try:
 except ImportError:
     HAS_CUDA = False
 
-from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
+from continuum_swr_replay.data_loaders.epoch_register import epochs_to_run
 from continuum_swr_replay.parameters import (
     BLOCK_SIZE,
     LOCAL_POSITION_STD,
@@ -397,11 +397,12 @@ def add_common_args(parser: ArgumentParser) -> ArgumentParser:
         "instead of refusing to start.",
     )
     parser.add_argument(
-        "--include-pending",
+        "--pending-only",
         action="store_true",
-        help="Also decode the epochs the epoch register holds pending a Spyglass "
-        "populate (the incremental update, run after the populates). By default "
-        "only its analysed epochs are decoded.",
+        help="Decode only the epochs the epoch register holds pending a Spyglass "
+        "populate (the incremental update, run after the populates), into a "
+        "staging --save_dir; the canonical folder is refused. By default the "
+        "register's analysed epochs are decoded.",
     )
     return parser
 
@@ -429,9 +430,13 @@ def run_batch(
 
     Notes
     -----
-    The epochs are the epoch register's analysed ones (``analysed_epochs``), and
-    its pending ones too with ``--include-pending``, narrowed by ``--animal``,
-    ``--date`` and ``--epoch``.
+    The epochs are the epoch register's analysed ones, or with ``--pending-only``
+    its pending ones alone (``epochs_to_run``), narrowed by ``--animal``,
+    ``--date`` and ``--epoch``. Pending epochs are decoded into a staging folder
+    and promoted with the register edit that makes them analysed
+    (``docs/epoch_register.md``), so ``--pending-only`` refuses the canonical
+    ``PROCESSED_DATA_DIR``: a reader of that folder must never meet a pending
+    epoch's decode.
 
     Before the cluster starts, the soft open-file limit is raised
     (``raise_open_file_limit``), so that the worker processes inherit it.
@@ -445,6 +450,8 @@ def run_batch(
     RuntimeError
         If ``dask_cuda`` is not importable and ``--allow_cpu`` was not given.
         Without this check the batch would silently decode on a CPU cluster.
+    ValueError
+        If ``--pending-only`` would decode into ``PROCESSED_DATA_DIR``.
     """
     if not HAS_CUDA and not args.allow_cpu:
         raise RuntimeError(
@@ -459,12 +466,16 @@ def run_batch(
     # Resolved once, here, before any worker sees it: a relative --save_dir
     # would otherwise be read against each worker's working directory.
     save_dir = Path(args.save_dir).resolve()
+    if args.pending_only and save_dir == Path(PROCESSED_DATA_DIR).resolve():
+        raise ValueError(
+            "--pending-only decodes the register's pending epochs, which must "
+            "not reach the canonical folder before they are analysed: give a "
+            f"staging --save_dir, not {save_dir}."
+        )
 
     # Before any cluster starts: a register that does not match Spyglass stops
     # the batch here, with no GPU worker started.
-    epoch_info = filter_epoch_info(
-        analysed_epochs(include_pending=args.include_pending), args
-    )
+    epoch_info = filter_epoch_info(epochs_to_run(args.pending_only), args)
 
     os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.99"
 

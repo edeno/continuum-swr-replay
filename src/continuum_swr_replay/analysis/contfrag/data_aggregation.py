@@ -23,6 +23,7 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     validate_required_session_data_keys,
     validate_results_position_time_alignment,
 )
+from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 
 from ...types import SessionData
@@ -195,23 +196,29 @@ def get_contfrag_data_over_time(
 
 
 def load_contfrag_data_over_time(data_dir: Path) -> pd.DataFrame:
-    """Load and concatenate all ContFrag processed session data.
+    """Load and concatenate the analysed epochs' ContFrag processed data.
+
+    The epochs are the epoch register's analysed ones
+    (``epoch_register.analysed_decode_files``), never a glob of `data_dir`.
 
     Parameters
     ----------
     data_dir : Path
-        Directory containing ``*_contfrag_data_over_time.pkl`` files.
+        Directory containing the ``{epoch_id}_contfrag_data_over_time.pkl`` files.
 
     Returns
     -------
     pd.DataFrame
         Concatenated data with derived distance column.
+
+    Raises
+    ------
+    FileNotFoundError
+        If an analysed epoch's file is not in `data_dir`.
     """
-    files = sorted(data_dir.glob("*_contfrag_data_over_time.pkl"))
-    if not files:
-        raise FileNotFoundError(
-            f"No *_contfrag_data_over_time.pkl files found in {data_dir}"
-        )
+    files = analysed_decode_files(
+        data_dir, "_contfrag_data_over_time.pkl", require_all=True
+    )
     data_over_time = pd.concat([pd.read_pickle(p) for p in files])
     data_over_time["distance"] = np.abs(data_over_time["ahead_behind_distance"])
     return data_over_time

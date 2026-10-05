@@ -168,8 +168,8 @@ def _parse(argv: list[str]) -> Namespace:
     return decoding_common.add_common_args(ArgumentParser()).parse_args(argv)
 
 
-def _one_epoch(include_pending: bool = False) -> pd.DataFrame:
-    """``analysed_epochs``'s frame (``get_epoch_info``'s shape), for the synthetic
+def _one_epoch(pending_only: bool = False) -> pd.DataFrame:
+    """``epochs_to_run``'s frame (``get_epoch_info``'s shape), for the synthetic
     epoch."""
     return pd.DataFrame(
         {"animal": ["testrat"], "date": [20990101], "epoch": [2], "epoch_tag": ["r1"]},
@@ -427,7 +427,7 @@ def test_run_batch_passes_save_dir(
     monkeypatch.setattr(
         decoding_common, unused_cluster_name, _no_cluster, raising=False
     )
-    monkeypatch.setattr(decoding_common, "analysed_epochs", _one_epoch)
+    monkeypatch.setattr(decoding_common, "epochs_to_run", _one_epoch)
     # run_batch sets this variable and makes logs/ in the working directory;
     # monkeypatch restores both after the test.
     monkeypatch.setenv("XLA_PYTHON_CLIENT_MEM_FRACTION", "0.99")
@@ -492,7 +492,7 @@ def test_run_batch_resolves_a_relative_save_dir(monkeypatch, tmp_path):
             delayed=lambda function: function, compute=lambda *outcomes: outcomes
         ),
     )
-    monkeypatch.setattr(decoding_common, "analysed_epochs", _one_epoch)
+    monkeypatch.setattr(decoding_common, "epochs_to_run", _one_epoch)
     # run_batch sets this variable and makes logs/ in the working directory;
     # monkeypatch restores both after the test.
     monkeypatch.setenv("XLA_PYTHON_CLIENT_MEM_FRACTION", "0.99")
@@ -927,7 +927,7 @@ def _stand_in_batch(monkeypatch, tmp_path, *, has_cuda: bool, cluster: Callable)
             delayed=lambda function: function, compute=lambda *outcomes: outcomes
         ),
     )
-    monkeypatch.setattr(decoding_common, "analysed_epochs", _one_epoch)
+    monkeypatch.setattr(decoding_common, "epochs_to_run", _one_epoch)
     monkeypatch.setattr(decoding_common, "raise_open_file_limit", lambda: (1024, 65536))
     # run_batch sets this variable and makes logs/ in the working directory;
     # monkeypatch restores both after the test.
@@ -968,35 +968,57 @@ def test_run_batch_closes_nwb_files_only_on_one_task_workers(
 
 
 @pytest.mark.parametrize(
-    ("flags", "include_pending"),
-    [([], False), (["--include-pending"], True)],
-    ids=["analysed", "with_pending"],
+    ("flags", "pending_only"),
+    [([], False), (["--pending-only"], True)],
+    ids=["analysed", "pending_only"],
 )
 def test_run_batch_selects_its_epochs_through_the_register(
-    monkeypatch, tmp_path, flags, include_pending
+    monkeypatch, tmp_path, flags, pending_only
 ):
-    """The batch decodes the register's analysed epochs, and its pending ones too
-    only when ``--include-pending`` asks: never ``get_epoch_info`` as it is."""
+    """The batch decodes the register's analysed epochs, or with
+    ``--pending-only`` its pending ones alone: never ``get_epoch_info`` as it is."""
     asked: list[bool] = []
     calls: list[dict[str, Any]] = []
 
-    def analysed_epochs(include_pending: bool = False) -> pd.DataFrame:
-        asked.append(include_pending)
+    def epochs_to_run(pending_only: bool = False) -> pd.DataFrame:
+        asked.append(pending_only)
         return _one_epoch()
 
     _stand_in_batch(
         monkeypatch, tmp_path, has_cuda=True, cluster=lambda **kwargs: object()
     )
-    monkeypatch.setattr(decoding_common, "analysed_epochs", analysed_epochs)
+    monkeypatch.setattr(decoding_common, "epochs_to_run", epochs_to_run)
     args = _parse([*flags, "--save_dir", "staging", "--local_scratch_dir", "scratch"])
 
     decoding_common.run_batch(lambda **kwargs: calls.append(kwargs), args)
 
-    assert asked == [include_pending]
+    assert asked == [pending_only]
     assert [(call["nwb_file_name"], call["epoch_name"]) for call in calls] == [
         (NWB_FILE_NAME, EPOCH_NAME)
     ]
     assert not hasattr(decoding_common, "get_epoch_info")
+
+
+def test_pending_epochs_are_never_decoded_into_the_canonical_folder(
+    monkeypatch, tmp_path
+):
+    """Readers that glob the canonical folder would see a pending decode there,
+    so ``--pending-only`` must name a staging ``--save_dir``. Refused before any
+    epoch is read or any cluster starts."""
+
+    def must_not_select(pending_only: bool = False) -> pd.DataFrame:
+        raise AssertionError("epochs were selected")
+
+    _stand_in_batch(monkeypatch, tmp_path, has_cuda=True, cluster=_no_cluster)
+    monkeypatch.setattr(decoding_common, "epochs_to_run", must_not_select)
+    canonical = tmp_path / "Processed-Data"
+    monkeypatch.setattr(decoding_common, "PROCESSED_DATA_DIR", canonical)
+    args = _parse(
+        ["--pending-only", "--save_dir", str(canonical), "--local_scratch_dir", "s"]
+    )
+
+    with pytest.raises(ValueError, match="staging"):
+        decoding_common.run_batch(lambda **kwargs: None, args)
 
 
 def test_run_batch_raises_the_open_file_limit_before_its_cluster(
