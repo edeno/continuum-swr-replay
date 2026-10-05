@@ -823,6 +823,41 @@ def test_version_only_kay_runs_with_spyglass_stored_parameters(tmp_path):
     }
 
 
+def test_spyglass_kay_inputs_that_cannot_be_read_leave_the_epoch_partial(tmp_path):
+    """Spyglass's own Kay inputs, which only the version-only comparison reads,
+    fail to load (two PositionOutput parents, as for j1620210710 02_r1 and
+    04_r2): the four detectors' events and the version-and-inputs comparison
+    are still written, the error is recorded under the Kay check, and the epoch
+    is partial with that reason."""
+    error = ValueError("Found 2 potential parents: [__interval_position_info, ...]")
+
+    def unreadable(nwb_file_name, epoch_name):
+        raise error
+
+    fetchers = _fetchers(_main_epoch())
+    fetchers["fetch_spyglass_kay_inputs"] = unreadable
+    output_dir = tmp_path / "out"
+
+    record = run_epoch(NWB_FILE_NAME, EPOCH_NAME, output_dir=output_dir, **fetchers)
+
+    json.dumps(record, allow_nan=False)
+    assert record["status"] == "partial"
+    assert "version-only Kay check" in record["reason"]
+    assert record["detectors"] == dict.fromkeys(DETECTORS, "ok")
+    paths = _outputs(output_dir, epoch_id(NWB_FILE_NAME, EPOCH_NAME))
+    for name in DETECTORS:
+        assert paths[name].exists(), name
+    version_check = record["kay_version_check"]
+    assert version_check["version_only"] == {"error": repr(error)}
+    assert version_check["spyglass_parameters"] is None
+    assert version_check["settings_mismatch"] is None
+    assert set(version_check["differences"]) == {"version_and_inputs"}
+    assert set(version_check["counts"]) == {"version_and_inputs"}
+    kay_check = read_table(paths["kay_version_check"])
+    assert set(kay_check.comparison) == {"version_and_inputs"}
+    assert "version-only Kay check" in runner.summary(record)
+
+
 def test_a_version_check_of_another_algorithm_fails_the_epoch(tmp_path):
     """Canonical events that another algorithm made cannot check Kay."""
     parameters = {

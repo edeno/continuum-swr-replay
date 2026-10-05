@@ -44,7 +44,10 @@ Per epoch:
 
    The canonical events and the version-only events are kept only inside the
    position span, by ``filter_ripple_lfp_time``'s rule, as ``load_data`` keeps
-   ``SWR_event``.
+   ``SWR_event``. If Spyglass's own inputs cannot be read, the version-only
+   comparison is recorded as that error under ``kay_version_check``, the epoch
+   is ``partial`` with that reason, and its inventories and the other
+   comparison are still written.
 
 Each epoch writes, under ``Processed-Data/replay_detection_comparison/swr/<run_id>/``:
 
@@ -574,13 +577,22 @@ def _detect(
         animal=animal, day=day, epoch=epoch_name, brain_area="HPC"
     )
     canonical = within_span(fetch_canonical_kay(nwb_file_name, epoch_name), span_s)
-    spyglass_speed, spyglass_lfps, spyglass_rate, spyglass_parameters = (
-        fetch_spyglass_kay_inputs(nwb_file_name, epoch_name)
-    )
-    # Kay on Spyglass's inputs is named apart from the direct Kay, so that an
-    # event key names one event across both comparisons
-    compared = {
-        "version_only": (
+    compared: dict[str, tuple[str, pd.DataFrame]] = {}
+    spyglass_parameters: dict | None = None
+    try:
+        spyglass_speed, spyglass_lfps, spyglass_rate, spyglass_parameters = (
+            fetch_spyglass_kay_inputs(nwb_file_name, epoch_name)
+        )
+    except Exception as error:  # noqa: BLE001 - recorded; the detectors stand
+        # Only the version-only comparison reads Spyglass's own inputs, so a
+        # failure to read them (a PositionOutput row with two parents, say)
+        # loses that comparison, not the epoch's inventories.
+        spyglass_error: str | None = repr(error)
+    else:
+        spyglass_error = None
+        # Kay on Spyglass's inputs is named apart from the direct Kay, so that
+        # an event key names one event across both comparisons
+        compared["version_only"] = (
             SPYGLASS_INPUTS_KAY,
             within_span(
                 kay_on_spyglass_inputs(
@@ -589,26 +601,33 @@ def _detect(
                 span_s,
             ),
         )
-    }
     if "kay" in succeeded:
         compared["version_and_inputs"] = ("kay", results["kay"])
-    kay_check = pd.concat(
-        [
-            kay_version_check(
-                direct,
-                canonical,
-                session=session,
-                run_id=run_id,
-                speed_time_s=position_time,
-                speed_cm_per_s=head_speed,
-                direct_detector=name,
-            ).assign(comparison=comparison)
-            for comparison, (name, direct) in compared.items()
-        ],
-        ignore_index=True,
+    kay_check = (
+        pd.concat(
+            [
+                kay_version_check(
+                    direct,
+                    canonical,
+                    session=session,
+                    run_id=run_id,
+                    speed_time_s=position_time,
+                    speed_cm_per_s=head_speed,
+                    direct_detector=name,
+                ).assign(comparison=comparison)
+                for comparison, (name, direct) in compared.items()
+            ],
+            ignore_index=True,
+        )
+        if compared
+        else None
     )
-    settings_mismatch = dict(spyglass_parameters["ripple_detection_params"]) != dict(
-        DETECTOR_SETTINGS["kay"]
+    # unknown (None) when Spyglass's stored parameters could not be read
+    settings_mismatch = (
+        None
+        if spyglass_parameters is None
+        else dict(spyglass_parameters["ripple_detection_params"])
+        != dict(DETECTOR_SETTINGS["kay"])
     )
     differences = {
         "version_only": ["package version"],
@@ -620,8 +639,15 @@ def _detect(
         "settings_mismatch": settings_mismatch,
         # what each comparison's events differ from the canonical ones in
         "differences": {name: differences[name] for name in compared},
-        "counts": kay_check_counts(kay_check),
+        "counts": {} if kay_check is None else kay_check_counts(kay_check),
     }
+    if spyglass_error is not None:
+        record["kay_version_check"]["version_only"] = {"error": spyglass_error}
+        record["status"] = "partial"
+        record["reason"] = (
+            "The version-only Kay check did not run: Spyglass's own Kay inputs "
+            f"could not be read ({spyglass_error})."
+        )
 
     frames = {
         name: events
@@ -629,7 +655,8 @@ def _detect(
         if isinstance(events, pd.DataFrame)
     }
     frames["swr_observed"] = observation_table(time, ripple_band, zugaro_lfp)
-    frames["kay_version_check"] = kay_check
+    if kay_check is not None:
+        frames["kay_version_check"] = kay_check
     stamp = {
         "produced_by": PRODUCED_BY,
         "run_id": run_id,
