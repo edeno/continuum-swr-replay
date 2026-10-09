@@ -1727,7 +1727,12 @@ also be kept out of decoding. A read-only design study built and validated a det
 - masks 402 s (0.15 %) across 74 of the 218 epochs.
 
 The lead approved the design on 2026-10-09, subject to a literature check
-(`.claude/research/refresh_artifact_detector/literature_review.md`). The lead also chose to
+(`.claude/research/refresh_artifact_detector/literature_review.md`, 23 papers and 3 code sources
+whose methods were read). The check found the design consistent with field practice. Rodent labs
+drop an event that also appears where an SWR cannot: a noise channel, a cortical electrode, or EMG
+estimated from the LFP. None of the rodent papers read reports how many true SWRs its rule
+removes. The check also found one main gap: no direct check for licking or chewing EMG. It is
+covered by study C1 below, before the full artifact run. The lead also chose to
 re-decode all epochs so that the decoders' encoding exclusion uses the same SWR source as the
 analyses: the masked 2.0 Kay inventory.
 
@@ -1743,6 +1748,13 @@ analyses: the masked 2.0 Kay inventory.
   each step's core.
 - **Keep the noisy tetrodes.** The sustained-noise tetrodes are masked during their noise blocks,
   not dropped. A sensitivity analysis (R8) leaves out the 4 epochs with more than 2 % masked.
+- **Masking versus dropping the noisy tetrodes.** The field usually drops a channel with sustained
+  noise instead of masking its time (literature review, verdict 6). R11 starts by decoding the 12
+  S epochs both ways on breeze. Masking stays unless the masked decode shows extra non-local
+  probability within 3 s outside the S blocks, beyond the 1-s pad, compared with the decode that
+  drops those tetrodes. If it does, the affected tetrodes are dropped for whole S epochs.
+- **No amplitude cap.** Some pipelines drop events above 9–10 SD. Our true SWRs reach 44 robust z,
+  so a cap would remove giant SWRs. The design note reports how many true SWRs a cap would drop.
 
 ## Task 16: artifact detection in the repo, with a run folder
 
@@ -1952,6 +1964,29 @@ Work in the worktree `/cumulus/edeno/continuum-swr-replay-refresh-dev`, branch
 **Acceptance:** on the 5 pilots with a scratch artifact run, report per cohort the counts before and
 after, and the exposure removed.
 
+## C1: follow-up checks from the literature review (read-only, CPU; alongside Tasks 16–18)
+
+Output: `.claude/research/refresh_artifact_detector/followup/`.
+1. **Licking and chewing EMG** (literature review §4.1). Build an EMG proxy:
+   - 250–400 Hz correlation across CA1 tetrodes;
+   - 250–400 Hz power on the reference.
+
+   Compare beam-break (licking) intervals with other immobility and with running. Calibrate it on
+   the true SWRs, and review the Kay events in high-EMG windows blind to behavior.
+   - **Rule:** if those events lack SWR features (sharp wave, MUA, in-distribution marks), add an
+     EMG signature with its threshold above the true-SWR maximum.
+   - **Otherwise** the methods state "no licking artifact found", with the numbers.
+2. **A raw-signal oscillation check** (narrowband peak or cycle count) on the 16 missed small steps
+   and on the true SWRs. It is added only if it catches steps and masks no true SWR.
+3. **A per-spike amplitude ceiling:** the max-channel amplitude of true-SWR marks against OOD marks.
+   It is added only if it separates.
+4. **The project's coincidence filter** (more than 33 % of tetrodes within 40 µs) during true SWRs:
+   how many SWR spikes it removes. Its docstring claims real synchrony "rarely exceeds 20 %", but
+   true SWRs reach 50 % of tetrodes in 200 µs.
+5. **Documentation:** how many true SWRs a 9 or 10 SD amplitude cap would drop.
+
+R9 waits for C1's decisions. A new signature or rule is a fix round on Task 16.
+
 ## R9: artifact detection, all epochs (CPU)
 
 1. Merge Tasks 16–18 into the main branch, and push.
@@ -1981,6 +2016,8 @@ after, and the exposure removed.
 ## R11: full re-decode, all 255 epochs (GPU, zephyr and breeze)
 
 - NonLocal and ContFrag, both into a new staging folder, from the commit that sets both run ids.
+- First, on breeze, decode the 12 S epochs with masking and with their noisy tetrodes dropped, and apply
+  the Phase C ruling.
 - Breeze needs SSH access first: the lead authorises the key, or runs the jobs there.
 - **Gates:** as R1 (P30-B pinned, no CPU fallback, provenance), plus both run ids recorded in every
   decode.
