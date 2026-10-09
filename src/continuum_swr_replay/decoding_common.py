@@ -105,17 +105,25 @@ class NonLocalDecodingConfig(DecodingConfig):
 
 
 def require_hpc_decode_sources() -> None:
-    """Refuse an HPC decode unless the SWR source names both of its runs.
+    """Refuse an HPC decode unless the SWR source names both of its runs, and
+    its inventory was masked with its artifact run.
 
     The decode's ``is_missing``, encoding exclusion, MUA detection and
     ``SWR_event`` read ``swr_source.SWR_INVENTORY_RUN_ID`` (the Kay inventory)
     and ``swr_source.ARTIFACT_INTERVALS_RUN_ID`` (the artifact run). Either
     left unset would decode without the masks, so it is refused (fail closed).
+    The inventory's manifest names the artifact run the SWR runner masked its
+    events with (``settings.artifacts.run_id``; absent from a run made before
+    it masked artifacts, such as R3's). An inventory masked with no artifact
+    run or another one is refused too: its events, which encoding leaves out,
+    would not be the masked inventory's.
 
     Raises
     ------
     ValueError
-        Naming each run id that is unset.
+        Naming each run id that is unset, or the inventory, the artifact run it
+        was masked with and the configured one when those two differ; or when
+        the inventory has no manifest.
     """
     unset = [
         f"swr_source.{name}"
@@ -127,6 +135,24 @@ def require_hpc_decode_sources() -> None:
             f"An HPC decode needs {' and '.join(unset)} set, so that its artifact "
             "mask, encoding exclusion and SWR labels come from named runs; "
             "refusing to decode without them."
+        )
+    manifest_path = swr_source.swr_inventory_dir() / "manifest.json"
+    if not manifest_path.exists():
+        raise ValueError(f"no SWR inventory manifest at {manifest_path}")
+    manifest = json.loads(manifest_path.read_text())
+    masked_with = manifest.get("settings", {}).get("artifacts", {}).get("run_id")
+    if masked_with != swr_source.ARTIFACT_INTERVALS_RUN_ID:
+        recorded = (
+            "no artifact run"
+            if masked_with is None
+            else f"artifact run {masked_with!r}"
+        )
+        raise ValueError(
+            f"The SWR inventory {swr_source.SWR_INVENTORY_RUN_ID!r} was masked with "
+            f"{recorded}, but the configured artifact run is "
+            f"{swr_source.ARTIFACT_INTERVALS_RUN_ID!r}: rerun the SWR runner with the "
+            "configured artifact run and set swr_source.SWR_INVENTORY_RUN_ID to it; "
+            "refusing to decode."
         )
 
 

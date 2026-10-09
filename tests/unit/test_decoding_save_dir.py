@@ -179,7 +179,11 @@ def decoders(monkeypatch, tmp_path):
         monkeypatch.setattr(module, "PROCESSED_DATA_DIR", canonical)
     use_swr_source(
         monkeypatch,
-        write_swr_inventory(tmp_path / "swr_inventory", {SWR_EPOCH: SWR_EVENTS}),
+        write_swr_inventory(
+            tmp_path / "swr_inventory",
+            {SWR_EPOCH: SWR_EVENTS},
+            artifact_run_id=ARTIFACT_RUN_ID,
+        ),
         write_artifact_run(tmp_path / "artifact_run", {SWR_EPOCH: ARTIFACT_CORES}),
     )
 
@@ -1044,6 +1048,31 @@ def test_an_hpc_decode_refuses_to_run_without_both_runs(
 
     assert failed == decoder.epoch_identifier
     assert f"swr_source.{unset}" in _log(tmp_path, decoder)
+
+
+@pytest.mark.parametrize("key", list(DECODERS))
+def test_an_hpc_decode_refuses_an_inventory_masked_by_another_artifact_run(
+    decoders, monkeypatch, tmp_path, key
+):
+    """Today's case: the artifact run is set, but the inventory is one made
+    without the mask (R3's has no ``settings.artifacts``)."""
+    decoder, module = DECODERS[key], decoders.modules[key]
+    unmasked = write_swr_inventory(
+        tmp_path / "unmasked_inventory", {SWR_EPOCH: SWR_EVENTS}
+    )
+    monkeypatch.setattr(swr_source, "SWR_INVENTORY_ROOT", unmasked.parent)
+
+    def load_data(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("an HPC decode loaded data on an unmasked inventory")
+
+    monkeypatch.setattr(module, "load_data", load_data)
+
+    failed = _run_decode(module, decoder, tmp_path, save_dir=tmp_path / "staging")
+
+    assert failed == decoder.epoch_identifier
+    log = _log(tmp_path, decoder)
+    assert f"The SWR inventory '{RUN_ID}' was masked with no artifact run" in log
+    assert f"the configured artifact run is '{ARTIFACT_RUN_ID}'" in log
 
 
 @pytest.mark.parametrize("key", list(DECODERS))

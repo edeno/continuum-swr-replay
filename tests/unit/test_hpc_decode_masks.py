@@ -47,7 +47,9 @@ DECODER_INTERVALS = [(104.01, 104.21), (106.7, 107.3)]
 @pytest.fixture
 def sources(tmp_path, monkeypatch):
     """The SWR source configured with a synthetic inventory and artifact run."""
-    inventory = write_swr_inventory(tmp_path / "swr", {EPOCH: EVENTS})
+    inventory = write_swr_inventory(
+        tmp_path / "swr", {EPOCH: EVENTS}, artifact_run_id=ARTIFACT_RUN_ID
+    )
     artifacts = write_artifact_run(tmp_path / "artifacts", {EPOCH: CORES})
     use_swr_source(monkeypatch, inventory, artifacts)
 
@@ -147,19 +149,55 @@ def test_an_unset_run_id_is_refused(sources, monkeypatch, unset):
         hpc_decoder_intervals(NWB_FILE_NAME, EPOCH_NAME)
 
 
-def test_the_committed_configuration_is_refused():
-    """No artifact run is configured yet, so no HPC decode can start."""
-    assert swr_source.ARTIFACT_INTERVALS_RUN_ID is None
-    with pytest.raises(ValueError, match="ARTIFACT_INTERVALS_RUN_ID"):
+def test_both_run_ids_unset_are_named(monkeypatch):
+    monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", None)
+    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", None)
+
+    with pytest.raises(ValueError) as refused:
         decoding_common.require_hpc_decode_sources()
 
+    assert "SWR_INVENTORY_RUN_ID and swr_source.ARTIFACT_INTERVALS_RUN_ID" in str(
+        refused.value
+    )
 
-def test_a_configured_run_missing_the_epoch_is_refused(sources, tmp_path, monkeypatch):
+
+@pytest.mark.parametrize("recorded", [None, "otherartifacts"])
+def test_an_inventory_masked_by_another_artifact_run_is_refused(
+    tmp_path, monkeypatch, recorded
+):
+    """The inventory's own manifest names the artifact run its events were
+    masked with (none for a run made before the SWR runner masked artifacts,
+    such as R3's); an HPC decode under another artifact run is refused, and
+    the error names both run ids."""
+    inventory = write_swr_inventory(
+        tmp_path / "swr", {EPOCH: EVENTS}, artifact_run_id=recorded
+    )
+    artifacts = write_artifact_run(tmp_path / "artifacts", {EPOCH: CORES})
+    use_swr_source(monkeypatch, inventory, artifacts)
+
+    for refuse in (
+        decoding_common.require_hpc_decode_sources,
+        lambda: hpc_decoder_intervals(NWB_FILE_NAME, EPOCH_NAME),
+    ):
+        with pytest.raises(ValueError) as refused:
+            refuse()
+        message = str(refused.value)
+        assert RUN_ID in message and ARTIFACT_RUN_ID in message
+        assert (recorded or "no artifact run") in message
+
+
+def test_an_inventory_masked_by_the_configured_artifact_run_is_accepted(sources):
+    decoding_common.require_hpc_decode_sources()
+
+
+def test_a_configured_run_missing_the_epoch_is_refused(tmp_path, monkeypatch):
     artifacts = write_artifact_run(
         tmp_path / "other", {"chimi20200225_02_r1_HPC": CORES}, run_id="otherrun"
     )
-    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_ROOT", artifacts.parent)
-    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", artifacts.name)
+    inventory = write_swr_inventory(
+        tmp_path / "swr", {EPOCH: EVENTS}, artifact_run_id="otherrun"
+    )
+    use_swr_source(monkeypatch, inventory, artifacts)
 
     with pytest.raises(swr_source.SwrSourceError, match="not in the artifact run"):
         hpc_decoder_intervals(NWB_FILE_NAME, EPOCH_NAME)

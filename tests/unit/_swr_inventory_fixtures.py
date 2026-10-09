@@ -55,6 +55,7 @@ def write_swr_inventory(
     observed: Mapping[str, Sequence[tuple[float, float]]] | None = None,
     records: Mapping[str, dict] | None = None,
     run_id: str = RUN_ID,
+    artifact_run_id: str | None = None,
 ) -> Path:
     """Write a run folder; return its path.
 
@@ -71,6 +72,10 @@ def write_swr_inventory(
         Epoch id -> a manifest record written as given (a failed or skipped
         epoch, say), with no files.
     run_id : str
+    artifact_run_id : str, optional
+        The artifact run the inventory was masked with, written as the SWR
+        runner writes it (``settings.artifacts.run_id``); no settings when
+        None, as in a run made before the runner masked artifacts.
     """
     directory = root / run_id
     directory.mkdir(parents=True, exist_ok=True)
@@ -100,9 +105,10 @@ def write_swr_inventory(
         }
     for epoch_id, record in (records or {}).items():
         manifest_epochs[epoch_id] = record
-    (directory / "manifest.json").write_text(
-        json.dumps({"run_id": run_id, "epochs": manifest_epochs}, indent=1)
-    )
+    manifest: dict = {"run_id": run_id, "epochs": manifest_epochs}
+    if artifact_run_id is not None:
+        manifest["settings"] = {"artifacts": {"run_id": artifact_run_id}}
+    (directory / "manifest.json").write_text(json.dumps(manifest, indent=1))
     return directory
 
 
