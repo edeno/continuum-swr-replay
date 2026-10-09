@@ -332,8 +332,8 @@ senor20201103_.nwb,12_r6,analysed,,
 senor20201103_.nwb,14_r7,analysed,,
 senor20201104_.nwb,02_r1,analysed,,
 senor20201104_.nwb,04_r2,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on senor20201030, LFPBandV1 ripple and theta, 22 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 10 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
-senor20201104_.nwb,06_r3,pending,PENDING_POPULATE,"LFPV1 was never populated for its LFPSelection (lfp_tets_senor, '06_r3 noPrePostTrialTimes'), so it has no LFPBandV1 ripple or theta band and no CA1 RippleTimesV1; its decode failed at get_ripple (logs/senor20201104_06_r3_HPC.log). Planned fix (populate_plan.py phases 3-6): LFPV1, LFPBandV1 ripple and theta, CA1 RippleLFPSelection, RippleTimesV1."
-senor20201104_.nwb,08_r4,pending,PENDING_POPULATE,"LFPV1 was never populated for its LFPSelection (lfp_tets_senor, '08_r4 noPrePostTrialTimes'), so it has no LFPBandV1 ripple or theta band and no CA1 RippleTimesV1; its decode failed at get_ripple (logs/senor20201104_08_r4_HPC.log). Planned fix (populate_plan.py phases 3-6): LFPV1, LFPBandV1 ripple and theta, CA1 RippleLFPSelection, RippleTimesV1."
+senor20201104_.nwb,06_r3,excluded,MISSING_INPUT,"LFPV1.make fails in spyglass common_interval.censor ('Interval_list must contain all timestamps') for the existing LFPSelection (populate 2026-10-09), so no LFP, ripple band or CA1 ripple times; likely why LFPV1 was never made"
+senor20201104_.nwb,08_r4,excluded,MISSING_INPUT,"LFPV1.make fails in spyglass common_interval.censor ('Interval_list must contain all timestamps') for the existing LFPSelection (populate 2026-10-09), so no LFP, ripple band or CA1 ripple times; likely why LFPV1 was never made"
 senor20201104_.nwb,10_r5,analysed,,
 senor20201104_.nwb,12_r6,analysed,,
 senor20201104_.nwb,14_r7,analysed,,
