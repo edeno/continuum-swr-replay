@@ -26,14 +26,14 @@ Per epoch, read only:
 
 Each epoch writes, under ``Processed-Data/artifact_intervals/<run_id>/``,
 ``{epoch_id}_artifact_intervals.parquet``: its cores (``io.CORE_COLUMNS``), no
-rows when it has no artifact. Consumers pad the cores themselves, from
-``masks.CONSUMER_PADDING``; ``swr_source.artifact_intervals`` reads the
-``analysis`` mask. A failed epoch keeps no file.
+rows when it has no artifact. A reader pads the cores into the one artifact
+mask (``masks.PADDING_S``), as ``swr_source.artifact_intervals`` does. A failed
+epoch keeps no file.
 
 ``manifest.json`` beside them holds the run's settings (every constant and
 the padding table) and one record per epoch: its status, span, input row
-counts, the constants, the code commit, the cores' counts and masked seconds
-per consumer, input hashes, and the file's path and sha256. Only this process
+counts, the constants, the code commit, the cores' counts and the mask's
+seconds, input hashes, and the file's path and sha256. Only this process
 writes it, atomically, after each epoch. A rerun under the same run id skips
 the epochs already ``ok`` unless ``--overwrite`` is given, and refuses
 settings other than the manifest's. A run holds an exclusive lock on its
@@ -87,8 +87,7 @@ from continuum_swr_replay.analysis.hippocampus.artifacts.io import (  # noqa: E4
     write_manifest,
 )
 from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (  # noqa: E402
-    CONSUMER_PADDING,
-    Consumer,
+    PADDING_S,
     artifact_intervals,
     masked_seconds,
 )
@@ -135,7 +134,7 @@ def detector_constants() -> dict[str, Any]:
     constants: dict[str, Any] = json_ready(
         {
             **detect.detector_constants(),
-            "consumer_padding": CONSUMER_PADDING,
+            "padding_s": PADDING_S,
         }
     )
     return constants
@@ -266,10 +265,7 @@ def _detect(
             str(name): int(n)
             for name, n in cores["signatures"].value_counts().sort_index().items()
         },
-        "masked_s": {
-            consumer.value: masked_seconds(artifact_intervals(cores, consumer, span))
-            for consumer in Consumer
-        },
+        "masked_s": masked_seconds(artifact_intervals(cores, span)),
         "constants": detector_constants(),
         "input_sha256": {
             "time": array_sha256(time),
@@ -355,9 +351,9 @@ def summary(record: dict) -> str:
     """One epoch's outcome, as the logs and the console report it."""
     if "masked_s" not in record:
         return f"{record['status']}: {record.get('error')}"
-    masked = ", ".join(f"{name} {s:.2f} s" for name, s in record["masked_s"].items())
     return (
-        f"ok: cores {record['n_cores_by_signatures'] or 'none'}; masked {masked}; "
+        f"ok: cores {record['n_cores_by_signatures'] or 'none'}; masked "
+        f"{record['masked_s']:.2f} s; "
         f"{record['n_spikes']} spikes on {record['n_tetrodes']} tetrodes, "
         f"{record['n_ood_spikes']} OOD; {record['wall_clock_s']:.0f} s, worker "
         f"peak RSS {record['worker_peak_rss_gib']:.1f} GiB"

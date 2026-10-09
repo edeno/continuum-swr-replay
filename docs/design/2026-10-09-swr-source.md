@@ -79,9 +79,10 @@ What the comparison shows:
   `artifact_intervals(epoch_id)` reads the artifact detector's run
   (`ARTIFACT_INTERVALS_ROOT / <run id>`: `manifest.json` and one
   `{epoch_id}_artifact_intervals.parquet` of unpadded cores per epoch) and returns the
-  `analysis` mask's intervals (`start_time`, `end_time`): the cores padded by that row of
-  the padding table, merged and clipped to the epoch's span
-  ([2026-10-09-artifact-detection.md](2026-10-09-artifact-detection.md)). It returns none
+  artifact mask's intervals (`start_time`, `end_time`): the cores padded by the one
+  padding table, merged and clipped to the epoch's span
+  ([2026-10-09-artifact-detection.md](2026-10-09-artifact-detection.md)). The SWR
+  runner, MUA detection and the HPC decoders use the same mask. It returns none
   while the run id is unset, and raises when a configured run does not serve the epoch
   (not run, failed, file missing or changed since the run). No caller passes artifact
   intervals: every function below resolves them by epoch id, so every caller gets the same
@@ -194,7 +195,7 @@ source.
 - **The decoders' `no_ripple` encoding-training mask** still excluded the stored
   `RippleTimesV1` ripples when this note was written; the two definitions overlap 93 %.
   Since Task 17a (the lead's decision of 2026-10-09, with the re-decode), an HPC decode
-  leaves out every event of this inventory and its `decoder` artifact mask instead
+  leaves out every event of this inventory and the artifact mask instead
   (`decoding_common.hpc_decode_masks`), and refuses to start unless both run ids are set.
 - **`get_data_over_time` still writes the stored ripples' `SWR_event`.** It is an older
   decode's (and a PFC decode's) provenance. An HPC decode since Task 17a reads its frame

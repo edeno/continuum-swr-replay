@@ -26,7 +26,6 @@ from continuum_swr_replay.analysis.hippocampus.artifacts.io import (
     read_epoch_cores,
 )
 from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
-    Consumer,
     artifact_intervals,
 )
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
@@ -129,11 +128,10 @@ def test_an_epoch_writes_its_cores_and_record(tmp_path):
     assert record["t_ref_disabled"] is False
     assert record["n_cores_by_signatures"] == {"S": 1, "ref": 1}
     assert record["constants"] == runner.detector_constants()
-    for consumer in Consumer:
-        expected = artifact_intervals(cores, consumer, span)
-        assert record["masked_s"][consumer.value] == pytest.approx(
-            float((expected["end_time"] - expected["start_time"]).sum())
-        )
+    expected = artifact_intervals(cores, span)
+    assert record["masked_s"] == pytest.approx(
+        float((expected["end_time"] - expected["start_time"]).sum())
+    )
     assert record["provenance"]["commit"]
     assert record["input_sha256"].keys() == {"time", "ca1_lfp", "reference_lfp"}
     assert record["wall_clock_s"] >= 0
@@ -153,7 +151,7 @@ def test_an_epoch_without_artifacts_writes_an_empty_file(tmp_path):
     assert cores.empty
     assert list(cores.columns) == list(CORE_COLUMNS)
     assert record["n_cores"] == {"S": 0, "T": 0}
-    assert record["masked_s"] == {"swr": 0.0, "decoder": 0.0, "analysis": 0.0}
+    assert record["masked_s"] == 0.0
 
 
 def test_an_epoch_whose_references_are_all_band_electrodes_runs_without_t_ref(
@@ -236,7 +234,7 @@ def test_the_runner_writes_where_the_source_reads():
 
 def test_the_source_reads_a_run_the_runner_wrote(tmp_path, monkeypatch):
     """End to end: the runner's file and manifest are what ``swr_source`` reads,
-    and it applies the analysis table."""
+    and it pads them into the one mask."""
     epoch = _artifact_epoch()
     output_dir = tmp_path / "artifacts" / "run0001"
     output_dir.mkdir(parents=True)
@@ -250,7 +248,7 @@ def test_the_source_reads_a_run_the_runner_wrote(tmp_path, monkeypatch):
     stored = read_epoch_cores(output_dir, EPOCH_ID)
     pd.testing.assert_frame_equal(
         swr_source.artifact_intervals(EPOCH_ID),
-        artifact_intervals(stored.cores, Consumer.ANALYSIS, stored.span),
+        artifact_intervals(stored.cores, stored.span),
     )
 
 

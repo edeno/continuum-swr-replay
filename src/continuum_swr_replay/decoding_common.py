@@ -3,8 +3,8 @@
 Contains the common infrastructure used by both ``run_decoding_bandit.py``
 (NonLocal 4-state detector) and ``run_decoding_contfrag.py`` (ContFrag
 2-state classifier), among it the HPC decode's masks: ``is_missing`` (the
-artifact run's ``decoder`` mask) and ``is_training`` (that mask and every event
-of the Kay inventory left out), both from the paper's SWR source
+artifact run's mask) and ``is_training`` (that mask and every event of the Kay
+inventory left out), both from the paper's SWR source
 (``analysis/hippocampus/swr_source.py``). An HPC decode refuses to start unless
 the source names both runs (``require_hpc_decode_sources``).
 """
@@ -39,8 +39,7 @@ except ImportError:
 
 from continuum_swr_replay.analysis.hippocampus import swr_source
 from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
-    CONSUMER_PADDING,
-    Consumer,
+    PADDING_S,
     interval_mask,
 )
 from continuum_swr_replay.data_loaders.epoch_register import epochs_to_run
@@ -197,8 +196,8 @@ def require_saved_decode_masks(attrs: Mapping[str, Any], what: str) -> None:
         )
 
 
-def hpc_decoder_intervals(nwb_file_name: str, epoch_name: str) -> pd.DataFrame:
-    """The epoch's ``decoder`` artifact intervals, from the configured run.
+def hpc_artifact_intervals(nwb_file_name: str, epoch_name: str) -> pd.DataFrame:
+    """The epoch's artifact mask, from the configured run.
 
     Parameters
     ----------
@@ -209,8 +208,8 @@ def hpc_decoder_intervals(nwb_file_name: str, epoch_name: str) -> pd.DataFrame:
     -------
     pd.DataFrame
         ``start_time`` and ``end_time`` in seconds, closed, disjoint and in
-        time order: the run's cores padded by the ``decoder`` row of
-        ``CONSUMER_PADDING`` (``swr_source.artifact_intervals``).
+        time order: the run's cores padded by ``PADDING_S``, the one mask
+        every stage uses (``swr_source.artifact_intervals``).
 
     Raises
     ------
@@ -221,7 +220,7 @@ def hpc_decoder_intervals(nwb_file_name: str, epoch_name: str) -> pd.DataFrame:
     """
     require_hpc_decode_sources()
     return swr_source.artifact_intervals(
-        swr_source.swr_epoch_id(nwb_file_name, epoch_name), Consumer.DECODER
+        swr_source.swr_epoch_id(nwb_file_name, epoch_name)
     )
 
 
@@ -230,7 +229,7 @@ class HpcDecodeMasks:
     """An HPC decode's masks on its time grid (the position grid)."""
 
     is_missing: NDArray[np.bool_]
-    """Shape (n_time,): bins in a ``decoder`` artifact interval, whose
+    """Shape (n_time,): bins in an artifact interval, whose
     log-likelihood the decoder sets to 0."""
     is_training: NDArray[np.bool_]
     """Shape (n_time,): bins the encoding model is fitted on."""
@@ -242,28 +241,28 @@ def hpc_decode_masks(
     nwb_file_name: str,
     epoch_name: str,
     position_info: pd.DataFrame,
-    decoder_intervals: pd.DataFrame,
+    artifact_mask: pd.DataFrame,
     training_type: str | TrainingType,
 ) -> HpcDecodeMasks:
     """Build an HPC decode's ``is_missing`` and ``is_training``.
 
-    - ``is_missing``: the bins (closed) inside a ``decoder`` artifact interval.
+    - ``is_missing``: the bins (closed) inside an artifact interval.
     - ``is_training``: for ``no_ripple``, the bins outside every event of the
       configured Kay inventory and outside ``is_missing``; for ``all``, the
       bins outside ``is_missing``. Every inventory event counts, at any speed,
       as the stored-ripple rule it replaces excluded every stored ripple: the
       inventory's events passed the detectors' own endpoint speed rule (speed
       at the first and last sample at most 4 cm/s), as the stored ripples did,
-      and the SWR runner has already dropped those overlapping its ``swr``
-      artifact mask.
+      and the SWR runner has already dropped those overlapping the artifact
+      mask.
 
     Parameters
     ----------
     nwb_file_name, epoch_name : str
     position_info : pd.DataFrame
         The decode's position, indexed by time in seconds: the decode grid.
-    decoder_intervals : pd.DataFrame
-        ``hpc_decoder_intervals``' table for the epoch.
+    artifact_mask : pd.DataFrame
+        ``hpc_artifact_intervals``' table for the epoch.
     training_type : str or TrainingType
         ``"no_ripple"`` or ``"all"``.
 
@@ -285,7 +284,7 @@ def hpc_decode_masks(
     training_type = TrainingType(training_type)
     epoch_id = swr_source.swr_epoch_id(nwb_file_name, epoch_name)
     time = position_info.index.to_numpy(dtype=np.float64)
-    is_missing = interval_mask(time, decoder_intervals)
+    is_missing = interval_mask(time, artifact_mask)
     if training_type == TrainingType.NO_RIPPLE:
         events = swr_source.read_swr_inventory(epoch_id)
         is_swr = interval_mask(time, events)
@@ -301,10 +300,7 @@ def hpc_decode_masks(
         "swr_source": swr_source.swr_source_name(),
         "swr_inventory_run_id": swr_source.SWR_INVENTORY_RUN_ID,
         "artifact_run_id": swr_source.ARTIFACT_INTERVALS_RUN_ID,
-        "consumer": Consumer.DECODER.value,
-        "padding_s": {
-            row: list(pad) for row, pad in CONSUMER_PADDING[Consumer.DECODER].items()
-        },
+        "padding_s": dict(PADDING_S),
         "training_type": training_type.value,
         "n_bins": int(time.size),
         "bin_s": bin_s,

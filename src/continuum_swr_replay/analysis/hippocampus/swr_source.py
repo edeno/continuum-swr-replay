@@ -18,9 +18,9 @@ What this module fixes
   (``scripts/decoding/run_artifact_detection.py``). It is None today: no
   artifact is masked. Every function here resolves an epoch's artifact
   intervals itself (:func:`artifact_intervals`), so no caller passes them and
-  every caller gets the same ones: the ``analysis`` mask
-  (``artifacts.masks.CONSUMER_PADDING``), the detector's cores padded for event
-  eligibility and rate exposure.
+  every caller gets the same ones: the one artifact mask, the detector's cores
+  padded by ``artifacts.masks.PADDING_S``. The SWR runner, MUA detection and
+  the decoders use the same mask.
 - **The source's name** (:func:`swr_source_name`): the detector, the inventory
   run and the artifact run, such as ``kay@50a98592acee+artifacts@none``. Every
   table built from these labels is stamped with it (:func:`stamp_swr_source`),
@@ -55,8 +55,8 @@ or :func:`read_dot_with_swr_source`. Its ``SWR_event`` column then holds this
 source's labels and ``swr_observed`` the coverage mask. An HPC decode made by
 the decoders since Task 17a already holds them: its ``organize_results`` reads
 the frame through :func:`with_swr_source`, so the decode's provenance is this
-source, and its encoding leaves out every event of this inventory and its
-``decoder`` artifact mask (``decoding_common.hpc_decode_masks``). In an older
+source, and its encoding leaves out every event of this inventory and the
+artifact mask (``decoding_common.hpc_decode_masks``). In an older
 decode, or a PFC decode, ``SWR_event`` (from ``RippleTimesV1``, written by
 ``get_data_over_time``) stays in the pickle as the decode's provenance and never
 reaches an analysis, and neither do the decode's stored-ripple counts
@@ -83,11 +83,10 @@ from continuum_swr_replay.analysis.hippocampus.artifacts.io import (
     read_epoch_cores,
 )
 from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
-    Consumer,
-    subtract_intervals,
+    artifact_intervals as padded_cores,
 )
 from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
-    artifact_intervals as consumer_intervals,
+    subtract_intervals,
 )
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     build_speed_eligible_event_cohort,
@@ -397,23 +396,18 @@ def _read_observed(path: str) -> NDArray[np.float64]:
     return stretches
 
 
-def artifact_intervals(
-    epoch_id: str, consumer: Consumer | str = Consumer.ANALYSIS
-) -> pd.DataFrame:
-    """The epoch's artifact intervals, from the one configured run.
+def artifact_intervals(epoch_id: str) -> pd.DataFrame:
+    """The epoch's artifact mask, from the one configured run.
 
-    The run's cores for the epoch, padded by the consumer's row of
-    ``artifacts.masks.CONSUMER_PADDING``, merged and clipped to the epoch's
-    span. The default, ``analysis``, pads S by 1 s on each side, an LFP step by
-    0.3 s before and 1.3 s after, and a spike-only line by 0.1 s; every function
-    here uses it. The HPC decoders ask for ``decoder`` (their ``is_missing``,
-    encoding exclusion and MUA detection).
+    The run's cores for the epoch, padded by ``artifacts.masks.PADDING_S`` (S
+    by 1 s, a step with an LFP signature by 0.3 s and a spike-only line by
+    0.1 s, on each side), merged and clipped to the epoch's span. Every
+    function here uses it, and so do the SWR runner, MUA detection and the HPC
+    decoders.
 
     Parameters
     ----------
     epoch_id : str
-    consumer : Consumer or str, optional
-        ``"analysis"`` (default), ``"decoder"`` or ``"swr"``.
 
     Returns
     -------
@@ -437,7 +431,7 @@ def artifact_intervals(
         epoch = read_epoch_cores(directory, epoch_id)
     except ArtifactRunError as error:
         raise SwrSourceError(str(error)) from error
-    return consumer_intervals(epoch.cores, consumer, epoch.span)
+    return padded_cores(epoch.cores, epoch.span)
 
 
 @dataclass(frozen=True)

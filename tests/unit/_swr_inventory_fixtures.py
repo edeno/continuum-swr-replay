@@ -143,7 +143,7 @@ def write_artifact_run(
         Epoch id -> its unpadded cores ``(signatures, core_start, core_end)``,
         such as ``("spk", 104.11, 104.11)``; each epoch is ``ok``.
     span : tuple of float
-        Every epoch's span, which the consumers' intervals are clipped to.
+        Every epoch's span, which the mask's intervals are clipped to.
     run_id : str
     """
     directory = root / run_id

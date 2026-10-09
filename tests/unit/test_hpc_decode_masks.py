@@ -1,6 +1,6 @@
 """The HPC decoders' masks: ``is_missing`` and ``is_training`` from the SWR source.
 
-``decoding_common.hpc_decoder_intervals`` and ``hpc_decode_masks`` build them
+``decoding_common.hpc_artifact_intervals`` and ``hpc_decode_masks`` build them
 from the configured Kay inventory and artifact run, here synthetic run folders
 written as the runners write them. Offline: nothing touches Spyglass or
 ``Processed-Data``.
@@ -15,8 +15,8 @@ import pytest
 from continuum_swr_replay import decoding_common
 from continuum_swr_replay.analysis.hippocampus import swr_source
 from continuum_swr_replay.decoding_common import (
+    hpc_artifact_intervals,
     hpc_decode_masks,
-    hpc_decoder_intervals,
     require_hpc_decode_sources,
 )
 from tests.unit._swr_inventory_fixtures import (
@@ -39,9 +39,9 @@ EVENTS = [
     (104.000, 104.030),  # overlaps an artifact
 ]
 CORES = [("spk", 104.11, 104.11), ("ca1", 107.0, 107.0)]
-"""A spike line and a CA1 step: the decoder pads them to [104.01, 104.21] and
-[106.7, 107.3] (the analysis mask would add a second after the step)."""
-DECODER_INTERVALS = [(104.01, 104.21), (106.7, 107.3)]
+"""A spike line and a CA1 step: the one mask pads them to [104.01, 104.21]
+and [106.7, 107.3]."""
+MASK_INTERVALS = [(104.01, 104.21), (106.7, 107.3)]
 
 
 @pytest.fixture
@@ -67,9 +67,9 @@ def _inside(intervals) -> np.ndarray:
     return inside
 
 
-def test_the_decoder_intervals_are_the_artifact_runs_decoder_mask(sources):
+def test_the_decoders_get_the_artifact_runs_one_mask(sources):
     np.testing.assert_allclose(
-        hpc_decoder_intervals(NWB_FILE_NAME, EPOCH_NAME).to_numpy(), DECODER_INTERVALS
+        hpc_artifact_intervals(NWB_FILE_NAME, EPOCH_NAME).to_numpy(), MASK_INTERVALS
     )
 
 
@@ -78,12 +78,12 @@ def test_is_missing_is_the_decoder_mask_on_the_decode_grid(sources):
         NWB_FILE_NAME,
         EPOCH_NAME,
         _position_info(),
-        hpc_decoder_intervals(NWB_FILE_NAME, EPOCH_NAME),
+        hpc_artifact_intervals(NWB_FILE_NAME, EPOCH_NAME),
         "no_ripple",
     )
 
     assert masks.is_missing.dtype == bool and masks.is_missing.shape == TIME.shape
-    np.testing.assert_array_equal(masks.is_missing, _inside(DECODER_INTERVALS))
+    np.testing.assert_array_equal(masks.is_missing, _inside(MASK_INTERVALS))
 
 
 def test_encoding_leaves_out_every_inventory_event_and_the_mask(sources):
@@ -92,11 +92,11 @@ def test_encoding_leaves_out_every_inventory_event_and_the_mask(sources):
         NWB_FILE_NAME,
         EPOCH_NAME,
         _position_info(),
-        hpc_decoder_intervals(NWB_FILE_NAME, EPOCH_NAME),
+        hpc_artifact_intervals(NWB_FILE_NAME, EPOCH_NAME),
         "no_ripple",
     )
 
-    expected = ~_inside(EVENTS) & ~_inside(DECODER_INTERVALS)
+    expected = ~_inside(EVENTS) & ~_inside(MASK_INTERVALS)
     np.testing.assert_array_equal(masks.is_training, expected)
     assert not masks.is_training[(TIME >= 102.4) & (TIME <= 102.6)].any()
 
@@ -106,11 +106,11 @@ def test_training_on_all_still_leaves_out_the_mask(sources):
         NWB_FILE_NAME,
         EPOCH_NAME,
         _position_info(),
-        hpc_decoder_intervals(NWB_FILE_NAME, EPOCH_NAME),
+        hpc_artifact_intervals(NWB_FILE_NAME, EPOCH_NAME),
         "all",
     )
 
-    np.testing.assert_array_equal(masks.is_training, ~_inside(DECODER_INTERVALS))
+    np.testing.assert_array_equal(masks.is_training, ~_inside(MASK_INTERVALS))
 
 
 def test_the_record_names_the_sources_and_the_seconds(sources):
@@ -118,7 +118,7 @@ def test_the_record_names_the_sources_and_the_seconds(sources):
         NWB_FILE_NAME,
         EPOCH_NAME,
         _position_info(),
-        hpc_decoder_intervals(NWB_FILE_NAME, EPOCH_NAME),
+        hpc_artifact_intervals(NWB_FILE_NAME, EPOCH_NAME),
         "no_ripple",
     )
 
@@ -126,14 +126,14 @@ def test_the_record_names_the_sources_and_the_seconds(sources):
     assert record["swr_source"] == f"kay@{RUN_ID}+artifacts@{ARTIFACT_RUN_ID}"
     assert record["swr_inventory_run_id"] == RUN_ID
     assert record["artifact_run_id"] == ARTIFACT_RUN_ID
-    assert record["consumer"] == "decoder"
+    assert record["padding_s"] == {"S": 1.0, "T_lfp": 0.3, "T_spike": 0.1}
     assert record["training_type"] == "no_ripple"
     assert record["n_bins"] == TIME.size
     assert record["bin_s"] == pytest.approx(0.002)
-    assert record["n_missing_bins"] == int(_inside(DECODER_INTERVALS).sum())
+    assert record["n_missing_bins"] == int(_inside(MASK_INTERVALS).sum())
     assert record["missing_s"] == pytest.approx(record["n_missing_bins"] * 0.002)
     assert record["n_swr_events"] == len(EVENTS)
-    removed = ~(~_inside(EVENTS) & ~_inside(DECODER_INTERVALS))
+    removed = ~(~_inside(EVENTS) & ~_inside(MASK_INTERVALS))
     assert record["n_encoding_removed_bins"] == int(removed.sum())
     assert record["encoding_removed_s"] == pytest.approx(removed.sum() * 0.002)
 
@@ -146,7 +146,7 @@ def test_an_unset_run_id_is_refused(sources, monkeypatch, unset):
     with pytest.raises(ValueError, match=unset):
         require_hpc_decode_sources()
     with pytest.raises(ValueError, match=unset):
-        hpc_decoder_intervals(NWB_FILE_NAME, EPOCH_NAME)
+        hpc_artifact_intervals(NWB_FILE_NAME, EPOCH_NAME)
 
 
 def test_both_run_ids_unset_are_named(monkeypatch):
@@ -177,7 +177,7 @@ def test_an_inventory_masked_by_another_artifact_run_is_refused(
 
     for refuse in (
         decoding_common.require_hpc_decode_sources,
-        lambda: hpc_decoder_intervals(NWB_FILE_NAME, EPOCH_NAME),
+        lambda: hpc_artifact_intervals(NWB_FILE_NAME, EPOCH_NAME),
     ):
         with pytest.raises(ValueError) as refused:
             refuse()
@@ -200,4 +200,4 @@ def test_a_configured_run_missing_the_epoch_is_refused(tmp_path, monkeypatch):
     use_swr_source(monkeypatch, inventory, artifacts)
 
     with pytest.raises(swr_source.SwrSourceError, match="not in the artifact run"):
-        hpc_decoder_intervals(NWB_FILE_NAME, EPOCH_NAME)
+        hpc_artifact_intervals(NWB_FILE_NAME, EPOCH_NAME)

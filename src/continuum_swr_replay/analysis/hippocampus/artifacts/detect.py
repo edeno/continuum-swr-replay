@@ -16,7 +16,7 @@ T signatures at most 50 ms apart merge into one T core (:func:`t_cores`); the
 merge chains, so a core can last longer than 50 ms. Each rule is its own
 function, so a further signature is one more event source.
 :func:`detect_artifacts` runs them on one epoch and returns unpadded cores
-with their evidence; each consumer pads them (``masks.CONSUMER_PADDING``).
+with their evidence; one table pads them into the mask (``masks.PADDING_S``).
 
 Every value below is the validated prototype's
 (``.claude/research/refresh_artifact_detector/detector_report.md``, the
@@ -52,7 +52,6 @@ from continuum_swr_replay.analysis.hippocampus.artifacts.io import (
     validate_cores,
 )
 from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
-    Consumer,
     artifact_intervals,
     interval_mask,
 )
@@ -458,7 +457,7 @@ def detect_artifacts(
     1. S from the CA1 window spectra.
     2. T-ref and T-ca1 from the reference and CA1 steps.
     3. The OOD reference: per tetrode, the marks outside the S, T-ref and
-       T-ca1 cores padded by the ``decoder`` table, so no decode is needed.
+       T-ca1 cores padded into the mask, so no decode is needed.
     4. T-spk from the spike lines; then all T signatures merge into T cores.
 
     Parameters
@@ -548,7 +547,7 @@ def detect_artifacts(
     )
 
     lfp_cores = pd.concat([s, t_cores(lfp_events)], ignore_index=True)
-    excluded = artifact_intervals(lfp_cores, Consumer.DECODER, span)
+    excluded = artifact_intervals(lfp_cores, span)
     spikes, tetrode, is_ood, spike_counts = spike_ood(
         spike_times, spike_marks, span, excluded
     )

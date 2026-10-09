@@ -58,8 +58,8 @@ from continuum_swr_replay.data_loaders import (
 from continuum_swr_replay.decoding_common import (
     NonLocalDecodingConfig,
     add_common_args,
+    hpc_artifact_intervals,
     hpc_decode_masks,
-    hpc_decoder_intervals,
     provenance_record,
     release_nwb_files,
     require_hpc_decode_sources,
@@ -369,9 +369,9 @@ def run_decode(
 
     An HPC decode reads the SWR source (``swr_source``) and refuses to start
     unless it names both its Kay inventory and its artifact run
-    (``hpc_decoder_intervals``). Its ``decoder`` artifact intervals mask MUA
-    detection (``load_data``) and are its ``is_missing``; its encoding leaves
-    them and every inventory event out (``hpc_decode_masks``, logged as
+    (``hpc_artifact_intervals``). Its artifact mask, the one every stage uses,
+    masks MUA detection (``load_data``) and is its ``is_missing``; its encoding
+    leaves the mask and every inventory event out (``hpc_decode_masks``, logged as
     ``DECODE MASKS`` and stamped into ``results.nc``); and its
     ``data_over_time`` carries the source's ``SWR_event``. An HPC resume
     refuses results whose stamped masks name other runs, or none
@@ -414,18 +414,18 @@ def run_decode(
         logger.info(f"brain_area: {brain_area}")
         logger.info(f"save_dir: {save_dir.resolve()}")
         save_dir.mkdir(parents=True, exist_ok=True)
-        decoder_intervals = None
+        artifact_mask = None
         if brain_area == "HPC":
             # fail closed, before anything is loaded: an HPC decode's masks and
             # SWR labels need the SWR source's inventory and artifact runs
-            decoder_intervals = hpc_decoder_intervals(nwb_file_name, epoch_name)
+            artifact_mask = hpc_artifact_intervals(nwb_file_name, epoch_name)
         logger.info("Loading data...")
         data = load_data(
             nwb_file_name,
             epoch_name,
             ripple_detector_name=ripple_detector_name,
             mua_artifact_intervals=(
-                None if decoder_intervals is None else {"HPC": decoder_intervals}
+                None if artifact_mask is None else {"HPC": artifact_mask}
             ),
         )
 
@@ -451,21 +451,21 @@ def run_decode(
                 training_type=training_type,
                 root=save_dir,
             )
-            if decoder_intervals is not None:
+            if artifact_mask is not None:
                 # the reused results must come from the configured masks
                 require_saved_decode_masks(
                     results.attrs, str(save_dir / f"{epoch_identifier}_results.nc")
                 )
         else:
             is_missing = None
-            if decoder_intervals is None:
+            if artifact_mask is None:
                 is_training = get_training_timepoints(data, training_type=training_type)
             else:
                 masks = hpc_decode_masks(
                     nwb_file_name,
                     epoch_name,
                     data["position_info"],
-                    decoder_intervals,
+                    artifact_mask,
                     training_type,
                 )
                 decode_masks = json.dumps(masks.record, sort_keys=True)

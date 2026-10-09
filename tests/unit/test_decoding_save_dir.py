@@ -99,8 +99,8 @@ DECODE_TIME = np.round(100.0 + np.arange(5000) / 500.0, 6)
 SWR_EVENTS = [(100.5, 100.56), (102.4, 102.6)]
 """Its Kay inventory."""
 ARTIFACT_CORES = [("ca1", 104.0, 104.0)]
-"""Its artifact run's cores: one CA1 step, [103.7, 104.3] for the decoder."""
-DECODER_INTERVAL = (103.7, 104.3)
+"""Its artifact run's cores: one CA1 step, [103.7, 104.3] in the one mask."""
+MASK_INTERVAL = (103.7, 104.3)
 
 
 @dataclass(frozen=True)
@@ -1051,7 +1051,7 @@ def _logged_decode_masks(tmp_path: Path, decoder: Decoder) -> str:
 def test_an_hpc_decode_masks_artifacts_and_leaves_swrs_out_of_encoding(
     decoders, monkeypatch, tmp_path, key
 ):
-    """The decoder mask is ``is_missing``; every Kay event and the mask leave
+    """The artifact mask is ``is_missing``; every Kay event and the mask leave
     encoding; MUA detection gets the mask; the record names both runs."""
     decoder, module = DECODERS[key], decoders.modules[key]
     fresh = _WritesPlaceholders(tmp_path)
@@ -1080,10 +1080,10 @@ def test_an_hpc_decode_masks_artifacts_and_leaves_swrs_out_of_encoding(
     assert failed is None, _log(tmp_path, decoder)
     (load,) = loads
     np.testing.assert_allclose(
-        load["mua_artifact_intervals"]["HPC"].to_numpy(), [DECODER_INTERVAL]
+        load["mua_artifact_intervals"]["HPC"].to_numpy(), [MASK_INTERVAL]
     )
     (bound,) = decodes
-    missing = _on_decode_grid(DECODER_INTERVAL)
+    missing = _on_decode_grid(MASK_INTERVAL)
     np.testing.assert_array_equal(bound.arguments["is_missing"], missing)
     np.testing.assert_array_equal(
         bound.arguments["is_training"], ~_on_decode_grid(*SWR_EVENTS) & ~missing
@@ -1210,16 +1210,15 @@ def test_an_hpc_decodes_swr_labels_are_the_sources(
     )
     assert set(data_over_time["SWR_event"]) == {0, 1, 2}
     assert "n_SWR" not in data_over_time
-    # the step's analysis interval, [103.7, 105.3], is not observed
+    # the step's interval in the one mask, [103.7, 104.3], is not observed,
+    # and nothing after it is
     np.testing.assert_array_equal(
         data_over_time["swr_observed"],
         swr_source.swr_observed_mask(DECODE_TIME, SWR_EPOCH),
     )
-    assert (
-        not data_over_time["swr_observed"]
-        .to_numpy()[_on_decode_grid((103.8, 105.2))]
-        .any()
-    )
+    observed = data_over_time["swr_observed"].to_numpy()
+    assert not observed[_on_decode_grid(MASK_INTERVAL)].any()
+    assert observed[_on_decode_grid((104.31, 105.3))].all()
     assert data_over_time.attrs["swr_source"] == swr_source.swr_source_name()
 
 

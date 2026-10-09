@@ -191,7 +191,7 @@ class TestGetMultiunitHSE:
 
 
 class TestArtifactIntervals:
-    """MUA detection leaves the artifact intervals (the ``decoder`` mask) out of
+    """MUA detection leaves the artifact intervals (the artifact mask) out of
     its normalization and drops the events that overlap them."""
 
     BURSTS_S = (5.0, 10.0)
@@ -201,7 +201,7 @@ class TestArtifactIntervals:
     """Seconds: a spike line, 300 spikes per unit in 50 ms, an artifact."""
 
     ARTIFACT = pd.DataFrame({"start_time": [14.8], "end_time": [15.3]})
-    """The spike line padded, as the ``decoder`` mask pads one."""
+    """The spike line padded, as the artifact mask pads one."""
 
     @pytest.fixture
     def bin_time(self):

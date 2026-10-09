@@ -1456,8 +1456,7 @@ def test_the_run_reads_and_records_the_configured_artifact_run(
 
     assert manifest["settings"]["artifacts"] == {
         "run_id": ARTIFACT_RUN_ID,
-        "consumer": "swr",
-        "padding_s": {"S": [0.0, 0.0], "T_lfp": [0.3, 0.3], "T_spike": [0.1, 0.1]},
+        "padding_s": {"S": 1.0, "T_lfp": 0.3, "T_spike": 0.1},
     }
     record = manifest["epochs"][identifier]
     assert record["status"] == "ok"

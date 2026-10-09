@@ -4,8 +4,8 @@
   spike lines and out-of-distribution marks).
 - ``detect``: the constants and the four rules (S, T-ref, T-ca1, T-spk);
   ``detect_artifacts`` returns an epoch's unpadded cores with their evidence.
-- ``masks``: the one padding table (``CONSUMER_PADDING``) and each consumer's
-  intervals, merged, clipped and closed.
+- ``masks``: the one padding table (``PADDING_S``) and the artifact mask,
+  merged, clipped and closed (``artifact_intervals``).
 - ``io``: the per-epoch cores file and the run manifest.
 
 ``scripts/decoding/run_artifact_detection.py`` runs it per epoch;

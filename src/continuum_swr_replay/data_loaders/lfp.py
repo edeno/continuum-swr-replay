@@ -609,7 +609,7 @@ def get_multiunit_hse(
         Time bins for spike counting in seconds
     artifact_intervals : pd.DataFrame, optional
         Closed ``[start_time, end_time]`` intervals (seconds) whose spikes are
-        not to be trusted, such as the ``decoder`` artifact mask. Their bins
+        not to be trusted, such as the artifact mask. Their bins
         are left out of the detector's normalization (``normalization_mask``)
         and of the z-scored rate's mean and SD, and an event that shares any
         time with one is dropped, the rest renumbered 1..n. The spike counts

@@ -234,8 +234,8 @@ def load_data(
         By brain area, closed ``[start_time, end_time]`` intervals (seconds)
         that multiunit (HSE) detection treats as artifact: left out of its
         normalization, and any HSE overlapping one dropped
-        (``lfp.get_multiunit_hse``). The HPC decoders pass their ``decoder``
-        artifact mask for HPC; by default nothing is masked.
+        (``lfp.get_multiunit_hse``). The HPC decoders pass the artifact mask
+        for HPC; by default nothing is masked.
 
     Returns
     -------

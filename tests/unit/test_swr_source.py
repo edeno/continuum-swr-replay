@@ -81,7 +81,7 @@ EVENTS = [
     (111.000, 111.050),  # 9 past the grid
 ]
 ARTIFACTS = [("spk", 104.11, 104.11), ("spk", 105.14, 105.14)]
-"""Two spike-only cores: padded by 0.1 s (the analysis table), they cover
+"""Two spike-only cores: padded by 0.1 s (``PADDING_S``), they cover
 [104.01, 104.21] and [105.04, 105.24]."""
 ARTIFACT_INTERVALS = [(104.01, 104.21), (105.04, 105.24)]
 
@@ -292,10 +292,10 @@ class TestTheArtifactIntervals:
             f"kay@{RUN_ID}+artifacts@{ARTIFACT_RUN_ID}"
         )
 
-    def test_the_analysis_table_pads_each_kind(self, inventory, tmp_path, monkeypatch):
-        """S by 1 s on each side; an LFP step by 0.3 s before and 1.3 s after
-        (the post-step second); a spike-only line by 0.1 s; merged and clipped
-        to the epoch's span."""
+    def test_the_one_table_pads_each_kind(self, inventory, tmp_path, monkeypatch):
+        """S by 1 s on each side, an LFP step by 0.3 s on each side (no
+        post-step second), a spike-only line by 0.1 s; merged and clipped to
+        the epoch's span."""
         _artifacts(
             tmp_path,
             monkeypatch,
@@ -310,39 +310,13 @@ class TestTheArtifactIntervals:
 
         np.testing.assert_allclose(
             artifact_intervals(EPOCH).to_numpy(),
-            [(99.5, 103.0), (104.2, 105.8), (107.4, 107.6), (109.2, 110.0)],
+            [(99.5, 103.0), (104.2, 104.8), (107.4, 107.6), (109.2, 109.8)],
         )
 
-    def test_each_consumer_pads_the_same_cores_from_its_own_row(
-        self, inventory, tmp_path, monkeypatch
-    ):
-        """The run's one set of cores gives every consumer's mask: the default
-        is the analysis one, and the swr and decoder ones are asked for by
-        name."""
-        _artifacts(
-            tmp_path,
-            monkeypatch,
-            [("S", 100.0, 102.0), ("ca1+ref", 104.5, 104.5), ("spk", 107.5, 107.5)],
-            span=(99.5, 110.0),
-        )
+    def test_there_is_one_mask_and_no_consumer_to_choose(self):
+        import inspect
 
-        by_consumer = {
-            consumer: artifact_intervals(EPOCH, consumer).to_numpy()
-            for consumer in ("swr", "decoder", "analysis")
-        }
-
-        np.testing.assert_allclose(
-            by_consumer["swr"], [(100.0, 102.0), (104.2, 104.8), (107.4, 107.6)]
-        )
-        np.testing.assert_allclose(
-            by_consumer["decoder"], [(99.5, 103.0), (104.2, 104.8), (107.4, 107.6)]
-        )
-        np.testing.assert_allclose(
-            by_consumer["analysis"], [(99.5, 103.0), (104.2, 105.8), (107.4, 107.6)]
-        )
-        np.testing.assert_array_equal(
-            artifact_intervals(EPOCH).to_numpy(), by_consumer["analysis"]
-        )
+        assert list(inspect.signature(artifact_intervals).parameters) == ["epoch_id"]
 
     def test_a_configured_run_without_the_epochs_file_is_refused(
         self, inventory, tmp_path, monkeypatch
@@ -499,7 +473,7 @@ class TestCoverage:
 
     def test_artifact_time_is_not_observed(self, tmp_path, monkeypatch):
         """Artifact time is unobserved: an event there is neither SWR nor
-        non-SWR. The analysis intervals leave the coverage, endpoints
+        non-SWR. The mask's intervals leave the coverage, endpoints
         included, and the stretches say the same as the mask."""
         directory = write_swr_inventory(
             tmp_path / "swr",

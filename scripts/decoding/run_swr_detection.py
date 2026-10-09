@@ -22,10 +22,11 @@ Per epoch:
    channels the four detectors read (today every CA1 band channel). The
    epoch's artifact intervals are the configured artifact run's cores
    (``swr_source.ARTIFACT_INTERVALS_RUN_ID``, read once when the run starts and
-   recorded in its settings) padded for the ``swr`` consumer
-   (``artifacts.masks.CONSUMER_PADDING``). Their time is the ``swr`` mask on
-   the LFP times; with no artifact run configured it is empty. A configured
-   run that cannot serve the epoch fails it.
+   recorded in its settings) padded by the one table every stage uses
+   (``artifacts.masks.PADDING_S``: S by 1 s, a step with an LFP signature by
+   0.3 s, a spike-only line by 0.1 s). Their time is the artifact mask on the
+   LFP times; with no artifact run configured it is empty. A configured run
+   that cannot serve the epoch fails it.
 4. **Zugaro's channel.** ``best_ripple_channel`` (buzcode's
    ``bz_GetBestRippleChan``) chooses one of the band's CA1 electrodes from their
    referenced raw LFP, and ``zero_phase_bandpass`` filters it. A candidate with
@@ -33,7 +34,7 @@ Per epoch:
    samples. If the channel cannot be chosen or filtered (no channel passes the
    dead-channel guard, say), Zugaro's entry is that error.
 5. **Detectors.** ``run_swr_detectors`` runs the four; Kay, Karlsson and Yu read
-   the stored band. Each is given its normalization sample less the ``swr``
+   the stored band. Each is given its normalization sample less the artifact
    mask's time: every sample for Kay, Karlsson and Zugaro, the immobile ones
    for Yu, whose threshold is then estimated on the masked immobile sample.
    Yu's per-channel z-score before the median still pools every valid sample,
@@ -42,7 +43,7 @@ Per epoch:
    ``ok`` when all four succeed, ``partial`` when some do, and ``failed``
    when none does.
 6. **Event filter.** ``filter_detected_events`` drops every detector's events
-   that overlap the ``swr`` mask, counted per detector in the record, and
+   that overlap the artifact mask, counted per detector in the record, and
    renumbers the rest 1..n.
 7. **Yu's diagnostics**, recomputed by ``yu_diagnostics`` on the same noise
    sample: the scalars in the manifest, the histogram arrays in the epoch's
@@ -74,7 +75,7 @@ Each epoch writes, under ``Processed-Data/replay_detection_comparison/swr/<run_i
   gap-free stretch, ``scope`` ``"stored_band"`` (the band Kay, Karlsson and Yu
   read) or ``"zugaro"`` (Zugaro's filtered channel, less its filter's edges),
   with ``start_s`` and ``end_s``, the stretch's first and last sample. The
-  ``swr`` mask's time is not observed in either scope;
+  artifact mask's time is not observed in either scope;
 - ``{epoch_id}_kay_version_check.parquet``: ``kay_version_check``'s rows, with a
   ``comparison`` column, ``"version_only"`` or ``"version_and_inputs"``;
 - ``{epoch_id}_yu_diagnostics.json``: every field of Yu's threshold
@@ -145,8 +146,7 @@ from ripple_detection import Kay_ripple_detector
 from continuum_swr_replay.analysis.hippocampus import swr_source
 from continuum_swr_replay.analysis.hippocampus.artifacts.io import read_epoch_cores
 from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
-    CONSUMER_PADDING,
-    Consumer,
+    PADDING_S,
     artifact_intervals,
     interval_mask,
     masked_seconds,
@@ -319,7 +319,7 @@ def observation_table(
     zugaro_lfp : NDArray, shape (n_time, 1)
         Zugaro's filtered channel, NaN where unobserved, scope ``"zugaro"``.
     unobserved : NDArray of bool, shape (n_time,)
-        Rows neither scope observed, such as the ``swr`` artifact mask: they
+        Rows neither scope observed, such as the artifact mask: they
         end a stretch as a non-finite row does.
 
     Returns
@@ -486,11 +486,13 @@ def detection_channels(inputs: RippleBandInputs) -> NDArray[np.bool_]:
     return np.ones(np.asarray(inputs["electrode_ids"]).size, dtype=bool)
 
 
-def swr_artifact_intervals(artifact_dir: Path | None, identifier: str) -> pd.DataFrame:
-    """The epoch's ``swr`` artifact intervals, from an artifact run folder.
+def epoch_artifact_intervals(
+    artifact_dir: Path | None, identifier: str
+) -> pd.DataFrame:
+    """The epoch's artifact mask, from an artifact run folder.
 
-    The run's cores for the epoch padded by the ``swr`` row of
-    ``CONSUMER_PADDING``, merged and clipped to the run's span, closed.
+    The run's cores for the epoch padded by ``PADDING_S``, merged and clipped to
+    the run's span, closed: the mask every stage uses.
 
     Parameters
     ----------
@@ -513,16 +515,16 @@ def swr_artifact_intervals(artifact_dir: Path | None, identifier: str) -> pd.Dat
     if artifact_dir is None:
         return pd.DataFrame({"start_time": [], "end_time": []}, dtype=np.float64)
     epoch = read_epoch_cores(artifact_dir, identifier)
-    return artifact_intervals(epoch.cores, Consumer.SWR, epoch.span)
+    return artifact_intervals(epoch.cores, epoch.span)
 
 
 def filter_detected_events(
-    results: Mapping[str, pd.DataFrame | Exception], swr_intervals: pd.DataFrame
+    results: Mapping[str, pd.DataFrame | Exception], artifact_mask: pd.DataFrame
 ) -> tuple[dict[str, pd.DataFrame | Exception], dict[str, int | None]]:
     """Every detector's events after the post-detection filter.
 
     The one place detected events are vetoed. Today the filter drops each
-    event that overlaps the ``swr`` artifact intervals
+    event that overlaps the artifact intervals
     (``drop_overlapping_events``: closed, touching included) and renumbers
     the rest 1..n. A detector's error passes through.
 
@@ -530,7 +532,7 @@ def filter_detected_events(
     ----------
     results : Mapping
         ``run_swr_detectors``' results, by detector.
-    swr_intervals : pd.DataFrame
+    artifact_mask : pd.DataFrame
         ``start_time`` and ``end_time`` in seconds.
 
     Returns
@@ -545,7 +547,7 @@ def filter_detected_events(
     for name, events in results.items():
         if isinstance(events, pd.DataFrame):
             filtered[name], n_dropped[name] = drop_overlapping_events(
-                events, swr_intervals
+                events, artifact_mask
             )
         else:
             filtered[name], n_dropped[name] = events, None
@@ -587,7 +589,7 @@ def _detect(
     tables by name, and the Yu sidecar's content."""
     # before any input is read: a configured artifact run that cannot serve
     # the epoch fails it
-    swr_intervals = swr_artifact_intervals(
+    artifact_mask = epoch_artifact_intervals(
         artifact_dir, epoch_id(nwb_file_name, epoch_name)
     )
     inputs = fetch_inputs(nwb_file_name, epoch_name)
@@ -632,7 +634,7 @@ def _detect(
         electrode_group_names = electrode_group_names[channels]
     speed = np.interp(time, position_time, head_speed, left=np.nan, right=np.nan)
     sampling_frequency = inputs["sampling_frequency"]
-    unobserved = interval_mask(time, swr_intervals)
+    unobserved = interval_mask(time, artifact_mask)
 
     zugaro_channel, zugaro_lfp, channel_error = choose_zugaro_channel(
         raw_referenced, time, sampling_frequency, electrode_ids
@@ -651,7 +653,7 @@ def _detect(
         if isinstance(zugaro_events, pd.DataFrame)
         else None
     )
-    results, n_dropped = filter_detected_events(results, swr_intervals)
+    results, n_dropped = filter_detected_events(results, artifact_mask)
     succeeded = [
         name for name, events in results.items() if isinstance(events, pd.DataFrame)
     ]
@@ -702,9 +704,9 @@ def _detect(
         "zugaro_dropped_over_150ms": zugaro_dropped,
         "artifacts": {
             "run_id": None if artifact_dir is None else artifact_dir.name,
-            "n_intervals": len(swr_intervals),
+            "n_intervals": len(artifact_mask),
             # the masked time within the LFP rows read
-            "masked_s": masked_seconds(swr_intervals.clip(time[0], time[-1])),
+            "masked_s": masked_seconds(artifact_mask.clip(time[0], time[-1])),
             "n_dropped": n_dropped,
         },
         # the distinct electrode groups (tetrodes) of the detecting electrodes;
@@ -913,8 +915,8 @@ def run_epoch(
     run_id : str, optional
         Recorded on the Kay check's events; default ``output_dir.name``.
     artifact_dir : Path, optional
-        The artifact run folder whose cores, padded for the ``swr`` consumer,
-        are the epoch's artifact mask; None masks nothing. ``run`` passes the
+        The artifact run folder whose cores, padded by ``PADDING_S``, are the
+        epoch's artifact mask; None masks nothing. ``run`` passes the
         SWR source's configured run.
 
     Returns
@@ -1101,15 +1103,14 @@ def run_settings(provenance: dict, artifact_run_id: str | None) -> dict:
     provenance : dict
         ``provenance_record``'s, for the ``ripple_detection`` commit.
     artifact_run_id : str or None
-        The artifact run whose ``swr`` mask every epoch gets; None for none.
+        The artifact run whose mask every epoch gets; None for none.
     """
     settings: dict = json_ready(
         {
             "ripple_detection_commit": provenance["ripple_detection_commit"],
             "artifacts": {
                 "run_id": artifact_run_id,
-                "consumer": Consumer.SWR.value,
-                "padding_s": CONSUMER_PADDING[Consumer.SWR],
+                "padding_s": PADDING_S,
             },
             "detectors": DETECTOR_SETTINGS,
             "zugaro": {

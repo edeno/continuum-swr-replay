@@ -1,9 +1,10 @@
-"""The artifact masks: one padding table, closed intervals, merged and clipped.
+"""The artifact mask: one padding table, closed intervals, merged and clipped.
 
-The detector stores unpadded cores; each consumer pads them from
-``CONSUMER_PADDING``. These pin the table's values (detector_report.md §5.1 and
-the Phase C rulings), the merging and clipping, and the closed-interval
-convention of ``interval_mask``. Offline.
+The detector stores unpadded cores; one table, ``PADDING_S``, pads them into
+the mask every stage uses. These pin the table's values (the lead's simplified
+design: S ±1 s, a step with an LFP signature ±0.3 s, a spike-only line
+±0.1 s), the merging and clipping, and the closed-interval convention of
+``interval_mask``. Offline.
 """
 
 from __future__ import annotations
@@ -13,8 +14,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
-    CONSUMER_PADDING,
-    Consumer,
+    PADDING_S,
     artifact_intervals,
     core_class,
     interval_mask,
@@ -43,33 +43,12 @@ def _pairs(intervals: pd.DataFrame) -> list[tuple[float, float]]:
 
 
 class TestThePaddingTable:
-    def test_the_values_are_the_rulings(self):
-        assert CONSUMER_PADDING == {
-            Consumer.SWR: {"S": (0.0, 0.0), "T_lfp": (0.3, 0.3), "T_spike": (0.1, 0.1)},
-            Consumer.DECODER: {
-                "S": (1.0, 1.0),
-                "T_lfp": (0.3, 0.3),
-                "T_spike": (0.1, 0.1),
-            },
-            Consumer.ANALYSIS: {
-                "S": (1.0, 1.0),
-                "T_lfp": (0.3, 1.3),
-                "T_spike": (0.1, 0.1),
-            },
-        }
+    def test_the_values_are_the_leads_design(self):
+        assert PADDING_S == {"S": 1.0, "T_lfp": 0.3, "T_spike": 0.1}
 
     def test_the_table_cannot_be_changed_in_place(self):
         with pytest.raises(TypeError):
-            CONSUMER_PADDING[Consumer.SWR] = {}  # type: ignore[index]
-        with pytest.raises(TypeError):
-            CONSUMER_PADDING[Consumer.SWR]["S"] = (5.0, 5.0)  # type: ignore[index]
-
-    def test_analysis_is_decoder_plus_one_second_after_each_lfp_step(self):
-        decoder = CONSUMER_PADDING[Consumer.DECODER]
-        analysis = CONSUMER_PADDING[Consumer.ANALYSIS]
-        assert analysis["S"] == decoder["S"]
-        assert analysis["T_spike"] == decoder["T_spike"]
-        assert analysis["T_lfp"] == (decoder["T_lfp"][0], decoder["T_lfp"][1] + 1.0)
+            PADDING_S["S"] = 0.0  # type: ignore[index]
 
     @pytest.mark.parametrize(
         ("signatures", "expected"),
@@ -92,7 +71,7 @@ class TestThePaddingTable:
             core_class(_cores([("emg", 150.0, 150.0)]))
 
 
-class TestEachConsumersIntervals:
+class TestTheMaskIntervals:
     CORES = [
         ("S", 110.0, 115.0),  # S block
         ("ref", 130.0, 130.01),  # LFP step
@@ -102,61 +81,29 @@ class TestEachConsumersIntervals:
         ("ref", 199.9, 199.9),  # a step near the span's end
     ]
 
-    def test_swr(self):
-        intervals = artifact_intervals(_cores(self.CORES), Consumer.SWR, SPAN)
+    def test_each_row_pads_both_sides(self):
+        intervals = artifact_intervals(_cores(self.CORES), SPAN)
 
         assert _pairs(intervals) == pytest.approx(
             [
                 (100.0, 100.42),  # clipped at the span's start
-                (110.0, 115.0),  # S unpadded
-                (129.7, 130.31),
-                (139.9, 140.25),  # the two lines merge once padded
+                (109.0, 116.0),  # S padded by 1 s
+                (129.7, 130.31),  # an LFP step by 0.3 s, after it too
+                (139.9, 140.25),  # spike-only by 0.1 s: the two lines merge
                 (199.6, 200.0),  # clipped at the span's end
             ]
         )
 
-    def test_decoder(self):
-        intervals = artifact_intervals(_cores(self.CORES), Consumer.DECODER, SPAN)
+    def test_there_is_no_post_step_second(self):
+        intervals = artifact_intervals(_cores([("ca1+ref", 150.0, 150.0)]), SPAN)
 
-        assert _pairs(intervals) == pytest.approx(
-            [
-                (100.0, 100.42),
-                (109.0, 116.0),  # S padded by 1 s
-                (129.7, 130.31),
-                (139.9, 140.25),
-                (199.6, 200.0),
-            ]
-        )
-
-    def test_analysis(self):
-        intervals = artifact_intervals(_cores(self.CORES), Consumer.ANALYSIS, SPAN)
-
-        assert _pairs(intervals) == pytest.approx(
-            [
-                (100.0, 101.42),  # 1.3 s after an LFP step
-                (109.0, 116.0),
-                (129.7, 131.31),
-                (139.9, 140.25),  # spike-only: no extra second
-                (199.6, 200.0),
-            ]
-        )
-
-    def test_a_consumer_is_named_by_its_string_too(self):
-        cores = _cores(self.CORES)
-        pd.testing.assert_frame_equal(
-            artifact_intervals(cores, "analysis", SPAN),
-            artifact_intervals(cores, Consumer.ANALYSIS, SPAN),
-        )
-
-    def test_an_unknown_consumer_is_refused(self):
-        with pytest.raises(ValueError, match="widloski"):
-            artifact_intervals(_cores(self.CORES), "widloski", SPAN)
+        assert _pairs(intervals) == pytest.approx([(149.7, 150.3)])
 
     def test_touching_intervals_merge(self):
         # closed intervals: [149, 156] and [156, 161] share 156
         cores = _cores([("S", 150.0, 155.0), ("S", 157.0, 160.0)])
 
-        intervals = artifact_intervals(cores, Consumer.DECODER, SPAN)
+        intervals = artifact_intervals(cores, SPAN)
 
         assert _pairs(intervals) == [(149.0, 161.0)]
 
@@ -165,31 +112,31 @@ class TestEachConsumersIntervals:
             [("S", 150.0, 160.0), ("ref", 155.0, 155.0), ("S", 159.0, 170.0)]
         )
 
-        intervals = artifact_intervals(cores, Consumer.SWR, SPAN)
+        intervals = artifact_intervals(cores, SPAN)
 
-        assert _pairs(intervals) == [(150.0, 170.0)]
+        assert _pairs(intervals) == [(149.0, 171.0)]
 
     def test_intervals_are_in_time_order_whatever_the_cores_order(self):
         cores = _cores(self.CORES)
         shuffled = cores.iloc[::-1].reset_index(drop=True)
 
         pd.testing.assert_frame_equal(
-            artifact_intervals(shuffled, Consumer.DECODER, SPAN),
-            artifact_intervals(cores, Consumer.DECODER, SPAN),
+            artifact_intervals(shuffled, SPAN),
+            artifact_intervals(cores, SPAN),
         )
 
     def test_no_cores_give_no_intervals(self):
-        intervals = artifact_intervals(_cores([]), Consumer.ANALYSIS, SPAN)
+        intervals = artifact_intervals(_cores([]), SPAN)
 
         assert list(intervals.columns) == ["start_time", "end_time"]
         assert intervals.empty
         assert intervals.dtypes.tolist() == [np.float64, np.float64]
 
     def test_masked_seconds_is_the_merged_length(self):
-        intervals = artifact_intervals(_cores(self.CORES), Consumer.SWR, SPAN)
+        intervals = artifact_intervals(_cores(self.CORES), SPAN)
 
         assert masked_seconds(intervals) == pytest.approx(
-            0.42 + 5.0 + 0.61 + 0.35 + 0.4
+            0.42 + 7.0 + 0.61 + 0.35 + 0.4
         )
 
 

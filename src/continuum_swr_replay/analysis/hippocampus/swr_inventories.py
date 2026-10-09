@@ -629,8 +629,7 @@ def normalization_sample(
     speed : NDArray, shape (n_time,)
         Head speed in cm/s.
     unobserved : NDArray of bool, shape (n_time,)
-        True where the LFP is not to be trusted, such as the ``swr`` artifact
-        mask.
+        True where the LFP is not to be trusted, such as the artifact mask.
 
     Returns
     -------
@@ -713,7 +712,7 @@ def run_swr_detectors(
         The nominal rate in Hz, passed to every detector.
     unobserved : NDArray of bool, shape (n_time,), optional
         Samples left out of every detector's normalization sample, such as the
-        ``swr`` artifact mask: each detector gets ``normalization_sample``'s
+        artifact mask: each detector gets ``normalization_sample``'s
         mask (Yu's per-channel z-score before the median still pools every
         valid sample, a package behaviour; its threshold uses the masked
         immobile sample). The LFP itself is not changed, so the filters and envelopes

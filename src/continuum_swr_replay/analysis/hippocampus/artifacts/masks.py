@@ -1,14 +1,11 @@
-"""Each consumer's artifact intervals, padded from one table.
+"""The artifact mask: the detector's cores, padded from one table.
 
-The detector stores unpadded cores (``detect.detect_artifacts``). Each consumer
-pads them from :data:`CONSUMER_PADDING` and nothing else, so one set of cores
-gives every mask in the project:
-
-- ``swr``: the SWR detectors' normalization and event dropping (they read
-  the LFP);
-- ``decoder``: the decoders' ``is_missing``, the encoding exclusion and MUA
-  detection (they read spikes);
-- ``analysis``: event eligibility and rate exposure, everything downstream.
+The detector stores unpadded cores (``detect.detect_artifacts``). One table,
+:data:`PADDING_S`, pads them, and :func:`artifact_intervals` gives the one mask
+every part of the project uses: the SWR detectors' normalization and event
+drops, MUA detection, the decoders (``is_missing`` and the encoding
+exclusion), the Widloski runner and every analysis. Artifact time is
+unobserved there.
 
 Intervals are closed, ``[start_time, end_time]`` in seconds, the project's
 convention: a time on an endpoint is masked. Design note:
@@ -18,7 +15,6 @@ convention: a time on an endpoint is masked. Design note:
 from __future__ import annotations
 
 from collections.abc import Mapping
-from enum import StrEnum
 from types import MappingProxyType
 
 import numpy as np
@@ -26,8 +22,7 @@ import pandas as pd
 from numpy.typing import NDArray
 
 __all__ = [
-    "CONSUMER_PADDING",
-    "Consumer",
+    "PADDING_S",
     "artifact_intervals",
     "core_class",
     "interval_mask",
@@ -44,55 +39,27 @@ SPIKE_SIGNATURES = frozenset({"spk"})
 """T signatures read from spikes alone: a spike line."""
 S_SIGNATURE = "S"
 
-
-class Consumer(StrEnum):
-    """Who reads a mask, which sets its padding."""
-
-    SWR = "swr"
-    """SWR detectors (Kay, Karlsson, Yu, Zugaro): normalization and event
-    dropping. They read the LFP."""
-    DECODER = "decoder"
-    """Decoders (``is_missing``, encoding exclusion) and MUA detection. They read
-    spikes."""
-    ANALYSIS = "analysis"
-    """Event eligibility for every cohort, and rate exposure."""
-
-
-def _frozen(table: Mapping[Consumer, Mapping[str, tuple[float, float]]]) -> Mapping:
-    return MappingProxyType(
-        {key: MappingProxyType(dict(row)) for key, row in table.items()}
-    )
-
-
-CONSUMER_PADDING: Mapping[Consumer, Mapping[str, tuple[float, float]]] = _frozen(
+PADDING_S: Mapping[str, float] = MappingProxyType(
     {
-        # S 0 s: with gap fill, 0 / 0.5 / 1 s give identical SD / robust SD in all
-        # 11 S epochs, and 0.5 s already masks a visual SWR (detector_report.md
-        # §5.1 s_pad). T ±0.3 s: consensus ringing, 99th pct 191 ms, max 335 ms;
-        # FIR half-length 0.267 s (§5.1 t_pad_lfp). Spike-only ±0.1 s: 99.3 % of
-        # excess OOD spikes within ±100 ms (§5.1 t_pad_spk).
-        Consumer.SWR: {"S": (0.0, 0.0), "T_lfp": (0.3, 0.3), "T_spike": (0.1, 0.1)},
-        # S ±1 s: noise spikes on the affected tetrodes leak up to 1 s past some
-        # block edges (§5.1 s_pad decoder, validation/S_edge_spike_rates.csv).
-        # T ±0.3 s: the post-step OOD discharge tail reaches +269 ms (§2.3, §6.3).
-        Consumer.DECODER: {
-            "S": (1.0, 1.0),
-            "T_lfp": (0.3, 0.3),
-            "T_spike": (0.1, 0.1),
-        },
-        # The decoder mask plus the 1 s after each LFP step: ripple-band power
-        # stays below its random-time level for at least 1 s after a step (§8
-        # item 4; Phase C ruling "post-step second").
-        Consumer.ANALYSIS: {
-            "S": (1.0, 1.0),
-            "T_lfp": (0.3, 1.3),
-            "T_spike": (0.1, 0.1),
-        },
+        # Noise spikes on the affected tetrodes leak up to 1 s past some block
+        # edges (detector_report.md §5.1 s_pad, validation/S_edge_spike_rates.csv).
+        "S": 1.0,
+        # The stored ripple FIR rings after a step: its half-length is 0.267 s,
+        # and the ringing above 2 robust z around 425 cores has its 99th
+        # percentile at 316 ms; 0.3 s covers 96.8-100 % of held-out cores
+        # (followup/justification_report.md §1, c2_padding_heldout.csv). The
+        # burst of out-of-distribution spikes after a step reaches +269 ms
+        # (detector_report.md §2.3).
+        "T_lfp": 0.3,
+        # 98.8 % of the out-of-distribution marks after a spike line lie within
+        # 100 ms (99th percentile 53 ms; justification_report.md §1).
+        "T_spike": 0.1,
     }
 )
-"""Seconds of padding ``(before, after)`` a core gets, by consumer and by its
-row: ``S``, ``T_lfp`` (a T core with an LFP signature, ``ref`` or ``ca1``) and
-``T_spike`` (a T core with the spike-line signature alone)."""
+"""Seconds of padding on each side of a core, by its row: ``S``, ``T_lfp`` (a T
+core with an LFP signature, ``ref`` or ``ca1``) and ``T_spike`` (a T core with
+the spike-line signature alone). No padding follows a step beyond 0.3 s: R8
+reruns the headline results with 1 s masked after each step instead."""
 
 
 def core_class(cores: pd.DataFrame) -> NDArray[np.str_]:
@@ -164,18 +131,15 @@ def _as_frame(intervals: NDArray[np.float64]) -> pd.DataFrame:
     )
 
 
-def artifact_intervals(
-    cores: pd.DataFrame, consumer: Consumer | str, span: tuple[float, float]
-) -> pd.DataFrame:
-    """One consumer's artifact intervals: padded cores, merged and clipped.
+def artifact_intervals(cores: pd.DataFrame, span: tuple[float, float]) -> pd.DataFrame:
+    """The artifact mask: the cores padded by :data:`PADDING_S`, merged and
+    clipped.
 
     Parameters
     ----------
     cores : pd.DataFrame
         One epoch's cores, with ``signatures``, ``core_start`` and ``core_end``
         (seconds), as ``detect_artifacts`` returns them.
-    consumer : Consumer or str
-        ``"swr"``, ``"decoder"`` or ``"analysis"``.
     span : tuple of float
         The epoch's first and last observed time (seconds); the intervals are
         clipped to it.
@@ -189,23 +153,11 @@ def artifact_intervals(
     Raises
     ------
     ValueError
-        If `consumer` is not in :data:`CONSUMER_PADDING`, or a core's signature
-        has no row in it.
+        If a core's signature has no row in :data:`PADDING_S`.
     """
-    try:
-        padding = CONSUMER_PADDING[Consumer(consumer)]
-    except ValueError:
-        raise ValueError(
-            f"unknown artifact consumer {consumer!r}; one of "
-            f"{[c.value for c in Consumer]}"
-        ) from None
-    rows = core_class(cores)
-    before = np.array([padding[row][0] for row in rows], dtype=np.float64)
-    after = np.array([padding[row][1] for row in rows], dtype=np.float64)
-    starts = np.maximum(
-        cores["core_start"].to_numpy(dtype=np.float64) - before, span[0]
-    )
-    ends = np.minimum(cores["core_end"].to_numpy(dtype=np.float64) + after, span[1])
+    pad = np.array([PADDING_S[row] for row in core_class(cores)], dtype=np.float64)
+    starts = np.maximum(cores["core_start"].to_numpy(dtype=np.float64) - pad, span[0])
+    ends = np.minimum(cores["core_end"].to_numpy(dtype=np.float64) + pad, span[1])
     inside = starts <= ends
     return _as_frame(merge_intervals(starts[inside], ends[inside]))
 
