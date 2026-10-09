@@ -33,10 +33,14 @@ Per epoch:
    samples. If the channel cannot be chosen or filtered (no channel passes the
    dead-channel guard, say), Zugaro's entry is that error.
 5. **Detectors.** ``run_swr_detectors`` runs the four; Kay, Karlsson and Yu read
-   the stored band. All four leave the ``swr`` mask's time out of their
-   normalization, and the LFP is not NaN-filled. A detector's error is
-   recorded and the rest still report: the epoch is ``ok`` when all four
-   succeed, ``partial`` when some do, and ``failed`` when none does.
+   the stored band. Each is given its normalization sample less the ``swr``
+   mask's time: every sample for Kay, Karlsson and Zugaro, the immobile ones
+   for Yu, whose threshold is then estimated on the masked immobile sample.
+   Yu's per-channel z-score before the median still pools every valid sample,
+   masked or not, as the package does. The LFP is not NaN-filled. A
+   detector's error is recorded and the rest still report: the epoch is
+   ``ok`` when all four succeed, ``partial`` when some do, and ``failed``
+   when none does.
 6. **Event filter.** ``filter_detected_events`` drops every detector's events
    that overlap the ``swr`` mask, counted per detector in the record, and
    renumbers the rest 1..n.
@@ -783,7 +787,10 @@ def _detect(
             else ["settings"]
             if settings_mismatch
             else []
-        ),
+        )
+        # the direct Kay is normalized and filtered with the swr mask; the
+        # canonical events are not
+        + ([] if artifact_dir is None else ["artifact mask"]),
     }
     record["kay_version_check"] = {
         "spyglass_parameters": spyglass_parameters,

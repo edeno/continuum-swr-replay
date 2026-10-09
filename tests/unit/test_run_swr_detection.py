@@ -1099,6 +1099,15 @@ def test_one_artifact_mask_for_all_four_detectors(tmp_path, monkeypatch):
     artifacts = record["artifacts"]
     assert artifacts["run_id"] == ARTIFACT_RUN_ID
     assert artifacts["n_intervals"] == 1
+    # the masked, filtered Kay is compared with the unmasked canonical events
+    assert record["kay_version_check"]["differences"] == {
+        "version_only": ["package version"],
+        "version_and_inputs": ["package version", "inputs", "artifact mask"],
+    }
+    assert unmasked["kay_version_check"]["differences"]["version_and_inputs"] == [
+        "package version",
+        "inputs",
+    ]
     assert artifacts["masked_s"] == pytest.approx(0.6)
     paths = _outputs(output_dir, identifier)
     for name in DETECTORS:
