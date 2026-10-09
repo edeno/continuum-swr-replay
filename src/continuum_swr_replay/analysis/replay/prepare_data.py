@@ -39,6 +39,9 @@ except ImportError:  # pragma: no cover - datajoint always present in practice
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     validate_dot_event_contract,
 )
+from continuum_swr_replay.analysis.hippocampus.swr_source import (
+    read_dot_with_swr_source,
+)
 from continuum_swr_replay.analysis.replay._tables_common import (
     EVENT_ARM_STANDARDIZED_COLS,
 )
@@ -387,7 +390,8 @@ def _process_session(
             "retrospective metrics, all posterior_* columns NaN)."
         )
 
-    dot = pd.read_pickle(session["dot_file"])
+    # SWR labels come from the one SWR source, not the decode's stored ripples.
+    dot = read_dot_with_swr_source(session["dot_file"])
     # Fail closed on input-contract violations (multi-session frame, unsorted
     # time, non-contiguous event labels) before they silently corrupt the tables.
     validate_dot_event_contract(dot)
@@ -643,7 +647,7 @@ def build_stop_table_scope(
     failures: list[dict[str, str]] = []
     for index, session in enumerate(sessions, start=1):
         try:
-            dot = pd.read_pickle(session["dot_file"])
+            dot = read_dot_with_swr_source(session["dot_file"])
             validate_dot_event_contract(dot)
             trials, experiences, graph, hit_cache = load_behavioral_context(
                 session, from_cache=from_cache

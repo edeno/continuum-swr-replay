@@ -44,9 +44,10 @@ def test_content_occupancy_propagates_event_contract_error(monkeypatch):
 
 
 def test_content_occupancy_validates_dot_before_environment_load(monkeypatch):
+    # The frame as the SWR source hands it over (stubbed: no inventory here).
     monkeypatch.setattr(
-        analyze_content_occupancy.pd,
-        "read_pickle",
+        analyze_content_occupancy,
+        "read_dot_with_swr_source",
         lambda _path: _noncontiguous_dot(),
     )
     monkeypatch.setattr(
@@ -88,9 +89,10 @@ def test_spike_evidence_main_propagates_event_contract_error(
 
 
 def test_spike_evidence_validates_dot_before_encoding_load(monkeypatch, tmp_path):
+    # The frame as the SWR source hands it over (stubbed: no inventory here).
     monkeypatch.setattr(
-        analyze_event_spike_evidence.pd,
-        "read_pickle",
+        analyze_event_spike_evidence,
+        "read_dot_with_swr_source",
         lambda _path: _noncontiguous_dot(),
     )
     monkeypatch.setattr(

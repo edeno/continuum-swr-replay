@@ -82,6 +82,12 @@ Loading and managing saved decoding results.
 
 `load_results`
 
+### `src/continuum_swr_replay/analysis/hippocampus/swr_source.py`
+
+The paper's one SWR source: the direct ripple_detection 2.0 Kay inventory.
+
+`DropReason`, `SwrSourceError`, `swr_inventory_dir`, `swr_source_name`, `swr_epoch_id`, `swr_source_files`, `read_swr_inventory`, `swr_observed_stretches`, `swr_observed_mask`, `swr_events`, `swr_event_labels`, `with_swr_source`, `read_dot_with_swr_source`
+
 ### `src/continuum_swr_replay/analysis/hippocampus/triggered_analysis.py`
 
 Event-triggered analysis utilities for extracting signal windows around events.

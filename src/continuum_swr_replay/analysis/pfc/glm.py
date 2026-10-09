@@ -1671,8 +1671,10 @@ def build_session_event_sets(
 
     Both populations are canonical and are read, not re-detected here: the
     non-local events are rows of the shipped event table and the SWR intervals
-    are its speed-gated ``SWR_event`` labels, both loaded by
-    :mod:`continuum_swr_replay.analysis.pfc.canonical_events`. The SWR split is
+    are the SWR source's speed-gated ``SWR_event`` labels (the direct Kay
+    inventory, :mod:`continuum_swr_replay.analysis.hippocampus.swr_source`), both
+    loaded by :mod:`continuum_swr_replay.analysis.pfc.canonical_events`. The SWR
+    split is
     the event table's own ``is_swr`` column -- strict positive-duration overlap
     with those same labels -- so a Figure 4 event and a content- or rate-family
     event with the same ``event_id`` are the same event, classified the same
@@ -2578,8 +2580,9 @@ def run_session(
         ``n_bins_fit``), the event counts before and after the restriction, and
         the canonical-event provenance (``is_swr_definition``,
         ``immobility_inequality``, ``canonical_event_table_path`` /
-        ``_sha256``, ``swr_interval_source``, ``data_over_time_path`` /
-        ``_sha256``), plus the matched non-event control's draw
+        ``_sha256``, ``swr_interval_source``, ``swr_events_path`` /
+        ``_sha256``, ``data_over_time_path`` / ``_sha256``), plus the matched
+        non-event control's draw
         (``matched_control_seed``, ``n_matched_control``,
         ``n_matched_control_unplaced`` and the two causes that total,
         ``n_matched_control_onset_outside_fitted_bout`` and
@@ -2606,7 +2609,7 @@ def run_session(
     Non-local events and their SWR classification are the canonical ones: the
     rows of ``Processed-Data/replay_content/event_table.parquet`` for this
     session, and that table's ``is_swr`` column (strict positive-duration
-    overlap with the speed-gated ``SWR_event`` labels). Figure 4 therefore
+    overlap with the SWR source's speed-gated ``SWR_event`` labels). Figure 4 therefore
     describes the same ``event_id``s as the content and rate families.
 
     The matched non-event control is drawn here rather than by the caller so
@@ -2628,6 +2631,7 @@ def run_session(
         load_session_canonical_events,
         load_session_swr_intervals,
         session_data_over_time_path,
+        session_swr_events_file,
     )
     from continuum_swr_replay.data_loaders import load_data
 
@@ -2723,6 +2727,7 @@ def run_session(
         non_local_threshold=non_local_threshold,
         speed_threshold=immobility_threshold,
     )
+    swr_events_file = session_swr_events_file(nwb_file_name, epoch_name)
     event_provenance = canonical_event_provenance(
         event_table_path=DEFAULT_EVENT_TABLE_PATH,
         event_table_sha256=event_table_sha256,
@@ -2730,6 +2735,8 @@ def run_session(
             nwb_file_name, epoch_name, non_local_threshold=non_local_threshold
         ),
         data_over_time_sha256=dot_sha256,
+        swr_events_path=swr_events_file["path"],
+        swr_events_sha256=swr_events_file["sha256"],
     )
 
     event_times, event_counts = build_session_event_sets(

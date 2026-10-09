@@ -30,6 +30,7 @@ from ...types import SessionData
 from ..hippocampus.event_detection import get_overlap_times
 from ..hippocampus.event_immobility import build_speed_eligible_event_cohort
 from ..hippocampus.posterior_analysis import get_map_step_distance, get_posterior_stats
+from ..hippocampus.swr_source import read_dot_with_swr_source
 from .posterior_analysis import get_contfrag_posterior
 
 
@@ -199,7 +200,9 @@ def load_contfrag_data_over_time(data_dir: Path) -> pd.DataFrame:
     """Load and concatenate the analysed epochs' ContFrag processed data.
 
     The epochs are the epoch register's analysed ones
-    (``epoch_register.analysed_decode_files``), never a glob of `data_dir`.
+    (``epoch_register.analysed_decode_files``), never a glob of `data_dir`. Each
+    is read through the SWR source (``swr_source.read_dot_with_swr_source``):
+    ``SWR_event`` is the direct Kay inventory's labels.
 
     Parameters
     ----------
@@ -209,16 +212,19 @@ def load_contfrag_data_over_time(data_dir: Path) -> pd.DataFrame:
     Returns
     -------
     pd.DataFrame
-        Concatenated data with derived distance column.
+        Concatenated data with derived distance column, and the source's
+        ``SWR_event`` and ``swr_observed``.
 
     Raises
     ------
     FileNotFoundError
         If an analysed epoch's file is not in `data_dir`.
+    SwrSourceError
+        If the SWR source cannot serve an analysed epoch.
     """
     files = analysed_decode_files(
         data_dir, "_contfrag_data_over_time.pkl", require_all=True
     )
-    data_over_time = pd.concat([pd.read_pickle(p) for p in files])
+    data_over_time = pd.concat([read_dot_with_swr_source(p) for p in files])
     data_over_time["distance"] = np.abs(data_over_time["ahead_behind_distance"])
     return data_over_time

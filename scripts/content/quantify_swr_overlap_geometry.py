@@ -2,7 +2,9 @@
 
 Runs ``classify_swr_overlap_geometry`` over one or more sessions and prints
 a table of sub-case counts. Useful for Methods-section numbers and for
-auditing what the coarse three-way split aggregates over.
+auditing what the coarse three-way split aggregates over. The SWRs are the
+paper's SWR source (``analysis/hippocampus/swr_source.py``: the direct Kay
+inventory), on the decode grid.
 
 Usage:
     uv run python scripts/content/quantify_swr_overlap_geometry.py
@@ -33,6 +35,11 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
 )
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     build_speed_eligible_event_cohort,
+    intervals_from_labels,
+)
+from continuum_swr_replay.analysis.hippocampus.swr_source import (
+    swr_epoch_id,
+    swr_event_labels,
 )
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
@@ -103,12 +110,12 @@ def quantify_session(
         speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     )
     nl_events = nl_events.reset_index(drop=True)
-    swr_events, _ = build_speed_eligible_event_cohort(
-        data["ripple_times"],
-        speed=speed,
-        time=position_time,
-        event_col="SWR_event",
-        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    # The paper's SWRs: the SWR source's labels on this grid, as sampled bounds.
+    swr_labels = swr_event_labels(
+        position_time, swr_epoch_id(nwb_file_name, epoch_name), speed=speed
+    )
+    swr_events = intervals_from_labels(
+        pd.DataFrame({"SWR_event": swr_labels}, index=position_time), "SWR_event"
     )
     logger.info(f"  {len(nl_events)} immobile non-local events detected")
     logger.info(f"  {len(swr_events)} whole-event-immobile SWR events")

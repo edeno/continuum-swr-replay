@@ -24,6 +24,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.hippocampus.swr_source import (
+    read_dot_with_swr_source,
+)
 from continuum_swr_replay.analysis.replay.prepare_data import find_sessions
 from continuum_swr_replay.analysis.replay.timebin_tables import (  # noqa: E402
     build_event_onset_table,
@@ -43,7 +46,8 @@ RC = PROCESSED_DATA_DIR / "replay_content"
 
 
 def build_one(session: dict) -> tuple[pd.DataFrame, pd.DataFrame] | None:
-    dot = pd.read_pickle(session["dot_file"])
+    # SWR labels from the one SWR source, not the decode's stored ripples
+    dot = read_dot_with_swr_source(session["dot_file"])
     data = load_data(
         session["nwb_file_name"],
         session["epoch_name"],

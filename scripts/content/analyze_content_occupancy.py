@@ -61,6 +61,9 @@ from continuum_swr_replay.analysis.hippocampus.event_immobility import (  # noqa
     filter_event_labels_by_speed,
     validate_nonlocal_event_probability_contract,
 )
+from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
+    read_dot_with_swr_source,
+)
 from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
     require_covariate_schema,
 )
@@ -139,7 +142,9 @@ def session_content_distances(epoch_id: str) -> tuple[np.ndarray, np.ndarray, np
     nearest reward well. Returns ``None`` if too few wells are localizable.
     """
     thr_int = int(round(NON_LOCAL_THRESHOLD * 100))
-    dot = pd.read_pickle(PROCESSED_DATA_DIR / f"{epoch_id}_{thr_int}_data_over_time.pkl")
+    dot = read_dot_with_swr_source(
+        PROCESSED_DATA_DIR / f"{epoch_id}_{thr_int}_data_over_time.pkl"
+    )
     # Validate the persisted cohort before any auxiliary load or early-return
     # path can turn corruption into an ordinary missing-data skip.
     validate_dot_event_contract(dot)

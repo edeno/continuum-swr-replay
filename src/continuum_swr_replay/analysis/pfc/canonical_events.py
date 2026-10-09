@@ -3,7 +3,9 @@
 Every family in this paper must describe the same events. The hippocampal
 content and rate ladders read the shipped event table
 (``Processed-Data/replay_content/event_table.parquet``) and the speed-gated
-``SWR_event`` labels of the cached ``*_HPC_80_data_over_time.pkl`` frame; this
+``SWR_event`` labels of the SWR source
+(:mod:`~continuum_swr_replay.analysis.hippocampus.swr_source`, the direct Kay
+inventory) on the cached ``*_HPC_80_data_over_time.pkl`` frame's grid; this
 module is the one place the PFC path loads those, so no PFC script re-detects
 non-local events or re-splits them on a separately detected ripple population.
 
@@ -14,7 +16,8 @@ Two definitions are fixed here and nowhere else on the PFC path:
   output on the canonical cached inputs, so an event carries the same
   ``event_id`` the content and rate tables key on.
 - **``is_swr``** is that table's column: strict positive-duration overlap with
-  the speed-gated ``SWR_event`` labels. It is read, never recomputed.
+  the SWR source's speed-gated ``SWR_event`` labels. It is read, never
+  recomputed.
 
 The SWR interval table returned here is the *same* population that column was
 built from -- ``SWR_event`` labels gated by the canonical whole-event
@@ -38,6 +41,7 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
+from continuum_swr_replay.analysis.hippocampus import swr_source
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     filter_event_labels_by_speed,
     intervals_from_labels,
@@ -49,13 +53,13 @@ from continuum_swr_replay.table_io import read_table, resolved_table_path, sha25
 
 __all__ = [
     "DEFAULT_EVENT_TABLE_PATH",
-    "SWR_INTERVAL_SOURCE",
     "IS_SWR_DEFINITION",
     "canonical_event_provenance",
     "canonical_event_input_hashes",
     "load_session_canonical_events",
     "load_session_swr_intervals",
     "session_data_over_time_path",
+    "session_swr_events_file",
 ]
 
 #: The canonical per-event table every family's events are read from.
@@ -64,7 +68,6 @@ DEFAULT_EVENT_TABLE_PATH = PROCESSED_DATA_DIR / "replay_content" / "event_table.
 #: Provenance labels for the two definitions this module fixes. Written to each
 #: run's sidecar so an artifact states which event definition it was fit on.
 IS_SWR_DEFINITION = "canonical_event_table"
-SWR_INTERVAL_SOURCE = "data_over_time.SWR_event"
 
 #: Columns of the shipped event table this path reads, and the names the GLM
 #: uses for the two timing columns.
@@ -184,14 +187,17 @@ def load_session_swr_intervals(
     non_local_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
     speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 ) -> tuple[pd.DataFrame, str]:
-    """Load one session's SWR intervals from the cached decode frame.
+    """Load one session's SWR intervals: the SWR source's, on the cached frame's grid.
 
-    The intervals are built exactly as
+    The cached decode frame is read through the SWR source
+    (:func:`~continuum_swr_replay.analysis.hippocampus.swr_source.read_dot_with_swr_source`),
+    so its ``SWR_event`` labels are the direct Kay inventory's, not the
+    decode's stored ripples. The intervals are then built exactly as
     :func:`~continuum_swr_replay.analysis.hippocampus.event_table.build_classified_nonlocal_event_table`
-    builds them -- the ``SWR_event`` labels gated atomically by the canonical
-    whole-event immobility rule, then reduced to their sampled bounds -- so the
-    population here and the population the canonical ``is_swr`` column was
-    computed against are the same one.
+    builds them -- the labels gated atomically by the canonical whole-event
+    immobility rule, then reduced to their sampled bounds -- so the population
+    here and the population the canonical ``is_swr`` column was computed against
+    are the same one.
 
     Parameters
     ----------
@@ -214,15 +220,18 @@ def load_session_swr_intervals(
         ``start_time``, with a fresh integer index. Empty (correct columns,
         zero rows) if the session has no speed-eligible SWR.
     sha256 : str
-        Hash of the frame that was read, for the run's provenance sidecar.
+        Hash of the frame that was read, for the run's provenance sidecar. The
+        SWR source's own files are hashed by
+        :func:`canonical_event_input_hashes`.
 
     Raises
     ------
     FileNotFoundError
         If the cached frame does not exist.
-    KeyError
-        If the frame lacks ``SWR_event``, ``head_speed`` or the session
-        columns the whole-event speed rule groups on.
+    ValueError
+        If the frame lacks ``head_speed`` or the session columns.
+    SwrSourceError
+        If the SWR source cannot serve the session.
     """
     path = (
         session_data_over_time_path(
@@ -237,7 +246,7 @@ def load_session_swr_intervals(
             "the canonical SWR population and cannot be re-detected here"
         )
 
-    dot = pd.read_pickle(path)
+    dot = swr_source.read_dot_with_swr_source(path)
     # ``intervals_from_labels`` prefers a ``time`` column and the speed rule
     # reads the index; promote a ``time`` column so both read one axis, as the
     # canonical builder does.
@@ -263,22 +272,45 @@ def canonical_event_provenance(
     event_table_sha256: str | None,
     data_over_time_path: str | Path,
     data_over_time_sha256: str | None,
+    swr_events_path: str | Path | None,
+    swr_events_sha256: str | None,
 ) -> dict[str, str | None]:
     """The sidecar block naming the event definition and the inputs it came from.
 
     Defined once so the runner's skip check and the run's own sidecar cannot
     disagree about the key names: a mismatch there would silently skip a
-    session whose events had changed.
+    session whose events had changed. ``swr_interval_source`` names the SWR
+    source (``kay@<run id>``) and ``swr_events_*`` the inventory file the SWR
+    intervals were read from.
     """
     return {
         "is_swr_definition": IS_SWR_DEFINITION,
         "immobility_inequality": "<",
         "canonical_event_table_path": str(event_table_path),
         "canonical_event_table_sha256": event_table_sha256,
-        "swr_interval_source": SWR_INTERVAL_SOURCE,
+        "swr_interval_source": swr_source.swr_source_name(),
+        "swr_events_path": None if swr_events_path is None else str(swr_events_path),
+        "swr_events_sha256": swr_events_sha256,
         "data_over_time_path": str(data_over_time_path),
         "data_over_time_sha256": data_over_time_sha256,
     }
+
+
+def session_swr_events_file(
+    nwb_file_name: str, epoch_name: str
+) -> dict[str, str] | dict[str, None]:
+    """The SWR source's events file for a session, checked against its manifest.
+
+    ``{"path", "sha256"}``, both ``None`` when the source cannot serve the
+    session: that matches no bundle, so the session is refit and the loader
+    then fails loudly.
+    """
+    try:
+        return swr_source.swr_source_files(
+            swr_source.swr_epoch_id(nwb_file_name, epoch_name)
+        )["events"]
+    except swr_source.SwrSourceError:
+        return {"path": None, "sha256": None}
 
 
 def canonical_event_input_hashes(
@@ -290,10 +322,11 @@ def canonical_event_input_hashes(
 ) -> dict[str, str | None]:
     """:func:`canonical_event_provenance` for a session, hashing from disk.
 
-    Neither input is loaded, so a caller deciding whether a session needs
-    refitting pays two hash passes rather than a table read. A missing input
-    hashes to ``None``, which matches no bundle -- the session is then refit
-    (and fails loudly in the loader) rather than skipped.
+    No input is loaded, so a caller deciding whether a session needs refitting
+    pays three hash passes rather than a table read. A missing input (or an
+    epoch the SWR source cannot serve) hashes to ``None``, which matches no
+    bundle -- the session is then refit (and fails loudly in the loader) rather
+    than skipped.
     """
     table = (
         DEFAULT_EVENT_TABLE_PATH if event_table_path is None else Path(event_table_path)
@@ -302,6 +335,7 @@ def canonical_event_input_hashes(
     dot = session_data_over_time_path(
         nwb_file_name, epoch_name, non_local_threshold=non_local_threshold
     )
+    swr_events = session_swr_events_file(nwb_file_name, epoch_name)
     return canonical_event_provenance(
         event_table_path=resolved_table,
         event_table_sha256=(
@@ -309,4 +343,6 @@ def canonical_event_input_hashes(
         ),
         data_over_time_path=dot,
         data_over_time_sha256=sha256_file(dot) if dot.exists() else None,
+        swr_events_path=swr_events["path"],
+        swr_events_sha256=swr_events["sha256"],
     )

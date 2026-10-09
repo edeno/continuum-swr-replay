@@ -34,9 +34,13 @@ takes a time-indexed ``data_over_time`` slice and emits, per event:
 
 SWR intervals are derived from ``SWR_event`` timebin labels after applying
 the same whole-event speed criterion used for Non-Local and MUA populations.
-This is the same label source used by the Figure 2 bar / triggered-average /
-timing panels and by the replay-content tables, so a single population and
-overlap convention governs the whole figure.
+The labels are the paper's SWR source's: callers read a decode's frame through
+:func:`~continuum_swr_replay.analysis.hippocampus.swr_source.read_dot_with_swr_source`
+(or :func:`~continuum_swr_replay.analysis.hippocampus.swr_source.with_swr_source`),
+which puts the direct Kay inventory's labels in ``SWR_event`` in place of the
+decode's stored ``RippleTimesV1`` ones. This is the same label source used by
+the Figure 2 bar / triggered-average / timing panels and by the replay-content
+tables, so a single population and overlap convention governs the whole figure.
 
 The replay-content tables in ``analysis/replay/tables_*.py`` build on top of
 this table: ``build_event_table`` computes aggregates over this same complete,
@@ -190,7 +194,8 @@ def build_classified_nonlocal_event_table(
     Parameters
     ----------
     dot : pd.DataFrame
-        Time-indexed ``data_over_time`` slice for one or more sessions. Must
+        Time-indexed ``data_over_time`` slice for one or more sessions, read
+        through the SWR source so that ``SWR_event`` is the paper's SWRs. Must
         carry ``animal``, ``day``, ``epoch``, ``non_local_event``,
         ``SWR_event``, ``head_speed``, ``Non-Local_Continuous_prob``,
         ``Non-Local_Fragmented_prob``.

@@ -27,6 +27,14 @@ and onset tables. Across the 218 HPC sessions the stop-level totals are slightly
 > unchanged: the two rules still differ, so the counts still must not be
 > cross-substituted.
 
+> **SWR source (2026-10-09).** Both grains now read their SWR labels from one source,
+> the direct ripple_detection 2.0 Kay inventory
+> (`analysis/hippocampus/swr_source.py`; design note
+> [../design/2026-10-09-swr-source.md](../design/2026-10-09-swr-source.md)), in place
+> of Spyglass's stored `RippleTimesV1` events. The per-bin label convention is
+> unchanged (closed intervals, whole-event speed gate, source event numbers), and so
+> are the per-grain rules below. Any re-derived Δ must be measured on the new source.
+
 ## Why
 
 The stop-level `is_swr_stop` / MUA flags use the **inclusive per-timebin** rule over the

@@ -8,9 +8,10 @@ to quantify how each neuron's firing rate changes relative to event onsets.
 The analysis pipeline per session:
 1. Load the session's non-local events from the canonical event table
 2. Split them on that table's ``is_swr`` column (strict positive-duration
-   overlap with the speed-gated ``SWR_event`` labels), so Figure 4 describes
-   the same events, with the same classification, as the content and rate
-   families
+   overlap with the SWR source's speed-gated ``SWR_event`` labels, the direct
+   Kay inventory of ``analysis/hippocampus/swr_source.py``), so Figure 4
+   describes the same events, with the same classification, as the content
+   and rate families
 3. Fit GLMs for each neuron comparing models: constant, SWR, non-local, combined
 4. Compute theta modulation during running
 5. Save per-session neuron statistics and modulation time courses
@@ -289,6 +290,8 @@ def results_exist(
     fold_seed: int | None = None,
     n_control_draws: int | None = None,
     control_draw_seed: int | None = None,
+    swr_interval_source: str | None = None,
+    swr_events_sha256: str | None = None,
 ) -> bool:
     """Check if this session's bundle already exists *for this population*.
 
@@ -320,6 +323,10 @@ def results_exist(
         Hashes of the canonical event table and the session's cached decode
         frame this run would read. ``None`` matches no existing bundle, so a
         session whose inputs could not be hashed is refit rather than skipped.
+    swr_interval_source, swr_events_sha256 : str or None
+        The SWR source (``kay@<run id>``) and the hash of its events file this
+        run would read the SWR intervals from: a bundle fit on the stored
+        ripples, or on another inventory run, describes other SWRs.
     fitter : str or None
         The backend this run would fit with. A bundle fit with the other one is
         not this run's bundle: the two agree to the equivalence audit's
@@ -375,6 +382,8 @@ def results_exist(
         and record.get("is_swr_definition") == IS_SWR_DEFINITION
         and record.get("canonical_event_table_sha256") == event_table_sha256
         and record.get("data_over_time_sha256") == data_over_time_sha256
+        and record.get("swr_interval_source") == swr_interval_source
+        and record.get("swr_events_sha256") == swr_events_sha256
         and record.get("fitter") == fitter
         and record.get("estimator") == ESTIMATOR
         and record.get("inference") == INFERENCE
@@ -975,6 +984,8 @@ def run_analysis(
         fold_seed=fold_seed,
         n_control_draws=n_control_draws,
         control_draw_seed=control_draw_seed,
+        swr_interval_source=event_inputs["swr_interval_source"],
+        swr_events_sha256=event_inputs["swr_events_sha256"],
     ):
         logger.info(f"Results already exist for {epoch_identifier}. Skipping...")
         return

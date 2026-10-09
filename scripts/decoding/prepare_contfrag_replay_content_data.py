@@ -53,6 +53,9 @@ from continuum_swr_replay.analysis.contfrag.tables import (
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     validate_dot_event_contract,
 )
+from continuum_swr_replay.analysis.hippocampus.swr_source import (
+    read_dot_with_swr_source,
+)
 from continuum_swr_replay.analysis.replay import build_event_patch_table
 from continuum_swr_replay.analysis.replay import prepare_data as replay_prepare_data
 from continuum_swr_replay.analysis.replay.covariates import load_contingency
@@ -199,7 +202,8 @@ def _process_session(
             "arm_posterior_mass and arm_fraction_posterior would all be NaN)."
         )
 
-    dot = pd.read_pickle(session["dot_file"])
+    # SWR labels (the ContFrag SWR events themselves) from the one SWR source
+    dot = read_dot_with_swr_source(session["dot_file"])
     # Fail closed on input-contract violations before they silently corrupt the
     # tables; a violation here is caught by the per-session skip+tally in main().
     validate_dot_event_contract(dot)

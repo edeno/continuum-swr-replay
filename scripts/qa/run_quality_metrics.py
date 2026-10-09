@@ -34,6 +34,9 @@ from continuum_swr_replay.analysis.hippocampus.quality_metrics import (
     compute_non_local_event_context,
     compute_session_quality_summary,
 )
+from continuum_swr_replay.analysis.hippocampus.swr_source import (
+    read_dot_with_swr_source,
+)
 from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
 from continuum_swr_replay.parameters import (
     FIGURE_DIR,
@@ -110,7 +113,7 @@ def load_all_sessions(
             raise ValueError(f"No files found for animal '{animal}'")
 
     logger.info("Loading %d session files...", len(paths))
-    data = pd.concat(pd.read_pickle(p) for p in paths)
+    data = pd.concat(read_dot_with_swr_source(p) for p in paths)
 
     n_sessions = data.groupby(["animal", "day", "epoch"]).ngroups
     logger.info("Loaded %d sessions (%d timebins)", n_sessions, len(data))

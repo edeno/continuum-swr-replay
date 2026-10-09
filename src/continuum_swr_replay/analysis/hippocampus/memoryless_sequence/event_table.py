@@ -441,7 +441,9 @@ def canonical_swr_intervals(
     ----------
     data_over_time : DataFrame
         One epoch, time-indexed or with a ``time`` column, carrying
-        ``SWR_event``, ``head_speed`` and the session columns.
+        ``SWR_event``, ``head_speed`` and the session columns: a frame read
+        through the SWR source (``swr_source.read_dot_with_swr_source``), whose
+        ``SWR_event`` is the direct Kay inventory's, as the canonical table's is.
     speed_threshold : float
         cm/s; the canonical immobility threshold.
 
@@ -463,11 +465,10 @@ def canonical_swr_intervals(
 def observed_intervals(data_over_time: pd.DataFrame, column: str) -> NDArray:
     """Closed intervals over which ``column`` holds a finite value.
 
-    For SWR labels use ``SWR_zscore``, not ``SWR_event``: ``SWR_event`` is
-    written as an integer and is never NaN, so a stretch of missing LFP would
-    read as observed and not an SWR. ``SWR_zscore`` is reindexed onto the
-    decode's grid with a 4 ms tolerance and is NaN wherever no LFP sample lies
-    that close.
+    Not for SWR labels: ``SWR_event`` is an integer and never NaN, so a
+    stretch of missing LFP would read as observed and not an SWR. Where SWR
+    detection was observed is the SWR source's
+    (``swr_source.swr_observed_stretches``), which the runner passes.
 
     Returns
     -------
@@ -514,11 +515,12 @@ def build_memoryless_event_table(
         builds them (``filter_event_labels_by_speed`` then
         ``intervals_from_labels``). None when SWR labels are unavailable.
     swr_observed_intervals : ndarray, shape (n_intervals, 2), or None
-        Closed intervals over which SWR labels were observed, from
-        :func:`observed_intervals` on ``SWR_zscore``. Required with
+        Closed intervals over which SWR labels were observed: the SWR source's
+        stretches (``swr_source.swr_observed_stretches``). Required with
         ``swr_intervals``; an event not wholly inside one is ``unknown``.
     swr_definition : str
-        Which SWR detector the labels come from, e.g. ``"Kay"``.
+        Which SWR source the labels come from, e.g. ``"kay@<run id>"``
+        (``swr_source.swr_source_name``).
     shuffle_results : mapping of int to ShuffleResult, or None
         Keyed by candidate index. Must cover exactly the candidates that meet
         both replay criteria, as :func:`shuffle_eligible` returns them. None

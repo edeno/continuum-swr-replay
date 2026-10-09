@@ -55,12 +55,12 @@ Examples
 >>> from continuum_swr_replay.analysis.hippocampus.quality_metrics import (
 ...     compute_session_quality_summary,
 ... )
->>> import pandas as pd
->>> from pathlib import Path
->>> # Load all sessions
->>> data = pd.concat(
-...     [pd.read_pickle(p) for p in Path("Processed-Data").glob("*_HPC_80_data_over_time.pkl")]
+>>> from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+...     load_data_over_time,
 ... )
+>>> from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+>>> # The analysed epochs, with the SWR source's labels
+>>> data = load_data_over_time(PROCESSED_DATA_DIR)
 >>> summary = compute_session_quality_summary(data)
 >>> print(summary[["animal", "day", "epoch", "median_error_cm", "local_fraction", "n_flags"]])
 

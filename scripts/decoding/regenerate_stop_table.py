@@ -25,6 +25,9 @@ import time
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
+    read_dot_with_swr_source,
+)
 from continuum_swr_replay.analysis.replay import build_stop_table  # noqa: E402
 from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
     require_covariate_schema,
@@ -57,7 +60,8 @@ def build_one(session: dict) -> pd.DataFrame | None:
     # must import without it
     from continuum_swr_replay.data_loaders import load_data
 
-    dot = pd.read_pickle(session["dot_file"])
+    # SWR labels from the one SWR source, not the decode's stored ripples
+    dot = read_dot_with_swr_source(session["dot_file"])
     data = load_data(
         session["nwb_file_name"],
         session["epoch_name"],

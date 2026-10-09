@@ -71,6 +71,9 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: 
     nearest_interior_bins,
     parse_epoch_identifier,
 )
+from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
+    read_dot_with_swr_source,
+)
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_decode_files,
 )
@@ -278,7 +281,9 @@ def analyze_session(
     figures (``pos``, ``gpi``, ``t``, ``mape``, ``lin``, etc.).
     """
     thr_int = int(round(NON_LOCAL_THRESHOLD * 100))
-    dot = pd.read_pickle(PROCESSED_DATA_DIR / f"{epoch_id}_{thr_int}_data_over_time.pkl")
+    dot = read_dot_with_swr_source(
+        PROCESSED_DATA_DIR / f"{epoch_id}_{thr_int}_data_over_time.pkl"
+    )
     # Validate before loading encoding data so a missing/corrupt auxiliary
     # artifact cannot mask malformed event labels as an ordinary session skip.
     validate_dot_event_contract(dot)

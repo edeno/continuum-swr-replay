@@ -142,6 +142,7 @@ from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
     yu_diagnostics,
     zero_phase_bandpass,
 )
+from continuum_swr_replay.analysis.hippocampus.swr_source import SWR_INVENTORY_ROOT
 from continuum_swr_replay.analysis.inventory_comparison.schema import SessionIdentity
 from continuum_swr_replay.data_loaders.epoch_register import epochs_to_run
 from continuum_swr_replay.data_loaders.lfp import _ripple_keys, get_ripple_band_inputs
@@ -155,10 +156,11 @@ from continuum_swr_replay.decoding_common import (
     setup_logger,
     write_atomically,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR
+from continuum_swr_replay.parameters import ROOT_DIR
 from continuum_swr_replay.table_io import sha256_file, write_table
 
-OUTPUT_ROOT = PROCESSED_DATA_DIR / "replay_detection_comparison" / "swr"
+OUTPUT_ROOT = SWR_INVENTORY_ROOT
+"""Where the run folders go: where the paper's SWR source reads them."""
 PRODUCED_BY = "scripts/decoding/run_swr_detection.py"
 DESIGN_SPEC = "docs/design/2026-10-03-full-pipeline-refresh-design.md"
 

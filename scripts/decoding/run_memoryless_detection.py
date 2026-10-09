@@ -4,8 +4,10 @@
 The Widloski & Foster sliding-window detector, ported in
 ``continuum_swr_replay.analysis.hippocampus.memoryless_sequence``, run on each
 epoch's saved clusterless decode: the encoding model from
-``{epoch_id}_detector.pkl``, the decode grid, position, speed and SWR labels
-from ``{epoch_id}_80_data_over_time.pkl``, and the spike marks read as
+``{epoch_id}_detector.pkl``, the decode grid, position and speed from
+``{epoch_id}_80_data_over_time.pkl``, the SWR labels and where they were
+observed from the paper's SWR source (``analysis/hippocampus/swr_source.py``,
+the direct Kay inventory, on that grid), and the spike marks read as
 ``load_data`` read them for the decode (``MARKS_RULE``): ``get_hpc_marks``,
 then ``filter_spike_times`` over the decode's time span.
 Both procedures therefore read one encoding model.
@@ -118,7 +120,6 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.event_table import (
     canonical_swr_intervals,
-    observed_intervals,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
     check_marks_match_encoding,
@@ -127,6 +128,13 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle impor
     DEFAULT_N_SHUFFLES,
     MINIMUM_N_SHUFFLES,
     SIGNIFICANCE_LEVEL,
+)
+from continuum_swr_replay.analysis.hippocampus.swr_source import (
+    read_dot_with_swr_source,
+    swr_epoch_id,
+    swr_observed_stretches,
+    swr_source_files,
+    swr_source_name,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import git_hash
 from continuum_swr_replay.data_loaders.epoch_register import epochs_to_run
@@ -505,7 +513,8 @@ def run_one(
     input_sha256 = {name: sha256_file(path) for name, path in inputs.items()}
 
     encoding_model = load_clusterless_encoding_model(inputs["detector"])
-    data_over_time = pd.read_pickle(inputs["data_over_time"])
+    # SWR labels from the one SWR source, whichever decode variant this is
+    data_over_time = read_dot_with_swr_source(inputs["data_over_time"])
     if "time" in data_over_time.columns:
         data_over_time = data_over_time.set_index("time")
     identity = SequenceIdentity(
@@ -524,8 +533,10 @@ def run_one(
 
     speed = data_over_time["head_speed"].to_numpy(dtype=np.float64)
     midpoint_s = window_midpoints_s(time[:-1], config)
-    # SWR_event is an integer and never NaN; SWR_zscore is NaN where the LFP is missing
-    swr_observed = observed_intervals(data_over_time, "SWR_zscore")
+    # where the source's detector read a gap-free stored band
+    swr_epoch = swr_epoch_id(f"{identity.animal}{identity.day}_.nwb", identity.epoch)
+    swr_observed = swr_observed_stretches(swr_epoch)
+    swr_files = swr_source_files(swr_epoch)
     detection = run_epoch(
         time,
         data_over_time["linear_position"].to_numpy(dtype=np.float64),
@@ -538,7 +549,7 @@ def run_one(
             data_over_time, speed_threshold=config.speed_threshold_cm_per_s
         ),
         swr_observed_intervals=swr_observed,
-        swr_definition=key.swr_definition,
+        swr_definition=swr_source_name(),
         seed=ShuffleSeed(run=run_seed, session=epoch_id) if shuffle else None,
         config=config,
         n_shuffles=n_shuffles,
@@ -600,6 +611,7 @@ def run_one(
             name: {"path": str(path), "sha256": input_sha256[name]}
             for name, path in inputs.items()
         },
+        "swr_source": {"name": swr_source_name(), **swr_files},
         "marks": {
             "rule": MARKS_RULE,
             "detector_sha256": input_sha256["detector"],
@@ -622,10 +634,12 @@ def run_settings(
     ``environment`` is the decoders' provenance record (``provenance_record``)
     without ``dirty``, which the run id and ``git_commit`` already carry: it
     holds ``uv.lock``'s sha256, the commit ``ripple_detection`` was installed
-    from and the CUDA plugin's version.
+    from and the CUDA plugin's version. ``swr_source`` names the inventory the
+    SWR labels come from (``kay@<run id>``), so a new inventory is a new run.
     """
     return {
         "git_commit": git_commit,
+        "swr_source": swr_source_name(),
         "libraries": {
             name: version(name) for name in ("non_local_detector", "numpy", "pandas")
         },

@@ -550,7 +550,9 @@ def build_event_table(
     """One row per non-local event with canonical event-level columns.
 
     Consumes the pre-saved ``{epoch}_HPC_{thr}_data_over_time.pkl`` frame
-    (``dot``) plus the session's ``env`` / ``trials`` /
+    (``dot``), read through the SWR source
+    (``swr_source.read_dot_with_swr_source``) so its ``SWR_event`` is the
+    paper's SWRs, plus the session's ``env`` / ``trials`` /
     ``port_experiences`` / ``track_graph``
     and emits the event-level slice of the canonical schema.
 

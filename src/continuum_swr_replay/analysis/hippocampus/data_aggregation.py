@@ -25,7 +25,10 @@ The output DataFrame contains time-indexed columns for:
 
 Event labels (integer event numbers):
     - non_local_event: Non-local event number (0 if not in event)
-    - SWR_event: Sharp-wave ripple event number
+    - SWR_event: Sharp-wave ripple event number, from the stored Spyglass
+      ``RippleTimesV1`` ripples. This is the decode's own provenance: analyses
+      read a saved frame through ``swr_source.read_dot_with_swr_source``, which
+      replaces it with the paper's SWR source (the direct Kay inventory)
     - MUA_event: Multiunit activity high-synchrony event number
 
 State probabilities (0-1):
@@ -49,7 +52,8 @@ Neural signals (z-scored or phase):
     - SWR_zscore: Z-scored ripple consensus trace
     - MUA_zscore: Z-scored multiunit firing rate
 
-Event counts (session-level):
+Event counts (session-level; the ``*SWR*`` counts are of the stored ripples
+and are dropped by ``swr_source.with_swr_source``):
     - n_non_local, n_SWR, n_MUA: Whole-event-speed-eligible event counts
     - n_non_local_SWR, n_non_local_no_SWR: Non-local overlaps with/without SWR
     - n_non_local_MUA, n_non_local_no_MUA: Non-local overlaps with/without MUA
@@ -136,6 +140,7 @@ from .posterior_analysis import (
     get_map_step_distance,
     get_posterior_stats,
 )
+from .swr_source import read_dot_with_swr_source
 
 
 def theta_power_zscore(theta_power: np.ndarray) -> np.ndarray:
@@ -712,7 +717,9 @@ def load_data_over_time(data_dir: Path) -> pd.DataFrame:
 
     The epochs are the epoch register's analysed ones
     (``epoch_register.analysed_decode_files``), never a glob of `data_dir`, so a
-    pending or excluded epoch's decode there is not read.
+    pending or excluded epoch's decode there is not read. Each is read through
+    the SWR source (``swr_source.read_dot_with_swr_source``): ``SWR_event`` is
+    the direct Kay inventory's labels, not the decode's stored ripples.
 
     Parameters
     ----------
@@ -722,16 +729,19 @@ def load_data_over_time(data_dir: Path) -> pd.DataFrame:
     Returns
     -------
     pd.DataFrame
-        Concatenated data with derived Non-Local_prob and distance columns.
+        Concatenated data with derived Non-Local_prob and distance columns,
+        and the source's ``SWR_event`` and ``swr_observed``.
 
     Raises
     ------
     FileNotFoundError
         If an analysed epoch's file is not in `data_dir`.
+    SwrSourceError
+        If the SWR source cannot serve an analysed epoch.
 
     """
     files = analysed_decode_files(data_dir, "_80_data_over_time.pkl", require_all=True)
-    data_over_time = pd.concat([pd.read_pickle(p) for p in files])
+    data_over_time = pd.concat([read_dot_with_swr_source(p) for p in files])
     data_over_time["Non-Local_prob"] = (
         data_over_time["Non-Local_Continuous_prob"]
         + data_over_time["Non-Local_Fragmented_prob"]

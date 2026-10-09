@@ -58,6 +58,10 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
   - [design/2026-08-21-covariate-naming-scheme.md](design/2026-08-21-covariate-naming-scheme.md)
     — proposed predictor-column names across the four canonical tables,
     code-verified; also flags the duplicate and dead columns the pass found.
+  - [design/2026-10-09-swr-source.md](design/2026-10-09-swr-source.md) — the paper's
+    one SWR source: the direct ripple_detection 2.0 Kay inventory, its comparison with
+    the stored `RippleTimesV1` events, the interface every SWR consumer reads, and the
+    artifact hook.
   - [design/content_estimator_comparison.md](design/content_estimator_comparison.md)
     — the retired count multinomial vs the shipped per-event fractions vs a
     Dirichlet-multinomial, on one 218-session cohort: what each assumes,

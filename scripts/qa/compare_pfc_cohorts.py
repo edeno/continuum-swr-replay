@@ -132,6 +132,7 @@ SIDECAR_TOP_LEVEL_KEYS = [
     "canonical_event_table_path",
     "data_over_time_sha256",
     "is_swr_definition",
+    "swr_interval_source",
     "n_events_total",
     "n_events_swr",
     "n_events_non_swr",
@@ -1039,6 +1040,7 @@ def fitter_table(sidecars: pd.DataFrame) -> pd.DataFrame:
         "gpu_name",
         "stop_table_sha256",
         "canonical_event_table_sha256",
+        "swr_interval_source",
         "git_hash",
     ]
     present = [c for c in columns if c in sidecars.columns]

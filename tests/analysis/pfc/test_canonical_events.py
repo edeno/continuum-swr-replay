@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.hippocampus import swr_source
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     filter_event_labels_by_speed,
     intervals_from_labels,
@@ -24,6 +25,7 @@ from continuum_swr_replay.analysis.pfc.canonical_events import (
     session_data_over_time_path,
 )
 from continuum_swr_replay.table_io import sha256_file, write_table
+from tests.unit._swr_inventory_fixtures import RUN_ID, write_swr_inventory
 
 
 @pytest.fixture
@@ -138,15 +140,32 @@ class TestLoadSessionCanonicalEvents:
 
 
 class TestLoadSessionSwrIntervals:
-    def test_the_intervals_equal_the_canonical_builders_on_the_same_frame(
-        self, tmp_path
+    """The intervals are the SWR source's, gated and bounded on the frame's grid.
+
+    The frame's own ``SWR_event`` (the decode's stored ripples) marks nothing
+    the source has, so an interval read from it would show.
+    """
+
+    @pytest.fixture
+    def source(self, tmp_path, monkeypatch):
+        def write(intervals):
+            root = tmp_path / "swr"
+            write_swr_inventory(root, {"j1620210706_02_r1_HPC": intervals})
+            monkeypatch.setattr(swr_source, "SWR_INVENTORY_ROOT", root)
+            monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", RUN_ID)
+
+        return write
+
+    def test_the_intervals_equal_the_canonical_builders_on_the_sources_labels(
+        self, tmp_path, source
     ):
-        # Three labelled runs: the middle one spans a moving sample and so is
+        # Three source SWRs: the middle one spans a moving sample and so is
         # removed atomically by the whole-event rule, exactly as the classified
         # event table's SWR population is.
-        labels = [0, 1, 1, 0, 2, 2, 2, 0, 3, 3, 0]
+        source([(1 / 500, 2 / 500), (4 / 500, 6 / 500), (8 / 500, 9 / 500)])
+        stored = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
         speed = [1.0, 1.0, 1.0, 1.0, 1.0, 9.0, 1.0, 1.0, 2.0, 2.0, 1.0]
-        dot = _synthetic_dot(labels, speed)
+        dot = _synthetic_dot(stored, speed)
         path = tmp_path / "j1620210706_02_r1_HPC_80_data_over_time.pkl"
         dot.to_pickle(path)
 
@@ -155,7 +174,9 @@ class TestLoadSessionSwrIntervals:
         )
 
         expected = intervals_from_labels(
-            filter_event_labels_by_speed(dot, ["SWR_event"], speed_threshold=4.0),
+            filter_event_labels_by_speed(
+                swr_source.with_swr_source(dot), ["SWR_event"], speed_threshold=4.0
+            ),
             "SWR_event",
         )
         np.testing.assert_allclose(
@@ -165,13 +186,20 @@ class TestLoadSessionSwrIntervals:
             intervals.end_time.to_numpy(), expected.end_time.to_numpy()
         )
         assert list(intervals.columns) == ["start_time", "end_time"]
-        # The moving-sample event is the one that must be gone.
+        # The moving-sample event is the one that must be gone, and the stored
+        # ripple at the last sample was never read.
         assert len(intervals) == 2
         np.testing.assert_allclose(
             intervals.start_time.to_numpy(), np.array([1, 8]) / 500.0
         )
+        np.testing.assert_allclose(
+            intervals.end_time.to_numpy(), np.array([2, 9]) / 500.0
+        )
 
-    def test_a_session_with_no_eligible_swr_returns_an_empty_frame(self, tmp_path):
+    def test_a_session_with_no_eligible_swr_returns_an_empty_frame(
+        self, tmp_path, source
+    ):
+        source([(1 / 500, 2 / 500)])
         dot = _synthetic_dot([0, 1, 1, 0], [1.0, 9.0, 1.0, 1.0])
         path = tmp_path / "dot.pkl"
         dot.to_pickle(path)
@@ -183,7 +211,8 @@ class TestLoadSessionSwrIntervals:
         assert list(intervals.columns) == ["start_time", "end_time"]
         assert len(intervals) == 0
 
-    def test_the_hash_is_of_the_frame_that_was_read(self, tmp_path):
+    def test_the_hash_is_of_the_frame_that_was_read(self, tmp_path, source):
+        source([])
         dot = _synthetic_dot([0, 1, 1, 0], [1.0, 1.0, 1.0, 1.0])
         path = tmp_path / "dot.pkl"
         dot.to_pickle(path)
@@ -215,6 +244,7 @@ class TestCanonicalEventInputHashes:
         import continuum_swr_replay.analysis.pfc.canonical_events as module
 
         monkeypatch.setattr(module, "PROCESSED_DATA_DIR", tmp_path)
+        monkeypatch.setattr(swr_source, "SWR_INVENTORY_ROOT", tmp_path / "swr")
 
         provenance = canonical_event_input_hashes(
             "j1620210706_.nwb", "02_r1", event_table_path=tmp_path / "absent.parquet"
@@ -224,6 +254,7 @@ class TestCanonicalEventInputHashes:
         assert provenance["immobility_inequality"] == "<"
         assert provenance["canonical_event_table_sha256"] is None
         assert provenance["data_over_time_sha256"] is None
+        assert provenance["swr_events_sha256"] is None
 
     def test_present_inputs_hash_to_the_files_on_disk(
         self, tmp_path, event_table_path, monkeypatch
@@ -231,6 +262,9 @@ class TestCanonicalEventInputHashes:
         import continuum_swr_replay.analysis.pfc.canonical_events as module
 
         monkeypatch.setattr(module, "PROCESSED_DATA_DIR", tmp_path)
+        write_swr_inventory(tmp_path / "swr", {"j1620210706_02_r1_HPC": []})
+        monkeypatch.setattr(swr_source, "SWR_INVENTORY_ROOT", tmp_path / "swr")
+        monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", RUN_ID)
         dot = _synthetic_dot([0, 1, 1, 0], [1.0, 1.0, 1.0, 1.0])
         dot_path = tmp_path / "j1620210706_02_r1_HPC_80_data_over_time.pkl"
         dot.to_pickle(dot_path)
@@ -244,3 +278,7 @@ class TestCanonicalEventInputHashes:
         )
         assert provenance["data_over_time_sha256"] == sha256_file(dot_path)
         assert provenance["data_over_time_path"] == str(dot_path)
+        events = tmp_path / "swr" / RUN_ID / "j1620210706_02_r1_HPC_kay_events.parquet"
+        assert provenance["swr_interval_source"] == f"kay@{RUN_ID}"
+        assert provenance["swr_events_path"] == str(events)
+        assert provenance["swr_events_sha256"] == sha256_file(events)

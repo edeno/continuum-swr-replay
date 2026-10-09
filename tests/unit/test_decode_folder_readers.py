@@ -7,7 +7,8 @@ reader names the analysed epochs' files through
 
 Offline: ``REGISTER_PATH`` points at a register written under ``tmp_path``,
 analysing ``a20200101 02_r1`` and ``b20200102 04_r2`` and holding
-``a20200101 06_r3`` pending; the decode files are small stand-ins.
+``a20200101 06_r3`` pending; the decode files are small stand-ins, and the SWR
+source is a synthetic inventory with no SWRs (the frames are read through it).
 """
 
 from __future__ import annotations
@@ -24,10 +25,12 @@ import scripts.qa.run_quality_metrics as quality_metrics
 from continuum_swr_replay.analysis.contfrag.data_aggregation import (
     load_contfrag_data_over_time,
 )
+from continuum_swr_replay.analysis.hippocampus import swr_source
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     load_data_over_time,
 )
 from continuum_swr_replay.data_loaders import epoch_register
+from tests.unit._swr_inventory_fixtures import RUN_ID, write_swr_inventory
 
 ANALYSED = ("a20200101_02_r1_HPC", "b20200102_04_r2_HPC")
 PENDING = "a20200101_06_r3_HPC"
@@ -47,6 +50,15 @@ def register(tmp_path, monkeypatch):
     monkeypatch.setattr(epoch_register, "REGISTER_PATH", path)
 
 
+@pytest.fixture(autouse=True)
+def source(tmp_path, monkeypatch):
+    """The decode frames are read through the SWR source: an empty inventory."""
+    root = tmp_path / "swr"
+    write_swr_inventory(root, {epoch_id: [] for epoch_id in (*ANALYSED, PENDING)})
+    monkeypatch.setattr(swr_source, "SWR_INVENTORY_ROOT", root)
+    monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", RUN_ID)
+
+
 def _frame(epoch_id: str) -> pd.DataFrame:
     """A two-row stand-in for a decode's ``data_over_time``."""
     stem, number, replicate, _ = epoch_id.split("_")
@@ -55,7 +67,8 @@ def _frame(epoch_id: str) -> pd.DataFrame:
             "epoch_id": epoch_id,
             "animal": stem[:-8],
             "day": int(stem[-8:]),
-            "epoch": int(number),
+            "epoch": f"{number}_{replicate}",
+            "head_speed": [0.0, 0.0],
             "Non-Local_Continuous_prob": [0.1, 0.2],
             "Non-Local_Fragmented_prob": [0.3, 0.4],
             "ahead_behind_distance": [-1.0, 2.0],

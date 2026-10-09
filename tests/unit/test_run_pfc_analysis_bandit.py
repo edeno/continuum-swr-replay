@@ -69,6 +69,11 @@ def test_only_the_sensitivity_bundle_is_suffixed(tmp_path):
 EVENT_TABLE_SHA = "event111"
 DOT_SHA = "dot222"
 
+#: The SWR source a test bundle claims its SWR intervals came from, and the hash
+#: of that source's events file.
+SWR_SOURCE = "kay@testrun"
+SWR_EVENTS_SHA = "swr333"
+
 
 #: The estimator and inference a test bundle claims, and the values a
 #: ``results_exist`` call in these tests asks for. The skip check compares them
@@ -83,8 +88,17 @@ INFERENCE = {
 
 
 def _results_exist(*args, **overrides):
-    """``runner.results_exist`` asking for the inference these tests write."""
-    return runner.results_exist(*args, **{**INFERENCE, **overrides})
+    """``runner.results_exist`` asking for the inference and the SWR source
+    these tests write."""
+    return runner.results_exist(
+        *args,
+        **{
+            **INFERENCE,
+            "swr_interval_source": SWR_SOURCE,
+            "swr_events_sha256": SWR_EVENTS_SHA,
+            **overrides,
+        },
+    )
 
 
 def _write_bundle_files(
@@ -96,6 +110,8 @@ def _write_bundle_files(
     is_swr_definition=runner.IS_SWR_DEFINITION,
     event_table_sha=EVENT_TABLE_SHA,
     data_over_time_sha=DOT_SHA,
+    swr_interval_source=SWR_SOURCE,
+    swr_events_sha=SWR_EVENTS_SHA,
     fitter=None,
     estimator=runner.ESTIMATOR,
     inference=runner.INFERENCE,
@@ -122,6 +138,8 @@ def _write_bundle_files(
                     "is_swr_definition": is_swr_definition,
                     "canonical_event_table_sha256": event_table_sha,
                     "data_over_time_sha256": data_over_time_sha,
+                    "swr_interval_source": swr_interval_source,
+                    "swr_events_sha256": swr_events_sha,
                     "fitter": fitter,
                     "estimator": estimator,
                     "inference": inference,
@@ -294,7 +312,9 @@ def fake_session(monkeypatch, tmp_path):
             "immobility_inequality": "<",
             "canonical_event_table_path": "/canonical/event_table.parquet",
             "canonical_event_table_sha256": EVENT_TABLE_SHA,
-            "swr_interval_source": "data_over_time.SWR_event",
+            "swr_interval_source": SWR_SOURCE,
+            "swr_events_path": "/canonical/swr/kay_events.parquet",
+            "swr_events_sha256": SWR_EVENTS_SHA,
             "data_over_time_path": "/canonical/dot.pkl",
             "data_over_time_sha256": DOT_SHA,
         }
@@ -388,7 +408,8 @@ def test_the_sidecar_states_the_event_definition_the_fit_was_read_on(
     assert record["immobility_inequality"] == "<"
     assert record["canonical_event_table_path"] == "/canonical/event_table.parquet"
     assert record["canonical_event_table_sha256"] == EVENT_TABLE_SHA
-    assert record["swr_interval_source"] == "data_over_time.SWR_event"
+    assert record["swr_interval_source"] == SWR_SOURCE
+    assert record["swr_events_sha256"] == SWR_EVENTS_SHA
     assert record["data_over_time_path"] == "/canonical/dot.pkl"
     assert record["data_over_time_sha256"] == DOT_SHA
     # The cohort-restricted split, so a reader need not recompute it.
@@ -416,6 +437,31 @@ def test_a_bundle_fit_on_the_retired_event_definition_is_refit(tmp_path):
         "at_well",
         "at_well",
         is_swr_definition="ripple_times_overlap",
+    )
+
+    assert not _results_exist(
+        tmp_path, epoch_identifier, False, "at_well", "abc123", EVENT_TABLE_SHA, DOT_SHA
+    )
+
+
+@pytest.mark.parametrize(
+    ("source", "sha"),
+    [
+        ("data_over_time.SWR_event", None),
+        ("kay@an_earlier_run", SWR_EVENTS_SHA),
+        (SWR_SOURCE, "stale333"),
+    ],
+    ids=["stored-ripples", "another-inventory-run", "changed-events-file"],
+)
+def test_a_bundle_fit_on_other_swrs_is_refit(tmp_path, source, sha):
+    epoch_identifier = "wilbur20210329_02_r1_mPFC"
+    _write_bundle_files(
+        tmp_path,
+        epoch_identifier,
+        "at_well",
+        "at_well",
+        swr_interval_source=source,
+        swr_events_sha=sha,
     )
 
     assert not _results_exist(

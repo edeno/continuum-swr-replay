@@ -27,6 +27,7 @@ from dask.distributed import LocalCluster
 
 import scripts.decoding.run_memoryless_detection as runner
 from continuum_swr_replay import decoding_common
+from continuum_swr_replay.analysis.hippocampus import swr_source
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
     MEMORYLESS_EVENT_TABLE_DTYPES,
     MemorylessSequenceConfig,
@@ -52,6 +53,7 @@ from tests.unit._memoryless_clusterless_epoch import (
     _StandInDetector,
     build_tiling_tetrode,
 )
+from tests.unit._swr_inventory_fixtures import RUN_ID, write_swr_inventory
 
 EPOCH_ID = "sim20200101_02_r1_HPC"
 N_SHUFFLES = 19
@@ -277,6 +279,48 @@ class TestFindEpochs:
         assert skipped == {}
 
 
+SIM_TIME = np.arange(2000) / SAMPLING_FREQUENCY
+"""``build_tiling_tetrode``'s grid."""
+SIM_EPOCH_IDS = (
+    "sim20200101_02_r1_HPC",
+    "sim20200101_04_r2_HPC",
+    "sim20200101_06_r3_HPC",
+    "sim20200102_02_r1_HPC",
+    "sim20200102_04_r2_HPC",
+)
+"""Every simulated epoch these tests run."""
+
+
+def write_swr_source(root, *, swrs=None, observed=None):
+    """The SWR source of the simulated epochs: by default one SWR early on, where
+    ``write_epoch`` also labels one, observed over the whole grid."""
+    swrs = [(SIM_TIME[50], SIM_TIME[89])] if swrs is None else swrs
+    observed = (SIM_TIME[0], SIM_TIME[-1]) if observed is None else observed
+    return write_swr_inventory(
+        root,
+        dict.fromkeys(SIM_EPOCH_IDS, swrs),
+        observed={epoch_id: [observed] for epoch_id in SIM_EPOCH_IDS},
+    )
+
+
+def use_swr_source(monkeypatch, root):
+    monkeypatch.setattr(swr_source, "SWR_INVENTORY_ROOT", root)
+    monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", RUN_ID)
+
+
+@pytest.fixture(scope="module")
+def swr_root(tmp_path_factory):
+    root = tmp_path_factory.mktemp("swr")
+    write_swr_source(root)
+    return root
+
+
+@pytest.fixture(autouse=True)
+def the_swr_source(swr_root, monkeypatch):
+    """Every run reads its SWRs from the synthetic source."""
+    use_swr_source(monkeypatch, swr_root)
+
+
 def write_epoch(root, epoch, epoch_id=EPOCH_ID, *, swr_zscore=None, corrupt=False):
     """Save one epoch as the decode saves it."""
     paths = input_paths(epoch_id, root)
@@ -378,9 +422,31 @@ class TestRunOne:
         assert (table.day == 20200101).all()
         assert (table.epoch == "02_r1").all()
         assert (table.brain_area == "HPC").all()
-        assert (table.swr_definition == "Kay").all()
+        assert (table.swr_definition == swr_source.swr_source_name()).all()
         # the saved labels are complete, so nothing is unknown
         assert not (table.overlap_class == "unknown").any()
+
+    def test_the_swrs_are_the_sources_not_the_decodes(
+        self, decode_root, tmp_path, monkeypatch
+    ):
+        """The source has one SWR over the whole epoch; the decode's stored
+        labels mark only an early one. Every classified candidate is an SWR."""
+        use_swr_source(
+            monkeypatch,
+            write_swr_source(
+                tmp_path / "swr", swrs=[(SIM_TIME[0], SIM_TIME[-1])]
+            ).parent,
+        )
+
+        record = run(decode_root, tmp_path)
+        table = read_table(record["outputs"]["events"])
+
+        known = table[table.overlap_class != "unknown"]
+        assert len(known) > 0
+        assert known.is_swr.astype(bool).all()
+        assert (known.overlap_class == "swr_contained").all()
+        assert record["swr_source"]["name"] == f"kay@{RUN_ID}"
+        assert len(record["swr_source"]["events"]["sha256"]) == 64
 
     def test_every_input_is_hashed(self, decode_root, tmp_path):
         record = run(decode_root, tmp_path)
@@ -464,15 +530,20 @@ class TestRunOne:
         assert record["n_swr_unknown"] == 0
         assert record["n_shuffle_untestable"] == 0
 
-    def test_missing_lfp_reaches_the_table_as_unknown(self, tmp_path):
-        """A NaN stretch of SWR_zscore is missing LFP: every candidate touching
-        it is ``unknown``, never ``non_swr``, and the observed table says so."""
+    def test_missing_lfp_reaches_the_table_as_unknown(self, tmp_path, monkeypatch):
+        """A stretch the SWR source did not observe is missing LFP: every
+        candidate touching it is ``unknown``, never ``non_swr``, and the
+        observed table says so."""
         epoch = build_tiling_tetrode()
         root = tmp_path / "processed"
         root.mkdir()
-        zscore = np.zeros(epoch.time.size)
-        zscore[: epoch.time.size // 2] = np.nan
-        write_epoch(root, epoch, swr_zscore=zscore)
+        write_epoch(root, epoch)
+        use_swr_source(
+            monkeypatch,
+            write_swr_source(
+                tmp_path / "swr", observed=(SIM_TIME[1000], SIM_TIME[-1])
+            ).parent,
+        )
 
         record = run((root, epoch), tmp_path)
         table = read_table(record["outputs"]["events"])

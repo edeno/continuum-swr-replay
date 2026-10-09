@@ -31,6 +31,9 @@ from continuum_swr_replay.analysis.contfrag.tables import (
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     validate_dot_event_contract,
 )
+from continuum_swr_replay.analysis.hippocampus.swr_source import (
+    read_dot_with_swr_source,
+)
 from continuum_swr_replay.analysis.replay import build_event_patch_table
 from continuum_swr_replay.analysis.replay import prepare_data as replay_prepare_data
 from continuum_swr_replay.analysis.replay.covariate_registry import (
@@ -116,7 +119,7 @@ def _rebuild_session(
     old_arm: pd.DataFrame,
     from_cache: bool,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    dot = pd.read_pickle(descriptor["dot_file"])
+    dot = read_dot_with_swr_source(descriptor["dot_file"])
     validate_dot_event_contract(dot)
     with Path(descriptor["env_file"]).open("rb") as stream:
         environment = pickle.load(stream)
