@@ -5,7 +5,8 @@ stage, thresholds placed by one rule, and no post-step second. Implemented in
 `src/continuum_swr_replay/analysis/hippocampus/artifacts/` and
 `scripts/decoding/run_artifact_detection.py` (Task 16 of the full pipeline refresh,
 [2026-10-03-full-pipeline-refresh-design.md](2026-10-03-full-pipeline-refresh-design.md)).
-The SWR runner, MUA detection and both HPC decoders use the mask (Task 17a); tables and
+The SWR runner, MUA detection and both HPC decoders use the mask (Task 17a), and so does the
+Widloski runner (Task 17b: the mask's bins are missing in its likelihood); tables and
 analyses follow in Task 18. **Not yet applied:** `swr_source.ARTIFACT_INTERVALS_RUN_ID` stays
 None until runbook R9 runs the detector on all epochs and sets it.
 
@@ -79,7 +80,8 @@ the giant-day events.
   - the reach does not grow with gap length.
 - **No reference veto (R-rip).** C1b's event veto (reference ripple envelope > 11.36 × the CA1
   median at the event's peak) removed 116 Kay events, most of them j16's. The tetrode rule
-  (R-T, Task 17b) now handles those. One rule fewer is kept.
+  (R-T, Task 17b) now handles those. One rule fewer is kept. Both are described in
+  [2026-10-09-swr-tetrode-selection.md](2026-10-09-swr-tetrode-selection.md).
 - **Keep the noisy tetrodes.** The sustained-noise (S) tetrodes are masked during their noise
   blocks, not dropped. R8 leaves out the 4 epochs with more than 2 % masked. R11 decodes the 12
   S epochs both ways (masked, and with those tetrodes dropped); masking stays unless it shows
@@ -386,7 +388,9 @@ The literature check read the methods of 23 papers and 3 code sources. It found:
 3. **Licking and chewing (study C1).** There is no EMG and no lick sensor, so C1 tested the
    detected events at the ports, not licking itself.
    - The featureless events it found were mostly j16's. Three tetrodes carry them, and the
-     tetrode rule (Task 17b) removes those tetrodes.
+     tetrode rule (Task 17b,
+     [2026-10-09-swr-tetrode-selection.md](2026-10-09-swr-tetrode-selection.md)) removes
+     those tetrodes.
    - After that rule, the featureless share at the ports is 1.0 % (rewarded) and 4.8 %
      (unrewarded) over all animals. No visit-onset rule is added.
 4. **Padding.**

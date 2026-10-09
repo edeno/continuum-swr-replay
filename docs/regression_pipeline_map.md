@@ -106,6 +106,12 @@ Loading and managing saved decoding results.
 
 `load_results`
 
+### `src/continuum_swr_replay/analysis/hippocampus/ripple_tetrodes.py`
+
+Rule R-T: per epoch, keep the CA1 band tetrodes that ripple with the rest.
+
+`TetrodeSelection`, `TetrodeSelectionError`, `select_ripple_tetrodes`
+
 ### `src/continuum_swr_replay/analysis/hippocampus/swr_source.py`
 
 The paper's one SWR source: the direct ripple_detection 2.0 Kay inventory.

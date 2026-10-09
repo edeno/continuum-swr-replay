@@ -67,6 +67,11 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     thresholds placed by one rule with their evidence, the one mask and its padding,
     validation against rule-defined and model-reviewed SWR sets, field precedents, the
     Spyglass comparison, and known limits.
+  - [design/2026-10-09-swr-tetrode-selection.md](design/2026-10-09-swr-tetrode-selection.md)
+    — rule R-T, the per-epoch choice of the CA1 tetrodes all four SWR detectors read: the
+    events at the ports (study C1), the j16 tetrodes that do not ripple with CA1, the rule
+    with its effect and blind checks, why the reference veto and the field's noise-channel
+    form are not used, the visit-onset numbers, and the limits.
   - [design/content_estimator_comparison.md](design/content_estimator_comparison.md)
     — the retired count multinomial vs the shipped per-event fractions vs a
     Dirichlet-multinomial, on one 218-session cohort: what each assumes,
