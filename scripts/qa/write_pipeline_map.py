@@ -54,6 +54,7 @@ STAGES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "*/analysis/replay/cohort_selection.py",
             "*/analysis/replay/prepare_data.py",
             "*/analysis/hippocampus/*.py",
+            "*/analysis/hippocampus/artifacts/*.py",
             "*/analysis/behavior/*.py",
         ),
     ),

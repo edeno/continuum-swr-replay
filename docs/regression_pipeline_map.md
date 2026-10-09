@@ -28,6 +28,30 @@ Per-stop RL-model values via DataJoint — canonical, complete, timestamp-aligne
 
 `peri_switch_index`, `add_experienced_value_columns`, `add_beta_belief_entropy`, `canonicalize_behavior_model_columns`, `assign_stops_to_trials`, `build_animal`, `run_build_qvals_table`
 
+### `src/continuum_swr_replay/analysis/hippocampus/artifacts/detect.py`
+
+The artifact detector: its constants and its four rules.
+
+`detector_constants`, `s_cores`, `t_ref_events`, `t_ca1_threshold`, `t_ca1_events`, `t_spk_events`, `t_cores`, `spike_ood`, `detect_artifacts`
+
+### `src/continuum_swr_replay/analysis/hippocampus/artifacts/features.py`
+
+The artifact detector's features: S window spectra, J5 and L20 steps, spike lines.
+
+`robust_scale`, `window_centers`, `window_band_power`, `channel_specificity`, `level_jump`, `level_shift`, `robust_jump`, `reference_jump`, `persistent_step_count`, `nearest_mark_distance`, `spike_lines`
+
+### `src/continuum_swr_replay/analysis/hippocampus/artifacts/io.py`
+
+The artifact run folder: one cores file per epoch, and the run's manifest.
+
+`ArtifactRunError`, `EpochCores`, `cores_path`, `empty_cores`, `make_cores`, `validate_cores`, `write_cores`, `write_manifest`, `read_manifest`, `read_epoch_cores`
+
+### `src/continuum_swr_replay/analysis/hippocampus/artifacts/masks.py`
+
+Each consumer's artifact intervals, padded from one table.
+
+`Consumer`, `core_class`, `merge_intervals`, `artifact_intervals`, `interval_mask`, `subtract_intervals`, `masked_seconds`
+
 ### `src/continuum_swr_replay/analysis/hippocampus/data_aggregation.py`
 
 Aggregation of analysis results over time.
@@ -451,6 +475,12 @@ Rebuild ContFrag tables while reusing immutable posterior aggregates.
 Regenerate ``stop_table.pkl`` with the new count columns.
 
 `build_one`, `validate`, `main`
+
+### `scripts/decoding/run_artifact_detection.py`
+
+Detect LFP and spike artifacts in every epoch's CA1 data, on CPU.
+
+`detector_constants`, `run_settings`, `reference_lfp`, `run_epoch`, `summary`, `register_epochs`, `main`, `run`
 
 ### `scripts/decoding/run_decoding_bandit.py`
 
