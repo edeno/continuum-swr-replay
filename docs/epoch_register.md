@@ -101,7 +101,8 @@ allowlist.
 | excluded | `DEPLETION_TASK` | 238 |
 | excluded | `NOT_INGESTED` | 15 |
 | excluded | `NO_TRIAL_INTERVALS` | 42 |
-| pending | `PENDING_POPULATE` | 40 |
+| pending | `PENDING_POPULATE` | 39 |
+| excluded | `MISSING_INPUT` | 1 |
 | **total** | | **557** |
 
 An entry is one run epoch, except the 4 session-wide `*` entries of sessions with no known run epoch: 553 run epochs and 4 session-wide entries in all.
@@ -111,9 +112,9 @@ An entry is one run epoch, except the 4 session-wide `*` entries of sessions wit
 | chimi | 45 | 1 |
 | j16 | 58 | 0 |
 | peanut | 13 | 32 |
-| senor | 58 | 6 |
+| senor | 58 | 5 |
 | wilbur | 44 | 1 |
-| **all** | **218** | **40** |
+| **all** | **218** | **39** |
 <!-- END GENERATED: counts -->
 
 Of the 91 `NWB_FILES`, 46 are depletion sessions. The other 45 hold every analysed
@@ -351,6 +352,6 @@ written `\|`.
 | senor20201104_.nwb | 06_r3 | pending | `PENDING_POPULATE` | LFPV1 was never populated for its LFPSelection (lfp_tets_senor, '06_r3 noPrePostTrialTimes'), so it has no LFPBandV1 ripple or theta band and no CA1 RippleTimesV1; its decode failed at get_ripple (logs/senor20201104_06_r3_HPC.log). Planned fix (populate_plan.py phases 3-6): LFPV1, LFPBandV1 ripple and theta, CA1 RippleLFPSelection, RippleTimesV1. |
 | senor20201104_.nwb | 08_r4 | pending | `PENDING_POPULATE` | LFPV1 was never populated for its LFPSelection (lfp_tets_senor, '08_r4 noPrePostTrialTimes'), so it has no LFPBandV1 ripple or theta band and no CA1 RippleTimesV1; its decode failed at get_ripple (logs/senor20201104_08_r4_HPC.log). Planned fix (populate_plan.py phases 3-6): LFPV1, LFPBandV1 ripple and theta, CA1 RippleLFPSelection, RippleTimesV1. |
 | senor20201105_.nwb | 02_r1 | pending | `PENDING_POPULATE` | No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on senor20201030, LFPBandV1 ripple and theta, 22 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 1 valid times'), CA1 RippleLFPSelection, RippleTimesV1. |
-| senor20201105_.nwb | 09_r4 | pending | `PENDING_POPULATE` | IntervalLinearizedPosition was never populated for its selection ('pos 8 valid times', default_decoding, track graph senor20201030), so get_position_info falls back to a TrackGraph 'senor20201105' that does not exist; its CA1 RippleTimesV1 is also unpopulated although its CA1 RippleLFPSelection exists. Planned fix (populate_plan.py phases 2 and 6): IntervalLinearizedPosition, RippleTimesV1. |
 | wilbur20210326_.nwb | 03_r1 | pending | `PENDING_POPULATE` | First-exposure session (200 trials, p(R) 100% then 50%). Its description, 'Spatial bandit task (regular) - exploration session', is admitted by FIRST_EXPOSURE_DESCRIPTIONS. No CA1 RippleLFPSelection or RippleTimesV1; every other input exists. Planned fix (populate_plan.py phases 5-6): CA1 RippleLFPSelection on the 14-electrode ripple band (decision D2), RippleTimesV1. |
+| senor20201105_.nwb | 09_r4 | excluded | `MISSING_INPUT` | IntervalPositionInfo head_position spatial series empty for 'pos 8 valid times' (IntervalLinearizedPosition.make fails, populate 2026-10-09); also no CA1 RippleTimesV1 |
 <!-- END GENERATED: entries -->

@@ -341,7 +341,7 @@ senor20201104_.nwb,16_r8,analysed,,
 senor20201105_.nwb,02_r1,pending,PENDING_POPULATE,"No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on senor20201030, LFPBandV1 ripple and theta, 22 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 1 valid times'), CA1 RippleLFPSelection, RippleTimesV1."
 senor20201105_.nwb,04_r2,analysed,,
 senor20201105_.nwb,06_r3,analysed,,
-senor20201105_.nwb,09_r4,pending,PENDING_POPULATE,"IntervalLinearizedPosition was never populated for its selection ('pos 8 valid times', default_decoding, track graph senor20201030), so get_position_info falls back to a TrackGraph 'senor20201105' that does not exist; its CA1 RippleTimesV1 is also unpopulated although its CA1 RippleLFPSelection exists. Planned fix (populate_plan.py phases 2 and 6): IntervalLinearizedPosition, RippleTimesV1."
+senor20201105_.nwb,09_r4,excluded,MISSING_INPUT,"IntervalPositionInfo head_position spatial series empty for 'pos 8 valid times' (IntervalLinearizedPosition.make fails, populate 2026-10-09); also no CA1 RippleTimesV1"
 senor20201105_.nwb,11_r5,analysed,,
 senor20201105_.nwb,13_r6,analysed,,
 senor20201105_.nwb,15_r7,analysed,,
