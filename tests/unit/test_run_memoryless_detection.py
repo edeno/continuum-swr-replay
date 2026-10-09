@@ -54,7 +54,11 @@ from tests.unit._memoryless_clusterless_epoch import (
     _StandInDetector,
     build_tiling_tetrode,
 )
-from tests.unit._swr_inventory_fixtures import RUN_ID, write_swr_inventory
+from tests.unit._swr_inventory_fixtures import (
+    RUN_ID,
+    write_artifact_run,
+    write_swr_inventory,
+)
 
 EPOCH_ID = "sim20200101_02_r1_HPC"
 N_SHUFFLES = 19
@@ -563,6 +567,66 @@ class TestRunOne:
         )
         swr = observed[observed.kind == "swr_labels"]
         assert swr.start_s.min() >= epoch.time[epoch.time.size // 2]
+
+    def test_the_artifact_mask_is_missing_on_the_decode_grid(
+        self, decode_root, tmp_path, monkeypatch
+    ):
+        """The source's artifact mask, on the decode grid, is missing in the
+        likelihood: no window holding it is decoded, no candidate touches it,
+        the observed table leaves it out, and the record counts it."""
+        _, epoch = decode_root
+        step_s = float(epoch.time[1000])
+        artifacts = write_artifact_run(
+            tmp_path / "artifacts",
+            {EPOCH_ID: [("ca1", step_s, step_s)]},
+            span=(float(epoch.time[0]), float(epoch.time[-1])),
+        )
+        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_ROOT", artifacts.parent)
+        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", artifacts.name)
+        missing = (epoch.time >= step_s - 0.3) & (epoch.time <= step_s + 0.3)
+
+        record = run(decode_root, tmp_path)
+
+        candidates = joblib.load(record["outputs"]["candidates"])
+        decoded = candidates.decisions.gates.posterior_usable
+        stride, width = CONFIG.stride_n_samples, CONFIG.window_n_samples
+        touching = np.array(
+            [
+                missing[k * stride : k * stride + width].any()
+                for k in range(decoded.size)
+            ]
+        )
+        np.testing.assert_array_equal(decoded, ~touching)
+        assert len(candidates.runs) >= 2
+        for first, last in candidates.runs:
+            assert not missing[first * stride : last * stride + width].any()
+        assert record["artifacts"] == {
+            "n_intervals": 1,
+            "masked_s": pytest.approx(0.6),
+            "n_missing_bins": int(missing.sum()),
+            "n_missing_windows": int(touching.sum()),
+        }
+        observed = read_table(record["outputs"]["observed"])
+        windows = observed[observed.kind == "decoded_windows"]
+        midpoints = candidates.midpoint_s
+        first, last = np.flatnonzero(touching)[[0, -1]]
+        np.testing.assert_array_equal(
+            windows[["start_s", "end_s"]].to_numpy(),
+            [
+                [midpoints[0], midpoints[first - 1]],
+                [midpoints[last + 1], midpoints[-1]],
+            ],
+        )
+
+    def test_without_an_artifact_run_nothing_is_missing(self, decode_root, tmp_path):
+        record = run(decode_root, tmp_path)
+
+        assert record["artifacts"] == {
+            "n_intervals": 0,
+            "masked_s": 0.0,
+            "n_missing_bins": 0,
+            "n_missing_windows": 0,
+        }
 
 
 KEY = parse_epoch_identifier(EPOCH_ID)

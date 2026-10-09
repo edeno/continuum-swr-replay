@@ -828,6 +828,49 @@ class TestDetectCandidateSequences:
         np.testing.assert_array_equal(found.runs, [[0, 59]])
         assert [piece.tolist() for piece in found.pieces] == [[0, 1]]
 
+    def test_no_merge_bridges_a_window_with_missing_rows(self):
+        """A window touching the artifact mask is not decoded, and no
+        candidate may span it: the same 8 ms, 6 cm gap is not bridged, so the
+        shuffle never re-decodes the masked rows."""
+        posterior = self.moving_posterior(np.arange(60))
+        posterior[30] = np.nan
+        unobserved = np.zeros(60, dtype=bool)
+        unobserved[30] = True
+
+        found = detect_candidate_sequences(
+            posterior,
+            window_times(60),
+            self.distance,
+            np.zeros(60),
+            self.config,
+            unobserved=unobserved,
+        )
+
+        np.testing.assert_array_equal(found.pre_merge_runs, [[0, 28], [31, 59]])
+        np.testing.assert_array_equal(found.runs, [[0, 28], [31, 59]])
+
+    def test_a_wide_merge_gap_still_does_not_bridge_missing_rows(self):
+        config = MemorylessSequenceConfig(merge_gap_s=1.0, merge_gap_cm=200.0)
+        posterior = self.moving_posterior(np.r_[np.arange(30), np.arange(30)])
+        posterior[30:40] = np.nan
+        unobserved = np.zeros(60, dtype=bool)
+        unobserved[30:40] = True
+
+        bridged = detect_candidate_sequences(
+            posterior, window_times(60), self.distance, np.zeros(60), config
+        )
+        found = detect_candidate_sequences(
+            posterior,
+            window_times(60),
+            self.distance,
+            np.zeros(60),
+            config,
+            unobserved=unobserved,
+        )
+
+        np.testing.assert_array_equal(bridged.runs, [[0, 59]])
+        assert not any(unobserved[first : last + 1].any() for first, last in found.runs)
+
     def test_the_result_carries_what_produced_it(self):
         found = detect_candidate_sequences(
             self.moving_posterior(np.arange(40)),

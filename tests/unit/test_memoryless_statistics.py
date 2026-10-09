@@ -76,6 +76,38 @@ class TestAggregateWindows:
         exact = log_likelihood[-40:].astype(np.float64).sum(axis=0)
         np.testing.assert_allclose(windows[-1], exact, rtol=0, atol=0)
 
+    def test_a_window_holding_a_missing_row_is_missing(self):
+        """Every window that holds a missing row is NaN, so it has no posterior;
+        the others are their rows' sums, whatever the missing row held."""
+        log_likelihood = np.arange(20, dtype=float).reshape(10, 2)
+        missing = np.zeros(10, dtype=bool)
+        missing[5] = True
+        garbled = log_likelihood.copy()
+        garbled[5] = [np.nan, np.inf]
+
+        windows = aggregate_windows(
+            garbled, window_n_samples=4, stride_n_samples=2, missing=missing
+        )
+
+        # rows 0-3, 2-5, 4-7 and 6-9: the middle two hold row 5
+        assert np.isnan(windows[[1, 2]]).all()
+        np.testing.assert_array_equal(
+            windows[[0, 3]],
+            [log_likelihood[0:4].sum(axis=0), log_likelihood[6:10].sum(axis=0)],
+        )
+
+    def test_no_missing_row_changes_nothing(self):
+        log_likelihood = np.random.default_rng(0).normal(-50.0, 20.0, (500, 7))
+
+        np.testing.assert_array_equal(
+            aggregate_windows(log_likelihood, 40, 2, missing=np.zeros(500, bool)),
+            aggregate_windows(log_likelihood, 40, 2),
+        )
+
+    def test_missing_rows_must_be_one_per_row(self):
+        with pytest.raises(ValueError, match="missing"):
+            aggregate_windows(np.zeros((10, 2)), 4, 2, missing=np.zeros(9, bool))
+
 
 class TestNormalizeWindows:
     def test_each_window_sums_to_one(self):

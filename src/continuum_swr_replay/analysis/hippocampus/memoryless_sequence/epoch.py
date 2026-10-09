@@ -5,6 +5,12 @@ the tests and under the per-epoch runner. The order is fixed here rather than
 left to callers: decode every window under a uniform prior, gate and assemble
 sequences, shuffle every candidate that meets the replay criteria, as the
 reference tests every such candidate, and write one row per candidate.
+
+Bins marked missing (``is_missing``: the artifact mask on the decode grid) are
+unobserved. Their rows of the likelihood never enter a window's sum, every
+window holding one is left undecoded (no posterior, so no normalization and no
+center), and no candidate spans such a window, so the shuffle, which
+re-decodes only a candidate's own windows, never reads them either.
 """
 
 from dataclasses import dataclass
@@ -40,6 +46,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle impor
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
     aggregate_windows,
     normalize_windows,
+    windows_holding,
 )
 
 __all__ = ["EpochDetection", "run_epoch"]
@@ -105,6 +112,7 @@ def run_epoch(
     seed: ShuffleSeed | None,
     config: MemorylessSequenceConfig,
     n_shuffles: int = DEFAULT_N_SHUFFLES,
+    is_missing: NDArray | None = None,
 ) -> EpochDetection:
     """Detect, test and tabulate the candidate sequences of one epoch.
 
@@ -130,6 +138,9 @@ def run_epoch(
         shuffle, and the table then records every candidate as untested.
     config : MemorylessSequenceConfig
     n_shuffles : int, default 100
+    is_missing : ndarray of bool, shape (n_time,), optional
+        Bins of the grid with no observation, such as the artifact mask's
+        (closed intervals, as the decoders' ``is_missing``). None marks none.
 
     Returns
     -------
@@ -142,6 +153,13 @@ def run_epoch(
         raise ValueError(
             f"speed_cm_per_s {speed.shape} must be on the decode grid {time.shape}."
         )
+    if is_missing is not None:
+        is_missing = np.asarray(is_missing, dtype=bool)
+        if is_missing.shape != time.shape:
+            raise ValueError(
+                f"is_missing {is_missing.shape} must be on the decode grid "
+                f"{time.shape}."
+            )
     if seed is not None and seed.session != identity.epoch_id:
         raise ValueError(
             f"The shuffle seed names session {seed.session!r} but the epoch is "
@@ -156,11 +174,14 @@ def run_epoch(
         encoding_model,
         config,
     )
+    # the likelihood drops the grid's final row, which no spike can reach
+    missing_rows = None if is_missing is None else is_missing[: likelihood.time.size]
     posterior = normalize_windows(
         aggregate_windows(
             likelihood.log_likelihood,
             config.window_n_samples,
             config.stride_n_samples,
+            missing=missing_rows,
         )
     )
     midpoint_s = window_midpoints_s(likelihood.time, config)
@@ -171,6 +192,13 @@ def run_epoch(
         bin_distance_cm,
         np.interp(midpoint_s, time, speed),
         config,
+        unobserved=(
+            None
+            if missing_rows is None
+            else windows_holding(
+                missing_rows, config.window_n_samples, config.stride_n_samples
+            )
+        ),
     )
 
     if seed is None:

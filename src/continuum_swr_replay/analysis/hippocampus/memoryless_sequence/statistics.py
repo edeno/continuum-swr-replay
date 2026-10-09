@@ -26,6 +26,7 @@ __all__ = [
     "forward_jumps_cm",
     "normalize_windows",
     "window_center_and_spread",
+    "windows_holding",
 ]
 
 NO_CENTER = -1
@@ -40,10 +41,39 @@ blocks; the result does not depend on the block size.
 """
 
 
+def windows_holding(
+    rows: NDArray, window_n_samples: int, stride_n_samples: int
+) -> NDArray[np.bool_]:
+    """Which sliding windows hold at least one of the marked rows.
+
+    Parameters
+    ----------
+    rows : ndarray of bool, shape (n_time,)
+    window_n_samples : int
+        Rows in one window.
+    stride_n_samples : int
+        Rows between the starts of consecutive windows.
+
+    Returns
+    -------
+    holding : ndarray of bool, shape (n_windows,)
+        One entry per window whose full support is present, as
+        :func:`aggregate_windows` returns them.
+
+    """
+    marked = np.asarray(rows, dtype=bool)
+    n_windows = max(0, 1 + (marked.size - window_n_samples) // stride_n_samples)
+    count = np.concatenate(([0], np.cumsum(marked)))
+    starts = np.arange(n_windows) * stride_n_samples
+    holding: NDArray[np.bool_] = (count[starts + window_n_samples] - count[starts]) > 0
+    return holding
+
+
 def aggregate_windows(
     log_likelihood: NDArray,
     window_n_samples: int,
     stride_n_samples: int,
+    missing: NDArray | None = None,
 ) -> NDArray:
     """Sum a log-likelihood over sliding windows.
 
@@ -59,12 +89,23 @@ def aggregate_windows(
         Rows in one window.
     stride_n_samples : int
         Rows between the starts of consecutive windows.
+    missing : ndarray of bool, shape (n_time,), optional
+        Rows with no observation, such as the artifact mask's bins. Their
+        values never enter a sum, whatever they hold, and every window holding
+        one is NaN: a window the decoder could not evaluate, which gets no
+        posterior. None marks no row.
 
     Returns
     -------
     window_log_likelihood : ndarray, shape (n_windows, n_bins)
         One row per window whose full support is present. A window that would
         run past the end of the data is not returned.
+
+    Raises
+    ------
+    ValueError
+        If the window or stride is below one row, or ``missing`` is not one
+        flag per row.
 
     """
     values = np.asarray(log_likelihood, dtype=np.float64)
@@ -74,6 +115,14 @@ def aggregate_windows(
             f"window_n_samples ({window_n_samples}) and stride_n_samples "
             f"({stride_n_samples}) must both be at least 1."
         )
+    if missing is not None:
+        missing = np.asarray(missing, dtype=bool)
+        if missing.shape != (n_time,):
+            raise ValueError(
+                f"missing has shape {missing.shape}; it must flag each of the "
+                f"{n_time} rows."
+            )
+        values = np.where(missing[:, np.newaxis], 0.0, values)
     n_windows = max(0, 1 + (n_time - window_n_samples) // stride_n_samples)
     if n_windows == 0:
         return np.empty((0, n_bins), dtype=np.float64)
@@ -82,6 +131,8 @@ def aggregate_windows(
     np.cumsum(values, axis=0, out=cumulative[1:])
     starts = np.arange(n_windows) * stride_n_samples
     windows: NDArray = cumulative[starts + window_n_samples] - cumulative[starts]
+    if missing is not None:
+        windows[windows_holding(missing, window_n_samples, stride_n_samples)] = np.nan
     return windows
 
 

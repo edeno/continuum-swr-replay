@@ -384,12 +384,15 @@ def merge_runs(
     window_time_s: NDArray,
     bin_distance_cm: NDArray,
     config: MemorylessSequenceConfig,
+    unobserved: NDArray | None = None,
 ) -> tuple[NDArray, list[NDArray]]:
     """Join neighboring runs separated by a short gap in both space and time.
 
     The gap is measured between the facing endpoints: the last window of one
     run and the first window of the next. Merging is transitive, so a chain of
-    close runs becomes one sequence.
+    close runs becomes one sequence. No merge bridges an ``unobserved``
+    window: a candidate never spans one, so the shuffle, which re-decodes a
+    candidate's every window, never reads its rows.
 
     Parameters
     ----------
@@ -400,6 +403,8 @@ def merge_runs(
         Window midpoints.
     bin_distance_cm : ndarray, shape (n_bins, n_bins)
     config : MemorylessSequenceConfig
+    unobserved : ndarray of bool, shape (n_windows,), optional
+        Windows holding a missing row (the artifact mask); None for none.
 
     Returns
     -------
@@ -432,6 +437,10 @@ def merge_runs(
     joins = _is_below(gap_cm, config.merge_gap_cm) & _is_below(
         gap_s, config.merge_gap_s
     )
+    if unobserved is not None:
+        # the windows strictly between the facing endpoints
+        count = np.concatenate(([0], np.cumsum(np.asarray(unobserved, dtype=bool))))
+        joins &= count[after] == count[before + 1]
 
     # a run starts a new sequence when it did not join the run before it
     opens = np.concatenate(([True], ~joins))
@@ -450,6 +459,7 @@ def assemble_sequences(
     window_time_s: NDArray,
     bin_distance_cm: NDArray,
     config: MemorylessSequenceConfig,
+    unobserved: NDArray | None = None,
 ) -> SequenceAssembly:
     """Collect kept windows into candidate sequences.
 
@@ -468,6 +478,8 @@ def assemble_sequences(
     window_time_s : ndarray, shape (n_windows,)
     bin_distance_cm : ndarray, shape (n_bins, n_bins)
     config : MemorylessSequenceConfig
+    unobserved : ndarray of bool, shape (n_windows,), optional
+        Windows no merge may bridge (:func:`merge_runs`).
 
     Returns
     -------
@@ -480,7 +492,7 @@ def assemble_sequences(
         runs = runs[runs[:, 1] > runs[:, 0]]
 
     merged, pieces = merge_runs(
-        runs, center_index, window_time_s, bin_distance_cm, config
+        runs, center_index, window_time_s, bin_distance_cm, config, unobserved
     )
     long_enough = (merged[:, 1] - merged[:, 0]) >= config.minimum_run_index_length
     return SequenceAssembly(
@@ -672,6 +684,7 @@ def detect_candidate_sequences(
     bin_distance_cm: NDArray,
     window_speed_cm_per_s: NDArray,
     config: MemorylessSequenceConfig,
+    unobserved: NDArray | None = None,
 ) -> CandidateSequences:
     """Run every per-window step in order and assemble what survives.
 
@@ -691,6 +704,10 @@ def detect_candidate_sequences(
     window_speed_cm_per_s : ndarray, shape (n_windows,)
         Speed at each window's midpoint.
     config : MemorylessSequenceConfig
+    unobserved : ndarray of bool, shape (n_windows,), optional
+        Windows holding a missing row, such as the artifact mask's bins. Their
+        posterior rows must be all NaN, so none is kept, and no merge bridges
+        one. None for none.
 
     Returns
     -------
@@ -699,7 +716,8 @@ def detect_candidate_sequences(
     Raises
     ------
     ValueError
-        The arrays disagree in length, the midpoints are not finite and
+        The arrays disagree in length, an unobserved window has a posterior,
+        the midpoints are not finite and
         increasing, a posterior row mixes finite and non-finite values, or a
         finite posterior row does not sum to one.
 
@@ -729,6 +747,14 @@ def detect_candidate_sequences(
             "one; normalize the windows first."
         )
 
+    if unobserved is not None:
+        unobserved = np.asarray(unobserved, dtype=bool)
+        if unobserved.shape != midpoint_s.shape or not unevaluated[unobserved].all():
+            raise ValueError(
+                "unobserved must flag windows whose posterior rows are all NaN, "
+                "one flag per window."
+            )
+
     decisions = window_decisions(
         posterior, bin_distance_cm, window_speed_cm_per_s, config
     )
@@ -738,6 +764,7 @@ def detect_candidate_sequences(
         midpoint_s,
         bin_distance_cm,
         config,
+        unobserved,
     )
     duration_s = sequence_duration_s(assembly.runs, midpoint_s)
     dispersion = sequence_dispersion_cm(

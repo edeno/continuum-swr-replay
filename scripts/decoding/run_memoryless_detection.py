@@ -10,7 +10,13 @@ observed from the paper's SWR source (``analysis/hippocampus/swr_source.py``,
 the direct Kay inventory, on that grid), and the spike marks read as
 ``load_data`` read them for the decode (``MARKS_RULE``): ``get_hpc_marks``,
 then ``filter_spike_times`` over the decode's time span.
-Both procedures therefore read one encoding model.
+Both procedures therefore read one encoding model. The decode's encoding
+model already leaves out the artifact mask (the decoders' encoding exclusion),
+but this detector computes its own likelihood over every bin, so the runner
+marks the mask's bins on the decode grid missing (``is_missing``, the decoders'
+rule: a bin inside a closed interval of ``swr_source.artifact_intervals``).
+No window holding one is decoded, no candidate touches one, and neither the
+shuffle null nor any normalization reads them (``memoryless_sequence.epoch``).
 ``check_marks_match_encoding`` refuses them unless every mark the encoding
 model was fitted on is among them. Those are the training span's, so it cannot
 see a spike the reload adds, or one dropped only during SWRs, which
@@ -21,8 +27,9 @@ Each epoch writes, under ``Processed-Data/replay_detection_comparison/memoryless
 
 - ``{epoch_id}_memoryless_events.parquet``, one row per candidate sequence;
 - ``{epoch_id}_memoryless_shuffle_draws.parquet``, every shuffled draw;
-- ``{epoch_id}_memoryless_observed.parquet``, what was observed: the span the
-  windows cover, and the stretches where SWR labels were observed;
+- ``{epoch_id}_memoryless_observed.parquet``, what was observed: the stretches
+  of decoded windows (none holds a masked bin), and the stretches where SWR
+  labels were observed;
 - ``{epoch_id}_memoryless_candidates.pkl``, the per-window statistics, gates
   and pre-merge runs that explain each rejection.
 
@@ -113,6 +120,10 @@ from numpy.typing import NDArray
 
 from continuum_swr_replay import decoding_common
 from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
+from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
+    interval_mask,
+    masked_seconds,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
     MemorylessSequenceConfig,
     SequenceIdentity,
@@ -120,6 +131,9 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
     load_clusterless_encoding_model,
     run_epoch,
     window_midpoints_s,
+)
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (
+    contiguous_runs,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.event_table import (
     canonical_swr_intervals,
@@ -132,7 +146,11 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle impor
     MINIMUM_N_SHUFFLES,
     SIGNIFICANCE_LEVEL,
 )
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
+    windows_holding,
+)
 from continuum_swr_replay.analysis.hippocampus.swr_source import (
+    artifact_intervals,
     read_dot_with_swr_source,
     stamp_swr_source,
     swr_epoch_id,
@@ -461,18 +479,32 @@ def output_paths(epoch_id: str, output_dir: Path) -> dict[str, Path]:
 
 
 def observation_table(
-    time: np.ndarray, swr_observed: np.ndarray, config: MemorylessSequenceConfig
+    time: np.ndarray,
+    swr_observed: np.ndarray,
+    config: MemorylessSequenceConfig,
+    missing_windows: np.ndarray,
 ) -> pd.DataFrame:
     """The stretches this epoch observed, independent of what it detected.
 
-    ``decoded_windows`` spans the first and last window midpoint the grid
-    supports, the final row, which no spike can reach, excluded;
+    ``decoded_windows`` are the stretches of window midpoints the grid
+    supports, the final row, which no spike can reach, excluded, less the
+    windows holding a missing bin, each from its first to its last midpoint;
     ``swr_labels`` are the stretches where SWR labels were observed.
+
+    Parameters
+    ----------
+    time : ndarray, shape (n_time,)
+        The decode grid.
+    swr_observed : ndarray, shape (n_stretches, 2)
+    config : MemorylessSequenceConfig
+    missing_windows : ndarray of bool, shape (n_windows,)
+        The windows holding a missing bin, which were not decoded.
     """
     midpoints = window_midpoints_s(time[:-1], config)
-    rows = []
-    if midpoints.size:
-        rows.append(("decoded_windows", midpoints[0], midpoints[-1]))
+    rows = [
+        ("decoded_windows", midpoints[first], midpoints[last])
+        for first, last in contiguous_runs(~np.asarray(missing_windows, dtype=bool))
+    ]
     rows += [("swr_labels", start, end) for start, end in swr_observed]
     return pd.DataFrame(rows, columns=["kind", "start_s", "end_s"]).astype(
         {"kind": object, "start_s": np.float64, "end_s": np.float64}
@@ -541,6 +573,12 @@ def run_one(
     swr_epoch = swr_epoch_id(f"{identity.animal}{identity.day}_.nwb", identity.epoch)
     swr_observed = swr_observed_stretches(swr_epoch)
     swr_files = swr_source_files(swr_epoch)
+    # the one artifact mask, on the decode grid, as the decoders' is_missing
+    artifact_mask = artifact_intervals(swr_epoch)
+    is_missing = interval_mask(time, artifact_mask)
+    missing_windows = windows_holding(
+        is_missing[:-1], config.window_n_samples, config.stride_n_samples
+    )
     detection = run_epoch(
         time,
         data_over_time["linear_position"].to_numpy(dtype=np.float64),
@@ -557,11 +595,12 @@ def run_one(
         seed=ShuffleSeed(run=run_seed, session=epoch_id) if shuffle else None,
         config=config,
         n_shuffles=n_shuffles,
+        is_missing=is_missing,
     )
 
     outputs = output_paths(epoch_id, output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    observed = observation_table(time, swr_observed, config)
+    observed = observation_table(time, swr_observed, config, missing_windows)
     for frame in (detection.table, detection.shuffle_draws, observed):
         frame.attrs = provenance | {"epoch_id": epoch_id}
     # The table's SWR columns are the source's: stamped as every canonical table is.
@@ -598,6 +637,13 @@ def run_one(
             "position_std": np.asarray(encoding_model["position_std"]).tolist(),
             "waveform_std": np.asarray(encoding_model["waveform_std"]).tolist(),
             "block_size": int(encoding_model["block_size"]),
+        },
+        "artifacts": {
+            "n_intervals": len(artifact_mask),
+            # the masked time within the decode grid
+            "masked_s": masked_seconds(artifact_mask.clip(time[0], time[-1])),
+            "n_missing_bins": int(np.count_nonzero(is_missing)),
+            "n_missing_windows": int(np.count_nonzero(missing_windows)),
         },
         "n_windows": int(gates.speed_eligible.size),
         # a window whose speed was NaN is rejected as not still; how many
