@@ -1743,6 +1743,23 @@ analyses: the masked 2.0 Kay inventory.
   `analysis` mask.
 - **Artifact time is unobserved.** An event of any kind that overlaps the `analysis` mask leaves
   every cohort; it is not counted as non-SWR. The mask's time leaves every rate exposure.
+- **So are its consequences (the lead, 2026-10-09: "We also need to make sure we are not analyzing
+  the artifact times or the consequences of artifact times in the analysis").**
+  - **The rule.** A unit is analysed only if everything it depends on was observed. A unit is an
+    event, a time bin, a peri-event window or a stop's exposure. Its *dependence window* is its own
+    span plus the reach of everything computed from data around it:
+    - filter support;
+    - the decoder's consequence window, how far a masked gap changes the posterior (study C3);
+    - history covariates;
+    - peri-event and baseline windows;
+    - normalization.
+  - **How it is applied.**
+    - Events, bins and peri-event windows whose dependence window touches the `analysis` mask are
+      dropped whole, with a reason.
+    - Rate exposure counts only observed time, with the same windows removed.
+    - Every normalization (any z-scoring, per epoch or per animal) leaves that time out.
+  - **Proof by invariance (Task 18 acceptance).** Change the data inside the mask and rerun the
+    chain. Every analysed row outside the declared windows must be unchanged.
 - **Post-step second.** Ripple-band power stays below its random-time level for at least 1 s after a
   step (`detector_report.md` §8 item 4). The `analysis` mask therefore also covers the 1 s after
   each step's core.
@@ -1971,6 +1988,11 @@ Work in the worktree `/cumulus/edeno/continuum-swr-replay-refresh-dev`, branch
     - the seconds set missing;
     - the seconds removed from encoding.
   - Refuse to run if either run id is unset (fail closed).
+- **Widloski masking (Task 17b, added 2026-10-09).** The runner reads the saved decode's encoding
+  model, so the new encoding exclusion reaches it. Its own likelihood still reads every bin. So:
+  - `decoder`-mask bins are missing in its likelihood;
+  - no candidate window may touch them;
+  - they enter neither the shuffle null nor any normalization.
 - **Widloski runner** (`run_memoryless_detection.py`): fix the thread cap. The dask nanny sets
   OMP/MKL/OPENBLAS_NUM_THREADS = 1 in each worker, and R4 took 18 h against an estimate of 5–6 h.
   Measure one epoch before and after: runtime, plus outputs identical bit for bit.
@@ -2028,6 +2050,21 @@ Work in the worktree `/cumulus/edeno/continuum-swr-replay-refresh-dev`, branch
   - per-bin tables (drop bins inside the mask; Family B);
   - PFC per-bin rows;
   - any other exposure you find.
+- **Dependence windows (the consequences ruling in the Phase C introduction).**
+  - **List them first.** Go through every analysis output: each table, rate ladder, content
+    ladder, PFC analysis, and each figure's source table. For each, write down its unit, its
+    dependence window and how the window is enforced. The table goes into the artifact design note
+    and the report.
+  - **Build the windows once.** Add one function that builds the unobserved intervals for a given
+    window: the `analysis` mask, padded before and after. Everything uses it.
+  - **Events.** Eligibility adds the decoder's consequence window around the `decoder` mask, set
+    from study C3, to the `analysis` mask.
+  - **Per-bin rows with history covariates.** Drop a bin when its longest history window touches
+    unobserved time; take that window from `model_specs.py`.
+  - **Peri-event windows** (PFC responses, MUA, reward kernels): drop a window that touches
+    unobserved time.
+  - **LFP-derived covariates** (theta phase and power, the ripple consensus): unobserved within the
+    filter's settling time of the mask.
 - **Stamps:** tables carry `artifacts@<run>` through the existing `swr_source` stamp.
 - **Docs:**
   - update `docs/known_issues/swr_mua_count_conventions.md`;
@@ -2040,8 +2077,19 @@ Work in the worktree `/cumulus/edeno/continuum-swr-replay-refresh-dev`, branch
 - per-bin rows inside the mask are dropped;
 - with no artifacts, every output is identical to before.
 
-**Acceptance:** on the 5 pilots with a scratch artifact run, report per cohort the counts before and
-after, and the exposure removed.
+**Acceptance:**
+- On the 5 pilots with a scratch artifact run, report per cohort the counts before and after, and
+  the exposure removed.
+- **Invariance test.** This is the proof that no artifact time and no consequence of it is
+  analysed. Use 2 pilot epochs with artifacts.
+  - Replace the data inside the `decoder` mask:
+    - spikes: marks shuffled across masked time;
+    - LFP: raw values replaced with scaled noise, then refiltered with the stored band's filter, as
+      the Task 8 band check does.
+  - Rerun SWR detection, the decode (scratch staging, one idle GPU) and the tables.
+  - Every analysed row outside the declared dependence windows must be identical; decoder outputs
+    must agree within float tolerance.
+  - A difference is a leak: fix it, or widen its declared window, and record which.
 
 ## C1: follow-up checks from the literature review (read-only, CPU; done 2026-10-09)
 
@@ -2064,6 +2112,22 @@ Output: `.claude/research/refresh_artifact_detector/followup/`. Reports: `follow
    chaining, 5.5 % of true SWRs exceed 20 %, and only 2 % exceed 33 %.
 5. **Amplitude cap,** for the methods: a cap at 9 or 10 robust z would drop 27.6 % or 23.7 % of
    true SWRs.
+
+## C2 and C3: justification and consequences (read-only; started 2026-10-09)
+
+- **C2** (`followup/c2_brief.md`, report `justification_report.md`) justifies every rule (S, T-ref,
+  T-ca1, T-spk, padding, R-T, R-rip) and every constant. For each it gives:
+  - the mechanism, and why SWRs lack the signature;
+  - field precedents read from source: FieldTrip `ft_artifact_jump`, PREP, EEGLAB
+    `clean_channels`, IBL / SpikeInterface `detect_bad_channels`, and the existing review;
+  - one stated rule for placing every threshold;
+  - held-out validation, with folds by animal and leave-one-animal-out.
+
+  A changed constant is a Task 16 fix round, or goes into Task 17b. R9 and Task 17b wait for C2.
+- **C3** (`followup/c3_brief.md`, report `followup_c3_report.md`; GPU on breeze) measures how far a
+  masked gap changes the NonLocal and ContFrag posteriors and their events. It injects gaps into
+  clean epochs and compares decodes with the same fitted model. Its result sets the decoder
+  consequence window in Task 18.
 
 ## R9: artifact detection, all epochs (CPU)
 
@@ -2136,4 +2200,4 @@ Run with the thread fix, into a new run folder.
 
 R5–R8 as written, on 255 epochs, with stamps `kay@<R10 run>+artifacts@<R9 run>`. R8 adds:
 - the sensitivity analysis without the 4 epochs over 2 % masked;
-- the masked-time table.
+- the masked-time table, plus the time and the units each dependence window removes, per analysis.
