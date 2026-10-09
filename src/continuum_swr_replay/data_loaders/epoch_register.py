@@ -355,8 +355,10 @@ def analysed_epochs(include_pending: bool = False) -> pd.DataFrame:
     Parameters
     ----------
     include_pending : bool, optional
-        Also the pending epochs. No stage asks for both at once: an incremental
-        run takes :func:`pending_epochs` alone.
+        Also the pending epochs. The artifact runner asks for both at once
+        (``--include-pending``: runbook R9 runs the analysed and the pending
+        epochs together). The incremental update of the decoders, the SWR runner
+        and the Widloski runner takes :func:`pending_epochs` alone.
 
     Returns
     -------
