@@ -1256,7 +1256,7 @@ for 40 restorable epochs is in `.claude/research/refresh_populate/`
     - `NO_TRIAL_INTERVALS` (trial parsing failed; holds for 12 sessions);
     - `NO_NWB` (files absent);
     - `DEPLETION_TASK`;
-    - `NOT_INGESTED_BLOCKED`;
+    - `NOT_INGESTED`;
     - `PENDING_POPULATE` (with the planned fix);
     - `MISSING_INPUT` (a decode input absent with no fix planned).
 
@@ -1274,7 +1274,7 @@ for 40 restorable epochs is in `.claude/research/refresh_populate/`
   sessions' descriptions. Keep its other behaviour, because other callers use it. Document
   the change.
 - Every stage that enumerates epochs uses `analysed_epochs()`:
-  - both decoders' `run_batch` epoch list (add an `--include-pending` flag for the
+  - both decoders' `run_batch` epoch list (add an `--pending-only` flag for the
     incremental update);
   - the SWR runner, which replaces `KNOWN_NO_INPUT_EPOCHS` with register lookups;
   - the Widloski runner;
@@ -1322,6 +1322,78 @@ for 40 restorable epochs is in `.claude/research/refresh_populate/`
 - the audit fails on an unregistered or unexplained epoch;
 - with the current Spyglass state, `analysed_epochs()` equals the 218 staged and swapped-in
   decodes.
+
+## Task 15: one SWR source for every analysis — the direct ripple_detection 2.0 Kay inventory (added 2026-10-09)
+
+Work in the worktree `/cumulus/edeno/continuum-swr-replay-refresh-dev`, branch `full-pipeline-refresh-code`.
+Leave the main tree untouched until the controller merges.
+
+**Why:** the project lead decided (2026-10-05) that the paper's SWR labels (`is_swr`, `SWR_event`,
+and every SWR-aligned analysis) come from the direct ripple_detection 2.0 Kay inventory produced by
+the SWR runner (R3), not from Spyglass's stored `RippleTimesV1`. The 2.0 rule is at least 15 ms
+continuously above z = 2, the published Kay et al. 2016 definition. Across 216 epochs the two agree
+closely: ratio 1.015, with 92.8% of stored events recovered. But the stored events came from
+unknown older inputs, and 1.7% of them fall inside artifacts. Artifact masking (Task 16) will be
+added later through the interface below.
+
+**Inputs:**
+- R3 inventory: `Processed-Data/replay_detection_comparison/swr/<run_id>/`.
+  - Files per epoch: `{epoch_id}_kay_events.parquet` (start_time, end_time, duration, …),
+    `{epoch_id}_swr_observed.parquet` (where detection was possible) and `manifest.json` (status,
+    provenance).
+  - The run id is today `50a98592acee`. It will change when R3 reruns with the artifact mask, so it
+    must be one configured constant, not a literal at each call site.
+- The project's whole-event immobility rule (`analysis/hippocampus/event_immobility.py`).
+- The epoch register (Task 14): `analysed_epochs()` and `analysed_decode_files()`.
+
+**Files:**
+- Create `src/continuum_swr_replay/analysis/hippocampus/swr_source.py`:
+  - `SWR_INVENTORY_RUN_ID` and the detector name (`"kay"`), each defined once and documented.
+  - `swr_events(epoch_id, *, artifact_intervals=None) -> pd.DataFrame`. It reads the inventory, keeps
+    the whole-event-immobile events (the same canonical rule as the non-local and MUA cohorts), and
+    drops events that overlap `artifact_intervals` (an interval table, a hook for Task 16; None
+    today). It records a reason for every dropped event.
+  - It raises if the epoch's manifest status is not `ok` or `partial` with the Kay inventory present.
+    That includes the 2 j16 epochs until R3 reruns them.
+  - `swr_event_labels(time, epoch_id, *, artifact_intervals=None) -> np.ndarray`: the per-bin
+    `SWR_event` labels on a decode time grid. It must use exactly the convention the table builders
+    use now for `SWR_event` (find it and keep it). Also give the coverage mask: bins where SWR
+    detection was observed, from `swr_observed`.
+- Replace the stored-ripple SWR source everywhere analyses read SWR labels or times. Grep `SWR_event`,
+  `ripple_times`, `get_ripple(`, `is_swr`, `RippleTimesV1` and `swr_` across `src/` and `scripts/`, and
+  list every consumer with your decision in the report. At least:
+  - the event-table builder `build_classified_nonlocal_event_table` (`analysis/hippocampus/event_table.py`),
+    which takes `SWR_event` from data_over_time today;
+  - the stop table's `is_swr_stop`;
+  - the timebin tables;
+  - the ContFrag tables;
+  - the PFC SWR-aligned analyses;
+  - the replay-content tables;
+  - the MUA/SWR count conventions doc;
+  - figure helpers in `src/` (do not edit figure scripts; that is a plan constraint).
+- Leave the decoders' `no_ripple` encoding-training mask unchanged in this task. It is a separate
+  decision, noted in the report.
+- Docs:
+  - a design note `docs/design/2026-10-09-swr-source.md`: the decision, the 2.0 vs stored comparison
+    numbers (from `.claude/research/refresh_r1/kay_version_ratio.csv`), and the interface;
+  - update `docs/known_issues/swr_mua_count_conventions.md` if the conventions change;
+  - update CLAUDE.md's description of `SWR_event` provenance only as a PROPOSAL in the report (do not
+    edit CLAUDE.md).
+
+**Tests (first):**
+- `swr_events` reads a synthetic inventory, applies the immobility rule, and drops overlapping events
+  with reasons.
+- It raises on a failed epoch.
+- `swr_event_labels` reproduces the current builder's labels exactly when fed the same intervals.
+- Every listed consumer now calls the source. Use stubs; no consumer reads `RippleTimesV1` or
+  data_over_time's `SWR_event` for analysis anymore. Keep `SWR_event` in data_over_time as the decode's
+  own provenance, unused by analyses.
+
+**Acceptance:**
+- the tests pass;
+- one source, used by every SWR consumer;
+- the report lists every consumer and the decision for each;
+- on 5 pilot epochs (read-only), the new `is_swr` counts per epoch are reported next to the old ones.
 
 ---
 
