@@ -63,6 +63,7 @@ from continuum_swr_replay.decoding_common import (
     provenance_record,
     release_nwb_files,
     require_hpc_decode_sources,
+    require_saved_decode_masks,
     results_exist,
     run_batch,
     setup_logger,
@@ -372,7 +373,9 @@ def run_decode(
     detection (``load_data``) and are its ``is_missing``; its encoding leaves
     them and every inventory event out (``hpc_decode_masks``, logged as
     ``DECODE MASKS`` and stamped into ``results.nc``); and its
-    ``data_over_time`` carries the source's ``SWR_event``.
+    ``data_over_time`` carries the source's ``SWR_event``. An HPC resume
+    refuses results whose stamped masks name other runs, or none
+    (``require_saved_decode_masks``).
 
     With ``release_nwb``, the epoch ends, pass or fail, by closing the NWB files
     Spyglass holds open in this process (``release_nwb_files``) and logging how
@@ -448,6 +451,11 @@ def run_decode(
                 training_type=training_type,
                 root=save_dir,
             )
+            if decoder_intervals is not None:
+                # the reused results must come from the configured masks
+                require_saved_decode_masks(
+                    results.attrs, str(save_dir / f"{epoch_identifier}_results.nc")
+                )
         else:
             is_missing = None
             if decoder_intervals is None:

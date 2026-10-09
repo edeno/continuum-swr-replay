@@ -55,6 +55,7 @@ from argparse import ArgumentParser, Namespace
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 
 import dask
@@ -300,11 +301,18 @@ class _FailsMidWrite(_WritesPlaceholders):
 
 
 class _RefusesToSave:
-    """Stands in for what a resume reloads: writing any of it back is the bug."""
+    """Stands in for what a resume reloads: writing any of it back is the bug.
+
+    Its ``attrs`` can be read, as a resume checks the saved masks, but not
+    written.
+    """
+
+    def __init__(self, attrs: dict[str, str] | None = None) -> None:
+        self._attrs = MappingProxyType(dict(attrs or {}))
 
     @property
-    def attrs(self) -> dict[str, str]:
-        raise AssertionError("a resume stamped results.attrs")
+    def attrs(self) -> MappingProxyType:
+        return self._attrs
 
     def reset_index(self, *args: Any, **kwargs: Any) -> None:
         raise AssertionError("a resume rewrote results.nc")
@@ -317,6 +325,18 @@ class _RefusesToSave:
 
     def save_environment(self, *args: Any, **kwargs: Any) -> None:
         raise AssertionError("a resume rewrote the environment")
+
+
+def _saved_attrs(
+    swr_inventory_run_id: str = RUN_ID, artifact_run_id: str = ARTIFACT_RUN_ID
+) -> dict[str, str]:
+    """A saved HPC decode's ``results.nc`` attrs: its masks' record, as built
+    under the given run ids (by default the configured ones)."""
+    record = {
+        "swr_inventory_run_id": swr_inventory_run_id,
+        "artifact_run_id": artifact_run_id,
+    }
+    return {"decode_masks": json.dumps(record, sort_keys=True)}
 
 
 def _sha256(path: Path) -> str:
@@ -682,7 +702,7 @@ def test_run_decode_resume_keeps_saved_files(decoders, monkeypatch, tmp_path, ke
 
     def loader(*args: Any, **kwargs: Any) -> tuple[_RefusesToSave, ...]:
         roots.append(kwargs["root"])
-        return _RefusesToSave(), _RefusesToSave(), _RefusesToSave()
+        return _RefusesToSave(_saved_attrs()), _RefusesToSave(), _RefusesToSave()
 
     monkeypatch.setattr(module, "load_data", lambda *args, **kwargs: _session_data())
     monkeypatch.setattr(module, decoder.loader_name, loader)
@@ -704,6 +724,56 @@ def test_run_decode_resume_keeps_saved_files(decoders, monkeypatch, tmp_path, ke
     assert len(resumed) == 1
     assert resumed[0].endswith(f"RESUMED from existing results in {save_dir.resolve()}")
     assert any(line.endswith(f"save_dir: {save_dir.resolve()}") for line in log)
+
+
+@pytest.mark.parametrize(
+    "saved",
+    [
+        {},
+        _saved_attrs(swr_inventory_run_id="50a98592acee"),
+        _saved_attrs(artifact_run_id="otherartifacts"),
+    ],
+    ids=["no_masks", "other_inventory", "other_artifact_run"],
+)
+@pytest.mark.parametrize("key", list(DECODERS))
+def test_a_resume_refuses_results_made_under_other_masks(
+    decoders, monkeypatch, tmp_path, key, saved
+):
+    """An HPC resume rewrites data_over_time with the configured source's
+    labels, so the results it reuses must have been decoded with the same two
+    runs: one decoded before the masks, or under other run ids, is refused and
+    left as it was."""
+    decoder, module = DECODERS[key], decoders.modules[key]
+    save_dir = tmp_path / "staging"
+    save_dir.mkdir()
+    before = _write_saved_files(save_dir, decoder.epoch_identifier)
+
+    def organize_results(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("a resume organized results decoded under other masks")
+
+    monkeypatch.setattr(module, "load_data", lambda *args, **kwargs: _session_data())
+    monkeypatch.setattr(
+        module,
+        decoder.loader_name,
+        lambda *args, **kwargs: (
+            _RefusesToSave(saved),
+            _RefusesToSave(),
+            _RefusesToSave(),
+        ),
+    )
+    monkeypatch.setattr(module, "organize_results", organize_results)
+
+    failed = _run_decode(module, decoder, tmp_path, save_dir=save_dir)
+
+    assert failed == decoder.epoch_identifier
+    assert _saved_file_hashes(save_dir, decoder.epoch_identifier) == before
+    assert not (save_dir / decoder.data_over_time_name).exists()
+    log = _log(tmp_path, decoder)
+    assert "refusing to resume" in log
+    if saved:
+        assert "50a98592acee" in log or "otherartifacts" in log
+    else:
+        assert "no decode_masks" in log
 
 
 @pytest.mark.parametrize("key", list(DECODERS))

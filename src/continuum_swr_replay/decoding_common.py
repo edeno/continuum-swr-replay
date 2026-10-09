@@ -19,7 +19,7 @@ import resource
 import subprocess
 import sys
 from argparse import ArgumentParser, Namespace
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -153,6 +153,47 @@ def require_hpc_decode_sources() -> None:
             f"{swr_source.ARTIFACT_INTERVALS_RUN_ID!r}: rerun the SWR runner with the "
             "configured artifact run and set swr_source.SWR_INVENTORY_RUN_ID to it; "
             "refusing to decode."
+        )
+
+
+def require_saved_decode_masks(attrs: Mapping[str, Any], what: str) -> None:
+    """Refuse to resume an HPC decode whose saved results were made under other
+    masks.
+
+    A resume reuses ``results.nc`` and rewrites ``data_over_time`` with the
+    configured source's SWR labels, so the results must have been decoded with
+    the configured Kay inventory and artifact run: their ``decode_masks``
+    record (``hpc_decode_masks``, stamped by a fresh save) must name both.
+
+    Parameters
+    ----------
+    attrs : Mapping
+        The saved results' ``attrs``.
+    what : str
+        What they are, for the message (the file, say).
+
+    Raises
+    ------
+    ValueError
+        If the record is missing (a decode made before the masks) or names
+        another inventory or artifact run.
+    """
+    stamp = attrs.get("decode_masks")
+    if stamp is None:
+        raise ValueError(
+            f"{what} has no decode_masks: it was decoded without the artifact "
+            "masks; refusing to resume. Decode it afresh (--overwrite)."
+        )
+    record = json.loads(stamp)
+    configured = {
+        "swr_inventory_run_id": swr_source.SWR_INVENTORY_RUN_ID,
+        "artifact_run_id": swr_source.ARTIFACT_INTERVALS_RUN_ID,
+    }
+    saved = {name: record.get(name) for name in configured}
+    if saved != configured:
+        raise ValueError(
+            f"{what} was decoded with {saved}, not the configured {configured}; "
+            "refusing to resume. Decode it afresh (--overwrite)."
         )
 
 
