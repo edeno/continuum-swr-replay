@@ -14,10 +14,13 @@ What this module fixes
   the only place either is written; rerunning R3 is a change of
   :data:`SWR_INVENTORY_RUN_ID` and nothing else.
 - **Which artifacts**: :data:`ARTIFACT_INTERVALS_RUN_ID` under
-  :data:`ARTIFACT_INTERVALS_ROOT`, Task 16's hook. It is None today: no
+  :data:`ARTIFACT_INTERVALS_ROOT`, the artifact detector's run
+  (``scripts/decoding/run_artifact_detection.py``). It is None today: no
   artifact is masked. Every function here resolves an epoch's artifact
   intervals itself (:func:`artifact_intervals`), so no caller passes them and
-  every caller gets the same ones.
+  every caller gets the same ones: the ``analysis`` mask
+  (``artifacts.masks.CONSUMER_PADDING``), the detector's cores padded for event
+  eligibility and rate exposure.
 - **The source's name** (:func:`swr_source_name`): the detector, the inventory
   run and the artifact run, such as ``kay@50a98592acee+artifacts@none``. Every
   table built from these labels is stamped with it (:func:`stamp_swr_source`),
@@ -43,7 +46,9 @@ What this module fixes
   gap; and a dropped event's bins are 0.
 - **Where detection was observed** (:func:`swr_observed_stretches`,
   :func:`swr_observed_mask`): the gap-free stretches of the stored ripple band
-  that Kay read (``scope == "stored_band"`` in ``swr_observed.parquet``).
+  that Kay read (``scope == "stored_band"`` in ``swr_observed.parquet``), less
+  the artifact intervals. Artifact time is unobserved: an event there is
+  neither an SWR nor a non-SWR event.
 
 Analyses read a decode's ``data_over_time`` through :func:`with_swr_source`
 or :func:`read_dot_with_swr_source`. Its ``SWR_event`` column then holds this
@@ -69,6 +74,17 @@ from numpy.typing import NDArray
 
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+)
+from continuum_swr_replay.analysis.hippocampus.artifacts.io import (
+    ArtifactRunError,
+    read_epoch_cores,
+)
+from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
+    Consumer,
+    subtract_intervals,
+)
+from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
+    artifact_intervals as consumer_intervals,
 )
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     build_speed_eligible_event_cohort,
@@ -130,14 +146,15 @@ SWR_INVENTORY_ROOT = PROCESSED_DATA_DIR / "replay_detection_comparison" / "swr"
 """Where the SWR runner writes its run folders, one per run id."""
 
 ARTIFACT_INTERVALS_RUN_ID: str | None = None
-"""The artifact-interval run whose intervals drop overlapping SWRs: Task 16's.
+"""The artifact detector's run whose intervals drop overlapping SWRs and leave
+the coverage.
 
-None today: no artifact intervals exist, so none is masked, and the source's
-name says so (``artifacts@none``). Task 16 sets this to its run id; its folder,
-:data:`ARTIFACT_INTERVALS_ROOT` ``/ <run id>``, then holds one
-``{epoch_id}_artifact_intervals.parquet`` per epoch, with columns
-``start_time`` and ``end_time`` in seconds (no rows when the epoch has none).
-A missing file is an error, not an epoch without artifacts.
+None today: no artifact is masked, and the source's name says so
+(``artifacts@none``). Runbook R9 sets it to its run id. The folder,
+:data:`ARTIFACT_INTERVALS_ROOT` ``/ <run id>``, holds ``manifest.json`` and one
+``{epoch_id}_artifact_intervals.parquet`` per epoch: the epoch's unpadded
+cores (``artifacts.io.CORE_COLUMNS``), no rows when it has none. A missing
+file is an error, not an epoch without artifacts.
 """
 
 ARTIFACT_INTERVALS_ROOT = PROCESSED_DATA_DIR / "artifact_intervals"
@@ -378,42 +395,36 @@ def _read_observed(path: str) -> NDArray[np.float64]:
 
 
 def artifact_intervals(epoch_id: str) -> pd.DataFrame:
-    """The epoch's artifact intervals, from the one configured location.
+    """The epoch's artifact intervals, from the one configured run.
+
+    The run's cores for the epoch, padded by the ``analysis`` row of
+    ``artifacts.masks.CONSUMER_PADDING`` (S by 1 s on each side, an LFP step by
+    0.3 s before and 1.3 s after, a spike-only line by 0.1 s), merged and
+    clipped to the epoch's span.
 
     Returns
     -------
     pd.DataFrame
-        Columns ``start_time`` and ``end_time`` (seconds); no rows while
-        :data:`ARTIFACT_INTERVALS_RUN_ID` is unset.
+        Columns ``start_time`` and ``end_time`` (seconds), closed, disjoint and
+        in time order; no rows while :data:`ARTIFACT_INTERVALS_RUN_ID` is unset.
 
     Raises
     ------
     SwrSourceError
-        If an artifact run is configured but holds no file for the epoch, or
-        the file is malformed.
+        If an artifact run is configured but its manifest does not serve the
+        epoch (not run, failed, another run's folder), its file is missing or
+        changed since the run, or the cores are malformed.
     """
     directory = artifact_intervals_dir()
     if directory is None:
         return pd.DataFrame(
             {column: np.empty(0, dtype=float) for column in _ARTIFACT_COLUMNS}
         )
-    path = directory / f"{epoch_id}_artifact_intervals.parquet"
-    if not path.exists():
-        raise SwrSourceError(
-            f"{epoch_id}: no artifact intervals at {path}; an epoch without "
-            "artifacts needs an empty file, not a missing one"
-        )
-    intervals = pd.read_parquet(path)
-    missing = [c for c in _ARTIFACT_COLUMNS if c not in intervals.columns]
-    if missing:
-        raise SwrSourceError(f"{path} is missing columns {missing}")
-    starts = intervals["start_time"].to_numpy(dtype=float)
-    ends = intervals["end_time"].to_numpy(dtype=float)
-    if not (np.isfinite(starts).all() and np.isfinite(ends).all()):
-        raise SwrSourceError(f"{path}: an artifact interval bound is not finite")
-    if (ends < starts).any():
-        raise SwrSourceError(f"{path}: an artifact interval ends before it starts")
-    return intervals.loc[:, _ARTIFACT_COLUMNS].astype(float).reset_index(drop=True)
+    try:
+        epoch = read_epoch_cores(directory, epoch_id)
+    except ArtifactRunError as error:
+        raise SwrSourceError(str(error)) from error
+    return consumer_intervals(epoch.cores, Consumer.ANALYSIS, epoch.span)
 
 
 @dataclass(frozen=True)
@@ -422,15 +433,19 @@ class _EpochSource:
 
     events: pd.DataFrame
     observed: NDArray[np.float64]
+    """The stored band's stretches less the artifact intervals."""
     artifacts: pd.DataFrame
 
 
 def _epoch_source(epoch_id: str) -> _EpochSource:
     files = swr_source_files(epoch_id)
+    artifacts = artifact_intervals(epoch_id)
     return _EpochSource(
         events=_read_events(epoch_id, files["events"]["path"]),
-        observed=_read_observed(files["observed"]["path"]),
-        artifacts=artifact_intervals(epoch_id),
+        observed=subtract_intervals(
+            _read_observed(files["observed"]["path"]), artifacts
+        ),
+        artifacts=artifacts,
     )
 
 
@@ -456,15 +471,22 @@ def read_swr_inventory(epoch_id: str) -> pd.DataFrame:
 
 
 def swr_observed_stretches(epoch_id: str) -> NDArray[np.float64]:
-    """Where SWR detection was observed: the stored band's gap-free stretches.
+    """Where SWR detection was observed: the stored band's gap-free stretches,
+    less the epoch's :func:`artifact_intervals`.
+
+    Artifact time is unobserved. Next to an artifact interval a stretch ends
+    (or starts) at the float just outside it, so a time lies in a stretch
+    exactly when it was observed and lies in no artifact interval.
 
     Returns
     -------
     ndarray, shape (n_stretches, 2)
-        First and last sample time (seconds) of each stretch, closed.
+        First and last time (seconds) of each stretch, closed.
     """
     files = swr_source_files(epoch_id)
-    return _read_observed(files["observed"]["path"])
+    return subtract_intervals(
+        _read_observed(files["observed"]["path"]), artifact_intervals(epoch_id)
+    )
 
 
 def _mask(
@@ -478,7 +500,8 @@ def _mask(
 
 
 def swr_observed_mask(time: NDArray | pd.Index, epoch_id: str) -> NDArray[np.bool_]:
-    """True at each time that lies in one of the observed stretches (closed).
+    """True at each time that lies in one of the observed stretches (closed):
+    detection was observed there, and it is in no artifact interval.
 
     Parameters
     ----------
@@ -675,7 +698,8 @@ def with_swr_source(dot: pd.DataFrame) -> pd.DataFrame:
     pd.DataFrame
         A new frame (`dot` is not changed) with the same rows: ``SWR_event``
         holds :func:`swr_event_labels` on the frame's time axis and head speed,
-        ``swr_observed`` is :func:`swr_observed_mask`, the decode's
+        ``swr_observed`` is :func:`swr_observed_mask` (artifact time
+        unobserved), the decode's
         stored-ripple counts (:data:`DECODE_SWR_COUNT_COLUMNS`) are gone, and
         ``attrs`` carries the source's stamp (:func:`stamp_swr_source`). The
         epoch's source files are checked against the manifest once.

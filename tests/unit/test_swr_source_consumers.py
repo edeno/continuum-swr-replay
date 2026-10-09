@@ -51,7 +51,7 @@ from tests.unit._swr_inventory_fixtures import (
     ARTIFACT_RUN_ID,
     RUN_ID,
     use_swr_source,
-    write_artifact_intervals,
+    write_artifact_run,
     write_swr_inventory,
 )
 
@@ -62,8 +62,10 @@ EPOCH_ID = "j1620210706_02_r1_HPC"
 TIME = np.round(100.0 + np.arange(2000) / 500.0, 6)
 """A 500 Hz decode grid, 100.000-103.998 s."""
 SOURCE_SWRS = [(100.50, 100.56), (101.00, 101.04), (102.00, 102.10)]
-ARTIFACT = (102.05, 102.06)
-"""The configured artifact run's one interval: it drops the third source SWR."""
+ARTIFACT = ("spk", 102.15, 102.15)
+"""The configured artifact run's one core, a spike-only line: padded by 0.1 s
+(the analysis table) it covers [102.05, 102.25] and drops the third source
+SWR."""
 KEPT_SWRS = SOURCE_SWRS[:2]
 """The source's SWRs every consumer must see: the artifact-overlapping one is
 dropped by the source itself, so no consumer passes artifacts."""
@@ -80,7 +82,7 @@ def source(tmp_path, monkeypatch):
     """The source's configured inventory and artifact run are synthetic ones
     under ``tmp_path``."""
     inventory = write_swr_inventory(tmp_path / "swr", {EPOCH_ID: SOURCE_SWRS})
-    artifacts = write_artifact_intervals(tmp_path / "artifacts", {EPOCH_ID: [ARTIFACT]})
+    artifacts = write_artifact_run(tmp_path / "artifacts", {EPOCH_ID: [ARTIFACT]})
     use_swr_source(monkeypatch, inventory, artifacts)
     return inventory
 
@@ -132,7 +134,11 @@ def assert_source_labels(frame: pd.DataFrame) -> None:
     np.testing.assert_array_equal(labels, source_labels())
     assert sorted(set(labels) - {0}) == [1, 2]  # the artifact dropped SWR 3
     assert "n_SWR" not in frame.columns
-    assert frame["swr_observed"].all()
+    # artifact time is unobserved: neither SWR nor non-SWR
+    ((start, end),) = swr_source.artifact_intervals(EPOCH_ID).to_numpy()
+    in_artifact = (TIME >= start) & (TIME <= end)
+    assert in_artifact.any()
+    np.testing.assert_array_equal(frame["swr_observed"].to_numpy(), ~in_artifact)
 
 
 def recorder(seen: list):

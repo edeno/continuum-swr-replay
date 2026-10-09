@@ -1,0 +1,434 @@
+"""The artifact detector's features: S window spectra, J5 and L20 steps, spike lines.
+
+Every LFP threshold is in robust per-channel units: a statistic over its own
+epoch MAD x 1.4826 (:func:`robust_scale`), never absolute LFP units. The
+definitions are the validated prototype's
+(``.claude/research/refresh_artifact_detector/scripts/``: ``artdet_lfp.py`` for
+the 1-s window spectra, ``artdet_lfp2.py`` and ``artdet_lfp3.py`` for J5 and
+L20, ``artdet_spikes.py`` and ``artdet_detector.py`` for the marks and the spike
+lines). The detector (``detect.py``) passes the LFP as float32, as the
+prototype did, so its thresholds see the same numbers.
+
+Shapes: ``n_time`` LFP samples, ``n_channels`` CA1 channels, ``n_references``
+reference electrodes, ``n_windows`` 1-s windows, ``n_spikes`` spikes.
+"""
+
+from __future__ import annotations
+
+import numpy as np
+import pandas as pd
+from numpy.typing import NDArray
+from scipy.ndimage import median_filter
+from scipy.spatial import cKDTree
+
+__all__ = [
+    "MADN_FACTOR",
+    "SPIKE_LINE_COLUMNS",
+    "channel_specificity",
+    "level_jump",
+    "level_shift",
+    "nearest_mark_distance",
+    "persistent_step_count",
+    "reference_jump",
+    "robust_jump",
+    "robust_scale",
+    "spike_lines",
+    "window_band_power",
+    "window_centers",
+]
+
+MADN_FACTOR = 1.4826
+"""MAD x 1.4826 estimates a normal SD: the robust unit of every LFP threshold."""
+
+SCALE_FLOOR = 1e-6
+"""Smallest robust scale divided by, so a flat channel gives 0, not NaN
+(the prototype's floor)."""
+
+SPIKE_LINE_COLUMNS = [
+    "time",
+    "n_tetrodes",
+    "tetrode_fraction",
+    "n_spikes",
+    "ood_fraction",
+]
+
+
+def robust_scale(
+    values: NDArray[np.floating], valid: NDArray[np.bool_] | None = None
+) -> NDArray[np.floating]:
+    """Each column's MAD x 1.4826 over the valid rows.
+
+    Parameters
+    ----------
+    values : ndarray, shape (n_rows, n_columns)
+    valid : ndarray of bool, shape (n_rows,), optional
+        Rows to use; all when None.
+
+    Returns
+    -------
+    ndarray, shape (n_columns,)
+        In `values`' dtype.
+    """
+    data = values if valid is None or bool(np.all(valid)) else values[valid]
+    center = np.median(data, axis=0)
+    scale: NDArray[np.floating] = MADN_FACTOR * np.median(np.abs(data - center), axis=0)
+    return scale
+
+
+def window_centers(
+    time: NDArray[np.float64], sampling_frequency: float, window_s: float = 1.0
+) -> NDArray[np.float64]:
+    """Each whole window's mean sample time.
+
+    Windows are consecutive runs of ``round(window_s * sampling_frequency)``
+    samples from the first sample; the samples after the last whole window are
+    in none.
+
+    Returns
+    -------
+    ndarray, shape (n_windows,)
+    """
+    n_window = int(round(window_s * sampling_frequency))
+    n_windows = time.size // n_window
+    centers: NDArray[np.float64] = (
+        time[: n_windows * n_window].reshape(n_windows, n_window).mean(axis=1)
+    )
+    return centers
+
+
+def window_band_power(
+    lfp: NDArray[np.floating],
+    sampling_frequency: float,
+    *,
+    window_s: float = 1.0,
+    segment_s: float = 0.064,
+    band_hz: tuple[float, float] = (150.0, 250.0),
+    windows_per_chunk: int = 256,
+) -> NDArray[np.float32]:
+    """Welch band power per window and channel.
+
+    Each window (as :func:`window_centers`) is cut into as many whole segments
+    of ``segment_s`` as fit (15 of 64 ms in 1 s, from the window's start). Each
+    segment has its mean removed and a Hann taper applied; the window's
+    spectrum is the mean of the segments' squared FFT magnitudes, and its band
+    power is the sum over ``band_hz[0] <= f < band_hz[1]``.
+
+    Parameters
+    ----------
+    lfp : ndarray, shape (n_time, n_channels)
+    sampling_frequency : float
+        Hz.
+    window_s, segment_s : float
+        Seconds.
+    band_hz : tuple of float
+        Lower bound inclusive, upper exclusive.
+    windows_per_chunk : int
+        Windows transformed at once; only memory depends on it.
+
+    Returns
+    -------
+    ndarray of float32, shape (n_windows, n_channels)
+    """
+    n_window = int(round(window_s * sampling_frequency))
+    n_segment = int(round(segment_s * sampling_frequency))
+    n_segments = n_window // n_segment
+    n_windows = lfp.shape[0] // n_window
+    n_channels = lfp.shape[1]
+    freqs = np.fft.rfftfreq(n_segment, 1.0 / sampling_frequency)
+    in_band = (freqs >= band_hz[0]) & (freqs < band_hz[1])
+    taper = np.hanning(n_segment)[None, None, :, None]
+    power = np.empty((n_windows, n_channels), dtype=np.float32)
+    for first in range(0, n_windows, windows_per_chunk):
+        last = min(first + windows_per_chunk, n_windows)
+        chunk = lfp[first * n_window : last * n_window].reshape(
+            last - first, n_window, n_channels
+        )[:, : n_segments * n_segment]
+        segments = chunk.reshape(last - first, n_segments, n_segment, n_channels)
+        segments = segments - segments.mean(axis=2, keepdims=True)
+        spectra = (
+            (np.abs(np.fft.rfft(segments * taper, axis=2)) ** 2)
+            .mean(axis=1)
+            .astype(np.float32)
+        )  # (windows, n_freqs, n_channels)
+        power[first:last] = spectra[:, in_band].sum(axis=1)
+    return power
+
+
+def channel_specificity(power: NDArray[np.floating]) -> NDArray[np.floating]:
+    """Per window: the 2nd-largest channel ratio over the median ratio.
+
+    A channel's ratio is its window power over its own epoch-median window
+    power. An SWR raises ripple power on most CA1 channels at once, so the
+    ratio is high on all of them and the specificity stays near 1. Sustained
+    noise on a fixed subset raises only that subset.
+
+    Parameters
+    ----------
+    power : ndarray, shape (n_windows, n_channels)
+        From :func:`window_band_power`; at least 2 channels.
+
+    Returns
+    -------
+    ndarray, shape (n_windows,)
+
+    Raises
+    ------
+    ValueError
+        If there are fewer than 2 channels, or a channel's epoch-median power
+        is not positive (a flat channel), which would make every ratio of
+        that channel undefined.
+    """
+    if power.shape[1] < 2:
+        raise ValueError("channel specificity needs at least 2 channels")
+    median_power = np.median(power, axis=0)
+    if not (median_power > 0).all():
+        flat = np.flatnonzero(~(median_power > 0)).tolist()
+        raise ValueError(
+            f"CA1 channel columns {flat} have no ripple-band power in most "
+            "windows, so the channel specificity is undefined"
+        )
+    ratio = power / median_power
+    second = -np.partition(-ratio, 1, axis=1)[:, 1]
+    specificity: NDArray[np.floating] = second / np.median(ratio, axis=1)
+    return specificity
+
+
+def level_jump(lfp: NDArray[np.floating]) -> NDArray[np.floating]:
+    """J5: the 5-ms median level after a sample minus the one before it.
+
+    ``J5[t] = median(x[t+1..t+5]) - median(x[t-5..t-1])``, from a 5-sample
+    running median with the edge sample repeated (``mode="nearest"``); 0 for
+    the first and last 3 samples.
+
+    Parameters
+    ----------
+    lfp : ndarray, shape (n_time, n_channels)
+
+    Returns
+    -------
+    ndarray, shape (n_time, n_channels)
+        In `lfp`'s units and dtype.
+    """
+    running = median_filter(lfp, size=(5, 1), mode="nearest")
+    jump = np.zeros_like(lfp)
+    jump[3:-3] = running[6:] - running[:-6]
+    return jump
+
+
+def level_shift(lfp: NDArray[np.floating]) -> NDArray[np.floating]:
+    """L20: the 20-ms mean level after a sample minus the one before it.
+
+    ``L20[t] = mean(x[t+5..t+24]) - mean(x[t-24..t-5])``, skipping 4 samples on
+    each side of ``t``; 0 where a window would leave the array (the first 24
+    and last 25 samples). Sums are taken in float64.
+
+    Parameters
+    ----------
+    lfp : ndarray, shape (n_time, n_channels)
+
+    Returns
+    -------
+    ndarray, shape (n_time, n_channels)
+        In `lfp`'s units and dtype.
+    """
+    n_time = lfp.shape[0]
+    shift = np.zeros_like(lfp)
+    if n_time < 50:
+        return shift
+    for channel in range(lfp.shape[1]):  # one channel at a time bounds memory
+        total = np.zeros(n_time + 1)
+        np.cumsum(lfp[:, channel], dtype=np.float64, out=total[1:])
+        # t runs over 24 .. n_time - 26; total[k] is the sum of x[0..k-1], so
+        # after = x[t+5..t+24] = total[t+25] - total[t+5] and
+        # before = x[t-24..t-5] = total[t-4] - total[t-24]
+        after = (total[49:n_time] - total[29 : n_time - 20]) / 20.0
+        before = (total[20 : n_time - 29] - total[: n_time - 49]) / 20.0
+        shift[24 : n_time - 25, channel] = after - before
+    return shift
+
+
+def robust_jump(
+    jump: NDArray[np.floating], valid: NDArray[np.bool_] | None = None
+) -> NDArray[np.floating]:
+    """|J5| in robust units: over each channel's MAD x 1.4826 of J5.
+
+    Parameters
+    ----------
+    jump : ndarray, shape (n_time, n_channels)
+        From :func:`level_jump`.
+    valid : ndarray of bool, shape (n_time,), optional
+        The samples the scale is estimated from.
+
+    Returns
+    -------
+    ndarray, shape (n_time, n_channels)
+    """
+    scale = robust_scale(jump, valid)
+    robust: NDArray[np.floating] = np.abs(jump) / np.maximum(scale, SCALE_FLOOR)
+    return robust
+
+
+def reference_jump(
+    reference_lfp: NDArray[np.floating], valid: NDArray[np.bool_] | None = None
+) -> NDArray[np.floating]:
+    """The largest robust |J5| over the reference electrodes, per sample.
+
+    Parameters
+    ----------
+    reference_lfp : ndarray, shape (n_time, n_references)
+        Raw, unreferenced reference electrodes.
+    valid : ndarray of bool, shape (n_time,), optional
+
+    Returns
+    -------
+    ndarray, shape (n_time,)
+        0 everywhere when there is no reference electrode.
+    """
+    if reference_lfp.shape[1] == 0:
+        return np.zeros(reference_lfp.shape[0], dtype=reference_lfp.dtype)
+    largest: NDArray[np.floating] = robust_jump(level_jump(reference_lfp), valid).max(
+        axis=1
+    )
+    return largest
+
+
+def persistent_step_count(
+    jump: NDArray[np.floating],
+    robust: NDArray[np.floating],
+    shift: NDArray[np.floating],
+    *,
+    threshold: float,
+    persistence: float,
+) -> NDArray[np.int64]:
+    """How many channels make a persistent step at each sample.
+
+    A channel's step persists when ``robust >= threshold``, L20 has J5's sign,
+    and ``|L20| >= persistence * |J5|``: the level stays shifted for tens of ms,
+    as after a step artifact, and not as after a ripple cycle.
+
+    Parameters
+    ----------
+    jump, robust, shift : ndarray, shape (n_time, n_channels)
+        J5, robust |J5| and L20.
+    threshold : float
+        Robust units.
+    persistence : float
+        The fraction of |J5| that |L20| must keep.
+
+    Returns
+    -------
+    ndarray of int, shape (n_time,)
+    """
+    persistent = (
+        (robust >= threshold)
+        & (np.sign(shift) == np.sign(jump))
+        & (np.abs(shift) >= persistence * np.abs(jump))
+    )
+    count: NDArray[np.int64] = persistent.sum(axis=1, dtype=np.int64)
+    return count
+
+
+def nearest_mark_distance(
+    marks: NDArray[np.floating], is_reference: NDArray[np.bool_]
+) -> NDArray[np.float64]:
+    """Each spike's Euclidean distance to the nearest reference mark, itself left out.
+
+    The prototype's mark space and metric: the tetrode's raw marks (µV),
+    Euclidean. A spike that is itself a reference mark is left out of its own
+    search by identity, so an exact duplicate of another spike's mark still
+    counts as support.
+
+    Parameters
+    ----------
+    marks : ndarray, shape (n_spikes, n_features)
+        One tetrode's marks.
+    is_reference : ndarray of bool, shape (n_spikes,)
+        Which spikes form the reference set.
+
+    Returns
+    -------
+    ndarray, shape (n_spikes,)
+        In the marks' units; inf when no other reference mark exists.
+    """
+    marks = np.asarray(marks, dtype=np.float64)
+    distance = np.full(marks.shape[0], np.inf)
+    reference_index = np.flatnonzero(is_reference)
+    if reference_index.size == 0 or marks.shape[0] == 0:
+        return distance
+    tree = cKDTree(marks[reference_index])
+    found, neighbour = tree.query(marks, k=2)
+    own = np.full(marks.shape[0], -1)
+    own[reference_index] = np.arange(reference_index.size)
+    nearest: NDArray[np.float64] = np.where(
+        neighbour[:, 0] == own, found[:, 1], found[:, 0]
+    )
+    return nearest
+
+
+def spike_lines(
+    spike_times: NDArray[np.float64],
+    tetrode: NDArray[np.integer],
+    is_ood: NDArray[np.bool_],
+    *,
+    n_tetrodes: int,
+    start_time: float,
+    bin_s: float,
+    min_tetrodes: int = 1,
+) -> pd.DataFrame:
+    """Spike synchrony in short bins, on two grids offset by half a bin.
+
+    Bins are ``bin_s`` wide from ``start_time`` (grid 0) and from
+    ``start_time + bin_s / 2`` (grid 1), so a line across one grid's bin edge
+    is whole on the other's.
+
+    Parameters
+    ----------
+    spike_times : ndarray, shape (n_spikes,)
+        Seconds.
+    tetrode : ndarray of int, shape (n_spikes,)
+        Each spike's tetrode, ``0 .. n_tetrodes - 1``.
+    is_ood : ndarray of bool, shape (n_spikes,)
+        Whether each spike's mark is out of distribution.
+    n_tetrodes : int
+        The epoch's tetrodes with any spike: the fraction's denominator.
+    start_time, bin_s : float
+        Seconds.
+    min_tetrodes : int
+        Bins with fewer distinct tetrodes are left out.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per bin with a spike on at least `min_tetrodes` tetrodes, both
+        grids, sorted by ``time`` (the bin's center): ``n_tetrodes`` (distinct
+        tetrodes), ``tetrode_fraction`` (over `n_tetrodes`), ``n_spikes``
+        (every spike in the bin) and ``ood_fraction`` (OOD spikes over
+        ``n_spikes``).
+    """
+    times = np.asarray(spike_times, dtype=np.float64)
+    tetrode = np.asarray(tetrode, dtype=np.int64)
+    weights = np.asarray(is_ood, dtype=np.float64)
+    frames = []
+    for offset in (0.0, bin_s / 2):
+        bins = np.floor((times - start_time - offset) / bin_s).astype(np.int64)
+        # distinct (bin, tetrode) pairs; floor division recovers the bin
+        pairs = np.unique(bins * n_tetrodes + tetrode)
+        line_bins, n_distinct = np.unique(pairs // n_tetrodes, return_counts=True)
+        position = np.searchsorted(line_bins, bins)
+        n_spikes = np.bincount(position, minlength=line_bins.size)
+        n_ood = np.bincount(position, weights=weights, minlength=line_bins.size)
+        keep = n_distinct >= min_tetrodes
+        frames.append(
+            pd.DataFrame(
+                {
+                    "time": start_time + offset + (line_bins[keep] + 0.5) * bin_s,
+                    "n_tetrodes": n_distinct[keep].astype(np.int64),
+                    "tetrode_fraction": n_distinct[keep] / n_tetrodes,
+                    "n_spikes": n_spikes[keep].astype(np.int64),
+                    "ood_fraction": n_ood[keep] / np.maximum(n_spikes[keep], 1),
+                },
+                columns=SPIKE_LINE_COLUMNS,
+            )
+        )
+    lines = pd.concat(frames, ignore_index=True)
+    return lines.sort_values("time", kind="stable").reset_index(drop=True)

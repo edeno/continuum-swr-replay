@@ -872,6 +872,9 @@ def run_epochs(
     epochs: list[tuple[str, str]],
     run_epoch_kwargs: dict,
     cluster_factory: Callable[[], Cluster],
+    *,
+    task: Callable[[str, str, dict, Path], dict] | None = None,
+    key_prefix: str = "swr",
 ) -> Iterator[tuple[str, dict]]:
     """Run each epoch as its own dask task; yield each record as it finishes.
 
@@ -888,29 +891,37 @@ def run_epochs(
         Makes the cluster, closed after the last record; none is made for no
         epochs. Its workers should run one task at a time: ``setup_logger``
         reconfigures logging for the whole worker process.
+    task : Callable, optional
+        ``(nwb_file_name, epoch_name, run_epoch_kwargs, log_directory) ->
+        record``, one epoch's dask task; this module's ``_run_epoch_logged``
+        when None. Another runner (the artifact runner) passes its own.
+    key_prefix : str, optional
+        The dask key of an epoch's task is ``{key_prefix}-{epoch_id}``.
 
     Yields
     ------
     epoch_id : str
     record : dict
-        ``run_epoch``'s record, in the order the epochs finish; ``status``
+        The task's record, in the order the epochs finish; ``status``
         ``"failed"`` with the error when the task could not return one, as
         when its worker died.
     """
     if not epochs:
         return
+    if task is None:
+        task = _run_epoch_logged
     log_directory = Path.cwd() / "logs"
     with cluster_factory() as cluster, Client(cluster) as client:
         futures = {}
         for nwb_file_name, epoch_name in epochs:
             identifier = epoch_id(nwb_file_name, epoch_name)
             future = client.submit(
-                _run_epoch_logged,
+                task,
                 nwb_file_name,
                 epoch_name,
                 run_epoch_kwargs,
                 log_directory,
-                key=f"swr-{identifier}",
+                key=f"{key_prefix}-{identifier}",
             )
             futures[future] = identifier
         for future in as_completed(futures):

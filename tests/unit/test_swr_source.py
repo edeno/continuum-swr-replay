@@ -21,6 +21,11 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.hippocampus import swr_source
+from continuum_swr_replay.analysis.hippocampus.artifacts.io import (
+    cores_path,
+    read_manifest,
+    write_manifest,
+)
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     EventDefinitionError,
     build_speed_eligible_event_cohort,
@@ -39,13 +44,15 @@ from continuum_swr_replay.analysis.hippocampus.swr_source import (
     swr_events,
     swr_intervals,
     swr_observed_mask,
+    swr_observed_stretches,
     with_swr_source,
 )
+from continuum_swr_replay.table_io import sha256_file
 from tests.unit._swr_inventory_fixtures import (
     ARTIFACT_RUN_ID,
     RUN_ID,
     use_swr_source,
-    write_artifact_intervals,
+    write_artifact_run,
     write_swr_inventory,
 )
 
@@ -73,7 +80,10 @@ EVENTS = [
     (107.000, 107.050),  # 8 kept
     (111.000, 111.050),  # 9 past the grid
 ]
-ARTIFACTS = [(104.010, 104.020), (105.040, 105.200)]
+ARTIFACTS = [("spk", 104.11, 104.11), ("spk", 105.14, 105.14)]
+"""Two spike-only cores: padded by 0.1 s (the analysis table), they cover
+[104.01, 104.21] and [105.04, 105.24]."""
+ARTIFACT_INTERVALS = [(104.01, 104.21), (105.04, 105.24)]
 
 
 @pytest.fixture
@@ -84,9 +94,10 @@ def inventory(tmp_path, monkeypatch):
     return directory
 
 
-def _artifacts(tmp_path, monkeypatch, spans) -> None:
-    """Configure an artifact run whose intervals for EPOCH are `spans`."""
-    directory = write_artifact_intervals(tmp_path / "artifacts", {EPOCH: spans})
+def _artifacts(tmp_path, monkeypatch, cores, span=(0.0, 1e6)) -> None:
+    """Configure an artifact run whose cores for EPOCH are `cores`
+    (``(signatures, core_start, core_end)``)."""
+    directory = write_artifact_run(tmp_path / "artifacts", {EPOCH: cores}, span=span)
     monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_ROOT", directory.parent)
     monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
 
@@ -254,7 +265,7 @@ class TestWhichEventsCount:
     def test_an_artifact_outranks_the_speed_rule(
         self, inventory, tmp_path, monkeypatch
     ):
-        _artifacts(tmp_path, monkeypatch, [(102.45, 102.46)])
+        _artifacts(tmp_path, monkeypatch, [("spk", 102.55, 102.55)])
 
         events = swr_events(EPOCH, speed=pd.Series(_speed(), index=TIME))
 
@@ -275,10 +286,31 @@ class TestTheArtifactIntervals:
         _artifacts(tmp_path, monkeypatch, ARTIFACTS)
 
         np.testing.assert_allclose(
-            artifact_intervals(EPOCH).to_numpy(), np.array(ARTIFACTS)
+            artifact_intervals(EPOCH).to_numpy(), np.array(ARTIFACT_INTERVALS)
         )
         assert swr_source.swr_source_name() == (
             f"kay@{RUN_ID}+artifacts@{ARTIFACT_RUN_ID}"
+        )
+
+    def test_the_analysis_table_pads_each_kind(self, inventory, tmp_path, monkeypatch):
+        """S by 1 s on each side; an LFP step by 0.3 s before and 1.3 s after
+        (the post-step second); a spike-only line by 0.1 s; merged and clipped
+        to the epoch's span."""
+        _artifacts(
+            tmp_path,
+            monkeypatch,
+            [
+                ("S", 100.0, 102.0),
+                ("ca1+ref", 104.5, 104.5),
+                ("spk", 107.5, 107.5),
+                ("ref", 109.5, 109.5),
+            ],
+            span=(99.5, 110.0),
+        )
+
+        np.testing.assert_allclose(
+            artifact_intervals(EPOCH).to_numpy(),
+            [(99.5, 103.0), (104.2, 105.8), (107.4, 107.6), (109.2, 110.0)],
         )
 
     def test_a_configured_run_without_the_epochs_file_is_refused(
@@ -286,28 +318,50 @@ class TestTheArtifactIntervals:
     ):
         # A missing file must not read as an epoch without artifacts.
         _artifacts(tmp_path, monkeypatch, ARTIFACTS)
-        (
-            swr_source.artifact_intervals_dir() / f"{EPOCH}_artifact_intervals.parquet"
-        ).unlink()
+        cores_path(swr_source.artifact_intervals_dir(), EPOCH).unlink()
 
         with pytest.raises(SwrSourceError, match="no artifact intervals"):
+            swr_events(EPOCH, speed=pd.Series(_speed(), index=TIME))
+
+    def test_an_epoch_the_artifact_run_never_saw_is_refused(
+        self, inventory, tmp_path, monkeypatch
+    ):
+        directory = write_artifact_run(
+            tmp_path / "artifacts", {"chimi20200225_02_r1_HPC": ARTIFACTS}
+        )
+        use_swr_source(monkeypatch, inventory, directory)
+
+        with pytest.raises(SwrSourceError, match="not in the artifact run"):
+            artifact_intervals(EPOCH)
+
+    def test_an_artifact_file_changed_after_the_run_is_refused(
+        self, inventory, tmp_path, monkeypatch
+    ):
+        _artifacts(tmp_path, monkeypatch, ARTIFACTS)
+        path = cores_path(swr_source.artifact_intervals_dir(), EPOCH)
+        pd.read_parquet(path).iloc[:1].to_parquet(path)
+
+        with pytest.raises(SwrSourceError, match="sha256"):
             swr_events(EPOCH, speed=pd.Series(_speed(), index=TIME))
 
     def test_a_malformed_artifact_file_is_refused(
         self, inventory, tmp_path, monkeypatch
     ):
         _artifacts(tmp_path, monkeypatch, ARTIFACTS)
-        pd.DataFrame({"start_time": [1.0]}).to_parquet(
-            swr_source.artifact_intervals_dir() / f"{EPOCH}_artifact_intervals.parquet"
-        )
+        directory = swr_source.artifact_intervals_dir()
+        path = cores_path(directory, EPOCH)
+        pd.DataFrame({"start_time": [1.0], "end_time": [2.0]}).to_parquet(path)
+        manifest = read_manifest(directory)
+        manifest["epochs"][EPOCH]["outputs"]["cores"]["sha256"] = sha256_file(path)
+        write_manifest(directory, manifest)
 
-        with pytest.raises(SwrSourceError, match="end_time"):
+        with pytest.raises(SwrSourceError, match="core_start"):
             swr_events(EPOCH, speed=pd.Series(_speed(), index=TIME))
 
     def test_every_entry_point_drops_the_same_artifact_events(
         self, inventory, tmp_path, monkeypatch
     ):
-        _artifacts(tmp_path, monkeypatch, [(100.55, 100.55)])
+        _artifacts(tmp_path, monkeypatch, [("spk", 100.65, 100.65)])
         dot = _dot()
         path = tmp_path / f"{EPOCH}_80_data_over_time.pkl"
         dot.to_pickle(path)
@@ -379,7 +433,7 @@ class TestTheLabels:
         self, inventory, tmp_path, monkeypatch
     ):
         plain = swr_event_labels(TIME, EPOCH, speed=_speed())
-        _artifacts(tmp_path, monkeypatch, [(100.55, 100.55)])
+        _artifacts(tmp_path, monkeypatch, [("spk", 100.65, 100.65)])
         masked = swr_event_labels(TIME, EPOCH, speed=_speed())
 
         np.testing.assert_array_equal(masked, np.where(plain == 1, 0, plain))
@@ -411,6 +465,47 @@ class TestCoverage:
             (TIME >= 102.0) & (TIME <= 103.0)
         )
         np.testing.assert_array_equal(observed, expected)
+
+    def test_artifact_time_is_not_observed(self, tmp_path, monkeypatch):
+        """Artifact time is unobserved: an event there is neither SWR nor
+        non-SWR. The analysis intervals leave the coverage, endpoints
+        included, and the stretches say the same as the mask."""
+        directory = write_swr_inventory(
+            tmp_path / "swr",
+            {EPOCH: EVENTS[:1]},
+            observed={EPOCH: [(100.0, 101.0), (102.0, 109.0)]},
+        )
+        use_swr_source(monkeypatch, directory)
+        _artifacts(tmp_path, monkeypatch, ARTIFACTS)
+
+        observed = swr_observed_mask(TIME, EPOCH)
+        stretches = swr_observed_stretches(EPOCH)
+
+        in_band = ((TIME >= 100.0) & (TIME <= 101.0)) | (
+            (TIME >= 102.0) & (TIME <= 109.0)
+        )
+        in_artifact = np.zeros(TIME.size, dtype=bool)
+        for start, end in artifact_intervals(EPOCH).to_numpy():
+            in_artifact |= (TIME >= start) & (TIME <= end)
+        assert in_artifact.sum() == 2 * 101  # both endpoints are grid samples
+        np.testing.assert_array_equal(observed, in_band & ~in_artifact)
+        from_stretches = np.zeros(TIME.size, dtype=bool)
+        for start, end in stretches:
+            from_stretches |= (TIME >= start) & (TIME <= end)
+        np.testing.assert_array_equal(from_stretches, observed)
+        assert stretches.shape == (4, 2)
+
+    def test_an_analysis_frame_is_unobserved_in_artifact_time(
+        self, inventory, tmp_path, monkeypatch
+    ):
+        _artifacts(tmp_path, monkeypatch, ARTIFACTS)
+
+        out = with_swr_source(_dot())
+
+        np.testing.assert_array_equal(
+            out["swr_observed"].to_numpy(), swr_observed_mask(TIME, EPOCH)
+        )
+        assert not out["swr_observed"].all()
 
 
 def _dot(stored_labels=None, **columns) -> pd.DataFrame:

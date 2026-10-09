@@ -1,0 +1,554 @@
+"""The artifact detector: its constants and its four rules.
+
+The detector masks a period only when it shows an artifact signature, never on
+power alone (a large SWR also has high ripple power):
+
+- **S**: ripple-band power raised on a fixed subset of CA1 channels for at
+  least 2 s (:func:`s_cores`).
+- **T-ref**: an abrupt level jump on the reference electrode, which sits in
+  white matter outside CA1 (:func:`t_ref_events`).
+- **T-ca1**: an abrupt and persistent level step on at least 3 CA1 channels
+  at once (:func:`t_ca1_events`).
+- **T-spk**: a spike line, at least 40 % of tetrodes in one 200-µs bin, with
+  at least 20 % of those marks out of distribution (:func:`t_spk_events`).
+
+T signatures within 50 ms merge into one T core (:func:`t_cores`). Each rule
+is its own function, so a further signature is one more event source.
+:func:`detect_artifacts` runs them on one epoch and returns unpadded cores
+with their evidence; each consumer pads them (``masks.CONSUMER_PADDING``).
+
+Every value below is the validated prototype's
+(``.claude/research/refresh_artifact_detector/detector_report.md``, the
+"report"). Design note: ``docs/design/2026-10-09-artifact-detection.md``.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+
+import numpy as np
+import pandas as pd
+from numpy.typing import NDArray
+
+from continuum_swr_replay.analysis.hippocampus.artifacts.features import (
+    channel_specificity,
+    level_jump,
+    level_shift,
+    nearest_mark_distance,
+    persistent_step_count,
+    reference_jump,
+    robust_jump,
+    spike_lines,
+    window_band_power,
+    window_centers,
+)
+from continuum_swr_replay.analysis.hippocampus.artifacts.io import (
+    empty_cores,
+    make_cores,
+    validate_cores,
+)
+from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
+    Consumer,
+    artifact_intervals,
+    interval_mask,
+)
+from continuum_swr_replay.decoding_common import DecodingConfig
+
+__all__ = [
+    "CONSTANT_NAMES",
+    "EVENT_COLUMNS",
+    "detect_artifacts",
+    "detector_constants",
+    "s_cores",
+    "spike_ood",
+    "t_ca1_events",
+    "t_cores",
+    "t_ref_events",
+    "t_spk_events",
+]
+
+# --- S: sustained, channel-specific ripple-band noise (report §1.1) ----------
+S_WINDOW_S = 1.0
+"""Window length (s): spec is computed per 1-s window (report §1.1)."""
+S_SEGMENT_S = 0.064
+"""Welch segment (s): 15 Hann segments of 64 ms per window (report §1.1)."""
+S_BAND_HZ = (150.0, 250.0)
+"""The ripple band of the window power, low inclusive, high exclusive (§1.1)."""
+S_CORE = 4.0
+"""Core spec: non-S epochs never hold 2 consecutive windows >= 4 (§5.1 s_core)."""
+S_CORE_RUN = 2
+"""Consecutive core windows: 1 adds 11 true SWRs and 121 s (§5.1 s_core_run)."""
+S_EXT = 2.0
+"""Extension spec: the run of windows >= 2 holding a core (§5.1 s_ext)."""
+S_GAP = 2
+"""Blocks <= 2 windows apart merge: a step inside a block drops spec for one
+window; without the fill senor20201101_14_r7 keeps SD / robust SD 1.61 (§5.1
+s_gap)."""
+
+# --- T-ref: a jump on the reference electrode (report §1.2) ------------------
+T_REF = 15.0
+"""Reference |J5| (robust units): giant-day Kay∩Karlsson max 10.7, true-SWR
+max 6.5, visual T median 31.9 (§5.1 t_ref)."""
+
+# --- T-ca1: a persistent step on several CA1 channels (report §1.2) ----------
+T_CA1_K = 20.0
+"""CA1 |J5| (robust units): at K <= 12 giant-SWR onsets fire; true-SWR max
+fraction is 0 at K = 20 (§5.1 t_ca1_k)."""
+T_CA1_RHO = 0.5
+"""|L20| >= 0.5 |J5| with J5's sign: the step persists, a ripple cycle does not
+(§5.1 t_ca1_rho)."""
+T_CA1_FRAC = 0.15
+"""Fraction of CA1 channels stepping at one sample: SWRs reach 1 channel at
+K = 20 (§5.1 t_ca1_frac)."""
+T_CA1_MIN = 3
+"""At least 3 channels, however few the epoch has (§5.1 t_ca1_min)."""
+
+# --- T-spk: an out-of-distribution spike line (report §1.2, §2.4) ------------
+T_SPK_BIN_S = 200e-6
+"""Line bin (s), on two grids offset by half a bin: at 0.5 ms a clean-day giant
+SWR is masked (§5.1 t_spk_bin)."""
+T_SPK_FRAC = 0.40
+"""Fraction of tetrodes in one bin: true SWRs reach 0.50, so the OOD gate
+carries the specificity (§5.1 t_spk_frac)."""
+T_SPK_MIN_TETRODES = 3
+"""A line needs at least 3 tetrodes: the prototype's line table kept bins with
+>= max(3, 25 %) of tetrodes (artdet_detector.spike_lines); with 8 or more
+tetrodes only the 40 % rule binds."""
+T_SPK_OOD = 0.20
+"""OOD fraction of the bin's spikes: true-SWR / visual-SWR / giant-day max 0,
+spike-only artifacts 0.27-0.42 (§5.1 t_spk_ood)."""
+T_SPK_OOD_NN = 4.0
+"""A mark is OOD when its nearest reference mark is more than 4 x the decoder's
+waveform_std away: there the decoder's mark kernel has no support (§2.4)."""
+WAVEFORM_STD: float = DecodingConfig().waveform_std
+"""The decoder's mark-kernel bandwidth (µV), read from its settings."""
+
+# --- merging T signatures (report §1.2) ---------------------------------------
+T_MERGE_S = 0.05
+"""T signatures closer than 50 ms form one core (§1.2)."""
+
+CONSTANT_NAMES = (
+    "S_WINDOW_S",
+    "S_SEGMENT_S",
+    "S_BAND_HZ",
+    "S_CORE",
+    "S_CORE_RUN",
+    "S_EXT",
+    "S_GAP",
+    "T_REF",
+    "T_CA1_K",
+    "T_CA1_RHO",
+    "T_CA1_FRAC",
+    "T_CA1_MIN",
+    "T_SPK_BIN_S",
+    "T_SPK_FRAC",
+    "T_SPK_MIN_TETRODES",
+    "T_SPK_OOD",
+    "T_SPK_OOD_NN",
+    "WAVEFORM_STD",
+    "T_MERGE_S",
+)
+"""Every constant the rules read, in the order above."""
+
+
+def detector_constants() -> dict[str, float | int | tuple[float, float]]:
+    """Every constant's current value, by its lower-case name (``t_ref``, ...)."""
+    values = globals()
+    return {name.lower(): values[name] for name in CONSTANT_NAMES}
+
+
+EVENT_COLUMNS = ["time", "signature", "ref_j5", "ca1_frac", "spk_frac", "spk_ood"]
+"""A T event table: one row per sample (or spike-line bin) where a T signature
+fires, with its evidence; NaN where the signature gives none."""
+
+_EVENT_DTYPES = {
+    "time": np.float64,
+    "signature": object,
+    "ref_j5": np.float64,
+    "ca1_frac": np.float64,
+    "spk_frac": np.float64,
+    "spk_ood": np.float64,
+}
+
+
+def _runs(flags: NDArray[np.bool_]) -> tuple[NDArray[np.int64], NDArray[np.int64]]:
+    """First index and one past the last index of each run of True."""
+    edges = np.diff(np.r_[0, flags.astype(np.int8), 0])
+    return np.flatnonzero(edges == 1), np.flatnonzero(edges == -1)
+
+
+def _events(
+    signature: str, time: NDArray[np.float64], **evidence: NDArray
+) -> pd.DataFrame:
+    columns = {
+        "time": time,
+        "signature": np.full(time.size, signature, dtype=object),
+        **{name: np.full(time.size, np.nan) for name in EVENT_COLUMNS[2:]},
+        **evidence,
+    }
+    return pd.DataFrame(columns, columns=EVENT_COLUMNS).astype(_EVENT_DTYPES)
+
+
+def s_cores(
+    centers: NDArray[np.float64],
+    specificity: NDArray[np.floating],
+    *,
+    half_window_s: float = S_WINDOW_S / 2,
+) -> pd.DataFrame:
+    """Rule S: blocks of 1-s windows with channel-specific ripple power.
+
+    1. A core is a run of at least :data:`S_CORE_RUN` windows with
+       ``spec >= S_CORE``.
+    2. A block is the run of windows with ``spec >= S_EXT`` that holds a core.
+    3. Blocks at most :data:`S_GAP` windows apart merge, the gap windows
+       included.
+
+    Parameters
+    ----------
+    centers : ndarray, shape (n_windows,)
+        Each window's mean sample time (seconds).
+    specificity : ndarray, shape (n_windows,)
+        From ``features.channel_specificity``; NaN never fires.
+    half_window_s : float
+        A block runs from its first window's center less this to its last
+        window's center plus this.
+
+    Returns
+    -------
+    pd.DataFrame
+        Cores in :data:`~continuum_swr_replay.analysis.hippocampus.artifacts.io.CORE_COLUMNS`,
+        kind and signatures ``"S"``, with ``spec_max`` (over the block, gap
+        windows included) and ``n_windows``.
+    """
+    spec = np.asarray(specificity, dtype=np.float64)
+    core_first, core_stop = _runs(spec >= S_CORE)
+    long_enough = (core_stop - core_first) >= S_CORE_RUN
+    in_core = np.zeros(spec.size + 1, dtype=np.int64)
+    np.add.at(in_core, core_first[long_enough], 1)
+    np.add.at(in_core, core_stop[long_enough], -1)
+    in_core = np.cumsum(in_core)[:-1] > 0
+    ext_first, ext_stop = _runs(spec >= S_EXT)
+    cores_in = np.r_[0, np.cumsum(in_core)]
+    holds_core = (cores_in[ext_stop] - cores_in[ext_first]) > 0
+    first, stop = ext_first[holds_core], ext_stop[holds_core]
+    if first.size == 0:
+        return empty_cores()
+    new_block = np.r_[True, (first[1:] - stop[:-1]) > S_GAP]
+    starts = np.flatnonzero(new_block)
+    block_first = first[starts]
+    block_stop = np.maximum.reduceat(stop, starts)
+    spec_max = [
+        np.nanmax(spec[a:b]) for a, b in zip(block_first, block_stop, strict=True)
+    ]
+    return make_cores(
+        {
+            "kind": "S",
+            "signatures": "S",
+            "core_start": centers[block_first] - half_window_s,
+            "core_end": centers[block_stop - 1] + half_window_s,
+            "spec_max": spec_max,
+            "n_windows": (block_stop - block_first).astype(np.float64),
+        }
+    )
+
+
+def t_ref_events(
+    time: NDArray[np.float64], reference_robust_jump: NDArray[np.floating]
+) -> pd.DataFrame:
+    """Rule T-ref: every sample where the reference |J5| >= :data:`T_REF`.
+
+    Parameters
+    ----------
+    time : ndarray, shape (n_time,)
+    reference_robust_jump : ndarray, shape (n_time,)
+        From ``features.reference_jump`` (robust units).
+
+    Returns
+    -------
+    pd.DataFrame
+        :data:`EVENT_COLUMNS`, signature ``"ref"``, evidence ``ref_j5``.
+    """
+    fired = np.flatnonzero(reference_robust_jump >= T_REF)
+    return _events(
+        "ref", time[fired], ref_j5=reference_robust_jump[fired].astype(np.float64)
+    )
+
+
+def t_ca1_threshold(n_channels: int) -> int:
+    """Channels needed for T-ca1: ``max(T_CA1_MIN, ceil(T_CA1_FRAC * n))``."""
+    return max(T_CA1_MIN, int(np.ceil(T_CA1_FRAC * n_channels - 1e-9)))
+
+
+def t_ca1_events(
+    time: NDArray[np.float64], step_count: NDArray[np.integer], n_channels: int
+) -> pd.DataFrame:
+    """Rule T-ca1: every sample where enough CA1 channels step persistently.
+
+    Parameters
+    ----------
+    time : ndarray, shape (n_time,)
+    step_count : ndarray of int, shape (n_time,)
+        From ``features.persistent_step_count`` at :data:`T_CA1_K` and
+        :data:`T_CA1_RHO`.
+    n_channels : int
+        The epoch's CA1 channels.
+
+    Returns
+    -------
+    pd.DataFrame
+        :data:`EVENT_COLUMNS`, signature ``"ca1"``, evidence ``ca1_frac``.
+    """
+    fired = np.flatnonzero(step_count >= t_ca1_threshold(n_channels))
+    return _events("ca1", time[fired], ca1_frac=step_count[fired] / n_channels)
+
+
+def t_spk_events(lines: pd.DataFrame) -> pd.DataFrame:
+    """Rule T-spk: every spike-line bin with enough tetrodes and OOD marks.
+
+    Parameters
+    ----------
+    lines : pd.DataFrame
+        From ``features.spike_lines`` at :data:`T_SPK_BIN_S`.
+
+    Returns
+    -------
+    pd.DataFrame
+        :data:`EVENT_COLUMNS`, signature ``"spk"``, evidence ``spk_frac`` and
+        ``spk_ood``; the time is the bin's center.
+    """
+    fired = (
+        (lines["n_tetrodes"] >= T_SPK_MIN_TETRODES)
+        & (lines["tetrode_fraction"] >= T_SPK_FRAC)
+        & (lines["ood_fraction"] >= T_SPK_OOD)
+    ).to_numpy()
+    return _events(
+        "spk",
+        lines["time"].to_numpy(dtype=np.float64)[fired],
+        spk_frac=lines["tetrode_fraction"].to_numpy(dtype=np.float64)[fired],
+        spk_ood=lines["ood_fraction"].to_numpy(dtype=np.float64)[fired],
+    )
+
+
+def t_cores(events: pd.DataFrame) -> pd.DataFrame:
+    """Merge T events closer than :data:`T_MERGE_S` into T cores.
+
+    Parameters
+    ----------
+    events : pd.DataFrame
+        :data:`EVENT_COLUMNS` rows from any T rule, in any order.
+
+    Returns
+    -------
+    pd.DataFrame
+        Cores in ``CORE_COLUMNS``, kind ``"T"``, in time order: from the first
+        to the last event of each group, the signatures that fired (sorted,
+        joined by ``+``) and the largest of each evidence.
+    """
+    if events.empty:
+        return empty_cores()
+    ordered = events.sort_values("time", kind="stable").reset_index(drop=True)
+    time = ordered["time"].to_numpy()
+    group = np.r_[0, np.cumsum(np.diff(time) > T_MERGE_S)]
+    by_group = ordered.groupby(group, sort=True)
+    signatures = by_group["signature"].agg(lambda names: "+".join(sorted(set(names))))
+    evidence = by_group[["ref_j5", "ca1_frac", "spk_frac", "spk_ood"]].max()
+    return make_cores(
+        {
+            "kind": "T",
+            "signatures": signatures.to_numpy(),
+            "core_start": by_group["time"].min().to_numpy(),
+            "core_end": by_group["time"].max().to_numpy(),
+            "ref_j5_max": evidence["ref_j5"].to_numpy(),
+            "ca1_frac_max": evidence["ca1_frac"].to_numpy(),
+            "spk_frac_max": evidence["spk_frac"].to_numpy(),
+            "spk_ood_max": evidence["spk_ood"].to_numpy(),
+        }
+    )
+
+
+def spike_ood(
+    spike_times: Sequence[NDArray[np.float64]],
+    spike_marks: Sequence[NDArray[np.floating]],
+    span: tuple[float, float],
+    excluded: pd.DataFrame,
+) -> tuple[NDArray[np.float64], NDArray[np.int64], NDArray[np.bool_], dict[str, int]]:
+    """Each spike in the span, its tetrode and whether its mark is OOD.
+
+    The reference set is decode-free: per tetrode, every mark of the epoch
+    outside `excluded` (the LFP signatures' intervals). A spike's mark is OOD
+    when its nearest reference mark, itself left out, is more than
+    :data:`T_SPK_OOD_NN` x :data:`WAVEFORM_STD` away.
+
+    Parameters
+    ----------
+    spike_times : sequence of ndarray, shape (n_spikes_k,)
+        Per tetrode, seconds; spikes outside `span` are ignored.
+    spike_marks : sequence of ndarray, shape (n_spikes_k, n_features)
+        Per tetrode, the marks of `spike_times`.
+    span : tuple of float
+        The epoch's first and last LFP sample (seconds), closed.
+    excluded : pd.DataFrame
+        ``start_time`` / ``end_time`` intervals whose marks are not reference.
+
+    Returns
+    -------
+    times : ndarray, shape (n_spikes,)
+        In tetrode order, then time order within a tetrode.
+    tetrode : ndarray of int, shape (n_spikes,)
+        ``0 .. n_tetrodes - 1`` over the tetrodes with a spike in the span.
+    is_ood : ndarray of bool, shape (n_spikes,)
+    counts : dict
+        ``n_tetrodes``, ``n_spikes``, ``n_reference_marks``, ``n_ood_spikes``.
+    """
+    times, tetrodes, ood = [], [], []
+    n_reference = 0
+    for spikes, marks in zip(spike_times, spike_marks, strict=True):
+        spikes = np.asarray(spikes, dtype=np.float64)
+        in_span = (spikes >= span[0]) & (spikes <= span[1])
+        if not in_span.any():
+            continue  # as filter_spike_times drops it for the decoder
+        spikes = spikes[in_span]
+        is_reference = ~interval_mask(spikes, excluded)
+        distance = nearest_mark_distance(np.asarray(marks)[in_span], is_reference)
+        times.append(spikes)
+        tetrodes.append(np.full(spikes.size, len(times) - 1, dtype=np.int64))
+        ood.append(distance / WAVEFORM_STD > T_SPK_OOD_NN)
+        n_reference += int(is_reference.sum())
+    if not times:
+        empty = np.zeros(0)
+        counts = {
+            "n_tetrodes": 0,
+            "n_spikes": 0,
+            "n_reference_marks": 0,
+            "n_ood_spikes": 0,
+        }
+        return empty, empty.astype(np.int64), empty.astype(bool), counts
+    is_ood = np.concatenate(ood)
+    counts = {
+        "n_tetrodes": len(times),
+        "n_spikes": int(is_ood.size),
+        "n_reference_marks": n_reference,
+        "n_ood_spikes": int(is_ood.sum()),
+    }
+    return np.concatenate(times), np.concatenate(tetrodes), is_ood, counts
+
+
+def detect_artifacts(
+    time: NDArray[np.float64],
+    ca1_lfp: NDArray[np.floating],
+    reference_lfp: NDArray[np.floating],
+    spike_times: Sequence[NDArray[np.float64]],
+    spike_marks: Sequence[NDArray[np.floating]],
+    sampling_frequency: float,
+    *,
+    valid: NDArray[np.bool_] | None = None,
+) -> pd.DataFrame:
+    """One epoch's artifact cores: rules S, T-ref, T-ca1 and T-spk.
+
+    1. S from the CA1 window spectra.
+    2. T-ref and T-ca1 from the reference and CA1 steps.
+    3. The OOD reference: per tetrode, the marks outside the S, T-ref and
+       T-ca1 cores padded by the ``decoder`` table, so no decode is needed.
+    4. T-spk from the spike lines; then all T signatures merge into T cores.
+
+    Parameters
+    ----------
+    time : ndarray, shape (n_time,)
+        LFP sample times (seconds), ascending: the span the detector reads.
+    ca1_lfp : ndarray, shape (n_time, n_channels)
+        The raw referenced CA1 LFP.
+    reference_lfp : ndarray, shape (n_time, n_references)
+        The raw, unreferenced reference electrodes; no columns when none.
+    spike_times, spike_marks : sequence of ndarray
+        Per tetrode, the HPC marks after the coincidence filter
+        (``get_hpc_marks``); spikes outside ``[time[0], time[-1]]`` are ignored.
+    sampling_frequency : float
+        The LFP's nominal rate (Hz).
+    valid : ndarray of bool, shape (n_time,), optional
+        Samples to read; a sample with a non-finite CA1 or reference value is
+        invalid too. Invalid samples are set to 0 and left out of every robust
+        scale.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns ``CORE_COLUMNS``, one row per core, in time order, unpadded;
+        no rows for a clean epoch. ``attrs["counts"]`` holds the inputs'
+        counts (samples, invalid samples, windows, channels, references,
+        tetrodes, spikes, reference marks, OOD spikes) and how many samples or
+        bins fired each T signature.
+    """
+    time = np.asarray(time, dtype=np.float64)
+    n_time = time.size
+    ca1 = np.array(ca1_lfp, dtype=np.float32)
+    reference = np.array(reference_lfp, dtype=np.float32).reshape(n_time, -1)
+    usable = np.isfinite(ca1).all(axis=1) & np.isfinite(reference).all(axis=1)
+    if valid is not None:
+        usable &= np.asarray(valid, dtype=bool)
+    ca1[~usable] = 0.0
+    reference[~usable] = 0.0
+    span = (float(time[0]), float(time[-1]))
+    n_channels = ca1.shape[1]
+
+    power = window_band_power(
+        ca1,
+        sampling_frequency,
+        window_s=S_WINDOW_S,
+        segment_s=S_SEGMENT_S,
+        band_hz=S_BAND_HZ,
+    )
+    s = s_cores(
+        window_centers(time, sampling_frequency, S_WINDOW_S),
+        channel_specificity(power),
+        half_window_s=S_WINDOW_S / 2,
+    )
+
+    jump = level_jump(ca1)
+    robust = robust_jump(jump, usable)
+    step_count = persistent_step_count(
+        jump, robust, level_shift(ca1), threshold=T_CA1_K, persistence=T_CA1_RHO
+    )
+    del jump, robust
+    lfp_events = pd.concat(
+        [
+            t_ref_events(time, reference_jump(reference, usable)),
+            t_ca1_events(time, step_count, n_channels),
+        ],
+        ignore_index=True,
+    )
+
+    lfp_cores = pd.concat([s, t_cores(lfp_events)], ignore_index=True)
+    excluded = artifact_intervals(lfp_cores, Consumer.DECODER, span)
+    spikes, tetrode, is_ood, spike_counts = spike_ood(
+        spike_times, spike_marks, span, excluded
+    )
+    lines = spike_lines(
+        spikes,
+        tetrode,
+        is_ood,
+        n_tetrodes=max(spike_counts["n_tetrodes"], 1),
+        start_time=span[0],
+        bin_s=T_SPK_BIN_S,
+        min_tetrodes=T_SPK_MIN_TETRODES,
+    )
+    spk_events = t_spk_events(lines)
+
+    cores = pd.concat(
+        [s, t_cores(pd.concat([lfp_events, spk_events], ignore_index=True))],
+        ignore_index=True,
+    )
+    cores = validate_cores(
+        cores.sort_values(["core_start", "kind"], kind="stable"), "detected cores"
+    )
+    cores.attrs["counts"] = {
+        "n_samples": int(n_time),
+        "n_invalid_samples": int((~usable).sum()),
+        "n_windows": int(power.shape[0]),
+        "n_channels": int(n_channels),
+        "n_references": int(reference.shape[1]),
+        **spike_counts,
+        "n_ref_samples": int((lfp_events["signature"] == "ref").sum()),
+        "n_ca1_samples": int((lfp_events["signature"] == "ca1").sum()),
+        "n_spike_line_bins": int(len(spk_events)),
+    }
+    return cores
