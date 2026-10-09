@@ -37,7 +37,9 @@ checks (Stage 5), and nothing else.
   Widloski and SWR run commit as at the decode commit.
 - ``tables_recorded``: the promoted tables are the ones their manifests
   record, built at a commit that descends from the decode commit, from its
-  decodes.
+  decodes, and from the configured SWR source (the manifest's
+  ``inputs["swr_source"]``, which ``record-tables`` reads from the tables'
+  own stamps).
 - ``pfc_sidecars``: every mPFC bundle names the canonical event table.
 - ``fit_provenance``: ``check_fit_provenance.py`` passes on both table roots,
   and on the fits at the ``replay_content`` root (Stage 5B and Stage 6).
@@ -121,6 +123,11 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
     load_clusterless_encoding_model,
     validate_time_grid,
 )
+from continuum_swr_replay.analysis.hippocampus.swr_source import (
+    SWR_SOURCE_ATTR,
+    SWR_SOURCE_TABLES,
+    swr_source_name,
+)
 from continuum_swr_replay.data_loaders.epoch_register import (
     REGISTER_PATH,
     EpochRegisterError,
@@ -141,7 +148,7 @@ from continuum_swr_replay.decoding_transitions import (
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
-from continuum_swr_replay.table_io import resolved_table_path, sha256_file
+from continuum_swr_replay.table_io import read_attrs, resolved_table_path, sha256_file
 
 REPO = Path(__file__).resolve().parents[2]
 """The checkout this script belongs to, whose ``check_fit_provenance.py`` runs."""
@@ -1107,6 +1114,38 @@ def table_files(table_dir: Path) -> list[str]:
     return sorted(names)
 
 
+def tables_swr_source(table_dir: Path, files: Iterable[str]) -> str | None:
+    """The SWR source the folder's SWR-bearing tables were built from.
+
+    A parquet table whose covariate-schema table is one of
+    ``swr_source.SWR_SOURCE_TABLES`` carries its source's stamp
+    (``attrs["swr_source"]``). Returns that one stamp, or None when the folder
+    holds no such table.
+
+    Raises
+    ------
+    ValueError
+        If such a table is unstamped, or two carry different stamps: the
+        folder is not one atomic set.
+    """
+    stamps: dict[str, object] = {}
+    for relative in files:
+        if not relative.endswith(".parquet"):
+            continue
+        attrs = read_attrs(table_dir / relative)
+        if attrs.get("covariate_schema_table") in SWR_SOURCE_TABLES:
+            stamps[relative] = attrs.get(SWR_SOURCE_ATTR)
+    if not stamps:
+        return None
+    distinct = set(stamps.values())
+    if None in distinct or len(distinct) > 1:
+        raise ValueError(
+            f"{table_dir}: its SWR-bearing tables do not share one SWR source "
+            f"stamp: {stamps}"
+        )
+    return str(distinct.pop())
+
+
 def record_tables(table_dir: Path, commit: str, inputs: Mapping[str, str]) -> Path:
     """Write ``table_dir/tables_manifest.json``: each table's sha256 and its origin.
 
@@ -1119,7 +1158,10 @@ def record_tables(table_dir: Path, commit: str, inputs: Mapping[str, str]) -> Pa
     inputs : Mapping of str to str
         What they were built from, such as ``decode_commit``, the qvals
         source and the behavioral cache. ``check_tables_recorded`` requires
-        ``decode_commit``.
+        ``decode_commit``. The SWR source is not taken from here: it is read
+        from the tables' own stamps (``tables_swr_source``) and recorded as
+        ``inputs["swr_source"]``, which ``check_tables_recorded`` requires to
+        be the configured source.
 
     Returns
     -------
@@ -1129,16 +1171,28 @@ def record_tables(table_dir: Path, commit: str, inputs: Mapping[str, str]) -> Pa
     Raises
     ------
     ValueError
-        If `table_dir` holds no table.
+        If `table_dir` holds no table; if its SWR-bearing tables are unstamped
+        or carry different stamps; or if `inputs` names an ``swr_source`` the
+        tables do not carry.
     """
     files = table_files(table_dir)
     if not files:
         raise ValueError(f"{table_dir} holds no table (*.parquet or *.json) to record.")
+    recorded_inputs = dict(inputs)
+    swr_source = tables_swr_source(table_dir, files)
+    if swr_source is not None:
+        named = recorded_inputs.get("swr_source", swr_source)
+        if named != swr_source:
+            raise ValueError(
+                f"--inputs names swr_source {named!r}, but the tables in "
+                f"{table_dir} are stamped {swr_source!r}"
+            )
+        recorded_inputs["swr_source"] = swr_source
     manifest = {
         "produced_by": f"{PRODUCED_BY} record-tables",
         "recorded_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "commit": commit,
-        "inputs": dict(inputs),
+        "inputs": recorded_inputs,
         "files": {relative: sha256_file(table_dir / relative) for relative in files},
     }
     text = json.dumps(manifest, indent=2, sort_keys=True) + "\n"
@@ -1156,8 +1210,10 @@ def check_tables_recorded(
     least one table; the folder's tables (``table_files``) are exactly the
     recorded ones, each with its recorded sha256; the manifest's ``commit``
     descends from `decode_commit` (``git merge-base --is-ancestor``, which
-    counts a commit as its own descendant); and its ``inputs`` name
-    `decode_commit` as ``decode_commit``.
+    counts a commit as its own descendant); its ``inputs`` name
+    `decode_commit` as ``decode_commit``; and they name the configured SWR
+    source (``swr_source.swr_source_name()``) as ``swr_source``, which
+    ``record_tables`` read from the tables' stamps.
 
     Parameters
     ----------
@@ -1217,6 +1273,12 @@ def check_tables_recorded(
             failures.append(
                 f"{table_dir}: its inputs name decode_commit {named!r}, not the "
                 f"decode commit {decode_commit}"
+            )
+        if inputs.get("swr_source") != swr_source_name():
+            failures.append(
+                f"{table_dir}: its tables were built from SWR source "
+                f"{inputs.get('swr_source')!r}, not the configured "
+                f"{swr_source_name()!r}"
             )
         details[str(table_dir)] = {
             "commit": commit,

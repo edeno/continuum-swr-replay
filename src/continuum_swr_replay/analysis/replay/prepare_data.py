@@ -41,6 +41,7 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
 )
 from continuum_swr_replay.analysis.hippocampus.swr_source import (
     read_dot_with_swr_source,
+    stamp_swr_source,
 )
 from continuum_swr_replay.analysis.replay._tables_common import (
     EVENT_ARM_STANDARDIZED_COLS,
@@ -691,6 +692,8 @@ def build_stop_table_scope(
         )
     _refuse_to_clobber_complete_stop_table(output_dir)  # re-check after the slow build
     output_dir.mkdir(parents=True, exist_ok=True)
+    # Built above from decode frames read through the SWR source.
+    stamp_swr_source(stop_table)
     path = publish_canonical(stop_table, output_dir, table="stop", basename="stop_table")
     logging.info("saved stop_table -> %s (%d rows)", path, len(stop_table))
     return stop_table
@@ -895,12 +898,14 @@ def _publish_canonical_tables(frames: tuple) -> None:
 
     ``publish_canonical`` stamps the covariate schema and writes atomically, so
     the tables cannot land unstamped; the per-table key selects the row-key
-    contract.
+    contract. Every frame was built here from decode frames read through the
+    SWR source, so each is stamped with it.
     """
     for basename, table_key, frame in frames:
         if frame is None:
             logging.info("  %s: skipped (no data)", basename)
             continue
+        stamp_swr_source(frame)
         path = publish_canonical(frame, OUTPUT_DIR, table=table_key, basename=basename)
         logging.info("saved %s → %s (%d rows)", basename, path, len(frame))
 

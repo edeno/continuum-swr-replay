@@ -24,7 +24,7 @@ from continuum_swr_replay.analysis.pfc.canonical_events import (
     load_session_swr_intervals,
     session_data_over_time_path,
 )
-from continuum_swr_replay.table_io import sha256_file, write_table
+from continuum_swr_replay.table_io import read_table, sha256_file, write_table
 from tests.unit._swr_inventory_fixtures import RUN_ID, write_swr_inventory
 
 
@@ -45,7 +45,7 @@ def event_table_path(tmp_path):
         }
     )
     path = tmp_path / "event_table.parquet"
-    write_table(frame, path)
+    write_table(swr_source.stamp_swr_source(frame), path)
     return path
 
 
@@ -121,6 +121,33 @@ class TestLoadSessionCanonicalEvents:
                 event_table_path=tmp_path / "absent.parquet",
             )
 
+    @pytest.mark.parametrize(
+        "stamp", [None, "kay@an_earlier_run+artifacts@none"], ids=["unstamped", "other"]
+    )
+    def test_a_table_from_another_swr_source_is_refused(self, event_table_path, stamp):
+        # Its is_swr would be split against this source's live SWR intervals.
+        frame = read_table(event_table_path)
+        frame.attrs.pop("swr_source")
+        if stamp is not None:
+            frame.attrs["swr_source"] = stamp
+        write_table(frame, event_table_path)
+
+        with pytest.raises(swr_source.SwrSourceError, match="event table"):
+            load_session_canonical_events(
+                "j1620210706_.nwb", "02_r1", event_table_path=event_table_path
+            )
+
+    def test_a_table_from_the_configured_swr_source_is_read(self, event_table_path):
+        assert read_table(event_table_path).attrs["swr_source"] == (
+            swr_source.swr_source_name()
+        )
+
+        events, _ = load_session_canonical_events(
+            "j1620210706_.nwb", "02_r1", event_table_path=event_table_path
+        )
+
+        assert len(events) == 3
+
     def test_a_table_without_the_event_columns_is_refused(self, tmp_path):
         frame = pd.DataFrame(
             {
@@ -131,7 +158,7 @@ class TestLoadSessionCanonicalEvents:
             }
         )
         path = tmp_path / "event_table.parquet"
-        write_table(frame, path)
+        write_table(swr_source.stamp_swr_source(frame), path)
 
         with pytest.raises(KeyError, match="event_start_s"):
             load_session_canonical_events(
@@ -279,6 +306,6 @@ class TestCanonicalEventInputHashes:
         assert provenance["data_over_time_sha256"] == sha256_file(dot_path)
         assert provenance["data_over_time_path"] == str(dot_path)
         events = tmp_path / "swr" / RUN_ID / "j1620210706_02_r1_HPC_kay_events.parquet"
-        assert provenance["swr_interval_source"] == f"kay@{RUN_ID}"
+        assert provenance["swr_interval_source"] == f"kay@{RUN_ID}+artifacts@none"
         assert provenance["swr_events_path"] == str(events)
         assert provenance["swr_events_sha256"] == sha256_file(events)

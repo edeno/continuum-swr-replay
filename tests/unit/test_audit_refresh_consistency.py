@@ -28,6 +28,7 @@ import xarray as xr
 from non_local_detector.discrete_state_transitions import DiscreteStationaryCustom
 
 import scripts.qa.audit_refresh_consistency as audit
+from continuum_swr_replay.analysis.hippocampus.swr_source import swr_source_name
 from continuum_swr_replay.data_loaders.epoch_register import read_register
 from continuum_swr_replay.decoding_transitions import (
     contfrag_transition_settings,
@@ -693,10 +694,22 @@ def test_a_span_off_by_10_ms_fails():
 # --------------------------------------------------------------------------
 
 
-def _table_dir(path: Path) -> Path:
+def _stamped(
+    frame: pd.DataFrame, table: str, source: str | None = None
+) -> pd.DataFrame:
+    """`frame` as a canonical `table` built from an SWR source (the configured one
+    by default), as ``publish_canonical`` writes it."""
+    frame.attrs["covariate_schema_table"] = table
+    frame.attrs["swr_source"] = swr_source_name() if source is None else source
+    return frame
+
+
+def _table_dir(path: Path, swr_source: str | None = None) -> Path:
     """A promoted table folder, with the files a manifest must and must not hold."""
-    write_table(_sessions(), path / "event_table.parquet")
-    write_table(_sessions(), path / "stop_table.parquet")
+    write_table(
+        _stamped(_sessions(), "event", swr_source), path / "event_table.parquet"
+    )
+    write_table(_stamped(_sessions(), "stop", swr_source), path / "stop_table.parquet")
     (path / "standardization_reference.json").write_text("{}")
     write_table(_qvals(), path / "models_per_bin_rate" / "qvals_table.parquet")
     (path / "models_per_bin_rate" / "qvals_standardization_reference.json").write_text(
@@ -755,7 +768,52 @@ def test_record_tables_records_tables_but_not_fits(tmp_path):
         table_dir / "event_table.parquet"
     )
     assert manifest["commit"] == "c" * 40
-    assert manifest["inputs"] == {"decode_commit": "a" * 40}
+    assert manifest["inputs"] == {
+        "decode_commit": "a" * 40,
+        "swr_source": swr_source_name(),
+    }
+
+
+def test_record_tables_records_the_swr_source_the_tables_carry(tmp_path):
+    table_dir = _table_dir(tmp_path / "replay_content", "kay@earlier+artifacts@none")
+
+    path = audit.record_tables(table_dir, "c" * 40, {"decode_commit": "a" * 40})
+
+    assert json.loads(path.read_text())["inputs"]["swr_source"] == (
+        "kay@earlier+artifacts@none"
+    )
+    with pytest.raises(ValueError, match="stamped"):
+        audit.record_tables(
+            table_dir,
+            "c" * 40,
+            {"decode_commit": "a" * 40, "swr_source": swr_source_name()},
+        )
+
+
+def test_record_tables_refuses_tables_from_two_swr_sources(tmp_path):
+    table_dir = _table_dir(tmp_path / "replay_content")
+    write_table(
+        _stamped(_sessions(), "stop", "kay@earlier+artifacts@none"),
+        table_dir / "stop_table.parquet",
+    )
+
+    with pytest.raises(ValueError, match="one SWR source"):
+        audit.record_tables(table_dir, "c" * 40, {"decode_commit": "a" * 40})
+
+
+def test_tables_built_from_another_swr_source_fail(tmp_path):
+    history = _history(tmp_path)
+    table_dir = _table_dir(tmp_path / "replay_content", "kay@earlier+artifacts@none")
+    audit.record_tables(table_dir, history.later, {"decode_commit": history.decode})
+
+    failures = audit.check_tables_recorded(
+        [table_dir], history.decode, repo=history.repo
+    )["failures"]
+
+    assert failures == [
+        f"{table_dir}: its tables were built from SWR source "
+        f"'kay@earlier+artifacts@none', not the configured {swr_source_name()!r}"
+    ]
 
 
 def test_recorded_tables_built_after_the_decode_commit_pass(tmp_path):
@@ -842,7 +900,11 @@ def test_record_tables_command_writes_only_its_manifest(tmp_path):
     assert code == 0
     assert _snapshot(tmp_path, table_dir / "tables_manifest.json") == before
     manifest = json.loads((table_dir / "tables_manifest.json").read_text())
-    assert manifest["inputs"] == {"decode_commit": "a" * 40, "behavior_cache": "cache"}
+    assert manifest["inputs"] == {
+        "decode_commit": "a" * 40,
+        "behavior_cache": "cache",
+        "swr_source": swr_source_name(),
+    }
 
 
 def test_tables_with_an_unknown_or_missing_commit_fail(tmp_path):
@@ -1611,7 +1673,9 @@ def _consistent_tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Tree:
     replay = _table_dir(root / "replay_content")
     _fit(replay / "models", "content", {"event_table": replay / "event_table.parquet"})
     contfrag = root / "contfrag_replay_content"
-    write_table(_sessions(), contfrag / "event_table_swr_HPC.parquet")
+    write_table(
+        _stamped(_sessions(), "event"), contfrag / "event_table_swr_HPC.parquet"
+    )
     _fit(
         contfrag / "models_swr_HPC",
         "content",

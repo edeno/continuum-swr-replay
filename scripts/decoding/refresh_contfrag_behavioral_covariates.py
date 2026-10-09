@@ -33,6 +33,8 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
 )
 from continuum_swr_replay.analysis.hippocampus.swr_source import (
     read_dot_with_swr_source,
+    require_swr_source,
+    stamp_swr_source,
 )
 from continuum_swr_replay.analysis.replay import build_event_patch_table
 from continuum_swr_replay.analysis.replay import prepare_data as replay_prepare_data
@@ -205,6 +207,11 @@ def refresh_contfrag_behavioral_covariates(
     basenames = contfrag_table_basenames(event_source, brain_area)
     old_event_all = read_table(source_dir / basenames["event_table"])
     old_arm_all = read_table(source_dir / basenames["event_arm_table"])
+    # The posterior aggregates are carried on event ids that hash the SWR
+    # labels, so the source bundle must come from the SWR source the rebuild
+    # reads: another source's events are other events.
+    for name, frame in (("event_table", old_event_all), ("event_arm_table", old_arm_all)):
+        require_swr_source(frame, what=f"{source_dir / basenames[name]}")
     validate_event_arm_table(old_arm_all, event_table=old_event_all)
     contingency = load_contingency(
         replay_content_dir / "models_per_bin_rate" / "qvals_table.pkl"
@@ -282,6 +289,7 @@ def refresh_contfrag_behavioral_covariates(
     if int(stop_table["n_selected_events"].sum()) != len(event_table):
         raise ValueError("rebuilt stop/event count conservation failed")
 
+    # Rebuilt from decode frames read through the SWR source, so stamped with it.
     tables = {
         "event_table": stamp_covariate_schema(event_table, table="event"),
         "event_arm_table": stamp_covariate_schema(
@@ -292,6 +300,8 @@ def refresh_contfrag_behavioral_covariates(
         ),
         "stop_table": stamp_covariate_schema(stop_table, table="stop"),
     }
+    for frame in tables.values():
+        stamp_swr_source(frame)
     output_dir.mkdir(parents=True, exist_ok=True)
     for name, frame in tables.items():
         # publish_canonical is the one write door (re-stamp idempotent, atomic).

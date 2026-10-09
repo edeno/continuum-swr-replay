@@ -533,8 +533,8 @@ def test_timing_offsets_empty_session():
 
 
 def test_assert_drawn_matches_label_fires_on_boundary_mismatch():
-    # Column header says swr_contained, but the threshold-crossing ripple
-    # ends inside the event (-> only partial). The guard must raise.
+    # Column header says swr_contained, but the drawn SWR span (from another
+    # population) ends inside the event (-> only partial). The guard must raise.
     chosen = {"swr_contained": pd.Series({"start_time": 1.0, "end_time": 2.0})}
     ripple_times = pd.DataFrame({"start_time": [0.5], "end_time": [1.5]})
     with pytest.raises(AssertionError, match="contradict"):

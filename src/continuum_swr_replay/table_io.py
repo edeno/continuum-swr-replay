@@ -106,13 +106,26 @@ def publish_canonical(
     stamped it and did not mutate it since) skips the re-validation -- the two
     full-frame ``isna``/``duplicated`` passes in ``stamp_covariate_schema`` --
     and is written as-is; the stamp is the record that it was validated.
+
+    A table built from SWR labels (``swr_source.SWR_SOURCE_TABLES``) must also
+    carry the SWR source's current stamp, which only its producer can give it
+    (``swr_source.stamp_swr_source``, after reading its decode frames through
+    the source). One without it, or with another source's, is refused, so no
+    canonical table lands without naming the SWRs it was built from.
     """
-    # Function-local import: covariate_registry's consumers import table_io, so a
-    # module-level import here would close a cycle.
+    # Function-local imports: covariate_registry's and swr_source's consumers
+    # import table_io, so a module-level import here would close a cycle.
+    from continuum_swr_replay.analysis.hippocampus.swr_source import (
+        SWR_SOURCE_TABLES,
+        require_swr_source,
+    )
     from continuum_swr_replay.analysis.replay.covariate_registry import (
         COVARIATE_SCHEMA_VERSION,
         stamp_covariate_schema,
     )
+
+    if table in SWR_SOURCE_TABLES:
+        require_swr_source(frame, what=f"the {table} table to publish")
 
     already_stamped = (
         frame.attrs.get("covariate_schema_version") == COVARIATE_SCHEMA_VERSION

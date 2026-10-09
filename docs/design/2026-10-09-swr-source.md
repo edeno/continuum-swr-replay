@@ -74,17 +74,46 @@ What the comparison shows:
 
 - **`SWR_INVENTORY_RUN_ID`, `SWR_DETECTOR` (`"kay"`), `SWR_INVENTORY_ROOT`.** These are
   the only definitions. The SWR runner writes under the same `SWR_INVENTORY_ROOT`.
+- **`ARTIFACT_INTERVALS_RUN_ID`, `ARTIFACT_INTERVALS_ROOT`.** Task 16's hook, configured
+  once like the run id. The run id is None today: no artifact is masked.
+  `artifact_intervals(epoch_id)` resolves an epoch's intervals from
+  `ARTIFACT_INTERVALS_ROOT / <run id> / {epoch_id}_artifact_intervals.parquet`
+  (`start_time`, `end_time`). It returns none while the run id is unset, and raises when
+  a configured run has no file for the epoch. No caller passes artifact intervals: every
+  function below resolves them by epoch id, so every caller gets the same ones.
+- **`swr_source_name()`** is the source's stamp:
+  `<detector>@<inventory run id>+artifacts@<artifact run id or none>`, today
+  `kay@50a98592acee+artifacts@none`.
+  - Every canonical table built from these labels carries it in its `attrs`, kept in the
+    parquet metadata (`stamp_swr_source`). That means event, event-arm, event-patch,
+    event-sequence, stop, event-onset and stop-timebin tables, Replay and ContFrag alike,
+    and the Widloski events table. Only qvals does not.
+  - Its producer stamps it after reading its decode frames through the source.
+  - `publish_canonical` refuses such a table without the current stamp.
+  - The shard assemblers and the ContFrag covariate refresh refuse an input stamped with
+    another source.
+  - `record-tables` (Task 10) records the tables' stamp as `inputs["swr_source"]`, and the
+    audit's `tables_recorded` requires it to be the configured source.
+  - The release manifest (`write_regeneration_manifest.py`) checks every SWR-bearing
+    candidate table and records the stamp.
+- **`require_swr_source(frame, what=...)`** refuses a table stamped with another source.
+  Every reader that combines a shipped table's SWR columns with the source's live labels
+  calls it:
+  - the PFC path's `load_session_canonical_events` (its `is_swr` against
+    `load_session_swr_intervals`);
+  - `regenerate_stop_table.py`, which splits rebuilt stops on the shipped event table's
+    `is_swr`;
+  - `analyze_content_occupancy.py`'s arm occupancy, reported beside its live SWR split.
 - **`swr_source_files(epoch_id)`.** It serves an epoch only if the manifest status is
   `ok`, or `partial` with the Kay inventory written. Otherwise it raises `SwrSourceError`
   (a `ValueError`; the table builders' per-session failure tallies collect it). It checks
   the events and observed files against the sha256 the manifest recorded, and the
   manifest against its folder's run id.
-- **`swr_events(epoch_id, *, speed, artifact_intervals=None)`.** It returns every
-  inventory event with its own `event_number` as `SWR_event` and a `drop_reason`. The
-  reason is None for a kept event. Otherwise it is the first that holds of:
-  - `artifact`: the event's closed interval shares any time with one of
-    `artifact_intervals` (`start_time`, `end_time`). This is Task 16's hook; it is None
-    today.
+- **`swr_events(epoch_id, *, speed)`.** It returns every inventory event with its own
+  `event_number` as `SWR_event` and a `drop_reason`. The reason is None for a kept event.
+  Otherwise it is the first that holds of:
+  - `artifact`: the event's closed interval shares any time with one of the epoch's
+    `artifact_intervals`.
   - `no_speed_sample`;
   - `moving`;
   - `speed_unknown`.
@@ -94,7 +123,7 @@ What the comparison shows:
   decode grid in `[start, end]` is finite and below 4 cm/s. The non-local and MUA cohorts
   use the same rule. The speed is the decode grid's `head_speed`. The inventory's own speed
   summaries are on LFP-interpolated samples, so they are not the canonical rule's samples.
-- **`swr_event_labels(time, epoch_id, *, speed, artifact_intervals=None)`.** It returns the
+- **`swr_event_labels(time, epoch_id, *, speed)`.** It returns the
   per-bin labels. The convention is unchanged: `build_speed_eligible_event_cohort(...,
   event_col="SWR_event")` with source ids preserved, as `get_data_over_time` writes
   `SWR_event`. A bin gets an event's number when its time lies in the closed interval
@@ -109,7 +138,12 @@ What the comparison shows:
   `n_non_local_no_SWR`, `n_SWR_MUA`, `n_SWR_no_MUA`) are dropped. The decode's own
   `SWR_event` stays in the pickle as provenance and never reaches an analysis. The epoch id
   comes from the frame's `animal`, `day` and `epoch`, so a ContFrag or cortical decode reads
-  the same CA1 SWRs.
+  the same CA1 SWRs. The epoch's files are checked against the manifest once, and the frame
+  carries the stamp.
+- **`swr_intervals(dot, *, nwb_file_name=None, epoch_name=None)`** returns one epoch's SWR
+  intervals from a source-read frame: the sampled bounds of its `SWR_event` labels, which
+  the event table classifies against. It refuses a frame without `swr_observed`. The figures
+  use it for their SWR shading and example selection.
 
 ## Who reads it
 
@@ -128,16 +162,24 @@ What the comparison shows:
     instead of `SWR_zscore`'s finite stretches.
 - **The PFC path** (`canonical_events.load_session_swr_intervals`) reads the source's
   labels on the cached frame's grid. Its provenance (`canonical_event_provenance`) now
-  records `swr_interval_source` (`kay@<run id>`) and the events file's path and sha256. The
+  records `swr_interval_source` (`swr_source_name()`, such as
+  `kay@<run id>+artifacts@none`) and the events file's path and sha256. The
   PFC runner's skip check compares both, so a bundle fit on the stored ripples is refit.
 - **`quantify_swr_overlap_geometry.py`** classifies against the source's intervals.
 - **Builders that take a frame** (`build_classified_nonlocal_event_table`,
   `build_stop_table`, the timebin and ContFrag builders, `quality_metrics`, the figure-panel
   helpers on `load_data_over_time`) are unchanged. They read whatever `SWR_event` the
   caller's frame holds, which is now the source's.
+- **Figures 2 and 3 and the event gallery** shade, select and check their SWRs with
+  `swr_intervals` on the source-read frame. They never gate `load_data`'s stored
+  `ripple_times`. `assert_drawn_class_matches_ripples` checks the drawn spans against
+  those classes. Figure 2's render cache is keyed by `swr_source_name()`.
+- **`plot_session_tables`**'s `swr_lfp` panel shades the `swr_intervals=` the caller
+  passes and refuses to draw without them.
 
 `tests/unit/test_swr_source_consumers.py` runs each reader on a frame whose stored labels
-disagree with the source. Two static checks there keep it that way: no module outside an
+disagree with the source, under a configured artifact run that masks one source SWR. Two
+static checks there keep it that way: no module outside the figure archive and an
 explained list names the stored ripples, and none unpickles a decode frame without the
 source.
 
@@ -150,12 +192,8 @@ source.
   own provenance.
 - **`SWR_zscore`** is still Spyglass's Kay consensus trace, a signal and not a label. The
   inventory ships no trace.
-- **The figure scripts are not edited** (a plan constraint).
-  - Figures 2 and 3 get the source's labels through `load_data_over_time`, but they still
-    shade and assert against `load_data`'s stored `ripple_times`.
-  - The event gallery and the pipeline-data-flow supplement unpickle frames directly.
-
-  Proposals are in the Task 15 report.
+- **The pipeline-data-flow supplement** unpickles a decode frame directly, but it reads
+  no SWR column.
 - **Conventions.**
   - Event-level `is_swr` is strict positive-duration overlap.
   - Stop-level `is_swr_stop` is the inclusive per-timebin rule.

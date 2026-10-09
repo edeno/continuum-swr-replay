@@ -133,6 +133,8 @@ SIDECAR_TOP_LEVEL_KEYS = [
     "data_over_time_sha256",
     "is_swr_definition",
     "swr_interval_source",
+    "swr_events_sha256",
+    "swr_events_path",
     "n_events_total",
     "n_events_swr",
     "n_events_non_swr",
@@ -1029,7 +1031,8 @@ def fitter_table(sidecars: pd.DataFrame) -> pd.DataFrame:
     hash is deliberately not part of the combination -- it is a property of the
     session, not of the run, so grouping on it would put every session in a row
     of its own; the number of distinct values is reported instead, and it
-    should equal the number of sessions.
+    should equal the number of sessions. The SWR source's events-file hash is
+    treated the same way; the source's name is part of the combination.
     """
     columns = [
         "fitter",
@@ -1054,6 +1057,7 @@ def fitter_table(sidecars: pd.DataFrame) -> pd.DataFrame:
     table = grouped.agg(
         n_sessions=("session", "size"),
         n_distinct_data_over_time=("data_over_time_sha256", "nunique"),
+        n_distinct_swr_events=("swr_events_sha256", "nunique"),
     ).reset_index()
     for column in (
         "n_model_fits",

@@ -445,8 +445,10 @@ class TestRunOne:
         assert len(known) > 0
         assert known.is_swr.astype(bool).all()
         assert (known.overlap_class == "swr_contained").all()
-        assert record["swr_source"]["name"] == f"kay@{RUN_ID}"
+        assert record["swr_source"]["name"] == swr_source.swr_source_name()
+        assert record["swr_source"]["name"].startswith(f"kay@{RUN_ID}+")
         assert len(record["swr_source"]["events"]["sha256"]) == 64
+        assert table.attrs["swr_source"] == swr_source.swr_source_name()
 
     def test_every_input_is_hashed(self, decode_root, tmp_path):
         record = run(decode_root, tmp_path)

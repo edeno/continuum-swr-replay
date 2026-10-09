@@ -324,7 +324,7 @@ def results_exist(
         frame this run would read. ``None`` matches no existing bundle, so a
         session whose inputs could not be hashed is refit rather than skipped.
     swr_interval_source, swr_events_sha256 : str or None
-        The SWR source (``kay@<run id>``) and the hash of its events file this
+        The SWR source (``swr_source_name()``) and the hash of its events file this
         run would read the SWR intervals from: a bundle fit on the stored
         ripples, or on another inventory run, describes other SWRs.
     fitter : str or None

@@ -181,15 +181,55 @@ def test_umask_file_mode_respects_umask():
 
 
 def _valid_stop_frame() -> pd.DataFrame:
-    return pd.DataFrame(
-        {
-            "animal": ["chimi", "chimi"],
-            "session_date": [20200212, 20200212],
-            "epoch": ["02_r1", "02_r1"],
-            "stop_id": [10, 11],
-            "n_selected_events": [1, 0],
-        }
+    """A stop table as its producer hands it over: stamped with the SWR source."""
+    from continuum_swr_replay.analysis.hippocampus.swr_source import (
+        stamp_swr_source,
     )
+
+    return stamp_swr_source(
+        pd.DataFrame(
+            {
+                "animal": ["chimi", "chimi"],
+                "session_date": [20200212, 20200212],
+                "epoch": ["02_r1", "02_r1"],
+                "stop_id": [10, 11],
+                "n_selected_events": [1, 0],
+            }
+        )
+    )
+
+
+@pytest.mark.parametrize("stamp", [None, "kay@earlier+artifacts@none"])
+def test_publish_canonical_refuses_an_swr_table_from_another_source(tmp_path, stamp):
+    """A table built from SWR labels must name the configured SWR source."""
+    from continuum_swr_replay.analysis.hippocampus.swr_source import SwrSourceError
+
+    frame = _valid_stop_frame()
+    frame.attrs.pop("swr_source")
+    if stamp is not None:
+        frame.attrs["swr_source"] = stamp
+
+    with pytest.raises(SwrSourceError, match="the stop table to publish"):
+        publish_canonical(frame, tmp_path, table="stop", basename="stop_table")
+    assert not (tmp_path / "stop_table.parquet").exists()
+
+
+def test_publish_canonical_keeps_the_swr_stamp_and_needs_none_for_qvals(tmp_path):
+    from continuum_swr_replay.analysis.hippocampus.swr_source import swr_source_name
+
+    stop = read_table(
+        publish_canonical(
+            _valid_stop_frame(), tmp_path, table="stop", basename="stop_table"
+        )
+    )
+    qvals = read_table(
+        publish_canonical(
+            pd.DataFrame({"stop_id": [10, 11]}), tmp_path, table="qvals", basename="q"
+        )
+    )
+
+    assert stop.attrs["swr_source"] == swr_source_name()
+    assert "swr_source" not in qvals.attrs
 
 
 def test_publish_canonical_stamps_and_writes(tmp_path):

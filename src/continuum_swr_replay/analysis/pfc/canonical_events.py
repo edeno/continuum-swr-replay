@@ -114,6 +114,11 @@ def load_session_canonical_events(
         If no event table exists at ``event_table_path``.
     KeyError
         If the table lacks the session or event columns.
+    SwrSourceError
+        If the table was not built from the configured SWR source
+        (``swr_source.require_swr_source``). Its ``is_swr`` column is combined
+        with :func:`load_session_swr_intervals`' live source intervals, so the
+        two must be one source.
     ValueError
         If the session has no events at all -- a missing session is a data
         problem, not an empty cohort, and re-detecting events for it would
@@ -126,6 +131,7 @@ def load_session_canonical_events(
     animal, session_date = parse_nwb_filename(nwb_file_name)
 
     event_table = read_table(path)
+    swr_source.require_swr_source(event_table, what=f"the event table at {path}")
     missing = [
         column
         for column in (*SESSION_COLUMNS, *_EVENT_COLUMNS)
@@ -280,7 +286,7 @@ def canonical_event_provenance(
     Defined once so the runner's skip check and the run's own sidecar cannot
     disagree about the key names: a mismatch there would silently skip a
     session whose events had changed. ``swr_interval_source`` names the SWR
-    source (``kay@<run id>``) and ``swr_events_*`` the inventory file the SWR
+    source (``swr_source_name()``) and ``swr_events_*`` the inventory file the SWR
     intervals were read from.
     """
     return {

@@ -2,16 +2,22 @@
 
 Each consumer's own entry point is run on a decode frame whose stored
 ``SWR_event`` (the decode's ``RippleTimesV1`` labels) marks a ripple the source
-does not have, and the source's inventory marks three the frame does not. What
-reaches the consumer must be the source's labels: the frame a builder gets,
-the intervals the PFC path fits, the labels a loader returns. Where a consumer
+does not have, and the source's inventory marks three the frame does not, one
+of which the configured artifact run masks. What reaches the consumer must be
+the source's two kept SWRs: the frame a builder gets, the intervals the PFC
+path fits, the labels a loader returns. No consumer passes the artifacts; the
+source resolves them, so every consumer gets the same ones. Where a consumer
 reads the frame and then needs Spyglass or a decode the test cannot supply,
 the next call it makes is replaced by a recorder that keeps the frame and stops
 it there.
 
-The static checks at the end keep it that way: no module outside the decode
-writers and an explained list reads the stored ripples or a decode frame's
-pickle directly.
+Every table built from these labels is published with the source's stamp, and
+every reader that combines a shipped table's SWR columns with the source's live
+labels refuses a table stamped with another source.
+
+The static checks at the end keep it that way: no module outside the figure
+archive, the decode writers and an explained list reads the stored ripples or
+a decode frame's pickle directly.
 
 Offline: the inventory and register are written under ``tmp_path``; scripts
 that import ``load_data`` are imported with ``spyglass`` stubbed, as
@@ -40,8 +46,14 @@ from continuum_swr_replay.analysis.hippocampus.swr_source import (
     swr_event_labels,
 )
 from continuum_swr_replay.data_loaders import epoch_register
-from continuum_swr_replay.table_io import sha256_file
-from tests.unit._swr_inventory_fixtures import RUN_ID, write_swr_inventory
+from continuum_swr_replay.table_io import read_table, sha256_file, write_table
+from tests.unit._swr_inventory_fixtures import (
+    ARTIFACT_RUN_ID,
+    RUN_ID,
+    use_swr_source,
+    write_artifact_intervals,
+    write_swr_inventory,
+)
 
 REPO = Path(__file__).resolve().parents[2]
 NWB = "j1620210706_.nwb"
@@ -50,6 +62,11 @@ EPOCH_ID = "j1620210706_02_r1_HPC"
 TIME = np.round(100.0 + np.arange(2000) / 500.0, 6)
 """A 500 Hz decode grid, 100.000-103.998 s."""
 SOURCE_SWRS = [(100.50, 100.56), (101.00, 101.04), (102.00, 102.10)]
+ARTIFACT = (102.05, 102.06)
+"""The configured artifact run's one interval: it drops the third source SWR."""
+KEPT_SWRS = SOURCE_SWRS[:2]
+"""The source's SWRs every consumer must see: the artifact-overlapping one is
+dropped by the source itself, so no consumer passes artifacts."""
 STORED_SWR = (103.00, 103.10)
 """The decode's stored ripple, which the source does not have."""
 
@@ -60,12 +77,12 @@ class _Stop(Exception):
 
 @pytest.fixture
 def source(tmp_path, monkeypatch):
-    """The source's default inventory is a synthetic one under ``tmp_path``."""
-    root = tmp_path / "swr"
-    write_swr_inventory(root, {EPOCH_ID: SOURCE_SWRS})
-    monkeypatch.setattr(swr_source, "SWR_INVENTORY_ROOT", root)
-    monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", RUN_ID)
-    return root / RUN_ID
+    """The source's configured inventory and artifact run are synthetic ones
+    under ``tmp_path``."""
+    inventory = write_swr_inventory(tmp_path / "swr", {EPOCH_ID: SOURCE_SWRS})
+    artifacts = write_artifact_intervals(tmp_path / "artifacts", {EPOCH_ID: [ARTIFACT]})
+    use_swr_source(monkeypatch, inventory, artifacts)
+    return inventory
 
 
 @pytest.fixture
@@ -111,7 +128,9 @@ def decode_frame(**columns) -> pd.DataFrame:
 
 
 def assert_source_labels(frame: pd.DataFrame) -> None:
-    np.testing.assert_array_equal(frame["SWR_event"].to_numpy(), source_labels())
+    labels = frame["SWR_event"].to_numpy()
+    np.testing.assert_array_equal(labels, source_labels())
+    assert sorted(set(labels) - {0}) == [1, 2]  # the artifact dropped SWR 3
     assert "n_SWR" not in frame.columns
     assert frame["swr_observed"].all()
 
@@ -418,7 +437,7 @@ def test_the_overlap_geometry_count_classifies_against_the_source(
         script.quantify_session(NWB, EPOCH)
 
     np.testing.assert_allclose(
-        seen[0][["start_time", "end_time"]].to_numpy(), np.array(SOURCE_SWRS)
+        seen[0][["start_time", "end_time"]].to_numpy(), np.array(KEPT_SWRS)
     )
 
 
@@ -437,7 +456,7 @@ def test_the_pfc_swr_intervals_are_the_sources(source, tmp_path):
 
     intervals, sha = load_session_swr_intervals(NWB, EPOCH, dot_path=path)
 
-    np.testing.assert_allclose(intervals.to_numpy(), np.array(SOURCE_SWRS))
+    np.testing.assert_allclose(intervals.to_numpy(), np.array(KEPT_SWRS))
     assert sha == sha256_file(path)
 
 
@@ -452,7 +471,9 @@ def test_the_pfc_provenance_names_the_source_and_hashes_its_events(
         NWB, EPOCH, event_table_path=tmp_path / "absent.parquet"
     )
 
-    assert provenance["swr_interval_source"] == f"kay@{RUN_ID}"
+    assert provenance["swr_interval_source"] == (
+        f"kay@{RUN_ID}+artifacts@{ARTIFACT_RUN_ID}"
+    )
     assert provenance["swr_events_sha256"] == sha256_file(
         source / f"{EPOCH_ID}_kay_events.parquet"
     )
@@ -461,10 +482,10 @@ def test_the_pfc_provenance_names_the_source_and_hashes_its_events(
 def test_a_pfc_epoch_the_source_cannot_serve_hashes_to_none(tmp_path, monkeypatch):
     import continuum_swr_replay.analysis.pfc.canonical_events as canonical
 
-    root = tmp_path / "swr"
-    write_swr_inventory(root, {}, records={EPOCH_ID: {"status": "failed"}})
-    monkeypatch.setattr(swr_source, "SWR_INVENTORY_ROOT", root)
-    monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", RUN_ID)
+    inventory = write_swr_inventory(
+        tmp_path / "swr", {}, records={EPOCH_ID: {"status": "failed"}}
+    )
+    use_swr_source(monkeypatch, inventory)
     monkeypatch.setattr(canonical, "PROCESSED_DATA_DIR", tmp_path)
 
     provenance = canonical.canonical_event_input_hashes(NWB, EPOCH)
@@ -483,10 +504,241 @@ def _saved(folder: Path, frame: pd.DataFrame) -> Path:
 
 
 # --------------------------------------------------------------------------
+# Every table built from the source carries its stamp; mixers refuse others
+# --------------------------------------------------------------------------
+
+STALE = "kay@an_earlier_run+artifacts@none"
+
+
+def _stop_frame(stamp: str | None = None) -> pd.DataFrame:
+    frame = pd.DataFrame(
+        {
+            "animal": ["j16"],
+            "session_date": [20210706],
+            "epoch": [EPOCH],
+            "stop_id": [1],
+            "n_selected_events": [0],
+        }
+    )
+    if stamp is not None:
+        frame.attrs["swr_source"] = stamp
+    return frame
+
+
+def test_the_replay_tables_are_published_with_the_sources_stamp(
+    source, monkeypatch, tmp_path
+):
+    from continuum_swr_replay.analysis.replay import prepare_data
+
+    published: dict = {}
+    monkeypatch.setattr(prepare_data, "OUTPUT_DIR", tmp_path)
+    monkeypatch.setattr(
+        prepare_data,
+        "publish_canonical",
+        lambda frame, path, *, table, basename: published.setdefault(
+            basename, dict(frame.attrs)
+        ),
+    )
+
+    prepare_data._publish_canonical_tables(
+        (("stop_table", "stop", _stop_frame()), ("event_table", "event", _stop_frame()))
+    )
+
+    assert {name: attrs["swr_source"] for name, attrs in published.items()} == {
+        "stop_table": swr_source.swr_source_name(),
+        "event_table": swr_source.swr_source_name(),
+    }
+
+
+def test_the_stop_only_bootstrap_publishes_with_the_sources_stamp(
+    source, saved_decode, monkeypatch, tmp_path
+):
+    from continuum_swr_replay.analysis.replay import prepare_data
+
+    monkeypatch.setattr(
+        prepare_data,
+        "load_behavioral_context",
+        lambda session, from_cache: (pd.DataFrame(), pd.DataFrame(), object(), True),
+    )
+    monkeypatch.setattr(
+        prepare_data, "build_stop_table", lambda *args, **kwargs: _stop_frame()
+    )
+
+    prepare_data.build_stop_table_scope(
+        [saved_decode], from_cache=True, output_dir=tmp_path / "out"
+    )
+
+    stop = read_table(tmp_path / "out" / "stop_table")
+    assert stop.attrs["swr_source"] == swr_source.swr_source_name()
+
+
+def test_the_timebin_tables_are_published_with_the_sources_stamp(
+    source, monkeypatch, offline, tmp_path
+):
+    script = offline("scripts.decoding.build_timebin_tables")
+    key = {"animal": "j16", "session_date": 20210706, "epoch": EPOCH}
+    session = {"nwb_file_name": NWB, "epoch_name": EPOCH}
+    monkeypatch.setattr(script, "find_sessions", lambda max_per_animal: [session])
+    monkeypatch.setattr(
+        script,
+        "build_one",
+        lambda s: (pd.DataFrame([key]), pd.DataFrame([{**key, "n_swr_events": 0}])),
+    )
+    monkeypatch.setattr(script, "validate", lambda onset, dense: None)
+    stamps: dict = {}
+    monkeypatch.setattr(
+        script,
+        "publish_canonical",
+        lambda frame, path, *, table, basename: stamps.setdefault(
+            table, frame.attrs.get("swr_source")
+        ),
+    )
+    monkeypatch.setattr(
+        sys, "argv", ["build_timebin_tables.py", "--output-dir", str(tmp_path)]
+    )
+
+    script.main()
+
+    assert stamps == {
+        "event_onset": swr_source.swr_source_name(),
+        "stop_timebin": swr_source.swr_source_name(),
+    }
+
+
+def test_the_stop_table_rebuild_refuses_an_event_table_from_another_source(
+    source, monkeypatch, offline, tmp_path
+):
+    script = offline("scripts.decoding.regenerate_stop_table")
+    event_table = _stop_frame(STALE)
+    monkeypatch.setattr(
+        script, "find_sessions", lambda max_per_animal: [{"nwb_file_name": NWB}]
+    )
+    monkeypatch.setattr(script, "build_one", lambda s: _stop_frame())
+    monkeypatch.setattr(script, "read_table", lambda path: event_table)
+    monkeypatch.setattr(script, "require_covariate_schema", lambda frame, table: None)
+    monkeypatch.setattr(sys, "argv", ["regenerate_stop_table.py", "--no-save"])
+
+    with pytest.raises(SwrSourceError, match="an_earlier_run"):
+        script.main()
+
+
+@pytest.mark.parametrize("stale_shard", [False, True], ids=["current", "stale"])
+def test_the_stop_shard_assembly_needs_every_shard_from_the_source(
+    source, monkeypatch, tmp_path, stale_shard
+):
+    monkeypatch.syspath_prepend(str(REPO / "scripts" / "decoding"))
+    from scripts.decoding.assemble_replay_content_shards import (
+        assemble_replay_stop_shards,
+    )
+
+    shards = []
+    for index, stamp in enumerate(
+        (swr_source.swr_source_name(), STALE if stale_shard else None)
+    ):
+        shard = tmp_path / f"shard{index}"
+        shard.mkdir()
+        frame = _stop_frame(stamp or swr_source.swr_source_name())
+        frame["epoch"] = f"0{2 * index + 2}_r{index + 1}"
+        frame["stop_id"] = index + 1
+        write_table(frame, shard / "stop_table.parquet")
+        shards.append(shard)
+
+    if stale_shard:
+        with pytest.raises(SwrSourceError, match="shard1"):
+            assemble_replay_stop_shards(
+                shards, output_dir=tmp_path / "out", expected_sessions=2
+            )
+    else:
+        assemble_replay_stop_shards(
+            shards, output_dir=tmp_path / "out", expected_sessions=2
+        )
+        assembled = read_table(tmp_path / "out" / "stop_table")
+        assert assembled.attrs["swr_source"] == swr_source.swr_source_name()
+
+
+def test_the_content_occupancy_refuses_an_arm_table_from_another_source(
+    source, monkeypatch, tmp_path
+):
+    import scripts.content.analyze_content_occupancy as occupancy
+
+    folder = tmp_path / "replay_content"
+    folder.mkdir()
+    arm = pd.DataFrame(
+        {"is_swr": [True], "candidate_arm": [0], "arm_posterior_mass": [1.0]}
+    )
+    arm.attrs["swr_source"] = STALE
+    write_table(arm, folder / "event_arm_table.parquet")
+    monkeypatch.setattr(occupancy, "PROCESSED_DATA_DIR", tmp_path)
+    monkeypatch.setattr(
+        occupancy, "require_covariate_schema", lambda frame, table: None
+    )
+
+    with pytest.raises(SwrSourceError, match="an_earlier_run"):
+        occupancy.arm_occupancy()
+
+
+def test_the_widloski_runner_stamps_its_table(source):
+    # The runner stamps its events table as the canonical tables are stamped;
+    # its own run is tested in test_run_memoryless_detection.py.
+    text = (REPO / "scripts/decoding/run_memoryless_detection.py").read_text()
+
+    assert "stamp_swr_source(detection.table)" in text
+
+
+# --------------------------------------------------------------------------
+# The figures draw and select the source's intervals
+# --------------------------------------------------------------------------
+
+
+def test_the_event_gallery_catalogs_against_the_source(source, tmp_path, offline):
+    gallery = offline("scripts.figures.generate_event_gallery")
+    nonlocal_event = np.zeros(TIME.size, dtype=int)
+    nonlocal_event[(TIME >= 101.01) & (TIME <= 101.03)] = 1  # inside source SWR 2
+    nonlocal_event[(TIME >= 103.02) & (TIME <= 103.06)] = 2  # inside the stored one
+    probability = np.where(nonlocal_event > 0, 0.95, 0.0)
+    path = tmp_path / f"{EPOCH_ID}_80_data_over_time.pkl"
+    decode_frame(
+        non_local_event=nonlocal_event, **{"Non-Local_Continuous_prob": probability}
+    ).to_pickle(path)
+
+    catalog = gallery._catalog_one_epoch(path)
+
+    by_category = catalog.groupby("category")["event_label"].apply(sorted).to_dict()
+    # NL 1 is SWR-contained, NL 2 non-SWR; source SWR 1 overlaps no NL event,
+    # source SWR 3 was dropped by the artifact, and the stored ripple is unseen.
+    assert by_category == {
+        "swr_contained": [1],
+        "non_swr": [2],
+        "swr_not_nonlocal": [1],
+    }
+
+
+FIGURE_SCRIPTS = (
+    "scripts/figures/generate_figure02.py",
+    "scripts/figures/generate_figure03.py",
+    "scripts/figures/generate_event_gallery.py",
+)
+
+
+@pytest.mark.parametrize("script", FIGURE_SCRIPTS)
+def test_the_figures_draw_the_sources_intervals(script):
+    text = (REPO / script).read_text()
+
+    # The plotted ``data["ripple_times"]`` is replaced by the session's source
+    # intervals from the source-read frame, before anything draws or gates it ...
+    assert re.search(r'data\["ripple_times"\] = swr_intervals\(', text)
+    # ... and load_data's stored ripples are never re-gated or unpickled around it.
+    assert not re.search(
+        r'build_speed_eligible_event_cohort\(\s*data\["ripple_times"\]', text
+    )
+    assert "pd.read_pickle(" not in text
+
+
+# --------------------------------------------------------------------------
 # Static: nothing else reads the stored ripples or a decode frame's pickle
 # --------------------------------------------------------------------------
 
-#: Files outside ``scripts/figures`` and ``scripts/exploratory`` that may name
+#: Files outside ``scripts/figures/archive`` that may name
 #: the stored Spyglass ripples, and why each is not an analysis read.
 STORED_RIPPLE_READERS = {
     "src/continuum_swr_replay/data_loaders/lfp.py": "the loader itself",
@@ -523,9 +775,14 @@ STORED_RIPPLE_READERS = {
     "scripts/qa/diagnose_pfc_event_definition.py": (
         "reproduces the retired PFC event definition on purpose"
     ),
+    # The figures set ``data["ripple_times"]`` from the source before drawing
+    # (test_the_figures_draw_the_sources_intervals pins that).
+    "scripts/figures/generate_figure02.py": "replaced by swr_intervals",
+    "scripts/figures/generate_figure03.py": "replaced by swr_intervals",
+    "scripts/figures/generate_event_gallery.py": "replaced by swr_intervals",
 }
 
-#: Files outside ``scripts/figures`` and ``scripts/exploratory`` that unpickle a
+#: Files outside ``scripts/figures/archive`` that unpickle a
 #: decode frame without the source, and why none of them reads its SWRs.
 DECODE_FRAME_READERS = {
     "src/continuum_swr_replay/analysis/hippocampus/swr_source.py": "the reader",
@@ -534,15 +791,23 @@ DECODE_FRAME_READERS = {
     "scripts/qa/run_half_tetrode_decodes.py": "time axis, non-local labels",
     "scripts/qa/diagnose_trial_detection.py": "position and trials",
     "scripts/qa/compare_pfc_cohorts.py": "PFC bundles; names data_over_time_sha256",
+    "scripts/figures/generate_supp_pipeline_data_flow.py": (
+        "decode schematic: posterior, position and speed columns only"
+    ),
+    "scripts/exploratory/_augment_data_over_time.py": "adds posterior columns",
+    "scripts/exploratory/_trunk_zscore_extract.py": "SWR_zscore and MUA_zscore",
+    "scripts/exploratory/_trunk_zscore_timebin.py": "SWR_zscore and MUA_zscore",
 }
 
 
 def _python_files() -> list[Path]:
+    """Every module under src/ and scripts/ but the retired figure archive."""
+    archive = REPO / "scripts" / "figures" / "archive"
     return [
         path
         for folder in ("src", "scripts")
         for path in (REPO / folder).rglob("*.py")
-        if not {"figures", "exploratory"} & set(path.relative_to(REPO).parts)
+        if not path.is_relative_to(archive)
     ]
 
 

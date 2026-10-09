@@ -84,6 +84,10 @@ from continuum_swr_replay.analysis.hippocampus.event_immobility import (
 from continuum_swr_replay.analysis.hippocampus.event_table import (
     build_classified_nonlocal_event_table,
 )
+from continuum_swr_replay.analysis.hippocampus.swr_source import (
+    read_dot_with_swr_source,
+    swr_intervals,
+)
 from continuum_swr_replay.analysis.replay.bouts import (
     immobility_bout_intervals,
 )
@@ -226,7 +230,7 @@ def _catalog_one_epoch(pkl_path: Path) -> pd.DataFrame:
     epoch_id = epoch_id_from_pkl(pkl_path)
     nwb_file_name, epoch_name = parse_epoch_id(epoch_id)
 
-    dot = pd.read_pickle(pkl_path)
+    dot = read_dot_with_swr_source(pkl_path)
     dot["Non-Local_prob"] = (
         dot["Non-Local_Continuous_prob"] + dot["Non-Local_Fragmented_prob"]
     )
@@ -1572,8 +1576,11 @@ def render_epoch(
     # immobility bouts (stop unit) it provides are used by every event's
     # behavioral-context panel. Per-arm predictors/content additionally need
     # the conditional posterior (NL categories only).
-    dot = pd.read_pickle(data_dir / f"{epoch_id}_HPC_80_data_over_time.pkl")
+    dot = read_dot_with_swr_source(data_dir / f"{epoch_id}_HPC_80_data_over_time.pkl")
     imm_bouts = immobility_bout_intervals(dot)
+    # The SWR trace's shading: the epoch's SWR source intervals, the ones its
+    # events were classified against (not load_data's stored ripples).
+    data["ripple_times"] = swr_intervals(dot)
 
     event_table = None
     arm_table = None

@@ -70,8 +70,9 @@ from continuum_swr_replay.analysis.hippocampus import (
     load_results,
     select_typical_event_by_class,
 )
-from continuum_swr_replay.analysis.hippocampus.event_immobility import (
-    build_speed_eligible_event_cohort,
+from continuum_swr_replay.analysis.hippocampus.swr_source import (
+    swr_intervals,
+    swr_source_name,
 )
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
@@ -174,7 +175,8 @@ def _figure02_cache_path(
     return (
         data_dir
         / "intermediates"
-        / f"{animal}{day}_{epoch_name}_figure02_whole_event_speed_v1_cache.joblib"
+        / f"{animal}{day}_{epoch_name}_figure02_whole_event_speed_v1_"
+        f"{swr_source_name()}_cache.joblib"
     )
 
 
@@ -196,18 +198,17 @@ def _compute_figure_inputs(
     # ── Load data ──
     logging.info(f"Loading session {nwb_file_name} {epoch_name}...")
     data = dict(load_data(nwb_file_name, epoch_name))
-    data["ripple_times"], _ = build_speed_eligible_event_cohort(
-        data["ripple_times"],
-        speed=data["position_info"].head_speed.to_numpy(),
-        time=data["position_info"].index,
-        event_col="SWR_event",
-    )
     results, detector, env = load_results(
         nwb_file_name, epoch_name, decoding_brain_area="HPC"
     )
 
     logging.info("Loading aggregated data for stats panels...")
     data_over_time = load_data_over_time(data_dir)
+    # Panel a's SWR shading: the session's SWR source intervals, the ones the
+    # classes below are computed against (not load_data's stored ripples).
+    data["ripple_times"] = swr_intervals(
+        data_over_time, nwb_file_name=nwb_file_name, epoch_name=epoch_name
+    )
     event_types = get_event_types(data_over_time)
 
     # Single classification source for panels a/b/d: the unfiltered
@@ -251,9 +252,8 @@ def _compute_figure_inputs(
                 ev.peak_prob,
             )
 
-    # Guard: the column header is label-derived, but panel a shades the
-    # threshold-crossing ripple_times. Fail if a chosen example would be
-    # drawn with a SWR span that contradicts its column label.
+    # Guard: panel a shades data["ripple_times"]; fail if a chosen example would
+    # be drawn with an SWR span that contradicts its column label.
     assert_drawn_class_matches_ripples(chosen, data["ripple_times"])
     # Cheap hash-collision guard: each chosen event_id must resolve to
     # exactly one classified row.

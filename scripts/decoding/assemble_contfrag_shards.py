@@ -10,6 +10,10 @@ from pathlib import Path
 import pandas as pd
 from prepare_contfrag_replay_content_data import contfrag_table_basenames
 
+from continuum_swr_replay.analysis.hippocampus.swr_source import (
+    require_swr_source,
+    stamp_swr_source,
+)
 from continuum_swr_replay.analysis.replay import build_event_patch_table
 from continuum_swr_replay.analysis.replay.covariate_registry import (
     stamp_covariate_schema,
@@ -49,6 +53,9 @@ def assemble_contfrag_shards(
         frames = {
             name: read_table(shard_dir / basenames[name]) for name in input_names
         }
+        # Every shard must come from the SWR source the bundle is stamped with.
+        for name, frame in frames.items():
+            require_swr_source(frame, what=f"{shard_dir / basenames[name]}")
         shard_sessions = _session_keys(frames["stop_table"])
         overlap = observed_sessions & shard_sessions
         if overlap:
@@ -102,6 +109,8 @@ def assemble_contfrag_shards(
         ),
         "stop_table": stamp_covariate_schema(stop_table, table="stop"),
     }
+    for frame in tables.values():
+        stamp_swr_source(frame)
     output_dir.mkdir(parents=True, exist_ok=True)
     for name, frame in tables.items():
         # publish_canonical is the one write door (re-stamp idempotent, atomic).

@@ -177,3 +177,43 @@ def test_verify_baseline_raises_on_structural_drift(tmp_path: Path):
     _write_replay_bundle(tmp_path / "cand", reward_fraction=0.5, n_events=5)  # key set differs
     with pytest.raises(ValueError, match="row"):
         _verify_baseline(tmp_path / "cand", tmp_path / "base", expected_drift_columns=set())
+
+
+# ---------------------------------------------------------------------------
+# One SWR source per release (_require_one_swr_source)
+# ---------------------------------------------------------------------------
+from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
+    swr_source_name,
+)
+from scripts.decoding.write_regeneration_manifest import (  # noqa: E402
+    _require_one_swr_source,
+)
+
+
+def _table(path: Path, table: str, swr_source: str | None) -> None:
+    frame = pd.DataFrame({"x": [1]})
+    frame.attrs["covariate_schema_table"] = table
+    if swr_source is not None:
+        frame.attrs["swr_source"] = swr_source
+    write_table(frame, path)
+
+
+def test_a_release_built_from_the_configured_swr_source_passes(tmp_path: Path):
+    roots = {"replay": tmp_path / "replay", "contfrag": tmp_path / "contfrag"}
+    _table(roots["replay"] / "event_table.parquet", "event", swr_source_name())
+    _table(roots["contfrag"] / "stop_table_swr_HPC.parquet", "stop", swr_source_name())
+    _table(roots["replay"] / "qvals_table.parquet", "qvals", None)
+
+    assert _require_one_swr_source(roots) == swr_source_name()
+
+
+@pytest.mark.parametrize("stamp", [None, "kay@earlier+artifacts@none"])
+def test_a_release_with_a_table_from_another_swr_source_is_refused(
+    tmp_path: Path, stamp
+):
+    roots = {"replay": tmp_path / "replay", "contfrag": tmp_path / "contfrag"}
+    _table(roots["replay"] / "event_table.parquet", "event", swr_source_name())
+    _table(roots["contfrag"] / "event_table_swr_HPC.parquet", "event", stamp)
+
+    with pytest.raises(ValueError, match="event_table_swr_HPC"):
+        _require_one_swr_source(roots)

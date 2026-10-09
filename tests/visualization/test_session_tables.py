@@ -1759,3 +1759,40 @@ class TestPublicPlotSessionTables:
         )
         assert title_box.y1 <= 1.0, "suptitle must stay inside the canvas"
         plt.close(fig)
+
+
+class TestSwrPanelShadesTheSourcesIntervals:
+    """The SWR LFP panel shades the caller's SWR source intervals, never the
+    stored ``data['ripple_times']``."""
+
+    def test_the_panel_draws_the_intervals_it_is_given(self, monkeypatch):
+        from continuum_swr_replay.visualization import session_tables as mod
+
+        drawn: list = []
+        monkeypatch.setattr(
+            mod,
+            "plot_ripple_consensus_trace_zscore",
+            lambda data, time_slice, ax: drawn.append(data["ripple_times"]),
+        )
+        inputs = _public_plot_inputs()
+        inputs["data"] = {
+            "ripple_times": pd.DataFrame({"start_time": [9.0], "end_time": [9.1]})
+        }
+        source = pd.DataFrame({"start_time": [1.0], "end_time": [1.2]})
+
+        fig, _ = plot_session_tables(
+            **inputs, time_window=(0.0, 4.0), panels=("swr_lfp",), swr_intervals=source
+        )
+
+        assert len(drawn) == 1
+        pd.testing.assert_frame_equal(drawn[0], source)
+        plt.close(fig)
+
+    def test_the_panel_without_source_intervals_is_refused(self):
+        inputs = _public_plot_inputs()
+        inputs["data"] = {
+            "ripple_times": pd.DataFrame({"start_time": [9.0], "end_time": [9.1]})
+        }
+
+        with pytest.raises(ValueError, match="swr_intervals"):
+            plot_session_tables(**inputs, time_window=(0.0, 4.0), panels=("swr_lfp",))

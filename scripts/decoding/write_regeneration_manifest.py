@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -15,6 +16,11 @@ import pyarrow.parquet as pq
 
 from continuum_swr_replay.analysis.behavior.qvals_table import (
     QVALS_STANDARDIZED_COLS,
+)
+from continuum_swr_replay.analysis.hippocampus.swr_source import (
+    SWR_SOURCE_ATTR,
+    SWR_SOURCE_TABLES,
+    swr_source_name,
 )
 from continuum_swr_replay.analysis.replay._tables_common import (
     EVENT_ARM_STANDARDIZED_COLS,
@@ -37,7 +43,7 @@ from continuum_swr_replay.session_keys import (
 from continuum_swr_replay.session_keys import (
     session_key_set as _session_keys,
 )
-from continuum_swr_replay.table_io import read_table, sha256_file
+from continuum_swr_replay.table_io import read_attrs, read_table, sha256_file
 from continuum_swr_replay.table_parity import diff_table
 
 MODEL_VALIDATION_BUNDLES = {
@@ -87,6 +93,40 @@ def _json_session_keys(keys: set[tuple[object, ...]]) -> list[dict[str, object]]
         dict(zip(SESSION_COLUMNS, key, strict=True))
         for key in sorted(keys, key=lambda key: tuple(map(str, key)))
     ]
+
+
+def _require_one_swr_source(roots: Mapping[str, Path]) -> str:
+    """Every SWR-bearing candidate table carries the configured SWR source's stamp.
+
+    Every parquet table under `roots` whose covariate-schema table is one of
+    ``swr_source.SWR_SOURCE_TABLES`` must be stamped ``swr_source_name()``:
+    a release mixing SWR sources, or built from an earlier one, is refused.
+
+    Returns
+    -------
+    str
+        The source the release records.
+
+    Raises
+    ------
+    ValueError
+        If a table is unstamped or carries another source's stamp.
+    """
+    expected = swr_source_name()
+    wrong = {
+        str(path): attrs.get(SWR_SOURCE_ATTR)
+        for root in roots.values()
+        for path in sorted(root.rglob("*.parquet"))
+        if (attrs := read_attrs(path)).get("covariate_schema_table")
+        in SWR_SOURCE_TABLES
+        and attrs.get(SWR_SOURCE_ATTR) != expected
+    }
+    if wrong:
+        raise ValueError(
+            f"{len(wrong)} candidate table(s) were not built from the configured "
+            f"SWR source {expected!r}: {dict(list(wrong.items())[:10])}"
+        )
+    return expected
 
 
 def _validate_model_bundle(
@@ -456,6 +496,7 @@ def write_manifest(
             expected_drift_columns=expected_drift_columns or set(),
         )
     roots = {"replay": replay_root, "contfrag": contfrag_root}
+    swr_source = _require_one_swr_source(roots)
     files = {
         label: [
             _inventory_file(path, root)
@@ -485,6 +526,8 @@ def write_manifest(
             "uv_lock_sha256": sha256_file(Path("uv.lock")),
         },
         "candidate_roots": {label: str(path) for label, path in roots.items()},
+        # Every SWR-bearing table was checked to carry this stamp above.
+        "swr_source": swr_source,
         "preserved_baselines": {
             "replay": str(baseline_replay) if baseline_replay else None,
             "contfrag": str(baseline_contfrag) if baseline_contfrag else None,

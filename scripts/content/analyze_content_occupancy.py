@@ -63,6 +63,7 @@ from continuum_swr_replay.analysis.hippocampus.event_immobility import (  # noqa
 )
 from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
     read_dot_with_swr_source,
+    require_swr_source,
 )
 from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
     require_covariate_schema,
@@ -225,6 +226,8 @@ def arm_occupancy(animal: str | None = None) -> pd.DataFrame | None:
         return None
     ea = read_table(f)
     require_covariate_schema(ea, table="event_arm")
+    # Reported beside the live-source SWR split of session_content_distances.
+    require_swr_source(ea, what=str(f))
     if animal is not None and "animal" in ea.columns:
         ea = ea[ea["animal"] == animal]
     ea = ea.assign(group=np.where(ea["is_swr"].astype(bool), "SWR", "nonSWR"))

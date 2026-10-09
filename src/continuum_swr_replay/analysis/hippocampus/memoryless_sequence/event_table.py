@@ -519,8 +519,8 @@ def build_memoryless_event_table(
         stretches (``swr_source.swr_observed_stretches``). Required with
         ``swr_intervals``; an event not wholly inside one is ``unknown``.
     swr_definition : str
-        Which SWR source the labels come from, e.g. ``"kay@<run id>"``
-        (``swr_source.swr_source_name``).
+        Which SWR source the labels come from: ``swr_source.swr_source_name()``,
+        such as ``"kay@<run id>+artifacts@none"``.
     shuffle_results : mapping of int to ShuffleResult, or None
         Keyed by candidate index. Must cover exactly the candidates that meet
         both replay criteria, as :func:`shuffle_eligible` returns them. None

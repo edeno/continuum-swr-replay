@@ -16,6 +16,10 @@ from pathlib import Path
 
 import pandas as pd
 
+from continuum_swr_replay.analysis.hippocampus.swr_source import (
+    require_swr_source,
+    stamp_swr_source,
+)
 from continuum_swr_replay.analysis.replay._tables_common import (
     EVENT_ARM_STANDARDIZED_COLS,
 )
@@ -72,6 +76,9 @@ def assemble_replay_content_shards(
     observed_sessions: set[tuple[object, ...]] = set()
     for shard_dir in shard_dirs:
         frames = {name: read_table(shard_dir / name) for name in INPUT_TABLES}
+        # Every shard must come from the SWR source the bundle is stamped with.
+        for name, frame in frames.items():
+            require_swr_source(frame, what=f"{shard_dir / name}")
         shard_sessions = _session_keys(frames["stop_table"])
         overlap = observed_sessions & shard_sessions
         if overlap:
@@ -159,6 +166,8 @@ def assemble_replay_content_shards(
             event_sequence_table, table="event_sequence"
         ),
     }
+    for frame in tables.values():
+        stamp_swr_source(frame)
     contingency = load_contingency(
         contingency_dir / "models_per_bin_rate" / "qvals_table.pkl"
     )
@@ -184,6 +193,7 @@ def assemble_replay_stop_shards(
     observed_sessions: set[tuple[object, ...]] = set()
     for shard_dir in shard_dirs:
         frame = read_table(shard_dir / "stop_table")
+        require_swr_source(frame, what=f"{shard_dir / 'stop_table'}")
         shard_sessions = _session_keys(frame)
         overlap = observed_sessions & shard_sessions
         if overlap:
@@ -202,6 +212,7 @@ def assemble_replay_stop_shards(
     if stop_table["stop_id"].isna().any() or stop_table["stop_id"].duplicated().any():
         raise ValueError("assembled stop table requires unique nonmissing stop_id")
     output_dir.mkdir(parents=True, exist_ok=True)
+    stamp_swr_source(stop_table)
     path = publish_canonical(stop_table, output_dir, table="stop", basename="stop_table")
     LOGGER.info("saved stop_table -> %s (%d rows)", path, len(stop_table))
     return stop_table

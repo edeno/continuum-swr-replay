@@ -27,6 +27,8 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
     read_dot_with_swr_source,
+    require_swr_source,
+    stamp_swr_source,
 )
 from continuum_swr_replay.analysis.replay import build_stop_table  # noqa: E402
 from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
@@ -196,9 +198,12 @@ def main() -> None:
 
     event_table = read_table(RC / "event_table.pkl")
     require_covariate_schema(event_table, table="event")
+    # The split joins the shipped event table's is_swr onto stops whose SWR
+    # columns were just built from the live source: both must be one source.
+    require_swr_source(event_table, what=f"{RC / 'event_table'}")
     _assert_matches_event_table(stop, event_table)
     stop = add_nonlocal_swr_split(stop, event_table)
-    stop = stamp_covariate_schema(stop, table="stop")
+    stop = stamp_swr_source(stamp_covariate_schema(stop, table="stop"))
     validate(stop)
 
     if args.no_save:

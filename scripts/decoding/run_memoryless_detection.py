@@ -131,6 +131,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle impor
 )
 from continuum_swr_replay.analysis.hippocampus.swr_source import (
     read_dot_with_swr_source,
+    stamp_swr_source,
     swr_epoch_id,
     swr_observed_stretches,
     swr_source_files,
@@ -560,6 +561,8 @@ def run_one(
     observed = observation_table(time, swr_observed, config)
     for frame in (detection.table, detection.shuffle_draws, observed):
         frame.attrs = provenance | {"epoch_id": epoch_id}
+    # The table's SWR columns are the source's: stamped as every canonical table is.
+    stamp_swr_source(detection.table)
     write_table(detection.table, outputs["events"])
     write_table(detection.shuffle_draws, outputs["shuffle_draws"])
     write_table(observed, outputs["observed"])
@@ -634,8 +637,9 @@ def run_settings(
     ``environment`` is the decoders' provenance record (``provenance_record``)
     without ``dirty``, which the run id and ``git_commit`` already carry: it
     holds ``uv.lock``'s sha256, the commit ``ripple_detection`` was installed
-    from and the CUDA plugin's version. ``swr_source`` names the inventory the
-    SWR labels come from (``kay@<run id>``), so a new inventory is a new run.
+    from and the CUDA plugin's version. ``swr_source`` names the SWR source
+    the labels come from (``swr_source_name()``), so a new inventory or
+    artifact run is a new run.
     """
     return {
         "git_commit": git_commit,

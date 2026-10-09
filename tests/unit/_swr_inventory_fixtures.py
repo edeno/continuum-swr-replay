@@ -4,8 +4,10 @@
 ``manifest.json`` with one record per epoch and, for each served epoch, its
 ``{epoch_id}_kay_events.parquet`` (indexed by ``event_number`` 1..n) and
 ``{epoch_id}_swr_observed.parquet``, with the sha256 of each in the record, as
-``run_swr_detection.py`` writes them. Offline: nothing here touches Spyglass or
-``Processed-Data``.
+``run_swr_detection.py`` writes them. ``write_artifact_intervals`` writes an
+artifact run folder in the layout ``swr_source.artifact_intervals`` reads, and
+``use_swr_source`` points the source's configured constants at both. Offline:
+nothing here touches Spyglass or ``Processed-Data``.
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ import pandas as pd
 from continuum_swr_replay.table_io import sha256_file
 
 RUN_ID = "testrun0001"
+ARTIFACT_RUN_ID = "testartifacts01"
 
 
 def kay_events(intervals: Sequence[tuple[float, float]]) -> pd.DataFrame:
@@ -94,3 +97,34 @@ def write_swr_inventory(
         json.dumps({"run_id": run_id, "epochs": manifest_epochs}, indent=1)
     )
     return directory
+
+
+def write_artifact_intervals(
+    root: Path,
+    intervals: Mapping[str, Sequence[tuple[float, float]]],
+    *,
+    run_id: str = ARTIFACT_RUN_ID,
+) -> Path:
+    """Write an artifact run folder, one file per epoch; return its path."""
+    directory = root / run_id
+    directory.mkdir(parents=True, exist_ok=True)
+    for epoch_id, spans in intervals.items():
+        pd.DataFrame(
+            {
+                "start_time": [float(s) for s, _ in spans],
+                "end_time": [float(e) for _, e in spans],
+            }
+        ).to_parquet(directory / f"{epoch_id}_artifact_intervals.parquet")
+    return directory
+
+
+def use_swr_source(monkeypatch, inventory: Path, artifacts: Path | None = None) -> None:
+    """Point the SWR source at a written inventory run folder (and artifact run
+    folder, if given), as its configured constants would."""
+    from continuum_swr_replay.analysis.hippocampus import swr_source
+
+    monkeypatch.setattr(swr_source, "SWR_INVENTORY_ROOT", inventory.parent)
+    monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", inventory.name)
+    if artifacts is not None:
+        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_ROOT", artifacts.parent)
+        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", artifacts.name)

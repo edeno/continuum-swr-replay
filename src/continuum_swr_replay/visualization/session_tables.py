@@ -390,6 +390,8 @@ def _add_interval_cells(
 
 
 def _plot_swr_lfp(ax: Axes, ctx: _PanelContext) -> None:
+    # ``ripple_times`` here is the caller's SWR source intervals
+    # (``plot_session_tables(swr_intervals=...)``), never load_data's.
     plot_ripple_consensus_trace_zscore(ctx.data, ctx.time_slice, ax)
 
 
@@ -3213,6 +3215,7 @@ def plot_session_tables(
     panel_group_labels: Mapping[str, str] | None = None,
     show_semantic_legend: bool = True,
     save_path: Path | None = None,
+    swr_intervals: pd.DataFrame | None = None,
 ) -> tuple[Figure, pd.DataFrame]:
     """Multi-panel time-aligned view of one session's canonical tables.
 
@@ -3220,11 +3223,12 @@ def plot_session_tables(
     ----------
     data : mapping
         ``load_data``-style dict. Must contain ``position_info``,
-        ``hse_times``, ``ripple_times``, ``multiunit_rate_zscore``,
-        ``zscored_ripple_consensus_trace`` — the same keys
-        :func:`plot_detector` consumes. ``trials`` and ``track_graph``
-        may be here or passed separately. Canonical behavioral-context panels
-        also require ``port_experiences``.
+        ``hse_times``, ``multiunit_rate_zscore``,
+        ``zscored_ripple_consensus_trace`` — the keys :func:`plot_detector`
+        consumes except ``ripple_times``, which the ``swr_lfp`` panel takes
+        from `swr_intervals` instead. ``trials`` and ``track_graph`` may be
+        here or passed separately. Canonical behavioral-context panels also
+        require ``port_experiences``.
     detector, results
         Fitted detector and decoding results — same roles as in
         :func:`plot_detector`. ``results`` may be a Dataset or DataArray as
@@ -3265,6 +3269,13 @@ def plot_session_tables(
         Add one figure-level key for event support, observed zero, missing
         input, structural trunk N/A, and any reward markers in the panel set.
     figsize, data_type, save_path : passthrough.
+    swr_intervals : pd.DataFrame, optional
+        The session's SWR intervals (``start_time``, ``end_time``) that the
+        ``swr_lfp`` panel shades: the SWR source's, such as
+        ``swr_source.swr_intervals`` on the session's source-read
+        ``data_over_time``, so the shading shows the SWRs the tables were
+        built from. Required when ``swr_lfp`` is among `panels`; a
+        ``data['ripple_times']`` (Spyglass's stored ripples) is never drawn.
 
     Returns
     -------
@@ -3276,6 +3287,14 @@ def plot_session_tables(
         plotting coordinate.
     """
     panel_names = _validated_panels(panels)
+    if "swr_lfp" in panel_names:
+        if swr_intervals is None:
+            raise ValueError(
+                "the swr_lfp panel shades the SWR source's intervals: pass "
+                "swr_intervals= (swr_source.swr_intervals on the session's "
+                "source-read data_over_time)"
+            )
+        data = {**data, "ripple_times": swr_intervals}
     result_time = _validated_result_time(results)
     t_start, t_end = _validated_time_window(result_time, time_window)
     _validate_event_intervals(event_table)

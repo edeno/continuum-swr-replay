@@ -55,6 +55,7 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
 )
 from continuum_swr_replay.analysis.hippocampus.swr_source import (
     read_dot_with_swr_source,
+    stamp_swr_source,
 )
 from continuum_swr_replay.analysis.replay import build_event_patch_table
 from continuum_swr_replay.analysis.replay import prepare_data as replay_prepare_data
@@ -551,6 +552,8 @@ def main():
         (basenames["event_patch_table"], "event_patch", event_patch_table_all),
         (basenames["stop_table"], "stop", stop_table_all),
     ):
+        # Built here from decode frames read through the SWR source.
+        stamp_swr_source(frame)
         path = publish_canonical(frame, output_dir, table=table_key, basename=name)
         logging.info("saved %s -> %s (%d rows)", name, path, len(frame))
 

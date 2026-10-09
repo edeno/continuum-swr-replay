@@ -47,6 +47,7 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     build_speed_eligible_event_cohort,
 )
+from continuum_swr_replay.analysis.hippocampus.swr_source import swr_intervals
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.figure_utilities import (
     PAGE_HEIGHT,
@@ -116,13 +117,8 @@ def find_non_swr_example_event(data, results, window_sec=1.0):
         event_col="non_local_event",
         speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     )
-    ripple_times, _ = build_speed_eligible_event_cohort(
-        data["ripple_times"],
-        speed=speed,
-        time=position_time,
-        event_col="SWR_event",
-        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-    )
+    # The session's SWR source intervals, already speed-gated (set by the caller).
+    ripple_times = data["ripple_times"]
 
     # Find events NOT overlapping with SWR
     _, non_swr_events = get_overlap_times(non_local_times, ripple_times)
@@ -174,6 +170,11 @@ def generate_figure(
 
     logging.info("Loading aggregated data for statistics panels...")
     data_over_time = load_data_over_time(data_dir)
+    # Panel a's SWR selection and shading: the session's SWR source intervals,
+    # not load_data's stored ripples.
+    data["ripple_times"] = swr_intervals(
+        data_over_time, nwb_file_name=nwb_file_name, epoch_name=epoch_name
+    )
 
     # Find example non-SWR event
     logging.info("Selecting non-SWR example event...")

@@ -26,6 +26,7 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.hippocampus.swr_source import (
     read_dot_with_swr_source,
+    stamp_swr_source,
 )
 from continuum_swr_replay.analysis.replay.prepare_data import find_sessions
 from continuum_swr_replay.analysis.replay.timebin_tables import (  # noqa: E402
@@ -151,11 +152,18 @@ def main() -> None:
         )
         return
     # publish_canonical stamps + writes atomically; the one canonical write door.
+    # Both were built from decode frames read through the SWR source.
     publish_canonical(
-        onset, args.output_dir, table="event_onset", basename="event_onset_table"
+        stamp_swr_source(onset),
+        args.output_dir,
+        table="event_onset",
+        basename="event_onset_table",
     )
     publish_canonical(
-        dense, args.output_dir, table="stop_timebin", basename="stop_timebin_table"
+        stamp_swr_source(dense),
+        args.output_dir,
+        table="stop_timebin",
+        basename="stop_timebin_table",
     )
     logger.info(
         "saved %d onsets -> event_onset_table.parquet, "
