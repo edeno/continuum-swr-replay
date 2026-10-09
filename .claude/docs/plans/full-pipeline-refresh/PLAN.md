@@ -9,7 +9,7 @@ events matched, 0 were missed and 62 were added; the largest SWR z-score differe
 2.56, at a trace end (at most 8.8e-4 more than 1 s from both ends); and non-local events
 went from 2,365 under the 1.7.0 rule to 2,405 under 2.0's, with minimum sample counts {7}. Tasks 1–3 complete and reviewed; `C0` = `de156501c05b4381714919be54a872b3ac0e58fc`, the commit both decoders launch from. R0 done (backup root `Processed-Data/_pre_redecode_backup_20261003`). An incident during Task 2 overwrote the April decode of `chimi20200212_02_r1` (accepted loss; see the backup's `MISSING_APRIL_DECODES.md`).
 
-**Status (2026-10-09):** Tasks 14–15 complete (one epoch register; one SWR source, the 2.0 Kay inventory). The lead chose to mask artifacts with a new, validated detector and to re-decode all 255 epochs with one SWR source; see Phase C (Tasks 16–18, R9–R13). Study C1 and its follow-ups (C1b, C1c) found that 43 % of j16's Kay events were not SWRs. Three tetrodes caused it. The lead chose a tetrode-selection rule for all four SWR detectors, and Task 17 now carries it, with a reference-electrode event veto.
+**Status (2026-10-09):** Tasks 14–15 complete (one epoch register; one SWR source, the 2.0 Kay inventory). The lead chose to mask artifacts with a new, validated detector and to re-decode all 255 epochs with one SWR source; see Phase C (Tasks 16–18, R9–R13). Study C1 and its follow-ups (C1b, C1c) found that 43 % of j16's Kay events were not SWRs. Three tetrodes caused it. The lead chose a tetrode-selection rule for all four SWR detectors, and Task 17 now carries it. On 2026-10-09 the lead also chose a simplified design: one mask for everything, decoded events within 0.3 s of it dropped, the spike-line rule kept, no reference veto, and no post-step second (see the Phase C introduction).
 
 **Status (2026-10-04):** the decoders' discrete-transition settings had silently followed changed library defaults (+32% non-local events on identical inputs). After validation the project lead chose setting P30-B (decision R10). Task 11 pins it. Its commit `C0'` replaces `C0` as the commit both decoders launch from, and R1 restarts from `C0'` into a new staging folder. Tasks 12 and 13 (held-out spike evidence per decoder state) were added at the project lead's request. **2026-10-05:** an exclusion audit led to Task 14 (one epoch register); 40 restorable epochs are populated and decoded as an incremental update after the 218-epoch analysis, which proceeds now. wilbur20210401 is registered as blocked.
 
@@ -1737,32 +1737,46 @@ re-decode all epochs so that the decoders' encoding exclusion uses the same SWR 
 analyses: the masked 2.0 Kay inventory.
 
 **Rulings (2026-10-09, controller):**
-- **One mask per consumer, from one stored set of cores.** The detector stores unpadded cores with
-  their evidence. Each consumer pads them from one table (Task 16). Detectors that read the LFP use
-  the `swr` mask; anything that reads spikes uses the `decoder` mask. Everything downstream uses the
-  `analysis` mask.
-- **Artifact time is unobserved.** An event of any kind that overlaps the `analysis` mask leaves
-  every cohort; it is not counted as non-SWR. The mask's time leaves every rate exposure.
-- **So are its consequences (the lead, 2026-10-09: "We also need to make sure we are not analyzing
-  the artifact times or the consequences of artifact times in the analysis").**
-  - **The rule.** A unit is analysed only if everything it depends on was observed. A unit is an
-    event, a time bin, a peri-event window or a stop's exposure. Its *dependence window* is its own
-    span plus the reach of everything computed from data around it:
-    - filter support;
-    - the decoder's consequence window, how far a masked gap changes the posterior (study C3);
-    - history covariates;
-    - peri-event and baseline windows;
-    - normalization.
-  - **How it is applied.**
-    - Events, bins and peri-event windows whose dependence window touches the `analysis` mask are
-      dropped whole, with a reason.
-    - Rate exposure counts only observed time, with the same windows removed.
-    - Every normalization (any z-scoring, per epoch or per animal) leaves that time out.
-  - **Proof by invariance (Task 18 acceptance).** Change the data inside the mask and rerun the
-    chain. Every analysed row outside the declared windows must be unchanged.
-- **Post-step second.** Ripple-band power stays below its random-time level for at least 1 s after a
-  step (`detector_report.md` §8 item 4). The `analysis` mask therefore also covers the 1 s after
-  each step's core.
+- **Simplified design (the lead, 2026-10-09).** This replaces the per-consumer masks, the post-step
+  second, the per-analysis dependence windows and the invariance test of earlier drafts.
+  - **One mask for everything.** The detector stores unpadded cores with their evidence. One table
+    pads them:
+    - S blocks ±1 s (noise spikes leak up to 1 s past a block's edges);
+    - T cores with an LFP signature ±0.3 s (the ripple filter's 0.27-s ringing, and the burst of odd
+      spikes that follows a step);
+    - spike-only T cores ±0.1 s.
+
+    The same mask feeds the SWR detectors' normalization and event drops, MUA detection, the
+    decoders (`is_missing` and the encoding exclusion), the Widloski runner and every analysis.
+  - **Artifact time is unobserved.** An event of any kind that overlaps the mask leaves every
+    cohort; it is not counted as non-SWR. The mask's time leaves every rate exposure. Every
+    normalization leaves it out.
+  - **Consequences (the lead: "We also need to make sure we are not analyzing the artifact times
+    or the consequences of artifact times in the analysis").**
+    - A decoded event (non-local event, ContFrag label, Widloski event) within 0.3 s of the mask is
+      dropped. C3 measured that a masked gap changes analysed events within at most 0.21 s; the
+      reach does not grow with gap length.
+    - A time bin whose history covariates reach into the mask is dropped, and so is a peri-event
+      window (PFC responses, reward kernels) that touches it.
+  - **No post-step second.** No rodent lab we read pads after an artifact; the Buzsáki lab's
+    `bz_FindRipples` drops flagged events and pads nothing. R8 instead reruns the headline results
+    with 1 s masked after each step, as a robustness check.
+  - **The spike-line rule (T-spk) stays** (the lead). It targets a mechanism no neural signal
+    produces: many tetrodes firing within 200 µs with waveforms unlike any spike on their tetrode.
+    The coincidence filter only removes lines within 40 µs. R9 reviews every spike-only core.
+  - **The reference veto (R-rip) is dropped.** It removed 116 Kay events, most of them j16's, which
+    the tetrode rule now handles.
+  - **Names.** The former "true SWRs" are the *reference SWR set*: 9,208 events that meet stated
+    rules (Kay∩Karlsson, 30–200 ms, speed < 4 cm/s over ± 250 ms, a sharp wave, MUA ≥ 2×). The
+    former "visual" labels are *model-reviewed* labels: one AI reviewer, no human, no second rater.
+    Neither is ground truth, and documents and methods say so.
+  - **Justification**, without knowing which events are SWRs:
+    - mechanism: each signature is something neural tissue cannot produce;
+    - precedent read from source (C2);
+    - one threshold rule (rule P, below);
+    - a small footprint: 0.15 % of time;
+    - robustness: R8 reruns the headline results without the mask, with every threshold 25 %
+      lower and 25 % higher, and with 1 s masked after each step.
 - **Keep the noisy tetrodes.** The sustained-noise tetrodes are masked during their noise blocks,
   not dropped. A sensitivity analysis (R8) leaves out the 4 epochs with more than 2 % masked.
 - **Masking versus dropping the noisy tetrodes.** The field usually drops a channel with sustained
@@ -1771,7 +1785,8 @@ analyses: the masked 2.0 Kay inventory.
   probability within 3 s outside the S blocks, beyond the 1-s pad, compared with the decode that
   drops those tetrodes. If it does, the affected tetrodes are dropped for whole S epochs.
 - **No amplitude cap.** Some pipelines drop events above 9–10 SD. Our true SWRs reach 44 robust z,
-  so a cap would remove giant SWRs. The design note reports how many true SWRs a cap would drop.
+  so a cap would remove giant SWRs. The design note reports how many reference-set SWRs a cap
+  would drop.
 
 **Rulings after study C1 (2026-10-09; reports in `.claude/research/refresh_artifact_detector/followup/`):**
 - **Tetrode selection for SWR detection (the lead's decision, 2026-10-09).**
@@ -1783,7 +1798,8 @@ analyses: the masked 2.0 Kay inventory.
   - Its effect: j16's featureless share falls from 43 % to 1.9 %, true SWRs detected rise from 3,767
     to 4,229, and no visually confirmed SWR is lost.
   - The same kept tetrodes feed all four detectors. Task 17 implements it.
-- **Reference event veto (R-rip).** Drop a detected event when the reference electrode's 150–250 Hz
+- **Reference event veto (R-rip): dropped in the simplified design** (116 events; most were j16's,
+  which R-T handles). What C1b found, for the record: drop a detected event when the reference electrode's 150–250 Hz
   envelope is more than 11.36 times the CA1 median envelope at the event's peak.
   - This is the field's noise-channel check, scaled by CA1 at the same moment
     (`followup_c1b_report.md`).
@@ -1857,6 +1873,9 @@ Work in the worktree `/cumulus/edeno/continuum-swr-replay-refresh-dev`, branch
   | `analysis`: event eligibility and rate exposure | ±1 s | 0.3 s before the core, 1.3 s after it | ±0.1 s |
 
   The `analysis` mask is the `decoder` mask plus the 1 s after each LFP-signature step.
+  **Superseded:** fix round 2 collapses this table into one mask (S ±1 s, T with an LFP signature
+  ±0.3 s, spike-only ±0.1 s), per the simplified design. The runners Task 17a changed switch to it.
+  It also sets the rule-P constants and puts C2's justification table into the design note.
 - **The OOD reference must not depend on a decode.** The prototype measured marks against a fitted
   decoder's encoding marks (`*_HPC_detector.pkl`), and the new decodes will themselves use this mask.
   Use instead, per tetrode, all of the epoch's marks outside the LFP-signature intervals (S, T-ref
@@ -1955,16 +1974,6 @@ Work in the worktree `/cumulus/edeno/continuum-swr-replay-refresh-dev`, branch
     - **Fail closed.** The epoch fails, with its reason recorded, when the rule would drop more than
       a third of the tetrodes, or when no reference sample has LOO ≥ 5.
     - The manifest records, per epoch, every tetrode's coupling and the dropped electrode groups.
-  - **Reference event veto (R-rip).** Port it from `artdet_lfp.py:318` and `followup/scripts/c1b_*.py`.
-    Apply it to every detector's events after the overlap drop.
-    - The reference electrode's 150–250 Hz envelope (raw, against ground, the maximum over reference
-      electrodes) is divided by the median over CA1 band tetrodes of each tetrode's maximum envelope.
-      Use all CA1 band tetrodes, as calibrated. The window is the anchor ± 25 ms.
-    - The anchor is the peak of the Kay consensus on the kept tetrodes inside the event. Every
-      detector uses this one definition.
-    - Veto when the ratio is > 11.36 (1.5 × the largest true-SWR value, 7.575; C1b held-out
-      calibration).
-    - Vetoed events are dropped and counted per detector in the manifest. They are not masked.
   - **Fix the 2 j16 epochs** (`j1620210710_02_r1`, `_04_r2`). They fail with "Found 2 potential
     parents" on the position merge table. Resolve the position the way the decoder's `load_data`
     does, and add a test with the failing restriction stubbed.
@@ -2000,7 +2009,7 @@ Work in the worktree `/cumulus/edeno/continuum-swr-replay-refresh-dev`, branch
 - **Design note** `docs/design/2026-10-09-swr-tetrode-selection.md`. It covers:
   - C1's port-period results;
   - the j16 finding and the R-T rule, with its before/after table and blind checks;
-  - the R-rip calibration, and the field noise-channel form that was rejected;
+  - the R-rip veto (C1b) and the field noise-channel form, and why neither is used;
   - the visit-onset numbers;
   - the limits: licking was not measured, there was one rater, and why j16's three tetrodes are
     noisy is unknown.
@@ -2016,7 +2025,6 @@ Work in the worktree `/cumulus/edeno/continuum-swr-replay-refresh-dev`, branch
   - samples inside the `swr` mask do not count as reference samples;
   - more than a third dropped fails the epoch;
 - all four detectors receive the same kept tetrodes, and Zugaro's channel is one of them;
-- R-rip: an event whose ratio is exactly at θ is kept; one above θ is vetoed and counted;
 - the decoders build `is_missing` and `is_training` from stubbed sources, and refuse to run when a
   run id is unset;
 - the Widloski workers see the intended thread counts.
@@ -2029,15 +2037,15 @@ Work in the worktree `/cumulus/edeno/continuum-swr-replay-refresh-dev`, branch
   - the runtime is compared with the previous decode.
 - **SWR runner** on the 5 pilots and the 2 j16 epochs, with a scratch artifact run: Kay counts are
   reported next to the prototype's masked counts (`validation/kay_effect_per_epoch.csv`).
-- **R-T and R-rip, read-only, against C1c.** Use the 5 pilots, 4 j16 epochs on different days,
+- **R-T, read-only, against C1c.** Use the 5 pilots, 4 j16 epochs on different days,
   chimi20200227 and chimi20200228 (one epoch each), and 2 senor S epochs.
   - The dropped groups match `followup/c1c_rule_drops.csv`.
   - Kay events match C1c's selected run (`followup/data/c1c_rule_events.parquet`, column `run`).
     The two runs use different artifact masks (the prototype's against the scratch run's), so
-    explain every difference.
-  - The R-rip ratios of matched events agree with C1b's to within 1 %.
+    explain every difference. C1c also applied R-rip, which is dropped: count its events
+    separately.
 
-## Task 18: tables and analyses use the `analysis` mask
+## Task 18: tables and analyses use the mask
 
 **Files and changes:**
 - **One eligibility rule for every event cohort** (non-local, SWR, MUA, ContFrag and Widloski): the
@@ -2050,21 +2058,15 @@ Work in the worktree `/cumulus/edeno/continuum-swr-replay-refresh-dev`, branch
   - per-bin tables (drop bins inside the mask; Family B);
   - PFC per-bin rows;
   - any other exposure you find.
-- **Dependence windows (the consequences ruling in the Phase C introduction).**
-  - **List them first.** Go through every analysis output: each table, rate ladder, content
-    ladder, PFC analysis, and each figure's source table. For each, write down its unit, its
-    dependence window and how the window is enforced. The table goes into the artifact design note
-    and the report.
-  - **Build the windows once.** Add one function that builds the unobserved intervals for a given
-    window: the `analysis` mask, padded before and after. Everything uses it.
-  - **Events.** Eligibility adds the decoder's consequence window around the `decoder` mask, set
-    from study C3, to the `analysis` mask.
-  - **Per-bin rows with history covariates.** Drop a bin when its longest history window touches
-    unobserved time; take that window from `model_specs.py`.
-  - **Peri-event windows** (PFC responses, MUA, reward kernels): drop a window that touches
-    unobserved time.
-  - **LFP-derived covariates** (theta phase and power, the ripple consensus): unobserved within the
-    filter's settling time of the mask.
+- **Consequences (the simplified design in the Phase C introduction).**
+  - Add one function that returns the mask's intervals padded by a given distance; everything uses
+    it.
+  - **Decoded events** (non-local, ContFrag labels, Widloski) within 0.3 s of the mask are dropped,
+    with their reason.
+  - **Per-bin rows with history covariates:** drop a bin when its longest history window, taken from
+    `model_specs.py`, touches the mask.
+  - **Peri-event windows** (PFC responses, MUA, reward kernels): drop a window that touches the mask.
+  - List every analysis output you changed, and how, in the report.
 - **Stamps:** tables carry `artifacts@<run>` through the existing `swr_source` stamp.
 - **Docs:**
   - update `docs/known_issues/swr_mua_count_conventions.md`;
@@ -2080,16 +2082,6 @@ Work in the worktree `/cumulus/edeno/continuum-swr-replay-refresh-dev`, branch
 **Acceptance:**
 - On the 5 pilots with a scratch artifact run, report per cohort the counts before and after, and
   the exposure removed.
-- **Invariance test.** This is the proof that no artifact time and no consequence of it is
-  analysed. Use 2 pilot epochs with artifacts.
-  - Replace the data inside the `decoder` mask:
-    - spikes: marks shuffled across masked time;
-    - LFP: raw values replaced with scaled noise, then refiltered with the stored band's filter, as
-      the Task 8 band check does.
-  - Rerun SWR detection, the decode (scratch staging, one idle GPU) and the tables.
-  - Every analysed row outside the declared dependence windows must be identical; decoder outputs
-    must agree within float tolerance.
-  - A difference is a leak: fix it, or widen its declared window, and record which.
 
 ## C1: follow-up checks from the literature review (read-only, CPU; done 2026-10-09)
 
@@ -2202,9 +2194,10 @@ Output: `.claude/research/refresh_artifact_detector/followup/`. Reports: `follow
 - Run `run_swr_detection.py` on all 255 epochs into a new run folder.
 - **Gate:**
   - the 14 low-count epochs have SD / robust SD ≤ 1.3;
-  - the 2.0 Kay total on the 218 is within 1 % of C1c's selected run, 34,281. That run has the
-    tetrode rule and the R-rip veto, and leaves out events overlapping the prototype's `swr` mask.
-    The prototype's 41,743 predates both rules;
+  - the 2.0 Kay total on the 218 is within 1 % of C1c's selected run, 34,281, plus the events
+    R-rip removed there (at most 116; R-rip is dropped). That run has the tetrode rule and leaves
+    out events overlapping the prototype's `swr` mask. The prototype's 41,743 predates the tetrode
+    rule;
   - R-T drops groups 0, 10 and 22 in every j16 epoch, and the other drops match
     `followup/c1c_rule_drops.csv`, or each difference is explained;
   - no epoch fails the R-T guard, or each failure is ruled on;
@@ -2239,4 +2232,6 @@ Run with the thread fix, into a new run folder.
 
 R5–R8 as written, on 255 epochs, with stamps `kay@<R10 run>+artifacts@<R9 run>`. R8 adds:
 - the sensitivity analysis without the 4 epochs over 2 % masked;
-- the masked-time table, plus the time and the units each dependence window removes, per analysis.
+- the masked-time table, and the events and bins the mask and the 0.3-s decoder reach remove;
+- robustness reruns of the headline results: without the mask; with every artifact threshold 25 %
+  lower and 25 % higher; with 1 s masked after each step.
