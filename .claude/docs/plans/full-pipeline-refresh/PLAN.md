@@ -9,7 +9,7 @@ events matched, 0 were missed and 62 were added; the largest SWR z-score differe
 2.56, at a trace end (at most 8.8e-4 more than 1 s from both ends); and non-local events
 went from 2,365 under the 1.7.0 rule to 2,405 under 2.0's, with minimum sample counts {7}. Tasks 1–3 complete and reviewed; `C0` = `de156501c05b4381714919be54a872b3ac0e58fc`, the commit both decoders launch from. R0 done (backup root `Processed-Data/_pre_redecode_backup_20261003`). An incident during Task 2 overwrote the April decode of `chimi20200212_02_r1` (accepted loss; see the backup's `MISSING_APRIL_DECODES.md`).
 
-**Status (2026-10-09):** Tasks 14–15 complete (one epoch register; one SWR source, the 2.0 Kay inventory). The lead chose to mask artifacts with a new, validated detector and to re-decode all 255 epochs with one SWR source; see Phase C (Tasks 16–18, R9–R13).
+**Status (2026-10-09):** Tasks 14–15 complete (one epoch register; one SWR source, the 2.0 Kay inventory). The lead chose to mask artifacts with a new, validated detector and to re-decode all 255 epochs with one SWR source; see Phase C (Tasks 16–18, R9–R13). Study C1 and its follow-ups (C1b, C1c) found that 43 % of j16's Kay events were not SWRs. Three tetrodes caused it. The lead chose a tetrode-selection rule for all four SWR detectors, and Task 17 now carries it, with a reference-electrode event veto.
 
 **Status (2026-10-04):** the decoders' discrete-transition settings had silently followed changed library defaults (+32% non-local events on identical inputs). After validation the project lead chose setting P30-B (decision R10). Task 11 pins it. Its commit `C0'` replaces `C0` as the commit both decoders launch from, and R1 restarts from `C0'` into a new staging folder. Tasks 12 and 13 (held-out spike evidence per decoder state) were added at the project lead's request. **2026-10-05:** an exclusion audit led to Task 14 (one epoch register); 40 restorable epochs are populated and decoded as an incremental update after the 218-epoch analysis, which proceeds now. wilbur20210401 is registered as blocked.
 
@@ -1756,6 +1756,34 @@ analyses: the masked 2.0 Kay inventory.
 - **No amplitude cap.** Some pipelines drop events above 9–10 SD. Our true SWRs reach 44 robust z,
   so a cap would remove giant SWRs. The design note reports how many true SWRs a cap would drop.
 
+**Rulings after study C1 (2026-10-09; reports in `.claude/research/refresh_artifact_detector/followup/`):**
+- **Tetrode selection for SWR detection (the lead's decision, 2026-10-09).**
+  - What C1 found: 43 % of j16's Kay events lacked SWR features, against 1–4 % in the other animals.
+    They are carried by j16 tetrode groups 0, 10 and 22, on every day. Those three do not ripple with
+    the rest of CA1, yet they carry 5–7× its ripple-band power (`followup_c1c_report.md`).
+  - The rule was stated before its effect was measured (`c1c_rule.json`). Per epoch, drop a CA1 band
+    tetrode whose ripple envelope stays low while the other tetrodes ripple.
+  - Its effect: j16's featureless share falls from 43 % to 1.9 %, true SWRs detected rise from 3,767
+    to 4,229, and no visually confirmed SWR is lost.
+  - The same kept tetrodes feed all four detectors. Task 17 implements it.
+- **Reference event veto (R-rip).** Drop a detected event when the reference electrode's 150–250 Hz
+  envelope is more than 11.36 times the CA1 median envelope at the event's peak.
+  - This is the field's noise-channel check, scaled by CA1 at the same moment
+    (`followup_c1b_report.md`).
+  - θ = 1.5 × the largest true-SWR value; it lost 0 true SWRs in all 7 held-out splits.
+  - The field's own form (buzcode, FMAToolbox) is not used: at its default it drops 2.7 % of true
+    SWRs, because large SWRs reach our white-matter reference.
+- **Not adopted:**
+  - a reference 250–400 Hz time mask (no margin over giant SWRs, and it removes 20 events);
+  - a raw-oscillation rule for small steps (fitted on the steps themselves);
+  - a per-spike amplitude ceiling (catches nothing new).
+- **Coincidence filter: kept.** It removes 0.52 % of true-SWR spikes, almost all of them
+  same-sample, common-mode lines.
+- **Visit onset.** In every animal, events in the first second after the pump or poke-in lacked
+  features more often. After the tetrode rule, the featureless share at the ports is 1.0 % (rewarded)
+  and 4.8 % (unrewarded) over all animals. No visit-onset or padded-speed rule is added. The design
+  note reports these numbers.
+
 ## Task 16: artifact detection in the repo, with a run folder
 
 Work in the worktree `/cumulus/edeno/continuum-swr-replay-refresh-dev`, branch
@@ -1893,6 +1921,33 @@ Work in the worktree `/cumulus/edeno/continuum-swr-replay-refresh-dev`, branch
   - Do not NaN-fill the LFP before filtering (report §6.2).
   - `swr_observed` marks the `swr` mask's time as not observed.
   - The manifest records the artifact run id.
+  - **Tetrode selection (rule R-T, the lead's decision of 2026-10-09).** It runs once per epoch,
+    before any detector, and all four detectors use the kept tetrodes. Zugaro chooses its channel
+    only among them. Put it in a new module, `analysis/hippocampus/ripple_tetrodes.py`, ported from
+    `followup/scripts/c1c_*.py`. The definition, verbatim from `followup/c1c_rule.json`:
+    - For each CA1 band tetrode c, take env_c = |Hilbert(stored ripple band)|. Its robust z, z_c, is
+      taken over the epoch's finite samples.
+    - LOO_c(t) = sqrt(gaussian_smooth(Σ over the other tetrodes of env², σ = 4 ms)). It is z-scored
+      by its mean and SD over the reference samples: finite, speed < 4 cm/s, and outside the `swr`
+      mask.
+    - coupling_c = the median of z_c over the reference samples where LOO_c ≥ 5.
+    - Drop c when coupling_c < 1.0.
+    - Constants, each with a one-line evidence note: cut 1.0, LOO threshold 5, σ = 4 ms. Evidence: in
+      j16, groups 0, 10 and 22 score −0.12 to 0.81 in all 58 epochs, and every other j16 tetrode
+      scores ≥ 1.78.
+    - **Fail closed.** The epoch fails, with its reason recorded, when the rule would drop more than
+      a third of the tetrodes, or when no reference sample has LOO ≥ 5.
+    - The manifest records, per epoch, every tetrode's coupling and the dropped electrode groups.
+  - **Reference event veto (R-rip).** Port it from `artdet_lfp.py:318` and `followup/scripts/c1b_*.py`.
+    Apply it to every detector's events after the overlap drop.
+    - The reference electrode's 150–250 Hz envelope (raw, against ground, the maximum over reference
+      electrodes) is divided by the median over CA1 band tetrodes of each tetrode's maximum envelope.
+      Use all CA1 band tetrodes, as calibrated. The window is the anchor ± 25 ms.
+    - The anchor is the peak of the Kay consensus on the kept tetrodes inside the event. Every
+      detector uses this one definition.
+    - Veto when the ratio is > 11.36 (1.5 × the largest true-SWR value, 7.575; C1b held-out
+      calibration).
+    - Vetoed events are dropped and counted per detector in the manifest. They are not masked.
   - **Fix the 2 j16 epochs** (`j1620210710_02_r1`, `_04_r2`). They fail with "Found 2 potential
     parents" on the position merge table. Resolve the position the way the decoder's `load_data`
     does, and add a test with the failing restriction stubbed.
@@ -1920,9 +1975,26 @@ Work in the worktree `/cumulus/edeno/continuum-swr-replay-refresh-dev`, branch
   OMP/MKL/OPENBLAS_NUM_THREADS = 1 in each worker, and R4 took 18 h against an estimate of 5–6 h.
   Measure one epoch before and after: runtime, plus outputs identical bit for bit.
 
+- **Design note** `docs/design/2026-10-09-swr-tetrode-selection.md`. It covers:
+  - C1's port-period results;
+  - the j16 finding and the R-T rule, with its before/after table and blind checks;
+  - the R-rip calibration, and the field noise-channel form that was rejected;
+  - the visit-onset numbers;
+  - the limits: licking was not measured, there was one rater, and why j16's three tetrodes are
+    noisy is unknown.
+
+  Link it from `docs/README.md` and from the artifact design note.
+
 **Tests (write them first):**
 - the SWR runner passes the same mask to all four detectors, counts the drops, and leaves the
   artifact time out of `swr_observed`;
+- R-T on synthetic data:
+  - a tetrode with ripple bursts of its own that do not follow the others is dropped;
+  - a tetrode that ripples with the others is kept;
+  - samples inside the `swr` mask do not count as reference samples;
+  - more than a third dropped fails the epoch;
+- all four detectors receive the same kept tetrodes, and Zugaro's channel is one of them;
+- R-rip: an event whose ratio is exactly at θ is kept; one above θ is vetoed and counted;
 - the decoders build `is_missing` and `is_training` from stubbed sources, and refuse to run when a
   run id is unset;
 - the Widloski workers see the intended thread counts.
@@ -1935,6 +2007,13 @@ Work in the worktree `/cumulus/edeno/continuum-swr-replay-refresh-dev`, branch
   - the runtime is compared with the previous decode.
 - **SWR runner** on the 5 pilots and the 2 j16 epochs, with a scratch artifact run: Kay counts are
   reported next to the prototype's masked counts (`validation/kay_effect_per_epoch.csv`).
+- **R-T and R-rip, read-only, against C1c.** Use the 5 pilots, 4 j16 epochs on different days,
+  chimi20200227 and chimi20200228 (one epoch each), and 2 senor S epochs.
+  - The dropped groups match `followup/c1c_rule_drops.csv`.
+  - Kay events match C1c's selected run (`followup/data/c1c_rule_events.parquet`, column `run`).
+    The two runs use different artifact masks (the prototype's against the scratch run's), so
+    explain every difference.
+  - The R-rip ratios of matched events agree with C1b's to within 1 %.
 
 ## Task 18: tables and analyses use the `analysis` mask
 
@@ -1964,34 +2043,45 @@ Work in the worktree `/cumulus/edeno/continuum-swr-replay-refresh-dev`, branch
 **Acceptance:** on the 5 pilots with a scratch artifact run, report per cohort the counts before and
 after, and the exposure removed.
 
-## C1: follow-up checks from the literature review (read-only, CPU; alongside Tasks 16–18)
+## C1: follow-up checks from the literature review (read-only, CPU; done 2026-10-09)
 
-Output: `.claude/research/refresh_artifact_detector/followup/`.
-1. **Licking and chewing EMG** (literature review §4.1). Build an EMG proxy:
-   - 250–400 Hz correlation across CA1 tetrodes;
-   - 250–400 Hz power on the reference.
-
-   Compare beam-break (licking) intervals with other immobility and with running. Calibrate it on
-   the true SWRs, and review the Kay events in high-EMG windows blind to behavior.
-   - **Rule:** if those events lack SWR features (sharp wave, MUA, in-distribution marks), add an
-     EMG signature with its threshold above the true-SWR maximum.
-   - **Otherwise** the methods state "no licking artifact found", with the numbers.
-2. **A raw-signal oscillation check** (narrowband peak or cycle count) on the 16 missed small steps
-   and on the true SWRs. It is added only if it catches steps and masks no true SWR.
-3. **A per-spike amplitude ceiling:** the max-channel amplitude of true-SWR marks against OOD marks.
-   It is added only if it separates.
-4. **The project's coincidence filter** (more than 33 % of tetrodes within 40 µs) during true SWRs:
-   how many SWR spikes it removes. Its docstring claims real synchrony "rarely exceeds 20 %", but
-   true SWRs reach 50 % of tetrodes in 200 µs.
-5. **Documentation:** how many true SWRs a 9 or 10 SD amplitude cap would drop.
-
-R9 waits for C1's decisions. A new signature or rule is a fix round on Task 16.
+Output: `.claude/research/refresh_artifact_detector/followup/`. Reports: `followup_report.md` (C1),
+`followup_c1b_report.md` and `followup_c1c_report.md`. The rulings are in the Phase C introduction.
+1. **Events at the ports (the licking question).** There is no EMG and no lick sensor; a beam
+   break shows only that the nose is in the port. So C1 tested the detected events, not licking.
+   - It compared Kay events during rewarded visits, unrewarded visits and immobility away from the
+     ports.
+   - It measured their SWR features (sharp wave, MUA, multi-channel ripple, in-distribution marks)
+     and reviewed them blind.
+   - The 250–400 Hz proxies only pointed to candidates; the stored LFP is cut off at about 410 Hz.
+   - **Result:** a featureless subpopulation, mostly j16. C1b calibrated the R-rip veto on
+     held-out data, and C1c traced j16 to three tetrodes (the R-T rule).
+2. **Raw-signal oscillation check** on the 16 missed small steps: not adopted. A two-feature rule
+   catches 6 of 16, but its cuts were fitted on those 16.
+3. **Per-spike amplitude ceiling:** not adopted. It catches nothing that is not already masked.
+4. **Coincidence filter:** kept. It removes 0.52 % of true-SWR spikes, almost all of them in the same
+   30-kHz sample. Correct the docstring's "rarely exceeds 20 %" claim when convenient: with 40-µs
+   chaining, 5.5 % of true SWRs exceed 20 %, and only 2 % exceed 33 %.
+5. **Amplitude cap,** for the methods: a cap at 9 or 10 robust z would drop 27.6 % or 23.7 % of
+   true SWRs.
 
 ## R9: artifact detection, all epochs (CPU)
 
-1. Merge Tasks 16–18 into the main branch, and push.
-2. Run on all 255 epochs (218 analysed and 37 pending) in tmux `artifacts_full`, on CPU.
-3. **Gate.** On the 218:
+1. Fast-forward the main branch to Task 16 once its review passes, and push. R9 needs only Task 16.
+   Tasks 17–18 continue in the worktree and merge after R9 finishes, because the run imports from
+   the main tree.
+2. Run on all 255 epochs (218 analysed and 37 pending) in tmux `artifacts_full`, on CPU, from a
+   clean tree. Use 8 workers and about 30 GiB of memory: one epoch peaked at 3.8 GiB.
+3. **Gate.**
+   - **Provenance:** every manifest record has `dirty: false`; otherwise the run is not used.
+   - **Reference electrodes:** list every epoch with `t_ref_disabled` and every epoch with
+     `n_time_gaps` > 0. Accept each one explicitly before setting the run id.
+   - **Repo-only cores:** list every core with no prototype core, and review each in a gallery.
+   - **S margins:** in the 12 S epochs, list every spike-only core within 1.1 s of an S core and
+     check it against the true-SWR and visual-SWR sets. This is review item 2 on the decode-free OOD
+     reference. If a true SWR is masked there, rule on it before going on.
+
+   On the 218:
    - every prototype core is matched, and masked time is within 2 % of the prototype's in total
      and per epoch;
    - the validation verdicts are reproduced:
@@ -2009,8 +2099,14 @@ R9 waits for C1's decisions. A new signature or rule is a fix round on Task 16.
 - Run `run_swr_detection.py` on all 255 epochs into a new run folder.
 - **Gate:**
   - the 14 low-count epochs have SD / robust SD ≤ 1.3;
-  - the 2.0 Kay total on the 218 is within 1 % of the prototype's 41,743;
-  - both j16 epochs are `ok`.
+  - the 2.0 Kay total on the 218 is within 1 % of C1c's selected run, 34,281. That run has the
+    tetrode rule and the R-rip veto, and leaves out events overlapping the prototype's `swr` mask.
+    The prototype's 41,743 predates both rules;
+  - R-T drops groups 0, 10 and 22 in every j16 epoch, and the other drops match
+    `followup/c1c_rule_drops.csv`, or each difference is explained;
+  - no epoch fails the R-T guard, or each failure is ruled on;
+  - both j16 epochs are `ok`;
+  - Karlsson, Yu and Zugaro counts are reported before and after the two rules (no gate).
 - Then set `SWR_INVENTORY_RUN_ID` (one commit), and push.
 
 ## R11: full re-decode, all 255 epochs (GPU, zephyr and breeze)
@@ -2018,7 +2114,15 @@ R9 waits for C1's decisions. A new signature or rule is a fix round on Task 16.
 - NonLocal and ContFrag, both into a new staging folder, from the commit that sets both run ids.
 - First, on breeze, decode the 12 S epochs with masking and with their noisy tetrodes dropped, and apply
   the Phase C ruling.
-- Breeze needs SSH access first: the lead authorises the key, or runs the jobs there.
+- **Also first: j16's three tetrodes in decoding.** R-T removes groups 0, 10 and 22 from SWR
+  detection only. Two of them have spikes that rise during true SWRs (own MUA 2.8× and 3.0×), so
+  they stay in decoding by default.
+  - Their LFP is loud at the ports, and their mark rate rises over days (C1c). So decode 4 j16
+    epochs, one every two days, with and without those three tetrodes.
+  - Compare the non-local events: count, overlap, and the share at the ports.
+  - Keep the tetrodes unless more than 5 % of the events with them have no overlapping event
+    without them. If they do, bring the comparison to the lead before the full run.
+- Breeze: SSH from zephyr works (2026-10-09). Check `nvidia-smi` and use idle cards only.
 - **Gates:** as R1 (P30-B pinned, no CPU fallback, provenance), plus both run ids recorded in every
   decode.
 - **Swap:** replace the 218 and promote the 37 pending with the register flip, using the R2 swap
