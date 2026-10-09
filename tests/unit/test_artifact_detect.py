@@ -18,6 +18,7 @@ from continuum_swr_replay.analysis.hippocampus.artifacts.detect import (
 )
 from continuum_swr_replay.analysis.hippocampus.artifacts.features import (
     level_jump,
+    persistent_step_count,
     robust_jump,
 )
 from continuum_swr_replay.analysis.hippocampus.artifacts.io import CORE_COLUMNS
@@ -38,17 +39,27 @@ def _detect(epoch: SyntheticEpoch, **kwargs) -> pd.DataFrame:
 
 
 class TestTheConstants:
-    def test_the_values_are_the_reports(self):
-        """detector_report.md §1 and §5.1, verbatim."""
-        assert detect.S_CORE == 4.0
+    def test_the_rule_p_thresholds_are_the_margin_times_the_calibration_maxima(
+        self,
+    ):
+        """C2's rule P: 1.5 x the largest value in the calibration SWR set
+        (followup/c2_rule_check.csv, row "rule (all four)", divided by 1.5)."""
+        assert detect.THRESHOLD_MARGIN == 1.5
+        assert detect.S_CORE_CALIBRATION_MAX == 2.8723976612091064
+        assert detect.T_REF_CALIBRATION_MAX == 11.715611457824707
+        assert detect.T_CA1_K_CALIBRATION_MAX == 16.682405471801758
+        assert detect.S_CORE == 4.30859649181366
+        assert detect.T_REF == 17.57341718673706
+        assert detect.T_CA1_K == 25.023608207702637
+
+    def test_the_definitions_are_the_reports(self):
+        """detector_report.md §1 and §5.1, verbatim; T-spk stays off rule P."""
         assert detect.S_CORE_RUN == 2
         assert detect.S_EXT == 2.0
         assert detect.S_GAP == 2
         assert detect.S_WINDOW_S == 1.0
         assert detect.S_SEGMENT_S == 0.064
         assert detect.S_BAND_HZ == (150.0, 250.0)
-        assert detect.T_REF == 15.0
-        assert detect.T_CA1_K == 20.0
         assert detect.T_CA1_RHO == 0.5
         assert detect.T_CA1_FRAC == 0.15
         assert detect.T_CA1_MIN == 3
@@ -379,16 +390,32 @@ class TestTheInputs:
 
 
 class TestBoundaries:
-    """Each threshold at exactly its value: >= for T_REF, T_SPK_FRAC, T_SPK_OOD;
+    """Each threshold at exactly its value: >= for T_REF, T_CA1_K, T_SPK_FRAC,
+    T_SPK_OOD;
     a strict > for the nearest-mark cut; merges at exactly S_GAP windows and
     at exactly T_MERGE_S."""
 
-    def test_t_ref_fires_at_exactly_15(self):
-        robust = np.array([14.999, 15.0, 15.001])
+    def test_t_ref_fires_at_exactly_its_threshold(self):
+        robust = np.array(
+            [np.nextafter(detect.T_REF, 0.0), detect.T_REF, detect.T_REF + 1e-3]
+        )
 
         events = detect.t_ref_events(np.arange(3.0), robust)
 
         assert events["time"].tolist() == [1.0, 2.0]
+
+    def test_t_ca1_counts_a_step_at_exactly_its_threshold(self):
+        jump = np.full((2, 3), 30.0)
+        robust = np.array(
+            [[detect.T_CA1_K] * 3, [np.nextafter(detect.T_CA1_K, 0.0)] * 3]
+        )
+        shift = np.full((2, 3), 30.0)
+
+        count = persistent_step_count(
+            jump, robust, shift, threshold=detect.T_CA1_K, persistence=detect.T_CA1_RHO
+        )
+
+        np.testing.assert_array_equal(count, [3, 0])
 
     @pytest.mark.parametrize(
         ("n_tetrodes", "ood", "fires"),

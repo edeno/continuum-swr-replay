@@ -18,9 +18,27 @@ function, so a further signature is one more event source.
 :func:`detect_artifacts` runs them on one epoch and returns unpadded cores
 with their evidence; one table pads them into the mask (``masks.PADDING_S``).
 
-Every value below is the validated prototype's
-(``.claude/research/refresh_artifact_detector/detector_report.md``, the
-"report"). Design note: ``docs/design/2026-10-09-artifact-detection.md``.
+By construction no rule can mask a ripple seen on one electrode alone: S needs
+at least 2 channels for at least 2 s, T-ca1 needs at least 3 channels with a
+lasting step, T-spk needs at least 40 % of tetrodes, and T-ref reads only the
+reference electrode.
+
+**Thresholds (rule P).** Each artifact threshold on a statistic SWRs also
+reach is :data:`THRESHOLD_MARGIN` (1.5) times the largest value that statistic
+reaches in the calibration SWR set: the reference SWR set, the model-reviewed
+SWRs and the giant-day Kay∩Karlsson events, each measured over the event
+widened by its padding. 1.5 is the largest ratio of one animal's maximum to
+the other four animals' maximum (1.27-1.59). The reference SWR set is
+rule-defined (Kay∩Karlsson, 30-200 ms, speed < 4 cm/s over ± 250 ms, a sharp
+wave, MUA >= 2x); model-reviewed labels come from one AI reviewer, with no
+human and no second rater. Neither is ground truth. Window lengths, bins, run
+lengths, persistence and padding are definitions, placed by a mechanism or a
+measured tail.
+
+Sources: the prototype's report
+(``.claude/research/refresh_artifact_detector/detector_report.md``, "the
+report") and study C2 (``followup/justification_report.md`` there, "C2").
+Design note: ``docs/design/2026-10-09-artifact-detection.md``.
 """
 
 from __future__ import annotations
@@ -70,6 +88,22 @@ __all__ = [
     "t_spk_events",
 ]
 
+# --- rule P (C2 §2) --------------------------------------------------------------
+THRESHOLD_MARGIN = 1.5
+"""Rule P's margin over the calibration maximum: one animal's maximum over the
+other four animals' maximum reaches 1.27-1.59 (C2 §2, c2_loao_ratio.csv)."""
+S_CORE_CALIBRATION_MAX = 2.8723976612091064
+"""The largest window specificity over the calibration SWR set: a reference-set
+SWR in j16 (C2 §1, §2.1; c2_rule_check.csv)."""
+T_REF_CALIBRATION_MAX = 11.715611457824707
+"""The largest reference |J5| (robust units) over the calibration SWR set: a
+giant-day event (reference set 9.2, model-reviewed SWRs 7.2; C2 §1, §2.1)."""
+T_CA1_K_CALIBRATION_MAX = 16.682405471801758
+"""The largest k-th largest persistent CA1 |J5| (robust units; k the channels
+T-ca1 needs) over the calibration SWR set: chimi's giant day and a
+model-reviewed SWR. Its cross-animal ratio, 1.59, is the largest (C2 §1,
+§2.1)."""
+
 # --- S: sustained, channel-specific ripple-band noise (report §1.1) ----------
 S_WINDOW_S = 1.0
 """Window length (s): spec is computed per 1-s window (report §1.1)."""
@@ -77,10 +111,12 @@ S_SEGMENT_S = 0.064
 """Welch segment (s): 15 Hann segments of 64 ms per window (report §1.1)."""
 S_BAND_HZ = (150.0, 250.0)
 """The ripple band of the window power, low inclusive, high exclusive (§1.1)."""
-S_CORE = 4.0
-"""Core spec: non-S epochs never hold 2 consecutive windows >= 4 (§5.1 s_core)."""
+S_CORE = THRESHOLD_MARGIN * S_CORE_CALIBRATION_MAX
+"""Core spec, rule P: 1.5 x 2.872 = 4.309 (C2 §2.1; the prototype's 4 had a
+1.39x margin)."""
 S_CORE_RUN = 2
-"""Consecutive core windows: 1 adds 11 true SWRs and 121 s (§5.1 s_core_run)."""
+"""Consecutive core windows, a definition (>= 2 s): 1 adds 11 reference-set
+SWRs and 121 s (§5.1 s_core_run)."""
 S_EXT = 2.0
 """Extension spec: the run of windows >= 2 holding a core (§5.1 s_ext)."""
 S_GAP = 2
@@ -89,37 +125,43 @@ window; without the fill senor20201101_14_r7 keeps SD / robust SD 1.61 (§5.1
 s_gap)."""
 
 # --- T-ref: a jump on the reference electrode (report §1.2) ------------------
-T_REF = 15.0
-"""Reference |J5| (robust units): giant-day Kay∩Karlsson max 10.7, true-SWR
-max 6.5, visual T median 31.9 (§5.1 t_ref)."""
+T_REF = THRESHOLD_MARGIN * T_REF_CALIBRATION_MAX
+"""Reference |J5| (robust units), rule P: 1.5 x 11.716 = 17.573 (C2 §2.1; the
+prototype's 15 had a 1.28x margin, and placed on four animals it failed on
+chimi's giant days, C2 §3.1). Model-reviewed steps have a median of 31.9."""
 
 # --- T-ca1: a persistent step on several CA1 channels (report §1.2) ----------
-T_CA1_K = 20.0
-"""CA1 |J5| (robust units): at K <= 12 giant-SWR onsets fire; true-SWR max
-fraction is 0 at K = 20 (§5.1 t_ca1_k)."""
+T_CA1_K = THRESHOLD_MARGIN * T_CA1_K_CALIBRATION_MAX
+"""CA1 |J5| (robust units) of a persistent step, rule P: 1.5 x 16.682 = 25.024
+(C2 §2.1; the prototype's 20 had a 1.20x margin). Giant-SWR onsets fire at
+K <= 12 (§5.1 t_ca1_k)."""
 T_CA1_RHO = 0.5
 """|L20| >= 0.5 |J5| with J5's sign: the step persists, a ripple cycle does not
 (§5.1 t_ca1_rho)."""
 T_CA1_FRAC = 0.15
-"""Fraction of CA1 channels stepping at one sample: SWRs reach 1 channel at
-K = 20 (§5.1 t_ca1_frac)."""
+"""Fraction of CA1 channels stepping at one sample: the calibration SWR set
+reaches 1 channel, so k = 3-4 of 13-22 channels is a 3-4x margin (C2 §1)."""
 T_CA1_MIN = 3
-"""At least 3 channels, however few the epoch has (§5.1 t_ca1_min)."""
+"""At least 3 channels, however few the epoch has (§5.1 t_ca1_min; C2 §1)."""
 
 # --- T-spk: an out-of-distribution spike line (report §1.2, §2.4) ------------
 T_SPK_BIN_S = 200e-6
 """Line bin (s), on two grids offset by half a bin: at 0.5 ms a clean-day giant
 SWR is masked (§5.1 t_spk_bin)."""
 T_SPK_FRAC = 0.40
-"""Fraction of tetrodes in one bin: true SWRs reach 0.50, so the OOD gate
-carries the specificity (§5.1 t_spk_frac)."""
+"""Fraction of tetrodes in one bin. Off rule P: reference-set SWRs reach 0.364
+in bins with OOD marks (a thin 1.10x margin), and the spike-only lines sit at
+0.50-0.55, so no value has a 1.5x margin and still catches them. It rests on 3
+model-reviewed lines; R9 reviews every spike-only core (C2 §2.1)."""
 T_SPK_MIN_TETRODES = 3
 """A line needs at least 3 tetrodes: the prototype's line table kept bins with
 >= max(3, 25 %) of tetrodes (artdet_detector.spike_lines); with 8 or more
 tetrodes only the 40 % rule binds."""
 T_SPK_OOD = 0.20
-"""OOD fraction of the bin's spikes: true-SWR / visual-SWR / giant-day max 0,
-spike-only artifacts 0.27-0.42 (§5.1 t_spk_ood)."""
+"""OOD fraction of the bin's spikes. Off rule P: the calibration SWR set's
+maximum is 0, so it sits 1.35x below the smallest model-reviewed spike-only
+line (0.27). It rests on those 3 lines; R9 reviews every spike-only core
+(C2 §2.1)."""
 T_SPK_OOD_NN = 4.0
 """A mark is OOD when its nearest reference mark is more than 4 x the decoder's
 waveform_std away: there the decoder's mark kernel has no support (§2.4)."""
@@ -131,6 +173,10 @@ T_MERGE_S = 0.05
 """T signatures at most 50 ms after the previous one join its core (§1.2)."""
 
 CONSTANT_NAMES = (
+    "THRESHOLD_MARGIN",
+    "S_CORE_CALIBRATION_MAX",
+    "T_REF_CALIBRATION_MAX",
+    "T_CA1_K_CALIBRATION_MAX",
     "S_WINDOW_S",
     "S_SEGMENT_S",
     "S_BAND_HZ",
