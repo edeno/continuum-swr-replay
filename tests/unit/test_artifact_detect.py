@@ -376,3 +376,82 @@ class TestTheInputs:
 
         assert counts["n_time_gaps"] == 2
         assert _detect(SyntheticEpoch()).attrs["counts"]["n_time_gaps"] == 0
+
+
+class TestBoundaries:
+    """Each threshold at exactly its value: >= for T_REF, T_SPK_FRAC, T_SPK_OOD;
+    a strict > for the nearest-mark cut; merges at exactly S_GAP windows and
+    at exactly T_MERGE_S."""
+
+    def test_t_ref_fires_at_exactly_15(self):
+        robust = np.array([14.999, 15.0, 15.001])
+
+        events = detect.t_ref_events(np.arange(3.0), robust)
+
+        assert events["time"].tolist() == [1.0, 2.0]
+
+    @pytest.mark.parametrize(
+        ("n_tetrodes", "ood", "fires"),
+        [(4, 1.0, True), (3, 1.0, False), (5, 0.2, True), (5, 0.19999, False)],
+    )
+    def test_t_spk_at_exactly_40_and_20_percent(self, n_tetrodes, ood, fires):
+        lines = pd.DataFrame(
+            {
+                "time": [1.0],
+                "n_tetrodes": [n_tetrodes],
+                "tetrode_fraction": [n_tetrodes / 10],
+                "n_spikes": [5],
+                "ood_fraction": [ood],
+            }
+        )
+
+        assert len(detect.t_spk_events(lines)) == int(fires)
+
+    def test_a_line_on_exactly_4_of_10_tetrodes_is_caught(self):
+        epoch = SyntheticEpoch()
+        epoch.add_spike_line(20.25, [0, 3, 6, 9], out_of_distribution=True)
+
+        cores = _detect(epoch)
+
+        assert cores["signatures"].tolist() == ["spk"]
+        assert cores["spk_frac_max"].iloc[0] == pytest.approx(0.4)
+
+    def test_a_line_with_exactly_1_of_5_marks_ood_is_caught(self):
+        epoch = SyntheticEpoch()
+        epoch.add_spike_line(20.25, [0, 2, 4, 6], out_of_distribution=False)
+        epoch.add_spike_line(20.25 + 32e-6, [8], out_of_distribution=True)
+
+        cores = _detect(epoch)
+
+        assert cores["signatures"].tolist() == ["spk"]
+        assert cores["spk_ood_max"].iloc[0] == pytest.approx(0.2)
+
+    @pytest.mark.parametrize(("offset", "ood"), [(0.0, False), (1e-3, True)])
+    def test_the_nearest_mark_cut_is_strict(self, offset, ood):
+        cut = detect.T_SPK_OOD_NN * detect.WAVEFORM_STD
+        marks = np.array([[0.0, 0.0, 0.0, 0.0], [cut + offset, 0.0, 0.0, 0.0]])
+        empty = pd.DataFrame({"start_time": [], "end_time": []}, dtype=float)
+
+        _, _, is_ood, _ = detect.spike_ood(
+            [np.array([1.0, 2.0])], [marks], (0.0, 3.0), empty
+        )
+
+        assert is_ood.tolist() == [ood, ood]
+
+    @pytest.mark.parametrize(("second_block", "n_blocks"), [(14, 1), (15, 2)])
+    def test_s_blocks_exactly_2_windows_apart_merge(self, second_block, n_blocks):
+        spec = np.ones(30)
+        spec[10:12] = 10.0
+        spec[second_block : second_block + 2] = 10.0
+
+        cores = detect.s_cores(np.arange(30) + 0.5, spec)
+
+        assert len(cores) == n_blocks
+        if n_blocks == 1:
+            assert cores["n_windows"].iloc[0] == 6  # the 2 gap windows included
+
+    @pytest.mark.parametrize(("second", "n_cores"), [(0.05, 1), (0.0500001, 2)])
+    def test_t_events_exactly_50_ms_apart_merge(self, second, n_cores):
+        events = detect.t_ref_events(np.array([0.0, second]), np.array([20.0, 20.0]))
+
+        assert len(detect.t_cores(events)) == n_cores

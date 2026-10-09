@@ -272,8 +272,9 @@ def level_shift(lfp: NDArray[np.floating]) -> NDArray[np.floating]:
     """L20: the 20-ms mean level after a sample minus the one before it.
 
     ``L20[t] = mean(x[t+5..t+24]) - mean(x[t-24..t-5])``, skipping 4 samples on
-    each side of ``t``; 0 where a window would leave the array (the first 24
-    and last 25 samples). Sums are taken in float64.
+    each side of ``t``, for ``t = 24 .. n_time - 26``; 0 for the first 24 and
+    the last 25 samples. Both windows would fit at ``t = n_time - 25`` too, but
+    the prototype left it 0 and so does this. Sums are taken in float64.
 
     Parameters
     ----------

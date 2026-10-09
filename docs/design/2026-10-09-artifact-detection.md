@@ -74,8 +74,9 @@ the prototype is in `task16_check/` there.
   its nearest reference mark of the same tetrode (Euclidean, raw marks in µV), the spike
   itself left out, is more than 4 × the decoder's `waveform_std` (24 µV, read from
   `DecodingConfig`) away: there the decoder's mark kernel has no support (report §2.4).
-- **Merging.** T signatures within 50 ms form one T core. Each rule is its own function, so a
-  fifth signature (C1's EMG, if needed) is one more event source.
+- **Merging.** A T signature at most 50 ms after the previous one joins its core, so a core
+  can chain past 50 ms. Each rule is its own function, so a fifth signature (C1's EMG, if
+  needed) is one more event source.
 
 ### The OOD reference: the one deliberate change from the prototype
 
@@ -285,6 +286,7 @@ The literature check (23 papers and 3 code sources whose methods were read) foun
   - a 1-s window holding one has no S value.
 
   The unobserved samples themselves are not masked. The SWR source's coverage already
-  leaves out non-finite samples of the stored band. The record counts them (`n_invalid_samples`) and the windows without S power
-  (`n_windows_without_power`). An epoch without a reference electrode outside CA1 runs with
-  T-ref disabled, and its record says `t_ref_disabled: true`.
+  leaves out non-finite samples of the stored band. The record counts them
+  (`n_invalid_samples`) and the windows without S power (`n_windows_without_power`). An
+  epoch without a reference electrode outside CA1 runs with T-ref disabled, and its record
+  says `t_ref_disabled: true`.

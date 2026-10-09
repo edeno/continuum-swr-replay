@@ -12,8 +12,9 @@ power alone (a large SWR also has high ripple power):
 - **T-spk**: a spike line, at least 40 % of tetrodes in one 200-µs bin, with
   at least 20 % of those marks out of distribution (:func:`t_spk_events`).
 
-T signatures within 50 ms merge into one T core (:func:`t_cores`). Each rule
-is its own function, so a further signature is one more event source.
+T signatures at most 50 ms apart merge into one T core (:func:`t_cores`); the
+merge chains, so a core can last longer than 50 ms. Each rule is its own
+function, so a further signature is one more event source.
 :func:`detect_artifacts` runs them on one epoch and returns unpadded cores
 with their evidence; each consumer pads them (``masks.CONSUMER_PADDING``).
 
@@ -128,7 +129,7 @@ WAVEFORM_STD: float = DecodingConfig().waveform_std
 
 # --- merging T signatures (report §1.2) ---------------------------------------
 T_MERGE_S = 0.05
-"""T signatures closer than 50 ms form one core (§1.2)."""
+"""T signatures at most 50 ms after the previous one join its core (§1.2)."""
 
 CONSTANT_NAMES = (
     "S_WINDOW_S",
@@ -338,7 +339,8 @@ def t_spk_events(lines: pd.DataFrame) -> pd.DataFrame:
 
 
 def t_cores(events: pd.DataFrame) -> pd.DataFrame:
-    """Merge T events closer than :data:`T_MERGE_S` into T cores.
+    """Merge T events into T cores: an event at most :data:`T_MERGE_S` after
+    the previous one joins its core.
 
     Parameters
     ----------
