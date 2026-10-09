@@ -165,9 +165,14 @@ epochs' files instead of globbing, so a decode of any other epoch in the folder 
 never read. The two `data_aggregation` loaders also require every analysed epoch's
 file. The helper reads only the register, not the database.
 
-`scripts/figures/generate_event_gallery.py` and `scripts/qa/measure_pfc_null_geometry.py`
-still glob their folders. They rely on the canonical folder holding only analysed
-epochs' decodes, which the audit's `decode_folder` check enforces.
+`scripts/figures/generate_event_gallery.py` still globs the decode folder. It relies on
+the canonical folder holding only analysed epochs' decodes, which the audit's
+`decode_folder` check enforces.
+
+`scripts/qa/measure_pfc_null_geometry.py` globs the PFC runner's `*_mPFC_modulation.pkl`
+bundles, not the decode folder, so the `decode_folder` check does not cover it. It relies
+on the PFC runner, which writes bundles only for the analysed PFC cohort (see "PFC
+subset"). No check removes a bundle left in that folder from an earlier cohort.
 
 `scripts/qa/check_data_availability.py` still reads `get_epoch_info()` itself. It
 diagnoses which inputs load for every epoch Spyglass lists, pending ones included.
@@ -196,6 +201,10 @@ The audit runs these checks on the register:
 3. Run the SWR runner with `--pending-only`. Run the Widloski runner with
    `--all --pending-only --root <staging>`. Under a run id whose settings match the
    main run's, each adds only the pending epochs to that run's manifest.
+
+   From here until step 4, the audit's `epoch_sets` check reports the pending epochs
+   in the SWR and Widloski manifests as epochs the register does not analyse. That is
+   expected. It clears when step 4 sets their entries to `analysed`.
 4. Check the staged decodes. Then move them into the canonical folder in the same
    change that sets their entries to `analysed`, with an empty reason. In that
    change, regenerate this doc with `scripts/qa/write_epoch_register_doc.py`.
@@ -215,6 +224,11 @@ folder, holding:
 - the analysed and PFC cohort counts;
 - the epochs it ran;
 - each left-out epoch with that reason.
+
+`ran` is per writer. Each invocation overwrites the file when it starts, with its own
+sessions. A batch split across parallel partitions (`--sessions`) leaves the last
+partition's share only. The union is the bundles on disk. The counts and `left_out`
+are the same whichever partition writes last.
 
 The mPFC and OFC ContFrag builds have their own cohort rule: an analysed epoch
 with no decode for the area is outside that area's cohort. That rule is not

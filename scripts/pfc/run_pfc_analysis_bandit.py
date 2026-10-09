@@ -1630,8 +1630,11 @@ def write_cohort_record(
     """Record the PFC cohort beside the bundles: what ran, and why the rest of
     the register's analysed epochs did not.
 
-    Every partition of a run computes the same cohort, so the record is the
-    same whichever writes it last; ``ran`` is this invocation's share.
+    Every partition of a run computes the same cohort, so every field but
+    ``ran`` is the same whichever partition writes it last. ``ran`` is per
+    writer: each invocation overwrites the file when it starts, so a batch
+    split across parallel partitions (``--sessions``) leaves the last
+    partition's share only. The union is the bundles on disk.
     """
     record = {
         "produced_by": "scripts/pfc/run_pfc_analysis_bandit.py",

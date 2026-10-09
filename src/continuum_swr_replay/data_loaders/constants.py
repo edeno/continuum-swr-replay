@@ -146,41 +146,17 @@ Animals and session counts:
 - senor: 22 sessions (Oct-Nov 2020)
 - wilbur: 19 sessions (Mar-Apr 2021)
 
-Not every file is analysed. 46 are depletion sessions ("Spatial bandit task
-(depletion)", a decaying reward schedule), a different task variant that
-``get_epoch_info`` leaves out by their description. Of the other 45, 44 are
-regular sessions and one, wilbur20210326, is a first-exposure session admitted
-through ``FIRST_EXPOSURE_DESCRIPTIONS``. Which run epochs are analysed, and why
-every other run epoch of these files and of the sessions listed below is not,
-is recorded in one place, the epoch register
-(``data_loaders/epoch_register.py``, ``epoch_register.csv``, documented in
-``docs/epoch_register.md``), which every stage reads.
-
-Sessions left out of this list (each with its register entry):
-- trial parsing incomplete, no ``noPrePostTrialTimes`` intervals
-  (``NO_TRIAL_INTERVALS``; experimenter-confirmed, commit c39f0e9):
-  chimi20200215, chimi20200219, chimi20200226, peanut20201124, peanut20201130,
-  senor20201029, senor20201031, wilbur20210327;
-- depletion sessions whose trial parsing is also incomplete
-  (``DEPLETION_TASK``): chimi20200303, chimi20200307, peanut20201207,
-  senor20201119;
-- wilbur20210416, "Spatial bandit task (regular) - after depletion", never
-  ingested (``NOT_INGESTED``);
-- chimi20200301, whose raw NWB holds only a sleep epoch (``NO_RUN_EPOCH``);
-- chimi20200302, peanut20201126 and senor20201108, with no NWB file in either
-  raw store and no Spyglass entry (``NO_NWB``);
-- wilbur20210401, a regular session with 8 run epochs that Spyglass ingested
-  only in part, whose re-ingestion is blocked (``NOT_INGESTED``).
-
-Run epochs of these files that a Spyglass populate will make decodable are
-``PENDING_POPULATE`` in the register: 36 with no ``PositionIntervalMap`` row and
-no CA1 ``RippleTimesV1`` (32 of peanut's, chimi20200212_02_r1,
-senor20201102_08_r4, senor20201104_04_r2, senor20201105_02_r1);
-senor20201104_06_r3 and 08_r4, whose ``LFPV1`` was never populated, so they
-have no ripple band; senor20201105_09_r4, with no ``IntervalLinearizedPosition``
-and no CA1 ``RippleTimesV1``; and wilbur20210326_03_r1, with no CA1
-``RippleTimesV1``. wilbur20210404 is a depletion session: it has no CA1 ripple
-extraction either, but that is not why it is left out.
+Not every file is analysed. The depletion sessions ("Spatial bandit task
+(depletion)", a decaying reward schedule) are a different task variant that
+``get_epoch_info`` leaves out by their description; one first-exposure
+session, wilbur20210326, is admitted through ``FIRST_EXPOSURE_DESCRIPTIONS``.
+Which run epochs are analysed, and why every other run epoch of these files
+and of the sessions left out of this list is not, is recorded in one place,
+the epoch register (``data_loaders/epoch_register.py``,
+``epoch_register.csv``), which every stage reads. Its counts and its excluded
+and pending entries, with their evidence, are generated into
+``docs/epoch_register.md`` by ``scripts/qa/write_epoch_register_doc.py``; they
+are not repeated here, so they cannot go stale.
 """
 
 REGULAR_SESSION_DESCRIPTION = "Spatial bandit task (regular)"
