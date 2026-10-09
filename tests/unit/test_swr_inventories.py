@@ -54,6 +54,7 @@ from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
     best_ripple_channel,
     cap_zugaro_duration,
     design_bandpass_sos,
+    drop_overlapping_events,
     gap_free_stretches,
     kay_version_check,
     odd_window_samples,
@@ -779,6 +780,177 @@ def test_each_detector_reads_its_own_input_and_settings(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# Artifact time: one mask for every detector's normalization
+# ---------------------------------------------------------------------------
+
+ARTIFACT_S = (50.0, 56.0)
+"""Seconds: a loud 200 Hz burst after the last injected ripple."""
+
+ARTIFACT_MASK_S = (49.7, 56.3)
+"""The burst padded by 0.3 s on each side, as the ``swr`` mask pads an LFP step:
+the band filter and the 4 ms smoothing carry the burst about 0.1 s past it."""
+
+
+@cache
+def _epoch_with_an_artifact() -> SimpleNamespace:
+    """``_simulated_epoch((150, 175))`` with a burst 50 times the LFP's SD.
+
+    Unmasked, the burst inflates every detector's normalization so far that
+    none finds an injected ripple (Yu cannot even estimate its threshold).
+    """
+    time = simulate_time(60_000, 1000)
+    session = simulate_session(
+        time, INJECTED_RIPPLE_TIMES, rng=0, ripple_frequency=(150, 175)
+    )
+    lfps = COUNTS_PER_SIMULATED_UNIT * session.lfps
+    burst = (time >= ARTIFACT_S[0]) & (time < ARTIFACT_S[1])
+    lfps[burst] += 50 * np.std(lfps) * np.sin(2 * np.pi * 200 * time[burst])[:, None]
+    choice = best_ripple_channel(lfps, time, FS, SIMULATED_ELECTRODE_IDS)
+    column = np.flatnonzero(SIMULATED_ELECTRODE_IDS == choice.electrode_id)
+    return SimpleNamespace(
+        time=time,
+        band=filter_ripple_band(lfps, sampling_frequency=1000),
+        zugaro_lfp=zero_phase_bandpass(
+            lfps[:, column], time, FS, ZUGARO_BAND_HZ, ZUGARO_FILTER_ORDER
+        ),
+        speed=session.speed,
+        windows=session.ripple_windows,
+        unobserved=(time >= ARTIFACT_MASK_S[0]) & (time <= ARTIFACT_MASK_S[1]),
+    )
+
+
+def test_the_artifact_mask_leaves_every_detectors_normalization(monkeypatch):
+    """One artifact mask reaches all four detectors as their normalization mask.
+
+    Each normalizes over its own sample less the artifact time. Kay, Karlsson
+    and Zugaro z-score over every valid sample, so theirs is every sample
+    outside the mask; Yu's noise sample is the immobile samples, so its is the
+    immobile samples outside the mask, an unknown speed not being immobile.
+    The other settings are the pinned ones.
+    """
+    calls = {}
+
+    def recorder(name):
+        def detector(time, signal, speed, sampling_frequency, **settings):
+            calls[name] = settings
+            return _events_with_durations([0.05])
+
+        return detector
+
+    for name, attribute in {
+        "kay": "Kay_ripple_detector",
+        "karlsson": "Karlsson_ripple_detector",
+        "yu": "Yu_ripple_detector",
+        "zugaro": "Zugaro_ripple_detector",
+    }.items():
+        monkeypatch.setattr(swr_inventories, attribute, recorder(name))
+    time = _regular_time(100)
+    speed = np.zeros(100)
+    speed[60:70] = 10.0
+    speed[70:75] = np.nan
+    unobserved = np.zeros(100, dtype=bool)
+    unobserved[20:40] = True
+
+    run_swr_detectors(
+        time,
+        np.ones((100, 3)),
+        np.ones((100, 1)),
+        speed,
+        FS,
+        unobserved=unobserved,
+    )
+
+    immobile_yu = ~unobserved
+    immobile_yu[60:75] = False
+    expected = {
+        "kay": ~unobserved,
+        "karlsson": ~unobserved,
+        "yu": immobile_yu,
+        "zugaro": ~unobserved,
+    }
+    for name, settings in calls.items():
+        settings = dict(settings)
+        mask = settings.pop("normalization_mask")
+        assert mask.dtype == bool and mask.shape == (100,), name
+        np.testing.assert_array_equal(mask, expected[name], err_msg=name)
+        assert not mask[unobserved].any(), name
+        assert settings == DETECTOR_SETTINGS[name], name
+
+
+def test_without_an_artifact_mask_no_normalization_mask_is_passed(monkeypatch):
+    """With no mask the detectors keep their own default normalization."""
+    calls = {}
+
+    def kay(time, signal, speed, sampling_frequency, **settings):
+        calls["kay"] = settings
+        return _events_with_durations([0.05])
+
+    monkeypatch.setattr(swr_inventories, "Kay_ripple_detector", kay)
+    time = _regular_time(100)
+
+    run_swr_detectors(time, np.ones((100, 3)), np.ones((100, 1)), np.zeros(100), FS)
+
+    assert calls["kay"] == DETECTOR_SETTINGS["kay"]
+
+
+def test_a_masked_artifact_no_longer_hides_the_ripples():
+    """A loud burst hides every injected ripple from all four detectors; with
+    its time masked out of their normalization, each finds them again."""
+    epoch = _epoch_with_an_artifact()
+
+    unmasked = _run_on(epoch)
+    masked = run_swr_detectors(
+        epoch.time,
+        epoch.band,
+        epoch.zugaro_lfp,
+        epoch.speed,
+        FS,
+        unobserved=epoch.unobserved,
+    )
+
+    for name in ("kay", "karlsson", "zugaro"):
+        assert _n_ripples_found(unmasked[name], epoch.windows) == 0, name
+    assert isinstance(unmasked["yu"], ValueError)
+    for name, events in masked.items():
+        assert isinstance(events, pd.DataFrame), (name, events)
+        assert _n_ripples_found(events, epoch.windows) >= 4, name
+
+
+def test_drop_overlapping_events_drops_closed_overlaps_and_renumbers():
+    """An event sharing any time with an interval goes, touching included; the
+    rest keep their rows, renumbered 1..n, and the drops are counted."""
+    events = _events_with_durations([0.1, 0.1, 0.1, 0.1])  # 1.0, 2.0, 3.0, 4.0
+    intervals = pd.DataFrame(
+        {"start_time": [2.05, 3.1, 9.0], "end_time": [2.07, 3.5, 9.5]}
+    )  # inside event 2; touching event 3 at its end, 3.1
+
+    kept, n_dropped = drop_overlapping_events(events, intervals)
+
+    assert n_dropped == 2
+    np.testing.assert_array_equal(kept.start_time, [1.0, 4.0])
+    assert kept.index.name == "event_number"
+    np.testing.assert_array_equal(kept.index, [1, 2])
+    np.testing.assert_array_equal(kept.max_zscore, events.max_zscore.loc[[1, 4]])
+
+
+def test_drop_overlapping_events_with_nothing_to_drop():
+    """No intervals, or no events, leave the table as it was."""
+    events = _events_with_durations([0.1, 0.1])
+    no_intervals = pd.DataFrame({"start_time": [], "end_time": []}, dtype=float)
+
+    kept, n_dropped = drop_overlapping_events(events, no_intervals)
+    assert n_dropped == 0
+    pd.testing.assert_frame_equal(kept, events)
+
+    no_events = events.iloc[:0]
+    kept, n_dropped = drop_overlapping_events(
+        no_events, pd.DataFrame({"start_time": [1.0], "end_time": [2.0]})
+    )
+    assert n_dropped == 0
+    assert kept.empty and kept.index.name == "event_number"
+
+
+# ---------------------------------------------------------------------------
 # Yu's threshold diagnostics
 # ---------------------------------------------------------------------------
 
@@ -820,6 +992,36 @@ def test_yu_diagnostics_match_the_detector():
     )
     assert len(diagnostics["counts"]) == len(diagnostics["histogram_edges"])
     json.dumps(diagnostics, allow_nan=False)
+
+
+def test_yu_diagnostics_leave_out_the_artifact_time():
+    """With an artifact mask, the diagnostics estimate on the noise sample the
+    detector is given: immobile samples outside the mask. Their threshold is
+    the masked detector's, and the masked samples are not counted."""
+    epoch = _epoch_with_an_artifact()
+    noise = np.isfinite(epoch.band).all(axis=1) & (epoch.speed <= 4.0)
+    noise &= ~epoch.unobserved
+
+    events = Yu_ripple_detector(
+        epoch.time,
+        epoch.band,
+        epoch.speed,
+        FS,
+        normalization_mask=noise,
+        **DETECTOR_SETTINGS["yu"],
+    )
+    diagnostics = yu_diagnostics(
+        epoch.time, epoch.band, epoch.speed, FS, unobserved=epoch.unobserved
+    )
+
+    assert len(events) > 0
+    np.testing.assert_allclose(
+        events.detection_threshold_zscore,
+        diagnostics["threshold_zscore"],
+        rtol=0,
+        atol=1e-9,
+    )
+    assert diagnostics["n_values"] == np.count_nonzero(noise)
 
 
 def test_yu_diagnostics_write_a_non_finite_scalar_as_none(monkeypatch):

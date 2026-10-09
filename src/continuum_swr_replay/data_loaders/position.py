@@ -283,7 +283,10 @@ def get_position_info(
         time = time[(time >= t_start) & (time <= t_end)]
     except DataJointError as e:
         logger.debug(
-            "No noPrePostTrialTimes interval for %s %s: %s", nwb_file_name, epoch_name, e
+            "No noPrePostTrialTimes interval for %s %s: %s",
+            nwb_file_name,
+            epoch_name,
+            e,
         )
 
     position_info = get_interpolated_position_info(
@@ -303,6 +306,42 @@ def get_position_info(
         "linear_edge_spacing": linear_edge_spacing,
         "track_graph": track_graph,
     }
+
+
+def get_merge_position_info(pos_merge_id: str) -> pd.DataFrame:
+    """A ``PositionOutput`` entry's position, read from the source it names.
+
+    ``(PositionOutput & {"merge_id": ...}).fetch1_dataframe()`` asks the merge
+    table which part holds the merge id and refuses when two do ("Found 2
+    potential parents"). j1620210710's ``02_r1`` and ``04_r2`` entries are in
+    both the CommonPos and the TrodesPosV1 part: their keys hold the same
+    values under different names, which give the same merge id. The master row
+    names one source, CommonPos. ``get_position_info`` (``load_data``) reads a
+    CommonPos epoch's position from ``IntervalPositionInfo`` itself, and so does
+    this: the part of the master's source gives its parent's key, and the
+    parent's ``fetch1_dataframe`` the position. For an entry in one part it is
+    the frame the merge table's own ``fetch1_dataframe`` returns. Read-only.
+
+    Parameters
+    ----------
+    pos_merge_id : str
+        A ``PositionOutput`` merge id, such as a ripple detection key's
+        ``pos_merge_id``.
+
+    Returns
+    -------
+    pd.DataFrame
+        The source table's ``fetch1_dataframe``, indexed by time in seconds.
+    """
+    from spyglass.position import PositionOutput
+
+    output = PositionOutput()
+    restriction = {"merge_id": pos_merge_id}
+    source = (output & restriction).fetch1("source")
+    parent_key = (getattr(output, source) & restriction).fetch1()
+    parent = output.merge_get_parent_class(source)
+    frame: pd.DataFrame = (parent & parent_key).fetch1_dataframe()
+    return frame
 
 
 def get_epoch_position_info(nwb_file_name: str, epoch_name: str) -> PositionInfoDict:

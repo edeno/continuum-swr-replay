@@ -750,8 +750,8 @@ STORED_RIPPLE_READERS = {
     "src/continuum_swr_replay/data_loaders/lfp.py": "the loader itself",
     "src/continuum_swr_replay/data_loaders/bandit_task.py": "load_data's decode input",
     "src/continuum_swr_replay/data_loaders/utils.py": (
-        "the decoders' no_ripple encoding-training mask (unchanged, a separate "
-        "decision)"
+        "get_training_timepoints: the PFC decoders' no_ripple encoding mask (the "
+        "HPC decoders' comes from the source, decoding_common.hpc_decode_masks)"
     ),
     "src/continuum_swr_replay/data_loaders/constants.py": "register evidence, prose",
     "src/continuum_swr_replay/analysis/hippocampus/swr_source.py": (
@@ -759,10 +759,12 @@ STORED_RIPPLE_READERS = {
     ),
     "src/continuum_swr_replay/types.py": "load_data's return types",
     "src/continuum_swr_replay/analysis/hippocampus/data_aggregation.py": (
-        "get_data_over_time: the decode's own SWR_event provenance"
+        "get_data_over_time: the stored labels, which an HPC decode replaces "
+        "with the source's (organize_results)"
     ),
     "src/continuum_swr_replay/analysis/contfrag/data_aggregation.py": (
-        "get_contfrag_data_over_time: the decode's own SWR_event provenance"
+        "get_contfrag_data_over_time: the stored labels, which an HPC decode "
+        "replaces with the source's (organize_results)"
     ),
     "src/continuum_swr_replay/analysis/hippocampus/event_detection.py": (
         "generic overlap classifiers; 'ripple_times' is a parameter name"

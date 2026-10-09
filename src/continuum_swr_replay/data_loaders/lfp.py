@@ -14,6 +14,9 @@ get_ripple
 get_ripple_band_inputs
     Read the stored CA1 ripple band and the referenced raw LFP behind it,
     read-only, for direct SWR detection.
+get_spyglass_kay_inputs
+    Read the inputs ``RippleTimesV1.make`` gave Kay, read-only, for the SWR
+    runner's version check.
 get_multiunit
     Compute multiunit high-synchrony events (HSE) from spike times across brain areas.
 
@@ -58,7 +61,7 @@ Examples
 """
 
 import warnings
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 
 import numpy as np
 import pandas as pd
@@ -119,15 +122,9 @@ def get_theta(nwb_file_name: str, epoch_name: str) -> ThetaData:
     theta_table = LFPBandV1 & theta_lfp_key
     theta_filtered_lfp = theta_table.fetch1_dataframe()
     # Pick the first reference electrode
-    electrode_list = [
-        theta_table.fetch_nwb()[0]["lfp_band"].electrodes.data[0]
-    ]
-    theta_phase = theta_table.compute_signal_phase(
-        electrode_list=electrode_list
-    )
-    theta_power = theta_table.compute_signal_power(
-        electrode_list=electrode_list
-    )
+    electrode_list = [theta_table.fetch_nwb()[0]["lfp_band"].electrodes.data[0]]
+    theta_phase = theta_table.compute_signal_phase(electrode_list=electrode_list)
+    theta_power = theta_table.compute_signal_power(electrode_list=electrode_list)
     return {
         "theta_filtered_lfp": theta_filtered_lfp,
         "theta_phase": theta_phase,
@@ -261,6 +258,101 @@ def get_ripple(
         "ripple_consensus_trace": ripple_consensus_trace,
         "zscored_ripple_consensus_trace": zscored_ripple_consensus_trace,
     }
+
+
+def get_spyglass_kay_inputs(
+    nwb_file_name: str, epoch_name: str
+) -> tuple[pd.Series, pd.DataFrame, float, dict]:
+    """The inputs and parameters ``RippleTimesV1.make`` gave Kay, read only.
+
+    ``RippleTimesV1.get_ripple_lfps_and_position_info``'s steps
+    (``spyglass/ripple/v1/ripple.py``) on the epoch's full ``RippleTimesV1``
+    key, with one change: the position of the key's ``pos_merge_id`` is read
+    by ``get_merge_position_info``, from the source the merge master names, as
+    ``load_data`` reads a position. Spyglass's own read,
+    ``(PositionOutput & {"merge_id": ...}).fetch1_dataframe()``, refuses an
+    entry held in two parts (j1620210710 ``02_r1`` and ``04_r2``); for any
+    other entry the two reads return the same frame. The steps:
+
+    - the key's ``RippleParameters`` row;
+    - the stored ``LFPBandV1`` band's columns of the
+      ``RippleLFPSelection.RippleLFPElectrode`` electrodes, in the band's
+      dtype, indexed by its timestamps;
+    - the key's target interval intersected with the position's first and
+      last time, and the band and the position restricted to it;
+    - the position interpolated linearly onto the band's times
+      (``interpolate_to_new_time``), and its ``speed_name`` column.
+
+    Parameters
+    ----------
+    nwb_file_name, epoch_name : str
+
+    Returns
+    -------
+    speed : pd.Series
+        Head speed in cm/s on the LFP times.
+    ripple_lfps : pd.DataFrame, shape (n_time, n_channels)
+        The stored ripple band, indexed by time in seconds.
+    sampling_frequency : float
+        The band's nominal rate in Hz.
+    ripple_param_dict : dict
+        The stored parameters: ``speed_name``, ``ripple_detection_algorithm``
+        and ``ripple_detection_params``.
+    """
+    from spyglass.common import IntervalList
+    from spyglass.lfp.analysis.v1.lfp_band import LFPBandV1
+    from spyglass.ripple.v1 import RippleLFPSelection, RippleParameters, RippleTimesV1
+    from spyglass.ripple.v1.ripple import interpolate_to_new_time
+    from spyglass.utils.nwb_helper_fn import get_electrode_indices
+
+    from .position import get_merge_position_info
+
+    ripple_key, _ = _ripple_keys(nwb_file_name, epoch_name)
+    key = (RippleTimesV1 & ripple_key).fetch1("KEY")
+    ripple_param_dict: dict = (
+        RippleParameters & {"ripple_param_name": key["ripple_param_name"]}
+    ).fetch1("ripple_param_dict")
+
+    electrode_keys = (RippleLFPSelection.RippleLFPElectrode() & key).fetch(
+        "electrode_id"
+    )
+    ripple_lfp_nwb = (LFPBandV1 & key).fetch_nwb()[0]
+    band = ripple_lfp_nwb["lfp_band"]
+    band_electrodes = band.electrodes.data[:]
+    is_selected = np.zeros_like(band_electrodes, dtype=bool)
+    selected = [
+        electrode for electrode in electrode_keys if electrode in band_electrodes
+    ]
+    is_selected[get_electrode_indices(band, selected)] = True
+    ripple_lfp = pd.DataFrame(
+        band.data, index=pd.Index(band.timestamps, name="time")
+    ).loc[:, is_selected]
+    sampling_frequency = ripple_lfp_nwb["lfp_band_sampling_rate"]
+
+    target_times = (
+        IntervalList
+        & {
+            "nwb_file_name": key["nwb_file_name"],
+            "interval_list_name": key["target_interval_list_name"],
+        }
+    ).fetch_interval()
+    position_info = get_merge_position_info(key["pos_merge_id"])
+    valid_times = target_times.intersect(
+        np.array([position_info.index[0], position_info.index[-1]])
+    ).times
+    position_info = pd.concat(
+        [position_info.loc[slice(start, end)] for start, end in valid_times], axis=0
+    )
+    ripple_lfps = pd.concat(
+        [ripple_lfp.loc[slice(start, end)] for start, end in valid_times], axis=0
+    )
+    position_info = interpolate_to_new_time(position_info, ripple_lfps.index)
+    return (
+        position_info[ripple_param_dict["speed_name"]],
+        ripple_lfps,
+        sampling_frequency,
+        ripple_param_dict,
+    )
 
 
 def check_band_electrodes(
@@ -461,10 +553,49 @@ def get_ripple_band_inputs(nwb_file_name: str, epoch_name: str) -> RippleBandInp
     }
 
 
+def _in_intervals(
+    time: NDArray[np.float64], intervals: pd.DataFrame
+) -> NDArray[np.bool_]:
+    """True at each time inside any closed ``[start_time, end_time]`` interval.
+
+    Parameters
+    ----------
+    time : NDArray, shape (n_time,)
+        Ascending seconds.
+    intervals : pd.DataFrame
+        ``start_time`` and ``end_time`` in seconds; any order, may overlap.
+
+    Returns
+    -------
+    NDArray of bool, shape (n_time,)
+    """
+    first = np.searchsorted(
+        time, intervals["start_time"].to_numpy(dtype=float), side="left"
+    )
+    stop = np.searchsorted(time, intervals["end_time"].to_numpy(dtype=float), "right")
+    coverage = np.zeros(time.size + 1, dtype=np.int64)
+    np.add.at(coverage, first, 1)
+    np.add.at(coverage, stop, -1)
+    inside: NDArray[np.bool_] = np.cumsum(coverage[:-1]) > 0
+    return inside
+
+
+def _overlap_any(events: pd.DataFrame, intervals: pd.DataFrame) -> NDArray[np.bool_]:
+    """Events whose closed interval shares any time with a closed interval."""
+    starts = events["start_time"].to_numpy(dtype=float)[:, np.newaxis]
+    ends = events["end_time"].to_numpy(dtype=float)[:, np.newaxis]
+    overlaps: NDArray[np.bool_] = (
+        (starts <= intervals["end_time"].to_numpy(dtype=float)[np.newaxis, :])
+        & (intervals["start_time"].to_numpy(dtype=float)[np.newaxis, :] <= ends)
+    ).any(axis=1)
+    return overlaps
+
+
 def get_multiunit_hse(
     spike_times: list[NDArray[np.float64]],
     speed: NDArray[np.float64],
     bin_time: NDArray[np.float64],
+    artifact_intervals: pd.DataFrame | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Compute multiunit high synchrony events (HSE).
 
@@ -476,13 +607,21 @@ def get_multiunit_hse(
         Speed of the animal in cm/s
     bin_time : NDArray[np.float64]
         Time bins for spike counting in seconds
+    artifact_intervals : pd.DataFrame, optional
+        Closed ``[start_time, end_time]`` intervals (seconds) whose spikes are
+        not to be trusted, such as the ``decoder`` artifact mask. Their bins
+        are left out of the detector's normalization (``normalization_mask``)
+        and of the z-scored rate's mean and SD, and an event that shares any
+        time with one is dropped, the rest renumbered 1..n. The spike counts
+        themselves are not changed. None, or no rows, masks nothing.
 
     Returns
     -------
     tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]
         - hse_times: pd.DataFrame with HSE start/end times; empty, with
           ``start_time``, ``end_time`` and ``duration`` columns, when the
-          firing rate is constant (for example, an area with no spikes)
+          firing rate is constant over the unmasked bins (for example, an
+          area with no spikes)
         - multiunit_firing_rate: pd.DataFrame with population firing rate
         - multiunit_rate_zscore: pd.DataFrame with z-scored firing rate
 
@@ -520,8 +659,14 @@ def get_multiunit_hse(
         index=bin_time,
         columns=["firing_rate"],
     )
-    mean = np.nanmean(multiunit_firing_rate)
-    std = np.nanstd(multiunit_firing_rate)
+    is_artifact = (
+        np.zeros(bin_time.shape, dtype=bool)
+        if artifact_intervals is None
+        else _in_intervals(bin_time, artifact_intervals)
+    )
+    observed_rate = multiunit_firing_rate.to_numpy()[~is_artifact]
+    mean = np.nanmean(observed_rate) if observed_rate.size else np.nan
+    std = np.nanstd(observed_rate) if observed_rate.size else np.nan
 
     # Avoid division by near-zero if firing rate is constant
     if std < 1e-10 or np.isnan(std):
@@ -550,13 +695,19 @@ def get_multiunit_hse(
         minimum_duration=HSE_MINIMUM_DURATION_SEC,
         zscore_threshold=HSE_ZSCORE_THRESHOLD,
         close_event_threshold=HSE_CLOSE_EVENT_THRESHOLD_SEC,
+        normalization_mask=None if not is_artifact.any() else ~is_artifact,
     )
+    if artifact_intervals is not None and len(artifact_intervals):
+        hse_times = hse_times.loc[~_overlap_any(hse_times, artifact_intervals)]
+        hse_times.index = pd.RangeIndex(1, len(hse_times) + 1, name="event_number")
 
     return hse_times, multiunit_firing_rate, multiunit_rate_zscore
 
 
 def get_multiunit(
-    spike_times: dict[str, list[NDArray[np.float64]]], position_info: pd.DataFrame
+    spike_times: dict[str, list[NDArray[np.float64]]],
+    position_info: pd.DataFrame,
+    artifact_intervals: Mapping[str, pd.DataFrame] | None = None,
 ) -> MultiunitData:
     """Get multiunit HSE data for all brain areas.
 
@@ -566,6 +717,9 @@ def get_multiunit(
         Dictionary mapping brain area to list of spike time arrays
     position_info : pd.DataFrame
         Position info with head_speed column and time index
+    artifact_intervals : Mapping[str, pd.DataFrame], optional
+        By brain area, the intervals ``get_multiunit_hse`` masks; an area not
+        named is not masked.
 
     Returns
     -------
@@ -590,6 +744,7 @@ def get_multiunit(
             spike_times[brain_area],
             position_info.head_speed.to_numpy(),
             position_info.index.to_numpy(),
+            artifact_intervals=(artifact_intervals or {}).get(brain_area),
         )
 
     return {

@@ -191,11 +191,15 @@ source.
 
 ## What does not change here
 
-- **The decoders' `no_ripple` encoding-training mask** still excludes the stored
-  `RippleTimesV1` ripples. That is a separate decision. The two definitions overlap
-  93 %, and the decodes were kept.
-- **`get_data_over_time` still writes the stored ripples' `SWR_event`.** It is the decode's
-  own provenance.
+- **The decoders' `no_ripple` encoding-training mask** still excluded the stored
+  `RippleTimesV1` ripples when this note was written; the two definitions overlap 93 %.
+  Since Task 17a (the lead's decision of 2026-10-09, with the re-decode), an HPC decode
+  leaves out every event of this inventory and its `decoder` artifact mask instead
+  (`decoding_common.hpc_decode_masks`), and refuses to start unless both run ids are set.
+- **`get_data_over_time` still writes the stored ripples' `SWR_event`.** It is an older
+  decode's (and a PFC decode's) provenance. An HPC decode since Task 17a reads its frame
+  through `with_swr_source` in `organize_results`, so its own `SWR_event` is this
+  source's.
 - **`SWR_zscore`** is still Spyglass's Kay consensus trace, a signal and not a label. The
   inventory ships no trace.
 - **The pipeline-data-flow supplement** unpickles a decode frame directly, but it reads

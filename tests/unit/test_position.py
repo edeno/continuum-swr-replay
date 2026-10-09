@@ -58,29 +58,33 @@ class TestGetInterpolatedPositionInfo:
         original_times = np.array([0.0, 1.0, 2.0, 3.0])
         original_x = np.array([0.0, 5.0, 10.0, 15.0])
         original_speed = np.array([5.0, 7.0, 9.0, 11.0])
-        position_info = pd.DataFrame({
-            'head_position_x': original_x,
-            'head_position_y': np.zeros(4),
-            'head_speed': original_speed,
-        }, index=original_times)
+        position_info = pd.DataFrame(
+            {
+                "head_position_x": original_x,
+                "head_position_y": np.zeros(4),
+                "head_speed": original_speed,
+            },
+            index=original_times,
+        )
 
         result = _interpolate(position_info, original_times, linear_3node_track)
 
-        assert {'linear_position', 'projected_x_position', 'track_segment_id'} <= set(result.columns)
-        np.testing.assert_array_equal(
-            result['head_position_x'].to_numpy(), original_x
+        assert {"linear_position", "projected_x_position", "track_segment_id"} <= set(
+            result.columns
         )
-        np.testing.assert_array_equal(
-            result['head_speed'].to_numpy(), original_speed
-        )
+        np.testing.assert_array_equal(result["head_position_x"].to_numpy(), original_x)
+        np.testing.assert_array_equal(result["head_speed"].to_numpy(), original_speed)
 
     def test_interpolation_to_new_times(self, linear_3node_track):
         """New time points should have linearly interpolated values."""
         original_times = np.array([0.0, 2.0])
-        position_info = pd.DataFrame({
-            'head_position_x': [0.0, 10.0],
-            'head_position_y': [0.0, 0.0],
-        }, index=original_times)
+        position_info = pd.DataFrame(
+            {
+                "head_position_x": [0.0, 10.0],
+                "head_position_y": [0.0, 0.0],
+            },
+            index=original_times,
+        )
 
         new_times = np.array([0.0, 1.0, 2.0])
         result = _interpolate(position_info, new_times, linear_3node_track)
@@ -89,7 +93,7 @@ class TestGetInterpolatedPositionInfo:
         assert result.index.tolist() == list(new_times)
         # Midpoint at t=1.0: 5.0 cm under linear interpolation.
         np.testing.assert_allclose(
-            result.loc[1.0, 'head_position_x'],
+            result.loc[1.0, "head_position_x"],
             5.0,
             rtol=0.01,
             err_msg="Expected linear interpolation at midpoint",
@@ -98,42 +102,55 @@ class TestGetInterpolatedPositionInfo:
     def test_interpolation_multiple_columns(self, linear_3node_track):
         """All columns should be interpolated independently."""
         original_times = np.array([0.0, 1.0])
-        position_info = pd.DataFrame({
-            'head_position_x': [0.0, 10.0],
-            'head_position_y': [0.0, 5.0],
-            'head_speed': [0.0, 10.0],
-            'head_orientation': [0.0, np.pi],
-        }, index=original_times)
+        position_info = pd.DataFrame(
+            {
+                "head_position_x": [0.0, 10.0],
+                "head_position_y": [0.0, 5.0],
+                "head_speed": [0.0, 10.0],
+                "head_orientation": [0.0, np.pi],
+            },
+            index=original_times,
+        )
 
         result = _interpolate(position_info, np.array([0.5]), linear_3node_track)
 
-        np.testing.assert_allclose(result.loc[0.5, 'head_position_x'], 5.0, rtol=0.01)
-        np.testing.assert_allclose(result.loc[0.5, 'head_position_y'], 2.5, rtol=0.01)
-        np.testing.assert_allclose(result.loc[0.5, 'head_speed'], 5.0, rtol=0.01)
-        np.testing.assert_allclose(result.loc[0.5, 'head_orientation'], np.pi / 2, rtol=0.01)
+        np.testing.assert_allclose(result.loc[0.5, "head_position_x"], 5.0, rtol=0.01)
+        np.testing.assert_allclose(result.loc[0.5, "head_position_y"], 2.5, rtol=0.01)
+        np.testing.assert_allclose(result.loc[0.5, "head_speed"], 5.0, rtol=0.01)
+        np.testing.assert_allclose(
+            result.loc[0.5, "head_orientation"], np.pi / 2, rtol=0.01
+        )
 
     def test_custom_position_columns(self, linear_3node_track):
         """Should handle custom position column names."""
         original_times = np.array([0.0, 1.0])
-        position_info = pd.DataFrame({
-            'custom_x': [0.0, 10.0],
-            'custom_y': [0.0, 0.0],
-        }, index=original_times)
-
-        result = _interpolate(
-            position_info, original_times, linear_3node_track,
-            position_columns=['custom_x', 'custom_y'],
+        position_info = pd.DataFrame(
+            {
+                "custom_x": [0.0, 10.0],
+                "custom_y": [0.0, 0.0],
+            },
+            index=original_times,
         )
 
-        assert 'linear_position' in result.columns
-        assert 'custom_x' in result.columns
+        result = _interpolate(
+            position_info,
+            original_times,
+            linear_3node_track,
+            position_columns=["custom_x", "custom_y"],
+        )
+
+        assert "linear_position" in result.columns
+        assert "custom_x" in result.columns
 
     def test_preserves_time_ordering(self, linear_3node_track):
         """Output should maintain time ordering even with unsorted input times."""
-        position_info = pd.DataFrame({
-            'head_position_x': [0.0, 5.0, 10.0],
-            'head_position_y': [0.0, 0.0, 0.0],
-        }, index=[0.0, 1.0, 2.0])
+        position_info = pd.DataFrame(
+            {
+                "head_position_x": [0.0, 5.0, 10.0],
+                "head_position_y": [0.0, 0.0, 0.0],
+            },
+            index=[0.0, 1.0, 2.0],
+        )
 
         unsorted_times = np.array([2.0, 0.5, 1.5, 0.0])
         result = _interpolate(position_info, unsorted_times, linear_3node_track)
@@ -142,18 +159,21 @@ class TestGetInterpolatedPositionInfo:
 
     def test_adds_linearization_columns(self, linear_3node_track):
         """Should add all required linearization columns."""
-        position_info = pd.DataFrame({
-            'head_position_x': [0.0, 10.0],
-            'head_position_y': [0.0, 0.0],
-        }, index=[0.0, 1.0])
+        position_info = pd.DataFrame(
+            {
+                "head_position_x": [0.0, 10.0],
+                "head_position_y": [0.0, 0.0],
+            },
+            index=[0.0, 1.0],
+        )
 
         result = _interpolate(position_info, np.array([0.0, 1.0]), linear_3node_track)
 
         required_columns = {
-            'linear_position',
-            'projected_x_position',
-            'projected_y_position',
-            'track_segment_id',
+            "linear_position",
+            "projected_x_position",
+            "projected_y_position",
+            "track_segment_id",
         }
         for col in required_columns:
             assert col in result.columns, f"Missing required column: {col}"
@@ -163,29 +183,36 @@ class TestGetInterpolatedPositionInfo:
         times = np.arange(0.0, 3.0, 0.1)
         positions = np.linspace(0.0, 15.0, len(times))
 
-        position_info = pd.DataFrame({
-            'head_position_x': positions,
-            'head_position_y': np.zeros(len(times)),
-        }, index=times)
+        position_info = pd.DataFrame(
+            {
+                "head_position_x": positions,
+                "head_position_y": np.zeros(len(times)),
+            },
+            index=times,
+        )
 
         result = _interpolate(position_info, times, linear_3node_track)
 
-        linear_pos = result['linear_position'].values
+        linear_pos = result["linear_position"].values
         diffs = np.diff(linear_pos)
-        assert np.all(diffs >= -0.01), \
+        assert np.all(diffs >= -0.01), (
             "Linear position should be monotonically increasing for forward movement"
+        )
 
     def test_respects_edge_spacing(self, linear_3node_track):
         """Linearization output should fall within the total track length."""
-        position_info = pd.DataFrame({
-            'head_position_x': [0.0, 10.0],
-            'head_position_y': [0.0, 0.0],
-        }, index=[0.0, 1.0])
+        position_info = pd.DataFrame(
+            {
+                "head_position_x": [0.0, 10.0],
+                "head_position_y": [0.0, 0.0],
+            },
+            index=[0.0, 1.0],
+        )
 
         result = _interpolate(position_info, np.array([0.0, 1.0]), linear_3node_track)
 
-        assert result['linear_position'].min() >= 0.0
-        assert result['linear_position'].max() <= 20.0  # Total track length
+        assert result["linear_position"].min() >= 0.0
+        assert result["linear_position"].max() <= 20.0  # Total track length
 
 
 # --- The epoch position that load_data and the SWR runner share -------------
@@ -313,3 +340,125 @@ def test_load_data_takes_position_from_get_epoch_position_info(
     assert set(result) == set(position_data)
     for key, value in position_data.items():
         assert result[key] is value
+
+
+# ---------------------------------------------------------------------------
+# A PositionOutput entry held in two parts (j1620210710 02_r1 and 04_r2)
+# ---------------------------------------------------------------------------
+
+_MERGE_ID = "9ba1f7d5-c9a3-b19a-19a6-e92b8674866e"
+_TWO_PARENTS = (
+    "Found  2 potential parents: [FreeTable(`common_position`.`__interval_position_"
+    "info`), FreeTable(`position_v1_trodes_position`.`__trodes_pos_v1`)]"
+)
+
+
+class _Restricted:
+    """``table & restriction``, answering only what the merge table answers."""
+
+    def __init__(self, table, restriction):
+        self.table, self.restriction = table, restriction
+
+    def fetch1(self, *attributes):
+        row = self.table.rows[self.restriction["merge_id"]]
+        return row[attributes[0]] if attributes else dict(row)
+
+    def fetch1_dataframe(self):
+        return self.table.fetch1_dataframe(self.restriction)
+
+
+class _Table:
+    def __init__(self, rows=None, frame=None, refuse=None):
+        self.rows, self.frame, self.refuse, self.restrictions = rows, frame, refuse, []
+
+    def __and__(self, restriction):
+        self.restrictions.append(dict(restriction))
+        return _Restricted(self, restriction)
+
+    def fetch1_dataframe(self, restriction):
+        if self.refuse is not None:
+            raise ValueError(self.refuse)
+        return self.frame
+
+
+def _position_output_stub(monkeypatch) -> types.SimpleNamespace:
+    """``spyglass.position.PositionOutput`` with one entry whose merge id is in
+    both its CommonPos and its TrodesPosV1 part, as the lab database holds
+    j1620210710's: the master names CommonPos, and the merge table's own
+    ``fetch1_dataframe`` refuses the entry."""
+    common_parent = _Table(frame=pd.DataFrame({"head_speed": [1.0]}))
+    trodes_parent = _Table(frame=pd.DataFrame({"head_speed": [99.0]}))
+    master = _Table(
+        rows={_MERGE_ID: {"merge_id": _MERGE_ID, "source": "CommonPos"}},
+        refuse=_TWO_PARENTS,
+    )
+    part_key = {
+        "nwb_file_name": "j1620210710_.nwb",
+        "interval_list_name": "pos 1 valid times",
+    }
+    common_part = _Table(
+        rows={
+            _MERGE_ID: {
+                "merge_id": _MERGE_ID,
+                **part_key,
+                "position_info_param_name": "default_decoding",
+            }
+        }
+    )
+    trodes_part = _Table(
+        rows={
+            _MERGE_ID: {
+                "merge_id": _MERGE_ID,
+                **part_key,
+                "trodes_pos_params_name": "default_decoding",
+            }
+        }
+    )
+    parents = {"CommonPos": common_parent, "TrodesPosV1": trodes_parent}
+
+    class PositionOutput:
+        CommonPos = common_part
+        TrodesPosV1 = trodes_part
+
+        def __call__(self):  # the instance stands in for the class too
+            return self
+
+        def __and__(self, restriction):
+            return master & restriction
+
+        def merge_get_parent_class(self, source):
+            return parents[source]
+
+    module = types.ModuleType("spyglass.position")
+    module.PositionOutput = PositionOutput()
+    monkeypatch.setitem(sys.modules, "spyglass", types.ModuleType("spyglass"))
+    monkeypatch.setitem(sys.modules, "spyglass.position", module)
+    return types.SimpleNamespace(
+        master=master,
+        common_parent=common_parent,
+        trodes_parent=trodes_parent,
+        part_key=part_key,
+    )
+
+
+def test_a_merge_entry_held_in_two_parts_is_read_from_its_masters_source(
+    monkeypatch,
+):
+    """The merge table's ``fetch1_dataframe`` finds two parents and refuses;
+    the entry is read as ``load_data`` reads it, from the source table itself:
+    the part the master names gives the parent's key."""
+    stub = _position_output_stub(monkeypatch)
+    PositionOutput = sys.modules["spyglass.position"].PositionOutput
+    with pytest.raises(ValueError, match="2 potential parents"):
+        (PositionOutput & {"merge_id": _MERGE_ID}).fetch1_dataframe()
+
+    frame = position.get_merge_position_info(_MERGE_ID)
+
+    pd.testing.assert_frame_equal(frame, stub.common_parent.frame)
+    (restriction,) = stub.common_parent.restrictions
+    assert restriction == {
+        "merge_id": _MERGE_ID,
+        **stub.part_key,
+        "position_info_param_name": "default_decoding",
+    }
+    assert stub.trodes_parent.restrictions == []

@@ -1,15 +1,20 @@
 """Tests for multiunit HSE (High Synchrony Event) detection.
 
-Tests get_multiunit_hse — a pure numpy function with no Spyglass dependency.
+Tests get_multiunit_hse — a pure numpy function with no Spyglass dependency —
+and the artifact intervals ``load_data`` passes it, with Spyglass stubbed.
 """
 
 from __future__ import annotations
+
+import importlib
+import sys
+import types
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.data_loaders.lfp import get_multiunit_hse
+from continuum_swr_replay.data_loaders.lfp import get_multiunit, get_multiunit_hse
 
 
 class TestGetMultiunitHSE:
@@ -48,9 +53,7 @@ class TestGetMultiunitHSE:
         rng = np.random.RandomState(42)
         spike_times = [np.sort(rng.uniform(0, 2, 50)) for _ in range(5)]
 
-        _, firing_rate, zscore = get_multiunit_hse(
-            spike_times, low_speed, bin_time
-        )
+        _, firing_rate, zscore = get_multiunit_hse(spike_times, low_speed, bin_time)
 
         assert len(firing_rate) == len(bin_time)
         assert len(zscore) == len(bin_time)
@@ -68,9 +71,7 @@ class TestGetMultiunitHSE:
         """Empty spike arrays should give zero firing rate."""
         spike_times = [np.array([]) for _ in range(5)]
 
-        _, firing_rate, zscore = get_multiunit_hse(
-            spike_times, low_speed, bin_time
-        )
+        _, firing_rate, zscore = get_multiunit_hse(spike_times, low_speed, bin_time)
 
         assert firing_rate.values.max() == 0.0
 
@@ -104,7 +105,10 @@ class TestGetMultiunitHSE:
         spike_times = [
             np.sort(
                 np.concatenate(
-                    [rng.uniform(0, 2, 20), np.full(10, burst_time) + rng.randn(10) * 0.001]
+                    [
+                        rng.uniform(0, 2, 20),
+                        np.full(10, burst_time) + rng.randn(10) * 0.001,
+                    ]
                 )
             )
             for _ in range(10)
@@ -184,3 +188,185 @@ class TestGetMultiunitHSE:
         # The function uses MAX_SPEED_THRESHOLD_CM_PER_SEC internally
         # Verify the parameter value is what we expect
         assert MAX_SPEED_THRESHOLD_CM_PER_SEC == 4.0
+
+
+class TestArtifactIntervals:
+    """MUA detection leaves the artifact intervals (the ``decoder`` mask) out of
+    its normalization and drops the events that overlap them."""
+
+    BURSTS_S = (5.0, 10.0)
+    """Seconds: two synchronous bursts, real HSEs."""
+
+    LINE_S = 15.0
+    """Seconds: a spike line, 300 spikes per unit in 50 ms, an artifact."""
+
+    ARTIFACT = pd.DataFrame({"start_time": [14.8], "end_time": [15.3]})
+    """The spike line padded, as the ``decoder`` mask pads one."""
+
+    @pytest.fixture
+    def bin_time(self):
+        """20 seconds at 500 Hz."""
+        return np.arange(0.0, 20.0, 0.002)
+
+    @pytest.fixture
+    def speed(self, bin_time):
+        return np.full(len(bin_time), 1.0)
+
+    @staticmethod
+    def units() -> list[np.ndarray]:
+        """Ten units: 5 Hz background, the two bursts, and the spike line."""
+        rng = np.random.default_rng(0)
+        units = []
+        for _ in range(10):
+            background = rng.uniform(0, 20, 100)
+            bursts = np.concatenate(
+                [at + rng.normal(0, 0.01, 4) for at in TestArtifactIntervals.BURSTS_S]
+            )
+            line = TestArtifactIntervals.LINE_S + rng.uniform(0, 0.05, 300)
+            units.append(np.sort(np.concatenate([background, bursts, line])))
+        return units
+
+    @pytest.fixture
+    def spike_times(self):
+        return self.units()
+
+    @staticmethod
+    def _found(hse_times: pd.DataFrame, at: float) -> bool:
+        return bool(((hse_times.start_time <= at) & (hse_times.end_time >= at)).any())
+
+    def test_the_artifact_hides_the_real_events_unmasked(
+        self, spike_times, speed, bin_time
+    ):
+        hse_times, _, _ = get_multiunit_hse(spike_times, speed, bin_time)
+
+        assert self._found(hse_times, self.LINE_S)
+        assert not any(self._found(hse_times, at) for at in self.BURSTS_S)
+
+    def test_masked_the_real_events_are_found_and_the_artifact_dropped(
+        self, spike_times, speed, bin_time
+    ):
+        hse_times, _, zscore = get_multiunit_hse(
+            spike_times, speed, bin_time, artifact_intervals=self.ARTIFACT
+        )
+
+        assert all(self._found(hse_times, at) for at in self.BURSTS_S)
+        overlaps = (hse_times.start_time <= 15.3) & (hse_times.end_time >= 14.8)
+        assert not overlaps.any()
+        np.testing.assert_array_equal(hse_times.index, np.arange(1, len(hse_times) + 1))
+        assert hse_times.index.name == "event_number"
+        # the z-score is normalized over the unmasked bins, as the detector is
+        outside = ~((bin_time >= 14.8) & (bin_time <= 15.3))
+        values = zscore["firing_rate"].to_numpy()
+        assert abs(values[outside].mean()) < 1e-9
+        assert values[outside].std() == pytest.approx(1.0, abs=1e-9)
+
+    def test_an_event_touching_an_interval_is_dropped(
+        self, spike_times, speed, bin_time
+    ):
+        """Closed intervals: an interval ending on an event's first bin drops it."""
+        found, _, _ = get_multiunit_hse(
+            spike_times, speed, bin_time, artifact_intervals=self.ARTIFACT
+        )
+        first = found.loc[found.start_time < 6.0].iloc[0]
+        touching = pd.concat(
+            [
+                self.ARTIFACT,
+                pd.DataFrame(
+                    {
+                        "start_time": [first.start_time - 0.5],
+                        "end_time": [first.start_time],
+                    }
+                ),
+            ],
+            ignore_index=True,
+        )
+
+        hse_times, _, _ = get_multiunit_hse(
+            spike_times, speed, bin_time, artifact_intervals=touching
+        )
+
+        assert not self._found(hse_times, self.BURSTS_S[0])
+        assert self._found(hse_times, self.BURSTS_S[1])
+
+    def test_no_intervals_is_no_mask(self, spike_times, speed, bin_time):
+        empty = pd.DataFrame({"start_time": [], "end_time": []}, dtype=float)
+
+        masked = get_multiunit_hse(
+            spike_times, speed, bin_time, artifact_intervals=empty
+        )
+        unmasked = get_multiunit_hse(spike_times, speed, bin_time)
+
+        for got, expected in zip(masked, unmasked, strict=True):
+            pd.testing.assert_frame_equal(got, expected)
+
+    def test_get_multiunit_masks_only_the_areas_given(
+        self, spike_times, speed, bin_time
+    ):
+        position_info = pd.DataFrame({"head_speed": speed}, index=bin_time)
+
+        multiunit = get_multiunit(
+            {"HPC": spike_times, "mPFC": spike_times},
+            position_info,
+            artifact_intervals={"HPC": self.ARTIFACT},
+        )
+
+        hpc, mpfc = multiunit["hse_times"]["HPC"], multiunit["hse_times"]["mPFC"]
+        assert all(self._found(hpc, at) for at in self.BURSTS_S)
+        assert not self._found(hpc, self.LINE_S)
+        assert self._found(mpfc, self.LINE_S)
+
+
+@pytest.fixture
+def bandit_task(monkeypatch):
+    """``bandit_task``, imported offline with ``spyglass.common`` stubbed, as
+    ``test_position.py`` imports it; forgotten afterwards if imported here."""
+    common = types.ModuleType("spyglass.common")
+    common.PositionIntervalMap = type("PositionIntervalMap", (), {})
+    monkeypatch.setitem(sys.modules, "spyglass", types.ModuleType("spyglass"))
+    monkeypatch.setitem(sys.modules, "spyglass.common", common)
+
+    name = "continuum_swr_replay.data_loaders.bandit_task"
+    fresh = name not in sys.modules
+    yield importlib.import_module(name)
+    if fresh:
+        sys.modules.pop(name, None)
+        vars(sys.modules["continuum_swr_replay.data_loaders"]).pop("bandit_task", None)
+
+
+def test_load_data_masks_the_mua_of_the_areas_it_is_given(bandit_task, monkeypatch):
+    """``load_data``'s HSEs leave out the artifact intervals given for an area."""
+    case = TestArtifactIntervals
+    bin_time = np.arange(0.0, 20.0, 0.002)
+    units = case.units()
+    monkeypatch.setattr(
+        bandit_task,
+        "get_epoch_position_info",
+        lambda nwb_file_name, epoch_name: {
+            "position_info": pd.DataFrame(
+                {"head_speed": np.full(bin_time.size, 1.0)},
+                index=pd.Index(bin_time, name="time"),
+            ),
+            "track_graph": None,
+            "linear_edge_order": None,
+            "linear_edge_spacing": None,
+        },
+    )
+    monkeypatch.setattr(
+        bandit_task,
+        "get_spike_data",
+        lambda nwb_file_name: {
+            "spike_times": {"HPC": units},
+            "spike_waveform_features": {"HPC": [np.zeros((u.size, 4)) for u in units]},
+        },
+    )
+
+    data = bandit_task.load_data(
+        "sim20200101_.nwb",
+        "02_r1",
+        include=frozenset({"hse_times"}),
+        mua_artifact_intervals={"HPC": case.ARTIFACT},
+    )
+
+    hse_times = data["hse_times"]["HPC"]
+    assert all(case._found(hse_times, at) for at in case.BURSTS_S)
+    assert not case._found(hse_times, case.LINE_S)

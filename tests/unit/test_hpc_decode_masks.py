@@ -1,0 +1,165 @@
+"""The HPC decoders' masks: ``is_missing`` and ``is_training`` from the SWR source.
+
+``decoding_common.hpc_decoder_intervals`` and ``hpc_decode_masks`` build them
+from the configured Kay inventory and artifact run, here synthetic run folders
+written as the runners write them. Offline: nothing touches Spyglass or
+``Processed-Data``.
+"""
+
+from __future__ import annotations
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from continuum_swr_replay import decoding_common
+from continuum_swr_replay.analysis.hippocampus import swr_source
+from continuum_swr_replay.decoding_common import (
+    hpc_decode_masks,
+    hpc_decoder_intervals,
+    require_hpc_decode_sources,
+)
+from tests.unit._swr_inventory_fixtures import (
+    ARTIFACT_RUN_ID,
+    RUN_ID,
+    use_swr_source,
+    write_artifact_run,
+    write_swr_inventory,
+)
+
+NWB_FILE_NAME = "j1620210706_.nwb"
+EPOCH_NAME = "02_r1"
+EPOCH = "j1620210706_02_r1_HPC"
+TIME = np.round(100.0 + np.arange(5000) / 500.0, 6)
+"""A 500 Hz decode grid (the position grid), 100.000-109.998 s."""
+
+EVENTS = [
+    (100.500, 100.560),  # immobile
+    (102.400, 102.600),  # moving: still left out of encoding
+    (104.000, 104.030),  # overlaps an artifact
+]
+CORES = [("spk", 104.11, 104.11), ("ca1", 107.0, 107.0)]
+"""A spike line and a CA1 step: the decoder pads them to [104.01, 104.21] and
+[106.7, 107.3] (the analysis mask would add a second after the step)."""
+DECODER_INTERVALS = [(104.01, 104.21), (106.7, 107.3)]
+
+
+@pytest.fixture
+def sources(tmp_path, monkeypatch):
+    """The SWR source configured with a synthetic inventory and artifact run."""
+    inventory = write_swr_inventory(tmp_path / "swr", {EPOCH: EVENTS})
+    artifacts = write_artifact_run(tmp_path / "artifacts", {EPOCH: CORES})
+    use_swr_source(monkeypatch, inventory, artifacts)
+
+
+def _position_info() -> pd.DataFrame:
+    speed = np.zeros(TIME.size)
+    speed[(TIME >= 102.0) & (TIME <= 102.8)] = 10.0
+    return pd.DataFrame({"head_speed": speed}, index=pd.Index(TIME, name="time"))
+
+
+def _inside(intervals) -> np.ndarray:
+    inside = np.zeros(TIME.size, dtype=bool)
+    for start, end in intervals:
+        inside |= (TIME >= start) & (TIME <= end)
+    return inside
+
+
+def test_the_decoder_intervals_are_the_artifact_runs_decoder_mask(sources):
+    np.testing.assert_allclose(
+        hpc_decoder_intervals(NWB_FILE_NAME, EPOCH_NAME).to_numpy(), DECODER_INTERVALS
+    )
+
+
+def test_is_missing_is_the_decoder_mask_on_the_decode_grid(sources):
+    masks = hpc_decode_masks(
+        NWB_FILE_NAME,
+        EPOCH_NAME,
+        _position_info(),
+        hpc_decoder_intervals(NWB_FILE_NAME, EPOCH_NAME),
+        "no_ripple",
+    )
+
+    assert masks.is_missing.dtype == bool and masks.is_missing.shape == TIME.shape
+    np.testing.assert_array_equal(masks.is_missing, _inside(DECODER_INTERVALS))
+
+
+def test_encoding_leaves_out_every_inventory_event_and_the_mask(sources):
+    """Every Kay event, moving or not, and every masked bin leave encoding."""
+    masks = hpc_decode_masks(
+        NWB_FILE_NAME,
+        EPOCH_NAME,
+        _position_info(),
+        hpc_decoder_intervals(NWB_FILE_NAME, EPOCH_NAME),
+        "no_ripple",
+    )
+
+    expected = ~_inside(EVENTS) & ~_inside(DECODER_INTERVALS)
+    np.testing.assert_array_equal(masks.is_training, expected)
+    assert not masks.is_training[(TIME >= 102.4) & (TIME <= 102.6)].any()
+
+
+def test_training_on_all_still_leaves_out_the_mask(sources):
+    masks = hpc_decode_masks(
+        NWB_FILE_NAME,
+        EPOCH_NAME,
+        _position_info(),
+        hpc_decoder_intervals(NWB_FILE_NAME, EPOCH_NAME),
+        "all",
+    )
+
+    np.testing.assert_array_equal(masks.is_training, ~_inside(DECODER_INTERVALS))
+
+
+def test_the_record_names_the_sources_and_the_seconds(sources):
+    masks = hpc_decode_masks(
+        NWB_FILE_NAME,
+        EPOCH_NAME,
+        _position_info(),
+        hpc_decoder_intervals(NWB_FILE_NAME, EPOCH_NAME),
+        "no_ripple",
+    )
+
+    record = masks.record
+    assert record["swr_source"] == f"kay@{RUN_ID}+artifacts@{ARTIFACT_RUN_ID}"
+    assert record["swr_inventory_run_id"] == RUN_ID
+    assert record["artifact_run_id"] == ARTIFACT_RUN_ID
+    assert record["consumer"] == "decoder"
+    assert record["training_type"] == "no_ripple"
+    assert record["n_bins"] == TIME.size
+    assert record["bin_s"] == pytest.approx(0.002)
+    assert record["n_missing_bins"] == int(_inside(DECODER_INTERVALS).sum())
+    assert record["missing_s"] == pytest.approx(record["n_missing_bins"] * 0.002)
+    assert record["n_swr_events"] == len(EVENTS)
+    removed = ~(~_inside(EVENTS) & ~_inside(DECODER_INTERVALS))
+    assert record["n_encoding_removed_bins"] == int(removed.sum())
+    assert record["encoding_removed_s"] == pytest.approx(removed.sum() * 0.002)
+
+
+@pytest.mark.parametrize("unset", ["SWR_INVENTORY_RUN_ID", "ARTIFACT_INTERVALS_RUN_ID"])
+def test_an_unset_run_id_is_refused(sources, monkeypatch, unset):
+    """Fail closed: an HPC decode needs both runs named."""
+    monkeypatch.setattr(swr_source, unset, None)
+
+    with pytest.raises(ValueError, match=unset):
+        require_hpc_decode_sources()
+    with pytest.raises(ValueError, match=unset):
+        hpc_decoder_intervals(NWB_FILE_NAME, EPOCH_NAME)
+
+
+def test_the_committed_configuration_is_refused():
+    """No artifact run is configured yet, so no HPC decode can start."""
+    assert swr_source.ARTIFACT_INTERVALS_RUN_ID is None
+    with pytest.raises(ValueError, match="ARTIFACT_INTERVALS_RUN_ID"):
+        decoding_common.require_hpc_decode_sources()
+
+
+def test_a_configured_run_missing_the_epoch_is_refused(sources, tmp_path, monkeypatch):
+    artifacts = write_artifact_run(
+        tmp_path / "other", {"chimi20200225_02_r1_HPC": CORES}, run_id="otherrun"
+    )
+    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_ROOT", artifacts.parent)
+    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", artifacts.name)
+
+    with pytest.raises(swr_source.SwrSourceError, match="not in the artifact run"):
+        hpc_decoder_intervals(NWB_FILE_NAME, EPOCH_NAME)

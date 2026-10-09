@@ -18,19 +18,32 @@ Per epoch:
 2. **Span and speed.** LFP rows outside the position span are dropped, as
    ``filter_ripple_lfp_time`` drops them, and ``head_speed`` is interpolated
    linearly onto the LFP times.
-3. **Zugaro's channel.** ``best_ripple_channel`` (buzcode's
+3. **Channels and artifacts.** ``detection_channels`` chooses the band's
+   channels the four detectors read (today every CA1 band channel). The
+   epoch's artifact intervals are the configured artifact run's cores
+   (``swr_source.ARTIFACT_INTERVALS_RUN_ID``, read once when the run starts and
+   recorded in its settings) padded for the ``swr`` consumer
+   (``artifacts.masks.CONSUMER_PADDING``). Their time is the ``swr`` mask on
+   the LFP times; with no artifact run configured it is empty. A configured
+   run that cannot serve the epoch fails it.
+4. **Zugaro's channel.** ``best_ripple_channel`` (buzcode's
    ``bz_GetBestRippleChan``) chooses one of the band's CA1 electrodes from their
    referenced raw LFP, and ``zero_phase_bandpass`` filters it. A candidate with
    no finite sample is excluded with that reason, so it costs the others no
    samples. If the channel cannot be chosen or filtered (no channel passes the
    dead-channel guard, say), Zugaro's entry is that error.
-4. **Detectors.** ``run_swr_detectors`` runs the four; Kay, Karlsson and Yu read
-   the stored band. A detector's error is recorded and the rest still report:
-   the epoch is ``ok`` when all four succeed, ``partial`` when some do, and
-   ``failed`` when none does.
-5. **Yu's diagnostics**, recomputed by ``yu_diagnostics``: the scalars in the
-   manifest, the histogram arrays in the epoch's sidecar.
-6. **Kay version check** against the canonical Spyglass events
+5. **Detectors.** ``run_swr_detectors`` runs the four; Kay, Karlsson and Yu read
+   the stored band. All four leave the ``swr`` mask's time out of their
+   normalization, and the LFP is not NaN-filled. A detector's error is
+   recorded and the rest still report: the epoch is ``ok`` when all four
+   succeed, ``partial`` when some do, and ``failed`` when none does.
+6. **Event filter.** ``filter_detected_events`` drops every detector's events
+   that overlap the ``swr`` mask, counted per detector in the record, and
+   renumbers the rest 1..n.
+7. **Yu's diagnostics**, recomputed by ``yu_diagnostics`` on the same noise
+   sample: the scalars in the manifest, the histogram arrays in the epoch's
+   sidecar.
+8. **Kay version check** against the canonical Spyglass events
    (``RippleTimesV1``), in two comparisons.
 
    - ``version_only`` runs Kay at the pinned commit on Spyglass's own inputs
@@ -56,7 +69,8 @@ Each epoch writes, under ``Processed-Data/replay_detection_comparison/swr/<run_i
 - ``{epoch_id}_swr_observed.parquet``: where the LFP was observed, one row per
   gap-free stretch, ``scope`` ``"stored_band"`` (the band Kay, Karlsson and Yu
   read) or ``"zugaro"`` (Zugaro's filtered channel, less its filter's edges),
-  with ``start_s`` and ``end_s``, the stretch's first and last sample;
+  with ``start_s`` and ``end_s``, the stretch's first and last sample. The
+  ``swr`` mask's time is not observed in either scope;
 - ``{epoch_id}_kay_version_check.parquet``: ``kay_version_check``'s rows, with a
   ``comparison`` column, ``"version_only"`` or ``"version_and_inputs"``;
 - ``{epoch_id}_yu_diagnostics.json``: every field of Yu's threshold
@@ -71,7 +85,8 @@ every detector's settings, the Zugaro filter and channel choice) and one record
 per epoch: its status and, for an epoch that ran, every detector's outcome, the
 provenance, the electrodes and references, Zugaro's channel with every score,
 the band check, Yu's diagnostic scalars, the sampling rates, the LFP's units and
-conversion, the position span, event counts, the Kay check's counts, input
+conversion, the position span, event counts, the artifact run with the masked
+seconds and each detector's dropped events, the Kay check's counts, input
 hashes, and each output's path and sha256. Only this process writes it,
 atomically, after each epoch finishes. A rerun under the same run id skips the
 epochs already ``ok`` unless ``--overwrite`` is given, removes the record of
@@ -123,6 +138,15 @@ from distributed.deploy import Cluster
 from numpy.typing import NDArray
 from ripple_detection import Kay_ripple_detector
 
+from continuum_swr_replay.analysis.hippocampus import swr_source
+from continuum_swr_replay.analysis.hippocampus.artifacts.io import read_epoch_cores
+from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
+    CONSUMER_PADDING,
+    Consumer,
+    artifact_intervals,
+    interval_mask,
+    masked_seconds,
+)
 from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
     CHANNEL_SELECTION_BAND_HZ,
     CHANNEL_SELECTION_FILTER_ORDER,
@@ -136,16 +160,20 @@ from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
     NoUsableChannelError,
     band_reproduction_error,
     best_ripple_channel,
+    drop_overlapping_events,
     gap_free_stretches,
     kay_version_check,
     run_swr_detectors,
     yu_diagnostics,
     zero_phase_bandpass,
 )
-from continuum_swr_replay.analysis.hippocampus.swr_source import SWR_INVENTORY_ROOT
 from continuum_swr_replay.analysis.inventory_comparison.schema import SessionIdentity
 from continuum_swr_replay.data_loaders.epoch_register import epochs_to_run
-from continuum_swr_replay.data_loaders.lfp import _ripple_keys, get_ripple_band_inputs
+from continuum_swr_replay.data_loaders.lfp import (
+    _ripple_keys,
+    get_ripple_band_inputs,
+    get_spyglass_kay_inputs,
+)
 from continuum_swr_replay.data_loaders.position import get_epoch_position_info
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.decoding_common import (
@@ -158,8 +186,9 @@ from continuum_swr_replay.decoding_common import (
 )
 from continuum_swr_replay.parameters import ROOT_DIR
 from continuum_swr_replay.table_io import sha256_file, write_table
+from continuum_swr_replay.types import RippleBandInputs
 
-OUTPUT_ROOT = SWR_INVENTORY_ROOT
+OUTPUT_ROOT = swr_source.SWR_INVENTORY_ROOT
 """Where the run folders go: where the paper's SWR source reads them."""
 PRODUCED_BY = "scripts/decoding/run_swr_detection.py"
 DESIGN_SPEC = "docs/design/2026-10-03-full-pipeline-refresh-design.md"
@@ -209,8 +238,11 @@ def spyglass_kay_inputs(
     """The inputs and parameters ``RippleTimesV1.make`` gave Kay for the
     canonical events, read only, as ``make`` reads them.
 
-    ``RippleTimesV1.get_ripple_lfps_and_position_info`` on the epoch's full
-    ``RippleTimesV1`` key, and that key's ``RippleParameters`` row.
+    ``get_spyglass_kay_inputs``: ``RippleTimesV1.get_ripple_lfps_and_position_info``'s
+    steps on the epoch's full ``RippleTimesV1`` key, with the position read
+    from the source its merge entry names, as ``load_data`` reads it (Spyglass's
+    own read refuses j1620210710's two entries held in two parts), and that
+    key's ``RippleParameters`` row.
 
     Returns
     -------
@@ -224,17 +256,7 @@ def spyglass_kay_inputs(
         The stored parameters: ``speed_name``, ``ripple_detection_algorithm``
         and ``ripple_detection_params``.
     """
-    from spyglass.ripple.v1 import RippleParameters, RippleTimesV1
-
-    ripple_key, _ = _ripple_keys(nwb_file_name, epoch_name)
-    key = (RippleTimesV1 & ripple_key).fetch1("KEY")
-    speed, ripple_lfps, sampling_frequency = (
-        RippleTimesV1.get_ripple_lfps_and_position_info(key)
-    )
-    ripple_param_dict: dict = (
-        RippleParameters & {"ripple_param_name": key["ripple_param_name"]}
-    ).fetch1("ripple_param_dict")
-    return speed, ripple_lfps, sampling_frequency, ripple_param_dict
+    return get_spyglass_kay_inputs(nwb_file_name, epoch_name)
 
 
 def kay_on_spyglass_inputs(
@@ -277,7 +299,10 @@ def within_span(events: pd.DataFrame, span_s: tuple[float, float]) -> pd.DataFra
 
 
 def observation_table(
-    time: NDArray, ripple_band: NDArray, zugaro_lfp: NDArray
+    time: NDArray,
+    ripple_band: NDArray,
+    zugaro_lfp: NDArray,
+    unobserved: NDArray[np.bool_],
 ) -> pd.DataFrame:
     """Where each input was observed: one row per gap-free stretch.
 
@@ -289,6 +314,9 @@ def observation_table(
         The stored band, scope ``"stored_band"``.
     zugaro_lfp : NDArray, shape (n_time, 1)
         Zugaro's filtered channel, NaN where unobserved, scope ``"zugaro"``.
+    unobserved : NDArray of bool, shape (n_time,)
+        Rows neither scope observed, such as the ``swr`` artifact mask: they
+        end a stretch as a non-finite row does.
 
     Returns
     -------
@@ -299,7 +327,12 @@ def observation_table(
     rows = [
         (scope, time[start], time[stop - 1])
         for scope, values in (("stored_band", ripple_band), ("zugaro", zugaro_lfp))
-        for start, stop in gap_free_stretches(time, values)
+        # one value per row, NaN where the row is unobserved, so the input is
+        # not copied
+        for start, stop in gap_free_stretches(
+            time,
+            np.where(np.isfinite(values).all(axis=1) & ~unobserved, 0.0, np.nan),
+        )
     ]
     return pd.DataFrame(rows, columns=["scope", "start_s", "end_s"]).astype(
         {"scope": object, "start_s": np.float64, "end_s": np.float64}
@@ -430,6 +463,91 @@ def choose_zugaro_channel(
     return channel, zugaro_lfp, None
 
 
+def detection_channels(inputs: RippleBandInputs) -> NDArray[np.bool_]:
+    """The band's channels the four detectors read, and Zugaro chooses among.
+
+    The one place an epoch's detecting tetrodes are chosen. Today every CA1
+    band channel.
+
+    Parameters
+    ----------
+    inputs : RippleBandInputs
+        The epoch's band, from ``get_ripple_band_inputs``.
+
+    Returns
+    -------
+    NDArray of bool, shape (n_channels,)
+        True for each kept column of ``ripple_band`` and ``raw_referenced``.
+    """
+    return np.ones(np.asarray(inputs["electrode_ids"]).size, dtype=bool)
+
+
+def swr_artifact_intervals(artifact_dir: Path | None, identifier: str) -> pd.DataFrame:
+    """The epoch's ``swr`` artifact intervals, from an artifact run folder.
+
+    The run's cores for the epoch padded by the ``swr`` row of
+    ``CONSUMER_PADDING``, merged and clipped to the run's span, closed.
+
+    Parameters
+    ----------
+    artifact_dir : Path or None
+        The artifact run folder; None when no run is configured.
+    identifier : str
+        The epoch's ``epoch_id``.
+
+    Returns
+    -------
+    pd.DataFrame
+        ``start_time`` and ``end_time`` in seconds; no rows when no run is
+        configured or the epoch has no artifacts.
+
+    Raises
+    ------
+    ArtifactRunError
+        If the run cannot serve the epoch (``read_epoch_cores``).
+    """
+    if artifact_dir is None:
+        return pd.DataFrame({"start_time": [], "end_time": []}, dtype=np.float64)
+    epoch = read_epoch_cores(artifact_dir, identifier)
+    return artifact_intervals(epoch.cores, Consumer.SWR, epoch.span)
+
+
+def filter_detected_events(
+    results: Mapping[str, pd.DataFrame | Exception], swr_intervals: pd.DataFrame
+) -> tuple[dict[str, pd.DataFrame | Exception], dict[str, int | None]]:
+    """Every detector's events after the post-detection filter.
+
+    The one place detected events are vetoed. Today the filter drops each
+    event that overlaps the ``swr`` artifact intervals
+    (``drop_overlapping_events``: closed, touching included) and renumbers
+    the rest 1..n. A detector's error passes through.
+
+    Parameters
+    ----------
+    results : Mapping
+        ``run_swr_detectors``' results, by detector.
+    swr_intervals : pd.DataFrame
+        ``start_time`` and ``end_time`` in seconds.
+
+    Returns
+    -------
+    filtered : dict
+        By detector, the kept events or the error.
+    n_dropped : dict
+        By detector, the events dropped; None for a detector that failed.
+    """
+    filtered: dict[str, pd.DataFrame | Exception] = {}
+    n_dropped: dict[str, int | None] = {}
+    for name, events in results.items():
+        if isinstance(events, pd.DataFrame):
+            filtered[name], n_dropped[name] = drop_overlapping_events(
+                events, swr_intervals
+            )
+        else:
+            filtered[name], n_dropped[name] = events, None
+    return filtered, n_dropped
+
+
 def kay_check_counts(kay_check: pd.DataFrame) -> dict:
     """The Kay check's events by comparison, detector and status.
 
@@ -454,6 +572,7 @@ def _detect(
     epoch_name: str,
     *,
     run_id: str,
+    artifact_dir: Path | None,
     fetch_inputs: Callable,
     fetch_position: Callable,
     fetch_canonical_kay: Callable,
@@ -462,6 +581,11 @@ def _detect(
 ) -> tuple[dict, dict[str, pd.DataFrame | dict]]:
     """One epoch's record, and the outputs to write (none for a failed epoch):
     tables by name, and the Yu sidecar's content."""
+    # before any input is read: a configured artifact run that cannot serve
+    # the epoch fails it
+    swr_intervals = swr_artifact_intervals(
+        artifact_dir, epoch_id(nwb_file_name, epoch_name)
+    )
     inputs = fetch_inputs(nwb_file_name, epoch_name)
     band_check: dict[str, Any] = {
         "max_abs_difference": None,
@@ -494,15 +618,23 @@ def _detect(
     time = inputs["time"][first:stop]
     ripple_band = inputs["ripple_band"][first:stop]
     raw_referenced = inputs["raw_referenced"][first:stop]
+    electrode_ids = inputs["electrode_ids"]
+    electrode_group_names = inputs["electrode_group_names"]
+    channels = detection_channels(inputs)
+    if not channels.all():  # a copy, made only when a channel is left out
+        ripple_band = ripple_band[:, channels]
+        raw_referenced = raw_referenced[:, channels]
+        electrode_ids = electrode_ids[channels]
+        electrode_group_names = electrode_group_names[channels]
     speed = np.interp(time, position_time, head_speed, left=np.nan, right=np.nan)
     sampling_frequency = inputs["sampling_frequency"]
-    electrode_ids = inputs["electrode_ids"]
+    unobserved = interval_mask(time, swr_intervals)
 
     zugaro_channel, zugaro_lfp, channel_error = choose_zugaro_channel(
         raw_referenced, time, sampling_frequency, electrode_ids
     )
     results = run_swr_detectors(
-        time, ripple_band, zugaro_lfp, speed, sampling_frequency
+        time, ripple_band, zugaro_lfp, speed, sampling_frequency, unobserved=unobserved
     )
     if channel_error is not None:
         # Zugaro was given an unobserved channel, which it refuses; its entry
@@ -515,11 +647,14 @@ def _detect(
         if isinstance(zugaro_events, pd.DataFrame)
         else None
     )
+    results, n_dropped = filter_detected_events(results, swr_intervals)
     succeeded = [
         name for name, events in results.items() if isinstance(events, pd.DataFrame)
     ]
     try:
-        yu = yu_diagnostics(time, ripple_band, speed, sampling_frequency)
+        yu = yu_diagnostics(
+            time, ripple_band, speed, sampling_frequency, unobserved=unobserved
+        )
     except ValueError as error:  # where Yu itself cannot estimate its threshold
         yu = {"error": repr(error)}
 
@@ -561,9 +696,16 @@ def _detect(
             for name, events in results.items()
         },
         "zugaro_dropped_over_150ms": zugaro_dropped,
-        # the distinct electrode groups (tetrodes) of the band's electrodes;
+        "artifacts": {
+            "run_id": None if artifact_dir is None else artifact_dir.name,
+            "n_intervals": len(swr_intervals),
+            # the masked time within the LFP rows read
+            "masked_s": masked_seconds(swr_intervals.clip(time[0], time[-1])),
+            "n_dropped": n_dropped,
+        },
+        # the distinct electrode groups (tetrodes) of the detecting electrodes;
         # their anatomy is not checked here, hence "unknown" below
-        "n_detecting_tetrodes": int(np.unique(inputs["electrode_group_names"]).size),
+        "n_detecting_tetrodes": int(np.unique(electrode_group_names).size),
         "meets_published_tetrode_criterion": "unknown",
         "input_sha256": {
             "time": array_sha256(time),
@@ -663,7 +805,9 @@ def _detect(
         for name, events in results.items()
         if isinstance(events, pd.DataFrame)
     }
-    frames["swr_observed"] = observation_table(time, ripple_band, zugaro_lfp)
+    frames["swr_observed"] = observation_table(
+        time, ripple_band, zugaro_lfp, unobserved
+    )
     if kay_check is not None:
         frames["kay_version_check"] = kay_check
     stamp = {
@@ -735,6 +879,7 @@ def run_epoch(
     fetch_spyglass_kay_inputs: Callable = spyglass_kay_inputs,
     fir_filter: Callable | None = None,
     run_id: str | None = None,
+    artifact_dir: Path | None = None,
 ) -> dict:
     """Run the four detectors and the checks on one epoch, and write the outputs.
 
@@ -760,6 +905,10 @@ def run_epoch(
         is Spyglass's own ``FirFilterParameters().filter_data``.
     run_id : str, optional
         Recorded on the Kay check's events; default ``output_dir.name``.
+    artifact_dir : Path, optional
+        The artifact run folder whose cores, padded for the ``swr`` consumer,
+        are the epoch's artifact mask; None masks nothing. ``run`` passes the
+        SWR source's configured run.
 
     Returns
     -------
@@ -778,6 +927,7 @@ def run_epoch(
             nwb_file_name,
             epoch_name,
             run_id=output_dir.name if run_id is None else run_id,
+            artifact_dir=artifact_dir,
             fetch_inputs=fetch_inputs,
             fetch_position=fetch_position,
             fetch_canonical_kay=fetch_canonical_kay,
@@ -936,17 +1086,24 @@ def run_epochs(
             yield futures[future], record
 
 
-def run_settings(provenance: dict) -> dict:
+def run_settings(provenance: dict, artifact_run_id: str | None) -> dict:
     """What every epoch of a run shares; a rerun under its run id must match.
 
     Parameters
     ----------
     provenance : dict
         ``provenance_record``'s, for the ``ripple_detection`` commit.
+    artifact_run_id : str or None
+        The artifact run whose ``swr`` mask every epoch gets; None for none.
     """
     settings: dict = json_ready(
         {
             "ripple_detection_commit": provenance["ripple_detection_commit"],
+            "artifacts": {
+                "run_id": artifact_run_id,
+                "consumer": Consumer.SWR.value,
+                "padding_s": CONSUMER_PADDING[Consumer.SWR],
+            },
             "detectors": DETECTOR_SETTINGS,
             "zugaro": {
                 "filter": "Butterworth band-pass, second-order sections, forward "
@@ -1065,7 +1222,12 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
         The run's folder, named for its run id.
     """
     run_id = output_dir.name
-    settings = run_settings(provenance)
+    # read once, here: the workers are other processes, and every epoch of the
+    # run must be masked by the same artifact run
+    artifact_dir = swr_source.artifact_intervals_dir()
+    settings = run_settings(
+        provenance, None if artifact_dir is None else artifact_dir.name
+    )
     selected = epochs_to_run(args.pending_only)
     epochs = list(dict.fromkeys(filter_epoch_info(selected, args).index))
     if not epochs:
@@ -1119,7 +1281,11 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
         LocalCluster, n_workers=args.n_workers, processes=True, threads_per_worker=1
     )
     failed = []
-    run_epoch_kwargs = {"output_dir": output_dir, "run_id": run_id}
+    run_epoch_kwargs = {
+        "output_dir": output_dir,
+        "run_id": run_id,
+        "artifact_dir": artifact_dir,
+    }
     # the workers only return records: this process alone writes the manifest
     for number, (identifier, record) in enumerate(
         run_epochs(to_run, run_epoch_kwargs, cluster_factory), start=1

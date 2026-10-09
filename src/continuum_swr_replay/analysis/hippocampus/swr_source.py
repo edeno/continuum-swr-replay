@@ -52,12 +52,15 @@ What this module fixes
 
 Analyses read a decode's ``data_over_time`` through :func:`with_swr_source`
 or :func:`read_dot_with_swr_source`. Its ``SWR_event`` column then holds this
-source's labels and ``swr_observed`` the coverage mask. The decode's own
-``SWR_event`` (from ``RippleTimesV1``, written by ``get_data_over_time``) stays
-in the pickle as the decode's provenance and never reaches an analysis, and
-neither do the decode's stored-ripple counts (:data:`DECODE_SWR_COUNT_COLUMNS`).
-The decoders' ``no_ripple`` encoding-training mask still reads the stored
-ripples; that is a separate decision.
+source's labels and ``swr_observed`` the coverage mask. An HPC decode made by
+the decoders since Task 17a already holds them: its ``organize_results`` reads
+the frame through :func:`with_swr_source`, so the decode's provenance is this
+source, and its encoding leaves out every event of this inventory and its
+``decoder`` artifact mask (``decoding_common.hpc_decode_masks``). In an older
+decode, or a PFC decode, ``SWR_event`` (from ``RippleTimesV1``, written by
+``get_data_over_time``) stays in the pickle as the decode's provenance and never
+reaches an analysis, and neither do the decode's stored-ripple counts
+(:data:`DECODE_SWR_COUNT_COLUMNS`).
 """
 
 from __future__ import annotations
@@ -394,13 +397,23 @@ def _read_observed(path: str) -> NDArray[np.float64]:
     return stretches
 
 
-def artifact_intervals(epoch_id: str) -> pd.DataFrame:
+def artifact_intervals(
+    epoch_id: str, consumer: Consumer | str = Consumer.ANALYSIS
+) -> pd.DataFrame:
     """The epoch's artifact intervals, from the one configured run.
 
-    The run's cores for the epoch, padded by the ``analysis`` row of
-    ``artifacts.masks.CONSUMER_PADDING`` (S by 1 s on each side, an LFP step by
-    0.3 s before and 1.3 s after, a spike-only line by 0.1 s), merged and
-    clipped to the epoch's span.
+    The run's cores for the epoch, padded by the consumer's row of
+    ``artifacts.masks.CONSUMER_PADDING``, merged and clipped to the epoch's
+    span. The default, ``analysis``, pads S by 1 s on each side, an LFP step by
+    0.3 s before and 1.3 s after, and a spike-only line by 0.1 s; every function
+    here uses it. The HPC decoders ask for ``decoder`` (their ``is_missing``,
+    encoding exclusion and MUA detection).
+
+    Parameters
+    ----------
+    epoch_id : str
+    consumer : Consumer or str, optional
+        ``"analysis"`` (default), ``"decoder"`` or ``"swr"``.
 
     Returns
     -------
@@ -424,7 +437,7 @@ def artifact_intervals(epoch_id: str) -> pd.DataFrame:
         epoch = read_epoch_cores(directory, epoch_id)
     except ArtifactRunError as error:
         raise SwrSourceError(str(error)) from error
-    return consumer_intervals(epoch.cores, Consumer.ANALYSIS, epoch.span)
+    return consumer_intervals(epoch.cores, consumer, epoch.span)
 
 
 @dataclass(frozen=True)

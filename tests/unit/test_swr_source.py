@@ -313,6 +313,37 @@ class TestTheArtifactIntervals:
             [(99.5, 103.0), (104.2, 105.8), (107.4, 107.6), (109.2, 110.0)],
         )
 
+    def test_each_consumer_pads_the_same_cores_from_its_own_row(
+        self, inventory, tmp_path, monkeypatch
+    ):
+        """The run's one set of cores gives every consumer's mask: the default
+        is the analysis one, and the swr and decoder ones are asked for by
+        name."""
+        _artifacts(
+            tmp_path,
+            monkeypatch,
+            [("S", 100.0, 102.0), ("ca1+ref", 104.5, 104.5), ("spk", 107.5, 107.5)],
+            span=(99.5, 110.0),
+        )
+
+        by_consumer = {
+            consumer: artifact_intervals(EPOCH, consumer).to_numpy()
+            for consumer in ("swr", "decoder", "analysis")
+        }
+
+        np.testing.assert_allclose(
+            by_consumer["swr"], [(100.0, 102.0), (104.2, 104.8), (107.4, 107.6)]
+        )
+        np.testing.assert_allclose(
+            by_consumer["decoder"], [(99.5, 103.0), (104.2, 104.8), (107.4, 107.6)]
+        )
+        np.testing.assert_allclose(
+            by_consumer["analysis"], [(99.5, 103.0), (104.2, 105.8), (107.4, 107.6)]
+        )
+        np.testing.assert_array_equal(
+            artifact_intervals(EPOCH).to_numpy(), by_consumer["analysis"]
+        )
+
     def test_a_configured_run_without_the_epochs_file_is_refused(
         self, inventory, tmp_path, monkeypatch
     ):

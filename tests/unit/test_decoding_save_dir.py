@@ -1,4 +1,5 @@
-"""Both HPC decoders stage, resume safely, refuse a CPU fallback and log provenance.
+"""Both HPC decoders stage, resume safely, refuse a CPU fallback, log provenance
+and take their masks and SWR labels from the SWR source.
 
 ``run_decoding_bandit.py`` (NonLocal) and ``run_decoding_contfrag.py``
 (ContFrag) write into ``--save_dir``, which defaults to ``Processed-Data``. A
@@ -30,6 +31,10 @@ Each script's ``PROCESSED_DATA_DIR`` global also points at an empty folder under
 ``tmp_path``. That catches only code that writes through the global, not
 through a default. An unguarded version of these tests once overwrote real
 decodes.
+
+An HPC decode reads the SWR source's Kay inventory and artifact run, so the
+fixture points the source at synthetic run folders under ``tmp_path`` for the
+synthetic epoch.
 """
 
 from __future__ import annotations
@@ -37,6 +42,7 @@ from __future__ import annotations
 import functools
 import hashlib
 import importlib
+import inspect
 import json
 import logging
 import os
@@ -60,7 +66,15 @@ import xarray as xr
 from continuum_swr_replay import decoding_common
 from continuum_swr_replay.analysis.contfrag import result_loading as contfrag_loading
 from continuum_swr_replay.analysis.hippocampus import result_loading as hpc_loading
+from continuum_swr_replay.analysis.hippocampus import swr_source
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from tests.unit._swr_inventory_fixtures import (
+    ARTIFACT_RUN_ID,
+    RUN_ID,
+    use_swr_source,
+    write_artifact_run,
+    write_swr_inventory,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 NWB_FILE_NAME = "testrat20990101_.nwb"
@@ -76,6 +90,16 @@ PROVENANCE_KEYS = {
 }
 SAVED_FILES = ("results.nc", "detector.pkl", "environment.pkl")
 """The files a decode writes once, and a resume must leave untouched."""
+
+SWR_EPOCH = "testrat20990101_02_r1_HPC"
+"""The synthetic epoch's id in the SWR source."""
+DECODE_TIME = np.round(100.0 + np.arange(5000) / 500.0, 6)
+"""The synthetic epoch's position (decode) grid: 500 Hz, 100.000-109.998 s."""
+SWR_EVENTS = [(100.5, 100.56), (102.4, 102.6)]
+"""Its Kay inventory."""
+ARTIFACT_CORES = [("ca1", 104.0, 104.0)]
+"""Its artifact run's cores: one CA1 step, [103.7, 104.3] for the decoder."""
+DECODER_INTERVAL = (103.7, 104.3)
 
 
 @dataclass(frozen=True)
@@ -153,6 +177,11 @@ def decoders(monkeypatch, tmp_path):
     canonical.mkdir()
     for module in modules.values():
         monkeypatch.setattr(module, "PROCESSED_DATA_DIR", canonical)
+    use_swr_source(
+        monkeypatch,
+        write_swr_inventory(tmp_path / "swr_inventory", {SWR_EPOCH: SWR_EVENTS}),
+        write_artifact_run(tmp_path / "artifact_run", {SWR_EPOCH: ARTIFACT_CORES}),
+    )
 
     yield Decoders(modules=modules, canonical=canonical)
 
@@ -331,6 +360,13 @@ def _patch_fresh_decode(
     """Make ``run_decode`` decode afresh into `fresh`, with nothing real loaded."""
     monkeypatch.setattr(module, "load_data", lambda *args, **kwargs: _session_data())
     monkeypatch.setattr(module, "get_training_timepoints", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        module,
+        "hpc_decode_masks",
+        lambda *args, **kwargs: decoding_common.HpcDecodeMasks(
+            np.zeros(2, dtype=bool), np.ones(2, dtype=bool), {"stand_in": True}
+        ),
+    )
     monkeypatch.setattr(
         module, "perform_decoding", lambda *args, **kwargs: (fresh, fresh, fresh)
     )
@@ -903,6 +939,223 @@ def test_a_failed_release_leaves_the_epochs_result(
     log = _log(tmp_path, decoder).splitlines()
     assert any(line.endswith("Done!") for line in log)
     assert log[-1].endswith("closed -1 NWB files Spyglass held open")
+
+
+# --------------------------------------------------------------------------
+# HPC: the artifact mask, the encoding exclusion and the SWR source
+# --------------------------------------------------------------------------
+
+
+def _decode_position_info() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "head_position_x": 0.0,
+            "head_position_y": 0.0,
+            "head_speed": np.zeros(DECODE_TIME.size),
+        },
+        index=pd.Index(DECODE_TIME, name="time"),
+    )
+
+
+def _on_decode_grid(*intervals: tuple[float, float]) -> np.ndarray:
+    """True at each decode bin inside a closed interval."""
+    inside = np.zeros(DECODE_TIME.size, dtype=bool)
+    for start, end in intervals:
+        inside |= (DECODE_TIME >= start) & (DECODE_TIME <= end)
+    return inside
+
+
+def _logged_decode_masks(tmp_path: Path, decoder: Decoder) -> str:
+    """The JSON of the epoch log's one ``DECODE MASKS`` line."""
+    (line,) = [
+        line for line in _log(tmp_path, decoder).splitlines() if "DECODE MASKS " in line
+    ]
+    return line.split("DECODE MASKS ", 1)[1]
+
+
+@pytest.mark.parametrize("key", list(DECODERS))
+def test_an_hpc_decode_masks_artifacts_and_leaves_swrs_out_of_encoding(
+    decoders, monkeypatch, tmp_path, key
+):
+    """The decoder mask is ``is_missing``; every Kay event and the mask leave
+    encoding; MUA detection gets the mask; the record names both runs."""
+    decoder, module = DECODERS[key], decoders.modules[key]
+    fresh = _WritesPlaceholders(tmp_path)
+    loads, decodes = [], []
+
+    def load_data(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        loads.append(kwargs)
+        return {**_session_data(), "position_info": _decode_position_info()}
+
+    signature = inspect.signature(module.perform_decoding)
+
+    def perform_decoding(*args: Any, **kwargs: Any) -> tuple:
+        decodes.append(signature.bind(*args, **kwargs))
+        return fresh, fresh, fresh
+
+    monkeypatch.setattr(module, "load_data", load_data)
+    monkeypatch.setattr(module, "perform_decoding", perform_decoding)
+    monkeypatch.setattr(
+        module,
+        "organize_results",
+        lambda *args, **kwargs: (_GuardedFrame(tmp_path), None),
+    )
+
+    failed = _run_decode(module, decoder, tmp_path, save_dir=tmp_path / "staging")
+
+    assert failed is None, _log(tmp_path, decoder)
+    (load,) = loads
+    np.testing.assert_allclose(
+        load["mua_artifact_intervals"]["HPC"].to_numpy(), [DECODER_INTERVAL]
+    )
+    (bound,) = decodes
+    missing = _on_decode_grid(DECODER_INTERVAL)
+    np.testing.assert_array_equal(bound.arguments["is_missing"], missing)
+    np.testing.assert_array_equal(
+        bound.arguments["is_training"], ~_on_decode_grid(*SWR_EVENTS) & ~missing
+    )
+    record = json.loads(_logged_decode_masks(tmp_path, decoder))
+    assert fresh.written_attrs["decode_masks"] == _logged_decode_masks(
+        tmp_path, decoder
+    )
+    assert record["swr_inventory_run_id"] == RUN_ID
+    assert record["artifact_run_id"] == ARTIFACT_RUN_ID
+    assert record["n_missing_bins"] == int(missing.sum())
+    assert record["missing_s"] == pytest.approx(missing.sum() * 0.002)
+    removed = int((_on_decode_grid(*SWR_EVENTS) | missing).sum())
+    assert record["encoding_removed_s"] == pytest.approx(removed * 0.002)
+
+
+@pytest.mark.parametrize("unset", ["SWR_INVENTORY_RUN_ID", "ARTIFACT_INTERVALS_RUN_ID"])
+@pytest.mark.parametrize("key", list(DECODERS))
+def test_an_hpc_decode_refuses_to_run_without_both_runs(
+    decoders, monkeypatch, tmp_path, key, unset
+):
+    """Fail closed: nothing is loaded, the epoch fails, and its log says why."""
+    decoder, module = DECODERS[key], decoders.modules[key]
+    monkeypatch.setattr(swr_source, unset, None)
+
+    def load_data(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("an HPC decode loaded data without both runs")
+
+    monkeypatch.setattr(module, "load_data", load_data)
+
+    failed = _run_decode(module, decoder, tmp_path, save_dir=tmp_path / "staging")
+
+    assert failed == decoder.epoch_identifier
+    assert f"swr_source.{unset}" in _log(tmp_path, decoder)
+
+
+@pytest.mark.parametrize("key", list(DECODERS))
+def test_main_refuses_an_hpc_batch_without_both_runs(
+    decoders, monkeypatch, capsys, key
+):
+    """The batch stops before any cluster starts; a PFC batch is not refused."""
+    module = decoders.modules[key]
+    batches = []
+    monkeypatch.setattr(module, "run_batch", lambda *args, **kw: batches.append(args))
+    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", None)
+
+    monkeypatch.setattr(sys, "argv", ["decoder"])
+    with pytest.raises(SystemExit) as stopped:
+        module.main()
+    assert stopped.value.code == 2
+    assert "swr_source.ARTIFACT_INTERVALS_RUN_ID" in capsys.readouterr().err
+    assert batches == []
+
+    monkeypatch.setattr(sys, "argv", ["decoder", "--brain_area", "mPFC"])
+    module.main()
+    assert len(batches) == 1
+
+
+@pytest.mark.parametrize("brain_area", ["HPC", "mPFC"])
+@pytest.mark.parametrize("key", list(DECODERS))
+def test_an_hpc_decodes_swr_labels_are_the_sources(
+    decoders, monkeypatch, key, brain_area
+):
+    """``organize_results`` writes the SWR source's labels and coverage into an
+    HPC decode's ``data_over_time``, which no longer carries stored-ripple
+    labels or counts; a PFC decode's frame is left as aggregated."""
+    module = decoders.modules[key]
+    aggregated = pd.DataFrame(
+        {
+            "SWR_event": 9,
+            "n_SWR": 3,
+            "animal": "testrat",
+            "day": 20990101,
+            "epoch": EPOCH_NAME,
+            "head_speed": np.zeros(DECODE_TIME.size),
+        },
+        index=pd.Index(DECODE_TIME, name="time"),
+    )
+    aggregator = (
+        "get_data_over_time" if key == "nonlocal" else "get_contfrag_data_over_time"
+    )
+    monkeypatch.setattr(
+        module, aggregator, lambda *args, **kwargs: (aggregated.copy(), None)
+    )
+    results = xr.Dataset(coords={"time": DECODE_TIME})
+
+    data_over_time, _ = module.organize_results(
+        {}, results, None, NWB_FILE_NAME, EPOCH_NAME, brain_area
+    )
+
+    if brain_area == "mPFC":
+        pd.testing.assert_frame_equal(data_over_time, aggregated)
+        return
+    np.testing.assert_array_equal(
+        data_over_time["SWR_event"],
+        swr_source.swr_event_labels(
+            DECODE_TIME, SWR_EPOCH, speed=np.zeros(DECODE_TIME.size)
+        ),
+    )
+    assert set(data_over_time["SWR_event"]) == {0, 1, 2}
+    assert "n_SWR" not in data_over_time
+    # the step's analysis interval, [103.7, 105.3], is not observed
+    np.testing.assert_array_equal(
+        data_over_time["swr_observed"],
+        swr_source.swr_observed_mask(DECODE_TIME, SWR_EPOCH),
+    )
+    assert (
+        not data_over_time["swr_observed"]
+        .to_numpy()[_on_decode_grid((103.8, 105.2))]
+        .any()
+    )
+    assert data_over_time.attrs["swr_source"] == swr_source.swr_source_name()
+
+
+@pytest.mark.parametrize("key", list(DECODERS))
+def test_perform_decoding_passes_is_missing_to_the_decoder(decoders, monkeypatch, key):
+    module = decoders.modules[key]
+    calls = []
+
+    class Detector:
+        def estimate_parameters(self, **kwargs: Any) -> str:
+            calls.append(kwargs)
+            return "results"
+
+    factory = "create_detector" if key == "nonlocal" else "create_contfrag_detector"
+    monkeypatch.setattr(module, factory, lambda *args, **kwargs: Detector())
+    monkeypatch.setattr(module, "Environment", lambda **kwargs: "environment")
+    is_training = np.array([True, False, True])
+    is_missing = np.array([False, True, False])
+
+    module.perform_decoding(
+        logging.getLogger(__name__),
+        [np.array([0.1])],
+        [np.zeros((1, 4))],
+        _decode_position_info().iloc[:3],
+        None,
+        None,
+        None,
+        is_training,
+        brain_area="HPC",
+        is_missing=is_missing,
+    )
+
+    (kwargs,) = calls
+    assert kwargs["is_missing"] is is_missing
+    assert kwargs["is_training"] is is_training
 
 
 def _stand_in_batch(monkeypatch, tmp_path, *, has_cuda: bool, cluster: Callable):

@@ -28,7 +28,7 @@ get_training_timepoints : Select time points for decoder training
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
@@ -118,8 +118,13 @@ def _process_multiunit_data(
     position_info: pd.DataFrame,
     should_load: Callable[[str], bool],
     result: dict[str, Any],
+    artifact_intervals: Mapping[str, pd.DataFrame] | None = None,
 ) -> None:
-    """Process multiunit data and add requested keys to result dict."""
+    """Process multiunit data and add requested keys to result dict.
+
+    ``artifact_intervals`` (by brain area) are masked as ``get_multiunit``
+    masks them.
+    """
     from ..types import SessionDataKeys
 
     if not any(
@@ -132,7 +137,9 @@ def _process_multiunit_data(
     ):
         return
 
-    multiunit_data = get_multiunit(spike_times, position_info)
+    multiunit_data = get_multiunit(
+        spike_times, position_info, artifact_intervals=artifact_intervals
+    )
     for key, value in multiunit_data.items():
         if should_load(key):
             result[key] = value
@@ -200,6 +207,7 @@ def load_data(
     epoch_name: str,
     ripple_detector_name: str = "Kay",
     include: frozenset[str] | None = None,
+    mua_artifact_intervals: Mapping[str, pd.DataFrame] | None = None,
 ) -> SessionData:
     """Load data for a given session and epoch with selective loading.
 
@@ -222,6 +230,12 @@ def load_data(
         Use DataLoadingPreset for common configurations or create custom sets.
         Position data (position_info, track_graph) is always loaded as it
         defines time bounds for other data types
+    mua_artifact_intervals : Mapping[str, pd.DataFrame], optional
+        By brain area, closed ``[start_time, end_time]`` intervals (seconds)
+        that multiunit (HSE) detection treats as artifact: left out of its
+        normalization, and any HSE overlapping one dropped
+        (``lfp.get_multiunit_hse``). The HPC decoders pass their ``decoder``
+        artifact mask for HPC; by default nothing is masked.
 
     Returns
     -------
@@ -419,6 +433,7 @@ def load_data(
             position_data["position_info"],
             should_load,
             result,
+            artifact_intervals=mua_artifact_intervals,
         )
 
     # Load electrode group info

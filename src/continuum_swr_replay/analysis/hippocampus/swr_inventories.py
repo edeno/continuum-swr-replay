@@ -56,7 +56,10 @@ kept only if speed at its first and last sample is at most 4 cm/s, and an
 unknown speed fails. What they share is the input: the electrodes, time, speed
 and the nominal sampling rate. Zugaro's events longer than 150 ms are then
 dropped. A detector that raises is reported as its exception, so one failure
-does not hide the others' results. ``yu_diagnostics`` recomputes Yu's
+does not hide the others' results. Given an artifact mask, all four leave its
+time out of their normalization (``normalization_sample``), and the caller
+drops their events that overlap it (``drop_overlapping_events``); the LFP is
+never NaN-filled, so no filter or envelope meets a gap. ``yu_diagnostics`` recomputes Yu's
 threshold and the histogram behind it, so both are known for an epoch with no
 events too.
 
@@ -601,12 +604,86 @@ def cap_zugaro_duration(events: pd.DataFrame) -> tuple[pd.DataFrame, int]:
     return events.loc[keep], int(np.count_nonzero(~keep))
 
 
+def normalization_sample(
+    detector: str, speed: NDArray, unobserved: NDArray[np.bool_]
+) -> NDArray[np.bool_]:
+    """The samples a detector's normalization reads, less the unobserved ones.
+
+    Each detector keeps its own sample: Kay, Karlsson and Zugaro z-score over
+    every valid sample, so theirs is every sample not ``unobserved``; Yu
+    estimates its threshold on the immobile samples (speed at or below its
+    ``speed_threshold``; an unknown speed is not immobile), so its is the
+    immobile samples not ``unobserved``. The detector still restricts the
+    sample to its valid rows. The artifact time thus leaves all four the same
+    way.
+
+    Parameters
+    ----------
+    detector : str
+        A key of ``DETECTOR_SETTINGS``.
+    speed : NDArray, shape (n_time,)
+        Head speed in cm/s.
+    unobserved : NDArray of bool, shape (n_time,)
+        True where the LFP is not to be trusted, such as the ``swr`` artifact
+        mask.
+
+    Returns
+    -------
+    NDArray of bool, shape (n_time,)
+        The ``normalization_mask`` to pass the detector.
+    """
+    sample = ~np.asarray(unobserved, dtype=bool)
+    if detector == "yu":
+        threshold = float(DETECTOR_SETTINGS["yu"]["speed_threshold"])
+        sample &= np.asarray(speed, dtype=float) <= threshold
+    return sample
+
+
+def drop_overlapping_events(
+    events: pd.DataFrame, intervals: pd.DataFrame
+) -> tuple[pd.DataFrame, int]:
+    """Drop the events that share any time with an interval; renumber the rest.
+
+    Both are closed, so an event that only touches an interval at an instant is
+    dropped too, as ``swr_source`` drops an event touching an artifact. The
+    kept events are renumbered 1..n in ``event_number``, which an inventory's
+    reader (``swr_source``) takes as the event's label.
+
+    Parameters
+    ----------
+    events : pd.DataFrame
+        A detector's event table, ``start_time`` and ``end_time`` in seconds.
+    intervals : pd.DataFrame
+        ``start_time`` and ``end_time`` in seconds, such as artifact intervals.
+
+    Returns
+    -------
+    kept : pd.DataFrame
+        The other rows, unchanged and in order, indexed by ``event_number``
+        1..n.
+    n_dropped : int
+    """
+    starts = events["start_time"].to_numpy(dtype=float)
+    ends = events["end_time"].to_numpy(dtype=float)
+    interval_starts = intervals["start_time"].to_numpy(dtype=float)
+    interval_ends = intervals["end_time"].to_numpy(dtype=float)
+    overlaps = (
+        (starts[:, np.newaxis] <= interval_ends[np.newaxis, :])
+        & (interval_starts[np.newaxis, :] <= ends[:, np.newaxis])
+    ).any(axis=1)
+    kept = events.loc[~overlaps].copy()
+    kept.index = pd.RangeIndex(1, len(kept) + 1, name="event_number")
+    return kept, int(np.count_nonzero(overlaps))
+
+
 def run_swr_detectors(
     time: NDArray,
     ripple_band: NDArray,
     zugaro_lfp: NDArray,
     speed: NDArray,
     sampling_frequency: float,
+    *,
+    unobserved: NDArray[np.bool_] | None = None,
 ) -> dict[str, pd.DataFrame | Exception]:
     """Run Kay, Karlsson, Yu and Zugaro on one epoch's shared inputs.
 
@@ -629,6 +706,13 @@ def run_swr_detectors(
         event's first or last sample.
     sampling_frequency : float
         The nominal rate in Hz, passed to every detector.
+    unobserved : NDArray of bool, shape (n_time,), optional
+        Samples left out of every detector's normalization, such as the
+        ``swr`` artifact mask: each detector gets ``normalization_sample``'s
+        mask. The LFP itself is not changed, so the filters and envelopes
+        never meet a gap, and events are still found there; the caller drops
+        those (``drop_overlapping_events``). None passes no mask, so each
+        detector normalizes over its own default sample.
 
     Returns
     -------
@@ -648,10 +732,13 @@ def run_swr_detectors(
     }
     results: dict[str, pd.DataFrame | Exception] = {}
     for name, (detector, signal) in detectors.items():
-        try:
-            events = detector(
-                time, signal, speed, sampling_frequency, **DETECTOR_SETTINGS[name]
+        settings = dict(DETECTOR_SETTINGS[name])
+        if unobserved is not None:
+            settings["normalization_mask"] = normalization_sample(
+                name, speed, unobserved
             )
+        try:
+            events = detector(time, signal, speed, sampling_frequency, **settings)
         except Exception as error:  # one detector's failure must not stop the rest
             results[name] = error
             continue
@@ -663,7 +750,12 @@ def run_swr_detectors(
 
 
 def yu_diagnostics(
-    time: NDArray, ripple_band: NDArray, speed: NDArray, sampling_frequency: float
+    time: NDArray,
+    ripple_band: NDArray,
+    speed: NDArray,
+    sampling_frequency: float,
+    *,
+    unobserved: NDArray[np.bool_] | None = None,
 ) -> dict:
     """Recompute Yu's threshold as ``Yu_ripple_detector`` does, with its diagnostics.
 
@@ -673,11 +765,13 @@ def yu_diagnostics(
     is treated as missing. ``noise_threshold_diagnostics`` then runs on the
     consensus over the detector's noise sample, the valid samples whose speed
     is at or below the speed threshold (an unknown speed is not), with the
-    percentile. The threshold is converted to the detector's units with the
-    mean and standard deviation (ddof=0) of that same sample. This is the
-    detector's ``zscore_per_channel=True`` path, the only one followed here.
-    Nothing depends on the events, so an epoch with none still has its
-    diagnostics.
+    percentile, less the ``unobserved`` samples, as ``run_swr_detectors``
+    gives the detector. The threshold is converted to the detector's units
+    with the mean and standard deviation (ddof=0) of that same sample. This is
+    the detector's ``zscore_per_channel=True`` path, the only one followed
+    here; its per-channel z-score reads every valid sample, unobserved or not,
+    as the detector's does. Nothing depends on the events, so an epoch with
+    none still has its diagnostics.
 
     Parameters
     ----------
@@ -689,6 +783,9 @@ def yu_diagnostics(
         Head speed in cm/s; NaN is unknown.
     sampling_frequency : float
         The nominal rate in Hz.
+    unobserved : NDArray of bool, shape (n_time,), optional
+        Samples left out of the noise sample, as ``run_swr_detectors`` leaves
+        them out of the detector's; None leaves none out.
 
     Returns
     -------
@@ -745,6 +842,8 @@ def yu_diagnostics(
     is_noise = np.all(np.isfinite(band), axis=1) & (
         speed <= settings["speed_threshold"]
     )
+    if unobserved is not None:
+        is_noise &= ~np.asarray(unobserved, dtype=bool)
     noise = consensus[is_noise]
     diagnostics = noise_threshold_diagnostics(noise, percentile=settings["percentile"])
     center = float(np.mean(noise))

@@ -23,6 +23,7 @@ import subprocess
 import sys
 from collections.abc import Callable
 from functools import cache
+from pathlib import Path
 from types import MappingProxyType, SimpleNamespace
 
 import dask
@@ -35,7 +36,7 @@ from ripple_detection import Kay_ripple_detector, filter_ripple_band
 from ripple_detection.simulate import simulate_session, simulate_time
 
 import scripts.decoding.run_swr_detection as runner
-from continuum_swr_replay.analysis.hippocampus import swr_inventories
+from continuum_swr_replay.analysis.hippocampus import swr_inventories, swr_source
 from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
     NoUsableChannelError,
     best_ripple_channel,
@@ -52,6 +53,7 @@ from scripts.decoding.run_swr_detection import (
     main,
     run_epoch,
 )
+from tests.unit._swr_inventory_fixtures import ARTIFACT_RUN_ID, write_artifact_run
 
 FS = 1000.0
 BASE_TIME_S = 1.58e9
@@ -124,6 +126,7 @@ MANIFEST_FIELDS = {
     "n_detecting_tetrodes",
     "meets_published_tetrode_criterion",
     "input_sha256",
+    "artifacts",
 }
 """The fields of an epoch's manifest record the brief names."""
 
@@ -1015,6 +1018,192 @@ def test_head_speed_varying_over_time_is_interpolated(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# Artifacts: the swr mask
+# ---------------------------------------------------------------------------
+
+ARTIFACT_CORE_S = 15.0
+"""Seconds after the first sample: an LFP step on the second injected ripple."""
+
+SWR_MASK_S = (ARTIFACT_CORE_S - 0.3, ARTIFACT_CORE_S + 0.3)
+"""Its ``swr`` interval: an LFP step padded by 0.3 s on each side."""
+
+
+def _artifact_run(tmp_path, identifier: str, cores=None) -> Path:
+    """An artifact run whose cores for `identifier` are one ``ca1`` step at
+    ``ARTIFACT_CORE_S``, unless `cores` says otherwise."""
+    if cores is None:
+        at = BASE_TIME_S + ARTIFACT_CORE_S
+        cores = [("ca1", at, at)]
+    return write_artifact_run(
+        tmp_path / "artifacts",
+        {identifier: cores},
+        span=(BASE_TIME_S, BASE_TIME_S + 60.0),
+    )
+
+
+def _recording_detectors(monkeypatch) -> dict:
+    """Wrap the four detectors so each call's ``normalization_mask`` is kept."""
+    masks: dict = {}
+    for name, attribute in {
+        "kay": "Kay_ripple_detector",
+        "karlsson": "Karlsson_ripple_detector",
+        "yu": "Yu_ripple_detector",
+        "zugaro": "Zugaro_ripple_detector",
+    }.items():
+        detector = getattr(swr_inventories, attribute)
+
+        def recording(*args, _name=name, _detector=detector, **settings):
+            masks[_name] = settings.get("normalization_mask")
+            return _detector(*args, **settings)
+
+        monkeypatch.setattr(swr_inventories, attribute, recording)
+    return masks
+
+
+def _overlapping(events: pd.DataFrame, lo: float, hi: float) -> pd.Series:
+    """The events sharing any time with the closed interval ``[lo, hi]``."""
+    return (events.start_time <= hi) & (events.end_time >= lo)
+
+
+def test_one_artifact_mask_for_all_four_detectors(tmp_path, monkeypatch):
+    """The ``swr`` mask leaves every detector's normalization the same way,
+    every detector's events that overlap it are dropped and counted, and its
+    time is not observed in either scope of ``swr_observed``."""
+    epoch = _main_epoch()
+    identifier = epoch_id(NWB_FILE_NAME, EPOCH_NAME)
+    artifact_dir = _artifact_run(tmp_path, identifier)
+    masks = _recording_detectors(monkeypatch)
+    lo, hi = (BASE_TIME_S + bound for bound in SWR_MASK_S)
+    unmasked_dir = tmp_path / "unmasked"
+    unmasked = run_epoch(
+        NWB_FILE_NAME, EPOCH_NAME, output_dir=unmasked_dir, **_fetchers(epoch)
+    )
+    output_dir = tmp_path / "out"
+
+    record = run_epoch(
+        NWB_FILE_NAME,
+        EPOCH_NAME,
+        output_dir=output_dir,
+        artifact_dir=artifact_dir,
+        **_fetchers(epoch),
+    )
+
+    assert record["status"] == "ok", record
+    time = _band_inputs(epoch)["time"]
+    in_mask = (time >= lo) & (time <= hi)
+    assert set(masks) == set(DETECTORS)
+    for name, mask in masks.items():
+        # 2 cm/s throughout, so Yu's immobile sample is every sample too
+        np.testing.assert_array_equal(mask, ~in_mask, err_msg=name)
+
+    artifacts = record["artifacts"]
+    assert artifacts["run_id"] == ARTIFACT_RUN_ID
+    assert artifacts["n_intervals"] == 1
+    assert artifacts["masked_s"] == pytest.approx(0.6)
+    paths = _outputs(output_dir, identifier)
+    for name in DETECTORS:
+        events = read_table(paths[name])
+        assert not _overlapping(events, lo, hi).any(), name
+        np.testing.assert_array_equal(events.index, np.arange(1, len(events) + 1))
+        assert record["n_events"][name] == len(events), name
+        # each detector finds the ripple under the step, and loses it
+        before = read_table(_outputs(unmasked_dir, identifier)[name])
+        assert _overlapping(before, lo, hi).any(), name
+        assert artifacts["n_dropped"][name] >= 1, name
+        assert unmasked["artifacts"]["n_dropped"][name] == 0, name
+
+    observed = read_table(paths["swr_observed"])
+    assert set(observed.scope) == {"stored_band", "zugaro"}
+    for scope, rows in observed.groupby("scope"):
+        assert not ((rows.start_s <= hi) & (rows.end_s >= lo)).any(), scope
+    band = observed[observed.scope == "stored_band"]
+    np.testing.assert_array_equal(
+        band[["start_s", "end_s"]].to_numpy(),
+        [[time[0], time[time < lo][-1]], [time[time > hi][0], time[-1]]],
+    )
+
+
+def test_without_an_artifact_run_nothing_is_masked(tmp_path, monkeypatch):
+    """No artifact run: the detectors normalize over all their sample, nothing
+    is dropped, and the record says no run was read."""
+    masks = _recording_detectors(monkeypatch)
+
+    record = run_epoch(
+        NWB_FILE_NAME,
+        EPOCH_NAME,
+        output_dir=tmp_path / "out",
+        **_fetchers(_main_epoch()),
+    )
+
+    assert record["status"] == "ok"
+    for name, mask in masks.items():
+        assert mask.all(), name
+    assert record["artifacts"] == {
+        "run_id": None,
+        "n_intervals": 0,
+        "masked_s": 0.0,
+        "n_dropped": dict.fromkeys(DETECTORS, 0),
+    }
+
+
+def test_an_artifact_run_without_the_epoch_fails_it(tmp_path):
+    """A configured run that never saw the epoch is an error, not an epoch
+    without artifacts: the epoch fails and writes nothing."""
+    artifact_dir = _artifact_run(tmp_path, "sim20200101_04_r2_HPC")
+    output_dir = tmp_path / "out"
+
+    record = run_epoch(
+        NWB_FILE_NAME,
+        EPOCH_NAME,
+        output_dir=output_dir,
+        artifact_dir=artifact_dir,
+        **_fetchers(_main_epoch()),
+    )
+
+    assert record["status"] == "failed"
+    assert "not in the artifact run" in record["error"]
+    assert not any(
+        path.exists()
+        for path in _outputs(output_dir, epoch_id(NWB_FILE_NAME, EPOCH_NAME)).values()
+    )
+
+
+def test_the_detecting_channels_are_chosen_in_one_place(tmp_path, monkeypatch):
+    """``detection_channels`` picks the band's channels the four detectors read
+    and Zugaro chooses among; today every one."""
+    epoch = _main_epoch()
+    widths = {}
+    for name, attribute in {
+        "kay": "Kay_ripple_detector",
+        "karlsson": "Karlsson_ripple_detector",
+        "yu": "Yu_ripple_detector",
+    }.items():
+        detector = getattr(swr_inventories, attribute)
+
+        def recording(time, signal, *args, _name=name, _detector=detector, **kw):
+            widths[_name] = signal.shape[1]
+            return _detector(time, signal, *args, **kw)
+
+        monkeypatch.setattr(swr_inventories, attribute, recording)
+    inputs = _band_inputs(epoch)
+    np.testing.assert_array_equal(
+        runner.detection_channels(inputs), np.ones(ELECTRODE_IDS.size, dtype=bool)
+    )
+    monkeypatch.setattr(
+        runner, "detection_channels", lambda inputs: np.array([False, True, True, True])
+    )
+
+    record = run_epoch(
+        NWB_FILE_NAME, EPOCH_NAME, output_dir=tmp_path / "out", **_fetchers(epoch)
+    )
+
+    assert record["status"] == "ok"
+    assert widths == {"kay": 3, "karlsson": 3, "yu": 3}
+    assert record["n_detecting_tetrodes"] == 2  # electrode 0 was tetrode "0"'s only
+    assert str(ELECTRODE_IDS[0]) not in record["zugaro_channel"]["scores"]
+
+
+# ---------------------------------------------------------------------------
 # The driver
 # ---------------------------------------------------------------------------
 
@@ -1234,6 +1423,41 @@ def test_a_rerun_with_other_settings_is_refused(
     with pytest.raises(SystemExit, match="other settings"):
         _cli(tmp_path, "--overwrite")
 
+    assert ran == [EPOCH_NAME]
+
+
+def test_the_run_reads_and_records_the_configured_artifact_run(
+    tmp_path, monkeypatch, in_tmp_path, in_process_cluster
+):
+    """The artifact run is the SWR source's, read when the run starts: its id
+    is in the run's settings, every epoch is masked by it, and a rerun under
+    the same run id with another artifact run is refused."""
+    identifier = epoch_id(NWB_FILE_NAME, EPOCH_NAME)
+    artifact_dir = _artifact_run(tmp_path, identifier)
+    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_ROOT", artifact_dir.parent)
+    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", artifact_dir.name)
+    monkeypatch.setattr(
+        runner,
+        "epochs_to_run",
+        lambda pending_only=False: _epoch_info((NWB_FILE_NAME, EPOCH_NAME)),
+    )
+    ran = _with_fakes(monkeypatch)
+
+    manifest = _cli(tmp_path)
+
+    assert manifest["settings"]["artifacts"] == {
+        "run_id": ARTIFACT_RUN_ID,
+        "consumer": "swr",
+        "padding_s": {"S": [0.0, 0.0], "T_lfp": [0.3, 0.3], "T_spike": [0.1, 0.1]},
+    }
+    record = manifest["epochs"][identifier]
+    assert record["status"] == "ok"
+    assert record["artifacts"]["run_id"] == ARTIFACT_RUN_ID
+    assert record["artifacts"]["n_intervals"] == 1
+
+    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", None)
+    with pytest.raises(SystemExit, match="other settings"):
+        _cli(tmp_path, "--overwrite")
     assert ran == [EPOCH_NAME]
 
 
