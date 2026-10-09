@@ -64,8 +64,9 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     artifact hook.
   - [design/2026-10-09-artifact-detection.md](design/2026-10-09-artifact-detection.md) —
     the LFP and spike artifact detector: its four signatures (S, T-ref, T-ca1, T-spk),
-    parameters with their evidence, validation against true SWRs, the per-consumer
-    padding table, the Spyglass comparison, and known limits.
+    thresholds placed by one rule with their evidence, the one mask and its padding,
+    validation against rule-defined and model-reviewed SWR sets, field precedents, the
+    Spyglass comparison, and known limits.
   - [design/content_estimator_comparison.md](design/content_estimator_comparison.md)
     — the retired count multinomial vs the shipped per-event fractions vs a
     Dirichlet-multinomial, on one 218-session cohort: what each assumes,
