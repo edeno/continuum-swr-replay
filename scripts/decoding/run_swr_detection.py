@@ -18,22 +18,31 @@ Per epoch:
 2. **Span and speed.** LFP rows outside the position span are dropped, as
    ``filter_ripple_lfp_time`` drops them, and ``head_speed`` is interpolated
    linearly onto the LFP times.
-3. **Channels and artifacts.** ``detection_channels`` chooses the band's
-   channels the four detectors read (today every CA1 band channel). The
-   epoch's artifact intervals are the configured artifact run's cores
-   (``swr_source.ARTIFACT_INTERVALS_RUN_ID``, read once when the run starts and
-   recorded in its settings) padded by the one table every stage uses
-   (``artifacts.masks.PADDING_S``: S by 1 s, a step with an LFP signature by
-   0.3 s, a spike-only line by 0.1 s). Their time is the artifact mask on the
-   LFP times; with no artifact run configured it is empty. A configured run
-   that cannot serve the epoch fails it.
-4. **Zugaro's channel.** ``best_ripple_channel`` (buzcode's
-   ``bz_GetBestRippleChan``) chooses one of the band's CA1 electrodes from their
+3. **Artifacts.** The epoch's artifact intervals are the configured artifact
+   run's cores (``swr_source.ARTIFACT_INTERVALS_RUN_ID``, read once when the
+   run starts and recorded in its settings) padded by the one table every
+   stage uses (``artifacts.masks.PADDING_S``: S by 1 s, a step with an LFP
+   signature by 0.3 s, a spike-only line by 0.1 s). Their time is the artifact
+   mask on the LFP times; with no artifact run configured it is empty. A
+   configured run that cannot serve the epoch fails it.
+4. **Tetrodes (rule R-T).** ``detection_channels`` applies
+   ``ripple_tetrodes.select_ripple_tetrodes`` once, before any detector: a
+   CA1 band tetrode whose ripple envelope stays low while the other tetrodes
+   ripple (coupling below 1.0, over immobile samples outside the artifact
+   mask) is dropped. The band, the raw LFP behind it, the electrode ids, their
+   references and their groups are subset to the kept tetrodes, which every
+   detector reads and among which Zugaro chooses. The rule fails the epoch
+   closed, with its reason and every tetrode's coupling recorded, when it
+   would drop more than a third of the tetrodes or when a tetrode's coupling
+   is undefined. Reference electrodes are not band channels and are never
+   dropped: a kept electrode keeps its own reference.
+5. **Zugaro's channel.** ``best_ripple_channel`` (buzcode's
+   ``bz_GetBestRippleChan``) chooses one of the kept CA1 electrodes from their
    referenced raw LFP, and ``zero_phase_bandpass`` filters it. A candidate with
    no finite sample is excluded with that reason, so it costs the others no
    samples. If the channel cannot be chosen or filtered (no channel passes the
    dead-channel guard, say), Zugaro's entry is that error.
-5. **Detectors.** ``run_swr_detectors`` runs the four; Kay, Karlsson and Yu read
+6. **Detectors.** ``run_swr_detectors`` runs the four; Kay, Karlsson and Yu read
    the stored band. Each is given its normalization sample less the artifact
    mask's time: every sample for Kay, Karlsson and Zugaro, the immobile ones
    for Yu, whose threshold is then estimated on the masked immobile sample.
@@ -42,13 +51,13 @@ Per epoch:
    detector's error is recorded and the rest still report: the epoch is
    ``ok`` when all four succeed, ``partial`` when some do, and ``failed``
    when none does.
-6. **Event filter.** ``filter_detected_events`` drops every detector's events
+7. **Event filter.** ``filter_detected_events`` drops every detector's events
    that overlap the artifact mask, counted per detector in the record, and
    renumbers the rest 1..n.
-7. **Yu's diagnostics**, recomputed by ``yu_diagnostics`` on the same noise
+8. **Yu's diagnostics**, recomputed by ``yu_diagnostics`` on the same noise
    sample: the scalars in the manifest, the histogram arrays in the epoch's
    sidecar.
-8. **Kay version check** against the canonical Spyglass events
+9. **Kay version check** against the canonical Spyglass events
    (``RippleTimesV1``), in two comparisons.
 
    - ``version_only`` runs Kay at the pinned commit on Spyglass's own inputs
@@ -91,12 +100,15 @@ per epoch: its status and, for an epoch that ran, every detector's outcome, the
 provenance, the electrodes and references, Zugaro's channel with every score,
 the band check, Yu's diagnostic scalars, the sampling rates, the LFP's units and
 conversion, the position span, event counts, the artifact run with the masked
-seconds and each detector's dropped events, the Kay check's counts, input
-hashes, and each output's path and sha256. Only this process writes it,
-atomically, after each epoch finishes. A rerun under the same run id skips the
-epochs already ``ok`` unless ``--overwrite`` is given, removes the record of
-each epoch it redoes before starting it, and refuses settings other than the
-ones the manifest was written with. A run holds an exclusive lock on its
+seconds and each detector's dropped events, rule R-T's coupling per tetrode and
+dropped electrode groups (``tetrode_selection``), the Kay check's counts, input
+hashes, and each output's path and sha256. ``electrode_ids`` and
+``reference_ids`` are the kept tetrodes' electrodes and their references, pair
+by pair; ``tetrode_selection`` keeps every band electrode's. Only this process
+writes it, atomically, after each epoch finishes. A rerun under the same run id
+skips the epochs already ``ok`` unless ``--overwrite`` is given, removes the
+record of each epoch it redoes before starting it, and refuses settings other
+than the ones the manifest was written with. A run holds an exclusive lock on its
 folder's ``.lock`` throughout, so a second run under the same run id exits at
 once instead of overwriting the first one's records.
 
@@ -151,6 +163,16 @@ from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
     interval_mask,
     masked_seconds,
 )
+from continuum_swr_replay.analysis.hippocampus.ripple_tetrodes import (
+    COUPLING_CUT,
+    LOO_SMOOTHING_SIGMA_S,
+    LOO_THRESHOLD_Z,
+    MAXIMUM_DROPPED_FRACTION,
+    REFERENCE_SPEED_CM_PER_S,
+    TetrodeSelection,
+    TetrodeSelectionError,
+    select_ripple_tetrodes,
+)
 from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
     CHANNEL_SELECTION_BAND_HZ,
     CHANNEL_SELECTION_FILTER_ORDER,
@@ -190,7 +212,6 @@ from continuum_swr_replay.decoding_common import (
 )
 from continuum_swr_replay.parameters import ROOT_DIR
 from continuum_swr_replay.table_io import sha256_file, write_table
-from continuum_swr_replay.types import RippleBandInputs
 
 OUTPUT_ROOT = swr_source.SWR_INVENTORY_ROOT
 """Where the run folders go: where the paper's SWR source reads them."""
@@ -467,23 +488,40 @@ def choose_zugaro_channel(
     return channel, zugaro_lfp, None
 
 
-def detection_channels(inputs: RippleBandInputs) -> NDArray[np.bool_]:
-    """The band's channels the four detectors read, and Zugaro chooses among.
+def detection_channels(
+    ripple_band: NDArray,
+    speed: NDArray,
+    unobserved: NDArray[np.bool_],
+    sampling_frequency: float,
+) -> TetrodeSelection:
+    """The band's tetrodes the four detectors read, and Zugaro chooses among.
 
-    The one place an epoch's detecting tetrodes are chosen. Today every CA1
-    band channel.
+    The one place an epoch's detecting tetrodes are chosen: rule R-T
+    (``ripple_tetrodes.select_ripple_tetrodes``).
 
     Parameters
     ----------
-    inputs : RippleBandInputs
-        The epoch's band, from ``get_ripple_band_inputs``.
+    ripple_band : NDArray, shape (n_time, n_channels)
+        The stored band within the position span, one channel per tetrode.
+    speed : NDArray, shape (n_time,)
+        Head speed in cm/s on the band's times.
+    unobserved : NDArray of bool, shape (n_time,)
+        The artifact mask on the band's times.
+    sampling_frequency : float
+        The band's nominal rate in Hz.
 
     Returns
     -------
-    NDArray of bool, shape (n_channels,)
-        True for each kept column of ``ripple_band`` and ``raw_referenced``.
+    TetrodeSelection
+        ``keep`` is True for each kept column of ``ripple_band`` and
+        ``raw_referenced``.
+
+    Raises
+    ------
+    TetrodeSelectionError
+        When the rule fails the epoch closed.
     """
-    return np.ones(np.asarray(inputs["electrode_ids"]).size, dtype=bool)
+    return select_ripple_tetrodes(ripple_band, speed, unobserved, sampling_frequency)
 
 
 def epoch_artifact_intervals(
@@ -625,16 +663,36 @@ def _detect(
     ripple_band = inputs["ripple_band"][first:stop]
     raw_referenced = inputs["raw_referenced"][first:stop]
     electrode_ids = inputs["electrode_ids"]
+    reference_ids = inputs["reference_ids"]
     electrode_group_names = inputs["electrode_group_names"]
-    channels = detection_channels(inputs)
+    speed = np.interp(time, position_time, head_speed, left=np.nan, right=np.nan)
+    sampling_frequency = inputs["sampling_frequency"]
+    unobserved = interval_mask(time, artifact_mask)
+
+    try:
+        selection = detection_channels(
+            ripple_band, speed, unobserved, sampling_frequency
+        )
+    except TetrodeSelectionError as error:
+        return {
+            "status": "failed",
+            "reason": f"Rule R-T failed the epoch closed: {error}",
+            "band_check": band_check,
+            "tetrode_selection": error.selection.record(
+                electrode_ids, electrode_group_names, reference_ids
+            ),
+        }, {}
+    tetrode_selection = selection.record(
+        electrode_ids, electrode_group_names, reference_ids
+    )
+    channels = selection.keep
     if not channels.all():  # a copy, made only when a channel is left out
         ripple_band = ripple_band[:, channels]
         raw_referenced = raw_referenced[:, channels]
         electrode_ids = electrode_ids[channels]
+        # each kept electrode with its own reference; no reference is dropped
+        reference_ids = reference_ids[channels]
         electrode_group_names = electrode_group_names[channels]
-    speed = np.interp(time, position_time, head_speed, left=np.nan, right=np.nan)
-    sampling_frequency = inputs["sampling_frequency"]
-    unobserved = interval_mask(time, artifact_mask)
 
     zugaro_channel, zugaro_lfp, channel_error = choose_zugaro_channel(
         raw_referenced, time, sampling_frequency, electrode_ids
@@ -682,7 +740,8 @@ def _detect(
         "provenance": provenance_record(ROOT_DIR)
         | {"numpy_version": np.__version__, "scipy_version": scipy.__version__},
         "electrode_ids": electrode_ids,
-        "reference_ids": inputs["reference_ids"],
+        "reference_ids": reference_ids,
+        "tetrode_selection": tetrode_selection,
         "zugaro_channel": zugaro_channel,
         "band_check": band_check,
         # the scalars; the histogram arrays go to the epoch's Yu sidecar
@@ -899,7 +958,8 @@ def run_epoch(
     output_dir : Path
         The run's folder, where the outputs are written.
     fetch_inputs : Callable, optional
-        ``(nwb_file_name, epoch_name) -> RippleBandInputs``.
+        ``(nwb_file_name, epoch_name) -> RippleBandInputs``, as
+        ``get_ripple_band_inputs`` returns them.
     fetch_position : Callable, optional
         ``(nwb_file_name, epoch_name) -> PositionInfoDict``, whose
         ``position_info`` gives the span and ``head_speed``.
@@ -1113,6 +1173,14 @@ def run_settings(provenance: dict, artifact_run_id: str | None) -> dict:
                 "padding_s": PADDING_S,
             },
             "detectors": DETECTOR_SETTINGS,
+            "tetrode_selection": {
+                "rule": "R-T",
+                "coupling_cut": COUPLING_CUT,
+                "loo_threshold_z": LOO_THRESHOLD_Z,
+                "loo_smoothing_sigma_s": LOO_SMOOTHING_SIGMA_S,
+                "reference_speed_cm_per_s": REFERENCE_SPEED_CM_PER_S,
+                "maximum_dropped_fraction": str(MAXIMUM_DROPPED_FRACTION),
+            },
             "zugaro": {
                 "filter": "Butterworth band-pass, second-order sections, forward "
                 "and backward (sosfiltfilt) over each gap-free stretch, padded "

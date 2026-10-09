@@ -127,6 +127,7 @@ MANIFEST_FIELDS = {
     "meets_published_tetrode_criterion",
     "input_sha256",
     "artifacts",
+    "tetrode_selection",
 }
 """The fields of an epoch's manifest record the brief names."""
 
@@ -1099,6 +1100,8 @@ def test_one_artifact_mask_for_all_four_detectors(tmp_path, monkeypatch):
     artifacts = record["artifacts"]
     assert artifacts["run_id"] == ARTIFACT_RUN_ID
     assert artifacts["n_intervals"] == 1
+    # R-T's reference samples leave the mask out too
+    assert record["tetrode_selection"]["n_reference"] == np.count_nonzero(~in_mask)
     # the masked, filtered Kay is compared with the unmasked canonical events
     assert record["kay_version_check"]["differences"] == {
         "version_only": ["package version"],
@@ -1177,11 +1180,44 @@ def test_an_artifact_run_without_the_epoch_fails_it(tmp_path):
     )
 
 
-def test_the_detecting_channels_are_chosen_in_one_place(tmp_path, monkeypatch):
-    """``detection_channels`` picks the band's channels the four detectors read
-    and Zugaro chooses among; today every one."""
+ROGUE_RIPPLE_TIMES_S = tuple(np.arange(2.5, 58.0, 5.0))
+"""Seconds after the first sample: a rogue tetrode's twelve own bursts, between
+the shared ripples. More bursts than the others' five, so that Zugaro's
+channel score (mean over median ripple-band RMS) prefers the rogue."""
+
+
+def _epoch_with_rogues(rogue_columns: tuple[int, ...]) -> SimpleNamespace:
+    """The main epoch with some band electrodes made rogue tetrodes.
+
+    Each rogue's raw LFP is replaced by one channel of another simulated
+    session, rippling at ``ROGUE_RIPPLE_TIMES_S`` (1 s later for a second
+    rogue) and not at the shared ripples (the j16 pattern R-T drops). Its band
+    is then the re-filtered raw, so the band check still holds.
+
+    Parameters
+    ----------
+    rogue_columns : tuple of int
+        Columns of the band (indices into ``ELECTRODE_IDS``).
+    """
     epoch = _main_epoch()
-    widths = {}
+    raw = epoch.raw.copy()
+    for number, column in enumerate(rogue_columns):
+        own = simulate_session(
+            epoch.time,
+            BASE_TIME_S + np.asarray(ROGUE_RIPPLE_TIMES_S) + number,
+            n_channels=1,
+            rng=10 + number,
+            ripple_frequency=(150, 175),
+        )
+        raw[:, BAND_COLUMNS[column]] = np.round(
+            COUNTS_PER_SIMULATED_UNIT * own.lfps[:, 0]
+        ).astype(np.int16)
+    return SimpleNamespace(time=epoch.time, raw=raw, windows=epoch.windows)
+
+
+def _recording_signals(monkeypatch) -> dict:
+    """Wrap Kay, Karlsson and Yu so each call's band is kept."""
+    signals: dict = {}
     for name, attribute in {
         "kay": "Kay_ripple_detector",
         "karlsson": "Karlsson_ripple_detector",
@@ -1190,26 +1226,97 @@ def test_the_detecting_channels_are_chosen_in_one_place(tmp_path, monkeypatch):
         detector = getattr(swr_inventories, attribute)
 
         def recording(time, signal, *args, _name=name, _detector=detector, **kw):
-            widths[_name] = signal.shape[1]
+            signals[_name] = np.array(signal)
             return _detector(time, signal, *args, **kw)
 
         monkeypatch.setattr(swr_inventories, attribute, recording)
+    return signals
+
+
+def test_rule_rt_chooses_the_tetrodes_every_detector_reads(tmp_path, monkeypatch):
+    """R-T drops the rogue tetrode once, before any detector: Kay, Karlsson and
+    Yu read the band of the kept tetrodes, Zugaro chooses its channel among
+    them, and the record keeps every tetrode's coupling, the dropped group,
+    and each kept electrode with its own reference."""
+    rogue = 2
+    epoch = _epoch_with_rogues((rogue,))
     inputs = _band_inputs(epoch)
-    np.testing.assert_array_equal(
-        runner.detection_channels(inputs), np.ones(ELECTRODE_IDS.size, dtype=bool)
+    unselected = best_ripple_channel(
+        inputs["raw_referenced"], inputs["time"], FS, ELECTRODE_IDS
     )
-    monkeypatch.setattr(
-        runner, "detection_channels", lambda inputs: np.array([False, True, True, True])
+    assert unselected.electrode_id == ELECTRODE_IDS[rogue], (
+        "the rogue must be the channel Zugaro would choose without R-T"
     )
+    signals = _recording_signals(monkeypatch)
 
     record = run_epoch(
         NWB_FILE_NAME, EPOCH_NAME, output_dir=tmp_path / "out", **_fetchers(epoch)
     )
 
-    assert record["status"] == "ok"
-    assert widths == {"kay": 3, "karlsson": 3, "yu": 3}
-    assert record["n_detecting_tetrodes"] == 2  # electrode 0 was tetrode "0"'s only
-    assert str(ELECTRODE_IDS[0]) not in record["zugaro_channel"]["scores"]
+    assert record["status"] == "ok", record
+    kept = np.arange(ELECTRODE_IDS.size) != rogue
+    for name in ("kay", "karlsson", "yu"):
+        np.testing.assert_array_equal(
+            signals[name], inputs["ripple_band"][:, kept], err_msg=name
+        )
+    assert record["electrode_ids"] == ELECTRODE_IDS[kept].tolist()
+    assert record["zugaro_channel"]["electrode_id"] in ELECTRODE_IDS[kept].tolist()
+    assert set(record["zugaro_channel"]["scores"]) == {
+        str(e) for e in ELECTRODE_IDS[kept]
+    }
+    # each kept electrode keeps its own reference; R-T drops no reference
+    assert record["reference_ids"] == [16, 16, 81]
+    selection = record["tetrode_selection"]
+    assert selection["kept"] == kept.tolist()
+    assert selection["dropped_electrode_groups"] == [ELECTRODE_GROUP_NAMES[rogue]]
+    assert selection["dropped_electrode_ids"] == [int(ELECTRODE_IDS[rogue])]
+    assert selection["coupling"][rogue] < 1.0
+    assert min(np.delete(selection["coupling"], rogue)) >= 1.0
+    # every band electrode, its group and its reference, in the band's order
+    assert selection["electrode_ids"] == ELECTRODE_IDS.tolist()
+    assert selection["electrode_group_names"] == ELECTRODE_GROUP_NAMES.tolist()
+    assert selection["reference_ids"] == [16, 16, 81, 81]
+    # electrode 8 left, but its tetrode "2" keeps electrode 12
+    assert record["n_detecting_tetrodes"] == 3
+    for name in DETECTORS:
+        assert record["n_events"][name] > 0, name
+
+
+def test_rule_rt_failing_closed_fails_the_epoch(tmp_path):
+    """Two rogues of four tetrodes is more than a third: the epoch fails with
+    the reason and every tetrode's coupling, and writes nothing."""
+    epoch = _epoch_with_rogues((0, 1))
+    output_dir = tmp_path / "out"
+
+    record = run_epoch(
+        NWB_FILE_NAME, EPOCH_NAME, output_dir=output_dir, **_fetchers(epoch)
+    )
+
+    assert record["status"] == "failed"
+    assert "more than a third" in record["reason"]
+    selection = record["tetrode_selection"]
+    assert {"0", "1"} <= set(selection["dropped_electrode_groups"])
+    assert len(selection["coupling"]) == ELECTRODE_IDS.size
+    assert not any(
+        path.exists()
+        for path in _outputs(output_dir, epoch_id(NWB_FILE_NAME, EPOCH_NAME)).values()
+    )
+
+
+def test_rule_rt_keeps_every_tetrode_that_ripples_with_the_rest(tmp_path):
+    record = run_epoch(
+        NWB_FILE_NAME,
+        EPOCH_NAME,
+        output_dir=tmp_path / "out",
+        **_fetchers(_main_epoch()),
+    )
+
+    selection = record["tetrode_selection"]
+    assert selection["dropped_electrode_groups"] == []
+    assert min(selection["coupling"]) >= 1.0
+    assert record["electrode_ids"] == ELECTRODE_IDS.tolist()
+    # 2 cm/s throughout and no mask: every sample is a reference sample
+    assert selection["n_reference"] == _band_inputs(_main_epoch())["time"].size
 
 
 # ---------------------------------------------------------------------------
@@ -1322,6 +1429,14 @@ def test_a_failed_epoch_is_recorded_and_the_rest_run(
     assert manifest["settings"]["detectors"] == {
         name: dict(settings)
         for name, settings in swr_inventories.DETECTOR_SETTINGS.items()
+    }
+    assert manifest["settings"]["tetrode_selection"] == {
+        "rule": "R-T",
+        "coupling_cut": 1.0,
+        "loo_threshold_z": 5.0,
+        "loo_smoothing_sigma_s": 0.004,
+        "reference_speed_cm_per_s": 4.0,
+        "maximum_dropped_fraction": "1/3",
     }
     output_dir = tmp_path / "swr" / "test-run"
     assert all(path.exists() for path in _outputs(output_dir, good).values())
