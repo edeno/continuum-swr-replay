@@ -31,6 +31,8 @@ import pandas as pd
 from numpy.typing import NDArray
 
 from continuum_swr_replay.analysis.hippocampus.artifacts.features import (
+    J5_REACH,
+    L20_REACH,
     channel_specificity,
     level_jump,
     level_shift,
@@ -41,6 +43,7 @@ from continuum_swr_replay.analysis.hippocampus.artifacts.features import (
     spike_lines,
     window_band_power,
     window_centers,
+    window_valid,
 )
 from continuum_swr_replay.analysis.hippocampus.artifacts.io import (
     empty_cores,
@@ -466,8 +469,10 @@ def detect_artifacts(
         The LFP's nominal rate (Hz).
     valid : ndarray of bool, shape (n_time,), optional
         Samples to read; a sample with a non-finite CA1 or reference value is
-        invalid too. Invalid samples are set to 0 and left out of every robust
-        scale.
+        invalid too. No feature reads across an invalid sample: a sample whose
+        J5 window (``t - 5 .. t + 5``) or L20 window (``t - 24 .. t + 24``)
+        holds one has no step value, and a 1-s window holding one has no S
+        value. The invalid samples themselves are not masked.
 
     Returns
     -------
@@ -485,8 +490,11 @@ def detect_artifacts(
     usable = np.isfinite(ca1).all(axis=1) & np.isfinite(reference).all(axis=1)
     if valid is not None:
         usable &= np.asarray(valid, dtype=bool)
+    # 0 keeps the filters finite; no feature reads these samples (below)
     ca1[~usable] = 0.0
     reference[~usable] = 0.0
+    has_jump = window_valid(usable, J5_REACH)
+    has_shift = window_valid(usable, L20_REACH)
     span = (float(time[0]), float(time[-1]))
     n_channels = ca1.shape[1]
 
@@ -496,6 +504,7 @@ def detect_artifacts(
         window_s=S_WINDOW_S,
         segment_s=S_SEGMENT_S,
         band_hz=S_BAND_HZ,
+        valid=usable,
     )
     s = s_cores(
         window_centers(time, sampling_frequency, S_WINDOW_S),
@@ -504,14 +513,15 @@ def detect_artifacts(
     )
 
     jump = level_jump(ca1)
-    robust = robust_jump(jump, usable)
+    robust = robust_jump(jump, has_jump)
+    robust[~has_shift] = 0.0  # no L20 there, so no persistent step
     step_count = persistent_step_count(
         jump, robust, level_shift(ca1), threshold=T_CA1_K, persistence=T_CA1_RHO
     )
     del jump, robust
     lfp_events = pd.concat(
         [
-            t_ref_events(time, reference_jump(reference, usable)),
+            t_ref_events(time, reference_jump(reference, has_jump)),
             t_ca1_events(time, step_count, n_channels),
         ],
         ignore_index=True,
@@ -544,6 +554,7 @@ def detect_artifacts(
         "n_samples": int(n_time),
         "n_invalid_samples": int((~usable).sum()),
         "n_windows": int(power.shape[0]),
+        "n_windows_without_power": int(np.isnan(power).any(axis=1).sum()),
         "n_channels": int(n_channels),
         "n_references": int(reference.shape[1]),
         **spike_counts,

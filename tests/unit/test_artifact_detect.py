@@ -257,11 +257,64 @@ class TestMergingT:
 
 
 class TestInvalidSamples:
-    def test_non_finite_rows_are_zeroed_and_counted(self):
+    """No feature reads across an invalid sample, and the gap itself is not
+    masked. The probe: a DC offset turns zero-filled samples into steps at the
+    run's edges unless the step features skip them."""
+
+    GAP = slice(10000, 10300)
+    """NaN at samples 10000-10299 (0.3 s at 10.0-10.3 s)."""
+
+    @staticmethod
+    def _offset_epoch() -> SyntheticEpoch:
+        epoch = SyntheticEpoch()
+        epoch.ca1 += 1000.0
+        epoch.reference += 1000.0
+        return epoch
+
+    def test_non_finite_rows_are_counted_and_make_no_core(self):
         epoch = SyntheticEpoch()
         epoch.ca1[5000:5010, 3] = np.nan
+
+        cores = _detect(epoch, valid=np.ones(epoch.time.size, dtype=bool))
+
+        assert cores.attrs["counts"]["n_invalid_samples"] == 10
+        assert cores.empty
+
+    @pytest.mark.parametrize("how", ["nan", "valid"])
+    def test_a_gap_in_offset_data_makes_no_core_at_its_edges(self, how):
+        epoch = self._offset_epoch()
         valid = np.ones(epoch.time.size, dtype=bool)
+        if how == "nan":
+            epoch.ca1[self.GAP] = np.nan
+        else:  # the stored band unobserved there, as the runner passes it
+            valid[self.GAP] = False
 
         cores = _detect(epoch, valid=valid)
 
-        assert cores.attrs["counts"]["n_invalid_samples"] == 10
+        assert cores.empty, cores[["signatures", "core_start"]]
+        counts = cores.attrs["counts"]
+        assert counts["n_invalid_samples"] == 300
+        assert counts["n_windows_without_power"] == 1  # window 10 holds the gap
+
+    def test_a_ca1_step_next_to_a_gap_is_still_found(self):
+        """40 ms after the gap: its J5 and L20 windows do not reach it."""
+        epoch = self._offset_epoch()
+        epoch.ca1[self.GAP] = np.nan
+        epoch.add_step(10.34, [0, 1, 2], 60 * NOISE)
+
+        cores = _detect(epoch)
+
+        assert cores["signatures"].tolist() == ["ca1"]
+        assert abs(cores["core_start"].iloc[0] - epoch.at(10.34)) < 0.01
+
+    def test_a_reference_step_next_to_a_gap_is_still_found(self):
+        """10 ms after the gap: T-ref reads J5 alone, whose window does not
+        reach it."""
+        epoch = self._offset_epoch()
+        epoch.ca1[self.GAP] = np.nan
+        epoch.add_step(10.31, [], 60 * NOISE, on_reference=True)
+
+        cores = _detect(epoch)
+
+        assert cores["signatures"].tolist() == ["ref"]
+        assert abs(cores["core_start"].iloc[0] - epoch.at(10.31)) < 0.01

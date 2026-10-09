@@ -276,5 +276,13 @@ The literature check (23 papers and 3 code sources whose methods were read) foun
 - **The masked decode has not been run.** The effect of `is_missing` and the encoding
   exclusion is inferred from the library code (Task 17 runs one).
 - **Time gaps.** Like the prototype, the features run on consecutive samples; a gap in the
-  LFP's timestamps is not treated specially. Every non-finite sample is counted in the
-  manifest (`n_invalid_samples`).
+  LFP's timestamps is not treated specially.
+- **Unobserved samples are not masked.** A sample is unobserved when the stored band, the CA1
+  LFP or a reference is not finite there. No feature reads across one:
+  - a sample whose J5 window (±5 samples) or L20 window (±24 samples) holds one has no step
+    value;
+  - a 1-s window holding one has no S value.
+
+  The unobserved samples themselves are not masked. The SWR source's coverage already
+  leaves out non-finite samples of the stored band. The record counts them
+  (`n_invalid_samples`) and the windows without S power (`n_windows_without_power`).

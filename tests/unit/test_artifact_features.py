@@ -31,6 +31,7 @@ from continuum_swr_replay.analysis.hippocampus.artifacts.features import (
     spike_lines,
     window_band_power,
     window_centers,
+    window_valid,
 )
 
 FS = 1000.0
@@ -51,6 +52,32 @@ class TestRobustUnits:
         values = np.arange(10.0)[:, None]
 
         np.testing.assert_allclose(robust_scale(values), [1.4826 * 2.5])
+
+
+class TestWindowValidity:
+    def test_a_sample_is_valid_when_its_whole_window_is(self):
+        valid = np.ones(100, dtype=bool)
+        valid[50] = False
+
+        out = window_valid(valid, 5)
+
+        expected = np.ones(100, dtype=bool)
+        expected[45:56] = False
+        np.testing.assert_array_equal(out, expected)
+
+    def test_samples_beyond_the_ends_count_as_valid(self):
+        valid = np.ones(20, dtype=bool)
+
+        np.testing.assert_array_equal(window_valid(valid, 24), valid)
+
+    def test_a_run_of_invalid_samples_widens_by_the_reach_on_each_side(self):
+        valid = np.ones(200, dtype=bool)
+        valid[100:130] = False
+
+        out = window_valid(valid, 24)
+
+        assert out[75] and not out[76]
+        assert not out[153] and out[154]
 
 
 class TestLevelJump:
@@ -74,6 +101,21 @@ class TestLevelJump:
         robust = robust_jump(jump, np.ones(5, dtype=bool))
 
         np.testing.assert_allclose(robust[:, 0], np.abs(jump[:, 0]) / 1.4826)
+
+    def test_a_sample_without_a_j5_value_is_0_and_left_out_of_the_scale(self):
+        rng = np.random.default_rng(3)
+        jump = rng.normal(size=(300, 2)).astype(np.float32)
+        jump[100:110] = 1e4  # values read across an invalid sample
+        has_jump = np.ones(300, dtype=bool)
+        has_jump[100:110] = False
+
+        robust = robust_jump(jump, has_jump)
+
+        assert not robust[100:110].any()
+        clean = np.r_[0:100, 110:300]
+        np.testing.assert_allclose(
+            robust[clean], np.abs(jump[clean]) / robust_scale(jump[clean]), rtol=1e-6
+        )
 
     def test_reference_jump_is_the_largest_over_references(self):
         x = np.zeros((100, 2), dtype=np.float32)
@@ -148,6 +190,19 @@ class TestWindowSpectra:
                 np.testing.assert_allclose(power[w, c], expected, rtol=1e-4)
         assert power.shape == (n_windows, n_channels)
 
+    def test_a_window_holding_an_invalid_sample_has_no_power(self):
+        rng = np.random.default_rng(4)
+        x = rng.normal(size=(4000, 3)).astype(np.float32)
+        valid = np.ones(4000, dtype=bool)
+        valid[2999] = False  # the last sample of window 2
+
+        power = window_band_power(x, FS, valid=valid)
+
+        assert np.isnan(power[2]).all()
+        np.testing.assert_array_equal(
+            power[[0, 1, 3]], window_band_power(x, FS)[[0, 1, 3]]
+        )
+
     def test_window_centers_are_the_mean_sample_time(self):
         time = 1.6e9 + np.arange(3500) / FS
 
@@ -166,6 +221,21 @@ class TestWindowSpectra:
 
         # every channel's epoch median is 1, so ratios are the powers
         np.testing.assert_allclose(spec, [1.0, 1.0, 30.0, 1.0, 1.0])
+
+    def test_a_window_without_power_has_no_specificity(self):
+        rng = np.random.default_rng(5)
+        power = rng.uniform(1.0, 2.0, (8, 6))
+        power[[2, 5]] = np.nan
+
+        spec = channel_specificity(power)
+
+        assert np.isnan(spec[[2, 5]]).all()
+        kept = [0, 1, 3, 4, 6, 7]
+        np.testing.assert_allclose(spec[kept], channel_specificity(power[kept]))
+
+    def test_no_window_with_power_is_refused(self):
+        with pytest.raises(ValueError, match="no window"):
+            channel_specificity(np.full((3, 4), np.nan))
 
     def test_an_swr_like_rise_on_every_channel_is_not_specific(self):
         power = np.ones((5, 6))

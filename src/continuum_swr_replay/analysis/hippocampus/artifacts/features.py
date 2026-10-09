@@ -18,10 +18,12 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
-from scipy.ndimage import median_filter
+from scipy.ndimage import binary_dilation, median_filter
 from scipy.spatial import cKDTree
 
 __all__ = [
+    "J5_REACH",
+    "L20_REACH",
     "MADN_FACTOR",
     "SPIKE_LINE_COLUMNS",
     "channel_specificity",
@@ -35,6 +37,7 @@ __all__ = [
     "spike_lines",
     "window_band_power",
     "window_centers",
+    "window_valid",
 ]
 
 MADN_FACTOR = 1.4826
@@ -43,6 +46,11 @@ MADN_FACTOR = 1.4826
 SCALE_FLOOR = 1e-6
 """Smallest robust scale divided by, so a flat channel gives 0, not NaN
 (the prototype's floor)."""
+
+J5_REACH = 5
+"""J5 at sample t reads the samples t-5 .. t+5."""
+L20_REACH = 24
+"""L20 at sample t reads the samples t-24 .. t+24."""
 
 SPIKE_LINE_COLUMNS = [
     "time",
@@ -75,6 +83,34 @@ def robust_scale(
     return scale
 
 
+def window_valid(valid: NDArray[np.bool_], reach: int) -> NDArray[np.bool_]:
+    """True at each sample whose window ``t - reach .. t + reach`` holds only
+    valid samples.
+
+    A sample's step value (J5 with ``reach = 5``, L20 with ``reach = 24``) is
+    defined only there: elsewhere its window reads across an invalid sample.
+    Samples beyond the array's ends count as valid; the step features handle
+    the ends themselves.
+
+    Parameters
+    ----------
+    valid : ndarray of bool, shape (n_time,)
+    reach : int
+        Samples on each side.
+
+    Returns
+    -------
+    ndarray of bool, shape (n_time,)
+    """
+    invalid = ~np.asarray(valid, dtype=bool)
+    if not invalid.any():
+        return np.ones(invalid.size, dtype=bool)
+    near_invalid: NDArray[np.bool_] = binary_dilation(
+        invalid, structure=np.ones(2 * reach + 1, dtype=bool)
+    )
+    return ~near_invalid
+
+
 def window_centers(
     time: NDArray[np.float64], sampling_frequency: float, window_s: float = 1.0
 ) -> NDArray[np.float64]:
@@ -103,6 +139,7 @@ def window_band_power(
     window_s: float = 1.0,
     segment_s: float = 0.064,
     band_hz: tuple[float, float] = (150.0, 250.0),
+    valid: NDArray[np.bool_] | None = None,
     windows_per_chunk: int = 256,
 ) -> NDArray[np.float32]:
     """Welch band power per window and channel.
@@ -111,7 +148,8 @@ def window_band_power(
     of ``segment_s`` as fit (15 of 64 ms in 1 s, from the window's start). Each
     segment has its mean removed and a Hann taper applied; the window's
     spectrum is the mean of the segments' squared FFT magnitudes, and its band
-    power is the sum over ``band_hz[0] <= f < band_hz[1]``.
+    power is the sum over ``band_hz[0] <= f < band_hz[1]``. A window holding
+    an invalid sample has no power (NaN).
 
     Parameters
     ----------
@@ -122,12 +160,15 @@ def window_band_power(
         Seconds.
     band_hz : tuple of float
         Lower bound inclusive, upper exclusive.
+    valid : ndarray of bool, shape (n_time,), optional
+        Which samples were observed; all when None.
     windows_per_chunk : int
         Windows transformed at once; only memory depends on it.
 
     Returns
     -------
     ndarray of float32, shape (n_windows, n_channels)
+        NaN in every channel of a window that holds an invalid sample.
     """
     n_window = int(round(window_s * sampling_frequency))
     n_segment = int(round(segment_s * sampling_frequency))
@@ -151,6 +192,9 @@ def window_band_power(
             .astype(np.float32)
         )  # (windows, n_freqs, n_channels)
         power[first:last] = spectra[:, in_band].sum(axis=1)
+    if valid is not None:
+        unobserved = ~np.asarray(valid, dtype=bool)[: n_windows * n_window]
+        power[unobserved.reshape(n_windows, n_window).any(axis=1)] = np.nan
     return power
 
 
@@ -158,38 +202,47 @@ def channel_specificity(power: NDArray[np.floating]) -> NDArray[np.floating]:
     """Per window: the 2nd-largest channel ratio over the median ratio.
 
     A channel's ratio is its window power over its own epoch-median window
-    power. An SWR raises ripple power on most CA1 channels at once, so the
-    ratio is high on all of them and the specificity stays near 1. Sustained
-    noise on a fixed subset raises only that subset.
+    power, the median taken over the windows with power. An SWR raises ripple
+    power on most CA1 channels at once, so the ratio is high on all of them
+    and the specificity stays near 1. Sustained noise on a fixed subset raises
+    only that subset.
 
     Parameters
     ----------
     power : ndarray, shape (n_windows, n_channels)
-        From :func:`window_band_power`; at least 2 channels.
+        From :func:`window_band_power`; at least 2 channels. A window with a
+        non-finite power has no specificity.
 
     Returns
     -------
     ndarray, shape (n_windows,)
+        NaN for a window without power, which never reaches an S threshold.
 
     Raises
     ------
     ValueError
-        If there are fewer than 2 channels, or a channel's epoch-median power
-        is not positive (a flat channel), which would make every ratio of
-        that channel undefined.
+        If there are fewer than 2 channels, no window has power, or a
+        channel's epoch-median power is not positive (a flat channel), which
+        would make every ratio of that channel undefined.
     """
     if power.shape[1] < 2:
         raise ValueError("channel specificity needs at least 2 channels")
-    median_power = np.median(power, axis=0)
+    observed = np.isfinite(power).all(axis=1)
+    if not observed.any():
+        raise ValueError("no window has ripple-band power on every channel")
+    median_power = np.median(power[observed], axis=0)
     if not (median_power > 0).all():
         flat = np.flatnonzero(~(median_power > 0)).tolist()
         raise ValueError(
             f"CA1 channel columns {flat} have no ripple-band power in most "
             "windows, so the channel specificity is undefined"
         )
-    ratio = power / median_power
+    ratio = power[observed] / median_power
     second = -np.partition(-ratio, 1, axis=1)[:, 1]
-    specificity: NDArray[np.floating] = second / np.median(ratio, axis=1)
+    specificity: NDArray[np.floating] = np.full(
+        power.shape[0], np.nan, dtype=ratio.dtype
+    )
+    specificity[observed] = second / np.median(ratio, axis=1)
     return specificity
 
 
@@ -257,7 +310,9 @@ def robust_jump(
     jump : ndarray, shape (n_time, n_channels)
         From :func:`level_jump`.
     valid : ndarray of bool, shape (n_time,), optional
-        The samples the scale is estimated from.
+        The samples with a J5 value (``window_valid(observed, J5_REACH)``):
+        the scale is estimated from them, and every other sample is 0, so it
+        cannot reach a threshold. All samples when None.
 
     Returns
     -------
@@ -265,6 +320,8 @@ def robust_jump(
     """
     scale = robust_scale(jump, valid)
     robust: NDArray[np.floating] = np.abs(jump) / np.maximum(scale, SCALE_FLOOR)
+    if valid is not None:
+        robust[~np.asarray(valid, dtype=bool)] = 0
     return robust
 
 
@@ -278,6 +335,7 @@ def reference_jump(
     reference_lfp : ndarray, shape (n_time, n_references)
         Raw, unreferenced reference electrodes.
     valid : ndarray of bool, shape (n_time,), optional
+        The samples with a J5 value, as :func:`robust_jump` takes them.
 
     Returns
     -------

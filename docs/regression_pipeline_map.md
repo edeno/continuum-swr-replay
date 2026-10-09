@@ -38,7 +38,7 @@ The artifact detector: its constants and its four rules.
 
 The artifact detector's features: S window spectra, J5 and L20 steps, spike lines.
 
-`robust_scale`, `window_centers`, `window_band_power`, `channel_specificity`, `level_jump`, `level_shift`, `robust_jump`, `reference_jump`, `persistent_step_count`, `nearest_mark_distance`, `spike_lines`
+`robust_scale`, `window_valid`, `window_centers`, `window_band_power`, `channel_specificity`, `level_jump`, `level_shift`, `robust_jump`, `reference_jump`, `persistent_step_count`, `nearest_mark_distance`, `spike_lines`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/artifacts/io.py`
 
