@@ -123,6 +123,10 @@ def test_an_epoch_writes_its_cores_and_record(tmp_path):
         int(((t >= span[0]) & (t <= span[1])).sum()) for t in epoch.spike_times
     )
     assert record["n_cores"] == {"S": 1, "T": 1}
+    assert record["n_invalid_samples"] == 0
+    assert record["n_time_gaps"] == 0
+    assert record["n_windows_without_power"] == 0
+    assert record["t_ref_disabled"] is False
     assert record["n_cores_by_signatures"] == {"S": 1, "ref": 1}
     assert record["constants"] == runner.detector_constants()
     for consumer in Consumer:
@@ -150,6 +154,39 @@ def test_an_epoch_without_artifacts_writes_an_empty_file(tmp_path):
     assert list(cores.columns) == list(CORE_COLUMNS)
     assert record["n_cores"] == {"S": 0, "T": 0}
     assert record["masked_s"] == {"swr": 0.0, "decoder": 0.0, "analysis": 0.0}
+
+
+def test_an_epoch_whose_references_are_all_band_electrodes_runs_without_t_ref(
+    tmp_path,
+):
+    """No reference electrode outside the band: T-ref is off, the epoch is
+    ``ok``, and its record says so for R9 to flag."""
+    epoch = _artifact_epoch()
+    fetch = _fetchers(epoch)["fetch_inputs"]
+
+    def fetch_inputs(nwb_file_name, epoch_name):
+        inputs = fetch(nwb_file_name, epoch_name)
+        inputs["reference_ids"] = np.full(20, ELECTRODE_IDS[0])
+        inputs["raw_referenced_native"] = inputs["raw_referenced_native"][:, :20]
+        return inputs
+
+    record = _run_epoch(tmp_path, epoch, fetch_inputs=fetch_inputs)
+
+    assert record["status"] == "ok", record
+    assert record["n_references"] == 0
+    assert record["reference_electrode_ids"] == []
+    assert record["t_ref_disabled"] is True
+    # the reference step goes unseen; the S block is still found
+    assert record["n_cores_by_signatures"] == {"S": 1}
+
+
+def test_timestamp_gaps_are_recorded(tmp_path):
+    epoch = SyntheticEpoch()
+    epoch.time[15000:] += 0.25
+
+    record = _run_epoch(tmp_path, epoch)
+
+    assert record["n_time_gaps"] == 1
 
 
 def test_lfp_outside_the_position_span_is_not_read(tmp_path):

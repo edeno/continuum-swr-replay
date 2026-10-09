@@ -160,6 +160,11 @@ def detector_constants() -> dict[str, float | int | tuple[float, float]]:
     return {name.lower(): values[name] for name in CONSTANT_NAMES}
 
 
+TIME_GAP_STEPS = 1.5
+"""A timestamp step longer than 1.5 sample periods counts as a gap in
+``attrs["counts"]["n_time_gaps"]``. Gaps are counted, not handled: windows
+run over consecutive samples, as in the prototype."""
+
 EVENT_COLUMNS = ["time", "signature", "ref_j5", "ca1_frac", "spk_frac", "spk_ood"]
 """A T event table: one row per sample (or spike-line bin) where a T signature
 fires, with its evidence; NaN where the signature gives none."""
@@ -479,14 +484,27 @@ def detect_artifacts(
     pd.DataFrame
         Columns ``CORE_COLUMNS``, one row per core, in time order, unpadded;
         no rows for a clean epoch. ``attrs["counts"]`` holds the inputs'
-        counts (samples, invalid samples, windows, channels, references,
-        tetrodes, spikes, reference marks, OOD spikes) and how many samples or
-        bins fired each T signature.
+        counts (samples, invalid samples, timestamp gaps, windows, channels,
+        references, tetrodes, spikes, reference marks, OOD spikes), whether
+        T-ref was disabled for want of a reference electrode, and how many
+        samples or bins fired each T signature.
+
+    Raises
+    ------
+    ValueError
+        If `ca1_lfp` or `reference_lfp` is not 2-D with one row per sample of
+        `time`.
     """
     time = np.asarray(time, dtype=np.float64)
     n_time = time.size
     ca1 = np.array(ca1_lfp, dtype=np.float32)
-    reference = np.array(reference_lfp, dtype=np.float32).reshape(n_time, -1)
+    reference = np.array(reference_lfp, dtype=np.float32)
+    for name, values in (("ca1_lfp", ca1), ("reference_lfp", reference)):
+        if values.ndim != 2 or values.shape[0] != n_time:
+            raise ValueError(
+                f"{name} has shape {values.shape}; it needs one row per sample of "
+                f"time ({n_time}), as (n_time, n_columns)"
+            )
     usable = np.isfinite(ca1).all(axis=1) & np.isfinite(reference).all(axis=1)
     if valid is not None:
         usable &= np.asarray(valid, dtype=bool)
@@ -553,10 +571,12 @@ def detect_artifacts(
     cores.attrs["counts"] = {
         "n_samples": int(n_time),
         "n_invalid_samples": int((~usable).sum()),
+        "n_time_gaps": int((np.diff(time) > TIME_GAP_STEPS / sampling_frequency).sum()),
         "n_windows": int(power.shape[0]),
         "n_windows_without_power": int(np.isnan(power).any(axis=1).sum()),
         "n_channels": int(n_channels),
         "n_references": int(reference.shape[1]),
+        "t_ref_disabled": bool(reference.shape[1] == 0),
         **spike_counts,
         "n_ref_samples": int((lfp_events["signature"] == "ref").sum()),
         "n_ca1_samples": int((lfp_events["signature"] == "ca1").sum()),

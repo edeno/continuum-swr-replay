@@ -318,3 +318,61 @@ class TestInvalidSamples:
 
         assert cores["signatures"].tolist() == ["ref"]
         assert abs(cores["core_start"].iloc[0] - epoch.at(10.31)) < 0.01
+
+
+class TestTheInputs:
+    def test_a_reference_not_shaped_time_by_electrode_is_refused(self):
+        epoch = SyntheticEpoch()
+        two = np.column_stack([epoch.reference, epoch.reference])
+
+        for reference in (two.T, epoch.reference[:, 0], epoch.reference[:-1]):
+            with pytest.raises(ValueError, match="reference_lfp"):
+                detect_artifacts(
+                    epoch.time,
+                    epoch.ca1,
+                    reference,
+                    epoch.spike_times,
+                    epoch.spike_marks,
+                    FS,
+                )
+
+    def test_a_ca1_lfp_not_shaped_time_by_channel_is_refused(self):
+        epoch = SyntheticEpoch()
+        with pytest.raises(ValueError, match="ca1_lfp"):
+            detect_artifacts(
+                epoch.time,
+                epoch.ca1.T,
+                epoch.reference,
+                epoch.spike_times,
+                epoch.spike_marks,
+                FS,
+            )
+
+    def test_no_reference_electrode_disables_t_ref_and_says_so(self):
+        epoch = SyntheticEpoch()
+        epoch.add_step(10.5, [0, 1, 2], 60 * NOISE)
+        no_reference = np.zeros((epoch.time.size, 0))
+
+        cores = detect_artifacts(
+            epoch.time,
+            epoch.ca1,
+            no_reference,
+            epoch.spike_times,
+            epoch.spike_marks,
+            FS,
+        )
+
+        assert cores.attrs["counts"]["t_ref_disabled"] is True
+        assert cores.attrs["counts"]["n_references"] == 0
+        assert cores["signatures"].tolist() == ["ca1"]  # the other rules still run
+        assert _detect(SyntheticEpoch()).attrs["counts"]["t_ref_disabled"] is False
+
+    def test_timestamp_gaps_are_counted(self):
+        epoch = SyntheticEpoch()
+        epoch.time[5000:] += 0.01
+        epoch.time[20000:] += 0.5
+
+        counts = _detect(epoch).attrs["counts"]
+
+        assert counts["n_time_gaps"] == 2
+        assert _detect(SyntheticEpoch()).attrs["counts"]["n_time_gaps"] == 0
