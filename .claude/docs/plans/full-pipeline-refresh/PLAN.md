@@ -2113,6 +2113,44 @@ Output: `.claude/research/refresh_artifact_detector/followup/`. Reports: `follow
 5. **Amplitude cap,** for the methods: a cap at 9 or 10 robust z would drop 27.6 % or 23.7 % of
    true SWRs.
 
+**C2 outcome and rulings (2026-10-09; `followup/justification_report.md`):**
+- **Placement rule P.** Every artifact threshold is 1.5 × the largest value its statistic reaches in
+  the calibration SWR sets: true SWRs, visual SWRs and giant-day events, measured over the event
+  plus its padding.
+  - Why 1.5: one animal's maximum, divided by the other four animals' maximum, reaches 1.27–1.59.
+  - Definitional constants are exempt, and their reason is a mechanism or a precedent: window
+    lengths, bins, persistence and padding.
+  - R-rip (11.36) already follows the rule.
+- **Constants that change under P (a Task 16 fix round, after Task 17a):**
+
+  | Constant | Now | Under P |
+  |---|---|---|
+  | `t_ref` | 15 | 1.5 × 11.716 = 17.6 |
+  | `t_ca1_k` | 20 | 1.5 × 16.682 = 25.0 |
+  | `s_core` | 4 | 1.5 × 2.872 = 4.31 |
+
+  - The code writes each threshold as the margin times a named calibration maximum, with an evidence
+    note.
+  - Measured cost: 1 of 111 visual steps is no longer caught, and no SWR count changes.
+  - The reason: when the rule was placed without chimi, the current values masked 2 visual SWRs and 2
+    giant-day events there.
+- **T-spk stays off the rule** (0.40 of tetrodes, 0.20 OOD), with its limits stated.
+  - True SWRs reach 0.364 of tetrodes in bins with at least 20 % OOD marks, so the margin is thin.
+  - It rests on 3 labels and masks 5.2 s in total.
+  - R9 reviews every spike-only core in a gallery, which adds labels on the full data.
+- **R-T keeps its cut of 1.0 and its LOO threshold of 5**, the values stated before any effect was
+  measured.
+  - The cut is a mechanism constant: a rise of less than one robust SD while the rest of CA1
+    ripples.
+  - Task 17b's acceptance reports LOO 6.25 as a sensitivity check. It drops no rippling tetrode;
+    5 drops 2 tetrode-epochs, about 1 true SWR.
+- **Precedents read from source:**
+  - FieldTrip `ft_artifact_jump`: jump z > 20 after a 9-point median filter; it supports T-ref and
+    T-ca1.
+  - PREP, EEGLAB `clean_channels` and IBL / SpikeInterface `detect_bad_channels`: low correlation
+    with the other channels and high-frequency noise; they support R-T and S.
+  - None of the four has a reference veto, a persistence test or an OOD spike-line rule.
+
 ## C2 and C3: justification and consequences (read-only; started 2026-10-09)
 
 - **C2** (`followup/c2_brief.md`, report `justification_report.md`) justifies every rule (S, T-ref,
@@ -2141,6 +2179,7 @@ Output: `.claude/research/refresh_artifact_detector/followup/`. Reports: `follow
    - **Reference electrodes:** list every epoch with `t_ref_disabled` and every epoch with
      `n_time_gaps` > 0. Accept each one explicitly before setting the run id.
    - **Repo-only cores:** list every core with no prototype core, and review each in a gallery.
+   - **Every spike-only core** goes into a review gallery too. T-spk rests on 3 labels (C2).
    - **S margins:** in the 12 S epochs, list every spike-only core within 1.1 s of an S core and
      check it against the true-SWR and visual-SWR sets. This is review item 2 on the decode-free OOD
      reference. If a true SWR is masked there, rule on it before going on.
