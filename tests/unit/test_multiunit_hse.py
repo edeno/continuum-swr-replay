@@ -370,3 +370,86 @@ def test_load_data_masks_the_mua_of_the_areas_it_is_given(bandit_task, monkeypat
     hse_times = data["hse_times"]["HPC"]
     assert all(case._found(hse_times, at) for at in case.BURSTS_S)
     assert not case._found(hse_times, case.LINE_S)
+
+
+class TestTheLoadersIntervalRulesAreTheMasks:
+    """``data_loaders`` may not import ``analysis``, so the loader keeps its own
+    copies of the closed-interval rules. These tie them to the originals:
+    ``artifacts.masks.interval_mask`` for membership, and
+    ``swr_inventories.drop_overlapping_events`` and ``swr_source``'s event
+    overlap for dropping."""
+
+    TIME = np.round(np.arange(0.0, 2.0, 0.001), 3)
+    """A 1 kHz grid, so interval and event bounds land on samples exactly."""
+
+    @staticmethod
+    def _cases() -> list[tuple[pd.DataFrame, pd.DataFrame]]:
+        """(intervals, events) pairs: random, unsorted and overlapping
+        intervals; zero-length ones; bounds on the grid's samples, at its
+        edges, and events touching intervals at an instant; and no rows."""
+        rng = np.random.default_rng(7)
+        grid = TestTheLoadersIntervalRulesAreTheMasks.TIME
+        cases = []
+        for _ in range(200):
+            n_intervals, n_events = rng.integers(0, 6), rng.integers(0, 8)
+            starts = rng.choice(grid, n_intervals)
+            ends = starts + rng.choice([0.0, 0.001, 0.05, 0.3], n_intervals)
+            event_starts = rng.choice(grid, n_events)
+            event_ends = event_starts + rng.choice([0.0, 0.002, 0.1], n_events)
+            cases.append(
+                (
+                    pd.DataFrame({"start_time": starts, "end_time": ends}),
+                    pd.DataFrame({"start_time": event_starts, "end_time": event_ends}),
+                )
+            )
+        touching = pd.DataFrame({"start_time": [0.5, 0.0], "end_time": [0.7, 0.0]})
+        cases.append(
+            (
+                touching,
+                pd.DataFrame(
+                    {
+                        "start_time": [0.7, 0.3, 0.71, 0.0, 1.999],
+                        "end_time": [0.8, 0.5, 0.9, 0.0, 1.999],
+                    }
+                ),
+            )
+        )
+        cases.append((pd.DataFrame({"start_time": [], "end_time": []}), cases[0][1]))
+        return cases
+
+    def test_membership_is_interval_mask(self):
+        from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
+            interval_mask,
+        )
+        from continuum_swr_replay.data_loaders.lfp import _in_intervals
+
+        for intervals, _ in self._cases():
+            np.testing.assert_array_equal(
+                _in_intervals(self.TIME, intervals), interval_mask(self.TIME, intervals)
+            )
+
+    def test_event_overlap_is_the_detectors_and_the_sources(self):
+        from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
+            drop_overlapping_events,
+        )
+        from continuum_swr_replay.analysis.hippocampus.swr_source import (
+            _artifact_overlap,
+        )
+        from continuum_swr_replay.data_loaders.lfp import _overlap_any
+
+        for intervals, events in self._cases():
+            overlaps = _overlap_any(events, intervals)
+            kept, n_dropped = drop_overlapping_events(events, intervals)
+            assert n_dropped == int(overlaps.sum())
+            np.testing.assert_array_equal(
+                kept.to_numpy(), events.loc[~overlaps].to_numpy()
+            )
+            if len(events) and len(intervals):
+                np.testing.assert_array_equal(
+                    overlaps,
+                    _artifact_overlap(
+                        events.start_time.to_numpy(),
+                        events.end_time.to_numpy(),
+                        intervals,
+                    ),
+                )
