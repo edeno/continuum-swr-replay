@@ -1754,8 +1754,10 @@ analyses: the masked 2.0 Kay inventory.
   - **Consequences (the lead: "We also need to make sure we are not analyzing the artifact times
     or the consequences of artifact times in the analysis").**
     - A decoded event (non-local event, ContFrag label, Widloski event) within 0.3 s of the mask is
-      dropped. C3 measured that a masked gap changes analysed events within at most 0.21 s; the
-      reach does not grow with gap length.
+      dropped. C3 measured that a masked gap changes analysed NonLocal events within at most 0.21 s
+      and flips ContFrag SWR labels within at most 0.19 s; the reach does not grow with gap length.
+      ContFrag's posterior settles more slowly, by about 1.3 s, but the change is small: SWR mean
+      P(Continuous) moves by 0.01 or more within 0.2 s in 99 % of gaps, and by 1.36 s at most.
     - A time bin whose history covariates reach into the mask is dropped, and so is a peri-event
       window (PFC responses, reward kernels) that touches it.
   - **No post-step second.** No rodent lab we read pads after an artifact; the Buzsáki lab's
@@ -1787,6 +1789,10 @@ analyses: the masked 2.0 Kay inventory.
 - **No amplitude cap.** Some pipelines drop events above 9–10 SD. Our true SWRs reach 44 robust z,
   so a cap would remove giant SWRs. The design note reports how many reference-set SWRs a cap
   would drop.
+
+**Reading the task bodies below.** They were written before the simplified design. Wherever they
+say the `swr`, `decoder` or `analysis` mask, read *the one artifact mask*. Task 16's fix round 2
+built it, and Task 17a's runners use it. Nothing pads a second after a step.
 
 **Rulings after study C1 (2026-10-09; reports in `.claude/research/refresh_artifact_detector/followup/`):**
 - **Tetrode selection for SWR detection (the lead's decision, 2026-10-09).**
