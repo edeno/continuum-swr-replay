@@ -2055,7 +2055,7 @@ Work in the worktree `/cumulus/edeno/continuum-swr-replay-refresh-dev`, branch
 
 **Files and changes:**
 - **One eligibility rule for every event cohort** (non-local, SWR, MUA, ContFrag and Widloski): the
-  whole event is immobile (the existing rule) **and** it does not overlap the `analysis` mask.
+  whole event is immobile (the existing rule) **and** it does not overlap the artifact mask.
   - Define it once, next to `analysis/hippocampus/event_immobility.py`.
   - A dropped event keeps a reason, as `swr_source`'s `DropReason` does.
   - Grep every cohort builder and list each, with your decision, in the report.
@@ -2176,19 +2176,25 @@ Output: `.claude/research/refresh_artifact_detector/followup/`. Reports: `follow
    - **Provenance:** every manifest record has `dirty: false`; otherwise the run is not used.
    - **Reference electrodes:** list every epoch with `t_ref_disabled` and every epoch with
      `n_time_gaps` > 0. Accept each one explicitly before setting the run id.
-   - **Repo-only cores:** list every core with no prototype core, and review each in a gallery.
+   - **Repo-only and prototype-only cores:** list every core with no prototype core, and every
+     prototype core with no repo core, and review each in a gallery. Differences are expected:
+     rule P raised two thresholds, and the OOD reference no longer depends on a decode. One known
+     example is a 0.2-s spike-only prototype core in chimi20200227 that the repo does not flag
+     (Task 17b). Each difference must be explained, not just matched.
    - **Every spike-only core** goes into a review gallery too. T-spk rests on 3 labels (C2).
    - **S margins:** in the 12 S epochs, list every spike-only core within 1.1 s of an S core and
      check it against the true-SWR and visual-SWR sets. This is review item 2 on the decode-free OOD
      reference. If a true SWR is masked there, rule on it before going on.
 
    On the 218:
-   - every prototype core is matched, and masked time is within 2 % of the prototype's in total
-     and per epoch;
+   - masked time is within 2 % of C2's rebuilt-detector prediction at the shipped constants and
+     one mask (301.06 s against 300.66 s on the 22 acceptance epochs), in total and per epoch.
+     Every core-level difference from the prototype is explained (above);
    - the validation verdicts are reproduced:
-     - true SWRs: 0 masked after adjudication;
-     - visual SWRs: 0 of 55;
-     - steps: at least 95 of 111;
+     - reference SWR set: 0 masked after adjudication;
+     - model-reviewed SWRs: only the known S-padding case is masked (senor20201103_14_r7, 202.48 s,
+       0.55 s before an S block), so 1 of 55;
+     - model-reviewed steps: at least 94 of 111 (rule P; C2's prediction);
      - spike-only lines: 3 of 3;
      - S windows: 153 of 153.
 
