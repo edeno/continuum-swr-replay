@@ -41,7 +41,9 @@ recomputed under the new one, which is what the settings gate is for.
 
 Without ``--cuda_visible_devices`` the epochs run one after another in this
 process. With it they run in parallel, as the decoders do: a dask
-``LocalCUDACluster`` with one worker per listed GPU runs one epoch per task.
+``LocalCUDACluster`` with one worker per listed GPU runs one epoch per task
+(``cuda_cluster``). Each worker may use its share of this process's CPUs for
+BLAS and OpenMP: dask's nanny would otherwise cap each at one thread.
 Each epoch logs to ``logs/{epoch_id}_memoryless.log`` under the working
 directory, and only this process writes ``manifest.json``, as each epoch
 finishes, in the order they finish. A device list is refused when ``dask_cuda``
@@ -101,6 +103,7 @@ from importlib.metadata import version
 from pathlib import Path
 from typing import Any
 
+import dask
 import joblib
 import numpy as np
 import pandas as pd
@@ -728,6 +731,78 @@ def _run_one_logged(epoch_id: str, run_one_kwargs: dict, log_directory: Path) ->
     return record
 
 
+THREAD_VARIABLES = ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS")
+"""The BLAS and OpenMP thread counts dask's nanny sets to 1 in each worker it
+spawns (``distributed.nanny.pre-spawn-environ``). Set before the worker starts,
+since numpy reads them when it is imported."""
+
+
+def available_cpus() -> int:
+    """The CPUs this process may run on (its affinity), as its workers inherit."""
+    return len(os.sched_getaffinity(0))
+
+
+def worker_thread_environ(n_workers: int, n_cpus: int) -> dict[str, int]:
+    """Each worker's BLAS and OpenMP thread count: its share of the CPUs.
+
+    Parameters
+    ----------
+    n_workers : int
+        Workers sharing the CPUs, one per GPU.
+    n_cpus : int
+
+    Returns
+    -------
+    dict
+        Each of ``THREAD_VARIABLES`` set to ``n_cpus // n_workers``, at least 1.
+    """
+    return dict.fromkeys(THREAD_VARIABLES, max(1, n_cpus // n_workers))
+
+
+def cuda_cluster(cuda_visible_devices: str, local_directory: str) -> Cluster:
+    """A ``LocalCUDACluster``, one worker per listed GPU, whose workers may each
+    use their share of the CPUs.
+
+    dask's nanny sets ``THREAD_VARIABLES`` to 1 in the environment it spawns
+    each worker with (``distributed.nanny.pre-spawn-environ``), so every worker
+    ran its BLAS and OpenMP on one core. A value already in this process's
+    environment overrides that configuration, and a nanny leaves its values in
+    its parent's environment. So while the cluster is made, and its nannies
+    spawn their workers, both this process's environment and the
+    configuration hold ``worker_thread_environ``'s share of ``available_cpus``;
+    the environment is then restored. The nannies keep the values for any
+    restart.
+
+    Parameters
+    ----------
+    cuda_visible_devices : str
+        The GPUs, such as ``"3,4,6,7"``: one worker each.
+    local_directory : str
+        The workers' scratch folder.
+    """
+    n_workers = len(str(cuda_visible_devices).split(","))
+    threads = {
+        name: str(n)
+        for name, n in worker_thread_environ(n_workers, available_cpus()).items()
+    }
+    environ = {**dask.config.get("distributed.nanny.pre-spawn-environ"), **threads}
+    inherited = {name: os.environ.get(name) for name in threads}
+    os.environ.update(threads)
+    try:
+        with dask.config.set({"distributed.nanny.pre-spawn-environ": environ}):
+            cluster: Cluster = decoding_common.LocalCUDACluster(
+                CUDA_VISIBLE_DEVICES=cuda_visible_devices,
+                local_directory=local_directory,
+            )
+    finally:
+        for name, value in inherited.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+    return cluster
+
+
 def run_epochs(
     epoch_ids: list[str],
     run_one_kwargs: dict,
@@ -989,9 +1064,7 @@ def main(argv: list[str] | None = None) -> None:
             Path.cwd() / "logs" / "<epoch_id>_memoryless.log",
         )
         cluster_factory = functools.partial(
-            decoding_common.LocalCUDACluster,
-            CUDA_VISIBLE_DEVICES=args.cuda_visible_devices,
-            local_directory=args.local_scratch_dir,
+            cuda_cluster, args.cuda_visible_devices, args.local_scratch_dir
         )
         # the workers only return records: this process alone writes the manifest
         for number, (epoch_id, record) in enumerate(

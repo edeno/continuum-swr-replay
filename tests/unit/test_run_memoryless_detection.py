@@ -15,6 +15,7 @@ scratch space is pointed into it.
 
 import hashlib
 import json
+import os
 import threading
 from pathlib import Path
 
@@ -23,7 +24,7 @@ import joblib
 import numpy as np
 import pandas as pd
 import pytest
-from dask.distributed import LocalCluster
+from dask.distributed import Client, LocalCluster
 
 import scripts.decoding.run_memoryless_detection as runner
 from continuum_swr_replay import decoding_common
@@ -1370,3 +1371,90 @@ class TestRunEpochs:
         assert failed["error"] == repr(RuntimeError("simulated: the worker died"))
         assert failed["git_commit"] == "test"
         assert all(record == {"status": "ok"} for record in records.values())
+
+
+def _thread_environ() -> dict[str, str | None]:
+    """In a worker: its BLAS and OpenMP thread variables, and the trim setting
+    dask's nanny also sets before spawning it."""
+    import os
+
+    names = (
+        "OMP_NUM_THREADS",
+        "MKL_NUM_THREADS",
+        "OPENBLAS_NUM_THREADS",
+        "MALLOC_TRIM_THRESHOLD_",
+    )
+    return {name: os.environ.get(name) for name in names}
+
+
+class TestWorkerThreads:
+    """dask's nanny sets OMP/MKL/OPENBLAS_NUM_THREADS to 1 in every worker it
+    spawns, so the shuffles' matrix products ran on one core each (R4: 18 h
+    against 5-6 h). The runner's GPU cluster gives each worker its share of
+    the CPUs instead."""
+
+    @pytest.mark.parametrize("inherited", [None, "1"])
+    def test_each_worker_gets_its_share_of_the_cpus(
+        self, tmp_path, monkeypatch, inherited
+    ):
+        """Whatever this process's environment says: dask's nanny lets an
+        inherited variable override its configuration, and a nanny that has
+        spawned a worker leaves its own (1) in its parent's environment."""
+        for name in runner.THREAD_VARIABLES:
+            if inherited is None:
+                monkeypatch.delenv(name, raising=False)
+            else:
+                monkeypatch.setenv(name, inherited)
+        made = []
+
+        def worker_processes(**kwargs):
+            # LocalCUDACluster's stand-in: real worker processes, spawned by
+            # nannies, so the variables are set as the GPU workers' are
+            made.append(kwargs)
+            return LocalCluster(
+                n_workers=1,
+                threads_per_worker=1,
+                processes=True,
+                dashboard_address=":0",
+                local_directory=kwargs["local_directory"],
+            )
+
+        monkeypatch.setattr(
+            decoding_common, "LocalCUDACluster", worker_processes, raising=False
+        )
+        monkeypatch.setattr(runner, "available_cpus", lambda: 13)
+        with dask.config.set({"temporary-directory": str(tmp_path / "dask-temporary")}):
+            with (
+                runner.cuda_cluster("3,4,6", str(tmp_path / "scratch")) as cluster,
+                Client(cluster) as client,
+            ):
+                seen = client.run(_thread_environ)
+
+        assert made == [
+            {
+                "CUDA_VISIBLE_DEVICES": "3,4,6",
+                "local_directory": str(tmp_path / "scratch"),
+            }
+        ]
+        assert list(seen.values()) == [
+            {
+                "OMP_NUM_THREADS": "4",  # 13 CPUs shared by 3 workers
+                "MKL_NUM_THREADS": "4",
+                "OPENBLAS_NUM_THREADS": "4",
+                "MALLOC_TRIM_THRESHOLD_": "65536",
+            }
+        ]
+        # this process's own environment is left as it was
+        assert {name: os.environ.get(name) for name in runner.THREAD_VARIABLES} == (
+            dict.fromkeys(runner.THREAD_VARIABLES, inherited)
+        )
+
+    def test_a_worker_never_gets_fewer_than_one_thread(self):
+        assert runner.worker_thread_environ(n_workers=8, n_cpus=4) == {
+            "OMP_NUM_THREADS": 1,
+            "MKL_NUM_THREADS": 1,
+            "OPENBLAS_NUM_THREADS": 1,
+        }
+
+    def test_the_cpus_are_the_ones_this_process_may_run_on(self):
+        assert runner.available_cpus() == len(os.sched_getaffinity(0))
