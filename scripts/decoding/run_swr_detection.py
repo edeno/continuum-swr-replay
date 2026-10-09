@@ -790,8 +790,8 @@ def _detect(
             if settings_mismatch
             else []
         )
-        # the direct Kay is normalized and filtered with the swr mask; the
-        # canonical events are not
+        # the direct Kay is normalized and filtered with the artifact mask;
+        # the canonical events are not
         + ([] if artifact_dir is None else ["artifact mask"]),
     }
     record["kay_version_check"] = {

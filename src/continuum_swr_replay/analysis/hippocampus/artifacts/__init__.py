@@ -9,7 +9,7 @@
 - ``io``: the per-epoch cores file and the run manifest.
 
 ``scripts/decoding/run_artifact_detection.py`` runs it per epoch;
-``analysis/hippocampus/swr_source.py`` reads the analysis mask. Design note:
+``analysis/hippocampus/swr_source.py`` reads the artifact mask. Design note:
 ``docs/design/2026-10-09-artifact-detection.md``. The submodules are imported
 by name, so reading a mask does not import the detector.
 """

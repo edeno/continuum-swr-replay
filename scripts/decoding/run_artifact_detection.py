@@ -154,8 +154,9 @@ def run_settings() -> dict[str, Any]:
                 "the span",
             },
             "ood_reference": "per tetrode, the epoch's marks outside the S, "
-            "T-ref and T-ca1 cores padded by the decoder table; the spike "
-            "itself left out; Euclidean distance on the raw marks",
+            "T-ref and T-ca1 cores padded into the one artifact mask "
+            "(masks.PADDING_S); the spike itself left out; Euclidean distance "
+            "on the raw marks",
         }
     )
     return settings

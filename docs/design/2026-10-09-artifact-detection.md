@@ -49,11 +49,12 @@ the giant-day events.
 - **Mask only on an artifact signature,** never on power alone. A large SWR is also a large,
   multichannel, high-frequency deflection on CA1, so any rule that counts channels above an
   amplitude also masks SWRs.
-- **No rule can mask a ripple seen on one electrode alone**, by construction:
+- **No rule can mask a ripple seen on one CA1 electrode alone**, by construction:
   - S needs at least 2 channels for at least 2 s;
   - T-ca1 needs at least 3 channels with a lasting step;
   - T-spk needs at least 40 % of tetrodes;
-  - T-ref reads only the reference electrode.
+  - T-ref reads only the reference electrodes. It takes the maximum over them, so a jump on
+    one reference electrode alone does fire it, as intended.
 - **Robust units only.** Every threshold is a statistic over its own epoch MAD × 1.4826, per
   channel. No absolute LFP units: the stored raw LFP says "volts, conversion 1.0", which is
   suspect.

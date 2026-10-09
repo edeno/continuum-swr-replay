@@ -1018,14 +1018,14 @@ def test_head_speed_varying_over_time_is_interpolated(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Artifacts: the swr mask
+# Artifacts: the artifact mask
 # ---------------------------------------------------------------------------
 
 ARTIFACT_CORE_S = 15.0
 """Seconds after the first sample: an LFP step on the second injected ripple."""
 
-SWR_MASK_S = (ARTIFACT_CORE_S - 0.3, ARTIFACT_CORE_S + 0.3)
-"""Its ``swr`` interval: an LFP step padded by 0.3 s on each side."""
+ARTIFACT_MASK_S = (ARTIFACT_CORE_S - 0.3, ARTIFACT_CORE_S + 0.3)
+"""Its interval in the artifact mask: an LFP step padded by 0.3 s on each side."""
 
 
 def _artifact_run(tmp_path, identifier: str, cores=None) -> Path:
@@ -1073,7 +1073,7 @@ def test_one_artifact_mask_for_all_four_detectors(tmp_path, monkeypatch):
     identifier = epoch_id(NWB_FILE_NAME, EPOCH_NAME)
     artifact_dir = _artifact_run(tmp_path, identifier)
     masks = _recording_detectors(monkeypatch)
-    lo, hi = (BASE_TIME_S + bound for bound in SWR_MASK_S)
+    lo, hi = (BASE_TIME_S + bound for bound in ARTIFACT_MASK_S)
     unmasked_dir = tmp_path / "unmasked"
     unmasked = run_epoch(
         NWB_FILE_NAME, EPOCH_NAME, output_dir=unmasked_dir, **_fetchers(epoch)

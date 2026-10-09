@@ -18,17 +18,21 @@ function, so a further signature is one more event source.
 :func:`detect_artifacts` runs them on one epoch and returns unpadded cores
 with their evidence; one table pads them into the mask (``masks.PADDING_S``).
 
-By construction no rule can mask a ripple seen on one electrode alone: S needs
-at least 2 channels for at least 2 s, T-ca1 needs at least 3 channels with a
-lasting step, T-spk needs at least 40 % of tetrodes, and T-ref reads only the
-reference electrode.
+By construction no rule can mask a ripple seen on one CA1 electrode alone: S
+needs at least 2 channels for at least 2 s, T-ca1 needs at least 3 channels
+with a lasting step, T-spk needs at least 40 % of tetrodes, and T-ref reads only
+the reference electrodes. (T-ref takes the maximum over the reference
+electrodes, so a jump on one reference electrode alone does fire it, as
+intended.)
 
 **Thresholds (rule P).** Each artifact threshold on a statistic SWRs also
 reach is :data:`THRESHOLD_MARGIN` (1.5) times the largest value that statistic
 reaches in the calibration SWR set: the reference SWR set, the model-reviewed
 SWRs and the giant-day Kay∩Karlsson events, each measured over the event
-widened by its padding. 1.5 is the largest ratio of one animal's maximum to
-the other four animals' maximum (1.27-1.59). The reference SWR set is
+widened by its padding. One animal's maximum over the other four animals'
+maximum reaches 1.59 (T-ca1, chimi held out): 1.5 covers T-ref (1.27) and
+R-rip (1.29), and K's 1.59 is why all five animals are in the calibration set.
+The reference SWR set is
 rule-defined (Kay∩Karlsson, 30-200 ms, speed < 4 cm/s over ± 250 ms, a sharp
 wave, MUA >= 2x); model-reviewed labels come from one AI reviewer, with no
 human and no second rater. Neither is ground truth. Window lengths, bins, run
@@ -90,11 +94,16 @@ __all__ = [
 
 # --- rule P (C2 §2) --------------------------------------------------------------
 THRESHOLD_MARGIN = 1.5
-"""Rule P's margin over the calibration maximum: one animal's maximum over the
-other four animals' maximum reaches 1.27-1.59 (C2 §2, c2_loao_ratio.csv)."""
+"""Rule P's margin over the calibration maximum. One animal's maximum over the
+other four animals' maximum reaches 1.27 (T-ref) to 1.59 (T-ca1, chimi held
+out): 1.5 covers T-ref and R-rip (1.29), and K's 1.59 is why the calibration
+set holds all five animals (C2 §2, c2_loao_ratio.csv)."""
 S_CORE_CALIBRATION_MAX = 2.8723976612091064
 """The largest window specificity over the calibration SWR set: a reference-set
-SWR in j16 (C2 §1, §2.1; c2_rule_check.csv)."""
+SWR in j16 (C2 §1, §2.1; c2_rule_check.csv). Measured with S padded by 0 s
+(C2's ``swr`` row). Under the shipped 1-s S padding one calibration event, a
+model-reviewed SWR 0.55 s before an S block, reaches 19.4; the design note
+explains it."""
 T_REF_CALIBRATION_MAX = 11.715611457824707
 """The largest reference |J5| (robust units) over the calibration SWR set: a
 giant-day event (reference set 9.2, model-reviewed SWRs 7.2; C2 §1, §2.1)."""

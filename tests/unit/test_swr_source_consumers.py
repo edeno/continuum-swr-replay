@@ -64,7 +64,7 @@ TIME = np.round(100.0 + np.arange(2000) / 500.0, 6)
 SOURCE_SWRS = [(100.50, 100.56), (101.00, 101.04), (102.00, 102.10)]
 ARTIFACT = ("spk", 102.15, 102.15)
 """The configured artifact run's one core, a spike-only line: padded by 0.1 s
-(the analysis table) it covers [102.05, 102.25] and drops the third source
+(``PADDING_S``) it covers [102.05, 102.25] and drops the third source
 SWR."""
 KEPT_SWRS = SOURCE_SWRS[:2]
 """The source's SWRs every consumer must see: the artifact-overlapping one is
