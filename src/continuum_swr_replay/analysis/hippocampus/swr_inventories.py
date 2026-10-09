@@ -56,10 +56,14 @@ kept only if speed at its first and last sample is at most 4 cm/s, and an
 unknown speed fails. What they share is the input: the electrodes, time, speed
 and the nominal sampling rate. Zugaro's events longer than 150 ms are then
 dropped. A detector that raises is reported as its exception, so one failure
-does not hide the others' results. Given an artifact mask, all four leave its
-time out of their normalization (``normalization_sample``), and the caller
-drops their events that overlap it (``drop_overlapping_events``); the LFP is
-never NaN-filled, so no filter or envelope meets a gap. ``yu_diagnostics`` recomputes Yu's
+does not hide the others' results. Given an artifact mask, each detector's
+normalization sample leaves its time out (``normalization_sample``): Kay,
+Karlsson and Zugaro z-score over the unmasked samples, and Yu estimates its
+threshold on the unmasked immobile ones, though its per-channel z-score
+before the median still pools every valid sample, masked or not (the
+package's behaviour). The caller drops the events that overlap the mask
+(``drop_overlapping_events``); the LFP is never NaN-filled, so no filter or
+envelope meets a gap. ``yu_diagnostics`` recomputes Yu's
 threshold and the histogram behind it, so both are known for an epoch with no
 events too.
 
@@ -614,8 +618,9 @@ def normalization_sample(
     estimates its threshold on the immobile samples (speed at or below its
     ``speed_threshold``; an unknown speed is not immobile), so its is the
     immobile samples not ``unobserved``. The detector still restricts the
-    sample to its valid rows. The artifact time thus leaves all four the same
-    way.
+    sample to its valid rows. For Yu the mask reaches the threshold and its
+    normalization only: its per-channel z-score before the median pools every
+    valid sample, ``unobserved`` or not, as the package does.
 
     Parameters
     ----------
@@ -707,9 +712,11 @@ def run_swr_detectors(
     sampling_frequency : float
         The nominal rate in Hz, passed to every detector.
     unobserved : NDArray of bool, shape (n_time,), optional
-        Samples left out of every detector's normalization, such as the
+        Samples left out of every detector's normalization sample, such as the
         ``swr`` artifact mask: each detector gets ``normalization_sample``'s
-        mask. The LFP itself is not changed, so the filters and envelopes
+        mask (Yu's per-channel z-score before the median still pools every
+        valid sample, a package behaviour; its threshold uses the masked
+        immobile sample). The LFP itself is not changed, so the filters and envelopes
         never meet a gap, and events are still found there; the caller drops
         those (``drop_overlapping_events``). None passes no mask, so each
         detector normalizes over its own default sample.
