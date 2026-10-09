@@ -32,10 +32,12 @@ Per epoch:
    mask) is dropped. The band, the raw LFP behind it, the electrode ids, their
    references and their groups are subset to the kept tetrodes, which every
    detector reads and among which Zugaro chooses. The rule fails the epoch
-   closed, with its reason and every tetrode's coupling recorded, when it
-   would drop more than a third of the tetrodes or when a tetrode's coupling
-   is undefined. Reference electrodes are not band channels and are never
-   dropped: a kept electrode keeps its own reference.
+   closed, with its reason (and every tetrode's coupling, once measured)
+   recorded, when the band holds two channels of one tetrode, when it would
+   drop more than a third of the tetrodes, or when a tetrode's coupling is
+   undefined. Reference electrodes are not band channels and are never
+   dropped: a kept electrode keeps its own reference. The Kay check names the
+   subset among the direct Kay's differences.
 5. **Zugaro's channel.** ``best_ripple_channel`` (buzcode's
    ``bz_GetBestRippleChan``) chooses one of the kept CA1 electrodes from their
    referenced raw LFP, and ``zero_phase_bandpass`` filters it. A candidate with
@@ -171,6 +173,7 @@ from continuum_swr_replay.analysis.hippocampus.ripple_tetrodes import (
     REFERENCE_SPEED_CM_PER_S,
     TetrodeSelection,
     TetrodeSelectionError,
+    check_one_channel_per_tetrode,
     select_ripple_tetrodes,
 )
 from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
@@ -493,11 +496,13 @@ def detection_channels(
     speed: NDArray,
     unobserved: NDArray[np.bool_],
     sampling_frequency: float,
+    electrode_group_names: NDArray,
 ) -> TetrodeSelection:
     """The band's tetrodes the four detectors read, and Zugaro chooses among.
 
     The one place an epoch's detecting tetrodes are chosen: rule R-T
-    (``ripple_tetrodes.select_ripple_tetrodes``).
+    (``ripple_tetrodes.select_ripple_tetrodes``), on a band with one channel
+    per tetrode (``check_one_channel_per_tetrode``).
 
     Parameters
     ----------
@@ -509,6 +514,8 @@ def detection_channels(
         The artifact mask on the band's times.
     sampling_frequency : float
         The band's nominal rate in Hz.
+    electrode_group_names : NDArray, shape (n_channels,)
+        Each column's electrode group (its tetrode).
 
     Returns
     -------
@@ -521,6 +528,7 @@ def detection_channels(
     TetrodeSelectionError
         When the rule fails the epoch closed.
     """
+    check_one_channel_per_tetrode(electrode_group_names)
     return select_ripple_tetrodes(ripple_band, speed, unobserved, sampling_frequency)
 
 
@@ -671,17 +679,19 @@ def _detect(
 
     try:
         selection = detection_channels(
-            ripple_band, speed, unobserved, sampling_frequency
+            ripple_band, speed, unobserved, sampling_frequency, electrode_group_names
         )
     except TetrodeSelectionError as error:
-        return {
+        failed: dict[str, Any] = {
             "status": "failed",
             "reason": f"Rule R-T failed the epoch closed: {error}",
             "band_check": band_check,
-            "tetrode_selection": error.selection.record(
+        }
+        if error.selection is not None:  # None: the rule could not start
+            failed["tetrode_selection"] = error.selection.record(
                 electrode_ids, electrode_group_names, reference_ids
-            ),
-        }, {}
+            )
+        return failed, {}
     tetrode_selection = selection.record(
         electrode_ids, electrode_group_names, reference_ids
     )
@@ -851,7 +861,9 @@ def _detect(
         )
         # the direct Kay is normalized and filtered with the artifact mask;
         # the canonical events are not
-        + ([] if artifact_dir is None else ["artifact mask"]),
+        + ([] if artifact_dir is None else ["artifact mask"])
+        # and it reads only the tetrodes R-T kept; the canonical Kay read all
+        + ([] if channels.all() else ["tetrode selection (R-T)"]),
     }
     record["kay_version_check"] = {
         "spyglass_parameters": spyglass_parameters,

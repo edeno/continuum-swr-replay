@@ -22,10 +22,12 @@ of the cohort, so a column is its tetrode):
    that z-score is at least 5.
 4. Drop ``c`` when ``coupling_c < 1.0``.
 
-It fails closed (:class:`TetrodeSelectionError`) when it would drop more than
-a third of the tetrodes, or when a tetrode has no reference sample where the
-others' consensus reaches 5 z, so its coupling is undefined. Every detector
-of the SWR runner then reads the kept tetrodes. Design note:
+It fails closed (:class:`TetrodeSelectionError`) when the band holds two
+channels of one tetrode (:func:`check_one_channel_per_tetrode`: a sibling
+channel would count as another tetrode), when it would drop more than a third
+of the tetrodes, or when a tetrode's coupling is undefined: no reference sample
+where the others' consensus reaches 5 z, or a flat channel (MADn 0). Every
+detector of the SWR runner then reads the kept tetrodes. Design note:
 ``docs/design/2026-10-09-swr-tetrode-selection.md``.
 """
 
@@ -51,6 +53,7 @@ __all__ = [
     "REFERENCE_SPEED_CM_PER_S",
     "TetrodeSelection",
     "TetrodeSelectionError",
+    "check_one_channel_per_tetrode",
     "select_ripple_tetrodes",
 ]
 
@@ -95,7 +98,8 @@ class TetrodeSelection:
     ----------
     coupling : NDArray, shape (n_tetrodes,)
         Each tetrode's median envelope robust z where the others' consensus
-        reaches :data:`LOO_THRESHOLD_Z`; NaN where it never does.
+        reaches :data:`LOO_THRESHOLD_Z`; NaN where it never does, or where the
+        tetrode's envelope is flat (MADn 0).
     n_high : NDArray of int, shape (n_tetrodes,)
         The reference samples that median is taken over.
     n_reference : int
@@ -147,13 +151,47 @@ class TetrodeSelectionError(ValueError):
 
     Attributes
     ----------
-    selection : TetrodeSelection
-        What was measured, for the record.
+    selection : TetrodeSelection or None
+        What was measured, for the record; None when the rule could not start
+        (two channels of one tetrode).
     """
 
-    def __init__(self, message: str, selection: TetrodeSelection) -> None:
+    def __init__(self, message: str, selection: TetrodeSelection | None) -> None:
         super().__init__(message)
         self.selection = selection
+
+
+def check_one_channel_per_tetrode(electrode_group_names: NDArray) -> None:
+    """Refuse a band with two channels of one tetrode.
+
+    The rule reads each band channel as its tetrode: a sibling channel of the
+    same tetrode would count as "another tetrode" in the leave-one-out
+    consensus, so a rogue tetrode with two channels would look coupled to
+    itself, and the one-third cap would count channels. Every recorded epoch
+    has one band channel per tetrode; a repopulate could change that.
+
+    Parameters
+    ----------
+    electrode_group_names : NDArray, shape (n_channels,)
+        Each band channel's electrode group (its tetrode).
+
+    Raises
+    ------
+    TetrodeSelectionError
+        Naming the groups that hold several band channels; its ``selection``
+        is None.
+    """
+    groups, counts = np.unique(
+        np.asarray(electrode_group_names).astype(str), return_counts=True
+    )
+    shared = groups[counts > 1]
+    if shared.size:
+        raise TetrodeSelectionError(
+            f"Electrode group(s) {shared.tolist()} hold several band channels, but "
+            "rule R-T reads one band channel per tetrode: a sibling channel would "
+            "count as another tetrode in the leave-one-out consensus.",
+            None,
+        )
 
 
 def select_ripple_tetrodes(
@@ -189,8 +227,17 @@ def select_ripple_tetrodes(
     ------
     TetrodeSelectionError
         If a tetrode has no reference sample where the others' consensus
-        reaches ``loo_threshold_z`` (no reference sample at all included),
+        reaches ``loo_threshold_z`` (no reference sample at all included), if
+        a tetrode's envelope is flat (MADn 0), so its coupling is undefined,
         or if more than a third of the tetrodes would be dropped.
+
+    Notes
+    -----
+    Memory: besides the input, two ``(n_time, n_tetrodes)`` float64 arrays
+    (the envelope, turned into its robust z in place, and the power, turned
+    into the smoothed leave-one-out consensus in place) and per-column
+    temporaries. The Hilbert transform runs one column at a time, since
+    ``scipy.signal.hilbert`` holds three complex copies of its input.
     """
     band = np.asarray(ripple_band, dtype=np.float64)
     finite = np.isfinite(band).all(axis=1)
@@ -202,27 +249,38 @@ def select_ripple_tetrodes(
         & ~np.asarray(unobserved, dtype=bool)
     )
 
-    envelope = np.abs(hilbert(np.where(finite[:, None], band, 0.0), axis=0))
-    power = envelope**2
-    median = np.median(envelope[finite], axis=0)
-    madn = MADN_SCALE * np.median(np.abs(envelope[finite] - median), axis=0)
-    robust_z = envelope
-    robust_z -= median
-    robust_z /= madn
+    n_time, n_tetrodes = band.shape
+    every_row_finite = bool(finite.all())
+    envelope = np.empty((n_time, n_tetrodes))
+    for column in range(n_tetrodes):
+        values = band[:, column]
+        if not every_row_finite:
+            values = np.where(finite, values, 0.0)
+        envelope[:, column] = np.abs(hilbert(values))
+    power = np.square(envelope)
 
-    others = power.sum(axis=1)[:, np.newaxis] - power
-    del power
-    consensus = gaussian_filter1d(
-        others,
-        sigma=LOO_SMOOTHING_SIGMA_S * sampling_frequency,
-        axis=0,
-        truncate=LOO_SMOOTHING_TRUNCATE,
-    )
-    del others
+    # the envelope becomes its robust z in place, column by column; a flat
+    # channel (MADn 0) gives NaN, which fails the epoch below
+    with np.errstate(divide="ignore", invalid="ignore"):
+        for column in range(n_tetrodes):
+            values = envelope[finite, column]
+            median = np.median(values)
+            madn = MADN_SCALE * np.median(np.abs(values - median))
+            envelope[:, column] -= median
+            envelope[:, column] /= madn
+    robust_z = envelope
+
+    # the power becomes the leave-one-out consensus in place
+    np.subtract(power.sum(axis=1)[:, np.newaxis], power, out=power)
+    sigma = LOO_SMOOTHING_SIGMA_S * sampling_frequency
+    for column in range(n_tetrodes):
+        power[:, column] = gaussian_filter1d(
+            power[:, column], sigma=sigma, truncate=LOO_SMOOTHING_TRUNCATE
+        )
+    consensus = power
     np.maximum(consensus, 0.0, out=consensus)
     np.sqrt(consensus, out=consensus)
 
-    n_tetrodes = band.shape[1]
     coupling = np.full(n_tetrodes, np.nan)
     n_high = np.zeros(n_tetrodes, dtype=np.int64)
     if reference.any():
@@ -247,6 +305,13 @@ def select_ripple_tetrodes(
             f"({selection.n_reference} reference samples: finite, slower than "
             f"{REFERENCE_SPEED_CM_PER_S:g} cm/s and outside the artifact mask), "
             "so their coupling is undefined.",
+            selection,
+        )
+    flat = ~np.isfinite(coupling)
+    if flat.any():
+        raise TetrodeSelectionError(
+            f"The envelope of tetrode column(s) {np.flatnonzero(flat).tolist()} has "
+            "MADn 0 (a flat channel), so its robust z and coupling are undefined.",
             selection,
         )
     n_dropped = int(np.count_nonzero(~selection.keep))

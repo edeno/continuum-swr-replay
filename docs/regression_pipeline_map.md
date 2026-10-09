@@ -110,7 +110,7 @@ Loading and managing saved decoding results.
 
 Rule R-T: per epoch, keep the CA1 band tetrodes that ripple with the rest.
 
-`TetrodeSelection`, `TetrodeSelectionError`, `select_ripple_tetrodes`
+`TetrodeSelection`, `TetrodeSelectionError`, `check_one_channel_per_tetrode`, `select_ripple_tetrodes`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/swr_source.py`
 

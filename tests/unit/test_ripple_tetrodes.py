@@ -8,6 +8,8 @@ pattern of ``followup_c1c_report.md``). Nothing here reads data.
 
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 import pytest
 from numpy.typing import NDArray
@@ -18,6 +20,7 @@ from continuum_swr_replay.analysis.hippocampus.ripple_tetrodes import (
     COUPLING_CUT,
     LOO_THRESHOLD_Z,
     TetrodeSelectionError,
+    check_one_channel_per_tetrode,
     select_ripple_tetrodes,
 )
 
@@ -180,6 +183,35 @@ def test_no_reference_sample_with_a_loud_consensus_fails_the_epoch(how):
         select_ripple_tetrodes(band, speed, unobserved, FS)
 
     assert (raised.value.selection.n_high == 0).any()
+
+
+def test_a_flat_channel_fails_the_epoch():
+    """A flat channel has MADn 0, so its robust z and coupling are undefined
+    although the others ripple: the epoch fails closed, without a warning."""
+    time, band = _band(6)
+    band[:, 4] = 0.0
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        with pytest.raises(TetrodeSelectionError, match="MADn") as raised:
+            select_ripple_tetrodes(band, _still(time), _nothing_masked(time), FS)
+
+    selection = raised.value.selection
+    assert np.isnan(selection.coupling[4])
+    assert selection.n_high[4] > 0
+    assert np.isfinite(np.delete(selection.coupling, 4)).all()
+
+
+def test_one_band_channel_per_tetrode_is_required():
+    check_one_channel_per_tetrode(np.array(["0", "1", "2", "10"]))
+
+    with pytest.raises(
+        TetrodeSelectionError, match="one band channel per tetrode"
+    ) as raised:
+        check_one_channel_per_tetrode(np.array(["0", "1", "1", "3", "3"]))
+
+    assert "'1'" in str(raised.value) and "'3'" in str(raised.value)
+    assert raised.value.selection is None
 
 
 def _prototype_coupling(band: NDArray, speed: NDArray, unobserved: NDArray) -> NDArray:

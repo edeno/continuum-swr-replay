@@ -105,10 +105,19 @@ tetrode in all 218 epochs: 22, or 13 for wilbur):
 | σ | 4 ms | Kay's own smoothing. 3 ms drops 1 weakly rippling tetrode-epoch, 5 ms drops 4 (C2 §3.3) |
 
 **Fail closed.** The epoch fails, with its reason and every tetrode's coupling in the
-manifest, when the rule would drop more than a third of the tetrodes, or when a tetrode has no
-reference sample with `LOO_c` ≥ 5 (its coupling is undefined). In C1c no epoch of the 218 came
-near either: at most 4 of 22 tetrodes dropped (senor20201107_08_r4), and every tetrode-epoch had
-at least 701 high-LOO reference samples.
+manifest, when:
+
+- the rule would drop more than a third of the tetrodes;
+- a tetrode's coupling is undefined: it has no reference sample with `LOO_c` ≥ 5, or its
+  envelope is flat (MADn 0);
+- the band holds two channels of one tetrode (checked before the rule runs, so no coupling is
+  recorded). A sibling channel would count as "another tetrode" in `LOO_c`, so a rogue
+  tetrode with two channels would look coupled to itself, and the one-third cap would count
+  channels. Every epoch on record has one band channel per tetrode; a repopulate could change
+  that.
+
+In C1c no epoch of the 218 came near the first two: at most 4 of 22 tetrodes dropped
+(senor20201107_08_r4), and every tetrode-epoch had at least 701 high-LOO reference samples.
 
 **In the runner.**
 
@@ -117,7 +126,13 @@ at least 701 high-LOO reference samples.
 - The manifest records, per epoch, every band electrode with its group, its reference, its
   coupling and its count of high-LOO reference samples, and the dropped electrode groups and
   ids (`tetrode_selection`). The run's settings record the constants, so a rerun under other
-  constants is refused.
+  constants is refused. When a tetrode is dropped, the Kay version check lists
+  "tetrode selection (R-T)" among the direct Kay's differences from the canonical Spyglass
+  events, which read every tetrode.
+- The rule holds two `(n_time, n_tetrodes)` arrays besides the band, and runs the Hilbert
+  transform one column at a time: on the longest epoch tested (j1620210706_02_r1, 2.5 M
+  samples × 22) its own peak is about 1 GiB, and the worker's peak (6.9 GiB) is set later, by
+  the detectors and the Kay check on Spyglass's own inputs.
 - **Reference electrodes are never dropped.** They are not band channels: each band electrode
   is referenced to one (j16 references all 22 to a single corpus-callosum electrode). Dropping a
   band tetrode removes its column; each kept electrode keeps its own reference.

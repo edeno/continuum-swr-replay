@@ -69,8 +69,9 @@ ELECTRODE_IDS = np.array([0, 4, 8, 12])
 BAND_COLUMNS = np.array([5, 1, 2, 4])
 """Each band electrode's column in the six-column raw LFP."""
 
-ELECTRODE_GROUP_NAMES = np.array(["0", "1", "2", "2"])
-"""Each band electrode's group: the last two share one, so three tetrodes."""
+ELECTRODE_GROUP_NAMES = np.array(["0", "1", "2", "3"])
+"""Each band electrode's group (tetrode): one band channel per tetrode, as rule
+R-T requires and every recorded epoch has."""
 
 LFP_CONVERSION = 1.95e-7
 """Volts per stored count, the LFP series' ``conversion``."""
@@ -446,7 +447,7 @@ def test_outputs_and_manifest_fields(tmp_path):
         == read_attrs(paths["zugaro"])["n_dropped_over_maximum_duration"]
     )
     assert isinstance(record["zugaro_dropped_over_150ms"], int)
-    assert record["n_detecting_tetrodes"] == 3  # four electrodes on three tetrodes
+    assert record["n_detecting_tetrodes"] == 4  # four electrodes on four tetrodes
     assert record["worker_peak_rss_gib"] > 0
     assert record["meets_published_tetrode_criterion"] == "unknown"
     assert set(record["input_sha256"]) == {"time", "ripple_band", "raw_referenced"}
@@ -1276,10 +1277,15 @@ def test_rule_rt_chooses_the_tetrodes_every_detector_reads(tmp_path, monkeypatch
     assert selection["electrode_ids"] == ELECTRODE_IDS.tolist()
     assert selection["electrode_group_names"] == ELECTRODE_GROUP_NAMES.tolist()
     assert selection["reference_ids"] == [16, 16, 81, 81]
-    # electrode 8 left, but its tetrode "2" keeps electrode 12
     assert record["n_detecting_tetrodes"] == 3
     for name in DETECTORS:
         assert record["n_events"][name] > 0, name
+    # the direct Kay reads fewer tetrodes than the canonical Spyglass events
+    assert record["kay_version_check"]["differences"]["version_and_inputs"] == [
+        "package version",
+        "inputs",
+        "tetrode selection (R-T)",
+    ]
 
 
 def test_rule_rt_failing_closed_fails_the_epoch(tmp_path):
@@ -1297,6 +1303,32 @@ def test_rule_rt_failing_closed_fails_the_epoch(tmp_path):
     selection = record["tetrode_selection"]
     assert {"0", "1"} <= set(selection["dropped_electrode_groups"])
     assert len(selection["coupling"]) == ELECTRODE_IDS.size
+    assert not any(
+        path.exists()
+        for path in _outputs(output_dir, epoch_id(NWB_FILE_NAME, EPOCH_NAME)).values()
+    )
+
+
+def test_two_band_channels_of_one_tetrode_fail_the_epoch(tmp_path):
+    """R-T reads one band channel per tetrode: a sibling channel would count as
+    "another tetrode" in the leave-one-out consensus. Such a band fails the
+    epoch closed, with its reason, before R-T or any detector runs."""
+    epoch = _main_epoch()
+    inputs = _band_inputs(epoch)
+    inputs["electrode_group_names"] = np.array(["0", "1", "2", "2"])
+    output_dir = tmp_path / "out"
+
+    record = run_epoch(
+        NWB_FILE_NAME,
+        EPOCH_NAME,
+        output_dir=output_dir,
+        **_fetchers(epoch, inputs=inputs),
+    )
+
+    assert record["status"] == "failed"
+    assert "one band channel per tetrode" in record["reason"]
+    assert "'2'" in record["reason"]
+    assert "tetrode_selection" not in record
     assert not any(
         path.exists()
         for path in _outputs(output_dir, epoch_id(NWB_FILE_NAME, EPOCH_NAME)).values()
