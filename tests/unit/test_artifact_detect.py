@@ -465,6 +465,19 @@ class TestBoundaries:
 
         assert is_ood.tolist() == [ood, ood]
 
+    @pytest.mark.parametrize(
+        ("value", "n_blocks"),
+        [(detect.S_CORE, 1), (np.nextafter(detect.S_CORE, 0.0), 0)],
+        ids=["at-s_core", "just-below"],
+    )
+    def test_an_s_core_starts_at_exactly_s_core(self, value, n_blocks):
+        spec = np.ones(30)
+        spec[10:12] = value
+
+        cores = detect.s_cores(np.arange(30) + 0.5, spec)
+
+        assert len(cores) == n_blocks
+
     @pytest.mark.parametrize(("second_block", "n_blocks"), [(14, 1), (15, 2)])
     def test_s_blocks_exactly_2_windows_apart_merge(self, second_block, n_blocks):
         spec = np.ones(30)
