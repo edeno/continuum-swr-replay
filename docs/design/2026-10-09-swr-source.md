@@ -76,11 +76,17 @@ What the comparison shows:
   the only definitions. The SWR runner writes under the same `SWR_INVENTORY_ROOT`.
 - **`ARTIFACT_INTERVALS_RUN_ID`, `ARTIFACT_INTERVALS_ROOT`.** Task 16's hook, configured
   once like the run id. The run id is None today: no artifact is masked.
-  `artifact_intervals(epoch_id)` resolves an epoch's intervals from
-  `ARTIFACT_INTERVALS_ROOT / <run id> / {epoch_id}_artifact_intervals.parquet`
-  (`start_time`, `end_time`). It returns none while the run id is unset, and raises when
-  a configured run has no file for the epoch. No caller passes artifact intervals: every
-  function below resolves them by epoch id, so every caller gets the same ones.
+  `artifact_intervals(epoch_id)` reads the artifact detector's run
+  (`ARTIFACT_INTERVALS_ROOT / <run id>`: `manifest.json` and one
+  `{epoch_id}_artifact_intervals.parquet` of unpadded cores per epoch) and returns the
+  `analysis` mask's intervals (`start_time`, `end_time`): the cores padded by that row of
+  the padding table, merged and clipped to the epoch's span
+  ([2026-10-09-artifact-detection.md](2026-10-09-artifact-detection.md)). It returns none
+  while the run id is unset, and raises when a configured run does not serve the epoch
+  (not run, failed, file missing or changed since the run). No caller passes artifact
+  intervals: every function below resolves them by epoch id, so every caller gets the same
+  ones. The coverage (`swr_observed_mask`, `swr_observed_stretches`) leaves the same
+  intervals out: artifact time is unobserved, neither SWR nor non-SWR.
 - **`swr_source_name()`** is the source's stamp:
   `<detector>@<inventory run id>+artifacts@<artifact run id or none>`, today
   `kay@50a98592acee+artifacts@none`.
