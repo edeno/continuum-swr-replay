@@ -9,6 +9,8 @@ events matched, 0 were missed and 62 were added; the largest SWR z-score differe
 2.56, at a trace end (at most 8.8e-4 more than 1 s from both ends); and non-local events
 went from 2,365 under the 1.7.0 rule to 2,405 under 2.0's, with minimum sample counts {7}. Tasks 1–3 complete and reviewed; `C0` = `de156501c05b4381714919be54a872b3ac0e58fc`, the commit both decoders launch from. R0 done (backup root `Processed-Data/_pre_redecode_backup_20261003`). An incident during Task 2 overwrote the April decode of `chimi20200212_02_r1` (accepted loss; see the backup's `MISSING_APRIL_DECODES.md`).
 
+**Status (2026-10-09):** Tasks 14–15 complete (one epoch register; one SWR source, the 2.0 Kay inventory). The lead chose to mask artifacts with a new, validated detector and to re-decode all 255 epochs with one SWR source; see Phase C (Tasks 16–18, R9–R13).
+
 **Status (2026-10-04):** the decoders' discrete-transition settings had silently followed changed library defaults (+32% non-local events on identical inputs). After validation the project lead chose setting P30-B (decision R10). Task 11 pins it. Its commit `C0'` replaces `C0` as the commit both decoders launch from, and R1 restarts from `C0'` into a new staging folder. Tasks 12 and 13 (held-out spike evidence per decoder state) were added at the project lead's request. **2026-10-05:** an exclusion audit led to Task 14 (one epoch register); 40 restorable epochs are populated and decoded as an incremental update after the 218-epoch analysis, which proceeds now. wilbur20210401 is registered as blocked.
 
 **Goal:** rebuild every long-running computation on one set of inputs, and prove it. That
@@ -1710,3 +1712,287 @@ alone: the cross-table check and the no-session path return 0 and write nothing
 R3 can start right after the merge, while the decode gates are still being checked. Task 12's
 run (CPU) starts after R2, alongside R3–R5. Task 13's decodes run on idle cards after R1's full
 batches.
+
+---
+
+# Phase C: artifact masking and one SWR source everywhere (added 2026-10-09)
+
+**Why.** The project lead asked (2026-10-05) to mask artifacts carefully: SWRs can look like
+artifacts, and Spyglass's artifact rules (algorithm and parameters) are not vetted. Artifacts must
+also be kept out of decoding. A read-only design study built and validated a detector:
+`.claude/research/refresh_artifact_detector/detector_report.md`. Its results:
+- masks 0 of 9,208 true SWRs (95 % upper bound 0.033 %);
+- catches 95 of 111 steps confirmed by eye, 3 of 3 spike-only lines and 153 of 153 sustained-noise
+  windows;
+- masks 402 s (0.15 %) across 74 of the 218 epochs.
+
+The lead approved the design on 2026-10-09, subject to a literature check
+(`.claude/research/refresh_artifact_detector/literature_review.md`). The lead also chose to
+re-decode all epochs so that the decoders' encoding exclusion uses the same SWR source as the
+analyses: the masked 2.0 Kay inventory.
+
+**Rulings (2026-10-09, controller):**
+- **One mask per consumer, from one stored set of cores.** The detector stores unpadded cores with
+  their evidence. Each consumer pads them from one table (Task 16). Detectors that read the LFP use
+  the `swr` mask; anything that reads spikes uses the `decoder` mask. Everything downstream uses the
+  `analysis` mask.
+- **Artifact time is unobserved.** An event of any kind that overlaps the `analysis` mask leaves
+  every cohort; it is not counted as non-SWR. The mask's time leaves every rate exposure.
+- **Post-step second.** Ripple-band power stays below its random-time level for at least 1 s after a
+  step (`detector_report.md` §8 item 4). The `analysis` mask therefore also covers the 1 s after
+  each step's core.
+- **Keep the noisy tetrodes.** The sustained-noise tetrodes are masked during their noise blocks,
+  not dropped. A sensitivity analysis (R8) leaves out the 4 epochs with more than 2 % masked.
+
+## Task 16: artifact detection in the repo, with a run folder
+
+Work in the worktree `/cumulus/edeno/continuum-swr-replay-refresh-dev`, branch
+`full-pipeline-refresh-code`.
+
+**Inputs:**
+- **Prototype:** `.claude/research/refresh_artifact_detector/scripts/`:
+  - `artdet_detector.py` (the rules);
+  - feature code in `artdet_lfp.py`, `artdet_lfp2.py` and `artdet_lfp3.py` (S window spectra, J5 and
+    L20 steps) and in `artdet_spikes.py` (spike lines and nearest-neighbour mark distances);
+  - `artdet_common.py`.
+
+  Read the report's §1, §5.1 and §6 first.
+- **Reference output:** `artifact_intervals_default.csv` in the same folder: 470 intervals in 74 of
+  the 218 epochs, with `swr`-mask padding.
+- **Validation sets** in `validation/`: `true_swr_set.csv`, `artifact_set.csv`,
+  `visual_labels_round*.csv` and `S_reference_windows.csv`.
+- **Data, read-only:**
+  - `get_ripple_band_inputs` (`data_loaders/lfp.py`): the raw referenced CA1 LFP, the reference
+    electrode columns, the stored band and the time;
+  - `get_hpc_marks` (`data_loaders/spikes.py`), after the coincidence filter;
+  - the epoch span the SWR runner uses.
+
+**Design rules:**
+- Mask only on an artifact signature: S, T-ref, T-ca1 or T-spk. Never mask on power alone.
+- Every threshold is in robust per-channel units: the statistic divided by its epoch MAD × 1.4826.
+  No absolute LFP units.
+- Parameters are module constants, each with a one-line evidence note naming the report section.
+  Values, verbatim from the report:
+
+  | Constant | Value |
+  |---|---|
+  | `s_core` | 4 |
+  | `s_core_run` | 2 windows of 1 s |
+  | `s_ext` | 2 |
+  | `s_gap` | 2 windows |
+  | `t_ref` | 15 |
+  | `t_ca1_k` | 20 |
+  | `t_ca1_rho` | 0.5 |
+  | `t_ca1_frac` | 0.15 |
+  | `t_ca1_min` | 3 channels |
+  | `t_spk_frac` | 0.40 |
+  | `t_spk_ood` | 0.20 |
+  | `t_spk_bin` | 200 µs, on two grids offset by half a bin |
+  | OOD cut | nearest neighbour > 4 × the decoder's `waveform_std` (read from the decoder settings, not a literal) |
+  | `t_merge` | 0.05 s |
+
+- The stored file holds **unpadded cores and their evidence**. Consumers pad them from one table:
+
+  | Consumer | S | T with an LFP signature | T spike-only |
+  |---|---|---|---|
+  | `swr`: SWR-detector normalization and event dropping | 0 s | ±0.3 s | ±0.1 s |
+  | `decoder`: `is_missing`, encoding exclusion, MUA detection | ±1 s | ±0.3 s | ±0.1 s |
+  | `analysis`: event eligibility and rate exposure | ±1 s | 0.3 s before the core, 1.3 s after it | ±0.1 s |
+
+  The `analysis` mask is the `decoder` mask plus the 1 s after each LFP-signature step.
+- **The OOD reference must not depend on a decode.** The prototype measured marks against a fitted
+  decoder's encoding marks (`*_HPC_detector.pkl`), and the new decodes will themselves use this mask.
+  Use instead, per tetrode, all of the epoch's marks outside the LFP-signature intervals (S, T-ref
+  and T-ca1, padded by the `decoder` table), leaving the spike itself out. Use the same mark space
+  and distance as the prototype. The acceptance criteria check that this reproduces the prototype.
+
+**Files:**
+- Create the package `src/continuum_swr_replay/analysis/hippocampus/artifacts/`:
+  - `features.py`: robust per-channel scaling; S window power and the specificity ratio; J5 and L20
+    on CA1 and on the reference; spike lines with their OOD fractions. Vectorised, with array shapes
+    documented.
+  - `detect.py`: the constants and the four rules. `detect_artifacts(...) -> pd.DataFrame` returns
+    cores with columns `kind`, `signatures`, `core_start`, `core_end` and the evidence columns.
+  - `masks.py`:
+    - `CONSUMER_PADDING`;
+    - `artifact_intervals(cores, consumer) -> pd.DataFrame[start_time, end_time]`, merged and clipped
+      to the span;
+    - `interval_mask(time, intervals) -> np.ndarray[bool]`, with closed intervals, the project's
+      convention.
+  - `io.py`: read and write the per-epoch file and the run manifest.
+- Create `scripts/decoding/run_artifact_detection.py`, a CPU runner in the style of
+  `run_swr_detection.py`:
+  - it selects epochs from the register (`analysed_epochs`, `--include-pending`, `--pending-only`);
+  - it can resume, writes atomically and releases NWB files after each epoch (`release_nwb_files()`);
+  - a failed epoch is recorded and does not stop the run.
+  - Output: `Processed-Data/artifact_intervals/<run_id>/{epoch_id}_artifact_intervals.parquet`, with
+    an empty file for an epoch with no artifacts, plus `manifest.json`. The manifest records, per
+    epoch, the status, span, input row counts, constants, code commit and sha256. The run id is the
+    code commit's first 12 characters, as for R3.
+- Update `swr_source.py`:
+  - `artifact_intervals(epoch_id)` reads the new file and returns the `analysis` mask's intervals;
+  - `swr_observed_mask` and `swr_observed_stretches` exclude that mask's time;
+  - `ARTIFACT_INTERVALS_RUN_ID` stays None in this task. Runbook R9 sets it.
+- Create the design note `docs/design/2026-10-09-artifact-detection.md`. It covers:
+  - the decision and the signatures;
+  - the parameter table with its evidence (report §5.1) and the validation numbers;
+  - the Spyglass comparison, including Spyglass #1695;
+  - the consumer table;
+  - the literature mapping (`literature_review.md`);
+  - known limits: 16 small steps missed, a single rater, licking not measured.
+
+**Tests (write them first):**
+- Synthetic cases:
+  - a reference step gives a T-ref core;
+  - a persistent step on 3 of 20 CA1 channels gives T-ca1;
+  - a large ripple burst on every channel, with jumps that do not persist, gives no core;
+  - 5 s of ripple-band noise on 4 of 20 channels gives one S block, and a 1-window dip inside it is
+    filled;
+  - a 200-µs spike line on 50 % of tetrodes with OOD marks gives T-spk;
+  - the same line with in-distribution marks gives no core.
+- The padding table: each consumer's intervals from a known set of cores, including merging and
+  clipping.
+- `interval_mask`: closed intervals.
+- The runner: epochs come from the register (stubbed); resume skips finished epochs; a failure is
+  recorded; an epoch with no artifacts writes an empty file.
+- `swr_source`: the hook applies the `analysis` table, coverage excludes its time, and a configured
+  run with a missing file raises.
+
+**Acceptance:**
+- **Real data, read-only.** Run on the 5 pilot epochs and on the 14 epochs with the most masked time
+  in `artifact_intervals_default.csv`:
+  - every prototype core is overlapped by a repo core, and the reverse;
+  - masked time per epoch is within 2 % of the prototype's;
+  - every difference is explained.
+- **Same validation verdicts in those epochs:** no true-SWR or visually confirmed SWR is masked
+  beyond the prototype's 5 label errors; the visual T, SPK and S windows are caught as in the
+  prototype.
+- **Cost:** runtime and memory per epoch are measured on the pilots, with the extrapolation to 255
+  epochs.
+
+## Task 17: the runners use the masks
+
+**Files and changes:**
+- **SWR runner** (`scripts/decoding/run_swr_detection.py`, `analysis/hippocampus/swr_inventories.py`):
+  - **One mask for all four detectors.** Kay, Karlsson, Yu and Zugaro each get
+    `normalization_mask = ~swr_mask` on their own time grid. Every detector's events that overlap
+    the `swr` mask are dropped, and the drops are counted per detector in the manifest. The same mask
+    for all four keeps the comparison fair.
+  - Do not NaN-fill the LFP before filtering (report §6.2).
+  - `swr_observed` marks the `swr` mask's time as not observed.
+  - The manifest records the artifact run id.
+  - **Fix the 2 j16 epochs** (`j1620210710_02_r1`, `_04_r2`). They fail with "Found 2 potential
+    parents" on the position merge table. Resolve the position the way the decoder's `load_data`
+    does, and add a test with the failing restriction stubbed.
+- **MUA / HSE detection,** wherever the project runs it (find every `multiunit_HSE_detector` caller
+  and the decode's `get_data_over_time`): use the `decoder` mask as its normalization mask, and
+  drop overlapping events.
+- **Decoders** (`run_decoding_bandit.py` and `run_decoding_contfrag.py`, HPC only):
+  - `is_missing` = the `decoder` mask on the decode time grid, passed to `estimate_parameters`.
+  - Encoding training:
+    `is_training = ~(Kay inventory events of the configured run) & ~decoder_mask`, on position time.
+    - Use every event in the inventory after artifact dropping, not only the immobile cohort, because
+      the old rule excluded every stored ripple.
+    - Check which speed gating the stored ripples had at detection, match it, and report it.
+    - This replaces the stored-ripple source of `get_training_timepoints(..., "no_ripple")` for HPC
+      (the lead's decision of 2026-10-09).
+  - `data_over_time`'s `SWR_event` comes from the same inventory, so the decode's provenance equals
+    the analysis source.
+  - Record, with the decode's settings provenance:
+    - the SWR inventory run id;
+    - the artifact run id;
+    - the seconds set missing;
+    - the seconds removed from encoding.
+  - Refuse to run if either run id is unset (fail closed).
+- **Widloski runner** (`run_memoryless_detection.py`): fix the thread cap. The dask nanny sets
+  OMP/MKL/OPENBLAS_NUM_THREADS = 1 in each worker, and R4 took 18 h against an estimate of 5–6 h.
+  Measure one epoch before and after: runtime, plus outputs identical bit for bit.
+
+**Tests (write them first):**
+- the SWR runner passes the same mask to all four detectors, counts the drops, and leaves the
+  artifact time out of `swr_observed`;
+- the decoders build `is_missing` and `is_training` from stubbed sources, and refuse to run when a
+  run id is unset;
+- the Widloski workers see the intended thread counts.
+
+**Acceptance:**
+- **One decode.** A pilot epoch with artifacts (`chimi20200225_02_r1`) is decoded into a scratch
+  staging folder:
+  - masked bins have a log-likelihood of 0 (spot-check);
+  - the seconds set missing and the seconds removed from encoding are reported;
+  - the runtime is compared with the previous decode.
+- **SWR runner** on the 5 pilots and the 2 j16 epochs, with a scratch artifact run: Kay counts are
+  reported next to the prototype's masked counts (`validation/kay_effect_per_epoch.csv`).
+
+## Task 18: tables and analyses use the `analysis` mask
+
+**Files and changes:**
+- **One eligibility rule for every event cohort** (non-local, SWR, MUA, ContFrag and Widloski): the
+  whole event is immobile (the existing rule) **and** it does not overlap the `analysis` mask.
+  - Define it once, next to `analysis/hippocampus/event_immobility.py`.
+  - A dropped event keeps a reason, as `swr_source`'s `DropReason` does.
+  - Grep every cohort builder and list each, with your decision, in the report.
+- **Exposure:** every rate denominator loses the mask's time. That includes:
+  - stop-level immobility time (Family A's offset);
+  - per-bin tables (drop bins inside the mask; Family B);
+  - PFC per-bin rows;
+  - any other exposure you find.
+- **Stamps:** tables carry `artifacts@<run>` through the existing `swr_source` stamp.
+- **Docs:**
+  - update `docs/known_issues/swr_mua_count_conventions.md`;
+  - write a CLAUDE.md change to the "One speed-eligible population" paragraph as a **proposal in the
+    report**. Do not edit CLAUDE.md.
+
+**Tests (write them first):**
+- an event that overlaps the mask leaves every cohort;
+- exposure falls by exactly the masked time inside the stop;
+- per-bin rows inside the mask are dropped;
+- with no artifacts, every output is identical to before.
+
+**Acceptance:** on the 5 pilots with a scratch artifact run, report per cohort the counts before and
+after, and the exposure removed.
+
+## R9: artifact detection, all epochs (CPU)
+
+1. Merge Tasks 16–18 into the main branch, and push.
+2. Run on all 255 epochs (218 analysed and 37 pending) in tmux `artifacts_full`, on CPU.
+3. **Gate.** On the 218:
+   - every prototype core is matched, and masked time is within 2 % of the prototype's in total
+     and per epoch;
+   - the validation verdicts are reproduced:
+     - true SWRs: 0 masked after adjudication;
+     - visual SWRs: 0 of 55;
+     - steps: at least 95 of 111;
+     - spike-only lines: 3 of 3;
+     - S windows: 153 of 153.
+
+   On the 37 pending epochs, review a gallery of their intervals.
+4. Set `ARTIFACT_INTERVALS_RUN_ID` (one commit), and push.
+
+## R10: SWR inventories rerun with the mask (CPU)
+
+- Run `run_swr_detection.py` on all 255 epochs into a new run folder.
+- **Gate:**
+  - the 14 low-count epochs have SD / robust SD ≤ 1.3;
+  - the 2.0 Kay total on the 218 is within 1 % of the prototype's 41,743;
+  - both j16 epochs are `ok`.
+- Then set `SWR_INVENTORY_RUN_ID` (one commit), and push.
+
+## R11: full re-decode, all 255 epochs (GPU, zephyr and breeze)
+
+- NonLocal and ContFrag, both into a new staging folder, from the commit that sets both run ids.
+- Breeze needs SSH access first: the lead authorises the key, or runs the jobs there.
+- **Gates:** as R1 (P30-B pinned, no CPU fallback, provenance), plus both run ids recorded in every
+  decode.
+- **Swap:** replace the 218 and promote the 37 pending with the register flip, using the R2 swap
+  procedure with a sample re-hash.
+
+## R12: Widloski rerun, all 255 epochs
+
+Run with the thread fix, into a new run folder.
+
+## R13: tables, refits, PFC, figures, audit
+
+R5–R8 as written, on 255 epochs, with stamps `kay@<R10 run>+artifacts@<R9 run>`. R8 adds:
+- the sensitivity analysis without the 4 epochs over 2 % masked;
+- the masked-time table.
