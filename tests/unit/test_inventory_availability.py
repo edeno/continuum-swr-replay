@@ -22,6 +22,8 @@ from continuum_swr_replay.analysis.inventory_comparison.availability import (
 )
 from continuum_swr_replay.analysis.inventory_comparison.intervals import (
     contains,
+    intersect,
+    subtract,
     total_duration,
 )
 from continuum_swr_replay.analysis.inventory_comparison.schema import SessionIdentity
@@ -256,3 +258,95 @@ class TestBoundsAndConversion:
         )
         assert y.observed.shape == (0, 2) and y.exposure.shape == (0, 2)
         assert sorted(k[3] for k in coverage) == ["x", "y"]
+
+
+class TestExcludedTime:
+    """Excluded time (the artifact mask widened by 0.3 s) is no detector's
+    observed time or exposure, whatever its observation table says."""
+
+    EPOCH_ID = "sim20200101_02_r1_HPC"
+    CORES = [("S", 20.0, 21.0), ("spk", 70.0, 70.0)]
+    """Padded into the mask [19, 22] and [69.9, 70.1]."""
+    EXCLUDED = np.array([[18.7, 22.3], [69.6, 70.4]])
+    STILL = np.array([[0.0, 30.0], [40.0, 100.0]])
+
+    @pytest.fixture
+    def masked(self, tmp_path, monkeypatch):
+        from continuum_swr_replay.analysis.hippocampus import swr_source
+        from tests.unit._swr_inventory_fixtures import write_artifact_run
+
+        directory = write_artifact_run(
+            tmp_path / "artifacts", {self.EPOCH_ID: self.CORES}
+        )
+        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_ROOT", directory.parent)
+        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
+        np.testing.assert_allclose(
+            swr_source.excluded_intervals(self.EPOCH_ID).to_numpy(), self.EXCLUDED
+        )
+
+    def _observations(self) -> tuple[pd.DataFrame, dict]:
+        stretches = {
+            # the memoryless runner's decoded windows keep the reach
+            "memoryless": np.array([[0.0, 18.9], [22.1, 100.0]]),
+            "kay": np.array([[0.0, 50.0], [60.0, 100.0]]),
+            "state_space": np.array([[0.0, 100.0]]),
+        }
+        tables = [
+            observation_table(
+                SESSION,
+                detector=detector,
+                run_id="r",
+                epoch_bounds=(0.0, 100.0),
+                observed=runs,
+                unavailable_reason="not decoded",
+            )
+            for detector, runs in stretches.items()
+        ]
+        tables.append(
+            missing_run_table(
+                SESSION,
+                detector="missing",
+                run_id="r",
+                epoch_bounds=(0.0, 100.0),
+                reason="no run",
+            )
+        )
+        return pd.concat(tables, ignore_index=True), stretches
+
+    def test_every_detectors_exposure_is_its_stretches_less_excluded_time(self, masked):
+        from continuum_swr_replay.analysis.hippocampus import swr_source
+
+        excluded = swr_source.excluded_intervals(self.EPOCH_ID).to_numpy()
+        observations, stretches = self._observations()
+
+        coverage = coverage_from_observations(
+            observations, {("sim", 20200101, "02_r1"): self.STILL}
+        )
+
+        for detector, runs in stretches.items():
+            entry = coverage[("sim", 20200101, "02_r1", detector)]
+            analysed = subtract(runs, excluded)
+            np.testing.assert_array_equal(entry.observed, analysed)
+            np.testing.assert_array_equal(
+                entry.exposure, exposure(analysed, self.STILL)
+            )
+            assert total_duration(intersect(entry.exposure, excluded)) == 0.0
+        empty = coverage[("sim", 20200101, "02_r1", "missing")]
+        assert empty.observed.shape == (0, 2) and empty.exposure.shape == (0, 2)
+        # the reach around the S block is gone from the memoryless exposure too
+        np.testing.assert_allclose(
+            coverage[("sim", 20200101, "02_r1", "memoryless")].exposure,
+            [[0.0, 18.7], [22.3, 30.0], [40.0, 69.6], [70.4, 100.0]],
+        )
+
+    def test_with_no_artifact_run_the_stretches_are_the_observed_time(self):
+        observations, stretches = self._observations()
+
+        coverage = coverage_from_observations(
+            observations, {("sim", 20200101, "02_r1"): self.STILL}
+        )
+
+        for detector, runs in stretches.items():
+            entry = coverage[("sim", 20200101, "02_r1", detector)]
+            np.testing.assert_allclose(entry.observed, runs)
+            np.testing.assert_allclose(entry.exposure, exposure(runs, self.STILL))

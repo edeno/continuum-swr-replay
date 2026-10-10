@@ -10,6 +10,12 @@ only when the whole window is there.
 Exposure is observed time during which the animal was known to be still:
 finite speed below the canonical threshold. Comparisons between detectors use
 the intersection of their exposures.
+
+Excluded time (``swr_source.excluded_intervals``: the artifact mask widened by
+0.3 s) is not analysed, so the reader of the observation tables
+(:func:`coverage_from_observations`) removes it from every detector's observed
+time, and so from its exposure. The tables themselves stay a record of what
+each detector read, as the SWR runner's ``swr_observed.parquet`` is.
 """
 
 from collections.abc import Mapping
@@ -22,6 +28,7 @@ from numpy.typing import NDArray
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
+from continuum_swr_replay.analysis.hippocampus import swr_source
 from continuum_swr_replay.analysis.inventory_comparison.intervals import (
     intersect,
     normalize,
@@ -264,8 +271,12 @@ def coverage_from_observations(
     """The coverage map the counts read, from observation tables.
 
     One origin for both representations of what a detector observed: the
-    ``available`` stretches become ``observed``, and their intersection with
-    the epoch's still intervals becomes ``exposure``. Every (epoch, detector)
+    ``available`` stretches less the epoch's excluded time
+    (``swr_source.excluded_intervals``) become ``observed``, and their
+    intersection with the epoch's still intervals becomes ``exposure``. A
+    detector's candidates in excluded time are dropped from its cohort, so its
+    rate's denominator loses that time too, for every detector alike; with no
+    artifact run configured nothing is removed. Every (epoch, detector)
     in the tables gets an entry, so a detector whose run was missing, entered
     through ``missing_run_table``, stays on the roster with empty coverage
     and reads as unavailable rather than vanishing.
@@ -284,7 +295,13 @@ def coverage_from_observations(
     coverage : dict
         ``(animal, day, epoch, detector) -> Coverage``.
 
+    Raises
+    ------
+    SwrSourceError
+        If an artifact run is configured and cannot serve an epoch.
+
     """
+    excluded: dict[tuple, NDArray] = {}
     coverage = {}
     for (session, detector), group in observations.groupby(
         [observations[list(SESSION_COLUMNS_DAY)].apply(tuple, axis=1), "detector"],
@@ -296,6 +313,13 @@ def coverage_from_observations(
             if len(available)
             else np.empty((0, 2))
         )
+        if session not in excluded:
+            excluded[session] = (
+                swr_source.excluded_intervals_of(group)[["start_time", "end_time"]]
+                .to_numpy(dtype=np.float64)
+                .reshape(-1, 2)
+            )
+        observed = subtract(observed, excluded[session])
         coverage[(*session, detector)] = Coverage(
             observed=observed,
             exposure=exposure(observed, still.get(tuple(session), np.empty((0, 2)))),

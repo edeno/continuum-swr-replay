@@ -33,7 +33,10 @@ Each epoch writes, under ``Processed-Data/replay_detection_comparison/memoryless
 - ``{epoch_id}_memoryless_shuffle_draws.parquet``, every shuffled draw;
 - ``{epoch_id}_memoryless_observed.parquet``, what was observed: the stretches
   of decoded windows (none holds a masked bin), and the stretches where SWR
-  labels were observed;
+  labels were observed. It records what was read, as the SWR runner's
+  ``swr_observed.parquet`` does: the comparison's reader
+  (``inventory_comparison.availability.coverage_from_observations``) removes
+  excluded time from it, as from every detector's;
 - ``{epoch_id}_memoryless_candidates.pkl``, the per-window statistics, gates
   and pre-merge runs that explain each rejection.
 
