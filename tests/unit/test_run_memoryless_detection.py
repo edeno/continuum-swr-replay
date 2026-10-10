@@ -1305,6 +1305,16 @@ class TestMain:
         with pytest.raises(SystemExit, match="other settings"):
             self.cli(decode_root, tmp_path)
 
+    def test_settings_record_that_runs_are_not_bit_reproducible(self):
+        """The measured limit is part of what a run states about itself."""
+        settings = runner.run_settings(7, True, N_SHUFFLES, CONFIG, "test")
+
+        known = settings["known_limits"]["bit_reproducible"]
+        assert known["value"] is False
+        assert (
+            "1.2e-4" in known["measured"] and "event outputs equal" in known["measured"]
+        )
+
     # --- open files: Spyglass's NWB cache and the open-file limit --------------
     COUNTS = dict.fromkeys(
         (

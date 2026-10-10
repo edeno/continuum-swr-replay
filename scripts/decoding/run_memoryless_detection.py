@@ -692,6 +692,19 @@ def run_one(
     }
 
 
+KNOWN_LIMITS = {
+    "bit_reproducible": {
+        "value": False,
+        "measured": "two runs of chimi20200225_02_r1 at identical settings, one "
+        "thread on one GPU (Task 17a, 2026-10-09): 19,199 windows differ, max "
+        "relative difference 1.2e-4, one window's gate flips; event outputs equal",
+    }
+}
+"""What a run is known not to guarantee, recorded in every manifest's settings.
+The cause is not established; see the design note
+(``docs/design/replay_detection_comparison/02-memoryless-sequence.md``)."""
+
+
 def run_settings(
     run_seed: int,
     shuffle: bool,
@@ -706,7 +719,9 @@ def run_settings(
     holds ``uv.lock``'s sha256, the commit ``ripple_detection`` was installed
     from and the CUDA plugin's version. ``swr_source`` names the SWR source
     the labels come from (``swr_source_name()``), so a new inventory or
-    artifact run is a new run.
+    artifact run is a new run. ``known_limits`` states what a run is known not
+    to guarantee: two runs at identical settings are not bit-for-bit equal
+    (:data:`KNOWN_LIMITS`; design note, "Run-to-run reproducibility").
     """
     return {
         "git_commit": git_commit,
@@ -720,6 +735,7 @@ def run_settings(
             if name != "dirty"
         },
         "config": asdict(config),
+        "known_limits": KNOWN_LIMITS,
         "shuffle": {
             "run": shuffle,
             "definition": "encoding-pair: within each electrode, encoding "
