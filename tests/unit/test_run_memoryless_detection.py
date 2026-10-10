@@ -1311,9 +1311,12 @@ class TestMain:
 
         known = settings["known_limits"]["bit_reproducible"]
         assert known["value"] is False
+        # the two measurements of Task 17a, each with its own epoch
         assert (
-            "1.2e-4" in known["measured"] and "event outputs equal" in known["measured"]
+            "chimi20200225_02_r1" in known["measured"] and "1.2e-4" in known["measured"]
         )
+        assert "j1620210706_02_r1" in known["measured"]
+        assert "every event-level output equal" in known["measured"]
 
     # --- open files: Spyglass's NWB cache and the open-file limit --------------
     COUNTS = dict.fromkeys(

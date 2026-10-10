@@ -695,9 +695,12 @@ def run_one(
 KNOWN_LIMITS = {
     "bit_reproducible": {
         "value": False,
-        "measured": "two runs of chimi20200225_02_r1 at identical settings, one "
-        "thread on one GPU (Task 17a, 2026-10-09): 19,199 windows differ, max "
-        "relative difference 1.2e-4, one window's gate flips; event outputs equal",
+        "measured": "Task 17a, 2026-10-09. chimi20200225_02_r1, two runs at "
+        "identical settings, one thread on one GPU: 19,199 windows differ, max "
+        "relative difference 1.2e-4, one window's gate flips (no event-level "
+        "comparison reported). j1620210706_02_r1, the runner before and after "
+        "its thread fix: 6,326 of 631,632 windows differ (max relative 1.3e-5), "
+        "one window's gate flips, every event-level output equal",
     }
 }
 """What a run is known not to guarantee, recorded in every manifest's settings.

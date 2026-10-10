@@ -1159,16 +1159,22 @@ automatically (D7).
 ## Run-to-run reproducibility
 
 Two runs of the detector on the same epoch at identical settings are not
-bit-for-bit equal. Measured in Task 17a (2026-10-09) on chimi20200225_02_r1: two runs
-on one GPU, both with one thread (the runner before and after its thread fix, which
-with one thread does the same computation). 19,199 windows' numbers differ, the
-largest relative difference is 1.2e-4, one window's gate flips, and the event-level
-outputs are equal. The cause is not established (the report's best guess
-is the GPU likelihood). This is a stated limit, not fixed: every run manifest records
-it in its settings (`known_limits.bit_reproducible`,
-`run_memoryless_detection.KNOWN_LIMITS`), and two runs are compared on their
-event-level outputs, not on window-level numbers or file hashes, as Task 17a's
-acceptance was. One epoch run with `XLA_FLAGS=--xla_gpu_deterministic_ops=true` at
+bit-for-bit equal. Task 17a (2026-10-09) measured it twice:
+
+- chimi20200225_02_r1, two runs on one GPU, both with one thread (the runner before
+  and after its thread fix, which with one thread does the same computation):
+  19,199 windows' numbers differ, the largest relative difference is 1.2e-4, and one
+  window's gate flips. The report gives no event-level comparison for this pair.
+- j1620210706_02_r1, the runner before and after its thread fix: 6,326 of 631,632
+  windows' spreads differ (largest relative difference 1.3e-5), and one window's gate
+  flips; every event-level output is equal (431 candidates, 51 replay, 50 passing
+  the shuffle, `is_swr`).
+
+The cause is not established (the report's best guess is the GPU likelihood). This
+is a stated limit, not fixed: every run manifest records it in its settings
+(`known_limits.bit_reproducible`, `run_memoryless_detection.KNOWN_LIMITS`), and two
+runs are compared on their event-level outputs, not on window-level numbers or file
+hashes, as Task 17a's acceptance was. One epoch run with `XLA_FLAGS=--xla_gpu_deterministic_ops=true` at
 R12 launch would measure the cost of deterministic GPU ops and whether the gate flip
 goes away; the decision is left to the R8 doc pass.
 
