@@ -18,7 +18,8 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import (
 
 SESSION = SessionIdentity(animal="sim", day=20200101, epoch="02_r1", brain_area="HPC")
 GRID = 100.0 + np.arange(2000) / 500.0
-# a memoryless table's swr_definition when built with no artifact run
+# a memoryless table's swr_definition when built from the configured source
+# (TestAdapters configures the inventory run "inventory") with no artifact run
 NO_ARTIFACT_RUN = "kay@inventory+artifacts@none"
 
 
@@ -158,9 +159,11 @@ class TestEmpty:
 class TestAdapters:
     @pytest.fixture(autouse=True)
     def _no_artifact_run(self, monkeypatch):
-        """The tables here are built with no artifact run; read them under none."""
+        """The tables here are built from the inventory run "inventory" with no
+        artifact run; read them under that source."""
         from continuum_swr_replay.analysis.hippocampus import swr_source
 
+        monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", "inventory")
         monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", None)
 
     def test_our_canonical_table_keeps_its_native_duration_apart(self):
@@ -298,7 +301,9 @@ class TestAdapters:
         from continuum_swr_replay.analysis.hippocampus import swr_source
         from tests.unit.test_memoryless_event_table import build, make_recording
 
-        table = build(make_recording()).drop(columns="artifact_drop_reason")
+        table = build(make_recording(), swr_definition=NO_ARTIFACT_RUN).drop(
+            columns="artifact_drop_reason"
+        )
         assert len(from_memoryless_table(table, cohort="replay_criteria")) == 2
         monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", "a_run")
 
@@ -308,7 +313,7 @@ class TestAdapters:
     def test_a_table_built_under_another_artifact_run_is_refused(self, monkeypatch):
         """Its artifact_drop_reason reads another mask: a table built with no
         run is refused under a run, one built under a run under another or
-        under none."""
+        under none. The message names both sources."""
         from continuum_swr_replay.analysis.hippocampus import swr_source
         from tests.unit.test_memoryless_event_table import build, make_recording
 
@@ -317,24 +322,41 @@ class TestAdapters:
         under_a = build(recording, swr_definition="kay@inventory+artifacts@run_a")
 
         assert len(from_memoryless_table(under_none, cohort="replay_criteria")) == 2
-        with pytest.raises(ValueError, match="run_a"):
+        with pytest.raises(ValueError, match="artifacts@run_a"):
             from_memoryless_table(under_a, cohort="replay_criteria")
 
         monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", "run_a")
         assert len(from_memoryless_table(under_a, cohort="replay_criteria")) == 2
-        with pytest.raises(ValueError, match="'run_a'"):
+        with pytest.raises(ValueError, match="'kay@inventory\\+artifacts@run_a'"):
             from_memoryless_table(under_none, cohort="replay_criteria")
 
         monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", "run_b")
-        with pytest.raises(ValueError, match="'run_b'"):
+        with pytest.raises(ValueError, match="'kay@inventory\\+artifacts@run_b'"):
             from_memoryless_table(under_a, cohort="replay_criteria")
+
+    def test_a_table_built_from_another_inventory_run_is_refused(self, monkeypatch):
+        """Its SWR labels, and so its candidates' SWR classes, are another
+        inventory's; so is a table from before the source had a name."""
+        from continuum_swr_replay.analysis.hippocampus import swr_source
+        from tests.unit.test_memoryless_event_table import build, make_recording
+
+        recording = make_recording()
+        other = build(recording, swr_definition="kay@other+artifacts@none")
+        unnamed = build(recording, swr_definition="Kay")
+
+        for table in (other, unnamed):
+            with pytest.raises(ValueError, match="kay@inventory\\+artifacts@none"):
+                from_memoryless_table(table, cohort="replay_criteria")
+
+        monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", "other")
+        assert len(from_memoryless_table(other, cohort="replay_criteria")) == 2
 
     def test_the_adapter_reads_what_the_memoryless_builder_writes(self):
         """Fed a real table, so a column rename in the builder fails here and
         not in the runner."""
         from tests.unit.test_memoryless_event_table import build, make_recording
 
-        table = build(make_recording())
+        table = build(make_recording(), swr_definition=NO_ARTIFACT_RUN)
 
         inventory = from_memoryless_table(table, cohort="replay_criteria")
 
@@ -350,9 +372,12 @@ class TestAdapters:
         from tests.unit.test_memoryless_event_table import build, make_recording
 
         recording = make_recording()
-        unshuffled = build(recording, shuffle_results=None)
+        shuffled = build(recording, swr_definition=NO_ARTIFACT_RUN)
+        unshuffled = build(
+            recording, shuffle_results=None, swr_definition=NO_ARTIFACT_RUN
+        )
 
-        assert len(from_memoryless_table(build(recording), cohort="published")) == 2
+        assert len(from_memoryless_table(shuffled, cohort="published")) == 2
         assert len(from_memoryless_table(unshuffled, cohort="replay_criteria")) == 2
         with pytest.raises(ValueError, match="shuffle"):
             from_memoryless_table(unshuffled, cohort="published")

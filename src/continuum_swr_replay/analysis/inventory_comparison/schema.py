@@ -424,8 +424,10 @@ def from_memoryless_table(table: pd.DataFrame, *, cohort: str) -> pd.DataFrame:
         If the cohort is unknown, a column is missing, a published cohort was
         not shuffled, an artifact run is configured and the table has no
         ``artifact_drop_reason`` (it was made before the rule), or the table's
-        ``swr_definition`` names another artifact run than the configured one
-        (no run included): its ``artifact_drop_reason`` reads another mask.
+        ``swr_definition`` is not the configured source
+        (``swr_source.swr_source_name()``): another artifact run (no run
+        included) would make its ``artifact_drop_reason`` read another mask,
+        and another inventory run its SWR labels another inventory's.
 
     """
     if cohort not in MEMORYLESS_COHORTS:
@@ -474,16 +476,14 @@ def from_memoryless_table(table: pd.DataFrame, *, cohort: str) -> pd.DataFrame:
             "configured: a table made before the analysed-time rule would read "
             "its candidates in excluded time as kept. Rerun the detector."
         )
-    configured = swr_source.ARTIFACT_INTERVALS_RUN_ID
-    built_under = {
-        swr_source.artifact_run_of(name) for name in table["swr_definition"].unique()
-    }
-    if any(run != configured for run in built_under):
+    configured = swr_source.swr_source_name()
+    built_from = {str(name) for name in table["swr_definition"].unique()}
+    if any(name != configured for name in built_from):
         raise ValueError(
-            "The memoryless table was built under artifact run(s) "
-            f"{sorted(str(run) for run in built_under)} (its swr_definition), not "
-            f"the configured {configured!r}: its artifact_drop_reason reads "
-            "another mask. Rerun the detector under the configured run."
+            f"The memoryless table was built from SWR source(s) {sorted(built_from)} "
+            f"(its swr_definition), not the configured {configured!r}: its SWR "
+            "labels or its artifact_drop_reason read another inventory or mask. "
+            "Rerun the detector under the configured source."
         )
     table = table[selected]
     frame = pd.DataFrame(
