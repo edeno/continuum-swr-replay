@@ -98,14 +98,15 @@ allowlist.
 <!-- BEGIN GENERATED: counts -->
 | status | reason | entries |
 |---|---|---|
-| analysed | — | 218 |
+| analysed | — | 207 |
 | excluded | `NO_NWB` | 3 |
 | excluded | `NO_RUN_EPOCH` | 1 |
 | excluded | `DEPLETION_TASK` | 238 |
 | excluded | `NOT_INGESTED` | 15 |
 | excluded | `NO_TRIAL_INTERVALS` | 42 |
-| pending | `PENDING_POPULATE` | 37 |
+| pending | `PENDING_POPULATE` | 35 |
 | excluded | `MISSING_INPUT` | 3 |
+| excluded | `SUSTAINED_NOISE` | 13 |
 | **total** | | **557** |
 
 An entry is one run epoch, except the 4 session-wide `*` entries of sessions with no known run epoch: 553 run epochs and 4 session-wide entries in all.
@@ -114,10 +115,10 @@ An entry is one run epoch, except the 4 session-wide `*` entries of sessions wit
 |---|---|---|
 | chimi | 45 | 1 |
 | j16 | 58 | 0 |
-| peanut | 13 | 32 |
-| senor | 58 | 3 |
+| peanut | 13 | 31 |
+| senor | 47 | 2 |
 | wilbur | 44 | 1 |
-| **all** | **218** | **37** |
+| **all** | **207** | **35** |
 <!-- END GENERATED: counts -->
 
 Of the 91 `NWB_FILES`, 46 are depletion sessions. The other 45 hold every analysed
@@ -257,9 +258,12 @@ recorded.
 
 The source for the evidence is the exclusion audit and the populate plan.
 `populate_plan.py` and `populate_report.md` are in
-`.claude/research/refresh_populate/`. One row per session and evidence, its epochs
-comma-separated, `*` for a session-wide entry. A literal `|` inside a cell is
-written `\|`.
+`.claude/research/refresh_populate/`. A `SUSTAINED_NOISE` entry's evidence comes from
+the artifact run (its S cores, with block bounds in seconds after the epoch's first
+sample) and from `.claude/research/refresh_r11/` (`s_epoch_tetrodes.csv`, and the
+step-5 test in `s_epoch/s_epochs.csv` and `r11a_report.md` §5). One row per session
+and evidence, its epochs comma-separated, `*` for a session-wide entry. A literal `|`
+inside a cell is written `\|`.
 
 <!-- BEGIN GENERATED: entries -->
 | session | epochs | status | reason | evidence |
@@ -347,7 +351,6 @@ written `\|`.
 | peanut20201127_.nwb | 12_r6 | pending | `PENDING_POPULATE` | No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 11 valid times'), CA1 RippleLFPSelection, RippleTimesV1. |
 | peanut20201128_.nwb | 02_r1 | pending | `PENDING_POPULATE` | No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 1 valid times'), CA1 RippleLFPSelection, RippleTimesV1. |
 | peanut20201128_.nwb | 04_r2 | pending | `PENDING_POPULATE` | No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 3 valid times'), CA1 RippleLFPSelection, RippleTimesV1. |
-| peanut20201128_.nwb | 08_r4 | pending | `PENDING_POPULATE` | No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 7 valid times'), CA1 RippleLFPSelection, RippleTimesV1. |
 | peanut20201128_.nwb | 10_r5 | pending | `PENDING_POPULATE` | No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 9 valid times'), CA1 RippleLFPSelection, RippleTimesV1. |
 | peanut20201128_.nwb | 12_r6 | pending | `PENDING_POPULATE` | No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 11 valid times'), CA1 RippleLFPSelection, RippleTimesV1. |
 | peanut20201128_.nwb | 14_r7 | pending | `PENDING_POPULATE` | No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 13 valid times'), CA1 RippleLFPSelection, RippleTimesV1. |
@@ -364,10 +367,22 @@ written `\|`.
 | peanut20201202_.nwb | 08_r4 | pending | `PENDING_POPULATE` | No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 7 valid times'), CA1 RippleLFPSelection, RippleTimesV1. |
 | peanut20201202_.nwb | 12_r6 | pending | `PENDING_POPULATE` | No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 11 valid times'), CA1 RippleLFPSelection, RippleTimesV1. |
 | peanut20201202_.nwb | 14_r7 | pending | `PENDING_POPULATE` | No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on peanut20201124, LFPBandV1 ripple and theta, 21 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 13 valid times'), CA1 RippleLFPSelection, RippleTimesV1. |
-| senor20201102_.nwb | 08_r4 | pending | `PENDING_POPULATE` | No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on senor20201030, LFPBandV1 ripple and theta, 22 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 7 valid times'), CA1 RippleLFPSelection, RippleTimesV1. |
 | senor20201104_.nwb | 04_r2 | pending | `PENDING_POPULATE` | No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on senor20201030, LFPBandV1 ripple and theta, 22 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 10 valid times'), CA1 RippleLFPSelection, RippleTimesV1. |
 | senor20201105_.nwb | 02_r1 | pending | `PENDING_POPULATE` | No PositionIntervalMap row, so get_epoch_info cannot list it, and no CA1 RippleLFPSelection or RippleTimesV1. Every other input exists: IntervalPositionInfo default_decoding, IntervalLinearizedPosition on senor20201030, LFPBandV1 ripple and theta, 22 HPC UnitMarks sort groups, DIO, Comrie's trials. Planned fix (populate_plan.py phases 1, 5, 6): PositionIntervalMap populate (predicted 'pos 1 valid times'), CA1 RippleLFPSelection, RippleTimesV1. |
 | wilbur20210326_.nwb | 03_r1 | pending | `PENDING_POPULATE` | First-exposure session (200 trials, p(R) 100% then 50%). Its description, 'Spatial bandit task (regular) - exploration session', is admitted by FIRST_EXPOSURE_DESCRIPTIONS. No CA1 RippleLFPSelection or RippleTimesV1; every other input exists. Planned fix (populate_plan.py phases 5-6): CA1 RippleLFPSelection on the 14-electrode ripple band (decision D2), RippleTimesV1. |
 | senor20201104_.nwb | 06_r3, 08_r4 | excluded | `MISSING_INPUT` | LFPV1.make fails in spyglass common_interval.censor ('Interval_list must contain all timestamps') for the existing LFPSelection (populate 2026-10-09), so no LFP, ripple band or CA1 ripple times; likely why LFPV1 was never made |
 | senor20201105_.nwb | 09_r4 | excluded | `MISSING_INPUT` | IntervalPositionInfo head_position spatial series empty for 'pos 8 valid times' (IntervalLinearizedPosition.make fails, populate 2026-10-09); also no CA1 RippleTimesV1 |
+| peanut20201128_.nwb | 08_r4 | excluded | `SUSTAINED_NOISE` | Artifact run fbbff144a123 finds 1 S block, at 5.0-7.0 s (core 2.0 s) after the epoch's first sample. Evidence tetrodes (electrode groups): 1 19. R11a step 5, excess P(non-local) 1-3 s outside the S blocks: +0.000 [95 % CI -0.000, +0.000], PASS. Was PENDING_POPULATE: populated and decoded in R11 (--pending-only) before the ruling. |
+| senor20201101_.nwb | 14_r7 | excluded | `SUSTAINED_NOISE` | Artifact run fbbff144a123 finds 1 S block, at 84.0-112.0 s (core 28.0 s) after the epoch's first sample. Evidence tetrodes (electrode groups): 0 1 2 3 20 21 22 23. R11a step 5, excess P(non-local) 1-3 s outside the S blocks: +0.015 [95 % CI -0.131, +0.186], PASS. |
+| senor20201101_.nwb | 16_r8 | excluded | `SUSTAINED_NOISE` | Artifact run fbbff144a123 finds 1 S block, at 632.2-636.2 s (core 4.0 s) after the epoch's first sample. Evidence tetrodes (electrode groups): 0 1 2 3 20 21 22 23. R11a step 5, excess P(non-local) 1-3 s outside the S blocks: +0.107 [95 % CI -0.052, +0.315], PASS. |
+| senor20201102_.nwb | 06_r3 | excluded | `SUSTAINED_NOISE` | Artifact run fbbff144a123 finds 1 S block, at 836.0-840.0 s (core 4.0 s) after the epoch's first sample. Evidence tetrodes (electrode groups): 0 1 2 3 20 21 22 23. R11a step 5, excess P(non-local) 1-3 s outside the S blocks: +0.032 [95 % CI -0.018, +0.122], PASS. |
+| senor20201102_.nwb | 08_r4 | excluded | `SUSTAINED_NOISE` | Artifact run fbbff144a123 finds 1 S block, at 805.0-809.0 s (core 4.0 s) after the epoch's first sample. Evidence tetrodes (electrode groups): 0 1 2 3 20 21 22 23. R11a step 5, excess P(non-local) 1-3 s outside the S blocks: +0.022 [95 % CI -0.020, +0.068], PASS. Was PENDING_POPULATE: populated and decoded in R11 (--pending-only) before the ruling. |
+| senor20201102_.nwb | 16_r8 | excluded | `SUSTAINED_NOISE` | Artifact run fbbff144a123 finds 1 S block, at 232.0-238.0 s (core 6.0 s) after the epoch's first sample. Evidence tetrodes (electrode groups): 0 1 2 3 20 21 22 23. R11a step 5, excess P(non-local) 1-3 s outside the S blocks: +0.025 [95 % CI -0.020, +0.074], PASS. |
+| senor20201103_.nwb | 10_r5 | excluded | `SUSTAINED_NOISE` | Artifact run fbbff144a123 finds 1 S block, at 306.0-327.0 s (core 21.0 s) after the epoch's first sample. Evidence tetrodes (electrode groups): 0 1 2 3 20 21 22 23. R11a step 5, excess P(non-local) 1-3 s outside the S blocks: +0.004 [95 % CI -0.061, +0.080], PASS. |
+| senor20201103_.nwb | 14_r7 | excluded | `SUSTAINED_NOISE` | Artifact run fbbff144a123 finds 1 S block, at 203.0-216.0 s (core 13.0 s) after the epoch's first sample. Evidence tetrodes (electrode groups): 0 1 2 3 20 21 22 23. R11a step 5, excess P(non-local) 1-3 s outside the S blocks: +0.115 [95 % CI +0.010, +0.252], FAIL. |
+| senor20201104_.nwb | 02_r1 | excluded | `SUSTAINED_NOISE` | Artifact run fbbff144a123 finds 1 S block, at 1.0-3.0 s (core 2.0 s) after the epoch's first sample. Evidence tetrodes (electrode groups): 0 1 2 21. R11a step 5, excess P(non-local) 1-3 s outside the S blocks: -0.035 [95 % CI -0.087, +0.016], PASS. |
+| senor20201105_.nwb | 06_r3 | excluded | `SUSTAINED_NOISE` | Artifact run fbbff144a123 finds 1 S block, at 562.0-578.0 s (core 16.0 s) after the epoch's first sample. Evidence tetrodes (electrode groups): 0 1 2 3 20 21 22 23. R11a step 5, excess P(non-local) 1-3 s outside the S blocks: +0.030 [95 % CI -0.021, +0.090], PASS. |
+| senor20201106_.nwb | 04_r2 | excluded | `SUSTAINED_NOISE` | Artifact run fbbff144a123 finds 1 S block, at 0.0-14.0 s (core 14.0 s) after the epoch's first sample. Evidence tetrodes (electrode groups): 0 1 2 3 20 21 22 23. R11a step 5, excess P(non-local) 1-3 s outside the S blocks: +0.311 [95 % CI +0.084, +0.486], FAIL. |
+| senor20201106_.nwb | 16_r8 | excluded | `SUSTAINED_NOISE` | Artifact run fbbff144a123 finds 1 S block, at 247.0-249.0 s (core 2.0 s) after the epoch's first sample. Evidence tetrodes (electrode groups): 1 2. R11a step 5, excess P(non-local) 1-3 s outside the S blocks: +0.013 [95 % CI -0.003, +0.032], PASS. |
+| senor20201107_.nwb | 12_r6 | excluded | `SUSTAINED_NOISE` | Artifact run fbbff144a123 finds 2 S blocks, at 1.0-30.0 s (core 29.0 s) and 398.0-421.0 s (core 23.0 s) after the epoch's first sample. Evidence tetrodes (electrode groups): 0 1 2 3 20 21 22 23. R11a step 5, excess P(non-local) 1-3 s outside the S blocks: +0.063 [95 % CI +0.018, +0.117], FAIL. |
 <!-- END GENERATED: entries -->
