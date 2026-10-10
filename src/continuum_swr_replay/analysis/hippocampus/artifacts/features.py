@@ -388,14 +388,28 @@ def persistent_step_count(
 
 
 def nearest_mark_distance(
-    marks: NDArray[np.floating], is_reference: NDArray[np.bool_]
+    marks: NDArray[np.floating],
+    is_reference: NDArray[np.bool_],
+    times: NDArray[np.floating],
+    *,
+    own_event_s: float,
 ) -> NDArray[np.float64]:
-    """Each spike's Euclidean distance to the nearest reference mark, itself left out.
+    """Each spike's Euclidean distance to the nearest reference mark outside its own event.
 
     The prototype's mark space and metric: the tetrode's raw marks (µV),
-    Euclidean. A spike that is itself a reference mark is left out of its own
-    search by identity, so an exact duplicate of another spike's mark still
-    counts as support.
+    Euclidean. A spike's own event is every mark of the same tetrode at most
+    `own_event_s` from it in time, the spike itself included (Δt = 0); those
+    marks are left out of its search. Within a neuron's absolute refractory
+    period (about 1 ms) two detections on one tetrode are either two units,
+    whose marks differ and are not each other's nearest neighbour among the
+    tetrode's marks, or one waveform detected twice. Leaving them out changes
+    nothing for real spikes, and stops an artifact detected twice from
+    holding its own twin in distribution. An exact duplicate of a mark more
+    than `own_event_s` away still counts as support.
+
+    The search is exact: the k nearest reference marks are found with k = 1 +
+    the most reference marks inside any spike's own event (capped at the
+    reference size), so they always hold the nearest one outside it.
 
     Parameters
     ----------
@@ -403,23 +417,42 @@ def nearest_mark_distance(
         One tetrode's marks.
     is_reference : ndarray of bool, shape (n_spikes,)
         Which spikes form the reference set.
+    times : ndarray, shape (n_spikes,)
+        The spikes' times (seconds), in any order.
+    own_event_s : float
+        A reference mark at most this far from the spike in time is its own
+        event; only marks strictly farther away are searched.
 
     Returns
     -------
     ndarray, shape (n_spikes,)
-        In the marks' units; inf when no other reference mark exists.
+        In the marks' units; inf when no reference mark lies outside the
+        spike's own event.
     """
     marks = np.asarray(marks, dtype=np.float64)
-    distance = np.full(marks.shape[0], np.inf)
+    times = np.asarray(times, dtype=np.float64)
+    n_spikes = marks.shape[0]
+    distance = np.full(n_spikes, np.inf)
     reference_index = np.flatnonzero(is_reference)
-    if reference_index.size == 0 or marks.shape[0] == 0:
+    if reference_index.size == 0 or n_spikes == 0:
         return distance
+    reference_time = times[reference_index]
+    # Reference marks inside each spike's own event, counted on a window a few
+    # float spacings wider, so rounding in t +- own_event_s cannot undercount
+    # (a larger k stays exact).
+    sorted_time = np.sort(reference_time)
+    reach = own_event_s + 4 * np.spacing(np.abs(times).max())
+    n_own = np.searchsorted(sorted_time, times + reach, side="right")
+    n_own -= np.searchsorted(sorted_time, times - reach, side="left")
+    k = int(min(n_own.max() + 1, reference_index.size))
     tree = cKDTree(marks[reference_index])
-    found, neighbour = tree.query(marks, k=2)
-    own = np.full(marks.shape[0], -1)
-    own[reference_index] = np.arange(reference_index.size)
+    found, neighbour = tree.query(marks, k=k)
+    found = found.reshape(n_spikes, k)
+    neighbour = neighbour.reshape(n_spikes, k)
+    outside = np.abs(reference_time[neighbour] - times[:, None]) > own_event_s
+    first = outside.argmax(axis=1)  # the nearest outside the own event
     nearest: NDArray[np.float64] = np.where(
-        neighbour[:, 0] == own, found[:, 1], found[:, 0]
+        outside.any(axis=1), found[np.arange(n_spikes), first], np.inf
     )
     return nearest
 

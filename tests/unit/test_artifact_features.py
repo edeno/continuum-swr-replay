@@ -9,7 +9,8 @@ scripts/artdet_lfp*.py``, ``artdet_spikes.py``, ``artdet_detector.py``):
 - J5(t) = median(x[t+1..t+5]) - median(x[t-5..t-1]);
 - L20(t) = mean(x[t+5..t+24]) - mean(x[t-24..t-5]);
 - spike lines on two 200-µs grids offset by half a bin;
-- a mark's leave-self-out nearest-neighbour distance to a reference set.
+- a mark's nearest-neighbour distance to a reference set, its own event (the
+  same tetrode's marks within 1 ms, itself included) left out.
 
 Offline and deterministic.
 """
@@ -18,6 +19,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from scipy.spatial import cKDTree
 
 from continuum_swr_replay.analysis.hippocampus.artifacts.features import (
     channel_specificity,
@@ -244,12 +246,70 @@ class TestWindowSpectra:
         assert channel_specificity(power)[2] == pytest.approx(1.0)
 
 
+OWN_EVENT_S = 1e-3
+"""The shipped own-event window (``detect.T_SPK_OOD_OWN_EVENT_S``)."""
+
+
+def _old_nearest_mark_distance(marks, is_reference):
+    """The function as R9 (run a1083731940b) ran it: only the spike itself left
+    out, by identity. Kept to show the new rule changes nothing when no two
+    spikes of a tetrode are within 1 ms."""
+    marks = np.asarray(marks, dtype=np.float64)
+    distance = np.full(marks.shape[0], np.inf)
+    reference_index = np.flatnonzero(is_reference)
+    if reference_index.size == 0 or marks.shape[0] == 0:
+        return distance
+    tree = cKDTree(marks[reference_index])
+    found, neighbour = tree.query(marks, k=2)
+    own = np.full(marks.shape[0], -1)
+    own[reference_index] = np.arange(reference_index.size)
+    return np.where(neighbour[:, 0] == own, found[:, 1], found[:, 0])
+
+
+def _brute_force(marks, is_reference, times, own_event_s):
+    """A Python loop over spikes: the nearest reference mark more than
+    `own_event_s` away in time, inf when none."""
+    distance = np.full(len(marks), np.inf)
+    for i in range(len(marks)):
+        far = is_reference & (np.abs(times - times[i]) > own_event_s)
+        if far.any():
+            distance[i] = np.sqrt(((marks[far] - marks[i]) ** 2).sum(axis=1)).min()
+    return distance
+
+
+def _clustered_spikes(rng, n_spikes, *, base_time=1.6e9):
+    """Spikes with bursts, sorted by time: about half in groups of 2-6 spread
+    over 1.2 ms (twins, triplets, ...), the rest single over 60 s.
+
+    A burst is one artifact detected several times: its spikes share one mark,
+    exactly in every other burst and within 0.5 µV in the rest, so a burst's
+    nearest marks are its own. Returns times (n_spikes,) and marks
+    (n_spikes, 4).
+    """
+    n_singles = n_spikes // 2
+    times = [rng.uniform(0.0, 60.0, n_singles)]
+    marks = [rng.normal(0.0, 20.0, (n_singles, 4))]
+    burst = 0
+    while sum(map(len, times)) < n_spikes:
+        size = int(rng.integers(2, 7))
+        times.append(rng.uniform(0.0, 60.0) + rng.uniform(0.0, 1.2e-3, size))
+        jitter = 0.0 if burst % 2 == 0 else rng.normal(0.0, 0.5, (size, 4))
+        marks.append(rng.normal(0.0, 20.0, 4) + jitter * np.ones((size, 4)))
+        burst += 1
+    all_times = np.concatenate(times)[:n_spikes]
+    order = np.argsort(all_times, kind="stable")
+    return base_time + all_times[order], np.vstack(marks)[:n_spikes][order]
+
+
 class TestNearestMark:
-    def test_the_spike_itself_is_left_out(self):
+    def test_exact_duplicates_more_than_1_ms_apart_support_each_other(self):
         marks = np.array([[0.0, 0.0], [0.0, 0.0], [10.0, 0.0], [30.0, 0.0]])
         is_reference = np.array([True, True, True, False])
+        times = np.array([1.0, 2.0, 3.0, 4.0])
 
-        distance = nearest_mark_distance(marks, is_reference)
+        distance = nearest_mark_distance(
+            marks, is_reference, times, own_event_s=OWN_EVENT_S
+        )
 
         # 0 and 1 are exact duplicates: each the other's neighbour
         np.testing.assert_allclose(distance, [0.0, 0.0, 10.0, 20.0])
@@ -257,14 +317,155 @@ class TestNearestMark:
     def test_a_lone_reference_mark_has_no_neighbour(self):
         marks = np.array([[0.0, 0.0], [3.0, 4.0]])
 
-        distance = nearest_mark_distance(marks, np.array([True, False]))
+        distance = nearest_mark_distance(
+            marks,
+            np.array([True, False]),
+            np.array([1.0, 2.0]),
+            own_event_s=OWN_EVENT_S,
+        )
 
         np.testing.assert_allclose(distance, [np.inf, 5.0])
 
     def test_no_reference_means_every_mark_is_unsupported(self):
         marks = np.zeros((3, 4))
 
-        distance = nearest_mark_distance(marks, np.zeros(3, dtype=bool))
+        distance = nearest_mark_distance(
+            marks,
+            np.zeros(3, dtype=bool),
+            np.array([1.0, 2.0, 3.0]),
+            own_event_s=OWN_EVENT_S,
+        )
+
+        assert np.isinf(distance).all()
+
+    def test_twin_marks_within_1_ms_do_not_support_each_other(self):
+        """One artifact detected twice, 0.15 ms apart (the chimi20200227_02_r1
+        line at 8.614 s): each twin's only close mark is the other twin."""
+        cluster = np.array([[100.0, 0.0], [101.0, 0.0], [100.0, 1.0]])
+        twins = np.array([[1500.0, 1500.0], [1500.0, 1500.0]])
+        marks = np.vstack([cluster, twins])
+        times = 1.6e9 + np.array([1.0, 2.0, 3.0, 8.6145, 8.6145 + 0.15e-3])
+
+        distance = nearest_mark_distance(
+            marks, np.ones(5, dtype=bool), times, own_event_s=OWN_EVENT_S
+        )
+
+        far = np.hypot(1400.0, 1499.0)  # to the cluster's (100, 1)
+        np.testing.assert_allclose(distance[3:], [far, far])
+        np.testing.assert_allclose(distance[:3], [1.0, 1.0, 1.0])
+
+    def test_the_same_twins_1_5_ms_apart_still_support_each_other(self):
+        cluster = np.array([[100.0, 0.0], [101.0, 0.0], [100.0, 1.0]])
+        twins = np.array([[1500.0, 1500.0], [1500.0, 1500.0]])
+        marks = np.vstack([cluster, twins])
+        times = 1.6e9 + np.array([1.0, 2.0, 3.0, 8.6145, 8.6145 + 1.5e-3])
+
+        distance = nearest_mark_distance(
+            marks, np.ones(5, dtype=bool), times, own_event_s=OWN_EVENT_S
+        )
+
+        np.testing.assert_allclose(distance[3:], [0.0, 0.0])
+
+    def test_a_close_neighbour_in_time_gives_way_to_a_matching_mark_farther_away(
+        self,
+    ):
+        # spike 0's twin (spike 1, 0.5 ms later) has its exact mark; spike 2,
+        # 2 s later, is 5 µV away and is what spike 0 and spike 1 get
+        marks = np.array([[0.0, 0.0], [0.0, 0.0], [3.0, 4.0], [50.0, 0.0]])
+        times = 1.6e9 + np.array([1.0, 1.0005, 3.0, 5.0])
+
+        distance = nearest_mark_distance(
+            marks, np.ones(4, dtype=bool), times, own_event_s=OWN_EVENT_S
+        )
+
+        np.testing.assert_allclose(distance, [5.0, 5.0, 5.0, np.hypot(47.0, 4.0)])
+
+    @pytest.mark.parametrize(
+        ("gap", "supported"),
+        [(0.5, False), (np.nextafter(0.5, 1.0), True)],
+        ids=["at-the-window", "just-beyond"],
+    )
+    def test_a_mark_exactly_the_window_away_is_its_own_event(self, gap, supported):
+        """'More than the window away' is strict; 0.5 s is exact in binary."""
+        marks = np.zeros((2, 2))
+
+        distance = nearest_mark_distance(
+            marks, np.ones(2, dtype=bool), np.array([0.0, gap]), own_event_s=0.5
+        )
+
+        assert np.isfinite(distance).tolist() == [supported, supported]
+
+    def test_a_non_reference_spike_leaves_out_reference_marks_within_1_ms(self):
+        # spike 0 is not reference; its twin (spike 1) is, and is left out
+        marks = np.array([[0.0, 0.0], [0.0, 0.0], [6.0, 8.0]])
+        times = np.array([1.0, 1.0002, 2.0])
+
+        distance = nearest_mark_distance(
+            marks, np.array([False, True, True]), times, own_event_s=OWN_EVENT_S
+        )
+
+        np.testing.assert_allclose(distance, [10.0, 10.0, 10.0])
+
+    def test_unsorted_times_give_the_sorted_answer(self):
+        rng = np.random.default_rng(3)
+        times, marks = _clustered_spikes(rng, 200)
+        is_reference = rng.random(200) < 0.8
+        order = rng.permutation(200)
+
+        distance = nearest_mark_distance(
+            marks[order], is_reference[order], times[order], own_event_s=OWN_EVENT_S
+        )
+
+        np.testing.assert_array_equal(
+            distance,
+            nearest_mark_distance(marks, is_reference, times, own_event_s=OWN_EVENT_S)[
+                order
+            ],
+        )
+
+    @pytest.mark.parametrize("seed", [0, 1, 2, 3])
+    def test_it_equals_a_loop_over_spikes(self, seed):
+        """Several hundred spikes, half in bursts that share a mark, so a burst
+        spike's nearest marks are its own event; some spikes not reference."""
+        rng = np.random.default_rng(seed)
+        n_spikes = 600
+        times, marks = _clustered_spikes(rng, n_spikes)
+        is_reference = rng.random(n_spikes) < 0.8
+
+        distance = nearest_mark_distance(
+            marks, is_reference, times, own_event_s=OWN_EVENT_S
+        )
+
+        expected = _brute_force(marks, is_reference, times, OWN_EVENT_S)
+        assert (np.diff(times) <= OWN_EVENT_S).sum() > 100  # bursts are present
+        assert np.array_equal(np.isinf(distance), np.isinf(expected))
+        np.testing.assert_allclose(distance, expected, rtol=1e-12, atol=0.0)
+
+    @pytest.mark.parametrize("seed", [0, 1])
+    def test_with_no_two_spikes_within_1_ms_it_is_the_old_function(self, seed):
+        rng = np.random.default_rng(seed)
+        n_spikes = 500
+        times = 1.6e9 + np.cumsum(rng.uniform(1.5e-3, 0.2, n_spikes))
+        marks = rng.normal(0.0, 20.0, (n_spikes, 4))
+        marks[10] = marks[300]  # an exact duplicate, far apart in time
+        is_reference = rng.random(n_spikes) < 0.8
+
+        distance = nearest_mark_distance(
+            marks, is_reference, times, own_event_s=OWN_EVENT_S
+        )
+
+        np.testing.assert_array_equal(
+            distance, _old_nearest_mark_distance(marks, is_reference)
+        )
+
+    def test_a_burst_all_inside_1_ms_has_no_support_from_itself(self):
+        """Every reference mark within 1 ms of every other: none is support."""
+        marks = np.zeros((5, 2))
+        times = 1.6e9 + np.linspace(0.0, 0.9e-3, 5)
+
+        distance = nearest_mark_distance(
+            marks, np.ones(5, dtype=bool), times, own_event_s=OWN_EVENT_S
+        )
 
         assert np.isinf(distance).all()
 
