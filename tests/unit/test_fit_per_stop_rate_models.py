@@ -15,6 +15,11 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.hippocampus.swr_source import (
+    SwrSourceError,
+    stamp_swr_source,
+)
+
 _SPEC = importlib.util.spec_from_file_location(
     "fit_per_stop_rate_models",
     Path(__file__).resolve().parents[2]
@@ -126,7 +131,8 @@ def stubbed_run(monkeypatch, tmp_path):
         return rate, []
 
     monkeypatch.setattr(fpsr, "RC", tmp_path)
-    monkeypatch.setattr(fpsr, "read_table", lambda _path: stop)
+    # stamped by the configured SWR source, as the shipped table is
+    monkeypatch.setattr(fpsr, "read_table", lambda _path: stamp_swr_source(stop))
     monkeypatch.setattr(fpsr, "require_covariate_schema", lambda *a, **k: None)
     monkeypatch.setattr(fpsr, "record_inputs", lambda inputs: {})
     monkeypatch.setattr(fpsr, "fit_per_stop_rate_hierarchy", _fit)
@@ -149,6 +155,21 @@ def test_default_cohort_is_at_well_and_publishes_the_canonical_names(
     provenance = json.loads((out.parent / "all_models.provenance.json").read_text())
     assert provenance["stop_cohort"] == "at_well"
     assert (out.parent / "all_models_cohort_audit.csv").exists()
+
+
+def test_a_stop_table_from_another_swr_source_is_refused(monkeypatch, stubbed_run):
+    """Its SWR counts would be another source's; nothing is fit or written."""
+    seen, tmp_path = stubbed_run
+    stop = _cohort_stop_table()
+    stop.attrs["swr_source"] = "kay@another_run+artifacts@none"
+    monkeypatch.setattr(fpsr, "read_table", lambda _path: stop)
+    monkeypatch.setattr(fpsr.sys, "argv", ["fit_per_stop_rate_models.py"])
+
+    with pytest.raises(SwrSourceError, match="another_run"):
+        fpsr.main()
+
+    assert seen == {}
+    assert not (tmp_path / "models_per_stop_rate").exists()
 
 
 def test_all_stops_cohort_publishes_the_suffixed_bundle(monkeypatch, stubbed_run):

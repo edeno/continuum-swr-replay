@@ -71,6 +71,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import wilcoxon
 
+from continuum_swr_replay.analysis.hippocampus.swr_source import require_swr_source
 from continuum_swr_replay.analysis.replay._helpers import (
     add_arm_fixed_effects,
 )
@@ -493,6 +494,7 @@ def _assemble_arm() -> tuple[pd.DataFrame, dict]:
     """Load the arm cohort and attach its design columns and ``_z`` reference."""
     ev = read_table(FIT_INPUTS["event_arm_table"])
     require_covariate_schema(ev, table="event_arm")
+    require_swr_source(ev, what=str(FIT_INPUTS["event_arm_table"]))
     # Cohort: at-well events, stated here rather than left to fall out of the
     # complete-case filter. Every rung carrying `is_current_arm` already lost the
     # off-well events that way (it is NaN off a well), so for those this is a
@@ -524,6 +526,7 @@ def _assemble_arm() -> tuple[pd.DataFrame, dict]:
     add_arm_fixed_effects(ev)
     stop = read_table(FIT_INPUTS["stop_table"])
     require_covariate_schema(stop, table="stop")
+    require_swr_source(stop, what=str(FIT_INPUTS["stop_table"]))
     stop = add_uncertainty_covariates(stop)
     q = read_table(FIT_INPUTS["qvals_table"])
     require_covariate_schema(q, table="qvals")
@@ -625,6 +628,7 @@ def _assemble_patch(arm_ev: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     """Load the patch cohort and attach its design columns and ``_z`` reference."""
     pt = read_table(FIT_INPUTS["event_patch_table"])
     require_covariate_schema(pt, table="event_patch")
+    require_swr_source(pt, what=str(FIT_INPUTS["event_patch_table"]))
     pt, patch_cohort = select_event_cohort(pt, cohort="at_well")
     _cohort_log("PATCH", patch_cohort)
     # patch table lacks stop_id: map event_id -> stop_id from the arm table
@@ -639,6 +643,7 @@ def _assemble_patch(arm_ev: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     pt = pt.merge(e2t, on="event_id", how="left")
     stop = read_table(FIT_INPUTS["stop_table"])
     require_covariate_schema(stop, table="stop")
+    require_swr_source(stop, what=str(FIT_INPUTS["stop_table"]))
     stop = add_uncertainty_covariates(stop)
     q = read_table(FIT_INPUTS["qvals_table"])
     require_covariate_schema(q, table="qvals")

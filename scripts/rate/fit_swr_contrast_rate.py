@@ -640,6 +640,7 @@ def _load(cohort: str) -> tuple[pd.DataFrame, pd.DataFrame, int]:
             if count
         },
     )
+    require_swr_source(event_table, what=str(FIT_INPUTS["event_table"]))
     onsets = attach_is_swr_to_onsets(onset_table, event_table)
     # Stops dropped by the inner qvals join are the mechanism-B "qvals gap" (no fitted
     # beta/value state) -- reported per-model as n_drop_qvals_gap in the cohort audit.
@@ -941,6 +942,7 @@ def _write_aggregation(
     st_full = read_table(FIT_INPUTS["stop_table"])
     require_covariate_schema(qv_full, table="qvals")
     require_covariate_schema(st_full, table="stop")
+    require_swr_source(st_full, what=str(FIT_INPUTS["stop_table"]))
     st_full = add_uncertainty_covariates(st_full)
     # A std_* column rescales a coefficient fit on ONE stop cohort, so its SD has
     # to come from that same cohort: dividing an at-well coefficient by an

@@ -38,6 +38,7 @@ import sys
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.hippocampus.swr_source import require_swr_source
 from continuum_swr_replay.analysis.replay.cohort_audit import (
     cohort_record,
     write_cohort_audit,
@@ -264,6 +265,9 @@ def main() -> None:
 
     stop = read_table(RC / "stop_table.pkl")
     require_covariate_schema(stop, table="stop")
+    # Its SWR counts (is_swr_stop, n_swr_events, ...) must come from the
+    # configured source, artifact run included.
+    require_swr_source(stop, what=str(FIT_INPUTS["stop_table"]))
     # Hash the input now, not at write time, so the sidecar describes the bytes
     # this fit read rather than whatever is on disk when it finishes.
     fit_inputs = record_inputs(FIT_INPUTS)

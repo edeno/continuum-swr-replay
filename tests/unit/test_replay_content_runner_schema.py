@@ -9,6 +9,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.hippocampus.swr_source import (
+    SwrSourceError,
+    stamp_swr_source,
+)
 from continuum_swr_replay.analysis.replay.covariate_registry import (
     stamp_covariate_schema,
 )
@@ -60,7 +64,7 @@ def _canonical_arm_table(n_events: int = 2) -> pd.DataFrame:
             if predictor.startswith("arm_fe_") or predictor in frame:
                 continue
             frame[predictor] = 0.0
-    return stamp_covariate_schema(frame, table="event_arm")
+    return stamp_swr_source(stamp_covariate_schema(frame, table="event_arm"))
 
 
 def _canonical_patch_table(n_events: int = 2) -> pd.DataFrame:
@@ -91,7 +95,7 @@ def _canonical_patch_table(n_events: int = 2) -> pd.DataFrame:
             if predictor in frame:
                 continue
             frame[predictor] = 0.0
-    return stamp_covariate_schema(frame, table="event_patch")
+    return stamp_swr_source(stamp_covariate_schema(frame, table="event_patch"))
 
 
 def test_complete_bundle_creates_explicit_output_parent(tmp_path):
@@ -178,6 +182,27 @@ def test_complete_default_ladder_passes_preflight_without_dropping_rungs():
     assert "is_candidate_arm_0" in prepared
     assert response_col == "arm_fraction"
     assert event_col == "event_id"
+
+
+def test_a_table_from_another_swr_source_is_refused(tmp_path, monkeypatch):
+    """Its events and is_swr would be another source's: nothing is fit."""
+    input_dir = tmp_path / "replay_content"
+    input_dir.mkdir()
+    frame = _canonical_arm_table()
+    frame.attrs["swr_source"] = "kay@another_run+artifacts@none"
+    frame.to_pickle(input_dir / "event_arm_table.pkl")
+
+    def _fit_must_not_run(*args, **kwargs):
+        pytest.fail("the source check must run before model fitting")
+
+    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    monkeypatch.setattr(runner, "fit_model_per_session", _fit_must_not_run)
+    monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py", "--models", "M0"])
+
+    with pytest.raises(SwrSourceError, match="another_run"):
+        runner.main()
+
+    assert not (_partial_ladder_dir(input_dir, "M0")).exists()
 
 
 def test_complete_requested_run_writes_every_requested_result(tmp_path, monkeypatch):

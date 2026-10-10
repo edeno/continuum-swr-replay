@@ -17,6 +17,10 @@ at it, as ``test_swr_source.py`` does.
 
 from __future__ import annotations
 
+import ast
+import re
+from pathlib import Path
+
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -576,3 +580,128 @@ def test_every_per_bin_runner_checks_its_tables_source():
         assert "require_swr_source(onset_table," in text, name
     for name in runners[:3]:
         assert '"swr_source": swr_source_name()' in (rate / name).read_text(), name
+
+
+# --------------------------------------------------------------------------
+# Static: every script checks the source of the SWR tables it reads
+# --------------------------------------------------------------------------
+
+SCRIPTS = Path(__file__).resolve().parents[2] / "scripts"
+
+#: The SWR-derived columns a fit or analysis reads from a stored table.
+SWR_COLUMNS = re.compile(
+    r"\b(is_swr|is_swr_stop|n_swr_events|n_nonlocal_swr_events"
+    r"|n_nonlocal_non_swr_events|swr_x_\w+)\b"
+)
+
+
+def _supported_scripts() -> list[Path]:
+    """Every script but the unsupported one-offs and the retired figures."""
+    skipped = (SCRIPTS / "exploratory", SCRIPTS / "figures" / "archive")
+    return sorted(
+        path
+        for path in SCRIPTS.rglob("*.py")
+        if not any(path.is_relative_to(folder) for folder in skipped)
+    )
+
+
+def _fit_runners() -> list[Path]:
+    """The rate and content runners: ``rate/fit_*``, ``content/*fit*`` and
+    ``content/analyze_*content*``."""
+    return sorted(
+        {
+            *SCRIPTS.glob("rate/fit_*.py"),
+            *SCRIPTS.glob("content/*fit*.py"),
+            *SCRIPTS.glob("content/analyze_*content*.py"),
+        }
+    )
+
+
+def _called(call: ast.Call) -> str | None:
+    if isinstance(call.func, ast.Name):
+        return call.func.id
+    if isinstance(call.func, ast.Attribute):
+        return call.func.attr
+    return None
+
+
+def _calls_by_function(tree: ast.Module) -> dict[ast.AST, list[ast.Call]]:
+    """Every call, keyed by the function (or module) it is made in."""
+    calls: dict[ast.AST, list[ast.Call]] = {}
+
+    def visit(node: ast.AST, scope: ast.AST) -> None:
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, ast.FunctionDef | ast.AsyncFunctionDef):
+                visit(child, child)
+                continue
+            if isinstance(child, ast.Call):
+                calls.setdefault(scope, []).append(child)
+            visit(child, scope)
+
+    visit(tree, tree)
+    return calls
+
+
+def _swr_tables_read_unchecked(path: Path) -> list[str]:
+    """Each frame a script reads as an SWR-source table without checking its source.
+
+    A frame is read as one where ``require_covariate_schema`` names a table of
+    ``swr_source.SWR_SOURCE_TABLES``; its source is checked where
+    ``require_swr_source`` is called on the same expression in the same function.
+    """
+    unchecked = []
+    for calls in _calls_by_function(ast.parse(path.read_text())).values():
+        read = {
+            ast.unparse(call.args[0])
+            for call in calls
+            if _called(call) == "require_covariate_schema"
+            and call.args
+            and {
+                node.value
+                for keyword in call.keywords
+                if keyword.arg == "table"
+                for node in ast.walk(keyword.value)
+                if isinstance(node, ast.Constant) and isinstance(node.value, str)
+            }
+            & swr_source.SWR_SOURCE_TABLES
+        }
+        checked = {
+            ast.unparse(call.args[0])
+            for call in calls
+            if _called(call) == "require_swr_source" and call.args
+        }
+        unchecked += sorted(read - checked)
+    return unchecked
+
+
+def test_every_script_checks_the_source_of_the_swr_tables_it_reads():
+    """A table built from another SWR source (the stamp the regeneration has not
+    replaced yet, another artifact run) is refused before anything is fit on it."""
+    unchecked = {
+        str(path.relative_to(SCRIPTS)): names
+        for path in _supported_scripts()
+        if (names := _swr_tables_read_unchecked(path))
+    }
+
+    assert unchecked == {}
+
+
+def test_every_fit_runner_reading_swr_columns_checks_its_tables_source():
+    """Family A, Family B and the content ladders: a runner that names an
+    SWR-derived column reads it from a schema-checked SWR table, whose source the
+    test above requires it to check."""
+    runners = _fit_runners()
+    assert {path.name for path in runners} >= {
+        "fit_per_stop_rate_models.py",
+        "fit_per_bin_rate_models.py",
+        "fit_replay_content_models.py",
+        "fit_swr_contrast_content.py",
+        "analyze_uncertainty_content.py",
+    }
+    for path in runners:
+        text = path.read_text()
+        if not SWR_COLUMNS.search(text):
+            continue
+        assert "require_covariate_schema(" in text, path.name
+        assert "require_swr_source(" in text, path.name
+        assert _swr_tables_read_unchecked(path) == [], path.name

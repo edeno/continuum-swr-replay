@@ -34,6 +34,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from continuum_swr_replay.analysis.hippocampus.swr_source import require_swr_source
 from continuum_swr_replay.analysis.replay import (
     MODEL_CHOICE,
     MODEL_PATCH,
@@ -200,6 +201,7 @@ def _load_tables(event_source: str, brain_area: str) -> dict[str, pd.DataFrame]:
                 "stop_table": "stop",
             }[short],
         )
+        require_swr_source(tables[short], what=str(path))
         logger.info("loaded %s: %d rows", path.name, len(tables[short]))
     return tables
 

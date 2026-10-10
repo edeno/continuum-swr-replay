@@ -358,7 +358,7 @@ def _aggregation_inputs(monkeypatch, tmp_path, stops):
     out_dir = tmp_path / "models_per_bin_rate"
     out_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(mod, "RC", tmp_path)
-    monkeypatch.setattr(mod, "read_table", lambda _path: stops)
+    monkeypatch.setattr(mod, "read_table", lambda _path: stamp_swr_source(stops))
     monkeypatch.setattr(mod, "require_covariate_schema", lambda *a, **k: None)
     monkeypatch.setattr(mod, "add_uncertainty_covariates", lambda frame: frame)
     return out_dir
@@ -549,7 +549,7 @@ def test_std_columns_use_the_bundles_own_cohort_sds(
     monkeypatch.setattr(
         mod,
         "read_table",
-        lambda path: qvals if "qvals" in str(path) else stops,
+        lambda path: qvals if "qvals" in str(path) else stamp_swr_source(stops),
     )
     monkeypatch.setattr(mod, "require_covariate_schema", lambda *a, **k: None)
     monkeypatch.setattr(mod, "add_uncertainty_covariates", lambda frame: frame)

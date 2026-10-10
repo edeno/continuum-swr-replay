@@ -21,6 +21,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.hippocampus.swr_source import stamp_swr_source
 from continuum_swr_replay.analysis.replay.covariate_registry import (
     stamp_covariate_schema,
 )
@@ -99,7 +100,7 @@ def _write_tables(input_dir):
         (event, "event"),
         (event_arm, "event_arm"),
     ):
-        stamp_covariate_schema(frame, table=table).to_pickle(
+        stamp_swr_source(stamp_covariate_schema(frame, table=table)).to_pickle(
             input_dir / f"{table}_table.pkl"
         )
 

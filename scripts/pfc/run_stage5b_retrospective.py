@@ -39,6 +39,7 @@ import time
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.hippocampus.swr_source import require_swr_source
 from continuum_swr_replay.analysis.replay import (
     at_well_event_cohort,
     retrospective_alignment_with_shuffle,
@@ -198,6 +199,13 @@ def main() -> None:
     require_covariate_schema(event_table, table="event")
     require_covariate_schema(event_arm_table, table="event_arm")
     require_covariate_schema(event_sequence_table, table="event_sequence")
+    # is_swr splits the events, so the tables must come from the configured
+    # SWR source (an atomic set: all three carry its stamp).
+    require_swr_source(event_table, what=str(FIT_INPUTS["event_table"]))
+    require_swr_source(event_arm_table, what=str(FIT_INPUTS["event_arm_table"]))
+    require_swr_source(
+        event_sequence_table, what=str(FIT_INPUTS["event_sequence_table"])
+    )
     logging.info(
         "events=%d  event_arm rows=%d  event_seq rows=%d  sessions=%d",
         len(event_table),

@@ -49,6 +49,7 @@ import pandas as pd
 from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
+from continuum_swr_replay.analysis.hippocampus.swr_source import require_swr_source
 from continuum_swr_replay.analysis.replay.cohort_selection import (
     select_stop_cohort,
     stop_cohort_suffix,
@@ -280,6 +281,10 @@ def main() -> None:
         require_covariate_schema(st, table="stop")
         require_covariate_schema(ev, table="event")
         require_covariate_schema(ea, table="event_arm")
+        # the content strata split on is_swr
+        require_swr_source(st, what=str(FIT_INPUTS["stop_table"]))
+        require_swr_source(ev, what=str(FIT_INPUTS["event_table"]))
+        require_swr_source(ea, what=str(FIT_INPUTS["event_arm_table"]))
         logging.info(
             "  stops=%d  events=%d  event_arm rows=%d",
             len(st),

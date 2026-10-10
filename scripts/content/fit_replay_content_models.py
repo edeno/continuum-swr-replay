@@ -72,6 +72,7 @@ import pandas as pd
 from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
+from continuum_swr_replay.analysis.hippocampus.swr_source import require_swr_source
 from continuum_swr_replay.analysis.replay._helpers import add_arm_fixed_effects
 from continuum_swr_replay.analysis.replay.cohort_audit import (
     cohort_record,
@@ -1627,6 +1628,9 @@ def _load_and_filter_cohort(
     require_covariate_schema(
         long_df, table="event_arm" if args.hierarchy == "arm" else "event_patch"
     )
+    # Its events and is_swr must come from the configured SWR source, artifact
+    # run included.
+    require_swr_source(long_df, what=str(canonical_path))
     (
         long_df,
         valid_model_names,

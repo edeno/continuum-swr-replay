@@ -32,6 +32,7 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
+from continuum_swr_replay.analysis.hippocampus.swr_source import require_swr_source
 from continuum_swr_replay.analysis.replay.covariate_registry import (
     require_covariate_schema,
 )
@@ -393,6 +394,8 @@ def main() -> None:
     events = read_table(RC / "event_table.pkl")
     require_covariate_schema(long_count, table="event_arm")
     require_covariate_schema(events, table="event")
+    require_swr_source(long_count, what=str(RC / "event_arm_table.pkl"))
+    require_swr_source(events, what=str(RC / "event_table.pkl"))
     require_fresh_inputs(M3_PATH, ALL_MODELS_INPUTS, allow_stale=args.allow_stale)
     m3_fits = pd.read_pickle(M3_PATH)
 

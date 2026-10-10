@@ -17,6 +17,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.hippocampus.swr_source import (
+    SwrSourceError,
+    stamp_swr_source,
+)
 from continuum_swr_replay.analysis.replay.covariate_registry import (
     stamp_covariate_schema,
 )
@@ -144,7 +148,7 @@ def test_swr_content_assembly_rejects_legacy_uncertainty_reference(
             "reward_belief_variance_candidate_arm_preoutcome_z": [-1.0, 1.0],
         }
     )
-    frame = stamp_covariate_schema(frame, table="event_arm")
+    frame = stamp_swr_source(stamp_covariate_schema(frame, table="event_arm"))
     frame.to_pickle(tmp_path / "event_arm_table.pkl")
     (tmp_path / "standardization_reference.json").write_text(
         json.dumps(
@@ -163,6 +167,22 @@ def test_swr_content_assembly_rejects_legacy_uncertainty_reference(
     )
 
     with pytest.raises(ValueError, match="stale or invalid"):
+        mod._assemble_arm()
+
+
+def test_swr_content_assembly_refuses_a_table_from_another_swr_source(
+    tmp_path, monkeypatch
+):
+    """Its is_swr would be another source's."""
+    frame = pd.DataFrame({"event_id": [1], "candidate_arm": [0]})
+    frame.attrs["swr_source"] = "kay@another_run+artifacts@none"
+    frame.to_pickle(tmp_path / "event_arm_table.pkl")
+    monkeypatch.setitem(
+        mod.FIT_INPUTS, "event_arm_table", tmp_path / "event_arm_table.pkl"
+    )
+    monkeypatch.setattr(mod, "require_covariate_schema", lambda *a, **k: None)
+
+    with pytest.raises(SwrSourceError, match="another_run"):
         mod._assemble_arm()
 
 

@@ -32,6 +32,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.hippocampus.swr_source import require_swr_source
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (
     PER_UNIT_TERMS,
     SEPARATION_COEF_ABS,
@@ -122,6 +123,8 @@ def _global_sd(covariates):
     require_covariate_schema(arm, table="event_arm")
     require_covariate_schema(qv, table="qvals")
     require_covariate_schema(stop, table="stop")
+    require_swr_source(arm, what=str(RC / "event_arm_table.pkl"))
+    require_swr_source(stop, what=str(RC / "stop_table.pkl"))
     stop = add_uncertainty_covariates(stop)
     sd = {}
     for c in covariates:

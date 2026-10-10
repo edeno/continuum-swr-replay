@@ -232,6 +232,7 @@ def main() -> None:
     # tables must come from that source (its artifact run included).
     require_swr_source(stop, what=str(RC / "stop_table.pkl"))
     require_swr_source(onset_table, what=str(RC / "event_onset_table.pkl"))
+    require_swr_source(event_table, what=str(RC / "event_table.pkl"))
     onsets = attach_is_swr_to_onsets(onset_table, event_table)
     if args.max_per_animal is not None:
         keep = (

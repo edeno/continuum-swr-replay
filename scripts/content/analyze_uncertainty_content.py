@@ -24,6 +24,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.hippocampus.swr_source import require_swr_source
 from continuum_swr_replay.analysis.replay.covariate_registry import (
     require_covariate_schema,
 )
@@ -337,6 +338,8 @@ def main() -> None:
     require_covariate_schema(event_arm, table="event_arm")
     require_covariate_schema(stops, table="stop")
     require_covariate_schema(qvals, table="qvals")
+    require_swr_source(event_arm, what=str(event_arm_path))
+    require_swr_source(stops, what=str(stop_path))
     require_fresh_inputs(
         mu_path, mu_inputs(args.data_dir), allow_stale=args.allow_stale
     )

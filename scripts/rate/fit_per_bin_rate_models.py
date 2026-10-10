@@ -575,6 +575,7 @@ def main() -> None:
     # Hash the inputs now, not at write time: the ladder runs long enough that a
     # table could be regenerated mid-fit and be certified as this fit's input.
     fit_inputs = record_inputs(FIT_INPUTS)
+    require_swr_source(event_table, what=str(FIT_INPUTS["event_table"]))
     onsets = attach_is_swr_to_onsets(onset_table, event_table)
     # The cohort is applied to the whole stop table BEFORE the smoke subset (so a
     # smoke session is a cohort session) and before the per-session common-cohort

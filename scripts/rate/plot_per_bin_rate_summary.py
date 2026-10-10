@@ -406,6 +406,8 @@ def main() -> None:
     require_covariate_schema(event_table, table="event")
     # the time course leaves out the configured source's excluded time
     require_swr_source(stop, what=str(ALL_MODELS_INPUTS["stop_table"]))
+    require_swr_source(onset_table, what=str(ALL_MODELS_INPUTS["event_onset_table"]))
+    require_swr_source(event_table, what=str(ALL_MODELS_INPUTS["event_table"]))
     onsets = attach_is_swr_to_onsets(onset_table, event_table)
     FIGS.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplot_mosaic(

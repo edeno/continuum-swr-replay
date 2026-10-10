@@ -46,6 +46,7 @@ import pandas as pd
 from scipy.stats import skew, wilcoxon
 
 from continuum_swr_replay.analysis.constants import OUTCOME_TIME_SEMANTICS
+from continuum_swr_replay.analysis.hippocampus.swr_source import require_swr_source
 from continuum_swr_replay.analysis.replay.cohort_audit import (
     cohort_record,
     write_cohort_audit,
@@ -115,6 +116,9 @@ def _assemble() -> pd.DataFrame:
     require_covariate_schema(ev, table="event")
     require_covariate_schema(stop, table="stop")
     require_covariate_schema(cont, table="qvals")
+    # is_swr and ripple_power_z must come from the configured SWR source
+    require_swr_source(ev, what=str(RC / "event_table.pkl"))
+    require_swr_source(stop, what=str(RC / "stop_table.pkl"))
     stop = add_uncertainty_covariates(stop)
     # Many events per stop, one row per stop on both right-hand tables.
     # Without validate= a duplicated stop_id would silently multiply
