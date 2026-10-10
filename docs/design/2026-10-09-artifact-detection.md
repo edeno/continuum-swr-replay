@@ -6,8 +6,14 @@ stage, thresholds placed by one rule, and no post-step second. Implemented in
 `scripts/decoding/run_artifact_detection.py` (Task 16 of the full pipeline refresh,
 [2026-10-03-full-pipeline-refresh-design.md](2026-10-03-full-pipeline-refresh-design.md)).
 The SWR runner, MUA detection and both HPC decoders use the mask (Task 17a), and so does the
-Widloski runner (Task 17b: the mask's bins are missing in its likelihood); tables and
-analyses follow in Task 18. **Not yet applied:** `swr_source.ARTIFACT_INTERVALS_RUN_ID` stays
+Widloski runner (Task 17b: the mask's bins are missing in its likelihood). Task 18 makes
+every table, cohort, exposure and analysis honour it: one eligibility rule for every event
+cohort (`analysis/hippocampus/event_eligibility.py`: the whole event immobile and clear of
+the mask, a decoded event also farther than 0.3 s from it), applied where a decode frame is
+read (`swr_source.with_swr_source`); the mask's time out of every rate exposure; per-bin
+rows whose history or peri-event window reaches it dropped; and the ripple-power covariate
+made from the Kay detector's own consensus over rule R-T's tetrodes, with the mask out of
+its normalization (`data_loaders/lfp.with_ripple_power`). **Not yet applied:** `swr_source.ARTIFACT_INTERVALS_RUN_ID` stays
 None until runbook R9 runs the detector on all epochs and sets it.
 
 **Sources** (all under `.claude/research/refresh_artifact_detector/`):

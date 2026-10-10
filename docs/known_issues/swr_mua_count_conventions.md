@@ -35,6 +35,34 @@ and onset tables. Across the 218 HPC sessions the stop-level totals are slightly
 > unchanged (closed intervals, whole-event speed gate, source event numbers), and so
 > are the per-grain rules below. Any re-derived Δ must be measured on the new source.
 
+> **Artifact mask (2026-10-09, Task 18).** With an artifact run configured
+> (`swr_source.ARTIFACT_INTERVALS_RUN_ID`), both grains honour the one artifact mask
+> (`analysis/hippocampus/artifacts/masks.py`), and the rule below still holds:
+>
+> - **Counts.** An SWR, MUA or non-local event that shares any time with the mask
+>   (closed intervals) is in neither grain: it is not an SWR, not a non-SWR event,
+>   not counted. A decoded event (non-local; a ContFrag label; a Widloski event)
+>   within 0.3 s of the mask (`event_eligibility.DECODER_REACH_S`) is dropped too. The
+>   drop is made once, where the decode frame is read (`swr_source.with_swr_source`),
+>   so the two grains drop the same events; `swr_source.artifact_event_drops` gives
+>   each one's reason. The kept events keep their numbers and their `event_id`.
+> - **Exposure.** The two time terms lose the mask's time, by different rules. A
+>   stop's `immobility_duration_s` is its span (`stop_end - stop_start`) less exactly
+>   the masked seconds inside it, so it is no longer the stop's span. A per-bin row
+>   (Family B's design, the dense `stop_timebin` table, a PFC fit bin) is dropped
+>   whole when it touches the mask, and a Family B bin also when its history window
+>   (`model_specs.longest_history_window_s`, 0.15 s) reaches it. The per-bin exposure
+>   therefore loses a little more than the stop-level one (the partial bins at the
+>   mask's edges and the history margin): one more reason the two grains' terms are
+>   not interchangeable.
+> - **Not in any exposure:** the 0.3 s on each side of the mask in which decoded
+>   events are dropped. Near a mask a decoded-event rate is therefore slightly
+>   under-counted; on Task 16's scratch run the reach dropped 5 non-local events
+>   in 22 epochs (389 were dropped for overlapping the mask).
+>
+> With no artifact run configured, every table and design is unchanged, byte for
+> byte (checked on the 5 pilot epochs against `a108373`).
+
 ## Why
 
 The stop-level `is_swr_stop` / MUA flags use the **inclusive per-timebin** rule over the

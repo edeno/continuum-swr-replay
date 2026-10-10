@@ -201,8 +201,17 @@ source.
   decode's (and a PFC decode's) provenance. An HPC decode since Task 17a reads its frame
   through `with_swr_source` in `organize_results`, so its own `SWR_event` is this
   source's.
-- **`SWR_zscore`** is still Spyglass's Kay consensus trace, a signal and not a label. The
-  inventory ships no trace.
+- **`SWR_zscore`** is a signal, not a label, and the inventory ships no trace. Since
+  Task 18 an HPC decode's `SWR_zscore` is the Kay detector's own consensus over the
+  tetrodes rule R-T kept for this inventory, z-scored with the artifact mask left out and
+  NaN inside it (`swr_source.ripple_power_inputs`, `data_loaders/lfp.with_ripple_power`).
+  An older decode's, and any `load_data` call made without those inputs, is still
+  Spyglass's consensus over every CA1 tetrode.
+- **Every other cohort of an analysis frame** is clear of the artifact mask since Task 18:
+  `with_swr_source` drops a decoded event (`non_local_event`; on a ContFrag frame the SWR
+  and MUA labels) within 0.3 s of the mask and a NonLocal frame's MUA event sharing time
+  with it (`event_eligibility`); `artifact_event_drops` gives each event's reason. A
+  decoder saving its own frame keeps every event it decoded (`drop_masked_events=False`).
 - **The pipeline-data-flow supplement** unpickles a decode frame directly, but it reads
   no SWR column.
 - **Conventions.**
