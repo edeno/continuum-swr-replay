@@ -758,7 +758,7 @@ Objective AST mutation check for value-critical builder logic.
 
 Held-out state labels: decode with one tetrode half, score with the other.
 
-`bout_column`, `gpu_usage`, `configure_devices`, `current_device`, `Job`, `decode_jobs`, `decode_paths`, `canonical_detector_stamp`, `reuse_reason`, `CanonicalEpoch`, `load_canonical`, `decode_split`, `decode_epoch`, `evidence_paths`, `half_label_sets`, `score_epoch`, `agreement_table`, `summarize_label_sources`, `agreement_markdown`, `score_manifest`, `readme`, `build_parser`, `main`
+`bout_column`, `gpu_usage`, `configure_devices`, `current_device`, `Job`, `decode_jobs`, `decode_paths`, `canonical_detector_stamp`, `reuse_reason`, `CanonicalEpoch`, `canonical_masks`, `analysed_labels`, `load_canonical`, `decode_split`, `decode_epoch`, `evidence_paths`, `half_label_sets`, `score_epoch`, `agreement_table`, `summarize_label_sources`, `agreement_markdown`, `score_manifest`, `readme`, `build_parser`, `main`
 
 ### `scripts/qa/run_quality_metrics.py`
 
