@@ -202,10 +202,10 @@ def channel_specificity(power: NDArray[np.floating]) -> NDArray[np.floating]:
     """Per window: the 2nd-largest channel ratio over the median ratio.
 
     A channel's ratio is its window power over its own epoch-median window
-    power, the median taken over the windows with power. An SWR raises ripple
-    power on most CA1 channels at once, so the ratio is high on all of them
-    and the specificity stays near 1. Sustained noise on a fixed subset raises
-    only that subset.
+    power, the median taken over the windows with power. Taking the 2nd-largest
+    ratio means one channel alone never raises the specificity. Rule S tells
+    sustained noise from SWRs by duration (:func:`~.detect.s_cores` needs 2
+    consecutive windows), not by how many channels an SWR raises.
 
     Parameters
     ----------

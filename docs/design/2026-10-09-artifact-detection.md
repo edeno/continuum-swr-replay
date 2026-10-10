@@ -112,8 +112,11 @@ the giant-day events.
 - **S.** For each 1-s window *w* and CA1 channel *c*, r[w, c] is the 150–250 Hz Welch power of
   the raw referenced LFP (15 Hann segments of 64 ms) over channel *c*'s epoch-median window
   power. The specificity spec[w] is the 2nd-largest r over channels divided by the median r.
-  - An SWR raises ripple power on most CA1 tetrodes at once for under 0.3 s, so spec stays
-    near 1. S raises it on a fixed subset for seconds.
+  - S is told from SWRs by duration, not by how many tetrodes an SWR raises, which is not
+    assumed. A core needs about 2 s of raised power (2 consecutive 1-s windows). Outside the
+    mask, the longest of the R10 inventory's 42,938 Kay SWRs lasts 0.68 s (median 0.08 s,
+    99.9th percentile 0.43 s). spec uses the 2nd-largest ratio, so one channel alone, such as
+    a ripple on a single electrode, never raises it.
   - A core is ≥ 2 consecutive windows with spec ≥ `S_CORE`. The block is the run of windows
     with spec ≥ 2 that holds it, and blocks ≤ 2 windows apart merge.
 - **T-ref.** J5(t) = median(x[t+1..t+5]) − median(x[t−5..t−1]), a 5-ms median level jump. T-ref
@@ -209,8 +212,8 @@ giant-day events and 1 of 55 model-reviewed SWRs (the S-padding case, below).
 
 | Rule · constant | What it detects | Why SWRs lack it | Field precedent | Placement | Margin | Held out (C2 §3.1) | Sensitivity (± 25 %) | Residual risk |
 |---|---|---|---|---|---|---|---|---|
-| **S** · `S_CORE` 4.31 | Ripple-band power rising on a fixed few CA1 channels for seconds | An SWR raises most CA1 tetrodes at once for < 0.3 s | PREP high-frequency noise, EEGLAB line noise, IBL `psd_hf`: a channel whose high-frequency power stands out from its population | Rule P | **1.5×** | P placed per split gave 4.13–4.31; 0 reference-set SWRs lost; S windows 55/55, 98/98, 153/153 | 3.23: +5.0 s; 5.39: −4.0 s; no SWR count changes, S windows 153/153 | Low. The cause of S is unknown (hardware) |
-| S · `S_CORE_RUN` 2 windows, `S_EXT` 2, `S_GAP` 2 windows | That the rise lasts; partial windows; a step inside a block | SWRs last < 0.3 s | PREP `badTimeThreshold`; EEGLAB `max_broken_time`; FMAToolbox / buzcode hysteresis; gap merging (Chen 2025; Staresina 2023) | Definitions | — | — | (C2) run 1: +121 s and 11 reference-set SWRs masked | Low |
+| **S** · `S_CORE` 4.31 | Ripple-band power rising on a fixed few CA1 channels for seconds | A core lasts about 2 s on at least 2 channels; the longest of 42,938 R10 SWRs lasts 0.68 s, and one channel alone never raises spec | PREP high-frequency noise, EEGLAB line noise, IBL `psd_hf`: a channel whose high-frequency power stands out from its population | Rule P | **1.5×** | P placed per split gave 4.13–4.31; 0 reference-set SWRs lost; S windows 55/55, 98/98, 153/153 | 3.23: +5.0 s; 5.39: −4.0 s; no SWR count changes, S windows 153/153 | Low. The cause of S is unknown (hardware) |
+| S · `S_CORE_RUN` 2 windows, `S_EXT` 2, `S_GAP` 2 windows | That the rise lasts; partial windows; a step inside a block | SWRs last under 1 s (R10: longest 0.68 s) | PREP `badTimeThreshold`; EEGLAB `max_broken_time`; FMAToolbox / buzcode hysteresis; gap merging (Chen 2025; Staresina 2023) | Definitions | — | — | (C2) run 1: +121 s and 11 reference-set SWRs masked | Low |
 | **T-ref** · `T_REF` 17.57 | An abrupt level jump on the reference electrode | The white-matter reference sees SWRs only weakly | FieldTrip `ft_artifact_jump` (same detector family) | Rule P | **1.5×** | P without chimi failed on chimi, which sets the pooled 1.5 | 13.18: +14.8 s; 21.97: −6.8 s and 2 fewer steps; no SWR count changes | Low–medium: the maximum is a giant-day event |
 | **T-ca1** · `T_CA1_K` 25.02 | A level step on several CA1 channels | Ripple cycles jump but do not persist; only giant onsets reach high \|J5\| | FieldTrip's jump-preserving median filter | Rule P | **1.5×** | as T-ref | 18.77: +5.8 s, 1 more step; 31.28: −9.8 s, 3 fewer steps; no SWR count changes | Medium: the largest cross-animal ratio (1.59) |
 | T-ca1 · ρ 0.5 | That the step persists for 20 ms | A ripple cycle reverses within 3 ms | FieldTrip median filter | Mechanism | — | — | (C2) recall unchanged at ρ 0.375–0.625 | Low |
