@@ -1517,7 +1517,10 @@ def build_session_fit_mask(
         ``is_immobile & in_cohort_stop`` (``is_immobile`` for ``all_stops``),
         less the bins whose basis window touches excluded time.
     counts : dict
-        ``stop_cohort``, ``n_bins_total``, ``n_bins_immobile``, ``n_bins_fit``.
+        ``stop_cohort``, ``n_bins_total``, ``n_bins_immobile``, ``n_bins_fit``,
+        and ``n_bins_excluded``: the bins immobility and the stop cohort would
+        fit that are not fit because their basis window touches excluded time
+        (0 without it).
 
     Raises
     ------
@@ -1538,6 +1541,7 @@ def build_session_fit_mask(
             position_info.index.to_numpy(dtype=float), cohort_stops
         )
         fit_mask = is_immobile & pd.Series(in_cohort, index=position_info.index)
+    n_bins_excluded = 0
     if excluded_intervals is not None and len(excluded_intervals):
         half_window = (
             DEFAULT_BASIS_HALF_WINDOW_S
@@ -1548,12 +1552,14 @@ def build_session_fit_mask(
             position_info.index.to_numpy(dtype=float),
             pad_intervals(excluded_intervals, half_window),
         )
+        n_bins_excluded = int((fit_mask.to_numpy() & reached).sum())
         fit_mask = fit_mask & pd.Series(~reached, index=position_info.index)
     counts = {
         "stop_cohort": stop_cohort,
         "n_bins_total": int(len(is_immobile)),
         "n_bins_immobile": int(is_immobile.sum()),
         "n_bins_fit": int(fit_mask.sum()),
+        "n_bins_excluded": n_bins_excluded,
     }
     return is_immobile, fit_mask, counts
 
@@ -2791,13 +2797,10 @@ def run_session(
         ] = np.nan
         data = {**data, "theta_phase": theta_phase}
         logger.info(
-            "Excluded time: %d intervals; %d time bins within %.3f s of it are not fit",
+            "Excluded time: %d intervals; %d time bins that would be fit lie "
+            "within %.3f s of it and are not fit",
             len(excluded),
-            int(
-                interval_mask(
-                    time, pad_intervals(excluded, DEFAULT_BASIS_HALF_WINDOW_S)
-                ).sum()
-            ),
+            bin_counts["n_bins_excluded"],
             DEFAULT_BASIS_HALF_WINDOW_S,
         )
     logger.info(

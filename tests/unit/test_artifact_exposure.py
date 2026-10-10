@@ -331,6 +331,23 @@ class TestPfcFitBins:
         # immobility itself is not redefined by the mask
         np.testing.assert_array_equal(is_immobile.to_numpy(), _speed() < 4.0)
         assert counts["n_bins_fit"] == int(fit_mask.sum())
+        assert counts["n_bins_excluded"] == int(reach.sum())
+
+    def test_the_excluded_count_is_of_bins_that_would_be_fit(self):
+        """A running bin near excluded time was never going to be fit, so the
+        count (and the run's log line) leaves it out."""
+        excluded = pd.DataFrame({"start_time": [2.0, 12.0], "end_time": [5.0, 12.5]})
+
+        is_immobile, fit_mask, counts = build_session_fit_mask(
+            self._position(),
+            stop_cohort="all_stops",
+            excluded_intervals=excluded,
+        )
+
+        reach = ((TIME >= 1.75) & (TIME <= 5.25)) | ((TIME >= 11.75) & (TIME <= 12.75))
+        assert counts["n_bins_excluded"] == int((is_immobile.to_numpy() & reach).sum())
+        assert 0 < counts["n_bins_excluded"] < int(reach.sum())
+        assert counts["n_bins_excluded"] == int(is_immobile.sum() - fit_mask.sum())
 
     def test_no_intervals_change_nothing(self):
         before = build_session_fit_mask(self._position(), stop_cohort="all_stops")
@@ -345,6 +362,7 @@ class TestPfcFitBins:
 
         pd.testing.assert_series_equal(after[1], before[1])
         assert after[2] == before[2]
+        assert after[2]["n_bins_excluded"] == 0
 
 
 def test_every_rate_fit_drops_the_excluded_bins():
