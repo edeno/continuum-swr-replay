@@ -353,6 +353,23 @@ class TestInvalidSamples:
         assert cores["signatures"].tolist() == ["ca1"]
         assert abs(cores["core_start"].iloc[0] - epoch.at(10.34)) < 0.01
 
+    def test_a_ca1_step_whose_l20_window_reaches_a_gap_is_not_found(self):
+        """10 ms after the gap: its J5 window does not reach it, but its L20
+        window (t - 24 .. t + 24 samples) does. L20 there would read the
+        zero-filled gap, so the step has no L20 value and the robust J5 is
+        zeroed (``detect_artifacts``): no persistent step, no T-ca1."""
+        clean = self._offset_epoch()
+        clean.add_step(10.31, [0, 1, 2], 60 * NOISE)
+        assert _detect(clean)["signatures"].tolist() == ["ca1"]  # found without it
+
+        epoch = self._offset_epoch()
+        epoch.ca1[self.GAP] = np.nan
+        epoch.add_step(10.31, [0, 1, 2], 60 * NOISE)
+
+        cores = _detect(epoch)
+
+        assert cores.empty, cores[["signatures", "core_start"]]
+
     def test_a_reference_step_next_to_a_gap_is_still_found(self):
         """10 ms after the gap: T-ref reads J5 alone, whose window does not
         reach it."""
