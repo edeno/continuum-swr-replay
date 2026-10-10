@@ -207,11 +207,13 @@ source.
   NaN inside it (`swr_source.ripple_power_inputs`, `data_loaders/lfp.with_ripple_power`).
   An older decode's, and any `load_data` call made without those inputs, is still
   Spyglass's consensus over every CA1 tetrode.
-- **Every other cohort of an analysis frame** is clear of the artifact mask since Task 18:
-  `with_swr_source` drops a decoded event (`non_local_event`; on a ContFrag frame the SWR
-  and MUA labels) within 0.3 s of the mask and a NonLocal frame's MUA event sharing time
-  with it (`event_eligibility`); `artifact_event_drops` gives each event's reason. A
-  decoder saving its own frame keeps every event it decoded (`drop_masked_events=False`).
+- **Every cohort of an analysis frame** follows one analysed-time rule since Task 18
+  (`event_eligibility`). `with_swr_source` drops whole every SWR, MUA or non-local event
+  in excluded time, which is the mask widened by 0.3 s (`excluded_intervals`). It also
+  drops any kept event that overlaps an SWR or MUA event dropped there.
+  `artifact_event_drops` gives each event's reason, and `swr_observed` is False in
+  excluded time. A decoder saving its own frame keeps every event it decoded
+  (`drop_masked_events=False`).
 - **The pipeline-data-flow supplement** unpickles a decode frame directly, but it reads
   no SWR column.
 - **Conventions.**

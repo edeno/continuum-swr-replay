@@ -35,30 +35,34 @@ and onset tables. Across the 218 HPC sessions the stop-level totals are slightly
 > unchanged (closed intervals, whole-event speed gate, source event numbers), and so
 > are the per-grain rules below. Any re-derived Δ must be measured on the new source.
 
-> **Artifact mask (2026-10-09, Task 18).** With an artifact run configured
-> (`swr_source.ARTIFACT_INTERVALS_RUN_ID`), both grains honour the one artifact mask
-> (`analysis/hippocampus/artifacts/masks.py`), and the rule below still holds:
+> **One analysed-time rule (2026-10-10, Task 18).** With an artifact run configured
+> (`swr_source.ARTIFACT_INTERVALS_RUN_ID`), both grains follow one rule
+> (`analysis/hippocampus/event_eligibility.py`). *Excluded time* is the artifact mask
+> widened by 0.3 s on each side (`swr_source.excluded_intervals`). The rule below
+> (do not cross-substitute) still holds:
 >
-> - **Counts.** An SWR, MUA or non-local event that shares any time with the mask
->   (closed intervals) is in neither grain: it is not an SWR, not a non-SWR event,
->   not counted. A decoded event (non-local; a ContFrag label; a Widloski event)
->   within 0.3 s of the mask (`event_eligibility.DECODER_REACH_S`) is dropped too. The
->   drop is made once, where the decode frame is read (`swr_source.with_swr_source`),
->   so the two grains drop the same events; `swr_source.artifact_event_drops` gives
->   each one's reason. The kept events keep their numbers and their `event_id`.
-> - **Exposure.** The two time terms lose the mask's time, by different rules. A
->   stop's `immobility_duration_s` is its span (`stop_end - stop_start`) less exactly
->   the masked seconds inside it, so it is no longer the stop's span. A per-bin row
->   (Family B's design, the dense `stop_timebin` table, a PFC fit bin) is dropped
->   whole when it touches the mask, and a Family B bin also when its history window
->   (`model_specs.longest_history_window_s`, 0.15 s) reaches it. The per-bin exposure
->   therefore loses a little more than the stop-level one (the partial bins at the
->   mask's edges and the history margin): one more reason the two grains' terms are
->   not interchangeable.
-> - **Not in any exposure:** the 0.3 s on each side of the mask in which decoded
->   events are dropped. Near a mask a decoded-event rate is therefore slightly
->   under-counted; on Task 16's scratch run the reach dropped 5 non-local events
->   in 22 epochs (389 were dropped for overlapping the mask).
+> - **Counts.** An event of any kind (SWR, MUA, non-local, ContFrag label, Widloski)
+>   that shares time with excluded time is in neither grain: not an SWR, not a non-SWR
+>   event, not counted. A kept event that overlaps an SWR or MUA event dropped for
+>   excluded time is dropped too (`overlaps_dropped_event`), because its overlap class
+>   is unknown. The drop is made once, where the decode frame is read
+>   (`swr_source.with_swr_source`), so both grains drop the same events, and NonLocal
+>   and ContFrag frames give the same SWR and MUA cohorts. `swr_source.artifact_event_drops`
+>   gives each event's reason. The kept events keep their numbers and their `event_id`.
+> - **Exposure.** Both time terms lose excluded time, by different rules:
+>   - A stop's `immobility_duration_s` is its span (`stop_end - stop_start`) less
+>     exactly the excluded seconds inside it, so it is no longer the stop's span.
+>   - A per-bin row is dropped whole when it touches excluded time: Family B's design,
+>     the dense `stop_timebin` table, a PFC fit bin (its +/-0.25 s basis window).
+>   - A Family B bin is also dropped when its history window
+>     (`model_specs.longest_history_window_s`, 0.15 s) reaches excluded time.
+>   - The per-bin exposure therefore loses a little more than the stop-level one: the
+>     partial bins at the edges and the history margin. Whole bins are dropped where
+>     the stop table subtracts exact seconds. That is one more reason the two grains'
+>     terms are not interchangeable.
+> - **Residual.** A dropped event that starts outside excluded time and runs into it
+>   (an SWR without a maximum length, say) leaves its onset's time in the exposure with
+>   no event. Task 18's acceptance counts these.
 >
 > With no artifact run configured, every table and design is unchanged, byte for
 > byte (checked on the 5 pilot epochs against `a108373`).
