@@ -109,7 +109,7 @@ module's to None for every test (tests/conftest.py)."""
 
 class TestTheConfiguredInventory:
     def test_the_run_id_and_detector_are_the_r3_kay_inventory(self, monkeypatch):
-        assert swr_source.SWR_INVENTORY_RUN_ID == "50a98592acee"
+        assert swr_source.SWR_INVENTORY_RUN_ID == "056eee0dcb5a"
         assert swr_source.SWR_DETECTOR == "kay"
         assert swr_source.swr_inventory_dir() == (
             swr_source.SWR_INVENTORY_ROOT / swr_source.SWR_INVENTORY_RUN_ID
@@ -122,7 +122,7 @@ class TestTheConfiguredInventory:
             swr_source.ARTIFACT_INTERVALS_ROOT / "fbbff144a123"
         )
         assert swr_source.swr_source_name() == (
-            "kay@50a98592acee+artifacts@fbbff144a123"
+            "kay@056eee0dcb5a+artifacts@fbbff144a123"
         )
 
     def test_the_folders_and_name_follow_the_constants_when_they_change(

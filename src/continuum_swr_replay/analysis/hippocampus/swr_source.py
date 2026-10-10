@@ -24,7 +24,7 @@ What this module fixes
   mask itself; every analysis consumer uses *excluded time*, the mask widened
   by ``event_eligibility.ARTIFACT_REACH_S`` (:func:`excluded_intervals`).
 - **The source's name** (:func:`swr_source_name`): the detector, the inventory
-  run and the artifact run, such as ``kay@50a98592acee+artifacts@none``. Every
+  run and the artifact run, such as ``kay@056eee0dcb5a+artifacts@fbbff144a123``. Every
   table built from these labels is stamped with it (:func:`stamp_swr_source`),
   and a reader that combines a table's SWR columns with this source's live
   labels refuses a table stamped with another name
@@ -157,14 +157,14 @@ __all__ = [
     "with_swr_source",
 ]
 
-SWR_INVENTORY_RUN_ID = "50a98592acee"
+SWR_INVENTORY_RUN_ID = "056eee0dcb5a"
 """The SWR runner's run folder every analysis reads its SWRs from.
 
-R3's full run of 2026-10-05 at commit ``50a98592acee``: 216 epochs ``ok``, the 3
-known no-input epochs skipped, and j1620210710 ``02_r1`` and ``04_r2``
-``failed`` (Spyglass's own Kay inputs could not be fetched), so this source
-refuses those two until R3 reruns them. R3 will be rerun with Task 16's
-artifact mask under a new run id; changing this constant is the whole switch.
+Runbook R10's run of 2026-10-10 at commit ``056eee0dcb5a``: all 255 epochs
+``ok`` (the 218 analysed and the 37 pending), with the artifact mask of
+:data:`ARTIFACT_INTERVALS_RUN_ID` and rule R-T for all four detectors (gate report
+``.claude/research/refresh_artifact_detector/r10_gate/r10_gate_report.md``).
+Changing this constant is the whole switch to another run.
 """
 
 SWR_DETECTOR = "kay"
@@ -282,7 +282,7 @@ def swr_source_name() -> str:
     """The source as one string, the stamp of every table built from it.
 
     ``<detector>@<inventory run id>+artifacts@<artifact run id or none>``, such
-    as ``kay@50a98592acee+artifacts@none``. Read when called.
+    as ``kay@056eee0dcb5a+artifacts@fbbff144a123``. Read when called.
     """
     artifacts = ARTIFACT_INTERVALS_RUN_ID or "none"
     return f"{SWR_DETECTOR}@{SWR_INVENTORY_RUN_ID}+artifacts@{artifacts}"

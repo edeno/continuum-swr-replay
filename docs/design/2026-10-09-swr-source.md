@@ -23,13 +23,13 @@ tables, the Widloski-detector table's SWR columns, and the PFC path's SWR interv
   duration 0.015 s, smoothing sigma 0.004 s, close-ripple threshold 0, and a speed
   threshold of 4 cm/s at the event's endpoints. They are on the stored CA1 ripple band,
   with the head speed and time span that `load_data` uses.
-- **The inventory.** Run `50a98592acee` (2026-10-05, commit `50a98592acee`): 216 epochs
-  `ok`, the 3 known no-input epochs skipped, and 2 `failed`
-  (j1620210710 `02_r1` and `04_r2`). Those 2 failed because Spyglass's own Kay inputs
-  could not be fetched for the version check (a lab-database inconsistency, "Found 2
-  potential parents"). The source refuses them until R3 reruns them. R3 will rerun with
-  Task 16's artifact mask under a new run id. `SWR_INVENTORY_RUN_ID` is the one value to
-  change then.
+- **The inventory.** Run `056eee0dcb5a` (R10, 2026-10-10, commit `056eee0dcb5a`): all
+  255 epochs `ok` (the 218 analysed and the 37 pending), with the artifact mask of run
+  `fbbff144a123` and rule R-T for all four detectors. It replaced R3's run `50a98592acee`
+  (no mask, no R-T; j1620210710 `02_r1` and `04_r2` had failed there on a lab-database
+  inconsistency, and both are `ok` now). Gate report:
+  `.claude/research/refresh_artifact_detector/r10_gate/r10_gate_report.md`.
+  `SWR_INVENTORY_RUN_ID` is the one value to change for another run.
 
 ## Why: the 2.0 inventory against the stored events
 
@@ -90,7 +90,7 @@ What the comparison shows:
   intervals out: artifact time is unobserved, neither SWR nor non-SWR.
 - **`swr_source_name()`** is the source's stamp:
   `<detector>@<inventory run id>+artifacts@<artifact run id or none>`, today
-  `kay@50a98592acee+artifacts@none`.
+  `kay@056eee0dcb5a+artifacts@fbbff144a123`.
   - Every canonical table built from these labels carries it in its `attrs`, kept in the
     parquet metadata (`stamp_swr_source`). That means event, event-arm, event-patch,
     event-sequence, stop, event-onset and stop-timebin tables, Replay and ContFrag alike,
