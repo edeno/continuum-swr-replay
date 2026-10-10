@@ -22,6 +22,7 @@ from continuum_swr_replay.analysis.replay.table_contracts import (
     validate_event_arm_table,
     validate_event_patch_table,
 )
+from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
 from continuum_swr_replay.session_keys import (
     session_key_set as _session_keys,
 )
@@ -129,7 +130,13 @@ def main() -> None:
     parser.add_argument(
         "--brain-area", required=True, choices=("HPC", "mPFC", "OFC")
     )
-    parser.add_argument("--expected-sessions", type=int, default=218)
+    parser.add_argument(
+        "--expected-sessions",
+        type=int,
+        default=len(analysed_epoch_ids()),
+        help="Epochs (sessions) the tables must hold (default: the epoch register's "
+        "analysed epochs).",
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     assemble_contfrag_shards(

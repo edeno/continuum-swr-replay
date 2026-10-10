@@ -44,6 +44,7 @@ from continuum_swr_replay.analysis.replay.tables_arm_patch import (
 )
 from continuum_swr_replay.analysis.replay.tables_stop import add_nonlocal_swr_split
 from continuum_swr_replay.data_loaders.constants import WELL_ARMS
+from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
 from continuum_swr_replay.session_keys import (
     session_key_set as _session_keys,
 )
@@ -223,7 +224,13 @@ def main() -> None:
     parser.add_argument("shard_dirs", nargs="+", type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--contingency-dir", required=True, type=Path)
-    parser.add_argument("--expected-sessions", type=int, default=218)
+    parser.add_argument(
+        "--expected-sessions",
+        type=int,
+        default=len(analysed_epoch_ids()),
+        help="Epochs (sessions) the tables must hold (default: the epoch register's "
+        "analysed epochs).",
+    )
     parser.add_argument(
         "--stop-only",
         action="store_true",
