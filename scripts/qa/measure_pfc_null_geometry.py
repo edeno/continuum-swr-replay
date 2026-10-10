@@ -238,12 +238,20 @@ def session_window_sets(
     from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
         align_results_to_position,
     )
+    from continuum_swr_replay.analysis.hippocampus.swr_source import (
+        excluded_intervals,
+        read_artifact_event_drops,
+        swr_epoch_id,
+    )
     from continuum_swr_replay.analysis.pfc.canonical_events import (
         load_session_canonical_events,
         load_session_swr_intervals,
+        session_data_over_time_path,
     )
     from continuum_swr_replay.analysis.pfc.cohort import load_session_stop_cohort
     from continuum_swr_replay.analysis.pfc.glm import (
+        DEFAULT_BASIS_HALF_WINDOW_S,
+        artifact_dropped_events,
         build_session_event_sets,
         build_session_fit_mask,
     )
@@ -264,8 +272,18 @@ def session_window_sets(
     )
     data = {**data, "position_info": position_info}
 
+    # Excluded time and the events it dropped, as ``run_session`` reads them.
     _, fit_mask, _ = build_session_fit_mask(
-        position_info, cohort_stops=cohort_stops, stop_cohort=stop_cohort
+        position_info,
+        cohort_stops=cohort_stops,
+        stop_cohort=stop_cohort,
+        excluded_intervals=excluded_intervals(swr_epoch_id(nwb_file_name, epoch_name)),
+        basis_half_window_s=DEFAULT_BASIS_HALF_WINDOW_S,
+    )
+    dropped = artifact_dropped_events(
+        read_artifact_event_drops(
+            session_data_over_time_path(nwb_file_name, epoch_name)
+        )
     )
     canonical_events, _ = load_session_canonical_events(nwb_file_name, epoch_name)
     swr_intervals, _ = load_session_swr_intervals(nwb_file_name, epoch_name)
@@ -284,6 +302,7 @@ def session_window_sets(
         event_times,
         fit_mask,
         np.random.default_rng(matched_control_seed(nwb_file_name, epoch_name)),
+        avoid=dropped,
     )
     real = {**event_times, "matched_control": control.times}
 
@@ -295,6 +314,7 @@ def session_window_sets(
             {**event_times, MATCHED_CONTROL_SOURCE_CLASS: event_times[class_name]},
             fit_mask,
             np.random.default_rng(_matchable_subset_seed(subset_seed, class_name)),
+            avoid=dropped,
         )
         tested = event_times[class_name].iloc[selection.source_indices]
         # Kept draw by draw: pooling them first would put 20 draws' onsets on
@@ -304,6 +324,7 @@ def session_window_sets(
                 {**event_times, MATCHED_CONTROL_SOURCE_CLASS: tested},
                 fit_mask,
                 np.random.default_rng(int(seed)),
+                avoid=dropped,
             ).times
             for seed in seeds
         ]

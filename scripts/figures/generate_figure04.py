@@ -61,6 +61,8 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     align_results_to_position,
 )
 from continuum_swr_replay.analysis.hippocampus.swr_source import (
+    excluded_intervals,
+    read_artifact_event_drops,
     ripple_power_inputs,
     swr_epoch_id,
 )
@@ -76,9 +78,14 @@ from continuum_swr_replay.analysis.pfc.batched_glm import DEFAULT_PENALTY_SIGMA
 from continuum_swr_replay.analysis.pfc.canonical_events import (
     load_session_canonical_events,
     load_session_swr_intervals,
+    session_data_over_time_path,
 )
 from continuum_swr_replay.analysis.pfc.cohort import load_session_stop_cohort
-from continuum_swr_replay.analysis.pfc.glm import model_penalties
+from continuum_swr_replay.analysis.pfc.glm import (
+    DEFAULT_BASIS_HALF_WINDOW_S,
+    artifact_dropped_events,
+    model_penalties,
+)
 from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
 from continuum_swr_replay.analysis.pfc.heldout import DEFAULT_CONTROL_DRAWS
 from continuum_swr_replay.analysis.pfc.load_population import (
@@ -492,6 +499,8 @@ def generate_figure(
         cohort_stops=cohort_stops,
         stop_cohort=stop_cohort,
         immobility_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+        excluded_intervals=excluded_intervals(swr_epoch_id(nwb_file_name, epoch_name)),
+        basis_half_window_s=DEFAULT_BASIS_HALF_WINDOW_S,
     )
     print(
         f"Fit bins: {bin_counts['n_bins_fit']}/{bin_counts['n_bins_immobile']} "
@@ -531,6 +540,15 @@ def generate_figure(
         event_times,
         fit_mask,
         np.random.default_rng(matched_control_seed(nwb_file_name, epoch_name)),
+        avoid=artifact_dropped_events(
+            read_artifact_event_drops(
+                session_data_over_time_path(
+                    nwb_file_name,
+                    epoch_name,
+                    non_local_threshold=DEFAULT_NON_LOCAL_THRESHOLD,
+                )
+            )
+        ),
     ).times
     print(
         f"Matched non-event controls: {len(event_times['matched_control'])}"

@@ -155,6 +155,11 @@ def rebuild_session(
     from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
         align_results_to_position,
     )
+    from continuum_swr_replay.analysis.hippocampus.swr_source import (
+        excluded_intervals,
+        read_artifact_event_drops,
+        swr_epoch_id,
+    )
     from continuum_swr_replay.analysis.pfc import (
         build_session_event_sets,
         build_session_fit_mask,
@@ -164,9 +169,14 @@ def rebuild_session(
     from continuum_swr_replay.analysis.pfc.canonical_events import (
         load_session_canonical_events,
         load_session_swr_intervals,
+        session_data_over_time_path,
     )
     from continuum_swr_replay.analysis.pfc.cohort import load_session_stop_cohort
-    from continuum_swr_replay.analysis.pfc.glm import get_spikecount_per_time_bin
+    from continuum_swr_replay.analysis.pfc.glm import (
+        DEFAULT_BASIS_HALF_WINDOW_S,
+        artifact_dropped_events,
+        get_spikecount_per_time_bin,
+    )
     from continuum_swr_replay.data_loaders import load_data
 
     animal_date, epoch = session.rsplit("_", 2)[0], "_".join(session.split("_")[-2:])
@@ -189,6 +199,8 @@ def rebuild_session(
         cohort_stops=cohort_stops,
         stop_cohort="at_well",
         immobility_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+        excluded_intervals=excluded_intervals(swr_epoch_id(nwb_file_name, epoch)),
+        basis_half_window_s=DEFAULT_BASIS_HALF_WINDOW_S,
     )
     canonical_events, _ = load_session_canonical_events(nwb_file_name, epoch)
     swr_intervals, _ = load_session_swr_intervals(
@@ -211,6 +223,15 @@ def rebuild_session(
         event_times,
         fit_mask,
         np.random.default_rng(matched_control_seed(nwb_file_name, epoch)),
+        avoid=artifact_dropped_events(
+            read_artifact_event_drops(
+                session_data_over_time_path(
+                    nwb_file_name,
+                    epoch,
+                    non_local_threshold=DEFAULT_NON_LOCAL_THRESHOLD,
+                )
+            )
+        ),
     ).times
 
     time = position_info.index.to_numpy(dtype=float)
