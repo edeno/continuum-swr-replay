@@ -60,6 +60,10 @@ from continuum_swr_replay.analysis.hippocampus import load_results
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     align_results_to_position,
 )
+from continuum_swr_replay.analysis.hippocampus.swr_source import (
+    ripple_power_inputs,
+    swr_epoch_id,
+)
 from continuum_swr_replay.analysis.pfc import (
     build_session_event_sets,
     build_session_fit_mask,
@@ -444,7 +448,12 @@ def generate_figure(
     results_hpc, _, _ = load_results(
         nwb_file_name, epoch_name, decoding_brain_area="HPC"
     )
-    data = load_data(nwb_file_name, epoch_name)
+    # the ripple trace is the source's (the Kay consensus over R-T's tetrodes)
+    data = load_data(
+        nwb_file_name,
+        epoch_name,
+        ripple_power=ripple_power_inputs(swr_epoch_id(nwb_file_name, epoch_name)),
+    )
 
     # Decodes saved before get_position_info was trimmed carry a few more time
     # bins than load_data now returns; refit the example neuron on the run the

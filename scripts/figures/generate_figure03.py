@@ -28,6 +28,7 @@ import warnings
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import pandas as pd
 from matplotlib.gridspec import GridSpec
 
 import continuum_swr_replay.figure_utilities as figure_utilities
@@ -44,10 +45,20 @@ from continuum_swr_replay.analysis.hippocampus import (
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     validate_results_position_time_alignment,
 )
+from continuum_swr_replay.analysis.hippocampus.event_eligibility import (
+    artifact_drop_reasons,
+)
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     build_speed_eligible_event_cohort,
 )
-from continuum_swr_replay.analysis.hippocampus.swr_source import swr_intervals
+from continuum_swr_replay.analysis.hippocampus.swr_source import (
+    artifact_intervals,
+    dropped_for_excluded_time,
+    read_artifact_event_drops,
+    ripple_power_inputs,
+    swr_epoch_id,
+    swr_intervals,
+)
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.figure_utilities import (
     PAGE_HEIGHT,
@@ -79,11 +90,16 @@ warnings.filterwarnings("ignore")
 # Panel a — Real data example (non-SWR non-local event)
 # ---------------------------------------------------------------------------
 
-def find_non_swr_example_event(data, results, window_sec=1.0):
+def find_non_swr_example_event(
+    data, results, window_sec=1.0, *, artifacts=None, dropped=None
+):
     """Find a representative non-local event NOT co-occurring with SWR.
 
     Selects the event with highest peak non-local probability that does
-    not overlap with any detected SWR.
+    not overlap with any detected SWR. The events are re-detected from the
+    posterior, so the one analysed-time rule is applied here: an event in
+    excluded time (`artifacts`, the mask, widened by 0.3 s), or overlapping an
+    SWR or MUA event dropped for it (`dropped`), is never chosen.
 
     Returns
     -------
@@ -117,6 +133,14 @@ def find_non_swr_example_event(data, results, window_sec=1.0):
         event_col="non_local_event",
         speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     )
+    if artifacts is not None:
+        reasons = artifact_drop_reasons(
+            non_local_times["start_time"].to_numpy(),
+            non_local_times["end_time"].to_numpy(),
+            artifacts,
+            dropped,
+        )
+        non_local_times = non_local_times.loc[pd.isna(reasons)]
     # The session's SWR source intervals, already speed-gated (set by the caller).
     ripple_times = data["ripple_times"]
 
@@ -163,7 +187,11 @@ def generate_figure(
     """
     # --- Load data ---
     logging.info("Loading session data for example panel...")
-    data = load_data(nwb_file_name, epoch_name)
+    epoch_id = swr_epoch_id(nwb_file_name, epoch_name)
+    # the ripple trace is the source's (the Kay consensus over R-T's tetrodes)
+    data = load_data(
+        nwb_file_name, epoch_name, ripple_power=ripple_power_inputs(epoch_id)
+    )
     results, detector, env = load_results(
         nwb_file_name, epoch_name, decoding_brain_area="HPC"
     )
@@ -178,7 +206,14 @@ def generate_figure(
 
     # Find example non-SWR event
     logging.info("Selecting non-SWR example event...")
-    time_slice = find_non_swr_example_event(data, results)
+    time_slice = find_non_swr_example_event(
+        data,
+        results,
+        artifacts=artifact_intervals(epoch_id),
+        dropped=dropped_for_excluded_time(
+            read_artifact_event_drops(data_dir / f"{epoch_id}_80_data_over_time.pkl")
+        ),
+    )
 
     # --- Create figure ---
     fig_height = min(7.0, PAGE_HEIGHT)

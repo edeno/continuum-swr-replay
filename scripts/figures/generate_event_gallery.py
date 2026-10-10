@@ -86,6 +86,8 @@ from continuum_swr_replay.analysis.hippocampus.event_table import (
 )
 from continuum_swr_replay.analysis.hippocampus.swr_source import (
     read_dot_with_swr_source,
+    ripple_power_inputs,
+    swr_epoch_id,
     swr_intervals,
 )
 from continuum_swr_replay.analysis.replay.bouts import (
@@ -1567,7 +1569,12 @@ def render_epoch(
 
     nwb_file_name, epoch_name = parse_epoch_id(epoch_id)
     logging.info("Loading %s %s (%d events)...", nwb_file_name, epoch_name, len(sel))
-    data = load_data(nwb_file_name, epoch_name)
+    # the ripple trace is the source's (the Kay consensus over R-T's tetrodes)
+    data = load_data(
+        nwb_file_name,
+        epoch_name,
+        ripple_power=ripple_power_inputs(swr_epoch_id(nwb_file_name, epoch_name)),
+    )
     results, detector, env = load_results(
         nwb_file_name, epoch_name, decoding_brain_area="HPC"
     )
