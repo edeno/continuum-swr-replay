@@ -17,8 +17,11 @@ from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
     PADDING_S,
     artifact_intervals,
     core_class,
+    covered_seconds,
     interval_mask,
     masked_seconds,
+    overlaps_intervals,
+    pad_intervals,
     subtract_intervals,
 )
 
@@ -216,3 +219,91 @@ class TestSubtractingIntervals:
         np.testing.assert_array_equal(
             subtract_intervals(stretches, intervals), [[5.0, 6.0]]
         )
+
+
+class TestPaddingTheMask:
+    """``pad_intervals`` is the one way any stage widens the mask: the decoded
+    events' reach, the history windows and the peri-event windows."""
+
+    def test_both_sides_by_one_distance(self):
+        intervals = pd.DataFrame({"start_time": [10.0, 20.0], "end_time": [11.0, 20.5]})
+
+        assert _pairs(pad_intervals(intervals, 0.3)) == [(9.7, 11.3), (19.7, 20.8)]
+
+    def test_before_and_after_apart(self):
+        """A history window looks back only: it is reached from after the mask."""
+        intervals = pd.DataFrame({"start_time": [10.0], "end_time": [11.0]})
+
+        assert _pairs(pad_intervals(intervals, 0.0, 0.15)) == [(10.0, 11.15)]
+        assert _pairs(pad_intervals(intervals, 0.25, 0.0)) == [(9.75, 11.0)]
+
+    def test_padded_intervals_that_meet_merge(self):
+        intervals = pd.DataFrame({"start_time": [10.0, 11.5], "end_time": [11.0, 12.0]})
+
+        assert _pairs(pad_intervals(intervals, 0.25)) == [(9.75, 12.25)]
+
+    def test_no_padding_is_the_mask_merged(self):
+        intervals = pd.DataFrame({"start_time": [3.0, 1.0], "end_time": [4.0, 2.0]})
+
+        assert _pairs(pad_intervals(intervals, 0.0)) == [(1.0, 2.0), (3.0, 4.0)]
+
+    def test_no_intervals_stay_none(self):
+        empty = pd.DataFrame({"start_time": [], "end_time": []}, dtype=float)
+
+        assert _pairs(pad_intervals(empty, 0.3)) == []
+
+    def test_a_negative_distance_is_refused(self):
+        intervals = pd.DataFrame({"start_time": [1.0], "end_time": [2.0]})
+
+        with pytest.raises(ValueError, match="distance"):
+            pad_intervals(intervals, -0.1)
+
+
+class TestOverlapAndCoverage:
+    def test_an_interval_that_touches_overlaps(self):
+        """Closed on both sides: sharing one instant counts."""
+        intervals = pd.DataFrame({"start_time": [10.0, 20.0], "end_time": [11.0, 21.0]})
+        starts = np.array([8.0, 9.0, 11.0, 11.0001, 15.0, 19.0, 21.0, 25.0])
+        ends = np.array([9.9, 10.0, 12.0, 12.0, 30.0, 19.9999, 22.0, 26.0])
+
+        np.testing.assert_array_equal(
+            overlaps_intervals(starts, ends, intervals),
+            [False, True, True, False, True, False, True, False],
+        )
+
+    def test_overlap_matches_the_brute_force_pairs(self):
+        rng = np.random.default_rng(0)
+        intervals = pd.DataFrame(
+            {"start_time": rng.uniform(0, 100, 30), "end_time": np.zeros(30)}
+        )
+        intervals["end_time"] = intervals["start_time"] + rng.uniform(0, 3, 30)
+        starts = rng.uniform(0, 100, 500)
+        ends = starts + rng.uniform(0, 2, 500)
+        a = intervals["start_time"].to_numpy()
+        b = intervals["end_time"].to_numpy()
+        brute = ((starts[:, None] <= b[None]) & (a[None] <= ends[:, None])).any(axis=1)
+
+        np.testing.assert_array_equal(
+            overlaps_intervals(starts, ends, intervals), brute
+        )
+
+    def test_covered_seconds_within_each_stretch(self):
+        intervals = pd.DataFrame(
+            {"start_time": [2.0, 4.0, 10.0], "end_time": [3.0, 6.0, 10.0]}
+        )
+        starts = np.array([0.0, 2.5, 5.0, 7.0, 0.0])
+        ends = np.array([1.0, 4.5, 20.0, 9.0, 20.0])
+
+        np.testing.assert_allclose(
+            covered_seconds(starts, ends, intervals), [0.0, 1.0, 1.0, 0.0, 3.0]
+        )
+
+    def test_no_intervals_cover_exactly_zero(self):
+        empty = pd.DataFrame({"start_time": [], "end_time": []}, dtype=float)
+        starts = np.array([0.0, 1.0])
+
+        covered = covered_seconds(starts, starts + 1.0, empty)
+
+        assert covered.dtype == np.float64
+        np.testing.assert_array_equal(covered, [0.0, 0.0])
+        assert not overlaps_intervals(starts, starts + 1.0, empty).any()

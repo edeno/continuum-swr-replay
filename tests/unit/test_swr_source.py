@@ -654,3 +654,157 @@ def test_the_module_names_no_stored_ripple_source():
 
     assert "RippleTimesV1" not in code
     assert "ripple_times" not in code
+
+
+def _labels(intervals: list[tuple[float, float]]) -> np.ndarray:
+    labels = np.zeros(TIME.size, dtype=np.int64)
+    for number, (start, end) in enumerate(intervals, start=1):
+        labels[(TIME >= start) & (TIME <= end)] = number
+    return labels
+
+
+NON_LOCAL = [
+    (100.70, 100.80),  # 1 kept
+    (103.80, 103.90),  # 2 ends 0.11 s before [104.01, 104.21]: the decoder's reach
+    (104.10, 104.15),  # 3 inside the mask
+    (105.60, 105.70),  # 4 starts 0.36 s after [105.04, 105.24]: kept
+    (105.40, 105.50),  # 5 starts 0.16 s after it: the decoder's reach
+]
+MUA = [
+    (103.80, 103.90),  # 1 near the mask, which a detector's event may be
+    (105.20, 105.30),  # 2 overlaps the mask
+    (108.00, 108.05),  # 3 kept
+]
+
+
+class TestEveryCohortHonoursTheMask:
+    """The source serves each analysis frame with every event cohort clear of
+    the one mask: decoded events farther than ``DECODER_REACH_S`` from it, SWR
+    and MUA events sharing no time with it. A dropped event keeps its reason,
+    and the others keep their numbers (so their ``event_id``)."""
+
+    def _nonlocal_dot(self) -> pd.DataFrame:
+        return _dot(non_local_event=_labels(NON_LOCAL), MUA_event=_labels(MUA))
+
+    def test_decoded_events_by_reach_and_mua_events_by_overlap(
+        self, inventory, tmp_path, monkeypatch
+    ):
+        _artifacts(tmp_path, monkeypatch, ARTIFACTS)
+        dot = self._nonlocal_dot()
+
+        out = with_swr_source(dot)
+
+        assert sorted(set(out["non_local_event"]) - {0}) == [1, 4]
+        assert sorted(set(out["MUA_event"]) - {0}) == [1, 3]
+        kept = np.isin(dot["non_local_event"], [1, 4])
+        np.testing.assert_array_equal(
+            out["non_local_event"].to_numpy()[kept],
+            dot["non_local_event"].to_numpy()[kept],
+        )
+        # the decode's frame is left as it was
+        assert sorted(set(dot["non_local_event"]) - {0}) == [1, 2, 3, 4, 5]
+
+    def test_each_dropped_event_keeps_its_reason(
+        self, inventory, tmp_path, monkeypatch
+    ):
+        _artifacts(tmp_path, monkeypatch, ARTIFACTS)
+
+        drops = swr_source.artifact_event_drops(self._nonlocal_dot())
+
+        def _reasons(column):
+            rows = drops.loc[drops["event_col"] == column]
+            return dict(zip(rows["label"], rows["drop_reason"], strict=True))
+
+        assert _reasons("non_local_event") == {
+            1: None,
+            2: DropReason.DECODER_REACH,
+            3: DropReason.ARTIFACT,
+            4: None,
+            5: DropReason.DECODER_REACH,
+        }
+        assert _reasons("MUA_event") == {1: None, 2: DropReason.ARTIFACT, 3: None}
+        # the SWRs with every reason the source gives them
+        assert _reasons("SWR_event")[5] == DropReason.ARTIFACT
+        assert _reasons("SWR_event")[3] == DropReason.MOVING
+        assert list(drops.columns) == [
+            "event_col",
+            "label",
+            "start_time",
+            "end_time",
+            "drop_reason",
+        ]
+
+    def test_a_contfrag_frame_drops_its_decoded_labels_by_reach(
+        self, inventory, tmp_path, monkeypatch
+    ):
+        """A ContFrag label is decoded: SWR 8 (107.000-107.050) ends 0.1 s before
+        the mask [107.15, 107.35], so its label is dropped there, while the
+        NonLocal frame keeps it as an SWR."""
+        _artifacts(tmp_path, monkeypatch, [("spk", 107.25, 107.25)])
+        contfrag = _dot(
+            MUA_event=_labels(MUA), Continuous_prob=0.5, Fragmented_prob=0.5
+        )
+
+        out = with_swr_source(contfrag)
+        nonlocal_frame = with_swr_source(self._nonlocal_dot())
+
+        assert 8 not in set(out["SWR_event"])
+        assert 8 in set(nonlocal_frame["SWR_event"])
+        assert sorted(set(out["SWR_event"]) - {0}) == [1, 2, 5, 6]
+        drops = swr_source.artifact_event_drops(contfrag)
+        swr8 = drops.loc[(drops["event_col"] == "SWR_event") & (drops["label"] == 8)]
+        assert swr8["drop_reason"].tolist() == [DropReason.DECODER_REACH]
+
+    def test_the_decoders_keep_every_decoded_event(
+        self, inventory, tmp_path, monkeypatch
+    ):
+        """A decode saves what it decoded; the read path drops, with reasons."""
+        _artifacts(tmp_path, monkeypatch, ARTIFACTS)
+        dot = self._nonlocal_dot()
+
+        out = with_swr_source(dot, drop_masked_events=False)
+
+        np.testing.assert_array_equal(out["non_local_event"], dot["non_local_event"])
+        np.testing.assert_array_equal(out["MUA_event"], dot["MUA_event"])
+
+    def test_with_no_artifact_run_every_label_is_the_decodes(self, inventory):
+        dot = self._nonlocal_dot()
+
+        out = with_swr_source(dot)
+
+        for column in ("non_local_event", "MUA_event"):
+            pd.testing.assert_series_equal(out[column], dot[column])
+        assert (
+            swr_source.artifact_event_drops(dot)["drop_reason"]
+            .map(
+                lambda reason: reason
+                in (
+                    None,
+                    DropReason.MOVING,
+                    DropReason.SPEED_UNKNOWN,
+                    DropReason.NO_SPEED_SAMPLE,
+                )
+            )
+            .all()
+        )
+
+    def test_a_frame_finds_its_own_mask(self, inventory, tmp_path, monkeypatch):
+        _artifacts(tmp_path, monkeypatch, ARTIFACTS)
+
+        np.testing.assert_allclose(
+            swr_source.artifact_intervals_of(_dot()).to_numpy(), ARTIFACT_INTERVALS
+        )
+        sessions = pd.DataFrame(
+            {"animal": ["j16"], "session_date": [20210706], "epoch": ["02_r1"]}
+        )
+        by_session = swr_source.artifact_intervals_by_session(sessions)
+        assert list(by_session.columns) == [
+            "animal",
+            "session_date",
+            "epoch",
+            "start_time",
+            "end_time",
+        ]
+        np.testing.assert_allclose(
+            by_session[["start_time", "end_time"]].to_numpy(), ARTIFACT_INTERVALS
+        )

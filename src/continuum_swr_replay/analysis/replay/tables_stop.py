@@ -10,6 +10,9 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
+from continuum_swr_replay.analysis.hippocampus.swr_source import (
+    artifact_intervals_of,
+)
 
 from ._helpers import (
     arm_to_patch as _arm_to_patch,
@@ -33,6 +36,9 @@ from ._tables_common import (
 )
 from .bouts import (
     assign_bout as _assign_bout,
+)
+from .bouts import (
+    bout_exposure_s as _bout_exposure_s,
 )
 from .bouts import (
     immobility_bout_intervals as _immobility_bout_intervals,
@@ -73,6 +79,11 @@ def build_stop_table(
     immobility bout (defined by ``head_speed < speed_threshold``) becomes a
     row, regardless of whether any non-local event fired during it. The
     hurdle occurrence model requires the zero-event rows.
+
+    ``immobility_duration_s`` is the stop's exposure: ``stop_end -
+    stop_start`` less the time of the epoch's artifact mask inside the stop
+    (``swr_source.artifact_intervals``; nothing with no artifact run). A stop
+    wholly inside the mask has zero exposure.
 
     The ``stop_id`` column is a 63-bit hash of
     ``(animal, day, epoch, stop_idx)`` and matches
@@ -142,7 +153,11 @@ def build_stop_table(
     per_bout = pd.DataFrame({"stop_idx": np.arange(n_bouts, dtype=np.int64)})
     per_bout["stop_start"] = bout_starts
     per_bout["stop_end"] = bout_ends
-    per_bout["immobility_duration_s"] = bout_ends - bout_starts
+    # The stop's exposure: its span less the artifact mask's time inside it
+    # (unobserved time is no rate's denominator). The bout itself is unchanged.
+    per_bout["immobility_duration_s"] = _bout_exposure_s(
+        bout_starts, bout_ends, artifact_intervals_of(dot)
+    )
     per_bout["reward_fraction_last10_known_trials"] = recent_trial_reward_rate(
         bout_starts, port_experiences
     )

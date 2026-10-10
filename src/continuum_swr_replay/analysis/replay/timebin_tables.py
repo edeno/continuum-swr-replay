@@ -16,7 +16,8 @@ reward at both within- and across-stop scales):
 
 Both recompute immobility bouts from ``dot`` with the canonical helpers, so
 ``stop_id`` matches ``build_stop_table`` row-for-row. Movement is absence of
-rows; ``t_since_pump`` (from absolute time) is the bridge across stops.
+rows; ``t_since_pump`` (from absolute time) is the bridge across stops. So is
+artifact time: a dense bin that touches the epoch's artifact mask has no row.
 """
 
 from __future__ import annotations
@@ -28,10 +29,12 @@ from ..constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
+from ..hippocampus.artifacts.masks import overlaps_intervals
 from ..hippocampus.event_immobility import (
     filter_event_labels_by_speed,
     validate_nonlocal_event_probability_contract,
 )
+from ..hippocampus.swr_source import artifact_intervals_of
 from .bouts import assign_bout, immobility_bout_intervals
 from .covariate_registry import stamp_covariate_schema
 from .event_ids import hash_stop_id
@@ -139,17 +142,25 @@ def build_event_onset_table(
             )
         )
     cols = [
-        "animal", "session_date", "epoch", "stop_id", "stop_idx", "event_type",
-        "onset_time", "t_since_stop_onset", "t_since_pump", "is_reward_stop",
+        "animal",
+        "session_date",
+        "epoch",
+        "stop_id",
+        "stop_idx",
+        "event_type",
+        "onset_time",
+        "t_since_stop_onset",
+        "t_since_pump",
+        "is_reward_stop",
         "isi_within_stop",
     ]
     if not frames:
-        return stamp_covariate_schema(
-            pd.DataFrame(columns=cols), table="event_onset"
-        )
+        return stamp_covariate_schema(pd.DataFrame(columns=cols), table="event_onset")
     out = pd.concat(frames, ignore_index=True)
     out["stop_id"] = hash_stop_id(animal, day, epoch, out["stop_idx"].to_numpy())
-    out = out.sort_values(["event_type", "stop_id", "onset_time"]).reset_index(drop=True)
+    out = out.sort_values(["event_type", "stop_id", "onset_time"]).reset_index(
+        drop=True
+    )
     out["isi_within_stop"] = out.groupby(["event_type", "stop_id"])["onset_time"].diff()
     return stamp_covariate_schema(out[cols], table="event_onset")
 
@@ -164,7 +175,10 @@ def build_stop_timebin_table(
     """Dense per-(stop, bin) table at ``bin_s`` resolution (default 4 ms).
 
     ``nonlocal_threshold`` must match the threshold used to create ``dot``'s
-    Non-Local labels — see :func:`build_event_onset_table`.
+    Non-Local labels — see :func:`build_event_onset_table`. A bin
+    ``[left, min(left + bin_s, stop end)]`` that touches the epoch's artifact
+    mask (``swr_source.artifact_intervals``; closed) is unobserved and has no
+    row; the other bins keep their ``bin_in_stop``.
     """
     if "non_local_event" in dot:
         validate_nonlocal_event_probability_contract(
@@ -183,14 +197,21 @@ def build_stop_timebin_table(
     bout_starts, bout_ends = immobility_bout_intervals(dot)
     n_bouts = bout_starts.size
     cols = [
-        "animal", "session_date", "epoch", "stop_id", "bin_in_stop",
-        "t_since_stop_onset", "t_since_pump", "is_reward_stop",
-        "n_swr_events", "n_nonlocal_events", "n_mua_events", "head_speed",
+        "animal",
+        "session_date",
+        "epoch",
+        "stop_id",
+        "bin_in_stop",
+        "t_since_stop_onset",
+        "t_since_pump",
+        "is_reward_stop",
+        "n_swr_events",
+        "n_nonlocal_events",
+        "n_mua_events",
+        "head_speed",
     ]
     if n_bouts == 0:
-        return stamp_covariate_schema(
-            pd.DataFrame(columns=cols), table="stop_timebin"
-        )
+        return stamp_covariate_schema(pd.DataFrame(columns=cols), table="stop_timebin")
 
     # Variable bins-per-bout; build the (bout, within-bin) index for every bin.
     n_bins = np.maximum(1, np.ceil((bout_ends - bout_starts) / bin_s).astype(int))
@@ -231,7 +252,9 @@ def build_stop_timebin_table(
             "epoch": epoch,
             "stop_id": hash_stop_id(animal, day, epoch, bout_of_bin),
             "bin_in_stop": within.astype(np.int32),
-            "t_since_stop_onset": (bin_center - bout_starts[bout_of_bin]).astype(np.float32),
+            "t_since_stop_onset": (bin_center - bout_starts[bout_of_bin]).astype(
+                np.float32
+            ),
             "t_since_pump": _time_since_pump(bin_center, pump_times).astype(np.float32),
             "is_reward_stop": reward_mask[bout_of_bin],
             "n_swr_events": counts["SWR"],
@@ -240,4 +263,11 @@ def build_stop_timebin_table(
             "head_speed": speed_mean.astype(np.float32),
         }
     )[cols]
+    artifacts = artifact_intervals_of(dot)
+    if len(artifacts):
+        left = bout_starts[bout_of_bin] + within * bin_s
+        right = np.minimum(left + bin_s, bout_ends[bout_of_bin])
+        out = out.loc[~overlaps_intervals(left, right, artifacts)].reset_index(
+            drop=True
+        )
     return stamp_covariate_schema(out, table="stop_timebin")

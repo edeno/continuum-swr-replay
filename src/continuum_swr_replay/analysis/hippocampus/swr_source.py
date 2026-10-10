@@ -31,12 +31,19 @@ What this module fixes
   ``partial`` with the Kay inventory written. Anything else raises
   :class:`SwrSourceError`. The event and observed files are checked against
   the sha256 the manifest recorded for them.
-- **Which events count** (:func:`swr_events`): the project's whole-event
-  immobility rule (every speed sample in the closed interval finite and
-  strictly below 4 cm/s, ``event_immobility``), the rule of the non-local and
-  MUA cohorts, on the head speed of the decode grid. An event that overlaps an
-  artifact interval is dropped too. Every dropped event keeps its row and a
-  :class:`DropReason`.
+- **Which events count** (:func:`swr_events`): the project's one eligibility
+  rule (``event_eligibility``): the whole-event immobility rule (every speed
+  sample in the closed interval finite and strictly below 4 cm/s,
+  ``event_immobility``), the rule of the non-local and MUA cohorts, on the
+  head speed of the decode grid, and no time shared with the artifact mask.
+  Every dropped event keeps its row and a :class:`DropReason`.
+- **Every other cohort of an analysis frame** (:func:`with_swr_source`): a
+  decoded event (a NonLocal decode's ``non_local_event``; a ContFrag decode's
+  ``SWR_event`` and ``MUA_event`` labels) within
+  ``event_eligibility.DECODER_REACH_S`` of the mask is dropped whole, and an
+  MUA event of a NonLocal decode that shares time with the mask is dropped
+  whole; the other events keep their numbers. :func:`artifact_event_drops`
+  gives every event of a frame with its reason.
 - **The per-bin labels** (:func:`swr_event_labels`): exactly the convention
   ``SWR_event`` has had since the unified immobility change. That is
   ``build_speed_eligible_event_cohort(..., preserve_source_ids=True)``, the call
@@ -52,11 +59,13 @@ What this module fixes
 
 Analyses read a decode's ``data_over_time`` through :func:`with_swr_source`
 or :func:`read_dot_with_swr_source`. Its ``SWR_event`` column then holds this
-source's labels and ``swr_observed`` the coverage mask. An HPC decode made by
-the decoders since Task 17a already holds them: its ``organize_results`` reads
-the frame through :func:`with_swr_source`, so the decode's provenance is this
-source, and its encoding leaves out every event of this inventory and the
-artifact mask (``decoding_common.hpc_decode_masks``). In an older
+source's labels and ``swr_observed`` the coverage mask, and every other event
+cohort of the frame is clear of the artifact mask. An HPC decode made by the
+decoders since Task 17a already holds the source's SWR labels: its
+``organize_results`` reads the frame through :func:`with_swr_source` (keeping
+every event it decoded, ``drop_masked_events=False``), so the decode's
+provenance is this source, and its encoding leaves out every event of this
+inventory and the artifact mask (``decoding_common.hpc_decode_masks``). In an older
 decode, or a PFC decode, ``SWR_event`` (from ``RippleTimesV1``, written by
 ``get_data_over_time``) stays in the pickle as the decode's provenance and never
 reaches an analysis, and neither do the decode's stored-ripple counts
@@ -66,8 +75,8 @@ reaches an analysis, and neither do the decode's stored-ripple counts
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
-from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -88,15 +97,23 @@ from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
 from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
     subtract_intervals,
 )
+from continuum_swr_replay.analysis.hippocampus.event_eligibility import (
+    DECODER_REACH_S,
+    DropReason,
+    drop_labels,
+    event_drop_reasons,
+    label_drop_reasons,
+)
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     build_speed_eligible_event_cohort,
-    filter_event_intervals_by_speed,
     intervals_from_labels,
 )
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
+from continuum_swr_replay.session_keys import SESSION_COLUMNS, SESSION_COLUMNS_DAY
 from continuum_swr_replay.table_io import sha256_file
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "ARTIFACT_INTERVALS_ROOT",
@@ -111,8 +128,11 @@ __all__ = [
     "SWR_SOURCE_ATTR",
     "SWR_SOURCE_TABLES",
     "SwrSourceError",
+    "artifact_event_drops",
     "artifact_intervals",
+    "artifact_intervals_by_session",
     "artifact_intervals_dir",
+    "artifact_intervals_of",
     "read_dot_with_swr_source",
     "read_swr_inventory",
     "require_swr_source",
@@ -209,20 +229,13 @@ analysis frame, as the decode's own ``SWR_event`` labels are replaced."""
 
 _ARTIFACT_COLUMNS = ["start_time", "end_time"]
 
+CONTFRAG_PROBABILITY_COLUMNS = ("Continuous_prob", "Fragmented_prob")
+"""The columns that mark a ContFrag decode's frame (with no ``non_local_event``):
+there the SWR and MUA events carry decoded labels, so the decoder's reach
+applies to them."""
 
-class DropReason(StrEnum):
-    """Why :func:`swr_events` drops an inventory event. The first that holds,
-    in this order."""
-
-    ARTIFACT = "artifact"
-    """The event overlaps an artifact interval (closed intervals: touching
-    counts)."""
-    NO_SPEED_SAMPLE = "no_speed_sample"
-    """No sample of the speed's time axis lies in the event."""
-    MOVING = "moving"
-    """A finite speed sample in the event is at or above the threshold."""
-    SPEED_UNKNOWN = "speed_unknown"
-    """A speed sample in the event is not finite (and none is fast)."""
+DROP_COLUMNS = ["event_col", "label", "start_time", "end_time", "drop_reason"]
+"""The columns of :func:`artifact_event_drops`."""
 
 
 class SwrSourceError(ValueError):
@@ -536,43 +549,20 @@ def _classify(
     source: _EpochSource,
     speed: pd.Series,
     speed_threshold: float,
+    reach_s: float = 0.0,
 ) -> pd.DataFrame:
     events = source.events.copy()
-    time = speed.index.to_numpy(dtype=float)
-    values = speed.to_numpy(dtype=float)
-    starts = events["start_time"].to_numpy(dtype=float)
-    ends = events["end_time"].to_numpy(dtype=float)
-
-    # The canonical rule decides; the counts below only say why it failed.
-    immobile = events.index.isin(
-        filter_event_intervals_by_speed(
-            events, speed=values, time=time, speed_threshold=speed_threshold
-        ).index
-    )
-    first = np.searchsorted(time, starts, side="left")
-    stop = np.searchsorted(time, ends, side="right")
-    finite = np.isfinite(values)
-    fast = finite & (values >= speed_threshold)
-
-    def _in_event(flags: NDArray[np.bool_]) -> NDArray[np.int64]:
-        cumulative = np.concatenate([[0], np.cumsum(flags, dtype=np.int64)])
-        counts: NDArray[np.int64] = cumulative[stop] - cumulative[first]
-        return counts
-
-    reason = np.full(len(events), None, dtype=object)
-    reason[~immobile & (_in_event(~finite) > 0)] = DropReason.SPEED_UNKNOWN.value
-    reason[~immobile & (_in_event(fast) > 0)] = DropReason.MOVING.value
-    reason[~immobile & (stop <= first)] = DropReason.NO_SPEED_SAMPLE.value
-    if len(source.artifacts) and len(events):
-        reason[_artifact_overlap(starts, ends, source.artifacts)] = (
-            DropReason.ARTIFACT.value
+    try:
+        events["drop_reason"] = event_drop_reasons(
+            events[["start_time", "end_time"]],
+            speed=speed.to_numpy(dtype=float),
+            time=speed.index.to_numpy(dtype=float),
+            artifacts=source.artifacts,
+            reach_s=reach_s,
+            speed_threshold=speed_threshold,
         )
-    if (pd.isna(reason) & ~immobile).any():
-        raise RuntimeError(
-            f"{epoch_id}: an event failed the immobility rule for no reason this "
-            "module names"
-        )
-    events["drop_reason"] = reason
+    except RuntimeError as error:
+        raise RuntimeError(f"{epoch_id}: {error}") from error
     return events
 
 
@@ -618,12 +608,14 @@ def _labels(
     time_index: pd.Index,
     speed_values: NDArray,
     speed_threshold: float,
+    reach_s: float = 0.0,
 ) -> NDArray[np.int64]:
     events = _classify(
         epoch_id,
         source,
         pd.Series(speed_values, index=time_index),
         speed_threshold,
+        reach_s,
     )
     _, labels = build_speed_eligible_event_cohort(
         events[["start_time", "end_time"]],
@@ -691,14 +683,119 @@ def swr_event_labels(
     )
 
 
-def with_swr_source(dot: pd.DataFrame) -> pd.DataFrame:
-    """One epoch's ``data_over_time`` with its SWR labels from this source.
+def _frame_epoch(dot: pd.DataFrame, what: str) -> tuple[str, NDArray]:
+    """The one epoch a frame holds, as the inventory's id, and its time axis."""
+    missing = [c for c in (*SESSION_COLUMNS_DAY, "head_speed") if c not in dot.columns]
+    if missing:
+        raise ValueError(f"{what}: data_over_time lacks columns {missing}")
+    sessions = dot[list(SESSION_COLUMNS_DAY)].drop_duplicates()
+    if len(sessions) != 1:
+        raise ValueError(f"{what} reads one epoch at a time, not {len(sessions)}")
+    animal, day, epoch = sessions.iloc[0]
+    time = dot["time"].to_numpy() if "time" in dot.columns else dot.index.to_numpy()
+    return swr_epoch_id(f"{animal}{day}_.nwb", str(epoch)), np.asarray(time, float)
+
+
+def _label_reaches(dot: pd.DataFrame) -> tuple[float, dict[str, float]]:
+    """The decoder's reach for the frame's SWR labels and its other label
+    columns: what its decode decoded.
+
+    A ContFrag decode (its state columns, no ``non_local_event``) labels the
+    SWR and MUA events, so both are decoded events. A NonLocal decode decodes
+    ``non_local_event``; its SWR and MUA events are the detectors'.
+    """
+    columns = set(dot.columns)
+    if (
+        "non_local_event" not in columns
+        and set(CONTFRAG_PROBABILITY_COLUMNS) <= columns
+    ):
+        reaches = {"MUA_event": DECODER_REACH_S}
+        return DECODER_REACH_S, reaches
+    reaches = {"non_local_event": DECODER_REACH_S, "MUA_event": 0.0}
+    return 0.0, {
+        column: reach for column, reach in reaches.items() if column in columns
+    }
+
+
+def artifact_event_drops(dot: pd.DataFrame) -> pd.DataFrame:
+    """Every event of one epoch's decode frame, with its reason to leave.
+
+    The reasons :func:`with_swr_source` acts on: the source's SWRs with every
+    :class:`DropReason` (:func:`swr_events`, with the decoder's reach on a
+    ContFrag frame), and each event of the frame's other label columns
+    (``non_local_event``, ``MUA_event``), read at its sampled bounds, with the
+    mask's reason. Those labels were speed-qualified when the decode was made.
+
+    Parameters
+    ----------
+    dot : pd.DataFrame
+        One epoch's decode frame as the decoder saved it (time-indexed or with
+        a ``time`` column), carrying ``animal``, ``day``, ``epoch`` and
+        ``head_speed``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns :data:`DROP_COLUMNS`: the label column, the event's label, its
+        bounds (seconds) and its reason (None for a kept event); SWR events
+        first, then each other column, in label order.
+
+    Raises
+    ------
+    ValueError
+        If the frame holds more than one epoch, or lacks a needed column.
+    SwrSourceError
+        If the epoch cannot be served.
+    """
+    epoch_id, time = _frame_epoch(dot, "artifact_event_drops")
+    source = _epoch_source(epoch_id)
+    swr_reach, reaches = _label_reaches(dot)
+    swrs = _classify(
+        epoch_id,
+        source,
+        pd.Series(dot["head_speed"].to_numpy(dtype=float), index=time),
+        DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+        swr_reach,
+    )
+    parts = [
+        pd.DataFrame(
+            {
+                "event_col": SWR_LABEL_COLUMN,
+                "label": swrs[SWR_LABEL_COLUMN].to_numpy(),
+                "start_time": swrs["start_time"].to_numpy(dtype=float),
+                "end_time": swrs["end_time"].to_numpy(dtype=float),
+                "drop_reason": swrs["drop_reason"].to_numpy(),
+            }
+        )
+    ]
+    for column, reach in reaches.items():
+        drops = label_drop_reasons(dot, column, source.artifacts, reach_s=reach)
+        parts.append(
+            drops.rename(columns={column: "label"}).assign(event_col=column)[
+                DROP_COLUMNS
+            ]
+        )
+    return pd.concat(parts, ignore_index=True)[DROP_COLUMNS]
+
+
+def with_swr_source(
+    dot: pd.DataFrame, *, drop_masked_events: bool = True
+) -> pd.DataFrame:
+    """One epoch's ``data_over_time`` with its SWR labels from this source,
+    and every event cohort clear of the artifact mask.
 
     Parameters
     ----------
     dot : pd.DataFrame
         One epoch's decode frame, time-indexed (or with a ``time`` column),
         carrying ``animal``, ``day``, ``epoch`` and ``head_speed``.
+    drop_masked_events : bool
+        True (every analysis read): each decoded event within
+        ``event_eligibility.DECODER_REACH_S`` of the mask and each NonLocal
+        frame's MUA event sharing time with it is dropped whole
+        (:func:`artifact_event_drops` gives the reasons), on a ContFrag frame
+        the SWR labels too. False only for a decoder saving its own frame,
+        which keeps every event it decoded.
 
     Returns
     -------
@@ -709,7 +806,8 @@ def with_swr_source(dot: pd.DataFrame) -> pd.DataFrame:
         unobserved), the decode's
         stored-ripple counts (:data:`DECODE_SWR_COUNT_COLUMNS`) are gone, and
         ``attrs`` carries the source's stamp (:func:`stamp_swr_source`). The
-        epoch's source files are checked against the manifest once.
+        epoch's source files are checked against the manifest once. With no
+        artifact run configured, every other label is the decode's.
 
     Raises
     ------
@@ -718,24 +816,17 @@ def with_swr_source(dot: pd.DataFrame) -> pd.DataFrame:
     SwrSourceError
         If the epoch cannot be served.
     """
-    missing = [c for c in (*SESSION_COLUMNS_DAY, "head_speed") if c not in dot.columns]
-    if missing:
-        raise ValueError(f"with_swr_source: data_over_time lacks columns {missing}")
-    sessions = dot[list(SESSION_COLUMNS_DAY)].drop_duplicates()
-    if len(sessions) != 1:
-        raise ValueError(
-            f"with_swr_source reads one epoch at a time, not {len(sessions)}"
-        )
-    animal, day, epoch = sessions.iloc[0]
-    epoch_id = swr_epoch_id(f"{animal}{day}_.nwb", str(epoch))
-    time = dot["time"].to_numpy() if "time" in dot.columns else dot.index.to_numpy()
+    epoch_id, time = _frame_epoch(dot, "with_swr_source")
     source = _epoch_source(epoch_id)
+    swr_reach, reaches = _label_reaches(dot)
+    masking = drop_masked_events and len(source.artifacts) > 0
     labels = _labels(
         epoch_id,
         source,
-        pd.Index(np.asarray(time, dtype=float), name="time"),
+        pd.Index(time, name="time"),
         dot["head_speed"].to_numpy(dtype=float),
         DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+        swr_reach if masking else 0.0,
     )
     # A shallow copy shares the untouched columns of a frame that can be half a
     # gigabyte; deleting and assigning columns on it leaves `dot` as it was.
@@ -746,7 +837,84 @@ def with_swr_source(dot: pd.DataFrame) -> pd.DataFrame:
             del out[column]
     out[SWR_LABEL_COLUMN] = labels
     out[SWR_OBSERVED_COLUMN] = _mask(source.observed, time)
+    if masking:
+        for column, reach in reaches.items():
+            drops = label_drop_reasons(out, column, source.artifacts, reach_s=reach)
+            out = drop_labels(out, column, drops)
+            counts = drops["drop_reason"].value_counts().to_dict()
+            if counts:
+                logger.info("%s: %s dropped %s", epoch_id, column, counts)
     return stamp_swr_source(out)
+
+
+def artifact_intervals_of(frame: pd.DataFrame) -> pd.DataFrame:
+    """:func:`artifact_intervals` of the one epoch a frame or table holds.
+
+    Parameters
+    ----------
+    frame : pd.DataFrame
+        Carrying ``animal``, ``epoch`` and the date as ``day`` or
+        ``session_date``; one epoch.
+
+    Returns
+    -------
+    pd.DataFrame
+        As :func:`artifact_intervals`.
+
+    Raises
+    ------
+    ValueError
+        If the frame holds more than one epoch, or lacks the session columns.
+    SwrSourceError
+        As :func:`artifact_intervals`.
+    """
+    date = "session_date" if "session_date" in frame.columns else "day"
+    columns = ["animal", date, "epoch"]
+    missing = [column for column in columns if column not in frame.columns]
+    if missing:
+        raise ValueError(f"artifact_intervals_of: the frame lacks columns {missing}")
+    sessions = frame[columns].drop_duplicates()
+    if len(sessions) != 1:
+        raise ValueError(
+            f"artifact_intervals_of reads one epoch at a time, not {len(sessions)}"
+        )
+    animal, day, epoch = sessions.iloc[0]
+    return artifact_intervals(swr_epoch_id(f"{animal}{day}_.nwb", str(epoch)))
+
+
+def artifact_intervals_by_session(sessions: pd.DataFrame) -> pd.DataFrame:
+    """:func:`artifact_intervals` of every session a table holds, in one frame.
+
+    Parameters
+    ----------
+    sessions : pd.DataFrame
+        Carrying ``animal``, ``session_date`` and ``epoch`` (rows may repeat).
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns ``animal``, ``session_date``, ``epoch``, ``start_time`` and
+        ``end_time`` (seconds, closed): each session's mask, one row per
+        interval, none for a session without artifacts.
+
+    Raises
+    ------
+    SwrSourceError
+        As :func:`artifact_intervals`.
+    """
+    keys = sessions[list(SESSION_COLUMNS)].drop_duplicates()
+    parts = [
+        artifact_intervals(swr_epoch_id(f"{animal}{day}_.nwb", str(epoch))).assign(
+            animal=animal, session_date=day, epoch=epoch
+        )
+        for animal, day, epoch in keys.itertuples(index=False)
+    ]
+    columns = [*SESSION_COLUMNS, *_ARTIFACT_COLUMNS]
+    if not parts:
+        return pd.DataFrame({column: [] for column in columns}).astype(
+            {"start_time": float, "end_time": float}
+        )
+    return pd.concat(parts, ignore_index=True)[columns]
 
 
 def read_dot_with_swr_source(path: str | Path) -> pd.DataFrame:

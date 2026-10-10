@@ -54,6 +54,9 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
 from continuum_swr_replay.analysis.constants import OUTCOME_TIME_SEMANTICS  # noqa: E402
+from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
+    artifact_intervals_by_session,
+)
 from continuum_swr_replay.analysis.replay import (  # noqa: E402
     BIN_S,
     N_HISTORY_BASIS,
@@ -91,6 +94,9 @@ from continuum_swr_replay.analysis.replay.covariates import (  # noqa: E402
 from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
     record_inputs,
     write_fit_provenance,
+)
+from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
+    longest_history_window_s,
 )
 from continuum_swr_replay.analysis.replay.per_bin_design import (  # noqa: E402
     POPULATIONS,
@@ -423,6 +429,9 @@ def fit_uncertainty_rate(
         if keys not in onset_groups:
             continue
         onsets_g = onset_groups[keys]
+        # artifact time is unobserved: its bins, and those whose history
+        # reaches it, are not fit
+        artifacts = artifact_intervals_by_session(stops_g)
         for outcome in POPULATIONS_TO_FIT:
             attempted[outcome] += 1
             design = aggregate_to_timebins(
@@ -434,6 +443,8 @@ def fit_uncertainty_rate(
                 self_history_lags=N_HISTORY_LAGS,
                 self_history_basis=N_HISTORY_BASIS,
                 stop_covariates=stop_covariates,
+                artifact_intervals=artifacts,
+                history_window_s=longest_history_window_s([MU_UNCERTAINTY]),
             )
             design, gate_audit = _gate_bins_after_outcome(design)
             gate_audit_rows.append(

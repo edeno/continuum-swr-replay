@@ -733,3 +733,38 @@ def test_a_dropped_single_window_inside_a_merged_gap_is_reported():
     assert row.is_replay
     assert row.pieces_dispersion_cm == pytest.approx(0.0)
     assert row.n_kept_windows_outside_pieces == 1
+
+
+class TestTheArtifactMask:
+    """A Widloski event is a decoded event: one sharing time with the artifact
+    mask, or within ``DECODER_REACH_S`` of it, leaves every cohort with its
+    reason. Every candidate keeps its row, as every rejection does."""
+
+    def test_each_candidate_keeps_its_reason(self, recording):
+        table = build(recording)
+        second_start = table.event_start_s.iloc[1]
+        # 10 ms at the second sequence's start: 0.084 s after the first one
+        # ends, 0.322 s before the third begins
+        artifacts = pd.DataFrame(
+            {"start_time": [second_start], "end_time": [second_start + 0.01]}
+        )
+        assert table.event_start_s.iloc[1] - table.event_end_s.iloc[0] < 0.3
+        assert table.event_start_s.iloc[2] - (second_start + 0.01) > 0.3
+
+        masked = build(recording, artifact_intervals=artifacts)
+
+        assert masked.artifact_drop_reason.tolist() == [
+            "decoder_reach",
+            "artifact",
+            None,
+        ]
+        pd.testing.assert_frame_equal(
+            masked.drop(columns="artifact_drop_reason"),
+            table.drop(columns="artifact_drop_reason"),
+        )
+
+    def test_no_mask_drops_nothing(self, recording):
+        table = build(recording)
+
+        assert table.artifact_drop_reason.isna().all()
+        assert table.artifact_drop_reason.dtype == object

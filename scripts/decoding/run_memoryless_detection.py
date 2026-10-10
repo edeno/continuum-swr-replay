@@ -17,6 +17,8 @@ marks the mask's bins on the decode grid missing (``is_missing``, the decoders'
 rule: a bin inside a closed interval of ``swr_source.artifact_intervals``).
 No window holding one is decoded, no candidate touches one, and neither the
 shuffle null nor any normalization reads them (``memoryless_sequence.epoch``).
+A candidate within ``event_eligibility.DECODER_REACH_S`` of the mask keeps its
+row with an ``artifact_drop_reason`` and is in no cohort.
 ``check_marks_match_encoding`` refuses them unless every mark the encoding
 model was fitted on is among them. Those are the training span's, so it cannot
 see a spike the reload adds, or one dropped only during SWRs, which
@@ -596,6 +598,7 @@ def run_one(
         config=config,
         n_shuffles=n_shuffles,
         is_missing=is_missing,
+        artifact_intervals=artifact_mask,
     )
 
     outputs = output_paths(epoch_id, output_dir)
@@ -644,6 +647,11 @@ def run_one(
             "masked_s": masked_seconds(artifact_mask.clip(time[0], time[-1])),
             "n_missing_bins": int(np.count_nonzero(is_missing)),
             "n_missing_windows": int(np.count_nonzero(missing_windows)),
+            # candidates the mask reaches, in no cohort (event_eligibility)
+            "n_dropped": {
+                reason: int((table["artifact_drop_reason"] == reason).sum())
+                for reason in ("artifact", "decoder_reach")
+            },
         },
         "n_windows": int(gates.speed_eligible.size),
         # a window whose speed was NaN is rejected as not still; how many

@@ -8,7 +8,9 @@ exclusion), the Widloski runner and every analysis. Artifact time is
 unobserved there.
 
 Intervals are closed, ``[start_time, end_time]`` in seconds, the project's
-convention: a time on an endpoint is masked. Design note:
+convention: a time on an endpoint is masked. :func:`pad_intervals` is the one
+way a stage widens the mask, by the reach of what it reads (a decoded event's
+0.3 s, a history window, a peri-event window). Design note:
 ``docs/design/2026-10-09-artifact-detection.md``.
 """
 
@@ -25,9 +27,12 @@ __all__ = [
     "PADDING_S",
     "artifact_intervals",
     "core_class",
+    "covered_seconds",
     "interval_mask",
     "masked_seconds",
     "merge_intervals",
+    "overlaps_intervals",
+    "pad_intervals",
     "subtract_intervals",
 ]
 
@@ -242,3 +247,123 @@ def masked_seconds(intervals: pd.DataFrame) -> float:
         intervals["end_time"].to_numpy(dtype=np.float64),
     )
     return float(np.sum(merged[:, 1] - merged[:, 0]))
+
+
+def pad_intervals(
+    intervals: pd.DataFrame, before_s: float, after_s: float | None = None
+) -> pd.DataFrame:
+    """The intervals widened by a distance on each side, merged.
+
+    Every stage that must keep clear of the mask by more than its own time
+    widens it here: a decoded event within 0.3 s of the mask, a bin whose
+    history window looks back into it, a peri-event window that reaches it.
+
+    Parameters
+    ----------
+    intervals : pd.DataFrame
+        ``start_time`` and ``end_time`` (seconds), closed; any order.
+    before_s : float
+        Seconds added before each start.
+    after_s : float, optional
+        Seconds added after each end; `before_s` when None.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns ``start_time`` and ``end_time`` (float64, seconds), closed,
+        disjoint and in time order.
+
+    Raises
+    ------
+    ValueError
+        If a distance is negative or not finite.
+    """
+    after_s = before_s if after_s is None else after_s
+    for distance in (before_s, after_s):
+        if not (np.isfinite(distance) and distance >= 0):
+            raise ValueError(f"a padding distance must be finite and >= 0: {distance}")
+    starts = intervals["start_time"].to_numpy(dtype=np.float64) - before_s
+    ends = intervals["end_time"].to_numpy(dtype=np.float64) + after_s
+    return _as_frame(merge_intervals(starts, ends))
+
+
+def overlaps_intervals(
+    starts: NDArray[np.float64], ends: NDArray[np.float64], intervals: pd.DataFrame
+) -> NDArray[np.bool_]:
+    """True for each closed ``[start, end]`` sharing any time with an interval.
+
+    Both sides are closed, so a stretch that only touches an interval at one
+    instant overlaps it.
+
+    Parameters
+    ----------
+    starts, ends : ndarray, shape (n,)
+        Seconds; ``ends >= starts``.
+    intervals : pd.DataFrame
+        ``start_time`` and ``end_time`` (seconds), closed; any order.
+
+    Returns
+    -------
+    ndarray of bool, shape (n,)
+    """
+    starts = np.asarray(starts, dtype=np.float64)
+    ends = np.asarray(ends, dtype=np.float64)
+    merged = merge_intervals(
+        intervals["start_time"].to_numpy(dtype=np.float64),
+        intervals["end_time"].to_numpy(dtype=np.float64),
+    )
+    if merged.size == 0:
+        return np.zeros(starts.shape, dtype=bool)
+    # the last merged interval starting at or before each end; the merged
+    # intervals are disjoint and sorted, so an earlier one ends earlier still
+    last = np.searchsorted(merged[:, 0], ends, side="right") - 1
+    overlaps: NDArray[np.bool_] = (last >= 0) & (
+        merged[np.maximum(last, 0), 1] >= starts
+    )
+    return overlaps
+
+
+def covered_seconds(
+    starts: NDArray[np.float64], ends: NDArray[np.float64], intervals: pd.DataFrame
+) -> NDArray[np.float64]:
+    """Seconds of each ``[start, end]`` that the intervals cover.
+
+    Overlapping intervals are counted once. Exactly 0.0 where no interval
+    reaches a stretch, so ``span - covered_seconds(...)`` is the span itself
+    when nothing is masked.
+
+    Parameters
+    ----------
+    starts, ends : ndarray, shape (n,)
+        Seconds; ``ends >= starts``.
+    intervals : pd.DataFrame
+        ``start_time`` and ``end_time`` (seconds), closed; any order.
+
+    Returns
+    -------
+    ndarray of float64, shape (n,)
+    """
+    starts = np.asarray(starts, dtype=np.float64)
+    ends = np.asarray(ends, dtype=np.float64)
+    merged = merge_intervals(
+        intervals["start_time"].to_numpy(dtype=np.float64),
+        intervals["end_time"].to_numpy(dtype=np.float64),
+    )
+    if merged.size == 0:
+        return np.zeros(starts.shape, dtype=np.float64)
+    lengths = merged[:, 1] - merged[:, 0]
+    before = np.concatenate([[0.0], np.cumsum(lengths)])
+
+    def _covered_until(time: NDArray[np.float64]) -> NDArray[np.float64]:
+        # masked seconds in (-inf, time]: every interval starting by then, the
+        # last of them only up to `time`
+        n_started = np.searchsorted(merged[:, 0], time, side="right")
+        last = np.maximum(n_started - 1, 0)
+        partial = np.clip(time - merged[last, 0], 0.0, lengths[last])
+        until: NDArray[np.float64] = np.where(
+            n_started > 0, before[last] + partial, 0.0
+        )
+        return until
+
+    covered: NDArray[np.float64] = _covered_until(ends) - _covered_until(starts)
+    return np.where(overlaps_intervals(starts, ends, intervals), covered, 0.0)

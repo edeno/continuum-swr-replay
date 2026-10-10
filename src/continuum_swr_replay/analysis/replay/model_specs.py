@@ -29,7 +29,7 @@ sits next to a specific ``ModelSpec`` stays inline below.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
 # Shared with the covariate builders, which must not import this module: see
@@ -103,6 +103,7 @@ __all__ = [
     "TMAX",
     "TMAX_ARRIVAL",
     "default_content_model_names",
+    "longest_history_window_s",
 ]
 
 
@@ -997,6 +998,42 @@ def _s_specs():
 
 SWR_CONTRAST_RATE_G_SPECS = _g_specs()
 SWR_CONTRAST_RATE_S_SPECS = _s_specs()
+
+
+def longest_history_window_s(
+    rungs: Iterable[PerBinRateModelSpec | tuple[str, list[str]]],
+) -> float:
+    """Seconds the longest history covariate of a per-bin ladder looks back.
+
+    A ladder is fit on one frozen cohort, so its bins are dropped by the
+    window of its longest-reaching rung: a bin whose window touches the
+    artifact mask reads unobserved time (``per_bin_design.aggregate_to_timebins``,
+    ``history_window_s``). A rung's window is its self- or cross-history lags
+    times ``BIN_S``; an is_swr-contrast rung (``(formula, columns)``) reaches
+    back ``N_HISTORY_LAGS`` bins when it carries the self-history basis. The
+    reward-history block reads trial outcomes, not neural time, and adds none.
+
+    Parameters
+    ----------
+    rungs : iterable
+        ``PerBinRateModelSpec`` rungs, or the ``(formula, columns)`` pairs of
+        ``SWR_CONTRAST_RATE_G_SPECS`` / ``SWR_CONTRAST_RATE_S_SPECS``.
+
+    Returns
+    -------
+    float
+        Seconds; 0.0 for a ladder with no history covariate.
+    """
+    n_lags = 0
+    for rung in rungs:
+        if isinstance(rung, PerBinRateModelSpec):
+            n_lags = max(n_lags, rung.self_history_lags, rung.cross_history_lags)
+        else:
+            _, columns = rung
+            if any(str(c).startswith(("hist_rcos_", "onset_lag")) for c in columns):
+                n_lags = max(n_lags, N_HISTORY_LAGS)
+    return n_lags * BIN_S
+
 
 # Covariates that are only defined once the trial's outcome is known. A stop that
 # begins before ``outcome_known_time`` carries no value for them, so the rate

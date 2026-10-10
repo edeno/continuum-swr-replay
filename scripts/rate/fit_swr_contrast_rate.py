@@ -69,6 +69,9 @@ import statsmodels.formula.api as smf  # noqa: E402
 from patsy import PatsyError  # noqa: E402
 from statsmodels.tools.sm_exceptions import PerfectSeparationError  # noqa: E402
 
+from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
+    artifact_intervals_by_session,
+)
 from continuum_swr_replay.analysis.replay import (  # noqa: E402
     BIN_S,
     N_HISTORY_BASIS,
@@ -113,12 +116,13 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
     record_inputs,
     write_fit_provenance,
 )
-from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
+from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402  # noqa: E402
     DESCRIPTIVE_RATE_RUNGS,
     POST_OUTCOME_COHORT,
     POST_OUTCOME_COVARIATES,
     POST_OUTCOME_RATE_RUNGS,
     PRIMARY_COHORT,
+    longest_history_window_s,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     SWR_CONTRAST_RATE_G_SPECS as G_SPECS,
@@ -144,10 +148,14 @@ logger = logging.getLogger(__name__)
 # Audited-aggregation key terms, mirroring the content ladder. G-rungs add one
 # dimension each (fit per population); S-rungs carry the is_swr:<dimension> contrast.
 _G_KEY = {
-    "G0_base": "reward_history_rcos_0", "G1_periswitch": "periswitch_index_trials",
-    "G2_block": "trials_since_block_change", "G3_switchrate": "patch_switch_fraction_last5_completed_trips",
-    "G4_value": "relative_value_switch_minus_stay_preoutcome", "G5_rpe": "rpe_postoutcome",
-    "G6_uncert": "reward_belief_differential_entropy_leaf_mean_preoutcome", "G7_update": "reward_belief_mean_update_l1_all_ports_postoutcome",
+    "G0_base": "reward_history_rcos_0",
+    "G1_periswitch": "periswitch_index_trials",
+    "G2_block": "trials_since_block_change",
+    "G3_switchrate": "patch_switch_fraction_last5_completed_trips",
+    "G4_value": "relative_value_switch_minus_stay_preoutcome",
+    "G5_rpe": "rpe_postoutcome",
+    "G6_uncert": "reward_belief_differential_entropy_leaf_mean_preoutcome",
+    "G7_update": "reward_belief_mean_update_l1_all_ports_postoutcome",
 }
 _S_KEY = {
     "S1_rew": "is_swr:reward_history_rcos_0",
@@ -162,8 +170,12 @@ _S_KEY = {
 # raw fit population -> friendly label shared with the content table
 _POP_LABEL = {"non_local": "all", "non_local_swr": "SWR", "non_local_no_swr": "nonSWR"}
 _RATE_CONT_COVARS = [
-    "periswitch_index_trials", "trials_since_block_change", "patch_switch_fraction_last5_completed_trips",
-    "relative_value_switch_minus_stay_preoutcome", "rpe_postoutcome", "reward_belief_differential_entropy_leaf_mean_preoutcome",
+    "periswitch_index_trials",
+    "trials_since_block_change",
+    "patch_switch_fraction_last5_completed_trips",
+    "relative_value_switch_minus_stay_preoutcome",
+    "rpe_postoutcome",
+    "reward_belief_differential_entropy_leaf_mean_preoutcome",
     "reward_belief_mean_update_l1_all_ports_postoutcome",
 ]
 RC = PROCESSED_DATA_DIR / "replay_content"
@@ -236,7 +248,10 @@ def _fit(
     try:
         with capture_fit_warnings() as caught:
             res = smf.glm(
-                f"count ~ {formula}", data=df, family=sm.families.Poisson(), offset=offset
+                f"count ~ {formula}",
+                data=df,
+                family=sm.families.Poisson(),
+                offset=offset,
             ).fit()
     except _EXPECTED as e:
         return None, type(e).__name__
@@ -262,11 +277,15 @@ def _fit(
         }
     )
     out.update(
-        n_bins=int(res.nobs), n_events=n_events, llf=float(res.llf), aic=float(res.aic),
+        n_bins=int(res.nobs),
+        n_events=n_events,
+        llf=float(res.llf),
+        aic=float(res.aic),
         n_params=int(len(res.params)),
         # distinct stops that contributed >=1 retained bin -- the stop-grain modeled count.
         n_stops=int(df["stop_id"].nunique()),
-        converged=status["converged"], separated=status["separated"],
+        converged=status["converged"],
+        separated=status["separated"],
         # "|"-joined so the tuple survives a round trip through pickle and CSV.
         separated_terms="|".join(status["separated_terms"]),
         n_convergence_warnings=count_fit_quality_warnings(caught),
@@ -346,14 +365,24 @@ def _fit_post_outcome_cohort(
         formula, need = specs[name]
         fit, reason = _fit(frozen, formula, [*need, *tag_cols])
         if fit is not None:
-            rows.append({
-                "population": population, "model": name,
-                "cohort": POST_OUTCOME_COHORT, **base, **fit,
-            })
+            rows.append(
+                {
+                    "population": population,
+                    "model": name,
+                    "cohort": POST_OUTCOME_COHORT,
+                    **base,
+                    **fit,
+                }
+            )
         else:
             key = (name, population, POST_OUTCOME_COHORT, reason)
             skips[key] = skips.get(key, 0) + 1
     return rows, skips, n_stops_dropped
+
+
+# The ladder's longest history window (both ladders share one cohort per
+# stratum), from the one catalog of ladders.
+HISTORY_WINDOW_S = longest_history_window_s([*G_SPECS.values(), *S_SPECS.values()])
 
 
 def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict, dict]:
@@ -378,6 +407,9 @@ def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict, 
     rows: list[dict] = []
     skips: dict = {}  # (model, population, cohort, reason) -> count
     cohort_drops: dict = {}
+    # artifact time is unobserved: its bins, and those whose history (the
+    # ladder's longest window) reaches it, leave every rung
+    artifacts = artifact_intervals_by_session(stops_g)
     designs = {
         pop: aggregate_to_timebins(
             stops_g,
@@ -388,6 +420,8 @@ def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict, 
             self_history_lags=N_HISTORY_LAGS,
             self_history_basis=N_HISTORY_BASIS,
             stop_covariates=STOP_COVARS,
+            artifact_intervals=artifacts,
+            history_window_s=HISTORY_WINDOW_S,
         )
         for pop in STRATA
     }
@@ -400,9 +434,7 @@ def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict, 
     # would cost the whole ladder those stops.
     g_union = _primary_union(G_SPECS)
     for pop in STRATA:
-        frozen, freeze = freeze_per_bin_cohort(
-            designs[pop], (), extra_columns=g_union
-        )
+        frozen, freeze = freeze_per_bin_cohort(designs[pop], (), extra_columns=g_union)
         cohort_drops[pop] = freeze["n_stops_before"] - freeze["n_stops_after"]
         designs[pop] = frozen
     base = dict(zip(SESSION_COLUMNS, keys, strict=True))
@@ -413,10 +445,15 @@ def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict, 
                 continue
             fit, reason = _fit(designs[pop], formula, need)
             if fit is not None:
-                rows.append({
-                    "population": pop, "model": name,
-                    "cohort": PRIMARY_COHORT, **base, **fit,
-                })
+                rows.append(
+                    {
+                        "population": pop,
+                        "model": name,
+                        "cohort": PRIMARY_COHORT,
+                        **base,
+                        **fit,
+                    }
+                )
             else:
                 key = (name, pop, PRIMARY_COHORT, reason)
                 skips[key] = skips.get(key, 0) + 1
@@ -441,18 +478,21 @@ def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict, 
     stacked, s_freeze = freeze_per_bin_cohort(
         stacked, (), extra_columns=[*s_union, "is_swr"]
     )
-    cohort_drops["contrast"] = (
-        s_freeze["n_stops_before"] - s_freeze["n_stops_after"]
-    )
+    cohort_drops["contrast"] = s_freeze["n_stops_before"] - s_freeze["n_stops_after"]
     for name, (formula, need) in S_SPECS.items():
         if name in POST_OUTCOME_RATE_RUNGS:
             continue
         fit, reason = _fit(stacked, formula, [*need, "is_swr"])
         if fit is not None:
-            rows.append({
-                "population": "contrast", "model": name,
-                "cohort": PRIMARY_COHORT, **base, **fit,
-            })
+            rows.append(
+                {
+                    "population": "contrast",
+                    "model": name,
+                    "cohort": PRIMARY_COHORT,
+                    **base,
+                    **fit,
+                }
+            )
         else:
             key = (name, "contrast", PRIMARY_COHORT, reason)
             skips[key] = skips.get(key, 0) + 1
@@ -668,12 +708,8 @@ def _cohort_records(
     union_by_ladder = {
         ("G", PRIMARY_COHORT): _primary_union(G_SPECS),
         ("S", PRIMARY_COHORT): _primary_union(S_SPECS),
-        ("G", POST_OUTCOME_COHORT): [
-            c for _f, need in G_SPECS.values() for c in need
-        ],
-        ("S", POST_OUTCOME_COHORT): [
-            c for _f, need in S_SPECS.values() for c in need
-        ],
+        ("G", POST_OUTCOME_COHORT): [c for _f, need in G_SPECS.values() for c in need],
+        ("S", POST_OUTCOME_COHORT): [c for _f, need in S_SPECS.values() for c in need],
     }
     union_missing = {
         key: stop_own_missing(
@@ -688,13 +724,9 @@ def _cohort_records(
     pairs = [(m, p, PRIMARY_COHORT) for m in primary_g for p in STRATA]
     pairs += [(m, "contrast", PRIMARY_COHORT) for m in primary_s]
     pairs += [
-        (m, p, POST_OUTCOME_COHORT)
-        for m in (*post_g, LADDER_NULL["G"])
-        for p in STRATA
+        (m, p, POST_OUTCOME_COHORT) for m in (*post_g, LADDER_NULL["G"]) for p in STRATA
     ]
-    pairs += [
-        (m, "contrast", POST_OUTCOME_COHORT) for m in (*post_s, LADDER_NULL["S"])
-    ]
+    pairs += [(m, "contrast", POST_OUTCOME_COHORT) for m in (*post_s, LADDER_NULL["S"])]
     records = []
     for name, pop, cohort in pairs:
         sub = (
@@ -703,7 +735,8 @@ def _cohort_records(
                 & (models.population == pop)
                 & (models.cohort == cohort)
             ]
-            if len(models) else models
+            if len(models)
+            else models
         )
         fit_keys = (
             {tuple(r) for r in sub[list(SESSION_COLUMNS)].to_numpy()}
@@ -717,9 +750,7 @@ def _cohort_records(
         ladder = "S" if pop == "contrast" else "G"
         n_common = int((union_missing[(ladder, cohort)] & ~own_missing).sum())
         n_frozen_out = int(
-            frozen_drops.get(
-                pop if cohort == PRIMARY_COHORT else (pop, cohort), 0
-            )
+            frozen_drops.get(pop if cohort == PRIMARY_COHORT else (pop, cohort), 0)
         )
         if n_frozen_out > n_own + n_common:
             raise AssertionError(
@@ -730,28 +761,35 @@ def _cohort_records(
         cohort_mode = (
             "common" if cohort == PRIMARY_COHORT else f"common_{POST_OUTCOME_COHORT}"
         )
-        records.append(cohort_record(
-            name, _POP_LABEL.get(pop, pop), "stop", cohort_mode=cohort_mode,
-            n_in=total + int(n_qvals_dropped), n_modeled=n_modeled,
-            sessions_in=n_sessions_in, sessions_modeled=len(fit_keys),
-            animals_modeled=len({k[0] for k in fit_keys}),
-            drop_notes=(
-                "qvals-join drop -> qvals_gap (mechanism B); immobility<=0 / NaN "
-                "own stop-level predictor -> own; NaN only in another rung's "
-                "column of this cohort's union -> common; bin-level + session "
-                "gates -> excluded"
-            ),
-            n_drop_qvals_gap=int(n_qvals_dropped),
-            n_drop_own_predictor_missing=n_own,
-            n_drop_common_cohort_other=n_common,
-            n_excluded_session=total - n_own - n_common - n_modeled,
-            n_sessions_flagged_nonconverged=(
-                int((sub["converged"] == False).sum()) if "converged" in sub else 0  # noqa: E712
-            ),
-            n_sessions_flagged_separated=(
-                int((sub["separated"] == True).sum()) if "separated" in sub else 0  # noqa: E712
-            ),
-        ))
+        records.append(
+            cohort_record(
+                name,
+                _POP_LABEL.get(pop, pop),
+                "stop",
+                cohort_mode=cohort_mode,
+                n_in=total + int(n_qvals_dropped),
+                n_modeled=n_modeled,
+                sessions_in=n_sessions_in,
+                sessions_modeled=len(fit_keys),
+                animals_modeled=len({k[0] for k in fit_keys}),
+                drop_notes=(
+                    "qvals-join drop -> qvals_gap (mechanism B); immobility<=0 / NaN "
+                    "own stop-level predictor -> own; NaN only in another rung's "
+                    "column of this cohort's union -> common; bin-level + session "
+                    "gates -> excluded"
+                ),
+                n_drop_qvals_gap=int(n_qvals_dropped),
+                n_drop_own_predictor_missing=n_own,
+                n_drop_common_cohort_other=n_common,
+                n_excluded_session=total - n_own - n_common - n_modeled,
+                n_sessions_flagged_nonconverged=(
+                    int((sub["converged"] == False).sum()) if "converged" in sub else 0  # noqa: E712
+                ),
+                n_sessions_flagged_separated=(
+                    int((sub["separated"] == True).sum()) if "separated" in sub else 0  # noqa: E712
+                ),
+            )
+        )
     return records
 
 
@@ -1066,7 +1104,10 @@ def main() -> None:
     # alignment). A NEW leaky covariate on an undeclared rung fails here. S-rungs carry
     # is_swr as a gating modifier (a SAFE_MODIFIER), so asserting `need` covers the
     # is_swr:<covariate> expansion.
-    for specs, descr in ((G_SPECS, DESCRIPTIVE_RATE_RUNGS), (S_SPECS, DESCRIPTIVE_RATE_RUNGS)):
+    for specs, descr in (
+        (G_SPECS, DESCRIPTIVE_RATE_RUNGS),
+        (S_SPECS, DESCRIPTIVE_RATE_RUNGS),
+    ):
         for name, (_formula, need) in specs.items():
             assert_predictor_timing(need, descriptive=(name in descr))
 

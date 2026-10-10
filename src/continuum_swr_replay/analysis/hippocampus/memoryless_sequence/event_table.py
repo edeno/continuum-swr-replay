@@ -10,7 +10,11 @@ replay criteria, as the reference tests every such candidate, so
 ``shuffle_pass`` alone selects the published replay definition, and
 ``shuffle_pass & whole_event_speed_eligible`` selects this project's cohort,
 whose immobility rule is stricter than the reference's per-window gate. A
-candidate that was not shuffled has ``n_shuffles == 0``.
+candidate that was not shuffled has ``n_shuffles == 0``. A fourth column,
+``artifact_drop_reason``, applies the project's one eligibility rule
+(``event_eligibility``) to the artifact mask: a candidate sharing time with it
+(``"artifact"``) or within ``DECODER_REACH_S`` of it (``"decoder_reach"``, the
+decoder's reach) is in no cohort; it is None for every other candidate.
 
 Three columns average three different window sets, each right for its
 purpose: ``n_windows`` counts every window of the span, merged gaps included;
@@ -47,6 +51,10 @@ from numpy.typing import NDArray
 
 from continuum_swr_replay.analysis.hippocampus.event_detection import (
     classify_swr_overlap_geometry,
+)
+from continuum_swr_replay.analysis.hippocampus.event_eligibility import (
+    DECODER_REACH_S,
+    artifact_drop_reasons,
 )
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     event_speeds_are_immobile,
@@ -143,6 +151,8 @@ MEMORYLESS_EVENT_TABLE_DTYPES: Mapping[str, object] = MappingProxyType(
         "shuffle_testable": np.bool_,
         "shuffle_pass": np.bool_,
         "n_shuffles": np.int64,
+        # the artifact mask: "artifact", "decoder_reach" or None (kept)
+        "artifact_drop_reason": object,
     }
 )
 """Every column, in order, with the dtype it always has, even when empty."""
@@ -496,6 +506,7 @@ def build_memoryless_event_table(
     swr_observed_intervals: NDArray | None,
     swr_definition: str,
     shuffle_results: Mapping[int, ShuffleResult] | None,
+    artifact_intervals: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """One row per candidate sequence, in time order.
 
@@ -525,6 +536,11 @@ def build_memoryless_event_table(
         Keyed by candidate index. Must cover exactly the candidates that meet
         both replay criteria, as :func:`shuffle_eligible` returns them. None
         when the shuffle was not run.
+    artifact_intervals : DataFrame or None
+        The epoch's artifact mask (``swr_source.artifact_intervals``):
+        ``start_time`` and ``end_time``, closed. Each candidate's
+        ``artifact_drop_reason`` is read from its ``[event_start_s,
+        event_end_s]`` with the decoder's reach. None masks nothing.
 
     Returns
     -------
@@ -585,6 +601,13 @@ def build_memoryless_event_table(
         ],
         **_swr_columns(starts, ends, swr_intervals, swr_observed_intervals),
         **shuffle,
+        "artifact_drop_reason": (
+            np.full(n, None, dtype=object)
+            if artifact_intervals is None
+            else artifact_drop_reasons(
+                starts, ends, artifact_intervals, reach_s=DECODER_REACH_S
+            )
+        ),
     }
     table = pd.DataFrame(columns)[list(MEMORYLESS_EVENT_TABLE_DTYPES)].astype(
         dict(MEMORYLESS_EVENT_TABLE_DTYPES)

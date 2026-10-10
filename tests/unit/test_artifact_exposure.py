@@ -1,0 +1,507 @@
+"""Every rate denominator loses the artifact mask's time.
+
+Artifact time is unobserved, so it is no one's exposure:
+
+- a stop's immobility exposure (Family A's offset, the ContFrag stop table's
+  too) falls by exactly the masked seconds inside the stop, and nothing else
+  about the stop changes;
+- a per-bin row that touches the mask is dropped (the dense stop-timebin
+  table, Family B's design, the PFC fit bins), and so is one whose history or
+  peri-event window reaches it;
+- with no artifact run configured, every one of these is what it was.
+
+Offline: the artifact run is written under ``tmp_path`` and the source pointed
+at it, as ``test_swr_source.py`` does.
+"""
+
+from __future__ import annotations
+
+import networkx as nx
+import numpy as np
+import pandas as pd
+import pytest
+
+from continuum_swr_replay.analysis.contfrag.tables import build_contfrag_stop_table
+from continuum_swr_replay.analysis.hippocampus import swr_source
+from continuum_swr_replay.analysis.pfc.glm import build_session_fit_mask
+from continuum_swr_replay.analysis.replay.model_specs import (
+    BIN_S,
+    MODEL_PER_BIN_RATE,
+    N_HISTORY_LAGS,
+    SWR_CONTRAST_RATE_G_SPECS,
+    SWR_CONTRAST_RATE_S_SPECS,
+    longest_history_window_s,
+)
+from continuum_swr_replay.analysis.replay.per_bin_design import aggregate_to_timebins
+from continuum_swr_replay.analysis.replay.tables_stop import build_stop_table
+from continuum_swr_replay.analysis.replay.timebin_tables import (
+    build_stop_timebin_table,
+)
+from tests.unit._port_experience_fixtures import port_experiences_from_trials
+from tests.unit._swr_inventory_fixtures import write_artifact_run
+
+EPOCH_ID = "m20200101_02_r1_HPC"
+TIME = np.round(np.arange(0.0, 20.0, 0.002), 6)
+"""A 500 Hz grid, 0-19.998 s."""
+CORES = [("S", 3.0, 4.0), ("spk", 15.95, 15.95)]
+"""An S block padded by 1 s, [2.0, 5.0], and a spike-only line padded by
+0.1 s, [15.85, 16.05], which straddles the second bout's start at 16.0."""
+MASK = [(2.0, 5.0), (15.85, 16.05)]
+
+
+def _speed() -> np.ndarray:
+    speed = np.zeros(TIME.size)
+    speed[(TIME > 10.0) & (TIME < 16.0)] = 10.0  # bouts [0, 10] and [16, 19.998]
+    return speed
+
+
+def _dot() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "animal": "m",
+            "day": 20200101,
+            "epoch": "02_r1",
+            "head_speed": _speed(),
+            "Non-Local_Continuous_prob": 0.0,
+            "Non-Local_Fragmented_prob": 0.0,
+            "Continuous_prob": 0.5,
+            "Fragmented_prob": 0.5,
+            "non_local_event": 0,
+            "SWR_event": 0,
+            "MUA_event": 0,
+            "track_segment_id": np.nan,
+            "map_estimate": np.nan,
+        },
+        index=pd.Index(TIME, name="time"),
+    )
+
+
+def _graph() -> nx.Graph:
+    graph = nx.Graph()
+    graph.add_node(0, pos=(0.0, 0.0))
+    graph.add_node(1, pos=(1.0, 0.0))
+    graph.add_edge(0, 1, edge_id=0, distance=1.0)
+    return graph
+
+
+def _trials() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "start_time": [11.0],
+            "end_time": [15.0],
+            "from_well": [1],
+            "to_well": [0],
+            "is_reward": [True],
+            "is_patch_change": [False],
+        }
+    )
+
+
+@pytest.fixture
+def masked(tmp_path, monkeypatch):
+    """The source's artifact run holds CORES for the test epoch."""
+    directory = write_artifact_run(tmp_path / "artifacts", {EPOCH_ID: CORES})
+    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_ROOT", directory.parent)
+    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
+    np.testing.assert_allclose(swr_source.artifact_intervals(EPOCH_ID).to_numpy(), MASK)
+
+
+def _stop_tables() -> dict[str, pd.DataFrame]:
+    trials = _trials()
+    experiences = port_experiences_from_trials(trials, prepend_initial=True)
+    return {
+        "nonlocal": build_stop_table(_dot(), trials, experiences, _graph()),
+        "contfrag": build_contfrag_stop_table(_dot(), trials, experiences, _graph()),
+    }
+
+
+class TestStopExposure:
+    @pytest.mark.parametrize("table", ["nonlocal", "contfrag"])
+    def test_falls_by_exactly_the_masked_time_inside_the_stop(self, masked, table):
+        stops = _stop_tables()[table]
+
+        assert stops["stop_start"].tolist() == [0.0, 16.0]
+        span = (stops["stop_end"] - stops["stop_start"]).to_numpy()
+        # 3 s of [2, 5] in the first stop; [16.0, 16.05] of the line in the
+        # second (its part before 16.0 is not the stop's)
+        np.testing.assert_allclose(
+            span - stops["immobility_duration_s"].to_numpy(), [3.0, 0.05]
+        )
+
+    @pytest.mark.parametrize("table", ["nonlocal", "contfrag"])
+    def test_nothing_else_about_the_stop_changes(self, tmp_path, monkeypatch, table):
+        unmasked = _stop_tables()[table]
+        directory = write_artifact_run(tmp_path / "artifacts", {EPOCH_ID: CORES})
+        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_ROOT", directory.parent)
+        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
+
+        masked_stops = _stop_tables()[table]
+
+        pd.testing.assert_frame_equal(
+            masked_stops.drop(columns="immobility_duration_s"),
+            unmasked.drop(columns="immobility_duration_s"),
+        )
+
+    @pytest.mark.parametrize("table", ["nonlocal", "contfrag"])
+    def test_with_no_artifact_run_it_is_the_stops_span(self, table):
+        stops = _stop_tables()[table]
+
+        np.testing.assert_array_equal(
+            stops["immobility_duration_s"].to_numpy(),
+            (stops["stop_end"] - stops["stop_start"]).to_numpy(),
+        )
+
+
+class TestTheDenseTimebinTable:
+    def test_a_bin_touching_the_mask_is_dropped(self, masked):
+        out = build_stop_timebin_table(_dot(), np.array([]), bin_s=0.5)
+
+        # bin k of the first stop is [0.5 k, 0.5 k + 0.5]: those touching
+        # [2, 5] (k = 3..10) are gone, and only those; of the second stop's
+        # bins [16 + 0.5 k, ...], the first touches [15.85, 16.05]
+        by_stop = out.groupby("stop_id", sort=False)["bin_in_stop"].apply(list)
+        assert by_stop.tolist() == [
+            [0, 1, 2, *range(11, 20)],
+            list(range(1, 8)),
+        ]
+
+    def test_with_no_artifact_run_it_is_unchanged(self, masked, monkeypatch):
+        masked_bins = build_stop_timebin_table(_dot(), np.array([]), bin_s=0.5)
+        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", None)
+
+        unmasked = build_stop_timebin_table(_dot(), np.array([]), bin_s=0.5)
+
+        assert len(unmasked) == 20 + 8
+        kept = unmasked.merge(
+            masked_bins[["stop_id", "bin_in_stop"]], on=["stop_id", "bin_in_stop"]
+        )
+        pd.testing.assert_frame_equal(
+            kept.reset_index(drop=True), masked_bins.reset_index(drop=True)
+        )
+
+
+def _design_inputs() -> tuple[pd.DataFrame, pd.DataFrame]:
+    stops = pd.DataFrame(
+        {
+            "animal": "m",
+            "session_date": 20200101,
+            "epoch": "02_r1",
+            "stop_id": [11, 12],
+            "stop_start": [0.0, 16.0],
+            "stop_end": [10.0, 19.998],
+            # Family A's exposure, the span less the mask
+            "immobility_duration_s": [7.0, 3.948],
+        }
+    )
+    onsets = pd.DataFrame(
+        {"stop_id": [11, 11, 11, 12], "t_since_stop_onset": [1.0, 5.6, 8.0, 2.0]}
+    )
+    return stops, onsets
+
+
+def _mask_by_session() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "animal": "m",
+            "session_date": 20200101,
+            "epoch": "02_r1",
+            "start_time": [s for s, _ in MASK],
+            "end_time": [e for _, e in MASK],
+        }
+    )
+
+
+class TestFamilyBDesign:
+    def test_the_longest_history_window_comes_from_the_ladder(self):
+        assert longest_history_window_s(MODEL_PER_BIN_RATE.values()) == pytest.approx(
+            N_HISTORY_LAGS * BIN_S
+        )
+        assert longest_history_window_s(
+            [*SWR_CONTRAST_RATE_G_SPECS.values(), *SWR_CONTRAST_RATE_S_SPECS.values()]
+        ) == pytest.approx(N_HISTORY_LAGS * BIN_S)
+
+    def test_bins_are_built_over_the_stops_whole_span(self):
+        """The bins' clock is the bout's: Family A's shorter exposure must not
+        cut the last bins off."""
+        stops, onsets = _design_inputs()
+
+        design = aggregate_to_timebins(stops, onsets, bin_s=0.5, tmax=20.0)
+
+        assert design.loc[design["stop_id"] == 11, "binj"].max() == 19
+        assert design["count"].sum() == 4
+
+    def test_bins_in_the_mask_and_after_it_by_the_history_window_are_dropped(self):
+        stops, onsets = _design_inputs()
+        full = aggregate_to_timebins(stops, onsets, bin_s=0.5, tmax=20.0)
+
+        design = aggregate_to_timebins(
+            stops,
+            onsets,
+            bin_s=0.5,
+            tmax=20.0,
+            artifact_intervals=_mask_by_session(),
+            history_window_s=1.0,
+        )
+
+        first = design.loc[design["stop_id"] == 11, "binj"].tolist()
+        # [1.5, 2] touches the mask's start, [5, 5.5] its end; [5.5, 6] and
+        # [6, 6.5] look back into it within 1 s; [6.5, 7] does not
+        assert first == [0, 1, 2, *range(13, 20)]
+        # the second stop's first bin [16, 16.5] touches [15.85, 16.05], and the
+        # next two look back at it; its history starts at the stop's start
+        second = design.loc[design["stop_id"] == 12, "binj"].tolist()
+        assert second == list(range(3, 8))
+        # the onset at 5.6 s fell in a dropped bin; the others are counted
+        assert design["count"].sum() == 3
+        assert design.attrs["n_bins_artifact"] == 8 + 1
+        assert design.attrs["n_bins_artifact_history"] == 2 + 2
+        assert design.attrs["n_onsets_in_artifact_bins"] == 1
+        # a kept row is the row of the design without the mask
+        kept = full.merge(design[["stop_id", "binj"]], on=["stop_id", "binj"])
+        pd.testing.assert_frame_equal(
+            kept.reset_index(drop=True), design.reset_index(drop=True)
+        )
+
+    def test_history_is_computed_before_the_drop(self):
+        """A kept bin's lags are its own past bins', never a dropped bin's
+        shifted into place."""
+        stops, onsets = _design_inputs()
+        full = aggregate_to_timebins(
+            stops, onsets, bin_s=0.5, tmax=20.0, self_history_lags=2
+        )
+
+        design = aggregate_to_timebins(
+            stops,
+            onsets,
+            bin_s=0.5,
+            tmax=20.0,
+            self_history_lags=2,
+            artifact_intervals=_mask_by_session(),
+            history_window_s=1.0,
+        )
+
+        merged = design.merge(full, on=["stop_id", "binj"], suffixes=("", "_full"))
+        np.testing.assert_array_equal(merged["onset_lag1"], merged["onset_lag1_full"])
+        np.testing.assert_array_equal(merged["onset_lag2"], merged["onset_lag2_full"])
+
+    def test_no_intervals_change_nothing(self):
+        stops, onsets = _design_inputs()
+        empty = _mask_by_session().iloc[0:0]
+
+        full = aggregate_to_timebins(stops, onsets, bin_s=0.5, tmax=20.0)
+        design = aggregate_to_timebins(
+            stops,
+            onsets,
+            bin_s=0.5,
+            tmax=20.0,
+            artifact_intervals=empty,
+            history_window_s=1.0,
+        )
+
+        pd.testing.assert_frame_equal(design, full)
+
+
+class TestPfcFitBins:
+    def _position(self) -> pd.DataFrame:
+        return pd.DataFrame({"head_speed": _speed()}, index=pd.Index(TIME, name="time"))
+
+    def test_bins_whose_peri_event_window_reaches_the_mask_are_not_fit(self):
+        artifacts = pd.DataFrame({"start_time": [2.0], "end_time": [5.0]})
+
+        is_immobile, fit_mask, counts = build_session_fit_mask(
+            self._position(),
+            stop_cohort="all_stops",
+            artifact_intervals=artifacts,
+            artifact_reach_s=0.25,
+        )
+
+        reach = (TIME >= 1.75) & (TIME <= 5.25)
+        np.testing.assert_array_equal(
+            fit_mask.to_numpy(), is_immobile.to_numpy() & ~reach
+        )
+        # immobility itself is not redefined by the mask
+        np.testing.assert_array_equal(is_immobile.to_numpy(), _speed() < 4.0)
+        assert counts["n_bins_fit"] == int(fit_mask.sum())
+
+    def test_no_intervals_change_nothing(self):
+        before = build_session_fit_mask(self._position(), stop_cohort="all_stops")
+        after = build_session_fit_mask(
+            self._position(),
+            stop_cohort="all_stops",
+            artifact_intervals=pd.DataFrame(
+                {"start_time": [], "end_time": []}, dtype=float
+            ),
+            artifact_reach_s=0.25,
+        )
+
+        pd.testing.assert_series_equal(after[1], before[1])
+        assert after[2] == before[2]
+
+
+def test_every_rate_fit_drops_the_masked_bins():
+    """Each runner that builds a per-bin design gives it the mask and its
+    ladder's history window (``**common`` counts when that dict holds both)."""
+    import ast
+    from pathlib import Path
+
+    rate = Path(__file__).resolve().parents[2] / "scripts" / "rate"
+    offenders, n_calls = [], 0
+    for path in sorted(rate.glob("fit_*.py")):
+        text = path.read_text()
+        for node in ast.walk(ast.parse(text)):
+            if not (
+                isinstance(node, ast.Call)
+                and getattr(node.func, "id", None) == "aggregate_to_timebins"
+            ):
+                continue
+            n_calls += 1
+            names = {keyword.arg for keyword in node.keywords}
+            spread = None in names and '"artifact_intervals":' in text
+            if not ({"artifact_intervals", "history_window_s"} <= names or spread):
+                offenders.append(f"{path.name}:{node.lineno}")
+    assert n_calls >= 5
+    assert offenders == []
+
+
+class TestPeriEventWindows:
+    """A triggered window that touches the mask is dropped whole."""
+
+    def _windows(self):
+        from continuum_swr_replay.analysis.hippocampus.triggered_analysis import (
+            get_signal_windows,
+        )
+
+        data = _dot().assign(signal=1.0)
+        events = pd.DataFrame(
+            {
+                "animal": "m",
+                "day": 20200101,
+                "epoch": "02_r1",
+                # windows of +-0.5 s: [0.5, 1.5] clear, [1.4, 2.4] touches [2, 5],
+                # [5.4, 6.4] clear, [15.3, 16.3] reaches [15.85, 16.05]
+                "start_time": [1.0, 1.9, 5.9, 15.8],
+                "event_number": [1, 2, 3, 4],
+            }
+        )
+        return get_signal_windows(
+            data, events, ["signal"], window_sec=1.0, event_id_col="event_number"
+        )
+
+    def test_a_window_touching_the_mask_is_dropped(self, masked):
+        windows = self._windows()
+
+        numbers = windows.indexes["event"].get_level_values("event_number")
+        assert numbers.tolist() == [1, 3]
+
+    def test_with_no_artifact_run_every_window_is_kept(self):
+        windows = self._windows()
+
+        assert windows.sizes["event"] == 4
+
+
+class TestNoArtifactsChangeNothing:
+    """With no artifact run configured, and with a run that has no cores for
+    the epoch, every output of the chain is the same, value for value: the
+    source's frame, the classified event table, the stop table, the onset and
+    dense timebin tables, and Family B's design."""
+
+    @staticmethod
+    def _outputs(tmp_path) -> dict[str, pd.DataFrame]:
+        from continuum_swr_replay.analysis.hippocampus.event_table import (
+            build_classified_nonlocal_event_table,
+        )
+        from continuum_swr_replay.analysis.replay.timebin_tables import (
+            build_event_onset_table,
+        )
+
+        dot = _dot()
+        labels = np.zeros(TIME.size, dtype=np.int64)
+        for number, (start, end) in enumerate(
+            [(1.0, 1.1), (1.95, 2.05), (5.2, 5.3), (8.0, 8.1), (16.1, 16.2)], 1
+        ):
+            labels[(TIME >= start) & (TIME <= end)] = number
+        dot["non_local_event"] = labels
+        dot["MUA_event"] = np.select(
+            [(TIME >= 4.0) & (TIME <= 4.05), (TIME >= 6.0) & (TIME <= 6.05)], [1, 2], 0
+        )
+        dot["Non-Local_Continuous_prob"] = np.where(labels > 0, 0.9, 0.0)
+        read = swr_source.with_swr_source(dot)
+        trials = _trials()
+        experiences = port_experiences_from_trials(trials, prepend_initial=True)
+        stops = build_stop_table(read, trials, experiences, _graph())
+        onsets = build_event_onset_table(read, np.array([1.0]))
+        return {
+            "frame": read,
+            "events": build_classified_nonlocal_event_table(read),
+            "stops": stops,
+            "onsets": onsets,
+            "timebins": build_stop_timebin_table(read, np.array([1.0]), bin_s=0.5),
+            "design": aggregate_to_timebins(
+                stops,
+                onsets[onsets.event_type == "non_local"].dropna(subset=["stop_id"]),
+                bin_s=0.5,
+                tmax=20.0,
+                artifact_intervals=swr_source.artifact_intervals_by_session(stops),
+                history_window_s=1.0,
+            ),
+        }
+
+    def test_every_output_is_the_same(self, tmp_path, monkeypatch):
+        from tests.unit._swr_inventory_fixtures import (
+            use_swr_source,
+            write_swr_inventory,
+        )
+
+        inventory = write_swr_inventory(
+            tmp_path / "swr", {EPOCH_ID: [(1.0, 1.05), (3.0, 3.05), (7.0, 7.05)]}
+        )
+        use_swr_source(monkeypatch, inventory)
+        unconfigured = self._outputs(tmp_path)
+        empty = write_artifact_run(tmp_path / "artifacts", {EPOCH_ID: []})
+        use_swr_source(monkeypatch, inventory, empty)
+
+        configured = self._outputs(tmp_path)
+
+        assert len(unconfigured["events"]) == 5
+        for name, frame in unconfigured.items():
+            pd.testing.assert_frame_equal(configured[name], frame, check_exact=True)
+
+    def test_an_event_the_mask_reaches_leaves_every_cohort(self, tmp_path, monkeypatch):
+        """Non-local 2 overlaps [2, 5], non-local 3 starts 0.2 s after it and
+        non-local 5 0.05 s after [15.85, 16.05]: the decoder's reach. SWR 2 and
+        MUA 1 overlap [2, 5]; MUA 2, a second after it, stays (a detector's event
+        has no reach)."""
+        from tests.unit._swr_inventory_fixtures import (
+            use_swr_source,
+            write_swr_inventory,
+        )
+
+        inventory = write_swr_inventory(
+            tmp_path / "swr", {EPOCH_ID: [(1.0, 1.05), (3.0, 3.05), (7.0, 7.05)]}
+        )
+        use_swr_source(monkeypatch, inventory)
+        before = self._outputs(tmp_path)
+        artifacts = write_artifact_run(tmp_path / "artifacts", {EPOCH_ID: CORES})
+        use_swr_source(monkeypatch, inventory, artifacts)
+
+        after = self._outputs(tmp_path)
+
+        assert before["events"]["non_local_event"].tolist() == [1, 2, 3, 4, 5]
+        assert after["events"]["non_local_event"].tolist() == [1, 4]
+        # the kept events are the same events, with the same event_id
+        kept = before["events"].set_index("non_local_event").loc[[1, 4]]
+        np.testing.assert_array_equal(
+            after["events"]["event_id"], kept["event_id"].to_numpy()
+        )
+        assert sorted(set(after["frame"]["SWR_event"]) - {0}) == [1, 3]
+        assert sorted(set(after["frame"]["MUA_event"]) - {0}) == [2]
+        # non-local 1 and 4, SWR 1 and 3 and MUA 2 all lie in the first stop
+        assert after["stops"]["n_selected_events"].tolist() == [2, 0]
+        assert before["stops"]["n_selected_events"].tolist() == [4, 1]
+        assert after["stops"]["n_swr_events"].tolist() == [2, 0]
+        assert before["stops"]["n_swr_events"].tolist() == [3, 0]
+        assert after["stops"]["n_mua_events"].tolist() == [1, 0]
+        assert before["stops"]["n_mua_events"].tolist() == [2, 0]
+        counts = after["onsets"].groupby("event_type").size().to_dict()
+        assert counts == {"MUA": 1, "SWR": 2, "non_local": 2}
+        assert after["design"]["count"].sum() == 2

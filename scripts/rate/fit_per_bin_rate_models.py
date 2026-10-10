@@ -65,6 +65,9 @@ from concurrent.futures import ProcessPoolExecutor, as_completed  # noqa: E402
 
 import pandas as pd  # noqa: E402
 
+from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
+    artifact_intervals_by_session,
+)
 from continuum_swr_replay.analysis.replay import (  # noqa: E402
     ARRIVAL_CLOCK_COLUMN,
     BIN_S,
@@ -103,6 +106,9 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
     record_inputs,
     write_fit_provenance,
 )
+from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
+    longest_history_window_s,
+)
 from continuum_swr_replay.analysis.replay.per_bin_rate_model import (  # noqa: E402
     _design_columns,
 )
@@ -129,6 +135,11 @@ FIT_INPUTS = {
     "event_onset_table": RC / "event_onset_table.pkl",
     "event_table": RC / "event_table.pkl",
 }
+
+# The ladder is fit on one frozen cohort, so its bins are dropped by its
+# longest-reaching history window: a bin whose window touches the artifact
+# mask reads unobserved time.
+HISTORY_WINDOW_S = longest_history_window_s(MODEL_PER_BIN_RATE.values())
 
 
 def _fit_one_session(
@@ -164,6 +175,9 @@ def _fit_one_session(
     has_arrival_rungs = any(
         spec.time_clock == "arrival" for spec in MODEL_PER_BIN_RATE.values()
     )
+    # artifact time is unobserved: its bins, and those whose history reaches
+    # it, leave every rung
+    artifacts = artifact_intervals_by_session(stops_g)
     for outcome, selector in POPULATIONS.items():
         design = aggregate_to_timebins(
             stops_g,
@@ -174,7 +188,21 @@ def _fit_one_session(
             self_history_lags=N_HISTORY_LAGS,
             self_history_basis=N_HISTORY_BASIS,
             stop_covariates=STOP_COVARIATES,
+            artifact_intervals=artifacts,
+            history_window_s=HISTORY_WINDOW_S,
         )
+        if design.attrs.get("n_bins_artifact") or design.attrs.get(
+            "n_bins_artifact_history"
+        ):
+            logger.info(
+                "  %s/%s: the artifact mask dropped %d bins and %d more by "
+                "their %.3f s history window",
+                "_".join(map(str, keys)),
+                outcome,
+                design.attrs["n_bins_artifact"],
+                design.attrs["n_bins_artifact_history"],
+                HISTORY_WINDOW_S,
+            )
         # ONE cohort for the whole ladder, frozen before the first fit.
         frozen, freeze = freeze_per_bin_cohort(design, MODEL_PER_BIN_RATE.values())
         n_dropped = freeze["n_stops_before"] - freeze["n_stops_after"]
@@ -442,7 +470,8 @@ def _cohort_records(
         for outcome in POPULATIONS:
             sub = (
                 models[(models.model == name) & (models.outcome == outcome)]
-                if len(models) else models
+                if len(models)
+                else models
             )
             fit_keys = (
                 {tuple(r) for r in sub[list(SESSION_COLUMNS)].to_numpy()}
@@ -457,34 +486,43 @@ def _cohort_records(
                     f"stops but the stop-level attribution only accounts for "
                     f"{n_own + n_common} (own {n_own} + common {n_common})"
                 )
-            recs.append(cohort_record(
-                name, outcome, "stop", cohort_mode="common",
-                n_in=total, n_modeled=n_modeled,
-                sessions_in=n_sessions_in, sessions_modeled=len(fit_keys),
-                animals_modeled=len({k[0] for k in fit_keys}),
-                drop_notes=(
-                    "immobility<=0 / NaN own stop-level predictor -> own; "
-                    "NaN only in another rung's column (frozen cohort) -> common; "
-                    "min_bins/min_events/reward-contrast gates + bin-level -> excluded"
-                    + (
-                        "; a stop whose every bin is past the arrival window is "
-                        "excluded too"
-                        if spec.time_clock == "arrival"
-                        else ""
-                    )
-                ),
-                n_drop_own_predictor_missing=n_own,
-                n_drop_common_cohort_other=n_common,
-                n_excluded_session=total - n_own - n_common - n_modeled,
-                n_sessions_flagged_nonconverged=(
-                    int((sub["converged"] == False).sum())  # noqa: E712
-                    if "converged" in sub else 0
-                ),
-                n_sessions_flagged_separated=(
-                    int((sub["separated"] == True).sum())  # noqa: E712
-                    if "separated" in sub else 0
-                ),
-            ))
+            recs.append(
+                cohort_record(
+                    name,
+                    outcome,
+                    "stop",
+                    cohort_mode="common",
+                    n_in=total,
+                    n_modeled=n_modeled,
+                    sessions_in=n_sessions_in,
+                    sessions_modeled=len(fit_keys),
+                    animals_modeled=len({k[0] for k in fit_keys}),
+                    drop_notes=(
+                        "immobility<=0 / NaN own stop-level predictor -> own; "
+                        "NaN only in another rung's column (frozen cohort) -> common; "
+                        "min_bins/min_events/reward-contrast gates + bin-level -> excluded"
+                        + (
+                            "; a stop whose every bin is past the arrival window is "
+                            "excluded too"
+                            if spec.time_clock == "arrival"
+                            else ""
+                        )
+                    ),
+                    n_drop_own_predictor_missing=n_own,
+                    n_drop_common_cohort_other=n_common,
+                    n_excluded_session=total - n_own - n_common - n_modeled,
+                    n_sessions_flagged_nonconverged=(
+                        int((sub["converged"] == False).sum())  # noqa: E712
+                        if "converged" in sub
+                        else 0
+                    ),
+                    n_sessions_flagged_separated=(
+                        int((sub["separated"] == True).sum())  # noqa: E712
+                        if "separated" in sub
+                        else 0
+                    ),
+                )
+            )
     return recs
 
 
@@ -562,7 +600,10 @@ def main() -> None:
     )
     t0 = time.perf_counter()
     models = fit_per_bin_rate_models(
-        stop, onsets, run_cv=not args.no_cv, run_gof=not args.no_gof,
+        stop,
+        onsets,
+        run_cv=not args.no_cv,
+        run_gof=not args.no_gof,
         workers=args.workers,
     )
 

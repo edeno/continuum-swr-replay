@@ -8,8 +8,9 @@ a smooth low-dimensional parameterization (plus the inverse, used to read a
 kernel back out of fitted coefficients). :func:`attach_is_swr_to_onsets` and
 ``POPULATIONS`` prepare the onset stream that supplies the response.
 
-This module is deliberately downstream of nothing but the design constants: it
-must not import :mod:`..covariates`, which imports the bases from here.
+This module is deliberately downstream of nothing but the design constants (and
+the artifact mask's interval rules): it must not import :mod:`..covariates`,
+which imports the bases from here.
 """
 
 from __future__ import annotations
@@ -20,6 +21,9 @@ import warnings
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
+    overlaps_intervals,
+)
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
 
 from .design_constants import (
@@ -437,13 +441,24 @@ def aggregate_to_timebins(
     cross_history_lags: int = 0,
     cross_history_basis: int = 0,
     stop_covariates: tuple[str, ...] = (),
+    artifact_intervals: pd.DataFrame | None = None,
+    history_window_s: float = 0.0,
 ) -> pd.DataFrame:
     """One row per (stop, bin) up to ``tmax``, at ``bin_s`` resolution.
 
     Builds the canonical (stop x bin) point-process design used by the per-bin
-    event-rate models. Bins are built from ``stop_table.immobility_time``
-    (continuous), independent of any dense 4 ms grid, so non-4-ms widths (e.g.
-    15 ms) are exact. The last bin's ``exposure`` is the partial remainder.
+    event-rate models. Bins are built over each stop's span, ``stop_end -
+    stop_start`` (``immobility_duration_s`` when the table has no bounds; the
+    two are equal unless the artifact mask took time out of the stop),
+    independent of any dense 4 ms grid, so non-4-ms widths (e.g. 15 ms) are
+    exact. The last bin's ``exposure`` is the partial remainder. A stop with no
+    exposure (``immobility_duration_s <= 0``) has no bins.
+
+    Artifact time is unobserved: with `artifact_intervals`, a bin that touches
+    the mask is dropped, and so is a bin whose history window (the
+    `history_window_s` before it, within its stop) reaches it. The drop comes
+    last, so every kept bin's history columns are those of the design without
+    the mask.
 
     Parameters
     ----------
@@ -475,6 +490,15 @@ def aggregate_to_timebins(
         which generalize where the lag dummies overfit the refractory bins.
     stop_covariates : tuple[str, ...]
         Extra per-stop columns carried from ``stop_table`` by ``stop_id``.
+    artifact_intervals : pd.DataFrame, optional
+        The artifact mask of each session: ``animal``, ``session_date``,
+        ``epoch``, ``start_time`` and ``end_time`` (absolute seconds, closed),
+        as ``swr_source.artifact_intervals_by_session`` gives it. Requires
+        ``stop_start`` in ``stop_table``. None masks nothing.
+    history_window_s : float
+        Seconds the ladder's longest history covariate looks back
+        (``model_specs.longest_history_window_s``); 0 drops only the bins that
+        touch the mask.
 
     Returns
     -------
@@ -491,6 +515,10 @@ def aggregate_to_timebins(
         ``time_since_last_well_arrival_s`` and ``time_since_outcome_known_s``
         (bin centre minus the absolute clock; ``NaN`` where the clock is
         ``NaN``, and negative for bins that precede the outcome boundary).
+        With `artifact_intervals`, ``attrs`` counts the bins dropped for
+        touching the mask (``n_bins_artifact``), those dropped for their
+        history window alone (``n_bins_artifact_history``) and the onsets
+        those bins held (``n_onsets_in_artifact_bins``).
 
     Notes on the outcome boundary
     -----------------------------
@@ -551,10 +579,14 @@ def aggregate_to_timebins(
         c in stop_table.columns
         for c in (*_OUTCOME_SHIFT_STOP_COLUMNS, *_ARRIVAL_SPAN_STOP_COLUMNS)
     )
+    mask_artifacts = artifact_intervals is not None
+    if mask_artifacts and "stop_start" not in stop_table.columns:
+        raise KeyError("artifact_intervals needs stop_start in stop_table")
     internal_cols = list(
         dict.fromkeys(
             (_ARRIVAL_CLOCK_STOP_COLUMNS if emit_clocks else ())
             + (_OUTCOME_SHIFT_STOP_COLUMNS if shift_at_outcome else ())
+            + (("stop_start",) if mask_artifacts else ())
         )
     )
     carry = list(dict.fromkeys([*reward_cols, *internal_cols, *stop_covariates]))
@@ -562,20 +594,25 @@ def aggregate_to_timebins(
     # particular must never reach a model as predictors (see covariate_timing).
     drop_internal = [c for c in internal_cols if c not in stop_covariates]
 
-    s = stop_table[stop_table["immobility_duration_s"] > 0]
+    s = stop_table[stop_table["immobility_duration_s"] > 0].copy()
+    # The bins' clock is the bout's: the mask takes time out of a stop's
+    # exposure (immobility_duration_s), not off its end, so the bins span the
+    # whole stop and the masked ones are dropped below.
+    if "stop_start" in s.columns and "stop_end" in s.columns:
+        s["_span_s"] = s["stop_end"].to_numpy() - s["stop_start"].to_numpy()
+    else:
+        s["_span_s"] = s["immobility_duration_s"].to_numpy()
     # ceil, not int: when tmax is not a multiple of bin_s, int() drops the final
     # partial window [floor(tmax/bin_s)*bin_s, tmax) so onsets there are lost.
     nmax = int(np.ceil(tmax / bin_s))
-    nbin = np.minimum(
-        np.ceil(s["immobility_duration_s"].to_numpy() / bin_s), nmax
-    ).astype(int)
+    nbin = np.minimum(np.ceil(s["_span_s"].to_numpy() / bin_s), nmax).astype(int)
     idx = np.repeat(np.arange(len(s)), nbin)
     binj = (
         np.concatenate([np.arange(n) for n in nbin])
         if len(s)
         else np.empty(0, dtype=int)
     )
-    cols = [*SESSION_COLUMNS, "stop_id", "immobility_duration_s", *carry]
+    cols = [*SESSION_COLUMNS, "stop_id", "_span_s", *carry]
     out = s.iloc[idx][cols].reset_index(drop=True)
     out["binj"] = binj
     out["tc"] = (binj + 0.5) * bin_s
@@ -593,9 +630,7 @@ def aggregate_to_timebins(
         ].to_numpy(dtype=float)
     # bin width, clipped by both the stop's immobility end and tmax (the final
     # bin of a stop longer than tmax is exposed only up to tmax, not bin_s).
-    out["exposure"] = np.minimum(
-        bin_s, np.minimum(out["immobility_duration_s"], tmax) - binj * bin_s
-    )
+    out["exposure"] = np.minimum(bin_s, np.minimum(out["_span_s"], tmax) - binj * bin_s)
     out = out[out["exposure"] > 1e-4]
 
     src = onset_times[onset_times["t_since_stop_onset"] < tmax]
@@ -625,11 +660,11 @@ def aggregate_to_timebins(
     # removed (immobility ending just past a bin edge): it is counted, not
     # raised on, so the design stays consistent and the loss stays visible.
     expected = src[["stop_id", "t_since_stop_onset"]].merge(
-        s[["stop_id", "immobility_duration_s"]], on="stop_id", how="inner"
+        s[["stop_id", "_span_s"]], on="stop_id", how="inner"
     )
     t_expected = expected["t_since_stop_onset"].to_numpy(dtype=float)
-    immobility = expected["immobility_duration_s"].to_numpy(dtype=float)
-    stop_end = np.minimum(immobility, tmax)
+    span = expected["_span_s"].to_numpy(dtype=float)
+    stop_end = np.minimum(span, tmax)
     in_window = t_expected < stop_end
     expected_binj = np.clip(
         np.floor(t_expected / bin_s + 1e-9).astype(int), 0, nmax - 1
@@ -642,7 +677,7 @@ def aggregate_to_timebins(
         raise ValueError(
             f"aggregate_to_timebins binned {n_binned} onset(s) but {n_expected} "
             "fall inside a stop's exposed window "
-            "(t_since_stop_onset < min(tmax, immobility_duration_s)) and in a "
+            "(t_since_stop_onset < min(tmax, the stop's span)) and in a "
             "retained bin; the (stop x bin) design's counts and exposure disagree"
         )
 
@@ -734,13 +769,64 @@ def aggregate_to_timebins(
         for k, col in enumerate(REWARD_HISTORY_COLUMNS):
             out[col] = np.nan_to_num(raw[:, k], nan=0.0)
 
-    out = out.drop(columns=["immobility_duration_s", *drop_internal]).reset_index(
-        drop=True
-    )
+    artifact_counts: dict[str, int] = {}
+    if mask_artifacts:
+        out, artifact_counts = _drop_artifact_bins(
+            out, artifact_intervals, bin_s=bin_s, history_window_s=history_window_s
+        )
+    out = out.drop(columns=["_span_s", *drop_internal]).reset_index(drop=True)
     out.attrs["n_onsets_in_dropped_bins"] = n_onsets_in_dropped_bins
+    out.attrs.update(artifact_counts)
     if n_stops_arrival_spanning is not None:
         out.attrs["n_stops_arrival_spanning"] = n_stops_arrival_spanning
     return out
+
+
+def _drop_artifact_bins(
+    design: pd.DataFrame,
+    artifact_intervals: pd.DataFrame,
+    *,
+    bin_s: float,
+    history_window_s: float,
+) -> tuple[pd.DataFrame, dict[str, int]]:
+    """Drop the bins that touch a session's mask, or whose history reaches it.
+
+    Bin ``binj`` of a stop is ``[left, left + exposure]`` with ``left =
+    stop_start + binj * bin_s``; its history looks back ``history_window_s``
+    from ``left``, never before ``stop_start`` (the lags reset at the stop
+    boundary). Intervals are closed, so touching counts.
+
+    Returns
+    -------
+    kept : pd.DataFrame
+        The other rows, in order.
+    counts : dict
+        ``n_bins_artifact``, ``n_bins_artifact_history`` and
+        ``n_onsets_in_artifact_bins``.
+    """
+    if not (np.isfinite(history_window_s) and history_window_s >= 0):
+        raise ValueError(
+            f"history_window_s must be finite and >= 0: {history_window_s}"
+        )
+    stop_start = design["stop_start"].to_numpy(dtype=float)
+    left = stop_start + design["binj"].to_numpy(dtype=float) * bin_s
+    right = left + design["exposure"].to_numpy(dtype=float)
+    look_from = np.maximum(left - history_window_s, stop_start)
+    in_mask = np.zeros(len(design), dtype=bool)
+    reached = np.zeros(len(design), dtype=bool)
+    keys = list(SESSION_COLUMNS)
+    if len(design) and len(artifact_intervals):
+        session_of_bin = pd.MultiIndex.from_frame(design[keys])
+        for key, intervals in artifact_intervals.groupby(keys, sort=False):
+            rows = session_of_bin.isin([key])
+            in_mask[rows] = overlaps_intervals(left[rows], right[rows], intervals)
+            reached[rows] = overlaps_intervals(look_from[rows], right[rows], intervals)
+    counts = {
+        "n_bins_artifact": int(in_mask.sum()),
+        "n_bins_artifact_history": int((reached & ~in_mask).sum()),
+        "n_onsets_in_artifact_bins": int(design.loc[reached, "count"].sum()),
+    }
+    return design.loc[~reached], counts
 
 
 # given onset_df already passed through attach_is_swr_to_onsets:

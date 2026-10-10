@@ -29,6 +29,10 @@ from dask.distributed import Client, LocalCluster
 import scripts.decoding.run_memoryless_detection as runner
 from continuum_swr_replay import decoding_common
 from continuum_swr_replay.analysis.hippocampus import swr_source
+from continuum_swr_replay.analysis.hippocampus.event_eligibility import (
+    DECODER_REACH_S,
+    artifact_drop_reasons,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
     MEMORYLESS_EVENT_TABLE_DTYPES,
     MemorylessSequenceConfig,
@@ -600,11 +604,27 @@ class TestRunOne:
         assert len(candidates.runs) >= 2
         for first, last in candidates.runs:
             assert not missing[first * stride : last * stride + width].any()
+        table = read_table(record["outputs"]["events"])
+        expected_reasons = artifact_drop_reasons(
+            table.event_start_s.to_numpy(),
+            table.event_end_s.to_numpy(),
+            pd.DataFrame({"start_time": [step_s - 0.3], "end_time": [step_s + 0.3]}),
+            reach_s=DECODER_REACH_S,
+        )
+        assert table.artifact_drop_reason.tolist() == expected_reasons.tolist()
+        # the candidates on either side of the mask are within its reach
+        assert (table.artifact_drop_reason == "decoder_reach").sum() >= 1
         assert record["artifacts"] == {
             "n_intervals": 1,
             "masked_s": pytest.approx(0.6),
             "n_missing_bins": int(missing.sum()),
             "n_missing_windows": int(touching.sum()),
+            "n_dropped": {
+                "artifact": int((table.artifact_drop_reason == "artifact").sum()),
+                "decoder_reach": int(
+                    (table.artifact_drop_reason == "decoder_reach").sum()
+                ),
+            },
         }
         observed = read_table(record["outputs"]["observed"])
         windows = observed[observed.kind == "decoded_windows"]
@@ -626,7 +646,10 @@ class TestRunOne:
             "masked_s": 0.0,
             "n_missing_bins": 0,
             "n_missing_windows": 0,
+            "n_dropped": {"artifact": 0, "decoder_reach": 0},
         }
+        table = read_table(record["outputs"]["events"])
+        assert table.artifact_drop_reason.isna().all()
 
 
 KEY = parse_epoch_identifier(EPOCH_ID)

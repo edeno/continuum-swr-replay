@@ -414,7 +414,8 @@ def from_memoryless_table(table: pd.DataFrame, *, cohort: str) -> pd.DataFrame:
         A key of :data:`MEMORYLESS_COHORTS`: ``"published"`` for the paper's
         replay definition, ``"replay_criteria"`` for duration and dispersion
         alone. ``"published"`` needs every candidate meeting the replay
-        criteria to have been shuffled.
+        criteria to have been shuffled. A candidate with an
+        ``artifact_drop_reason`` (the artifact mask reaches it) is in neither.
 
     """
     if cohort not in MEMORYLESS_COHORTS:
@@ -451,7 +452,11 @@ def from_memoryless_table(table: pd.DataFrame, *, cohort: str) -> pd.DataFrame:
             "run made without the shuffle passes nothing and would read as a "
             "detector that found no replay."
         )
-    table = table[table[flag].to_numpy(dtype=bool)]
+    selected = table[flag].to_numpy(dtype=bool)
+    if "artifact_drop_reason" in table.columns:
+        # a candidate the artifact mask reaches is unobserved: in no cohort
+        selected &= table["artifact_drop_reason"].isna().to_numpy()
+    table = table[selected]
     frame = pd.DataFrame(
         {
             "animal": table.animal,

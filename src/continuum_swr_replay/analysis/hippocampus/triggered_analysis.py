@@ -9,6 +9,14 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
+from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
+    overlaps_intervals,
+)
+from continuum_swr_replay.analysis.hippocampus.swr_source import (
+    artifact_intervals,
+    swr_epoch_id,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -60,6 +68,9 @@ def get_signal_windows(
 
     Notes
     -----
+    - Artifact time is unobserved: an event whose window touches the epoch's
+      artifact mask (``swr_source.artifact_intervals``; closed) is dropped
+      whole, and its row is not returned.
     - Windows are centered on event times
     - Missing data filled with NaN (occurs for events near data boundaries)
     - Events outside the data time range will have partial or fully NaN windows
@@ -125,6 +136,26 @@ def get_signal_windows(
         if len(session_events) == 0:
             logger.debug(f"No events found for {animal}/{day}/{epoch}, skipping")
             continue
+
+        artifacts = artifact_intervals(swr_epoch_id(f"{animal}{day}_.nwb", str(epoch)))
+        if len(artifacts):
+            centers = session_events[time_col].to_numpy(dtype=float)
+            touches = overlaps_intervals(
+                centers - half_window_sec, centers + half_window_sec, artifacts
+            )
+            if touches.any():
+                logger.info(
+                    "%d of %d windows for %s/%s/%s touch the artifact mask and "
+                    "are dropped",
+                    int(touches.sum()),
+                    len(touches),
+                    animal,
+                    day,
+                    epoch,
+                )
+                session_events = session_events.loc[~touches]
+            if len(session_events) == 0:
+                continue
 
         times = session_events[time_col].to_numpy()
         time_index = group.index.values

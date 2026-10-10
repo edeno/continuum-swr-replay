@@ -36,6 +36,9 @@ from statsmodels.stats.multitest import multipletests
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
+from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
+    artifact_intervals_by_session,
+)
 from continuum_swr_replay.analysis.replay import (  # noqa: E402
     BIN_S,
     N_HISTORY_BASIS,
@@ -52,6 +55,9 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
 )
 from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
     require_covariate_schema,
+)
+from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
+    longest_history_window_s,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
@@ -91,6 +97,9 @@ def _spec(name: str, *, cross: bool) -> PerBinRateModelSpec:
 
 M_SELF = _spec("Mself", cross=False)
 M_CROSS = _spec("Mselfcross", cross=True)
+# Both designs drop the bins whose longest history window (self or cross)
+# touches the artifact mask, so the two are fit to the same bins.
+HISTORY_WINDOW_S = longest_history_window_s([M_SELF, M_CROSS])
 CROSS_COEFS = [f"coef_cross_hist_rcos_{k}" for k in range(N_HISTORY_BASIS)]
 
 
@@ -104,11 +113,16 @@ def _fit_direction(stops_g, onsets_g, resp_pop, cross_pop) -> dict | None:
         "reward_basis": True,
         "self_history_lags": N_HISTORY_LAGS,
         "self_history_basis": N_HISTORY_BASIS,
+        "artifact_intervals": artifact_intervals_by_session(stops_g),
+        "history_window_s": HISTORY_WINDOW_S,
     }
     design_self = aggregate_to_timebins(stops_g, resp, **common)
     design_cross = aggregate_to_timebins(
-        stops_g, resp, cross_onset_times=cross,
-        cross_history_lags=N_HISTORY_LAGS, cross_history_basis=N_HISTORY_BASIS,
+        stops_g,
+        resp,
+        cross_onset_times=cross,
+        cross_history_lags=N_HISTORY_LAGS,
+        cross_history_basis=N_HISTORY_BASIS,
         **common,
     )
     # One cohort per design before the first fit: the fitters refuse an
@@ -145,8 +159,13 @@ def fit_cross_history(stop_table: pd.DataFrame, onsets: pd.DataFrame) -> pd.Data
         for direction, (resp_pop, cross_pop) in DIRECTIONS.items():
             r = _fit_direction(stops_g, onsets_g, resp_pop, cross_pop)
             if r is not None:
-                rows.append({**dict(zip(SESSION_COLUMNS, keys, strict=True)),
-                             "direction": direction, **r})
+                rows.append(
+                    {
+                        **dict(zip(SESSION_COLUMNS, keys, strict=True)),
+                        "direction": direction,
+                        **r,
+                    }
+                )
     return pd.DataFrame(rows)
 
 
@@ -155,16 +174,20 @@ def _summary(models: pd.DataFrame) -> None:
         print(f"\n=== {direction}  (n={len(g)} sessions) ===")
         da = g["delta_aic"].dropna()
         if len(da) >= 5:
-            print(f"  self->+cross AIC drop: median {da.median():+.2f}  "
-                  f"%improved {100 * (da > 0).mean():.0f}%  "
-                  f"p={wilcoxon(da)[1]:.1e}")
+            print(
+                f"  self->+cross AIC drop: median {da.median():+.2f}  "
+                f"%improved {100 * (da > 0).mean():.0f}%  "
+                f"p={wilcoxon(da)[1]:.1e}"
+            )
         else:
             print("  (n<5)")
         if "delta_cv_bits" in g:
             dc = g["delta_cv_bits"].dropna()
             if len(dc) >= 5:
-                print(f"  cross cv-bits/event gain: median {dc.median():+.4f}  "
-                      f"%+ {100 * (dc > 0).mean():.0f}%")
+                print(
+                    f"  cross cv-bits/event gain: median {dc.median():+.4f}  "
+                    f"%+ {100 * (dc > 0).mean():.0f}%"
+                )
         # cross-history coefficients (FDR across the basis)
         present = [c for c in CROSS_COEFS if c in g and g[c].notna().sum() >= 5]
         if present:
@@ -174,14 +197,20 @@ def _summary(models: pd.DataFrame) -> None:
             for c, q in zip(present, fdr, strict=True):
                 s = g[c].dropna()
                 n_an = (g.groupby("animal")[c].median() > 0).sum()
-                print(f"    {c.removeprefix('coef_'):<18}{s.median():>+8.3f}"
-                      f"{(s > 0).mean() * 100:>6.0f}%{f'{n_an}/5':>7}  q={q:.1e}")
+                print(
+                    f"    {c.removeprefix('coef_'):<18}{s.median():>+8.3f}"
+                    f"{(s > 0).mean() * 100:>6.0f}%{f'{n_an}/5':>7}  q={q:.1e}"
+                )
 
 
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--max-per-animal", type=int, default=None,
-                   help="smoke: cap sessions per animal")
+    p.add_argument(
+        "--max-per-animal",
+        type=int,
+        default=None,
+        help="smoke: cap sessions per animal",
+    )
     p.add_argument("--write", action="store_true")
     args = p.parse_args()
 
@@ -194,8 +223,10 @@ def main() -> None:
     onsets = attach_is_swr_to_onsets(onset_table, event_table)
     if args.max_per_animal is not None:
         keep = (
-            stop[list(SESSION_COLUMNS)].drop_duplicates()
-            .groupby("animal").head(args.max_per_animal)
+            stop[list(SESSION_COLUMNS)]
+            .drop_duplicates()
+            .groupby("animal")
+            .head(args.max_per_animal)
         )
         stop = stop.merge(keep, on=list(SESSION_COLUMNS))
         logger.info(

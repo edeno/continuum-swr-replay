@@ -16,9 +16,11 @@ import pandas as pd
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
+from continuum_swr_replay.analysis.hippocampus.artifacts.masks import covered_seconds
 
 __all__ = [
     "assign_bout",
+    "bout_exposure_s",
     "immobility_bout_intervals",
     "nearest_well_distance_cm",
     "time_since_stop",
@@ -122,6 +124,33 @@ def immobility_bout_intervals(
     start_idx = np.where(diff == 1)[0]
     end_idx = np.where(diff == -1)[0] - 1
     return times[start_idx], times[end_idx]
+
+
+def bout_exposure_s(
+    bout_starts: np.ndarray, bout_ends: np.ndarray, artifacts: pd.DataFrame
+) -> np.ndarray:
+    """Each bout's observed immobility: its span less the masked time in it.
+
+    Artifact time is unobserved, so it is no rate's exposure. The bout itself
+    (its start, end and ``stop_id``) is not changed; only its exposure falls.
+
+    Parameters
+    ----------
+    bout_starts, bout_ends : np.ndarray, shape (n_bouts,)
+        Seconds, from :func:`immobility_bout_intervals`.
+    artifacts : pd.DataFrame
+        The epoch's artifact mask: ``start_time`` and ``end_time``, closed.
+
+    Returns
+    -------
+    np.ndarray, shape (n_bouts,)
+        Seconds; ``bout_ends - bout_starts`` itself when nothing is masked.
+    """
+    span = bout_ends - bout_starts
+    if len(artifacts) == 0:
+        return span
+    exposure: np.ndarray = span - covered_seconds(bout_starts, bout_ends, artifacts)
+    return exposure
 
 
 def time_since_stop(

@@ -50,7 +50,7 @@ The artifact run folder: one cores file per epoch, and the run's manifest.
 
 The artifact mask: the detector's cores, padded from one table.
 
-`core_class`, `merge_intervals`, `artifact_intervals`, `interval_mask`, `subtract_intervals`, `masked_seconds`
+`core_class`, `merge_intervals`, `artifact_intervals`, `interval_mask`, `subtract_intervals`, `masked_seconds`, `pad_intervals`, `overlaps_intervals`, `covered_seconds`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/data_aggregation.py`
 
@@ -69,6 +69,12 @@ Analysis functions for manipulating and characterizing detected events.
 Detection and analysis of neural events (ripples, non-local states).
 
 `get_confident_times`, `positive_duration_interval_mask`, `event_strict_overlap_keys`, `event_strict_overlap_mask`, `get_overlap_times`, `classify_swr_overlap`, `merged_interval_duration`, `classify_swr_overlap_geometry`, `select_typical_event_by_class`
+
+### `src/continuum_swr_replay/analysis/hippocampus/event_eligibility.py`
+
+One eligibility rule for every event cohort: immobile, and clear of the mask.
+
+`DropReason`, `artifact_drop_reasons`, `event_drop_reasons`, `label_drop_reasons`, `drop_labels`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/event_immobility.py`
 
@@ -116,7 +122,7 @@ Rule R-T: per epoch, keep the CA1 band tetrodes that ripple with the rest.
 
 The paper's one SWR source: the direct ripple_detection 2.0 Kay inventory.
 
-`DropReason`, `SwrSourceError`, `swr_inventory_dir`, `artifact_intervals_dir`, `swr_source_name`, `stamp_swr_source`, `require_swr_source`, `swr_epoch_id`, `swr_source_files`, `artifact_intervals`, `read_swr_inventory`, `swr_observed_stretches`, `swr_observed_mask`, `swr_events`, `swr_event_labels`, `with_swr_source`, `read_dot_with_swr_source`, `swr_intervals`
+`SwrSourceError`, `swr_inventory_dir`, `artifact_intervals_dir`, `swr_source_name`, `stamp_swr_source`, `require_swr_source`, `swr_epoch_id`, `swr_source_files`, `artifact_intervals`, `read_swr_inventory`, `swr_observed_stretches`, `swr_observed_mask`, `swr_events`, `swr_event_labels`, `artifact_event_drops`, `with_swr_source`, `artifact_intervals_of`, `artifact_intervals_by_session`, `read_dot_with_swr_source`, `swr_intervals`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/triggered_analysis.py`
 
@@ -134,7 +140,7 @@ _No module-level public symbols._
 
 Immobility bouts: where a stop begins and ends, and what falls inside one.
 
-`nearest_well_distance_cm`, `immobility_bout_intervals`, `time_since_stop`, `assign_bout`
+`nearest_well_distance_cm`, `immobility_bout_intervals`, `bout_exposure_s`, `time_since_stop`, `assign_bout`
 
 ### `src/continuum_swr_replay/analysis/replay/cohort_selection.py`
 
@@ -310,7 +316,7 @@ _No module-level public symbols._
 
 Model definitions for replay content analysis.
 
-`ModelSpec`, `default_content_model_names`, `PerBinRateModelSpec`, `leaf_only_predictors`
+`ModelSpec`, `default_content_model_names`, `PerBinRateModelSpec`, `longest_history_window_s`, `leaf_only_predictors`
 
 ## Fitters
 

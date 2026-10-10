@@ -22,6 +22,10 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
+from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
+    interval_mask,
+    pad_intervals,
+)
 from continuum_swr_replay.analysis.replay.cohort_selection import (
     events_in_stops,
     stop_interval_mask,
@@ -1465,13 +1469,18 @@ def build_session_fit_mask(
     cohort_stops: pd.DataFrame | None = None,
     stop_cohort: str = "at_well",
     immobility_threshold: float = 4.0,
+    artifact_intervals: pd.DataFrame | None = None,
+    artifact_reach_s: float = 0.0,
 ) -> tuple[pd.Series, pd.Series, dict[str, Any]]:
     """Bins the immobility GLMs are fit on, for one session.
 
-    Two restrictions compose. Immobility is the long-standing one. The stop
-    cohort is the new one: it keeps only the time the animal spends stopped at a
-    well, which is the population the hippocampal rate and content ladders are
-    read on, so a PFC claim and a replay claim describe the same stops.
+    Three restrictions compose. Immobility is the long-standing one. The stop
+    cohort keeps only the time the animal spends stopped at a well, which is
+    the population the hippocampal rate and content ladders are read on, so a
+    PFC claim and a replay claim describe the same stops. The artifact mask is
+    unobserved time: a bin within `artifact_reach_s` of it (the peri-event
+    basis's half-width, so no fitted bin's design reads masked time) is not
+    fit.
 
     Parameters
     ----------
@@ -1488,13 +1497,20 @@ def build_session_fit_mask(
         reproducing the pre-cohort mask exactly.
     immobility_threshold : float
         Speed threshold for immobility (cm/s).
+    artifact_intervals : pandas.DataFrame, optional
+        The session's artifact mask (``swr_source.artifact_intervals``):
+        ``start_time`` and ``end_time``, absolute seconds, closed. None masks
+        nothing.
+    artifact_reach_s : float
+        Seconds on each side of the mask whose bins are not fit either.
 
     Returns
     -------
     is_immobile : pandas.Series of bool, shape (n_time,)
         Immobility alone; still the definition of the *running* comparison.
     fit_mask : pandas.Series of bool, shape (n_time,)
-        ``is_immobile & in_cohort_stop``, or ``is_immobile`` for ``all_stops``.
+        ``is_immobile & in_cohort_stop`` (``is_immobile`` for ``all_stops``),
+        less the bins within `artifact_reach_s` of the mask.
     counts : dict
         ``stop_cohort``, ``n_bins_total``, ``n_bins_immobile``, ``n_bins_fit``.
 
@@ -1517,6 +1533,12 @@ def build_session_fit_mask(
             position_info.index.to_numpy(dtype=float), cohort_stops
         )
         fit_mask = is_immobile & pd.Series(in_cohort, index=position_info.index)
+    if artifact_intervals is not None and len(artifact_intervals):
+        reached = interval_mask(
+            position_info.index.to_numpy(dtype=float),
+            pad_intervals(artifact_intervals, artifact_reach_s),
+        )
+        fit_mask = fit_mask & pd.Series(~reached, index=position_info.index)
     counts = {
         "stop_cohort": stop_cohort,
         "n_bins_total": int(len(is_immobile)),
@@ -2621,7 +2643,7 @@ def run_session(
     # import time. Keeping them function-local lets the rest of the
     # module (pure GLM helpers + design-matrix builders) stay
     # offline-importable for unit tests.
-    from continuum_swr_replay.analysis.hippocampus import load_results
+    from continuum_swr_replay.analysis.hippocampus import load_results, swr_source
     from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
         align_results_to_position,
     )
@@ -2703,12 +2725,33 @@ def run_session(
     fit_lags = np.arange(-125, 126, 1)
     report_lags = np.arange(-100, 101, 1)
 
+    # The one artifact mask is unobserved time. No fitted bin's peri-event
+    # design reaches it (the basis's half-width on each side), and no running
+    # bin's theta phase is read from it.
+    artifacts = swr_source.artifact_intervals(
+        swr_source.swr_epoch_id(nwb_file_name, epoch_name)
+    )
+    artifact_reach_s = float(np.abs(fit_lags).max()) / sampling_frequency
     is_immobile, fit_mask, bin_counts = build_session_fit_mask(
         data["position_info"],
         cohort_stops=cohort_stops,
         stop_cohort=stop_cohort,
         immobility_threshold=immobility_threshold,
+        artifact_intervals=artifacts,
+        artifact_reach_s=artifact_reach_s,
     )
+    if len(artifacts):
+        theta_phase = data["theta_phase"].copy()
+        theta_phase.loc[
+            interval_mask(theta_phase.index.to_numpy(dtype=float), artifacts)
+        ] = np.nan
+        data = {**data, "theta_phase": theta_phase}
+        logger.info(
+            "Artifact mask: %d intervals; %d time bins within %.3f s of it are not fit",
+            len(artifacts),
+            int(interval_mask(time, pad_intervals(artifacts, artifact_reach_s)).sum()),
+            artifact_reach_s,
+        )
     logger.info(
         "Fit bins: %d immobile, %d in cohort (%.3f of %d time bins)",
         bin_counts["n_bins_immobile"],

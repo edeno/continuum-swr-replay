@@ -1223,6 +1223,46 @@ def test_an_hpc_decodes_swr_labels_are_the_sources(
 
 
 @pytest.mark.parametrize("key", list(DECODERS))
+def test_an_hpc_decode_keeps_every_event_it_decoded(decoders, monkeypatch, key):
+    """The decode saves every event it decoded, the ones near the mask too; the
+    analyses' read through the source drops those, each with its reason."""
+    module = decoders.modules[key]
+    near = _on_decode_grid((MASK_INTERVAL[1] + 0.1, MASK_INTERVAL[1] + 0.15))
+    labels = np.where(near, 1, 0)
+    columns = (
+        {"non_local_event": labels}
+        if key == "nonlocal"
+        else {"MUA_event": labels, "Continuous_prob": 0.5, "Fragmented_prob": 0.5}
+    )
+    aggregated = pd.DataFrame(
+        {
+            "SWR_event": 0,
+            "animal": "testrat",
+            "day": 20990101,
+            "epoch": EPOCH_NAME,
+            "head_speed": np.zeros(DECODE_TIME.size),
+            **columns,
+        },
+        index=pd.Index(DECODE_TIME, name="time"),
+    )
+    aggregator = (
+        "get_data_over_time" if key == "nonlocal" else "get_contfrag_data_over_time"
+    )
+    monkeypatch.setattr(
+        module, aggregator, lambda *args, **kwargs: (aggregated.copy(), None)
+    )
+    results = xr.Dataset(coords={"time": DECODE_TIME})
+
+    data_over_time, _ = module.organize_results(
+        {}, results, None, NWB_FILE_NAME, EPOCH_NAME, "HPC"
+    )
+
+    column = next(iter(columns))
+    np.testing.assert_array_equal(data_over_time[column], labels)
+    assert not swr_source.with_swr_source(data_over_time)[column].any()
+
+
+@pytest.mark.parametrize("key", list(DECODERS))
 def test_perform_decoding_passes_is_missing_to_the_decoder(decoders, monkeypatch, key):
     module = decoders.modules[key]
     calls = []

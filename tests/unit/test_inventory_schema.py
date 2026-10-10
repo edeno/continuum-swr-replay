@@ -6,6 +6,7 @@ import pytest
 
 from continuum_swr_replay.analysis.inventory_comparison.schema import (
     INVENTORY_DTYPES,
+    MEMORYLESS_COHORTS,
     SessionIdentity,
     combine_inventories,
     empty_inventory,
@@ -250,6 +251,33 @@ class TestAdapters:
             from_memoryless_table(
                 table.drop(columns="shuffle_pass"), cohort="published"
             )
+
+    def test_a_candidate_the_artifact_mask_reaches_is_in_no_cohort(self):
+        """Its row keeps its reason in the detector's table; no cohort reads it."""
+        table = pd.DataFrame(
+            {
+                "animal": ["sim"] * 3,
+                "day": [20200101] * 3,
+                "epoch": ["02_r1"] * 3,
+                "brain_area": ["HPC"] * 3,
+                "run_id": ["run"] * 3,
+                "ms_event_id": [1, 2, 3],
+                "event_start_s": [GRID[10], GRID[100], GRID[200]],
+                "event_end_s": [GRID[60], GRID[160], GRID[260]],
+                "event_duration_s": [0.1, 0.12, 0.12],
+                "animal_max_speed_cm_s": [1.0] * 3,
+                "animal_mean_speed_cm_s": [1.0] * 3,
+                "whole_event_speed_eligible": [True] * 3,
+                "is_replay": [True] * 3,
+                "shuffle_pass": [True] * 3,
+                "n_shuffles": [100] * 3,
+                "artifact_drop_reason": [None, "decoder_reach", "artifact"],
+            }
+        )
+
+        for cohort in MEMORYLESS_COHORTS:
+            inventory = from_memoryless_table(table, cohort=cohort)
+            assert inventory.event_key.tolist() == ["memoryless:sim20200101_02_r1:1"]
 
     def test_the_adapter_reads_what_the_memoryless_builder_writes(self):
         """Fed a real table, so a column rename in the builder fails here and
