@@ -224,6 +224,27 @@ def hpc_artifact_intervals(nwb_file_name: str, epoch_name: str) -> pd.DataFrame:
     )
 
 
+def hpc_ripple_power_inputs(nwb_file_name: str, epoch_name: str) -> dict[str, Any]:
+    """The SWR source's ripple-power inputs for ``load_data``, from the
+    configured runs (``swr_source.ripple_power_inputs``).
+
+    With them the decode's ``SWR_zscore`` is the Kay detector's consensus over
+    the tetrodes rule R-T kept for the configured inventory, z-scored with the
+    artifact mask left out and NaN inside it.
+
+    Raises
+    ------
+    ValueError
+        If a run id is unset (``require_hpc_decode_sources``).
+    SwrSourceError
+        If the inventory or the artifact run cannot serve the epoch.
+    """
+    require_hpc_decode_sources()
+    return swr_source.ripple_power_inputs(
+        swr_source.swr_epoch_id(nwb_file_name, epoch_name)
+    )
+
+
 @dataclass(frozen=True)
 class HpcDecodeMasks:
     """An HPC decode's masks on its time grid (the position grid)."""

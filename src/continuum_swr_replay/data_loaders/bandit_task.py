@@ -43,6 +43,9 @@ logging.getLogger("spyglass.utils").setLevel(logging.ERROR)
 logging.getLogger("spyglass").setLevel(logging.ERROR)
 
 if TYPE_CHECKING:
+    import numpy as np
+    from numpy.typing import NDArray
+
     from ..types import (
         DIOEventData,
         PositionInfoDict,
@@ -53,7 +56,14 @@ if TYPE_CHECKING:
     )
 
 from .events import load_dios
-from .lfp import filter_ripple_lfp_time, get_multiunit, get_ripple, get_theta
+from .lfp import (
+    filter_ripple_lfp_time,
+    get_multiunit,
+    get_ripple,
+    get_theta,
+    ripple_band_electrode_ids,
+    with_ripple_power,
+)
 from .position import get_epoch_position_info
 from .spikes import filter_spike_times, get_electrode_group_info, get_spike_data
 from .task_variables import make_task_variables
@@ -94,9 +104,23 @@ def _process_ripple_data(
     position_index: pd.Index,
     should_load: Callable[[str], bool],
     result: dict[str, Any],
+    *,
+    ripple_power: Mapping[str, Any] | None = None,
+    band_electrode_ids: NDArray[np.int64] | None = None,
 ) -> None:
-    """Process raw ripple data and add to result dict."""
+    """Process raw ripple data and add to result dict.
+
+    With `ripple_power` (``swr_source.ripple_power_inputs``), both consensus
+    traces are the SWR source's covariate on the band within the position
+    span (``lfp.with_ripple_power``); without it, Spyglass's.
+    """
     filtered_ripple = filter_ripple_lfp_time(ripple_data, position_index)
+    if ripple_power is not None:
+        if band_electrode_ids is None:
+            raise ValueError("ripple_power needs the band's electrode ids")
+        filtered_ripple = with_ripple_power(
+            filtered_ripple, ripple_power, band_electrode_ids=band_electrode_ids
+        )
     for key, value in filtered_ripple.items():
         if should_load(key):
             result[key] = value
@@ -208,6 +232,7 @@ def load_data(
     ripple_detector_name: str = "Kay",
     include: frozenset[str] | None = None,
     mua_artifact_intervals: Mapping[str, pd.DataFrame] | None = None,
+    ripple_power: Mapping[str, Any] | None = None,
 ) -> SessionData:
     """Load data for a given session and epoch with selective loading.
 
@@ -236,6 +261,14 @@ def load_data(
         normalization, and any HSE overlapping one dropped
         (``lfp.get_multiunit_hse``). The HPC decoders pass the artifact mask
         for HPC; by default nothing is masked.
+    ripple_power : Mapping, optional
+        The SWR source's ripple-power inputs (``swr_source.ripple_power_inputs``:
+        the inventory's band and kept tetrodes, its sampling rate and the
+        artifact mask). Given, ``ripple_consensus_trace`` and
+        ``zscored_ripple_consensus_trace`` are the Kay detector's consensus over
+        the kept tetrodes, z-scored with the mask left out and NaN inside it
+        (``lfp.with_ripple_power``); by default they are Spyglass's, over every
+        CA1 tetrode and all time. The HPC decoders pass it.
 
     Returns
     -------
@@ -393,7 +426,16 @@ def load_data(
     ):
         ripple_data = get_ripple(nwb_file_name, epoch_name, ripple_detector_name)
         _process_ripple_data(
-            ripple_data, position_data["position_info"].index, should_load, result
+            ripple_data,
+            position_data["position_info"].index,
+            should_load,
+            result,
+            ripple_power=ripple_power,
+            band_electrode_ids=(
+                None
+                if ripple_power is None
+                else ripple_band_electrode_ids(nwb_file_name, epoch_name)
+            ),
         )
 
     # Load and process theta data

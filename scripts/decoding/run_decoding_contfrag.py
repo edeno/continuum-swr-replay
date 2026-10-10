@@ -60,6 +60,7 @@ from continuum_swr_replay.decoding_common import (
     add_common_args,
     hpc_artifact_intervals,
     hpc_decode_masks,
+    hpc_ripple_power_inputs,
     provenance_record,
     release_nwb_files,
     require_hpc_decode_sources,
@@ -384,6 +385,13 @@ def run_decode(
             ripple_detector_name=ripple_detector_name,
             mua_artifact_intervals=(
                 None if artifact_mask is None else {"HPC": artifact_mask}
+            ),
+            # SWR_zscore: the inventory's Kay consensus, R-T's tetrodes, the
+            # mask out of its normalization and NaN inside it
+            ripple_power=(
+                None
+                if artifact_mask is None
+                else hpc_ripple_power_inputs(nwb_file_name, epoch_name)
             ),
         )
 

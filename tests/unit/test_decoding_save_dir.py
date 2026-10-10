@@ -1082,6 +1082,14 @@ def test_an_hpc_decode_masks_artifacts_and_leaves_swrs_out_of_encoding(
     np.testing.assert_allclose(
         load["mua_artifact_intervals"]["HPC"].to_numpy(), [MASK_INTERVAL]
     )
+    # the ripple-power covariate is the source's: its kept tetrodes, the mask
+    expected = swr_source.ripple_power_inputs(SWR_EPOCH)
+    assert {
+        k: v for k, v in load["ripple_power"].items() if k != "artifact_intervals"
+    } == {k: v for k, v in expected.items() if k != "artifact_intervals"}
+    np.testing.assert_allclose(
+        load["ripple_power"]["artifact_intervals"].to_numpy(), [MASK_INTERVAL]
+    )
     (bound,) = decodes
     missing = _on_decode_grid(MASK_INTERVAL)
     np.testing.assert_array_equal(bound.arguments["is_missing"], missing)

@@ -136,6 +136,7 @@ __all__ = [
     "read_dot_with_swr_source",
     "read_swr_inventory",
     "require_swr_source",
+    "ripple_power_inputs",
     "stamp_swr_source",
     "swr_epoch_id",
     "swr_event_labels",
@@ -378,6 +379,50 @@ def swr_source_files(epoch_id: str) -> dict[str, dict[str, str]]:
             )
         files[name] = {"path": str(path), "sha256": sha}
     return files
+
+
+def ripple_power_inputs(epoch_id: str) -> dict[str, Any]:
+    """What ``load_data`` needs to make the ripple-power covariate this source's.
+
+    ``SWR_zscore`` in a decode's ``data_over_time`` (``ripple_power_z`` in the
+    analyses) is then the consensus the Kay detector thresholded for this
+    inventory: over the tetrodes rule R-T kept, z-scored with the artifact mask
+    left out and no value inside it (``data_loaders.lfp.with_ripple_power``).
+    An inventory made before rule R-T read every band tetrode.
+
+    Parameters
+    ----------
+    epoch_id : str
+
+    Returns
+    -------
+    dict
+        ``band_electrode_ids`` (the band the runner read, in column order),
+        ``kept_electrode_ids`` (the tetrodes it detected on), the band's
+        nominal ``sampling_frequency`` (Hz) and ``artifact_intervals``
+        (:func:`artifact_intervals`).
+
+    Raises
+    ------
+    SwrSourceError
+        As :func:`swr_source_files` and :func:`artifact_intervals`.
+    """
+    swr_source_files(epoch_id)  # the epoch is served, and its files unchanged
+    manifest = json.loads((swr_inventory_dir() / "manifest.json").read_text())
+    record = manifest["epochs"][epoch_id]
+    kept = [int(electrode) for electrode in record["electrode_ids"]]
+    selection = record.get("tetrode_selection")
+    band = (
+        kept
+        if selection is None
+        else [int(electrode) for electrode in selection["electrode_ids"]]
+    )
+    return {
+        "band_electrode_ids": band,
+        "kept_electrode_ids": kept,
+        "sampling_frequency": float(record["sampling"]["nominal"]),
+        "artifact_intervals": artifact_intervals(epoch_id),
+    }
 
 
 def _read_events(epoch_id: str, path: str) -> pd.DataFrame:

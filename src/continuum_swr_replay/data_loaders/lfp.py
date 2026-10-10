@@ -67,8 +67,10 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 from ripple_detection import (
+    get_Kay_ripple_consensus_trace,
     get_multiunit_population_firing_rate,
     multiunit_HSE_detector,
+    normalize_signal,
 )
 from scipy.stats import zscore
 
@@ -84,6 +86,11 @@ from ..parameters import (
     MAX_SPEED_THRESHOLD_CM_PER_SEC,
 )
 from ..types import MultiunitData, RippleBandInputs, RippleData, ThetaData
+
+KAY_SMOOTHING_SIGMA_S = 0.004
+"""The Kay consensus's Gaussian smoothing, in seconds: the SWR runner's
+``swr_inventories.DETECTOR_SETTINGS["kay"]["smoothing_sigma"]`` (a test holds
+the two equal; ``data_loaders`` may not import ``analysis``)."""
 
 # Ignore warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="pynwb")
@@ -257,6 +264,144 @@ def get_ripple(
         "ripple_lfps": lfp_df,
         "ripple_consensus_trace": ripple_consensus_trace,
         "zscored_ripple_consensus_trace": zscored_ripple_consensus_trace,
+    }
+
+
+def ripple_band_electrode_ids(nwb_file_name: str, epoch_name: str) -> NDArray[np.int64]:
+    """The stored CA1 ripple band's electrodes, in its column order.
+
+    The order of ``get_ripple``'s ``ripple_filtered_lfps`` columns: ascending
+    electrode id, as ``get_ripple_band_inputs`` checks the band holds them.
+
+    Parameters
+    ----------
+    nwb_file_name, epoch_name : str
+
+    Returns
+    -------
+    NDArray of int, shape (n_channels,)
+    """
+    from spyglass.lfp.analysis.v1.lfp_band import LFPBandSelection, LFPBandV1
+
+    _, lfp_band_restriction = _ripple_keys(nwb_file_name, epoch_name)
+    band_key = (LFPBandV1 & lfp_band_restriction).fetch1("KEY")
+    electrode_ids = (LFPBandSelection.LFPBandElectrode & band_key).fetch("electrode_id")
+    return np.sort(np.asarray(electrode_ids, dtype=np.int64))
+
+
+def kay_ripple_power_z(
+    time: NDArray[np.float64],
+    ripple_band: NDArray[np.float64],
+    sampling_frequency: float,
+    unobserved: NDArray[np.bool_],
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    """The Kay detector's consensus trace and its z-score, the mask left out.
+
+    ``ripple_detection``'s own ``get_Kay_ripple_consensus_trace`` (``sqrt`` of
+    the Gaussian-smoothed sum of squared envelopes, within each gap-free block)
+    and ``normalize_signal`` (mean and SD over the samples it is given), as
+    ``Kay_ripple_detector`` computes and normalizes them: the trace the SWR
+    inventory's events are thresholds of. The normalization reads the finite
+    samples outside `unobserved`; the z-score inside it is NaN (no value).
+
+    Parameters
+    ----------
+    time : NDArray, shape (n_time,)
+        Seconds, ascending.
+    ripple_band : NDArray, shape (n_time, n_channels)
+        The stored 150-250 Hz band of the tetrodes to combine (rule R-T's kept
+        ones).
+    sampling_frequency : float
+        Hz.
+    unobserved : NDArray of bool, shape (n_time,)
+        The artifact mask on `time`.
+
+    Returns
+    -------
+    consensus : NDArray, shape (n_time,)
+        NaN where a channel is not finite.
+    zscore : NDArray, shape (n_time,)
+        NaN there and inside `unobserved`.
+    """
+    unobserved = np.asarray(unobserved, dtype=bool)
+    consensus = get_Kay_ripple_consensus_trace(
+        ripple_band, sampling_frequency, KAY_SMOOTHING_SIGMA_S, time=time
+    )
+    normalized = np.asarray(
+        normalize_signal(
+            consensus,
+            method="zscore",
+            normalization_mask=np.isfinite(consensus) & ~unobserved,
+        ),
+        dtype=np.float64,
+    )
+    normalized[unobserved] = np.nan
+    return np.asarray(consensus, dtype=np.float64), normalized
+
+
+def with_ripple_power(
+    ripple_data: RippleData,
+    ripple_power: Mapping[str, object],
+    *,
+    band_electrode_ids: NDArray[np.int64],
+) -> RippleData:
+    """`ripple_data` with both consensus traces the SWR source's covariate.
+
+    The traces become :func:`kay_ripple_power_z` over the tetrodes rule R-T
+    kept for the configured SWR inventory, on the band as given (already
+    within the position span, as the SWR runner reads it), with the artifact
+    mask out of the normalization and NaN inside it. Everything else is as
+    given.
+
+    Parameters
+    ----------
+    ripple_data : RippleData
+        As ``filter_ripple_lfp_time`` returns it.
+    ripple_power : Mapping
+        ``swr_source.ripple_power_inputs``: ``band_electrode_ids`` and
+        ``kept_electrode_ids`` (the inventory's), ``sampling_frequency`` (Hz)
+        and ``artifact_intervals`` (closed, seconds).
+    band_electrode_ids : NDArray of int, shape (n_channels,)
+        The electrodes of `ripple_data`'s band, in column order
+        (:func:`ripple_band_electrode_ids`).
+
+    Returns
+    -------
+    RippleData
+
+    Raises
+    ------
+    ValueError
+        If the band is not the inventory's band, or a kept electrode is not
+        in it.
+    """
+    band = ripple_data["ripple_filtered_lfps"]
+    band_ids = np.asarray(band_electrode_ids, dtype=np.int64)
+    inventory_ids = np.asarray(ripple_power["band_electrode_ids"], dtype=np.int64)
+    if band.shape[1] != band_ids.size or not np.array_equal(band_ids, inventory_ids):
+        raise ValueError(
+            f"The ripple band holds electrodes {band_ids.tolist()} in "
+            f"{band.shape[1]} columns, but the SWR inventory read the band "
+            f"{inventory_ids.tolist()}."
+        )
+    kept = np.isin(band_ids, np.asarray(ripple_power["kept_electrode_ids"]))
+    if kept.sum() != len(ripple_power["kept_electrode_ids"]):
+        raise ValueError("A tetrode the SWR inventory kept is not in the ripple band.")
+    time = band.index.to_numpy(dtype=np.float64)
+    consensus, z = kay_ripple_power_z(
+        time,
+        band.to_numpy(dtype=np.float64)[:, kept],
+        float(ripple_power["sampling_frequency"]),
+        _in_intervals(time, ripple_power["artifact_intervals"]),
+    )
+    return {
+        **ripple_data,
+        "ripple_consensus_trace": pd.Series(
+            consensus, index=band.index, name="ripple_consensus_trace"
+        ),
+        "zscored_ripple_consensus_trace": pd.Series(
+            z, index=band.index, name="zscored_ripple_consensus_trace"
+        ),
     }
 
 
