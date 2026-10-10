@@ -125,6 +125,16 @@ class TestTheConfiguredInventory:
         )
         assert swr_source.swr_source_name() == "kay@rerun_masked+artifacts@task16"
 
+    def test_a_source_name_says_which_artifact_run_it_was_built_under(
+        self, monkeypatch
+    ):
+        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", "task16")
+        assert swr_source.artifact_run_of(swr_source.swr_source_name()) == "task16"
+        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", None)
+        assert swr_source.artifact_run_of(swr_source.swr_source_name()) is None
+        # a name from before the artifact run was recorded in it: no run
+        assert swr_source.artifact_run_of("Kay") is None
+
     def test_the_run_id_is_written_in_one_module(self):
         # A literal anywhere else would survive the switch to R3's rerun.
         holders = sorted(

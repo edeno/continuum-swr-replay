@@ -134,6 +134,7 @@ __all__ = [
     "artifact_event_drops",
     "artifact_intervals",
     "artifact_intervals_dir",
+    "artifact_run_of",
     "dropped_for_excluded_time",
     "excluded_intervals",
     "excluded_intervals_by_session",
@@ -284,6 +285,19 @@ def swr_source_name() -> str:
     """
     artifacts = ARTIFACT_INTERVALS_RUN_ID or "none"
     return f"{SWR_DETECTOR}@{SWR_INVENTORY_RUN_ID}+artifacts@{artifacts}"
+
+
+def artifact_run_of(source_name: str) -> str | None:
+    """The artifact run a source name (:func:`swr_source_name`) was built under.
+
+    ``None`` for ``artifacts@none``, and for a name with no ``+artifacts@``
+    part (written before the name recorded the artifact run): neither was
+    built under a run.
+    """
+    _, separator, run = str(source_name).partition("+artifacts@")
+    if not separator or run == "none":
+        return None
+    return run
 
 
 def stamp_swr_source(frame: pd.DataFrame) -> pd.DataFrame:

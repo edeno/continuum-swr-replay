@@ -18,6 +18,8 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import (
 
 SESSION = SessionIdentity(animal="sim", day=20200101, epoch="02_r1", brain_area="HPC")
 GRID = 100.0 + np.arange(2000) / 500.0
+# a memoryless table's swr_definition when built with no artifact run
+NO_ARTIFACT_RUN = "kay@inventory+artifacts@none"
 
 
 def still(n=GRID.size):
@@ -154,6 +156,13 @@ class TestEmpty:
 
 
 class TestAdapters:
+    @pytest.fixture(autouse=True)
+    def _no_artifact_run(self, monkeypatch):
+        """The tables here are built with no artifact run; read them under none."""
+        from continuum_swr_replay.analysis.hippocampus import swr_source
+
+        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", None)
+
     def test_our_canonical_table_keeps_its_native_duration_apart(self):
         """Its duration adds one sample width to the span; the span does not."""
         classified = pd.DataFrame(
@@ -205,6 +214,7 @@ class TestAdapters:
                 "is_replay": [True],
                 "shuffle_pass": [True],
                 "n_shuffles": [100],
+                "swr_definition": [NO_ARTIFACT_RUN],
             }
         )
 
@@ -234,6 +244,7 @@ class TestAdapters:
                 "is_replay": [True, True, False],
                 "shuffle_pass": [True, False, False],
                 "n_shuffles": [100, 100, 0],
+                "swr_definition": [NO_ARTIFACT_RUN] * 3,
             }
         )
 
@@ -272,6 +283,7 @@ class TestAdapters:
                 "shuffle_pass": [True] * 3,
                 "n_shuffles": [100] * 3,
                 "artifact_drop_reason": [None, "near_artifact", "artifact"],
+                "swr_definition": [NO_ARTIFACT_RUN] * 3,
             }
         )
 
@@ -292,6 +304,30 @@ class TestAdapters:
 
         with pytest.raises(ValueError, match="artifact_drop_reason"):
             from_memoryless_table(table, cohort="replay_criteria")
+
+    def test_a_table_built_under_another_artifact_run_is_refused(self, monkeypatch):
+        """Its artifact_drop_reason reads another mask: a table built with no
+        run is refused under a run, one built under a run under another or
+        under none."""
+        from continuum_swr_replay.analysis.hippocampus import swr_source
+        from tests.unit.test_memoryless_event_table import build, make_recording
+
+        recording = make_recording()
+        under_none = build(recording, swr_definition=NO_ARTIFACT_RUN)
+        under_a = build(recording, swr_definition="kay@inventory+artifacts@run_a")
+
+        assert len(from_memoryless_table(under_none, cohort="replay_criteria")) == 2
+        with pytest.raises(ValueError, match="run_a"):
+            from_memoryless_table(under_a, cohort="replay_criteria")
+
+        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", "run_a")
+        assert len(from_memoryless_table(under_a, cohort="replay_criteria")) == 2
+        with pytest.raises(ValueError, match="'run_a'"):
+            from_memoryless_table(under_none, cohort="replay_criteria")
+
+        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", "run_b")
+        with pytest.raises(ValueError, match="'run_b'"):
+            from_memoryless_table(under_a, cohort="replay_criteria")
 
     def test_the_adapter_reads_what_the_memoryless_builder_writes(self):
         """Fed a real table, so a column rename in the builder fails here and

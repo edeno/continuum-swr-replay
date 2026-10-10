@@ -422,8 +422,10 @@ def from_memoryless_table(table: pd.DataFrame, *, cohort: str) -> pd.DataFrame:
     ------
     ValueError
         If the cohort is unknown, a column is missing, a published cohort was
-        not shuffled, or an artifact run is configured and the table has no
-        ``artifact_drop_reason`` (it was made before the rule).
+        not shuffled, an artifact run is configured and the table has no
+        ``artifact_drop_reason`` (it was made before the rule), or the table's
+        ``swr_definition`` names another artifact run than the configured one
+        (no run included): its ``artifact_drop_reason`` reads another mask.
 
     """
     if cohort not in MEMORYLESS_COHORTS:
@@ -449,6 +451,7 @@ def from_memoryless_table(table: pd.DataFrame, *, cohort: str) -> pd.DataFrame:
             "is_replay",
             "shuffle_pass",
             "n_shuffles",
+            "swr_definition",
         ),
         "memoryless event",
     )
@@ -470,6 +473,17 @@ def from_memoryless_table(table: pd.DataFrame, *, cohort: str) -> pd.DataFrame:
             f"artifact run {swr_source.ARTIFACT_INTERVALS_RUN_ID!r} is "
             "configured: a table made before the analysed-time rule would read "
             "its candidates in excluded time as kept. Rerun the detector."
+        )
+    configured = swr_source.ARTIFACT_INTERVALS_RUN_ID
+    built_under = {
+        swr_source.artifact_run_of(name) for name in table["swr_definition"].unique()
+    }
+    if any(run != configured for run in built_under):
+        raise ValueError(
+            "The memoryless table was built under artifact run(s) "
+            f"{sorted(str(run) for run in built_under)} (its swr_definition), not "
+            f"the configured {configured!r}: its artifact_drop_reason reads "
+            "another mask. Rerun the detector under the configured run."
         )
     table = table[selected]
     frame = pd.DataFrame(
