@@ -28,7 +28,17 @@ Event labels (integer event numbers):
     - SWR_event: Sharp-wave ripple event number, from the stored Spyglass
       ``RippleTimesV1`` ripples. This is the decode's own provenance: analyses
       read a saved frame through ``swr_source.read_dot_with_swr_source``, which
-      replaces it with the paper's SWR source (the direct Kay inventory)
+      replaces it with the paper's SWR source (the direct Kay inventory). An
+      HPC decode saves its frame with the source's labels
+      (``swr_source.with_swr_source(..., drop_masked_events=False)``): that
+      frame keeps the SWRs in the 0.3-s reach of the artifact mask, while its
+      ``swr_observed`` already excludes the reach, so both are provenance and
+      analyses re-read the frame through the source.
+    - swr_observed: True where SWR detection was observed and is analysed (the
+      stored band's stretches less excluded time); added to the saved frame
+      with the source's labels, and again by every read through the source.
+      In the saved frame it already excludes the 0.3-s reach whose SWR labels
+      the frame keeps.
     - MUA_event: Multiunit activity high-synchrony event number
 
 State probabilities (0-1):
