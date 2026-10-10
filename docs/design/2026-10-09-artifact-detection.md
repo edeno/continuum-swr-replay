@@ -90,10 +90,18 @@ the giant-day events.
   median at the event's peak) removed 116 Kay events, most of them j16's. The tetrode rule
   (R-T, Task 17b) now handles those. One rule fewer is kept. Both are described in
   [2026-10-09-swr-tetrode-selection.md](2026-10-09-swr-tetrode-selection.md).
-- **Keep the noisy tetrodes.** The sustained-noise (S) tetrodes are masked during their noise
-  blocks, not dropped. R8 leaves out the 4 epochs with more than 2 % masked. R11 decodes the 12
-  S epochs both ways (masked, and with those tetrodes dropped); masking stays unless it shows
-  extra non-local probability within 3 s outside the S blocks.
+- **Leave out every epoch with an S block (project lead, 2026-10-10).** The 13 epochs in which
+  the artifact run finds an S block (11 analysed, 2 pending) are excluded whole, in the epoch
+  register (`SUSTAINED_NOISE`). Two reasons:
+  1. The masked R11 decode still shows extra non-local probability 1–3 s outside the S blocks:
+     +0.054 pooled over 14 blocks, 95 % CI [0.019, 0.102], and 3 of 13 epochs fail on their
+     own. The per-epoch test is weak, so a pass does not show an epoch is clean (R11a §5).
+  2. R1, which trained through the noise, moved the S epochs' decodes across the whole epoch,
+     not only near the blocks. Against R11, non-local events change by −8 % to −57 % in 6 S
+     epochs, against at most ±5 % in the other 154 of 160 epochs, and the fitted transitions
+     moved too (R11 gates report, gate 6).
+
+  R8 leaves out the 4 epochs with more than 2 % masked.
 - **No amplitude cap.** Some pipelines drop events above 9–10 SD as non-biological. Of the
   9,208 reference-set SWRs, 2,538 (27.6 %) have a Kay consensus peak above 9 robust z and
   2,181 (23.7 %) above 10; so do 24 and 23 of the 55 model-reviewed SWRs. These are robust

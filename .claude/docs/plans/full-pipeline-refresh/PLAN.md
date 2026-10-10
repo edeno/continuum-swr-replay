@@ -2237,11 +2237,25 @@ Output: `.claude/research/refresh_artifact_detector/followup/`. Reports: `follow
   - Compare the non-local events: count, overlap, and the share at the ports.
   - Keep the tetrodes unless more than 5 % of the events with them have no overlapping event
     without them. If they do, bring the comparison to the lead before the full run.
+- **Rulings (project lead, 2026-10-10).**
+  - **S epochs excluded.** The 13 epochs in which artifact run `fbbff144a123` finds an S block
+    (11 analysed, 2 pending) are left out whole. No tetrode is dropped. The register gives them
+    reason `SUSTAINED_NOISE`, and the audit's `sustained_noise` check holds the register to the run.
+    The reasons: the S-epoch test failed (3 of 13 epochs fail; pooled over 14 blocks the excess is
+    +0.054, 95 % CI [0.019, 0.102]; `.claude/research/refresh_r11/r11a_report.md` §5), and R1's
+    decodes of the S epochs moved across the whole epoch (−8 % to −57 % non-local events in 6 S
+    epochs against R11; `.claude/research/refresh_r11/gates/r11_full_gates_report.md`, gate 6).
+  - **j16's groups 0, 10 and 22 kept in decoding.** They fail the 5 % rule (13.4 % of events
+    lost), but 8 random sets of 3 other tetrodes per epoch, matched for spike share, lose 11.0–13.1 %
+    pooled. The excess is about 20 events at the ports on one day, 07-07: about 2 % of the four
+    days' events (`.claude/research/refresh_r11/j16_control/j16_control_report.md`).
 - Breeze: SSH from zephyr works (2026-10-09). Check `nvidia-smi` and use idle cards only.
 - **Gates:** as R1 (P30-B pinned, no CPU fallback, provenance), plus both run ids recorded in every
   decode.
-- **Swap:** replace the 218 and promote the 37 pending with the register flip, using the R2 swap
-  procedure with a sample re-hash.
+- **Swap:** move the 218 old decodes out of the canonical folder, and move 242 R11 decodes in: the
+  207 analysed epochs and the 35 pending ones, whose entries flip to `analysed` in the same change
+  (with `docs/epoch_register.md` regenerated). The 13 S epochs' R11 decodes stay out of the
+  canonical folder. Use the R2 swap procedure with a sample re-hash.
 
 ## R12: Widloski rerun, all 255 epochs
 
@@ -2249,7 +2263,8 @@ Run with the thread fix, into a new run folder.
 
 ## R13: tables, refits, PFC, figures, audit
 
-R5–R8 as written, on 255 epochs, with stamps `kay@<R10 run>+artifacts@<R9 run>`. R8 adds:
+R5–R8 as written, on 242 epochs (255 less the 13 S epochs), with stamps
+`kay@<R10 run>+artifacts@<R9 run>`. R8 adds:
 - the sensitivity analysis without the 4 epochs over 2 % masked;
 - the masked-time table, and the events and bins the mask and the 0.3-s decoder reach remove;
 - robustness reruns of the headline results: without the mask; with every artifact threshold 25 %
