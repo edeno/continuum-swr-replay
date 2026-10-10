@@ -2,8 +2,10 @@
 
 Nothing here reaches the Spyglass database, a GPU or a real ``Processed-Data``
 tree. Every artifact is made up under the test's ``tmp_path``, for made-up
-epochs (``sim20200101_*``), and so is the epoch register the audit reads
-(``--register``); ``get_epoch_info`` is replaced by a frame of named epochs. Every git check runs in a throwaway repository
+epochs (``sim20200101_*``), and so are the epoch register the audit reads
+(``--register``) and the artifact run its ``sustained_noise`` check reads (a
+stub run folder the test configures in ``swr_source``); ``get_epoch_info`` is
+replaced by a frame of named epochs. Every git check runs in a throwaway repository
 there, and ``check_encoding_marks`` reads its marks and encoding models through
 fakes. ``check_fit_provenance`` runs the repository's real
 ``scripts/qa/check_fit_provenance.py`` on roots under ``tmp_path``; that script
@@ -35,6 +37,7 @@ from continuum_swr_replay.decoding_transitions import (
     nonlocal_transition_settings,
 )
 from continuum_swr_replay.table_io import sha256_file, write_table
+from tests.unit._swr_inventory_fixtures import ARTIFACT_RUN_ID, write_artifact_run
 
 BASE_TIME_S = 1.58e9
 """Unix-like timestamps, as the decodes carry them, so nothing can assume time 0."""
@@ -48,6 +51,8 @@ SPIKE_LOADER = "src/continuum_swr_replay/data_loaders/spikes.py"
 
 REGISTER_COLUMNS = ["nwb_file_name", "epoch", "status", "reason", "evidence"]
 DEPLETION = "a depletion session"
+NOISY_EPOCH = "sim20200101_08_r4_HPC"
+S_BLOCK = "an S block at 84.0-112.0 s"
 
 
 def _key(epoch_id: str) -> tuple[str, str]:
@@ -62,8 +67,10 @@ def _write_register(
     analysed: tuple[str, ...] = EPOCHS,
     pending: tuple[str, ...] = (NO_INPUT_EPOCH,),
     excluded: tuple[str, ...] = (),
+    noisy: tuple[str, ...] = (),
 ) -> Path:
-    """An epoch register: `pending` waits on a populate, `excluded` is depletion."""
+    """An epoch register: `pending` waits on a populate, `excluded` is depletion,
+    `noisy` is excluded for an S block (``SUSTAINED_NOISE``)."""
     rows = [[*_key(epoch_id), "analysed", "", ""] for epoch_id in analysed]
     rows += [
         [*_key(epoch_id), "pending", "PENDING_POPULATE", NO_RIPPLE_BAND]
@@ -72,6 +79,9 @@ def _write_register(
     rows += [
         [*_key(epoch_id), "excluded", "DEPLETION_TASK", DEPLETION]
         for epoch_id in excluded
+    ]
+    rows += [
+        [*_key(epoch_id), "excluded", "SUSTAINED_NOISE", S_BLOCK] for epoch_id in noisy
     ]
     path.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(rows, columns=REGISTER_COLUMNS).to_csv(path, index=False)
@@ -1194,6 +1204,113 @@ def test_the_pending_epochs_are_reported(tmp_path):
     }
 
 
+# --------------------------------------------------------------------------
+# check_sustained_noise
+# --------------------------------------------------------------------------
+
+
+S_CORE = ("S", BASE_TIME_S + 84.0, BASE_TIME_S + 112.0)
+T_CORE = ("spk", BASE_TIME_S + 104.11, BASE_TIME_S + 104.11)
+
+
+def _artifact_run(tmp_path: Path, cores: dict[str, list]) -> Path:
+    """A stub artifact run under `tmp_path`, written with ``io.write_cores`` and
+    ``io.write_manifest``: epoch id -> its cores, each epoch ``ok``."""
+    return write_artifact_run(
+        tmp_path / "artifact_intervals",
+        cores,
+        span=(BASE_TIME_S, BASE_TIME_S + 1200.0),
+    )
+
+
+def _clean_run(tmp_path: Path, **overrides: list) -> Path:
+    """The run for the default register plus `NOISY_EPOCH`: only the noisy epoch
+    has an S core, unless `overrides` (by epoch id) says otherwise."""
+    cores = {
+        EPOCHS[0]: [T_CORE],
+        EPOCHS[1]: [],
+        NO_INPUT_EPOCH: [],
+        NOISY_EPOCH: [S_CORE, T_CORE],
+    }
+    cores.update(overrides)
+    return _artifact_run(tmp_path, cores)
+
+
+def test_sustained_noise_passes_when_the_register_excludes_exactly_the_s_epochs(
+    tmp_path,
+):
+    """A depletion epoch the run never saw is not checked."""
+    depletion = "sim20200101_10_r5_HPC"
+    register = _register(tmp_path, noisy=(NOISY_EPOCH,), excluded=(depletion,))
+
+    result = audit.check_sustained_noise(register, _clean_run(tmp_path))
+
+    assert result["ok"], result["failures"]
+    assert result["details"]["run_id"] == ARTIFACT_RUN_ID
+    assert result["details"]["n_checked"] == 4
+    assert result["details"]["s_epochs"] == {NOISY_EPOCH: 1}
+
+
+def test_an_s_epoch_the_register_does_not_exclude_for_it_fails(tmp_path):
+    register = _register(tmp_path, noisy=(NOISY_EPOCH,))
+    run = _clean_run(tmp_path, **{EPOCHS[1]: [S_CORE], NO_INPUT_EPOCH: [S_CORE]})
+
+    result = audit.check_sustained_noise(register, run)
+
+    assert result["failures"] == [
+        f"2 epoch(s) have an S block in the artifact run {ARTIFACT_RUN_ID} but are "
+        f"not excluded for SUSTAINED_NOISE: {EPOCHS[1]} (analysed), "
+        f"{NO_INPUT_EPOCH} (pending, PENDING_POPULATE)"
+    ]
+
+
+def test_an_epoch_excluded_for_sustained_noise_without_an_s_core_fails(tmp_path):
+    register = _register(tmp_path, noisy=(NOISY_EPOCH,))
+    run = _clean_run(tmp_path, **{NOISY_EPOCH: [T_CORE]})
+
+    result = audit.check_sustained_noise(register, run)
+
+    assert result["failures"] == [
+        f"1 epoch(s) are excluded for SUSTAINED_NOISE but the artifact run "
+        f"{ARTIFACT_RUN_ID} gives them no S core: {NOISY_EPOCH}"
+    ]
+
+
+def test_a_run_that_lacks_an_epochs_cores_fails(tmp_path):
+    """The noisy epoch and a pending one are missing from the run: neither can
+    be told, so both fail, and the noisy one is not also reported as without S."""
+    register = _register(tmp_path, noisy=(NOISY_EPOCH,))
+    run = _artifact_run(tmp_path, {EPOCHS[0]: [], EPOCHS[1]: []})
+
+    result = audit.check_sustained_noise(register, run)
+
+    (failure,) = result["failures"]
+    assert failure.startswith(
+        f"the artifact run {ARTIFACT_RUN_ID} cannot serve 2 epoch(s): "
+    )
+    assert NO_INPUT_EPOCH in failure and NOISY_EPOCH in failure
+    assert set(result["details"]["unreadable"]) == {NO_INPUT_EPOCH, NOISY_EPOCH}
+
+
+def test_a_run_folder_without_a_manifest_fails_once(tmp_path):
+    folder = tmp_path / "artifact_intervals" / ARTIFACT_RUN_ID
+    folder.mkdir(parents=True)
+
+    result = audit.check_sustained_noise(_register(tmp_path), folder)
+
+    (failure,) = result["failures"]
+    assert failure.startswith(f"the artifact run {ARTIFACT_RUN_ID} cannot be read: ")
+
+
+def test_no_configured_artifact_run_fails(tmp_path):
+    result = audit.check_sustained_noise(_register(tmp_path), None)
+
+    assert result["failures"] == [
+        "no artifact run is configured (swr_source.ARTIFACT_INTERVALS_RUN_ID is "
+        "None), so no epoch's S blocks were read"
+    ]
+
+
 QVALS = "replay_content/models_per_bin_rate/qvals_table.parquet"
 
 
@@ -1606,6 +1723,9 @@ EMPTY_INPUTS: dict[str, Callable[[Path], dict]] = {
         _epoch_info, _register(tmp, analysed=(), pending=())
     ),
     "decode_folder": lambda tmp: audit.check_decode_folder(tmp, _register(tmp)),
+    "sustained_noise": lambda tmp: audit.check_sustained_noise(
+        _register(tmp, analysed=(), pending=()), _artifact_run(tmp, {})
+    ),
 }
 """Each check on empty input: an audit that passes on nothing has checked nothing."""
 
@@ -1638,7 +1758,14 @@ class Tree:
 def _consistent_tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Tree:
     """Decodes, logs, both run manifests, tables, fits and PFC sidecars that agree,
     with an epoch register analysing their epochs and ``get_epoch_info`` listing
-    them."""
+    them, and a configured artifact run that finds no S block in any of them."""
+    # configured first: the tables are stamped with the SWR source, which names it
+    artifacts = _artifact_run(
+        tmp_path, {epoch_id: [T_CORE] for epoch_id in (*EPOCHS, NO_INPUT_EPOCH)}
+    )
+    module = "continuum_swr_replay.analysis.hippocampus.swr_source"
+    monkeypatch.setattr(f"{module}.ARTIFACT_INTERVALS_ROOT", artifacts.parent)
+    monkeypatch.setattr(f"{module}.ARTIFACT_INTERVALS_RUN_ID", artifacts.name)
     history = _history(tmp_path)
     repo, decode_commit, run_commit = history.repo, history.decode, history.later
     root, log_dir = tmp_path / "Processed-Data", tmp_path / "logs"
@@ -1765,6 +1892,10 @@ def test_the_audit_passes_a_consistent_tree_and_writes_only_its_report(
     assert report["checks"]["pending_epochs"]["details"]["epochs"] == {
         NO_INPUT_EPOCH: f"PENDING_POPULATE: {NO_RIPPLE_BAND}"
     }
+    # the configured artifact run's S epochs were read, the pending one's too
+    sustained_noise = report["checks"]["sustained_noise"]["details"]
+    assert sustained_noise["run_id"] == ARTIFACT_RUN_ID
+    assert sustained_noise["n_checked"] == 3
     # and a pass says what it did not cover
     assert report["not_checked"] == [
         f"fit_provenance: no Stage 5B fit (stage5b_*.pkl) at {tree.replay}",
@@ -1901,6 +2032,27 @@ def test_the_audit_fails_on_an_epoch_spyglass_lists_but_the_register_does_not(
     assert report["failed_checks"] == ["epochs_registered"]
     assert report["checks"]["epochs_registered"]["failures"] == [
         "get_epoch_info lists 1 epoch(s) the register does not: sim20200101_.nwb 12_r6"
+    ]
+
+
+def test_the_audit_fails_on_an_s_epoch_the_register_still_analyses(
+    tmp_path, monkeypatch
+):
+    """The configured run finds an S block in an analysed epoch: the register
+    has drifted from the run."""
+    tree = _consistent_tree(tmp_path, monkeypatch)
+    _artifact_run(
+        tmp_path, {EPOCHS[0]: [T_CORE], EPOCHS[1]: [S_CORE], NO_INPUT_EPOCH: []}
+    )
+
+    code = audit.main(tree.argv)
+
+    report = json.loads(tree.output.read_text())
+    assert code == 1
+    assert report["failed_checks"] == ["sustained_noise"]
+    assert report["checks"]["sustained_noise"]["failures"] == [
+        f"1 epoch(s) have an S block in the artifact run {ARTIFACT_RUN_ID} but are "
+        f"not excluded for SUSTAINED_NOISE: {EPOCHS[1]} (analysed)"
     ]
 
 

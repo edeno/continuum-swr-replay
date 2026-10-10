@@ -61,6 +61,12 @@ checks (Stage 5), and nothing else.
 - ``pending_epochs``: the register's pending epochs, with their evidence. It
   never fails; ``not_checked`` names them, since no artifact is expected of
   them.
+- ``sustained_noise``: among the register's analysed, pending and
+  ``SUSTAINED_NOISE`` epochs, those with at least one S core (``kind == "S"``)
+  in the configured artifact run (``swr_source.artifact_intervals_dir()``) are
+  exactly the ``SUSTAINED_NOISE`` ones. An S epoch the register does not
+  exclude for it fails, and so does a ``SUSTAINED_NOISE`` epoch the run gives
+  no S core, or an epoch whose cores the run cannot serve.
 - ``encoding_marks``, with ``--check-marks`` only, since it reads the
   database: the marks reloaded through the project's loader hold every
   encoding mark of both decodes.
@@ -115,6 +121,11 @@ from numpy.typing import NDArray
 from ripple_detection import minimum_sample_count
 
 from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
+from continuum_swr_replay.analysis.hippocampus.artifacts.io import (
+    ArtifactRunError,
+    read_epoch_cores,
+    read_manifest,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import (
     MemorylessSequenceConfig,
 )
@@ -126,11 +137,14 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
 from continuum_swr_replay.analysis.hippocampus.swr_source import (
     SWR_SOURCE_ATTR,
     SWR_SOURCE_TABLES,
+    artifact_intervals_dir,
     swr_source_name,
 )
 from continuum_swr_replay.data_loaders.epoch_register import (
     REGISTER_PATH,
+    SESSION_WIDE,
     EpochRegisterError,
+    Reason,
     Status,
     read_register,
     register_entry,
@@ -1645,6 +1659,100 @@ def check_pending_epochs(register: pd.DataFrame) -> dict:
     return _result([], {"n_pending": len(pending), "epochs": pending})
 
 
+def check_sustained_noise(register: pd.DataFrame, run_dir: Path | None) -> dict:
+    """The register excludes for ``SUSTAINED_NOISE`` exactly the epochs with an S block.
+
+    Among the register's epoch entries that are analysed, pending or excluded
+    for ``SUSTAINED_NOISE``, the ones with at least one ``kind == "S"`` core in
+    the artifact run must be the ``SUSTAINED_NOISE`` ones. The check fails
+    naming each S epoch the register does not exclude for it, each
+    ``SUSTAINED_NOISE`` epoch the run gives no S core, and each of those epochs
+    whose cores the run cannot serve (``read_epoch_cores``).
+
+    Parameters
+    ----------
+    register : pd.DataFrame
+        ``read_register``'s frame.
+    run_dir : Path or None
+        The configured artifact run's folder,
+        ``swr_source.artifact_intervals_dir()``; None when no run is
+        configured, which fails.
+    """
+    if run_dir is None:
+        return _result(
+            [
+                "no artifact run is configured (swr_source.ARTIFACT_INTERVALS_RUN_ID "
+                "is None), so no epoch's S blocks were read"
+            ],
+            {},
+        )
+    run_id = run_dir.name
+    details: dict[str, Any] = {"run_id": run_id, "run_dir": str(run_dir)}
+    try:
+        read_manifest(run_dir)
+    except ArtifactRunError as error:
+        return _result([f"the artifact run {run_id} cannot be read: {error}"], details)
+    rows = register.reset_index()
+    rows = rows[rows["epoch"] != SESSION_WIDE]
+    noisy = rows["reason"] == Reason.SUSTAINED_NOISE
+    checked = rows[noisy | rows["status"].isin([Status.ANALYSED, Status.PENDING])]
+    entries: dict[str, str] = {}
+    s_epochs: dict[str, int] = {}
+    unreadable: dict[str, str] = {}
+    for row in checked.itertuples(index=False):
+        epoch_id = register_epoch_id(row.nwb_file_name, row.epoch)
+        entries[epoch_id] = ", ".join(filter(None, (row.status, row.reason)))
+        try:
+            cores = read_epoch_cores(run_dir, epoch_id).cores
+        except ArtifactRunError as error:
+            unreadable[epoch_id] = str(error)
+            continue
+        n_s = int((cores["kind"] == "S").sum())
+        if n_s:
+            s_epochs[epoch_id] = n_s
+    excluded = {
+        register_epoch_id(name, epoch)
+        for name, epoch in zip(
+            rows.loc[noisy, "nwb_file_name"], rows.loc[noisy, "epoch"], strict=True
+        )
+    }
+    not_excluded = sorted(set(s_epochs) - excluded)
+    without_s = sorted(excluded - set(s_epochs) - set(unreadable))
+    failures = []
+    if not entries:
+        failures.append(
+            "the register has no analysed, pending or SUSTAINED_NOISE epoch to check"
+        )
+    if not_excluded:
+        failures.append(
+            f"{len(not_excluded)} epoch(s) have an S block in the artifact run "
+            f"{run_id} but are not excluded for SUSTAINED_NOISE: "
+            + ", ".join(
+                f"{epoch_id} ({entries[epoch_id]})" for epoch_id in not_excluded
+            )
+        )
+    if without_s:
+        failures.append(
+            f"{len(without_s)} epoch(s) are excluded for SUSTAINED_NOISE but the "
+            f"artifact run {run_id} gives them no S core: {', '.join(without_s)}"
+        )
+    if unreadable:
+        failures.append(
+            f"the artifact run {run_id} cannot serve {len(unreadable)} epoch(s): "
+            + "; ".join(unreadable[epoch_id] for epoch_id in sorted(unreadable))
+        )
+    details.update(
+        {
+            "n_checked": len(entries),
+            "s_epochs": dict(sorted(s_epochs.items())),
+            "not_excluded": {epoch_id: entries[epoch_id] for epoch_id in not_excluded},
+            "without_s": without_s,
+            "unreadable": dict(sorted(unreadable.items())),
+        }
+    )
+    return _result(failures, details)
+
+
 def _epoch_ids(sessions: pd.DataFrame) -> pd.Series:
     """``{animal}{session_date}_{epoch}_HPC`` for each row of the session columns."""
     return (
@@ -1855,12 +1963,15 @@ def run_audit(
     check_marks: bool,
     register: pd.DataFrame,
     load_epoch_info: Callable[[], pd.DataFrame],
+    artifact_run_dir: Path | None,
 ) -> tuple[dict[str, dict], list[str]]:
     """Run every check, reading only.
 
     `register` is ``read_register``'s frame, the epochs every artifact must
     hold; `load_epoch_info` is ``get_epoch_info``, whose epochs must all be
-    registered.
+    registered; `artifact_run_dir` is the configured artifact run's folder
+    (``swr_source.artifact_intervals_dir()``), whose S epochs must be the
+    register's ``SUSTAINED_NOISE`` ones.
 
     Returns
     -------
@@ -2012,6 +2123,7 @@ def run_audit(
             "outside the analysed cohort, so no artifact is checked for them "
             "(checks.pending_epochs lists them)"
         )
+    checks["sustained_noise"] = check_sustained_noise(register, artifact_run_dir)
     epoch_sets = check_epoch_sets(sets, reasons, register=register, named=named)
     epoch_sets["failures"] = table_failures + epoch_sets["failures"]
     epoch_sets["ok"] = not epoch_sets["failures"]
@@ -2176,6 +2288,7 @@ def main(argv: list[str] | None = None) -> int:
         check_marks=args.check_marks,
         register=read_register(args.register),
         load_epoch_info=get_epoch_info,
+        artifact_run_dir=artifact_intervals_dir(),
     )
     failed = [name for name, check in checks.items() if not check["ok"]]
     head = _git(args.repo, "rev-parse", "HEAD")

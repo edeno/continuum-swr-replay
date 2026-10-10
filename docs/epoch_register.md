@@ -194,6 +194,11 @@ The audit runs these checks on the register:
   analysed epoch is listed.
 - `pending_epochs`: lists the pending epochs and their evidence, which
   `not_checked` names.
+- `sustained_noise`: among the analysed, pending and `SUSTAINED_NOISE` epochs, those
+  with at least one S core in the configured artifact run
+  (`swr_source.artifact_intervals_dir()`) are exactly the `SUSTAINED_NOISE` ones. An
+  S epoch the register does not exclude for it fails, and so does a `SUSTAINED_NOISE`
+  epoch the run gives no S core, or an epoch whose cores the run cannot serve.
 
 ## Adding the pending epochs
 
@@ -245,6 +250,10 @@ recorded.
   with the failure as evidence, and regenerate this doc.
 - **A new session or epoch appears in Spyglass.** `analysed_epochs()` raises until
   it is registered.
+- **The configured artifact run changes.** An analysed or pending epoch in which it
+  finds an S block becomes `excluded` / `SUSTAINED_NOISE`, with the run's evidence.
+  A `SUSTAINED_NOISE` epoch in which it finds none goes back to the lead. The audit's
+  `sustained_noise` check fails until the register and the run agree.
 
 `read_register` refuses a malformed file:
 
