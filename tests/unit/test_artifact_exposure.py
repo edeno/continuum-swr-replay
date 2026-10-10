@@ -1,13 +1,14 @@
-"""Every rate denominator loses the artifact mask's time.
+"""Every rate denominator loses excluded time: the mask widened by 0.3 s.
 
-Artifact time is unobserved, so it is no one's exposure:
+Excluded time is not analysed, so it is no one's exposure:
 
 - a stop's immobility exposure (Family A's offset, the ContFrag stop table's
-  too) falls by exactly the masked seconds inside the stop, and nothing else
+  too) falls by exactly the excluded seconds inside the stop, and nothing else
   about the stop changes;
-- a per-bin row that touches the mask is dropped (the dense stop-timebin
+- a per-bin row that touches excluded time is dropped (the dense stop-timebin
   table, Family B's design, the PFC fit bins), and so is one whose history or
-  peri-event window reaches it;
+  peri-event window reaches it, and a matched control never lands on a
+  dropped event;
 - with no artifact run configured, every one of these is what it was.
 
 Offline: the artifact run is written under ``tmp_path`` and the source pointed
@@ -47,6 +48,8 @@ CORES = [("S", 3.0, 4.0), ("spk", 15.95, 15.95)]
 """An S block padded by 1 s, [2.0, 5.0], and a spike-only line padded by
 0.1 s, [15.85, 16.05], which straddles the second bout's start at 16.0."""
 MASK = [(2.0, 5.0), (15.85, 16.05)]
+EXCLUDED = [(1.7, 5.3), (15.55, 16.35)]
+"""MASK widened by 0.3 s on each side."""
 
 
 def _speed() -> np.ndarray:
@@ -104,6 +107,9 @@ def masked(tmp_path, monkeypatch):
     monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_ROOT", directory.parent)
     monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
     np.testing.assert_allclose(swr_source.artifact_intervals(EPOCH_ID).to_numpy(), MASK)
+    np.testing.assert_allclose(
+        swr_source.excluded_intervals(EPOCH_ID).to_numpy(), EXCLUDED
+    )
 
 
 def _stop_tables() -> dict[str, pd.DataFrame]:
@@ -117,15 +123,15 @@ def _stop_tables() -> dict[str, pd.DataFrame]:
 
 class TestStopExposure:
     @pytest.mark.parametrize("table", ["nonlocal", "contfrag"])
-    def test_falls_by_exactly_the_masked_time_inside_the_stop(self, masked, table):
+    def test_falls_by_exactly_the_excluded_time_inside_the_stop(self, masked, table):
         stops = _stop_tables()[table]
 
         assert stops["stop_start"].tolist() == [0.0, 16.0]
         span = (stops["stop_end"] - stops["stop_start"]).to_numpy()
-        # 3 s of [2, 5] in the first stop; [16.0, 16.05] of the line in the
-        # second (its part before 16.0 is not the stop's)
+        # 3.6 s of [1.7, 5.3] in the first stop; [16.0, 16.35] of the line's
+        # excluded time in the second (its part before 16.0 is not the stop's)
         np.testing.assert_allclose(
-            span - stops["immobility_duration_s"].to_numpy(), [3.0, 0.05]
+            span - stops["immobility_duration_s"].to_numpy(), [3.6, 0.35]
         )
 
     @pytest.mark.parametrize("table", ["nonlocal", "contfrag"])
@@ -157,8 +163,8 @@ class TestTheDenseTimebinTable:
         out = build_stop_timebin_table(_dot(), np.array([]), bin_s=0.5)
 
         # bin k of the first stop is [0.5 k, 0.5 k + 0.5]: those touching
-        # [2, 5] (k = 3..10) are gone, and only those; of the second stop's
-        # bins [16 + 0.5 k, ...], the first touches [15.85, 16.05]
+        # [1.7, 5.3] (k = 3..10) are gone, and only those; of the second
+        # stop's bins [16 + 0.5 k, ...], the first touches [15.55, 16.35]
         by_stop = out.groupby("stop_id", sort=False)["bin_in_stop"].apply(list)
         assert by_stop.tolist() == [
             [0, 1, 2, *range(11, 20)],
@@ -189,8 +195,8 @@ def _design_inputs() -> tuple[pd.DataFrame, pd.DataFrame]:
             "stop_id": [11, 12],
             "stop_start": [0.0, 16.0],
             "stop_end": [10.0, 19.998],
-            # Family A's exposure, the span less the mask
-            "immobility_duration_s": [7.0, 3.948],
+            # Family A's exposure, the span less excluded time
+            "immobility_duration_s": [6.4, 3.648],
         }
     )
     onsets = pd.DataFrame(
@@ -205,8 +211,8 @@ def _mask_by_session() -> pd.DataFrame:
             "animal": "m",
             "session_date": 20200101,
             "epoch": "02_r1",
-            "start_time": [s for s, _ in MASK],
-            "end_time": [e for _, e in MASK],
+            "start_time": [s for s, _ in EXCLUDED],
+            "end_time": [e for _, e in EXCLUDED],
         }
     )
 
@@ -239,23 +245,23 @@ class TestFamilyBDesign:
             onsets,
             bin_s=0.5,
             tmax=20.0,
-            artifact_intervals=_mask_by_session(),
+            excluded_intervals=_mask_by_session(),
             history_window_s=1.0,
         )
 
         first = design.loc[design["stop_id"] == 11, "binj"].tolist()
-        # [1.5, 2] touches the mask's start, [5, 5.5] its end; [5.5, 6] and
-        # [6, 6.5] look back into it within 1 s; [6.5, 7] does not
+        # [1.5, 2] touches excluded time's start, [5, 5.5] its end; [5.5, 6]
+        # and [6, 6.5] look back into it within 1 s; [6.5, 7] does not
         assert first == [0, 1, 2, *range(13, 20)]
-        # the second stop's first bin [16, 16.5] touches [15.85, 16.05], and the
+        # the second stop's first bin [16, 16.5] touches [15.55, 16.35], and the
         # next two look back at it; its history starts at the stop's start
         second = design.loc[design["stop_id"] == 12, "binj"].tolist()
         assert second == list(range(3, 8))
         # the onset at 5.6 s fell in a dropped bin; the others are counted
         assert design["count"].sum() == 3
-        assert design.attrs["n_bins_artifact"] == 8 + 1
-        assert design.attrs["n_bins_artifact_history"] == 2 + 2
-        assert design.attrs["n_onsets_in_artifact_bins"] == 1
+        assert design.attrs["n_bins_excluded"] == 8 + 1
+        assert design.attrs["n_bins_excluded_history"] == 2 + 2
+        assert design.attrs["n_onsets_in_excluded_bins"] == 1
         # a kept row is the row of the design without the mask
         kept = full.merge(design[["stop_id", "binj"]], on=["stop_id", "binj"])
         pd.testing.assert_frame_equal(
@@ -276,7 +282,7 @@ class TestFamilyBDesign:
             bin_s=0.5,
             tmax=20.0,
             self_history_lags=2,
-            artifact_intervals=_mask_by_session(),
+            excluded_intervals=_mask_by_session(),
             history_window_s=1.0,
         )
 
@@ -294,7 +300,7 @@ class TestFamilyBDesign:
             onsets,
             bin_s=0.5,
             tmax=20.0,
-            artifact_intervals=empty,
+            excluded_intervals=empty,
             history_window_s=1.0,
         )
 
@@ -305,14 +311,13 @@ class TestPfcFitBins:
     def _position(self) -> pd.DataFrame:
         return pd.DataFrame({"head_speed": _speed()}, index=pd.Index(TIME, name="time"))
 
-    def test_bins_whose_peri_event_window_reaches_the_mask_are_not_fit(self):
-        artifacts = pd.DataFrame({"start_time": [2.0], "end_time": [5.0]})
+    def test_bins_whose_basis_window_reaches_excluded_time_are_not_fit(self):
+        excluded = pd.DataFrame({"start_time": [2.0], "end_time": [5.0]})
 
         is_immobile, fit_mask, counts = build_session_fit_mask(
             self._position(),
             stop_cohort="all_stops",
-            artifact_intervals=artifacts,
-            artifact_reach_s=0.25,
+            excluded_intervals=excluded,
         )
 
         reach = (TIME >= 1.75) & (TIME <= 5.25)
@@ -328,38 +333,54 @@ class TestPfcFitBins:
         after = build_session_fit_mask(
             self._position(),
             stop_cohort="all_stops",
-            artifact_intervals=pd.DataFrame(
+            excluded_intervals=pd.DataFrame(
                 {"start_time": [], "end_time": []}, dtype=float
             ),
-            artifact_reach_s=0.25,
+            basis_half_window_s=0.25,
         )
 
         pd.testing.assert_series_equal(after[1], before[1])
         assert after[2] == before[2]
 
 
-def test_every_rate_fit_drops_the_masked_bins():
-    """Each runner that builds a per-bin design gives it the mask and its
-    ladder's history window (``**common`` counts when that dict holds both)."""
+def test_every_rate_fit_drops_the_excluded_bins():
+    """Each runner that builds a per-bin design gives it excluded time and its
+    ladder's history window, as keywords or through a ``**`` dict literal
+    assigned in the same function."""
     import ast
     from pathlib import Path
 
+    wanted = {"excluded_intervals", "history_window_s"}
     rate = Path(__file__).resolve().parents[2] / "scripts" / "rate"
     offenders, n_calls = [], 0
-    for path in sorted(rate.glob("fit_*.py")):
-        text = path.read_text()
-        for node in ast.walk(ast.parse(text)):
-            if not (
-                isinstance(node, ast.Call)
-                and getattr(node.func, "id", None) == "aggregate_to_timebins"
-            ):
-                continue
-            n_calls += 1
-            names = {keyword.arg for keyword in node.keywords}
-            spread = None in names and '"artifact_intervals":' in text
-            if not ({"artifact_intervals", "history_window_s"} <= names or spread):
-                offenders.append(f"{path.name}:{node.lineno}")
-    assert n_calls >= 5
+    for path in sorted([*rate.glob("fit_*.py"), rate / "plot_model_checking.py"]):
+        tree = ast.parse(path.read_text())
+        for function in [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]:
+            literals = {
+                target.id: {
+                    key.value
+                    for key in node.value.keys
+                    if isinstance(key, ast.Constant)
+                }
+                for node in ast.walk(function)
+                if isinstance(node, ast.Assign) and isinstance(node.value, ast.Dict)
+                for target in node.targets
+                if isinstance(target, ast.Name)
+            }
+            for node in ast.walk(function):
+                if not (
+                    isinstance(node, ast.Call)
+                    and getattr(node.func, "id", None) == "aggregate_to_timebins"
+                ):
+                    continue
+                n_calls += 1
+                given = {k.arg for k in node.keywords if k.arg is not None}
+                for spread in (k for k in node.keywords if k.arg is None):
+                    if isinstance(spread.value, ast.Name):
+                        given |= literals.get(spread.value.id, set())
+                if not wanted <= given:
+                    offenders.append(f"{path.name}:{node.lineno}")
+    assert n_calls >= 6
     assert offenders == []
 
 
@@ -441,7 +462,7 @@ class TestNoArtifactsChangeNothing:
                 onsets[onsets.event_type == "non_local"].dropna(subset=["stop_id"]),
                 bin_s=0.5,
                 tmax=20.0,
-                artifact_intervals=swr_source.artifact_intervals_by_session(stops),
+                excluded_intervals=swr_source.excluded_intervals_by_session(stops),
                 history_window_s=1.0,
             ),
         }
@@ -518,7 +539,7 @@ def test_an_empty_mask_needs_no_stop_bounds():
         onsets,
         bin_s=0.5,
         tmax=20.0,
-        artifact_intervals=_mask_by_session().iloc[0:0],
+        excluded_intervals=_mask_by_session().iloc[0:0],
         history_window_s=1.0,
     )
 
@@ -531,5 +552,27 @@ def test_an_empty_mask_needs_no_stop_bounds():
             onsets,
             bin_s=0.5,
             tmax=20.0,
-            artifact_intervals=_mask_by_session(),
+            excluded_intervals=_mask_by_session(),
         )
+
+
+def test_every_per_bin_runner_checks_its_tables_source():
+    """A runner drops bins by the configured source's excluded time, so it
+    refuses stop and onset tables stamped with another source (another artifact
+    run, say), and its provenance names the source."""
+    from pathlib import Path
+
+    rate = Path(__file__).resolve().parents[2] / "scripts" / "rate"
+    runners = [
+        "fit_per_bin_rate_models.py",
+        "fit_swr_contrast_rate.py",
+        "fit_uncertainty_rate.py",
+        "fit_cross_history_rate.py",
+        "plot_model_checking.py",
+    ]
+    for name in runners:
+        text = (rate / name).read_text()
+        assert "require_swr_source(stop," in text, name
+        assert "require_swr_source(onset_table," in text, name
+    for name in runners[:3]:
+        assert '"swr_source": swr_source_name()' in (rate / name).read_text(), name

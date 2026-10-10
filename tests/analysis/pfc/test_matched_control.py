@@ -469,3 +469,64 @@ def test_a_real_session_writes_the_control_array_and_records_its_draw(tmp_path):
         n_control_draws=record["n_control_draws"],
         control_draw_seed=record["control_draw_seed"],
     )
+
+
+class TestEventsTheAnalysedTimeRuleDropped:
+    """A control never lands on an event the analysed-time rule dropped (a
+    non-local event or SWR in excluded time, or overlapping one dropped there),
+    and the dropped events near fitted bins are counted, not hidden."""
+
+    def test_a_control_avoids_a_dropped_event(self, event_times, fit_mask):
+        # a dropped non-local event filling most of the second bout's free time
+        dropped = _windows([(6.7, 7.9)])
+
+        for seed in range(20):
+            draw = make_matched_control_times(
+                event_times, fit_mask, np.random.default_rng(seed), avoid=dropped
+            )
+            for start, end in draw.times.to_numpy():
+                assert not _overlaps(start, end, dropped)
+
+    def test_no_dropped_events_change_nothing(self, event_times, fit_mask):
+        plain = make_matched_control_times(
+            event_times, fit_mask, np.random.default_rng(3)
+        )
+        empty = make_matched_control_times(
+            event_times, fit_mask, np.random.default_rng(3), avoid=_windows([])
+        )
+
+        pd.testing.assert_frame_equal(plain.times, empty.times)
+
+    def test_the_dropped_events_are_the_non_local_events_and_swrs(self):
+        from continuum_swr_replay.analysis.pfc.glm import artifact_dropped_events
+
+        drops = pd.DataFrame(
+            {
+                "event_col": [
+                    "SWR_event",
+                    "SWR_event",
+                    "MUA_event",
+                    "non_local_event",
+                    "non_local_event",
+                    "non_local_event",
+                ],
+                "label": [1, 2, 1, 1, 2, 3],
+                "start_time": [5.0, 1.0, 2.0, 3.0, 4.0, 0.5],
+                "end_time": [5.1, 1.1, 2.1, 3.1, 4.1, 0.6],
+                "speed_eligible": True,
+                "drop_reason": [
+                    "near_artifact",
+                    "moving",
+                    "artifact",
+                    None,
+                    "overlaps_dropped_event",
+                    "artifact",
+                ],
+            }
+        )
+
+        dropped = artifact_dropped_events(drops)
+
+        np.testing.assert_allclose(
+            dropped.to_numpy(), [[0.5, 0.6], [4.0, 4.1], [5.0, 5.1]]
+        )

@@ -26,6 +26,10 @@ from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
     interval_mask,
     pad_intervals,
 )
+from continuum_swr_replay.analysis.hippocampus.event_eligibility import (
+    EXCLUDED_TIME_REASONS,
+    DropReason,
+)
 from continuum_swr_replay.analysis.replay.cohort_selection import (
     events_in_stops,
     stop_interval_mask,
@@ -1469,18 +1473,18 @@ def build_session_fit_mask(
     cohort_stops: pd.DataFrame | None = None,
     stop_cohort: str = "at_well",
     immobility_threshold: float = 4.0,
-    artifact_intervals: pd.DataFrame | None = None,
-    artifact_reach_s: float = 0.0,
+    excluded_intervals: pd.DataFrame | None = None,
+    basis_half_window_s: float | None = None,
 ) -> tuple[pd.Series, pd.Series, dict[str, Any]]:
     """Bins the immobility GLMs are fit on, for one session.
 
     Three restrictions compose. Immobility is the long-standing one. The stop
     cohort keeps only the time the animal spends stopped at a well, which is
     the population the hippocampal rate and content ladders are read on, so a
-    PFC claim and a replay claim describe the same stops. The artifact mask is
-    unobserved time: a bin within `artifact_reach_s` of it (the peri-event
-    basis's half-width, so no fitted bin's design reads masked time) is not
-    fit.
+    PFC claim and a replay claim describe the same stops. Excluded time (the
+    artifact mask widened by 0.3 s) is not analysed: a bin whose peri-event
+    basis window (``+/- basis_half_window_s``) touches it is not fit, so no
+    fitted bin's design reads excluded time.
 
     Parameters
     ----------
@@ -1497,12 +1501,13 @@ def build_session_fit_mask(
         reproducing the pre-cohort mask exactly.
     immobility_threshold : float
         Speed threshold for immobility (cm/s).
-    artifact_intervals : pandas.DataFrame, optional
-        The session's artifact mask (``swr_source.artifact_intervals``):
-        ``start_time`` and ``end_time``, absolute seconds, closed. None masks
-        nothing.
-    artifact_reach_s : float
-        Seconds on each side of the mask whose bins are not fit either.
+    excluded_intervals : pandas.DataFrame, optional
+        The session's excluded time (``swr_source.excluded_intervals``):
+        ``start_time`` and ``end_time``, absolute seconds, closed. None
+        excludes nothing.
+    basis_half_window_s : float, optional
+        Half-width of the peri-event basis, in seconds;
+        :data:`DEFAULT_BASIS_HALF_WINDOW_S` when None.
 
     Returns
     -------
@@ -1510,7 +1515,7 @@ def build_session_fit_mask(
         Immobility alone; still the definition of the *running* comparison.
     fit_mask : pandas.Series of bool, shape (n_time,)
         ``is_immobile & in_cohort_stop`` (``is_immobile`` for ``all_stops``),
-        less the bins within `artifact_reach_s` of the mask.
+        less the bins whose basis window touches excluded time.
     counts : dict
         ``stop_cohort``, ``n_bins_total``, ``n_bins_immobile``, ``n_bins_fit``.
 
@@ -1533,10 +1538,15 @@ def build_session_fit_mask(
             position_info.index.to_numpy(dtype=float), cohort_stops
         )
         fit_mask = is_immobile & pd.Series(in_cohort, index=position_info.index)
-    if artifact_intervals is not None and len(artifact_intervals):
+    if excluded_intervals is not None and len(excluded_intervals):
+        half_window = (
+            DEFAULT_BASIS_HALF_WINDOW_S
+            if basis_half_window_s is None
+            else basis_half_window_s
+        )
         reached = interval_mask(
             position_info.index.to_numpy(dtype=float),
-            pad_intervals(artifact_intervals, artifact_reach_s),
+            pad_intervals(excluded_intervals, half_window),
         )
         fit_mask = fit_mask & pd.Series(~reached, index=position_info.index)
     counts = {
@@ -2046,6 +2056,37 @@ def _merge_windows(starts: NDArray, ends: NDArray) -> tuple[NDArray, NDArray]:
     return starts[opens_group], np.maximum.reduceat(ends, group_start)
 
 
+#: The decode-frame cohorts whose dropped events the PFC path counts and keeps
+#: its controls clear of: the two it models (non-local events and SWRs).
+ARTIFACT_DROP_COLUMNS = ("non_local_event", "SWR_event")
+
+
+def artifact_dropped_events(drops: pd.DataFrame) -> pd.DataFrame:
+    """The non-local events and SWRs the analysed-time rule dropped.
+
+    Parameters
+    ----------
+    drops : pandas.DataFrame
+        ``swr_source.artifact_event_drops`` of the session's decode frame.
+
+    Returns
+    -------
+    pandas.DataFrame
+        ``start_time`` and ``end_time`` (seconds) of every non-local event or
+        SWR dropped for excluded time (``artifact``, ``near_artifact``) or for
+        overlapping such an event (``overlaps_dropped_event``), sorted by start.
+    """
+    reasons = {*EXCLUDED_TIME_REASONS, DropReason.OVERLAPS_DROPPED_EVENT.value}
+    selected = drops["event_col"].isin(ARTIFACT_DROP_COLUMNS) & drops[
+        "drop_reason"
+    ].isin(reasons)
+    return (
+        drops.loc[selected, ["start_time", "end_time"]]
+        .sort_values("start_time")
+        .reset_index(drop=True)
+    )
+
+
 class MatchedControlDraw(NamedTuple):
     """One draw of the matched non-event control, and why events went unplaced.
 
@@ -2093,6 +2134,7 @@ def make_matched_control_times(
     is_immobile: pd.Series,
     rng: np.random.Generator,
     max_attempts: int = DEFAULT_MATCHED_CONTROL_ATTEMPTS,
+    avoid: pd.DataFrame | None = None,
 ) -> MatchedControlDraw:
     """Time-shifted-onset matched non-event control.
 
@@ -2110,7 +2152,8 @@ def make_matched_control_times(
 
     - the control window lies entirely inside that bout (so every bin it covers
       is a bin the models are fit on),
-    - it overlaps no window of any real event class, ``SWR`` included, and
+    - it overlaps no window of any real event class, ``SWR`` included, nor any
+      event in `avoid` (the events the analysed-time rule dropped), and
     - no other control in the draw uses that exact onset bin.
 
     The duration-matching windows may overlap one another. Duration constrains
@@ -2148,6 +2191,10 @@ def make_matched_control_times(
         Random source-order matchings attempted before the best incomplete
         matching is kept. Zero deliberately places nothing (used by the
         incomplete-null regression test).
+    avoid : pandas.DataFrame, optional
+        Further windows a control may not overlap (``start_time`` /
+        ``end_time``, seconds): the events :func:`artifact_dropped_events`
+        returns.
 
     Returns
     -------
@@ -2167,16 +2214,12 @@ def make_matched_control_times(
     runs = _contiguous_true_runs(np.asarray(is_immobile, dtype=bool))
 
     source = event_times[MATCHED_CONTROL_SOURCE_CLASS]
+    windows = [event_times[name] for name in EVENT_CLASSES]
+    if avoid is not None:
+        windows.append(avoid)
     real_starts, real_ends = _merge_windows(
-        np.concatenate(
-            [
-                event_times[name].start_time.to_numpy(dtype=float)
-                for name in EVENT_CLASSES
-            ]
-        ),
-        np.concatenate(
-            [event_times[name].end_time.to_numpy(dtype=float) for name in EVENT_CLASSES]
-        ),
+        np.concatenate([w.start_time.to_numpy(dtype=float) for w in windows]),
+        np.concatenate([w.end_time.to_numpy(dtype=float) for w in windows]),
     )
 
     if max_attempts < 0:
@@ -2725,32 +2768,35 @@ def run_session(
     fit_lags = np.arange(-125, 126, 1)
     report_lags = np.arange(-100, 101, 1)
 
-    # The one artifact mask is unobserved time. No fitted bin's peri-event
-    # design reaches it (the basis's half-width on each side), and no running
-    # bin's theta phase is read from it.
-    artifacts = swr_source.artifact_intervals(
+    # Excluded time (the artifact mask widened by 0.3 s) is not analysed. No
+    # fitted bin's peri-event basis window reaches it, and no running bin's
+    # theta phase is read from it.
+    excluded = swr_source.excluded_intervals(
         swr_source.swr_epoch_id(nwb_file_name, epoch_name)
     )
-    artifact_reach_s = float(np.abs(fit_lags).max()) / sampling_frequency
     is_immobile, fit_mask, bin_counts = build_session_fit_mask(
         data["position_info"],
         cohort_stops=cohort_stops,
         stop_cohort=stop_cohort,
         immobility_threshold=immobility_threshold,
-        artifact_intervals=artifacts,
-        artifact_reach_s=artifact_reach_s,
+        excluded_intervals=excluded,
+        basis_half_window_s=DEFAULT_BASIS_HALF_WINDOW_S,
     )
-    if len(artifacts):
+    if len(excluded):
         theta_phase = data["theta_phase"].copy()
         theta_phase.loc[
-            interval_mask(theta_phase.index.to_numpy(dtype=float), artifacts)
+            interval_mask(theta_phase.index.to_numpy(dtype=float), excluded)
         ] = np.nan
         data = {**data, "theta_phase": theta_phase}
         logger.info(
-            "Artifact mask: %d intervals; %d time bins within %.3f s of it are not fit",
-            len(artifacts),
-            int(interval_mask(time, pad_intervals(artifacts, artifact_reach_s)).sum()),
-            artifact_reach_s,
+            "Excluded time: %d intervals; %d time bins within %.3f s of it are not fit",
+            len(excluded),
+            int(
+                interval_mask(
+                    time, pad_intervals(excluded, DEFAULT_BASIS_HALF_WINDOW_S)
+                ).sum()
+            ),
+            DEFAULT_BASIS_HALF_WINDOW_S,
         )
     logger.info(
         "Fit bins: %d immobile, %d in cohort (%.3f of %d time bins)",
@@ -2792,12 +2838,33 @@ def run_session(
         fit_mask=fit_mask,
         basis_half_window_s=float(np.abs(fit_lags).max()) / sampling_frequency,
     )
+    # The events the one analysed-time rule dropped (``swr_source``): fitted
+    # bins near one are fit with its regressor missing, which is counted, and
+    # no matched control may land on one.
+    artifact_dropped = artifact_dropped_events(
+        swr_source.read_artifact_event_drops(
+            session_data_over_time_path(
+                nwb_file_name, epoch_name, non_local_threshold=non_local_threshold
+            )
+        )
+    )
+    event_counts["n_artifact_dropped_events"] = int(len(artifact_dropped))
+    event_counts["n_artifact_dropped_overlapping_fit"] = count_events_covering_fit_bins(
+        artifact_dropped["start_time"].to_numpy(dtype=float),
+        time,
+        np.asarray(fit_mask, dtype=bool),
+        basis_half_window_s=DEFAULT_BASIS_HALF_WINDOW_S,
+    )
     # The matched non-event control is drawn after the cohort restriction and
     # from the fit mask, so its windows sample exactly the bins the models are
-    # fit on and avoid exactly the events that survived the restriction.
+    # fit on and avoid every event, the ones the restriction or the
+    # analysed-time rule dropped included.
     control_seed = matched_control_seed(nwb_file_name, epoch_name)
     control_draw = make_matched_control_times(
-        event_times, fit_mask, np.random.default_rng(control_seed)
+        event_times,
+        fit_mask,
+        np.random.default_rng(control_seed),
+        avoid=artifact_dropped,
     )
     event_times["matched_control"] = control_draw.times
     n_matched_control = int(len(control_draw.times))

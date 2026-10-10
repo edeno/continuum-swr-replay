@@ -24,6 +24,13 @@ from patsy import dmatrix
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
+from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (  # noqa: E402
+    covered_seconds,
+)
+from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
+    excluded_intervals_by_session,
+    require_swr_source,
+)
 from continuum_swr_replay.analysis.replay import (  # noqa: E402
     POPULATIONS,
     attach_is_swr_to_onsets,
@@ -85,32 +92,59 @@ def _coef(df, model, oc, coef):
     return df[(df.model == model) & (df.outcome == oc)][coef].dropna()
 
 
+def _lag_exposure(stop, edges):
+    """Immobility seconds per lag bin since stop onset, excluded time left out.
+
+    The clock is the stop's own (``stop_end - stop_start``): a stop covers lag
+    bin ``[e, e + dt)`` from ``stop_start + e`` to its end, less the excluded
+    seconds there (``swr_source.excluded_intervals_by_session``). Its
+    ``immobility_duration_s`` is already net of excluded time, so it is not a
+    length on this clock.
+    """
+    excluded = excluded_intervals_by_session(stop)
+    keys = ["animal", "session_date", "epoch"]
+    denom = np.zeros(len(edges) - 1)
+    for session, stops_g in stop.groupby(keys, sort=False):
+        session_excluded = excluded.loc[
+            (excluded[keys] == pd.Series(session, index=keys)).all(axis=1)
+        ]
+        start = stops_g["stop_start"].to_numpy(dtype=float)
+        span = stops_g["stop_end"].to_numpy(dtype=float) - start
+        for k, (low, high) in enumerate(zip(edges[:-1], edges[1:], strict=True)):
+            lo, hi = start + low, start + np.minimum(span, high)
+            inside = hi > lo
+            denom[k] += (hi - lo)[inside].sum() - covered_seconds(
+                lo[inside], hi[inside], session_excluded
+            ).sum()
+    return denom
+
+
 def _timecourse(stop, onsets, oc, dt=0.1, tmax=4.0):
     """Descriptive onset rate (events / s of immobility) vs time since stop onset.
 
     Numerator = onset-count histogram over t_since_stop_onset; denominator =
-    immobility-seconds per t-bin (sum over stops of the bin's overlap with each
-    stop's immobility duration). The denominator already makes this a proper
-    rate despite varying stop durations; what changes with tc is the *support*
-    (fewer, longer, more-rewarded stops survive) — see the survival overlay.
+    immobility-seconds per t-bin (:func:`_lag_exposure`: each stop's span in
+    the bin, excluded time left out). The denominator already makes this a
+    proper rate despite varying stop durations; what changes with tc is the
+    *support* (fewer, longer, more-rewarded stops survive) — see the survival
+    overlay.
     """
     t = POPULATIONS[oc](onsets)["t_since_stop_onset"].to_numpy()
     t = t[(t >= 0) & (t < tmax)]
     edges = np.arange(0, tmax + dt, dt)
     num, _ = np.histogram(t, edges)
-    immob = stop["immobility_duration_s"].to_numpy()
-    immob = immob[immob > 0]
-    denom = np.array([np.clip(immob - e, 0, dt).sum() for e in edges[:-1]])
+    denom = _lag_exposure(stop, edges)
     rate = num / np.where(denom > 0, denom, np.nan)
     return edges[:-1] + dt / 2, rate
 
 
 def _survival(stop, tmax=4.0, dt=0.1):
-    """Fraction of stops still immobile at each tc (the support of the curve)."""
-    immob = stop["immobility_duration_s"].to_numpy()
-    immob = immob[immob > 0]
+    """Fraction of stops still immobile at each tc (the support of the curve),
+    on the stops' own clock (``stop_end - stop_start``)."""
+    span = (stop["stop_end"] - stop["stop_start"]).to_numpy()
+    span = span[span > 0]
     tc = np.arange(dt / 2, tmax, dt)
-    return tc, np.array([(immob > t).mean() for t in tc])
+    return tc, np.array([(span > t).mean() for t in tc])
 
 
 def _shade_low_support(ax, stop, thresh=0.2, tmax=4.0):
@@ -119,8 +153,14 @@ def _shade_low_support(ax, stop, thresh=0.2, tmax=4.0):
     below = tc[surv < thresh]
     if below.size:
         ax.axvspan(below.min(), tmax, color="0.85", zorder=0)
-        ax.text(below.min(), ax.get_ylim()[1] * 0.97,
-                f" <{thresh:.0%} stops survive", fontsize=6, va="top", color="0.4")
+        ax.text(
+            below.min(),
+            ax.get_ylim()[1] * 0.97,
+            f" <{thresh:.0%} stops survive",
+            fontsize=6,
+            va="top",
+            color="0.4",
+        )
 
 
 def _panel_timecourse(ax, stop, onsets):
@@ -156,8 +196,10 @@ def _panel_fitted_timecourse(ax, df, stop):
     grid = np.linspace(0, TMAX, 81)
     B = _spline_basis(grid)
     scols = sorted(
-        c for c in df.columns
-        if c.startswith("coef_bs(tc, knots=") and c.endswith("]")
+        c
+        for c in df.columns
+        if c.startswith("coef_bs(tc, knots=")
+        and c.endswith("]")
         and f"{REWARD_HISTORY_COLUMNS[0]}:" not in c
     )
     for oc in POPS4:
@@ -168,8 +210,13 @@ def _panel_fitted_timecourse(ax, df, stop):
         if ok.sum() == 0:
             continue
         curves = np.exp(b0[ok, None] + beta[ok] @ B.T)  # (n_sess, n_grid)
-        ax.plot(grid, np.median(curves, axis=0), color=STYLE[oc][1],
-                label=STYLE[oc][0], lw=1.8)
+        ax.plot(
+            grid,
+            np.median(curves, axis=0),
+            color=STYLE[oc][1],
+            label=STYLE[oc][0],
+            lw=1.8,
+        )
     ax.set_xlabel("time since stop onset (s)")
     ax.set_ylabel("fitted rate (events / s)")
     ax.set_title("A1. Fitted time course (M7r spline, reward/history at ref)")
@@ -181,10 +228,12 @@ def _panel_fitted_timecourse(ax, df, stop):
 def _panel_baseline(ax, df):
     for i, oc in enumerate(POPS4):
         v = np.exp(_coef(df, "M0_const", oc, "coef_Intercept"))
-        err = [[v.median() - v.quantile(.25)], [v.quantile(.75) - v.median()]]
+        err = [[v.median() - v.quantile(0.25)], [v.quantile(0.75) - v.median()]]
         ax.bar(i, v.median(), color=STYLE[oc][1], alpha=0.7, yerr=err, capsize=4)
     ax.set_xticks(range(4))
-    ax.set_xticklabels([STYLE[o][0] for o in POPS4], rotation=20, ha="right", fontsize=8)
+    ax.set_xticklabels(
+        [STYLE[o][0] for o in POPS4], rotation=20, ha="right", fontsize=8
+    )
     ax.set_ylabel("baseline rate (events / s)")
     ax.set_title("A. Baseline rate (M0_const)")
 
@@ -241,8 +290,15 @@ def _panel_reward_kernel(ax, df):
     lags = np.arange(1, REWARD_HISTORY_N_LAGS + 1)
     for oc in POPS4:
         sessions = df[(df.model == FULL) & (df.outcome == oc)]
-        ax.plot(lags, reward_kernel_rate_ratios(sessions), marker="o",
-                color=STYLE[oc][1], label=STYLE[oc][0], lw=1.8, ms=4)
+        ax.plot(
+            lags,
+            reward_kernel_rate_ratios(sessions),
+            marker="o",
+            color=STYLE[oc][1],
+            label=STYLE[oc][0],
+            lw=1.8,
+            ms=4,
+        )
     ax.axhline(1, color="0.5", ls=":")
     ax.set_xticks(lags)
     ax.set_ylim(0, 4.3)
@@ -308,8 +364,15 @@ def _panel_covar(ax, df):
     for j, (model, coef) in enumerate(blocks):
         for i, oc in enumerate(POPS3):
             rr = np.exp(_coef(df, model, oc, coef).median())
-            ax.bar(i + j * (w + 0.05) - 0.2, rr, width=w, color=STYLE[oc][1],
-                   alpha=0.5 + 0.5 * (1 - j), edgecolor="k", linewidth=0.5)
+            ax.bar(
+                i + j * (w + 0.05) - 0.2,
+                rr,
+                width=w,
+                color=STYLE[oc][1],
+                alpha=0.5 + 0.5 * (1 - j),
+                edgecolor="k",
+                linewidth=0.5,
+            )
     ax.axhline(1, color="0.5", ls=":")
     ax.set_xticks(range(3))
     ax.set_xticklabels(SHORT)
@@ -341,11 +404,13 @@ def main() -> None:
     require_covariate_schema(stop, table="stop")
     require_covariate_schema(onset_table, table="event_onset")
     require_covariate_schema(event_table, table="event")
+    # the time course leaves out the configured source's excluded time
+    require_swr_source(stop, what=str(ALL_MODELS_INPUTS["stop_table"]))
     onsets = attach_is_swr_to_onsets(onset_table, event_table)
     FIGS.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplot_mosaic(
-        [["time", "rate", "rew1", "ladder"],
-         ["timefit", "rewk", "hist", "covar"]], figsize=(21, 9)
+        [["time", "rate", "rew1", "ladder"], ["timefit", "rewk", "hist", "covar"]],
+        figsize=(21, 9),
     )
     _panel_timecourse(ax["time"], stop, onsets)
     _panel_fitted_timecourse(ax["timefit"], df, stop)

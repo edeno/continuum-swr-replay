@@ -119,7 +119,10 @@ def _process_ripple_data(
         if band_electrode_ids is None:
             raise ValueError("ripple_power needs the band's electrode ids")
         filtered_ripple = with_ripple_power(
-            filtered_ripple, ripple_power, band_electrode_ids=band_electrode_ids
+            filtered_ripple,
+            ripple_power,
+            band_electrode_ids=band_electrode_ids,
+            position_span_s=(float(position_index[0]), float(position_index[-1])),
         )
     for key, value in filtered_ripple.items():
         if should_load(key):

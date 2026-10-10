@@ -72,9 +72,9 @@ Detection and analysis of neural events (ripples, non-local states).
 
 ### `src/continuum_swr_replay/analysis/hippocampus/event_eligibility.py`
 
-One eligibility rule for every event cohort: immobile, and clear of the mask.
+One analysed-time rule for every event cohort, exposure, bin and window.
 
-`DropReason`, `artifact_drop_reasons`, `event_drop_reasons`, `label_drop_reasons`, `drop_labels`
+`DropReason`, `excluded_time`, `artifact_drop_reasons`, `overlaps_dropped_events`, `event_drop_reasons`, `label_drop_reasons`, `drop_labels`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/event_immobility.py`
 
@@ -122,7 +122,7 @@ Rule R-T: per epoch, keep the CA1 band tetrodes that ripple with the rest.
 
 The paper's one SWR source: the direct ripple_detection 2.0 Kay inventory.
 
-`SwrSourceError`, `swr_inventory_dir`, `artifact_intervals_dir`, `swr_source_name`, `stamp_swr_source`, `require_swr_source`, `swr_epoch_id`, `swr_source_files`, `ripple_power_inputs`, `artifact_intervals`, `read_swr_inventory`, `swr_observed_stretches`, `swr_observed_mask`, `swr_events`, `swr_event_labels`, `artifact_event_drops`, `with_swr_source`, `artifact_intervals_of`, `artifact_intervals_by_session`, `read_dot_with_swr_source`, `swr_intervals`
+`SwrSourceError`, `swr_inventory_dir`, `artifact_intervals_dir`, `swr_source_name`, `stamp_swr_source`, `require_swr_source`, `swr_epoch_id`, `swr_source_files`, `ripple_power_inputs`, `artifact_intervals`, `excluded_intervals`, `read_swr_inventory`, `swr_observed_stretches`, `swr_observed_mask`, `swr_events`, `swr_event_labels`, `artifact_event_drops`, `read_artifact_event_drops`, `dropped_for_excluded_time`, `with_swr_source`, `excluded_intervals_of`, `excluded_intervals_by_session`, `read_dot_with_swr_source`, `swr_intervals`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/triggered_analysis.py`
 

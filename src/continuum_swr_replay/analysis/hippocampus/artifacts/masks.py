@@ -8,9 +8,10 @@ exclusion), the Widloski runner and every analysis. Artifact time is
 unobserved there.
 
 Intervals are closed, ``[start_time, end_time]`` in seconds, the project's
-convention: a time on an endpoint is masked. :func:`pad_intervals` is the one
-way a stage widens the mask, by the reach of what it reads (a decoded event's
-0.3 s, a history window, a peri-event window). Design note:
+convention: a time on an endpoint is masked. :func:`pad_intervals` widens
+intervals by a distance on each side: the mask into excluded time
+(``event_eligibility.excluded_time``), and excluded time by a peri-event
+window's half-width. Design note:
 ``docs/design/2026-10-09-artifact-detection.md``.
 """
 
@@ -249,23 +250,20 @@ def masked_seconds(intervals: pd.DataFrame) -> float:
     return float(np.sum(merged[:, 1] - merged[:, 0]))
 
 
-def pad_intervals(
-    intervals: pd.DataFrame, before_s: float, after_s: float | None = None
-) -> pd.DataFrame:
-    """The intervals widened by a distance on each side, merged.
+def pad_intervals(intervals: pd.DataFrame, distance_s: float) -> pd.DataFrame:
+    """The intervals widened by one distance on each side, merged.
 
-    Every stage that must keep clear of the mask by more than its own time
-    widens it here: a decoded event within 0.3 s of the mask, a bin whose
-    history window looks back into it, a peri-event window that reaches it.
+    Excluded time is the artifact mask widened here by
+    ``event_eligibility.ARTIFACT_REACH_S``; the PFC fit widens excluded time
+    by its peri-event basis's half-width. A history window, which looks back
+    from a bin, widens the bin instead (``per_bin_design``).
 
     Parameters
     ----------
     intervals : pd.DataFrame
         ``start_time`` and ``end_time`` (seconds), closed; any order.
-    before_s : float
-        Seconds added before each start.
-    after_s : float, optional
-        Seconds added after each end; `before_s` when None.
+    distance_s : float
+        Seconds added before each start and after each end.
 
     Returns
     -------
@@ -276,14 +274,12 @@ def pad_intervals(
     Raises
     ------
     ValueError
-        If a distance is negative or not finite.
+        If the distance is negative or not finite.
     """
-    after_s = before_s if after_s is None else after_s
-    for distance in (before_s, after_s):
-        if not (np.isfinite(distance) and distance >= 0):
-            raise ValueError(f"a padding distance must be finite and >= 0: {distance}")
-    starts = intervals["start_time"].to_numpy(dtype=np.float64) - before_s
-    ends = intervals["end_time"].to_numpy(dtype=np.float64) + after_s
+    if not (np.isfinite(distance_s) and distance_s >= 0):
+        raise ValueError(f"a padding distance must be finite and >= 0: {distance_s}")
+    starts = intervals["start_time"].to_numpy(dtype=np.float64) - distance_s
+    ends = intervals["end_time"].to_numpy(dtype=np.float64) + distance_s
     return _as_frame(merge_intervals(starts, ends))
 
 

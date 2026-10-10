@@ -25,6 +25,7 @@ from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
     DETECTOR_SETTINGS,
 )
 from continuum_swr_replay.data_loaders.lfp import (
+    KAY_MINIMUM_DURATION_S,
     KAY_SMOOTHING_SIGMA_S,
     kay_ripple_power_z,
     with_ripple_power,
@@ -57,8 +58,9 @@ def _unobserved() -> np.ndarray:
     return (TIME >= 108.0) & (TIME <= 109.0)
 
 
-def test_the_smoothing_is_kays():
+def test_the_smoothing_and_minimum_duration_are_kays():
     assert KAY_SMOOTHING_SIGMA_S == DETECTOR_SETTINGS["kay"]["smoothing_sigma"]
+    assert KAY_MINIMUM_DURATION_S == DETECTOR_SETTINGS["kay"]["minimum_duration"]
 
 
 def test_a_rogue_tetrode_rt_dropped_does_not_move_it():
@@ -112,6 +114,42 @@ def test_it_is_the_trace_the_kay_detector_thresholds():
         assert np.max(z[inside]) == pytest.approx(event.max_zscore, rel=1e-9)
 
 
+def test_on_a_gappy_band_it_is_still_the_trace_kay_thresholds():
+    """Kay treats a gap-free block shorter than its minimum duration as
+    missing, so it is in neither the normalization nor the trace: the
+    covariate leaves it out the same way, and every event still peaks at its
+    ``max_zscore``."""
+    band = _band()[:, :3].copy()
+    unobserved = _unobserved()
+    # islands between NaN gaps: 10 ms (shorter than Kay's 15 ms) of very loud
+    # signal, which would dominate the scale if it counted, and a 50 ms one,
+    # each fenced by missing samples
+    for start, n_samples, gain in ((103.400, 10, 40.0), (115.400, 50, 1.0)):
+        first = int(np.searchsorted(TIME, start))
+        band[first - 20 : first] = np.nan
+        band[first : first + n_samples] *= gain
+        band[first + n_samples : first + n_samples + 20] = np.nan
+    with pytest.warns(UserWarning, match="shorter"):
+        events = Kay_ripple_detector(
+            TIME,
+            band,
+            np.zeros(TIME.size),
+            FS,
+            **dict(DETECTOR_SETTINGS["kay"]),
+            normalization_mask=~unobserved,
+        )
+    with pytest.warns(UserWarning, match="shorter"):
+        _, z = kay_ripple_power_z(TIME, band, FS, unobserved)
+
+    short = (TIME >= 103.400) & (TIME < 103.410)
+    assert np.isnan(z[short]).all()
+    events = events[(events.end_time < 108.0) | (events.start_time > 109.0)]
+    assert len(events) >= 8
+    for event in events.itertuples():
+        inside = (TIME >= event.start_time) & (TIME <= event.end_time)
+        assert np.nanmax(z[inside]) == pytest.approx(event.max_zscore, rel=1e-9)
+
+
 class TestTheSourcesInputs:
     def test_the_kept_tetrodes_and_the_band_come_from_the_inventory(
         self, tmp_path, monkeypatch
@@ -122,6 +160,7 @@ class TestTheSourcesInputs:
         record = manifest["epochs"][epoch_id]
         record["electrode_ids"] = [4, 12]
         record["sampling"] = {"nominal": 1000.0, "measured": 999.99}
+        record["position_span_s"] = [10.0, 900.0]
         record["tetrode_selection"] = {
             "electrode_ids": [0, 4, 12],
             "kept": [False, True, True],
@@ -140,6 +179,7 @@ class TestTheSourcesInputs:
         assert inputs["band_electrode_ids"] == [0, 4, 12]
         assert inputs["kept_electrode_ids"] == [4, 12]
         assert inputs["sampling_frequency"] == 1000.0
+        assert inputs["position_span_s"] == (10.0, 900.0)
         np.testing.assert_allclose(
             inputs["artifact_intervals"].to_numpy(), [[2.0, 5.0]]
         )
@@ -166,6 +206,7 @@ INPUTS = {
     "band_electrode_ids": [0, 4, 12, 16],
     "kept_electrode_ids": [0, 4, 12],
     "sampling_frequency": FS,
+    "position_span_s": (float(TIME[1000]), float(TIME[-1001])),
     "artifact_intervals": MASK,
 }
 
@@ -190,7 +231,10 @@ class TestTheLoader:
         span = TIME[1000:-1000]
 
         out = with_ripple_power(
-            _ripple_data(span), INPUTS, band_electrode_ids=np.array([0, 4, 12, 16])
+            _ripple_data(span),
+            INPUTS,
+            band_electrode_ids=np.array([0, 4, 12, 16]),
+            position_span_s=(span[0], span[-1]),
         )
 
         consensus, z = kay_ripple_power_z(
@@ -207,11 +251,25 @@ class TestTheLoader:
         assert out["ripple_filtered_lfps"].shape[1] == 4
 
     def test_a_band_other_than_the_inventorys_is_refused(self):
+        span = TIME[1000:-1000]
         with pytest.raises(ValueError, match="band"):
             with_ripple_power(
-                _ripple_data(),
+                _ripple_data(span),
                 INPUTS | {"band_electrode_ids": [0, 4, 12, 20]},
                 band_electrode_ids=np.array([0, 4, 12, 16]),
+                position_span_s=(span[0], span[-1]),
+            )
+
+    def test_a_span_other_than_the_inventorys_is_refused(self):
+        """The normalization reads the band within the position span, so a
+        position trimmed differently from the runner's would move it."""
+        span = TIME[1000:-1002]
+        with pytest.raises(ValueError, match="span"):
+            with_ripple_power(
+                _ripple_data(span),
+                INPUTS,
+                band_electrode_ids=np.array([0, 4, 12, 16]),
+                position_span_s=(span[0], span[-1]),
             )
 
 

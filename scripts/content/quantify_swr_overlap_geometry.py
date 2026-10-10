@@ -4,10 +4,11 @@ Runs ``classify_swr_overlap_geometry`` over one or more sessions and prints
 a table of sub-case counts. Useful for Methods-section numbers and for
 auditing what the coarse three-way split aggregates over. The SWRs are the
 paper's SWR source (``analysis/hippocampus/swr_source.py``: the direct Kay
-inventory), on the decode grid. The non-local events are re-detected from the
-posterior, so the one eligibility rule is applied here: an event the artifact
-mask reaches (``event_eligibility``: in it, or within 0.3 s of it) is not
-counted.
+inventory), on the decode grid, held to the one analysed-time rule as the
+decode frame's read holds them. The non-local events are re-detected from the
+posterior, so the rule is applied here (``event_eligibility``): an event in
+excluded time (the mask widened by 0.3 s), or overlapping an SWR or MUA event
+dropped for it, is not counted.
 
 Usage:
     uv run python scripts/content/quantify_swr_overlap_geometry.py
@@ -22,6 +23,7 @@ import argparse
 import logging
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.constants import (
@@ -37,7 +39,6 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     validate_results_position_time_alignment,
 )
 from continuum_swr_replay.analysis.hippocampus.event_eligibility import (
-    DECODER_REACH_S,
     artifact_drop_reasons,
 )
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (
@@ -46,6 +47,8 @@ from continuum_swr_replay.analysis.hippocampus.event_immobility import (
 )
 from continuum_swr_replay.analysis.hippocampus.swr_source import (
     artifact_intervals,
+    dropped_for_excluded_time,
+    read_artifact_event_drops,
     swr_epoch_id,
     swr_event_labels,
 )
@@ -115,22 +118,28 @@ def quantify_session(
         event_col="non_local_event",
         speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     )
+    epoch_id = swr_epoch_id(nwb_file_name, epoch_name)
+    # every event of the decode frame, with its reason under the one rule
+    drops = read_artifact_event_drops(data_dir / f"{epoch_id}_80_data_over_time.pkl")
     reasons = artifact_drop_reasons(
         nl_events["start_time"].to_numpy(),
         nl_events["end_time"].to_numpy(),
-        artifact_intervals(swr_epoch_id(nwb_file_name, epoch_name)),
-        reach_s=DECODER_REACH_S,
+        artifact_intervals(epoch_id),
+        dropped_for_excluded_time(drops),
     )
     if pd.notna(reasons).any():
         logger.info(
             f"  {int(pd.notna(reasons).sum())} non-local events dropped by the "
-            "artifact mask"
+            "analysed-time rule"
         )
     nl_events = nl_events.loc[pd.isna(reasons)].reset_index(drop=True)
-    # The paper's SWRs: the SWR source's labels on this grid, as sampled bounds.
-    swr_labels = swr_event_labels(
-        position_time, swr_epoch_id(nwb_file_name, epoch_name), speed=speed
-    )
+    # The paper's SWRs: the SWR source's labels on this grid, as sampled bounds,
+    # the ones the rule keeps (an SWR overlapping a dropped MUA event is not).
+    kept_swrs = drops.loc[
+        (drops["event_col"] == "SWR_event") & drops["drop_reason"].isna(), "label"
+    ].to_numpy()
+    swr_labels = swr_event_labels(position_time, epoch_id, speed=speed)
+    swr_labels = np.where(np.isin(swr_labels, kept_swrs), swr_labels, 0)
     swr_events = intervals_from_labels(
         pd.DataFrame({"SWR_event": swr_labels}, index=position_time), "SWR_event"
     )

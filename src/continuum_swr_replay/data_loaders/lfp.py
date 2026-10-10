@@ -92,6 +92,11 @@ KAY_SMOOTHING_SIGMA_S = 0.004
 ``swr_inventories.DETECTOR_SETTINGS["kay"]["smoothing_sigma"]`` (a test holds
 the two equal; ``data_loaders`` may not import ``analysis``)."""
 
+KAY_MINIMUM_DURATION_S = 0.015
+"""Kay's minimum event duration, in seconds: a gap-free block shorter than this
+is missing to the detector (``DETECTOR_SETTINGS["kay"]["minimum_duration"]``,
+held equal by the same test)."""
+
 # Ignore warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="pynwb")
 warnings.filterwarnings("ignore", category=UserWarning, module="hdmf")
@@ -301,8 +306,11 @@ def kay_ripple_power_z(
     the Gaussian-smoothed sum of squared envelopes, within each gap-free block)
     and ``normalize_signal`` (mean and SD over the samples it is given), as
     ``Kay_ripple_detector`` computes and normalizes them: the trace the SWR
-    inventory's events are thresholds of. The normalization reads the finite
-    samples outside `unobserved`; the z-score inside it is NaN (no value).
+    inventory's events are thresholds of. The valid samples are the detector's
+    own (``ripple_detection``'s ``_valid_blocks``): a gap-free block shorter
+    than :data:`KAY_MINIMUM_DURATION_S` is missing, NaN here. The normalization
+    reads the valid samples outside `unobserved`; the z-score inside it is NaN
+    (no value).
 
     Parameters
     ----------
@@ -319,24 +327,35 @@ def kay_ripple_power_z(
     Returns
     -------
     consensus : NDArray, shape (n_time,)
-        NaN where a channel is not finite.
+        NaN where a channel is not finite and in a block too short for Kay.
     zscore : NDArray, shape (n_time,)
         NaN there and inside `unobserved`.
     """
+    # the detector's own valid samples: its private block rule, imported so the
+    # two cannot drift (it warns for each short block it drops)
+    from ripple_detection.detectors._blocks import _valid_blocks
+
     unobserved = np.asarray(unobserved, dtype=bool)
-    consensus = get_Kay_ripple_consensus_trace(
-        ripple_band, sampling_frequency, KAY_SMOOTHING_SIGMA_S, time=time
+    time = np.asarray(time, dtype=np.float64)
+    band = np.asarray(ripple_band, dtype=np.float64)
+    is_valid, _ = _valid_blocks(time, band, minimum_duration=KAY_MINIMUM_DURATION_S)
+    consensus = np.asarray(
+        get_Kay_ripple_consensus_trace(
+            band, sampling_frequency, KAY_SMOOTHING_SIGMA_S, time=time
+        ),
+        dtype=np.float64,
     )
+    consensus[~is_valid] = np.nan
     normalized = np.asarray(
         normalize_signal(
             consensus,
             method="zscore",
-            normalization_mask=np.isfinite(consensus) & ~unobserved,
+            normalization_mask=is_valid & ~unobserved,
         ),
         dtype=np.float64,
     )
-    normalized[unobserved] = np.nan
-    return np.asarray(consensus, dtype=np.float64), normalized
+    normalized[~is_valid | unobserved] = np.nan
+    return consensus, normalized
 
 
 def with_ripple_power(
@@ -344,6 +363,7 @@ def with_ripple_power(
     ripple_power: Mapping[str, object],
     *,
     band_electrode_ids: NDArray[np.int64],
+    position_span_s: tuple[float, float],
 ) -> RippleData:
     """`ripple_data` with both consensus traces the SWR source's covariate.
 
@@ -364,6 +384,10 @@ def with_ripple_power(
     band_electrode_ids : NDArray of int, shape (n_channels,)
         The electrodes of `ripple_data`'s band, in column order
         (:func:`ripple_band_electrode_ids`).
+    position_span_s : tuple of float
+        The position's first and last time, the span the band was cut to: it
+        must be the span the SWR runner normalized over
+        (``ripple_power["position_span_s"]``).
 
     Returns
     -------
@@ -372,9 +396,15 @@ def with_ripple_power(
     Raises
     ------
     ValueError
-        If the band is not the inventory's band, or a kept electrode is not
-        in it.
+        If the band is not the inventory's band, a kept electrode is not in
+        it, or the position span is not the one the runner normalized over.
     """
+    inventory_span = tuple(float(t) for t in ripple_power["position_span_s"])
+    if tuple(float(t) for t in position_span_s) != inventory_span:
+        raise ValueError(
+            f"The position span {tuple(position_span_s)} is not the span "
+            f"{inventory_span} the SWR inventory normalized its Kay trace over."
+        )
     band = ripple_data["ripple_filtered_lfps"]
     band_ids = np.asarray(band_electrode_ids, dtype=np.int64)
     inventory_ids = np.asarray(ripple_power["band_electrode_ids"], dtype=np.int64)

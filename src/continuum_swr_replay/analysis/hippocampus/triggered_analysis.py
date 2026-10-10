@@ -13,7 +13,7 @@ from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
     overlaps_intervals,
 )
 from continuum_swr_replay.analysis.hippocampus.swr_source import (
-    artifact_intervals,
+    excluded_intervals,
     swr_epoch_id,
 )
 
@@ -68,9 +68,10 @@ def get_signal_windows(
 
     Notes
     -----
-    - Artifact time is unobserved: an event whose window touches the epoch's
-      artifact mask (``swr_source.artifact_intervals``; closed) is dropped
-      whole, and its row is not returned.
+    - Excluded time (the artifact mask widened by 0.3 s) is not analysed: an
+      event whose window touches the epoch's excluded time
+      (``swr_source.excluded_intervals``; closed) is dropped whole, and its row
+      is not returned.
     - Windows are centered on event times
     - Missing data filled with NaN (occurs for events near data boundaries)
     - Events outside the data time range will have partial or fully NaN windows
@@ -137,16 +138,15 @@ def get_signal_windows(
             logger.debug(f"No events found for {animal}/{day}/{epoch}, skipping")
             continue
 
-        artifacts = artifact_intervals(swr_epoch_id(f"{animal}{day}_.nwb", str(epoch)))
-        if len(artifacts):
+        excluded = excluded_intervals(swr_epoch_id(f"{animal}{day}_.nwb", str(epoch)))
+        if len(excluded):
             centers = session_events[time_col].to_numpy(dtype=float)
             touches = overlaps_intervals(
-                centers - half_window_sec, centers + half_window_sec, artifacts
+                centers - half_window_sec, centers + half_window_sec, excluded
             )
             if touches.any():
                 logger.info(
-                    "%d of %d windows for %s/%s/%s touch the artifact mask and "
-                    "are dropped",
+                    "%d of %d windows for %s/%s/%s touch excluded time and are dropped",
                     int(touches.sum()),
                     len(touches),
                     animal,

@@ -38,6 +38,7 @@ import pytest
 import xarray as xr
 
 from continuum_swr_replay.analysis.hippocampus import swr_source
+from continuum_swr_replay.analysis.hippocampus.artifacts.masks import interval_mask
 from continuum_swr_replay.analysis.hippocampus.event_table import (
     build_classified_nonlocal_event_table,
 )
@@ -134,11 +135,12 @@ def assert_source_labels(frame: pd.DataFrame) -> None:
     np.testing.assert_array_equal(labels, source_labels())
     assert sorted(set(labels) - {0}) == [1, 2]  # the artifact dropped SWR 3
     assert "n_SWR" not in frame.columns
-    # artifact time is unobserved: neither SWR nor non-SWR
-    ((start, end),) = swr_source.artifact_intervals(EPOCH_ID).to_numpy()
-    in_artifact = (TIME >= start) & (TIME <= end)
-    assert in_artifact.any()
-    np.testing.assert_array_equal(frame["swr_observed"].to_numpy(), ~in_artifact)
+    # excluded time (the mask widened by 0.3 s) is not analysed: neither SWR
+    # nor non-SWR
+    ((start, end),) = swr_source.excluded_intervals(EPOCH_ID).to_numpy()
+    in_excluded = (TIME >= start) & (TIME <= end)
+    assert in_excluded.any()
+    np.testing.assert_array_equal(frame["swr_observed"].to_numpy(), ~in_excluded)
 
 
 def recorder(seen: list):
@@ -406,7 +408,7 @@ def test_the_spike_evidence_scan_reads_the_sources_labels(
 
 
 def test_the_overlap_geometry_count_classifies_against_the_source(
-    source, monkeypatch, offline
+    source, saved_decode, monkeypatch, offline, tmp_path
 ):
     script = offline("scripts.content.quantify_swr_overlap_geometry")
     position = pd.DataFrame({"head_speed": np.zeros(TIME.size)}, index=TIME)
@@ -440,7 +442,7 @@ def test_the_overlap_geometry_count_classifies_against_the_source(
     monkeypatch.setattr(script, "classify_swr_overlap_geometry", record)
 
     with pytest.raises(_Stop):
-        script.quantify_session(NWB, EPOCH)
+        script.quantify_session(NWB, EPOCH, data_dir=tmp_path)
 
     np.testing.assert_allclose(
         seen[0][["start_time", "end_time"]].to_numpy(), np.array(KEPT_SWRS)
@@ -842,11 +844,11 @@ def test_only_the_listed_modules_unpickle_a_decode_frame():
 
 
 def test_the_overlap_geometry_count_drops_the_events_the_mask_reaches(
-    source, monkeypatch, offline
+    source, saved_decode, monkeypatch, offline, tmp_path
 ):
     """The script re-detects non-local events from the posterior, so it applies
-    the one eligibility rule itself: an event in the configured mask
-    [102.05, 102.25], or within 0.3 s of it, is not counted."""
+    the one analysed-time rule itself: an event in excluded time [101.75,
+    102.55] (the configured mask widened by 0.3 s) is not counted."""
     script = offline("scripts.content.quantify_swr_overlap_geometry")
     position = pd.DataFrame({"head_speed": np.zeros(TIME.size)}, index=TIME)
     states = ["Local", "No-Spike", "Non-Local Continuous", "Non-Local Fragmented"]
@@ -870,8 +872,33 @@ def test_the_overlap_geometry_count_drops_the_events_the_mask_reaches(
     monkeypatch.setattr(script, "classify_swr_overlap_geometry", record)
 
     with pytest.raises(_Stop):
-        script.quantify_session(NWB, EPOCH)
+        script.quantify_session(NWB, EPOCH, data_dir=tmp_path)
 
     np.testing.assert_allclose(
         seen[0][["start_time", "end_time"]].to_numpy(), [[101.50, 101.60]]
     )
+
+
+def test_the_spike_evidence_baseline_lies_outside_excluded_time(source):
+    """The null's matched non-event windows are analysed time too: none may
+    touch excluded time [101.75, 102.55] (the configured mask widened by
+    0.3 s)."""
+    from scripts.qa import analyze_event_spike_evidence as spike_evidence
+
+    probability = np.full(TIME.size, 0.5)
+    windows = [(100.20, 100.24), (101.72, 101.76), (102.20, 102.24), (103.00, 103.04)]
+    for start, end in windows:  # short, clearly local stretches
+        probability[(TIME >= start) & (TIME <= end)] = 0.0
+    dot = swr_source.with_swr_source(
+        decode_frame(**{"Non-Local_Continuous_prob": probability})
+    )
+
+    events = spike_evidence.build_session_events(dot)
+
+    baseline = events[events.group == "baseline"]
+    # the stretch at 101.72 is cut where excluded time begins; the one at
+    # 102.20 lies in it and is gone
+    np.testing.assert_allclose(TIME[baseline.s.to_numpy()], [100.20, 101.72, 103.00])
+    excluded = swr_source.excluded_intervals(EPOCH_ID)
+    for s, e in zip(baseline.s, baseline.e, strict=True):
+        assert not interval_mask(TIME[s : e + 1], excluded).any()

@@ -15,6 +15,7 @@ import json
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.hippocampus.swr_source import stamp_swr_source
 from scripts.rate import fit_uncertainty_rate as mod
 
 _STATES = ("at_well", "at_well", "in_transit", "in_transit", "mixed", "at_well")
@@ -67,9 +68,10 @@ def stubbed_run(monkeypatch, tmp_path):
     def _read_table(path):
         if "qvals" in str(path):
             return qvals
+        # stamped by the configured SWR source, as the shipped tables are
         if "stop_table" in str(path):
-            return stops
-        return pd.DataFrame()
+            return stamp_swr_source(stops.copy())
+        return stamp_swr_source(pd.DataFrame())
 
     def _fit(stop_table, onsets):
         seen["stop_ids"] = list(stop_table["stop_id"])

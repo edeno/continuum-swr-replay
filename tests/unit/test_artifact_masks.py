@@ -222,20 +222,13 @@ class TestSubtractingIntervals:
 
 
 class TestPaddingTheMask:
-    """``pad_intervals`` is the one way any stage widens the mask: the decoded
-    events' reach, the history windows and the peri-event windows."""
+    """``pad_intervals`` widens intervals by one distance on each side: the mask
+    into excluded time, and excluded time by a peri-event window's half-width."""
 
     def test_both_sides_by_one_distance(self):
         intervals = pd.DataFrame({"start_time": [10.0, 20.0], "end_time": [11.0, 20.5]})
 
         assert _pairs(pad_intervals(intervals, 0.3)) == [(9.7, 11.3), (19.7, 20.8)]
-
-    def test_before_and_after_apart(self):
-        """A history window looks back only: it is reached from after the mask."""
-        intervals = pd.DataFrame({"start_time": [10.0], "end_time": [11.0]})
-
-        assert _pairs(pad_intervals(intervals, 0.0, 0.15)) == [(10.0, 11.15)]
-        assert _pairs(pad_intervals(intervals, 0.25, 0.0)) == [(9.75, 11.0)]
 
     def test_padded_intervals_that_meet_merge(self):
         intervals = pd.DataFrame({"start_time": [10.0, 11.5], "end_time": [11.0, 12.0]})

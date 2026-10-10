@@ -31,7 +31,7 @@ from continuum_swr_replay.analysis.hippocampus.event_immobility import (
 
 from ...data_loaders.constants import ALL_ARMS
 from ...parameters import PLACE_BIN_SIZE_1D
-from ..hippocampus.swr_source import artifact_intervals_of
+from ..hippocampus.swr_source import excluded_intervals_of
 from ..replay._helpers import (
     align_count_matrix,
     align_posterior_to_dot,
@@ -720,8 +720,8 @@ def build_contfrag_stop_table(
 
     The ``stop_id`` hash matches ``build_contfrag_event_table``'s
     ``stop_id`` row-for-row, so the two tables join cleanly.
-    ``immobility_duration_s`` is the stop's span less the artifact mask's
-    time inside it, as in the NonLocal stop table.
+    ``immobility_duration_s`` is the stop's span less the excluded time
+    inside it, as in the NonLocal stop table.
 
     Parameters
     ----------
@@ -774,9 +774,9 @@ def build_contfrag_stop_table(
     per_bout = pd.DataFrame({"stop_idx": np.arange(n_bouts, dtype=np.int64)})
     per_bout["stop_start"] = bout_starts
     per_bout["stop_end"] = bout_ends
-    # The stop's exposure: its span less the artifact mask's time inside it.
+    # The stop's exposure: its span less the excluded time inside it.
     per_bout["immobility_duration_s"] = bout_exposure_s(
-        bout_starts, bout_ends, artifact_intervals_of(dot)
+        bout_starts, bout_ends, excluded_intervals_of(dot)
     )
     per_bout["reward_fraction_last10_known_trials"] = recent_trial_reward_rate(
         bout_starts, port_experiences

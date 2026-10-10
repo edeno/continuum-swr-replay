@@ -736,9 +736,10 @@ def test_a_dropped_single_window_inside_a_merged_gap_is_reported():
 
 
 class TestTheArtifactMask:
-    """A Widloski event is a decoded event: one sharing time with the artifact
-    mask, or within ``DECODER_REACH_S`` of it, leaves every cohort with its
-    reason. Every candidate keeps its row, as every rejection does."""
+    """A Widloski event is held to the one analysed-time rule: a candidate in
+    excluded time (the mask widened by ``ARTIFACT_REACH_S``), or overlapping an
+    SWR or MUA event dropped for it, leaves every cohort with its reason. Every
+    candidate keeps its row, as every rejection does."""
 
     def test_each_candidate_keeps_its_reason(self, recording):
         table = build(recording)
@@ -750,13 +751,18 @@ class TestTheArtifactMask:
         )
         assert table.event_start_s.iloc[1] - table.event_end_s.iloc[0] < 0.3
         assert table.event_start_s.iloc[2] - (second_start + 0.01) > 0.3
+        # an SWR dropped for excluded time, running into the third sequence
+        third = table.event_start_s.iloc[2]
+        dropped = pd.DataFrame(
+            {"start_time": [third - 0.05], "end_time": [third + 0.02]}
+        )
 
-        masked = build(recording, artifact_intervals=artifacts)
+        masked = build(recording, artifact_intervals=artifacts, dropped_events=dropped)
 
         assert masked.artifact_drop_reason.tolist() == [
-            "decoder_reach",
+            "near_artifact",
             "artifact",
-            None,
+            "overlaps_dropped_event",
         ]
         pd.testing.assert_frame_equal(
             masked.drop(columns="artifact_drop_reason"),

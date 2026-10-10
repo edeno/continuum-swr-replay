@@ -70,7 +70,9 @@ from patsy import PatsyError  # noqa: E402
 from statsmodels.tools.sm_exceptions import PerfectSeparationError  # noqa: E402
 
 from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
-    artifact_intervals_by_session,
+    excluded_intervals_by_session,
+    require_swr_source,
+    swr_source_name,
 )
 from continuum_swr_replay.analysis.replay import (  # noqa: E402
     BIN_S,
@@ -116,7 +118,7 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
     record_inputs,
     write_fit_provenance,
 )
-from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402  # noqa: E402
+from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     DESCRIPTIVE_RATE_RUNGS,
     POST_OUTCOME_COHORT,
     POST_OUTCOME_COVARIATES,
@@ -407,9 +409,10 @@ def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict, 
     rows: list[dict] = []
     skips: dict = {}  # (model, population, cohort, reason) -> count
     cohort_drops: dict = {}
-    # artifact time is unobserved: its bins, and those whose history (the
-    # ladder's longest window) reaches it, leave every rung
-    artifacts = artifact_intervals_by_session(stops_g)
+    # excluded time (the artifact mask widened by 0.3 s) is not analysed: its
+    # bins, and those whose history (the ladder's longest window) reaches it,
+    # leave every rung
+    excluded = excluded_intervals_by_session(stops_g)
     designs = {
         pop: aggregate_to_timebins(
             stops_g,
@@ -420,7 +423,7 @@ def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict, 
             self_history_lags=N_HISTORY_LAGS,
             self_history_basis=N_HISTORY_BASIS,
             stop_covariates=STOP_COVARS,
-            artifact_intervals=artifacts,
+            excluded_intervals=excluded,
             history_window_s=HISTORY_WINDOW_S,
         )
         for pop in STRATA
@@ -566,6 +569,10 @@ def _load(cohort: str) -> tuple[pd.DataFrame, pd.DataFrame, int]:
     require_covariate_schema(q, table="qvals")
     require_covariate_schema(onset_table, table="event_onset")
     require_covariate_schema(event_table, table="event")
+    # The bins are dropped by the configured source's excluded time, so the
+    # tables must come from that source (its artifact run included).
+    require_swr_source(stop, what=str(FIT_INPUTS["stop_table"]))
+    require_swr_source(onset_table, what=str(FIT_INPUTS["event_onset_table"]))
     stop = add_uncertainty_covariates(stop)
     qcols = [
         "stop_id",
@@ -978,7 +985,7 @@ def _write_aggregation(
         fit_inputs,
         "poisson_glm",
         cli,
-        extra={"stop_cohort": stop_cohorts[0]},
+        extra={"stop_cohort": stop_cohorts[0], "swr_source": swr_source_name()},
     )
     # Persist the exact per-SD factors this run used for the std_* columns so the
     # standardized coefficients are reproducible. They are computed over the stop
@@ -1196,7 +1203,7 @@ def main() -> None:
         fit_inputs,
         "poisson_glm",
         sys.argv,
-        extra={"stop_cohort": args.stop_cohort},
+        extra={"stop_cohort": args.stop_cohort, "swr_source": swr_source_name()},
     )
 
     # Cohort-audit table (stop grain; reconciles n_in - Σdrops == n_modeled) +

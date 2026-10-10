@@ -98,6 +98,7 @@ def write_swr_inventory(
             # the detecting electrodes and the band's rate, as the runner records
             "electrode_ids": [0, 4, 8],
             "sampling": {"nominal": 1000.0, "measured": 1000.0},
+            "position_span_s": [0.0, 1e6],
             "outputs": {
                 "kay": {"path": str(events_path), "sha256": sha256_file(events_path)},
                 "swr_observed": {

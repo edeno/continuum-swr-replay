@@ -1218,15 +1218,15 @@ def test_an_hpc_decodes_swr_labels_are_the_sources(
     )
     assert set(data_over_time["SWR_event"]) == {0, 1, 2}
     assert "n_SWR" not in data_over_time
-    # the step's interval in the one mask, [103.7, 104.3], is not observed,
-    # and nothing after it is
+    # excluded time, the step's interval in the one mask [103.7, 104.3]
+    # widened by 0.3 s, is not observed, and nothing after it is
     np.testing.assert_array_equal(
         data_over_time["swr_observed"],
         swr_source.swr_observed_mask(DECODE_TIME, SWR_EPOCH),
     )
     observed = data_over_time["swr_observed"].to_numpy()
-    assert not observed[_on_decode_grid(MASK_INTERVAL)].any()
-    assert observed[_on_decode_grid((104.31, 105.3))].all()
+    assert not observed[_on_decode_grid((103.4, 104.6))].any()
+    assert observed[_on_decode_grid((104.61, 105.3))].all()
     assert data_over_time.attrs["swr_source"] == swr_source.swr_source_name()
 
 

@@ -17,6 +17,7 @@ import pandas as pd
 import pytest
 from threadpoolctl import threadpool_limits
 
+from continuum_swr_replay.analysis.hippocampus.swr_source import stamp_swr_source
 from continuum_swr_replay.analysis.replay import (
     MODEL_PER_BIN_RATE,
     POPULATIONS,
@@ -25,7 +26,10 @@ from continuum_swr_replay.analysis.replay import (
 
 _SPEC = importlib.util.spec_from_file_location(
     "fit_per_bin_rate_models",
-    Path(__file__).resolve().parents[2] / "scripts" / "rate" / "fit_per_bin_rate_models.py",
+    Path(__file__).resolve().parents[2]
+    / "scripts"
+    / "rate"
+    / "fit_per_bin_rate_models.py",
 )
 fprm = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(fprm)
@@ -76,18 +80,27 @@ def _toy_tables(
             # indicator 1, baseline rate (the persisted stop-table contract).
             incomplete = float(sid % 12 == 0)
             reward = 0.0 if incomplete else float(sid % 2)
-            stop_rows.append({
-                "animal": animal, "session_date": session_date, "epoch": epoch, "stop_id": sid,
-                "immobility_duration_s": immob,
-                "reward_history_rcos_0": reward,
-                "reward_history_rcos_1": 0.0 if incomplete else float(rng.uniform(0, 1)),
-                "reward_history_rcos_2": 0.0 if incomplete else float(rng.uniform(0, 1)),
-                "reward_history_incomplete": incomplete,
-                "did_last_completed_trip_switch_patch": float(rng.integers(0, 2)),
-                "stop_start": stop_start,
-                "last_well_arrival_time_s": arrival,
-                "outcome_known_time_s": stop_start + 0.1,
-            })
+            stop_rows.append(
+                {
+                    "animal": animal,
+                    "session_date": session_date,
+                    "epoch": epoch,
+                    "stop_id": sid,
+                    "immobility_duration_s": immob,
+                    "reward_history_rcos_0": reward,
+                    "reward_history_rcos_1": 0.0
+                    if incomplete
+                    else float(rng.uniform(0, 1)),
+                    "reward_history_rcos_2": 0.0
+                    if incomplete
+                    else float(rng.uniform(0, 1)),
+                    "reward_history_incomplete": incomplete,
+                    "did_last_completed_trip_switch_patch": float(rng.integers(0, 2)),
+                    "stop_start": stop_start,
+                    "last_well_arrival_time_s": arrival,
+                    "outcome_known_time_s": stop_start + 0.1,
+                }
+            )
             # onset times within the stop; rewarded stops get more events.
             rate = 12.0 if reward else 6.0
             n_ev = rng.poisson(rate * min(immob, 4.0))
@@ -95,11 +108,18 @@ def _toy_tables(
                 for _ in range(n_ev):
                     t = float(rng.uniform(0, min(immob, 4.0)))
                     is_swr = bool(rng.integers(0, 2)) if et == "non_local" else np.nan
-                    onset_rows.append({
-                        "animal": animal, "session_date": session_date, "epoch": epoch,
-                        "stop_id": sid, "event_type": et,
-                        "t_since_stop_onset": t, "onset_time": t, "is_swr": is_swr,
-                    })
+                    onset_rows.append(
+                        {
+                            "animal": animal,
+                            "session_date": session_date,
+                            "epoch": epoch,
+                            "stop_id": sid,
+                            "event_type": et,
+                            "t_since_stop_onset": t,
+                            "onset_time": t,
+                            "is_swr": is_swr,
+                        }
+                    )
             sid += 1
     return pd.DataFrame(stop_rows), pd.DataFrame(onset_rows)
 
@@ -114,10 +134,22 @@ def test_tidy_schema():
 
     assert len(out) > 0
     expected_cols = {
-        "outcome", "model", "animal", "session_date", "epoch",
-        "rr_reward_history_rcos_0", "n_bins", "n_events", "aic", "deviance", "dispersion",
-        "ks_statistic", "ks_within_band",
-        "cv_ll_per_bin_mean", "cv_bits_per_event", "cv_n_folds",
+        "outcome",
+        "model",
+        "animal",
+        "session_date",
+        "epoch",
+        "rr_reward_history_rcos_0",
+        "n_bins",
+        "n_events",
+        "aic",
+        "deviance",
+        "dispersion",
+        "ks_statistic",
+        "ks_within_band",
+        "cv_ll_per_bin_mean",
+        "cv_bits_per_event",
+        "cv_n_folds",
     }
     assert expected_cols <= set(out.columns)
 
@@ -168,8 +200,11 @@ def test_no_stop_dropped_by_freeze():
     prefix = stop.groupby(["animal", "session_date", "epoch"], sort=False).head(3)
     stop["reward_history_incomplete"] = 0.0
     stop.loc[prefix.index, "reward_history_incomplete"] = 1.0
-    for col in ("reward_history_rcos_0", "reward_history_rcos_1",
-                "reward_history_rcos_2"):
+    for col in (
+        "reward_history_rcos_0",
+        "reward_history_rcos_1",
+        "reward_history_rcos_2",
+    ):
         stop.loc[prefix.index, col] = 0.0
 
     with threadpool_limits(limits=1):
@@ -301,8 +336,12 @@ def stubbed_run(monkeypatch, tmp_path):
 
     stop = _cohort_stop_table()
 
+    # stamped by the configured SWR source, as the shipped tables are
+    stamped_stop = stamp_swr_source(stop.copy())
+    stamped_other = stamp_swr_source(pd.DataFrame())
+
     def _read_table(path):
-        return stop if "stop_table" in str(path) else pd.DataFrame()
+        return stamped_stop if "stop_table" in str(path) else stamped_other
 
     def _fit(stop_table, onsets, **kwargs):
         seen["stop_ids"] = list(stop_table["stop_id"])
@@ -404,3 +443,15 @@ def test_unknown_cohort_is_refused_by_the_parser(monkeypatch, capsys):
 
     assert excinfo.value.code == 2
     assert "at_the_well" in capsys.readouterr().err
+
+
+def test_tables_from_another_swr_source_are_refused(monkeypatch, stubbed_run):
+    """The bins are dropped by the configured source's excluded time, so tables
+    made under another source (another artifact run, say) would mix two masks."""
+    from continuum_swr_replay.analysis.hippocampus import swr_source
+
+    monkeypatch.setattr(fprm.sys, "argv", ["fit_per_bin_rate_models.py"])
+    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", "another_run")
+
+    with pytest.raises(swr_source.SwrSourceError, match="another_run"):
+        fprm.main()

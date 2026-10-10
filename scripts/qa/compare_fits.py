@@ -63,6 +63,9 @@ import pandas as pd
 from patsy import dmatrix
 from scipy.stats import wilcoxon
 
+from continuum_swr_replay.analysis.hippocampus.swr_source import (
+    excluded_intervals_by_session,
+)
 from continuum_swr_replay.analysis.replay._fit_diagnostics import (
     SEPARATION_COEF_ABS,
 )
@@ -73,6 +76,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     ARRIVAL_CLOCK_COLUMN,
     ARRIVAL_SPLINE_KNOTS,
     BIN_S,
+    MODEL_PER_BIN_RATE,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_BASIS,
     REWARD_HISTORY_N_LAGS,
@@ -81,8 +85,10 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     SWR_CONTRAST_CONTENT_PATCH_KEY_TERM,
     TMAX,
     TMAX_ARRIVAL,
+    longest_history_window_s,
 )
 from continuum_swr_replay.analysis.replay.per_bin_design import (
+    aggregate_to_timebins,
     reconstruct_reward_kernels,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
@@ -753,12 +759,21 @@ def outcome_boundary_shift_cohort(stop_path: Path) -> pd.DataFrame:
     ).fillna(False)
     spans = spans.reindex(stops.index)
     # A crossing stop only moves if a retained bin starts at or past the
-    # boundary: the first such bin is ceil(delta / BIN_S), and it survives the
-    # exposure filter only inside min(immobility, TMAX).
+    # boundary: the first such bin is ceil(delta / BIN_S). The bins are the
+    # design's own: over the stop's span within TMAX, less those excluded time
+    # (and the ladder's history window) drops.
     delta = (stops["outcome_known_time_s"] - stops["stop_start"]).to_numpy(float)
-    exposed = np.minimum(stops["immobility_duration_s"].to_numpy(float), float(TMAX))
+    bins = aggregate_to_timebins(
+        stops,
+        pd.DataFrame({"stop_id": [], "t_since_stop_onset": []}),
+        bin_s=BIN_S,
+        tmax=TMAX,
+        excluded_intervals=excluded_intervals_by_session(stops),
+        history_window_s=longest_history_window_s(MODEL_PER_BIN_RATE.values()),
+    )
+    last_bin = stops["stop_id"].map(bins.groupby("stop_id")["binj"].max())
     with np.errstate(invalid="ignore"):
-        has_bin = (exposed - np.ceil(delta / BIN_S) * BIN_S) > 1e-4
+        has_bin = last_bin.to_numpy(float) >= np.ceil(delta / BIN_S)
     has_bin = pd.Series(np.nan_to_num(has_bin, nan=False).astype(bool), stops.index)
     shifts = crosses & ~spans & has_bin
     rows = []

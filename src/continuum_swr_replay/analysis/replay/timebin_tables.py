@@ -17,7 +17,8 @@ reward at both within- and across-stop scales):
 Both recompute immobility bouts from ``dot`` with the canonical helpers, so
 ``stop_id`` matches ``build_stop_table`` row-for-row. Movement is absence of
 rows; ``t_since_pump`` (from absolute time) is the bridge across stops. So is
-artifact time: a dense bin that touches the epoch's artifact mask has no row.
+excluded time: a dense bin that touches the epoch's excluded time (the artifact
+mask widened by 0.3 s) has no row.
 """
 
 from __future__ import annotations
@@ -34,7 +35,7 @@ from ..hippocampus.event_immobility import (
     filter_event_labels_by_speed,
     validate_nonlocal_event_probability_contract,
 )
-from ..hippocampus.swr_source import artifact_intervals_of
+from ..hippocampus.swr_source import excluded_intervals_of
 from .bouts import assign_bout, immobility_bout_intervals
 from .covariate_registry import stamp_covariate_schema
 from .event_ids import hash_stop_id
@@ -176,9 +177,9 @@ def build_stop_timebin_table(
 
     ``nonlocal_threshold`` must match the threshold used to create ``dot``'s
     Non-Local labels — see :func:`build_event_onset_table`. A bin
-    ``[left, min(left + bin_s, stop end)]`` that touches the epoch's artifact
-    mask (``swr_source.artifact_intervals``; closed) is unobserved and has no
-    row; the other bins keep their ``bin_in_stop``.
+    ``[left, min(left + bin_s, stop end)]`` that touches the epoch's excluded
+    time (``swr_source.excluded_intervals``; closed) is not analysed and has
+    no row; the other bins keep their ``bin_in_stop``.
     """
     if "non_local_event" in dot:
         validate_nonlocal_event_probability_contract(
@@ -263,11 +264,9 @@ def build_stop_timebin_table(
             "head_speed": speed_mean.astype(np.float32),
         }
     )[cols]
-    artifacts = artifact_intervals_of(dot)
-    if len(artifacts):
+    excluded = excluded_intervals_of(dot)
+    if len(excluded):
         left = bout_starts[bout_of_bin] + within * bin_s
         right = np.minimum(left + bin_s, bout_ends[bout_of_bin])
-        out = out.loc[~overlaps_intervals(left, right, artifacts)].reset_index(
-            drop=True
-        )
+        out = out.loc[~overlaps_intervals(left, right, excluded)].reset_index(drop=True)
     return stamp_covariate_schema(out, table="stop_timebin")

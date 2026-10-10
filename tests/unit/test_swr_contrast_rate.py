@@ -22,6 +22,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.hippocampus.swr_source import stamp_swr_source
 from continuum_swr_replay.analysis.replay import (
     BIN_S,
     N_HISTORY_BASIS,
@@ -660,8 +661,11 @@ def _load_tables() -> tuple[pd.DataFrame, pd.DataFrame]:
 def stubbed_load(monkeypatch):
     """Route ``_load`` at synthetic tables, leaving its cohort step untouched."""
     stops, qvals = _load_tables()
+    # the stop and onset tables are stamped by the configured SWR source
     monkeypatch.setattr(
-        mod, "read_table", lambda path: qvals if "qvals" in str(path) else stops
+        mod,
+        "read_table",
+        lambda path: qvals if "qvals" in str(path) else stamp_swr_source(stops.copy()),
     )
     monkeypatch.setattr(mod, "require_covariate_schema", lambda *a, **k: None)
     monkeypatch.setattr(mod, "add_uncertainty_covariates", lambda frame: frame)

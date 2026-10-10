@@ -32,6 +32,10 @@ from non_local_detector.model_checking.sorted_spikes import (  # noqa: E402
     point_process_residuals,
 )
 
+from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
+    excluded_intervals_by_session,
+    require_swr_source,
+)
 from continuum_swr_replay.analysis.replay import (  # noqa: E402
     BIN_S,
     MODEL_PER_BIN_RATE,
@@ -50,6 +54,9 @@ from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
     require_fresh_inputs,
+)
+from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
+    longest_history_window_s,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
@@ -194,11 +201,19 @@ def _refit_session(
     for c, v in zip(SC, keys, strict=True):
         om &= onsets[c] == v
     pop = POPULATIONS[outcome](onsets[om])
+    # the bins the published fits used: excluded time and the bins whose
+    # history window (the ladder's longest) reaches it are not analysed
     design = aggregate_to_timebins(
-        stops_g, pop, bin_s=BIN_S, tmax=TMAX,
-        reward_basis=True, self_history_lags=N_HISTORY_LAGS,
+        stops_g,
+        pop,
+        bin_s=BIN_S,
+        tmax=TMAX,
+        reward_basis=True,
+        self_history_lags=N_HISTORY_LAGS,
         self_history_basis=N_HISTORY_BASIS,
         stop_covariates=(*STOP_COVARIATES, "stop_start"),
+        excluded_intervals=excluded_intervals_by_session(stops_g),
+        history_window_s=longest_history_window_s(MODEL_PER_BIN_RATE.values()),
     )
     # Freeze the cohort before fitting (the fitter refuses an incomplete
     # design). This design is built for one rung, not the whole ladder, so the
@@ -208,7 +223,9 @@ def _refit_session(
     return design, fit
 
 
-def plot_example_quartet(design: pd.DataFrame, fit: dict, title: str, fname: str) -> None:
+def plot_example_quartet(
+    design: pd.DataFrame, fit: dict, title: str, fname: str
+) -> None:
     """KS / Q-Q / rescaled-ISI autocorr / cumulative-residual diagnostic quartet."""
     predicted = fit["predicted"]
     # Order by true within-session time (stop_start, then bin): stop_id is a
@@ -259,15 +276,19 @@ def _print_ladder_table(df: pd.DataFrame) -> None:
         ),
     ):
         print(f"-- {header}")
-        print(f"{'model':30s} {'ks_band':>8s} {'ks_med':>8s} "
-              f"{'disp_med':>9s} {'bits_med':>9s}")
+        print(
+            f"{'model':30s} {'ks_band':>8s} {'ks_med':>8s} "
+            f"{'disp_med':>9s} {'bits_med':>9s}"
+        )
         for m in rungs:
             s = g[g.model == m]
             if len(s):
-                print(f"{m:30s} {s.ks_within_band.mean():8.2f} "
-                      f"{s.ks_statistic.median():8.3f} "
-                      f"{s.dispersion.median():9.3f} "
-                      f"{s.cv_bits_per_event.median():9.3f}")
+                print(
+                    f"{m:30s} {s.ks_within_band.mean():8.2f} "
+                    f"{s.ks_statistic.median():8.3f} "
+                    f"{s.dispersion.median():9.3f} "
+                    f"{s.cv_bits_per_event.median():9.3f}"
+                )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -298,27 +319,33 @@ def main() -> None:
     ks0 = g[g.model == "M0_const"].ks_within_band.mean()
     ksf = g[g.model == FULL].ks_within_band.mean()
     assert ks0 < ksf, f"expected M0 KS-band frac < {FULL} ({ks0:.2f} !< {ksf:.2f})"
-    print(f"\nKS calibration improves up the ladder: M0_const={ks0:.2f} -> {FULL}={ksf:.2f}")
+    print(
+        f"\nKS calibration improves up the ladder: M0_const={ks0:.2f} -> {FULL}={ksf:.2f}"
+    )
 
     # Honest reporting of where the textbook narrative does NOT hold:
     bits = {
         m: g[g.model == m].cv_bits_per_event.median()
         for m in (*STOP_LADDER, *ARRIVAL_LADDER)
     }
-    print("CV bits/event: time block helps (M5_time={:.3f}); the raised-cosine "
-          "self-history block costs held-out likelihood (M3r_histcos={:.3f}) -- "
-          "in-sample KS improves but cv_bits drops. Dispersion stays ~{:.2f} "
-          "(underdispersed at sparse 15 ms bins), so the dispersion->1 "
-          "expectation does not apply here."
-          .format(bits["M5_time"], bits["M3r_histcos"],
-                  g[g.model == FULL].dispersion.median()))
+    print(
+        "CV bits/event: time block helps (M5_time={:.3f}); the raised-cosine "
+        "self-history block costs held-out likelihood (M3r_histcos={:.3f}) -- "
+        "in-sample KS improves but cv_bits drops. Dispersion stays ~{:.2f} "
+        "(underdispersed at sparse 15 ms bins), so the dispersion->1 "
+        "expectation does not apply here.".format(
+            bits["M5_time"], bits["M3r_histcos"], g[g.model == FULL].dispersion.median()
+        )
+    )
 
     # --- per-event-type model-checking face of the dissociation ---
     print(f"\n=== fit quality by population (model={FULL}) ===")
     for oc in ["swr", "non_local_swr", "non_local_no_swr"]:
         s = df[(df.outcome == oc) & (df.model == FULL)]
-        print(f"  {oc:18s}: ks_band={s.ks_within_band.mean():.2f} "
-              f"bits/event_med={s.cv_bits_per_event.median():.3f} n={len(s)}")
+        print(
+            f"  {oc:18s}: ks_band={s.ks_within_band.mean():.2f} "
+            f"bits/event_med={s.cv_bits_per_event.median():.3f} n={len(s)}"
+        )
 
     # --- example-session diagnostic quartets (inline refit) ---
     stop = read_table(RC / "stop_table.pkl")
@@ -327,8 +354,12 @@ def main() -> None:
     require_covariate_schema(stop, table="stop")
     require_covariate_schema(onset_table, table="event_onset")
     require_covariate_schema(event_table, table="event")
+    require_swr_source(stop, what=str(ALL_MODELS_INPUTS["stop_table"]))
+    require_swr_source(onset_table, what=str(ALL_MODELS_INPUTS["event_onset_table"]))
     onsets = attach_is_swr_to_onsets(onset_table, event_table)
-    full_nl = df[(df.outcome == "non_local") & (df.model == FULL)].dropna(subset=["n_events"])
+    full_nl = df[(df.outcome == "non_local") & (df.model == FULL)].dropna(
+        subset=["n_events"]
+    )
     if full_nl.empty:
         print("No fitted non_local M7 sessions; skipping example quartets.")
         return
@@ -347,7 +378,9 @@ def main() -> None:
             continue
         label = "_".join(map(str, keys))
         plot_example_quartet(
-            design, fit, f"{FULL} GOF — non_local — {label} ({tag})",
+            design,
+            fit,
+            f"{FULL} GOF — non_local — {label} ({tag})",
             f"model_checking_example_{tag}.png",
         )
 

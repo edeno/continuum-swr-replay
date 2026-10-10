@@ -17,8 +17,10 @@ marks the mask's bins on the decode grid missing (``is_missing``, the decoders'
 rule: a bin inside a closed interval of ``swr_source.artifact_intervals``).
 No window holding one is decoded, no candidate touches one, and neither the
 shuffle null nor any normalization reads them (``memoryless_sequence.epoch``).
-A candidate within ``event_eligibility.DECODER_REACH_S`` of the mask keeps its
-row with an ``artifact_drop_reason`` and is in no cohort.
+A candidate in excluded time (the mask widened by
+``event_eligibility.ARTIFACT_REACH_S``), or overlapping an SWR or MUA event
+dropped for it, keeps its row with an ``artifact_drop_reason`` and is in no
+cohort.
 ``check_marks_match_encoding`` refuses them unless every mark the encoding
 model was fitted on is among them. Those are the training span's, so it cannot
 see a spike the reload adds, or one dropped only during SWRs, which
@@ -153,6 +155,8 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics im
 )
 from continuum_swr_replay.analysis.hippocampus.swr_source import (
     artifact_intervals,
+    dropped_for_excluded_time,
+    read_artifact_event_drops,
     read_dot_with_swr_source,
     stamp_swr_source,
     swr_epoch_id,
@@ -599,6 +603,9 @@ def run_one(
         n_shuffles=n_shuffles,
         is_missing=is_missing,
         artifact_intervals=artifact_mask,
+        dropped_events=dropped_for_excluded_time(
+            read_artifact_event_drops(inputs["data_over_time"])
+        ),
     )
 
     outputs = output_paths(epoch_id, output_dir)
@@ -650,7 +657,7 @@ def run_one(
             # candidates the mask reaches, in no cohort (event_eligibility)
             "n_dropped": {
                 reason: int((table["artifact_drop_reason"] == reason).sum())
-                for reason in ("artifact", "decoder_reach")
+                for reason in ("artifact", "near_artifact", "overlaps_dropped_event")
             },
         },
         "n_windows": int(gates.speed_eligible.size),

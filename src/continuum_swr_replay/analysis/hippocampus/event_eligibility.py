@@ -1,21 +1,27 @@
-"""One eligibility rule for every event cohort: immobile, and clear of the mask.
+"""One analysed-time rule for every event cohort, exposure, bin and window.
 
-An event of any kind (non-local, SWR, MUA, ContFrag label, Widloski) enters a
-cohort only when
+**Excluded time** is the one artifact mask (``artifacts.masks``) widened by
+:data:`ARTIFACT_REACH_S` on each side (:func:`excluded_time`). An event of any
+kind (non-local, SWR, MUA, ContFrag label, Widloski) enters a cohort only when
 
 - the whole event is immobile: every speed sample in its closed interval is
   finite and strictly below the threshold (``event_immobility``); and
-- it shares no time with the one artifact mask (``artifacts.masks``; closed
-  intervals, so touching counts). Artifact time is unobserved, so an event
-  there is neither an SWR nor a non-SWR event: it leaves every cohort.
+- it lies wholly outside excluded time (closed intervals: touching counts). An
+  event in the mask itself is ``artifact``; one within the reach of it is
+  ``near_artifact``. Either way it is unobserved: not an SWR, not a non-SWR
+  event, in no cohort.
 
-A *decoded* event (a non-local event, a ContFrag label, a Widloski event) must
-also lie farther than :data:`DECODER_REACH_S` from the mask, because the
-decoder's posterior near a masked gap still feels it. SWR and MUA events come
-from the LFP and spike detectors, which have no such reach.
+A kept event that overlaps an SWR or MUA event dropped for excluded time is
+dropped too (``overlaps_dropped_event``): its overlap class is unknown. One pass
+is made; an event dropped by that pass drops no other.
 
-A dropped event keeps its reason (:class:`DropReason`), the first that holds
-in the enum's order. Design note: ``docs/design/2026-10-09-artifact-detection.md``.
+Exposure seconds, time bins with their history windows, and peri-event windows
+follow the same rule: they are analysed only outside excluded time. Inputs (the
+decoders' missing bins and encoding exclusion, the SWR detectors'
+normalization, the ripple-power covariate) use the mask itself, not this.
+
+A dropped event keeps its reason (:class:`DropReason`). Design note:
+``docs/design/2026-10-09-artifact-detection.md``.
 """
 
 from __future__ import annotations
@@ -39,72 +45,154 @@ from continuum_swr_replay.analysis.hippocampus.event_immobility import (
 )
 
 __all__ = [
-    "DECODER_REACH_S",
+    "ARTIFACT_REACH_S",
+    "EXCLUDED_TIME_REASONS",
     "DropReason",
     "artifact_drop_reasons",
     "drop_labels",
     "event_drop_reasons",
+    "excluded_time",
     "label_drop_reasons",
+    "overlaps_dropped_events",
 ]
 
-DECODER_REACH_S = 0.3
-"""Seconds within which a masked gap still moves a decoded event.
+ARTIFACT_REACH_S = 0.3
+"""Seconds by which the artifact mask is widened into excluded time.
 
-Study C3 masked gaps in the decodes: analysed NonLocal events changed within at
-most 0.21 s of a gap and ContFrag SWR labels flipped within at most 0.19 s,
-and the reach did not grow with the gap's length (the plan's Phase C rulings,
-2026-10-09). A decoded event closer than this to the mask is dropped."""
+Why 0.3 s: study C3 masked gaps in the decodes, and a gap changed analysed
+NonLocal events within at most 0.21 s and flipped ContFrag SWR labels within at
+most 0.19 s; the reach did not grow with the gap's length. The lead chose
+(2026-10-10) to apply it to every cohort, exposure, bin and window, not only to
+decoded events, so all rates share one exposure and the NonLocal and ContFrag
+cohorts agree."""
 
 
 class DropReason(StrEnum):
-    """Why an event leaves its cohort: the first that holds, in this order."""
+    """Why an event leaves its cohort: the first that holds, in this order.
+    ``overlaps_dropped_event`` is given only to an event every other rule
+    keeps."""
 
     ARTIFACT = "artifact"
     """The event shares time with the artifact mask (closed: touching counts)."""
-    DECODER_REACH = "decoder_reach"
-    """A decoded event within :data:`DECODER_REACH_S` of the mask."""
+    NEAR_ARTIFACT = "near_artifact"
+    """The event lies within :data:`ARTIFACT_REACH_S` of the mask, not in it."""
     NO_SPEED_SAMPLE = "no_speed_sample"
     """No sample of the speed's time axis lies in the event."""
     MOVING = "moving"
     """A finite speed sample in the event is at or above the threshold."""
     SPEED_UNKNOWN = "speed_unknown"
     """A speed sample in the event is not finite (and none is fast)."""
+    OVERLAPS_DROPPED_EVENT = "overlaps_dropped_event"
+    """The event overlaps an SWR or MUA event dropped for excluded time, so its
+    overlap class is unknown."""
+
+
+EXCLUDED_TIME_REASONS = frozenset(
+    {DropReason.ARTIFACT.value, DropReason.NEAR_ARTIFACT.value}
+)
+"""The reasons that put an event in excluded time: the drops another event's
+overlap is checked against."""
+
+
+def excluded_time(artifacts: pd.DataFrame) -> pd.DataFrame:
+    """Excluded time: the artifact mask widened by :data:`ARTIFACT_REACH_S`.
+
+    Parameters
+    ----------
+    artifacts : pd.DataFrame
+        One epoch's mask: ``start_time`` and ``end_time`` (seconds), closed.
+
+    Returns
+    -------
+    pd.DataFrame
+        ``start_time`` and ``end_time`` (seconds), closed, merged, in time order.
+    """
+    return pad_intervals(artifacts, ARTIFACT_REACH_S)
 
 
 def artifact_drop_reasons(
     starts: NDArray[np.float64],
     ends: NDArray[np.float64],
     artifacts: pd.DataFrame,
-    *,
-    reach_s: float = 0.0,
+    dropped: pd.DataFrame | None = None,
 ) -> NDArray[np.object_]:
-    """Each event's reason to leave its cohort because of the mask, or None.
+    """Each event's reason to leave its cohort for excluded time, or None.
 
     Parameters
     ----------
     starts, ends : ndarray, shape (n_events,)
         Each event's closed interval, seconds.
     artifacts : pd.DataFrame
-        The epoch's mask: ``start_time`` and ``end_time`` (seconds), closed.
-    reach_s : float
-        :data:`DECODER_REACH_S` for a decoded event, 0 for an SWR or MUA event.
+        The epoch's mask (not excluded time): ``start_time`` and ``end_time``,
+        closed.
+    dropped : pd.DataFrame, optional
+        The SWR and MUA events dropped for excluded time
+        (``swr_source.dropped_for_excluded_time``), for a cohort not read
+        through the source (events re-detected from a posterior, Widloski
+        events): an event every other rule keeps that overlaps one is
+        ``overlaps_dropped_event``.
 
     Returns
     -------
     ndarray of object, shape (n_events,)
         ``"artifact"`` for an event sharing time with the mask,
-        ``"decoder_reach"`` for one within `reach_s` of it (and not in it),
-        None for the rest.
+        ``"near_artifact"`` for one in excluded time but not in the mask,
+        ``"overlaps_dropped_event"`` as above, None for the rest.
     """
     starts = np.asarray(starts, dtype=np.float64)
     ends = np.asarray(ends, dtype=np.float64)
     reasons = np.full(starts.shape, None, dtype=object)
-    if reach_s > 0:
-        reasons[overlaps_intervals(starts, ends, pad_intervals(artifacts, reach_s))] = (
-            DropReason.DECODER_REACH.value
-        )
+    reasons[overlaps_intervals(starts, ends, excluded_time(artifacts))] = (
+        DropReason.NEAR_ARTIFACT.value
+    )
     reasons[overlaps_intervals(starts, ends, artifacts)] = DropReason.ARTIFACT.value
+    if dropped is not None:
+        kept = pd.isna(reasons)
+        reasons[kept & overlaps_dropped_events(starts, ends, dropped)] = (
+            DropReason.OVERLAPS_DROPPED_EVENT.value
+        )
     return reasons
+
+
+def overlaps_dropped_events(
+    starts: NDArray[np.float64],
+    ends: NDArray[np.float64],
+    dropped: pd.DataFrame,
+) -> NDArray[np.bool_]:
+    """True for each event that overlaps a dropped event.
+
+    Overlap is ``is_swr``'s: a positive-duration dropped interval with
+    ``dropped_end > start`` and ``dropped_start < end``, so an event only
+    touching a dropped one at an instant keeps a known (``non_swr``) class.
+
+    Parameters
+    ----------
+    starts, ends : ndarray, shape (n_events,)
+        Seconds.
+    dropped : pd.DataFrame
+        ``start_time`` and ``end_time`` of the SWR and MUA events dropped for
+        excluded time.
+
+    Returns
+    -------
+    ndarray of bool, shape (n_events,)
+    """
+    starts = np.asarray(starts, dtype=np.float64)
+    ends = np.asarray(ends, dtype=np.float64)
+    dropped_starts = dropped["start_time"].to_numpy(dtype=np.float64)
+    dropped_ends = dropped["end_time"].to_numpy(dtype=np.float64)
+    positive = dropped_ends > dropped_starts
+    dropped_starts, dropped_ends = dropped_starts[positive], dropped_ends[positive]
+    if starts.size == 0 or dropped_starts.size == 0:
+        return np.zeros(starts.shape, dtype=bool)
+    order = np.argsort(dropped_starts, kind="stable")
+    dropped_starts = dropped_starts[order]
+    reach = np.maximum.accumulate(dropped_ends[order])
+    # the dropped intervals starting strictly before each event's end; one of
+    # them overlaps the event iff the furthest end among them passes its start
+    last = np.searchsorted(dropped_starts, ends, side="left") - 1
+    overlaps: NDArray[np.bool_] = (last >= 0) & (reach[np.maximum(last, 0)] > starts)
+    return overlaps
 
 
 def event_drop_reasons(
@@ -113,15 +201,15 @@ def event_drop_reasons(
     speed: NDArray[np.float64],
     time: NDArray[np.float64],
     artifacts: pd.DataFrame,
-    reach_s: float = 0.0,
     speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 ) -> NDArray[np.object_]:
-    """The whole rule on events given as intervals: each one's reason, or None.
+    """The rule on events given as intervals: each one's reason, or None.
 
     The canonical whole-event immobility rule decides the speed part
     (``filter_event_intervals_by_speed``: samples in the closed interval, every
     one finite and strictly below `speed_threshold`); the counts here only name
-    why it failed. The mask's reasons come first.
+    why it failed. Excluded time's reasons come first. The pass for
+    ``overlaps_dropped_event`` needs the other cohorts and is not made here.
 
     Parameters
     ----------
@@ -133,8 +221,6 @@ def event_drop_reasons(
         Seconds, strictly increasing.
     artifacts : pd.DataFrame
         The epoch's mask, closed intervals.
-    reach_s : float
-        As :func:`artifact_drop_reasons`.
     speed_threshold : float
         cm/s, strict.
 
@@ -178,9 +264,9 @@ def event_drop_reasons(
         raise RuntimeError(
             "an event failed the immobility rule for no reason this module names"
         )
-    masked = artifact_drop_reasons(starts, ends, artifacts, reach_s=reach_s)
-    has_mask_reason = ~pd.isna(masked)
-    reasons[has_mask_reason] = masked[has_mask_reason]
+    excluded = artifact_drop_reasons(starts, ends, artifacts)
+    in_excluded = ~pd.isna(excluded)
+    reasons[in_excluded] = excluded[in_excluded]
     return reasons
 
 
@@ -188,14 +274,13 @@ def label_drop_reasons(
     frame: pd.DataFrame,
     event_col: str,
     artifacts: pd.DataFrame,
-    *,
-    reach_s: float,
 ) -> pd.DataFrame:
-    """Every labelled event of one epoch's frame, with its reason to leave.
+    """Every labelled event of one epoch's frame, with its excluded-time reason.
 
     The labels are already speed-qualified where the frame was made (the
-    decode's ``get_data_over_time``), so only the mask's reasons apply; each
-    event is read at its sampled bounds, its first and last labelled bin.
+    decode's ``get_data_over_time``), so only excluded time's reasons apply
+    here; each event is read at its sampled bounds, its first and last
+    labelled bin.
 
     Parameters
     ----------
@@ -206,8 +291,6 @@ def label_drop_reasons(
         Such as ``"non_local_event"`` or ``"MUA_event"``.
     artifacts : pd.DataFrame
         The epoch's mask, closed intervals.
-    reach_s : float
-        As :func:`artifact_drop_reasons`.
 
     Returns
     -------
@@ -225,10 +308,7 @@ def label_drop_reasons(
         }
     )
     drops["drop_reason"] = artifact_drop_reasons(
-        drops["start_time"].to_numpy(),
-        drops["end_time"].to_numpy(),
-        artifacts,
-        reach_s=reach_s,
+        drops["start_time"].to_numpy(), drops["end_time"].to_numpy(), artifacts
     )
     return drops
 
@@ -247,7 +327,8 @@ def drop_labels(
         One epoch, carrying `event_col`.
     event_col : str
     drops : pd.DataFrame
-        From :func:`label_drop_reasons` on the same frame.
+        One row per labelled event: `event_col` and ``drop_reason`` (None for
+        a kept event), as :func:`label_drop_reasons` returns it.
 
     Returns
     -------

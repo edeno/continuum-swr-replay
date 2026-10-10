@@ -66,7 +66,9 @@ from concurrent.futures import ProcessPoolExecutor, as_completed  # noqa: E402
 import pandas as pd  # noqa: E402
 
 from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
-    artifact_intervals_by_session,
+    excluded_intervals_by_session,
+    require_swr_source,
+    swr_source_name,
 )
 from continuum_swr_replay.analysis.replay import (  # noqa: E402
     ARRIVAL_CLOCK_COLUMN,
@@ -137,7 +139,7 @@ FIT_INPUTS = {
 }
 
 # The ladder is fit on one frozen cohort, so its bins are dropped by its
-# longest-reaching history window: a bin whose window touches the artifact
+# longest-reaching history window: a bin whose window touches excluded
 # mask reads unobserved time.
 HISTORY_WINDOW_S = longest_history_window_s(MODEL_PER_BIN_RATE.values())
 
@@ -175,9 +177,9 @@ def _fit_one_session(
     has_arrival_rungs = any(
         spec.time_clock == "arrival" for spec in MODEL_PER_BIN_RATE.values()
     )
-    # artifact time is unobserved: its bins, and those whose history reaches
-    # it, leave every rung
-    artifacts = artifact_intervals_by_session(stops_g)
+    # excluded time (the artifact mask widened by 0.3 s) is not analysed: its
+    # bins, and those whose history reaches it, leave every rung
+    excluded = excluded_intervals_by_session(stops_g)
     for outcome, selector in POPULATIONS.items():
         design = aggregate_to_timebins(
             stops_g,
@@ -188,19 +190,19 @@ def _fit_one_session(
             self_history_lags=N_HISTORY_LAGS,
             self_history_basis=N_HISTORY_BASIS,
             stop_covariates=STOP_COVARIATES,
-            artifact_intervals=artifacts,
+            excluded_intervals=excluded,
             history_window_s=HISTORY_WINDOW_S,
         )
-        if design.attrs.get("n_bins_artifact") or design.attrs.get(
-            "n_bins_artifact_history"
+        if design.attrs.get("n_bins_excluded") or design.attrs.get(
+            "n_bins_excluded_history"
         ):
             logger.info(
-                "  %s/%s: the artifact mask dropped %d bins and %d more by "
+                "  %s/%s: excluded time dropped %d bins and %d more by "
                 "their %.3f s history window",
                 "_".join(map(str, keys)),
                 outcome,
-                design.attrs["n_bins_artifact"],
-                design.attrs["n_bins_artifact_history"],
+                design.attrs["n_bins_excluded"],
+                design.attrs["n_bins_excluded_history"],
                 HISTORY_WINDOW_S,
             )
         # ONE cohort for the whole ladder, frozen before the first fit.
@@ -566,6 +568,10 @@ def main() -> None:
     require_covariate_schema(stop, table="stop")
     require_covariate_schema(onset_table, table="event_onset")
     require_covariate_schema(event_table, table="event")
+    # The bins are dropped by the configured source's excluded time, so the
+    # tables must come from that source (its artifact run included).
+    require_swr_source(stop, what=str(FIT_INPUTS["stop_table"]))
+    require_swr_source(onset_table, what=str(FIT_INPUTS["event_onset_table"]))
     # Hash the inputs now, not at write time: the ladder runs long enough that a
     # table could be regenerated mid-fit and be certified as this fit's input.
     fit_inputs = record_inputs(FIT_INPUTS)
@@ -624,7 +630,7 @@ def main() -> None:
         fit_inputs,
         "poisson_glm",
         sys.argv,
-        extra={"stop_cohort": args.stop_cohort},
+        extra={"stop_cohort": args.stop_cohort, "swr_source": swr_source_name()},
     )
     write_cohort_audit(
         _cohort_records(models, stop, models.attrs.get("cohort_stop_drops")),

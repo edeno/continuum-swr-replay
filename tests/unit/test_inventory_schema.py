@@ -271,13 +271,27 @@ class TestAdapters:
                 "is_replay": [True] * 3,
                 "shuffle_pass": [True] * 3,
                 "n_shuffles": [100] * 3,
-                "artifact_drop_reason": [None, "decoder_reach", "artifact"],
+                "artifact_drop_reason": [None, "near_artifact", "artifact"],
             }
         )
 
         for cohort in MEMORYLESS_COHORTS:
             inventory = from_memoryless_table(table, cohort=cohort)
             assert inventory.event_key.tolist() == ["memoryless:sim20200101_02_r1:1"]
+
+    def test_a_table_made_before_the_rule_is_refused_under_an_artifact_run(
+        self, monkeypatch
+    ):
+        """It would read its candidates in excluded time as kept."""
+        from continuum_swr_replay.analysis.hippocampus import swr_source
+        from tests.unit.test_memoryless_event_table import build, make_recording
+
+        table = build(make_recording()).drop(columns="artifact_drop_reason")
+        assert len(from_memoryless_table(table, cohort="replay_criteria")) == 2
+        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", "a_run")
+
+        with pytest.raises(ValueError, match="artifact_drop_reason"):
+            from_memoryless_table(table, cohort="replay_criteria")
 
     def test_the_adapter_reads_what_the_memoryless_builder_writes(self):
         """Fed a real table, so a column rename in the builder fails here and

@@ -54,6 +54,9 @@ from continuum_swr_replay.analysis.constants import (  # noqa: E402
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
+from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (  # noqa: E402
+    interval_mask,
+)
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (  # noqa: E402
     validate_dot_event_contract,
 )
@@ -72,6 +75,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: 
     parse_epoch_identifier,
 )
 from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
+    excluded_intervals_of,
     read_dot_with_swr_source,
 )
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
@@ -122,7 +126,9 @@ def find_sessions(animal: str | None) -> list[str]:
         if animal is not None and not epoch_id.startswith(animal):
             continue
         has_results = (PROCESSED_DATA_DIR / f"{epoch_id}_results.nc").exists()
-        has_dot = (PROCESSED_DATA_DIR / f"{epoch_id}_{thr_int}_data_over_time.pkl").exists()
+        has_dot = (
+            PROCESSED_DATA_DIR / f"{epoch_id}_{thr_int}_data_over_time.pkl"
+        ).exists()
         if has_results and has_dot:
             out.append(epoch_id)
     return out
@@ -157,16 +163,16 @@ def build_session_events(dot: pd.DataFrame) -> pd.DataFrame:
     # Business-logic boundary: direct callers get the same fail-closed input
     # contract as the file-loading entry point.
     validate_dot_event_contract(dot)
-    nlp = (dot["Non-Local_Continuous_prob"] + dot["Non-Local_Fragmented_prob"]).to_numpy()
+    nlp = (
+        dot["Non-Local_Continuous_prob"] + dot["Non-Local_Fragmented_prob"]
+    ).to_numpy()
     immobile = dot["head_speed"].to_numpy() < IMMOBILITY_CM_PER_S
     ab = dot["ahead_behind_distance"].to_numpy()
     validate_nonlocal_event_probability_contract(
         dot,
         probability_threshold=NON_LOCAL_THRESHOLD,
     )
-    eligible = filter_event_labels_by_speed(
-        dot, ["non_local_event", "SWR_event"]
-    )
+    eligible = filter_event_labels_by_speed(dot, ["non_local_event", "SWR_event"])
     nonlocal_labels = eligible["non_local_event"].to_numpy()
     is_swr_event = event_strict_overlap_mask(
         eligible, "non_local_event", "SWR_event"
@@ -179,9 +185,7 @@ def build_session_events(dot: pd.DataFrame) -> pd.DataFrame:
         if n_bins < MIN_EVENT_BINS:
             continue
         if n_bins > 1 and not (np.diff(event_bins) == 1).all():
-            raise ValueError(
-                f"non_local_event {event_label} is not one contiguous run"
-            )
+            raise ValueError(f"non_local_event {event_label} is not one contiguous run")
         s, e = int(event_bins[0]), int(event_bins[-1])
         mab = float(np.nanmean(np.abs(ab[event_bins])))
         is_swr = bool(is_swr_event[event_bins[0]])
@@ -204,7 +208,11 @@ def build_session_events(dot: pd.DataFrame) -> pd.DataFrame:
             }
         )
 
-    for s, e in _contiguous_spans((nlp < NON_EVENT_THRESHOLD) & immobile):
+    # the null is analysed time too: no baseline window touches excluded time
+    # (the artifact mask widened by 0.3 s; the low-non-local label is decoded)
+    time = dot["time"].to_numpy() if "time" in dot.columns else dot.index.to_numpy()
+    observed = ~interval_mask(time, excluded_intervals_of(dot))
+    for s, e in _contiguous_spans((nlp < NON_EVENT_THRESHOLD) & immobile & observed):
         n_bins = e - s + 1
         if n_bins < MIN_EVENT_BINS or n_bins > MAX_BASELINE_BINS:
             continue
@@ -237,15 +245,25 @@ def load_marks(epoch_id: str, cache_dir: Path) -> tuple[list, list]:
 
     nwb, epoch_name, brain_area = parse_epoch_identifier(epoch_id)
     data = load_data(nwb, epoch_name)
-    marks = (data["spike_times"][brain_area], data["spike_waveform_features"][brain_area])
+    marks = (
+        data["spike_times"][brain_area],
+        data["spike_waveform_features"][brain_area],
+    )
     joblib.dump(marks, cache)
     return marks
 
 
 # --- Likelihood + metrics -----------------------------------------------------
 def event_metrics(
-    s: int, e: int, L: np.ndarray, n_spikes: int,
-    mape: np.ndarray, lin: np.ndarray, env, pos: np.ndarray, gpi_peak_pos: float,
+    s: int,
+    e: int,
+    L: np.ndarray,
+    n_spikes: int,
+    mape: np.ndarray,
+    lin: np.ndarray,
+    env,
+    pos: np.ndarray,
+    gpi_peak_pos: float,
 ) -> dict | None:
     """Compute the per-event reality metrics (track-distance bins)."""
     mt, at = mape[s : e + 1], lin[s : e + 1]
@@ -310,24 +328,44 @@ def analyze_session(
         sample = g.sample(min(n_sample, len(g)), random_state=seed)
         for _, r in sample.iterrows():
             s, ev = int(r.s), int(r.e)
-            L, n_spk, n_tet = event_likelihood(s, ev, t, lin, spike_times, waveform_features, encargs)
+            L, n_spk, n_tet = event_likelihood(
+                s, ev, t, lin, spike_times, waveform_features, encargs
+            )
             m = event_metrics(s, ev, L, n_spk, mape, lin, env, pos, gpi_peak_pos)
             if m is not None:
-                m.update(group=group, n_tetrodes=n_tet, n_bins=int(r.n_bins),
-                         start_time=float(t[s]), end_time=float(t[ev]),
-                         epoch_id=epoch_id, animal=animal)
+                m.update(
+                    group=group,
+                    n_tetrodes=n_tet,
+                    n_bins=int(r.n_bins),
+                    start_time=float(t[s]),
+                    end_time=float(t[ev]),
+                    epoch_id=epoch_id,
+                    animal=animal,
+                )
                 records.append(m)
 
     metrics_df = pd.DataFrame(records)
-    context = {"pos": pos, "gpi": gpi, "t": t, "mape": mape, "lin": lin, "env": env,
-               "encargs": encargs, "events": events, "spike_times": spike_times,
-               "waveform_features": waveform_features, "gpi_peak_pos": gpi_peak_pos,
-               "epoch_id": epoch_id}
+    context = {
+        "pos": pos,
+        "gpi": gpi,
+        "t": t,
+        "mape": mape,
+        "lin": lin,
+        "env": env,
+        "encargs": encargs,
+        "events": events,
+        "spike_times": spike_times,
+        "waveform_features": waveform_features,
+        "gpi_peak_pos": gpi_peak_pos,
+        "epoch_id": epoch_id,
+    }
     return metrics_df, context
 
 
 # --- Figures ------------------------------------------------------------------
-def render_session_figures(metrics_df: pd.DataFrame, context: dict, output_dir: Path) -> None:
+def render_session_figures(
+    metrics_df: pd.DataFrame, context: dict, output_dir: Path
+) -> None:
     """Heatmaps, metric distributions (with baseline) and the GPI-position panel."""
     import matplotlib
 
@@ -343,13 +381,25 @@ def render_session_figures(metrics_df: pd.DataFrame, context: dict, output_dir: 
     groups = [g for g in GROUP_ORDER if g in set(metrics_df["group"])]
 
     # 1. example likelihood heatmaps (per-timebin normalized)
-    ex_groups = [g for g in ["nonSWR-remote", "nonSWR-close", "SWR-remote"] if g in set(events["group"])]
-    fig, axes = plt.subplots(1, len(ex_groups), figsize=(5.3 * len(ex_groups), 4.2), squeeze=False)
+    ex_groups = [
+        g
+        for g in ["nonSWR-remote", "nonSWR-close", "SWR-remote"]
+        if g in set(events["group"])
+    ]
+    fig, axes = plt.subplots(
+        1, len(ex_groups), figsize=(5.3 * len(ex_groups), 4.2), squeeze=False
+    )
     for ax, name in zip(axes[0], ex_groups, strict=True):
         row = events[events.group == name].nlargest(1, "n_bins").iloc[0]
         s, e = int(row.s), int(row.e)
         L, n_spk, n_tet = event_likelihood(
-            s, e, t, lin, context["spike_times"], context["waveform_features"], context["encargs"]
+            s,
+            e,
+            t,
+            lin,
+            context["spike_times"],
+            context["waveform_features"],
+            context["encargs"],
         )
         ln = np.exp(L - L.max(1, keepdims=True))
         ln = ln / ln.sum(1, keepdims=True)
@@ -369,16 +419,28 @@ def render_session_figures(metrics_df: pd.DataFrame, context: dict, output_dir: 
     # 2. metric distributions (with baseline)
     rng = np.random.RandomState(1)
     fig, axs = plt.subplots(1, 2, figsize=(11, 4.2))
-    for ax, (metric, lab) in zip(axs, [("dll_animal", "dLL: MAP vs animal"), ("dll_per_spike", "dLL per spike")], strict=True):
+    for ax, (metric, lab) in zip(
+        axs,
+        [("dll_animal", "dLL: MAP vs animal"), ("dll_per_spike", "dLL per spike")],
+        strict=True,
+    ):
         for i, name in enumerate(groups):
             v = metrics_df.loc[metrics_df.group == name, metric].dropna().to_numpy()
-            ax.scatter(np.full(len(v), i) + rng.uniform(-0.12, 0.12, len(v)), v, s=13, alpha=0.6, color=GROUP_COLORS[name])
+            ax.scatter(
+                np.full(len(v), i) + rng.uniform(-0.12, 0.12, len(v)),
+                v,
+                s=13,
+                alpha=0.6,
+                color=GROUP_COLORS[name],
+            )
             ax.hlines(np.median(v), i - 0.22, i + 0.22, color="k", lw=2)
         ax.axhline(0, color="r", ls="--", lw=0.8)
         ax.set_xticks(range(len(groups)))
         ax.set_xticklabels(groups, fontsize=7, rotation=15)
         ax.set_title(lab, fontsize=10)
-    fig.suptitle(f"{epoch_id}: spike-evidence reality metrics (baseline = null)", fontsize=11)
+    fig.suptitle(
+        f"{epoch_id}: spike-evidence reality metrics (baseline = null)", fontsize=11
+    )
     fig.tight_layout(rect=[0, 0, 1, 0.93])
     fig.savefig(output_dir / f"{epoch_id}_02_reality_metrics.png", dpi=140)
     plt.close(fig)
@@ -395,7 +457,14 @@ def render_session_figures(metrics_df: pd.DataFrame, context: dict, output_dir: 
     a1.set_title("GPI(x)")
     for name in ex_groups:
         v = metrics_df.loc[metrics_df.group == name, "map_mean"].dropna()
-        a2.hist(v, bins=25, histtype="step", color=GROUP_COLORS[name], label=name, density=True)
+        a2.hist(
+            v,
+            bins=25,
+            histtype="step",
+            color=GROUP_COLORS[name],
+            label=name,
+            density=True,
+        )
     a2.axvline(gpi_peak, color="k", ls="--")
     a2.axvline(gpi_min, color="gray", ls=":")
     a2.set_xlabel("event MAP position (cm)")
@@ -431,7 +500,9 @@ def per_animal_medians(metrics_df: pd.DataFrame) -> pd.DataFrame:
     many animals show each event group exceeding their own non-event baseline.
     """
     return (
-        metrics_df.groupby(["animal", "group"])["dll_per_spike"].median().unstack("group")
+        metrics_df.groupby(["animal", "group"])["dll_per_spike"]
+        .median()
+        .unstack("group")
     )
 
 
@@ -439,14 +510,18 @@ def per_animal_medians(metrics_df: pd.DataFrame) -> pd.DataFrame:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     g = parser.add_mutually_exclusive_group(required=True)
-    g.add_argument("--epoch-identifier", help="single session, e.g. chimi20200213_02_r1_HPC")
+    g.add_argument(
+        "--epoch-identifier", help="single session, e.g. chimi20200213_02_r1_HPC"
+    )
     g.add_argument("--animal", help="run all HPC sessions for this animal")
     g.add_argument("--epoch-identifiers", help="comma-separated list of sessions")
     g.add_argument("--all", action="store_true", help="run every HPC session")
     parser.add_argument("--cache-dir", type=Path, default=DEFAULT_CACHE_DIR)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--n-sample", type=int, default=N_SAMPLE_PER_GROUP)
-    parser.add_argument("--make-figures", action="store_true", help="render per-session figures")
+    parser.add_argument(
+        "--make-figures", action="store_true", help="render per-session figures"
+    )
     args = parser.parse_args()
 
     if args.epoch_identifier:
@@ -462,7 +537,9 @@ def main() -> None:
     all_metrics = []
     for epoch_id in sessions:
         try:
-            metrics_df, context = analyze_session(epoch_id, args.cache_dir, args.n_sample)
+            metrics_df, context = analyze_session(
+                epoch_id, args.cache_dir, args.n_sample
+            )
         except EventDefinitionError:
             # A malformed saved event cohort invalidates the multi-session
             # comparison. Abort instead of writing a selectively incomplete
@@ -473,7 +550,10 @@ def main() -> None:
             continue
         all_metrics.append(metrics_df)
         med = metrics_df.groupby("group")["dll_per_spike"].median()
-        print(f"  {epoch_id}: per-spike dLL by group -> " + ", ".join(f"{k}={v:.2f}" for k, v in med.items()))
+        print(
+            f"  {epoch_id}: per-spike dLL by group -> "
+            + ", ".join(f"{k}={v:.2f}" for k, v in med.items())
+        )
         if args.make_figures:
             render_session_figures(metrics_df, context, args.output_dir)
 
@@ -486,15 +566,25 @@ def main() -> None:
     summary = summarize(metrics)
     summary.to_csv(args.output_dir / "event_spike_evidence_summary.csv", index=False)
     print(f"\nWrote metrics ({len(metrics)} events) and summary to {args.output_dir}")
-    print("\nPooled per-group medians (NOT the inferential statistic — see per-animal below):")
-    print(metrics.groupby("group")[["dll_animal", "dll_per_spike", "n_spikes", "dist_to_gpi_peak"]].median().to_string())
+    print(
+        "\nPooled per-group medians (NOT the inferential statistic — see per-animal below):"
+    )
+    print(
+        metrics.groupby("group")[
+            ["dll_animal", "dll_per_spike", "n_spikes", "dist_to_gpi_peak"]
+        ]
+        .median()
+        .to_string()
+    )
 
     pam = per_animal_medians(metrics)
     pam.to_csv(args.output_dir / "event_spike_evidence_per_animal.csv")
     print("\nPer-animal median dLL/spike (within-animal summary):")
     print(pam.to_string())
     if "baseline" in pam.columns:
-        print("\nWithin-animal direction test: event group median > that animal's baseline")
+        print(
+            "\nWithin-animal direction test: event group median > that animal's baseline"
+        )
         for grp in [g for g in GROUP_ORDER if g != "baseline" and g in pam.columns]:
             valid = pam[grp].notna() & pam["baseline"].notna()
             n_exceed = int((pam.loc[valid, grp] > pam.loc[valid, "baseline"]).sum())

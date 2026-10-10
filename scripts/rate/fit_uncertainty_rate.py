@@ -55,7 +55,9 @@ import pandas as pd  # noqa: E402
 
 from continuum_swr_replay.analysis.constants import OUTCOME_TIME_SEMANTICS  # noqa: E402
 from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
-    artifact_intervals_by_session,
+    excluded_intervals_by_session,
+    require_swr_source,
+    swr_source_name,
 )
 from continuum_swr_replay.analysis.replay import (  # noqa: E402
     BIN_S,
@@ -429,9 +431,9 @@ def fit_uncertainty_rate(
         if keys not in onset_groups:
             continue
         onsets_g = onset_groups[keys]
-        # artifact time is unobserved: its bins, and those whose history
-        # reaches it, are not fit
-        artifacts = artifact_intervals_by_session(stops_g)
+        # excluded time (the artifact mask widened by 0.3 s) is not analysed:
+        # its bins, and those whose history reaches it, are not fit
+        excluded = excluded_intervals_by_session(stops_g)
         for outcome in POPULATIONS_TO_FIT:
             attempted[outcome] += 1
             design = aggregate_to_timebins(
@@ -443,7 +445,7 @@ def fit_uncertainty_rate(
                 self_history_lags=N_HISTORY_LAGS,
                 self_history_basis=N_HISTORY_BASIS,
                 stop_covariates=stop_covariates,
-                artifact_intervals=artifacts,
+                excluded_intervals=excluded,
                 history_window_s=longest_history_window_s([MU_UNCERTAINTY]),
             )
             design, gate_audit = _gate_bins_after_outcome(design)
@@ -603,7 +605,11 @@ def _write_outputs(
     models.to_pickle(out)
     save_reference(z_reference, z_reference_path(out))
     write_fit_provenance(
-        out, fit_inputs, "poisson_glm", argv, extra={"stop_cohort": stop_cohort}
+        out,
+        fit_inputs,
+        "poisson_glm",
+        argv,
+        extra={"stop_cohort": stop_cohort, "swr_source": swr_source_name()},
     )
     gate_audit.to_csv(
         out_dir / f"uncertainty_rate_post_outcome_gate_audit{sfx}.csv",
@@ -656,6 +662,10 @@ def main() -> None:
     require_covariate_schema(stop, table="stop")
     require_covariate_schema(onset_table, table="event_onset")
     require_covariate_schema(event_table, table="event")
+    # The bins are dropped by the configured source's excluded time, so the
+    # tables must come from that source (its artifact run included).
+    require_swr_source(stop, what=str(FIT_INPUTS["stop_table"]))
+    require_swr_source(onset_table, what=str(FIT_INPUTS["event_onset_table"]))
     onsets = attach_is_swr_to_onsets(onset_table, event_table)
 
     # add_uncertainty_covariates validates the upstream recent_switch_rate (the

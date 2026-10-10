@@ -22,6 +22,7 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
+from continuum_swr_replay.analysis.hippocampus import swr_source
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     event_speeds_are_immobile,
 )
@@ -415,7 +416,14 @@ def from_memoryless_table(table: pd.DataFrame, *, cohort: str) -> pd.DataFrame:
         replay definition, ``"replay_criteria"`` for duration and dispersion
         alone. ``"published"`` needs every candidate meeting the replay
         criteria to have been shuffled. A candidate with an
-        ``artifact_drop_reason`` (the artifact mask reaches it) is in neither.
+        ``artifact_drop_reason`` (excluded time reaches it) is in neither.
+
+    Raises
+    ------
+    ValueError
+        If the cohort is unknown, a column is missing, a published cohort was
+        not shuffled, or an artifact run is configured and the table has no
+        ``artifact_drop_reason`` (it was made before the rule).
 
     """
     if cohort not in MEMORYLESS_COHORTS:
@@ -454,8 +462,15 @@ def from_memoryless_table(table: pd.DataFrame, *, cohort: str) -> pd.DataFrame:
         )
     selected = table[flag].to_numpy(dtype=bool)
     if "artifact_drop_reason" in table.columns:
-        # a candidate the artifact mask reaches is unobserved: in no cohort
+        # a candidate in excluded time is not analysed: in no cohort
         selected &= table["artifact_drop_reason"].isna().to_numpy()
+    elif swr_source.ARTIFACT_INTERVALS_RUN_ID is not None:
+        raise ValueError(
+            "The memoryless table has no artifact_drop_reason column, but the "
+            f"artifact run {swr_source.ARTIFACT_INTERVALS_RUN_ID!r} is "
+            "configured: a table made before the analysed-time rule would read "
+            "its candidates in excluded time as kept. Rerun the detector."
+        )
     table = table[selected]
     frame = pd.DataFrame(
         {

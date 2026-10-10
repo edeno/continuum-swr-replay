@@ -37,7 +37,9 @@ from statsmodels.stats.multitest import multipletests
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
-    artifact_intervals_by_session,
+    excluded_intervals_by_session,
+    require_swr_source,
+    swr_source_name,
 )
 from continuum_swr_replay.analysis.replay import (  # noqa: E402
     BIN_S,
@@ -98,13 +100,18 @@ def _spec(name: str, *, cross: bool) -> PerBinRateModelSpec:
 M_SELF = _spec("Mself", cross=False)
 M_CROSS = _spec("Mselfcross", cross=True)
 # Both designs drop the bins whose longest history window (self or cross)
-# touches the artifact mask, so the two are fit to the same bins.
+# touches excluded time, so the two are fit to the same bins.
 HISTORY_WINDOW_S = longest_history_window_s([M_SELF, M_CROSS])
 CROSS_COEFS = [f"coef_cross_hist_rcos_{k}" for k in range(N_HISTORY_BASIS)]
 
 
-def _fit_direction(stops_g, onsets_g, resp_pop, cross_pop) -> dict | None:
-    """Fit M_self and M_self+cross for one session/direction; return a row."""
+def _fit_direction(
+    stops_g, onsets_g, resp_pop, cross_pop, excluded: pd.DataFrame
+) -> dict | None:
+    """Fit M_self and M_self+cross for one session/direction; return a row.
+
+    `excluded` is the session's excluded time
+    (``swr_source.excluded_intervals_by_session``)."""
     resp = POPULATIONS[resp_pop](onsets_g)
     cross = POPULATIONS[cross_pop](onsets_g)
     common = {
@@ -113,7 +120,7 @@ def _fit_direction(stops_g, onsets_g, resp_pop, cross_pop) -> dict | None:
         "reward_basis": True,
         "self_history_lags": N_HISTORY_LAGS,
         "self_history_basis": N_HISTORY_BASIS,
-        "artifact_intervals": artifact_intervals_by_session(stops_g),
+        "excluded_intervals": excluded,
         "history_window_s": HISTORY_WINDOW_S,
     }
     design_self = aggregate_to_timebins(stops_g, resp, **common)
@@ -156,8 +163,9 @@ def fit_cross_history(stop_table: pd.DataFrame, onsets: pd.DataFrame) -> pd.Data
         if keys not in onset_groups:
             continue
         onsets_g = onset_groups[keys]
+        excluded = excluded_intervals_by_session(stops_g)
         for direction, (resp_pop, cross_pop) in DIRECTIONS.items():
-            r = _fit_direction(stops_g, onsets_g, resp_pop, cross_pop)
+            r = _fit_direction(stops_g, onsets_g, resp_pop, cross_pop, excluded)
             if r is not None:
                 rows.append(
                     {
@@ -220,6 +228,10 @@ def main() -> None:
     require_covariate_schema(stop, table="stop")
     require_covariate_schema(onset_table, table="event_onset")
     require_covariate_schema(event_table, table="event")
+    # The bins are dropped by the configured source's excluded time, so the
+    # tables must come from that source (its artifact run included).
+    require_swr_source(stop, what=str(RC / "stop_table.pkl"))
+    require_swr_source(onset_table, what=str(RC / "event_onset_table.pkl"))
     onsets = attach_is_swr_to_onsets(onset_table, event_table)
     if args.max_per_animal is not None:
         keep = (
@@ -237,6 +249,7 @@ def main() -> None:
     _summary(models)
     if args.write:
         out = RC / "models_per_bin_rate" / "cross_history_models.pkl"
+        models.attrs["swr_source"] = swr_source_name()
         models.to_pickle(out)
         print(f"\nwrote {len(models)} rows -> {out}")
 

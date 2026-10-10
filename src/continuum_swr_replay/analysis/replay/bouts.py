@@ -127,29 +127,31 @@ def immobility_bout_intervals(
 
 
 def bout_exposure_s(
-    bout_starts: np.ndarray, bout_ends: np.ndarray, artifacts: pd.DataFrame
+    bout_starts: np.ndarray, bout_ends: np.ndarray, excluded: pd.DataFrame
 ) -> np.ndarray:
-    """Each bout's observed immobility: its span less the masked time in it.
+    """Each bout's analysed immobility: its span less the excluded time in it.
 
-    Artifact time is unobserved, so it is no rate's exposure. The bout itself
-    (its start, end and ``stop_id``) is not changed; only its exposure falls.
+    Excluded time (the artifact mask widened by 0.3 s) is not analysed, so it
+    is no rate's exposure. The bout itself (its start, end and ``stop_id``) is
+    not changed; only its exposure falls.
 
     Parameters
     ----------
     bout_starts, bout_ends : np.ndarray, shape (n_bouts,)
         Seconds, from :func:`immobility_bout_intervals`.
-    artifacts : pd.DataFrame
-        The epoch's artifact mask: ``start_time`` and ``end_time``, closed.
+    excluded : pd.DataFrame
+        The epoch's excluded time (``swr_source.excluded_intervals``):
+        ``start_time`` and ``end_time``, closed.
 
     Returns
     -------
     np.ndarray, shape (n_bouts,)
-        Seconds; ``bout_ends - bout_starts`` itself when nothing is masked.
+        Seconds; ``bout_ends - bout_starts`` itself when nothing is excluded.
     """
     span = bout_ends - bout_starts
-    if len(artifacts) == 0:
+    if len(excluded) == 0:
         return span
-    exposure: np.ndarray = span - covered_seconds(bout_starts, bout_ends, artifacts)
+    exposure: np.ndarray = span - covered_seconds(bout_starts, bout_ends, excluded)
     return exposure
 
 

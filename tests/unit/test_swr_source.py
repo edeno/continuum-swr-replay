@@ -434,14 +434,18 @@ class TestTheLabels:
         assert sorted(set(labels) - {0}) == [1, 2, 5, 6, 8]
         assert (labels[(TIME >= 102.4) & (TIME <= 102.6)] == 0).all()
 
-    def test_an_artifact_zeroes_its_event_and_nothing_else(
+    def test_excluded_time_zeroes_its_events_and_nothing_else(
         self, inventory, tmp_path, monkeypatch
     ):
+        """The mask [100.55, 100.75] overlaps SWR 1; SWR 2 (101.000-101.020)
+        lies within its 0.3 s reach, in excluded time [100.25, 101.05]."""
         plain = swr_event_labels(TIME, EPOCH, speed=_speed())
         _artifacts(tmp_path, monkeypatch, [("spk", 100.65, 100.65)])
         masked = swr_event_labels(TIME, EPOCH, speed=_speed())
 
-        np.testing.assert_array_equal(masked, np.where(plain == 1, 0, plain))
+        np.testing.assert_array_equal(
+            masked, np.where(np.isin(plain, [1, 2]), 0, plain)
+        )
 
     def test_events_sharing_a_bin_are_refused_as_the_builders_refuse_them(
         self, tmp_path, monkeypatch
@@ -471,10 +475,10 @@ class TestCoverage:
         )
         np.testing.assert_array_equal(observed, expected)
 
-    def test_artifact_time_is_not_observed(self, tmp_path, monkeypatch):
-        """Artifact time is unobserved: an event there is neither SWR nor
-        non-SWR. The mask's intervals leave the coverage, endpoints
-        included, and the stretches say the same as the mask."""
+    def test_excluded_time_is_not_observed(self, tmp_path, monkeypatch):
+        """Excluded time (the mask widened by 0.3 s) is not analysed: an event
+        there is neither SWR nor non-SWR. Its intervals leave the coverage,
+        endpoints included, and the stretches say the same as the mask."""
         directory = write_swr_inventory(
             tmp_path / "swr",
             {EPOCH: EVENTS[:1]},
@@ -489,11 +493,12 @@ class TestCoverage:
         in_band = ((TIME >= 100.0) & (TIME <= 101.0)) | (
             (TIME >= 102.0) & (TIME <= 109.0)
         )
-        in_artifact = np.zeros(TIME.size, dtype=bool)
-        for start, end in artifact_intervals(EPOCH).to_numpy():
-            in_artifact |= (TIME >= start) & (TIME <= end)
-        assert in_artifact.sum() == 2 * 101  # both endpoints are grid samples
-        np.testing.assert_array_equal(observed, in_band & ~in_artifact)
+        in_excluded = np.zeros(TIME.size, dtype=bool)
+        for start, end in swr_source.excluded_intervals(EPOCH).to_numpy():
+            in_excluded |= (TIME >= start) & (TIME <= end)
+        # 0.8 s each; the padded bounds fall a hair off the grid
+        assert in_excluded.sum() == 2 * 399
+        np.testing.assert_array_equal(observed, in_band & ~in_excluded)
         from_stretches = np.zeros(TIME.size, dtype=bool)
         for start, end in stretches:
             from_stretches |= (TIME >= start) & (TIME <= end)
@@ -663,46 +668,80 @@ def _labels(intervals: list[tuple[float, float]]) -> np.ndarray:
     return labels
 
 
+EXCLUDED_INTERVALS = [(103.71, 104.51), (104.74, 105.54)]
+"""ARTIFACT_INTERVALS widened by 0.3 s on each side."""
 NON_LOCAL = [
     (100.70, 100.80),  # 1 kept
-    (103.80, 103.90),  # 2 ends 0.11 s before [104.01, 104.21]: the decoder's reach
-    (104.10, 104.15),  # 3 inside the mask
-    (105.60, 105.70),  # 4 starts 0.36 s after [105.04, 105.24]: kept
-    (105.40, 105.50),  # 5 starts 0.16 s after it: the decoder's reach
+    (103.80, 103.90),  # 2 near the mask: in excluded time [103.71, 104.51]
+    (104.10, 104.15),  # 3 in the mask
+    (105.60, 105.70),  # 4 starts 0.06 s after excluded time ends: kept
+    (105.40, 105.50),  # 5 near the mask
+    (103.40, 103.60),  # 6 outside excluded time, but overlaps MUA 4
 ]
 MUA = [
-    (103.80, 103.90),  # 1 near the mask, which a detector's event may be
-    (105.20, 105.30),  # 2 overlaps the mask
+    (103.80, 103.90),  # 1 near the mask: every cohort has the one reach
+    (105.20, 105.30),  # 2 in the mask
     (108.00, 108.05),  # 3 kept
+    (103.50, 103.75),  # 4 runs into excluded time: dropped, near the mask
 ]
 
 
 class TestEveryCohortHonoursTheMask:
-    """The source serves each analysis frame with every event cohort clear of
-    the one mask: decoded events farther than ``DECODER_REACH_S`` from it, SWR
-    and MUA events sharing no time with it. A dropped event keeps its reason,
-    and the others keep their numbers (so their ``event_id``)."""
+    """The source serves each analysis frame with every event cohort held to the
+    one analysed-time rule: an event in excluded time (the mask widened by
+    ``ARTIFACT_REACH_S``) is dropped whatever its kind, and a kept event that
+    overlaps an SWR or MUA event dropped for excluded time is dropped too. A
+    dropped event keeps its reason, and the others keep their numbers (so
+    their ``event_id``)."""
 
     def _nonlocal_dot(self) -> pd.DataFrame:
         return _dot(non_local_event=_labels(NON_LOCAL), MUA_event=_labels(MUA))
 
-    def test_decoded_events_by_reach_and_mua_events_by_overlap(
+    def _contfrag_dot(self) -> pd.DataFrame:
+        return _dot(MUA_event=_labels(MUA), Continuous_prob=0.5, Fragmented_prob=0.5)
+
+    def test_excluded_time_is_the_mask_widened_by_the_reach(
         self, inventory, tmp_path, monkeypatch
     ):
+        _artifacts(tmp_path, monkeypatch, ARTIFACTS)
+
+        np.testing.assert_allclose(
+            swr_source.excluded_intervals(EPOCH).to_numpy(), EXCLUDED_INTERVALS
+        )
+        np.testing.assert_allclose(
+            swr_source.excluded_intervals_of(_dot()).to_numpy(), EXCLUDED_INTERVALS
+        )
+        sessions = pd.DataFrame(
+            {"animal": ["j16"], "session_date": [20210706], "epoch": ["02_r1"]}
+        )
+        by_session = swr_source.excluded_intervals_by_session(sessions)
+        assert list(by_session.columns) == [
+            "animal",
+            "session_date",
+            "epoch",
+            "start_time",
+            "end_time",
+        ]
+        np.testing.assert_allclose(
+            by_session[["start_time", "end_time"]].to_numpy(), EXCLUDED_INTERVALS
+        )
+
+    def test_every_cohort_leaves_excluded_time(self, inventory, tmp_path, monkeypatch):
         _artifacts(tmp_path, monkeypatch, ARTIFACTS)
         dot = self._nonlocal_dot()
 
         out = with_swr_source(dot)
 
         assert sorted(set(out["non_local_event"]) - {0}) == [1, 4]
-        assert sorted(set(out["MUA_event"]) - {0}) == [1, 3]
+        assert sorted(set(out["MUA_event"]) - {0}) == [3]
+        assert sorted(set(out["SWR_event"]) - {0}) == [1, 2, 8]
         kept = np.isin(dot["non_local_event"], [1, 4])
         np.testing.assert_array_equal(
             out["non_local_event"].to_numpy()[kept],
             dot["non_local_event"].to_numpy()[kept],
         )
         # the decode's frame is left as it was
-        assert sorted(set(dot["non_local_event"]) - {0}) == [1, 2, 3, 4, 5]
+        assert sorted(set(dot["non_local_event"]) - {0}) == [1, 2, 3, 4, 5, 6]
 
     def test_each_dropped_event_keeps_its_reason(
         self, inventory, tmp_path, monkeypatch
@@ -717,43 +756,56 @@ class TestEveryCohortHonoursTheMask:
 
         assert _reasons("non_local_event") == {
             1: None,
-            2: DropReason.DECODER_REACH,
+            2: DropReason.NEAR_ARTIFACT,
             3: DropReason.ARTIFACT,
             4: None,
-            5: DropReason.DECODER_REACH,
+            5: DropReason.NEAR_ARTIFACT,
+            6: DropReason.OVERLAPS_DROPPED_EVENT,
         }
-        assert _reasons("MUA_event") == {1: None, 2: DropReason.ARTIFACT, 3: None}
-        # the SWRs with every reason the source gives them
-        assert _reasons("SWR_event")[5] == DropReason.ARTIFACT
-        assert _reasons("SWR_event")[3] == DropReason.MOVING
-        assert list(drops.columns) == [
-            "event_col",
-            "label",
-            "start_time",
-            "end_time",
-            "drop_reason",
+        assert _reasons("MUA_event") == {
+            1: DropReason.NEAR_ARTIFACT,
+            2: DropReason.ARTIFACT,
+            3: None,
+            4: DropReason.NEAR_ARTIFACT,
+        }
+        swrs = _reasons("SWR_event")
+        assert swrs[5] == swrs[6] == DropReason.ARTIFACT
+        assert swrs[3] == DropReason.MOVING
+        assert list(drops.columns) == swr_source.DROP_COLUMNS
+        dropped = swr_source.dropped_for_excluded_time(drops)
+        assert sorted(zip(dropped["event_col"], dropped["label"], strict=True)) == [
+            ("MUA_event", 1),
+            ("MUA_event", 2),
+            ("MUA_event", 4),
+            ("SWR_event", 5),
+            ("SWR_event", 6),
         ]
 
-    def test_a_contfrag_frame_drops_its_decoded_labels_by_reach(
+    def test_a_frame_without_an_overlap_keeps_its_events(
         self, inventory, tmp_path, monkeypatch
     ):
-        """A ContFrag label is decoded: SWR 8 (107.000-107.050) ends 0.1 s before
-        the mask [107.15, 107.35], so its label is dropped there, while the
-        NonLocal frame keeps it as an SWR."""
-        _artifacts(tmp_path, monkeypatch, [("spk", 107.25, 107.25)])
-        contfrag = _dot(
-            MUA_event=_labels(MUA), Continuous_prob=0.5, Fragmented_prob=0.5
-        )
+        """Only an event dropped for excluded time drops the events that overlap
+        it, and only once: without MUA 4, non-local 6 is kept."""
+        _artifacts(tmp_path, monkeypatch, ARTIFACTS)
+        dot = _dot(non_local_event=_labels(NON_LOCAL), MUA_event=_labels(MUA[:3]))
 
-        out = with_swr_source(contfrag)
+        out = with_swr_source(dot)
+
+        assert sorted(set(out["non_local_event"]) - {0}) == [1, 4, 6]
+
+    def test_nonlocal_and_contfrag_frames_give_the_same_swr_and_mua_cohorts(
+        self, inventory, tmp_path, monkeypatch
+    ):
+        _artifacts(tmp_path, monkeypatch, ARTIFACTS)
+
         nonlocal_frame = with_swr_source(self._nonlocal_dot())
+        contfrag = with_swr_source(self._contfrag_dot())
 
-        assert 8 not in set(out["SWR_event"])
-        assert 8 in set(nonlocal_frame["SWR_event"])
-        assert sorted(set(out["SWR_event"]) - {0}) == [1, 2, 5, 6]
-        drops = swr_source.artifact_event_drops(contfrag)
-        swr8 = drops.loc[(drops["event_col"] == "SWR_event") & (drops["label"] == 8)]
-        assert swr8["drop_reason"].tolist() == [DropReason.DECODER_REACH]
+        for column in ("SWR_event", "MUA_event"):
+            np.testing.assert_array_equal(nonlocal_frame[column], contfrag[column])
+        np.testing.assert_array_equal(
+            nonlocal_frame["swr_observed"], contfrag["swr_observed"]
+        )
 
     def test_the_decoders_keep_every_decoded_event(
         self, inventory, tmp_path, monkeypatch
@@ -774,37 +826,9 @@ class TestEveryCohortHonoursTheMask:
 
         for column in ("non_local_event", "MUA_event"):
             pd.testing.assert_series_equal(out[column], dot[column])
-        assert (
-            swr_source.artifact_event_drops(dot)["drop_reason"]
-            .map(
-                lambda reason: reason
-                in (
-                    None,
-                    DropReason.MOVING,
-                    DropReason.SPEED_UNKNOWN,
-                    DropReason.NO_SPEED_SAMPLE,
-                )
-            )
-            .all()
-        )
-
-    def test_a_frame_finds_its_own_mask(self, inventory, tmp_path, monkeypatch):
-        _artifacts(tmp_path, monkeypatch, ARTIFACTS)
-
-        np.testing.assert_allclose(
-            swr_source.artifact_intervals_of(_dot()).to_numpy(), ARTIFACT_INTERVALS
-        )
-        sessions = pd.DataFrame(
-            {"animal": ["j16"], "session_date": [20210706], "epoch": ["02_r1"]}
-        )
-        by_session = swr_source.artifact_intervals_by_session(sessions)
-        assert list(by_session.columns) == [
-            "animal",
-            "session_date",
-            "epoch",
-            "start_time",
-            "end_time",
-        ]
-        np.testing.assert_allclose(
-            by_session[["start_time", "end_time"]].to_numpy(), ARTIFACT_INTERVALS
-        )
+        reasons = swr_source.artifact_event_drops(dot)["drop_reason"].dropna()
+        assert set(reasons) <= {
+            DropReason.MOVING,
+            DropReason.SPEED_UNKNOWN,
+            DropReason.NO_SPEED_SAMPLE,
+        }

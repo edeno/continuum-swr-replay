@@ -114,6 +114,7 @@ def run_epoch(
     n_shuffles: int = DEFAULT_N_SHUFFLES,
     is_missing: NDArray | None = None,
     artifact_intervals: pd.DataFrame | None = None,
+    dropped_events: pd.DataFrame | None = None,
 ) -> EpochDetection:
     """Detect, test and tabulate the candidate sequences of one epoch.
 
@@ -142,10 +143,10 @@ def run_epoch(
     is_missing : ndarray of bool, shape (n_time,), optional
         Bins of the grid with no observation, such as the artifact mask's
         (closed intervals, as the decoders' ``is_missing``). None marks none.
-    artifact_intervals : DataFrame, optional
-        The artifact mask itself, for each candidate's
-        ``artifact_drop_reason`` (``build_memoryless_event_table``). None
-        masks nothing.
+    artifact_intervals, dropped_events : DataFrame, optional
+        The artifact mask itself and the SWR and MUA events dropped for
+        excluded time, for each candidate's ``artifact_drop_reason``
+        (``build_memoryless_event_table``). None masks nothing.
 
     Returns
     -------
@@ -236,6 +237,7 @@ def run_epoch(
         swr_definition=swr_definition,
         shuffle_results=shuffle_results,
         artifact_intervals=artifact_intervals,
+        dropped_events=dropped_events,
     )
     return EpochDetection(
         identity=identity,
