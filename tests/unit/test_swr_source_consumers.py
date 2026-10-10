@@ -839,3 +839,39 @@ def test_only_the_listed_modules_unpickle_a_decode_frame():
     }
 
     assert found - set(DECODE_FRAME_READERS) == set()
+
+
+def test_the_overlap_geometry_count_drops_the_events_the_mask_reaches(
+    source, monkeypatch, offline
+):
+    """The script re-detects non-local events from the posterior, so it applies
+    the one eligibility rule itself: an event in the configured mask
+    [102.05, 102.25], or within 0.3 s of it, is not counted."""
+    script = offline("scripts.content.quantify_swr_overlap_geometry")
+    position = pd.DataFrame({"head_speed": np.zeros(TIME.size)}, index=TIME)
+    states = ["Local", "No-Spike", "Non-Local Continuous", "Non-Local Fragmented"]
+    probabilities = np.zeros((TIME.size, len(states)))
+    for start, end in [(101.50, 101.60), (101.80, 101.90), (102.10, 102.20)]:
+        probabilities[(TIME >= start) & (TIME <= end), 2] = 0.95
+    results = xr.Dataset(
+        {"acausal_state_probabilities": (("time", "states"), probabilities)},
+        coords={"time": TIME, "states": states},
+    )
+    monkeypatch.setattr(
+        script, "load_data", lambda *args, **kwargs: {"position_info": position}
+    )
+    monkeypatch.setattr(script, "load_results", lambda *a, **k: (results, None, None))
+    seen: list = []
+
+    def record(events, swrs):
+        seen.append(events)
+        raise _Stop
+
+    monkeypatch.setattr(script, "classify_swr_overlap_geometry", record)
+
+    with pytest.raises(_Stop):
+        script.quantify_session(NWB, EPOCH)
+
+    np.testing.assert_allclose(
+        seen[0][["start_time", "end_time"]].to_numpy(), [[101.50, 101.60]]
+    )

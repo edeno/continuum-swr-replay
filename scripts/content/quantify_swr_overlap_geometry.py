@@ -4,7 +4,10 @@ Runs ``classify_swr_overlap_geometry`` over one or more sessions and prints
 a table of sub-case counts. Useful for Methods-section numbers and for
 auditing what the coarse three-way split aggregates over. The SWRs are the
 paper's SWR source (``analysis/hippocampus/swr_source.py``: the direct Kay
-inventory), on the decode grid.
+inventory), on the decode grid. The non-local events are re-detected from the
+posterior, so the one eligibility rule is applied here: an event the artifact
+mask reaches (``event_eligibility``: in it, or within 0.3 s of it) is not
+counted.
 
 Usage:
     uv run python scripts/content/quantify_swr_overlap_geometry.py
@@ -33,11 +36,16 @@ from continuum_swr_replay.analysis.hippocampus import (
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     validate_results_position_time_alignment,
 )
+from continuum_swr_replay.analysis.hippocampus.event_eligibility import (
+    DECODER_REACH_S,
+    artifact_drop_reasons,
+)
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     build_speed_eligible_event_cohort,
     intervals_from_labels,
 )
 from continuum_swr_replay.analysis.hippocampus.swr_source import (
+    artifact_intervals,
     swr_epoch_id,
     swr_event_labels,
 )
@@ -57,17 +65,17 @@ SUBCLASS_ORDER = [
     "swr_contains_event",
 ]
 SUBCLASS_DESCRIPTIONS = {
-    "no_overlap":          "no SWR overlaps the event",
-    "event_contains_swr":  "event strictly contains >= 1 SWR",
-    "single_swr_partial":  "single-SWR partial overlap at a boundary",
-    "multi_swr_no_gap":    "tiled by >= 2 SWRs with no gap",
-    "multi_swr_gap":       "overlaps >= 2 SWRs, event has non-SWR timebins",
-    "swr_contains_event":  "single SWR fully contains the event",
+    "no_overlap": "no SWR overlaps the event",
+    "event_contains_swr": "event strictly contains >= 1 SWR",
+    "single_swr_partial": "single-SWR partial overlap at a boundary",
+    "multi_swr_no_gap": "tiled by >= 2 SWRs with no gap",
+    "multi_swr_gap": "overlaps >= 2 SWRs, event has non-SWR timebins",
+    "swr_contains_event": "single SWR fully contains the event",
 }
 COARSE_ORDER = [
     ("swr_contained", "SWR-contained (event inside one SWR)"),
-    ("swr_partial",   "SWR-partial (event extends past SWR boundaries)"),
-    ("non_swr",       "non-SWR (no overlap)"),
+    ("swr_partial", "SWR-partial (event extends past SWR boundaries)"),
+    ("non_swr", "non-SWR (no overlap)"),
 ]
 
 
@@ -88,9 +96,7 @@ def quantify_session(
 
     position_time = data["position_info"].index
     speed = data["position_info"].head_speed.to_numpy()
-    validate_results_position_time_alignment(
-        results.time.values, position_time
-    )
+    validate_results_position_time_alignment(results.time.values, position_time)
     non_local_prob = (
         results.acausal_state_probabilities.sel(states="Non-Local Continuous")
         + results.acausal_state_probabilities.sel(states="Non-Local Fragmented")
@@ -109,7 +115,18 @@ def quantify_session(
         event_col="non_local_event",
         speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     )
-    nl_events = nl_events.reset_index(drop=True)
+    reasons = artifact_drop_reasons(
+        nl_events["start_time"].to_numpy(),
+        nl_events["end_time"].to_numpy(),
+        artifact_intervals(swr_epoch_id(nwb_file_name, epoch_name)),
+        reach_s=DECODER_REACH_S,
+    )
+    if pd.notna(reasons).any():
+        logger.info(
+            f"  {int(pd.notna(reasons).sum())} non-local events dropped by the "
+            "artifact mask"
+        )
+    nl_events = nl_events.loc[pd.isna(reasons)].reset_index(drop=True)
     # The paper's SWRs: the SWR source's labels on this grid, as sampled bounds.
     swr_labels = swr_event_labels(
         position_time, swr_epoch_id(nwb_file_name, epoch_name), speed=speed
@@ -137,9 +154,7 @@ def print_report(geom: pd.DataFrame, session_label: str) -> None:
     for sub in SUBCLASS_ORDER:
         n = int(counts.get(sub, 0))
         pct = 100.0 * n / n_events if n_events else 0.0
-        print(
-            f"{sub:>{name_col}} {n:>6} {pct:>6.1f}%   {SUBCLASS_DESCRIPTIONS[sub]}"
-        )
+        print(f"{sub:>{name_col}} {n:>6} {pct:>6.1f}%   {SUBCLASS_DESCRIPTIONS[sub]}")
 
     # Coarse rollup.
     print()

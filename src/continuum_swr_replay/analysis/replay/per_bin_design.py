@@ -494,7 +494,8 @@ def aggregate_to_timebins(
         The artifact mask of each session: ``animal``, ``session_date``,
         ``epoch``, ``start_time`` and ``end_time`` (absolute seconds, closed),
         as ``swr_source.artifact_intervals_by_session`` gives it. Requires
-        ``stop_start`` in ``stop_table``. None masks nothing.
+        ``stop_start`` in ``stop_table`` when it has rows. None, or no rows,
+        masks nothing and leaves ``attrs`` without the artifact counts.
     history_window_s : float
         Seconds the ladder's longest history covariate looks back
         (``model_specs.longest_history_window_s``); 0 drops only the bins that
@@ -579,7 +580,8 @@ def aggregate_to_timebins(
         c in stop_table.columns
         for c in (*_OUTCOME_SHIFT_STOP_COLUMNS, *_ARRIVAL_SPAN_STOP_COLUMNS)
     )
-    mask_artifacts = artifact_intervals is not None
+    # an empty mask masks nothing, so a stop table without bounds still builds
+    mask_artifacts = artifact_intervals is not None and len(artifact_intervals) > 0
     if mask_artifacts and "stop_start" not in stop_table.columns:
         raise KeyError("artifact_intervals needs stop_start in stop_table")
     internal_cols = list(

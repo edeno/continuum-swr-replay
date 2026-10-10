@@ -577,18 +577,6 @@ def swr_observed_mask(time: NDArray | pd.Index, epoch_id: str) -> NDArray[np.boo
     return _mask(swr_observed_stretches(epoch_id), time)
 
 
-def _artifact_overlap(
-    starts: NDArray, ends: NDArray, artifacts: pd.DataFrame
-) -> NDArray[np.bool_]:
-    """Events whose closed interval shares any time with an artifact interval."""
-    art_starts = artifacts["start_time"].to_numpy(dtype=float)
-    art_ends = artifacts["end_time"].to_numpy(dtype=float)
-    overlaps: NDArray[np.bool_] = (
-        (starts[:, None] <= art_ends[None, :]) & (art_starts[None, :] <= ends[:, None])
-    ).any(axis=1)
-    return overlaps
-
-
 def _classify(
     epoch_id: str,
     source: _EpochSource,

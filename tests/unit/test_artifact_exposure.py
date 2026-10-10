@@ -505,3 +505,31 @@ class TestNoArtifactsChangeNothing:
         counts = after["onsets"].groupby("event_type").size().to_dict()
         assert counts == {"MUA": 1, "SWR": 2, "non_local": 2}
         assert after["design"]["count"].sum() == 2
+
+
+def test_an_empty_mask_needs_no_stop_bounds():
+    """A runner passes the source's mask whatever it holds; with no rows it
+    masks nothing, so a stop table without ``stop_start`` still builds."""
+    stops, onsets = _design_inputs()
+    stops = stops.drop(columns=["stop_start", "stop_end"])
+
+    design = aggregate_to_timebins(
+        stops,
+        onsets,
+        bin_s=0.5,
+        tmax=20.0,
+        artifact_intervals=_mask_by_session().iloc[0:0],
+        history_window_s=1.0,
+    )
+
+    pd.testing.assert_frame_equal(
+        design, aggregate_to_timebins(stops, onsets, bin_s=0.5, tmax=20.0)
+    )
+    with pytest.raises(KeyError, match="stop_start"):
+        aggregate_to_timebins(
+            stops,
+            onsets,
+            bin_s=0.5,
+            tmax=20.0,
+            artifact_intervals=_mask_by_session(),
+        )
