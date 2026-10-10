@@ -726,6 +726,68 @@ class TestControlDrawNull:
                 classes=["non_local"],
             )
 
+    def test_the_null_controls_avoid_the_dropped_events(
+        self, null_session, monkeypatch
+    ):
+        """The events the analysed-time rule dropped are avoided by the subset
+        selection and by every null draw, as they are by the shipped control."""
+        from continuum_swr_replay.analysis.pfc import heldout
+
+        # One dropped event over each bout's last free stretch (bouts start
+        # every 3.3 s; the last real event of a bout starts 2.4 s in).
+        bout_starts = 3.3 * np.arange(14)
+        dropped = pd.DataFrame(
+            {"start_time": bout_starts + 2.5, "end_time": bout_starts + 2.98}
+        )
+        folds = assign_blocked_folds(null_session["fit_mask"], n_folds=5, seed=2)
+        real = heldout.make_matched_control_times
+
+        def drawn_windows(**extra):
+            calls = []
+
+            def spy(*args, **kwargs):
+                draw = real(*args, **kwargs)
+                calls.append((kwargs.get("avoid"), draw.times))
+                return draw
+
+            monkeypatch.setattr(heldout, "make_matched_control_times", spy)
+            control_draw_null(
+                null_session["event_times"],
+                null_session["fit_mask"],
+                null_session["counts"][:, :2],
+                folds,
+                rng_seeds=[101, 102, 103],
+                spline_basis=null_session["spline_basis"],
+                lags=null_session["lags"],
+                classes=["non_local"],
+                **extra,
+            )
+            return calls
+
+        def n_overlapping(times):
+            starts = times.start_time.to_numpy(dtype=float)[:, None]
+            ends = times.end_time.to_numpy(dtype=float)[:, None]
+            return int(
+                (
+                    (starts < dropped.end_time.to_numpy()[None, :])
+                    & (dropped.start_time.to_numpy()[None, :] < ends)
+                )
+                .any(axis=1)
+                .sum()
+            )
+
+        without = drawn_windows()
+        # Not vacuous: unconstrained draws do land on the dropped events.
+        assert sum(n_overlapping(times) for _, times in without) > 0
+
+        with_avoid = drawn_windows(avoid=dropped)
+        # The selection plus one call per draw, each handed the dropped events.
+        assert len(with_avoid) == 4
+        for avoid, times in with_avoid:
+            assert avoid is dropped
+            assert len(times) > 0
+            assert n_overlapping(times) == 0
+
     def test_an_incompletely_placed_draw_is_not_a_null_replicate(self, null_session):
         folds = assign_blocked_folds(null_session["fit_mask"], n_folds=5, seed=2)
 

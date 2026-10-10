@@ -2611,8 +2611,10 @@ def run_session(
         need from this session: ``fit_mask`` (bool Series on the session's time
         axis), ``counts`` (``(n_time, n_units)`` spike counts in unit order),
         ``designs`` (the full-length design matrices by model name),
-        ``spline_basis``, ``lag_time``, ``lags`` and ``event_times`` (the
-        matched control included, as drawn here). It is the same material the
+        ``spline_basis``, ``lag_time``, ``lags``, ``event_times`` (the
+        matched control included, as drawn here) and ``artifact_dropped`` (the
+        events the analysed-time rule dropped, which the null's controls avoid
+        as the shipped one does). It is the same material the
         fits were built from, handed over rather than rebuilt: a caller that
         reassembled it from the same functions would pay a second load of the
         session and could drift from what was actually fit. Left empty for a
@@ -2955,6 +2957,7 @@ def run_session(
                 "lag_time": lag_time,
                 "lags": fit_lags,
                 "event_times": event_times,
+                "artifact_dropped": artifact_dropped,
             }
         )
 

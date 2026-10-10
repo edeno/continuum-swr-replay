@@ -961,6 +961,9 @@ def _synthetic_context(seed=0, n_units=3):
         "lags": lags,
         "lag_time": lag_time,
         "event_times": event_times,
+        "artifact_dropped": pd.DataFrame(
+            {"start_time": np.empty(0), "end_time": np.empty(0)}
+        ),
         "n_basis_per_class": int(spline_basis.shape[1]),
     }
 
@@ -1108,6 +1111,35 @@ def test_the_scored_table_says_what_each_model_bought_out_of_fold(caplog):
         "non_local": 2,
         "SWR": 2,
     }
+
+
+def test_the_null_avoids_the_events_the_session_dropped(monkeypatch):
+    """The null's controls avoid what ``run_session``'s shipped control avoids:
+    the events the analysed-time rule dropped, handed back in the context."""
+    context = _synthetic_context()
+    context["artifact_dropped"] = pd.DataFrame(
+        {"start_time": [3.0, 30.0], "end_time": [3.4, 30.2]}
+    )
+    seen = {}
+    real = runner.control_draw_null
+
+    def spy(*args, **kwargs):
+        seen["avoid"] = kwargs.get("avoid")
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(runner, "control_draw_null", spy)
+    runner.score_session(
+        context,
+        modulation_curves=_synthetic_curves(context),
+        penalty_sigma=runner.CANONICAL_PENALTY_SIGMA,
+        n_folds=3,
+        fold_seed=5,
+        n_control_draws=2,
+        control_draw_seed=6,
+        logger=logging.getLogger("test"),
+    )
+
+    assert seen["avoid"] is context["artifact_dropped"]
 
 
 def test_the_best_model_is_the_one_with_the_lowest_heldout_deviance():

@@ -607,6 +607,7 @@ def control_draw_null(
     model_deviance: Mapping[str, NDArray] | None = None,
     response: PreparedHeldoutResponse | None = None,
     design_batch_size: int = DEFAULT_NULL_DESIGN_BATCH_SIZE,
+    avoid: pd.DataFrame | None = None,
 ) -> ControlDrawNull:
     """Held-out improvements from repeated matched-control draws, per class.
 
@@ -623,7 +624,7 @@ def control_draw_null(
     with **that class's tested events as the source**, so the draw carries the
     tested onset count and durations, drawn from the same fitted bouts and
     avoiding all real events (every class's windows, including the ones being
-    stood in for). The draw is turned into the design a real class gets and
+    stood in for) and every window in `avoid`. The draw is turned into the design a real class gets and
     scored on the same folds under the same penalty, giving per unit what a
     regressor of that size and shape with no event content buys.
 
@@ -688,6 +689,13 @@ def control_draw_null(
         Maximum number of equal-width null designs generated and scored
         together. Draws are discarded after each batch, so memory use stays
         bounded as ``len(rng_seeds)`` grows.
+    avoid : pandas.DataFrame, optional
+        Further windows no control may overlap (``start_time`` / ``end_time``,
+        seconds): the events the analysed-time rule dropped
+        (:func:`~continuum_swr_replay.analysis.pfc.glm.artifact_dropped_events`),
+        as ``run_session`` passes them to the shipped control. The subset
+        selection and every draw avoid them, so the null's controls avoid what
+        the observed control avoids.
 
     Returns
     -------
@@ -771,6 +779,7 @@ def control_draw_null(
             # Keep the estimand independent of a caller deliberately reducing
             # attempts to exercise incomplete-null handling.
             max_attempts=DEFAULT_MATCHED_CONTROL_ATTEMPTS,
+            avoid=avoid,
         )
         tested_source_indices[class_name] = selection.source_indices
         tested_events[class_name] = (
@@ -797,6 +806,7 @@ def control_draw_null(
             fit_mask,
             np.random.default_rng(seed),
             max_attempts=max_attempts,
+            avoid=avoid,
         ).times
 
     if model_deviance is not None and "constant" in model_deviance:

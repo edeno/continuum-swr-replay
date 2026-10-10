@@ -614,6 +614,7 @@ def score_session(
             baseline_control=context["event_times"]["matched_control"],
             model_deviance=deviance,
             response=scoring_response,
+            avoid=context["artifact_dropped"],
         )
         # Each class is read against a null drawn to its own fixed matchable
         # onset subset and durations: a regressor built from 30 windows buys
