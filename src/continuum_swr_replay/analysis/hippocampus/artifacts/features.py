@@ -402,9 +402,10 @@ def nearest_mark_distance(
     marks are left out of its search. Within a neuron's absolute refractory
     period (about 1 ms) two detections on one tetrode are either two units,
     whose marks differ and are not each other's nearest neighbour among the
-    tetrode's marks, or one waveform detected twice. Leaving them out changes
-    nothing for real spikes, and stops an artifact detected twice from
-    holding its own twin in distribution. An exact duplicate of a mark more
+    tetrode's marks, or one waveform detected twice. Leaving them out stops an
+    artifact detected twice from holding its own twin in distribution; on the
+    23 acceptance epochs it made 20 other spikes OOD and changed no other
+    core. An exact duplicate of a mark more
     than `own_event_s` away still counts as support.
 
     The search is exact: the k nearest reference marks are found with k = 1 +

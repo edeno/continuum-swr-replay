@@ -148,19 +148,19 @@ is searched only among the same tetrode's reference marks more than 1 ms from it
 cannot fire twice within its absolute refractory period (about 1 ms), so two detections that
 close on one tetrode are either two units, whose marks differ and are not each other's nearest
 neighbour among the tetrode's ~10^5 marks, or one waveform detected twice. Leaving them out
-changes nothing for real spikes and takes away the support an artifact's twin detection gives
-it. R9 (run `a1083731940b`, gate report §7) found the case: at 8.614 s in chimi20200227_02_r1 a
-spike line on 55 % of tetrodes was detected twice, about 0.15 ms apart, on five tetrodes; the
+takes away the support an artifact's twin detection gives it; on the 23 acceptance epochs it
+also made 20 other spikes OOD, and no other core changed. R9 (run `a1083731940b`, gate report
+§7) found the case: at 8.614 s in chimi20200227_02_r1 a spike line on 55 % of tetrodes was detected twice, about 0.15 ms apart, on five tetrodes; the
 twins held each other in distribution, only 3 of 17 spikes were OOD (0.176 < 0.20), and T-spk
 did not fire. With the own event left out, 9 of 17 are OOD (0.529) and the line is a spike-only
 core. The 1 ms is a definition, not a margin, so rule P does not apply. SpikeInterface 0.99.1's
 default refractory period is also 1 ms (`compute_refrac_period_violations`,
 `get_potential_auto_merge`), and its `remove_duplicated_spikes` treats one unit's spikes within
-0.3 ms as one spike detected twice. The prototype left out only a neighbour at distance 0
-(`artdet_spikes.py`), so twins with identical marks did not support each other there, but twins
-with nearly identical marks did. The search is exact: the k nearest reference marks, with k = 1
-+ the most reference marks inside any spike's own event (4–10 on the acceptance epochs). On the
-23 acceptance epochs (Task 16's 22 and chimi20200227_02_r1) the new core is the only change:
+0.3 ms as one spike detected twice. The prototype also let twins support each other (it left
+out only the spike itself, `artdet_spikes.py`); it caught this line because its reference was the
+decoder's encoding marks, which did not hold the twins. The search is exact: the k nearest
+reference marks, with k = 1 + the most reference marks inside any spike's own event (4–10 on the
+acceptance epochs). On the 23 acceptance epochs (Task 16's 22 and chimi20200227_02_r1) the new core is the only change:
 every other core is identical, 2 of 619 line bins with ≥ 40 % of tetrodes move (this line on
 both grids), and no reference-set SWR is newly masked. The search takes 1.3–2.0× as long as
 before: 0.2–1.0 s more per epoch, 26 s more on j1620210709_10_r5 (3.1 M spikes).

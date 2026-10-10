@@ -179,9 +179,9 @@ T_SPK_OOD_OWN_EVENT_S = 1e-3
 included), left out of its nearest-mark search. A neuron cannot fire twice
 within its absolute refractory period (about 1 ms), so two detections that close
 on one tetrode are two units, whose marks differ and are not each other's
-nearest neighbour, or one waveform detected twice. Leaving them out changes
-nothing for real spikes and stops an artifact's twin detections from holding
-each other in distribution: R9 missed the chimi20200227_02_r1 line at 8.614 s
+nearest neighbour, or one waveform detected twice. Leaving them out stops an
+artifact's twin detections from holding each other in distribution; on the 23
+acceptance epochs it made 20 other spikes OOD and changed no other core. R9 missed the chimi20200227_02_r1 line at 8.614 s
 this way (3 of 17 spikes OOD, 0.176; 9 of 17 with 1 ms left out). A definition,
 off rule P. SpikeInterface 0.99.1's default refractory period is 1 ms
 (``qualitymetrics`` ``rp_violation``, ``curation.get_potential_auto_merge``),
