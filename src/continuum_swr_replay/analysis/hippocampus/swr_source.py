@@ -175,12 +175,13 @@ SWR_DETECTOR = "kay"
 SWR_INVENTORY_ROOT = PROCESSED_DATA_DIR / "replay_detection_comparison" / "swr"
 """Where the SWR runner writes its run folders, one per run id."""
 
-ARTIFACT_INTERVALS_RUN_ID: str | None = None
+ARTIFACT_INTERVALS_RUN_ID: str | None = "fbbff144a123"
 """The artifact detector's run whose intervals drop overlapping SWRs and leave
 the coverage.
 
-None today: no artifact is masked, and the source's name says so
-(``artifacts@none``). Runbook R9 sets it to its run id. The folder,
+Runbook R9's run (2026-10-10, commit fbbff14, all 255 epochs, gate report
+``.claude/research/refresh_artifact_detector/r9_gate/rerun/r9_regate_report.md``).
+None would mean no artifact is masked (``artifacts@none``). The folder,
 :data:`ARTIFACT_INTERVALS_ROOT` ``/ <run id>``, holds ``manifest.json`` and one
 ``{epoch_id}_artifact_intervals.parquet`` per epoch: the epoch's unpadded
 cores (``artifacts.io.CORE_COLUMNS``), no rows when it has none. A missing

@@ -127,9 +127,9 @@ the giant-day events.
 - **T-spk.** Spike synchrony in 200-µs bins on two grids offset by half a bin, so a line across
   one grid's bin edge is whole on the other.
   - A mark is out of distribution (OOD) when its nearest reference mark of the same tetrode
-    (Euclidean, raw marks in µV), the spike itself left out, is more than 4 × the decoder's
-    `waveform_std` (24 µV, read from `DecodingConfig`) away. There the decoder's mark kernel has
-    no support (report §2.4).
+    (Euclidean, raw marks in µV), its own event left out (the tetrode's marks within 1 ms of
+    it, itself included; below), is more than 4 × the decoder's `waveform_std` (24 µV, read
+    from `DecodingConfig`) away. There the decoder's mark kernel has no support (report §2.4).
   - Many tetrodes firing within 200 µs, with waveforms unlike any spike on their tetrode, is
     a mechanism no neural signal produces. The project's coincidence filter removes only lines
     within 40 µs.
@@ -137,18 +137,41 @@ the giant-day events.
   chain past 50 ms. Each rule is its own function, so a further signature is one more event
   source.
 
-### The OOD reference: the one deliberate change from the prototype
+### The OOD reference: the deliberate changes from the prototype
 
 The prototype measured each mark against a fitted decoder's encoding marks
 (`*_HPC_detector.pkl`). The decoders now use this mask, so the reference must not depend on a
 decode. The repo uses, per tetrode, **all of the epoch's marks outside the S, T-ref and T-ca1
-cores padded into the mask**, the spike itself left out, in the prototype's mark space and
-metric.
+cores padded into the mask**, each spike's own event left out (below), in the prototype's mark
+space and metric.
 
 The encoding set it replaces was "all non-ripple time", which included the artifact spikes
 around steps (report §8 item 8). Leaving those out makes some lines near steps OOD that the
 prototype's reference called in distribution. In S epochs, S-noise marks inside their blocks
 become OOD too. Task 16's checks measured both effects (below).
+
+**A spike's own event is not its reference (added after R9).** A spike's nearest reference mark
+is searched only among the same tetrode's reference marks more than 1 ms from it
+(`T_SPK_OOD_OWN_EVENT_S`); the spike itself, at Δt = 0, falls under the same rule. A neuron
+cannot fire twice within its absolute refractory period (about 1 ms), so two detections that
+close on one tetrode are either two units, whose marks differ and are not each other's nearest
+neighbour among the tetrode's ~10^5 marks, or one waveform detected twice. Leaving them out
+takes away the support an artifact's twin detection gives it; on the 23 acceptance epochs it
+also made 20 other spikes OOD, and no other core changed. R9 (run `a1083731940b`, gate report
+§7) found the case: at 8.614 s in chimi20200227_02_r1 a spike line on 55 % of tetrodes was detected twice, about 0.15 ms apart, on five tetrodes; the
+twins held each other in distribution, only 3 of 17 spikes were OOD (0.176 < 0.20), and T-spk
+did not fire. With the own event left out, 9 of 17 are OOD (0.529) and the line is a spike-only
+core. The 1 ms is a definition, not a margin, so rule P does not apply. SpikeInterface 0.99.1's
+default refractory period is also 1 ms (`compute_refrac_period_violations`,
+`get_potential_auto_merge`), and its `remove_duplicated_spikes` treats one unit's spikes within
+0.3 ms as one spike detected twice. The prototype also let twins support each other (it left
+out only the spike itself, `artdet_spikes.py`); it caught this line because its reference was the
+decoder's encoding marks, which did not hold the twins. The search is exact: the k nearest
+reference marks, with k = 1 + the most reference marks inside any spike's own event (4–10 on the
+acceptance epochs). On the 23 acceptance epochs (Task 16's 22 and chimi20200227_02_r1) the new core is the only change:
+every other core is identical, 2 of 619 line bins with ≥ 40 % of tetrodes move (this line on
+both grids), and no reference-set SWR is newly masked. The search takes 1.3–2.0× as long as
+before: 0.2–1.0 s more per epoch, 26 s more on j1620210709_10_r5 (3.1 M spikes).
 
 ## Thresholds: rule P
 

@@ -174,6 +174,19 @@ line (0.27). It rests on those 3 lines; R9 reviews every spike-only core
 T_SPK_OOD_NN = 4.0
 """A mark is OOD when its nearest reference mark is more than 4 x the decoder's
 waveform_std away: there the decoder's mark kernel has no support (§2.4)."""
+T_SPK_OOD_OWN_EVENT_S = 1e-3
+"""A spike's own event: the same tetrode's marks at most 1 ms from it (itself
+included), left out of its nearest-mark search. A neuron cannot fire twice
+within its absolute refractory period (about 1 ms), so two detections that close
+on one tetrode are two units, whose marks differ and are not each other's
+nearest neighbour, or one waveform detected twice. Leaving them out stops an
+artifact's twin detections from holding each other in distribution; on the 23
+acceptance epochs it made 20 other spikes OOD and changed no other core. R9 missed the chimi20200227_02_r1 line at 8.614 s
+this way (3 of 17 spikes OOD, 0.176; 9 of 17 with 1 ms left out). A definition,
+off rule P. SpikeInterface 0.99.1's default refractory period is 1 ms
+(``qualitymetrics`` ``rp_violation``, ``curation.get_potential_auto_merge``),
+and it treats one unit's spikes within 0.3 ms as one spike detected twice
+(``curation.remove_duplicated_spikes``, ``censored_period_ms``)."""
 WAVEFORM_STD: float = DecodingConfig().waveform_std
 """The decoder's mark-kernel bandwidth (µV), read from its settings."""
 
@@ -203,6 +216,7 @@ CONSTANT_NAMES = (
     "T_SPK_MIN_TETRODES",
     "T_SPK_OOD",
     "T_SPK_OOD_NN",
+    "T_SPK_OOD_OWN_EVENT_S",
     "WAVEFORM_STD",
     "T_MERGE_S",
 )
@@ -440,8 +454,9 @@ def spike_ood(
 
     The reference set is decode-free: per tetrode, every mark of the epoch
     outside `excluded` (the LFP signatures' intervals). A spike's mark is OOD
-    when its nearest reference mark, itself left out, is more than
-    :data:`T_SPK_OOD_NN` x :data:`WAVEFORM_STD` away.
+    when its nearest reference mark outside its own event (the same tetrode's
+    marks within :data:`T_SPK_OOD_OWN_EVENT_S` of it, itself included) is more
+    than :data:`T_SPK_OOD_NN` x :data:`WAVEFORM_STD` away.
 
     Parameters
     ----------
@@ -473,7 +488,12 @@ def spike_ood(
             continue  # as filter_spike_times drops it for the decoder
         spikes = spikes[in_span]
         is_reference = ~interval_mask(spikes, excluded)
-        distance = nearest_mark_distance(np.asarray(marks)[in_span], is_reference)
+        distance = nearest_mark_distance(
+            np.asarray(marks)[in_span],
+            is_reference,
+            spikes,
+            own_event_s=T_SPK_OOD_OWN_EVENT_S,
+        )
         times.append(spikes)
         tetrodes.append(np.full(spikes.size, len(times) - 1, dtype=np.int64))
         ood.append(distance / WAVEFORM_STD > T_SPK_OOD_NN)

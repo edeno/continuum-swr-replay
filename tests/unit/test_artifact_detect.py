@@ -69,6 +69,11 @@ class TestTheConstants:
         assert detect.T_SPK_OOD_NN == 4.0
         assert detect.T_MERGE_S == 0.05
 
+    def test_the_own_event_window_is_1_ms_and_recorded(self):
+        """A neuron's absolute refractory period: a definition, off rule P."""
+        assert detect.T_SPK_OOD_OWN_EVENT_S == 1e-3
+        assert detect.detector_constants()["t_spk_ood_own_event_s"] == 1e-3
+
     def test_the_ood_cut_is_read_from_the_decoders_settings(self):
         assert detect.WAVEFORM_STD == DecodingConfig().waveform_std
 
@@ -210,6 +215,36 @@ class TestTSpk:
         epoch.add_spike_line(20.25, [0, 2, 4, 6, 8], out_of_distribution=False)
 
         assert _detect(epoch).empty
+
+    def test_a_line_detected_twice_per_tetrode_still_gives_t_spk(self):
+        """The R9 miss (chimi20200227_02_r1 at 8.614 s): the artifact is
+        detected twice, 0.15 ms apart, on each tetrode of the line. The twins
+        share a mark, but neither is the other's reference: they are one
+        event."""
+        epoch = SyntheticEpoch()
+        tetrodes = [0, 2, 4, 6, 8]
+        epoch.add_spike_line(20.25, tetrodes, out_of_distribution=True)
+        epoch.add_spike_line(20.25 + 0.15e-3, tetrodes, out_of_distribution=True)
+
+        cores = _detect(epoch)
+
+        assert cores["signatures"].tolist() == ["spk"]
+        assert cores["spk_frac_max"].iloc[0] == pytest.approx(0.5)
+        assert cores["spk_ood_max"].iloc[0] == pytest.approx(1.0)
+
+    def test_twin_detections_are_ood_but_the_same_marks_2_ms_apart_are_not(self):
+        cut = detect.T_SPK_OOD_NN * detect.WAVEFORM_STD
+        artifact = np.full(4, 10 * cut)
+        marks = np.array([[0.0, 0.0, 0.0, 0.0], [1.0, 0, 0, 0], artifact, artifact])
+        empty = pd.DataFrame({"start_time": [], "end_time": []}, dtype=float)
+
+        def ood(gap_s: float) -> list[bool]:
+            times = np.array([1.0, 2.0, 5.0, 5.0 + gap_s])
+            _, _, is_ood, _ = detect.spike_ood([times], [marks], (0.0, 9.0), empty)
+            return is_ood.tolist()
+
+        assert ood(0.15e-3) == [False, False, True, True]
+        assert ood(2e-3) == [False, False, False, False]
 
     def test_an_ood_line_on_30_percent_of_tetrodes_is_not_enough(self):
         epoch = SyntheticEpoch()
