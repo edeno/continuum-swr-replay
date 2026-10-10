@@ -145,6 +145,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: 
     half_splits,
     json_ready,
     parse_epoch_identifier,
+    saved_decode_masks,
     write_json,
 )
 from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
@@ -156,7 +157,6 @@ from continuum_swr_replay.decoding_common import (  # noqa: E402
     hpc_decode_masks,
     provenance_record,
     raise_open_file_limit,
-    require_saved_decode_masks,
     setup_logger,
     write_atomically,
 )
@@ -481,20 +481,15 @@ def canonical_masks(
     ------
     ValueError
         The decode has no ``decode_masks`` or names other runs
-        (``require_saved_decode_masks``), its counts of bins, missing bins or
-        bins left out of encoding differ from the masks', or the masks'
-        training bins are not the ones the decode used: it was made under
-        other masks (before R11, say), so a half decode would not share its
-        encoding.
+        (``saved_decode_masks``: rerun once R11's decodes are in the decode
+        folder), its counts of bins, missing bins or bins left out of encoding
+        differ from the masks', or the masks' training bins are not the ones
+        the decode used: it was made under other masks, so a half decode would
+        not share its encoding.
     """
-    import xarray as xr
-
     nwb_file_name, epoch_name, _ = parse_epoch_identifier(epoch_id)
     path = Path(decode_dir) / f"{epoch_id}_results.nc"
-    with xr.open_dataset(path, engine="h5netcdf") as results:
-        attrs = dict(results.attrs)
-    require_saved_decode_masks(attrs, str(path))
-    saved = json.loads(attrs["decode_masks"])
+    saved = saved_decode_masks(path)
     masks = hpc_decode_masks(
         nwb_file_name,
         epoch_name,

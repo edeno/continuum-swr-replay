@@ -797,6 +797,10 @@ STORED_RIPPLE_READERS = {
 DECODE_FRAME_READERS = {
     "src/continuum_swr_replay/analysis/hippocampus/swr_source.py": "the reader",
     "scripts/qa/audit_refresh_consistency.py": "audits the decode's own outputs",
+    "scripts/qa/run_state_evidence.py": (
+        "reads it through with_swr_source, and keeps the decoder's own non-local "
+        "labels so every decoded event stays out of the running-only encodings"
+    ),
     "scripts/qa/run_half_tetrode_decodes.py": (
         "reads it through with_swr_source, and keeps its own MUA labels to hold "
         "each half decode's events to the same rule (analysed_labels)"

@@ -220,20 +220,24 @@ def saved_decode_masks(canonical: Canonical, **changes) -> dict:
 
 
 def write_canonical_decode(
-    canonical: Canonical, directory: Path, decode_masks: dict | None = None
+    canonical: Canonical,
+    directory: Path,
+    decode_masks: dict | None = None,
+    *,
+    stamped: bool = True,
 ) -> None:
     """The decode's three files, written as ``run_decoding_bandit`` writes them,
-    with its ``decode_masks`` (``saved_decode_masks`` by default)."""
+    with its ``decode_masks`` (``saved_decode_masks`` by default; none, as
+    before R11, when not ``stamped``)."""
     directory.mkdir(parents=True, exist_ok=True)
     canonical.detector.save_model(str(directory / f"{EPOCH}_detector.pkl"))
     saved = canonical.results.reset_index("state_bins")
-    saved.attrs = {
-        **saved.attrs,
-        "decode_masks": json.dumps(
+    saved.attrs = dict(saved.attrs)
+    if stamped:
+        saved.attrs["decode_masks"] = json.dumps(
             saved_decode_masks(canonical) if decode_masks is None else decode_masks,
             sort_keys=True,
-        ),
-    }
+        )
     saved.to_netcdf(directory / f"{EPOCH}_results.nc", engine="h5netcdf")
     probabilities = canonical.results.acausal_state_probabilities.values
     dot = pd.DataFrame(
@@ -907,21 +911,32 @@ def test_the_half_decode_uses_the_canonical_decodes_masks(
 @pytest.mark.parametrize(
     ("changes", "message"),
     [
-        ({"artifact_run_id": "another"}, "decoded with"),
+        (None, "has no decode_masks"),
+        ({"artifact_run_id": "another"}, "was decoded with"),
         ({"n_missing_bins": 0}, "n_missing_bins"),
     ],
 )
 def test_a_canonical_decode_made_under_other_masks_is_refused(
     canonical, tmp_path, source, changes, message
 ):
-    """Its encoding and missing bins would not be the ones built now."""
+    """Its encoding and missing bins would not be the ones built now. One made
+    before R11 (no stamp) or under other runs is told to wait for R11's
+    decodes: this runner's --overwrite cannot help."""
     decode_dir = tmp_path / "decode"
     write_canonical_decode(
-        canonical, decode_dir, decode_masks=saved_decode_masks(canonical, **changes)
+        canonical,
+        decode_dir,
+        decode_masks=None
+        if changes is None
+        else saved_decode_masks(canonical, **changes),
+        stamped=changes is not None,
     )
 
-    with pytest.raises(ValueError, match=message):
+    with pytest.raises(ValueError, match=message) as refused:
         runner.load_canonical(EPOCH, decode_dir)
+    if changes is None or "artifact_run_id" in changes:
+        assert "R11" in str(refused.value)
+        assert "--overwrite does not help" in str(refused.value)
 
 
 def test_a_canonical_decode_trained_on_other_bins_is_refused(

@@ -8,12 +8,15 @@ it one epoch at a time and summarizes the pooled result.
 
 Per epoch (a dask CPU worker each):
 
-1. **Decode.** ``{epoch}_80_data_over_time.pkl``, read through the SWR source
-   (``swr_source.read_dot_with_swr_source``), gives the time axis, head
-   position and speed, linear position, the four state probabilities and the
-   non-local event labels the analysed-time rule keeps; ``{epoch}_detector.pkl``
-   the fitted encoding model and ``no_spike_rate``. The probabilities must be
-   finite and sum to 1.
+1. **Decode.** ``{epoch}_results.nc`` must carry the ``decode_masks`` of the
+   configured SWR source's runs (``saved_decode_masks``): a decode made before
+   R11 is refused before anything is loaded. ``{epoch}_80_data_over_time.pkl``,
+   read through the SWR source (``swr_source.with_swr_source``), gives the time
+   axis, head position and speed, linear position and the four state
+   probabilities; its own non-local event labels, as the decoder wrote them
+   (before the analysed-time rule), give the event bins the running-only
+   encodings leave out. ``{epoch}_detector.pkl`` gives the fitted encoding
+   model and ``no_spike_rate``. The probabilities must be finite and sum to 1.
 2. **Windows.** Each state's confident bouts and their matched windows, and the
    calibration windows (``build_windows``), seeded by ``(SEED, epoch_id)``. A
    bin in excluded time (``swr_source.excluded_intervals``: the artifact mask
@@ -30,8 +33,9 @@ Per epoch (a dask CPU worker each):
 4. **Encodings** (``running_only_masks``): running-only refits (head speed
    >= 4 cm/s), on every running bin and on each fold of alternating 30 s
    blocks (``time_folds``), leaving out running bins within two bins of a
-   non-local event bin and the decode's missing bins; no event bin may be in
-   the library's padded training span of any of them (``training_spike_bins``).
+   decoded non-local event bin (one the analysed-time rule drops included) and
+   the decode's missing bins; no event bin may be in the library's padded
+   training span of any of them (``training_spike_bins``).
    The canonical encoding is the decode's own.
 5. **Per-tetrode terms** for the spikes in the scored bins, one encoding at a
    time. Checked twice: summed over all tetrodes the canonical terms reproduce
@@ -139,6 +143,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: 
     parse_epoch_identifier,
     per_tetrode_terms,
     regimes,
+    saved_decode_masks,
     summarize_state_evidence,
     tetrode_halves,
     time_folds,
@@ -605,14 +610,25 @@ def epoch_table(
         raise ValueError("the label sets need distinct names")
     checks: dict[str, Any] = {}
     files = decode_files(epoch_id, decode_dir)
-    dot = swr_source.read_dot_with_swr_source(files["data_over_time"])
+    # a decode made with the configured source's masks, before anything loads
+    decode_masks = saved_decode_masks(files["results"])
+    saved = pd.read_pickle(files["data_over_time"])
+    # every event the decoder labelled, the ones the analysed-time rule drops
+    # too: decoded non-local content stays out of the running-only encodings
+    in_event = (
+        swr_source.with_swr_source(saved, drop_masked_events=False)[
+            "non_local_event"
+        ].to_numpy()
+        > 0
+    )
+    dot = swr_source.with_swr_source(saved)
+    del saved
     excluded = swr_source.excluded_intervals_of(dot)
     time = dot.index.to_numpy(dtype=float)
     speed = dot["head_speed"].to_numpy(dtype=float)
     linear = dot["linear_position"].to_numpy(dtype=float)
     position = dot[["head_position_x", "head_position_y"]].to_numpy(dtype=float)
     probabilities = dot[PROBABILITY_COLUMNS].to_numpy(dtype=float)
-    in_event = dot["non_local_event"].to_numpy() > 0
     del dot
     worst = float(np.max(np.abs(probabilities.sum(1) - 1.0)))
     if not np.isfinite(probabilities).all() or worst > PROBABILITY_SUM_TOLERANCE:
@@ -620,6 +636,7 @@ def epoch_table(
     bin_s = float(np.median(np.diff(time)))
     checks["decode"] = {
         "decode_dir": str(decode_dir),
+        "decode_masks": decode_masks,
         "n_time": int(time.size),
         "bin_s": bin_s,
         "max_abs_probability_sum_error": worst,
@@ -924,7 +941,8 @@ def running_only_masks(
     position : ndarray, shape (n_time, n_dims)
         What the encoding is fit with.
     in_event : ndarray of bool, shape (n_time,)
-        Non-local event bins.
+        Non-local event bins, every event the decoder labelled (the ones the
+        analysed-time rule drops included).
     folds : ndarray of int, shape (n_time,)
     is_missing : ndarray of bool, shape (n_time,)
         The decode's missing bins (``hpc_decode_masks``).
@@ -937,7 +955,10 @@ def running_only_masks(
         The counts: event bins, those at running speed, the running bins left
         out near them, the missing bins at running speed (all left out), and
         per mask its training bins, the event and missing bins among them and
-        the event bins in the library's padded span (0, or it raises).
+        the event bins in the library's padded span (0, or it raises). The
+        missing bins are counted on the bin mask; the library's padding of
+        each training run by about one bin is not counted (the canonical
+        encoding is padded the same way).
 
     Raises
     ------
@@ -1000,7 +1021,8 @@ def run_settings() -> dict:
             "run": "running-only refit on every running bin",
             "can": "the decode's own (hpc_decode_masks' no_ripple training bins)",
             "running_only_leaves_out": f"running bins within {EVENT_MARGIN_BINS} "
-            "bins of a non-local event bin, and the decode's missing bins",
+            "bins of a decoded non-local event bin (the decoder's own labels, "
+            "before the analysed-time rule), and the decode's missing bins",
         },
     }
 

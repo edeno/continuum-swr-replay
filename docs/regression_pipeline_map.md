@@ -822,9 +822,9 @@ Decodes that see one tetrode half, so that the state labels are held out too.
 
 ### `src/continuum_swr_replay/analysis/hippocampus/state_evidence/io.py`
 
-Strict JSON records and code versions, shared by the state-evidence runners.
+Strict JSON records, code versions and the decode's stamp, shared by the state-evidence runners.
 
-`json_ready`, `write_json`, `code_version`
+`json_ready`, `write_json`, `code_version`, `saved_decode_masks`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/state_evidence/summary.py`
 

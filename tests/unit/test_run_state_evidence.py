@@ -46,6 +46,7 @@ from scripts.qa import run_state_evidence as runner
 from tests.unit._memoryless_clusterless_epoch import _y_track
 from tests.unit._swr_inventory_fixtures import (
     ARTIFACT_RUN_ID,
+    RUN_ID,
     artifact_cores,
     use_swr_source,
     write_artifact_run,
@@ -59,9 +60,18 @@ N_TIME = 6000
 TIME = 1000.0 + np.arange(N_TIME) / FS
 RIPPLE = (1000, 1100)
 """Bins (first, last + 1) of the Kay inventory's one event."""
-ARTIFACT_CORES = [("spk", TIME[3000], TIME[3000])]
-"""A spike-only line at 6 s, while the animal runs: the mask pads it by 0.1 s
-(about bins 2950-3050) and excluded time by 0.3 s more."""
+ARTIFACT_CORES = [("spk", TIME[3000], TIME[3000]), ("spk", TIME[5000], TIME[5000])]
+"""Spike-only lines at 6 s (while the animal runs) and at 10 s: the mask pads
+each by 0.1 s (about bins 2950-3050 and 4950-5050, [9.9, 10.1] s into the
+epoch) and excluded time by 0.3 s more."""
+
+
+SAVED_DECODE_MASKS = {
+    "swr_inventory_run_id": RUN_ID,
+    "artifact_run_id": ARTIFACT_RUN_ID,
+    "training_type": "no_ripple",
+}
+"""The run ids of the source the simulated decode was made under (``source``)."""
 
 
 def simulated_is_missing() -> np.ndarray:
@@ -152,6 +162,8 @@ def simulate_decode(directory: Path) -> dict:
     xr.Dataset(
         {"log_likelihood": (("time", "state_bins"), log_likelihood)},
         coords={"time": time, "state": ("state_bins", state)},
+        # the masks' record an HPC decode stamps (hpc_decode_masks)
+        attrs={"decode_masks": json.dumps(SAVED_DECODE_MASKS, sort_keys=True)},
     ).to_netcdf(directory / f"{EPOCH}_results.nc", engine="h5netcdf")
 
     raw = np.clip(rng.normal(0.0, 1.0, (n_time, len(STATES))), 0, None) ** 3 + 1e-3
@@ -254,7 +266,7 @@ def test_an_epoch_is_validated_and_written(simulated, tmp_path):
     assert record["windows"]["silent_ns_logratio_identity_max_abs"] < 1e-9
     # excluded time is no window's, and no masked bin is in a running-only fit
     excluded = interval_mask(TIME, swr_source.excluded_intervals(EPOCH))
-    assert excluded[2801:3199].all()
+    assert excluded[2801:3199].all() and excluded[4801:5199].all()
     reach = np.r_[0, np.cumsum(excluded)]
     assert (reach[table.e.to_numpy() + 1] == reach[table.s.to_numpy()]).all()
     assert running_only["missing_bins_at_running_speed"] > 0
@@ -270,6 +282,63 @@ def test_an_epoch_is_validated_and_written(simulated, tmp_path):
     assert not [c for c in default if c.endswith("_window_level")]
     runner.summarize(output_dir, [EPOCH], window_level=True)
     assert "p_signflip_window_level" in pd.read_csv(output_dir / "bout_stats.csv")
+
+
+def test_a_decoded_event_the_rule_drops_stays_out_of_the_running_fits(
+    simulated, tmp_path
+):
+    """The review's probe: a running non-local event at 10.2-10.3 s lies in the
+    0.3-s reach of the mask at [9.9, 10.1] s, outside the mask. The analysed-time
+    rule drops it, but it is decoded non-local content: it is in no running-only
+    training mask, and the record counts it."""
+    decode_dir = decode_copy(simulated, tmp_path)
+    path = decode_dir / f"{EPOCH}_80_data_over_time.pkl"
+    dot = pd.read_pickle(path)
+    offset = TIME - TIME[0]
+    event = (offset >= 10.2) & (offset <= 10.3)
+    assert (dot.head_speed.to_numpy()[event] >= 4.0).all()  # running
+    dot.iloc[np.flatnonzero(event), dot.columns.get_loc("non_local_event")] = 1
+    dot.to_pickle(path)
+    # the rule drops it from the frame analyses read
+    assert not swr_source.read_dot_with_swr_source(path).non_local_event[event].any()
+
+    record = run(decode_dir, tmp_path / "out", simulated[1])
+
+    assert record["status"] == "ok", record.get("traceback")
+    running_only = record["running_only"]
+    assert running_only["event_bins"] == int(event.sum())
+    assert running_only["event_bins_at_running_speed"] == int(event.sum())
+    for name in ("run", "runcv0", "runcv1"):
+        assert running_only[name]["event_bins_in_training_bins"] == 0
+        assert running_only[name]["event_bins_in_library_span"] == 0
+
+
+def test_a_decode_without_the_sources_masks_fails_before_the_marks_load(
+    simulated, tmp_path
+):
+    """A decode made before R11 (no decode_masks) is refused before load_data:
+    the message says to rerun on the R11 decodes."""
+    decode_dir = decode_copy(simulated, tmp_path)
+    path = decode_dir / f"{EPOCH}_results.nc"
+    with xr.open_dataset(path, engine="h5netcdf") as results:
+        unstamped = results.load()
+    unstamped.attrs = {}
+    unstamped.to_netcdf(path, engine="h5netcdf")
+
+    def load_inputs(_epoch_id):
+        raise AssertionError("the marks were loaded")
+
+    record = runner.run_epoch(
+        EPOCH,
+        decode_dir=decode_dir,
+        output_dir=tmp_path / "out",
+        load_inputs=load_inputs,
+        log=lambda _message: None,
+    )
+
+    assert record["status"] == "failed"
+    assert "no decode_masks" in record["error"] and "R11" in record["error"]
+    assert "--overwrite" in record["error"]  # ... does not help
 
 
 def test_the_runner_holds_jax_to_the_cpu(monkeypatch):

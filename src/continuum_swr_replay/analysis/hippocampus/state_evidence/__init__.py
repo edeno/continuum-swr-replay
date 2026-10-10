@@ -152,6 +152,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.half_decode import
 from continuum_swr_replay.analysis.hippocampus.state_evidence.io import (
     code_version,
     json_ready,
+    saved_decode_masks,
     write_json,
 )
 from continuum_swr_replay.analysis.hippocampus.state_evidence.summary import (
@@ -272,6 +273,7 @@ __all__ = [
     "per_tetrode_terms",
     "rate_calibration",
     "regimes",
+    "saved_decode_masks",
     "sign_flip_p",
     "state_bouts",
     "stratified_bootstrap_ci",
