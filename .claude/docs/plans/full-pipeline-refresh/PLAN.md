@@ -1753,13 +1753,20 @@ analyses: the masked 2.0 Kay inventory.
     normalization leaves it out.
   - **Consequences (the lead: "We also need to make sure we are not analyzing the artifact times
     or the consequences of artifact times in the analysis").**
-    - A decoded event (non-local event, ContFrag label, Widloski event) within 0.3 s of the mask is
-      dropped. C3 measured that a masked gap changes analysed NonLocal events within at most 0.21 s
-      and flips ContFrag SWR labels within at most 0.19 s; the reach does not grow with gap length.
-      ContFrag's posterior settles more slowly, by about 1.3 s, but the change is small: SWR mean
-      P(Continuous) moves by 0.01 or more within 0.2 s in 99 % of gaps, and by 1.36 s at most.
-    - A time bin whose history covariates reach into the mask is dropped, and so is a peri-event
-      window (PFC responses, reward kernels) that touches it.
+    - **One analysed-time rule (the lead, 2026-10-10).** Excluded time is the mask widened by
+      0.3 s on each side. An event of any kind (non-local, SWR, MUA, ContFrag label, Widloski), an
+      exposure second, a time bin with its history window, and a peri-event window (PFC responses,
+      reward kernels, triggered averages) is analysed only when it lies wholly outside excluded
+      time. A kept event that overlaps a dropped event is dropped too, because its overlap class is
+      unknown. Inputs (the decoders' `is_missing` and encoding exclusion, the detectors'
+      normalization and the ripple-power covariate's normalization) use the mask itself.
+    - Why 0.3 s: C3 measured that a masked gap changes analysed NonLocal events within at most
+      0.21 s and flips ContFrag SWR labels within at most 0.19 s; the reach does not grow with gap
+      length. ContFrag's posterior settles more slowly, by about 1.3 s, but the change is small: SWR
+      mean P(Continuous) moves by 0.01 or more within 0.2 s in 99 % of gaps, and by 1.36 s at most.
+      The reach is applied to every cohort and every exposure, not only to decoded events, so all
+      rates share one exposure and NonLocal and ContFrag cohorts agree. Excluded time is 0.28 % of
+      the 255 epochs (mask alone 0.17 %; R9 run `a1083731940b`).
   - **No post-step second.** No rodent lab we read pads after an artifact; the Buzsáki lab's
     `bz_FindRipples` drops flagged events and pads nothing. R8 instead reruns the headline results
     with 1 s masked after each step, as a robustness check.
