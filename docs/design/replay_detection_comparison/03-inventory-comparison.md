@@ -54,8 +54,12 @@ window edges and gaps can reduce observation time. A failed amplitude, probabili
 sequence, or significance criterion is a detection outcome, not missing coverage.
 Record the source masks and timing conventions in the manifest.
 
-Intersect each detector's observed intervals with the shared finite-speed < 4 cm/s
-eligibility mask to obtain its comparison exposure, `E_d`. A comparison involving a
+The reader of the observation tables (`availability.coverage_from_observations`) first
+removes excluded time (`swr_source.excluded_intervals`: the artifact mask widened by
+0.3 s) from every detector's observed intervals, since no detector's events there are
+analysed; the tables themselves record what each detector read. Intersect each
+detector's observed intervals with the shared finite-speed < 4 cm/s eligibility mask
+to obtain its comparison exposure, `E_d`. A comparison involving a
 set of detectors uses the intersection of their exposures. Pairwise summaries use
 `E_A ∩ E_B`; seven-detector exclusivity and no-detector time use all seven exposures.
 Report the exposure duration and excluded time by reason for each comparison. Empty
