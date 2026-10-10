@@ -19,7 +19,18 @@ Task 12's tetrode partitions, each in both directions: four decodes, ``p0d0``,
    canonical one restricted to S (``encoding_subset_check``);
 2. keeps the canonical fit's discrete transitions (12 numbers) and initial
    conditions fixed, and runs no EM;
-3. decodes S's spikes.
+3. decodes S's spikes, with the canonical decode's missing bins (its artifact
+   mask) set missing.
+
+The canonical decode's masks are built as the decoder built them
+(``decoding_common.hpc_decode_masks``, from the configured SWR source) and
+checked against what it used (``canonical_masks``): its saved ``decode_masks``
+must name the configured runs and the same counts, and the training bins must
+be the ones its detector kept. A decode made under other masks (one from before
+R11, say) is refused. Its ``data_over_time`` is read through the SWR source
+(``swr_source.with_swr_source``), so its non-local events are the analysed
+ones, and each half decode's events are held to the same analysed-time rule
+(``analysed_labels``) before the two are compared.
 
 ``--all-tetrodes`` decodes with every tetrode instead (split ``all``), to check
 that the pipeline reproduces the canonical decode. Each decode writes
@@ -133,11 +144,19 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: 
     code_version,
     half_splits,
     json_ready,
+    parse_epoch_identifier,
     write_json,
 )
+from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
+    with_swr_source,
+)
 from continuum_swr_replay.decoding_common import (  # noqa: E402
+    HpcDecodeMasks,
+    hpc_artifact_intervals,
+    hpc_decode_masks,
     provenance_record,
     raise_open_file_limit,
+    require_saved_decode_masks,
     setup_logger,
     write_atomically,
 )
@@ -399,14 +418,21 @@ class CanonicalEpoch:
     probabilities : ndarray, shape (n_time, 4)
         The canonical state probabilities, float32 as the decode wrote them.
     labels : ndarray of int, shape (n_time,)
-        The canonical ``non_local_event`` labels.
+        The canonical ``non_local_event`` labels, read through the SWR source:
+        the events the analysed-time rule keeps.
     labels_reproduced : bool
-        Whether :func:`non_local_event_labels` remakes them from the
-        probabilities exactly.
+        Whether :func:`non_local_event_labels`, held to the same rule
+        (:func:`analysed_labels`), remakes them from the probabilities exactly.
     stamp : dict
         :func:`canonical_detector_stamp`, taken before the detector is read.
     n_tetrodes : int
         The tetrodes the canonical decode used.
+    is_missing : ndarray of bool, shape (n_time,)
+        The canonical decode's missing bins (:func:`canonical_masks`).
+    rule_frame : pd.DataFrame
+        The frame's session columns, head speed and ``MUA_event`` as the
+        decoder saved them, time-indexed: what :func:`analysed_labels` holds a
+        half decode's events to the rule with.
     """
 
     epoch_id: str
@@ -419,15 +445,118 @@ class CanonicalEpoch:
     labels_reproduced: bool
     stamp: dict
     n_tetrodes: int
+    is_missing: np.ndarray
+    rule_frame: pd.DataFrame
 
 
-def load_canonical(epoch_id: str, decode_dir: Path) -> CanonicalEpoch:
-    """The canonical decode's detector, states, events and speed for one epoch.
+RULE_FRAME_COLUMNS = ("animal", "day", "epoch", "head_speed", "MUA_event")
+"""The columns of a decode frame the analysed-time rule reads, besides the
+labels it holds to it (:func:`analysed_labels`)."""
+
+
+def canonical_masks(
+    epoch_id: str, decode_dir: Path, time: np.ndarray, is_training: np.ndarray
+) -> HpcDecodeMasks:
+    """The canonical decode's masks, built as the decoder built them, and checked.
+
+    ``hpc_decode_masks`` on the decode's time axis, from the configured SWR
+    source, with the training type the decode recorded.
+
+    Parameters
+    ----------
+    epoch_id : str
+    decode_dir : Path
+        Holds ``{epoch_id}_results.nc``, whose ``decode_masks`` the decoder
+        stamped.
+    time : ndarray, shape (n_time,)
+        The decode's time axis (s).
+    is_training : ndarray of bool, shape (n_time,)
+        The training bins the canonical detector kept (``decode_inputs``).
+
+    Returns
+    -------
+    HpcDecodeMasks
 
     Raises
     ------
     ValueError
-        The detector's decode inputs are not on ``data_over_time``'s axis.
+        The decode has no ``decode_masks`` or names other runs
+        (``require_saved_decode_masks``), its counts of bins, missing bins or
+        bins left out of encoding differ from the masks', or the masks'
+        training bins are not the ones the decode used: it was made under
+        other masks (before R11, say), so a half decode would not share its
+        encoding.
+    """
+    import xarray as xr
+
+    nwb_file_name, epoch_name, _ = parse_epoch_identifier(epoch_id)
+    path = Path(decode_dir) / f"{epoch_id}_results.nc"
+    with xr.open_dataset(path, engine="h5netcdf") as results:
+        attrs = dict(results.attrs)
+    require_saved_decode_masks(attrs, str(path))
+    saved = json.loads(attrs["decode_masks"])
+    masks = hpc_decode_masks(
+        nwb_file_name,
+        epoch_name,
+        pd.DataFrame(index=pd.Index(time, name="time")),
+        hpc_artifact_intervals(nwb_file_name, epoch_name),
+        saved["training_type"],
+    )
+    differ = {
+        name: {"saved": saved.get(name), "now": masks.record[name]}
+        for name in ("n_bins", "n_missing_bins", "n_encoding_removed_bins")
+        if saved.get(name) != masks.record[name]
+    }
+    if differ:
+        raise ValueError(
+            f"{path.name}'s decode_masks are not the masks built now from the "
+            f"configured SWR source: {differ}"
+        )
+    if not np.array_equal(masks.is_training, np.asarray(is_training)):
+        raise ValueError(
+            f"{epoch_id}: the canonical decode's training bins are not the ones "
+            "built now from the configured SWR source (hpc_decode_masks); "
+            "it was decoded under other masks"
+        )
+    return masks
+
+
+def analysed_labels(rule_frame: pd.DataFrame, labels: np.ndarray) -> np.ndarray:
+    """Non-local event labels held to the one analysed-time rule.
+
+    ``swr_source.with_swr_source`` on the decode frame's own columns with
+    `labels` as its ``non_local_event``: an event the rule drops (excluded
+    time, or overlapping an SWR or MUA event dropped for it) is zeroed, as
+    reading the canonical decode's frame through the source zeroes its own.
+
+    Parameters
+    ----------
+    rule_frame : pd.DataFrame
+        :attr:`CanonicalEpoch.rule_frame`, or its first rows.
+    labels : ndarray of int, shape (n_time,)
+        On `rule_frame`'s rows (:func:`non_local_event_labels`).
+
+    Returns
+    -------
+    ndarray of int, shape (n_time,)
+    """
+    frame = rule_frame.assign(non_local_event=np.asarray(labels, dtype=np.int64))
+    return with_swr_source(frame)["non_local_event"].to_numpy(dtype=np.int64)
+
+
+def load_canonical(epoch_id: str, decode_dir: Path) -> CanonicalEpoch:
+    """The canonical decode's detector, masks, states, events and speed for one epoch.
+
+    The frame is read through the SWR source (``with_swr_source``), and its
+    masks are :func:`canonical_masks`.
+
+    Raises
+    ------
+    ValueError
+        The detector's decode inputs are not on ``data_over_time``'s axis, or
+        :func:`canonical_masks` refuses the decode.
+    SwrSourceError
+        The SWR source cannot serve the epoch.
     """
     from continuum_swr_replay.analysis.hippocampus.state_evidence import (
         decode_inputs,
@@ -438,16 +567,21 @@ def load_canonical(epoch_id: str, decode_dir: Path) -> CanonicalEpoch:
     stamp = canonical_detector_stamp(epoch_id, decode_dir)
     detector = load_detector(epoch_id, decode_dir)
     inputs = decode_inputs(detector)
-    dot = pd.read_pickle(Path(decode_dir) / f"{epoch_id}_80_data_over_time.pkl")
-    time = dot.index.to_numpy(dtype=float)
+    saved = pd.read_pickle(Path(decode_dir) / f"{epoch_id}_80_data_over_time.pkl")
+    time = saved.index.to_numpy(dtype=float)
     if not np.array_equal(time, np.asarray(inputs["position_time"], dtype=float)):
         raise ValueError(
             "the detector's decode inputs are not on data_over_time's axis"
         )
+    masks = canonical_masks(epoch_id, decode_dir, time, inputs["is_training"])
+    rule_frame = saved[[c for c in RULE_FRAME_COLUMNS if c in saved.columns]].copy()
+    dot = with_swr_source(saved)
+    del saved
     columns = [f"{state.replace(' ', '_')}_prob" for state in STATES]
     probabilities = dot[columns].to_numpy()
     labels = dot["non_local_event"].to_numpy(dtype=np.int64)
     speed = dot["head_speed"].to_numpy(dtype=float)
+    del dot
     return CanonicalEpoch(
         epoch_id=epoch_id,
         decode_dir=Path(decode_dir),
@@ -457,10 +591,17 @@ def load_canonical(epoch_id: str, decode_dir: Path) -> CanonicalEpoch:
         probabilities=probabilities,
         labels=labels,
         labels_reproduced=bool(
-            np.array_equal(non_local_event_labels(probabilities, speed, time), labels)
+            np.array_equal(
+                analysed_labels(
+                    rule_frame, non_local_event_labels(probabilities, speed, time)
+                ),
+                labels,
+            )
         ),
         stamp=stamp,
         n_tetrodes=len(inputs["spike_times"]),
+        is_missing=masks.is_missing,
+        rule_frame=rule_frame,
     )
 
 
@@ -521,7 +662,10 @@ def decode_split(
     began = clock.perf_counter()
     try:
         results, half = half_tetrode_decode(
-            canonical.detector, job.selecting, n_bins=n_bins
+            canonical.detector,
+            job.selecting,
+            is_missing=canonical.is_missing,
+            n_bins=n_bins,
         )
         probabilities = results.acausal_state_probabilities.values
         decoded = probabilities.shape[0]
@@ -543,7 +687,10 @@ def decode_split(
                 "the half encoding is not the canonical encoding restricted to "
                 f"its tetrodes: {check}"
             )
-        labels = non_local_event_labels(probabilities, canonical.speed[:decoded], time)
+        labels = analysed_labels(
+            canonical.rule_frame.iloc[:decoded],
+            non_local_event_labels(probabilities, canonical.speed[:decoded], time),
+        )
         record["agreement"] = label_agreement(
             canonical.probabilities[:decoded],
             canonical.labels[:decoded],
@@ -552,6 +699,7 @@ def decode_split(
         )
         record["agreement"]["reference_labels_reproduced"] = canonical.labels_reproduced
         record["n_bins"] = int(decoded)
+        record["n_missing_bins"] = int(canonical.is_missing[:decoded].sum())
         record["complete"] = bool(decoded == canonical.time.size)
         transitions = np.asarray(canonical.detector.discrete_state_transitions_)
         record["fixed"] = {

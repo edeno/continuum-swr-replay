@@ -8,22 +8,31 @@ it one epoch at a time and summarizes the pooled result.
 
 Per epoch (a dask CPU worker each):
 
-1. **Decode.** ``{epoch}_80_data_over_time.pkl`` gives the time axis, head
+1. **Decode.** ``{epoch}_80_data_over_time.pkl``, read through the SWR source
+   (``swr_source.read_dot_with_swr_source``), gives the time axis, head
    position and speed, linear position, the four state probabilities and the
-   non-local event labels; ``{epoch}_detector.pkl`` the fitted encoding model
-   and ``no_spike_rate``. The probabilities must be finite and sum to 1.
+   non-local event labels the analysed-time rule keeps; ``{epoch}_detector.pkl``
+   the fitted encoding model and ``no_spike_rate``. The probabilities must be
+   finite and sum to 1.
 2. **Windows.** Each state's confident bouts and their matched windows, and the
-   calibration windows (``build_windows``), seeded by ``(SEED, epoch_id)``.
-3. **Marks** and the decode's ``no_ripple`` training mask, through the
-   project's loader (``load_data``; read-only Spyglass). Its time axis must be
-   the decode's, and refitting the encoding model on it with that mask must
-   reproduce the stored one exactly, so the marks are the decode's.
+   calibration windows (``build_windows``), seeded by ``(SEED, epoch_id)``. A
+   bin in excluded time (``swr_source.excluded_intervals``: the artifact mask
+   widened by 0.3 s) is in no regime, so every window lies wholly outside it:
+   the decode set the mask's bins missing (their stored log-likelihood is 0),
+   and their spikes are an artifact's.
+3. **Marks** and the decode's masks, through the project's loader
+   (``load_data``; read-only Spyglass) and ``decoding_common.hpc_decode_masks``,
+   as the decoder built them: the training bins leave out the Kay inventory's
+   events and the artifact mask, and the mask's bins are missing. Its time axis
+   must be the decode's, and refitting the encoding model on it with those
+   training bins must reproduce the stored one exactly, so the marks are the
+   decode's.
 4. **Encodings** (``running_only_masks``): running-only refits (head speed
    >= 4 cm/s), on every running bin and on each fold of alternating 30 s
    blocks (``time_folds``), leaving out running bins within two bins of a
-   non-local event bin; no event bin may be in the library's padded training
-   span of any of them (``training_spike_bins``). The canonical encoding is the
-   decode's own.
+   non-local event bin and the decode's missing bins; no event bin may be in
+   the library's padded training span of any of them (``training_spike_bins``).
+   The canonical encoding is the decode's own.
 5. **Per-tetrode terms** for the spikes in the scored bins, one encoding at a
    time. Checked twice: summed over all tetrodes the canonical terms reproduce
    the stored ``results.nc`` log-likelihood on 2000 sampled bins, and every
@@ -97,6 +106,10 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 from numpy.typing import NDArray  # noqa: E402
 
+from continuum_swr_replay.analysis.hippocampus import swr_source  # noqa: E402
+from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (  # noqa: E402
+    interval_mask,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (  # noqa: E402
     interior_bin_distances_cm,
 )
@@ -138,10 +151,11 @@ from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_decode_files,
 )
 from continuum_swr_replay.data_loaders.utils import (  # noqa: E402
-    get_training_timepoints,
     parse_nwb_filename,
 )
 from continuum_swr_replay.decoding_common import (  # noqa: E402
+    hpc_artifact_intervals,
+    hpc_decode_masks,
     provenance_record,
     raise_open_file_limit,
     release_nwb_files,
@@ -348,13 +362,17 @@ def canonical_epochs(decode_dir: Path) -> list[str]:
 
 
 def load_marks_and_training_mask(epoch_id: str) -> dict:
-    """Marks, the position axis and the ``no_ripple`` mask, from ``load_data``.
+    """Marks, the position axis and the decode's masks, from ``load_data``.
+
+    The masks are ``decoding_common.hpc_decode_masks``' for a ``no_ripple``
+    decode, from the configured SWR source, as the decoder built them.
 
     Returns
     -------
     dict
         ``time`` (the loader's position axis, s), ``spike_times`` and
-        ``marks`` (per tetrode) and ``is_training`` (bool per time bin).
+        ``marks`` (per tetrode), ``is_training`` and ``is_missing`` (bool per
+        time bin).
     """
     from continuum_swr_replay.data_loaders import load_data
     from continuum_swr_replay.types import SessionDataKeys as K
@@ -363,15 +381,21 @@ def load_marks_and_training_mask(epoch_id: str) -> dict:
     data = load_data(
         nwb_file_name,
         epoch_name,
-        include=frozenset({K.SPIKE_TIMES, K.SPIKE_WAVEFORM_FEATURES, K.RIPPLE_TIMES}),
+        include=frozenset({K.SPIKE_TIMES, K.SPIKE_WAVEFORM_FEATURES}),
+    )
+    masks = hpc_decode_masks(
+        nwb_file_name,
+        epoch_name,
+        data["position_info"],
+        hpc_artifact_intervals(nwb_file_name, epoch_name),
+        "no_ripple",
     )
     return {
         "time": data["position_info"].index.to_numpy(dtype=float),
         "spike_times": [np.asarray(x) for x in data["spike_times"][brain_area]],
         "marks": [np.asarray(x) for x in data["spike_waveform_features"][brain_area]],
-        "is_training": np.asarray(
-            get_training_timepoints(data, training_type="no_ripple"), dtype=bool
-        ),
+        "is_training": masks.is_training,
+        "is_missing": masks.is_missing,
     }
 
 
@@ -581,7 +605,8 @@ def epoch_table(
         raise ValueError("the label sets need distinct names")
     checks: dict[str, Any] = {}
     files = decode_files(epoch_id, decode_dir)
-    dot = pd.read_pickle(files["data_over_time"])
+    dot = swr_source.read_dot_with_swr_source(files["data_over_time"])
+    excluded = swr_source.excluded_intervals_of(dot)
     time = dot.index.to_numpy(dtype=float)
     speed = dot["head_speed"].to_numpy(dtype=float)
     linear = dot["linear_position"].to_numpy(dtype=float)
@@ -600,9 +625,12 @@ def epoch_table(
         "max_abs_probability_sum_error": worst,
     }
 
-    # windows: a bin with no finite position is in no regime
+    # windows: a bin with no finite position, or in excluded time, is in no regime
     regime = regimes(speed)
     regime[~np.isfinite(linear)] = ""
+    in_excluded = interval_mask(time, excluded)
+    regime[in_excluded] = ""
+    checks["decode"]["excluded_bins"] = int(in_excluded.sum())
     windows: dict[str, pd.DataFrame] = {}
     for label_set in sets:
         labels = (
@@ -657,14 +685,15 @@ def epoch_table(
         )
     ):
         raise ValueError(
-            "refitting with the no_ripple mask does not reproduce the stored "
-            f"encoding model, so the marks are not the decode's: {same}"
+            "refitting with the decode's training bins (hpc_decode_masks) does not "
+            f"reproduce the stored encoding model, so the marks are not the "
+            f"decode's, or it was decoded under other masks: {same}"
         )
 
     # the running-only encodings, checked against the library's padding
     folds = time_folds(time, CV_BLOCK_S)
     masks, checks["running_only"] = running_only_masks(
-        time, speed, position, in_event, folds
+        time, speed, position, in_event, folds, is_missing=inputs["is_missing"]
     )
     in_span = {
         f: np.r_[0, np.cumsum(training_spike_bins(time, position, masks[f"runcv{f}"]))]
@@ -876,6 +905,8 @@ def running_only_masks(
     position: NDArray,
     in_event: NDArray,
     folds: NDArray,
+    *,
+    is_missing: NDArray,
 ) -> tuple[dict[str, NDArray], dict]:
     """The running-only encodings' training masks, and their record.
 
@@ -884,7 +915,8 @@ def running_only_masks(
     bins within :data:`EVENT_MARGIN_BINS` of a non-local event bin are left
     out: the library pads every training run by about one bin on each side and
     bridges bins without a position (:func:`training_spike_bins`), and no
-    event spike may enter a running-only encoding.
+    event spike may enter a running-only encoding. The decode's missing bins
+    (its artifact mask) are left out too, as its own encoding leaves them out.
 
     Parameters
     ----------
@@ -894,6 +926,8 @@ def running_only_masks(
     in_event : ndarray of bool, shape (n_time,)
         Non-local event bins.
     folds : ndarray of int, shape (n_time,)
+    is_missing : ndarray of bool, shape (n_time,)
+        The decode's missing bins (``hpc_decode_masks``).
 
     Returns
     -------
@@ -901,8 +935,9 @@ def running_only_masks(
         ``run``, ``runcv0`` and ``runcv1``: bool, shape (n_time,).
     record : dict
         The counts: event bins, those at running speed, the running bins left
-        out, and per mask its training bins, the event bins among them and the
-        event bins in the library's padded span (0, or it raises).
+        out near them, the missing bins at running speed (all left out), and
+        per mask its training bins, the event and missing bins among them and
+        the event bins in the library's padded span (0, or it raises).
 
     Raises
     ------
@@ -914,7 +949,8 @@ def running_only_masks(
     for shift in range(1, EVENT_MARGIN_BINS + 1):
         near_event[:-shift] |= in_event[shift:]
         near_event[shift:] |= in_event[:-shift]
-    running = at_speed & ~near_event
+    is_missing = np.asarray(is_missing, dtype=bool)
+    running = at_speed & ~near_event & ~is_missing
     masks = {
         "run": running,
         "runcv0": running & (folds == 0),
@@ -925,6 +961,7 @@ def running_only_masks(
         "event_bins": int(in_event.sum()),
         "event_bins_at_running_speed": int((in_event & at_speed).sum()),
         "running_bins_left_out_near_events": int((near_event & at_speed).sum()),
+        "missing_bins_at_running_speed": int((is_missing & at_speed).sum()),
     }
     for name, mask in masks.items():
         if not mask.any():
@@ -933,6 +970,7 @@ def running_only_masks(
         record[name] = {
             "training_bins": int(mask.sum()),
             "event_bins_in_training_bins": int((in_event & mask).sum()),
+            "missing_bins_in_training_bins": int((is_missing & mask).sum()),
             "event_bins_in_library_span": in_span,
         }
         if in_span:
@@ -949,7 +987,8 @@ def run_settings() -> dict:
         "seed": SEED,
         "halves_seed": HALVES_SEED,
         "n_partitions": 10,
-        "regimes": "immobile head_speed < 4 cm/s, running > 10 cm/s",
+        "regimes": "immobile head_speed < 4 cm/s, running > 10 cm/s; none in "
+        "excluded time (swr_source.excluded_intervals)",
         "bouts": "P(state) > 0.8, >= 5 bins, <= 1500 per state x regime, "
         "scored on a seeded <= 50-bin sub-window",
         "calibration": "2000 random 10-bin windows per regime",
@@ -959,9 +998,9 @@ def run_settings() -> dict:
             f"cm/s) refit on each fold of alternating {CV_BLOCK_S:g} s blocks; a "
             "window is scored by the fold without its centre bin",
             "run": "running-only refit on every running bin",
-            "can": "the decode's own (no_ripple training mask)",
+            "can": "the decode's own (hpc_decode_masks' no_ripple training bins)",
             "running_only_leaves_out": f"running bins within {EVENT_MARGIN_BINS} "
-            "bins of a non-local event bin",
+            "bins of a non-local event bin, and the decode's missing bins",
         },
     }
 

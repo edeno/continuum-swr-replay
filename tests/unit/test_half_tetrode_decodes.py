@@ -32,6 +32,10 @@ from non_local_detector.environment import Environment
 from non_local_detector.models import base as library_base
 from track_linearization import get_linearized_position
 
+from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
+    artifact_intervals,
+    interval_mask,
+)
 from continuum_swr_replay.analysis.hippocampus.state_evidence import (
     ENCODING_KEY,
     STATES,
@@ -52,6 +56,14 @@ from continuum_swr_replay.table_io import read_table
 from scripts.qa import run_half_tetrode_decodes as runner
 from scripts.qa import run_state_evidence
 from tests.unit._memoryless_clusterless_epoch import _y_track
+from tests.unit._swr_inventory_fixtures import (
+    ARTIFACT_RUN_ID,
+    RUN_ID,
+    artifact_cores,
+    use_swr_source,
+    write_artifact_run,
+    write_swr_inventory,
+)
 from tests.unit.test_state_evidence import (
     NO_SPIKE_RATE,
     linear_distance,
@@ -84,6 +96,11 @@ CLUSTERLESS_PARAMS = {
     "disable_progress_bar": True,
 }
 SELECTING = np.array([0, 2, 5])
+BURSTS = [(300, 330, 3.0), (1100, 1130, 46.0), (3300, 3330, 3.0)]
+"""Bins (first, last + 1) and replayed place (cm) of the remote bursts."""
+ARTIFACT_CORES = [("spk", 1000.0 + 1200 / FS, 1000.0 + 1200 / FS)]
+"""A spike-only line 140 ms after the second burst: the mask pads it by 0.1 s
+(about bins 1150-1250), and excluded time, 0.3 s wider, holds the burst."""
 PROVENANCE = {"commit": "c" * 40, "dirty": False}
 """A clean tree's provenance, so that decodes written in a test can be kept."""
 REPO = Path(__file__).resolve().parents[2]
@@ -109,6 +126,7 @@ class Canonical:
     spike_times: list[np.ndarray]
     marks: list[np.ndarray]
     is_training: np.ndarray
+    is_missing: np.ndarray
     speed: np.ndarray
     linear: np.ndarray
 
@@ -118,7 +136,9 @@ def simulate_canonical() -> Canonical:
 
     The animal shuttles along the bottom of the Y and pauses at both ends. While
     it pauses at one end, a 60 ms burst replays the other end; the bursts are
-    left out of the training bins, as ripples are.
+    left out of the training bins, as the Kay inventory's events are. An
+    artifact mask's bins are missing and out of the training bins, as
+    ``hpc_decode_masks`` makes them for a canonical decode.
     """
     rng = np.random.default_rng(0)
     time = 1000.0 + np.arange(N_TIME) / FS
@@ -128,7 +148,7 @@ def simulate_canonical() -> Canonical:
     linear = get_linearized_position(
         position, _y_track(), edge_order=EDGE_ORDER, edge_spacing=8.0
     ).linear_position.to_numpy()
-    bursts = [(300, 330, 3.0), (1100, 1130, 46.0), (3300, 3330, 3.0)]
+    bursts = BURSTS
     silence = slice(5500, 5600)  # while paused
     spike_times, marks = [], []
     for k, center in enumerate(FIELD_CENTERS_CM):
@@ -142,6 +162,10 @@ def simulate_canonical() -> Canonical:
     is_training = np.ones(N_TIME, dtype=bool)
     for s, e, _ in bursts:
         is_training[s - 10 : e + 10] = False
+    is_missing = interval_mask(
+        time, artifact_intervals(artifact_cores(ARTIFACT_CORES), (0.0, 1e6))
+    )
+    is_training &= ~is_missing
 
     detector = NonLocalClusterlessDetector(
         environments=environment(),
@@ -157,6 +181,7 @@ def simulate_canonical() -> Canonical:
         spike_waveform_features=marks,
         time=time,
         is_training=is_training,
+        is_missing=is_missing,
         discrete_transition_covariate_data=None,
         return_outputs="log_likelihood",
         max_iter=2,
@@ -169,6 +194,7 @@ def simulate_canonical() -> Canonical:
         spike_times,
         marks,
         is_training,
+        is_missing,
         speed,
         linear,
     )
@@ -179,16 +205,43 @@ def canonical() -> Canonical:
     return simulate_canonical()
 
 
-def write_canonical_decode(canonical: Canonical, directory: Path) -> None:
-    """The decode's three files, written as ``run_decoding_bandit`` writes them."""
+def saved_decode_masks(canonical: Canonical, **changes) -> dict:
+    """The ``decode_masks`` a decode made with the simulation's masks stamps."""
+    return {
+        "swr_source": f"kay@{RUN_ID}+artifacts@{ARTIFACT_RUN_ID}",
+        "swr_inventory_run_id": RUN_ID,
+        "artifact_run_id": ARTIFACT_RUN_ID,
+        "training_type": "no_ripple",
+        "n_bins": N_TIME,
+        "n_missing_bins": int(canonical.is_missing.sum()),
+        "n_encoding_removed_bins": int((~canonical.is_training).sum()),
+        **changes,
+    }
+
+
+def write_canonical_decode(
+    canonical: Canonical, directory: Path, decode_masks: dict | None = None
+) -> None:
+    """The decode's three files, written as ``run_decoding_bandit`` writes them,
+    with its ``decode_masks`` (``saved_decode_masks`` by default)."""
     directory.mkdir(parents=True, exist_ok=True)
     canonical.detector.save_model(str(directory / f"{EPOCH}_detector.pkl"))
-    canonical.results.reset_index("state_bins").to_netcdf(
-        directory / f"{EPOCH}_results.nc", engine="h5netcdf"
-    )
+    saved = canonical.results.reset_index("state_bins")
+    saved.attrs = {
+        **saved.attrs,
+        "decode_masks": json.dumps(
+            saved_decode_masks(canonical) if decode_masks is None else decode_masks,
+            sort_keys=True,
+        ),
+    }
+    saved.to_netcdf(directory / f"{EPOCH}_results.nc", engine="h5netcdf")
     probabilities = canonical.results.acausal_state_probabilities.values
     dot = pd.DataFrame(
         {
+            "animal": "aa",
+            "day": 20200101,
+            "epoch": "02_r1",
+            "MUA_event": 0,
             "non_local_event": non_local_event_labels(
                 probabilities, canonical.speed, canonical.time
             ),
@@ -213,7 +266,21 @@ def stand_in_loader(canonical: Canonical) -> dict:
         "spike_times": canonical.spike_times,
         "marks": canonical.marks,
         "is_training": canonical.is_training,
+        "is_missing": canonical.is_missing,
     }
+
+
+@pytest.fixture
+def source(tmp_path, monkeypatch):
+    """The SWR source the simulated decode was made under: the bursts' training
+    gaps are its inventory's events, and ARTIFACT_CORES its artifact run's."""
+    time = 1000.0 + np.arange(N_TIME) / FS
+    events = [(time[s - 10], time[e + 9]) for s, e, _ in BURSTS]
+    inventory = write_swr_inventory(
+        tmp_path / "swr", {EPOCH: events}, artifact_run_id=ARTIFACT_RUN_ID
+    )
+    artifacts = write_artifact_run(tmp_path / "artifacts", {EPOCH: ARTIFACT_CORES})
+    use_swr_source(monkeypatch, inventory, artifacts)
 
 
 # --- the library's EM and the canonical encoding ------------------------------------------
@@ -279,7 +346,9 @@ def test_decode_inputs_are_the_ones_the_canonical_fit_kept(canonical):
 
 # --- the half decode ----------------------------------------------------------------------
 def test_the_half_encoding_holds_only_the_selecting_halfs_electrodes(canonical):
-    _, half = half_tetrode_decode(canonical.detector, SELECTING)
+    _, half = half_tetrode_decode(
+        canonical.detector, SELECTING, is_missing=canonical.is_missing
+    )
 
     encoding = half.encoding_model_[ENCODING_KEY]
     stored = canonical.detector.encoding_model_[ENCODING_KEY]
@@ -322,7 +391,9 @@ def test_the_half_encoding_holds_only_the_selecting_halfs_electrodes(canonical):
 
 def test_the_half_decode_reads_nothing_of_the_scoring_half(canonical):
     """C's spikes, marks and encoding may change: the half decode does not."""
-    expected, _ = half_tetrode_decode(canonical.detector, SELECTING)
+    expected, _ = half_tetrode_decode(
+        canonical.detector, SELECTING, is_missing=canonical.is_missing
+    )
     altered = copy.deepcopy(canonical.detector)
     scoring = np.setdiff1d(np.arange(len(FIELD_CENTERS_CM)), SELECTING)
     data = altered._encoding_model_data
@@ -334,7 +405,9 @@ def test_the_half_decode_reads_nothing_of_the_scoring_half(canonical):
         )
         stored["encoding_positions"][i] = stored["encoding_positions"][i] + 10.0
 
-    results, _ = half_tetrode_decode(altered, SELECTING)
+    results, _ = half_tetrode_decode(
+        altered, SELECTING, is_missing=canonical.is_missing
+    )
 
     np.testing.assert_array_equal(
         results.acausal_state_probabilities.values,
@@ -364,7 +437,9 @@ def test_no_em_iteration_runs(canonical, monkeypatch):
     ]:
         monkeypatch.setattr(cls, name, counted(name, getattr(cls, name)))
 
-    results, half = half_tetrode_decode(canonical.detector, SELECTING)
+    results, half = half_tetrode_decode(
+        canonical.detector, SELECTING, is_missing=canonical.is_missing
+    )
 
     assert calls == {"fit_encoding_model": 1, "_predict": 1}
     np.testing.assert_array_equal(
@@ -382,7 +457,9 @@ def test_the_fixed_transition_decode_equals_the_librarys_decode_with_the_same_tr
     fitted = canonical.detector.discrete_state_transitions_
     # EM moved the transitions, so its starting matrix would be another decode
     assert not np.allclose(fitted, canonical.detector.discrete_transition_type.values)
-    results, _ = half_tetrode_decode(canonical.detector, SELECTING)
+    results, _ = half_tetrode_decode(
+        canonical.detector, SELECTING, is_missing=canonical.is_missing
+    )
 
     spikes = [canonical.spike_times[i] for i in SELECTING]
     marks = [canonical.marks[i] for i in SELECTING]
@@ -400,7 +477,7 @@ def test_the_fixed_transition_decode_equals_the_librarys_decode_with_the_same_tr
     library.initial_conditions_ = canonical.detector.initial_conditions_
     expected = library.predict(
         spikes, marks, time=canonical.time, position=canonical.position,
-        position_time=canonical.time,
+        position_time=canonical.time, is_missing=canonical.is_missing,
     )  # fmt: skip
 
     for name in ("acausal_state_probabilities", "acausal_posterior"):
@@ -413,7 +490,7 @@ def test_the_fixed_transition_decode_equals_the_librarys_decode_with_the_same_tr
     )
     start = library.predict(
         spikes, marks, time=canonical.time, position=canonical.position,
-        position_time=canonical.time,
+        position_time=canonical.time, is_missing=canonical.is_missing,
     )  # fmt: skip
     assert (
         np.abs(
@@ -427,7 +504,9 @@ def test_the_fixed_transition_decode_equals_the_librarys_decode_with_the_same_tr
 def test_with_every_tetrode_the_half_decode_reproduces_the_canonical_decode(canonical):
     every = np.arange(len(FIELD_CENTERS_CM))
 
-    results, _ = half_tetrode_decode(canonical.detector, every)
+    results, _ = half_tetrode_decode(
+        canonical.detector, every, is_missing=canonical.is_missing
+    )
 
     np.testing.assert_allclose(
         results.acausal_state_probabilities.values,
@@ -443,10 +522,25 @@ def test_with_every_tetrode_the_half_decode_reproduces_the_canonical_decode(cano
     )
 
 
-def test_a_decode_of_the_first_bins_only(canonical):
-    full, _ = half_tetrode_decode(canonical.detector, SELECTING)
+def test_the_missing_bins_must_be_on_the_decodes_axis(canonical):
+    with pytest.raises(ValueError, match="is_missing"):
+        half_tetrode_decode(
+            canonical.detector, SELECTING, is_missing=canonical.is_missing[:-1]
+        )
+    with pytest.raises(ValueError, match="is_missing"):
+        half_tetrode_decode(
+            canonical.detector, SELECTING, is_missing=canonical.is_missing.astype(int)
+        )
 
-    first, _ = half_tetrode_decode(canonical.detector, SELECTING, n_bins=3000)
+
+def test_a_decode_of_the_first_bins_only(canonical):
+    full, _ = half_tetrode_decode(
+        canonical.detector, SELECTING, is_missing=canonical.is_missing
+    )
+
+    first, _ = half_tetrode_decode(
+        canonical.detector, SELECTING, is_missing=canonical.is_missing, n_bins=3000
+    )
 
     assert first.time.size == 3000
     np.testing.assert_array_equal(first.time.values, canonical.time[:3000])
@@ -712,11 +806,17 @@ def test_the_detector_stamp_survives_a_move_but_not_an_edit(tmp_path):
     assert runner.canonical_detector_stamp(EPOCH, canonical_dir) != stamp
 
 
-def test_one_split_is_decoded_checked_and_written(canonical, tmp_path):
+def test_one_split_is_decoded_checked_and_written(canonical, tmp_path, source):
     decode_dir = tmp_path / "decode"
     write_canonical_decode(canonical, decode_dir)
     loaded = runner.load_canonical(EPOCH, decode_dir)
     assert loaded.labels_reproduced and loaded.n_tetrodes == len(FIELD_CENTERS_CM)
+    # the labels are read through the SWR source: the second burst's event lies
+    # in excluded time, so of the decode's three events two are analysed
+    raw = pd.read_pickle(decode_dir / f"{EPOCH}_80_data_over_time.pkl")
+    assert np.unique(raw.non_local_event[raw.non_local_event > 0]).size == 3
+    assert np.unique(loaded.labels[loaded.labels > 0]).size == 2
+    assert not loaded.labels[1100:1128].any()
     job = runner.decode_jobs(loaded.n_tetrodes)[1]
     output_dir = tmp_path / "out"
 
@@ -739,7 +839,9 @@ def test_one_split_is_decoded_checked_and_written(canonical, tmp_path):
     assert record["agreement"]["reference_labels_reproduced"]
     paths = runner.decode_paths(EPOCH, "p0d1", output_dir)
     assert json.loads(paths["record"].read_text()) == record
-    expected, _ = half_tetrode_decode(canonical.detector, job.selecting)
+    expected, _ = half_tetrode_decode(
+        canonical.detector, job.selecting, is_missing=canonical.is_missing
+    )
     with xr.open_dataset(paths["decode"], engine="h5netcdf") as decoded:
         # stored as float32, which the decode already is unless another test
         # module has turned on JAX's x64 mode
@@ -760,9 +862,90 @@ def test_one_split_is_decoded_checked_and_written(canonical, tmp_path):
     assert not bad_paths["decode"].exists() and bad_paths["record"].exists()
 
 
+def test_the_half_decode_uses_the_canonical_decodes_masks(
+    canonical, tmp_path, source, monkeypatch
+):
+    """Built by hpc_decode_masks as the decoder built them: the half encoding is
+    fit at the canonical training bins and the decode sets the canonical
+    missing bins missing; both agree with the decode's saved decode_masks."""
+    decode_dir = tmp_path / "decode"
+    write_canonical_decode(canonical, decode_dir)
+    loaded = runner.load_canonical(EPOCH, decode_dir)
+    seen: dict[str, np.ndarray] = {}
+    fit = library_base.ClusterlessDetector.fit
+    predict = library_base.ClusterlessDetector.predict
+
+    def spy_fit(self, *args, **kwargs):
+        seen["is_training"] = np.asarray(kwargs["is_training"])
+        return fit(self, *args, **kwargs)
+
+    def spy_predict(self, *args, **kwargs):
+        seen["is_missing"] = np.asarray(kwargs["is_missing"])
+        return predict(self, *args, **kwargs)
+
+    monkeypatch.setattr(library_base.ClusterlessDetector, "fit", spy_fit)
+    monkeypatch.setattr(library_base.ClusterlessDetector, "predict", spy_predict)
+
+    record = runner.decode_split(
+        loaded,
+        runner.decode_jobs(loaded.n_tetrodes)[0],
+        output_dir=tmp_path / "out",
+        provenance=PROVENANCE,
+    )
+
+    assert record["status"] == "ok", record.get("traceback")
+    assert canonical.is_missing.any()
+    np.testing.assert_array_equal(loaded.is_missing, canonical.is_missing)
+    np.testing.assert_array_equal(seen["is_training"], canonical.is_training)
+    np.testing.assert_array_equal(seen["is_missing"], canonical.is_missing)
+    saved = saved_decode_masks(canonical)
+    assert int(seen["is_missing"].sum()) == saved["n_missing_bins"]
+    assert int((~seen["is_training"]).sum()) == saved["n_encoding_removed_bins"]
+    assert record["n_missing_bins"] == saved["n_missing_bins"]
+
+
+@pytest.mark.parametrize(
+    ("changes", "message"),
+    [
+        ({"artifact_run_id": "another"}, "decoded with"),
+        ({"n_missing_bins": 0}, "n_missing_bins"),
+    ],
+)
+def test_a_canonical_decode_made_under_other_masks_is_refused(
+    canonical, tmp_path, source, changes, message
+):
+    """Its encoding and missing bins would not be the ones built now."""
+    decode_dir = tmp_path / "decode"
+    write_canonical_decode(
+        canonical, decode_dir, decode_masks=saved_decode_masks(canonical, **changes)
+    )
+
+    with pytest.raises(ValueError, match=message):
+        runner.load_canonical(EPOCH, decode_dir)
+
+
+def test_a_canonical_decode_trained_on_other_bins_is_refused(
+    canonical, tmp_path, monkeypatch
+):
+    """The inventory's events moved by 5 bins: as many bins leave encoding, but
+    not the ones the canonical decode left out."""
+    time = 1000.0 + np.arange(N_TIME) / FS
+    events = [(time[s - 5], time[e + 14]) for s, e, _ in BURSTS]
+    inventory = write_swr_inventory(
+        tmp_path / "swr", {EPOCH: events}, artifact_run_id=ARTIFACT_RUN_ID
+    )
+    artifacts = write_artifact_run(tmp_path / "artifacts", {EPOCH: ARTIFACT_CORES})
+    use_swr_source(monkeypatch, inventory, artifacts)
+    decode_dir = tmp_path / "decode"
+    write_canonical_decode(canonical, decode_dir)
+
+    with pytest.raises(ValueError, match="training bins"):
+        runner.load_canonical(EPOCH, decode_dir)
+
+
 @pytest.mark.parametrize("alteration", ["mean_rates", "ground_models", "keys"])
 def test_a_canonical_encoding_that_is_not_the_plain_fit_fails_the_split(
-    canonical, tmp_path, alteration
+    canonical, tmp_path, alteration, source
 ):
     """What a posterior-weighted canonical encoding, say, would do to the check."""
     decode_dir = tmp_path / "decode"
@@ -788,7 +971,7 @@ def test_a_canonical_encoding_that_is_not_the_plain_fit_fails_the_split(
 
 
 def test_half_labels_are_decoded_and_scored_end_to_end(
-    canonical, tmp_path, monkeypatch
+    canonical, tmp_path, monkeypatch, source
 ):
     decode_dir = tmp_path / "decode"
     write_canonical_decode(canonical, decode_dir)
@@ -817,10 +1000,12 @@ def test_half_labels_are_decoded_and_scored_end_to_end(
                 json.loads(decoded.attrs["selecting_tetrodes"])
                 == (record["selecting_tetrodes"])
             )
-    # S = every tetrode reproduces the canonical decode
+    # S = every tetrode reproduces the canonical decode, and its events are held
+    # to the analysed-time rule as the canonical decode's are: two of three
     [agreement] = [r["agreement"] for r in check]
     assert check[0]["split"] == "all"
     assert agreement["max_abs_diff"] < 1e-5
+    assert agreement["events_reference"] == agreement["events_other"] == 2
     assert agreement["events_identical"] == agreement["events_reference"]
     # a rerun keeps what is written
     again = runner.decode_epoch(

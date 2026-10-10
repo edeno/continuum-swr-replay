@@ -2,8 +2,12 @@
 
 The all-tetrode decode's labels are made with the scoring half C's spikes. Here
 a decode sees only half S. Its encoding model is fit on S's tetrodes alone, at
-the canonical decode's training bins, and it decodes S's spikes alone. Two
-things come from the canonical fit, held fixed, with no EM:
+the canonical decode's training bins, and it decodes S's spikes alone, with the
+canonical decode's missing bins (its artifact mask, ``is_missing``) set
+missing. Both masks are the canonical decode's own: its fitted detector keeps
+the training bins, and the caller builds the missing bins as the decoder built
+them (``decoding_common.hpc_decode_masks``). Two things come from the
+canonical fit, held fixed, with no EM:
 
 - the discrete transition matrix: 4 x 4 with rows summing to 1, so 12 free
   numbers. EM learned 9 of them; the No-Spike row is frozen at its prior.
@@ -136,8 +140,9 @@ def decode_inputs(detector: Any) -> dict[str, Any]:
     ``estimate_parameters`` keeps its inputs as ``_encoding_model_data`` for the
     encoding refits of EM, and the saved detector still holds them: at its end
     it deletes ``encoding_model_data_``, another name. They are the spikes,
-    marks, positions and ``no_ripple`` training mask the decode used, so a half
-    decode trains at the canonical training bins without reloading anything.
+    marks, positions and training mask the decode used, so a half decode trains
+    at the canonical training bins without reloading anything. They do not hold
+    the decode's missing bins.
 
     Returns
     -------
@@ -234,7 +239,11 @@ def _fix_initial_conditions(detector: Any, canonical: Any) -> None:
 
 
 def half_tetrode_decode(
-    canonical: Any, tetrodes: NDArray, *, n_bins: int | None = None
+    canonical: Any,
+    tetrodes: NDArray,
+    *,
+    is_missing: NDArray[np.bool_],
+    n_bins: int | None = None,
 ) -> tuple[xr.Dataset, Any]:
     """Decode with ``tetrodes`` only, the canonical fit's transitions held fixed.
 
@@ -243,7 +252,8 @@ def half_tetrode_decode(
     2. ``fit`` on the tetrodes' spikes and marks, at the canonical training
        bins (:func:`decode_inputs`): the encoding model sees no other tetrode.
     3. The canonical fit's initial conditions.
-    4. ``predict`` with the tetrodes' spikes: one forward-backward pass, no EM.
+    4. ``predict`` with the tetrodes' spikes and ``is_missing``: one
+       forward-backward pass, no EM.
 
     Parameters
     ----------
@@ -251,6 +261,10 @@ def half_tetrode_decode(
         The canonical decode's fitted detector.
     tetrodes : ndarray of int
         Half S's tetrode indices.
+    is_missing : ndarray of bool, shape (n_time,)
+        The canonical decode's missing bins on its time axis
+        (``decoding_common.hpc_decode_masks``' ``is_missing``), whose
+        log-likelihood the decode sets to 0.
     n_bins : int, optional
         Decode only the first ``n_bins`` bins (a smoke test); default all.
 
@@ -280,6 +294,12 @@ def half_tetrode_decode(
     stop = time.size if n_bins is None else int(n_bins)
     if not 2 <= stop <= time.size:
         raise ValueError(f"n_bins must be between 2 and {time.size}")
+    is_missing = np.asarray(is_missing)
+    if is_missing.dtype != bool or is_missing.shape != time.shape:
+        raise ValueError(
+            f"is_missing must be boolean, one per bin of the decode ({time.size}); "
+            f"got {is_missing.dtype} of shape {is_missing.shape}"
+        )
 
     detector = fixed_transition_detector(canonical)
     detector.fit(time, position, spikes, marks, is_training=inputs["is_training"])
@@ -290,6 +310,7 @@ def half_tetrode_decode(
         time=time[:stop],
         position=position[:stop],
         position_time=time[:stop],
+        is_missing=is_missing[:stop],
     )
     return results, detector
 

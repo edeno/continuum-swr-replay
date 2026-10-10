@@ -2,7 +2,10 @@
 
 A real ``NonLocalClusterlessDetector`` is fitted on simulated spikes over a Y
 track and saved beside a ``results.nc`` holding the library's own non-local
-log-likelihood and a ``data_over_time`` table, under a made-up epoch id. The
+log-likelihood and a ``data_over_time`` table, under a made-up epoch id. It is
+made as an HPC decode under the SWR source is: one inventory event and an
+artifact mask leave encoding, and the mask's bins are missing (their stored
+log-likelihood 0). The source is a synthetic run folder (``source``). The
 marks come from a stand-in for the database loader, so nothing here touches
 Spyglass.
 """
@@ -26,6 +29,11 @@ from non_local_detector.likelihoods.clusterless_kde import (
 )
 from track_linearization import get_linearized_position
 
+from continuum_swr_replay.analysis.hippocampus import swr_source
+from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
+    artifact_intervals,
+    interval_mask,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
     CLUSTERLESS_LIKELIHOOD_KEYS,
 )
@@ -36,17 +44,50 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (
 from continuum_swr_replay.table_io import read_table
 from scripts.qa import run_state_evidence as runner
 from tests.unit._memoryless_clusterless_epoch import _y_track
+from tests.unit._swr_inventory_fixtures import (
+    ARTIFACT_RUN_ID,
+    artifact_cores,
+    use_swr_source,
+    write_artifact_run,
+    write_swr_inventory,
+)
 
 EPOCH = "aa20200101_02_r1_HPC"
 FS = 500.0
 EDGE_ORDER = [(0, 3), (3, 1), (3, 2)]
+N_TIME = 6000
+TIME = 1000.0 + np.arange(N_TIME) / FS
+RIPPLE = (1000, 1100)
+"""Bins (first, last + 1) of the Kay inventory's one event."""
+ARTIFACT_CORES = [("spk", TIME[3000], TIME[3000])]
+"""A spike-only line at 6 s, while the animal runs: the mask pads it by 0.1 s
+(about bins 2950-3050) and excluded time by 0.3 s more."""
+
+
+def simulated_is_missing() -> np.ndarray:
+    """The decode's missing bins: the mask, as ``hpc_decode_masks`` builds it."""
+    return interval_mask(
+        TIME, artifact_intervals(artifact_cores(ARTIFACT_CORES), (0.0, 1e6))
+    )
+
+
+@pytest.fixture(autouse=True)
+def source(tmp_path, monkeypatch):
+    """The SWR source the simulated decode was made under."""
+    inventory = write_swr_inventory(
+        tmp_path / "swr",
+        {EPOCH: [(TIME[RIPPLE[0]], TIME[RIPPLE[1] - 1])]},
+        artifact_run_id=ARTIFACT_RUN_ID,
+    )
+    artifacts = write_artifact_run(tmp_path / "artifacts", {EPOCH: ARTIFACT_CORES})
+    use_swr_source(monkeypatch, inventory, artifacts)
 
 
 def simulate_decode(directory: Path) -> dict:
     """Write a decode's three files for EPOCH; return what the loader would give."""
     rng = np.random.default_rng(0)
-    n_time = 6000
-    time = 1000.0 + np.arange(n_time) / FS
+    n_time = N_TIME
+    time = TIME
     # the animal shuttles along the bottom of the Y and pauses at both ends
     phase = np.clip(1.6 * np.sin(2 * np.pi * np.arange(n_time) / FS / 3.0), -1, 1)
     position = np.c_[20.0 + 18.0 * phase, np.zeros(n_time)]
@@ -62,8 +103,10 @@ def simulate_decode(directory: Path) -> dict:
         sample = np.repeat(np.arange(n_time), rng.poisson(rate / FS))
         spike_times.append(np.sort(time[sample] + rng.uniform(0, 1 / FS, sample.size)))
         marks.append(rng.normal(100.0 + 30.0 * k, 10.0, (sample.size, 2)))
+    is_missing = simulated_is_missing()
     is_training = np.ones(n_time, dtype=bool)
-    is_training[1000:1100] = False  # a ripple
+    is_training[RIPPLE[0] : RIPPLE[1]] = False  # the inventory's event
+    is_training &= ~is_missing
 
     detector = NonLocalClusterlessDetector(
         environments=Environment(
@@ -105,6 +148,7 @@ def simulate_decode(directory: Path) -> dict:
     )
     log_likelihood = np.zeros((n_time, len(state)), dtype=np.float32)
     log_likelihood[:, n_bins + 1 : 2 * n_bins + 1][:, interior] = non_local
+    log_likelihood[is_missing] = 0.0  # as the library's predict leaves them
     xr.Dataset(
         {"log_likelihood": (("time", "state_bins"), log_likelihood)},
         coords={"time": time, "state": ("state_bins", state)},
@@ -115,6 +159,10 @@ def simulate_decode(directory: Path) -> dict:
     probabilities = raw / raw.sum(1, keepdims=True)
     dot = pd.DataFrame(
         {
+            "animal": "aa",
+            "day": 20200101,
+            "epoch": "02_r1",
+            "MUA_event": 0,
             "head_position_x": position[:, 0],
             "head_position_y": position[:, 1],
             "head_speed": speed,
@@ -133,6 +181,7 @@ def simulate_decode(directory: Path) -> dict:
         "spike_times": spike_times,
         "marks": marks,
         "is_training": is_training,
+        "is_missing": is_missing,
     }
 
 
@@ -203,6 +252,14 @@ def test_an_epoch_is_validated_and_written(simulated, tmp_path):
     assert not np.allclose(table.runcv_loc_mark, table.run_loc_mark, equal_nan=True)
     assert set(table.kind) == {"bout", "baseline", "calib"}
     assert record["windows"]["silent_ns_logratio_identity_max_abs"] < 1e-9
+    # excluded time is no window's, and no masked bin is in a running-only fit
+    excluded = interval_mask(TIME, swr_source.excluded_intervals(EPOCH))
+    assert excluded[2801:3199].all()
+    reach = np.r_[0, np.cumsum(excluded)]
+    assert (reach[table.e.to_numpy() + 1] == reach[table.s.to_numpy()]).all()
+    assert running_only["missing_bins_at_running_speed"] > 0
+    for name in ("run", "runcv0", "runcv1"):
+        assert running_only[name]["missing_bins_in_training_bins"] == 0
 
     runner.summarize(output_dir, [EPOCH])
     for name in ("bout_stats.csv", "trend_stats.csv", "silence_stats.csv",
@@ -298,6 +355,36 @@ def test_an_event_bin_at_running_speed_is_left_out_of_the_running_fits(
         assert running_only[name]["event_bins_in_library_span"] == 0
 
 
+def test_the_loader_builds_the_decodes_masks_from_the_swr_source(
+    simulated, monkeypatch
+):
+    """As the decoder built them (hpc_decode_masks): the inventory's event and
+    the artifact mask leave encoding, the mask is missing, and the stored
+    ripples are not read."""
+    import continuum_swr_replay.data_loaders as data_loaders
+
+    inputs = simulated[1]
+    stored_ripple = pd.DataFrame({"start_time": [TIME[4000]], "end_time": [TIME[4050]]})
+
+    def load_data(nwb_file_name, epoch_name, include=None):
+        assert (nwb_file_name, epoch_name) == ("aa20200101_.nwb", "02_r1")
+        return {
+            "position_info": pd.DataFrame(index=pd.Index(TIME, name="time")),
+            "spike_times": {"HPC": inputs["spike_times"]},
+            "spike_waveform_features": {"HPC": inputs["marks"]},
+            "ripple_times": stored_ripple,
+        }
+
+    monkeypatch.setattr(data_loaders, "load_data", load_data)
+
+    loaded = runner.load_marks_and_training_mask(EPOCH)
+
+    np.testing.assert_array_equal(loaded["time"], TIME)
+    np.testing.assert_array_equal(loaded["is_training"], inputs["is_training"])
+    np.testing.assert_array_equal(loaded["is_missing"], inputs["is_missing"])
+    assert loaded["is_missing"].any() and loaded["is_training"][4000:4051].all()
+
+
 def test_running_only_masks_refuse_an_event_spike_in_the_library_span():
     n = 200
     time = np.arange(n) * 0.002
@@ -308,7 +395,10 @@ def test_running_only_masks_refuse_an_event_spike_in_the_library_span():
     in_event = np.zeros(n, dtype=bool)
     in_event[50] = True
 
-    masks, record = runner.running_only_masks(time, speed, position, in_event, folds)
+    none = np.zeros(n, dtype=bool)
+    masks, record = runner.running_only_masks(
+        time, speed, position, in_event, folds, is_missing=none
+    )
 
     # the event bin and two bins either side are left out, and the padding
     # stops short of it
@@ -318,11 +408,23 @@ def test_running_only_masks_refuse_an_event_spike_in_the_library_span():
     # no position around the event: the library joins the runs across it
     position[48:53] = np.nan
     with pytest.raises(ValueError, match="1 non-local event bins are in the run"):
-        runner.running_only_masks(time, speed, position, in_event, folds)
+        runner.running_only_masks(
+            time, speed, position, in_event, folds, is_missing=none
+        )
     # a fold with no running bin
     position[48:53] = 0.0
     with pytest.raises(ValueError, match="runcv1 encoding has no training bin"):
-        runner.running_only_masks(time, speed, position, in_event, np.zeros(n, np.int8))
+        runner.running_only_masks(
+            time, speed, position, in_event, np.zeros(n, np.int8), is_missing=none
+        )
+    # the decode's missing bins are in no running-only fit
+    missing = none.copy()
+    missing[150:160] = True
+    masks, record = runner.running_only_masks(
+        time, speed, position, in_event, folds, is_missing=missing
+    )
+    assert not masks["run"][150:160].any() and masks["run"][149] and masks["run"][160]
+    assert record["missing_bins_at_running_speed"] == 10
 
 
 def test_float_rounding_of_the_bin_width_cannot_carry_the_span_into_an_event():
@@ -346,7 +448,12 @@ def test_float_rounding_of_the_bin_width_cannot_carry_the_span_into_an_event():
     assert (in_event & training_spike_bins(time, position, one_bin)).any()
 
     _, record = runner.running_only_masks(
-        time, speed, position, in_event, np.arange(n) // 5000 % 2
+        time,
+        speed,
+        position,
+        in_event,
+        np.arange(n) // 5000 % 2,
+        is_missing=np.zeros(n, dtype=bool),
     )
 
     for name in ("run", "runcv0", "runcv1"):
