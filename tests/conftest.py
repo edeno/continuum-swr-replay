@@ -32,18 +32,23 @@ import pytest  # noqa: E402
 # ============================================================================
 
 
-@pytest.fixture(autouse=True)
-def no_configured_artifact_run(monkeypatch):
+@pytest.fixture(scope="session", autouse=True)
+def no_configured_artifact_run():
     """Every test starts with no artifact run configured.
 
     ``swr_source.ARTIFACT_INTERVALS_RUN_ID`` names a real run under
-    Processed-Data. A unit test must not read it, so each test sees None unless
-    it sets a run of its own (most use a ``tmp_path`` run). The committed value
-    is pinned by ``test_swr_source.TestTheConfiguredInventory``.
+    Processed-Data. A unit test must not read it, so every test and every
+    module-scoped fixture sees None unless a test sets a run of its own (most
+    use a ``tmp_path`` run; ``monkeypatch`` restores None after it). Session
+    scope, so the module-scoped fixtures that run a pipeline end to end see it
+    too. The committed value is pinned by
+    ``test_swr_source.TestTheConfiguredInventory``.
     """
     from continuum_swr_replay.analysis.hippocampus import swr_source
 
-    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", None)
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", None)
+        yield
 
 
 # ============================================================================
