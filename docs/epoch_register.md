@@ -42,15 +42,17 @@ doc drifts from the register.
 > regular spatial-bandit session in Spyglass (or of a listed first-exposure
 > session), with parsed trials (`noPrePostTrialTimes`), and every decode input
 > resolves to exactly one row: position map, position info and linearization, ripple
-> band, CA1 ripple times, HPC marks. Every other run epoch of a project session is
-> excluded with exactly one enumerated reason code and its evidence, in one register
-> that every stage reads and the audit checks.
+> band, CA1 ripple times, HPC marks; and the artifact run finds no S block in the
+> epoch. Every other run epoch of a project session is excluded with exactly one
+> enumerated reason code and its evidence, in one register that every stage reads
+> and the audit checks.
 <!-- END GENERATED: rule -->
 
 When several reasons hold for one epoch, the register records the first in the
 rule's order: no data (`NO_NWB`, `NO_RUN_EPOCH`), then the task (`DEPLETION_TASK`),
 then Spyglass (`NOT_INGESTED`, `NO_TRIAL_INTERVALS`), then the decode inputs
-(`PENDING_POPULATE`, `MISSING_INPUT`). The evidence names the others. For example,
+(`PENDING_POPULATE`, `MISSING_INPUT`), then the artifact run (`SUSTAINED_NOISE`).
+The evidence names the others. For example,
 chimi20200303, chimi20200307, peanut20201207 and senor20201119 are depletion
 sessions whose trial parsing is also incomplete: they are `DEPLETION_TASK`, so
 `NO_TRIAL_INTERVALS` holds for 8 of the 12 sessions with incomplete trial parsing.
@@ -88,6 +90,7 @@ allowlist.
 | `NO_TRIAL_INTERVALS` | excluded | Trial parsing failed: the epoch has no `noPrePostTrialTimes` interval. |
 | `PENDING_POPULATE` | pending | A decode input is missing from Spyglass and a planned populate adds it; analysed once its decodes exist and its entry is updated. |
 | `MISSING_INPUT` | excluded | A decode input is missing from Spyglass and no fix is planned. |
+| `SUSTAINED_NOISE` | excluded | The artifact run finds an S block (sustained ripple-band noise) in the epoch. That noise's effect on the decode outside the mask could not be bounded, so the whole epoch is left out (project lead, 2026-10-10). |
 <!-- END GENERATED: reason-codes -->
 
 ## Counts

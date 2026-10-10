@@ -38,8 +38,10 @@ from continuum_swr_replay.data_loaders.epoch_register import (
     epochs_to_run,
     pending_epochs,
     read_register,
+    reason_status,
     register_entry,
     register_reason,
+    select_epochs,
 )
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 
@@ -206,6 +208,10 @@ def test_a_well_formed_register_is_read_by_epoch(tmp_path):
         (["c20200101_.nwb", "02_r1", "excluded", "NO_NWB", " "], "evidence"),
         (["c20200101_.nwb", "02_r1", "analysed", "NO_NWB", "x"], "reason"),
         (["c20200101_.nwb", "02_r1", "pending", "NO_NWB", "x"], "PENDING_POPULATE"),
+        (
+            ["c20200101_.nwb", "02_r1", "pending", "SUSTAINED_NOISE", "x"],
+            "PENDING_POPULATE",
+        ),
         (["c20200101_.nwb", "02_r1", "excluded", "PENDING_POPULATE", "x"], "pending"),
         (["c20200101_.nwb", "2_s1", "excluded", "NO_NWB", "x"], "run epoch"),
         (["c20200101_.nwb", "*", "pending", "PENDING_POPULATE", "x"], "session-wide"),
@@ -218,6 +224,7 @@ def test_a_well_formed_register_is_read_by_epoch(tmp_path):
         "blank-evidence",
         "analysed-with-reason",
         "pending-other-reason",
+        "pending-sustained-noise",
         "excluded-pending-reason",
         "not-a-run-epoch",
         "star-not-excluded",
@@ -319,6 +326,44 @@ def test_pending_epochs_refuse_a_register_with_none(tmp_path, monkeypatch):
 
     with pytest.raises(EpochRegisterError, match="no pending epoch"):
         pending_epochs()
+
+
+# --------------------------------------------------------------------------
+# SUSTAINED_NOISE: an epoch with an S block is left out whole
+# --------------------------------------------------------------------------
+
+
+NOISY = ("a20200101_.nwb", "08_r4")
+NOISY_ROW = [*NOISY, "excluded", "SUSTAINED_NOISE", "S block 84.0-112.0 s"]
+
+
+def test_a_sustained_noise_entry_is_excluded():
+    assert reason_status(Reason.SUSTAINED_NOISE) is Status.EXCLUDED
+
+
+def test_read_register_accepts_a_sustained_noise_entry(tmp_path):
+    register = read_register(
+        _write_register(tmp_path / "r.csv", [*GOOD_ROWS, NOISY_ROW])
+    )
+
+    assert register.loc[NOISY, "status"] == Status.EXCLUDED
+    assert register.loc[NOISY, "reason"] == Reason.SUSTAINED_NOISE
+
+
+def test_select_epochs_drops_a_listed_sustained_noise_epoch_without_raising(
+    tmp_path,
+):
+    """Spyglass lists the epoch (it was populated and decoded), and the register
+    leaves it out of every selection without an error."""
+    register = read_register(_write_register(tmp_path / "r.csv", [*ROWS, NOISY_ROW]))
+    listed = [ANALYSED[0], NOISY, *PENDING, ANALYSED[1]]
+    epoch_info = _epoch_info(listed)
+
+    analysed = select_epochs(epoch_info, {Status.ANALYSED}, register)
+    both = select_epochs(epoch_info, {Status.ANALYSED, Status.PENDING}, register)
+
+    assert list(analysed.index) == ANALYSED
+    assert list(both.index) == [ANALYSED[0], *PENDING, ANALYSED[1]]
 
 
 # --------------------------------------------------------------------------

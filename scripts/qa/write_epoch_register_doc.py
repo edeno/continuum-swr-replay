@@ -51,6 +51,7 @@ REASON_ORDER: tuple[Reason, ...] = (
     Reason.NO_TRIAL_INTERVALS,
     Reason.PENDING_POPULATE,
     Reason.MISSING_INPUT,
+    Reason.SUSTAINED_NOISE,
 )
 """The rule's order, which is also the precedence when several reasons hold."""
 

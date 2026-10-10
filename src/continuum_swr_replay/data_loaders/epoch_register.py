@@ -6,9 +6,10 @@ The rule:
     a regular spatial-bandit session in Spyglass (or of a listed first-exposure
     session), with parsed trials (`noPrePostTrialTimes`), and every decode input
     resolves to exactly one row: position map, position info and linearization,
-    ripple band, CA1 ripple times, HPC marks. Every other run epoch of a project
-    session is excluded with exactly one enumerated reason code and its evidence,
-    in one register that every stage reads and the audit checks.
+    ripple band, CA1 ripple times, HPC marks; and the artifact run finds no S
+    block in the epoch. Every other run epoch of a project session is excluded
+    with exactly one enumerated reason code and its evidence, in one register
+    that every stage reads and the audit checks.
 
 The register is ``epoch_register.csv`` beside this module, one row per
 ``(nwb_file_name, epoch)``: its ``status`` (:class:`Status`), its ``reason``
@@ -25,8 +26,8 @@ together.
 When several reasons hold for one epoch, the register records the first in the
 rule's order: no data (``NO_NWB``, ``NO_RUN_EPOCH``), then the task
 (``DEPLETION_TASK``), then Spyglass (``NOT_INGESTED``, ``NO_TRIAL_INTERVALS``),
-then the decode inputs (``PENDING_POPULATE``, ``MISSING_INPUT``). The evidence
-names the others.
+then the decode inputs (``PENDING_POPULATE``, ``MISSING_INPUT``), then the
+artifact run (``SUSTAINED_NOISE``). The evidence names the others.
 
 The cohort is pinned here, not in Spyglass. A populate that makes a pending
 epoch decodable lists it in ``get_epoch_info``, but it is analysed only once its
@@ -69,12 +70,13 @@ RULE = (
     "of a regular spatial-bandit session in Spyglass (or of a listed "
     "first-exposure session), with parsed trials (`noPrePostTrialTimes`), and "
     "every decode input resolves to exactly one row: position map, position info "
-    "and linearization, ripple band, CA1 ripple times, HPC marks. Every other run "
-    "epoch of a project session is excluded with exactly one enumerated reason "
-    "code and its evidence, in one register that every stage reads and the audit "
-    "checks."
+    "and linearization, ripple band, CA1 ripple times, HPC marks; and the artifact "
+    "run finds no S block in the epoch. Every other run epoch of a project session "
+    "is excluded with exactly one enumerated reason code and its evidence, in one "
+    "register that every stage reads and the audit checks."
 )
-"""The project lead's exclusion rule, verbatim."""
+"""The project lead's exclusion rule (2026-10-05), with the S-block clause added
+on 2026-10-10."""
 
 _RUN_EPOCH = re.compile(r"^[0-9]+_r[0-9]+$")
 
@@ -102,6 +104,7 @@ class Reason(StrEnum):
     NO_TRIAL_INTERVALS = "NO_TRIAL_INTERVALS"
     PENDING_POPULATE = "PENDING_POPULATE"
     MISSING_INPUT = "MISSING_INPUT"
+    SUSTAINED_NOISE = "SUSTAINED_NOISE"
 
 
 REASON_DEFINITIONS: dict[Reason, str] = {
@@ -123,6 +126,11 @@ REASON_DEFINITIONS: dict[Reason, str] = {
     ),
     Reason.MISSING_INPUT: (
         "A decode input is missing from Spyglass and no fix is planned."
+    ),
+    Reason.SUSTAINED_NOISE: (
+        "The artifact run finds an S block (sustained ripple-band noise) in the "
+        "epoch. That noise's effect on the decode outside the mask could not be "
+        "bounded, so the whole epoch is left out (project lead, 2026-10-10)."
     ),
 }
 """One line per reason code."""
