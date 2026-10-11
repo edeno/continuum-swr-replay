@@ -41,6 +41,10 @@ from .covariate_registry import stamp_covariate_schema
 from .event_ids import hash_stop_id
 
 EVENT_TYPES = {"SWR": "SWR_event", "non_local": "non_local_event", "MUA": "MUA_event"}
+ONSETS_IN_EXCLUDED_BINS_ATTR = "n_onsets_in_excluded_bins"
+"""The dense table's ``attrs`` key: per event type, the onsets whose bin it
+dropped for touching excluded time. Their events lie wholly outside excluded
+time, so the sparse table keeps them."""
 
 
 def _event_onset_times(dot: pd.DataFrame, times: np.ndarray, col: str) -> np.ndarray:
@@ -179,7 +183,10 @@ def build_stop_timebin_table(
     Non-Local labels — see :func:`build_event_onset_table`. A bin
     ``[left, min(left + bin_s, stop end)]`` that touches the epoch's excluded
     time (``swr_source.excluded_intervals``; closed) is not analysed and has
-    no row; the other bins keep their ``bin_in_stop``.
+    no row; the other bins keep their ``bin_in_stop``. An event kept by the
+    event rule (wholly outside excluded time) can still start in such a bin;
+    its onset stays in the sparse table and is counted, per event type, in
+    ``attrs[ONSETS_IN_EXCLUDED_BINS_ATTR]``.
     """
     if "non_local_event" in dot:
         validate_nonlocal_event_probability_contract(
@@ -265,8 +272,15 @@ def build_stop_timebin_table(
         }
     )[cols]
     excluded = excluded_intervals_of(dot)
+    in_excluded_bins = dict.fromkeys(counts, 0)
     if len(excluded):
         left = bout_starts[bout_of_bin] + within * bin_s
         right = np.minimum(left + bin_s, bout_ends[bout_of_bin])
-        out = out.loc[~overlaps_intervals(left, right, excluded)].reset_index(drop=True)
-    return stamp_covariate_schema(out, table="stop_timebin")
+        dropped = overlaps_intervals(left, right, excluded)
+        in_excluded_bins = {
+            etype: int(count[dropped].sum()) for etype, count in counts.items()
+        }
+        out = out.loc[~dropped].reset_index(drop=True)
+    out = stamp_covariate_schema(out, table="stop_timebin")
+    out.attrs[ONSETS_IN_EXCLUDED_BINS_ATTR] = in_excluded_bins
+    return out

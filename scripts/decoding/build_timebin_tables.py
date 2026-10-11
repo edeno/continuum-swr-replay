@@ -30,6 +30,7 @@ from continuum_swr_replay.analysis.hippocampus.swr_source import (
 )
 from continuum_swr_replay.analysis.replay.prepare_data import find_sessions
 from continuum_swr_replay.analysis.replay.timebin_tables import (  # noqa: E402
+    ONSETS_IN_EXCLUDED_BINS_ATTR,
     build_event_onset_table,
     build_stop_timebin_table,
 )
@@ -65,9 +66,13 @@ def build_one(session: dict) -> tuple[pd.DataFrame, pd.DataFrame] | None:
     )
 
 
-def validate(onset: pd.DataFrame, dense: pd.DataFrame) -> None:
+def validate(
+    onset: pd.DataFrame, dense: pd.DataFrame, in_excluded: dict[str, int]
+) -> None:
     # Dense onset totals reconstruct the sparse onset counts. Both derive from
-    # the same _event_onset_times + assign_bout, so they must agree exactly.
+    # the same _event_onset_times + assign_bout, so they must agree exactly,
+    # once the onsets whose bin the dense table dropped for touching excluded
+    # time (`in_excluded`, summed over sessions) are added back.
     for etype, col in [
         ("SWR", "n_swr_events"),
         ("non_local", "n_nonlocal_events"),
@@ -75,7 +80,11 @@ def validate(onset: pd.DataFrame, dense: pd.DataFrame) -> None:
     ]:
         a = int((onset.event_type == etype).sum())
         b = int(dense[col].sum())
-        assert a == b, f"{etype}: onset rows {a} != dense {col} sum {b}"
+        c = int(in_excluded.get(etype, 0))
+        assert a == b + c, (
+            f"{etype}: onset rows {a} != dense {col} sum {b} + {c} onsets in "
+            "excluded bins"
+        )
     assert (dense.t_since_stop_onset >= 0).all(), "negative t_since_stop_onset"
     assert (onset.t_since_stop_onset >= 0).all(), "negative onset t_since_stop_onset"
     # Reward stops: at least some bins land soon after the pump.
@@ -113,6 +122,7 @@ def main() -> None:
     sessions = find_sessions(max_per_animal=args.max_per_animal)
     logger.info("building time-binned tables for %d sessions...", len(sessions))
     onsets, denses, failures, t0 = [], [], [], time.time()
+    in_excluded: dict[str, int] = {}
     for i, s in enumerate(sessions):
         try:
             o, d = build_one(s)
@@ -124,6 +134,8 @@ def main() -> None:
             continue
         onsets.append(o)
         denses.append(d)
+        for etype, n in d.attrs.get(ONSETS_IN_EXCLUDED_BINS_ATTR, {}).items():
+            in_excluded[etype] = in_excluded.get(etype, 0) + n
         if (i + 1) % 20 == 0:
             logger.info("  %d/%d (%.0fs)", i + 1, len(sessions), time.time() - t0)
 
@@ -144,7 +156,8 @@ def main() -> None:
             raise RuntimeError(
                 f"{label} table has {n} sessions; expected {len(sessions)}"
             )
-    validate(onset, dense)
+    logger.info("onsets in bins dropped for excluded time: %s", in_excluded)
+    validate(onset, dense, in_excluded)
 
     if args.no_save:
         logger.info(

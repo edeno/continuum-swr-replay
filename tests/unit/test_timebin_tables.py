@@ -254,6 +254,73 @@ def test_all_sources_exclude_a_movement_spanning_event_atomically():
         assert int(dense[count_col].sum()) == 1
 
 
+def test_onsets_in_excluded_bins_are_counted_not_lost(two_bout_dot, monkeypatch):
+    """A kept event whose onset bin touches excluded time.
+
+    The event lies wholly outside excluded time, so the sparse table keeps its
+    onset (later bins' history needs it). Its bin touches excluded time, so the
+    dense table drops the bin. The dense table counts such onsets per event
+    type in ``attrs``, and sparse rows = dense sum + that count.
+    """
+    from continuum_swr_replay.analysis.replay import timebin_tables
+
+    dot, pumps = two_bout_dot
+    # The SWR onset at t = 0.05 lies in a 10-ms bin that touches [0.041, 0.0505].
+    monkeypatch.setattr(
+        timebin_tables,
+        "excluded_intervals_of",
+        lambda frame: pd.DataFrame({"start_time": [0.041], "end_time": [0.0505]}),
+    )
+    onset = build_event_onset_table(dot, pumps)
+    dense = build_stop_timebin_table(dot, pumps, bin_s=0.01)
+
+    in_excluded = dense.attrs[timebin_tables.ONSETS_IN_EXCLUDED_BINS_ATTR]
+    assert in_excluded == {"SWR": 1, "non_local": 0, "MUA": 0}
+    for event_type, count_col in (
+        ("SWR", "n_swr_events"),
+        ("non_local", "n_nonlocal_events"),
+        ("MUA", "n_mua_events"),
+    ):
+        n_onsets = int((onset["event_type"] == event_type).sum())
+        assert n_onsets == int(dense[count_col].sum()) + in_excluded[event_type]
+
+
+def test_no_excluded_time_counts_no_onsets_in_excluded_bins(two_bout_dot):
+    """Without excluded time every onset is in a kept bin."""
+    from continuum_swr_replay.analysis.replay import timebin_tables
+
+    dot, pumps = two_bout_dot
+    dense = build_stop_timebin_table(dot, pumps, bin_s=0.01)
+    assert dense.attrs[timebin_tables.ONSETS_IN_EXCLUDED_BINS_ATTR] == {
+        "SWR": 0,
+        "non_local": 0,
+        "MUA": 0,
+    }
+
+
+def test_validate_counts_onsets_in_excluded_bins(timebin_script):
+    """The script's check: onset rows = dense sum + onsets in excluded bins."""
+    onset = pd.DataFrame(
+        {
+            "event_type": ["SWR", "SWR", "non_local"],
+            "t_since_stop_onset": [0.1, 0.2, 0.3],
+        }
+    )
+    dense = pd.DataFrame(
+        {
+            "n_swr_events": [1],
+            "n_nonlocal_events": [1],
+            "n_mua_events": [0],
+            "t_since_stop_onset": [0.0],
+            "is_reward_stop": [False],
+            "t_since_pump": [np.nan],
+        }
+    )
+    timebin_script.validate(onset, dense, {"SWR": 1, "non_local": 0, "MUA": 0})
+    with pytest.raises(AssertionError, match="SWR"):
+        timebin_script.validate(onset, dense, {"SWR": 0, "non_local": 0, "MUA": 0})
+
+
 def test_empty_session_returns_schema(two_bout_dot):
     """No immobility -> empty tables with the documented columns (not a crash)."""
     dot, pumps = two_bout_dot
@@ -339,7 +406,7 @@ def test_output_dir_receives_both_tables(timebin_script, monkeypatch, tmp_path):
     assert script.RC == PROCESSED_DATA_DIR / "replay_content"
     monkeypatch.setattr(script, "find_sessions", lambda max_per_animal: _SESSIONS)
     monkeypatch.setattr(script, "build_one", _small_tables)
-    monkeypatch.setattr(script, "validate", lambda onset, dense: None)
+    monkeypatch.setattr(script, "validate", lambda onset, dense, in_excluded: None)
     published: list[tuple[Path, str]] = []
 
     def record(frame: pd.DataFrame, path: Path, *, table: str, basename: str) -> Path:

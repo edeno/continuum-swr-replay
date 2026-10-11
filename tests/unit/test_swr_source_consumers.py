@@ -592,7 +592,7 @@ def test_the_timebin_tables_are_published_with_the_sources_stamp(
         "build_one",
         lambda s: (pd.DataFrame([key]), pd.DataFrame([{**key, "n_swr_events": 0}])),
     )
-    monkeypatch.setattr(script, "validate", lambda onset, dense: None)
+    monkeypatch.setattr(script, "validate", lambda onset, dense, in_excluded: None)
     stamps: dict = {}
     monkeypatch.setattr(
         script,
