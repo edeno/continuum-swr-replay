@@ -68,6 +68,28 @@ N_SHUFFLES = 19
 """The fewest draws at which p <= 0.05 is possible."""
 CONFIG = MemorylessSequenceConfig(sampling_frequency=SAMPLING_FREQUENCY)
 
+XLA_FLAGS_CASES = [
+    (None, "--xla_gpu_deterministic_ops=true"),
+    (
+        "--xla_dump_hlo_as_text",
+        "--xla_dump_hlo_as_text --xla_gpu_deterministic_ops=true",
+    ),
+    (
+        "--xla_gpu_deterministic_ops=true --xla_dump_hlo_as_text",
+        "--xla_gpu_deterministic_ops=true --xla_dump_hlo_as_text",
+    ),
+]
+"""XLA_FLAGS as this process inherits them (None: unset), and as every process
+that runs JAX gets them: the flag appended to the user's, and not twice."""
+
+
+def set_xla_flags(monkeypatch, value: str | None) -> None:
+    """This process's XLA_FLAGS for one test; None unsets them."""
+    if value is None:
+        monkeypatch.delenv("XLA_FLAGS", raising=False)
+    else:
+        monkeypatch.setenv("XLA_FLAGS", value)
+
 
 class TestParseEpochIdentifier:
     def test_the_canonical_decode_carries_kay_swrs(self):
@@ -1305,18 +1327,42 @@ class TestMain:
         with pytest.raises(SystemExit, match="other settings"):
             self.cli(decode_root, tmp_path)
 
-    def test_settings_record_that_runs_are_not_bit_reproducible(self):
-        """The measured limit is part of what a run states about itself."""
+    def test_settings_record_that_runs_are_bit_reproducible(self):
+        """What a run states about itself: with deterministic XLA two runs are
+        bit-for-bit equal (R12 smoke test); without it they were not (Task 17a)."""
         settings = runner.run_settings(7, True, N_SHUFFLES, CONFIG, "test")
 
         known = settings["known_limits"]["bit_reproducible"]
-        assert known["value"] is False
-        # the two measurements of Task 17a, each with its own epoch
-        assert (
-            "chimi20200225_02_r1" in known["measured"] and "1.2e-4" in known["measured"]
-        )
-        assert "j1620210706_02_r1" in known["measured"]
-        assert "every event-level output equal" in known["measured"]
+        assert known["value"] is True
+        assert "--xla_gpu_deterministic_ops=true" in known["measured"]
+        assert "chimi20200225_02_r1_HPC" in known["measured"]
+        assert "111 of 295,369 windows" in known["measured"]
+        # the earlier measurement is kept, as made without the flag
+        assert "without the flag" in known["history"]
+        assert "1.2e-4" in known["history"]
+        assert "j1620210706_02_r1" in known["history"]
+        assert "every event-level output equal" in known["history"]
+
+    @pytest.mark.parametrize(("inherited", "expected"), XLA_FLAGS_CASES)
+    def test_settings_record_the_xla_flags(self, monkeypatch, inherited, expected):
+        """The XLA_FLAGS every process that runs JAX gets: the user's, with the
+        deterministic flag appended once."""
+        set_xla_flags(monkeypatch, inherited)
+
+        settings = runner.run_settings(7, True, N_SHUFFLES, CONFIG, "test")
+
+        assert settings["xla_flags"] == expected
+
+    def test_a_rerun_with_other_xla_flags_is_refused(
+        self, decode_root, tmp_path, monkeypatch
+    ):
+        """XLA flags change what the GPU computes, as a library version can."""
+        monkeypatch.delenv("XLA_FLAGS", raising=False)
+        self.cli(decode_root, tmp_path)
+        monkeypatch.setenv("XLA_FLAGS", "--xla_dump_hlo_as_text")
+
+        with pytest.raises(SystemExit, match="other settings"):
+            self.cli(decode_root, tmp_path)
 
     # --- open files: Spyglass's NWB cache and the open-file limit --------------
     COUNTS = dict.fromkeys(
@@ -1416,6 +1462,49 @@ class TestMain:
         log = (output_root / "cli-run" / "run.log").read_text().splitlines()
         assert sum(line.endswith("closed 14 NWB files Spyglass held open")
                    for line in log) == 2  # fmt: skip
+
+    @pytest.mark.parametrize(("inherited", "expected"), XLA_FLAGS_CASES)
+    def test_epochs_run_in_this_process_run_xla_deterministically(
+        self, tmp_path, monkeypatch, inherited, expected
+    ):
+        """Without a device list this process runs JAX itself, so it holds the
+        flag while each epoch runs (XLA reads it when JAX starts its backend, in
+        the first epoch). The manifest records the same flags, and this
+        process's environment is restored afterwards."""
+        set_xla_flags(monkeypatch, inherited)
+        self.recording_release(monkeypatch)
+        seen = []
+
+        def run_one(epoch_id, **kwargs):
+            seen.append(os.environ.get("XLA_FLAGS"))
+            return {"status": "ok", **self.COUNTS}
+
+        monkeypatch.setattr(runner, "run_one", run_one)
+
+        main(
+            [
+                "--epoch-id",
+                EPOCH_ID,
+                "--epoch-id",
+                "sim20200101_04_r2_HPC",
+                "--run-seed",
+                "7",
+                "--n-shuffles",
+                str(N_SHUFFLES),
+                "--run-id",
+                "cli-run",
+                "--root",
+                str(tmp_path / "processed"),
+                "--output-root",
+                str(tmp_path / "memoryless"),
+                "--cache-dir",
+                str(tmp_path / "cache"),
+            ]
+        )
+
+        assert seen == [expected, expected]
+        assert read_manifest(tmp_path)["settings"]["xla_flags"] == expected
+        assert os.environ.get("XLA_FLAGS") == inherited
 
     def test_main_raises_the_open_file_limit_before_its_cluster(
         self, parallel, tmp_path, monkeypatch
@@ -1558,3 +1647,49 @@ class TestWorkerThreads:
 
     def test_the_cpus_are_the_ones_this_process_may_run_on(self):
         assert runner.available_cpus() == len(os.sched_getaffinity(0))
+
+
+def _xla_flags() -> str | None:
+    """In a worker: the XLA_FLAGS it was spawned with."""
+    import os
+
+    return os.environ.get("XLA_FLAGS")
+
+
+class TestWorkerXlaFlags:
+    """Two runs on the GPU differ unless XLA runs deterministically (R12 smoke
+    test, 2026-10-10). XLA reads XLA_FLAGS when JAX starts its backend, so the
+    flag must be in a worker's environment when its nanny spawns it."""
+
+    @pytest.mark.parametrize(("inherited", "expected"), XLA_FLAGS_CASES)
+    def test_each_worker_runs_xla_deterministically(
+        self, tmp_path, monkeypatch, inherited, expected
+    ):
+        """Whatever this process's environment says: the deterministic flag is
+        appended to its XLA_FLAGS, once, and this process's own are left as
+        they were."""
+        set_xla_flags(monkeypatch, inherited)
+
+        def worker_processes(**kwargs):
+            # LocalCUDACluster's stand-in: a real worker process, spawned by a
+            # nanny, so its environment is set as the GPU workers' is
+            return LocalCluster(
+                n_workers=1,
+                threads_per_worker=1,
+                processes=True,
+                dashboard_address=":0",
+                local_directory=kwargs["local_directory"],
+            )
+
+        monkeypatch.setattr(
+            decoding_common, "LocalCUDACluster", worker_processes, raising=False
+        )
+        with dask.config.set({"temporary-directory": str(tmp_path / "dask-temporary")}):
+            with (
+                runner.cuda_cluster("3,4,6", str(tmp_path / "scratch")) as cluster,
+                Client(cluster) as client,
+            ):
+                seen = client.run(_xla_flags)
+
+        assert list(seen.values()) == [expected]
+        assert os.environ.get("XLA_FLAGS") == inherited

@@ -44,10 +44,10 @@ Each epoch writes, under ``Processed-Data/replay_detection_comparison/memoryless
 time grid, a hash of every input, the marks' rule and hash, the encoding model's
 settings, and the outcome. It is rewritten atomically after each epoch, so a
 run that stops part way still says what it did, and a rerun under the same
-run id refuses to continue with different settings, code, library versions or
+run id refuses to continue with different settings, code, library versions,
 environment (``uv.lock``'s sha256, the commit ``ripple_detection`` was
-installed from, the CUDA plugin's version). An epoch that fails is recorded as
-``failed`` with its error and the run goes on to the next; the run then exits
+installed from, the CUDA plugin's version) or XLA flags. An epoch that fails
+is recorded as ``failed`` with its error and the run goes on to the next; the run then exits
 non-zero, and a rerun under the same run id retries the failed epochs. That holds for a transient failure; after a code fix the
 commit, and so the default run id, has changed, and the finished epochs are
 recomputed under the new one, which is what the settings gate is for.
@@ -58,6 +58,11 @@ process. With it they run in parallel, as the decoders do: a dask
 ``LocalCUDACluster`` with one worker per listed GPU runs one epoch per task
 (``cuda_cluster``). Each worker may use its share of this process's CPUs for
 BLAS and OpenMP: dask's nanny would otherwise cap each at one thread.
+Every process that runs JAX, the workers or this process without a device
+list, runs XLA deterministically: ``--xla_gpu_deterministic_ops=true`` is
+added to the ``XLA_FLAGS`` it inherits (``xla_flags``), so two runs at
+identical settings are bit-for-bit equal (``KNOWN_LIMITS``). The run settings
+record those flags.
 Each epoch logs to ``logs/{epoch_id}_memoryless.log`` under the working
 directory, and only this process writes ``manifest.json``, as each epoch
 finishes, in the order they finish. A device list is refused when ``dask_cuda``
@@ -103,6 +108,7 @@ Usage:
 """
 
 import argparse
+import contextlib
 import functools
 import hashlib
 import json
@@ -692,20 +698,52 @@ def run_one(
     }
 
 
+DETERMINISTIC_XLA_FLAG = "--xla_gpu_deterministic_ops=true"
+"""Makes XLA's GPU operations deterministic, so two runs at identical settings
+are bit-for-bit equal (:data:`KNOWN_LIMITS`). XLA reads ``XLA_FLAGS`` once in a
+process, when JAX starts its backend; importing this module does not start it."""
+
+
+def xla_flags() -> str:
+    """The ``XLA_FLAGS`` every process that runs JAX gets: this process's, with
+    :data:`DETERMINISTIC_XLA_FLAG` added at the end unless it is already there.
+
+    The user's flags are kept as they are. The processes are the dask workers
+    (``cuda_cluster``), or this process when it runs the epochs itself
+    (``main``); the run settings record the value (``run_settings``).
+    """
+    inherited = os.environ.get("XLA_FLAGS", "").strip()
+    if DETERMINISTIC_XLA_FLAG in inherited.split():
+        return inherited
+    return f"{inherited} {DETERMINISTIC_XLA_FLAG}".lstrip()
+
+
 KNOWN_LIMITS = {
     "bit_reproducible": {
-        "value": False,
-        "measured": "Task 17a, 2026-10-09. chimi20200225_02_r1, two runs at "
-        "identical settings, one thread on one GPU: 19,199 windows differ, max "
-        "relative difference 1.2e-4, one window's gate flips (no event-level "
-        "comparison reported). j1620210706_02_r1, the runner before and after "
-        "its thread fix: 6,326 of 631,632 windows differ (max relative 1.3e-5), "
-        "one window's gate flips, every event-level output equal",
+        "value": True,
+        "measured": "R12 smoke test, 2026-10-10. chimi20200225_02_r1_HPC, seed "
+        "20260922, decodes read from the R11 staging folder, on breeze: two runs "
+        "with XLA_FLAGS=--xla_gpu_deterministic_ops=true are bit-for-bit equal "
+        "(every column of the events, shuffle draws, observed and candidates "
+        "outputs; only run_id differs), 4:20 wall clock each against 5:10 "
+        "without the flag. A run without the flag differs from them: 111 of "
+        "295,369 windows flip a gate, spread differs by up to 0.35 % relative, "
+        "one event's bounds move by a window; the counts are equal (237 "
+        "candidates, 4 replay, 3 passing the shuffle)",
+        "history": "Task 17a, 2026-10-09, without the flag: two runs were not "
+        "bit-for-bit equal. chimi20200225_02_r1, two runs at identical "
+        "settings, one thread on one GPU: 19,199 windows differ, max relative "
+        "difference 1.2e-4, one window's gate flips (no event-level comparison "
+        "reported). j1620210706_02_r1, the runner before and after its thread "
+        "fix: 6,326 of 631,632 windows differ (max relative 1.3e-5), one "
+        "window's gate flips, every event-level output equal",
     }
 }
-"""What a run is known not to guarantee, recorded in every manifest's settings.
-The cause is not established; see the design note
-(``docs/design/replay_detection_comparison/02-memoryless-sequence.md``)."""
+"""What is known of a run's reproducibility, recorded in every manifest's
+settings: two runs are bit-for-bit equal with :data:`DETERMINISTIC_XLA_FLAG`,
+which the runner sets (:func:`xla_flags`), and were not without it. See the
+design note (``docs/design/replay_detection_comparison/02-memoryless-sequence.md``,
+"Run-to-run reproducibility")."""
 
 
 def run_settings(
@@ -722,9 +760,12 @@ def run_settings(
     holds ``uv.lock``'s sha256, the commit ``ripple_detection`` was installed
     from and the CUDA plugin's version. ``swr_source`` names the SWR source
     the labels come from (``swr_source_name()``), so a new inventory or
-    artifact run is a new run. ``known_limits`` states what a run is known not
-    to guarantee: two runs at identical settings are not bit-for-bit equal
-    (:data:`KNOWN_LIMITS`; design note, "Run-to-run reproducibility").
+    artifact run is a new run. ``xla_flags`` are the ``XLA_FLAGS`` every
+    process that runs JAX gets (:func:`xla_flags`), so a rerun under other
+    flags is refused. ``known_limits`` states what is known of a run's
+    reproducibility: with those flags two runs at identical settings are
+    bit-for-bit equal (:data:`KNOWN_LIMITS`; design note, "Run-to-run
+    reproducibility").
     """
     return {
         "git_commit": git_commit,
@@ -738,6 +779,7 @@ def run_settings(
             if name != "dirty"
         },
         "config": asdict(config),
+        "xla_flags": xla_flags(),
         "known_limits": KNOWN_LIMITS,
         "shuffle": {
             "run": shuffle,
@@ -842,9 +884,25 @@ def worker_thread_environ(n_workers: int, n_cpus: int) -> dict[str, int]:
     return dict.fromkeys(THREAD_VARIABLES, max(1, n_cpus // n_workers))
 
 
+@contextlib.contextmanager
+def environment_holding(values: dict[str, str]) -> Iterator[None]:
+    """This process's environment holds ``values`` inside the block. Each
+    variable is then restored, or removed if it was not set."""
+    inherited = {name: os.environ.get(name) for name in values}
+    os.environ.update(values)
+    try:
+        yield
+    finally:
+        for name, value in inherited.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+
+
 def cuda_cluster(cuda_visible_devices: str, local_directory: str) -> Cluster:
     """A ``LocalCUDACluster``, one worker per listed GPU, whose workers may each
-    use their share of the CPUs.
+    use their share of the CPUs and run XLA deterministically.
 
     dask's nanny sets ``THREAD_VARIABLES`` to 1 in the environment it spawns
     each worker with (``distributed.nanny.pre-spawn-environ``), so every worker
@@ -852,8 +910,9 @@ def cuda_cluster(cuda_visible_devices: str, local_directory: str) -> Cluster:
     environment overrides that configuration, and a nanny leaves its values in
     its parent's environment. So while the cluster is made, and its nannies
     spawn their workers, both this process's environment and the
-    configuration hold ``worker_thread_environ``'s share of ``available_cpus``;
-    the environment is then restored. The nannies keep the values for any
+    configuration hold ``worker_thread_environ``'s share of ``available_cpus``,
+    and ``XLA_FLAGS`` with the deterministic flag (:func:`xla_flags`); the
+    environment is then restored. The nannies keep the values for any
     restart.
 
     Parameters
@@ -864,25 +923,25 @@ def cuda_cluster(cuda_visible_devices: str, local_directory: str) -> Cluster:
         The workers' scratch folder.
     """
     n_workers = len(str(cuda_visible_devices).split(","))
-    threads = {
-        name: str(n)
-        for name, n in worker_thread_environ(n_workers, available_cpus()).items()
+    worker_environ = {
+        **{
+            name: str(n)
+            for name, n in worker_thread_environ(n_workers, available_cpus()).items()
+        },
+        "XLA_FLAGS": xla_flags(),
     }
-    environ = {**dask.config.get("distributed.nanny.pre-spawn-environ"), **threads}
-    inherited = {name: os.environ.get(name) for name in threads}
-    os.environ.update(threads)
-    try:
-        with dask.config.set({"distributed.nanny.pre-spawn-environ": environ}):
-            cluster: Cluster = decoding_common.LocalCUDACluster(
-                CUDA_VISIBLE_DEVICES=cuda_visible_devices,
-                local_directory=local_directory,
-            )
-    finally:
-        for name, value in inherited.items():
-            if value is None:
-                os.environ.pop(name, None)
-            else:
-                os.environ[name] = value
+    environ = {
+        **dask.config.get("distributed.nanny.pre-spawn-environ"),
+        **worker_environ,
+    }
+    with (
+        environment_holding(worker_environ),
+        dask.config.set({"distributed.nanny.pre-spawn-environ": environ}),
+    ):
+        cluster: Cluster = decoding_common.LocalCUDACluster(
+            CUDA_VISIBLE_DEVICES=cuda_visible_devices,
+            local_directory=local_directory,
+        )
     return cluster
 
 
@@ -1111,7 +1170,10 @@ def main(argv: list[str] | None = None) -> None:
                 continue
             log.info("[%d/%d] %s", number, len(epoch_ids), epoch_id)
             try:
-                epochs[epoch_id] = run_one(epoch_id, **run_one_kwargs)
+                # this process runs JAX itself: XLA reads the flags when JAX
+                # starts its backend, in the first epoch
+                with environment_holding({"XLA_FLAGS": settings["xla_flags"]}):
+                    epochs[epoch_id] = run_one(epoch_id, **run_one_kwargs)
             except Exception as error:  # noqa: BLE001 - one epoch must not stop the rest
                 # recorded, not swallowed: the manifest says which epoch failed
                 # and why, the run exits non-zero, and a rerun retries it

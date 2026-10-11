@@ -1158,8 +1158,36 @@ automatically (D7).
 
 ## Run-to-run reproducibility
 
-Two runs of the detector on the same epoch at identical settings are not
-bit-for-bit equal. Task 17a (2026-10-09) measured it twice:
+Two runs of the detector on the same epoch at identical settings are bit-for-bit
+equal, because the runner runs XLA in deterministic mode. R12 and every later run do
+so (the coordinator's ruling, 2026-10-10).
+
+Every process that runs JAX gets `--xla_gpu_deterministic_ops=true` added to the
+`XLA_FLAGS` it inherits. These are the Dask GPU workers, or the runner itself when it
+runs the epochs one after another. The user's own flags are kept, and the flag is not
+added twice. XLA reads `XLA_FLAGS` once, when JAX starts in a process, so the runner
+sets them before that: in each worker's environment when the worker is started, and
+in its own environment while it runs an epoch. Its own environment is restored
+afterwards. Each run manifest records the flags in its settings (`xla_flags`), so a
+resume under the same run id with other flags is refused, like any other change of
+settings.
+
+The R12 smoke test (2026-10-10) measured it on breeze, on one epoch:
+chimi20200225_02_r1_HPC, seed 20260922, with the decodes read from the R11 staging
+folder.
+
+- Two runs with the flag are bit-for-bit equal. Every column of the events, shuffle
+  draws, observed and candidates outputs matches; only `run_id` differs.
+- Each run took 4:20 wall clock, against 5:10 without the flag.
+- A run without the flag differs from them: 111 of 295,369 windows flip a gate, the
+  spread differs by up to 0.35 % relative, and one event's bounds move by a window.
+  The counts are equal: 237 candidates, 4 replay, 3 passing the shuffle.
+
+Every run manifest records this in its settings (`known_limits.bit_reproducible`,
+`run_memoryless_detection.KNOWN_LIMITS`).
+
+Before the flag, two runs were not bit-for-bit equal. Task 17a (2026-10-09) measured
+it twice, without the flag:
 
 - chimi20200225_02_r1, two runs on one GPU, both with one thread (the runner before
   and after its thread fix, which with one thread does the same computation):
@@ -1170,13 +1198,10 @@ bit-for-bit equal. Task 17a (2026-10-09) measured it twice:
   flips; every event-level output is equal (431 candidates, 51 replay, 50 passing
   the shuffle, `is_swr`).
 
-The cause is not established (the report's best guess is the GPU likelihood). This
-is a stated limit, not fixed: every run manifest records it in its settings
-(`known_limits.bit_reproducible`, `run_memoryless_detection.KNOWN_LIMITS`), and two
-runs are compared on their event-level outputs, not on window-level numbers or file
-hashes, as Task 17a's acceptance was. One epoch run with `XLA_FLAGS=--xla_gpu_deterministic_ops=true` at
-R12 launch would measure the cost of deterministic GPU ops and whether the gate flip
-goes away; the decision is left to the R8 doc pass.
+Task 17a could not say why (its best guess was the GPU likelihood). On the R12 epoch
+the flag removes the differences, which points to XLA's GPU operations that are not
+deterministic by default. Runs made without the flag can be compared only on their event-level
+outputs, not on window-level numbers or file hashes, as Task 17a's acceptance was.
 
 ## Unverified assumptions
 
