@@ -50,6 +50,7 @@ holds analysed epochs' decodes, which the audit checks (``decode_folder``).
 from __future__ import annotations
 
 import re
+from collections.abc import Collection
 from enum import StrEnum
 from pathlib import Path
 from typing import NamedTuple
@@ -283,9 +284,13 @@ def register_reason(nwb_file_name: str, epoch: str) -> Reason | None:
 
 
 def select_epochs(
-    epoch_info: pd.DataFrame, statuses: set[Status], register: pd.DataFrame
+    epoch_info: pd.DataFrame,
+    statuses: set[Status],
+    register: pd.DataFrame,
+    reasons: Collection[Reason] = (),
 ) -> pd.DataFrame:
-    """``epoch_info``'s rows whose register status is one of `statuses`.
+    """``epoch_info``'s rows whose register status is one of `statuses`, or
+    whose reason is one of `reasons`.
 
     Parameters
     ----------
@@ -295,15 +300,18 @@ def select_epochs(
     statuses : set of Status
     register : pd.DataFrame
         ``read_register``'s frame.
+    reasons : collection of Reason, optional
+        Unanalysed entries also selected, such as ``SUSTAINED_NOISE`` for the
+        artifact runner.
 
     Raises
     ------
     EpochRegisterError
         If `epoch_info` lists an epoch the register does not, or lacks an epoch
-        the register gives one of `statuses`.
+        the register gives one of `statuses` or `reasons`.
     """
     keys = list(epoch_info.index)
-    unregistered, absent = registration_gaps(keys, register, statuses)
+    unregistered, absent = registration_gaps(keys, register, statuses, reasons)
     if unregistered:
         raise EpochRegisterError(
             f"get_epoch_info lists {len(unregistered)} epoch(s) the epoch register "
@@ -320,16 +328,19 @@ def select_epochs(
             "cannot serve them (a pending one needs its populate first): "
             + ", ".join(f"{name} {epoch}" for name, epoch in absent.index)
         )
-    keep = [
-        register_entry(name, epoch, register).status in statuses for name, epoch in keys
-    ]
+    entries = [register_entry(name, epoch, register) for name, epoch in keys]
+    keep = [entry.status in statuses or entry.reason in reasons for entry in entries]
     return epoch_info[keep]
 
 
 def registration_gaps(
-    keys: list[tuple[str, str]], register: pd.DataFrame, statuses: set[Status]
+    keys: list[tuple[str, str]],
+    register: pd.DataFrame,
+    statuses: set[Status],
+    reasons: Collection[Reason] = (),
 ) -> tuple[list[tuple[str, str]], pd.DataFrame]:
-    """The listed epochs the register lacks, and its epochs of `statuses` not listed.
+    """The listed epochs the register lacks, and its epochs of `statuses` (or
+    `reasons`) not listed.
 
     Parameters
     ----------
@@ -338,13 +349,15 @@ def registration_gaps(
     register : pd.DataFrame
         ``read_register``'s frame.
     statuses : set of Status
+    reasons : collection of Reason, optional
 
     Returns
     -------
     unregistered : list of (str, str)
         Listed keys with no entry, theirs or their session's.
     absent : pd.DataFrame
-        The register's epoch entries with one of `statuses` that `keys` lacks.
+        The register's epoch entries with one of `statuses` or `reasons` that
+        `keys` lacks.
     """
     unregistered = [
         (name, epoch)
@@ -352,12 +365,16 @@ def registration_gaps(
         if (name, epoch) not in register.index
         and (name, SESSION_WIDE) not in register.index
     ]
-    wanted = register[register["status"].isin(statuses)]
+    wanted = register[
+        register["status"].isin(statuses) | register["reason"].isin(reasons)
+    ]
     absent = wanted[~wanted.index.isin(keys)]
     return unregistered, absent
 
 
-def analysed_epochs(include_pending: bool = False) -> pd.DataFrame:
+def analysed_epochs(
+    include_pending: bool = False, include_sustained_noise: bool = False
+) -> pd.DataFrame:
     """``get_epoch_info``'s epochs that the register analyses: the cohort.
 
     Parameters
@@ -367,6 +384,10 @@ def analysed_epochs(include_pending: bool = False) -> pd.DataFrame:
         (``--include-pending``: runbook R9 runs the analysed and the pending
         epochs together). The incremental update of the decoders, the SWR runner
         and the Widloski runner takes :func:`pending_epochs` alone.
+    include_sustained_noise : bool, optional
+        Also the epochs excluded for ``SUSTAINED_NOISE``. Only the artifact
+        runner asks for them, so that a new artifact run re-tests them; the
+        audit's ``sustained_noise`` check needs their cores.
 
     Returns
     -------
@@ -378,13 +399,15 @@ def analysed_epochs(include_pending: bool = False) -> pd.DataFrame:
     EpochRegisterError
         If ``get_epoch_info`` lists an epoch the register does not, or does not
         list an epoch the register analyses (or, with `include_pending`, one it
-        holds pending): the cohort would otherwise change without a register
-        edit.
+        holds pending, or with `include_sustained_noise`, one it excludes for
+        ``SUSTAINED_NOISE``): the cohort would otherwise change without a
+        register edit.
     """
     statuses = {Status.ANALYSED}
     if include_pending:
         statuses.add(Status.PENDING)
-    return select_epochs(get_epoch_info(), statuses, read_register())
+    reasons = {Reason.SUSTAINED_NOISE} if include_sustained_noise else set()
+    return select_epochs(get_epoch_info(), statuses, read_register(), reasons)
 
 
 def pending_epochs() -> pd.DataFrame:

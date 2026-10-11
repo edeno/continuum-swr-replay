@@ -40,9 +40,10 @@ settings other than the manifest's. A run holds an exclusive lock on its
 folder's ``.lock``. The run id is the code commit's first 12 characters unless
 ``--run-id`` is given.
 
-The epochs are the epoch register's analysed ones; with ``--include-pending``
-also its pending ones, and with ``--pending-only`` its pending ones alone;
-narrowed by ``--animal``, ``--date`` and ``--epoch``. They run in parallel on a
+The epochs are the epoch register's analysed ones and the ones it excludes for
+an S block (``SUSTAINED_NOISE``, re-tested by every run); with
+``--include-pending`` also its pending ones, and with ``--pending-only`` its
+pending ones alone; narrowed by ``--animal``, ``--date`` and ``--epoch``. They run in parallel on a
 dask ``LocalCluster`` of ``--n-workers`` processes, one epoch per worker at a
 time, each logging to ``logs/{epoch_id}_artifacts.log`` under the working
 directory, and closing the NWB files Spyglass opened when its epoch ends. An
@@ -388,10 +389,17 @@ def _run_epoch_logged(
 
 
 def register_epochs(include_pending: bool, pending_only: bool) -> pd.DataFrame:
-    """The register's epochs: analysed, analysed and pending, or pending alone."""
+    """The register's epochs: analysed, analysed and pending, or pending alone.
+
+    Except with `pending_only`, also the epochs excluded for ``SUSTAINED_NOISE``,
+    so that a new run re-tests them: the audit's ``sustained_noise`` check reads
+    their cores in the configured run.
+    """
     if pending_only:
         return pending_epochs()
-    return analysed_epochs(include_pending=include_pending)
+    return analysed_epochs(
+        include_pending=include_pending, include_sustained_noise=True
+    )
 
 
 def main(argv: list[str] | None = None) -> None:

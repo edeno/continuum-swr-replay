@@ -366,6 +366,39 @@ def test_select_epochs_drops_a_listed_sustained_noise_epoch_without_raising(
     assert list(both.index) == [ANALYSED[0], *PENDING, ANALYSED[1]]
 
 
+def test_analysed_epochs_add_the_sustained_noise_epochs_on_request(
+    tmp_path, monkeypatch
+):
+    """The artifact runner re-tests the S epochs, read through get_epoch_info
+    like the others."""
+    path = _write_register(tmp_path / "epoch_register.csv", [*ROWS, NOISY_ROW])
+    monkeypatch.setattr(epoch_register, "REGISTER_PATH", path)
+    _listing(monkeypatch, [ANALYSED[0], NOISY, *PENDING, ANALYSED[1]])
+
+    assert list(analysed_epochs().index) == ANALYSED
+    assert list(analysed_epochs(include_sustained_noise=True).index) == [
+        ANALYSED[0],
+        NOISY,
+        ANALYSED[1],
+    ]
+    assert list(
+        analysed_epochs(include_pending=True, include_sustained_noise=True).index
+    ) == [ANALYSED[0], NOISY, *PENDING, ANALYSED[1]]
+
+
+def test_a_requested_sustained_noise_epoch_spyglass_does_not_list_raises(
+    tmp_path, monkeypatch
+):
+    path = _write_register(tmp_path / "epoch_register.csv", [*ROWS, NOISY_ROW])
+    monkeypatch.setattr(epoch_register, "REGISTER_PATH", path)
+    _listing(monkeypatch, ANALYSED)
+
+    with pytest.raises(EpochRegisterError, match="1 excluded epoch"):
+        analysed_epochs(include_sustained_noise=True)
+    # unrequested, its absence is no concern
+    assert list(analysed_epochs().index) == ANALYSED
+
+
 # --------------------------------------------------------------------------
 # analysed_decode_files, the register's replacement for globbing a folder
 # --------------------------------------------------------------------------

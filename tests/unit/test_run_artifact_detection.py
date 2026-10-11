@@ -300,15 +300,18 @@ def in_process_cluster(tmp_path, monkeypatch):
 
 @pytest.fixture
 def register(monkeypatch):
-    """The register serves two analysed epochs and one pending one; returns
-    what each register function was asked."""
+    """The register serves two analysed epochs, one pending one and one
+    excluded for an S block (``SUSTAINED_NOISE``); returns what each register
+    function was asked."""
     asked = []
 
-    def analysed_epochs(include_pending=False):
-        asked.append(("analysed", include_pending))
+    def analysed_epochs(include_pending=False, include_sustained_noise=False):
+        asked.append(("analysed", include_pending, include_sustained_noise))
         epochs = [(NWB_FILE_NAME, "02_r1"), (NWB_FILE_NAME, "04_r2")]
         if include_pending:
             epochs.append((NWB_FILE_NAME, "06_r3"))
+        if include_sustained_noise:
+            epochs.append((NWB_FILE_NAME, "08_r4"))
         return _epoch_info(*epochs)
 
     def pending_epochs():
@@ -362,8 +365,12 @@ def _cli(tmp_path, *extra: str) -> dict:
 @pytest.mark.parametrize(
     ("flags", "asked", "epochs"),
     [
-        ([], [("analysed", False)], ["02_r1", "04_r2"]),
-        (["--include-pending"], [("analysed", True)], ["02_r1", "04_r2", "06_r3"]),
+        ([], [("analysed", False, True)], ["02_r1", "04_r2", "08_r4"]),
+        (
+            ["--include-pending"],
+            [("analysed", True, True)],
+            ["02_r1", "04_r2", "06_r3", "08_r4"],
+        ),
         (["--pending-only"], [("pending", None)], ["06_r3"]),
     ],
     ids=["analysed", "include-pending", "pending-only"],
@@ -378,6 +385,8 @@ def test_the_epochs_come_from_the_register(
     asked,
     epochs,
 ):
+    """The analysed epochs, the pending ones on request, and always the ones
+    excluded for an S block, so that a new run re-tests them."""
     ran = _with_fakes(monkeypatch)
 
     manifest = _cli(tmp_path, *flags)
@@ -455,7 +464,7 @@ def test_a_rerun_skips_finished_epochs_and_redoes_failed_ones(
     ran = _with_fakes(monkeypatch)
     _cli(tmp_path, "--overwrite")
 
-    assert sorted(ran) == ["02_r1", "04_r2"]
+    assert sorted(ran) == ["02_r1", "04_r2", "08_r4"]
 
 
 def test_a_rerun_with_other_settings_is_refused(
@@ -468,7 +477,7 @@ def test_a_rerun_with_other_settings_is_refused(
     with pytest.raises(SystemExit, match="other settings"):
         _cli(tmp_path, "--overwrite")
 
-    assert sorted(ran) == ["02_r1", "04_r2"]
+    assert sorted(ran) == ["02_r1", "04_r2", "08_r4"]
 
 
 def test_the_run_id_defaults_to_the_commit(

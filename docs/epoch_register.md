@@ -134,7 +134,8 @@ picks one of the two, by a stage's `--pending-only` flag.
 Each raises `EpochRegisterError` when `get_epoch_info()` and the register disagree:
 
 - `get_epoch_info()` lists an epoch the register does not;
-- `get_epoch_info()` does not list an epoch of the requested status.
+- `get_epoch_info()` does not list an epoch of the requested status (or, with
+  `include_sustained_noise`, a `SUSTAINED_NOISE` epoch).
 
 `pending_epochs()` also raises when the register holds no pending epoch.
 
@@ -145,6 +146,7 @@ once its decodes exist and its entry is changed to `analysed`.
 | stage | reads |
 |---|---|
 | NonLocal and ContFrag decoders (`decoding_common.run_batch`) | `epochs_to_run(args.pending_only)`. `--pending-only` refuses the canonical `Processed-Data` folder as `--save_dir`. |
+| artifact runner (`run_artifact_detection.py`) | `analysed_epochs(include_pending=..., include_sustained_noise=True)`: the analysed epochs, the pending ones with `--include-pending`, and always the `SUSTAINED_NOISE` ones, so that a new run re-tests them. `--pending-only` runs the pending ones alone. |
 | SWR runner (`run_swr_detection.py`) | `epochs_to_run(args.pending_only)`; no skip list of its own |
 | Widloski runner (`run_memoryless_detection.py`, `--all` / `--animal`) | `epochs_to_run(args.pending_only)`. An epoch it selects with no decode under `--root` is run and recorded as failed. A decode of any other epoch is left out and recorded as skipped. `--epoch-id` runs what it names. |
 | replay table builders (`prepare_data.find_sessions`, used by `prepare_replay_content_data.py`, `build_timebin_tables.py`, `regenerate_stop_table.py`) | `analysed_epochs()`; an analysed epoch with no decode stops the build |
@@ -250,7 +252,9 @@ recorded.
   with the failure as evidence, and regenerate this doc.
 - **A new session or epoch appears in Spyglass.** `analysed_epochs()` raises until
   it is registered.
-- **The configured artifact run changes.** An analysed or pending epoch in which it
+- **The configured artifact run changes.** Make the new run with
+  `--include-pending`. The artifact runner always adds the `SUSTAINED_NOISE` epochs, so
+  the run covers every epoch the check reads. An analysed or pending epoch in which it
   finds an S block becomes `excluded` / `SUSTAINED_NOISE`, with the run's evidence.
   A `SUSTAINED_NOISE` epoch in which it finds none goes back to the lead. The audit's
   `sustained_noise` check fails until the register and the run agree.
