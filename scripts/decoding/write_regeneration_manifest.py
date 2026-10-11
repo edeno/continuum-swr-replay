@@ -579,8 +579,8 @@ def main() -> None:
         "--expected-sessions",
         type=int,
         default=len(analysed_epoch_ids()),
-        help="Epochs (sessions) the tables must hold (default: the epoch register's "
-        "analysed epochs).",
+        help="Epochs (sessions) the tables must hold; default: the epoch register's "
+        "analysed epochs (HPC cohort).",
     )
     parser.add_argument(
         "--expected-drift-columns",

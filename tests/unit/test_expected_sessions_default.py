@@ -97,3 +97,16 @@ def test_the_default_expected_sessions_is_the_registers_analysed_count(
         module.main()
 
     assert seen["expected_sessions"] == 2
+
+
+@pytest.mark.parametrize("script", list(SCRIPTS))
+def test_the_help_says_the_default_is_the_hpc_cohort(script, monkeypatch, capsys):
+    """For ``--brain-area mPFC`` or ``OFC`` the default is not the area's count."""
+    monkeypatch.syspath_prepend(str(REPO / "scripts" / "decoding"))
+    module = importlib.import_module(f"scripts.decoding.{script}")
+    monkeypatch.setattr(sys, "argv", [script, "--help"])
+
+    with pytest.raises(SystemExit):
+        module.main()
+
+    assert "analysed epochs (HPC cohort)" in " ".join(capsys.readouterr().out.split())
