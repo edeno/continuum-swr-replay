@@ -74,13 +74,32 @@ XLA_FLAGS_CASES = [
         "--xla_dump_hlo_as_text",
         "--xla_dump_hlo_as_text --xla_gpu_deterministic_ops=true",
     ),
+    ("--xla_gpu_deterministic_ops=true", "--xla_gpu_deterministic_ops=true"),
     (
         "--xla_gpu_deterministic_ops=true --xla_dump_hlo_as_text",
         "--xla_gpu_deterministic_ops=true --xla_dump_hlo_as_text",
     ),
+    (
+        "--xla_gpu_deterministic_ops=false",
+        "--xla_gpu_deterministic_ops=false --xla_gpu_deterministic_ops=true",
+    ),
+    (
+        "--xla_gpu_deterministic_ops=true --xla_gpu_deterministic_ops=false",
+        "--xla_gpu_deterministic_ops=true --xla_gpu_deterministic_ops=false "
+        "--xla_gpu_deterministic_ops=true",
+    ),
+    (
+        "--xla_gpu_deterministic_ops=false --xla_gpu_deterministic_ops=true",
+        "--xla_gpu_deterministic_ops=false --xla_gpu_deterministic_ops=true",
+    ),
 ]
 """XLA_FLAGS as this process inherits them (None: unset), and as every process
-that runs JAX gets them: the flag appended to the user's, and not twice."""
+that runs JAX gets them. XLA uses the last value of a repeated flag, so the
+flag is appended unless the last ``--xla_gpu_deterministic_ops`` already says
+``=true``; the user's flags are kept."""
+
+GIVEN_XLA_FLAGS = "--xla_dump_hlo_as_text --xla_gpu_deterministic_ops=true"
+"""XLA_FLAGS handed to ``cuda_cluster``, as ``main`` hands it the settings'."""
 
 
 def set_xla_flags(monkeypatch, value: str | None) -> None:
@@ -1527,6 +1546,33 @@ class TestMain:
         run_log = (tmp_path / "memoryless" / "cli-run" / "run.log").read_text()
         assert "open-file soft limit 1024 -> 65536" in run_log
 
+    def test_the_cluster_is_given_the_xla_flags_the_settings_record(
+        self, parallel, tmp_path, monkeypatch
+    ):
+        """The workers' XLA_FLAGS and the manifest's come from one value."""
+        monkeypatch.setenv("XLA_FLAGS", "--xla_gpu_deterministic_ops=false")
+        self.recording_release(monkeypatch)
+        monkeypatch.setattr(
+            runner,
+            "run_one",
+            lambda epoch_id, **kwargs: {"status": "ok", **self.COUNTS},
+        )
+        given = []
+        cuda_cluster = runner.cuda_cluster
+
+        def recording_cuda_cluster(cuda_visible_devices, local_directory, xla_flags):
+            given.append(xla_flags)
+            return cuda_cluster(cuda_visible_devices, local_directory, xla_flags)
+
+        monkeypatch.setattr(runner, "cuda_cluster", recording_cuda_cluster)
+
+        self.parallel_cli(tmp_path)
+
+        assert given == [read_manifest(tmp_path)["settings"]["xla_flags"]]
+        assert given == [
+            "--xla_gpu_deterministic_ops=false --xla_gpu_deterministic_ops=true"
+        ]
+
 
 class TestRunEpochs:
     def test_an_error_its_worker_cannot_return_is_recorded(self, tmp_path, monkeypatch):
@@ -1614,7 +1660,9 @@ class TestWorkerThreads:
         monkeypatch.setattr(runner, "available_cpus", lambda: 13)
         with dask.config.set({"temporary-directory": str(tmp_path / "dask-temporary")}):
             with (
-                runner.cuda_cluster("3,4,6", str(tmp_path / "scratch")) as cluster,
+                runner.cuda_cluster(
+                    "3,4,6", str(tmp_path / "scratch"), GIVEN_XLA_FLAGS
+                ) as cluster,
                 Client(cluster) as client,
             ):
                 seen = client.run(_thread_environ)
@@ -1661,13 +1709,13 @@ class TestWorkerXlaFlags:
     test, 2026-10-10). XLA reads XLA_FLAGS when JAX starts its backend, so the
     flag must be in a worker's environment when its nanny spawns it."""
 
-    @pytest.mark.parametrize(("inherited", "expected"), XLA_FLAGS_CASES)
-    def test_each_worker_runs_xla_deterministically(
-        self, tmp_path, monkeypatch, inherited, expected
+    @pytest.mark.parametrize("inherited", [None, "--xla_gpu_deterministic_ops=false"])
+    def test_each_worker_gets_the_xla_flags_it_is_given(
+        self, tmp_path, monkeypatch, inherited
     ):
-        """Whatever this process's environment says: the deterministic flag is
-        appended to its XLA_FLAGS, once, and this process's own are left as
-        they were."""
+        """Whatever this process's environment says: each worker gets the
+        XLA_FLAGS ``cuda_cluster`` is given (``main`` gives it the ones the
+        settings record), and this process's own are left as they were."""
         set_xla_flags(monkeypatch, inherited)
 
         def worker_processes(**kwargs):
@@ -1686,10 +1734,12 @@ class TestWorkerXlaFlags:
         )
         with dask.config.set({"temporary-directory": str(tmp_path / "dask-temporary")}):
             with (
-                runner.cuda_cluster("3,4,6", str(tmp_path / "scratch")) as cluster,
+                runner.cuda_cluster(
+                    "3,4,6", str(tmp_path / "scratch"), GIVEN_XLA_FLAGS
+                ) as cluster,
                 Client(cluster) as client,
             ):
                 seen = client.run(_xla_flags)
 
-        assert list(seen.values()) == [expected]
+        assert list(seen.values()) == [GIVEN_XLA_FLAGS]
         assert os.environ.get("XLA_FLAGS") == inherited

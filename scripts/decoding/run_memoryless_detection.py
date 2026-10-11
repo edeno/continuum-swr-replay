@@ -706,14 +706,20 @@ process, when JAX starts its backend; importing this module does not start it.""
 
 def xla_flags() -> str:
     """The ``XLA_FLAGS`` every process that runs JAX gets: this process's, with
-    :data:`DETERMINISTIC_XLA_FLAG` added at the end unless it is already there.
+    :data:`DETERMINISTIC_XLA_FLAG` added at the end unless the last
+    ``--xla_gpu_deterministic_ops`` in them already is it.
 
-    The user's flags are kept as they are. The processes are the dask workers
-    (``cuda_cluster``), or this process when it runs the epochs itself
-    (``main``); the run settings record the value (``run_settings``).
+    XLA uses the last value of a repeated flag, so an earlier ``=true`` is
+    overridden by a later ``=false``, and the appended flag overrides both. The
+    user's flags are kept as they are. The run settings record the value
+    (``run_settings``), and ``main`` hands that record to the processes: the
+    dask workers (``cuda_cluster``), or this process when it runs the epochs
+    itself.
     """
     inherited = os.environ.get("XLA_FLAGS", "").strip()
-    if DETERMINISTIC_XLA_FLAG in inherited.split():
+    name = DETERMINISTIC_XLA_FLAG.split("=")[0]
+    given = [flag for flag in inherited.split() if flag.split("=")[0] == name]
+    if given and given[-1] == DETERMINISTIC_XLA_FLAG:
         return inherited
     return f"{inherited} {DETERMINISTIC_XLA_FLAG}".lstrip()
 
@@ -900,7 +906,9 @@ def environment_holding(values: dict[str, str]) -> Iterator[None]:
                 os.environ[name] = value
 
 
-def cuda_cluster(cuda_visible_devices: str, local_directory: str) -> Cluster:
+def cuda_cluster(
+    cuda_visible_devices: str, local_directory: str, worker_xla_flags: str
+) -> Cluster:
     """A ``LocalCUDACluster``, one worker per listed GPU, whose workers may each
     use their share of the CPUs and run XLA deterministically.
 
@@ -911,9 +919,8 @@ def cuda_cluster(cuda_visible_devices: str, local_directory: str) -> Cluster:
     its parent's environment. So while the cluster is made, and its nannies
     spawn their workers, both this process's environment and the
     configuration hold ``worker_thread_environ``'s share of ``available_cpus``,
-    and ``XLA_FLAGS`` with the deterministic flag (:func:`xla_flags`); the
-    environment is then restored. The nannies keep the values for any
-    restart.
+    and ``XLA_FLAGS`` set to ``worker_xla_flags``; the environment is then
+    restored. The nannies keep the values for any restart.
 
     Parameters
     ----------
@@ -921,6 +928,9 @@ def cuda_cluster(cuda_visible_devices: str, local_directory: str) -> Cluster:
         The GPUs, such as ``"3,4,6,7"``: one worker each.
     local_directory : str
         The workers' scratch folder.
+    worker_xla_flags : str
+        Each worker's ``XLA_FLAGS``: the run settings' ``xla_flags``
+        (:func:`xla_flags`), so the manifest records what the workers get.
     """
     n_workers = len(str(cuda_visible_devices).split(","))
     worker_environ = {
@@ -928,7 +938,7 @@ def cuda_cluster(cuda_visible_devices: str, local_directory: str) -> Cluster:
             name: str(n)
             for name, n in worker_thread_environ(n_workers, available_cpus()).items()
         },
-        "XLA_FLAGS": xla_flags(),
+        "XLA_FLAGS": worker_xla_flags,
     }
     environ = {
         **dask.config.get("distributed.nanny.pre-spawn-environ"),
@@ -1208,8 +1218,12 @@ def main(argv: list[str] | None = None) -> None:
             args.cuda_visible_devices,
             Path.cwd() / "logs" / "<epoch_id>_memoryless.log",
         )
+        # the workers get the XLA flags the settings record, computed once
         cluster_factory = functools.partial(
-            cuda_cluster, args.cuda_visible_devices, args.local_scratch_dir
+            cuda_cluster,
+            args.cuda_visible_devices,
+            args.local_scratch_dir,
+            settings["xla_flags"],
         )
         # the workers only return records: this process alone writes the manifest
         for number, (epoch_id, record) in enumerate(

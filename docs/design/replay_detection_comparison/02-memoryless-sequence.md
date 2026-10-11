@@ -1164,13 +1164,15 @@ so (the coordinator's ruling, 2026-10-10).
 
 Every process that runs JAX gets `--xla_gpu_deterministic_ops=true` added to the
 `XLA_FLAGS` it inherits. These are the Dask GPU workers, or the runner itself when it
-runs the epochs one after another. The user's own flags are kept, and the flag is not
-added twice. XLA reads `XLA_FLAGS` once, when JAX starts in a process, so the runner
-sets them before that: in each worker's environment when the worker is started, and
-in its own environment while it runs an epoch. Its own environment is restored
-afterwards. Each run manifest records the flags in its settings (`xla_flags`), so a
-resume under the same run id with other flags is refused, like any other change of
-settings.
+runs the epochs one after another. The user's own flags are kept. When a flag is given
+more than once, XLA uses its last value, so the runner adds the flag unless the last
+`--xla_gpu_deterministic_ops` already says `=true`. XLA reads `XLA_FLAGS` once, when
+JAX starts in a process, so the runner sets them before that: in each worker's
+environment when the worker is started, and in its own environment while it runs an
+epoch. Its own environment is restored afterwards. The runner works the flags out
+once and records them in the run manifest's settings (`xla_flags`). The workers and
+the runner get that same value, so the manifest says what they ran with. A resume
+under the same run id with other flags is refused, like any other change of settings.
 
 The R12 smoke test (2026-10-10) measured it on breeze, on one epoch:
 chimi20200225_02_r1_HPC, seed 20260922, with the decodes read from the R11 staging
