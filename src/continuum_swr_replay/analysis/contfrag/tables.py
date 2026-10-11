@@ -733,9 +733,10 @@ def build_contfrag_stop_table(
     ``reward_history_rcos_0..2`` and its flag ``reward_history_incomplete``,
     computed at bout start by ``reward_history_basis_features`` exactly as in
     the NonLocal stop table. The NonLocal table's other columns
-    (``known_reward_outcome_lag_*``, the stop clocks, ``n_*_events``,
-    ``completed_trial_reward``) are not built here; no ContFrag consumer reads
-    them.
+    (``known_reward_outcome_lag_*``, the stop clocks, the per-detector counts
+    ``n_swr_events``, ``n_mua_events``, ``n_nonlocal_swr_events`` and
+    ``n_nonlocal_non_swr_events``, and ``completed_trial_reward``) are not built
+    here; no ContFrag consumer reads them.
 
     Parameters
     ----------

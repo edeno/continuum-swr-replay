@@ -103,10 +103,12 @@ def test_the_comparison_rate_block_accepts_the_contfrag_stop_table():
     compare = _load_compare_script()
     contfrag, _, _ = _stop_tables()
 
+    # The check is that this call does not raise. The fixture's one session has
+    # fewer stops than the block's minimum, so it is not fit.
     _, provenance = compare.fit_per_stop_rate_hierarchy(contfrag, "SWR")
 
     assert len(provenance) == 1
-    assert "missing_columns" not in set(provenance["status"])
+    assert set(provenance["status"]) == {"too_few_units"}
 
 
 def test_its_reward_history_is_the_nonlocal_stop_tables():
