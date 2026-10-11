@@ -447,7 +447,10 @@ def test_published_dense_table_keeps_its_stamp_and_sums_the_excluded_onsets(
     def stamped_tables(session: dict) -> tuple[pd.DataFrame, pd.DataFrame]:
         onset, dense = _small_tables(session)
         dense.attrs["covariate_schema_table"] = "stop_timebin"
-        dense.attrs[ONSETS_IN_EXCLUDED_BINS_ATTR] = {"SWR": 1, "non_local": 0}
+        # Counts differ by session: unequal attrs are what make pd.concat drop
+        # every attr, the stamp included, unless the count is taken off first.
+        n_swr = 1 if session["epoch_name"] == "02_r1" else 2
+        dense.attrs[ONSETS_IN_EXCLUDED_BINS_ATTR] = {"SWR": n_swr, "non_local": 0}
         return onset, dense
 
     monkeypatch.setattr(script, "find_sessions", lambda max_per_animal: _SESSIONS)
@@ -470,7 +473,7 @@ def test_published_dense_table_keeps_its_stamp_and_sums_the_excluded_onsets(
     )
     script.main()
 
-    assert checked == [{"SWR": 2, "non_local": 0}]
+    assert checked == [{"SWR": 3, "non_local": 0}]
     dense = published["stop_timebin"]
     assert dense.attrs["covariate_schema_table"] == "stop_timebin"
-    assert dense.attrs[ONSETS_IN_EXCLUDED_BINS_ATTR] == {"SWR": 2, "non_local": 0}
+    assert dense.attrs[ONSETS_IN_EXCLUDED_BINS_ATTR] == {"SWR": 3, "non_local": 0}
