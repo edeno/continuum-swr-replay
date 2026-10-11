@@ -35,6 +35,7 @@ def _three_row_frame() -> pd.DataFrame:
             "Non-Local_Fragmented_prob": [0.0, 0.0, 0.0],
             "ahead_behind_distance": [0.0, 0.0, 0.0],
             "hpd": [0.1, 0.1, 0.1],
+            "in_excluded_time": [False] * 3,
         },
         index=times,
     )

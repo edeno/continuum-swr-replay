@@ -31,6 +31,7 @@ class TestCalibrationCurveNaNLocalProb:
                 "epoch": ["e"] * 4,
                 "Local_prob": [0.05, 0.15, 0.95, np.nan],
                 "ahead_behind_distance": [3.0, 2.0, 1.0, 500.0],
+                "in_excluded_time": False,
             },
             index=[0.0, 0.1, 0.2, 0.3],
         )

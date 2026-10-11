@@ -33,7 +33,12 @@ def _empty_schema_frame() -> pd.DataFrame:
         "theta_power_zscore",
         "max_distance", "max_coverage", "max_linear_position",
     ]
-    return pd.DataFrame({c: pd.Series(dtype="float64") for c in columns})
+    return pd.DataFrame(
+        {
+            **{c: pd.Series(dtype="float64") for c in columns},
+            "in_excluded_time": pd.Series(dtype=bool),
+        }
+    )
 
 
 class TestEmptyCalibSummary:

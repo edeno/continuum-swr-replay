@@ -8,7 +8,18 @@ state classifications are internally consistent.
 
 All functions operate on the ``data_over_time`` DataFrame produced by
 :func:`~continuum_swr_replay.analysis.hippocampus.get_data_over_time`,
-which is already saved as pickle files for all sessions.
+which is already saved as pickle files for all sessions, read through the SWR
+source (``swr_source.read_dot_with_swr_source``, or ``load_data_over_time``).
+
+Excluded time
+-------------
+Nothing in excluded time is analysed. The read marks those bins with
+``in_excluded_time``, and every ``compute_*`` function requires that column
+(:func:`_analysed_rows`). A point-wise statistic (an error, a mean, a
+calibration bin, a correlation) leaves the excluded rows out. A function that
+labels runs of bins (collapse episodes, non-local runs during movement, running
+bouts) keeps the rows and treats the excluded bins as a gap that breaks a run:
+removing the rows would join the runs on either side.
 
 Design Principles
 -----------------
@@ -86,10 +97,53 @@ from .event_immobility import (
     filter_event_labels_by_speed,
     validate_nonlocal_event_probability_contract,
 )
+from .swr_source import IN_EXCLUDED_TIME_COLUMN
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_GROUP_COLS = list(SESSION_COLUMNS_DAY)
+
+
+def _analysed_rows(data: pd.DataFrame) -> np.ndarray:
+    """The rows outside excluded time: the one analysed-time rule for a bin.
+
+    Every ``compute_*`` function applies this at entry. A point-wise statistic
+    keeps only these rows. A run-labelling function ANDs this into its run
+    condition per session, so an excluded bin breaks a run instead of being
+    removed.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        A ``data_over_time`` frame read through the SWR source, which adds
+        ``in_excluded_time`` (``swr_source.with_swr_source``).
+
+    Returns
+    -------
+    np.ndarray of bool, shape (n_rows,)
+        True where the row lies outside excluded time.
+
+    Raises
+    ------
+    KeyError
+        If the frame has no ``in_excluded_time`` column.
+    TypeError
+        If the column is not boolean. A concatenation with a frame read another
+        way leaves NaN in it, which a cast to bool would read as excluded.
+    """
+    if IN_EXCLUDED_TIME_COLUMN not in data.columns:
+        raise KeyError(
+            f"the frame has no {IN_EXCLUDED_TIME_COLUMN!r} column: read it "
+            "through swr_source.read_dot_with_swr_source (or "
+            "load_data_over_time), which marks excluded time"
+        )
+    column = data[IN_EXCLUDED_TIME_COLUMN]
+    if column.dtype != bool:
+        raise TypeError(
+            f"{IN_EXCLUDED_TIME_COLUMN!r} must be boolean, not {column.dtype}: "
+            "read every frame through swr_source.read_dot_with_swr_source"
+        )
+    return ~column.to_numpy()
 
 
 def compute_local_decoding_error(
@@ -123,7 +177,7 @@ def compute_local_decoding_error(
     if group_cols is None:
         group_cols = list(_DEFAULT_GROUP_COLS)
 
-    local_mask = data["Local_prob"] > local_prob_threshold
+    local_mask = (data["Local_prob"] > local_prob_threshold) & _analysed_rows(data)
     local_data = data.loc[local_mask].copy()
     local_data["error_cm"] = local_data["ahead_behind_distance"].abs()
 
@@ -183,7 +237,7 @@ def compute_state_fraction_during_movement(
     if group_cols is None:
         group_cols = list(_DEFAULT_GROUP_COLS)
 
-    is_moving_full = data["head_speed"] > speed_threshold
+    is_moving_full = (data["head_speed"] > speed_threshold) & _analysed_rows(data)
 
     if not is_moving_full.any():
         return pd.DataFrame(
@@ -195,7 +249,10 @@ def compute_state_fraction_during_movement(
         )
 
     def _session_stats(group: pd.DataFrame) -> pd.Series:
-        is_moving = (group["head_speed"] > speed_threshold).to_numpy()
+        # Moving bins outside excluded time: the means leave the excluded bins
+        # out, and the collapse runs below treat them as gaps.
+        analysed = _analysed_rows(group)
+        is_moving = (group["head_speed"] > speed_threshold).to_numpy() & analysed
         n_moving = int(is_moving.sum())
         moving_block = group.loc[is_moving]
         result = {
@@ -210,9 +267,9 @@ def compute_state_fraction_during_movement(
             "n_moving_bins": n_moving,
         }
 
-        # Label on the FULL timeline so immobile rows act as gaps that
-        # break collapse runs. Filtering first and labeling on the
-        # filtered frame would treat 5 cm/s | 0 cm/s | 5 cm/s as one
+        # Label on the FULL timeline so immobile rows and excluded rows act
+        # as gaps that break collapse runs. Filtering first and labeling on
+        # the filtered frame would treat 5 cm/s | 0 cm/s | 5 cm/s as one
         # contiguous moving stretch and merge two 1-bin events into
         # one 3-second event.
         collapsed_and_moving = (
@@ -278,7 +335,7 @@ def compute_non_local_during_movement(
     if group_cols is None:
         group_cols = list(_DEFAULT_GROUP_COLS)
 
-    is_moving_full = data["head_speed"] > speed_threshold
+    is_moving_full = (data["head_speed"] > speed_threshold) & _analysed_rows(data)
 
     if not is_moving_full.any():
         return pd.DataFrame(
@@ -292,7 +349,10 @@ def compute_non_local_during_movement(
         )
 
     def _session_stats(group: pd.DataFrame) -> pd.Series:
-        is_moving = (group["head_speed"] > speed_threshold).to_numpy()
+        # Moving bins outside excluded time: the rate is per minute of them,
+        # and the runs below treat excluded bins as gaps.
+        analysed = _analysed_rows(group)
+        is_moving = (group["head_speed"] > speed_threshold).to_numpy() & analysed
         n_moving = int(is_moving.sum())
         if n_moving == 0:
             return pd.Series({
@@ -306,8 +366,8 @@ def compute_non_local_during_movement(
         nonlocal_prob = (
             group["Non-Local_Continuous_prob"] + group["Non-Local_Fragmented_prob"]
         )
-        # Label on the FULL timeline so immobile rows act as gaps
-        # that break event runs. Filtering first treated 5/0/5 cm/s
+        # Label on the FULL timeline so immobile rows and excluded rows act
+        # as gaps that break event runs. Filtering first treated 5/0/5 cm/s
         # as one contiguous moving stretch and merged separate events.
         is_nonlocal_and_moving = (
             (nonlocal_prob > non_local_threshold).to_numpy() & is_moving
@@ -385,6 +445,7 @@ def compute_behavior_state_breakdown(
         ``n_total_bins``, ``immobile_local_fraction``,
         ``immobile_nospike_fraction``, ``immobile_nonlocal_continuous_fraction``,
         ``immobile_nonlocal_fragmented_fraction``, ``immobile_nonlocal_fraction``.
+        Every count, split and mean is over the bins outside excluded time.
 
     """
     if group_cols is None:
@@ -403,10 +464,13 @@ def compute_behavior_state_breakdown(
         "immobile_nonlocal_fraction",
     ]
 
+    _analysed_rows(data)
     if data.empty:
         return pd.DataFrame(columns=out_cols)
 
     def _session_stats(group: pd.DataFrame) -> pd.Series:
+        # Every count and mean is over the session's bins outside excluded time.
+        group = group.loc[_analysed_rows(group)]
         n_total = len(group)
         running_mask = group["head_speed"] > speed_threshold
         n_running = int(running_mask.sum())
@@ -500,13 +564,17 @@ def compute_bout_nonlocal_dominance(
         "median_bout_local_fraction",
     ]
 
+    _analysed_rows(data)
     if data.empty:
         return pd.DataFrame(columns=out_cols)
 
     min_bout_bins = int(round(min_bout_duration_sec * sampling_frequency))
 
     def _session_stats(group: pd.DataFrame) -> pd.Series:
-        running_mask = (group["head_speed"] > speed_threshold).to_numpy()
+        # A bout is a run of running bins outside excluded time: an excluded
+        # bin ends a bout, as a stop does.
+        analysed = _analysed_rows(group)
+        running_mask = (group["head_speed"] > speed_threshold).to_numpy() & analysed
         labeled, n_raw_bouts = label(running_mask)
         if n_raw_bouts == 0:
             return pd.Series({
@@ -610,6 +678,7 @@ def compute_running_error_tail(
     mask = (
         (data["head_speed"] > speed_threshold)
         & (data["Local_prob"] > local_prob_threshold)
+        & _analysed_rows(data)
     )
     subset = data.loc[mask].copy()
     if subset.empty:
@@ -670,7 +739,8 @@ def compute_error_by_track_segment(
     if group_cols is None:
         group_cols = list(_DEFAULT_GROUP_COLS)
 
-    local_data = data.loc[data["Local_prob"] > local_prob_threshold].copy()
+    local_mask = (data["Local_prob"] > local_prob_threshold) & _analysed_rows(data)
+    local_data = data.loc[local_mask].copy()
     local_data["error_cm"] = local_data["ahead_behind_distance"].abs()
 
     if local_data.empty:
@@ -726,12 +796,14 @@ def compute_no_spike_firing_correspondence(
     """
     if group_cols is None:
         group_cols = list(_DEFAULT_GROUP_COLS)
+    _analysed_rows(data)
 
     def _session_corr(group: pd.DataFrame) -> pd.Series:
         nospike = group["No-Spike_prob"]
         mua = group["MUA_zscore"]
 
-        valid = nospike.notna() & mua.notna()
+        # bins outside excluded time with both values
+        valid = nospike.notna() & mua.notna() & _analysed_rows(group)
         if valid.sum() < 10:
             return pd.Series({"nospike_mua_rho": np.nan, "nospike_mua_pvalue": np.nan})
 
@@ -787,6 +859,11 @@ def compute_non_local_event_context(
     """
     if group_cols is None:
         group_cols = list(_DEFAULT_GROUP_COLS)
+    # Event-based: the read zeroes every event label in excluded time and
+    # renormalizes ``theta_power_zscore`` outside the artifact mask, so the
+    # events here are the analysed ones. The rows are kept: removing some
+    # could only cut an event, never drop it.
+    _analysed_rows(data)
 
     if event_col == "non_local_event":
         validate_nonlocal_event_probability_contract(
@@ -950,7 +1027,7 @@ def compute_local_state_collapse_details(
     if group_cols is None:
         group_cols = list(_DEFAULT_GROUP_COLS)
 
-    is_moving_full = data["head_speed"] > speed_threshold
+    is_moving_full = (data["head_speed"] > speed_threshold) & _analysed_rows(data)
 
     if not is_moving_full.any():
         return pd.DataFrame(
@@ -967,11 +1044,12 @@ def compute_local_state_collapse_details(
         if not isinstance(keys, tuple):
             keys = (keys,)
 
-        # Label on the FULL session timeline so immobile rows act as
-        # gaps that break collapse runs. Filtering first treated
+        # Label on the FULL session timeline so immobile rows and excluded
+        # rows act as gaps that break collapse runs. Filtering first treated
         # 5/0/5 cm/s as one contiguous moving stretch and merged
         # separate 1-bin episodes.
-        is_moving = (group["head_speed"] > speed_threshold).to_numpy()
+        analysed = _analysed_rows(group)
+        is_moving = (group["head_speed"] > speed_threshold).to_numpy() & analysed
         collapsed = (
             (group["Local_prob"] < local_prob_threshold).to_numpy() & is_moving
         )
@@ -980,7 +1058,7 @@ def compute_local_state_collapse_details(
         if n_episodes == 0:
             continue
 
-        session_median_hpd = group["hpd"].median()
+        session_median_hpd = group.loc[analysed, "hpd"].median()
         error = group["ahead_behind_distance"].abs()
         nonlocal_prob = group["Non-Local_Continuous_prob"] + group["Non-Local_Fragmented_prob"]
         times = group.index.to_numpy()
@@ -1057,7 +1135,7 @@ def compute_calibration_curve(
         group_cols = list(_DEFAULT_GROUP_COLS)
 
     needed_cols = group_cols + ["Local_prob", "ahead_behind_distance"]
-    working = data[needed_cols].copy()
+    working = data.loc[_analysed_rows(data), needed_cols].copy()
     # Drop rows with NaN ``Local_prob`` BEFORE binning. ``np.digitize``
     # returns ``len(bin_edges)`` for NaN inputs, which after the
     # ``.clip(0, n_bins-1)`` below maps every NaN row into the
@@ -1160,8 +1238,8 @@ def compute_session_quality_summary(
         Fraction of running bouts dominated by non-local state above which
         ``flag_bout_nonlocal_dominant`` triggers. Catches localized decoder
         failures that are hidden in session-level state means. The default
-        (0.15) was calibrated against the dataset: the median across 218
-        sessions is ~6% and 0.15 flags the worst ~10%.
+        (0.15) was calibrated against the dataset: the median across the
+        sessions it was calibrated on was ~6% and 0.15 flagged the worst ~10%.
     running_error_p90_flag_threshold_cm : float, optional
         p90 of running-local decoding error above which
         ``flag_running_error_tail`` triggers. Catches catastrophic episodic
@@ -1183,6 +1261,9 @@ def compute_session_quality_summary(
     """
     if group_cols is None:
         group_cols = list(_DEFAULT_GROUP_COLS)
+    # Each metric below applies the rule itself (point-wise or as gaps); this
+    # only refuses a frame not read through the source before any work.
+    _analysed_rows(data)
 
     error_df = compute_local_decoding_error(
         data, local_prob_threshold=local_prob_threshold, group_cols=group_cols,

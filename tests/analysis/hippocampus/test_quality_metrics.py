@@ -65,6 +65,7 @@ def perfect_session() -> pd.DataFrame:
             "animal": "mouse1",
             "day": 20200101,
             "epoch": "02_r1",
+            "in_excluded_time": np.zeros(n, dtype=bool),
         },
         index=time,
     )
@@ -105,6 +106,7 @@ def collapsed_session() -> pd.DataFrame:
             "animal": "mouse2",
             "day": 20200102,
             "epoch": "02_r1",
+            "in_excluded_time": np.zeros(n, dtype=bool),
         },
         index=time,
     )
@@ -153,6 +155,7 @@ def session_with_events() -> pd.DataFrame:
             "animal": "mouse3",
             "day": 20200103,
             "epoch": "02_r1",
+            "in_excluded_time": np.zeros(n, dtype=bool),
         },
         index=time,
     )
@@ -179,9 +182,9 @@ class TestComputeLocalDecodingError:
         empty = pd.DataFrame(
             columns=[
                 "Local_prob", "ahead_behind_distance",
-                "animal", "day", "epoch",
+                "animal", "day", "epoch", "in_excluded_time",
             ]
-        )
+        ).astype({"in_excluded_time": bool})
         result = compute_local_decoding_error(empty)
         assert len(result) == 0
 
@@ -258,6 +261,7 @@ class TestComputeNoSpikeFiringCorrespondence:
             "animal": "mouse1",
             "day": 20200101,
             "epoch": "02_r1",
+            "in_excluded_time": False,
         })
         result = compute_no_spike_firing_correspondence(data)
         assert result["nospike_mua_rho"].iloc[0] < 0
@@ -276,6 +280,7 @@ class TestComputeNoSpikeFiringCorrespondence:
             "animal": "mouse1",
             "day": 20200101,
             "epoch": "02_r1",
+            "in_excluded_time": False,
         })
         result = compute_no_spike_firing_correspondence(data)
         assert result["nospike_mua_rho"].iloc[0] > 0
@@ -310,6 +315,7 @@ class TestComputeNonLocalEventContext:
                 "Non-Local_Fragmented_prob": [0.0] * 6,
                 "theta_power_zscore": [0.0] * 6,
                 "theta_phase": [0.0] * 6,
+                "in_excluded_time": False,
             },
             index=[0.0, 0.1, 0.2, 0.0, 0.1, 0.2],
         )
@@ -371,6 +377,7 @@ class TestComputeNonLocalEventContext:
                 "animal": "mouse_unequal",
                 "day": 20200104,
                 "epoch": "02_r1",
+                "in_excluded_time": np.zeros(n, dtype=bool),
             },
             index=time,
         )
@@ -419,6 +426,7 @@ class TestComputeNonLocalEventContext:
                         "head_speed": 0.0,
                         "theta_power_zscore": 1.5,
                         "theta_phase": phase,
+                        "in_excluded_time": False,
                     }
                 )
         df = _with_valid_nonlocal_probabilities(pd.DataFrame(rows))
@@ -457,6 +465,7 @@ class TestComputeNonLocalEventContext:
                     "head_speed": 0.0,
                     "theta_power_zscore": 1.5,
                     "theta_phase": phase,
+                    "in_excluded_time": False,
                 }
             )
         # Three more clean events so the session reduction has the
@@ -473,6 +482,7 @@ class TestComputeNonLocalEventContext:
                         "head_speed": 0.0,
                         "theta_power_zscore": 1.5,
                         "theta_phase": 0.55,
+                        "in_excluded_time": False,
                     }
                 )
         df = _with_valid_nonlocal_probabilities(pd.DataFrame(rows))
@@ -507,6 +517,7 @@ class TestComputeNonLocalEventContext:
                 "head_speed": [0.0] * 5,
                 "theta_phase": [np.nan] * 5,
                 "theta_power_zscore": [0.0] * 5,
+                "in_excluded_time": False,
             },
             index=[0.0, 0.5, 1.0, 1.5, 2.0],
         ))
@@ -528,6 +539,7 @@ class TestComputeNonLocalEventContext:
                 "head_speed": [5.0, 0.0, 0.0, 0.0],
                 "theta_phase": [np.nan] * 4,
                 "theta_power_zscore": [0.0] * 4,
+                "in_excluded_time": False,
             },
             index=[0.0, 0.5, 1.0, 1.5],
         ))
@@ -554,6 +566,7 @@ class TestComputeNonLocalEventContext:
                         "head_speed": 0.0,
                         "theta_power_zscore": 1.5,
                         "theta_phase": np.nan,
+                        "in_excluded_time": False,
                     }
                 )
         df = _with_valid_nonlocal_probabilities(pd.DataFrame(rows))
@@ -610,6 +623,7 @@ class TestComputeCalibrationCurve:
             "animal": "mouse1",
             "day": 20200101,
             "epoch": "02_r1",
+            "in_excluded_time": False,
         })
         result = compute_calibration_curve(data)
         assert result["calibration_slope"].iloc[0] < 0
@@ -640,6 +654,7 @@ class TestComputeCalibrationCurve:
                     42.0, 40.0, 12.0, 10.0,
                     np.nan, np.nan, np.nan, np.nan,
                 ],
+                "in_excluded_time": False,
             }
         )
         out = compute_calibration_curve(df, n_bins=3)
