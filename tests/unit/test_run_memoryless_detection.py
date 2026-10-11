@@ -74,6 +74,7 @@ DUMP = "--xla_dump_hlo_as_text"
 
 XLA_FLAGS_CASES = [
     (None, f"{DETERMINISTIC} {TRITON_OFF}"),
+    ("", f"{DETERMINISTIC} {TRITON_OFF}"),
     # the user's other flags are kept as they are
     (DUMP, f"{DUMP} {DETERMINISTIC} {TRITON_OFF}"),
     (
@@ -99,6 +100,11 @@ XLA_FLAGS_CASES = [
     ),
     # Triton GEMM: the last value of the flag decides, and =false is not repeated
     (TRITON_OFF, f"{TRITON_OFF} {DETERMINISTIC}"),
+    # a bare flag has no value of "false", so the required value is appended
+    (
+        "--xla_gpu_enable_triton_gemm",
+        f"--xla_gpu_enable_triton_gemm {DETERMINISTIC} {TRITON_OFF}",
+    ),
     (
         "--xla_gpu_enable_triton_gemm=true",
         f"--xla_gpu_enable_triton_gemm=true {DETERMINISTIC} {TRITON_OFF}",
@@ -1382,20 +1388,34 @@ class TestMain:
         known = settings["known_limits"]["bit_reproducible"]
         assert known["value"] is True
         measured = known["measured"]
-        assert DETERMINISTIC in measured
-        assert TRITON_OFF in measured
+        # the spike's flags, in the order they were set
+        assert measured.index(TRITON_OFF) < measured.index(DETERMINISTIC)
+        assert "appended by the runner" in measured
         # the epoch R12 lost runs, twice, with equal outputs
         assert "chimi20200224_08_r4_HPC" in measured
         assert "233 candidates, 11 replay, 7 passing" in measured
         assert "bit-for-bit equal" in measured
+        assert "only epoch run twice with Triton GEMM off" in measured
         # a passing epoch, against R12's output (Triton on)
+        assert "On one passing epoch" in measured
         assert "chimi20200225_02_r1_HPC" in measured
         assert "237 candidates, 4 replay, 3 passing" in measured
         assert "38 spread and 73 jump" in measured
         assert "about 291,000 windows" in measured
-        assert "1.7e-4" in measured
         assert "4:56" in measured
         assert "4:20" in measured
+        # the candidates' spread differs as much as the earlier no-flag run's did
+        assert "spread_cm differs in all 291,301 windows" in measured
+        assert "max relative 3.5e-3" in measured
+        assert "jump_cm differs in 2,769 windows" in measured
+        assert "1.7e-4" in measured
+        assert "null_jump_cm in 7 values (max relative 1.8e-2)" in measured
+        # and the Triton-off output is close to the earlier run with neither flag
+        assert "2026-10-10 run with neither flag" in measured
+        assert "0 gate flips" in measured
+        assert "4.2e-4" in measured
+        assert "the event bounds are the same" in measured
+        assert "the same windows as the 111 flips" in measured
 
     def test_settings_keep_the_earlier_measurements_with_their_flags(self):
         history = runner.run_settings(7, True, N_SHUFFLES, CONFIG, "test")[
@@ -1432,6 +1452,24 @@ class TestMain:
             "CANCELLED: Too small divisible part of the contracting dimension" in before
         )
         assert "clusterless_kde.py:89" in before
+        # the claim is as wide as the evidence: one epoch of three, one compared
+        assert (
+            "Only chimi20200224_08_r4_HPC has been run with Triton GEMM off" in before
+        )
+        assert "chimi20200227_04_r2_HPC and chimi20200228_02_r1_HPC" in before
+        assert "have not been run yet" in before
+        assert "the one epoch compared" in before
+
+    def test_settings_give_the_reason_for_triton_off_as_unconfirmed(self):
+        """The mechanism is the working explanation, so the record says so; the
+        hedge must not be lost when the text is edited."""
+        before = runner.run_settings(7, True, N_SHUFFLES, CONFIG, "test")[
+            "known_limits"
+        ]["bit_reproducible"]["runs_before_this_change"]
+
+        assert "the working explanation; not confirmed" in before
+        assert "turn off XLA's autotuning" in before
+        assert "the spike tested the fix, not the mechanism" in before
 
     @pytest.mark.parametrize(("inherited", "expected"), XLA_FLAGS_CASES)
     def test_settings_record_the_xla_flags(self, monkeypatch, inherited, expected):

@@ -1159,10 +1159,11 @@ automatically (D7).
 ## Run-to-run reproducibility
 
 Two runs of the detector on the same epoch at identical settings are bit-for-bit
-equal, because the runner runs XLA in deterministic mode with Triton GEMM off. Every
-run made after this change does so, so every epoch runs under one setting (the
-coordinator's ruling, 2026-10-11). R12 ran in deterministic mode with Triton GEMM on,
-and lost 3 epochs for that reason (below).
+equal when the runner runs XLA in deterministic mode with Triton GEMM off. This was
+measured on chimi20200224_08_r4_HPC (below). Every run made after this change uses
+these settings, so every epoch runs under one setting (the coordinator's ruling,
+2026-10-11). R12 ran in deterministic mode with Triton GEMM on, and lost 3 epochs to
+the error below.
 
 Every process that runs JAX gets two flags added to the `XLA_FLAGS` it inherits:
 `--xla_gpu_deterministic_ops=true` and `--xla_gpu_enable_triton_gemm=false`. These are
@@ -1178,17 +1179,19 @@ workers and the runner get that same value, so the manifest says what they ran w
 resume under the same run id with other flags is refused, like any other change of
 settings.
 
-Triton GEMM is off because deterministic mode alone failed some epochs. Deterministic
-ops turn off XLA's autotuning, and the default Triton GEMM setup then fails on some
-shapes. With Triton GEMM off, XLA sends these matrix products to cuBLAS. R12 (run
+Triton GEMM is off because deterministic mode alone failed some epochs. The working
+explanation (not confirmed) is that deterministic ops turn off XLA's autotuning, and
+the default Triton GEMM setup then fails on some shapes. The spike below tested the fix,
+not the mechanism. With Triton GEMM off, XLA sends these matrix products to cuBLAS. R12 (run
 `c55cf318d199-seed20260922`, 242 epochs) used deterministic mode with Triton GEMM on and
 lost 3 epochs: chimi20200224_08_r4_HPC, chimi20200227_04_r2_HPC and
 chimi20200228_02_r1_HPC. Each failed in the shuffle with
 `JaxRuntimeError('CANCELLED: Too small divisible part of the contracting dimension.')`,
 at `non_local_detector/likelihoods/clusterless_kde.py:89`
 (`spike_waveform_feature_distance.T @ position_distance`). All three ran without error
-on 2026-10-05, with neither flag. The reason given above is the working
-explanation (autotuning off); the spike below tested the fix, not the mechanism.
+on 2026-10-05, with neither flag. So far only chimi20200224_08_r4_HPC has been run
+with Triton GEMM off (it runs, below). chimi20200227_04_r2_HPC and
+chimi20200228_02_r1_HPC have not been run yet; the full rerun will run them.
 
 The R12 Triton spike (2026-10-11) measured it on breeze, one epoch per GPU, with the
 canonical R11 decodes and seed 20260922:
@@ -1196,16 +1199,27 @@ canonical R11 decodes and seed 20260922:
 - With deterministic ops alone, chimi20200224_08_r4_HPC fails again, 4:34 into the run.
 - With `--xla_gpu_enable_triton_gemm=false` added, it runs: 233 candidates, 11 replay,
   7 passing the shuffle. The 2026-10-05 run, with neither flag, had 232, 11 and 7.
-- Two such runs are bit-for-bit equal; only `run_id` differs.
-- On a passing epoch, chimi20200225_02_r1_HPC, the output with Triton GEMM off differs
-  a little from R12's (Triton GEMM on, both deterministic). The counts are the same:
-  237 candidates, 4 replay, 3 passing the shuffle. 38 spread gates and 73 jump gates
-  flip, out of about 291,000 windows that have a spread (295,369 windows in all). One
-  event's bounds move by a window. The null spread differs by at most 1.7e-4 relative.
-  Wall time is 4:56 against 4:20.
+- Two such runs are bit-for-bit equal; only `run_id` differs. This is the only epoch
+  run twice with Triton GEMM off.
+- On one passing epoch, chimi20200225_02_r1_HPC, the output with Triton GEMM off differs
+  from the R12 smoke test's (Triton GEMM on, both deterministic). The counts are the
+  same: 237 candidates, 4 replay, 3 passing the shuffle. 38 spread gates and 73 jump
+  gates flip, out of about 291,000 windows that have a spread (295,369 windows in all).
+  One event's bounds move by a window. In the candidates, `decisions spread_cm` differs
+  in all 291,301 windows with a finite spread (largest relative difference 3.5e-3), and
+  `jump_cm` differs in 2,769 windows (largest relative difference 1.0). In the shuffle,
+  the null spread differs by at most 1.7e-4 relative, and `null_jump_cm` in 7 values
+  (largest relative difference 1.8e-2). Wall time is 4:56 against 4:20.
+- On the same epoch, the output with Triton GEMM off is much closer to the 2026-10-10 run
+  with neither flag than R12 is. Against that run there are 0 gate flips, the spread
+  differs by at most 4.2e-4 relative, and the event bounds are the same. The 38 spread
+  and 73 jump flips against R12 are the same windows as the 111 flips that run showed
+  against R12.
 
-So Triton GEMM on and off agree on the counts and differ slightly at the window level.
-R12 is rerun whole under a new run id, so that every epoch runs under one setting.
+On this one epoch, Triton GEMM on and off agree on the counts and differ at the window
+level: the candidate spread differs by up to 0.35 % relative, as it does between the run
+with neither flag and the deterministic run with Triton GEMM on (below). R12 is rerun
+whole under a new run id, so that every epoch runs under one setting.
 
 Every run manifest records this in its settings (`known_limits.bit_reproducible`,
 `run_memoryless_detection.KNOWN_LIMITS`): the measurement above, the earlier ones as
