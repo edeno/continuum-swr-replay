@@ -49,6 +49,7 @@ from ..replay.bouts import (
     bout_exposure_s,
     immobility_bout_intervals,
     nearest_well_distance_cm,
+    summarize_bout_location,
     time_since_stop,
 )
 from ..replay.covariate_registry import stamp_covariate_schema
@@ -726,7 +727,9 @@ def build_contfrag_stop_table(
     The ``stop_id`` hash matches ``build_contfrag_event_table``'s
     ``stop_id`` row-for-row, so the two tables join cleanly.
     ``immobility_duration_s`` is the stop's span less the excluded time
-    inside it, as in the NonLocal stop table.
+    inside it, and the stop's location, segment and distance summaries read
+    only its rows outside excluded time, as in the NonLocal stop table (one
+    helper, ``bouts.summarize_bout_location``).
 
     The table carries every column the shared per-stop rate ladder
     (``MODEL_PER_STOP_RATE``) reads: the reward-history basis
@@ -789,9 +792,11 @@ def build_contfrag_stop_table(
     per_bout = pd.DataFrame({"stop_idx": np.arange(n_bouts, dtype=np.int64)})
     per_bout["stop_start"] = bout_starts
     per_bout["stop_end"] = bout_ends
-    # The stop's exposure: its span less the excluded time inside it.
+    # The stop's exposure: its span less the excluded time inside it. The
+    # location summaries below read the same intervals.
+    excluded = excluded_intervals_of(dot)
     per_bout["immobility_duration_s"] = bout_exposure_s(
-        bout_starts, bout_ends, excluded_intervals_of(dot)
+        bout_starts, bout_ends, excluded
     )
     per_bout["reward_fraction_last10_known_trials"] = recent_trial_reward_rate(
         bout_starts, port_experiences
@@ -875,40 +880,23 @@ def build_contfrag_stop_table(
         dtype="Int64",
     )
 
-    # Whole-window behavioral location plus modal physical segment. The
-    # at-well occupancy arm (occupancy_well_arm) is NaN off a single well.
-    location_state_vals: list[str] = []
-    at_well_vals: list[object] = []
-    location_well_vals = np.full(n_bouts, np.nan)
-    physical_arm_vals = np.full(n_bouts, np.nan)
-    nearest_min_vals = np.full(n_bouts, np.nan)
-    nearest_mean_vals = np.full(n_bouts, np.nan)
-    nearest_max_vals = np.full(n_bouts, np.nan)
-    current_arm_vals = np.full(n_bouts, np.nan)
+    # Behavioral location, modal physical segment and distances over the
+    # bout's rows outside excluded time, as in the NonLocal stop table (one
+    # helper). The at-well occupancy arm (occupancy_well_arm) is NaN off a
+    # single well.
+    location = summarize_bout_location(bout_rows, n_bouts, track_graph, excluded)
+    for column in location.columns:
+        per_bout[column] = location[column]
+    current_arm_vals = location["occupancy_well_arm"].to_numpy()
+
+    # The contextual wells at the bout's first row: the state at the stop's
+    # start, not a summary over its bins, so read whether or not that row is
+    # in excluded time.
     prev_arm_vals = np.full(n_bouts, np.nan)
     next_arm_vals = np.full(n_bouts, np.nan)
     last_rew_vals = np.full(n_bouts, np.nan)
     completed_trial_arm_vals = np.full(n_bouts, np.nan)
     for bi, (_, g) in enumerate(grouped):
-        physical_arm = (
-            safe_mode(g["track_segment_id"]) if "track_segment_id" in g else np.nan
-        )
-        location = summarize_behavioral_location(
-            g[["occupancy_state", "occupancy_well_id"]]
-        )
-        location_well = float(location["occupancy_well_id"])
-        location_arm = single_arm_from_well(location_well, track_graph)
-        location_state_vals.append(str(location["occupancy_state"]))
-        at_well_vals.append(location["at_well"])
-        location_well_vals[bi] = location_well
-        physical_arm_vals[bi] = physical_arm
-        current_arm_vals[bi] = location_arm
-        distance = g["nearest_well_distance_cm"].to_numpy(dtype=float)
-        finite_distance = distance[np.isfinite(distance)]
-        if finite_distance.size:
-            nearest_min_vals[bi] = finite_distance.min()
-            nearest_mean_vals[bi] = finite_distance.mean()
-            nearest_max_vals[bi] = finite_distance.max()
         prev_arm_vals[bi] = single_arm_from_well(
             strict_first(g["prev_well"]), track_graph
         )
@@ -922,14 +910,6 @@ def build_contfrag_stop_table(
             strict_first(g["last_visited_well"]), track_graph
         )
 
-    per_bout["occupancy_state"] = location_state_vals
-    per_bout["at_well"] = pd.array(at_well_vals, dtype="boolean")
-    per_bout["occupancy_well_id"] = location_well_vals
-    per_bout["modal_observed_track_segment_id"] = physical_arm_vals
-    per_bout["nearest_well_distance_cm_min"] = nearest_min_vals
-    per_bout["nearest_well_distance_cm_mean"] = nearest_mean_vals
-    per_bout["nearest_well_distance_cm_max"] = nearest_max_vals
-    per_bout["occupancy_well_arm"] = current_arm_vals
     per_bout["prev_arm"] = prev_arm_vals
     per_bout["next_arm"] = next_arm_vals
     per_bout["last_rewarded_arm"] = last_rew_vals

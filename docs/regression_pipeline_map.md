@@ -146,7 +146,7 @@ _No module-level public symbols._
 
 Immobility bouts: where a stop begins and ends, and what falls inside one.
 
-`nearest_well_distance_cm`, `immobility_bout_intervals`, `bout_exposure_s`, `time_since_stop`, `assign_bout`
+`nearest_well_distance_cm`, `immobility_bout_intervals`, `bout_exposure_s`, `summarize_bout_location`, `time_since_stop`, `assign_bout`
 
 ### `src/continuum_swr_replay/analysis/replay/cohort_selection.py`
 

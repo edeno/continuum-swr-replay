@@ -5,6 +5,8 @@ timebins below the immobility speed threshold; events are placed in one by
 timestamp, and their time since the bout began is the point-process clock the
 per-bin rate models are built on. ``nearest_well_distance_cm`` is the physical
 companion: how far the animal actually was from a reward port while stopped.
+``summarize_bout_location`` is where a stop was, over its rows outside excluded
+time, for both stop tables.
 """
 
 from __future__ import annotations
@@ -16,13 +18,20 @@ import pandas as pd
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
-from continuum_swr_replay.analysis.hippocampus.artifacts.masks import covered_seconds
+from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
+    covered_seconds,
+    interval_mask,
+)
+
+from ._helpers import safe_mode, single_arm_from_well
+from .covariates.context import summarize_behavioral_location
 
 __all__ = [
     "assign_bout",
     "bout_exposure_s",
     "immobility_bout_intervals",
     "nearest_well_distance_cm",
+    "summarize_bout_location",
     "time_since_stop",
 ]
 
@@ -153,6 +162,92 @@ def bout_exposure_s(
         return span
     exposure: np.ndarray = span - covered_seconds(bout_starts, bout_ends, excluded)
     return exposure
+
+
+def summarize_bout_location(
+    bout_rows: pd.DataFrame,
+    n_bouts: int,
+    track_graph: nx.Graph,
+    excluded: pd.DataFrame,
+) -> pd.DataFrame:
+    """Where each bout was: location, segment and distance to a well.
+
+    Excluded time (the artifact mask widened by 0.3 s) is not analysed, so each
+    summary reads only the bout's rows outside it (closed intervals). A bout
+    wholly inside it is ``unknown``, with no well, segment or distance. The
+    bout itself is not changed. With no excluded time every row is read.
+
+    Parameters
+    ----------
+    bout_rows : pd.DataFrame
+        The session frame's rows that lie in a bout, time-indexed (seconds),
+        with ``_bout_idx`` (0 .. ``n_bouts - 1``, from :func:`assign_bout`),
+        ``occupancy_state``, ``occupancy_well_id``,
+        ``nearest_well_distance_cm`` and, when the frame has it,
+        ``track_segment_id``.
+    n_bouts : int
+        Number of bouts.
+    track_graph : nx.Graph
+        Session track graph, for the well's arm.
+    excluded : pd.DataFrame
+        The epoch's excluded time (``swr_source.excluded_intervals``):
+        ``start_time`` and ``end_time``, closed.
+
+    Returns
+    -------
+    pd.DataFrame, shape (n_bouts, 8)
+        Indexed 0 .. ``n_bouts - 1``: ``occupancy_state``, ``at_well``
+        (nullable boolean) and ``occupancy_well_id``
+        (``summarize_behavioral_location``); ``modal_observed_track_segment_id``
+        (the modal segment, NaN without the column);
+        ``nearest_well_distance_cm_min``, ``_mean`` and ``_max`` over the
+        finite distances; and ``occupancy_well_arm``, the arm of the well of a
+        strict at-well bout, NaN otherwise.
+    """
+    times = bout_rows.index.to_numpy(dtype=float)
+    analysed = bout_rows.loc[~interval_mask(times, excluded)]
+    by_bout = dict(tuple(analysed.groupby("_bout_idx", sort=True)))
+    no_rows = analysed.iloc[0:0]
+
+    states: list[str] = []
+    at_well: list[object] = []
+    wells = np.full(n_bouts, np.nan)
+    segments = np.full(n_bouts, np.nan)
+    distance_min = np.full(n_bouts, np.nan)
+    distance_mean = np.full(n_bouts, np.nan)
+    distance_max = np.full(n_bouts, np.nan)
+    arms = np.full(n_bouts, np.nan)
+    for bout in range(n_bouts):
+        rows = by_bout.get(bout, no_rows)
+        location = summarize_behavioral_location(
+            rows[["occupancy_state", "occupancy_well_id"]]
+        )
+        well = float(location["occupancy_well_id"])
+        states.append(str(location["occupancy_state"]))
+        at_well.append(location["at_well"])
+        wells[bout] = well
+        arms[bout] = single_arm_from_well(well, track_graph)
+        if "track_segment_id" in rows:
+            segments[bout] = safe_mode(rows["track_segment_id"])
+        distance = rows["nearest_well_distance_cm"].to_numpy(dtype=float)
+        finite_distance = distance[np.isfinite(distance)]
+        if finite_distance.size:
+            distance_min[bout] = finite_distance.min()
+            distance_mean[bout] = finite_distance.mean()
+            distance_max[bout] = finite_distance.max()
+
+    return pd.DataFrame(
+        {
+            "occupancy_state": states,
+            "at_well": pd.array(at_well, dtype="boolean"),
+            "occupancy_well_id": wells,
+            "modal_observed_track_segment_id": segments,
+            "nearest_well_distance_cm_min": distance_min,
+            "nearest_well_distance_cm_mean": distance_mean,
+            "nearest_well_distance_cm_max": distance_max,
+            "occupancy_well_arm": arms,
+        }
+    )
 
 
 def time_since_stop(

@@ -18,9 +18,6 @@ from ._helpers import (
     arm_to_patch as _arm_to_patch,
 )
 from ._helpers import (
-    safe_mode as _safe_mode,
-)
-from ._helpers import (
     single_arm_from_well as _single_arm_from_well,
 )
 from ._helpers import (
@@ -46,13 +43,15 @@ from .bouts import (
 from .bouts import (
     nearest_well_distance_cm as _nearest_well_distance_cm,
 )
+from .bouts import (
+    summarize_bout_location as _summarize_bout_location,
+)
 from .covariate_registry import stamp_covariate_schema
 from .covariates import (
     add_trial_context,
     lagged_trial_rewards,
     recent_trial_reward_rate,
     reward_history_basis_features,
-    summarize_behavioral_location,
 )
 from .design_constants import (
     N_REWARD_LAGS,
@@ -84,6 +83,13 @@ def build_stop_table(
     stop_start`` less the epoch's excluded time inside the stop
     (``swr_source.excluded_intervals``, the artifact mask widened by 0.3 s;
     nothing with no artifact run). A stop wholly inside it has zero exposure.
+    The stop's location, segment and distance summaries (``occupancy_state``,
+    ``at_well``, ``occupancy_well_id``, ``modal_observed_track_segment_id``,
+    ``nearest_well_distance_cm_*`` and the columns derived from them) read only
+    its rows outside excluded time (``bouts.summarize_bout_location``): a stop
+    wholly inside it is ``unknown``, with NaN well, segment and distances, so it
+    is in no well-anchored cohort. The bout-start context columns read the
+    stop's first row, as before.
 
     The ``stop_id`` column is a 63-bit hash of
     ``(animal, day, epoch, stop_idx)`` and matches
@@ -155,9 +161,10 @@ def build_stop_table(
     per_bout["stop_end"] = bout_ends
     # The stop's exposure: its span less the excluded time inside it (the
     # artifact mask widened by 0.3 s is no rate's denominator). The bout itself
-    # is unchanged.
+    # is unchanged. The location summaries below read the same intervals.
+    excluded = excluded_intervals_of(dot)
     per_bout["immobility_duration_s"] = _bout_exposure_s(
-        bout_starts, bout_ends, excluded_intervals_of(dot)
+        bout_starts, bout_ends, excluded
     )
     per_bout["reward_fraction_last10_known_trials"] = recent_trial_reward_rate(
         bout_starts, port_experiences
@@ -274,43 +281,25 @@ def build_stop_table(
         dtype="Int64",
     )
 
-    # Behavioral-location and physical-segment fields use the whole bout.
-    # ``occupancy_well_arm`` is defined only for strict at-well occupancy; a
-    # trunk/in-transit/mixed bout is never rewritten as a
-    # destination leaf arm. ``_strict_first`` below is reserved for contextual
-    # previous/next/rewarded wells at the bout start.
-    location_state_vals: list[str] = []
-    at_well_vals: list[object] = []
-    location_well_vals = np.full(n_bouts, np.nan)
-    physical_arm_vals = np.full(n_bouts, np.nan)
-    nearest_min_vals = np.full(n_bouts, np.nan)
-    nearest_mean_vals = np.full(n_bouts, np.nan)
-    nearest_max_vals = np.full(n_bouts, np.nan)
-    current_arm_vals = np.full(n_bouts, np.nan)
+    # Behavioral-location, physical-segment and distance fields summarise the
+    # bout's rows outside excluded time (the stop's exposure's intervals); a
+    # bout wholly inside it is ``unknown``, with NaN well, segment and
+    # distances. ``occupancy_well_arm`` is defined only for strict at-well
+    # occupancy; a trunk/in-transit/mixed bout is never rewritten as a
+    # destination leaf arm.
+    location = _summarize_bout_location(bout_rows, n_bouts, track_graph, excluded)
+    for column in location.columns:
+        per_bout[column] = location[column]
+    current_arm_vals = location["occupancy_well_arm"].to_numpy()
+
+    # ``_strict_first`` reads the contextual previous/next/rewarded wells at
+    # the bout's first row: the state at the stop's start, not a summary over
+    # its bins, so it reads that row whether or not it is in excluded time.
     prev_arm_vals = np.full(n_bouts, np.nan)
     next_arm_vals = np.full(n_bouts, np.nan)
     last_rew_vals = np.full(n_bouts, np.nan)
     completed_trial_arm_vals = np.full(n_bouts, np.nan)
     for bi, (_, g) in enumerate(grouped):
-        physical_arm = (
-            _safe_mode(g["track_segment_id"]) if "track_segment_id" in g else np.nan
-        )
-        location = summarize_behavioral_location(
-            g[["occupancy_state", "occupancy_well_id"]]
-        )
-        location_well = float(location["occupancy_well_id"])
-        location_arm = _single_arm_from_well(location_well, track_graph)
-        location_state_vals.append(str(location["occupancy_state"]))
-        at_well_vals.append(location["at_well"])
-        location_well_vals[bi] = location_well
-        physical_arm_vals[bi] = physical_arm
-        current_arm_vals[bi] = location_arm
-        distance = g["nearest_well_distance_cm"].to_numpy(dtype=float)
-        finite_distance = distance[np.isfinite(distance)]
-        if finite_distance.size:
-            nearest_min_vals[bi] = finite_distance.min()
-            nearest_mean_vals[bi] = finite_distance.mean()
-            nearest_max_vals[bi] = finite_distance.max()
         prev_arm_vals[bi] = _single_arm_from_well(
             _strict_first(g["prev_well"]), track_graph
         )
@@ -324,14 +313,6 @@ def build_stop_table(
             _strict_first(g["last_visited_well"]), track_graph
         )
 
-    per_bout["occupancy_state"] = location_state_vals
-    per_bout["at_well"] = pd.array(at_well_vals, dtype="boolean")
-    per_bout["occupancy_well_id"] = location_well_vals
-    per_bout["modal_observed_track_segment_id"] = physical_arm_vals
-    per_bout["nearest_well_distance_cm_min"] = nearest_min_vals
-    per_bout["nearest_well_distance_cm_mean"] = nearest_mean_vals
-    per_bout["nearest_well_distance_cm_max"] = nearest_max_vals
-    per_bout["occupancy_well_arm"] = current_arm_vals
     per_bout["prev_arm"] = prev_arm_vals
     per_bout["next_arm"] = next_arm_vals
     per_bout["last_rewarded_arm"] = last_rew_vals
