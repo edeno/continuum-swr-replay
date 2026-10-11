@@ -1159,24 +1159,63 @@ automatically (D7).
 ## Run-to-run reproducibility
 
 Two runs of the detector on the same epoch at identical settings are bit-for-bit
-equal, because the runner runs XLA in deterministic mode. R12 and every later run do
-so (the coordinator's ruling, 2026-10-10).
+equal, because the runner runs XLA in deterministic mode with Triton GEMM off. Every
+run made after this change does so, so every epoch runs under one setting (the
+coordinator's ruling, 2026-10-11). R12 ran in deterministic mode with Triton GEMM on,
+and lost 3 epochs for that reason (below).
 
-Every process that runs JAX gets `--xla_gpu_deterministic_ops=true` added to the
-`XLA_FLAGS` it inherits. These are the Dask GPU workers, or the runner itself when it
-runs the epochs one after another. The user's own flags are kept. When a flag is given
-more than once, XLA uses its last value, so the runner adds the flag unless the last
-`--xla_gpu_deterministic_ops` already says `=true`. XLA reads `XLA_FLAGS` once, when
-JAX starts in a process, so the runner sets them before that: in each worker's
-environment when the worker is started, and in its own environment while it runs an
-epoch. Its own environment is restored afterwards. The runner works the flags out
-once and records them in the run manifest's settings (`xla_flags`). The workers and
-the runner get that same value, so the manifest says what they ran with. A resume
-under the same run id with other flags is refused, like any other change of settings.
+Every process that runs JAX gets two flags added to the `XLA_FLAGS` it inherits:
+`--xla_gpu_deterministic_ops=true` and `--xla_gpu_enable_triton_gemm=false`. These are
+the Dask GPU workers, or the runner itself when it runs the epochs one after another.
+The user's own flags are kept. When a flag is given more than once, XLA uses its last
+value, so the runner adds each flag unless the last occurrence of that flag already has
+the value the runner needs. A flag that is already right is not added twice. XLA reads
+`XLA_FLAGS` once, when JAX starts in a process, so the runner sets them before that: in
+each worker's environment when the worker is started, and in its own environment while
+it runs an epoch. Its own environment is restored afterwards. The runner works the
+flags out once and records them in the run manifest's settings (`xla_flags`). The
+workers and the runner get that same value, so the manifest says what they ran with. A
+resume under the same run id with other flags is refused, like any other change of
+settings.
 
-The R12 smoke test (2026-10-10) measured it on breeze, on one epoch:
-chimi20200225_02_r1_HPC, seed 20260922, with the decodes read from the R11 staging
-folder.
+Triton GEMM is off because deterministic mode alone failed some epochs. Deterministic
+ops turn off XLA's autotuning, and the default Triton GEMM setup then fails on some
+shapes. With Triton GEMM off, XLA sends these matrix products to cuBLAS. R12 (run
+`c55cf318d199-seed20260922`, 242 epochs) used deterministic mode with Triton GEMM on and
+lost 3 epochs: chimi20200224_08_r4_HPC, chimi20200227_04_r2_HPC and
+chimi20200228_02_r1_HPC. Each failed in the shuffle with
+`JaxRuntimeError('CANCELLED: Too small divisible part of the contracting dimension.')`,
+at `non_local_detector/likelihoods/clusterless_kde.py:89`
+(`spike_waveform_feature_distance.T @ position_distance`). All three ran without error
+on 2026-10-05, with neither flag. The reason given above is the working
+explanation (autotuning off); the spike below tested the fix, not the mechanism.
+
+The R12 Triton spike (2026-10-11) measured it on breeze, one epoch per GPU, with the
+canonical R11 decodes and seed 20260922:
+
+- With deterministic ops alone, chimi20200224_08_r4_HPC fails again, 4:34 into the run.
+- With `--xla_gpu_enable_triton_gemm=false` added, it runs: 233 candidates, 11 replay,
+  7 passing the shuffle. The 2026-10-05 run, with neither flag, had 232, 11 and 7.
+- Two such runs are bit-for-bit equal; only `run_id` differs.
+- On a passing epoch, chimi20200225_02_r1_HPC, the output with Triton GEMM off differs
+  a little from R12's (Triton GEMM on, both deterministic). The counts are the same:
+  237 candidates, 4 replay, 3 passing the shuffle. 38 spread gates and 73 jump gates
+  flip, out of about 291,000 windows that have a spread (295,369 windows in all). One
+  event's bounds move by a window. The null spread differs by at most 1.7e-4 relative.
+  Wall time is 4:56 against 4:20.
+
+So Triton GEMM on and off agree on the counts and differ slightly at the window level.
+R12 is rerun whole under a new run id, so that every epoch runs under one setting.
+
+Every run manifest records this in its settings (`known_limits.bit_reproducible`,
+`run_memoryless_detection.KNOWN_LIMITS`): the measurement above, the earlier ones as
+history with the flags each used, and a note that R12 used Triton GEMM and lost 3
+epochs.
+
+Before the Triton flag, the runner set deterministic mode only. The R12 smoke test
+(2026-10-10) measured that on one epoch: chimi20200225_02_r1_HPC, seed 20260922, with
+the decodes read from the R11 staging folder. The only flag was
+`--xla_gpu_deterministic_ops=true`, so Triton GEMM was on.
 
 - Two runs with the flag are bit-for-bit equal. Every column of the events, shuffle
   draws, observed and candidates outputs matches; only `run_id` differs.
@@ -1185,11 +1224,8 @@ folder.
   spread differs by up to 0.35 % relative, and one event's bounds move by a window.
   The counts are equal: 237 candidates, 4 replay, 3 passing the shuffle.
 
-Every run manifest records this in its settings (`known_limits.bit_reproducible`,
-`run_memoryless_detection.KNOWN_LIMITS`).
-
-Before the flag, two runs were not bit-for-bit equal. Task 17a (2026-10-09) measured
-it twice, without the flag:
+Before deterministic mode, with neither flag, two runs were not bit-for-bit equal. Task
+17a (2026-10-09) measured it twice:
 
 - chimi20200225_02_r1, two runs on one GPU, both with one thread (the runner before
   and after its thread fix, which with one thread does the same computation):

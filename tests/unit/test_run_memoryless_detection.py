@@ -68,37 +68,64 @@ N_SHUFFLES = 19
 """The fewest draws at which p <= 0.05 is possible."""
 CONFIG = MemorylessSequenceConfig(sampling_frequency=SAMPLING_FREQUENCY)
 
+DETERMINISTIC = "--xla_gpu_deterministic_ops=true"
+TRITON_OFF = "--xla_gpu_enable_triton_gemm=false"
+DUMP = "--xla_dump_hlo_as_text"
+
 XLA_FLAGS_CASES = [
-    (None, "--xla_gpu_deterministic_ops=true"),
+    (None, f"{DETERMINISTIC} {TRITON_OFF}"),
+    # the user's other flags are kept as they are
+    (DUMP, f"{DUMP} {DETERMINISTIC} {TRITON_OFF}"),
     (
-        "--xla_dump_hlo_as_text",
-        "--xla_dump_hlo_as_text --xla_gpu_deterministic_ops=true",
+        f"{DUMP} --xla_gpu_enable_triton_gemm=true --xla_other=1",
+        f"{DUMP} --xla_gpu_enable_triton_gemm=true --xla_other=1 "
+        f"{DETERMINISTIC} {TRITON_OFF}",
     ),
-    ("--xla_gpu_deterministic_ops=true", "--xla_gpu_deterministic_ops=true"),
-    (
-        "--xla_gpu_deterministic_ops=true --xla_dump_hlo_as_text",
-        "--xla_gpu_deterministic_ops=true --xla_dump_hlo_as_text",
-    ),
+    # deterministic ops: the last value of the flag decides
+    (DETERMINISTIC, f"{DETERMINISTIC} {TRITON_OFF}"),
+    (f"{DETERMINISTIC} {DUMP}", f"{DETERMINISTIC} {DUMP} {TRITON_OFF}"),
     (
         "--xla_gpu_deterministic_ops=false",
-        "--xla_gpu_deterministic_ops=false --xla_gpu_deterministic_ops=true",
+        f"--xla_gpu_deterministic_ops=false {DETERMINISTIC} {TRITON_OFF}",
     ),
     (
         "--xla_gpu_deterministic_ops=true --xla_gpu_deterministic_ops=false",
         "--xla_gpu_deterministic_ops=true --xla_gpu_deterministic_ops=false "
-        "--xla_gpu_deterministic_ops=true",
+        f"{DETERMINISTIC} {TRITON_OFF}",
     ),
     (
         "--xla_gpu_deterministic_ops=false --xla_gpu_deterministic_ops=true",
-        "--xla_gpu_deterministic_ops=false --xla_gpu_deterministic_ops=true",
+        f"--xla_gpu_deterministic_ops=false {DETERMINISTIC} {TRITON_OFF}",
     ),
+    # Triton GEMM: the last value of the flag decides, and =false is not repeated
+    (TRITON_OFF, f"{TRITON_OFF} {DETERMINISTIC}"),
+    (
+        "--xla_gpu_enable_triton_gemm=true",
+        f"--xla_gpu_enable_triton_gemm=true {DETERMINISTIC} {TRITON_OFF}",
+    ),
+    (
+        f"{DETERMINISTIC} --xla_gpu_enable_triton_gemm=true",
+        f"{DETERMINISTIC} --xla_gpu_enable_triton_gemm=true {TRITON_OFF}",
+    ),
+    (
+        f"{TRITON_OFF} --xla_gpu_enable_triton_gemm=true",
+        f"{TRITON_OFF} --xla_gpu_enable_triton_gemm=true {DETERMINISTIC} {TRITON_OFF}",
+    ),
+    (
+        f"--xla_gpu_enable_triton_gemm=true {TRITON_OFF}",
+        f"--xla_gpu_enable_triton_gemm=true {TRITON_OFF} {DETERMINISTIC}",
+    ),
+    # both already right: nothing is added
+    (f"{DETERMINISTIC} {TRITON_OFF}", f"{DETERMINISTIC} {TRITON_OFF}"),
+    (f"{TRITON_OFF} {DETERMINISTIC}", f"{TRITON_OFF} {DETERMINISTIC}"),
 ]
 """XLA_FLAGS as this process inherits them (None: unset), and as every process
-that runs JAX gets them. XLA uses the last value of a repeated flag, so the
-flag is appended unless the last ``--xla_gpu_deterministic_ops`` already says
-``=true``; the user's flags are kept."""
+that runs JAX gets them. XLA uses the last value of a repeated flag, so each
+required flag (deterministic ops on, Triton GEMM off) is appended unless the last
+occurrence of its name already has the required value; the user's flags are
+kept."""
 
-GIVEN_XLA_FLAGS = "--xla_dump_hlo_as_text --xla_gpu_deterministic_ops=true"
+GIVEN_XLA_FLAGS = f"{DUMP} {DETERMINISTIC} {TRITON_OFF}"
 """XLA_FLAGS handed to ``cuda_cluster``, as ``main`` hands it the settings'."""
 
 
@@ -1347,20 +1374,64 @@ class TestMain:
             self.cli(decode_root, tmp_path)
 
     def test_settings_record_that_runs_are_bit_reproducible(self):
-        """What a run states about itself: with deterministic XLA two runs are
-        bit-for-bit equal (R12 smoke test); without it they were not (Task 17a)."""
+        """What a run states about itself: with deterministic XLA and Triton GEMM
+        off two runs are bit-for-bit equal (R12 Triton spike). The earlier
+        measurements are kept as history, each with the flags it used."""
         settings = runner.run_settings(7, True, N_SHUFFLES, CONFIG, "test")
 
         known = settings["known_limits"]["bit_reproducible"]
         assert known["value"] is True
-        assert "--xla_gpu_deterministic_ops=true" in known["measured"]
-        assert "chimi20200225_02_r1_HPC" in known["measured"]
-        assert "111 of 295,369 windows" in known["measured"]
-        # the earlier measurement is kept, as made without the flag
-        assert "without the flag" in known["history"]
-        assert "1.2e-4" in known["history"]
-        assert "j1620210706_02_r1" in known["history"]
-        assert "every event-level output equal" in known["history"]
+        measured = known["measured"]
+        assert DETERMINISTIC in measured
+        assert TRITON_OFF in measured
+        # the epoch R12 lost runs, twice, with equal outputs
+        assert "chimi20200224_08_r4_HPC" in measured
+        assert "233 candidates, 11 replay, 7 passing" in measured
+        assert "bit-for-bit equal" in measured
+        # a passing epoch, against R12's output (Triton on)
+        assert "chimi20200225_02_r1_HPC" in measured
+        assert "237 candidates, 4 replay, 3 passing" in measured
+        assert "38 spread and 73 jump" in measured
+        assert "about 291,000 windows" in measured
+        assert "1.7e-4" in measured
+        assert "4:56" in measured
+        assert "4:20" in measured
+
+    def test_settings_keep_the_earlier_measurements_with_their_flags(self):
+        history = runner.run_settings(7, True, N_SHUFFLES, CONFIG, "test")[
+            "known_limits"
+        ]["bit_reproducible"]["history"]
+
+        # R12 smoke test: deterministic ops only, so Triton GEMM was on
+        assert "2026-10-10" in history
+        assert "Triton GEMM on" in history
+        assert "111 of 295,369 windows" in history
+        assert "5:10" in history
+        # Task 17a: neither flag
+        assert "2026-10-09" in history
+        assert "neither flag" in history
+        assert "1.2e-4" in history
+        assert "j1620210706_02_r1" in history
+        assert "every event-level output equal" in history
+
+    def test_settings_say_that_r12_ran_with_triton_gemm_and_lost_epochs(self):
+        before = runner.run_settings(7, True, N_SHUFFLES, CONFIG, "test")[
+            "known_limits"
+        ]["bit_reproducible"]["runs_before_this_change"]
+
+        assert "c55cf318d199-seed20260922" in before
+        assert "Triton GEMM on" in before
+        assert "3 of 242 epochs" in before
+        for epoch_id in (
+            "chimi20200224_08_r4_HPC",
+            "chimi20200227_04_r2_HPC",
+            "chimi20200228_02_r1_HPC",
+        ):
+            assert epoch_id in before
+        assert (
+            "CANCELLED: Too small divisible part of the contracting dimension" in before
+        )
+        assert "clusterless_kde.py:89" in before
 
     @pytest.mark.parametrize(("inherited", "expected"), XLA_FLAGS_CASES)
     def test_settings_record_the_xla_flags(self, monkeypatch, inherited, expected):
@@ -1372,6 +1443,25 @@ class TestMain:
 
         assert settings["xla_flags"] == expected
 
+    def test_settings_record_both_flags_by_the_last_token_rule(self, monkeypatch):
+        """Whatever the user gave, the last occurrence of each required flag in
+        the record has the required value."""
+        set_xla_flags(
+            monkeypatch,
+            "--xla_gpu_deterministic_ops=false --xla_gpu_enable_triton_gemm=true",
+        )
+
+        recorded = runner.run_settings(7, True, N_SHUFFLES, CONFIG, "test")[
+            "xla_flags"
+        ].split()
+
+        assert [f for f in recorded if f.startswith("--xla_gpu_deterministic_ops=")][
+            -1
+        ] == DETERMINISTIC
+        assert [f for f in recorded if f.startswith("--xla_gpu_enable_triton_gemm=")][
+            -1
+        ] == TRITON_OFF
+
     def test_a_rerun_with_other_xla_flags_is_refused(
         self, decode_root, tmp_path, monkeypatch
     ):
@@ -1379,6 +1469,23 @@ class TestMain:
         monkeypatch.delenv("XLA_FLAGS", raising=False)
         self.cli(decode_root, tmp_path)
         monkeypatch.setenv("XLA_FLAGS", "--xla_dump_hlo_as_text")
+
+        with pytest.raises(SystemExit, match="other settings"):
+            self.cli(decode_root, tmp_path)
+
+    def test_a_run_recorded_with_deterministic_ops_only_is_not_resumed(
+        self, decode_root, tmp_path, monkeypatch
+    ):
+        """R12 ran with Triton GEMM on and recorded only the deterministic flag.
+        Under the same run id, the runner now asks for both, so the settings
+        differ and the resume is refused."""
+        monkeypatch.delenv("XLA_FLAGS", raising=False)
+        self.cli(decode_root, tmp_path)
+        manifest_path = tmp_path / "memoryless" / "cli-run" / "manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        assert manifest["settings"]["xla_flags"] == f"{DETERMINISTIC} {TRITON_OFF}"
+        manifest["settings"]["xla_flags"] = DETERMINISTIC
+        manifest_path.write_text(json.dumps(manifest))
 
         with pytest.raises(SystemExit, match="other settings"):
             self.cli(decode_root, tmp_path)
@@ -1570,7 +1677,7 @@ class TestMain:
 
         assert given == [read_manifest(tmp_path)["settings"]["xla_flags"]]
         assert given == [
-            "--xla_gpu_deterministic_ops=false --xla_gpu_deterministic_ops=true"
+            f"--xla_gpu_deterministic_ops=false {DETERMINISTIC} {TRITON_OFF}"
         ]
 
 
@@ -1742,4 +1849,48 @@ class TestWorkerXlaFlags:
                 seen = client.run(_xla_flags)
 
         assert list(seen.values()) == [GIVEN_XLA_FLAGS]
+        assert os.environ.get("XLA_FLAGS") == inherited
+
+    @pytest.mark.parametrize(
+        "inherited",
+        [
+            None,
+            "--xla_gpu_deterministic_ops=false",
+            "--xla_gpu_enable_triton_gemm=true",
+            f"{DETERMINISTIC} --xla_gpu_enable_triton_gemm=true",
+        ],
+    )
+    def test_each_worker_carries_both_flags(self, tmp_path, monkeypatch, inherited):
+        """The workers get what ``xla_flags`` works out from this process's
+        environment: deterministic ops on and Triton GEMM off, last."""
+        set_xla_flags(monkeypatch, inherited)
+
+        def worker_processes(**kwargs):
+            return LocalCluster(
+                n_workers=1,
+                threads_per_worker=1,
+                processes=True,
+                dashboard_address=":0",
+                local_directory=kwargs["local_directory"],
+            )
+
+        monkeypatch.setattr(
+            decoding_common, "LocalCUDACluster", worker_processes, raising=False
+        )
+        with dask.config.set({"temporary-directory": str(tmp_path / "dask-temporary")}):
+            with (
+                runner.cuda_cluster(
+                    "3,4,6", str(tmp_path / "scratch"), runner.xla_flags()
+                ) as cluster,
+                Client(cluster) as client,
+            ):
+                (seen,) = client.run(_xla_flags).values()
+
+        flags = seen.split()
+        assert [f for f in flags if f.startswith("--xla_gpu_deterministic_ops=")][
+            -1
+        ] == DETERMINISTIC
+        assert [f for f in flags if f.startswith("--xla_gpu_enable_triton_gemm=")][
+            -1
+        ] == TRITON_OFF
         assert os.environ.get("XLA_FLAGS") == inherited
