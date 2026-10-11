@@ -62,6 +62,7 @@ from continuum_swr_replay.analysis.hippocampus.event_immobility import (  # noqa
     validate_nonlocal_event_probability_contract,
 )
 from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
+    IN_EXCLUDED_TIME_COLUMN,
     read_dot_with_swr_source,
     require_swr_source,
 )
@@ -124,8 +125,15 @@ def find_sessions(animal: str | None) -> list[str]:
     return out
 
 
-def _well_positions(immobile: np.ndarray, segment: np.ndarray, linear: np.ndarray) -> list[float]:
-    """Reward-well linear positions: the animal's median immobile position per leaf arm."""
+def _well_positions(dot: pd.DataFrame) -> list[float]:
+    """Reward-well linear positions: the animal's median immobile position per leaf arm.
+
+    Over the immobile bins outside excluded time (``in_excluded_time``).
+    """
+    analysed = ~dot[IN_EXCLUDED_TIME_COLUMN].to_numpy(dtype=bool)
+    immobile = (dot["head_speed"].to_numpy() < IMMOBILITY_CM_PER_S) & analysed
+    segment = dot["track_segment_id"].to_numpy()
+    linear = dot["linear_position"].to_numpy()
     wells = []
     for arm in range(N_LEAF_ARMS):
         m = immobile & (segment == arm) & np.isfinite(linear)
@@ -159,10 +167,7 @@ def session_content_distances(epoch_id: str) -> tuple[np.ndarray, np.ndarray, np
     interior = np.asarray(env.is_track_interior_).reshape(-1)
     pos = np.asarray(env.place_bin_centers_).reshape(-1)[interior]  # (n_interior,)
 
-    immobile = dot["head_speed"].to_numpy() < IMMOBILITY_CM_PER_S
-    segment = dot["track_segment_id"].to_numpy()
-    linear = dot["linear_position"].to_numpy()
-    well_lin = _well_positions(immobile, segment, linear)
+    well_lin = _well_positions(dot)
     if len(well_lin) < MIN_WELLS:
         return None
 

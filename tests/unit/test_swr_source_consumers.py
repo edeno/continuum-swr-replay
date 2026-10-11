@@ -808,7 +808,8 @@ DECODE_FRAME_READERS = {
     "scripts/qa/diagnose_trial_detection.py": "position and trials",
     "scripts/qa/compare_pfc_cohorts.py": "PFC bundles; names data_over_time_sha256",
     "scripts/figures/generate_supp_pipeline_data_flow.py": (
-        "decode schematic: posterior, position and speed columns only"
+        "reads its decode frame through read_dot_with_swr_source; read_pickle "
+        "reads the M3 fit"
     ),
     "scripts/exploratory/_augment_data_over_time.py": "adds posterior columns",
     "scripts/exploratory/_trunk_zscore_extract.py": "SWR_zscore and MUA_zscore",

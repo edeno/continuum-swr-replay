@@ -37,6 +37,9 @@ from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     filter_event_labels_by_speed,
     validate_nonlocal_event_probability_contract,
 )
+from continuum_swr_replay.analysis.hippocampus.swr_source import (
+    IN_EXCLUDED_TIME_COLUMN,
+)
 from continuum_swr_replay.figure_utilities import (
     PANEL_SINGLE,
     PANEL_SINGLE_SQUARE,
@@ -350,7 +353,8 @@ def plot_swr_zscore_by_state(
     ----------
     data_over_time : pd.DataFrame
         Aggregated data with ``SWR_zscore``, ``Local_prob``,
-        ``Non-Local_prob``, and ``head_speed`` columns.
+        ``Non-Local_prob``, ``head_speed`` and ``in_excluded_time`` columns.
+        Bins in excluded time are left out.
     output_dir, figure_name, formats, dpi :
         Standalone-mode save parameters (ignored when ``ax`` is provided).
     ax : matplotlib Axes, optional
@@ -361,7 +365,11 @@ def plot_swr_zscore_by_state(
     if standalone:
         fig, ax = plt.subplots(figsize=PANEL_SINGLE)
 
-    is_immobile = data_over_time.head_speed < DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
+    # Immobile bins outside excluded time. The mask bins have no SWR z-score,
+    # but the bins in its 0.3-s reach do, and they are not analysed either.
+    is_immobile = (
+        data_over_time.head_speed < DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
+    ) & ~data_over_time[IN_EXCLUDED_TIME_COLUMN].to_numpy(dtype=bool)
 
     local_mask = is_immobile & (data_over_time["Local_prob"] > 0.8)
     ax.hist(
@@ -680,7 +688,8 @@ def plot_state_fractions_by_movement(
     Parameters
     ----------
     data_over_time : pd.DataFrame
-        Aggregated ``data_over_time`` DataFrame.
+        Aggregated ``data_over_time`` DataFrame, with ``in_excluded_time``.
+        Bins in excluded time are left out of both bars.
     ax : matplotlib Axes, optional
         Axes to plot on. If None, creates standalone figure.
 
@@ -707,10 +716,11 @@ def plot_state_fractions_by_movement(
     ]
     moving_fracs = [moving_df[col].median() for col in moving_frac_cols]
 
-    # Compute per-session state fractions during immobility (same aggregation)
+    # Compute per-session state fractions during immobility (same aggregation),
+    # over the immobile bins outside excluded time
     is_immobile = (
         data_over_time["head_speed"] <= DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
-    )
+    ) & ~data_over_time[IN_EXCLUDED_TIME_COLUMN].to_numpy(dtype=bool)
     immobile_session = (
         data_over_time.loc[is_immobile]
         .groupby(group_cols, sort=False)[prob_cols]
@@ -793,8 +803,9 @@ def plot_state_probability_by_theta_phase(
     data_over_time : pd.DataFrame
         Aggregated ``data_over_time`` DataFrame with ``theta_phase``,
         ``Local_prob``, ``Non-Local_Continuous_prob``,
-        ``Non-Local_Fragmented_prob``, ``head_speed``, and session grouping
-        columns (``animal``, ``day``, ``epoch``).
+        ``Non-Local_Fragmented_prob``, ``head_speed``, ``in_excluded_time``
+        and session grouping columns (``animal``, ``day``, ``epoch``). Bins in
+        excluded time are left out.
     n_bins : int, optional
         Number of phase bins over [0, 2pi]. Default 36 (10-degree bins).
     ax : matplotlib Axes, optional
@@ -807,8 +818,11 @@ def plot_state_probability_by_theta_phase(
 
     group_cols = ["animal", "day", "epoch"]
 
-    # Movement periods only — theta phase is unreliable during immobility
-    is_moving = data_over_time["head_speed"] > DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
+    # Movement periods only — theta phase is unreliable during immobility —
+    # outside excluded time
+    is_moving = (
+        data_over_time["head_speed"] > DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
+    ) & ~data_over_time[IN_EXCLUDED_TIME_COLUMN].to_numpy(dtype=bool)
     moving = data_over_time.loc[is_moving].copy()
 
     # Combined non-local probability

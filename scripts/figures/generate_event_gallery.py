@@ -23,11 +23,12 @@ The first three come from ``build_classified_nonlocal_event_table``'s
 ``overlap_class``; the fourth is the SWR-side complement (SWR intervals
 overlapping no non-local event).
 
-Why a sample? Each epoch holds ~1.7k immobile non-local events (~370k across
-218 epochs) — too many to render or eyeball. We instead take ~50 events per
-category per animal, *stratified by ambiguity* (boundary cases: low-overlap
-partials, near-miss non-SWR events, sub-threshold SWR-only windows, very
-short events), which is what actually stresses the category definitions.
+Why a sample? Each epoch holds ~1.7k immobile non-local events (hundreds of
+thousands across the analysed epochs) — too many to render or eyeball. We
+instead take ~50 events per category per animal, *stratified by ambiguity*
+(boundary cases: low-overlap partials, near-miss non-SWR events, sub-threshold
+SWR-only windows, very short events), which is what actually stresses the
+category definitions.
 
 Two phases (the per-epoch Spyglass load dominates cost, so it is the
 parallel unit):
@@ -39,6 +40,11 @@ parallel unit):
                   once, build_event_table for predictors, render each
                   selected event to PNG. Run in parallel across epochs via
                   ``run_event_gallery.sh`` (tmux).
+
+The sample is the same in every run: each (animal, category) group's seed is
+built from its strings (``_group_seed``), not from ``hash()``. Each rendered
+window shades the epoch's excluded time (``excluded_intervals_of``) in a
+light grey hatched band behind the data, and its column title says so.
 
 Usage
 -----
@@ -57,6 +63,7 @@ from __future__ import annotations
 import argparse
 import logging
 import warnings
+import zlib
 from pathlib import Path
 
 import matplotlib
@@ -85,6 +92,7 @@ from continuum_swr_replay.analysis.hippocampus.event_table import (
     build_classified_nonlocal_event_table,
 )
 from continuum_swr_replay.analysis.hippocampus.swr_source import (
+    excluded_intervals_of,
     read_dot_with_swr_source,
     ripple_power_inputs,
     swr_epoch_id,
@@ -135,6 +143,7 @@ DEFAULT_GALLERY_DIR = Path("event_gallery")
 DEFAULT_N_PER_CATEGORY = 50
 WINDOW_SEC = 0.4
 SAMPLE_SEED = 20260617
+EXCLUDED_LABEL = "excluded time"
 
 
 # ---------------------------------------------------------------------------
@@ -365,6 +374,39 @@ def _stratified_sample(
     return res.drop(columns="_bin")
 
 
+def _group_seed(animal: str, category: str) -> int:
+    """The sample seed of one (animal, category) group, the same in every process.
+
+    ``SAMPLE_SEED`` plus a CRC-32 of the two strings. Python's ``hash()`` of a
+    string is salted per process (``PYTHONHASHSEED``), so a seed built from it
+    selected different events in each run.
+    """
+    return SAMPLE_SEED + (zlib.crc32(f"{animal}|{category}".encode()) & 0xFFFF)
+
+
+def select_events(catalog: pd.DataFrame, n_per_category: int) -> pd.DataFrame:
+    """Stratified sample of ~n events per category per animal, deterministic per group.
+
+    Parameters
+    ----------
+    catalog : pd.DataFrame
+        :func:`_catalog_one_epoch` rows, with ``animal``, ``category`` and
+        ``ambiguity``.
+    n_per_category : int
+
+    Returns
+    -------
+    pd.DataFrame
+        The selected rows.
+    """
+    selected = []
+    for (animal, cls), g in catalog.groupby(["animal", "category"]):
+        selected.append(
+            _stratified_sample(g, n_per_category, seed=_group_seed(animal, cls))
+        )
+    return pd.concat(selected, ignore_index=True)
+
+
 def build_catalog(
     data_dir: Path, gallery_dir: Path, n_per_category: int
 ) -> pd.DataFrame:
@@ -382,12 +424,7 @@ def build_catalog(
         catalog["category"].value_counts().to_string(),
     )
 
-    # Stratified sample ~n per category per animal, deterministic per group.
-    selected = []
-    for (animal, cls), g in catalog.groupby(["animal", "category"]):
-        seed = SAMPLE_SEED + (hash((animal, cls)) & 0xFFFF)
-        selected.append(_stratified_sample(g, n_per_category, seed=seed))
-    selected_df = pd.concat(selected, ignore_index=True)
+    selected_df = select_events(catalog, n_per_category)
     logging.info(
         "Selected %d events for the gallery. By category:\n%s",
         len(selected_df),
@@ -1345,6 +1382,51 @@ def _plot_decoding_stack(
     ax_swr.set_title(column_title, fontsize=8, pad=6)
 
 
+def _excluded_spans_in_window(
+    excluded: pd.DataFrame, start: float, stop: float
+) -> list[tuple[float, float]]:
+    """The parts of the epoch's excluded time that lie inside one window.
+
+    Parameters
+    ----------
+    excluded : pd.DataFrame
+        ``start_time`` and ``end_time`` (s), as ``excluded_intervals_of`` gives.
+    start, stop : float
+        The window (s).
+
+    Returns
+    -------
+    list of (float, float)
+        Each excluded interval clipped to the window, in time order; an
+        interval that only touches the window at one instant is left out.
+    """
+    lo = np.maximum(excluded["start_time"].to_numpy(dtype=float), start)
+    hi = np.minimum(excluded["end_time"].to_numpy(dtype=float), stop)
+    keep = hi > lo
+    return [(float(a), float(b)) for a, b in zip(lo[keep], hi[keep], strict=True)]
+
+
+def _shade_excluded(axes: list, spans: list[tuple[float, float]]) -> None:
+    """A light grey hatched band behind the data over each excluded span.
+
+    Drawn on every row of the window, below the traces (``zorder`` -3, under the
+    SWR shading's -2). The hatch tells it apart from the speed row's grey fill.
+    The posterior row's image covers it, so the column title names it too.
+    """
+    for ax in axes:
+        for start, stop in spans:
+            ax.axvspan(
+                start,
+                stop,
+                facecolor="0.92",
+                edgecolor="0.65",
+                hatch="////",
+                linewidth=0,
+                zorder=-3,
+                label=EXCLUDED_LABEL,
+            )
+
+
 def _arm_set(value) -> str:
     if value is None or pd.isna(value):
         return "?"
@@ -1507,6 +1589,11 @@ def _render_event(row: pd.Series, ctx: dict, out_dir: Path, overwrite: bool) -> 
     for ax in axes[1:]:
         ax.sharex(axes[0])
     title = f"{cls} · {row['duration_ms']:.0f} ms"
+    excluded_spans = _excluded_spans_in_window(
+        ctx["excluded"], time_slice.start, time_slice.stop
+    )
+    if excluded_spans:
+        title += "\nhatched grey: excluded time (not analysed)"
     _plot_decoding_stack(
         axes,
         ctx["data"],
@@ -1517,6 +1604,7 @@ def _render_event(row: pd.Series, ctx: dict, out_dir: Path, overwrite: bool) -> 
         center,
         title,
     )
+    _shade_excluded(axes, excluded_spans)
 
     # 1D linearized track-graph strip flush to the posterior (its y-key).
     ax_post = axes[3]
@@ -1624,6 +1712,8 @@ def render_epoch(
         "arm_of_edge": arm_of_edge,
         "arm_colors": _arm_colors(data["linear_edge_order"], arm_of_edge),
         "imm_bouts": imm_bouts,
+        # the windows shade it: a window may reach into excluded time
+        "excluded": excluded_intervals_of(dot),
     }
     n_written = 0
     for _, row in sel.iterrows():

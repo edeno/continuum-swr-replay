@@ -51,6 +51,9 @@ from continuum_swr_replay.analysis.hippocampus import (
     get_event_types,
     load_data_over_time,
 )
+from continuum_swr_replay.analysis.hippocampus.swr_source import (
+    IN_EXCLUDED_TIME_COLUMN,
+)
 from continuum_swr_replay.figure_utilities import (
     PAGE_HEIGHT,
     TWO_COLUMN,
@@ -80,11 +83,12 @@ warnings.filterwarnings("ignore")
 def plot_non_local_prob_distribution(data_over_time, ax) -> None:
     """Bimodal non-local probability distribution during immobility.
 
-    Used to justify the 0.8 threshold applied throughout the paper.
+    Used to justify the 0.8 threshold applied throughout the paper. Bins in
+    excluded time (``in_excluded_time``) are left out.
     """
     is_immobile = (
         data_over_time.head_speed < DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
-    )
+    ) & ~data_over_time[IN_EXCLUDED_TIME_COLUMN].to_numpy(dtype=bool)
     ax.hist(
         data_over_time.loc[is_immobile, "Non-Local_prob"],
         bins=50,

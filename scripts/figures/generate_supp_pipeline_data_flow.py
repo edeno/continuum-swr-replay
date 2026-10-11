@@ -32,7 +32,10 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
-from continuum_swr_replay.analysis.hippocampus.swr_source import require_swr_source
+from continuum_swr_replay.analysis.hippocampus.swr_source import (
+    read_dot_with_swr_source,
+    require_swr_source,
+)
 from continuum_swr_replay.analysis.replay.covariate_registry import (
     require_covariate_schema,
 )
@@ -51,6 +54,37 @@ RC = PROCESSED_DATA_DIR / "replay_content"
 M3_PATH = RC / "models" / "M3.pkl"
 ALL_MODELS_INPUTS = {"event_arm_table": RC / "event_arm_table.pkl"}
 
+# The event's long-format rows, as panel E shows them.
+INDICATOR_COLUMNS = [
+    "candidate_arm",
+    "arm_count_hard",
+    "is_current_arm",
+    "is_prev_arm",
+    "is_next_arm",
+    "is_last_rewarded_arm",
+]
+# Panel E's header lines are wrapped at underscores to this many characters, so
+# each name fits its column (six columns across half of the 13-inch figure).
+HEADER_WIDTH = 12
+
+
+def wrap_name(name: str, width: int = HEADER_WIDTH) -> str:
+    """`name` on lines of at most `width` characters, each break after an
+    underscore, which stays at the end of its line: the lines joined give the
+    name back."""
+    lines: list[str] = []
+    line = ""
+    for part in name.split("_"):
+        candidate = f"{line}_{part}" if line else part
+        if line and len(candidate) > width:
+            lines.append(f"{line}_")
+            line = part
+        else:
+            line = candidate
+    lines.append(line)
+    return "\n".join(lines)
+
+
 # Colour code for each arm (0..8). Patches share families:
 # arms 0-1 = patch 1 (blues), 2-3 = patch 2 (greens), 4-5 = patch 3 (reds),
 # 6-8 = trunks (greys).
@@ -66,15 +100,104 @@ def load_session(animal: str, day: int, epoch: str):
     base = f"{animal}{day}_{epoch}_HPC"
     dot_path = PROCESSED_DATA_DIR / f"{base}_80_data_over_time.pkl"
     env_path = PROCESSED_DATA_DIR / f"{base}_environment.pkl"
-    dot = pd.read_pickle(dot_path)
+    # Through the SWR source: its event labels, and the excluded-time column.
+    dot = read_dot_with_swr_source(dot_path)
     with open(env_path, "rb") as f:
         env = pickle.load(f)
-    dot = dot.copy()
     dot["replay_arm"] = map_estimate_to_arm(dot["map_estimate"].values, env)
     dot["Non-Local_prob"] = (
         dot["Non-Local_Continuous_prob"] + dot["Non-Local_Fragmented_prob"]
     )
     return dot, env
+
+
+def indicator_table(lc_event: pd.DataFrame, event_id: int) -> pd.DataFrame:
+    """The event's long-format rows as integers, for panel E.
+
+    Parameters
+    ----------
+    lc_event : pd.DataFrame
+        The event's ``event_arm_table`` rows, one per candidate arm.
+    event_id : int
+        The session-local ``non_local_event`` label, for the error message.
+
+    Returns
+    -------
+    pd.DataFrame
+        :data:`INDICATOR_COLUMNS`, as int.
+
+    Raises
+    ------
+    ValueError
+        If an indicator is NaN. Under the covariate contract an off-well event
+        has no current arm, so its ``is_current_arm`` is NaN; pick an event at a
+        well.
+    """
+    table = lc_event[INDICATOR_COLUMNS]
+    missing = [column for column in INDICATOR_COLUMNS if table[column].isna().any()]
+    if missing:
+        raise ValueError(
+            f"event {event_id} has NaN in {missing}, so it cannot be drawn as "
+            "integer indicators; choose an event at a well with every indicator "
+            "(--event-id)"
+        )
+    return table.astype(int)
+
+
+def figure_axes() -> tuple[plt.Figure, dict[str, plt.Axes]]:
+    """The figure and its six panels, A-F (3 rows x 2 columns)."""
+    fig = plt.figure(figsize=(13, 11), constrained_layout=True)
+    gs = fig.add_gridspec(3, 2, height_ratios=[1.1, 1.0, 1.2])
+    ax_a = fig.add_subplot(gs[0, 0])
+    axes = {
+        "A": ax_a,
+        "B": fig.add_subplot(gs[0, 1], sharex=ax_a),
+        "C": fig.add_subplot(gs[1, 0]),
+        "D": fig.add_subplot(gs[1, 1]),
+        "E": fig.add_subplot(gs[2, 0]),
+        "F": fig.add_subplot(gs[2, 1]),
+    }
+    return fig, axes
+
+
+def draw_indicator_table(ax: plt.Axes, long_table: pd.DataFrame):
+    """Panel E's table, with each header wrapped at underscores to fit its cell.
+
+    Parameters
+    ----------
+    ax : plt.Axes
+    long_table : pd.DataFrame
+        :func:`indicator_table`'s rows.
+
+    Returns
+    -------
+    matplotlib.table.Table
+    """
+    ax.axis("off")
+    table_data = long_table.values
+    col_labels = [wrap_name(name) for name in long_table.columns]
+    table = ax.table(
+        cellText=table_data,
+        colLabels=col_labels,
+        loc="center",
+        cellLoc="center",
+        colColours=["#e8eef5"] * len(col_labels),
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(9)
+    table.scale(1, 1.25)
+    # The header row is as tall as its longest wrapped name.
+    n_lines = max(label.count("\n") + 1 for label in col_labels)
+    for column in range(len(col_labels)):
+        header = table[(0, column)]
+        header.set_height(header.get_height() * n_lines)
+    # Color candidate-arm cells by arm color for visual link
+    for row in range(len(table_data)):
+        arm = int(table_data[row, 0])
+        cell = table[(row + 1, 0)]
+        cell.set_facecolor(ARM_COLORS[arm])
+        cell.set_text_props(color="white" if arm < 6 else "black", fontweight="bold")
+    return table
 
 
 def make_figure(
@@ -112,21 +235,9 @@ def make_figure(
     track_seg = int(event_row["modal_observed_track_segment_id"].iloc[0])
 
     # Indicator columns from the long_count for the long-format mini-table.
-    indicator_cols = [
-        "candidate_arm",
-        "arm_count_hard",
-        "is_current_arm",
-        "is_prev_arm",
-        "is_next_arm",
-        "is_last_rewarded_arm",
-    ]
-    long_table = lc_event[indicator_cols].copy()
-    long_table["candidate_arm"] = long_table["candidate_arm"].astype(int)
-    long_table["arm_count_hard"] = long_table["arm_count_hard"].astype(int)
-    for c in long_table.columns[2:]:
-        long_table[c] = long_table[c].astype(int)
+    long_table = indicator_table(lc_event, event_id)
 
-    # Per-session M3 coefficients across all 218 sessions.
+    # Per-session M3 coefficients, one row per session the M3 fit kept.
     coef_cols = [
         "coef_is_current_arm",
         "coef_is_prev_arm",
@@ -137,14 +248,8 @@ def make_figure(
     )
 
     # ── Layout: 3 rows × 2 cols ──
-    fig = plt.figure(figsize=(13, 11), constrained_layout=True)
-    gs = fig.add_gridspec(3, 2, height_ratios=[1.1, 1.0, 1.2])
-    ax_a = fig.add_subplot(gs[0, 0])
-    ax_b = fig.add_subplot(gs[0, 1], sharex=ax_a)
-    ax_c = fig.add_subplot(gs[1, 0])
-    ax_d = fig.add_subplot(gs[1, 1])
-    ax_e = fig.add_subplot(gs[2, 0])
-    ax_f = fig.add_subplot(gs[2, 1])
+    fig, axes = figure_axes()
+    ax_a, ax_b, ax_c, ax_d, ax_e, ax_f = (axes[k] for k in "ABCDEF")
 
     # ── (A) Filters: speed + non-local prob over a 6-sec window ──
     ax = ax_a
@@ -281,25 +386,7 @@ def make_figure(
 
     # ── (E) Long-format mini-table for this event ──
     ax = ax_e
-    ax.axis("off")
-    table_data = long_table.values
-    col_labels = long_table.columns.tolist()
-    table = ax.table(
-        cellText=table_data,
-        colLabels=col_labels,
-        loc="center",
-        cellLoc="center",
-        colColours=["#e8eef5"] * len(col_labels),
-    )
-    table.auto_set_font_size(False)
-    table.set_fontsize(9)
-    table.scale(1, 1.25)
-    # Color candidate-arm cells by arm color for visual link
-    for row in range(len(table_data)):
-        arm = int(table_data[row, 0])
-        cell = table[(row + 1, 0)]
-        cell.set_facecolor(ARM_COLORS[arm])
-        cell.set_text_props(color="white" if arm < 6 else "black", fontweight="bold")
+    draw_indicator_table(ax, long_table)
     ax.set_title(
         f"(E) Long-format expansion — event {event_id} becomes 9 rows\n"
         "this is the input row block to fit_conditional_poisson",
@@ -374,7 +461,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--animal", default="chimi")
     parser.add_argument("--day", type=int, default=20200213)
     parser.add_argument("--epoch", default="02_r1")
-    parser.add_argument("--event-id", type=int, default=14)
+    # The featured event: the session-local non_local_event label. 275 is at a
+    # well, with every arm indicator (none NaN), content on at least 3 arms, some
+    # on the current arm, and 80-160 ms long (124 ms, 62 bins on 4 arms, at
+    # well arm 5). The old default, 14, is off-well under the current covariate
+    # contract, so its is_current_arm is NaN.
+    parser.add_argument("--event-id", type=int, default=275)
     parser.add_argument(
         "--output-dir", type=Path, default=Path("paper/figures/qc_diagnosis")
     )
