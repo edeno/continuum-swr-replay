@@ -265,14 +265,15 @@ def test_onsets_in_excluded_bins_are_counted_not_lost(two_bout_dot, monkeypatch)
     from continuum_swr_replay.analysis.replay import timebin_tables
 
     dot, pumps = two_bout_dot
-    # The SWR onset at t = 0.05 lies in a 10-ms bin that touches [0.041, 0.0505].
+    # The SWR onset at t = 0.05 lies outside [0.041, 0.0474], in the 20-ms bin
+    # [0.04, 0.06], which touches it; the other onsets' bins do not.
     monkeypatch.setattr(
         timebin_tables,
         "excluded_intervals_of",
-        lambda frame: pd.DataFrame({"start_time": [0.041], "end_time": [0.0505]}),
+        lambda frame: pd.DataFrame({"start_time": [0.041], "end_time": [0.0474]}),
     )
     onset = build_event_onset_table(dot, pumps)
-    dense = build_stop_timebin_table(dot, pumps, bin_s=0.01)
+    dense = build_stop_timebin_table(dot, pumps, bin_s=0.02)
 
     in_excluded = dense.attrs[timebin_tables.ONSETS_IN_EXCLUDED_BINS_ATTR]
     assert in_excluded == {"SWR": 1, "non_local": 0, "MUA": 0}
@@ -429,3 +430,47 @@ def test_output_dir_receives_both_tables(timebin_script, monkeypatch, tmp_path):
     monkeypatch.setattr(sys, "argv", ["build_timebin_tables.py"])
     script.main()
     assert published == [(canonical, "event_onset"), (canonical, "stop_timebin")]
+
+
+def test_published_dense_table_keeps_its_stamp_and_sums_the_excluded_onsets(
+    timebin_script, monkeypatch, tmp_path
+):
+    """Each session's count of onsets in excluded bins is taken off its frame,
+    so the concat keeps the frames' shared stamp, and the published dense table
+    carries the sum over sessions."""
+    from continuum_swr_replay.analysis.replay.timebin_tables import (
+        ONSETS_IN_EXCLUDED_BINS_ATTR,
+    )
+
+    script = timebin_script
+
+    def stamped_tables(session: dict) -> tuple[pd.DataFrame, pd.DataFrame]:
+        onset, dense = _small_tables(session)
+        dense.attrs["covariate_schema_table"] = "stop_timebin"
+        dense.attrs[ONSETS_IN_EXCLUDED_BINS_ATTR] = {"SWR": 1, "non_local": 0}
+        return onset, dense
+
+    monkeypatch.setattr(script, "find_sessions", lambda max_per_animal: _SESSIONS)
+    monkeypatch.setattr(script, "build_one", stamped_tables)
+    checked: list[dict] = []
+    monkeypatch.setattr(
+        script,
+        "validate",
+        lambda onset, dense, in_excluded: checked.append(dict(in_excluded)),
+    )
+    published: dict[str, pd.DataFrame] = {}
+
+    def record(frame: pd.DataFrame, path: Path, *, table: str, basename: str) -> Path:
+        published[table] = frame
+        return Path(path) / f"{basename}.parquet"
+
+    monkeypatch.setattr(script, "publish_canonical", record)
+    monkeypatch.setattr(
+        sys, "argv", ["build_timebin_tables.py", "--output-dir", str(tmp_path)]
+    )
+    script.main()
+
+    assert checked == [{"SWR": 2, "non_local": 0}]
+    dense = published["stop_timebin"]
+    assert dense.attrs["covariate_schema_table"] == "stop_timebin"
+    assert dense.attrs[ONSETS_IN_EXCLUDED_BINS_ATTR] == {"SWR": 2, "non_local": 0}

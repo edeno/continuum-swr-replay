@@ -134,7 +134,9 @@ def main() -> None:
             continue
         onsets.append(o)
         denses.append(d)
-        for etype, n in d.attrs.get(ONSETS_IN_EXCLUDED_BINS_ATTR, {}).items():
+        # Taken off each frame so the frames' attrs stay equal and the concat
+        # keeps the schema stamp; the sum is set on the concatenated table.
+        for etype, n in d.attrs.pop(ONSETS_IN_EXCLUDED_BINS_ATTR, {}).items():
             in_excluded[etype] = in_excluded.get(etype, 0) + n
         if (i + 1) % 20 == 0:
             logger.info("  %d/%d (%.0fs)", i + 1, len(sessions), time.time() - t0)
@@ -150,6 +152,7 @@ def main() -> None:
         )
     onset = pd.concat(onsets, ignore_index=True)
     dense = pd.concat(denses, ignore_index=True)
+    dense.attrs[ONSETS_IN_EXCLUDED_BINS_ATTR] = in_excluded
     for label, frame in (("event_onset", onset), ("stop_timebin", dense)):
         n = n_sessions(frame)
         if n != len(sessions):

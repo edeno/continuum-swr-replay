@@ -41,7 +41,7 @@ from .covariate_registry import stamp_covariate_schema
 from .event_ids import hash_stop_id
 
 EVENT_TYPES = {"SWR": "SWR_event", "non_local": "non_local_event", "MUA": "MUA_event"}
-ONSETS_IN_EXCLUDED_BINS_ATTR = "n_onsets_in_excluded_bins"
+ONSETS_IN_EXCLUDED_BINS_ATTR = "onsets_in_excluded_bins_by_event_type"
 """The dense table's ``attrs`` key: per event type, the onsets whose bin it
 dropped for touching excluded time. Their events lie wholly outside excluded
 time, so the sparse table keeps them."""
