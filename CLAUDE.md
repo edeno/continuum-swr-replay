@@ -198,12 +198,28 @@ bins), so no non-local event is clipped. From that window it derives
 timing, per-event speed summaries, peak non-local probability, the 3-way
 `overlap_class` (and 6-way `overlap_subclass`), and the matched SWR.
 
-**One speed-eligible population.** Non-Local, SWR, and MUA cohorts all
-apply the same canonical whole-event immobility rule — every sampled speed
-finite and strictly below 4 cm/s — defined once in
-`analysis/hippocampus/event_immobility.py`. SWR intervals still come from
-the `SWR_event` timebin labels, but those labels are speed-gated first, so
-a movement-spanning SWR cannot mark an immobile non-local event.
+**One analysed-time rule.** *Excluded time* is the artifact mask widened by
+0.3 s on each side (`swr_source.excluded_intervals`; the rule is in
+`analysis/hippocampus/event_eligibility.py`). Nothing inside it is analysed.
+An event of any kind (non-local, SWR, MUA, ContFrag label, Widloski), an
+exposure second, a time bin with its history window, and a peri-event window
+are used only when they lie wholly outside excluded time. An event must also
+be immobile as a whole: every sampled speed finite and below 4 cm/s
+(`event_immobility.py`). A kept event that overlaps a dropped SWR or MUA
+event is dropped too, because its overlap class is unknown.
+
+The rule is applied once, where a decode frame is read
+(`swr_source.with_swr_source`), so every table inherits it. Each dropped
+event keeps a reason (`swr_source.artifact_event_drops`), and kept events
+keep their labels and `event_id`. A stop's `immobility_duration_s` is its
+span less the excluded seconds in it, so it is no longer
+`stop_end - stop_start`.
+
+Inputs use the mask itself, not excluded time: the decoders' missing bins,
+the SWR detectors' normalization, and the ripple-power covariate
+(`SWR_zscore`, the Kay consensus over the tetrodes rule R-T keeps). With no
+artifact run configured, the rule changes nothing.
+
 Event-level `is_swr` means strict positive-duration overlap, not the old
 inclusive `any SWR_event > 0`. (The stop-level `is_swr_stop` flag in
 `build_stop_table` deliberately still uses the inclusive per-timebin rule —
@@ -230,6 +246,9 @@ Changing the eligible cohort renumbers non-local labels, so `event_id`
 hashes shift. `event_table`, `event_arm_table`, `event_sequence_table`,
 `stop_table`, and the qvals/stop joins must therefore be regenerated as
 one atomic set — a partial regeneration mis-joins silently on `event_id`.
+The artifact rule drops events without renumbering the rest, so kept
+`event_id`s do not shift; the atomic set is still regenerated together,
+because dropped events leave every table.
 
 ### Spatial Variables
 
@@ -330,17 +349,17 @@ macOS arm64, where `jax-cuda12-plugin` has no wheel).
 
 ## Animal and Session Information
 
-The dataset includes recordings from 5 animals. Each NWB file can contain multiple epochs (e.g., `02_r1`, `04_r2`, `06_r3`). There are 91 NWB files and 221 total epochs across all animals:
+The dataset includes recordings from 5 animals. Each NWB file can contain multiple epochs (e.g., `02_r1`, `04_r2`, `06_r3`). The cohort is the epoch register's analysed epochs (`data_loaders/epoch_register.csv`, read by `analysed_epochs()`); `docs/epoch_register.md` gives each excluded epoch's reason. After the R11 swap: 242 epochs in 45 NWB files.
 
 | Animal | NWB Files | Epochs | Dates |
 |--------|-----------|--------|-------|
-| chimi | 22 | 45 | Feb-Mar 2020 |
-| j16 | 16 | 58 | Jul 2021 |
-| peanut | 12 | 13 | Nov-Dec 2020 |
-| senor | 22 | 61 | Oct-Nov 2020 |
-| wilbur | 19 | 44 | Mar-Apr 2021 |
+| chimi | 14 | 46 | Feb-Mar 2020 |
+| j16 | 8 | 58 | Jul 2021 |
+| peanut | 6 | 44 | Nov-Dec 2020 |
+| senor | 10 | 49 | Oct-Nov 2020 |
+| wilbur | 7 | 45 | Mar-Apr 2021 |
 
-Epoch counts are computed dynamically by `get_epoch_info()`, which queries Spyglass for all valid intervals per NWB file. See `NWB_FILES` in `data_loaders/constants.py` for the complete file list.
+See `NWB_FILES` in `data_loaders/constants.py` for the complete file list.
 
 ## Running Decoding Analysis
 
@@ -434,3 +453,4 @@ Logs are written to `logs/{epoch_identifier}.log` with git hash for reproducibil
 - Position data uses DLC tracking when available, falls back to older tracking methods
 - Some sessions may lack certain interval types (wrapped in try/except in data loading)
 - Check for empty spike data before running decoding (`if not data["spike_times"]`)
+- Artifacts: one detector (`analysis/hippocampus/artifacts/`, run `swr_source.ARTIFACT_INTERVALS_RUN_ID`) masks sustained ripple-band noise (S blocks), step artifacts and synchronous spike lines; see `docs/design/2026-10-09-artifact-detection.md`. An epoch with an S block is left out whole (epoch register reason `SUSTAINED_NOISE`).
