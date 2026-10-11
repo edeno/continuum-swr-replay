@@ -190,7 +190,9 @@ The audit runs these checks on the register:
 - `epoch_sets`: every artifact holds exactly the analysed epochs. An absence passes
   only with a reason under `--exceptions`. An epoch an artifact holds but the
   register does not analyse fails, named with its status and reason. So does any
-  unregistered epoch.
+  unregistered epoch. One exception: the SWR and Widloski run manifests may hold
+  epochs excluded for `SUSTAINED_NOISE`, which those runs processed before the
+  ruling; they are listed under `held_sustained_noise`, not failed.
 - `decode_folder`: the decode folder (`--root`) holds HPC NonLocal and ContFrag
   decode files only of analysed epochs. A file of a pending, excluded or unregistered
   epoch fails, even one of a partly saved decode.
