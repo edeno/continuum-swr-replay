@@ -705,8 +705,8 @@ are bit-for-bit equal (:data:`KNOWN_LIMITS`). XLA reads ``XLA_FLAGS`` once in a
 process, when JAX starts its backend; importing this module does not start it."""
 
 TRITON_GEMM_OFF_XLA_FLAG = "--xla_gpu_enable_triton_gemm=false"
-"""Turns off XLA's Triton GEMM, so XLA sends matrix products to cuBLAS. Deterministic
-ops turn off XLA's autotuning, and the default Triton GEMM setup then fails on some
+"""Turns off XLA's Triton GEMM for matrix products; XLA then uses another GEMM path
+(presumably cuBLAS; not checked). Deterministic ops turn off XLA's autotuning, and the default Triton GEMM setup then fails on some
 shapes (the working explanation; not confirmed: the spike tested the fix, not the
 mechanism). With deterministic ops alone, R12 lost 3 of 242 epochs in the shuffle to
 ``JaxRuntimeError('CANCELLED: Too small divisible part of the contracting
@@ -768,10 +768,11 @@ KNOWN_LIMITS = {
         "the null spread differs by at most 1.7e-4 relative and null_jump_cm in "
         "7 values (max relative 1.8e-2); wall time is 4:56 against 4:20. (3) On "
         "the same epoch, the output with Triton GEMM off is much closer to the "
-        "2026-10-10 run with neither flag than R12 is: 0 gate flips against "
-        "it, spread differs by at most 4.2e-4 relative, and the event bounds "
-        "are the same. The 38 spread and 73 jump flips against R12 are the "
-        "same windows as the 111 flips that run showed against R12",
+        "2026-10-10 run with neither flag than the R12 smoke test's output is. "
+        "Against the 2026-10-10 run there are 0 gate flips, the spread differs by "
+        "at most 4.2e-4 relative, and the event bounds are the same. The 38 "
+        "spread and 73 jump flips against the R12 smoke test's output are the "
+        "same windows as the 111 flips the 2026-10-10 run showed against it",
         "history": "R12 smoke test, 2026-10-10, with XLA_FLAGS="
         "--xla_gpu_deterministic_ops=true only (the Triton GEMM flag not set, "
         "Triton GEMM on). "
@@ -797,16 +798,17 @@ KNOWN_LIMITS = {
         "contracting dimension.'), at non_local_detector/likelihoods/"
         "clusterless_kde.py:89 (spike_waveform_feature_distance.T @ "
         "position_distance). All three ran without error on 2026-10-05, with "
-        "neither flag. Only chimi20200224_08_r4_HPC has been run with Triton GEMM "
+        "neither flag. Of these three, only chimi20200224_08_r4_HPC has been run "
+        "with Triton GEMM "
         "off so far (it runs); chimi20200227_04_r2_HPC and "
         "chimi20200228_02_r1_HPC have not been run yet, and the full rerun will "
         "run them. Why Triton GEMM is off (the working explanation; not "
         "confirmed): deterministic ops turn off XLA's autotuning, and the default "
         "Triton GEMM setup then fails on some shapes; the spike tested the fix, "
-        "not the mechanism. Outputs of runs before this change used Triton GEMM. "
-        "On chimi20200225_02_r1_HPC, the one epoch compared, they differ from a "
-        "run made under the new flags (see measured); other epochs have not been "
-        "compared",
+        "not the mechanism. Runs before this change used Triton GEMM. On "
+        "chimi20200225_02_r1_HPC, the one epoch compared, the R12 smoke test's "
+        "output differs from a run made under the new flags (see measured); R12's "
+        "own outputs and other epochs have not been compared",
     }
 }
 """What is known of a run's reproducibility, recorded in every manifest's

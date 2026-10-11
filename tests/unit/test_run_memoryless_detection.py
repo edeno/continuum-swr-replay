@@ -1396,7 +1396,7 @@ class TestMain:
         assert "233 candidates, 11 replay, 7 passing" in measured
         assert "bit-for-bit equal" in measured
         assert "only epoch run twice with Triton GEMM off" in measured
-        # a passing epoch, against R12's output (Triton on)
+        # a passing epoch, against the R12 smoke test's output (Triton on)
         assert "On one passing epoch" in measured
         assert "chimi20200225_02_r1_HPC" in measured
         assert "237 candidates, 4 replay, 3 passing" in measured
@@ -1454,7 +1454,8 @@ class TestMain:
         assert "clusterless_kde.py:89" in before
         # the claim is as wide as the evidence: one epoch of three, one compared
         assert (
-            "Only chimi20200224_08_r4_HPC has been run with Triton GEMM off" in before
+            "Of these three, only chimi20200224_08_r4_HPC has been run with Triton GEMM off"
+            in before
         )
         assert "chimi20200227_04_r2_HPC and chimi20200228_02_r1_HPC" in before
         assert "have not been run yet" in before
