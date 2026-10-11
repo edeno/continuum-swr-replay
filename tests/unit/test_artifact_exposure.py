@@ -55,6 +55,20 @@ MASK = [(2.0, 5.0), (15.85, 16.05)]
 EXCLUDED = [(1.7, 5.3), (15.55, 16.35)]
 """MASK widened by 0.3 s on each side."""
 
+#: Stop columns summarised over the stop's rows outside excluded time.
+LOCATION_COLUMNS = [
+    "occupancy_state",
+    "at_well",
+    "occupancy_well_id",
+    "modal_observed_track_segment_id",
+    "nearest_well_distance_cm_min",
+    "nearest_well_distance_cm_mean",
+    "nearest_well_distance_cm_max",
+    "occupancy_well_arm",
+    "current_patch",
+    "is_stay",
+]
+
 
 def _speed() -> np.ndarray:
     speed = np.zeros(TIME.size)
@@ -139,7 +153,7 @@ class TestStopExposure:
         )
 
     @pytest.mark.parametrize("table", ["nonlocal", "contfrag"])
-    def test_nothing_else_about_the_stop_changes(self, tmp_path, monkeypatch, table):
+    def test_only_exposure_and_location_change(self, tmp_path, monkeypatch, table):
         unmasked = _stop_tables()[table]
         directory = write_artifact_run(tmp_path / "artifacts", {EPOCH_ID: CORES})
         monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_ROOT", directory.parent)
@@ -147,9 +161,12 @@ class TestStopExposure:
 
         masked_stops = _stop_tables()[table]
 
+        # The location summaries follow the stop's rows outside excluded time;
+        # test_stop_location_excluded_time.py tests them.
+        changed = ["immobility_duration_s", *LOCATION_COLUMNS]
         pd.testing.assert_frame_equal(
-            masked_stops.drop(columns="immobility_duration_s"),
-            unmasked.drop(columns="immobility_duration_s"),
+            masked_stops.drop(columns=changed, errors="ignore"),
+            unmasked.drop(columns=changed, errors="ignore"),
         )
 
     @pytest.mark.parametrize("table", ["nonlocal", "contfrag"])

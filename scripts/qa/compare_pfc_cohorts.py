@@ -2171,10 +2171,10 @@ def build_report(
         f"`{FIT_RATE_COLUMN}` is the mean rate over the bins the bundle was fit "
         "on, so before the change it was the rate over every immobile bin and "
         "after it is the rate over the cohort's immobile bins. The new bundles "
-        f"also carry `{ALL_IMMOBILE_RATE_COLUMN}`, the unrestricted rate, and "
-        "`n_passing_all_immobile_rate` counts the neurons the *old* quantity "
-        "would have admitted -- so the gate's contribution to any change in n "
-        "is separable from the cohort's.\n"
+        f"also carry `{ALL_IMMOBILE_RATE_COLUMN}`, the rate over every immobile "
+        "bin outside excluded time, and `n_passing_all_immobile_rate` counts the "
+        "neurons that rate would admit -- so the gate's contribution to any "
+        "change in n is separable from the cohort's.\n"
     )
 
     add("### Neurons per animal\n")

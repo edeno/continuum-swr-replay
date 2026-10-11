@@ -60,18 +60,21 @@ Spatial statistics:
     - hpd: Highest posterior density threshold value
     - run_speed_baseline: The epoch's run-speed baseline (cm/s), a percentile
       of head speed (``epoch_normalizers.run_speed_baseline``), one value per
-      epoch. Taken over every bin here; ``swr_source.with_swr_source`` (every
-      read) takes it again over the bins outside the artifact mask.
+      epoch. Taken over every bin by ``get_data_over_time``;
+      ``swr_source.with_swr_source`` (every read, and a decoder saving its
+      frame) takes it again over the bins outside the artifact mask.
     - max_coverage: Maximum HPD spatial coverage
     - max_distance: Maximum distance in posterior
     - max_linear_position: Maximum linear position
 
 Neural signals (z-scored or phase):
     - theta_phase: Theta oscillation phase (radians)
-    - theta_power_zscore: Z-scored theta power. Z-scored over every bin
-      here; ``swr_source.with_swr_source`` (every read) re-z-scores it over
-      the bins outside the artifact mask and sets it to NaN inside the mask,
-      as ``SWR_zscore`` and ``MUA_zscore`` already are.
+    - theta_power_zscore: Z-scored theta power. Z-scored over every bin by
+      ``get_data_over_time``; ``swr_source.with_swr_source`` (every read, and
+      a decoder saving its frame) re-z-scores it over the bins outside the
+      artifact mask and sets it to NaN inside the mask. ``SWR_zscore`` is also
+      NaN inside the mask; ``MUA_zscore`` leaves the mask out of its
+      normalization but stays finite inside it.
     - SWR_zscore: Z-scored ripple consensus trace
     - MUA_zscore: Z-scored multiunit firing rate
 

@@ -1251,9 +1251,10 @@ def process_neuron(
         # the bins the models are actually fit on, so the downstream
         # minimum-firing-rate inclusion gate screens the sample the estimates
         # come from rather than a wider one. The column name is the same across
-        # cohorts, so the unrestricted rate is carried alongside it: the pair
-        # makes a bundle's cohort readable from the table itself (the two are
-        # equal exactly when no stop restriction was applied).
+        # cohorts, so the rate over every immobile bin outside excluded time is
+        # carried alongside it: the pair makes a bundle's cohort readable from
+        # the table itself (the two are equal exactly when no stop restriction
+        # was applied).
         neuron_stats["immobility_avg_firing_rate"] = (
             neuron_spike_count[fit_mask].mean() * sampling_frequency
         )
