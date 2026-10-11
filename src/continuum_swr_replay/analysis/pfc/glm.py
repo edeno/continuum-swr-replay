@@ -1003,6 +1003,7 @@ def process_neuron(
     fit_diagnostics_out: dict[str, Any] | None = None,
     penalty_sigma: float | None = None,
     prebinned_spike_count: NDArray | None = None,
+    in_excluded_time: NDArray | None = None,
 ) -> tuple[dict[str, Any], NDArray, NDArray, NDArray, NDArray, NDArray]:
     """Fit GLM models for a single neuron and compute modulation statistics.
 
@@ -1140,13 +1141,20 @@ def process_neuron(
         Counts already binned on ``time``. The session runner bins every unit
         once for the batched and held-out fits and passes the corresponding
         column here; direct callers may continue to pass spike times only.
+    in_excluded_time : NDArray, shape (n_time,), optional
+        True at the bins in the session's excluded time (the artifact mask
+        widened by 0.3 s, ``swr_source.excluded_intervals``). They are left out
+        of ``run_avg_firing_rate`` and
+        ``immobility_avg_firing_rate_all_immobile``; ``fit_mask`` already
+        leaves them out of the fit. None leaves no bin out.
 
     Returns
     -------
     neuron_stats : dict[str, Any]
         Per-neuron statistics including:
 
-        - ``run_avg_firing_rate``: Hz over every moving bin.
+        - ``run_avg_firing_rate``: Hz over every moving bin outside excluded
+          time.
         - ``immobility_avg_firing_rate``: Hz over the bins the models were fit
           on -- with a stop cohort, the cohort's immobile bins, not every
           immobile bin. This is the rate the downstream ``min_firing_rate``
@@ -1154,8 +1162,10 @@ def process_neuron(
           come from; its value therefore depends on the cohort the bundle was
           fit on (named in the bundle's provenance sidecar).
         - ``immobility_avg_firing_rate_all_immobile``: Hz over every immobile
-          bin, cohort or not. Equal to ``immobility_avg_firing_rate`` exactly
-          when no stop restriction was applied.
+          bin outside excluded time, cohort or not. Equal to
+          ``immobility_avg_firing_rate`` exactly when no stop restriction was
+          applied and the session has no excluded time (the fit mask also
+          leaves out the bins whose basis window reaches excluded time).
         - ``theta_mod``, ``theta_preferred_phase``: theta modulation during running
         - ``{model} vs. {baseline}: frac_null_dev, frac_explained_dev``:
           fractional deviance measures
@@ -1211,6 +1221,13 @@ def process_neuron(
     sampling_frequency = 1 / np.median(np.diff(time))
     if fit_mask is None:
         fit_mask = is_immobile
+    # The descriptive rates leave excluded time out, as the fit mask does.
+    immobile_bins = np.asarray(is_immobile, dtype=bool)
+    running_bins = ~immobile_bins
+    if in_excluded_time is not None:
+        analysed = ~np.asarray(in_excluded_time, dtype=bool)
+        immobile_bins = immobile_bins & analysed
+        running_bins = running_bins & analysed
 
     try:
         neuron_stats: dict[str, Any] = {}
@@ -1227,7 +1244,7 @@ def process_neuron(
             design=theta_design,
         )
         neuron_stats["run_avg_firing_rate"] = (
-            neuron_spike_count[~is_immobile].mean() * sampling_frequency
+            neuron_spike_count[running_bins].mean() * sampling_frequency
         )
 
         # Get immobility SWR/non-local statistics. This is the mean rate over
@@ -1241,7 +1258,7 @@ def process_neuron(
             neuron_spike_count[fit_mask].mean() * sampling_frequency
         )
         neuron_stats["immobility_avg_firing_rate_all_immobile"] = (
-            neuron_spike_count[is_immobile].mean() * sampling_frequency
+            neuron_spike_count[immobile_bins].mean() * sampling_frequency
         )
 
         results, _ = _fit_immobility_models(
@@ -1442,13 +1459,13 @@ def process_neuron(
         )
         neuron_stats = {}
         neuron_stats["run_avg_firing_rate"] = (
-            neuron_spike_count[~is_immobile].mean() * sampling_frequency
+            neuron_spike_count[running_bins].mean() * sampling_frequency
         )
         neuron_stats["immobility_avg_firing_rate"] = (
             neuron_spike_count[fit_mask].mean() * sampling_frequency
         )
         neuron_stats["immobility_avg_firing_rate_all_immobile"] = (
-            neuron_spike_count[is_immobile].mean() * sampling_frequency
+            neuron_spike_count[immobile_bins].mean() * sampling_frequency
         )
         nan_modulation = np.full(spline_basis.shape[0], np.nan)
         swr_modulation = nan_modulation
@@ -3006,11 +3023,16 @@ def run_session(
             counts=session_counts,
         )
 
+    # The descriptive rates leave excluded time out too (the fit mask already
+    # does, with the basis window's reach).
+    in_excluded_time = interval_mask(time, excluded)
+
     def _neuron_args(index: int) -> dict[str, Any]:
         prefit = None if prefitted_immobility is None else prefitted_immobility[index]
         return {
             "logger_name": logger.name,
             "fit_mask": fit_mask,
+            "in_excluded_time": in_excluded_time,
             "fitter": fitter,
             "design_ranks": design_ranks,
             "theta_design": theta_design,

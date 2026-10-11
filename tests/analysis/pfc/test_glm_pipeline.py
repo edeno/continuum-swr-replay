@@ -2195,6 +2195,172 @@ class TestProcessNeuronFitMask:
         )
 
 
+class TestProcessNeuronExcludedTime:
+    """The two descriptive rates leave excluded time out (the artifact mask
+    widened by 0.3 s); the rate over the fitted bins already does, through
+    the fit mask."""
+
+    #: Excluded time: part of the 4-5 s run and a second of immobility.
+    EXCLUDED = ((4.2, 4.6), (8.0, 9.0))
+
+    def _inputs(self, time_axis, poisson_spike_times):
+        in_excluded = np.zeros(time_axis.size, dtype=bool)
+        for start, end in self.EXCLUDED:
+            in_excluded |= (time_axis >= start) & (time_axis <= end)
+        # dense firing in excluded time, so leaving it out moves both rates
+        spikes = np.sort(
+            np.r_[
+                poisson_spike_times,
+                np.arange(4.2, 4.6, 0.01),
+                np.arange(8.0, 9.0, 0.01),
+            ]
+        )
+        return in_excluded, spikes
+
+    @staticmethod
+    def _rate(spikes, time_axis, mask, sampling_frequency):
+        return spike_counts_of(spikes, time_axis)[mask].mean() * sampling_frequency
+
+    @staticmethod
+    def _process(
+        spikes,
+        is_immobile,
+        theta_phase,
+        time_axis,
+        events,
+        position_info,
+        sampling_frequency,
+        **kwargs,
+    ):
+        dm, spline_basis, lag_time = _make_design_matrices(
+            events,
+            position_info,
+            sampling_frequency=sampling_frequency,
+            lags=np.arange(-50, 51),
+        )
+        stats, *_ = process_neuron(
+            spikes,
+            is_immobile,
+            theta_phase,
+            time_axis,
+            dm,
+            spline_basis,
+            lag_time,
+            **kwargs,
+        )
+        return stats
+
+    def test_the_two_rates_leave_excluded_bins_out(
+        self,
+        poisson_spike_times,
+        is_immobile,
+        theta_phase,
+        time_axis,
+        simple_event_times,
+        position_info,
+        sampling_frequency,
+    ):
+        in_excluded, spikes = self._inputs(time_axis, poisson_spike_times)
+        immobile = is_immobile.to_numpy()
+        fit_mask = is_immobile & ~in_excluded
+        fs = sampling_frequency
+
+        stats = self._process(
+            spikes,
+            is_immobile,
+            theta_phase,
+            time_axis,
+            simple_event_times,
+            position_info,
+            fs,
+            fit_mask=fit_mask,
+            in_excluded_time=in_excluded,
+        )
+
+        run = self._rate(spikes, time_axis, ~immobile & ~in_excluded, fs)
+        all_immobile = self._rate(spikes, time_axis, immobile & ~in_excluded, fs)
+        assert stats["run_avg_firing_rate"] == pytest.approx(run)
+        assert stats["immobility_avg_firing_rate_all_immobile"] == pytest.approx(
+            all_immobile
+        )
+        assert stats["immobility_avg_firing_rate"] == pytest.approx(
+            self._rate(spikes, time_axis, fit_mask.to_numpy(), fs)
+        )
+        # over every bin the rates differ: the case discriminates
+        assert run != pytest.approx(self._rate(spikes, time_axis, ~immobile, fs))
+        assert all_immobile != pytest.approx(
+            self._rate(spikes, time_axis, immobile, fs)
+        )
+
+    def test_a_failed_fit_reports_the_same_rates(
+        self,
+        poisson_spike_times,
+        is_immobile,
+        theta_phase,
+        time_axis,
+        simple_event_times,
+        position_info,
+        sampling_frequency,
+        monkeypatch,
+    ):
+        """The fallback path, rates only, applies the same masks."""
+        from continuum_swr_replay.analysis.pfc import glm
+
+        def _fail(*args, **kwargs):
+            raise ValueError("no fit")
+
+        monkeypatch.setattr(glm, "_fit_immobility_models", _fail)
+        in_excluded, spikes = self._inputs(time_axis, poisson_spike_times)
+        immobile = is_immobile.to_numpy()
+        fs = sampling_frequency
+
+        stats = self._process(
+            spikes,
+            is_immobile,
+            theta_phase,
+            time_axis,
+            simple_event_times,
+            position_info,
+            fs,
+            in_excluded_time=in_excluded,
+        )
+
+        assert set(stats) == {
+            "run_avg_firing_rate",
+            "immobility_avg_firing_rate",
+            "immobility_avg_firing_rate_all_immobile",
+        }
+        assert stats["run_avg_firing_rate"] == pytest.approx(
+            self._rate(spikes, time_axis, ~immobile & ~in_excluded, fs)
+        )
+        assert stats["immobility_avg_firing_rate_all_immobile"] == pytest.approx(
+            self._rate(spikes, time_axis, immobile & ~in_excluded, fs)
+        )
+
+    def test_the_session_runner_passes_excluded_time(self):
+        """``run_session`` gives every neuron the session's excluded bins."""
+        import ast
+        import inspect
+        import textwrap
+
+        from continuum_swr_replay.analysis.pfc.glm import run_session
+
+        tree = ast.parse(textwrap.dedent(inspect.getsource(run_session)))
+        neuron_args = next(
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef) and node.name == "_neuron_args"
+        )
+        keys = {
+            key.value
+            for node in ast.walk(neuron_args)
+            if isinstance(node, ast.Dict)
+            for key in node.keys
+            if isinstance(key, ast.Constant)
+        }
+        assert "in_excluded_time" in keys
+
+
 class TestAlignmentIsIdentityOnMatchedAxes:
     """A session whose decode and position axes already match must be
     untouched by the shared-timestamp alignment on the PFC load path: same
