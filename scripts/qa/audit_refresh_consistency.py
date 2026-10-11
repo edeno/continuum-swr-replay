@@ -178,7 +178,7 @@ DECODERS = ("nonlocal", "contfrag")
 DECODE_FILES = ("results", "detector", "environment", "data_over_time")
 RUN_ARTIFACTS = ("widloski", "swr")
 """The ``epoch_sets`` artifacts read from a run manifest. Such a run may hold
-``SUSTAINED_NOISE`` epochs (lead's ruling, 2026-10-10): the SWR run did, and
+``SUSTAINED_NOISE`` epochs (coordinator's ruling, 2026-10-10): the SWR run did, and
 rerunning it would change the run id every R11 decode records."""
 NON_LOCAL_THRESHOLD_PERCENT = round(100 * DEFAULT_NON_LOCAL_THRESHOLD)
 """The NonLocal ``data_over_time`` file is named for the decode's threshold."""
