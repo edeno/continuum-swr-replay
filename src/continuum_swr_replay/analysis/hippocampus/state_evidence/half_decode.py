@@ -528,7 +528,8 @@ def label_agreement(
     dict
         - ``n_bins``; ``max_abs_diff``, the largest |P - P_ref| over states;
         - ``state``: per state, ``max_abs_diff``, ``mean_abs_diff``,
-          ``p999_abs_diff`` and ``share_bins_over_1e-3``;
+          ``p999_abs_diff`` and ``share_bins_over_1e-3``, over every bin,
+          excluded time included (a decode-to-decode check);
         - events: ``events_reference`` and ``events_other``;
           ``events_identical`` (the same first and last bin);
           ``reference_events_shared`` and ``other_events_shared`` (overlapping
@@ -544,6 +545,15 @@ def label_agreement(
         raise ValueError("the two decodes' probabilities must be on the same bins")
     if labels.shape != reference_labels.shape or labels.size != reference.shape[0]:
         raise ValueError("the event labels must be on the probabilities' bins")
+    # The state differences cover every bin, excluded time included, on
+    # purpose. This compares two decodes of the same bins, not the data: with
+    # every tetrode (run_half_tetrode_decodes.py --all-tetrodes) it is the
+    # check that the pipeline reproduces the canonical decode, and the
+    # artifact-mask bins, where both decoders apply ``is_missing``, are where a
+    # wrong mask would show. For the half splits these statistics are only
+    # recorded; the agreement table reads the event fields, and both decodes'
+    # events already follow the analysed-time rule (the canonical labels are
+    # read through the SWR source, the half decode's are ``analysed_labels``).
     diff = np.abs(other - reference)
     both = (reference_labels > 0) & (labels > 0)
     either = int(((reference_labels > 0) | (labels > 0)).sum())
