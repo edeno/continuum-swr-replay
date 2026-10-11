@@ -60,8 +60,11 @@ What this module fixes
 
 Analyses read a decode's ``data_over_time`` through :func:`with_swr_source`
 or :func:`read_dot_with_swr_source`. Its ``SWR_event`` column then holds this
-source's labels and ``swr_observed`` the coverage mask, and every event cohort
-of the frame follows the one analysed-time rule. An HPC decode made by the
+source's labels, ``swr_observed`` the coverage mask and ``in_excluded_time``
+the rows in excluded time; every event cohort of the frame follows the one
+analysed-time rule, and the frame's two epoch normalizers
+(``theta_power_zscore``, ``run_speed_baseline``) leave the artifact mask out,
+as the other inputs do. An HPC decode made by the
 decoders since Task 17a already holds the source's SWR labels: its
 ``organize_results`` reads the frame through :func:`with_swr_source` (keeping
 every event it decoded, ``drop_masked_events=False``), so the decode's
@@ -70,7 +73,8 @@ inventory and the artifact mask (``decoding_common.hpc_decode_masks``). In an ol
 decode, or a PFC decode, ``SWR_event`` (from ``RippleTimesV1``, written by
 ``get_data_over_time``) stays in the pickle as the decode's provenance and never
 reaches an analysis, and neither do the decode's stored-ripple counts
-(:data:`DECODE_SWR_COUNT_COLUMNS`).
+(:data:`DECODE_SWR_COUNT_COLUMNS`) or its other event counts
+(:data:`DECODE_EVENT_COUNT_COLUMNS`).
 """
 
 from __future__ import annotations
@@ -96,7 +100,11 @@ from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
     artifact_intervals as padded_cores,
 )
 from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
+    interval_mask,
     subtract_intervals,
+)
+from continuum_swr_replay.analysis.hippocampus.epoch_normalizers import (
+    run_speed_baseline,
 )
 from continuum_swr_replay.analysis.hippocampus.event_eligibility import (
     EXCLUDED_TIME_REASONS,
@@ -121,8 +129,10 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "ARTIFACT_INTERVALS_ROOT",
     "ARTIFACT_INTERVALS_RUN_ID",
+    "DECODE_EVENT_COUNT_COLUMNS",
     "DECODE_SWR_COUNT_COLUMNS",
     "DropReason",
+    "IN_EXCLUDED_TIME_COLUMN",
     "SWR_DETECTOR",
     "SWR_INVENTORY_ROOT",
     "SWR_INVENTORY_RUN_ID",
@@ -199,6 +209,12 @@ SWR_OBSERVED_COLUMN = "swr_observed"
 """The per-bin coverage column :func:`with_swr_source` adds: True where SWR
 detection was observed."""
 
+IN_EXCLUDED_TIME_COLUMN = "in_excluded_time"
+"""The per-bin column :func:`with_swr_source` adds: True where the row's time
+lies in the epoch's excluded time (:func:`excluded_intervals`, closed), all
+False with no artifact run. A reader that summarises bins leaves these rows out.
+It is not ``swr_observed``, which is also False at gaps in the stored band."""
+
 SWR_SOURCE_ATTR = "swr_source"
 """The ``attrs`` key (kept in a parquet table's metadata) that names the SWR
 source a frame or table was built from: :func:`swr_source_name`."""
@@ -235,6 +251,20 @@ DECODE_SWR_COUNT_COLUMNS = (
 )
 """The decode's stored-ripple counts in ``data_over_time``; dropped from every
 analysis frame, as the decode's own ``SWR_event`` labels are replaced."""
+
+DECODE_EVENT_COUNT_COLUMNS = (
+    "n_non_local",
+    "n_MUA",
+    "n_non_local_MUA",
+    "n_non_local_no_MUA",
+)
+"""The decode's other event counts in ``data_over_time`` (one number per epoch).
+They count every event the decode labelled, the ones the analysed-time rule
+drops too, so they are dropped from every analysis frame as well. No reader in
+``src/`` or ``scripts/`` used them (checked 2026-10-11)."""
+
+_THETA_COLUMN = "theta_power_zscore"
+_RUN_SPEED_BASELINE_COLUMN = "run_speed_baseline"
 
 _ARTIFACT_COLUMNS = ["start_time", "end_time"]
 
@@ -953,6 +983,37 @@ def dropped_for_excluded_time(drops: pd.DataFrame) -> pd.DataFrame:
     return drops.loc[selected]
 
 
+def _normalize_outside_mask(frame: pd.DataFrame, in_mask: NDArray[np.bool_]) -> None:
+    """Take the frame's two epoch normalizers again without the artifact mask.
+
+    Both are inputs, so they leave out the mask itself (not excluded time), as
+    ``SWR_zscore`` and ``MUA_zscore`` already do. ``frame`` is changed in place:
+    each column is replaced by a new array, so a shallow copy's source keeps
+    its own.
+
+    - ``theta_power_zscore``: the decode z-scored theta power over every bin.
+      It is re-z-scored over the rows outside the mask (NaN ignored, SD with
+      ``ddof=0`` as ``scipy.stats.zscore``) and set to NaN inside it. A z-score
+      is affine in raw power, so this equals z-scoring the raw power over the
+      rows outside the mask, and a frame already renormalized is unchanged (to
+      float rounding).
+    - ``run_speed_baseline``: ``epoch_normalizers.run_speed_baseline`` of the
+      head speed outside the mask, the percentile the decoders took over every
+      bin.
+
+    A frame without a column (a rule frame, say) is left without it.
+    """
+    if _THETA_COLUMN in frame.columns:
+        theta = frame[_THETA_COLUMN].to_numpy(dtype=float)
+        outside = theta[~in_mask]
+        renormalized = (theta - np.nanmean(outside)) / np.nanstd(outside)
+        renormalized[in_mask] = np.nan
+        frame[_THETA_COLUMN] = renormalized
+    if _RUN_SPEED_BASELINE_COLUMN in frame.columns:
+        speed = frame["head_speed"].to_numpy(dtype=float)
+        frame[_RUN_SPEED_BASELINE_COLUMN] = run_speed_baseline(speed[~in_mask])
+
+
 def with_swr_source(
     dot: pd.DataFrame, *, drop_masked_events: bool = True
 ) -> pd.DataFrame:
@@ -977,11 +1038,28 @@ def with_swr_source(
         A new frame (`dot` is not changed) with the same rows: ``SWR_event``
         holds the kept SWRs' labels on the frame's time axis and head speed
         (the inventory's numbers), ``swr_observed`` is
-        :func:`swr_observed_mask` (excluded time unobserved), the decode's
-        stored-ripple counts (:data:`DECODE_SWR_COUNT_COLUMNS`) are gone, and
-        ``attrs`` carries the source's stamp (:func:`stamp_swr_source`). The
-        epoch's source files are checked against the manifest once. With no
-        artifact run configured, every other label is the decode's.
+        :func:`swr_observed_mask` (excluded time unobserved), and ``attrs``
+        carries the source's stamp (:func:`stamp_swr_source`). The epoch's
+        source files are checked against the manifest once. In both modes
+        also:
+
+        - ``in_excluded_time`` (:data:`IN_EXCLUDED_TIME_COLUMN`) is True at
+          each row whose time lies in :func:`excluded_intervals` (closed), all
+          False with no artifact run;
+        - the decode's event counts are gone: the stored-ripple counts
+          (:data:`DECODE_SWR_COUNT_COLUMNS`) and the others
+          (:data:`DECODE_EVENT_COUNT_COLUMNS`), which count events the rule
+          drops;
+        - when the epoch has artifacts, the two epoch normalizers leave the
+          artifact mask out, as inputs do: ``theta_power_zscore`` is
+          re-z-scored over the rows outside the mask and NaN inside it, and
+          ``run_speed_baseline`` is the same percentile of head speed over the
+          rows outside the mask. Applying this to a frame already read (or
+          saved by a decoder through this function) changes nothing (theta to
+          float rounding).
+
+        With no artifact run configured, every other label and column is the
+        decode's.
 
     Raises
     ------
@@ -1010,11 +1088,14 @@ def with_swr_source(
     # gigabyte; deleting and assigning columns on it leaves `dot` as it was.
     out = dot.copy(deep=False)
     out.attrs = dict(dot.attrs)
-    for column in DECODE_SWR_COUNT_COLUMNS:
+    for column in (*DECODE_SWR_COUNT_COLUMNS, *DECODE_EVENT_COUNT_COLUMNS):
         if column in out.columns:
             del out[column]
     out[SWR_LABEL_COLUMN] = _keep_labels(swr_labels, kept_swrs)
     out[SWR_OBSERVED_COLUMN] = _mask(source.observed, time)
+    out[IN_EXCLUDED_TIME_COLUMN] = interval_mask(time, excluded_time(source.artifacts))
+    if len(source.artifacts) > 0:
+        _normalize_outside_mask(out, interval_mask(time, source.artifacts))
     if masking:
         for column in LABEL_COLUMNS:
             if column in out.columns:

@@ -58,6 +58,12 @@ Aggregation of analysis results over time.
 
 `theta_power_zscore`, `validate_required_session_data_keys`, `validate_results_position_time_alignment`, `align_results_to_position`, `validate_dot_event_contract`, `get_data_over_time`, `load_data_over_time`, `get_event_types`, `compute_swr_overlap_class_counts`, `compute_swr_nl_event_counts`
 
+### `src/continuum_swr_replay/analysis/hippocampus/epoch_normalizers.py`
+
+An epoch's run-speed baseline, shared by the decoders and the read path.
+
+`run_speed_baseline`
+
 ### `src/continuum_swr_replay/analysis/hippocampus/event_analysis.py`
 
 Analysis functions for manipulating and characterizing detected events.

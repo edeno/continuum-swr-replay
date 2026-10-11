@@ -27,6 +27,9 @@ from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_fil
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 
 from ...types import SessionData
+from ..hippocampus.epoch_normalizers import (
+    run_speed_baseline as epoch_run_speed_baseline,
+)
 from ..hippocampus.event_detection import get_overlap_times
 from ..hippocampus.event_immobility import build_speed_eligible_event_cohort
 from ..hippocampus.posterior_analysis import get_map_step_distance, get_posterior_stats
@@ -134,13 +137,12 @@ def get_contfrag_data_over_time(
         np.asarray(env.place_bin_centers_nodes_df_.node_id),
     )
     # Per-session "typical run speed" baseline (cm/s): robust, threshold-free
-    # 90th-percentile of head speed, a per-session speed normalizer for
-    # downstream replay-speed/compression measures.
-    run_speed_baseline = float(
-        np.nanpercentile(data["position_info"].head_speed.to_numpy(), 90)
+    # percentile of head speed over every bin, a per-session speed normalizer
+    # for downstream replay-speed/compression measures. The read through the
+    # SWR source takes it again over the bins outside the artifact mask.
+    run_speed_baseline = epoch_run_speed_baseline(
+        data["position_info"].head_speed.to_numpy()
     )
-    if not np.isfinite(run_speed_baseline):
-        raise ValueError("run_speed_baseline is not finite (head_speed all-NaN?)")
 
     animal, day = parse_nwb_filename(nwb_file_name)
 

@@ -39,6 +39,12 @@ Event labels (integer event numbers):
       with the source's labels, and again by every read through the source.
       In the saved frame it already excludes the 0.3-s reach whose SWR labels
       the frame keeps.
+    - in_excluded_time: True where the row's time lies in the epoch's
+      excluded time (the artifact mask widened by 0.3 s,
+      ``swr_source.excluded_intervals``, closed); added by
+      ``swr_source.with_swr_source`` in both its modes, so by every read
+      through the source; all False with no artifact run. A reader that
+      summarises bins leaves these rows out.
     - MUA_event: Multiunit activity high-synchrony event number
 
 State probabilities (0-1):
@@ -52,18 +58,26 @@ Spatial statistics:
     - map_speed: Speed of MAP position estimate (cm/s)
     - ahead_behind_distance: Signed distance from actual to decoded position (cm)
     - hpd: Highest posterior density threshold value
+    - run_speed_baseline: The epoch's run-speed baseline (cm/s), a percentile
+      of head speed (``epoch_normalizers.run_speed_baseline``), one value per
+      epoch. Taken over every bin here; ``swr_source.with_swr_source`` (every
+      read) takes it again over the bins outside the artifact mask.
     - max_coverage: Maximum HPD spatial coverage
     - max_distance: Maximum distance in posterior
     - max_linear_position: Maximum linear position
 
 Neural signals (z-scored or phase):
     - theta_phase: Theta oscillation phase (radians)
-    - theta_power_zscore: Z-scored theta power
+    - theta_power_zscore: Z-scored theta power. Z-scored over every bin
+      here; ``swr_source.with_swr_source`` (every read) re-z-scores it over
+      the bins outside the artifact mask and sets it to NaN inside the mask,
+      as ``SWR_zscore`` and ``MUA_zscore`` already are.
     - SWR_zscore: Z-scored ripple consensus trace
     - MUA_zscore: Z-scored multiunit firing rate
 
-Event counts (session-level; the ``*SWR*`` counts are of the stored ripples
-and are dropped by ``swr_source.with_swr_source``):
+Event counts (session-level; the ``*SWR*`` counts are of the stored ripples,
+and every count includes events the analysed-time rule drops, so all of them
+are dropped by ``swr_source.with_swr_source``):
     - n_non_local, n_SWR, n_MUA: Whole-event-speed-eligible event counts
     - n_non_local_SWR, n_non_local_no_SWR: Non-local overlaps with/without SWR
     - n_non_local_MUA, n_non_local_no_MUA: Non-local overlaps with/without MUA
@@ -134,6 +148,7 @@ from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_fil
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 
 from ...types import SessionData
+from .epoch_normalizers import run_speed_baseline as epoch_run_speed_baseline
 from .event_detection import (
     event_strict_overlap_keys,
     get_confident_times,
@@ -642,14 +657,13 @@ def get_data_over_time(
         np.asarray(env.place_bin_centers_nodes_df_.node_id),
     )
     # Per-session "typical run speed" baseline (cm/s): a robust, threshold-free
-    # 90th-percentile of head speed, intended as a per-session speed normalizer
-    # for downstream replay-speed/compression measures. Constant across the
-    # session.
-    run_speed_baseline = float(
-        np.nanpercentile(data["position_info"].head_speed.to_numpy(), 90)
+    # percentile of head speed over every bin, intended as a per-session speed
+    # normalizer for downstream replay-speed/compression measures. Constant
+    # across the session. The read through the SWR source takes it again over
+    # the bins outside the artifact mask (``swr_source.with_swr_source``).
+    run_speed_baseline = epoch_run_speed_baseline(
+        data["position_info"].head_speed.to_numpy()
     )
-    if not np.isfinite(run_speed_baseline):
-        raise ValueError("run_speed_baseline is not finite (head_speed all-NaN?)")
     animal, day = parse_nwb_filename(nwb_file_name)
 
     def _nearest(series):

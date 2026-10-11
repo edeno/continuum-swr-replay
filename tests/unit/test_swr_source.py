@@ -855,3 +855,252 @@ class TestEveryCohortHonoursTheMask:
             DropReason.SPEED_UNKNOWN,
             DropReason.NO_SPEED_SAMPLE,
         }
+
+
+# --------------------------------------------------------------------------
+# What the read adds and re-derives besides the labels (task 26a)
+# --------------------------------------------------------------------------
+
+
+def _closed_mask(intervals: pd.DataFrame, time: np.ndarray) -> np.ndarray:
+    """By hand: True at each time in a closed ``[start_time, end_time]``."""
+    inside = np.zeros(time.shape, dtype=bool)
+    for start, end in intervals[["start_time", "end_time"]].to_numpy():
+        inside |= (time >= start) & (time <= end)
+    return inside
+
+
+class TestTheExcludedTimeColumn:
+    """``in_excluded_time`` marks the rows in the epoch's excluded time (the
+    mask widened by 0.3 s), closed, so a reader can leave excluded time out
+    without reading the intervals again."""
+
+    def test_it_marks_the_closed_excluded_intervals(
+        self, inventory, tmp_path, monkeypatch
+    ):
+        _artifacts(tmp_path, monkeypatch, ARTIFACTS)
+        excluded = swr_source.excluded_intervals(EPOCH)
+        # the grid holds every interval's exact endpoints, so closedness shows
+        time = np.unique(np.r_[TIME, excluded.to_numpy().ravel()])
+        dot = pd.DataFrame(
+            {
+                "head_speed": np.zeros(time.size),
+                "animal": "j16",
+                "day": 20210706,
+                "epoch": "02_r1",
+            },
+            index=pd.Index(time, name="time"),
+        )
+
+        out = with_swr_source(dot)
+
+        column = out["in_excluded_time"].to_numpy()
+        assert column.dtype == bool
+        np.testing.assert_array_equal(column, _closed_mask(excluded, time))
+        at_ends = np.isin(time, excluded.to_numpy().ravel())
+        assert at_ends.sum() == 4
+        assert column[at_ends].all()
+        # it is not the coverage column: excluded time and nothing else
+        assert column.sum() == 2 * 399 + 4
+
+    def test_it_is_all_false_with_no_artifact_run(self, inventory):
+        out = with_swr_source(_dot())
+
+        assert out["in_excluded_time"].dtype == bool
+        assert not out["in_excluded_time"].any()
+
+    @pytest.mark.parametrize("drop_masked_events", [True, False])
+    def test_both_modes_carry_it(
+        self, inventory, tmp_path, monkeypatch, drop_masked_events
+    ):
+        _artifacts(tmp_path, monkeypatch, ARTIFACTS)
+
+        out = with_swr_source(_dot(), drop_masked_events=drop_masked_events)
+
+        np.testing.assert_array_equal(
+            out["in_excluded_time"].to_numpy(),
+            _closed_mask(swr_source.excluded_intervals(EPOCH), TIME),
+        )
+
+    def test_a_contfrag_frame_read_from_its_pickle_carries_it(
+        self, inventory, tmp_path, monkeypatch
+    ):
+        """The ContFrag prep reads its frames with ``read_dot_with_swr_source``."""
+        _artifacts(tmp_path, monkeypatch, ARTIFACTS)
+        path = tmp_path / f"{EPOCH}_contfrag_data_over_time.pkl"
+        _dot(Continuous_prob=0.5, Fragmented_prob=0.5).to_pickle(path)
+
+        out = read_dot_with_swr_source(path)
+
+        np.testing.assert_array_equal(
+            out["in_excluded_time"].to_numpy(),
+            _closed_mask(swr_source.excluded_intervals(EPOCH), TIME),
+        )
+
+
+def _raw_theta_power() -> np.ndarray:
+    """Theta power with an artifact's large values in the mask and a few
+    untracked (NaN) samples outside it."""
+    rng = np.random.default_rng(26)
+    power = rng.gamma(4.0, 2.0, TIME.size)
+    in_mask = _closed_mask(pd.DataFrame(ARTIFACT_INTERVALS, columns=_BOUNDS), TIME)
+    power[in_mask] *= 40.0
+    power[(TIME >= 101.5) & (TIME <= 101.52)] = np.nan
+    return power
+
+
+_BOUNDS = ["start_time", "end_time"]
+
+
+class TestTheNormalizers:
+    """The two epoch normalizers are inputs, so they leave the artifact mask
+    itself out, as ``SWR_zscore`` and ``MUA_zscore`` already do: the theta-power
+    z-score is re-z-scored over the rows outside the mask (NaN inside it) and the
+    run-speed baseline is the same percentile of head speed outside the mask."""
+
+    def _theta_dot(self) -> pd.DataFrame:
+        from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+            theta_power_zscore,
+        )
+
+        # as the decoders stored it: z-scored over every bin, the mask included
+        return _dot(theta_power_zscore=theta_power_zscore(_raw_theta_power()))
+
+    def test_theta_has_mean_zero_and_sd_one_outside_the_mask(
+        self, inventory, tmp_path, monkeypatch
+    ):
+        _artifacts(tmp_path, monkeypatch, ARTIFACTS)
+        dot = self._theta_dot()
+        outside = ~_closed_mask(artifact_intervals(EPOCH), TIME)
+        stored = dot["theta_power_zscore"].to_numpy()
+        # the decode-time z-score is not normalized outside the mask
+        assert np.nanstd(stored[outside]) < 0.5
+
+        theta = with_swr_source(dot)["theta_power_zscore"].to_numpy()
+
+        np.testing.assert_allclose(np.nanmean(theta[outside]), 0.0, atol=1e-12)
+        np.testing.assert_allclose(np.nanstd(theta[outside]), 1.0, atol=1e-12)
+
+    def test_theta_is_nan_inside_the_mask(self, inventory, tmp_path, monkeypatch):
+        _artifacts(tmp_path, monkeypatch, ARTIFACTS)
+        in_mask = _closed_mask(artifact_intervals(EPOCH), TIME)
+        assert in_mask.sum() == 2 * 101
+
+        theta = with_swr_source(self._theta_dot())["theta_power_zscore"].to_numpy()
+
+        assert np.isnan(theta[in_mask]).all()
+        # the reach of the mask is outside it: finite there
+        reach = _closed_mask(swr_source.excluded_intervals(EPOCH), TIME) & ~in_mask
+        assert np.isfinite(theta[reach]).all()
+
+    def test_theta_is_the_raw_power_z_scored_outside_the_mask(
+        self, inventory, tmp_path, monkeypatch
+    ):
+        """z is affine in raw power, so re-z-scoring the stored z over the rows
+        outside the mask is z-scoring the raw power over those rows."""
+        from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+            theta_power_zscore,
+        )
+
+        _artifacts(tmp_path, monkeypatch, ARTIFACTS)
+        outside = ~_closed_mask(artifact_intervals(EPOCH), TIME)
+
+        theta = with_swr_source(self._theta_dot())["theta_power_zscore"].to_numpy()
+
+        np.testing.assert_allclose(
+            theta[outside],
+            theta_power_zscore(_raw_theta_power()[outside]),
+            rtol=0,
+            atol=1e-12,
+        )
+        assert np.isnan(theta[outside]).sum() == 11  # the untracked samples
+
+    @pytest.mark.parametrize("first_mode", [True, False], ids=["read", "decoder"])
+    def test_theta_is_idempotent(self, inventory, tmp_path, monkeypatch, first_mode):
+        """A frame already renormalized (by a read, or by a decoder saving its
+        frame through the source) is not changed by the next read."""
+        _artifacts(tmp_path, monkeypatch, ARTIFACTS)
+        once = with_swr_source(self._theta_dot(), drop_masked_events=first_mode)
+
+        twice = with_swr_source(once)
+
+        np.testing.assert_allclose(
+            twice["theta_power_zscore"].to_numpy(),
+            once["theta_power_zscore"].to_numpy(),
+            rtol=0,
+            atol=1e-12,
+        )
+        np.testing.assert_array_equal(
+            np.isnan(twice["theta_power_zscore"].to_numpy()),
+            np.isnan(once["theta_power_zscore"].to_numpy()),
+        )
+
+    def test_the_speed_baseline_is_the_percentile_outside_the_mask(
+        self, inventory, tmp_path, monkeypatch
+    ):
+        from continuum_swr_replay.analysis.hippocampus.epoch_normalizers import (
+            RUN_SPEED_BASELINE_PERCENTILE,
+        )
+
+        _artifacts(tmp_path, monkeypatch, ARTIFACTS)
+        in_mask = _closed_mask(artifact_intervals(EPOCH), TIME)
+        speed = _speed() + np.random.default_rng(4).uniform(0.0, 3.9, TIME.size)
+        speed[in_mask] = 100.0  # an artifact's tracking jumps
+        dot = _dot(head_speed=speed, run_speed_baseline=np.nanpercentile(speed, 90))
+
+        baseline = with_swr_source(dot)["run_speed_baseline"].to_numpy()
+
+        # the decoders' percentile (data_aggregation, both decoders)
+        assert RUN_SPEED_BASELINE_PERCENTILE == 90
+        expected = np.nanpercentile(speed[~in_mask], 90)
+        assert np.unique(baseline).tolist() == [expected]
+        assert expected != pytest.approx(np.nanpercentile(speed, 90))
+
+    def test_with_no_artifact_run_both_are_the_decodes(self, inventory):
+        dot = self._theta_dot().assign(run_speed_baseline=123.0)
+
+        out = with_swr_source(dot)
+
+        pd.testing.assert_series_equal(
+            out["theta_power_zscore"], dot["theta_power_zscore"]
+        )
+        pd.testing.assert_series_equal(
+            out["run_speed_baseline"], dot["run_speed_baseline"]
+        )
+
+    def test_the_decodes_frame_is_left_as_it_was(
+        self, inventory, tmp_path, monkeypatch
+    ):
+        _artifacts(tmp_path, monkeypatch, ARTIFACTS)
+        dot = self._theta_dot().assign(run_speed_baseline=123.0)
+        before = dot.copy(deep=True)
+
+        with_swr_source(dot)
+
+        pd.testing.assert_frame_equal(dot, before)
+
+    def test_a_frame_without_them_is_read(self, inventory, tmp_path, monkeypatch):
+        """A rule frame (the half-tetrode QA's) carries neither normalizer."""
+        _artifacts(tmp_path, monkeypatch, ARTIFACTS)
+
+        out = with_swr_source(_dot())
+
+        assert not {"theta_power_zscore", "run_speed_baseline"} & set(out.columns)
+
+
+@pytest.mark.parametrize("drop_masked_events", [True, False])
+def test_the_decodes_event_counts_are_dropped(inventory, drop_masked_events):
+    """Every decode-time count counts events the one rule drops; none reaches
+    an analysis frame."""
+    counts = {
+        "n_non_local": 9,
+        "n_MUA": 8,
+        "n_non_local_MUA": 7,
+        "n_non_local_no_MUA": 6,
+    }
+    assert set(counts) == set(swr_source.DECODE_EVENT_COUNT_COLUMNS)
+
+    out = with_swr_source(_dot(**counts), drop_masked_events=drop_masked_events)
+
+    assert not set(counts) & set(out.columns)
+    assert not set(swr_source.DECODE_SWR_COUNT_COLUMNS) & set(out.columns)

@@ -141,8 +141,15 @@ What the comparison shows:
   (`swr_observed.parquet`, scope `stored_band`), as closed intervals.
 - **`with_swr_source(dot)` and `read_dot_with_swr_source(path)`.** They give one epoch's
   `data_over_time` for analysis. `SWR_event` holds the source's labels and `swr_observed`
-  the coverage mask. The decode's stored-ripple counts (`n_SWR`, `n_non_local_SWR`,
-  `n_non_local_no_SWR`, `n_SWR_MUA`, `n_SWR_no_MUA`) are dropped. The decode's own
+  the coverage mask. `in_excluded_time` is True at each row in the epoch's excluded time
+  (closed intervals), all False with no artifact run. The decode's stored-ripple counts
+  (`n_SWR`, `n_non_local_SWR`, `n_non_local_no_SWR`, `n_SWR_MUA`, `n_SWR_no_MUA`) are
+  dropped, and so are its other event counts (`n_non_local`, `n_MUA`, `n_non_local_MUA`,
+  `n_non_local_no_MUA`), which count events the rule drops. When the epoch has artifacts,
+  the two epoch normalizers leave the mask out, as inputs do: `theta_power_zscore` is
+  re-z-scored over the rows outside the mask and is NaN inside it, and
+  `run_speed_baseline` is the same percentile of head speed over the rows outside the
+  mask (task 26a, 2026-10-11). The decode's own
   `SWR_event` stays in the pickle as provenance and never reaches an analysis. The epoch id
   comes from the frame's `animal`, `day` and `epoch`, so a ContFrag or cortical decode reads
   the same CA1 SWRs. The epoch's files are checked against the manifest once, and the frame
