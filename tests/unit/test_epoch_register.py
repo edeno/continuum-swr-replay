@@ -174,9 +174,12 @@ def test_the_committed_cohort_is_whatever_the_register_analyses(monkeypatch):
     assert set(analysed_epochs().index) == {
         key for key in listed if status[key] == Status.ANALYSED
     }
-    assert set(pending_epochs().index) == {
-        key for key in listed if status[key] == Status.PENDING
-    }
+    pending = {key for key in listed if status[key] == Status.PENDING}
+    if pending:
+        assert set(pending_epochs().index) == pending
+    else:
+        with pytest.raises(EpochRegisterError, match="no pending epoch"):
+            pending_epochs()
 
 
 # --------------------------------------------------------------------------
