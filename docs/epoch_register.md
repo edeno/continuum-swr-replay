@@ -56,6 +56,8 @@ The evidence names the others. For example,
 chimi20200303, chimi20200307, peanut20201207 and senor20201119 are depletion
 sessions whose trial parsing is also incomplete: they are `DEPLETION_TASK`, so
 `NO_TRIAL_INTERVALS` holds for 8 of the 12 sessions with incomplete trial parsing.
+An epoch the artifact run has read is populated, so `PENDING_POPULATE` no longer
+holds for it.
 
 wilbur20210416 is not a depletion session. Its raw NWB describes it as "Spatial
 bandit task (regular) - after depletion". It was never ingested, so it is

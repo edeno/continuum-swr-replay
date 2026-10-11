@@ -27,7 +27,9 @@ When several reasons hold for one epoch, the register records the first in the
 rule's order: no data (``NO_NWB``, ``NO_RUN_EPOCH``), then the task
 (``DEPLETION_TASK``), then Spyglass (``NOT_INGESTED``, ``NO_TRIAL_INTERVALS``),
 then the decode inputs (``PENDING_POPULATE``, ``MISSING_INPUT``), then the
-artifact run (``SUSTAINED_NOISE``). The evidence names the others.
+artifact run (``SUSTAINED_NOISE``). The evidence names the others. An epoch the
+artifact run has read is populated, so ``PENDING_POPULATE`` no longer holds for
+it.
 
 The cohort is pinned here, not in Spyglass. A populate that makes a pending
 epoch decodable lists it in ``get_epoch_info``, but it is analysed only once its
