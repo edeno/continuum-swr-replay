@@ -2228,7 +2228,7 @@ Output: `.claude/research/refresh_artifact_detector/followup/`. Reports: `follow
 
 - NonLocal and ContFrag, both into a new staging folder, from the commit that sets both run ids.
 - First, on breeze, decode the 12 S epochs with masking and with their noisy tetrodes dropped, and apply
-  the Phase C ruling.
+  the Phase C ruling (superseded 2026-10-10: see Rulings).
 - **Also first: j16's three tetrodes in decoding.** R-T removes groups 0, 10 and 22 from SWR
   detection only. Two of them have spikes that rise during true SWRs (own MUA 2.8× and 3.0×), so
   they stay in decoding by default.
@@ -2257,7 +2257,7 @@ Output: `.claude/research/refresh_artifact_detector/followup/`. Reports: `follow
   (with `docs/epoch_register.md` regenerated). The 13 S epochs' R11 decodes stay out of the
   canonical folder. Use the R2 swap procedure with a sample re-hash.
 
-## R12: Widloski rerun, all 255 epochs
+## R12: Widloski rerun, all 242 epochs
 
 Run with the thread fix, into a new run folder.
 
@@ -2265,7 +2265,9 @@ Run with the thread fix, into a new run folder.
 
 R5–R8 as written, on 242 epochs (255 less the 13 S epochs), with stamps
 `kay@<R10 run>+artifacts@<R9 run>`. R8 adds:
-- the sensitivity analysis without the 4 epochs over 2 % masked;
+- the sensitivity analysis without the epochs over 2 % masked. Restate that set on the 242 epochs:
+  the old "4 epochs" no longer fits, since two of the most-masked epochs (senor20201107_12_r6 and
+  senor20201101_14_r7) are now excluded;
 - the masked-time table, and the events and bins the mask and the 0.3-s decoder reach remove;
 - robustness reruns of the headline results: without the mask; with every artifact threshold 25 %
   lower and 25 % higher; with 1 s masked after each step.

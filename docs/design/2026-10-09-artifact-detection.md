@@ -100,8 +100,9 @@ the giant-day events.
      not only near the blocks. Against R11, non-local events change by −8 % to −57 % in 6 S
      epochs, against at most ±5 % in the other 154 of 160 epochs, and the fitted transitions
      moved too (R11 gates report, gate 6).
-
-  R8 leaves out the 4 epochs with more than 2 % masked.
+- **A sensitivity analysis without the most-masked epochs.** R8 leaves out the 4 epochs with more
+  than 2 % masked. That set is to be restated on the 242 epochs. Two of the most-masked epochs,
+  senor20201107_12_r6 and senor20201101_14_r7, have S blocks and are now excluded.
 - **No amplitude cap.** Some pipelines drop events above 9–10 SD as non-biological. Of the
   9,208 reference-set SWRs, 2,538 (27.6 %) have a Kay consensus peak above 9 robust z and
   2,181 (23.7 %) above 10; so do 24 and 23 of the 55 model-reviewed SWRs. These are robust
