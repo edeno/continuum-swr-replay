@@ -49,6 +49,7 @@ Usage
 from __future__ import annotations
 
 import argparse
+import hashlib
 import logging
 import warnings
 from pathlib import Path
@@ -77,6 +78,7 @@ from continuum_swr_replay.analysis.hippocampus.swr_source import (
     swr_source_name,
 )
 from continuum_swr_replay.data_loaders import load_data
+from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.figure_utilities import (
     PAGE_HEIGHT,
@@ -103,13 +105,15 @@ from continuum_swr_replay.visualization.plots import (
 TRIGGERED_SIGNALS = ["Non-Local_prob", "SWR_zscore"]
 
 # The render cache's version, part of its file name. The name also carries the
-# SWR source's name, so a new SWR inventory or artifact run makes a new cache by
-# itself. Bump this whenever the cached values could change for any other
-# reason: a change to ``_compute_figure_inputs`` or to a library function it
-# calls (the read through the SWR source, the event classification, the
-# triggered averages, ``compute_local_decoding_error``), or to the decodes
-# themselves. Without a bump the figure is drawn from the old cache, unless
-# ``--force-recompute`` is passed.
+# SWR source's name and a fingerprint of the epoch register's analysed epochs
+# (the cohort panels b-e summarise), so a new SWR inventory, artifact run or
+# register change makes a new cache by itself. Bump this whenever the cached
+# values could change for any other reason: a change to
+# ``_compute_figure_inputs`` or to a library function it calls (the read through
+# the SWR source, the event classification, the triggered averages,
+# ``compute_local_decoding_error``), or to the decodes themselves. Without a
+# bump the figure is drawn from the old cache, unless ``--force-recompute`` is
+# passed.
 # 1: the cache named ``..._figure02_whole_event_speed_v1_...``.
 # 2: panel e's decoding error leaves excluded time out (task 26b).
 FIGURE02_CACHE_VERSION = 2
@@ -186,11 +190,14 @@ def _figure02_cache_path(
     preserves them all exactly.
     """
     animal, day = parse_nwb_filename(nwb_file_name)
+    # ``load_data_over_time`` reads every analysed epoch, so the cohort is the
+    # register's analysed epochs.
+    cohort = hashlib.sha256("\n".join(analysed_epoch_ids()).encode()).hexdigest()
     return (
         data_dir
         / "intermediates"
         / f"{animal}{day}_{epoch_name}_figure02_v{FIGURE02_CACHE_VERSION}_"
-        f"{swr_source_name()}_cache.joblib"
+        f"{swr_source_name()}_register{cohort[:12]}_cache.joblib"
     )
 
 

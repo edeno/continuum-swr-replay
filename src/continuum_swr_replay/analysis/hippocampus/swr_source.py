@@ -61,7 +61,8 @@ What this module fixes
 Analyses read a decode's ``data_over_time`` through :func:`with_swr_source`
 or :func:`read_dot_with_swr_source`. Its ``SWR_event`` column then holds this
 source's labels, ``swr_observed`` the coverage mask and ``in_excluded_time``
-the rows in excluded time; every event cohort of the frame follows the one
+the rows in excluded time (a per-bin summary keeps the rows
+:func:`analysed_bins` returns); every event cohort of the frame follows the one
 analysed-time rule, and the frame's two epoch normalizers
 (``theta_power_zscore``, ``run_speed_baseline``) leave the artifact mask out,
 as the other inputs do. An HPC decode made by the
@@ -141,6 +142,7 @@ __all__ = [
     "SWR_SOURCE_ATTR",
     "SWR_SOURCE_TABLES",
     "SwrSourceError",
+    "analysed_bins",
     "artifact_event_drops",
     "artifact_intervals",
     "artifact_intervals_dir",
@@ -1194,6 +1196,49 @@ def read_dot_with_swr_source(path: str | Path) -> pd.DataFrame:
     """
     frame: Any = pd.read_pickle(path)
     return with_swr_source(frame)
+
+
+def analysed_bins(frame: pd.DataFrame) -> NDArray[np.bool_]:
+    """The rows of a read frame that lie outside excluded time.
+
+    The one check of :data:`IN_EXCLUDED_TIME_COLUMN` that every per-bin summary
+    uses (the quality metrics, the figure panels, the content scan). It sits
+    beside the column's writer, :func:`with_swr_source`, so the library and the
+    scripts import it from the module that defines the column.
+
+    Parameters
+    ----------
+    frame : pd.DataFrame
+        A frame read through this source (:func:`read_dot_with_swr_source`,
+        or ``load_data_over_time``), which carries the column.
+
+    Returns
+    -------
+    np.ndarray of bool, shape (n_rows,)
+        True where the row is analysed: ``~in_excluded_time``.
+
+    Raises
+    ------
+    KeyError
+        If the frame has no ``in_excluded_time`` column.
+    TypeError
+        If the column is not boolean. There is no coercion: cast to bool, a NaN
+        (left by a concat with a frame read another way) would read as excluded
+        and a None as analysed.
+    """
+    if IN_EXCLUDED_TIME_COLUMN not in frame.columns:
+        raise KeyError(
+            f"the frame has no {IN_EXCLUDED_TIME_COLUMN!r} column: read it "
+            "through swr_source.read_dot_with_swr_source (or "
+            "load_data_over_time), which marks excluded time"
+        )
+    column = frame[IN_EXCLUDED_TIME_COLUMN]
+    if column.dtype != bool:
+        raise TypeError(
+            f"{IN_EXCLUDED_TIME_COLUMN!r} must be boolean, not {column.dtype}: "
+            "read every frame through swr_source.read_dot_with_swr_source"
+        )
+    return ~column.to_numpy()
 
 
 def swr_intervals(

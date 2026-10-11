@@ -51,9 +51,7 @@ from continuum_swr_replay.analysis.hippocampus import (
     get_event_types,
     load_data_over_time,
 )
-from continuum_swr_replay.analysis.hippocampus.swr_source import (
-    IN_EXCLUDED_TIME_COLUMN,
-)
+from continuum_swr_replay.analysis.hippocampus.swr_source import analysed_bins
 from continuum_swr_replay.figure_utilities import (
     PAGE_HEIGHT,
     TWO_COLUMN,
@@ -88,7 +86,7 @@ def plot_non_local_prob_distribution(data_over_time, ax) -> None:
     """
     is_immobile = (
         data_over_time.head_speed < DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
-    ) & ~data_over_time[IN_EXCLUDED_TIME_COLUMN].to_numpy(dtype=bool)
+    ) & analysed_bins(data_over_time)
     ax.hist(
         data_over_time.loc[is_immobile, "Non-Local_prob"],
         bins=50,

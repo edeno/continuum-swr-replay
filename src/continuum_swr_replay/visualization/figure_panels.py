@@ -37,9 +37,7 @@ from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     filter_event_labels_by_speed,
     validate_nonlocal_event_probability_contract,
 )
-from continuum_swr_replay.analysis.hippocampus.swr_source import (
-    IN_EXCLUDED_TIME_COLUMN,
-)
+from continuum_swr_replay.analysis.hippocampus.swr_source import analysed_bins
 from continuum_swr_replay.figure_utilities import (
     PANEL_SINGLE,
     PANEL_SINGLE_SQUARE,
@@ -369,7 +367,7 @@ def plot_swr_zscore_by_state(
     # but the bins in its 0.3-s reach do, and they are not analysed either.
     is_immobile = (
         data_over_time.head_speed < DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
-    ) & ~data_over_time[IN_EXCLUDED_TIME_COLUMN].to_numpy(dtype=bool)
+    ) & analysed_bins(data_over_time)
 
     local_mask = is_immobile & (data_over_time["Local_prob"] > 0.8)
     ax.hist(
@@ -720,7 +718,7 @@ def plot_state_fractions_by_movement(
     # over the immobile bins outside excluded time
     is_immobile = (
         data_over_time["head_speed"] <= DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
-    ) & ~data_over_time[IN_EXCLUDED_TIME_COLUMN].to_numpy(dtype=bool)
+    ) & analysed_bins(data_over_time)
     immobile_session = (
         data_over_time.loc[is_immobile]
         .groupby(group_cols, sort=False)[prob_cols]
@@ -822,7 +820,7 @@ def plot_state_probability_by_theta_phase(
     # outside excluded time
     is_moving = (
         data_over_time["head_speed"] > DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
-    ) & ~data_over_time[IN_EXCLUDED_TIME_COLUMN].to_numpy(dtype=bool)
+    ) & analysed_bins(data_over_time)
     moving = data_over_time.loc[is_moving].copy()
 
     # Combined non-local probability

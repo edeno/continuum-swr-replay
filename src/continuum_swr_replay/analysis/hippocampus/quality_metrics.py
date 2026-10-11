@@ -97,7 +97,7 @@ from .event_immobility import (
     filter_event_labels_by_speed,
     validate_nonlocal_event_probability_contract,
 )
-from .swr_source import IN_EXCLUDED_TIME_COLUMN
+from .swr_source import analysed_bins
 
 logger = logging.getLogger(__name__)
 
@@ -125,25 +125,11 @@ def _analysed_rows(data: pd.DataFrame) -> np.ndarray:
 
     Raises
     ------
-    KeyError
-        If the frame has no ``in_excluded_time`` column.
-    TypeError
-        If the column is not boolean. A concatenation with a frame read another
-        way leaves NaN in it, which a cast to bool would read as excluded.
+    KeyError, TypeError
+        As :func:`~.swr_source.analysed_bins`, which this is: a missing or
+        non-boolean column is refused.
     """
-    if IN_EXCLUDED_TIME_COLUMN not in data.columns:
-        raise KeyError(
-            f"the frame has no {IN_EXCLUDED_TIME_COLUMN!r} column: read it "
-            "through swr_source.read_dot_with_swr_source (or "
-            "load_data_over_time), which marks excluded time"
-        )
-    column = data[IN_EXCLUDED_TIME_COLUMN]
-    if column.dtype != bool:
-        raise TypeError(
-            f"{IN_EXCLUDED_TIME_COLUMN!r} must be boolean, not {column.dtype}: "
-            "read every frame through swr_source.read_dot_with_swr_source"
-        )
-    return ~column.to_numpy()
+    return analysed_bins(data)
 
 
 def compute_local_decoding_error(
@@ -464,6 +450,8 @@ def compute_behavior_state_breakdown(
         "immobile_nonlocal_fraction",
     ]
 
+    # Only the check here: each session's rows are filtered below, so the
+    # multi-session frame is not copied whole.
     _analysed_rows(data)
     if data.empty:
         return pd.DataFrame(columns=out_cols)
@@ -564,6 +552,8 @@ def compute_bout_nonlocal_dominance(
         "median_bout_local_fraction",
     ]
 
+    # Only the check here: the rows are kept, and the bouts below break at
+    # excluded bins.
     _analysed_rows(data)
     if data.empty:
         return pd.DataFrame(columns=out_cols)
@@ -796,6 +786,7 @@ def compute_no_spike_firing_correspondence(
     """
     if group_cols is None:
         group_cols = list(_DEFAULT_GROUP_COLS)
+    # Only the check here: each session's excluded bins leave ``valid`` below.
     _analysed_rows(data)
 
     def _session_corr(group: pd.DataFrame) -> pd.Series:

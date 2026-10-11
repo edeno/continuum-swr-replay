@@ -86,6 +86,26 @@ def test_a_panel_refuses_a_frame_not_read_through_the_source(plot):
         _drawn(plot, frame)
 
 
+STRICT = {
+    **PANELS,
+    "B8 well positions": lambda frame, ax: (
+        analyze_content_occupancy._well_positions(frame)
+    ),
+}
+
+
+@pytest.mark.parametrize("name", STRICT)
+def test_a_filter_refuses_a_column_that_is_not_boolean(name):
+    """The same check as the quality metrics (``swr_source.analysed_bins``).
+    Cast to bool, a None would read as analysed and a NaN as excluded."""
+    frame = two_sessions()
+    frame["in_excluded_time"] = frame["in_excluded_time"].astype(object)
+    frame.iloc[:10, frame.columns.get_loc("in_excluded_time")] = None
+
+    with pytest.raises(TypeError, match="in_excluded_time"):
+        _drawn(STRICT[name], frame)
+
+
 # --------------------------------------------------------------------------
 # B8: the reward-well positions of the content-occupancy scan
 # --------------------------------------------------------------------------

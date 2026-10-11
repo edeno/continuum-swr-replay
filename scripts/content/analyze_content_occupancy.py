@@ -62,7 +62,7 @@ from continuum_swr_replay.analysis.hippocampus.event_immobility import (  # noqa
     validate_nonlocal_event_probability_contract,
 )
 from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
-    IN_EXCLUDED_TIME_COLUMN,
+    analysed_bins,
     read_dot_with_swr_source,
     require_swr_source,
 )
@@ -130,7 +130,7 @@ def _well_positions(dot: pd.DataFrame) -> list[float]:
 
     Over the immobile bins outside excluded time (``in_excluded_time``).
     """
-    analysed = ~dot[IN_EXCLUDED_TIME_COLUMN].to_numpy(dtype=bool)
+    analysed = analysed_bins(dot)
     immobile = (dot["head_speed"].to_numpy() < IMMOBILITY_CM_PER_S) & analysed
     segment = dot["track_segment_id"].to_numpy()
     linear = dot["linear_position"].to_numpy()

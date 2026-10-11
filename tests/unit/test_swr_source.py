@@ -938,6 +938,40 @@ class TestTheExcludedTimeColumn:
         )
 
 
+class TestTheAnalysedBins:
+    """``analysed_bins`` is the one check of the column every per-bin summary
+    uses: the column must be there and boolean, with no coercion."""
+
+    def test_it_is_the_rows_outside_excluded_time(self):
+        frame = pd.DataFrame({"in_excluded_time": [False, True, True, False]})
+
+        np.testing.assert_array_equal(
+            swr_source.analysed_bins(frame), [True, False, False, True]
+        )
+        assert "analysed_bins" in swr_source.__all__
+
+    def test_a_frame_without_the_column_is_refused(self):
+        with pytest.raises(
+            KeyError, match="in_excluded_time.*read_dot_with_swr_source"
+        ):
+            swr_source.analysed_bins(pd.DataFrame({"head_speed": [0.0]}))
+
+    @pytest.mark.parametrize(
+        "values",
+        [
+            [False, True],  # boolean values, object dtype: no coercion
+            [False, np.nan],  # a concat with a frame read another way
+            [False, None],  # cast to bool, None would read as analysed
+        ],
+        ids=["object", "nan", "none"],
+    )
+    def test_a_column_that_is_not_boolean_is_refused(self, values):
+        frame = pd.DataFrame({"in_excluded_time": pd.Series(values, dtype=object)})
+
+        with pytest.raises(TypeError, match="in_excluded_time"):
+            swr_source.analysed_bins(frame)
+
+
 def _raw_theta_power() -> np.ndarray:
     """Theta power with an artifact's large values in the mask and a few
     untracked (NaN) samples outside it."""

@@ -252,3 +252,34 @@ def test_the_figure02_cache_is_keyed_on_a_version_token(offline, tmp_path):
     assert f"_v{figure02.FIGURE02_CACHE_VERSION}_" in path.name
     assert figure02.FIGURE02_CACHE_VERSION >= 2
     assert swr_source.swr_source_name() in path.name
+
+
+def _register(path: Path, epochs: list[str]) -> Path:
+    pd.DataFrame(
+        [["wilbur20210329_.nwb", epoch, "analysed", "", ""] for epoch in epochs],
+        columns=["nwb_file_name", "epoch", "status", "reason", "evidence"],
+    ).to_csv(path, index=False)
+    return path
+
+
+def test_the_figure02_cache_is_keyed_on_the_analysed_epochs(
+    offline, tmp_path, monkeypatch
+):
+    """Panel e summarises every analysed epoch, so a register change must make
+    a new cache without a code change."""
+    from continuum_swr_replay.data_loaders import epoch_register
+
+    figure02 = offline("scripts.figures.generate_figure02")
+
+    def cache_name(epochs: list[str]) -> str:
+        register = _register(tmp_path / f"register_{len(epochs)}.csv", epochs)
+        monkeypatch.setattr(epoch_register, "REGISTER_PATH", register)
+        return figure02._figure02_cache_path(
+            "wilbur20210329_.nwb", "02_r1", tmp_path
+        ).name
+
+    one = cache_name(["02_r1"])
+    two = cache_name(["02_r1", "04_r2"])
+
+    assert one != two
+    assert cache_name(["02_r1"]) == one
