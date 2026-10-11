@@ -85,4 +85,8 @@ def test_contfrag_stop_table_schema_is_pinned_exactly():
         "current_patch",
         "prev_patch",
         "next_patch",
+        "reward_history_rcos_0",
+        "reward_history_rcos_1",
+        "reward_history_rcos_2",
+        "reward_history_incomplete",
     ]

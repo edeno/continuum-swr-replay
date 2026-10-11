@@ -213,6 +213,33 @@ def _predictor_union(models) -> tuple[str, ...]:
     )
 
 
+def _block_required_columns(models, *, unit_col: str, required_base) -> list[str]:
+    """Columns a model block reads: its unit ID, base columns and predictors."""
+    return list(dict.fromkeys([unit_col, *required_base, *_predictor_union(models)]))
+
+
+def _require_block_columns(
+    table: pd.DataFrame,
+    required_cols: list[str],
+    *,
+    analysis: str,
+    event_source: str | None,
+) -> None:
+    """Raise if the block's table lacks a column the block reads.
+
+    A missing column is a broken table contract, not a gap in one session's
+    data: every session would lose the block. The run stops here rather than
+    saving a block that fit nothing.
+    """
+    missing = [col for col in required_cols if col not in table.columns]
+    if missing:
+        source = "" if event_source is None else f" (event source {event_source!r})"
+        raise ValueError(
+            f"{analysis}{source}: the table lacks required column(s) {missing}; "
+            "rebuild the table so it carries every column the block's models read"
+        )
+
+
 def _as_python_scalar(value):
     """Convert numpy scalar IDs to stable Python scalars for provenance."""
     if hasattr(value, "item"):
@@ -253,9 +280,10 @@ def _freeze_common_cohort(
     """Return one complete-case cohort shared by every model in a block."""
     session = dict(zip(SESS, keys, strict=True))
     predictors = _predictor_union(models)
-    required_cols = list(dict.fromkeys([unit_col, *required_base, *predictors]))
-    missing_cols = [col for col in required_cols if col not in group.columns]
-    ids_before = _sorted_unit_ids(group[unit_col]) if unit_col in group.columns else ()
+    required_cols = _block_required_columns(
+        models, unit_col=unit_col, required_base=required_base
+    )
+    ids_before = _sorted_unit_ids(group[unit_col])
 
     provenance = {
         **session,
@@ -279,11 +307,7 @@ def _freeze_common_cohort(
         "id_hash_algorithm": "sha256_sorted_unit_ids_v1",
         "status": "ok",
         "failed_models": (),
-        "missing_columns": tuple(missing_cols),
     }
-    if missing_cols:
-        provenance["status"] = "missing_columns"
-        return group.iloc[0:0].copy(), provenance
 
     cohort, selection = freeze_common_cohort(
         group,
@@ -326,12 +350,28 @@ def _fit_per_session_common_cohort(
     offset_col: str | None = None,
     choice_response_col: str | None = None,
     selection_filter: str | None = None,
+    event_source: str | None = None,
 ) -> tuple[dict[str, pd.DataFrame], pd.DataFrame]:
-    """Fit all models on one frozen per-session cohort and record provenance."""
+    """Fit all models on one frozen per-session cohort and record provenance.
+
+    Raises
+    ------
+    ValueError
+        If a non-empty ``table`` lacks ``unit_col``, a ``required_base``
+        column or a predictor of any model. The check is on the whole table,
+        before any session is fit, so a broken table contract stops the run
+        instead of yielding a block with no fits.
+    """
     out = {name: [] for name in models}
     provenance_rows = []
     if len(table) == 0:
         return {name: pd.DataFrame() for name in models}, pd.DataFrame()
+    _require_block_columns(
+        table,
+        _block_required_columns(models, unit_col=unit_col, required_base=required_base),
+        analysis=analysis,
+        event_source=event_source,
+    )
 
     for keys, group in table.groupby(SESS):
         cohort, provenance = _freeze_common_cohort(
@@ -430,6 +470,7 @@ def fit_patch_hierarchy(
         response_col="patch_count_hard",
         drop_zero_response=True,
         min_units=10,
+        event_source=event_source,
     )
 
 
@@ -437,11 +478,18 @@ def fit_patch_switch(
     patch_table: pd.DataFrame, event_arm_table: pd.DataFrame, event_source: str
 ) -> tuple[dict[str, pd.DataFrame], pd.DataFrame]:
     """Fit source-appropriate switch patch models on switch events only."""
-    sw = event_arm_table.groupby("event_id")["did_last_completed_trip_switch_patch"].first()
+    sw = event_arm_table.groupby("event_id")[
+        "did_last_completed_trip_switch_patch"
+    ].first()
     switch_patch = patch_table.merge(
-        sw.rename("did_last_completed_trip_switch_patch"), left_on="event_id", right_index=True, how="left"
+        sw.rename("did_last_completed_trip_switch_patch"),
+        left_on="event_id",
+        right_index=True,
+        how="left",
     )
-    switch_patch = switch_patch[switch_patch["did_last_completed_trip_switch_patch"] == 1]
+    switch_patch = switch_patch[
+        switch_patch["did_last_completed_trip_switch_patch"] == 1
+    ]
     switch_models = _patch_switch_models_for_source(event_source)
     _assert_ladder_timing(switch_models, ladder="patch switch")
     return _fit_per_session_common_cohort(
@@ -455,6 +503,7 @@ def fit_patch_switch(
         drop_zero_response=True,
         min_units=10,
         selection_filter="did_last_completed_trip_switch_patch == 1",
+        event_source=event_source,
     )
 
 
@@ -472,11 +521,12 @@ def fit_per_stop_rate_hierarchy(
         response_col="n_selected_events",
         offset_col="immobility_duration_s",
         min_units=20,
+        event_source=event_source,
     )
 
 
 def _fit_choice_block(
-    choice: pd.DataFrame, models, analysis: str
+    choice: pd.DataFrame, models, analysis: str, event_source: str
 ) -> tuple[dict[str, pd.DataFrame], pd.DataFrame]:
     """Fit a choice model block on one common stop cohort."""
     return _fit_per_session_common_cohort(
@@ -488,6 +538,7 @@ def _fit_choice_block(
         required_base=["chosen"],
         choice_response_col="chosen",
         min_units=10,
+        event_source=event_source,
     )
 
 
@@ -503,14 +554,18 @@ def fit_choice_blocks(
 
     choice_models = _choice_models_for_source(event_source)
     _assert_ladder_timing(choice_models, ladder="choice")
-    primary, primary_prov = _fit_choice_block(choice, choice_models, "choice")
+    primary, primary_prov = _fit_choice_block(
+        choice, choice_models, "choice", event_source
+    )
     blocks["choice"] = primary
     provenance["choice"] = primary_prov
 
     split_models = _choice_swr_split_models_for_source(event_source)
     if split_models:
         _assert_ladder_timing(split_models, ladder="choice_swr_split")
-        split, split_prov = _fit_choice_block(choice, split_models, "choice_swr_split")
+        split, split_prov = _fit_choice_block(
+            choice, split_models, "choice_swr_split", event_source
+        )
         blocks["choice_swr_split"] = split
         provenance["choice_swr_split"] = split_prov
 

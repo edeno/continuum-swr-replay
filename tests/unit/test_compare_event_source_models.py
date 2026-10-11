@@ -6,7 +6,14 @@ import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
 
+import numpy as np
 import pandas as pd
+import pytest
+
+from continuum_swr_replay.analysis.replay.design_constants import (
+    REWARD_HISTORY_COLUMNS,
+    REWARD_HISTORY_INCOMPLETE,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "content" / "compare_event_source_models.py"
@@ -215,3 +222,91 @@ def test_common_cohort_drops_session_if_any_model_fails():
     assert fits["M1"].empty
     assert provenance.loc[0, "status"] == "fit_failed"
     assert provenance.loc[0, "failed_models"] == ("M1",)
+
+
+def _rate_stop_table(n_stops: int = 40, seed: int = 0) -> pd.DataFrame:
+    """One session's complete per-stop table for the rate block.
+
+    The first three stops carry an incomplete history (zero-filled features,
+    flag 1), like the epoch prefix of the real tables.
+    """
+    rng = np.random.default_rng(seed)
+    history = rng.uniform(0.0, 1.0, size=(n_stops, len(REWARD_HISTORY_COLUMNS)))
+    history[:3] = 0.0
+    incomplete = np.zeros(n_stops)
+    incomplete[:3] = 1.0
+    duration = rng.uniform(1.0, 10.0, size=n_stops)
+    table = pd.DataFrame(
+        {
+            "animal": "a",
+            "session_date": 1,
+            "epoch": "02_r1",
+            "stop_id": np.arange(n_stops),
+            "n_selected_events": rng.poisson(0.3 * duration),
+            "immobility_duration_s": duration,
+        }
+    )
+    for j, column in enumerate(REWARD_HISTORY_COLUMNS):
+        table[column] = history[:, j]
+    table[REWARD_HISTORY_INCOMPLETE] = incomplete
+    return table
+
+
+def test_rate_block_fits_a_complete_stop_table():
+    compare = _load_compare_script()
+
+    fits, provenance = compare.fit_per_stop_rate_hierarchy(_rate_stop_table(), "SWR")
+
+    assert provenance["status"].tolist() == ["fit"]
+    assert tuple(fits) == ("R0", "R1")
+    for fit in fits.values():
+        assert len(fit) == 1
+        assert fit.loc[0, "cohort_n_units"] == 40
+
+
+def test_rate_block_refuses_a_stop_table_without_a_ladder_column():
+    """R6 fit 0 of 242 sessions this way and still exited 0."""
+    compare = _load_compare_script()
+    stops = _rate_stop_table().drop(columns="reward_history_rcos_0")
+
+    with pytest.raises(ValueError, match="rate_hierarchy") as raised:
+        compare.fit_per_stop_rate_hierarchy(stops, "SWR")
+
+    assert "reward_history_rcos_0" in str(raised.value)
+    assert "'SWR'" in str(raised.value)
+
+
+def test_a_missing_column_stops_the_block_before_any_session_is_fit():
+    compare = _load_compare_script()
+    models = {
+        "M0": SimpleNamespace(predictors=()),
+        "M1": SimpleNamespace(predictors=("x",)),
+    }
+    table = pd.DataFrame(
+        {
+            "animal": ["a"] * 6,
+            "session_date": [1] * 6,
+            "epoch": ["e1"] * 3 + ["e2"] * 3,
+            "event_id": [1, 1, 1, 2, 2, 2],
+            "patch_count_hard": [1, 0, 0, 0, 1, 0],
+        }
+    )
+    calls = []
+
+    def fake_fit(group, spec):
+        calls.append(spec)
+        return {"n_events": group["event_id"].nunique()}
+
+    with pytest.raises(ValueError, match=r"test.*\['x'\]"):
+        compare._fit_per_session_common_cohort(
+            table,
+            models,
+            fake_fit,
+            analysis="test",
+            unit_col="event_id",
+            required_base=["patch_count_hard"],
+            response_col="patch_count_hard",
+            drop_zero_response=True,
+            min_units=1,
+        )
+    assert calls == []

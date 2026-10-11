@@ -55,11 +55,16 @@ from ..replay.covariate_registry import stamp_covariate_schema
 from ..replay.covariates import (
     add_trial_context,
     recent_trial_reward_rate,
+    reward_history_basis_features,
     summarize_behavioral_location,
 )
 from ..replay.covariates.candidate_arm import (
     attach_candidate_arm_covariates,
     broadcast_candidate_arms,
+)
+from ..replay.design_constants import (
+    REWARD_HISTORY_COLUMNS,
+    REWARD_HISTORY_INCOMPLETE,
 )
 from ..replay.event_ids import hash_stop_id
 from ..replay.spatial_mapping import map_estimate_to_arm
@@ -723,6 +728,15 @@ def build_contfrag_stop_table(
     ``immobility_duration_s`` is the stop's span less the excluded time
     inside it, as in the NonLocal stop table.
 
+    The table carries every column the shared per-stop rate ladder
+    (``MODEL_PER_STOP_RATE``) reads: the reward-history basis
+    ``reward_history_rcos_0..2`` and its flag ``reward_history_incomplete``,
+    computed at bout start by ``reward_history_basis_features`` exactly as in
+    the NonLocal stop table. The NonLocal table's other columns
+    (``known_reward_outcome_lag_*``, the stop clocks, ``n_*_events``,
+    ``completed_trial_reward``) are not built here; no ContFrag consumer reads
+    them.
+
     Parameters
     ----------
     dot : pd.DataFrame
@@ -781,6 +795,14 @@ def build_contfrag_stop_table(
     per_bout["reward_fraction_last10_known_trials"] = recent_trial_reward_rate(
         bout_starts, port_experiences
     )
+    # The reward-history basis the per-stop rate ladder reads (R1), built at
+    # bout start by the NonLocal stop table's helper so the two tables agree.
+    reward_history, reward_history_incomplete = reward_history_basis_features(
+        bout_starts, port_experiences
+    )
+    for j, column in enumerate(REWARD_HISTORY_COLUMNS):
+        per_bout[column] = reward_history[:, j]
+    per_bout[REWARD_HISTORY_INCOMPLETE] = reward_history_incomplete
 
     per_bout["is_swr_stop"] = (
         grouped["SWR_event"]
@@ -1043,6 +1065,9 @@ _CONTFRAG_STOP_TABLE_BUILD_COLUMNS: tuple[str, ...] = (
     "current_patch",
     "prev_patch",
     "next_patch",
+    # After the trial context, as in the NonLocal stop table's order.
+    *REWARD_HISTORY_COLUMNS,
+    REWARD_HISTORY_INCOMPLETE,
 )
 
 _CONTFRAG_STOP_TABLE_COLUMNS: tuple[str, ...] = tuple(
