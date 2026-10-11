@@ -47,6 +47,8 @@ from .summaries import (
     posterior_to_arm_marginal,
 )
 from .table_contracts import (
+    EVENT_BIN_TOTAL_COLUMNS,
+    event_bin_total_column,
     validate_event_arm_table,
     validate_event_patch_table,
 )
@@ -216,8 +218,6 @@ def build_event_arm_table(
     return canonical[canonical_column_order]
 
 
-
-
 def build_event_patch_table(
     event_table: pd.DataFrame,
     event_arm_table: pd.DataFrame,
@@ -233,7 +233,11 @@ def build_event_patch_table(
     ----------
     event_table : pd.DataFrame
         Canonical event table (for ``last_rewarded_arm`` → patch mapping and
-        the ``n_nonlocal_bins`` / ``n_undecoded_bins`` fraction denominator).
+        the ``patch_fraction`` denominator). The denominator is the event's
+        bin total minus ``n_undecoded_bins``. The bin total is
+        ``n_nonlocal_bins`` for non-local tables and ``n_timebins`` for
+        ContFrag tables (``n_nonlocal_bins`` wins when both exist). Either way
+        it is the same denominator as that table's ``arm_fraction``.
     event_arm_table : pd.DataFrame
         Canonical event-arm table (9 rows per event).
 
@@ -316,21 +320,21 @@ def build_event_patch_table(
     # the in-event timebins whose MAP landed on a real arm -- so a patch
     # fraction is exactly the sum of its three arms' fractions and an event's
     # three patch fractions sum to one. NaN when the event has no real-arm bin.
-    # Both bin counts are event-grain and only ``n_nonlocal_bins`` survives onto
-    # the canonical arm table, so the denominator is carried from event_table
-    # rather than reconstructed from the response's own total.
-    missing_bins = [
-        column
-        for column in ("n_nonlocal_bins", "n_undecoded_bins")
-        if column not in event_table.columns
-    ]
-    if missing_bins:
+    # The bin total is ``n_nonlocal_bins`` on a non-local event table and
+    # ``n_timebins`` on a ContFrag event table; either way it is the total that
+    # table's own ``arm_fraction`` divides by. Both bin counts are event-grain,
+    # so the denominator is carried from event_table rather than reconstructed
+    # from the response's own total.
+    total_column = event_bin_total_column(event_table)
+    if total_column is None or "n_undecoded_bins" not in event_table.columns:
+        accepted = " or ".join(f"'{name}'" for name in EVENT_BIN_TOTAL_COLUMNS)
         raise ValueError(
-            "build_event_patch_table requires canonical event_table columns "
-            f"{missing_bins}; patch_fraction has no denominator without them"
+            "build_event_patch_table requires an event_table bin-total column "
+            f"({accepted}) and 'n_undecoded_bins'; patch_fraction has no "
+            "denominator without them"
         )
     real_bins_per_event = (
-        pd.to_numeric(event_table["n_nonlocal_bins"], errors="coerce")
+        pd.to_numeric(event_table[total_column], errors="coerce")
         - pd.to_numeric(event_table["n_undecoded_bins"], errors="coerce")
     ).set_axis(event_table["event_id"])
     patch_eat.insert(

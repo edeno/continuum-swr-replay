@@ -34,6 +34,10 @@ from continuum_swr_replay.analysis.replay.covariates import (
     rolling_reward_count_all_events,
     visit_recency_all_events,
 )
+from continuum_swr_replay.analysis.replay.tables_arm_patch import (
+    build_event_patch_table,
+)
+from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 from tests.unit._port_experience_fixtures import port_experiences_from_trials
 
 
@@ -445,3 +449,148 @@ class TestContfragArmFractionDenominator:
             ].item()
             == start_reward
         )
+
+
+def _build_two_event_dot() -> pd.DataFrame:
+    """Two SWR events: one with undecoded (junction) bins, one without.
+
+    Event 1 has 5 real bins (3 on arm 0, 2 on arm 1) and 5 junction bins, so its
+    bin total (``n_timebins`` = 10) differs from its decoded-bin count (5).
+    Event 2 has 5 real bins (2 on arm 2, 2 on arm 4, 1 on arm 5) and no
+    junction bins. The two frames are separated in time by one second.
+    """
+    first = _build_dot({0: 3, 1: 2}, junction_bins=5, event_id=1)
+    second = _build_dot({2: 2, 4: 2, 5: 1}, junction_bins=0, event_id=2)
+    second.index = pd.Index(second.index.to_numpy() + 1.0, name="time")
+    return pd.concat([first, second])
+
+
+class TestContfragEventPatchTable:
+    """``build_event_patch_table`` accepts the real ContFrag builders' tables.
+
+    The ContFrag event table carries ``n_timebins``, not ``n_nonlocal_bins``.
+    The patch builder used to require ``n_nonlocal_bins`` and so raised on every
+    ContFrag table. Its ``patch_fraction`` must be the sum of the ContFrag
+    ``arm_fraction`` of the patch's three arms.
+    """
+
+    @pytest.fixture
+    def tables(self):
+        env = _EnvStub()
+        graph = _bandit_graph()
+        dot = _build_two_event_dot()
+        events = build_contfrag_event_table(
+            dot, env, _empty_trials(), graph, event_source="SWR"
+        )
+        event_arms = build_contfrag_event_arm_table(
+            events, dot, env, _empty_trials(), graph, event_source="SWR"
+        )
+        return events, event_arms
+
+    def test_fixture_has_an_event_with_undecoded_bins(self, tables):
+        events, _ = tables
+        assert "n_nonlocal_bins" not in events
+        by_event = events.sort_values("event_start_s")
+        assert by_event["n_timebins"].tolist() == [10, 5]
+        assert by_event["n_undecoded_bins"].tolist() == [5, 0]
+
+    def test_patch_table_builds_from_contfrag_tables(self, tables):
+        events, event_arms = tables
+        patches = build_event_patch_table(events, event_arms)
+        assert len(patches) == 3 * len(events)
+
+    def test_patch_fraction_is_sum_of_arm_fractions(self, tables):
+        events, event_arms = tables
+        patches = build_event_patch_table(events, event_arms)
+        arm_patch = event_arms.assign(
+            patch=event_arms["candidate_arm"].map(TRACK_SEGMENT_TO_PATCH)
+        )
+        expected = (
+            arm_patch.groupby(["event_id", "patch"])["arm_fraction"]
+            .sum(min_count=1)
+            .rename("expected")
+            .reset_index()
+        )
+        merged = patches.merge(
+            expected, on=["event_id", "patch"], validate="one_to_one"
+        )
+        assert len(merged) == len(patches)
+        np.testing.assert_allclose(
+            merged["patch_fraction"].to_numpy(dtype=float),
+            merged["expected"].to_numpy(dtype=float),
+            rtol=0.0,
+            atol=1e-12,
+        )
+
+    def test_patch_fractions_sum_to_one_within_each_event(self, tables):
+        events, event_arms = tables
+        patches = build_event_patch_table(events, event_arms)
+        totals = patches.groupby("event_id")["patch_fraction"].sum()
+        assert len(totals) == len(events)
+        np.testing.assert_allclose(totals.to_numpy(), 1.0, rtol=0.0, atol=1e-12)
+
+    def test_undecoded_event_is_divided_by_decoded_bins_not_n_timebins(self, tables):
+        events, event_arms = tables
+        patches = build_event_patch_table(events, event_arms)
+        first = events.loc[events["n_undecoded_bins"] > 0, "event_id"].item()
+        by_patch = patches[patches["event_id"] == first].set_index("patch")
+        # 5 real bins in patch 1 (arms 0 and 1) out of 5 decoded bins.
+        assert by_patch.loc[1, "patch_fraction"] == pytest.approx(1.0)
+        assert by_patch.loc[2, "patch_fraction"] == pytest.approx(0.0)
+        assert by_patch.loc[3, "patch_fraction"] == pytest.approx(0.0)
+
+
+def _synthetic_patch_inputs(**event_columns) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """One event, nine arms: 4 hard counts on arm 0 and 4 on arm 2."""
+    arms = list(range(9))
+    event_arms = pd.DataFrame(
+        {
+            "event_id": [1] * 9,
+            "candidate_arm": arms,
+            "arm_count_hard": [4.0, 0, 4.0, 0, 0, 0, 0, 0, 0],
+            "is_same_patch_as_current": np.zeros(9, dtype=int),
+            "reward_count_candidate_arm_last10_known_trials": np.zeros(9),
+            "visit_recency_trials": np.full(9, np.nan),
+            "is_candidate_arm_never_visited": np.full(9, np.nan),
+        }
+    )
+    events = pd.DataFrame(
+        {
+            "animal": ["test"],
+            "session_date": [20200101],
+            "epoch": ["01_r1"],
+            "event_id": [1],
+            "last_rewarded_arm": [np.nan],
+            "prev_patch": [np.nan],
+            "did_last_completed_trip_switch_patch": [0],
+            "is_swr": [False],
+            **{name: [value] for name, value in event_columns.items()},
+        }
+    )
+    return events, event_arms
+
+
+class TestPatchFractionBinTotalColumn:
+    def test_nonlocal_bins_wins_when_both_columns_exist(self):
+        events, event_arms = _synthetic_patch_inputs(
+            n_nonlocal_bins=10, n_timebins=99, n_undecoded_bins=2
+        )
+        by_patch = build_event_patch_table(events, event_arms).set_index("patch")
+        # (10 - 2) = 8 decoded bins; 99 would give 4 / 97.
+        assert by_patch["patch_fraction"].tolist() == pytest.approx([0.5, 0.5, 0.0])
+
+    def test_n_timebins_is_used_when_n_nonlocal_bins_is_absent(self):
+        events, event_arms = _synthetic_patch_inputs(n_timebins=10, n_undecoded_bins=2)
+        by_patch = build_event_patch_table(events, event_arms).set_index("patch")
+        assert by_patch["patch_fraction"].tolist() == pytest.approx([0.5, 0.5, 0.0])
+
+    def test_neither_bin_total_column_raises_and_names_both(self):
+        events, event_arms = _synthetic_patch_inputs(n_undecoded_bins=2)
+        with pytest.raises(ValueError, match="n_nonlocal_bins") as excinfo:
+            build_event_patch_table(events, event_arms)
+        assert "n_timebins" in str(excinfo.value)
+
+    def test_missing_n_undecoded_bins_raises(self):
+        events, event_arms = _synthetic_patch_inputs(n_nonlocal_bins=10)
+        with pytest.raises(ValueError, match="n_undecoded_bins"):
+            build_event_patch_table(events, event_arms)

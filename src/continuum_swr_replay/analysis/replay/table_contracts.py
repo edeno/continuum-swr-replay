@@ -172,6 +172,24 @@ def _require_event_set_matches(
         )
 
 
+EVENT_BIN_TOTAL_COLUMNS = ("n_nonlocal_bins", "n_timebins")
+
+
+def event_bin_total_column(frame: pd.DataFrame) -> str | None:
+    """Name the column holding an event's total bin count, or ``None``.
+
+    Non-local event tables carry ``n_nonlocal_bins``; ContFrag event tables
+    carry ``n_timebins``. ``n_nonlocal_bins`` wins when both are present.
+    Subtracting ``n_undecoded_bins`` from this column gives the event's
+    decoded-bin count, which is the denominator of that table's
+    ``arm_fraction``.
+    """
+    for candidate in EVENT_BIN_TOTAL_COLUMNS:
+        if candidate in frame:
+            return candidate
+    return None
+
+
 def _require_response_conservation(frame: pd.DataFrame) -> None:
     if "arm_count_hard" not in frame:
         return
@@ -185,11 +203,7 @@ def _require_response_conservation(frame: pd.DataFrame) -> None:
     ):
         raise ValueError("arm_count_hard must be finite, nonnegative integer counts")
 
-    total_column = None
-    for candidate in ("n_nonlocal_bins", "n_timebins"):
-        if candidate in frame:
-            total_column = candidate
-            break
+    total_column = event_bin_total_column(frame)
     if total_column is None or "n_undecoded_bins" not in frame:
         return
 

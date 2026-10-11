@@ -164,7 +164,7 @@ Build the four canonical replay-content tables across all sessions.
 
 Scientific table contracts beyond the generic covariate schema stamp.
 
-`validate_event_arm_table`, `validate_event_patch_table`, `validate_requested_standardization`, `validate_canonical_table_contract`, `validate_and_match_fit_results`
+`event_bin_total_column`, `validate_event_arm_table`, `validate_event_patch_table`, `validate_requested_standardization`, `validate_canonical_table_contract`, `validate_and_match_fit_results`
 
 ### `src/continuum_swr_replay/analysis/replay/tables_arm_patch.py`
 
