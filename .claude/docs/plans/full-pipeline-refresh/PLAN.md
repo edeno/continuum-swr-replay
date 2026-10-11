@@ -2269,3 +2269,10 @@ R5–R8 as written, on 242 epochs (255 less the 13 S epochs), with stamps
 - the masked-time table, and the events and bins the mask and the 0.3-s decoder reach remove;
 - robustness reruns of the headline results: without the mask; with every artifact threshold 25 %
   lower and 25 % higher; with 1 s masked after each step.
+
+**The audit's `epoch_sets` and the S epochs (lead's ruling, 2026-10-10).** The SWR run
+`056eee0dcb5a` holds the 13 S epochs, and it is not rerun. A new SWR run id would make the
+analysis-side run-id checks refuse every R11 decode, since each records `056eee0dcb5a` in
+`attrs["decode_masks"]`. So `check_epoch_sets` accepts `SUSTAINED_NOISE` epochs in run manifests
+(SWR, Widloski) only, and lists them under `held_sustained_noise`. A decode, a table or the decode
+folder holding one still fails.

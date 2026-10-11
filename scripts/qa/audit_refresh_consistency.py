@@ -47,8 +47,10 @@ checks (Stage 5), and nothing else.
   exactly the epoch register's analysed epochs. An analysed epoch an artifact
   lacks fails unless ``--exceptions`` records why for that artifact; an epoch
   an artifact holds that the register does not analyse fails, named with its
-  register status and reason; and every epoch an artifact holds or a run
-  manifest names must be registered. A table names its epochs by its session
+  register status and reason. The exception is a run (Widloski or SWR)
+  holding epochs excluded for ``SUSTAINED_NOISE``: it passes, and they are
+  listed in its details. Every epoch an artifact holds or a run manifest names
+  must be registered. A table names its epochs by its session
   columns or, keyed by ``stop_id`` alone as the qvals table is, through its
   folder's stop table.
 - ``decode_folder``: the decode folder (``--root``) holds HPC NonLocal and
@@ -174,6 +176,10 @@ SPIKE_LOADER = "src/continuum_swr_replay/data_loaders/spikes.py"
 
 DECODERS = ("nonlocal", "contfrag")
 DECODE_FILES = ("results", "detector", "environment", "data_over_time")
+RUN_ARTIFACTS = ("widloski", "swr")
+"""The ``epoch_sets`` artifacts read from a run manifest. Such a run may hold
+``SUSTAINED_NOISE`` epochs (lead's ruling, 2026-10-10): the SWR run did, and
+rerunning it would change the run id every R11 decode records."""
 NON_LOCAL_THRESHOLD_PERCENT = round(100 * DEFAULT_NON_LOCAL_THRESHOLD)
 """The NonLocal ``data_over_time`` file is named for the decode's threshold."""
 
@@ -1466,8 +1472,11 @@ def check_epoch_sets(
 
     An analysed epoch an artifact lacks passes only with a non-empty reason in
     ``reasons[artifact]``. An epoch an artifact holds that the register does
-    not analyse fails, named with its status and reason. Every epoch an
-    artifact holds, or `named`, must be registered.
+    not analyse fails, named with its status and reason. One exception: a run
+    (:data:`RUN_ARTIFACTS`) may hold epochs excluded for ``SUSTAINED_NOISE``,
+    which ran before the lead's ruling of 2026-10-10. Its details list them
+    under ``held_sustained_noise``. A decode or a table holding one still
+    fails. Every epoch an artifact holds, or `named`, must be registered.
 
     Parameters
     ----------
@@ -1487,6 +1496,7 @@ def check_epoch_sets(
     if not analysed:
         failures.append("the register analyses no epoch")
     entries: dict[str, str] = {}
+    sustained_noise: set[str] = set()
     unregistered: list[str] = []
     for epoch_id in sorted(set(named).union(*sets.values()) - analysed):
         try:
@@ -1496,6 +1506,8 @@ def check_epoch_sets(
             continue
         reason = "" if entry.reason is None else entry.reason.value
         entries[epoch_id] = f"{entry.status.value}, {reason}"
+        if entry.reason is Reason.SUSTAINED_NOISE:
+            sustained_noise.add(epoch_id)
     if unregistered:
         failures.append(
             f"{len(unregistered)} epoch(s) are not in the epoch register: "
@@ -1511,9 +1523,10 @@ def check_epoch_sets(
             if recorded.get(epoch_id)
         }
         unexplained = [epoch_id for epoch_id in missing if epoch_id not in explained]
+        accepted = present & sustained_noise if artifact in RUN_ARTIFACTS else set()
         not_analysed = {
             epoch_id: entries[epoch_id]
-            for epoch_id in sorted(present - analysed)
+            for epoch_id in sorted(present - analysed - accepted)
             if epoch_id in entries
         }
         if unexplained:
@@ -1540,6 +1553,10 @@ def check_epoch_sets(
                 for epoch_id, entry in not_analysed.items()
             },
         }
+        if artifact in RUN_ARTIFACTS:
+            details[artifact]["held_sustained_noise"] = dict.fromkeys(
+                sorted(accepted), "held, excluded SUSTAINED_NOISE"
+            )
     return _result(failures, details)
 
 
@@ -2001,7 +2018,7 @@ def run_audit(
         "contfrag_decode": complete["contfrag"],
     }
     named: set[str] = set()
-    for run, manifest in (("widloski", widloski), ("swr", swr)):
+    for run, manifest in zip(RUN_ARTIFACTS, (widloski, swr), strict=True):
         present, mentioned = (
             (set(), set()) if manifest is None else run_manifest_epochs(manifest)
         )

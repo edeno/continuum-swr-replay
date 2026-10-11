@@ -1066,6 +1066,50 @@ def test_an_epoch_the_register_does_not_analyse_must_not_be_held(tmp_path):
     }
 
 
+def test_a_run_may_hold_an_epoch_excluded_for_sustained_noise(tmp_path):
+    """The SWR and Widloski runs ran before the S epochs were excluded: a run
+    holding one passes, named in its details, but a decode or a table does not."""
+    register = _register(tmp_path, noisy=(NOISY_EPOCH,))
+    held = {*EPOCHS, NOISY_EPOCH}
+    sets = {
+        "nonlocal_decode": held,
+        "widloski": held,
+        "swr": held,
+        "replay_content/event_table.parquet": held,
+    }
+
+    result = audit.check_epoch_sets(sets, {}, register=register)
+
+    assert result["failures"] == [
+        f"{name} holds 1 epoch(s) the register does not analyse: "
+        f"{NOISY_EPOCH} (excluded, SUSTAINED_NOISE)"
+        for name in ("nonlocal_decode", "replay_content/event_table.parquet")
+    ]
+    for run in ("widloski", "swr"):
+        details = result["details"][run]
+        assert details["held_sustained_noise"] == {
+            NOISY_EPOCH: "held, excluded SUSTAINED_NOISE"
+        }
+        assert details["not_analysed"] == {}
+
+
+def test_a_run_holding_an_epoch_excluded_for_another_reason_fails(tmp_path):
+    depleted = "sim20200101_10_r5_HPC"
+    register = _register(tmp_path, excluded=(depleted,), noisy=(NOISY_EPOCH,))
+
+    result = audit.check_epoch_sets(
+        {"swr": {*EPOCHS, depleted, NOISY_EPOCH}}, {}, register=register
+    )
+
+    assert result["failures"] == [
+        "swr holds 1 epoch(s) the register does not analyse: "
+        f"{depleted} (excluded, DEPLETION_TASK)"
+    ]
+    assert result["details"]["swr"]["held_sustained_noise"] == {
+        NOISY_EPOCH: "held, excluded SUSTAINED_NOISE"
+    }
+
+
 def test_an_unregistered_epoch_fails_wherever_it_is_named(tmp_path):
     register = _register(tmp_path)
     stray = "sim20200101_12_r6_HPC"
@@ -1139,6 +1183,20 @@ def test_any_decode_file_of_an_unanalysed_epoch_fails_the_decode_folder(tmp_path
         f"analyse: {NO_INPUT_EPOCH} (pending, PENDING_POPULATE)",
         f"the decode folder holds files of 1 epoch(s) not in the epoch register: "
         f"{stray}",
+    ]
+
+
+def test_a_sustained_noise_epochs_decode_fails_the_decode_folder(tmp_path):
+    """The R11 decodes of the S epochs stay out of the canonical folder."""
+    root = tmp_path / "decodes"
+    for epoch_id in (*EPOCHS, NOISY_EPOCH):
+        _touch_decodes(root, epoch_id)
+
+    result = audit.check_decode_folder(root, _register(tmp_path, noisy=(NOISY_EPOCH,)))
+
+    assert result["failures"] == [
+        "the decode folder holds files of 1 epoch(s) the register does not "
+        f"analyse: {NOISY_EPOCH} (excluded, SUSTAINED_NOISE)"
     ]
 
 
