@@ -9,14 +9,20 @@
 - Figure 3 panel a's relative-time ticks sit on round steps and each label is
   its tick's exact relative time (task 26c).
 - ``animal_from_epoch_id`` keeps the digits of ``j16`` (task 26c).
+- The rate summary's panel B shows every box, the contrast coefficient
+  figures keep their titles and x labels inside the figure, the arrival
+  retention note states no constant share, and the rescaled-ISI
+  autocorrelation panel draws its points (task 26d).
 """
 
 from __future__ import annotations
 
+import ast
 import importlib
 import json
 import os
 import pickle
+import re
 import subprocess
 import sys
 import textwrap
@@ -460,3 +466,244 @@ def test_the_figure02_panel_e_label_lies_inside_the_figure():
     assert label.x1 <= figure.x1
     assert label.y0 >= figure.y0
     assert label.y1 <= figure.y1
+
+
+# --------------------------------------------------------------------------
+# Rate summary panel B: the y-limit (task 26d)
+# --------------------------------------------------------------------------
+
+
+def _whisker_top(values: np.ndarray) -> float:
+    """Top whisker of a default box plot: the largest value within 1.5 IQR of Q3."""
+    q1, q3 = np.percentile(values, [25, 75])
+    return float(values[values <= q3 + 1.5 * (q3 - q1)].max())
+
+
+def test_the_rate_summary_panel_b_shows_every_box_whose_median_exceeds_six():
+    """The limit was ``(0, 6)``; the SWR median was 6.39 and the NL-with-SWR
+    median 9.91 in the R6b fit, so their boxes ran off the top."""
+    import matplotlib.pyplot as plt
+
+    summary = importlib.import_module("scripts.rate.plot_per_bin_rate_summary")
+    rng = np.random.default_rng(0)
+    medians = {"swr": 6.4, "non_local_swr": 9.9, "non_local_no_swr": 2.0}
+    rate_ratios = {
+        outcome: median * np.exp(rng.normal(0.0, 0.35, 60))
+        for outcome, median in medians.items()
+    }
+    frame = pd.concat(
+        pd.DataFrame(
+            {
+                "model": summary.FULL,
+                "outcome": outcome,
+                summary.IMMEDIATE_COEF: np.log(values),
+            }
+        )
+        for outcome, values in rate_ratios.items()
+    )
+
+    fig, ax = plt.subplots()
+    summary._panel_reward1(ax, frame)
+    fig.canvas.draw()
+    low, high = ax.get_ylim()
+    whisker_tops = [_whisker_top(values) for values in rate_ratios.values()]
+    # every whisker and cap line the box plot drew lies inside the axis
+    drawn = [
+        line.get_ydata().max()
+        for line in ax.lines
+        if len(line.get_ydata()) and line.get_linestyle() in ("-", "--")
+    ]
+    plt.close(fig)
+
+    assert max(whisker_tops) > 6.0  # the case the old limit hid
+    assert low == 0.0
+    assert high >= max(whisker_tops)
+    assert high <= 1.25 * max(whisker_tops)  # a small margin, not a loose one
+    assert max(drawn) <= high
+    assert low <= 1.0 <= high  # the RR = 1 reference line stays in view
+
+
+# --------------------------------------------------------------------------
+# Contrast coefficient figures: titles and x labels inside the figure (task 26d)
+# --------------------------------------------------------------------------
+
+CONTRAST_SCRIPT = REPO / "scripts" / "figures" / "plot_swr_contrast_coefs.py"
+# The statements of the script's top level the test keeps: the plotting
+# functions and the row lists they draw. The script has no
+# ``main()`` and gates on ``Processed-Data`` when imported, so it cannot be
+# imported here; its other top-level statements read the fits and are left out.
+_CONTRAST_FUNCTIONS = {
+    "forest",
+    "animal_ci",
+    "rate_figure",
+    "content_arm_figure",
+    "content_patch_figure",
+}
+_CONTRAST_NAMES = {
+    "ANIM",
+    "CMAP",
+    "RNG",
+    "SWR",
+    "NON",
+    "handles",
+    "rate_rows",
+    "mod_rows",
+    "con_rows",
+    "patch_mod_rows",
+    "patch_con_rows",
+}
+
+
+def _contrast_plotting_namespace() -> dict:
+    """The script's own plotting code, run on synthetic coefficients.
+
+    ``sessions`` and ``std_factor`` are the two functions that need the fits'
+    source tables; they are replaced by stand-ins that give each term random
+    per-animal coefficients and the dagger of its real kind.
+    """
+    import matplotlib.pyplot as plt
+
+    tree = ast.parse(CONTRAST_SCRIPT.read_text())
+    kept = []
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef) and node.name in _CONTRAST_FUNCTIONS:
+            kept.append(node)
+        elif isinstance(node, ast.Assign):
+            names = {
+                n.id
+                for target in node.targets
+                for n in ast.walk(target)
+                if isinstance(n, ast.Name)
+            }
+            if names & _CONTRAST_NAMES:
+                kept.append(node)
+    module = ast.Module(body=kept, type_ignores=[])
+
+    def std_factor(term):
+        if term.startswith("swr_x_is_") or term.startswith("is_"):
+            return 1.0, "per_category"
+        if "reward_history_rcos" in term:
+            return 1.0, "per_unit"
+        return 1.0, "per_SD"
+
+    rng = np.random.default_rng(1)
+
+    def sessions(df, mod, pop, term):
+        return {a: rng.normal(0.0, 1.0, 30) for a in namespace["ANIM"]}
+
+    namespace = {
+        "np": np,
+        "pd": pd,
+        "plt": plt,
+        "std_factor": std_factor,
+        "sessions": sessions,
+    }
+    exec(compile(module, str(CONTRAST_SCRIPT), "exec"), namespace)  # noqa: S102
+    return namespace
+
+
+@pytest.mark.parametrize(
+    "figure_function", ["rate_figure", "content_arm_figure", "content_patch_figure"]
+)
+def test_the_contrast_figures_keep_titles_and_x_labels_inside_the_figure(
+    figure_function,
+):
+    """The rate figure's title ran off the right edge and the content figures'
+    right-hand x label was cut off, as saved (no ``bbox_inches="tight"``)."""
+    import matplotlib.pyplot as plt
+
+    fig = _contrast_plotting_namespace()[figure_function](None)
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    figure = fig.bbox
+    texts = {}
+    for i, ax in enumerate(fig.axes):
+        texts[f"axes {i} title"] = ax.title
+        texts[f"axes {i} x label"] = ax.xaxis.label
+    extents = {name: text.get_window_extent(renderer) for name, text in texts.items()}
+    plt.close(fig)
+
+    assert extents
+    for name, box in extents.items():
+        assert box.x0 >= figure.x0 - 0.5, f"{name} runs off the left edge"
+        assert box.x1 <= figure.x1 + 0.5, f"{name} runs off the right edge"
+        assert box.y0 >= figure.y0 - 0.5, f"{name} runs off the bottom"
+        assert box.y1 <= figure.y1 + 0.5, f"{name} runs off the top"
+
+
+# --------------------------------------------------------------------------
+# Model-checking figure: the retention note and the ISI autocorrelation panel
+# --------------------------------------------------------------------------
+
+
+def test_the_arrival_retention_note_states_no_constant_share():
+    """The note quoted "91 % of SWR vs 81 % of non-SWR" as constants. The cohort
+    audit it named counts stops, not non-local onsets, so it holds neither share,
+    and the fit's own onset counts give 0.91 and 0.87. The warning stays, in
+    words."""
+    checking = importlib.import_module("scripts.rate.plot_model_checking")
+    note = checking.ARRIVAL_RETENTION_NOTE
+
+    assert not re.search(r"\d|%", note)
+    assert "arrival" in note
+    assert "retention" in note
+
+
+def _symmetric_autocorrelation(n_spikes: int) -> np.ndarray:
+    """A normalised autocorrelation of length ``2 * n_spikes - 1``."""
+    from scipy.signal import correlate
+
+    values = np.random.default_rng(2).normal(size=n_spikes)
+    c = correlate(values, values)
+    return c / c.max()
+
+
+@pytest.mark.parametrize(
+    ("n_spikes", "lag_max"), [(100, 50), (100, 3), (60, 60), (30, 50)]
+)
+def test_the_isi_autocorrelation_window_is_centred_on_the_zero_lag(n_spikes, lag_max):
+    """non_local_detector#64: ``slice(-lag_max + 1, lag_max)`` is empty for every
+    ``lag_max <= n_spikes`` because its start counts from the end of the array and
+    its stop from the start."""
+    checking = importlib.import_module("scripts.rate.plot_model_checking")
+    autocorrelation = _symmetric_autocorrelation(n_spikes)
+    assert autocorrelation.size == 2 * n_spikes - 1
+
+    lags, values = checking.isi_autocorrelation_window(autocorrelation, lag_max)
+
+    half = min(lag_max, n_spikes) - 1
+    assert lags.size == values.size == 2 * half + 1
+    np.testing.assert_array_equal(lags, np.arange(-half, half + 1))
+    # lag 0 is the autocorrelation's maximum, 1.0, at index n_spikes - 1
+    assert values[lags == 0] == pytest.approx(1.0)
+    np.testing.assert_array_equal(values, autocorrelation[n_spikes - 1 + lags])
+    np.testing.assert_allclose(values, values[::-1])
+
+
+def test_the_isi_autocorrelation_panel_draws_its_points_and_the_bounds():
+    import matplotlib.pyplot as plt
+    from non_local_detector.model_checking.sorted_spikes import TimeRescaling
+
+    checking = importlib.import_module("scripts.rate.plot_model_checking")
+    rng = np.random.default_rng(3)
+    rate = np.full(4000, 0.05)
+    is_spike = rng.random(rate.size) < rate
+    trial_id = np.repeat(np.arange(40), 100)
+    tr = TimeRescaling(rate, is_spike, trial_id, adjust_for_short_trials=True)
+    autocorrelation = tr.rescaled_ISI_autocorrelation()
+    n_spikes = autocorrelation.size // 2 + 1
+    assert n_spikes > 50
+
+    fig, ax = plt.subplots()
+    checking.plot_rescaled_isi_autocorrelation(ax, tr, lag_max=50)
+    offsets = ax.collections[0].get_offsets()
+    bounds = sorted(line.get_ydata()[0] for line in ax.lines)
+    plt.close(fig)
+
+    assert offsets.shape == (2 * 50 - 1, 2)
+    np.testing.assert_array_equal(offsets[:, 0], np.arange(-49, 50))
+    np.testing.assert_allclose(
+        offsets[:, 1], autocorrelation[n_spikes - 1 - 49 : n_spikes + 49]
+    )
+    ci = 1.96 / np.sqrt(n_spikes)
+    np.testing.assert_allclose(bounds, [-ci, ci])

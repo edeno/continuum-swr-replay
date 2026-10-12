@@ -285,7 +285,8 @@ def generate_figure(
     )
     plot_acausal_probabilities(results, time_slice, ax_probs, plot_local=True)
 
-    # Convert absolute timestamps to relative time (seconds from event start)
+    # Convert absolute timestamps to relative time (seconds from the window
+    # start, ``time_slice.start`` = the event centre minus 1 s)
     _set_relative_time_ticks(
         [ax_swr, ax_raster, ax_posterior, ax_probs], time_slice.start
     )

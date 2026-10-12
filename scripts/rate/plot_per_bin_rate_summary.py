@@ -245,7 +245,11 @@ def _panel_reward1(ax, df):
         patch.set_facecolor(STYLE[oc][1])
         patch.set_alpha(0.4)
     ax.axhline(1, color="0.5", ls=":")
-    ax.set_ylim(0, 6)
+    # Fliers are off, so the top of the data is the highest whisker or cap; a
+    # fixed limit hid the medians once they passed it. A rate ratio is positive,
+    # so 0 is the floor, and RR = 1 stays in view.
+    top = max(line.get_ydata().max() for line in bp["whiskers"] + bp["caps"])
+    ax.set_ylim(0, 1.05 * max(top, 1.0))
     ax.set_ylabel("immediate reward RR (per session)")
     ax.set_title("B. Immediate reward-history component (M7r, controlled)")
 

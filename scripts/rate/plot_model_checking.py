@@ -88,11 +88,14 @@ FULL = "M7r_time_histcos_rew"
 # The arrival rungs are fit on the arrival window, which is not a neutral
 # subset: it keeps a larger share of the SWR onsets than of the non-SWR ones,
 # so a BETWEEN-population arrival comparison is confounded by retention. The
-# shares are the corpus values from the cohort audit that the current fit was
-# generated with (``per_bin_rate_cohort_audit.csv``).
+# note gives the warning in words, with no share. It used to quote two shares
+# as constants and name the cohort audit (``per_bin_rate_cohort_audit.csv``) as
+# their source; that audit counts stops, one row per (model, population), so it
+# holds no onset retention to compute them from. A share belongs in the note
+# only if it is computed when the figure is made.
 ARRIVAL_RETENTION_NOTE = (
-    "arrival rungs are read on a different row set — the arrival window keeps "
-    "91 % of SWR vs 81 % of non-SWR non-local onsets, so between-population "
+    "arrival rungs are read on a different row set — the arrival window keeps a "
+    "larger share of SWR than of non-SWR non-local onsets, so between-population "
     "arrival differences are partly retention"
 )
 
@@ -223,6 +226,50 @@ def _refit_session(
     return design, fit
 
 
+def isi_autocorrelation_window(
+    autocorrelation: np.ndarray, lag_max: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """Lags ``-(lag_max - 1) ... lag_max - 1`` of a rescaled-ISI autocorrelation.
+
+    Parameters
+    ----------
+    autocorrelation : np.ndarray, shape (2 * n_spikes - 1,)
+        ``TimeRescaling.rescaled_ISI_autocorrelation()``; lag 0 is at index
+        ``n_spikes - 1``.
+    lag_max : int
+        The largest lag shown, exclusive. A value above ``n_spikes`` keeps every
+        lag.
+
+    Returns
+    -------
+    lags : np.ndarray, shape (2 * min(lag_max, n_spikes) - 1,)
+    values : np.ndarray, shape (2 * min(lag_max, n_spikes) - 1,)
+    """
+    n_spikes = autocorrelation.size // 2 + 1
+    half = min(lag_max, n_spikes) - 1
+    lags = np.arange(-half, half + 1)
+    return lags, autocorrelation[n_spikes - 1 + lags]
+
+
+def plot_rescaled_isi_autocorrelation(
+    ax: plt.Axes, tr: TimeRescaling, lag_max: int
+) -> None:
+    """Scatter the rescaled-ISI autocorrelation with its +/- 1.96 / sqrt(n) lines.
+
+    The values, the bounds and the labels are the ones non_local_detector's own
+    ``plot_rescaled_ISI_autocorrelation`` draws; only the lag selection differs.
+    """
+    autocorrelation = tr.rescaled_ISI_autocorrelation()
+    lags, values = isi_autocorrelation_window(autocorrelation, lag_max)
+    n_spikes = autocorrelation.size // 2 + 1
+    ci = 1.96 / np.sqrt(n_spikes)
+    ax.scatter(lags, values)
+    ax.axhline(ci, linestyle="--", color="red")
+    ax.axhline(-ci, linestyle="--", color="red")
+    ax.set_xlabel("Lag")
+    ax.set_ylabel("Autocorrelation")
+
+
 def plot_example_quartet(
     design: pd.DataFrame, fit: dict, title: str, fname: str
 ) -> None:
@@ -242,8 +289,11 @@ def plot_example_quartet(
     axes[0, 0].set_title(f"KS (stat={tr.ks_statistic():.3f}, n={int(is_spike.sum())})")
     tr.plot_qq(ax=axes[0, 1])
     axes[0, 1].set_title("Q-Q rescaled ISIs")
-    tr.plot_rescaled_ISI_autocorrelation(ax=axes[1, 0], lag_max=50)
-    axes[1, 0].set_title("Rescaled-ISI autocorrelation (lag ≤ 50)")
+    # Drawn here, not by ``tr.plot_rescaled_ISI_autocorrelation``: the library's
+    # lag slice is empty (LorenFrankLab/non_local_detector#64). Return to the
+    # library call once #64 is fixed.
+    plot_rescaled_isi_autocorrelation(axes[1, 0], tr, lag_max=50)
+    axes[1, 0].set_title("Rescaled-ISI autocorrelation (|lag| < 50)")
 
     # Cumulative point-process residual vs within-session time (stop order):
     # systematic drift signals structure the model misses (e.g. slow session

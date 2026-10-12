@@ -276,8 +276,9 @@ def forest(ax, df, rows, title):
         lo, hi = np.percentile(cat, [1, 99])
         pad = 0.1 * (hi - lo + 1e-9)
         ax.set_xlim(lo - pad, hi + pad)
+    # two lines: on one line the label ran past the right edge of the right panel
     ax.set_xlabel(
-        "coefficient  (continuous: per 1 SD;  † binary: per category;  "
+        "coefficient  (continuous: per 1 SD;  † binary: per category;\n"
         "‡ reward fraction: per unit)"
     )
     ax.set_title(title, fontsize=11, weight="bold")
@@ -287,7 +288,6 @@ def forest(ax, df, rows, title):
 handles = [plt.Line2D([], [], marker="o", ls="", color=CMAP[a], label=a) for a in ANIM]
 
 # ---- RATE ----
-R = pd.read_pickle(SWR_CONTRAST_RATE)
 SWR, NON = "non_local_swr", "non_local_no_swr"
 rate_rows = [
     ("immediate reward history · SWR", "G0_base", SWR, "reward_history_rcos_0"),
@@ -303,14 +303,28 @@ rate_rows = [
     ("switch-rate · SWR", "G3_switchrate", SWR, "patch_switch_fraction_last5_completed_trips"),
     ("switch-rate · nonSWR", "G3_switchrate", NON, "patch_switch_fraction_last5_completed_trips"),
 ]
-fig, ax = plt.subplots(figsize=(8.5, 6.6))
-forest(ax, R, rate_rows, "Rate ladder — is_swr contrast (standardized; all sessions + animal 95% CI)")
-ax.legend(handles=handles, fontsize=8, loc="lower right", title="animal", framealpha=0.95)
-fig.tight_layout()
-fig.savefig(OUT / "rate_swr_contrast_coefs.png", dpi=150)
+
+
+def rate_figure(R):
+    fig, ax = plt.subplots(figsize=(8.5, 6.6))
+    forest(
+        ax,
+        R,
+        rate_rows,
+        "Rate ladder — is_swr contrast\n(standardized; all sessions + animal 95% CI)",
+    )
+    ax.legend(
+        handles=handles, fontsize=8, loc="lower right", title="animal", framealpha=0.95
+    )
+    fig.tight_layout()
+    return fig
+
+
+rate_figure(pd.read_pickle(SWR_CONTRAST_RATE)).savefig(
+    OUT / "rate_swr_contrast_coefs.png", dpi=150
+)
 
 # ---- CONTENT ----
-C = pd.read_pickle(SWR_CONTRAST_CONTENT_ARM)
 mod_rows = [
     ("current-arm (C1)", "C1_current", "all", "is_current_arm"),
     ("reward_rate_arm (C3)", "C3_armreward", "all", "reward_fraction_candidate_arm_last10_visits"),
@@ -345,15 +359,31 @@ con_rows = [
         "swr_x_reward_belief_mean_candidate_arm_preoutcome",
     ),
 ]
-fig, axes = plt.subplots(1, 2, figsize=(14, 5.4))
-forest(axes[0], C, mod_rows, "Content (arm) — dimension effects (all events, standardized)")
-forest(axes[1], C, con_rows, "Content (arm) — SWR contrasts (swr_x_*, standardized)")
-axes[1].legend(handles=handles, fontsize=8, loc="lower left", title="animal", framealpha=0.95)
-fig.tight_layout()
-fig.savefig(OUT / "content_swr_contrast_coefs.png", dpi=150)
+
+
+def content_arm_figure(C):
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5.4))
+    forest(
+        axes[0],
+        C,
+        mod_rows,
+        "Content (arm) — dimension effects (all events, standardized)",
+    )
+    forest(
+        axes[1], C, con_rows, "Content (arm) — SWR contrasts (swr_x_*, standardized)"
+    )
+    axes[1].legend(
+        handles=handles, fontsize=8, loc="lower left", title="animal", framealpha=0.95
+    )
+    fig.tight_layout()
+    return fig
+
+
+content_arm_figure(pd.read_pickle(SWR_CONTRAST_CONTENT_ARM)).savefig(
+    OUT / "content_swr_contrast_coefs.png", dpi=150
+)
 
 # ---- CONTENT: PATCH ladder ----
-P = pd.read_pickle(SWR_CONTRAST_CONTENT_PATCH)
 patch_mod_rows = [
     ("current-patch (CP0)", "CP0_base", "all", "is_current_patch"),
     ("last-rew-patch (CP1)", "CP1_lastrew", "all", "is_last_rewarded_noncurrent_patch"),
@@ -364,12 +394,27 @@ patch_con_rows = [
     ("swr × current-patch (CPS1)", "CPS1_current", "all", "swr_x_is_current_patch"),
     ("swr × lastrew-patch (CPS2)", "CPS2_lastrew", "all", "swr_x_is_last_rewarded_noncurrent_patch"),
 ]
-fig, axes = plt.subplots(1, 2, figsize=(14, 3.6))
-forest(axes[0], P, patch_mod_rows, "Content (patch) — dimension effects (all events, standardized)")
-forest(axes[1], P, patch_con_rows, "Content (patch) — SWR contrasts (standardized)")
-axes[1].legend(handles=handles, fontsize=8, loc="lower left", title="animal", framealpha=0.95)
-fig.tight_layout()
-fig.savefig(OUT / "content_patch_swr_contrast_coefs.png", dpi=150)
+
+
+def content_patch_figure(P):
+    fig, axes = plt.subplots(1, 2, figsize=(14, 3.6))
+    forest(
+        axes[0],
+        P,
+        patch_mod_rows,
+        "Content (patch) — dimension effects (all events, standardized)",
+    )
+    forest(axes[1], P, patch_con_rows, "Content (patch) — SWR contrasts (standardized)")
+    axes[1].legend(
+        handles=handles, fontsize=8, loc="lower left", title="animal", framealpha=0.95
+    )
+    fig.tight_layout()
+    return fig
+
+
+content_patch_figure(pd.read_pickle(SWR_CONTRAST_CONTENT_PATCH)).savefig(
+    OUT / "content_patch_swr_contrast_coefs.png", dpi=150
+)
 
 print("wrote:")
 for p in sorted(OUT.glob("*.png")):
