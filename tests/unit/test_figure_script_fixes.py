@@ -11,7 +11,7 @@
 - ``animal_from_epoch_id`` keeps the digits of ``j16`` (task 26c).
 - The rate summary's panel B boxes log(RR), so one extreme session does not set
   its axis; the contrast coefficient figures keep their titles and x labels
-  inside the figure; the arrival retention note states no constant share; and
+  inside the figure; the arrival retention note is computed from the fit; and
   the rescaled-ISI autocorrelation panel draws its points (task 26d).
 """
 
@@ -473,6 +473,20 @@ def test_the_figure02_panel_e_label_lies_inside_the_figure():
 # --------------------------------------------------------------------------
 
 
+@pytest.fixture
+def default_style():
+    """Draw with matplotlib's defaults, whatever an earlier test leaked.
+
+    ``generate_figure02`` and ``generate_figure03`` call
+    ``set_figure_defaults("paper")`` when they are imported, which sets font size
+    7, dpi 450 and constrained layout for the rest of the process. The figure
+    scripts these tests draw run on the defaults, and a test of text that must
+    fit inside a figure passes for the wrong reason on the paper style.
+    """
+    with matplotlib.rc_context(matplotlib.rcParamsDefault):
+        yield
+
+
 def _log_box_statistics(values: np.ndarray) -> dict[str, float]:
     """Quartiles and 1.5 IQR whiskers of ``log(values)``, clipped to the data.
 
@@ -490,6 +504,7 @@ def _log_box_statistics(values: np.ndarray) -> dict[str, float]:
     }
 
 
+@pytest.mark.usefixtures("default_style")
 def test_the_rate_summary_panel_b_takes_its_box_statistics_in_log_space():
     """A rate ratio is skewed, so on RR the 1.5 IQR whisker runs to the minimum:
     a near-separated session (RR 0.0006 in the R6b fit) stretched the axis over
@@ -666,6 +681,7 @@ def _contrast_plotting_namespace() -> dict:
     return namespace
 
 
+@pytest.mark.usefixtures("default_style")
 @pytest.mark.parametrize(
     "figure_function", ["rate_figure", "content_arm_figure", "content_patch_figure"]
 )
@@ -700,17 +716,84 @@ def test_the_contrast_figures_keep_titles_and_x_labels_inside_the_figure(
 # --------------------------------------------------------------------------
 
 
-def test_the_arrival_retention_note_states_no_constant_share():
-    """The note quoted "91 % of SWR vs 81 % of non-SWR" as constants. The cohort
-    audit it named counts stops, not non-local onsets, so it holds neither share,
-    and the fit's own onset counts give 0.91 and 0.87. The warning stays, in
-    words."""
-    checking = importlib.import_module("scripts.rate.plot_model_checking")
-    note = checking.ARRIVAL_RETENTION_NOTE
+def _fits_with_arrival_cohort(swr: tuple[int, int], no_swr: tuple[int, int]):
+    """A fit frame whose ``attrs`` hold the arrival cohort tallies of the runner.
 
-    assert not re.search(r"\d|%", note)
-    assert "arrival" in note
+    Each tuple is (event bins kept by the arrival window, event bins in the
+    frozen cohort) for one population; an event bin is a bin with ``count > 0``.
+    """
+    fits = pd.DataFrame(
+        {
+            "outcome": ["swr", "non_local_no_swr"],
+            "model": "M0_const",
+            "ks_within_band": 0.5,
+            "ks_statistic": 0.1,
+            "dispersion": 1.0,
+            "cv_bits_per_event": 0.0,
+        }
+    )
+    fits.attrs["arrival_clock_cohort"] = {
+        population: {
+            "n_event_bins_arrival_window": kept,
+            "n_event_bins_frozen": frozen,
+        }
+        for population, (kept, frozen) in (
+            ("swr", swr),
+            ("non_local", (5, 10)),
+            ("non_local_swr", (6, 10)),
+            ("non_local_no_swr", no_swr),
+        )
+    }
+    return fits
+
+
+@pytest.mark.parametrize(
+    ("swr", "no_swr", "swr_pct", "no_swr_pct"),
+    [((190, 200), (7, 10), 95, 70), ((1, 3), (2, 3), 33, 67)],
+)
+def test_the_arrival_retention_note_gives_the_shares_the_fit_stored(
+    swr, no_swr, swr_pct, no_swr_pct
+):
+    """The shares are the SWR and the non-local no-SWR populations' event bins
+    kept by the arrival window, over their frozen cohort, in whole percent."""
+    checking = importlib.import_module("scripts.rate.plot_model_checking")
+
+    note = checking.arrival_retention_note(_fits_with_arrival_cohort(swr, no_swr))
+
+    assert f"keeps {swr_pct} % of SWR vs {no_swr_pct} % of non-SWR" in note
     assert "retention" in note
+
+
+def test_the_arrival_retention_note_is_words_only_without_the_cohort_tallies():
+    checking = importlib.import_module("scripts.rate.plot_model_checking")
+    fits = _fits_with_arrival_cohort((190, 200), (7, 10))
+    del fits.attrs["arrival_clock_cohort"]
+
+    note = checking.arrival_retention_note(fits)
+
+    assert note == checking.ARRIVAL_RETENTION_NOTE
+    assert not re.search(r"\d|%", note)
+    assert "larger share of SWR than of non-SWR" in note
+    assert "retention" in note
+
+
+@pytest.mark.usefixtures("default_style")
+def test_the_gof_ladder_title_carries_the_computed_retention_note(
+    tmp_path, monkeypatch
+):
+    import matplotlib.pyplot as plt
+
+    checking = importlib.import_module("scripts.rate.plot_model_checking")
+    monkeypatch.setattr(checking, "FIGS", tmp_path)
+    figures = []
+    monkeypatch.setattr(checking.plt, "close", figures.append)
+
+    checking.plot_gof_ladder(_fits_with_arrival_cohort((190, 200), (7, 10)))
+
+    (fig,) = figures
+    title = fig._suptitle.get_text()
+    plt.close("all")
+    assert "keeps 95 % of SWR vs 70 % of non-SWR" in title
 
 
 def _symmetric_autocorrelation(n_spikes: int) -> np.ndarray:
@@ -744,6 +827,7 @@ def test_the_isi_autocorrelation_window_is_centred_on_the_zero_lag(n_spikes, lag
     np.testing.assert_allclose(values, values[::-1])
 
 
+@pytest.mark.usefixtures("default_style")
 def test_the_isi_autocorrelation_panel_draws_its_points_and_the_bounds():
     import matplotlib.pyplot as plt
     from non_local_detector.model_checking.sorted_spikes import TimeRescaling

@@ -86,8 +86,9 @@ SHORT = ["SWR", "NL\nw/SWR", "NL\nno-SWR"]
 FULL = "M7r_time_histcos_rew"
 IMMEDIATE_COEF = f"coef_{REWARD_HISTORY_COLUMNS[0]}"
 SLOW_COEF = f"coef_{REWARD_HISTORY_COLUMNS[-1]}"
-# Panel B's margin beyond the lowest and highest whisker, as a factor in RR.
-LOG_MARGIN = 1.15
+# Panel B's margin beyond the lowest and highest whisker: a factor in RR, applied
+# as its log on the beta axis.
+RR_MARGIN_FACTOR = 1.15
 
 
 def _coef(df, model, oc, coef):
@@ -257,7 +258,7 @@ def _panel_reward1(ax, df):
     # the limits are those, less and plus a margin. RR = 1 stays in view.
     ends = np.concatenate([line.get_ydata() for line in bp["whiskers"] + bp["caps"]])
     low, high = min(ends.min(), 0.0), max(ends.max(), 0.0)
-    margin = np.log(LOG_MARGIN)
+    margin = np.log(RR_MARGIN_FACTOR)
     ax.set_ylim(low - margin, high + margin)
     rate_ratios = [
         m * 10.0**e

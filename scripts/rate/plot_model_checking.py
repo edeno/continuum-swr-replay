@@ -86,18 +86,51 @@ ARRIVAL_LADDER = [n for n, s in MODEL_PER_BIN_RATE.items() if s.time_clock == "a
 CLOCK_GAP = 1.0
 FULL = "M7r_time_histcos_rew"
 # The arrival rungs are fit on the arrival window, which is not a neutral
-# subset: it keeps a larger share of the SWR onsets than of the non-SWR ones,
-# so a BETWEEN-population arrival comparison is confounded by retention. The
-# note gives the warning in words, with no share. It used to quote two shares
-# as constants and name the cohort audit (``per_bin_rate_cohort_audit.csv``) as
-# their source; that audit counts stops, one row per (model, population), so it
-# holds no onset retention to compute them from. A share belongs in the note
-# only if it is computed when the figure is made.
-ARRIVAL_RETENTION_NOTE = (
-    "arrival rungs are read on a different row set — the arrival window keeps a "
-    "larger share of SWR than of non-SWR non-local onsets, so between-population "
-    "arrival differences are partly retention"
+# subset: it keeps a larger share of the SWR event bins than of the non-SWR
+# ones, so a BETWEEN-population arrival comparison is confounded by retention.
+# The shares are the runner's own tallies, ``fits.attrs["arrival_clock_cohort"]``:
+# per population, the event bins (bins with ``count > 0``) of the frozen cohort
+# that the window kept. ``per_bin_rate_cohort_audit.csv`` cannot give them: it
+# counts stops. A fit without the tallies gets the warning in words only.
+_ARRIVAL_RETENTION_TEMPLATE = (
+    "arrival rungs are read on a different row set — the arrival window keeps "
+    "{shares} non-local event bins, so between-population arrival differences "
+    "are partly retention"
 )
+ARRIVAL_RETENTION_NOTE = _ARRIVAL_RETENTION_TEMPLATE.format(
+    shares="a larger share of SWR than of non-SWR"
+)
+
+
+def arrival_retention_note(fits: pd.DataFrame) -> str:
+    """The arrival-window retention warning, with the SWR and non-SWR shares.
+
+    Parameters
+    ----------
+    fits : pd.DataFrame
+        ``all_models.pkl``; ``attrs["arrival_clock_cohort"]`` holds, per
+        population, ``n_event_bins_arrival_window`` and ``n_event_bins_frozen``.
+
+    Returns
+    -------
+    str
+        "... keeps 95 % of SWR vs 88 % of non-SWR non-local event bins ...", the
+        shares of the ``swr`` and ``non_local_no_swr`` populations in whole
+        percent; the words-only :data:`ARRIVAL_RETENTION_NOTE` when the fit
+        carries no tallies.
+    """
+    cohort = fits.attrs.get("arrival_clock_cohort")
+    if not cohort:
+        return ARRIVAL_RETENTION_NOTE
+    share = {
+        population: 100
+        * cohort[population]["n_event_bins_arrival_window"]
+        / cohort[population]["n_event_bins_frozen"]
+        for population in ("swr", "non_local_no_swr")
+    }
+    return _ARRIVAL_RETENTION_TEMPLATE.format(
+        shares=f"{share['swr']:.0f} % of SWR vs {share['non_local_no_swr']:.0f} % of non-SWR"
+    )
 
 
 def _ladder_positions() -> tuple[np.ndarray, np.ndarray, float]:
@@ -176,7 +209,7 @@ def plot_gof_ladder(df: pd.DataFrame) -> None:
             ax.axhline(0, color="0.5", ls=":")
     axes.flat[0].legend(frameon=False, fontsize=8)
     fig.suptitle(
-        "Point-process GOF up the per-bin ladder\n" + ARRIVAL_RETENTION_NOTE,
+        "Point-process GOF up the per-bin ladder\n" + arrival_retention_note(df),
         y=1.06,
         fontsize=10,
     )

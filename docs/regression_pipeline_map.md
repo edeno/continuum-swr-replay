@@ -558,7 +558,7 @@ Fit the per-bin replay rate vs behavioral-uncertainty / value, by population.
 
 Point-process model checking for the per-bin ladder (Family B).
 
-`plot_gof_ladder`, `isi_autocorrelation_window`, `plot_rescaled_isi_autocorrelation`, `plot_example_quartet`, `build_parser`, `main`
+`arrival_retention_note`, `plot_gof_ladder`, `isi_autocorrelation_window`, `plot_rescaled_isi_autocorrelation`, `plot_example_quartet`, `build_parser`, `main`
 
 ### `scripts/rate/plot_per_bin_rate_models.py`
 
