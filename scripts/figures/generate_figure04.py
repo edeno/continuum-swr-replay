@@ -110,6 +110,49 @@ warnings.filterwarnings("ignore")
 # ---------------------------------------------------------------------------
 
 
+#: The range panel a always shows: 0.5x to 2x, on the log-modulation scale.
+MODULATION_REFERENCE_BOUNDS = (np.log(0.5), np.log(2.0))
+
+
+def modulation_axis_bounds(drawn):
+    """Limits of the modulation axis, on the log scale the curves are drawn on.
+
+    The 0.5x to 2x reference range, widened where a curve or its band leaves it,
+    with 5 % of the drawn span as margin so a line on the limit is not half
+    clipped. A fixed range cut off the example neuron's non-SWR replay curve,
+    which rises to about 2.8x, and its band, which reaches about 3.9x.
+
+    Parameters
+    ----------
+    drawn : list of np.ndarray
+        Every curve and band edge drawn on the axis (log modulation).
+
+    Returns
+    -------
+    tuple of float
+        ``(low, high)`` in log modulation.
+    """
+    data_low = min(float(np.min(values)) for values in drawn)
+    data_high = max(float(np.max(values)) for values in drawn)
+    margin = 0.05 * (data_high - data_low)
+    return (
+        min(MODULATION_REFERENCE_BOUNDS[0], data_low - margin),
+        max(MODULATION_REFERENCE_BOUNDS[1], data_high + margin),
+    )
+
+
+def modulation_axis_ticks(bounds):
+    """Fold-change ticks on the modulation axis: each power of two inside it.
+
+    Always 0.5, 1 and 2 (the reference range), plus 0.25, 4, 8 ... when the
+    limits were widened.
+    """
+    tolerance = 1e-9
+    low = int(np.ceil(bounds[0] / np.log(2) - tolerance))
+    high = int(np.floor(bounds[1] / np.log(2) + tolerance))
+    return [2.0**power for power in range(low, high + 1)]
+
+
 def plot_single_neuron_overlay(
     axes,
     lag_time,
@@ -151,14 +194,15 @@ def plot_single_neuron_overlay(
     """
     ax_mod, ax_psth = axes
     lag_bounds = lag_time[0], lag_time[-1]
-    modulation_bounds = np.log(0.5), np.log(2.0)
 
     # ── Sub-row 1: overlaid modulation curves ──
+    drawn = []
     for cfg in model_configs:
         result = glm_results[cfg["model"]]
         modulation = result.params[1:] @ spline_basis.T
         upper = (result.params[1:] + result.bse[1:]) @ spline_basis.T
         lower = (result.params[1:] - result.bse[1:]) @ spline_basis.T
+        drawn += [modulation, upper, lower]
 
         ax_mod.plot(
             lag_time,
@@ -177,18 +221,24 @@ def plot_single_neuron_overlay(
 
     ax_mod.axhline(0, color="black", linestyle="--", linewidth=0.5)
     ax_mod.axvline(0, color="black", linestyle="--", linewidth=0.5)
+    modulation_bounds = modulation_axis_bounds(drawn)
     ax_mod.set_ylim(modulation_bounds)
     ax_mod.set_xticks((lag_bounds[0], 0, lag_bounds[1]))
-    ax_mod.set_yticks((modulation_bounds[0], 0, modulation_bounds[1]))
-    ax_mod.set_yticklabels(
-        (
-            f"{np.exp(modulation_bounds[0]):.1f}",
-            "1",
-            f"{np.exp(modulation_bounds[1]):.1f}",
-        )
-    )
+    modulation_ticks = modulation_axis_ticks(modulation_bounds)
+    ax_mod.set_yticks(np.log(modulation_ticks))
+    ax_mod.set_yticklabels([f"{tick:g}" for tick in modulation_ticks])
     ax_mod.set_ylabel("GLM\nmodulation")
-    ax_mod.legend(frameon=False, fontsize=6, loc="upper right")
+    # In the empty margin to the right of the axes: inside them it covered the
+    # non-SWR replay curve and its band. Left out of the layout so the axes keep
+    # the width they had.
+    legend = ax_mod.legend(
+        frameon=False,
+        fontsize=6,
+        loc="upper left",
+        bbox_to_anchor=(1.02, 1.0),
+        borderaxespad=0.0,
+    )
+    legend.set_in_layout(False)
     ax_mod.tick_params(labelbottom=False)
     ax_mod.set_title(
         "Example mPFC neuron (penalised fit, ±1 posterior SE)", fontsize=8, pad=4
@@ -367,11 +417,14 @@ def plot_significance(df, ax, alpha=0.05, n_control_draws=DEFAULT_CONTROL_DRAWS)
     ax.tick_params(axis="x", labelsize=5)
     # Say both the raw-p threshold and R on the panel: this is a descriptive
     # preview, and its Monte Carlo resolution is part of what the bars mean.
+    # Left-aligned: the title is wider than the axes, and centred it ran under
+    # the panel letter.
     ax.set_title(
         "Raw empirical p < "
         f"{alpha:g} (descriptive)\n"
         f"R={n_control_draws}, min p={1 / (n_control_draws + 1):.3f}",
         fontsize=7,
+        loc="left",
     )
 
 
@@ -397,7 +450,7 @@ def plot_best_model_selection(df, ax):
             )
     ax.set_ylabel("% units")
     ax.tick_params(axis="x", labelsize=5)
-    ax.set_title("Best model\n(held-out deviance)", fontsize=7)
+    ax.set_title("Best model\n(held-out deviance)", fontsize=7, loc="left")
 
 
 # ---------------------------------------------------------------------------
@@ -595,6 +648,56 @@ def generate_figure(
         artifact_suffix=stop_cohort_suffix(stop_cohort),
     )
 
+    return assemble_figure(
+        lag_time=lag_time,
+        spline_basis=spline_basis,
+        neuron_spike_times=neuron_spike_times,
+        glm_results=glm_results,
+        event_times=event_times,
+        pop_df=pop_df,
+        modulations=modulations,
+        pop_lag_time=pop_lag_time,
+    )
+
+
+def assemble_figure(
+    lag_time,
+    spline_basis,
+    neuron_spike_times,
+    glm_results,
+    event_times,
+    pop_df,
+    modulations,
+    pop_lag_time,
+):
+    """Lay out and draw the four panels from already-loaded inputs.
+
+    Split from ``generate_figure`` so the layout can be drawn, and checked for
+    overlapping text, without loading a session or fitting a neuron.
+
+    Parameters
+    ----------
+    lag_time : np.ndarray, shape (n_report_lags,)
+        Reported lags of the example neuron's curves, in seconds.
+    spline_basis : np.ndarray, shape (n_report_lags, n_basis)
+        Spline basis matching ``glm_results[...].params[1:]``.
+    neuron_spike_times : np.ndarray
+        Spike times of the example neuron (seconds).
+    glm_results : dict[str, fitted GLM result]
+        The example neuron's fits; ``SWR`` and ``non_local_no_SWR`` are drawn.
+    event_times : dict[str, pd.DataFrame]
+        Event interval tables for the example neuron's PSTHs.
+    pop_df : pd.DataFrame
+        One row per population unit (held-out p-values, best model).
+    modulations : dict[str, np.ndarray], each (n_lag, n_neuron)
+        Population modulation curves, keys ``swr`` and ``no_swr``.
+    pop_lag_time : np.ndarray, shape (n_lag,)
+        Lags of ``modulations``, in seconds.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+    """
     # --- Create figure ---
     # 4-panel layout (was 6): the standalone single-neuron AIC was dropped
     # because it duplicated the population AIC in the stats panel, and
@@ -661,14 +764,19 @@ def generate_figure(
     cbar.set_ticklabels(["0.5x", "1x", "2x"])
 
     # ── Row 3: panel c (population average) + panel d (stats) ──
-    gs_cd = gs[2].subgridspec(1, 2, width_ratios=[1.0, 1.3], wspace=0.25)
+    # Panel d needs the width: each of its bar plots has four category labels.
+    # The 1.0 : 1.4 split and the narrower gap leave panel c the width it had
+    # (1.0 : 1.3 with a 0.25 gap) and give the rest to panel d.
+    gs_cd = gs[2].subgridspec(1, 2, width_ratios=[1.0, 1.4], wspace=0.1)
 
     # Panel c: population average modulation
     ax_c = fig.add_subplot(gs_cd[0])
     plot_population_average(modulations, pop_lag_time, ax_c)
 
-    # Panel d: consolidated stats — % beating the control null + best model
-    gs_d = gs_cd[1].subgridspec(1, 2, wspace=0.3)
+    # Panel d: consolidated stats — % beating the control null + best model.
+    # A small wspace: the gap used to be 0.3 of an axes width, which left each
+    # bar plot too narrow for its four category labels.
+    gs_d = gs_cd[1].subgridspec(1, 2, wspace=0.05)
     ax_d1 = fig.add_subplot(gs_d[0])
     ax_d2 = fig.add_subplot(gs_d[1])
     plot_significance(pop_df, ax_d1)
