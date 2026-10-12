@@ -109,8 +109,12 @@ GROUP_COLORS = {
 
 # --- Session / epoch helpers --------------------------------------------------
 def animal_from_epoch_id(epoch_id: str) -> str:
-    """``"chimi20200213_02_r1_HPC"`` -> ``"chimi"`` (leading alpha of the NWB stem)."""
-    return "".join(c for c in epoch_id.split("_")[0] if c.isalpha())
+    """``"chimi20200213_02_r1_HPC"`` -> ``"chimi"``, ``"j1620210709_..."`` -> ``"j16"``.
+
+    The NWB stem ends in an 8-digit date, so the animal id is everything before
+    it (``j16`` keeps its digits), as in ``prepare_data``.
+    """
+    return epoch_id.split("_")[0][:-8]
 
 
 def find_sessions(animal: str | None) -> list[str]:

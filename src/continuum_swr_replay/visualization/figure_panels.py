@@ -664,7 +664,9 @@ def plot_decoding_error_distribution(
         label=f"Median: {grand_median:.1f} cm",
     )
 
-    ax.set_xlabel("Median Decoding Error (cm)")
+    # Short: Figure 2 draws this in its narrow right-edge cell, where the longer
+    # "Median Decoding Error (cm)" ran off the saved figure.
+    ax.set_xlabel("Median error (cm)")
     ax.set_ylabel("Number of Sessions")
     ax.legend()
     sns.despine(ax=ax)

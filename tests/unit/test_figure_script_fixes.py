@@ -1,4 +1,4 @@
-"""Fixes to the figure scripts found in the R7a figure run (task 26b, items 4-6).
+"""Fixes to the figure scripts found in the R7a figure run (tasks 26b and 26c).
 
 - The event gallery selects the same events in every process.
 - The pipeline data-flow figure reads its frame through the SWR source, has a
@@ -6,6 +6,9 @@
   clear error, and fits its panel E headers in their cells.
 - Figure 2's render cache is keyed on a version token, so a library change can
   invalidate it.
+- Figure 3 panel a's relative-time ticks sit on round steps and each label is
+  its tick's exact relative time (task 26c).
+- ``animal_from_epoch_id`` keeps the digits of ``j16`` (task 26c).
 """
 
 from __future__ import annotations
@@ -283,3 +286,177 @@ def test_the_figure02_cache_is_keyed_on_the_analysed_epochs(
 
     assert one != two
     assert cache_name(["02_r1"]) == one
+
+
+# --------------------------------------------------------------------------
+# Figure 3 panel a: relative-time ticks (task 26c)
+# --------------------------------------------------------------------------
+
+# A real session time is a Unix time near 1.6e9 s, so a float64 step is
+# 2.4e-7 s; a label that matches to 1e-6 s is exact at the precision shown.
+T0 = 1_615_000_000.123
+LABEL_TOLERANCE_S = 1e-6
+
+
+@pytest.mark.parametrize(
+    ("before_t0", "after_t0"),
+    [(0.0, 2.0), (0.05, 2.05), (0.0, 0.3), (0.0, 8.0), (0.17, 0.41)],
+)
+def test_the_figure03_ticks_sit_on_a_round_step_with_exact_labels(
+    offline, before_t0, after_t0
+):
+    figure03 = offline("scripts.figures.generate_figure03")
+
+    ticks, labels = figure03._relative_time_ticks(T0 - before_t0, T0 + after_t0, T0)
+
+    relative = np.array([float(label) for label in labels])
+    # each label is its tick's relative time
+    np.testing.assert_allclose(
+        relative, np.asarray(ticks) - T0, rtol=0, atol=LABEL_TOLERANCE_S
+    )
+    # evenly spaced, with a step of at most two decimals (0.05, 0.25, 0.5, 1 ...)
+    steps = np.diff(relative)
+    assert len(ticks) >= 2
+    np.testing.assert_allclose(steps, steps[0], rtol=0, atol=1e-9)
+    assert round(steps[0], 2) == pytest.approx(steps[0], abs=1e-9)
+    assert all(len(label.partition(".")[2]) <= 2 for label in labels)
+    # inside the window, and at most a handful of them
+    assert min(ticks) >= T0 - before_t0 - LABEL_TOLERANCE_S
+    assert max(ticks) <= T0 + after_t0 + LABEL_TOLERANCE_S
+    assert len(ticks) <= 9
+
+
+def test_the_figure03_first_tick_at_or_after_t0_is_zero(offline):
+    figure03 = offline("scripts.figures.generate_figure03")
+
+    ticks, labels = figure03._relative_time_ticks(T0 - 0.05, T0 + 2.05, T0)
+
+    at_or_after = [
+        (tick, label)
+        for tick, label in zip(ticks, labels, strict=True)
+        if tick >= T0 - LABEL_TOLERANCE_S
+    ]
+    tick, label = min(at_or_after)
+    assert label == "0"
+    assert tick == pytest.approx(T0, abs=LABEL_TOLERANCE_S)
+
+
+def test_the_figure03_panel_a_axes_get_the_ticks_and_keep_their_limits(offline):
+    import matplotlib.pyplot as plt
+
+    figure03 = offline("scripts.figures.generate_figure03")
+    fig = plt.figure()
+    first = fig.add_subplot(3, 1, 1)
+    axes = [first] + [fig.add_subplot(3, 1, i, sharex=first) for i in (2, 3)]
+    for ax in axes:
+        ax.plot([T0, T0 + 2.0], [0, 1])
+        ax.set_xlim(T0, T0 + 2.0)
+
+    figure03._set_relative_time_ticks(axes, T0)
+    fig.canvas.draw()
+
+    for ax in axes:
+        labels = [label.get_text() for label in ax.get_xticklabels()]
+        np.testing.assert_allclose(
+            [float(label) for label in labels],
+            ax.get_xticks() - T0,
+            rtol=0,
+            atol=LABEL_TOLERANCE_S,
+        )
+        assert ax.get_xlim() == (T0, T0 + 2.0)
+    assert [t.get_text() for t in axes[-1].get_xticklabels()][0] == "0"
+    plt.close(fig)
+
+
+# --------------------------------------------------------------------------
+# The animal id of an epoch identifier (task 26c)
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "module",
+    [
+        "scripts.content.analyze_content_occupancy",
+        "scripts.qa.analyze_event_spike_evidence",
+    ],
+)
+@pytest.mark.parametrize(
+    ("epoch_id", "animal"),
+    [
+        ("j1620210709_02_r1_HPC", "j16"),
+        ("chimi20200213_02_r1_HPC", "chimi"),
+        ("peanut20201125_04_r2_HPC", "peanut"),
+        ("senor20201031_06_r3_HPC", "senor"),
+        ("wilbur20210329_02_r1_HPC", "wilbur"),
+    ],
+)
+def test_the_animal_id_of_an_epoch_keeps_the_digits_of_j16(
+    offline, module, epoch_id, animal
+):
+    assert offline(module).animal_from_epoch_id(epoch_id) == animal
+
+
+# --------------------------------------------------------------------------
+# Figure 2 panel e: the x-axis label (task 26c)
+# --------------------------------------------------------------------------
+
+
+def test_the_figure02_panel_e_label_lies_inside_the_figure():
+    """The label was wider than panel e's cell and ran off the right edge of the
+    saved figure. Panel e sits at the right edge, so a label wider than the
+    room left there is cut.
+
+    A proxy for ``generate_figure02._render_figure``: the same figure size, the
+    same row-3 grid (the script's ``gs_cde``) and the paper typography, with
+    panel e drawn by the same function. The real figure needs the cached
+    session, so the render check stays a manual one.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.gridspec import GridSpec
+
+    from continuum_swr_replay import figure_utilities
+    from continuum_swr_replay.visualization.figure_panels import (
+        plot_decoding_error_distribution,
+    )
+
+    with matplotlib.rc_context():
+        figure_utilities.set_figure_defaults(context="paper")
+        fig = plt.figure(
+            figsize=(
+                figure_utilities.TWO_COLUMN,
+                min(9.0, figure_utilities.PAGE_HEIGHT),
+            ),
+            dpi=100,
+            constrained_layout=True,
+        )
+        outer = GridSpec(3, 1, figure=fig, height_ratios=[2.2, 0.5, 1.1], hspace=0.3)
+        gs_cde = outer[2].subgridspec(
+            2, 4, width_ratios=[1.35, 0.8, 0.8, 1.05], hspace=0.05, wspace=0.38
+        )
+        # the neighbours that set the room panel e gets
+        ax_c_top = fig.add_subplot(gs_cde[0, 0])
+        ax_c_bot = fig.add_subplot(gs_cde[1, 0], sharex=ax_c_top)
+        ax_c_top.set_ylabel("Non-Local\nProb.")
+        ax_c_bot.set_ylabel("SWR\nZ-score")
+        ax_c_bot.set_xlabel("Time from Event (s)")
+        ax_d_start = fig.add_subplot(gs_cde[:, 1])
+        ax_d_end = fig.add_subplot(gs_cde[:, 2], sharey=ax_d_start)
+        ax_d_start.set_ylabel("Density")
+        ax_d_start.set_xlabel("NL start − SWR start (ms)")
+        ax_d_end.set_xlabel("NL end − SWR end (ms)")
+        ax_e = fig.add_subplot(gs_cde[:, 3])
+        rng = np.random.default_rng(0)
+        plot_decoding_error_distribution(
+            ax=ax_e,
+            error_df=pd.DataFrame({"median_error_cm": rng.gamma(9, 0.4, 200)}),
+        )
+
+        fig.canvas.draw()
+        label = ax_e.xaxis.label.get_window_extent(fig.canvas.get_renderer())
+        figure = fig.bbox
+        plt.close(fig)
+
+    assert label.x0 >= figure.x0
+    assert label.x1 <= figure.x1
+    assert label.y0 >= figure.y0
+    assert label.y1 <= figure.y1

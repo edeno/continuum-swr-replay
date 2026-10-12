@@ -28,6 +28,7 @@ import warnings
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from matplotlib.gridspec import GridSpec
 
@@ -89,6 +90,52 @@ warnings.filterwarnings("ignore")
 # ---------------------------------------------------------------------------
 # Panel a — Real data example (non-SWR non-local event)
 # ---------------------------------------------------------------------------
+
+# Round steps (s) for panel a's relative-time ticks, finest first.
+_TICK_STEPS_S = (0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0)
+_MAX_TICKS = 6
+
+
+def _relative_time_ticks(
+    t_lo: float, t_hi: float, t0: float
+) -> tuple[np.ndarray, list[str]]:
+    """Ticks for an axis showing ``[t_lo, t_hi]`` s, labelled in seconds from ``t0``.
+
+    The ticks sit at relative times that are multiples of a round step (0 at
+    ``t0``), the finest step that gives at most ``_MAX_TICKS`` ticks. Each label
+    is its tick's relative time, not that time rounded from an automatic tick.
+
+    Parameters
+    ----------
+    t_lo, t_hi : float
+        Axis limits, in absolute seconds.
+    t0 : float
+        The absolute time shown as 0, in seconds.
+
+    Returns
+    -------
+    ticks : np.ndarray, shape (n_ticks,)
+        Tick positions, in absolute seconds.
+    labels : list of str
+        The relative time of each tick, e.g. ``"0"``, ``"0.5"``.
+    """
+    rel_lo, rel_hi = t_lo - t0, t_hi - t0
+    for step in _TICK_STEPS_S:
+        first = int(np.ceil(rel_lo / step - 1e-9))
+        last = int(np.floor(rel_hi / step + 1e-9))
+        if last - first + 1 <= _MAX_TICKS:
+            break
+    relative = np.round(np.arange(first, last + 1) * step, 6)
+    return t0 + relative, [f"{r:g}" for r in relative]
+
+
+def _set_relative_time_ticks(axes, t0: float) -> None:
+    """Tick each axis of ``axes`` in seconds from ``t0``, leaving its limits."""
+    for ax in axes:
+        ticks, labels = _relative_time_ticks(*ax.get_xlim(), t0)
+        ax.set_xticks(ticks)
+        ax.set_xticklabels(labels)
+
 
 def find_non_swr_example_event(
     data, results, window_sec=1.0, *, artifacts=None, dropped=None
@@ -239,11 +286,9 @@ def generate_figure(
     plot_acausal_probabilities(results, time_slice, ax_probs, plot_local=True)
 
     # Convert absolute timestamps to relative time (seconds from event start)
-    t0 = time_slice.start
-    for ax in [ax_swr, ax_raster, ax_posterior, ax_probs]:
-        ticks = ax.get_xticks()
-        ax.set_xticks(ticks)
-        ax.set_xticklabels([f"{t - t0:.1f}" for t in ticks])
+    _set_relative_time_ticks(
+        [ax_swr, ax_raster, ax_posterior, ax_probs], time_slice.start
+    )
 
     # Remove x-labels from non-bottom sub-rows
     for ax in [ax_swr, ax_raster, ax_posterior]:
