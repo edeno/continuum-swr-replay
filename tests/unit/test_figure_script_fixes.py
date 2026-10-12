@@ -9,10 +9,10 @@
 - Figure 3 panel a's relative-time ticks sit on round steps and each label is
   its tick's exact relative time (task 26c).
 - ``animal_from_epoch_id`` keeps the digits of ``j16`` (task 26c).
-- The rate summary's panel B is a log axis showing every box, the contrast coefficient
-  figures keep their titles and x labels inside the figure, the arrival
-  retention note states no constant share, and the rescaled-ISI
-  autocorrelation panel draws its points (task 26d).
+- The rate summary's panel B boxes log(RR), so one extreme session does not set
+  its axis; the contrast coefficient figures keep their titles and x labels
+  inside the figure; the arrival retention note states no constant share; and
+  the rescaled-ISI autocorrelation panel draws its points (task 26d).
 """
 
 from __future__ import annotations
@@ -469,37 +469,44 @@ def test_the_figure02_panel_e_label_lies_inside_the_figure():
 
 
 # --------------------------------------------------------------------------
-# Rate summary panel B: a log y axis that shows every box (task 26d)
+# Rate summary panel B: box statistics in log space (task 26d)
 # --------------------------------------------------------------------------
 
 
-def _whisker_top(values: np.ndarray) -> float:
-    """Top whisker of a default box plot: the largest value within 1.5 IQR of Q3."""
-    q1, q3 = np.percentile(values, [25, 75])
-    return float(values[values <= q3 + 1.5 * (q3 - q1)].max())
+def _log_box_statistics(values: np.ndarray) -> dict[str, float]:
+    """Quartiles and 1.5 IQR whiskers of ``log(values)``, clipped to the data.
+
+    The whisker is the most extreme data point within 1.5 IQR of the quartile,
+    which is how matplotlib clips it.
+    """
+    beta = np.log(values)
+    q1, q3 = np.percentile(beta, [25, 75])
+    iqr = q3 - q1
+    return {
+        "q1": q1,
+        "q3": q3,
+        "bottom": float(beta[beta >= q1 - 1.5 * iqr].min()),
+        "top": float(beta[beta <= q3 + 1.5 * iqr].max()),
+    }
 
 
-def _whisker_bottom(values: np.ndarray) -> float:
-    """Bottom whisker: the smallest value within 1.5 IQR of Q1."""
-    q1, q3 = np.percentile(values, [25, 75])
-    return float(values[values >= q1 - 1.5 * (q3 - q1)].min())
+def test_the_rate_summary_panel_b_takes_its_box_statistics_in_log_space():
+    """A rate ratio is skewed, so on RR the 1.5 IQR whisker runs to the minimum:
+    a near-separated session (RR 0.0006 in the R6b fit) stretched the axis over
+    five decades. The panel boxes the coefficient beta = log(RR) instead.
 
-
-def test_the_rate_summary_panel_b_is_a_log_axis_that_shows_every_box():
-    """The limit was ``(0, 6)``: the SWR median was 6.39 and the NL-with-SWR
-    median 9.91 in the R6b fit, so their boxes ran off the top. A linear axis
-    that reaches the top whisker (79 there) squeezes those medians against the
-    floor, and a rate ratio is multiplicative, so the axis is logarithmic."""
+    The axis is therefore linear in beta by design, not a log axis; its ticks
+    sit at beta = log(RR) for plain RR values and are labelled with the RR."""
     import matplotlib.pyplot as plt
 
     summary = importlib.import_module("scripts.rate.plot_per_bin_rate_summary")
     rng = np.random.default_rng(0)
+    no_swr = np.exp(rng.uniform(np.log(0.5), np.log(20.0), 60))
+    no_swr[0] = 1e-4  # one extreme low value among values between 0.5 and 20
     rate_ratios = {
         "swr": 6.4 * np.exp(rng.normal(0.0, 0.6, 60)),
-        # median 14, top whisker 82
-        "non_local_swr": np.geomspace(2.0, 100.0, 61),
-        # median 0.8, bottom whisker well below 1
-        "non_local_no_swr": 0.8 * np.exp(rng.normal(0.0, 0.8, 60)),
+        "non_local_swr": np.geomspace(2.0, 100.0, 61),  # median 14, top whisker 82
+        "non_local_no_swr": no_swr,
     }
     frame = pd.concat(
         pd.DataFrame(
@@ -526,32 +533,58 @@ def test_the_rate_summary_panel_b_is_a_log_axis_that_shows_every_box():
         ]
     )
     box_tops = [patch.get_path().vertices[:, 1].max() for patch in ax.patches]
+    # a whisker is the vertical line from a quartile to its end
+    whisker_y = np.concatenate(
+        [
+            line.get_ydata()
+            for line in ax.lines
+            if len(line.get_ydata()) == 2 and line.get_ydata()[0] != line.get_ydata()[1]
+        ]
+    )
+    one_lines = [
+        line.get_ydata()
+        for line in ax.lines
+        if line.get_linestyle() == ":" and len(line.get_ydata())
+    ]
     ticks = [tick for tick in ax.get_yticks() if low <= tick <= high]
     tick_labels = [
         label.get_text()
         for tick, label in zip(ax.get_yticks(), ax.get_yticklabels(), strict=True)
         if low <= tick <= high
     ]
-    minor_labels = [label.get_text() for label in ax.yaxis.get_minorticklabels()]
     plt.close(fig)
 
-    top = max(_whisker_top(values) for values in rate_ratios.values())
-    bottom = min(_whisker_bottom(values) for values in rate_ratios.values())
-    assert top > 60.0 and bottom < 0.5  # the spread the test is meant to cover
-    assert scale == "log"
+    stats = [_log_box_statistics(values) for values in rate_ratios.values()]
+    top = max(s["top"] for s in stats)
+    bottom = min(s["bottom"] for s in stats)
+    # the spread to cover: a top whisker near 80, and the extreme value far
+    # below the log-space bottom whisker
+    assert top > np.log(60.0)
+    assert np.log(1e-4) < bottom - 3.0
+    assert scale == "linear"  # linear in beta = log(RR), by design
+    # the whiskers are 1.5 IQR in log space, clipped to the data
+    expected = [s[key] for s in stats for key in ("q1", "q3", "bottom", "top")]
+    np.testing.assert_allclose(np.sort(whisker_y), np.sort(expected))
+    # the extreme low value is a flier, so it does not set the limit
+    assert low > np.log(1e-4)
+    # the limits hold every whisker, cap, median and box, with a small margin
     assert low <= bottom and top <= high
     assert drawn.min() >= low and drawn.max() <= high
     assert max(box_tops) <= high
-    # a small margin in log space, not a loose one
-    assert high <= 1.3 * top
-    assert low >= bottom / 1.3
-    assert low < 1.0 < high  # the RR = 1 reference line stays in view
-    # plain numbers, not 10^x: every label parses as a float, and 1 is one of them
+    assert high - top <= np.log(1.3)
+    assert bottom - low <= np.log(1.3)
+    # RR = 1 is beta = 0: inside the limits, and drawn there
+    assert low < 0.0 < high
+    assert any(np.allclose(y, 0.0) for y in one_lines)
+    # ticks at log of plain 1-2-5 rate ratios, labelled with the RR
     assert len(ticks) >= 3
     assert all("^" not in text and "$" not in text for text in tick_labels)
-    assert [float(text) for text in tick_labels] == pytest.approx(ticks)
+    rate_ratio_labels = [float(text) for text in tick_labels]
+    np.testing.assert_allclose(ticks, np.log(rate_ratio_labels))
+    for rate_ratio in rate_ratio_labels:
+        mantissa = rate_ratio / 10.0 ** np.floor(np.log10(rate_ratio))
+        assert round(mantissa, 6) in (1.0, 2.0, 5.0)
     assert "1" in tick_labels
-    assert set(minor_labels) <= {""}
 
 
 # --------------------------------------------------------------------------
