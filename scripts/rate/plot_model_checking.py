@@ -86,19 +86,21 @@ ARRIVAL_LADDER = [n for n, s in MODEL_PER_BIN_RATE.items() if s.time_clock == "a
 CLOCK_GAP = 1.0
 FULL = "M7r_time_histcos_rew"
 # The arrival rungs are fit on the arrival window, which is not a neutral
-# subset: it keeps a larger share of the SWR event bins than of the non-SWR
-# ones, so a BETWEEN-population arrival comparison is confounded by retention.
+# subset: it need not keep the same share of each population's event bins, so a
+# BETWEEN-population arrival comparison is confounded by retention. The order
+# differs between fits (the in-transit cohort keeps more non-SWR bins).
 # The shares are the runner's own tallies, ``fits.attrs["arrival_clock_cohort"]``:
 # per population, the event bins (bins with ``count > 0``) of the frozen cohort
 # that the window kept. ``per_bin_rate_cohort_audit.csv`` cannot give them: it
 # counts stops. A fit without the tallies gets the warning in words only.
 _ARRIVAL_RETENTION_TEMPLATE = (
     "arrival rungs are read on a different row set — the arrival window keeps "
-    "{shares} non-local event bins, so between-population arrival differences "
-    "are partly retention"
+    "{shares}, so between-population arrival differences are partly retention"
 )
-ARRIVAL_RETENTION_NOTE = _ARRIVAL_RETENTION_TEMPLATE.format(
-    shares="a larger share of SWR than of non-SWR"
+ARRIVAL_RETENTION_NOTE = (
+    "arrival rungs are read on a different row set — the arrival window can keep "
+    "different shares of SWR and of non-SWR non-local event bins, so "
+    "between-population arrival differences can be partly retention"
 )
 
 
@@ -114,7 +116,8 @@ def arrival_retention_note(fits: pd.DataFrame) -> str:
     Returns
     -------
     str
-        "... keeps 95 % of SWR vs 88 % of non-SWR non-local event bins ...", the
+        "... keeps 95 % of SWR event bins vs 88 % of non-SWR non-local event
+        bins ...", the
         shares of the ``swr`` and ``non_local_no_swr`` populations in whole
         percent; the words-only :data:`ARRIVAL_RETENTION_NOTE` when the fit
         carries no tallies.
@@ -129,7 +132,10 @@ def arrival_retention_note(fits: pd.DataFrame) -> str:
         for population in ("swr", "non_local_no_swr")
     }
     return _ARRIVAL_RETENTION_TEMPLATE.format(
-        shares=f"{share['swr']:.0f} % of SWR vs {share['non_local_no_swr']:.0f} % of non-SWR"
+        shares=(
+            f"{share['swr']:.0f} % of SWR event bins vs "
+            f"{share['non_local_no_swr']:.0f} % of non-SWR non-local event bins"
+        )
     )
 
 

@@ -760,7 +760,10 @@ def test_the_arrival_retention_note_gives_the_shares_the_fit_stored(
 
     note = checking.arrival_retention_note(_fits_with_arrival_cohort(swr, no_swr))
 
-    assert f"keeps {swr_pct} % of SWR vs {no_swr_pct} % of non-SWR" in note
+    assert (
+        f"keeps {swr_pct} % of SWR event bins vs {no_swr_pct} % of non-SWR non-local"
+        " event bins" in note
+    )
     assert "retention" in note
 
 
@@ -773,7 +776,8 @@ def test_the_arrival_retention_note_is_words_only_without_the_cohort_tallies():
 
     assert note == checking.ARRIVAL_RETENTION_NOTE
     assert not re.search(r"\d|%", note)
-    assert "larger share of SWR than of non-SWR" in note
+    # No direction: the order differs between fits.
+    assert "different shares of SWR and of non-SWR" in note
     assert "retention" in note
 
 
@@ -786,14 +790,16 @@ def test_the_gof_ladder_title_carries_the_computed_retention_note(
     checking = importlib.import_module("scripts.rate.plot_model_checking")
     monkeypatch.setattr(checking, "FIGS", tmp_path)
     figures = []
+    # ``checking.plt`` is pyplot itself, so keep the real close for the cleanup.
+    real_close = plt.close
     monkeypatch.setattr(checking.plt, "close", figures.append)
 
     checking.plot_gof_ladder(_fits_with_arrival_cohort((190, 200), (7, 10)))
 
     (fig,) = figures
-    title = fig._suptitle.get_text()
-    plt.close("all")
-    assert "keeps 95 % of SWR vs 70 % of non-SWR" in title
+    title = fig.get_suptitle()
+    real_close("all")
+    assert "keeps 95 % of SWR event bins vs 70 % of non-SWR non-local" in title
 
 
 def _symmetric_autocorrelation(n_spikes: int) -> np.ndarray:
