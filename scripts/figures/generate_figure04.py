@@ -119,8 +119,7 @@ def modulation_axis_bounds(drawn):
 
     The 0.5x to 2x reference range, widened where a curve or its band leaves it,
     with 5 % of the drawn span as margin so a line on the limit is not half
-    clipped. A fixed range cut off the example neuron's non-SWR replay curve,
-    which rises to about 2.8x, and its band, which reaches about 3.9x.
+    clipped. A fixed range would cut off any curve or band that leaves it.
 
     Parameters
     ----------
@@ -765,8 +764,7 @@ def assemble_figure(
 
     # ── Row 3: panel c (population average) + panel d (stats) ──
     # Panel d needs the width: each of its bar plots has four category labels.
-    # The 1.0 : 1.4 split and the narrower gap leave panel c the width it had
-    # (1.0 : 1.3 with a 0.25 gap) and give the rest to panel d.
+    # The narrow gap gives panel d the room without shrinking panel c.
     gs_cd = gs[2].subgridspec(1, 2, width_ratios=[1.0, 1.4], wspace=0.1)
 
     # Panel c: population average modulation
@@ -774,8 +772,8 @@ def assemble_figure(
     plot_population_average(modulations, pop_lag_time, ax_c)
 
     # Panel d: consolidated stats — % beating the control null + best model.
-    # A small wspace: the gap used to be 0.3 of an axes width, which left each
-    # bar plot too narrow for its four category labels.
+    # A small wspace, so each bar plot is wide enough for its four category
+    # labels.
     gs_d = gs_cd[1].subgridspec(1, 2, wspace=0.05)
     ax_d1 = fig.add_subplot(gs_d[0])
     ax_d2 = fig.add_subplot(gs_d[1])
