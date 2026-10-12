@@ -9,7 +9,7 @@
 - Figure 3 panel a's relative-time ticks sit on round steps and each label is
   its tick's exact relative time (task 26c).
 - ``animal_from_epoch_id`` keeps the digits of ``j16`` (task 26c).
-- The rate summary's panel B shows every box, the contrast coefficient
+- The rate summary's panel B is a log axis showing every box, the contrast coefficient
   figures keep their titles and x labels inside the figure, the arrival
   retention note states no constant share, and the rescaled-ISI
   autocorrelation panel draws its points (task 26d).
@@ -469,7 +469,7 @@ def test_the_figure02_panel_e_label_lies_inside_the_figure():
 
 
 # --------------------------------------------------------------------------
-# Rate summary panel B: the y-limit (task 26d)
+# Rate summary panel B: a log y axis that shows every box (task 26d)
 # --------------------------------------------------------------------------
 
 
@@ -479,17 +479,27 @@ def _whisker_top(values: np.ndarray) -> float:
     return float(values[values <= q3 + 1.5 * (q3 - q1)].max())
 
 
-def test_the_rate_summary_panel_b_shows_every_box_whose_median_exceeds_six():
-    """The limit was ``(0, 6)``; the SWR median was 6.39 and the NL-with-SWR
-    median 9.91 in the R6b fit, so their boxes ran off the top."""
+def _whisker_bottom(values: np.ndarray) -> float:
+    """Bottom whisker: the smallest value within 1.5 IQR of Q1."""
+    q1, q3 = np.percentile(values, [25, 75])
+    return float(values[values >= q1 - 1.5 * (q3 - q1)].min())
+
+
+def test_the_rate_summary_panel_b_is_a_log_axis_that_shows_every_box():
+    """The limit was ``(0, 6)``: the SWR median was 6.39 and the NL-with-SWR
+    median 9.91 in the R6b fit, so their boxes ran off the top. A linear axis
+    that reaches the top whisker (79 there) squeezes those medians against the
+    floor, and a rate ratio is multiplicative, so the axis is logarithmic."""
     import matplotlib.pyplot as plt
 
     summary = importlib.import_module("scripts.rate.plot_per_bin_rate_summary")
     rng = np.random.default_rng(0)
-    medians = {"swr": 6.4, "non_local_swr": 9.9, "non_local_no_swr": 2.0}
     rate_ratios = {
-        outcome: median * np.exp(rng.normal(0.0, 0.35, 60))
-        for outcome, median in medians.items()
+        "swr": 6.4 * np.exp(rng.normal(0.0, 0.6, 60)),
+        # median 14, top whisker 82
+        "non_local_swr": np.geomspace(2.0, 100.0, 61),
+        # median 0.8, bottom whisker well below 1
+        "non_local_no_swr": 0.8 * np.exp(rng.normal(0.0, 0.8, 60)),
     }
     frame = pd.concat(
         pd.DataFrame(
@@ -506,21 +516,42 @@ def test_the_rate_summary_panel_b_shows_every_box_whose_median_exceeds_six():
     summary._panel_reward1(ax, frame)
     fig.canvas.draw()
     low, high = ax.get_ylim()
-    whisker_tops = [_whisker_top(values) for values in rate_ratios.values()]
-    # every whisker and cap line the box plot drew lies inside the axis
-    drawn = [
-        line.get_ydata().max()
-        for line in ax.lines
-        if len(line.get_ydata()) and line.get_linestyle() in ("-", "--")
+    scale = ax.get_yscale()
+    # every line the box plot drew (whiskers, caps, medians) and every box
+    drawn = np.concatenate(
+        [
+            line.get_ydata()
+            for line in ax.lines
+            if line.get_linestyle() in ("-", "--") and len(line.get_ydata())
+        ]
+    )
+    box_tops = [patch.get_path().vertices[:, 1].max() for patch in ax.patches]
+    ticks = [tick for tick in ax.get_yticks() if low <= tick <= high]
+    tick_labels = [
+        label.get_text()
+        for tick, label in zip(ax.get_yticks(), ax.get_yticklabels(), strict=True)
+        if low <= tick <= high
     ]
+    minor_labels = [label.get_text() for label in ax.yaxis.get_minorticklabels()]
     plt.close(fig)
 
-    assert max(whisker_tops) > 6.0  # the case the old limit hid
-    assert low == 0.0
-    assert high >= max(whisker_tops)
-    assert high <= 1.25 * max(whisker_tops)  # a small margin, not a loose one
-    assert max(drawn) <= high
-    assert low <= 1.0 <= high  # the RR = 1 reference line stays in view
+    top = max(_whisker_top(values) for values in rate_ratios.values())
+    bottom = min(_whisker_bottom(values) for values in rate_ratios.values())
+    assert top > 60.0 and bottom < 0.5  # the spread the test is meant to cover
+    assert scale == "log"
+    assert low <= bottom and top <= high
+    assert drawn.min() >= low and drawn.max() <= high
+    assert max(box_tops) <= high
+    # a small margin in log space, not a loose one
+    assert high <= 1.3 * top
+    assert low >= bottom / 1.3
+    assert low < 1.0 < high  # the RR = 1 reference line stays in view
+    # plain numbers, not 10^x: every label parses as a float, and 1 is one of them
+    assert len(ticks) >= 3
+    assert all("^" not in text and "$" not in text for text in tick_labels)
+    assert [float(text) for text in tick_labels] == pytest.approx(ticks)
+    assert "1" in tick_labels
+    assert set(minor_labels) <= {""}
 
 
 # --------------------------------------------------------------------------

@@ -23,6 +23,7 @@ from patsy import dmatrix
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib.ticker import FuncFormatter, NullFormatter  # noqa: E402
 
 from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (  # noqa: E402
     covered_seconds,
@@ -86,6 +87,8 @@ SHORT = ["SWR", "NL\nw/SWR", "NL\nno-SWR"]
 FULL = "M7r_time_histcos_rew"
 IMMEDIATE_COEF = f"coef_{REWARD_HISTORY_COLUMNS[0]}"
 SLOW_COEF = f"coef_{REWARD_HISTORY_COLUMNS[-1]}"
+# Panel B's log-axis margin beyond the lowest and highest whisker (a factor).
+LOG_MARGIN = 1.15
 
 
 def _coef(df, model, oc, coef):
@@ -245,12 +248,26 @@ def _panel_reward1(ax, df):
         patch.set_facecolor(STYLE[oc][1])
         patch.set_alpha(0.4)
     ax.axhline(1, color="0.5", ls=":")
-    # Fliers are off, so the top of the data is the highest whisker or cap; a
-    # fixed limit hid the medians once they passed it. A rate ratio is positive,
-    # so 0 is the floor, and RR = 1 stays in view.
-    top = max(line.get_ydata().max() for line in bp["whiskers"] + bp["caps"])
-    ax.set_ylim(0, 1.05 * max(top, 1.0))
-    ax.set_ylabel("immediate reward RR (per session)")
+    # A rate ratio is multiplicative, so the axis is logarithmic: the whiskers
+    # span orders of magnitude, and on a linear axis that reaches the top one the
+    # medians sit against the floor. Fliers are off, so the data end at the lowest
+    # and highest whisker or cap; the limits are those, less and plus a margin in
+    # log space. RR = 1 stays in view.
+    ends = np.concatenate([line.get_ydata() for line in bp["whiskers"] + bp["caps"]])
+    ax.set_yscale("log")
+    low, high = min(ends.min(), 1.0), max(ends.max(), 1.0)
+    ax.set_ylim(low / LOG_MARGIN, high * LOG_MARGIN)
+    # plain numbers (0.5, 1, 2, 5, 10 ...) rather than powers of ten
+    ticks = [
+        m * 10.0**e
+        for e in range(-6, 7)
+        for m in (1, 2, 5)
+        if low <= m * 10.0**e <= high
+    ]
+    ax.set_yticks(ticks)
+    ax.yaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value:g}"))
+    ax.yaxis.set_minor_formatter(NullFormatter())
+    ax.set_ylabel("immediate reward RR (per session, log scale)")
     ax.set_title("B. Immediate reward-history component (M7r, controlled)")
 
 
