@@ -279,6 +279,32 @@ def test_sidecar_records_a_commit_passed_in(fit_dir, inputs):
     assert json.loads(sidecar.read_text())["git_hash"] == parent
 
 
+@pytest.mark.parametrize(
+    "no_git, cause",
+    [("not_a_repo", subprocess.CalledProcessError), ("no_git_binary", OSError)],
+)
+def test_the_module_imports_outside_a_git_checkout(
+    tmp_path, monkeypatch, no_git, cause
+):
+    """Readers import fit_provenance without git; only a sidecar needs a commit."""
+    # git must not find a repository above tmp_path either
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path.parent))
+    if no_git == "no_git_binary":
+        monkeypatch.setenv("PATH", "")
+
+    module = _load_copy_in(tmp_path)
+
+    with pytest.raises(RuntimeError, match="could not read the git checkout") as error:
+        module.git_hash()
+    assert isinstance(error.value.__cause__, cause)
+    with pytest.raises(RuntimeError, match="could not read the git checkout"):
+        module.write_fit_provenance(tmp_path / "fit.pkl", {}, "poisson_glm", ["fit.py"])
+    sidecar = module.write_fit_provenance(
+        tmp_path / "fit.pkl", {}, "poisson_glm", ["fit.py"], commit="parent-commit"
+    )
+    assert json.loads(sidecar.read_text())["git_hash"] == "parent-commit"
+
+
 def test_git_hash_never_writes_the_git_index(tmp_path):
     """By default ``git status`` refreshes the index and writes it back under a
     lock. The Widloski runner records its commit in a checkout that other work

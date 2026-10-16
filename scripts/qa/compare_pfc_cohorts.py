@@ -258,8 +258,11 @@ def read_sidecars(data_dir: Path, artifact_suffix: str = "") -> pd.DataFrame:
 SINGLE_BUDGET_S = 0.1
 
 #: How a sidecar's own fields identify the runner code the worker had imported.
-#: The recorded ``git_hash`` is the repository HEAD when the sidecar was
-#: WRITTEN, which drifts ahead of the running process; these two facts do not.
+#: In a sidecar written before b7dc1d6, the recorded ``git_hash`` is the
+#: repository HEAD when the sidecar was WRITTEN, which drifts ahead of the
+#: running process; these two facts do not. From b7dc1d6 on, ``git_hash`` is the
+#: commit the parent process loaded, and ``worker_git_hash`` is added when the
+#: worker loaded a different one.
 RUNNER_CODE_PRE_ALIGNMENT = "50bf4b7 (no alignment step)"
 RUNNER_CODE_SINGLE_BUDGET = f"7362347 (alignment, {SINGLE_BUDGET_S} s budget)"
 RUNNER_CODE_PER_AXIS = "6c162ce (alignment, per-axis budgets)"

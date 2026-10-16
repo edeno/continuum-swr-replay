@@ -451,6 +451,12 @@ def test_the_sidecar_records_the_commit_the_parent_passed_in(
     artifact = output_dir / "wilbur20210329_02_r1_mPFC_modulation.pkl"
     record = json.loads(artifact.with_suffix(".provenance.json").read_text())
     assert record["git_hash"] == "parent-commit-dirty"
+    # This process loaded another commit than the parent's, so it may have run
+    # newer library code: the sidecar records both, and the log says so.
+    assert record["worker_git_hash"] == fit_provenance.git_hash()
+    log = (tmp_path / "logs" / "wilbur20210329_02_r1_mPFC.log").read_text()
+    assert "parent-commit-dirty" in log
+    assert f"loaded {fit_provenance.git_hash()}" in log
 
 
 def test_a_session_run_on_its_own_records_the_commit_this_process_loaded(
@@ -471,6 +477,7 @@ def test_a_session_run_on_its_own_records_the_commit_this_process_loaded(
     artifact = output_dir / "wilbur20210329_02_r1_mPFC_modulation.pkl"
     record = json.loads(artifact.with_suffix(".provenance.json").read_text())
     assert record["git_hash"] == fit_provenance.git_hash()
+    assert "worker_git_hash" not in record
 
 
 def test_a_bundle_fit_on_the_retired_event_definition_is_refit(tmp_path):

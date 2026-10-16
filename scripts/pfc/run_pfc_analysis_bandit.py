@@ -937,8 +937,12 @@ def run_analysis(
     save_file = modulation_path(
         output_dir, epoch_identifier, stop_cohort, penalty_sigma
     )
+    # A dask worker imports the library when it starts, which can be hours
+    # after main did; if the checkout moved on in between, it runs newer code
+    # than the commit main passed in.
+    worker_commit = loaded_commit()
     if git_hash is None:
-        git_hash = loaded_commit()
+        git_hash = worker_commit
     if fold_seed is None:
         fold_seed = session_seed("folds", nwb_file_name, epoch_name)
     if control_draw_seed is None:
@@ -1000,6 +1004,11 @@ def run_analysis(
 
     logger.info(" START ".center(50, "#"))
     logger.info(f"Git Hash: {git_hash}")
+    if worker_commit != git_hash:
+        logger.warning(
+            f"this process loaded {worker_commit}, not {git_hash}: the "
+            "checkout changed after main started; the sidecar records both"
+        )
     logger.info(f"brain_area: {brain_area}")
     logger.info(f"sampling_frequency: {sampling_frequency}")
     logger.info(f"immobility_threshold: {immobility_threshold}")
@@ -1171,6 +1180,11 @@ def run_analysis(
             cli=sys.argv,
             commit=git_hash,
             extra={
+                **(
+                    {"worker_git_hash": worker_commit}
+                    if worker_commit != git_hash
+                    else {}
+                ),
                 "stop_cohort": stop_cohort,
                 # The estimator and the inference, in full: the prior the
                 # coefficients were fit under, the blocked split the models
