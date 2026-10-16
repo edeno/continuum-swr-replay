@@ -533,7 +533,15 @@ def _assemble_arm() -> tuple[pd.DataFrame, dict]:
     q = read_table(FIT_INPUTS["qvals_table"])
     require_covariate_schema(q, table="qvals")
     ev = ev.merge(
-        stop[["stop_id", "known_reward_outcome_lag_1", "patch_switch_fraction_last5_completed_trips"]], on="stop_id", how="left"
+        stop[
+            [
+                "stop_id",
+                "known_reward_outcome_lag_1",
+                "patch_switch_fraction_last5_completed_trips",
+            ]
+        ],
+        on="stop_id",
+        how="left",
     )
     ev = ev.merge(
         q[
@@ -578,25 +586,21 @@ def _attach_arm_design_columns(ev: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     swr = ev["is_swr"].to_numpy(dtype=float)
     # State-modulation interactions spell out both canonical factors.
     ev["rpe_postoutcome_z_x_is_current_arm"] = cur * ev["rpe_postoutcome_z"]
-    ev["relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm"] = cur * ev[
-        "relative_value_switch_minus_stay_preoutcome_z"
-    ]
-    ev[
-        "reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm"
-    ] = cur * ev[
-        "reward_belief_differential_entropy_leaf_mean_preoutcome_z"
-    ]
-    ev[
-        "reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm"
-    ] = cur * ev[
-        "reward_belief_mean_update_l1_all_ports_postoutcome_z"
-    ]
+    ev["relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm"] = (
+        cur * ev["relative_value_switch_minus_stay_preoutcome_z"]
+    )
+    ev["reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm"] = (
+        cur * ev["reward_belief_differential_entropy_leaf_mean_preoutcome_z"]
+    )
+    ev["reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm"] = (
+        cur * ev["reward_belief_mean_update_l1_all_ports_postoutcome_z"]
+    )
     # context interactions
     ev["periswitch_index_trials_z_x_is_current_arm"] = (
         cur * ev["periswitch_index_trials_z"]
     )
-    ev["is_periswitch_post_x_is_current_arm"] = (
-        cur * ev["is_periswitch_post"].to_numpy(dtype=float)
+    ev["is_periswitch_post_x_is_current_arm"] = cur * ev["is_periswitch_post"].to_numpy(
+        dtype=float
     )
     ev["periswitch_index_trials_z_x_is_periswitch_post_x_is_current_arm"] = (
         cur
@@ -606,9 +610,9 @@ def _attach_arm_design_columns(ev: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     ev["trials_since_block_change_z_x_is_current_arm"] = (
         cur * ev["trials_since_block_change_z"]
     )
-    ev["patch_switch_fraction_last5_completed_trips_z_x_is_current_arm"] = cur * ev[
-        "patch_switch_fraction_last5_completed_trips_z"
-    ]
+    ev["patch_switch_fraction_last5_completed_trips_z_x_is_current_arm"] = (
+        cur * ev["patch_switch_fraction_last5_completed_trips_z"]
+    )
     # within-stop-time duration control (z(log1p t) : is_current)
     ev["log1p_time_since_stop_start_s_z_x_is_current_arm"] = (
         cur * ev[f"{_LOG1P_STOP_TIME}_z"]
@@ -649,7 +653,11 @@ def _assemble_patch(arm_ev: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     stop = add_uncertainty_covariates(stop)
     q = read_table(FIT_INPUTS["qvals_table"])
     require_covariate_schema(q, table="qvals")
-    pt = pt.merge(stop[["stop_id", "patch_switch_fraction_last5_completed_trips"]], on="stop_id", how="left")
+    pt = pt.merge(
+        stop[["stop_id", "patch_switch_fraction_last5_completed_trips"]],
+        on="stop_id",
+        how="left",
+    )
     pt = pt.merge(q[["stop_id", "periswitch_index_trials"]], on="stop_id", how="left")
     return _attach_patch_design_columns(pt)
 
@@ -688,9 +696,9 @@ def _attach_patch_design_columns(pt: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     )
     pt["log_n_nonlocal_bins_z_x_is_current_patch"] = cp * pt[f"{_LOG_EVENT_LENGTH}_z"]
     pt["log_n_nonlocal_bins_z_x_is_prev_patch"] = pp * pt[f"{_LOG_EVENT_LENGTH}_z"]
-    pt["patch_switch_fraction_last5_completed_trips_z_x_is_current_patch"] = cp * pt[
-        "patch_switch_fraction_last5_completed_trips_z"
-    ]
+    pt["patch_switch_fraction_last5_completed_trips_z_x_is_current_patch"] = (
+        cp * pt["patch_switch_fraction_last5_completed_trips_z"]
+    )
     pt["swr_x_is_current_patch"] = swr * cp
     return pt, z_reference
 
@@ -748,10 +756,14 @@ def _prepare_session(
     # n_drop_zero_response below, as the ladder's cohort audit does.
     other_cols = [c for c in predictors if c not in QVALS_GAP_COLS]
     qvals_nan = (
-        set(g.loc[g[qvals_preds].isna().any(axis=1), "event_id"]) if qvals_preds else set()
+        set(g.loc[g[qvals_preds].isna().any(axis=1), "event_id"])
+        if qvals_preds
+        else set()
     )
     other_nan = (
-        set(g.loc[g[other_cols].isna().any(axis=1), "event_id"]) if other_cols else set()
+        set(g.loc[g[other_cols].isna().any(axis=1), "event_id"])
+        if other_cols
+        else set()
     )
     other_nan -= qvals_nan
     n_qvals, n_own = len(qvals_nan), len(other_nan)
@@ -937,10 +949,17 @@ def _run(
     for name, (preds, scope) in ladder.items():
         pops = ["all"] if scope == "pooled" else ["all", "SWR", "nonSWR"]
         for pop in pops:
-            acc = dict.fromkeys((
-                "n_in", "n_drop_qvals_gap", "n_drop_own_predictor_missing",
-                "n_drop_zero_response", "n_excluded_session", "n_modeled",
-            ), 0)
+            acc = dict.fromkeys(
+                (
+                    "n_in",
+                    "n_drop_qvals_gap",
+                    "n_drop_own_predictor_missing",
+                    "n_drop_zero_response",
+                    "n_excluded_session",
+                    "n_modeled",
+                ),
+                0,
+            )
             sessions_in = sessions_modeled = n_nonconv = n_sep = 0
             animals_modeled: set = set()
             session_skips: list[tuple[str, str]] = []
@@ -955,7 +974,9 @@ def _run(
             fit_preds = preds
             renormalized = False
             if leaf_only:
-                pop_frame = pop_frame[pop_frame["candidate_arm"] < LEAF_ONLY_N_CATEGORIES]
+                pop_frame = pop_frame[
+                    pop_frame["candidate_arm"] < LEAF_ONLY_N_CATEGORIES
+                ]
                 fit_categories = LEAF_ONLY_N_CATEGORIES
                 fit_preds = leaf_only_predictors(preds)
                 # A fraction is a share of the event's whole nine-arm mass, and
@@ -1045,7 +1066,8 @@ def _run(
                     }
                 )
             dropped = (
-                pd.concat(dropped_frames, ignore_index=True) if dropped_frames
+                pd.concat(dropped_frames, ignore_index=True)
+                if dropped_frames
                 else pd.DataFrame()
             )
             notes = drop_profile(dropped)
@@ -1058,18 +1080,25 @@ def _run(
             skip_note = estimator_skip_note(session_skips, _ESTIMATOR_SKIP_CLASSES)
             if skip_note:
                 notes = "; ".join(filter(None, [notes, skip_note]))
-            audits.append(cohort_record(
-                name, pop, "event",
-                n_in=acc["n_in"], n_modeled=acc["n_modeled"],
-                sessions_in=sessions_in, sessions_modeled=sessions_modeled,
-                animals_modeled=len(animals_modeled), drop_notes=notes,
-                n_drop_qvals_gap=acc["n_drop_qvals_gap"],
-                n_drop_own_predictor_missing=acc["n_drop_own_predictor_missing"],
-                n_drop_zero_response=acc["n_drop_zero_response"],
-                n_excluded_session=acc["n_excluded_session"],
-                n_sessions_flagged_nonconverged=n_nonconv,
-                n_sessions_flagged_separated=n_sep,
-            ))
+            audits.append(
+                cohort_record(
+                    name,
+                    pop,
+                    "event",
+                    n_in=acc["n_in"],
+                    n_modeled=acc["n_modeled"],
+                    sessions_in=sessions_in,
+                    sessions_modeled=sessions_modeled,
+                    animals_modeled=len(animals_modeled),
+                    drop_notes=notes,
+                    n_drop_qvals_gap=acc["n_drop_qvals_gap"],
+                    n_drop_own_predictor_missing=acc["n_drop_own_predictor_missing"],
+                    n_drop_zero_response=acc["n_drop_zero_response"],
+                    n_excluded_session=acc["n_excluded_session"],
+                    n_sessions_flagged_nonconverged=n_nonconv,
+                    n_sessions_flagged_separated=n_sep,
+                )
+            )
     return pd.DataFrame(rows), audits
 
 
@@ -1221,8 +1250,7 @@ def _provenance(
         # produced none is not named here.
         "response_renormalized_rungs": list(renormalized_rungs or []),
         "q_arm_source": (
-            "beta-bernoulli per-arm value "
-            "(reward_belief_mean_candidate_arm_preoutcome)"
+            "beta-bernoulli per-arm value (reward_belief_mean_candidate_arm_preoutcome)"
         ),
         "deferred": [
             "mixed conditional logit with animal random effects (the rigorous "
@@ -1485,9 +1513,7 @@ def main() -> None:
             # more (or less) an SWR event's mass is spread out, which is the
             # "SWR broadens" claim tested directly rather than read off a
             # coefficient on the mean structure.
-            aggregate_contrast(
-                arm, _concentration_specs(ARM_LADDER), "candidate_arm"
-            ),
+            aggregate_contrast(arm, _concentration_specs(ARM_LADDER), "candidate_arm"),
             aggregate_contrast(patch, _concentration_specs(PATCH_LADDER), "patch"),
         ],
         ignore_index=True,
@@ -1507,14 +1533,25 @@ def main() -> None:
     (RC / "models" / f"swr_contrast_content_provenance{sfx}.json").write_text(
         json.dumps(prov, indent=2)
     )
-    logger.info("saved audited table (%d rows) + provenance -> %s", len(agg), RC / "models")
+    logger.info(
+        "saved audited table (%d rows) + provenance -> %s", len(agg), RC / "models"
+    )
     print(
         "\n########## AUDITED  (animal-level = primary; session signed-rank = descriptive) ##########"
     )
     cols = [
-        "level", "model", "population", "term", "n_sessions", "n_animals",
-        "coef_animal_median", "n_animals_pos", "coef_session_median",
-        "typical_session_se", "pct_sig_session", "session_signrank_p",
+        "level",
+        "model",
+        "population",
+        "term",
+        "n_sessions",
+        "n_animals",
+        "coef_animal_median",
+        "n_animals_pos",
+        "coef_session_median",
+        "typical_session_se",
+        "pct_sig_session",
+        "session_signrank_p",
         "session_signrank_fdr_q",
     ]
     with pd.option_context("display.max_rows", None, "display.width", 220):
