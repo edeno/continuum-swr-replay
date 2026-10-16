@@ -1,8 +1,10 @@
 """Per-session model fitting for the replay content model hierarchy.
 
-Primary model: Conditional Poisson regression (multinomial-count softmax)
-via statsmodels ConditionalPoisson, where the response is per-arm timebin
-counts and the model conditions on the event.
+Primary model: Conditional Poisson regression (multinomial-count softmax),
+where the response is per-arm timebin counts and the model conditions on the
+event. Its likelihood is the one statsmodels' ``ConditionalPoisson`` defines;
+it is maximized here, by BFGS on columns scaled to unit within-event SD and a
+Newton finish with the analytic Hessian (see :func:`fit_conditional_poisson`).
 
 Robustness model: Conditional Logit on dominant arm (highest count).
 
@@ -15,14 +17,14 @@ with nonzero availability (currently always 9).
 from __future__ import annotations
 
 import logging
+from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
-from statsmodels.discrete.conditional_models import (
-    ConditionalLogit,
-    ConditionalPoisson,
-)
+from scipy.optimize import minimize
+from scipy.stats import norm
+from statsmodels.discrete.conditional_models import ConditionalLogit
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 from ._fit_diagnostics import (
@@ -30,6 +32,7 @@ from ._fit_diagnostics import (
     capture_fit_warnings,
     count_fit_quality_warnings,
     fit_status,
+    separated_terms,
 )
 
 logger = logging.getLogger(__name__)
@@ -50,6 +53,51 @@ logger = logging.getLogger(__name__)
 # optimum once allowed to run. Nor is it expensive -- the same fit takes 2.0s
 # failing at 100 iterations and 2.1s converging at 1000.
 CONDITIONAL_FIT_MAXITER = 1000
+
+# The Newton finish of the conditional-Poisson fit.
+#
+# BFGS stops when the gradient of the per-row MEAN log-likelihood is below 1e-5.
+# On the total log-likelihood that allows a gradient of 1e-5 x n_rows, and in a
+# weakly informed direction a small gradient hides a large gap: the optimum
+# lies g' H^-1 g / 2 higher (H the information). F3 measured gaps of up to 4.8
+# log-likelihood units on the shipped content fits, every one flagged converged
+# (``.claude/research/refresh_followup/f3_optimizer_report.md``). Newton steps
+# use the exact curvature and close that gap in a few steps. The Newton
+# decrement g' H^-1 g / 2 is the gain the next step predicts; the fit is at its
+# optimum once it is below NEWTON_DECREMENT_TOL.
+NEWTON_DECREMENT_TOL = 1e-8
+NEWTON_MAX_STEPS = 20
+# A Newton step is halved until the log-likelihood does not fall. 2**-30 of a
+# step is below the log-likelihood's floating-point resolution, so a step that
+# still lowers it there is abandoned and the fit stops where it is.
+_MAX_STEP_HALVINGS = 30
+
+# Smallest information, along any direction, a fitted design may have at its
+# optimum. It is measured on the columns divided by their within-event SD, so
+# one unit means the same for every column: below 1e-3 the SE along that
+# direction exceeds 30 within-event SDs.
+#
+# Such a direction is a term the data cannot bound. F3 found 62 headline content
+# fits with one. In 60 it is a nuisance term whose rows get all or none of each
+# event's mass: ``is_candidate_arm_never_visited`` (1-28 rows per fit), or
+# ``is_candidate_arm_0`` in a session where no event reached arm 0. Its
+# coefficient runs to +/-inf and the information along it decays with it, so
+# whether such a fit used to be kept depended on where BFGS stopped and on
+# whether statsmodels' numerical Hessian then inverted (14 refused, 48 kept).
+# With the Newton finish it no longer does. Along a term running off on an
+# exponential tail, the decrement is lambda / (2 * Delta**2), with lambda the
+# information and Delta the column's range in within-event SDs. A finish that
+# reaches NEWTON_DECREMENT_TOL therefore leaves lambda below 2e-8 * Delta**2,
+# which is under this threshold for any column whose range is under 220
+# within-event SDs. On the real fits the two groups are four orders of
+# magnitude apart: the 2,583 identified fits have at least 0.30, and Newton run
+# on without this check takes all 62 to 3.1e-5 or below. The refusal is the
+# same whether Newton starts from zero, from BFGS or from the old fit.
+MIN_SCALED_INFORMATION = 1e-3
+
+# A column is named as carrying an uninformed direction when at least 1 % of its
+# unit weight lies in that direction (a loading of 0.1 or more).
+_MIN_NULL_DIRECTION_WEIGHT = 0.01
 
 # Response columns whose per-event values are an allocation fraction summing to
 # 1.0 rather than a timebin count. The distinction is not cosmetic: with a
@@ -108,24 +156,218 @@ def event_clustered_covariance(
     np.ndarray, shape (n_params, n_params)
         Event-clustered covariance of ``params``.
     """
-    order = np.argsort(groups, kind="stable")
-    X, y, groups = X[order], y[order], groups[order]
-    _, starts, counts = np.unique(groups, return_index=True, return_counts=True)
-    p = X.shape[1]
-    bread = np.zeros((p, p))
-    meat = np.zeros((p, p))
-    eta = X @ params
-    for s, c in zip(starts, counts, strict=True):
-        sl = slice(s, s + c)
-        w = np.exp(eta[sl] - eta[sl].max())
-        prob = w / w.sum()
-        total = y[sl].sum()
-        xbar = prob @ X[sl]
-        score = (y[sl] - total * prob) @ X[sl]
-        bread += total * ((X[sl].T * prob) @ X[sl] - np.outer(xbar, xbar))
-        meat += np.outer(score, score)
+    X, y, starts = _sorted_by_event(X, y, groups)
+    _, scores, bread = _event_terms(X, y, starts, params)
     bread_inv = np.linalg.pinv(bread)
-    return bread_inv @ meat @ bread_inv
+    return bread_inv @ (scores.T @ scores) @ bread_inv
+
+
+def _sorted_by_event(
+    X: np.ndarray, y: np.ndarray, groups: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Rows sorted by event, keeping their order within an event.
+
+    Returns
+    -------
+    X : np.ndarray, shape (n_rows, n_params)
+    y : np.ndarray, shape (n_rows,)
+    starts : np.ndarray, shape (n_events,)
+        Index of each event's first row.
+    """
+    order = np.argsort(groups, kind="stable")
+    _, starts = np.unique(groups[order], return_index=True)
+    return X[order], y[order], starts
+
+
+def _event_terms(
+    X: np.ndarray,
+    y: np.ndarray,
+    starts: np.ndarray,
+    params: np.ndarray,
+    *,
+    information: bool = True,
+) -> tuple[float, np.ndarray, np.ndarray | None]:
+    """Conditional-Poisson log-likelihood, per-event scores and information.
+
+    For event ``e`` with response ``y_ea``, total ``n_e = sum_a y_ea`` and
+    linear predictor ``eta_ea = x_ea' params``::
+
+        l_e = sum_a y_ea eta_ea - n_e log sum_a exp(eta_ea)
+        score_e = sum_a (y_ea - n_e p_ea) x_ea,  p_ea = softmax_a(eta_e)
+        I_e = n_e (sum_a p_ea x_ea x_ea' - xbar_e xbar_e'),  xbar_e = sum_a p_ea x_ea
+
+    ``I = sum_e I_e`` is the observed information (minus the Hessian; it does
+    not depend on ``y`` beyond ``n_e``). It is the bread of
+    :func:`event_clustered_covariance` and the curvature of the Newton finish.
+
+    Parameters
+    ----------
+    X : np.ndarray, shape (n_rows, n_params)
+        Design, rows sorted by event (see :func:`_sorted_by_event`).
+    y : np.ndarray, shape (n_rows,)
+        Response, same order.
+    starts : np.ndarray, shape (n_events,)
+        Index of each event's first row.
+    params : np.ndarray, shape (n_params,)
+        Coefficients.
+    information : bool
+        Compute the information too. BFGS needs only the log-likelihood and
+        the gradient.
+
+    Returns
+    -------
+    llf : float
+    scores : np.ndarray, shape (n_events, n_params)
+        Each event's score; their sum is the gradient.
+    information : np.ndarray, shape (n_params, n_params), or None
+    """
+    sizes = np.diff(starts, append=X.shape[0])
+    eta = X @ params
+    top = np.maximum.reduceat(eta, starts)
+    weight = np.exp(eta - np.repeat(top, sizes))
+    weight_sum = np.add.reduceat(weight, starts)
+    prob = weight / np.repeat(weight_sum, sizes)
+    total = np.add.reduceat(y, starts)
+    expected = np.repeat(total, sizes) * prob
+    llf = float(y @ eta - total @ (top + np.log(weight_sum)))
+    scores = np.add.reduceat((y - expected)[:, None] * X, starts)
+    if not information:
+        return llf, scores, None
+    xbar = np.add.reduceat(prob[:, None] * X, starts)
+    return llf, scores, (X.T * expected) @ X - (xbar.T * total) @ xbar
+
+
+def _rows_of_events_whose_response_varies(
+    y: np.ndarray, groups: np.ndarray
+) -> np.ndarray:
+    """Row mask of the events whose response is not the same on all their rows.
+
+    statsmodels' ``ConditionalPoisson``, which fit this model before, leaves an
+    event out of the likelihood when ``np.std`` of its response is 0. The rule
+    is kept, with the same test on the same values in the same order, so the
+    likelihood and its optimum are unchanged.
+    """
+    order = np.argsort(groups, kind="stable")
+    _, starts, inverse = np.unique(
+        groups[order], return_index=True, return_inverse=True
+    )
+    varies = np.array([np.std(chunk) > 0 for chunk in np.split(y[order], starts[1:])])
+    keep = np.empty(len(y), dtype=bool)
+    keep[order] = varies[inverse]
+    return keep
+
+
+class _NewtonFinish(NamedTuple):
+    """Where the Newton finish stopped, on the scaled columns."""
+
+    params: np.ndarray
+    llf: float
+    gradient: np.ndarray
+    eigenvalues: np.ndarray
+    eigenvectors: np.ndarray
+    decrement: float
+    n_steps: int
+
+
+def _bfgs_start(X: np.ndarray, y: np.ndarray, starts: np.ndarray) -> np.ndarray:
+    """BFGS from zero with statsmodels' settings: the old fit, on scaled columns.
+
+    The objective is minus the mean log-likelihood per row and BFGS stops on
+    ``gtol=1e-5`` in the sup norm, as ``ConditionalPoisson.fit`` ran it. Where
+    it stops matters little: the Newton finish takes it from there.
+    """
+    n_rows = X.shape[0]
+
+    def objective(params: np.ndarray) -> tuple[float, np.ndarray]:
+        llf, scores, _ = _event_terms(X, y, starts, params, information=False)
+        return -llf / n_rows, -scores.sum(axis=0) / n_rows
+
+    return minimize(
+        objective,
+        np.zeros(X.shape[1]),
+        jac=True,
+        method="BFGS",
+        options={"gtol": 1e-5, "norm": np.inf, "maxiter": CONDITIONAL_FIT_MAXITER},
+    ).x
+
+
+def _newton_finish(
+    X: np.ndarray, y: np.ndarray, starts: np.ndarray, params: np.ndarray
+) -> _NewtonFinish:
+    """Newton steps with the analytic information until the decrement is small.
+
+    Each step solves ``I d = g`` and is halved until the log-likelihood does not
+    fall. It stops when the decrement ``g' I^-1 g / 2`` is below
+    ``NEWTON_DECREMENT_TOL``, after ``NEWTON_MAX_STEPS`` steps, when no fraction
+    of the step raises the log-likelihood, or at once when the information has a
+    direction below ``MIN_SCALED_INFORMATION`` (the caller refuses that design;
+    the decrement is then NaN).
+
+    A Newton step and its decrement do not depend on how the columns are scaled:
+    with ``beta_s = s * beta`` the step on the scaled columns maps onto the step
+    on the original ones exactly. Taking it on the scaled columns is the same
+    step, solved on a better-conditioned matrix.
+    """
+    llf, scores, information = _event_terms(X, y, starts, params)
+    n_steps = 0
+    while True:
+        gradient = scores.sum(axis=0)
+        eigenvalues, eigenvectors = np.linalg.eigh(information)
+        if eigenvalues[0] < MIN_SCALED_INFORMATION:
+            decrement = np.nan
+            break
+        step = eigenvectors @ ((eigenvectors.T @ gradient) / eigenvalues)
+        decrement = float(gradient @ step) / 2
+        if decrement < NEWTON_DECREMENT_TOL or n_steps >= NEWTON_MAX_STEPS:
+            break
+        for halving in range(_MAX_STEP_HALVINGS + 1):
+            trial = params + step / 2**halving
+            trial_llf, trial_scores, trial_information = _event_terms(
+                X, y, starts, trial
+            )
+            if trial_llf >= llf:
+                break
+        else:
+            break
+        params, llf = trial, trial_llf
+        scores, information = trial_scores, trial_information
+        n_steps += 1
+    return _NewtonFinish(
+        params, llf, gradient, eigenvalues, eigenvectors, decrement, n_steps
+    )
+
+
+def _terms_on(directions: np.ndarray, names: list[str]) -> list[str]:
+    """Names of the columns that carry weight on the given unit directions.
+
+    ``directions`` has one orthonormal direction per column, shape
+    ``(n_params, n_directions)``.
+    """
+    weight = (directions**2).sum(axis=1)
+    return [
+        name
+        for name, w in zip(names, weight, strict=True)
+        if w >= _MIN_NULL_DIRECTION_WEIGHT
+    ]
+
+
+def _within_group_centered(X: np.ndarray, groups: np.ndarray) -> np.ndarray:
+    """``X`` minus each group's mean of each column."""
+    return X - pd.DataFrame(X).groupby(groups).transform("mean").to_numpy()
+
+
+def _rank_deficient_terms(
+    X: np.ndarray, groups: np.ndarray, names: list[str]
+) -> list[str]:
+    """Columns on the directions :func:`within_group_full_rank` found missing.
+
+    Uses the same tolerance as ``numpy.linalg.matrix_rank``, so the directions
+    named are the ones that made the rank fall short.
+    """
+    centered = _within_group_centered(X, groups)
+    _, singular, right = np.linalg.svd(centered, full_matrices=False)
+    tol = singular.max() * max(centered.shape) * np.finfo(float).eps
+    return _terms_on(right[singular <= tol].T, names)
 
 
 def within_group_full_rank(X: np.ndarray, groups: np.ndarray) -> bool:
@@ -154,7 +396,7 @@ def within_group_full_rank(X: np.ndarray, groups: np.ndarray) -> bool:
     """
     if X.shape[1] == 0:
         return True
-    centered = X - pd.DataFrame(X).groupby(groups).transform("mean").to_numpy()
+    centered = _within_group_centered(X, groups)
     return int(np.linalg.matrix_rank(centered)) == X.shape[1]
 
 
@@ -195,8 +437,26 @@ def fit_conditional_poisson(
     Returns
     -------
     dict | None
-        Coefficients, standard errors, p-values, fit statistics.
-        None if fitting fails or insufficient data.
+        Coefficients, standard errors, p-values, fit statistics, and the
+        optimizer's end state: ``newton_decrement`` (the log-likelihood gain one
+        more Newton step predicts), ``max_abs_grad`` (largest gradient
+        component of the total log-likelihood) and ``n_newton_steps``.
+        ``converged`` is True only when the decrement is below
+        ``NEWTON_DECREMENT_TOL``. None if there are too few events, or if the
+        design is not identified within events: rank-deficient, or with a
+        direction whose information at the optimum is below
+        ``MIN_SCALED_INFORMATION``. The log names the columns involved.
+
+    Notes
+    -----
+    The fit is BFGS from zero followed by Newton steps, on the columns divided
+    by their within-event SD. Dividing a column by a positive constant
+    reparametrizes the model and changes nothing else: the log-likelihood is a
+    function of ``X @ beta`` alone, so the optimum, the log-likelihood, the
+    model covariance and the event-clustered covariance all map back exactly
+    (``beta = beta_s / s``, ``Cov = D^-1 Cov_s D^-1`` with ``D = diag(s)``). It
+    changes only the optimizer's path. The model SEs come from the inverse of
+    the analytic information at the optimum.
     """
     if len(predictors) == 0:
         return fit_null_model_conditional(
@@ -249,48 +509,93 @@ def fit_conditional_poisson(
 
     # Reject designs the conditional model cannot identify: globally
     # collinear predictors AND predictors with no within-group variation
-    # (constant within every event), which statsmodels would otherwise fit
-    # with finite-but-meaningless coefficients and exploding SEs.
+    # (constant within every event), which would otherwise be fit with
+    # finite-but-meaningless coefficients and exploding SEs.
     if not within_group_full_rank(X, groups):
         logger.warning(
-            "fit_conditional_poisson: rank-deficient or within-group-constant "
-            "design; not fitting %s",
-            predictors,
+            "fit_conditional_poisson: no within-event information in %s (constant "
+            "within every event, or collinear); not fitting this design",
+            ", ".join(_rank_deficient_terms(X, groups, predictors)),
         )
         return None
 
-    try:
-        with capture_fit_warnings() as caught:
-            model = ConditionalPoisson(y, X, groups=groups)
-            result = model.fit(disp=0, maxiter=CONDITIONAL_FIT_MAXITER)
-    except Exception:
+    # Divide each column by its within-event SD before optimizing. This is a
+    # reparametrization, not a change of model: the conditional log-likelihood
+    # depends on the design only through X @ beta = (X / s) @ (s * beta), so the
+    # optimum, the log-likelihood and both covariances map back exactly, and only
+    # the optimizer's path and stopping point change. The conditional likelihood
+    # sees only the variation within each event, so the within-event SD is the
+    # scale its curvature is set by; the global SD (the ``sd_*`` outputs) can be
+    # large for a column whose within-event variation is tiny. The columns are
+    # not centred: a per-event constant drops out of a conditional likelihood, so
+    # centring would change nothing and would be one more step to undo.
+    #
+    # within_group_full_rank counts a singular value of the centred design as
+    # zero below numpy.linalg.matrix_rank's default tolerance,
+    # sigma_max * max(n_rows, n_params) * machine epsilon. A column with no
+    # within-event variation is a zero column of the centred design, so the
+    # check above has refused it and every scale here is positive.
+    scale = _within_group_centered(X, groups).std(axis=0)
+    assert np.all(scale > 0), "a column with no within-event SD passed the rank check"
+    X_scaled = X / scale
+
+    in_likelihood = _rows_of_events_whose_response_varies(y, groups)
+    X_fit, y_fit, starts = _sorted_by_event(
+        X_scaled[in_likelihood], y[in_likelihood], groups[in_likelihood]
+    )
+    finish = _newton_finish(X_fit, y_fit, starts, _bfgs_start(X_fit, y_fit, starts))
+
+    uninformed = finish.eigenvalues < MIN_SCALED_INFORMATION
+    if uninformed.any():
         logger.warning(
-            "ConditionalPoisson failed for predictors %s", predictors, exc_info=True
+            "fit_conditional_poisson: the data do not bound %s (information %.2g "
+            "< %.0e on the within-event-SD scale; a term running to +/-inf); not "
+            "fitting this design",
+            ", ".join(_terms_on(finish.eigenvectors[:, uninformed], predictors)),
+            finish.eigenvalues[0],
+            MIN_SCALED_INFORMATION,
         )
         return None
+    converged = bool(finish.decrement < NEWTON_DECREMENT_TOL)
+    if not converged:
+        logger.warning(
+            "fit_conditional_poisson: not converged; the optimum is %.2g "
+            "log-likelihood units away after %d Newton steps (fitting %s)",
+            finish.decrement,
+            finish.n_steps,
+            predictors,
+        )
+
+    # Back to the original scale: beta = beta_s / s and Cov = D^-1 Cov_s D^-1,
+    # with Cov_s the inverse of the analytic information at the optimum.
+    params = finish.params / scale
+    variance_scaled = (finish.eigenvectors**2 / finish.eigenvalues).sum(axis=1)
+    bse_values = np.sqrt(variance_scaled) / scale
+    pvalues = 2 * norm.sf(np.abs(params / bse_values))
     # Judge separation on the effect scale: a basis column with a small SD reaches a
     # large coefficient at an ordinary effect size, and would otherwise be mis-flagged.
     predictor_sd = X.std(axis=0)
-    status = fit_status(
-        result,
-        "conditional",
-        caught=caught,
+    separated = separated_terms(
+        params,
+        bse_values,
         predictor_sd=predictor_sd,
         term_names=predictors,
         nuisance_terms=NUISANCE_TERMS,
     )
-    n_fit_warnings = count_fit_quality_warnings(caught)
 
-    coefs = dict(zip(predictors, result.params, strict=True))
-    bse = dict(zip(predictors, result.bse, strict=True))
-    pvals = dict(zip(predictors, result.pvalues, strict=True))
+    coefs = dict(zip(predictors, params, strict=True))
+    bse = dict(zip(predictors, bse_values, strict=True))
+    pvals = dict(zip(predictors, pvalues, strict=True))
     # Event-clustered SEs alongside the model SEs: the model SE is the one the
     # conditional likelihood implies, the clustered SE is the one the events'
     # own variability supports. Aggregation prefers the clustered column.
-    cluster_cov = event_clustered_covariance(X, y, groups, result.params)
-    bse_cluster = dict(zip(predictors, np.sqrt(np.diag(cluster_cov)), strict=True))
+    # Computed on the scaled columns and mapped back like the model covariance.
+    cluster_cov = event_clustered_covariance(X_scaled, y, groups, finish.params)
+    bse_cluster = dict(
+        zip(predictors, np.sqrt(np.diag(cluster_cov)) / scale, strict=True)
+    )
 
-    llf = result.llf
+    llf = finish.llf
     n_params = len(predictors)
     aic = 2 * n_params - 2 * llf
     # BIC with n = n_events (the number of conditioning groups).
@@ -333,11 +638,17 @@ def fit_conditional_poisson(
             f"sd_{name}": float(s)
             for name, s in zip(predictors, predictor_sd, strict=True)
         },
-        "converged": status["converged"],
-        "separated": status["separated"],
+        "converged": converged,
+        "separated": len(separated) > 0,
         # "|"-joined so the tuple survives a round trip through pickle and CSV.
-        "separated_terms": "|".join(status["separated_terms"]),
-        "n_convergence_warnings": n_fit_warnings,
+        "separated_terms": "|".join(separated),
+        # The fit raises no warnings of its own; a fit short of its optimum
+        # counts as one, as in the Dirichlet-multinomial fitter.
+        "n_convergence_warnings": int(not converged),
+        "newton_decrement": float(finish.decrement),
+        # On the original scale: the scaled gradient is the original one / s.
+        "max_abs_grad": float(np.max(np.abs(finish.gradient * scale))),
+        "n_newton_steps": int(finish.n_steps),
     }
 
     # Diagnostics
@@ -547,7 +858,9 @@ def fit_conditional_logit(
     # first-row idxmax behavior for minimal legacy inputs.
     if arm_col is not None:
         idx = (
-            df.sort_values([event_col, response_col, arm_col], ascending=[True, False, True])
+            df.sort_values(
+                [event_col, response_col, arm_col], ascending=[True, False, True]
+            )
             .groupby(event_col, sort=False)
             .head(1)
             .index
@@ -659,7 +972,6 @@ def _drop_zero_count_events(
             response_col,
         )
     return kept
-
 
 
 # Condition number above which collinearity is strong enough that individual

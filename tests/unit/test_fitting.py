@@ -13,6 +13,10 @@ import logging
 import numpy as np
 import pandas as pd
 import pytest
+from scipy.optimize import minimize
+from scipy.stats import norm
+from statsmodels.base.model import LikelihoodModel
+from statsmodels.discrete.conditional_models import ConditionalPoisson
 
 from continuum_swr_replay.analysis.replay import fitting as fitting_mod
 from continuum_swr_replay.analysis.replay.fitting import (
@@ -21,6 +25,7 @@ from continuum_swr_replay.analysis.replay.fitting import (
     fit_conditional_poisson,
     fit_null_model_conditional,
     fit_null_model_conditional_logit,
+    within_group_full_rank,
 )
 from continuum_swr_replay.analysis.replay.simulation import (
     simulate_autocorrelated_counts,
@@ -244,7 +249,9 @@ def test_collinear_design_warns_without_refusing_to_fit(caplog):
     base = rng.normal(size=(500, 1))
     # Second column is the first plus a whisker of noise: near-dependent.
     X = np.column_stack([base, base + rng.normal(scale=1e-3, size=(500, 1))])
-    diagnostics = fitting_mod._compute_conditional_diagnostics(X, ["recency", "novelty"])
+    diagnostics = fitting_mod._compute_conditional_diagnostics(
+        X, ["recency", "novelty"]
+    )
 
     assert diagnostics["cond_number"] > fitting_mod.COND_NUMBER_WARN
     with caplog.at_level(logging.WARNING, logger=fitting_mod.__name__):
@@ -446,3 +453,234 @@ def test_null_models_carry_the_estimator_of_the_ladder_they_null():
     empty_fit = fit_conditional_poisson(long_df, [], response_col="arm_fraction")
     assert empty_fit["estimator"] == "conditional_poisson_fraction"
     assert empty_fit["llf_includes_constants"] is False
+
+
+# ── Reaching the optimum: within-event scaling, a Newton finish, analytic SEs ──
+
+TINY_PREDICTORS = ["a", "r", "tiny"]
+
+
+def _session_with_a_tiny_within_event_column(n_events=300, seed=2):
+    """One session whose ``tiny`` column has a within-event SD of about 1e-3.
+
+    ``tiny`` tracks ``r`` (correlation 0.9) and carries an ordinary effect
+    (coefficient 500, so 0.5 log units per unit of ``1e-3 * r``), like the last
+    recency-spline basis column in the content rungs. Its gradient is about
+    1e-3 of the other columns', so BFGS on the raw columns leaves its
+    coefficient near the start value. The response is the per-event fraction,
+    as in the shipped content fits.
+    """
+    rng = np.random.default_rng(seed)
+    n_arms = 9
+    a = rng.normal(size=(n_events, n_arms))
+    r = rng.normal(size=(n_events, n_arms))
+    tiny = 1e-3 * (0.9 * r + np.sqrt(1 - 0.9**2) * rng.normal(size=(n_events, n_arms)))
+    design = np.stack([a, r, tiny], axis=-1)
+    eta = design @ np.array([0.8, -0.5, 500.0])
+    prob = np.exp(eta - eta.max(axis=1, keepdims=True))
+    prob /= prob.sum(axis=1, keepdims=True)
+    counts = np.array([rng.multinomial(10, p) for p in prob])
+    frame = pd.DataFrame(design.reshape(-1, 3), columns=TINY_PREDICTORS)
+    frame["event_id"] = np.repeat(np.arange(n_events), n_arms)
+    frame["arm_fraction"] = (counts / counts.sum(axis=1, keepdims=True)).reshape(-1)
+    return frame
+
+
+def _arrays(long_df, predictors, response_col):
+    return (
+        long_df[predictors].to_numpy(dtype=float),
+        long_df[response_col].to_numpy(dtype=float),
+        long_df["event_id"].to_numpy(),
+    )
+
+
+def _loglike_by_event(X, y, groups, beta):
+    """Log-likelihood, gradient and information, one event at a time.
+
+    Written independently of the module under test, from the definition
+    ``l_e = sum_a y_ea eta_ea - n_e log sum_a exp(eta_ea)``.
+    """
+    llf = 0.0
+    grad = np.zeros(beta.size)
+    info = np.zeros((beta.size, beta.size))
+    for event in np.unique(groups):
+        rows = groups == event
+        x_e, y_e = X[rows], y[rows]
+        eta = x_e @ beta
+        top = eta.max()
+        weight = np.exp(eta - top)
+        prob = weight / weight.sum()
+        total = y_e.sum()
+        llf += y_e @ eta - total * (top + np.log(weight.sum()))
+        grad += (y_e - total * prob) @ x_e
+        xbar = prob @ x_e
+        info += total * ((x_e.T * prob) @ x_e - np.outer(xbar, xbar))
+    return llf, grad, info
+
+
+def _reference_optimum(X, y, groups, start):
+    """The conditional-Poisson optimum by scipy's trust-region Newton."""
+    result = minimize(
+        lambda beta: tuple(-v for v in _loglike_by_event(X, y, groups, beta)[:2]),
+        start,
+        jac=True,
+        hess=lambda beta: _loglike_by_event(X, y, groups, beta)[2],
+        method="trust-exact",
+        options={"gtol": 1e-10},
+    )
+    return -result.fun, result.x
+
+
+def test_a_tiny_within_event_column_reaches_the_optimum():
+    """F3: BFGS on raw columns stopped up to 4.8 log-likelihood units short."""
+    long_df = _session_with_a_tiny_within_event_column()
+    X, y, groups = _arrays(long_df, TINY_PREDICTORS, "arm_fraction")
+    ref_llf, ref_beta = _reference_optimum(X, y, groups, np.array([0.8, -0.5, 500.0]))
+
+    fit = fit_conditional_poisson(long_df, TINY_PREDICTORS, response_col="arm_fraction")
+
+    assert fit["llf"] == pytest.approx(ref_llf, abs=1e-8)
+    coef = np.array([fit[f"coef_{t}"] for t in TINY_PREDICTORS])
+    assert coef == pytest.approx(ref_beta, rel=1e-5)
+    # The case is a hard one: statsmodels' BFGS on the raw columns, which is
+    # what this fitter ran before, stops far short of the same optimum.
+    old = ConditionalPoisson(y, X, groups=groups).fit(
+        disp=0, maxiter=fitting_mod.CONDITIONAL_FIT_MAXITER
+    )
+    assert old.llf < ref_llf - 1.0
+
+
+def test_rescaling_a_column_is_a_pure_reparametrisation():
+    """x1000 on one column divides its coefficient and both SEs by 1000 exactly.
+
+    The fitter divides each column by its within-event SD, so the optimizer sees
+    the same scaled problem either way and takes the same path. Nothing else
+    may change: not the other terms, their SEs, the p-values or the llf.
+    """
+    long_df = _session_with_a_tiny_within_event_column()
+    base = fit_conditional_poisson(
+        long_df, TINY_PREDICTORS, response_col="arm_fraction"
+    )
+    rescaled = fit_conditional_poisson(
+        long_df.assign(tiny=long_df["tiny"] * 1000.0),
+        TINY_PREDICTORS,
+        response_col="arm_fraction",
+    )
+
+    for kind in ("coef", "bse", "bse_cluster"):
+        assert 1000.0 * rescaled[f"{kind}_tiny"] == pytest.approx(
+            base[f"{kind}_tiny"], rel=1e-8
+        )
+        for term in ("a", "r"):
+            assert rescaled[f"{kind}_{term}"] == pytest.approx(
+                base[f"{kind}_{term}"], rel=1e-8
+            )
+    for term in TINY_PREDICTORS:
+        assert rescaled[f"pval_{term}"] == pytest.approx(base[f"pval_{term}"], rel=1e-8)
+    assert rescaled["llf"] == pytest.approx(base["llf"], abs=1e-8)
+
+
+def test_model_se_is_the_inverse_of_the_analytic_information():
+    long_df = simulate_with_event_covariates(CONTENT_BETA, n_events=300, L_e=10, seed=4)
+    X, y, groups = _arrays(long_df, CONTENT_PREDICTORS, "arm_count_hard")
+
+    fit = fit_conditional_poisson(long_df, CONTENT_PREDICTORS)
+
+    beta = np.array([fit[f"coef_{t}"] for t in CONTENT_PREDICTORS])
+    bse = np.array([fit[f"bse_{t}"] for t in CONTENT_PREDICTORS])
+    _, _, info = _loglike_by_event(X, y, groups, beta)
+    assert bse == pytest.approx(np.sqrt(np.diag(np.linalg.inv(info))), rel=1e-9)
+    # statsmodels' numerical Hessian at the same coefficients, as shipped before.
+    numeric_hessian = ConditionalPoisson(y, X, groups=groups).hessian(beta)
+    numeric_bse = np.sqrt(np.diag(np.linalg.inv(-numeric_hessian)))
+    assert bse == pytest.approx(numeric_bse, rel=1e-4)
+    pval = np.array([fit[f"pval_{t}"] for t in CONTENT_PREDICTORS])
+    assert pval == pytest.approx(2 * norm.sf(np.abs(beta / bse)), rel=1e-12)
+
+
+def test_a_fit_stopped_before_the_optimum_is_flagged_not_converged(monkeypatch, caplog):
+    long_df = _session_with_a_tiny_within_event_column()
+    full = fit_conditional_poisson(
+        long_df, TINY_PREDICTORS, response_col="arm_fraction"
+    )
+    assert full["converged"] is True
+    assert full["newton_decrement"] < fitting_mod.NEWTON_DECREMENT_TOL
+    assert full["n_newton_steps"] >= 1
+    assert full["max_abs_grad"] < 1e-3
+
+    monkeypatch.setattr(fitting_mod, "NEWTON_MAX_STEPS", 0)
+    with caplog.at_level(logging.WARNING, logger=fitting_mod.__name__):
+        stopped = fit_conditional_poisson(
+            long_df, TINY_PREDICTORS, response_col="arm_fraction"
+        )
+
+    assert stopped["n_newton_steps"] == 0
+    assert stopped["newton_decrement"] >= fitting_mod.NEWTON_DECREMENT_TOL
+    assert stopped["converged"] is False
+    assert stopped["n_convergence_warnings"] == 1
+    assert any("not converged" in r.getMessage() for r in caplog.records)
+    # It keeps its numbers: a fit short of the optimum, not a refused one.
+    assert stopped["llf"] < full["llf"]
+
+
+def test_a_column_constant_within_every_event_is_named_in_the_refusal(caplog):
+    long_df = _make_long_df([[3, 1, 1]] * 6)
+    long_df["ev_level"] = long_df["event_id"].astype(float)
+
+    with caplog.at_level(logging.WARNING, logger=fitting_mod.__name__):
+        assert fit_conditional_poisson(long_df, ["is_prev_arm", "ev_level"]) is None
+
+    refusals = [r.getMessage() for r in caplog.records if "ev_level" in r.getMessage()]
+    assert refusals
+    # Only the offending column is named, not the whole design.
+    assert "is_prev_arm" not in refusals[0]
+
+
+def test_a_direction_without_information_is_refused_and_named(caplog):
+    """A term whose optimum is at infinity passes the rank check but not the fit.
+
+    No event puts any mass on a ``never_visited`` row, so its coefficient runs to
+    -inf and the information along it goes to zero (F3: 62 real sessions, all on
+    a nuisance term). Whether such a fit was kept used to depend on whether
+    statsmodels' numerical Hessian happened to invert.
+    """
+    long_df = simulate_with_event_covariates(CONTENT_BETA, n_events=200, L_e=10, seed=0)
+    rng = np.random.default_rng(0)
+    long_df["never_visited"] = (rng.random(len(long_df)) < 0.15).astype(float)
+    long_df.loc[long_df["never_visited"] == 1, "arm_count_hard"] = 0
+    predictors = [*CONTENT_PREDICTORS, "never_visited"]
+    X, _, groups = _arrays(long_df, predictors, "arm_count_hard")
+    assert within_group_full_rank(X, groups)
+
+    with caplog.at_level(logging.WARNING, logger=fitting_mod.__name__):
+        assert fit_conditional_poisson(long_df, predictors) is None
+
+    refusals = [
+        r.getMessage() for r in caplog.records if "never_visited" in r.getMessage()
+    ]
+    assert refusals
+    assert not any(term in refusals[0] for term in CONTENT_PREDICTORS)
+
+
+def test_a_well_scaled_fit_is_unchanged():
+    """Where the old fit was already at the optimum, the numbers do not move.
+
+    The old fitter's BFGS stopped on a per-row gradient of 1e-5, so on this
+    design its coefficients sit about 5e-6 from the optimum (llf 1e-9 to 2e-8
+    short): 1e-6 against it is not reachable. Allowed to finish, the same
+    optimizer agrees to 1e-6.
+    """
+    long_df = simulate_with_event_covariates(CONTENT_BETA, n_events=300, L_e=10, seed=4)
+    X, y, groups = _arrays(long_df, CONTENT_PREDICTORS, "arm_count_hard")
+
+    fit = fit_conditional_poisson(long_df, CONTENT_PREDICTORS)
+    coef = np.array([fit[f"coef_{t}"] for t in CONTENT_PREDICTORS])
+
+    model = ConditionalPoisson(y, X, groups=groups)
+    old = model.fit(disp=0, maxiter=fitting_mod.CONDITIONAL_FIT_MAXITER)
+    assert coef == pytest.approx(np.asarray(old.params), abs=2e-5)
+    assert 0.0 <= fit["llf"] - old.llf < 1e-7
+    finished = LikelihoodModel.fit(
+        model, method="bfgs", gtol=1e-8, maxiter=1000, disp=0, skip_hessian=True
+    )
+    assert coef == pytest.approx(np.asarray(finished.params), abs=1e-6)
