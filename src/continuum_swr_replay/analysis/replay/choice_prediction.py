@@ -34,7 +34,11 @@ from ._fit_diagnostics import (
     fit_status,
 )
 from ._helpers import strict_mean
-from .fitting import CONDITIONAL_FIT_MAXITER, within_group_full_rank
+from .fitting import (
+    CONDITIONAL_FIT_MAXITER,
+    conditional_linear_predictor,
+    within_group_full_rank,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -142,11 +146,13 @@ def predict_arm_fractions(
     events_with_nan = eat.loc[invalid_row, event_col].unique()
     is_dropped = eat[event_col].isin(events_with_nan)
 
-    params = np.array([fit_result[f"coef_{p}"] for p in predictors])
-    if not np.isfinite(params).all():
-        raise ValueError("content-fit coefficients must be finite for prediction")
+    # A term the fit reports as unidentified is taken to its limit: a separated
+    # term gives its ruled-out rows probability 0, a term constant within every
+    # event contributes nothing. Any other non-finite coefficient raises.
     X = eat[predictors].values.astype(float)
-    eta = X @ params
+    eta = conditional_linear_predictor(
+        X, eat[event_col].to_numpy(), fit_result, list(predictors)
+    )
 
     # Numerically stable softmax within each event
     eat["_eta"] = eta

@@ -512,6 +512,48 @@ class TestPredictArmFractions:
         assert np.isfinite(out.loc[out["event_id"] == 2, "predicted_frac"]).all()
 
 
+def test_predictions_take_a_fits_unidentified_terms_to_their_limits():
+    """A content fit whose session never reached arm 3 reports that arm's dummy
+    as not estimated (its coefficient runs to -inf). Prediction must use that
+    limit, not fail: arm 3 gets fraction 0, the column constant within every
+    event contributes nothing, and the other arms share the mass by the
+    identified terms."""
+    from continuum_swr_replay.analysis.replay.fitting import fit_conditional_poisson
+    from continuum_swr_replay.analysis.replay.simulation import (
+        simulate_with_event_covariates,
+    )
+
+    eat = simulate_with_event_covariates(
+        {"is_current_arm": 1.2, "is_prev_arm": 0.6}, n_events=150, L_e=10, seed=4
+    )
+    eat.loc[eat["arm_id"] == 3, "arm_count_hard"] = 0
+    eat = eat[eat.groupby("event_id")["arm_count_hard"].transform("sum") > 0]
+    eat["arm_fraction"] = eat["arm_count_hard"] / eat.groupby("event_id")[
+        "arm_count_hard"
+    ].transform("sum")
+    eat["ev_level"] = eat["event_id"].astype(float)
+    identified = ["is_current_arm", "is_prev_arm"]
+    predictors = [*identified, "is_candidate_arm_3", "ev_level"]
+    fit = fit_conditional_poisson(eat, predictors)
+    assert set(fit["unidentified_terms"].split("|")) == {
+        "is_candidate_arm_3:separated_to_minus_inf",
+        "ev_level:no_within_event_variation",
+    }
+
+    out = predict_arm_fractions(eat, fit, predictors)
+
+    arm_3 = out["arm_id"] == 3
+    assert (out.loc[arm_3, "predicted_frac"] == 0).all()
+    np.testing.assert_allclose(
+        out.groupby("event_id")["predicted_frac"].sum().to_numpy(), 1.0, atol=1e-12
+    )
+    rest = out[~arm_3].copy()
+    beta = np.array([fit[f"coef_{t}"] for t in identified])
+    rest["w"] = np.exp(rest[identified].to_numpy(dtype=float) @ beta)
+    expected = rest["w"] / rest.groupby("event_id")["w"].transform("sum")
+    np.testing.assert_allclose(rest["predicted_frac"], expected, rtol=1e-12)
+
+
 # ── build_residualized_choice_dataset ──
 
 
