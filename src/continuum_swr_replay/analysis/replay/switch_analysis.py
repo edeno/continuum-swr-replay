@@ -132,50 +132,46 @@ def _patch_relative_fracs(
 
 
 def _detect_first_switches(stop_table: pd.DataFrame) -> pd.DataFrame | None:
-    """Per-session first-switch rows: each ``is_stay == 0`` row whose
-    immediate predecessor in chronological stop order was not also a
-    switch. Returns ``None`` when no rows have ``is_stay`` defined.
+    """Per-session first-switch rows: the stops that start a run of switches.
 
-    A session's first stop has no predecessor, so it is a first switch
-    when it is a switch.
+    A stop starts a run when it is a switch (``is_stay == 0``), the trip
+    that brought the animal to it stayed in its patch
+    (``did_last_completed_trip_switch_patch == 0``), and no earlier stop
+    after that same trip (same session and ``completed_trial_id``) was
+    already a switch. Returns ``None`` when no rows have ``is_stay``
+    defined.
 
-    ``is_stay`` is NaN for three kinds of stop. A stop known to be off a
-    well (``at_well`` False: in transit or mixed) has no current patch,
-    so it is not a choice between patches; it is left out of the
-    sequence, as before. A stop whose location is unknown (``at_well``
-    NA: wholly in excluded time, or before the first completed trip) and
-    an at-well stop whose next patch is unknown may each have been a
-    switch. Such a stop is not a first switch, and the stop after it is
-    not one either, because its predecessor may have been a switch. It
-    stays in the sequence for this reason; dropping it would compare the
-    next stop with an earlier one.
+    Whether the run started here is read from the stop's own arriving
+    trip, not from the ``is_stay`` of the stop before it. That neighbour's
+    ``is_stay`` is NaN for reasons that say nothing about switching: the
+    stop was in transit or mixed (no current patch), before the first trial
+    (no next well yet), or wholly in excluded time. When the stop before
+    is a known at-well stop one trip earlier, the two readings agree
+    exactly. A stop whose own ``is_stay`` or arriving-trip record is NaN
+    starts no episode; that includes a session's first stops before any
+    trip has completed.
 
-    Sorting by ``[animal, session_date, epoch, stop_idx]`` before the
-    ``groupby(...).shift(1)`` is load-bearing: it makes ``shift`` walk
-    chronological stop order rather than caller row order, and the
-    ``groupby`` on session keys prevents the cross-session boundary
-    from leaking the previous session's last stop into
-    ``prev_is_switch`` for the next session's first stop. A
-    builder-level test cannot exercise that boundary because a
-    session's first-switch at ``stop_idx == 0`` has no preceding rows
-    to emit, so the bug is non-observable downstream — exposing this
-    helper lets the regression be tested directly.
+    Stops after the same trip share its departure and so its ``is_stay``;
+    only the first switch among them starts the episode. When an earlier
+    stop of that visit is NaN (in excluded time, say), the episode starts
+    at the first switch stop that is known.
+
+    Sorting by ``[animal, session_date, epoch, stop_idx]`` is load-bearing:
+    "earlier stop after the same trip" is read in chronological stop order,
+    not caller row order. ``completed_trial_id`` restarts in every session,
+    so the visit is keyed by session as well.
     """
     if not stop_table["is_stay"].notna().any():
         return None
     session = ["animal", "session_date", "epoch"]
-    ordered = stop_table.sort_values([*session, "stop_idx"])
-    off_well = ordered["at_well"].astype("boolean").eq(False).fillna(False)
-    ordered = ordered[~off_well.to_numpy()].reset_index(drop=True)
-    is_stay = ordered["is_stay"]
-    # 1 switch, 0 stay, NaN unknown.
-    ordered["is_switch"] = is_stay.eq(0).astype(float).where(is_stay.notna())
-    by_session = ordered.groupby(session)
-    # NaN when the predecessor is unknown; 0 for a session's first stop.
-    ordered["prev_is_switch"] = (
-        by_session["is_switch"].shift(1).where(by_session.cumcount() > 0, 0.0)
+    ordered = stop_table.sort_values([*session, "stop_idx"]).reset_index(drop=True)
+    is_switch = ordered["is_stay"].eq(0)
+    arrived_by_stay = ordered["did_last_completed_trip_switch_patch"].eq(0)
+    visit = [ordered[c] for c in [*session, "completed_trial_id"]]
+    switches_before = (
+        is_switch.astype(int).groupby(visit, dropna=False).cumsum() - is_switch
     )
-    return ordered[ordered["is_switch"].eq(1) & ordered["prev_is_switch"].eq(0)]
+    return ordered[is_switch & arrived_by_stay & switches_before.eq(0)]
 
 
 def build_switch_aligned_table(
@@ -192,17 +188,17 @@ def build_switch_aligned_table(
 
     Identifies unique switching episodes (first switch in a run of
     consecutive switches), then collects the preceding ``max_lag``
-    stops. A stop whose ``is_stay`` is unknown starts no episode, and
-    neither does the stop after it; stops off a well are skipped (see
-    ``_detect_first_switches``). For each stop with replay, computes
-    patch-level replay content: fraction on the current patch vs
+    stops. A run starts at a switch stop reached by a trip that stayed in
+    its patch (see ``_detect_first_switches``). For each stop with replay,
+    computes patch-level replay content: fraction on the current patch vs
     non-current patches.
 
     Parameters
     ----------
     stop_table : pd.DataFrame
         Canonical stop table (includes zero-event stops), with
-        ``is_stay`` and ``at_well``.
+        ``is_stay``, ``did_last_completed_trip_switch_patch`` and
+        ``completed_trial_id``.
     event_table : pd.DataFrame
         Canonical event table.
     event_arm_table : pd.DataFrame

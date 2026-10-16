@@ -12,6 +12,24 @@ from continuum_swr_replay.analysis.replay.switch_analysis import (
 )
 
 
+def _with_trip_record(stop_table: pd.DataFrame) -> pd.DataFrame:
+    """Add the arriving-trip record that agrees with ``is_stay``.
+
+    One completed trip separates consecutive stops, so the trip into a stop
+    changed patch exactly when the stop before it was a switch. A session's
+    first stop arrives by a trip that stayed.
+    """
+    session = ["animal", "session_date", "epoch"]
+    ordered = stop_table.sort_values([*session, "stop_idx"])
+    arrived_by_switch = ordered.groupby(session)["is_stay"].shift(1).eq(0).astype(float)
+    return stop_table.assign(
+        completed_trial_id=pd.array(stop_table["stop_idx"], dtype="Int64"),
+        did_last_completed_trip_switch_patch=arrived_by_switch.reindex(
+            stop_table.index
+        ),
+    )
+
+
 def _make_two_session_stop_table() -> pd.DataFrame:
     """Two sessions where the last stop of session 1 and first stop of session 2
     are both switches. Under the old code (plain .shift without groupby),
@@ -37,7 +55,7 @@ def _make_two_session_stop_table() -> pd.DataFrame:
             "has_replay": True,
             "n_selected_events": 2,
         })
-    return pd.DataFrame(rows).assign(at_well=True)
+    return _with_trip_record(pd.DataFrame(rows))
 
 
 def _replay_tables_for_stops(
@@ -168,7 +186,7 @@ def test_first_switch_detection_sorts_by_stop_idx():
          "stop_idx": 2, "stop_id": 2, "is_stay": 0.0,
          "current_patch": 1, "has_replay": False, "n_selected_events": 0},
     ]
-    stop_table = pd.DataFrame(stop_rows).assign(at_well=True)
+    stop_table = _with_trip_record(pd.DataFrame(stop_rows))
 
     event_table = pd.DataFrame([
         {"animal": "test", "session_date": 20200101, "epoch": "02_r1",
@@ -331,7 +349,8 @@ def _make_patch_relative_fixture():
          "is_stay": 1.0, "current_patch": 2, "has_replay": False, "n_selected_events": 0},
         {"animal": "a", "session_date": 1, "epoch": "e1", "stop_idx": 3, "stop_id": 3,
          "is_stay": 0.0, "current_patch": 2, "has_replay": False, "n_selected_events": 0},
-    ]).assign(at_well=True)
+    ])
+    stop_table = _with_trip_record(stop_table)
     event_table = pd.DataFrame([
         {"event_id": 100, "stop_id": 0, "current_patch": 1,
          "is_swr": True, "is_mua": False},
@@ -519,7 +538,7 @@ def _make_two_session_collision_fixture(replay_arms: tuple[int, int]):
                 "current_patch": 1,
             })
     return (
-        pd.DataFrame(rows_st).assign(at_well=True),
+        _with_trip_record(pd.DataFrame(rows_st)),
         pd.DataFrame(rows_et),
         pd.DataFrame(rows_eat),
     )
@@ -615,31 +634,52 @@ def test_stop_replay_per_patch_fallback_merge_still_validates_stop_id():
         _stop_replay_per_patch(eat, et, fraction_col="arm_fraction")
 
 
-# ── Stops with unknown ``is_stay`` (task 27) ──
+# ── First switches from the arriving trip (task 27) ──
 #
-# The episode rule: a stop starts a first-switch episode when it is a switch
-# (``is_stay == 0``) and the stop just before it in the session was not a
-# switch. A session's first stop has no stop before it, so it starts an
-# episode when it is a switch.
-#
-# ``is_stay`` is NaN for three kinds of stop. A stop known to be off a well
-# (``at_well`` False: in transit or mixed) has no current patch, so it is not a
-# choice between patches; it is left out of the sequence, as before. A stop
-# whose location is unknown (``at_well`` NA: wholly in excluded time, or before
-# the first completed trip) and an at-well stop whose next patch is unknown may
-# each have been a switch. Such a stop starts no episode, and the stop after it
-# cannot be told to be a first switch either.
-
-#: (is_stay, at_well) of one stop.
-STAY = (1.0, True)
-SWITCH = (0.0, True)
-UNKNOWN = (np.nan, pd.NA)
-NEXT_UNKNOWN = (np.nan, True)
-OFF_WELL = (np.nan, False)
+# A stop starts a first-switch episode when it is a switch (``is_stay == 0``),
+# the trip that brought the animal to it stayed in its patch
+# (``did_last_completed_trip_switch_patch == 0``), and no earlier stop after
+# that same trip (same ``completed_trial_id``) was already a switch. The
+# decision reads the stop's own trip record, not its neighbour's ``is_stay``,
+# which is NaN for location reasons (in transit, mixed, excluded time, before
+# the first trial) that say nothing about switching.
 
 
-def _stop_sequence(stops: list[tuple[float, object]]) -> pd.DataFrame:
+def _stop(is_stay, at_well, trip, arrived_by_switch) -> dict:
+    return {
+        "is_stay": is_stay,
+        "at_well": at_well,
+        "completed_trial_id": trip,
+        "did_last_completed_trip_switch_patch": arrived_by_switch,
+    }
+
+
+def _stay(trip, arrived_by_switch=0.0):
+    return _stop(1.0, True, trip, arrived_by_switch)
+
+
+def _switch(trip, arrived_by_switch=0.0):
+    return _stop(0.0, True, trip, arrived_by_switch)
+
+
+def _excluded(trip, arrived_by_switch=0.0):
+    """Wholly in excluded time: location, and so ``is_stay``, unknown."""
+    return _stop(np.nan, pd.NA, trip, arrived_by_switch)
+
+
+def _mixed(trip, arrived_by_switch=0.0):
+    """Part at a well: no current patch, so no ``is_stay``."""
+    return _stop(np.nan, False, trip, arrived_by_switch)
+
+
+def _before_first_trial():
+    """At a well before any trip has completed: no trip record, no ``is_stay``."""
+    return _stop(np.nan, True, pd.NA, np.nan)
+
+
+def _stop_sequence(stops: list[dict]) -> pd.DataFrame:
     """One session of these stops, in order, all with replay."""
+    frame = pd.DataFrame(stops)
     return pd.DataFrame(
         {
             "animal": "test",
@@ -647,8 +687,12 @@ def _stop_sequence(stops: list[tuple[float, object]]) -> pd.DataFrame:
             "epoch": "02_r1",
             "stop_idx": range(len(stops)),
             "stop_id": range(len(stops)),
-            "is_stay": [is_stay for is_stay, _ in stops],
-            "at_well": pd.array([at_well for _, at_well in stops], dtype="boolean"),
+            "is_stay": frame["is_stay"].astype(float),
+            "at_well": pd.array(frame["at_well"], dtype="boolean"),
+            "completed_trial_id": pd.array(frame["completed_trial_id"], dtype="Int64"),
+            "did_last_completed_trip_switch_patch": frame[
+                "did_last_completed_trip_switch_patch"
+            ].astype(float),
             "current_patch": 1,
             "has_replay": True,
             "n_selected_events": 1,
@@ -671,76 +715,94 @@ def _first_switch_stops(stop_table: pd.DataFrame) -> list[int]:
     return sorted(_detect_first_switches(stop_table)["stop_idx"].tolist())
 
 
-def test_switch_unknown_switch_makes_no_episode_at_the_second_switch():
-    """The second switch's predecessor is unknown, so it is not a first switch.
-
-    Reading the unknown stop as a stay would wrongly start an episode there.
-    """
-    stop_table = _stop_sequence([STAY, SWITCH, UNKNOWN, SWITCH])
+def test_a_stop_before_the_first_trial_does_not_block_the_next_switch():
+    """The pre-trial stop has no ``is_stay`` only because no trip has started;
+    the switch arrived by a trip that stayed, so it starts a run."""
+    stop_table = _stop_sequence([_before_first_trial(), _switch(0)])
 
     assert _first_switch_stops(stop_table) == [1]
     assert _episode_switch_stops(stop_table) == [1]
 
 
-def test_stay_unknown_switch_makes_no_episode_because_its_predecessor_is_unknown():
-    """Dropping the unknown stop compared the switch with the stay before it,
-    and called it a first switch, though the unknown stop may have been a
-    switch that started the run."""
-    stop_table = _stop_sequence([STAY, STAY, UNKNOWN, SWITCH])
-
-    assert _first_switch_stops(stop_table) == []
-    assert _episode_switch_stops(stop_table) == []
-
-
-def test_stay_then_at_well_stop_with_unknown_next_patch_then_switch_makes_no_episode():
-    stop_table = _stop_sequence([STAY, STAY, NEXT_UNKNOWN, SWITCH])
-
-    assert _first_switch_stops(stop_table) == []
-    assert _episode_switch_stops(stop_table) == []
-
-
-def test_unknown_first_stop_then_switch_makes_no_episode():
-    """An unknown first stop is still the switch's predecessor, so the switch
-    is not taken for a session-opening first switch."""
-    stop_table = _stop_sequence([UNKNOWN, SWITCH, STAY])
-
-    assert _first_switch_stops(stop_table) == []
-    assert _episode_switch_stops(stop_table) == []
-
-
-def test_an_unknown_switch_stop_starts_no_episode():
-    stop_table = _stop_sequence([STAY, STAY, UNKNOWN, STAY])
-
-    assert _first_switch_stops(stop_table) == []
-    assert _episode_switch_stops(stop_table) == []
-
-
-def test_a_switch_after_a_known_stay_still_starts_an_episode():
-    """An unknown stop earlier in the session does not reach past its successor."""
-    stop_table = _stop_sequence([STAY, UNKNOWN, STAY, STAY, SWITCH, SWITCH])
-
-    assert _first_switch_stops(stop_table) == [4]
-    assert _episode_switch_stops(stop_table) == [4]
-
-
-def test_stay_off_well_switch_starts_an_episode_because_off_well_stops_are_skipped():
-    """A stop in transit is not a choice between patches, so the switch is
-    compared with the stay before it, as before."""
-    stop_table = _stop_sequence([STAY, OFF_WELL, SWITCH])
+def test_an_excluded_stop_in_an_earlier_visit_does_not_block_a_switch():
+    stop_table = _stop_sequence([_stay(0), _excluded(1), _switch(2)])
 
     assert _first_switch_stops(stop_table) == [2]
     assert _episode_switch_stops(stop_table) == [2]
 
 
-def test_switch_off_well_switch_is_one_run_of_switches():
-    stop_table = _stop_sequence([STAY, SWITCH, OFF_WELL, SWITCH])
+def test_an_excluded_stop_in_its_own_visit_leaves_the_first_known_switch():
+    """The excluded stop and the switch share one trip; the episode is anchored
+    at the first switch stop whose ``is_stay`` is known."""
+    stop_table = _stop_sequence([_stay(0), _excluded(1), _switch(1)])
+
+    assert _first_switch_stops(stop_table) == [2]
+    assert _episode_switch_stops(stop_table) == [2]
+
+
+def test_a_switch_reached_by_a_hidden_patch_change_continues_a_run():
+    """The excluded stop was the switch; dropping it compared the next switch
+    with the stay before it and made it a spurious first switch."""
+    stop_table = _stop_sequence(
+        [_stay(0), _excluded(1), _switch(2, arrived_by_switch=1.0)]
+    )
+
+    assert _first_switch_stops(stop_table) == []
+    assert _episode_switch_stops(stop_table) == []
+
+
+def test_stops_sharing_one_trip_start_one_episode():
+    stop_table = _stop_sequence([_stay(0), _switch(1), _mixed(1), _switch(1)])
 
     assert _first_switch_stops(stop_table) == [1]
     assert _episode_switch_stops(stop_table) == [1]
 
 
+def test_a_switch_after_a_mixed_visit_that_switched_starts_no_episode():
+    """The departure from the mixed visit changed patch, so the run started
+    there; the next switch continues it."""
+    stop_table = _stop_sequence(
+        [_stay(0), _mixed(1), _switch(2, arrived_by_switch=1.0)]
+    )
+
+    assert _first_switch_stops(stop_table) == []
+    assert _episode_switch_stops(stop_table) == []
+
+
+def test_a_switch_after_a_mixed_visit_that_stayed_starts_an_episode():
+    """The mixed visit's departure stayed in its patch, so it broke the run
+    the first switch started."""
+    stop_table = _stop_sequence(
+        [_switch(0), _mixed(1, arrived_by_switch=1.0), _switch(2)]
+    )
+
+    assert _first_switch_stops(stop_table) == [0, 2]
+    assert _episode_switch_stops(stop_table) == [2]
+
+
+@pytest.mark.parametrize(
+    "arrived_by_switch, expected",
+    [(0.0, [0]), (1.0, []), (np.nan, [])],
+    ids=["trip_stayed", "trip_changed_patch", "no_trip_record"],
+)
+def test_a_session_opening_switch_is_decided_by_its_arriving_trip(
+    arrived_by_switch, expected
+):
+    """A session's first stop has no stop before it; its own trip record
+    still says whether the run started there."""
+    stop_table = _stop_sequence([_switch(0, arrived_by_switch), _stay(1)])
+
+    assert _first_switch_stops(stop_table) == expected
+
+
+def test_a_stop_of_unknown_is_stay_starts_no_episode():
+    stop_table = _stop_sequence([_stay(0), _excluded(1), _stay(2)])
+
+    assert _first_switch_stops(stop_table) == []
+
+
 def _first_switches_before_task_27(stop_table: pd.DataFrame) -> pd.DataFrame:
-    """The rule as it was: every stop with ``is_stay`` NaN dropped first."""
+    """The rule as it was: compare each known stop with the known stop before it."""
     session = ["animal", "session_date", "epoch"]
     valid = stop_table[stop_table["is_stay"].notna()].sort_values(
         [*session, "stop_idx"]
@@ -751,38 +813,46 @@ def _first_switches_before_task_27(stop_table: pd.DataFrame) -> pd.DataFrame:
     return valid[(is_switch == 1) & (prev_is_switch.fillna(0) == 0)]
 
 
-@pytest.mark.parametrize("p_off_well", [0.0, 0.3], ids=["no_nan", "nan_only_off_well"])
-def test_without_unknown_stops_the_output_is_unchanged(monkeypatch, p_off_well):
-    """With no stop of unknown ``is_stay``, episodes, their ids and every row
-    match the rule as it was, over several shuffled sessions: with no NaN at
-    all, and with NaN only on stops known to be off a well."""
-    from continuum_swr_replay.analysis.replay import switch_analysis
+def _visit_sessions(p_in_transit: float) -> pd.DataFrame:
+    """Shuffled sessions of visits, each one trip apart, with no unknown stop.
 
+    A visit holds one to three at-well stops after the same trip, all with the
+    visit's ``is_stay``; its trip changed patch when the visit before it was a
+    switch. In-transit stops (``is_stay`` NaN, off a well) may follow a visit.
+    """
     rng = np.random.default_rng(27)
     sessions = [("a", 20200101, "02_r1"), ("a", 20200101, "04_r2"), ("b", 1, "02_r1")]
     frames = []
     for k, (animal, date, epoch) in enumerate(sessions):
-        off_well = rng.random(40) < p_off_well
-        frames.append(
-            pd.DataFrame(
-                {
-                    "animal": animal,
-                    "session_date": date,
-                    "epoch": epoch,
-                    "stop_idx": range(40),
-                    "stop_id": [1000 * k + i for i in range(40)],
-                    "is_stay": np.where(
-                        off_well, np.nan, rng.choice([1.0, 0.0], size=40, p=[0.6, 0.4])
-                    ),
-                    "at_well": pd.array(~off_well, dtype="boolean"),
-                    "current_patch": rng.integers(1, 4, size=40),
-                    "has_replay": rng.random(40) < 0.7,
-                    "n_selected_events": 1,
-                }
-            )
+        stops, previous = [], 1.0
+        for trip in range(20):
+            is_stay = rng.choice([1.0, 0.0], p=[0.6, 0.4])
+            arrived = 1.0 if previous == 0.0 else 0.0
+            stops += [_stop(is_stay, True, trip, arrived)] * int(rng.integers(1, 4))
+            if rng.random() < p_in_transit:
+                stops.append(_stop(np.nan, False, trip, arrived))
+            previous = is_stay
+        frame = _stop_sequence(stops).assign(
+            animal=animal,
+            session_date=date,
+            epoch=epoch,
+            stop_id=lambda f, k=k: 1000 * k + f["stop_idx"],
+            current_patch=rng.integers(1, 4, size=len(stops)),
+            has_replay=rng.random(len(stops)) < 0.7,
         )
-    stop_table = pd.concat(frames).sample(frac=1.0, random_state=0)
-    assert stop_table["is_stay"].isna().any() == (p_off_well > 0)
+        frames.append(frame)
+    return pd.concat(frames).sample(frac=1.0, random_state=0)
+
+
+@pytest.mark.parametrize("p_in_transit", [0.0, 0.3], ids=["no_nan", "nan_in_transit"])
+def test_without_unknown_stops_the_output_is_unchanged(monkeypatch, p_in_transit):
+    """With every at-well ``is_stay`` known and one trip between visits, the
+    trip record says what the stop before said: episodes, their ids and every
+    row match the rule as it was."""
+    from continuum_swr_replay.analysis.replay import switch_analysis
+
+    stop_table = _visit_sessions(p_in_transit)
+    assert stop_table["is_stay"].isna().any() == (p_in_transit > 0)
     event_table, event_arm_table = _replay_tables_for_stops(stop_table)
 
     actual = build_switch_aligned_table(
