@@ -32,6 +32,7 @@ from continuum_swr_replay.analysis.replay import (
     aggregate_to_timebins,
 )
 from scripts.rate import fit_swr_contrast_rate as mod
+from tests.unit._executor_fixtures import InlineExecutor, completion_order
 
 
 @pytest.fixture
@@ -699,25 +700,9 @@ def test_load_in_transit_keeps_only_the_transit_stops(stubbed_load):
 
 # ── Row order of the saved per-session fits (task 27) ──
 
-
-class _InlineExecutor:
-    """``ProcessPoolExecutor`` stand-in: runs each task as it is submitted."""
-
-    def __init__(self, max_workers):
-        del max_workers
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *exc):
-        return False
-
-    def submit(self, function, *args):
-        from concurrent.futures import Future
-
-        future = Future()
-        future.set_result(function(*args))
-        return future
+#: Shuffles each session's rows differently on every call, as a fan-out split
+#: below the session would deliver them.
+_ROW_ORDER = np.random.default_rng(0)
 
 
 def _fake_fit_one_session(keys, stops_g, onsets_g):
@@ -737,6 +722,7 @@ def _fake_fit_one_session(keys, stops_g, onsets_g):
         for model in ("R0_null", "R1_rew")
         for cohort in (mod.PRIMARY_COHORT, mod.POST_OUTCOME_COHORT)
     ]
+    rows = [rows[i] for i in _ROW_ORDER.permutation(len(rows))]
     return keys, rows, {}, {"contrast": 0}
 
 
@@ -762,7 +748,7 @@ def stubbed_fan_out(monkeypatch, tmp_path):
     monkeypatch.setattr(
         mod, "_write_aggregation", lambda models, *a, **k: aggregated.append(models)
     )
-    monkeypatch.setattr(mod, "ProcessPoolExecutor", _InlineExecutor)
+    monkeypatch.setattr(mod, "ProcessPoolExecutor", InlineExecutor)
     saved = tmp_path / "models_per_bin_rate" / "swr_contrast_rate.pkl"
 
     def run(workers: int, finish=lambda futures: list(futures)):
@@ -780,20 +766,19 @@ def stubbed_fan_out(monkeypatch, tmp_path):
 def test_saved_fits_do_not_depend_on_the_order_sessions_finish(
     stubbed_fan_out, finish_order
 ):
-    """Workers finish in any order; the saved pickle must be the same bytes."""
-
-    def finish(futures):
-        futures = list(futures)
-        if finish_order == "reversed":
-            return futures[::-1]
-        return [futures[i] for i in np.random.default_rng(27).permutation(len(futures))]
-
+    """Workers finish in any order, and a session's rows may arrive in any
+    order; the saved pickle must be the same bytes."""
     serial_bytes, serial, _ = stubbed_fan_out(workers=1)
-    parallel_bytes, parallel, aggregated = stubbed_fan_out(workers=3, finish=finish)
+    parallel_bytes, parallel, aggregated = stubbed_fan_out(
+        workers=3, finish=completion_order(finish_order)
+    )
 
     pd.testing.assert_frame_equal(parallel, serial)
     assert parallel_bytes == serial_bytes
     # the audited aggregation is computed from the same ordered frame
     pd.testing.assert_frame_equal(aggregated, parallel)
-    sessions = parallel[list(mod.SESSION_COLUMNS)].drop_duplicates()
-    assert sessions.equals(sessions.sort_values(list(mod.SESSION_COLUMNS)))
+    key = [*mod.SESSION_COLUMNS, "population", "model", "cohort"]
+    assert not parallel.duplicated(key).any()
+    pd.testing.assert_frame_equal(
+        parallel, parallel.sort_values(key, ignore_index=True)
+    )

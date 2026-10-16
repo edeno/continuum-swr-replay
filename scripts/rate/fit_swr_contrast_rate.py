@@ -1178,12 +1178,11 @@ def main() -> None:
         )
 
     models = pd.DataFrame(rows)
-    # Workers finish in any order. Each session's rows arrive together, in the
-    # order _fit_one_session made them, so a stable sort by session fixes the
-    # row order of the saved fits and of everything aggregated from them.
+    # Workers finish in any order, so the rows are sorted by their full key
+    # (unique per row) before they are saved and aggregated.
     if len(models):
         models = models.sort_values(
-            list(SESSION_COLUMNS), kind="stable", ignore_index=True
+            [*SESSION_COLUMNS, "population", "model", "cohort"], ignore_index=True
         )
     # Cohort sizes: the post-outcome cohort is the primary one minus the stops
     # gated above, so the gap between the two lines is the cost of the gate.
