@@ -1063,6 +1063,16 @@ def _run(
                         "converged": r.get("converged"),
                         "separated": r.get("separated"),
                         "n_convergence_warnings": r.get("n_convergence_warnings"),
+                        # Whether the fit reached its optimum, for the bundle's
+                        # gates: the conditional-Poisson fitter's Newton finish
+                        # (NaN for an estimator without one). Terms the session
+                        # cannot inform are listed, "|"-joined, with NaN
+                        # coefficients.
+                        "llf": r.get("llf", np.nan),
+                        "newton_decrement": r.get("newton_decrement", np.nan),
+                        "max_abs_grad": r.get("max_abs_grad", np.nan),
+                        "n_newton_steps": r.get("n_newton_steps", np.nan),
+                        "unidentified_terms": r.get("unidentified_terms", ""),
                     }
                 )
             dropped = (

@@ -539,6 +539,39 @@ def _fit_row() -> dict:
     }
 
 
+def test_fit_rows_carry_the_optimizer_diagnostics(monkeypatch):
+    """The refit bundle records whether each fit reached its optimum, and which
+    terms its session could not inform, so its gates can check them."""
+    diagnostics = {
+        "llf": -12.5,
+        "newton_decrement": 3e-12,
+        "max_abs_grad": 1e-7,
+        "n_newton_steps": 1,
+        "unidentified_terms": "is_candidate_arm_0",
+    }
+
+    def _fit(g, predictors, *, response_col, n_categories):
+        fit = {**_fit_row(), **diagnostics}
+        return fit, mod._audit(2, 0, 0, 0, 0, 2, "", g.iloc[0:0])
+
+    monkeypatch.setattr(mod, "_fit_session", _fit)
+    term = "reward_belief_mean_candidate_arm_preoutcome_z"
+
+    res, _audits = mod._run(
+        _nine_arm_cohort(),
+        {"C1_nine_arm": ([term], "pooled")},
+        response_col="arm_fraction",
+        n_categories=9,
+    )
+
+    row = res.iloc[0]
+    for column, value in diagnostics.items():
+        assert row[column] == value
+    # The existing columns are kept.
+    assert row[f"coef_{term}"] == pytest.approx(0.1)
+    assert bool(row["converged"]) is True
+
+
 def test_leaf_only_rungs_are_fit_on_leaf_renormalized_fractions(monkeypatch):
     """The trunk share is not balanced across the contrast, so it cannot set the
     weight an event carries: leaf-only rungs get unit mass over the six leaves,
