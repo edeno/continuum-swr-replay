@@ -640,6 +640,46 @@ def test_provenance_names_only_the_rescaled_rungs_that_produced_rows():
     assert mod._provenance(args, n_sessions=1)["response_renormalized_rungs"] == []
 
 
+def _provenance_args():
+    import argparse
+
+    return argparse.Namespace(
+        max_per_animal=None,
+        response="fraction",
+        estimator="conditional_poisson",
+        min_events_session_phi=40,
+        outcome_stratum="all",
+    )
+
+
+def test_provenance_records_the_commit_this_process_loaded(monkeypatch):
+    """The audited record names the code that ran, as the fit sidecars do.
+
+    A content refit runs for hours in a checkout that other work commits in, so
+    the HEAD at write time can be newer than the code that ran, and a bare
+    ``git rev-parse HEAD`` drops the ``-dirty`` marker of an edited tree.
+    """
+    import subprocess
+
+    loaded = "0123456789abcdef0123456789abcdef01234567-dirty"
+    monkeypatch.setattr(mod, "loaded_commit", lambda: loaded)
+
+    def read_at_write_time(*args, **kwargs):
+        raise AssertionError("_provenance read the checkout at write time")
+
+    monkeypatch.setattr(subprocess, "run", read_at_write_time)
+
+    assert mod._provenance(_provenance_args(), n_sessions=1)["git_hash"] == loaded
+
+
+def test_provenance_defaults_to_the_fit_provenance_record_of_the_commit():
+    from continuum_swr_replay.analysis.replay import fit_provenance
+
+    prov = mod._provenance(_provenance_args(), n_sessions=1)
+
+    assert prov["git_hash"] == fit_provenance.git_hash()
+
+
 def _leaf_session_with_a_trunk_only_event(n_events: int = 20) -> pd.DataFrame:
     """One session; event ``e0`` spends its whole allocation on the trunks."""
     rows = []

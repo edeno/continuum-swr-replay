@@ -63,7 +63,6 @@ import argparse
 import datetime
 import json
 import logging
-import subprocess
 import sys
 import warnings
 
@@ -115,6 +114,9 @@ from continuum_swr_replay.analysis.replay.dirichlet_multinomial import (
 )
 from continuum_swr_replay.analysis.replay.dirichlet_multinomial import (
     ESTIMATOR as DIRICHLET_MULTINOMIAL,
+)
+from continuum_swr_replay.analysis.replay.fit_provenance import (
+    git_hash as loaded_commit,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import (
     record_inputs,
@@ -1178,14 +1180,12 @@ def _provenance(
     concentration_cols: list[str] | None = None,
 ) -> dict:
     """Reproducibility record saved alongside the audited results."""
-    try:
-        git_hash = subprocess.run(
-            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=False
-        ).stdout.strip()
-    except Exception:  # noqa: BLE001
-        git_hash = "unknown"
     return {
-        "git_hash": git_hash,
+        # The commit this process loaded, suffixed -dirty if its tracked files
+        # were edited then: the value the fit sidecars record. A refit runs for
+        # hours in a checkout that other work commits in, so the HEAD at write
+        # time can be newer than the code that ran.
+        "git_hash": loaded_commit(),
         # Fit-time _z reference (event-cohort mean/SD for the event scalars). This is
         # the runner's OWN standardization -- NOT the builder's pooled-global table _z.
         "fit_time_z_reference": z_reference or {},
