@@ -480,6 +480,54 @@ def test_a_session_run_on_its_own_records_the_commit_this_process_loaded(
     assert "worker_git_hash" not in record
 
 
+def test_a_worker_that_cannot_read_git_still_fits_under_the_parents_commit(
+    tmp_path, fake_session, monkeypatch
+):
+    # A worker that could not read git when it imported must not fail the
+    # session: the parent's commit is the one recorded, and the worker's is
+    # recorded as unknown.
+    def no_git():
+        raise RuntimeError("git could not be read at import")
+
+    monkeypatch.setattr(runner, "loaded_commit", no_git)
+    monkeypatch.setattr(runner.sys, "argv", ["run_pfc_analysis_bandit.py"])
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+
+    runner.run_analysis(
+        "wilbur20210329_.nwb",
+        "02_r1",
+        log_directory=tmp_path / "logs",
+        git_hash="parent-commit",
+        stop_cohort="at_well",
+        output_dir=output_dir,
+    )
+
+    artifact = output_dir / "wilbur20210329_02_r1_mPFC_modulation.pkl"
+    record = json.loads(artifact.with_suffix(".provenance.json").read_text())
+    assert record["git_hash"] == "parent-commit"
+    assert record["worker_git_hash"] == "unknown"
+
+
+def test_a_session_run_on_its_own_needs_a_readable_commit(
+    tmp_path, fake_session, monkeypatch
+):
+    def no_git():
+        raise RuntimeError("git could not be read at import")
+
+    monkeypatch.setattr(runner, "loaded_commit", no_git)
+    monkeypatch.setattr(runner.sys, "argv", ["run_pfc_analysis_bandit.py"])
+
+    with pytest.raises(RuntimeError, match="git could not be read"):
+        runner.run_analysis(
+            "wilbur20210329_.nwb",
+            "02_r1",
+            log_directory=tmp_path / "logs",
+            stop_cohort="at_well",
+            output_dir=tmp_path,
+        )
+
+
 def test_a_bundle_fit_on_the_retired_event_definition_is_refit(tmp_path):
     epoch_identifier = "wilbur20210329_02_r1_mPFC"
     _write_bundle_files(

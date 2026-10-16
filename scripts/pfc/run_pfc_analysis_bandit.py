@@ -940,7 +940,14 @@ def run_analysis(
     # A dask worker imports the library when it starts, which can be hours
     # after main did; if the checkout moved on in between, it runs newer code
     # than the commit main passed in.
-    worker_commit = loaded_commit()
+    try:
+        worker_commit = loaded_commit()
+    except RuntimeError:
+        # A worker that could not read git must not fail a session main has a
+        # commit for; run on its own, the session has no commit to record.
+        if git_hash is None:
+            raise
+        worker_commit = "unknown"
     if git_hash is None:
         git_hash = worker_commit
     if fold_seed is None:
