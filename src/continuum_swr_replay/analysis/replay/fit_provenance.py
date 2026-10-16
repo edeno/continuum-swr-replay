@@ -68,35 +68,73 @@ def fit_provenance_path(artifact_path: str | Path) -> Path:
     return Path(artifact_path).with_suffix(".provenance.json")
 
 
-def git_hash() -> str:
-    """Return the current commit, suffixed ``-dirty`` if the tree is modified.
+def _read_git_hash(root: Path) -> str:
+    """Return the commit checked out at `root`, suffixed ``-dirty`` if modified.
 
-    Returns
-    -------
-    str
-        ``git rev-parse HEAD``, plus ``-dirty`` when
-        ``git status --porcelain --untracked-files=no`` is non-empty. Untracked
-        files do not count as dirty: they cannot change how the code ran.
-        ``status`` runs with ``--no-optional-locks``, as in
-        ``decoding_common.provenance_record``: by default it refreshes the
-        index and writes it back under a lock, and the runners that record
-        this commit run in a checkout that other work commits in.
+    ``git rev-parse HEAD``, plus ``-dirty`` when
+    ``git status --porcelain --untracked-files=no`` is non-empty. Untracked
+    files do not count as dirty: they cannot change how the code ran.
+    ``status`` runs with ``--no-optional-locks``, as in
+    ``decoding_common.provenance_record``: by default it refreshes the index
+    and writes it back under a lock, and the runners that record this commit
+    run in a checkout that other work commits in.
     """
     head = subprocess.run(
         ["git", "rev-parse", "HEAD"],
-        cwd=_REPO_ROOT,
+        cwd=root,
         capture_output=True,
         text=True,
         check=True,
     ).stdout.strip()
     porcelain = subprocess.run(
         ["git", "--no-optional-locks", "status", "--porcelain", "--untracked-files=no"],
-        cwd=_REPO_ROOT,
+        cwd=root,
         capture_output=True,
         text=True,
         check=True,
     ).stdout.strip()
     return f"{head}-dirty" if porcelain else head
+
+
+# The checkout is read once, when this module is imported, because that is when
+# the process loaded its code. A run that lasts hours in a checkout that gets a
+# new commit or an edited file still ran what it loaded. A failure is kept and
+# raised by ``git_hash``, so a reader that never writes a sidecar can still
+# import this module outside a git checkout.
+try:
+    _LOADED_GIT_HASH: str | None = _read_git_hash(_REPO_ROOT)
+    _LOADED_GIT_ERROR: Exception | None = None
+except (OSError, subprocess.CalledProcessError) as error:
+    _LOADED_GIT_HASH, _LOADED_GIT_ERROR = None, error
+
+
+def git_hash() -> str:
+    """Return the commit this process loaded, suffixed ``-dirty`` if it was modified.
+
+    The checkout is read when this module is imported, not when this is
+    called, so later commits and file edits do not change the result. A worker
+    process (dask, loky, multiprocessing) may import this module later than its
+    parent; a sidecar written there should be given the parent's value through
+    ``write_fit_provenance(..., commit=...)``.
+
+    Returns
+    -------
+    str
+        ``git rev-parse HEAD`` at import, plus ``-dirty`` when
+        ``git status --porcelain --untracked-files=no`` was non-empty then
+        (see ``_read_git_hash``).
+
+    Raises
+    ------
+    RuntimeError
+        If the checkout could not be read at import.
+    """
+    if _LOADED_GIT_HASH is None:
+        raise RuntimeError(
+            f"could not read the git checkout at {_REPO_ROOT} when "
+            "fit_provenance was imported"
+        ) from _LOADED_GIT_ERROR
+    return _LOADED_GIT_HASH
 
 
 def _resolve_input(path: str | Path) -> Path:
@@ -158,6 +196,7 @@ def write_fit_provenance(
     estimator: str,
     cli: list[str],
     extra: Mapping[str, object] | None = None,
+    commit: str | None = None,
 ) -> Path:
     """Write the provenance sidecar for a fitted artifact.
 
@@ -177,6 +216,11 @@ def write_fit_provenance(
         Further JSON-serializable facts about how the fit was produced, merged
         into the record (e.g. whether the response was rescaled to the fitted
         candidate set). Keys the record already defines are refused.
+    commit : str, optional
+        The commit to record as ``git_hash``. Omitted, it is this process's
+        :func:`git_hash`, read when the code was loaded. A sidecar written in a
+        worker process takes its parent's value here, because the worker may
+        have imported the code after the checkout moved on.
 
     Returns
     -------
@@ -192,7 +236,7 @@ def write_fit_provenance(
     record = {
         "artifact": artifact.name,
         "written_at": datetime.now(UTC).isoformat(),
-        "git_hash": git_hash(),
+        "git_hash": git_hash() if commit is None else commit,
         "estimator": estimator,
         "inputs": {
             name: value if isinstance(value, dict) else _input_record(value)

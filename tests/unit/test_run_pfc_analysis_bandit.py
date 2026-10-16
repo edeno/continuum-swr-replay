@@ -17,6 +17,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.replay import fit_provenance
 from continuum_swr_replay.table_io import write_table
 
 _SPEC = importlib.util.spec_from_file_location(
@@ -427,6 +428,49 @@ def test_the_sidecar_states_the_event_definition_the_fit_was_read_on(
     assert record["n_model_fits"] == 18
     assert record["n_matched_control_onset_outside_fitted_bout"] == 1
     assert record["n_matched_control_bout_saturated"] == 0
+
+
+def test_the_sidecar_records_the_commit_the_parent_passed_in(
+    tmp_path, fake_session, monkeypatch
+):
+    # A dask worker imports the code after the parent did; the checkout may
+    # have moved on by then, so it records the parent's commit, not its own.
+    monkeypatch.setattr(runner.sys, "argv", ["run_pfc_analysis_bandit.py"])
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+
+    runner.run_analysis(
+        "wilbur20210329_.nwb",
+        "02_r1",
+        log_directory=tmp_path / "logs",
+        git_hash="parent-commit-dirty",
+        stop_cohort="at_well",
+        output_dir=output_dir,
+    )
+
+    artifact = output_dir / "wilbur20210329_02_r1_mPFC_modulation.pkl"
+    record = json.loads(artifact.with_suffix(".provenance.json").read_text())
+    assert record["git_hash"] == "parent-commit-dirty"
+
+
+def test_a_session_run_on_its_own_records_the_commit_this_process_loaded(
+    tmp_path, fake_session, monkeypatch
+):
+    monkeypatch.setattr(runner.sys, "argv", ["run_pfc_analysis_bandit.py"])
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+
+    runner.run_analysis(
+        "wilbur20210329_.nwb",
+        "02_r1",
+        log_directory=tmp_path / "logs",
+        stop_cohort="at_well",
+        output_dir=output_dir,
+    )
+
+    artifact = output_dir / "wilbur20210329_02_r1_mPFC_modulation.pkl"
+    record = json.loads(artifact.with_suffix(".provenance.json").read_text())
+    assert record["git_hash"] == fit_provenance.git_hash()
 
 
 def test_a_bundle_fit_on_the_retired_event_definition_is_refit(tmp_path):
@@ -1379,6 +1423,56 @@ def test_main_raises_the_limit_first_and_closes_each_sessions_files(
     sessions = ["run 02_r1", "release", "run 04_r2", "release"]
     assert events == ["limit", *(["cluster"] if n_workers > 1 else []), *sessions]
     assert "open-file soft limit 1024 -> 65536" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("n_workers", [1, 2], ids=["serial", "dask"])
+def test_main_hands_every_session_the_commit_it_loaded(
+    tmp_path, monkeypatch, n_workers
+):
+    """A dask worker imports the code later than ``main`` does, so the commit
+    each session's sidecar records is the one ``main`` loaded, passed in."""
+    keys = [("chimi20200223_.nwb", "02_r1"), ("chimi20200223_.nwb", "04_r2")]
+    passed: list[str] = []
+
+    def run_analysis(nwb_file_name, epoch_name, **kwargs):
+        passed.append(kwargs["git_hash"])
+
+    monkeypatch.setattr(
+        runner.sys,
+        "argv",
+        [
+            "run_pfc_analysis_bandit.py",
+            "--n_workers",
+            str(n_workers),
+            "--local_scratch_dir",
+            str(tmp_path / "scratch"),
+            "--log_directory",
+            str(tmp_path / "logs"),
+            "--output-dir",
+            str(tmp_path / "out"),
+        ],
+    )
+    monkeypatch.setattr(runner, "loaded_commit", lambda: "parent-commit-dirty")
+    monkeypatch.setattr(runner, "raise_open_file_limit", lambda: (1024, 65536))
+    monkeypatch.setattr(runner, "analysed_epochs", lambda: _epoch_info(keys))
+    monkeypatch.setattr(runner, "_filter_to_sorted_sessions", lambda info: info)
+    monkeypatch.setattr(runner, "run_analysis", run_analysis)
+    monkeypatch.setattr(runner, "release_nwb_files", lambda: 0)
+    monkeypatch.setattr(runner, "LocalCluster", lambda **kwargs: object())
+    monkeypatch.setattr(runner, "Client", _Client)
+    monkeypatch.setattr(
+        runner,
+        "dask",
+        types.SimpleNamespace(
+            delayed=lambda function: function, compute=lambda *outcomes: outcomes
+        ),
+    )
+
+    runner.main()
+
+    assert passed == ["parent-commit-dirty", "parent-commit-dirty"]
+    cohort = json.loads((tmp_path / "out" / "pfc_cohort_mPFC.json").read_text())
+    assert cohort["git_hash"] == "parent-commit-dirty"
 
 
 def test_main_takes_the_registers_analysed_epochs_less_those_without_sorting(

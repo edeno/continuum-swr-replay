@@ -53,7 +53,6 @@ import hashlib
 import json
 import logging
 import os
-import subprocess
 import sys
 import warnings
 from argparse import ArgumentParser, Namespace, RawDescriptionHelpFormatter
@@ -118,6 +117,9 @@ from continuum_swr_replay.analysis.replay.cohort_selection import stop_cohort_su
 from continuum_swr_replay.analysis.replay.fit_provenance import (
     fit_provenance_path,
     write_fit_provenance,
+)
+from continuum_swr_replay.analysis.replay.fit_provenance import (
+    git_hash as loaded_commit,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
 from continuum_swr_replay.decoding_common import (
@@ -846,7 +848,7 @@ def run_analysis(
     immobility_threshold: float = MAX_SPEED_THRESHOLD_CM_PER_SEC,
     log_directory: str | Path = "logs",
     overwrite: bool = False,
-    git_hash: str = "",
+    git_hash: str | None = None,
     stop_cohort: str = "at_well",
     output_dir: Path = PROCESSED_DATA_DIR,
     fitter: str = "jax",
@@ -877,8 +879,11 @@ def run_analysis(
         Directory for log files
     overwrite : bool
         Whether to overwrite existing results
-    git_hash : str
-        Pre-computed git hash for logging
+    git_hash : str, optional
+        The commit ``main`` loaded, logged and recorded in the sidecar. A dask
+        worker imports the code later than ``main`` does, after the checkout
+        may have moved on, so ``main`` passes its own. Omitted, it is the
+        commit this process loaded.
     stop_cohort : {"at_well", "all_stops"}
         Population to fit: the well-anchored stops the hippocampal ladders are
         read on, or no stop restriction at all.
@@ -932,6 +937,8 @@ def run_analysis(
     save_file = modulation_path(
         output_dir, epoch_identifier, stop_cohort, penalty_sigma
     )
+    if git_hash is None:
+        git_hash = loaded_commit()
     if fold_seed is None:
         fold_seed = session_seed("folds", nwb_file_name, epoch_name)
     if control_draw_seed is None:
@@ -1162,6 +1169,7 @@ def run_analysis(
             {"stop_table": DEFAULT_STOP_TABLE_PATH} if cohort_stops is not None else {},
             estimator=ESTIMATOR,
             cli=sys.argv,
+            commit=git_hash,
             extra={
                 "stop_cohort": stop_cohort,
                 # The estimator and the inference, in full: the prior the
@@ -1705,12 +1713,8 @@ def main() -> None:
     Path(args.log_directory).mkdir(exist_ok=True, parents=True)
     args.output_dir.mkdir(exist_ok=True, parents=True)
 
-    git_hash = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-        text=True,
-    ).stdout.rstrip()
+    # Read when this script imported its code, before any worker starts.
+    git_hash = loaded_commit()
 
     # The PFC cohort: the register's analysed epochs, whose session has sorted
     # units. An analysed epoch without them is left out here, with that reason,

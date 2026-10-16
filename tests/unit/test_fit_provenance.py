@@ -177,6 +177,12 @@ def test_sidecar_records_the_current_commit(fit_dir, inputs):
     assert re.fullmatch(r"[0-9a-f]{40}(-dirty)?", recorded["git_hash"])
 
 
+_GIT_CONFIG = [
+    *("-c", "user.name=test", "-c", "user.email=test@example.com"),
+    *("-c", "commit.gpgsign=false"),
+]
+
+
 def _git_repo(path: Path) -> Callable[..., str]:
     """Commit one file in a new git repo at `path`; return a git runner for it."""
 
@@ -185,16 +191,95 @@ def _git_repo(path: Path) -> Callable[..., str]:
             ["git", *args], cwd=path, check=True, capture_output=True, text=True
         ).stdout.strip()
 
-    config = ["-c", "user.name=test", "-c", "user.email=test@example.com"]
-    config += ["-c", "commit.gpgsign=false"]
     git("init", "-q")
     (path / "tracked.txt").write_text("tracked")
     git("add", "tracked.txt")
-    git(*config, "commit", "-q", "-m", "tracked")
+    git(*_GIT_CONFIG, "commit", "-q", "-m", "tracked")
     return git
 
 
-def test_git_hash_never_writes_the_git_index(tmp_path, monkeypatch):
+def _load_copy_in(repo: Path) -> ModuleType:
+    """Import a copy of ``fit_provenance`` placed inside `repo`, as a runner would.
+
+    The copy sits at the real module's depth below the repo root, so its
+    ``_REPO_ROOT`` is `repo`: what it reads of the checkout when it is imported
+    is `repo` at that moment. The copy is untracked, so it does not make the
+    tree dirty.
+    """
+    target = repo / "src" / "continuum_swr_replay" / "analysis" / "replay"
+    target.mkdir(parents=True)
+    target = target / "fit_provenance.py"
+    target.write_bytes(Path(fit_provenance.__file__).read_bytes())
+    spec = importlib.util.spec_from_file_location("fit_provenance_copy", target)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _recorded_commit(module: ModuleType, tmp_path: Path) -> str:
+    """The commit a sidecar written now by `module` records."""
+    sidecar = module.write_fit_provenance(
+        tmp_path / "all_models.pkl", {}, "poisson_glm", ["fit.py"]
+    )
+    return json.loads(sidecar.read_text())["git_hash"]
+
+
+def test_sidecar_records_the_commit_loaded_not_a_later_head(tmp_path):
+    """A long run in a checkout that gets a new commit still ran the old code."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    git = _git_repo(repo)
+    loaded = git("rev-parse", "HEAD")
+    module = _load_copy_in(repo)
+
+    (repo / "tracked.txt").write_text("next commit")
+    git(*_GIT_CONFIG, "commit", "-q", "-am", "next")
+    assert git("rev-parse", "HEAD") != loaded
+
+    assert _recorded_commit(module, tmp_path) == loaded
+
+
+def test_sidecar_ignores_a_tracked_file_edited_after_import(tmp_path):
+    """An edit made after the code was loaded did not change how it ran."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    git = _git_repo(repo)
+    loaded = git("rev-parse", "HEAD")
+    module = _load_copy_in(repo)
+
+    (repo / "tracked.txt").write_text("edited after import")
+    assert git("status", "--porcelain", "--untracked-files=no") != ""
+
+    assert _recorded_commit(module, tmp_path) == loaded
+
+
+def test_sidecar_records_a_tree_dirty_at_import_as_dirty(tmp_path):
+    """The run loaded uncommitted code, even if the edit is undone before it ends."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    git = _git_repo(repo)
+    loaded = git("rev-parse", "HEAD")
+    (repo / "tracked.txt").write_text("edited before import")
+    module = _load_copy_in(repo)
+
+    git("checkout", "--", "tracked.txt")
+    assert git("status", "--porcelain", "--untracked-files=no") == ""
+
+    assert _recorded_commit(module, tmp_path) == f"{loaded}-dirty"
+    assert module.git_hash() == f"{loaded}-dirty"
+
+
+def test_sidecar_records_a_commit_passed_in(fit_dir, inputs):
+    """A worker that imported the code after its parent records the parent's."""
+    parent = "0123456789abcdef0123456789abcdef01234567-dirty"
+    sidecar = write_fit_provenance(
+        fit_dir / "all_models.pkl", inputs, "poisson_glm", ["fit.py"], commit=parent
+    )
+
+    assert json.loads(sidecar.read_text())["git_hash"] == parent
+
+
+def test_git_hash_never_writes_the_git_index(tmp_path):
     """By default ``git status`` refreshes the index and writes it back under a
     lock. The Widloski runner records its commit in a checkout that other work
     commits in, so, like ``decoding_common.provenance_record``, it must not write.
@@ -206,9 +291,8 @@ def test_git_hash_never_writes_the_git_index(tmp_path, monkeypatch):
     os.utime(tracked, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1_000_000_000))
     index = tmp_path / ".git" / "index"
     before = _sha256(index)
-    monkeypatch.setattr(fit_provenance, "_REPO_ROOT", tmp_path)
 
-    assert git_hash() == git("rev-parse", "HEAD")
+    assert _load_copy_in(tmp_path).git_hash() == git("rev-parse", "HEAD")
     assert _sha256(index) == before
 
     # The control: a plain status does refresh and rewrite this index.
