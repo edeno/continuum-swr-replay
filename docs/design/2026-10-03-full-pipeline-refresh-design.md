@@ -1,7 +1,28 @@
 # Full pipeline refresh: re-decode, comparison inventories, downstream regeneration
 
-**Status (2026-10-03):** approved, then revised after an independent review (dask-cuda, ContFrag staging, R9, backups, Kay version check, filter edges). Implementation is underway. The
-implementation plan will live at `.claude/docs/plans/full-pipeline-refresh/PLAN.md`.
+**Status (2026-10-12): the refresh is done and audited.** The final audit passed (17 of 17
+checks), and the report is
+[docs/audits/2026-10-12-full-pipeline-refresh.md](../audits/2026-10-12-full-pipeline-refresh.md).
+The implementation plan is `.claude/docs/plans/full-pipeline-refresh/PLAN.md`. What the re-decode
+changed, and where the backups are, is in
+[the known issue](../known_issues/2026-10-12-full-redecode-r11.md).
+
+The spec was approved on 2026-10-03 and revised after an independent review (dask-cuda, ContFrag
+staging, R9, backups, Kay version check, filter edges). It was not rewritten after the build. Its
+planning numbers stand as written, among them "218 epochs". The cohort is now the epoch
+register's 242 analysed epochs, with 13 more left out as `SUSTAINED_NOISE`.
+
+Out of scope, as the spec says: Phase 3 of the comparison, Phase 2's deferred pilot checks,
+Spyglass integration, and requoting the hand-maintained result docs (they wait for the project
+lead's review of the report).
+
+Not run in the refresh (report, section 4.7):
+
+- Task 12 on the R11 decodes. Only the five-epoch pilot on pre-R11 decodes exists.
+- Task 13's half-tetrode decodes. The code is done; the 20 GPU decodes were not run.
+- The R13 robustness and sensitivity reruns: the sensitivity without the epochs over 2 % masked,
+  the masked-time table, and the reruns without the mask, with every artifact threshold 25 % lower
+  and higher, and with 1 s masked after each step.
 
 ## Purpose
 

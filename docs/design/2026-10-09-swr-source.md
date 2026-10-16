@@ -24,9 +24,9 @@ tables, the Widloski-detector table's SWR columns, and the PFC path's SWR interv
   threshold of 4 cm/s at the event's endpoints. They are on the stored CA1 ripple band,
   with the head speed and time span that `load_data` uses.
 - **The inventory.** Run `056eee0dcb5a` (R10, 2026-10-10, commit `056eee0dcb5a`): all
-  255 epochs `ok` (the 218 analysed and the 37 pending), with the artifact mask of run
-  `fbbff144a123` and rule R-T for all four detectors. It replaced R3's run `50a98592acee`
-  (no mask, no R-T; j1620210710 `02_r1` and `04_r2` had failed there on a lab-database
+  255 epochs `ok` (the register's 242 analysed and its 13 `SUSTAINED_NOISE`), with the
+  artifact mask of run `fbbff144a123` and rule R-T for all four detectors. It replaced R3's
+  run `50a98592acee` (no mask, no R-T; j1620210710 `02_r1` and `04_r2` had failed there on a lab-database
   inconsistency, and both are `ok` now). Gate report:
   `.claude/research/refresh_artifact_detector/r10_gate/r10_gate_report.md`.
   `SWR_INVENTORY_RUN_ID` is the one value to change for another run.

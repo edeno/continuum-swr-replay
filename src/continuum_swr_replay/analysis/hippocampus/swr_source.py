@@ -173,8 +173,9 @@ SWR_INVENTORY_RUN_ID = "056eee0dcb5a"
 """The SWR runner's run folder every analysis reads its SWRs from.
 
 Runbook R10's run of 2026-10-10 at commit ``056eee0dcb5a``: all 255 epochs
-``ok`` (the 218 analysed and the 37 pending), with the artifact mask of
-:data:`ARTIFACT_INTERVALS_RUN_ID` and rule R-T for all four detectors (gate report
+``ok`` (the register's 242 analysed and its 13 ``SUSTAINED_NOISE``), with the
+artifact mask of :data:`ARTIFACT_INTERVALS_RUN_ID` and rule R-T for all four
+detectors (gate report
 ``.claude/research/refresh_artifact_detector/r10_gate/r10_gate_report.md``).
 Changing this constant is the whole switch to another run.
 """

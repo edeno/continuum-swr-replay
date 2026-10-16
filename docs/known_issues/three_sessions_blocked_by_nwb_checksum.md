@@ -1,10 +1,21 @@
 # Three sessions blocked by an upstream NWB checksum failure
 
-**Status:** resolved on 2026-08-19. All 218 analysed epochs are in every table. The
-cohort is 218, not 215. Found resolved by the exclusion audit of 2026-10-05
+**Status:** resolved on 2026-08-19. The three epochs are in the cohort and in every table.
+Found resolved by the exclusion audit of 2026-10-05
 (`.claude/research/refresh_exclusions/exclusions_report.md`, section 3.8). The
-cohort is now the epoch register's ([../epoch_register.md](../epoch_register.md)),
+cohort is the epoch register's ([../epoch_register.md](../epoch_register.md)),
 where these three epochs are `analysed`.
+
+**Cohort size, as this note has stated it:**
+
+| from | cohort | status |
+|---|---|---|
+| (until 2026-08-19) | 215 | superseded 2026-08-19: the three epochs rejoined |
+| 2026-08-19 | 218 | superseded 2026-10-11: the full pipeline refresh swapped in the R11 decodes and the register switched to 242 analysed epochs (255 decoded, less 13 `SUSTAINED_NOISE`; [known issue](2026-10-12-full-redecode-r11.md)) |
+| 2026-10-11 | **242** | current |
+
+The text below is the history of the 215-to-218 change. Where a count has been superseded, it
+says so.
 
 ## What it was
 
@@ -40,19 +51,27 @@ three analysis files:
 - `wilbur20210331_7EIP36CASJ`.
 
 Their hash (`uuid_from_file`) now matches `~external_analysis.contents_hash`. All
-three epochs are decoded, by both the April decode and the October 2026 re-decode,
-and have rows in all seven canonical tables:
+three epochs are decoded, by the April decode, by the first October 2026 re-decode and by
+the R11 decode. As of 2026-10-05, on the 218-epoch tables, they had rows in all seven
+canonical tables:
 
-- `event_table` has 157, 309 and 118 rows;
-- `qvals_table` covers them through `stop_id`;
-- so do the ContFrag tables.
+- `event_table` had 157, 309 and 118 rows (**superseded 2026-10-11**; the 242-epoch table
+  has 167, 308 and 111, read from `replay_content/event_table.parquet` on 2026-10-16);
+- `qvals_table` covered them through `stop_id`;
+- so did the ContFrag tables.
+
+The refresh audit of 2026-10-12 passed all 17 of its checks
+([report](../audits/2026-10-12-full-pipeline-refresh.md), section 1). For the three epochs,
+only the `event_table` counts were re-read; `qvals_table` and the ContFrag tables were not
+re-counted.
 
 `docs/audits/2026-08-25-covariate-regen-staging-audit.md` recorded the recovery in
 the Replay and ContFrag tables.
 
 ## What no longer applies
 
-- Every count is over the 218 analysed epochs, not 215.
+- Every count is over the register's analysed epochs: 218 from 2026-08-19, and **242 since
+  2026-10-11** (not 215, and no longer 218).
 - A parity gate that reports a 218→215 drop for these keys is now reporting a real
   regression, not the expected state.
 - `model_specs.py`'s note that "215 of 218 had fitted before" describes fits made
