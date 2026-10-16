@@ -253,6 +253,67 @@ def interior_bin_mask(environment: Any) -> NDArray[np.bool_]:
     return interior
 
 
+UNDERFLOW_OCCUPANCY_FLOOR = 1e-20
+"""Real place bins whose stored occupancy is below this are left out.
+
+Where the animal never went, the KDE occupancy underflows to float32 subnormals
+(below 1.18e-38) or to exactly 0. A GPU decode keeps the subnormals; XLA on the
+CPU flushes them to zero, so a CPU rebuild of the likelihood there differs from
+the stored decode by up to 20 nats per spike, and the stored decode is the
+closer to exact arithmetic (D1, ``chimi20200221_08_r4``, the only analysed
+epoch with such bins: the animal never entered patch 1).
+
+D1 measured the per-spike difference between the CPU rebuild and the decode, by
+the stored occupancy of the bin: 20 nats from 5.6e-40 to 2.5e-34, falling to 16,
+11 and 5.6 nats at 1e-31, 3e-29 and 8e-27, 0.35 at 1.4e-24, and 9e-4 (float
+noise, as at every other bin) from 1.9e-22 up. The floor sits 7,000 times above
+the last bin that disagreed and 4e14 times below the lowest occupancy of any
+other analysed epoch's decode (4e-6), so it takes in no ordinary bin.
+"""
+
+
+def underflowed_bin_mask(
+    occupancy: NDArray,
+    environment: Any,
+    floor: float = UNDERFLOW_OCCUPANCY_FLOOR,
+) -> NDArray[np.bool_]:
+    """The real place bins whose stored occupancy is below ``floor``.
+
+    The one definition the state-evidence runner and the spike-evidence engine
+    share (see :data:`UNDERFLOW_OCCUPANCY_FLOOR`). Compare the occupancy as
+    stored (float32 on a GPU decode), not a float64 recomputation: the stored
+    array is what the decode used.
+
+    Parameters
+    ----------
+    occupancy : ndarray, shape (n_real_bins,)
+        The encoding model's stored ``occupancy``, on the real place bins.
+    environment : non_local_detector.environment.Environment
+        Fitted; :func:`interior_bin_mask` gives the real bins.
+    floor : float, optional
+
+    Returns
+    -------
+    left_out : ndarray of bool, shape (n_real_bins,)
+        True where ``occupancy < floor`` (exact zeros included). Indices are
+        into the real place bins, ``is_track_interior_`` order, the order of
+        :class:`TetrodeTerms` columns and of ``event_likelihood``.
+
+    Raises
+    ------
+    ValueError
+        The occupancy does not cover exactly the real bins.
+    """
+    n_real = int(interior_bin_mask(environment).sum())
+    values = np.asarray(occupancy, dtype=np.float64).reshape(-1)
+    if values.size != n_real:
+        raise ValueError(
+            f"{n_real} real place bins; the occupancy covers {values.size}"
+        )
+    left_out: NDArray[np.bool_] = values < floor
+    return left_out
+
+
 @dataclass(frozen=True)
 class TetrodeTerms:
     """Per-tetrode pieces of the decoder's non-local clusterless log-likelihood.

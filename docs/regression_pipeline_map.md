@@ -650,7 +650,7 @@ Artifact I/O, provenance gating, and the diagnostics that check the tables and t
 
 Spike-evidence reality analysis for non-SWR non-local events.
 
-`animal_from_epoch_id`, `find_sessions`, `build_session_events`, `load_marks`, `event_metrics`, `analyze_session`, `render_session_figures`, `summarize`, `per_animal_medians`, `main`
+`animal_from_epoch_id`, `find_sessions`, `build_session_events`, `load_marks`, `events_with_map_in_left_out_bins`, `event_metrics`, `analyze_session`, `render_session_figures`, `summarize`, `per_animal_medians`, `main`
 
 ### `scripts/qa/audit_event_patch_fraction.py`
 
@@ -842,7 +842,7 @@ Summary statistics of the per-window table, over epochs nested in animals.
 
 Per-tetrode likelihood terms, and the encodings and decode files they come from.
 
-`parse_epoch_identifier`, `load_detector`, `encoding_inputs`, `load_encoding`, `encoding_comparison`, `event_likelihood`, `nearest_interior_bins`, `interior_bin_mask`, `TetrodeTerms`, `per_tetrode_terms`, `time_folds`, `training_spike_bins`
+`parse_epoch_identifier`, `load_detector`, `encoding_inputs`, `load_encoding`, `encoding_comparison`, `event_likelihood`, `nearest_interior_bins`, `interior_bin_mask`, `underflowed_bin_mask`, `TetrodeTerms`, `per_tetrode_terms`, `time_folds`, `training_spike_bins`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/state_evidence/windows.py`
 

@@ -186,6 +186,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.summary import (
 from continuum_swr_replay.analysis.hippocampus.state_evidence.terms import (
     CV_BLOCK_S,
     ENCODING_KEY,
+    UNDERFLOW_OCCUPANCY_FLOOR,
     TetrodeTerms,
     encoding_comparison,
     encoding_inputs,
@@ -198,6 +199,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.terms import (
     per_tetrode_terms,
     time_folds,
     training_spike_bins,
+    underflowed_bin_mask,
 )
 from continuum_swr_replay.analysis.hippocampus.state_evidence.windows import (
     HALVES_SEED,
@@ -234,6 +236,7 @@ __all__ = [
     "SECONDARY_METRICS",
     "SPLIT_COLUMN",
     "STATES",
+    "UNDERFLOW_OCCUPANCY_FLOOR",
     "Split",
     "TetrodeTerms",
     "animal_t_test",
@@ -281,6 +284,7 @@ __all__ = [
     "tetrode_halves",
     "time_folds",
     "training_spike_bins",
+    "underflowed_bin_mask",
     "window_evidence",
     "window_folds",
     "write_json",

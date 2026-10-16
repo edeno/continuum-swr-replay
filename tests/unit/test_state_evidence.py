@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import warnings
 from itertools import chain, product
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -29,6 +30,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (
     PRIMARY_METRICS,
     SECONDARY_METRICS,
     STATES,
+    UNDERFLOW_OCCUPANCY_FLOOR,
     TetrodeTerms,
     animal_t_test,
     bout_animal_summaries,
@@ -56,6 +58,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (
     tetrode_halves,
     time_folds,
     training_spike_bins,
+    underflowed_bin_mask,
     window_evidence,
     window_folds,
 )
@@ -1451,3 +1454,183 @@ def test_tetrode_terms_refuse_what_would_corrupt_the_evidence():
     ]:
         with pytest.raises(ValueError, match=message):
             TetrodeTerms(**(fields | change))
+
+
+# --- place bins whose occupancy underflows --------------------------------------------
+def environment_with_real_bins(n_real: int, n_junction: int = 2) -> SimpleNamespace:
+    """The one attribute ``interior_bin_mask`` needs: ``n_real`` real bins and some
+    junction placeholders around them."""
+    interior = np.r_[
+        np.zeros(1, bool), np.ones(n_real, bool), np.zeros(n_junction, bool)
+    ]
+    return SimpleNamespace(is_track_interior_=interior)
+
+
+def test_underflowed_bins_are_the_real_bins_with_occupancy_below_the_floor():
+    # the decode's occupancy of chimi20200221_08_r4 at bins 0, 2, 71, 72, 78, 79
+    # and 80 (D1): exact zeros, float32 subnormals, normal numbers down to 1.4e-24
+    # (the highest at which the CPU and the GPU disagreed), then 1.9e-22 (the
+    # CPU matched there) and ordinary values
+    occupancy = np.array(
+        [0.0, 3e-2, 5.4e-43, 5.6e-40, 1.4e-24, 1.9e-22, 4e-6, 5.8e-5], dtype=np.float32
+    )
+    assert occupancy[2] < np.finfo(np.float32).tiny  # really subnormal
+    environment = environment_with_real_bins(occupancy.size)
+
+    left_out = underflowed_bin_mask(occupancy, environment)
+
+    assert left_out.dtype == bool and left_out.shape == (occupancy.size,)
+    np.testing.assert_array_equal(
+        left_out, [True, False, True, True, True, True, False, False]
+    )
+    # the floor is a parameter, and the comparison is strict
+    np.testing.assert_array_equal(
+        underflowed_bin_mask(occupancy.astype(float), environment, floor=4e-6),
+        occupancy.astype(float) < 4e-6,
+    )
+
+
+def test_a_normal_occupancy_has_no_underflowed_bin(tmp_path):
+    epoch = build_simulated_epoch(tmp_path)
+
+    left_out = underflowed_bin_mask(
+        epoch.encoding_model["occupancy"], epoch.environment
+    )
+
+    assert left_out.shape == (int(interior_bin_mask(epoch.environment).sum()),)
+    assert not left_out.any()
+    assert np.asarray(epoch.encoding_model["occupancy"]).min() > 1e-8
+
+
+def test_the_floor_sits_between_the_float32_trouble_and_every_real_occupancy():
+    # D1: the CPU rebuild and the decode disagreed up to an occupancy of 1.4e-24;
+    # the lowest occupancy of any other analysed epoch's decode is 4e-6
+    assert UNDERFLOW_OCCUPANCY_FLOOR >= 1e3 * 1.4e-24
+    assert UNDERFLOW_OCCUPANCY_FLOOR <= 1e-6 * 4e-6
+    assert UNDERFLOW_OCCUPANCY_FLOOR > 1e6 * np.finfo(np.float32).tiny
+
+
+def test_the_occupancy_must_cover_exactly_the_real_bins():
+    environment = environment_with_real_bins(6)
+
+    with pytest.raises(ValueError, match="6 real place bins"):
+        underflowed_bin_mask(np.ones(7), environment)
+
+
+def drop_bins(terms: TetrodeTerms, left_out: np.ndarray) -> TetrodeTerms:
+    """The same terms with some place bins removed."""
+    keep = ~left_out
+    return TetrodeTerms(
+        ground=terms.ground[:, keep],
+        log_intensity=terms.log_intensity[:, keep],
+        time_bin=terms.time_bin,
+        tetrode=terms.tetrode,
+        bin_s=terms.bin_s,
+    )
+
+
+def underflow_case(n_pos: int = 30, n_time: int = 600, seed: int = 4):
+    """Random terms, windows and halves, and bins 0-5 and 22 left out."""
+    rng = np.random.default_rng(seed)
+    terms = random_terms(n_time, n_pos, 4, rate=0.3, seed=seed)
+    left_out = np.zeros(n_pos, dtype=bool)
+    left_out[[0, 1, 2, 3, 4, 5, 22]] = True
+    # strongly favour the left-out bins, as the CPU does for a zone it flushed
+    li = terms.log_intensity.copy()
+    li[:, left_out] += 6.0
+    terms = TetrodeTerms(
+        ground=terms.ground,
+        log_intensity=li,
+        time_bin=terms.time_bin,
+        tetrode=terms.tetrode,
+        bin_s=terms.bin_s,
+    )
+    animal = rng.integers(6, n_pos, n_time)
+    animal[animal == 22] = 23  # the animal is never where the model was never fit
+    windows = overlapping_windows(n_time, seed)
+    return terms, windows, animal, left_out
+
+
+def test_left_out_bins_are_no_choice_and_the_evidence_is_that_of_the_remaining_bins():
+    terms, windows, animal, left_out = underflow_case()
+    n_pos = terms.n_place_bins
+    distance = linear_distance(n_pos)
+    halves = tetrode_halves(terms.n_tetrodes, n_partitions=3, seed=5)
+    options = {"n_partners": 4, "no_spike_rate": NO_SPIKE_RATE, "seed": 6}
+
+    out = window_evidence(
+        terms, windows, animal, distance, halves, left_out_bins=left_out, **options
+    )
+    # the same evidence as if the bins were not in the model at all
+    renumber = np.cumsum(~left_out) - 1
+    keep = ~left_out
+    absent = window_evidence(
+        drop_bins(terms, left_out), windows, renumber[animal],
+        distance[np.ix_(keep, keep)], halves, **options,
+    )  # fmt: skip
+
+    index_columns = ["run0_mapS", "run0_mapSr", "animal_center_bin"]
+    marks = [c for c in absent.columns if c not in index_columns]
+    pd.testing.assert_frame_equal(out[marks], absent[marks])
+    kept_bins = np.flatnonzero(keep)
+    for column in ("run0_mapS", "run0_mapSr"):
+        np.testing.assert_array_equal(out[column], kept_bins[absent[column]])
+        assert not left_out[out[column].to_numpy()].any()
+    # without the rule the planted favour picks a left-out bin, which is marked
+    free = window_evidence(terms, windows, animal, distance, halves, **options)
+    assert left_out[free.run0_mapS.to_numpy()].any()
+    assert (out.mapS_left_out_runs > 0).any() and (out.mapSr_left_out_runs > 0).any()
+    n_runs = 2 * len(halves)
+    assert out.mapS_left_out_runs.between(0, n_runs).all()
+    assert out.mapSr_left_out_runs.between(0, n_runs).all()
+
+
+def test_nothing_left_out_is_the_evidence_as_before():
+    terms, windows, animal, left_out = underflow_case()
+    distance = linear_distance(terms.n_place_bins)
+    halves = tetrode_halves(terms.n_tetrodes, n_partitions=2, seed=5)
+    options = {"n_partners": 4, "no_spike_rate": NO_SPIKE_RATE, "seed": 6}
+    before = window_evidence(terms, windows, animal, distance, halves, **options)
+
+    none = window_evidence(
+        terms, windows, animal, distance, halves, left_out_bins=None, **options
+    )
+    empty = window_evidence(
+        terms, windows, animal, distance, halves,
+        left_out_bins=np.zeros_like(left_out), **options,
+    )  # fmt: skip
+
+    pd.testing.assert_frame_equal(none, before)
+    pd.testing.assert_frame_equal(empty, before)
+    assert not [c for c in before if "left_out" in c]
+
+
+def test_an_animal_in_a_left_out_bin_is_refused():
+    terms, windows, animal, left_out = underflow_case()
+    animal = animal.copy()
+    animal[windows.s.iloc[0] + 1] = int(np.flatnonzero(left_out)[0])
+
+    with pytest.raises(ValueError, match="animal"):
+        window_evidence(
+            terms, windows, animal, linear_distance(terms.n_place_bins),
+            tetrode_halves(terms.n_tetrodes, n_partitions=2, seed=5),
+            left_out_bins=left_out, n_partners=4, no_spike_rate=NO_SPIKE_RATE, seed=6,
+        )  # fmt: skip
+
+
+def test_left_out_bins_must_be_one_flag_per_place_bin_and_leave_some():
+    terms, windows, animal, left_out = underflow_case()
+    kwargs = {"n_partners": 4, "no_spike_rate": NO_SPIKE_RATE, "seed": 6}
+    distance = linear_distance(terms.n_place_bins)
+    halves = tetrode_halves(terms.n_tetrodes, n_partitions=2, seed=5)
+
+    with pytest.raises(ValueError, match="one flag per place bin"):
+        window_evidence(
+            terms, windows, animal, distance, halves,
+            left_out_bins=left_out[:-1], **kwargs,
+        )  # fmt: skip
+    with pytest.raises(ValueError, match="every place bin"):
+        window_evidence(
+            terms, windows, animal, distance, halves,
+            left_out_bins=np.ones_like(left_out), **kwargs,
+        )  # fmt: skip

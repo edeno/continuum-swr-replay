@@ -17,6 +17,8 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.windows import (
 )
 
 _PER_RUN_SUMMED = ("cond_S_silent", "cond_both_silent", "cond_pred_C_silent")
+_LEFT_OUT_COLUMNS = ("mapS_left_out_runs", "mapSr_left_out_runs")
+"""Present only when place bins are left out; summed over runs like ``cond_*``."""
 
 
 def held_out_evidence(
@@ -68,6 +70,7 @@ def window_evidence(
     partner_min_cm: float = 20.0,
     n_partners: int = 20,
     both_directions: bool = True,
+    left_out_bins: NDArray | None = None,
     no_spike_rate: float,
     seed: Seed,
 ) -> pd.DataFrame:
@@ -93,6 +96,12 @@ def window_evidence(
         one run per pair, its first half selecting and its second scoring, for
         labels decoded from the first half alone (:mod:`.half_decode`), which
         must not score them.
+    left_out_bins : ndarray of bool, shape (n_place_bins,), optional
+        Place bins that are no candidate for MAP_S or the best remote bin,
+        :func:`~.terms.underflowed_bin_mask`'s: bins where the CPU rebuild of
+        the likelihood is not the decode's. The choice is the best remaining
+        bin; the result is that of a model without those bins. The animal must
+        not be in one. None, or all False, changes nothing.
     no_spike_rate : float
         The decoder's No-Spike rate, Hz.
     seed : int or sequence
@@ -105,7 +114,17 @@ def window_evidence(
         ``loc_mark_sd_runs`` and ``nl_null_mark_sd_runs`` (their spread over
         runs), ``run0_mapS`` / ``run0_mapSr`` (run 0's choices, for spot
         checks), and ``n_spikes``, ``n_tetrodes`` (all tetrodes),
-        ``animal_center_bin`` and ``has_loc_partner``.
+        ``animal_center_bin`` and ``has_loc_partner``. With bins left out, also
+        ``mapS_left_out_runs`` and ``mapSr_left_out_runs``: the runs in which
+        MAP_S, or the best remote bin, would have been a left-out bin without
+        the rule (the window is scored all the same, on the remaining bins).
+
+    Raises
+    ------
+    ValueError
+        An input does not fit the others, ``left_out_bins`` is not one flag per
+        place bin or leaves out every bin, or a window's animal is in a left-out
+        bin.
     """
     s = windows["s"].to_numpy(dtype=np.int64)
     e = windows["e"].to_numpy(dtype=np.int64)
@@ -122,6 +141,17 @@ def window_evidence(
         raise ValueError(f"track_distance is {distance.shape}; terms have {n_pos} bins")
     if terms.time_bin.size and terms.time_bin.max() >= n_time:
         raise ValueError("a spike's time bin is beyond animal_bins")
+    left_out: NDArray | None = None
+    if left_out_bins is not None:
+        flags = np.asarray(left_out_bins, dtype=bool)
+        if flags.shape != (n_pos,):
+            raise ValueError(
+                f"left_out_bins needs one flag per place bin ({n_pos}); "
+                f"got shape {flags.shape}"
+            )
+        if flags.all():
+            raise ValueError("left_out_bins leaves out every place bin")
+        left_out = flags if flags.any() else None
     lens = e - s + 1
     starts = np.r_[0, np.cumsum(lens)[:-1]].astype(np.int64)
     win_of_row = np.repeat(np.arange(n_win), lens)
@@ -136,6 +166,11 @@ def window_evidence(
     animal_row = animal_bins[union_bins]
     if (animal_row < 0).any() or (animal_row >= n_pos).any():
         raise ValueError("a window bin has no animal place bin")
+    if left_out is not None and left_out[animal_row].any():
+        raise ValueError(
+            "a window's animal is in a left-out place bin, so the evidence there "
+            "cannot be scored"
+        )
     animal_concat = animal_bins[concat_bins]
     centre = animal_bins[s + lens // 2]
     near_animal = distance[centre] < partner_min_cm
@@ -182,6 +217,7 @@ def window_evidence(
         "ns_logratio", "ns_count", "ns_expected", "ns_silent_frac", "ns_pred_silent",
         "sel_count", "mapS_dist_cm", *_PER_RUN_SUMMED,
         *(f"{name}_ps" for name in _PER_SPIKE),
+        *(_LEFT_OUT_COLUMNS if left_out is not None else ()),
     ]  # fmt: skip
     directions = ((0, 1), (1, 0)) if both_directions else ((0, 1),)
     values = {
@@ -201,8 +237,13 @@ def window_evidence(
             pooled = (
                 np.asarray(window_sum @ sel_mark) - lens[:, None] * sel_ground[None, :]
             )
-            choice = pooled.argmax(1)
-            remote_choice = np.where(near_animal, -np.inf, pooled).argmax(1)
+            remote_pooled = np.where(near_animal, -np.inf, pooled)
+            choice, remote_choice = pooled.argmax(1), remote_pooled.argmax(1)
+            if left_out is not None:
+                # marked where the rule moved the choice; then the best other bin
+                would_be_left_out = (left_out[choice], left_out[remote_choice])
+                choice = np.where(left_out, -np.inf, pooled).argmax(1)
+                remote_choice = np.where(left_out, -np.inf, remote_pooled).argmax(1)
             if run == 0:
                 first_choice = {"run0_mapS": choice, "run0_mapSr": remote_choice}
             flat = sco_mark.ravel()
@@ -267,6 +308,9 @@ def window_evidence(
                 "cond_both_silent": s_silent * (n_sco == 0),
                 "cond_pred_C_silent": s_silent * np.exp(-expected),
             }
+            if left_out is not None:
+                run_values["mapS_left_out_runs"] = would_be_left_out[0].astype(float)
+                run_values["mapSr_left_out_runs"] = would_be_left_out[1].astype(float)
             with np.errstate(invalid="ignore", divide="ignore"):
                 for name in _PER_SPIKE:
                     run_values[f"{name}_ps"] = np.where(
@@ -278,7 +322,7 @@ def window_evidence(
     with warnings.catch_warnings():  # a window with no partner is NaN in every run
         warnings.simplefilter("ignore", RuntimeWarning)
         for name, value in values.items():
-            summed = name in _PER_RUN_SUMMED
+            summed = name in _PER_RUN_SUMMED or name in _LEFT_OUT_COLUMNS
             out[name] = np.nansum(value, 0) if summed else np.nanmean(value, 0)
         out["loc_mark_sd_runs"] = np.nanstd(values["loc_mark"], 0)
         out["nl_null_mark_sd_runs"] = np.nanstd(values["nl_null_mark"], 0)

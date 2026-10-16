@@ -27,6 +27,15 @@ Per-event metrics (all bin lookups use native track-graph distance):
 The matched non-event immobility baseline is the null (its dll_animal and
 dll_per_spike sit at ~0).
 
+Events decoded where the model was never fit are left out. A real place bin
+whose stored occupancy is below ``UNDERFLOW_OCCUPANCY_FLOOR`` (float32
+underflow where the animal never went; ``underflowed_bin_mask``) has a CPU
+likelihood that is not the decode's, up to 20 nats per spike off (D1). An event
+(or baseline window) with a scored bin whose MAP is in such a bin is not
+scored; ``event_spike_evidence_left_out.csv`` counts them per epoch. With no
+such bin (every analysed epoch but chimi20200221_08_r4) the outputs are
+unchanged.
+
 Usage
 -----
     # one session
@@ -69,10 +78,12 @@ from continuum_swr_replay.analysis.hippocampus.event_immobility import (  # noqa
     validate_nonlocal_event_probability_contract,
 )
 from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: E402
+    UNDERFLOW_OCCUPANCY_FLOOR,
     event_likelihood,
     load_encoding,
     nearest_interior_bins,
     parse_epoch_identifier,
+    underflowed_bin_mask,
 )
 from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
     excluded_intervals_of,
@@ -258,6 +269,43 @@ def load_marks(epoch_id: str, cache_dir: Path) -> tuple[list, list]:
 
 
 # --- Likelihood + metrics -----------------------------------------------------
+def events_with_map_in_left_out_bins(
+    events: pd.DataFrame,
+    mape: np.ndarray,
+    lin: np.ndarray,
+    env,
+    left_out: np.ndarray,
+) -> np.ndarray:
+    """Which events have a scored bin whose MAP is in a left-out place bin.
+
+    The bins are those :func:`event_metrics` scores (finite MAP and animal
+    position), and the MAP is binned as it bins it
+    (``nearest_interior_bins``).
+
+    Parameters
+    ----------
+    events : pd.DataFrame
+        ``s`` and ``e``, inclusive bin indices.
+    mape, lin : ndarray, shape (n_time,)
+        Decoded MAP and animal linear position, cm.
+    env : Environment
+        Fitted.
+    left_out : ndarray of bool, shape (n_real_bins,)
+        :func:`underflowed_bin_mask`.
+
+    Returns
+    -------
+    ndarray of bool, shape (n_events,)
+    """
+    hit = np.zeros(len(events), dtype=bool)
+    for k, (s, e) in enumerate(zip(events["s"], events["e"], strict=True)):
+        mt, at = mape[s : e + 1], lin[s : e + 1]
+        valid = np.isfinite(mt) & np.isfinite(at)
+        if valid.any():
+            hit[k] = left_out[nearest_interior_bins(env, mt[valid])].any()
+    return hit
+
+
 def event_metrics(
     s: int,
     e: int,
@@ -324,6 +372,17 @@ def analyze_session(
     mape = dot["map_estimate"].to_numpy()
     lin = dot["linear_position"].to_numpy()
 
+    # events decoded where the model was never fit are not scored (module notes)
+    left_out = underflowed_bin_mask(
+        enc["encargs"]["occupancy"], env, floor=UNDERFLOW_OCCUPANCY_FLOOR
+    )
+    n_events = len(events)
+    n_events_left_out = 0
+    if left_out.any():
+        hit = events_with_map_in_left_out_bins(events, mape, lin, env, left_out)
+        events = events[~hit]
+        n_events_left_out = int(hit.sum())
+
     records = []
     animal = animal_from_epoch_id(epoch_id)
     for group, g in events.groupby("group"):
@@ -362,6 +421,12 @@ def analyze_session(
         "waveform_features": waveform_features,
         "gpi_peak_pos": gpi_peak_pos,
         "epoch_id": epoch_id,
+        "left_out": {
+            "floor": UNDERFLOW_OCCUPANCY_FLOOR,
+            "bins": np.flatnonzero(left_out).tolist(),
+            "n_events": n_events,
+            "n_events_left_out": n_events_left_out,
+        },
     }
     return metrics_df, context
 
@@ -539,6 +604,7 @@ def main() -> None:
     print(f"Analyzing {len(sessions)} session(s)")
 
     all_metrics = []
+    left_out_rows = []
     for epoch_id in sessions:
         try:
             metrics_df, context = analyze_session(
@@ -553,6 +619,23 @@ def main() -> None:
             print(f"  {epoch_id}: FAILED ({type(exc).__name__}: {exc})")
             continue
         all_metrics.append(metrics_df)
+        left_out = context["left_out"]
+        left_out_rows.append(
+            {
+                "epoch_id": epoch_id,
+                "floor": left_out["floor"],
+                "n_underflowed_bins": len(left_out["bins"]),
+                "n_events": left_out["n_events"],
+                "n_events_left_out": left_out["n_events_left_out"],
+            }
+        )
+        if left_out["n_events_left_out"]:
+            print(
+                f"    {epoch_id}: {left_out['n_events_left_out']} of "
+                f"{left_out['n_events']} events left out (MAP in the "
+                f"{len(left_out['bins'])} real bins with occupancy below "
+                f"{left_out['floor']:g})"
+            )
         med = metrics_df.groupby("group")["dll_per_spike"].median()
         print(
             f"  {epoch_id}: per-spike dLL by group -> "
@@ -569,6 +652,9 @@ def main() -> None:
     metrics.to_parquet(args.output_dir / "event_spike_evidence_metrics.parquet")
     summary = summarize(metrics)
     summary.to_csv(args.output_dir / "event_spike_evidence_summary.csv", index=False)
+    pd.DataFrame(left_out_rows).to_csv(
+        args.output_dir / "event_spike_evidence_left_out.csv", index=False
+    )
     print(f"\nWrote metrics ({len(metrics)} events) and summary to {args.output_dir}")
     print(
         "\nPooled per-group medians (NOT the inferential statistic — see per-animal below):"

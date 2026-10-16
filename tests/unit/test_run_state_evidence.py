@@ -17,6 +17,7 @@ import os
 import shutil
 from pathlib import Path
 
+import jax.numpy as jnp
 import joblib
 import numpy as np
 import pandas as pd
@@ -40,6 +41,9 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
 from continuum_swr_replay.analysis.hippocampus.state_evidence import (
     ENCODING_KEY,
     STATES,
+    UNDERFLOW_OCCUPANCY_FLOOR,
+    interior_bin_mask,
+    nearest_interior_bins,
 )
 from continuum_swr_replay.table_io import read_table
 from scripts.qa import run_state_evidence as runner
@@ -264,6 +268,12 @@ def test_an_epoch_is_validated_and_written(simulated, tmp_path):
     assert not np.allclose(table.runcv_loc_mark, table.run_loc_mark, equal_nan=True)
     assert set(table.kind) == {"bout", "baseline", "calib"}
     assert record["windows"]["silent_ns_logratio_identity_max_abs"] < 1e-9
+    # no bin underflows: the check was made, nothing is left out, no column is added
+    assert record["underflowed_bins"] == {
+        "floor": UNDERFLOW_OCCUPANCY_FLOOR, "n": 0, "bins": [],
+    }  # fmt: skip
+    assert not [c for c in table if "left_out" in c]
+    assert "left_out_selection" not in record["windows"]
     # excluded time is no window's, and no masked bin is in a running-only fit
     excluded = interval_mask(TIME, swr_source.excluded_intervals(EPOCH))
     assert excluded[2801:3199].all() and excluded[4801:5199].all()
@@ -282,6 +292,90 @@ def test_an_epoch_is_validated_and_written(simulated, tmp_path):
     assert not [c for c in default if c.endswith("_window_level")]
     runner.summarize(output_dir, [EPOCH], window_level=True)
     assert "p_signflip_window_level" in pd.read_csv(output_dir / "bout_stats.csv")
+
+
+ZONE_SIZE = 3
+
+
+def underflowing_copy(simulated, tmp_path: Path) -> tuple[Path, np.ndarray]:
+    """A copy of the decode whose stored occupancy underflows at the last real bins.
+
+    As in chimi20200221_08_r4 (D1): the animal never reached those bins, so the
+    stored occupancy there is a float32 subnormal. ``results.nc`` stays as the
+    library wrote it, with ordinary numbers there (the GPU decode kept the
+    subnormals and so was close to exact arithmetic), while a CPU rebuild flushes
+    the subnormal to zero and gets the library's floor.
+
+    Returns the decode folder and the underflowed real bins (indices into the
+    real place bins).
+    """
+    assert not bool(jnp.asarray(np.float32(1e-42)) > 0), (
+        "this test needs a CPU that flushes float32 subnormals to zero, as XLA's "
+        "does (D1); the premise of the rule is gone"
+    )
+    decode_dir = decode_copy(simulated, tmp_path)
+    detector = joblib.load(decode_dir / f"{EPOCH}_detector.pkl")
+    encoding = detector.encoding_model_[ENCODING_KEY]
+    environment = encoding["environment"]
+    environment._is_fitted = True
+    n_real = int(interior_bin_mask(environment).sum())
+    zone = np.arange(n_real - ZONE_SIZE, n_real)
+    # the animal shuttles on the first two arms: the third arm's tip is never visited
+    animal = nearest_interior_bins(
+        environment, pd.read_pickle(decode_dir / f"{EPOCH}_80_data_over_time.pkl")
+        .linear_position.to_numpy(),
+    )  # fmt: skip
+    assert not np.isin(zone, animal).any()
+    occupancy = np.array(encoding["occupancy"], dtype=np.float32)
+    occupancy[zone] = np.float32(1e-42)
+    assert (occupancy[zone] < np.finfo(np.float32).tiny).all()
+    encoding["occupancy"] = occupancy
+    joblib.dump(detector, decode_dir / f"{EPOCH}_detector.pkl")
+    return decode_dir, zone
+
+
+def test_bins_whose_occupancy_underflows_are_left_out_of_the_checks_and_the_evidence(
+    simulated, tmp_path
+):
+    decode_dir, zone = underflowing_copy(simulated, tmp_path)
+
+    record = run(decode_dir, tmp_path / "out", simulated[1])
+
+    assert record["status"] == "ok", record.get("traceback")
+    # recorded: the floor, the count and the bins
+    assert record["underflowed_bins"] == {
+        "floor": UNDERFLOW_OCCUPANCY_FLOOR, "n": ZONE_SIZE, "bins": zone.tolist(),
+    }  # fmt: skip
+    # the stored-likelihood check and the library check pass on the other bins
+    assert record["stored_log_likelihood"]["max_rel"] < 1e-5
+    for name in ("can", "run", "runcv0", "runcv1"):
+        assert record["library_log_likelihood"][name]["max_rel"] < 1e-5
+    # no encoding chose a left-out bin as the selecting half's best bin
+    table = read_table(runner.output_paths(EPOCH, tmp_path / "out")["windows"])
+    for prefix in ("can", "run", "runcv"):
+        for column in ("run0_mapS", "run0_mapSr"):
+            assert not table[f"{prefix}_{column}"].isin(zone).any(), (prefix, column)
+    # and the windows that would have chosen one are marked and counted, not dropped
+    marked = table.can_mapS_left_out_runs + table.can_mapSr_left_out_runs
+    assert (marked > 0).any()
+    counted = record["windows"]["left_out_selection"]
+    assert counted["can"]["windows"] == int((marked > 0).sum())
+    assert counted["can"]["bouts"] == int(((marked > 0) & (table.kind == "bout")).sum())
+    assert set(counted) == {"runcv", "run", "can"}
+    # every window is still scored
+    assert len(table) == sum(record["windows"]["n"].values())
+
+
+def test_the_stored_likelihood_check_fails_as_before_when_the_bins_are_not_left_out(
+    simulated, tmp_path, monkeypatch
+):
+    decode_dir, _ = underflowing_copy(simulated, tmp_path)
+    monkeypatch.setattr(runner, "UNDERFLOW_OCCUPANCY_FLOOR", 0.0)
+
+    record = run(decode_dir, tmp_path / "out", simulated[1])
+
+    assert record["status"] == "failed"
+    assert "do not reproduce results.nc" in record["error"]
 
 
 def test_a_decoded_event_the_rule_drops_stays_out_of_the_running_fits(
