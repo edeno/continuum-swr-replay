@@ -71,11 +71,19 @@ NEWTON_MAX_STEPS = 20
 # step is below the log-likelihood's floating-point resolution, so a step that
 # still lowers it there is abandoned and the fit stops where it is.
 _MAX_STEP_HALVINGS = 30
+# Longest Newton step, as the largest change of any coefficient (on the scaled
+# columns: log units per within-event SD). Near the optimum, and along a term
+# running off on an exponential tail, a step is far shorter. From a start where
+# the probabilities saturate the information is tiny and the raw step enormous
+# (1e17 from (25, -30) in a test), past what 30 halvings can bring back.
+_MAX_STEP_LENGTH = 10.0
 
 # Smallest information, along any direction, a fitted design may have at its
-# optimum. It is measured on the columns divided by their within-event SD, so
-# one unit means the same for every column: below 1e-3 the SE along that
-# direction exceeds 30 within-event SDs.
+# optimum. It is read on the final Newton iterate only (an iterate far from the
+# optimum can have saturated probabilities and tiny information along an
+# identified direction). It is measured on the columns divided by their
+# within-event SD, so one unit means the same for every column: below 1e-3 the
+# SE along that direction exceeds 30 within-event SDs.
 #
 # Such a direction is a term the data cannot bound. F3 found 62 headline content
 # fits with one. In 60 it is a nuisance term whose rows get all or none of each
@@ -90,9 +98,10 @@ _MAX_STEP_HALVINGS = 30
 # reaches NEWTON_DECREMENT_TOL therefore leaves lambda below 2e-8 * Delta**2,
 # which is under this threshold for any column whose range is under 220
 # within-event SDs. On the real fits the two groups are four orders of
-# magnitude apart: the 2,583 identified fits have at least 0.30, and Newton run
-# on without this check takes all 62 to 3.1e-5 or below. The decision is the
-# same whether Newton starts from zero, from BFGS or from the old fit.
+# magnitude apart: the 2,583 identified fits have at least 0.30, and the finish,
+# run on to its decrement threshold, takes all 62 to 3.1e-5 or below. The
+# decision is the same whether Newton starts from zero, from BFGS or from the
+# old fit.
 #
 # What happens next depends on how many columns the direction involves; see
 # ``fit_conditional_poisson``. A direction carried by one column is a term the
@@ -328,11 +337,18 @@ def _newton_finish(
     """Newton steps with the analytic information until the decrement is small.
 
     Each step solves ``I d = g`` and is halved until the log-likelihood does not
-    fall. It stops when the decrement ``g' I^-1 g / 2`` is below
-    ``NEWTON_DECREMENT_TOL``, after ``NEWTON_MAX_STEPS`` steps, when no fraction
-    of the step raises the log-likelihood, or at once when the information has a
-    direction below ``MIN_SCALED_INFORMATION`` (the caller refuses that design;
-    the decrement is then NaN).
+    fall, after being shortened to ``_MAX_STEP_LENGTH`` if longer. It stops when
+    the decrement ``g' I^-1 g / 2`` is below ``NEWTON_DECREMENT_TOL``, after
+    ``NEWTON_MAX_STEPS`` steps, or when no fraction of the step raises the
+    log-likelihood. The solve is a pseudo-inverse: a direction with no
+    information to machine precision takes no step.
+
+    Low information is not judged here. An iterate far from the optimum can have
+    saturated probabilities and tiny information along an identified direction,
+    so the caller reads the eigenvalues of the FINAL iterate (returned with it)
+    to find a term the data cannot bound. Along such a term the finish keeps
+    stepping until the decrement is small, which drives its information down
+    (see ``MIN_SCALED_INFORMATION``).
 
     A Newton step and its decrement do not depend on how the columns are scaled:
     with ``beta_s = s * beta`` the step on the scaled columns maps onto the step
@@ -344,13 +360,15 @@ def _newton_finish(
     while True:
         gradient = scores.sum(axis=0)
         eigenvalues, eigenvectors = np.linalg.eigh(information)
-        if eigenvalues[0] < MIN_SCALED_INFORMATION:
-            decrement = np.nan
-            break
-        step = eigenvectors @ ((eigenvectors.T @ gradient) / eigenvalues)
+        solvable = (
+            eigenvalues > eigenvalues[-1] * len(eigenvalues) * np.finfo(float).eps
+        )
+        basis = eigenvectors[:, solvable]
+        step = basis @ ((basis.T @ gradient) / eigenvalues[solvable])
         decrement = float(gradient @ step) / 2
         if decrement < NEWTON_DECREMENT_TOL or n_steps >= NEWTON_MAX_STEPS:
             break
+        step *= min(1.0, _MAX_STEP_LENGTH / np.max(np.abs(step)))
         for halving in range(_MAX_STEP_HALVINGS + 1):
             trial = params + step / 2**halving
             trial_llf, trial_scores, trial_information = _event_terms(
@@ -426,11 +444,16 @@ def _rows_sent_to_zero_probability(
 ) -> tuple[np.ndarray, str] | None:
     """Rows that a column's coefficient running to -inf or +inf takes out.
 
-    If no event in the likelihood has mass on a row where ``x`` is above its
-    event minimum, the log-likelihood rises without bound as the coefficient
-    goes to -inf, and those rows' probabilities go to 0. The limit of the fit is
-    then the fit without those rows, on which ``x`` is constant within each
-    event. Likewise for rows below the event maximum and +inf.
+    If no row where ``x`` is above its event minimum has mass, and some such
+    row is in an event the likelihood uses, the log-likelihood rises without
+    bound as the coefficient goes to -inf, and those rows' probabilities go to
+    0. The limit of the fit is then the fit without those rows, on which ``x``
+    is constant within each event. Likewise for rows below the event maximum
+    and +inf.
+
+    Mass is checked on every row, including events the likelihood leaves out
+    (constant response), because a prediction from the fit applies the limit
+    to those events too and must never give a row with mass probability 0.
 
     Returns
     -------
@@ -441,7 +464,7 @@ def _rows_sent_to_zero_probability(
     """
     for reason in (SEPARATED_TO_MINUS_INF, SEPARATED_TO_PLUS_INF):
         vanishing = _rows_ruled_out(x, groups, np.ones(len(x), dtype=bool), reason)
-        if vanishing.any() and not np.any(y[vanishing & in_likelihood] > 0):
+        if (vanishing & in_likelihood).any() and not np.any(y[vanishing] > 0):
             return vanishing, reason
     return None
 
@@ -481,10 +504,10 @@ def _fit_scaled(
     """BFGS and the Newton finish on ``X`` divided by its within-event SD.
 
     Returns the scale, the scaled design (all rows) and the finish. The scale
-    comes from all of ``X``'s rows, which the caller has checked are full rank
-    within events; the likelihood uses the ``in_likelihood`` rows.
+    and the likelihood both use the ``in_likelihood`` rows, which the caller has
+    checked are full rank within events.
     """
-    scale = _within_group_centered(X, groups).std(axis=0)
+    scale = _within_group_centered(X[in_likelihood], groups[in_likelihood]).std(axis=0)
     assert np.all(scale > 0), "a column with no within-event SD passed the rank check"
     X_scaled = X / scale
     X_fit, y_fit, starts = _sorted_by_event(
@@ -525,10 +548,15 @@ def _fit_to_the_limit(
     rows a probability that their zero mass contradicts, and on the real fits it
     moves the headline term by up to 0.76 SE.
 
-    A column that the removed rows leave constant within every event is not
-    informed either, and is dropped with it. A direction that mixes columns, or
-    a single column whose rows do not split this way, is refused (None), as is a
-    design with no column left.
+    A column that the removed rows leave constant within every event the
+    likelihood uses is not informed either, and is dropped with it. Refused
+    (None): a direction that mixes columns; a single column whose rows do not
+    split this way (``_rows_sent_to_zero_probability``); remaining columns that
+    the removal leaves collinear; and a design with no column left.
+
+    Identifiability is judged on the rows the likelihood uses: the low
+    information on the final Newton iterate, and the within-event variation
+    after a removal.
     """
     rows = np.ones(len(y), dtype=bool)
     columns = list(range(X.shape[1]))
@@ -545,31 +573,39 @@ def _fit_to_the_limit(
                 rows, columns, scale, X_scaled, finish, n_newton_steps, unidentified
             )
         directions = finish.eigenvectors[:, uninformed]
+        carriers = _single_columns(directions)
         separation = None
-        for k in _single_columns(directions) or []:
-            separation = _rows_sent_to_zero_probability(
+        for k in carriers or []:
+            found = _rows_sent_to_zero_probability(
                 X[rows, columns[k]], y[rows], groups[rows], in_likelihood[rows]
             )
-            if separation is not None:
+            if found is not None:
+                separation = (columns[k], *found)
                 break
         if separation is None:
+            why = (
+                "along a direction that mixes several columns"
+                if carriers is None
+                else "and its rows do not get all or none of each event's mass"
+            )
             logger.warning(
                 "fit_conditional_poisson: the data do not bound %s (information "
-                "%.2g < %.0e on the within-event-SD scale, along a direction no "
-                "single column carries); not fitting this design",
+                "%.2g < %.0e on the within-event-SD scale, %s); not fitting this "
+                "design",
                 ", ".join(_terms_on(directions, [names[c] for c in columns])),
                 finish.eigenvalues[0],
                 MIN_SCALED_INFORMATION,
+                why,
             )
             return None
-        vanishing, reason = separation
-        unbounded = columns[k]
+        unbounded, vanishing, reason = separation
         unidentified.append((unbounded, reason))
         rows[np.flatnonzero(rows)[vanishing]] = False
         columns = [c for c in columns if c != unbounded]
         left_constant: list[int] = []
         if columns:
-            null = _within_group_null_directions(X[rows][:, columns], groups[rows])
+            used = rows & in_likelihood
+            null = _within_group_null_directions(X[used][:, columns], groups[used])
             if null.shape[1]:
                 single = _single_columns(null)
                 if single is None:
@@ -675,13 +711,22 @@ def fit_conditional_poisson(
         the fit took them (reasons: ``UNIDENTIFIED_REASONS``): a column constant
         within every event, or a single column along which the information at
         the optimum is below ``MIN_SCALED_INFORMATION`` because its coefficient
-        runs to +/-inf (see :func:`_fit_to_the_limit`). Their coefficient and
-        p-value are NaN and their SEs infinite; the other terms are their values
-        in that limit. Predict from a fit with
-        :func:`conditional_linear_predictor`, which applies the limits. None if
-        there are too few events, if the columns that vary within events are
-        collinear, or if a direction without information mixes several columns.
-        The log names the columns involved.
+        runs to +/-inf (see :func:`_fit_to_the_limit`), judged on the rows the
+        likelihood uses. Their coefficient and p-value are NaN and their SEs
+        infinite; the other terms are their values in that limit. Predict from a
+        fit with :func:`conditional_linear_predictor`, which applies the limits.
+
+        None, with a log line naming the columns, if:
+
+        - there are fewer than ``2 * len(predictors)`` events;
+        - no column varies within the events the likelihood uses;
+        - the columns that vary are collinear within events;
+        - a direction without information mixes several columns;
+        - a single column carries it, but its rows do not get all or none of
+          each event's mass;
+        - removing a separated term's rows leaves the remaining columns
+          collinear; or
+        - no column is left.
 
     Notes
     -----
@@ -746,7 +791,11 @@ def fit_conditional_poisson(
     # A column constant within every event cancels in the conditional
     # likelihood: the session cannot inform it, and dropping it changes nothing
     # else. It is reported as not estimated, not a reason to refuse the fit.
-    constant = _columns_constant_within_every_event(X, groups)
+    # Identifiability is judged on the rows the likelihood uses: statsmodels'
+    # rule leaves out an event whose response is the same on every row.
+    in_likelihood = _rows_of_events_whose_response_varies(y, groups)
+    X_used, groups_used = X[in_likelihood], groups[in_likelihood]
+    constant = _columns_constant_within_every_event(X_used, groups_used)
     varying = [k for k in range(len(predictors)) if k not in constant]
     if constant:
         logger.warning(
@@ -766,11 +815,13 @@ def fit_conditional_poisson(
     # Reject the designs the conditional model cannot identify that remain:
     # globally collinear predictors (a duplicated column, say), which would
     # otherwise be fit with finite-but-meaningless coefficients and exploding SEs.
-    if not within_group_full_rank(X_varying, groups):
+    if not within_group_full_rank(X_used[:, varying], groups_used):
         logger.warning(
             "fit_conditional_poisson: no within-event information in %s (collinear "
             "within events); not fitting this design",
-            ", ".join(_rank_deficient_terms(X_varying, groups, names_varying)),
+            ", ".join(
+                _rank_deficient_terms(X_used[:, varying], groups_used, names_varying)
+            ),
         )
         return None
 
@@ -792,7 +843,6 @@ def fit_conditional_poisson(
     # within-event variation is a zero column of the centred design, so the
     # check above has refused any that the exact test let through, and every
     # scale is positive.
-    in_likelihood = _rows_of_events_whose_response_varies(y, groups)
     limit = _fit_to_the_limit(X_varying, y, groups, in_likelihood, names_varying)
     if limit is None:
         return None

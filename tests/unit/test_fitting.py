@@ -849,3 +849,120 @@ def test_pearson_residuals_take_a_fits_unidentified_terms_to_their_limits():
     np.testing.assert_allclose(
         out.groupby("event_id")["predicted_frac"].sum().to_numpy(), 1.0, atol=1e-12
     )
+
+
+# ── Review round: identifiability on the likelihood's rows, and untested parts ──
+
+
+def test_a_column_that_varies_only_in_events_the_likelihood_leaves_out_is_inert():
+    """An event whose response is the same on every row is left out of the
+    likelihood. A column that varies only inside such an event is constant on
+    every row the likelihood uses, so it is ``no_within_event_variation``, not a
+    separated term, and prediction rules out no row (the review's probe 3F: the
+    old code ruled out a row that has mass)."""
+    long_df = simulate_with_event_covariates(CONTENT_BETA, n_events=150, L_e=10, seed=3)
+    first = long_df["event_id"].iloc[0]
+    long_df.loc[long_df["event_id"] == first, "arm_count_hard"] = 1
+    long_df["marker"] = 0.0
+    long_df.loc[(long_df["event_id"] == first) & (long_df["arm_id"] == 2), "marker"] = (
+        1.0
+    )
+    predictors = [*CONTENT_PREDICTORS, "marker"]
+
+    fit = fit_conditional_poisson(long_df, predictors)
+
+    assert fit["unidentified_terms"] == "marker:no_within_event_variation"
+    X, _, groups = _arrays(long_df, predictors, "arm_count_hard")
+    eta = fitting_mod.conditional_linear_predictor(X, groups, fit, predictors)
+    assert np.isfinite(eta).all()
+
+
+def test_the_information_test_reads_each_column_per_within_event_sd():
+    """A column with a large spread between events and a small one within them
+    is identified: per within-event SD its information is ordinary. Per global
+    SD it would read 1e4 times smaller, as if the data could not bound it."""
+    long_df = simulate_with_event_covariates(CONTENT_BETA, n_events=300, L_e=10, seed=6)
+    rng = np.random.default_rng(6)
+    between = rng.normal(scale=1000.0, size=long_df["event_id"].nunique())
+    long_df["spread"] = between[long_df["event_id"].to_numpy()] + rng.normal(
+        scale=0.1, size=len(long_df)
+    )
+
+    fit = fit_conditional_poisson(long_df, [*CONTENT_PREDICTORS, "spread"])
+
+    assert fit is not None
+    assert fit["unidentified_terms"] == ""
+    assert np.isfinite(fit["coef_spread"])
+    assert fit["converged"] is True
+
+
+def test_the_newton_finish_from_a_far_start_never_lowers_the_log_likelihood():
+    """From (6, 3) the full Newton step overshoots: only the step-halving keeps
+    the log-likelihood from falling, and the finish still reaches the optimum."""
+    long_df = simulate_with_event_covariates(CONTENT_BETA, n_events=200, L_e=10, seed=1)
+    X, y, groups = _arrays(long_df, CONTENT_PREDICTORS, "arm_count_hard")
+    X_sorted, y_sorted, starts = fitting_mod._sorted_by_event(X, y, groups)
+    ref_llf, _ = _reference_optimum(X, y, groups, np.array([1.2, 0.6]))
+    start = np.array([6.0, 3.0])
+    start_llf = fitting_mod._event_terms(X_sorted, y_sorted, starts, start)[0]
+
+    finish = fitting_mod._newton_finish(X_sorted, y_sorted, starts, start)
+
+    assert finish.llf > start_llf
+    assert finish.llf == pytest.approx(ref_llf, abs=1e-8)
+    assert finish.decrement < fitting_mod.NEWTON_DECREMENT_TOL
+
+
+def test_the_newton_finish_from_a_saturated_start_goes_on_to_the_optimum():
+    """At (25, -30) the probabilities saturate and the information is tiny along
+    both columns. That is the start, not the optimum: the finish must take steps
+    rather than read it as a term the data cannot bound (the review's probe 2D)."""
+    long_df = simulate_with_event_covariates(CONTENT_BETA, n_events=200, L_e=10, seed=1)
+    X, y, groups = _arrays(long_df, CONTENT_PREDICTORS, "arm_count_hard")
+    X_sorted, y_sorted, starts = fitting_mod._sorted_by_event(X, y, groups)
+    ref_llf, _ = _reference_optimum(X, y, groups, np.array([1.2, 0.6]))
+
+    finish = fitting_mod._newton_finish(
+        X_sorted, y_sorted, starts, np.array([25.0, -30.0])
+    )
+
+    assert finish.n_steps > 0
+    assert finish.llf == pytest.approx(ref_llf, abs=1e-8)
+    assert finish.eigenvalues[0] >= fitting_mod.MIN_SCALED_INFORMATION
+
+
+def test_max_abs_grad_is_the_gradient_on_the_original_scale():
+    """Read where the gradient is not yet ~0: the fit stopped after BFGS."""
+    long_df = _session_with_a_tiny_within_event_column()
+    X, y, groups = _arrays(long_df, TINY_PREDICTORS, "arm_fraction")
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(fitting_mod, "NEWTON_MAX_STEPS", 0)
+        fit = fit_conditional_poisson(
+            long_df, TINY_PREDICTORS, response_col="arm_fraction"
+        )
+    beta = np.array([fit[f"coef_{t}"] for t in TINY_PREDICTORS])
+
+    _, gradient, _ = _loglike_by_event(X, y, groups, beta)
+
+    assert fit["max_abs_grad"] == pytest.approx(np.max(np.abs(gradient)), rel=1e-6)
+
+
+def test_the_linear_predictor_applies_separated_limits_in_sequence():
+    """Each limit acts on the rows the earlier ones left.
+
+    In each event, ``a`` rules out its row first; ``b`` then rules out the rows
+    above its minimum over the rows left (b = 2), keeping b = 1. Read over all
+    rows, ``b``'s minimum would be the ruled-out row's 0, and it would rule out
+    every row.
+    """
+    X = np.array([[1.0, 0.0], [0.0, 1.0], [0.0, 2.0]] * 2)
+    groups = np.repeat([1, 2], 3)
+    fit = {
+        "coef_a": np.nan,
+        "coef_b": np.nan,
+        "unidentified_terms": "a:separated_to_minus_inf|b:separated_to_minus_inf",
+    }
+
+    eta = fitting_mod.conditional_linear_predictor(X, groups, fit, ["a", "b"])
+
+    np.testing.assert_array_equal(eta, [-np.inf, 0.0, -np.inf] * 2)
