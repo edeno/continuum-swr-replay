@@ -271,6 +271,35 @@ def test_the_summary_has_one_row_per_rung_and_term(two_rungs):
     assert set(map(tuple, summary[["model", "term"]].values)) == expected
 
 
+def test_the_summary_reports_the_sessions_each_term_lost_to_identifiability(two_rungs):
+    """A session that cannot inform a term (NaN coefficient) leaves that term's
+    medians, and the summary says how many did."""
+    coefficients = two_rungs.coefficients.copy()
+    term = "is_current_arm"
+    first = coefficients[
+        (coefficients["model"] == BASE_RUNG.name) & (coefficients["term"] == term)
+    ][SC].iloc[0]
+    hit = (
+        (coefficients["model"] == BASE_RUNG.name)
+        & (coefficients["term"] == term)
+        & (coefficients[SC] == first).all(axis=1)
+        & (coefficients["estimator"] == CONDITIONAL_POISSON_FRACTION)
+    )
+    coefficients.loc[hit, "coef"] = np.nan
+
+    summary = mod.summarize(coefficients).set_index(["model", "term"])
+
+    before = two_rungs.summary.set_index(["model", "term"])
+    row = summary.loc[(BASE_RUNG.name, term)]
+    assert row["n_sessions_unidentified"] == (
+        before.loc[(BASE_RUNG.name, term), "n_sessions_unidentified"] + 1
+    )
+    assert (
+        row["n_sessions_count"]
+        == before.loc[(BASE_RUNG.name, term), "n_sessions_count"] - 1
+    )
+
+
 def test_delta_aic_is_formed_only_against_a_parent_fit_on_the_same_events(two_rungs):
     coefficients = two_rungs.coefficients
     parentless = coefficients[coefficients["model"] == BASE_RUNG.name]

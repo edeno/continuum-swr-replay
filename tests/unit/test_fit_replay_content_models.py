@@ -434,6 +434,13 @@ def test_the_printed_se_skips_a_session_that_cannot_inform_the_term(capsys) -> N
             "animal": ["a", "a", "b", "b", "c"],
             "coef_is_candidate_arm_0": [0.5, 0.6, np.nan, np.nan, 0.7],
             "bse_is_candidate_arm_0": [0.1, 0.2, np.inf, np.inf, 0.3],
+            "unidentified_terms": [
+                "",
+                "",
+                "is_candidate_arm_0:separated_to_minus_inf",
+                "is_candidate_arm_0:no_within_event_variation",
+                "",
+            ],
         }
     )
     hierarchy = {"X": argparse.Namespace(description="test rung")}
@@ -445,8 +452,10 @@ def test_the_printed_se_skips_a_session_that_cannot_inform_the_term(capsys) -> N
         for text in capsys.readouterr().out.splitlines()
         if text.strip().startswith("is_candidate_arm_0")
     )
-    # Columns: name, animal median, agree, session median, SE, p.
+    # Columns: name, animal median, agree, session median, SE, p, unidentified.
     assert float(line.split()[4]) == pytest.approx(0.2)
+    # The sessions that cannot inform the term are reported, not just skipped.
+    assert line.split()[6] == "2"
 
 
 # ── Event-scale reporting ──

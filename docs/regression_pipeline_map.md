@@ -598,7 +598,7 @@ Per-model cohort / drop-profile audit records.
 
 Shared audited aggregation for the is_swr contrast ladders (rate + content).
 
-`load_per_sd_scale`, `std_factor`, `separated_for_term`, `session_se`, `typical_session_se`, `pct_significant_sessions`, `aggregate_contrast`, `specs_from_ladder`
+`load_per_sd_scale`, `std_factor`, `separated_for_term`, `unidentified_for_term`, `session_se`, `typical_session_se`, `pct_significant_sessions`, `aggregate_contrast`, `specs_from_ladder`
 
 ### `src/continuum_swr_replay/analysis/replay/learning.py`
 

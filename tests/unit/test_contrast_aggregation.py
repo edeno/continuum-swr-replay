@@ -245,11 +245,13 @@ def test_separation_drops_only_the_term_it_holds_for() -> None:
     assert set(out["n_sessions_flagged_separated"]) == {1}
 
 
-def test_a_term_a_session_cannot_inform_is_skipped_for_that_term_only() -> None:
-    """The fitter reports such a term with a NaN coefficient and infinite SEs.
+def test_a_term_a_session_cannot_inform_is_counted_as_unidentified() -> None:
+    """The fitter reports such a term with a NaN coefficient, infinite SEs and
+    the term named in ``unidentified_terms``.
 
-    That session drops out of that term's aggregate and nothing else: it is not
-    counted as a separation drop, and it still contributes its other terms.
+    That session drops out of the term's aggregate and is counted in
+    ``n_unidentified`` (``n_dropped`` stays the count of separation drops); it
+    still contributes its other terms.
     """
     fits = _two_term_fits()
     fits["bse_cluster_hist_rcos_2"] = [0.10] * len(fits)
@@ -257,7 +259,9 @@ def test_a_term_a_session_cannot_inform_is_skipped_for_that_term_only() -> None:
     fits.loc[0, "pval_hist_rcos_2"] = float("nan")
     fits.loc[0, "bse_hist_rcos_2"] = float("inf")
     fits.loc[0, "bse_cluster_hist_rcos_2"] = float("inf")
-    fits["unidentified_terms"] = ["hist_rcos_2"] + [""] * (len(fits) - 1)
+    fits["unidentified_terms"] = ["hist_rcos_2:separated_to_minus_inf"] + [""] * (
+        len(fits) - 1
+    )
 
     out = aggregate_contrast(
         fits,
@@ -269,10 +273,46 @@ def test_a_term_a_session_cannot_inform_is_skipped_for_that_term_only() -> None:
     ).set_index("term")
 
     assert out.loc["hist_rcos_2", "n_sessions"] == 7
+    assert out.loc["hist_rcos_2", "n_unidentified"] == 1
     assert out.loc["hist_rcos_2", "n_dropped"] == 0
     assert out.loc["hist_rcos_2", "coef_session_median"] == pytest.approx(0.50)
     assert out.loc["hist_rcos_2", "typical_session_se"] == pytest.approx(0.10)
     assert out.loc["reward_history_rcos_0", "n_sessions"] == 8
+    assert out.loc["reward_history_rcos_0", "n_unidentified"] == 0
+
+
+def test_a_term_half_the_sessions_cannot_inform_is_withheld(caplog) -> None:
+    """The refusal gate counts unidentified sessions as it counts separated ones.
+
+    A headline that 20 of 40 sessions cannot inform describes the identified
+    half only, exactly as when those 20 were separated (the review's probe 2E).
+    """
+    n = 40
+    fits = pd.DataFrame(
+        {
+            "model": "CS1",
+            "population": "all",
+            "animal": [animal for animal in "abcde" for _ in range(n // 5)],
+            "coef_h": [0.3] * n,
+            "bse_h": [0.1] * n,
+            "bse_cluster_h": [0.1] * n,
+            "pval_h": [0.01] * n,
+            "sd_h": [1.0] * n,
+            "separated_terms": [""] * n,
+            "separated": [False] * n,
+            "converged": [True] * n,
+            "unidentified_terms": ["h:no_within_event_variation"] * (n // 2)
+            + [""] * (n // 2),
+        }
+    )
+    fits.loc[: n // 2 - 1, ["coef_h", "pval_h"]] = float("nan")
+    fits.loc[: n // 2 - 1, ["bse_h", "bse_cluster_h"]] = float("inf")
+
+    with caplog.at_level("WARNING"):
+        out = aggregate_contrast(fits, [("CS1", "all", "h")], "candidate_arm")
+
+    assert out.empty
+    assert any("20 of 40" in r.getMessage() for r in caplog.records)
 
 
 def _product_fits(separated_terms: list[str]) -> pd.DataFrame:

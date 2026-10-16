@@ -93,6 +93,9 @@ from continuum_swr_replay.analysis.replay.content_response import (
     resolve_response_choice,
     resolve_response_column,
 )
+from continuum_swr_replay.analysis.replay.contrast_aggregation import (
+    unidentified_for_term,
+)
 from continuum_swr_replay.analysis.replay.covariate_registry import (
     require_covariate_schema,
 )
@@ -1122,7 +1125,12 @@ def print_model_results(
         f"\nCoefficients (animal-level primary, n={n_animals} animals; "
         "session median/p descriptive):"
     )
-    header = f"  {'Predictor':<25} {'AnimalMed':>10} {'agree':>7} {'SessMed':>9} {'SE':>8} {'sess p':>10}"
+    # ``unident``: sessions that cannot inform the predictor at all (NaN
+    # coefficient, named in ``unidentified_terms``); they are in no median here.
+    header = (
+        f"  {'Predictor':<25} {'AnimalMed':>10} {'agree':>7} {'SessMed':>9} "
+        f"{'SE':>8} {'sess p':>10} {'unident':>7}"
+    )
     print(header)
     print(f"  {'-' * (len(header) - 2)}")
     for pred in predictors:
@@ -1152,9 +1160,10 @@ def print_model_results(
             agree = f"{max(n_pos, len(per_animal) - n_pos)}/{len(per_animal)}"
         else:
             animal_med, agree = float("nan"), "—"
+        n_unidentified = int(unidentified_for_term(mdf, pred).sum())
         print(
             f"  {pred:<25} {animal_med:10.3f} {agree:>7} {vals.median():9.3f} "
-            f"{se:8.3f} {p_str:>10}"
+            f"{se:8.3f} {p_str:>10} {n_unidentified:>7d}"
         )
 
 

@@ -809,6 +809,15 @@ def summarize(coefficients: pd.DataFrame) -> pd.DataFrame:
     if identified.empty:
         return pd.DataFrame(columns=["model", "term"])
     wide = _wide_by_estimator(identified)
+    # Sessions each (rung, term) lost to the identifiability rule: separated,
+    # runaway, or not estimated at all (a NaN coefficient: the session cannot
+    # inform the term). Their whole estimator triple is out of every median.
+    unidentified = (
+        coefficients.loc[unidentified_rows(coefficients), [*SC, "model", "term"]]
+        .drop_duplicates()
+        .groupby(["model", "term"])
+        .size()
+    )
 
     log_phi = identified[
         (identified["estimator"] == DIRICHLET_MULTINOMIAL)
@@ -821,7 +830,11 @@ def summarize(coefficients: pd.DataFrame) -> pd.DataFrame:
 
     records = []
     for (model, term), group in wide.groupby(["model", "term"], sort=True):
-        record = {"model": model, "term": term}
+        record = {
+            "model": model,
+            "term": term,
+            "n_sessions_unidentified": int(unidentified.get((model, term), 0)),
+        }
         for estimator in ESTIMATORS:
             label = ESTIMATOR_LABELS[estimator]
             coef = group[f"coef_{label}"]

@@ -19,6 +19,7 @@ from scripts.qa.compare_fits import (
     _disjoint_rungs_note,
     _md,
     _stratum_power_note,
+    audited_term_drop_table,
     build_content_report,
     collect_content_inputs,
     content_delta_aic_table,
@@ -91,6 +92,50 @@ def _new() -> pd.DataFrame:
         bse=0.05,
         bse_cluster=0.30,
     )
+
+
+def test_term_table_counts_unidentified_sessions_and_skips_their_ses():
+    """A session that cannot inform the term has a NaN coefficient and infinite
+    SEs: it is counted, and it stays out of the SE medians as it does out of the
+    coefficient median."""
+    new = _new()
+    new[f"bse_cluster_{TERM}"] = [0.1, 0.2, 0.3, np.inf]
+    new[f"bse_{TERM}"] = [0.01, 0.02, 0.03, np.inf]
+    new.loc[3, f"coef_{TERM}"] = np.nan
+    new["unidentified_terms"] = ["", "", "", f"{TERM}:separated_to_minus_inf"]
+
+    row = content_term_table(_old(), new).set_index("term").loc[TERM]
+
+    assert row["n_unidentified_after"] == 1
+    assert row["n_unidentified_before"] == 0
+    assert row["n_sessions_after"] == 3
+    assert row["bse_cluster_median_after"] == pytest.approx(0.2)
+    assert row["bse_model_median_after"] == pytest.approx(0.02)
+
+
+def test_the_drop_table_counts_unidentified_sessions_as_the_gate_does():
+    """``n_fitted`` and the share include the sessions that cannot inform the
+    term, as the aggregation's refusal gate does; a frame from before the
+    column reports none."""
+    audited = pd.DataFrame(
+        {
+            "model": ["CS1", "CS4"],
+            "population": ["all", "all"],
+            "cohort": ["at_well", "at_well"],
+            "term": ["a", "b"],
+            "n_sessions": [16, 18],
+            "n_dropped": [2, 1],
+            "n_unidentified": [2, 1],
+        }
+    )
+
+    table = audited_term_drop_table(audited).set_index("term")
+
+    assert table.loc["a", "n_fitted"] == 20
+    assert table.loc["a", "pct_dropped"] == pytest.approx(20.0)
+    assert table.loc["b", "pct_dropped"] == pytest.approx(10.0)
+    legacy = audited_term_drop_table(audited.drop(columns="n_unidentified"))
+    assert (legacy["n_unidentified"] == 0).all()
 
 
 def test_se_columns_keep_the_model_and_clustered_medians_apart():

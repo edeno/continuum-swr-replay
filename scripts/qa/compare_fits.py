@@ -71,6 +71,7 @@ from continuum_swr_replay.analysis.replay._fit_diagnostics import (
 )
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (
     separated_for_term,
+    unidentified_for_term,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (
     ARRIVAL_CLOCK_COLUMN,
@@ -928,6 +929,7 @@ COUNT_COLUMN_STEMS = (
     "n_bins",
     "n_event",
     "n_dropped",
+    "n_unidentified",
     "n_paired",
     "n_fit",
     "n_flagged",
@@ -1156,7 +1158,10 @@ def audited_term_drop_table(audited: pd.DataFrame) -> pd.DataFrame:
     a factor of it) as unidentified, plus the effect-scale
     ``|coef| * SD >= 10`` backstop. A spec
     whose share exceeds the unidentified-share gate emits no row at all and so
-    does not appear here.
+    does not appear here. ``n_unidentified`` counts the sessions that cannot
+    inform the term at all (NaN coefficient); they are fitted sessions too, and
+    the gate counts them with ``n_dropped``. Frames that predate the column have
+    none.
 
     Parameters
     ----------
@@ -1167,39 +1172,35 @@ def audited_term_drop_table(audited: pd.DataFrame) -> pd.DataFrame:
     -------
     pd.DataFrame
         ``model``, ``population``, ``cohort``, ``term``, ``n_fitted``,
-        ``n_dropped``, ``pct_dropped``, worst first.
+        ``n_dropped``, ``n_unidentified``, ``pct_dropped`` (both counts), worst
+        first.
     """
+    columns = [
+        "model",
+        "population",
+        "cohort",
+        "term",
+        "n_fitted",
+        "n_dropped",
+        "n_unidentified",
+        "pct_dropped",
+    ]
     if audited.empty:
-        return pd.DataFrame(
-            columns=[
-                "model",
-                "population",
-                "cohort",
-                "term",
-                "n_fitted",
-                "n_dropped",
-                "pct_dropped",
-            ]
-        )
+        return pd.DataFrame(columns=columns)
     out = audited[
         ["model", "population", "cohort", "term", "n_sessions", "n_dropped"]
     ].copy()
-    out["n_fitted"] = out["n_sessions"] + out["n_dropped"]
-    out["pct_dropped"] = 100 * out["n_dropped"] / out["n_fitted"]
+    out["n_unidentified"] = (
+        audited["n_unidentified"] if "n_unidentified" in audited.columns else 0
+    )
+    out["n_fitted"] = out["n_sessions"] + out["n_dropped"] + out["n_unidentified"]
+    out["pct_dropped"] = (
+        100 * (out["n_dropped"] + out["n_unidentified"]) / out["n_fitted"]
+    )
     return (
         out.drop(columns=["n_sessions"])
         .sort_values("pct_dropped", ascending=False)
-        .reset_index(drop=True)[
-            [
-                "model",
-                "population",
-                "cohort",
-                "term",
-                "n_fitted",
-                "n_dropped",
-                "pct_dropped",
-            ]
-        ]
+        .reset_index(drop=True)[columns]
     )
 
 
@@ -1981,6 +1982,10 @@ def content_term_table(old: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
     coefficient moved; the unpaired pair still reports a rung that only one side
     fitted at all.
 
+    A session that cannot inform the term (named in ``unidentified_terms``, with
+    a NaN coefficient and infinite SEs) is counted in ``n_unidentified_*`` and
+    left out of every median, the SE medians included.
+
     Parameters
     ----------
     old, new : pd.DataFrame
@@ -2006,9 +2011,16 @@ def content_term_table(old: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
             n_coef = n[col] if col in n.columns else pd.Series(dtype=float)
             o_pos, o_animals = _n_animals_pos(o, term)
             n_pos, n_animals = _n_animals_pos(n, term)
+            # SEs over the sessions with a coefficient, as the coefficient
+            # medians are: an unidentified session's SE is infinite.
             o_se = o.get(f"bse_{term}")
+            o_se = None if o_se is None else o_se[o_coef.notna()]
             n_model_se = n.get(f"bse_{term}")
+            n_model_se = None if n_model_se is None else n_model_se[n_coef.notna()]
             n_cluster_se = n.get(f"bse_cluster_{term}")
+            n_cluster_se = (
+                None if n_cluster_se is None else n_cluster_se[n_coef.notna()]
+            )
             paired_before, paired_after, n_paired = _paired_coefficients(o, n, term)
             rows.append(
                 {
@@ -2016,6 +2028,8 @@ def content_term_table(old: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
                     "term": term,
                     "n_sessions_before": int(o_coef.notna().sum()),
                     "n_sessions_after": int(n_coef.notna().sum()),
+                    "n_unidentified_before": int(unidentified_for_term(o, term).sum()),
+                    "n_unidentified_after": int(unidentified_for_term(n, term).sum()),
                     "n_paired": n_paired,
                     "coef_median_before": o_coef.median() if len(o_coef) else np.nan,
                     "coef_median_after": n_coef.median() if len(n_coef) else np.nan,
@@ -2190,6 +2204,8 @@ def contrast_audited_table(
         "n_sessions",
         "n_animals",
         "n_dropped",
+        # Sessions that cannot inform the term at all; absent before Task 28.
+        "n_unidentified",
         "coef_animal_median",
         "n_animals_pos",
         "coef_session_median",

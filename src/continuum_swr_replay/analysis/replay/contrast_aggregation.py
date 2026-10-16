@@ -34,10 +34,13 @@ from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
 from ._fit_diagnostics import SEPARATION_COEF_ABS
+from .fitting import parse_unidentified_terms
 from .model_specs import REWARD_HISTORY_COLUMNS
 
 # Above this share of unidentified session fits, a term's aggregate is a
-# statement about the identified minority and is not emitted at all.
+# statement about the identified minority and is not emitted at all. The share
+# counts both kinds: separated or runaway sessions (``n_dropped``) and sessions
+# that cannot inform the term at all (``n_unidentified``).
 MAX_UNIDENTIFIED_SHARE = 0.20
 
 # Two-sided normal critical value at alpha = 0.05, for the per-session Wald test.
@@ -55,6 +58,7 @@ _AGG_COLUMNS = (
     "n_sessions",
     "n_animals",
     "n_dropped",
+    "n_unidentified",
     "n_sessions_flagged_nonconverged",
     "n_sessions_flagged_separated",
     "coef_animal_median",
@@ -212,6 +216,35 @@ def separated_for_term(fits: pd.DataFrame, term: str) -> pd.Series:
     )
 
 
+def unidentified_for_term(fits: pd.DataFrame, term: str) -> pd.Series:
+    """Per-fit mask: does the fit report ``term`` as one its session cannot inform?
+
+    Read from the ``unidentified_terms`` column the conditional-Poisson fitter
+    writes ("|"-joined ``<term>:<reason>``). Such a fit carries a NaN
+    coefficient for the term. Frames without the column (older bundles, other
+    fitters) report none.
+
+    Parameters
+    ----------
+    fits : pd.DataFrame
+        Per-session fits.
+    term : str
+        The aggregated term.
+
+    Returns
+    -------
+    pd.Series of bool
+        Indexed like ``fits``.
+    """
+    if "unidentified_terms" not in fits.columns:
+        return pd.Series(False, index=fits.index)
+    return (
+        fits["unidentified_terms"]
+        .map(lambda v: term in parse_unidentified_terms(v))
+        .astype(bool)
+    )
+
+
 def session_se(fits: pd.DataFrame, term: str) -> tuple[pd.Series | None, str]:
     """Per-session SE for ``term``, and which SE it is made of.
 
@@ -313,7 +346,11 @@ def aggregate_contrast(
         SEPARATION_COEF_ABS``, using the fit's own persisted predictor SD --
         including for an ``is_swr:<covariate>`` product, which carries its own
         ``sd_`` column. Frames with no ``sd_<term>`` column (legacy artifacts)
-        fall back to ``|coef_<term>| >= SEPARATION_COEF_ABS``.
+        fall back to ``|coef_<term>| >= SEPARATION_COEF_ABS``. Those exclusions
+        are counted in ``n_dropped``. A session whose fit names the term in
+        ``unidentified_terms`` (NaN coefficient: the session cannot inform the
+        term) is excluded too and counted in ``n_unidentified``. Both counts
+        enter the ``MAX_UNIDENTIFIED_SHARE`` gate.
     specs : list of (model, population, term)
         One aggregated row per spec (in order).
     level : str
@@ -356,18 +393,33 @@ def aggregate_contrast(
             runaway = s_all[ccol].abs() >= SEPARATION_COEF_ABS
         kept = present & ~runaway & ~flagged
         n_dropped = int((present & ~kept).sum())
+        # A session that cannot inform the term at all (the fitter reports it in
+        # ``unidentified_terms``, with a NaN coefficient) is fitted but not
+        # present. It is counted apart from the separation drops, and both enter
+        # the refusal gate below.
+        n_unidentified = int((unidentified_for_term(s_all, term) & ~present).sum())
         s = s_all[kept]
         if len(s) < 5:
             continue
         # Refuse to publish a term that is unidentified in a large share of the
         # sessions that were fit: the surviving median describes the identified
         # minority, not the corpus, and reads as if it described the corpus.
-        drop_share = n_dropped / max(int(present.sum()), 1)
+        n_fitted = int(present.sum()) + n_unidentified
+        n_lost = n_dropped + n_unidentified
+        drop_share = n_lost / max(n_fitted, 1)
         if drop_share > MAX_UNIDENTIFIED_SHARE:
             logging.warning(
-                "%s/%s/%s: %.0f%% of fitted sessions unidentified (%d of %d); "
-                "not emitting an aggregate row",
-                model, pop, term, 100 * drop_share, n_dropped, int(present.sum()),
+                "%s/%s/%s: %.0f%% of fitted sessions unidentified (%d of %d: %d "
+                "separated or runaway, %d not informed); not emitting an "
+                "aggregate row",
+                model,
+                pop,
+                term,
+                100 * drop_share,
+                n_lost,
+                n_fitted,
+                n_dropped,
+                n_unidentified,
             )
             continue
         coef = s[ccol]
@@ -399,6 +451,7 @@ def aggregate_contrast(
                 "n_sessions": len(s),
                 "n_animals": int(per_animal.size),
                 "n_dropped": n_dropped,
+                "n_unidentified": n_unidentified,
                 "n_sessions_flagged_nonconverged": n_nonconverged,
                 "n_sessions_flagged_separated": n_separated,
                 "coef_animal_median": float(per_animal.median()),
