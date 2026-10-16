@@ -117,9 +117,11 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     comparison's per-detector adapters and runner, the Yu detector's project
     wiring, and specs 04–05.
 - [known_issues/](known_issues/) — *reference*: documented data/pipeline issues.
+  - [2026-10-12-full-redecode-r11.md](known_issues/2026-10-12-full-redecode-r11.md) — the
+    October full re-decode (R11): what changed, the backups, and what stays stale until rerun.
   - [three_sessions_blocked_by_nwb_checksum.md](known_issues/three_sessions_blocked_by_nwb_checksum.md)
     — *resolved 2026-08-19*: three sessions once failed an upstream NWB checksum;
-    their files were rewritten and all 218 analysed epochs are in every table.
+    their files were rewritten. The cohort is now the register's 242 analysed epochs.
   - [wilbur20210404_missing_ca1_ripples.md](known_issues/wilbur20210404_missing_ca1_ripples.md)
     — wilbur20210404 has no CA1 ripple extraction, but it is a depletion session,
     never in the cohort; its register entry is `DEPLETION_TASK`.
