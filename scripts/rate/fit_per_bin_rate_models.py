@@ -393,6 +393,13 @@ def fit_per_bin_rate_models(
             / max(counts["n_event_bins_frozen"], 1),
         )
     result = pd.DataFrame(rows)
+    # Workers finish in any order. Each session's rows arrive together, in
+    # ladder order, so a stable sort by session fixes the row order of the
+    # saved frame without reordering the ladder within a session.
+    if len(result):
+        result = result.sort_values(
+            list(SESSION_COLUMNS), kind="stable", ignore_index=True
+        )
     result.attrs["cohort_stop_drops"] = {
         outcome: int(cohort_stop_drops.get(outcome, 0)) for outcome in POPULATIONS
     }

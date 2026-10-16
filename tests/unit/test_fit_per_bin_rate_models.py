@@ -455,3 +455,87 @@ def test_tables_from_another_swr_source_are_refused(monkeypatch, stubbed_run):
 
     with pytest.raises(swr_source.SwrSourceError, match="another_run"):
         fprm.main()
+
+
+# ── Row order of the saved frame (task 27) ──
+
+
+class _InlineExecutor:
+    """``ProcessPoolExecutor`` stand-in: runs each task as it is submitted."""
+
+    def __init__(self, max_workers):
+        del max_workers
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def submit(self, function, *args):
+        from concurrent.futures import Future
+
+        future = Future()
+        future.set_result(function(*args))
+        return future
+
+
+def _fake_fit_one_session(keys, stops_g, onsets_g, run_cv, run_gof):
+    """One row per (outcome, model), carrying values that identify the session."""
+    rows = [
+        {
+            "outcome": outcome,
+            "model": model,
+            **dict(zip(fprm.SESSION_COLUMNS, keys, strict=True)),
+            "n_stops": len(stops_g),
+            "n_events": len(onsets_g),
+        }
+        for outcome in POPULATIONS
+        for model in MODEL_PER_BIN_RATE
+    ]
+    drops = dict.fromkeys(POPULATIONS, 0)
+    return keys, rows, {}, {}, drops, {}, 0.0
+
+
+def _sessions_frame(n_sessions: int = 5):
+    """Stops and onsets of several sessions, one session per animal-day."""
+    keys = [(f"r{i % 2}", 20200100 + i, "02_r1") for i in range(n_sessions)]
+    stops = pd.DataFrame(
+        [
+            dict(zip(fprm.SESSION_COLUMNS, k, strict=True))
+            for k in keys
+            for _ in range(3)
+        ]
+    )
+    onsets = stops.iloc[: len(stops) - 1].copy()
+    return stops, onsets
+
+
+@pytest.mark.parametrize("finish_order", ["reversed", "shuffled"])
+def test_saved_frame_does_not_depend_on_the_order_sessions_finish(
+    monkeypatch, finish_order
+):
+    """Workers finish in any order; the frame main saves must not follow it."""
+    stop, onsets = _sessions_frame()
+    monkeypatch.setattr(fprm, "_fit_one_session", _fake_fit_one_session)
+    serial = fprm.fit_per_bin_rate_models(stop, onsets, workers=1)
+
+    def finish(futures):
+        futures = list(futures)
+        if finish_order == "reversed":
+            return futures[::-1]
+        return [futures[i] for i in np.random.default_rng(27).permutation(len(futures))]
+
+    monkeypatch.setattr(fprm, "ProcessPoolExecutor", _InlineExecutor)
+    monkeypatch.setattr(fprm, "as_completed", finish)
+    parallel = fprm.fit_per_bin_rate_models(stop, onsets, workers=3)
+
+    pd.testing.assert_frame_equal(parallel, serial)
+    assert parallel.attrs == serial.attrs
+    # sessions in key order, each session's rows in ladder order
+    sessions = parallel[list(fprm.SESSION_COLUMNS)].drop_duplicates()
+    assert sessions.equals(sessions.sort_values(list(fprm.SESSION_COLUMNS)))
+    first = parallel.iloc[: len(POPULATIONS) * len(MODEL_PER_BIN_RATE)]
+    assert list(first["model"].iloc[: len(MODEL_PER_BIN_RATE)]) == list(
+        MODEL_PER_BIN_RATE
+    )

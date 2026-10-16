@@ -695,3 +695,105 @@ def test_load_in_transit_keeps_only_the_transit_stops(stubbed_load):
     stop, _onsets, _dropped = mod._load("in_transit")
 
     assert list(stop["stop_id"]) == ["s2", "s3"]
+
+
+# ── Row order of the saved per-session fits (task 27) ──
+
+
+class _InlineExecutor:
+    """``ProcessPoolExecutor`` stand-in: runs each task as it is submitted."""
+
+    def __init__(self, max_workers):
+        del max_workers
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def submit(self, function, *args):
+        from concurrent.futures import Future
+
+        future = Future()
+        future.set_result(function(*args))
+        return future
+
+
+def _fake_fit_one_session(keys, stops_g, onsets_g):
+    """Rows per (population, model, cohort), with values that identify the session."""
+    base = dict(zip(mod.SESSION_COLUMNS, keys, strict=True))
+    rows = [
+        {
+            "population": population,
+            "model": model,
+            "cohort": cohort,
+            **base,
+            "n_stops": len(stops_g),
+            "n_bins": 10 * len(stops_g),
+            "n_events": len(onsets_g),
+        }
+        for population in (*mod.STRATA, "contrast")
+        for model in ("R0_null", "R1_rew")
+        for cohort in (mod.PRIMARY_COHORT, mod.POST_OUTCOME_COHORT)
+    ]
+    return keys, rows, {}, {"contrast": 0}
+
+
+@pytest.fixture()
+def stubbed_fan_out(monkeypatch, tmp_path):
+    """Run ``main`` on fake per-session fits; return what it saved per run."""
+    keys = [(f"r{i % 2}", 20200100 + i, "02_r1") for i in range(5)]
+    stops = pd.DataFrame(
+        [
+            {**dict(zip(mod.SESSION_COLUMNS, k, strict=True)), "stop_id": f"{j}{n}"}
+            for j, k in enumerate(keys)
+            for n in range(j + 2)
+        ]
+    )
+    onsets = stops.iloc[:-1].copy()
+    aggregated: list[pd.DataFrame] = []
+    monkeypatch.setattr(mod, "RC", tmp_path)
+    monkeypatch.setattr(mod, "_load", lambda cohort: (stops, onsets, 0))
+    monkeypatch.setattr(mod, "record_inputs", lambda inputs: {})
+    monkeypatch.setattr(mod, "_fit_one_session", _fake_fit_one_session)
+    monkeypatch.setattr(mod, "_cohort_records", lambda *a, **k: [])
+    monkeypatch.setattr(mod, "write_cohort_audit", lambda records, path: None)
+    monkeypatch.setattr(
+        mod, "_write_aggregation", lambda models, *a, **k: aggregated.append(models)
+    )
+    monkeypatch.setattr(mod, "ProcessPoolExecutor", _InlineExecutor)
+    saved = tmp_path / "models_per_bin_rate" / "swr_contrast_rate.pkl"
+
+    def run(workers: int, finish=lambda futures: list(futures)):
+        monkeypatch.setattr(mod, "as_completed", finish)
+        monkeypatch.setattr(
+            mod.sys, "argv", ["fit_swr_contrast_rate.py", "--workers", str(workers)]
+        )
+        mod.main()
+        return saved.read_bytes(), pd.read_pickle(saved), aggregated[-1]
+
+    return run
+
+
+@pytest.mark.parametrize("finish_order", ["reversed", "shuffled"])
+def test_saved_fits_do_not_depend_on_the_order_sessions_finish(
+    stubbed_fan_out, finish_order
+):
+    """Workers finish in any order; the saved pickle must be the same bytes."""
+
+    def finish(futures):
+        futures = list(futures)
+        if finish_order == "reversed":
+            return futures[::-1]
+        return [futures[i] for i in np.random.default_rng(27).permutation(len(futures))]
+
+    serial_bytes, serial, _ = stubbed_fan_out(workers=1)
+    parallel_bytes, parallel, aggregated = stubbed_fan_out(workers=3, finish=finish)
+
+    pd.testing.assert_frame_equal(parallel, serial)
+    assert parallel_bytes == serial_bytes
+    # the audited aggregation is computed from the same ordered frame
+    pd.testing.assert_frame_equal(aggregated, parallel)
+    sessions = parallel[list(mod.SESSION_COLUMNS)].drop_duplicates()
+    assert sessions.equals(sessions.sort_values(list(mod.SESSION_COLUMNS)))
