@@ -91,13 +91,24 @@ _MAX_STEP_HALVINGS = 30
 # which is under this threshold for any column whose range is under 220
 # within-event SDs. On the real fits the two groups are four orders of
 # magnitude apart: the 2,583 identified fits have at least 0.30, and Newton run
-# on without this check takes all 62 to 3.1e-5 or below. The refusal is the
+# on without this check takes all 62 to 3.1e-5 or below. The decision is the
 # same whether Newton starts from zero, from BFGS or from the old fit.
+#
+# What happens next depends on how many columns the direction involves; see
+# ``fit_conditional_poisson``. A direction carried by one column is a term the
+# session cannot inform: the fit is kept at that term's limit and the term is
+# reported as not estimated. A direction that mixes columns is refused.
 MIN_SCALED_INFORMATION = 1e-3
 
 # A column is named as carrying an uninformed direction when at least 1 % of its
 # unit weight lies in that direction (a loading of 0.1 or more).
 _MIN_NULL_DIRECTION_WEIGHT = 0.01
+
+# A set of uninformed directions is carried by single columns when it is spanned
+# by that many columns, each with at least this weight in it (a loading of 0.99
+# or more). In 61 of F3's 62 fits the columns have weight 1.0000 to four places;
+# in the other, the direction spreads 0.125 over each of eight arm dummies.
+_SINGLE_COLUMN_WEIGHT = 0.98
 
 # Response columns whose per-event values are an allocation fraction summing to
 # 1.0 rather than a timebin count. The distinction is not cosmetic: with a
@@ -356,18 +367,179 @@ def _within_group_centered(X: np.ndarray, groups: np.ndarray) -> np.ndarray:
     return X - pd.DataFrame(X).groupby(groups).transform("mean").to_numpy()
 
 
-def _rank_deficient_terms(
-    X: np.ndarray, groups: np.ndarray, names: list[str]
-) -> list[str]:
-    """Columns on the directions :func:`within_group_full_rank` found missing.
+def _within_group_null_directions(X: np.ndarray, groups: np.ndarray) -> np.ndarray:
+    """Directions :func:`within_group_full_rank` finds missing, shape (p, k).
 
-    Uses the same tolerance as ``numpy.linalg.matrix_rank``, so the directions
-    named are the ones that made the rank fall short.
+    The right singular vectors of the within-group-centred design whose singular
+    value is zero by ``numpy.linalg.matrix_rank``'s tolerance, so they are the
+    directions that make the rank fall short.
     """
     centered = _within_group_centered(X, groups)
     _, singular, right = np.linalg.svd(centered, full_matrices=False)
     tol = singular.max() * max(centered.shape) * np.finfo(float).eps
-    return _terms_on(right[singular <= tol].T, names)
+    return right[singular <= tol].T
+
+
+def _rank_deficient_terms(
+    X: np.ndarray, groups: np.ndarray, names: list[str]
+) -> list[str]:
+    """Columns on the directions :func:`within_group_full_rank` found missing."""
+    return _terms_on(_within_group_null_directions(X, groups), names)
+
+
+def _single_columns(directions: np.ndarray) -> list[int] | None:
+    """The columns that carry ``directions`` one each, or None if they mix columns.
+
+    ``directions`` is an orthonormal basis, shape ``(n_params, k)``. It is
+    carried by single columns when exactly ``k`` columns each have at least
+    ``_SINGLE_COLUMN_WEIGHT`` of their unit weight in it. The test is on the
+    whole set, not on each vector, because the basis of a repeated eigenvalue is
+    any rotation of it.
+    """
+    weight = (directions**2).sum(axis=1)
+    single = [int(k) for k in np.flatnonzero(weight >= _SINGLE_COLUMN_WEIGHT)]
+    return single if len(single) == directions.shape[1] else None
+
+
+def _rows_sent_to_zero_probability(
+    x: np.ndarray, y: np.ndarray, groups: np.ndarray, in_likelihood: np.ndarray
+) -> np.ndarray | None:
+    """Rows that a column's coefficient running to -inf or +inf takes out.
+
+    If no event in the likelihood has mass on a row where ``x`` is above its
+    event minimum, the log-likelihood rises without bound as the coefficient
+    goes to -inf, and those rows' probabilities go to 0. The limit of the fit is
+    then the fit without those rows, on which ``x`` is constant within each
+    event. Likewise for rows below the event maximum and +inf.
+
+    Returns
+    -------
+    np.ndarray of bool, shape (n_rows,), or None
+        The rows to remove, or None if the column is not separated this way.
+    """
+    by_event = pd.Series(x).groupby(groups)
+    above_min = x > by_event.transform("min").to_numpy()
+    below_max = x < by_event.transform("max").to_numpy()
+    for vanishing in (above_min, below_max):
+        if vanishing.any() and not np.any(y[vanishing & in_likelihood] > 0):
+            return vanishing
+    return None
+
+
+def _fit_scaled(
+    X: np.ndarray, y: np.ndarray, groups: np.ndarray, in_likelihood: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, _NewtonFinish]:
+    """BFGS and the Newton finish on ``X`` divided by its within-event SD.
+
+    Returns the scale, the scaled design (all rows) and the finish. The scale
+    comes from all of ``X``'s rows, which the caller has checked are full rank
+    within events; the likelihood uses the ``in_likelihood`` rows.
+    """
+    scale = _within_group_centered(X, groups).std(axis=0)
+    assert np.all(scale > 0), "a column with no within-event SD passed the rank check"
+    X_scaled = X / scale
+    X_fit, y_fit, starts = _sorted_by_event(
+        X_scaled[in_likelihood], y[in_likelihood], groups[in_likelihood]
+    )
+    finish = _newton_finish(X_fit, y_fit, starts, _bfgs_start(X_fit, y_fit, starts))
+    return scale, X_scaled, finish
+
+
+class _LimitFit(NamedTuple):
+    """A fit with every term the session cannot inform taken to its limit."""
+
+    rows: np.ndarray  # bool, the rows still in the fit
+    columns: list[int]  # the columns estimated, in design order
+    scale: np.ndarray  # their within-event SD on those rows
+    X_scaled: np.ndarray  # those rows and columns, scaled
+    finish: _NewtonFinish
+    n_newton_steps: int  # over every pass
+
+
+def _fit_to_the_limit(
+    X: np.ndarray,
+    y: np.ndarray,
+    groups: np.ndarray,
+    in_likelihood: np.ndarray,
+    names: list[str],
+) -> _LimitFit | None:
+    """Fit, taking any term the session cannot inform to its limit.
+
+    A direction without information that a single column carries is a term
+    whose rows get all or none of each event's mass, so its coefficient runs to
+    +/-inf. In that limit the rows it moves away from have probability 0, and
+    they carry no mass, so the limit is the fit without those rows and without
+    the column, which is then constant within each event. Its log-likelihood is
+    the supremum of the full model's, and the other coefficients are their
+    limits. Dropping only the column would be a different model: it gives those
+    rows a probability that their zero mass contradicts, and on the real fits it
+    moves the headline term by up to 0.76 SE.
+
+    A column that the removed rows leave constant within every event is not
+    informed either, and is dropped with it. A direction that mixes columns, or
+    a single column whose rows do not split this way, is refused (None), as is a
+    design with no column left.
+    """
+    rows = np.ones(len(y), dtype=bool)
+    columns = list(range(X.shape[1]))
+    n_newton_steps = 0
+    while True:
+        scale, X_scaled, finish = _fit_scaled(
+            X[rows][:, columns], y[rows], groups[rows], in_likelihood[rows]
+        )
+        n_newton_steps += finish.n_steps
+        uninformed = finish.eigenvalues < MIN_SCALED_INFORMATION
+        if not uninformed.any():
+            return _LimitFit(rows, columns, scale, X_scaled, finish, n_newton_steps)
+        directions = finish.eigenvectors[:, uninformed]
+        vanishing = None
+        for k in _single_columns(directions) or []:
+            vanishing = _rows_sent_to_zero_probability(
+                X[rows, columns[k]], y[rows], groups[rows], in_likelihood[rows]
+            )
+            if vanishing is not None:
+                break
+        if vanishing is None:
+            logger.warning(
+                "fit_conditional_poisson: the data do not bound %s (information "
+                "%.2g < %.0e on the within-event-SD scale, along a direction no "
+                "single column carries); not fitting this design",
+                ", ".join(_terms_on(directions, [names[c] for c in columns])),
+                finish.eigenvalues[0],
+                MIN_SCALED_INFORMATION,
+            )
+            return None
+        unbounded = columns[k]
+        rows[np.flatnonzero(rows)[vanishing]] = False
+        columns = [c for c in columns if c != unbounded]
+        left_constant: list[int] = []
+        if columns:
+            null = _within_group_null_directions(X[rows][:, columns], groups[rows])
+            if null.shape[1]:
+                single = _single_columns(null)
+                if single is None:
+                    logger.warning(
+                        "fit_conditional_poisson: without the rows %s rules out, "
+                        "%s are collinear within events; not fitting this design",
+                        names[unbounded],
+                        ", ".join(_terms_on(null, [names[c] for c in columns])),
+                    )
+                    return None
+                left_constant = [columns[i] for i in single]
+                columns = [c for c in columns if c not in left_constant]
+        logger.warning(
+            "fit_conditional_poisson: no event has mass on the rows %s rules out, "
+            "so its coefficient runs to +/-inf; fitted at that limit, with %s "
+            "reported as not estimated",
+            names[unbounded],
+            ", ".join(names[c] for c in [unbounded, *left_constant]),
+        )
+        if not columns:
+            logger.warning(
+                "fit_conditional_poisson: no term of %s is informed; not fitting",
+                names,
+            )
+            return None
 
 
 def within_group_full_rank(X: np.ndarray, groups: np.ndarray) -> bool:
@@ -442,10 +614,14 @@ def fit_conditional_poisson(
         more Newton step predicts), ``max_abs_grad`` (largest gradient
         component of the total log-likelihood) and ``n_newton_steps``.
         ``converged`` is True only when the decrement is below
-        ``NEWTON_DECREMENT_TOL``. None if there are too few events, or if the
-        design is not identified within events: rank-deficient, or with a
-        direction whose information at the optimum is below
-        ``MIN_SCALED_INFORMATION``. The log names the columns involved.
+        ``NEWTON_DECREMENT_TOL``. ``unidentified_terms`` ("|"-joined) names the
+        terms this session cannot inform: a single column along which the
+        information at the optimum is below ``MIN_SCALED_INFORMATION``, because
+        its coefficient runs to +/-inf (see :func:`_fit_to_the_limit`). Their
+        coefficient and p-value are NaN and their SEs infinite; the other terms
+        are their values in that limit. None if there are too few events, if the
+        design is rank-deficient within events, or if a direction without
+        information mixes several columns. The log names the columns involved.
 
     Notes
     -----
@@ -519,43 +695,29 @@ def fit_conditional_poisson(
         )
         return None
 
-    # Divide each column by its within-event SD before optimizing. This is a
-    # reparametrization, not a change of model: the conditional log-likelihood
-    # depends on the design only through X @ beta = (X / s) @ (s * beta), so the
-    # optimum, the log-likelihood and both covariances map back exactly, and only
-    # the optimizer's path and stopping point change. The conditional likelihood
-    # sees only the variation within each event, so the within-event SD is the
-    # scale its curvature is set by; the global SD (the ``sd_*`` outputs) can be
-    # large for a column whose within-event variation is tiny. The columns are
-    # not centred: a per-event constant drops out of a conditional likelihood, so
-    # centring would change nothing and would be one more step to undo.
+    # Divide each column by its within-event SD before optimizing (_fit_scaled).
+    # This is a reparametrization, not a change of model: the conditional
+    # log-likelihood depends on the design only through X @ beta =
+    # (X / s) @ (s * beta), so the optimum, the log-likelihood and both
+    # covariances map back exactly, and only the optimizer's path and stopping
+    # point change. The conditional likelihood sees only the variation within
+    # each event, so the within-event SD is the scale its curvature is set by;
+    # the global SD (the ``sd_*`` outputs) can be large for a column whose
+    # within-event variation is tiny. The columns are not centred: a per-event
+    # constant drops out of a conditional likelihood, so centring would change
+    # nothing and would be one more step to undo.
     #
     # within_group_full_rank counts a singular value of the centred design as
     # zero below numpy.linalg.matrix_rank's default tolerance,
     # sigma_max * max(n_rows, n_params) * machine epsilon. A column with no
     # within-event variation is a zero column of the centred design, so the
-    # check above has refused it and every scale here is positive.
-    scale = _within_group_centered(X, groups).std(axis=0)
-    assert np.all(scale > 0), "a column with no within-event SD passed the rank check"
-    X_scaled = X / scale
-
+    # check above has refused it and every scale is positive.
     in_likelihood = _rows_of_events_whose_response_varies(y, groups)
-    X_fit, y_fit, starts = _sorted_by_event(
-        X_scaled[in_likelihood], y[in_likelihood], groups[in_likelihood]
-    )
-    finish = _newton_finish(X_fit, y_fit, starts, _bfgs_start(X_fit, y_fit, starts))
-
-    uninformed = finish.eigenvalues < MIN_SCALED_INFORMATION
-    if uninformed.any():
-        logger.warning(
-            "fit_conditional_poisson: the data do not bound %s (information %.2g "
-            "< %.0e on the within-event-SD scale; a term running to +/-inf); not "
-            "fitting this design",
-            ", ".join(_terms_on(finish.eigenvectors[:, uninformed], predictors)),
-            finish.eigenvalues[0],
-            MIN_SCALED_INFORMATION,
-        )
+    limit = _fit_to_the_limit(X, y, groups, in_likelihood, predictors)
+    if limit is None:
         return None
+    finish, scale = limit.finish, limit.scale
+    estimated = [predictors[k] for k in limit.columns]
     converged = bool(finish.decrement < NEWTON_DECREMENT_TOL)
     if not converged:
         logger.warning(
@@ -578,22 +740,29 @@ def fit_conditional_poisson(
     separated = separated_terms(
         params,
         bse_values,
-        predictor_sd=predictor_sd,
-        term_names=predictors,
+        predictor_sd=predictor_sd[limit.columns],
+        term_names=estimated,
         nuisance_terms=NUISANCE_TERMS,
     )
-
-    coefs = dict(zip(predictors, params, strict=True))
-    bse = dict(zip(predictors, bse_values, strict=True))
-    pvals = dict(zip(predictors, pvalues, strict=True))
     # Event-clustered SEs alongside the model SEs: the model SE is the one the
     # conditional likelihood implies, the clustered SE is the one the events'
     # own variability supports. Aggregation prefers the clustered column.
     # Computed on the scaled columns and mapped back like the model covariance.
-    cluster_cov = event_clustered_covariance(X_scaled, y, groups, finish.params)
-    bse_cluster = dict(
-        zip(predictors, np.sqrt(np.diag(cluster_cov)) / scale, strict=True)
+    cluster_cov = event_clustered_covariance(
+        limit.X_scaled, y[limit.rows], groups[limit.rows], finish.params
     )
+    bse_cluster_values = np.sqrt(np.diag(cluster_cov)) / scale
+
+    # A term the session cannot inform is reported, not estimated: NaN
+    # coefficient and p-value, infinite SEs. Readers skip it for that term only.
+    coefs = dict.fromkeys(predictors, np.nan)
+    bse = dict.fromkeys(predictors, np.inf)
+    pvals = dict.fromkeys(predictors, np.nan)
+    bse_cluster = dict.fromkeys(predictors, np.inf)
+    coefs.update(zip(estimated, params, strict=True))
+    bse.update(zip(estimated, bse_values, strict=True))
+    pvals.update(zip(estimated, pvalues, strict=True))
+    bse_cluster.update(zip(estimated, bse_cluster_values, strict=True))
 
     llf = finish.llf
     n_params = len(predictors)
@@ -648,7 +817,11 @@ def fit_conditional_poisson(
         "newton_decrement": float(finish.decrement),
         # On the original scale: the scaled gradient is the original one / s.
         "max_abs_grad": float(np.max(np.abs(finish.gradient * scale))),
-        "n_newton_steps": int(finish.n_steps),
+        "n_newton_steps": int(limit.n_newton_steps),
+        # Terms this session cannot inform ("|"-joined, like separated_terms).
+        "unidentified_terms": "|".join(
+            p for k, p in enumerate(predictors) if k not in limit.columns
+        ),
     }
 
     # Diagnostics

@@ -604,6 +604,7 @@ def test_a_fit_stopped_before_the_optimum_is_flagged_not_converged(monkeypatch, 
         long_df, TINY_PREDICTORS, response_col="arm_fraction"
     )
     assert full["converged"] is True
+    assert full["unidentified_terms"] == ""
     assert full["newton_decrement"] < fitting_mod.NEWTON_DECREMENT_TOL
     assert full["n_newton_steps"] >= 1
     assert full["max_abs_grad"] < 1e-3
@@ -636,30 +637,99 @@ def test_a_column_constant_within_every_event_is_named_in_the_refusal(caplog):
     assert "is_prev_arm" not in refusals[0]
 
 
-def test_a_direction_without_information_is_refused_and_named(caplog):
-    """A term whose optimum is at infinity passes the rank check but not the fit.
+def _with_arm_never_reached(arm, seed=0):
+    """A session in which no event puts any mass on ``arm``."""
+    long_df = simulate_with_event_covariates(
+        CONTENT_BETA, n_events=200, L_e=10, seed=seed
+    )
+    long_df.loc[long_df["arm_id"] == arm, "arm_count_hard"] = 0
+    return long_df
 
-    No event puts any mass on a ``never_visited`` row, so its coefficient runs to
-    -inf and the information along it goes to zero (F3: 62 real sessions, all on
-    a nuisance term). Whether such a fit was kept used to depend on whether
-    statsmodels' numerical Hessian happened to invert.
+
+def test_an_arm_no_event_reaches_is_kept_and_reported_unidentified(caplog):
+    """The session cannot inform the arm's dummy, but it informs every other term.
+
+    The dummy's coefficient runs to -inf (F3: 62 real fits, each on a nuisance
+    term like this), and in that limit the arm has probability 0. So the other
+    terms are those of the fit without the arm's rows, and the dummy is reported
+    as not estimated: NaN coefficient and p-value, infinite SEs.
     """
-    long_df = simulate_with_event_covariates(CONTENT_BETA, n_events=200, L_e=10, seed=0)
-    rng = np.random.default_rng(0)
-    long_df["never_visited"] = (rng.random(len(long_df)) < 0.15).astype(float)
-    long_df.loc[long_df["never_visited"] == 1, "arm_count_hard"] = 0
-    predictors = [*CONTENT_PREDICTORS, "never_visited"]
+    long_df = _with_arm_never_reached(3)
+    predictors = [*CONTENT_PREDICTORS, "is_candidate_arm_3"]
     X, _, groups = _arrays(long_df, predictors, "arm_count_hard")
     assert within_group_full_rank(X, groups)
 
     with caplog.at_level(logging.WARNING, logger=fitting_mod.__name__):
-        assert fit_conditional_poisson(long_df, predictors) is None
+        fit = fit_conditional_poisson(long_df, predictors)
+
+    assert fit is not None
+    assert fit["unidentified_terms"] == "is_candidate_arm_3"
+    assert np.isnan(fit["coef_is_candidate_arm_3"])
+    assert np.isnan(fit["pval_is_candidate_arm_3"])
+    assert fit["bse_is_candidate_arm_3"] == np.inf
+    assert fit["bse_cluster_is_candidate_arm_3"] == np.inf
+    assert "is_candidate_arm_3" not in fit["separated_terms"].split("|")
+    assert fit["converged"] is True
+    assert any("is_candidate_arm_3" in r.getMessage() for r in caplog.records)
+
+    without_arm = fit_conditional_poisson(
+        long_df[long_df["arm_id"] != 3], CONTENT_PREDICTORS
+    )
+    for term in CONTENT_PREDICTORS:
+        for kind in ("coef", "bse", "bse_cluster", "pval"):
+            assert fit[f"{kind}_{term}"] == pytest.approx(
+                without_arm[f"{kind}_{term}"], rel=1e-8
+            )
+    assert fit["llf"] == pytest.approx(without_arm["llf"], abs=1e-8)
+    # Dropping only the column is a different model: it gives arm 3 a
+    # probability that its zero mass contradicts, and moves the other terms.
+    column_only = fit_conditional_poisson(long_df, CONTENT_PREDICTORS)
+    assert abs(column_only["coef_is_current_arm"] - fit["coef_is_current_arm"]) > 1e-3
+
+
+def test_a_term_left_without_variation_by_the_removed_rows_is_unidentified_too():
+    """No event reaches the previous arm, so ``is_prev_arm`` runs to -inf.
+
+    Its product with an event-level covariate is then zero on every row left,
+    so the session cannot inform that term either.
+    """
+    long_df = simulate_with_event_covariates(CONTENT_BETA, n_events=200, L_e=10, seed=1)
+    long_df.loc[long_df["is_prev_arm"] == 1, "arm_count_hard"] = 0
+    event_z = np.random.default_rng(1).normal(size=long_df["event_id"].nunique())
+    long_df["z_x_is_prev_arm"] = (
+        event_z[long_df["event_id"].to_numpy()] * long_df["is_prev_arm"]
+    )
+    predictors = ["is_current_arm", "is_prev_arm", "z_x_is_prev_arm"]
+
+    fit = fit_conditional_poisson(long_df, predictors)
+
+    assert fit["unidentified_terms"] == "is_prev_arm|z_x_is_prev_arm"
+    without_prev = fit_conditional_poisson(
+        long_df[long_df["is_prev_arm"] == 0], ["is_current_arm"]
+    )
+    assert fit["coef_is_current_arm"] == pytest.approx(
+        without_prev["coef_is_current_arm"], rel=1e-8
+    )
+    assert fit["llf"] == pytest.approx(without_prev["llf"], abs=1e-8)
+
+
+def test_a_direction_mixing_several_columns_is_refused_and_named(caplog):
+    """No event reaches arm 8, the reference of the arm dummies.
+
+    The unbounded direction then moves all eight dummies together, so no single
+    column carries it, and the design is refused.
+    """
+    long_df = _with_arm_never_reached(8)
+    dummies = [f"is_candidate_arm_{arm}" for arm in range(8)]
+
+    with caplog.at_level(logging.WARNING, logger=fitting_mod.__name__):
+        assert fit_conditional_poisson(long_df, [*CONTENT_PREDICTORS, *dummies]) is None
 
     refusals = [
-        r.getMessage() for r in caplog.records if "never_visited" in r.getMessage()
+        r.getMessage() for r in caplog.records if "is_candidate_arm_0" in r.getMessage()
     ]
     assert refusals
-    assert not any(term in refusals[0] for term in CONTENT_PREDICTORS)
+    assert all(dummy in refusals[0] for dummy in dummies)
 
 
 def test_a_well_scaled_fit_is_unchanged():
