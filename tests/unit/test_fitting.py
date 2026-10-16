@@ -624,17 +624,31 @@ def test_a_fit_stopped_before_the_optimum_is_flagged_not_converged(monkeypatch, 
     assert stopped["llf"] < full["llf"]
 
 
-def test_a_column_constant_within_every_event_is_named_in_the_refusal(caplog):
-    long_df = _make_long_df([[3, 1, 1]] * 6)
+def test_a_column_constant_within_every_event_is_reported_unidentified(caplog):
+    """Such a column cancels exactly in the conditional likelihood.
+
+    So the session cannot inform it, and dropping it changes nothing: the fit is
+    kept, the column is reported as not estimated, and every other number is
+    bit-identical to a fit without it.
+    """
+    long_df = simulate_with_event_covariates(CONTENT_BETA, n_events=150, L_e=10, seed=2)
     long_df["ev_level"] = long_df["event_id"].astype(float)
 
     with caplog.at_level(logging.WARNING, logger=fitting_mod.__name__):
-        assert fit_conditional_poisson(long_df, ["is_prev_arm", "ev_level"]) is None
+        fit = fit_conditional_poisson(long_df, [*CONTENT_PREDICTORS, "ev_level"])
 
-    refusals = [r.getMessage() for r in caplog.records if "ev_level" in r.getMessage()]
-    assert refusals
-    # Only the offending column is named, not the whole design.
-    assert "is_prev_arm" not in refusals[0]
+    assert fit["unidentified_terms"] == "ev_level:no_within_event_variation"
+    assert np.isnan(fit["coef_ev_level"]) and np.isnan(fit["pval_ev_level"])
+    assert fit["bse_ev_level"] == np.inf and fit["bse_cluster_ev_level"] == np.inf
+    without = fit_conditional_poisson(long_df, CONTENT_PREDICTORS)
+    for term in CONTENT_PREDICTORS:
+        for kind in ("coef", "bse", "bse_cluster", "pval"):
+            assert fit[f"{kind}_{term}"] == without[f"{kind}_{term}"]
+    assert fit["llf"] == without["llf"]
+    named = [r.getMessage() for r in caplog.records if "ev_level" in r.getMessage()]
+    assert named
+    # Only the column is named, not the whole design.
+    assert not any(term in named[0] for term in CONTENT_PREDICTORS)
 
 
 def _with_arm_never_reached(arm, seed=0):
@@ -663,7 +677,7 @@ def test_an_arm_no_event_reaches_is_kept_and_reported_unidentified(caplog):
         fit = fit_conditional_poisson(long_df, predictors)
 
     assert fit is not None
-    assert fit["unidentified_terms"] == "is_candidate_arm_3"
+    assert fit["unidentified_terms"] == "is_candidate_arm_3:separated_to_minus_inf"
     assert np.isnan(fit["coef_is_candidate_arm_3"])
     assert np.isnan(fit["pval_is_candidate_arm_3"])
     assert fit["bse_is_candidate_arm_3"] == np.inf
@@ -703,7 +717,10 @@ def test_a_term_left_without_variation_by_the_removed_rows_is_unidentified_too()
 
     fit = fit_conditional_poisson(long_df, predictors)
 
-    assert fit["unidentified_terms"] == "is_prev_arm|z_x_is_prev_arm"
+    # In the order the fit took them; the product is constant on the rows left.
+    assert fit["unidentified_terms"] == (
+        "is_prev_arm:separated_to_minus_inf|z_x_is_prev_arm:no_within_event_variation"
+    )
     without_prev = fit_conditional_poisson(
         long_df[long_df["is_prev_arm"] == 0], ["is_current_arm"]
     )
@@ -754,3 +771,81 @@ def test_a_well_scaled_fit_is_unchanged():
         model, method="bfgs", gtol=1e-8, maxiter=1000, disp=0, skip_hessian=True
     )
     assert coef == pytest.approx(np.asarray(finished.params), abs=1e-6)
+
+
+# ── Prediction from a fit with unidentified terms ──
+
+
+def _fit_with_every_kind_of_unidentified_term():
+    """No event reaches arm 3; ``ev_level`` is constant within every event; and
+    ``holds_mass`` marks exactly the rows with mass, so it runs to +inf."""
+    long_df = _with_arm_never_reached(3, seed=4)
+    long_df["ev_level"] = long_df["event_id"].astype(float)
+    long_df["holds_mass"] = (long_df["arm_count_hard"] > 0).astype(float)
+    predictors = [*CONTENT_PREDICTORS, "is_candidate_arm_3", "ev_level"]
+    return long_df, predictors
+
+
+def test_the_linear_predictor_takes_unidentified_terms_to_their_limits():
+    long_df, predictors = _fit_with_every_kind_of_unidentified_term()
+    fit = fit_conditional_poisson(long_df, predictors)
+    assert fit["unidentified_terms"] == (
+        "ev_level:no_within_event_variation|is_candidate_arm_3:separated_to_minus_inf"
+    )
+    X = long_df[predictors].to_numpy(dtype=float)
+    groups = long_df["event_id"].to_numpy()
+
+    eta = fitting_mod.conditional_linear_predictor(X, groups, fit, predictors)
+
+    arm_3 = long_df["arm_id"].to_numpy() == 3
+    assert np.all(eta[arm_3] == -np.inf)
+    beta = np.array([fit[f"coef_{t}"] for t in CONTENT_PREDICTORS])
+    expected = long_df[CONTENT_PREDICTORS].to_numpy(dtype=float) @ beta
+    np.testing.assert_array_equal(eta[~arm_3], expected[~arm_3])
+
+
+def test_the_linear_predictor_rules_out_the_rows_a_plus_inf_term_moves_away_from():
+    long_df, _ = _fit_with_every_kind_of_unidentified_term()
+    predictors = [*CONTENT_PREDICTORS, "holds_mass"]
+    fit = fit_conditional_poisson(long_df, predictors)
+    assert fit["unidentified_terms"] == "holds_mass:separated_to_plus_inf"
+    X = long_df[predictors].to_numpy(dtype=float)
+
+    eta = fitting_mod.conditional_linear_predictor(
+        X, long_df["event_id"].to_numpy(), fit, predictors
+    )
+
+    no_mass = long_df["holds_mass"].to_numpy() == 0
+    assert np.all(eta[no_mass] == -np.inf)
+    assert np.all(np.isfinite(eta[~no_mass]))
+
+
+def test_the_linear_predictor_refuses_a_missing_coefficient_it_cannot_explain():
+    long_df, _ = _fit_with_every_kind_of_unidentified_term()
+    fit = fit_conditional_poisson(long_df, CONTENT_PREDICTORS)
+    fit["coef_is_prev_arm"] = np.nan
+    X = long_df[CONTENT_PREDICTORS].to_numpy(dtype=float)
+
+    with pytest.raises(ValueError, match="is_prev_arm"):
+        fitting_mod.conditional_linear_predictor(
+            X, long_df["event_id"].to_numpy(), fit, CONTENT_PREDICTORS
+        )
+
+
+def test_pearson_residuals_take_a_fits_unidentified_terms_to_their_limits():
+    from continuum_swr_replay.analysis.replay.model_checking import (
+        compute_pearson_residuals,
+    )
+
+    long_df, predictors = _fit_with_every_kind_of_unidentified_term()
+    fit = fit_conditional_poisson(long_df, predictors)
+
+    out = compute_pearson_residuals(long_df, fit, predictors)
+
+    arm_3 = out["arm_id"] == 3
+    assert (out.loc[arm_3, "predicted_frac"] == 0).all()
+    assert (out.loc[arm_3, "pearson_resid"] == 0).all()
+    assert np.isfinite(out["pearson_resid"]).all()
+    np.testing.assert_allclose(
+        out.groupby("event_id")["predicted_frac"].sum().to_numpy(), 1.0, atol=1e-12
+    )

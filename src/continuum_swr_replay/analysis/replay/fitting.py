@@ -110,6 +110,26 @@ _MIN_NULL_DIRECTION_WEIGHT = 0.01
 # in the other, the direction spreads 0.125 over each of eight arm dummies.
 _SINGLE_COLUMN_WEIGHT = 0.98
 
+# Why a term is reported as not estimated, in ``unidentified_terms``. That field
+# is "|"-joined ``<term>:<reason>`` entries, in the order the fit took them, so a
+# reader can rebuild the fit's limit (see ``conditional_linear_predictor``):
+#
+# - ``no_within_event_variation``: the column is constant within every event, in
+#   the data or on the rows a separated term leaves. It cancels in the
+#   conditional likelihood and contributes nothing to a prediction.
+# - ``separated_to_minus_inf``: no event has mass on a row where the column is
+#   above its event minimum, so its coefficient runs to -inf and those rows have
+#   probability 0.
+# - ``separated_to_plus_inf``: the same for rows below the event maximum, +inf.
+NO_WITHIN_EVENT_VARIATION = "no_within_event_variation"
+SEPARATED_TO_MINUS_INF = "separated_to_minus_inf"
+SEPARATED_TO_PLUS_INF = "separated_to_plus_inf"
+UNIDENTIFIED_REASONS = (
+    NO_WITHIN_EVENT_VARIATION,
+    SEPARATED_TO_MINUS_INF,
+    SEPARATED_TO_PLUS_INF,
+)
+
 # Response columns whose per-event values are an allocation fraction summing to
 # 1.0 rather than a timebin count. The distinction is not cosmetic: with a
 # fraction the event contributes a single draw, so the model information (and
@@ -403,7 +423,7 @@ def _single_columns(directions: np.ndarray) -> list[int] | None:
 
 def _rows_sent_to_zero_probability(
     x: np.ndarray, y: np.ndarray, groups: np.ndarray, in_likelihood: np.ndarray
-) -> np.ndarray | None:
+) -> tuple[np.ndarray, str] | None:
     """Rows that a column's coefficient running to -inf or +inf takes out.
 
     If no event in the likelihood has mass on a row where ``x`` is above its
@@ -414,16 +434,45 @@ def _rows_sent_to_zero_probability(
 
     Returns
     -------
-    np.ndarray of bool, shape (n_rows,), or None
-        The rows to remove, or None if the column is not separated this way.
+    (np.ndarray of bool, str) or None
+        The rows to remove, shape (n_rows,), and the limit
+        (``SEPARATED_TO_MINUS_INF`` or ``SEPARATED_TO_PLUS_INF``); None if the
+        column is not separated this way.
     """
-    by_event = pd.Series(x).groupby(groups)
-    above_min = x > by_event.transform("min").to_numpy()
-    below_max = x < by_event.transform("max").to_numpy()
-    for vanishing in (above_min, below_max):
+    for reason in (SEPARATED_TO_MINUS_INF, SEPARATED_TO_PLUS_INF):
+        vanishing = _rows_ruled_out(x, groups, np.ones(len(x), dtype=bool), reason)
         if vanishing.any() and not np.any(y[vanishing & in_likelihood] > 0):
-            return vanishing
+            return vanishing, reason
     return None
+
+
+def _rows_ruled_out(
+    x: np.ndarray, groups: np.ndarray, alive: np.ndarray, reason: str
+) -> np.ndarray:
+    """Alive rows a separated column's limit gives probability 0.
+
+    For ``SEPARATED_TO_MINUS_INF``, the alive rows above their event's minimum
+    over the alive rows; for ``SEPARATED_TO_PLUS_INF``, those below the maximum.
+    """
+    by_event = pd.Series(np.where(alive, x, np.nan)).groupby(groups)
+    if reason == SEPARATED_TO_MINUS_INF:
+        return alive & (x > by_event.transform("min").to_numpy())
+    if reason == SEPARATED_TO_PLUS_INF:
+        return alive & (x < by_event.transform("max").to_numpy())
+    raise ValueError(f"not a separated limit: {reason!r}")
+
+
+def _columns_constant_within_every_event(
+    X: np.ndarray, groups: np.ndarray
+) -> list[int]:
+    """Columns whose value is the same on every row of each event.
+
+    Exact equality: such a column adds a per-event constant to the linear
+    predictor, which cancels in the conditional likelihood, so dropping it
+    changes nothing.
+    """
+    by_event = pd.DataFrame(X).groupby(groups)
+    return [int(k) for k in np.flatnonzero((by_event.max() == by_event.min()).all())]
 
 
 def _fit_scaled(
@@ -454,6 +503,7 @@ class _LimitFit(NamedTuple):
     X_scaled: np.ndarray  # those rows and columns, scaled
     finish: _NewtonFinish
     n_newton_steps: int  # over every pass
+    unidentified: list[tuple[int, str]]  # (column, reason), in the order taken
 
 
 def _fit_to_the_limit(
@@ -482,6 +532,7 @@ def _fit_to_the_limit(
     """
     rows = np.ones(len(y), dtype=bool)
     columns = list(range(X.shape[1]))
+    unidentified: list[tuple[int, str]] = []
     n_newton_steps = 0
     while True:
         scale, X_scaled, finish = _fit_scaled(
@@ -490,16 +541,18 @@ def _fit_to_the_limit(
         n_newton_steps += finish.n_steps
         uninformed = finish.eigenvalues < MIN_SCALED_INFORMATION
         if not uninformed.any():
-            return _LimitFit(rows, columns, scale, X_scaled, finish, n_newton_steps)
+            return _LimitFit(
+                rows, columns, scale, X_scaled, finish, n_newton_steps, unidentified
+            )
         directions = finish.eigenvectors[:, uninformed]
-        vanishing = None
+        separation = None
         for k in _single_columns(directions) or []:
-            vanishing = _rows_sent_to_zero_probability(
+            separation = _rows_sent_to_zero_probability(
                 X[rows, columns[k]], y[rows], groups[rows], in_likelihood[rows]
             )
-            if vanishing is not None:
+            if separation is not None:
                 break
-        if vanishing is None:
+        if separation is None:
             logger.warning(
                 "fit_conditional_poisson: the data do not bound %s (information "
                 "%.2g < %.0e on the within-event-SD scale, along a direction no "
@@ -509,7 +562,9 @@ def _fit_to_the_limit(
                 MIN_SCALED_INFORMATION,
             )
             return None
+        vanishing, reason = separation
         unbounded = columns[k]
+        unidentified.append((unbounded, reason))
         rows[np.flatnonzero(rows)[vanishing]] = False
         columns = [c for c in columns if c != unbounded]
         left_constant: list[int] = []
@@ -527,6 +582,7 @@ def _fit_to_the_limit(
                     return None
                 left_constant = [columns[i] for i in single]
                 columns = [c for c in columns if c not in left_constant]
+                unidentified += [(c, NO_WITHIN_EVENT_VARIATION) for c in left_constant]
         logger.warning(
             "fit_conditional_poisson: no event has mass on the rows %s rules out, "
             "so its coefficient runs to +/-inf; fitted at that limit, with %s "
@@ -614,14 +670,18 @@ def fit_conditional_poisson(
         more Newton step predicts), ``max_abs_grad`` (largest gradient
         component of the total log-likelihood) and ``n_newton_steps``.
         ``converged`` is True only when the decrement is below
-        ``NEWTON_DECREMENT_TOL``. ``unidentified_terms`` ("|"-joined) names the
-        terms this session cannot inform: a single column along which the
-        information at the optimum is below ``MIN_SCALED_INFORMATION``, because
-        its coefficient runs to +/-inf (see :func:`_fit_to_the_limit`). Their
-        coefficient and p-value are NaN and their SEs infinite; the other terms
-        are their values in that limit. None if there are too few events, if the
-        design is rank-deficient within events, or if a direction without
-        information mixes several columns. The log names the columns involved.
+        ``NEWTON_DECREMENT_TOL``. ``unidentified_terms`` names the terms this
+        session cannot inform, as "|"-joined ``<term>:<reason>`` in the order
+        the fit took them (reasons: ``UNIDENTIFIED_REASONS``): a column constant
+        within every event, or a single column along which the information at
+        the optimum is below ``MIN_SCALED_INFORMATION`` because its coefficient
+        runs to +/-inf (see :func:`_fit_to_the_limit`). Their coefficient and
+        p-value are NaN and their SEs infinite; the other terms are their values
+        in that limit. Predict from a fit with
+        :func:`conditional_linear_predictor`, which applies the limits. None if
+        there are too few events, if the columns that vary within events are
+        collinear, or if a direction without information mixes several columns.
+        The log names the columns involved.
 
     Notes
     -----
@@ -683,15 +743,34 @@ def fit_conditional_poisson(
 
     X = df[predictors].values.astype(float)
 
-    # Reject designs the conditional model cannot identify: globally
-    # collinear predictors AND predictors with no within-group variation
-    # (constant within every event), which would otherwise be fit with
-    # finite-but-meaningless coefficients and exploding SEs.
-    if not within_group_full_rank(X, groups):
+    # A column constant within every event cancels in the conditional
+    # likelihood: the session cannot inform it, and dropping it changes nothing
+    # else. It is reported as not estimated, not a reason to refuse the fit.
+    constant = _columns_constant_within_every_event(X, groups)
+    varying = [k for k in range(len(predictors)) if k not in constant]
+    if constant:
         logger.warning(
-            "fit_conditional_poisson: no within-event information in %s (constant "
-            "within every event, or collinear); not fitting this design",
-            ", ".join(_rank_deficient_terms(X, groups, predictors)),
+            "fit_conditional_poisson: %s constant within every event; reported as "
+            "not estimated",
+            ", ".join(predictors[k] for k in constant),
+        )
+    if not varying:
+        logger.warning(
+            "fit_conditional_poisson: no term of %s varies within events; not fitting",
+            predictors,
+        )
+        return None
+    X_varying = X[:, varying]
+    names_varying = [predictors[k] for k in varying]
+
+    # Reject the designs the conditional model cannot identify that remain:
+    # globally collinear predictors (a duplicated column, say), which would
+    # otherwise be fit with finite-but-meaningless coefficients and exploding SEs.
+    if not within_group_full_rank(X_varying, groups):
+        logger.warning(
+            "fit_conditional_poisson: no within-event information in %s (collinear "
+            "within events); not fitting this design",
+            ", ".join(_rank_deficient_terms(X_varying, groups, names_varying)),
         )
         return None
 
@@ -711,13 +790,18 @@ def fit_conditional_poisson(
     # zero below numpy.linalg.matrix_rank's default tolerance,
     # sigma_max * max(n_rows, n_params) * machine epsilon. A column with no
     # within-event variation is a zero column of the centred design, so the
-    # check above has refused it and every scale is positive.
+    # check above has refused any that the exact test let through, and every
+    # scale is positive.
     in_likelihood = _rows_of_events_whose_response_varies(y, groups)
-    limit = _fit_to_the_limit(X, y, groups, in_likelihood, predictors)
+    limit = _fit_to_the_limit(X_varying, y, groups, in_likelihood, names_varying)
     if limit is None:
         return None
     finish, scale = limit.finish, limit.scale
-    estimated = [predictors[k] for k in limit.columns]
+    columns = [varying[k] for k in limit.columns]
+    estimated = [predictors[k] for k in columns]
+    unidentified = [(predictors[k], NO_WITHIN_EVENT_VARIATION) for k in constant] + [
+        (names_varying[k], reason) for k, reason in limit.unidentified
+    ]
     converged = bool(finish.decrement < NEWTON_DECREMENT_TOL)
     if not converged:
         logger.warning(
@@ -740,7 +824,7 @@ def fit_conditional_poisson(
     separated = separated_terms(
         params,
         bse_values,
-        predictor_sd=predictor_sd[limit.columns],
+        predictor_sd=predictor_sd[columns],
         term_names=estimated,
         nuisance_terms=NUISANCE_TERMS,
     )
@@ -818,10 +902,9 @@ def fit_conditional_poisson(
         # On the original scale: the scaled gradient is the original one / s.
         "max_abs_grad": float(np.max(np.abs(finish.gradient * scale))),
         "n_newton_steps": int(limit.n_newton_steps),
-        # Terms this session cannot inform ("|"-joined, like separated_terms).
-        "unidentified_terms": "|".join(
-            p for k, p in enumerate(predictors) if k not in limit.columns
-        ),
+        # Terms this session cannot inform, as "|"-joined "<term>:<reason>" in
+        # the order the fit took them (see UNIDENTIFIED_REASONS).
+        "unidentified_terms": "|".join(f"{t}:{r}" for t, r in unidentified),
     }
 
     # Diagnostics
@@ -833,6 +916,105 @@ def fit_conditional_poisson(
         logger.debug("VIF/conditional diagnostics skipped: %s", exc)
 
     return output
+
+
+def parse_unidentified_terms(value: object) -> dict[str, str]:
+    """``unidentified_terms`` of a fit as ``{term: reason}``, in the order taken.
+
+    Parameters
+    ----------
+    value : str or None
+        The field as :func:`fit_conditional_poisson` writes it: "|"-joined
+        ``<term>:<reason>`` entries, "" (or None / NaN) when there are none.
+
+    Returns
+    -------
+    dict
+        Term name to one of ``UNIDENTIFIED_REASONS``, in the field's order.
+
+    Raises
+    ------
+    ValueError
+        If an entry has no reason or an unknown one.
+    """
+    if not isinstance(value, str) or not value:
+        return {}
+    parsed: dict[str, str] = {}
+    for entry in value.split("|"):
+        term, _, reason = entry.rpartition(":")
+        if not term or reason not in UNIDENTIFIED_REASONS:
+            raise ValueError(
+                f"unidentified_terms entry {entry!r} is not '<term>:<reason>' with "
+                f"a reason in {UNIDENTIFIED_REASONS}"
+            )
+        parsed[term] = reason
+    return parsed
+
+
+def conditional_linear_predictor(
+    X: np.ndarray, groups: np.ndarray, fit: dict, predictors: list[str]
+) -> np.ndarray:
+    """``X @ beta`` of a conditional-Poisson fit, with its unidentified terms at
+    their limits.
+
+    The one way to predict from a stored fit. A term reported
+    ``no_within_event_variation`` contributes nothing. A separated term gives
+    probability 0 to the rows its limit rules out (the rows above, or below, its
+    event's extreme over the rows still in play, applied in the fit's order), so
+    their linear predictor is -inf and a within-event softmax gives them 0.
+
+    Parameters
+    ----------
+    X : np.ndarray, shape (n_rows, n_predictors)
+        Design, columns in ``predictors`` order.
+    groups : np.ndarray, shape (n_rows,)
+        Event of each row.
+    fit : dict
+        A :func:`fit_conditional_poisson` result: ``coef_<term>`` for every
+        predictor and ``unidentified_terms``.
+    predictors : list of str
+        The fit's predictors.
+
+    Returns
+    -------
+    np.ndarray, shape (n_rows,)
+        The linear predictor; -inf on the rows a separated term rules out.
+
+    Raises
+    ------
+    ValueError
+        If a coefficient is not finite and the fit does not report its term as
+        unidentified: there is no limit to predict from.
+    """
+    unidentified = {
+        term: reason
+        for term, reason in parse_unidentified_terms(
+            fit.get("unidentified_terms")
+        ).items()
+        if term in predictors
+    }
+    unexplained = [
+        term
+        for term in predictors
+        if term not in unidentified and not np.isfinite(fit[f"coef_{term}"])
+    ]
+    if unexplained:
+        raise ValueError(
+            f"coefficients of {unexplained} are not finite and the fit does not "
+            "report them as unidentified; there is no limit to predict from"
+        )
+    beta = np.array(
+        [0.0 if term in unidentified else fit[f"coef_{term}"] for term in predictors],
+        dtype=float,
+    )
+    eta = X @ beta
+    alive = np.ones(len(eta), dtype=bool)
+    for term, reason in unidentified.items():
+        if reason != NO_WITHIN_EVENT_VARIATION:
+            column = X[:, predictors.index(term)]
+            alive &= ~_rows_ruled_out(column, groups, alive, reason)
+    eta[~alive] = -np.inf
+    return eta
 
 
 def fit_null_model_conditional(

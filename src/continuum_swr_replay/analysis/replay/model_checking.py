@@ -267,10 +267,14 @@ def compute_pearson_residuals(
     event_totals = df.groupby(event_col)[response_col].transform("sum")
     df = df[event_totals > 0].reset_index(drop=True)
 
-    params = np.array([fit_result[f"coef_{p}"] for p in predictors])
+    # Unidentified terms at their limits (see conditional_linear_predictor): a
+    # row a separated term rules out has prediction 0, and so residual 0.
+    from .fitting import conditional_linear_predictor
 
     X = df[predictors].values.astype(float)
-    eta = X @ params
+    eta = conditional_linear_predictor(
+        X, df[event_col].to_numpy(), fit_result, list(predictors)
+    )
 
     # Predicted fractions per event (softmax within event, stabilized)
     df["_eta"] = eta
