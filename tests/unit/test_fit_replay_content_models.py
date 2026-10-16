@@ -408,6 +408,47 @@ def test_fitted_rows_record_the_estimator_and_the_response(
     assert result["response_col"].tolist() == [response_col]
 
 
+def test_fitted_rows_carry_the_optimizer_diagnostics() -> None:
+    result = mod.fit_model_per_session(
+        _simulated_session("arm_fraction"),
+        "X",
+        ["is_current_arm"],
+        response_col="arm_fraction",
+    )
+    row = result.iloc[0]
+    assert row["llf"] < 0
+    assert row["newton_decrement"] < 1e-8
+    assert row["max_abs_grad"] < 1e-3
+    assert row["n_newton_steps"] >= 0
+    assert row["unidentified_terms"] == ""
+
+
+def test_the_printed_se_skips_a_session_that_cannot_inform_the_term(capsys) -> None:
+    """The fitter reports such a term with a NaN coefficient and an infinite SE.
+
+    The session drops out of that term's summary, SE included, rather than
+    pulling the median SE toward infinity.
+    """
+    mdf = pd.DataFrame(
+        {
+            "animal": ["a", "a", "b", "b", "c"],
+            "coef_is_candidate_arm_0": [0.5, 0.6, np.nan, np.nan, 0.7],
+            "bse_is_candidate_arm_0": [0.1, 0.2, np.inf, np.inf, 0.3],
+        }
+    )
+    hierarchy = {"X": argparse.Namespace(description="test rung")}
+
+    mod.print_model_results("X", mdf, ["is_candidate_arm_0"], hierarchy=hierarchy)
+
+    line = next(
+        text
+        for text in capsys.readouterr().out.splitlines()
+        if text.strip().startswith("is_candidate_arm_0")
+    )
+    # Columns: name, animal median, agree, session median, SE, p.
+    assert float(line.split()[4]) == pytest.approx(0.2)
+
+
 # ── Event-scale reporting ──
 
 

@@ -721,7 +721,10 @@ def unidentified_rows(coefficients: pd.DataFrame) -> pd.Series:
     # A missing SD makes the product NaN, which compares False -- so a term with
     # no design scale is never dropped for magnitude, only for its own flag.
     runaway = coef * sd >= SEPARATION_COEF_ABS
-    return coefficients["separated_term"].astype(bool) | runaway
+    # A NaN coefficient is a term the session cannot inform: the
+    # conditional-Poisson fitter reports it so (``unidentified_terms``).
+    not_estimated = coefficients["coef"].isna()
+    return coefficients["separated_term"].astype(bool) | runaway | not_estimated
 
 
 def _identified(coefficients: pd.DataFrame) -> pd.DataFrame:

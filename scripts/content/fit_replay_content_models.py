@@ -1130,7 +1130,13 @@ def print_model_results(
             continue
         vals = coef_info[pred]
         se_col = f"bse_{pred}"
-        se = mdf[se_col].median() if se_col in mdf.columns else float("nan")
+        # Over the sessions with a coefficient: a session that cannot inform the
+        # term reports it with a NaN coefficient and an infinite SE.
+        se = (
+            mdf.loc[vals.index, se_col].median()
+            if se_col in mdf.columns
+            else float("nan")
+        )
         p = corrected_map.get(pred)
         p_str = f"{p:.2e}" if p is not None else "—"
         if n_animals:

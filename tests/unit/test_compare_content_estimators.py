@@ -396,6 +396,36 @@ def test_a_large_concentration_intercept_is_kept_because_it_has_no_design_scale(
     assert list(mod.unidentified_rows(rows)) == [False, True]
 
 
+def test_a_term_the_fit_could_not_estimate_drops_its_estimator_triple():
+    """A NaN coefficient means the session does not inform the term.
+
+    The conditional-Poisson fitter reports such a term (``unidentified_terms``)
+    with a NaN coefficient; the paired rule drops the term's triple, so the
+    estimators are still compared on the same sessions, and keeps the others.
+    """
+    rows = pd.DataFrame(
+        [
+            _row(
+                "is_candidate_arm_0", np.nan, 0.3, estimator=CONDITIONAL_POISSON_COUNT
+            ),
+            _row(
+                "is_candidate_arm_0",
+                np.nan,
+                0.3,
+                estimator=CONDITIONAL_POISSON_FRACTION,
+            ),
+            _row("is_candidate_arm_0", -20.0, 0.3, estimator=DIRICHLET_MULTINOMIAL),
+            _row("is_current_arm", 0.7, 0.3, estimator=CONDITIONAL_POISSON_COUNT),
+            _row("is_current_arm", 0.7, 0.3, estimator=CONDITIONAL_POISSON_FRACTION),
+            _row("is_current_arm", 0.8, 0.3, estimator=DIRICHLET_MULTINOMIAL),
+        ]
+    )
+    assert list(mod.unidentified_rows(rows)) == [True, True, False, False, False, False]
+    kept = mod._identified(rows)
+    assert set(kept["term"]) == {"is_current_arm"}
+    assert len(kept) == 3
+
+
 def test_an_unidentified_row_drops_the_whole_estimator_triple():
     """Otherwise one summary row would average different sessions per estimator."""
     rows = pd.DataFrame(

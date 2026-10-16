@@ -245,6 +245,36 @@ def test_separation_drops_only_the_term_it_holds_for() -> None:
     assert set(out["n_sessions_flagged_separated"]) == {1}
 
 
+def test_a_term_a_session_cannot_inform_is_skipped_for_that_term_only() -> None:
+    """The fitter reports such a term with a NaN coefficient and infinite SEs.
+
+    That session drops out of that term's aggregate and nothing else: it is not
+    counted as a separation drop, and it still contributes its other terms.
+    """
+    fits = _two_term_fits()
+    fits["bse_cluster_hist_rcos_2"] = [0.10] * len(fits)
+    fits.loc[0, "coef_hist_rcos_2"] = float("nan")
+    fits.loc[0, "pval_hist_rcos_2"] = float("nan")
+    fits.loc[0, "bse_hist_rcos_2"] = float("inf")
+    fits.loc[0, "bse_cluster_hist_rcos_2"] = float("inf")
+    fits["unidentified_terms"] = ["hist_rcos_2"] + [""] * (len(fits) - 1)
+
+    out = aggregate_contrast(
+        fits,
+        [
+            ("S1_rew", "contrast", "hist_rcos_2"),
+            ("S1_rew", "contrast", "reward_history_rcos_0"),
+        ],
+        level="rate",
+    ).set_index("term")
+
+    assert out.loc["hist_rcos_2", "n_sessions"] == 7
+    assert out.loc["hist_rcos_2", "n_dropped"] == 0
+    assert out.loc["hist_rcos_2", "coef_session_median"] == pytest.approx(0.50)
+    assert out.loc["hist_rcos_2", "typical_session_se"] == pytest.approx(0.10)
+    assert out.loc["reward_history_rcos_0", "n_sessions"] == 8
+
+
 def _product_fits(separated_terms: list[str]) -> pd.DataFrame:
     """Twelve sessions carrying both ``is_swr`` and its product with ``q_arm``."""
     n = len(separated_terms)
