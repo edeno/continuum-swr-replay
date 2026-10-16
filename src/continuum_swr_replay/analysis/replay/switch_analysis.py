@@ -61,12 +61,8 @@ def _stop_replay_per_patch(
             how="left",
         )
 
-    _require_session_unique_ids(
-        eat, "event_id", helper_name="_stop_replay_per_patch"
-    )
-    _require_session_unique_ids(
-        eat, "stop_id", helper_name="_stop_replay_per_patch"
-    )
+    _require_session_unique_ids(eat, "event_id", helper_name="_stop_replay_per_patch")
+    _require_session_unique_ids(eat, "stop_id", helper_name="_stop_replay_per_patch")
 
     p_arr = eat["_patch"].to_numpy(dtype=float)
     f_arr = eat[fraction_col].to_numpy(dtype=float)
@@ -90,10 +86,7 @@ def _stop_replay_per_patch(
             .groupby(["stop_id", "event_id"])["_contrib"]
             .apply(strict_sum)
         )
-        per_stop = (
-            per_event.groupby("stop_id")
-            .apply(strict_mean)
-        )
+        per_stop = per_event.groupby("stop_id").apply(strict_mean)
         out[patch] = per_stop
 
     return pd.DataFrame(out)
@@ -118,7 +111,11 @@ def _patch_relative_fracs(
         or pd.isna(target_patch)
         or int(target_patch) not in (1, 2, 3)
     ):
-        return float("nan"), float("nan"), (None if per_stop_per_patch_residual is None else float("nan"))
+        return (
+            float("nan"),
+            float("nan"),
+            (None if per_stop_per_patch_residual is None else float("nan")),
+        )
     tp = int(target_patch)
     sp = per_stop_per_patch.loc[sid]
     frac_target = float(sp[tp])
@@ -139,6 +136,20 @@ def _detect_first_switches(stop_table: pd.DataFrame) -> pd.DataFrame | None:
     immediate predecessor in chronological stop order was not also a
     switch. Returns ``None`` when no rows have ``is_stay`` defined.
 
+    A session's first stop has no predecessor, so it is a first switch
+    when it is a switch.
+
+    ``is_stay`` is NaN for three kinds of stop. A stop known to be off a
+    well (``at_well`` False: in transit or mixed) has no current patch,
+    so it is not a choice between patches; it is left out of the
+    sequence, as before. A stop whose location is unknown (``at_well``
+    NA: wholly in excluded time, or before the first completed trip) and
+    an at-well stop whose next patch is unknown may each have been a
+    switch. Such a stop is not a first switch, and the stop after it is
+    not one either, because its predecessor may have been a switch. It
+    stays in the sequence for this reason; dropping it would compare the
+    next stop with an earlier one.
+
     Sorting by ``[animal, session_date, epoch, stop_idx]`` before the
     ``groupby(...).shift(1)`` is load-bearing: it makes ``shift`` walk
     chronological stop order rather than caller row order, and the
@@ -150,22 +161,21 @@ def _detect_first_switches(stop_table: pd.DataFrame) -> pd.DataFrame | None:
     to emit, so the bug is non-observable downstream — exposing this
     helper lets the regression be tested directly.
     """
-    valid = stop_table[stop_table["is_stay"].notna()].copy()
-    if len(valid) == 0:
+    if not stop_table["is_stay"].notna().any():
         return None
-    valid = valid.sort_values(
-        ["animal", "session_date", "epoch", "stop_idx"]
-    ).reset_index(drop=True)
-    valid["is_switch"] = (valid["is_stay"] == 0).astype(int)
-    valid["prev_is_switch"] = (
-        valid.groupby(["animal", "session_date", "epoch"])["is_switch"]
-        .shift(1)
-        .fillna(0)
-        .astype(int)
+    session = ["animal", "session_date", "epoch"]
+    ordered = stop_table.sort_values([*session, "stop_idx"])
+    off_well = ordered["at_well"].astype("boolean").eq(False).fillna(False)
+    ordered = ordered[~off_well.to_numpy()].reset_index(drop=True)
+    is_stay = ordered["is_stay"]
+    # 1 switch, 0 stay, NaN unknown.
+    ordered["is_switch"] = is_stay.eq(0).astype(float).where(is_stay.notna())
+    by_session = ordered.groupby(session)
+    # NaN when the predecessor is unknown; 0 for a session's first stop.
+    ordered["prev_is_switch"] = (
+        by_session["is_switch"].shift(1).where(by_session.cumcount() > 0, 0.0)
     )
-    return valid[
-        (valid["is_switch"] == 1) & (valid["prev_is_switch"] == 0)
-    ]
+    return ordered[ordered["is_switch"].eq(1) & ordered["prev_is_switch"].eq(0)]
 
 
 def build_switch_aligned_table(
@@ -182,13 +192,17 @@ def build_switch_aligned_table(
 
     Identifies unique switching episodes (first switch in a run of
     consecutive switches), then collects the preceding ``max_lag``
-    stops. For each stop with replay, computes patch-level replay
-    content: fraction on the current patch vs non-current patches.
+    stops. A stop whose ``is_stay`` is unknown starts no episode, and
+    neither does the stop after it; stops off a well are skipped (see
+    ``_detect_first_switches``). For each stop with replay, computes
+    patch-level replay content: fraction on the current patch vs
+    non-current patches.
 
     Parameters
     ----------
     stop_table : pd.DataFrame
-        Canonical stop table (includes zero-event stops).
+        Canonical stop table (includes zero-event stops), with
+        ``is_stay`` and ``at_well``.
     event_table : pd.DataFrame
         Canonical event table.
     event_arm_table : pd.DataFrame
@@ -535,23 +549,18 @@ def stop_patch_replay(
     event_agg = pd.DataFrame(
         {
             "replay_fraction_current_patch": (
-                eat.groupby(["stop_id", "event_id"])["_frac_cp"]
-                .apply(strict_sum)
+                eat.groupby(["stop_id", "event_id"])["_frac_cp"].apply(strict_sum)
             ),
             "replay_fraction_noncurrent": (
-                eat.groupby(["stop_id", "event_id"])["_frac_nc"]
-                .apply(strict_sum)
+                eat.groupby(["stop_id", "event_id"])["_frac_nc"].apply(strict_sum)
             ),
         }
     )
 
     # Average across events within each stop, NaN-aware.
-    result = (
-        event_agg.groupby("stop_id")[
-            ["replay_fraction_current_patch", "replay_fraction_noncurrent"]
-        ]
-        .agg(strict_mean)
-    )
+    result = event_agg.groupby("stop_id")[
+        ["replay_fraction_current_patch", "replay_fraction_noncurrent"]
+    ].agg(strict_mean)
 
     # Residualized version if available
     if "residual_frac" in eat.columns:
