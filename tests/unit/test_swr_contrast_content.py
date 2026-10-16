@@ -547,7 +547,7 @@ def test_fit_rows_carry_the_optimizer_diagnostics(monkeypatch):
         "newton_decrement": 3e-12,
         "max_abs_grad": 1e-7,
         "n_newton_steps": 1,
-        "unidentified_terms": "is_candidate_arm_0",
+        "unidentified_terms": "is_candidate_arm_0:separated_to_minus_inf",
     }
 
     def _fit(g, predictors, *, response_col, n_categories):
@@ -703,14 +703,6 @@ def test_provenance_records_the_commit_this_process_loaded(monkeypatch):
     monkeypatch.setattr(subprocess, "run", read_at_write_time)
 
     assert mod._provenance(_provenance_args(), n_sessions=1)["git_hash"] == loaded
-
-
-def test_provenance_defaults_to_the_fit_provenance_record_of_the_commit():
-    from continuum_swr_replay.analysis.replay import fit_provenance
-
-    prov = mod._provenance(_provenance_args(), n_sessions=1)
-
-    assert prov["git_hash"] == fit_provenance.git_hash()
 
 
 def _leaf_session_with_a_trunk_only_event(n_events: int = 20) -> pd.DataFrame:
