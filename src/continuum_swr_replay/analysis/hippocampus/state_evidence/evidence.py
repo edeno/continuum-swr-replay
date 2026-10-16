@@ -98,10 +98,10 @@ def window_evidence(
         must not score them.
     left_out_bins : ndarray of bool, shape (n_place_bins,), optional
         Place bins that are no candidate for MAP_S or the best remote bin,
-        :func:`~.terms.underflowed_bin_mask`'s: bins where the CPU rebuild of
-        the likelihood is not the decode's. The choice is the best remaining
-        bin; the result is that of a model without those bins. The animal must
-        not be in one. None, or all False, changes nothing.
+        :func:`~.terms.subnormal_occupancy_bin_mask`'s: bins where the CPU
+        rebuild of the likelihood is not the decode's. The choice is the best
+        remaining bin; the result is that of a model without those bins. The
+        animal must not be in one. None, or all False, changes nothing.
     no_spike_rate : float
         The decoder's No-Spike rate, Hz.
     seed : int or sequence

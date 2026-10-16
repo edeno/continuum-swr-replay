@@ -297,17 +297,72 @@ def test_an_epoch_is_validated_and_written(simulated, tmp_path):
 ZONE_SIZE = 3
 
 
-def underflowing_copy(simulated, tmp_path: Path) -> tuple[Path, np.ndarray]:
-    """A copy of the decode whose stored occupancy underflows at the last real bins.
+def give_exact_zero_occupancy(
+    decode_dir: Path, inputs: dict, real_bin: int, stored_offset: float = 0.0
+) -> None:
+    """Make one real bin one the decode saw with an occupancy of exactly 0.
 
-    As in chimi20200221_08_r4 (D1): the animal never reached those bins, so the
-    stored occupancy there is a float32 subnormal. ``results.nc`` stays as the
-    library wrote it, with ordinary numbers there (the GPU decode kept the
-    subnormals and so was close to exact arithmetic), while a CPU rebuild flushes
-    the subnormal to zero and gets the library's floor.
+    A bin the animal never reached and the KDE put no weight on. The decode (GPU
+    or CPU) reads ``occupancy > 0`` as False there and takes the library's floor,
+    so its stored likelihood and ground intensity are what a CPU rebuild gives
+    (D1: they agree to 2e-14 per spike). The detector and ``results.nc`` are
+    rewritten that way; ``stored_offset`` then moves the stored likelihood off it.
+    """
+    from non_local_detector.likelihoods.common import EPS
 
-    Returns the decode folder and the underflowed real bins (indices into the
-    real place bins).
+    path = decode_dir / f"{EPOCH}_detector.pkl"
+    detector = joblib.load(path)
+    encoding = detector.encoding_model_[ENCODING_KEY]
+    occupancy = np.array(encoding["occupancy"], dtype=np.float32)
+    occupancy[real_bin] = 0.0
+    encoding["occupancy"] = occupancy
+    ground = np.array(encoding["summed_ground_process_intensity"])
+    ground[real_bin] = np.clip(
+        np.asarray(encoding["mean_rates"]) * EPS, EPS, None
+    ).sum()
+    encoding["summed_ground_process_intensity"] = ground
+    joblib.dump(detector, path)
+
+    dot = pd.read_pickle(decode_dir / f"{EPOCH}_80_data_over_time.pkl")
+    non_local = np.asarray(
+        predict_clusterless_kde_log_likelihood(
+            inputs["time"], inputs["time"],
+            dot[["head_position_x", "head_position_y"]].to_numpy(),
+            inputs["spike_times"], inputs["marks"],
+            **{key: encoding[key] for key in CLUSTERLESS_LIKELIHOOD_KEYS},
+            is_local=False, disable_progress_bar=True,
+        )
+    )  # fmt: skip
+    results_path = decode_dir / f"{EPOCH}_results.nc"
+    with xr.open_dataset(results_path, engine="h5netcdf") as results:
+        results = results.load()
+    first = int(np.flatnonzero(results["state"].values == "Non-Local Continuous")[0])
+    interior = interior_bin_mask(encoding["environment"])
+    column = first + int(np.flatnonzero(interior)[real_bin])
+    values = results["log_likelihood"].values.copy()
+    values[:, column] = non_local[:, real_bin] + stored_offset
+    values[inputs["is_missing"], column] = 0.0
+    results["log_likelihood"] = (("time", "state_bins"), values)
+    results.to_netcdf(results_path, engine="h5netcdf")
+
+
+def underflowing_copy(
+    simulated, tmp_path: Path, *, zero_offset: float = 0.0
+) -> tuple[Path, np.ndarray, int]:
+    """A copy of the decode with an unreached arm tip: three subnormal bins, one zero.
+
+    As in chimi20200221_08_r4 (D1): the animal never reached the third arm's tip.
+    The stored occupancy of its three bins before the last is a float32 subnormal.
+    ``results.nc`` stays as the library wrote it, with ordinary numbers there (the
+    GPU decode kept the subnormals and so was close to exact arithmetic), while a
+    CPU rebuild flushes the subnormal to zero and gets the library's floor. The
+    last bin has an occupancy of exactly 0 and a stored likelihood that agrees
+    with the CPU rebuild (``give_exact_zero_occupancy``); it comes after the
+    others, so that in the CPU rebuild, where all four are alike, the first of
+    the three is the one an unrestricted choice takes.
+
+    Returns the decode folder, the subnormal real bins (indices into the real
+    place bins) and the exact-zero real bin.
     """
     assert not bool(jnp.asarray(np.float32(1e-42)) > 0), (
         "this test needs a CPU that flushes float32 subnormals to zero, as XLA's "
@@ -319,34 +374,37 @@ def underflowing_copy(simulated, tmp_path: Path) -> tuple[Path, np.ndarray]:
     environment = encoding["environment"]
     environment._is_fitted = True
     n_real = int(interior_bin_mask(environment).sum())
-    zone = np.arange(n_real - ZONE_SIZE, n_real)
+    zero_bin = n_real - 1
+    zone = np.arange(zero_bin - ZONE_SIZE, zero_bin)
     # the animal shuttles on the first two arms: the third arm's tip is never visited
     animal = nearest_interior_bins(
         environment, pd.read_pickle(decode_dir / f"{EPOCH}_80_data_over_time.pkl")
         .linear_position.to_numpy(),
     )  # fmt: skip
-    assert not np.isin(zone, animal).any()
+    assert not np.isin(np.r_[zone, zero_bin], animal).any()
     occupancy = np.array(encoding["occupancy"], dtype=np.float32)
     occupancy[zone] = np.float32(1e-42)
     assert (occupancy[zone] < np.finfo(np.float32).tiny).all()
     encoding["occupancy"] = occupancy
     joblib.dump(detector, decode_dir / f"{EPOCH}_detector.pkl")
-    return decode_dir, zone
+    give_exact_zero_occupancy(decode_dir, simulated[1], zero_bin, zero_offset)
+    return decode_dir, zone, zero_bin
 
 
-def test_bins_whose_occupancy_underflows_are_left_out_of_the_checks_and_the_evidence(
+def test_bins_with_a_subnormal_occupancy_are_left_out_of_the_checks_and_the_evidence(
     simulated, tmp_path
 ):
-    decode_dir, zone = underflowing_copy(simulated, tmp_path)
+    decode_dir, zone, zero_bin = underflowing_copy(simulated, tmp_path)
 
     record = run(decode_dir, tmp_path / "out", simulated[1])
 
     assert record["status"] == "ok", record.get("traceback")
-    # recorded: the floor, the count and the bins
+    # recorded: the floor, the count and the bins; the exact-zero bin is not one
     assert record["underflowed_bins"] == {
         "floor": UNDERFLOW_OCCUPANCY_FLOOR, "n": ZONE_SIZE, "bins": zone.tolist(),
     }  # fmt: skip
-    # the stored-likelihood check and the library check pass on the other bins
+    # the stored-likelihood check and the library check pass on the other bins,
+    # the exact-zero bin among them
     assert record["stored_log_likelihood"]["max_rel"] < 1e-5
     for name in ("can", "run", "runcv0", "runcv1"):
         assert record["library_log_likelihood"][name]["max_rel"] < 1e-5
@@ -355,7 +413,10 @@ def test_bins_whose_occupancy_underflows_are_left_out_of_the_checks_and_the_evid
     for prefix in ("can", "run", "runcv"):
         for column in ("run0_mapS", "run0_mapSr"):
             assert not table[f"{prefix}_{column}"].isin(zone).any(), (prefix, column)
-    # and the windows that would have chosen one are marked and counted, not dropped
+    # the exact-zero bin stays a candidate: a silent window still chooses it
+    assert (table.can_run0_mapS == zero_bin).any()
+    # and the windows that would have chosen a left-out bin are marked and counted,
+    # not dropped
     marked = table.can_mapS_left_out_runs + table.can_mapSr_left_out_runs
     assert (marked > 0).any()
     counted = record["windows"]["left_out_selection"]
@@ -369,8 +430,20 @@ def test_bins_whose_occupancy_underflows_are_left_out_of_the_checks_and_the_evid
 def test_the_stored_likelihood_check_fails_as_before_when_the_bins_are_not_left_out(
     simulated, tmp_path, monkeypatch
 ):
-    decode_dir, _ = underflowing_copy(simulated, tmp_path)
+    decode_dir, _, _ = underflowing_copy(simulated, tmp_path)
     monkeypatch.setattr(runner, "UNDERFLOW_OCCUPANCY_FLOOR", 0.0)
+
+    record = run(decode_dir, tmp_path / "out", simulated[1])
+
+    assert record["status"] == "failed"
+    assert "do not reproduce results.nc" in record["error"]
+
+
+def test_a_bin_with_an_exact_zero_occupancy_is_still_checked_against_the_stored_one(
+    simulated, tmp_path
+):
+    """Both devices agree at an exact zero, so a disagreement there is a real one."""
+    decode_dir, _, _ = underflowing_copy(simulated, tmp_path, zero_offset=50.0)
 
     record = run(decode_dir, tmp_path / "out", simulated[1])
 

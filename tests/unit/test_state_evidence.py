@@ -54,11 +54,11 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (
     sign_flip_p,
     state_bouts,
     stratified_bootstrap_ci,
+    subnormal_occupancy_bin_mask,
     summarize_state_evidence,
     tetrode_halves,
     time_folds,
     training_spike_bins,
-    underflowed_bin_mask,
     window_evidence,
     window_folds,
 )
@@ -1466,34 +1466,46 @@ def environment_with_real_bins(n_real: int, n_junction: int = 2) -> SimpleNamesp
     return SimpleNamespace(is_track_interior_=interior)
 
 
-def test_underflowed_bins_are_the_real_bins_with_occupancy_below_the_floor():
-    # the decode's occupancy of chimi20200221_08_r4 at bins 0, 2, 71, 72, 78, 79
-    # and 80 (D1): exact zeros, float32 subnormals, normal numbers down to 1.4e-24
-    # (the highest at which the CPU and the GPU disagreed), then 1.9e-22 (the
-    # CPU matched there) and ordinary values
+def test_flagged_bins_are_the_real_bins_with_occupancy_above_zero_and_below_the_floor():
+    # the decode's occupancy of chimi20200221_08_r4 (D1) at bins 69-70 (exact
+    # zeros: both devices agree there), 71 and 72 (float32 subnormals), 78 (1.4e-24,
+    # the highest at which the CPU and the GPU disagreed), 79 (1.9e-22, where the CPU
+    # matched) and two ordinary values
     occupancy = np.array(
-        [0.0, 3e-2, 5.4e-43, 5.6e-40, 1.4e-24, 1.9e-22, 4e-6, 5.8e-5], dtype=np.float32
+        [0.0, 0.0, 5.4e-43, 5.6e-40, 1.4e-24, 1.9e-22, 4e-6, 5.8e-5], dtype=np.float32
     )
     assert occupancy[2] < np.finfo(np.float32).tiny  # really subnormal
     environment = environment_with_real_bins(occupancy.size)
 
-    left_out = underflowed_bin_mask(occupancy, environment)
+    left_out = subnormal_occupancy_bin_mask(occupancy, environment)
 
     assert left_out.dtype == bool and left_out.shape == (occupancy.size,)
     np.testing.assert_array_equal(
-        left_out, [True, False, True, True, True, True, False, False]
+        left_out, [False, False, True, True, True, True, False, False]
     )
     # the floor is a parameter, and the comparison is strict
+    wide = occupancy.astype(float)
     np.testing.assert_array_equal(
-        underflowed_bin_mask(occupancy.astype(float), environment, floor=4e-6),
-        occupancy.astype(float) < 4e-6,
+        subnormal_occupancy_bin_mask(wide, environment, floor=4e-6),
+        (wide > 0) & (wide < 4e-6),
     )
 
 
-def test_a_normal_occupancy_has_no_underflowed_bin(tmp_path):
+def test_an_exact_zero_occupancy_is_not_flagged_but_a_subnormal_one_is():
+    """Both devices test ``occupancy > 0``: False at an exact zero, so both use the
+    same floor and agree (D1: 2e-14 per spike at bins 0-70); a subnormal is True on
+    the GPU and False on the XLA CPU, so they disagree."""
+    occupancy = np.array([0.0, np.float32(5.4e-43), 0.0, 3e-2], dtype=np.float32)
+
+    left_out = subnormal_occupancy_bin_mask(occupancy, environment_with_real_bins(4))
+
+    np.testing.assert_array_equal(left_out, [False, True, False, False])
+
+
+def test_a_normal_occupancy_has_no_flagged_bin(tmp_path):
     epoch = build_simulated_epoch(tmp_path)
 
-    left_out = underflowed_bin_mask(
+    left_out = subnormal_occupancy_bin_mask(
         epoch.encoding_model["occupancy"], epoch.environment
     )
 
@@ -1514,7 +1526,7 @@ def test_the_occupancy_must_cover_exactly_the_real_bins():
     environment = environment_with_real_bins(6)
 
     with pytest.raises(ValueError, match="6 real place bins"):
-        underflowed_bin_mask(np.ones(7), environment)
+        subnormal_occupancy_bin_mask(np.ones(7), environment)
 
 
 def drop_bins(terms: TetrodeTerms, left_out: np.ndarray) -> TetrodeTerms:

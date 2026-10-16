@@ -27,14 +27,16 @@ Per-event metrics (all bin lookups use native track-graph distance):
 The matched non-event immobility baseline is the null (its dll_animal and
 dll_per_spike sit at ~0).
 
-Events decoded where the model was never fit are left out. A real place bin
-whose stored occupancy is below ``UNDERFLOW_OCCUPANCY_FLOOR`` (float32
-underflow where the animal never went; ``underflowed_bin_mask``) has a CPU
-likelihood that is not the decode's, up to 20 nats per spike off (D1). An event
-(or baseline window) with a scored bin whose MAP is in such a bin is not
-scored; ``event_spike_evidence_left_out.csv`` counts them per epoch. With no
-such bin (every analysed epoch but chimi20200221_08_r4) the outputs are
-unchanged.
+Events decoded where the CPU rebuild is not the decode are left out. A real
+place bin whose stored occupancy is above 0 and below
+``UNDERFLOW_OCCUPANCY_FLOOR`` (float32 subnormals where the animal never went; a
+GPU decode keeps them, the CPU flushes them to zero;
+``subnormal_occupancy_bin_mask``) has a CPU likelihood that is not the decode's,
+up to 20 nats per spike off (D1). A bin with an occupancy of exactly 0 does not:
+both devices read ``occupancy > 0`` as False and agree there. An event (or
+baseline window) with a scored bin whose MAP is in a flagged bin is not scored;
+``event_spike_evidence_left_out.csv`` counts them per epoch. With no flagged bin
+(every analysed epoch but chimi20200221_08_r4) the outputs are unchanged.
 
 Usage
 -----
@@ -83,7 +85,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: 
     load_encoding,
     nearest_interior_bins,
     parse_epoch_identifier,
-    underflowed_bin_mask,
+    subnormal_occupancy_bin_mask,
 )
 from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
     excluded_intervals_of,
@@ -291,7 +293,7 @@ def events_with_map_in_left_out_bins(
     env : Environment
         Fitted.
     left_out : ndarray of bool, shape (n_real_bins,)
-        :func:`underflowed_bin_mask`.
+        :func:`subnormal_occupancy_bin_mask`.
 
     Returns
     -------
@@ -372,8 +374,8 @@ def analyze_session(
     mape = dot["map_estimate"].to_numpy()
     lin = dot["linear_position"].to_numpy()
 
-    # events decoded where the model was never fit are not scored (module notes)
-    left_out = underflowed_bin_mask(
+    # events decoded where the CPU rebuild is not the decode are not scored
+    left_out = subnormal_occupancy_bin_mask(
         enc["encargs"]["occupancy"], env, floor=UNDERFLOW_OCCUPANCY_FLOOR
     )
     n_events = len(events)
@@ -633,7 +635,7 @@ def main() -> None:
             print(
                 f"    {epoch_id}: {left_out['n_events_left_out']} of "
                 f"{left_out['n_events']} events left out (MAP in the "
-                f"{len(left_out['bins'])} real bins with occupancy below "
+                f"{len(left_out['bins'])} real bins with 0 < occupancy < "
                 f"{left_out['floor']:g})"
             )
         med = metrics_df.groupby("group")["dll_per_spike"].median()

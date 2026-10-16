@@ -254,14 +254,22 @@ def interior_bin_mask(environment: Any) -> NDArray[np.bool_]:
 
 
 UNDERFLOW_OCCUPANCY_FLOOR = 1e-20
-"""Real place bins whose stored occupancy is below this are left out.
+"""Real place bins whose stored occupancy is above 0 and below this are left out.
 
-Where the animal never went, the KDE occupancy underflows to float32 subnormals
-(below 1.18e-38) or to exactly 0. A GPU decode keeps the subnormals; XLA on the
-CPU flushes them to zero, so a CPU rebuild of the likelihood there differs from
-the stored decode by up to 20 nats per spike, and the stored decode is the
-closer to exact arithmetic (D1, ``chimi20200221_08_r4``, the only analysed
-epoch with such bins: the animal never entered patch 1).
+Where the animal never went, the KDE occupancy is exactly 0 or underflows
+float32. The two cases differ.
+
+- **Exactly 0**: the GPU decode and the XLA CPU both read ``occupancy > 0`` as
+  False and take the library's floor (EPS), so they agree. D1 measured 2e-14 per
+  spike at bins 0-70 of ``chimi20200221_08_r4``, and its whole-epoch CPU rebuild
+  matched the stored decode to 0.005 outside bins 70-79. These bins are not
+  flagged (and their evidence, that silent windows prefer them, is a property of
+  the model, not of the arithmetic).
+- **Above 0 and tiny**: a GPU keeps float32 subnormals (below 1.18e-38); XLA on the
+  CPU flushes them to zero. A CPU rebuild of the likelihood there differs from the
+  stored decode by up to 20 nats per spike, and the stored decode is the closer to
+  exact arithmetic (D1; ``chimi20200221_08_r4`` is the only analysed epoch with
+  such bins: the animal never entered patch 1). These are flagged.
 
 D1 measured the per-spike difference between the CPU rebuild and the decode, by
 the stored occupancy of the bin: 20 nats from 5.6e-40 to 2.5e-34, falling to 16,
@@ -272,17 +280,20 @@ other analysed epoch's decode (4e-6), so it takes in no ordinary bin.
 """
 
 
-def underflowed_bin_mask(
+def subnormal_occupancy_bin_mask(
     occupancy: NDArray,
     environment: Any,
     floor: float = UNDERFLOW_OCCUPANCY_FLOOR,
 ) -> NDArray[np.bool_]:
-    """The real place bins whose stored occupancy is below ``floor``.
+    """The real place bins whose stored occupancy is above 0 and below ``floor``.
 
     The one definition the state-evidence runner and the spike-evidence engine
-    share (see :data:`UNDERFLOW_OCCUPANCY_FLOOR`). Compare the occupancy as
-    stored (float32 on a GPU decode), not a float64 recomputation: the stored
-    array is what the decode used.
+    share (see :data:`UNDERFLOW_OCCUPANCY_FLOOR`): the bins where a GPU decode,
+    which keeps float32 subnormals, and a CPU rebuild, which flushes them to
+    zero, disagree. A bin with an occupancy of exactly 0 is not one: both devices
+    read ``occupancy > 0`` as False there and use the same floor. Compare the
+    occupancy as stored (float32 on a GPU decode), not a float64 recomputation:
+    the stored array is what the decode used.
 
     Parameters
     ----------
@@ -295,9 +306,9 @@ def underflowed_bin_mask(
     Returns
     -------
     left_out : ndarray of bool, shape (n_real_bins,)
-        True where ``occupancy < floor`` (exact zeros included). Indices are
-        into the real place bins, ``is_track_interior_`` order, the order of
-        :class:`TetrodeTerms` columns and of ``event_likelihood``.
+        True where ``0 < occupancy < floor``. Indices are into the real place
+        bins, ``is_track_interior_`` order, the order of :class:`TetrodeTerms`
+        columns and of ``event_likelihood``.
 
     Raises
     ------
@@ -310,7 +321,7 @@ def underflowed_bin_mask(
         raise ValueError(
             f"{n_real} real place bins; the occupancy covers {values.size}"
         )
-    left_out: NDArray[np.bool_] = values < floor
+    left_out: NDArray[np.bool_] = (values > 0.0) & (values < floor)
     return left_out
 
 

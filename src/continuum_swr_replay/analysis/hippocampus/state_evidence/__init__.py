@@ -197,9 +197,9 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.terms import (
     nearest_interior_bins,
     parse_epoch_identifier,
     per_tetrode_terms,
+    subnormal_occupancy_bin_mask,
     time_folds,
     training_spike_bins,
-    underflowed_bin_mask,
 )
 from continuum_swr_replay.analysis.hippocampus.state_evidence.windows import (
     HALVES_SEED,
@@ -284,7 +284,7 @@ __all__ = [
     "tetrode_halves",
     "time_folds",
     "training_spike_bins",
-    "underflowed_bin_mask",
+    "subnormal_occupancy_bin_mask",
     "window_evidence",
     "window_folds",
     "write_json",

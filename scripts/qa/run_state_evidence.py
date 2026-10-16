@@ -42,14 +42,16 @@ Per epoch (a dask CPU worker each):
    the stored ``results.nc`` log-likelihood on 2000 sampled bins, and every
    encoding's terms reproduce the library's own likelihood
    (``event_likelihood``) on a 200-bin block. Real place bins whose stored
-   occupancy is below ``UNDERFLOW_OCCUPANCY_FLOOR`` (float32 underflow where
-   the animal never went; a GPU decode keeps the subnormals, the CPU flushes
-   them) are left out of both comparisons and of every encoding's MAP_S choice
-   (``underflowed_bin_mask``). They are listed in the validation record
-   (``underflowed_bins``: the floor, the count, the bins), and a window whose
-   choice would have been one is scored on the remaining bins and marked
-   (``*_mapS_left_out_runs``, ``*_mapSr_left_out_runs``) and counted
-   (``windows.left_out_selection``). With none, the outputs are unchanged.
+   occupancy is above 0 and below ``UNDERFLOW_OCCUPANCY_FLOOR`` (float32
+   subnormals where the animal never went; a GPU decode keeps them, the CPU
+   flushes them) are left out of both comparisons and of every encoding's MAP_S
+   choice (``subnormal_occupancy_bin_mask``). A bin with an occupancy of exactly
+   0 is not: both devices read ``occupancy > 0`` as False and agree there. The
+   left-out bins are listed in the validation record (``underflowed_bins``: the
+   floor, the count, the bins), and a window whose choice would have been one is
+   scored on the remaining bins and marked (``*_mapS_left_out_runs``,
+   ``*_mapSr_left_out_runs``) and counted (``windows.left_out_selection``). With
+   none, the outputs are unchanged.
 6. **Evidence** under every encoding (``window_evidence``), 10 seeded tetrode
    half-partitions x 2 directions. The primary, ``runcv_``, takes each window
    from the fold model without its centre bin (``held_out_evidence``), so a
@@ -153,11 +155,11 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: 
     per_tetrode_terms,
     regimes,
     saved_decode_masks,
+    subnormal_occupancy_bin_mask,
     summarize_state_evidence,
     tetrode_halves,
     time_folds,
     training_spike_bins,
-    underflowed_bin_mask,
     window_evidence,
     window_folds,
     write_json,
@@ -222,14 +224,16 @@ CAVEATS = [
     "each tetrode scores in exactly half of the 20 runs.",
     "With few spikes, S's silence term pulls MAP_S toward low-rate bins, so "
     "MAP_S's distance from the animal (mapS_dist_cm) is not a Local test.",
-    "Real place bins whose stored occupancy is below "
-    f"{UNDERFLOW_OCCUPANCY_FLOOR:g} (float32 underflow where the animal never "
-    "went; a GPU decode keeps the subnormals and a CPU rebuild flushes them to "
-    "zero, D1) are left out of the stored-likelihood check and are no choice of "
-    "MAP_S or of the best remote bin. A window that would have chosen one is "
-    "scored on the remaining bins, and marked and counted in the epoch's "
-    "validation record (underflowed_bins, windows.left_out_selection). D1's scan "
-    "of the 242 analysed epochs found one with such bins, chimi20200221_08_r4.",
+    "Real place bins whose stored occupancy is above 0 and below "
+    f"{UNDERFLOW_OCCUPANCY_FLOOR:g} (float32 subnormals where the animal never "
+    "went; a GPU decode keeps them and a CPU rebuild flushes them to zero, D1) "
+    "are left out of the stored-likelihood check and are no choice of MAP_S or "
+    "of the best remote bin. A bin with an occupancy of exactly 0 is not: both "
+    "devices agree there, and a silent window may still choose it. A window "
+    "that would have chosen a left-out bin is scored on the remaining bins, and "
+    "marked and counted in the epoch's validation record (underflowed_bins, "
+    "windows.left_out_selection). D1's scan of the 242 analysed epochs found one "
+    "with such bins, chimi20200221_08_r4.",
     "Each epoch enters as one value (epoch_summary): its median over windows "
     "for the log-likelihood ratios (loc_*, nl_*, nlr_*, ns_logratio), which are "
     "heavy-tailed (three spike bursts in one pilot chimi epoch score -1641, "
@@ -683,9 +687,10 @@ def epoch_table(
     centers = np.asarray(environment.place_bin_centers_)[interior]
     distance = interior_bin_distances_cm(environment)
     no_spike_rate = float(detector.no_spike_rate)
-    # real bins whose stored occupancy underflows: the CPU rebuild is not the
-    # decode there (D1), so no check compares them and no encoding picks them
-    left_out = underflowed_bin_mask(
+    # real bins whose stored occupancy is a float32 subnormal or tiny: the CPU
+    # rebuild is not the decode there (D1), so no check compares them and no
+    # encoding picks them (an exact 0 is not one: both devices agree)
+    left_out = subnormal_occupancy_bin_mask(
         stored["occupancy"], environment, floor=UNDERFLOW_OCCUPANCY_FLOOR
     )
     kept = ~left_out
@@ -695,8 +700,8 @@ def epoch_table(
         "bins": np.flatnonzero(left_out).tolist(),
     }
     if left_out.any():
-        log(f"{left_out.sum()} real place bins left out: stored occupancy below "
-            f"{UNDERFLOW_OCCUPANCY_FLOOR:g}")  # fmt: skip
+        log(f"{left_out.sum()} real place bins left out: stored occupancy above 0 "
+            f"and below {UNDERFLOW_OCCUPANCY_FLOOR:g}")  # fmt: skip
     checks["decode"].update(
         no_spike_rate=no_spike_rate,
         sampling_frequency=float(detector.sampling_frequency),
@@ -1062,10 +1067,10 @@ def run_settings() -> dict:
         "scored on a seeded <= 50-bin sub-window",
         "calibration": "2000 random 10-bin windows per regime",
         "partners": "20 per window from its pool; Local partners >= 20 cm away",
-        "left_out_bins": "real place bins whose stored occupancy is below "
-        f"{UNDERFLOW_OCCUPANCY_FLOOR:g} (float32 underflow: a CPU rebuild flushes "
-        "them): no stored-likelihood or library comparison, and no MAP_S or "
-        "remote-bin choice, of any encoding",
+        "left_out_bins": "real place bins whose stored occupancy is above 0 and "
+        f"below {UNDERFLOW_OCCUPANCY_FLOOR:g} (float32 subnormals: a CPU rebuild "
+        "flushes them): no stored-likelihood or library comparison, and no MAP_S "
+        "or remote-bin choice, of any encoding",
         "encodings": {
             "runcv": f"running-only (head_speed >= {RUNNING_ENCODING_MIN_SPEED_CM_S} "
             f"cm/s) refit on each fold of alternating {CV_BLOCK_S:g} s blocks; a "
