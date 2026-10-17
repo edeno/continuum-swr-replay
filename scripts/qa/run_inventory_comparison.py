@@ -358,7 +358,11 @@ def epoch_inventories(
     tables[STATE_SPACE] = state_space_inventory(dot, drops=drops, run_id=decode_run_id)
     for detector in (MEMORYLESS, MEMORYLESS_CRITERIA):
         tables[detector] = memoryless_inventory(
-            memoryless_dir, cohort=str(ROSTER[detector]), detector=detector, dot=dot
+            memoryless_dir,
+            cohort=str(ROSTER[detector]),
+            detector=detector,
+            dot=dot,
+            drops=drops,
         )
     return tables
 

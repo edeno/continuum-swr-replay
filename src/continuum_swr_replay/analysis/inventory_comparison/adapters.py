@@ -24,9 +24,10 @@ detector's native count is its inventory's rows plus its set-aside rows.
 A run whose record for the epoch cannot be used (no manifest, the epoch not in
 it, a status other than ``ok`` or ``partial``, the detector not ``ok``, a file
 missing or changed since the run, events not numbered 1..n, two LFP events
-sharing a sample of the decode grid, a memoryless record that does not describe
-its table or the frame's grid) observed none of the epoch: its adapter returns
-an empty inventory and a ``missing_run_table`` row saying why.
+or memoryless candidates sharing a sample of the decode grid, a memoryless
+record that does not describe its table or the frame's grid) observed none of
+the epoch: its adapter returns an empty inventory and a ``missing_run_table``
+row saying why.
 """
 
 import json
@@ -657,8 +658,51 @@ def _check_memoryless_record(record: dict, table: pd.DataFrame, epoch: _Epoch) -
             )
 
 
+def _memoryless_second_pass(
+    table: pd.DataFrame, flag: str, epoch: _Epoch, drops: pd.DataFrame
+) -> NDArray:
+    """Each candidate's ``artifact_drop_reason``, its second pass read on the
+    grid as the LFP inventories' is.
+
+    The stored excluded-time reasons stand. The stored
+    ``overlaps_dropped_event`` is not read: the cohort's candidates outside
+    excluded time are checked at their bounds sampled on the decode grid
+    against the SWR and MUA events dropped for excluded time at theirs
+    (:func:`_dropped_on_grid`).
+
+    Raises
+    ------
+    EventDefinitionError
+        Two of the checked candidates share a sample of the grid.
+    """
+    stored = table["artifact_drop_reason"].to_numpy(dtype=object)
+    reasons: NDArray = stored.copy()
+    reasons[~np.isin(stored.astype(str), list(EXCLUDED_TIME_REASONS))] = None
+    checked = np.flatnonzero(table[flag].to_numpy(dtype=bool) & pd.isna(reasons))
+    sampled = _sampled_bounds(
+        pd.DataFrame(
+            {
+                "start_time": table["event_start_s"].to_numpy(dtype=np.float64),
+                "end_time": table["event_end_s"].to_numpy(dtype=np.float64),
+            }
+        ).iloc[checked],
+        epoch,
+    )
+    on_grid = np.isfinite(sampled[:, 0])
+    overlapping = overlaps_dropped_events(
+        sampled[on_grid, 0], sampled[on_grid, 1], _dropped_on_grid(drops, epoch)
+    )
+    reasons[checked[on_grid][overlapping]] = DropReason.OVERLAPS_DROPPED_EVENT.value
+    return reasons
+
+
 def memoryless_inventory(
-    run_dir: Path, *, cohort: str, detector: str, dot: pd.DataFrame
+    run_dir: Path,
+    *,
+    cohort: str,
+    detector: str,
+    dot: pd.DataFrame,
+    drops: pd.DataFrame,
 ) -> InventoryTables:
     """One memoryless cohort from the memoryless runner's run folder.
 
@@ -675,13 +719,19 @@ def memoryless_inventory(
         for ``published`` and ``memoryless_criteria`` for ``replay_criteria``.
     dot : DataFrame
         The epoch's decode frame, read through the SWR source (for its
-        session and bounds).
+        session, bounds and speed).
+    drops : DataFrame
+        ``swr_source.read_artifact_event_drops`` of the decode pickle, as for
+        :func:`swr_inventory`.
 
     Returns
     -------
     InventoryTables
         The cohort's candidates with no ``artifact_drop_reason``; those the
-        cohort selects that have one are set aside with it. Observed: the
+        cohort selects that have one are set aside with it. The stored
+        excluded-time reasons stand; ``overlaps_dropped_event`` is read again
+        on the grid-sampled bounds, as for the LFP inventories; two candidates
+        sharing a grid sample make the run read unavailable. Observed: the
         observed file's ``decoded_windows`` stretches. The run records no
         sha256 of its outputs, so the record's ``n_candidates``, ``n_replay``
         and ``n_shuffle_pass`` must describe the table, and its ``time_grid``
@@ -703,6 +753,20 @@ def memoryless_inventory(
         _check_memoryless_record(record, table, epoch)
     except _Unavailable as why:
         return _unavailable(epoch, detector, run_dir.name, str(why))
+    # an unknown cohort is refused by from_memoryless_table
+    if cohort in MEMORYLESS_COHORTS and "artifact_drop_reason" in table.columns:
+        try:
+            reasons = _memoryless_second_pass(
+                table, MEMORYLESS_COHORTS[cohort], epoch, drops
+            )
+        except EventDefinitionError as error:
+            return _unavailable(
+                epoch,
+                detector,
+                run_dir.name,
+                f"two candidates share a decode-grid sample: {str(error)[:200]}",
+            )
+        table = table.assign(artifact_drop_reason=reasons)
     named = from_memoryless_table(table, cohort=cohort)
     named["detector"] = detector
     named["event_key"] = detector + named["event_key"].str.removeprefix(MEMORYLESS)

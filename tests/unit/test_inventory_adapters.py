@@ -651,13 +651,18 @@ class TestTheMemorylessInventory:
         run = self._run(tmp_path)
 
         published = memoryless_inventory(
-            run, cohort="published", detector="memoryless", dot=epoch["dot"]
+            run,
+            cohort="published",
+            detector="memoryless",
+            dot=epoch["dot"],
+            drops=epoch["drops"],
         )
         criteria = memoryless_inventory(
             run,
             cohort="replay_criteria",
             detector="memoryless_criteria",
             dot=epoch["dot"],
+            drops=epoch["drops"],
         )
 
         for tables in (published, criteria):
@@ -681,12 +686,50 @@ class TestTheMemorylessInventory:
         # native: every candidate the cohort selects
         assert len(published.inventory) + len(published.set_aside) == 3
 
+    def test_the_second_pass_reads_bounds_sampled_on_the_grid(self, epoch, tmp_path):
+        """The stored ``overlaps_dropped_event`` is not read. Candidate 16 ends
+        0.5 ms past the first sample of dropped MUA 2 (105.500), so its stored
+        bounds overlap it, but its last sample is 105.500: on the grid it only
+        touches MUA 2 and is kept. Candidate 17 overlaps dropped Kay 3 on the
+        grid though its stored reason is None, and is set aside."""
+        from continuum_swr_replay.analysis.hippocampus import swr_source
+
+        table = memoryless_table(swr_source.swr_source_name())
+        extra = table.iloc[[0, 0]].assign(
+            ms_event_id=[16, 17],
+            event_start_s=[105.300, 103.500],
+            event_end_s=[105.5005, 103.650],
+            artifact_drop_reason=["overlaps_dropped_event", None],
+        )
+        extra["event_duration_s"] = extra.event_end_s - extra.event_start_s
+        run = write_memoryless_run(
+            tmp_path / "memoryless", pd.concat([table, extra], ignore_index=True)
+        )
+
+        tables = memoryless_inventory(
+            run,
+            cohort="published",
+            detector="memoryless",
+            dot=epoch["dot"],
+            drops=epoch["drops"],
+        )
+
+        _check_dtypes(tables)
+        assert tables.inventory.event_key.tolist() == [
+            f"memoryless:{PREFIX}:{n}" for n in (11, 12, 16)
+        ]
+        assert _reasons(tables.set_aside) == {
+            f"memoryless:{PREFIX}:13": "artifact",
+            f"memoryless:{PREFIX}:17": "overlaps_dropped_event",
+        }
+
     def test_it_observes_the_decoded_windows(self, epoch, tmp_path):
         tables = memoryless_inventory(
             self._run(tmp_path),
             cohort="published",
             detector="memoryless",
             dot=epoch["dot"],
+            drops=epoch["drops"],
         )
 
         observed = tables.observations[tables.observations.available]
@@ -722,7 +765,11 @@ class TestTheMemorylessInventory:
         edit_record(run, change)
 
         tables = memoryless_inventory(
-            run, cohort="published", detector="memoryless", dot=epoch["dot"]
+            run,
+            cohort="published",
+            detector="memoryless",
+            dot=epoch["dot"],
+            drops=epoch["drops"],
         )
 
         _assert_unavailable(tables, "memoryless", reason)
@@ -734,6 +781,7 @@ class TestTheMemorylessInventory:
                 cohort="published",
                 detector="memoryless",
                 dot=epoch["dot"],
+                drops=epoch["drops"],
             )
 
     def test_an_empty_table_keeps_the_schema(self, epoch, tmp_path):
@@ -743,7 +791,11 @@ class TestTheMemorylessInventory:
         run = write_memoryless_run(tmp_path / "memoryless", table)
 
         tables = memoryless_inventory(
-            run, cohort="published", detector="memoryless", dot=epoch["dot"]
+            run,
+            cohort="published",
+            detector="memoryless",
+            dot=epoch["dot"],
+            drops=epoch["drops"],
         )
 
         _check_dtypes(tables)

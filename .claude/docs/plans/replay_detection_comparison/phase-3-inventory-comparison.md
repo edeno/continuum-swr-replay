@@ -226,7 +226,7 @@ tables carry a reason per stretch, but nothing joins them to `Coverage`.
   | `carey_inventory(run_dir, ...)` | `{epoch_id}_carey_events.parquet`, checked against its manifest | as the SWR row | `{epoch_id}_carey_observed.parquet` |
   | `mua_inventory(dot, ...)` | `intervals_from_labels(dot, "MUA_event")` through `inventory_from_intervals` | `artifact_event_drops` rows with `event_col == "MUA_event"` and a reason | `sample_runs` on the decode grid, valid outside the artifact mask (`interval_mask`) |
   | `state_space_inventory(dot, ...)` | `from_classified_nonlocal_table(build_classified_nonlocal_event_table(dot))` | `artifact_event_drops` rows with `event_col == "non_local_event"` and a reason | `sample_runs` on the decode grid, valid where the non-local probability is finite and outside the mask |
-  | `memoryless_inventory(run_dir, ...)` | `from_memoryless_table(..., cohort="published")` (Q7) | rows with an `artifact_drop_reason` that the cohort flag selects | the observed file's `decoded_windows` stretches |
+  | `memoryless_inventory(run_dir, ...)` | `from_memoryless_table(..., cohort="published")` (Q7) | rows the cohort flag selects with a stored excluded-time `artifact_drop_reason`; the stored `overlaps_dropped_event` is not read, and the second pass is made again on grid-sampled bounds, as the SWR row's | the observed file's `decoded_windows` stretches |
 
   `dot` is the canonical decode frame read once through `read_dot_with_swr_source`; `artifact_event_drops`
   is read once from the same pickle (`read_artifact_event_drops`). The SWR-file reader repeats
