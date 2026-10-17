@@ -691,7 +691,7 @@ def draw_example(
     for row, detector in enumerate(detectors):
         own = inputs.inventory[inputs.inventory.detector == detector]
         own = own[(own.event_end_s >= t0) & (own.event_start_s <= t1)]
-        moving = own.component_id.isna().to_numpy()
+        moving = ~own.whole_event_speed_eligible.to_numpy(dtype=bool)
         for subset, alpha in ((own[~moving], 0.9), (own[moving], 0.3)):
             bars.broken_barh(
                 list(

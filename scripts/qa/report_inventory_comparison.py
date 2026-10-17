@@ -179,8 +179,10 @@ _TOPICS: Mapping[str, tuple[str, str, str]] = MappingProxyType(
             "The cells pairwise counts miss: each source detector's events found "
             "by exactly one detector (exactly_one_detector, over the eight "
             "without memoryless_criteria), SWRs matched by no decoder "
-            "(swr_matched_by_no_decoder), and sequences matched by no LFP- or "
-            "rate-triggered inventory (sequence_matched_by_no_trigger). "
+            "(swr_matched_by_no_decoder), and sequences (state_space, "
+            "memoryless and memoryless_criteria, each its own source) matched "
+            "by no LFP- or rate-triggered inventory "
+            "(sequence_matched_by_no_trigger). "
             "n_unmatched counts unmatched memberships only; n_unknown, the "
             "events not observed by every detector tested against, is reported "
             "apart and never enters n_unmatched.",
@@ -227,8 +229,10 @@ _TOPICS: Mapping[str, tuple[str, str, str]] = MappingProxyType(
             _ANIMAL_SUMS,
         ),
         "components": (
-            "Connected components of the overlap graph over all nine "
-            "inventories: their sizes (n_events, n_detectors) and spans "
+            "Connected components of the overlap graph over the eight "
+            "inventories without memoryless_criteria (every published "
+            "memoryless event is also a criteria event, so with both a "
+            "component would count one detector twice): their sizes (n_events, n_detectors) and spans "
             "(span_s, first onset to last offset). Components are diagnostics, "
             "not event intervals. " + _QUANTILE_COLUMNS,
             _SESSION_ROWS,
@@ -286,7 +290,8 @@ FIGURE_CAPTIONS: Mapping[str, str] = MappingProxyType(
             "each cell. Grey: no eligible events."
         ),
         "components.png": _caption(
-            "Overlap-graph components pooled over every session: the number of "
+            "Overlap-graph components over the eight inventories without "
+            "memoryless_criteria, pooled over every session: the number of "
             "events in each (left) and its span, first onset to last offset "
             "(right, logarithmic bins from 1 ms to 10 s, values outside drawn in "
             "the edge bins)."
@@ -830,7 +835,7 @@ def report_tables(
         ),
     }
 
-    compared = tables["inventory"][tables["inventory"].component_id.notna()]
+    compared = tables["inventory"][tables["inventory"].whole_event_speed_eligible]
     durations = ["interval_span_s", "native_duration_s"]
     for level, keys in (("by_session", SESSION), ("by_animal", ["animal"])):
         out[f"native_durations_{level}"] = _distribution(
@@ -965,8 +970,9 @@ def report_tables(
         if topic in marks:
             out[name] = with_pending(out[name], **marks[topic])
         elif topic in {"no_detector_time", "components"}:
-            # no-detector time is over the eight with memoryless; a component
-            # can chain through a memoryless event whatever its label
+            # no-detector time and the components are over the eight with
+            # memoryless; a component can chain through a memoryless event
+            # whatever its label
             involved = (
                 settings["no_detector_time"]
                 if topic == "no_detector_time"
@@ -1041,7 +1047,7 @@ def draw_figures(
 
     # native durations
     inventory = tables["inventory"]
-    compared = inventory[inventory.component_id.notna()]
+    compared = inventory[inventory.whole_event_speed_eligible]
     bins = _log_bins()
     n_rows = -(-len(roster) // 3)
     fig, axes = plt.subplots(
@@ -1211,7 +1217,10 @@ def draw_figures(
     for ax in axes:
         ax.set_ylabel("components", fontsize=7)
         ax.tick_params(labelsize=6)
-    fig.suptitle(f"{len(components)} components over every inventory†", fontsize=8)
+    fig.suptitle(
+        f"{len(components)} components over the eight without memoryless_criteria†",
+        fontsize=8,
+    )
     save(fig, "components.png")
     return paths
 

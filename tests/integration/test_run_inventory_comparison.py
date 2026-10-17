@@ -301,7 +301,11 @@ class TestTheWorkedEpoch:
         moving = at(inventory, "event_start_s", 21.0)
         assert not moving.whole_event_speed_eligible
         assert pd.isna(moving.component_id)
-        assert inventory.component_id.notna().sum() == len(inventory) - 1
+        # the components leave the criteria twin's two kept events out
+        twin = inventory[inventory.detector == "memoryless_criteria"]
+        assert len(twin) == 2 and twin.whole_event_speed_eligible.all()
+        assert twin.component_id.isna().all()
+        assert inventory.component_id.notna().sum() == len(inventory) - 1 - 2
 
     def test_the_bridging_sequence_is_set_aside(self, run):
         set_aside = table(run, WORKED, "set_aside")
@@ -360,6 +364,8 @@ class TestTheWorkedEpoch:
             ("state_space", 51.0): "unknown",
             # Kay's SWR at 5.05-5.1 s only touches it
             ("memoryless", 5.1): "unmatched",
+            ("memoryless_criteria", 5.1): "unmatched",
+            ("memoryless_criteria", 12.0): "unmatched",
         }
 
     def test_no_detector_time_is_the_hand_worked_shared_exposure(self, run):
@@ -427,8 +433,14 @@ class TestTheWorkedEpoch:
         assert ss_k.union_s == pytest.approx(0.3 + 0.2 + 0.05 + 0.1)
         assert ss_k.intersection_s == pytest.approx(0.05)
         joined = at(components, "span_start_s", 5.0)
-        assert joined.detectors == "kay+memoryless+memoryless_criteria+state_space"
+        assert joined.detectors == "kay+memoryless+state_space"
+        # Kay's SWR only touches the memoryless sequence: two pairs
+        assert (joined.n_events, joined.n_pairs) == (3, 2)
         assert joined.span_end_s == 5.4
+        # the criteria twin is in no component, and its event at 12.0 s,
+        # overlapping nothing, is not one of its own
+        assert not components.detectors.str.contains("memoryless_criteria").any()
+        assert not np.isclose(components.span_start_s, 12.0).any()
 
     def test_the_recount_at_no_gap_is_the_native_count(self, run):
         recount = table(run, WORKED, "recount_directional")

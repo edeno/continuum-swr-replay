@@ -458,6 +458,39 @@ class TestTheReportOnTheRunnersTables:
                 .all()
             )
 
+    def test_the_criteria_twin_keeps_its_durations_and_its_sequence_cell(
+        self,
+        run,  # noqa: F811
+        written,
+    ):
+        """The components leave memoryless_criteria out, but its compared
+        events keep their duration rows, and it is a source of the sequences
+        cell, pooled apart from memoryless."""
+        report_dir, _ = written
+        inventory = pd.read_parquet(run / f"{EPOCHS['02_r1']}_inventory.parquet")
+
+        durations = pd.read_csv(
+            report_dir / "native_durations_by_session.csv"
+        ).set_index(["epoch", "detector"])
+        compared = inventory[inventory.whole_event_speed_eligible]
+        for detector in ("memoryless", "memoryless_criteria", "state_space"):
+            assert (
+                durations.n_events[("02_r1", detector)]
+                == (compared.detector == detector).sum()
+            ), detector
+        assert durations.n_events[("02_r1", "memoryless_criteria")] == 2
+        cells = pd.read_csv(report_dir / "cells_by_animal.csv").set_index(
+            ["cell", "detector"]
+        )
+        sources = cells.loc["sequence_matched_by_no_trigger"]
+        assert set(sources.index) == {
+            "state_space",
+            "memoryless",
+            "memoryless_criteria",
+        }
+        assert sources.n_unmatched["memoryless_criteria"] == 2
+        assert sources.pending["memoryless_criteria"] == report.PENDING
+
     def test_the_label_tables_list_the_session_without_memoryless(self, written):
         report_dir, _ = written
 

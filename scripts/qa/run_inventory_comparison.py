@@ -40,14 +40,14 @@ Per epoch:
    detector's unobserved time are set aside too (``remove_bridging_events``,
    reason ``bridging``).
 5. **Comparison.** Every overlap pair, flagged; directional agreement and time
-   coverage over the nine; the overlap components; the state-space fragment
-   recount at every ``FRAGMENT_GAPS_S``, each followed by its pairs and
-   directional agreement; the three cells (:data:`CELLS`) and no-detector
-   time over the eight that leave ``memoryless_criteria`` out (every
-   published event is also a criteria event); the SWR label matrix of the
-   three sequence cohorts under the five SWR definitions; and excluded time by
-   reason for every pair, for ``all`` nine and for each matrix population
-   (:data:`COMPARISONS`). Any second outside a comparison's shared exposure
+   coverage over the nine; the state-space fragment recount at every
+   ``FRAGMENT_GAPS_S``, each followed by its pairs and directional agreement;
+   the three cells (:data:`CELLS`); the overlap components, the exactly-one
+   cell and no-detector time over the eight that leave ``memoryless_criteria``
+   out (every published event is also a criteria event); the SWR label
+   matrix of the three sequence cohorts under the five SWR definitions; and
+   excluded time by reason for every pair, for ``all`` nine and for each matrix
+   population (:data:`COMPARISONS`). Any second outside a comparison's shared exposure
    with no reason fails the epoch.
 
 Each epoch writes, under
@@ -211,11 +211,13 @@ others)."""
 DETECTORS = tuple(ROSTER)
 SWR_DEFINITIONS = (*SWR_DETECTORS, CAREY)
 SEQUENCE_COHORTS = (STATE_SPACE, MEMORYLESS, MEMORYLESS_CRITERIA)
-"""The cohorts the SWR label matrix labels."""
+"""The cohorts the SWR label matrix labels, and the sequences cell's
+sources."""
 CELL_DETECTORS = tuple(d for d in DETECTORS if d != MEMORYLESS_CRITERIA)
-"""The eight of the exactly-one cell and no-detector time: every published
-memoryless event is also a criteria event, so with both, no memoryless event
-could be found by exactly one detector."""
+"""The eight of the exactly-one cell, no-detector time and the overlap
+components: every published memoryless event is also a criteria event, so with
+both, no memoryless event could be found by exactly one detector, and every
+component holding one would count one detector twice."""
 DECODERS = (STATE_SPACE, MEMORYLESS)
 TRIGGERED = (*SWR_DEFINITIONS, MUA)
 """The LFP- and rate-triggered inventories."""
@@ -223,7 +225,7 @@ CELLS: Mapping[str, tuple[tuple[str, ...], tuple[str, ...]]] = MappingProxyType(
     {
         "exactly_one_detector": (CELL_DETECTORS, CELL_DETECTORS),
         "swr_matched_by_no_decoder": (SWR_DEFINITIONS, DECODERS),
-        "sequence_matched_by_no_trigger": (DECODERS, TRIGGERED),
+        "sequence_matched_by_no_trigger": (SEQUENCE_COHORTS, TRIGGERED),
     }
 )
 """Each cell's source detectors, and the detectors they are tested against."""
@@ -294,8 +296,10 @@ TABLE_DTYPES: Mapping[str, Mapping[str, object]] = MappingProxyType(
     }
 )
 """Every table an epoch writes, with its columns and dtypes. ``inventory``
-holds the compared events and the moving ones, whose ``component_id`` is
-missing; ``set_aside`` the events the rule dropped and the bridging ones."""
+holds the compared events and the moving ones; ``component_id`` is missing for
+the moving ones and for ``memoryless_criteria``'s, which the components leave
+out (:data:`CELL_DETECTORS`); ``set_aside`` the events the rule dropped and the
+bridging ones."""
 
 
 def decode_path(identifier: str) -> Path:
@@ -480,7 +484,12 @@ def compare_epoch(
 
     pairs = overlap_pairs(kept)
     matches = event_matches(kept, pairs, coverage, detectors=DETECTORS)
-    labelled, components = overlap_components(kept, pairs)
+    # the components leave the criteria twin out, its events and their pairs
+    twin = kept.detector == MEMORYLESS_CRITERIA
+    twin_pair = (pairs.detector_a == MEMORYLESS_CRITERIA) | (
+        pairs.detector_b == MEMORYLESS_CRITERIA
+    )
+    labelled, components = overlap_components(kept[~twin], pairs[~twin_pair])
     recount = []
     for gap_s in FRAGMENT_GAPS_S:
         merged = merge_fragments(
@@ -510,7 +519,11 @@ def compare_epoch(
         swr_definitions=SWR_DEFINITIONS,
     )
     tables = {
-        "inventory": [labelled, moving.assign(component_id=pd.NA)],
+        "inventory": [
+            labelled,
+            kept[twin].assign(component_id=pd.NA),
+            moving.assign(component_id=pd.NA),
+        ],
         "set_aside": [set_aside],
         "observations": [observations],
         "exclusion_by_reason": [
