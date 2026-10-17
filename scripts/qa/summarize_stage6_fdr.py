@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 """Print Stage 6's per-role cross-session FDR table for a saved bundle.
 
-``run_stage6_learning.py`` logs this table for the run it just did. An audit
+``run_stay_leave.py`` logs this table for the run it just did. An audit
 needs the same table for a bundle it did *not* just fit -- a backed-up bundle
 from before a cohort change, or the ``_allstops`` sensitivity bundle next to the
 canonical one -- so that a before/after comparison is two readings of one
 statistic rather than two implementations of it. This script is that reading:
 it calls the runner's own
-:func:`~scripts.pfc.run_stage6_learning.cross_session_role_summary`.
+:func:`~scripts.behavior.run_stay_leave.cross_session_role_summary`.
 
 Usage::
 
@@ -29,7 +29,7 @@ import pandas as pd
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from scripts.pfc.run_stage6_learning import (  # noqa: E402
+from scripts.behavior.run_stay_leave import (  # noqa: E402
     cross_session_role_summary,
 )
 

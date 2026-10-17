@@ -45,7 +45,7 @@ from continuum_swr_replay.analysis.replay.retrospective import (
 )
 from continuum_swr_replay.analysis.replay.shuffles import next_arm_circular_shift
 from continuum_swr_replay.data_loaders.constants import WELL_PATCH_MAPPING
-from scripts.pfc.run_stage5b_retrospective import (
+from scripts.behavior.run_retrospective_alignment import (
     _family_unit_counts,
     _retrospective_status,
 )

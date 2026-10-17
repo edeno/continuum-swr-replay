@@ -27,7 +27,7 @@ from continuum_swr_replay.analysis.replay.covariate_registry import (
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import fit_provenance_path
 from continuum_swr_replay.table_io import read_table
-from scripts.pfc import run_stage6_learning as runner
+from scripts.behavior import run_stay_leave as runner
 
 SESSION = {"animal": "a", "session_date": 1, "epoch": "02_r1"}
 
@@ -125,7 +125,7 @@ def stage6(tmp_path, monkeypatch):
 def _run(monkeypatch, *cli: str) -> None:
     monkeypatch.setattr(
         "sys.argv",
-        ["run_stage6_learning.py", "--min-stops", "5", "--rebuild-summary", *cli],
+        ["run_stay_leave.py", "--min-stops", "5", "--rebuild-summary", *cli],
     )
     runner.main()
 
@@ -212,7 +212,7 @@ class TestProvenance:
         summary = pd.read_pickle(stage6 / "stop_replay_summary_allstops.pkl")
         summary.to_pickle(stage6 / "stop_replay_summary.pkl")
 
-        monkeypatch.setattr("sys.argv", ["run_stage6_learning.py", "--min-stops", "5"])
+        monkeypatch.setattr("sys.argv", ["run_stay_leave.py", "--min-stops", "5"])
         with pytest.raises(ValueError, match="not 'at_well'"):
             runner.main()
 
@@ -228,7 +228,7 @@ class TestProvenance:
         del summary.attrs["stop_cohort"]
         summary.to_pickle(stage6 / "stop_replay_summary.pkl")
 
-        monkeypatch.setattr("sys.argv", ["run_stage6_learning.py", "--min-stops", "5"])
+        monkeypatch.setattr("sys.argv", ["run_stay_leave.py", "--min-stops", "5"])
         with pytest.raises(ValueError, match="cohort None, not 'at_well'"):
             runner.main()
 
@@ -246,7 +246,7 @@ class TestProvenance:
         regenerated["immobility_duration_s"] = 6.0
         regenerated.to_pickle(stage6 / "stop_table.pkl")
 
-        monkeypatch.setattr("sys.argv", ["run_stage6_learning.py", "--min-stops", "5"])
+        monkeypatch.setattr("sys.argv", ["run_stay_leave.py", "--min-stops", "5"])
         with pytest.raises(ValueError, match="different generation of stop_table"):
             runner.main()
 
@@ -257,7 +257,7 @@ class TestProvenance:
         _run(monkeypatch)
         stamp = (stage6 / "stop_replay_summary.pkl").stat().st_mtime_ns
 
-        monkeypatch.setattr("sys.argv", ["run_stage6_learning.py", "--min-stops", "5"])
+        monkeypatch.setattr("sys.argv", ["run_stay_leave.py", "--min-stops", "5"])
         runner.main()
 
         assert (stage6 / "stop_replay_summary.pkl").stat().st_mtime_ns == stamp

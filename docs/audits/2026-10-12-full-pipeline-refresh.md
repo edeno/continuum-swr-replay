@@ -9,6 +9,29 @@ Date: 2026-10-12. Runbook step R8 of
 Section 10 has one subsection per follow-up. The update also changed §0, the content rows of §3, §4.6, §4.7,
 §5, §6.1 and §6.6. Each change says where its numbers come from.
 
+**Codes used below.** This report names steps by the plan's codes. What each one is:
+
+| Code | What it is |
+|---|---|
+| R0–R8 | The plan's first pass: environment and backups (R0), decodes (R1), swap (R2), SWR inventories (R3), Widloski run (R4), tables (R5), model refits and PFC (R6), figures (R7), this audit (R8) |
+| R9 | Artifact detection on every epoch |
+| R10 | The SWR inventories rerun with the artifact mask |
+| R11 | The full re-decode of all 255 epochs |
+| R12, R12b | The Widloski rerun on the R11 decodes (R12b: the full run with shuffle) |
+| R13, R13a, R13c | Tables, refits, PFC and figures after R11 (R13a and R13c: the table builds) |
+| R6b, R6c | Later refits: R6b on the R13c tables; R6c with the fixed fitter (Task 28) |
+| R7a, R7b | The two figure batches |
+| R8a | Why the results moved (the attribution report) |
+| R-T | The SWR tetrode rule: which tetrodes feed the SWR detector |
+| Task N | A code task in the plan or a later brief (Tasks 26–29 were added during the audit) |
+| F1 | Spike and state evidence on all epochs (2026-10-16) |
+| F2 | Robustness and leave-one-animal-out checks |
+| F3 | The optimizer check on the content fits |
+| D1 | The chimi20200221_08_r4 decode mismatch |
+| V0–V3, X_R10nr, S2pct (§5, §10.10) | The artifact-rule robustness reruns: V0 no mask, V1 detector thresholds ×0.75, V2 ×1.25, V3 the mask widened by 1 s, X_R10nr the R10 SWR labels without the rule, S2pct the >2 % sensitivity |
+| V1–V9 (§6.1, §6.1a) | A different use of the same letters: the numbered conclusion changes |
+| R01–R11, C01–C08, K01–K07, X01–X05, F01–F04, P01–P03, S01–S08 | The refit run ids. They now have names in `scripts/qa/run_refits.py`; [docs/analysis_map.md](../analysis_map.md) maps each id to its name and question |
+
 **This report changes no number in any other document.** Section 6 lists the hand-maintained
 doc claims that need new numbers. The project lead reviews them before any doc is requoted
 (plan R8 "STOP").

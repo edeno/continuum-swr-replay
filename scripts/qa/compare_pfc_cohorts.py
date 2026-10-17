@@ -2084,7 +2084,7 @@ def build_report(
         "`run_session`, once in `build_session_event_sets`), logging what it "
         "trimmed, and adding the `alignment` block to `cohort_info`; "
         "`analysis/hippocampus/data_aggregation.py`, which is the new function "
-        "and its budget constants; and `scripts/pfc/run_stage6_learning.py` "
+        "and its budget constants; and `scripts/behavior/run_stay_leave.py` "
         "plus `analysis/replay/retrospective.py`, which are the Stage 6 and "
         "Stage 5B paths and are not imported by the unit runner. No estimation "
         "code moved. On matched axes the alignment step is the identity, which "

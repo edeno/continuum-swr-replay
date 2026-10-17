@@ -30,10 +30,10 @@ Outputs (next to the input tables):
 
 Usage::
 
-    uv run python scripts/pfc/run_stage6_learning.py
-    uv run python scripts/pfc/run_stage6_learning.py --content-stratum swr
-    uv run python scripts/pfc/run_stage6_learning.py --content-stratum non_swr
-    uv run python scripts/pfc/run_stage6_learning.py --stop-cohort all_stops
+    uv run python scripts/behavior/run_stay_leave.py
+    uv run python scripts/behavior/run_stay_leave.py --content-stratum swr
+    uv run python scripts/behavior/run_stay_leave.py --content-stratum non_swr
+    uv run python scripts/behavior/run_stay_leave.py --stop-cohort all_stops
 """
 
 from __future__ import annotations

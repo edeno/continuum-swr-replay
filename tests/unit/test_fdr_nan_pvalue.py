@@ -1,7 +1,7 @@
 """Regression test: cross-session FDR must not be poisoned
 by a NaN p-value from a single role.
 
-``run_stage6_learning.cross_session_role_summary`` runs one Wilcoxon per role
+``run_stay_leave.cross_session_role_summary`` runs one Wilcoxon per role
 and corrects across roles. It sets ``p = nan`` when ``wilcoxon`` raises
 ``ValueError`` (e.g. all-zero β_inter samples on some SciPy versions).
 ``multipletests`` returns an all-NaN adjusted-p vector when *any* input is NaN,
@@ -20,8 +20,8 @@ import pytest
 from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
-from scripts.pfc import run_stage6_learning as runner
-from scripts.pfc.run_stage6_learning import ROLES, cross_session_role_summary
+from scripts.behavior import run_stay_leave as runner
+from scripts.behavior.run_stay_leave import ROLES, cross_session_role_summary
 
 #: Enough sessions for a role to be testable at all.
 N_SESSIONS = 8

@@ -55,6 +55,12 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
 - `fetch_spatial_bandit_behavior.sh` — pull the canonical SpatialBanditTask behavior CSVs.
 - `build_qvals_table.py` — build the per-stop behavioral-model covariate table
   (`qvals_table`) from the shared DataJoint RL-model and trial-timing schemas.
+- `run_retrospective_alignment.py` (was `pfc/run_stage5b_retrospective.py`, "Stage 5B") —
+  does content during a stop match the arm visited next, against a visit-context shuffle
+  (Q4). `at_well` only, because its metrics need a current arm.
+- `run_stay_leave.py` (was `pfc/run_stage6_learning.py`, "Stage 6") — content × reward
+  outcome → stay or leave (Q4); `--stop-cohort all_stops` writes the `_allstops`
+  sensitivity bundle. Output files keep their `stage5b_*` / `stage6_*` names.
 
 ## `figures/` — publication figures
 - `generate_figure01.py … generate_figure04.py`, `generate_all_figures.py` (orchestrator).
@@ -73,13 +79,15 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
 - `archive/` — retired figure scripts (not linted; kept for provenance).
 
 ## `qa/` — diagnostics / validation
-- `run_refits.py` — reruns the CPU refits (rate, content, ContFrag, Stage 5B/6) and the
-  figures that read them, in dependency order, under a core budget (`--cpus`, `--budget`)
-  with a thread cap per run. `--only <ids or groups>` also runs everything that depends on
-  them. One log and JSON record per run go under `logs/refits_<time>/`, then
-  `check_fit_provenance.py` checks both table roots. `--dry-run` lists the runs. Set
-  `CSR_PROCESSED_DATA_DIR` to read and write another data root. It does not run the
-  decodes, the tables or the PFC unit GLM.
+- `run_refits.py` — reruns the CPU fits for Q2–Q4 and the figures that read them, in
+  dependency order, under a core budget (`--cpus`, `--budget`) with a thread cap per run.
+  Runs are named `<question>.<analysis>[.<variant>]` (`rate.swr_contrast.at_well`);
+  `--only rate,content.swr_contrast` selects by name or prefix and adds everything that
+  depends on the selection; `--dry-run` lists the runs under their question. One log and
+  JSON record per run go under `logs/refits_<time>/`, then `check_fit_provenance.py` checks
+  both table roots. Set `CSR_PROCESSED_DATA_DIR` to read and write another data root. It
+  does not run the decodes, the tables, the Q1 checks or the PFC unit GLM. See
+  `docs/analysis_map.md`.
 - `check_data_availability.py`, `diagnose_trial_detection.py`, `compute_hpc_raw_stats.py`,
   `run_quality_metrics.py`, `analyze_event_spike_evidence.py` (spike-evidence reality check).
 - `run_state_evidence.py` — held-out spike evidence for each decoder state (Local, No-Spike,
@@ -183,13 +191,11 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
   runner no longer offers the unpenalised per-neuron backend, so this compares two
   archived trees rather than two runs anyone can make now.
 
-## `pfc/` — cross-area / staged analyses
-- `run_pfc_analysis_bandit.py`, `run_stage5b_retrospective.py`, `run_stage6_learning.py`.
-  All three take `--stop-cohort`: the well-anchored stop cohort the hippocampal rate
-  and content ladders are read on is the default (`at_well`, canonical artifact
-  names), `all_stops` publishes an unrestricted sensitivity bundle under `_allstops`
-  names, and Stage 5B accepts only `at_well` because its metrics need a current arm.
-  `run_pfc_analysis_bandit.py` fits the unit GLMs under a Gaussian prior on the
+## `pfc/` — PFC responses to the events (Q5)
+- `run_pfc_analysis_bandit.py` takes `--stop-cohort`: the well-anchored stop cohort the
+  hippocampal rate and content ladders are read on is the default (`at_well`, canonical
+  artifact names), and `all_stops` publishes an unrestricted sensitivity bundle under
+  `_allstops` names. It fits the unit GLMs under a Gaussian prior on the
   event-basis coefficients and scores them out of fold: `--penalty-sigma` (the prior
   standard deviation on the log-rate scale; another value writes a `_sigma<value>`
   sensitivity bundle and draws no null), `--n-folds` (blocked over whole immobility

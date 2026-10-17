@@ -1,26 +1,29 @@
 #!/usr/bin/env python
-"""Rerun the CPU model refits and the figures that read them, in dependency order.
+"""Rerun the CPU model fits and the figures that read them, in dependency order.
 
-The run list (``RUNS``) is every refit the full pipeline refresh ran (R6), plus
-the figure and summary scripts that read those fits (R7). Each run is one
-command with a CPU budget and the runs it needs first. Selecting a run also
-selects every run that depends on it, so ``--only C01`` refits the content
-contrasts too: their outputs sit in the folder ``C01`` rewrites.
+Every run answers one of the paper's questions (``QUESTIONS``; the full map is
+``docs/analysis_map.md``). A run's name says what it is:
+``<question>.<analysis>[.<variant>]``, for example ``rate.swr_contrast.at_well``.
+Each run is one command with a CPU budget and the runs it needs first.
+Selecting a run also selects every run that depends on it, so
+``--only content.arm_ladder.all_arms`` refits the content contrasts too: their outputs
+sit in the folder that run rewrites.
 
 Every run gets a thread cap (OMP, MKL, OpenBLAS, numba and XLA), CPU-only JAX,
 and its own log under ``--log-dir``, with a JSON record of the command, commit,
 data root, times and exit code. A run whose dependency failed is not started.
 After the fits, ``check_fit_provenance.py`` checks both table roots.
 
-Not here: the decodes, the tables, and the PFC unit GLM, which runs on GPUs
-for 14-17 h per card under its own launcher.
+Not here: the decodes, the tables, the Q1 checks (state and spike evidence,
+the detectors) and the PFC unit GLM, which runs on GPUs for 14-17 h per card
+under its own launcher.
 
 Usage
 -----
     uv run --no-sync python scripts/qa/run_refits.py --dry-run
     uv run --no-sync python scripts/qa/run_refits.py --only content --cpus 0-23
     CSR_PROCESSED_DATA_DIR=/path/to/root uv run --no-sync python \\
-        scripts/qa/run_refits.py --only R01,R05
+        scripts/qa/run_refits.py --only rate.per_bin,rate.swr_contrast
 """
 
 from __future__ import annotations
@@ -38,94 +41,129 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 
+#: The paper's questions this driver's runs answer (Q1, are the events real,
+#: has no CPU refit here). Keys are the first part of a run's name.
+QUESTIONS = {
+    "rate": "Q2. How often do non-local events occur, and what drives the rate, for SWR against non-SWR events?",
+    "content": "Q3. What do the events represent (arm or patch), what shapes that, and does it differ for SWR events?",
+    "behavior": "Q4. Does content relate to what the animal does next?",
+    "pfc": "Q5. Does PFC respond to the events, SWR or not?",
+}
+
 
 @dataclass(frozen=True)
 class Run:
-    """One command: its id, group, arguments, CPU budget, thread cap and needs."""
+    """One command: its name, arguments, CPU budget, thread cap and needs."""
 
-    id: str
-    group: str
+    name: str
     argv: tuple[str, ...]
     cores: int
     threads: int = 1
     deps: tuple[str, ...] = field(default=())
+    figure: bool = False
+
+    @property
+    def question(self) -> str:
+        return self.name.split(".")[0]
 
 
-def _run(id_, group, cmd, cores, deps=(), threads=1):
-    return Run(id_, group, tuple(cmd.split()), cores, threads, tuple(deps))
+def _run(name, cmd, cores, deps=(), threads=1, figure=False):
+    return Run(name, tuple(cmd.split()), cores, threads, tuple(deps), figure)
 
 
+def _fig(name, cmd, deps=()):
+    return _run(name, cmd, 1, deps, figure=True)
+
+
+_PB = "scripts/rate/fit_per_bin_rate_models.py"
+_RC = "scripts/rate/fit_swr_contrast_rate.py"
+_CL = "scripts/content/fit_replay_content_models.py"
 _KC = "scripts/content/fit_swr_contrast_content.py"
-_S6 = "scripts/pfc/run_stage6_learning.py"
-_K_ALL = ("K01", "K02", "K03", "K04", "K05", "K06", "K07")
+_ES = "scripts/content/compare_event_source_models.py"
+_S5 = "scripts/behavior/run_retrospective_alignment.py"
+_S6 = "scripts/behavior/run_stay_leave.py"
+_DM = "--estimator dirichlet_multinomial"
+_SWR_CONTRAST = (
+    "content.swr_contrast.all",
+    "content.swr_contrast.rewarded",
+    "content.swr_contrast.omitted",
+)
+_BREADTH = (
+    "content.breadth_contrast.all",
+    "content.breadth_contrast.all_length_adjusted",
+    "content.breadth_contrast.rewarded",
+    "content.breadth_contrast.omitted",
+)
 
 # Cores: a run's worker count, or its thread cap for a run without workers.
+# The at_well cohort is the shipped one; all_stops and in_transit are sensitivities.
 # fmt: off
 RUNS: tuple[Run, ...] = (
-    _run("R01", "rate", "scripts/rate/fit_per_bin_rate_models.py --stop-cohort at_well --workers 16", 16),
-    _run("R02", "rate", "scripts/rate/fit_per_bin_rate_models.py --stop-cohort all_stops --workers 16", 16),
-    _run("R03", "rate", "scripts/rate/fit_per_bin_rate_models.py --stop-cohort in_transit --workers 10", 10),
-    _run("R04", "rate", "scripts/rate/fit_per_stop_rate_models.py --stop-cohort at_well", 1),
-    _run("R05", "rate", "scripts/rate/fit_swr_contrast_rate.py --stop-cohort at_well --workers 16", 16),
-    _run("R06", "rate", "scripts/rate/fit_swr_contrast_rate.py --stop-cohort all_stops --workers 16", 16),
-    _run("R07", "rate", "scripts/rate/fit_swr_contrast_rate.py --aggregate-only --stop-cohort at_well", 1, ["R05"]),
-    _run("R08", "rate", "scripts/rate/fit_swr_contrast_rate.py --aggregate-only --stop-cohort all_stops", 1, ["R06"]),
-    _run("R09", "rate", "scripts/rate/fit_uncertainty_rate.py --stop-cohort at_well", 1),
-    _run("R10", "rate", "scripts/rate/fit_swr_power_model.py", 1),
+    # Q2 rate. The per-bin conditional intensity (Family B) is the main model; the
+    # per-stop Poisson (Family A) is the literature-comparable one.
+    _run("rate.per_bin.at_well", f"{_PB} --stop-cohort at_well --workers 16", 16),
+    _run("rate.per_bin.all_stops", f"{_PB} --stop-cohort all_stops --workers 16", 16),
+    _run("rate.per_bin.in_transit", f"{_PB} --stop-cohort in_transit --workers 10", 10),
+    _run("rate.per_stop.at_well", "scripts/rate/fit_per_stop_rate_models.py --stop-cohort at_well", 1),
+    _run("rate.swr_contrast.at_well", f"{_RC} --stop-cohort at_well --workers 16", 16),
+    _run("rate.swr_contrast.all_stops", f"{_RC} --stop-cohort all_stops --workers 16", 16),
+    _run("rate.uncertainty.at_well", "scripts/rate/fit_uncertainty_rate.py --stop-cohort at_well", 1),
+    _run("rate.ripple_power", "scripts/rate/fit_swr_power_model.py", 1),
     # No worker flag: its parallelism is BLAS threads.
-    _run("R11", "rate", "scripts/rate/fit_cross_history_rate.py --write", 8, threads=8),
-    _run("C01", "content", "scripts/content/fit_replay_content_models.py", 2, threads=2),
-    _run("C02", "content", "scripts/content/fit_replay_content_models.py --leaf-only --models M0,M0a,M1,M2,M3,M4,Mv,Mu,Mvu", 2, threads=2),
-    _run("C03", "content", "scripts/content/fit_replay_content_models.py --hierarchy patch", 1),
-    _run("C04", "content", "scripts/content/fit_replay_content_models.py --swr-subset T", 2, threads=2),
-    _run("C05", "content", "scripts/content/fit_replay_content_models.py --swr-subset F", 2, threads=2),
-    _run("C06", "content", "scripts/content/fit_replay_content_models.py --hierarchy patch --swr-subset T", 1),
-    _run("C07", "content", "scripts/content/fit_replay_content_models.py --hierarchy patch --swr-subset F", 1),
-    _run("C08", "content", "scripts/content/fit_replay_content_models.py --estimator dirichlet_multinomial --n-jobs 16", 16),
-    # The contrasts write into models/, which C01 replaces whole, so they follow it.
-    _run("K01", "content", f"{_KC} --outcome-stratum all", 2, ["C01"], threads=2),
-    _run("K02", "content", f"{_KC} --outcome-stratum rewarded", 2, ["C01"], threads=2),
-    _run("K03", "content", f"{_KC} --outcome-stratum omitted", 2, ["C01"], threads=2),
-    _run("K04", "content", f"{_KC} --estimator dirichlet_multinomial --n-jobs 16 --outcome-stratum all", 16, ["C01"]),
-    _run("K05", "content", f"{_KC} --estimator dirichlet_multinomial --n-jobs 16 --concentration-length --outcome-stratum all", 16, ["C01"]),
-    _run("K06", "content", f"{_KC} --estimator dirichlet_multinomial --n-jobs 8 --outcome-stratum rewarded", 8, ["C01"]),
-    _run("K07", "content", f"{_KC} --estimator dirichlet_multinomial --n-jobs 8 --outcome-stratum omitted", 8, ["C01"]),
-    _run("X01", "content", "scripts/content/compare_content_estimators.py --n-jobs 16", 16),
-    _run("X02", "content", "scripts/content/analyze_uncertainty_content.py", 1, ["C02"]),
-    _run("X03", "content", "scripts/content/compare_event_source_models.py --event-source non_local", 1),
-    _run("X04", "content", "scripts/content/compare_event_source_models.py --event-source SWR", 1),
-    _run("X05", "content", "scripts/content/compare_event_source_models.py --event-source MUA", 1),
-    _run("F01", "contfrag", "scripts/content/fit_replay_content_models.py --event-source SWR --brain-area HPC", 2, threads=2),
-    _run("F02", "contfrag", "scripts/content/fit_replay_content_models.py --event-source SWR --hierarchy patch --brain-area HPC", 2, threads=2),
-    _run("F03", "contfrag", "scripts/content/fit_replay_content_models.py --event-source MUA --brain-area HPC", 2, threads=2),
-    _run("F04", "contfrag", "scripts/content/fit_replay_content_models.py --event-source MUA --hierarchy patch --brain-area HPC", 2, threads=2),
-    _run("P01", "pfc", "scripts/pfc/run_stage5b_retrospective.py", 2, threads=2),
-    _run("P02", "pfc", "scripts/pfc/run_stage5b_retrospective.py --swr-only", 2, threads=2),
-    _run("P03", "pfc", "scripts/pfc/run_stage5b_retrospective.py --non-swr-only", 2, threads=2),
-    _run("S01", "pfc", f"{_S6} --rebuild-summary", 2, threads=2),
-    _run("S02", "pfc", f"{_S6} --stop-cohort all_stops --rebuild-summary", 2, threads=2),
-    _run("S03", "pfc", f"{_S6} --content-stratum swr", 2, ["S01"], threads=2),
-    _run("S04", "pfc", f"{_S6} --content-stratum non_swr", 2, ["S01"], threads=2),
-    _run("S05", "pfc", f"{_S6} --content-stratum mua", 2, ["S01"], threads=2),
-    _run("S06", "pfc", f"{_S6} --stop-cohort all_stops --content-stratum swr", 2, ["S02"], threads=2),
-    _run("S07", "pfc", f"{_S6} --stop-cohort all_stops --content-stratum non_swr", 2, ["S02"], threads=2),
-    _run("S08", "pfc", f"{_S6} --stop-cohort all_stops --content-stratum mua", 2, ["S02"], threads=2),
-    # Figures and generated docs that read the fits (R7).
-    _run("G01", "figures", "scripts/rate/plot_per_bin_rate_models.py", 1, ["R01"]),
-    _run("G02", "figures", "scripts/rate/plot_per_bin_rate_summary.py", 1, ["R01"]),
-    _run("G03", "figures", "scripts/rate/plot_model_checking.py", 1, ["R01"]),
-    _run("G04", "figures", "scripts/rate/summarize_per_bin_rate_models.py", 1, ["R01"]),
-    _run("G05", "figures", "scripts/rate/plot_uncertainty_rate.py", 1, ["R09"]),
-    _run("G06", "figures", "scripts/figures/plot_swr_contrast_coefs.py", 1, ["R07", *_K_ALL]),
-    _run("G07", "figures", "scripts/figures/generate_uncertainty_content_figure.py", 1, ["X02"]),
-    _run("G08", "figures", "scripts/content/generate_replay_content_figures.py", 1, ["C01", *_K_ALL]),
-    # Reads the PFC unit GLM bundles, which this driver does not make.
-    _run("G09", "figures", "scripts/figures/generate_figure04.py", 1),
+    _run("rate.cross_history", "scripts/rate/fit_cross_history_rate.py --write", 8, threads=8),
+    _fig("rate.fig.per_bin_ladder", "scripts/rate/plot_per_bin_rate_models.py", ["rate.per_bin.at_well"]),
+    _fig("rate.fig.per_bin_summary", "scripts/rate/plot_per_bin_rate_summary.py", ["rate.per_bin.at_well"]),
+    _fig("rate.fig.model_checking", "scripts/rate/plot_model_checking.py", ["rate.per_bin.at_well"]),
+    _fig("rate.doc.per_bin_results", "scripts/rate/summarize_per_bin_rate_models.py", ["rate.per_bin.at_well"]),
+    _fig("rate.fig.uncertainty", "scripts/rate/plot_uncertainty_rate.py", ["rate.uncertainty.at_well"]),
+    # Q3 content. The arm ladder asks what shapes content; the SWR contrast asks how
+    # SWR content differs (paired within session); the breadth contrast is the
+    # Dirichlet-multinomial fit of how widely an event spreads over arms.
+    _run("content.arm_ladder.all_arms", _CL, 2, threads=2),
+    _run("content.arm_ladder.leaf_arms", f"{_CL} --leaf-only --models M0,M0a,M1,M2,M3,M4,Mv,Mu,Mvu", 2, threads=2),
+    # The contrasts write into models/, which content.arm_ladder.all_arms replaces whole.
+    _run("content.swr_contrast.all", f"{_KC} --outcome-stratum all", 2, ["content.arm_ladder.all_arms"], threads=2),
+    _run("content.swr_contrast.rewarded", f"{_KC} --outcome-stratum rewarded", 2, ["content.arm_ladder.all_arms"], threads=2),
+    _run("content.swr_contrast.omitted", f"{_KC} --outcome-stratum omitted", 2, ["content.arm_ladder.all_arms"], threads=2),
+    _run("content.breadth_contrast.all", f"{_KC} {_DM} --n-jobs 16 --outcome-stratum all", 16, ["content.arm_ladder.all_arms"]),
+    _run("content.breadth_contrast.all_length_adjusted", f"{_KC} {_DM} --n-jobs 16 --concentration-length --outcome-stratum all", 16, ["content.arm_ladder.all_arms"]),
+    _run("content.breadth_contrast.rewarded", f"{_KC} {_DM} --n-jobs 8 --outcome-stratum rewarded", 8, ["content.arm_ladder.all_arms"]),
+    _run("content.breadth_contrast.omitted", f"{_KC} {_DM} --n-jobs 8 --outcome-stratum omitted", 8, ["content.arm_ladder.all_arms"]),
+    _run("content.estimator_comparison", "scripts/content/compare_content_estimators.py --n-jobs 16", 16),
+    _run("content.uncertainty", "scripts/content/analyze_uncertainty_content.py", 1, ["content.arm_ladder.leaf_arms"]),
+    # Content on events found by other detectors (ContFrag SWR- and MUA-anchored).
+    _run("content.event_source.swr_arm", f"{_CL} --event-source SWR --brain-area HPC", 2, threads=2),
+    _run("content.event_source.swr_patch", f"{_CL} --event-source SWR --hierarchy patch --brain-area HPC", 2, threads=2),
+    _run("content.event_source.mua_arm", f"{_CL} --event-source MUA --brain-area HPC", 2, threads=2),
+    _run("content.event_source.mua_patch", f"{_CL} --event-source MUA --hierarchy patch --brain-area HPC", 2, threads=2),
+    _fig("content.fig.swr_contrast_coefs", "scripts/figures/plot_swr_contrast_coefs.py",
+         ["rate.swr_contrast.at_well", *_SWR_CONTRAST, *_BREADTH]),
+    _fig("content.fig.uncertainty", "scripts/figures/generate_uncertainty_content_figure.py", ["content.uncertainty"]),
+    _fig("content.fig.ladder", "scripts/content/generate_replay_content_figures.py",
+         ["content.arm_ladder.all_arms", *_SWR_CONTRAST, *_BREADTH]),
+    # Q4 behaviour. One suite per event source: the patch, per-stop rate and patch-switch
+    # ladders on one common cohort, the choice prediction and switch-aligned content.
+    _run("behavior.event_source_suite.non_local", f"{_ES} --event-source non_local", 1),
+    _run("behavior.event_source_suite.swr", f"{_ES} --event-source SWR", 1),
+    _run("behavior.event_source_suite.mua", f"{_ES} --event-source MUA", 1),
+    # Retrospective content alignment (Stage 5B) and content x outcome -> stay/leave (Stage 6).
+    _run("behavior.retrospective.all", _S5, 2, threads=2),
+    _run("behavior.retrospective.swr", f"{_S5} --swr-only", 2, threads=2),
+    _run("behavior.retrospective.non_swr", f"{_S5} --non-swr-only", 2, threads=2),
+    _run("behavior.stay_leave.at_well", f"{_S6} --rebuild-summary", 2, threads=2),
+    _run("behavior.stay_leave.all_stops", f"{_S6} --stop-cohort all_stops --rebuild-summary", 2, threads=2),
+    _run("behavior.stay_leave.at_well_swr", f"{_S6} --content-stratum swr", 2, ["behavior.stay_leave.at_well"], threads=2),
+    _run("behavior.stay_leave.at_well_non_swr", f"{_S6} --content-stratum non_swr", 2, ["behavior.stay_leave.at_well"], threads=2),
+    _run("behavior.stay_leave.at_well_mua", f"{_S6} --content-stratum mua", 2, ["behavior.stay_leave.at_well"], threads=2),
+    _run("behavior.stay_leave.all_stops_swr", f"{_S6} --stop-cohort all_stops --content-stratum swr", 2, ["behavior.stay_leave.all_stops"], threads=2),
+    _run("behavior.stay_leave.all_stops_non_swr", f"{_S6} --stop-cohort all_stops --content-stratum non_swr", 2, ["behavior.stay_leave.all_stops"], threads=2),
+    _run("behavior.stay_leave.all_stops_mua", f"{_S6} --stop-cohort all_stops --content-stratum mua", 2, ["behavior.stay_leave.all_stops"], threads=2),
+    # Q5 PFC. Figure 4 reads the PFC unit GLM bundles, which this driver does not make.
+    _fig("pfc.fig.figure04", "scripts/figures/generate_figure04.py"),
 )
 # fmt: on
 
-BY_ID = {r.id: r for r in RUNS}
-GROUPS = sorted({r.group for r in RUNS})
+BY_NAME = {r.name: r for r in RUNS}
 THREAD_VARS = (
     "OMP_NUM_THREADS",
     "MKL_NUM_THREADS",
@@ -135,29 +173,33 @@ THREAD_VARS = (
 
 
 def select(names: list[str] | None, with_dependents: bool = True) -> list[Run]:
-    """The runs named by id or group (all when ``names`` is None), in list order.
+    """The runs named (all when ``names`` is None), in list order.
 
+    A name selects the run of that name and every run whose name extends it, so
+    ``content`` selects all of Q3 and ``content.swr_contrast`` its three strata.
     With ``with_dependents``, every run that needs a selected run, directly or
     through another, is selected too.
     """
     if not names:
-        chosen = set(BY_ID)
+        chosen = set(BY_NAME)
     else:
         chosen = set()
         for name in names:
-            if name in BY_ID:
-                chosen.add(name)
-            elif name in GROUPS:
-                chosen |= {r.id for r in RUNS if r.group == name}
-            else:
-                raise SystemExit(f"unknown run or group {name!r}; groups: {GROUPS}")
+            hits = {
+                r.name for r in RUNS if r.name == name or r.name.startswith(name + ".")
+            }
+            if not hits:
+                raise SystemExit(
+                    f"no run is named {name!r} or starts with it; see --dry-run"
+                )
+            chosen |= hits
     if with_dependents:
         grew = True
         while grew:
-            more = {r.id for r in RUNS if set(r.deps) & chosen} - chosen
+            more = {r.name for r in RUNS if set(r.deps) & chosen} - chosen
             chosen |= more
             grew = bool(more)
-    return [r for r in RUNS if r.id in chosen]
+    return [r for r in RUNS if r.name in chosen]
 
 
 def run_env(run: Run) -> dict[str, str]:
@@ -198,23 +240,24 @@ def schedule(
     A dependency outside ``runs`` is taken as already done.
     """
     log_dir.mkdir(parents=True, exist_ok=True)
-    ids = {r.id for r in runs}
+    names = {r.name for r in runs}
     pending = list(runs)
     active: dict[str, tuple[subprocess.Popen, Run, float, str]] = {}
-    codes: dict[str, int | None] = {r.id: None for r in runs}
+    codes: dict[str, int | None] = {r.name: None for r in runs}
     blocked: set[str] = set()
     commit = _git("rev-parse", "HEAD")
     dirty = bool(_git("status", "--porcelain", "--untracked-files=no"))
     from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
     while pending or active:
-        for rid, (proc, run, t0, started) in list(active.items()):
+        for name, (proc, run, t0, started) in list(active.items()):
             if proc.poll() is None:
                 continue
-            codes[rid] = proc.returncode
-            del active[rid]
+            codes[name] = proc.returncode
+            del active[name]
             record = {
-                "id": rid,
+                "name": name,
+                "question": QUESTIONS.get(run.question, run.question),
                 "argv": [*prefix, *run.argv],
                 "cores": run.cores,
                 "threads": run.threads,
@@ -226,23 +269,25 @@ def schedule(
                 "end_utc": _now(),
                 "wall_seconds": round(time.monotonic() - t0, 1),
                 "exit_code": proc.returncode,
-                "log": str(log_dir / f"{rid}.log"),
+                "log": str(log_dir / f"{name}.log"),
             }
-            (log_dir / f"{rid}.json").write_text(json.dumps(record, indent=1) + "\n")
-            print(f"{_now()} {rid} exit {proc.returncode}", flush=True)
+            (log_dir / f"{name}.json").write_text(json.dumps(record, indent=1) + "\n")
+            print(f"{_now()} {name} exit {proc.returncode}", flush=True)
         for run in list(pending):
-            needs = [d for d in run.deps if d in ids]
+            needs = [d for d in run.deps if d in names]
             if any(d in blocked or codes[d] not in (None, 0) for d in needs):
                 pending.remove(run)
-                blocked.add(run.id)
-                print(f"{_now()} {run.id} not started: a dependency failed", flush=True)
+                blocked.add(run.name)
+                print(
+                    f"{_now()} {run.name} not started: a dependency failed", flush=True
+                )
                 continue
             if any(codes[d] != 0 for d in needs):  # still running
                 continue
             used = sum(r.cores for _, r, _, _ in active.values())
             if active and used + run.cores > budget:
                 continue
-            log = open(log_dir / f"{run.id}.log", "w")
+            log = open(log_dir / f"{run.name}.log", "w")
             proc = subprocess.Popen(
                 [*prefix, *run.argv],
                 cwd=REPO,
@@ -251,12 +296,12 @@ def schedule(
                 stderr=subprocess.STDOUT,
             )
             log.close()
-            active[run.id] = (proc, run, time.monotonic(), _now())
+            active[run.name] = (proc, run, time.monotonic(), _now())
             pending.remove(run)
-            print(f"{_now()} {run.id} start ({run.cores} cores)", flush=True)
+            print(f"{_now()} {run.name} start ({run.cores} cores)", flush=True)
         if pending and not active:
             # Dependencies come earlier in RUNS, so this cannot happen.
-            raise RuntimeError(f"nothing can start: {[r.id for r in pending]}")
+            raise RuntimeError(f"nothing can start: {[r.name for r in pending]}")
         if active:
             time.sleep(poll_s)
     return codes
@@ -286,6 +331,19 @@ def check_provenance(log_dir: Path) -> int:
     return worst
 
 
+def print_plan(runs: list[Run]) -> None:
+    """The selected runs, grouped under their question."""
+    for key, text in QUESTIONS.items():
+        group = [r for r in runs if r.question == key]
+        if not group:
+            continue
+        print(text)
+        for r in group:
+            deps = f"   after {', '.join(r.deps)}" if r.deps else ""
+            print(f"  {r.name:<46} {r.cores:>2} cores  {' '.join(r.argv)}{deps}")
+        print()
+
+
 def _cpu_list(spec: str) -> list[int]:
     cpus: list[int] = []
     for part in spec.split(","):
@@ -297,7 +355,9 @@ def _cpu_list(spec: str) -> list[int]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument(
-        "--only", help=f"comma-separated run ids or groups ({', '.join(GROUPS)})"
+        "--only",
+        help="comma-separated run names or name prefixes (rate, content, behavior, pfc, "
+        "content.swr_contrast, ...)",
     )
     parser.add_argument(
         "--no-dependents",
@@ -325,9 +385,7 @@ def main(argv: list[str] | None = None) -> int:
 
     runs = select(args.only.split(",") if args.only else None, not args.no_dependents)
     if args.dry_run:
-        for r in runs:
-            deps = f"  after {','.join(r.deps)}" if r.deps else ""
-            print(f"{r.id}  {r.cores:>2} cores  {' '.join(r.argv)}{deps}")
+        print_plan(runs)
         return 0
     prefix = ["uv", "run", "--no-sync", "python"]
     if args.cpus:
@@ -339,15 +397,12 @@ def main(argv: list[str] | None = None) -> int:
         args.log_dir or REPO / "logs" / f"refits_{datetime.now(UTC):%Y%m%dT%H%M%S}"
     )
     codes = schedule(runs, budget, log_dir, prefix)
-    failed = sorted(rid for rid, code in codes.items() if code != 0)
+    failed = sorted(name for name, code in codes.items() if code != 0)
     print(
         f"{len(codes) - len(failed)}/{len(codes)} runs exited 0; not ok: {failed or 'none'}"
     )
-    worst = (
-        0
-        if args.no_check or not any(r.group != "figures" for r in runs)
-        else check_provenance(log_dir)
-    )
+    fits = any(not r.figure for r in runs)
+    worst = check_provenance(log_dir) if fits and not args.no_check else 0
     return 1 if failed or worst else 0
 
 

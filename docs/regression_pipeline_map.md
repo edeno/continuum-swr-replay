@@ -398,6 +398,18 @@ Per-stop RL-model values via DataJoint — canonical, complete, timestamp-aligne
 
 `main`
 
+### `scripts/behavior/run_retrospective_alignment.py`
+
+Stage 5B: per-session retrospective replay-content alignment.
+
+`main`
+
+### `scripts/behavior/run_stay_leave.py`
+
+Stage 6: replay content × reward outcome → behavioral change.
+
+`summary_path`, `fit_path`, `write_summary_provenance`, `cross_session_role_summary`, `log_cross_session_role_summary`, `main`
+
 ### `scripts/content/analyze_content_occupancy.py`
 
 Content occupancy of non-local events — where the decoded activity represents.
@@ -762,9 +774,9 @@ Compute decoding quality metrics across all sessions.
 
 ### `scripts/qa/run_refits.py`
 
-Rerun the CPU model refits and the figures that read them, in dependency order.
+Rerun the CPU model fits and the figures that read them, in dependency order.
 
-`Run`, `select`, `run_env`, `schedule`, `check_provenance`, `main`
+`Run`, `select`, `run_env`, `schedule`, `check_provenance`, `print_plan`, `main`
 
 ### `scripts/qa/run_state_evidence.py`
 

@@ -25,6 +25,8 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
 
 ## `docs/` contents
 
+- [analysis_map.md](analysis_map.md) — *start here*: the five questions, each analysis that answers
+  them, its run name, script, outputs, figures and claims rows, and the flow from decodes to figures.
 - [models_table.md](models_table.md) — *catalog*: every model in R formula notation.
 - [covariate_dictionary.md](covariate_dictionary.md) — *definitions*: covariate semantics across families.
 - [behavior_model_covariates.md](behavior_model_covariates.md) — *definitions*: `qvals_table.parquet` data dictionary.
@@ -183,15 +185,16 @@ Three tiers:
    (per-term quasi-separation counts). `scripts/qa/summarize_cohort_audits.py` stacks and
    flags them; the schema is documented in [models_table.md](models_table.md#cohort-audit-tables).
 
-   The **PFC** analyses write outside that table — the unit bundles sit at the
-   `Processed-Data/` root, the two staged analyses in `replay_content/` beside the
+   The **PFC** unit bundles and the two behaviour analyses (retrospective alignment and
+   stay/leave) write outside that table — the unit bundles at the
+   `Processed-Data/` root, the two behaviour analyses in `replay_content/` beside the
    hippocampal fits:
 
    | artifact | producer | holds |
    |---|---|---|
    | `Processed-Data/{epoch_identifier}_mPFC_modulation.pkl` + five `*_modulation.npy` | `scripts/pfc/run_pfc_analysis_bandit.py` | per-unit penalised-GLM statistics — held-out deviance and separated-column count per model, each nested pair's held-out difference (total and per fold), an empirical p-value per event class and for the engagement comparison, the best model by held-out deviance, and per curve the penalised and unpenalised peak with that peak's own standard error — plus the five peri-event modulation time courses (`SWR`, `no_SWR`, `non_local_SWR`, `non_local_no_SWR`, and `matched_control`, the duration-matched non-event baseline). All five are read into the Figure 4 population by `analysis/pfc/load_population.py`; the first four are NaN-free by its drop rule, while the matched-control curve may carry NaN and is reduced with `nanmean` |
-   | `replay_content/stop_replay_summary.pkl`, `stage6_is_stay_{logistic,pooled_gee}{,_swr,_non_swr,_mua}.pkl` | `scripts/pfc/run_stage6_learning.py` | the per-stop replay summary and the stay/leave models (claim 19e) |
-   | `replay_content/stage5b_retrospective{,_swr_only,_non_swr_only}.pkl` | `scripts/pfc/run_stage5b_retrospective.py` | the retrospective/prospective event-grain metrics against their visit-context shuffle |
+   | `replay_content/stop_replay_summary.pkl`, `stage6_is_stay_{logistic,pooled_gee}{,_swr,_non_swr,_mua}.pkl` | `scripts/behavior/run_stay_leave.py` | the per-stop replay summary and the stay/leave models (claim 19e) |
+   | `replay_content/stage5b_retrospective{,_swr_only,_non_swr_only}.pkl` | `scripts/behavior/run_retrospective_alignment.py` | the retrospective/prospective event-grain metrics against their visit-context shuffle |
 
    All three are fit on the **well-anchored stop cohort**, the same population as the
    rate and content ladders, and an unsuffixed PFC artifact is that cohort; `_allstops`
