@@ -107,8 +107,13 @@ def _fetchers(
     swr_inputs: dict | None = None,
     encoding_model: dict | None = None,
     n_tetrodes: int = N_TETRODES,
+    decode_span_s: tuple[float, float] | None = None,
 ) -> dict:
-    """``run_epoch``'s fetch arguments, every one a fake."""
+    """``run_epoch``'s fetch arguments, every one a fake.
+
+    The marks are loaded over ``decode_span_s`` (by default the LFP's span),
+    and the encoding model is fitted on marks within it, as a decode's is.
+    """
     position_time = np.linspace(epoch.time[0], epoch.time[-1], 15_001)
     position_info = pd.DataFrame(
         {"head_speed": np.full(position_time.size, SPEED_CM_PER_S)},
@@ -120,16 +125,32 @@ def _fetchers(
         "electrode_ids": BAND_ELECTRODE_IDS,
         "sampling_frequency": FS,
     }
-    model = _encoding_model(epoch) if encoding_model is None else encoding_model
+    if decode_span_s is None:
+        decode_span_s = (float(epoch.time[0]), float(epoch.time[-1]))
+    in_span = [
+        (times >= decode_span_s[0]) & (times <= decode_span_s[1])
+        for times in epoch.spike_times
+    ]
+    spike_times = [t[keep] for t, keep in zip(epoch.spike_times, in_span, strict=True)]
+    features = [f[keep] for f, keep in zip(epoch.features, in_span, strict=True)]
+    model = (
+        {"encoding_spike_waveform_features": [f[::2] for f in features]}
+        if encoding_model is None
+        else encoding_model
+    )
     marks = {
-        "spike_times": epoch.spike_times[:n_tetrodes],
-        "spike_waveform_features": epoch.features[:n_tetrodes],
+        "spike_times": spike_times[:n_tetrodes],
+        "spike_waveform_features": features[:n_tetrodes],
         "encoding_model": {
             "encoding_spike_waveform_features": model[
                 "encoding_spike_waveform_features"
             ][:n_tetrodes]
         },
-        "record": {"rule": "simulated", "detector_sha256": "0" * 64},
+        "record": {
+            "rule": "simulated",
+            "detector_sha256": "0" * 64,
+            "decode_span_s": list(decode_span_s),
+        },
     }
     return {
         "fetch_inputs": lambda nwb_file_name, epoch_name: inputs,
@@ -191,6 +212,9 @@ def test_an_epoch_writes_its_events_its_observed_stretches_and_its_record(tmp_pa
     assert record["n_multiunit_tetrodes"] == N_TETRODES
     assert record["input_sha256"] == _swr_inputs(epoch)["input_sha256"]
     assert record["n_dropped_overlapping_unobserved"] == 0
+    # a decode span covering the LFP sets nothing unobserved
+    assert record["decode_span_s"] == [epoch.time[0], epoch.time[-1]]
+    assert record["seconds_outside_decode_span"] == 0
     assert record["marks"]["rule"] == "simulated"
     assert len(record["marks"]["sha256"]) == 64
     assert record["wall_clock_s"] > 0
@@ -236,6 +260,32 @@ def test_the_artifact_mask_leaves_the_scaling_and_drops_what_it_overlaps(tmp_pat
     in_mask = (observed.start_s <= at + 0.3) & (observed.end_s >= at - 0.3)
     assert not in_mask.any()
     assert len(observed) == 2
+
+
+def test_lfp_outside_the_decode_span_is_unobserved(tmp_path):
+    """No spike was loaded outside the decode span, so the LFP there is out of
+    the scaling, the events and the observed stretches; the LFP is not cut."""
+    epoch = _simulated_epoch()
+    lo, hi = float(epoch.time[2_000]), float(epoch.time[27_000])
+
+    record = run_epoch(
+        NWB_FILE_NAME,
+        EPOCH_NAME,
+        output_dir=tmp_path / "out",
+        **_fetchers(epoch, decode_span_s=(lo, hi)),
+    )
+
+    assert record["status"] == "ok", record
+    assert record["input_sha256"] == _swr_inputs(epoch)["input_sha256"]
+    assert record["decode_span_s"] == [lo, hi]
+    assert record["position_span_s"] == [epoch.time[0], epoch.time[-1]]
+    assert record["seconds_outside_decode_span"] == (2_000 + 2_999) / FS
+    events = read_table(_outputs(tmp_path / "out")["events"])
+    observed = read_table(_outputs(tmp_path / "out")["observed"])
+    np.testing.assert_array_equal(observed[["start_s", "end_s"]], [[lo, hi]])
+    assert ((events.start_time >= lo) & (events.end_time <= hi)).all()
+    for start_s, end_s in epoch.windows:  # all five lie inside the decode span
+        assert _overlapping(events, start_s, end_s).sum() == 1
 
 
 @pytest.mark.parametrize("name", ["time", "ripple_band"])

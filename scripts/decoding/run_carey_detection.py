@@ -27,8 +27,12 @@ Per epoch:
    are refused unless every mark the decode's encoding model was fitted on is
    among them (``check_marks_match_encoding``). Each tetrode's spikes are
    binned onto the LFP times (``tetrode_spike_counts``): one unit per tetrode.
-5. **Detector.** ``run_carey_detector`` leaves the mask out of the joint
-   score's scaling and drops the events that overlap it. Its error fails the
+   The LFP samples outside the decode span (half a step's tolerance at each
+   edge), where no spike was loaded, join the artifact mask as unobserved; the
+   LFP itself is not trimmed, so its hash stays the SWR run's.
+5. **Detector.** ``run_carey_detector`` leaves the unobserved samples out of
+   the joint score's scaling and drops the events that overlap them; they are
+   not in the observed stretches either. Its error fails the
    epoch, recorded with the error.
 
 Each epoch writes, under ``Processed-Data/replay_detection_comparison/carey/<run_id>/``:
@@ -106,6 +110,7 @@ from continuum_swr_replay.decoding_common import (  # noqa: E402
     raise_open_file_limit,
     release_nwb_files,
     setup_logger,
+    write_atomically,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR  # noqa: E402
 from continuum_swr_replay.table_io import sha256_file, write_table  # noqa: E402
@@ -128,7 +133,6 @@ from scripts.decoding.run_swr_detection import (  # noqa: E402
     json_ready,
     run_epochs,
     run_lock,
-    write_json,
 )
 
 OUTPUT_ROOT = PROCESSED_DATA_DIR / "replay_detection_comparison" / "carey"
@@ -153,9 +157,12 @@ ADAPTATIONS = (
 )
 """Where this run departs from the published detector."""
 GRID = (
-    "the stored band's samples (1000 Hz) within the position span; each "
-    "tetrode's spikes binned onto them by the MUA rule (tetrode_spike_counts)"
+    "the stored band's own samples within the position span; each tetrode's "
+    "spikes binned onto them by the MUA rule (tetrode_spike_counts); samples "
+    "outside the decode span, where no spike was loaded, unobserved"
 )
+"""The rate is the band's own, not asserted here: the time hash ties the
+samples to the SWR run's, and each record keeps the nominal rate."""
 
 
 def output_paths(identifier: str, output_dir: Path) -> dict[str, Path]:
@@ -330,8 +337,15 @@ def _detect(
     check_marks_match_encoding(
         marks["encoding_model"], spike_times, spike_waveform_features
     )
-    spike_counts = tetrode_spike_counts(spike_times, time)
     sampling_frequency = float(inputs["sampling_frequency"])
+    # The marks were loaded over the decode span only: outside it a zero count
+    # means no spike was loaded, not that none fired. Those samples join the
+    # mask; half a step at each edge keeps float rounding off an edge sample.
+    decode_lo, decode_hi = marks["record"]["decode_span_s"]
+    half_step = 0.5 / sampling_frequency
+    outside_decode = (time < decode_lo - half_step) | (time > decode_hi + half_step)
+    unobserved = unobserved | outside_decode
+    spike_counts = tetrode_spike_counts(spike_times, time)
     events = run_carey_detector(
         time,
         ripple_band,
@@ -352,6 +366,10 @@ def _detect(
         "n_multiunit_tetrodes": len(spike_times),
         "sampling_frequency": sampling_frequency,
         "position_span_s": span_s,
+        "decode_span_s": [decode_lo, decode_hi],
+        # the LFP samples outside the decode span, as samples / nominal rate
+        "seconds_outside_decode_span": int(np.count_nonzero(outside_decode))
+        / sampling_frequency,
         "input_sha256": input_sha256,
         "marks": marks["record"]
         | {"sha256": marks_sha256(spike_times, spike_waveform_features)},
@@ -481,8 +499,8 @@ def summary(record: dict) -> str:
         return f"{record['status']}: {record.get('reason') or record.get('error')}"
     return (
         f"{record['status']}: {record['n_events']} events "
-        f"({record['n_dropped_overlapping_unobserved']} dropped on the artifact "
-        f"mask) on {len(record['electrode_ids'])} band tetrodes and "
+        f"({record['n_dropped_overlapping_unobserved']} dropped as unobserved) "
+        f"on {len(record['electrode_ids'])} band tetrodes and "
         f"{record['n_multiunit_tetrodes']} multiunit tetrodes; "
         f"{record['wall_clock_s']:.0f} s, worker peak RSS "
         f"{record['worker_peak_rss_gib']:.1f} GiB"
@@ -608,8 +626,7 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
         records = previous["epochs"]
 
     def write_manifest() -> None:
-        write_json(
-            manifest_path,
+        text = json.dumps(
             {
                 "produced_by": PRODUCED_BY,
                 "run_id": run_id,
@@ -617,7 +634,10 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
                 "settings": settings,
                 "epochs": records,
             },
+            indent=2,
+            allow_nan=False,
         )
+        write_atomically(manifest_path, lambda path: path.write_text(text))
 
     to_run = []
     for nwb_file_name, epoch_name in epochs:
