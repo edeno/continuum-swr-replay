@@ -20,7 +20,7 @@ What *differs* about the events once matched is [04](04-event-features.md).
 
 ## Common schema
 
-The eight inventories are the overview's: Kay, Karlsson, Yu and Zugaro (SWR), Carey (ripple
+The eight detectors are the overview's: Kay, Karlsson, Yu and Zugaro (SWR), Carey (ripple
 power and multiunit activity jointly), MUA high-synchrony events, our state-space non-local
 events, and the memoryless sequences. Long was dropped (decision D1: it needs a stratum
 radiatum channel, which this dataset lacks).
@@ -28,9 +28,10 @@ radiatum channel, which this dataset lacks).
 The runner reads the memoryless one under two cohorts, so it compares nine inventories:
 `kay`, `karlsson`, `yu`, `zugaro`, `carey`, `mua`, `state_space`, `memoryless` (cohort
 `published`) and `memoryless_criteria` (cohort `replay_criteria`, before the significance
-test). The two memoryless inventories share one detector; the cells and no-detector time
-use the eight that leave `memoryless_criteria` out, because every published event is also a
-criteria event.
+test). The two memoryless inventories share one detector; the overlap components, the
+exactly-one cell and no-detector time use the eight that leave `memoryless_criteria` out,
+because every published event is also a criteria event. The sequences cell takes
+`state_space` and both memoryless cohorts as its sources, each counted on its own.
 
 Carey runs with four adaptations of the published detector:
 
@@ -258,7 +259,7 @@ population.
 
 ## Deliverables
 
-1. The eight inventories and their observation-interval tables, with native and eligible
+1. The nine inventories (eight detectors) and their observation-interval tables, with native and eligible
    counts, exposure durations, rates, and exclusions.
 2. The all-pairs overlap table and the per-detector denominators.
 3. The single-detector and no-detector cells, including SWRs with no detected sequence and

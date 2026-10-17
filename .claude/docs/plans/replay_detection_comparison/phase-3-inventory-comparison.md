@@ -39,7 +39,8 @@ The report and the examples carry that note wherever the `memoryless` column app
   `missing_run_table` :255, `coverage_from_observations` :268); `overlap` (`Coverage` :140,
   `remove_bridging_events` :308, `overlap_pairs` :352, `event_matches` :403, `flag_pairs` :457,
   `directional_agreement` :488, `time_coverage` :547); `components.overlap_components` :44;
-  `recount.merge_fragments` :68 with `FRAGMENT_GAPS_S`; `cells` (`membership_against` :77,
+  `recount.merge_fragments` :70 with `FRAGMENT_GAPS_S` and `not_still_s` (the times of the samples that were
+  not still, `availability.not_still_times`; no merged event holds one); `cells` (`membership_against` :77,
   `no_detector_time` :140); `swr_matrix` (`swr_labels` :143, `swr_label_matrix` :211, `paired_labels` :294,
   `definition_disagreement` :338). The worked end-to-end epoch is
   `tests/unit/test_inventory_comparison_end_to_end.py`.
@@ -88,7 +89,9 @@ The report and the examples carry that note wherever the `memoryless` column app
 - **Outputs** go under `PROCESSED_DATA_DIR` (`parameters.py:84`; `CSR_PROCESSED_DATA_DIR` overrides it). In
   the phase-3 worktree, `Processed-Data` is a symlink to the main tree's, so a run writes the main tree's data.
   Tables are written with `table_io.write_table` (parquet with `attrs`).
-- **Names.** No docstring, test or module names a plan, phase or task number.
+- **Names.** No docstring, test or module names a plan, phase or task number. The one exception is the
+  deferred-check phrase "pending the Phase 2 pilot checks", which marks every row, caption and figure that
+  shows a memoryless inventory.
 
 ## Tasks
 
@@ -252,11 +255,13 @@ tables carry a reason per stretch, but nothing joins them to `Coverage`.
 - **Consumes.** Task 5's adapters; `still_intervals` on the decode frame's `head_speed`;
   `coverage_from_observations`; `set_aside_events`; `combine_inventories`; `remove_bridging_events`;
   `overlap_pairs`, `event_matches`, `flag_pairs`, `directional_agreement`, `time_coverage`;
-  `overlap_components`; `merge_fragments` (detector `state_space`, every `FRAGMENT_GAPS_S`,
-  `sample_interval_s` 0.002) followed by `overlap_pairs` and `directional_agreement` on each recount;
-  `membership_against` for the three cells (exactly one detector, each against the other seven; SWRs
-  `kay, karlsson, yu, zugaro` against `state_space, memoryless`; sequences `state_space, memoryless` against
-  `kay, karlsson, yu, zugaro, carey, mua`, see Q6); `no_detector_time` over the eight; `swr_labels`,
+  `overlap_components` over the eight without `memoryless_criteria` (its events and their pairs left out);
+  `merge_fragments` (detector `state_space`, every `FRAGMENT_GAPS_S`, `sample_interval_s` 0.002, and
+  `not_still_s` from `not_still_times` on the decode frame's `head_speed`) followed by `overlap_pairs` and
+  `directional_agreement` on each recount; `membership_against` for the three cells (exactly one detector,
+  each against the other seven; SWRs `kay, karlsson, yu, zugaro` against `state_space, memoryless`;
+  sequences `state_space, memoryless, memoryless_criteria` against `kay, karlsson, yu, zugaro, carey, mua`,
+  see Q6); `no_detector_time` over the eight; `swr_labels`,
   `swr_label_matrix`, `paired_labels`, `definition_disagreement` (cohorts `state_space, memoryless`;
   definitions `kay, karlsson, yu, zugaro`, see Q6); `exclusion_by_reason`.
 - **Produces**, under `PROCESSED_DATA_DIR/replay_detection_comparison/inventory/<run_id>/`, per epoch
@@ -344,7 +349,10 @@ ps -eo user,pcpu,pmem,args --sort=-pcpu | head -20   # other users' load
 Pick a core range no other user's job is on, and pin with `taskset -c <range>`. Set
 `OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1` so each worker uses one core. Run inside
 `tmux`; the session names are below. Run from the phase-3 worktree with its `.venv`, from a clean commit
-(the run id is the commit). `PROCESSED_DATA_DIR` is the main tree's `Processed-Data` through the symlink;
+(the run id is the commit). The Carey and comparison runners' settings gate keys, as the SWR runner's
+does, on the inputs and rules (Carey's also on the `ripple_detection` package commit), not the repository
+commit: a rerun under one `--run-id` from another commit is accepted, and each epoch's record holds the
+commit it ran at. `PROCESSED_DATA_DIR` is the main tree's `Processed-Data` through the symlink;
 set `CSR_PROCESSED_DATA_DIR` only to write elsewhere.
 
 **R0. Before any run.** Q1–Q4, Q7, Q9 and Q10 answered and their tasks merged into the phase branch; the suite

@@ -7,7 +7,7 @@ ran on all 242 analysed epochs (run `d0964cc76ed2-seed20260922`); its two remain
 checks (null validation, two sensitivities) are still to do; the inventory comparison's
 accounting is implemented and tested on synthetic inventories, and its per-detector
 adapters, per-epoch runner, report and examples are built and tested on simulated epochs;
-none has run on the canonical data. The Kay, Karlsson, Yu and Zugaro SWR inventories are
+the comparison has not yet run on the canonical data. The Kay, Karlsson, Yu and Zugaro SWR inventories are
 computed directly from the package, on shared CA1 inputs, by
 `scripts/decoding/run_swr_detection.py`, which ran on every epoch in the full pipeline
 refresh (R3, then R10, run `056eee0dcb5a`); Spyglass integration is the
@@ -26,7 +26,7 @@ register invites the cross-method blending this design forbids.
 |---|---|---|
 | [01-yu-swr-detector.md](01-yu-swr-detector.md) | SWR detector with a noise-percentile threshold (Yu et al. 2017) | package side implemented; direct project inventory produced by `scripts/decoding/run_swr_detection.py`, run on every epoch in R3 and R10 (run `056eee0dcb5a`); Spyglass integration last |
 | [02-memoryless-sequence.md](02-memoryless-sequence.md) | Memoryless sliding-window sequence detector (Widloski & Foster 2025) | implemented and tested, shuffle and event table included; ran on all 242 analysed epochs (`d0964cc76ed2-seed20260922`); the pilot checks (null validation, two sensitivities) are still to do |
-| [03-inventory-comparison.md](03-inventory-comparison.md) | Eight inventories → common schema → N-way overlap accounting | accounting, adapters, per-epoch runner, report and examples implemented and tested on synthetic or simulated epochs; not yet run on the canonical data |
+| [03-inventory-comparison.md](03-inventory-comparison.md) | Nine inventories (eight detectors) → common schema → N-way overlap accounting | accounting, adapters, per-epoch runner, report and examples implemented and tested on synthetic or simulated epochs; not yet run on the canonical data |
 | [04-event-features.md](04-event-features.md) | Symmetric event characterization and selection diagnostics; threshold robustness as a later follow-up | initial scope agreed |
 | [05-validation.md](05-validation.md) | Simulation and held-out-tetrode validation: what a performance claim would need | parked |
 | [memoryless_simulation_controls.md](memoryless_simulation_controls.md) | Simulated timing, false positives, multi-part events and a first held-out test, extending 02's comparison figure | implemented 2026-09-25 |
@@ -124,7 +124,7 @@ why our own pipeline is in it. Worth noting that our lab lineage moved families 
 measuring the cost: Denovellis et al. 2021 and Gillespie et al. 2021 are state-space but
 SWR-*triggered*, where our current pipeline is posterior-triggered.
 
-## The eight inventories
+## The nine inventories (eight detectors)
 
 Each produces an event table over the same epochs and the same speed-eligible population.
 The comparison runner reads the memoryless one under two cohorts, `published` and
@@ -243,7 +243,7 @@ Method-specific decisions live in the component specs. These apply across the co
 | # | Decision | Reasoning |
 |---|---|---|
 | **X1** | Compare detection *triggers* (level 1); defer scoring (level 2) to 04 | The trigger is upstream of everything else and determines which of the ripple-less and neither-ripple-nor-burst questions each inventory can ask at all. What level 1 actually compares, though, is the event inventories of complete pipelines: acceptance criteria, significance filters and boundary rules differ between them too, so a disagreement between two inventories is not attributable to the trigger alone |
-| **X2** | Eight inventories, not two | A within-family comparison of two posterior-triggered methods cannot say what the standard SWR/MUA pipelines would have found |
+| **X2** | Nine inventories (eight detectors), not two | A within-family comparison of two posterior-triggered methods cannot say what the standard SWR/MUA pipelines would have found |
 | **X3** | Harmonize substrate, not method internals | Comparability without blending; see the governing rule above |
 | **X4** | Shared whole-event < 4 cm/s eligibility for every method; native-speed controls are deferred | Apply the same eligibility criterion to each method's candidates. Different event boundaries can still affect qualification |
 | **X5** | Hold the fitted encoding model fixed for both decoding-based methods; any later running-only control applies to **both** | Substrate under X3. An encoding refit is not an initial deliverable |
