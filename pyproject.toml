@@ -155,4 +155,4 @@ override-dependencies = [
 [tool.uv.sources]
 # 68e1784 is the changelog's 2.0.0, never tagged, so the installed version string
 # (1.7.2.dev365+g68e1784b1) comes from the last tag and does not identify it.
-ripple-detection = { git = "https://github.com/Eden-Kramer-Lab/ripple_detection.git", rev = "68e1784b183f161a568d3154325cf770730bfb83" }
+ripple-detection = { git = "https://github.com/Eden-Kramer-Lab/ripple_detection.git", rev = "9766fd4875ff2372ebe94f27182af0f7c9f4db5e" }

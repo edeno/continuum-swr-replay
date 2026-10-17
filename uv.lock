@@ -632,7 +632,7 @@ requires-dist = [
     { name = "patsy", specifier = ">=0.5.3" },
     { name = "pyarrow", specifier = ">=14.0.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
-    { name = "ripple-detection", git = "https://github.com/Eden-Kramer-Lab/ripple_detection.git?rev=68e1784b183f161a568d3154325cf770730bfb83" },
+    { name = "ripple-detection", git = "https://github.com/Eden-Kramer-Lab/ripple_detection.git?rev=9766fd4875ff2372ebe94f27182af0f7c9f4db5e" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.4.0" },
     { name = "scikit-learn", specifier = ">=1.3.0" },
     { name = "scipy", specifier = ">=1.11.0" },
@@ -3317,8 +3317,8 @@ wheels = [
 
 [[package]]
 name = "ripple-detection"
-version = "1.7.2.dev365+g68e1784b1"
-source = { git = "https://github.com/Eden-Kramer-Lab/ripple_detection.git?rev=68e1784b183f161a568d3154325cf770730bfb83#68e1784b183f161a568d3154325cf770730bfb83" }
+version = "1.7.2.dev367+g9766fd487"
+source = { git = "https://github.com/Eden-Kramer-Lab/ripple_detection.git?rev=9766fd4875ff2372ebe94f27182af0f7c9f4db5e#9766fd4875ff2372ebe94f27182af0f7c9f4db5e" }
 dependencies = [
     { name = "numpy" },
     { name = "pandas" },
