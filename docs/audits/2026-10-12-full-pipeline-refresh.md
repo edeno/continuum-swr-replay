@@ -23,7 +23,7 @@ What "before" and "now" mean everywhere below (the R8a definitions, `r8a_report.
   `056eee0dcb5a`, artifact run `fbbff144a123`, Widloski run `d0964cc76ed2-seed20260922`, and the 75 PFC
   bundles at `110c9ae`. Cohort: 242 analysed epochs (255 less the 13 `SUSTAINED_NOISE` epochs).
 
-**Audit: PASS.** `audit_refresh_consistency.py audit --check-marks` exited 0 on 2026-10-12 (19:58 PDT, main at `d29cc3c`): 17 of 17 checks ok, none failed, none skipped, no `--exceptions` file (section 1).
+**Audit: PASS.** `audit_refresh_consistency.py audit --check-marks` exited 0 on 2026-10-12 (19:58 PDT, main at `d29cc3c`): 17 of 17 checks ok, none failed, none skipped, no `--exceptions` file (section 1). The audit script was deleted after use (2026-10-16); it is in git history up to `d7561e8`.
 
 ## 0. Summary
 

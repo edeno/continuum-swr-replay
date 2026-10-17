@@ -155,7 +155,6 @@ once its decodes exist and its entry is changed to `analysed`.
 | PFC runner (`run_pfc_analysis_bandit.py`) | `analysed_epochs()`, then the PFC-level condition below |
 | HPC raw stats (`scripts/qa/compute_hpc_raw_stats.py`) | `analysed_epochs()` |
 | decode-folder readers (see below) | `analysed_decode_files()`, from the register alone |
-| audit (`scripts/qa/audit_refresh_consistency.py`) | the register (`--register`), checked against every artifact and `get_epoch_info()` |
 
 The decode-folder readers read decode files rather than Spyglass:
 

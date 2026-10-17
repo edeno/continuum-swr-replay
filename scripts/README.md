@@ -121,33 +121,6 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
 - `check_fit_provenance.py` — sweeps the whole `models*/` tree and reports which
   fitted artifacts are stale for the tables they read, from the SHA-256 sidecars
   each runner writes.
-- `audit_refresh_consistency.py` — the full pipeline refresh's same-data audit (refresh
-  design, Stage 8). `audit --output <audit.json>` only reads, and checks: one commit, a
-  clean tree and one environment across every NonLocal and ContFrag decode (from each
-  `results.nc`'s provenance, else its log's `PROVENANCE` line unless the log says
-  `RESUMED`); the same discrete-transition settings in every epoch's detector, and the
-  expected ones (by default `expected_decoder_settings()`, built from the code: the pinned
-  `decoding_transitions` settings, the NonLocal Local state's `local_position_std` and the
-  library's regularization default; an optional `--expected-settings <json>` overrides
-  it), numbers to a relative 1e-9, which absorbs only how a value is written, far below
-  any drift that matters; identical NonLocal and ContFrag grids,
-  position and speed; one minimum non-local sample count (R9); the Widloski run's input
-  hashes against the canonical decodes (`--widloski-manifest`); the SWR runner's position
-  spans (`--swr-manifest`); an unchanged `data_loaders/spikes.py` from the decode commit
-  to each run's; the promoted tables against their manifests; the mPFC sidecars' event
-  table; `check_fit_provenance.py` on both table roots and the Stage 5B, Stage 6 and
-  `stop_replay_summary` fits; and a recorded reason for every epoch an artifact lacks
-  (manifests' `skipped` reasons, or `--exceptions`), tables included, the qvals table
-  through its folder's stop table. `--check-marks` also reloads each epoch's marks from
-  the database for both decodes' encoding-mark guard. Exits 1 if any check fails.
-  `audit.json` records under `expected_settings` the settings the detectors were held to
-  and their source, and lists under `not_checked` what was not checked (the encoding
-  marks without `--check-marks`, a decoder an `--expected-settings` file leaves out, a
-  table whose epochs cannot be told, a family of root-level fits with no fit), so a pass
-  is read for what it covers.
-  `record-tables <dir> --commit <sha> --inputs <json>` writes that folder's
-  `tables_manifest.json` (each table's sha256, the commit and the inputs) and nothing
-  else.
 - `audit_event_patch_fraction.py`, `audit_stop_table_reward_history.py` — keyed-parity
   audits of a candidate event-patch / stop table against its pre-change reference:
   every pre-existing column must be unchanged and only the declared new columns may
