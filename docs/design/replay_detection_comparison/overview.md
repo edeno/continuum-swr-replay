@@ -1,13 +1,14 @@
 # Replay detection method comparison — overview
 
-*Design spec, cross-cutting. Status (2026-10-03): approved; the Yu detector exists in the
+*Design spec, cross-cutting. Status (2026-10-17): approved; the Yu detector exists in the
 `ripple_detection` package, and the memoryless sequence detector, its shuffle, its event
 table and a per-epoch runner are implemented and tested in this project but not yet run
 on recorded data (real-data pilot next); the inventory comparison's accounting is
 implemented and tested on synthetic inventories but not yet run on recorded data. The
 Kay, Karlsson, Yu and Zugaro SWR inventories are computed directly from the package, on
-shared CA1 inputs, by `scripts/decoding/run_swr_detection.py`, which is implemented and
-tested offline but not yet run on recorded data; Spyglass integration is the last step.
+shared CA1 inputs, by `scripts/decoding/run_swr_detection.py`, which ran on every epoch in
+the full pipeline refresh (R3, then R10, run `056eee0dcb5a`); Spyglass integration is the
+last step. Inventory 8, Carey, is decided (2026-10-17) and not yet run.
 Each spec's own header carries its status; the per-spec sections below carry the open
 decisions.*
 
@@ -19,9 +20,9 @@ register invites the cross-method blending this design forbids.
 
 | spec | scope | status |
 |---|---|---|
-| [01-yu-swr-detector.md](01-yu-swr-detector.md) | SWR detector with a noise-percentile threshold (Yu et al. 2017) | package side implemented; direct project inventory produced by `scripts/decoding/run_swr_detection.py`, not yet run on recorded data; Spyglass integration last |
+| [01-yu-swr-detector.md](01-yu-swr-detector.md) | SWR detector with a noise-percentile threshold (Yu et al. 2017) | package side implemented; direct project inventory produced by `scripts/decoding/run_swr_detection.py`, run on every epoch in R3 and R10 (run `056eee0dcb5a`); Spyglass integration last |
 | [02-memoryless-sequence.md](02-memoryless-sequence.md) | Memoryless sliding-window sequence detector (Widloski & Foster 2025) | implemented and tested, shuffle and event table included; not yet run on recorded data (pilot next) |
-| [03-inventory-comparison.md](03-inventory-comparison.md) | Seven inventories → common schema → N-way overlap accounting | accounting implemented and tested on synthetic inventories; recorded-data adapters and runner pending |
+| [03-inventory-comparison.md](03-inventory-comparison.md) | Eight inventories → common schema → N-way overlap accounting | accounting implemented and tested on synthetic inventories; recorded-data adapters and runner pending |
 | [04-event-features.md](04-event-features.md) | Symmetric event characterization and selection diagnostics; threshold robustness as a later follow-up | initial scope agreed |
 | [05-validation.md](05-validation.md) | Simulation and held-out-tetrode validation: what a performance claim would need | parked |
 | [memoryless_simulation_controls.md](memoryless_simulation_controls.md) | Simulated timing, false positives, multi-part events and a first held-out test, extending 02's comparison figure | implemented 2026-09-25 |
@@ -119,19 +120,20 @@ why our own pipeline is in it. Worth noting that our lab lineage moved families 
 measuring the cost: Denovellis et al. 2021 and Gillespie et al. 2021 are state-space but
 SWR-*triggered*, where our current pipeline is posterior-triggered.
 
-## The seven inventories
+## The eight inventories
 
 Each produces an event table over the same epochs and the same speed-eligible population.
 
 | # | Trigger | Family | Method | Status |
 |---|---|---|---|---|
-| 1 | SWR, consensus trace | LFP | `Kay_ripple_detector` | recomputed directly at the pinned package commit (`scripts/decoding/run_swr_detection.py`, not yet run on recorded data); the canonical `SWR_event` stays as an extra SWR definition and as the version check |
-| 2 | SWR, per-channel with merging | LFP | `Karlsson_ripple_detector` (Karlsson & Frank 2009) | in package; computed directly by `scripts/decoding/run_swr_detection.py` (not yet run on recorded data) |
-| 3 | SWR, noise-percentile threshold | LFP | `Yu_ripple_detector` (Yu et al. 2017) | in package; computed directly by `scripts/decoding/run_swr_detection.py` (not yet run on recorded data) — [01](01-yu-swr-detector.md) |
+| 1 | SWR, consensus trace | LFP | `Kay_ripple_detector` | computed directly at the pinned package commit by `scripts/decoding/run_swr_detection.py` (R3, then R10, run `056eee0dcb5a`); it is the paper's SWR source (D7, closed 2026-10-17). The canonical Spyglass `SWR_event` is its version check, not an inventory |
+| 2 | SWR, per-channel with merging | LFP | `Karlsson_ripple_detector` (Karlsson & Frank 2009) | in package; computed directly by `scripts/decoding/run_swr_detection.py` (R3, then R10, run `056eee0dcb5a`) |
+| 3 | SWR, noise-percentile threshold | LFP | `Yu_ripple_detector` (Yu et al. 2017) | in package; computed directly by `scripts/decoding/run_swr_detection.py` (R3, then R10, run `056eee0dcb5a`) — [01](01-yu-swr-detector.md) |
 | 4 | MUA high-synchrony events | population rate | `multiunit_HSE_detector` | exists (`MUA_event`) |
 | 5 | Posterior threshold | decoding | our state-space non-local detection | exists (`non_local_event`) |
 | 6 | Posterior sequence | decoding | Widloski & Foster 2025 | implemented (`memoryless_sequence/`, `scripts/decoding/run_memoryless_detection.py`); real-data pilot next — [02](02-memoryless-sequence.md) |
-| 7 | SWR, one channel, two thresholds | LFP | `Zugaro_ripple_detector` (the `FindRipples` lineage: Hirase and Zugaro, FMAToolbox; Csicsvari et al. 1999 as ancestor) | in package; computed directly by `scripts/decoding/run_swr_detection.py` on one CA1 channel per epoch (not yet run on recorded data) — see below |
+| 7 | SWR, one channel, two thresholds | LFP | `Zugaro_ripple_detector` (the `FindRipples` lineage: Hirase and Zugaro, FMAToolbox; Csicsvari et al. 1999 as ancestor) | in package; computed directly by `scripts/decoding/run_swr_detection.py` on one CA1 channel per epoch (R3, then R10, run `056eee0dcb5a`) — see below |
+| 8 | Ripple power and multiunit activity jointly | joint LFP × rate | `Carey_candidate_detector` (Carey, Tanaka & van der Meer 2019; vandermeerlab `GenCandidateEvents`) | in package (PR #17, pinned commit `68e1784`); decided 2026-10-17, not yet run — see below |
 
 1, 2, 3 and 7 are four different SWR *algorithms*, not four thresholds on one algorithm:
 Kay thresholds a root-sum-of-squares consensus trace, Karlsson detects per channel and
@@ -141,7 +143,7 @@ one channel's smoothed squared ripple band at 2 SD and keeps the events that pea
 boundaries; the comparison measures those differences rather than assuming an ordering
 of sensitivity.
 
-The `ripple_detection` package supplying 1, 2, 3, 4 and 7 is
+The `ripple_detection` package supplying 1, 2, 3, 4, 7 and 8 is
 [Eden-Kramer-Lab/ripple_detection](https://github.com/Eden-Kramer-Lab/ripple_detection);
 Spyglass reaches 1 and 2 through `RippleTimesV1`. For the comparison, 1, 2, 3 and 7 are
 computed directly by calling the package at its pinned commit, one epoch at a time, in
@@ -155,10 +157,14 @@ filtered it, reproduces the stored band. It also checks Kay against the canonica
 alone), and the direct Kay inventory (version and inputs together). Populating them
 through Spyglass is deferred to the end and must reproduce the direct inventories.
 
-**Inventory 7, Zugaro: open decision D1, resolved for Zugaro (2026-10-03).** D1 in the
-comparison plan (`.claude/docs/plans/replay_detection_comparison/PLAN.md`) asked whether
-Zugaro, Long and Carey get project inventories or stay as package-only comparison rows. Zugaro gets one (refresh design R3). D1 stays open for
-Long, which needs a stratum radiatum channel, and for Carey. Zugaro runs with the
+**Decision D1, resolved (2026-10-17).** D1 in the comparison plan
+(`.claude/docs/plans/replay_detection_comparison/PLAN.md`) asked whether Zugaro, Long and
+Carey get project inventories or stay as package-only comparison rows. Zugaro gets one
+(inventory 7, refresh design R3, 2026-10-03). Carey gets one (inventory 8, below). Long is
+dropped: it needs a stratum radiatum channel, and every tetrode in this dataset targets CA1
+stratum pyramidale ([task description](../../task_description.md), "Neural implant").
+
+**Inventory 7, Zugaro.** Zugaro runs with the
 Buzsáki-lab Databank files' settings: a 120–180 Hz Butterworth band-pass of order 3,
 zero-phase; events bounded at 2 SD and kept if they peak above 5 SD; events closer than
 50 ms merged with no length cap; no minimum duration; events longer than 150 ms then
@@ -169,6 +175,20 @@ channel selection's moving RMS (13 samples at 1000 Hz) truncates its window at g
 stretch edges (NaN-aware), where the package's own Zugaro moving average zero-pads
 (`np.convolve(..., mode="same")`); it affects the 6 samples at each end of a stretch.
 
+**Inventory 8, Carey.** `Carey_candidate_detector` runs at the package default, which is
+the code's Hilbert ripple score, on the same shared inputs and speed rule as the other SWR
+detectors (the 4 cm/s rule, the artifact mask, rule R-T for the LFP), with the multiunit
+trains built from the marks the decode used. Two adaptations are recorded:
+
+1. Clusterless tetrodes stand in for units. Each tetrode's multiunit train is one "unit"
+   for `minimum_active_units` and for the per-unit `spike_cap`. That is a coarser count
+   than sorted cells.
+2. The Hilbert configuration is used, not the published spectral one. The paper's
+   published candidates used a spectral ripple score built from hand-picked ripples, which
+   this dataset does not have.
+
+The input choices the spec does not settle are open questions in the Phase 3 task plan.
+
 ## Scope boundary: clusterless compatibility
 
 HPC in this project is decoded clusterless. That excludes every method requiring
@@ -178,6 +198,7 @@ be stated in the paper, because otherwise the absences read as oversights.
 | method | needs sorted units? | in scope |
 |---|---|---|
 | SWR triggers — Kay, Karlsson, Yu 2017, Zugaro | no (LFP) | ✅ |
+| Joint ripple × multiunit trigger — Carey 2019 | no (LFP and multiunit; tetrodes stand in for units) | ✅ |
 | MUA trigger — `multiunit_HSE_detector` | no (spike times) | ✅ |
 | Posterior triggers — ours, Widloski port | no (clusterless encoding model) | ✅ |
 | HMM over units — Maboudi et al. 2018, eLife 34467 | **yes** | ❌ for HPC |
@@ -205,7 +226,7 @@ Method-specific decisions live in the component specs. These apply across the co
 | # | Decision | Reasoning |
 |---|---|---|
 | **X1** | Compare detection *triggers* (level 1); defer scoring (level 2) to 04 | The trigger is upstream of everything else and determines which of the ripple-less and neither-ripple-nor-burst questions each inventory can ask at all. What level 1 actually compares, though, is the event inventories of complete pipelines: acceptance criteria, significance filters and boundary rules differ between them too, so a disagreement between two inventories is not attributable to the trigger alone |
-| **X2** | Seven inventories, not two | A within-family comparison of two posterior-triggered methods cannot say what the standard SWR/MUA pipelines would have found |
+| **X2** | Eight inventories, not two | A within-family comparison of two posterior-triggered methods cannot say what the standard SWR/MUA pipelines would have found |
 | **X3** | Harmonize substrate, not method internals | Comparability without blending; see the governing rule above |
 | **X4** | Shared whole-event < 4 cm/s eligibility for every method; native-speed controls are deferred | Apply the same eligibility criterion to each method's candidates. Different event boundaries can still affect qualification |
 | **X5** | Hold the fitted encoding model fixed for both decoding-based methods; any later running-only control applies to **both** | Substrate under X3. An encoding refit is not an initial deliverable |

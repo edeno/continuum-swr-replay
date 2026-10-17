@@ -1,4 +1,4 @@
-# Inventory comparison: seven detectors over one substrate
+# Inventory comparison: eight detectors over one substrate
 
 *Design spec. Status: approved; the accounting — schema, availability, overlap, components,
 fragment-merge recount, cells and SWR label matrix — is implemented in
@@ -10,10 +10,20 @@ aggregates it per comparison).*
 *Governing rule and cross-cutting decisions: [overview.md](overview.md).*
 
 Depends on [01](01-yu-swr-detector.md) and [02](02-memoryless-sequence.md). Covers how the
-seven event inventories are brought onto a common schema and how their overlap is counted.
+eight event inventories are brought onto a common schema and how their overlap is counted.
 What *differs* about the events once matched is [04](04-event-features.md).
 
 ## Common schema
+
+The eight inventories are the overview's: Kay, Karlsson, Yu and Zugaro (SWR), Carey (ripple
+power and multiunit activity jointly), MUA high-synchrony events, our state-space non-local
+events, and the memoryless sequences. Long was dropped (decision D1: it needs a stratum
+radiatum channel, which this dataset lacks).
+
+Carey runs with two adaptations. Each clusterless tetrode's multiunit train stands in for
+one unit, for `minimum_active_units` and the per-unit `spike_cap`, a coarser count than
+sorted cells. The score is the code's Hilbert ripple score, not the published spectral one,
+which needs hand-picked ripples this dataset does not have.
 
 Each inventory produces one table, one row per event, over the same epochs and the same
 speed-eligible population (overview X4). Every table carries:
@@ -61,7 +71,7 @@ analysed; the tables themselves record what each detector read. Intersect each
 detector's observed intervals with the shared finite-speed < 4 cm/s eligibility mask
 to obtain its comparison exposure, `E_d`. A comparison involving a
 set of detectors uses the intersection of their exposures. Pairwise summaries use
-`E_A ∩ E_B`; seven-detector exclusivity and no-detector time use all seven exposures.
+`E_A ∩ E_B`; eight-detector exclusivity and no-detector time use all eight exposures.
 Report the exposure duration and excluded time by reason for each comparison. Empty
 shared exposure produces an unavailable summary, not a zero rate or zero overlap.
 
@@ -117,7 +127,7 @@ Coverage is less sensitive to segmentation than event counts, and the two can di
 one detector splitting an event into three does not change the time it accounts for.
 
 **Overlap is not transitive.** A can overlap B and B overlap C without A overlapping C.
-Membership in "all seven" is therefore not well-defined by pairwise overlap alone.
+Membership in "all eight" is therefore not well-defined by pairwise overlap alone.
 Summarize connected components of the multipartite overlap graph, labeled by which
 detectors contribute to each component, and report component size and span as
 diagnostics — a long chain can fuse events that do not individually overlap.
@@ -224,7 +234,7 @@ population.
 
 ## Deliverables
 
-1. The seven inventories and their observation-interval tables, with native and eligible
+1. The eight inventories and their observation-interval tables, with native and eligible
    counts, exposure durations, rates, and exclusions.
 2. The all-pairs overlap table and the per-detector denominators.
 3. The single-detector and no-detector cells, including SWRs with no detected sequence and
