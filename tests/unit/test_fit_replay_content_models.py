@@ -26,6 +26,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     default_content_model_names,
 )
 from continuum_swr_replay.analysis.replay.simulation import (
+    simulate_dirichlet_multinomial_counts,
     simulate_with_event_covariates,
 )
 from continuum_swr_replay.data_loaders.constants import (
@@ -43,11 +44,15 @@ STAGING = Path("/tmp/staging").resolve()
 
 def _args(**overrides) -> argparse.Namespace:
     defaults = {
+        "estimator": "conditional_poisson",
         "logit": False,
+        "n_jobs": 1,
+        "min_events_session_phi": 40,
         "cv": False,
         "event_source": "non_local",
         "hierarchy": "arm",
         "brain_area": "HPC",
+        "swr_subset": "all",
         "grain": "timebin",
         "response": "fraction",
         "leaf_only": False,
@@ -109,9 +114,9 @@ def test_subset_run_may_be_sent_to_an_explicit_non_canonical_directory() -> None
 def test_subset_may_not_target_another_configurations_canonical_bundle() -> None:
     """The guard covers every canonical bundle, not just this invocation's.
 
-    A patch run pointed at ``models/``, or an event-grain run pointed at the
-    timebin ``models/``, would replace part of a bundle the run does not even
-    resolve to.
+    A patch run pointed at ``models/``, or an SWR-subset run pointed at the
+    unrestricted ``models/``, would replace part of a bundle the run does not
+    even resolve to.
     """
     with pytest.raises(ValueError, match="canonical models/ bundle"):
         mod._resolve_run_config(
@@ -124,7 +129,7 @@ def test_subset_may_not_target_another_configurations_canonical_bundle() -> None
     with pytest.raises(ValueError, match="canonical models/ bundle"):
         mod._resolve_run_config(
             _args(
-                grain="event",
+                swr_subset="T",
                 models="M0,M1",
                 output_dir=CONTENT_IN / "models",
             )
@@ -134,21 +139,22 @@ def test_subset_may_not_target_another_configurations_canonical_bundle() -> None
 def test_canonical_bundle_names_cover_every_suffix_variant() -> None:
     names = mod.canonical_output_subdirs()
     assert {"models", "models_patch"} <= names
-    assert {"models_event_grain", "models_patch_event_grain_hard_count"} <= names
+    assert {"models_swr_T", "models_patch_swr_F"} <= names
+    assert {"models_event_grain", "models_swr_T_event_grain"} <= names
     assert {"models_swr_HPC", "models_patch_mua_OFC"} <= names
     # Every name a full run of some configuration resolves to is in the set.
     for hierarchy in ("arm", "patch"):
-        for response in ("fraction", "hard_count"):
+        for swr_subset in ("all", "T"):
             for grain in ("timebin", "event"):
                 config = mod._resolve_run_config(
-                    _args(hierarchy=hierarchy, response=response, grain=grain)
+                    _args(hierarchy=hierarchy, swr_subset=swr_subset, grain=grain)
                 )
                 assert config.output_dir.name in names
 
 
-def test_event_grain_run_keeps_its_own_suffixed_bundle() -> None:
-    config = mod._resolve_run_config(_args(grain="event"))
-    assert config.output_dir == CONTENT_IN / "models_event_grain"
+def test_swr_subset_run_keeps_its_own_suffixed_bundle() -> None:
+    config = mod._resolve_run_config(_args(swr_subset="T", grain="event"))
+    assert config.output_dir == CONTENT_IN / "models_swr_T_event_grain"
 
 
 # ── Response selection ──
@@ -345,18 +351,23 @@ def test_hard_count_runs_publish_to_their_own_bundle() -> None:
 
 
 def test_fraction_runs_keep_the_unsuffixed_canonical_bundle() -> None:
-    assert mod.canonical_output_subdir("non_local", "HPC", "arm", "timebin") == "models"
     assert (
-        mod.canonical_output_subdir("non_local", "HPC", "arm", "timebin", "fraction")
+        mod.canonical_output_subdir("non_local", "HPC", "arm", "all", "timebin")
+        == "models"
+    )
+    assert (
+        mod.canonical_output_subdir(
+            "non_local", "HPC", "arm", "all", "timebin", "fraction"
+        )
         == "models"
     )
 
 
-def test_parser_defaults_to_the_fraction_response() -> None:
+def test_parser_leaves_the_response_to_the_estimator_by_default() -> None:
     parser = mod._build_arg_parser()
-    assert parser.parse_args([]).response == "fraction"
+    assert parser.parse_args([]).response is None
     assert parser.parse_args(["--response", "hard_count"]).response == "hard_count"
-    assert mod._resolve_run_config(_args()).response == "fraction"
+    assert mod._resolve_run_config(_args(response=None)).response == "fraction"
 
 
 # ── Estimator and response recorded on every fitted row ──
@@ -565,7 +576,7 @@ def test_leaf_only_run_publishes_to_its_own_bundle() -> None:
     config = mod._resolve_run_config(_args(leaf_only=True))
     assert config.output_dir == CONTENT_IN / "models_leaf"
     assert "models_leaf" in mod.canonical_output_subdirs()
-    assert "models_event_grain_leaf" in mod.canonical_output_subdirs()
+    assert "models_swr_T_leaf" in mod.canonical_output_subdirs()
     assert "models_hard_count_leaf" in mod.canonical_output_subdirs()
 
 
@@ -627,7 +638,7 @@ def test_leaf_only_is_refused_on_the_patch_hierarchy() -> None:
         mod._resolve_run_config(_args(hierarchy="patch", leaf_only=True))
     with pytest.raises(ValueError, match="leaf"):
         mod.canonical_output_subdir(
-            "non_local", "HPC", "patch", "timebin", "fraction", leaf_only=True
+            "non_local", "HPC", "patch", "all", "timebin", "fraction", leaf_only=True
         )
 
 
@@ -814,10 +825,225 @@ def test_leaf_only_ladder_fits_six_categories_on_the_rescaled_response() -> None
         response_renormalized=renormalized,
     )
 
-    results = mod._fit_content_ladder(_args(leaf_only=True, cv=False), config, cohort)
+    results, _skips = mod._fit_content_ladder(
+        _args(leaf_only=True, cv=False), config, cohort
+    )
 
     fitted = results["X"]
     assert fitted["response_renormalized"].tolist() == [True]
     n_events = int(fitted["n_events"].iloc[0])
     # Unit mass per event against a six-category uniform null.
     assert fitted["llf_null"].iloc[0] == pytest.approx(-n_events * np.log(6))
+
+
+# ── Dirichlet-multinomial estimator ──
+
+
+def test_dm_bundle_is_suffixed_last_and_named_in_the_canonical_set() -> None:
+    """The overdispersed ladder never publishes over the conditional bundle."""
+    assert (
+        mod.canonical_output_subdir(
+            "non_local",
+            "HPC",
+            "arm",
+            "all",
+            "timebin",
+            "hard_count",
+            False,
+            "dirichlet_multinomial",
+        )
+        == "models_dm"
+    )
+    # ``_dm`` is appended after every other suffix, so stripping it names the
+    # conditional bundle this fit is the counterpart of.
+    assert (
+        mod.canonical_output_subdir(
+            "non_local",
+            "HPC",
+            "arm",
+            "T",
+            "timebin",
+            "hard_count",
+            True,
+            "dirichlet_multinomial",
+        )
+        == "models_swr_T_leaf_dm"
+    )
+    subdirs = mod.canonical_output_subdirs()
+    assert {"models", "models_hard_count", "models_dm", "models_leaf_dm"} <= subdirs
+    assert "models_patch_dm" in subdirs
+    # The count response is the estimator's own, so it is not named twice.
+    assert "models_hard_count_dm" not in subdirs
+
+
+def test_dm_run_resolves_the_count_response_and_its_own_directory() -> None:
+    config = mod._resolve_run_config(
+        _args(estimator="dirichlet_multinomial", response=None)
+    )
+    assert config.response == "hard_count"
+    assert config.output_dir == CONTENT_IN / "models_dm"
+
+
+def test_dm_refuses_the_fraction_response_naming_both_flags() -> None:
+    with pytest.raises(ValueError) as excinfo:
+        mod._resolve_run_config(
+            _args(estimator="dirichlet_multinomial", response="fraction")
+        )
+    message = str(excinfo.value)
+    assert "--response fraction" in message
+    assert "--estimator dirichlet_multinomial" in message
+
+
+def test_dm_parser_defaults() -> None:
+    parser = mod._build_arg_parser()
+    args = parser.parse_args([])
+    assert args.estimator == "conditional_poisson"
+    assert args.n_jobs == mod.DEFAULT_N_JOBS
+    assert args.min_events_session_phi == 40
+    assert (
+        parser.parse_args(["--estimator", "dirichlet_multinomial"]).estimator
+        == "dirichlet_multinomial"
+    )
+
+
+def test_dm_numbers_are_labelled_a_full_event_likelihood() -> None:
+    assert mod.scale_label("dirichlet_multinomial") == "event-scale (full likelihood)"
+
+
+def _dm_session(
+    n_events: int, *, seed: int, animal: str = "chimi", epoch: str = "02_r1"
+) -> pd.DataFrame:
+    df = simulate_dirichlet_multinomial_counts(
+        {"is_current_arm": 0.8},
+        log_phi_intercept=1.2,
+        n_events=n_events,
+        L_e=20,
+        seed=seed,
+    )
+    df["animal"] = animal
+    df["session_date"] = "20200212"
+    df["epoch"] = epoch
+    # Event ids are globally unique; the simulator numbers each session from 0.
+    df["event_id"] = [f"{epoch}-{index}" for index in df["event_id"]]
+    # The simulator leaves its drawn allocations in attrs, which pandas compares
+    # element-wise (and so raises on) when concatenating two sessions.
+    df.attrs.clear()
+    return df
+
+
+def test_short_dm_session_borrows_its_animals_concentration() -> None:
+    """A 20-event session cannot pin down its own concentration; a 60-event one can."""
+    cohort = pd.concat(
+        [
+            _dm_session(60, seed=0, epoch="02_r1"),
+            _dm_session(20, seed=1, epoch="04_r2"),
+        ],
+        ignore_index=True,
+    )
+
+    result = mod.fit_model_per_session(
+        cohort,
+        "X",
+        ["is_current_arm"],
+        response_col="arm_count_hard",
+        estimator="dirichlet_multinomial",
+        n_jobs=2,
+        min_events_session_phi=40,
+    )
+
+    assert result["estimator"].tolist() == ["dirichlet_multinomial"] * 2
+    assert result["response_col"].tolist() == ["arm_count_hard"] * 2
+    rows = result.set_index("epoch")
+    assert rows.loc["02_r1", "n_events"] == 60
+    assert rows.loc["04_r2", "n_events"] == 20
+    assert rows.loc["02_r1", "phi_source"] == "session"
+    assert rows.loc["04_r2", "phi_source"] == "animal_pooled"
+    assert rows.loc["04_r2", "coef_log_phi_intercept"] == pytest.approx(
+        rows.loc["02_r1", "coef_log_phi_intercept"]
+    )
+    # The concentration modifier is estimated because the cohort carries both
+    # kinds of event.
+    assert "coef_log_phi_is_swr" in result.columns
+    assert result["coef_log_phi_is_swr"].notna().all()
+    assert bool(result["llf_includes_constants"].all())
+
+
+def test_dm_concentration_modifier_is_dropped_within_an_swr_subset() -> None:
+    """Inside a subset ``is_swr`` is constant, so there is no contrast to fit."""
+    cohort = _dm_session(60, seed=0)
+    assert mod.concentration_cols_for_cohort(cohort) == ("is_swr",)
+    subset = cohort[cohort["is_swr"] == 1.0]
+    assert mod.concentration_cols_for_cohort(subset) == ()
+    assert mod.concentration_cols_for_cohort(cohort.drop(columns="is_swr")) == ()
+
+
+def test_dm_session_with_a_refused_design_is_an_audited_skip() -> None:
+    """A predictor constant within every event raises; the ladder books it instead."""
+    good = _dm_session(60, seed=0, epoch="02_r1")
+    bad = _dm_session(60, seed=2, epoch="04_r2").assign(is_prev_arm=0.0)
+    cohort = pd.concat([good, bad], ignore_index=True)
+
+    result = mod.fit_model_per_session(
+        cohort,
+        "X",
+        ["is_current_arm", "is_prev_arm"],
+        response_col="arm_count_hard",
+        estimator="dirichlet_multinomial",
+        n_jobs=2,
+        min_events_session_phi=40,
+    )
+
+    assert result["epoch"].tolist() == ["02_r1"]
+    skips = result.attrs["estimator_skips"]
+    assert [skip["session"] for skip in skips] == ["chimi/20200212/04_r2"]
+    assert skips[0]["reason"].startswith("dm_design:")
+
+
+def test_a_refused_dm_session_is_named_in_the_published_cohort_audit(tmp_path) -> None:
+    """The skip channel's consumer: the audit says which session, and why.
+
+    A session the estimator refuses is not a dropped event -- its events are
+    already counted under ``n_excluded_session`` -- so the only place a reader
+    can learn that a session is missing from the fitted cohort, and for what
+    reason, is the audit's ``drop_notes``.
+    """
+    good = _dm_session(60, seed=0, epoch="02_r1")
+    bad = _dm_session(60, seed=2, epoch="04_r2").assign(is_prev_arm=0.0)
+    cohort_df = pd.concat([good, bad], ignore_index=True)
+    ladder = {"X": ModelSpec("X", ("is_current_arm", "is_prev_arm"), "two arms", None)}
+    args = _args(estimator="dirichlet_multinomial", response="hard_count", n_jobs=2)
+    args.logit = False
+    config = mod._RunConfig(
+        hierarchy=ladder,
+        input_dir=tmp_path,
+        output_dir=tmp_path / "models_dm",
+        table_name="event_arm_table",
+        model_names=["X"],
+        response="hard_count",
+    )
+    cohort = mod._ContentCohort(
+        long_df=cohort_df,
+        long_df_prefilter=cohort_df,
+        valid_model_names=["X"],
+        union_predictors=["is_current_arm", "is_prev_arm"],
+        response_col="arm_count_hard",
+        event_col="event_id",
+        n_events_before_complete_case=int(cohort_df["event_id"].nunique()),
+        fit_inputs={},
+        response_renormalized=False,
+    )
+
+    model_results, estimator_skips = mod._fit_content_ladder(args, config, cohort)
+    mod._audit_compare_and_publish(args, config, cohort, model_results, estimator_skips)
+
+    # The refused session contributes no row to the fit frame.
+    assert model_results["X"]["epoch"].tolist() == ["02_r1"]
+
+    audit = pd.read_csv(config.output_dir / "all_models_cohort_audit.csv")
+    assert len(audit) == 1
+    notes = str(audit["drop_notes"].iloc[0])
+    assert "estimator skipped chimi/20200212/04_r2" in notes
+    assert "dm_design:" in notes
+    # Its events are excluded at the session level, not booked as event drops.
+    assert int(audit["n_drop_own_predictor_missing"].iloc[0]) == 0
+    assert int(audit["n_excluded_session"].iloc[0]) == 60

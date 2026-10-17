@@ -412,8 +412,9 @@ def build_event_patch_table(
 
     # SWR × patch interactions (P4, PS3). is_swr is event-level — bring
     # it in from event_table once and reuse for the three products. The
-    # column is RETAINED in the output because the patch is_swr-contrast fit
-    # (``fit_swr_contrast_content.py``) reads ``is_swr`` from this table.
+    # column is RETAINED in the output so the patch-level fitter's
+    # ``--swr-subset`` filter (which gates on an ``is_swr`` column) works
+    # for ``--hierarchy patch`` as it does for arm fits.
     if "is_swr" not in event_table.columns:
         raise ValueError(
             "build_event_patch_table requires canonical event_table column "

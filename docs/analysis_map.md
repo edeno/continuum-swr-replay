@@ -30,8 +30,8 @@ run skips them unless they are named in full or `--include-optional` is given.
 
 ## The flow
 
-All scripts are in `scripts/`. Steps 1–4 are the full rebuild; after a change to tables or fitting code, start
-at step 3 or 5.
+All scripts are in `scripts/`. Steps 1–7 are the full rebuild. After a change to the table code, start at step 4;
+after a change to fitting code only, start at step 6.
 
 1. **Cohort.** The analysed epochs are the register's (`data_loaders/epoch_register.csv`;
    [epoch_register.md](epoch_register.md)).
@@ -68,13 +68,14 @@ at step 3 or 5.
 | Each event's spikes support its decoded location better than a matched baseline | `qa/analyze_event_spike_evidence.py` | `paper/figures/reality/` | 6, 7, 7b, 7c, 9 |
 | Held-out tetrodes support each decoder state (Local, No-Spike, Continuous, Fragmented) | `qa/run_state_evidence.py` | `Processed-Data/_refresh_<date>/state_evidence/` | 7, 9 |
 | The sub-cases of SWR and non-local overlap (for Methods numbers) | `content/quantify_swr_overlap_geometry.py` | printed tables | 4 |
-| Four SWR detectors from shared inputs | `decoding/run_swr_detection.py` | SWR inventories | 23 |
+| Four SWR detectors from shared inputs | `decoding/run_swr_detection.py` | SWR inventories | — (the inputs to 23, 24) |
 | A second sequence detector (Widloski & Foster) on the same decodes | `decoding/run_memoryless_detection.py` | `Processed-Data/replay_detection_comparison/memoryless/` | 21, 22, 25 |
-| That detector on simulated replays of known shape, against an independent re-implementation of the reference code | `qa/sweep_memoryless_detection.py`, `qa/sweep_memoryless_controls.py`, `qa/sweep_memoryless_heldout.py`, `qa/compare_memoryless_to_reference.py` (with `qa/memoryless_reference.py`), `figures/generate_memoryless_comparison.py` | `docs/design/replay_detection_comparison/*.csv`; supplement | 21 |
+| That detector on simulated replays of known shape, against an independent re-implementation of the reference code | `qa/sweep_memoryless_detection.py`, `qa/sweep_memoryless_controls.py`, `qa/sweep_memoryless_heldout.py`, `qa/compare_memoryless_to_reference.py` (with `qa/memoryless_reference.py`), `figures/generate_memoryless_comparison.py` | `docs/design/replay_detection_comparison/*.csv`; supplement | — (validates the port) |
 | Single decoded events, for checking categories by eye | `figures/generate_event_gallery.py`, `figures/run_event_gallery.sh` | `event_gallery/` | — |
 
 **No script:**
 - 3 (the threshold sweep);
+- 23 (the fraction of SWRs with local content);
 - 8 (a re-decode with a wider Local kernel);
 - 11 (held-out model selection);
 - 12 (the false-positive rate);
@@ -123,6 +124,9 @@ Every content model is conditional on the event: it asks which arm (or patch) an
 |---|---|---|---|---|
 | Which task variables shape content (the M0–M6 ladder, all nine arms) | `content.arm_ladder.all_arms` | `content/fit_replay_content_models.py` | `content.fig.ladder`, `content.fig.pipeline_data_flow` | — |
 | The same on the six leaf arms, with value and uncertainty | `content.arm_ladder.leaf_arms` | same, `--leaf-only` | — | 19g |
+| The arm ladder (M0–M4) on SWR events alone and on non-SWR events alone: which terms help in each population | `content.arm_ladder.{swr_only,non_swr_only}` | same, `--swr-subset {T,F}` | — | — |
+| The arm ladder (M0–M6) under the Dirichlet-multinomial estimator: does each step still help once breadth is modelled | `content.arm_ladder.dirichlet_multinomial` | same, `--estimator dirichlet_multinomial` | — | — |
+| Which task variables shape patch content (P0–P3), on all events and on each population alone | `content.patch_ladder.{all_events,swr_only,non_swr_only}` | same, `--hierarchy patch` | — | — |
 | How SWR content differs, term by term, paired within session (arm and patch) | `content.swr_contrast.{all,rewarded,omitted}` | `content/fit_swr_contrast_content.py` | `content.fig.swr_contrast_coefs` | 19a, 19b, 19f, 19g |
 | How widely an event spreads over arms (Dirichlet-multinomial concentration), SWR against non-SWR | `content.breadth_contrast.{all,all_length_adjusted,rewarded,omitted}` | same, `--estimator dirichlet_multinomial` | — | 19a, 19f |
 | Whether the conclusions depend on the estimator (fraction, count, Dirichlet-multinomial) | `content.estimator_comparison` | `content/compare_content_estimators.py` | `paper/figures/content_estimators/` | 19f |
@@ -161,15 +165,10 @@ A decision-grain rebuild of the choice models is planned:
 
 | Was | Why |
 |---|---|
-| The content ladder refit on SWR-only and on non-SWR-only events (`--swr-subset`; `models_swr_{T,F}/`, `models_patch_swr_{T,F}/`) | The content SWR contrast asks the same question with paired within-session terms, and its split rungs fit all, SWR and non-SWR on the same events. Nothing read these bundles |
-| The base patch ladder on non-local events (`models_patch/`, fraction response, at-well cohort) | No claim cites a P rung. The SWR contrast's patch rungs (CP, CPS) cover the patch question on the same response and cohort |
-| The Dirichlet-multinomial content ladder (`models_dm/`) | Nothing read it. The breadth contrast carries `log_phi_is_swr`, and the estimator comparison fits the Dirichlet-multinomial on M2–M4 and the contrast rungs. Its old numbers in `design/content_estimator_comparison.md` are marked as retired |
-| The rate SWR-contrast `--aggregate-only` reruns | The full fit already writes the same aggregation. The flag stays for re-auditing saved fits |
+| The rate SWR-contrast `--aggregate-only` reruns | The full fit already writes the same aggregation, so the rerun rewrote identical files. The flag stays for re-auditing saved fits |
 
-Only the `--aggregate-only` reruns were exact repeats. The other three were close duplicates, and each lost a
-variant (the per-population ladders, the plain patch ladder, the Dirichlet-multinomial fits of M0, M0a, M1, M5
-and M6). To restore one, take its runner option from git (up to `c293086`). Their bundles were moved to `Processed-Data/replay_content/_archive_removed_20261017/`, which
-`check_fit_provenance.py` skips.
+Three content ladders removed the same day (the SWR-only and non-SWR-only ladders, the patch ladder and the
+Dirichlet-multinomial arm ladder) were restored: they overlap other analyses but are not duplicates.
 
 ## Old run ids
 
@@ -185,4 +184,6 @@ The 2026-10 refresh (its R6 and R7 stages) named runs by code:
 | R10 | `rate.ripple_power` | F01–F04 | `content.event_source.{swr_arm,swr_patch,mua_arm,mua_patch}` |
 | R11 | `rate.cross_history` | P01–P03 | `behavior.retrospective.{all,swr,non_swr}` |
 | C01 | `content.arm_ladder.all_arms` | S01–S08 | `behavior.stay_leave.*` |
-| C02 | `content.arm_ladder.leaf_arms` | C03–C08 | removed |
+| C02 | `content.arm_ladder.leaf_arms` | C03 | `content.patch_ladder.all_events` |
+| C04, C05 | `content.arm_ladder.{swr_only,non_swr_only}` | C06, C07 | `content.patch_ladder.{swr_only,non_swr_only}` |
+| C08 | `content.arm_ladder.dirichlet_multinomial` | | |

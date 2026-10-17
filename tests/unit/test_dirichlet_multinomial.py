@@ -17,7 +17,6 @@ import pytest
 
 from continuum_swr_replay.analysis.replay.dirichlet_multinomial import (
     animal_pooled_log_phi,
-    concentration_cols_for_cohort,
     cross_validate_dirichlet_multinomial,
     event_loglik,
     fit_dirichlet_multinomial,
@@ -166,15 +165,6 @@ def test_is_swr_concentration_recovered():
         for rep in range(20)
     ]
     assert abs(float(np.median(estimates)) - (-1.0)) <= 0.3
-
-
-def test_concentration_modifier_is_dropped_where_is_swr_is_constant():
-    """Inside an SWR-only or non-SWR-only cohort there is no contrast to fit."""
-    df = _simulate(3.0, seed=0, n_events=60)
-    assert concentration_cols_for_cohort(df) == ("is_swr",)
-    subset = df[df["is_swr"] == 1.0]
-    assert concentration_cols_for_cohort(subset) == ()
-    assert concentration_cols_for_cohort(df.drop(columns="is_swr")) == ()
 
 
 def test_event_constant_predictor_rejected():

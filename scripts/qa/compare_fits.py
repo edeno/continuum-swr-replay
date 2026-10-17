@@ -1765,6 +1765,11 @@ def build_report(
 # in a rung-keyed directory that has no pre-fix counterpart.
 CONTENT_BUNDLES = (
     "models",
+    "models_patch",
+    "models_swr_T",
+    "models_swr_F",
+    "models_patch_swr_T",
+    "models_patch_swr_F",
     # The leaf-only belief chain. A partial ladder, so it publishes to a
     # rung-keyed directory named after the documented invocation
     # (--leaf-only --models M0,M0a,M1,M2,M3,M4,Mv,Mu,Mvu) and has no
@@ -1931,8 +1936,8 @@ def _paired_coefficients(
     """Medians of ``coef_<term>`` over the sessions BOTH fits reached.
 
     The per-side medians are taken over each side's own fitted sessions, which
-    differ (e.g. 197 vs 201 sessions), so a shift between them can be a cohort
-    change rather than an effect change. This restricts to
+    differ (e.g. 197 vs 201 sessions on ``models_swr_T``), so a shift between
+    them can be a cohort change rather than an effect change. This restricts to
     the intersection on (session, rung) -- the brief's join -- so the two
     medians describe the same sessions. Returns NaNs and 0 when the rung has no
     session in common, which is what a bundle whose rung sets are disjoint looks

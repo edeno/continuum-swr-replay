@@ -55,11 +55,19 @@ _TABLE_RELPATHS = {
 # copy a stale bundle into a fresh baseline. The leaf-only belief chain's
 # directory is derived, not spelled out, because it is keyed by the rungs it
 # fits.
-# NB the Dirichlet-multinomial ``*_dm`` / ``*_dm_len`` contrast artifacts that
-# live INSIDE ``models`` are copied along with that directory (``copytree`` has
-# no ignore filter); add one here if that ever matters.
+# The Dirichlet-multinomial ``models_dm`` directory is deliberately absent: it
+# is a non-primary estimator kept for the content-estimator comparison, not part
+# of the shipped result the baseline exists to protect, and freezing it would
+# make every DM experiment a baseline diff. NB the ``*_dm`` / ``*_dm_len``
+# artifacts that live INSIDE ``models`` are copied along with that directory
+# (``copytree`` has no ignore filter); add one here if that ever matters.
 _MODEL_DIRS = (
     "models",
+    "models_swr_T",
+    "models_swr_F",
+    "models_patch",
+    "models_patch_swr_T",
+    "models_patch_swr_F",
     belief_chain_output_subdir(),
     "models_per_stop_rate",
     "models_per_bin_rate",

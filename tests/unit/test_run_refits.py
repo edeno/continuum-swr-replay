@@ -137,27 +137,25 @@ def test_runs_wait_for_cpus_and_a_run_larger_than_the_list_still_runs(tmp_path):
     assert (logs / "rate.c.log").read_text().strip() == "3"
 
 
-def test_only_artifacts_written_since_the_start_are_checked(tmp_path):
-    import time
+def test_only_artifacts_whose_sidecar_changed_are_checked(tmp_path):
+    def fit(path, ext=".pkl"):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.with_suffix(ext).write_bytes(b"")
+        path.with_suffix(".provenance.json").write_text("{}")
 
-    old = tmp_path / "models_dm"
-    new = tmp_path / "models"
-    for d in (old, new, tmp_path / "_backup_x"):
-        d.mkdir()
-    (old / "M0.pkl").write_bytes(b"")
-    (old / "M0.provenance.json").write_text("{}")
-    since = time.time() + 1
-    os.utime(old / "M0.provenance.json", (since - 10, since - 10))
-    for d in (new, tmp_path / "_backup_x"):
-        (d / "C1.pkl").write_bytes(b"")
-        (d / "C1.provenance.json").write_text("{}")
-        os.utime(d / "C1.provenance.json", (since + 5, since + 5))
-    (tmp_path / "stage6.parquet").write_bytes(b"")
-    (tmp_path / "stage6.provenance.json").write_text("{}")
-    os.utime(tmp_path / "stage6.provenance.json", (since + 5, since + 5))
-    found = rr.written_artifacts(tmp_path, since)
+    fit(tmp_path / "models_dm" / "M0")  # untouched by the runs
+    fit(tmp_path / "models" / "C1")  # rewritten by the runs
+    before = rr.sidecar_times(tmp_path)
+    os.utime(tmp_path / "models" / "C1.provenance.json", (1, 1))
+    fit(tmp_path / "_backup_x" / "C1")  # backups are skipped
+    fit(tmp_path / "stage6", ".parquet")  # new, at the root
+    # A z-reference file sits beside its fit and has no sidecar of its own.
+    fit(tmp_path / "models" / "K1")
+    (tmp_path / "models" / "K1.z_reference.json").write_text("{}")
+    found = rr.written_artifacts(tmp_path, before)
     assert sorted(p.relative_to(tmp_path).as_posix() for p in found) == [
         "models/C1.pkl",
+        "models/K1.pkl",
         "stage6.parquet",
     ]
 

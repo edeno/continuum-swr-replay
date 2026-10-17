@@ -164,7 +164,7 @@ and child dropped different events — and their ΔAIC cell is NaN;
 `n_unidentified_triples_dropped = 34` triples were removed by the same
 separation rule the shipped aggregation uses.
 
-The DM arm ladder (`Processed-Data/replay_content/models_dm/`) (retired 2026-10-17: no run makes this ladder now, and these are its 2026-09-05 numbers) fit on its own,
+The DM arm ladder (`Processed-Data/replay_content/models_dm/`) fit on its own,
 animal-median ΔAIC with the count of animals where the child is better:
 
 | step | ΔAIC | animals child-better |
@@ -266,7 +266,7 @@ stratum**, and its median is positive on every rung of every stratum. On the
 pooled DM contrast table (32 rung × population rows: arm +1.789 … +2.001, patch
 +1.781 … +1.841) it is positive for **5/5 animals and 100 % of sessions** —
 per-session minimum +0.657 — with BH-FDR q from 2.4e-37 to 8.3e-18. The
-`models_dm` ladder (retired 2026-10-17: no run makes this ladder now, and these are its 2026-09-05 numbers) gave the same over M0–M4 (+1.775 … +1.819, 5/5 animals,
+`models_dm` ladder gives the same over M0–M4 (+1.775 … +1.819, 5/5 animals,
 100 % of sessions). (§9 gives the weaker `omitted`-stratum version.)
 
 Read it on the log scale, and read φ as the Dirichlet **concentration**: it
@@ -414,7 +414,7 @@ fits the minimum is **25** SWR events (and 29 non-SWR), in two of `wilbur`'s
 changes; the `omitted` stratum in particular has not been audited this way.
 
 Pooled-φ pinning is otherwise rare: no fit in the comparison (1,742 fits) or in
-the `models_dm` ladder (1,744 fits; retired 2026-10-17) needed one — the smallest per-fit cohort
+the `models_dm` ladder (1,744 fits) needed one — the smallest per-fit cohort
 there is 54 events against the 40-event threshold. In the `all` contrast run,
 70 of 11,075 arm rows and 19 of 2,815 patch rows are `animal_pooled`; none are
 `pooled_all_animals`.

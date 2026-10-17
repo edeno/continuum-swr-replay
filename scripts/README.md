@@ -41,7 +41,7 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
 - `summarize_per_bin_rate_models.py` — generates `docs/per_bin_rate_results.md`.
 
 ## `content/` — replay content / choice models
-- `fit_replay_content_models.py` — arm/patch content hierarchy (M0–M7 / P0–P4).
+- `fit_replay_content_models.py` — arm/patch content hierarchy (M0–M7 / P0–P4), per `is_swr` split.
 - `fit_swr_contrast_content.py` — the HMM-harmonized content `is_swr`-contrast ladder (C / CP).
 - `compare_event_source_models.py` — choice (clogit) model comparison.
 - `compare_content_estimators.py` — conditional Poisson (counts), conditional Poisson

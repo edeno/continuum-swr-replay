@@ -34,6 +34,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import signal
 import socket
 import subprocess
 import sys
@@ -118,6 +119,14 @@ RUNS: tuple[Run, ...] = (
     # Dirichlet-multinomial fit of how widely an event spreads over arms.
     _run(_ARM, _CL, 2, threads=2),
     _run("content.arm_ladder.leaf_arms", f"{_CL} --leaf-only --models M0,M0a,M1,M2,M3,M4,Mv,Mu,Mvu", 2, threads=2),
+    # The same ladders fit on SWR events alone and on non-SWR events alone, the patch
+    # ladder, and the arm ladder under the Dirichlet-multinomial estimator.
+    _run("content.arm_ladder.swr_only", f"{_CL} --swr-subset T", 2, threads=2),
+    _run("content.arm_ladder.non_swr_only", f"{_CL} --swr-subset F", 2, threads=2),
+    _run("content.arm_ladder.dirichlet_multinomial", f"{_CL} {_DM} --n-jobs 16", 16),
+    _run("content.patch_ladder.all_events", f"{_CL} --hierarchy patch", 1),
+    _run("content.patch_ladder.swr_only", f"{_CL} --hierarchy patch --swr-subset T", 1),
+    _run("content.patch_ladder.non_swr_only", f"{_CL} --hierarchy patch --swr-subset F", 1),
     # The contrasts write into models/, which the arm ladder replaces whole.
     _run("content.swr_contrast.all", f"{_KC} --outcome-stratum all", 2, [_ARM], threads=2),
     _run("content.swr_contrast.rewarded", f"{_KC} --outcome-stratum rewarded", 2, [_ARM], threads=2),
@@ -347,25 +356,43 @@ def schedule(
     return codes
 
 
-def written_artifacts(root: Path, since: float) -> list[Path]:
-    """The fit artifacts under ``root`` whose provenance sidecar changed since ``since``."""
-    artifacts = []
-    for sidecar in sorted(root.rglob(f"*{_SIDECAR}")):
-        parts = sidecar.relative_to(root).parts
-        if (
-            any(p.startswith(_SKIPPED_DIRS) for p in parts)
-            or sidecar.stat().st_mtime < since
+def sidecar_times(root: Path) -> dict[Path, float]:
+    """Every fit-provenance sidecar under ``root`` with its modification time.
+
+    Backup, archive, staging and golden-baseline folders are left out.
+    """
+    times = {}
+    for sidecar in root.rglob(f"*{_SIDECAR}"):
+        if not any(
+            p.startswith(_SKIPPED_DIRS) for p in sidecar.relative_to(root).parts
         ):
+            times[sidecar] = sidecar.stat().st_mtime
+    return times
+
+
+def written_artifacts(root: Path, before: dict[Path, float]) -> list[Path]:
+    """The fit artifacts under ``root`` whose sidecar is new or changed since ``before``.
+
+    Comparing against a snapshot, not the driver's clock, keeps this right when
+    the file server's clock differs. One artifact per sidecar: the ``.pkl`` or
+    ``.parquet`` file it describes (other files beside it, such as a
+    ``.z_reference.json``, have no sidecar of their own).
+    """
+    artifacts = []
+    for sidecar, mtime in sorted(sidecar_times(root).items()):
+        if before.get(sidecar) == mtime:
             continue
         stem = sidecar.name[: -len(_SIDECAR)]
-        artifacts += [p for p in sidecar.parent.glob(f"{stem}.*") if p != sidecar]
+        found = [sidecar.with_name(stem + ext) for ext in (".pkl", ".parquet")]
+        found = [f for f in found if f.exists()] or found[:1]
+        artifacts += found
     return artifacts
 
 
-def check_provenance(log_dir: Path, since: float) -> int:
+def check_provenance(log_dir: Path, before: dict[str, dict[Path, float]]) -> int:
     """``check_fit_provenance.py`` on what the runs wrote; the worst exit code.
 
-    Only the artifacts written since ``since`` are checked, so a bundle no run
+    Only the artifacts whose sidecar changed from ``before`` (per fit root) are checked, so a bundle no run
     makes any more (left on disk) cannot fail a run that did not touch it.
     """
     from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
@@ -373,7 +400,9 @@ def check_provenance(log_dir: Path, since: float) -> int:
     worst = 0
     for name in FIT_ROOTS:
         root = Path(PROCESSED_DATA_DIR) / name
-        artifacts = written_artifacts(root, since) if root.is_dir() else []
+        artifacts = (
+            written_artifacts(root, before.get(name, {})) if root.is_dir() else []
+        )
         if not artifacts:
             continue
         with open(log_dir / f"check_fit_provenance_{name}.log", "w") as log:
@@ -460,18 +489,27 @@ def main(argv: list[str] | None = None) -> int:
     if args.dry_run:
         print_plan(runs)
         return 0
-    cpus = _cpu_list(args.cpus) if args.cpus else sorted(os.sched_getaffinity(0))
+    allowed = sorted(os.sched_getaffinity(0))
+    cpus = _cpu_list(args.cpus) if args.cpus else allowed
+    if not set(cpus) <= set(allowed):
+        parser.error(f"--cpus {args.cpus} is not within the CPUs this process may use")
     log_dir = (
         args.log_dir or REPO / "logs" / f"refits_{datetime.now(UTC):%Y%m%dT%H%M%S}"
     )
-    started = time.time()
+    from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+
+    roots = {name: Path(PROCESSED_DATA_DIR) / name for name in FIT_ROOTS}
+    before = {n: sidecar_times(r) for n, r in roots.items() if r.is_dir()}
+    # A SIGTERM or SIGHUP leaves through schedule's cleanup, which stops the runs.
+    for sig in (signal.SIGTERM, signal.SIGHUP):
+        signal.signal(sig, lambda signum, _frame: sys.exit(128 + signum))
     codes = schedule(runs, cpus, log_dir, ["uv", "run", "--no-sync", "python"])
     failed = sorted(name for name, code in codes.items() if code != 0)
     print(
         f"{len(codes) - len(failed)}/{len(codes)} runs exited 0; not ok: {failed or 'none'}"
     )
     fits = any(not r.figure for r in runs)
-    worst = check_provenance(log_dir, started) if fits and not args.no_check else 0
+    worst = check_provenance(log_dir, before) if fits and not args.no_check else 0
     return 1 if failed or worst else 0
 
 
