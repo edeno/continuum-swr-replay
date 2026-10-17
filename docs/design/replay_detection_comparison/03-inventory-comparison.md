@@ -181,9 +181,9 @@ separately. No-detector time is shared exposure minus the union of detected inte
 Distinct from the inventory comparison above, and the reason level 3 needs no separate
 sweep (overview X6). Each *sequence* cohort — ours and the memoryless one, under both
 its cohorts — is labeled under each of the five SWR definitions (Kay, Karlsson, Yu,
-Zugaro and Carey), giving a cohort × SWR-definition matrix of non-SWR fractions. The canonical Spyglass `SWR_event`
-that the existing tables use is not a sixth column of the matrix: it is the version check
-for the direct Kay inventory, which is the matrix's Kay column
+Zugaro and Carey), giving a cohort × SWR-definition matrix of non-SWR fractions. The
+canonical Spyglass `SWR_event` that the existing tables use is not a sixth column of the
+matrix: it is the version check for the direct Kay inventory, which is the matrix's Kay column
 ([refresh design](../2026-10-03-full-pipeline-refresh-design.md), decision R4).
 
 Labels are `SWR`, `non-SWR`, or `unknown`. Incomplete observation over a sequence's
