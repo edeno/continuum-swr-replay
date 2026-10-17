@@ -96,7 +96,7 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
 - `generate_inventory_examples.py` — seeded draws from each cell of one inventory comparison run
   (`--run-id`), each event on one time axis: spikes, the state-space posterior, the Widloski window
   posteriors (recomputed and checked against the run's stored candidates; a figure that disagrees is
-  not written), the gate masks, speed, the ripple band and every inventory's events. Draws only
+  not written, and the manifest records why), the gate masks, speed, the ripple band and every inventory's events. Draws only
   `matched` or `unmatched` events, never `unknown`. → `paper/figures/inventory_comparison/<run_id>/examples/`,
   with `captions.md` and `manifest.json`. Captions are marked pending the Phase 2 pilot checks.
 - `archive/` — retired figure scripts (not linted; kept for provenance).

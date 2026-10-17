@@ -21,7 +21,7 @@ inventory. Each figure is one drawn event, its panels on one time axis
   spread of every stored candidate inside the plotted windows, are checked
   against the run's ``{epoch_id}_memoryless_candidates.pkl``
   (:func:`recompute_windows`); a figure whose recomputation disagrees is not
-  written;
+  written, and its record in the manifest says why;
 - the gate masks: non-local probability over 0.8, the memoryless per-window
   gates as stored in the candidates file, and speed below 4 cm/s; excluded time
   is shaded in every panel;
@@ -51,13 +51,12 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
+import jax
 import joblib
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-# CPU only: the plotted windows are few.
-os.environ.setdefault("JAX_PLATFORMS", "cpu")
 # Sibling-script import: run as a script, only this file's directory is on
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -83,6 +82,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import
     window_decisions,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (  # noqa: E402
+    check_marks_match_encoding,
     interior_bin_distances_cm,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (  # noqa: E402
@@ -270,8 +270,10 @@ def load_epoch(identifier: str, *, run_dir: Path, memoryless_dir: Path) -> Epoch
     Raises
     ------
     ValueError
-        The stored windows are not the decode grid's, or the band does not
-        hold every tetrode the SWR source kept.
+        The decode's marks are not the ones its encoding model was fitted on
+        (``check_marks_match_encoding``), the stored windows are not the
+        decode grid's, or the band does not hold every tetrode the SWR source
+        kept.
     """
     dot = pd.read_pickle(runner.decode_path(identifier))
     if "time" in dot.columns:
@@ -279,6 +281,9 @@ def load_epoch(identifier: str, *, run_dir: Path, memoryless_dir: Path) -> Epoch
     time = dot.index.to_numpy(dtype=np.float64)
     marks = decode_marks(identifier)
     encoding_model = marks["encoding_model"]
+    check_marks_match_encoding(
+        encoding_model, marks["spike_times"], marks["spike_waveform_features"]
+    )
     environment = encoding_model["environment"]
     interior = np.asarray(environment.is_track_interior_).ravel()
     candidates: CandidateSequences = joblib.load(
@@ -788,10 +793,15 @@ CAPTION = (
 def write_examples(run_dir: Path, figure_dir: Path) -> list[dict[str, Any]]:
     """Draw every example of the run and write them, captions and manifest.
 
+    A draw whose figure cannot be made (its recomputed windows are not the
+    stored ones, or its epoch's inputs cannot be read) is recorded with
+    ``status`` ``not_written`` and its ``reason``, and the run goes on.
+
     Returns
     -------
     list of dict
-        Each figure's record, as the manifest holds it.
+        Each draw's record, as the manifest holds it: ``status`` ``written``
+        or ``not_written``.
     """
     manifest = json.loads((run_dir / "manifest.json").read_text())
     settings = manifest["settings"]
@@ -808,22 +818,41 @@ def write_examples(run_dir: Path, figure_dir: Path) -> list[dict[str, Any]]:
     run_id = run_dir.name
     records = []
     for identifier, group in drawn.groupby("epoch_id", sort=True):
-        inputs = load_epoch(identifier, run_dir=run_dir, memoryless_dir=memoryless_dir)
+        try:
+            inputs: EpochInputs | None = load_epoch(
+                identifier, run_dir=run_dir, memoryless_dir=memoryless_dir
+            )
+            epoch_error: str | None = None
+        except ValueError as error:
+            # the epoch's draws fail, not the run
+            inputs, epoch_error = None, str(error)
         for _, row in group.iterrows():
             against = sorted(
                 set(settings["cells"][row.cell]["against"]) - {row.detector}
             )
-            records.append(
-                draw_example(
-                    inputs,
-                    row,
-                    against=against,
-                    path=figure_dir / figure_name(row),
-                    run_id=run_id,
-                )
-            )
-            print(f"{identifier}: {figure_name(row)}", flush=True)
-        inputs.results.close()
+            path = figure_dir / figure_name(row)
+            reason = epoch_error
+            if inputs is not None:
+                try:
+                    record = draw_example(
+                        inputs, row, against=against, path=path, run_id=run_id
+                    )
+                except ValueError as error:
+                    reason = str(error)
+            if reason is not None:
+                # no figure of an earlier run stands beside this record
+                path.unlink(missing_ok=True)
+                record = {
+                    **row.to_dict(),
+                    "against": against,
+                    "path": str(path),
+                    "reason": reason,
+                }
+            status = "written" if reason is None else "not_written"
+            records.append({"status": status, **record})
+            print(f"{identifier}: {figure_name(row)} {status}", flush=True)
+        if inputs is not None:
+            inputs.results.close()
     figure_dir.mkdir(parents=True, exist_ok=True)
     (figure_dir / "manifest.json").write_text(
         json.dumps(
@@ -849,7 +878,11 @@ def write_examples(run_dir: Path, figure_dir: Path) -> list[dict[str, Any]]:
         )
     )
     lines = [f"# Inventory comparison examples: run {run_id}", "", CAPTION, ""]
-    lines += [f"- `{Path(r['path']).name}`: {r['event_key']}" for r in records]
+    lines += [
+        f"- `{Path(r['path']).name}`: {r['event_key']}"
+        + ("" if r["status"] == "written" else f" (not written: {r['reason']})")
+        for r in records
+    ]
     (figure_dir / "captions.md").write_text("\n".join(lines) + "\n")
     return records
 
@@ -865,12 +898,17 @@ def main(argv: list[str] | None = None) -> None:
         "replay_detection_comparison/inventory/.",
     )
     args = parser.parse_args(argv)
+    # CPU only: the plotted windows are few. JAX read its environment when
+    # imported, so the platform is set through its config too.
+    os.environ.setdefault("JAX_PLATFORMS", "cpu")
+    jax.config.update("jax_platforms", os.environ["JAX_PLATFORMS"])
     run_dir = runner.OUTPUT_ROOT / args.run_id
     if not (run_dir / "manifest.json").exists():
         sys.exit(f"No inventory run manifest at {run_dir}.")
     figure_dir = FIGURE_ROOT / args.run_id / EXAMPLES_DIR
     records = write_examples(run_dir, figure_dir)
-    print(f"{len(records)} examples -> {figure_dir}", flush=True)
+    written = sum(r["status"] == "written" for r in records)
+    print(f"{written} of {len(records)} examples written -> {figure_dir}", flush=True)
 
 
 if __name__ == "__main__":
