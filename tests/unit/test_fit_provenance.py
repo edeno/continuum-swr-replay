@@ -604,7 +604,7 @@ def test_content_ladder_readers_gate_the_canonical_bundle():
     bundle = (
         fitter.PROCESSED_DATA_DIR
         / "replay_content"
-        / (fitter.canonical_output_subdir("non_local", "HPC", "arm", "all", "timebin"))
+        / (fitter.canonical_output_subdir("non_local", "HPC", "arm", "timebin"))
     )
 
     assert figures.MODEL_DIR == bundle

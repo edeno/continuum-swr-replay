@@ -79,11 +79,9 @@ to whichever base name that produced, in this order:
 
 | suffix | added when |
 |---|---|
-| `_swr_T` / `_swr_F` | `--swr-subset {T,F}` — the ladder refit on SWR-only / non-SWR-only events (`models_swr_T`, `models_patch_swr_F`, and on a ContFrag base `models_swr_HPC_swr_T`) |
 | `_event_grain` | `--grain event` |
-| `_hard_count` | `--response hard_count`, where that is not the estimator's own default response |
+| `_hard_count` | `--response hard_count` |
 | `_leaf` | `--leaf-only` — the six-leaf candidate set |
-| `_dm` | `--estimator dirichlet_multinomial`; appended **last** so an estimator's artifacts sort together |
 | `-` joined rung names | a **partial** ladder (any rung set other than the default) is keyed by the rungs it fits, because it is fitted on its own complete-case cohort and must never overwrite a canonical bundle |
 
 So the documented belief chain — `--leaf-only --models
@@ -119,8 +117,8 @@ themselves are in
 | Per-bin rate (B) | Poisson GLM | shipped | `count` (onsets per 15 ms bin) | log | `log(exposure)` | per session × population {swr, non_local_swr, non_local_no_swr} |
 | MU uncertainty | Poisson GLM | shipped (auxiliary) | `count` | log | `log(exposure)` | per session × 3 populations |
 | Per-stop rate (A) | Poisson GLM | shipped | `n_selected_events` per stop | log | `log(immobility_duration_s)` | per session |
-| Content arm | conditional Poisson over 9 arms/event ≡ `clogit(…, strata(event_id))` | **shipped** | `arm_fraction` (per-event allocation fraction) | log | — | per session × `is_swr` split {all, T, F}; SEs event-clustered |
-| Content patch | conditional Poisson over 3 patches/event | **shipped** | `patch_fraction` | log | — | per session × {all, T, F}; SEs event-clustered |
+| Content arm | conditional Poisson over 9 arms/event ≡ `clogit(…, strata(event_id))` | **shipped** | `arm_fraction` (per-event allocation fraction) | log | — | per session; SEs event-clustered |
+| Content patch | conditional Poisson over 3 patches/event | **shipped** | `patch_fraction` | log | — | per session; SEs event-clustered |
 | Content, timebin-count response | same conditional Poisson | **retired as primary**; retained behind `--response hard_count` for the estimator comparison and the before/after audit | `arm_count_hard` / `patch_count_hard` | log | — | as above, but weighted by decoded timebins |
 | Content, DM alternative | Dirichlet-multinomial over the same 9 arms / 3 patches per event | comparison estimator | `arm_count_hard` / `patch_count_hard` | log (softmax mean) | — | per session × population; SEs event-level by construction |
 | Choice | conditional logit over candidate arms/stop ≡ `clogit(…, strata(stop))` | shipped | `chosen` (event grain) | logit | — | per event-source |
@@ -144,8 +142,9 @@ an event. The timebin **count** response weights an event by its number of
 decoded timebins and treats those autocorrelated bins as independent draws, so
 its AIC scale is not comparable with a fraction bundle's.
 
-**Dirichlet-multinomial alternative (`--estimator dirichlet_multinomial`).** A
-second, non-primary content estimator that keeps the timebin **count** response
+**Dirichlet-multinomial alternative (`--estimator dirichlet_multinomial`, on the
+`is_swr`-contrast runner `fit_swr_contrast_content.py`; the arm/patch ladder
+runner has no DM path).** A second, non-primary content estimator that keeps the timebin **count** response
 (it has no fraction form, so the flag forces `--response hard_count`) and adds
 an explicit within-event concentration,
 `log φ_e = log_phi_intercept + log_phi_is_swr · is_swr_e`. Overdispersion is then
@@ -280,7 +279,7 @@ effect. Candidate-arm visit recency has no stop-level analog (every trial visits
 some arm), so the ladder stops at `R1`.
 
 ## Content — arm
-`scripts/content/fit_replay_content_models.py --hierarchy arm` (per `is_swr` split {all, T, F})
+`scripts/content/fit_replay_content_models.py --hierarchy arm`
 
 The runner accepts only the current canonical table schema and validates every
 requested rung before fitting. A stale/legacy table, or one missing any
@@ -308,9 +307,8 @@ Mvu  arm_fraction ~ [M4 terms] + reward_belief_mean_candidate_arm_preoutcome
                   + reward_belief_variance_candidate_arm_preoutcome_z
 ```
 
-`M0`–`M6` are the default ladder (`models/`); under
-`--estimator dirichlet_multinomial` the same eight default rungs publish to
-`models_dm/`. `Mv` / `Mu` / `Mvu` are the belief-dependent rungs
+`M0`–`M6` are the default ladder (`models/`). `Mv` / `Mu` / `Mvu` are the
+belief-dependent rungs
 (`BELIEF_DEPENDENT_CONTENT_MODELS`): their covariates are NaN on the unmapped-stop
 tail, so co-fitting them would shrink the shared complete-case cohort for the
 whole base ladder, and they are excluded from a default run either way. Request
@@ -335,7 +333,7 @@ events put more of their bins on the trunks. The bundle is
 "Bundle names and suffixes").
 
 ## Content — patch
-`scripts/content/fit_replay_content_models.py --hierarchy patch` (per {all, T, F})
+`scripts/content/fit_replay_content_models.py --hierarchy patch`
 
 The nine arms collapsed to three patches (arm counts summed within patch). The
 conditional Poisson conditions on the event total as before, but over three
