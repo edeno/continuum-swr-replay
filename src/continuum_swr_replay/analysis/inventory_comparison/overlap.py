@@ -17,7 +17,9 @@ Run :func:`remove_bridging_events` first: a cached event that spans its own
 detector's unavailable data cannot be trusted as a match, and removing it
 must not read as the other detector missing something. The counting
 functions refuse an inventory in which that has not been done, and a pair
-table that was not built from the inventory they are given.
+table that was not built from the inventory they are given. An event the
+analysed-time rule drops leaves its own detector's coverage the same way,
+through :func:`set_aside_events`.
 
 The detectors of a comparison are the roster: by default every detector with
 a coverage entry anywhere, or the ``detectors`` a caller names. A detector on
@@ -49,6 +51,7 @@ __all__ = [
     "MATCHED",
     "MATCH_DTYPES",
     "PAIR_DTYPES",
+    "SET_ASIDE_DTYPES",
     "TIME_COVERAGE_DTYPES",
     "UNKNOWN",
     "UNMATCHED",
@@ -59,6 +62,7 @@ __all__ = [
     "overlap_pairs",
     "remove_bridging_events",
     "roster",
+    "set_aside_events",
     "time_coverage",
     "validate_detectors",
     "validate_pairs",
@@ -118,6 +122,22 @@ DIRECTIONAL_DTYPES: Mapping[str, object] = MappingProxyType(
         "proportion_matched": np.float64,
     }
 )
+
+SET_ASIDE_DTYPES: Mapping[str, object] = MappingProxyType(
+    {
+        "animal": object,
+        "day": np.int64,
+        "epoch": object,
+        "detector": object,
+        "event_key": object,
+        "interval_start_s": np.float64,
+        "interval_end_s": np.float64,
+        "reason": object,
+    }
+)
+"""One row per event left out of its cohort: the inventory key, the event's
+span and why it was left out (a drop reason, or that it bridges its own
+detector's unavailable data)."""
 
 TIME_COVERAGE_DTYPES: Mapping[str, object] = MappingProxyType(
     {
@@ -347,6 +367,45 @@ def remove_bridging_events(
         adjusted,
         inventory[bridging].reset_index(drop=True),
     )
+
+
+def set_aside_events(
+    coverage: CoverageMap, events: pd.DataFrame
+) -> dict[tuple, Coverage]:
+    """Remove the spans of events left out of their cohorts from their own coverage.
+
+    An event the analysed-time rule drops is not compared, so, as for a
+    bridging event, the time it occupied reads as time its own detector did
+    not observe: another detector's event there is ``unknown`` against it,
+    never ``unmatched``. Every other detector's coverage is unchanged.
+
+    Parameters
+    ----------
+    coverage : mapping
+        ``(animal, day, epoch, detector) -> Coverage``.
+    events : DataFrame
+        Columns as ``SET_ASIDE_DTYPES``.
+
+    Returns
+    -------
+    coverage : dict
+        ``coverage`` with each event's span removed from its own detector's
+        ``observed`` and ``exposure``.
+
+    """
+    adjusted = dict(coverage)
+    for key, group in events.groupby([*SESSION_COLUMNS_DAY, "detector"], sort=False):
+        own = coverage.get(key)
+        if own is None:
+            raise ValueError(
+                f"{key[3]} has events set aside in {key[:3]} but no coverage there."
+            )
+        spans = group[["interval_start_s", "interval_end_s"]].to_numpy(dtype=np.float64)
+        adjusted[key] = Coverage(
+            observed=subtract(own.observed, spans),
+            exposure=subtract(own.exposure, spans),
+        )
+    return adjusted
 
 
 def overlap_pairs(inventory: pd.DataFrame) -> pd.DataFrame:

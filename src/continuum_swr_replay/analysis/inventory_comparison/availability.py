@@ -18,9 +18,14 @@ Excluded time (``swr_source.excluded_intervals``: the artifact mask widened by
 (:func:`coverage_from_observations`) removes it from every detector's observed
 time, and so from its exposure. The tables themselves stay a record of what
 each detector read, as the SWR runner's ``swr_observed.parquet`` is.
+
+:func:`exclusion_by_reason` accounts for the rest of each epoch: for a
+comparison, every second outside its shared exposure under the first reason
+that explains it.
 """
 
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
+from functools import reduce
 from types import MappingProxyType
 
 import numpy as np
@@ -35,14 +40,20 @@ from continuum_swr_replay.analysis.inventory_comparison.intervals import (
     intersect,
     normalize,
     subtract,
+    total_duration,
 )
-from continuum_swr_replay.analysis.inventory_comparison.overlap import Coverage
+from continuum_swr_replay.analysis.inventory_comparison.overlap import (
+    Coverage,
+    validate_detectors,
+)
 from continuum_swr_replay.analysis.inventory_comparison.schema import SessionIdentity
 from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 
 __all__ = [
+    "EXCLUSION_DTYPES",
     "OBSERVATION_DTYPES",
     "coverage_from_observations",
+    "exclusion_by_reason",
     "exposure",
     "missing_run_table",
     "not_still_times",
@@ -64,6 +75,17 @@ OBSERVATION_DTYPES: Mapping[str, object] = MappingProxyType(
         "end_s": np.float64,
         "available": np.bool_,
         "reason": object,
+    }
+)
+
+EXCLUSION_DTYPES: Mapping[str, object] = MappingProxyType(
+    {
+        "animal": object,
+        "day": np.int64,
+        "epoch": object,
+        "comparison": object,
+        "reason": object,
+        "seconds": np.float64,
     }
 )
 
@@ -392,3 +414,146 @@ def coverage_from_observations(
             exposure=exposure(observed, still.get(tuple(session), np.empty((0, 2)))),
         )
     return coverage
+
+
+def _intervals(frame: pd.DataFrame, start: str, end: str) -> NDArray:
+    intervals: NDArray = frame[[start, end]].to_numpy(dtype=np.float64)
+    return intervals.reshape(-1, 2)
+
+
+def exclusion_by_reason(
+    observations: pd.DataFrame,
+    coverage: Mapping[tuple, Coverage],
+    still: Mapping[tuple, NDArray],
+    set_aside: pd.DataFrame,
+    *,
+    comparisons: Mapping[str, Collection[str]],
+    speed_known: Mapping[tuple, NDArray],
+) -> pd.DataFrame:
+    """Each epoch's seconds outside each comparison's shared exposure, by reason.
+
+    The shared exposure is the intersection of the comparison's detectors'
+    exposures. Every other second of the epoch goes to the first reason that
+    explains it, in this order: ``excluded_time``; each detector's own
+    unavailable reason from its observation table, ``"<detector>: <reason>"``;
+    the span of each event it set aside, ``"<detector>: <reason>"``; then
+    speed not still, ``moving`` where the speed was known and
+    ``speed_unknown`` where it was not. Within each step the detectors are
+    taken in name order, so a stretch two of them miss is counted once, under
+    the first.
+
+    Parameters
+    ----------
+    observations : DataFrame
+        ``observation_table`` and ``missing_run_table`` rows, concatenated;
+        each epoch's span is from its first to its last row.
+    coverage : mapping
+        ``(animal, day, epoch, detector) -> Coverage``, as the counts read
+        it: from ``coverage_from_observations`` on these tables and ``still``,
+        then ``set_aside_events`` with ``set_aside``.
+    still : mapping
+        ``(animal, day, epoch) -> ndarray (n, 2)``, as for
+        ``coverage_from_observations``.
+    set_aside : DataFrame
+        Columns as ``overlap.SET_ASIDE_DTYPES``.
+    comparisons : mapping
+        Name -> the detectors compared.
+    speed_known : mapping
+        ``(animal, day, epoch) -> ndarray (n, 2)``, where the speed was
+        known: ``sample_runs(time, np.isfinite(speed))`` on the trace
+        ``still`` was read from. An epoch absent here is taken as never
+        known, as one absent from ``still`` is never still.
+
+    Returns
+    -------
+    rows : DataFrame
+        Columns and dtypes as ``EXCLUSION_DTYPES``. Per epoch and comparison,
+        a ``shared_exposure`` row and one row per reason with time, in the
+        order above; the rows sum to the epoch span.
+
+    Raises
+    ------
+    ValueError
+        If a comparison names a detector no coverage entry knows, or if the
+        coverage was not built from these inputs: a reason's time lies in the
+        shared exposure, or time outside it has no reason.
+    SwrSourceError
+        If an artifact run is configured and cannot serve an epoch.
+
+    """
+    names = {
+        name: sorted(validate_detectors(detectors, coverage, f"Comparison {name!r}"))
+        for name, detectors in comparisons.items()
+    }
+    empty = np.empty((0, 2))
+    rows = []
+    for session, epoch_rows in observations.groupby(list(SESSION_COLUMNS_DAY)):
+        span = np.array([[epoch_rows.start_s.min(), epoch_rows.end_s.max()]])
+        excluded = _intervals(
+            swr_source.excluded_intervals_of(epoch_rows), "start_time", "end_time"
+        )
+        known = speed_known.get(session, empty)
+        not_still = [
+            ("moving", subtract(known, still.get(session, empty))),
+            ("speed_unknown", subtract(span, known)),
+        ]
+        dropped = set_aside[
+            np.logical_and.reduce(
+                [
+                    set_aside[column] == value
+                    for column, value in zip(SESSION_COLUMNS_DAY, session, strict=True)
+                ]
+            )
+        ]
+        unavailable = epoch_rows[~epoch_rows.available]
+        for name, detectors in names.items():
+            reasons = [("excluded_time", excluded)]
+            for table, start, end in (
+                (unavailable, "start_s", "end_s"),
+                (dropped, "interval_start_s", "interval_end_s"),
+            ):
+                for detector in detectors:
+                    own = table[table.detector == detector]
+                    reasons += [
+                        (f"{detector}: {reason}", _intervals(group, start, end))
+                        for reason, group in own.groupby("reason", sort=False)
+                    ]
+            reasons += not_still
+            shared = reduce(
+                intersect,
+                (
+                    coverage[(*session, d)].exposure
+                    if (*session, d) in coverage
+                    else empty
+                    for d in detectors
+                ),
+            )
+            seconds = {"shared_exposure": total_duration(shared)}
+            remainder = subtract(span, shared)
+            for reason, time in reasons:
+                if total_duration(intersect(shared, time)) > 0:
+                    raise ValueError(
+                        f"{name} in {session}: time under {reason!r} lies in the "
+                        "shared exposure; the coverage was not built from these "
+                        "inputs (was set_aside_events run?)."
+                    )
+                taken = total_duration(intersect(remainder, time))
+                if taken > 0:
+                    seconds[reason] = seconds.get(reason, 0.0) + taken
+                remainder = subtract(remainder, time)
+            if total_duration(remainder) > 0:
+                raise ValueError(
+                    f"{name} in {session}: {total_duration(remainder)} s outside the "
+                    "shared exposure has no reason; the coverage was not built "
+                    "from these inputs."
+                )
+            rows += [
+                dict(zip(SESSION_COLUMNS_DAY, session, strict=True))
+                | {"comparison": name, "reason": reason, "seconds": value}
+                for reason, value in seconds.items()
+            ]
+    if not rows:
+        return pd.DataFrame(
+            {k: pd.Series(dtype=v) for k, v in EXCLUSION_DTYPES.items()}
+        )
+    return pd.DataFrame(rows)[list(EXCLUSION_DTYPES)].astype(dict(EXCLUSION_DTYPES))

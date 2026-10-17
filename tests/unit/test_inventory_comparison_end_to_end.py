@@ -18,10 +18,12 @@ the movement bout is set aside before any comparison.
 """
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.inventory_comparison.availability import (
     coverage_from_observations,
+    exclusion_by_reason,
     exposure,
     not_still_times,
     observation_table,
@@ -36,7 +38,12 @@ from continuum_swr_replay.analysis.inventory_comparison.cells import (
 from continuum_swr_replay.analysis.inventory_comparison.components import (
     overlap_components,
 )
+from continuum_swr_replay.analysis.inventory_comparison.intervals import (
+    intersect,
+    total_duration,
+)
 from continuum_swr_replay.analysis.inventory_comparison.overlap import (
+    SET_ASIDE_DTYPES,
     Coverage,
     directional_agreement,
     event_matches,
@@ -303,3 +310,76 @@ def test_coverage_built_from_observation_tables_is_the_coverage_the_counts_read(
         entry = coverage[(*KEY, detector)]
         np.testing.assert_allclose(entry.observed, runs)
         np.testing.assert_allclose(entry.exposure, exposure(runs, still))
+
+
+def test_the_epoch_outside_the_shared_exposure_is_split_by_reason(comparison):
+    """By hand, against the coverage the counts read: K misses the LFP at
+    50-52 s; MS misses [0, 0.04], [39.962, 41.04] and [59.962, 60], which
+    holds SS's spike gap at 40-41 s, so SS's reason reads nothing; MS's
+    bridging event [41.0, 41.2] adds [41.04, 41.2]; the movement bout leaves
+    (20.0, 24.998)."""
+    _, coverage, _, _ = comparison
+    spikes = ~((TIME > 40.0) & (TIME < 41.0))
+    lfp = ~((TIME > 50.0) & (TIME < 52.0))
+    observations = pd.concat(
+        [
+            observation_table(
+                EPOCH,
+                detector=detector,
+                run_id="run",
+                epoch_bounds=(TIME[0], TIME[-1]),
+                observed=sample_runs(TIME, valid),
+                unavailable_reason=reason,
+            )
+            for detector, valid, reason in [
+                (STATE_SPACE, spikes, "spikes missing"),
+                (MEMORYLESS, window_supported(TIME, spikes, 40), "window incomplete"),
+                (KAY, lfp, "lfp missing"),
+            ]
+        ],
+        ignore_index=True,
+    )
+    bridging = pd.DataFrame(
+        {
+            "animal": ["sim"],
+            "day": [20200101],
+            "epoch": ["02_r1"],
+            "detector": [MEMORYLESS],
+            "event_key": [key(MEMORYLESS, 1)],
+            "interval_start_s": [41.0],
+            "interval_end_s": [41.2],
+            "reason": ["bridging"],
+        }
+    ).astype(dict(SET_ASIDE_DTYPES))
+    everyone = {STATE_SPACE, MEMORYLESS, KAY}
+
+    rows = exclusion_by_reason(
+        observations,
+        coverage,
+        {KEY: still_intervals(TIME, SPEED)},
+        bridging,
+        comparisons={"all": everyone},
+        speed_known={KEY: sample_runs(TIME, np.isfinite(SPEED))},
+    )
+
+    seconds = rows.set_index("reason").seconds
+    shared = intersect(
+        intersect(
+            coverage[(*KEY, STATE_SPACE)].exposure, coverage[(*KEY, KAY)].exposure
+        ),
+        coverage[(*KEY, MEMORYLESS)].exposure,
+    )
+    assert seconds.sum() == pytest.approx(TIME[-1] - TIME[0])
+    assert seconds["shared_exposure"] == total_duration(shared)
+    assert seconds.to_dict() == pytest.approx(
+        {
+            "shared_exposure": (20.0 - 0.04)
+            + (39.962 - 24.998)
+            + (50.0 - 41.2)
+            + (59.962 - 52.0),
+            f"{KAY}: lfp missing": 2.0,
+            f"{MEMORYLESS}: window incomplete": 0.04 + (41.04 - 39.962) + 0.038,
+            f"{MEMORYLESS}: bridging": 41.2 - 41.04,
+            "moving": 24.998 - 20.0,
+        }
+    )

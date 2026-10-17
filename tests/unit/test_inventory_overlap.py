@@ -8,12 +8,14 @@ from continuum_swr_replay.analysis.inventory_comparison.overlap import (
     DIRECTIONAL_DTYPES,
     MATCH_DTYPES,
     PAIR_DTYPES,
+    SET_ASIDE_DTYPES,
     Coverage,
     directional_agreement,
     event_matches,
     flag_pairs,
     overlap_pairs,
     remove_bridging_events,
+    set_aside_events,
     time_coverage,
     validate_pairs,
 )
@@ -391,6 +393,85 @@ class TestBridgingEvents:
         assert kept.event_key.tolist() == [key("A", 0), key("B", 0)]
         assert bridging.empty
         assert adjusted[(*KEY, "A")] is coverage[(*KEY, "A")]
+
+
+def set_aside(detector, spans, reason, session_key=KEY):
+    """Set-aside rows of one detector in one epoch."""
+    animal, day, epoch = session_key
+    return pd.DataFrame(
+        {
+            "animal": animal,
+            "day": day,
+            "epoch": epoch,
+            "detector": detector,
+            "event_key": [key(detector, 100 + i) for i in range(len(spans))],
+            "interval_start_s": [a for a, _ in spans],
+            "interval_end_s": [b for _, b in spans],
+            "reason": reason,
+        }
+    ).astype(dict(SET_ASIDE_DTYPES))
+
+
+class TestSetAsideEvents:
+    def test_the_layout_is_the_inventory_key_with_bounds_and_reason(self):
+        assert list(SET_ASIDE_DTYPES) == [
+            "animal",
+            "day",
+            "epoch",
+            "detector",
+            "event_key",
+            "interval_start_s",
+            "interval_end_s",
+            "reason",
+        ]
+
+    def test_a_dropped_events_span_leaves_its_own_detectors_coverage(self):
+        """A Kay SWR dropped near an artifact does not make B's event there
+        read unmatched against Kay: Kay did not observe that time."""
+        inventory = events("B", [(20.05, 20.1)])
+        coverage = everywhere("Kay", "B")
+        before = event_matches(inventory, overlap_pairs(inventory), coverage)
+
+        adjusted = set_aside_events(
+            coverage, set_aside("Kay", [(20.0, 20.2)], "near_artifact")
+        )
+
+        np.testing.assert_array_equal(
+            adjusted[(*KEY, "Kay")].observed, [[0.0, 20.0], [20.2, 100.0]]
+        )
+        np.testing.assert_array_equal(
+            adjusted[(*KEY, "Kay")].exposure, [[0.0, 20.0], [20.2, 100.0]]
+        )
+        assert adjusted[(*KEY, "B")] is coverage[(*KEY, "B")]
+        after = event_matches(inventory, overlap_pairs(inventory), adjusted)
+        assert before.membership.tolist() == ["unmatched"]
+        assert after.membership.tolist() == ["unknown"]
+
+    def test_only_the_epoch_of_the_event_loses_time(self):
+        other = ("sim", 20200101, "04_r2")
+        coverage = everywhere("Kay") | everywhere("Kay", session_key=other)
+
+        adjusted = set_aside_events(
+            coverage, set_aside("Kay", [(20.0, 20.2)], "artifact", session_key=other)
+        )
+
+        assert adjusted[(*KEY, "Kay")] is coverage[(*KEY, "Kay")]
+        np.testing.assert_array_equal(
+            adjusted[(*other, "Kay")].observed, [[0.0, 20.0], [20.2, 100.0]]
+        )
+
+    def test_nothing_set_aside_leaves_the_coverage_as_it_was(self):
+        coverage = everywhere("Kay")
+
+        adjusted = set_aside_events(coverage, set_aside("Kay", [], "artifact"))
+
+        assert adjusted == coverage
+
+    def test_an_event_of_a_detector_with_no_coverage_is_refused(self):
+        with pytest.raises(ValueError, match="no coverage"):
+            set_aside_events(
+                everywhere("B"), set_aside("Kay", [(20.0, 20.2)], "artifact")
+            )
 
 
 class TestTimeCoverage:

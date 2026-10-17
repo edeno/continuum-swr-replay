@@ -13,6 +13,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
 from continuum_swr_replay.analysis.inventory_comparison.availability import (
     OBSERVATION_DTYPES,
     coverage_from_observations,
+    exclusion_by_reason,
     exposure,
     missing_run_table,
     observation_table,
@@ -27,9 +28,11 @@ from continuum_swr_replay.analysis.inventory_comparison.intervals import (
     total_duration,
 )
 from continuum_swr_replay.analysis.inventory_comparison.overlap import (
+    SET_ASIDE_DTYPES,
     Coverage,
     event_matches,
     overlap_pairs,
+    set_aside_events,
 )
 from continuum_swr_replay.analysis.inventory_comparison.schema import (
     SessionIdentity,
@@ -465,6 +468,32 @@ class TestExcludedTime:
             [[0.0, 18.7], [22.3, 30.0], [40.0, 69.6], [70.4, 100.0]],
         )
 
+    def test_excluded_time_reads_first_whatever_else_is_missing_there(self, masked):
+        """The memoryless gap around the S block is excluded time, not the
+        memoryless detector's own reason."""
+        observations, _ = self._observations()
+        session = ("sim", 20200101, "02_r1")
+        coverage = coverage_from_observations(observations, {session: self.STILL})
+
+        rows = exclusion_by_reason(
+            observations,
+            coverage,
+            {session: self.STILL},
+            empty_set_aside(),
+            comparisons={"three": {"memoryless", "kay", "state_space"}},
+            speed_known={session: np.array([[0.0, 100.0]])},
+        )
+
+        seconds = rows.set_index("reason").seconds
+        assert seconds.to_dict() == pytest.approx(
+            {
+                "shared_exposure": 100.0 - 4.4 - 10.0 - 10.0,
+                "excluded_time": 4.4,
+                "kay: not decoded": 10.0,
+                "moving": 10.0,
+            }
+        )
+
     def test_with_no_artifact_run_the_stretches_are_the_observed_time(self):
         observations, stretches = self._observations()
 
@@ -476,3 +505,232 @@ class TestExcludedTime:
             entry = coverage[("sim", 20200101, "02_r1", detector)]
             np.testing.assert_allclose(entry.observed, runs)
             np.testing.assert_allclose(entry.exposure, exposure(runs, self.STILL))
+
+
+def empty_set_aside():
+    return pd.DataFrame(
+        {name: pd.Series(dtype=dtype) for name, dtype in SET_ASIDE_DTYPES.items()}
+    )
+
+
+class TestExclusionByReason:
+    """The epoch outside each comparison's shared exposure, by reason; the
+    rows tile the epoch."""
+
+    KEY = ("sim", 20200101, "02_r1")
+    BOUNDS = (0.0, 100.0)
+    EVERYWHERE = np.array([BOUNDS])
+
+    def tables(self, **unavailable):
+        """One observation table per detector, missing the given stretches."""
+        return pd.concat(
+            [
+                observation_table(
+                    SESSION,
+                    detector=detector,
+                    run_id="r",
+                    epoch_bounds=self.BOUNDS,
+                    observed=subtract(self.EVERYWHERE, np.array(missing)),
+                    unavailable_reason=f"{detector} missing",
+                )
+                for detector, missing in unavailable.items()
+            ],
+            ignore_index=True,
+        )
+
+    def by_reason(self, observations, set_aside=None, still=None, known=None, **kw):
+        still = {self.KEY: self.EVERYWHERE if still is None else still}
+        known = {self.KEY: self.EVERYWHERE if known is None else known}
+        set_aside = empty_set_aside() if set_aside is None else set_aside
+        coverage = set_aside_events(
+            coverage_from_observations(observations, still), set_aside
+        )
+        return exclusion_by_reason(
+            observations, coverage, still, set_aside, speed_known=known, **kw
+        )
+
+    def test_columns_and_dtypes(self):
+        rows = self.by_reason(self.tables(a=[[10.0, 20.0]]), comparisons={"a": {"a"}})
+
+        assert list(rows.columns) == [
+            "animal",
+            "day",
+            "epoch",
+            "comparison",
+            "reason",
+            "seconds",
+        ]
+        assert rows.day.dtype == np.int64 and rows.seconds.dtype == np.float64
+        assert rows.reason.tolist() == ["shared_exposure", "a: a missing"]
+
+    def test_a_stretch_missing_for_two_detectors_is_counted_once_under_the_first(
+        self,
+    ):
+        observations = self.tables(b=[[15.0, 30.0]], a=[[10.0, 20.0]])
+
+        rows = self.by_reason(observations, comparisons={"pair": {"b", "a"}})
+
+        assert rows.set_index("reason").seconds.to_dict() == pytest.approx(
+            {"shared_exposure": 80.0, "a: a missing": 10.0, "b: b missing": 10.0}
+        )
+        assert rows.seconds.sum() == pytest.approx(100.0)
+
+    def test_each_comparison_reads_only_its_own_detectors(self):
+        observations = self.tables(a=[[10.0, 20.0]], b=[[50.0, 60.0]])
+
+        rows = self.by_reason(
+            observations, comparisons={"a": {"a"}, "b": {"b"}, "pair": {"a", "b"}}
+        )
+
+        assert rows.groupby("comparison", sort=False).seconds.sum().to_dict() == (
+            pytest.approx({"a": 100.0, "b": 100.0, "pair": 100.0})
+        )
+        reasons = rows.groupby("comparison").reason.apply(list).to_dict()
+        assert reasons == {
+            "a": ["shared_exposure", "a: a missing"],
+            "b": ["shared_exposure", "b: b missing"],
+            "pair": ["shared_exposure", "a: a missing", "b: b missing"],
+        }
+
+    def test_a_dropped_events_span_reads_under_its_reason_and_matches_nothing(self):
+        """Kay's dropped SWR leaves Kay's coverage, so the Karlsson event
+        inside it is unknown against Kay, not unmatched."""
+        observations = self.tables(kay=[], karlsson=[])
+        dropped = pd.DataFrame(
+            {
+                "animal": ["sim"],
+                "day": [20200101],
+                "epoch": ["02_r1"],
+                "detector": ["kay"],
+                "event_key": ["kay:sim20200101_02_r1:7"],
+                "interval_start_s": [40.0],
+                "interval_end_s": [40.2],
+                "reason": ["near_artifact"],
+            }
+        ).astype(dict(SET_ASIDE_DTYPES))
+        coverage = set_aside_events(
+            coverage_from_observations(observations, {self.KEY: self.EVERYWHERE}),
+            dropped,
+        )
+        karlsson = inventory_from_intervals(
+            np.array([40.05]),
+            np.array([40.1]),
+            native_keys=np.arange(1),
+            detector="karlsson",
+            session=SESSION,
+            run_id="r",
+            speed_time_s=np.linspace(0.0, 100.0, 50_001),
+            speed_cm_per_s=np.zeros(50_001),
+        )
+
+        rows = exclusion_by_reason(
+            observations,
+            coverage,
+            {self.KEY: self.EVERYWHERE},
+            dropped,
+            comparisons={"pair": {"kay", "karlsson"}},
+            speed_known={self.KEY: self.EVERYWHERE},
+        )
+        matches = event_matches(karlsson, overlap_pairs(karlsson), coverage)
+
+        assert rows.set_index("reason").seconds.to_dict() == pytest.approx(
+            {"shared_exposure": 99.8, "kay: near_artifact": 0.2}
+        )
+        assert matches.membership.tolist() == ["unknown"]
+
+    def test_a_missing_run_reads_as_its_reason_for_the_whole_epoch(self):
+        observations = pd.concat(
+            [
+                self.tables(x=[]),
+                missing_run_table(
+                    SESSION,
+                    detector="y",
+                    run_id="r",
+                    epoch_bounds=self.BOUNDS,
+                    reason="no y run for this epoch",
+                ),
+            ],
+            ignore_index=True,
+        )
+
+        rows = self.by_reason(observations, comparisons={"pair": {"x", "y"}})
+
+        assert rows.set_index("reason").seconds.to_dict() == pytest.approx(
+            {"shared_exposure": 0.0, "y: no y run for this epoch": 100.0}
+        )
+
+    def test_speed_not_still_reads_last_as_moving_or_unknown(self):
+        """A moving bout at 20-25 s and NaN speed at 60-62 s, read from the
+        trace; the missing stretch at 21-30 s is the detector's own first."""
+        time = np.arange(50_001) * 0.002
+        speed = np.where((time >= 20.0) & (time < 25.0), 10.0, 1.0)
+        speed[(time > 60.0) & (time < 62.0)] = np.nan
+        still = still_intervals(time, speed)
+        known = sample_runs(time, np.isfinite(speed))
+
+        rows = self.by_reason(
+            self.tables(a=[[21.0, 30.0]]),
+            still=still,
+            known=known,
+            comparisons={"a": {"a"}},
+        )
+
+        assert rows.set_index("reason").seconds.to_dict() == pytest.approx(
+            {
+                "shared_exposure": 100.0 - 9.0 - (21.0 - 20.0) - 2.0,
+                "a: a missing": 9.0,
+                "moving": 1.0,
+                "speed_unknown": 2.0,
+            }
+        )
+
+    def test_coverage_still_holding_a_set_aside_span_is_refused(self):
+        """Forgetting set_aside_events would leave the span in the shared
+        exposure and its reason with nothing."""
+        observations = self.tables(kay=[])
+        dropped = pd.DataFrame(
+            {
+                "animal": ["sim"],
+                "day": [20200101],
+                "epoch": ["02_r1"],
+                "detector": ["kay"],
+                "event_key": ["kay:sim20200101_02_r1:7"],
+                "interval_start_s": [40.0],
+                "interval_end_s": [40.2],
+                "reason": ["artifact"],
+            }
+        ).astype(dict(SET_ASIDE_DTYPES))
+        still = {self.KEY: self.EVERYWHERE}
+
+        with pytest.raises(ValueError, match="kay: artifact"):
+            exclusion_by_reason(
+                observations,
+                coverage_from_observations(observations, still),
+                still,
+                dropped,
+                comparisons={"kay": {"kay"}},
+                speed_known=still,
+            )
+
+    def test_unexposed_time_no_reason_explains_is_refused(self):
+        observations = self.tables(a=[])
+        still = {self.KEY: self.EVERYWHERE}
+        coverage = {
+            (*self.KEY, "a"): Coverage(
+                observed=np.array([[0.0, 50.0]]), exposure=np.array([[0.0, 50.0]])
+            )
+        }
+
+        with pytest.raises(ValueError, match="no reason"):
+            exclusion_by_reason(
+                observations,
+                coverage,
+                still,
+                empty_set_aside(),
+                comparisons={"a": {"a"}},
+                speed_known=still,
+            )
+
+    def test_a_comparison_naming_an_unknown_detector_is_refused(self):
+        with pytest.raises(ValueError, match="roster"):
+            self.by_reason(self.tables(a=[]), comparisons={"typo": {"a", "kya"}})
