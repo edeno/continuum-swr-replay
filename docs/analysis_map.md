@@ -1,91 +1,141 @@
 # Analysis map: each question, the analyses that answer it, and where they live
 
-Every analysis in this repository answers one of five questions. This page lists, for each question, what is
-estimated, the script, the run name in `scripts/qa/run_refits.py` (for the CPU fits it reruns), the figures, and
-the claims rows in [../paper/claims_table.md](../paper/claims_table.md) it supports. Current numbers live in the
-results docs: [replay_rate_content_swr_synthesis.md](replay_rate_content_swr_synthesis.md),
-[per_bin_rate_results.md](per_bin_rate_results.md) and the claims table. Model formulas live in
+Every analysis here answers one of the paper's questions. For each, this page lists:
+
+- what is estimated;
+- the script;
+- the run name in `scripts/qa/run_refits.py`, for the CPU fits it reruns;
+- the figures;
+- the rows of [../paper/claims_table.md](../paper/claims_table.md) it supports.
+
+Current numbers live in the results docs ([replay_rate_content_swr_synthesis.md](replay_rate_content_swr_synthesis.md),
+[per_bin_rate_results.md](per_bin_rate_results.md)) and in the claims table. Model formulas live in
 [models_table.md](models_table.md).
 
-The claims table groups claims by goal. Goals 1, 2 and 4 are Q1; Goal 3a is Q3a; Goal 3b is Q2, Q3b and Q4;
-Goal 3c is Q5.
+The claims table groups claims by goal:
 
-Run names read `<question>.<analysis>[.<variant>]`. `--dry-run` lists them by question. The `at_well` cohort
-(well-anchored stops) is the shipped one; `all_stops` and `in_transit` are sensitivity cohorts.
+| Claims-table goal | Question here |
+|---|---|
+| 1, 2 and 4 | Q1 |
+| 3a | Q3a |
+| 3b | Q2, Q3b and Q4 |
+| 3c | Q5 |
+
+A claim marked "no script" has no tracked analysis yet.
+
+Run names read `<question>.<analysis>[.<variant>]`; `--dry-run` lists them under their question. The `at_well`
+cohort (well-anchored stops) is the shipped one. `all_stops` and `in_transit` are sensitivity cohorts.
+The uncited sensitivity runs (`rate.per_bin.in_transit` and `behavior.stay_leave.all_stops*`) are opt-in: a
+run skips them unless they are named in full or `--include-optional` is given.
 
 ## The flow
 
-1. **Decode** every epoch: `scripts/decoding/run_decoding_bandit.py` (non-local detector) and
-   `run_decoding_contfrag.py` (ContFrag). Before that, `run_artifact_detection.py` masks artifacts, and
-   `run_swr_detection.py` builds the SWR inventories the decoders read.
-2. **Tables**: `prepare_replay_content_data.py`, `build_qvals_table.py`, `build_timebin_tables.py` and the
-   ContFrag table builder. They give one row per event, event × arm, stop and time bin.
-3. **Q1 checks** on the decodes (below).
-4. **Fits** for Q2–Q4 and the figures that read them: `scripts/qa/run_refits.py`.
-5. **PFC unit GLM** (GPU) for Q5: `scripts/pfc/run_pfc_analysis_bandit.py`, then Figure 4.
+All scripts are in `scripts/`. Steps 1–4 are the full rebuild; after a change to tables or fitting code, start
+at step 3 or 5.
+
+1. **Cohort.** The analysed epochs are the register's (`data_loaders/epoch_register.csv`;
+   [epoch_register.md](epoch_register.md)).
+2. **Artifacts and SWRs.**
+   - Run `decoding/run_artifact_detection.py` (the artifact mask), then `decoding/run_swr_detection.py` (the
+     four SWR inventories).
+   - Then set the two run ids the decoders read: `ARTIFACT_INTERVALS_RUN_ID` and `SWR_INVENTORY_RUN_ID` in
+     `src/continuum_swr_replay/analysis/hippocampus/swr_source.py`. A decode refuses to start without them.
+3. **Decodes.** `decoding/run_decoding_bandit.py` (non-local detector) and `decoding/run_decoding_contfrag.py`
+   (ContFrag), on GPUs.
+4. **Tables**, in this order:
+   1. `behavior/fetch_spatial_bandit_behavior.sh`;
+   2. `decoding/prepare_replay_content_data.py --stop-only` (the stop table);
+   3. `behavior/build_qvals_table.py --write` (needs the stop table);
+   4. `decoding/prepare_replay_content_data.py` (the event, event × arm, event × patch, sequence and stop
+      tables; needs `qvals_table`);
+   5. `decoding/build_timebin_tables.py`;
+   6. `decoding/prepare_contfrag_replay_content_data.py --event-source SWR` and `--event-source MUA`.
+5. **Q1 checks** on the decodes, and the decode-only figures (Figures 1–3, the supplements). See Q1 and Q3a below.
+6. **Fits and the figures that read them**, for Q2, Q3b and Q4: `qa/run_refits.py`.
+7. **PFC** for Q5: `pfc/run_pfc_analysis_bandit.py` on GPUs, then `figures/generate_figure04.py`.
+
+`figures/generate_all_figures.py` draws Figures 1–4 in one go. Run it only after step 7.
 
 ## Q1. Are the decoded non-local events real, including those outside SWRs?
 
 | What it tests | Script | Output, figure | Claims |
 |---|---|---|---|
-| How common non-SWR events are; SWR detection and non-local detection as separate axes | `scripts/figures/generate_figure02.py`, `generate_figure03.py` | Figures 2–3 | 1, 2, 4, 5 |
-| The decoder on simulated data | `scripts/figures/generate_figure01.py` | Figure 1 | — |
-| Decoder validation (held-out likelihood, label stability) | `scripts/figures/generate_supp_decoder_validation.py`, `scripts/qa/run_quality_metrics.py` | supplement; `paper/figures/quality_metrics/` | 10, 11 |
-| Each event's spikes support its decoded location better than a matched baseline | `scripts/qa/analyze_event_spike_evidence.py` | `paper/figures/reality/` | 6, 7, 7b, 7c, 9 |
-| Held-out tetrodes support each decoder state (Local, No-Spike, Continuous, Fragmented) | `scripts/qa/run_state_evidence.py` | `Processed-Data/_refresh_<date>/state_evidence/` | 7, 9 |
-| How SWR and non-local events overlap | `scripts/content/quantify_swr_overlap_geometry.py` | printed tables | 4, 22 |
-| Four SWR detectors from shared inputs | `scripts/decoding/run_swr_detection.py` | SWR inventories | 3, 23, 24 |
-| A second sequence detector (Widloski & Foster) on the same decodes | `scripts/decoding/run_memoryless_detection.py`, `scripts/figures/generate_memoryless_comparison.py` | `Processed-Data/replay_detection_comparison/memoryless/`; supplement | 21, 22, 25 |
+| Example events per overlap class; how many non-local events have no SWR; NL against SWR start and end offsets; Local-state decoding error | `figures/generate_figure02.py` | Figure 2 (a, b, d, e) | 1, 2, 22, 10 |
+| SWR power at Local against Non-Local times | `figures/generate_figure03.py` | Figure 3b | 24 |
+| The decoder on simulated data | `figures/generate_figure01.py` | Figure 1 | — |
+| The 0.8 threshold, state fractions, calibration, and theta and MUA triggered averages (all in sample) | `figures/generate_supp_decoder_validation.py` | supplement | 10, 5 |
+| Decoding quality per session | `qa/run_quality_metrics.py`, after `qa/compute_hpc_raw_stats.py` | `paper/figures/quality_metrics/` | 10 |
+| Each event's spikes support its decoded location better than a matched baseline | `qa/analyze_event_spike_evidence.py` | `paper/figures/reality/` | 6, 7, 7b, 7c, 9 |
+| Held-out tetrodes support each decoder state (Local, No-Spike, Continuous, Fragmented) | `qa/run_state_evidence.py` | `Processed-Data/_refresh_<date>/state_evidence/` | 7, 9 |
+| The sub-cases of SWR and non-local overlap (for Methods numbers) | `content/quantify_swr_overlap_geometry.py` | printed tables | 4 |
+| Four SWR detectors from shared inputs | `decoding/run_swr_detection.py` | SWR inventories | 23 |
+| A second sequence detector (Widloski & Foster) on the same decodes | `decoding/run_memoryless_detection.py` | `Processed-Data/replay_detection_comparison/memoryless/` | 21, 22, 25 |
+| That detector on simulated replays of known shape, against an independent re-implementation of the reference code | `qa/sweep_memoryless_detection.py`, `qa/sweep_memoryless_controls.py`, `qa/sweep_memoryless_heldout.py`, `qa/compare_memoryless_to_reference.py` (with `qa/memoryless_reference.py`), `figures/generate_memoryless_comparison.py` | `docs/design/replay_detection_comparison/*.csv`; supplement | 21 |
+| Single decoded events, for checking categories by eye | `figures/generate_event_gallery.py`, `figures/run_event_gallery.sh` | `event_gallery/` | — |
 
-Claims 8 (re-decode with a wider Local kernel) and 12 (false-positive rate) have no script yet. Goal 4's
-full detector comparison is planned and not built:
-[.claude/docs/plans/replay_detection_comparison/PLAN.md](../.claude/docs/plans/replay_detection_comparison/PLAN.md),
-Phase 3.
+**No script:**
+- 3 (the threshold sweep);
+- 8 (a re-decode with a wider Local kernel);
+- 11 (held-out model selection);
+- 12 (the false-positive rate);
+- Goal 4's full detector comparison
+  ([.claude/docs/plans/replay_detection_comparison/PLAN.md](../.claude/docs/plans/replay_detection_comparison/PLAN.md),
+  Phase 3).
 
 ## Q2. How often do events occur, and what drives the rate, for SWR against non-SWR events?
 
-Two model families: per time bin (Family B, the main one; it has a spline time course, a reward kernel and self-history) and
-per stop (Family A, comparable with the literature). See [rate_models.md](rate_models.md).
+There are two model families; see [rate_models.md](rate_models.md):
+
+- **Per time bin (Family B), the main one:** a spline time course, a reward kernel and self-history.
+- **Per stop (Family A):** comparable with the literature.
 
 | What it estimates | Run | Script | Figures | Claims |
 |---|---|---|---|---|
-| Rate per time bin: time course, reward kernel, history | `rate.per_bin.{at_well,all_stops,in_transit}` | `scripts/rate/fit_per_bin_rate_models.py` | `rate.fig.per_bin_ladder`, `rate.fig.per_bin_summary`, `rate.fig.model_checking`; `rate.doc.per_bin_results` writes [per_bin_rate_results.md](per_bin_rate_results.md) | 19c |
-| Rate per stop | `rate.per_stop.at_well` | `scripts/rate/fit_per_stop_rate_models.py` | — | 19c |
-| How SWR and non-SWR rates differ, term by term, paired within session | `rate.swr_contrast.{at_well,all_stops}` | `scripts/rate/fit_swr_contrast_rate.py` | `content.fig.swr_contrast_coefs` | 19c, 19f |
-| Rate against arm uncertainty and value | `rate.uncertainty.at_well` | `scripts/rate/fit_uncertainty_rate.py` | `rate.fig.uncertainty` | 19g |
-| Ripple power as a continuous mark of SWR coupling | `rate.ripple_power` | `scripts/rate/fit_swr_power_model.py` | — | — |
-| Whether one stream's history drives the other's rate | `rate.cross_history` | `scripts/rate/fit_cross_history_rate.py` | — (no result written yet) | — |
+| Rate per time bin: time course, reward kernel, history | `rate.per_bin.{at_well,all_stops,in_transit}` | `rate/fit_per_bin_rate_models.py` | `rate.fig.per_bin_ladder`, `rate.fig.per_bin_summary`, `rate.fig.model_checking`; `rate.doc.per_bin_results` writes [per_bin_rate_results.md](per_bin_rate_results.md) | 19c |
+| Rate per stop | `rate.per_stop.{at_well,all_stops}` | `rate/fit_per_stop_rate_models.py` | — | 19c |
+| How SWR and non-SWR rates differ, term by term, paired within session | `rate.swr_contrast.{at_well,all_stops}` | `rate/fit_swr_contrast_rate.py` | `content.fig.swr_contrast_coefs` | 19c, 19f |
+| Rate against arm uncertainty and value | `rate.uncertainty.at_well` | `rate/fit_uncertainty_rate.py` | `rate.fig.uncertainty` | — |
+| Ripple power as a continuous mark of SWR coupling | `rate.ripple_power` | `rate/fit_swr_power_model.py` | — | — |
+| Whether one stream's history drives the other's rate | `rate.cross_history` | `rate/fit_cross_history_rate.py` | — (no result written yet) | — |
 
 ## Q3a. What are the events like: location, speed, extent, certainty, duration?
 
 | What it measures | Script | Figure | Claims |
 |---|---|---|---|
-| Distance from the animal (close against remote) | `scripts/figures/generate_figure03.py` | Figure 3 | 13 |
-| Where content sits relative to the animal and to reward wells | `scripts/content/analyze_content_occupancy.py` | `paper/figures/content_occupancy/` | 14 |
-| Speed, extent, stationarity, certainty and duration, SWR against non-SWR, duration-controlled | `scripts/figures/generate_figure03.py` (trajectory metrics from the event table) | Figure 3, supplement | 15–18 |
+| Replay speed by SWR status | `figures/generate_figure03.py` | Figure 3c | 15 |
+| Where content sits relative to the animal and to reward wells | `content/analyze_content_occupancy.py`; `figures/generate_figure03.py` | `paper/figures/content_occupancy/`; Figure 3d | 13, 14 |
+| Event duration by detector | `figures/generate_supp_decoder_validation.py` | supplement d | 18 |
+
+**No tracked script:**
+- 16 (extent);
+- 16b (stationarity);
+- 17 (certainty);
+- the duration-controlled contrasts behind 15 and 18.
+
+The per-event trajectory columns they need (`pause_fraction` and others) are built in
+`src/continuum_swr_replay/analysis/replay/trajectory.py`.
 
 ## Q3b. What do the events represent (arm or patch), what shapes that, and does it differ for SWR events?
 
-All content models are conditional on the event: they ask which arm (or patch) an event's posterior mass falls
-on.
+Every content model is conditional on the event: it asks which arm (or patch) an event's posterior mass falls on.
 
 | What it estimates | Run | Script | Figures | Claims |
 |---|---|---|---|---|
-| Which task variables shape content (M0–M6 ladder, all nine arms) | `content.arm_ladder.all_arms` | `scripts/content/fit_replay_content_models.py` | `content.fig.ladder` | 19a, 19b |
+| Which task variables shape content (the M0–M6 ladder, all nine arms) | `content.arm_ladder.all_arms` | `content/fit_replay_content_models.py` | `content.fig.ladder`, `content.fig.pipeline_data_flow` | — |
 | The same on the six leaf arms, with value and uncertainty | `content.arm_ladder.leaf_arms` | same, `--leaf-only` | — | 19g |
-| How SWR content differs, term by term, paired within session (arm and patch) | `content.swr_contrast.{all,rewarded,omitted}` | `scripts/content/fit_swr_contrast_content.py` | `content.fig.swr_contrast_coefs`, `content.fig.ladder` | 19a, 19b, 19f |
-| How widely an event spreads over arms (Dirichlet-multinomial concentration), SWR against non-SWR | `content.breadth_contrast.{all,all_length_adjusted,rewarded,omitted}` | same, `--estimator dirichlet_multinomial` | `content.fig.swr_contrast_coefs` | 19a, 19f |
-| Whether conclusions depend on the estimator (fraction, count, Dirichlet-multinomial) | `content.estimator_comparison` | `scripts/content/compare_content_estimators.py` | `paper/figures/content_estimators/` | 19f |
-| Content against reward-belief uncertainty | `content.uncertainty` | `scripts/content/analyze_uncertainty_content.py` | `content.fig.uncertainty` | 19g |
-| Content of events found by SWR- or MUA-anchored detection (ContFrag) | `content.event_source.{swr,mua}_{arm,patch}` | `scripts/content/fit_replay_content_models.py --event-source` | — | — |
+| How SWR content differs, term by term, paired within session (arm and patch) | `content.swr_contrast.{all,rewarded,omitted}` | `content/fit_swr_contrast_content.py` | `content.fig.swr_contrast_coefs` | 19a, 19b, 19f, 19g |
+| How widely an event spreads over arms (Dirichlet-multinomial concentration), SWR against non-SWR | `content.breadth_contrast.{all,all_length_adjusted,rewarded,omitted}` | same, `--estimator dirichlet_multinomial` | — | 19a, 19f |
+| Whether the conclusions depend on the estimator (fraction, count, Dirichlet-multinomial) | `content.estimator_comparison` | `content/compare_content_estimators.py` | `paper/figures/content_estimators/` | 19f |
+| Content against reward-belief uncertainty | `content.uncertainty` | `content/analyze_uncertainty_content.py` | `content.fig.uncertainty` | 19g |
+| Content of events found by SWR- or MUA-anchored detection (ContFrag) | `content.event_source.{swr,mua}_{arm,patch}` | `content/fit_replay_content_models.py --event-source` | — | — |
 
 ## Q4. Does content relate to what the animal does next?
 
 | What it estimates | Run | Script | Claims |
 |---|---|---|---|
-| Content predicts the next choice (conditional logit over a behavioural baseline); the patch, per-stop rate and patch-switch ladders and switch-aligned content, per event source, on one common cohort | `behavior.event_source_suite.{non_local,swr,mua}` | `scripts/content/compare_event_source_models.py` | 19d |
-| Content during a stop matches the arm visited next, against a shuffle (formerly "Stage 5B") | `behavior.retrospective.{all,swr,non_swr}` | `scripts/behavior/run_retrospective_alignment.py` | 19e |
-| Content × reward outcome → stay or leave (formerly "Stage 6") | `behavior.stay_leave.*` | `scripts/behavior/run_stay_leave.py` | 19e |
+| Content predicts the next choice (conditional logit over a behavioural baseline). Each event source's suite also fits patch, per-stop rate, patch-switch and switch-aligned blocks on one common cohort; only the choice block is cited | `behavior.event_source_suite.{non_local,swr,mua}` | `content/compare_event_source_models.py` | 19d |
+| Content during a stop matches the arm visited next, against a shuffle (was "Stage 5B") | `behavior.retrospective.{all,swr,non_swr}` | `behavior/run_retrospective_alignment.py` | — |
+| Content × reward outcome → stay or leave (was "Stage 6"); FDR summary across roles | `behavior.stay_leave.*` | `behavior/run_stay_leave.py`; `qa/summarize_stage6_fdr.py` | 19e |
 
 A decision-grain rebuild of the choice models is planned:
 [.claude/docs/plans/regression-integrity-fixes/phase-11-decision-models.md](../.claude/docs/plans/regression-integrity-fixes/phase-11-decision-models.md).
@@ -94,25 +144,41 @@ A decision-grain rebuild of the choice models is planned:
 
 | What it estimates | Script | Output, figure | Claims |
 |---|---|---|---|
-| Per-unit modulation by SWR and non-SWR non-local events (penalised GLM, held-out deviance) | `scripts/pfc/run_pfc_analysis_bandit.py` (GPU; about 14–17 h per card) | `Processed-Data/{epoch}_mPFC_modulation.pkl`; Figure 4 (`pfc.fig.figure04`) | 20 |
+| Per-unit modulation by SWR and non-SWR non-local events (penalised GLM, held-out deviance) | `pfc/run_pfc_analysis_bandit.py` (GPU; about 14–17 h per card) | `Processed-Data/{epoch}_mPFC_modulation.pkl` | 20 |
+| Figure 4, drawn from those bundles | `figures/generate_figure04.py` | Figure 4 | 20 |
+
+## Supporting scripts (no question of their own)
+
+| Script | What it does |
+|---|---|
+| `qa/check_data_availability.py`, `qa/diagnose_trial_detection.py` | Input checks per session |
+| `qa/check_fit_provenance.py` | Is each fit current for the tables it read (`run_refits.py` runs it) |
+| `qa/compare_fits.py`, `qa/compare_pfc_cohorts.py` | Old against new fits, when code or tables change |
+| `figures/generate_supp_pipeline_schematic.py`, `figures/generate_supp_pipeline_data_flow.py` | The pipeline supplement figures (the second reads `models/M3.pkl`, so the driver redraws it) |
+| `figures/generate_all_figures.py` | Figures 1–4 in one go |
 
 ## Removed as redundant (2026-10-17)
 
 | Was | Why |
 |---|---|
-| The content ladder refit on SWR-only and on non-SWR-only events (`--swr-subset`; `models_swr_{T,F}/`, `models_patch_swr_{T,F}/`) | The content SWR contrast answers the same question with paired within-session terms, and nothing read these bundles |
-| The base patch ladder on non-local events (`models_patch/`) | The event-source suite fits the same patch models on the same events, and the content SWR contrast fits the patch contrast |
-| The Dirichlet-multinomial content ladder (`models_dm/`) | Nothing read it; the breadth contrast and the estimator comparison carry the Dirichlet-multinomial results |
-| The rate SWR-contrast `--aggregate-only` reruns | The full fit already writes the same aggregation; the flag stays for re-auditing persisted fits |
+| The content ladder refit on SWR-only and on non-SWR-only events (`--swr-subset`; `models_swr_{T,F}/`, `models_patch_swr_{T,F}/`) | The content SWR contrast asks the same question with paired within-session terms, and its split rungs fit all, SWR and non-SWR on the same events. Nothing read these bundles |
+| The base patch ladder on non-local events (`models_patch/`, fraction response, at-well cohort) | No claim cites a P rung. The SWR contrast's patch rungs (CP, CPS) cover the patch question on the same response and cohort |
+| The Dirichlet-multinomial content ladder (`models_dm/`) | Nothing read it. The breadth contrast carries `log_phi_is_swr`, and the estimator comparison fits the Dirichlet-multinomial on M2–M4 and the contrast rungs. Its old numbers in `design/content_estimator_comparison.md` are marked as retired |
+| The rate SWR-contrast `--aggregate-only` reruns | The full fit already writes the same aggregation. The flag stays for re-auditing saved fits |
+
+Only the `--aggregate-only` reruns were exact repeats. The other three were close duplicates, and each lost a
+variant (the per-population ladders, the plain patch ladder, the Dirichlet-multinomial fits of M0, M0a, M1, M5
+and M6). To restore one, take its runner option from git (up to `c293086`). Their bundles were moved to `Processed-Data/replay_content/_archive_removed_20261017/`, which
+`check_fit_provenance.py` skips.
 
 ## Old run ids
 
-The 2026-10 refresh (its R6 and R7 stages) named runs by code. They map as follows:
+The 2026-10 refresh (its R6 and R7 stages) named runs by code:
 
 | Old | Run | Old | Run |
 |---|---|---|---|
 | R01–R03 | `rate.per_bin.{at_well,all_stops,in_transit}` | K01–K03 | `content.swr_contrast.{all,rewarded,omitted}` |
-| R04 | `rate.per_stop.at_well` | K04–K07 | `content.breadth_contrast.{all,all_length_adjusted,rewarded,omitted}` |
+| R04 | `rate.per_stop.at_well` (and new: `rate.per_stop.all_stops`) | K04–K07 | `content.breadth_contrast.{all,all_length_adjusted,rewarded,omitted}` |
 | R05, R06 | `rate.swr_contrast.{at_well,all_stops}` | X01 | `content.estimator_comparison` |
 | R07, R08 | removed | X02 | `content.uncertainty` |
 | R09 | `rate.uncertainty.at_well` | X03–X05 | `behavior.event_source_suite.{non_local,swr,mua}` |

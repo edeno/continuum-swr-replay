@@ -176,8 +176,8 @@ Three properties of that control decide what the comparison can be read as.
   fit yet.
 
 Stage 6
-(`run_stage6_learning.py`) applies `select_stop_cohort` at the stop grain before
-its per-stop summary, and Stage 5B (`run_stage5b_retrospective.py`) takes its
+(`behavior/run_stay_leave.py`) applies `select_stop_cohort` at the stop grain before
+its per-stop summary, and Stage 5B (`behavior/run_retrospective_alignment.py`) takes its
 at-well membership from `select_event_cohort` at the event grain (keeping its
 finite-`occupancy_well_arm` conjunct). All three carry `--stop-cohort`; only the
 unit GLM and Stage 6 offer `all_stops`.
@@ -401,7 +401,7 @@ descriptive**, else the run fails.
   `is_candidate_arm_never_visited` explicitly identifies novelty. The two enter
   together wherever recency/reward history is modeled.
 - The stay/leave model `is_stay ~ outcome * content`
-  (`scripts/pfc/run_stage6_learning.py`) legitimately uses the post-outcome
+  (`scripts/behavior/run_stay_leave.py`) legitimately uses the post-outcome
   `is_omitted_outcome`: its modeled unit (the stay/leave decision) is
   post-outcome by construction, so the timing gate does not apply.
 

@@ -776,7 +776,7 @@ Compute decoding quality metrics across all sessions.
 
 Rerun the CPU model fits and the figures that read them, in dependency order.
 
-`Run`, `select`, `run_env`, `schedule`, `check_provenance`, `print_plan`, `main`
+`Run`, `select`, `run_env`, `schedule`, `written_artifacts`, `check_provenance`, `print_plan`, `main`
 
 ### `scripts/qa/run_state_evidence.py`
 

@@ -92,7 +92,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics im
     dispersion_cm,
     normalize_windows,
 )
-from continuum_swr_replay.parameters import LOCAL_POSITION_STD
+from continuum_swr_replay.parameters import LOCAL_POSITION_STD, PROCESSED_DATA_DIR
 from continuum_swr_replay.table_io import write_table
 
 DECODE_BIN_STRIDE = 3
@@ -1021,7 +1021,7 @@ def main() -> None:
     parser.add_argument(
         "--out",
         type=Path,
-        default=Path("Processed-Data/replay_detection_comparison")
+        default=PROCESSED_DATA_DIR / "replay_detection_comparison"
         / "memoryless_detection_sweep.parquet",
     )
     parser.add_argument(

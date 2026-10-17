@@ -67,6 +67,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics im
     aggregate_windows,
     normalize_windows,
 )
+from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.table_io import write_table
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -81,7 +82,7 @@ SUMMARY_PATH = Path(
     "docs/design/replay_detection_comparison/reference_check_summary.csv"
 )
 OUT_PATH = (
-    Path("Processed-Data/replay_detection_comparison")
+    PROCESSED_DATA_DIR / "replay_detection_comparison"
     / "memoryless_reference_check.parquet"
 )
 FIGURE_SEED = ShuffleSeed(run=SHUFFLE_RUN_SEED, session="figure-one-simulation")

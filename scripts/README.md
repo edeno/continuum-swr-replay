@@ -79,15 +79,17 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
 - `archive/` — retired figure scripts (not linted; kept for provenance).
 
 ## `qa/` — diagnostics / validation
-- `run_refits.py` — reruns the CPU fits for Q2–Q4 and the figures that read them, in
-  dependency order, under a core budget (`--cpus`, `--budget`) with a thread cap per run.
-  Runs are named `<question>.<analysis>[.<variant>]` (`rate.swr_contrast.at_well`);
-  `--only rate,content.swr_contrast` selects by name or prefix and adds everything that
-  depends on the selection; `--dry-run` lists the runs under their question. One log and
-  JSON record per run go under `logs/refits_<time>/`, then `check_fit_provenance.py` checks
-  both table roots. Set `CSR_PROCESSED_DATA_DIR` to read and write another data root. It
-  does not run the decodes, the tables, the Q1 checks or the PFC unit GLM. See
-  `docs/analysis_map.md`.
+- `run_refits.py` — reruns the CPU fits for Q2, Q3b and Q4 and the figures that read them,
+  in dependency order. Each run is pinned to its own CPUs from `--cpus` (default: all this
+  process may use), and OMP/MKL/OpenBLAS/numba threads are capped per run. Runs are named
+  `<question>.<analysis>[.<variant>]` (`rate.swr_contrast.at_well`); `--only
+  rate,content.swr_contrast` selects by name or prefix and adds everything that depends on
+  the selection; `--dry-run` lists the runs under their question. The uncited sensitivity runs
+  are opt-in (`--include-optional`, or name them in full). One log and JSON record
+  per run (a "blocked" record when a dependency failed) go under `logs/refits_<time>/`, then
+  `check_fit_provenance.py` checks every artifact the runs wrote. Set
+  `CSR_PROCESSED_DATA_DIR` to read and write another data root. It does not run the
+  decodes, the tables, the Q1 checks or the PFC unit GLM. See `docs/analysis_map.md`.
 - `check_data_availability.py`, `diagnose_trial_detection.py`, `compute_hpc_raw_stats.py`,
   `run_quality_metrics.py`, `analyze_event_spike_evidence.py` (spike-evidence reality check).
 - `run_state_evidence.py` — held-out spike evidence for each decoder state (Local, No-Spike,

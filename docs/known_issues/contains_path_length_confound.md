@@ -66,7 +66,7 @@ in contains rate with identical content.
 
 ## Current exposure
 
-**One consumer, and it ships outputs.** `scripts/pfc/run_stage5b_retrospective.py`
+**One consumer, and it ships outputs.** `scripts/behavior/run_retrospective_alignment.py`
 computes `contains_path_to_next` for every session — it is one of
 `retrospective._DEFAULT_METRICS` — and its results are on disk as
 `replay_content/stage5b_retrospective{,_swr_only,_non_swr_only}.pkl`, 218 rows

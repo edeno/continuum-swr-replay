@@ -1,6 +1,7 @@
 """The refit driver: its run list, what a selection adds, and how runs are scheduled."""
 
 import json
+import os
 import sys
 
 import pytest
@@ -38,6 +39,7 @@ def test_selecting_the_arm_ladder_adds_the_contrasts_and_the_figures_that_read_t
         "content.breadth_contrast.omitted",
         "content.fig.swr_contrast_coefs",
         "content.fig.ladder",
+        "content.fig.pipeline_data_flow",
     ]
 
 
@@ -61,11 +63,17 @@ def test_the_environment_caps_threads_and_keeps_jax_on_cpu():
     env = rr.run_env(rr.Run("rate.t", ("t.py",), cores=4, threads=3))
     assert {env[v] for v in rr.THREAD_VARS} == {"3"}
     assert env["JAX_PLATFORMS"] == "cpu" and env["CUDA_VISIBLE_DEVICES"] == ""
-    assert "intra_op_parallelism_threads=3" in env["XLA_FLAGS"]
 
 
 def _py(code):
     return (sys.executable, "-c", code)
+
+
+def _cpus(n):
+    cpus = sorted(os.sched_getaffinity(0))
+    if len(cpus) < n:
+        pytest.skip(f"needs {n} CPUs")
+    return cpus[:n]
 
 
 def test_a_failed_run_blocks_its_dependents_and_nothing_else(tmp_path):
@@ -82,7 +90,7 @@ def test_a_failed_run_blocks_its_dependents_and_nothing_else(tmp_path):
         rr.Run("rate.e", _py("pass"), 1, deps=("rate.c",)),
     ]
     logs = tmp_path / "logs"
-    codes = rr.schedule(runs, budget=2, log_dir=logs, prefix=[], poll_s=0.05)
+    codes = rr.schedule(runs, _cpus(2), log_dir=logs, prefix=[], poll_s=0.05)
     assert codes == {
         "rate.a": 0,
         "rate.b": 3,
@@ -94,16 +102,78 @@ def test_a_failed_run_blocks_its_dependents_and_nothing_else(tmp_path):
     record = json.loads((logs / "rate.b.json").read_text())
     assert record["exit_code"] == 3 and record["argv"][-1] == "raise SystemExit(3)"
     assert record["question"] == rr.QUESTIONS["rate"]
-    assert not (logs / "rate.c.json").exists()
+    assert record["env"]["OMP_NUM_THREADS"] == "1"
+    blocked = {n: json.loads((logs / f"rate.{n}.json").read_text()) for n in "ce"}
+    assert blocked["c"]["status"] == "blocked" and blocked["c"]["blocked_by"] == [
+        "rate.b"
+    ]
+    assert blocked["e"]["blocked_by"] == ["rate.c"]
 
 
-def test_runs_wait_for_cores_and_a_run_larger_than_the_budget_still_runs(tmp_path):
+def test_each_run_is_pinned_to_its_own_cpus(tmp_path):
+    cpus = _cpus(3)
+    show = "import os, time; print(sorted(os.sched_getaffinity(0))); time.sleep(0.3)"
+    runs = [rr.Run("rate.a", _py(show), 2), rr.Run("rate.b", _py(show), 1)]
+    logs = tmp_path / "logs"
+    rr.schedule(runs, cpus, log_dir=logs, prefix=[], poll_s=0.02)
+    a = json.loads((logs / "rate.a.log").read_text())
+    b = json.loads((logs / "rate.b.log").read_text())
+    assert len(a) == 2 and len(b) == 1 and not set(a) & set(b)
+    assert set(a) | set(b) == set(cpus)
+
+
+def test_runs_wait_for_cpus_and_a_run_larger_than_the_list_still_runs(tmp_path):
     stamp = "import time; print(time.time()); time.sleep(0.3); print(time.time())"
     runs = [rr.Run(f"rate.{i}", _py(stamp), 2) for i in ("a", "b")]
-    runs.append(rr.Run("rate.c", _py("pass"), 9))
+    runs.append(
+        rr.Run("rate.c", _py("import os; print(len(os.sched_getaffinity(0)))"), 9)
+    )
     logs = tmp_path / "logs"
-    codes = rr.schedule(runs, budget=3, log_dir=logs, prefix=[], poll_s=0.02)
+    codes = rr.schedule(runs, _cpus(3), log_dir=logs, prefix=[], poll_s=0.02)
     assert codes == {"rate.a": 0, "rate.b": 0, "rate.c": 0}
     a_end = float((logs / "rate.a.log").read_text().split()[1])
     b_start = float((logs / "rate.b.log").read_text().split()[0])
     assert b_start >= a_end
+    assert (logs / "rate.c.log").read_text().strip() == "3"
+
+
+def test_only_artifacts_written_since_the_start_are_checked(tmp_path):
+    import time
+
+    old = tmp_path / "models_dm"
+    new = tmp_path / "models"
+    for d in (old, new, tmp_path / "_backup_x"):
+        d.mkdir()
+    (old / "M0.pkl").write_bytes(b"")
+    (old / "M0.provenance.json").write_text("{}")
+    since = time.time() + 1
+    os.utime(old / "M0.provenance.json", (since - 10, since - 10))
+    for d in (new, tmp_path / "_backup_x"):
+        (d / "C1.pkl").write_bytes(b"")
+        (d / "C1.provenance.json").write_text("{}")
+        os.utime(d / "C1.provenance.json", (since + 5, since + 5))
+    (tmp_path / "stage6.parquet").write_bytes(b"")
+    (tmp_path / "stage6.provenance.json").write_text("{}")
+    os.utime(tmp_path / "stage6.provenance.json", (since + 5, since + 5))
+    found = rr.written_artifacts(tmp_path, since)
+    assert sorted(p.relative_to(tmp_path).as_posix() for p in found) == [
+        "models/C1.pkl",
+        "stage6.parquet",
+    ]
+
+
+def test_optional_runs_are_left_out_unless_asked_for():
+    optional = {r.name for r in rr.RUNS if r.optional}
+    assert optional == {
+        "rate.per_bin.in_transit",
+        "behavior.stay_leave.all_stops",
+        "behavior.stay_leave.all_stops_swr",
+        "behavior.stay_leave.all_stops_non_swr",
+        "behavior.stay_leave.all_stops_mua",
+    }
+    assert not optional & {r.name for r in rr.select(None)}
+    assert not optional & {r.name for r in rr.select(["behavior.stay_leave"])}
+    assert optional <= {r.name for r in rr.select(None, include_optional=True)}
+    # Named in full, an optional run comes with the optional runs that need it.
+    named = {r.name for r in rr.select(["behavior.stay_leave.all_stops"])}
+    assert named == optional - {"rate.per_bin.in_transit"}

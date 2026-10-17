@@ -135,7 +135,7 @@ def figure_trial_sanity(
 
 def figure_predictor_collapse(*, output_dir: Path) -> None:
     """Across all events, quantify how often each predictor collapses with is_current."""
-    ev = pd.read_pickle(Path("Processed-Data/replay_content/events.pkl"))
+    ev = pd.read_pickle(PROCESSED_DATA_DIR / "replay_content" / "events.pkl")
     ev = ev.copy()
     ev["cur"]   = ev["track_segment_id"]
     ev["prev"]  = ev["prev_trial_from_well"]

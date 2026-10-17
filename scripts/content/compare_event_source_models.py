@@ -5,9 +5,9 @@ Mirrors the non-local pipeline so non-local / ContFrag-SWR / ContFrag-MUA
 can be compared head-to-head. For a given event source it fits, per
 session:
 
-- Patch hierarchy P0-P4 for non-local events; P0-P3 for source-restricted
+- Patch hierarchy P0-P3 and Pv for non-local events; P0-P2 for source-restricted
   SWR/MUA events where SWR interaction terms are not identifiable
-- Rate hierarchy R0-R2 (the ``is_swr_stop`` term R3 was dropped: it is
+- Rate hierarchy R0-R1 (the ``is_swr_stop`` term was dropped: it is
   tautological with the per-stop non-local/SWR event count)
 - MODEL_PATCH_SWITCH PS0-PS3 for non-local events; PS0-PS2 for
   source-restricted SWR/MUA events
