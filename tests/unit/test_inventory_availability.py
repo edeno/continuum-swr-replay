@@ -26,7 +26,16 @@ from continuum_swr_replay.analysis.inventory_comparison.intervals import (
     subtract,
     total_duration,
 )
-from continuum_swr_replay.analysis.inventory_comparison.schema import SessionIdentity
+from continuum_swr_replay.analysis.inventory_comparison.overlap import (
+    Coverage,
+    event_matches,
+    overlap_pairs,
+)
+from continuum_swr_replay.analysis.inventory_comparison.schema import (
+    SessionIdentity,
+    combine_inventories,
+    inventory_from_intervals,
+)
 
 SESSION = SessionIdentity(animal="sim", day=20200101, epoch="02_r1", brain_area="HPC")
 FS = 500.0
@@ -136,10 +145,106 @@ class TestExposure:
         still = still_intervals(time, speed)
         exposed = exposure(sample_runs(time, np.ones(time.size, bool)), still)
 
+        # each still run reaches the moving sample beside it, not the unknown one
         assert exposed.shape == (3, 2)
         assert total_duration(exposed) == pytest.approx(
-            (199 + (599 - 300) + (999 - 601)) / FS
+            (200 + (599 - 299) + (999 - 601)) / FS
         )
+
+
+class TestStillRunsReachTheNeighbouringSamples:
+    """An event is speed-eligible when every sample inside it is still, so a
+    still run's exposure reaches the samples on either side of it."""
+
+    def test_a_still_run_reaches_the_moving_samples_beside_it(self):
+        time = grid()
+        speed = np.zeros(time.size)
+        speed[300:600] = 9.0
+
+        np.testing.assert_array_equal(
+            still_intervals(time, speed),
+            [[time[0], time[300]], [time[599], time[999]]],
+        )
+
+    @pytest.mark.parametrize("break_kind", ["gap", "nan speed", "nan time"])
+    def test_a_run_does_not_reach_across_a_break(self, break_kind):
+        """Still, then moving, then still, with a break at each change."""
+        time = grid()
+        speed = np.zeros(time.size)
+        speed[301:600] = 9.0
+        expected = [[time[0], time[299]], [time[601], time[999]]]
+        breaks = [300, 600]
+        if break_kind == "gap":
+            keep = np.ones(time.size, bool)
+            keep[breaks] = False
+            time, speed = time[keep], speed[keep]
+        elif break_kind == "nan speed":
+            speed[breaks] = np.nan
+        else:
+            time[breaks] = np.nan
+
+        np.testing.assert_array_equal(still_intervals(time, speed), expected)
+
+    @staticmethod
+    def _matches(time, speed, start_s, end_s):
+        """One event of detector ``a`` against a detector ``b`` that found
+        nothing, both observing the whole trace."""
+        inventory, moving = combine_inventories(
+            [
+                inventory_from_intervals(
+                    np.array([start_s]),
+                    np.array([end_s]),
+                    native_keys=np.arange(1),
+                    detector="a",
+                    session=SESSION,
+                    run_id="run",
+                    speed_time_s=time,
+                    speed_cm_per_s=speed,
+                )
+            ]
+        )
+        observed = np.array([[time[0], time[-1]]])
+        still = still_intervals(time, speed)
+        coverage = {
+            ("sim", 20200101, "02_r1", d): Coverage(
+                observed=observed, exposure=exposure(observed, still)
+            )
+            for d in ("a", "b")
+        }
+        return moving, event_matches(inventory, overlap_pairs(inventory), coverage)
+
+    def test_an_event_ending_after_the_last_still_sample_is_unmatched(self):
+        """Its only samples are still, so it is compared, not left unknown."""
+        time = grid()
+        speed = np.where(np.arange(time.size) < 500, 0.0, 9.0)
+
+        moving, matches = self._matches(time, speed, time[495], time[499] + 0.001)
+
+        assert moving.empty
+        row = matches.set_index("detector").loc["a"]
+        assert row.within_shared_exposure
+        assert row.membership == "unmatched"
+
+    def test_an_event_starting_before_the_first_still_sample_is_unmatched(self):
+        time = grid()
+        speed = np.where(np.arange(time.size) < 500, 9.0, 0.0)
+
+        moving, matches = self._matches(time, speed, time[499] + 0.001, time[505])
+
+        assert moving.empty
+        row = matches.set_index("detector").loc["a"]
+        assert row.within_shared_exposure
+        assert row.membership == "unmatched"
+
+    def test_an_event_with_a_moving_sample_is_set_aside_not_counted(self):
+        """The reach takes in the moving sample's time, never its events."""
+        time = grid()
+        speed = np.where(np.arange(time.size) < 500, 0.0, 9.0)
+
+        moving, matches = self._matches(time, speed, time[495], time[500])
+
+        assert len(moving) == 1
+        assert matches.empty
 
 
 class TestObservationTable:

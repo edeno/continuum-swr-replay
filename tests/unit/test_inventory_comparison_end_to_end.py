@@ -8,11 +8,12 @@ spikes (40-41 s) and a gap in the LFP (50-52 s):
 - memoryless ``MS`` needs the spikes over a whole 80 ms window;
 - the SWR detector ``K`` needs the LFP.
 
-Shared exposure, worked by hand: still [0, 20) and [25, 60]; SS observes
-[0, 40] and [41, 60]; MS, whose 40-sample windows are stamped 20 samples in,
-observes [0.04, 39.962] and [41.04, 59.962] and loses [41.0, 41.2] to its
-bridging event; K observes [0, 50] and [52, 60]. Their intersection is
-[0.04, 19.998], [25, 39.962], [41.2, 50] and [52, 59.962]. SS's event during
+Shared exposure, worked by hand: still [0, 20.0] and [24.998, 60], each still
+run reaching the first and last moving samples (20.0 and 24.998 s) beside it;
+SS observes [0, 40] and [41, 60]; MS, whose 40-sample windows are stamped 20
+samples in, observes [0.04, 39.962] and [41.04, 59.962] and loses [41.0, 41.2]
+to its bridging event; K observes [0, 50] and [52, 60]. Their intersection is
+[0.04, 20.0], [24.998, 39.962], [41.2, 50] and [52, 59.962]. SS's event during
 the movement bout is set aside before any comparison.
 """
 
@@ -181,7 +182,7 @@ def test_no_detector_time_is_the_hand_worked_shared_exposure_less_detections(
         kept, coverage, detectors=[STATE_SPACE, MEMORYLESS, KAY]
     ).iloc[0]
 
-    shared = (19.998 - 0.04) + (39.962 - 25.0) + (50.0 - 41.2) + (59.962 - 52.0)
+    shared = (20.0 - 0.04) + (39.962 - 24.998) + (50.0 - 41.2) + (59.962 - 52.0)
     # SS:0/MS:0/K:0 cover 5.0-5.4, SS:1 0.2 s, K:1 0.1 s; the rest is outside
     assert row.shared_exposure_s == pytest.approx(shared)
     assert row.detected_s == pytest.approx(0.7)
@@ -208,7 +209,7 @@ def test_missing_lfp_leaves_the_matrix_rather_than_reading_as_non_swr(comparison
 
 
 def test_time_coverage_is_clipped_to_the_shared_exposure(comparison):
-    """SS and K share exposure over [0, 20), [25, 40], [41, 50] and [52, 60]:
+    """SS and K share exposure over [0, 20], [24.998, 40], [41, 50] and [52, 60]:
     SS:0 with K:0, SS:1, SS:2 and K:1 lie inside it; SS:3, during the LFP
     gap, does not."""
     kept, coverage, _, _ = comparison

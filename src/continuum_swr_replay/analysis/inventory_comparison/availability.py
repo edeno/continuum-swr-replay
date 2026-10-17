@@ -8,8 +8,10 @@ across either; a detector that reads a window of samples observes a moment
 only when the whole window is there.
 
 Exposure is observed time during which the animal was known to be still:
-finite speed below the canonical threshold. Comparisons between detectors use
-the intersection of their exposures.
+finite speed below the canonical threshold, each still run reaching the sample
+on either side of it, since an event is speed-eligible when the samples inside
+it are still. Comparisons between detectors use the intersection of their
+exposures.
 
 Excluded time (``swr_source.excluded_intervals``: the artifact mask widened by
 0.3 s) is not analysed, so the reader of the observation tables
@@ -175,11 +177,45 @@ def still_intervals(
     threshold_cm_per_s: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     max_gap_s: float | None = None,
 ) -> NDArray:
-    """Stretches of finite speed below the threshold; an unknown speed is not still."""
+    """Stretches of finite speed below the threshold; an unknown speed is not still.
+
+    An event is speed-eligible when every sample inside it is still, so an
+    event may end after a run's last still sample, or start before its first,
+    without touching a moving sample. Each run of still samples therefore
+    reaches the sample on either side of it, moving or not, unless a gap in
+    the timestamps (as for ``sample_runs``), a non-finite timestamp or a
+    non-finite speed lies between them: exposure grows by at most one sample
+    interval at each end of a run. A still sample alone between two moving
+    ones spans the time from one to the other.
+
+    Parameters
+    ----------
+    time : ndarray, shape (n_samples,)
+        Strictly increasing where finite.
+    speed_cm_per_s : ndarray, shape (n_samples,)
+    threshold_cm_per_s : float, optional
+    max_gap_s : float, optional
+        As for ``sample_runs``.
+
+    Returns
+    -------
+    still : ndarray, shape (n_runs, 2)
+
+    """
+    time = np.asarray(time, dtype=np.float64)
     speed = np.asarray(speed_cm_per_s, dtype=np.float64)
-    return sample_runs(
-        time, np.isfinite(speed) & (speed < threshold_cm_per_s), max_gap_s
-    )
+    if time.size < 2:
+        return np.empty((0, 2))
+    known = np.isfinite(time) & np.isfinite(speed)
+    still = known & (speed < threshold_cm_per_s)
+    # whether each pair of neighbouring samples is known and unbroken
+    joined = _joined(time, known, max_gap_s)
+    within_run = joined & still[1:] & still[:-1]
+    first = np.flatnonzero(still & np.r_[True, ~within_run])
+    last = np.flatnonzero(still & np.r_[~within_run, True])
+    first = first - np.r_[False, joined][first]
+    last = last + np.r_[joined, False][last]
+    return normalize(np.column_stack([time[first], time[last]]))
 
 
 def exposure(observed: NDArray, still: NDArray) -> NDArray:
