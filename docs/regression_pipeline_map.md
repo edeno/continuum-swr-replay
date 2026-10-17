@@ -772,6 +772,12 @@ Objective AST mutation check for value-critical builder logic.
 
 `check`, `main`
 
+### `scripts/qa/run_inventory_comparison.py`
+
+Compare the replay-detection inventories, one epoch at a time.
+
+`decode_path`, `epoch_inventories`, `compare_epoch`, `output_path`, `replace_outputs`, `run_epoch`, `summary`, `run_settings`, `select_epochs`, `main`, `run`
+
 ### `scripts/qa/run_quality_metrics.py`
 
 Compute decoding quality metrics across all sessions.

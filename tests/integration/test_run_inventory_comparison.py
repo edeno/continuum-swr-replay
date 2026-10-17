@@ -1,0 +1,570 @@
+"""The comparison runner end to end, on two simulated epochs written to disk.
+
+Every input is written to a temporary folder as its runner writes it: the
+decode frame's pickle, the SWR run (Kay, Karlsson, Yu, Zugaro), a Carey run, a
+memoryless run and an artifact run. The runner reads them through the adapters
+and writes its tables, which the tests read back. Nothing here reaches
+Spyglass or ``Processed-Data``.
+
+Epoch ``02_r1`` is the worked epoch of ``test_inventory_comparison_end_to_end``
+(0-60 s on a 500 Hz grid): the animal moves over 20-25 s, the posterior is
+missing over 40-41 s, the stored band over 50-52 s, and the memoryless decoded
+windows are [0.04, 39.962] and [41.04, 59.962]. The other five detectors
+observe the whole epoch and find nothing, so the hand-worked exposures hold
+for every comparison. Epoch ``04_r2`` repeats it with an artifact core at
+30.05 s, which sets Kay's SWR at 30.0 s aside, and no memoryless record; its
+Karlsson event at 29.5-29.7 s reaches excluded time and is set aside, and the
+Kay SWR at 29.52-29.58 s that it overlaps is kept.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import pytest
+
+import scripts.qa.run_inventory_comparison as runner
+from continuum_swr_replay.analysis.hippocampus import swr_source
+from continuum_swr_replay.table_io import read_table, sha256_file
+from tests.unit._swr_inventory_fixtures import (
+    kay_events,
+    use_swr_source,
+    write_artifact_run,
+    write_swr_inventory,
+)
+
+pytestmark = pytest.mark.slow
+
+ANIMAL, DAY = "sim", 20200101
+EPOCHS = {"02_r1": "sim20200101_02_r1_HPC", "04_r2": "sim20200101_04_r2_HPC"}
+WORKED, MASKED = EPOCHS["02_r1"], EPOCHS["04_r2"]
+TIME = np.round(np.arange(30_001) * 0.002, 6)
+SPEED = np.where((TIME >= 20.0) & (TIME < 25.0), 10.0, 1.0)
+
+NON_LOCAL = [(5.0, 5.3), (10.0, 10.2), (21.0, 21.3), (41.1, 41.15), (51.0, 51.2)]
+"""The state-space events; the one at 21.0 s is during the movement bout."""
+KAY = [(5.05, 5.1), (30.0, 30.1)]
+MASKED_KAY = [(5.05, 5.1), (29.52, 29.58), (30.0, 30.1)]
+MASKED_KARLSSON = [(29.5, 29.7)]
+STORED_BAND = [(0.0, 50.0), (52.0, 60.0)]
+DECODED_WINDOWS = [(0.04, 39.962), (41.04, 59.962)]
+MEMORYLESS = [(5.1, 5.4), (41.0, 41.2), (12.0, 12.1)]
+"""Two published sequences (the second bridges a gap in the decoded windows)
+and one meeting the replay criteria alone."""
+CAREY_RUN, MEMORYLESS_RUN, RUN_ID = "careyrun01", "memorylessrun01", "comparison01"
+
+
+def _labels(intervals) -> np.ndarray:
+    labels = np.zeros(TIME.size, dtype=np.int64)
+    for number, (start, end) in enumerate(intervals, start=1):
+        labels[(TIME >= start) & (TIME <= end)] = number
+    return labels
+
+
+def write_decode(root: Path, epoch: str, identifier: str) -> None:
+    """The decode's ``data_over_time`` pickle, as the decoder saves it."""
+    continuous = np.full(TIME.size, 0.9)
+    continuous[(TIME > 40.0) & (TIME < 41.0)] = np.nan
+    pd.DataFrame(
+        {
+            "animal": ANIMAL,
+            "day": DAY,
+            "epoch": epoch,
+            "head_speed": SPEED,
+            "SWR_event": 0,
+            "MUA_event": 0,
+            "non_local_event": _labels(NON_LOCAL),
+            "Non-Local_Continuous_prob": continuous,
+            "Non-Local_Fragmented_prob": 0.05,
+        },
+        index=pd.Index(TIME, name="time"),
+    ).to_pickle(root / f"{identifier}_80_data_over_time.pkl")
+
+
+def add_swr_detector(
+    run_dir: Path, identifier: str, detector: str, intervals=()
+) -> None:
+    """An SWR detector's events, in the run folder and its manifest."""
+    path = run_dir / f"{identifier}_{detector}_events.parquet"
+    kay_events(list(intervals)).to_parquet(path)
+    manifest_path = run_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["epochs"][identifier]["outputs"][detector] = {
+        "path": str(path),
+        "sha256": sha256_file(path),
+    }
+    manifest_path.write_text(json.dumps(manifest))
+
+
+def write_carey_run(root: Path) -> None:
+    """Carey ran on both epochs, observed all of each and found nothing."""
+    directory = root / CAREY_RUN
+    directory.mkdir(parents=True)
+    records = {}
+    for identifier in EPOCHS.values():
+        events = directory / f"{identifier}_carey_events.parquet"
+        kay_events([]).assign(n_active_units=np.array([], dtype=int)).to_parquet(events)
+        observed = directory / f"{identifier}_carey_observed.parquet"
+        pd.DataFrame(
+            {"scope": ["carey"], "start_s": [0.0], "end_s": [60.0]}
+        ).to_parquet(observed)
+        records[identifier] = {
+            "status": "ok",
+            "outputs": {
+                "events": {"path": str(events), "sha256": sha256_file(events)},
+                "observed": {"path": str(observed), "sha256": sha256_file(observed)},
+            },
+        }
+    (directory / "manifest.json").write_text(
+        json.dumps({"run_id": CAREY_RUN, "epochs": records})
+    )
+
+
+def write_memoryless_run(root: Path) -> None:
+    """The memoryless run, with a record for the worked epoch only."""
+    directory = root / MEMORYLESS_RUN
+    directory.mkdir(parents=True)
+    starts = [start for start, _ in MEMORYLESS]
+    ends = [end for _, end in MEMORYLESS]
+    table = pd.DataFrame(
+        {
+            "animal": ANIMAL,
+            "day": DAY,
+            "epoch": "02_r1",
+            "brain_area": "HPC",
+            "run_id": MEMORYLESS_RUN,
+            "ms_event_id": [0, 1, 2],
+            "event_start_s": starts,
+            "event_end_s": ends,
+            "event_duration_s": np.subtract(ends, starts),
+            "animal_max_speed_cm_s": 1.0,
+            "animal_mean_speed_cm_s": 1.0,
+            "whole_event_speed_eligible": True,
+            "is_replay": True,
+            "shuffle_pass": [True, True, False],
+            "n_shuffles": 100,
+            "swr_definition": swr_source.swr_source_name(),
+            "artifact_drop_reason": [None, None, None],
+        }
+    )
+    events = directory / f"{WORKED}_memoryless_events.parquet"
+    table.to_parquet(events)
+    observed = directory / f"{WORKED}_memoryless_observed.parquet"
+    pd.DataFrame(
+        {
+            "kind": ["decoded_windows"] * 2 + ["swr_labels"],
+            "start_s": [start for start, _ in DECODED_WINDOWS] + [0.0],
+            "end_s": [end for _, end in DECODED_WINDOWS] + [60.0],
+        }
+    ).to_parquet(observed)
+    record = {
+        "status": "ok",
+        "time_grid": {
+            "start_s": float(TIME[0]),
+            "end_s": float(TIME[-1]),
+            "n_samples": int(TIME.size),
+        },
+        "n_candidates": len(table),
+        "n_replay": int(table.is_replay.sum()),
+        "n_shuffle_pass": int(table.shuffle_pass.sum()),
+        "outputs": {"events": str(events), "observed": str(observed)},
+    }
+    (directory / "manifest.json").write_text(
+        json.dumps({"run_id": MEMORYLESS_RUN, "epochs": {WORKED: record}})
+    )
+
+
+@pytest.fixture(scope="module")
+def module_monkeypatch():
+    with pytest.MonkeyPatch.context() as patch:
+        yield patch
+
+
+@pytest.fixture(scope="module")
+def inputs(tmp_path_factory, module_monkeypatch):
+    """Every input on disk, and the runner's roots pointed at them."""
+    tmp_path = tmp_path_factory.mktemp("comparison")
+    monkeypatch = module_monkeypatch
+    swr_run = write_swr_inventory(
+        tmp_path / "swr",
+        {WORKED: KAY, MASKED: MASKED_KAY},
+        observed=dict.fromkeys(EPOCHS.values(), STORED_BAND),
+    )
+    for identifier in EPOCHS.values():
+        for detector in ("karlsson", "yu", "zugaro"):
+            intervals = (
+                MASKED_KARLSSON
+                if (identifier, detector) == (MASKED, "karlsson")
+                else ()
+            )
+            add_swr_detector(swr_run, identifier, detector, intervals)
+    artifact_run = write_artifact_run(
+        tmp_path / "artifacts", {WORKED: [], MASKED: [("spk", 30.05, 30.05)]}
+    )
+    use_swr_source(monkeypatch, swr_run, artifact_run)
+    decode_root = tmp_path / "decodes"
+    decode_root.mkdir()
+    for epoch, identifier in EPOCHS.items():
+        write_decode(decode_root, epoch, identifier)
+    write_carey_run(tmp_path / "carey")
+    write_memoryless_run(tmp_path / "memoryless")
+    monkeypatch.setattr(runner, "DECODE_ROOT", decode_root)
+    monkeypatch.setattr(runner, "CAREY_ROOT", tmp_path / "carey")
+    monkeypatch.setattr(runner, "MEMORYLESS_ROOT", tmp_path / "memoryless")
+    monkeypatch.setattr(runner, "OUTPUT_ROOT", tmp_path / "inventory")
+    monkeypatch.setattr(runner, "analysed_epoch_ids", lambda: list(EPOCHS.values()))
+    return tmp_path
+
+
+ARGS = [
+    "--carey-run-id",
+    CAREY_RUN,
+    "--memoryless-run-id",
+    MEMORYLESS_RUN,
+    "--run-id",
+    RUN_ID,
+]
+
+
+@pytest.fixture(scope="module")
+def run(inputs):
+    """The runner over both epochs; its run folder."""
+    runner.main([*ARGS, "--animal", ANIMAL])
+    return inputs / "inventory" / RUN_ID
+
+
+def table(run_dir: Path, identifier: str, name: str) -> pd.DataFrame:
+    return read_table(run_dir / f"{identifier}_{name}.parquet")
+
+
+def at(frame: pd.DataFrame, start_column: str, start: float) -> pd.Series:
+    """The one row of `frame` whose `start_column` is `start`."""
+    rows = frame[np.isclose(frame[start_column], start)]
+    assert len(rows) == 1
+    return rows.iloc[0]
+
+
+SHARED = (20.0 - 0.04) + (39.962 - 24.998) + (50.0 - 41.2) + (59.962 - 52.0)
+"""The hand-worked shared exposure of state space, memoryless and Kay."""
+
+
+class TestTheWorkedEpoch:
+    def test_each_detectors_counts_and_own_exposure(self, run):
+        counts = table(run, WORKED, "counts").set_index("detector")
+
+        assert counts.loc[
+            "state_space", ["n_native", "n_moving", "n_eligible"]
+        ].tolist() == [5, 1, 4]
+        assert counts.loc[
+            "memoryless", ["n_native", "n_set_aside", "n_eligible"]
+        ].tolist() == [2, 1, 1]
+        assert counts.loc["memoryless_criteria", "n_native"] == 3
+        assert counts.loc["kay", "n_eligible"] == 2
+        assert (
+            counts.n_native.tolist()
+            == (counts.n_eligible + counts.n_moving + counts.n_set_aside).tolist()
+        )
+        # still [0, 20.0] and [24.998, 60], each observed span within it
+        exposures = counts.exposure_s.to_dict()
+        assert exposures["state_space"] == pytest.approx(20.0 + 15.002 + 19.0)
+        assert exposures["memoryless"] == pytest.approx(19.96 + 14.964 + 18.762)
+        assert exposures["kay"] == pytest.approx(20.0 + 25.002 + 8.0)
+        assert exposures["mua"] == pytest.approx(20.0 + 35.002)
+        assert counts.loc["state_space", "rate_per_s"] == pytest.approx(
+            4 / exposures["state_space"]
+        )
+        assert counts.loc["mua", "rate_per_s"] == 0.0
+        assert (
+            counts.loc["mua", "native_note"]
+            and counts.loc["state_space", "native_note"]
+        )
+        assert counts.loc["kay", "native_note"] == ""
+
+    def test_the_moving_event_stays_in_the_inventory_without_a_component(self, run):
+        inventory = table(run, WORKED, "inventory")
+
+        moving = at(inventory, "event_start_s", 21.0)
+        assert not moving.whole_event_speed_eligible
+        assert pd.isna(moving.component_id)
+        assert inventory.component_id.notna().sum() == len(inventory) - 1
+
+    def test_the_bridging_sequence_is_set_aside(self, run):
+        set_aside = table(run, WORKED, "set_aside")
+
+        assert set(set_aside.detector) == {"memoryless", "memoryless_criteria"}
+        assert set(set_aside.reason) == {"bridging"}
+        assert np.allclose(set_aside.interval_start_s, 41.0)
+        assert np.allclose(set_aside.interval_end_s, 41.2)
+
+    def test_the_directional_denominators(self, run):
+        directional = table(run, WORKED, "directional").set_index(
+            ["source_detector", "target_detector"]
+        )
+
+        ss_to_ms = directional.loc[("state_space", "memoryless")]
+        assert (ss_to_ms.n_source_events, ss_to_ms.n_eligible, ss_to_ms.n_matched) == (
+            4,
+            3,
+            1,
+        )
+        ms_to_ss = directional.loc[("memoryless", "state_space")]
+        assert (ms_to_ss.n_eligible, ms_to_ss.n_matched) == (1, 1)
+        assert len(directional) == 9 * 8
+
+    def test_the_three_cells(self, run):
+        cells = table(run, WORKED, "cells")
+        inventory = table(run, WORKED, "inventory").set_index("event_key")
+        cells["start"] = inventory.event_start_s.loc[cells.event_key].to_numpy()
+
+        def membership(cell):
+            rows = cells[cells.cell == cell]
+            return {
+                (detector, round(start, 3)): value
+                for detector, start, value in zip(
+                    rows.detector, rows.start, rows.membership, strict=True
+                )
+            }
+
+        assert membership("exactly_one_detector") == {
+            ("state_space", 5.0): "matched",
+            ("state_space", 10.0): "unmatched",
+            ("state_space", 41.1): "unknown",
+            ("state_space", 51.0): "unknown",
+            ("memoryless", 5.1): "matched",
+            ("kay", 5.05): "matched",
+            ("kay", 30.0): "unmatched",
+        }
+        assert membership("swr_matched_by_no_decoder") == {
+            ("kay", 5.05): "matched",
+            ("kay", 30.0): "unmatched",
+        }
+        assert membership("sequence_matched_by_no_trigger") == {
+            ("state_space", 5.0): "matched",
+            ("state_space", 10.0): "unmatched",
+            ("state_space", 41.1): "unmatched",
+            ("state_space", 51.0): "unknown",
+            # Kay's SWR at 5.05-5.1 s only touches it
+            ("memoryless", 5.1): "unmatched",
+        }
+
+    def test_no_detector_time_is_the_hand_worked_shared_exposure(self, run):
+        row = table(run, WORKED, "no_detector_time").iloc[0]
+
+        assert row.shared_exposure_s == pytest.approx(SHARED)
+        assert row.detected_s == pytest.approx(0.7)
+
+    def test_excluded_time_by_reason(self, run):
+        exclusion = table(run, WORKED, "exclusion_by_reason")
+
+        totals = exclusion.groupby("comparison").seconds.sum()
+        assert np.allclose(totals, 60.0)
+        everyone = exclusion[exclusion.comparison == "all"].set_index("reason")
+        # Karlsson misses the stored band's gap first, by name order
+        assert everyone.seconds.to_dict() == pytest.approx(
+            {
+                "shared_exposure": SHARED,
+                "karlsson: lfp_not_observed": 2.0,
+                "memoryless: no_decoded_window": 0.04 + (41.04 - 39.962) + 0.038,
+                "memoryless: bridging": 41.2 - 41.04,
+                "moving": 24.998 - 20.0,
+            }
+        )
+        pair = exclusion[exclusion.comparison == "kay+state_space"].set_index("reason")
+        assert pair.seconds["state_space: no_posterior_or_in_artifact_mask"] == (
+            pytest.approx(1.0)
+        )
+        n_pairs = 9 * 8 // 2
+        assert exclusion.comparison.nunique() == n_pairs + 1 + 3
+
+    def test_the_swr_matrix_and_its_paired_labels(self, run):
+        matrix = table(run, WORKED, "swr_matrix").set_index(
+            ["cohort", "swr_definition"]
+        )
+        paired = table(run, WORKED, "paired_labels")
+
+        ss = matrix.loc[("state_space", "kay")]
+        assert (ss.n_events, ss.n_eligible, ss.n_swr, ss.n_non_swr) == (4, 3, 1, 2)
+        assert set(matrix.index.get_level_values("swr_definition")) == {
+            "kay",
+            "karlsson",
+            "yu",
+            "zugaro",
+            "carey",
+        }
+        row = paired[
+            (paired.detector_a == "memoryless")
+            & (paired.detector_b == "state_space")
+            & (paired.swr_definition == "kay")
+        ].iloc[0]
+        assert (row.label_a, row.label_b, row.agreement) == (
+            "non-SWR",
+            "SWR",
+            "disagree",
+        )
+
+    def test_time_coverage_and_components(self, run):
+        covered = table(run, WORKED, "time_coverage").set_index(
+            ["detector_a", "detector_b"]
+        )
+        components = table(run, WORKED, "components")
+
+        ss_k = covered.loc[("kay", "state_space")]
+        assert ss_k.union_s == pytest.approx(0.3 + 0.2 + 0.05 + 0.1)
+        assert ss_k.intersection_s == pytest.approx(0.05)
+        joined = at(components, "span_start_s", 5.0)
+        assert joined.detectors == "kay+memoryless+memoryless_criteria+state_space"
+        assert joined.span_end_s == 5.4
+
+    def test_the_recount_at_no_gap_is_the_native_count(self, run):
+        recount = table(run, WORKED, "recount_directional")
+        directional = table(run, WORKED, "directional")
+
+        assert sorted(recount.gap_s.unique()) == [0.0, 0.01, 0.02, 0.05]
+        native = recount[recount.gap_s == 0.0].drop(columns="gap_s")
+        pd.testing.assert_frame_equal(
+            native.reset_index(drop=True), directional.reset_index(drop=True)
+        )
+
+
+class TestAnEpochWithoutAMemorylessRecord:
+    def test_memoryless_is_unavailable_in_every_table(self, run):
+        observations = table(run, MASKED, "observations")
+        directional = table(run, MASKED, "directional")
+        matrix = table(run, MASKED, "swr_matrix")
+        counts = table(run, MASKED, "counts").set_index("detector")
+
+        for detector in ("memoryless", "memoryless_criteria"):
+            rows = observations[observations.detector == detector]
+            assert len(rows) == 1 and not rows.available.any()
+            assert "not in" in rows.reason.iloc[0]
+            touching = directional[
+                (directional.source_detector == detector)
+                | (directional.target_detector == detector)
+            ]
+            assert len(touching) == 2 * 8 and not touching.available.any()
+            assert counts.loc[detector, "exposure_s"] == 0.0
+            assert np.isnan(counts.loc[detector, "rate_per_s"])
+        assert not matrix[matrix.cohort.str.startswith("memoryless")].available.any()
+
+    def test_its_cells_are_unknown_not_unmatched(self, run):
+        cells = table(run, MASKED, "cells")
+
+        for cell in ("exactly_one_detector", "swr_matched_by_no_decoder"):
+            assert "unmatched" not in set(cells[cells.cell == cell].membership)
+        # the sequences' cell asks only the triggered inventories
+        sequences = cells[cells.cell == "sequence_matched_by_no_trigger"]
+        assert "unmatched" in set(sequences.membership)
+
+    def test_the_swr_in_the_artifact_mask_is_set_aside(self, run):
+        set_aside = table(run, MASKED, "set_aside")
+        exclusion = table(run, MASKED, "exclusion_by_reason")
+
+        kay = set_aside[set_aside.detector == "kay"]
+        assert kay.reason.tolist() == ["artifact"]
+        assert (kay.interval_start_s.iloc[0], kay.interval_end_s.iloc[0]) == (
+            30.0,
+            30.1,
+        )
+        assert np.allclose(exclusion.groupby("comparison").seconds.sum(), 60.0)
+        assert "excluded_time" in set(exclusion.reason)
+
+    def test_a_set_aside_events_span_is_unobserved_by_its_own_detector(self, run):
+        """Karlsson's event at 29.5-29.7 s is set aside, so Kay's SWR inside its
+        span leaves Kay's denominator against Karlsson: not observed by
+        Karlsson, rather than missed."""
+        set_aside = table(run, MASKED, "set_aside")
+        directional = table(run, MASKED, "directional").set_index(
+            ["source_detector", "target_detector"]
+        )
+
+        karlsson = set_aside[set_aside.detector == "karlsson"]
+        assert karlsson.reason.tolist() == ["near_artifact"]
+        kay = directional.loc[("kay", "karlsson")]
+        assert (kay.n_source_events, kay.n_eligible, kay.n_matched) == (2, 1, 0)
+
+
+def test_event_keys_are_unique_across_the_epochs(run):
+    inventory = pd.concat(
+        [table(run, identifier, "inventory") for identifier in EPOCHS.values()]
+    )
+    set_aside = pd.concat(
+        [table(run, identifier, "set_aside") for identifier in EPOCHS.values()]
+    )
+
+    keys = pd.concat([inventory.event_key, set_aside.event_key])
+    assert keys.is_unique
+    # the same native events in both epochs, under keys naming each epoch
+    assert set(inventory.epoch) == {"02_r1", "04_r2"}
+
+
+def test_every_table_keeps_its_dtypes_through_a_write_and_read(run):
+    for identifier in EPOCHS.values():
+        for name, dtypes in runner.TABLE_DTYPES.items():
+            read = table(run, identifier, name)
+            assert list(read.columns) == list(dtypes), name
+            assert read.dtypes.to_dict() == {
+                column: pd.api.types.pandas_dtype(dtype)
+                for column, dtype in dtypes.items()
+            }, name
+
+
+def test_the_manifest_records_the_inputs_and_each_epoch(run):
+    manifest = json.loads((run / "manifest.json").read_text())
+
+    settings = manifest["settings"]
+    assert settings["input_runs"] == {
+        "swr": swr_source.SWR_INVENTORY_RUN_ID,
+        "carey": CAREY_RUN,
+        "memoryless": MEMORYLESS_RUN,
+        "artifacts": swr_source.ARTIFACT_INTERVALS_RUN_ID,
+    }
+    assert settings["swr_source"] == swr_source.swr_source_name()
+    assert settings["roster"]["memoryless"] == "published"
+    assert settings["roster"]["memoryless_criteria"] == "replay_criteria"
+    assert set(settings["native_is_eligible"]) == {"mua", "state_space"}
+    for identifier in EPOCHS.values():
+        record = manifest["epochs"][identifier]
+        assert record["status"] == "ok"
+        decode = runner.DECODE_ROOT / f"{identifier}_80_data_over_time.pkl"
+        assert record["decode"]["sha256"] == sha256_file(decode)
+        assert set(record["outputs"]) == set(runner.TABLE_DTYPES)
+        for output in record["outputs"].values():
+            assert sha256_file(output["path"]) == output["sha256"]
+    assert manifest["epochs"][WORKED]["counts"]["kay"]["n_native"] == len(KAY)
+    assert manifest["epochs"][MASKED]["counts"]["kay"]["n_native"] == len(MASKED_KAY)
+    for record in manifest["epochs"].values():
+        assert record["wall_clock_s"] > 0 and record["peak_rss_gib"] > 0
+    assert set(manifest["epochs"][MASKED]["unavailable"]) == {
+        "memoryless",
+        "memoryless_criteria",
+    }
+
+
+def test_a_rerun_skips_ok_epochs(run, monkeypatch, capsys):
+    before = {path.name: path.stat().st_mtime_ns for path in run.glob("*.parquet")}
+
+    def refuse(*args, **kwargs):
+        raise AssertionError("an ok epoch was run again")
+
+    monkeypatch.setattr(runner, "compare_epoch", refuse)
+    runner.main([*ARGS, "--epoch-id", WORKED])
+
+    assert "already written" in capsys.readouterr().out
+    after = {path.name: path.stat().st_mtime_ns for path in run.glob("*.parquet")}
+    assert after == before
+
+
+def test_a_rerun_under_other_settings_is_refused(run, inputs):
+    other = inputs / "carey" / "careyrun02"
+    other.mkdir()
+    (other / "manifest.json").write_text(
+        json.dumps({"run_id": "careyrun02", "epochs": {}})
+    )
+    changed = [*ARGS]
+    changed[changed.index(CAREY_RUN)] = "careyrun02"
+
+    with pytest.raises(SystemExit, match="other settings"):
+        runner.main([*changed, "--epoch-id", WORKED])
