@@ -776,7 +776,7 @@ Objective AST mutation check for value-critical builder logic.
 
 Report one inventory comparison run: its counts per session and per animal.
 
-`session_names`, `read_run`, `epoch_status`, `detector_availability`, `with_pending`, `pool_sessions`, `counts_by_session`, `counts_by_animal`, `directional_by_animal`, `cells_by_session`, `cells_by_animal`, `swr_matrix_by_animal`, `report_tables`, `draw_figures`, `write_report`, `main`
+`session_names`, `read_run`, `epoch_status`, `detector_availability`, `with_pending`, `pool_sessions`, `counts_by_session`, `counts_by_animal`, `directional_by_animal`, `cells_by_session`, `cells_by_animal`, `swr_matrix_by_animal`, `matrix_population`, `paired_labels_by_session`, `definition_disagreement_by_session`, `labels_by_animal`, `report_tables`, `draw_figures`, `write_report`, `main`
 
 ### `scripts/qa/run_inventory_comparison.py`
 

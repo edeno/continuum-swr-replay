@@ -205,6 +205,95 @@ class TestUnknownMembership:
         assert row.unavailable_sessions == "sim20200101_04_r2"
 
 
+class TestTheLabelTablesPoolOnTheMatrixPopulation:
+    """Paired labels and definition disagreement pool the sessions the SWR
+    matrix pools, cohort by cohort, and list the others."""
+
+    MATRIX = rows(
+        "swr_matrix",
+        [
+            session(
+                epoch,
+                cohort=cohort,
+                swr_definition="kay",
+                available=not (epoch == "04_r2" and cohort == "memoryless"),
+            )
+            for epoch in ("02_r1", "04_r2")
+            for cohort in ("memoryless", "state_space")
+        ],
+    )
+
+    def test_paired_labels_leave_a_session_without_both_populations(self):
+        paired = rows(
+            "paired_labels",
+            [
+                session(
+                    epoch,
+                    swr_definition="kay",
+                    detector_a="memoryless",
+                    detector_b="state_space",
+                    agreement=agreement,
+                )
+                for epoch, agreement in (
+                    ("02_r1", "agree"),
+                    ("02_r1", "unknown"),
+                    ("04_r2", "disagree"),
+                )
+            ],
+        )
+
+        by_session = report.paired_labels_by_session(paired, self.MATRIX)
+        row = report.labels_by_animal(by_session, "paired_labels").iloc[0]
+
+        assert by_session.available.tolist() == [True, False]
+        assert (row.n_sessions, row.n_pairs, row.n_agree, row.n_disagree) == (
+            1,
+            2,
+            1,
+            0,
+        )
+        assert row.n_unknown == 1
+        assert row.unavailable_sessions == "sim20200101_04_r2"
+
+    def test_disagreement_leaves_a_session_without_the_population(self):
+        labels = rows(
+            "definition_disagreement",
+            [
+                session(epoch, cohort="memoryless", event_key=key, n_unknown=unknown)
+                for epoch, key, unknown in (
+                    ("02_r1", "a", 0),
+                    ("04_r2", "b", 1),
+                    ("04_r2", "c", 0),
+                )
+            ],
+        )
+
+        by_session = report.definition_disagreement_by_session(labels, self.MATRIX)
+        pooled = report.labels_by_animal(
+            by_session, "definition_disagreement"
+        ).set_index("cohort")
+
+        memoryless = pooled.loc["memoryless"]
+        assert (memoryless.n_sessions, memoryless.n_events) == (1, 1)
+        assert memoryless.n_with_unknown == 0
+        assert memoryless.unavailable_sessions == "sim20200101_04_r2"
+        # a population with no events is pooled with zeros
+        assert (pooled.n_sessions["state_space"], pooled.n_events["state_space"]) == (
+            2,
+            0,
+        )
+
+
+def test_a_detector_with_no_observation_row_is_refused():
+    counts = rows("counts", [session("02_r1", detector="kay")])
+    availability = report.detector_availability(observed({("02_r1", "yu"): True}))
+
+    with pytest.raises(
+        ValueError, match="No observation row for kay in sim20200101_02_r1"
+    ):
+        report.counts_by_session(counts, availability)
+
+
 def test_rows_with_a_memoryless_inventory_are_marked_pending():
     table = directional(
         [
@@ -229,9 +318,9 @@ def written(run, tmp_path_factory, module_monkeypatch):  # noqa: F811
         "analysed_epoch_ids",
         lambda: [*EPOCHS.values(), SHIFTED, NO_DECODE, "sim20200101_10_r5_HPC"],
     )
-    figure_dir = tmp_path_factory.mktemp("figures")
-    report.write_report(run, figure_dir)
-    return run / "report", figure_dir
+    figure_root = tmp_path_factory.mktemp("figures")
+    report.write_report(run, figure_root)
+    return run / "report", figure_root / run.name
 
 
 @pytest.mark.slow
@@ -257,7 +346,7 @@ class TestTheReportOnTheRunnersTables:
         assert report.PENDING in (report_dir / "report.md").read_text()
         assert report.PENDING in (figure_dir / "captions.md").read_text()
 
-    def test_failed_and_unrun_epochs_are_listed(self, written):
+    def test_failed_epochs_are_listed_and_unrun_ones_counted(self, written):
         report_dir, _ = written
 
         epochs = pd.read_csv(report_dir / "epochs.csv").set_index("epoch_id")
@@ -266,13 +355,52 @@ class TestTheReportOnTheRunnersTables:
             EPOCHS["04_r2"]: "ok",
             SHIFTED: "failed",
             NO_DECODE: "failed",
-            "sim20200101_10_r5_HPC": "not_run",
         }
+        assert "1 analysed epochs of the epoch register outside the run" in (
+            (report_dir / "report.md").read_text()
+        )
         assert "position span" in epochs.reason[SHIFTED]
         assert "FileNotFoundError" in epochs.reason[NO_DECODE]
         assert epochs.unavailable_detectors[EPOCHS["04_r2"]] == (
             "memoryless; memoryless_criteria"
         )
+        assert epochs.pending[EPOCHS["04_r2"]] == report.PENDING
+        assert pd.isna(epochs.pending[EPOCHS["02_r1"]])
+
+    def test_the_pending_marks_of_the_cells_and_exclusion_tables(self, written):
+        report_dir, _ = written
+
+        cells = pd.read_csv(report_dir / "cells_by_animal.csv").set_index(
+            ["cell", "detector"]
+        )
+        exclusion = pd.read_csv(report_dir / "exclusion_by_animal.csv")
+
+        marked = cells.pending == report.PENDING
+        # tested against the triggered inventories alone
+        assert not marked[("sequence_matched_by_no_trigger", "state_space")]
+        assert marked[("sequence_matched_by_no_trigger", "memoryless")]
+        # tested against both decoders, memoryless among them
+        assert marked[("swr_matched_by_no_decoder", "kay")]
+        assert marked.xs("exactly_one_detector").all()
+        by_comparison = exclusion.groupby("comparison").pending.first()
+        assert (
+            by_comparison[["all", "kay+memoryless", "swr_matrix_memoryless"]]
+            .eq(report.PENDING)
+            .all()
+        )
+        assert by_comparison[["kay+state_space", "swr_matrix_state_space"]].isna().all()
+
+    def test_the_label_tables_list_the_session_without_memoryless(self, written):
+        report_dir, _ = written
+
+        paired = pd.read_csv(report_dir / "paired_labels_by_animal.csv")
+        disagreement = pd.read_csv(
+            report_dir / "definition_disagreement_by_animal.csv"
+        ).set_index("cohort")
+
+        assert set(paired.unavailable_sessions) == {f"{ANIMAL}{DAY}_04_r2"}
+        assert disagreement.unavailable_sessions["memoryless"] == f"{ANIMAL}{DAY}_04_r2"
+        assert pd.isna(disagreement.unavailable_sessions["state_space"])
 
     def test_the_animal_counts_are_the_session_counts_summed(self, run, written):  # noqa: F811
         report_dir, _ = written
@@ -321,4 +449,4 @@ class TestTheReportOnTheRunnersTables:
 
         manifest = json.loads((run / "manifest.json").read_text())
         assert manifest["run_id"] == run.name
-        assert (tmp_path / "figures" / "native_durations.png").exists()
+        assert (tmp_path / "figures" / run.name / "native_durations.png").exists()

@@ -5,7 +5,8 @@ Reads the per-epoch tables ``scripts/qa/run_inventory_comparison.py`` wrote
 for the run's ``ok`` epochs, concatenated, and its ``manifest.json``. Writes
 plain tables, one CSV each, to ``<inventory run>/report/`` with a
 ``report.md`` that captions them, and a few figures to
-``paper/figures/inventory_comparison/`` with a ``captions.md``. Design:
+``paper/figures/inventory_comparison/<run id>/`` with a ``captions.md``.
+Design:
 ``docs/design/replay_detection_comparison/03-inventory-comparison.md``
 (Reporting).
 
@@ -31,6 +32,7 @@ import json
 import os
 import sys
 from collections.abc import Collection, Iterable, Mapping, Sequence
+from itertools import combinations
 from pathlib import Path
 from types import MappingProxyType
 
@@ -210,8 +212,9 @@ _TOPICS: Mapping[str, tuple[str, str, str]] = MappingProxyType(
             "Paired label agreement: for each overlapping pair of sequence "
             "events and each SWR definition, whether their two labels agree, "
             "disagree, or either is unknown (n_unknown, counted apart).",
-            _SESSION_ROWS,
-            "Per animal, summed over its sessions.",
+            _SESSION_ROWS + " available says whether both cohorts' SWR-matrix "
+            "populations exist in the session.",
+            _ANIMAL_SUMS,
         ),
         "definition_disagreement": (
             "Definition disagreement: per cohort, the sequence events labelled "
@@ -219,8 +222,9 @@ _TOPICS: Mapping[str, tuple[str, str, str]] = MappingProxyType(
             "(n_disagree); n_with_unknown counts events with at least one "
             "unknown label, and n_agree_all_known the events every definition "
             "labelled the same.",
-            _SESSION_ROWS,
-            "Per animal, summed over its sessions.",
+            _SESSION_ROWS + " available says whether the cohort's SWR-matrix "
+            "population exists in the session, as in swr_matrix.",
+            _ANIMAL_SUMS,
         ),
         "components": (
             "Connected components of the overlap graph over all nine "
@@ -236,10 +240,9 @@ _TOPICS: Mapping[str, tuple[str, str, str]] = MappingProxyType(
 TABLE_CAPTIONS: Mapping[str, str] = MappingProxyType(
     {
         "epochs": _caption(
-            "Every epoch of the run and of the epoch register's analysed "
-            "epochs: ok, failed (with the manifest's reason or error), or "
-            "not_run (an analysed epoch the run does not hold), and the "
-            "detectors unavailable in each ok epoch."
+            "Every epoch of the run: ok or failed (with the manifest's reason "
+            "or error), and the detectors unavailable in each ok epoch. The "
+            "analysed epochs the run does not hold are counted in report.md."
         ),
         "unavailable_detectors": _caption(
             "Each session and detector with no observed time, and the reason "
@@ -340,34 +343,28 @@ def read_run(run_dir: Path) -> tuple[dict, dict[str, pd.DataFrame]]:
     return manifest, tables
 
 
-def epoch_status(manifest: Mapping, analysed: Collection[str]) -> pd.DataFrame:
-    """Every epoch of the run or of ``analysed``: its status, reason, gaps.
+def epoch_status(manifest: Mapping) -> pd.DataFrame:
+    """Every epoch of the run: its status, reason and unavailable detectors.
 
-    ``not_run`` is an analysed epoch the manifest has no record of; a failed
-    epoch's reason is its record's ``reason``, or else its ``error``.
+    A failed epoch's reason is its record's ``reason``, or else its
+    ``error``. ``pending`` is :data:`PENDING` where a memoryless inventory is
+    among the unavailable detectors.
     """
-    records = manifest["epochs"]
     rows = []
-    for identifier in sorted(set(records) | set(analysed)):
-        record = records.get(identifier)
-        if record is None:
-            rows.append(
-                {"epoch_id": identifier, "status": "not_run", "reason": ""}
-                | {"unavailable_detectors": ""}
-            )
-            continue
+    for identifier, record in sorted(manifest["epochs"].items()):
+        unavailable = sorted(record.get("unavailable", {}))
         rows.append(
             {
                 "epoch_id": identifier,
                 "status": record["status"],
                 "reason": record.get("reason") or record.get("error", ""),
-                "unavailable_detectors": "; ".join(
-                    sorted(record.get("unavailable", {}))
-                ),
+                "unavailable_detectors": "; ".join(unavailable),
+                "pending": PENDING if PENDING_DETECTORS & set(unavailable) else "",
             }
         )
     return pd.DataFrame(
-        rows, columns=["epoch_id", "status", "reason", "unavailable_detectors"]
+        rows,
+        columns=["epoch_id", "status", "reason", "unavailable_detectors", "pending"],
     )
 
 
@@ -495,13 +492,33 @@ def _distribution(
 
 
 def counts_by_session(counts: pd.DataFrame, availability: pd.DataFrame) -> pd.DataFrame:
-    """The runner's counts with each detector's session availability."""
-    return counts.merge(
+    """The runner's counts with each detector's session availability.
+
+    Raises
+    ------
+    ValueError
+        A detector has counts in a session but no observation row there.
+    """
+    merged = counts.merge(
         availability[[*SESSION, "detector", "available"]],
         on=[*SESSION, "detector"],
         how="left",
         validate="one_to_one",
     )
+    unobserved = merged.available.isna()
+    if unobserved.any():
+        missing = merged[unobserved]
+        raise ValueError(
+            "No observation row for "
+            + ", ".join(
+                f"{detector} in {session}"
+                for detector, session in zip(
+                    missing.detector, session_names(missing), strict=True
+                )
+            )
+            + "; its availability is unknown."
+        )
+    return merged.astype({"available": np.bool_})
 
 
 COUNT_SUMS = (
@@ -621,6 +638,130 @@ def swr_matrix_by_animal(matrix: pd.DataFrame) -> pd.DataFrame:
     return pooled.assign(non_swr_fraction=_ratio(pooled.n_non_swr, pooled.n_eligible))
 
 
+def matrix_population(matrix: pd.DataFrame) -> pd.DataFrame:
+    """Per session and cohort, whether the SWR-matrix population exists.
+
+    The runner gives every definition of a cohort the same ``available``;
+    the population is taken as available only where all of them are.
+    """
+    return matrix.groupby([*SESSION, "cohort"]).available.all().reset_index()
+
+
+def _with_counts(
+    skeleton: pd.DataFrame, counted: pd.DataFrame, keys: Sequence[str]
+) -> pd.DataFrame:
+    """``counted`` on ``skeleton``'s rows, zeros where it has none.
+
+    Raises
+    ------
+    ValueError
+        ``counted`` has a row ``skeleton`` does not.
+    """
+    out = skeleton.merge(counted, on=list(keys), how="outer", indicator=True)
+    if (out._merge == "right_only").any():
+        raise ValueError(
+            "Label counts of a session or cohort the matrix does not name."
+        )
+    counts = [c for c in counted.columns if c not in keys]
+    out[counts] = out[counts].fillna(0).astype(np.int64)
+    return out.drop(columns="_merge").sort_values(list(keys), ignore_index=True)
+
+
+def paired_labels_by_session(
+    paired_labels: pd.DataFrame, matrix: pd.DataFrame
+) -> pd.DataFrame:
+    """Paired label agreement counted per session, definition and cohort pair.
+
+    One row per session, SWR definition and pair of matrix cohorts (in name
+    order), zeros where no pair overlapped. ``available`` is whether both
+    cohorts' matrix populations exist in the session.
+    """
+    population = matrix_population(matrix)
+    cohorts = sorted(population.cohort.unique())
+    skeleton = (
+        population[SESSION]
+        .drop_duplicates()
+        .merge(
+            pd.DataFrame({"swr_definition": sorted(matrix.swr_definition.unique())}),
+            how="cross",
+        )
+        .merge(
+            pd.DataFrame(
+                list(combinations(cohorts, 2)), columns=["detector_a", "detector_b"]
+            ),
+            how="cross",
+        )
+    )
+    for side in ("a", "b"):
+        skeleton = skeleton.merge(
+            population.rename(
+                columns={"cohort": f"detector_{side}", "available": f"_{side}"}
+            ),
+            on=[*SESSION, f"detector_{side}"],
+            how="left",
+        )
+    skeleton["available"] = skeleton._a.astype(bool) & skeleton._b.astype(bool)
+    keys = [*SESSION, "swr_definition", "detector_a", "detector_b"]
+    counted = _count_by(paired_labels, keys, "agreement", AGREEMENTS).rename(
+        columns={"n": "n_pairs"}
+    )
+    return _with_counts(skeleton.drop(columns=["_a", "_b"]), counted, keys)
+
+
+def definition_disagreement_by_session(
+    labels: pd.DataFrame, matrix: pd.DataFrame
+) -> pd.DataFrame:
+    """Definition disagreement counted per session and cohort.
+
+    One row per session and matrix cohort, with the matrix population's
+    ``available``.
+    """
+    keys = [*SESSION, "cohort"]
+    counted = (
+        labels.assign(
+            n_disagree=labels.definitions_disagree,
+            n_with_unknown=labels.n_unknown > 0,
+            n_agree_all_known=(labels.n_unknown == 0) & ~labels.definitions_disagree,
+        )
+        .groupby(keys)
+        .agg(
+            n_events=("event_key", "size"),
+            n_disagree=("n_disagree", "sum"),
+            n_with_unknown=("n_with_unknown", "sum"),
+            n_agree_all_known=("n_agree_all_known", "sum"),
+        )
+        .astype(np.int64)
+        .reset_index()
+    )
+    return _with_counts(matrix_population(matrix), counted, keys)
+
+
+LABEL_SUMS: Mapping[str, tuple[str, ...]] = MappingProxyType(
+    {
+        "paired_labels": ("n_pairs", *(f"n_{a}" for a in AGREEMENTS)),
+        "definition_disagreement": (
+            "n_events",
+            "n_disagree",
+            "n_with_unknown",
+            "n_agree_all_known",
+        ),
+    }
+)
+
+
+def labels_by_animal(by_session: pd.DataFrame, table: str) -> pd.DataFrame:
+    """Paired-label or disagreement counts summed over each animal's sessions
+    with the matrix population; the others are listed."""
+    by = (
+        ["swr_definition", "detector_a", "detector_b"]
+        if table == "paired_labels"
+        else ["cohort"]
+    )
+    return pool_sessions(
+        by_session, by=by, sums=LABEL_SUMS[table], available=by_session.available
+    )
+
+
 def _per_session(frame: pd.DataFrame) -> pd.DataFrame:
     """``frame`` with each row's session name after the session columns."""
     return frame.assign(session=session_names(frame))[
@@ -650,20 +791,17 @@ def _summed(
 
 
 def report_tables(
-    manifest: Mapping, tables: Mapping[str, pd.DataFrame], analysed: Collection[str]
+    manifest: Mapping, tables: Mapping[str, pd.DataFrame]
 ) -> dict[str, pd.DataFrame]:
     """Every report table, by name, in the order of :data:`TABLE_CAPTIONS`."""
     settings = manifest["settings"]
     cell_sources = {name: cell["sources"] for name, cell in settings["cells"].items()}
-    cell_detectors = {
-        name: {*cell["sources"], *cell["against"]}
-        for name, cell in settings["cells"].items()
-    }
+    cell_against = {name: cell["against"] for name, cell in settings["cells"].items()}
     pairs_of = ["detector_a", "detector_b"]
     ordered = ["source_detector", "target_detector"]
     availability = detector_availability(tables["observations"])
     out: dict[str, pd.DataFrame] = {
-        "epochs": epoch_status(manifest, analysed),
+        "epochs": epoch_status(manifest),
         "unavailable_detectors": with_pending(
             _per_session(availability[~availability.available]), ["detector"]
         ),
@@ -767,41 +905,15 @@ def report_tables(
     out["swr_matrix_by_session"] = _per_session(matrix)
     out["swr_matrix_by_animal"] = swr_matrix_by_animal(matrix)
 
-    agreement = ["n", *(f"n_{a}" for a in AGREEMENTS)]
-    paired = _count_by(
-        tables["paired_labels"],
-        [*SESSION, "swr_definition", *pairs_of],
-        "agreement",
-        AGREEMENTS,
-    ).rename(columns={"n": "n_pairs"})
-    agreement[0] = "n_pairs"
+    paired = paired_labels_by_session(tables["paired_labels"], matrix)
     out["paired_labels_by_session"] = _per_session(paired)
-    out["paired_labels_by_animal"] = _summed(
-        paired, ["swr_definition", *pairs_of], agreement
-    )
-
-    labels = tables["definition_disagreement"]
-    disagreement = (
-        labels.assign(
-            n_disagree=labels.definitions_disagree,
-            n_with_unknown=labels.n_unknown > 0,
-            n_agree_all_known=(labels.n_unknown == 0) & ~labels.definitions_disagree,
-        )
-        .groupby([*SESSION, "cohort"])
-        .agg(
-            n_events=("event_key", "size"),
-            n_disagree=("n_disagree", "sum"),
-            n_with_unknown=("n_with_unknown", "sum"),
-            n_agree_all_known=("n_agree_all_known", "sum"),
-        )
-        .astype(np.int64)
-        .reset_index()
+    out["paired_labels_by_animal"] = labels_by_animal(paired, "paired_labels")
+    disagreement = definition_disagreement_by_session(
+        tables["definition_disagreement"], matrix
     )
     out["definition_disagreement_by_session"] = _per_session(disagreement)
-    out["definition_disagreement_by_animal"] = _summed(
-        disagreement,
-        ["cohort"],
-        ["n_events", "n_disagree", "n_with_unknown", "n_agree_all_known"],
+    out["definition_disagreement_by_animal"] = labels_by_animal(
+        disagreement, "definition_disagreement"
     )
 
     components = tables["components"]
@@ -819,7 +931,7 @@ def report_tables(
         "overlap": {"columns": pairs_of},
         "time_coverage": {"columns": pairs_of},
         "recount": {"columns": ordered},
-        "cells": {"columns": ["detector"], "groups": {"cell": cell_detectors}},
+        "cells": {"columns": ["detector"], "groups": {"cell": cell_against}},
         "swr_matrix": {"columns": ["cohort"]},
         "paired_labels": {"columns": pairs_of},
         "definition_disagreement": {"columns": ["cohort"]},
@@ -1080,8 +1192,11 @@ def draw_figures(
     return paths
 
 
-def write_report(run_dir: Path, figure_dir: Path) -> dict[str, list[Path]]:
+def write_report(run_dir: Path, figure_root: Path) -> dict[str, list[Path]]:
     """Write the run's report tables, figures and captions.
+
+    Tables go to ``run_dir/report/``; figures and ``captions.md`` to
+    ``figure_root/<run id>/``, so runs do not overwrite each other.
 
     Returns
     -------
@@ -1089,8 +1204,10 @@ def write_report(run_dir: Path, figure_dir: Path) -> dict[str, list[Path]]:
         ``tables`` and ``figures``: the paths written.
     """
     manifest, tables = read_run(run_dir)
-    out = report_tables(manifest, tables, analysed_epoch_ids())
+    out = report_tables(manifest, tables)
     run_id = run_dir.name
+    figure_dir = figure_root / run_id
+    outside = len(set(analysed_epoch_ids()) - set(manifest["epochs"]))
     report_dir = run_dir / REPORT_DIR
     report_dir.mkdir(exist_ok=True)
     table_paths = []
@@ -1109,7 +1226,7 @@ def write_report(run_dir: Path, figure_dir: Path) -> dict[str, list[Path]]:
         "",
         f"Written by `{PRODUCED_BY}` from the per-epoch tables of `{run_dir}` "
         f"({status.get('ok', 0)} ok epochs, {status.get('failed', 0)} failed, "
-        f"{status.get('not_run', 0)} analysed epochs not run).",
+        f"and {outside} analysed epochs of the epoch register outside the run).",
         "",
         PENDING_SENTENCE,
         "",
@@ -1146,7 +1263,7 @@ def main(argv: list[str] | None = None) -> None:
     written = write_report(run_dir, FIGURE_ROOT)
     print(
         f"{len(written['tables'])} tables -> {run_dir / REPORT_DIR}; "
-        f"{len(written['figures'])} figures -> {FIGURE_ROOT}",
+        f"{len(written['figures'])} figures -> {FIGURE_ROOT / args.run_id}",
         flush=True,
     )
 
