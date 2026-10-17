@@ -31,7 +31,9 @@ Per epoch:
    known (``exclusion_by_reason``'s ``speed_known``) and the samples that were
    not still (the recount's ``not_still_s``). The grid must step by
    :data:`SAMPLE_INTERVAL_S`. Every detector's epoch is the grid's first to
-   last time.
+   last time, which must be the position span the SWR source run cut its band
+   to (its record's ``position_span_s``); otherwise the epoch fails, with that
+   reason, and writes nothing.
 4. **Coverage.** ``coverage_from_observations``; each set-aside event's span
    leaves its own detector's coverage (``set_aside_events``); the
    speed-eligible events (``combine_inventories``) that bridge their own
@@ -57,7 +59,8 @@ SWR source, the roster and its cohorts, the comparisons, the recount and the
 speed rule, and why MUA and state-space native counts equal their eligible
 counts) and one record per epoch: its status, the decode's sha256, the counts,
 the unavailable detectors, each output's path and sha256, its wall clock and
-the process's peak RSS so far. Only this process writes it, atomically, after
+the process's peak RSS so far (``process_peak_rss_gib``, cumulative over the
+epochs before it). Only this process writes it, atomically, after
 each epoch. A rerun under the same run id skips the epochs already ``ok``
 unless ``--overwrite`` is given, and refuses settings other than the ones the
 manifest was written with. The epochs are the epoch register's analysed ones,
@@ -240,6 +243,9 @@ BRIDGING = "bridging"
 """The set-aside reason of an event bridging its own detector's unobserved
 time."""
 SPEED_TRACE = "head_speed of the canonical decode frame, on its grid"
+BOUNDS_TOLERANCE_S = SAMPLE_INTERVAL_S / 2
+"""How far the decode grid's first or last time may lie from the SWR run's
+position span: less than half a sample, so both name the same samples."""
 
 COUNT_DTYPES: Mapping[str, object] = MappingProxyType(
     {
@@ -295,7 +301,8 @@ missing; ``set_aside`` the events the rule dropped and the bridging ones."""
 def decode_path(identifier: str) -> Path:
     """The canonical decode's ``data_over_time`` pickle."""
     threshold = round(100 * DEFAULT_NON_LOCAL_THRESHOLD)
-    return DECODE_ROOT / f"{identifier}_{threshold}_data_over_time.pkl"
+    path: Path = DECODE_ROOT / f"{identifier}_{threshold}_data_over_time.pkl"
+    return path
 
 
 def _typed(
@@ -543,6 +550,28 @@ def compare_epoch(
     return out
 
 
+class _EpochRefused(Exception):
+    """The epoch cannot be compared; the message says why."""
+
+
+def bounds_mismatch(identifier: str, bounds: tuple[float, float]) -> str | None:
+    """Why the decode grid's first and last time are not the epoch's, or None.
+
+    They must be the position span the SWR source run cut its band to (its
+    record's ``position_span_s``), within :data:`BOUNDS_TOLERANCE_S`: every
+    detector is compared over that one span.
+    """
+    span = swr_source.ripple_power_inputs(identifier)["position_span_s"]
+    if np.allclose(bounds, span, rtol=0.0, atol=BOUNDS_TOLERANCE_S):
+        return None
+    return (
+        f"The decode grid spans {bounds[0]!r} to {bounds[1]!r} s, not the position "
+        f"span {span[0]!r} to {span[1]!r} s SWR run "
+        f"{swr_source.SWR_INVENTORY_RUN_ID} cut its band to; the detectors would "
+        "not share one epoch."
+    )
+
+
 def output_path(identifier: str, output_dir: Path, name: str) -> Path:
     return output_dir / f"{identifier}_{name}.parquet"
 
@@ -590,8 +619,9 @@ def run_epoch(
     -------
     dict
         The epoch's manifest record, in strict JSON types: ``status`` ``"ok"``,
-        or ``"failed"`` with the ``error`` and its ``traceback``, its outputs
-        removed.
+        or ``"failed"`` with a ``reason`` (the decode grid does not span the
+        position span the SWR run cut to) or the ``error`` and its
+        ``traceback``, its outputs removed.
     """
     started = clock.perf_counter()
     stamp = {
@@ -608,6 +638,12 @@ def run_epoch(
         drops = swr_source.artifact_event_drops(saved)
         dot = swr_source.with_swr_source(saved)
         del saved
+        time, _ = _speed_trace(dot)
+        bounds = (float(time[0]), float(time[-1]))
+        reason = bounds_mismatch(identifier, bounds)
+        if reason is not None:
+            replace_outputs(identifier, output_dir, {}, stamp)
+            raise _EpochRefused(reason)
         tables = compare_epoch(
             dot,
             drops,
@@ -621,7 +657,7 @@ def run_epoch(
         record = {
             "status": "ok",
             "decode": {"path": str(path), "sha256": decode_sha256},
-            "epoch_bounds_s": [observations.start_s.min(), observations.end_s.max()],
+            "epoch_bounds_s": list(bounds),
             "counts": {
                 detector: counts.loc[
                     detector, ["n_native", "n_eligible", "n_moving", "n_set_aside"]
@@ -637,6 +673,13 @@ def run_epoch(
             },
             "outputs": replace_outputs(identifier, output_dir, tables, stamp),
         }
+    except _EpochRefused as refused:
+        record = {
+            "status": "failed",
+            "reason": str(refused),
+            "decode": {"path": str(path), "sha256": decode_sha256},
+            "epoch_bounds_s": list(bounds),
+        }
     except Exception as error:  # noqa: BLE001 - recorded; the run goes on
         replace_outputs(identifier, output_dir, {}, stamp)
         record = {
@@ -646,8 +689,11 @@ def run_epoch(
         }
     record["provenance"] = dict(provenance)
     record["wall_clock_s"] = clock.perf_counter() - started
-    # the process's peak resident set over its life so far (KiB on Linux)
-    record["peak_rss_gib"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 2**20
+    # the process's peak resident set over its life so far, every earlier
+    # epoch included: not this epoch's own (KiB on Linux)
+    record["process_peak_rss_gib"] = (
+        resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 2**20
+    )
     ready: dict = json_ready(record)
     return ready
 
@@ -655,7 +701,7 @@ def run_epoch(
 def summary(record: dict) -> str:
     """One epoch's outcome, as the console reports it."""
     if record["status"] != "ok":
-        return f"{record['status']}: {record['error']}"
+        return f"{record['status']}: {record.get('reason') or record['error']}"
     eligible = ", ".join(
         f"{detector} {counts['n_eligible']}"
         for detector, counts in record["counts"].items()
@@ -663,7 +709,8 @@ def summary(record: dict) -> str:
     unavailable = ", ".join(record["unavailable"]) or "none"
     return (
         f"ok: eligible {eligible}; unavailable: {unavailable}; "
-        f"{record['wall_clock_s']:.0f} s, peak RSS {record['peak_rss_gib']:.1f} GiB"
+        f"{record['wall_clock_s']:.0f} s, process peak RSS "
+        f"{record['process_peak_rss_gib']:.1f} GiB"
     )
 
 
@@ -697,7 +744,13 @@ def run_settings(carey_run_id: str, memoryless_run_id: str) -> dict:
                 "threshold_cm_per_s": DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
                 "max_gap_s": MAX_GAP_S,
             },
-            "epoch_bounds": "the decode grid's first and last time",
+            "epoch_bounds": {
+                "rule": "the decode grid's first and last time, which must be "
+                "the SWR run's position_span_s",
+                "tolerance_s": BOUNDS_TOLERANCE_S,
+            },
+            "peak_rss": "process_peak_rss_gib: the process's peak so far, "
+            "cumulative over the epochs run before",
             "decode": decode_path("{epoch_id}").name + ", read through the SWR source",
             "native_is_eligible": NATIVE_IS_ELIGIBLE,
         }

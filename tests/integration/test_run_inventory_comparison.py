@@ -1,4 +1,4 @@
-"""The comparison runner end to end, on two simulated epochs written to disk.
+"""The comparison runner end to end, on simulated epochs written to disk.
 
 Every input is written to a temporary folder as its runner writes it: the
 decode frame's pickle, the SWR run (Kay, Karlsson, Yu, Zugaro), a Carey run, a
@@ -14,7 +14,9 @@ observe the whole epoch and find nothing, so the hand-worked exposures hold
 for every comparison. Epoch ``04_r2`` repeats it with an artifact core at
 30.05 s, which sets Kay's SWR at 30.0 s aside, and no memoryless record; its
 Karlsson event at 29.5-29.7 s reaches excluded time and is set aside, and the
-Kay SWR at 29.52-29.58 s that it overlaps is kept.
+Kay SWR at 29.52-29.58 s that it overlaps is kept. Two more epochs fail: in
+``06_r3`` the SWR run cut its band to a position span other than the decode
+grid's, and ``08_r4`` has no decode.
 """
 
 from __future__ import annotations
@@ -41,6 +43,7 @@ pytestmark = pytest.mark.slow
 ANIMAL, DAY = "sim", 20200101
 EPOCHS = {"02_r1": "sim20200101_02_r1_HPC", "04_r2": "sim20200101_04_r2_HPC"}
 WORKED, MASKED = EPOCHS["02_r1"], EPOCHS["04_r2"]
+SHIFTED, NO_DECODE = "sim20200101_06_r3_HPC", "sim20200101_08_r4_HPC"
 TIME = np.round(np.arange(30_001) * 0.002, 6)
 SPEED = np.where((TIME >= 20.0) & (TIME < 25.0), 10.0, 1.0)
 
@@ -190,9 +193,14 @@ def inputs(tmp_path_factory, module_monkeypatch):
     monkeypatch = module_monkeypatch
     swr_run = write_swr_inventory(
         tmp_path / "swr",
-        {WORKED: KAY, MASKED: MASKED_KAY},
-        observed=dict.fromkeys(EPOCHS.values(), STORED_BAND),
+        {WORKED: KAY, MASKED: MASKED_KAY, SHIFTED: KAY},
+        observed=dict.fromkeys([*EPOCHS.values(), SHIFTED], STORED_BAND),
     )
+    # the span each epoch's band was cut to: the grid's, but for SHIFTED
+    manifest = json.loads((swr_run / "manifest.json").read_text())
+    for identifier, record in manifest["epochs"].items():
+        record["position_span_s"] = [0.0, 59.0 if identifier == SHIFTED else 60.0]
+    (swr_run / "manifest.json").write_text(json.dumps(manifest))
     for identifier in EPOCHS.values():
         for detector in ("karlsson", "yu", "zugaro"):
             intervals = (
@@ -202,12 +210,13 @@ def inputs(tmp_path_factory, module_monkeypatch):
             )
             add_swr_detector(swr_run, identifier, detector, intervals)
     artifact_run = write_artifact_run(
-        tmp_path / "artifacts", {WORKED: [], MASKED: [("spk", 30.05, 30.05)]}
+        tmp_path / "artifacts",
+        {WORKED: [], MASKED: [("spk", 30.05, 30.05)], SHIFTED: []},
     )
     use_swr_source(monkeypatch, swr_run, artifact_run)
     decode_root = tmp_path / "decodes"
     decode_root.mkdir()
-    for epoch, identifier in EPOCHS.items():
+    for epoch, identifier in [*EPOCHS.items(), ("06_r3", SHIFTED)]:
         write_decode(decode_root, epoch, identifier)
     write_carey_run(tmp_path / "carey")
     write_memoryless_run(tmp_path / "memoryless")
@@ -215,7 +224,9 @@ def inputs(tmp_path_factory, module_monkeypatch):
     monkeypatch.setattr(runner, "CAREY_ROOT", tmp_path / "carey")
     monkeypatch.setattr(runner, "MEMORYLESS_ROOT", tmp_path / "memoryless")
     monkeypatch.setattr(runner, "OUTPUT_ROOT", tmp_path / "inventory")
-    monkeypatch.setattr(runner, "analysed_epoch_ids", lambda: list(EPOCHS.values()))
+    monkeypatch.setattr(
+        runner, "analysed_epoch_ids", lambda: [*EPOCHS.values(), SHIFTED, NO_DECODE]
+    )
     return tmp_path
 
 
@@ -231,8 +242,9 @@ ARGS = [
 
 @pytest.fixture(scope="module")
 def run(inputs):
-    """The runner over both epochs; its run folder."""
-    runner.main([*ARGS, "--animal", ANIMAL])
+    """The runner over the four epochs, two failing; its run folder."""
+    with pytest.raises(SystemExit, match="2 epochs failed"):
+        runner.main([*ARGS, "--animal", ANIMAL])
     return inputs / "inventory" / RUN_ID
 
 
@@ -530,17 +542,40 @@ def test_the_manifest_records_the_inputs_and_each_epoch(run):
         assert record["status"] == "ok"
         decode = runner.DECODE_ROOT / f"{identifier}_80_data_over_time.pkl"
         assert record["decode"]["sha256"] == sha256_file(decode)
+        assert record["epoch_bounds_s"] == [float(TIME[0]), float(TIME[-1])]
         assert set(record["outputs"]) == set(runner.TABLE_DTYPES)
         for output in record["outputs"].values():
             assert sha256_file(output["path"]) == output["sha256"]
     assert manifest["epochs"][WORKED]["counts"]["kay"]["n_native"] == len(KAY)
     assert manifest["epochs"][MASKED]["counts"]["kay"]["n_native"] == len(MASKED_KAY)
     for record in manifest["epochs"].values():
-        assert record["wall_clock_s"] > 0 and record["peak_rss_gib"] > 0
+        assert record["wall_clock_s"] > 0 and record["process_peak_rss_gib"] > 0
     assert set(manifest["epochs"][MASKED]["unavailable"]) == {
         "memoryless",
         "memoryless_criteria",
     }
+
+
+class TestAFailedEpoch:
+    @pytest.mark.parametrize("identifier", [SHIFTED, NO_DECODE])
+    def test_it_leaves_no_tables_and_a_failed_record(self, run, identifier):
+        record = json.loads((run / "manifest.json").read_text())["epochs"][identifier]
+
+        assert record["status"] == "failed"
+        assert "outputs" not in record
+        assert not list(run.glob(f"{identifier}_*"))
+
+    def test_a_grid_other_than_the_position_span_fails_with_that_reason(self, run):
+        record = json.loads((run / "manifest.json").read_text())["epochs"][SHIFTED]
+
+        assert "position span" in record["reason"]
+        assert record["epoch_bounds_s"] == [float(TIME[0]), float(TIME[-1])]
+
+    def test_an_error_is_recorded_with_its_traceback(self, run):
+        record = json.loads((run / "manifest.json").read_text())["epochs"][NO_DECODE]
+
+        assert "FileNotFoundError" in record["error"]
+        assert "Traceback" in record["traceback"]
 
 
 def test_a_rerun_skips_ok_epochs(run, monkeypatch, capsys):
