@@ -3,10 +3,15 @@
 *Design spec. Status: approved; the accounting — schema, availability, overlap, components,
 fragment-merge recount, cells and SWR label matrix — is implemented in
 `src/continuum_swr_replay/analysis/inventory_comparison/` and tested on synthetic
-inventories. Not yet run on recorded data: the per-detector adapters that build coverage
-from recordings, the runner, and the sampled examples remain, and excluded time is not
-yet reported by reason (the observation tables carry a reason per stretch; nothing
-aggregates it per comparison).*
+inventories. Also built and tested, on simulated epochs: the per-detector adapters that
+build coverage from recordings (`adapters.py`), Carey's runner
+(`scripts/decoding/run_carey_detection.py`), the per-epoch runner
+(`scripts/qa/run_inventory_comparison.py`), the report
+(`scripts/qa/report_inventory_comparison.py`), the sampled examples
+(`scripts/figures/generate_inventory_examples.py`), and excluded time by reason for every
+comparison. Run so far: Carey's one-epoch smoke (`chimi20200225_02_r1_HPC`). Not yet run:
+Carey on every epoch, and the comparison, report and examples on the canonical data. The
+Widloski columns are pending the Phase 2 pilot checks.*
 *Governing rule and cross-cutting decisions: [overview.md](overview.md).*
 
 Depends on [01](01-yu-swr-detector.md) and [02](02-memoryless-sequence.md). Covers how the
@@ -20,10 +25,27 @@ power and multiunit activity jointly), MUA high-synchrony events, our state-spac
 events, and the memoryless sequences. Long was dropped (decision D1: it needs a stratum
 radiatum channel, which this dataset lacks).
 
-Carey runs with two adaptations. Each clusterless tetrode's multiunit train stands in for
-one unit, for `minimum_active_units` and the per-unit `spike_cap`, a coarser count than
-sorted cells. The score is the code's Hilbert ripple score, not the published spectral one,
-which needs hand-picked ripples this dataset does not have.
+The runner reads the memoryless one under two cohorts, so it compares nine inventories:
+`kay`, `karlsson`, `yu`, `zugaro`, `carey`, `mua`, `state_space`, `memoryless` (cohort
+`published`) and `memoryless_criteria` (cohort `replay_criteria`, before the significance
+test). The two memoryless inventories share one detector; the cells and no-detector time
+use the eight that leave `memoryless_criteria` out, because every published event is also a
+criteria event.
+
+Carey runs with four adaptations of the published detector:
+
+1. Each clusterless tetrode's multiunit train stands in for one unit, for
+   `minimum_active_units` and the per-unit `spike_cap`, a coarser count than sorted cells.
+2. The score is the code's Hilbert ripple score, not the published spectral one, which
+   needs hand-picked ripples this dataset does not have.
+3. The ripple signal is the stored 150–250 Hz band averaged over the tetrodes rule R-T
+   kept, not one 140–250 Hz channel.
+4. There is no theta restriction; the 4 cm/s speed rule gates.
+
+Its artifact handling is the other four SWR detectors': the package's `normalization_mask`
+leaves the artifact mask out of its normalization, and events that touch the mask are
+dropped. Carey is a fifth SWR definition: it is a column of the SWR label matrix and one of
+the triggered inventories below.
 
 Each inventory produces one table, one row per event, over the same epochs and the same
 speed-eligible population (overview X4). Every table carries:
@@ -127,7 +149,7 @@ Coverage is less sensitive to segmentation than event counts, and the two can di
 one detector splitting an event into three does not change the time it accounts for.
 
 **Overlap is not transitive.** A can overlap B and B overlap C without A overlapping C.
-Membership in "all eight" is therefore not well-defined by pairwise overlap alone.
+Membership in "all of them" is therefore not well-defined by pairwise overlap alone.
 Summarize connected components of the multipartite overlap graph, labeled by which
 detectors contribute to each component, and report component size and span as
 diagnostics — a long chain can fuse events that do not individually overlap.
@@ -138,11 +160,13 @@ diagnostics — a long chain can fuse events that do not individually overlap.
 The cells of most interest are the ones no pairwise table reaches:
 
 - **Events found by exactly one detector**, per detector.
-- **SWRs matched by neither decoding-based detector** — absence of a detected match,
+- **SWRs matched by neither decoding-based detector** (under each of the five SWR
+  definitions) — absence of a detected match,
   not proof that the ripple has no spatial content. Characterize their activity with
   the same diagnostics as every other inventory. This is computable because SWR
   inventories are first-class here rather than labels attached to someone else's events.
-- **Sequences matched by no LFP- or rate-triggered inventory** — events the standard
+- **Sequences matched by no LFP- or rate-triggered inventory** (the five SWR definitions
+  and MUA) — events the standard
   field pipelines would not have found at all. This is the neither-ripple-nor-burst
   cell, distinct from ripple-less (overview): an MUA-matched, SWR-unmatched sequence is
   ripple-less but not in this cell.
@@ -155,22 +179,22 @@ separately. No-detector time is shared exposure minus the union of detected inte
 ## The SWR label matrix
 
 Distinct from the inventory comparison above, and the reason level 3 needs no separate
-sweep (overview X6). Each *sequence* cohort — ours and the memoryless one — is labeled
-under each of the four SWR definitions (Kay, Karlsson, Yu and Zugaro), giving a
-cohort × SWR-definition matrix of non-SWR fractions. The canonical Spyglass `SWR_event`
-that the existing tables use is not a fifth column of the matrix: it is the version check
+sweep (overview X6). Each *sequence* cohort — ours and the memoryless one, under both
+its cohorts — is labeled under each of the five SWR definitions (Kay, Karlsson, Yu,
+Zugaro and Carey), giving a cohort × SWR-definition matrix of non-SWR fractions. The canonical Spyglass `SWR_event`
+that the existing tables use is not a sixth column of the matrix: it is the version check
 for the direct Kay inventory, which is the matrix's Kay column
 ([refresh design](../2026-10-03-full-pipeline-refresh-design.md), decision R4).
 
 Labels are `SWR`, `non-SWR`, or `unknown`. Incomplete observation over a sequence's
 native interval yields `unknown`, with any observed overlap retained in the pair table
 for diagnostics. For the matrix, restrict each sequence cohort to events fully within
-its exposure intersected with all four SWR exposures, so all four fractions use the
+its exposure intersected with all five SWR exposures, so all five fractions use the
 same events. Report the eligible denominator and exclusions alongside the fractions;
 unknown labels never count as non-SWR.
 
 A non-SWR fraction is a function of the SWR definition as much as of the events, so it is
-never reported without its definition attached. Where the four definitions disagree
+never reported without its definition attached. Where the five definitions disagree
 about a given event, that disagreement is itself reported: an event labeled ripple-less
 by one algorithm and ripple-bearing by another describes dependence on the detection
 rule; it does not establish which label is correct.
@@ -230,7 +254,7 @@ population.
 | Complete data with zero detections remains observed; missing outputs and zero shared exposure yield unavailable summaries | Empty inventories differ from failed or unobserved runs |
 | An event crossing a coverage boundary is excluded from its count denominator without changing its bounds; a valid counterpart crossing that boundary still supplies an overlap for an eligible source event | Directional denominators and native timing remain consistent |
 | An 80 ms window overlapping a data gap has unavailable midpoint coverage; no-detector time and baseline windows exclude it | Observation support includes the detector's input window |
-| The SWR matrix uses the same eligible sequence events across its four columns and excludes unknown labels | Definition changes are not confounded with differing availability |
+| The SWR matrix uses the same eligible sequence events across its five columns and excludes unknown labels | Definition changes are not confounded with differing availability |
 
 ## Deliverables
 

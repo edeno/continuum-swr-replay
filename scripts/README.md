@@ -27,6 +27,23 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
   processes, each logging to `logs/{epoch_id}_swr.log`; only the main process writes
   `manifest.json`. A failing epoch is recorded and the rest run; a rerun skips the epochs
   already `ok` unless `--overwrite` is given.
+- `run_carey_detection.py` — Carey's candidate detector (`Carey_candidate_detector`, ripple power and
+  multiunit activity jointly), the fifth SWR definition, for every analysed epoch, into
+  `replay_detection_comparison/carey/<run_id>/`. It reads the SWR runner's inputs: the stored ripple band
+  of the tetrodes rule R-T kept, cut to the position span, the head speed and the artifact mask. It
+  refuses an epoch whose band hashes differ from the SWR run's, or whose marks are not the ones the
+  decode's encoding model was fitted on, and writes nothing for it. Each tetrode's marks are binned
+  onto the LFP times as one unit. The detector's normalization leaves out the artifact mask
+  (`normalization_mask`), as the other four SWR detectors' does. Four adaptations of the published
+  detector are recorded in the manifest: a tetrode's multiunit train stands in for a unit; the package's
+  Hilbert ripple score, not the published spectral one; the stored 150–250 Hz band averaged over the
+  kept tetrodes, not one 140–250 Hz channel; no theta restriction. One event table and one
+  observed-stretches table per epoch, plus `manifest.json`. `--animal`, `--date` and `--epoch` narrow the
+  epochs, which run on a dask `LocalCluster` of `--n-workers` processes, each logging to
+  `logs/{epoch_id}_carey.log`; a failing epoch is recorded and the rest run, and a rerun skips the
+  epochs already `ok` unless `--overwrite` is given. Built and tested; the one-epoch smoke has run
+  (`chimi20200225_02_r1_HPC`); the run on every epoch is pending. Imports the SWR runner's and the
+  memoryless runner's helpers (the exception to the rule above).
 - `prepare_replay_content_data.py` — build the canonical replay-content tables
   (event / event-arm / event-patch / event-sequence / stop) across all sessions.
 - `regenerate_stop_table.py` — rebuild the per-stop immobility table.
@@ -76,6 +93,12 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
   sliding-window detector against the state-space detector on the Figure 1 simulation, with
   the sweep summary below; every verdict in its titles and caption is read from the data
   → `paper/figures/memoryless_comparison/`.
+- `generate_inventory_examples.py` — seeded draws from each cell of one inventory comparison run
+  (`--run-id`), each event on one time axis: spikes, the state-space posterior, the Widloski window
+  posteriors (recomputed and checked against the run's stored candidates; a figure that disagrees is
+  not written), the gate masks, speed, the ripple band and every inventory's events. Draws only
+  `matched` or `unmatched` events, never `unknown`. → `paper/figures/inventory_comparison/<run_id>/examples/`,
+  with `captions.md` and `manifest.json`. Captions are marked pending the Phase 2 pilot checks.
 - `archive/` — retired figure scripts (not linted; kept for provenance).
 
 ## `qa/` — diagnostics / validation
@@ -90,6 +113,24 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
   `check_fit_provenance.py` checks every artifact the runs wrote. Set
   `CSR_PROCESSED_DATA_DIR` to read and write another data root. It does not run the
   decodes, the tables, the Q1 checks or the PFC unit GLM. See `docs/analysis_map.md`.
+- `run_inventory_comparison.py` — compares nine inventories of each analysed epoch on one substrate:
+  the five SWR definitions (`kay`, `karlsson`, `yu`, `zugaro`, `carey`), `mua`, `state_space`, and the
+  Widloski detector under two cohorts (`memoryless`, cohort `published`; `memoryless_criteria`, cohort
+  `replay_criteria`). Takes the Carey run (`--carey-run-id`) and the memoryless run
+  (`--memoryless-run-id`); the SWR run is the one `swr_source` pins. Per epoch it writes, as one set,
+  the inventories, observation tables, every overlap pair, directional agreement, time coverage,
+  components, the fragment recount, the three cells, the SWR label matrix (three sequence cohorts
+  under five SWR definitions) and excluded time by reason, to
+  `replay_detection_comparison/inventory/<run_id>/`. A run with no usable record reads `unavailable`,
+  never empty; a failed epoch writes nothing. `--animal`, `--date`, `--epoch` or `--epoch-id` narrow
+  the epochs, which run one at a time; a rerun skips the epochs already `ok` unless `--overwrite` is
+  given. Built and tested on simulated epochs; not yet run on the canonical data. The Widloski columns
+  are pending the Phase 2 pilot checks.
+- `report_inventory_comparison.py` — the counts of one comparison run, per session and per animal
+  (sums of counts and seconds, never averages of proportions; `unavailable` sessions listed, not
+  pooled; `unknown` never counted as `unmatched` or non-SWR). Tables go to `<inventory run>/report/`
+  with a `report.md`; figures to `paper/figures/inventory_comparison/<run_id>/` with `captions.md`.
+  Counts only, no verdicts; every Widloski row and caption is marked pending the Phase 2 pilot checks.
 - `check_data_availability.py`, `diagnose_trial_detection.py`, `compute_hpc_raw_stats.py`,
   `run_quality_metrics.py`, `analyze_event_spike_evidence.py` (spike-evidence reality check).
 - `run_state_evidence.py` — held-out spike evidence for each decoder state (Local, No-Spike,

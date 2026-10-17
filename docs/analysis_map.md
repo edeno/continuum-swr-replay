@@ -69,8 +69,12 @@ after a change to fitting code only, start at step 6.
 | Held-out tetrodes support each decoder state (Local, No-Spike, Continuous, Fragmented) | `qa/run_state_evidence.py` | `Processed-Data/_refresh_<date>/state_evidence/` | 7, 9 |
 | The sub-cases of SWR and non-local overlap (for Methods numbers) | `content/quantify_swr_overlap_geometry.py` | printed tables | 4 |
 | Four SWR detectors from shared inputs | `decoding/run_swr_detection.py` | SWR inventories | — (the inputs to 23, 24) |
+| Carey's joint ripple-power and multiunit detector, a fifth SWR definition, on the same CA1 inputs (built and tested; the one-epoch smoke has run, the full run waits) | `decoding/run_carey_detection.py` | `Processed-Data/replay_detection_comparison/carey/` | — (an input to the detector comparison) |
 | A second sequence detector (Widloski & Foster) on the same decodes | `decoding/run_memoryless_detection.py` | `Processed-Data/replay_detection_comparison/memoryless/` | 21, 22, 25 |
 | That detector on simulated replays of known shape, against an independent re-implementation of the reference code | `qa/sweep_memoryless_detection.py`, `qa/sweep_memoryless_controls.py`, `qa/sweep_memoryless_heldout.py`, `qa/compare_memoryless_to_reference.py` (with `qa/memoryless_reference.py`), `figures/generate_memoryless_comparison.py` | `docs/design/replay_detection_comparison/*.csv`; supplement | — (validates the port) |
+| Nine inventories of each epoch (the five SWR definitions, MUA, the state-space detector, and the Widloski detector under two cohorts) on one substrate: overlap pairs, per-detector denominators, cells, the SWR label matrix. Built and tested; not yet run on the canonical data. Widloski columns pending the Phase 2 pilot checks | `qa/run_inventory_comparison.py` | `Processed-Data/replay_detection_comparison/inventory/` | — |
+| That comparison's counts per session and per animal | `qa/report_inventory_comparison.py` | `<inventory run>/report/`; `paper/figures/inventory_comparison/` | — |
+| Sampled examples from each cell of that comparison, on one time axis | `figures/generate_inventory_examples.py` | `paper/figures/inventory_comparison/<run id>/examples/` | — |
 | Single decoded events, for checking categories by eye | `figures/generate_event_gallery.py`, `figures/run_event_gallery.sh` | `event_gallery/` | — |
 
 **No script:**
@@ -79,7 +83,8 @@ after a change to fitting code only, start at step 6.
 - 8 (a re-decode with a wider Local kernel);
 - 11 (held-out model selection);
 - 12 (the false-positive rate);
-- Goal 4's full detector comparison
+- Goal 4's full detector comparison (its four scripts are built and in the table above; the run on the
+  canonical data is pending)
   ([.claude/docs/plans/replay_detection_comparison/PLAN.md](../.claude/docs/plans/replay_detection_comparison/PLAN.md),
   Phase 3).
 

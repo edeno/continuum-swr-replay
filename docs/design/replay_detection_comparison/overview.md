@@ -4,11 +4,14 @@
 `ripple_detection` package, and the memoryless sequence detector, its shuffle, its event
 table and a per-epoch runner are implemented and tested in this project but not yet run
 on recorded data (real-data pilot next); the inventory comparison's accounting is
-implemented and tested on synthetic inventories but not yet run on recorded data. The
+implemented and tested on synthetic inventories, and its per-detector adapters, per-epoch
+runner, report and examples are built and tested on simulated epochs; none has run on the
+canonical data. The
 Kay, Karlsson, Yu and Zugaro SWR inventories are computed directly from the package, on
 shared CA1 inputs, by `scripts/decoding/run_swr_detection.py`, which ran on every epoch in
 the full pipeline refresh (R3, then R10, run `056eee0dcb5a`); Spyglass integration is the
-last step. Inventory 8, Carey, is decided (2026-10-17) and not yet run.
+last step. Inventory 8, Carey, is decided (2026-10-17); its runner is built and tested and its
+one-epoch smoke has run (`chimi20200225_02_r1_HPC`), and the run on every epoch waits.
 Each spec's own header carries its status; the per-spec sections below carry the open
 decisions.*
 
@@ -22,7 +25,7 @@ register invites the cross-method blending this design forbids.
 |---|---|---|
 | [01-yu-swr-detector.md](01-yu-swr-detector.md) | SWR detector with a noise-percentile threshold (Yu et al. 2017) | package side implemented; direct project inventory produced by `scripts/decoding/run_swr_detection.py`, run on every epoch in R3 and R10 (run `056eee0dcb5a`); Spyglass integration last |
 | [02-memoryless-sequence.md](02-memoryless-sequence.md) | Memoryless sliding-window sequence detector (Widloski & Foster 2025) | implemented and tested, shuffle and event table included; not yet run on recorded data (pilot next) |
-| [03-inventory-comparison.md](03-inventory-comparison.md) | Eight inventories → common schema → N-way overlap accounting | accounting implemented and tested on synthetic inventories; recorded-data adapters and runner pending |
+| [03-inventory-comparison.md](03-inventory-comparison.md) | Eight inventories → common schema → N-way overlap accounting | accounting, adapters, per-epoch runner, report and examples implemented and tested on synthetic or simulated epochs; not yet run on the canonical data |
 | [04-event-features.md](04-event-features.md) | Symmetric event characterization and selection diagnostics; threshold robustness as a later follow-up | initial scope agreed |
 | [05-validation.md](05-validation.md) | Simulation and held-out-tetrode validation: what a performance claim would need | parked |
 | [memoryless_simulation_controls.md](memoryless_simulation_controls.md) | Simulated timing, false positives, multi-part events and a first held-out test, extending 02's comparison figure | implemented 2026-09-25 |
@@ -84,7 +87,7 @@ and these are live hazards rather than hypotheticals:
   even though both implement a mode-mirroring noise model. Yu's mode is Yu's mode; the
   robustified variant is a sensitivity check inside 01, not the default.
 - No single SWR definition is imposed on the sequence cohorts. Each cohort is labeled
-  under **each** SWR definition and the matrix is reported (03). This also makes the
+  under **each** SWR definition (Kay, Karlsson, Yu, Zugaro and Carey) and the matrix is reported (03). This also makes the
   label-sensitivity analysis fall out of the design rather than needing a separate sweep.
 - Deviations that are *forced* — clusterless rather than sorted units, a 1-D branched
   track rather than a 2-D arena, a 500 Hz grid — are unavoidable and documented per
@@ -123,6 +126,9 @@ SWR-*triggered*, where our current pipeline is posterior-triggered.
 ## The eight inventories
 
 Each produces an event table over the same epochs and the same speed-eligible population.
+The comparison runner reads the memoryless one under two cohorts, `published` and
+`replay_criteria`, so it compares nine inventories (03): `kay`, `karlsson`, `yu`, `zugaro`, `carey`,
+`mua`, `state_space`, `memoryless` and `memoryless_criteria`.
 
 | # | Trigger | Family | Method | Status |
 |---|---|---|---|---|
@@ -133,7 +139,7 @@ Each produces an event table over the same epochs and the same speed-eligible po
 | 5 | Posterior threshold | decoding | our state-space non-local detection | exists (`non_local_event`) |
 | 6 | Posterior sequence | decoding | Widloski & Foster 2025 | implemented (`memoryless_sequence/`, `scripts/decoding/run_memoryless_detection.py`); real-data pilot next — [02](02-memoryless-sequence.md) |
 | 7 | SWR, one channel, two thresholds | LFP | `Zugaro_ripple_detector` (the `FindRipples` lineage: Hirase and Zugaro, FMAToolbox; Csicsvari et al. 1999 as ancestor) | in package; computed directly by `scripts/decoding/run_swr_detection.py` on one CA1 channel per epoch (R3, then R10, run `056eee0dcb5a`) — see below |
-| 8 | Ripple power and multiunit activity jointly | joint LFP × rate | `Carey_candidate_detector` (Carey, Tanaka & van der Meer 2019; vandermeerlab `GenCandidateEvents`) | in package (PR #17, pinned commit `68e1784`); decided 2026-10-17, not yet run — see below |
+| 8 | Ripple power and multiunit activity jointly | joint LFP × rate | `Carey_candidate_detector` (Carey, Tanaka & van der Meer 2019; vandermeerlab `GenCandidateEvents`) | in package (PR #17; `normalization_mask` since `9766fd4`, pinned from `e1decf2`); decided 2026-10-17; runner `scripts/decoding/run_carey_detection.py` built and tested, one-epoch smoke run, full run pending — see below |
 
 1, 2, 3 and 7 are four different SWR *algorithms*, not four thresholds on one algorithm:
 Kay thresholds a root-sum-of-squares consensus trace, Karlsson detects per channel and
@@ -178,7 +184,9 @@ stretch edges (NaN-aware), where the package's own Zugaro moving average zero-pa
 **Inventory 8, Carey.** `Carey_candidate_detector` runs at the package default, which is
 the code's Hilbert ripple score, on the same shared inputs and speed rule as the other SWR
 detectors (the 4 cm/s rule, the artifact mask, rule R-T for the LFP), with the multiunit
-trains built from the marks the decode used. Two adaptations are recorded:
+trains built from the marks the decode used. It is a fifth SWR definition: it is a column of
+the SWR label matrix (X6) and one of the triggered inventories in the neither-ripple-nor-burst
+cell. Four adaptations are recorded:
 
 1. Clusterless tetrodes stand in for units. Each tetrode's multiunit train is one "unit"
    for `minimum_active_units` and for the per-unit `spike_cap`. That is a coarser count
@@ -186,8 +194,16 @@ trains built from the marks the decode used. Two adaptations are recorded:
 2. The Hilbert configuration is used, not the published spectral one. The paper's
    published candidates used a spectral ripple score built from hand-picked ripples, which
    this dataset does not have.
+3. The ripple signal is the stored 150–250 Hz band averaged over the tetrodes rule R-T
+   kept, as the package averages channels for Kay, Karlsson and Yu. The original reads one
+   channel in 140–250 Hz.
+4. There is no theta restriction. The package default has none; the original leaves out
+   high-theta periods. The 4 cm/s speed rule gates.
 
-The input choices the spec does not settle are open questions in the Phase 3 task plan.
+The time grid is the LFP's, with each tetrode's spikes binned onto it. Carey's artifact
+handling is the one the other four SWR detectors have: the package's `normalization_mask`
+(`ripple_detection` `9766fd4`) leaves the masked samples out of its normalization, and an
+event that touches the mask is dropped.
 
 ## Scope boundary: clusterless compatibility
 
