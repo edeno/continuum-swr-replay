@@ -512,6 +512,12 @@ Detect LFP and spike artifacts in every epoch's CA1 data, on CPU.
 
 `detector_constants`, `run_settings`, `reference_lfp`, `run_epoch`, `summary`, `register_epochs`, `main`, `run`
 
+### `scripts/decoding/run_carey_detection.py`
+
+Run Carey's candidate detector on every epoch's CA1 LFP and multiunit spikes.
+
+`output_paths`, `swr_run_inputs`, `decode_marks`, `observation_table`, `replace_outputs`, `run_epoch`, `summary`, `run_settings`, `main`, `run`
+
 ### `scripts/decoding/run_decoding_bandit.py`
 
 Main script for running continuum neural decoding on spatial bandit task data.
