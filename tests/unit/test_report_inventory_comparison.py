@@ -31,6 +31,7 @@ from tests.integration.test_run_inventory_comparison import (  # noqa: F401
     run,
 )
 
+MEMORYLESS_INVENTORIES = {"memoryless", "memoryless_criteria"}
 DEFAULTS = {object: "", np.int64: 0, np.float64: 0.0, np.bool_: True, "Int64": pd.NA}
 
 
@@ -294,6 +295,55 @@ def test_a_detector_with_no_observation_row_is_refused():
         report.counts_by_session(counts, availability)
 
 
+def test_a_run_with_no_ok_epoch_gives_empty_tables(tmp_path, monkeypatch):
+    settings = json.loads(
+        json.dumps(
+            {
+                "roster": dict(runner.ROSTER),
+                "cells": {
+                    name: {"sources": sources, "against": against}
+                    for name, (sources, against) in runner.CELLS.items()
+                },
+                "comparisons": dict(runner.COMPARISONS),
+                "no_detector_time": runner.CELL_DETECTORS,
+                "recount": {"detector": "state_space"},
+            }
+        )
+    )
+    run_dir = tmp_path / "run01"
+    run_dir.mkdir()
+    (run_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "settings": settings,
+                "epochs": {"sim20200101_02_r1_HPC": {"status": "failed", "error": "e"}},
+            }
+        )
+    )
+    monkeypatch.setattr(report, "analysed_epoch_ids", lambda: [])
+
+    written = report.write_report(run_dir, tmp_path / "figures")
+
+    assert len(written["figures"]) == len(report.FIGURE_CAPTIONS)
+    for name in report.TABLE_CAPTIONS:
+        table = pd.read_csv(run_dir / "report" / f"{name}.csv")
+        assert len(table) == (1 if name == "epochs" else 0), name
+
+
+def test_a_session_without_a_cohorts_matrix_row_is_refused():
+    matrix = rows(
+        "swr_matrix",
+        [
+            session("02_r1", cohort="memoryless", swr_definition="kay"),
+            session("02_r1", cohort="state_space", swr_definition="kay"),
+            session("04_r2", cohort="state_space", swr_definition="kay"),
+        ],
+    )
+
+    with pytest.raises(ValueError, match="memoryless in sim20200101_04_r2"):
+        report.paired_labels_by_session(rows("paired_labels", []), matrix)
+
+
 def test_rows_with_a_memoryless_inventory_are_marked_pending():
     table = directional(
         [
@@ -367,28 +417,46 @@ class TestTheReportOnTheRunnersTables:
         assert epochs.pending[EPOCHS["04_r2"]] == report.PENDING
         assert pd.isna(epochs.pending[EPOCHS["02_r1"]])
 
-    def test_the_pending_marks_of_the_cells_and_exclusion_tables(self, written):
+    def test_the_pending_marks_of_the_cells_and_exclusion_tables(
+        self,
+        run,  # noqa: F811
+        written,
+    ):
+        """Every row's mark follows the rule: a cell row is marked when its own
+        detector or the cell's against set has a memoryless inventory, and a
+        comparison when it holds one, the same on all its rows."""
         report_dir, _ = written
+        settings = json.loads((run / "manifest.json").read_text())["settings"]
 
-        cells = pd.read_csv(report_dir / "cells_by_animal.csv").set_index(
-            ["cell", "detector"]
-        )
-        exclusion = pd.read_csv(report_dir / "exclusion_by_animal.csv")
+        def expected(detectors) -> str:
+            return report.PENDING if MEMORYLESS_INVENTORIES & set(detectors) else ""
 
-        marked = cells.pending == report.PENDING
-        # tested against the triggered inventories alone
-        assert not marked[("sequence_matched_by_no_trigger", "state_space")]
-        assert marked[("sequence_matched_by_no_trigger", "memoryless")]
-        # tested against both decoders, memoryless among them
-        assert marked[("swr_matched_by_no_decoder", "kay")]
-        assert marked.xs("exactly_one_detector").all()
-        by_comparison = exclusion.groupby("comparison").pending.first()
-        assert (
-            by_comparison[["all", "kay+memoryless", "swr_matrix_memoryless"]]
-            .eq(report.PENDING)
-            .all()
-        )
-        assert by_comparison[["kay+state_space", "swr_matrix_state_space"]].isna().all()
+        for level in ("by_session", "by_animal"):
+            cells = pd.read_csv(report_dir / f"cells_{level}.csv")
+            assert len(cells) > 0
+            want = [
+                expected([detector, *settings["cells"][cell]["against"]])
+                for cell, detector in zip(cells.cell, cells.detector, strict=True)
+            ]
+            assert cells.pending.fillna("").tolist() == want, level
+            # both kinds occur, so the comparison is not vacuous
+            assert set(want) == {"", report.PENDING}
+
+            exclusion = pd.read_csv(report_dir / f"exclusion_{level}.csv")
+            assert set(exclusion.comparison) == set(settings["comparisons"])
+            want = [
+                expected(settings["comparisons"][comparison])
+                for comparison in exclusion.comparison
+            ]
+            assert exclusion.pending.fillna("").tolist() == want, level
+            assert set(want) == {"", report.PENDING}
+            assert (
+                exclusion.assign(pending=exclusion.pending.fillna(""))
+                .groupby("comparison")
+                .pending.nunique()
+                .eq(1)
+                .all()
+            )
 
     def test_the_label_tables_list_the_session_without_memoryless(self, written):
         report_dir, _ = written

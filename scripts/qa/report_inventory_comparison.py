@@ -675,6 +675,11 @@ def paired_labels_by_session(
     One row per session, SWR definition and pair of matrix cohorts (in name
     order), zeros where no pair overlapped. ``available`` is whether both
     cohorts' matrix populations exist in the session.
+
+    Raises
+    ------
+    ValueError
+        A session has no matrix row for one of the cohorts.
     """
     population = matrix_population(matrix)
     cohorts = sorted(population.cohort.unique())
@@ -682,12 +687,17 @@ def paired_labels_by_session(
         population[SESSION]
         .drop_duplicates()
         .merge(
-            pd.DataFrame({"swr_definition": sorted(matrix.swr_definition.unique())}),
+            pd.DataFrame(
+                {"swr_definition": sorted(matrix.swr_definition.unique())},
+                dtype=object,
+            ),
             how="cross",
         )
         .merge(
             pd.DataFrame(
-                list(combinations(cohorts, 2)), columns=["detector_a", "detector_b"]
+                list(combinations(cohorts, 2)),
+                columns=["detector_a", "detector_b"],
+                dtype=object,
             ),
             how="cross",
         )
@@ -700,6 +710,19 @@ def paired_labels_by_session(
             on=[*SESSION, f"detector_{side}"],
             how="left",
         )
+        missing = skeleton[f"_{side}"].isna()
+        if missing.any():
+            rows = skeleton[missing].drop_duplicates([*SESSION, f"detector_{side}"])
+            raise ValueError(
+                "No SWR-matrix row for "
+                + ", ".join(
+                    f"{cohort} in {session}"
+                    for cohort, session in zip(
+                        rows[f"detector_{side}"], session_names(rows), strict=True
+                    )
+                )
+                + "; its population is unknown."
+            )
     skeleton["available"] = skeleton._a.astype(bool) & skeleton._b.astype(bool)
     keys = [*SESSION, "swr_definition", "detector_a", "detector_b"]
     counted = _count_by(paired_labels, keys, "agreement", AGREEMENTS).rename(
@@ -1178,7 +1201,8 @@ def draw_figures(
     fig, axes = plt.subplots(1, 2, figsize=(7.2, 2.4), constrained_layout=True)
     largest = int(components.n_events.max()) if len(components) else 1
     axes[0].hist(components.n_events, bins=np.arange(0.5, largest + 1.5), color="0.4")
-    axes[0].set_yscale("log")
+    if len(components):
+        axes[0].set_yscale("log")
     axes[0].xaxis.set_major_locator(matplotlib.ticker.MaxNLocator(integer=True))
     axes[0].set_xlabel("events per component", fontsize=7)
     axes[1].hist(_clipped(components.span_s, bins), bins=bins, color="0.4")
