@@ -5,6 +5,10 @@ Date: 2026-10-12. Runbook step R8 of
 (section "R8: audit and report", plus the R13 additions). Written by the R8 agent from the brief
 `.superpowers/sdd/PLAN/r8-brief.md`.
 
+**Updated 2026-10-16** with the day's follow-up results (brief `.superpowers/sdd/PLAN/r8-update-brief.md`).
+Section 10 has one subsection per follow-up. The update also changed §0, the content rows of §3, §4.6, §4.7,
+§5, §6.1 and §6.6. Each change says where its numbers come from.
+
 **This report changes no number in any other document.** Section 6 lists the hand-maintained
 doc claims that need new numbers. The project lead reviews them before any doc is requoted
 (plan R8 "STOP").
@@ -40,14 +44,47 @@ What "before" and "now" mean everywhere below (the R8a definitions, `r8a_report.
   value-identical (R13c, section 2.1).
 - **Not run in the refresh:** Task 12 on the R11 decodes (only the 5-epoch pilot on pre-R11 decodes
   exists), Task 13's half-tetrode decodes, and the R13 robustness and sensitivity reruns (section 4.7).
-- **Open items:** 44 — 1 High (the doc requotes), 10 Medium, 33 Low (section 5).
+  *Update 2026-10-16:* Task 12 (240 of 242 epochs) and Task 13 have now run; R13 ran in part and is paused
+  (sections 4.6, 4.7, 10).
+- **Open items:** 44 — 1 High (the doc requotes), 10 Medium, 33 Low (section 5). *Update 2026-10-16:* the
+  follow-ups close 10 items and add 10. Still open: 44 of 54, again 1 High, 10 Medium, 33 Low.
 - **Hand-maintained doc claims needing new numbers:** 78 (section 6). Eight of them change a stated
   conclusion, not only a number (section 6.1): the NL w/ SWR vs no-SWR baseline rates no longer differ;
   NL w/ SWR is no longer the burstiest stream; the non-SWR time-course peak is back on the window edge;
   the non-SWR immediate reward response is weaker (kernel lag 1 = 1.01) while the paired dissociation is
   stronger; the CS5 three-estimator sign pattern reversed and no interval excludes zero; CS1's
   intervals include zero; the own-well share is 0.13, not 0.30 (a 2026-08-12 script change); and the
-  arm-value main effect is 3/5 animals with an interval that includes zero.
+  arm-value main effect is 3/5 animals with an interval that includes zero. *Update 2026-10-16:* a ninth
+  conclusion change (CS5b, from R6c), and corrections to V4 and V6 (from F2), are in section 6.1a. Two of
+  the 78 claims (M2, M3) are now fixed on `full-pipeline-refresh-code` (section 6.6).
+
+**Follow-ups, 2026-10-16** (section 10):
+
+- **The content fits now reach their optimum.** F3 found the shipped BFGS fits short of the optimum (gap up
+  to 4.81 log-likelihood) in a nuisance spline term. Task 28 fixed the fitter, and R6c refit the content
+  family. The terms F3 checked move in the third or fourth decimal, with no sign change. Five rows move more,
+  mostly by cohort, and must be re-read before quoting: CS5b, C3 SWR, C13 SWR, CS3 and the omitted stratum
+  (section 3; R6c also marks C2_base SWR's animal count). The rewarded-stratum
+  CS5b row is the CS5 model, not a previous-goal control.
+- **The SWR reward rate ratio does not rest on j16** (6.89 without it). About a fifth of it rests on the 31
+  added early peanut epochs (5.29 without them). The NL-no-SWR response is the fragile number (1.21, p 0.083,
+  without wilbur). The paired dissociation holds in every leave-out (F2).
+- **CS1 is negative because SWR content shifts onto the trunk arms**, and the "+0.88 vs +0.53" split compares
+  unpaired animal medians (F2). See section 6.1a for the wording.
+- **Spike evidence holds on the R11 decodes.** Held-out tetrodes support immobile Non-Local Continuous bouts:
+  6.10 nats per bout, 5/5 animals, 240 epochs (F1). Non-SWR events carry less evidence per spike than SWR
+  events. Half-tetrode labels support Local and the immobile non-local states, more weakly, but not No-Spike
+  (Task 13, 5 epochs).
+- **chimi20200221_08_r4:** its decode is correct. The check failed on float32 subnormal occupancy, which the
+  CPU flushes to zero (D1). Task 29 fixes the checks. The artifact rule's V0 and V3 variants move no headline
+  beyond its interval; V1, V2 and X_R10nr are paused (R13 interim).
+- **The lead's decisions:**
+  - the review of this report;
+  - the merges `full-pipeline-refresh-code` → `memoryless-sequence-detection` → `master`;
+  - resuming R13 (V1, V2, X_R10nr; about 4–8 h);
+  - keeping chimi20200221_08_r4 (D1 option (a), the coordinator's ruling);
+  - push access: the commits on `full-pipeline-refresh-code` from `a857191` onward (24 before this update)
+    are not pushed (`origin/full-pipeline-refresh-code` is at `d29cc3c`), and the non_local_detector issue is not filed.
 
 ## 1. Audit
 
@@ -203,28 +240,51 @@ bootstrap (2,000 resamples within animal) excludes zero.
 | ref | the fit-time reference cohort, 205 vs 242 epochs (content/DM only) |
 | cohort (now side) | 205 → 242: the 35 added epochs plus the 2 j16 epochs |
 
-| Headline | before → now | cohort (before) | code | Kay 2.0 | R-T + mask | decode | ref | cohort (now) |
+| Headline | before → now (R8) → R6c, content rows only | cohort (before) | code | Kay 2.0 | R-T + mask | decode | ref | cohort (now) |
 |---|---|---|---|---|---|---|---|---|
 | per-bin M7r immediate RR, SWR | 3.44 → 6.39 | +0.04 | 0 | −0.33 | **+2.13** | 0 (exact) | – | +1.12 |
 | same, NL with SWR | 7.18 → 9.91 | −0.15 | 0 | +0.78 | −0.45 | +1.87 | – | +0.67 |
 | same, NL no-SWR | 2.00 → 1.42 | +0.01 | 0 | +0.02 | **−0.36** | +0.01 | – | −0.26 |
 | rate contrast G0, nonSWR | 0.680 → 0.635 | 0 | 0 | 0 | −0.01 | +0.05 | – | −0.09 |
 | rate contrast G0, SWR | 1.919 → 2.202 | −0.01 | 0 | +0.07 | −0.02 | +0.24 | – | 0 |
-| CS1 swr × current | −0.373 → −0.069 | 0 | 0 | +0.05 | +0.06 | **+0.21** | 0 | −0.01 |
-| CS2 swr × prev | −0.646 → −0.425 | +0.01 | 0 | +0.06 | −0.07 | +0.23 | 0 | −0.01 |
-| CS3 swr × last-rewarded (64–98 sessions identified) | −1.156 → −0.758 | 0 | 0 | +0.20 | −0.31 | +0.73 | −0.15 | −0.06 |
-| CS4 swr × reward fraction (raw; std −0.361 → −0.307) | −1.198 → −1.003 | 0 | 0 | 0 | +0.20 (borderline) | +0.01 | 0 | −0.02 |
-| CS5 swr × arm value = `swr_x_reward_belief_mean_candidate_arm_preoutcome` (raw; std +0.028 → −0.001) | +0.236 → −0.012 | 0 | 0 | −0.19 | +0.09 | +0.04 | 0 | −0.19 |
-| CS5nt (raw) | −0.651 → −0.259 | 0 | 0 | +0.18 | +0.08 | +0.13 | 0 | 0 |
-| CS6 swr × uncertainty | +0.004 → −0.059 | +0.003 | 0 | −0.02 | −0.01 | −0.04 | 0 | +0.01 |
-| C1 current arm (fraction) | 0.873 → 0.781 | 0 | 0 | 0 | 0 | −0.07 (DM: **−0.09**) | 0 | −0.02 |
-| DM `log_phi_is_swr` (C1 rung) | 1.817 → 1.724 | +0.002 | 0 | −0.02 | +0.13 | **−0.21** | 0 | +0.01 |
-| DM CS1 | −0.297 → −0.036 | 0 | 0 | +0.01 | −0.03 | **+0.27** | 0 | +0.01 |
+| CS1 swr × current | −0.373 → −0.069 → **−0.0709** (242, 1/5) | 0 | 0 | +0.05 | +0.06 | **+0.21** | 0 | −0.01 |
+| CS2 swr × prev | −0.646 → −0.425 → −0.4186 (240, 1/5) | +0.01 | 0 | +0.06 | −0.07 | +0.23 | 0 | −0.01 |
+| CS3 swr × last-rewarded (64–98 sessions identified; R6c 55) **re-read** | −1.156 → −0.758 → **−0.5525** (55, 0/5) | 0 | 0 | +0.20 | −0.31 | +0.73 | −0.15 | −0.06 |
+| CS4 swr × reward fraction (raw; std −0.361 → −0.307 → −0.3089) | −1.198 → −1.003 → −1.0086 (242, 0/5) | 0 | 0 | 0 | +0.20 (borderline) | +0.01 | 0 | −0.02 |
+| CS5 swr × arm value = `swr_x_reward_belief_mean_candidate_arm_preoutcome` (raw; std +0.028 → −0.001 → −0.0017) | +0.236 → −0.012 → −0.0142 (238, 2/5) | 0 | 0 | −0.19 | +0.09 | +0.04 | 0 | −0.19 |
+| CS5nt (raw) | −0.651 → −0.259 → −0.2528 (239, 0/5) | 0 | 0 | +0.18 | +0.08 | +0.13 | 0 | 0 |
+| CS6 swr × uncertainty | +0.004 → −0.059 → −0.0585 (242, 2/5) | +0.003 | 0 | −0.02 | −0.01 | −0.04 | 0 | +0.01 |
+| C1 current arm (fraction) | 0.873 → 0.781 → 0.7814 (242, 5/5) | 0 | 0 | 0 | 0 | −0.07 (DM: **−0.09**) | 0 | −0.02 |
+| DM `log_phi_is_swr` (C1 rung) | 1.817 → 1.724 (not refit in R6c) | +0.002 | 0 | −0.02 | +0.13 | **−0.21** | 0 | +0.01 |
+| DM CS1 | −0.297 → −0.036 (not refit in R6c) | 0 | 0 | +0.01 | −0.03 | **+0.27** | 0 | +0.01 |
 | immobile Local / No-Spike (descriptive) | 0.777/0.151 → 0.702/0.229 | +0.007/−0.001 | 0 | 0 | 0 | −0.061/+0.068 | – | −0.021/+0.012 |
 | non-SWR content own well (descriptive) | 0.299 → 0.130 | +0.010 | −0.162 (script, 2026-08-12) | label (Kay + R-T together) +0.004 | | −0.028 | – | +0.007 |
 | SWR not overlapping NL (count) | 12,245 → 7,061 | −391 (and −242 from the 2 j16 epochs R3 lacks) | −260 | +2,391 | −6,141 (j16 −6,447) | −1,122 | – | +581 |
 | PFC (Figure 4 n) | 10,907 → 11,604 | −320 | | | | | | +1,017 |
 | PFC raw-p SWR / engagement | 28.5/24.7 → 30.8/23.4 % | +0.1/0.0 | not refit: shared sessions +1.9/−1.9 pts | | | | | +0.3/+0.6 |
+
+**R6c values (added 2026-10-16).** The content rows now end with R6c's value: the refit with the Task 28
+fitter, as animal median (sessions, animals positive). Source: `r6c_report.md` §5.4, the re-aggregation
+table (accessor `aggregate_contrast` with each bundle's own per-SD scale; CS3 by R8a's no-gate accessor).
+- The step columns are still R8a's. They were fit with the old BFGS fitter. F3 infers that each step value
+  can carry optimizer noise up to about 0.007, below their two-decimal precision (`f3_optimizer_report.md`
+  §5; inferred, not re-derived).
+- CS3's R6c value rests on 55 sessions, not 98: 74 uninformed coefficients are now NaN. Its step columns no
+  longer describe the current value.
+- Not refit in R6c, so unchanged: the DM rows, the rate rows, the PFC rows and the descriptive rows.
+
+**Rows R6c says must be re-read before quoting** (`r6c_report.md` §5.4 and concern 3). R6c also marks
+C2_base SWR.
+
+| quantity | R8 (R6b fits) | R6c | change: fit / cohort | why |
+|---|---|---|---|---|
+| CS5b, stratum all | −0.4234 (155, 1/5, q 0.21) | −0.0608 (198, 2/5, q 0.16) | +0.0813 / +0.2812 | 74 sessions added, 29 removed. In many added sessions the previous-goal control `swr_x_is_last_rewarded_noncurrent_arm` is unidentified, so the per-session estimand is mixed |
+| CS5b, rewarded stratum | withheld | −0.0526 (237, 2/5) | – | both previous-goal controls are unidentified in every session, so this row **is the CS5 rewarded model, not a previous-goal-controlled estimate** |
+| C3 SWR | −0.1617 (222, 0/5) | −0.2570 (241, 0/5) | +0.0032 / −0.0984 | 19 added sessions, each with `is_candidate_arm_never_visited` unidentified |
+| C13 SWR | +0.3398 (217, 5/5) | +0.3704 (239, 5/5) | 0 / +0.0306 | 22 added sessions, the same |
+| CS3 (no-gate accessor) | −0.7583 (98, 1/5) | −0.5525 (55, 0/5) | 74 coefficients now NaN | still gated out of the audited table |
+| omitted stratum, every rung | – | 16 of 44 audited rows move by more than 0.1 | e.g. C2_base nonSWR +1.301 (14) → +0.482 (18), −0.001 / −0.818 | 13–40 sessions per rung; full list in `r6c_runs/_decompose.csv` |
+| C2_base SWR | +0.8839 (221, 4/5) | +0.8823 (241, 4/5) | +0.0001 / −0.0018 | F3 predicted 5/5 on the same 221 sessions. wilbur's median is ≈ 0, so neither 4/5 nor 5/5 carries weight |
 
 The plan's headline list maps onto this table as follows: its arm-value term = CS5 (`swr_x_reward_belief_mean_candidate_arm_preoutcome`); the reward-gating rate
 ratios = the three per-bin M7r rows and the two rate-contrast rows; CS4/CS5/CS6 and the DM
@@ -407,45 +467,72 @@ a one-to-one partner (R8a §4).
 
 ### 4.6 Held-out spike evidence per decoder state (Task 12)
 
-**Only the pilot exists.** Task 12's runner (`scripts/qa/run_state_evidence.py`, commits
-`dfca863..6225c12`) was run on the five staged pilot decodes of 2026-10-04 (P30-B settings, before R11),
-one epoch per animal. The planned full run on the R11 decodes was not done (no output under
-`Processed-Data` or `.claude/research/refresh_validation/state_evidence_task12/` after 2026-10-04; no
-ledger entry). Pilot results (`.superpowers/sdd/PLAN/task-12-report.md`, "Fix round 0d", section 4;
-outputs `.claude/research/refresh_validation/state_evidence_task12/pilot_fix0d/`); running-only
-held-out encoding, spike-mark evidence in nats (metric names as in that report), animal mean with a t-interval on 4 df:
+*Rewritten 2026-10-16.* The R8 text reported only the 5-epoch pilot. F1 has now run Task 12 on the R11
+decodes. Source: [`f1_evidence_report.md`](../../.claude/research/refresh_followup/f1_evidence_report.md)
+§1 and §3 (main tree `d29cc3c`, CPU only). Pooled outputs: `.claude/research/refresh_followup/f1_outputs/b_pooled_240/`;
+per-epoch tables: `Processed-Data/_refresh_20261016/state_evidence/per_epoch/`.
 
-| cell | evidence | estimate [95 % t] | p | animals > 0 | bout − matched [95 % t] | p |
+**Coverage: 240 of 242 epochs.**
+- **j1620210709_10_r5 is still running** (788,696 spikes). It is 1 of j16's 58 epochs, and each animal's
+  summary is the mean of its epochs, so it cannot change a verdict (F1 §5).
+- **chimi20200221_08_r4 failed** the stored-likelihood gate (max abs 90.45 nats, max rel 1.21). F1 calls the
+  cause unknown. D1 found it: the animal never entered patch 1, so the occupancy at bins 71–78 is a float32
+  subnormal. The GPU decode keeps subnormals; JAX on the CPU flushes them to zero. The decode is correct; the
+  CPU check is not ([`d1_decode_mismatch_report.md`](../../.claude/research/refresh_followup/d1_decode_mismatch_report.md)).
+  Task 29 (`da34665`, `e224a09`) makes the checks leave out bins with 0 < occupancy < 1e-20. This epoch's
+  rerun waits for the merge.
+- Every other gate passes in 240/240: exact encoding refit; summed per-tetrode terms reproduce the stored
+  likelihood to max rel ≤ 4.6e-5; A's marks equal B's.
+
+**Results.** Primary encoding `runcv_` (time-held-out, running-only), spike-mark part, nats per window. Animal
+mean with a t-interval on 4 df (F1 §3). The pilot column is Task 12's `pilot_fix1`, as F1 reports it; R8's
+earlier text quoted `pilot_fix0d`.
+
+| state, regime | evidence | estimate [95 % t] | p | animals, epochs > 0 | bout − matched [t]; p; animals | pilot estimate; p; animals |
 |---|---|---|---|---|---|---|
-| Local immobile | `run_loc_mark` | 2.08 [0.47, 3.69] | 0.023 | 5/5 | 0.49 [−0.04, 1.02] | 0.062 |
-| Local running | `run_loc_mark` | 12.49 [4.54, 20.44] | 0.012 | 5/5 | −0.31 [−0.78, 0.16] | 0.14 |
-| NL-Continuous immobile | `run_nl_anim_mark` (MAP_S vs animal) | 5.22 [0.73, 9.71] | 0.032 | 5/5 | 6.59 [2.88, 10.30] | 0.0079 |
-| NL-Continuous immobile | `run_nl_null_mark` (MAP_S vs mismatched) | 4.70 [2.62, 6.79] | 0.0033 | 5/5 | 4.28 [2.45, 6.10] | 0.0029 |
-| NL-Continuous running | `run_nl_anim_mark` | −1.31 [−2.92, 0.31] | 0.088 | 1/5 | 1.15 [0.01, 2.28] | 0.048 |
-| NL-Fragmented immobile | `run_nl_anim_mark` | 5.65 [−2.68, 13.98] | 0.13 | 5/5 | 6.94 [−1.39, 15.28] | 0.082 |
-| No-Spike immobile | `run_ns_logratio` | 6.74 [4.13, 9.34] | 0.002 | 5/5 | 76.04 [57.26, 94.81] | 0.00036 |
-| No-Spike running | `run_ns_logratio` | 4.01 [2.78, 5.24] | 0.0008 | 5/5 | 104.93 [58.95, 150.92] | 0.0032 |
+| Local, immobile | animal vs mismatched | 2.76 [1.17, 4.36] | 0.009 | 5/5, 240/240 | 0.63 [0.24, 1.01]; 0.011; 5/5 | 2.16; 0.026; 5/5 |
+| Local, running | animal vs mismatched | 15.2 [9.2, 21.3] | 0.002 | 5/5, 240/240 | 0.08 [−0.90, 1.06]; 0.83; 3/5 | 11.8; 0.014; 5/5 |
+| No-Spike, immobile | silence vs local coding | 7.70 [5.70, 9.70] | 0.0004 | 5/5, 240/240 | 85.6 [70.2, 101]; 0.0001; 5/5 | 6.68; 0.002; 5/5 |
+| No-Spike, running | silence vs local coding | 4.65 [3.80, 5.49] | 0.0001 | 5/5, 240/240 | 125 [98, 151]; 0.0002; 5/5 | 4.04; 0.0009; 5/5 |
+| NL-Continuous, immobile | MAP_S vs animal | 6.10 [4.25, 7.94] | 0.0008 | 5/5, 237/240 | 7.82 [5.74, 9.90]; 0.0005; 5/5 | 5.03; 0.042; 5/5 |
+| NL-Continuous, immobile | MAP_S vs mismatched MAP | 6.41 [2.94, 9.88] | 0.007 | 5/5, 240/240 | 5.24 [2.51, 7.98]; 0.006; 5/5 | 4.78; 0.003; 5/5 |
+| NL-Continuous, running | MAP_S vs animal | −1.19 [−1.88, −0.50] | 0.009 | 0/5, 23/240 | 2.21 [1.60, 2.81]; 0.0005; 5/5 | −1.54; 0.12; 1/5 |
+| NL-Fragmented, immobile | MAP_S vs animal | 5.22 [3.07, 7.37] | 0.003 | 5/5, 218/240 | 6.46 [4.30, 8.61]; 0.001; 5/5 | 6.09; 0.15; 4/5 |
+| NL-Fragmented, immobile | MAP_S vs mismatched | 0.13 [−0.56, 0.81] | 0.64 | 3/5, 116/240 | −0.45 [−0.96, 0.06]; 0.07; 0/5 | 1.29; 0.16; 3/5 |
 
-Immobile coordinated-silence excess over the canonical prediction: 0.343 [0.075, 0.610], p = 0.024.
-Fix round 1 (`cf8b04d..42823e1`) changed the primary encoding to a 2-fold time-held-out one; the
-running Local estimate moved 12.49 → 11.77. **These are five epochs on pre-R11 decodes and must not be
-quoted as the refresh result.** Task 13's half-tetrode labels were never produced (4.7), so the
-evidence is labelled by the all-tetrode decode it is scored against.
+- Every pilot verdict holds at 240 epochs, and two firm up: Local immobile vs matched windows (p 0.08 → 0.011)
+  and NL-Fragmented immobile vs animal (p 0.15 → 0.003).
+- Not supported: running NL-Continuous against the animal's position (0/5; all its bouts are non-SWR), and
+  immobile NL-Fragmented against a mismatched location (3/5).
+- Coordinated silence, immobile: excess over local coding 0.449 [0.203, 0.694], p 0.007, 5/5 (pilot 0.420).
+- Split by SWR (F1's supplement): immobile NL-Continuous per held-out spike, against the animal's position,
+  0.60 [0.45, 0.74] with SWR and 0.20 [0.16, 0.25] without, 5/5 each.
+
+**Caveats (F1 §6).** B's labels come from the all-tetrode decode, so only the remote location is truly held
+out. The NL-Continuous immobile top calibration bin does not separate from 0 against the animal (0.75, lower
+bound −0.08). Task 13's half-tetrode labels now exist; section 10.6 compares them.
 
 ### 4.7 Not run in the refresh
 
 - **Task 13 (half-tetrode held-out labels).** The code is done and reviewed (`a06892a..3f50a90`); the
   20 GPU decodes were never run. One CPU end-to-end on peanut exists (half decodes found 153–182 events
   against 245; `.superpowers/sdd/PLAN/progress.md:307`), which is not evidence.
-- **Task 12 full run on the R11 decodes** (4.6).
+  **Run 2026-10-16:** 20 half decodes plus 2 S = all checks, all ok, on the 5 pilot epochs (section 10.6).
+- **Task 12 full run on the R11 decodes** (4.6). **Run 2026-10-16** by F1 on 240 of 242 epochs (section 4.6).
 - **The R13 additions** (plan "R13: tables, refits, PFC, figures, audit"): the sensitivity analysis
   without the epochs over 2 % masked (to be restated on the 242 epochs), the masked-time table with the
   events and bins the mask and the 0.3-s reach remove, and the robustness reruns of the headline
   results (without the mask; every artifact threshold 25 % lower and higher; 1 s masked after each
   step). No ledger entry or output exists for any of them.
+  **Run in part 2026-10-16** (R13 interim, section 10.10): the >2 % sensitivity, the masked-time table, V0
+  (no mask) and V3 (+1 s after steps) are done. V1 (thresholds ×0.75), V2 (×1.25) and X_R10nr (R10 labels,
+  no rule) are paused by the lead. V1's and V2's detector reruns are done and kept; X_R10nr's root and inputs
+  exist, its tables are not built.
 - **Plan R8 "Docs" step** (a `docs/known_issues/` note on the re-decode; the
   `three_sessions_blocked_by_nwb_checksum.md` update; the spec's status line; the
   `replay_detection_comparison` PLAN; the memory notes): after the lead's review, by the plan.
+  **Done 2026-10-16** on `full-pipeline-refresh-code` (`bd3aa2c`, `0134a63`), not merged; the coordinator
+  updated the memory notes (ledger `progress.md`, 09:00 and 09:10 PDT).
 
 ## 5. Open items
 
@@ -461,14 +548,14 @@ Every row was checked against the cited evidence in this session unless it says 
 | # | item | evidence | severity | proposed owner / action |
 |---|---|---|---|---|
 | 1 | Hand-maintained docs quote pre-refresh numbers; 8 conclusions change | section 6 (78 claims; 6.1 lists the 8) | **High** | lead: review section 6, then requote (plan R8 STOP) |
-| 2 | `fit_provenance.git_hash()` reads the checkout's HEAD at every write, so a long run in a checkout whose HEAD moves stamps a commit it did not run | `src/continuum_swr_replay/analysis/replay/fit_provenance.py:85-96` (subprocess at call time), `:195` (called in each `write_fit_provenance`); ledger 2026-10-11 22:45 | Medium | code task: read HEAD once at process start and pass it down; until then, freeze the checkout during runs (the R6b/R7 runbooks did) |
+| 2 | `fit_provenance.git_hash()` reads the checkout's HEAD at every write, so a long run in a checkout whose HEAD moves stamps a commit it did not run | `src/continuum_swr_replay/analysis/replay/fit_provenance.py:85-96` (subprocess at call time), `:195` (called in each `write_fit_provenance`); ledger 2026-10-11 22:45 | Medium | code task: read HEAD once at process start and pass it down; until then, freeze the checkout during runs (the R6b/R7 runbooks did). **Resolved 2026-10-16** on `full-pipeline-refresh-code` (not merged): Task 27 item 1 (`b7dc1d6`, `e6e3b9e`) reads the commit once at import; Task 28 `929b1b9` does the same for the content runner's `_provenance` (`task-27-report.md`, `task-28-report.md`) |
 | 3 | R09 / R05 / R07 z- and SD-references are taken over all cohort stops after the qvals join, including zero-bin stops that are never fit | `r6b_cpu_report.md` §4.2 and concern 1: ≤ 0.2 % in any SD; R09's own comment says "the SD of exactly the rows that get fit" | Low | design decision (lead); a code task if references should be the fitted rows |
-| 4 | `switch_aligned`: a NaN `is_stay` drops the stop from the sequence, which creates 6–8 spurious "first-switch" episodes per source | `r6b_cpu_report.md` §4.4 (non_local 21 lost / 8 gained episodes). Built only by `scripts/content/compare_event_source_models.py:575-628` and stored in the X03–X05 bundles; grep over `scripts/` and `src/` finds **no figure that reads it** | Low | code task: an unknown stop breaks the run instead of being skipped |
-| 5 | Per-bin and contrast-rate fit pickles save rows in a non-deterministic order | `r6b_cpu_report.md` §4.1 (R01–R03, R05, R06 bit-equal values, rows reordered) | Low | code task: sort by key before saving |
+| 4 | `switch_aligned`: a NaN `is_stay` drops the stop from the sequence, which creates 6–8 spurious "first-switch" episodes per source | `r6b_cpu_report.md` §4.4 (non_local 21 lost / 8 gained episodes). Built only by `scripts/content/compare_event_source_models.py:575-628` and stored in the X03–X05 bundles; grep over `scripts/` and `src/` finds **no figure that reads it** | Low | code task: an unknown stop breaks the run instead of being skipped. **Resolved 2026-10-16**: Task 27 fix round 1 (`28e00cc`) decides a first switch from the stop's own arriving trip. R6c rebuilt X03–X05: 2,319 first switches; episodes 1,961 / 1,721 / 1,693 (non_local / SWR / MUA), equal to Task 27's counts (`r6c_report.md` §4.3) |
+| 5 | Per-bin and contrast-rate fit pickles save rows in a non-deterministic order | `r6b_cpu_report.md` §4.1 (R01–R03, R05, R06 bit-equal values, rows reordered) | Low | code task: sort by key before saving. **Resolved in code 2026-10-16** (not merged): Task 27 item 3 (`c0b69fd`, `a4ba6d2`) sorts by the full row key. The rate pickles on disk were not refit (R6c reran no rate run) |
 | 6 | The R12b (Widloski) runner exits 1 at cluster teardown after every record is saved | `logs/memoryless_r12b_20261011.out` ends `TimeoutError` then `EXIT=1`; `.claude/research/refresh_r13/r12b_gate.json` 242/242 ok, inputs re-hashed equal | Low | code task: close the cluster with a longer timeout, or exit by the manifest |
 | 7 | `generate_replay_content_figures.py` asks for an M7 model and for behaviour / mixed-effects inputs that do not exist (those figures are silently skipped) | `scripts/content/generate_replay_content_figures.py:127` (`key_models = ["M2", "M4", "M6", "M7"]`), `:89`, `:146`, `:161`; R7a report "Tracked-output decisions" | Low | code task: drop M7, decide whether those inputs belong in the pipeline |
 | 8 | The event-gallery catalog globs the decode folder instead of reading the register | `scripts/figures/generate_event_gallery.py:167-173` (`list_epoch_pkls`); equal to the 242 today | Low | code task: `analysed_decode_files` |
-| 9 | A stale "218" in the `SWR_INVENTORY_RUN_ID` docstring | `src/continuum_swr_replay/analysis/hippocampus/swr_source.py:176` ("the 218 analysed and the 37 pending"); same text in `docs/design/2026-10-09-swr-source.md:27` (6.4 M3) | Low | doc pass |
+| 9 | A stale "218" in the `SWR_INVENTORY_RUN_ID` docstring | `src/continuum_swr_replay/analysis/hippocampus/swr_source.py:176` ("the 218 analysed and the 37 pending"); same text in `docs/design/2026-10-09-swr-source.md:27` (6.4 M3) | Low | doc pass. **Resolved 2026-10-16** on `full-pipeline-refresh-code` (not merged): `bd3aa2c` fixes both texts (ledger 09:10 PDT) |
 | 10 | The model-checking ladder's top-left legend covers a few points | R7 report, wave 2b checks (by eye) | Low | batch with the next figure fix |
 | 11 | The gallery's excluded-span hatch has never been seen by eye | R7a "Gallery checks": 0 of 1,000 selected windows touch excluded time | Low | render one window that crosses excluded time and look |
 | 12 | Theta power is raised 0.3–1 s beyond the mask (analysed time): SD 1.2–1.26 and p99 4.3–4.9 there, against SD ≈ 1 and p99 2.5–2.8 far from any mask | ledger 2026-10-11 R13c promotion note (coordinator's `theta_reach.py`, 3 epochs). No model reads `theta_z` (R8 grep: no hit in `model_specs.py`, `covariate_registry.py`, `scripts/{rate,content,pfc}`, `analysis/pfc`); Fig 2 / theta-QA panels and the event table's `theta_z` do | Medium | lead: decide whether theta displays need a wider reach |
@@ -491,21 +578,45 @@ Every row was checked against the cited evidence in this session unless it says 
 | 29 | Earlier parked: `pfc_marked_model_family/` (852 sidecars) is stale on the old tables | ledger R6 ruling (out of scope) | Low | do not cite; refit if the family is used |
 | 30 | Earlier parked: the PFC smoke check fails near-silent units (0 usable null draws → NaN p) | ledger: senor20201101_04_r2 units 111/124, identical in September | Low | relax the smoke gate for near-silent units |
 | 31 | Earlier parked: ContFrag `arm_fraction_posterior` divides by `n_timebins`, which includes undecoded bins, so its per-event sum can be < 1 | `src/continuum_swr_replay/analysis/contfrag/tables.py:672-675` (`arm_fraction` beside it uses `n_timebins − n_undecoded_bins`); only an optional column in `choice_prediction` / `switch_analysis`, not the default | Low | code task: same denominator as `arm_fraction` |
-| 32 | Earlier parked: the main venv has drifted from `uv.lock` (numba 0.68 vs 0.62.1, llvmlite 0.50 vs 0.45.1, cuda-pathfinder, extra mutmut/textual/rich/libcst, jax-cuda12 plugin) | ledger; the tables and R11 ran in it; freeze `.claude/research/refresh_r13/main_venv_freeze_20261011.txt` | Medium | lead: lock the freeze or re-sync; a `uv sync` today would change the environment the results were made in |
+| 32 | Earlier parked: the main venv has drifted from `uv.lock` (numba 0.68 vs 0.62.1, llvmlite 0.50 vs 0.45.1, cuda-pathfinder, extra mutmut/textual/rich/libcst, jax-cuda12 plugin) | ledger; the tables and R11 ran in it; freeze `.claude/research/refresh_r13/main_venv_freeze_20261011.txt` | Medium | lead: lock the freeze or re-sync; a `uv sync` today would change the environment the results were made in. **Resolved 2026-10-16** on `full-pipeline-refresh-code` (not merged): the lead asked for a re-lock; `01b3051` pins what ran (numba 0.68.0, llvmlite 0.50.0, the CUDA plugin 0.8.0 and 14 NVIDIA CUDA 12.9 packages). The lock now matches the freeze except other-platform packages and hand-installed tools (`venv_drift.md`; ledger 07:40 PDT) |
 | 33 | Figure 2 panel e text must say "per-session median Local-state decoding error" | task-26c review; text at `paper/figure_claims_plan.md:33-34` (6.4 F1) | Low | doc pass |
 | 34 | The plan's R7 line is wrong: `summarize_per_bin_rate_models.py` only prints; `docs/per_bin_rate_results.md` is hand-transcribed | `.claude/docs/plans/full-pipeline-refresh/PLAN.md:1660`; the script writes no file (R7b) | Low | plan edit |
 | 35 | Upstream: `plot_rescaled_ISI_autocorrelation`'s lag slice selects 0 points (LorenFrankLab/non_local_detector#64, filed); a local workaround is in task 26d | R7b report; ledger | Low | track upstream; drop the workaround after the fix |
-| 36 | Task 12 (held-out spike evidence per decoder state) was never run on the R11 decodes; only the 5-epoch pilot on pre-R11 decodes exists | section 4.6; no output in `Processed-Data/_refresh_*/state_evidence` | Medium | run `scripts/qa/run_state_evidence.py` on the 242 epochs (CPU, ~2.6 h at 16 workers by the task-12 estimate) |
-| 37 | Task 13 (half-tetrode held-out labels): GPU decodes never run | section 4.7 | Medium | run after R11 on free GPUs, per the ledger ruling |
-| 38 | R13 additions not run: sensitivity without the > 2 % masked epochs (restated on 242), the masked-time table, and the robustness reruns (no mask; thresholds ±25 %; 1 s after each step) | section 4.7; plan "R13" | Medium | lead: schedule before the artifact rule is described as robust |
-| 39 | The spike-evidence ("reality") outputs are stale against the R11 decodes, and `paper/figures/reality/event_spike_evidence_per_animal.csv` still labels j16 "j"; claims row 19a cites its ΔLL ≈ 0.73 | ledger 2026-10-11 22:45 (task 26c note) | Medium | rerun `analyze_event_spike_evidence.py` before citing |
+| 36 | Task 12 (held-out spike evidence per decoder state) was never run on the R11 decodes; only the 5-epoch pilot on pre-R11 decodes exists | section 4.6; no output in `Processed-Data/_refresh_*/state_evidence` | Medium | run `scripts/qa/run_state_evidence.py` on the 242 epochs (CPU, ~2.6 h at 16 workers by the task-12 estimate). **Resolved 2026-10-16**: F1 ran it on 240 of 242 epochs (section 4.6). Left: j1620210709_10_r5 (running) and chimi20200221_08_r4 (after the merge; items 50 and 54) |
+| 37 | Task 13 (half-tetrode held-out labels): GPU decodes never run | section 4.7 | Medium | run after R11 on free GPUs, per the ledger ruling. **Resolved 2026-10-16**: 20 half decodes plus 2 checks, all ok (section 10.6). Follow-up: item 52 |
+| 38 | R13 additions not run: sensitivity without the > 2 % masked epochs (restated on 242), the masked-time table, and the robustness reruns (no mask; thresholds ±25 %; 1 s after each step) | section 4.7; plan "R13" | Medium | lead: schedule before the artifact rule is described as robust. **Partly resolved 2026-10-16**: the >2 % sensitivity, the masked-time table, V0 and V3 are done (R13 interim, section 10.10). The rest (V1, V2, X_R10nr) is item 49 |
+| 39 | The spike-evidence ("reality") outputs are stale against the R11 decodes, and `paper/figures/reality/event_spike_evidence_per_animal.csv` still labels j16 "j"; claims row 19a cites its ΔLL ≈ 0.73 | ledger 2026-10-11 22:45 (task 26c note) | Medium | rerun `analyze_event_spike_evidence.py` before citing. **Resolved 2026-10-16**: F1 reran the engine on 242/242 epochs; outputs in `paper/figures/reality_r11/` (its per-animal CSV names j16). Row 19a's ≈ 0.73 was a one-session prototype; F1's replacement is in section 10.2 |
 | 40 | `compare_pfc_cohorts.py` cannot compare two held-out PFC trees (it always reads the "before" tree as likelihood-ratio bundles) | section 2.4; `compare_pfc_cohorts.py:2627-2629` | Low | code task: read each tree by its sidecars' estimator |
 | 41 | `compare_fits.py`'s default mode leaves the "before" reward-step cells empty when both sides use the current rung names | section 2.2 | Low | code task: pair by the current names when both sides have them |
 | 42 | 33 at-well stops in chimi20200218_06_r3 disagree on reward between `qvals` and the stop table (old and new tables alike) | `r13a_report.md` concern 5 | Low | known-issues note (plan R8 Docs step) |
-| 43 | Plan R8 "Docs" step pending: re-decode known-issues note, `three_sessions_blocked_by_nwb_checksum.md`, the spec's status line, the replay-detection PLAN, memory notes | plan R8 | Low | after the lead's review |
+| 43 | Plan R8 "Docs" step pending: re-decode known-issues note, `three_sessions_blocked_by_nwb_checksum.md`, the spec's status line, the replay-detection PLAN, memory notes | plan R8 | Low | after the lead's review. **Resolved 2026-10-16** on `full-pipeline-refresh-code` (not merged): `bd3aa2c`, `0134a63`; memory notes updated by the coordinator (ledger 09:00, 09:10 PDT) |
 | 44 | The audit's `--check-marks` path keeps every NWB analysis file it opens (about 22 per recording day) and does not raise the open-file limit; over 45 days it reaches about 1,000 open files against a soft limit of 1,024 | R8 run: 158 NWB handles open after 8 chimi days (`/proc/<pid>/fd`), soft limit 1,024 (`/proc/<pid>/limits`). R8 raised the running process's soft limit with `prlimit --nofile=65536` at 18:02; no code or data was touched. `scripts/qa/audit_refresh_consistency.py` calls neither `decoding_common.raise_open_file_limit` nor `release_nwb_files` | Low | code task: call both in the marks check |
+| 45 | The fitter takes only a single-column separated term to its limit; a multi-column separated direction refuses the session. X03 non_local patch_switch keeps 157 of 189 sessions (PS3 refuses 33, and the common cohort drops them from PS0–PS2) | `r6c_report.md` §5.2, concern 1; ruling 2 (ledger 14:05 PDT) | Medium | code task (parked): a multi-column limit, or a per-rung cohort for that block; do not cite patch_switch without the n |
+| 46 | The same BFGS stopping problem is still in `fit_conditional_logit`, `choice_prediction.fit_choice_model`, the `model_checking` CV folds and (unmeasured) the DM L-BFGS-B | `task-28-report.md` §3 and fix round 1 §7; ledger 09:40 PDT ("Parked") | Medium | code task: apply Task 28's fix; measure the DM gap first |
+| 47 | X01 (`compare_content_estimators.py`) stores no optimizer diagnostics (`newton_decrement`, `max_abs_grad`, `n_newton_steps`, `unidentified_terms`) | `r6c_report.md` §3.1, concern 4; all 3,872 of its conditional fits are `converged` (decrement < 1e-8) | Low | small code task |
+| 48 | C01's directory swap (`_publish_staged_directory`) deletes the K04–K07 DM contrast files in `replay_content/models/` | `r6c_report.md` §2.3, concern 7; R6c restored the 44 files byte for byte | Medium | before any C01 rerun: restore or rerun K04–K07; code task: keep files the runner does not own |
+| 49 | R13's V1 (thresholds ×0.75), V2 (×1.25) and X_R10nr (R10 labels, no rule) are paused. V1's and V2's detector reruns are done and kept; no V1, V2 or X_R10nr table or fit is built | `r13_robustness_report.md` §9 (resume commands; about 4–8 h); the lead paused R13 at 13:48 PDT | Medium | lead: resume or drop before the artifact rule is called robust to its thresholds |
+| 50 | Post-merge reruns: chimi20200221_08_r4's state evidence and reality engine with Task 29's checks; every figure that reads the content fits (stale against R6c) | `task-29-report.md` (the rerun waits for the merge); `r6c_report.md` concern 8 | Medium | after the merges: rerun that epoch (about 10–20 min of CPU, D1) and the content figures; the lead confirms keeping the epoch (D1 option (a)) |
+| 51 | Phase 3, the detector comparison, was out of the refresh's scope; its inputs are ready, its adapters, runner and report are not built | ledger 08:30 PDT (answer to the user) | Low | the next project |
+| 52 | Half-tetrode No-Spike labels fail the log-ratio test (0/5), and the sign tracks the selecting half's spike share (Spearman 0.80); "held out" and "less power" are confounded | `t13_half_tetrode_report.md` §3, §5, concern 1 | Medium | spike-balanced half splits (or more partitions) before any held-out No-Spike claim |
+| 53 | The non_local_detector issue on device-dependent subnormal occupancy is drafted, not filed | D1 recommendation 4; draft `scratchpad/nld_issue_subnormal.md` (session scratchpad); ledger 12:20 PDT: no GitHub credentials on breeze | Low | file it once push access works |
+| 54 | F1's final full pass of Task 12 is still to run (see below) | `f1_evidence_report.md` §5 | Low | watch it; stop it if it recomputes all 242 epochs |
 
-**Count by severity: 1 High, 10 Medium, 33 Low (44 items).**
+**Count by severity, 2026-10-16: 1 High, 10 Medium, 33 Low still open (44 of 54 items).** Closed: items 2,
+4, 5, 9, 32, 36, 37, 38 (in part, the rest is item 49), 39 and 43. On 2026-10-12 it was 1 High, 10 Medium,
+33 Low (44 items).
+
+**The F1 final pass (item 54).** Source: `f1_evidence_report.md` §5; ledger 17:50 PDT.
+- After j1620210709_10_r5 ends (about 03:00–04:00 on 2026-10-17), `logs/f1_evidence_20261016/run_state_xargs.sh`
+  runs a final full pass from the main tree (`--n-workers 4`, no `--epochs`).
+- It reuses the 241 written epochs only if the commit (`d29cc3c`), settings and decode files are unchanged and
+  the tree has no tracked changes. It recomputes chimi20200221_08_r4, which fails the same check (about
+  10 min), records that, writes the pooled outputs over the 241 ok epochs, and exits 1.
+- **If the main tree has a new commit by then** (the `memoryless-sequence-detection` branch moves), the commit
+  check fails for every epoch and the pass recomputes all 242 (10 h or more). In that case stop it and use
+  `.claude/research/refresh_followup/f1_outputs/b_pooled_240/`. Do not stop the j16 epoch itself.
+- A second risk: the dask shutdown `TimeoutError` seen in 5 epochs could recur at the end, before the pooled
+  summary is written. The same fallback applies.
 
 ## 6. Hand-maintained doc claims that need new numbers
 
@@ -543,6 +654,28 @@ listed.
 | V6 | "SWR content is less current-locked" (`CS1` −0.373, 0/5 animals positive). `claims_table.md:51` (19a); synthesis `:283`, `:622`, `:657`; `content_estimator_comparison.md:54`, `:122`, `:248`, `:259` | fraction −0.373 (0/5); count −0.461; DM −0.297 | fraction **−0.069 (1/5)**, count −0.093, DM −0.036; all three animal-bootstrap intervals include zero ([−0.632, +0.145] fraction); the session sign-rank q is still < 1e-4 (`compare_fits_content.md`). The total `CS1nt` stays clearly negative: −0.599 → −0.411 (0/5). Split `C2_base`: SWR +0.797 → **+0.884**, non-SWR +0.725 → **+0.530** | the decode, +0.21, bootstrap excludes 0 (R8a) |
 | V7 | Content occupancy #14: "non-SWR content is well-dominated (72 % at wells = ~42 % remote + ~30 % own well; 27 % paths); SWR ~76 % paths". `claims_table.md:43` | remote well 0.42, own well 0.30, remote path 0.27; SWR paths 0.76; 218 sessions | remote well 0.45, own well **0.13**, remote path **0.41** (wells 0.58); SWR remote path 0.73, wells 0.21 + 0.05; 242 sessions | own well −0.169 = script definition change of 2026-08-12 (−0.162) + decode −0.028 + cohort/label (R8a §5.2): **the 0.30 was already stale before the refresh** |
 | V8 | "Arm value's main effect is positive too (`CS5_armvalue` main term +0.264, 5/5, bootstrap [+0.031, +0.818])". `claims_table.md:52` (19b), `:56` (19g); synthesis `:417-421` | fraction +0.264 (217, 5/5) [+0.031, +0.818]; count +0.228 (5/5); DM +0.168 (4/5); leaf `Mv` +0.2512 (215, 4/5) | fraction +0.256 (242, **3/5**) [**−0.268**, +0.608]; count +0.701 (4/5); DM +0.300 (4/5); `Mv` +0.2409 (237, 3/5). The fraction interval now includes zero | not attributed (R8a does not split this term) |
+
+### 6.1a Follow-up changes to these conclusions (2026-10-16)
+
+Sources: F2 ([`f2_robustness_report.md`](../../.claude/research/refresh_followup/f2_robustness_report.md)),
+R6c ([`r6c_report.md`](../../.claude/research/refresh_r13/r6c_report.md)) and F1
+([`f1_evidence_report.md`](../../.claude/research/refresh_followup/f1_evidence_report.md)). The claim rows of
+6.2–6.4 are not requoted here; they wait for the lead's review.
+
+| # | what changes | evidence | effect on the wording |
+|---|---|---|---|
+| F2-a | **The SWR reward rate ratio does not rest on j16.** Without j16 it rises, 6.39 → 6.89 (animal-balanced 6.80). j16 sits at 5.35; it raised the pooled value from 3.44 by ceasing to be a low outlier (1.16 before R-T), not by being high. | F2 §1a, §1c; leave-one-animal-out range 5.36–6.98; 81–84 % positive in every set | A cohort-robust statement is "about 5–7×, every animal positive" (F2). §0's and §3's attribution of the *change* (R-T in j16, plus the cohort) still holds |
+| F2-b | **About a fifth of 6.39 rests on the 31 added early peanut epochs:** 5.29 without them (5.27 animal-balanced); 5.29 without them and j16 (4.29 animal-balanced). The added peanut epochs' SWR RR is 17.54 against 3.49 for the 13 original ones (Mann-Whitney p 0.025). | F2 §1a, §1c | Quote a range or the animal-balanced value, and name the cohort. F2's day-trend explanation is a hypothesis |
+| F2-c | **V4: the NL-no-SWR immediate response is fragile.** Without wilbur: RR 1.21, 55 % positive, p 0.083 (G0 nonSWR session p 0.053). In the 31 added peanut epochs: 0.92. The paired dissociation holds in every leave-out: 72.4–78.5 % of sessions, every remaining animal positive, signed-rank p ≤ 4.9e-9. | F2 §1a, §1b, concern 1 | "Both streams respond" is not robust; the dissociation is. The joint-model contrast S1_rew is 4/5 (chimi negative), against 5/5 for the paired M7r test; cite 4/5 if the joint model is cited |
+| F2-d | **V6: CS1 is negative because SWR content shifts onto the trunk arms.** The pooled term shares the arm fixed effects between classes, so it measures the current arm's *share*. SWR events put about 0.35 of their mass on trunk arms, non-SWR 0.18. Giving SWR its own arm baseline moves CS1 −0.065 → +0.208 (3/5) and CS1nt −0.405 → +0.058 (3/5). | F2 §2e (sandbox refit; 215 sessions where every model fits) | Name the share estimand: SWR content devotes a smaller share to the current arm (CS1nt −0.41, 0/5; descriptive log-share −0.32, 0/5); among leaf arms only, −0.10 (1/5). F2 gives recommended wording (Item 2 conclusions) |
+| F2-e | **V6: CS1 is not null at the session level.** The animal median −0.069 is the least negative summary. On the 216 shared sessions: session median −0.191, fixed- and random-effects pools −0.226 and −0.228; session sign-rank p 2e-7. | F2 §2d, concern 5 | Do not call the direct effect null |
+| F2-f | **V6: the "+0.88 vs +0.53" split compared unpaired animal medians** (senor's for SWR, chimi's for non-SWR). Paired within session: +0.092 (3/5) at the pooled mean length; −0.11 (2/5) to +0.24 (4/5) at other reference lengths. | F2 §2b; R6c's split values +0.8823 / +0.5252 change nothing here | "SWR content favours the current arm more" is not supported. Report paired within-session differences |
+| V9 | **CS5b no longer estimates the arm-value term under a previous-goal control.** All strata: −0.4234 (155, 1/5) → −0.0608 (198, 2/5, q 0.16); many added sessions have the control unidentified, so the estimand is mixed. Rewarded stratum: the published row (−0.0526, n 237) is the CS5 model, because both controls are unidentified in every session. | R6c §5.2, §5.4, concern 2 | Do not quote either CS5b row as "controlling for the previous goal" until the lead decides how to treat it. Claim C9 (`paper/claims_table.md:57`) and synthesis `:568-583` (S13) quote CS5b |
+| F1 | **No conclusion change.** Non-SWR non-local events under the R11 decodes carry spike evidence for their decoded location, less per spike than SWR events: engine, per spike, nonSWR-close 0.51, nonSWR-remote 0.71, SWR-remote 1.14, each above baseline in 5/5 animals; held out, 0.20 vs 0.60 per held-out spike, 5/5. | F1 Verdict, §2, §3 | Row 19a's "≈ 0.73" (C4) came from a one-session prototype. F1's replacement: nonSWR-close dll_animal 0.79, per spike 0.51, 5/5 animals and 242/242 epochs above baseline (F1 concern 5) |
+
+R6c changes no other 6.1 conclusion. Its values for V5 (CS5 count / fraction / DM −0.1732 / −0.0142 /
++0.0461), V6 (fraction CS1 −0.0709, 1/5) and V8 (CS5 main term +0.2560, 3/5) keep the same signs and animal
+counts (R6c §5.4). F3 found no conclusion change from the optimizer gap (`f3_optimizer_report.md` §5).
 
 ### 6.2 The two items the brief names
 
@@ -666,6 +799,19 @@ stated conclusion** (6.1 lists them; they are the same lines, read for their con
 counted again). In 26 of the 78 at least one new value is "not re-derived" and must be read from the
 named artifact first. F1 is a wording fix, not a number.
 
+**Status changes, 2026-10-16** (the rows of 6.2–6.4 are unchanged):
+- **Fixed on `full-pipeline-refresh-code`, not merged: 2 claims.** M2 (the three-sessions note now states
+  the 242 cohort, keeping its history) and M3 (the swr-source note's "218 analysed and 37 pending"), both by
+  `bd3aa2c` (ledger 09:10 PDT). M1 is fixed in one of its three lines only: `0134a63` rewrote the
+  `docs/README.md` index line; "one 218-session cohort" (`:77`) and "50 of 218 sessions" (now `:172`) remain.
+  **76 claims still need new numbers.**
+- **Conclusion changes: 9, not 8.** CS5b in C9 (and S13) is the ninth (6.1a, V9). F2 corrects V4 and V6
+  further (6.1a); they were already counted.
+- **"Not re-derived": 24, not 26.** C4's ΔLL is now derived (F1: nonSWR-close dll_animal 0.79, per spike
+  0.51). C8's DM CS6 is now derived (R13 interim §4, canonical bundles, R8a's accessor: DM CS6 −0.070, DM
+  CS6nt +0.122). Both rows still need their other values re-read: R6c moved C4's and C8's content values
+  (section 3).
+
 ## 7. For the lead: proposed CLAUDE.md wording
 
 Source: `.superpowers/sdd/PLAN/task-26a-report.md`, "Proposed `CLAUDE.md` wording ("One analysed-time
@@ -754,6 +900,228 @@ golden baseline; this list does not include them, nor any `_pre_*_backup_*` fold
   `probe_marks_wilbur.{py,csv}`, `nonlocal_events_per_epoch.{py,csv,txt}`, `grep_doc_claims.py`,
   `doc_claims_hits.tsv`, `cleanup_sizes.{sh,txt}`.
 - This report, in the dev worktree only.
+- The 2026-10-16 update wrote only this report (section 10). It ran no analysis; every number in it is
+  copied from the cited follow-up reports.
 
 Nothing else was written. No canonical table, fit, decode, backup, PFC output or figure was touched; no
 tracked file in the main tree or in `-run2` changed.
+
+## 10. Follow-ups, 2026-10-16
+
+One subsection per follow-up. Each gives what was run, the result, what it changes in this report, and what is
+still open. The source reports are untracked files in the main tree (`/cumulus/edeno/continuum-swr-replay`);
+the links resolve there. The ledger is `.superpowers/sdd/PLAN/progress.md` (entries of 2026-10-16, PDT); it
+holds the coordinator's rulings. Code changes are on `full-pipeline-refresh-code` (head `e224a09`) and are
+neither pushed nor merged.
+
+### 10.1 R8a attribution
+
+Source: [`r8a_report.md`](../../.claude/research/refresh_attribution/r8a_report.md) (2026-10-12).
+
+- **Run:** Stage 1 descriptives and the Stage 2 sandbox ladder on 205 shared epochs. No new run today.
+- **Result:** already in section 3.
+- **Changes here:** none to its numbers. Two of its open items are now answered elsewhere:
+  - R-T against mask normalisation (its §11 item 2): R13 finds that R-T, in j16 alone, accounts for all of
+    the SWR reward-RR rise (section 10.10);
+  - the j16 reading: F2 shows the SWR reward RR does not rest on j16 (section 10.3).
+- **Still open:** which decoder change moves CS1, C1 and `log_phi_is_swr` (its §11 item 3), and the PFC
+  changes (not refit, its §11 item 4).
+
+### 10.2 F1: spike and state evidence on 242 epochs
+
+Source: [`f1_evidence_report.md`](../../.claude/research/refresh_followup/f1_evidence_report.md).
+
+- **Run:** (A) the spike-evidence engine `analyze_event_spike_evidence.py` on 242/242 epochs, with a fresh
+  marks cache; outputs `paper/figures/reality_r11/`. (B) Task 12's `run_state_evidence.py` on the R11
+  decodes; 240 ok, 1 failed, 1 running. CPU only, main tree `d29cc3c`.
+- **Result, A** (event medians, per spike, in nats): SWR-remote 1.14, nonSWR-remote 0.71, nonSWR-close 0.51.
+  Every class is above its epoch's matched baseline in 5/5 animals and 242/242 epochs. SWR-remote exceeds
+  nonSWR-remote in 5/5 animals and 240/242 epochs (+0.40). Uncapped, on 241 epochs: NL with SWR 1.05, NL
+  without SWR 0.65 per spike. A is not held out (the same spikes choose and score the MAP), so its "above
+  baseline" is close to built in.
+- **Result, B:** section 4.6. Immobile NL-Continuous against the animal's position: 6.10 [4.25, 7.94],
+  p 0.0008, 5/5, 237/240 epochs.
+- **June vs R11:** the P30-B transitions do not explain the rise in evidence. SWR-remote's rise is the decode.
+  For nonSWR-close, about half is the event-definition code and half the decode (F1 §4).
+- **Changes here:** §4.6 rewritten; items 36 and 39 closed; claims row 19a's ≈ 0.73 replaced (6.1a, 6.6).
+- **Still open:** j1620210709_10_r5 (running); chimi20200221_08_r4 after the merge (item 50); the final
+  pass (item 54). Untested hypotheses: why non-SWR events are weaker per spike (fewer cells, or a weaker
+  sequence), and which decode input raised R11 above June.
+- **Disagreement, resolved:** F1 calls the chimi20200221_08_r4 failure "not known". D1, written later the same
+  day, explains it (section 10.7).
+
+### 10.3 F2: robustness and leave-one-out checks
+
+Source: [`f2_robustness_report.md`](../../.claude/research/refresh_followup/f2_robustness_report.md).
+
+- **Run:** read-only leave-outs of the per-bin M7r immediate reward RR and of the paired dissociation, with
+  the summarizer's own functions (reproduces 6.39 / 3.27 / 9.91 / 1.42 and 76.7 % of 240 exactly). One
+  sandbox content refit (run checkout, `bb19449`) for the current-arm question.
+- **Result, rate:** SWR RR 6.39; without j16 6.89; without the 31 added peanut epochs 5.29; without both
+  5.29 (4.29 animal-balanced); leave-one-animal-out 5.36–6.98. The dissociation holds in every set (72.4–78.5 %,
+  p ≤ 4.9e-9). NL-no-SWR without wilbur: 1.21, p 0.083. S1_rew is 4/5 (chimi negative).
+- **Result, content:** the brief's hypothesis (per-class length reference) is refuted: length is z-scored
+  once, over the whole at-well cohort. The cause is the shared arm fixed effects; SWR content moves onto the
+  trunk arms (0.35 vs 0.18 of its mass).
+- **Changes here:** §0; section 6.1a rows F2-a to F2-f (V4, V6).
+- **Still open:** whether the peanut day trend is real (a hypothesis; 1–5 sessions per day). F2's BFGS
+  observation led to F3.
+
+### 10.4 F3: did the content fits stop short of their optimum?
+
+Source: [`f3_optimizer_report.md`](../../.claude/research/refresh_followup/f3_optimizer_report.md).
+
+- **Run:** Newton refits of all 2,631 shipped headline content fits (C2_base in three populations, CS1,
+  CS1nt, CS4, CS4nt, CS5, CS5nt, CS6, CS6nt), read-only. The shipped coefficients reproduce exactly.
+- **Result:** every fit was flagged converged, yet the log-likelihood gap to the optimum is median 1e-4, p90
+  0.074, p99 1.38, max 4.81; above 0.1 in 243 fits and above 1 in 57. The gap is in a nuisance term, the third
+  recency-spline column (tiny SD). Headline terms move by median 0.001 SE, max 0.35 SE. No sign changes and no
+  animal count falls; C2_base SWR rises 4/5 → 5/5 on a knife edge (wilbur −0.008 → +0.009).
+- **Cause (confirmed):** BFGS stops on gtol 1e-5 applied to −LL/nobs, and `ConditionalPoisson.fit` silently
+  ignores a `gtol` argument.
+- **Changes here:** led to Task 28 and R6c; the note under section 3's table; item 46.
+- **Still open:** the same gap in other fitters (item 46). ΔAIC across a step that adds the spline may carry
+  the gap (a hypothesis, not measured).
+- **Disagreement:** the coordinator's own read of `f3_per_fit.csv` (ledger 07:35 PDT) gives median 5e-5 and
+  p99 1.35; F3's report gives 1e-4 and 1.38. Both agree on p90 0.074 and max 4.81.
+
+### 10.5 Venv drift and the uv re-lock
+
+Sources: [`venv_drift.md`](../../.claude/research/refresh_followup/venv_drift.md); commit `01b3051`; ledger
+07:40 PDT.
+
+- **Run:** `uv sync --frozen --dry-run --all-extras` in the main tree (no change made).
+- **Result:** the refresh ran with numba 0.68.0 / llvmlite 0.50.0 (lock 0.62.1 / 0.45.1). The lock resolved no
+  CUDA plugin or NVIDIA package, so it could not rebuild the GPU environment of the R11 decodes and the PFC
+  fits. Root cause: `[tool.uv] override-dependencies` "jax>=0.7.2" replaced every jax requirement, the extras'
+  `jax[cuda12]` included.
+- **Re-lock (the lead's request):** `01b3051` names `jax-cuda12-plugin[with-cuda]==0.8.0` directly and pins
+  what ran. The lock now matches the freeze except other-platform packages and hand-installed tools.
+- **Changes here:** item 32 closed.
+- **Still open:** the merge. numba's effect on the position-linearization Viterbi is judged low risk and was
+  not tested.
+
+### 10.6 Task 13: half-tetrode decodes
+
+Source: [`t13_half_tetrode_report.md`](../../.claude/research/refresh_followup/t13_half_tetrode_report.md).
+Outputs: `Processed-Data/_refresh_20261016/half_tetrode/`.
+
+- **Run:** 20 half decodes and 2 all-tetrode checks on the 5 pilot epochs, on idle breeze GPUs, from the main
+  tree at `d29cc3c`, after four R11-compatibility checks. All ok. S = all reproduces the canonical decode (max |ΔP|
+  2.4e-4; events identical, 257/257 and 245/245).
+- **Result** (animal means, n = 5; half labels against canonical labels scored by the same four runs):
+  - Local immobile 0.98 vs 1.17; Local running 9.27 vs 9.27; all 5/5.
+  - NL-Continuous immobile, against the mismatched location, 2.91 [0.88, 4.95] p 0.017 vs 4.46; against the
+    animal, 3.41 vs 4.48.
+  - NL-Fragmented immobile, against the mismatched location, 2.33 vs 1.58.
+  - **No-Spike fails the log-ratio test:** −55.9 immobile and −78.7 running (p 0.016), 0/5, against +6.65 and
+    +3.93. Yet the other half is silent in 34 % of these bouts against 1 % expected (excess +0.32, 5/5).
+- **Caveat:** the two label sources select different bouts (event-bin Jaccard 0.32–0.80). The comparison holds
+  the scoring runs fixed, not the bouts.
+- **Changes here:** §4.7; item 37 closed; item 52 added.
+- **Still open:** whether the No-Spike failure is the half decoder's lower spike count (the sign tracks the
+  selecting half's spike share, Spearman 0.80; a hypothesis). Spike-balanced splits would test it.
+
+### 10.7 D1: the chimi20200221_08_r4 mismatch
+
+Source: [`d1_decode_mismatch_report.md`](../../.claude/research/refresh_followup/d1_decode_mismatch_report.md).
+
+- **Run:** a read-only rebuild of the whole epoch on the CPU, a per-tetrode breakdown, a numpy float32
+  emulation, and an occupancy scan of all 242 epochs.
+- **Result (confirmed):** the animal never entered patch 1. Occupancy is exactly 0 at bins 0–70 and a float32
+  subnormal at bins 71–72 (5.4e-43, 5.6e-40). The GPU keeps subnormals; JAX on the CPU flushes them to zero.
+  So CPU rebuilds differ by up to 20 nats per spike at bins 71–78. The numpy emulation reproduces the stored
+  values, so the stored decode is correct float32 arithmetic. Only this epoch is affected: the next-lowest
+  minimum occupancy is 4e-6.
+- **A separate, model-level effect** in this epoch: never-visited bins attract MAPs in silent bins. 192 of its
+  6,779 non-local event bins have their MAP in never-visited bins; in the event-arm table the never-visited arms 1 and 6
+  hold 90 and 176 MAP bins (3.9 % of its event bins). This explains Task 28's arm-0-unidentified fits.
+- **Ruling** (ledger 12:20 PDT): option (a), keep the epoch and document it; fix the checks (Task 29); draft a
+  non_local_detector issue. Keeping the epoch is listed for the lead in §0.
+- **Changes here:** the cause in §4.6; items 50 and 53.
+- **Still open:** the issue is not filed (no GitHub credentials on breeze). D1 infers, without checking, that
+  the epoch's ContFrag decode behaves the same.
+
+### 10.8 Tasks 27, 28 and 29 (code, on `full-pipeline-refresh-code`)
+
+Sources: [`task-27-report.md`](../../.superpowers/sdd/PLAN/task-27-report.md),
+[`task-28-report.md`](../../.superpowers/sdd/PLAN/task-28-report.md),
+[`task-29-report.md`](../../.superpowers/sdd/PLAN/task-29-report.md), and the ledger. All three were reviewed
+and approved (ledger 08:50, 13:10 and 14:25 PDT).
+
+- **Task 27** (`b7dc1d6`, `cfb2f4e`, `c0b69fd`; fix round `28e00cc`, `e6e3b9e`, `a4ba6d2`; `ec04edf`):
+  - fit provenance records the commit the process loaded;
+  - a first switch is decided by the stop's own arriving trip (ruling 08:10 PDT). On the shipped stop table
+    first switches go 2,290 → 2,319; episodes 1,936 → 1,961 (non_local), 1,705 → 1,721 (SWR), 1,675 → 1,693
+    (MUA);
+  - the rate runners save rows sorted by the full row key.
+  - 1,077 tests passed. Closes items 2, 4 and 5.
+- **Task 28** (`6e329de` … `f05fa4a`):
+  - the conditional-Poisson fitter scales columns by their within-event SD, adds a Newton finish and analytic
+    SEs, and stores `llf`, `newton_decrement`, `max_abs_grad`, `n_newton_steps` and `unidentified_terms`;
+  - a single-column separated term is fit at its limit and reported unidentified; a column constant within
+    every event is unidentified; a mixed direction is refused; aggregators count `n_unidentified` and gate on
+    it.
+  - On the 2,662 F3 tasks: 2,658 fit, 4 refused (3 with too few events, and j16 20210707 04_r2 C2_base nonSWR
+    for a mixed direction). The 2,583 identified fits are within 1.8e-9 log-likelihood of F3's optimum and
+    about 11× faster. No headline term is unidentified in any fit.
+  - Also `929b1b9`: the content runner's provenance records the loaded commit.
+  - Parked: the same stopping problem in other fitters (item 46); the multi-column limit (item 45); N1 (the
+    clustered SE, `sd_*` and separation flag read left-out constant-response events; 4 real fits, ≤ 0.4 %).
+- **Task 29** (`da34665`, `e224a09`):
+  - the state-evidence checks and the reality engine leave out bins with 0 < occupancy < 1e-20 (exact zeros
+    stay in: both devices agree there; leaving them out would be D1's option (c), not approved);
+  - on chimi20200221_08_r4 it flags 9 bins (71–79), and the reality engine leaves out 19 of 184 windows (17 of
+    53 SWR-remote). Other epochs give byte-identical outputs (2 real and 2 simulated checked). 188 tests
+    passed.
+  - Still open: the rerun of that epoch after the merge (item 50); whether dropping 32 % of its SWR-remote
+    windows is acceptable (the lead's); the half-decode ground-intensity check at bins 71–79 is unchecked.
+- **Counts that differ by definition:** D1 counts 22 of 182 events with a MAP bin in 71–78; Task 29 counts 19
+  of 184 windows in 71–79 (the engine's three groups plus baseline windows). Task 29 says they are the same
+  order; they were not reconciled.
+
+### 10.9 R6c: the content refit with the fixed fitter
+
+Source: [`r6c_report.md`](../../.claude/research/refresh_r13/r6c_report.md).
+
+- **Run:** 19 runs (C01–C07, K01–K03, X01–X05, F01–F04) from `continuum-swr-replay-run2` at `f05fa4a`, clean,
+  CPU only, writing the canonical content bundles; backup `Processed-Data/_pre_r6c_backup_20261016/fits/`
+  (267 files, SHA256SUMS verified). Not rerun: DM (C08, K04–K07), rate (R01–R11), P/S.
+- **Gates:** all pass. Headline coefficients equal F3's optimum to ≤ 5.6e-6 SE and llf to ≤ 1.8e-9;
+  inclusion equals Task 28's table; switch counts equal Task 27's; `check_fit_provenance` fresh on all four
+  roots. One documented exception: X01 stores no optimizer columns (item 47).
+- **Result:** headlines equal F3's predictions in the third or fourth decimal (section 3). No log-likelihood
+  fell. 48 single-session moves above 0.35 SE, all traced to a stop-short fit, a limit term, or an R6b fit
+  flagged separated. Five rows move by cohort and must be re-read (section 3). X03 non_local patch_switch
+  falls 189 → 157 sessions (item 45).
+- **C01's directory swap** deleted the 44 K04–K07 DM files; they were restored byte for byte (item 48).
+- **Changes here:** section 3 content rows and the re-read table; 6.1a V9; items 45, 47, 48 and 50.
+- **Still open:** figures and docs that read the content fits are stale until the merge (item 50); the X
+  runners silence the fitter's log (`compare_event_source_models.py:78-82`), so refusal reasons are not in the
+  X03–X05 logs.
+
+### 10.10 R13 interim: artifact-rule robustness
+
+Source: [`r13_robustness_report.md`](../../.claude/research/refresh_robustness/r13_robustness_report.md).
+**Interim:** the lead paused R13 at 13:48 PDT.
+
+- **Run (done):** V0 (no mask, with a sandbox SWR run under R-T and no mask normalisation), V3 (+1 s after each
+  step), the >2 % masked-epoch sensitivity, the masked-time table and the R-T against mask split. Code
+  `bb19449` in the run checkout; 242 epochs; reference = a copy of the R6b fits taken at 12:44, before R6c.
+- **Result, V0 and V3:** no headline moves beyond its paired session bootstrap interval. Per-bin M7r immediate
+  RR, canonical → V0 / V3: SWR 6.39 → 6.39 / 6.38; NL with SWR 9.91 → 10.35 / 9.82; NL no-SWR 1.42 → 1.64 /
+  1.56. Content and DM terms move ≤ 0.04 in V0 and ≤ 0.06 in V3, except the null CS5 (−0.012 → −0.116 in V0).
+- **Result, >2 % sensitivity:** 3 epochs over 2 % masked; leaving them out moves nothing beyond its interval.
+  The 10 epochs over 2 % excluded (per-session families only): SWR RR 5.88, Δ −0.083 log [−0.161, +0.014].
+- **Result, the split** (205 R3 epochs): SWR RR 3.15 (R3) → 5.44 with R-T and no mask (+0.547 log [0.310,
+  0.840]; j16 1.16 → 5.20) → 5.27 with mask normalisation and the rule (−0.031 [−0.175, 0.138]). R-T acts in j16
+  alone; mask normalisation acts in chimi, senor and peanut and raises `is_swr` by about 0.015.
+- **Result, the masked-time table:** the mask covers 345.5 s (0.111 % of 86.4 h) in 85 epochs, all from steps;
+  excluded time 691.9 s. The rule removes 251 Kay events at detection, 9 non-local events, 0.26 % of the 4-ms
+  stop bins and 436 at-well-cohort stops.
+- **Changes here:** §4.7; item 38 closed in part, item 49 added; C8's DM CS6 now derived (6.6).
+- **Still open:** V1, V2 and X_R10nr (item 49; resume commands in its §9). V0's two channels are inferred, not
+  measured (X_R10nr would measure them). The rule's 9 non-local events here against R8a's 21 are not
+  reconciled (different definitions). R13's content fits used the old fitter, so its deltas include optimizer
+  noise (up to 0.35 SE by F3), and its canonical content values are the R6b ones (e.g. C2_base SWR 0.884,
+  n 221).
