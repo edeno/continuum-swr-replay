@@ -457,6 +457,23 @@ class TestAnUnusableRecordReadsUnavailable:
 
         _assert_unavailable(tables, "karlsson", "event_number 1..n")
 
+    def test_two_events_sharing_a_decode_grid_sample(self, tmp_path, monkeypatch):
+        """Karlsson 4 and 5 touch at 107.020 s, a sample of the grid, so the
+        speed rule cannot label both there: Karlsson reads unavailable, and
+        Kay, whose events share no sample, is unaffected."""
+        karlsson = [*KARLSSON[:3], (107.010, 107.020), (107.020, 107.030)]
+        epoch = write_epoch(tmp_path, monkeypatch, karlsson=karlsson)
+
+        tables = swr_inventory(
+            epoch["swr_run"], "karlsson", dot=epoch["dot"], drops=epoch["drops"]
+        )
+        kay = swr_inventory(
+            epoch["swr_run"], "kay", dot=epoch["dot"], drops=epoch["drops"]
+        )
+
+        _assert_unavailable(tables, "karlsson", "share a decode-grid sample")
+        assert len(kay.inventory) == 3
+
     def test_a_missing_file(self, epoch):
         (epoch["swr_run"] / f"{EPOCH}_swr_observed.parquet").unlink()
 

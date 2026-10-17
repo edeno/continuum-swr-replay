@@ -23,10 +23,10 @@ detector's native count is its inventory's rows plus its set-aside rows.
 
 A run whose record for the epoch cannot be used (no manifest, the epoch not in
 it, a status other than ``ok`` or ``partial``, the detector not ``ok``, a file
-missing or changed since the run, events not numbered 1..n, a memoryless record
-that does not describe its table or the frame's grid) observed none of the
-epoch: its adapter returns an empty inventory and a ``missing_run_table`` row
-saying why.
+missing or changed since the run, events not numbered 1..n, two LFP events
+sharing a sample of the decode grid, a memoryless record that does not describe
+its table or the frame's grid) observed none of the epoch: its adapter returns
+an empty inventory and a ``missing_run_table`` row saying why.
 """
 
 import json
@@ -51,6 +51,7 @@ from continuum_swr_replay.analysis.hippocampus.event_eligibility import (
     overlaps_dropped_events,
 )
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+    EventDefinitionError,
     intervals_from_labels,
 )
 from continuum_swr_replay.analysis.hippocampus.event_table import (
@@ -375,7 +376,11 @@ def _lfp_inventory(
     """An LFP detector's events under the one rule: excluded time with the
     artifact mask and the speed rule (``event_drop_reasons``), then its second
     pass on the grid-sampled bounds of each kept event and of the SWR and MUA
-    events dropped for excluded time, as ``swr_source`` makes it."""
+    events dropped for excluded time, as ``swr_source`` makes it.
+
+    Two events sharing a sample of the grid cannot both be labelled on it, so
+    the second pass cannot read them: the detector is then unavailable for the
+    epoch, with the error as its reason."""
     starts = events["start_time"].to_numpy(dtype=np.float64)
     ends = events["end_time"].to_numpy(dtype=np.float64)
     keys = events.index.to_numpy()
@@ -385,11 +390,18 @@ def _lfp_inventory(
         time=epoch.time,
         artifacts=swr_source.artifact_intervals(epoch.epoch_id),
     )
-    sampled = _sampled_bounds(events, epoch)
+    try:
+        sampled = _sampled_bounds(events, epoch)
+        dropped = _dropped_on_grid(drops, epoch)
+    except EventDefinitionError as error:
+        return _unavailable(
+            epoch,
+            detector,
+            run_dir.name,
+            f"two events share a decode-grid sample: {str(error)[:200]}",
+        )
     kept = np.flatnonzero(pd.isna(reasons) & np.isfinite(sampled[:, 0]))
-    overlapping = overlaps_dropped_events(
-        sampled[kept, 0], sampled[kept, 1], _dropped_on_grid(drops, epoch)
-    )
+    overlapping = overlaps_dropped_events(sampled[kept, 0], sampled[kept, 1], dropped)
     reasons[kept[overlapping]] = DropReason.OVERLAPS_DROPPED_EVENT.value
     aside = np.isin(reasons.astype(str), list(SET_ASIDE_REASONS))
     inventory = inventory_from_intervals(
