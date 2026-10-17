@@ -760,6 +760,12 @@ Compute decoding quality metrics across all sessions.
 
 `maybe_merge_raw_stats`, `load_all_sessions`, `print_summary`, `plot_diagnostics`, `main`
 
+### `scripts/qa/run_refits.py`
+
+Rerun the CPU model refits and the figures that read them, in dependency order.
+
+`Run`, `select`, `run_env`, `schedule`, `check_provenance`, `main`
+
 ### `scripts/qa/run_state_evidence.py`
 
 Held-out spike evidence for each decoder state, on every canonical HPC decode.

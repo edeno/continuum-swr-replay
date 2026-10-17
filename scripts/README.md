@@ -73,6 +73,13 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
 - `archive/` — retired figure scripts (not linted; kept for provenance).
 
 ## `qa/` — diagnostics / validation
+- `run_refits.py` — reruns the CPU refits (rate, content, ContFrag, Stage 5B/6) and the
+  figures that read them, in dependency order, under a core budget (`--cpus`, `--budget`)
+  with a thread cap per run. `--only <ids or groups>` also runs everything that depends on
+  them. One log and JSON record per run go under `logs/refits_<time>/`, then
+  `check_fit_provenance.py` checks both table roots. `--dry-run` lists the runs. Set
+  `CSR_PROCESSED_DATA_DIR` to read and write another data root. It does not run the
+  decodes, the tables or the PFC unit GLM.
 - `check_data_availability.py`, `diagnose_trial_detection.py`, `compute_hpc_raw_stats.py`,
   `run_quality_metrics.py`, `analyze_event_spike_evidence.py` (spike-evidence reality check).
 - `run_state_evidence.py` — held-out spike evidence for each decoder state (Local, No-Spike,

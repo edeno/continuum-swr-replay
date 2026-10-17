@@ -14,7 +14,9 @@ MAX_SPEED_THRESHOLD_CM_PER_SEC : float
 ROOT_DIR : Path
     Root directory of the project (parent of src/).
 PROCESSED_DATA_DIR : Path
-    Directory for saving analysis results and processed data.
+    Directory for saving analysis results and processed data: the checkout's
+    ``Processed-Data/`` unless ``CSR_PROCESSED_DATA_DIR`` names another, so a run
+    from any checkout can read and write one root.
 FIGURE_DIR : Path
     Directory for saving generated figures.
 PLACE_BIN_SIZE_1D : float
@@ -62,6 +64,7 @@ Examples
 
 """
 
+import os
 from enum import Enum
 from pathlib import Path
 from typing import Final
@@ -78,7 +81,9 @@ MAX_SPEED_THRESHOLD_CM_PER_SEC = 4.0
 # Data directories and definitions
 # ROOT_DIR is the project root (continuum-swr-replay/), not src/
 ROOT_DIR = Path(__file__).parent.parent.parent
-PROCESSED_DATA_DIR = ROOT_DIR / "Processed-Data"
+PROCESSED_DATA_DIR = Path(
+    os.environ.get("CSR_PROCESSED_DATA_DIR", ROOT_DIR / "Processed-Data")
+)
 FIGURE_DIR = ROOT_DIR / "paper" / "figures"
 
 # Multiunit High Synchrony Event (HSE) detection parameters
