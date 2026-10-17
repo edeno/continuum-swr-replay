@@ -809,6 +809,16 @@ DECODE_FRAME_READERS = {
     "scripts/exploratory/_augment_data_over_time.py": "adds posterior columns",
     "scripts/exploratory/_trunk_zscore_extract.py": "SWR_zscore and MUA_zscore",
     "scripts/exploratory/_trunk_zscore_timebin.py": "SWR_zscore and MUA_zscore",
+    "scripts/qa/run_inventory_comparison.py": (
+        "reads it through with_swr_source; artifact_event_drops of the frame as "
+        "saved, from the one read its sha256 names"
+    ),
+    "scripts/decoding/run_carey_detection.py": (
+        "the grid's first and last time, the span the marks are loaded over"
+    ),
+    "scripts/figures/generate_inventory_examples.py": (
+        "grid, speed, posterior and position; its events are the comparison's tables"
+    ),
 }
 
 
