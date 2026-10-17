@@ -224,7 +224,8 @@ def not_still_times(
 
     """
     time, _, still = _still_samples(time, speed_cm_per_s, threshold_cm_per_s)
-    return time[np.isfinite(time) & ~still]
+    times: NDArray = time[np.isfinite(time) & ~still]
+    return times
 
 
 def still_intervals(
