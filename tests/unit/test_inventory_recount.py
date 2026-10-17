@@ -4,6 +4,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.inventory_comparison.availability import (
+    not_still_times,
+    still_intervals,
+)
 from continuum_swr_replay.analysis.inventory_comparison.overlap import (
     Coverage,
     directional_agreement,
@@ -25,6 +29,8 @@ OTHER = SessionIdentity(animal="sim", day=20200101, epoch="04_r2", brain_area="H
 KEY = ("sim", 20200101, "02_r1")
 OTHER_KEY = ("sim", 20200101, "04_r2")
 FRAGMENTS = [(10.0, 11.0), (11.005, 12.0), (12.015, 13.0), (13.04, 14.0)]
+ALL_STILL = {KEY: np.empty(0), OTHER_KEY: np.empty(0)}
+"""No sample in either epoch was moving or of unknown speed."""
 
 
 def key(detector, native):
@@ -88,7 +94,12 @@ def test_gap_zero_reproduces_the_native_events():
     inventory = events("A", FRAGMENTS)
 
     merged = merge_fragments(
-        inventory, coverage("A"), detector="A", gap_s=0.0, sample_interval_s=0.001
+        inventory,
+        coverage("A"),
+        detector="A",
+        gap_s=0.0,
+        sample_interval_s=0.001,
+        not_still_s=ALL_STILL,
     )
 
     assert merged.event_key.tolist() == inventory.event_key.tolist()
@@ -112,6 +123,7 @@ def test_fragments_closer_than_the_gap_merge(gap_s, expected):
         detector="A",
         gap_s=gap_s,
         sample_interval_s=0.001,
+        not_still_s=ALL_STILL,
     )
 
     assert list(zip(merged.event_start_s, merged.event_end_s, strict=True)) == expected
@@ -141,6 +153,7 @@ def test_a_gap_of_exactly_the_setting_never_merges_on_a_real_clock(gap_s, base_s
                 detector="A",
                 gap_s=gap_s,
                 sample_interval_s=0.002,
+                not_still_s=ALL_STILL,
             )
         )
         for p in pairs
@@ -153,6 +166,7 @@ def test_a_gap_of_exactly_the_setting_never_merges_on_a_real_clock(gap_s, base_s
                 detector="A",
                 gap_s=gap_s,
                 sample_interval_s=0.002,
+                not_still_s=ALL_STILL,
             )
         )
         for p in pairs
@@ -167,7 +181,12 @@ def test_gaps_off_the_sample_grid_are_refused():
 
     with pytest.raises(ValueError, match="grid"):
         merge_fragments(
-            inventory, coverage("A"), detector="A", gap_s=0.01, sample_interval_s=0.001
+            inventory,
+            coverage("A"),
+            detector="A",
+            gap_s=0.01,
+            sample_interval_s=0.001,
+            not_still_s=ALL_STILL,
         )
 
 
@@ -192,6 +211,7 @@ def test_never_merges_outside_one_continuous_eligible_bout(exposure):
         detector="A",
         gap_s=0.05,
         sample_interval_s=0.001,
+        not_still_s=ALL_STILL,
     )
 
     assert len(merged) == 2
@@ -207,7 +227,12 @@ def test_never_merges_across_epochs():
     assert (
         len(
             merge_fragments(
-                inventory, both, detector="A", gap_s=0.05, sample_interval_s=0.001
+                inventory,
+                both,
+                detector="A",
+                gap_s=0.05,
+                sample_interval_s=0.001,
+                not_still_s=ALL_STILL,
             )
         )
         == 2
@@ -220,7 +245,12 @@ def test_other_detectors_pass_through_untouched():
     )
 
     merged = merge_fragments(
-        inventory, coverage("A", "B"), detector="A", gap_s=0.05, sample_interval_s=0.001
+        inventory,
+        coverage("A", "B"),
+        detector="A",
+        gap_s=0.05,
+        sample_interval_s=0.001,
+        not_still_s=ALL_STILL,
     )
 
     b = merged[merged.detector == "B"]
@@ -245,7 +275,12 @@ def test_the_recount_feeds_the_same_agreement_accounting():
     native = a_to_b(inventory)
     merged = a_to_b(
         merge_fragments(
-            inventory, cover, detector="A", gap_s=0.05, sample_interval_s=0.001
+            inventory,
+            cover,
+            detector="A",
+            gap_s=0.05,
+            sample_interval_s=0.001,
+            not_still_s=ALL_STILL,
         )
     )
 
@@ -260,6 +295,7 @@ def test_merged_keys_name_their_fragments():
         detector="A",
         gap_s=0.05,
         sample_interval_s=0.001,
+        not_still_s=ALL_STILL,
     )
 
     assert merged.event_key.tolist() == [f"{key('A', 0)}|{key('A', 1)}"]
@@ -271,7 +307,12 @@ def test_row_order_does_not_matter():
     assert inventory.event_key.tolist() != sorted(inventory.event_key)
 
     merged = merge_fragments(
-        inventory, coverage("A"), detector="A", gap_s=0.010, sample_interval_s=0.001
+        inventory,
+        coverage("A"),
+        detector="A",
+        gap_s=0.010,
+        sample_interval_s=0.001,
+        not_still_s=ALL_STILL,
     )
 
     assert list(zip(merged.event_start_s, merged.event_end_s, strict=True)) == [
@@ -279,6 +320,28 @@ def test_row_order_does_not_matter():
         (12.015, 13.0),
         (13.04, 14.0),
     ]
+
+
+@pytest.mark.parametrize(("moving_in_gap", "n_merged"), [(False, 1), (True, 2)])
+def test_a_bridge_never_crosses_a_sample_that_was_not_still(moving_in_gap, n_merged):
+    """One moving sample between still ones leaves the exposure whole, since
+    each still run reaches it, but the merged event would hold it."""
+    speed = np.zeros(GRID.size)
+    if moving_in_gap:
+        speed[np.flatnonzero(np.isclose(GRID, 11.002))] = 9.0
+    exposed = still_intervals(GRID, speed)
+    assert exposed.shape == (1, 2)
+
+    merged = merge_fragments(
+        events("A", [(10.0, 11.0), (11.004, 12.0)]),
+        coverage("A", exposure=exposed),
+        detector="A",
+        gap_s=0.05,
+        sample_interval_s=0.002,
+        not_still_s={KEY: not_still_times(GRID, speed)},
+    )
+
+    assert len(merged) == n_merged
 
 
 class TestRecountContracts:
@@ -290,6 +353,7 @@ class TestRecountContracts:
                 detector="A",
                 gap_s=-0.01,
                 sample_interval_s=0.002,
+                not_still_s=ALL_STILL,
             )
 
     def test_a_detector_the_comparison_does_not_know_is_refused(self):
@@ -300,6 +364,7 @@ class TestRecountContracts:
                 detector="nobody",
                 gap_s=0.0,
                 sample_interval_s=0.002,
+                not_still_s=ALL_STILL,
             )
 
     def test_events_in_an_epoch_without_coverage_are_refused_by_name(self):
@@ -310,6 +375,18 @@ class TestRecountContracts:
                 detector="A",
                 gap_s=0.0,
                 sample_interval_s=0.002,
+                not_still_s=ALL_STILL,
+            )
+
+    def test_events_in_an_epoch_without_a_not_still_entry_are_refused(self):
+        with pytest.raises(ValueError, match="not_still_s"):
+            merge_fragments(
+                events("A", [(10.0, 10.1)]),
+                coverage("A"),
+                detector="A",
+                gap_s=0.0,
+                sample_interval_s=0.002,
+                not_still_s={OTHER_KEY: np.empty(0)},
             )
 
     def test_the_merged_table_is_typed_even_when_empty(self):
@@ -319,6 +396,7 @@ class TestRecountContracts:
             detector="A",
             gap_s=0.0,
             sample_interval_s=0.002,
+            not_still_s=ALL_STILL,
         )
 
         assert list(merged.columns) == list(RECOUNT_DTYPES)

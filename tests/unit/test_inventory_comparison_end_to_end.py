@@ -23,6 +23,7 @@ import pytest
 from continuum_swr_replay.analysis.inventory_comparison.availability import (
     coverage_from_observations,
     exposure,
+    not_still_times,
     observation_table,
     sample_runs,
     still_intervals,
@@ -241,7 +242,12 @@ def test_the_recount_leaves_this_epoch_alone_and_stays_inside_exposure(compariso
     kept, coverage, pairs, _ = comparison
 
     merged = merge_fragments(
-        kept, coverage, detector=STATE_SPACE, gap_s=0.05, sample_interval_s=0.002
+        kept,
+        coverage,
+        detector=STATE_SPACE,
+        gap_s=0.05,
+        sample_interval_s=0.002,
+        not_still_s={KEY: not_still_times(TIME, SPEED)},
     )
 
     assert len(merged) == len(kept)

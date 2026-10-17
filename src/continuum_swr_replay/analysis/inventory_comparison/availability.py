@@ -45,6 +45,7 @@ __all__ = [
     "coverage_from_observations",
     "exposure",
     "missing_run_table",
+    "not_still_times",
     "observation_table",
     "sample_runs",
     "still_intervals",
@@ -171,6 +172,39 @@ def window_supported(
     return supported
 
 
+def _still_samples(
+    time: NDArray, speed_cm_per_s: NDArray, threshold_cm_per_s: float
+) -> tuple[NDArray, NDArray, NDArray]:
+    """The trace as arrays, with which samples are known and which still.
+
+    Known is a finite timestamp and a finite speed; still is known and below
+    the threshold.
+    """
+    time = np.asarray(time, dtype=np.float64)
+    speed = np.asarray(speed_cm_per_s, dtype=np.float64)
+    known = np.isfinite(time) & np.isfinite(speed)
+    return time, known, known & (speed < threshold_cm_per_s)
+
+
+def not_still_times(
+    time: NDArray,
+    speed_cm_per_s: NDArray,
+    threshold_cm_per_s: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+) -> NDArray:
+    """Times of the samples that were not still: moving, or of unknown speed.
+
+    An event holding one of them is not speed-eligible.
+
+    Returns
+    -------
+    times : ndarray, shape (n_not_still,)
+        The finite timestamps among them.
+
+    """
+    time, _, still = _still_samples(time, speed_cm_per_s, threshold_cm_per_s)
+    return time[np.isfinite(time) & ~still]
+
+
 def still_intervals(
     time: NDArray,
     speed_cm_per_s: NDArray,
@@ -202,12 +236,9 @@ def still_intervals(
     still : ndarray, shape (n_runs, 2)
 
     """
-    time = np.asarray(time, dtype=np.float64)
-    speed = np.asarray(speed_cm_per_s, dtype=np.float64)
+    time, known, still = _still_samples(time, speed_cm_per_s, threshold_cm_per_s)
     if time.size < 2:
         return np.empty((0, 2))
-    known = np.isfinite(time) & np.isfinite(speed)
-    still = known & (speed < threshold_cm_per_s)
     # whether each pair of neighbouring samples is known and unbroken
     joined = _joined(time, known, max_gap_s)
     within_run = joined & still[1:] & still[:-1]

@@ -6,12 +6,14 @@ stated gap are merged, so the same overlap accounting can be rerun on the
 merged intervals beside the native ones.
 
 A merge never crosses an epoch, and never leaves one continuous interval of
-the detector's exposure: the fragments and the whole gap between them must lie
-in time that was observed with the animal still, so no merge bridges movement
-or missing samples. One detector's events are disjoint (the inventory schema
-requires it), so at a gap of 0 nothing merges and the native events come
-back. The merged intervals are accounting intervals for this diagnostic, not a
-replacement cohort; the native count stays primary.
+the detector's exposure, so no merge bridges missing samples. A bridge never
+crosses a sample that was not still (moving, or of unknown speed) either, so
+the merged event stays speed-eligible. Exposure alone does not ensure that:
+each still run reaches the sample beside it, so two runs one moving sample
+apart are one interval of exposure. One detector's events are disjoint (the
+inventory schema requires it), so at a gap of 0 nothing merges and the native
+events come back. The merged intervals are accounting intervals for this
+diagnostic, not a replacement cohort; the native count stays primary.
 """
 
 from collections.abc import Mapping
@@ -72,6 +74,7 @@ def merge_fragments(
     detector: str,
     gap_s: float,
     sample_interval_s: float,
+    not_still_s: Mapping[tuple, NDArray],
 ) -> pd.DataFrame:
     """Merge one detector's events separated by less than ``gap_s``.
 
@@ -91,6 +94,10 @@ def merge_fragments(
     sample_interval_s : float
         The grid the events' bounds sit on. Gaps are counted in samples, so a
         gap of exactly ``gap_s`` never merges however the clock rounds.
+    not_still_s : mapping
+        ``(animal, day, epoch) -> ndarray (n,)``, the times of the epoch's
+        samples that were not still, from ``availability.not_still_times``.
+        No merged event holds one.
 
     Returns
     -------
@@ -105,7 +112,7 @@ def merge_fragments(
     ValueError
         ``gap_s`` is negative or off the sample grid, the detector is not on
         the roster, its events overlap one another, or an epoch of its events
-        has no coverage.
+        has no coverage or no entry in ``not_still_s``.
 
     """
     if gap_s < 0:
@@ -122,6 +129,11 @@ def merge_fragments(
             raise ValueError(
                 f"{detector} has events in {session} but no coverage there."
             )
+        if session not in not_still_s:
+            raise ValueError(
+                f"{detector} has events in {session} but no entry in not_still_s."
+            )
+        not_still = np.sort(np.asarray(not_still_s[session], dtype=np.float64))
         group = group.sort_values("event_start_s")
         start = group.event_start_s.to_numpy()
         end = group.event_end_s.to_numpy()
@@ -130,8 +142,13 @@ def merge_fragments(
                 f"Two events of {detector} in {session} overlap; the recount needs "
                 "one detector's events to be disjoint."
             )
-        joins = (_samples(start[1:] - end[:-1], sample_interval_s) < limit) & contains(
-            own.exposure, start[:-1], end[1:]
+        holds_not_still = np.searchsorted(
+            not_still, end[1:], side="right"
+        ) > np.searchsorted(not_still, start[:-1], side="left")
+        joins = (
+            (_samples(start[1:] - end[:-1], sample_interval_s) < limit)
+            & contains(own.exposure, start[:-1], end[1:])
+            & ~holds_not_still
         )
         run = np.r_[0, np.cumsum(~joins)]
         merged.append(

@@ -166,6 +166,25 @@ class TestStillRunsReachTheNeighbouringSamples:
             [[time[0], time[300]], [time[599], time[999]]],
         )
 
+    def test_a_lone_still_sample_spans_from_one_moving_neighbour_to_the_other(self):
+        time = grid()
+        speed = np.full(time.size, 9.0)
+        speed[500] = 0.0
+
+        np.testing.assert_array_equal(
+            still_intervals(time, speed), [[time[499], time[501]]]
+        )
+
+    def test_two_runs_one_moving_sample_apart_are_one_interval(self):
+        """Both reach the moving sample; events holding it stay ineligible."""
+        time = grid()
+        speed = np.zeros(time.size)
+        speed[500] = 9.0
+
+        np.testing.assert_array_equal(
+            still_intervals(time, speed), [[time[0], time[999]]]
+        )
+
     @pytest.mark.parametrize("break_kind", ["gap", "nan speed", "nan time"])
     def test_a_run_does_not_reach_across_a_break(self, break_kind):
         """Still, then moving, then still, with a break at each change."""
@@ -218,6 +237,7 @@ class TestStillRunsReachTheNeighbouringSamples:
         time = grid()
         speed = np.where(np.arange(time.size) < 500, 0.0, 9.0)
 
+        # 1 ms is half a sample interval: the event ends between two samples
         moving, matches = self._matches(time, speed, time[495], time[499] + 0.001)
 
         assert moving.empty
@@ -229,6 +249,7 @@ class TestStillRunsReachTheNeighbouringSamples:
         time = grid()
         speed = np.where(np.arange(time.size) < 500, 9.0, 0.0)
 
+        # 1 ms is half a sample interval: the event starts between two samples
         moving, matches = self._matches(time, speed, time[499] + 0.001, time[505])
 
         assert moving.empty
