@@ -94,7 +94,7 @@ The report and the examples carry that note wherever the `memoryless` column app
 
 ### Task 1 — Carey on one epoch's shared inputs (package code, no IO)
 
-**Blocked on Q1–Q4** (artifact mask, time grid, ripple channels, theta). Write the tests for the parts the
+**Unblocked 2026-10-17** (see "Answers from the lead"; Q1–Q4 were the artifact mask, time grid, ripple channels and theta). Write the tests for the parts the
 answers do not change first.
 
 - **Files.** Modify `src/continuum_swr_replay/analysis/hippocampus/swr_inventories.py`. Tests in a new
@@ -427,6 +427,25 @@ Outputs, all under `PROCESSED_DATA_DIR/replay_detection_comparison/`: `carey/<ru
 | `test_report_inventory_comparison.py` | pooling sums counts; unavailable sessions listed, not pooled; `unknown` never counted |
 | `test_inventory_examples.py` | sampler deterministic, draws only `unmatched` or `matched`, never `unknown` |
 | R1, R3 (real data, manual) | the gates listed in the runbook |
+
+## Answers from the lead (2026-10-17)
+
+The lead agreed with every recommendation below. These rulings bind the tasks; the questions are kept under
+them as asked.
+
+- **Q1.** Use the package's new `normalization_mask` on `Carey_candidate_detector` (the lead's commit
+  `9766fd4`; the project pins it from `e1decf2`). Pass the artifact mask's complement as the other four
+  detectors are run. Task 1 is no longer blocked.
+- **Q2.** The LFP's 1000 Hz grid, with each tetrode's spikes binned onto it.
+- **Q3.** The stored 150–250 Hz band of the R-T kept tetrodes, averaged as the package does.
+- **Q4.** No theta restriction (the package default). The 4 cm/s speed rule gates.
+- **Q5.** Yes: record Q3 and Q4 as adaptations 3 and 4.
+- **Q6.** Carey is a fifth SWR definition in the SWR label matrix, and also in the "triggered" set.
+- **Q7.** Both cohorts, `published` and `replay_criteria`.
+- **Q8.** Native counts equal eligible counts for MUA and state-space, with a note saying why.
+- **Q9.** Agreed: still runs reach the neighbouring samples.
+- **Q10.** Agreed: a dropped event's span leaves its own detector's coverage.
+- **Q11.** Accepted: the Carey runner imports the SWR runner's helpers.
 
 ## Open questions for the lead
 
