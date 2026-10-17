@@ -8,20 +8,25 @@ no IO; the readers of recorded outputs are here.
 
 Every adapter reads one epoch's canonical decode frame, read once through the
 SWR source (``swr_source.read_dot_with_swr_source``), and its drops, read once
-from the same pickle (``swr_source.read_artifact_event_drops``). The frame's
-``head_speed`` on its grid is the one speed trace, and the grid's first and
-last time are the epoch's bounds.
+from the same pickle (``swr_source.read_artifact_event_drops``): the frame as
+saved, never ``artifact_event_drops`` of the read frame, whose dropped labels
+are already gone. The frame's ``head_speed`` on its grid is the one speed
+trace, and the grid's first and last time are the epoch's bounds.
 
 An event is set aside, and leaves the inventory, when the one rule drops it
 for excluded time (``artifact``, ``near_artifact``) or for overlapping an SWR
-or MUA event dropped for excluded time (``overlaps_dropped_event``). A moving
-event stays in the inventory with ``whole_event_speed_eligible`` False. So a
+or MUA event dropped for excluded time (``overlaps_dropped_event``). That
+second pass reads every event at its bounds sampled on the decode grid, as
+``swr_source`` reads the paper's SWRs, so Kay's kept events are exactly the
+ones ``swr_source.with_swr_source`` keeps. A moving event stays in the inventory with ``whole_event_speed_eligible`` False. So a
 detector's native count is its inventory's rows plus its set-aside rows.
 
 A run whose record for the epoch cannot be used (no manifest, the epoch not in
 it, a status other than ``ok`` or ``partial``, the detector not ``ok``, a file
-missing or changed since the run) observed none of the epoch: its adapter
-returns an empty inventory and a ``missing_run_table`` row saying why.
+missing or changed since the run, events not numbered 1..n, a memoryless record
+that does not describe its table or the frame's grid) observed none of the
+epoch: its adapter returns an empty inventory and a ``missing_run_table`` row
+saying why.
 """
 
 import json
@@ -34,6 +39,9 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
+from continuum_swr_replay.analysis.constants import (
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+)
 from continuum_swr_replay.analysis.hippocampus import swr_source
 from continuum_swr_replay.analysis.hippocampus.artifacts.masks import interval_mask
 from continuum_swr_replay.analysis.hippocampus.event_eligibility import (
@@ -224,16 +232,18 @@ def _run_files(
     run_dir: Path,
     epoch_id: str,
     files: Mapping[str, str],
+    *,
     detector: str | None = None,
-) -> dict[str, Path]:
+    hashed: bool = True,
+) -> tuple[dict[str, Path], dict]:
     """The epoch's files in a run folder, checked against its manifest.
 
     The check ``swr_source.swr_source_files`` makes for Kay, for any run
-    folder: the epoch's record must be ``ok`` or ``partial`` (and, when the
-    record lists its detectors, ``detector`` must be ``ok``), and each file
-    must exist with the sha256 the manifest recorded for it. The memoryless
-    runner records each output's path and no sha256, so its files are checked
-    for presence only.
+    folder: the epoch's record must be ``ok`` or ``partial``, ``detector`` (if
+    given) must be ``ok`` in its ``detectors``, and each file must exist with
+    the sha256 the manifest recorded for it; an output with no sha256 is a
+    mismatch. The memoryless runner records each output's path and no sha256,
+    so its files (``hashed=False``) are checked for presence only.
 
     Parameters
     ----------
@@ -243,6 +253,15 @@ def _run_files(
         Manifest output name -> the file's name in ``run_dir``.
     detector : str, optional
         The detector whose status the record must give as ``ok``.
+    hashed : bool
+        Whether the manifest records each output's sha256.
+
+    Returns
+    -------
+    paths : dict
+        Output name -> path.
+    record : dict
+        The epoch's manifest record.
 
     Raises
     ------
@@ -267,38 +286,96 @@ def _run_files(
     if status not in swr_source.USABLE_STATUSES:
         why = record.get("error") or record.get("reason") or "no reason recorded"
         raise _Unavailable(f"{status}: {str(why)[:200]}")
-    if detector is not None and "detectors" in record:
-        if record["detectors"].get(detector) != "ok":
-            raise _Unavailable(
-                f"{detector} {record['detectors'].get(detector)!r} in a "
-                f"{status!r} record"
-            )
+    if detector is not None:
+        detector_status = record.get("detectors", {}).get(detector)
+        if detector_status != "ok":
+            raise _Unavailable(f"{detector} {detector_status!r} in a {status!r} record")
     paths = {}
     for name, file_name in files.items():
         path = run_dir / file_name
         if not path.exists():
             raise _Unavailable(f"{file_name} is missing")
-        output = record.get("outputs", {}).get(name)
-        if isinstance(output, Mapping) and sha256_file(path) != output.get("sha256"):
-            raise _Unavailable(
-                f"{file_name} has changed since the run (sha256 is not the manifest's)"
-            )
+        if hashed:
+            output = record.get("outputs", {}).get(name)
+            expected = output.get("sha256") if isinstance(output, Mapping) else None
+            if sha256_file(path) != expected:
+                raise _Unavailable(
+                    f"{file_name} has sha256 other than the manifest's "
+                    f"({str(expected)[:12]})"
+                )
         paths[name] = path
-    return paths
+    return paths, record
+
+
+def _numbered_events(path: Path) -> pd.DataFrame:
+    """An LFP detector's events, indexed ``event_number`` 1..n, as
+    ``swr_source`` requires of Kay's.
+
+    Raises
+    ------
+    _Unavailable
+        The table is not so indexed.
+    """
+    events = pd.read_parquet(path)
+    if events.index.name != "event_number" or not np.array_equal(
+        events.index.to_numpy(), np.arange(1, len(events) + 1)
+    ):
+        raise _Unavailable(f"{path.name} is not indexed by event_number 1..n")
+    return events
+
+
+def _sampled_bounds(intervals: pd.DataFrame, epoch: _Epoch) -> NDArray:
+    """Each interval's first and last sample on the decode grid, as
+    ``swr_source`` samples the SWRs for the rule's second pass.
+
+    Returns
+    -------
+    bounds : ndarray, shape (n_intervals, 2)
+        NaN for an interval the speed rule rejects, which the pass never reads.
+    """
+    time_index = pd.Index(epoch.time, name="time")
+    # labels are the intervals' row ordinals, 1..n
+    labels = swr_source._speed_eligible_labels(
+        intervals[["start_time", "end_time"]],
+        time_index,
+        epoch.speed,
+        DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    )
+    sampled = intervals_from_labels(
+        pd.DataFrame({"label": labels}, index=time_index), "label"
+    )
+    bounds = np.full((len(intervals), 2), np.nan)
+    bounds[sampled["label"].to_numpy(dtype=int) - 1] = sampled[
+        ["start_time", "end_time"]
+    ].to_numpy(dtype=np.float64)
+    return bounds
+
+
+def _dropped_on_grid(drops: pd.DataFrame, epoch: _Epoch) -> pd.DataFrame:
+    """``swr_source.dropped_for_excluded_time`` at the bounds ``swr_source``
+    reads them: each SWR's sampled on the grid (the drops hold the
+    inventory's), each labelled event's as the drops hold them."""
+    sampled = drops.copy()
+    is_swr = (sampled["event_col"] == swr_source.SWR_LABEL_COLUMN).to_numpy()
+    sampled.loc[is_swr, ["start_time", "end_time"]] = _sampled_bounds(
+        sampled.loc[is_swr], epoch
+    )
+    dropped = swr_source.dropped_for_excluded_time(sampled)
+    return dropped[np.isfinite(dropped["start_time"].to_numpy(dtype=np.float64))]
 
 
 def _lfp_inventory(
     detector: str,
     run_dir: Path,
-    events_path: Path,
+    events: pd.DataFrame,
     observed: NDArray,
     epoch: _Epoch,
     drops: pd.DataFrame,
 ) -> InventoryTables:
     """An LFP detector's events under the one rule: excluded time with the
     artifact mask and the speed rule (``event_drop_reasons``), then its second
-    pass, against the SWR and MUA events dropped for excluded time."""
-    events = pd.read_parquet(events_path)
+    pass on the grid-sampled bounds of each kept event and of the SWR and MUA
+    events dropped for excluded time, as ``swr_source`` makes it."""
     starts = events["start_time"].to_numpy(dtype=np.float64)
     ends = events["end_time"].to_numpy(dtype=np.float64)
     keys = events.index.to_numpy()
@@ -308,9 +385,10 @@ def _lfp_inventory(
         time=epoch.time,
         artifacts=swr_source.artifact_intervals(epoch.epoch_id),
     )
-    kept = np.flatnonzero(pd.isna(reasons))
+    sampled = _sampled_bounds(events, epoch)
+    kept = np.flatnonzero(pd.isna(reasons) & np.isfinite(sampled[:, 0]))
     overlapping = overlaps_dropped_events(
-        starts[kept], ends[kept], swr_source.dropped_for_excluded_time(drops)
+        sampled[kept, 0], sampled[kept, 1], _dropped_on_grid(drops, epoch)
     )
     reasons[kept[overlapping]] = DropReason.OVERLAPS_DROPPED_EVENT.value
     aside = np.isin(reasons.astype(str), list(SET_ASIDE_REASONS))
@@ -353,7 +431,9 @@ def swr_inventory(
     dot : DataFrame
         The epoch's decode frame, read through the SWR source.
     drops : DataFrame
-        ``swr_source.artifact_event_drops`` of the same frame.
+        ``swr_source.read_artifact_event_drops`` of the decode pickle, the
+        frame as saved; never ``artifact_event_drops`` of the read frame,
+        whose dropped labels are already gone.
 
     Returns
     -------
@@ -366,7 +446,7 @@ def swr_inventory(
         raise ValueError(f"detector must be one of {SWR_DETECTORS}, got {detector!r}.")
     epoch = _epoch(dot)
     try:
-        files = _run_files(
+        files, _ = _run_files(
             run_dir,
             epoch.epoch_id,
             {
@@ -375,14 +455,13 @@ def swr_inventory(
             },
             detector=detector,
         )
+        events = _numbered_events(files[detector])
     except _Unavailable as why:
         return _unavailable(epoch, detector, run_dir.name, str(why))
     scope = "zugaro" if detector == "zugaro" else swr_source.OBSERVED_SCOPE
     observed = pd.read_parquet(files["swr_observed"])
     stretches = observed.loc[observed["scope"] == scope, ["start_s", "end_s"]]
-    return _lfp_inventory(
-        detector, run_dir, files[detector], stretches.to_numpy(), epoch, drops
-    )
+    return _lfp_inventory(detector, run_dir, events, stretches.to_numpy(), epoch, drops)
 
 
 def carey_inventory(
@@ -391,12 +470,12 @@ def carey_inventory(
     """Carey's candidate events from the Carey runner's run folder.
 
     ``{epoch_id}_carey_events.parquet`` and its observed stretches,
-    ``{epoch_id}_carey_observed.parquet``, under the same rule as the SWR
+    ``{epoch_id}_carey_observed.parquet`` (scope ``carey``), under the same rule as the SWR
     inventories (:func:`swr_inventory`, whose parameters these are).
     """
     epoch = _epoch(dot)
     try:
-        files = _run_files(
+        files, _ = _run_files(
             run_dir,
             epoch.epoch_id,
             {
@@ -404,12 +483,12 @@ def carey_inventory(
                 "observed": f"{epoch.epoch_id}_carey_observed.parquet",
             },
         )
+        events = _numbered_events(files["events"])
     except _Unavailable as why:
         return _unavailable(epoch, CAREY, run_dir.name, str(why))
-    observed = pd.read_parquet(files["observed"])[["start_s", "end_s"]]
-    return _lfp_inventory(
-        CAREY, run_dir, files["events"], observed.to_numpy(), epoch, drops
-    )
+    observed = pd.read_parquet(files["observed"])
+    stretches = observed.loc[observed["scope"] == CAREY, ["start_s", "end_s"]]
+    return _lfp_inventory(CAREY, run_dir, events, stretches.to_numpy(), epoch, drops)
 
 
 def _label_set_aside(
@@ -448,7 +527,9 @@ def mua_inventory(
     dot : DataFrame
         The epoch's decode frame, read through the SWR source.
     drops : DataFrame
-        ``swr_source.artifact_event_drops`` of the same frame.
+        ``swr_source.read_artifact_event_drops`` of the decode pickle, the
+        frame as saved; never ``artifact_event_drops`` of the read frame,
+        whose dropped labels are already gone.
     run_id : str
         Names the decode the labels come from.
 
@@ -536,6 +617,34 @@ def state_space_inventory(
     )
 
 
+def _check_memoryless_record(record: dict, table: pd.DataFrame, epoch: _Epoch) -> None:
+    """Raise :class:`_Unavailable` unless the record describes the table it
+    names and was run on the frame's grid."""
+    grid = record.get("time_grid", {})
+    recorded = {
+        "n_candidates": record.get("n_candidates"),
+        "n_replay": record.get("n_replay"),
+        "n_shuffle_pass": record.get("n_shuffle_pass"),
+        "time_grid start_s": grid.get("start_s"),
+        "time_grid end_s": grid.get("end_s"),
+        "time_grid n_samples": grid.get("n_samples"),
+    }
+    found = {
+        "n_candidates": len(table),
+        "n_replay": int(table["is_replay"].sum()),
+        "n_shuffle_pass": int(table["shuffle_pass"].sum()),
+        "time_grid start_s": epoch.bounds[0],
+        "time_grid end_s": epoch.bounds[1],
+        "time_grid n_samples": epoch.time.size,
+    }
+    for name, value in found.items():
+        if recorded[name] != value:
+            raise _Unavailable(
+                f"the record's {name} is {recorded[name]!r}, the table or frame "
+                f"gives {value!r}"
+            )
+
+
 def memoryless_inventory(
     run_dir: Path, *, cohort: str, detector: str, dot: pd.DataFrame
 ) -> InventoryTables:
@@ -561,22 +670,27 @@ def memoryless_inventory(
     InventoryTables
         The cohort's candidates with no ``artifact_drop_reason``; those the
         cohort selects that have one are set aside with it. Observed: the
-        observed file's ``decoded_windows`` stretches.
+        observed file's ``decoded_windows`` stretches. The run records no
+        sha256 of its outputs, so the record's ``n_candidates``, ``n_replay``
+        and ``n_shuffle_pass`` must describe the table, and its ``time_grid``
+        the frame's grid; otherwise the run reads unavailable.
 
     """
     epoch = _epoch(dot)
     try:
-        files = _run_files(
+        files, record = _run_files(
             run_dir,
             epoch.epoch_id,
             {
                 "events": f"{epoch.epoch_id}_memoryless_events.parquet",
                 "observed": f"{epoch.epoch_id}_memoryless_observed.parquet",
             },
+            hashed=False,
         )
+        table = pd.read_parquet(files["events"])
+        _check_memoryless_record(record, table, epoch)
     except _Unavailable as why:
         return _unavailable(epoch, detector, run_dir.name, str(why))
-    table = pd.read_parquet(files["events"])
     named = from_memoryless_table(table, cohort=cohort)
     named["detector"] = detector
     named["event_key"] = detector + named["event_key"].str.removeprefix(MEMORYLESS)

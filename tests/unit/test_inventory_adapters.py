@@ -149,7 +149,11 @@ def write_carey_run(root: Path, events=CAREY, record=None) -> Path:
         )
         observed_path = directory / f"{EPOCH}_carey_observed.parquet"
         pd.DataFrame(
-            {"scope": ["carey"], "start_s": [100.001], "end_s": [109.997]}
+            {
+                "scope": ["carey", "another"],
+                "start_s": [100.001, 0.0],
+                "end_s": [109.997, 1e6],
+            }
         ).to_parquet(observed_path)
         epochs[EPOCH] = {
             "status": "ok",
@@ -210,6 +214,15 @@ def write_memoryless_run(root: Path, table: pd.DataFrame) -> Path:
     ).to_parquet(observed_path)
     record = {
         "status": "ok",
+        "time_grid": {
+            "start_s": float(TIME[0]),
+            "end_s": float(TIME[-1]),
+            "n_samples": int(TIME.size),
+            "sampling_frequency": 500.0,
+        },
+        "n_candidates": len(table),
+        "n_replay": int(table.is_replay.sum()),
+        "n_shuffle_pass": int(table.shuffle_pass.sum()),
         "outputs": {"events": str(events_path), "observed": str(observed_path)},
     }
     (directory / "manifest.json").write_text(
@@ -218,14 +231,21 @@ def write_memoryless_run(root: Path, table: pd.DataFrame) -> Path:
     return directory
 
 
-@pytest.fixture
-def epoch(tmp_path, monkeypatch):
+def edit_record(run_dir: Path, change) -> None:
+    """Apply ``change(epochs)`` to the run folder's manifest epochs."""
+    manifest_path = run_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    change(manifest["epochs"])
+    manifest_path.write_text(json.dumps(manifest))
+
+
+def write_epoch(tmp_path, monkeypatch, kay=KAY, karlsson=KARLSSON) -> dict:
     """The SWR and artifact runs configured; the decode frame read once
-    through the source, and its drops read once from the same frame."""
+    through the source, and its drops from the frame as saved."""
     swr_run = write_swr_inventory(
-        tmp_path / "swr", {EPOCH: KAY}, observed={EPOCH: STORED_BAND}
+        tmp_path / "swr", {EPOCH: kay}, observed={EPOCH: STORED_BAND}
     )
-    add_detector(swr_run, "karlsson", KARLSSON)
+    add_detector(swr_run, "karlsson", karlsson)
     add_detector(swr_run, "yu", [])
     add_detector(swr_run, "zugaro", [(107.000, 107.030)])
     artifact_run = write_artifact_run(tmp_path / "artifacts", {EPOCH: ARTIFACTS})
@@ -237,6 +257,11 @@ def epoch(tmp_path, monkeypatch):
         "dot": with_swr_source(raw),
         "drops": artifact_event_drops(raw),
     }
+
+
+@pytest.fixture
+def epoch(tmp_path, monkeypatch):
+    return write_epoch(tmp_path, monkeypatch)
 
 
 def _reasons(set_aside: pd.DataFrame) -> dict[str, str]:
@@ -310,6 +335,34 @@ class TestTheSwrInventories:
             f"karlsson:{PREFIX}:3": "artifact",
         }
 
+    def test_the_second_pass_reads_bounds_sampled_on_the_grid(
+        self, tmp_path, monkeypatch
+    ):
+        """Kay 5 and a new Karlsson event end 0.5 ms past the first sample of
+        dropped MUA 2 (105.500): their last samples are 105.500, so neither
+        overlaps it on the grid, and both are kept, as the source keeps Kay 5."""
+        late = (105.300, 105.5005)
+        kay = [*KAY[:4], late, KAY[5]]
+        karlsson = [*KARLSSON[:3], late, KARLSSON[3]]
+        epoch = write_epoch(tmp_path, monkeypatch, kay=kay, karlsson=karlsson)
+
+        kay_tables = swr_inventory(
+            epoch["swr_run"], "kay", dot=epoch["dot"], drops=epoch["drops"]
+        )
+        karlsson_tables = swr_inventory(
+            epoch["swr_run"], "karlsson", dot=epoch["dot"], drops=epoch["drops"]
+        )
+
+        kept = kay_tables.inventory[kay_tables.inventory.whole_event_speed_eligible]
+        labels = sorted(set(epoch["dot"]["SWR_event"]) - {0})
+        assert labels == [1, 5, 6]
+        assert kept.event_key.tolist() == [f"kay:{PREFIX}:{n}" for n in labels]
+        assert f"karlsson:{PREFIX}:4" in set(karlsson_tables.inventory.event_key)
+        assert set(karlsson_tables.set_aside.reason) == {
+            "overlaps_dropped_event",
+            "artifact",
+        }
+
     def test_the_observed_time_is_the_detectors_scope(self, epoch):
         kay = swr_inventory(
             epoch["swr_run"], "kay", dot=epoch["dot"], drops=epoch["drops"]
@@ -365,6 +418,44 @@ class TestAnUnusableRecordReadsUnavailable:
         )
 
         _assert_unavailable(tables, "karlsson", "sha256")
+
+    def test_an_output_the_manifest_records_no_sha256_for(self, epoch):
+        """No output entry at all is a mismatch, not a pass."""
+        edit_record(
+            epoch["swr_run"],
+            lambda epochs: epochs[EPOCH]["outputs"].pop("karlsson"),
+        )
+
+        tables = swr_inventory(
+            epoch["swr_run"], "karlsson", dot=epoch["dot"], drops=epoch["drops"]
+        )
+
+        _assert_unavailable(tables, "karlsson", "sha256")
+
+    def test_a_record_without_its_detectors(self, epoch):
+        edit_record(epoch["swr_run"], lambda epochs: epochs[EPOCH].pop("detectors"))
+
+        tables = swr_inventory(
+            epoch["swr_run"], "zugaro", dot=epoch["dot"], drops=epoch["drops"]
+        )
+
+        _assert_unavailable(tables, "zugaro", "None")
+
+    def test_events_not_numbered_one_to_n(self, epoch):
+        path = epoch["swr_run"] / f"{EPOCH}_karlsson_events.parquet"
+        kay_events(KARLSSON).reset_index(drop=True).to_parquet(path)
+        sha = sha256_file(path)
+
+        def rehash(epochs):
+            epochs[EPOCH]["outputs"]["karlsson"]["sha256"] = sha
+
+        edit_record(epoch["swr_run"], rehash)
+
+        tables = swr_inventory(
+            epoch["swr_run"], "karlsson", dot=epoch["dot"], drops=epoch["drops"]
+        )
+
+        _assert_unavailable(tables, "karlsson", "event_number 1..n")
 
     def test_a_missing_file(self, epoch):
         (epoch["swr_run"] / f"{EPOCH}_swr_observed.parquet").unlink()
@@ -586,6 +677,38 @@ class TestTheMemorylessInventory:
             observed[["start_s", "end_s"]].to_numpy(),
             [(100.04, 103.96), (104.30, 109.95)],
         )
+
+    @pytest.mark.parametrize(
+        ("change", "reason"),
+        [
+            (lambda epochs: epochs.pop(EPOCH), "not in"),
+            (
+                lambda epochs: epochs.__setitem__(
+                    EPOCH, {"status": "failed", "error": "boom"}
+                ),
+                "failed",
+            ),
+            (lambda epochs: epochs[EPOCH].__setitem__("n_replay", 3), "n_replay"),
+            (
+                lambda epochs: epochs[EPOCH]["time_grid"].__setitem__(
+                    "n_samples", 4999
+                ),
+                "n_samples",
+            ),
+        ],
+        ids=["missing epoch", "failed record", "other table", "other grid"],
+    )
+    def test_an_unusable_record_reads_unavailable(
+        self, epoch, tmp_path, change, reason
+    ):
+        run = self._run(tmp_path)
+        edit_record(run, change)
+
+        tables = memoryless_inventory(
+            run, cohort="published", detector="memoryless", dot=epoch["dot"]
+        )
+
+        _assert_unavailable(tables, "memoryless", reason)
 
     def test_an_unshuffled_table_is_refused(self, epoch, tmp_path):
         with pytest.raises(ValueError, match="never shuffled"):
