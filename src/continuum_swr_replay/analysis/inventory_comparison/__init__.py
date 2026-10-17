@@ -13,4 +13,6 @@ with per-detector denominators.
 - ``recount``: one detector's events recounted with nearby fragments merged.
 - ``cells``: events no detector of a set found, and time no detector found.
 - ``swr_matrix``: each sequence cohort labelled under each SWR definition.
+- ``adapters``: each detector's recorded outputs for an epoch, read onto the
+  schema with what it observed and the events it set aside.
 """

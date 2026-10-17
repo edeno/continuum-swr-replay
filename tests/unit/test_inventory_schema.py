@@ -290,9 +290,13 @@ class TestAdapters:
             }
         )
 
+        before = table.copy()
         for cohort in MEMORYLESS_COHORTS:
             inventory = from_memoryless_table(table, cohort=cohort)
             assert inventory.event_key.tolist() == ["memoryless:sim20200101_02_r1:1"]
+        # the detector's table keeps its flags: the dropped rows are still in
+        # their cohorts there, with their reasons
+        pd.testing.assert_frame_equal(table, before)
 
     def test_a_table_made_before_the_rule_is_refused_under_an_artifact_run(
         self, monkeypatch
