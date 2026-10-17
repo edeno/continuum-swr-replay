@@ -67,6 +67,17 @@ envelope meets a gap. ``yu_diagnostics`` recomputes Yu's
 threshold and the histogram behind it, so both are known for an epoch with no
 events too.
 
+Carey
+-----
+``run_carey_detector`` runs ``Carey_candidate_detector``, which needs a
+ripple and a multiunit burst together, with the package defaults
+(``CAREY_SETTINGS``) and no theta restriction. It is run on its own, not by
+``run_swr_detectors``. It reads the same stored band, on the LFP's 1000 Hz
+samples, and one multiunit train per tetrode, binned onto those samples by
+``tetrode_spike_counts``. The artifact mask is handled as for the four: left
+out of the score's scaling, then the events that overlap it are dropped.
+``carey_observed_stretches`` gives the time it can detect in.
+
 Checks
 ------
 ``band_reproduction_error`` re-filters the raw LFP as ``LFPBandV1.make`` did
@@ -80,7 +91,7 @@ overlap.
 from __future__ import annotations
 
 import math
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, fields
 from types import MappingProxyType
 from typing import Any
@@ -89,6 +100,7 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 from ripple_detection import (
+    Carey_candidate_detector,
     Karlsson_ripple_detector,
     Kay_ripple_detector,
     Yu_ripple_detector,
@@ -105,6 +117,7 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import (
     SessionIdentity,
     inventory_from_intervals,
 )
+from continuum_swr_replay.analysis.pfc.glm import get_spikecount_per_time_bin
 from continuum_swr_replay.types import RippleBandInputs
 
 ZUGARO_BAND_HZ: tuple[float, float] = (120.0, 180.0)
@@ -753,6 +766,192 @@ def run_swr_detectors(
             events.attrs["n_dropped_over_maximum_duration"] = n_dropped
         results[name] = events
     return results
+
+
+CAREY_SETTINGS: Mapping[str, Any] = MappingProxyType(
+    {
+        "speed_threshold": 4.0,
+        "low_threshold": 1.0,
+        "high_threshold": 3.0,
+        "minimum_duration": 0.020,
+        "minimum_active_units": 5,
+        "ripple_smoothing_sigma": 0.010,
+        "spike_smoothing_sigma": 0.020,
+        "spike_cap": 2.0,
+        "baseline_smoothing_sigma": 0.125,
+        "baseline_cap": 4.0,
+        "state_merge_gap": 0.050,
+        "minimum_state_duration": 0.050,
+        "maximum_duration": None,
+        "threshold_method": "zscore",
+    }
+)
+"""``Carey_candidate_detector``'s keyword settings, read-only: every one the
+package default, set explicitly.
+
+Kept apart from ``DETECTOR_SETTINGS``, whose keys are the four detectors
+``run_swr_detectors`` runs. No theta channel is given, so there is no theta
+restriction and the theta band and threshold do not apply; speed (4 cm/s)
+gates alone.
+"""
+
+
+def tetrode_spike_counts(
+    spike_times: Sequence[NDArray], time: NDArray
+) -> NDArray[np.int64]:
+    """Each tetrode's multiunit spikes counted on the LFP's samples.
+
+    A tetrode's multiunit train is one of Carey's units. Spikes are binned by
+    the MUA rule (``get_spikecount_per_time_bin``): sample ``i`` holds the
+    spikes with ``time[i] <= s < time[i + 1]``, the last sample those at
+    ``time[-1]``, and a spike outside ``[time[0], time[-1]]`` is not counted.
+    Before a timestamp gap (a step over 1.5 times the median step) a sample
+    holds only the spikes less than one median step after it (to a tolerance
+    of 1e-6 steps, as ``minimum_sample_count`` rounds); the rest are inside
+    the gap and are not counted.
+
+    Parameters
+    ----------
+    spike_times : sequence of NDArray, each shape (n_spikes,)
+        Spike times in seconds, one array per tetrode.
+    time : NDArray, shape (n_time,)
+        The LFP's sample times in seconds, increasing.
+
+    Returns
+    -------
+    counts : NDArray[np.int64], shape (n_time, n_tetrodes)
+        One column per tetrode, in ``spike_times``' order.
+    """
+    time = np.asarray(time, dtype=float)
+    steps = np.diff(time)
+    median_step = np.median(steps)
+    gap_starts = np.flatnonzero(steps > _GAP_STEP_RATIO * median_step)
+    columns = []
+    for spikes in spike_times:
+        spikes = np.asarray(spikes, dtype=float)
+        sample = np.searchsorted(time, spikes, side="right") - 1
+        steps_past = (spikes - time[np.maximum(sample, 0)]) / median_step
+        # the tolerance keeps a spike on the next sample's nominal time, rounded
+        # down by float arithmetic, out of the sample before the gap
+        in_gap = np.isin(sample, gap_starts) & (steps_past >= 1 - 1e-6)
+        columns.append(get_spikecount_per_time_bin(spikes[~in_gap], time))
+    return np.column_stack(columns).astype(np.int64, copy=False)
+
+
+def _mask_intervals(time: NDArray, mask: NDArray[np.bool_]) -> pd.DataFrame:
+    """The runs of True samples, each from its first to its last sample time."""
+    runs = gap_free_stretches(time, np.where(mask, 0.0, np.nan))
+    return pd.DataFrame(
+        {"start_time": time[runs[:, 0]], "end_time": time[runs[:, 1] - 1]},
+        dtype=np.float64,
+    )
+
+
+def run_carey_detector(
+    time: NDArray,
+    ripple_band: NDArray,
+    spike_counts: NDArray,
+    speed: NDArray,
+    sampling_frequency: float,
+    *,
+    unobserved: NDArray[np.bool_],
+) -> pd.DataFrame | Exception:
+    """Run Carey's candidate detector on one epoch's shared inputs.
+
+    ``Carey_candidate_detector`` with ``CAREY_SETTINGS``, as the four in
+    ``run_swr_detectors`` are run: the ``unobserved`` samples are left out of
+    the joint score's scaling (``normalization_mask`` is their complement),
+    the inputs are not NaN-filled, so events are still found there, and the
+    events that overlap ``unobserved`` are then dropped
+    (``drop_overlapping_events``) and the rest renumbered. The mask's runs are
+    taken as closed intervals from their first to their last sample. Every
+    event begins and ends on a sample and spans no timestamp gap, so it
+    overlaps a run exactly when it shares a sample with the mask.
+
+    Parameters
+    ----------
+    time : NDArray, shape (n_time,)
+        The LFP's sample times in seconds.
+    ripple_band : NDArray, shape (n_time, n_channels)
+        The stored 150-250 Hz band of the kept CA1 tetrodes; the detector
+        averages their envelopes. NaN rows are missing.
+    spike_counts : NDArray, shape (n_time, n_tetrodes)
+        ``tetrode_spike_counts``' counts.
+    speed : NDArray, shape (n_time,)
+        Head speed in cm/s; NaN is unknown and is not low speed.
+    sampling_frequency : float
+        The nominal rate in Hz.
+    unobserved : NDArray of bool, shape (n_time,)
+        Samples not to be trusted, such as the artifact mask.
+
+    Returns
+    -------
+    events : pd.DataFrame or Exception
+        The detector's event table, indexed by ``event_number`` 1..n, with
+        ``attrs["n_dropped_overlapping_unobserved"]`` the number of events
+        dropped; or the exception the detector raised, such as for fewer
+        tetrodes than ``minimum_active_units`` or no spikes.
+    """
+    unobserved = np.asarray(unobserved, dtype=bool)
+    try:
+        events = Carey_candidate_detector(
+            time,
+            ripple_band,
+            spike_counts,
+            speed,
+            sampling_frequency,
+            normalization_mask=~unobserved,
+            **CAREY_SETTINGS,
+        )
+    except Exception as error:  # reported as its exception, as run_swr_detectors
+        return error
+    kept, n_dropped = drop_overlapping_events(events, _mask_intervals(time, unobserved))
+    kept.attrs["n_dropped_overlapping_unobserved"] = n_dropped
+    return kept
+
+
+def carey_observed_stretches(
+    time: NDArray,
+    ripple_band: NDArray,
+    spike_counts: NDArray,
+    unobserved: NDArray[np.bool_],
+) -> NDArray[np.int64]:
+    """The stretches Carey can detect in, less the unobserved samples.
+
+    Carey splits its inputs into blocks at a row with a non-finite ripple-band
+    or spike value and at a timestamp gap (``gap_free_stretches``), and treats
+    a block shorter than its minimum duration (``minimum_sample_count``) as
+    missing. The ``unobserved`` samples are then removed from the blocks that
+    are left; a piece the mask leaves shorter than the minimum is still
+    observed. The edges are not trimmed for the detector's smoothing kernels,
+    as Kay's smoothing is not trimmed either.
+
+    Parameters
+    ----------
+    time : NDArray, shape (n_time,)
+        Sample times in seconds.
+    ripple_band : NDArray, shape (n_time, n_channels)
+        The band ``run_carey_detector`` reads.
+    spike_counts : NDArray, shape (n_time, n_tetrodes)
+        The counts ``run_carey_detector`` reads.
+    unobserved : NDArray of bool, shape (n_time,)
+        Samples not to be trusted, such as the artifact mask.
+
+    Returns
+    -------
+    stretches : NDArray[np.int64], shape (n_stretches, 2)
+        ``[start, stop)`` row indices, in time order.
+    """
+    is_valid = np.isfinite(ripple_band).all(axis=1) & np.isfinite(spike_counts).all(
+        axis=1
+    )
+    blocks = gap_free_stretches(time, np.where(is_valid, 0.0, np.nan))
+    minimum = minimum_sample_count(time, CAREY_SETTINGS["minimum_duration"])
+    observed = np.zeros(len(is_valid), dtype=bool)
+    for start, stop in blocks[blocks[:, 1] - blocks[:, 0] >= minimum]:
+        observed[start:stop] = True
+    observed &= ~np.asarray(unobserved, dtype=bool)
+    return gap_free_stretches(time, np.where(observed, 0.0, np.nan))
 
 
 def yu_diagnostics(
