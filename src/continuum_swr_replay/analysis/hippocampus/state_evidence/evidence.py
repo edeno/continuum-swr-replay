@@ -94,7 +94,7 @@ def window_evidence(
     both_directions : bool, optional
         True (default): each pair is two runs, each half selecting once. False:
         one run per pair, its first half selecting and its second scoring, for
-        labels decoded from the first half alone (:mod:`.half_decode`), which
+        labels decoded from the first half alone (Task 13's half decodes), which
         must not score them.
     left_out_bins : ndarray of bool, shape (n_place_bins,), optional
         Place bins that are no candidate for MAP_S or the best remote bin,

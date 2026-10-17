@@ -1,9 +1,8 @@
 """Strict JSON records, code versions and the decode's stamp, shared by the
 state-evidence runners.
 
-It imports nothing that holds JAX to a device, so the GPU half-decode runner
-(``scripts/qa/run_half_tetrode_decodes.py``) and the CPU state-evidence runner
-(``scripts/qa/run_state_evidence.py``) both use it.
+It imports nothing that holds JAX to a device. The CPU state-evidence runner
+(``scripts/qa/run_state_evidence.py``) uses it.
 """
 
 from __future__ import annotations

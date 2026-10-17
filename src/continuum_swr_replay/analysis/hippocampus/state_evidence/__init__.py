@@ -85,9 +85,9 @@ What is and is not held out (properties, not defects)
 -----------------------------------------------------
 - Only the remote location is held out by the tetrode split: S alone chooses
   MAP_S. The state labels come from the all-tetrode decode, so C's spikes
-  helped make them. Labels from a decode that saw S alone (:mod:`.half_decode`)
-  hold them out too, but for the canonical fit's discrete transitions and
-  initial conditions; such labels are scored by their own C only
+  helped make them. Labels from a decode that saw S alone (Task 13's half
+  decodes, since removed) hold them out too, but for the canonical fit's
+  discrete transitions and initial conditions; such labels are scored by their own C only
   (``window_evidence(..., both_directions=False)``), and a table holding
   several splits names each in :data:`~.summary.SPLIT_COLUMN`.
 - Run-averaged Local and No-Spike values equal half the all-tetrode
@@ -127,27 +127,13 @@ each epoch enters as one value, and the animal is the unit of replication.
 
 Modules: :mod:`.terms` (per-tetrode terms, encodings, decode files),
 :mod:`.windows` (regimes, bouts, matched and calibration windows, tetrode
-halves, partners), :mod:`.evidence` (window evidence), :mod:`.summary` and
-:mod:`.half_decode` (decodes that see one tetrode half, and how their labels
-agree with the canonical decode's); :mod:`.io` writes the runners' JSON records.
+halves, partners), :mod:`.evidence` (window evidence) and :mod:`.summary`;
+:mod:`.io` writes the runners' JSON records.
 """
 
 from continuum_swr_replay.analysis.hippocampus.state_evidence.evidence import (
     held_out_evidence,
     window_evidence,
-)
-from continuum_swr_replay.analysis.hippocampus.state_evidence.half_decode import (
-    GROUND_MAX_REL,
-    HALF_PARTITIONS,
-    OCCUPANCY_MAX_REL,
-    Split,
-    decode_inputs,
-    encoding_subset_check,
-    fixed_transition_detector,
-    half_splits,
-    half_tetrode_decode,
-    label_agreement,
-    non_local_event_labels,
 )
 from continuum_swr_replay.analysis.hippocampus.state_evidence.io import (
     code_version,
@@ -224,11 +210,8 @@ __all__ = [
     "ENCODING_KEY",
     "ENCODING_LABELS",
     "EPOCH_SUMMARY",
-    "GROUND_MAX_REL",
-    "HALF_PARTITIONS",
     "HALVES_SEED",
     "MIN_BIN_WINDOWS",
-    "OCCUPANCY_MAX_REL",
     "PRIMARY_ENCODING",
     "PRIMARY_METRICS",
     "PROBABILITY_BIN_LABELS",
@@ -237,7 +220,6 @@ __all__ = [
     "SPLIT_COLUMN",
     "STATES",
     "UNDERFLOW_OCCUPANCY_FLOOR",
-    "Split",
     "TetrodeTerms",
     "animal_t_test",
     "bout_animal_summaries",
@@ -247,28 +229,21 @@ __all__ = [
     "calibration_windows",
     "code_version",
     "coordinated_silence",
-    "decode_inputs",
     "encoding_comparison",
     "encoding_inputs",
-    "encoding_subset_check",
     "epoch_slopes",
     "epoch_summaries",
     "epoch_summary_kind",
     "event_likelihood",
-    "fixed_transition_detector",
-    "half_splits",
-    "half_tetrode_decode",
     "held_out_evidence",
     "hierarchical_bootstrap_ci",
     "interior_bin_mask",
     "json_ready",
     "keyed_rng",
-    "label_agreement",
     "load_detector",
     "load_encoding",
     "matched_windows",
     "nearest_interior_bins",
-    "non_local_event_labels",
     "null_partners",
     "ols_slope_ci",
     "paired_bouts",

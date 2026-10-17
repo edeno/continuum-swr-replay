@@ -754,12 +754,6 @@ Objective AST mutation check for value-critical builder logic.
 
 `check`, `main`
 
-### `scripts/qa/run_half_tetrode_decodes.py`
-
-Held-out state labels: decode with one tetrode half, score with the other.
-
-`bout_column`, `gpu_usage`, `configure_devices`, `current_device`, `Job`, `decode_jobs`, `decode_paths`, `canonical_detector_stamp`, `reuse_reason`, `CanonicalEpoch`, `canonical_masks`, `analysed_labels`, `load_canonical`, `decode_split`, `decode_epoch`, `evidence_paths`, `half_label_sets`, `score_epoch`, `agreement_table`, `summarize_label_sources`, `agreement_markdown`, `score_manifest`, `readme`, `build_parser`, `main`
-
 ### `scripts/qa/run_quality_metrics.py`
 
 Compute decoding quality metrics across all sessions.
@@ -813,12 +807,6 @@ Generate the symbol-anchored regression pipeline code map.
 Held-out evidence of every window, by tetrode half (see the package notes).
 
 `held_out_evidence`, `window_evidence`
-
-### `src/continuum_swr_replay/analysis/hippocampus/state_evidence/half_decode.py`
-
-Decodes that see one tetrode half, so that the state labels are held out too.
-
-`Split`, `half_splits`, `decode_inputs`, `fixed_transition_detector`, `half_tetrode_decode`, `encoding_subset_check`, `non_local_event_labels`, `label_agreement`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/state_evidence/io.py`
 

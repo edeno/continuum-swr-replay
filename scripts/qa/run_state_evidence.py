@@ -58,8 +58,8 @@ Per epoch (a dask CPU worker each):
    window's own spikes are not in the model that scores it.
 
 ``epoch_table`` and ``run_epoch`` also take other label sets (``LabelSet``):
-labels from another decode, scored by chosen tetrode pairs, their rows stacked;
-``run_half_tetrode_decodes.py score`` gives each epoch its half decodes' labels.
+labels from another decode, scored by chosen tetrode pairs, their rows stacked
+(Task 13's half decodes used this; their runner is removed, see git history).
 
 It writes ``per_epoch/{epoch}_windows.parquet`` (one row per window; columns
 ``runcv_*`` for the primary, time-held-out running-only encoding, ``run_*`` for
@@ -514,7 +514,7 @@ class LabelSet:
 
     The default is Task 12's: the canonical decode's labels, scored by every
     seeded partition in both directions. Labels from a decode that saw one half
-    S alone (``scripts/qa/run_half_tetrode_decodes.py``) are scored by its own
+    S alone (Task 13's half decodes) are scored by its own
     half C only: ``halves=[(S, C)]`` and ``both_directions=False``.
 
     Attributes

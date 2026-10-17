@@ -800,10 +800,6 @@ DECODE_FRAME_READERS = {
         "reads it through with_swr_source, and keeps the decoder's own non-local "
         "labels so every decoded event stays out of the running-only encodings"
     ),
-    "scripts/qa/run_half_tetrode_decodes.py": (
-        "reads it through with_swr_source, and keeps its own MUA labels to hold "
-        "each half decode's events to the same rule (analysed_labels)"
-    ),
     "scripts/qa/diagnose_trial_detection.py": "position and trials",
     "scripts/qa/compare_pfc_cohorts.py": "PFC bundles; names data_over_time_sha256",
     "scripts/figures/generate_supp_pipeline_data_flow.py": (
