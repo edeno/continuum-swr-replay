@@ -15,6 +15,22 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import (
+    MemorylessSequenceConfig,
+)
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (
+    CandidateSequences,
+    WindowDecisions,
+    assemble_sequences,
+    gate_windows,
+    replay_mask,
+    sequence_dispersion_cm,
+    sequence_duration_s,
+)
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
+    NO_CENTER,
+    forward_jumps_cm,
+)
 from continuum_swr_replay.analysis.inventory_comparison.availability import (
     still_intervals,
 )
@@ -40,10 +56,14 @@ from continuum_swr_replay.analysis.inventory_comparison.selection import (
     LOCATION,
     LOCATION_TOLERANCE_CM,
     N_BASELINES,
+    REJECTION_COHORTS,
+    REJECTION_DTYPES,
+    REJECTION_STAGES,
     WINDOW_DTYPES,
     baseline_draws,
     baseline_pool,
     matched_baselines,
+    rejection_stages,
     window_room,
 )
 
@@ -493,3 +513,355 @@ class TestMatchedBaselines:
             rank = (scores < own.evidence_dll.iloc[0]).mean()
             assert summary.evidence_rank.iloc[i] == rank
             assert windows.event_start_s.iloc[i] == TIME[starts[i, 0]]
+
+
+# The rejection stages. One simulated memoryless run of 700 windows, 4 ms
+# apart, on a straight track of 2 cm bins. Every window has a center (bin
+# k // 2, so jumps are 0 or 2 cm), a usable posterior and an eligible speed,
+# and fails the spread gate, except in these stretches, which pass it:
+#   50          one kept window, a run of one, dropped;
+#   100-115     a lone run of 60 ms, below the duration filter;
+#   200-215, 220-235  two 60 ms runs 20 ms apart, merged into a candidate;
+#   300-329     a stationary stretch (bin 150); window 329 fails its 30 cm jump;
+#   400-460     a 240 ms moving run, replay;
+#   600-625     exactly 100 ms, kept by assembly and declined as replay.
+# Window 30 is undecoded (it holds a masked row) and window 71 is too fast.
+
+REJECTION_CONFIG = MemorylessSequenceConfig()
+N_WINDOWS = 700
+MIDPOINT = 100.0 + REJECTION_CONFIG.stride_s * np.arange(N_WINDOWS)
+TRACK_DISTANCE_CM = 2.0 * np.abs(np.subtract.outer(np.arange(400), np.arange(400)))
+UNDECODED = np.zeros(N_WINDOWS, dtype=bool)
+UNDECODED[30] = True
+SS = "state_space"
+CRITERIA = "memoryless_criteria"
+
+
+def simulated_candidates():
+    """The run, built with the detector's own gates, assembly and criteria."""
+    raw_center = np.arange(N_WINDOWS) // 2
+    spread = np.full(N_WINDOWS, 50.0)
+    for first, last in [
+        (50, 50),
+        (100, 115),
+        (200, 215),
+        (220, 235),
+        (300, 329),
+        (400, 460),
+        (600, 625),
+    ]:
+        spread[first : last + 1] = 1.0
+    raw_center[300:330] = 150
+    raw_center[30], spread[30] = NO_CENTER, np.nan
+    speed_ok = np.ones(N_WINDOWS, dtype=bool)
+    speed_ok[71] = False
+    center = np.where(speed_ok, raw_center, NO_CENTER)
+    jump = forward_jumps_cm(center, TRACK_DISTANCE_CM)
+    gates = gate_windows(
+        raw_center, spread, jump, REJECTION_CONFIG, speed_eligible=speed_ok
+    )
+    assembly = assemble_sequences(
+        gates.kept, center, MIDPOINT, TRACK_DISTANCE_CM, REJECTION_CONFIG, UNDECODED
+    )
+    dispersion = sequence_dispersion_cm(
+        assembly.runs, assembly.kept, center, TRACK_DISTANCE_CM
+    )
+    return CandidateSequences(
+        runs=assembly.runs,
+        duration_s=sequence_duration_s(assembly.runs, MIDPOINT),
+        dispersion_cm=dispersion,
+        is_replay=replay_mask(assembly.runs, dispersion, REJECTION_CONFIG),
+        decisions=WindowDecisions(center, spread, jump, gates),
+        assembly=assembly,
+        midpoint_s=MIDPOINT,
+        config=REJECTION_CONFIG,
+    )
+
+
+CANDIDATES = simulated_candidates()
+MERGED, STATIONARY, REPLAY, EXACTLY_100_MS = 0, 1, 2, 3
+"""The candidates, in window order."""
+
+
+def candidate_table(**replay_columns):
+    """The run's table, every candidate still and unshuffled but the replay one,
+    which takes ``replay_columns`` (passed and still by default)."""
+    runs = CANDIDATES.runs
+    n = len(runs)
+    table = pd.DataFrame(
+        {
+            "animal": SESSION[0],
+            "day": SESSION[1],
+            "epoch": SESSION[2],
+            "ms_event_id": 1000 + np.arange(n),
+            "first_window": runs[:, 0],
+            "last_window": runs[:, 1],
+            "event_start_s": MIDPOINT[runs[:, 0]],
+            "event_end_s": MIDPOINT[runs[:, 1]],
+            "is_replay": CANDIDATES.is_replay,
+            "whole_event_speed_eligible": True,
+            "shuffle_testable": False,
+            "shuffle_pass": False,
+            "n_shuffles": 0,
+            "artifact_drop_reason": None,
+        }
+    )
+    replay = {
+        "whole_event_speed_eligible": True,
+        "shuffle_testable": True,
+        "shuffle_pass": True,
+        "n_shuffles": 100,
+    } | replay_columns
+    for column, value in replay.items():
+        table.loc[REPLAY, column] = value
+    return table
+
+
+def candidate_key(cohort, index):
+    return f"{cohort}:sim20200101_02_r1:{1000 + index}"
+
+
+def ss_events(spans):
+    """State-space events from ``(first window, last window)`` spans or bounds."""
+    return event_frame(
+        [
+            (SS, f"{SS}:sim20200101_02_r1:{i}", start, end)
+            for i, (start, end) in enumerate(spans)
+        ]
+    )
+
+
+def windows(first, last):
+    return MIDPOINT[first], MIDPOINT[last]
+
+
+def membership(events, labels, cohort, in_cohort=(), reasons=None):
+    """Population rows: each event's membership against ``cohort`` and the
+    cohort's compared events (``in_cohort``, candidate indices)."""
+    reasons = reasons or {}
+    rows = [
+        (SS, key, f"{label}_by:{cohort}", reasons.get(key, ""))
+        for key, label in zip(events.event_key, labels, strict=True)
+    ]
+    rows += [(cohort, candidate_key(cohort, i), "all", "") for i in in_cohort]
+    rows += [(SS, key, "all", "") for key in events.event_key]
+    frame = pd.DataFrame(
+        rows, columns=["detector", "event_key", "population", "unknown_reason"]
+    )
+    for column, value in zip(("animal", "day", "epoch"), SESSION, strict=True):
+        frame[column] = value
+    return frame
+
+
+def stages(spans, labels=None, *, cohort="memoryless", in_cohort=(), table=None):
+    events = ss_events(spans)
+    labels = labels or ["unmatched"] * len(events)
+    return rejection_stages(
+        events,
+        membership(events, labels, cohort, in_cohort),
+        CANDIDATES,
+        candidate_table() if table is None else table,
+        UNDECODED,
+        cohort=cohort,
+    )
+
+
+class TestRejectionStages:
+    def test_the_simulated_run_is_as_described(self):
+        assert CANDIDATES.runs.tolist() == [
+            [200, 235],
+            [300, 328],
+            [400, 460],
+            [600, 625],
+        ]
+        assert CANDIDATES.is_replay.tolist() == [False, False, True, False]
+        assert CANDIDATES.pre_merge_runs[:, 0].tolist() == [
+            100,
+            200,
+            220,
+            300,
+            400,
+            600,
+        ]
+
+    def test_a_window_failing_only_spread_counts_under_spread(self):
+        row = stages([windows(10, 20)]).iloc[0]
+        assert row.stage == "no_kept_window"
+        assert row.n_windows == row.n_spread_failed == 11
+        for name in (
+            "n_undecoded",
+            "n_posterior_unusable",
+            "n_speed_ineligible",
+            "n_jump_failed",
+            "n_kept",
+            "n_kept_in_runs",
+            "n_candidates",
+        ):
+            assert row[name] == 0, name
+
+    def test_an_undecoded_window_counts_apart(self):
+        row = stages([windows(28, 32)]).iloc[0]
+        assert (row.n_windows, row.n_undecoded) == (5, 1)
+        assert row.n_posterior_unusable == 0
+        # the decoded windows only; window 29 has no jump into window 30
+        assert (row.n_spread_failed, row.n_jump_failed) == (4, 1)
+
+    def test_a_fast_window_counts_under_speed(self):
+        row = stages([windows(70, 72)]).iloc[0]
+        assert (row.n_speed_ineligible, row.n_posterior_unusable) == (1, 0)
+        # the blanked window 71 has no jump, nor has window 70 into it
+        assert row.n_jump_failed == 2
+
+    def test_a_single_kept_window_between_rejected_ones_is_no_run(self):
+        row = stages([windows(48, 52)]).iloc[0]
+        assert (row.n_kept, row.n_kept_in_runs) == (1, 0)
+        assert row.stage == "no_run"
+
+    def test_a_lone_60_ms_run_is_no_candidate(self):
+        row = stages([windows(100, 115)]).iloc[0]
+        assert row.n_kept == row.n_kept_in_runs == 16
+        assert (row.n_candidates, row.stage) == (0, "no_candidate")
+
+    def test_two_short_runs_merged_reach_the_criteria(self):
+        row = stages([windows(205, 225)]).iloc[0]
+        assert row.n_candidates == 1
+        assert REJECTION_STAGES.index(row.stage) >= REJECTION_STAGES.index("duration")
+        # the merged gap's windows are not kept
+        assert row.n_kept == 11 + 6
+
+    def test_touching_a_candidate_is_not_overlapping_it(self):
+        result = stages([windows(190, 200), windows(235, 240), windows(190, 201)])
+        assert result.n_candidates.tolist() == [0, 0, 1]
+        # window 200 is kept in a run, but the candidate only touches the event
+        assert result.stage.iloc[0] == "no_candidate"
+
+    def test_a_candidate_of_exactly_100_ms_fails_duration(self):
+        row = stages([windows(600, 625)]).iloc[0]
+        assert row.stage == "duration"
+        # every reason is kept, not only the stage's
+        assert row.any_duration_failed and row.any_dispersion_failed
+
+    def test_a_stationary_candidate_is_dispersion(self):
+        row = stages([windows(300, 328)]).iloc[0]
+        assert row.stage == "dispersion"
+        assert not row.any_duration_failed and row.any_dispersion_failed
+
+    def test_a_moving_replay_candidate_is_speed(self):
+        table = candidate_table(whole_event_speed_eligible=False)
+        for cohort in ("memoryless", CRITERIA):
+            row = stages([windows(410, 450)], cohort=cohort, table=table).iloc[0]
+            assert row.stage == "speed"
+            assert row.any_replay and row.any_replay_not_speed_eligible
+
+    @pytest.mark.parametrize(
+        ("columns", "stage"),
+        [
+            ({"shuffle_pass": False}, "shuffle_failed"),
+            (
+                {"shuffle_pass": False, "shuffle_testable": False, "n_shuffles": 0},
+                "shuffle_failed",
+            ),
+            ({"shuffle_pass": False, "shuffle_testable": False}, "shuffle_untestable"),
+        ],
+    )
+    def test_a_failing_or_unshuffled_candidate_is_shuffle_failed(self, columns, stage):
+        table = candidate_table(**columns)
+        row = stages([windows(410, 450)], table=table).iloc[0]
+        assert row.stage == stage
+        assert row.any_shuffle_failed
+        assert row.any_shuffle_untestable == (stage == "shuffle_untestable")
+        # the criteria cohort has no shuffle
+        criteria = stages(
+            [windows(410, 450)],
+            ["matched"],
+            cohort=CRITERIA,
+            in_cohort=[REPLAY],
+            table=table,
+        ).iloc[0]
+        assert criteria.stage == "in_cohort"
+
+    def test_an_event_matched_by_the_cohort_is_in_cohort(self):
+        row = stages([windows(410, 450)], ["matched"], in_cohort=[REPLAY]).iloc[0]
+        assert row.stage == "in_cohort"
+        assert row.any_in_cohort and row.membership == "matched"
+
+    def test_an_unmatched_event_is_never_in_cohort(self):
+        with pytest.raises(ValueError, match="matched"):
+            stages([windows(410, 450)], ["unmatched"], in_cohort=[REPLAY])
+        with pytest.raises(ValueError, match="matched"):
+            stages([windows(410, 450)], ["matched"], in_cohort=[])
+
+    def test_a_candidate_through_every_gate_outside_the_cohort_is_refused(self):
+        # set aside by the comparison: no unmatched event can overlap it
+        with pytest.raises(ValueError, match="cohort"):
+            stages([windows(410, 450)], ["unmatched"], in_cohort=[])
+
+    def test_an_unknown_event_has_no_rejection_reason(self):
+        events = ss_events([windows(10, 20), windows(410, 450)])
+        result = rejection_stages(
+            events,
+            membership(
+                events,
+                ["unknown", "unknown"],
+                "memoryless",
+                [REPLAY],
+                {events.event_key[1]: "outside_shared_exposure"},
+            ),
+            CANDIDATES,
+            candidate_table(),
+            UNDECODED,
+            cohort="memoryless",
+        )
+        assert result.stage.tolist() == ["unknown", "unknown"]
+        assert result.unknown_reason.tolist() == ["", "outside_shared_exposure"]
+        reasons = result.filter(regex="^(n_|any_)")
+        assert reasons.shape[1] == 16
+        assert reasons.isna().all(axis=None)
+
+    def test_no_window_and_the_r1_gate_over_every_event(self):
+        spans = [
+            (MIDPOINT[60] + 0.001, MIDPOINT[60] + 0.002),
+            windows(10, 20),
+            windows(205, 225),
+            windows(300, 328),
+            windows(400, 460),
+            windows(600, 625),
+        ]
+        labels = ["unmatched"] * 4 + ["matched", "unmatched"]
+        result = stages(spans, labels, in_cohort=[REPLAY])
+        assert result.stage.iloc[0] == "no_window"
+        assert ((result.stage == "in_cohort") == (result.membership == "matched")).all()
+        assert list(result.dtypes.astype(str)) == [
+            str(pd.Series(dtype=dtype).dtype) for dtype in REJECTION_DTYPES.values()
+        ]
+
+    def test_without_a_run_every_event_must_be_unknown(self):
+        events = ss_events([windows(10, 20)])
+        rows = membership(events, ["unknown"], "memoryless", (), {})
+        result = rejection_stages(events, rows, None, None, None, cohort="memoryless")
+        assert result.stage.tolist() == ["unknown"]
+        with pytest.raises(ValueError, match="together"):
+            rejection_stages(
+                events, rows, CANDIDATES, None, UNDECODED, cohort="memoryless"
+            )
+        with pytest.raises(ValueError, match="unknown"):
+            rejection_stages(
+                events,
+                membership(events, ["unmatched"], "memoryless"),
+                None,
+                None,
+                None,
+                cohort="memoryless",
+            )
+
+    def test_the_cohorts_are_the_comparisons(self):
+        import scripts.qa.run_inventory_comparison as runner
+
+        assert {name: runner.ROSTER[name] for name in REJECTION_COHORTS} == dict(
+            REJECTION_COHORTS
+        )
+
+    def test_empty_events_keep_their_dtypes(self):
+        result = stages([])
+        assert result.empty
+        assert list(result.columns) == list(REJECTION_DTYPES)

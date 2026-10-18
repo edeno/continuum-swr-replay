@@ -35,6 +35,17 @@ they get identical features. An event's draws depend only on the seed, its
 epoch and bounds, and the pool, never on the other events. Stream names are
 hashed (CRC-32), so two intervals could share a stream; that would only
 correlate their draws, never change a level or a candidate set.
+
+The rejection stages (:func:`rejection_stages`) say, for each state-space
+event, how far the memoryless detector got on that activity before it did not
+select it, against each memoryless cohort: ``memoryless`` (the published
+cohort, after the shuffle) and ``memoryless_criteria`` (duration and
+dispersion alone). Its windows are those whose midpoint lies in the event,
+both bounds included, as for the ``ms_`` features; its candidates are those
+sharing time of positive duration with it, as the comparison's overlaps are.
+Every gate's failures are kept as their own count or flag, and one exclusive
+``stage`` gives the furthest gate reached, in the detector's order. All
+memoryless results are pending the Phase 2 pilot checks.
 """
 
 from collections.abc import Collection, Mapping
@@ -45,6 +56,11 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (
+    CandidateSequences,
+    # the detector's own threshold comparison, so a tie is decided as it decides
+    _is_above,
+)
 from continuum_swr_replay.analysis.hippocampus.state_evidence.windows import (
     Seed,
     keyed_rng,
@@ -56,6 +72,7 @@ from continuum_swr_replay.analysis.inventory_comparison.features import (
     RowTraces,
     _grid_rows,
     _over_rows,
+    interval_rows,
     middle_row,
 )
 from continuum_swr_replay.analysis.inventory_comparison.intervals import (
@@ -64,9 +81,18 @@ from continuum_swr_replay.analysis.inventory_comparison.intervals import (
     subtract,
 )
 from continuum_swr_replay.analysis.inventory_comparison.overlap import (
+    MATCHED,
+    UNKNOWN,
+    UNMATCHED,
     Coverage,
     roster,
     validate_detectors,
+)
+from continuum_swr_replay.analysis.inventory_comparison.populations import ALL
+from continuum_swr_replay.analysis.inventory_comparison.schema import (
+    MEMORYLESS,
+    MEMORYLESS_COHORTS,
+    _event_keys,
 )
 from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 
@@ -79,10 +105,14 @@ __all__ = [
     "LOCATION_TOLERANCE_CM",
     "MIN_MATCHED",
     "N_BASELINES",
+    "REJECTION_COHORTS",
+    "REJECTION_DTYPES",
+    "REJECTION_STAGES",
     "WINDOW_DTYPES",
     "baseline_draws",
     "baseline_pool",
     "matched_baselines",
+    "rejection_stages",
     "window_room",
 ]
 
@@ -122,6 +152,79 @@ WINDOW_DTYPES: Mapping[str, object] = MappingProxyType(
 )
 """The first draw of each event that has one: its event and its bounds, the
 times of its first and last rows."""
+
+REJECTION_COHORTS: Mapping[str, str] = MappingProxyType(
+    {MEMORYLESS: "published", "memoryless_criteria": "replay_criteria"}
+)
+"""Each memoryless inventory of the comparison, by its detector name, and the
+cohort of ``schema.MEMORYLESS_COHORTS`` it was built from."""
+REJECTION_STAGES = (
+    "no_window",
+    "no_kept_window",
+    "no_run",
+    "no_candidate",
+    "duration",
+    "dispersion",
+    "speed",
+    "shuffle_failed",
+    "shuffle_untestable",
+    "in_cohort",
+)
+"""The exclusive stages, in the detector's order: no window's midpoint lies in
+the event; no window passed every per-window gate; no kept window was in a run
+of two or more; no candidate shares time with it; then the furthest any of
+its candidates reached: declined on duration, on dispersion, on whole-event
+speed, (published cohort only) on the shuffle, failed or with an observed
+statistic that is not finite, and last selected by the cohort."""
+_WINDOW_COUNTS = (
+    "n_windows",
+    "n_undecoded",
+    "n_posterior_unusable",
+    "n_speed_ineligible",
+    "n_spread_failed",
+    "n_jump_failed",
+    "n_kept",
+    "n_kept_in_runs",
+)
+_CANDIDATE_FLAGS = (
+    "any_duration_failed",
+    "any_dispersion_failed",
+    "any_replay",
+    "any_replay_not_speed_eligible",
+    "any_shuffle_failed",
+    "any_shuffle_untestable",
+    "any_in_cohort",
+)
+REJECTION_DTYPES: Mapping[str, object] = MappingProxyType(
+    {
+        "animal": object,
+        "day": np.int64,
+        "epoch": object,
+        "detector": object,
+        "event_key": object,
+        "cohort": object,
+        "membership": object,
+        "stage": object,
+        "unknown_reason": object,
+        **dict.fromkeys(_WINDOW_COUNTS, pd.Int64Dtype()),
+        "n_candidates": pd.Int64Dtype(),
+        **dict.fromkeys(_CANDIDATE_FLAGS, pd.BooleanDtype()),
+    }
+)
+"""One row per event and cohort. ``stage`` is one of :data:`REJECTION_STAGES`,
+or ``unknown`` where the membership is, with the population's
+``unknown_reason`` (empty otherwise); there every count and flag is missing,
+since an unknown comparison is not a rejection. Over the event's windows,
+undecoded ones apart (``n_undecoded``) and the rest over the decoded ones:
+each gate's failures (``n_posterior_unusable``, ``n_speed_ineligible`` at the
+window's midpoint, ``n_spread_failed``, ``n_jump_failed``; a window with no
+center fails spread and jump too), the windows passing all of them
+(``n_kept``) and those in a run of two or more (``n_kept_in_runs``). Over its
+candidates: ``n_candidates`` and whether any was declined on duration or on
+dispersion, met both (``any_replay``) and was not still over the whole event,
+met both and failed the shuffle (unshuffled included), met both, was shuffled
+and has an observed statistic that is not finite, or is one of the cohort's
+compared events."""
 
 
 def baseline_pool(
@@ -428,3 +531,316 @@ def matched_baselines(
         }
     ).astype(dict(WINDOW_DTYPES))
     return summary, windows
+
+
+def _memberships(
+    events: pd.DataFrame, populations: pd.DataFrame, cohort: str
+) -> tuple[NDArray[np.object_], NDArray[np.object_]]:
+    """Each event's membership against ``cohort`` and its unknown reason."""
+    # the labels as population_rows writes them, "<membership>_by:<detector>"
+    labels = {f"{name}_by:{cohort}": name for name in (MATCHED, UNMATCHED, UNKNOWN)}
+    own = populations[
+        populations["event_key"].isin(events["event_key"])
+        & populations["population"].isin(labels)
+    ].set_index("event_key")
+    if not own.index.is_unique or len(own) != len(events):
+        raise ValueError(
+            f"Every event needs exactly one membership against {cohort}; "
+            f"{len(own)} rows for {len(events)} events."
+        )
+    own = own.loc[events["event_key"]]
+    return (
+        own["population"].map(labels).to_numpy(dtype=object),
+        own["unknown_reason"].to_numpy(dtype=object),
+    )
+
+
+def _window_counts(
+    candidates: CandidateSequences,
+    undecoded: NDArray,
+    starts: NDArray,
+    ends: NDArray,
+) -> dict[str, NDArray[np.int64]]:
+    """Each count of :data:`_WINDOW_COUNTS` over the windows of each event."""
+    gates = candidates.decisions.gates
+    n_windows = candidates.midpoint_s.size
+    undecoded = np.asarray(undecoded, dtype=bool)
+    if undecoded.shape != (n_windows,):
+        raise ValueError(
+            f"undecoded has shape {undecoded.shape}; there are {n_windows} windows."
+        )
+    if (undecoded & gates.posterior_usable).any():
+        raise ValueError(
+            "An undecoded window has a usable posterior; the mask is not the one "
+            "the run was given."
+        )
+    decoded = ~undecoded
+    edges = np.zeros(n_windows + 1, dtype=np.int64)
+    runs = candidates.pre_merge_runs
+    np.add.at(edges, runs[:, 0], 1)
+    np.add.at(edges, runs[:, 1] + 1, -1)
+    in_run = np.cumsum(edges[:-1]) > 0
+    masks = {
+        "n_windows": np.ones(n_windows, dtype=bool),
+        "n_undecoded": undecoded,
+        "n_posterior_unusable": decoded & ~gates.posterior_usable,
+        "n_speed_ineligible": decoded & ~gates.speed_eligible,
+        "n_spread_failed": decoded & ~gates.spread_below_threshold,
+        "n_jump_failed": decoded & ~gates.jump_below_threshold,
+        "n_kept": decoded & gates.kept,
+        "n_kept_in_runs": decoded & gates.kept & in_run,
+    }
+    first, n_in = interval_rows(candidates.midpoint_s, starts, ends)
+    counts = {}
+    for name, mask in masks.items():
+        before = np.concatenate(([0], np.cumsum(mask, dtype=np.int64)))
+        counts[name] = before[first + n_in] - before[first]
+    return counts
+
+
+def _candidate_gates(
+    candidates: CandidateSequences,
+    table: pd.DataFrame,
+    cohort_keys: NDArray[np.bool_],
+    shuffled: bool,
+) -> tuple[dict[str, NDArray[np.bool_]], NDArray[np.bool_], NDArray[np.int64]]:
+    """Each candidate's flags, whether it passed every gate outside the cohort,
+    and the index in :data:`REJECTION_STAGES` of the furthest gate it reached
+    (-1 for one outside the cohort that passed them all)."""
+    config = candidates.config
+    runs = candidates.runs
+    long_enough = _is_above(
+        runs[:, 1] - runs[:, 0], config.minimum_duration_s / config.stride_s
+    )
+    spread_out = _is_above(candidates.dispersion_cm, config.dispersion_threshold_cm)
+    replay = candidates.is_replay
+    still = table["whole_event_speed_eligible"].to_numpy(dtype=bool)
+    passed = table["shuffle_pass"].to_numpy(dtype=bool)
+    untestable = (
+        replay
+        & (table["n_shuffles"].to_numpy() > 0)
+        & ~table["shuffle_testable"].to_numpy(dtype=bool)
+    )
+    shuffle_gate = passed if shuffled else np.ones_like(passed)
+    through = replay & still & shuffle_gate
+    if (cohort_keys & ~through).any():
+        raise ValueError(
+            "A compared event of the cohort fails one of its gates in the "
+            "candidate table; the table is not the one the comparison read."
+        )
+    stage = REJECTION_STAGES.index
+    rank = np.select(
+        [
+            ~long_enough,
+            ~spread_out,
+            ~still,
+            ~shuffle_gate & untestable,
+            ~shuffle_gate,
+            cohort_keys,
+        ],
+        [
+            stage("duration"),
+            stage("dispersion"),
+            stage("speed"),
+            stage("shuffle_untestable"),
+            stage("shuffle_failed"),
+            stage("in_cohort"),
+        ],
+        default=-1,
+    )
+    flags = {
+        "any_duration_failed": ~long_enough,
+        "any_dispersion_failed": ~spread_out,
+        "any_replay": replay,
+        "any_replay_not_speed_eligible": replay & ~still,
+        "any_shuffle_failed": replay & ~passed,
+        "any_shuffle_untestable": untestable,
+        "any_in_cohort": cohort_keys,
+    }
+    return flags, through & ~cohort_keys, rank.astype(np.int64)
+
+
+def rejection_stages(
+    events: pd.DataFrame,
+    membership: pd.DataFrame,
+    candidates: CandidateSequences | None,
+    candidate_table: pd.DataFrame | None,
+    undecoded: NDArray | None,
+    *,
+    cohort: str,
+) -> pd.DataFrame:
+    """How far the memoryless detector got on each event, against one cohort.
+
+    A cohort's events are the comparison's own: the ``all`` population rows
+    of the cohort's detector, which are the candidates the adapter selected
+    (``schema.MEMORYLESS_COHORTS``, no ``artifact_drop_reason`` after its
+    second pass) that are speed-eligible and not bridging. An event is
+    ``matched`` against the cohort when one of those shares time of positive
+    duration with it, which is the rule of ``any_in_cohort``; so ``stage`` is
+    ``in_cohort`` exactly when the membership is ``matched``, and inputs that
+    break that are refused.
+
+    Parameters
+    ----------
+    events : pd.DataFrame
+        The state-space compared events of one epoch: ``animal``, ``day``,
+        ``epoch``, ``detector``, ``event_key``, ``event_start_s`` and
+        ``event_end_s``.
+    membership : pd.DataFrame
+        The epoch's population rows (``populations.population_rows`` of the
+        pair membership), holding each event's ``<membership>_by:<cohort>``
+        row and the cohort's ``all`` rows.
+    candidates : CandidateSequences or None
+        The epoch's stored memoryless run; None when there is none, and then
+        every membership must be ``unknown``.
+    candidate_table : pd.DataFrame or None
+        The run's ``memoryless_events`` table, row ``i`` candidate ``i``.
+    undecoded : NDArray of bool, shape (n_windows,), or None
+        The windows the run left undecoded (``windows_holding`` on the mask).
+    cohort : str
+        A key of :data:`REJECTION_COHORTS`.
+
+    Returns
+    -------
+    stages : pd.DataFrame
+        On ``events``' index, columns and dtypes as :data:`REJECTION_DTYPES`.
+
+    Raises
+    ------
+    ValueError
+        The cohort is unknown; an event has no single membership against it;
+        only some of the run's inputs are given; there is no run and an event
+        is not ``unknown``; the table is not the run's (other windows or
+        verdicts, or a cohort event it lacks or whose gates it fails), or
+        ``undecoded`` is not the run's; or an event
+        ``matched`` by the cohort overlaps none of its events, one
+        ``unmatched`` overlaps one, or one ``unmatched`` overlaps a candidate
+        that passed every gate but is not in the cohort (the comparison set
+        it aside, so the event cannot be unmatched).
+    """
+    if cohort not in REJECTION_COHORTS:
+        raise ValueError(
+            f"cohort must be one of {list(REJECTION_COHORTS)}, got {cohort!r}."
+        )
+    member, unknown_reason = _memberships(events, membership, cohort)
+    known = member != UNKNOWN
+    n_events = len(events)
+    columns: dict[str, object] = {
+        **{c: events[c].to_numpy() for c in ("animal", "day", "epoch", "detector")},
+        "event_key": events["event_key"].to_numpy(),
+        "cohort": cohort,
+        "membership": member,
+        "stage": np.full(n_events, UNKNOWN, dtype=object),
+        "unknown_reason": unknown_reason,
+    }
+    reasons: dict[str, NDArray] = {}
+    absent = [given is None for given in (candidates, candidate_table, undecoded)]
+    if any(absent) and not all(absent):
+        raise ValueError(
+            "Pass the run's candidates, table and undecoded windows together, or "
+            "none of them."
+        )
+    if candidates is None or candidate_table is None or undecoded is None:
+        if known.any():
+            raise ValueError(
+                f"Without a memoryless run every membership against {cohort} must "
+                f"be unknown; {int(known.sum())} are not."
+            )
+    else:
+        starts = events["event_start_s"].to_numpy(dtype=np.float64)
+        ends = events["event_end_s"].to_numpy(dtype=np.float64)
+        reasons |= _window_counts(candidates, undecoded, starts, ends)
+
+        table = candidate_table
+        if not (
+            len(table) == len(candidates.runs)
+            and np.array_equal(table["first_window"], candidates.runs[:, 0])
+            and np.array_equal(table["last_window"], candidates.runs[:, 1])
+            and np.array_equal(table["is_replay"], candidates.is_replay)
+        ):
+            raise ValueError(
+                "The candidate table does not describe the run: its windows or "
+                "verdicts differ."
+            )
+        candidate_start = table["event_start_s"].to_numpy(dtype=np.float64)
+        candidate_end = table["event_end_s"].to_numpy(dtype=np.float64)
+        if (candidate_start[1:] < candidate_end[:-1]).any():
+            raise ValueError("The candidates are not disjoint and in time order.")
+        keys = np.asarray(
+            _event_keys(
+                cohort,
+                table["animal"],
+                table["day"],
+                table["epoch"],
+                table["ms_event_id"],
+            ),
+            dtype=object,
+        )
+        selected = membership.loc[
+            (membership["detector"] == cohort) & (membership["population"] == ALL),
+            "event_key",
+        ]
+        if not selected.isin(keys).all():
+            raise ValueError(
+                f"A compared event of {cohort} is not a candidate of the table."
+            )
+        flags, set_aside, rank = _candidate_gates(
+            candidates,
+            table,
+            np.isin(keys, selected.to_numpy()),
+            shuffled=MEMORYLESS_COHORTS[REJECTION_COHORTS[cohort]] == "shuffle_pass",
+        )
+
+        # disjoint candidates in order: those ending after the event's start
+        # and starting before its end share positive time with it
+        low = np.searchsorted(candidate_end, starts, side="right")
+        high = np.maximum(np.searchsorted(candidate_start, ends, side="left"), low)
+        reasons["n_candidates"] = high - low
+
+        def any_of(flag: NDArray[np.bool_]) -> NDArray[np.bool_]:
+            before = np.concatenate(([0], np.cumsum(flag, dtype=np.int64)))
+            return np.asarray(before[high] > before[low])
+
+        reasons |= {name: any_of(flag) for name, flag in flags.items()}
+        matched = member == MATCHED
+        unmatched = member == UNMATCHED
+        overlapping = reasons["any_in_cohort"]
+        if (matched & ~overlapping).any() or (unmatched & overlapping).any():
+            raise ValueError(
+                f"An event matched by {cohort} overlaps none of its events, or one "
+                "unmatched overlaps one: the memberships are not over this run."
+            )
+        if (unmatched & any_of(set_aside)).any():
+            raise ValueError(
+                f"An event unmatched by {cohort} overlaps a candidate that passed "
+                "every gate but is not among the cohort's compared events."
+            )
+
+        n_candidates = reasons["n_candidates"]
+        furthest = np.full(n_events, -1, dtype=np.int64)
+        with_candidates = n_candidates > 0
+        if with_candidates.any():
+            edges = np.column_stack([low, high])[with_candidates].ravel()
+            padded = np.append(rank, -1)
+            furthest[with_candidates] = np.maximum.reduceat(padded, edges)[::2]
+        stage = REJECTION_STAGES.index
+        before_candidates = np.select(
+            [
+                reasons["n_kept_in_runs"] > 0,
+                reasons["n_kept"] > 0,
+                reasons["n_windows"] > 0,
+            ],
+            [stage("no_candidate"), stage("no_run"), stage("no_kept_window")],
+            default=stage("no_window"),
+        )
+        reached = np.where(with_candidates, furthest, before_candidates)
+        columns["stage"] = np.where(
+            known, np.asarray(REJECTION_STAGES, dtype=object)[reached], UNKNOWN
+        )
+    for name, dtype in REJECTION_DTYPES.items():
+        if name in columns:
+            continue
+        values = pd.Series(reasons.get(name, np.zeros(n_events)), dtype=dtype)
+        columns[name] = values.where(pd.Series(known)).astype(dtype).to_numpy()
+    result = pd.DataFrame(columns, index=events.index)
+    return result[list(REJECTION_DTYPES)].astype(dict(REJECTION_DTYPES))
