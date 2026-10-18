@@ -772,6 +772,12 @@ Objective AST mutation check for value-critical builder logic.
 
 `check`, `main`
 
+### `scripts/qa/report_event_features.py`
+
+Report one event features run: its features per session and per animal.
+
+`distribution`, `epoch_status`, `read_inputs`, `event_populations`, `feature_tables`, `missing_by_session`, `evidence_vs_baseline_by_session`, `evidence_coverage_by_session`, `baseline_matching_by_session`, `rejection_by_session`, `rejection_by_animal`, `memoryless_cohort_by_session`, `comparator_only_events`, `comparator_only_table`, `stratum_labels`, `report_tables`, `draw_figures`, `write_report`, `main`
+
 ### `scripts/qa/report_inventory_comparison.py`
 
 Report one inventory comparison run: its counts per session and per animal.

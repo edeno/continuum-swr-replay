@@ -31,7 +31,7 @@ import argparse
 import json
 import os
 import sys
-from collections.abc import Collection, Iterable, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from itertools import combinations
 from pathlib import Path
 from types import MappingProxyType
@@ -344,16 +344,31 @@ def _typed(
     return pd.concat(rows, ignore_index=True)[list(dtypes)].astype(dict(dtypes))
 
 
-def read_run(run_dir: Path) -> tuple[dict, dict[str, pd.DataFrame]]:
+def read_run(
+    run_dir: Path,
+    table_dtypes: Mapping[str, Mapping[str, object]] | None = None,
+    output_path: Callable[[str, Path, str], Path] | None = None,
+) -> tuple[dict, dict[str, pd.DataFrame]]:
     """The run's manifest and every table of its ``ok`` epochs, concatenated.
+
+    Parameters
+    ----------
+    run_dir : Path
+    table_dtypes : mapping, optional
+        Each table's columns and dtypes; the comparison runner's
+        (``run_inventory_comparison.TABLE_DTYPES``) by default.
+    output_path : callable, optional
+        ``(epoch id, run folder, table name) -> path`` of the runner that
+        wrote the run; the comparison runner's by default.
 
     Returns
     -------
     manifest : dict
     tables : dict of str to DataFrame
-        By name, with the runner's columns and dtypes
-        (``run_inventory_comparison.TABLE_DTYPES``).
+        By name, with the runner's columns and dtypes.
     """
+    table_dtypes = runner.TABLE_DTYPES if table_dtypes is None else table_dtypes
+    output_path = runner.output_path if output_path is None else output_path
     manifest: dict = json.loads((run_dir / "manifest.json").read_text())
     ok = sorted(
         identifier
@@ -362,13 +377,10 @@ def read_run(run_dir: Path) -> tuple[dict, dict[str, pd.DataFrame]]:
     )
     tables = {
         name: _typed(
-            (
-                read_table(runner.output_path(identifier, run_dir, name))
-                for identifier in ok
-            ),
+            (read_table(output_path(identifier, run_dir, name)) for identifier in ok),
             dtypes,
         )
-        for name, dtypes in runner.TABLE_DTYPES.items()
+        for name, dtypes in table_dtypes.items()
     }
     return manifest, tables
 
