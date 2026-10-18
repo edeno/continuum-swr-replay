@@ -41,8 +41,8 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
   observed-stretches table per epoch, plus `manifest.json`. `--animal`, `--date` and `--epoch` narrow the
   epochs, which run on a dask `LocalCluster` of `--n-workers` processes, each logging to
   `logs/{epoch_id}_carey.log`; a failing epoch is recorded and the rest run, and a rerun skips the
-  epochs already `ok` unless `--overwrite` is given. Built and tested; the one-epoch smoke has run
-  (`chimi20200225_02_r1_HPC`); the run on every epoch is pending. Imports the SWR runner's and the
+  epochs already `ok` unless `--overwrite` is given. Built and tested; it ran on all 242 epochs
+  (run `fa6537e48bcf`). Imports the SWR runner's and the
   memoryless runner's helpers (the exception to the rule above).
 - `prepare_replay_content_data.py` — build the canonical replay-content tables
   (event / event-arm / event-patch / event-sequence / stop) across all sessions.

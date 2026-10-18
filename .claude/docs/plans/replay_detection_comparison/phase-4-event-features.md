@@ -18,7 +18,7 @@ decoded non-local events real, including those outside SWRs?"), for every invent
 1. **Per-event features**, the same rule on every inventory's intervals: timing, population engagement,
    LFP and MUA on one common trace each, spatial features in two namespaces (`ss_*`, `ms_*`), and context.
    How often each feature is missing is reported.
-2. **The common spike-evidence diagnostic** on every compared event and on matched baseline windows, with
+2. **The common spike-evidence diagnostic** on every compared event and on matched baseline windows (baseline windows dropped 2026-10-18, lead decision D8), with
    spike counts, valid-row coverage and the unscorable intervals counted.
 3. **The populations**: shared events, each method's unmatched events, and sequences matched by no SWR or
    MUA event, from Phase 3's membership, with unknown memberships kept apart.
@@ -346,6 +346,8 @@ follow-ups".
 
 ### Task 7 — The per-epoch runner
 
+> **Dropped 2026-10-18 (lead decision D8, PLAN.md):** the runner draws and scores no baseline windows. Read every baseline step, column, constant and `baseline_*` manifest entry below as the original plan; they are not built.
+
 - **Files.** Create `scripts/qa/run_event_features.py`. Tests in `tests/integration/test_run_event_features.py`,
   on the simulated epoch on disk of `tests/integration/test_run_inventory_comparison.py` (its fixtures
   `write_decode`, `write_carey_run`, `write_memoryless_run`, run first through the comparison runner), plus a
@@ -380,6 +382,8 @@ follow-ups".
 - **Accepts.** Tests pass; `--help` runs; R1's gates pass.
 
 ### Task 8 — Per-session and per-animal report
+
+> **Dropped 2026-10-18 (lead decision D8, PLAN.md):** the report has no `baseline_matching_by_*` or `evidence_vs_baseline_by_*` table and no evidence-against-baseline figure; it gives the evidence beside the spikes per row. The baseline items below are the original plan.
 
 - **Files.** Create `scripts/qa/report_event_features.py`; tables to `<features run>/report/`, figures to
   `paper/figures/event_features/<run_id>/`. Tests in `tests/unit/test_report_event_features.py` on synthetic
@@ -416,6 +420,8 @@ follow-ups".
 - **Accepts.** Tests pass; the report on the pilot (R2) is read by the lead.
 
 ### Task 9 — Sampled examples
+
+> **Dropped 2026-10-18 (lead decision D8, PLAN.md):** the subsets are no longer relative to a baseline. They are now the top and bottom quartile of `evidence_dll` within each population, source detector and animal; an event meeting both cuts falls in neither. The baseline subsets below are the original plan.
 
 - **Files.** Create `scripts/figures/generate_event_feature_examples.py`; figures to
   `paper/figures/event_features/<run_id>/examples/`. Modify `generate_inventory_examples.draw_examples` to
@@ -477,6 +483,8 @@ inventory run `afeb897d850f` has 242 `ok` epochs; `swr_source.SWR_INVENTORY_RUN_
 `ARTIFACT_INTERVALS_RUN_ID` is `fbbff144a123`.
 
 **R1. Smoke, one epoch.** tmux `features_smoke`.
+
+> **Dropped 2026-10-18 (lead decision D8, PLAN.md):** the gates below that name baseline windows ("one per baseline window", "no baseline window overlaps an event or leaves the shared exposure", "baseline levels per detector printed") no longer apply. The other gates stand.
 
 ```bash
 JAX_PLATFORMS=cpu taskset -c <range> /usr/bin/time -v .venv/bin/python scripts/qa/run_event_features.py \

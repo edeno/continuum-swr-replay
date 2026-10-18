@@ -2,8 +2,8 @@
 
 *Design spec. Status: implemented; the smoke ran (run `68f51dabdb3c`), and the pilot ran on 5 epochs (run `86ed2e7fa90a`: 4 `ok`, and peanut, which failed there on a bug at its last window, re-checked `ok` under `f8a6984ae781`); the full run is pending.
 The initial report (features, spike evidence, selection diagnostics, populations, report
-and examples) is built and reviewed. Baseline windows are deferred by the lead (2026-10-18)
-pending a design matched on spike count; the evidence is reported beside its spike counts. Default-setting diagnostics follow
+and examples) is built and reviewed. Baseline windows are dropped from this stage and left for a later design
+(lead, 2026-10-18), matched on spike count; the evidence is reported beside its spike counts. Default-setting diagnostics follow
 [03](03-inventory-comparison.md). Threshold robustness is planned for a later stage, is
 not implemented, and does not block the initial report.*
 *Governing rule and cross-cutting decisions: [overview.md](overview.md).*
@@ -88,6 +88,8 @@ bin or missing position are explicitly unscorable.
 If trajectory-specific likelihood is also reported, evaluate each named trajectory on
 all intervals where it is defined. Do not compare a remote maximum for SWRs against a
 trajectory-constrained score for our events as if they were the same statistic.
+
+*Dropped from the initial report by the lead on 2026-10-18, and left for a later design matched on spike count (see PLAN.md, D8). The paragraph below is the original text.*
 
 Score baseline windows with the same rule. Select them outside the union of the default
 inventories within all seven detectors' shared observation exposure during eligible

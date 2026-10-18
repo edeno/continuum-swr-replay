@@ -24,10 +24,11 @@ The populations, by label (:func:`population_rows`):
   ``sequence_matched_by_no_trigger`` (or any cell's name): the events of the
   stored cell with membership ``unmatched``. ``<cell>:matched`` is the
   reference beside it, and ``<cell>:unknown`` is counted apart.
-- ``baseline`` (:data:`BASELINE`): the matched baseline windows. They are
-  rows of detector ``baseline`` in the features table, not compared events,
-  and never enter a detector's populations; :func:`population_rows` makes
-  none.
+- ``baseline`` (:data:`BASELINE`): the matched baseline windows. Only runs
+  written before the baselines were dropped (2026-10-18) hold such rows, as
+  detector ``baseline`` in the features table; the report drops them, and
+  :data:`BASELINE` names them for that. They are not compared events and
+  never enter a detector's populations; :func:`population_rows` makes none.
 
 Each method's unmatched events are ``unmatched_by:<B>`` and the exactly-one
 cell; sequences matched by no SWR or MUA event are
