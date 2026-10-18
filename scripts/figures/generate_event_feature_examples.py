@@ -1,0 +1,456 @@
+#!/usr/bin/env python
+"""Sampled comparator-only and ours-only events of one event features run.
+
+Reads the per-epoch ``features``, ``pair_membership`` and ``rejection`` tables
+that ``scripts/qa/run_event_features.py`` wrote for the run's ``ok`` epochs,
+and the ``cells`` and ``directional`` tables of the inventory comparison run
+it read, and draws events from two populations by :data:`SAMPLING_RULE`.
+Design: ``docs/design/replay_detection_comparison/04-event-features.md``
+(examples follow 03's sampling rule).
+
+- **Comparator-only**: each detector's events unmatched by ``state_space``
+  (``unmatched_by:state_space``), for every detector of the comparison's
+  exactly-one cell but ``state_space``.
+- **Ours-only**: ``state_space``'s events of the exactly-one cell.
+
+Each event is in one of two descriptive subsets by its spike evidence against
+its matched baseline windows, or in neither. Each figure is
+``generate_inventory_examples.draw_example``'s, with the event's evidence, its
+baseline's median and q95, and its ``ss_disagreement`` (comparator-only) or
+its rejection stage in each memoryless cohort (ours-only) in the title. A
+figure whose recomputed memoryless windows are not the stored ones is not
+written, and its record in the manifest says why.
+
+Figures, ``captions.md`` and ``manifest.json`` (the rule, the seed and every
+draw) go to ``paper/figures/event_features/<run id>/examples/``.
+
+Usage:
+    python scripts/figures/generate_event_feature_examples.py --run-id <event features run id>
+"""
+
+import argparse
+import json
+import os
+import sys
+from collections.abc import Mapping
+from pathlib import Path
+from types import MappingProxyType
+from typing import Any
+
+import jax
+import numpy as np
+import pandas as pd
+
+# Sibling-script import: run as a script, only this file's directory is on
+# sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from continuum_swr_replay.analysis.inventory_comparison.overlap import (  # noqa: E402
+    UNMATCHED,
+)
+from continuum_swr_replay.analysis.inventory_comparison.schema import (  # noqa: E402
+    STATE_SPACE,
+)
+from continuum_swr_replay.analysis.inventory_comparison.selection import (  # noqa: E402
+    REJECTION_COHORTS,
+)
+from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
+from scripts.figures import (  # noqa: E402
+    generate_inventory_examples as inventory_examples,
+)
+from scripts.qa import report_event_features as report  # noqa: E402
+from scripts.qa import run_event_features as features_runner  # noqa: E402
+from scripts.qa.run_inventory_comparison import CELL_DETECTORS  # noqa: E402
+
+PRODUCED_BY = "scripts/figures/generate_event_feature_examples.py"
+FIGURE_ROOT = FIGURE_DIR / "event_features"
+EXAMPLES_DIR = "examples"
+"""The examples' folder inside the run's figure folder."""
+
+EXAMPLE_SEED = 20261018
+"""The run seed every draw is seeded from, with its population, detector and
+animal."""
+N_PER_SIDE = inventory_examples.N_PER_SIDE
+
+ABOVE = "evidence above baseline"
+AT_OR_BELOW = "evidence at or below baseline"
+SUBSET_COLUMN = "evidence_subset"
+SUBSETS: Mapping[str, str] = MappingProxyType(
+    {
+        ABOVE: "evidence_dll > baseline_q95_dll",
+        AT_OR_BELOW: "evidence_dll <= baseline_median_dll",
+    }
+)
+"""Each descriptive evidence subset and its rule; an event in neither, or with
+a missing value, is never drawn."""
+
+COMPARATOR_ONLY = "comparator_only"
+OURS_ONLY = "ours_only"
+EXACTLY_ONE = "exactly_one_detector"
+POPULATIONS: Mapping[str, str] = MappingProxyType(
+    {COMPARATOR_ONLY: f"unmatched_by:{STATE_SPACE}", OURS_ONLY: EXACTLY_ONE}
+)
+"""Each population drawn from and its ``populations.population_rows`` label."""
+COMPARATOR_DETECTORS = tuple(d for d in CELL_DETECTORS if d != STATE_SPACE)
+"""The comparator-only population's source detectors."""
+ROLES: Mapping[str, Mapping[str, str]] = MappingProxyType(
+    {
+        COMPARATOR_ONLY: MappingProxyType(
+            {ABOVE: "example", AT_OR_BELOW: "counterexample"}
+        ),
+        OURS_ONLY: MappingProxyType({AT_OR_BELOW: "example", ABOVE: "counterexample"}),
+    }
+)
+"""Each population's target subset (``example``) and the other subset
+(``counterexample``), in the order drawn."""
+
+SESSION = ["animal", "day", "epoch"]
+EVIDENCE = ("evidence_dll", "baseline_median_dll", "baseline_q95_dll")
+
+NOT_CALIBRATED = (
+    "The two subsets are descriptive: an excess of evidence over the baseline "
+    "is not a calibrated declaration of replay."
+)
+SAMPLING_RULE = (
+    "Two populations are drawn from: comparator-only events, each detector's "
+    "events unmatched by state_space (unmatched_by:state_space; detectors "
+    f"{', '.join(COMPARATOR_DETECTORS)}), and ours-only events, state_space's "
+    f"events of the {EXACTLY_ONE} cell. An event's evidence is {ABOVE} when its "
+    "evidence_dll exceeds its matched baseline windows' q95 (baseline_q95_dll), "
+    f"and {AT_OR_BELOW} when its evidence_dll is at or below their median "
+    "(baseline_median_dll); an event in neither subset, or with a missing "
+    "value, is not drawn. For each population, source detector and animal, "
+    f"{N_PER_SIDE} events of the target subset are drawn (comparator-only: "
+    f"{ABOVE}; ours-only: {AT_OR_BELOW}) and, as counterexamples, "
+    f"{N_PER_SIDE} events of the other subset; fewer when a subset has fewer. "
+    "Events with membership unknown are in neither population and are never "
+    "drawn. The draws are made without replacement from the events sorted by "
+    "session and event_key, by numpy.random.default_rng seeded from the run "
+    f"seed {EXAMPLE_SEED} and the (population, detector, animal) triple."
+)
+
+
+def evidence_subsets(events: pd.DataFrame) -> pd.Series:
+    """Each event's evidence subset by :data:`SUBSETS`, or None in neither.
+
+    Parameters
+    ----------
+    events : DataFrame
+        With ``evidence_dll``, ``baseline_median_dll`` and
+        ``baseline_q95_dll``.
+
+    Returns
+    -------
+    Series of object
+        :data:`ABOVE`, :data:`AT_OR_BELOW` or None, on ``events``' index.
+    """
+    above = (events.evidence_dll > events.baseline_q95_dll).to_numpy(dtype=bool)
+    below = (events.evidence_dll <= events.baseline_median_dll).to_numpy(dtype=bool)
+    labels = np.full(len(events), None, dtype=object)
+    labels[below] = AT_OR_BELOW
+    labels[above] = ABOVE
+    return pd.Series(labels, index=events.index, dtype=object)
+
+
+def sampler_events(features: pd.DataFrame, populations: pd.DataFrame) -> pd.DataFrame:
+    """The comparator-only and ours-only events, with their evidence subsets.
+
+    Parameters
+    ----------
+    features : DataFrame
+        The run's ``features`` rows: ``animal``, ``day``, ``epoch``,
+        ``brain_area``, ``detector``, ``event_key``, the evidence and its
+        baseline's median and q95, and ``ss_disagreement``.
+    populations : DataFrame
+        ``report_event_features.event_populations`` of the run.
+
+    Returns
+    -------
+    DataFrame
+        One row per event of the two populations: ``cell`` (the population's
+        name, :data:`COMPARATOR_ONLY` or :data:`OURS_ONLY`), the session,
+        ``detector``, ``event_key``, ``population`` (its label),
+        ``membership`` (``unmatched``), ``brain_area``, the evidence columns,
+        ``ss_disagreement``, :data:`SUBSET_COLUMN` and ``epoch_id``, sorted by
+        population, detector, session and event key.
+    """
+    ids = [*SESSION, "detector", "event_key"]
+    population, detector = populations.population, populations.detector
+    comparator = (population == POPULATIONS[COMPARATOR_ONLY]) & detector.isin(
+        COMPARATOR_DETECTORS
+    )
+    ours = (population == POPULATIONS[OURS_ONLY]) & (detector == STATE_SPACE)
+    rows = populations.loc[(comparator | ours).to_numpy(), [*ids, "population"]]
+    rows.insert(
+        0,
+        "cell",
+        np.where(
+            rows.population == POPULATIONS[COMPARATOR_ONLY], COMPARATOR_ONLY, OURS_ONLY
+        ),
+    )
+    events = rows.merge(
+        features[[*ids, "brain_area", *EVIDENCE, "ss_disagreement"]],
+        on=ids,
+        how="left",
+        validate="one_to_one",
+    ).assign(membership=UNMATCHED)
+    events[SUBSET_COLUMN] = evidence_subsets(events)
+    events["epoch_id"] = (
+        events.animal
+        + events.day.astype(str)
+        + "_"
+        + events.epoch
+        + "_"
+        + events.brain_area
+    )
+    return events.sort_values(["cell", "detector", *ids[:3], "event_key"]).reset_index(
+        drop=True
+    )
+
+
+def draw_population_examples(
+    events: pd.DataFrame, *, seed: int = EXAMPLE_SEED, n: int = N_PER_SIDE
+) -> pd.DataFrame:
+    """The events :data:`SAMPLING_RULE` draws from :func:`sampler_events`.
+
+    Each population is drawn by ``generate_inventory_examples.draw_examples``
+    by :data:`SUBSET_COLUMN`, with that population's :data:`ROLES`.
+
+    Returns
+    -------
+    DataFrame
+        The drawn rows with ``role`` and ``draw``, comparator-only first.
+    """
+    drawn = [
+        inventory_examples.draw_examples(
+            events[(events.cell == name).to_numpy()],
+            seed=seed,
+            n=n,
+            column=SUBSET_COLUMN,
+            roles=ROLES[name],
+        )
+        for name in POPULATIONS
+    ]
+    return pd.concat([d for d in drawn if len(d)] or drawn[:1], ignore_index=True)
+
+
+def rejection_stages(rejection: pd.DataFrame) -> dict[str, dict[str, str]]:
+    """``event_key -> {cohort: stage}`` of the run's ``rejection`` table."""
+    stages: dict[str, dict[str, str]] = {}
+    for key, cohort, stage in zip(
+        rejection.event_key, rejection.cohort, rejection.stage, strict=True
+    ):
+        stages.setdefault(key, {})[cohort] = stage
+    return stages
+
+
+def figure_note(drawn: pd.Series, stages: Mapping[str, str], run_id: str) -> str:
+    """The title's last lines: the event's evidence and what it disagrees by."""
+    values = (
+        f"{drawn.evidence_subset}: evidence_dll {drawn.evidence_dll:.3g}, baseline "
+        f"median {drawn.baseline_median_dll:.3g}, q95 {drawn.baseline_q95_dll:.3g}"
+    )
+    if drawn.cell == COMPARATOR_ONLY:
+        disagreement = drawn.ss_disagreement
+        detail = (
+            f"ss_disagreement {disagreement if pd.notna(disagreement) else 'missing'}"
+        )
+    else:
+        detail = "rejection stage " + ", ".join(
+            f"{inventory_examples._label(cohort)} {stages.get(cohort, 'missing')}"
+            for cohort in REJECTION_COHORTS
+        )
+    return (
+        f"{values}; {detail}\nevent features run {run_id}; an excess over baseline "
+        "is not a calibrated declaration of replay"
+    )
+
+
+CAPTION = (
+    "Sampled comparator-only and ours-only events of the event features run. "
+    + SAMPLING_RULE
+    + " "
+    + NOT_CALIBRATED
+    + " Each title gives the event's evidence_dll, its matched baseline windows' "
+    "median and q95, and its ss_disagreement (comparator-only) or its rejection "
+    "stage in each memoryless cohort (ours-only)." + inventory_examples.PANELS_CAPTION
+)
+
+
+def write_examples(
+    run_dir: Path,
+    figure_dir: Path,
+    *,
+    inventory_root: Path | None = None,
+    memoryless_root: Path | None = None,
+) -> list[dict[str, Any]]:
+    """Draw every example of the run and write them, captions and manifest.
+
+    A draw whose figure cannot be made (its recomputed windows are not the
+    stored ones, or its epoch's inputs cannot be read) is recorded with
+    ``status`` ``not_written`` and its ``reason``, and the run goes on.
+
+    Parameters
+    ----------
+    run_dir : Path
+        The event features run's folder.
+    figure_dir : Path
+    inventory_root, memoryless_root : Path, optional
+        Where the comparison and memoryless runs are; the event features
+        runner's by default.
+
+    Returns
+    -------
+    list of dict
+        Each draw's record, as the manifest holds it: ``status`` ``written``
+        or ``not_written``.
+    """
+    inventory_root = (
+        features_runner.INVENTORY_ROOT if inventory_root is None else inventory_root
+    )
+    memoryless_root = (
+        features_runner.MEMORYLESS_ROOT if memoryless_root is None else memoryless_root
+    )
+    manifest, tables = report.read_run(
+        run_dir, features_runner.TABLE_DTYPES, features_runner.output_path
+    )
+    tables |= report.read_inputs(manifest, inventory_root, memoryless_root)
+    populations = report.event_populations(
+        tables["features"],
+        tables["pair_membership"],
+        tables["cells"],
+        tables["directional"],
+    )
+    drawn = draw_population_examples(sampler_events(tables["features"], populations))
+    stages = rejection_stages(tables["rejection"])
+    runs = manifest["settings"]["input_runs"]
+    inventory_dir = inventory_root / runs["inventory"]
+    memoryless_dir = memoryless_root / runs["memoryless"]
+    cells = json.loads((inventory_dir / "manifest.json").read_text())["settings"][
+        "cells"
+    ]
+    against = {
+        COMPARATOR_ONLY: [STATE_SPACE],
+        OURS_ONLY: sorted(set(cells[EXACTLY_ONE]["against"]) - {STATE_SPACE}),
+    }
+    run_id = run_dir.name
+    records = []
+    for identifier, group in drawn.groupby("epoch_id", sort=True):
+        try:
+            inputs: inventory_examples.EpochInputs | None = (
+                inventory_examples.load_epoch(
+                    identifier, run_dir=inventory_dir, memoryless_dir=memoryless_dir
+                )
+            )
+            epoch_error: str | None = None
+        except ValueError as error:
+            # the epoch's draws fail, not the run
+            inputs, epoch_error = None, str(error)
+        for _, row in group.iterrows():
+            path = figure_dir / inventory_examples.figure_name(row)
+            event_stages = (
+                stages.get(row.event_key, {}) if row.cell == OURS_ONLY else {}
+            )
+            note = figure_note(row, event_stages, run_id)
+            reason = epoch_error
+            if inputs is not None:
+                try:
+                    record = inventory_examples.draw_example(
+                        inputs,
+                        row,
+                        against=against[row.cell],
+                        path=path,
+                        run_id=runs["inventory"],
+                        seed=EXAMPLE_SEED,
+                        note=note,
+                    )
+                except ValueError as error:
+                    reason = str(error)
+            if reason is not None:
+                # no figure of an earlier run stands beside this record
+                path.unlink(missing_ok=True)
+                record = {
+                    **row.to_dict(),
+                    "against": against[row.cell],
+                    "path": str(path),
+                    "reason": reason,
+                }
+            status = "written" if reason is None else "not_written"
+            records.append(
+                {
+                    "status": status,
+                    **record,
+                    "rejection_stage": event_stages,
+                    "caption": note.split("\n")[0],
+                }
+            )
+            print(f"{identifier}: {path.name} {status}", flush=True)
+        if inputs is not None:
+            inputs.results.close()
+    figure_dir.mkdir(parents=True, exist_ok=True)
+    (figure_dir / "manifest.json").write_text(
+        json.dumps(
+            inventory_examples.runner.json_ready(
+                {
+                    "produced_by": PRODUCED_BY,
+                    "event_features_run_id": run_id,
+                    "input_runs": runs,
+                    "seed": EXAMPLE_SEED,
+                    "n_per_side": N_PER_SIDE,
+                    "sampling_rule": SAMPLING_RULE,
+                    "populations": {
+                        name: {"label": label, "roles": ROLES[name]}
+                        for name, label in POPULATIONS.items()
+                    },
+                    "comparator_detectors": COMPARATOR_DETECTORS,
+                    "subsets": SUBSETS,
+                    "not_calibrated": NOT_CALIBRATED,
+                    "pad_s": inventory_examples.PAD_S,
+                    "memoryless_check": {
+                        "spread_rtol": inventory_examples.SPREAD_RTOL,
+                        "center_tie_rtol": inventory_examples.CENTER_TIE_RTOL,
+                    },
+                    "pending": inventory_examples.PENDING,
+                    "figures": records,
+                }
+            ),
+            indent=2,
+            allow_nan=False,
+        )
+    )
+    lines = [f"# Event features examples: run {run_id}", "", CAPTION, ""]
+    lines += [
+        f"- `{Path(r['path']).name}`: {r['event_key']} ({r['role']}); {r['caption']}"
+        + ("" if r["status"] == "written" else f" (not written: {r['reason']})")
+        for r in records
+    ]
+    (figure_dir / "captions.md").write_text("\n".join(lines) + "\n")
+    return records
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--run-id",
+        required=True,
+        help="The event features run's folder name, under "
+        "replay_detection_comparison/event_features/.",
+    )
+    args = parser.parse_args(argv)
+    # CPU only: the plotted windows are few. JAX read its environment when
+    # imported, so the platform is set through its config too.
+    os.environ.setdefault("JAX_PLATFORMS", "cpu")
+    jax.config.update("jax_platforms", os.environ["JAX_PLATFORMS"])
+    run_dir = features_runner.OUTPUT_ROOT / args.run_id
+    if not (run_dir / "manifest.json").exists():
+        sys.exit(f"No event features run manifest at {run_dir}.")
+    figure_dir = FIGURE_ROOT / args.run_id / EXAMPLES_DIR
+    records = write_examples(run_dir, figure_dir)
+    written = sum(r["status"] == "written" for r in records)
+    print(f"{written} of {len(records)} examples written -> {figure_dir}", flush=True)
+
+
+if __name__ == "__main__":
+    main()

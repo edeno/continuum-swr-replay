@@ -245,32 +245,44 @@ def _unit_rng(seed: int, unit: tuple[str, ...]) -> np.random.Generator:
 
 
 def draw_examples(
-    cells: pd.DataFrame, *, seed: int = EXAMPLE_SEED, n: int = N_PER_SIDE
+    cells: pd.DataFrame,
+    *,
+    seed: int = EXAMPLE_SEED,
+    n: int = N_PER_SIDE,
+    column: str = "membership",
+    roles: Mapping[str, str] = ROLES,
 ) -> pd.DataFrame:
     """The events :data:`SAMPLING_RULE` draws from a run's ``cells`` table.
 
     Parameters
     ----------
     cells : DataFrame
-        The runner's ``cells`` table, over any number of epochs.
+        The runner's ``cells`` table, over any number of epochs, or any
+        table with its ``cell``, ``detector``, ``animal``, ``day``, ``epoch``
+        and ``event_key`` columns and ``column``.
     seed : int
         The run seed.
     n : int
-        Events drawn of each membership, at most.
+        Events drawn of each value of ``column``, at most.
+    column : str
+        The column the events are drawn by.
+    roles : mapping
+        Each value of ``column`` drawn -> the role of its events, in the
+        order drawn; events of any other value are never drawn.
 
     Returns
     -------
     DataFrame
-        The drawn rows of ``cells`` with ``role`` (``example`` for an
-        ``unmatched`` event, ``counterexample`` for a ``matched`` one) and
+        The drawn rows of ``cells`` with ``role`` (by default ``example`` for
+        an ``unmatched`` event, ``counterexample`` for a ``matched`` one) and
         ``draw`` (1 to ``n``, in the order drawn), ordered by cell, detector
-        and animal, examples before counterexamples, each in draw order.
+        and animal, then by ``roles``' order, each in draw order.
     """
     out = []
     for unit, events in cells.groupby(list(UNIT), sort=True):
         rng = _unit_rng(seed, tuple(str(value) for value in unit))
-        for membership, role in ROLES.items():
-            pool = events[events.membership == membership].sort_values(
+        for value, role in roles.items():
+            pool = events[events[column] == value].sort_values(
                 ["day", "epoch", "event_key"], kind="stable"
             )
             picks = rng.choice(len(pool), size=min(n, len(pool)), replace=False)
@@ -627,8 +639,14 @@ def draw_example(
     against: list[str],
     path: Path,
     run_id: str,
+    seed: int = EXAMPLE_SEED,
+    note: str = "",
 ) -> dict[str, Any]:
     """One drawn event's figure, written to ``path``; returns its record.
+
+    ``run_id`` is the inventory run's and ``seed`` the run seed the event was
+    drawn by, both named in the title; ``note``, if given, is the title's last
+    line.
 
     Raises
     ------
@@ -828,7 +846,8 @@ def draw_example(
         f"{drawn.cell}: {_label(drawn.detector)} event, {drawn.role} "
         f"({drawn.membership} by {', '.join(_label(d) for d in against)})\n"
         f"{drawn.event_key} ({drawn.animal} {drawn.day} {drawn.epoch})\n"
-        f"† {PENDING}; inventory run {run_id}; seed {EXAMPLE_SEED}",
+        f"† {PENDING}; inventory run {run_id}; seed {seed}"
+        + (f"\n{note}" if note else ""),
         fontsize=7,
     )
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -848,10 +867,8 @@ def figure_name(drawn: pd.Series) -> str:
     return f"{drawn.cell}_{drawn.detector}_{drawn.animal}_{drawn.role}{drawn.draw}.png"
 
 
-CAPTION = (
-    "Sampled examples of each cell of the inventory comparison. "
-    + SAMPLING_RULE
-    + f" Each figure shows one event on one time axis, {PAD_S} s either side of "
+PANELS_CAPTION = (
+    f" Each figure shows one event on one time axis, {PAD_S} s either side of "
     "it (dotted lines mark the event): the spikes of each tetrode (the decode's "
     "marks); the state-space posterior summed over the Local and both "
     "Non-Local states, with the animal's linear position (magenta); the "
@@ -871,6 +888,12 @@ CAPTION = (
     "colored by family as in the paper: SWR definitions orange, MUA purple, "
     "state-space green, memoryless blue. "
     "Excluded time is shaded grey in every panel. " + PENDING_SENTENCE
+)
+"""What every figure's panels show, after the sampling rule in a caption."""
+CAPTION = (
+    "Sampled examples of each cell of the inventory comparison. "
+    + SAMPLING_RULE
+    + PANELS_CAPTION
 )
 
 
