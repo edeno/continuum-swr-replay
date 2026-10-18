@@ -717,8 +717,8 @@ def rejection_stages(
         only some of the run's inputs are given; there is no run and an event
         is not ``unknown``; the table is not the run's (other windows or
         verdicts, or a cohort event it lacks or whose gates it fails), or
-        ``undecoded`` is not the run's; or an event
-        ``matched`` by the cohort overlaps none of its events, one
+        ``undecoded`` is not the run's; a known event reached no stage; or
+        an event ``matched`` by the cohort overlaps none of its events, one
         ``unmatched`` overlaps one, or one ``unmatched`` overlaps a candidate
         that passed every gate but is not in the cohort (the comparison set
         it aside, so the event cannot be unmatched).
@@ -797,9 +797,11 @@ def rejection_stages(
         )
 
         # disjoint candidates in order: those ending after the event's start
-        # and starting before its end share positive time with it
+        # and starting before its end share positive time with it; an event
+        # of no duration shares none with any
         low = np.searchsorted(candidate_end, starts, side="right")
         high = np.maximum(np.searchsorted(candidate_start, ends, side="left"), low)
+        high = np.where(ends > starts, high, low)
         reasons["n_candidates"] = high - low
 
         def any_of(flag: NDArray[np.bool_]) -> NDArray[np.bool_]:
@@ -839,6 +841,12 @@ def rejection_stages(
             default=stage("no_window"),
         )
         reached = np.where(with_candidates, furthest, before_candidates)
+        if (known & (reached < 0)).any():
+            raise ValueError(
+                f"{int((known & (reached < 0)).sum())} events against {cohort} "
+                "reached no rejection stage: every candidate they overlap passed "
+                "every gate outside the cohort."
+            )
         columns["stage"] = np.where(
             known, np.asarray(REJECTION_STAGES, dtype=object)[reached], UNKNOWN
         )

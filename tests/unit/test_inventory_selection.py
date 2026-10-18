@@ -31,6 +31,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics im
     NO_CENTER,
     forward_jumps_cm,
 )
+from continuum_swr_replay.analysis.inventory_comparison import selection
 from continuum_swr_replay.analysis.inventory_comparison.availability import (
     still_intervals,
 )
@@ -825,8 +826,61 @@ class TestRejectionStages:
 
     def test_a_candidate_through_every_gate_outside_the_cohort_is_refused(self):
         # set aside by the comparison: no unmatched event can overlap it
-        with pytest.raises(ValueError, match="cohort"):
+        with pytest.raises(
+            ValueError,
+            match="overlaps a candidate that passed every gate but is not among "
+            "the cohort's compared events",
+        ):
             stages([windows(410, 450)], ["unmatched"], in_cohort=[])
+
+    def test_a_known_event_with_no_stage_reached_is_refused(self, monkeypatch):
+        # every overlapping candidate ranked -1 (through every gate, outside
+        # the cohort) without the set-aside check catching it: the stage must
+        # not be read silently from the end of REJECTION_STAGES
+        real = selection._candidate_gates
+
+        def no_stage(*args, **kwargs):
+            flags, set_aside, rank = real(*args, **kwargs)
+            return flags, np.zeros_like(set_aside), np.full_like(rank, -1)
+
+        monkeypatch.setattr(selection, "_candidate_gates", no_stage)
+        with pytest.raises(ValueError, match="no rejection stage"):
+            stages([windows(300, 328)])
+
+    def test_an_event_over_candidates_of_different_ranks_takes_the_furthest(self):
+        table = candidate_table(shuffle_pass=False)
+        # the stationary (dispersion), the replay (shuffle failed) and the
+        # 100 ms (duration) candidates
+        row = stages([windows(300, 625)], table=table).iloc[0]
+        assert row.n_candidates == 3
+        assert row.stage == "shuffle_failed"
+        assert row.any_duration_failed and row.any_dispersion_failed
+        assert row.any_shuffle_failed and not row.any_in_cohort
+        # with the replay candidate in the cohort, it is the furthest
+        matched = stages([windows(300, 625)], ["matched"], in_cohort=[REPLAY])
+        assert matched.stage.iloc[0] == "in_cohort"
+
+    def test_events_out_of_time_order_get_their_own_stages(self):
+        spans = [windows(600, 625), windows(10, 20), windows(410, 450)]
+        labels = ["unmatched", "unmatched", "matched"]
+        shuffled = stages(spans, labels, in_cohort=[REPLAY])
+        ordered = stages(
+            [spans[1], spans[0], spans[2]],
+            [labels[1], labels[0], labels[2]],
+            in_cohort=[REPLAY],
+        )
+        assert shuffled.stage.tolist() == ["duration", "no_kept_window", "in_cohort"]
+        columns = shuffled.columns.drop("event_key")
+        pd.testing.assert_frame_equal(
+            shuffled.iloc[[1, 0, 2]][columns].reset_index(drop=True),
+            ordered[columns].reset_index(drop=True),
+        )
+
+    def test_an_event_of_no_duration_inside_a_candidate_overlaps_none(self):
+        inside = MIDPOINT[310]
+        row = stages([(inside, inside)]).iloc[0]
+        assert row.n_candidates == 0
+        assert row.stage == "no_candidate"
 
     def test_an_unknown_event_has_no_rejection_reason(self):
         events = ss_events([windows(10, 20), windows(410, 450)])
@@ -850,7 +904,7 @@ class TestRejectionStages:
         assert reasons.shape[1] == 16
         assert reasons.isna().all(axis=None)
 
-    def test_no_window_and_the_r1_gate_over_every_event(self):
+    def test_no_window_and_in_cohort_exactly_when_matched_over_every_event(self):
         spans = [
             (MIDPOINT[60] + 0.001, MIDPOINT[60] + 0.002),
             windows(10, 20),
