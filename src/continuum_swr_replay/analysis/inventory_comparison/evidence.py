@@ -16,7 +16,10 @@ evidence (NaN) when the animal's position is not finite, its bin is flagged,
 or no usable bin is remote.
 
 Row ``k`` holds the spikes with ``t_k <= s < t_{k + 1}``, as in
-``clusterless_epoch_log_likelihood``, whatever rows are computed together. The
+``clusterless_epoch_log_likelihood``, whatever rows are computed together: the
+spikes a row holds never depend on the blocking (:data:`BLOCK_ROWS`). Its
+values can, at the float32 rounding of the library's sums (at most about 5e-5
+on log-likelihoods of order 100). The
 grid's last sample holds no span of spikes and is never a row (the row rule of
 ``features``).
 
@@ -130,7 +133,9 @@ def log_likelihood_blocks(
     encargs : dict
         The likelihood's arguments, ``encoding_inputs(...)["encargs"]``.
     block_rows : int, optional
-        Rows per block.
+        Rows per block, :data:`BLOCK_ROWS` by default. It bounds a call's
+        memory and fixes its time shape (``block_rows + 3`` samples); it
+        changes no row's spikes, only the float rounding of its values.
 
     Yields
     ------
@@ -274,6 +279,7 @@ def epoch_row_evidence(
     remote_cm : float
         A bin is remote when its track distance from the animal's is above this.
     block_rows : int, optional
+        As :func:`log_likelihood_blocks`.
 
     Returns
     -------

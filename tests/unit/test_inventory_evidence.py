@@ -3,6 +3,12 @@
 The fixture fits the library's clusterless KDE model on simulated spikes over a
 Y track whose bins lie at most 36 cm apart by track distance, so the tests use
 a remote distance of 30 cm in place of the analysis's 100 cm.
+
+Blocked and whole-grid likelihoods are compared at ``rtol=atol=1e-6``: the
+library sums in float32, so another call shape may round a value differently
+(about 1e-7 relative, a few units of 1e-5 on log-likelihoods of order 100),
+while a spike put in the wrong row moves a value by a whole spike's term,
+orders of magnitude more.
 """
 
 import copy
@@ -166,9 +172,7 @@ def on_rows(epoch, first, last):
 
 
 class TestBlocks:
-    def test_whole_grid_in_blocks_cut_at_window_boundaries(
-        self, epoch, encargs, whole_grid
-    ):
+    def test_the_whole_grid_in_blocks_equals_one_call(self, epoch, encargs, whole_grid):
         rows = requested(epoch.time.size, [(0, epoch.time.size - 1)])
         for block_rows in BOUNDARY_SAMPLES:  # cuts at 100, 200, ... and 140, 280, ...
             got = assembled(epoch, encargs, rows, block_rows=block_rows)

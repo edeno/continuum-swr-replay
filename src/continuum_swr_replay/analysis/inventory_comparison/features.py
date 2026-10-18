@@ -203,8 +203,8 @@ class PosteriorTraces:
 
     Attributes
     ----------
-    local_prob, no_spike_prob, continuous_prob, fragmented_prob : NDArray, shape (n_time,)
-        The frame's ``Local_prob``, ``No-Spike_prob``,
+    local_prob, no_spike_prob, continuous_prob, fragmented_prob : NDArray
+        Each shape (n_time,): the frame's ``Local_prob``, ``No-Spike_prob``,
         ``Non-Local_Continuous_prob`` and ``Non-Local_Fragmented_prob``, as
         float64.
     nonlocal_prob : NDArray, shape (n_time,)
@@ -337,12 +337,16 @@ def _over_rows(
 
 
 def _float_or_nan(reduced: NDArray, has_rows: NDArray) -> NDArray[np.float64]:
+    """``reduced`` (one value per interval with rows) spread over every
+    interval, NaN where it has no row."""
     values = np.full(has_rows.shape, np.nan)
     values[has_rows] = reduced
     return values
 
 
 def _int_or_na(reduced: NDArray, has_rows: NDArray) -> pd.arrays.IntegerArray:
+    """``reduced`` (one count per interval with rows) spread over every
+    interval as Int64, NA where it has no row."""
     values = np.zeros(has_rows.shape, dtype=np.int64)
     values[has_rows] = reduced
     return pd.arrays.IntegerArray(values, ~has_rows)
@@ -581,9 +585,11 @@ def ss_features(
           ``state_space_events``, 0 when one overlaps or touches the interval,
           NaN with none and for the state-space detector's own intervals;
         - ``ss_disagreement``: for every other detector's interval, ``"near"``
-          when that gap is at most ``max(FRAGMENT_GAPS_S)`` (50 ms; gaps
-          compared to the microsecond, as a clock near 1.6e9 s reads 25
-          samples of 2 ms as 50.0002 ms), else ``"subthreshold"`` when a run
+          when that gap is at most ``max(FRAGMENT_GAPS_S)`` (50 ms, the bound
+          included; gaps compared to the microsecond, as a clock near 1.6e9 s
+          reads 25 samples of 2 ms as 50.0002 ms). The fragment recount merges
+          only gaps below 50 ms, so a gap of exactly 50 ms is ``"near"`` but
+          not merged. Else ``"subthreshold"`` when a run
           lies inside it, else ``"sustained"``; None for the state-space
           detector and where the runs are unknown. It describes an event no
           compared state-space event matches; it does not decide anything.
@@ -699,9 +705,9 @@ def ms_features(
         ``dispersion_cm`` reads its kept windows alone),
         ``ms_distance_cm_mean`` (the mean track distance from each center to
         the animal's bin, NaN when one of those bins is unknown) and
-        ``ms_frac_windows_kept`` (``gates.kept`` over the decoded windows). With no window every feature but
-        ``ms_n_windows`` is missing, and a mean or extent with nothing to
-        read is NaN.
+        ``ms_frac_windows_kept`` (``gates.kept`` over the decoded windows).
+        With no window every feature but ``ms_n_windows`` is missing, and a
+        mean or extent with nothing to read is NaN.
 
     Raises
     ------

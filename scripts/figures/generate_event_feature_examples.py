@@ -25,7 +25,8 @@ Figures, ``captions.md`` and ``manifest.json`` (the rule, the seed and every
 draw) go to ``paper/figures/event_features/<run id>/examples/``.
 
 Usage:
-    python scripts/figures/generate_event_feature_examples.py --run-id <event features run id>
+    python scripts/figures/generate_event_feature_examples.py \
+        --run-id <event features run id>
 """
 
 import argparse
@@ -121,7 +122,8 @@ NOT_CALIBRATED = (
 SAMPLING_RULE = (
     "Two populations are drawn from: comparator-only events, each detector's "
     "events unmatched by state_space (unmatched_by:state_space; detectors "
-    f"{', '.join(COMPARATOR_DETECTORS)}), and ours-only events, state_space's "
+    f"{', '.join(map(inventory_examples._label, COMPARATOR_DETECTORS))}), and "
+    "ours-only events, state_space's "
     f"events of the {EXACTLY_ONE} cell. An event's evidence is {ABOVE} when its "
     "evidence_dll exceeds its matched baseline windows' q95 (baseline_q95_dll), "
     f"and {AT_OR_BELOW} when its evidence_dll is at or below their median "
@@ -223,6 +225,16 @@ def draw_population_examples(
     Each population is drawn by ``generate_inventory_examples.draw_examples``
     by :data:`SUBSET_COLUMN`, with that population's :data:`ROLES`.
 
+    Parameters
+    ----------
+    events : DataFrame
+        :func:`sampler_events` of the run.
+    seed : int, optional
+        The run seed; each draw's stream is seeded from it and its
+        (population, detector, animal).
+    n : int, optional
+        Events drawn per subset, population, detector and animal, at most.
+
     Returns
     -------
     DataFrame
@@ -268,7 +280,26 @@ def rejection_stages(rejection: pd.DataFrame) -> dict[str, dict[str, str]]:
 
 
 def figure_note(drawn: pd.Series, stages: Mapping[str, str], run_id: str) -> str:
-    """The title's last lines: the event's evidence and what it disagrees by."""
+    """The title's last lines: the event's evidence and what it disagrees by.
+
+    Parameters
+    ----------
+    drawn : Series
+        One row of :func:`draw_population_examples`.
+    stages : mapping
+        The event's rejection stage by memoryless cohort
+        (:func:`rejection_stages`); a cohort it lacks reads ``missing``.
+    run_id : str
+        The event features run.
+
+    Returns
+    -------
+    str
+        Two lines: the evidence subset and values with the ``ss_disagreement``
+        (comparator-only) or the rejection stages (ours-only); then the run and
+        the reminder that an excess over baseline is not a calibrated
+        declaration of replay.
+    """
     values = (
         f"{drawn.evidence_subset}: evidence_dll {drawn.evidence_dll:.3g}, baseline "
         f"median {drawn.baseline_median_dll:.3g}, q95 {drawn.baseline_q95_dll:.3g}"
@@ -296,7 +327,7 @@ CAPTION = (
     + NOT_CALIBRATED
     + " Each title gives the event's evidence_dll, its matched baseline windows' "
     "median and q95, and its ss_disagreement (comparator-only) or its rejection "
-    "stage in each memoryless cohort (ours-only)." + inventory_examples.PANELS_CAPTION
+    "stage in each memoryless† cohort (ours-only)." + inventory_examples.PANELS_CAPTION
 )
 
 
@@ -461,6 +492,13 @@ def write_examples(
 
 
 def main(argv: list[str] | None = None) -> None:
+    """Draw and write the examples of the run ``--run-id`` names.
+
+    Parameters
+    ----------
+    argv : list of str, optional
+        The command line; ``sys.argv[1:]`` by default.
+    """
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
