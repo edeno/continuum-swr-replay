@@ -1324,6 +1324,9 @@ def draw_figures(
                 )
                 ax.xaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter("%g"))
                 ax.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+            else:
+                # few ticks, so four-digit values (spike_rate_hz) do not run together
+                ax.xaxis.set_major_locator(matplotlib.ticker.MaxNLocator(3))
             ax.set_ylim(len(populations) - 0.5, -0.5)
             ax.tick_params(labelsize=6)
             if col == 0:
