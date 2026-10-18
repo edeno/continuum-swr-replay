@@ -237,6 +237,16 @@ COHORT_COUNTS = (
     "n_shuffle_failed",
     "n_shuffle_untestable",
 )
+CONTEXT_CATEGORIES: Mapping[str, tuple[object, ...] | None] = MappingProxyType(
+    {
+        "at_well": (True, False),
+        "occupancy_state": None,
+        "current_patch": (1, 2, 3),
+        "is_rewarded_outcome": (1, 0),
+    }
+)
+"""The categorical context counted per category, each with its missing
+events; ``None`` takes every value the run holds."""
 EVIDENCE_COUNTS = (
     "n_events",
     "n_scorable",
@@ -255,7 +265,12 @@ _POPULATIONS = (
     "sequence_matched_by_no_trigger) with <cell>:matched and <cell>:unknown "
     "beside it; and baseline, the matched baseline windows (detector "
     "baseline), which enter no detector's population. The baseline pool is the "
-    "shared exposure of all nine inventories less every event of each."
+    "shared exposure of all nine inventories less every event of each. Each "
+    "distinct baseline window counts once (twin intervals, such as a published "
+    "memoryless event and its memoryless_criteria twin, draw identical "
+    "windows); the windows are drawn per compared event, so the baseline "
+    "population weights each detector by the events it contributed "
+    "(baseline_sources_by_*)."
 )
 _SESSION_ROWS = (
     "Per session (one analysed epoch, nested in its animal), with the pairwise "
@@ -312,17 +327,40 @@ _TOPICS: Mapping[str, tuple[str, str, str]] = MappingProxyType(
             "ss_nearest_event_gap_s and ss_disagreement of state_space's own "
             "events, the stop context of an event in no stop, and a baseline "
             "window's native duration, gaps and baseline columns. Labels "
-            f"({', '.join(LABELLED_FEATURES)}) are counted here only. " + _POPULATIONS,
-            _SESSION_ROWS,
-            _ANIMAL_SUMS,
+            f"({', '.join(LABELLED_FEATURES)}) are counted here and in "
+            "context_by_*. " + _POPULATIONS,
+            _SESSION_ROWS + " Features with no missing value in any session of "
+            "the run are left out; report.md names them.",
+            _ANIMAL_SUMS + " Every feature.",
         ),
         "evidence_coverage": (
             "The spike evidence's coverage per detector, baseline windows "
             "included: n_events; n_scorable (an evidence score); "
             "n_unscorable_no_row (no grid row) and n_unscorable_no_valid_row "
             "(rows, none valid); and the rows (n_rows), valid rows "
-            "(n_valid_rows) and spikes (n_spikes) summed.",
+            "(n_valid_rows) and spikes (n_spikes) summed, a missing count (an "
+            "interval with no row) summed as 0. The baseline row counts each "
+            "distinct window once.",
             "Per session (one analysed epoch, nested in its animal).",
+            _ANIMAL_SUMS,
+        ),
+        "baseline_sources": (
+            "The baseline windows by the detector of the event each was drawn "
+            "for: n_windows (one per event with a baseline, twins included) and "
+            "p_windows, its share of all n_windows. The baseline population "
+            "keeps each distinct window once, so its detectors weigh in by these "
+            "shares.",
+            "Per session (one analysed epoch, nested in its animal).",
+            _ANIMAL_SUMS,
+        ),
+        "context": (
+            "The categorical context of each detector's events, per population: "
+            "n_events and, per category, n_<feature>_<value> and n_<feature>_"
+            "missing (the event's onset in no stop, or the stop's value "
+            "missing) for at_well (true, false), occupancy_state (each value), "
+            "current_patch (1, 2, 3) and is_rewarded_outcome (1, 0); each p_ "
+            "is its count over n_events. " + _POPULATIONS,
+            _SESSION_ROWS,
             _ANIMAL_SUMS,
         ),
         "baseline_matching": (
@@ -589,10 +627,83 @@ def event_populations(
     return together[list(POPULATION_DTYPES)].astype(dict(POPULATION_DTYPES))
 
 
+WINDOW_KEYS = [*SESSION, "event_start_s", "event_end_s"]
+"""A baseline window's identity: twin intervals draw identical windows."""
+
+
+def distinct_windows(features: pd.DataFrame) -> pd.DataFrame:
+    """``features`` with each baseline window once, the first of identical
+    ones (by :data:`WINDOW_KEYS`) kept."""
+    windows = features.detector == BASELINE
+    repeated = features.loc[windows, WINDOW_KEYS].duplicated()
+    return features.drop(index=repeated.index[repeated.to_numpy()])
+
+
+def baseline_sources_by_session(features: pd.DataFrame) -> pd.DataFrame:
+    """Per session and detector, the baseline windows drawn for its events
+    (``n_windows``, twins included) and their share of the session's
+    (``p_windows``)."""
+    windows = features[(features.detector == BASELINE).to_numpy()]
+    detectors = windows.matched_event_key.str.split(":", n=1).str[0]
+    counted = _grouped_sum(
+        pd.DataFrame({"n_windows": 1}, index=windows.index),
+        windows[SESSION].assign(detector=detectors.to_numpy()),
+    )
+    return _with_window_shares(counted, SESSION)
+
+
+def _with_window_shares(frame: pd.DataFrame, keys: Sequence[str]) -> pd.DataFrame:
+    total = frame.groupby(list(keys)).n_windows.transform("sum")
+    return frame.assign(p_windows=_ratio(frame.n_windows, total))
+
+
+def context_by_session(
+    populations: pd.DataFrame, features: pd.DataFrame
+) -> pd.DataFrame:
+    """Per session, detector and population, the events by each category of
+    :data:`CONTEXT_CATEGORIES`, and the missing ones.
+
+    Raises
+    ------
+    ValueError
+        A value is not one of its feature's categories.
+    """
+    frame = _with(populations, features, list(CONTEXT_CATEGORIES))
+    counts: dict[str, object] = {"n_events": 1}
+    for feature, categories in CONTEXT_CATEGORIES.items():
+        values = frame[feature]
+        present = values.notna().to_numpy()
+        if categories is None:
+            categories = tuple(sorted(set(values[present])))
+        _refuse_values(values[present], categories, feature)
+        for category in categories:
+            label = str(category).lower()
+            counts[f"n_{feature}_{label}"] = present & (values == category).to_numpy(
+                dtype=bool, na_value=False
+            )
+        counts[f"n_{feature}_missing"] = ~present
+    counted = pd.DataFrame(counts, index=frame.index).astype(np.int64)
+    return _grouped_sum(counted, frame[[*SESSION, *POPULATION]])
+
+
+def _with_context_shares(frame: pd.DataFrame) -> pd.DataFrame:
+    counts = [
+        c
+        for c in frame.columns
+        if c.startswith("n_") and c not in ("n_events", "n_sessions")
+    ]
+    return frame.assign(
+        **{
+            "p_" + c.removeprefix("n_"): _ratio(frame[c], frame.n_events)
+            for c in counts
+        }
+    )
+
+
 def _at_session(populations: pd.DataFrame) -> pd.DataFrame:
     """The populations a session table holds: pairwise only against
     :data:`SESSION_PAIRS`."""
-    against = populations.population.str.partition("_by:")[2]
+    against = populations.population.str.split("_by:", n=1).str[1].fillna("")
     return populations[((against == "") | against.isin(SESSION_PAIRS)).to_numpy()]
 
 
@@ -672,7 +783,7 @@ def _grouped_sum(
     return summed.reset_index()
 
 
-def _refuse_values(values: pd.Series, known: Collection[str], name: str) -> None:
+def _refuse_values(values: pd.Series, known: Collection[object], name: str) -> None:
     """Raise unless every value is one of ``known``."""
     strange = set(values) - set(known)
     if strange:
@@ -701,6 +812,12 @@ def missing_by_session(
     return long[[*keys, "feature", "n", "n_missing"]].sort_values(
         keys, kind="stable", ignore_index=True
     )
+
+
+def never_missing(missing: pd.DataFrame) -> list[str]:
+    """The features no event of the run misses, in table order."""
+    total = missing.groupby("feature", sort=False).n_missing.sum()
+    return [f for f in MISSING_FEATURES if f in total.index and total[f] == 0]
 
 
 EVIDENCE_COLUMNS = (
@@ -998,7 +1115,14 @@ def stratum_labels(features: pd.DataFrame, labels: Sequence[str]) -> pd.DataFram
     ValueError
         A stratum is not one of ``labels``.
     """
-    present = set(features.duration_stratum.dropna())
+    unstratified = features.duration_stratum.isna()
+    if unstratified.any():
+        raise ValueError(
+            f"{int(unstratified.sum())} rows, such as "
+            f"{features.event_key[unstratified].iloc[0]}, have no duration_stratum; "
+            "a compared event or baseline window always has a positive span."
+        )
+    present = set(features.duration_stratum)
     if present - set(labels):
         raise ValueError(
             f"duration_stratum {sorted(present - set(labels))} is not among the "
@@ -1037,6 +1161,8 @@ def report_tables(
     features = stratum_labels(
         features, manifest["settings"]["duration_strata"]["labels"]
     )
+    sources = baseline_sources_by_session(features)
+    features = distinct_windows(features)
     populations = event_populations(
         features, tables["pair_membership"], tables["cells"], tables["directional"]
     )
@@ -1044,9 +1170,19 @@ def report_tables(
     out |= feature_tables(populations, features)
 
     missing = missing_by_session(populations, features)
-    out["missing_by_session"] = _per_session(_at_session(missing))
+    kept = ~missing.feature.isin(never_missing(missing)).to_numpy()
+    out["missing_by_session"] = _per_session(_at_session(missing[kept]))
     out["missing_by_animal"] = _summed(
         missing, [*POPULATION, "feature"], ["n", "n_missing"]
+    )
+    context = context_by_session(populations, features)
+    out["context_by_session"] = _with_context_shares(_per_session(_at_session(context)))
+    out["context_by_animal"] = _with_context_shares(
+        _summed(context, POPULATION, [c for c in context.columns if c.startswith("n_")])
+    )
+    out["baseline_sources_by_session"] = _per_session(sources)
+    out["baseline_sources_by_animal"] = _with_window_shares(
+        _summed(sources, ["detector"], ["n_windows"]), ["animal"]
     )
     for topic, counted in (
         ("evidence_coverage", evidence_coverage_by_session(features)),
@@ -1147,6 +1283,7 @@ def _stacked(
     shares: pd.DataFrame,
     labels: Sequence[str],
     colors: Mapping[str, Any],
+    hatches: Mapping[str, str] = MappingProxyType({}),
 ) -> None:
     """Horizontal stacked bars of ``shares`` (rows by columns, each row
     summing to 1), the share printed where its segment has room."""
@@ -1158,8 +1295,9 @@ def _stacked(
             width,
             left=left,
             color=colors[column],
-            edgecolor="w",
-            linewidth=0.5,
+            edgecolor="0.2",
+            linewidth=0.3,
+            hatch=hatches.get(column),
             label=column,
         )
         for y, (x, w) in enumerate(zip(left, width, strict=True)):
@@ -1219,13 +1357,25 @@ def draw_figures(
         for row in range(n_rows):
             ax = axes[row, col]
             animal = animals[row] if animals else None
+            counts = []
             for y, (detector, population) in enumerate(populations):
                 match = table[
                     (table.animal == animal)
                     & (table.detector == detector)
                     & (table.population == population)
                 ]
+                counts.append(0 if match.empty else int(match.n_events.iloc[0]))
                 if match.empty or not match[f"{feature}_n"].iloc[0]:
+                    ax.text(
+                        0.5,
+                        y,
+                        "no events" if match.empty else "no values",
+                        ha="center",
+                        va="center",
+                        fontsize=5,
+                        color="0.4",
+                        transform=ax.get_yaxis_transform(),
+                    )
                     continue
                 values = match.iloc[0]
                 color = detector_color(detector)
@@ -1258,8 +1408,8 @@ def draw_figures(
                     range(len(populations)),
                     [
                         f"{_label(d)}\n{p.partition('_by:')[0]} by "
-                        f"{_label(p.partition('_by:')[2])}"
-                        for d, p in populations
+                        f"{_label(p.partition('_by:')[2])} (n = {n})"
+                        for (d, p), n in zip(populations, counts, strict=True)
                     ],
                     fontsize=5,
                 )
@@ -1326,7 +1476,14 @@ def draw_figures(
     # rejection stages of the ours-only events
     rejection = out["rejection_by_animal"]
     stages = list(REJECTION_STAGES[:-1])
-    stage_colors = {s: plt.get_cmap("tab10")(i) for i, s in enumerate(stages)}
+    # ordered stages: a grey ramp, no family hue
+    stage_colors = dict(
+        zip(
+            stages,
+            plt.get_cmap("Greys")(np.linspace(0.15, 0.95, len(stages))),
+            strict=True,
+        )
+    )
     cohorts = list(features_runner.REJECTION_COHORTS)
     fig, axes = _subplots(
         1,
@@ -1374,7 +1531,10 @@ def draw_figures(
             _no_data(ax)
     fig.legend(
         handles=[
-            matplotlib.patches.Patch(color=stage_colors[s], label=s) for s in stages
+            matplotlib.patches.Patch(
+                facecolor=stage_colors[s], edgecolor="0.2", linewidth=0.3, label=s
+            )
+            for s in stages
         ],
         loc="outside right center",
         ncol=1,
@@ -1385,9 +1545,9 @@ def draw_figures(
 
     # comparator-only classes
     comparator = out["comparator_only_by_animal"]
-    class_colors = dict(
-        zip(DISAGREEMENTS, ["#0072B2", "#E69F00", "#CC79A7", "0.75"], strict=True)
-    )
+    # neutral greys, no family hue; missing white and hatched
+    class_colors = dict(zip(DISAGREEMENTS, ["0.3", "0.6", "0.85", "w"], strict=True))
+    class_hatches = {"missing": "////"}
     detectors = [d for d in _detectors_of(comparator) if d != STATE_SPACE]
     fig, axes = _subplots(
         n_rows,
@@ -1411,6 +1571,7 @@ def draw_figures(
                 for d, t in zip(detectors, totals, strict=True)
             ],
             class_colors,
+            class_hatches,
         )
         ax.set_title(animal or "", fontsize=7)
         if not detectors:
@@ -1420,7 +1581,13 @@ def draw_figures(
     )
     fig.legend(
         handles=[
-            matplotlib.patches.Patch(color=class_colors[c], label=c)
+            matplotlib.patches.Patch(
+                facecolor=class_colors[c],
+                edgecolor="0.2",
+                linewidth=0.3,
+                hatch=class_hatches.get(c),
+                label=c,
+            )
             for c in DISAGREEMENTS
         ],
         loc="outside right center",
@@ -1596,7 +1763,13 @@ def write_report(
         "## Tables",
         "",
     ]
+    dropped = never_missing(out["missing_by_animal"])
     for name, caption in TABLE_CAPTIONS.items():
+        if name == "missing_by_session":
+            caption += (
+                " Left out here, missing in no session: "
+                f"{', '.join(dropped) or 'none'}."
+            )
         lines += [f"### `{name}.csv` ({len(out[name])} rows)", "", caption, ""]
     lines += ["## Figures", ""]
     for name, caption in FIGURE_CAPTIONS.items():

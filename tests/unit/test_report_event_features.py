@@ -434,12 +434,14 @@ class TestAMissingFeature:
         out = report.report_tables(manifest, tables)
 
         missing = row_of(
-            out["missing_by_session"],
+            out["missing_by_animal"],
             detector="kay",
             population="all",
             feature="n_spikes",
         )
         assert (missing.n, missing.n_missing) == (1, 0)
+        # missing in no session, so left out of the session table
+        assert "n_spikes" not in set(out["missing_by_session"].feature)
 
 
 def _pending_world() -> tuple[dict, dict[str, pd.DataFrame]]:
@@ -1027,3 +1029,180 @@ def test_the_distribution_reads_the_inventory_reports_quantiles():
     assert list(report.distribution(frame.iloc[:0], ["g"], ["x"], "n").columns) == list(
         inventory_report._distribution(frame.iloc[:0], ["g"], ["x"], "n").columns
     )
+
+    # one-element and all-NaN groups, two keys, one of them categorical
+    edge = pd.DataFrame(
+        {
+            "g": ["a", "a", "b", "c", "c"],
+            "s": pd.Categorical(
+                ["late", "early", "late", "early", "early"],
+                categories=["late", "early"],
+                ordered=True,
+            ),
+            "x": [1.0, 2.0, 3.0, np.nan, np.nan],
+        }
+    )
+    fast = report.distribution(edge, ["g", "s"], ["x"], "n")
+    slow = inventory_report._distribution(
+        edge.assign(s=edge.s.astype(str)), ["g", "s"], ["x"], "n"
+    )
+    assert fast.s.tolist() == ["late", "early", "late", "early"]
+    order = ["g", "s"]
+    pd.testing.assert_frame_equal(
+        fast.assign(s=fast.s.astype(str)).sort_values(order, ignore_index=True),
+        slow.sort_values(order, ignore_index=True).astype(
+            fast.dtypes.to_dict() | {"s": object}
+        ),
+        check_exact=False,
+        rtol=1e-12,
+    )
+    lone = row_of(fast, g="b")
+    assert (lone.n, lone.x_n, lone.x_median, lone.x_max) == (1, 1, 3.0, 3.0)
+    empty = row_of(fast, g="c")
+    assert (empty.n, empty.x_n) == (2, 0)
+    assert np.isnan(empty.x_median) and np.isnan(empty.x_max)
+
+
+def test_twin_baseline_windows_count_once():
+    def window(i: int, matched: str, start: float, dll: float) -> dict:
+        return event(
+            "02_r1",
+            "baseline",
+            i,
+            matched_event_key=matched,
+            event_start_s=start,
+            event_end_s=start + 0.1,
+            evidence_dll=dll,
+        )
+
+    events = [
+        event("02_r1", "kay", 0),
+        event("02_r1", "memoryless", 0),
+        # the twins' windows are identical; the kay window is not
+        window(0, key("memoryless", "02_r1", 0), 5.0, 2.0),
+        window(1, key("memoryless_criteria", "02_r1", 0), 5.0, 2.0),
+        window(2, key("kay", "02_r1", 0), 7.0, 4.0),
+    ]
+    manifest, tables = build(events)
+
+    out = report.report_tables(manifest, tables)
+
+    for level in ("by_session", "by_animal"):
+        spread = row_of(out[f"features_evidence_{level}"], detector="baseline")
+        assert (spread.n_events, spread.evidence_dll_median) == (2, 3.0)
+        assert (
+            row_of(out[f"evidence_coverage_{level}"], detector="baseline").n_events == 2
+        )
+        sources = out[f"baseline_sources_{level}"]
+        assert sources.set_index("detector").n_windows.to_dict() == {
+            "kay": 1,
+            "memoryless": 1,
+            "memoryless_criteria": 1,
+        }
+        assert sources.p_windows.tolist() == pytest.approx([1 / 3] * 3)
+    missing = row_of(
+        out["missing_by_animal"], detector="baseline", feature="evidence_dll"
+    )
+    assert missing.n == 2
+
+
+def test_the_context_pools_counts_per_animal():
+    events = [
+        event(
+            "02_r1",
+            "kay",
+            0,
+            at_well=True,
+            occupancy_state="at_well",
+            current_patch=1.0,
+        ),
+        event(
+            "02_r1",
+            "kay",
+            1,
+            at_well=True,
+            occupancy_state="at_well",
+            current_patch=2.0,
+        ),
+        event(
+            "02_r1",
+            "kay",
+            2,
+            at_well=False,
+            occupancy_state="leaving",
+            is_rewarded_outcome=0.0,
+        ),
+        event(
+            "04_r2",
+            "kay",
+            0,
+            at_well=pd.NA,
+            occupancy_state=None,
+            current_patch=np.nan,
+            is_rewarded_outcome=np.nan,
+        ),
+    ]
+    manifest, tables = build(events)
+
+    out = report.report_tables(manifest, tables)
+
+    sessions = out["context_by_session"]
+    first = row_of(sessions, epoch="02_r1", detector="kay", population="all")
+    assert (first.n_events, first.n_at_well_true, first.p_at_well_true) == (
+        3,
+        2,
+        pytest.approx(2 / 3),
+    )
+    pooled = row_of(out["context_by_animal"], detector="kay", population="all")
+    assert (pooled.n_sessions, pooled.n_events) == (2, 4)
+    assert (
+        pooled.n_at_well_true,
+        pooled.n_at_well_false,
+        pooled.n_at_well_missing,
+    ) == (2, 1, 1)
+    assert pooled.p_at_well_true == pytest.approx(0.5)
+    assert "p_sessions" not in out["context_by_animal"]
+    assert (pooled.n_occupancy_state_at_well, pooled.n_occupancy_state_leaving) == (
+        2,
+        1,
+    )
+    assert pooled.n_occupancy_state_missing == 1
+    assert (
+        pooled.n_current_patch_1,
+        pooled.n_current_patch_2,
+        pooled.n_current_patch_3,
+    ) == (2, 1, 0)
+    assert pooled.n_current_patch_missing == 1
+    assert (pooled.n_is_rewarded_outcome_1, pooled.n_is_rewarded_outcome_0) == (2, 1)
+    assert pooled.pending == ""
+
+
+def test_a_context_value_outside_its_categories_is_refused():
+    manifest, tables = build([event("02_r1", "kay", 0, current_patch=4.0)])
+
+    with pytest.raises(ValueError, match="current_patch"):
+        report.report_tables(manifest, tables)
+
+
+def test_an_event_without_a_stratum_is_refused():
+    manifest, tables = build([event("02_r1", "kay", 0, duration_stratum=None)])
+
+    with pytest.raises(ValueError, match="no duration_stratum"):
+        report.report_tables(manifest, tables)
+
+
+def test_the_session_missing_table_leaves_out_features_never_missing():
+    manifest, tables = build(
+        [
+            event("02_r1", "kay", 0, evidence_dll=np.nan),
+            event("04_r2", "kay", 0),
+        ]
+    )
+
+    out = report.report_tables(manifest, tables)
+
+    sessions = out["missing_by_session"]
+    assert set(sessions.feature) == {"evidence_dll", "ss_disagreement"}
+    assert set(out["missing_by_animal"].feature) == set(report.MISSING_FEATURES)
+    assert "evidence_dll" not in report.never_missing(out["missing_by_animal"])
+    assert "n_spikes" in report.never_missing(out["missing_by_animal"])
