@@ -551,3 +551,86 @@ class TestTheReportOnTheRunnersTables:
         manifest = json.loads((run / "manifest.json").read_text())
         assert manifest["run_id"] == run.name
         assert (tmp_path / "figures" / run.name / "native_durations.png").exists()
+
+
+def _pair(key_a, key_b, cover_a, cover_b, iou, onset, offset, *, within_a=True):
+    return session(
+        "02_r1",
+        **{
+            "detector_a": "kay",
+            "event_key_a": key_a,
+            "detector_b": "zugaro",
+            "event_key_b": key_b,
+            "iou": iou,
+            "fraction_a_covered": cover_a,
+            "fraction_b_covered": cover_b,
+            "onset_difference_s": onset,
+            "offset_difference_s": offset,
+            "a_within_shared_exposure": within_a,
+            "b_within_shared_exposure": True,
+        },
+    )
+
+
+def _directional(source, target, n_eligible, n_matched):
+    return session(
+        "02_r1",
+        source_detector=source,
+        target_detector=target,
+        available=True,
+        n_eligible=n_eligible,
+        n_matched=n_matched,
+    )
+
+
+def test_match_strength_counts_each_source_event_by_its_best_match():
+    """A short zugaro event nested in a kay event is fully covered (cover 1.0)
+    while the kay event is only partly covered; a kay event touched by two
+    zugaro events counts once, by its best match; a kay event outside the
+    shared exposure does not count. Offsets read target less source."""
+    pairs = rows(
+        "pairs",
+        [
+            # k1 wraps z1: z1 starts 30 ms later and ends 20 ms earlier
+            _pair("k1", "z1", 0.4, 1.0, 0.4, 0.03, -0.02),
+            # k2 touched by z2 (sliver) and z3 (most of it)
+            _pair("k2", "z2", 0.1, 0.2, 0.08, 0.05, 0.1),
+            _pair("k2", "z3", 0.95, 0.9, 0.86, -0.004, 0.002),
+            # k3 lies outside the shared exposure
+            _pair("k3", "z4", 1.0, 1.0, 1.0, 0.0, 0.0, within_a=False),
+        ],
+    )
+    directional = pd.DataFrame(
+        [_directional("kay", "zugaro", 4, 2), _directional("zugaro", "kay", 4, 4)]
+    )
+    out = report.match_strength_by_session(pairs, directional).set_index(
+        ["source_detector", "target_detector"]
+    )
+    kay = out.loc[("kay", "zugaro")]
+    assert (kay.n_matched, kay.n_covered_50pct, kay.n_covered_90pct) == (2, 1, 1)
+    assert kay.n_iou_50pct == 1
+    assert kay.p_covered_50pct == pytest.approx(0.25)
+    zugaro = out.loc[("zugaro", "kay")]
+    # z1, z3 and z4 are covered (z4 lies within the shared exposure); z3 and
+    # z4 reach the IoU
+    assert (zugaro.n_covered_50pct, zugaro.n_covered_90pct, zugaro.n_iou_50pct) == (
+        3,
+        3,
+        2,
+    )
+
+    oriented = report.oriented_pairs(pairs)
+    z1 = oriented[oriented.source_event_key == "z1"].iloc[0]
+    # from z1's side, kay starts 30 ms earlier and ends 20 ms later
+    assert (z1.onset_difference_s, z1.offset_difference_s) == pytest.approx(
+        (-0.03, 0.02)
+    )
+
+
+def test_match_strength_refuses_a_directional_count_it_cannot_reproduce():
+    pairs = rows("pairs", [_pair("k1", "z1", 0.4, 1.0, 0.4, 0.03, -0.02)])
+    directional = pd.DataFrame(
+        [_directional("kay", "zugaro", 3, 2), _directional("zugaro", "kay", 3, 1)]
+    )
+    with pytest.raises(ValueError, match="n_matched 2 in the directional table"):
+        report.match_strength_by_session(pairs, directional)

@@ -157,6 +157,30 @@ _TOPICS: Mapping[str, tuple[str, str, str]] = MappingProxyType(
             _SESSION_ROWS,
             "Per animal, the pairs of all its sessions pooled.",
         ),
+        "match_strength": (
+            "Directional agreement under stricter rules than any overlap: of the "
+            "source detector's events wholly inside the pair's shared exposure "
+            "(n_eligible, as in directional), n_matched overlap a target event "
+            "for a positive duration, n_covered_50pct and n_covered_90pct have "
+            "one target event covering at least half or 90 % of their span, and "
+            "n_iou_50pct have one target event with a temporal IoU of at least "
+            "0.5. Covering tells a source event nested inside a longer target "
+            "event (high cover, low IoU) apart from two events that only touch. "
+            "Each p_ column is its count over n_eligible.",
+            _SESSION_ROWS + " available as in directional.",
+            _ANIMAL_SUMS,
+        ),
+        "boundary_offsets": (
+            "Boundary offsets of every overlapping pair, by ordered detector "
+            "pair, with the source event wholly inside the pair's shared "
+            "exposure: onset_difference_s is the target event's start less the "
+            "source event's start, offset_difference_s the target's end less "
+            "the source's end, so a target that wraps its source has a negative "
+            "onset and a positive offset difference. Pair counts describe the "
+            "matching relation; they are not event counts. " + _QUANTILE_COLUMNS,
+            _SESSION_ROWS,
+            "Per animal, the pairs of all its sessions pooled.",
+        ),
         "time_coverage": (
             "Time coverage of each pair of inventories: the union and "
             "intersection of their events, clipped to the pair's shared "
@@ -575,6 +599,119 @@ def directional_by_animal(
     return pooled.assign(proportion_matched=_ratio(pooled.n_matched, pooled.n_eligible))
 
 
+COVERED_FRACTIONS = (0.5, 0.9)
+"""The fractions of a source event one target event must cover (match_strength)."""
+MATCH_IOU = 0.5
+"""The temporal IoU one target event must reach (match_strength)."""
+MATCH_STRENGTH_COUNTS = (
+    "n_matched",
+    *(f"n_covered_{round(f * 100)}pct" for f in COVERED_FRACTIONS),
+    f"n_iou_{round(MATCH_IOU * 100)}pct",
+)
+
+
+def oriented_pairs(pairs: pd.DataFrame) -> pd.DataFrame:
+    """Every overlapping pair from each event's side, as source and target.
+
+    Returns
+    -------
+    DataFrame
+        Two rows per pair: the session columns, ``source_detector``,
+        ``target_detector``, ``source_event_key``, ``fraction_covered`` (of the
+        source), ``iou``, ``onset_difference_s`` and ``offset_difference_s``
+        (target less source) and ``source_within_shared_exposure``.
+    """
+
+    def side(source: str, target: str, sign: float) -> pd.DataFrame:
+        return pd.DataFrame(
+            {
+                **{column: pairs[column].to_numpy() for column in SESSION},
+                "source_detector": pairs[f"detector_{source}"].to_numpy(),
+                "target_detector": pairs[f"detector_{target}"].to_numpy(),
+                "source_event_key": pairs[f"event_key_{source}"].to_numpy(),
+                "fraction_covered": pairs[f"fraction_{source}_covered"].to_numpy(),
+                "iou": pairs["iou"].to_numpy(),
+                # the pair table's differences are b less a
+                "onset_difference_s": sign * pairs["onset_difference_s"].to_numpy(),
+                "offset_difference_s": sign * pairs["offset_difference_s"].to_numpy(),
+                "source_within_shared_exposure": pairs[
+                    f"{source}_within_shared_exposure"
+                ].to_numpy(dtype=bool),
+            }
+        )
+
+    return pd.concat([side("a", "b", 1.0), side("b", "a", -1.0)], ignore_index=True)
+
+
+def match_strength_by_session(
+    pairs: pd.DataFrame, directional: pd.DataFrame
+) -> pd.DataFrame:
+    """Each ordered pair's directional agreement under the stricter rules.
+
+    A source event's best match is the largest fraction of it one target
+    event covers and the largest IoU one target event reaches.
+
+    Raises
+    ------
+    ValueError
+        The source events the pair table matches are not the directional
+        table's ``n_matched``: the two tables disagree on the eligible events.
+    """
+    ordered = ["source_detector", "target_detector"]
+    oriented = oriented_pairs(pairs)
+    oriented = oriented[oriented.source_within_shared_exposure]
+    best = oriented.groupby([*SESSION, *ordered, "source_event_key"]).agg(
+        fraction_covered=("fraction_covered", "max"), iou=("iou", "max")
+    )
+    flags = {"n_paired": np.ones(len(best), dtype=bool)} | {
+        f"n_covered_{round(f * 100)}pct": best.fraction_covered.to_numpy() >= f
+        for f in COVERED_FRACTIONS
+    }
+    flags[f"n_iou_{round(MATCH_IOU * 100)}pct"] = best.iou.to_numpy() >= MATCH_IOU
+    counts = (
+        pd.DataFrame(flags, index=best.index)
+        .groupby(level=[*SESSION, *ordered])
+        .sum()
+        .reset_index()
+    )
+    merged = directional[[*SESSION, *ordered, "available", "n_eligible", "n_matched"]]
+    merged = merged.merge(counts, on=[*SESSION, *ordered], how="left", validate="1:1")
+    stricter = [c for c in MATCH_STRENGTH_COUNTS if c != "n_matched"]
+    merged[["n_paired", *stricter]] = (
+        merged[["n_paired", *stricter]].fillna(0).astype(np.int64)
+    )
+    disagree = merged.n_paired != merged.n_matched
+    if disagree.any():
+        bad = merged[disagree].iloc[0]
+        raise ValueError(
+            f"{session_names(merged[disagree]).iloc[0]}: {bad.source_detector} -> "
+            f"{bad.target_detector} has {bad.n_paired} source events in the pair "
+            f"table but n_matched {bad.n_matched} in the directional table."
+        )
+    return _with_proportions(merged.drop(columns="n_paired"))
+
+
+def _with_proportions(frame: pd.DataFrame) -> pd.DataFrame:
+    """``frame`` with ``p_<x>`` = ``n_<x>`` / ``n_eligible`` for each count."""
+    return frame.assign(
+        **{
+            "p_" + c.removeprefix("n_"): _ratio(frame[c], frame.n_eligible)
+            for c in MATCH_STRENGTH_COUNTS
+        }
+    )
+
+
+def match_strength_by_animal(by_session: pd.DataFrame) -> pd.DataFrame:
+    """The stricter-rule counts pooled per animal and ordered pair."""
+    pooled = pool_sessions(
+        by_session,
+        by=["source_detector", "target_detector"],
+        sums=["n_eligible", *MATCH_STRENGTH_COUNTS],
+        available=by_session.available,
+    )
+    return _with_proportions(pooled)
+
+
 def cells_by_session(
     cells: pd.DataFrame,
     availability: pd.DataFrame,
@@ -882,6 +1019,19 @@ def report_tables(
         spread = _distribution(pairs, group, ["intersection_s", "iou"], "n_pairs")
         out[f"overlap_{level}"] = spread.merge(within, on=group, how="left")
 
+    strength = match_strength_by_session(pairs, directional)
+    out["match_strength_by_session"] = _per_session(strength)
+    out["match_strength_by_animal"] = match_strength_by_animal(strength)
+    oriented = oriented_pairs(pairs)
+    oriented = oriented[oriented.source_within_shared_exposure]
+    for level, keys in (("by_session", SESSION), ("by_animal", ["animal"])):
+        out[f"boundary_offsets_{level}"] = _distribution(
+            oriented,
+            [*keys, *ordered],
+            ["onset_difference_s", "offset_difference_s"],
+            "n_pairs",
+        )
+
     coverage = tables["time_coverage"]
     out["time_coverage_by_session"] = _per_session(coverage)
     pooled = pool_sessions(
@@ -958,6 +1108,8 @@ def report_tables(
         "exclusion": {"groups": {"comparison": settings["comparisons"]}},
         "directional": {"columns": ordered},
         "overlap": {"columns": pairs_of},
+        "match_strength": {"columns": ordered},
+        "boundary_offsets": {"columns": ordered},
         "time_coverage": {"columns": pairs_of},
         "recount": {"columns": ordered},
         "cells": {"columns": ["detector"], "groups": {"cell": cell_against}},
