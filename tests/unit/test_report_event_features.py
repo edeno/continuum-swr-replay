@@ -37,6 +37,7 @@ DETECTORS = ("kay", "state_space", "memoryless", "memoryless_criteria")
 
 SETTINGS = {
     "input_runs": {"inventory": "inventory01", "memoryless": "memoryless01"},
+    "swr_source": "kay@run01+artifacts@run02",
     "duration_strata": {"labels": list(DURATION_STRATUM_LABELS)},
     "tracking_confidence": "unavailable: the decode frame carries none",
 }
@@ -57,6 +58,7 @@ _OBJECT_DEFAULTS = {
     "baseline_level": "location",
     "ss_disagreement": None,
     "matched_event_key": None,
+    "occupancy_state": "at_well",
 }
 MEMORYLESS_COLUMNS = {
     "animal": object,
@@ -528,6 +530,18 @@ class TestPending:
         )
         assert cell.pending == ""
 
+    def test_the_memoryless_context_rows_are_marked(self):
+        manifest, tables = _pending_world()
+
+        out = report.report_tables(manifest, tables)
+
+        for level in ("by_session", "by_animal"):
+            context = out[f"context_{level}"]
+            for detector in ("memoryless", "memoryless_criteria"):
+                row = row_of(context, detector=detector, population="all")
+                assert row.pending == report.PENDING, (level, detector)
+            assert row_of(context, detector="kay", population="all").pending == ""
+
     def test_every_caption_carries_the_pending_note(self):
         for caption in [
             *report.TABLE_CAPTIONS.values(),
@@ -967,6 +981,7 @@ class TestTheReportOnARunOnDisk:
         assert "tracking confidence" in text.lower()
         assert SETTINGS["tracking_confidence"] in text
         assert "Widloski" in text
+        assert f"SWR source {SETTINGS['swr_source']}" in text.split("## ")[0]
         # 3 ok, 1 failed, and 1 analysed epoch outside the run
         assert "3 ok epochs, 1 failed, and 1 analysed epochs" in text
 
@@ -1206,3 +1221,116 @@ def test_the_session_missing_table_leaves_out_features_never_missing():
     assert set(out["missing_by_animal"].feature) == set(report.MISSING_FEATURES)
     assert "evidence_dll" not in report.never_missing(out["missing_by_animal"])
     assert "n_spikes" in report.never_missing(out["missing_by_animal"])
+
+
+def test_an_empty_occupancy_state_counts_as_missing():
+    manifest, tables = build(
+        [
+            event("02_r1", "kay", 0, occupancy_state="at_well"),
+            event("02_r1", "kay", 1, occupancy_state=""),
+        ]
+    )
+
+    out = report.report_tables(manifest, tables)
+
+    context = row_of(out["context_by_animal"], detector="kay", population="all")
+    assert (context.n_occupancy_state_at_well, context.n_occupancy_state_missing) == (
+        1,
+        1,
+    )
+    assert "n_occupancy_state_" not in out["context_by_animal"]
+    missing = row_of(
+        out["missing_by_animal"],
+        detector="kay",
+        population="all",
+        feature="occupancy_state",
+    )
+    assert (missing.n, missing.n_missing) == (2, 1)
+
+
+def test_the_evidence_against_baseline_carries_the_spike_rates_beside_the_counts():
+    # each event's own spike rate, and the rate of the window drawn for it
+    def scored(epoch, i, rate, window_rate):
+        own = event(epoch, "kay", i, spike_rate_hz=rate)
+        window = event(
+            epoch,
+            "baseline",
+            i,
+            matched_event_key=key("kay", epoch, i),
+            event_start_s=float(i),
+            event_end_s=float(i) + 0.1,
+            spike_rate_hz=window_rate,
+        )
+        return [own, window]
+
+    events = [
+        *scored("02_r1", 0, 100.0, 10.0),
+        *scored("02_r1", 1, 300.0, 30.0),
+        *scored("04_r2", 0, 500.0, 50.0),
+        # an event without a baseline: its rate counts, no window rate
+        event("04_r2", "kay", 1, spike_rate_hz=700.0, baseline_level="failed"),
+    ]
+    manifest, tables = build(events)
+
+    out = report.report_tables(manifest, tables)
+
+    first = row_of(
+        out["evidence_vs_baseline_by_session"],
+        epoch="02_r1",
+        detector="kay",
+        population="all",
+    )
+    assert (first.n_events, first.spike_rate_hz_n) == (2, 2)
+    assert first.spike_rate_hz_median == 200.0
+    assert first.baseline_spike_rate_hz_median == 20.0
+    pooled = row_of(
+        out["evidence_vs_baseline_by_animal"], detector="kay", population="all"
+    )
+    # pooled over the animal's events, not the median of session medians
+    assert (pooled.n_events, pooled.spike_rate_hz_n) == (4, 4)
+    assert pooled.spike_rate_hz_median == 400.0
+    assert (pooled.baseline_spike_rate_hz_n, pooled.baseline_spike_rate_hz_median) == (
+        3,
+        30.0,
+    )
+    assert "baseline" not in set(out["evidence_vs_baseline_by_animal"].detector)
+
+
+def test_the_evidence_captions_say_what_the_baselines_are_not_matched_on():
+    evidence = [
+        caption
+        for name, caption in report.TABLE_CAPTIONS.items()
+        if name.startswith(("evidence_vs_baseline_", "features_evidence_"))
+    ]
+    evidence += [
+        report.FIGURE_CAPTIONS["evidence_vs_baseline.png"],
+        report.FIGURE_CAPTIONS["evidence_by_stratum.png"],
+    ]
+    assert len(evidence) == 8
+    for caption in evidence:
+        assert "not on spike count" in caption
+        assert "grows with the number of spikes" in caption
+        assert "mixes evidence with engagement" in caption
+        assert "evidence_coverage_by_" in caption
+        assert "features_engagement_by_" in caption
+        assert "An excess over baseline is not a calibrated declaration of replay" in (
+            caption
+        )
+
+
+def test_the_ripple_and_mua_traces_are_named():
+    for level in ("by_session", "by_animal"):
+        for name in (
+            f"features_lfp_mua_{level}",
+            f"features_lfp_mua_by_stratum_{level}",
+        ):
+            caption = report.TABLE_CAPTIONS[name]
+            assert "SWR_zscore" in caption and "MUA_zscore" in caption
+            assert "Kay consensus" in caption
+            assert "one sample off" in caption
+
+
+def test_a_failed_baseline_can_mean_no_shared_exposure():
+    for level in ("by_session", "by_animal"):
+        caption = report.TABLE_CAPTIONS[f"baseline_matching_{level}"]
+        assert "no shared exposure" in caption

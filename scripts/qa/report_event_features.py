@@ -284,12 +284,26 @@ _ANIMAL_SUMS = (
     "Per animal: counts summed over its sessions (n_sessions), proportions "
     "taken from those sums, never averaged over sessions."
 )
+_NOT_CALIBRATED = "An excess over baseline is not a calibrated declaration of replay."
+_ENGAGEMENT_CAVEAT = (
+    "The baselines are matched on duration and location, not on spike count, "
+    "and the per-row remote maximum grows with the number of spikes, so a share "
+    "above baseline mixes evidence with engagement: see the spikes per row "
+    "(n_spikes / n_rows) by detector, baseline windows included, in "
+    "evidence_coverage_by_*, and the spike counts and rates in "
+    "features_engagement_by_*. " + _NOT_CALIBRATED
+)
 _AGAINST_BASELINE = (
     "n_scorable have an evidence score; n_with_baseline are scorable and have "
     "a baseline median and 95th percentile; n_above_q95 score above their own "
     "baseline_q95_dll and n_at_or_below_median at or below their own "
-    "baseline_median_dll. These are descriptive labels: an excess over "
-    "baseline is not a calibrated declaration of replay."
+    "baseline_median_dll. These are descriptive labels. " + _ENGAGEMENT_CAVEAT
+)
+_LFP_MUA = (
+    "ripple_z_* reads the decode frame's SWR_zscore: the Kay consensus over "
+    "the tetrodes rule R-T kept, normalized outside the artifact mask and "
+    "nearest-sampled onto the 500 Hz decode grid, so a peak can be one sample "
+    "off. mua_z_* reads the frame's MUA_zscore."
 )
 
 
@@ -305,6 +319,10 @@ def _feature_topic(group: str, columns: Sequence[str], stratified: bool) -> str:
         )
     if group == "ms":
         what += " Every ms_* feature reads the memoryless run, so every row is pending."
+    if group == "lfp_mua":
+        what += " " + _LFP_MUA
+    if group == "evidence":
+        what += " " + _ENGAGEMENT_CAVEAT
     return " ".join((what, _POPULATIONS, _QUANTILE_COLUMNS))
 
 
@@ -367,7 +385,10 @@ _TOPICS: Mapping[str, tuple[str, str, str]] = MappingProxyType(
             "Each detector's compared events by the level of their matched "
             "baselines: n_location (matched in duration and in the animal's "
             "location), n_duration_only (in duration only) and n_failed (no "
-            "baseline). The baseline pool involves every inventory.",
+            "baseline). The baseline pool involves every inventory: it is the "
+            "shared exposure of all nine, so in an epoch where any detector "
+            "did not run it is empty and every event there is failed. failed "
+            "can mean no shared exposure, not only too few windows.",
             "Per session (one analysed epoch, nested in its animal).",
             _ANIMAL_SUMS,
         ),
@@ -376,7 +397,11 @@ _TOPICS: Mapping[str, tuple[str, str, str]] = MappingProxyType(
             "counted per detector and population: n_events; "
             + _AGAINST_BASELINE
             + " p_above_q95 and p_at_or_below_median are those counts over "
-            "n_with_baseline. " + _POPULATIONS,
+            "n_with_baseline. Beside the counts, spike_rate_hz_n and "
+            "spike_rate_hz_median of the events, and baseline_spike_rate_hz_n "
+            "and baseline_spike_rate_hz_median of the first baseline window "
+            "drawn for each of them (the all row gives each detector's), "
+            "quantiles of the events pooled. " + _POPULATIONS,
             _SESSION_ROWS,
             _ANIMAL_SUMS,
         ),
@@ -477,15 +502,17 @@ FIGURE_CAPTIONS: Mapping[str, str] = MappingProxyType(
             "below its baseline median (right), of the events scorable with a "
             "baseline, from counts summed over the animal's sessions; printed "
             "in each cell to two places. Grey: no such events. Descriptive "
-            "labels, not a calibrated declaration of replay. Counts in "
+            "labels. " + _ENGAGEMENT_CAVEAT + " Counts and spike rates in "
             "evidence_vs_baseline_by_animal.csv."
         ),
         "rejection_stages.png": _caption(
             "Rejection stages of the state_space events unmatched by each "
-            "memoryless cohort, per animal: the fraction of those events at "
-            "each exclusive stage, printed where the bar has room. n counts "
-            "the unmatched events; unknown memberships are counted apart in "
-            "the label and never drawn as a stage. Counts in "
+            "memoryless cohort (panels), per animal (rows) and exclusive stage "
+            "(columns, in the detector's order): the fraction of those events "
+            "at the stage, printed in every cell (0 for none, <0.01 for a "
+            "nonzero share below 0.005), each row summing to 1. n counts the "
+            "unmatched events; unknown memberships are counted apart in the "
+            "label and never drawn as a stage. Counts in "
             "rejection_by_animal.csv."
         ),
         "comparator_only.png": _caption(
@@ -499,7 +526,8 @@ FIGURE_CAPTIONS: Mapping[str, str] = MappingProxyType(
             "(panels), every compared event, and the baseline windows: the "
             "median (marker, one per animal) and the 25th to 75th percentiles "
             "(bar) of the animal's events pooled. Colors by detector family. "
-            "Counts in features_evidence_by_stratum_by_animal.csv."
+            + _ENGAGEMENT_CAVEAT
+            + " Counts in features_evidence_by_stratum_by_animal.csv."
         ),
     }
 )
@@ -848,6 +876,30 @@ def _against_baseline(frame: pd.DataFrame, keys: Sequence[str]) -> pd.DataFrame:
     return _grouped_sum(flags, frame[list(keys)])
 
 
+SPIKE_RATES = ("spike_rate_hz", "baseline_spike_rate_hz")
+"""The spike rates beside the counts of ``evidence_vs_baseline_by_*``."""
+
+
+def with_window_spike_rate(features: pd.DataFrame) -> pd.DataFrame:
+    """``features`` with ``baseline_spike_rate_hz``: for each compared event,
+    the spike rate of the first baseline window drawn for it; NaN for an
+    event with none and for the windows themselves.
+
+    Read before the twin windows are dropped, so every event finds its own.
+    """
+    windows = features[(features.detector == BASELINE).to_numpy()]
+    rate = windows.set_index("matched_event_key").spike_rate_hz
+    return features.assign(
+        baseline_spike_rate_hz=features.event_key.map(rate).astype(np.float64)
+    )
+
+
+def _spike_rates(frame: pd.DataFrame, keys: Sequence[str]) -> pd.DataFrame:
+    """Per ``keys`` group, the count and median of each of :data:`SPIKE_RATES`."""
+    table = distribution(frame, keys, SPIKE_RATES, "n")
+    return table[[*keys, *(f"{c}_{s}" for c in SPIKE_RATES for s in ("n", "median"))]]
+
+
 def _with_shares(frame: pd.DataFrame) -> pd.DataFrame:
     """``frame`` with the two shares over ``n_with_baseline``."""
     return frame.assign(
@@ -1161,8 +1213,10 @@ def report_tables(
     features = stratum_labels(
         features, manifest["settings"]["duration_strata"]["labels"]
     )
+    # an empty label is no state
+    features["occupancy_state"] = features.occupancy_state.replace("", None)
     sources = baseline_sources_by_session(features)
-    features = distinct_windows(features)
+    features = distinct_windows(with_window_spike_rate(features))
     populations = event_populations(
         features, tables["pair_membership"], tables["cells"], tables["directional"]
     )
@@ -1193,11 +1247,26 @@ def report_tables(
             counted, ["detector"], [c for c in counted.columns if c.startswith("n_")]
         )
     against = evidence_vs_baseline_by_session(populations, features)
+    rates = _with(
+        populations[(populations.population != BASELINE).to_numpy()],
+        features,
+        SPIKE_RATES,
+    )
     out["evidence_vs_baseline_by_session"] = _with_shares(
         _per_session(_at_session(against))
+    ).merge(
+        _spike_rates(rates, [*SESSION, *POPULATION]),
+        on=[*SESSION, *POPULATION],
+        how="left",
+        validate="one_to_one",
     )
     out["evidence_vs_baseline_by_animal"] = _with_shares(
         _summed(against, POPULATION, EVIDENCE_COUNTS)
+    ).merge(
+        _spike_rates(rates, ["animal", *POPULATION]),
+        on=["animal", *POPULATION],
+        how="left",
+        validate="one_to_one",
     )
 
     rejection = rejection_by_session(tables["rejection"])
@@ -1469,28 +1538,23 @@ def draw_figures(
             _no_data(ax)
     if image is not None:
         bar = fig.colorbar(image, ax=axes[0], shrink=0.8)
-        bar.set_label("fraction of events scorable with a baseline", fontsize=6)
+        bar.set_label("fraction (of events scorable with a baseline)", fontsize=6)
         bar.ax.tick_params(labelsize=6)
     save(fig, "evidence_vs_baseline.png")
 
-    # rejection stages of the ours-only events
+    # rejection stages of the ours-only events: one cell per animal and
+    # stage, each labelled by its column and printed, so a thin stage shows
     rejection = out["rejection_by_animal"]
     stages = list(REJECTION_STAGES[:-1])
-    # ordered stages: a grey ramp, no family hue
-    stage_colors = dict(
-        zip(
-            stages,
-            plt.get_cmap("Greys")(np.linspace(0.15, 0.95, len(stages))),
-            strict=True,
-        )
-    )
     cohorts = list(features_runner.REJECTION_COHORTS)
+    greys = plt.get_cmap("Greys")
     fig, axes = _subplots(
         1,
         len(cohorts),
-        figsize=(7.2, 0.32 * max(len(animals), 2) + 1.6),
+        figsize=(7.2, 0.3 * max(len(animals), 2) + 1.9),
         squeeze=False,
     )
+    image = None
     for ax, cohort in zip(axes[0], cohorts, strict=True):
         rows = rejection[(rejection.cohort == cohort)].set_index(
             ["animal", "membership"]
@@ -1516,31 +1580,43 @@ def draw_figures(
             else 0
             for a in animals
         ]
-        _stacked(
-            ax,
-            counts.div(totals.where(totals > 0), axis=0).fillna(0),
+        shares = counts.div(totals.where(totals > 0), axis=0).to_numpy(np.float64)
+        image = ax.imshow(
+            shares.reshape(len(animals), len(stages)),
+            vmin=0,
+            vmax=1,
+            cmap=greys,
+            aspect="auto",
+        )
+        for (i, j), value in np.ndenumerate(shares):
+            if not np.isfinite(value):
+                continue
+            text = "0" if value == 0 else "<0.01" if value < 0.005 else f"{value:.2f}"
+            ax.text(
+                j,
+                i,
+                text,
+                ha="center",
+                va="center",
+                fontsize=5,
+                color="w" if value > 0.5 else "k",
+            )
+        ax.set_xticks(range(len(stages)), stages, rotation=45, ha="right", fontsize=6)
+        ax.set_yticks(
+            range(len(animals)),
             [
                 f"{a} (n = {int(t)}; unknown {u})"
                 for a, t, u in zip(animals, totals, unknown, strict=True)
             ],
-            stage_colors,
+            fontsize=6,
         )
         ax.set_title(f"state_space unmatched by {_label(cohort)}", fontsize=7)
-        ax.set_xlabel("fraction of unmatched events", fontsize=6)
         if not animals:
             _no_data(ax)
-    fig.legend(
-        handles=[
-            matplotlib.patches.Patch(
-                facecolor=stage_colors[s], edgecolor="0.2", linewidth=0.3, label=s
-            )
-            for s in stages
-        ],
-        loc="outside right center",
-        ncol=1,
-        fontsize=6,
-        frameon=False,
-    )
+    if image is not None:
+        bar = fig.colorbar(image, ax=axes[0], shrink=0.8)
+        bar.set_label("fraction (of the animal's unmatched events)", fontsize=6)
+        bar.ax.tick_params(labelsize=6)
     save(fig, "rejection_stages.png")
 
     # comparator-only classes
@@ -1727,8 +1803,8 @@ def write_report(
         f"and {outside} analysed epochs of the epoch register outside the run), "
         f"the cells and directional tables of inventory comparison run "
         f"{inventory_run} and the candidates of memoryless run "
-        f"{settings['input_runs']['memoryless']}. It states counts and makes no "
-        "claim.",
+        f"{settings['input_runs']['memoryless']}, read through SWR source "
+        f"{settings['swr_source']}. It states counts and makes no claim.",
         "",
         PENDING_SENTENCE,
         "",
