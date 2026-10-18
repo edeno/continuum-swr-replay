@@ -29,7 +29,30 @@ import pandas as pd
 import pytest
 
 import scripts.qa.run_inventory_comparison as runner
+from continuum_swr_replay.analysis.constants import (
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+)
 from continuum_swr_replay.analysis.hippocampus import swr_source
+from continuum_swr_replay.analysis.inventory_comparison.availability import (
+    coverage_from_observations,
+    still_intervals,
+    stored_coverage,
+)
+from continuum_swr_replay.analysis.inventory_comparison.cells import (
+    membership_against,
+)
+from continuum_swr_replay.analysis.inventory_comparison.intervals import (
+    intersect,
+    total_duration,
+)
+from continuum_swr_replay.analysis.inventory_comparison.overlap import (
+    PAIR_DTYPES,
+    directional_agreement,
+    event_matches,
+)
+from continuum_swr_replay.analysis.inventory_comparison.populations import (
+    rebuild_matches,
+)
 from continuum_swr_replay.table_io import read_table, sha256_file
 from tests.unit._swr_inventory_fixtures import (
     kay_events,
@@ -508,6 +531,122 @@ class TestAnEpochWithoutAMemorylessRecord:
         assert karlsson.reason.tolist() == ["near_artifact"]
         kay = directional.loc[("kay", "karlsson")]
         assert (kay.n_source_events, kay.n_eligible, kay.n_matched) == (2, 1, 0)
+
+
+@pytest.mark.parametrize("identifier", [WORKED, MASKED], scope="class")
+class TestTheStoredTablesRebuildTheComparison:
+    """The coverage and memberships rebuilt from the written tables are the
+    ones ``compare_epoch`` built, exactly: the worked epoch holds a bridging
+    sequence, the masked one events the rule dropped and no memoryless run."""
+
+    @pytest.fixture(scope="class")
+    def built(self, run, identifier):
+        """``compare_epoch`` run again on the epoch, with what it passed to
+        ``event_matches`` and what that returned; the epoch's still
+        intervals, from the frame as the runner reads its speed."""
+        seen = {}
+
+        def spy(kept, pairs, coverage, **kwargs):
+            seen.update(kept=kept, coverage=coverage)
+            seen["matches"] = event_matches(kept, pairs, coverage, **kwargs)
+            return seen["matches"]
+
+        saved = pd.read_pickle(runner.decode_path(identifier))
+        dot = swr_source.with_swr_source(saved)
+        with pytest.MonkeyPatch.context() as patch:
+            patch.setattr(runner, "event_matches", spy)
+            runner.compare_epoch(
+                dot,
+                swr_source.artifact_event_drops(saved),
+                decode_run_id="decode",
+                carey_dir=runner.CAREY_ROOT / CAREY_RUN,
+                memoryless_dir=runner.MEMORYLESS_ROOT / MEMORYLESS_RUN,
+            )
+        time, speed = runner._speed_trace(dot)
+        key = (ANIMAL, DAY, dot.epoch.iloc[0])
+        still = {
+            key: still_intervals(
+                time, speed, DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC, runner.MAX_GAP_S
+            )
+        }
+        return seen, still
+
+    @staticmethod
+    def stored(run, identifier):
+        names = ("observations", "set_aside", "inventory", "pairs")
+        return {
+            name: table(run, identifier, name)
+            for name in (*names, "directional", "cells")
+        }
+
+    def test_the_coverage_is_the_one_compare_epoch_built(self, run, identifier, built):
+        seen, still = built
+        tables = self.stored(run, identifier)
+
+        rebuilt = stored_coverage(tables["observations"], tables["set_aside"], still)
+
+        assert set(rebuilt) == set(seen["coverage"])
+        for key, coverage in seen["coverage"].items():
+            np.testing.assert_array_equal(rebuilt[key].observed, coverage.observed)
+            np.testing.assert_array_equal(rebuilt[key].exposure, coverage.exposure)
+
+    def test_the_memberships_reproduce_the_stored_directional_and_cells(
+        self, run, identifier, built
+    ):
+        seen, still = built
+        tables = self.stored(run, identifier)
+        inventory = tables["inventory"]
+        compared = inventory[inventory.whole_event_speed_eligible]
+        coverage = stored_coverage(tables["observations"], tables["set_aside"], still)
+        pairs = tables["pairs"][list(PAIR_DTYPES)]
+
+        directional = directional_agreement(
+            compared, pairs, coverage, detectors=runner.DETECTORS
+        )
+        _, matches = rebuild_matches(
+            tables, still, detectors=runner.DETECTORS, cells=runner.CELLS
+        )
+        cells = pd.concat(
+            [
+                membership_against(
+                    compared, matches, sources=sources, against=against
+                ).assign(cell=name)
+                for name, (sources, against) in runner.CELLS.items()
+            ],
+            ignore_index=True,
+        )[list(runner.TABLE_DTYPES["cells"])]
+
+        pd.testing.assert_frame_equal(directional, tables["directional"])
+        order = ["cell", "event_key"]
+        pd.testing.assert_frame_equal(
+            cells.sort_values(order, ignore_index=True),
+            tables["cells"].sort_values(order, ignore_index=True),
+        )
+        order = ["event_key", "other_detector"]
+        pd.testing.assert_frame_equal(
+            matches.sort_values(order, ignore_index=True),
+            seen["matches"].sort_values(order, ignore_index=True),
+        )
+
+    def test_a_set_aside_span_is_unobserved_by_its_own_detector_only(
+        self, run, identifier, built
+    ):
+        _, still = built
+        tables = self.stored(run, identifier)
+        set_aside = tables["set_aside"]
+
+        rebuilt = stored_coverage(tables["observations"], set_aside, still)
+        before = coverage_from_observations(tables["observations"], still)
+
+        assert len(set_aside)
+        for key, coverage in rebuilt.items():
+            own = set_aside[set_aside.detector == key[3]]
+            spans = own[["interval_start_s", "interval_end_s"]].to_numpy()
+            if own.empty:
+                np.testing.assert_array_equal(coverage.observed, before[key].observed)
+                np.testing.assert_array_equal(coverage.exposure, before[key].exposure)
+            else:
+                assert total_duration(intersect(coverage.observed, spans)) == 0.0
 
 
 def test_event_keys_are_unique_across_the_epochs(run):

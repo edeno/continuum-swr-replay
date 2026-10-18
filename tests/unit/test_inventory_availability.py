@@ -19,6 +19,7 @@ from continuum_swr_replay.analysis.inventory_comparison.availability import (
     observation_table,
     sample_runs,
     still_intervals,
+    stored_coverage,
     window_supported,
 )
 from continuum_swr_replay.analysis.inventory_comparison.intervals import (
@@ -32,6 +33,7 @@ from continuum_swr_replay.analysis.inventory_comparison.overlap import (
     Coverage,
     event_matches,
     overlap_pairs,
+    remove_bridging_events,
     set_aside_events,
 )
 from continuum_swr_replay.analysis.inventory_comparison.schema import (
@@ -734,3 +736,138 @@ class TestExclusionByReason:
     def test_a_comparison_naming_an_unknown_detector_is_refused(self):
         with pytest.raises(ValueError, match="roster"):
             self.by_reason(self.tables(a=[]), comparisons={"typo": {"a", "kya"}})
+
+
+class TestStoredCoverage:
+    """The coverage rebuilt from the stored observation and set-aside tables
+    is the one the comparison built: the rule's drops first, then the
+    bridging events, each span leaving its own detector's coverage."""
+
+    KEY = ("sim", 20200101, "02_r1")
+    TIME = np.arange(50_001) * 0.002
+    STILL = {KEY: np.array([[0.0, 70.0], [80.0, 100.0]])}
+
+    def observations(self):
+        return pd.concat(
+            [
+                observation_table(
+                    SESSION,
+                    detector=detector,
+                    run_id="r",
+                    epoch_bounds=(0.0, 100.0),
+                    observed=observed,
+                    unavailable_reason=f"{detector} missing",
+                )
+                for detector, observed in (
+                    ("kay", np.array([[0.0, 100.0]])),
+                    ("state_space", np.array([[0.0, 40.0], [41.0, 100.0]])),
+                    ("mua", np.array([[0.0, 100.0]])),
+                )
+            ],
+            ignore_index=True,
+        )
+
+    @staticmethod
+    def set_aside(rows):
+        """Set-aside rows of (detector, key, start, end, reason)."""
+        detector, key, start, end, reason = zip(*rows, strict=True)
+        return pd.DataFrame(
+            {
+                "animal": "sim",
+                "day": 20200101,
+                "epoch": "02_r1",
+                "detector": detector,
+                "event_key": key,
+                "interval_start_s": start,
+                "interval_end_s": end,
+                "reason": reason,
+            }
+        ).astype(dict(SET_ASIDE_DTYPES))
+
+    def events(self, detector, intervals):
+        starts, ends = np.array(intervals).T
+        return inventory_from_intervals(
+            starts,
+            ends,
+            native_keys=np.arange(starts.size),
+            detector=detector,
+            session=SESSION,
+            run_id="r",
+            speed_time_s=self.TIME,
+            speed_cm_per_s=np.zeros(self.TIME.size),
+        )
+
+    def test_it_equals_the_coverage_built_drops_first_then_bridging(self):
+        observations = self.observations()
+        dropped = self.set_aside(
+            [
+                ("kay", "kay:sim20200101_02_r1:9", 50.0, 50.2, "near_artifact"),
+                ("state_space", "x", 60.0, 60.3, "artifact"),
+            ]
+        )
+        eligible, _ = combine_inventories(
+            [
+                self.events("kay", [(10.0, 10.1), (39.9, 40.05)]),
+                # the second bridges state space's own gap at 40-41 s
+                self.events("state_space", [(10.0, 10.3), (39.8, 41.2)]),
+            ]
+        )
+        built = set_aside_events(
+            coverage_from_observations(observations, self.STILL), dropped
+        )
+        kept, built, bridging = remove_bridging_events(eligible, built)
+        assert bridging.event_start_s.tolist() == [39.8]
+        stored = pd.concat(
+            [
+                dropped,
+                self.set_aside(
+                    zip(
+                        bridging.detector,
+                        bridging.event_key,
+                        bridging.event_start_s,
+                        bridging.event_end_s,
+                        ["bridging"] * len(bridging),
+                        strict=True,
+                    )
+                ),
+            ],
+            ignore_index=True,
+        )
+
+        rebuilt = stored_coverage(observations, stored, self.STILL)
+
+        assert set(rebuilt) == set(built)
+        for key, coverage in built.items():
+            np.testing.assert_array_equal(rebuilt[key].observed, coverage.observed)
+            np.testing.assert_array_equal(rebuilt[key].exposure, coverage.exposure)
+        np.testing.assert_array_equal(
+            rebuilt[(*self.KEY, "state_space")].observed,
+            [[0.0, 39.8], [41.2, 60.0], [60.3, 100.0]],
+        )
+        # the coverage reads the kept events as observed by their own detector
+        event_matches(kept, overlap_pairs(kept), rebuilt)
+
+    def test_a_set_aside_span_is_unobserved_by_its_own_detector_only(self):
+        observations = self.observations()
+        stored = self.set_aside(
+            [("kay", "kay:sim20200101_02_r1:9", 50.0, 50.2, "near_artifact")]
+        )
+
+        rebuilt = stored_coverage(observations, stored, self.STILL)
+        before = coverage_from_observations(observations, self.STILL)
+
+        kay = rebuilt[(*self.KEY, "kay")]
+        np.testing.assert_array_equal(kay.observed, [[0.0, 50.0], [50.2, 100.0]])
+        np.testing.assert_array_equal(
+            kay.exposure, [[0.0, 50.0], [50.2, 70.0], [80.0, 100.0]]
+        )
+        for detector in ("state_space", "mua"):
+            key = (*self.KEY, detector)
+            np.testing.assert_array_equal(rebuilt[key].observed, before[key].observed)
+            np.testing.assert_array_equal(rebuilt[key].exposure, before[key].exposure)
+
+    def test_a_set_aside_event_of_a_detector_with_no_observations_is_refused(self):
+        stored = self.set_aside([("carey", "c", 50.0, 50.2, "artifact")])
+
+        with pytest.raises(ValueError, match="no coverage"):
+            stored_coverage(self.observations(), stored, self.STILL)

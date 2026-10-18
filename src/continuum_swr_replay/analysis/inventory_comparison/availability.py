@@ -44,6 +44,7 @@ from continuum_swr_replay.analysis.inventory_comparison.intervals import (
 )
 from continuum_swr_replay.analysis.inventory_comparison.overlap import (
     Coverage,
+    set_aside_events,
     validate_detectors,
 )
 from continuum_swr_replay.analysis.inventory_comparison.schema import SessionIdentity
@@ -60,6 +61,7 @@ __all__ = [
     "observation_table",
     "sample_runs",
     "still_intervals",
+    "stored_coverage",
     "window_supported",
 ]
 
@@ -415,6 +417,51 @@ def coverage_from_observations(
             exposure=exposure(observed, still.get(tuple(session), np.empty((0, 2)))),
         )
     return coverage
+
+
+def stored_coverage(
+    observations: pd.DataFrame,
+    set_aside: pd.DataFrame,
+    still: Mapping[tuple, NDArray],
+) -> dict[tuple, Coverage]:
+    """The coverage a comparison read, rebuilt from the tables it stored.
+
+    The comparison builds its coverage from the observation tables and the
+    still intervals, removes the span of each event the analysed-time rule
+    dropped from its own detector's coverage (``set_aside_events``), then
+    removes the span of each event bridging its own detector's unobserved time
+    (``remove_bridging_events``). The stored set-aside table holds both kinds,
+    the bridging ones with their event spans, and subtracting every span at
+    once leaves the same interval sets as subtracting them in two steps.
+
+    Parameters
+    ----------
+    observations : DataFrame
+        The stored ``observations`` table: ``observation_table`` and
+        ``missing_run_table`` rows, concatenated.
+    set_aside : DataFrame
+        The stored ``set_aside`` table, columns as
+        ``overlap.SET_ASIDE_DTYPES``: dropped and bridging events alike.
+    still : mapping
+        ``(animal, day, epoch) -> ndarray (n, 2)``, as for
+        ``coverage_from_observations``: ``still_intervals`` on the speed trace
+        the comparison read, with its threshold and largest step.
+
+    Returns
+    -------
+    coverage : dict
+        ``(animal, day, epoch, detector) -> Coverage``, each set-aside span
+        unobserved by its own detector only.
+
+    Raises
+    ------
+    ValueError
+        If a set-aside event's detector has no observation rows in its epoch.
+    SwrSourceError
+        If an artifact run is configured and cannot serve an epoch.
+
+    """
+    return set_aside_events(coverage_from_observations(observations, still), set_aside)
 
 
 def _intervals(frame: pd.DataFrame, start: str, end: str) -> NDArray:

@@ -22,4 +22,6 @@ with per-detector denominators.
 - ``evidence``: the common spike-evidence diagnostic, how much better a remote
   place explains each row's spikes than the animal's own place, and its
   summary over each interval's rows.
+- ``populations``: the comparison's memberships rebuilt from its stored
+  tables, and the populations of compared events they define.
 """
