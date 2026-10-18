@@ -15,6 +15,8 @@ tables.
 - ``04_r2``: an artifact core at 30.05 s and no memoryless record.
 - ``10_r5``: its decode is rewritten after the comparison ran, so its sha256
   is no longer the one the comparison recorded.
+- ``12_r6``: no event of any inventory, no Carey record and no memoryless
+  record, so no compared event and no baseline pool.
 
 The simulated animal sweeps 60 cm in 0.3 s once a second, firing only then,
 while its saved speed says it is still (but over 20-25 s): the memoryless
@@ -109,8 +111,9 @@ EPOCHS = {
     "02_r1": "sim20200101_02_r1_HPC",
     "04_r2": "sim20200101_04_r2_HPC",
     "10_r5": "sim20200101_10_r5_HPC",
+    "12_r6": "sim20200101_12_r6_HPC",
 }
-WORKED, MASKED, CHANGED = EPOCHS.values()
+WORKED, MASKED, CHANGED, EMPTY = EPOCHS.values()
 MEMORYLESS_RUN, INVENTORY_RUN = "memorylessrun01", "comparison01"
 COMMIT = "featurestest0000000000000000000000000000"
 RUN_ID = COMMIT[:12]
@@ -279,7 +282,7 @@ def inputs(tmp_path_factory, module_monkeypatch):
 
     swr_run = write_swr_inventory(
         tmp_path / "swr",
-        {WORKED: KAY, MASKED: MASKED_KAY, CHANGED: KAY},
+        {WORKED: KAY, MASKED: MASKED_KAY, CHANGED: KAY, EMPTY: []},
         observed=dict.fromkeys(EPOCHS.values(), STORED_BAND),
     )
     manifest = json.loads((swr_run / "manifest.json").read_text())
@@ -296,7 +299,7 @@ def inputs(tmp_path_factory, module_monkeypatch):
             add_swr_detector(swr_run, identifier, detector, intervals)
     artifact_run = write_artifact_run(
         tmp_path / "artifacts",
-        {WORKED: [], MASKED: [("spk", 30.05, 30.05)], CHANGED: []},
+        {WORKED: [], MASKED: [("spk", 30.05, 30.05)], CHANGED: [], EMPTY: []},
     )
     use_swr_source(monkeypatch, swr_run, artifact_run)
 
@@ -307,6 +310,8 @@ def inputs(tmp_path_factory, module_monkeypatch):
     for epoch, identifier in EPOCHS.items():
         write_epoch(decode_root, epoch, identifier, simulated)
         write_marks_cache(cache_dir, decode_root, identifier, simulated)
+    empty = comparison.decode_path(EMPTY)
+    pd.read_pickle(empty).assign(non_local_event=0).to_pickle(empty)
     write_carey_run(tmp_path / "carey")
     write_memoryless_run(tmp_path / "memoryless", decode_root, simulated)
     stop_table = tmp_path / "stop_table.parquet"
@@ -614,11 +619,65 @@ def test_memberships_that_do_not_reproduce_the_stored_tables_fail_the_epoch(
 
     assert record["status"] == "failed"
     assert "directional" in record["error"]
+    assert record["decode"]["sha256"] == sha256_file(comparison.decode_path(WORKED))
     assert not list(output_dir.glob("*.parquet"))
 
 
+@pytest.mark.parametrize("name", ["marks", "detector"])
+def test_inputs_other_than_the_memoryless_runs_fail_the_epoch(
+    run, inputs, tmp_path, name
+):
+    """The memoryless run recorded other marks, or another detector file: the
+    epoch is refused with that reason, and its earlier outputs are removed."""
+    memoryless_dir = tmp_path / "memoryless"
+    shutil.copytree(inputs / "memoryless" / MEMORYLESS_RUN, memoryless_dir)
+    manifest_path = memoryless_dir / "manifest.json"
+    recorded = json.loads(manifest_path.read_text())
+    epoch = recorded["epochs"][WORKED]
+    entry = epoch["marks"] if name == "marks" else epoch["inputs"]["detector"]
+    entry["sha256"] = "0" * 64
+    manifest_path.write_text(json.dumps(recorded))
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+    for table_name in runner.TABLE_DTYPES:
+        shutil.copy(run / f"{WORKED}_{table_name}.parquet", output_dir)
+
+    key = parse_epoch_identifier(WORKED)
+    record = runner.run_epoch(
+        key.nwb_file_name,
+        key.epoch_name,
+        output_dir=output_dir,
+        inventory_dir=inputs / "inventory" / INVENTORY_RUN,
+        memoryless_dir=memoryless_dir,
+        decode_sha256={WORKED: sha256_file(comparison.decode_path(WORKED))},
+        stop_table=runner.STOP_TABLE,
+        provenance={"commit": COMMIT, "dirty": False},
+    )
+
+    assert record["status"] == "failed"
+    assert f"The {name} sha256 differ" in record["reason"]
+    assert not list(output_dir.glob("*.parquet"))
+
+
+def test_an_epoch_with_no_compared_event_writes_empty_typed_tables(run):
+    record = manifest(run)["epochs"][EMPTY]
+
+    assert record["status"] == "ok"
+    assert record["n_evidence_rows"] == 0
+    for name, dtypes in runner.TABLE_DTYPES.items():
+        read = table(run, EMPTY, name)
+        assert read.empty and read.dtypes.to_dict() == dtypes_of(dtypes), name
+
+
+def test_a_comparison_under_another_swr_source_is_refused(run, monkeypatch):
+    monkeypatch.setattr(swr_source, "swr_source_name", lambda: "yu@other+none")
+
+    with pytest.raises(SystemExit, match="SWR source"):
+        runner.main([*ARGS, "--epoch-id", WORKED])
+
+
 def test_every_table_keeps_its_dtypes_through_a_write_and_read(run):
-    for identifier in (WORKED, MASKED):
+    for identifier in (WORKED, MASKED, EMPTY):
         for name, dtypes in runner.TABLE_DTYPES.items():
             read = table(run, identifier, name)
             assert list(read.columns) == list(dtypes), name

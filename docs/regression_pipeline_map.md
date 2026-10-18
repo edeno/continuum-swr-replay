@@ -782,7 +782,7 @@ Report one inventory comparison run: its counts per session and per animal.
 
 Event features of every compared event and of matched baselines, one epoch per task.
 
-`output_path`, `replace_outputs`, `baseline_rows`, `epoch_tables`, `run_epoch`, `summary`, `run_settings`, `main`, `run`
+`output_path`, `replace_outputs`, `baseline_rows`, `memoryless_input_mismatch`, `epoch_tables`, `run_epoch`, `summary`, `run_settings`, `main`, `run`
 
 ### `scripts/qa/run_inventory_comparison.py`
 

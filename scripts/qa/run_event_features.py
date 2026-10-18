@@ -19,7 +19,9 @@ Per epoch:
    exactly. The populations follow (``population_rows``).
 3. **Marks.** The decode's marks (``decode_marks``, from the memoryless
    runner's cache), refused unless every mark of the encoding model is among
-   them (``check_marks_match_encoding``).
+   them (``check_marks_match_encoding``). When the memoryless run observed
+   the epoch, the epoch is refused, and writes nothing, unless the decode's
+   detector, the decode and the marks have the sha256 that run recorded.
 4. **Evidence.** The baseline pool is the ``all`` comparison's shared exposure
    less every event of every inventory (``baseline_pool``). The spike evidence
    is computed on every row of the compared events and on every row strictly
@@ -52,7 +54,9 @@ its status, the decode's and the marks' sha256, the counts, the outputs, its
 wall clock, the share of it spent computing the evidence, and the worker's
 peak RSS. Only the main process writes it, atomically, after each epoch. A
 rerun skips the epochs already ``ok`` unless ``--overwrite`` is given, and
-refuses settings other than the ones the manifest was written with.
+refuses settings other than the ones the manifest was written with. A run
+whose SWR source (its SWR and artifact runs, and the source's name) is not the
+one the comparison read is refused before any epoch.
 
 The epochs are the epoch register's analysed ones, narrowed by ``--animal``,
 ``--date`` and ``--epoch``, or the one ``--epoch-id``, run on a dask
@@ -86,6 +90,7 @@ import resource  # noqa: E402
 import sys  # noqa: E402
 import time as clock  # noqa: E402
 import traceback  # noqa: E402
+import warnings  # noqa: E402
 from collections.abc import Mapping  # noqa: E402
 from pathlib import Path  # noqa: E402
 from types import MappingProxyType  # noqa: E402
@@ -206,7 +211,11 @@ from scripts.decoding.run_swr_detection import (  # noqa: E402
     run_lock,
 )
 from scripts.qa import run_inventory_comparison as comparison  # noqa: E402
-from scripts.qa.analyze_event_spike_evidence import REMOTE_CM  # noqa: E402
+
+# the spike-evidence script installs ignore filters for whole warning classes
+# when imported; they stay inside this block, out of the run and its workers
+with warnings.catch_warnings():
+    from scripts.qa.analyze_event_spike_evidence import REMOTE_CM  # noqa: E402
 
 OUTPUT_ROOT = comparison.COMPARISON_ROOT / "event_features"
 INVENTORY_ROOT = comparison.OUTPUT_ROOT
@@ -468,6 +477,36 @@ def _memoryless_run(
     return candidates, read_table(paths["events"]), undecoded
 
 
+def memoryless_input_mismatch(
+    record: Mapping[str, Any], read: Mapping[str, str]
+) -> str | None:
+    """Why the inputs read here are not the ones the memoryless run read, or
+    None.
+
+    Parameters
+    ----------
+    record : mapping
+        The memoryless run's manifest record of the epoch, with its
+        ``inputs`` (the decode's ``detector`` and ``data_over_time``) and
+        ``marks``, each with a ``sha256``.
+    read : mapping
+        The sha256 of what this run read, by the same names: ``detector``,
+        ``data_over_time`` and ``marks``.
+    """
+    recorded = {
+        "detector": record["inputs"]["detector"]["sha256"],
+        "data_over_time": record["inputs"]["data_over_time"]["sha256"],
+        "marks": record["marks"]["sha256"],
+    }
+    differ = [name for name in recorded if recorded[name] != read[name]]
+    if not differ:
+        return None
+    return (
+        f"The {', '.join(differ)} sha256 differ from the memoryless run's record: "
+        "its windows and candidates are not of these inputs."
+    )
+
+
 def _missing_ms(index: pd.Index) -> pd.DataFrame:
     """Every ``ms_*`` feature missing, for an epoch with no memoryless run."""
     return pd.DataFrame(
@@ -512,11 +551,18 @@ def epoch_tables(
     memoryless_dir: Path,
     stop_table: Path,
     run_id: str,
+    decode_sha256: str,
 ) -> tuple[dict[str, Any], dict[str, pd.DataFrame]]:
     """One epoch's tables by name, with :data:`TABLE_DTYPES`, and its record.
 
+    ``decode_sha256`` is the decode's, checked against the comparison's record
+    by the caller and here against the memoryless run's.
+
     Raises
     ------
+    _EpochRefused
+        The decode's detector, the decode or the marks are not the ones the
+        memoryless run read (its manifest record of the epoch).
     ValueError
         The grid does not step by the comparison's ``SAMPLE_INTERVAL_S``; the
         rebuilt memberships do not reproduce the stored ``directional`` or
@@ -558,6 +604,20 @@ def epoch_tables(
     check_marks_match_encoding(
         marks["encoding_model"], spike_times, spike_waveform_features
     )
+    marks_hash = marks_sha256(spike_times, spike_waveform_features)
+    run = _memoryless_run(identifier, stored["observations"], memoryless_dir, time)
+    if run is not None:
+        memoryless = json.loads((memoryless_dir / "manifest.json").read_text())
+        reason = memoryless_input_mismatch(
+            memoryless["epochs"][identifier],
+            {
+                "detector": marks["record"]["detector_sha256"],
+                "data_over_time": decode_sha256,
+                "marks": marks_hash,
+            },
+        )
+        if reason is not None:
+            raise _EpochRefused(reason)
     encoding = encoding_inputs(marks["encoding_model"])
     environment = encoding["env"]
     traces = RowTraces.from_frame(dot, spike_times)
@@ -626,7 +686,6 @@ def epoch_tables(
             ("epoch", "==", session[2]),
         ],
     )
-    run = _memoryless_run(identifier, stored["observations"], memoryless_dir, time)
     if run is None:
         ms = _missing_ms(intervals.index)
     else:
@@ -676,8 +735,7 @@ def epoch_tables(
     }
     record = {
         "memoryless_available": run is not None,
-        "marks": marks["record"]
-        | {"sha256": marks_sha256(spike_times, spike_waveform_features)},
+        "marks": marks["record"] | {"sha256": marks_hash},
         "n_grid_rows": int(time.size),
         "n_evidence_rows": int(rows.sum()),
         "likelihood_s": likelihood_s,
@@ -720,8 +778,10 @@ def run_epoch(
     dict
         The epoch's manifest record, in strict JSON types: ``status`` ``"ok"``,
         or ``"failed"`` with a ``reason`` (the decode is not the comparison's,
-        or the comparison has no ``ok`` record of the epoch) or the ``error``
-        and its ``traceback``. A failed epoch's outputs are removed.
+        the comparison has no ``ok`` record of the epoch, or the inputs are
+        not the memoryless run's) or the ``error`` and its ``traceback``,
+        with the decode's ``path`` and ``sha256`` once read. A failed epoch's
+        outputs are removed.
     """
     started = clock.perf_counter()
     identifier = epoch_id(nwb_file_name, epoch_name)
@@ -751,6 +811,7 @@ def run_epoch(
             memoryless_dir=memoryless_dir,
             stop_table=stop_table,
             run_id=output_dir.name,
+            decode_sha256=record["decode"]["sha256"],
         )
         record |= {"status": "ok", **found}
         record["outputs"] = replace_outputs(identifier, output_dir, tables, stamp)
@@ -759,7 +820,7 @@ def run_epoch(
         record |= {"status": "failed", "reason": str(refused)}
     except Exception as error:  # noqa: BLE001 - recorded; the run goes on
         replace_outputs(identifier, output_dir, {}, stamp)
-        record = {
+        record |= {
             "status": "failed",
             "error": repr(error),
             "traceback": traceback.format_exc(),
@@ -960,6 +1021,12 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
             f"Comparison run {args.inventory_run_id} read SWR run "
             f"{input_runs['swr']} and artifact run {input_runs['artifacts']}; the "
             f"SWR source is {current['swr']} and {current['artifacts']}."
+        )
+    if inventory["settings"]["swr_source"] != swr_source.swr_source_name():
+        sys.exit(
+            f"Comparison run {args.inventory_run_id} read SWR source "
+            f"{inventory['settings']['swr_source']}; the SWR source is "
+            f"{swr_source.swr_source_name()}."
         )
     memoryless_dir = MEMORYLESS_ROOT / input_runs["memoryless"]
     if not (memoryless_dir / "manifest.json").exists():
