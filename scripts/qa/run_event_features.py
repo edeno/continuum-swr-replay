@@ -909,7 +909,12 @@ def run_settings(inventory_run_id: str, inventory: Mapping[str, Any]) -> dict:
                 **inventory["settings"]["input_runs"],
             },
             "swr_source": swr_source.swr_source_name(),
-            "stop_table": {"path": str(STOP_TABLE), "sha256": sha256_file(STOP_TABLE)},
+            # relative, so a worktree whose Processed-Data links to the same
+            # folder records the same settings
+            "stop_table": {
+                "path": str(STOP_TABLE.relative_to(PROCESSED_DATA_DIR)),
+                "sha256": sha256_file(STOP_TABLE),
+            },
             "decode": comparison.decode_path("{epoch_id}").name
             + ", read through the SWR source; its sha256 the comparison's",
             "marks_rule": MARKS_RULE,

@@ -314,7 +314,9 @@ def inputs(tmp_path_factory, module_monkeypatch):
     pd.read_pickle(empty).assign(non_local_event=0).to_pickle(empty)
     write_carey_run(tmp_path / "carey")
     write_memoryless_run(tmp_path / "memoryless", decode_root, simulated)
-    stop_table = tmp_path / "stop_table.parquet"
+    processed = tmp_path / "processed"
+    stop_table = processed / "replay_content" / "stop_table.parquet"
+    stop_table.parent.mkdir(parents=True)
     write_stop_table(stop_table)
 
     monkeypatch.setattr(comparison, "CAREY_ROOT", tmp_path / "carey")
@@ -340,6 +342,7 @@ def inputs(tmp_path_factory, module_monkeypatch):
     monkeypatch.setattr(runner, "INVENTORY_ROOT", tmp_path / "inventory")
     monkeypatch.setattr(runner, "MEMORYLESS_ROOT", tmp_path / "memoryless")
     monkeypatch.setattr(runner, "MARKS_CACHE_DIR", cache_dir)
+    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", processed)
     monkeypatch.setattr(runner, "STOP_TABLE", stop_table)
     monkeypatch.setattr(runner, "OUTPUT_ROOT", tmp_path / "event_features")
     monkeypatch.setattr(
@@ -722,6 +725,7 @@ def test_the_manifest_records_the_inputs_and_the_rules(run):
     assert settings["baselines"]["seed"] == runner.BASELINE_SEED
     assert settings["grid"]["sample_interval_s"] == comparison.SAMPLE_INTERVAL_S
     assert "unavailable" in settings["tracking_confidence"]
+    assert settings["stop_table"]["path"] == "replay_content/stop_table.parquet"
     assert len(settings["stop_table"]["sha256"]) == 64
     record = manifest(run)["epochs"][WORKED]
     assert record["decode"]["sha256"] == sha256_file(comparison.decode_path(WORKED))
@@ -734,6 +738,26 @@ def test_the_manifest_records_the_inputs_and_the_rules(run):
         "duration_only",
         "failed",
     }
+
+
+def test_the_settings_name_no_absolute_path(run, inputs, tmp_path, monkeypatch):
+    """Two roots holding the same stop table, as two worktrees whose
+    Processed-Data links to one folder, give the same settings."""
+    inventory = json.loads(
+        (inputs / "inventory" / INVENTORY_RUN / "manifest.json").read_text()
+    )
+    settings = []
+    for root in (tmp_path / "one" / "Processed-Data", tmp_path / "two" / "elsewhere"):
+        stop_table = root / "replay_content" / "stop_table.parquet"
+        stop_table.parent.mkdir(parents=True)
+        shutil.copy(runner.STOP_TABLE, stop_table)
+        with monkeypatch.context() as patch:
+            patch.setattr(runner, "PROCESSED_DATA_DIR", root)
+            patch.setattr(runner, "STOP_TABLE", stop_table)
+            settings.append(runner.run_settings(INVENTORY_RUN, inventory))
+
+    assert settings[0] == settings[1] == manifest(run)["settings"]
+    assert str(tmp_path) not in json.dumps(settings[0])
 
 
 def test_a_rerun_skips_ok_epochs(run, monkeypatch, capsys):
