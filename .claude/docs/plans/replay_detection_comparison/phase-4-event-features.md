@@ -281,6 +281,8 @@ follow-ups".
 
 ### Task 5 — Baseline windows
 
+> **2026-10-18, the lead's decision:** the baseline comparison is dropped from this phase, since windows matched on duration and location but not on spike count mostly measured engagement. The runner no longer draws or scores baselines; the functions below are built, reviewed and kept, with their tests, for a later design matched on spike count.
+
 - **Files.** Create `src/continuum_swr_replay/analysis/inventory_comparison/selection.py` (baselines, Task 6's
   rejection stages). Tests in `tests/unit/test_inventory_selection.py`.
 - **Consumes.** `intervals` arithmetic; the `all` comparison's shared exposure from Task 4's coverage;
@@ -517,6 +519,7 @@ per figure.
 
 ## Deliberately not in this phase
 
+- Baseline windows (dropped by the lead, 2026-10-18): the evidence score is reported beside its spike counts, with no baseline, pending a design matched on spike count.
 - Threshold robustness (Phase 5), and every follow-up control of 04 and 03 (native speed gates,
   running-only encoding, reference-channel ripple power, leave-one-tetrode-out).
 - The Phase 2 pilot checks (deferred by the lead); no Widloski claim.
