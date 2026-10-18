@@ -97,8 +97,12 @@ from continuum_swr_replay.analysis.inventory_comparison.overlap import (  # noqa
     UNMATCHED,
 )
 from continuum_swr_replay.data_loaders.lfp import get_ripple_band_inputs  # noqa: E402
-from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
+from continuum_swr_replay.figure_utilities import WONG  # noqa: E402
+from continuum_swr_replay.parameters import COLORS, FIGURE_DIR  # noqa: E402
 from continuum_swr_replay.table_io import read_table  # noqa: E402
+from continuum_swr_replay.visualization.plots import (  # noqa: E402
+    plot_linear_track_graph_strip,
+)
 from scripts.decoding.run_carey_detection import decode_marks  # noqa: E402
 from scripts.qa import run_inventory_comparison as runner  # noqa: E402
 
@@ -159,6 +163,72 @@ GATE_ROWS: Mapping[str, str] = MappingProxyType(
 """The stored memoryless gates drawn, with their row labels."""
 POSITION_STATES = ("Local", "Non-Local Continuous", "Non-Local Fragmented")
 """The state-space states with a position; ``No-Spike`` has none."""
+
+ANIMAL_POSITION_COLOR = "magenta"
+"""The animal's position over a posterior, as in Figure 1 and the event gallery."""
+MEMORYLESS_COLOR = WONG[5]
+"""The memoryless inventories: Wong blue, which no ``COLORS`` entry uses."""
+WINDOW_CENTER_COLOR = WONG[2]
+"""Each memoryless window's center (sky blue), as in the memoryless comparison."""
+
+
+def detector_color(detector: str) -> str:
+    """The paper's color for a detector's events: ``COLORS`` by family.
+
+    Every SWR definition takes ``COLORS["SWR"]``, ``mua`` ``COLORS["MUA"]`` and
+    ``state_space`` ``COLORS["Non-Local"]``; both memoryless inventories take
+    :data:`MEMORYLESS_COLOR`. The bars' rows name the detector.
+    """
+    if detector in runner.SWR_DEFINITIONS:
+        return str(COLORS["SWR"])
+    if detector == "mua":
+        return str(COLORS["MUA"])
+    if detector == "state_space":
+        return str(COLORS["Non-Local"])
+    return str(MEMORYLESS_COLOR)
+
+
+def _track_key(ax: Any, environment: Any, max_position: float, label: str) -> None:
+    """The linearized track beside a posterior, as in the event gallery.
+
+    A strip flush to the posterior's left (``plot_linear_track_graph_strip``,
+    the decode's own ``edge_order`` and ``edge_spacing``), each arm labeled by
+    its ``edge_id`` at its middle. The strip takes the posterior's y label.
+    """
+    strip = ax.inset_axes([-0.075, 0.0, 0.06, 1.0])
+    graph = environment.track_graph
+    plot_linear_track_graph_strip(
+        graph,
+        environment.edge_order,
+        environment.edge_spacing,
+        ax=strip,
+        max_position=max_position,
+        node_size=6,
+    )
+    n_edges = len(environment.edge_order)
+    spacing = np.atleast_1d(np.asarray(environment.edge_spacing, dtype=float))
+    # one gap after each edge but the last, as plot_graph_as_1D lays them
+    gaps = np.resize(spacing, n_edges - 1) if spacing.size == 1 else spacing
+    # plot_graph_as_1D's per-edge colors
+    colors = getattr(plt.get_cmap("tab10"), "colors")  # noqa: B009
+    position = 0.0
+    for index, edge in enumerate(environment.edge_order):
+        length = float(graph.edges[edge]["distance"])
+        strip.text(
+            -0.8,
+            position + length / 2,
+            f"a{graph.edges[edge]['edge_id']}",
+            fontsize=4.5,
+            color=colors[index % len(colors)],
+            ha="center",
+            va="center",
+        )
+        position += length + (gaps[index] if index < n_edges - 1 else 0.0)
+    strip.set_ylabel(label, fontsize=7)
+    strip.tick_params(labelsize=6)
+    ax.set_ylabel("")
+    ax.set_ylim(0.0, max_position)
+    ax.tick_params(labelleft=False)
 
 
 def _unit_rng(seed: int, unit: tuple[str, ...]) -> np.random.Generator:
@@ -627,10 +697,13 @@ def draw_example(
         vmax=max(float(np.quantile(summed, 0.99)), 1e-12),
         rasterized=True,
     )
+    animal_position = dot["linear_position"].to_numpy(dtype=np.float64)
+    environment = inputs.encoding_model["environment"]
+    max_position = float(np.ceil(np.nanmax(environment.place_bin_edges_)))
     state_space.plot(
-        rel(time), dot["linear_position"], color="#D55E00", lw=0.6, ls="--"
+        rel(time), animal_position, color=ANIMAL_POSITION_COLOR, lw=0.8, alpha=0.9
     )
-    state_space.set_ylabel("state-space\nposterior (cm)", fontsize=7)
+    _track_key(state_space, environment, max_position, "state-space\nposterior (cm)")
 
     usable = np.isfinite(posterior).all(axis=1)
     shown = np.where(usable[:, None], posterior, 0.0)
@@ -649,10 +722,13 @@ def draw_example(
         rel(window_time[has_center]),
         inputs.bin_centers_cm[decisions.center_index[has_center]],
         s=1.5,
-        color="#0072B2",
+        color=WINDOW_CENTER_COLOR,
         linewidths=0,
     )
-    memoryless.set_ylabel("memoryless†\nwindows (cm)", fontsize=7)
+    memoryless.plot(
+        rel(time), animal_position, color=ANIMAL_POSITION_COLOR, lw=0.8, alpha=0.9
+    )
+    _track_key(memoryless, environment, max_position, "memoryless†\nwindows (cm)")
 
     stored = candidates.decisions.gates
     rows = {
@@ -669,18 +745,23 @@ def draw_example(
             speed < DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
         ),
     }
-    for row, (times, mask) in enumerate(rows.values()):
+    row_colors = [COLORS["Non-Local"], *[MEMORYLESS_COLOR] * len(GATE_ROWS), "0.4"]
+    for row, ((times, mask), color) in enumerate(
+        zip(rows.values(), row_colors, strict=True)
+    ):
         gates.broken_barh(
             [(s - start, w) for s, w in _spans(times, np.asarray(mask, bool))],
             (row - 0.4, 0.8),
-            color="#009E73",
+            color=color,
             linewidth=0,
         )
     gates.set_yticks(range(len(rows)), list(rows), fontsize=6)
     gates.set_ylim(len(rows) - 0.5, -0.5)
 
     speed_ax.plot(rel(time), speed, color="k", lw=0.7)
-    speed_ax.axhline(DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC, color="#D55E00", lw=0.5)
+    speed_ax.axhline(
+        DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC, color="red", ls="--", lw=0.8
+    )
     speed_ax.set_ylabel("speed\n(cm/s)", fontsize=7)
 
     in_band = (inputs.band_time >= t0) & (inputs.band_time <= t1)
@@ -692,7 +773,6 @@ def draw_example(
     band_ax.set_ylabel(f"ripple band\n({band.shape[1]} kept tetrodes)", fontsize=7)
 
     detectors = list(runner.DETECTORS)
-    colors = plt.get_cmap("tab10").colors
     for row, detector in enumerate(detectors):
         own = inputs.inventory[inputs.inventory.detector == detector]
         own = own[(own.event_end_s >= t0) & (own.event_start_s <= t1)]
@@ -703,7 +783,7 @@ def draw_example(
                     zip(rel(subset.event_start_s), subset.interval_span_s, strict=True)
                 ),
                 (row - 0.4, 0.8),
-                color=colors[row % len(colors)],
+                color=detector_color(detector),
                 alpha=alpha,
                 linewidth=0,
             )
@@ -741,7 +821,7 @@ def draw_example(
                 linewidth=0,
             )
         for edge in (0.0, end - start):
-            ax.axvline(edge, color="#CC79A7", lw=0.6, ls=":")
+            ax.axvline(edge, color="k", lw=0.6, ls=":")
         ax.tick_params(labelsize=6)
     raster.set_xlim(-PAD_S, end - start + PAD_S)
     fig.suptitle(
@@ -774,9 +854,11 @@ CAPTION = (
     + f" Each figure shows one event on one time axis, {PAD_S} s either side of "
     "it (dotted lines mark the event): the spikes of each tetrode (the decode's "
     "marks); the state-space posterior summed over the Local and both "
-    "Non-Local states, with the animal's linear position (dashed); the "
+    "Non-Local states, with the animal's linear position (magenta); the "
     "memoryless window posteriors, recomputed for the plotted windows on the "
-    "decode's encoding model, with each window's center (dots). Their spreads, "
+    "decode's encoding model, with each window's center (sky-blue dots) and the "
+    "animal's position. Beside each posterior, the decode's linearized track, "
+    "its arms labeled a0-a8. The recomputed windows' spreads, "
     "jumps and candidate statistics equal the stored ones within "
     f"{SPREAD_RTOL} relative, and their centers and gates equal them except "
     "where a center tied between two bins or a statistic sat at its threshold "
@@ -785,7 +867,9 @@ CAPTION = (
     "per-window speed, spread, jump and kept gates as stored; speed below "
     f"{DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC} cm/s); the speed; the stored ripple "
     "band of the tetrodes the SWR source kept; and every inventory's events "
-    "(compared events solid, moving events light, events set aside outlined). "
+    "(compared events solid, moving events light, events set aside outlined), "
+    "colored by family as in the paper: SWR definitions orange, MUA purple, "
+    "state-space green, memoryless blue. "
     "Excluded time is shaded grey in every panel. " + PENDING_SENTENCE
 )
 

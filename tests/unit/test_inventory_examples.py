@@ -232,3 +232,16 @@ def test_a_draw_that_cannot_be_made_is_recorded_and_the_run_goes_on(
     assert [r["status"] for r in manifest["figures"]] == [r["status"] for r in records]
     captions = (figure_dir / "captions.md").read_text()
     assert captions.count("(not written: ") == 3
+
+
+def test_detector_colors_follow_the_paper_families():
+    """Every SWR definition shares COLORS["SWR"]; MUA, state-space and the two
+    memoryless inventories each take their own family color."""
+    from continuum_swr_replay.parameters import COLORS
+
+    colors = {d: examples.detector_color(d) for d in runner.DETECTORS}
+    assert {colors[d] for d in runner.SWR_DEFINITIONS} == {COLORS["SWR"]}
+    assert colors["mua"] == COLORS["MUA"]
+    assert colors["state_space"] == COLORS["Non-Local"]
+    assert colors["memoryless"] == colors["memoryless_criteria"]
+    assert colors["memoryless"] not in COLORS.values()
