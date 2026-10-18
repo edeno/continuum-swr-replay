@@ -778,6 +778,12 @@ Report one inventory comparison run: its counts per session and per animal.
 
 `session_names`, `read_run`, `epoch_status`, `detector_availability`, `with_pending`, `pool_sessions`, `counts_by_session`, `counts_by_animal`, `directional_by_animal`, `oriented_pairs`, `match_strength_by_session`, `match_strength_by_animal`, `cells_by_session`, `cells_by_animal`, `swr_matrix_by_animal`, `matrix_population`, `paired_labels_by_session`, `definition_disagreement_by_session`, `labels_by_animal`, `report_tables`, `draw_figures`, `write_report`, `main`
 
+### `scripts/qa/run_event_features.py`
+
+Event features of every compared event and of matched baselines, one epoch per task.
+
+`output_path`, `replace_outputs`, `baseline_rows`, `epoch_tables`, `run_epoch`, `summary`, `run_settings`, `main`, `run`
+
 ### `scripts/qa/run_inventory_comparison.py`
 
 Compare the replay-detection inventories, one epoch at a time.
