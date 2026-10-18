@@ -70,3 +70,50 @@ def test_importing_the_runner_installs_no_ignore_filter_for_a_warning_class():
         check=True,
         env={"JAX_PLATFORMS": "cpu", "PATH": ""},
     )
+
+
+def test_a_failure_after_the_tables_keeps_no_field_of_an_ok_record(
+    tmp_path, monkeypatch
+):
+    """The tables are made, then writing them fails: the record is a failure
+    with the decode it read, and nothing of the ok record it nearly was."""
+    decode = tmp_path / "decode.pkl"
+    decode.write_bytes(b"decode")
+    identifier = "sim20200101_02_r1_HPC"
+    monkeypatch.setattr(runner.comparison, "decode_path", lambda _: decode)
+    found = {
+        "memoryless_available": True,
+        "marks": {"sha256": "m"},
+        "n_grid_rows": 10,
+        "n_evidence_rows": 5,
+        "likelihood_s": 1.0,
+        "counts": {"events": {"kay": 1}},
+    }
+    calls = []
+
+    def failing_write(identifier, output_dir, tables, stamp):
+        calls.append(tables)
+        if tables:
+            raise OSError("disk full")
+        return {}
+
+    monkeypatch.setattr(runner, "replace_outputs", failing_write)
+    monkeypatch.setattr(runner, "epoch_tables", lambda *a, **k: (found, {"x": 1}))
+
+    record = runner.run_epoch(
+        "sim20200101_.nwb",
+        "02_r1",
+        output_dir=tmp_path,
+        inventory_dir=tmp_path,
+        memoryless_dir=tmp_path,
+        decode_sha256={identifier: runner.sha256_file(decode)},
+        stop_table=tmp_path / "stops.parquet",
+        provenance={"commit": "c" * 40},
+    )
+
+    assert record["status"] == "failed"
+    assert "disk full" in record["error"]
+    assert record["decode"]["path"] == str(decode)
+    assert not set(found) & set(record)
+    assert "likelihood_share" not in record
+    assert calls[-1] == {}

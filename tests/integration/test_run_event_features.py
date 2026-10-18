@@ -185,6 +185,9 @@ def write_epoch(root: Path, epoch: str, identifier: str, simulated: dict) -> Non
         SWR_zscore=np.sin(2 * np.pi * TIME / 7.0),
         MUA_zscore=np.cos(2 * np.pi * TIME / 5.0),
     )
+    # the decode stores the state probabilities as float32
+    states = [c for c in dot.columns if c.endswith("_prob")]
+    dot[states] = dot[states].astype(np.float32)
     dot.to_pickle(path)
     joblib.dump(
         _StandInDetector({ENCODING_KEY: simulated["encoding_model"]}),
@@ -626,18 +629,19 @@ def test_memberships_that_do_not_reproduce_the_stored_tables_fail_the_epoch(
     assert not list(output_dir.glob("*.parquet"))
 
 
-@pytest.mark.parametrize("name", ["marks", "detector"])
+@pytest.mark.parametrize("name", ["marks", "detector", "data_over_time"])
 def test_inputs_other_than_the_memoryless_runs_fail_the_epoch(
     run, inputs, tmp_path, name
 ):
-    """The memoryless run recorded other marks, or another detector file: the
-    epoch is refused with that reason, and its earlier outputs are removed."""
+    """The memoryless run recorded other marks, another detector file or
+    another decode: the epoch is refused with that reason, and its earlier
+    outputs are removed."""
     memoryless_dir = tmp_path / "memoryless"
     shutil.copytree(inputs / "memoryless" / MEMORYLESS_RUN, memoryless_dir)
     manifest_path = memoryless_dir / "manifest.json"
     recorded = json.loads(manifest_path.read_text())
     epoch = recorded["epochs"][WORKED]
-    entry = epoch["marks"] if name == "marks" else epoch["inputs"]["detector"]
+    entry = epoch["marks"] if name == "marks" else epoch["inputs"][name]
     entry["sha256"] = "0" * 64
     manifest_path.write_text(json.dumps(recorded))
     output_dir = tmp_path / "out"
@@ -675,7 +679,11 @@ def test_an_epoch_with_no_compared_event_writes_empty_typed_tables(run):
 def test_a_comparison_under_another_swr_source_is_refused(run, monkeypatch):
     monkeypatch.setattr(swr_source, "swr_source_name", lambda: "yu@other+none")
 
-    with pytest.raises(SystemExit, match="SWR source"):
+    with pytest.raises(
+        SystemExit,
+        match=rf"Comparison run {INVENTORY_RUN} read SWR source \S+; the SWR "
+        r"source is yu@other\+none\.",
+    ):
         runner.main([*ARGS, "--epoch-id", WORKED])
 
 

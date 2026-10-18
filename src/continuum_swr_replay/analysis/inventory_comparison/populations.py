@@ -54,6 +54,7 @@ from continuum_swr_replay.analysis.inventory_comparison.overlap import (
     Coverage,
     directional_agreement,
     event_matches,
+    flag_pairs,
 )
 from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 
@@ -101,11 +102,16 @@ def _require_same(
     if rebuilt.shape == stored.shape and rebuilt.equals(stored):
         return
     if rebuilt.shape == stored.shape:
-        differs = (rebuilt != stored) & ~(rebuilt.isna() & stored.isna())
-        detail = (
-            f"{int(differs.any(axis=1).sum())} of {len(stored)} rows differ, in "
-            f"{list(stored.columns[differs.any(axis=0).to_numpy()])} (or in dtype)"
-        )
+        try:
+            differs = (rebuilt != stored) & ~(rebuilt.isna() & stored.isna())
+        except TypeError:  # values of dtypes that cannot be compared
+            detail = "the columns differ in dtype"
+        else:
+            detail = (
+                f"{int(differs.any(axis=1).sum())} of {len(stored)} rows differ, "
+                f"in {list(stored.columns[differs.any(axis=0).to_numpy()])} (or "
+                "in dtype)"
+            )
     else:
         detail = f"{len(rebuilt)} rows rebuilt against {len(stored)} stored"
     raise ValueError(
@@ -128,9 +134,9 @@ def rebuild_matches(
     set-aside events; the memberships are ``event_matches`` over the stored
     compared events (the ``inventory`` rows with
     ``whole_event_speed_eligible``) and pairs. Both are checked: the
-    ``directional_agreement`` and ``membership_against`` they give must equal
-    the stored ``directional`` and ``cells`` tables exactly, rows in any
-    order.
+    ``flag_pairs``, ``directional_agreement`` and ``membership_against`` they
+    give must equal the stored ``pairs``, ``directional`` and ``cells`` tables
+    exactly, rows in any order.
 
     Parameters
     ----------
@@ -157,9 +163,9 @@ def rebuild_matches(
     Raises
     ------
     ValueError
-        If the rebuilt directional agreement or cells differ from the stored
-        ones, or (from ``event_matches``) a compared event lies outside its
-        own detector's rebuilt coverage.
+        If the rebuilt pair flags, directional agreement or cells differ from
+        the stored ones, or (from ``event_matches``) a compared event lies
+        outside its own detector's rebuilt coverage.
 
     """
     coverage = stored_coverage(tables["observations"], tables["set_aside"], still)
@@ -167,6 +173,14 @@ def rebuild_matches(
     compared = inventory[inventory.whole_event_speed_eligible].reset_index(drop=True)
     pairs = tables["pairs"][list(PAIR_DTYPES)]
     matches = event_matches(compared, pairs, coverage, detectors=detectors)
+    # each pair's within-exposure flags, so the memberships are checked event
+    # by event and not only through the tables counted from them
+    _require_same(
+        "pairs",
+        flag_pairs(pairs, matches),
+        tables["pairs"],
+        [*SESSION_COLUMNS_DAY, "event_key_a", "event_key_b"],
+    )
     _require_same(
         "directional",
         directional_agreement(compared, pairs, coverage, detectors=detectors),
@@ -220,14 +234,19 @@ def population_rows(
     Raises
     ------
     ValueError
-        If the matches are not over these events, or a membership has no
-        directional row for its pair.
+        If the matches are not over these events, a cell holds an event not
+        among them, or a membership has no directional row for its pair.
 
     """
     if set(events.event_key) != set(matches.event_key):
         raise ValueError(
             "The matches are not over these events; pass the compared events "
             "the matches were computed over."
+        )
+    if not cells.event_key.isin(events.event_key).all():
+        raise ValueError(
+            "A row of the cells table is not one of these events; pass the "
+            "cells of the compared events."
         )
     ids = [*SESSION_COLUMNS_DAY, "detector", "event_key"]
     everyone = events[ids].assign(population=ALL, unknown_reason="")

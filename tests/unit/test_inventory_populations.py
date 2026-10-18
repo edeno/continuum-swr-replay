@@ -31,6 +31,7 @@ from continuum_swr_replay.analysis.inventory_comparison.overlap import (
 )
 from continuum_swr_replay.analysis.inventory_comparison.populations import (
     POPULATION_DTYPES,
+    _require_same,
     population_rows,
     rebuild_matches,
 )
@@ -196,6 +197,27 @@ class TestRebuildMatches:
                 {**tables, name: changed}, still, detectors=DETECTORS, cells=CELLS
             )
 
+    def test_a_dtype_clash_is_refused_by_name_not_a_type_error(self):
+        # categoricals of other categories cannot be compared: != raises a
+        # TypeError, and the refusal must still be the named one
+        rebuilt = pd.DataFrame({"k": [0, 1], "m": pd.Categorical(["a", "b"])})
+        stored = pd.DataFrame({"k": [0, 1], "m": pd.Categorical(["a", "c"])})
+
+        with pytest.raises(ValueError, match="stored cells table.*in dtype"):
+            _require_same("cells", rebuilt, stored, ["k"])
+
+    def test_stored_pair_flags_it_does_not_reproduce_are_refused(self, epoch):
+        tables, still, _, _ = epoch
+        pairs = tables["pairs"].copy()
+        pairs.loc[0, "a_within_shared_exposure"] = ~pairs.loc[
+            0, "a_within_shared_exposure"
+        ]
+
+        with pytest.raises(ValueError, match="stored pairs table"):
+            rebuild_matches(
+                {**tables, "pairs": pairs}, still, detectors=DETECTORS, cells=CELLS
+            )
+
     def test_coverage_without_the_set_aside_spans_is_refused(self, epoch):
         """Without the bridging row, b's bridging span beside its gap reads as
         exposure it shares with a, so the pair's shared exposure differs."""
@@ -223,6 +245,7 @@ class TestPopulationRows:
 
     def populations(self, rows, key):
         these = rows[rows.event_key == key]
+        assert not these.population.duplicated().any(), key
         return dict(zip(these.population, these.unknown_reason, strict=True))
 
     def test_columns_and_dtypes(self, rows):
@@ -283,6 +306,18 @@ class TestPopulationRows:
             .eq(rows.population.str.startswith("unknown_by:"))
             .all()
         )
+
+    def test_each_event_and_population_is_one_row(self, rows):
+        assert not rows.duplicated(["event_key", "population"]).any()
+
+    def test_cells_of_other_events_are_refused(self, epoch):
+        tables, _, _, matches = epoch
+        compared = tables["inventory"][tables["inventory"].whole_event_speed_eligible]
+        cells = tables["cells"].copy()
+        cells.loc[0, "event_key"] = "a:sim20200101_02_r1:elsewhere"
+
+        with pytest.raises(ValueError, match="cells"):
+            population_rows(compared, matches, cells, tables["directional"])
 
     def test_a_membership_with_no_directional_row_is_refused(self, epoch):
         tables, _, _, matches = epoch

@@ -842,14 +842,10 @@ def run_epoch(
         record["outputs"] = replace_outputs(identifier, output_dir, tables, stamp)
     except _EpochRefused as refused:
         replace_outputs(identifier, output_dir, {}, stamp)
-        record |= {"status": "failed", "reason": str(refused)}
+        record = _failed(record, reason=str(refused))
     except Exception as error:  # noqa: BLE001 - recorded; the run goes on
         replace_outputs(identifier, output_dir, {}, stamp)
-        record |= {
-            "status": "failed",
-            "error": repr(error),
-            "traceback": traceback.format_exc(),
-        }
+        record = _failed(record, error=repr(error), traceback=traceback.format_exc())
     record["provenance"] = dict(provenance)
     record["wall_clock_s"] = clock.perf_counter() - started
     if "likelihood_s" in record:
@@ -860,6 +856,13 @@ def run_epoch(
     )
     ready: dict = json_ready(record)
     return ready
+
+
+def _failed(record: Mapping[str, Any], **why: str) -> dict[str, Any]:
+    """A failed epoch's record: the decode it read, if any, and why it failed;
+    nothing of the ok record it may have nearly been."""
+    kept = {name: record[name] for name in ("decode",) if name in record}
+    return {**kept, "status": "failed", **why}
 
 
 def summary(record: dict) -> str:

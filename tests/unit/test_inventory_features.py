@@ -214,6 +214,14 @@ def test_identical_intervals_ending_on_the_last_sample_give_identical_features()
     )
 
 
+def test_an_interval_starting_past_the_grid_has_no_row():
+    table = features(traces(), [[TIME[-1] + 0.5, TIME[-1] + 1.0]])
+    assert (table.first_row.iloc[0], table.n_rows.iloc[0]) == (TIME.size, 0)
+    assert table.n_spikes.isna().all() and table.ripple_z_max.isna().all()
+    out = ss(intervals_of("kay", [[TIME[-1] + 0.5, TIME[-1] + 1.0]])).iloc[0]
+    assert pd.isna(out["ss_local_prob_mean"]) and pd.isna(out["ss_n_runs_nonlocal"])
+
+
 # --- the same interval reads the same -----------------------------------
 
 
@@ -283,10 +291,11 @@ def test_a_nan_ripple_row_makes_only_the_intervals_holding_it_nan():
             [TIME[300], TIME[310]],  # starts on it
             [TIME[280], TIME[299]],  # ends just before it
             [TIME[301], TIME[320]],  # starts just after it
+            [TIME[295], TIME[305]],  # holds it inside, not on an edge
         ],
     )
-    assert table.ripple_z_max.isna().tolist() == [True, True, False, False]
-    assert table.ripple_z_mean.isna().tolist() == [True, True, False, False]
+    assert table.ripple_z_max.isna().tolist() == [True, True, False, False, True]
+    assert table.ripple_z_mean.isna().tolist() == [True, True, False, False, True]
     assert table.mua_z_max.notna().all()
     assert table.mua_z_mean.notna().all()
 
@@ -511,6 +520,15 @@ def on_rows(first, last, detector="kay"):
     return inventory([[TIME[first], TIME[last]]], detector)
 
 
+@pytest.mark.parametrize("column", STATE_COLUMNS)
+def test_state_columns_not_in_the_decodes_float32_are_refused(column):
+    # the threshold is compared in float32, as the decode compared it
+    frame = posterior_frame()
+    frame[column] = frame[column].astype(np.float64)
+    with pytest.raises(ValueError, match="float32"):
+        PosteriorTraces.from_frame(frame)
+
+
 def test_the_state_means_and_the_non_local_maximum_over_the_rows():
     rng = np.random.default_rng(1)
     states = rng.dirichlet(np.ones(4), size=TIME.size)
@@ -643,6 +661,54 @@ def test_runs_are_counted_on_the_rows_inside_the_interval():
     assert out["ss_n_runs_nonlocal"] == 2
     # rows 110 to 114: the last sample's time less the first's
     assert out["ss_longest_run_nonlocal_s"] == TIME[114] - TIME[110]
+
+
+def test_a_run_is_cut_at_the_intervals_start():
+    non_local = np.zeros(TIME.size)
+    non_local[95:105] = 0.9  # rows 95 to 104, from before the interval
+    out = ss(on_rows(100, 120), posterior(non_local)).iloc[0]
+    assert out["ss_n_runs_nonlocal"] == 1
+    assert out["ss_longest_run_nonlocal_s"] == TIME[104] - TIME[100]
+    assert out["ss_frac_rows_nonlocal"] == pytest.approx(5 / 21)
+
+
+def test_the_run_length_boundary_on_a_grid_whose_rule_gives_seven_samples():
+    # at a clock near 1.6e9 s the median step reads above 2 ms, so 15 ms is
+    # 7 samples, not 8: a 7-row run forms an event, a 6-row run does not
+    grid = 1.6e9 + SAMPLE_INTERVAL_S * np.arange(TIME.size)
+    assert minimum_sample_count(grid, 0.015) == 7
+    non_local = np.zeros(grid.size)
+    non_local[100:107] = 0.9
+    non_local[300:306] = 0.9
+    frame = posterior_frame(non_local).set_axis(pd.Index(grid, name="time"))
+    row_posterior = PosteriorTraces.from_frame(frame)
+    events = get_confident_times(
+        xr.DataArray(row_posterior.nonlocal_prob, dims="time", coords={"time": grid})
+    )
+    zeros = np.zeros(grid.size)
+    row_traces = RowTraces(
+        time=grid,
+        spike_counts=np.zeros((grid.size, 1), dtype=np.int64),
+        ripple_z=zeros,
+        mua_z=zeros,
+        linear_position=zeros,
+        track_segment_id=zeros.astype(np.int64),
+        patch_id=zeros.astype(np.int64),
+    )
+    table = intervals_of("kay", [[grid[90], grid[200]], [grid[290], grid[400]]])
+    out = ss_features(
+        row_traces,
+        row_posterior,
+        table,
+        DISTANCE_CM,
+        np.ones(grid.size, dtype=np.int64),
+        np.ones(grid.size, dtype=np.int64),
+        state_space_events=inventory(np.empty((0, 2)), "state_space"),
+    )
+    assert list(events["start_time"]) == [grid[100]]
+    assert out["ss_longest_run_nonlocal_s"].iloc[0] == events["duration"].iloc[0]
+    assert out["ss_longest_run_nonlocal_s"].iloc[1] == grid[305] - grid[300]
+    assert out["ss_n_runs_nonlocal"].tolist() == [1, 1]
 
 
 def test_no_run_has_no_longest_run():
@@ -873,6 +939,21 @@ def test_an_undecoded_window_is_counted_apart_and_enters_no_mean():
     assert out["ms_n_windows_decoded"] == 2
     assert out["ms_n_windows_with_center"] == 2
     assert out["ms_frac_windows_kept"] == 1.0
+    assert out["ms_spread_cm_mean"] == 0.0
+
+
+def test_an_undecoded_window_with_a_usable_posterior_enters_no_mean():
+    # the mask, not the stored posterior, says which windows were decoded
+    window_posterior = one_hot(np.ones(N_WINDOWS, dtype=int))
+    window_posterior[40] = [0.25, 0.5, 0.25]  # center 1, spread sqrt(50) cm
+    candidates = memoryless(window_posterior)
+    assert candidates.decisions.gates.posterior_usable[40]
+    undecoded = np.zeros(N_WINDOWS, dtype=bool)
+    undecoded[40] = True
+    out = ms(on_rows(100, 104), candidates, undecoded=undecoded).iloc[0]
+    assert out["ms_n_windows"] == 3
+    assert out["ms_n_windows_decoded"] == 2
+    assert out["ms_n_windows_with_center"] == 2
     assert out["ms_spread_cm_mean"] == 0.0
 
 

@@ -228,7 +228,21 @@ class PosteriorTraces:
 
     @classmethod
     def from_frame(cls, dot: pd.DataFrame) -> "PosteriorTraces":
-        """The posterior summaries of a decode frame, one per grid sample."""
+        """The posterior summaries of a decode frame, one per grid sample.
+
+        Raises
+        ------
+        ValueError
+            A state column is not float32, the decode's precision: the
+            non-local sum is compared with the threshold in it, so a tie at
+            the threshold reads as the decode read it only there.
+        """
+        for column in _STATE_COLUMNS:
+            if dot[column].dtype != np.float32:
+                raise ValueError(
+                    f"{column} is {dot[column].dtype}; the decode frame stores "
+                    "the state probabilities as float32."
+                )
         continuous = dot["Non-Local_Continuous_prob"]
         fragmented = dot["Non-Local_Fragmented_prob"]
         return cls(
@@ -239,6 +253,15 @@ class PosteriorTraces:
             nonlocal_prob=(continuous + fragmented).to_numpy(),
             hpd_cm=dot["hpd"].to_numpy(dtype=np.float64),
         )
+
+
+_STATE_COLUMNS = (
+    "Local_prob",
+    "No-Spike_prob",
+    "Non-Local_Continuous_prob",
+    "Non-Local_Fragmented_prob",
+)
+"""The decode frame's state probabilities, float32."""
 
 
 def middle_row(first: NDArray, n_rows: NDArray | int) -> NDArray[np.int64]:
