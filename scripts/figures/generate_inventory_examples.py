@@ -170,6 +170,10 @@ MEMORYLESS_COLOR = WONG[5]
 """The memoryless inventories: Wong blue, which no ``COLORS`` entry uses."""
 WINDOW_CENTER_COLOR = WONG[2]
 """Each memoryless window's center (sky blue), as in the memoryless comparison."""
+TRACK_MARGIN = 0.015
+"""The y margin of each posterior and its track strip, as a fraction of the
+track's length on each side, so a position at either end of the track is drawn
+inside the axes."""
 
 
 def detector_color(detector: str) -> str:
@@ -194,6 +198,8 @@ def _track_key(ax: Any, environment: Any, max_position: float, label: str) -> No
     A strip flush to the posterior's left (``plot_linear_track_graph_strip``,
     the decode's own ``edge_order`` and ``edge_spacing``), each arm labeled by
     its ``edge_id`` at its middle. The strip takes the posterior's y label.
+    Both share one y range, the track with :data:`TRACK_MARGIN` either side,
+    and the strip keeps its 0 and maximum ticks.
     """
     strip = ax.inset_axes([-0.075, 0.0, 0.06, 1.0])
     graph = environment.track_graph
@@ -224,10 +230,12 @@ def _track_key(ax: Any, environment: Any, max_position: float, label: str) -> No
             va="center",
         )
         position += length + (gaps[index] if index < n_edges - 1 else 0.0)
+    margin = TRACK_MARGIN * max_position
+    strip.set_ylim(-margin, max_position + margin)
     strip.set_ylabel(label, fontsize=7)
     strip.tick_params(labelsize=6)
     ax.set_ylabel("")
-    ax.set_ylim(0.0, max_position)
+    ax.set_ylim(-margin, max_position + margin)
     ax.tick_params(labelleft=False)
 
 

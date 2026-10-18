@@ -104,6 +104,13 @@ ROLES: Mapping[str, Mapping[str, str]] = MappingProxyType(
 """Each population's target subset (``example``) and the other subset
 (``counterexample``), in the order drawn."""
 
+CELL_NOTE = (
+    "In manifest.json, a figure's cell is the name of its population "
+    f"({COMPARATOR_ONLY} or {OURS_ONLY}) and its population is that "
+    f"population's label ({POPULATIONS[COMPARATOR_ONLY]} or "
+    f"{POPULATIONS[OURS_ONLY]})."
+)
+
 SESSION = ["animal", "day", "epoch"]
 EVIDENCE = ("evidence_dll", "baseline_median_dll", "baseline_q95_dll")
 
@@ -234,6 +241,22 @@ def draw_population_examples(
     return pd.concat([d for d in drawn if len(d)] or drawn[:1], ignore_index=True)
 
 
+def empty_subsets(events: pd.DataFrame) -> list[str]:
+    """A sentence for each population's subset with no event in ``events``.
+
+    Parameters
+    ----------
+    events : DataFrame
+        :func:`sampler_events` of the run.
+    """
+    return [
+        f"No {name.replace('_', '-')} event is {subset} in this run."
+        for name, roles in ROLES.items()
+        for subset in roles
+        if not ((events.cell == name) & (events[SUBSET_COLUMN] == subset)).any()
+    ]
+
+
 def rejection_stages(rejection: pd.DataFrame) -> dict[str, dict[str, str]]:
     """``event_key -> {cohort: stage}`` of the run's ``rejection`` table."""
     stages: dict[str, dict[str, str]] = {}
@@ -287,7 +310,8 @@ def write_examples(
     """Draw every example of the run and write them, captions and manifest.
 
     A draw whose figure cannot be made (its recomputed windows are not the
-    stored ones, or its epoch's inputs cannot be read) is recorded with
+    stored ones, or its epoch's inputs cannot be read, a missing memoryless
+    run's file included) is recorded with
     ``status`` ``not_written`` and its ``reason``, and the run goes on.
 
     Parameters
@@ -321,7 +345,9 @@ def write_examples(
         tables["cells"],
         tables["directional"],
     )
-    drawn = draw_population_examples(sampler_events(tables["features"], populations))
+    events = sampler_events(tables["features"], populations)
+    drawn = draw_population_examples(events)
+    empty = empty_subsets(events)
     stages = rejection_stages(tables["rejection"])
     runs = manifest["settings"]["input_runs"]
     inventory_dir = inventory_root / runs["inventory"]
@@ -343,8 +369,9 @@ def write_examples(
                 )
             )
             epoch_error: str | None = None
-        except ValueError as error:
-            # the epoch's draws fail, not the run
+        except (ValueError, FileNotFoundError) as error:
+            # the epoch's draws fail, not the run; a missing file is, for
+            # example, an epoch the memoryless run did not observe
             inputs, epoch_error = None, str(error)
         for _, row in group.iterrows():
             path = figure_dir / inventory_examples.figure_name(row)
@@ -403,6 +430,8 @@ def write_examples(
                         for name, label in POPULATIONS.items()
                     },
                     "comparator_detectors": COMPARATOR_DETECTORS,
+                    "cell_column": CELL_NOTE,
+                    "empty_subsets": empty,
                     "subsets": SUBSETS,
                     "not_calibrated": NOT_CALIBRATED,
                     "pad_s": inventory_examples.PAD_S,
@@ -419,6 +448,9 @@ def write_examples(
         )
     )
     lines = [f"# Event features examples: run {run_id}", "", CAPTION, ""]
+    if empty:
+        lines += [" ".join(empty), ""]
+    lines += [CELL_NOTE, ""]
     lines += [
         f"- `{Path(r['path']).name}`: {r['event_key']} ({r['role']}); {r['caption']}"
         + ("" if r["status"] == "written" else f" (not written: {r['reason']})")

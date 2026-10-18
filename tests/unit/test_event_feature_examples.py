@@ -7,13 +7,20 @@ exactly-one cell. Within each population, source detector and animal the
 sampler draws up to two events of the target evidence subset and up to two
 counterexamples of the other: comparator-only targets evidence above the
 baseline's q95, ours-only evidence at or below the baseline's median. An event
-in neither subset, or with an ``unknown`` membership, is never drawn.
+in neither subset, or with an ``unknown`` membership, is never drawn. An epoch
+whose inputs cannot be read, a missing memoryless run's file included, is
+recorded as not written and the run goes on.
 """
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+from types import SimpleNamespace
+
 import numpy as np
 import pandas as pd
+import pytest
 
 import scripts.figures.generate_event_feature_examples as examples
 from continuum_swr_replay.analysis.inventory_comparison.populations import (
@@ -216,3 +223,127 @@ def test_a_small_subset_gives_fewer() -> None:
         ("ours_only", "counterexample"): 2,
     }
     assert drawn(features.iloc[:0], populations.iloc[:0]).empty
+
+
+def test_an_epoch_without_its_inputs_is_recorded_and_the_run_goes_on(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Animal b's epoch has no memoryless run: loading it raises
+    FileNotFoundError, its draw is recorded as not written with the reason,
+    and animal a's draws are written. A subset with no event in the run is
+    named in the manifest and the captions."""
+    features, populations = tables(
+        [
+            ("kay", "a", COMPARATOR, ABOVE, 1),
+            ("kay", "b", COMPARATOR, ABOVE, 1),
+            ("state_space", "a", OURS, ABOVE, 1),
+        ]
+    )
+    ours_key = features.event_key.iloc[2]
+    rejection = pd.DataFrame(
+        {
+            "event_key": [ours_key, ours_key],
+            "cohort": ["memoryless", "memoryless_criteria"],
+            "stage": ["no_run", "duration"],
+        }
+    )
+    manifest = {
+        "settings": {"input_runs": {"inventory": "inv01", "memoryless": "ml01"}}
+    }
+    inventory_root = tmp_path / "inventory"
+    (inventory_root / "inv01").mkdir(parents=True)
+    (inventory_root / "inv01" / "manifest.json").write_text(
+        json.dumps(
+            {
+                "settings": {
+                    "cells": {
+                        "exactly_one_detector": {
+                            "against": ["kay", "state_space", "mua"]
+                        }
+                    }
+                }
+            }
+        )
+    )
+    run_dir, figure_dir = tmp_path / "run01", tmp_path / "figures"
+    tables_read = {
+        "features": features,
+        "pair_membership": None,
+        "rejection": rejection,
+    }
+    monkeypatch.setattr(
+        examples.report, "read_run", lambda *args: (manifest, dict(tables_read))
+    )
+    monkeypatch.setattr(
+        examples.report,
+        "read_inputs",
+        lambda *args: {"cells": None, "directional": None},
+    )
+    monkeypatch.setattr(examples.report, "event_populations", lambda *a: populations)
+    closed = []
+
+    def load_epoch(
+        identifier: str, *, run_dir: Path, memoryless_dir: Path
+    ) -> SimpleNamespace:
+        if identifier.startswith("b"):
+            raise FileNotFoundError(
+                f"No such file: {memoryless_dir / identifier}_memoryless_candidates.pkl"
+            )
+        return SimpleNamespace(results=SimpleNamespace(close=lambda: closed.append(1)))
+
+    notes: dict[str, str] = {}
+
+    def draw_example(
+        inputs: object,
+        drawn: pd.Series,
+        *,
+        against: list[str],
+        path: Path,
+        run_id: str,
+        seed: int,
+        note: str,
+    ) -> dict:
+        notes[drawn.event_key] = note
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"png")
+        return {**drawn.to_dict(), "against": against, "path": str(path)}
+
+    monkeypatch.setattr(examples.inventory_examples, "load_epoch", load_epoch)
+    monkeypatch.setattr(examples.inventory_examples, "draw_example", draw_example)
+
+    records = examples.write_examples(
+        run_dir,
+        figure_dir,
+        inventory_root=inventory_root,
+        memoryless_root=tmp_path / "memoryless",
+    )
+
+    status = {r["animal"] + r["cell"]: r for r in records}
+    assert len(records) == 3 and closed == [1]
+    missing = status["bcomparator_only"]
+    assert missing["status"] == "not_written"
+    assert missing["reason"].startswith("No such file:")
+    assert not Path(missing["path"]).exists()
+    for name in ("acomparator_only", "aours_only"):
+        assert status[name]["status"] == "written"
+        assert Path(status[name]["path"]).exists()
+    assert status["acomparator_only"]["against"] == ["state_space"]
+    assert status["aours_only"]["against"] == ["kay", "mua"]
+    assert status["aours_only"]["rejection_stage"] == {
+        "memoryless": "no_run",
+        "memoryless_criteria": "duration",
+    }
+    assert "memoryless† no_run, memoryless_criteria† duration" in notes[ours_key]
+
+    empty = [
+        "No comparator-only event is evidence at or below baseline in this run.",
+        "No ours-only event is evidence at or below baseline in this run.",
+    ]
+    written = json.loads((figure_dir / "manifest.json").read_text())
+    assert written["empty_subsets"] == empty
+    assert written["seed"] == examples.EXAMPLE_SEED
+    assert [r["status"] for r in written["figures"]] == [r["status"] for r in records]
+    captions = (figure_dir / "captions.md").read_text()
+    assert all(sentence in captions for sentence in empty)
+    assert examples.CELL_NOTE in captions
+    assert captions.count("(not written: No such file:") == 1
