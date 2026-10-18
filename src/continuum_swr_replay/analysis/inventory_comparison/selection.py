@@ -22,7 +22,9 @@ levels:
   the location level has too few and at least :data:`MIN_MATCHED` exist;
 - ``failed``: neither; the event has no baseline.
 
-The middle row of ``n`` rows from row ``k`` is ``k + n // 2``. Up to
+The middle row of ``n`` rows from row ``k`` is ``k + (n - 1) // 2``, the
+earlier of two, as for the event's own location features
+(``features.middle_row``). Up to
 :data:`N_BASELINES` windows are drawn without replacement from the level's
 candidates by ``keyed_rng(seed, animal, day, epoch, start, end)``: the epoch
 and the interval's bounds as stored, each written exactly as
@@ -30,7 +32,9 @@ and the interval's bounds as stored, each written exactly as
 intervals of different inventories (the memoryless twins, an SWR event equal
 to another detector's) draw identical windows and get identical baselines, as
 they get identical features. An event's draws depend only on the seed, its
-epoch and bounds, and the pool, never on the other events.
+epoch and bounds, and the pool, never on the other events. Stream names are
+hashed (CRC-32), so two intervals could share a stream; that would only
+correlate their draws, never change a level or a candidate set.
 """
 
 from collections.abc import Collection, Mapping
@@ -52,6 +56,7 @@ from continuum_swr_replay.analysis.inventory_comparison.features import (
     RowTraces,
     _grid_rows,
     _over_rows,
+    middle_row,
 )
 from continuum_swr_replay.analysis.inventory_comparison.intervals import (
     intersect,
@@ -131,8 +136,9 @@ def baseline_pool(
     ----------
     coverage : mapping
         ``(animal, day, epoch, detector) -> Coverage`` of one epoch, as
-        ``stored_coverage`` rebuilds it. A detector of the comparison with no
-        entry was not exposed.
+        ``stored_coverage`` rebuilds it, every detector of the comparison
+        with an entry; a detector that did not run has one with empty
+        coverage, so it leaves no pool.
     events : pd.DataFrame
         ``animal``, ``day``, ``epoch``, ``event_start_s`` and ``event_end_s``
         of every event of every inventory in the epoch: the stored
@@ -152,7 +158,8 @@ def baseline_pool(
     ------
     ValueError
         ``coverage`` holds more than one epoch, ``events`` hold another
-        epoch's, or ``detectors`` names one no coverage entry knows.
+        epoch's, ``detectors`` names one no coverage entry knows, or an
+        event has a missing or inverted bound.
     """
     sessions = {tuple(key[:3]) for key in coverage}
     if len(sessions) != 1:
@@ -173,18 +180,10 @@ def baseline_pool(
         if detectors is None
         else validate_detectors(detectors, coverage, "detectors")
     )
-    empty = np.empty((0, 2))
-    shared = reduce(
-        intersect,
-        (
-            coverage[(*session, name)].exposure
-            if (*session, name) in coverage
-            else empty
-            for name in names
-        ),
-    )
+    # one epoch, so every name of the roster has an entry there
+    shared = reduce(intersect, (coverage[(*session, name)].exposure for name in names))
     spans = events[["event_start_s", "event_end_s"]].to_numpy(dtype=np.float64)
-    return subtract(shared, spans)
+    return subtract(shared, normalize(spans, strict=True))
 
 
 def window_room(time: NDArray, pool: NDArray) -> NDArray[np.int64]:
@@ -278,7 +277,7 @@ def baseline_draws(
     room = window_room(time, pool)
     has_rows = n_rows > 0
     event_bin = np.full(n_rows.shape, -1, dtype=np.int64)
-    event_bin[has_rows] = animal_bin[(first + n_rows // 2)[has_rows]]
+    event_bin[has_rows] = animal_bin[middle_row(first, n_rows)[has_rows]]
     names = list(
         zip(
             *(events[column].tolist() for column in SESSION_COLUMNS_DAY),
@@ -291,7 +290,7 @@ def baseline_draws(
     starts = np.full((n_rows.size, N_BASELINES), -1, dtype=np.int64)
     for length in np.unique(n_rows[has_rows]):
         candidates = np.flatnonzero(room >= length)
-        window_bin = animal_bin[candidates + length // 2]
+        window_bin = animal_bin[middle_row(candidates, length)]
         known = window_bin >= 0
         of_length = np.flatnonzero(n_rows == length)
         for at in np.unique(event_bin[of_length]):

@@ -56,6 +56,7 @@ __all__ = [
     "duration_stratum",
     "interval_features",
     "interval_rows",
+    "middle_row",
     "ms_features",
     "neighbour_gaps",
     "ss_features",
@@ -229,6 +230,26 @@ class PosteriorTraces:
         )
 
 
+def middle_row(first: NDArray, n_rows: NDArray | int) -> NDArray[np.int64]:
+    """The middle row of each run of ``n_rows`` rows from ``first``, the
+    earlier of two: ``first + (n_rows - 1) // 2``.
+
+    Parameters
+    ----------
+    first : NDArray of int, shape (n,)
+    n_rows : NDArray of int, shape (n,), or int
+
+    Returns
+    -------
+    middle : NDArray[np.int64], shape (n,)
+    """
+    middle: NDArray[np.int64] = (
+        np.asarray(first, dtype=np.int64)
+        + (np.asarray(n_rows, dtype=np.int64) - 1) // 2
+    )
+    return middle
+
+
 def _grid_rows(
     time: NDArray, intervals: pd.DataFrame
 ) -> tuple[NDArray[np.int64], NDArray[np.int64]]:
@@ -312,7 +333,7 @@ def interval_features(
     has_rows = n_rows > 0
     per_tetrode = _over_rows(np.add, traces.spike_counts, first, n_rows)
     n_spikes = per_tetrode.sum(axis=1)
-    middle = (first + (n_rows - 1) // 2)[has_rows]
+    middle = middle_row(first, n_rows)[has_rows]
     n_tetrodes = traces.spike_counts.shape[1]
     columns: dict[str, object] = {
         "first_row": first,

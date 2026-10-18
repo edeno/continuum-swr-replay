@@ -186,6 +186,14 @@ class TestBaselinePool:
         with pytest.raises(ValueError, match="no coverage entry knows"):
             baseline_pool(COVERAGE, EVERY_EVENT, detectors=["a", "z"])
 
+    @pytest.mark.parametrize("bounds", [(2.6, 2.5), (np.nan, 2.5)])
+    def test_refuses_an_event_with_a_bad_bound(self, bounds):
+        bad = EVERY_EVENT.iloc[[0]].assign(
+            event_start_s=bounds[0], event_end_s=bounds[1]
+        )
+        with pytest.raises(ValueError, match="non-finite or inverted"):
+            baseline_pool(COVERAGE, pd.concat([EVERY_EVENT, bad]))
+
     def test_refuses_more_than_one_epoch(self):
         coverage = dict(COVERAGE)
         coverage[("sim", 20200101, "04_r2", "a")] = COVERAGE[(*SESSION, "a")]
@@ -285,16 +293,16 @@ class TestMatchedBaselines:
             POOL, COMPARED, traces(), animal_bin, BIN_DISTANCE_CM, seed=SEED
         )
         first, _ = rows_of(COMPARED)
-        event_bin = animal_bin[first + n_rows // 2]
+        event_bin = animal_bin[first + (n_rows - 1) // 2]
         for i in range(len(COMPARED)):
             assert levels[i] == LOCATION
             drawn = starts[i][starts[i] >= 0]
-            window_bin = animal_bin[drawn + n_rows[i] // 2]
+            window_bin = animal_bin[drawn + (n_rows[i] - 1) // 2]
             distance = BIN_DISTANCE_CM[event_bin[i], window_bin]
             assert (distance <= LOCATION_TOLERANCE_CM).all()
         summary, windows = run(animal_bin=animal_bin)
         first_window, window_n = rows_of(windows)
-        window_bin = animal_bin[first_window + window_n // 2]
+        window_bin = animal_bin[first_window + (window_n - 1) // 2]
         assert (BIN_DISTANCE_CM[event_bin, window_bin] <= LOCATION_TOLERANCE_CM).all()
 
     def test_an_event_longer_than_every_pool_interval_fails(self):
@@ -327,6 +335,23 @@ class TestMatchedBaselines:
         summary, windows = run(events=COMPARED.iloc[:1], animal_bin=animal_bin)
         assert summary.baseline_level.iloc[0] == level
         assert summary.baseline_n.iloc[0] == n_drawn
+
+    def test_the_middle_of_an_even_run_is_the_earlier_row(self):
+        # 24 rows from 500: the middle is row 511, not 512, for the event and
+        # for its windows, as for the event's own location features
+        event = event_frame([("a", "a:even", TIME[500], TIME[523])])
+        animal_bin = np.full(N_TIME, N_BINS - 1, dtype=np.int64)
+        animal_bin[511] = 0
+        # the middle rows of the 30 windows from the first row of a pool
+        # interval: the row before it starts no window, so a middle one row
+        # later would find 29
+        start = 3400 + np.flatnonzero(window_room(TIME, POOL)[3400:] > 0)[0]
+        animal_bin[start + 11 : start + 41] = 0
+        summary, windows = run(events=event, animal_bin=animal_bin)
+        assert summary.baseline_level.iloc[0] == LOCATION
+        assert summary.baseline_n.iloc[0] == 30
+        first_window, _ = rows_of(windows)
+        assert start <= first_window[0] < start + 30
 
     def test_an_event_of_unknown_location_is_matched_on_duration(self):
         animal_bin = np.zeros(N_TIME, dtype=np.int64)
@@ -398,6 +423,37 @@ class TestMatchedBaselines:
     def test_an_event_tied_with_every_baseline_beats_none(self):
         summary, _ = run(evidence=np.zeros(N_TIME))
         assert (summary.evidence_rank == 0.0).all()
+
+    def test_scored_and_unscored_windows_mixed(self):
+        # no evidence on rows 3000-3999: windows there are unscored
+        evidence = noise_evidence()
+        evidence[3000:4000] = np.nan
+        levels, starts, n_rows = baseline_draws(
+            POOL,
+            COMPARED.iloc[:1],
+            traces(),
+            np.zeros(N_TIME, dtype=np.int64),
+            BIN_DISTANCE_CM,
+            seed=SEED,
+        )
+        drawn = pd.DataFrame(
+            {
+                "event_start_s": TIME[starts[0]],
+                "event_end_s": TIME[starts[0] + n_rows[0] - 1],
+            }
+        )
+        scores = interval_evidence(traces(), evidence, drawn).evidence_dll
+        scored = scores.dropna().to_numpy()
+        assert 0 < scored.size < N_BASELINES
+        summary, _ = run(events=COMPARED.iloc[:1], evidence=evidence)
+        own = interval_evidence(traces(), evidence, COMPARED.iloc[:1]).evidence_dll
+        assert summary.baseline_n.iloc[0] == N_BASELINES
+        assert summary.baseline_n_scored.iloc[0] == scored.size
+        assert summary.baseline_median_dll.iloc[0] == np.median(scored)
+        assert summary.baseline_q95_dll.iloc[0] == np.quantile(scored, 0.95)
+        assert summary.evidence_rank.iloc[0] == (
+            (scored < own.iloc[0]).sum() / scored.size
+        )
 
     def test_windows_without_evidence_enter_no_statistic(self):
         evidence = np.full(N_TIME, np.nan)
