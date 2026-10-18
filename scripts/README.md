@@ -133,7 +133,7 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
   `replay_detection_comparison/inventory/<run_id>/`. A run with no usable record reads `unavailable`,
   never empty; a failed epoch writes nothing. `--animal`, `--date`, `--epoch` or `--epoch-id` narrow
   the epochs, which run one at a time; a rerun skips the epochs already `ok` unless `--overwrite` is
-  given. Built and tested on simulated epochs; not yet run on the canonical data. The Widloski columns
+  given. Built and tested on simulated epochs; ran on all 242 analysed epochs (run `afeb897d850f`). The Widloski columns
   are pending the Phase 2 pilot checks.
 - `report_inventory_comparison.py` — the counts of one comparison run, per session and per animal
   (sums of counts and seconds, never averages of proportions; `unavailable` sessions listed, not
@@ -151,7 +151,7 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
   memoryless run has no record for has `ms_*` missing and its memberships `unknown`. `--animal`,
   `--date`, `--epoch` or `--epoch-id` narrow the epochs; `--n-workers` sets the worker processes; a
   rerun skips the epochs already `ok` unless `--overwrite` is given. Built and tested on simulated
-  epochs; the one-epoch smoke has run and the pilot is in progress. The full run is pending. The
+  epochs; the one-epoch smoke ran (run `68f51dabdb3c`), and the pilot ran on 5 epochs (run `86ed2e7fa90a`: 4 `ok`, and peanut, which failed there on a bug at its last window, re-checked `ok` under `f8a6984ae781`); the full run is pending. The
   Widloski columns and every `ms_*` feature are pending the Phase 2 pilot checks.
 - `report_event_features.py` — the features of one event features run, per session and per animal
   (sums of counts, never averages of proportions; quantiles of the events; `unknown` never counted as

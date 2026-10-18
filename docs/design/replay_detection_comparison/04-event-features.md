@@ -1,8 +1,9 @@
 # Event differences, selection diagnostics, and threshold robustness
 
-*Design spec. Status: implemented; the full run is pending. The initial report (features,
-spike evidence, selection diagnostics, populations, report and examples) is built and
-reviewed. Default-setting diagnostics follow
+*Design spec. Status: implemented; the smoke ran (run `68f51dabdb3c`), and the pilot ran on 5 epochs (run `86ed2e7fa90a`: 4 `ok`, and peanut, which failed there on a bug at its last window, re-checked `ok` under `f8a6984ae781`); the full run is pending.
+The initial report (features, spike evidence, selection diagnostics, populations, report
+and examples) is built and reviewed. Its baselines are matched on duration and location,
+not on spike count, so a share of events above baseline mixes evidence with engagement. Default-setting diagnostics follow
 [03](03-inventory-comparison.md). Threshold robustness is planned for a later stage, is
 not implemented, and does not block the initial report.*
 *Governing rule and cross-cutting decisions: [overview.md](overview.md).*

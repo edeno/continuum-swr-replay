@@ -9,8 +9,8 @@ build coverage from recordings (`adapters.py`), Carey's runner
 (`scripts/qa/run_inventory_comparison.py`), the report
 (`scripts/qa/report_inventory_comparison.py`), the sampled examples
 (`scripts/figures/generate_inventory_examples.py`), and excluded time by reason for every
-comparison. Run so far: Carey's one-epoch smoke (`chimi20200225_02_r1_HPC`). Not yet run:
-Carey on every epoch, and the comparison, report and examples on the canonical data. The
+comparison. Run: Carey on all 242 analysed epochs (run `fa6537e48bcf`), and the comparison
+on all 242 (run `afeb897d850f`, every epoch `ok`), with its report and examples. The
 Widloski columns are pending the Phase 2 pilot checks.*
 *Governing rule and cross-cutting decisions: [overview.md](overview.md).*
 
