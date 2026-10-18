@@ -135,6 +135,9 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
   - [contains_path_length_confound.md](known_issues/contains_path_length_confound.md) —
     `contains_path_to_next` is 2.8× harder for cross-patch than within-patch trips
     by construction; don't pool across trip types.
+  - [nonlocal_minimum_duration_rounding.md](known_issues/nonlocal_minimum_duration_rounding.md) —
+    the non-local 15 ms minimum is really 7 samples (12 ms span), 1.1 % of events;
+    fix at the next full rebuild.
 
 ## Figure outputs
 

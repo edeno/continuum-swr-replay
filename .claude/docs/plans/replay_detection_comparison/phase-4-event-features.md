@@ -95,7 +95,7 @@ follow-ups".
   keyed by `animal`, `session_date`, `epoch`). An event belongs to the stop holding its onset, as
   `replay/cohort_selection.events_in_stops` (:533) and `stop_interval_mask` (:491) assign it.
 - `hippocampus/event_detection.get_confident_times` (:48): our events are runs of non-local probability above
-  0.8 lasting at least 15 ms (`minimum_duration=0.015`).
+  0.8 lasting at least `minimum_duration=0.015`, which in practice is 7 samples (a 12 ms span; see `docs/known_issues/nonlocal_minimum_duration_rounding.md`).
 - `state_evidence/windows.keyed_rng` (:31), the seeded stream every draw here uses.
 - The report and examples to reuse: `scripts/qa/report_inventory_comparison.py` (`read_run` :347,
   `with_pending` :423, `pool_sessions` :459, `_distribution` :509, `PENDING`, `_caption`) and
