@@ -12,6 +12,13 @@ span, so no interval may reach it.
 
 A summary over rows (a mean or a maximum) is NaN when any of its rows is NaN,
 so a masked sample inside an interval is never skipped silently.
+
+Posterior features come in two namespaces, each read for every inventory's
+intervals: ``ss_`` from the state-space decode frame, over the interval's rows,
+and ``ms_`` from the memoryless run's stored window statistics, over the
+windows whose midpoint lies in the interval. Spatial features of both use one
+matrix of track-graph distances between the real place bins, so no junction
+placeholder bin enters either.
 """
 
 from collections.abc import Mapping, Sequence
@@ -22,9 +29,21 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
+from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (
+    CandidateSequences,
+)
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
+    NO_CENTER,
+    dispersion_cm,
+)
 from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
     tetrode_spike_counts,
 )
+from continuum_swr_replay.analysis.inventory_comparison.recount import (
+    FRAGMENT_GAPS_S,
+)
+from continuum_swr_replay.analysis.inventory_comparison.schema import STATE_SPACE
 from continuum_swr_replay.analysis.replay.cohort_selection import events_in_stops
 from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 
@@ -32,11 +51,14 @@ __all__ = [
     "DURATION_STRATA_S",
     "DURATION_STRATUM_LABELS",
     "STOP_CONTEXT_DTYPES",
+    "PosteriorTraces",
     "RowTraces",
     "duration_stratum",
     "interval_features",
     "interval_rows",
+    "ms_features",
     "neighbour_gaps",
+    "ss_features",
     "stop_context",
 ]
 
@@ -122,13 +144,7 @@ class RowTraces:
     patch_id: NDArray[np.int64]
 
     def __post_init__(self) -> None:
-        n_time = self.time.shape[0]
-        for field in fields(self):
-            length = getattr(self, field.name).shape[0]
-            if length != n_time:
-                raise ValueError(
-                    f"{field.name} has {length} rows; the grid has {n_time}."
-                )
+        _check_lengths(self, self.time.shape[0])
 
     @classmethod
     def from_frame(
@@ -156,6 +172,79 @@ class RowTraces:
             track_segment_id=dot["track_segment_id"].to_numpy(dtype=np.int64),
             patch_id=dot["patch_id"].to_numpy(dtype=np.int64),
         )
+
+
+def _check_lengths(traces: "RowTraces | PosteriorTraces", n_time: int) -> None:
+    """Raise unless every array field of ``traces`` has ``n_time`` rows."""
+    for field in fields(traces):
+        length = getattr(traces, field.name).shape[0]
+        if length != n_time:
+            raise ValueError(f"{field.name} has {length} rows; the grid has {n_time}.")
+
+
+@dataclass(frozen=True)
+class PosteriorTraces:
+    """One epoch's state-space posterior summaries on the decode grid.
+
+    Kept beside :class:`RowTraces`, as the spike evidence is, so the features
+    that read no posterior need no decode state.
+
+    Attributes
+    ----------
+    local_prob, no_spike_prob, continuous_prob, fragmented_prob : NDArray, shape (n_time,)
+        The frame's ``Local_prob``, ``No-Spike_prob``,
+        ``Non-Local_Continuous_prob`` and ``Non-Local_Fragmented_prob``, as
+        float64.
+    nonlocal_prob : NDArray, shape (n_time,)
+        ``Non-Local_Continuous_prob + Non-Local_Fragmented_prob``, summed and
+        kept in the frame's precision (float32), the trace the decode
+        compared with the threshold to find its events.
+    hpd_cm : NDArray, shape (n_time,)
+        The frame's ``hpd``, the size of the posterior's highest-density
+        region in cm.
+    """
+
+    local_prob: NDArray[np.float64]
+    no_spike_prob: NDArray[np.float64]
+    continuous_prob: NDArray[np.float64]
+    fragmented_prob: NDArray[np.float64]
+    nonlocal_prob: NDArray[np.floating]
+    hpd_cm: NDArray[np.float64]
+
+    def __post_init__(self) -> None:
+        _check_lengths(self, self.local_prob.shape[0])
+
+    @classmethod
+    def from_frame(cls, dot: pd.DataFrame) -> "PosteriorTraces":
+        """The posterior summaries of a decode frame, one per grid sample."""
+        continuous = dot["Non-Local_Continuous_prob"]
+        fragmented = dot["Non-Local_Fragmented_prob"]
+        return cls(
+            local_prob=dot["Local_prob"].to_numpy(dtype=np.float64),
+            no_spike_prob=dot["No-Spike_prob"].to_numpy(dtype=np.float64),
+            continuous_prob=continuous.to_numpy(dtype=np.float64),
+            fragmented_prob=fragmented.to_numpy(dtype=np.float64),
+            nonlocal_prob=(continuous + fragmented).to_numpy(),
+            hpd_cm=dot["hpd"].to_numpy(dtype=np.float64),
+        )
+
+
+def _grid_rows(
+    time: NDArray, intervals: pd.DataFrame
+) -> tuple[NDArray[np.int64], NDArray[np.int64]]:
+    """:func:`interval_rows` of ``intervals``; raises when one reaches the
+    grid's last sample, which holds no span of spikes and is never read."""
+    first, n_rows = interval_rows(
+        time,
+        intervals["event_start_s"].to_numpy(dtype=np.float64),
+        intervals["event_end_s"].to_numpy(dtype=np.float64),
+    )
+    if ((n_rows > 0) & (first + n_rows >= time.size)).any():
+        raise ValueError(
+            "An interval reaches the grid's last sample, which holds no span of "
+            "spikes and is never read."
+        )
+    return first, n_rows
 
 
 def _over_rows(
@@ -219,18 +308,8 @@ def interval_features(
         An interval's rows reach the grid's last sample, which holds no span
         of spikes.
     """
-    first, n_rows = interval_rows(
-        traces.time,
-        intervals["event_start_s"].to_numpy(dtype=np.float64),
-        intervals["event_end_s"].to_numpy(dtype=np.float64),
-    )
+    first, n_rows = _grid_rows(traces.time, intervals)
     has_rows = n_rows > 0
-    n_time = traces.time.size
-    if (has_rows & (first + n_rows >= n_time)).any():
-        raise ValueError(
-            "An interval reaches the grid's last sample, which holds no span of "
-            "spikes and is never read."
-        )
     per_tetrode = _over_rows(np.add, traces.spike_counts, first, n_rows)
     n_spikes = per_tetrode.sum(axis=1)
     middle = (first + (n_rows - 1) // 2)[has_rows]
@@ -259,6 +338,367 @@ def interval_features(
     columns["track_segment_id"] = _int_or_na(traces.track_segment_id[middle], has_rows)
     columns["patch_id"] = _int_or_na(traces.patch_id[middle], has_rows)
     return pd.DataFrame(columns, index=intervals.index)
+
+
+def _real_bins(bins: NDArray, n_bins: int, n_expected: int, name: str) -> NDArray:
+    """``bins`` as int64 after checking they index the real place bins.
+
+    -1 marks an unknown bin (``animal_bins``' value, and ``NO_CENTER``).
+    """
+    bins = np.asarray(bins, dtype=np.int64)
+    if bins.shape != (n_expected,):
+        raise ValueError(f"{name} has shape {bins.shape}; expected ({n_expected},).")
+    if ((bins < -1) | (bins >= n_bins)).any():
+        raise ValueError(
+            f"{name} holds an index outside the {n_bins} real place bins of the "
+            "distance matrix; a junction placeholder bin must never enter."
+        )
+    return bins
+
+
+def _pair_distance_cm(
+    bin_distance_cm: NDArray, here: NDArray, there: NDArray
+) -> NDArray[np.float64]:
+    """Track distance from each ``here`` bin to its ``there`` bin; NaN where
+    either is unknown (-1)."""
+    known = (here >= 0) & (there >= 0)
+    distance: NDArray[np.float64] = np.where(
+        known, bin_distance_cm[np.maximum(here, 0), np.maximum(there, 0)], np.nan
+    )
+    return distance
+
+
+def _extents_cm(
+    bins: NDArray, first: NDArray, n_rows: NDArray, bin_distance_cm: NDArray
+) -> NDArray[np.float64]:
+    """``dispersion_cm`` of each interval's bins (``NO_CENTER`` left out);
+    NaN with none."""
+    return np.array(
+        [
+            dispersion_cm(bins[start : start + n], bin_distance_cm) if n else np.nan
+            for start, n in zip(first.tolist(), n_rows.tolist(), strict=True)
+        ],
+        dtype=np.float64,
+    )
+
+
+def _nearest_event_gap_s(intervals: pd.DataFrame, events: pd.DataFrame) -> NDArray:
+    """Each interval's end-to-start gap to the nearest of ``events``.
+
+    ``events`` are one detector's, disjoint. 0 where an event overlaps or
+    touches the interval; NaN when there is no event.
+    """
+    starts = intervals["event_start_s"].to_numpy(dtype=np.float64)
+    ends = intervals["event_end_s"].to_numpy(dtype=np.float64)
+    if len(events) == 0:
+        return np.full(starts.shape, np.nan)
+    ordered = events.sort_values("event_start_s", kind="stable")
+    event_start = ordered["event_start_s"].to_numpy(dtype=np.float64)
+    event_end = ordered["event_end_s"].to_numpy(dtype=np.float64)
+    # disjoint events: the nearest is the last starting at or before the
+    # interval's end, or the first starting after it
+    before = np.searchsorted(event_start, ends, side="right") - 1
+    after = before + 1
+    gap_before = np.where(
+        before >= 0, np.maximum(starts - event_end[np.maximum(before, 0)], 0.0), np.inf
+    )
+    gap_after = np.where(
+        after < event_start.size,
+        event_start[np.minimum(after, event_start.size - 1)] - ends,
+        np.inf,
+    )
+    gap: NDArray = np.minimum(gap_before, gap_after)
+    return gap
+
+
+def _runs_above(
+    above: NDArray[np.bool_], time: NDArray, first: NDArray, n_rows: NDArray
+) -> tuple[NDArray[np.int64], NDArray[np.float64]]:
+    """The runs of ``above`` inside each interval, each cut at its bounds.
+
+    Returns
+    -------
+    n_runs : NDArray[np.int64], shape (n_intervals,)
+    longest_s : NDArray, shape (n_intervals,)
+        The longest run's last sample time less its first; NaN with no run.
+    """
+    padded = np.concatenate([[False], above, [False]])
+    run_start, run_stop = np.flatnonzero(padded[1:] != padded[:-1]).reshape(-1, 2).T
+    stop = first + n_rows
+    # runs are disjoint and ordered: those ending after the interval's first
+    # row and starting before its end are its own
+    low = np.searchsorted(run_stop, first, side="right")
+    high = np.searchsorted(run_start, stop, side="left")
+    n_runs = np.where(n_rows > 0, high - low, 0)
+    interval = np.repeat(np.arange(first.size), n_runs)
+    run = np.repeat(low, n_runs) + (
+        np.arange(interval.size) - np.repeat(np.cumsum(n_runs) - n_runs, n_runs)
+    )
+    cut_first = np.maximum(run_start[run], first[interval])
+    cut_last = np.minimum(run_stop[run], stop[interval]) - 1
+    longest = np.full(first.shape, np.nan)
+    np.fmax.at(longest, interval, time[cut_last] - time[cut_first])
+    return n_runs.astype(np.int64), longest
+
+
+def ss_features(
+    traces: RowTraces,
+    posterior: PosteriorTraces,
+    intervals: pd.DataFrame,
+    bin_distance_cm: NDArray,
+    map_bin: NDArray,
+    animal_bin: NDArray,
+    *,
+    state_space_events: pd.DataFrame,
+) -> pd.DataFrame:
+    """The state-space decode's posterior over each interval's rows.
+
+    **Runs.** A run is a stretch of consecutive rows whose non-local
+    probability is above ``DEFAULT_NON_LOCAL_THRESHOLD`` (0.8), compared in
+    the frame's float32 as the decode compared it (``get_confident_times``;
+    a row that reads 0.8 in float32 is not above). Inside an interval a run
+    is cut at the interval's bounds. A run is measured as
+    ``get_confident_times`` measures an event, its last sample's time less its
+    first, so it reads on the scale of the state-space events'
+    ``interval_span_s``. ``get_confident_times`` made an event of a run of at
+    least ``ripple_detection.core.minimum_sample_count(time, 0.015)`` rows:
+    the 15 ms rounded half up to a whole number of samples of the grid's
+    median step. 15 ms is 7.5 samples of 2 ms; on the decode grids the median
+    step reads 2.0000935 ms (float error at their clock), so the count is 7
+    rows, a 12 ms span, where an exact 2 ms step gives 8. So a run inside an
+    event no compared state-space event matches is shorter than that,
+    continues past the interval's bound, or formed an event that is not
+    compared (moving, or set aside).
+
+    Parameters
+    ----------
+    traces : RowTraces
+        The epoch's grid.
+    posterior : PosteriorTraces
+        On the same grid.
+    intervals : pd.DataFrame
+        ``event_start_s``, ``event_end_s`` and ``detector`` of each interval,
+        of one epoch.
+    bin_distance_cm : NDArray, shape (n_bins, n_bins)
+        Track-graph distances between the real place bins
+        (``interior_bin_distances_cm``).
+    map_bin, animal_bin : NDArray of int, shape (n_time,)
+        Each row's real bin nearest the MAP estimate and the animal
+        (``evidence.animal_bins``, through ``nearest_interior_bins``, so a
+        position in a junction gap maps to a real bin); -1 where unknown.
+    state_space_events : pd.DataFrame
+        The epoch's compared state-space events (``whole_event_speed_eligible``
+        true), ``event_start_s`` and ``event_end_s``.
+
+    Returns
+    -------
+    features : pd.DataFrame
+        On ``intervals``' index, over each interval's rows:
+
+        - ``ss_local_prob_mean``, ``ss_no_spike_prob_mean``,
+          ``ss_continuous_prob_mean``, ``ss_fragmented_prob_mean``,
+          ``ss_hpd_cm_mean``: means;
+        - ``ss_nonlocal_prob_max``: the non-local probability's maximum;
+        - ``ss_frac_rows_nonlocal``: the rows above the threshold over
+          ``n_rows``;
+        - ``ss_extent_cm``: ``dispersion_cm`` of the rows' MAP bins;
+        - ``ss_distance_cm_mean``: the mean track distance from the MAP bin to
+          the animal's bin;
+        - ``ss_n_runs_nonlocal`` (Int64) and ``ss_longest_run_nonlocal_s``
+          (NaN with no run): the runs inside the interval.
+
+        Each is missing for an interval with no row, and for one holding a
+        row where it is unknown: a NaN probability or ``hpd``, or a bin of -1
+        for the spatial two. Besides, not read on rows:
+
+        - ``ss_nearest_event_gap_s``: the end-to-start gap to the nearest of
+          ``state_space_events``, 0 when one overlaps or touches the interval,
+          NaN with none and for the state-space detector's own intervals;
+        - ``ss_disagreement``: for every other detector's interval, ``"near"``
+          when that gap is at most ``max(FRAGMENT_GAPS_S)`` (50 ms; gaps
+          compared to the microsecond, as a clock near 1.6e9 s reads 25
+          samples of 2 ms as 50.0002 ms), else ``"subthreshold"`` when a run
+          lies inside it, else ``"sustained"``; None for the state-space
+          detector and where the runs are unknown. It describes an event no
+          compared state-space event matches; it does not decide anything.
+
+    Raises
+    ------
+    ValueError
+        An array is not on the grid, a bin is outside the distance matrix, an
+        interval reaches the grid's last sample, or a state-space event is not
+        compared.
+    """
+    time = traces.time
+    _check_lengths(posterior, time.size)
+    n_bins = bin_distance_cm.shape[0]
+    map_bin = _real_bins(map_bin, n_bins, time.size, "map_bin")
+    animal_bin = _real_bins(animal_bin, n_bins, time.size, "animal_bin")
+    if not state_space_events["whole_event_speed_eligible"].all():
+        raise ValueError(
+            "The nearest state-space event is a compared one; pass only the rows "
+            "with whole_event_speed_eligible true."
+        )
+    first, n_rows = _grid_rows(time, intervals)
+    has_rows = n_rows > 0
+
+    def mean(values: NDArray) -> NDArray[np.float64]:
+        total = _over_rows(np.add, values, first, n_rows)
+        return _float_or_nan(total / n_rows[has_rows], has_rows)
+
+    columns: dict[str, object] = {
+        f"ss_{name}_prob_mean": mean(values)
+        for name, values in (
+            ("local", posterior.local_prob),
+            ("no_spike", posterior.no_spike_prob),
+            ("continuous", posterior.continuous_prob),
+            ("fragmented", posterior.fragmented_prob),
+        )
+    }
+    non_local = posterior.nonlocal_prob.astype(np.float64)
+    columns["ss_nonlocal_prob_max"] = _float_or_nan(
+        _over_rows(np.maximum, non_local, first, n_rows), has_rows
+    )
+    known = has_rows.copy()
+    known[has_rows] = ~_over_rows(np.logical_or, np.isnan(non_local), first, n_rows)
+    above = posterior.nonlocal_prob > DEFAULT_NON_LOCAL_THRESHOLD
+    n_above = np.zeros(first.shape, dtype=np.int64)
+    n_above[has_rows] = _over_rows(np.add, above.astype(np.int64), first, n_rows)
+    columns["ss_frac_rows_nonlocal"] = np.where(
+        known, n_above / np.maximum(n_rows, 1), np.nan
+    )
+
+    unknown_map = np.zeros(first.shape, dtype=bool)
+    unknown_map[has_rows] = _over_rows(np.logical_or, map_bin < 0, first, n_rows)
+    extent = _extents_cm(map_bin, first, n_rows, bin_distance_cm)
+    columns["ss_extent_cm"] = np.where(unknown_map, np.nan, extent)
+    columns["ss_distance_cm_mean"] = mean(
+        _pair_distance_cm(bin_distance_cm, map_bin, animal_bin)
+    )
+    columns["ss_hpd_cm_mean"] = mean(posterior.hpd_cm)
+
+    n_runs, longest = _runs_above(above, time, first, n_rows)
+    columns["ss_n_runs_nonlocal"] = pd.arrays.IntegerArray(n_runs, ~known)
+    columns["ss_longest_run_nonlocal_s"] = np.where(known, longest, np.nan)
+
+    is_ours = (intervals["detector"] == STATE_SPACE).to_numpy()
+    gap = np.where(is_ours, np.nan, _nearest_event_gap_s(intervals, state_space_events))
+    near = np.round(gap, 6) <= max(FRAGMENT_GAPS_S)
+    disagreement = np.where(
+        near, "near", np.where(n_runs > 0, "subthreshold", "sustained")
+    ).astype(object)
+    disagreement[is_ours | (~near & ~known)] = None
+    columns["ss_nearest_event_gap_s"] = gap
+    columns["ss_disagreement"] = disagreement
+    return pd.DataFrame(columns, index=intervals.index)
+
+
+def ms_features(
+    candidates: CandidateSequences,
+    intervals: pd.DataFrame,
+    undecoded: NDArray,
+    bin_distance_cm: NDArray,
+    animal_bin_at_window: NDArray,
+) -> pd.DataFrame:
+    """The memoryless run's stored window statistics over each interval.
+
+    An interval's windows are those whose midpoint (``midpoint_s``, a grid
+    sample) lies in it, both bounds included. The stored centers are after
+    the speed gate, so a window whose midpoint speed is not below the
+    threshold has none: it is counted as missing, not recomputed. An
+    undecoded window (holding a sample of the artifact mask) is counted in
+    ``ms_n_windows`` alone and enters no other feature.
+
+    Parameters
+    ----------
+    candidates : CandidateSequences
+        The epoch's stored memoryless run.
+    intervals : pd.DataFrame
+        ``event_start_s`` and ``event_end_s`` of each interval, in seconds.
+    undecoded : NDArray of bool, shape (n_windows,)
+        The windows the run left undecoded (``windows_holding`` on the mask).
+    bin_distance_cm : NDArray, shape (n_bins, n_bins)
+        Track-graph distances between the real place bins, as the run's.
+    animal_bin_at_window : NDArray of int, shape (n_windows,)
+        The animal's real bin at each window's midpoint sample; -1 where
+        unknown.
+
+    Returns
+    -------
+    features : pd.DataFrame
+        On ``intervals``' index: ``ms_n_windows``; over its decoded windows,
+        ``ms_n_windows_decoded``, ``ms_n_windows_with_center``
+        (``gates.has_center``), ``ms_spread_cm_mean`` (``spread_cm`` over the
+        windows whose posterior was usable), ``ms_extent_cm``
+        (``dispersion_cm`` of every center, kept or not; a candidate's stored
+        ``dispersion_cm`` reads its kept windows alone),
+        ``ms_distance_cm_mean`` (the mean track distance from each center to
+        the animal's bin, NaN when one of those bins is unknown) and
+        ``ms_frac_windows_kept`` (``gates.kept`` over the decoded windows). With no window every feature but
+        ``ms_n_windows`` is missing, and a mean or extent with nothing to
+        read is NaN.
+
+    Raises
+    ------
+    ValueError
+        ``undecoded`` or ``animal_bin_at_window`` is not one per window, or a
+        center or the animal's bin is outside the distance matrix.
+    """
+    midpoint = candidates.midpoint_s
+    n_windows = midpoint.size
+    undecoded = np.asarray(undecoded, dtype=bool)
+    if undecoded.shape != (n_windows,):
+        raise ValueError(
+            f"undecoded has shape {undecoded.shape}; there are {n_windows} windows."
+        )
+    n_bins = bin_distance_cm.shape[0]
+    animal_bin = _real_bins(
+        animal_bin_at_window, n_bins, n_windows, "animal_bin_at_window"
+    )
+    gates = candidates.decisions.gates
+    decoded = ~undecoded
+    with_center = gates.has_center & decoded
+    center = np.where(with_center, candidates.decisions.center_index, NO_CENTER)
+    center = _real_bins(center, n_bins, n_windows, "center_index")
+    usable = gates.posterior_usable & decoded
+    first, n_in = interval_rows(
+        midpoint,
+        intervals["event_start_s"].to_numpy(dtype=np.float64),
+        intervals["event_end_s"].to_numpy(dtype=np.float64),
+    )
+    has_windows = n_in > 0
+
+    def total(values: NDArray) -> NDArray:
+        summed = np.zeros(first.shape, dtype=values.dtype)
+        summed[has_windows] = _over_rows(np.add, values, first, n_in)
+        return summed
+
+    def ratio(numerator: NDArray, denominator: NDArray) -> NDArray[np.float64]:
+        return np.where(denominator > 0, numerator / np.maximum(denominator, 1), np.nan)
+
+    n_decoded = total(decoded.astype(np.int64))
+    n_with_center = total(with_center.astype(np.int64))
+    n_usable = total(usable.astype(np.int64))
+    spread = np.where(usable, candidates.decisions.spread_cm, 0.0)
+    distance = np.where(
+        with_center, _pair_distance_cm(bin_distance_cm, center, animal_bin), 0.0
+    )
+    return pd.DataFrame(
+        {
+            "ms_n_windows": n_in,
+            "ms_n_windows_decoded": pd.arrays.IntegerArray(n_decoded, ~has_windows),
+            "ms_n_windows_with_center": pd.arrays.IntegerArray(
+                n_with_center, ~has_windows
+            ),
+            "ms_spread_cm_mean": ratio(total(spread), n_usable),
+            "ms_extent_cm": _extents_cm(center, first, n_in, bin_distance_cm),
+            "ms_distance_cm_mean": ratio(total(distance), n_with_center),
+            "ms_frac_windows_kept": ratio(
+                total((gates.kept & decoded).astype(np.int64)), n_decoded
+            ),
+        },
+        index=intervals.index,
+    )
 
 
 def neighbour_gaps(inventory: pd.DataFrame) -> pd.DataFrame:

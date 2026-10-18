@@ -16,8 +16,9 @@ with per-detector denominators.
 - ``adapters``: each detector's recorded outputs for an epoch, read onto the
   schema with what it observed and the events it set aside.
 - ``features``: per-event features read on the decode grid by one rule for
-  every inventory: rows, population engagement, LFP and MUA, timing, and the
-  stop holding the onset.
+  every inventory: rows, population engagement, LFP and MUA, timing, the
+  stop holding the onset, and the posterior in two namespaces, the
+  state-space decode's (``ss_``) and the memoryless windows' (``ms_``).
 - ``evidence``: the common spike-evidence diagnostic, how much better a remote
   place explains each row's spikes than the animal's own place, and its
   summary over each interval's rows.
