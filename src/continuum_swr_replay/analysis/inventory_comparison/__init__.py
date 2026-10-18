@@ -24,4 +24,6 @@ with per-detector denominators.
   summary over each interval's rows.
 - ``populations``: the comparison's memberships rebuilt from its stored
   tables, and the populations of compared events they define.
+- ``selection``: matched baseline windows for the evidence score, drawn from
+  the shared exposure outside every event.
 """
