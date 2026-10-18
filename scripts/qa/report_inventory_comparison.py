@@ -287,7 +287,8 @@ FIGURE_CAPTIONS: Mapping[str, str] = MappingProxyType(
             "The SWR label matrix per animal: non_swr_fraction of each sequence "
             "cohort (rows) under each SWR definition (columns), n_non_swr over "
             "n_eligible summed over the animal's available sessions, printed in "
-            "each cell. Grey: no eligible events."
+            "each cell to two places; the counts are in "
+            "swr_matrix_by_animal.csv. Grey: no eligible events."
         ),
         "components.png": _caption(
             "Overlap-graph components over the eight inventories without "
@@ -1184,11 +1185,11 @@ def draw_figures(
                 ax.text(
                     j,
                     i,
-                    f"{row.n_non_swr}/{row.n_eligible}",
+                    f"{row.non_swr_fraction:.2f}",
                     ha="center",
                     va="center",
                     fontsize=5,
-                    color="w",
+                    color="k" if row.non_swr_fraction > 0.6 else "w",
                 )
         image = ax.imshow(grid, vmin=0, vmax=1, cmap=cmap)
         ax.set_xticks(range(len(definitions)), definitions, rotation=90, fontsize=6)
