@@ -273,6 +273,8 @@ def _over_rows(
 ) -> NDArray:
     """``ufunc`` reduced over the rows of each interval that has any.
 
+    An interval may end at the array's last row.
+
     Returns
     -------
     reduced : NDArray, shape (n_with_rows, *values.shape[1:])
@@ -281,8 +283,11 @@ def _over_rows(
     edges = np.column_stack([first[has_rows], first[has_rows] + n_rows[has_rows]])
     if edges.size == 0:
         return np.empty((0, *values.shape[1:]), dtype=values.dtype)
-    # reduceat over (start, end) pairs: each even entry is one interval's rows
-    reduced: NDArray = ufunc.reduceat(values, edges.ravel(), axis=0)[::2]
+    # reduceat over (start, end) pairs: each even entry is one interval's rows.
+    # One padding row lets an end edge equal the length; it lies past every
+    # interval's rows, so only a discarded odd entry reads it.
+    padded = np.concatenate([values, np.zeros_like(values[:1])], axis=0)
+    reduced: NDArray = ufunc.reduceat(padded, edges.ravel(), axis=0)[::2]
     return reduced
 
 

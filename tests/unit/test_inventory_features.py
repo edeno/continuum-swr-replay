@@ -30,6 +30,7 @@ from continuum_swr_replay.analysis.inventory_comparison.features import (
     DURATION_STRATA_S,
     PosteriorTraces,
     RowTraces,
+    _over_rows,
     duration_stratum,
     interval_features,
     interval_rows,
@@ -933,3 +934,31 @@ def test_a_map_in_a_junction_gap_maps_to_a_real_bin(y_environment):
     ).iloc[0]
     assert out["ss_distance_cm_mean"] == pytest.approx(distance[bins, 0].mean())
     assert out["ss_extent_cm"] == pytest.approx(dispersion_cm(bins, distance))
+
+
+# --- reductions reaching the end of an array ------------------------------
+
+
+@pytest.mark.parametrize(
+    ("ufunc", "expected"),
+    [(np.add, [3.0, 9.0, 9.0]), (np.maximum, [2.0, 4.0, 5.0])],
+)
+def test_over_rows_reads_an_interval_ending_at_the_arrays_end(ufunc, expected):
+    values = np.arange(6, dtype=float)
+    first, n_rows = np.array([0, 2, 4]), np.array([3, 3, 2])
+    np.testing.assert_array_equal(_over_rows(ufunc, values, first, n_rows), expected)
+
+
+def test_over_rows_carries_a_nan_in_the_last_row_to_its_interval_alone():
+    values = np.array([1.0, 2.0, 3.0, np.nan])
+    reduced = _over_rows(np.add, values, np.array([0, 2]), np.array([2, 2]))
+    assert reduced[0] == 3.0 and np.isnan(reduced[1])
+
+
+def test_ms_features_read_an_interval_holding_the_last_window():
+    out = ms(inventory([[MIDPOINT_S[-3], MIDPOINT_S[-1]]], "kay")).iloc[0]
+    assert out["ms_n_windows"] == 3
+    assert out["ms_n_windows_decoded"] == 3
+    assert out["ms_frac_windows_kept"] == pytest.approx(
+        memoryless().decisions.gates.kept[-3:].mean()
+    )
