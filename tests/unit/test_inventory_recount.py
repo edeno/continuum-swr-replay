@@ -190,6 +190,43 @@ def test_gaps_off_the_sample_grid_are_refused():
         )
 
 
+def test_a_long_gap_on_a_drifting_clock_is_left_unmerged_not_refused():
+    """The real decode grid runs about 0.8 ppm off 500 Hz, so a gap of tens of
+    seconds is a fraction of a sample off the grid. Only a gap that could merge
+    is checked against the grid; a longer one is simply not merged."""
+    n_gap = 26_733
+    time = 1000.0 + np.arange(40_000) * 0.002 * (1 + 8e-7)
+    grid = GridSpan(time)
+    pair = [(time[100], time[120]), (time[120 + n_gap], time[140 + n_gap])]
+    n_samples = (pair[1][0] - pair[0][1]) / 0.002
+    assert abs(n_samples - round(n_samples)) > 0.01
+
+    merged = merge_fragments(
+        grid.events(pair),
+        grid.coverage,
+        detector="A",
+        gap_s=0.05,
+        sample_interval_s=0.002,
+        not_still_s=ALL_STILL,
+    )
+
+    assert merged.n_fragments.tolist() == [1, 1]
+
+
+def test_a_short_off_grid_gap_is_still_refused():
+    inventory = events("A", [(10.0, 11.0), (11.0031, 12.0)])
+
+    with pytest.raises(ValueError, match="grid"):
+        merge_fragments(
+            inventory,
+            coverage("A"),
+            detector="A",
+            gap_s=0.01,
+            sample_interval_s=0.002,
+            not_still_s=ALL_STILL,
+        )
+
+
 @pytest.mark.parametrize(
     "exposure",
     [

@@ -145,11 +145,13 @@ def merge_fragments(
         holds_not_still = np.searchsorted(
             not_still, end[1:], side="right"
         ) > np.searchsorted(not_still, start[:-1], side="left")
-        joins = (
-            (_samples(start[1:] - end[:-1], sample_interval_s) < limit)
-            & contains(own.exposure, start[:-1], end[1:])
-            & ~holds_not_still
-        )
+        gap = start[1:] - end[:-1]
+        # Only a gap that could merge is counted in samples: over tens of
+        # seconds the decode clock drifts a fraction of a sample off the grid.
+        short = gap < gap_s + sample_interval_s
+        close = np.zeros(gap.shape, dtype=bool)
+        close[short] = _samples(gap[short], sample_interval_s) < limit
+        joins = close & contains(own.exposure, start[:-1], end[1:]) & ~holds_not_still
         run = np.r_[0, np.cumsum(~joins)]
         merged.append(
             pd.DataFrame(
