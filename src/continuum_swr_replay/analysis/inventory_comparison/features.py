@@ -1,14 +1,20 @@
 """Per-event features, read on the decode grid by one rule for every inventory.
 
 An interval's **rows** are the decode grid's samples ``t`` with
-``event_start_s <= t <= event_end_s``. Every feature of an interval is read
-over its rows and no others, so two inventories' identical intervals get
-identical features, whatever detector found them. An interval with no row
-(shorter than a sample, or off the grid) has every row feature missing.
+``event_start_s <= t <= event_end_s``, the grid's last sample left out. Every
+feature of an interval is read over its rows and no others, so two
+inventories' identical intervals get identical features, whatever detector
+found them. An interval with no row (shorter than a sample, off the grid, or
+holding only the grid's last sample) has every row feature missing, and its
+evidence is unscorable as ``no_row``.
 
 Row ``k`` holds the spikes with ``t_k <= s < t_{k + 1}``, the rule of
 ``tetrode_spike_counts`` and of the decode. The grid's last sample has no such
-span, so no interval may reach it.
+span, so it is never a row: an interval ending on it has one row fewer than
+the samples it holds (:func:`_grid_rows`). This is the one row rule of every
+interval, event or baseline window, and of every reader of rows: the features
+here, ``evidence.interval_evidence``, ``selection.baseline_draws`` and the
+runner's choice of the rows whose evidence it computes.
 
 A summary over rows (a mean or a maximum) is NaN when any of its rows is NaN,
 so a masked sample inside an interval is never skipped silently.
@@ -91,7 +97,12 @@ with the dtype each has; every one can hold a missing value."""
 def interval_rows(
     time: NDArray, starts: NDArray, ends: NDArray
 ) -> tuple[NDArray[np.int64], NDArray[np.int64]]:
-    """The grid rows of each closed interval.
+    """The samples of each closed interval.
+
+    Every sample with ``start <= t <= end`` is counted, the last one too. On
+    the memoryless windows' midpoints these are an interval's windows; on the
+    decode grid the rows are :func:`_grid_rows`', which leave out the grid's
+    last sample.
 
     Parameters
     ----------
@@ -253,18 +264,29 @@ def middle_row(first: NDArray, n_rows: NDArray | int) -> NDArray[np.int64]:
 def _grid_rows(
     time: NDArray, intervals: pd.DataFrame
 ) -> tuple[NDArray[np.int64], NDArray[np.int64]]:
-    """:func:`interval_rows` of ``intervals``; raises when one reaches the
-    grid's last sample, which holds no span of spikes and is never read."""
+    """The decode-grid rows of each interval: :func:`interval_rows` with the
+    grid's last sample left out (the module's row rule).
+
+    Parameters
+    ----------
+    time : NDArray, shape (n_time,)
+        The decode grid's sample times in seconds, increasing.
+    intervals : pd.DataFrame
+        ``event_start_s`` and ``event_end_s`` of each interval, in seconds.
+
+    Returns
+    -------
+    first_row : NDArray[np.int64], shape (n_intervals,)
+    n_rows : NDArray[np.int64], shape (n_intervals,)
+        0 for an interval holding no sample but the grid's last.
+    """
     first, n_rows = interval_rows(
         time,
         intervals["event_start_s"].to_numpy(dtype=np.float64),
         intervals["event_end_s"].to_numpy(dtype=np.float64),
     )
-    if ((n_rows > 0) & (first + n_rows >= time.size)).any():
-        raise ValueError(
-            "An interval reaches the grid's last sample, which holds no span of "
-            "spikes and is never read."
-        )
+    # the last sample holds no span of spikes, so the rows stop before it
+    n_rows = np.clip(np.minimum(first + n_rows, time.size - 1) - first, 0, None)
     return first, n_rows
 
 
@@ -327,12 +349,7 @@ def interval_features(
         ``linear_position_cm``, ``track_segment_id``, ``patch_id`` at the
         middle row (the earlier of two). Every feature but ``first_row``,
         ``n_rows`` and ``n_tetrodes`` is missing for an interval with no row.
-
-    Raises
-    ------
-    ValueError
-        An interval's rows reach the grid's last sample, which holds no span
-        of spikes.
+        The rows are the module's: the grid's last sample is never one.
     """
     first, n_rows = _grid_rows(traces.time, intervals)
     has_rows = n_rows > 0
@@ -551,9 +568,8 @@ def ss_features(
     Raises
     ------
     ValueError
-        An array is not on the grid, a bin is outside the distance matrix, an
-        interval reaches the grid's last sample, or a state-space event is not
-        compared.
+        An array is not on the grid, a bin is outside the distance matrix, or
+        a state-space event is not compared.
     """
     time = traces.time
     _check_lengths(posterior, time.size)

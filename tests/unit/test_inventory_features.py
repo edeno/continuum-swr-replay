@@ -169,9 +169,49 @@ def test_an_interval_with_no_row_has_every_row_feature_missing():
     assert table.patch_id.isna().all()
 
 
-def test_an_interval_reaching_the_grids_last_sample_is_refused():
-    with pytest.raises(ValueError, match="last sample"):
-        features(traces(), [[TIME[-3], TIME[-1]]])
+def test_an_interval_ending_on_the_grids_last_sample_scores_one_row_fewer():
+    # the grid's last sample holds no span of spikes, so it is never a row
+    spikes = [np.array([TIME[-3], TIME[-2] + 1e-4]), np.array([TIME[-1]])]
+    row_traces = traces(spikes)
+    table = features(row_traces, [[TIME[-3], TIME[-1]], [TIME[-3], TIME[-2]]])
+    assert table.first_row.tolist() == [TIME.size - 3] * 2
+    assert table.n_rows.tolist() == [2, 2]
+    pd.testing.assert_frame_equal(
+        table.iloc[[0]].reset_index(drop=True),
+        table.iloc[[1]].reset_index(drop=True),
+        check_exact=True,
+    )
+    # the spike on the last sample is in no row, as that sample is none
+    assert table.n_spikes.tolist() == [2, 2]
+
+
+def test_an_interval_of_only_the_grids_last_sample_has_no_row():
+    table = features(traces(), [[TIME[-1], TIME[-1]], [TIME[-2] + 0.0005, TIME[-1]]])
+    assert table.n_rows.tolist() == [0, 0]
+    assert table.n_spikes.isna().all()
+    assert table.ripple_z_max.isna().all()
+    assert table.linear_position_cm.isna().all()
+
+
+def test_identical_intervals_ending_on_the_last_sample_give_identical_features():
+    rng = np.random.default_rng(3)
+    spikes = [np.sort(rng.uniform(TIME[0], TIME[-1], 400)) for _ in range(3)]
+    row_traces = traces(spikes, SWR_zscore=rng.normal(size=TIME.size))
+    shared = [[TIME[-20] + 0.0003, TIME[-1]]]
+    table = interval_features(
+        row_traces,
+        pd.concat(
+            [inventory(shared, "kay"), inventory(shared, "state_space")],
+            ignore_index=True,
+        ),
+        sample_interval_s=SAMPLE_INTERVAL_S,
+    )
+    assert table.n_rows.tolist() == [18, 18]
+    pd.testing.assert_frame_equal(
+        table.iloc[[0]].reset_index(drop=True),
+        table.iloc[[1]].reset_index(drop=True),
+        check_exact=True,
+    )
 
 
 # --- the same interval reads the same -----------------------------------
@@ -554,9 +594,28 @@ def test_an_interval_with_no_row_has_every_ss_feature_missing():
         assert pd.isna(out[name]), name
 
 
-def test_ss_features_refuse_an_interval_reaching_the_last_sample():
-    with pytest.raises(ValueError, match="last sample"):
-        ss(on_rows(990, TIME.size - 1))
+def test_ss_features_of_an_interval_ending_on_the_last_sample_drop_that_row():
+    rng = np.random.default_rng(4)
+    states = rng.dirichlet(np.ones(4), size=TIME.size)
+    row_posterior = posterior(
+        **{name: states[:, k] for k, name in enumerate(STATE_COLUMNS)},
+        hpd=rng.uniform(2.0, 80.0, TIME.size),
+    )
+    out = ss(
+        pd.concat(
+            [on_rows(990, TIME.size - 1), on_rows(990, TIME.size - 2)],
+            ignore_index=True,
+        ),
+        row_posterior,
+    )
+    pd.testing.assert_frame_equal(
+        out.iloc[[0]].reset_index(drop=True),
+        out.iloc[[1]].reset_index(drop=True),
+        check_exact=True,
+    )
+    alone = ss(intervals_of("kay", [[TIME[-1], TIME[-1]]]), row_posterior).iloc[0]
+    assert pd.isna(alone["ss_local_prob_mean"])
+    assert pd.isna(alone["ss_n_runs_nonlocal"])
 
 
 def test_ss_features_refuse_a_bin_outside_the_distance_matrix():
@@ -953,6 +1012,18 @@ def test_over_rows_carries_a_nan_in_the_last_row_to_its_interval_alone():
     values = np.array([1.0, 2.0, 3.0, np.nan])
     reduced = _over_rows(np.add, values, np.array([0, 2]), np.array([2, 2]))
     assert reduced[0] == 3.0 and np.isnan(reduced[1])
+
+
+def test_ms_features_read_windows_so_the_grids_last_sample_changes_nothing():
+    # the windows are on the grid less its last sample, so no midpoint is there
+    assert MIDPOINT_S[-1] < TIME[-1]
+    out = ms(intervals([[TIME[-30], TIME[-1]], [TIME[-30], TIME[-2]]]))
+    assert out["ms_n_windows"].iloc[0] > 0
+    pd.testing.assert_frame_equal(
+        out.iloc[[0]].reset_index(drop=True),
+        out.iloc[[1]].reset_index(drop=True),
+        check_exact=True,
+    )
 
 
 def test_ms_features_read_an_interval_holding_the_last_window():

@@ -143,9 +143,9 @@ from continuum_swr_replay.analysis.inventory_comparison.features import (  # noq
     STOP_CONTEXT_DTYPES,
     PosteriorTraces,
     RowTraces,
+    _grid_rows,
     duration_stratum,
     interval_features,
-    interval_rows,
     ms_features,
     neighbour_gaps,
     ss_features,
@@ -230,7 +230,8 @@ DESIGN_SPEC = "docs/design/replay_detection_comparison/04-event-features.md"
 GRID_RULE = (
     "every interval is read on the decode grid: its rows are the samples t with "
     "event_start_s <= t <= event_end_s, and row k holds the spikes with "
-    "t_k <= s < t_{k+1}; the grid's last sample is never read"
+    "t_k <= s < t_{k+1}; the grid's last sample holds no such span and is never "
+    "a row, so an interval holding only it has no row"
 )
 TRACKING_CONFIDENCE = (
     "unavailable: the decode frame carries no tracking confidence, so no "
@@ -376,6 +377,35 @@ def _row_mask(n_time: int, first: NDArray, n_rows: NDArray) -> NDArray[np.bool_]
     np.add.at(edges, first, 1)
     np.add.at(edges, first + n_rows, -1)
     mask: NDArray[np.bool_] = np.cumsum(edges[:-1]) > 0
+    return mask
+
+
+def evidence_rows(
+    time: NDArray, pool: NDArray, events: pd.DataFrame
+) -> NDArray[np.bool_]:
+    """The rows whose evidence is computed: every row of the compared events
+    and every row strictly inside the baseline pool, the rows any scored
+    interval can hold.
+
+    Parameters
+    ----------
+    time : NDArray, shape (n_time,)
+        The decode grid.
+    pool : NDArray, shape (n_intervals, 2)
+        ``baseline_pool``'s.
+    events : pd.DataFrame
+        ``event_start_s`` and ``event_end_s`` of the compared events.
+
+    Returns
+    -------
+    rows : NDArray of bool, shape (n_time,)
+        Never the grid's last sample, which is no row (``features``' row
+        rule).
+    """
+    first, n_rows = _grid_rows(time, events)
+    mask: NDArray[np.bool_] = (window_room(time, pool) > 0) | _row_mask(
+        time.size, first, n_rows
+    )
     return mask
 
 
@@ -635,12 +665,7 @@ def epoch_tables(
         pd.concat([inventory[bounds], set_aside[bounds]], ignore_index=True),
         detectors=comparison.DETECTORS,
     )
-    first, n_rows = interval_rows(
-        time,
-        compared["event_start_s"].to_numpy(dtype=np.float64),
-        compared["event_end_s"].to_numpy(dtype=np.float64),
-    )
-    rows = (window_room(time, pool) > 0) | _row_mask(time.size, first, n_rows)
+    rows = evidence_rows(time, pool, compared)
     started = clock.perf_counter()
     evidence = epoch_row_evidence(
         traces.time,

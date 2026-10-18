@@ -17,7 +17,8 @@ or no usable bin is remote.
 
 Row ``k`` holds the spikes with ``t_k <= s < t_{k + 1}``, as in
 ``clusterless_epoch_log_likelihood``, whatever rows are computed together. The
-grid's last sample holds no span of spikes and is never read.
+grid's last sample holds no span of spikes and is never a row (the row rule of
+``features``).
 
 The likelihood reads no position (``is_local=False``) and no posterior, so the
 evidence of an interval depends only on its rows' spikes and the animal's bins.
@@ -41,8 +42,8 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.terms import (
 )
 from continuum_swr_replay.analysis.inventory_comparison.features import (
     RowTraces,
+    _grid_rows,
     _over_rows,
-    interval_rows,
 )
 
 __all__ = [
@@ -336,30 +337,22 @@ def interval_evidence(
         evidence (NaN when none has); ``evidence_n_valid_rows`` (Int64, NA
         with no row); ``evidence_valid_fraction``, valid rows over ``n_rows``
         (NaN with no row); and ``evidence_unscorable``, ``"no_row"``,
-        ``"no_valid_row"`` or ``""``.
+        ``"no_valid_row"`` or ``""``. The rows are ``features``': the grid's
+        last sample is never one, so an interval holding only it is
+        ``"no_row"``.
 
     Raises
     ------
     ValueError
-        ``evidence`` is not on the grid, or an interval's rows reach the grid's
-        last sample.
+        ``evidence`` is not on the grid.
     """
     evidence = np.asarray(evidence, dtype=np.float64)
     if evidence.shape != traces.time.shape:
         raise ValueError(
             f"evidence has shape {evidence.shape}; the grid {traces.time.shape}."
         )
-    first, n_rows = interval_rows(
-        traces.time,
-        intervals["event_start_s"].to_numpy(dtype=np.float64),
-        intervals["event_end_s"].to_numpy(dtype=np.float64),
-    )
+    first, n_rows = _grid_rows(traces.time, intervals)
     has_rows = n_rows > 0
-    if (has_rows & (first + n_rows >= traces.time.size)).any():
-        raise ValueError(
-            "An interval reaches the grid's last sample, which holds no span of "
-            "spikes and is never read."
-        )
     valid = np.isfinite(evidence)
     n_valid = np.zeros(first.shape, dtype=np.int64)
     n_valid[has_rows] = _over_rows(np.add, valid.astype(np.int64), first, n_rows)

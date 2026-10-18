@@ -26,6 +26,19 @@ def test_overlapping_intervals_mark_their_rows_once():
     np.testing.assert_array_equal(np.flatnonzero(mask), [0, 1, 2, 3, 4])
 
 
+def test_the_evidence_rows_never_hold_the_grids_last_sample():
+    time = 100.0 + 0.002 * np.arange(20)
+    pool = np.array([[time[2] - 1e-4, time[6] + 1e-4]])
+    events = pd.DataFrame(
+        {"event_start_s": [time[10], time[19]], "event_end_s": [time[-1], time[-1]]}
+    )
+
+    rows = runner.evidence_rows(time, pool, events)
+
+    # strictly inside the pool: rows 2 to 6; the first event's rows 10 to 18
+    np.testing.assert_array_equal(np.flatnonzero(rows), [2, 3, 4, 5, 6, *range(10, 19)])
+
+
 def test_a_row_of_a_scored_interval_not_requested_is_refused():
     rows = np.zeros(10, dtype=bool)
     rows[2:6] = True

@@ -62,7 +62,7 @@ from continuum_swr_replay.analysis.inventory_comparison.cells import (
 )
 from continuum_swr_replay.analysis.inventory_comparison.features import (
     DURATION_STRATUM_LABELS,
-    interval_rows,
+    _grid_rows,
 )
 from continuum_swr_replay.analysis.inventory_comparison.overlap import MATCH_DTYPES
 from continuum_swr_replay.analysis.inventory_comparison.populations import (
@@ -697,12 +697,11 @@ def test_an_empty_epoch_keeps_the_declared_dtypes(tmp_path):
 
 
 def test_every_interval_is_read_on_the_decode_grid(run):
-    """Each interval's rows are the grid's samples within its bounds, and the
-    evidence was computed on each of them."""
+    """Each interval's rows are the grid's samples within its bounds, the
+    grid's last sample left out, and the evidence was computed on each of
+    them."""
     features = table(run, WORKED, "features")
-    first, n_rows = interval_rows(
-        TIME, features.event_start_s.to_numpy(), features.event_end_s.to_numpy()
-    )
+    first, n_rows = _grid_rows(TIME, features)
 
     np.testing.assert_array_equal(first, features.first_row)
     np.testing.assert_array_equal(n_rows, features.n_rows)

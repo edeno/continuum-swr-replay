@@ -415,6 +415,38 @@ class TestMatchedBaselines:
         np.testing.assert_array_equal(rows_of(windows)[1], [25, 25])
         assert windows.event_start_s.iloc[0] != windows.event_start_s.iloc[1]
 
+    def test_an_event_ending_on_the_grids_last_sample_is_matched_without_it(self):
+        # rows 5980 to 5998: the grid's last sample, row 5999, is never a row
+        events = event_frame(
+            [
+                ("a", "a:end", TIME[5980], TIME[-1]),
+                ("a", "a:last", TIME[-1], TIME[-1]),
+            ]
+        )
+        evidence = noise_evidence()
+        levels, starts, n_rows = baseline_draws(
+            POOL,
+            events,
+            traces(),
+            np.zeros(N_TIME, dtype=np.int64),
+            BIN_DISTANCE_CM,
+            seed=SEED,
+        )
+        assert n_rows.tolist() == [19, 0]
+        assert list(levels) == [LOCATION, FAILED]
+        summary, windows = run(events=events, evidence=evidence)
+        np.testing.assert_array_equal(rows_of(windows)[1], [19])
+        own = evidence[5980:5999].mean()
+        drawn = pd.DataFrame(
+            {
+                "event_start_s": TIME[starts[0]],
+                "event_end_s": TIME[starts[0] + 18],
+            }
+        )
+        scores = interval_evidence(traces(), evidence, drawn).evidence_dll
+        assert summary.evidence_rank.iloc[0] == (scores < own).mean()
+        assert summary.baseline_n.iloc[1] == 0
+
     def test_a_window_across_a_timestamp_gap_is_refused(self):
         # a pool by hand across the gap after row 2999: not still time
         pool = np.array([[TIME[2985] - 1e-4, TIME[3049] + 1e-4]])

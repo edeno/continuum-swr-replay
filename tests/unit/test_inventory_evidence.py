@@ -498,11 +498,37 @@ class TestValidity:
         assert pd.isna(got["evidence_n_valid_rows"].iloc[3])
         assert np.isnan(got["evidence_valid_fraction"].iloc[3])
 
-    def test_an_interval_reaching_the_last_sample_is_refused(self, epoch):
+    def test_an_interval_ending_on_the_last_sample_is_scored_without_it(
+        self, epoch, encargs
+    ):
+        last = epoch.time.size - 1
         traces = row_traces(epoch, epoch.spike_times)
-        evidence = np.full(epoch.time.size, np.nan)
-        with pytest.raises(ValueError, match="last sample"):
-            interval_evidence(traces, evidence, on_rows(epoch, 590, 599))
+        evidence = row_evidence(
+            epoch, encargs, requested(epoch.time.size, [(580, last)])
+        )
+        got = interval_evidence(
+            traces,
+            evidence,
+            pd.concat(
+                [
+                    on_rows(epoch, 580, last),
+                    on_rows(epoch, 580, last - 1),
+                    on_rows(epoch, last, last),
+                ],
+                ignore_index=True,
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            got.iloc[[0]].reset_index(drop=True),
+            got.iloc[[1]].reset_index(drop=True),
+            check_exact=True,
+        )
+        n_valid = np.isfinite(evidence[580:last]).sum()
+        assert n_valid > 0
+        assert got["evidence_n_valid_rows"].iloc[0] == n_valid
+        assert got["evidence_valid_fraction"].iloc[0] == n_valid / (last - 580)
+        assert got["evidence_unscorable"].iloc[2] == "no_row"
+        assert pd.isna(got["evidence_n_valid_rows"].iloc[2])
 
     def test_animal_bins_mark_a_missing_position(self, epoch, encargs):
         bins = animal_bins(encargs["environment"], np.array([2.0, np.nan, 74.0]))

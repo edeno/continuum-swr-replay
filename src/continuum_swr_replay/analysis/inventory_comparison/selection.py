@@ -366,9 +366,14 @@ def baseline_draws(
     Raises
     ------
     ValueError
-        ``animal_bin`` is not on the grid, an event reaches the grid's last
-        sample, or a drawn window spans a timestamp gap (a step over 1.5
-        times the grid's median step).
+        ``animal_bin`` is not on the grid, or a drawn window spans a
+        timestamp gap (a step over 1.5 times the grid's median step).
+
+    Notes
+    -----
+    An event's rows are ``features``' (the grid's last sample is never one),
+    so an event ending on it is matched on one row fewer, and one holding only
+    it has no row and fails.
     """
     time = traces.time
     animal_bin = np.asarray(animal_bin, dtype=np.int64)
@@ -472,8 +477,8 @@ def matched_baselines(
     Raises
     ------
     ValueError
-        ``evidence`` or ``animal_bin`` is not on the grid, an event reaches
-        the grid's last sample, or a drawn window spans a timestamp gap.
+        ``evidence`` or ``animal_bin`` is not on the grid, or a drawn window
+        spans a timestamp gap.
     """
     evidence = np.asarray(evidence, dtype=np.float64)
     if evidence.shape != traces.time.shape:

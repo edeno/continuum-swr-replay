@@ -113,8 +113,9 @@ follow-ups".
   posterior, LFP, MUA, speed, position) is read over those rows and no others. An interval with no row
   (shorter than a sample, off the grid) is unscorable for every row-based feature and counted.
 - **Spikes of a row.** Row k holds the spikes with `t_k <= s < t_{k+1}`, the rule of the decode, of
-  `clusterless_epoch_log_likelihood` and of `tetrode_spike_counts`. The grid's last sample is never read
-  (no compared event or baseline window reaches it; `_drop_the_unreachable_row`).
+  `clusterless_epoch_log_likelihood` and of `tetrode_spike_counts`. The grid's last sample is never a
+  row (`_drop_the_unreachable_row`): an interval ending on it has one row fewer, and one holding only it
+  has no row (`no_row`). Six compared events of four real epochs end on it (`features._grid_rows`).
 - **The compared events** are the `inventory` rows with `whole_event_speed_eligible` true, of all nine
   inventories (moving events and set-aside events are not compared, as in Phase 3). `memoryless` and
   `memoryless_criteria` share their published events, interval for interval.
