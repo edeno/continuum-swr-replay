@@ -99,6 +99,15 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
   not written, and the manifest records why), the gate masks, speed, the ripple band and every inventory's events. Draws only
   `matched` or `unmatched` events, never `unknown`. → `paper/figures/inventory_comparison/<run_id>/examples/`,
   with `captions.md` and `manifest.json`. Captions are marked pending the Phase 2 pilot checks.
+- `generate_event_feature_examples.py` — seeded draws of comparator-only events (each detector's events
+  unmatched by `state_space`) and ours-only events (`state_space` events of the exactly-one cell) from one
+  event features run (`--run-id`), in the form of `generate_inventory_examples.py`. Each event is in one of two
+  descriptive subsets by its spike evidence against its matched baseline windows, or in neither. The title
+  gives the evidence, the baseline's median and q95, and the `ss_disagreement` (comparator-only) or the
+  rejection stage in each memoryless cohort (ours-only). A figure whose recomputed memoryless windows are
+  not the stored ones is not written, and the manifest records why. →
+  `paper/figures/event_features/<run_id>/examples/`, with `captions.md` and `manifest.json`. Captions are
+  marked pending the Phase 2 pilot checks. Built and tested; not yet run on a real features run.
 - `archive/` — retired figure scripts (not linted; kept for provenance).
 
 ## `qa/` — diagnostics / validation
@@ -131,6 +140,24 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
   pooled; `unknown` never counted as `unmatched` or non-SWR). Tables go to `<inventory run>/report/`
   with a `report.md`; figures to `paper/figures/inventory_comparison/<run_id>/` with `captions.md`.
   Counts only, no verdicts; every Widloski row and caption is marked pending the Phase 2 pilot checks.
+- `run_event_features.py` — the event features of every compared event of the nine inventories, and of
+  one matched baseline window for each, on the decode grid by one rule. Takes the comparison run
+  (`--inventory-run-id`); the memoryless run is the one its manifest names. Per epoch it rebuilds the
+  pairwise memberships from the stored tables and fails unless they reproduce the stored `directional`
+  and `cells`. It then writes, as one set, the `features` table (timing, engagement, one ripple and MUA
+  trace, `ss_*` and `ms_*` spatial features, context, and the common spike-evidence score), the
+  `pair_membership` table and the `rejection` table (the memoryless rejection stage of each
+  state-space event), to `replay_detection_comparison/event_features/<run_id>/`. An epoch the
+  memoryless run has no record for has `ms_*` missing and its memberships `unknown`. `--animal`,
+  `--date`, `--epoch` or `--epoch-id` narrow the epochs; `--n-workers` sets the worker processes; a
+  rerun skips the epochs already `ok` unless `--overwrite` is given. Built and tested on simulated
+  epochs; the one-epoch smoke has run and the pilot is in progress. The full run is pending. The
+  Widloski columns and every `ms_*` feature are pending the Phase 2 pilot checks.
+- `report_event_features.py` — the features of one event features run, per session and per animal
+  (sums of counts, never averages of proportions; quantiles of the events; `unknown` never counted as
+  `unmatched`; baseline windows kept apart). Tables go to `<features run>/report/` with a `report.md`;
+  figures to `paper/figures/event_features/<run_id>/` with `captions.md`. Counts only, no verdicts;
+  every Widloski row and caption is marked pending the Phase 2 pilot checks.
 - `check_data_availability.py`, `diagnose_trial_detection.py`, `compute_hpc_raw_stats.py`,
   `run_quality_metrics.py`, `analyze_event_spike_evidence.py` (spike-evidence reality check).
 - `run_state_evidence.py` — held-out spike evidence for each decoder state (Local, No-Spike,

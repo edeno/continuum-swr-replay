@@ -1,8 +1,10 @@
 # Event differences, selection diagnostics, and threshold robustness
 
-*Design spec. Status: agreed, not yet implemented. Default-setting diagnostics follow
-[03](03-inventory-comparison.md). Threshold robustness is planned for a later stage and
-does not block the initial report.*
+*Design spec. Status: implemented; the full run is pending. The initial report (features,
+spike evidence, selection diagnostics, populations, report and examples) is built and
+reviewed. Default-setting diagnostics follow
+[03](03-inventory-comparison.md). Threshold robustness is planned for a later stage, is
+not implemented, and does not block the initial report.*
 *Governing rule and cross-cutting decisions: [overview.md](overview.md).*
 
 The initial comparison asks which events each method finds, how the overlapping and

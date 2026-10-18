@@ -75,6 +75,9 @@ after a change to fitting code only, start at step 6.
 | Nine inventories of each epoch (the five SWR definitions, MUA, the state-space detector, and the Widloski detector under two cohorts) on one substrate: overlap pairs, per-detector denominators, cells, the SWR label matrix. Built and tested; not yet run on the canonical data. Widloski columns pending the Phase 2 pilot checks | `qa/run_inventory_comparison.py` | `Processed-Data/replay_detection_comparison/inventory/` | — |
 | That comparison's counts per session and per animal | `qa/report_inventory_comparison.py` | `<inventory run>/report/`; `paper/figures/inventory_comparison/` | — |
 | Sampled examples from each cell of that comparison, on one time axis | `figures/generate_inventory_examples.py` | `paper/figures/inventory_comparison/<run id>/examples/` | — |
+| Event features on every compared event of the nine inventories and on matched baseline windows: timing, engagement, ripple and MUA on one trace, spatial features, context, and the common spike-evidence score; the populations (shared, unmatched, unknown); the memoryless rejection stage of each ours-only event. Built and tested; the smoke has run, the pilot is in progress, the full run waits. Widloski columns and every `ms_*` feature pending the Phase 2 pilot checks | `qa/run_event_features.py` | `Processed-Data/replay_detection_comparison/event_features/` | — |
+| That run's features per session and per animal (counts and quantiles, no verdicts) | `qa/report_event_features.py` | `<event features run>/report/`; `paper/figures/event_features/` | — |
+| Sampled comparator-only and ours-only events, with their spike evidence against matched baselines | `figures/generate_event_feature_examples.py` | `paper/figures/event_features/<run id>/examples/` | — |
 | Single decoded events, for checking categories by eye | `figures/generate_event_gallery.py`, `figures/run_event_gallery.sh` | `event_gallery/` | — |
 
 **No script:**
