@@ -4,8 +4,8 @@ The rules are checked on per-epoch tables built by hand with the runner's own
 columns and dtypes: an animal pools its sessions by summing counts, never by
 averaging their proportions; an ``unknown`` membership never enters an
 ``unmatched`` population; a missing feature is counted and left out of its
-quantiles; every ``ms_*`` and memoryless row is marked pending; the baseline
-windows never enter a detector's populations. The last tests write the report
+quantiles; every ``ms_*`` and memoryless row is marked pending; a run's old
+baseline rows are dropped. The last tests write the report
 of a small run on disk, into temporary folders.
 """
 
@@ -55,7 +55,6 @@ _OBJECT_DEFAULTS = {
     "brain_area": "HPC",
     "run_id": "run01",
     "duration_stratum": "50-100 ms",
-    "baseline_level": "location",
     "ss_disagreement": None,
     "matched_event_key": None,
     "occupancy_state": "at_well",
@@ -90,15 +89,6 @@ def event(
         "event_index": i,
         "event_key": key(detector, epoch, i, animal),
     }
-    if detector == "baseline":
-        row |= {
-            "baseline_level": None,
-            "baseline_n": pd.NA,
-            "baseline_n_scored": pd.NA,
-            "baseline_median_dll": np.nan,
-            "baseline_q95_dll": np.nan,
-            "evidence_rank": np.nan,
-        }
     return row | values
 
 
@@ -143,7 +133,8 @@ def build(
     Parameters
     ----------
     events : list of dict
-        Features rows (``event``), baseline windows included.
+        Features rows (``event``); a ``baseline`` row stands for a run written
+        before the baselines were dropped.
     memberships : dict
         ``(event_key, other_detector) -> membership``; ``unmatched`` otherwise.
     unavailable : set
@@ -264,48 +255,27 @@ def row_of(table: pd.DataFrame, **values: object) -> pd.Series:
     return table[mask].iloc[0]
 
 
-def scored_against_baseline(epoch: str, n: int, n_above: int) -> list[dict]:
-    """``n`` state-space events, ``n_above`` of them above their q95."""
-    return [
-        event(
-            epoch,
-            "state_space",
-            i,
-            evidence_dll=2.0 if i < n_above else 0.5,
-            baseline_median_dll=0.0,
-            baseline_q95_dll=1.0,
-        )
-        for i in range(n)
-    ]
-
-
 class TestAnAnimalPoolsItsSessions:
     def test_by_summing_counts_not_averaging_proportions(self):
-        # 9 of 10 and 9 of 90: the counts pool to 18 of 100, the proportions
-        # average to 0.5
+        # 90 spikes over 10 rows and 9 over 90: the sums give 99 over 100, the
+        # per-session ratios average to 4.55
         manifest, tables = build(
-            scored_against_baseline("02_r1", 10, 9)
-            + scored_against_baseline("04_r2", 90, 9)
+            [
+                event("02_r1", "kay", 0, n_rows=10, n_spikes=90),
+                event("04_r2", "kay", 0, n_rows=90, n_spikes=9),
+            ]
         )
 
         out = report.report_tables(manifest, tables)
 
-        pooled = row_of(
-            out["evidence_vs_baseline_by_animal"],
-            detector="state_space",
-            population="all",
+        pooled = row_of(out["evidence_coverage_by_animal"], detector="kay")
+        assert (pooled.n_sessions, pooled.n_spikes, pooled.n_rows) == (2, 99, 100)
+        assert pooled.spikes_per_row == pytest.approx(0.99)
+        assert np.mean([9.0, 0.1]) == pytest.approx(4.55)
+        sessions = out["evidence_coverage_by_session"]
+        assert sessions[sessions.detector == "kay"].spikes_per_row.tolist() == (
+            pytest.approx([9.0, 0.1])
         )
-        assert (pooled.n_sessions, pooled.n_with_baseline, pooled.n_above_q95) == (
-            2,
-            100,
-            18,
-        )
-        assert pooled.p_above_q95 == pytest.approx(0.18)
-        assert np.mean([9 / 10, 9 / 90]) == pytest.approx(0.5)
-        sessions = out["evidence_vs_baseline_by_session"]
-        assert sessions[
-            (sessions.detector == "state_space") & (sessions.population == "all")
-        ].n_above_q95.tolist() == [9, 9]
 
     def test_the_rejection_counts_are_summed(self):
         rejection = [
@@ -375,15 +345,6 @@ class TestUnknownMembership:
             )
             assert apart.n_events == 1
             assert apart.unknown_reason == "outside_shared_exposure"
-            counts = out[f"evidence_vs_baseline_{level}"]
-            assert (
-                row_of(
-                    counts,
-                    detector="state_space",
-                    population="unmatched_by:memoryless",
-                ).n_events
-                == 2
-            )
 
     def test_a_pair_sharing_no_exposure_gives_its_reason(self):
         manifest, tables = build(
@@ -451,7 +412,6 @@ def _pending_world() -> tuple[dict, dict[str, pd.DataFrame]]:
         event("02_r1", "kay", 0),
         event("02_r1", "state_space", 0),
         event("02_r1", "memoryless", 0),
-        event("02_r1", "baseline", 0, matched_event_key=key("kay", "02_r1", 0)),
     ]
     cells = [
         {
@@ -519,8 +479,6 @@ class TestPending:
         for population in ("all", "unmatched_by:state_space"):
             row = row_of(timing, detector="kay", population=population)
             assert row.pending == "", population
-        window = row_of(timing, detector="baseline")
-        assert window.pending == ""
         # tested against memoryless, so pending
         cell = row_of(timing, detector="kay", population="exactly_one_detector")
         assert cell.pending == report.PENDING
@@ -551,37 +509,27 @@ class TestPending:
         assert report.PENDING == "pending the Phase 2 pilot checks"
 
 
-class TestBaselineWindows:
-    def test_never_enter_a_detectors_populations(self):
+class TestOldBaselineRows:
+    def test_are_dropped_from_every_table(self):
         manifest, tables = build(
             [
                 event("02_r1", "kay", 0, evidence_dll=1.0),
                 event("02_r1", "state_space", 0, evidence_dll=2.0),
-                event(
-                    "02_r1",
-                    "baseline",
-                    0,
-                    evidence_dll=1000.0,
-                    matched_event_key=key("kay", "02_r1", 0),
-                ),
+                # a run written before the baselines were dropped
+                event("02_r1", "baseline", 0, evidence_dll=1000.0),
             ]
         )
 
         out = report.report_tables(manifest, tables)
 
-        for level in ("by_session", "by_animal", "by_stratum_by_animal"):
-            evidence = out[f"features_evidence_{level}"]
-            ours = evidence[evidence.detector != "baseline"]
-            assert (ours.evidence_dll_max < 1000).all()
-            assert set(ours.population) >= {"all"}
-            assert "baseline" not in set(ours.population)
-            window = row_of(evidence, detector="baseline")
-            assert window.population == "baseline"
-            assert (window.n_events, window.evidence_dll_max) == (1, 1000.0)
-        assert "baseline" not in set(out["evidence_vs_baseline_by_animal"].detector)
-        assert "baseline" not in set(out["baseline_matching_by_animal"].detector)
-        coverage = out["evidence_coverage_by_animal"]
-        assert row_of(coverage, detector="baseline").n_events == 1
+        for name, table in out.items():
+            if "detector" in table:
+                assert "baseline" not in set(table.detector), name
+            if "population" in table:
+                assert "baseline" not in set(table.population), name
+        assert (out["features_evidence_by_animal"].evidence_dll_max < 1000).all()
+        assert not [name for name in report.TABLE_CAPTIONS if "baseline" in name]
+        assert not [name for name in report.FIGURE_CAPTIONS if "baseline" in name]
 
 
 def test_session_tables_hold_the_decoders_pairs_and_animal_tables_every_pair():
@@ -777,8 +725,6 @@ def test_comparator_only_events_by_disagreement():
             i,
             ss_disagreement=disagreement,
             evidence_dll=dll,
-            baseline_median_dll=0.0,
-            baseline_q95_dll=1.0,
             ss_continuous_prob_mean=0.1 * (i + 1),
         )
 
@@ -798,7 +744,8 @@ def test_comparator_only_events_by_disagreement():
     for level in ("by_session", "by_animal"):
         table = out[f"comparator_only_{level}"]
         near = row_of(table, detector="kay", ss_disagreement="near")
-        assert (near.n_events, near.n_above_q95, near.n_at_or_below_median) == (2, 1, 1)
+        assert (near.n_events, near.n_scorable) == (2, 2)
+        assert near.evidence_dll_median == pytest.approx(0.5)
         assert near.ss_continuous_prob_mean_median == pytest.approx(0.15)
         assert row_of(table, detector="kay", ss_disagreement="sustained").n_events == 1
         assert row_of(table, detector="kay", ss_disagreement="missing").n_events == 1
@@ -807,7 +754,7 @@ def test_comparator_only_events_by_disagreement():
         assert "state_space" not in set(table.detector)
 
 
-def test_evidence_coverage_and_baseline_matching_count_by_reason_and_level():
+def test_evidence_coverage_counts_by_reason_with_the_spikes_per_row():
     manifest, tables = build(
         [
             event("02_r1", "kay", 0, n_rows=10, evidence_n_valid_rows=8, n_spikes=5),
@@ -820,7 +767,6 @@ def test_evidence_coverage_and_baseline_matching_count_by_reason_and_level():
                 evidence_dll=np.nan,
                 evidence_n_valid_rows=pd.NA,
                 n_spikes=pd.NA,
-                baseline_level="failed",
             ),
             event(
                 "02_r1",
@@ -831,7 +777,6 @@ def test_evidence_coverage_and_baseline_matching_count_by_reason_and_level():
                 evidence_dll=np.nan,
                 evidence_n_valid_rows=0,
                 n_spikes=0,
-                baseline_level="duration_only",
             ),
         ]
     )
@@ -847,13 +792,7 @@ def test_evidence_coverage_and_baseline_matching_count_by_reason_and_level():
             coverage.n_unscorable_no_valid_row,
         ) == (3, 1, 1, 1)
         assert (coverage.n_rows, coverage.n_valid_rows, coverage.n_spikes) == (14, 8, 5)
-        matching = row_of(out[f"baseline_matching_{level}"], detector="kay")
-        assert (
-            matching.n_events,
-            matching.n_location,
-            matching.n_duration_only,
-            matching.n_failed,
-        ) == (3, 1, 1, 1)
+        assert coverage.spikes_per_row == pytest.approx(5 / 14)
 
 
 def test_an_unscorable_reason_the_report_does_not_know_is_refused():
@@ -876,8 +815,8 @@ def _write_run(tmp_path) -> tuple:
             i,
             animal=animal,
             evidence_dll=float(i),
-            baseline_median_dll=0.5,
-            baseline_q95_dll=1.5,
+            n_rows=10,
+            n_spikes=i,
             duration_stratum=DURATION_STRATUM_LABELS[i % 5],
             ss_disagreement=(None if detector == "state_space" else "near"),
         )
@@ -939,6 +878,12 @@ def _write_run(tmp_path) -> tuple:
 def written(tmp_path_factory):
     tmp_path = tmp_path_factory.mktemp("report")
     run_dir, inventory_root, memoryless_root = _write_run(tmp_path)
+    # an earlier version of the report's outputs
+    (run_dir / "report").mkdir()
+    (run_dir / "report" / "evidence_vs_baseline_by_animal.csv").write_text("old")
+    (tmp_path / "figures" / "run01" / "examples").mkdir(parents=True)
+    (tmp_path / "figures" / "run01" / "evidence_vs_baseline.png").write_bytes(b"old")
+    (tmp_path / "figures" / "run01" / "examples" / "kept.png").write_bytes(b"x")
     paths = report.write_report(
         run_dir,
         tmp_path / "figures",
@@ -966,6 +911,14 @@ class TestTheReportOnARunOnDisk:
         assert (figure_dir / "captions.md").exists()
         assert len(paths["tables"]) == len(report.TABLE_CAPTIONS)
         assert len(paths["figures"]) == len(report.FIGURE_CAPTIONS)
+        # nothing of an earlier version is left beside them; examples are kept
+        assert sorted(p.stem for p in report_dir.glob("*.csv")) == sorted(
+            report.TABLE_CAPTIONS
+        )
+        assert sorted(p.name for p in figure_dir.glob("*.png")) == sorted(
+            report.FIGURE_CAPTIONS
+        )
+        assert (figure_dir / "examples" / "kept.png").exists()
 
     def test_report_md_lists_every_table_and_states_the_unknowns(self, written):
         report_dir, _, _ = written
@@ -1008,12 +961,13 @@ def test_main_reads_the_run_named(tmp_path, monkeypatch):
     report.main(["--run-id", "run01"])
 
     assert (run_dir / "report" / "report.md").exists()
-    assert (tmp_path / "figures" / "run01" / "evidence_vs_baseline.png").exists()
+    assert (tmp_path / "figures" / "run01" / "evidence_by_spikes.png").exists()
 
 
 def test_every_feature_group_names_columns_of_the_features_table():
+    known = {*features_runner.FEATURE_DTYPES, *report.DERIVED_FEATURES}
     for group, columns in report.FEATURE_GROUPS.items():
-        assert set(columns) <= set(features_runner.FEATURE_DTYPES), group
+        assert set(columns) <= known, group
     assert all(c.startswith("ss_") for c in report.FEATURE_GROUPS["ss"])
     assert all(c.startswith("ms_") for c in report.FEATURE_GROUPS["ms"])
 
@@ -1076,49 +1030,6 @@ def test_the_distribution_reads_the_inventory_reports_quantiles():
     empty = row_of(fast, g="c")
     assert (empty.n, empty.x_n) == (2, 0)
     assert np.isnan(empty.x_median) and np.isnan(empty.x_max)
-
-
-def test_twin_baseline_windows_count_once():
-    def window(i: int, matched: str, start: float, dll: float) -> dict:
-        return event(
-            "02_r1",
-            "baseline",
-            i,
-            matched_event_key=matched,
-            event_start_s=start,
-            event_end_s=start + 0.1,
-            evidence_dll=dll,
-        )
-
-    events = [
-        event("02_r1", "kay", 0),
-        event("02_r1", "memoryless", 0),
-        # the twins' windows are identical; the kay window is not
-        window(0, key("memoryless", "02_r1", 0), 5.0, 2.0),
-        window(1, key("memoryless_criteria", "02_r1", 0), 5.0, 2.0),
-        window(2, key("kay", "02_r1", 0), 7.0, 4.0),
-    ]
-    manifest, tables = build(events)
-
-    out = report.report_tables(manifest, tables)
-
-    for level in ("by_session", "by_animal"):
-        spread = row_of(out[f"features_evidence_{level}"], detector="baseline")
-        assert (spread.n_events, spread.evidence_dll_median) == (2, 3.0)
-        assert (
-            row_of(out[f"evidence_coverage_{level}"], detector="baseline").n_events == 2
-        )
-        sources = out[f"baseline_sources_{level}"]
-        assert sources.set_index("detector").n_windows.to_dict() == {
-            "kay": 1,
-            "memoryless": 1,
-            "memoryless_criteria": 1,
-        }
-        assert sources.p_windows.tolist() == pytest.approx([1 / 3] * 3)
-    missing = row_of(
-        out["missing_by_animal"], detector="baseline", feature="evidence_dll"
-    )
-    assert missing.n == 2
 
 
 def test_the_context_pools_counts_per_animal():
@@ -1217,7 +1128,12 @@ def test_the_session_missing_table_leaves_out_features_never_missing():
     out = report.report_tables(manifest, tables)
 
     sessions = out["missing_by_session"]
-    assert set(sessions.feature) == {"evidence_dll", "ss_disagreement"}
+    # spikes_per_row too: an event of no row has none
+    assert set(sessions.feature) == {
+        "evidence_dll",
+        "ss_disagreement",
+        "spikes_per_row",
+    }
     assert set(out["missing_by_animal"].feature) == set(report.MISSING_FEATURES)
     assert "evidence_dll" not in report.never_missing(out["missing_by_animal"])
     assert "n_spikes" in report.never_missing(out["missing_by_animal"])
@@ -1248,74 +1164,70 @@ def test_an_empty_occupancy_state_counts_as_missing():
     assert (missing.n, missing.n_missing) == (2, 1)
 
 
-def test_the_evidence_against_baseline_carries_the_spike_rates_beside_the_counts():
-    # each event's own spike rate, and the rate of the window drawn for it
-    def scored(epoch, i, rate, window_rate):
-        own = event(epoch, "kay", i, spike_rate_hz=rate)
-        window = event(
-            epoch,
-            "baseline",
-            i,
-            matched_event_key=key("kay", epoch, i),
-            event_start_s=float(i),
-            event_end_s=float(i) + 0.1,
-            spike_rate_hz=window_rate,
-        )
-        return [own, window]
-
+def test_the_evidence_is_read_beside_the_spikes_per_row():
     events = [
-        *scored("02_r1", 0, 100.0, 10.0),
-        *scored("02_r1", 1, 300.0, 30.0),
-        *scored("04_r2", 0, 500.0, 50.0),
-        # an event without a baseline: its rate counts, no window rate
-        event("04_r2", "kay", 1, spike_rate_hz=700.0, baseline_level="failed"),
+        event("02_r1", "kay", 0, n_rows=10, n_spikes=1, evidence_dll=0.1),  # 0.1
+        event("02_r1", "kay", 1, n_rows=10, n_spikes=3, evidence_dll=0.3),  # 0.3
+        event("02_r1", "kay", 2, n_rows=10, n_spikes=15, evidence_dll=1.0),  # 1.5
+        event("04_r2", "kay", 0, n_rows=10, n_spikes=15, evidence_dll=3.0),  # 1.5
+        # no row, so in no bin
+        event("04_r2", "kay", 1, n_rows=0, n_spikes=pd.NA, evidence_dll=np.nan),
     ]
     manifest, tables = build(events)
 
     out = report.report_tables(manifest, tables)
 
-    first = row_of(
-        out["evidence_vs_baseline_by_session"],
-        epoch="02_r1",
+    pooled = out["evidence_by_spikes_by_animal"]
+    pooled = pooled[(pooled.detector == "kay") & (pooled.population == "all")]
+    assert pooled.spikes_per_row_bin.astype(str).tolist() == [
+        "0-0.25",
+        "0.25-0.5",
+        "1-2",
+    ]
+    assert pooled.n_events.tolist() == [1, 1, 2]
+    assert pooled.evidence_dll_median.tolist() == pytest.approx([0.1, 0.3, 2.0])
+    sessions = out["evidence_by_spikes_by_session"]
+    second = row_of(
+        sessions,
+        epoch="04_r2",
         detector="kay",
         population="all",
+        spikes_per_row_bin="1-2",
     )
-    assert (first.n_events, first.spike_rate_hz_n) == (2, 2)
-    assert first.spike_rate_hz_median == 200.0
-    assert first.baseline_spike_rate_hz_median == 20.0
-    pooled = row_of(
-        out["evidence_vs_baseline_by_animal"], detector="kay", population="all"
+    assert second.n_events == 1
+    evidence = row_of(
+        out["features_evidence_by_animal"], detector="kay", population="all"
     )
-    # pooled over the animal's events, not the median of session medians
-    assert (pooled.n_events, pooled.spike_rate_hz_n) == (4, 4)
-    assert pooled.spike_rate_hz_median == 400.0
-    assert (pooled.baseline_spike_rate_hz_n, pooled.baseline_spike_rate_hz_median) == (
-        3,
-        30.0,
+    assert (evidence.spikes_per_row_n, evidence.spikes_per_row_median) == (
+        4,
+        pytest.approx(0.9),
     )
-    assert "baseline" not in set(out["evidence_vs_baseline_by_animal"].detector)
 
 
-def test_the_evidence_captions_say_what_the_baselines_are_not_matched_on():
+def test_every_evidence_caption_says_what_the_score_is_and_is_not():
     evidence = [
         caption
         for name, caption in report.TABLE_CAPTIONS.items()
-        if name.startswith(("evidence_vs_baseline_", "features_evidence_"))
+        if name.startswith(
+            ("features_evidence_", "evidence_coverage_", "evidence_by_spikes_")
+        )
+        or name.startswith("comparator_only_")
     ]
     evidence += [
-        report.FIGURE_CAPTIONS["evidence_vs_baseline.png"],
         report.FIGURE_CAPTIONS["evidence_by_stratum.png"],
+        report.FIGURE_CAPTIONS["evidence_by_spikes.png"],
     ]
-    assert len(evidence) == 8
+    assert len(evidence) == 12
     for caption in evidence:
-        assert "not on spike count" in caption
+        assert (
+            "log-likelihood difference between the best remote real place bin "
+            "and the animal's bin" in caption
+        )
         assert "grows with the number of spikes" in caption
-        assert "mixes evidence with engagement" in caption
-        assert "evidence_coverage_by_" in caption
-        assert "features_engagement_by_" in caption
-        assert "An excess over baseline is not a calibrated declaration of replay" in (
+        assert "It is a diagnostic: it is not a calibrated declaration of replay" in (
             caption
         )
+    assert "evidence_vs_baseline.png" not in report.FIGURE_CAPTIONS
 
 
 def test_the_ripple_and_mua_traces_are_named():
@@ -1328,9 +1240,3 @@ def test_the_ripple_and_mua_traces_are_named():
             assert "SWR_zscore" in caption and "MUA_zscore" in caption
             assert "Kay consensus" in caption
             assert "one sample off" in caption
-
-
-def test_a_failed_baseline_can_mean_no_shared_exposure():
-    for level in ("by_session", "by_animal"):
-        caption = report.TABLE_CAPTIONS[f"baseline_matching_{level}"]
-        assert "no shared exposure" in caption

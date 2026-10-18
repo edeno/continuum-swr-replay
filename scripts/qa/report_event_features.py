@@ -16,9 +16,12 @@ rebuilt from the run's pair memberships and the comparison's cells and
 directional tables: ``all``, ``matched_by:<B>``, ``unmatched_by:<B>``,
 ``unknown_by:<B>`` (with its ``unknown_reason``), each cell's unmatched
 events (``<cell>``) with ``<cell>:matched`` and ``<cell>:unknown``. An
-``unknown`` membership is its own population, never pooled as unmatched. The
-matched baseline windows are the population ``baseline`` of detector
-``baseline`` and enter no detector's population.
+``unknown`` membership is its own population, never pooled as unmatched.
+There are no baseline windows: the lead dropped the baseline comparison from
+this stage (2026-10-18), since windows matched on duration and location but
+not on spike count measured engagement more than evidence. A run written
+before that decision holds baseline rows (detector ``baseline``); they are
+dropped on reading. The evidence is reported beside the spikes per row.
 
 Every table comes per session (one analysed epoch, nested in its animal) and
 per animal. Counts are summed over each animal's sessions and proportions are
@@ -73,9 +76,6 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import (  # noqa:
     _event_keys,
 )
 from continuum_swr_replay.analysis.inventory_comparison.selection import (  # noqa: E402
-    DURATION_ONLY,
-    FAILED,
-    LOCATION,
     REJECTION_DTYPES,
     REJECTION_STAGES,
 )
@@ -141,9 +141,7 @@ FEATURE_GROUPS: Mapping[str, tuple[str, ...]] = MappingProxyType(
             "evidence_dll",
             "evidence_n_valid_rows",
             "evidence_valid_fraction",
-            "evidence_rank",
-            "baseline_median_dll",
-            "baseline_q95_dll",
+            "spikes_per_row",
         ),
         "ss": (
             "ss_local_prob_mean",
@@ -173,6 +171,12 @@ FEATURE_GROUPS: Mapping[str, tuple[str, ...]] = MappingProxyType(
 )
 """The numeric features of each group, whose quantiles the features tables
 give."""
+DERIVED_FEATURES = ("spikes_per_row",)
+"""Features the report derives from the features table: ``spikes_per_row`` is
+``n_spikes / n_rows``, NaN for an interval with no row."""
+SPIKES_PER_ROW_BINS = (0.0, 0.25, 0.5, 1.0, 2.0, 4.0, np.inf)
+"""Bounds of the spikes-per-row bins, each closed on the left."""
+SPIKES_PER_ROW_LABELS = ("0-0.25", "0.25-0.5", "0.5-1", "1-2", "2-4", ">=4")
 LABELLED_FEATURES = (
     "track_segment_id",
     "patch_id",
@@ -193,7 +197,6 @@ MISSING_FEATURES = (
 
 UNSCORABLE_REASONS = ("no_row", "no_valid_row")
 """``evidence_unscorable``'s reasons; ``""`` is a scored interval."""
-BASELINE_LEVELS = (LOCATION, DURATION_ONLY, FAILED)
 UNKNOWN_REASONS = (NO_SHARED_EXPOSURE, OUTSIDE_SHARED_EXPOSURE)
 REJECTION_COUNTS = tuple(
     name for name, dtype in REJECTION_DTYPES.items() if dtype == "Int64"
@@ -247,13 +250,7 @@ CONTEXT_CATEGORIES: Mapping[str, tuple[object, ...] | None] = MappingProxyType(
 )
 """The categorical context counted per category, each with its missing
 events; ``None`` takes every value the run holds."""
-EVIDENCE_COUNTS = (
-    "n_events",
-    "n_scorable",
-    "n_with_baseline",
-    "n_above_q95",
-    "n_at_or_below_median",
-)
+COMPARATOR_COUNTS = ("n_events", "n_scorable")
 
 _POPULATIONS = (
     "Populations: all (every compared event of the detector); matched_by:<B> "
@@ -263,14 +260,7 @@ _POPULATIONS = (
     "outside_shared_exposure: the event is not wholly inside it); each cell's "
     "unmatched events (exactly_one_detector, swr_matched_by_no_decoder, "
     "sequence_matched_by_no_trigger) with <cell>:matched and <cell>:unknown "
-    "beside it; and baseline, the matched baseline windows (detector "
-    "baseline), which enter no detector's population. The baseline pool is the "
-    "shared exposure of all nine inventories less every event of each. Each "
-    "distinct baseline window counts once (twin intervals, such as a published "
-    "memoryless event and its memoryless_criteria twin, draw identical "
-    "windows); the windows are drawn per compared event, so the baseline "
-    "population weights each detector by the events it contributed "
-    "(baseline_sources_by_*)."
+    "beside it."
 )
 _SESSION_ROWS = (
     "Per session (one analysed epoch, nested in its animal), with the pairwise "
@@ -284,20 +274,14 @@ _ANIMAL_SUMS = (
     "Per animal: counts summed over its sessions (n_sessions), proportions "
     "taken from those sums, never averaged over sessions."
 )
-_NOT_CALIBRATED = "An excess over baseline is not a calibrated declaration of replay."
-_ENGAGEMENT_CAVEAT = (
-    "The baselines are matched on duration and location, not on spike count, "
-    "and the per-row remote maximum grows with the number of spikes, so a share "
-    "above baseline mixes evidence with engagement: see the spikes per row "
-    "(n_spikes / n_rows) by detector, baseline windows included, in "
-    "evidence_coverage_by_*, and the spike counts and rates in "
-    "features_engagement_by_*. " + _NOT_CALIBRATED
-)
-_AGAINST_BASELINE = (
-    "n_scorable have an evidence score; n_with_baseline are scorable and have "
-    "a baseline median and 95th percentile; n_above_q95 score above their own "
-    "baseline_q95_dll and n_at_or_below_median at or below their own "
-    "baseline_median_dll. These are descriptive labels. " + _ENGAGEMENT_CAVEAT
+_EVIDENCE_NOTE = (
+    "evidence_dll is the mean, over an interval's rows with evidence, of each "
+    "row's log-likelihood difference between the best remote real place bin "
+    "and the animal's bin. It grows with the number of spikes in the row, so "
+    "it is read beside spikes_per_row (n_spikes / n_rows; evidence_coverage_by_* "
+    "and evidence_by_spikes_*). It is a diagnostic: it is not a calibrated "
+    "declaration of replay. No baseline is compared: the lead dropped the "
+    "baseline windows, pending a design matched on spike count."
 )
 _LFP_MUA = (
     "ripple_z_* reads the decode frame's SWR_zscore: the Kay consensus over "
@@ -322,7 +306,7 @@ def _feature_topic(group: str, columns: Sequence[str], stratified: bool) -> str:
     if group == "lfp_mua":
         what += " " + _LFP_MUA
     if group == "evidence":
-        what += " " + _ENGAGEMENT_CAVEAT
+        what += " " + _EVIDENCE_NOTE
     return " ".join((what, _POPULATIONS, _QUANTILE_COLUMNS))
 
 
@@ -343,8 +327,8 @@ _TOPICS: Mapping[str, tuple[str, str, str]] = MappingProxyType(
             "definition is counted the same: the gaps at an epoch's first and "
             "last event, ss_longest_run_nonlocal_s with no run, "
             "ss_nearest_event_gap_s and ss_disagreement of state_space's own "
-            "events, the stop context of an event in no stop, and a baseline "
-            "window's native duration, gaps and baseline columns. Labels "
+            "events, the stop context of an event in no stop, and "
+            "spikes_per_row of an interval with no row. Labels "
             f"({', '.join(LABELLED_FEATURES)}) are counted here and in "
             "context_by_*. " + _POPULATIONS,
             _SESSION_ROWS + " Features with no missing value in any session of "
@@ -352,24 +336,23 @@ _TOPICS: Mapping[str, tuple[str, str, str]] = MappingProxyType(
             _ANIMAL_SUMS + " Every feature.",
         ),
         "evidence_coverage": (
-            "The spike evidence's coverage per detector, baseline windows "
-            "included: n_events; n_scorable (an evidence score); "
-            "n_unscorable_no_row (no grid row) and n_unscorable_no_valid_row "
-            "(rows, none valid); and the rows (n_rows), valid rows "
-            "(n_valid_rows) and spikes (n_spikes) summed, a missing count (an "
-            "interval with no row) summed as 0. The baseline row counts each "
-            "distinct window once.",
+            "The spike evidence's coverage per detector: n_events; n_scorable "
+            "(an evidence score); n_unscorable_no_row (no grid row) and "
+            "n_unscorable_no_valid_row (rows, none valid); the rows (n_rows), "
+            "valid rows (n_valid_rows) and spikes (n_spikes) summed, a missing "
+            "count (an interval with no row) summed as 0; and spikes_per_row, "
+            "n_spikes over n_rows. " + _EVIDENCE_NOTE,
             "Per session (one analysed epoch, nested in its animal).",
-            _ANIMAL_SUMS,
+            _ANIMAL_SUMS + " spikes_per_row is taken from the sums.",
         ),
-        "baseline_sources": (
-            "The baseline windows by the detector of the event each was drawn "
-            "for: n_windows (one per event with a baseline, twins included) and "
-            "p_windows, its share of all n_windows. The baseline population "
-            "keeps each distinct window once, so its detectors weigh in by these "
-            "shares.",
-            "Per session (one analysed epoch, nested in its animal).",
-            _ANIMAL_SUMS,
+        "evidence_by_spikes": (
+            "Quantiles of evidence_dll of each detector's events, by population "
+            "and by spikes_per_row bin ("
+            + ", ".join(SPIKES_PER_ROW_LABELS)
+            + "; each bin closed on the left; an interval with no row is in "
+            "none). " + _EVIDENCE_NOTE + " " + _POPULATIONS + " " + _QUANTILE_COLUMNS,
+            _SESSION_ROWS,
+            _ANIMAL_EVENTS,
         ),
         "context": (
             "The categorical context of each detector's events, per population: "
@@ -378,30 +361,6 @@ _TOPICS: Mapping[str, tuple[str, str, str]] = MappingProxyType(
             "missing) for at_well (true, false), occupancy_state (each value), "
             "current_patch (1, 2, 3) and is_rewarded_outcome (1, 0); each p_ "
             "is its count over n_events. " + _POPULATIONS,
-            _SESSION_ROWS,
-            _ANIMAL_SUMS,
-        ),
-        "baseline_matching": (
-            "Each detector's compared events by the level of their matched "
-            "baselines: n_location (matched in duration and in the animal's "
-            "location), n_duration_only (in duration only) and n_failed (no "
-            "baseline). The baseline pool involves every inventory: it is the "
-            "shared exposure of all nine, so in an epoch where any detector "
-            "did not run it is empty and every event there is failed. failed "
-            "can mean no shared exposure, not only too few windows.",
-            "Per session (one analysed epoch, nested in its animal).",
-            _ANIMAL_SUMS,
-        ),
-        "evidence_vs_baseline": (
-            "Each event's spike evidence against its own matched baselines, "
-            "counted per detector and population: n_events; "
-            + _AGAINST_BASELINE
-            + " p_above_q95 and p_at_or_below_median are those counts over "
-            "n_with_baseline. Beside the counts, spike_rate_hz_n and "
-            "spike_rate_hz_median of the events, and baseline_spike_rate_hz_n "
-            "and baseline_spike_rate_hz_median of the first baseline window "
-            "drawn for each of them (the all row gives each detector's), "
-            "quantiles of the events pooled. " + _POPULATIONS,
             _SESSION_ROWS,
             _ANIMAL_SUMS,
         ),
@@ -441,11 +400,12 @@ _TOPICS: Mapping[str, tuple[str, str, str]] = MappingProxyType(
             "ss_disagreement: near (a compared state_space event within near_s, "
             "50 ms), subthreshold (a run of non-local probability above the "
             "threshold inside it), sustained (neither), missing (the runs "
-            "unknown). Counts against their baselines: "
-            + _AGAINST_BASELINE
-            + " Then quantiles of their state-space composition ("
+            "unknown): n_events, and n_scorable of them with an evidence score. "
+            "Then quantiles of their state-space composition ("
             + ", ".join(COMPOSITION)
-            + "). "
+            + "), their evidence_dll and their spikes_per_row. "
+            + _EVIDENCE_NOTE
+            + " "
             + _QUANTILE_COLUMNS,
             "Per session (one analysed epoch, nested in its animal).",
             _ANIMAL_SUMS + " The quantiles pool the animal's events.",
@@ -495,16 +455,6 @@ FIGURE_CAPTIONS: Mapping[str, str] = MappingProxyType(
             "of the animal's events pooled. Colors by detector family. Counts "
             "in features_*_by_animal.csv."
         ),
-        "evidence_vs_baseline.png": _caption(
-            "Spike evidence against each event's own matched baselines, per "
-            "animal (columns) and detector (rows), every compared event: the "
-            "fraction above its baseline 95th percentile (left) and at or "
-            "below its baseline median (right), of the events scorable with a "
-            "baseline, from counts summed over the animal's sessions; printed "
-            "in each cell to two places. Grey: no such events. Descriptive "
-            "labels. " + _ENGAGEMENT_CAVEAT + " Counts and spike rates in "
-            "evidence_vs_baseline_by_animal.csv."
-        ),
         "rejection_stages.png": _caption(
             "Rejection stages of the state_space events unmatched by each "
             "memoryless cohort (panels), per animal (rows) and exclusive stage "
@@ -523,11 +473,19 @@ FIGURE_CAPTIONS: Mapping[str, str] = MappingProxyType(
         ),
         "evidence_by_stratum.png": _caption(
             "Spike evidence (evidence_dll) by duration stratum, per detector "
-            "(panels), every compared event, and the baseline windows: the "
+            "(panels), every compared event: the median (marker, one per "
+            "animal) and the 25th to 75th percentiles (bar) of the animal's "
+            "events pooled. Colors by detector family. "
+            + _EVIDENCE_NOTE
+            + " Counts in features_evidence_by_stratum_by_animal.csv."
+        ),
+        "evidence_by_spikes.png": _caption(
+            "Spike evidence (evidence_dll) against spikes per row, per detector "
+            "(panels), every compared event: in each spikes_per_row bin, the "
             "median (marker, one per animal) and the 25th to 75th percentiles "
             "(bar) of the animal's events pooled. Colors by detector family. "
-            + _ENGAGEMENT_CAVEAT
-            + " Counts in features_evidence_by_stratum_by_animal.csv."
+            + _EVIDENCE_NOTE
+            + " Counts in evidence_by_spikes_by_animal.csv."
         ),
     }
 )
@@ -632,57 +590,28 @@ def read_inputs(
     return tables
 
 
+def without_baseline_rows(features: pd.DataFrame) -> pd.DataFrame:
+    """``features`` less the baseline windows (detector ``baseline``) that a
+    run written before the baselines were dropped holds."""
+    kept: pd.DataFrame = features[(features.detector != BASELINE).to_numpy()]
+    return kept.reset_index(drop=True)
+
+
 def event_populations(
     features: pd.DataFrame,
     pair_membership: pd.DataFrame,
     cells: pd.DataFrame,
     directional: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Each compared event once per population it belongs to, and each
-    baseline window once, as population ``baseline``.
+    """Each compared event once per population it belongs to.
 
     Returns
     -------
     DataFrame
         Columns and dtypes as ``populations.POPULATION_DTYPES``.
     """
-    windows = (features.detector == BASELINE).to_numpy()
-    rows = population_rows(features[~windows], pair_membership, cells, directional)
-    baselines = features.loc[windows, [*SESSION, "detector", "event_key"]].assign(
-        population=BASELINE, unknown_reason=""
-    )
-    together = pd.concat([rows, baselines], ignore_index=True)
-    return together[list(POPULATION_DTYPES)].astype(dict(POPULATION_DTYPES))
-
-
-WINDOW_KEYS = [*SESSION, "event_start_s", "event_end_s"]
-"""A baseline window's identity: twin intervals draw identical windows."""
-
-
-def distinct_windows(features: pd.DataFrame) -> pd.DataFrame:
-    """``features`` with each baseline window once, the first of identical
-    ones (by :data:`WINDOW_KEYS`) kept."""
-    windows = features.detector == BASELINE
-    repeated = features.loc[windows, WINDOW_KEYS].duplicated()
-    return features.drop(index=repeated.index[repeated.to_numpy()])
-
-
-def baseline_sources_by_session(features: pd.DataFrame) -> pd.DataFrame:
-    """Per session and detector, the baseline windows drawn for its events
-    (``n_windows``, twins included) and their share of the session's
-    (``p_windows``)."""
-    windows = features[(features.detector == BASELINE).to_numpy()]
-    detectors = windows.matched_event_key.str.split(":", n=1).str[0]
-    counted = _grouped_sum(
-        pd.DataFrame({"n_windows": 1}, index=windows.index),
-        windows[SESSION].assign(detector=detectors.to_numpy()),
-    )
-    return _with_window_shares(counted, SESSION)
-
-
-def _with_window_shares(frame: pd.DataFrame, keys: Sequence[str]) -> pd.DataFrame:
-    total = frame.groupby(list(keys)).n_windows.transform("sum")
-    return frame.assign(p_windows=_ratio(frame.n_windows, total))
+    rows = population_rows(features, pair_membership, cells, directional)
+    return rows[list(POPULATION_DTYPES)].astype(dict(POPULATION_DTYPES))
 
 
 def context_by_session(
@@ -848,80 +777,39 @@ def never_missing(missing: pd.DataFrame) -> list[str]:
     return [f for f in MISSING_FEATURES if f in total.index and total[f] == 0]
 
 
-EVIDENCE_COLUMNS = (
-    "evidence_dll",
-    "evidence_unscorable",
-    "baseline_median_dll",
-    "baseline_q95_dll",
-)
+EVIDENCE_COLUMNS = ("evidence_dll", "evidence_unscorable", "spikes_per_row")
 
 
-def _against_baseline(frame: pd.DataFrame, keys: Sequence[str]) -> pd.DataFrame:
-    """Per ``keys`` group, :data:`EVIDENCE_COUNTS` of the events against their
-    own baselines."""
-    dll = frame.evidence_dll.to_numpy(np.float64)
-    scorable = (frame.evidence_unscorable == "").to_numpy()
-    median = frame.baseline_median_dll.to_numpy(np.float64)
-    q95 = frame.baseline_q95_dll.to_numpy(np.float64)
-    with_baseline = scorable & np.isfinite(median) & np.isfinite(q95)
+def with_spikes_per_row(features: pd.DataFrame) -> pd.DataFrame:
+    """``features`` with ``spikes_per_row`` (``n_spikes / n_rows``, NaN with
+    no row) and its bin of :data:`SPIKES_PER_ROW_BINS`."""
+    n_rows = features.n_rows.to_numpy(np.float64)
+    n_spikes = features.n_spikes.astype("Float64").to_numpy(np.float64, na_value=np.nan)
+    per_row = np.where(n_rows > 0, n_spikes / np.maximum(n_rows, 1), np.nan)
+    return features.assign(
+        spikes_per_row=per_row,
+        spikes_per_row_bin=pd.cut(
+            per_row,
+            bins=list(SPIKES_PER_ROW_BINS),
+            labels=list(SPIKES_PER_ROW_LABELS),
+            right=False,
+        ),
+    )
+
+
+def _comparator_counts(frame: pd.DataFrame, keys: Sequence[str]) -> pd.DataFrame:
+    """Per ``keys`` group, the events and the scorable ones."""
     flags = pd.DataFrame(
         {
             "n_events": np.ones(len(frame), dtype=np.int64),
-            "n_scorable": scorable,
-            "n_with_baseline": with_baseline,
-            "n_above_q95": with_baseline & (dll > q95),
-            "n_at_or_below_median": with_baseline & (dll <= median),
+            "n_scorable": (frame.evidence_unscorable == "").to_numpy(),
         }
     ).astype(np.int64)
     return _grouped_sum(flags, frame[list(keys)])
 
 
-SPIKE_RATES = ("spike_rate_hz", "baseline_spike_rate_hz")
-"""The spike rates beside the counts of ``evidence_vs_baseline_by_*``."""
-
-
-def with_window_spike_rate(features: pd.DataFrame) -> pd.DataFrame:
-    """``features`` with ``baseline_spike_rate_hz``: for each compared event,
-    the spike rate of the first baseline window drawn for it; NaN for an
-    event with none and for the windows themselves.
-
-    Read before the twin windows are dropped, so every event finds its own.
-    """
-    windows = features[(features.detector == BASELINE).to_numpy()]
-    rate = windows.set_index("matched_event_key").spike_rate_hz
-    return features.assign(
-        baseline_spike_rate_hz=features.event_key.map(rate).astype(np.float64)
-    )
-
-
-def _spike_rates(frame: pd.DataFrame, keys: Sequence[str]) -> pd.DataFrame:
-    """Per ``keys`` group, the count and median of each of :data:`SPIKE_RATES`."""
-    table = distribution(frame, keys, SPIKE_RATES, "n")
-    return table[[*keys, *(f"{c}_{s}" for c in SPIKE_RATES for s in ("n", "median"))]]
-
-
-def _with_shares(frame: pd.DataFrame) -> pd.DataFrame:
-    """``frame`` with the two shares over ``n_with_baseline``."""
-    return frame.assign(
-        p_above_q95=_ratio(frame.n_above_q95, frame.n_with_baseline),
-        p_at_or_below_median=_ratio(frame.n_at_or_below_median, frame.n_with_baseline),
-    )
-
-
-def evidence_vs_baseline_by_session(
-    populations: pd.DataFrame, features: pd.DataFrame
-) -> pd.DataFrame:
-    """Per session, detector and population, the events against their
-    baselines; every population but ``baseline``."""
-    rows = populations[(populations.population != BASELINE).to_numpy()]
-    return _against_baseline(
-        _with(rows, features, EVIDENCE_COLUMNS), [*SESSION, *POPULATION]
-    )
-
-
 def evidence_coverage_by_session(features: pd.DataFrame) -> pd.DataFrame:
-    """Per session and detector, baseline windows included: the events, the
-    scorable ones, the unscorable ones by reason, and the summed rows, valid
+    """Per session and detector: the events, the scorable ones, the unscorable ones by reason, and the summed rows, valid
     rows and spikes.
 
     Raises
@@ -946,29 +834,6 @@ def evidence_coverage_by_session(features: pd.DataFrame) -> pd.DataFrame:
         index=features.index,
     ).astype(np.int64)
     return _grouped_sum(counted, features[[*SESSION, "detector"]])
-
-
-def baseline_matching_by_session(features: pd.DataFrame) -> pd.DataFrame:
-    """Per session and detector, its compared events by baseline level.
-
-    Raises
-    ------
-    ValueError
-        A compared event's level is not one of :data:`BASELINE_LEVELS`.
-    """
-    events = features[(features.detector != BASELINE).to_numpy()]
-    _refuse_values(events.baseline_level, BASELINE_LEVELS, "baseline_level")
-    counted = pd.DataFrame(
-        {
-            "n_events": 1,
-            **{
-                f"n_{level}": (events.baseline_level == level).to_numpy()
-                for level in BASELINE_LEVELS
-            },
-        },
-        index=events.index,
-    ).astype(np.int64)
-    return _grouped_sum(counted, events[[*SESSION, "detector"]])
 
 
 REJECTION_STAGE_COUNTS = tuple(f"n_{s}" for s in (*REJECTION_STAGES, "unknown"))
@@ -1151,11 +1016,13 @@ def comparator_only_events(
 def comparator_only_table(
     counts: pd.DataFrame, events: pd.DataFrame, keys: Sequence[str]
 ) -> pd.DataFrame:
-    """``counts`` with their shares and the composition's quantiles of
-    ``events`` pooled by ``keys``, detector and class."""
+    """``counts`` with the quantiles of the composition, the evidence and the
+    spikes per row of ``events`` pooled by ``keys``, detector and class."""
     by = [*keys, "detector", "ss_disagreement"]
-    spread = distribution(events, by, COMPOSITION, "n_events").drop(columns="n_events")
-    return _with_shares(counts).merge(spread, on=by, how="left")
+    spread = distribution(
+        events, by, [*COMPOSITION, "evidence_dll", "spikes_per_row"], "n_events"
+    ).drop(columns="n_events")
+    return counts.merge(spread, on=by, how="left")
 
 
 def stratum_labels(features: pd.DataFrame, labels: Sequence[str]) -> pd.DataFrame:
@@ -1172,7 +1039,7 @@ def stratum_labels(features: pd.DataFrame, labels: Sequence[str]) -> pd.DataFram
         raise ValueError(
             f"{int(unstratified.sum())} rows, such as "
             f"{features.event_key[unstratified].iloc[0]}, have no duration_stratum; "
-            "a compared event or baseline window always has a positive span."
+            "a compared event always has a positive span."
         )
     present = set(features.duration_stratum)
     if present - set(labels):
@@ -1207,7 +1074,7 @@ def report_tables(
         Two features rows share an event key, a value is not one the report
         knows, or the tables disagree (see the functions called).
     """
-    features = tables["features"]
+    features = without_baseline_rows(tables["features"])
     if not features.event_key.is_unique:
         raise ValueError("Two features rows share an event key.")
     features = stratum_labels(
@@ -1215,8 +1082,7 @@ def report_tables(
     )
     # an empty label is no state
     features["occupancy_state"] = features.occupancy_state.replace("", None)
-    sources = baseline_sources_by_session(features)
-    features = distinct_windows(with_window_spike_rate(features))
+    features = with_spikes_per_row(features)
     populations = event_populations(
         features, tables["pair_membership"], tables["cells"], tables["directional"]
     )
@@ -1234,40 +1100,28 @@ def report_tables(
     out["context_by_animal"] = _with_context_shares(
         _summed(context, POPULATION, [c for c in context.columns if c.startswith("n_")])
     )
-    out["baseline_sources_by_session"] = _per_session(sources)
-    out["baseline_sources_by_animal"] = _with_window_shares(
-        _summed(sources, ["detector"], ["n_windows"]), ["animal"]
+    coverage = evidence_coverage_by_session(features)
+    out["evidence_coverage_by_session"] = _per_session(coverage).assign(
+        spikes_per_row=lambda t: _ratio(t.n_spikes, t.n_rows)
     )
-    for topic, counted in (
-        ("evidence_coverage", evidence_coverage_by_session(features)),
-        ("baseline_matching", baseline_matching_by_session(features)),
+    out["evidence_coverage_by_animal"] = _summed(
+        coverage, ["detector"], [c for c in coverage.columns if c.startswith("n_")]
+    ).assign(spikes_per_row=lambda t: _ratio(t.n_spikes, t.n_rows))
+    for level, keys, rows in (
+        ("by_session", SESSION, _at_session(populations)),
+        ("by_animal", ["animal"], populations),
     ):
-        out[f"{topic}_by_session"] = _per_session(counted)
-        out[f"{topic}_by_animal"] = _summed(
-            counted, ["detector"], [c for c in counted.columns if c.startswith("n_")]
+        binned = _with(rows, features, ["evidence_dll", "spikes_per_row_bin"])
+        table = distribution(
+            # an interval with no row is in no bin
+            binned[binned.spikes_per_row_bin.notna().to_numpy()],
+            [*keys, *POPULATION, "spikes_per_row_bin"],
+            ["evidence_dll"],
+            "n_events",
         )
-    against = evidence_vs_baseline_by_session(populations, features)
-    rates = _with(
-        populations[(populations.population != BASELINE).to_numpy()],
-        features,
-        SPIKE_RATES,
-    )
-    out["evidence_vs_baseline_by_session"] = _with_shares(
-        _per_session(_at_session(against))
-    ).merge(
-        _spike_rates(rates, [*SESSION, *POPULATION]),
-        on=[*SESSION, *POPULATION],
-        how="left",
-        validate="one_to_one",
-    )
-    out["evidence_vs_baseline_by_animal"] = _with_shares(
-        _summed(against, POPULATION, EVIDENCE_COUNTS)
-    ).merge(
-        _spike_rates(rates, ["animal", *POPULATION]),
-        on=["animal", *POPULATION],
-        how="left",
-        validate="one_to_one",
-    )
+        out[f"evidence_by_spikes_{level}"] = (
+            _per_session(table) if level == "by_session" else table
+        )
 
     rejection = rejection_by_session(tables["rejection"])
     out["rejection_by_session"] = _per_session(rejection)
@@ -1282,12 +1136,12 @@ def report_tables(
 
     events = comparator_only_events(populations, features)
     keys = [*SESSION, "detector", "ss_disagreement"]
-    counts = _against_baseline(events, keys)
+    counts = _comparator_counts(events, keys)
     out["comparator_only_by_session"] = _per_session(
         comparator_only_table(counts, events, SESSION)
     )
     out["comparator_only_by_animal"] = comparator_only_table(
-        _summed(counts, ["detector", "ss_disagreement"], EVIDENCE_COUNTS),
+        _summed(counts, ["detector", "ss_disagreement"], COMPARATOR_COUNTS),
         events,
         ["animal"],
     )
@@ -1493,55 +1347,6 @@ def draw_figures(
         _no_data(axes[0, 0])
     save(fig, "feature_distributions.png")
 
-    # evidence against baseline
-    against = out["evidence_vs_baseline_by_animal"]
-    against = against[(against.population == ALL).to_numpy()]
-    detectors = _detectors_of(against)
-    cmap = plt.get_cmap("viridis").copy()
-    cmap.set_bad("0.85")
-    fig, axes = _subplots(
-        1,
-        2,
-        figsize=(7.2, 0.28 * max(len(detectors), 3) + 1.4),
-        squeeze=False,
-    )
-    image = None
-    for ax, (column, title) in zip(
-        axes[0],
-        (
-            ("p_above_q95", "above its baseline 95th percentile"),
-            ("p_at_or_below_median", "at or below its baseline median"),
-        ),
-        strict=True,
-    ):
-        grid = (
-            against.pivot(index="detector", columns="animal", values=column)
-            .reindex(index=detectors, columns=animals)
-            .to_numpy(np.float64)
-        )
-        image = ax.imshow(grid, vmin=0, vmax=1, cmap=cmap, aspect="auto")
-        for (i, j), value in np.ndenumerate(grid):
-            if np.isfinite(value):
-                ax.text(
-                    j,
-                    i,
-                    f"{value:.2f}",
-                    ha="center",
-                    va="center",
-                    fontsize=6,
-                    color="k" if value > 0.6 else "w",
-                )
-        ax.set_xticks(range(len(animals)), animals, fontsize=6)
-        ax.set_yticks(range(len(detectors)), [_label(d) for d in detectors], fontsize=6)
-        ax.set_title(f"fraction {title}", fontsize=7)
-        if not detectors:
-            _no_data(ax)
-    if image is not None:
-        bar = fig.colorbar(image, ax=axes[0], shrink=0.8)
-        bar.set_label("fraction (of events scorable with a baseline)", fontsize=6)
-        bar.ax.tick_params(labelsize=6)
-    save(fig, "evidence_vs_baseline.png")
-
     # rejection stages of the ours-only events: one cell per animal and
     # stage, each labelled by its column and printed, so a thin stage shows
     rejection = out["rejection_by_animal"]
@@ -1673,20 +1478,40 @@ def draw_figures(
     )
     save(fig, "comparator_only.png")
 
-    # evidence by duration stratum
-    strata = out["features_evidence_by_stratum_by_animal"]
-    strata = strata[strata.population.isin([ALL, BASELINE]).to_numpy()]
-    detectors = [
-        *_detectors_of(strata),
-        *([BASELINE] if (strata.detector == BASELINE).any() else []),
-    ]
-    labels = list(strata.duration_stratum.cat.categories) if len(strata) else []
+    # evidence by duration stratum, and against spikes per row
+    for table, category, xlabel, name in (
+        (
+            out["features_evidence_by_stratum_by_animal"],
+            "duration_stratum",
+            "duration stratum",
+            "evidence_by_stratum.png",
+        ),
+        (
+            out["evidence_by_spikes_by_animal"],
+            "spikes_per_row_bin",
+            "spikes per row",
+            "evidence_by_spikes.png",
+        ),
+    ):
+        save(_evidence_by(table, category, xlabel, animals), name)
+    return paths
+
+
+def _evidence_by(
+    table: pd.DataFrame, category: str, xlabel: str, animals: Sequence[str]
+) -> plt.Figure:
+    """One panel per detector of ``evidence_dll`` by the bins of ``category``:
+    each animal's median (marker) and 25th to 75th percentiles (bar), from
+    ``table``'s ``all`` rows."""
+    rows_of_all = table[(table.population == ALL).to_numpy()]
+    detectors = _detectors_of(rows_of_all)
+    labels = list(rows_of_all[category].cat.categories) if len(rows_of_all) else []
     n_cols = 4
     n_panel_rows = max(-(-len(detectors) // n_cols), 1)
     fig, axes = _subplots(
         n_panel_rows,
         n_cols,
-        figsize=(7.2, 1.55 * n_panel_rows + 0.8),
+        figsize=(7.2, 1.55 * n_panel_rows + 0.9),
         sharex=True,
         sharey=True,
         squeeze=False,
@@ -1696,10 +1521,10 @@ def draw_figures(
         zip(animals, np.linspace(-0.25, 0.25, max(len(animals), 1)), strict=False)
     )
     for ax, detector in zip(axes.flat, detectors, strict=False):
-        rows = strata[strata.detector == detector]
-        color = "0.4" if detector == BASELINE else detector_color(detector)
+        rows = rows_of_all[rows_of_all.detector == detector]
+        color = detector_color(detector)
         for animal, values in rows.groupby("animal"):
-            x = values.duration_stratum.cat.codes.to_numpy() + offsets[animal]
+            x = values[category].cat.codes.to_numpy() + offsets[animal]
             ax.vlines(
                 x, values.evidence_dll_q25, values.evidence_dll_q75, color=color, lw=0.8
             )
@@ -1718,7 +1543,7 @@ def draw_figures(
     for ax in list(axes.flat)[len(detectors) :]:
         ax.axis("off")
     for index, ax in enumerate(axes.flat[: len(detectors)]):
-        # the lowest panel of each column carries the strata
+        # the lowest panel of each column carries the bins
         if index + n_cols >= len(detectors):
             ax.xaxis.set_tick_params(labelbottom=True)
             ax.set_xticks(
@@ -1727,6 +1552,7 @@ def draw_figures(
     if not detectors:
         _no_data(axes[0, 0])
     fig.supylabel("evidence_dll", fontsize=7)
+    fig.supxlabel(xlabel, fontsize=7)
     fig.legend(
         handles=[
             plt.Line2D([], [], marker=markers[a], color="0.3", ls="none", ms=3, label=a)
@@ -1737,8 +1563,7 @@ def draw_figures(
         fontsize=6,
         frameon=False,
     )
-    save(fig, "evidence_by_stratum.png")
-    return paths
+    return fig
 
 
 def write_report(
@@ -1782,12 +1607,20 @@ def write_report(
     figure_dir = figure_root / run_id
     report_dir = run_dir / REPORT_DIR
     report_dir.mkdir(exist_ok=True)
+    # a table or figure an earlier version of the report wrote, and this one
+    # does not, must not stand beside it
+    for stale in report_dir.glob("*.csv"):
+        if stale.stem not in out:
+            stale.unlink()
     table_paths = []
     for name, frame in out.items():
         path = report_dir / f"{name}.csv"
         frame.to_csv(path, index=False, float_format="%.10g")
         table_paths.append(path)
     figure_dir.mkdir(parents=True, exist_ok=True)
+    for stale in figure_dir.glob("*.png"):
+        if stale.name not in FIGURE_CAPTIONS:
+            stale.unlink()
     figure_paths = draw_figures(out, figure_dir, run_id)
 
     settings = manifest["settings"]
@@ -1816,6 +1649,9 @@ def write_report(
         "detector), the populations tested against them, and every ms_* "
         "feature, which reads that detector's window posteriors. No claim is "
         "made from them.",
+        "- **No baseline**: the lead dropped the baseline windows (2026-10-18), "
+        "pending a design matched on spike count, so the evidence score is read "
+        "beside the spikes per row and against nothing.",
         "- **Unknown memberships** are their own populations (unknown_by:<B>, "
         "<cell>:unknown) with their reasons, never counted as unmatched.",
         "",

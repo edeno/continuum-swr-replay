@@ -13,10 +13,12 @@ Design: ``docs/design/replay_detection_comparison/04-event-features.md``
   exactly-one cell but ``state_space``.
 - **Ours-only**: ``state_space``'s events of the exactly-one cell.
 
-Each event is in one of two descriptive subsets by its spike evidence against
-its matched baseline windows, or in neither. Each figure is
+Each event is in one of two descriptive subsets by its spike evidence within
+its population, source detector and animal (high: at or above the group's 75th
+percentile; low: at or below its 25th), or in neither. No baseline is compared:
+the lead dropped the baseline windows (2026-10-18). Each figure is
 ``generate_inventory_examples.draw_example``'s, with the event's evidence, its
-baseline's median and q95, and its ``ss_disagreement`` (comparator-only) or
+spikes per row, and its ``ss_disagreement`` (comparator-only) or
 its rejection stage in each memoryless cohort (ours-only) in the title. A
 figure whose recomputed memoryless windows are not the stored ones is not
 written, and its record in the manifest says why.
@@ -73,17 +75,26 @@ EXAMPLE_SEED = 20261018
 animal."""
 N_PER_SIDE = inventory_examples.N_PER_SIDE
 
-ABOVE = "evidence above baseline"
-AT_OR_BELOW = "evidence at or below baseline"
+HIGH = "high evidence"
+LOW = "low evidence"
 SUBSET_COLUMN = "evidence_subset"
+SUBSET_QUANTILES: Mapping[str, float] = MappingProxyType({HIGH: 0.75, LOW: 0.25})
+"""The quantile of each subset's bound, over the scorable events of the event's
+group (:data:`GROUP`)."""
 SUBSETS: Mapping[str, str] = MappingProxyType(
     {
-        ABOVE: "evidence_dll > baseline_q95_dll",
-        AT_OR_BELOW: "evidence_dll <= baseline_median_dll",
+        HIGH: "evidence_dll at or above the 75th percentile of the group's "
+        "scorable events",
+        LOW: "evidence_dll at or below the 25th percentile of the group's "
+        "scorable events",
     }
 )
-"""Each descriptive evidence subset and its rule; an event in neither, or with
-a missing value, is never drawn."""
+"""Each descriptive evidence subset and its rule. An event with no evidence is
+in neither; so is one meeting both, as every event of a group whose 25th and
+75th percentiles coincide does."""
+GROUP = ("cell", "detector", "animal")
+"""An event's group: its population, source detector and animal, the unit the
+examples are drawn by."""
 
 COMPARATOR_ONLY = "comparator_only"
 OURS_ONLY = "ours_only"
@@ -96,10 +107,8 @@ COMPARATOR_DETECTORS = tuple(d for d in CELL_DETECTORS if d != STATE_SPACE)
 """The comparator-only population's source detectors."""
 ROLES: Mapping[str, Mapping[str, str]] = MappingProxyType(
     {
-        COMPARATOR_ONLY: MappingProxyType(
-            {ABOVE: "example", AT_OR_BELOW: "counterexample"}
-        ),
-        OURS_ONLY: MappingProxyType({AT_OR_BELOW: "example", ABOVE: "counterexample"}),
+        COMPARATOR_ONLY: MappingProxyType({HIGH: "example", LOW: "counterexample"}),
+        OURS_ONLY: MappingProxyType({LOW: "example", HIGH: "counterexample"}),
     }
 )
 """Each population's target subset (``example``) and the other subset
@@ -113,24 +122,28 @@ CELL_NOTE = (
 )
 
 SESSION = ["animal", "day", "epoch"]
-EVIDENCE = ("evidence_dll", "baseline_median_dll", "baseline_q95_dll")
+EVIDENCE = ("evidence_dll", "n_spikes", "n_rows")
 
 NOT_CALIBRATED = (
-    "The two subsets are descriptive: an excess of evidence over the baseline "
-    "is not a calibrated declaration of replay."
+    "The two subsets are descriptive. evidence_dll, the mean per-row "
+    "log-likelihood difference between the best remote real place bin and the "
+    "animal's bin, grows with the number of spikes, so each title gives the "
+    "spikes per row beside it; it is a diagnostic, not a calibrated declaration "
+    "of replay."
 )
 SAMPLING_RULE = (
     "Two populations are drawn from: comparator-only events, each detector's "
     "events unmatched by state_space (unmatched_by:state_space; detectors "
     f"{', '.join(map(inventory_examples._label, COMPARATOR_DETECTORS))}), and "
     "ours-only events, state_space's "
-    f"events of the {EXACTLY_ONE} cell. An event's evidence is {ABOVE} when its "
-    "evidence_dll exceeds its matched baseline windows' q95 (baseline_q95_dll), "
-    f"and {AT_OR_BELOW} when its evidence_dll is at or below their median "
-    "(baseline_median_dll); an event in neither subset, or with a missing "
-    "value, is not drawn. For each population, source detector and animal, "
+    f"events of the {EXACTLY_ONE} cell. Within each population, source detector "
+    f"and animal, an event's evidence is {HIGH} when its evidence_dll is at or "
+    "above the 75th percentile of that group's scorable events, and "
+    f"{LOW} when it is at or below their 25th percentile; an event with no "
+    "evidence, or meeting both (a group whose two percentiles coincide), is in "
+    "neither subset and is not drawn. For each population, source detector and animal, "
     f"{N_PER_SIDE} events of the target subset are drawn (comparator-only: "
-    f"{ABOVE}; ours-only: {AT_OR_BELOW}) and, as counterexamples, "
+    f"{HIGH}; ours-only: {LOW}) and, as counterexamples, "
     f"{N_PER_SIDE} events of the other subset; fewer when a subset has fewer. "
     "Events with membership unknown are in neither population and are never "
     "drawn. The draws are made without replacement from the events sorted by "
@@ -145,19 +158,21 @@ def evidence_subsets(events: pd.DataFrame) -> pd.Series:
     Parameters
     ----------
     events : DataFrame
-        With ``evidence_dll``, ``baseline_median_dll`` and
-        ``baseline_q95_dll``.
+        With ``evidence_dll`` and the columns of :data:`GROUP`.
 
     Returns
     -------
     Series of object
-        :data:`ABOVE`, :data:`AT_OR_BELOW` or None, on ``events``' index.
+        :data:`HIGH`, :data:`LOW` or None, on ``events``' index.
     """
-    above = (events.evidence_dll > events.baseline_q95_dll).to_numpy(dtype=bool)
-    below = (events.evidence_dll <= events.baseline_median_dll).to_numpy(dtype=bool)
+    dll = events.evidence_dll.astype(np.float64)
+    groups = dll.groupby([events[column] for column in GROUP], sort=False)
+    # quantiles of each group's finite values; NaN is skipped
+    high = (dll >= groups.transform("quantile", SUBSET_QUANTILES[HIGH])).to_numpy()
+    low = (dll <= groups.transform("quantile", SUBSET_QUANTILES[LOW])).to_numpy()
     labels = np.full(len(events), None, dtype=object)
-    labels[below] = AT_OR_BELOW
-    labels[above] = ABOVE
+    labels[high & ~low] = HIGH
+    labels[low & ~high] = LOW
     return pd.Series(labels, index=events.index, dtype=object)
 
 
@@ -168,8 +183,8 @@ def sampler_events(features: pd.DataFrame, populations: pd.DataFrame) -> pd.Data
     ----------
     features : DataFrame
         The run's ``features`` rows: ``animal``, ``day``, ``epoch``,
-        ``brain_area``, ``detector``, ``event_key``, the evidence and its
-        baseline's median and q95, and ``ss_disagreement``.
+        ``brain_area``, ``detector``, ``event_key``, ``evidence_dll``,
+        ``n_spikes``, ``n_rows`` and ``ss_disagreement``.
     populations : DataFrame
         ``report_event_features.event_populations`` of the run.
 
@@ -180,7 +195,8 @@ def sampler_events(features: pd.DataFrame, populations: pd.DataFrame) -> pd.Data
         name, :data:`COMPARATOR_ONLY` or :data:`OURS_ONLY`), the session,
         ``detector``, ``event_key``, ``population`` (its label),
         ``membership`` (``unmatched``), ``brain_area``, the evidence columns,
-        ``ss_disagreement``, :data:`SUBSET_COLUMN` and ``epoch_id``, sorted by
+        ``ss_disagreement``, ``spikes_per_row`` (``n_spikes / n_rows``, NaN
+        with no row), :data:`SUBSET_COLUMN` and ``epoch_id``, sorted by
         population, detector, session and event key.
     """
     ids = [*SESSION, "detector", "event_key"]
@@ -203,6 +219,11 @@ def sampler_events(features: pd.DataFrame, populations: pd.DataFrame) -> pd.Data
         how="left",
         validate="one_to_one",
     ).assign(membership=UNMATCHED)
+    n_rows = events.n_rows.to_numpy(np.float64)
+    n_spikes = events.n_spikes.astype("Float64").to_numpy(np.float64, na_value=np.nan)
+    events["spikes_per_row"] = np.where(
+        n_rows > 0, n_spikes / np.maximum(n_rows, 1), np.nan
+    )
     events[SUBSET_COLUMN] = evidence_subsets(events)
     events["epoch_id"] = (
         events.animal
@@ -297,12 +318,12 @@ def figure_note(drawn: pd.Series, stages: Mapping[str, str], run_id: str) -> str
     str
         Two lines: the evidence subset and values with the ``ss_disagreement``
         (comparator-only) or the rejection stages (ours-only); then the run and
-        the reminder that an excess over baseline is not a calibrated
+        the reminder that the evidence is a diagnostic, not a calibrated
         declaration of replay.
     """
     values = (
-        f"{drawn.evidence_subset}: evidence_dll {drawn.evidence_dll:.3g}, baseline "
-        f"median {drawn.baseline_median_dll:.3g}, q95 {drawn.baseline_q95_dll:.3g}"
+        f"{drawn.evidence_subset}: evidence_dll {drawn.evidence_dll:.3g}, "
+        f"{drawn.spikes_per_row:.3g} spikes per row"
     )
     if drawn.cell == COMPARATOR_ONLY:
         disagreement = drawn.ss_disagreement
@@ -315,8 +336,8 @@ def figure_note(drawn: pd.Series, stages: Mapping[str, str], run_id: str) -> str
             for cohort in REJECTION_COHORTS
         )
     return (
-        f"{values}; {detail}\nevent features run {run_id}; an excess over baseline "
-        "is not a calibrated declaration of replay"
+        f"{values}; {detail}\nevent features run {run_id}; the evidence is a "
+        "diagnostic, not a calibrated declaration of replay"
     )
 
 
@@ -325,8 +346,8 @@ CAPTION = (
     + SAMPLING_RULE
     + " "
     + NOT_CALIBRATED
-    + " Each title gives the event's evidence_dll, its matched baseline windows' "
-    "median and q95, and its ss_disagreement (comparator-only) or its rejection "
+    + " Each title gives the event's evidence_dll, its spikes per row, and its "
+    "ss_disagreement (comparator-only) or its rejection "
     "stage in each memoryless† cohort (ours-only)." + inventory_examples.PANELS_CAPTION
 )
 
@@ -370,6 +391,7 @@ def write_examples(
         run_dir, features_runner.TABLE_DTYPES, features_runner.output_path
     )
     tables |= report.read_inputs(manifest, inventory_root, memoryless_root)
+    tables["features"] = report.without_baseline_rows(tables["features"])
     populations = report.event_populations(
         tables["features"],
         tables["pair_membership"],

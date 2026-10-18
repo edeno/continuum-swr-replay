@@ -26,16 +26,18 @@ def test_overlapping_intervals_mark_their_rows_once():
     np.testing.assert_array_equal(np.flatnonzero(mask), [0, 1, 2, 3, 4])
 
 
-def test_the_evidence_rows_never_hold_the_grids_last_sample():
+def test_the_evidence_rows_are_the_events_rows_never_the_last_sample():
     time = 100.0 + 0.002 * np.arange(20)
-    pool = np.array([[time[2] - 1e-4, time[6] + 1e-4]])
     events = pd.DataFrame(
-        {"event_start_s": [time[10], time[19]], "event_end_s": [time[-1], time[-1]]}
+        {
+            "event_start_s": [time[2], time[10], time[19]],
+            "event_end_s": [time[6], time[-1], time[-1]],
+        }
     )
 
-    rows = runner.evidence_rows(time, pool, events)
+    rows = runner.evidence_rows(time, events)
 
-    # strictly inside the pool: rows 2 to 6; the first event's rows 10 to 18
+    # rows 2 to 6, and 10 to 18: the grid's last sample is no row
     np.testing.assert_array_equal(np.flatnonzero(rows), [2, 3, 4, 5, 6, *range(10, 19)])
 
 

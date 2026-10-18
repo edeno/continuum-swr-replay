@@ -1,10 +1,12 @@
 #!/usr/bin/env python
-"""Event features of every compared event and of matched baselines, one epoch per task.
+"""Event features of every compared event, one epoch per task.
 
 Reads the comparison runner's stored tables (``run_inventory_comparison.py``,
 ``--inventory-run-id``) and the memoryless run its manifest names, and reads
-every compared event of the nine inventories, and a matched baseline window
-for each, on the decode grid by one rule. Design:
+every compared event of the nine inventories on the decode grid by one rule.
+No baseline windows are drawn: the lead dropped the baseline comparison from
+this stage (2026-10-18), since windows matched on duration and location but
+not on spike count measured engagement more than evidence. Design:
 ``docs/design/replay_detection_comparison/04-event-features.md``.
 
 Per epoch:
@@ -13,7 +15,7 @@ Per epoch:
    sha256 is the one the comparison run recorded for it. The frame is read
    through the SWR source, and its grid must step by the comparison's
    ``SAMPLE_INTERVAL_S`` (the median step; ``_speed_trace``).
-2. **Memberships.** The coverage and the pairwise memberships are rebuilt from
+2. **Memberships.** The pairwise memberships are rebuilt from
    the stored tables and the frame's still time (``rebuild_matches``); the
    epoch fails unless they reproduce the stored ``directional`` and ``cells``
    exactly. The populations follow (``population_rows``).
@@ -22,19 +24,14 @@ Per epoch:
    them (``check_marks_match_encoding``). When the memoryless run observed
    the epoch, the epoch is refused, and writes nothing, unless the decode's
    detector, the decode and the marks have the sha256 that run recorded.
-4. **Evidence.** The baseline pool is the ``all`` comparison's shared exposure
-   less every event of every inventory (``baseline_pool``). The spike evidence
-   is computed on every row of the compared events and on every row strictly
-   inside the pool (``epoch_row_evidence``), the rows any scored interval can
-   hold; every scored interval's rows are checked to be among them.
-5. **Baselines.** ``matched_baselines``, with ``BASELINE_SEED``; each event's
-   first window joins the features table as detector ``baseline``.
-6. **Features** of every compared event and baseline window: rows, engagement,
-   LFP and MUA (``interval_features``), evidence (``interval_evidence``), the
-   stop holding the onset (``stop_context``), the state-space posterior
-   (``ss_features``), the memoryless windows (``ms_features``), and for the
-   compared events their neighbour gaps and baseline scores.
-7. **Rejection stages** of every state-space event against each memoryless
+4. **Evidence.** The spike evidence is computed on every row of the compared
+   events (``epoch_row_evidence``), the rows a scored interval holds; every
+   scored interval's rows are checked to be among them.
+5. **Features** of every compared event: rows, engagement, LFP and MUA
+   (``interval_features``), evidence (``interval_evidence``), the stop holding
+   the onset (``stop_context``), the state-space posterior (``ss_features``),
+   the memoryless windows (``ms_features``) and the neighbour gaps.
+6. **Rejection stages** of every state-space event against each memoryless
    cohort (``rejection_stages``).
 
 An epoch the memoryless run has no record for has every ``ms_*`` feature
@@ -48,8 +45,8 @@ run id is the first 12 characters of the commit), one set of
 ``features`` (:data:`FEATURE_DTYPES`), ``pair_membership`` (the rebuilt
 ``event_matches``) and ``rejection``. Every table is made before any is
 written, and a failed epoch keeps none. ``manifest.json`` beside them holds the
-run's settings (the input runs, the stop table, the grid, evidence and baseline
-rules, tracking confidence recorded as unavailable) and one record per epoch:
+run's settings (the input runs, the stop table, the grid and evidence rules,
+tracking confidence recorded as unavailable) and one record per epoch:
 its status, the decode's and the marks' sha256, the counts, the outputs, its
 wall clock, the share of it spent computing the evidence, and the worker's
 peak RSS. Only the main process writes it, atomically, after each epoch. A
@@ -155,7 +152,6 @@ from continuum_swr_replay.analysis.inventory_comparison.overlap import (  # noqa
     MATCH_DTYPES,
 )
 from continuum_swr_replay.analysis.inventory_comparison.populations import (  # noqa: E402
-    BASELINE,
     population_rows,
     rebuild_matches,
 )
@@ -165,20 +161,11 @@ from continuum_swr_replay.analysis.inventory_comparison.recount import (  # noqa
 from continuum_swr_replay.analysis.inventory_comparison.schema import (  # noqa: E402
     INVENTORY_DTYPES,
     STATE_SPACE,
-    _event_keys,
 )
 from continuum_swr_replay.analysis.inventory_comparison.selection import (  # noqa: E402
-    BASELINE_DTYPES,
-    BASELINE_SEED,
-    LOCATION_TOLERANCE_CM,
-    MIN_MATCHED,
-    N_BASELINES,
     REJECTION_COHORTS,
     REJECTION_DTYPES,
-    baseline_pool,
-    matched_baselines,
     rejection_stages,
-    window_room,
 )
 from continuum_swr_replay.decoding_common import (  # noqa: E402
     provenance_record,
@@ -239,8 +226,7 @@ TRACKING_CONFIDENCE = (
 )
 EVIDENCE_LIKELIHOOD = (
     "predict_clusterless_kde_log_likelihood, is_local=False, on the decode's "
-    "saved encoding model; the rows of the compared events and the rows "
-    "strictly inside the baseline pool"
+    "saved encoding model; the rows of the compared events"
 )
 
 _MS_DTYPES: Mapping[str, object] = MappingProxyType(
@@ -260,7 +246,6 @@ with no memoryless run."""
 FEATURE_DTYPES: Mapping[str, object] = MappingProxyType(
     {
         **INVENTORY_DTYPES,
-        "matched_event_key": object,
         "duration_stratum": object,
         "first_row": np.int64,
         "n_rows": np.int64,
@@ -298,21 +283,11 @@ FEATURE_DTYPES: Mapping[str, object] = MappingProxyType(
         "ss_nearest_event_gap_s": np.float64,
         "ss_disagreement": object,
         **_MS_DTYPES,
-        **{
-            name: "Int64" if dtype is np.int64 else dtype
-            for name, dtype in BASELINE_DTYPES.items()
-        },
     }
 )
-"""One row per compared event and per baseline window (detector ``baseline``):
-the inventory schema's columns (a baseline window's ``native_duration_s`` and
-speeds are not measured, so missing; it lies in still time, so it is speed
-eligible; its ``run_id`` is this run's), the event a baseline window was
-drawn for (``matched_event_key``, missing for an event), the span's stratum
-(a label of ``DURATION_STRATUM_LABELS``, in that order), and every feature.
-``previous_gap_s``, ``next_gap_s`` and the ``baseline_*`` and
-``evidence_rank`` columns are the compared events'; a baseline window has them
-missing."""
+"""One row per compared event: the inventory schema's columns, the span's
+stratum (a label of ``DURATION_STRATUM_LABELS``, in that order), and every
+feature."""
 
 TABLE_DTYPES: Mapping[str, Mapping[str, object]] = MappingProxyType(
     {
@@ -380,19 +355,13 @@ def _row_mask(n_time: int, first: NDArray, n_rows: NDArray) -> NDArray[np.bool_]
     return mask
 
 
-def evidence_rows(
-    time: NDArray, pool: NDArray, events: pd.DataFrame
-) -> NDArray[np.bool_]:
-    """The rows whose evidence is computed: every row of the compared events
-    and every row strictly inside the baseline pool, the rows any scored
-    interval can hold.
+def evidence_rows(time: NDArray, events: pd.DataFrame) -> NDArray[np.bool_]:
+    """The rows whose evidence is computed: every row of the compared events.
 
     Parameters
     ----------
     time : NDArray, shape (n_time,)
         The decode grid.
-    pool : NDArray, shape (n_intervals, 2)
-        ``baseline_pool``'s.
     events : pd.DataFrame
         ``event_start_s`` and ``event_end_s`` of the compared events.
 
@@ -403,10 +372,7 @@ def evidence_rows(
         rule).
     """
     first, n_rows = _grid_rows(time, events)
-    mask: NDArray[np.bool_] = (window_room(time, pool) > 0) | _row_mask(
-        time.size, first, n_rows
-    )
-    return mask
+    return _row_mask(time.size, first, n_rows)
 
 
 def _require_requested(rows: NDArray[np.bool_], intervals: pd.DataFrame) -> None:
@@ -423,50 +389,6 @@ def _require_requested(rows: NDArray[np.bool_], intervals: pd.DataFrame) -> None
             f"{int((scored & ~rows).sum())} rows of scored intervals were not among "
             "the rows the evidence was computed on."
         )
-
-
-def baseline_rows(
-    windows: pd.DataFrame, *, identifier: str, session: tuple, run_id: str
-) -> pd.DataFrame:
-    """The baseline windows in the inventory schema, detector ``baseline``.
-
-    Parameters
-    ----------
-    windows : pd.DataFrame
-        ``matched_baselines``' windows: ``matched_event_key`` and the bounds.
-    identifier : str
-        The epoch id, for its brain area.
-    session : tuple
-        ``(animal, day, epoch)``.
-    run_id : str
-        This run's id, the windows' ``run_id``.
-    """
-    animal, day, epoch = session
-    start = windows["event_start_s"].to_numpy(dtype=np.float64)
-    end = windows["event_end_s"].to_numpy(dtype=np.float64)
-    n = len(windows)
-    return pd.DataFrame(
-        {
-            "animal": animal,
-            "day": day,
-            "epoch": epoch,
-            "brain_area": parse_epoch_identifier(identifier).brain_area,
-            "detector": BASELINE,
-            "event_index": np.arange(n, dtype=np.int64),
-            "event_key": _event_keys(BASELINE, animal, day, epoch, range(n)),
-            "run_id": run_id,
-            "event_start_s": start,
-            "event_end_s": end,
-            "interval_span_s": end - start,
-            "event_midpoint_s": (start + end) / 2,
-            "native_duration_s": np.nan,
-            "animal_max_speed_cm_s": np.nan,
-            "animal_mean_speed_cm_s": np.nan,
-            "whole_event_speed_eligible": True,
-            "matched_event_key": windows["matched_event_key"].to_numpy(),
-        },
-        index=pd.RangeIndex(n),
-    )
 
 
 def _memoryless_run(
@@ -549,10 +471,8 @@ def _missing_ms(index: pd.Index) -> pd.DataFrame:
 
 def _counts(features: pd.DataFrame, rejection: pd.DataFrame) -> dict[str, Any]:
     """What the console and the manifest report of an epoch's tables: per
-    detector (``baseline`` included) the rows and those with or without an
-    evidence score; per detector the compared events' baseline levels; per
+    detector the events and those with or without an evidence score; per
     cohort the rejection stages."""
-    events = features[features.detector != BASELINE]
     unscorable = features[features.evidence_unscorable != ""]
     return {
         "events": features.detector.value_counts().to_dict(),
@@ -562,10 +482,6 @@ def _counts(features: pd.DataFrame, rejection: pd.DataFrame) -> dict[str, Any]:
         "unscorable": {
             detector: group.evidence_unscorable.value_counts().to_dict()
             for detector, group in unscorable.groupby("detector")
-        },
-        "baseline_levels": {
-            detector: group.baseline_level.value_counts().to_dict()
-            for detector, group in events.groupby("detector")
         },
         "rejection_stages": {
             cohort: group.stage.value_counts().to_dict()
@@ -580,7 +496,6 @@ def epoch_tables(
     inventory_dir: Path,
     memoryless_dir: Path,
     stop_table: Path,
-    run_id: str,
     decode_sha256: str,
 ) -> tuple[dict[str, Any], dict[str, pd.DataFrame]]:
     """One epoch's tables by name, with :data:`TABLE_DTYPES`, and its record.
@@ -617,7 +532,7 @@ def epoch_tables(
         name: read_table(comparison.output_path(identifier, inventory_dir, name))
         for name in INVENTORY_TABLES
     }
-    coverage, matches = rebuild_matches(
+    _, matches = rebuild_matches(
         stored, still, detectors=comparison.DETECTORS, cells=comparison.CELLS
     )
     inventory = stored["inventory"]
@@ -656,16 +571,7 @@ def epoch_tables(
     animal_bin = animal_bins(environment, traces.linear_position)
     map_bin = animal_bins(environment, dot["map_estimate"].to_numpy(dtype=np.float64))
 
-    set_aside = stored["set_aside"].rename(
-        columns={"interval_start_s": "event_start_s", "interval_end_s": "event_end_s"}
-    )
-    bounds = [*SESSION_COLUMNS_DAY, "event_start_s", "event_end_s"]
-    pool = baseline_pool(
-        coverage,
-        pd.concat([inventory[bounds], set_aside[bounds]], ignore_index=True),
-        detectors=comparison.DETECTORS,
-    )
-    rows = evidence_rows(time, pool, compared)
+    rows = evidence_rows(time, compared)
     started = clock.perf_counter()
     evidence = epoch_row_evidence(
         traces.time,
@@ -681,23 +587,7 @@ def epoch_tables(
     if evidence.shape != traces.time.shape:
         raise RuntimeError("The evidence is not on the traces' grid.")
 
-    summary, windows = matched_baselines(
-        pool,
-        compared,
-        traces,
-        evidence,
-        animal_bin,
-        bin_distance_cm,
-        seed=BASELINE_SEED,
-    )
-    baselines = baseline_rows(
-        windows, identifier=identifier, session=session, run_id=run_id
-    )
-    schema = [*INVENTORY_DTYPES, "matched_event_key"]
-    intervals = pd.concat(
-        [compared.assign(matched_event_key=None)[schema], baselines[schema]],
-        ignore_index=True,
-    )
+    intervals = compared[list(INVENTORY_DTYPES)]
     engagement = interval_features(
         traces, intervals, sample_interval_s=comparison.SAMPLE_INTERVAL_S
     )
@@ -734,7 +624,6 @@ def epoch_tables(
                 state_space_events=compared[compared.detector == STATE_SPACE],
             ),
             ms,
-            summary.reindex(intervals.index),
         ],
         axis=1,
     )
@@ -835,7 +724,6 @@ def run_epoch(
             inventory_dir=inventory_dir,
             memoryless_dir=memoryless_dir,
             stop_table=stop_table,
-            run_id=output_dir.name,
             decode_sha256=record["decode"]["sha256"],
         )
         record |= {"status": "ok", **found}
@@ -872,8 +760,8 @@ def summary(record: dict) -> str:
     counts = record["counts"]
     unscorable = counts["unscorable"] or "none"
     return (
-        f"ok: events {counts['events']}; unscorable {unscorable}; baseline levels "
-        f"{counts['baseline_levels']}; {record['wall_clock_s']:.0f} s, "
+        f"ok: events {counts['events']}; unscorable {unscorable}; "
+        f"{record['wall_clock_s']:.0f} s, "
         f"{100 * record['likelihood_share']:.0f} % in the likelihood, worker "
         f"peak RSS {record['worker_peak_rss_gib']:.1f} GiB"
     )
@@ -956,12 +844,6 @@ def run_settings(inventory_run_id: str, inventory: Mapping[str, Any]) -> dict:
                 "block_rows": BLOCK_ROWS,
                 # encoding_inputs passes none, so the library's default is used
                 "library_block_size": block_size,
-            },
-            "baselines": {
-                "n_baselines": N_BASELINES,
-                "location_tolerance_cm": LOCATION_TOLERANCE_CM,
-                "min_matched": MIN_MATCHED,
-                "seed": BASELINE_SEED,
             },
             "speed": {
                 "threshold_cm_per_s": DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,

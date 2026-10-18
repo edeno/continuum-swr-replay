@@ -5,9 +5,10 @@ events (``state_space`` and ``memoryless_criteria`` aside) unmatched by
 ``state_space``; ours-only events are ``state_space``'s events of the
 exactly-one cell. Within each population, source detector and animal the
 sampler draws up to two events of the target evidence subset and up to two
-counterexamples of the other: comparator-only targets evidence above the
-baseline's q95, ours-only evidence at or below the baseline's median. An event
-in neither subset, or with an ``unknown`` membership, is never drawn. An epoch
+counterexamples of the other: comparator-only targets high evidence (at or
+above the group's 75th percentile), ours-only low evidence (at or below its
+25th). An event in neither subset, or with an ``unknown`` membership, is never
+drawn. An epoch
 whose inputs cannot be read, a missing memoryless run's file included, is
 recorded as not written and the run goes on.
 """
@@ -29,21 +30,27 @@ from continuum_swr_replay.analysis.inventory_comparison.populations import (
 
 SEED = 7
 DAY = 20200101
-ABOVE, AT_OR_BELOW = examples.ABOVE, examples.AT_OR_BELOW
+HIGH, LOW = examples.HIGH, examples.LOW
 
-# evidence_dll for each subset against a baseline median 0 and q95 1
-EVIDENCE = {ABOVE: 2.0, AT_OR_BELOW: -1.0, "between": 0.5, "missing": np.nan}
+# evidence_dll by subset: in a group holding as many of each of the first
+# three, the 75th percentile is 2.0 and the 25th -1.0
+EVIDENCE = {HIGH: 2.0, LOW: -1.0, "between": 0.5, "missing": np.nan}
 
 
 def tables(
     records: list[tuple[str, str, str, str, int]],
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Features and population rows from (detector, animal, population, subset,
-    count): each event in ``all`` and in the named population."""
+    count): each event in ``all`` and in the named population. A subset may
+    be a list of evidence values, one event each."""
     features, populations = [], []
     for detector, animal, population, subset, count in records:
-        for number in range(count):
-            key = f"{detector}:{animal}{DAY}_02_r1:{population}:{subset}{number}"
+        values = (
+            list(subset) if isinstance(subset, list) else [EVIDENCE[subset]] * count
+        )
+        for number, value in enumerate(values):
+            label = subset if isinstance(subset, str) else "value"
+            key = f"{detector}:{animal}{DAY}_02_r1:{population}:{label}{number}"
             ids = {
                 "animal": animal,
                 "day": DAY,
@@ -55,9 +62,9 @@ def tables(
                 {
                     **ids,
                     "brain_area": "HPC",
-                    "evidence_dll": EVIDENCE[subset],
-                    "baseline_median_dll": 0.0,
-                    "baseline_q95_dll": 1.0,
+                    "evidence_dll": value,
+                    "n_spikes": 3,
+                    "n_rows": 10,
                     "ss_disagreement": "near",
                 }
             )
@@ -78,7 +85,7 @@ LARGE = tables(
             ("state_space", OURS),
         )
         for animal in ("a", "b")
-        for subset in (ABOVE, AT_OR_BELOW, "between", "missing")
+        for subset in (HIGH, LOW, "between", "missing")
     ]
 )
 UNIT = ["cell", "detector", "animal"]
@@ -91,27 +98,29 @@ def drawn(
     return examples.draw_population_examples(events, seed=seed)
 
 
-def test_the_evidence_subsets() -> None:
-    features = pd.DataFrame(
+def test_the_evidence_subsets_are_quartiles_of_each_group() -> None:
+    values = [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, np.nan]
+    events = pd.DataFrame(
         {
-            "evidence_dll": [2.0, 1.0, 0.5, 0.0, -1.0, np.nan, 2.0, -1.0],
-            "baseline_median_dll": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, np.nan, 0.0],
-            "baseline_q95_dll": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, np.nan, np.nan],
+            "cell": "comparator_only",
+            "detector": ["kay"] * 9 + ["kay"] * 9 + ["mua"],
+            "animal": ["a"] * 9 + ["b"] * 9 + ["a"],
+            # animal b's values are shifted: its own quartiles apply
+            "evidence_dll": values + [v + 100.0 for v in values] + [5.0],
         }
     )
-    subsets = examples.evidence_subsets(features)
-    # above q95 is strict; at the median is at or below; a missing value is in
-    # neither, as is everything between the median and q95
-    assert subsets.tolist() == [
-        ABOVE,
-        None,
-        None,
-        AT_OR_BELOW,
-        AT_OR_BELOW,
-        None,
-        None,
-        AT_OR_BELOW,
-    ]
+    subsets = examples.evidence_subsets(events).tolist()
+    # quartiles 1.75 and 5.25 of the eight finite values; a missing value is in
+    # neither, as is a group of one event, whose quartiles coincide
+    expected = [LOW, LOW, None, None, None, None, HIGH, HIGH, None]
+    assert subsets == expected + expected + [None]
+
+
+def test_the_subsets_are_descriptive_and_named_so() -> None:
+    assert "descriptive" in examples.NOT_CALIBRATED
+    assert "not a calibrated declaration of replay" in examples.NOT_CALIBRATED
+    assert "baseline_" not in examples.SAMPLING_RULE
+    assert "75th percentile" in examples.SAMPLING_RULE
 
 
 def test_only_the_two_populations_enter_the_sampler() -> None:
@@ -120,40 +129,32 @@ def test_only_the_two_populations_enter_the_sampler() -> None:
     and other detectors' exactly-one events never enter."""
     features, populations = tables(
         [
-            ("kay", "a", COMPARATOR, ABOVE, 1),
-            ("memoryless", "a", COMPARATOR, ABOVE, 1),
-            ("state_space", "a", OURS, AT_OR_BELOW, 1),
+            ("kay", "a", COMPARATOR, [2.0, -1.0], 0),
+            ("memoryless", "a", COMPARATOR, [2.0, -1.0], 0),
+            ("state_space", "a", OURS, [2.0, -1.0], 0),
             # none of these
-            ("memoryless_criteria", "a", COMPARATOR, ABOVE, 3),
-            ("kay", "a", "unknown_by:state_space", ABOVE, 3),
-            ("kay", "a", "matched_by:state_space", ABOVE, 3),
-            ("kay", "a", "unmatched_by:memoryless", ABOVE, 3),
-            ("kay", "a", OURS, ABOVE, 3),
-            ("state_space", "a", f"{OURS}:unknown", AT_OR_BELOW, 3),
-            ("state_space", "a", f"{OURS}:matched", AT_OR_BELOW, 3),
-            ("state_space", "a", "swr_matched_by_no_decoder", AT_OR_BELOW, 3),
-            ("state_space", "a", "unmatched_by:kay", AT_OR_BELOW, 3),
+            ("memoryless_criteria", "a", COMPARATOR, HIGH, 3),
+            ("kay", "a", "unknown_by:state_space", HIGH, 3),
+            ("kay", "a", "matched_by:state_space", HIGH, 3),
+            ("kay", "a", "unmatched_by:memoryless", HIGH, 3),
+            ("kay", "a", OURS, HIGH, 3),
+            ("state_space", "a", f"{OURS}:unknown", LOW, 3),
+            ("state_space", "a", f"{OURS}:matched", LOW, 3),
+            ("state_space", "a", "swr_matched_by_no_decoder", LOW, 3),
+            ("state_space", "a", "unmatched_by:kay", LOW, 3),
         ]
     )
     events = examples.sampler_events(features, populations)
-    assert sorted(zip(events.cell, events.detector, strict=True)) == [
+    assert sorted(set(zip(events.cell, events.detector, strict=True))) == [
         ("comparator_only", "kay"),
         ("comparator_only", "memoryless"),
         ("ours_only", "state_space"),
     ]
+    assert len(events) == 6
     assert (events.membership == "unmatched").all()
     assert set(events.population) == {COMPARATOR, OURS}
     assert events.epoch_id.unique().tolist() == [f"a{DAY}_02_r1_HPC"]
-    # an epoch's baseline windows are rows of detector baseline: never drawn
-    baseline = features.iloc[:1].assign(detector="baseline", event_key="baseline:0")
-    with_baseline = pd.concat([features, baseline], ignore_index=True)
-    rows = populations.iloc[:1].assign(
-        detector="baseline", event_key="baseline:0", population="baseline"
-    )
-    again = examples.sampler_events(
-        with_baseline, pd.concat([populations, rows], ignore_index=True)
-    )
-    pd.testing.assert_frame_equal(again, events)
+    assert (events.spikes_per_row == 0.3).all()
 
 
 def test_each_unit_draws_two_targets_and_two_counterexamples() -> None:
@@ -163,14 +164,14 @@ def test_each_unit_draws_two_targets_and_two_counterexamples() -> None:
     assert len(sizes) == 2 * len(picks[UNIT].drop_duplicates()) == 2 * 6
     roles = picks.groupby(["cell", "evidence_subset"]).role.unique().to_dict()
     assert {key: list(value) for key, value in roles.items()} == {
-        ("comparator_only", ABOVE): ["example"],
-        ("comparator_only", AT_OR_BELOW): ["counterexample"],
-        ("ours_only", AT_OR_BELOW): ["example"],
-        ("ours_only", ABOVE): ["counterexample"],
+        ("comparator_only", HIGH): ["example"],
+        ("comparator_only", LOW): ["counterexample"],
+        ("ours_only", LOW): ["example"],
+        ("ours_only", HIGH): ["counterexample"],
     }
     assert not picks.duplicated("event_key").any()
-    # every draw is in its subset by its own evidence
-    assert (examples.evidence_subsets(picks) == picks.evidence_subset).all()
+    # every draw is in its subset by its own evidence and its group's
+    assert (picks.evidence_dll == picks.evidence_subset.map(EVIDENCE)).all()
 
 
 def test_the_draw_is_deterministic_for_a_seed() -> None:
@@ -196,31 +197,33 @@ def test_events_in_neither_subset_or_unknown_are_never_drawn() -> None:
         [
             ("kay", "a", COMPARATOR, "between", 20),
             ("kay", "a", COMPARATOR, "missing", 20),
-            ("kay", "a", "unknown_by:state_space", ABOVE, 20),
-            ("kay", "a", COMPARATOR, ABOVE, 1),
-            ("state_space", "a", f"{OURS}:unknown", AT_OR_BELOW, 20),
+            ("kay", "a", "unknown_by:state_space", HIGH, 20),
+            ("kay", "a", COMPARATOR, HIGH, 1),
+            ("state_space", "a", f"{OURS}:unknown", LOW, 20),
             ("state_space", "a", OURS, "between", 20),
         ]
     )
     for seed in range(20):
         picks = drawn(features, populations, seed=seed)
         assert len(picks) == 1
-        assert picks.event_key.iloc[0].endswith(f"{COMPARATOR}:{ABOVE}0")
+        assert picks.event_key.iloc[0].endswith(f"{COMPARATOR}:{HIGH}0")
 
 
 def test_a_small_subset_gives_fewer() -> None:
     features, populations = tables(
         [
-            ("kay", "a", COMPARATOR, ABOVE, 1),
-            ("kay", "a", COMPARATOR, AT_OR_BELOW, 5),
-            ("state_space", "a", OURS, ABOVE, 3),
+            # quartiles 0.5 and 1.5: one high, one low
+            ("kay", "a", COMPARATOR, [0.0, 1.0, 2.0], 0),
+            # quartiles 1.75 and 5.25: two of each
+            ("state_space", "a", OURS, [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0], 0),
         ]
     )
     counts = drawn(features, populations).groupby(["cell", "role"]).size().to_dict()
     assert counts == {
-        ("comparator_only", "counterexample"): 2,
+        ("comparator_only", "counterexample"): 1,
         ("comparator_only", "example"): 1,
         ("ours_only", "counterexample"): 2,
+        ("ours_only", "example"): 2,
     }
     assert drawn(features.iloc[:0], populations.iloc[:0]).empty
 
@@ -234,12 +237,12 @@ def test_an_epoch_without_its_inputs_is_recorded_and_the_run_goes_on(
     named in the manifest and the captions."""
     features, populations = tables(
         [
-            ("kay", "a", COMPARATOR, ABOVE, 1),
-            ("kay", "b", COMPARATOR, ABOVE, 1),
-            ("state_space", "a", OURS, ABOVE, 1),
+            ("kay", "a", COMPARATOR, [2.0, -1.0], 0),
+            ("kay", "b", COMPARATOR, [2.0, -1.0], 0),
+            ("state_space", "a", OURS, [-1.0, 2.0], 0),
         ]
     )
-    ours_key = features.event_key.iloc[2]
+    ours_key = features.event_key.iloc[4]
     rejection = pd.DataFrame(
         {
             "event_key": [ours_key, ours_key],
@@ -318,32 +321,49 @@ def test_an_epoch_without_its_inputs_is_recorded_and_the_run_goes_on(
         memoryless_root=tmp_path / "memoryless",
     )
 
-    status = {r["animal"] + r["cell"]: r for r in records}
-    assert len(records) == 3 and closed == [1]
-    missing = status["bcomparator_only"]
-    assert missing["status"] == "not_written"
-    assert missing["reason"].startswith("No such file:")
-    assert not Path(missing["path"]).exists()
-    for name in ("acomparator_only", "aours_only"):
+    status = {r["animal"] + r["cell"] + r["role"]: r for r in records}
+    assert len(records) == 6 and closed == [1]
+    for role in ("example", "counterexample"):
+        missing = status[f"bcomparator_only{role}"]
+        assert missing["status"] == "not_written"
+        assert missing["reason"].startswith("No such file:")
+        assert not Path(missing["path"]).exists()
+    for name in ("acomparator_onlyexample", "aours_onlyexample"):
         assert status[name]["status"] == "written"
         assert Path(status[name]["path"]).exists()
-    assert status["acomparator_only"]["against"] == ["state_space"]
-    assert status["aours_only"]["against"] == ["kay", "mua"]
-    assert status["aours_only"]["rejection_stage"] == {
+    assert status["acomparator_onlyexample"]["against"] == ["state_space"]
+    assert status["aours_onlyexample"]["against"] == ["kay", "mua"]
+    assert status["aours_onlyexample"]["rejection_stage"] == {
         "memoryless": "no_run",
         "memoryless_criteria": "duration",
     }
     assert "memoryless† no_run, memoryless_criteria† duration" in notes[ours_key]
+    # the title gives the evidence and the spikes per row, no baseline
+    assert notes[ours_key].startswith(
+        "low evidence: evidence_dll -1, 0.3 spikes per row"
+    )
+    assert "baseline" not in notes[ours_key]
 
-    empty = [
-        "No comparator-only event is evidence at or below baseline in this run.",
-        "No ours-only event is evidence at or below baseline in this run.",
-    ]
     written = json.loads((figure_dir / "manifest.json").read_text())
-    assert written["empty_subsets"] == empty
+    assert written["empty_subsets"] == []
     assert written["seed"] == examples.EXAMPLE_SEED
     assert [r["status"] for r in written["figures"]] == [r["status"] for r in records]
     captions = (figure_dir / "captions.md").read_text()
-    assert all(sentence in captions for sentence in empty)
     assert examples.CELL_NOTE in captions
-    assert captions.count("(not written: No such file:") == 1
+    assert captions.count("(not written: No such file:") == 2
+
+
+def test_a_population_whose_groups_are_constant_has_empty_subsets() -> None:
+    features, populations = tables(
+        [
+            ("kay", "a", COMPARATOR, [2.0, -1.0], 0),
+            # one value throughout: its quartiles coincide, so neither subset
+            ("state_space", "a", OURS, [1.0, 1.0, 1.0], 0),
+        ]
+    )
+    events = examples.sampler_events(features, populations)
+
+    assert examples.empty_subsets(events) == [
+        "No ours-only event is low evidence in this run.",
+        "No ours-only event is high evidence in this run.",
+    ]

@@ -1,4 +1,12 @@
-"""Matched baseline windows for the common spike-evidence score.
+"""Matched baseline windows for the common spike-evidence score, and the
+memoryless rejection stages.
+
+The event-features runner does not use the baseline windows (``baseline_pool``,
+``window_room``, ``baseline_draws``, ``matched_baselines``): the lead dropped
+the baseline comparison from that stage (2026-10-18), because windows matched
+on duration and location but not on spike count measured engagement more than
+evidence. They are kept, with their tests, for a later design matched on spike
+count. The rejection stages are used.
 
 The baselines are a reference population for the evidence score, not known
 negatives. They come from the **pool**: the time every detector of the

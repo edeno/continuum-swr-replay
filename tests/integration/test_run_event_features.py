@@ -16,7 +16,7 @@ tables.
 - ``10_r5``: its decode is rewritten after the comparison ran, so its sha256
   is no longer the one the comparison recorded.
 - ``12_r6``: no event of any inventory, no Carey record and no memoryless
-  record, so no compared event and no baseline pool.
+  record, so no compared event.
 
 The simulated animal sweeps 60 cm in 0.3 s once a second, firing only then,
 while its saved speed says it is still (but over 20-25 s): the memoryless
@@ -66,7 +66,6 @@ from continuum_swr_replay.analysis.inventory_comparison.features import (
 )
 from continuum_swr_replay.analysis.inventory_comparison.overlap import MATCH_DTYPES
 from continuum_swr_replay.analysis.inventory_comparison.populations import (
-    BASELINE,
     rebuild_matches,
 )
 from continuum_swr_replay.analysis.inventory_comparison.schema import (
@@ -420,41 +419,29 @@ class TestTheWorkedEpoch:
 
         assert (compared.detector == "memoryless_criteria").any()
 
-    def test_one_row_per_compared_event_and_per_baseline_window(self, run, inputs):
+    def test_one_row_per_compared_event_and_no_baseline(self, run, inputs):
         features = table(run, WORKED, "features")
         compared = compared_events(inputs, WORKED)
 
-        events = features[features.detector != BASELINE]
-        baselines = features[features.detector == BASELINE]
-        assert events.detector.value_counts().to_dict() == (
+        assert features.detector.value_counts().to_dict() == (
             compared.detector.value_counts().to_dict()
         )
-        assert sorted(events.event_key) == sorted(compared.event_key)
-        assert events.matched_event_key.isna().all()
-        with_baseline = events[events.baseline_level != "failed"]
-        assert sorted(baselines.matched_event_key) == sorted(with_baseline.event_key)
-        assert baselines.event_key.is_unique
-        assert baselines.baseline_level.isna().all()
+        assert sorted(features.event_key) == sorted(compared.event_key)
+        assert not [c for c in features.columns if c.startswith("baseline")]
+        assert "matched_event_key" not in features
+        assert "evidence_rank" not in features
         record = manifest(run)["epochs"][WORKED]
-        assert record["counts"]["events"] == (
-            compared.detector.value_counts().to_dict() | {BASELINE: len(baselines)}
-        )
+        assert record["counts"]["events"] == compared.detector.value_counts().to_dict()
 
-    def test_a_baseline_window_has_its_events_rows_and_lies_off_every_event(
-        self, run, inputs
-    ):
-        features = table(run, WORKED, "features").set_index("event_key")
-        inventory = stored(inputs, WORKED, "inventory")
-        baselines = features[features.detector == BASELINE]
+    def test_the_evidence_is_computed_on_the_events_rows_alone(self, run):
+        features = table(run, WORKED, "features")
+        first, n_rows = _grid_rows(TIME, features)
+        requested = np.zeros(TIME.size, dtype=bool)
+        for start, n in zip(first, n_rows, strict=True):
+            requested[start : start + n] = True
 
-        own = features.loc[baselines.matched_event_key]
-        np.testing.assert_array_equal(baselines.n_rows, own.n_rows)
-        starts = inventory.event_start_s.to_numpy()
-        ends = inventory.event_end_s.to_numpy()
-        for start, end in zip(
-            baselines.event_start_s, baselines.event_end_s, strict=True
-        ):
-            assert not ((starts <= end) & (ends >= start)).any()
+        record = manifest(run)["epochs"][WORKED]
+        assert record["n_evidence_rows"] == int(requested.sum())
 
     def test_every_scored_row_was_computed(self, run):
         features = table(run, WORKED, "features")
@@ -535,12 +522,11 @@ class TestTheWorkedEpoch:
         assert not (rejection.stage == "unknown").all()
 
     def test_each_published_event_reads_as_its_criteria_twin(self, run):
-        """The same interval gets the same features, its baselines included;
-        only its identity and its neighbours in its own inventory differ."""
+        """The same interval gets the same features; only its identity and its
+        neighbours in its own inventory differ."""
         features = table(run, WORKED, "features")
         own = {
             *INVENTORY_DTYPES,
-            "matched_event_key",
             "previous_gap_s",
             "next_gap_s",
         }
@@ -729,7 +715,7 @@ def test_the_manifest_records_the_inputs_and_the_rules(run):
     assert settings["evidence"]["remote_cm"] == runner.REMOTE_CM == 100.0
     assert settings["evidence"]["block_rows"] == runner.BLOCK_ROWS
     assert settings["evidence"]["library_block_size"] == 100
-    assert settings["baselines"]["seed"] == runner.BASELINE_SEED
+    assert "baselines" not in settings
     assert settings["grid"]["sample_interval_s"] == comparison.SAMPLE_INTERVAL_S
     assert "unavailable" in settings["tracking_confidence"]
     assert settings["stop_table"]["path"] == "replay_content/stop_table.parquet"
@@ -739,12 +725,7 @@ def test_the_manifest_records_the_inputs_and_the_rules(run):
     assert len(record["marks"]["sha256"]) == 64
     assert record["wall_clock_s"] > 0 and record["worker_peak_rss_gib"] > 0
     counts = record["counts"]
-    assert set(counts) >= {"events", "scorable", "unscorable", "baseline_levels"}
-    assert set(counts["baseline_levels"]["state_space"]) <= {
-        "location",
-        "duration_only",
-        "failed",
-    }
+    assert set(counts) == {"events", "scorable", "unscorable", "rejection_stages"}
 
 
 def test_the_settings_name_no_absolute_path(run, inputs, tmp_path, monkeypatch):
