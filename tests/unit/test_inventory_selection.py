@@ -347,6 +347,43 @@ class TestMatchedBaselines:
         _, other_windows = run(seed=SEED + 1)
         assert not other_windows.event_start_s.equals(windows.event_start_s)
 
+    def test_identical_intervals_of_two_inventories_draw_identically(self):
+        twin = COMPARED.iloc[[0]].assign(detector="c", event_key="c:twin")
+        events = pd.concat([COMPARED, twin], ignore_index=True)
+        summary, windows = run(events=events)
+        pd.testing.assert_series_equal(
+            summary.iloc[3], summary.iloc[0], check_names=False
+        )
+        assert windows.matched_event_key.iloc[3] == "c:twin"
+        pd.testing.assert_series_equal(
+            windows.drop(columns="matched_event_key").iloc[3],
+            windows.drop(columns="matched_event_key").iloc[0],
+            check_names=False,
+        )
+
+    def test_different_bounds_draw_from_different_streams(self):
+        # the same rows, so the same candidates, but another start
+        moved = COMPARED.iloc[[0]].assign(
+            event_start_s=TIME[500] - 1e-4, event_key="a:moved"
+        )
+        _, windows = run(events=pd.concat([COMPARED.iloc[[0]], moved]))
+        np.testing.assert_array_equal(rows_of(windows)[1], [25, 25])
+        assert windows.event_start_s.iloc[0] != windows.event_start_s.iloc[1]
+
+    def test_a_window_across_a_timestamp_gap_is_refused(self):
+        # a pool by hand across the gap after row 2999: not still time
+        pool = np.array([[TIME[2985] - 1e-4, TIME[3049] + 1e-4]])
+        with pytest.raises(ValueError, match="timestamp gap"):
+            matched_baselines(
+                pool,
+                COMPARED.iloc[:1],
+                traces(),
+                noise_evidence(),
+                np.zeros(N_TIME, dtype=np.int64),
+                BIN_DISTANCE_CM,
+                seed=SEED,
+            )
+
     def test_evidence_rank_is_one_above_every_baseline_and_zero_below(self):
         evidence = noise_evidence()
         evidence[500:525] = 50.0

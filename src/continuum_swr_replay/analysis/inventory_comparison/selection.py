@@ -8,9 +8,12 @@ aside alike. Nothing about the decode's posterior enters the pool.
 
 A candidate window for an event is a run of exactly the event's number of
 grid rows, every row strictly inside one pool interval. Strictly, so that a
-window never shares a row with an event whose bound is a pool bound; a pool
-interval never spans a timestamp gap, since the still time it comes from does
-not. A window is matched at one of three levels:
+window never shares a row with an event whose bound is a pool bound (every
+event whose bound is a grid sample leaves that sample as a pool edge); the
+cost is one row at each pool edge, which no window uses. A pool interval
+never spans a timestamp gap, since the still time it comes from does not;
+a drawn window that spans one is refused. A window is matched at one of three
+levels:
 
 - ``location``: the animal's bin at the window's middle row lies within
   :data:`LOCATION_TOLERANCE_CM` of track-graph distance from its bin at the
@@ -21,8 +24,13 @@ not. A window is matched at one of three levels:
 
 The middle row of ``n`` rows from row ``k`` is ``k + n // 2``. Up to
 :data:`N_BASELINES` windows are drawn without replacement from the level's
-candidates by ``keyed_rng(seed, event_key)``, so an event's draws depend only
-on the seed, its key, its length and location, and the pool.
+candidates by ``keyed_rng(seed, animal, day, epoch, start, end)``: the epoch
+and the interval's bounds as stored, each written exactly as
+``float.hex``. The stream names the interval, not the detector, so identical
+intervals of different inventories (the memoryless twins, an SWR event equal
+to another detector's) draw identical windows and get identical baselines, as
+they get identical features. An event's draws depend only on the seed, its
+epoch and bounds, and the pool, never on the other events.
 """
 
 from collections.abc import Collection, Mapping
@@ -231,8 +239,8 @@ def baseline_draws(
     pool : NDArray, shape (n_intervals, 2)
         From :func:`baseline_pool`.
     events : pd.DataFrame
-        The compared events: ``event_key``, ``event_start_s``,
-        ``event_end_s``.
+        The compared events of one epoch: ``animal``, ``day``, ``epoch``,
+        ``event_start_s`` and ``event_end_s``.
     traces : RowTraces
         The epoch's grid.
     animal_bin : NDArray of int, shape (n_time,)
@@ -242,8 +250,8 @@ def baseline_draws(
         Track-graph distance between real bins
         (``interior_bin_distances_cm``).
     seed : int or sequence
-        Names the streams with each ``event_key``; the runner passes
-        :data:`BASELINE_SEED`.
+        Names the streams with each event's epoch and bounds; the runner
+        passes :data:`BASELINE_SEED`.
 
     Returns
     -------
@@ -256,8 +264,9 @@ def baseline_draws(
     Raises
     ------
     ValueError
-        ``animal_bin`` is not on the grid, or an event reaches the grid's last
-        sample.
+        ``animal_bin`` is not on the grid, an event reaches the grid's last
+        sample, or a drawn window spans a timestamp gap (a step over 1.5
+        times the grid's median step).
     """
     time = traces.time
     animal_bin = np.asarray(animal_bin, dtype=np.int64)
@@ -270,7 +279,14 @@ def baseline_draws(
     has_rows = n_rows > 0
     event_bin = np.full(n_rows.shape, -1, dtype=np.int64)
     event_bin[has_rows] = animal_bin[(first + n_rows // 2)[has_rows]]
-    keys = events["event_key"].to_numpy()
+    names = list(
+        zip(
+            *(events[column].tolist() for column in SESSION_COLUMNS_DAY),
+            (float(t).hex() for t in events["event_start_s"]),
+            (float(t).hex() for t in events["event_end_s"]),
+            strict=True,
+        )
+    )
     level = np.full(n_rows.shape, FAILED, dtype=object)
     starts = np.full((n_rows.size, N_BASELINES), -1, dtype=np.int64)
     for length in np.unique(n_rows[has_rows]):
@@ -291,10 +307,29 @@ def baseline_draws(
                 continue
             n_draw = min(N_BASELINES, choices.size)
             for i in of_length[event_bin[of_length] == at]:
-                stream = keyed_rng(seed, str(keys[i]))
+                stream = keyed_rng(seed, *names[i])
                 starts[i, :n_draw] = stream.choice(choices, n_draw, replace=False)
                 level[i] = name
+    _refuse_gaps(time, starts, n_rows)
     return level, starts, n_rows
+
+
+def _refuse_gaps(time: NDArray, starts: NDArray, n_rows: NDArray) -> None:
+    """Raise when a drawn window holds a step over 1.5 median grid steps."""
+    if time.size < 2:
+        return
+    steps = np.diff(time)
+    gap = steps > 1.5 * np.median(steps)
+    # gaps_before[k]: gaps among the steps between rows 0 and k
+    gaps_before = np.r_[0, np.cumsum(gap)]
+    drawn = starts >= 0
+    first = starts[drawn]
+    last = first + np.broadcast_to(n_rows[:, None], starts.shape)[drawn] - 1
+    if (gaps_before[last] > gaps_before[first]).any():
+        raise ValueError(
+            "A baseline window spans a timestamp gap; the pool was not built "
+            "from still time broken at gaps."
+        )
 
 
 def matched_baselines(
@@ -315,8 +350,11 @@ def matched_baselines(
 
     Parameters
     ----------
-    pool, events, traces, animal_bin, bin_distance_cm, seed
+    pool, traces, animal_bin, bin_distance_cm, seed
         As :func:`baseline_draws`.
+    events : pd.DataFrame
+        As :func:`baseline_draws`, with ``event_key`` too, which names each
+        event's window.
     evidence : NDArray, shape (n_time,)
         ``epoch_row_evidence``, computed on every row of the events and of
         the pool.
@@ -332,8 +370,8 @@ def matched_baselines(
     Raises
     ------
     ValueError
-        ``evidence`` or ``animal_bin`` is not on the grid, or an event reaches
-        the grid's last sample.
+        ``evidence`` or ``animal_bin`` is not on the grid, an event reaches
+        the grid's last sample, or a drawn window spans a timestamp gap.
     """
     evidence = np.asarray(evidence, dtype=np.float64)
     if evidence.shape != traces.time.shape:
