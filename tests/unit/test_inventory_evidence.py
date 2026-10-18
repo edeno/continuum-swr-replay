@@ -231,6 +231,22 @@ class TestBlocks:
         np.testing.assert_allclose(blocks[boundary - 1][0], -silent, rtol=1e-6)
         assert not np.allclose(blocks[boundary][0], -silent)
 
+    def test_every_call_has_one_time_shape(self, epoch, encargs, monkeypatch):
+        import non_local_detector.likelihoods.clusterless_kde as library
+
+        lengths = []
+        call = library.predict_clusterless_kde_log_likelihood
+
+        def counted(time, *args, **kwargs):
+            lengths.append(len(time))
+            return call(time, *args, **kwargs)
+
+        monkeypatch.setattr(library, "predict_clusterless_kde_log_likelihood", counted)
+        # the first, an interior and the last block, the last moved inward
+        rows = requested(epoch.time.size, [(5, 20), (250, 260), (590, 599)])
+        assembled(epoch, encargs, rows, block_rows=100)
+        assert lengths == [103, 103, 103]
+
     def test_the_last_sample_is_refused(self, epoch, encargs):
         rows = requested(epoch.time.size, [(epoch.time.size - 3, epoch.time.size)])
         with pytest.raises(ValueError, match="last sample"):
@@ -267,6 +283,24 @@ class TestIntervalScores:
         others = pd.concat([target, on_rows(epoch, 100, 140), on_rows(epoch, 220, 380)])
         c = interval_evidence(traces, among_others, others)
         assert c["evidence_dll"].iloc[0] == b["evidence_dll"].iloc[0]
+
+    def test_an_interval_across_a_block_edge(self, epoch, encargs):
+        traces = row_traces(epoch, epoch.spike_times)
+        target = on_rows(epoch, 90, 110)  # blocks of 100 rows cut it at row 100
+        alone = row_evidence(epoch, encargs, requested(epoch.time.size, [(90, 111)]))
+        across = row_evidence(
+            epoch,
+            encargs,
+            requested(epoch.time.size, [(90, 111), (450, 470)]),
+            block_rows=100,
+        )
+        np.testing.assert_allclose(
+            interval_evidence(traces, across, target)["evidence_dll"],
+            interval_evidence(traces, alone, target)["evidence_dll"],
+            rtol=1e-6,
+            atol=1e-6,
+        )
+        np.testing.assert_allclose(across[90:111], alone[90:111], rtol=1e-6, atol=1e-6)
 
     def test_mean_over_the_rows(self, epoch, encargs):
         evidence = row_evidence(epoch, encargs, requested(epoch.time.size, [(0, 599)]))

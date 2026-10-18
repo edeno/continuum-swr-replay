@@ -55,18 +55,42 @@ __all__ = [
 ]
 
 BLOCK_ROWS = 25_000
-"""Rows per library call at most (50 s at 500 Hz); bounds the memory of a long run."""
+"""Rows of one grid block (50 s at 500 Hz).
+
+The grid is cut into blocks of this many rows, from row 0, and the likelihood
+is computed one block at a time, so its memory is bounded by the block. Every
+library call covers ``BLOCK_ROWS + 3`` samples, so they all share one time
+shape: the library runs JAX op by op and compiles anew for each new shape
+(about 7 s a call on a real epoch, against 0.7 s per 1,000 rows of spikes).
+"""
 
 
-def _row_blocks(rows: NDArray[np.bool_], block_rows: int) -> list[tuple[int, int]]:
-    """``(first, stop)`` of each block: the runs of ``rows`` cut every ``block_rows``."""
+def _block_spans(
+    n_time: int, rows: NDArray[np.bool_], block_rows: int
+) -> list[tuple[int, int, int, int]]:
+    """``(first, stop, low, high)`` of each grid block holding a requested row.
+
+    Rows ``first`` to ``stop - 1`` are the block's; samples ``low`` to
+    ``high - 1`` are its call, ``block_rows + 3`` of them (the whole grid when
+    shorter): one sample before the block and two after, the call moved
+    inward at the grid's ends.
+    """
+    n_rows = n_time - 1  # the last sample is no row
+    n_call = min(block_rows + 3, n_time)
+    spans = []
+    for first in range(0, n_rows, block_rows):
+        stop = min(first + block_rows, n_rows)
+        if rows[first:stop].any():
+            low = min(max(first - 1, 0), n_time - n_call)
+            spans.append((first, stop, low, low + n_call))
+    return spans
+
+
+def _runs(rows: NDArray[np.bool_]) -> list[tuple[int, int]]:
+    """``(start, stop)`` of each run of True in ``rows``."""
     edges = np.diff(np.r_[0, rows.astype(np.int8), 0])
     starts, stops = np.flatnonzero(edges == 1), np.flatnonzero(edges == -1)
-    return [
-        (first, min(first + block_rows, stop))
-        for start, stop in zip(starts.tolist(), stops.tolist(), strict=True)
-        for first in range(start, stop, block_rows)
-    ]
+    return list(zip(starts.tolist(), stops.tolist(), strict=True))
 
 
 def log_likelihood_blocks(
@@ -79,12 +103,16 @@ def log_likelihood_blocks(
     *,
     block_rows: int = BLOCK_ROWS,
 ) -> Iterator[tuple[int, NDArray]]:
-    """The log-likelihood of the requested rows, one block at a time.
+    """The log-likelihood of the requested rows, one grid block at a time.
 
-    Each block is one library call on its rows padded by one sample before and
-    two after (fewer at the grid's ends), the pads dropped. Row ``k`` then
-    holds exactly the spikes in ``[t_k, t_{k + 1})``, as in one call on the
-    whole grid, wherever the blocks are cut.
+    The grid is cut into blocks of ``block_rows`` rows from row 0, and each
+    block holding a requested row is one library call. The call covers the
+    block padded by one sample before and two after, moved inward at the
+    grid's ends so every call has ``block_rows + 3`` samples; the pads are
+    dropped. Only the spikes of the block's requested rows are sent, so
+    the other rows of a call are wrong and are never returned. Row ``k`` holds
+    exactly the spikes in ``[t_k, t_{k + 1})`` (the grid's last row also the
+    spike on its final sample), as in one call on the whole grid.
 
     Parameters
     ----------
@@ -101,14 +129,14 @@ def log_likelihood_blocks(
     encargs : dict
         The likelihood's arguments, ``encoding_inputs(...)["encargs"]``.
     block_rows : int, optional
-        Rows per call at most.
+        Rows per block.
 
     Yields
     ------
     first_row : int
-        The block's first row.
-    log_likelihood : NDArray, shape (n_block_rows, n_interior_bins)
-        Rows ``first_row`` onward, on the real place bins.
+        The first row of a run of requested rows within one block.
+    log_likelihood : NDArray, shape (n_run_rows, n_interior_bins)
+        The run's rows, on the real place bins.
 
     Raises
     ------
@@ -129,29 +157,39 @@ def log_likelihood_blocks(
             "The grid's last sample holds no span of spikes and is never read."
         )
     position = np.asarray(linear_position, dtype=np.float64).reshape(-1, 1)
-    for first, stop in _row_blocks(rows, block_rows):
-        low, high = max(first - 1, 0), min(stop + 2, time.size)
-        grid = time[low:high]
-        # the library's own cut, applied first so only the block's spikes are sent
-        in_grid = [(t >= grid[0]) & (t <= grid[-1]) for t in spike_times]
+    # each spike's row, as the decode bins it: t_k <= s < t_{k+1}, the final
+    # sample in the last row; -1 off the grid
+    spike_rows = []
+    for t in spike_times:
+        t = np.asarray(t, dtype=np.float64)
+        row = np.searchsorted(time, t, side="right") - 1
+        row[t == time[-1]] = time.size - 2
+        row[(t < time[0]) | (t > time[-1])] = -1
+        spike_rows.append(row)
+    for first, stop, low, high in _block_spans(time.size, rows, block_rows):
+        in_block = rows.copy()
+        in_block[:first] = False
+        in_block[stop:] = False
+        sent = [(row >= 0) & in_block[np.maximum(row, 0)] for row in spike_rows]
         log_likelihood = predict_clusterless_kde_log_likelihood(
-            cast(Any, grid),
-            cast(Any, grid),
+            cast(Any, time[low:high]),
+            cast(Any, time[low:high]),
             cast(Any, position[low:high]),
-            [np.asarray(t)[k] for t, k in zip(spike_times, in_grid, strict=True)],
+            [np.asarray(t)[k] for t, k in zip(spike_times, sent, strict=True)],
             [
                 np.asarray(f)[k]
-                for f, k in zip(spike_waveform_features, in_grid, strict=True)
+                for f, k in zip(spike_waveform_features, sent, strict=True)
             ],
             **encargs,
             is_local=False,
             disable_progress_bar=True,
         )
-        # the call's last row holds no span; the pads hold other rows' spikes
+        # the call's last row holds no span; it and the pads are dropped
         reachable = _drop_the_unreachable_row(
-            np.asarray(log_likelihood), grid, encargs
+            np.asarray(log_likelihood), time[low:high], encargs
         ).log_likelihood
-        yield first, reachable[first - low : stop - low]
+        for start, end in _runs(in_block[first:stop]):
+            yield first + start, reachable[first + start - low : first + end - low]
 
 
 def animal_bins(environment: Any, linear_position: NDArray) -> NDArray[np.int64]:
@@ -240,6 +278,8 @@ def epoch_row_evidence(
     -------
     evidence : NDArray, shape (n_time,)
         :func:`remote_evidence` on the requested rows; NaN on every other row.
+        A row not requested reads NaN as an invalid row does, so a caller must
+        request every row it scores.
 
     Raises
     ------

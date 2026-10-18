@@ -18,4 +18,7 @@ with per-detector denominators.
 - ``features``: per-event features read on the decode grid by one rule for
   every inventory: rows, population engagement, LFP and MUA, timing, and the
   stop holding the onset.
+- ``evidence``: the common spike-evidence diagnostic, how much better a remote
+  place explains each row's spikes than the animal's own place, and its
+  summary over each interval's rows.
 """
