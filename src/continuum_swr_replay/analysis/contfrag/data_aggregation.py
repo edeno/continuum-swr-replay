@@ -25,6 +25,7 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
+from continuum_swr_replay.decoding_common import data_over_time_suffix
 
 from ...types import SessionData
 from ..hippocampus.epoch_normalizers import (
@@ -225,7 +226,7 @@ def load_contfrag_data_over_time(data_dir: Path) -> pd.DataFrame:
         If the SWR source cannot serve an analysed epoch.
     """
     files = analysed_decode_files(
-        data_dir, "_contfrag_data_over_time.pkl", require_all=True
+        data_dir, f"_contfrag{data_over_time_suffix(None)}", require_all=True
     )
     data_over_time = pd.concat([read_dot_with_swr_source(p) for p in files])
     data_over_time["distance"] = np.abs(data_over_time["ahead_behind_distance"])

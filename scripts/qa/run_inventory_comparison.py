@@ -98,7 +98,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from continuum_swr_replay.analysis.constants import (  # noqa: E402
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-    DEFAULT_NON_LOCAL_THRESHOLD,
 )
 from continuum_swr_replay.analysis.hippocampus import swr_source  # noqa: E402
 from continuum_swr_replay.analysis.inventory_comparison.adapters import (  # noqa: E402
@@ -175,6 +174,7 @@ from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
 )
 from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier  # noqa: E402
 from continuum_swr_replay.decoding_common import (  # noqa: E402
+    decode_paths,
     parse_run_id,
     provenance_record,
     replace_outputs,
@@ -305,10 +305,8 @@ bridging ones."""
 
 
 def decode_path(identifier: str) -> Path:
-    """The canonical decode's ``data_over_time`` pickle."""
-    threshold = round(100 * DEFAULT_NON_LOCAL_THRESHOLD)
-    path: Path = DECODE_ROOT / f"{identifier}_{threshold}_data_over_time.pkl"
-    return path
+    """The canonical decode's ``data_over_time`` pickle (``decode_paths``)."""
+    return decode_paths(identifier, DECODE_ROOT).data_over_time
 
 
 def _typed(

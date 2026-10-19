@@ -47,6 +47,10 @@ from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     intervals_from_labels,
 )
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
+from continuum_swr_replay.decoding_common import (
+    decode_paths,
+    non_local_threshold_percent,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
 from continuum_swr_replay.table_io import read_table, resolved_table_path, sha256_file
@@ -174,15 +178,17 @@ def session_data_over_time_path(
     """Path of one session's cached per-bin decode frame.
 
     The threshold tag in the name is the one the decoder wrote
-    (``int(non_local_threshold * 100)``), so a run reads the labels that were
-    cut at the threshold it asks for rather than whichever file exists.
+    (:func:`~continuum_swr_replay.decoding_common.non_local_threshold_percent`),
+    so a run reads the labels that were cut at the threshold it asks for rather
+    than whichever file exists.
     """
     animal, session_date = parse_nwb_filename(nwb_file_name)
     directory = PROCESSED_DATA_DIR if data_dir is None else Path(data_dir)
-    threshold_int = int(non_local_threshold * 100)
-    return directory / (
-        f"{animal}{session_date}_{epoch_name}_HPC_{threshold_int}_data_over_time.pkl"
-    )
+    return decode_paths(
+        f"{animal}{session_date}_{epoch_name}_HPC",
+        directory,
+        threshold_percent=non_local_threshold_percent(non_local_threshold),
+    ).data_over_time
 
 
 def load_session_swr_intervals(

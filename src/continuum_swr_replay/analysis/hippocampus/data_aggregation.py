@@ -145,6 +145,7 @@ from scipy.stats import zscore
 
 from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
+from continuum_swr_replay.decoding_common import data_over_time_suffix
 
 from ...types import SessionData
 from .epoch_normalizers import run_speed_baseline as epoch_run_speed_baseline
@@ -760,7 +761,7 @@ def load_data_over_time(data_dir: Path) -> pd.DataFrame:
         If the SWR source cannot serve an analysed epoch.
 
     """
-    files = analysed_decode_files(data_dir, "_80_data_over_time.pkl", require_all=True)
+    files = analysed_decode_files(data_dir, data_over_time_suffix(), require_all=True)
     data_over_time = pd.concat([read_dot_with_swr_source(p) for p in files])
     data_over_time["Non-Local_prob"] = (
         data_over_time["Non-Local_Continuous_prob"]

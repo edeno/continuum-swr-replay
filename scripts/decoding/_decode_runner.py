@@ -40,9 +40,11 @@ from continuum_swr_replay.data_loaders import (
 )
 from continuum_swr_replay.decoding_common import (
     DecodingConfig,
+    decode_paths,
     hpc_artifact_intervals,
     hpc_decode_masks,
     hpc_ripple_power_inputs,
+    non_local_threshold_percent,
     provenance_record,
     release_nwb_files,
     require_hpc_decode_sources,
@@ -243,8 +245,15 @@ def save_results_and_model(
 
     ``data_over_time`` is ``{epoch_identifier}_{threshold}_data_over_time.pkl``,
     the threshold in percent, or ``{epoch_identifier}_data_over_time.pkl`` when
-    ``non_local_threshold`` is None.
+    ``non_local_threshold`` is None; every name is ``decode_paths``'.
     """
+    paths = decode_paths(
+        epoch_identifier,
+        save_folder,
+        threshold_percent=None
+        if non_local_threshold is None
+        else non_local_threshold_percent(non_local_threshold),
+    )
     if resumed:
         logger.info("Resumed: saving data_over_time only...")
     else:
@@ -254,22 +263,12 @@ def save_results_and_model(
         if decode_masks is not None:
             stamped.attrs["decode_masks"] = decode_masks
         write_atomically(
-            save_folder / f"{epoch_identifier}_results.nc",
-            lambda path: stamped.to_netcdf(path, engine="h5netcdf"),
+            paths.results, lambda path: stamped.to_netcdf(path, engine="h5netcdf")
         )
-        write_atomically(
-            save_folder / f"{epoch_identifier}_detector.pkl", detector.save_model
-        )
-        write_atomically(
-            save_folder / f"{epoch_identifier}_environment.pkl", env.save_environment
-        )
+        write_atomically(paths.detector, detector.save_model)
+        write_atomically(paths.environment, env.save_environment)
 
-    if non_local_threshold is None:
-        data_over_time_name = f"{epoch_identifier}_data_over_time.pkl"
-    else:
-        threshold_int = int(non_local_threshold * 100)
-        data_over_time_name = f"{epoch_identifier}_{threshold_int}_data_over_time.pkl"
-    write_atomically(save_folder / data_over_time_name, data_over_time.to_pickle)
+    write_atomically(paths.data_over_time, data_over_time.to_pickle)
 
 
 def organize_results(
@@ -466,7 +465,7 @@ def run_decode(
             if artifact_mask is not None:
                 # the reused results must come from the configured masks
                 require_saved_decode_masks(
-                    results.attrs, str(save_dir / f"{epoch_identifier}_results.nc")
+                    results.attrs, str(decode_paths(epoch_identifier, save_dir).results)
                 )
         else:
             is_missing = None

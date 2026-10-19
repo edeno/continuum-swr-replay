@@ -164,12 +164,13 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: 
     write_json,
 )
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
-    analysed_decode_files,
+    analysed_epoch_ids,
 )
 from continuum_swr_replay.data_loaders.utils import (  # noqa: E402
     parse_epoch_identifier,
 )
 from continuum_swr_replay.decoding_common import (  # noqa: E402
+    decode_paths,
     hpc_artifact_intervals,
     hpc_decode_masks,
     provenance_record,
@@ -320,11 +321,12 @@ def require_cpu() -> None:
 
 
 def decode_files(epoch_id: str, decode_dir: Path) -> dict[str, Path]:
-    """The canonical decode's three files for an epoch."""
+    """The canonical decode's three files for an epoch (``decode_paths``)."""
+    paths = decode_paths(epoch_id, decode_dir)
     return {
-        "data_over_time": decode_dir / f"{epoch_id}_80_data_over_time.pkl",
-        "detector": decode_dir / f"{epoch_id}_detector.pkl",
-        "results": decode_dir / f"{epoch_id}_results.nc",
+        "data_over_time": paths.data_over_time,
+        "detector": paths.detector,
+        "results": paths.results,
     }
 
 
@@ -376,15 +378,15 @@ def reuse_reason(
 def canonical_epochs(decode_dir: Path) -> list[str]:
     """Every analysed HPC epoch with any canonical decode file in ``decode_dir``.
 
-    The epoch register's analysed epochs (``analysed_decode_files``), never a
+    The epoch register's analysed epochs (``analysed_epoch_ids``), never a
     glob, so a pending epoch's decode there is not read. An epoch missing one of
     its files is still listed, so that the run records why it skips it.
     """
-    stems = set()
-    for suffix in ("_80_data_over_time.pkl", "_detector.pkl", "_results.nc"):
-        for path in analysed_decode_files(decode_dir, suffix):
-            stems.add(path.name.removesuffix(suffix))
-    return sorted(stems)
+    return [
+        epoch_id
+        for epoch_id in analysed_epoch_ids()
+        if any(path.exists() for path in decode_files(epoch_id, decode_dir).values())
+    ]
 
 
 def load_marks_and_training_mask(epoch_id: str) -> dict:

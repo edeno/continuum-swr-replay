@@ -92,6 +92,11 @@ from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_decode_files,
 )
 from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier  # noqa: E402
+from continuum_swr_replay.decoding_common import (  # noqa: E402
+    DecodePaths,
+    decode_paths,
+    non_local_threshold_percent,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
 
 # --- Parameters (provisional; see spec) ---------------------------------------
@@ -128,23 +133,28 @@ def animal_from_epoch_id(epoch_id: str) -> str:
     return parse_epoch_identifier(epoch_id).animal
 
 
+def _decode_paths(epoch_id: str) -> DecodePaths:
+    """The epoch's decode files, ``data_over_time`` named for NON_LOCAL_THRESHOLD."""
+    return decode_paths(
+        epoch_id,
+        PROCESSED_DATA_DIR,
+        threshold_percent=non_local_threshold_percent(NON_LOCAL_THRESHOLD),
+    )
+
+
 def find_sessions(animal: str | None) -> list[str]:
     """Return analysed HPC epoch identifiers with detector + results + data_over_time.
 
     The epoch register's analysed epochs (``analysed_decode_files``), never a
     glob, so a pending epoch's decode in the folder is not read.
     """
-    thr_int = int(round(NON_LOCAL_THRESHOLD * 100))
     out = []
     for det in analysed_decode_files(PROCESSED_DATA_DIR, "_detector.pkl"):
         epoch_id = det.name.removesuffix("_detector.pkl")
         if animal is not None and not epoch_id.startswith(animal):
             continue
-        has_results = (PROCESSED_DATA_DIR / f"{epoch_id}_results.nc").exists()
-        has_dot = (
-            PROCESSED_DATA_DIR / f"{epoch_id}_{thr_int}_data_over_time.pkl"
-        ).exists()
-        if has_results and has_dot:
+        paths = _decode_paths(epoch_id)
+        if paths.results.exists() and paths.data_over_time.exists():
             out.append(epoch_id)
     return out
 
@@ -346,11 +356,10 @@ def analyze_session(
     Returns ``(metrics_df, context)`` where context holds arrays needed for
     figures (``pos``, ``gpi``, ``t``, ``mape``, ``lin``, etc.).
     """
-    thr_int = int(round(NON_LOCAL_THRESHOLD * 100))
     # The read refuses labels that break the speed rule or the probability
     # contract.
     dot = read_dot_with_swr_source(
-        PROCESSED_DATA_DIR / f"{epoch_id}_{thr_int}_data_over_time.pkl",
+        _decode_paths(epoch_id).data_over_time,
         non_local_threshold=NON_LOCAL_THRESHOLD,
     )
     # Validate before loading encoding data so a missing/corrupt auxiliary

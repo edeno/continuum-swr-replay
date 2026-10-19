@@ -20,6 +20,7 @@ import pandas as pd
 import pytest
 
 import scripts.content.analyze_content_occupancy as content_occupancy
+import scripts.figures.generate_event_gallery as event_gallery
 import scripts.qa.analyze_event_spike_evidence as spike_evidence
 import scripts.qa.run_quality_metrics as quality_metrics
 from continuum_swr_replay.analysis.contfrag.data_aggregation import (
@@ -148,3 +149,25 @@ def test_the_spike_evidence_scan_finds_only_analysed_epochs(tmp_path, monkeypatc
 
     assert spike_evidence.find_sessions(None) == list(ANALYSED)
     assert spike_evidence.find_sessions("a") == [ANALYSED[0]]
+
+
+def test_the_event_gallery_catalogs_only_analysed_epochs(tmp_path):
+    """The gallery read every ``*_HPC_80_data_over_time.pkl`` in the folder."""
+    folder = _folder(tmp_path, "_80_data_over_time.pkl")
+    _frame("z20990101_02_r1_HPC").to_pickle(
+        folder / "z20990101_02_r1_HPC_80_data_over_time.pkl"
+    )
+
+    pkls = event_gallery.list_epoch_pkls(folder)
+
+    assert pkls == [
+        folder / f"{epoch_id}_80_data_over_time.pkl" for epoch_id in ANALYSED
+    ]
+    assert [event_gallery.epoch_id_from_pkl(pkl) for pkl in pkls] == [
+        "a20200101_02_r1",
+        "b20200102_04_r2",
+    ]
+    with pytest.raises(FileNotFoundError, match="No analysed epoch"):
+        event_gallery.list_epoch_pkls(
+            _folder(tmp_path / "other", "_80_data_over_time.pkl", (PENDING,))
+        )

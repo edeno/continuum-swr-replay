@@ -71,6 +71,11 @@ from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_decode_files,
 )
 from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier  # noqa: E402
+from continuum_swr_replay.decoding_common import (  # noqa: E402
+    DecodePaths,
+    decode_paths,
+    non_local_threshold_percent,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
 from continuum_swr_replay.table_io import read_table, table_exists  # noqa: E402
 
@@ -110,19 +115,27 @@ def animal_from_epoch_id(epoch_id: str) -> str:
     return parse_epoch_identifier(epoch_id).animal
 
 
+def _decode_paths(epoch_id: str) -> DecodePaths:
+    """The epoch's decode files, ``data_over_time`` named for NON_LOCAL_THRESHOLD."""
+    return decode_paths(
+        epoch_id,
+        PROCESSED_DATA_DIR,
+        threshold_percent=non_local_threshold_percent(NON_LOCAL_THRESHOLD),
+    )
+
+
 def find_sessions(animal: str | None) -> list[str]:
     """Analysed HPC epoch identifiers with data_over_time + environment present.
 
     The epoch register's analysed epochs (``analysed_decode_files``), never a
     glob, so a pending epoch's decode in the folder is not read.
     """
-    thr_int = int(round(NON_LOCAL_THRESHOLD * 100))
     out = []
     for env in analysed_decode_files(PROCESSED_DATA_DIR, "_environment.pkl"):
         epoch_id = env.name.removesuffix("_environment.pkl")
         if animal is not None and not epoch_id.startswith(animal):
             continue
-        if (PROCESSED_DATA_DIR / f"{epoch_id}_{thr_int}_data_over_time.pkl").exists():
+        if _decode_paths(epoch_id).data_over_time.exists():
             out.append(epoch_id)
     return out
 
@@ -154,17 +167,16 @@ def session_content_distances(
     (``ahead_behind_distance``) and ``d_well`` is the track distance to the
     nearest reward well. Returns ``None`` if too few wells are localizable.
     """
-    thr_int = int(round(NON_LOCAL_THRESHOLD * 100))
+    paths = _decode_paths(epoch_id)
     # The read refuses labels that break the speed rule or the probability
     # contract.
     dot = read_dot_with_swr_source(
-        PROCESSED_DATA_DIR / f"{epoch_id}_{thr_int}_data_over_time.pkl",
-        non_local_threshold=NON_LOCAL_THRESHOLD,
+        paths.data_over_time, non_local_threshold=NON_LOCAL_THRESHOLD
     )
     # Validate the persisted cohort before any auxiliary load or early-return
     # path can turn corruption into an ordinary missing-data skip.
     validate_dot_event_contract(dot)
-    env = joblib.load(PROCESSED_DATA_DIR / f"{epoch_id}_environment.pkl")
+    env = joblib.load(paths.environment)
     # The fit flag is not persisted, but the grid + track graph are intact.
     env._is_fitted = True
     interior = np.asarray(env.is_track_interior_).reshape(-1)

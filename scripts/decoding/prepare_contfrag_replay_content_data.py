@@ -65,6 +65,7 @@ from continuum_swr_replay.analysis.replay.covariate_registry import (
 from continuum_swr_replay.analysis.replay.covariates import load_contingency
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
+from continuum_swr_replay.decoding_common import decode_paths
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.table_io import publish_canonical
 from continuum_swr_replay.table_parity import BASENAME_TO_TABLE
@@ -179,11 +180,12 @@ def find_sessions(
         animal_date = nwb_file_name.removesuffix("_.nwb")
         animal = parse_nwb_filename(nwb_file_name)[0]
         session_id = f"{animal_date}_{epoch}_{brain_area}_contfrag"
-        dot_file = PROCESSED_DATA_DIR / f"{session_id}_data_over_time.pkl"
-        env_file = PROCESSED_DATA_DIR / f"{session_id}_environment.pkl"
+        paths = decode_paths(session_id, PROCESSED_DATA_DIR, threshold_percent=None)
+        dot_file = paths.data_over_time
+        env_file = paths.environment
         if brain_area != "HPC" and not (dot_file.exists() and env_file.exists()):
             continue
-        results_path = PROCESSED_DATA_DIR / f"{session_id}_results.nc"
+        results_path = paths.results
         by_animal.setdefault(animal, []).append(
             {
                 "nwb_file_name": nwb_file_name,

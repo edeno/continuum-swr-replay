@@ -61,6 +61,7 @@ from continuum_swr_replay.analysis.hippocampus.swr_source import (
     swr_intervals,
 )
 from continuum_swr_replay.data_loaders import load_data
+from continuum_swr_replay.decoding_common import decode_paths
 from continuum_swr_replay.figure_utilities import (
     PAGE_HEIGHT,
     TWO_COLUMN,
@@ -258,7 +259,7 @@ def generate_figure(
         results,
         artifacts=artifact_intervals(epoch_id),
         dropped=dropped_for_excluded_time(
-            read_artifact_event_drops(data_dir / f"{epoch_id}_80_data_over_time.pkl")
+            read_artifact_event_drops(decode_paths(epoch_id, data_dir).data_over_time)
         ),
     )
 

@@ -40,6 +40,7 @@ from continuum_swr_replay.analysis.hippocampus.hpc_raw_stats import (
 )
 from continuum_swr_replay.data_loaders.bandit_task import load_data
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
+from continuum_swr_replay.decoding_common import decode_paths
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.types import DataLoadingPreset
 
@@ -56,7 +57,7 @@ ALL_STAT_COLS = list(RAW_STAT_COLUMNS) + list(TRANSITION_MATRIX_COLUMNS)
 
 def _load_detector(epoch_identifier: str):
     """Load a fitted HPC detector pickle for an epoch, or None if missing."""
-    path = PROCESSED_DATA_DIR / f"{epoch_identifier}_HPC_detector.pkl"
+    path = decode_paths(f"{epoch_identifier}_HPC", PROCESSED_DATA_DIR).detector
     if not path.exists():
         return None
     # Local import to keep module import cheap when --help is requested

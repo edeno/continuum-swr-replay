@@ -37,6 +37,7 @@ from continuum_swr_replay.analysis.hippocampus.swr_source import (
     read_dot_with_swr_source,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
+from continuum_swr_replay.decoding_common import data_over_time_suffix
 from continuum_swr_replay.parameters import (
     FIGURE_DIR,
     PROCESSED_DATA_DIR,
@@ -98,7 +99,7 @@ def load_all_sessions(
     The epoch register's analysed epochs (``analysed_decode_files``), never a
     glob, so a pending epoch's decode in the folder is not read.
     """
-    suffix = f"_{threshold}_data_over_time.pkl"
+    suffix = data_over_time_suffix(threshold)
     paths = analysed_decode_files(PROCESSED_DATA_DIR, suffix)
 
     if not paths:

@@ -45,6 +45,7 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
 from continuum_swr_replay.analysis.replay.spatial_mapping import (
     map_estimate_to_arm,
 )
+from continuum_swr_replay.decoding_common import decode_paths
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.table_io import read_table
 
@@ -97,9 +98,9 @@ ARM_COLORS = {
 
 
 def load_session(animal: str, day: int, epoch: str):
-    base = f"{animal}{day}_{epoch}_HPC"
-    dot_path = PROCESSED_DATA_DIR / f"{base}_80_data_over_time.pkl"
-    env_path = PROCESSED_DATA_DIR / f"{base}_environment.pkl"
+    paths = decode_paths(f"{animal}{day}_{epoch}_HPC", PROCESSED_DATA_DIR)
+    dot_path = paths.data_over_time
+    env_path = paths.environment
     # Through the SWR source: its event labels, and the excluded-time column.
     dot = read_dot_with_swr_source(dot_path)
     with open(env_path, "rb") as f:

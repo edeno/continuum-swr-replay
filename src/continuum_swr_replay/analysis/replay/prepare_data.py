@@ -81,6 +81,7 @@ from continuum_swr_replay.data_loaders.trials import (
     validate_port_experience_pump_audit,
 )
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
+from continuum_swr_replay.decoding_common import decode_paths
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
 from continuum_swr_replay.table_io import (
@@ -147,15 +148,15 @@ def find_sessions(max_per_animal: int | None = None) -> list[dict]:
     for nwb_file_name, epoch in analysed_epochs().index:
         animal = parse_nwb_filename(nwb_file_name)[0]
         session_id = swr_epoch_id(nwb_file_name, epoch)
-        results_path = PROCESSED_DATA_DIR / f"{session_id}_results.nc"
+        paths = decode_paths(session_id, PROCESSED_DATA_DIR)
         by_animal.setdefault(animal, []).append(
             {
                 "nwb_file_name": nwb_file_name,
                 "epoch_name": epoch,
                 "session_id": session_id,
-                "dot_file": PROCESSED_DATA_DIR / f"{session_id}_80_data_over_time.pkl",
-                "env_file": PROCESSED_DATA_DIR / f"{session_id}_environment.pkl",
-                "results_file": results_path if results_path.exists() else None,
+                "dot_file": paths.data_over_time,
+                "env_file": paths.environment,
+                "results_file": paths.results if paths.results.exists() else None,
             }
         )
 

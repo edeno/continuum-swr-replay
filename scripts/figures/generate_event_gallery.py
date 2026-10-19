@@ -33,7 +33,8 @@ category definitions.
 Two phases (the per-epoch Spyglass load dominates cost, so it is the
 parallel unit):
 
-    1. catalog  — stream every ``*_HPC_80_data_over_time.pkl`` (cheap, no
+    1. catalog  — stream every analysed epoch's ``*_HPC_80_data_over_time.pkl``
+                  (the epoch register's, ``analysed_decode_files``; cheap, no
                   Spyglass load), classify + sample, write a small catalog
                   parquet of selected events.
     2. render   — for one epoch in the catalog: load_data + load_results
@@ -110,7 +111,9 @@ from continuum_swr_replay.analysis.replay.posterior_io import (
 from continuum_swr_replay.analysis.replay.tables_arm_patch import build_event_arm_table
 from continuum_swr_replay.analysis.replay.tables_event import build_event_table
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
+from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
 from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier
+from continuum_swr_replay.decoding_common import data_over_time_suffix, decode_paths
 from continuum_swr_replay.parameters import COLORS, PROCESSED_DATA_DIR
 from continuum_swr_replay.visualization.plots import (
     _track_edge_colors,
@@ -153,7 +156,7 @@ EXCLUDED_LABEL = "excluded time"
 
 def epoch_id_from_pkl(pkl_path: Path) -> str:
     """``chimi20200213_02_r1_HPC_80_data_over_time.pkl`` -> ``chimi20200213_02_r1``."""
-    return pkl_path.name.replace("_HPC_80_data_over_time.pkl", "")
+    return pkl_path.name.removesuffix(f"_HPC{data_over_time_suffix()}")
 
 
 def parse_epoch_id(epoch_id: str) -> tuple[str, str]:
@@ -167,11 +170,15 @@ def parse_epoch_id(epoch_id: str) -> tuple[str, str]:
 
 
 def list_epoch_pkls(data_dir: Path) -> list[Path]:
-    pkls = sorted(data_dir.glob("*_HPC_80_data_over_time.pkl"))
+    """The analysed epochs' canonical decode frames in `data_dir`.
+
+    The epoch register's analysed epochs (``analysed_decode_files``), never a
+    glob, so a pending or excluded epoch's decode in the folder is not shown.
+    """
+    suffix = data_over_time_suffix()
+    pkls = analysed_decode_files(data_dir, suffix)
     if not pkls:
-        raise FileNotFoundError(
-            f"No *_HPC_80_data_over_time.pkl files found in {data_dir}"
-        )
+        raise FileNotFoundError(f"No analysed epoch's *{suffix} found in {data_dir}")
     return pkls
 
 
@@ -1653,7 +1660,9 @@ def render_epoch(
     # immobility bouts (stop unit) it provides are used by every event's
     # behavioral-context panel. Per-arm predictors/content additionally need
     # the conditional posterior (NL categories only).
-    dot = read_dot_with_swr_source(data_dir / f"{epoch_id}_HPC_80_data_over_time.pkl")
+    dot = read_dot_with_swr_source(
+        decode_paths(f"{epoch_id}_HPC", data_dir).data_over_time
+    )
     imm_bouts = immobility_bout_intervals(dot)
     # The SWR trace's shading: the epoch's SWR source intervals, the ones its
     # events were classified against (not load_data's stored ripples).
@@ -1663,7 +1672,7 @@ def render_epoch(
     arm_table = None
     if (sel["category"] != "swr_not_nonlocal").any():
         posterior = load_conditional_posterior(
-            PROCESSED_DATA_DIR / f"{epoch_id}_HPC_results.nc"
+            decode_paths(f"{epoch_id}_HPC", PROCESSED_DATA_DIR).results
         )
         event_table = build_event_table(
             dot,

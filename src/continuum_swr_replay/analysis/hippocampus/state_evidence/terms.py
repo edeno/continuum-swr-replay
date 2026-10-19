@@ -18,6 +18,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
     CLUSTERLESS_LIKELIHOOD_KEYS,
     ENCODING_KEY,
 )
+from continuum_swr_replay.decoding_common import decode_paths
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
 
@@ -36,7 +37,7 @@ def load_detector(epoch_id: str, decode_dir: Path = PROCESSED_DATA_DIR) -> Any:
     KeyError
         The detector holds no :data:`ENCODING_KEY` encoding model.
     """
-    detector = joblib.load(Path(decode_dir) / f"{epoch_id}_detector.pkl")
+    detector = joblib.load(decode_paths(epoch_id, Path(decode_dir)).detector)
     if ENCODING_KEY not in detector.encoding_model_:
         raise KeyError(
             f"ENCODING_KEY {ENCODING_KEY!r} not in encoding_model_; "

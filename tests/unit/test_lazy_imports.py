@@ -46,6 +46,8 @@ _LAZY_IMPORTS: list[str] = [
     "from continuum_swr_replay.data_loaders.position import get_interpolated_position_info",
     # The one epoch-identifier parser, read by offline decode-file readers.
     "from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier",
+    # The one decode-file naming rule, read by the same offline readers.
+    "from continuum_swr_replay.decoding_common import decode_paths",
     # ``analysis/*`` leaf modules. The hippocampus leaves used to drag
     # ``data_aggregation`` (which imports ``get_labels`` → spyglass);
     # the PFC leaves used to be poisoned by the eager re-export from

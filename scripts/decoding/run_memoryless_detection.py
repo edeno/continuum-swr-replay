@@ -133,7 +133,6 @@ from distributed.deploy import Cluster
 from numpy.typing import NDArray
 
 from continuum_swr_replay import decoding_common
-from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
 from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
     interval_mask,
     masked_seconds,
@@ -183,6 +182,7 @@ from continuum_swr_replay.data_loaders.utils import (
     parse_nwb_filename,
 )
 from continuum_swr_replay.decoding_common import (
+    decode_paths,
     provenance_record,
     raise_open_file_limit,
     release_nwb_files,
@@ -194,9 +194,6 @@ from continuum_swr_replay.table_io import sha256_file, write_table
 
 OUTPUT_ROOT = PROCESSED_DATA_DIR / "replay_detection_comparison" / "memoryless"
 DESIGN_SPEC = "docs/design/replay_detection_comparison/02-memoryless-sequence.md"
-NON_LOCAL_THRESHOLD_PERCENT = round(100 * DEFAULT_NON_LOCAL_THRESHOLD)
-"""The ``data_over_time`` file is named for the decode's non-local threshold."""
-
 MARKS_RULE = (
     "load_data: get_hpc_marks (tetrode sort groups; coincident spikes counted) "
     "then filter_spike_times over the decode's time span"
@@ -208,12 +205,9 @@ MARKS_RULE_TAG = "loader"
 
 
 def input_paths(epoch_id: str, root: Path) -> dict[str, Path]:
-    """The two saved decode artifacts the detector reads."""
-    return {
-        "detector": root / f"{epoch_id}_detector.pkl",
-        "data_over_time": root
-        / f"{epoch_id}_{NON_LOCAL_THRESHOLD_PERCENT}_data_over_time.pkl",
-    }
+    """The two saved decode artifacts the detector reads (``decode_paths``)."""
+    paths = decode_paths(epoch_id, root)
+    return {"detector": paths.detector, "data_over_time": paths.data_over_time}
 
 
 NOT_ANALYSED = "not an analysed epoch in the epoch register"

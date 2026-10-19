@@ -97,6 +97,7 @@ from continuum_swr_replay.analysis.inventory_comparison.overlap import (  # noqa
     UNMATCHED,
 )
 from continuum_swr_replay.data_loaders.lfp import get_ripple_band_inputs  # noqa: E402
+from continuum_swr_replay.decoding_common import decode_paths  # noqa: E402
 from continuum_swr_replay.figure_utilities import WONG  # noqa: E402
 from continuum_swr_replay.parameters import COLORS, FIGURE_DIR  # noqa: E402
 from continuum_swr_replay.table_io import read_table  # noqa: E402
@@ -441,7 +442,7 @@ def load_epoch(identifier: str, *, run_dir: Path, memoryless_dir: Path) -> Epoch
         # h5netcdf, as the decode wrote it: the netCDF4 library fails on this
         # file once Spyglass has loaded its own HDF5
         results=xr.open_dataset(
-            runner.DECODE_ROOT / f"{identifier}_results.nc",
+            decode_paths(identifier, runner.DECODE_ROOT).results,
             engine="h5netcdf",
             cache=False,
         ),

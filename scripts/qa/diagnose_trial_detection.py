@@ -30,6 +30,7 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
 from continuum_swr_replay.data_loaders import load_data
+from continuum_swr_replay.decoding_common import decode_paths
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.types import SessionDataKeys
 
@@ -49,7 +50,7 @@ def figure_trial_sanity(
 ) -> None:
     """Plot a window of position + speed + trip boundaries for one session."""
     base = f"{animal}{day}_{epoch}_HPC"
-    dot = pd.read_pickle(PROCESSED_DATA_DIR / f"{base}_80_data_over_time.pkl")
+    dot = pd.read_pickle(decode_paths(base, PROCESSED_DATA_DIR).data_over_time)
     nwb = f"{animal}{day}_.nwb"
     data = load_data(nwb, epoch, include=frozenset({SessionDataKeys.TRIALS}))
     trials = data["trials"].sort_values("start_time").reset_index(drop=True)

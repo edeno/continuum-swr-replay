@@ -53,6 +53,7 @@ from continuum_swr_replay.analysis.hippocampus.swr_source import (
     swr_event_labels,
 )
 from continuum_swr_replay.data_loaders import load_data
+from continuum_swr_replay.decoding_common import decode_paths
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -120,7 +121,7 @@ def quantify_session(
     )
     epoch_id = swr_epoch_id(nwb_file_name, epoch_name)
     # every event of the decode frame, with its reason under the one rule
-    drops = read_artifact_event_drops(data_dir / f"{epoch_id}_80_data_over_time.pkl")
+    drops = read_artifact_event_drops(decode_paths(epoch_id, data_dir).data_over_time)
     reasons = artifact_drop_reasons(
         nl_events["start_time"].to_numpy(),
         nl_events["end_time"].to_numpy(),
