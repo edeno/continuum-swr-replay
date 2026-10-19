@@ -55,6 +55,7 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import (  # noqa:
 from continuum_swr_replay.analysis.inventory_comparison.selection import (  # noqa: E402
     REJECTION_COHORTS,
 )
+from continuum_swr_replay.decoding_common import parse_run_id  # noqa: E402
 from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
 from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
 from scripts.figures import (  # noqa: E402
@@ -526,6 +527,7 @@ def main(argv: list[str] | None = None) -> None:
     )
     parser.add_argument(
         "--run-id",
+        type=parse_run_id,
         required=True,
         help="The event features run's folder name, under "
         "replay_detection_comparison/event_features/.",

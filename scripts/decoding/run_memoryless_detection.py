@@ -183,6 +183,7 @@ from continuum_swr_replay.data_loaders.utils import (
 )
 from continuum_swr_replay.decode_files import decode_paths
 from continuum_swr_replay.decoding_common import (
+    parse_run_id,
     provenance_record,
     raise_open_file_limit,
     release_nwb_files,
@@ -1027,7 +1028,9 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="Also run decodes made another way (_all, _non_stationary, ...).",
     )
-    parser.add_argument("--run-id", help="Defaults to the commit and the seed.")
+    parser.add_argument(
+        "--run-id", type=parse_run_id, help="Defaults to the commit and the seed."
+    )
     parser.add_argument("--root", type=Path, default=PROCESSED_DATA_DIR)
     parser.add_argument("--output-root", type=Path, default=OUTPUT_ROOT)
     parser.add_argument("--cache-dir", type=Path, default=OUTPUT_ROOT / "marks_cache")

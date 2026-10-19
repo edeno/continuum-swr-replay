@@ -42,9 +42,7 @@ def test_writes_the_outputs_and_removes_the_others(tmp_path):
     paths = _paths(tmp_path)
     _previous_run(paths)
 
-    written = replace_outputs(
-        paths, {"events": _frame(), "sidecar": {"x": 1.5}, "unlisted": _frame()}
-    )
+    written = replace_outputs(paths, {"events": _frame(), "sidecar": {"x": 1.5}})
 
     assert set(written) == {"events", "sidecar"}
     for name, record in written.items():
@@ -57,7 +55,17 @@ def test_writes_the_outputs_and_removes_the_others(tmp_path):
     assert events.attrs == {"run_id": "r"}
     assert json.loads(paths["sidecar"].read_text()) == {"x": 1.5}
     assert not paths["observed"].exists()
-    assert not (tmp_path / "unlisted").exists()
+
+
+def test_an_output_not_among_the_files_is_refused_before_any_write(tmp_path):
+    """A misspelt name would drop that table without a word."""
+    paths = _paths(tmp_path)
+    _previous_run(paths)
+
+    with pytest.raises(ValueError, match=r"\['evnets'\] are not among"):
+        replace_outputs(paths, {"evnets": _frame(), "sidecar": {"x": 1.5}})
+
+    assert all(path.read_bytes() == b"an earlier run" for path in paths.values())
 
 
 def test_no_outputs_removes_every_file(tmp_path):
@@ -129,3 +137,34 @@ def test_argparse_reports_a_bad_run_id_as_a_usage_error(capsys):
         capsys.readouterr().err
     )
     assert parser.parse_args([]).run_id is None
+
+
+def test_every_run_id_option_is_checked():
+    """Every ``--…run-id`` option of a supported script names one run folder:
+    its argparse ``type`` is ``parse_run_id``, so ``../x`` cannot reach a path."""
+    import ast
+    from pathlib import Path
+
+    scripts = Path(__file__).resolve().parents[2] / "scripts"
+    skipped = (scripts / "exploratory", scripts / "figures" / "archive")
+    options, unchecked = [], []
+    for path in sorted(scripts.rglob("*.py")):
+        if any(path.is_relative_to(folder) for folder in skipped):
+            continue
+        for node in ast.walk(ast.parse(path.read_text())):
+            if not (
+                isinstance(node, ast.Call)
+                and getattr(node.func, "attr", None) == "add_argument"
+                and node.args
+                and isinstance(node.args[0], ast.Constant)
+                and str(node.args[0].value).endswith("run-id")
+            ):
+                continue
+            where = f"{path.relative_to(scripts)}:{node.lineno}"
+            options.append(where)
+            kind = {k.arg: k.value for k in node.keywords}.get("type")
+            if getattr(kind, "id", None) != "parse_run_id":
+                unchecked.append(where)
+
+    assert len(options) >= 12
+    assert unchecked == []

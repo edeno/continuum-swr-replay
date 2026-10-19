@@ -57,6 +57,7 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import (  # noqa:
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_epoch_ids,
 )
+from continuum_swr_replay.decoding_common import parse_run_id  # noqa: E402
 from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
 from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
 from continuum_swr_replay.table_io import read_table  # noqa: E402
@@ -1439,6 +1440,7 @@ def main(argv: list[str] | None = None) -> None:
     )
     parser.add_argument(
         "--run-id",
+        type=parse_run_id,
         required=True,
         help="The inventory run's folder name, under "
         "replay_detection_comparison/inventory/.",

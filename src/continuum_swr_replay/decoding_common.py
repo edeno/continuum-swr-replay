@@ -473,13 +473,26 @@ def replace_outputs(
     outputs : Mapping[str, pd.DataFrame | Mapping]
         By name in `paths`: a table, written as parquet with its ``attrs``
         (``table_io.write_table``), or any other content, written as strict
-        JSON (``write_json``). A name not in `paths` is not written.
+        JSON (``write_json``).
 
     Returns
     -------
     dict[str, dict[str, str]]
         Each written file's ``path`` and ``sha256``, by name.
+
+    Raises
+    ------
+    ValueError
+        If `outputs` names an output not in `paths` (a misspelt name would
+        otherwise drop that output without a word); nothing is written or
+        removed.
     """
+    unknown = sorted(set(outputs) - set(paths))
+    if unknown:
+        raise ValueError(
+            f"replace_outputs: outputs {unknown} are not among the epoch's files "
+            f"{sorted(paths)}; name each output as its output_paths entry does"
+        )
     written = {}
     try:
         for name, path in paths.items():
