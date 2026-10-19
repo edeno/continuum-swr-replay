@@ -33,7 +33,6 @@ from non_local_detector.model_checking.sorted_spikes import (  # noqa: E402
 )
 
 from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
-    excluded_intervals_by_session,
     require_swr_source,
 )
 from continuum_swr_replay.analysis.replay import (  # noqa: E402
@@ -254,7 +253,6 @@ def _refit_session(
         self_history_lags=N_HISTORY_LAGS,
         self_history_basis=N_HISTORY_BASIS,
         stop_covariates=(*STOP_COVARIATES, "stop_start"),
-        excluded_intervals=excluded_intervals_by_session(stops_g),
         history_window_s=longest_history_window_s(MODEL_PER_BIN_RATE.values()),
     )
     # Freeze the cohort before fitting (the fitter refuses an incomplete

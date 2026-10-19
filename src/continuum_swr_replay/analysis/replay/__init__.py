@@ -54,6 +54,7 @@ from .model_specs import (
     PerBinRateModelSpec,
 )
 from .per_bin_design import (
+    NO_EXCLUDED_TIME,
     POPULATIONS,
     aggregate_to_timebins,
     attach_is_swr_to_onsets,
@@ -110,6 +111,7 @@ __all__ = [
     "N_HISTORY_BASIS",
     "N_HISTORY_LAGS",
     "N_REWARD_LAGS",
+    "NO_EXCLUDED_TIME",
     "POPULATIONS",
     "REWARD_HISTORY_COLUMNS",
     "REWARD_HISTORY_N_BASIS",

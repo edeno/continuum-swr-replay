@@ -55,7 +55,6 @@ import pandas as pd  # noqa: E402
 
 from continuum_swr_replay.analysis.constants import OUTCOME_TIME_SEMANTICS  # noqa: E402
 from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
-    excluded_intervals_by_session,
     require_swr_source,
     swr_source_name,
 )
@@ -423,9 +422,6 @@ def fit_uncertainty_rate(
         if keys not in onset_groups:
             continue
         onsets_g = onset_groups[keys]
-        # excluded time (the artifact mask widened by 0.3 s) is not analysed:
-        # its bins, and those whose history reaches it, are not fit
-        excluded = excluded_intervals_by_session(stops_g)
         for outcome in POPULATIONS_TO_FIT:
             attempted[outcome] += 1
             design = aggregate_to_timebins(
@@ -437,7 +433,6 @@ def fit_uncertainty_rate(
                 self_history_lags=N_HISTORY_LAGS,
                 self_history_basis=N_HISTORY_BASIS,
                 stop_covariates=stop_covariates,
-                excluded_intervals=excluded,
                 history_window_s=longest_history_window_s([MU_UNCERTAINTY]),
             )
             design, gate_audit = _gate_bins_after_outcome(design)

@@ -37,7 +37,10 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     SWR_CONTRAST_RATE_S_SPECS,
     longest_history_window_s,
 )
-from continuum_swr_replay.analysis.replay.per_bin_design import aggregate_to_timebins
+from continuum_swr_replay.analysis.replay.per_bin_design import (
+    NO_EXCLUDED_TIME,
+    aggregate_to_timebins,
+)
 from continuum_swr_replay.analysis.replay.tables_stop import build_stop_table
 from continuum_swr_replay.analysis.replay.timebin_tables import (
     build_stop_timebin_table,
@@ -259,7 +262,9 @@ class TestFamilyBDesign:
 
     def test_bins_in_the_mask_and_after_it_by_the_history_window_are_dropped(self):
         stops, onsets = _design_inputs()
-        full = aggregate_to_timebins(stops, onsets, bin_s=0.5, tmax=20.0)
+        full = aggregate_to_timebins(
+            stops, onsets, bin_s=0.5, tmax=20.0, excluded_intervals=NO_EXCLUDED_TIME
+        )
 
         design = aggregate_to_timebins(
             stops,
@@ -294,7 +299,12 @@ class TestFamilyBDesign:
         shifted into place."""
         stops, onsets = _design_inputs()
         full = aggregate_to_timebins(
-            stops, onsets, bin_s=0.5, tmax=20.0, self_history_lags=2
+            stops,
+            onsets,
+            bin_s=0.5,
+            tmax=20.0,
+            self_history_lags=2,
+            excluded_intervals=NO_EXCLUDED_TIME,
         )
 
         design = aggregate_to_timebins(
@@ -315,7 +325,9 @@ class TestFamilyBDesign:
         stops, onsets = _design_inputs()
         empty = _mask_by_session().iloc[0:0]
 
-        full = aggregate_to_timebins(stops, onsets, bin_s=0.5, tmax=20.0)
+        full = aggregate_to_timebins(
+            stops, onsets, bin_s=0.5, tmax=20.0, excluded_intervals=NO_EXCLUDED_TIME
+        )
         design = aggregate_to_timebins(
             stops,
             onsets,
@@ -326,6 +338,57 @@ class TestFamilyBDesign:
         )
 
         pd.testing.assert_frame_equal(design, full)
+
+    def test_by_default_excluded_time_is_read_from_the_source(self, masked):
+        """A caller that names no mask gets its sessions' excluded time, not an
+        unmasked design."""
+        stops, onsets = _design_inputs()
+
+        design = aggregate_to_timebins(
+            stops, onsets, bin_s=0.5, tmax=20.0, history_window_s=1.0
+        )
+
+        explicit = aggregate_to_timebins(
+            stops,
+            onsets,
+            bin_s=0.5,
+            tmax=20.0,
+            excluded_intervals=_mask_by_session(),
+            history_window_s=1.0,
+        )
+        pd.testing.assert_frame_equal(design, explicit, check_exact=True)
+        assert design.attrs == explicit.attrs
+        assert design.attrs["n_bins_excluded"] == 8 + 1
+
+    def test_with_no_artifact_run_the_default_masks_nothing(self):
+        stops, onsets = _design_inputs()
+
+        design = aggregate_to_timebins(
+            stops, onsets, bin_s=0.5, tmax=20.0, history_window_s=1.0
+        )
+
+        full = aggregate_to_timebins(
+            stops, onsets, bin_s=0.5, tmax=20.0, excluded_intervals=NO_EXCLUDED_TIME
+        )
+        pd.testing.assert_frame_equal(design, full, check_exact=True)
+        assert "n_bins_excluded" not in design.attrs
+
+    def test_a_run_that_does_not_serve_the_session_raises(self, tmp_path, monkeypatch):
+        """The default never falls back to an unmasked design; the no-mask
+        sentinel still builds one."""
+        directory = write_artifact_run(
+            tmp_path / "artifacts", {"m20200101_04_r2_HPC": CORES}
+        )
+        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_ROOT", directory.parent)
+        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
+        stops, onsets = _design_inputs()
+
+        with pytest.raises(swr_source.SwrSourceError, match="not in the artifact run"):
+            aggregate_to_timebins(stops, onsets, bin_s=0.5, tmax=20.0)
+        design = aggregate_to_timebins(
+            stops, onsets, bin_s=0.5, tmax=20.0, excluded_intervals=NO_EXCLUDED_TIME
+        )
+        assert design["count"].sum() == 4
 
 
 class TestPfcFitBins:
@@ -383,13 +446,14 @@ class TestPfcFitBins:
 
 
 def test_every_rate_fit_drops_the_excluded_bins():
-    """Each runner that builds a per-bin design gives it excluded time and its
-    ladder's history window, as keywords or through a ``**`` dict literal
-    assigned in the same function."""
+    """Each runner that builds a per-bin design gives it its ladder's history
+    window, as a keyword or through a ``**`` dict literal assigned in the same
+    function, and leaves excluded time to the design, which reads it from the
+    source."""
     import ast
     from pathlib import Path
 
-    wanted = {"excluded_intervals", "history_window_s"}
+    wanted = {"history_window_s"}
     rate = Path(__file__).resolve().parents[2] / "scripts" / "rate"
     offenders, n_calls = [], 0
     for path in sorted([*rate.glob("fit_*.py"), rate / "plot_model_checking.py"]):
@@ -417,7 +481,7 @@ def test_every_rate_fit_drops_the_excluded_bins():
                 for spread in (k for k in node.keywords if k.arg is None):
                     if isinstance(spread.value, ast.Name):
                         given |= literals.get(spread.value.id, set())
-                if not wanted <= given:
+                if not wanted <= given or "excluded_intervals" in given:
                     offenders.append(f"{path.name}:{node.lineno}")
     assert n_calls >= 6
     assert offenders == []
@@ -583,7 +647,10 @@ def test_an_empty_mask_needs_no_stop_bounds():
     )
 
     pd.testing.assert_frame_equal(
-        design, aggregate_to_timebins(stops, onsets, bin_s=0.5, tmax=20.0)
+        design,
+        aggregate_to_timebins(
+            stops, onsets, bin_s=0.5, tmax=20.0, excluded_intervals=NO_EXCLUDED_TIME
+        ),
     )
     with pytest.raises(KeyError, match="stop_start"):
         aggregate_to_timebins(

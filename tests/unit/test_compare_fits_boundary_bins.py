@@ -10,6 +10,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from continuum_swr_replay.analysis.replay import per_bin_design
+
 _SPEC = importlib.util.spec_from_file_location(
     "compare_fits",
     Path(__file__).resolve().parents[2] / "scripts" / "qa" / "compare_fits.py",
@@ -44,7 +46,7 @@ def test_a_stop_with_a_bin_past_its_boundary_shifts_whatever_its_exposure(
 ):
     monkeypatch.setattr(compare_fits, "read_table", lambda path: _stops())
     monkeypatch.setattr(
-        compare_fits,
+        per_bin_design,
         "excluded_intervals_by_session",
         lambda sessions: pd.DataFrame(
             {

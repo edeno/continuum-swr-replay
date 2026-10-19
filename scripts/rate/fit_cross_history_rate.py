@@ -37,7 +37,6 @@ from statsmodels.stats.multitest import multipletests
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
-    excluded_intervals_by_session,
     require_swr_source,
     swr_source_name,
 )
@@ -105,13 +104,8 @@ HISTORY_WINDOW_S = longest_history_window_s([M_SELF, M_CROSS])
 CROSS_COEFS = [f"coef_cross_hist_rcos_{k}" for k in range(N_HISTORY_BASIS)]
 
 
-def _fit_direction(
-    stops_g, onsets_g, resp_pop, cross_pop, excluded: pd.DataFrame
-) -> dict | None:
-    """Fit M_self and M_self+cross for one session/direction; return a row.
-
-    `excluded` is the session's excluded time
-    (``swr_source.excluded_intervals_by_session``)."""
+def _fit_direction(stops_g, onsets_g, resp_pop, cross_pop) -> dict | None:
+    """Fit M_self and M_self+cross for one session/direction; return a row."""
     resp = POPULATIONS[resp_pop](onsets_g)
     cross = POPULATIONS[cross_pop](onsets_g)
     common = {
@@ -120,7 +114,6 @@ def _fit_direction(
         "reward_basis": True,
         "self_history_lags": N_HISTORY_LAGS,
         "self_history_basis": N_HISTORY_BASIS,
-        "excluded_intervals": excluded,
         "history_window_s": HISTORY_WINDOW_S,
     }
     design_self = aggregate_to_timebins(stops_g, resp, **common)
@@ -163,9 +156,8 @@ def fit_cross_history(stop_table: pd.DataFrame, onsets: pd.DataFrame) -> pd.Data
         if keys not in onset_groups:
             continue
         onsets_g = onset_groups[keys]
-        excluded = excluded_intervals_by_session(stops_g)
         for direction, (resp_pop, cross_pop) in DIRECTIONS.items():
-            r = _fit_direction(stops_g, onsets_g, resp_pop, cross_pop, excluded)
+            r = _fit_direction(stops_g, onsets_g, resp_pop, cross_pop)
             if r is not None:
                 rows.append(
                     {

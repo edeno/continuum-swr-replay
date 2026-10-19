@@ -61,9 +61,6 @@ import pandas as pd
 from patsy import dmatrix
 from scipy.stats import wilcoxon
 
-from continuum_swr_replay.analysis.hippocampus.swr_source import (
-    excluded_intervals_by_session,
-)
 from continuum_swr_replay.analysis.replay._fit_diagnostics import (
     SEPARATION_COEF_ABS,
 )
@@ -764,7 +761,6 @@ def outcome_boundary_shift_cohort(stop_path: Path) -> pd.DataFrame:
         pd.DataFrame({"stop_id": [], "t_since_stop_onset": []}),
         bin_s=BIN_S,
         tmax=TMAX,
-        excluded_intervals=excluded_intervals_by_session(stops),
         history_window_s=longest_history_window_s(MODEL_PER_BIN_RATE.values()),
     )
     last_bin = stops["stop_id"].map(bins.groupby("stop_id")["binj"].max())

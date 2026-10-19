@@ -70,7 +70,6 @@ from patsy import PatsyError  # noqa: E402
 from statsmodels.tools.sm_exceptions import PerfectSeparationError  # noqa: E402
 
 from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
-    excluded_intervals_by_session,
     require_swr_source,
     swr_source_name,
 )
@@ -412,10 +411,6 @@ def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict, 
     rows: list[dict] = []
     skips: dict = {}  # (model, population, cohort, reason) -> count
     cohort_drops: dict = {}
-    # excluded time (the artifact mask widened by 0.3 s) is not analysed: its
-    # bins, and those whose history (the ladder's longest window) reaches it,
-    # leave every rung
-    excluded = excluded_intervals_by_session(stops_g)
     designs = {
         pop: aggregate_to_timebins(
             stops_g,
@@ -426,7 +421,6 @@ def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict, 
             self_history_lags=N_HISTORY_LAGS,
             self_history_basis=N_HISTORY_BASIS,
             stop_covariates=STOP_COVARS,
-            excluded_intervals=excluded,
             history_window_s=HISTORY_WINDOW_S,
         )
         for pop in STRATA

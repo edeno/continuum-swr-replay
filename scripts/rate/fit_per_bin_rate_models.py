@@ -66,7 +66,6 @@ from concurrent.futures import ProcessPoolExecutor, as_completed  # noqa: E402
 import pandas as pd  # noqa: E402
 
 from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
-    excluded_intervals_by_session,
     require_swr_source,
     swr_source_name,
 )
@@ -180,9 +179,6 @@ def _fit_one_session(
     has_arrival_rungs = any(
         spec.time_clock == "arrival" for spec in MODEL_PER_BIN_RATE.values()
     )
-    # excluded time (the artifact mask widened by 0.3 s) is not analysed: its
-    # bins, and those whose history reaches it, leave every rung
-    excluded = excluded_intervals_by_session(stops_g)
     for outcome, selector in POPULATIONS.items():
         design = aggregate_to_timebins(
             stops_g,
@@ -193,7 +189,6 @@ def _fit_one_session(
             self_history_lags=N_HISTORY_LAGS,
             self_history_basis=N_HISTORY_BASIS,
             stop_covariates=STOP_COVARIATES,
-            excluded_intervals=excluded,
             history_window_s=HISTORY_WINDOW_S,
         )
         if design.attrs.get("n_bins_excluded") or design.attrs.get(

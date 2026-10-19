@@ -9,8 +9,8 @@ kernel back out of fitted coefficients). :func:`attach_is_swr_to_onsets` and
 ``POPULATIONS`` prepare the onset stream that supplies the response.
 
 This module is deliberately downstream of nothing but the design constants (and
-the artifact mask's interval rules): it must not import :mod:`..covariates`,
-which imports the bases from here.
+the SWR source's excluded time with the artifact mask's interval rules): it must
+not import :mod:`..covariates`, which imports the bases from here.
 """
 
 from __future__ import annotations
@@ -24,6 +24,9 @@ import pandas as pd
 from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
     overlaps_intervals,
 )
+from continuum_swr_replay.analysis.hippocampus.swr_source import (
+    excluded_intervals_by_session,
+)
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
 
 from .design_constants import (
@@ -36,6 +39,7 @@ from .design_constants import (
 )
 
 __all__ = [
+    "NO_EXCLUDED_TIME",
     "POPULATIONS",
     "aggregate_to_timebins",
     "attach_is_swr_to_onsets",
@@ -49,6 +53,19 @@ __all__ = [
 ]
 
 logger = logging.getLogger(__name__)
+
+NO_EXCLUDED_TIME = pd.DataFrame(
+    {
+        **{column: pd.Series(dtype=object) for column in SESSION_COLUMNS},
+        "start_time": pd.Series(dtype=float),
+        "end_time": pd.Series(dtype=float),
+    }
+)
+"""``excluded_intervals`` for :func:`aggregate_to_timebins` that masks nothing.
+
+For synthetic stop tables, whose sessions the SWR source does not serve. The
+default (``None``) reads each session's excluded time from the source instead.
+"""
 
 _REWARD_LAG_COLUMNS = tuple(
     f"known_reward_outcome_lag_{j}" for j in range(1, REWARD_HISTORY_N_LAGS + 1)
@@ -515,11 +532,10 @@ def aggregate_to_timebins(
     exact. The last bin's ``exposure`` is the partial remainder. A stop with no
     exposure (``immobility_duration_s <= 0``) has no bins.
 
-    Excluded time (the artifact mask widened by 0.3 s) is not analysed: with
-    `excluded_intervals`, a bin is dropped when ``[left - history_window_s,
-    left + bin]`` (its history clipped at the stop's start) touches it. The drop comes
-    last, so every kept bin's history columns are those of the design without
-    the mask.
+    Excluded time (the artifact mask widened by 0.3 s) is not analysed: a bin is
+    dropped when ``[left - history_window_s, left + bin]`` (its history clipped
+    at the stop's start) touches it. The drop comes last, so every kept bin's
+    history columns are those of the design without the mask.
 
     Parameters
     ----------
@@ -553,10 +569,13 @@ def aggregate_to_timebins(
         Extra per-stop columns carried from ``stop_table`` by ``stop_id``.
     excluded_intervals : pd.DataFrame, optional
         Each session's excluded time: ``animal``, ``session_date``,
-        ``epoch``, ``start_time`` and ``end_time`` (absolute seconds, closed),
-        as ``swr_source.excluded_intervals_by_session`` gives it. Requires
-        ``stop_start`` in ``stop_table`` when it has rows. None, or no rows,
-        masks nothing and leaves ``attrs`` without the excluded counts.
+        ``epoch``, ``start_time`` and ``end_time`` (absolute seconds, closed).
+        None (the default) reads it for ``stop_table``'s sessions from the SWR
+        source, ``swr_source.excluded_intervals_by_session(stop_table)``; with
+        no artifact run configured that has no rows. A frame with no rows (such
+        as :data:`NO_EXCLUDED_TIME`, for synthetic sessions the source does not
+        serve) masks nothing and leaves ``attrs`` without the excluded counts.
+        Requires ``stop_start`` in ``stop_table`` when it has rows.
     history_window_s : float
         Seconds the ladder's longest history covariate looks back
         (``model_specs.longest_history_window_s``); 0 drops only the bins that
@@ -577,8 +596,8 @@ def aggregate_to_timebins(
         ``time_since_last_well_arrival_s`` and ``time_since_outcome_known_s``
         (bin centre minus the absolute clock; ``NaN`` where the clock is
         ``NaN``, and negative for bins that precede the outcome boundary).
-        With `excluded_intervals`, ``attrs`` counts the bins dropped for
-        touching excluded time (``n_bins_excluded``), those dropped for their
+        When excluded time has rows, ``attrs`` counts the bins dropped for
+        touching it (``n_bins_excluded``), those dropped for their
         history window alone (``n_bins_excluded_history``) and the onsets
         those bins held (``n_onsets_in_excluded_bins``).
 
@@ -615,6 +634,12 @@ def aggregate_to_timebins(
         immobility_duration_s)``) AND land in a bin the exposure filter keeps --
         e.g. an onset at or past the end of its stop's immobility, which is
         binned into the stop's last bin but earns no exposure there.
+    KeyError
+        If excluded time has rows and ``stop_table`` has no ``stop_start``.
+    SwrSourceError
+        With the default ``excluded_intervals``, if an artifact run is
+        configured but does not serve one of ``stop_table``'s sessions (as
+        ``swr_source.artifact_intervals``).
 
     Notes
     -----
@@ -641,8 +666,10 @@ def aggregate_to_timebins(
         c in stop_table.columns
         for c in (*_OUTCOME_SHIFT_STOP_COLUMNS, *_ARRIVAL_SPAN_STOP_COLUMNS)
     )
+    if excluded_intervals is None:
+        excluded_intervals = excluded_intervals_by_session(stop_table)
     # an empty mask masks nothing, so a stop table without bounds still builds
-    mask_excluded = excluded_intervals is not None and len(excluded_intervals) > 0
+    mask_excluded = len(excluded_intervals) > 0
     if mask_excluded and "stop_start" not in stop_table.columns:
         raise KeyError("excluded_intervals needs stop_start in stop_table")
     internal_cols = list(
