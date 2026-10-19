@@ -466,7 +466,8 @@ them also contains an outcome boundary. See
 
 ## MU — the uncertainty/value model (Family B extension)
 
-`MU_uncertainty` (runner: `scripts/rate/fit_uncertainty_rate.py`, output
+`MU_uncertainty` (spec: `model_specs.MODEL_UNCERTAINTY_RATE`; runner:
+`scripts/rate/fit_uncertainty_rate.py`, output
 `models_per_bin_rate/uncertainty_rate.pkl`) is an **out-of-ladder** Family-B spec
 that asks whether replay rate tracks the animal's *behavioral-model* value and
 uncertainty beyond the time/reward/history controls. It is the M7r base

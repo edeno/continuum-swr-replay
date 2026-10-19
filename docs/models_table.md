@@ -2,9 +2,9 @@
 
 The complete set of regression models across all families, written as R
 formulas. The **single source of truth is
-`src/continuum_swr_replay/analysis/replay/model_specs.py`** (plus the per-family
-runners for the two auxiliary models that are instantiated in their runner);
-this file is the human-readable mirror. Covariate definitions live in
+`src/continuum_swr_replay/analysis/replay/model_specs.py`** (plus the runner of
+the SWR-power model, the one auxiliary model instantiated in its runner); this
+file is the human-readable mirror. Covariate definitions live in
 [covariate_dictionary.md](covariate_dictionary.md) and
 [behavior_model_covariates.md](behavior_model_covariates.md); the design
 narrative (why each rung carries what it does, and what was retired) is
@@ -26,8 +26,8 @@ Every section that mirrors an executable ladder in `model_specs.py` carries
 
 `tests/unit/test_models_table_mirrors_specs.py` parses those blocks and asserts,
 per family, that the rung set equals the executable ladder's keys. Adding a rung
-to `model_specs.py` without adding it here fails that test. Sections without a
-`rungs` block (the two auxiliary models below) have no ladder to mirror.
+to `model_specs.py` without adding it here fails that test. A section without a
+`rungs` block (the SWR-power model below) has no ladder to mirror.
 
 ## Conventions & shorthands
 
@@ -45,6 +45,8 @@ REWBASIS:= reward_history_rcos_0 + reward_history_rcos_1 + reward_history_rcos_2
                                                                   # missingness nuisance indicator
 HISTCOS := hist_rcos_0 + hist_rcos_1 + hist_rcos_2 + hist_rcos_3  # raised-cosine self-history over
                                                                   # a 10-bin (150 ms) window
+CROSSCOS:= cross_hist_rcos_0 + ... + cross_hist_rcos_3            # HISTCOS over the OTHER stream's
+                                                                  # onsets (cross-history coupling)
 ARMFE   := is_candidate_arm_0 + ... + is_candidate_arm_7          # arm 8 is reference
 RECSPL  := visit_recency_trials_event_leaf_centered_spline_{1,2,3}
            + is_candidate_arm_never_visited
@@ -244,11 +246,12 @@ complete-case cohort and makes the design rank-deficient. See
 ## MU uncertainty — per-bin Poisson (auxiliary)
 `scripts/rate/fit_uncertainty_rate.py` → `models_per_bin_rate/uncertainty_rate.pkl`
 
-One model, instantiated in the runner rather than in the shipped ladder so
-`all_models.pkl`'s schema is untouched. `M7r_time_histcos_rew` plus the curated
-value/uncertainty block:
+One model, `MODEL_UNCERTAINTY_RATE` in `model_specs.py`, kept out of the shipped
+`MODEL_PER_BIN_RATE` ladder so `all_models.pkl`'s schema is untouched.
+`M7r_time_histcos_rew` (its `parent`) plus the curated value/uncertainty block
+`MU_UNCERTAINTY_COVARIATES`:
 
-```r
+```rungs
 MU_uncertainty  count ~ BS_TC + REWBASIS + HISTCOS
                         + task_reward_probability_chosen_arm
                         + task_reward_probability_patch_mean_gap_best_vs_second
@@ -259,6 +262,21 @@ MU_uncertainty  count ~ BS_TC + REWBASIS + HISTCOS
                         + reward_belief_differential_entropy_leaf_mean_preoutcome
                         + reward_belief_mean_update_l1_all_ports_postoutcome
                         + reward_belief_mean_update_l1_alternative_patches_postoutcome
+```
+
+## Cross-history coupling — per-bin Poisson (auxiliary)
+`scripts/rate/fit_cross_history_rate.py` → `models_per_bin_rate/cross_history_models.pkl`
+(only with `--write`)
+
+`MODEL_CROSS_HISTORY_RATE` in `model_specs.py`. Fit per session in both
+directions — the non-SWR non-local rate given the with-SWR stream's history, and
+the reverse. Reward enters through the kernel only. Both rungs carry
+`parent = None`; the runner compares the pair directly (self → self + cross AIC
+drop and held-out bits per event).
+
+```rungs
+Mself       count ~ BS_TC + REWBASIS + HISTCOS
+Mselfcross  count ~ BS_TC + REWBASIS + HISTCOS + CROSSCOS
 ```
 
 ## Per-stop rate — Family A

@@ -12,9 +12,9 @@ isolates the cross contribution; the cross-history coefficients give its sign an
 timescale. The reverse direction (with-SWR rate ~ ... + non-SWR cross history) is
 fit too, so the coupling is reported both ways.
 
-Per session, per direction:
-  M_self      = bs(tc) + reward kernel + self-history (raised cosine)
-  M_selfcross = M_self + cross-history (raised cosine)
+Per session, per direction (specs: ``model_specs.MODEL_CROSS_HISTORY_RATE``):
+  Mself      = bs(tc) + reward kernel + self-history (raised cosine)
+  Mselfcross = Mself + cross-history (raised cosine)
 We report the cross-history coefficients, the self->cross AIC drop, and the
 cross cv-bits/event gain; then aggregate across sessions (median, %+, per-animal
 sign consistency, FDR Wilcoxon).
@@ -45,9 +45,7 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     N_HISTORY_BASIS,
     N_HISTORY_LAGS,
     POPULATIONS,
-    REWARD_HISTORY_N_BASIS,
     TMAX,
-    PerBinRateModelSpec,
     aggregate_to_timebins,
     attach_is_swr_to_onsets,
     cross_validate_per_bin_rate_model,
@@ -58,6 +56,7 @@ from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E
     require_covariate_schema,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
+    MODEL_CROSS_HISTORY_RATE,
     longest_history_window_s,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
@@ -75,29 +74,8 @@ DIRECTIONS = {
     "SWR_from_nonSWR": ("non_local_swr", "non_local_no_swr"),
 }
 
-
-def _spec(name: str, *, cross: bool) -> PerBinRateModelSpec:
-    """M_self (cross=False) or M_self+cross (cross=True). Reward via the kernel
-    only (no reward_rate stop covariate), so the design needs no regenerated
-    stop covariate and builds on the current tables."""
-    return PerBinRateModelSpec(
-        name=name,
-        time_spline=True,
-        reward_basis=REWARD_HISTORY_N_BASIS,
-        reward_rate=False,
-        self_history_lags=N_HISTORY_LAGS,
-        switch=False,
-        reward_time_interaction=False,
-        description="non-local cross-history coupling",
-        parent=None,
-        self_history_basis=N_HISTORY_BASIS,
-        cross_history_lags=N_HISTORY_LAGS if cross else 0,
-        cross_history_basis=N_HISTORY_BASIS if cross else 0,
-    )
-
-
-M_SELF = _spec("Mself", cross=False)
-M_CROSS = _spec("Mselfcross", cross=True)
+M_SELF = MODEL_CROSS_HISTORY_RATE["Mself"]
+M_CROSS = MODEL_CROSS_HISTORY_RATE["Mselfcross"]
 # Both designs drop the bins whose longest history window (self or cross)
 # touches excluded time, so the two are fit to the same bins.
 HISTORY_WINDOW_S = longest_history_window_s([M_SELF, M_CROSS])

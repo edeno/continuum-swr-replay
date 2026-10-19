@@ -62,6 +62,7 @@ __all__ = [
     "BIN_S",
     "BELIEF_DEPENDENT_CONTENT_MODELS",
     "MODEL_CHOICE",
+    "MODEL_CROSS_HISTORY_RATE",
     "MODEL_HIERARCHY",
     "MODEL_HIERARCHY_MUA",
     "MODEL_HIERARCHY_SWR",
@@ -71,6 +72,11 @@ __all__ = [
     "MODEL_PATCH_SWR",
     "MODEL_PER_BIN_RATE",
     "MODEL_PER_STOP_RATE",
+    "MODEL_UNCERTAINTY_RATE",
+    "MU_UNCERTAINTY_COVARIATES",
+    "MU_UNCERTAINTY_CURATED_COVARIATES",
+    "MU_UNCERTAINTY_MODEL_VALUE_COVARIATES",
+    "MU_UNCERTAINTY_RL_COVARIATES",
     "ModelSpec",
     "N_HISTORY_BASIS",
     "N_HISTORY_LAGS",
@@ -592,7 +598,7 @@ class PerBinRateModelSpec:
     cross_history_lags: int = 0
     cross_history_basis: int = 0
     # Extra per-stop covariates appended to the formula as plain linear terms
-    # (e.g. the uncertainty/value block instantiated in the runner). Default
+    # (e.g. the ``MU_uncertainty`` uncertainty/value block). Default
     # ``()`` so the shipped ``MODEL_PER_BIN_RATE`` ladder is byte-identical and
     # the persisted ``all_models.pkl`` schema is unchanged. These names must be
     # carried into the per-bin design via ``aggregate_to_timebins``'
@@ -812,6 +818,105 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
         self_history_basis=N_HISTORY_BASIS,
         time_clock="arrival",
     ),
+}
+
+
+# ── Auxiliary per-bin rate models ──
+#
+# Fit by their own runners and persisted in their own bundles, never in
+# ``MODEL_PER_BIN_RATE`` / ``all_models.pkl`` (whose schema they would change).
+
+# MU uncertainty (``scripts/rate/fit_uncertainty_rate.py`` ->
+# ``uncertainty_rate.pkl``): M7r plus the curated uncertainty/value block, so
+# the block is tested beyond the time course, self-history and reward kernel.
+#
+# Nominal / model-free block (per-unit; these covariates are O(1) and are the
+# task schedule + raw behavior, NOT the behavioral model). We prefer the real
+# model over stand-ins, so the leaky-Q comparison is replaced by the model DeltaV
+# and nominal-RPE stand-ins by the model's canonical RPE below.
+# task_reward_probability_patch_mean_gap_best_vs_second is
+# KEPT: it is the nominal best-minus-second patch value from the schedule and is
+# orthogonal to the model DeltaV (r=-0.04), so it carries independent information
+# (an earlier drop assuming redundancy was wrong). Excluded for collinearity:
+# wsls_deviation (r=-0.70 with rpe), omission_streak (r=-0.66 with known_reward_outcome_lag_1).
+MU_UNCERTAINTY_CURATED_COVARIATES = (
+    "task_reward_probability_chosen_arm",
+    "task_reward_probability_patch_mean_gap_best_vs_second",
+    "patch_switch_fraction_last5_completed_trips",
+    "trials_since_block_change",
+)
+
+# Real behavioral-model reward-prediction error, used instead of the retired
+# nominal-RPE stand-in (the two had r=0.71, so the model version matters).
+# q_chosen (model chosen-port value) is deliberately NOT fit: it is r=0.90
+# collinear with the DeltaV decision variable (switch_advantage), which carries
+# the model's value signal here. O(1) scale, so per-unit like the nominal block.
+MU_UNCERTAINTY_MODEL_VALUE_COVARIATES = (
+    "rpe_postoutcome",  # reward - chosen-arm pre-outcome belief
+)
+
+# Real SpatialBanditTask decision variables (qvals_table.pkl, beta_stable_withleaf;
+# see docs/behavior_model_covariates.md). The paper's covariates: DeltaV, belief
+# entropy, absolute value-update magnitudes. The runner z-scores them
+# (disparate/tiny scale) -> per-SD rate ratios.
+MU_UNCERTAINTY_RL_COVARIATES = (
+    "relative_value_switch_minus_stay_preoutcome",  # DeltaV = Switch - Stay value
+    "reward_belief_differential_entropy_leaf_mean_preoutcome",  # belief uncertainty (mean per-leaf Beta differential entropy)
+    "reward_belief_mean_update_l1_all_ports_postoutcome",  # |value update| summed over all ports
+    "reward_belief_mean_update_l1_alternative_patches_postoutcome",  # |update| over alternative patches
+)
+
+# What the model actually fits + reports (nominal + model value + RL DVs).
+MU_UNCERTAINTY_COVARIATES = (
+    *MU_UNCERTAINTY_CURATED_COVARIATES,
+    *MU_UNCERTAINTY_MODEL_VALUE_COVARIATES,
+    *MU_UNCERTAINTY_RL_COVARIATES,
+)
+
+MODEL_UNCERTAINTY_RATE: dict[str, PerBinRateModelSpec] = {
+    "MU_uncertainty": PerBinRateModelSpec(
+        name="MU_uncertainty",
+        time_spline=True,
+        reward_basis=REWARD_HISTORY_N_BASIS,
+        reward_rate=False,
+        self_history_lags=N_HISTORY_LAGS,
+        switch=False,  # recent_switch_rate carries the switch signal
+        reward_time_interaction=False,
+        description="curated uncertainty/value beyond time/reward/history",
+        parent="M7r_time_histcos_rew",
+        self_history_basis=N_HISTORY_BASIS,
+        extra_covariates=MU_UNCERTAINTY_COVARIATES,
+    ),
+}
+
+
+# Cross-history coupling (``scripts/rate/fit_cross_history_rate.py``): does one
+# non-local stream's recent history drive the other's rate? ``Mself`` is the
+# time spline + reward kernel + self-history; ``Mselfcross`` adds the other
+# stream's raised-cosine cross-history. Reward enters via the kernel only (no
+# reward_rate stop covariate), so the design needs no regenerated stop
+# covariate and builds on the current tables. The pair is compared by its
+# runner on two designs (self vs self+cross), not by ``parent``.
+def _cross_history_spec(name: str, *, cross: bool) -> PerBinRateModelSpec:
+    return PerBinRateModelSpec(
+        name=name,
+        time_spline=True,
+        reward_basis=REWARD_HISTORY_N_BASIS,
+        reward_rate=False,
+        self_history_lags=N_HISTORY_LAGS,
+        switch=False,
+        reward_time_interaction=False,
+        description="non-local cross-history coupling",
+        parent=None,
+        self_history_basis=N_HISTORY_BASIS,
+        cross_history_lags=N_HISTORY_LAGS if cross else 0,
+        cross_history_basis=N_HISTORY_BASIS if cross else 0,
+    )
+
+
+MODEL_CROSS_HISTORY_RATE: dict[str, PerBinRateModelSpec] = {
+    "Mself": _cross_history_spec("Mself", cross=False),
+    "Mselfcross": _cross_history_spec("Mselfcross", cross=True),
 }
 
 

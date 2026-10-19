@@ -20,8 +20,9 @@ physical response bins whose left edge is at or after ``outcome_known_time``
 the collapsed task visit's final departure, for omissions).
 Per population in ``{swr, non_local_swr, non_local_no_swr}`` build the per-bin
 design (carrying the uncertainty + value covariates as ``stop_covariates``) and
-fit a single spec -- ``MU_uncertainty`` -- instantiated HERE (not added to
-``MODEL_PER_BIN_RATE`` / ``all_models.pkl``). The spec is M7r (time spline +
+fit a single spec -- ``MU_uncertainty``, defined in
+``model_specs.MODEL_UNCERTAINTY_RATE`` (not in ``MODEL_PER_BIN_RATE`` /
+``all_models.pkl``). The spec is M7r (time spline +
 raised-cosine self-history + reward kernel + reward rate) plus the
 uncertainty/value block, so the block is tested *beyond* those confounds.
 
@@ -62,10 +63,8 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     BIN_S,
     N_HISTORY_BASIS,
     N_HISTORY_LAGS,
-    REWARD_HISTORY_N_BASIS,
     STOP_COVARIATES,
     TMAX,
-    PerBinRateModelSpec,
     add_uncertainty_covariates,
     aggregate_to_timebins,
     attach_is_swr_to_onsets,
@@ -97,7 +96,14 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
     write_fit_provenance,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
+    MODEL_UNCERTAINTY_RATE,
     longest_history_window_s,
+)
+from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
+    MU_UNCERTAINTY_COVARIATES as FITTED_COVARIATES,
+)
+from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
+    MU_UNCERTAINTY_RL_COVARIATES as RL_COVARIATES,
 )
 from continuum_swr_replay.analysis.replay.per_bin_design import (  # noqa: E402
     POPULATIONS,
@@ -145,47 +151,8 @@ VALUE_COVARIATES = (
     "trials_since_block_change",
 )
 
-# Nominal / model-free block (per-unit; these covariates are O(1) and are the
-# task schedule + raw behavior, NOT the behavioral model). We prefer the real
-# model over stand-ins, so the leaky-Q comparison is replaced by the model DeltaV
-# and nominal-RPE stand-ins by the model's canonical RPE below.
-# task_reward_probability_patch_mean_gap_best_vs_second is
-# KEPT: it is the nominal best-minus-second patch value from the schedule and is
-# orthogonal to the model DeltaV (r=-0.04), so it carries independent information
-# (an earlier drop assuming redundancy was wrong). Excluded for collinearity:
-# wsls_deviation (r=-0.70 with rpe), omission_streak (r=-0.66 with known_reward_outcome_lag_1).
-CURATED_COVARIATES = (
-    "task_reward_probability_chosen_arm",
-    "task_reward_probability_patch_mean_gap_best_vs_second",
-    "patch_switch_fraction_last5_completed_trips",
-    "trials_since_block_change",
-)
-
-# Real behavioral-model reward-prediction error, used instead of the retired
-# nominal-RPE stand-in (the two had r=0.71, so the model version matters).
-# q_chosen (model chosen-port value) is deliberately NOT fit: it is r=0.90
-# collinear with the DeltaV decision variable (switch_advantage), which carries
-# the model's value signal here. O(1) scale, so per-unit like the nominal block.
-MODEL_VALUE_COVARIATES = (
-    "rpe_postoutcome",  # reward - chosen-arm pre-outcome belief
-)
-
-# Real SpatialBanditTask decision variables (qvals_table.pkl, beta_stable_withleaf;
-# see docs/behavior_model_covariates.md). The paper's covariates: DeltaV, belief
-# entropy, absolute value-update magnitudes. z-scored below (disparate/tiny scale)
-# -> per-SD rate ratios.
-RL_COVARIATES = (
-    "relative_value_switch_minus_stay_preoutcome",  # DeltaV = Switch - Stay value
-    "reward_belief_differential_entropy_leaf_mean_preoutcome",  # belief uncertainty (mean per-leaf Beta differential entropy)
-    "reward_belief_mean_update_l1_all_ports_postoutcome",  # |value update| summed over all ports
-    "reward_belief_mean_update_l1_alternative_patches_postoutcome",  # |update| over alternative patches
-)
-
 # Fit-cohort standardization support: the moments are the fitted rows' own.
 FIT_SUPPORT_LABEL = "fit_cohort_all_rows"
-
-# What the model actually fits + reports (nominal + model value + RL DVs).
-FITTED_COVARIATES = (*CURATED_COVARIATES, *MODEL_VALUE_COVARIATES, *RL_COVARIATES)
 
 # The three non-local-vs-SWR populations to dissociate (pooled non_local is the
 # null and is not fit here).
@@ -193,21 +160,7 @@ POPULATIONS_TO_FIT = ("swr", "non_local_swr", "non_local_no_swr")
 
 POST_OUTCOME_GATE_RULE = "stop_start + binj * BIN_S >= outcome_known_time"
 
-# M7r + the curated uncertainty/value block, instantiated in the runner so the
-# shipped MODEL_PER_BIN_RATE ladder / all_models.pkl schema is untouched.
-MU_UNCERTAINTY = PerBinRateModelSpec(
-    name="MU_uncertainty",
-    time_spline=True,
-    reward_basis=REWARD_HISTORY_N_BASIS,
-    reward_rate=False,
-    self_history_lags=N_HISTORY_LAGS,
-    switch=False,  # recent_switch_rate carries the switch signal
-    reward_time_interaction=False,
-    description="curated uncertainty/value beyond time/reward/history",
-    parent="M7r_time_histcos_rew",
-    self_history_basis=N_HISTORY_BASIS,
-    extra_covariates=FITTED_COVARIATES,
-)
+MU_UNCERTAINTY = MODEL_UNCERTAINTY_RATE["MU_uncertainty"]
 
 
 def _drop_first_session_per_animal(stop_table: pd.DataFrame) -> pd.DataFrame:

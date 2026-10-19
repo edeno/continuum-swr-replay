@@ -40,11 +40,15 @@ import matplotlib.pyplot as plt  # noqa: E402
 from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
     require_fresh_inputs,
 )
+from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
+    MU_UNCERTAINTY_CURATED_COVARIATES,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
 
-# Single source of truth: the curated covariate set + populations are defined in
-# the fitter; import them so the plot axes match exactly what was fit.
+# Single source of truth: the curated covariate set is part of the MU_uncertainty
+# spec in model_specs and the populations are defined in the fitter; import them
+# so the plot axes match exactly what was fit.
 _FIT_SPEC = importlib.util.spec_from_file_location(
     "fit_uncertainty_rate",
     Path(__file__).resolve().with_name("fit_uncertainty_rate.py"),
@@ -58,7 +62,7 @@ UNCERTAINTY_RATE_INPUTS = _fit.FIT_INPUTS
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
 
-COVARIATES = _fit.CURATED_COVARIATES
+COVARIATES = MU_UNCERTAINTY_CURATED_COVARIATES
 
 
 def _paired_wilcoxon(

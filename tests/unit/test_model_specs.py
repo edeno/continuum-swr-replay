@@ -25,7 +25,18 @@ from continuum_swr_replay.analysis.replay.contrast_aggregation import (
 )
 from continuum_swr_replay.analysis.replay.per_bin_rate_model import _design_columns
 
-RETIRED_PREDICTORS = ("known_reward_outcome_lag_", "reward_fraction_last10_known_trials")
+RETIRED_PREDICTORS = (
+    "known_reward_outcome_lag_",
+    "reward_fraction_last10_known_trials",
+)
+
+# Every per-bin spec this module ships: the Family B ladder and the auxiliary
+# per-bin models fit by their own runners.
+ALL_PER_BIN_SPECS = {
+    **ms.MODEL_PER_BIN_RATE,
+    **ms.MODEL_UNCERTAINTY_RATE,
+    **ms.MODEL_CROSS_HISTORY_RATE,
+}
 
 
 def _all_shipped_formulas() -> dict[str, str]:
@@ -34,7 +45,7 @@ def _all_shipped_formulas() -> dict[str, str]:
         name: " + ".join(spec.predictors)
         for name, spec in ms.MODEL_PER_STOP_RATE.items()
     }
-    out.update({name: spec.formula() for name, spec in ms.MODEL_PER_BIN_RATE.items()})
+    out.update({name: spec.formula() for name, spec in ALL_PER_BIN_SPECS.items()})
     out.update({n: f for n, (f, _) in ms.SWR_CONTRAST_RATE_G_SPECS.items()})
     out.update({n: f for n, (f, _) in ms.SWR_CONTRAST_RATE_S_SPECS.items()})
     return out
@@ -49,13 +60,9 @@ def test_no_shipped_rate_spec_uses_the_retired_reward_encodings() -> None:
 def test_no_shipped_need_list_asks_for_the_retired_reward_encodings() -> None:
     ladders = (ms.SWR_CONTRAST_RATE_G_SPECS, ms.SWR_CONTRAST_RATE_S_SPECS)
     need_lists = {n: need for lad in ladders for n, (_, need) in lad.items()}
-    need_lists.update(
-        {n: _design_columns(s) for n, s in ms.MODEL_PER_BIN_RATE.items()}
-    )
+    need_lists.update({n: _design_columns(s) for n, s in ALL_PER_BIN_SPECS.items()})
     need_lists["STOP_COVARIATES"] = list(ms.STOP_COVARIATES)
-    need_lists["SWR_CONTRAST_RATE_STOP_COVARS"] = list(
-        ms.SWR_CONTRAST_RATE_STOP_COVARS
-    )
+    need_lists["SWR_CONTRAST_RATE_STOP_COVARS"] = list(ms.SWR_CONTRAST_RATE_STOP_COVARS)
     for name, need in need_lists.items():
         for col in need:
             for retired in RETIRED_PREDICTORS:
@@ -73,9 +80,7 @@ def test_per_stop_ladder_is_the_null_plus_the_basis_rung() -> None:
 
 
 def test_per_bin_ladder_reward_rungs_carry_the_basis() -> None:
-    basis_terms = " + ".join(
-        [*ms.REWARD_HISTORY_COLUMNS, ms.REWARD_HISTORY_INCOMPLETE]
-    )
+    basis_terms = " + ".join([*ms.REWARD_HISTORY_COLUMNS, ms.REWARD_HISTORY_INCOMPLETE])
     reward_rungs = {
         "M1_rew": "M0_const",
         "M7r_time_histcos_rew": "M6r_time_histcos",
@@ -108,6 +113,31 @@ def test_the_reward_block_has_a_time_plus_self_history_null() -> None:
     assert [t for t in m7r_terms if t not in reward_terms] == m6r_terms
 
 
+def _rhs_terms(spec: ms.PerBinRateModelSpec) -> list[str]:
+    return [t.strip() for t in re.split(r"\+(?![^(]*\))", spec.formula().split("~")[1])]
+
+
+def test_mu_uncertainty_is_m7r_plus_the_uncertainty_block() -> None:
+    mu = ms.MODEL_UNCERTAINTY_RATE["MU_uncertainty"]
+    m7r = ms.MODEL_PER_BIN_RATE[mu.parent]
+    assert mu.parent == "M7r_time_histcos_rew"
+    assert _rhs_terms(mu) == [*_rhs_terms(m7r), *ms.MU_UNCERTAINTY_COVARIATES]
+    assert ms.MU_UNCERTAINTY_COVARIATES == (
+        *ms.MU_UNCERTAINTY_CURATED_COVARIATES,
+        *ms.MU_UNCERTAINTY_MODEL_VALUE_COVARIATES,
+        *ms.MU_UNCERTAINTY_RL_COVARIATES,
+    )
+
+
+def test_cross_history_pair_differs_only_by_the_cross_basis() -> None:
+    self_only = ms.MODEL_CROSS_HISTORY_RATE["Mself"]
+    with_cross = ms.MODEL_CROSS_HISTORY_RATE["Mselfcross"]
+    cross_terms = [f"cross_hist_rcos_{k}" for k in range(ms.N_HISTORY_BASIS)]
+    assert _rhs_terms(with_cross) == [*_rhs_terms(self_only), *cross_terms]
+    # Same self-history window, so one history window serves both designs.
+    assert with_cross.cross_history_lags == self_only.self_history_lags
+
+
 def test_reward_time_interaction_uses_the_immediate_component() -> None:
     formula = ms.MODEL_PER_BIN_RATE["M9r_rew_x_time"].formula()
     assert f"{ms.REWARD_HISTORY_COLUMNS[0]}:{ms._SPLINE}" in formula
@@ -115,7 +145,7 @@ def test_reward_time_interaction_uses_the_immediate_component() -> None:
 
 def test_every_per_bin_formula_term_resolves_through_design_columns() -> None:
     """Each formula term is a column the fitter requests (``tc`` via the spline)."""
-    for name, spec in ms.MODEL_PER_BIN_RATE.items():
+    for name, spec in ALL_PER_BIN_SPECS.items():
         cols = set(_design_columns(spec))
         assert "count" in cols
         rhs = spec.formula().split("~", 1)[1]

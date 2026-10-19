@@ -38,6 +38,12 @@ _FENCE_ANY = re.compile(r"^```")
 # Heading text -> the executable rung names that heading must enumerate.
 EXPECTED: dict[str, frozenset[str]] = {
     "Per-bin rate — Family B": frozenset(specs.MODEL_PER_BIN_RATE),
+    "MU uncertainty — per-bin Poisson (auxiliary)": frozenset(
+        specs.MODEL_UNCERTAINTY_RATE
+    ),
+    "Cross-history coupling — per-bin Poisson (auxiliary)": frozenset(
+        specs.MODEL_CROSS_HISTORY_RATE
+    ),
     "Per-stop rate — Family A": frozenset(specs.MODEL_PER_STOP_RATE),
     "Content — arm": frozenset(specs.MODEL_HIERARCHY),
     "Content — patch": frozenset(specs.MODEL_PATCH),

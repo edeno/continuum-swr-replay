@@ -22,6 +22,9 @@ from continuum_swr_replay.analysis.replay.covariates import (
     canonical_port_value_history,
     canonical_trial_switch_history,
 )
+from continuum_swr_replay.analysis.replay.model_specs import (
+    MU_UNCERTAINTY_CURATED_COVARIATES,
+)
 from continuum_swr_replay.session_keys import subset_max_per_animal
 from continuum_swr_replay.table_io import read_table, table_exists
 
@@ -992,9 +995,9 @@ def test_runner_smoke():
     assert len(models) > 0
     assert set(models["outcome"]).issubset(set(fur.POPULATIONS_TO_FIT))
     # every curated uncertainty/value covariate the model fits has a
-    # coefficient/RR column (CURATED_COVARIATES is the set actually fit; it
-    # supersets VALUE_COVARIATES).
-    for cov in fur.CURATED_COVARIATES:
+    # coefficient/RR column (MU_UNCERTAINTY_CURATED_COVARIATES is the set
+    # actually fit; it supersets VALUE_COVARIATES).
+    for cov in MU_UNCERTAINTY_CURATED_COVARIATES:
         assert f"coef_{cov}" in models.columns
         assert f"rr_{cov}" in models.columns
     # reward-history basis is also present (the controlled-for block).
