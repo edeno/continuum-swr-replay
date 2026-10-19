@@ -1,6 +1,6 @@
 # Cross-cutting simplification and the two behaviour changes
 
-Status: in progress (branch `simplify-repo-2026-10-19`, started from e70ab12).
+Status: complete 2026-10-19 — tasks 1–9 + final review fix wave on branch `simplify-repo-2026-10-19` (e70ab12..2b38381); not merged to master (awaiting the lead). Ledger: ledger.md; final review: final-review.md; code-organization review: ../../reviews/2026-10-19-code-organization-review.md.
 
 Source: the 2026-10-19 `/simplify` whole-repo review (reuse, simplification,
 efficiency, altitude agents). The local, behaviour-preserving fixes landed in
