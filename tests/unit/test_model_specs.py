@@ -32,11 +32,19 @@ RETIRED_PREDICTORS = (
 
 # Every per-bin spec this module ships: the Family B ladder and the auxiliary
 # per-bin models fit by their own runners.
+PER_BIN_LADDERS = (
+    ms.MODEL_PER_BIN_RATE,
+    ms.MODEL_UNCERTAINTY_RATE,
+    ms.MODEL_CROSS_HISTORY_RATE,
+)
 ALL_PER_BIN_SPECS = {
-    **ms.MODEL_PER_BIN_RATE,
-    **ms.MODEL_UNCERTAINTY_RATE,
-    **ms.MODEL_CROSS_HISTORY_RATE,
+    name: spec for ladder in PER_BIN_LADDERS for name, spec in ladder.items()
 }
+
+
+def test_the_per_bin_ladders_share_no_rung_name() -> None:
+    """Merging them into ``ALL_PER_BIN_SPECS`` must drop no rung."""
+    assert len(ALL_PER_BIN_SPECS) == sum(len(ladder) for ladder in PER_BIN_LADDERS)
 
 
 def _all_shipped_formulas() -> dict[str, str]:

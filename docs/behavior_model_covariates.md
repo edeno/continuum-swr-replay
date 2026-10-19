@@ -147,7 +147,7 @@ citing the paper for "uncertainty" should say which of the two it means.
 | `reward_belief_variance_chosen_arm_preoutcome` | variance of the chosen port |
 | `prev_local_variance` | upstream diagnostic retained under its native, insufficiently documented name; outside the v1 fitted vocabulary |
 | `reward_belief_variance_leaf_sum_preoutcome` | sum of the six port variances; canonicalized from the numerically duplicate global-variance paths |
-| `upcoming_leaf_variance`, `next_choice_variance` | uncertainty about the upcoming choice — **look-ahead**: both use trial `t+1` (sourced from the upstream DataJoint `BehaviorModelResults`, not recomputed here). They **are** exported (listed in `COVARIATES`, present in `qvals_table.parquet`) but are **never fitted** (not in `fit_uncertainty_rate.RL_COVARIATES`); do not use them as contemporaneous stop-time covariates for a replay event at trial `t`. The repo's own session-safe analogues are the `_sess` variants. |
+| `upcoming_leaf_variance`, `next_choice_variance` | uncertainty about the upcoming choice — **look-ahead**: both use trial `t+1` (sourced from the upstream DataJoint `BehaviorModelResults`, not recomputed here). They **are** exported (listed in `COVARIATES`, present in `qvals_table.parquet`) but are **never fitted** (not in `model_specs.MU_UNCERTAINTY_RL_COVARIATES`); do not use them as contemporaneous stop-time covariates for a replay event at trial `t`. The repo's own session-safe analogues are the `_sess` variants. |
 
 ### Belief entropy (beta — the outcome-uncertainty covariate)
 | Column | Meaning |

@@ -1,7 +1,7 @@
 """Model definitions for replay content analysis.
 
-Single source of truth for the four model families, each a dict of
-:class:`ModelSpec`:
+Single source of truth for every model family, each a dict of
+:class:`ModelSpec` (or :class:`PerBinRateModelSpec`):
 
 - ``MODEL_HIERARCHY`` (+ ``_SWR`` / ``_MUA``) — arm-level nested
   hierarchy, conditional Poisson on per-arm timebin counts.
@@ -9,8 +9,13 @@ Single source of truth for the four model families, each a dict of
   conditional Poisson (9 arms collapsed to 3 patches).
 - ``MODEL_PER_STOP_RATE`` — ordinary Poisson on per-stop event counts
   (different estimator; see its section below).
+- ``MODEL_PER_BIN_RATE`` — the per-bin conditional-intensity ladder, with
+  the auxiliary per-bin models ``MODEL_UNCERTAINTY_RATE`` and
+  ``MODEL_CROSS_HISTORY_RATE`` fit by their own runners.
 - ``MODEL_CHOICE`` — conditional logit on the animal's next-arm
   choice (different estimator again).
+
+The ``is_swr``-contrast ladders (``SWR_CONTRAST_*``) are defined here too.
 
 Defining constraint for the conditional-Poisson **arm and patch**
 hierarchies: only arm-varying predictors are identifiable — event-level

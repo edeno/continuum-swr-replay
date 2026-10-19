@@ -120,6 +120,7 @@ themselves are in
 |---|---|---|---|---|---|---|
 | Per-bin rate (B) | Poisson GLM | shipped | `count` (onsets per 15 ms bin) | log | `log(exposure)` | per session × population {swr, non_local_swr, non_local_no_swr} |
 | MU uncertainty | Poisson GLM | shipped (auxiliary) | `count` | log | `log(exposure)` | per session × 3 populations |
+| Cross-history | Poisson GLM | auxiliary (written only with `--write`) | `count` (the target stream's onsets per bin) | log | `log(exposure)` | per session × direction {non-SWR ← with-SWR history, with-SWR ← non-SWR history} |
 | Per-stop rate (A) | Poisson GLM | shipped | `n_selected_events` per stop | log | `log(immobility_duration_s)` | per session |
 | Content arm | conditional Poisson over 9 arms/event ≡ `clogit(…, strata(event_id))` | **shipped** | `arm_fraction` (per-event allocation fraction) | log | — | per session × `is_swr` split {all, T, F}; SEs event-clustered |
 | Content patch | conditional Poisson over 3 patches/event | **shipped** | `patch_fraction` | log | — | per session × {all, T, F}; SEs event-clustered |

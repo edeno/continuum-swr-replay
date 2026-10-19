@@ -8,9 +8,9 @@ a smooth low-dimensional parameterization (plus the inverse, used to read a
 kernel back out of fitted coefficients). :func:`attach_is_swr_to_onsets` and
 ``POPULATIONS`` prepare the onset stream that supplies the response.
 
-This module is deliberately downstream of nothing but the design constants (and
-the SWR source's excluded time with the artifact mask's interval rules): it must
-not import :mod:`..covariates`, which imports the bases from here.
+Its imports are the design constants, the SWR source (for each session's
+excluded time) and the artifact mask's interval rule. It must not import
+:mod:`..covariates`, which imports the bases from here.
 """
 
 from __future__ import annotations
@@ -65,6 +65,9 @@ NO_EXCLUDED_TIME = pd.DataFrame(
 
 For synthetic stop tables, whose sessions the SWR source does not serve. The
 default (``None``) reads each session's excluded time from the source instead.
+
+One frame shared by every caller: do not mutate it (add rows, columns or
+``attrs``). Pass it as it is, or pass a copy you change.
 """
 
 _REWARD_LAG_COLUMNS = tuple(

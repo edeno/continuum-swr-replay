@@ -97,13 +97,9 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
 )
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     MODEL_UNCERTAINTY_RATE,
+    MU_UNCERTAINTY_COVARIATES,
+    MU_UNCERTAINTY_RL_COVARIATES,
     longest_history_window_s,
-)
-from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
-    MU_UNCERTAINTY_COVARIATES as FITTED_COVARIATES,
-)
-from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
-    MU_UNCERTAINTY_RL_COVARIATES as RL_COVARIATES,
 )
 from continuum_swr_replay.analysis.replay.per_bin_design import (  # noqa: E402
     POPULATIONS,
@@ -123,6 +119,10 @@ from continuum_swr_replay.session_keys import (  # noqa: E402
     subset_max_per_animal,
 )
 from continuum_swr_replay.table_io import read_table  # noqa: E402
+
+# This runner's names for the model_specs blocks it fits and standardizes.
+FITTED_COVARIATES = MU_UNCERTAINTY_COVARIATES
+RL_COVARIATES = MU_UNCERTAINTY_RL_COVARIATES
 
 # separated history coefs legitimately overflow exp(); convergence/separation are
 # recorded per fit as flags in per_bin_rate_model (analysis.replay._fit_diagnostics),

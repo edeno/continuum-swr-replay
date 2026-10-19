@@ -2,7 +2,13 @@
 
 Analysis scripts grouped by domain. Run from the repo root, e.g.
 `uv run python scripts/rate/fit_per_bin_rate_models.py`. Scripts import the package
-(`continuum_swr_replay`) and read/write `Processed-Data/`; they do not import each other.
+(`continuum_swr_replay`) and read/write `Processed-Data/`. Shared code belongs in the
+package, so a script does not import another script, with two documented exceptions:
+the `_`-prefixed shared modules (`decoding/_decode_runner.py`, `qa/_report.py`), which
+exist to be imported, and the existing `from scripts.… import …` lines, by which a
+report, figure or QA script reuses another script's constants, output paths and helpers
+(usually those of the runner whose output it reads). Run from the repo root so
+`scripts` is importable.
 
 ## `decoding/` — produce the decoded data + event/stop tables
 - `run_decoding_bandit.py` — continuum decoding for the bandit task (HPC/mPFC/OFC).
