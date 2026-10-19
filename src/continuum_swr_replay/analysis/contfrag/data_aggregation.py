@@ -112,9 +112,7 @@ def get_contfrag_data_over_time(
     )
 
     # SWR vs MUA overlap
-    swr_mua_times, swr_no_mua_times = get_overlap_times(
-        swr_times, mua_times
-    )
+    swr_mua_times, swr_no_mua_times = get_overlap_times(swr_times, mua_times)
 
     # Posterior stats on the full posterior
     (
@@ -153,9 +151,9 @@ def get_contfrag_data_over_time(
         # ``position_info.index`` when packed into the DataFrame
         # below, silently introducing NaNs whenever the two axes
         # differ by epsilon despite identical lengths.
-        return (
-            series.reindex(results.time, method="nearest", tolerance=0.004).to_numpy()
-        )
+        return series.reindex(
+            results.time, method="nearest", tolerance=0.004
+        ).to_numpy()
 
     data_over_time = pd.DataFrame(
         {
@@ -181,9 +179,7 @@ def get_contfrag_data_over_time(
                 _nearest(data["theta_power"].squeeze()).squeeze()
             ),
             "SWR_zscore": _nearest(data["zscored_ripple_consensus_trace"]).squeeze(),
-            "MUA_zscore": _nearest(
-                data["multiunit_rate_zscore"][brain_area].squeeze()
-            ),
+            "MUA_zscore": _nearest(data["multiunit_rate_zscore"][brain_area].squeeze()),
             "n_SWR": len(swr_times),
             "n_MUA": len(mua_times),
             "n_SWR_MUA": len(swr_mua_times),

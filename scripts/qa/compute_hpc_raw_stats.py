@@ -62,6 +62,7 @@ def _load_detector(epoch_identifier: str):
         return None
     # Local import to keep module import cheap when --help is requested
     from non_local_detector import NonLocalClusterlessDetector
+
     try:
         return NonLocalClusterlessDetector.load_model(path)
     except Exception as exc:  # noqa: BLE001
@@ -82,11 +83,12 @@ def _compute_one_session(
 
     try:
         data = load_data(
-            nwb_file_name, epoch_name, include=DataLoadingPreset.MINIMAL,
+            nwb_file_name,
+            epoch_name,
+            include=DataLoadingPreset.MINIMAL,
         )
     except Exception as exc:  # noqa: BLE001
-        logger.warning("load_data failed for %s %s: %s",
-                       nwb_file_name, epoch_name, exc)
+        logger.warning("load_data failed for %s %s: %s", nwb_file_name, epoch_name, exc)
         return row
 
     hpc_times = data.get("spike_times", {}).get("HPC", [])
@@ -122,12 +124,14 @@ def _build_session_list(animal: str | None, limit: int | None) -> pd.DataFrame:
     The epochs are the epoch register's analysed ones.
     """
     ei = analysed_epochs().reset_index()  # index: (nwb_file_name, interval_list_name)
-    df = pd.DataFrame({
-        "nwb_file_name": ei["nwb_file_name"],
-        "animal": ei["animal"],
-        "day": ei["date"].astype(str),
-        "epoch": ei["interval_list_name"],
-    })
+    df = pd.DataFrame(
+        {
+            "nwb_file_name": ei["nwb_file_name"],
+            "animal": ei["animal"],
+            "day": ei["date"].astype(str),
+            "epoch": ei["interval_list_name"],
+        }
+    )
     if animal is not None:
         df = df.loc[df["animal"] == animal]
     df = df.sort_values(["animal", "day", "epoch"]).reset_index(drop=True)
@@ -139,16 +143,21 @@ def _build_session_list(animal: str | None, limit: int | None) -> pd.DataFrame:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
-        "--output", type=str, default="hpc_raw_stats.csv",
+        "--output",
+        type=str,
+        default="hpc_raw_stats.csv",
         help="Output CSV filename (saved in PROCESSED_DATA_DIR)",
     )
     parser.add_argument("--animal", type=str, default=None, help="Filter to one animal")
     parser.add_argument(
-        "--overwrite", action="store_true",
+        "--overwrite",
+        action="store_true",
         help="Recompute all sessions; default skips rows already in the CSV",
     )
     parser.add_argument(
-        "--limit", type=int, default=None,
+        "--limit",
+        type=int,
+        default=None,
         help="Only process the first N sessions (for testing)",
     )
     args = parser.parse_args()
@@ -167,11 +176,16 @@ def main() -> None:
         before = len(sessions)
         sessions = sessions.loc[
             ~sessions.apply(
-                lambda r: (r["animal"], r["day"], r["epoch"]) in already, axis=1,
+                lambda r: (r["animal"], r["day"], r["epoch"]) in already,
+                axis=1,
             )
         ].reset_index(drop=True)
-        logger.info("Resuming: %d sessions already in %s, %d remaining",
-                    before - len(sessions), output_path.name, len(sessions))
+        logger.info(
+            "Resuming: %d sessions already in %s, %d remaining",
+            before - len(sessions),
+            output_path.name,
+            len(sessions),
+        )
         rows_accum: list[dict] = existing.to_dict("records")
     else:
         rows_accum = []
@@ -179,7 +193,11 @@ def main() -> None:
     for i, sess in sessions.iterrows():
         logger.info(
             "[%d/%d] %s %s %s",
-            i + 1, len(sessions), sess["animal"], sess["day"], sess["epoch"],
+            i + 1,
+            len(sessions),
+            sess["animal"],
+            sess["day"],
+            sess["epoch"],
         )
         stats = _compute_one_session(sess["nwb_file_name"], sess["epoch"])
         row = {

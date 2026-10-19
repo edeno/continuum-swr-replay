@@ -35,15 +35,23 @@ from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.types import SessionDataKeys
 
 ARM_COLORS = {
-    0: "#1f77b4", 1: "#5ba3d8",
-    2: "#2ca02c", 3: "#7fc97f",
-    4: "#d62728", 5: "#e87a7a",
-    6: "#5a5a5a", 7: "#7a7a7a", 8: "#9a9a9a",
+    0: "#1f77b4",
+    1: "#5ba3d8",
+    2: "#2ca02c",
+    3: "#7fc97f",
+    4: "#d62728",
+    5: "#e87a7a",
+    6: "#5a5a5a",
+    7: "#7a7a7a",
+    8: "#9a9a9a",
 }
 
 
 def figure_trial_sanity(
-    *, animal: str, day: int, epoch: str,
+    *,
+    animal: str,
+    day: int,
+    epoch: str,
     window_start: float | None,
     window_seconds: float,
     output_dir: Path,
@@ -68,7 +76,11 @@ def figure_trial_sanity(
     ].copy()
 
     fig, axes = plt.subplots(
-        3, 1, figsize=(12, 8), sharex=True, constrained_layout=True,
+        3,
+        1,
+        figsize=(12, 8),
+        sharex=True,
+        constrained_layout=True,
         gridspec_kw={"height_ratios": [1.5, 0.7, 0.6]},
     )
 
@@ -95,8 +107,10 @@ def figure_trial_sanity(
         ax.annotate(
             f"{from_arm}→{to_arm}",
             xy=(midt, -0.6),
-            ha="center", va="top",
-            fontsize=8, color="#222",
+            ha="center",
+            va="top",
+            fontsize=8,
+            color="#222",
             annotation_clip=False,
         )
     ax.set_title(
@@ -108,7 +122,9 @@ def figure_trial_sanity(
     # (2) head_speed
     ax = axes[1]
     ax.plot(win_t, win["head_speed"].values, color="#444", lw=1)
-    ax.axhline(DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC, color="#a55a3b", ls="--", lw=0.8)
+    ax.axhline(
+        DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC, color="#a55a3b", ls="--", lw=0.8
+    )
     ax.set_ylabel("speed (cm/s)")
     ax.set_ylim(0, max(40, np.nanpercentile(win["head_speed"].values, 95)))
 
@@ -119,18 +135,35 @@ def figure_trial_sanity(
         s = max(0, t["start_time"] - window_start)
         e = min(window_seconds, t["end_time"] - window_start)
         to_arm = int(t["to_well"])
-        ax.barh(0, e - s, left=s, height=0.5, color=ARM_COLORS[to_arm],
-                edgecolor="black", linewidth=0.4)
-        ax.text((s + e) / 2, 0, f"trip→{to_arm}", ha="center", va="center",
-                fontsize=7, color="white" if to_arm < 6 else "black")
+        ax.barh(
+            0,
+            e - s,
+            left=s,
+            height=0.5,
+            color=ARM_COLORS[to_arm],
+            edgecolor="black",
+            linewidth=0.4,
+        )
+        ax.text(
+            (s + e) / 2,
+            0,
+            f"trip→{to_arm}",
+            ha="center",
+            va="center",
+            fontsize=7,
+            color="white" if to_arm < 6 else "black",
+        )
     ax.set_yticks([])
     ax.set_ylabel("In-progress\ntrip")
     ax.set_xlabel("time relative to window start (s)")
 
     output_dir.mkdir(parents=True, exist_ok=True)
     for ext in ["png", "pdf"]:
-        fig.savefig(output_dir / f"trial_detection_sanity.{ext}",
-                    dpi=200 if ext == "png" else None, bbox_inches="tight")
+        fig.savefig(
+            output_dir / f"trial_detection_sanity.{ext}",
+            dpi=200 if ext == "png" else None,
+            bbox_inches="tight",
+        )
     plt.close(fig)
 
 
@@ -138,38 +171,50 @@ def figure_predictor_collapse(*, output_dir: Path) -> None:
     """Across all events, quantify how often each predictor collapses with is_current."""
     ev = pd.read_pickle(PROCESSED_DATA_DIR / "replay_content" / "events.pkl")
     ev = ev.copy()
-    ev["cur"]   = ev["track_segment_id"]
-    ev["prev"]  = ev["prev_trial_from_well"]
+    ev["cur"] = ev["track_segment_id"]
+    ev["prev"] = ev["prev_trial_from_well"]
     ev["prev_to"] = ev["prev_trial_to_well"]
-    ev["next"]  = ev["next_trial_to_well"]
+    ev["next"] = ev["next_trial_to_well"]
     ev["rewarded"] = ev["last_rewarded_well"]
     n = len(ev)
 
     pcts = {
-        "is_prev\n(prev_trial_from_well)":      (ev["prev"]      == ev["cur"]).mean() * 100,
-        "(prev_trial_to_well)\n[not in model]": (ev["prev_to"]   == ev["cur"]).mean() * 100,
-        "is_next\n(next_trial_to_well)":        (ev["next"]      == ev["cur"]).mean() * 100,
-        "is_last_rewarded\n(last_rewarded_well)": (ev["rewarded"] == ev["cur"]).mean() * 100,
+        "is_prev\n(prev_trial_from_well)": (ev["prev"] == ev["cur"]).mean() * 100,
+        "(prev_trial_to_well)\n[not in model]": (ev["prev_to"] == ev["cur"]).mean()
+        * 100,
+        "is_next\n(next_trial_to_well)": (ev["next"] == ev["cur"]).mean() * 100,
+        "is_last_rewarded\n(last_rewarded_well)": (ev["rewarded"] == ev["cur"]).mean()
+        * 100,
     }
 
-    fig, axes = plt.subplots(1, 2, figsize=(13, 5), constrained_layout=True,
-                             gridspec_kw={"width_ratios": [1.2, 1]})
+    fig, axes = plt.subplots(
+        1,
+        2,
+        figsize=(13, 5),
+        constrained_layout=True,
+        gridspec_kw={"width_ratios": [1.2, 1]},
+    )
 
     # (A) Bar chart: % of events where each context column == current arm
     ax = axes[0]
     names = list(pcts.keys())
     vals = list(pcts.values())
-    bars = ax.barh(np.arange(len(names))[::-1], vals,
-                   color=["#d62728" if v > 50 else "#3b6ea5" for v in vals],
-                   edgecolor="black", linewidth=0.5)
+    bars = ax.barh(
+        np.arange(len(names))[::-1],
+        vals,
+        color=["#d62728" if v > 50 else "#3b6ea5" for v in vals],
+        edgecolor="black",
+        linewidth=0.5,
+    )
     ax.set_yticks(np.arange(len(names))[::-1])
     ax.set_yticklabels(names, fontsize=9)
     ax.set_xlabel("% of events where this predictor marks the same arm as is_current")
     ax.set_xlim(0, 100)
     ax.axvline(50, color="grey", lw=0.5, ls="--")
     for b, v in zip(bars, vals, strict=True):
-        ax.text(v + 1, b.get_y() + b.get_height() / 2, f"{v:.1f}%",
-                va="center", fontsize=9)
+        ax.text(
+            v + 1, b.get_y() + b.get_height() / 2, f"{v:.1f}%", va="center", fontsize=9
+        )
     ax.set_title(
         f"(A) Predictor collapse with is_current  (n = {n:,} events)\n"
         "red = >50% redundant; columns named in the model on the left"
@@ -187,22 +232,33 @@ def figure_predictor_collapse(*, output_dir: Path) -> None:
     bars = ax.bar(dist.index, dist.values, color="#3b6ea5", edgecolor="black")
     ax.set_xticks([0, 1, 2, 3])
     ax.set_xticklabels(["0", "1", "2", "3"])
-    ax.set_xlabel("Number of context predictors collapsing with is_current\n"
-                  "(out of: is_prev, is_next, is_last_rewarded)")
+    ax.set_xlabel(
+        "Number of context predictors collapsing with is_current\n"
+        "(out of: is_prev, is_next, is_last_rewarded)"
+    )
     ax.set_ylabel("Number of events")
     for b, v in zip(bars, dist.values, strict=True):
-        ax.text(b.get_x() + b.get_width()/2, v, f"{v:,}\n({v/n*100:.0f}%)",
-                ha="center", va="bottom", fontsize=8)
+        ax.text(
+            b.get_x() + b.get_width() / 2,
+            v,
+            f"{v:,}\n({v / n * 100:.0f}%)",
+            ha="center",
+            va="bottom",
+            fontsize=8,
+        )
     ax.set_title(
         f"(B) Per-event count of predictors marking the current arm\n"
         f"events with all 3 predictors collapsing: "
-        f"{(ev['n_collapse']==3).sum():,} ({(ev['n_collapse']==3).mean()*100:.0f}%)"
+        f"{(ev['n_collapse'] == 3).sum():,} ({(ev['n_collapse'] == 3).mean() * 100:.0f}%)"
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)
     for ext in ["png", "pdf"]:
-        fig.savefig(output_dir / f"predictor_collapse.{ext}",
-                    dpi=200 if ext == "png" else None, bbox_inches="tight")
+        fig.savefig(
+            output_dir / f"predictor_collapse.{ext}",
+            dpi=200 if ext == "png" else None,
+            bbox_inches="tight",
+        )
     plt.close(fig)
 
 
@@ -213,18 +269,23 @@ def main() -> None:
     p.add_argument("--epoch", default="02_r1")
     p.add_argument("--window-seconds", type=float, default=60.0)
     p.add_argument("--window-start", type=float, default=None)
-    p.add_argument("--output-dir", type=Path,
-                   default=Path("paper/figures/qc_diagnosis"))
+    p.add_argument(
+        "--output-dir", type=Path, default=Path("paper/figures/qc_diagnosis")
+    )
     args = p.parse_args()
 
     figure_trial_sanity(
-        animal=args.animal, day=args.day, epoch=args.epoch,
+        animal=args.animal,
+        day=args.day,
+        epoch=args.epoch,
         window_start=args.window_start,
         window_seconds=args.window_seconds,
         output_dir=args.output_dir,
     )
     figure_predictor_collapse(output_dir=args.output_dir)
-    print(f"Saved diagnostic figures to {args.output_dir}/{{trial_detection_sanity,predictor_collapse}}.{{png,pdf}}")
+    print(
+        f"Saved diagnostic figures to {args.output_dir}/{{trial_detection_sanity,predictor_collapse}}.{{png,pdf}}"
+    )
 
 
 if __name__ == "__main__":

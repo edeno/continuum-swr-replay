@@ -74,13 +74,19 @@ def maybe_merge_raw_stats(
         summary = summary.drop(columns=drop_cols)
     keep = RAW_STATS_JOIN_COLS + [c for c in RAW_STATS_DATA_COLS if c in raw.columns]
     merged = summary.merge(
-        raw[keep], on=RAW_STATS_JOIN_COLS, how="left", validate="many_to_one",
+        raw[keep],
+        on=RAW_STATS_JOIN_COLS,
+        how="left",
+        validate="many_to_one",
     )
     logger.info(
         "Merged raw stats for %d/%d sessions from %s",
-        merged["rate_hz_per_tetrode"].notna().sum(), len(merged), raw_stats_csv.name,
+        merged["rate_hz_per_tetrode"].notna().sum(),
+        len(merged),
+        raw_stats_csv.name,
     )
     return apply_raw_stats_flags(merged)
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -128,12 +134,18 @@ def print_summary(summary: pd.DataFrame) -> None:
     n = len(summary)
     n_flagged = (summary["n_flags"] > 0).sum()
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Decoding Quality Summary: {n} sessions")
-    print(f"{'='*60}")
-    print(f"  Median error (cm):    {summary['median_error_cm'].median():.1f} (median across sessions)")
-    print(f"  Running fraction:     {summary['running_fraction'].median():.2f} (median across sessions)")
-    print(f"  Local fraction:       {summary['local_fraction'].median():.2f} (median during movement)")
+    print(f"{'=' * 60}")
+    print(
+        f"  Median error (cm):    {summary['median_error_cm'].median():.1f} (median across sessions)"
+    )
+    print(
+        f"  Running fraction:     {summary['running_fraction'].median():.2f} (median across sessions)"
+    )
+    print(
+        f"  Local fraction:       {summary['local_fraction'].median():.2f} (median during movement)"
+    )
     print(
         "  Immobile local/nl:    "
         f"{summary['immobile_local_fraction'].median():.2f} / "
@@ -168,9 +180,15 @@ def print_summary(summary: pd.DataFrame) -> None:
         diag_cols = ["T_local_local", "T_nospike_nospike", "T_nlc_nlc", "T_nlf_nlf"]
         present = [c for c in diag_cols if c in summary.columns]
         meds = [f"{summary[c].median():.3f}" for c in present]
-        print("  Self-transitions:     " + " / ".join(meds) + "  (Local / No-Spike / NL-C / NL-F)")
+        print(
+            "  Self-transitions:     "
+            + " / ".join(meds)
+            + "  (Local / No-Spike / NL-C / NL-F)"
+        )
     print(f"  No-spike/MUA rho:     {summary['nospike_mua_rho'].median():.3f} (median)")
-    print(f"  Calibration slope:    {summary['calibration_slope'].median():.1f} (median)")
+    print(
+        f"  Calibration slope:    {summary['calibration_slope'].median():.1f} (median)"
+    )
     print(f"  Sessions with flags:  {n_flagged}/{n}")
 
     flag_cols = [c for c in summary.columns if c.startswith("flag_")]
@@ -181,7 +199,9 @@ def print_summary(summary: pd.DataFrame) -> None:
 
     if n_flagged > 0:
         print("\nFlagged sessions:")
-        flagged = summary.loc[summary["n_flags"] > 0, ["animal", "day", "epoch", "n_flags"] + flag_cols]
+        flagged = summary.loc[
+            summary["n_flags"] > 0, ["animal", "day", "epoch", "n_flags"] + flag_cols
+        ]
         print(flagged.to_string(index=False))
     print()
 
@@ -211,13 +231,17 @@ def _plot_error_distribution(summary: pd.DataFrame, output_path) -> None:
     """A: Distribution of median decoding error across sessions."""
     fig, axes = plt.subplots(1, 2, figsize=(10, 4))
 
-    axes[0].hist(summary["median_error_cm"].dropna(), bins=30, edgecolor="black", alpha=0.7)
+    axes[0].hist(
+        summary["median_error_cm"].dropna(), bins=30, edgecolor="black", alpha=0.7
+    )
     axes[0].set_xlabel("Median decoding error (cm)")
     axes[0].set_ylabel("Number of sessions")
     axes[0].set_title("Error distribution")
 
     animals = sorted(summary["animal"].unique())
-    box_data = [summary.loc[summary["animal"] == a, "median_error_cm"].dropna() for a in animals]
+    box_data = [
+        summary.loc[summary["animal"] == a, "median_error_cm"].dropna() for a in animals
+    ]
     axes[1].boxplot(box_data, labels=animals)
     axes[1].set_xlabel("Animal")
     axes[1].set_ylabel("Median decoding error (cm)")
@@ -231,8 +255,10 @@ def _plot_error_distribution(summary: pd.DataFrame, output_path) -> None:
 def _plot_state_fractions(summary: pd.DataFrame, output_path) -> None:
     """B: State fractions during movement."""
     fraction_cols = [
-        "local_fraction", "nonlocal_continuous_fraction",
-        "nonlocal_fragmented_fraction", "nospike_fraction",
+        "local_fraction",
+        "nonlocal_continuous_fraction",
+        "nonlocal_fragmented_fraction",
+        "nospike_fraction",
     ]
     labels = ["Local", "Non-Local Cont.", "Non-Local Frag.", "No-Spike"]
 
@@ -305,11 +331,16 @@ def _plot_calibration_curves(data: pd.DataFrame, output_path) -> None:
 
     for ax, animal in zip(axes[0], animals, strict=True):
         animal_data = calib.loc[calib["animal"] == animal]
-        for (_, _day, _epoch), group in animal_data.groupby(["animal", "day", "epoch"], sort=False):
+        for (_, _day, _epoch), group in animal_data.groupby(
+            ["animal", "day", "epoch"], sort=False
+        ):
             sorted_g = group.sort_values("prob_bin_center")
             ax.plot(
-                sorted_g["prob_bin_center"], sorted_g["median_error_cm"],
-                alpha=0.3, color="gray", linewidth=0.5,
+                sorted_g["prob_bin_center"],
+                sorted_g["median_error_cm"],
+                alpha=0.3,
+                color="gray",
+                linewidth=0.5,
             )
 
         # Animal mean
@@ -342,7 +373,14 @@ def _plot_event_context(data: pd.DataFrame, output_path) -> None:
         ("frac_neither", "Neither", "#d62728"),
     ]:
         values = sorted_ctx[col].to_numpy()
-        ax.bar(range(len(sorted_ctx)), values, bottom=bottom, label=lbl, color=color, width=1.0)
+        ax.bar(
+            range(len(sorted_ctx)),
+            values,
+            bottom=bottom,
+            label=lbl,
+            color=color,
+            width=1.0,
+        )
         bottom += values
 
     ax.set_xlabel("Session (sorted by SWR fraction)")
@@ -381,8 +419,10 @@ def _plot_segment_error(data: pd.DataFrame, output_path) -> None:
     seg["session"] = seg["animal"] + "_" + seg["day"].astype(str) + "_" + seg["epoch"]
 
     pivot = seg.pivot_table(
-        index="session", columns="track_segment_id",
-        values="median_error_cm", aggfunc="first",
+        index="session",
+        columns="track_segment_id",
+        values="median_error_cm",
+        aggfunc="first",
     )
 
     if pivot.empty:
@@ -409,25 +449,34 @@ def _plot_segment_error(data: pd.DataFrame, output_path) -> None:
 def main():
     parser = argparse.ArgumentParser(description="Compute decoding quality metrics")
     parser.add_argument(
-        "--output", type=str, default="quality_summary.csv",
+        "--output",
+        type=str,
+        default="quality_summary.csv",
         help="Output CSV filename (saved in PROCESSED_DATA_DIR)",
     )
     parser.add_argument("--animal", type=str, default=None, help="Filter to one animal")
     parser.add_argument(
-        "--threshold", type=int, default=80,
+        "--threshold",
+        type=int,
+        default=80,
         help="Non-local probability threshold (matches pickle filename, default 80)",
     )
     parser.add_argument("--no_plots", action="store_true", help="Skip diagnostic plots")
     parser.add_argument(
-        "--plots_only", action="store_true",
+        "--plots_only",
+        action="store_true",
         help="Skip metric computation, load existing CSV and regenerate plots",
     )
     parser.add_argument(
-        "--figure_dir", type=str, default="quality_metrics",
+        "--figure_dir",
+        type=str,
+        default="quality_metrics",
         help="Subdirectory under FIGURE_DIR for plots",
     )
     parser.add_argument(
-        "--raw_stats_csv", type=str, default="hpc_raw_stats.csv",
+        "--raw_stats_csv",
+        type=str,
+        default="hpc_raw_stats.csv",
         help=(
             "Optional raw-data stats CSV (from scripts/qa/compute_hpc_raw_stats.py) "
             "to merge into the summary. If the file does not exist, the merge "
@@ -452,7 +501,8 @@ def main():
             sampling_frequency=SAMPLING_FREQUENCY,
         )
         summary = maybe_merge_raw_stats(
-            summary, PROCESSED_DATA_DIR / args.raw_stats_csv,
+            summary,
+            PROCESSED_DATA_DIR / args.raw_stats_csv,
         )
         summary.to_csv(output_path, index=False)
         logger.info("Saved summary to %s", output_path)

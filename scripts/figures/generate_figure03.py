@@ -154,16 +154,13 @@ def find_non_swr_example_event(
     time_slice : slice
         Time window centered on the event.
     """
-    non_local_prob = (
-        results.acausal_state_probabilities.sel(states="Non-Local Continuous")
-        + results.acausal_state_probabilities.sel(states="Non-Local Fragmented")
-    )
+    non_local_prob = results.acausal_state_probabilities.sel(
+        states="Non-Local Continuous"
+    ) + results.acausal_state_probabilities.sel(states="Non-Local Fragmented")
     position_info = data["position_info"]
     speed = position_info.head_speed.to_numpy()
     position_time = position_info.index
-    validate_results_position_time_alignment(
-        results.time.values, position_time
-    )
+    validate_results_position_time_alignment(results.time.values, position_time)
     non_local_prob = non_local_prob.assign_coords(
         time=position_time.to_numpy(dtype=float)
     )
@@ -209,6 +206,7 @@ def find_non_swr_example_event(
 # ---------------------------------------------------------------------------
 # Main Figure Assembly
 # ---------------------------------------------------------------------------
+
 
 def generate_figure(
     # TODO: swap to a non-wilbur session so Fig 3a comes from a different
@@ -265,15 +263,13 @@ def generate_figure(
 
     # --- Create figure ---
     fig_height = min(7.0, PAGE_HEIGHT)
-    fig = plt.figure(figsize=(TWO_COLUMN, fig_height), dpi=450,
-                     constrained_layout=True)
+    fig = plt.figure(figsize=(TWO_COLUMN, fig_height), dpi=450, constrained_layout=True)
 
     # 2 rows: (a) example stack, (b/c/d) stats
     gs = GridSpec(2, 1, figure=fig, height_ratios=[1.8, 1.1], hspace=0.35)
 
     # ── Row 1: Real data example (panel a) — 4 stacked sub-rows ──
-    gs_a = gs[0].subgridspec(4, 1, hspace=0.05,
-                              height_ratios=[0.6, 0.8, 1.2, 0.8])
+    gs_a = gs[0].subgridspec(4, 1, hspace=0.05, height_ratios=[0.6, 0.8, 1.2, 0.8])
     ax_swr = fig.add_subplot(gs_a[0])
     ax_raster = fig.add_subplot(gs_a[1], sharex=ax_swr)
     ax_posterior = fig.add_subplot(gs_a[2], sharex=ax_swr)
@@ -327,15 +323,20 @@ def generate_figure(
 
 def main():
     parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--output-dir", type=Path, default=Path("paper/figures/figure03"),
+        "--output-dir",
+        type=Path,
+        default=Path("paper/figures/figure03"),
     )
     parser.add_argument("--nwb-file-name", type=str, default="wilbur20210329_.nwb")
     parser.add_argument("--epoch-name", type=str, default="02_r1")
     parser.add_argument(
-        "--data-dir", type=Path, default=PROCESSED_DATA_DIR,
+        "--data-dir",
+        type=Path,
+        default=PROCESSED_DATA_DIR,
     )
     parser.add_argument("--show", action="store_true")
 
