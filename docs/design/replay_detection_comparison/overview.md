@@ -200,7 +200,9 @@ cell. Four adaptations are recorded:
    kept, as the package averages channels for Kay, Karlsson and Yu. The original reads one
    channel in 140–250 Hz.
 4. There is no theta restriction. The package default has none; the original leaves out
-   high-theta periods. The 4 cm/s speed rule gates.
+   high-theta periods. The 4 cm/s speed rule gates. **To change at the next full rebuild (lead, 2026-10-19;
+   PLAN.md D10):** the theta gate is added, on the raw LFP of the corpus callosum tetrode
+   the project uses for theta, at the package defaults (6–10 Hz, z < 2).
 
 The time grid is the LFP's, with each tetrode's spikes binned onto it. Carey's artifact
 handling is the one the other four SWR detectors have: the package's `normalization_mask`
