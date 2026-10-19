@@ -83,6 +83,7 @@ from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_epoch_ids,
 )
 from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
+from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
 from continuum_swr_replay.table_io import read_table  # noqa: E402
 from scripts.decoding.run_memoryless_detection import (  # noqa: E402
     output_paths as memoryless_outputs,
@@ -117,7 +118,7 @@ MEMORYLESS_ROOT = features_runner.MEMORYLESS_ROOT
 FIGURE_ROOT = FIGURE_DIR / "event_features"
 REPORT_DIR = "report"
 """The report's folder inside the run's."""
-SESSION = ["animal", "day", "epoch"]
+SESSION = list(SESSION_COLUMNS_DAY)
 POPULATION = ["detector", "population", "unknown_reason"]
 
 SESSION_PAIRS = (STATE_SPACE, MEMORYLESS)

@@ -56,6 +56,7 @@ from continuum_swr_replay.analysis.inventory_comparison.selection import (  # no
     REJECTION_COHORTS,
 )
 from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
+from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
 from scripts.figures import (  # noqa: E402
     generate_inventory_examples as inventory_examples,
 )
@@ -119,7 +120,7 @@ CELL_NOTE = (
     f"{POPULATIONS[OURS_ONLY]})."
 )
 
-SESSION = ["animal", "day", "epoch"]
+SESSION = list(SESSION_COLUMNS_DAY)
 EVIDENCE = ("evidence_dll", "n_spikes", "n_rows")
 
 NOT_CALIBRATED = (
@@ -489,8 +490,8 @@ def write_examples(
                     "memoryless_check": {
                         "spread_rtol": inventory_examples.SPREAD_RTOL,
                         "center_tie_rtol": inventory_examples.CENTER_TIE_RTOL,
-                    },
                         **inventory_examples.recompute_device(),
+                    },
                     "pending": inventory_examples.PENDING,
                     "figures": records,
                 }
