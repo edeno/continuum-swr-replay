@@ -355,7 +355,7 @@ def build_contfrag_event_table(
         current_arm = location_arm
         # Trial-derived context columns are NaN at every dot timebin
         # before the first trial start (see ``add_trial_context``).
-        # ``safe_first`` would skip leading NaNs and return the next
+        # A NaN-skipping "first" would skip leading NaNs and return the next
         # trial's context, leaking future state into events whose first
         # timebin had no trial active. The stop-table builder already
         # uses the strict semantics for the same hazard — match it

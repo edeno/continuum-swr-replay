@@ -65,7 +65,7 @@ from continuum_swr_replay.analysis.replay.standardization import (
     z_reference_path,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.session_keys import SESSION_COLUMNS, subset_max_per_animal
 from continuum_swr_replay.table_io import read_table
 
 RC = PROCESSED_DATA_DIR / "replay_content"
@@ -83,18 +83,6 @@ PREDICTORS = [
 POWER_FIT_COLUMNS = (*PREDICTORS, POWER_COL)
 POST_OUTCOME_GATE_RULE = "event_start_s >= outcome_known_time"
 FIT_SUPPORT_LABEL = "fit_cohort_all_rows"
-
-
-def _subset_max_per_animal(events: pd.DataFrame, n: int) -> pd.DataFrame:
-    """Keep the first ``n`` sessions per animal (session order, not event order)."""
-    keep = (
-        events[SC]
-        .drop_duplicates()
-        .sort_values(SC)
-        .groupby("animal", sort=False)
-        .head(n)
-    )
-    return events.merge(keep, on=SC)
 
 
 def _bimodality_coef(x: np.ndarray) -> float:
@@ -463,7 +451,7 @@ def main() -> None:
 
     df = _assemble()
     if smoke:
-        df = _subset_max_per_animal(df, args.max_per_animal)
+        df = subset_max_per_animal(df, args.max_per_animal, sort_sessions=True)
     m = df[POWER_COL].to_numpy()
     print(f"=== SWR power distribution ({POWER_COL}, n={len(df)} non-local events) ===")
     print(

@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
+from continuum_swr_replay.session_keys import SESSION_COLUMNS
 
 from ._helpers import strict_mean, strict_sum
 from .choice_prediction import predict_arm_fractions
@@ -163,7 +164,7 @@ def _detect_first_switches(stop_table: pd.DataFrame) -> pd.DataFrame | None:
     """
     if not stop_table["is_stay"].notna().any():
         return None
-    session = ["animal", "session_date", "epoch"]
+    session = list(SESSION_COLUMNS)
     ordered = stop_table.sort_values([*session, "stop_idx"]).reset_index(drop=True)
     is_switch = ordered["is_stay"].eq(0)
     arrived_by_stay = ordered["did_last_completed_trip_switch_patch"].eq(0)

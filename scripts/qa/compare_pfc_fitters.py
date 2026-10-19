@@ -35,7 +35,6 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import shlex
 import sys
 from collections.abc import Iterable, Mapping
 from pathlib import Path
@@ -46,7 +45,10 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.replay.fit_provenance import fit_provenance_path
 
-REPO = Path(__file__).resolve().parents[2]
+# Sibling-script import: run as a script, only this file's directory is on
+# sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from scripts.qa._report import _invocation  # noqa: E402
 
 #: Gate tolerances. Parameters and anything derived from them linearly (the
 #: modulation curves, the peak modulations, the theta statistics) are compared
@@ -77,16 +79,6 @@ EXACT_COLUMNS = (
     "brain_area",
     "stop_cohort",
 )
-
-
-def _invocation() -> str:
-    """This run's command line, relative to the repo root and shell-quoted."""
-    script = Path(sys.argv[0])
-    try:
-        script = script.resolve().relative_to(REPO)
-    except ValueError:
-        pass
-    return shlex.join(["uv", "run", "python", str(script), *sys.argv[1:]])
 
 
 def _column_tolerance(column: str) -> float:

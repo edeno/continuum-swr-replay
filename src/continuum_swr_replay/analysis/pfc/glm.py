@@ -24,6 +24,7 @@ from continuum_swr_replay.analysis.constants import (
 )
 from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
     interval_mask,
+    merge_intervals,
     pad_intervals,
 )
 from continuum_swr_replay.analysis.hippocampus.event_eligibility import (
@@ -1998,33 +1999,6 @@ def _bout_containing(runs: NDArray, index: int) -> int:
     return row
 
 
-def _within_immobile(
-    start_time: float, end_time: float, times: NDArray, run: NDArray
-) -> bool:
-    """Whether ``[start_time, end_time]`` lies inside one run's sampled span.
-
-    Every sample between a run's first and last is True by construction, so a
-    window bounded by those two times covers True bins only.
-
-    Parameters
-    ----------
-    start_time, end_time : float
-        Window bounds in seconds.
-    times : NDArray, shape (n_time,)
-        Ascending sample times in seconds.
-    run : NDArray of int, shape (2,)
-        One row of :func:`_contiguous_true_runs`.
-
-    Returns
-    -------
-    bool
-    """
-    run_start, run_stop = int(run[0]), int(run[1])
-    if run_stop <= run_start:
-        return False
-    return bool(start_time >= times[run_start] and end_time <= times[run_stop - 1])
-
-
 def _overlaps_any(
     start_time: float, end_time: float, starts: NDArray, ends: NDArray
 ) -> bool:
@@ -2037,8 +2011,8 @@ def _overlaps_any(
     start_time, end_time : float
         Window bounds in seconds.
     starts, ends : NDArray, shape (n_windows,)
-        Ascending, non-overlapping window bounds (as :func:`_merge_windows`
-        returns them). ``ends`` is then ascending too, so the only window that
+        Ascending, non-overlapping window bounds (the columns of
+        :func:`~continuum_swr_replay.analysis.hippocampus.artifacts.masks.merge_intervals`). ``ends`` is then ascending too, so the only window that
         can reach past ``start_time`` among those starting before ``end_time``
         is the last of them.
 
@@ -2052,32 +2026,6 @@ def _overlaps_any(
     if n_starting_before == 0:
         return False
     return bool(ends[n_starting_before - 1] > start_time)
-
-
-def _merge_windows(starts: NDArray, ends: NDArray) -> tuple[NDArray, NDArray]:
-    """Sort and union windows into ascending, non-overlapping bounds.
-
-    Parameters
-    ----------
-    starts, ends : NDArray, shape (n_windows,)
-        Window bounds in seconds, in any order, possibly overlapping.
-
-    Returns
-    -------
-    merged_starts, merged_ends : NDArray, shape (n_merged,)
-        Ascending and disjoint; touching windows are merged.
-    """
-    starts = np.asarray(starts, dtype=float)
-    ends = np.asarray(ends, dtype=float)
-    if starts.size == 0:
-        return starts, ends
-    order = np.argsort(starts, kind="stable")
-    starts, ends = starts[order], ends[order]
-    # A window that starts after every end seen so far opens a new merged group.
-    reach = np.maximum.accumulate(ends)
-    opens_group = np.concatenate([[True], starts[1:] > reach[:-1]])
-    group_start = np.flatnonzero(opens_group)
-    return starts[opens_group], np.maximum.reduceat(ends, group_start)
 
 
 #: The decode-frame cohorts whose dropped events the PFC path counts and keeps
@@ -2241,10 +2189,10 @@ def make_matched_control_times(
     windows = [event_times[name] for name in EVENT_CLASSES]
     if avoid is not None:
         windows.append(avoid)
-    real_starts, real_ends = _merge_windows(
+    real_starts, real_ends = merge_intervals(
         np.concatenate([w.start_time.to_numpy(dtype=float) for w in windows]),
         np.concatenate([w.end_time.to_numpy(dtype=float) for w in windows]),
-    )
+    ).T
 
     if max_attempts < 0:
         raise ValueError(f"max_attempts must be non-negative, got {max_attempts}")

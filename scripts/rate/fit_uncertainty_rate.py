@@ -113,7 +113,10 @@ from continuum_swr_replay.analysis.replay.standardization import (  # noqa: E402
     z_reference_path,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
-from continuum_swr_replay.session_keys import SESSION_COLUMNS  # noqa: E402
+from continuum_swr_replay.session_keys import (  # noqa: E402
+    SESSION_COLUMNS,
+    subset_max_per_animal,
+)
 from continuum_swr_replay.table_io import read_table  # noqa: E402
 
 # separated history coefs legitimately overflow exp(); convergence/separation are
@@ -221,17 +224,6 @@ def _drop_first_session_per_animal(stop_table: pd.DataFrame) -> pd.DataFrame:
         first, on=list(SESSION_COLUMNS), how="left", indicator=True
     )
     return stop_table[merged["_merge"].to_numpy() == "left_only"]
-
-
-def _subset_max_per_animal(stop_table: pd.DataFrame, n: int) -> pd.DataFrame:
-    keep = (
-        stop_table[list(SESSION_COLUMNS)]
-        .drop_duplicates()
-        .sort_values(list(SESSION_COLUMNS))
-        .groupby("animal", sort=False)
-        .head(n)
-    )
-    return stop_table.merge(keep, on=list(SESSION_COLUMNS))
 
 
 def _retained_time_course_support(
@@ -728,7 +720,7 @@ def main() -> None:
     )
     stop = _drop_first_session_per_animal(stop)
     if args.max_per_animal is not None:
-        stop = _subset_max_per_animal(stop, args.max_per_animal)
+        stop = subset_max_per_animal(stop, args.max_per_animal, sort_sessions=True)
     # z-score the RL decision variables AFTER the drop/subset so the per-SD scale
     # is the SD of exactly the rows that get fit (disparate/tiny scale: DeltaV
     # ~0.2, updates ~0.05). The nominal block + RPE stay per-unit.

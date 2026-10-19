@@ -36,15 +36,13 @@ from continuum_swr_replay.analysis.replay.fit_provenance import require_fresh_in
 from continuum_swr_replay.analysis.replay.model_specs import (
     BIN_S,
     MODEL_PER_BIN_RATE,
-    N_HISTORY_BASIS,
     N_HISTORY_LAGS,
     REWARD_HISTORY_COLUMNS,
-    REWARD_HISTORY_N_BASIS,
     REWARD_HISTORY_N_LAGS,
 )
 from continuum_swr_replay.analysis.replay.per_bin_design import (
-    reconstruct_reward_kernels,
-    reconstruct_self_history_kernels,
+    reward_kernel_rate_ratios,
+    self_history_rate_ratios,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
@@ -62,8 +60,12 @@ ALL_MODELS_INPUTS = {
 
 SC = list(SESSION_COLUMNS)
 OUT = ["swr", "non_local", "non_local_swr", "non_local_no_swr"]
-LABEL = {"swr": "detected SWR", "non_local": "non-local (all)",
-         "non_local_swr": "NL w/ SWR", "non_local_no_swr": "NL no-SWR"}
+LABEL = {
+    "swr": "detected SWR",
+    "non_local": "non-local (all)",
+    "non_local_swr": "NL w/ SWR",
+    "non_local_no_swr": "NL no-SWR",
+}
 FULL = "M7r_time_histcos_rew"
 IMMEDIATE_COEF = f"coef_{REWARD_HISTORY_COLUMNS[0]}"
 
@@ -90,8 +92,13 @@ def _paired(df: pd.DataFrame, model: str, coef: str, a: str, b: str):
         return None
     d = m[f"{coef}_a"] - m[f"{coef}_b"]
     pa = m.assign(x=d).groupby("animal")["x"].median().dropna()
-    return float((d > 0).mean()), int((pa > 0).sum()), int(pa.size), \
-        wilcoxon(m[f"{coef}_a"], m[f"{coef}_b"]).pvalue, len(m)
+    return (
+        float((d > 0).mean()),
+        int((pa > 0).sum()),
+        int(pa.size),
+        wilcoxon(m[f"{coef}_a"], m[f"{coef}_b"]).pvalue,
+        len(m),
+    )
 
 
 def section_baseline(df):
@@ -101,12 +108,18 @@ def section_baseline(df):
     for oc in OUT:
         s = df[(df.model == "M0_const") & (df.outcome == oc)]
         rate = np.exp(s["coef_Intercept"].dropna()) / 1.0  # exp(intercept)=events/s
-        print(f"  {LABEL[oc]:16s}: {rate.median():.3f} events/s "
-              f"(IQR {rate.quantile(.25):.3f}-{rate.quantile(.75):.3f}, n={len(rate)})")
+        print(
+            f"  {LABEL[oc]:16s}: {rate.median():.3f} events/s "
+            f"(IQR {rate.quantile(0.25):.3f}-{rate.quantile(0.75):.3f}, n={len(rate)})"
+        )
     print("  (exp(intercept); offset is log(exposure_seconds))")
     print("  pairwise (median rate ratio between types, paired p):")
-    for a, b in [("non_local_swr", "non_local_no_swr"), ("swr", "non_local"),
-                 ("non_local_swr", "swr"), ("non_local_no_swr", "swr")]:
+    for a, b in [
+        ("non_local_swr", "non_local_no_swr"),
+        ("swr", "non_local"),
+        ("non_local_swr", "swr"),
+        ("non_local_no_swr", "swr"),
+    ]:
         A = df[(df.model == "M0_const") & (df.outcome == a)][SC + ["coef_Intercept"]]
         B = df[(df.model == "M0_const") & (df.outcome == b)][SC + ["coef_Intercept"]]
         m = A.merge(B, on=SC, suffixes=("_a", "_b")).dropna()
@@ -121,27 +134,14 @@ def section_coef(title, model, coef, note=""):
     if note:
         print(note)
     print("=" * 78)
-    print(f"  {'population':16s} {'RR':>6} {'%pos':>6} {'animals':>8} {'p(vs0)':>9} {'n':>5}")
+    print(
+        f"  {'population':16s} {'RR':>6} {'%pos':>6} {'animals':>8} {'p(vs0)':>9} {'n':>5}"
+    )
     for oc in OUT:
         r = _one_sample(df, model, coef, oc)
         if r:
             rr, fp, n5, na, p, n = r
             print(f"  {LABEL[oc]:16s} {rr:6.2f} {fp:6.0%} {n5:5d}/{na} {p:9.1e} {n:5d}")
-
-
-def self_history_rate_ratios(sessions: pd.DataFrame) -> np.ndarray:
-    """Across-session median of the per-session reconstructed self-history kernel.
-
-    ``hist_rcos_k`` is the plain projection of the ``onset_lag{j}`` counts onto
-    the raw raised-cosine bumps, so an onset ``j`` bins back contributes
-    ``sum_k coef_k * B[k, j]`` to the log rate — the un-normalized basis, unlike
-    the reward block's bump-weighted fractions.
-    """
-    columns = [f"coef_hist_rcos_{k}" for k in range(N_HISTORY_BASIS)]
-    kernels = reconstruct_self_history_kernels(
-        sessions[columns].to_numpy(dtype=float), N_HISTORY_LAGS, N_HISTORY_BASIS
-    )
-    return np.median(np.exp(kernels), axis=0)
 
 
 def section_kernel(title, model):
@@ -154,35 +154,6 @@ def section_kernel(title, model):
             f"  {LABEL[oc]:16s} "
             + " ".join(f"{v:5.2f}" for v in self_history_rate_ratios(s))
         )
-
-
-def reward_kernel_rate_ratios(sessions: pd.DataFrame) -> np.ndarray:
-    """Across-session median of the per-session reconstructed reward kernel.
-
-    Each session's kernel is reconstructed from that session's own basis
-    coefficients and the median is taken per lag, which is the estimator
-    ``plot_per_bin_rate_models.py`` draws. Reconstructing from across-session
-    median coefficients instead would summarize a session that does not exist:
-    the basis coefficients are strongly collinear, so their marginal medians do
-    not describe any fitted kernel.
-
-    Parameters
-    ----------
-    sessions : pd.DataFrame
-        One row per session for a single (model, outcome), carrying
-        ``coef_reward_history_rcos_*``.
-
-    Returns
-    -------
-    np.ndarray, shape (REWARD_HISTORY_N_LAGS,)
-        Median rate ratio at each lag 1..10.
-    """
-    columns = [f"coef_{c}" for c in REWARD_HISTORY_COLUMNS]
-    coefs = sessions[columns].to_numpy(dtype=float)
-    kernels = reconstruct_reward_kernels(
-        coefs, REWARD_HISTORY_N_LAGS, REWARD_HISTORY_N_BASIS
-    )
-    return np.median(np.exp(kernels), axis=0)
 
 
 def section_reward_kernel(title, model):
@@ -204,19 +175,23 @@ def section_selfhistory(model):
     print("\n" + "=" * 78)
     print(f"   self-history kernel detail   ({model}: reconstructed, 15 ms lags)")
     print("=" * 78)
-    print(f"  {'population':16s} {'refractory(<1 lags)':>20} {'burst peak RR':>14} {'@lag(ms)':>9}")
+    print(
+        f"  {'population':16s} {'refractory(<1 lags)':>20} {'burst peak RR':>14} {'@lag(ms)':>9}"
+    )
     for oc in OUT:
         s = df[(df.model == model) & (df.outcome == oc)]
         rr = self_history_rate_ratios(s)
         refr = [j for j in range(1, 11) if rr[j - 1] < 1.0]
-        refr_lags = f"{len(refr)} (≤{max(refr)*15 if refr else 0}ms)"
+        refr_lags = f"{len(refr)} (≤{max(refr) * 15 if refr else 0}ms)"
         pk = int(np.nanargmax(rr)) + 1
-        print(f"  {LABEL[oc]:16s} {refr_lags:>20} {rr[pk-1]:14.2f} {pk*15:9d}")
+        print(f"  {LABEL[oc]:16s} {refr_lags:>20} {rr[pk - 1]:14.2f} {pk * 15:9d}")
 
 
 def section_ladder():
     print("\n" + "=" * 78)
-    print("6. LADDER FIT (median AIC, CV bits/event, KS-in-band frac), outcome=non_local")
+    print(
+        "6. LADDER FIT (median AIC, CV bits/event, KS-in-band frac), outcome=non_local"
+    )
     print("=" * 78)
     # Stop-clock rungs only, taken from the executable spec so a new rung cannot
     # be silently missing here: the arrival rungs are fit on a subset of the
@@ -227,8 +202,10 @@ def section_ladder():
     for m in ladder:
         s = g[g.model == m]
         if len(s):
-            print(f"  {m:22s} {s.aic.median():8.0f} {s.cv_bits_per_event.median():9.3f} "
-                  f"{s.ks_within_band.mean():8.2f} {len(s):4d}")
+            print(
+                f"  {m:22s} {s.aic.median():8.0f} {s.cv_bits_per_event.median():9.3f} "
+                f"{s.ks_within_band.mean():8.2f} {len(s):4d}"
+            )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -250,13 +227,16 @@ def main():
     require_fresh_inputs(ALL_MODELS, ALL_MODELS_INPUTS, allow_stale=args.allow_stale)
     global df
     df = pd.read_pickle(ALL_MODELS)
-    print(f"all_models.pkl: {len(df)} rows, {df.groupby(SC).ngroups} sessions, "
-          f"{df.model.nunique()} models, BIN_S={BIN_S}")
+    print(
+        f"all_models.pkl: {len(df)} rows, {df.groupby(SC).ngroups} sessions, "
+        f"{df.model.nunique()} models, BIN_S={BIN_S}"
+    )
 
     section_baseline(df)
 
-    section_coef("2. IMMEDIATE REWARD COMPONENT (raw, uncontrolled)", "M1_rew",
-                 IMMEDIATE_COEF)
+    section_coef(
+        "2. IMMEDIATE REWARD COMPONENT (raw, uncontrolled)", "M1_rew", IMMEDIATE_COEF
+    )
     section_coef(
         "2. IMMEDIATE REWARD COMPONENT (controlled: time+history)",
         FULL,

@@ -256,23 +256,19 @@ def main() -> None:
     if args.max_sessions is not None:
         sessions = sessions[: args.max_sessions]
         logging.info("Smoke run: first %d session(s) only", len(sessions))
+    # Each table split by session once; a session a table lacks gets its empty
+    # frame (same columns and dtypes).
+    tables = (event_table, event_arm_table, event_sequence_table)
+    by_session = [
+        dict(tuple(table.groupby(list(SESSION_COLUMNS), sort=False)))
+        for table in tables
+    ]
     for i, sess_key in enumerate(sessions):
         animal, session_date, epoch = sess_key
-        ev_s = event_table[
-            (event_table["animal"] == animal)
-            & (event_table["session_date"] == session_date)
-            & (event_table["epoch"] == epoch)
-        ]
-        ea_s = event_arm_table[
-            (event_arm_table["animal"] == animal)
-            & (event_arm_table["session_date"] == session_date)
-            & (event_arm_table["epoch"] == epoch)
-        ]
-        es_s = event_sequence_table[
-            (event_sequence_table["animal"] == animal)
-            & (event_sequence_table["session_date"] == session_date)
-            & (event_sequence_table["epoch"] == epoch)
-        ]
+        ev_s, ea_s, es_s = (
+            groups.get(sess_key, table.iloc[:0])
+            for groups, table in zip(by_session, tables, strict=True)
+        )
         t0 = time.time()
         # Fail the batch before publication when any session violates the
         # location/observability contract.  Continuing here would turn a

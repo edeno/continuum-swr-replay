@@ -220,7 +220,7 @@ def _aggregate_event_features(
         current_arm = location_arm
         # Trial-derived context columns are NaN at every dot timebin
         # before the first trial start (see ``add_trial_context``).
-        # ``_safe_first`` would silently skip those leading NaNs and
+        # Taking the first non-NaN value would skip those leading NaNs and
         # return the next trial's context, leaking future state into
         # events whose first timebin had no trial active. The
         # stop-table builder already uses the strict semantics for the

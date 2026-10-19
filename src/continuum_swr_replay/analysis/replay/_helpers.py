@@ -117,25 +117,10 @@ def align_posterior_to_dot(
 
 def safe_mode(series: pd.Series) -> float:
     """Mode of a series (first value on tie), ``NaN`` if empty or all NaN."""
-    if len(series) == 0:
-        return np.nan
     valid = series.dropna()
     if len(valid) == 0:
         return np.nan
-    mode = valid.mode()
-    if len(mode) == 0:
-        return np.nan
-    return float(mode.iloc[0])
-
-
-def safe_first(series: pd.Series) -> float:
-    """First non-NaN value of a series, ``NaN`` if empty or all NaN."""
-    if len(series) == 0:
-        return np.nan
-    valid = series.dropna()
-    if len(valid) == 0:
-        return np.nan
-    return float(valid.iloc[0])
+    return float(valid.mode().iloc[0])
 
 
 def strict_first(series: pd.Series) -> float:
@@ -143,8 +128,8 @@ def strict_first(series: pd.Series) -> float:
 
     Use this when extracting event-level / bout-level context columns
     that come from ``add_trial_context``: those columns are NaN at every
-    timebin before the first trial start. ``safe_first`` would silently
-    skip leading NaNs and inherit the *next* trial's context, leaking
+    timebin before the first trial start. Taking the first non-NaN value
+    would silently skip leading NaNs and inherit the *next* trial's context, leaking
     future state into events that started before any trial existed.
     ``strict_first`` returns the first row's value as-is (NaN stays
     NaN), so before-trial events surface as missing context instead of

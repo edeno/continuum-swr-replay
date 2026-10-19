@@ -54,6 +54,7 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (
     write_cohort_audit,
 )
 from continuum_swr_replay.analysis.replay.cohort_selection import (
+    _sorted_unit_ids,
     freeze_common_cohort,
 )
 from continuum_swr_replay.analysis.replay.covariate_registry import (
@@ -117,21 +118,17 @@ def _patch_switch_models_for_source(event_source: str):
     return MODEL_PATCH_SWITCH
 
 
-def _rate_models_for_source(event_source: str):
-    """Rate hierarchy for the event-source definition (R0-R2 for all sources).
+# Rate hierarchy, the same for every event source. The ``is_swr_stop`` term
+# (formerly R3) was removed from ``MODEL_PER_STOP_RATE``: it is tautological
+# with a per-stop event count that overlaps SWRs by construction, so it is
+# dropped for every source, not just SWR.
+_RATE_MODELS = MODEL_PER_STOP_RATE
 
-    The ``is_swr_stop`` term (formerly R3) was removed from ``MODEL_PER_STOP_RATE``: it
-    is tautological with a per-stop event count that overlaps SWRs by
-    construction, so it is dropped for every source, not just SWR.
-    """
-    return MODEL_PER_STOP_RATE
-
-
-def _choice_models_for_source(event_source: str):  # noqa: ARG001
-    """Primary choice models fit on one common stop cohort."""
-    return {
-        name: MODEL_CHOICE[name] for name in ("C_replay_only", "C_behavior", "C_full")
-    }
+# Primary choice models, the same for every event source, fit on one common
+# stop cohort.
+_CHOICE_MODELS = {
+    name: MODEL_CHOICE[name] for name in ("C_replay_only", "C_behavior", "C_full")
+}
 
 
 def _choice_swr_split_models_for_source(event_source: str):
@@ -157,8 +154,8 @@ def _comparison_metadata(event_source: str, brain_area: str) -> dict[str, object
         ),
         "patch_models": tuple(_patch_models_for_source(event_source)),
         "patch_switch_models": tuple(_patch_switch_models_for_source(event_source)),
-        "rate_models": tuple(_rate_models_for_source(event_source)),
-        "choice_models": tuple(_choice_models_for_source(event_source)),
+        "rate_models": tuple(_RATE_MODELS),
+        "choice_models": tuple(_CHOICE_MODELS),
         "choice_swr_split_models": tuple(
             _choice_swr_split_models_for_source(event_source)
         ),
@@ -238,19 +235,6 @@ def _require_block_columns(
             f"{analysis}{source}: the table lacks required column(s) {missing}; "
             "rebuild the table so it carries every column the block's models read"
         )
-
-
-def _as_python_scalar(value):
-    """Convert numpy scalar IDs to stable Python scalars for provenance."""
-    if hasattr(value, "item"):
-        return value.item()
-    return value
-
-
-def _sorted_unit_ids(values) -> tuple:
-    """Stable sorted tuple of non-null unit IDs."""
-    ids = [_as_python_scalar(v) for v in pd.Series(values).dropna().unique()]
-    return tuple(sorted(ids, key=repr))
 
 
 def _hash_unit_ids(ids: tuple) -> str:
@@ -513,7 +497,7 @@ def fit_per_stop_rate_hierarchy(
     """Fit the source-appropriate Poisson rate hierarchy per session."""
     return _fit_per_session_common_cohort(
         stop_table,
-        _rate_models_for_source(event_source),
+        _RATE_MODELS,
         lambda g, spec: fit_per_stop_rate_model(g, list(spec.predictors), min_stops=20),
         analysis="rate_hierarchy",
         unit_col="stop_id",
@@ -552,7 +536,7 @@ def fit_choice_blocks(
     blocks: dict[str, dict[str, pd.DataFrame]] = {}
     provenance: dict[str, pd.DataFrame] = {}
 
-    choice_models = _choice_models_for_source(event_source)
+    choice_models = _CHOICE_MODELS
     _assert_ladder_timing(choice_models, ladder="choice")
     primary, primary_prov = _fit_choice_block(
         choice, choice_models, "choice", event_source

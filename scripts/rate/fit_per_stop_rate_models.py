@@ -70,7 +70,7 @@ from continuum_swr_replay.analysis.replay.per_stop_rate_model import (
     fit_per_stop_rate_model,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.session_keys import SESSION_COLUMNS, subset_max_per_animal
 from continuum_swr_replay.table_io import read_table
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
@@ -225,17 +225,6 @@ def fit_per_stop_rate_hierarchy(
     return pd.DataFrame(rows), records
 
 
-def _subset_max_per_animal(stop_table: pd.DataFrame, n: int) -> pd.DataFrame:
-    """Keep only the first ``n`` sessions per animal (smoke mode)."""
-    keep = (
-        stop_table[list(SESSION_COLUMNS)]
-        .drop_duplicates()
-        .groupby("animal", sort=False)
-        .head(n)
-    )
-    return stop_table.merge(keep, on=list(SESSION_COLUMNS))
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -298,7 +287,7 @@ def main() -> None:
         cohort_report["counts_before"],
     )
     if args.max_per_animal is not None:
-        stop = _subset_max_per_animal(stop, args.max_per_animal)
+        stop = subset_max_per_animal(stop, args.max_per_animal)
     logger.info(
         "Fitting rate hierarchy %s (CV=%s) x %s over %d sessions...",
         list(MODEL_PER_STOP_RATE),

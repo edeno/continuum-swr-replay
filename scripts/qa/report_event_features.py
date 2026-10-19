@@ -104,7 +104,6 @@ from scripts.qa.report_inventory_comparison import (  # noqa: E402
     _per_session,
     _ratio,
     _summed,
-    _typed,
     pool_sessions,
     read_run,
     with_pending,
@@ -568,7 +567,7 @@ def read_inputs(
     memoryless_dir = memoryless_root / runs["memoryless"]
     ok = _ok(manifest)
     tables = {
-        name: _typed(
+        name: comparison._typed(
             (
                 read_table(comparison.output_path(identifier, inventory_dir, name))
                 for identifier in ok
@@ -577,7 +576,7 @@ def read_inputs(
         )
         for name in ("cells", "directional")
     }
-    tables["memoryless_events"] = _typed(
+    tables["memoryless_events"] = comparison._typed(
         (
             read_table(
                 memoryless_outputs(identifier, memoryless_dir)["events"],

@@ -6,6 +6,7 @@ import xarray as xr
 from non_local_detector import ContFragClusterlessClassifier
 from non_local_detector.environment import Environment
 
+from continuum_swr_replay.analysis.hippocampus.result_loading import _load_saved_decode
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
 
@@ -55,31 +56,13 @@ def load_contfrag_results(
     env : Environment | None
         Environment configuration (None if load_detector=False).
     """
-    epoch_identifier = (
+    return _load_saved_decode(
         f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}"
-        f"_{decoding_brain_area}_contfrag"
+        f"_{decoding_brain_area}_contfrag",
+        ContFragClusterlessClassifier,
+        load_detector=load_detector,
+        non_stationary=non_stationary,
+        ripple_detector_name=ripple_detector_name,
+        training_type=training_type,
+        root=root,
     )
-    if ripple_detector_name != "Kay":
-        epoch_identifier += f"_{ripple_detector_name}"
-    if non_stationary:
-        epoch_identifier += "_non_stationary"
-    if training_type != "no_ripple":
-        epoch_identifier += f"_{training_type}"
-
-    results = xr.open_dataset(
-        root / f"{epoch_identifier}_results.nc",
-        engine="h5netcdf",
-    )
-    state_bin_coord_names = list(results["state_bins"].coords)
-    results = results.set_index(state_bins=state_bin_coord_names)
-
-    if load_detector:
-        detector = ContFragClusterlessClassifier.load_model(
-            root / f"{epoch_identifier}_detector.pkl"
-        )
-        env = detector.environments[0]
-    else:
-        detector = None
-        env = None
-
-    return results, detector, env

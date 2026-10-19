@@ -24,7 +24,6 @@ Usage::
 from __future__ import annotations
 
 import argparse
-import hashlib
 from pathlib import Path
 
 import pandas as pd
@@ -35,19 +34,10 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     REWARD_HISTORY_INCOMPLETE,
 )
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
-from continuum_swr_replay.table_io import read_table
+from continuum_swr_replay.table_io import read_table, sha256_file
 from continuum_swr_replay.table_parity import diff_table
 
 DEFAULT_ADDED_COLUMNS = (*REWARD_HISTORY_COLUMNS, REWARD_HISTORY_INCOMPLETE)
-
-
-def sha256(path: Path) -> str:
-    """Return the SHA-256 hex digest of ``path``."""
-    digest = hashlib.sha256()
-    with open(path, "rb") as handle:
-        for chunk in iter(lambda: handle.read(1 << 20), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def assert_row_and_column_order(
@@ -145,8 +135,8 @@ def main() -> None:
         print(text)
         lines.append(text)
 
-    emit(f"candidate : {args.candidate}  sha256={sha256(args.candidate)}")
-    emit(f"reference : {args.reference}  sha256={sha256(args.reference)}")
+    emit(f"candidate : {args.candidate}  sha256={sha256_file(args.candidate)}")
+    emit(f"reference : {args.reference}  sha256={sha256_file(args.reference)}")
     emit(f"rows      : candidate {len(candidate)} | reference {len(reference)}")
     emit(
         f"columns   : candidate {len(candidate.columns)} | "

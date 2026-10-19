@@ -31,7 +31,7 @@ import argparse
 import json
 import os
 import sys
-from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from itertools import combinations
 from pathlib import Path
 from types import MappingProxyType
@@ -333,17 +333,6 @@ def session_names(frame: pd.DataFrame) -> pd.Series:
     )
 
 
-def _typed(
-    frames: Iterable[pd.DataFrame], dtypes: Mapping[str, object]
-) -> pd.DataFrame:
-    rows = [frame for frame in frames if len(frame)]
-    if not rows:
-        return pd.DataFrame(
-            {name: pd.Series(dtype=dtype) for name, dtype in dtypes.items()}
-        )
-    return pd.concat(rows, ignore_index=True)[list(dtypes)].astype(dict(dtypes))
-
-
 def read_run(
     run_dir: Path,
     table_dtypes: Mapping[str, Mapping[str, object]] | None = None,
@@ -376,7 +365,7 @@ def read_run(
         if record["status"] == "ok"
     )
     tables = {
-        name: _typed(
+        name: runner._typed(
             (read_table(output_path(identifier, run_dir, name)) for identifier in ok),
             dtypes,
         )

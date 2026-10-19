@@ -37,8 +37,6 @@ __all__ = [
     "subtract_intervals",
 ]
 
-INTERVAL_COLUMNS = ["start_time", "end_time"]
-
 LFP_SIGNATURES = frozenset({"ref", "ca1"})
 """T signatures read from the LFP: a step on the reference or on CA1."""
 SPIKE_SIGNATURES = frozenset({"spk"})

@@ -680,8 +680,8 @@ def plot_spike_times(
         time=time_slice
     ).acausal_state_probabilities
     non_local_probabilities = acausal_state_probabilities.sel(
-        time=time_slice, states="Non-Local Continuous"
-    ) + acausal_state_probabilities.sel(time=time_slice, states="Non-Local Fragmented")
+        states="Non-Local Continuous"
+    ) + acausal_state_probabilities.sel(states="Non-Local Fragmented")
     is_non_local = (non_local_probabilities > 0.8).values.squeeze()
     try:
         place_fields = detector.encoding_model_[("", 0)]["place_fields"]
@@ -930,17 +930,13 @@ def plot_linear_track_graph_strip(
     ax.set_ylabel("Position [cm]")
 
 
-def _track_edge_colors(n_edges: int) -> NDArray[np.floating]:
+def _track_edge_colors() -> NDArray[np.floating]:
     """tab10 per-edge colors, matching :func:`plot_graph_as_1D`'s default.
 
     Both the 1D strip and the 2D key index this by position in
     ``edge_order`` so an arm has the same color in both views.
     """
-    cmap = matplotlib.colormaps.get_cmap("tab10")
-    colors = getattr(cmap, "colors", None)
-    if colors is not None:
-        return np.array(colors)
-    return np.array([cmap(i / 10) for i in range(10)])
+    return np.array(matplotlib.colormaps["tab10"].colors)
 
 
 def plot_track_graph_2d(
@@ -995,12 +991,14 @@ def plot_track_graph_2d(
     )
     if edge_order is None:
         edge_order = list(track_graph.edges)
-    edge_colors = _track_edge_colors(len(edge_order))
+    edge_colors = _track_edge_colors()
     reward_well_nodes = [n for n in track_graph.nodes if track_graph.degree(n) == 1]
     node_pos = {n: track_graph.nodes[n]["pos"] for n in track_graph.nodes}
     for edge_ind, (n1, n2) in enumerate(edge_order):
         xy = np.stack((node_pos[n1], node_pos[n2]))
-        ax.plot(xy[:, 0], xy[:, 1], color=edge_colors[edge_ind], linewidth=1.5, zorder=2)
+        ax.plot(
+            xy[:, 0], xy[:, 1], color=edge_colors[edge_ind], linewidth=1.5, zorder=2
+        )
         if mark_wells:
             for node in (n1, n2):
                 if node in reward_well_nodes:

@@ -62,7 +62,10 @@ _INTERACTION_FACTORS: dict[str, tuple[str, str]] = {
         "reward_fraction_candidate_arm_last10_visits",
         "is_swr",
     ),
-    "swr_x_visit_recency_trials_event_leaf_centered": ("visit_recency_trials_event_leaf_centered", "is_swr"),
+    "swr_x_visit_recency_trials_event_leaf_centered": (
+        "visit_recency_trials_event_leaf_centered",
+        "is_swr",
+    ),
     "swr_x_is_candidate_arm_never_visited": (
         "is_candidate_arm_never_visited",
         "is_swr",
@@ -104,6 +107,32 @@ def _softmax(logits: np.ndarray) -> np.ndarray:
     shifted = logits - logits.max(axis=-1, keepdims=True)
     exp = np.exp(shifted)
     return exp / exp.sum(axis=-1, keepdims=True)
+
+
+def _broadcast_event_lengths(L_e: int | Sequence[int], n_events: int) -> np.ndarray:
+    """Per-event lengths: a scalar ``L_e`` repeated, or a sequence checked.
+
+    Parameters
+    ----------
+    L_e : int or sequence of int
+        One length for every event, or one per event.
+    n_events : int
+
+    Returns
+    -------
+    np.ndarray of int, shape (n_events,)
+
+    Raises
+    ------
+    ValueError
+        If a sequence ``L_e`` does not have shape ``(n_events,)``.
+    """
+    if np.isscalar(L_e):
+        return np.full(n_events, int(L_e))
+    L_e_arr = np.asarray(L_e, dtype=int)
+    if L_e_arr.shape != (n_events,):
+        raise ValueError(f"L_e length {L_e_arr.shape} != n_events {n_events}")
+    return L_e_arr
 
 
 def _sample_visit_history(
@@ -177,31 +206,41 @@ def sample_arm_design(
     feature_cols["is_last_rewarded_arm"] = (arm_grid == rewarded[:, None]).astype(float)
     # Last-rewarded arm restricted to where it is not the current arm
     # (the identifiable, non-collinear reward-memory predictor for M5/M6).
-    feature_cols["is_last_rewarded_noncurrent_arm"] = feature_cols["is_last_rewarded_arm"] * (
-        1.0 - feature_cols["is_current_arm"]
-    )
+    feature_cols["is_last_rewarded_noncurrent_arm"] = feature_cols[
+        "is_last_rewarded_arm"
+    ] * (1.0 - feature_cols["is_current_arm"])
 
     # Continuous: independent across events and arms with arbitrary scale.
     if any(
         name in predictors
-        for name in ("visit_recency_trials", "visit_recency_trials_event_leaf_centered", "is_candidate_arm_never_visited")
+        for name in (
+            "visit_recency_trials",
+            "visit_recency_trials_event_leaf_centered",
+            "is_candidate_arm_never_visited",
+        )
     ):
         vr, never_visited = _sample_visit_history(n_events, rng)
         if "visit_recency_trials" in predictors:
             feature_cols["visit_recency_trials"] = vr
         if "visit_recency_trials_event_leaf_centered" in predictors:
-            feature_cols["visit_recency_trials_event_leaf_centered"] = center_visit_recency_within_event(
-                vr, never_visited
+            feature_cols["visit_recency_trials_event_leaf_centered"] = (
+                center_visit_recency_within_event(vr, never_visited)
             )
         if "is_candidate_arm_never_visited" in predictors:
             feature_cols["is_candidate_arm_never_visited"] = never_visited
     if "reward_count_candidate_arm_last10_known_trials" in predictors:
-        feature_cols["reward_count_candidate_arm_last10_known_trials"] = rng.uniform(0, 5, size=(n_events, n_arms))
+        feature_cols["reward_count_candidate_arm_last10_known_trials"] = rng.uniform(
+            0, 5, size=(n_events, n_arms)
+        )
     if "reward_fraction_candidate_arm_last10_visits" in predictors:
         # Rewarded fraction of recent visits — a rate in [0, 1].
-        feature_cols["reward_fraction_candidate_arm_last10_visits"] = rng.uniform(0, 1, size=(n_events, n_arms))
+        feature_cols["reward_fraction_candidate_arm_last10_visits"] = rng.uniform(
+            0, 1, size=(n_events, n_arms)
+        )
     if "distance_to_candidate_arm_cm" in predictors:
-        feature_cols["distance_to_candidate_arm_cm"] = rng.uniform(0, 100, size=(n_events, n_arms))
+        feature_cols["distance_to_candidate_arm_cm"] = rng.uniform(
+            0, 100, size=(n_events, n_arms)
+        )
 
     # Arm fixed-effect dummies: arm_fe_k = 1 on arm k, identical across
     # events (the static per-arm baseline the FE model controls for).
@@ -271,12 +310,7 @@ def simulate_counts(
                 f"design shape {design.shape} != expected {expected_shape}"
             )
 
-    if np.isscalar(L_e):
-        L_e_arr = np.full(n_events, int(L_e))
-    else:
-        L_e_arr = np.asarray(L_e, dtype=int)
-        if L_e_arr.shape != (n_events,):
-            raise ValueError(f"L_e length {L_e_arr.shape} != n_events {n_events}")
+    L_e_arr = _broadcast_event_lengths(L_e, n_events)
 
     logits = design @ beta_vec  # (n_events, n_arms)
     probs = _softmax(logits)
@@ -346,12 +380,7 @@ def simulate_with_event_covariates(
     logits = design @ beta_vec
     probs = _softmax(logits)
 
-    if np.isscalar(L_e):
-        L_e_arr = np.full(n_events, int(L_e))
-    else:
-        L_e_arr = np.asarray(L_e, dtype=int)
-        if L_e_arr.shape != (n_events,):
-            raise ValueError(f"L_e length {L_e_arr.shape} != n_events {n_events}")
+    L_e_arr = _broadcast_event_lengths(L_e, n_events)
 
     counts = np.empty((n_events, n_arms), dtype=int)
     for e in range(n_events):
@@ -399,18 +428,25 @@ def _sample_event_covariate_columns(
         "is_last_rewarded_arm": (arm_grid == rewarded[:, None]).astype(float),
         "visit_recency_trials": visit_recency,
         "is_candidate_arm_never_visited": arm_never_visited,
-        "reward_count_candidate_arm_last10_known_trials": rng.uniform(0, 5, size=(n_events, n_arms)),
-        "reward_fraction_candidate_arm_last10_visits": rng.uniform(0, 1, size=(n_events, n_arms)),
+        "reward_count_candidate_arm_last10_known_trials": rng.uniform(
+            0, 5, size=(n_events, n_arms)
+        ),
+        "reward_fraction_candidate_arm_last10_visits": rng.uniform(
+            0, 1, size=(n_events, n_arms)
+        ),
         "distance_to_candidate_arm_cm": rng.uniform(0, 100, size=(n_events, n_arms)),
     }
     # M5/M6 reward-memory predictor: last-rewarded arm where it is not
     # the current arm (disjoint support from is_current by construction).
-    arm_features["is_last_rewarded_noncurrent_arm"] = arm_features["is_last_rewarded_arm"] * (
-        1.0 - arm_features["is_current_arm"]
-    )
+    arm_features["is_last_rewarded_noncurrent_arm"] = arm_features[
+        "is_last_rewarded_arm"
+    ] * (1.0 - arm_features["is_current_arm"])
     # M4 visit-recency predictor: time-local relative recency among leaf arms.
-    arm_features["visit_recency_trials_event_leaf_centered"] = center_visit_recency_within_event(
-        arm_features["visit_recency_trials"], arm_features["is_candidate_arm_never_visited"]
+    arm_features["visit_recency_trials_event_leaf_centered"] = (
+        center_visit_recency_within_event(
+            arm_features["visit_recency_trials"],
+            arm_features["is_candidate_arm_never_visited"],
+        )
     )
     # Arm fixed-effect dummies: constant across events, so a fit
     # recovers their coefficients at 0 unless the generative truth
@@ -514,12 +550,7 @@ def simulate_dirichlet_multinomial_counts(
     phi = np.exp(log_phi_intercept + log_phi_is_swr * is_swr)
     alpha = phi[:, None] * mean_probs
 
-    if np.isscalar(L_e):
-        L_e_arr = np.full(n_events, int(L_e))
-    else:
-        L_e_arr = np.asarray(L_e, dtype=int)
-        if L_e_arr.shape != (n_events,):
-            raise ValueError(f"L_e length {L_e_arr.shape} != n_events {n_events}")
+    L_e_arr = _broadcast_event_lengths(L_e, n_events)
 
     p_true = np.empty((n_events, n_arms))
     counts = np.empty((n_events, n_arms), dtype=int)
@@ -615,12 +646,7 @@ def simulate_autocorrelated_counts(
                 f"design shape {design.shape} != expected {expected_shape}"
             )
 
-    if np.isscalar(L_e):
-        L_e_arr = np.full(n_events, int(L_e))
-    else:
-        L_e_arr = np.asarray(L_e, dtype=int)
-        if L_e_arr.shape != (n_events,):
-            raise ValueError(f"L_e length {L_e_arr.shape} != n_events {n_events}")
+    L_e_arr = _broadcast_event_lengths(L_e, n_events)
 
     logits = design @ beta_vec
     probs = _softmax(logits)
@@ -805,12 +831,7 @@ def simulate_posterior_bumps(
                 f"design shape {design.shape} != expected {expected_shape}"
             )
 
-    if np.isscalar(L_e):
-        L_e_arr = np.full(n_events, int(L_e))
-    else:
-        L_e_arr = np.asarray(L_e, dtype=int)
-        if L_e_arr.shape != (n_events,):
-            raise ValueError(f"L_e length {L_e_arr.shape} != n_events {n_events}")
+    L_e_arr = _broadcast_event_lengths(L_e, n_events)
 
     logits = design @ beta_vec
     probs = _softmax(logits)
@@ -906,12 +927,7 @@ def simulate_hard_vs_soft_counts(
 
     design = sample_arm_design(n_events, predictor_list, rng)
 
-    if np.isscalar(L_e):
-        L_e_arr = np.full(n_events, int(L_e))
-    else:
-        L_e_arr = np.asarray(L_e, dtype=int)
-        if L_e_arr.shape != (n_events,):
-            raise ValueError(f"L_e length {L_e_arr.shape} != n_events {n_events}")
+    L_e_arr = _broadcast_event_lengths(L_e, n_events)
 
     logits = design @ beta_vec
     probs = _softmax(logits)
@@ -1119,12 +1135,7 @@ def simulate_full_pipeline(
         )
     design = np.stack([feature_cols[p] for p in predictor_list], axis=-1)
 
-    if np.isscalar(L_e):
-        L_e_arr = np.full(n_events, int(L_e))
-    else:
-        L_e_arr = np.asarray(L_e, dtype=int)
-        if L_e_arr.shape != (n_events,):
-            raise ValueError(f"L_e length {L_e_arr.shape} != n_events {n_events}")
+    L_e_arr = _broadcast_event_lengths(L_e, n_events)
 
     logits = design @ beta_vec
     probs = _softmax(logits)

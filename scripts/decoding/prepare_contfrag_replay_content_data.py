@@ -59,10 +59,14 @@ from continuum_swr_replay.analysis.hippocampus.swr_source import (
 )
 from continuum_swr_replay.analysis.replay import build_event_patch_table
 from continuum_swr_replay.analysis.replay import prepare_data as replay_prepare_data
+from continuum_swr_replay.analysis.replay.covariate_registry import (
+    stamp_covariate_schema,
+)
 from continuum_swr_replay.analysis.replay.covariates import load_contingency
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.table_io import publish_canonical
+from continuum_swr_replay.table_parity import BASENAME_TO_TABLE
 
 logging.basicConfig(
     level=logging.INFO,
@@ -86,6 +90,48 @@ def contfrag_table_basenames(event_source: str, brain_area: str) -> dict[str, st
         "event_patch_table": f"event_patch_table_{src}_{brain_area}",
         "stop_table": f"stop_table_{src}_{brain_area}",
     }
+
+
+def publish_contfrag_tables(
+    event_table: pd.DataFrame,
+    event_arm_table: pd.DataFrame,
+    event_patch_table: pd.DataFrame,
+    stop_table: pd.DataFrame,
+    *,
+    output_dir: Path,
+    basenames: dict[str, str],
+) -> dict[str, pd.DataFrame]:
+    """Stamp the four ContFrag tables and publish them to ``output_dir``.
+
+    Each table is stamped with its covariate schema and the SWR source, then
+    written through ``publish_canonical`` under its name in ``basenames``
+    (from :func:`contfrag_table_basenames`). The shard assembler and the
+    behavioral-covariate refresh both end here.
+
+    Returns
+    -------
+    dict of str to pd.DataFrame
+        The stamped tables, keyed ``event_table``, ``event_arm_table``,
+        ``event_patch_table`` and ``stop_table``.
+    """
+    tables = {
+        "event_table": stamp_covariate_schema(event_table, table="event"),
+        "event_arm_table": stamp_covariate_schema(event_arm_table, table="event_arm"),
+        "event_patch_table": stamp_covariate_schema(
+            event_patch_table, table="event_patch"
+        ),
+        "stop_table": stamp_covariate_schema(stop_table, table="stop"),
+    }
+    for frame in tables.values():
+        stamp_swr_source(frame)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    for name, frame in tables.items():
+        # publish_canonical is the one write door (re-stamp idempotent, atomic).
+        path = publish_canonical(
+            frame, output_dir, table=BASENAME_TO_TABLE[name], basename=basenames[name]
+        )
+        logging.info("saved %s -> %s (%d rows)", name, path, len(frame))
+    return tables
 
 
 OUTPUT_DIR = PROCESSED_DATA_DIR / "contfrag_replay_content"

@@ -27,6 +27,8 @@ from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
 
 from .design_constants import (
+    N_HISTORY_BASIS,
+    N_HISTORY_LAGS,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_INCOMPLETE,
     REWARD_HISTORY_N_BASIS,
@@ -41,7 +43,9 @@ __all__ = [
     "reconstruct_reward_kernels",
     "reconstruct_self_history_kernels",
     "reward_basis_from_lags",
+    "reward_kernel_rate_ratios",
     "reward_kernel_weights",
+    "self_history_rate_ratios",
 ]
 
 logger = logging.getLogger(__name__)
@@ -396,6 +400,63 @@ def reconstruct_self_history_kernels(
     return coefs @ raised_cosine_history_basis(n_lags, n_basis)
 
 
+def reward_kernel_rate_ratios(sessions: pd.DataFrame) -> np.ndarray:
+    """Across-session median of the per-session reconstructed reward kernel.
+
+    Each session's kernel is reconstructed from that session's own basis
+    coefficients and the median is then taken per lag. Reconstructing from
+    across-session median coefficients instead would summarize a session that
+    was never fit: the bumps are strongly collinear, so their marginal medians
+    describe no fitted kernel.
+
+    Parameters
+    ----------
+    sessions : pd.DataFrame
+        One row per session for a single (model, outcome), carrying
+        ``coef_reward_history_rcos_*``. Sessions with any NaN basis coefficient
+        contribute nothing.
+
+    Returns
+    -------
+    np.ndarray, shape (REWARD_HISTORY_N_LAGS,)
+        Median rate ratio at each lag ``1..REWARD_HISTORY_N_LAGS``.
+    """
+    columns = [f"coef_{c}" for c in REWARD_HISTORY_COLUMNS]
+    kernels = reconstruct_reward_kernels(
+        sessions[columns].to_numpy(dtype=float),
+        REWARD_HISTORY_N_LAGS,
+        REWARD_HISTORY_N_BASIS,
+    )
+    return np.median(np.exp(kernels), axis=0)
+
+
+def self_history_rate_ratios(sessions: pd.DataFrame) -> np.ndarray:
+    """Across-session median of the per-session reconstructed self-history kernel.
+
+    ``hist_rcos_k`` is the plain projection of the ``onset_lag{j}`` counts onto
+    the raw raised-cosine bumps, so an onset ``j`` bins back contributes
+    ``sum_k coef_k * B[k, j]`` to the log rate -- the un-normalized basis,
+    unlike the reward block's bump-weighted fractions.
+
+    Parameters
+    ----------
+    sessions : pd.DataFrame
+        One row per session for a single (model, outcome), carrying
+        ``coef_hist_rcos_*``. Sessions with any NaN basis coefficient
+        contribute nothing.
+
+    Returns
+    -------
+    np.ndarray, shape (N_HISTORY_LAGS,)
+        Median rate ratio at each lag ``1..N_HISTORY_LAGS``.
+    """
+    columns = [f"coef_hist_rcos_{k}" for k in range(N_HISTORY_BASIS)]
+    kernels = reconstruct_self_history_kernels(
+        sessions[columns].to_numpy(dtype=float), N_HISTORY_LAGS, N_HISTORY_BASIS
+    )
+    return np.median(np.exp(kernels), axis=0)
+
+
 def _arrival_spanning_stop_ids(stops: pd.DataFrame) -> np.ndarray:
     """``stop_id`` of the bouts that contain a later well arrival.
 
@@ -609,11 +670,8 @@ def aggregate_to_timebins(
     nmax = int(np.ceil(tmax / bin_s))
     nbin = np.minimum(np.ceil(s["_span_s"].to_numpy() / bin_s), nmax).astype(int)
     idx = np.repeat(np.arange(len(s)), nbin)
-    binj = (
-        np.concatenate([np.arange(n) for n in nbin])
-        if len(s)
-        else np.empty(0, dtype=int)
-    )
+    # position of each bin within its stop: 0..nbin-1, stop after stop
+    binj = np.arange(len(idx)) - np.repeat(np.cumsum(nbin) - nbin, nbin)
     cols = [*SESSION_COLUMNS, "stop_id", "_span_s", *carry]
     out = s.iloc[idx][cols].reset_index(drop=True)
     out["binj"] = binj
@@ -715,7 +773,10 @@ def aggregate_to_timebins(
         )
         out = out.merge(xcnt, on=["stop_id", "binj"], how="left")
         out["cross_count"] = out["cross_count"].fillna(0)
-        out = out.sort_values(["stop_id", "binj"])
+        # A left merge on keys unique in ``xcnt`` keeps the rows in order, so
+        # the self-history block's sort still holds.
+        if not self_history_lags:
+            out = out.sort_values(["stop_id", "binj"])
         xgrouped = out.groupby("stop_id")["cross_count"]
         for j in range(1, cross_history_lags + 1):
             out[f"cross_lag{j}"] = xgrouped.shift(j).fillna(0)

@@ -130,7 +130,6 @@ def _negloglike(
 
 
 _event_loglik_jit = jax.jit(_event_loglik_jax)
-_negloglike_jit = jax.jit(_negloglike)
 _value_and_grad_jit = jax.jit(jax.value_and_grad(_negloglike))
 _hessian_jit = jax.jit(jax.hessian(_negloglike))
 

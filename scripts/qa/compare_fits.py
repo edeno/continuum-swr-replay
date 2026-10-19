@@ -48,10 +48,8 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
-import hashlib
 import json
 import re
-import shlex
 import subprocess
 import sys
 from collections.abc import Sequence
@@ -94,7 +92,12 @@ from continuum_swr_replay.analysis.replay.per_bin_design import (
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
-from continuum_swr_replay.table_io import read_table, table_exists
+from continuum_swr_replay.table_io import read_table, sha256_file, table_exists
+
+# Sibling-script import: run as a script, only this file's directory is on
+# sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from scripts.qa._report import _invocation  # noqa: E402
 
 RC = PROCESSED_DATA_DIR / "replay_content"
 REPO = Path(__file__).resolve().parents[2]
@@ -146,14 +149,6 @@ CONTRAST_OUTCOME_STRATA = ("all", "rewarded", "omitted")
 # The rung both reward quantities below are read from.
 FULL_MODEL = "M7r_time_histcos_rew"
 IMMEDIATE_COEF = f"coef_{REWARD_HISTORY_COLUMNS[0]}"
-
-
-def _sha256(path: Path) -> str:
-    h = hashlib.sha256()
-    with path.open("rb") as fh:
-        for chunk in iter(lambda: fh.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
 
 
 def delta_aic(
@@ -1468,16 +1463,6 @@ def _termlevel_section(frames: dict[str, pd.DataFrame]) -> str:
     return "\n".join(lines)
 
 
-def _invocation() -> str:
-    """This run's command line, relative to the repo root and shell-quoted."""
-    script = Path(sys.argv[0])
-    try:
-        script = script.resolve().relative_to(REPO)
-    except ValueError:
-        pass
-    return shlex.join(["uv", "run", "python", str(script), *sys.argv[1:]])
-
-
 def build_report(
     old_bin: pd.DataFrame,
     new_bin: pd.DataFrame,
@@ -1540,7 +1525,7 @@ def build_report(
                 "path": str(path.relative_to(REPO))
                 if path.is_relative_to(REPO)
                 else str(path),
-                "sha256[:12]": _sha256(path)[:12],
+                "sha256[:12]": sha256_file(path)[:12],
                 "modified": dt.datetime.fromtimestamp(path.stat().st_mtime).isoformat(
                     timespec="seconds"
                 ),
@@ -2467,7 +2452,7 @@ def build_content_report(
                     if path.is_relative_to(REPO)
                     else str(path)
                 ),
-                "sha256[:12]": _sha256(path)[:12],
+                "sha256[:12]": sha256_file(path)[:12],
                 "modified": dt.datetime.fromtimestamp(path.stat().st_mtime).isoformat(
                     timespec="seconds"
                 ),
@@ -3519,7 +3504,7 @@ def build_cohort_report(
         _md(
             pd.DataFrame(
                 [
-                    {"role": role, "path": str(path), "sha256": _sha256(path)[:12]}
+                    {"role": role, "path": str(path), "sha256": sha256_file(path)[:12]}
                     for role, path in inputs.items()
                 ]
             )

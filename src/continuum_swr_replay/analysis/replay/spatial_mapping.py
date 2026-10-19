@@ -15,6 +15,49 @@ from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 logger = logging.getLogger(__name__)
 
 
+def _nearest_bin_index(bin_positions: np.ndarray, x: np.ndarray) -> np.ndarray:
+    """Index of the bin nearest each position, the first one on a tie.
+
+    The same index as ``np.abs(bin_positions[None, :] - x[:, None]).argmin(1)``
+    without its ``(n_x, n_bins)`` temporary: on strictly increasing bins the
+    nearest one is a ``searchsorted`` neighbour of ``x``. Other bins take the
+    dense path.
+
+    Parameters
+    ----------
+    bin_positions : np.ndarray, shape (n_bins,)
+        Bin centres, at least one.
+    x : np.ndarray, shape (n_x,)
+        Positions, none NaN.
+
+    Returns
+    -------
+    np.ndarray of int, shape (n_x,)
+    """
+    n_bins = len(bin_positions)
+    if n_bins < 2 or not np.all(np.diff(bin_positions) > 0):
+        return np.abs(bin_positions[None, :] - x[:, None]).argmin(axis=1)
+    right = np.searchsorted(bin_positions, x, side="left")
+    left = right - 1
+    left_clipped = np.maximum(left, 0)
+    right_clipped = np.minimum(right, n_bins - 1)
+    d_left = np.abs(bin_positions[left_clipped] - x)
+    d_right = np.abs(bin_positions[right_clipped] - x)
+    # equidistant -> the left bin, as argmin takes the first minimum
+    take_left = (right == n_bins) | ((left >= 0) & (d_left <= d_right))
+    idx = np.where(take_left, left_clipped, right_clipped)
+    # The rounded distances fall monotonically toward x on each side, so the
+    # only other bin that can tie the chosen one is the one just left of it
+    # (far outside the bins, or at infinity); argmin would take that one.
+    previous = np.maximum(idx - 1, 0)
+    tied = (idx > 0) & (
+        np.abs(bin_positions[previous] - x) == np.where(take_left, d_left, d_right)
+    )
+    if tied.any():
+        idx[tied] = np.abs(bin_positions[None, :] - x[tied, None]).argmin(axis=1)
+    return idx
+
+
 def map_estimate_to_patch(map_estimate: np.ndarray, env) -> np.ndarray:
     """Map decoded linear position to patch ID (1, 2, or 3).
 
@@ -50,7 +93,7 @@ def map_estimate_to_patch(map_estimate: np.ndarray, env) -> np.ndarray:
     result = np.full(len(map_est), np.nan)
     valid = ~np.isnan(map_est)
     if valid.any() and len(lp_real) > 0:
-        idx = np.abs(lp_real[None, :] - map_est[valid, None]).argmin(axis=1)
+        idx = _nearest_bin_index(lp_real, map_est[valid])
         result[valid] = [
             TRACK_SEGMENT_TO_PATCH.get(int(ei_real[j]), np.nan) for j in idx
         ]
@@ -90,7 +133,7 @@ def map_estimate_to_arm(map_estimate: np.ndarray, env) -> np.ndarray:
     result = np.full(len(map_est), np.nan)
     valid = ~np.isnan(map_est)
     if valid.any() and len(lp_real) > 0:
-        idx = np.abs(lp_real[None, :] - map_est[valid, None]).argmin(axis=1)
+        idx = _nearest_bin_index(lp_real, map_est[valid])
         result[valid] = ei_real[idx].astype(float)
     return result
 

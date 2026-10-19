@@ -53,6 +53,7 @@ from non_local_detector.simulate.sorted_spikes_simulation import (
     make_simulated_data,
 )
 
+from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import (
     MemorylessSequenceConfig,
 )
@@ -119,7 +120,7 @@ Enough for a window of full support plus context, and small enough that the
 pieces left after cutting out the recording's own events can still hold an
 event."""
 
-NON_LOCAL_PROB_THRESHOLD = 0.8
+NON_LOCAL_PROB_THRESHOLD = DEFAULT_NON_LOCAL_THRESHOLD
 NON_LOCAL_MINIMUM_DURATION_S = 0.015
 """The project's non-local event definition, as in
 ``analysis/hippocampus/event_detection.get_confident_times``: non-local
@@ -1021,7 +1022,8 @@ def main() -> None:
     parser.add_argument(
         "--out",
         type=Path,
-        default=PROCESSED_DATA_DIR / "replay_detection_comparison"
+        default=PROCESSED_DATA_DIR
+        / "replay_detection_comparison"
         / "memoryless_detection_sweep.parquet",
     )
     parser.add_argument(

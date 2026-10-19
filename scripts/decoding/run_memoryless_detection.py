@@ -342,8 +342,7 @@ def find_epochs(
         if animal is None or parse_nwb_filename(nwb_file_name)[0] == animal
     }
     epochs = {
-        f"{nwb_file_name.removesuffix('_.nwb')}_{epoch_name}_HPC"
-        for nwb_file_name, epoch_name in keys
+        swr_epoch_id(nwb_file_name, epoch_name) for nwb_file_name, epoch_name in keys
     }
     skipped = {}
     pattern = f"{animal}*_HPC*_detector.pkl" if animal else "*_HPC*_detector.pkl"
@@ -877,9 +876,9 @@ def run_settings(
 def write_manifest(path: Path, manifest: dict) -> None:
     """Write through a temporary file, so a stopped run never leaves half a manifest."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(".json.tmp")
-    temporary.write_text(json.dumps(manifest, indent=2))
-    os.replace(temporary, path)
+    write_atomically(
+        path, lambda temporary: temporary.write_text(json.dumps(manifest, indent=2))
+    )
 
 
 def _counts(record: dict) -> str:

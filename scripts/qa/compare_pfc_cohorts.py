@@ -51,7 +51,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -67,6 +66,11 @@ from continuum_swr_replay.analysis.pfc.load_population import (
 )
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+
+# Sibling-script import: run as a script, only this file's directory is on
+# sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from scripts.qa._report import _invocation, _md  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -86,16 +90,6 @@ FDR_TESTS = [
     "SWR + non_local_no_SWR vs. non_local_no_SWR",
     "non_local_SWR + non_local_no_SWR vs. non_local",
 ]
-
-
-def _invocation() -> str:
-    """This run's command line, relative to the repo root and shell-quoted."""
-    script = Path(sys.argv[0])
-    try:
-        script = script.resolve().relative_to(REPO)
-    except ValueError:
-        pass
-    return shlex.join(["uv", "run", "python", str(script), *sys.argv[1:]])
 
 
 #: Top-level sidecar keys carried into the per-session frame beside the
@@ -1165,41 +1159,6 @@ def worker_time_table(paths: list[Path]) -> pd.DataFrame:
             }
         )
     return pd.DataFrame(rows)
-
-
-def _cell(value: object, float_format: str) -> str:
-    """One markdown cell: missing renders blank, a count renders as a count."""
-    if value is None:
-        return ""
-    if isinstance(value, str):
-        return value
-    if pd.isna(value):
-        return ""
-    if isinstance(value, float):
-        return float_format.format(value)
-    return str(value)
-
-
-def _md(frame: pd.DataFrame, float_format: str = "{:.4g}") -> str:
-    """A markdown table, with missing values rendered as an empty cell.
-
-    Cells are rendered by iterating the columns rather than with
-    ``Series.map``: mapping over a nullable-integer column coerces its values
-    to float, which turns a neuron count into ``10986.0``.
-    """
-    if frame.empty:
-        return "_(no rows)_\n"
-    columns = {
-        name: [_cell(value, float_format) for value in frame[name]]
-        for name in frame.columns
-    }
-    header = "| " + " | ".join(str(name) for name in columns) + " |"
-    rule = "| " + " | ".join("---" for _ in columns) + " |"
-    body = [
-        "| " + " | ".join(cells[i] for cells in columns.values()) + " |"
-        for i in range(len(frame))
-    ]
-    return "\n".join([header, rule, *body]) + "\n"
 
 
 # ---------------------------------------------------------------------------

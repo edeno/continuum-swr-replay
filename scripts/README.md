@@ -112,6 +112,8 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
 - `archive/` — retired figure scripts (not linted; kept for provenance).
 
 ## `qa/` — diagnostics / validation
+- `_report.py` — not a script: the run's command line (`_invocation`) and the markdown
+  table (`_md`) that several QA reports share, imported as `scripts.qa._report`.
 - `run_refits.py` — reruns the CPU fits for Q2, Q3b and Q4 and the figures that read them,
   in dependency order. Each run is pinned to its own CPUs from `--cpus` (default: all this
   process may use), and OMP/MKL/OpenBLAS/numba threads are capped per run. Runs are named

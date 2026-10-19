@@ -46,13 +46,13 @@ from continuum_swr_replay.session_keys import SESSION_COLUMNS
 # Single source of truth: the curated covariate set + populations are defined in
 # the fitter; import them so the plot axes match exactly what was fit.
 _FIT_SPEC = importlib.util.spec_from_file_location(
-    "fit_uncertainty_rate", Path(__file__).resolve().with_name("fit_uncertainty_rate.py")
+    "fit_uncertainty_rate",
+    Path(__file__).resolve().with_name("fit_uncertainty_rate.py"),
 )
 _fit = importlib.util.module_from_spec(_FIT_SPEC)
 _FIT_SPEC.loader.exec_module(_fit)
 POPULATIONS = _fit.POPULATIONS_TO_FIT
 # The same tables the fitter recorded in the artifact's provenance sidecar.
-UNCERTAINTY_RATE = _fit.RC / "models_per_bin_rate" / "uncertainty_rate.pkl"
 UNCERTAINTY_RATE_INPUTS = _fit.FIT_INPUTS
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -145,9 +145,7 @@ def plot(models: pd.DataFrame, out_path) -> None:
         ax.text(
             0.5,
             0.97,
-            f"NLnoSWR vs SWR p={p:.2g} (n={npair})"
-            if np.isfinite(p)
-            else "p n/a",
+            f"NLnoSWR vs SWR p={p:.2g} (n={npair})" if np.isfinite(p) else "p n/a",
             transform=ax.transAxes,
             ha="center",
             va="top",

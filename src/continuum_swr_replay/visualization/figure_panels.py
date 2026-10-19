@@ -10,7 +10,6 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -40,7 +39,6 @@ from continuum_swr_replay.analysis.hippocampus.event_immobility import (
 from continuum_swr_replay.analysis.hippocampus.swr_source import analysed_bins
 from continuum_swr_replay.figure_utilities import (
     PANEL_SINGLE,
-    PANEL_SINGLE_SQUARE,
     get_figure_size,
     save_figure,
 )
@@ -80,7 +78,10 @@ def plot_event_duration_distribution(
     if standalone:
         fig, ax = plt.subplots(figsize=PANEL_SINGLE)
 
-    for event_type in ("non_local_event_immobile", "non_local_event_immobile_no_overlap_SWR_event"):
+    for event_type in (
+        "non_local_event_immobile",
+        "non_local_event_immobile_no_overlap_SWR_event",
+    ):
         event_times = get_event_start_end_times(
             event_types[event_type], event_col="non_local_event"
         )
@@ -253,7 +254,10 @@ def plot_triggered_averages(
 
     if precomputed is None:
         curves = compute_triggered_average_curves(
-            data_over_time, event_types, signal_types, time_col=time_col,
+            data_over_time,
+            event_types,
+            signal_types,
+            time_col=time_col,
         )
     else:
         curves = precomputed
@@ -421,9 +425,7 @@ def _nonlocal_swr_event_bin_masks(
         ["non_local_event", "SWR_event"],
     )
     active = eligible["non_local_event"] > 0
-    is_swr_event = event_strict_overlap_mask(
-        eligible, "non_local_event", "SWR_event"
-    )
+    is_swr_event = event_strict_overlap_mask(eligible, "non_local_event", "SWR_event")
     return active & is_swr_event, active & ~is_swr_event
 
 
@@ -941,13 +943,26 @@ def plot_event_example_stack(
 
     plot_ripple_consensus_trace_zscore(data, time_slice, ax_swr)
     plot_spike_times(
-        data, time_slice, detector, env, results, ax_raster,
+        data,
+        time_slice,
+        detector,
+        env,
+        results,
+        ax_raster,
     )
     plot_conditional_non_local_posterior(
-        data, time_slice, results, env, detector, ax_post,
+        data,
+        time_slice,
+        results,
+        env,
+        detector,
+        ax_post,
     )
     plot_acausal_probabilities(
-        results, time_slice, ax_probs, plot_local=True,
+        results,
+        time_slice,
+        ax_probs,
+        plot_local=True,
     )
 
     # Tighten the x-limits to the requested window. The four sub-row
@@ -1014,7 +1029,7 @@ def plot_swr_overlap_class_bar(
     order = ("swr_contained", "swr_partial", "non_swr")
     segment_colors = {
         "swr_contained": COLORS["SWR"],
-        "swr_partial": "#b5825a",        # neutral sand: overlap but not contained
+        "swr_partial": "#b5825a",  # neutral sand: overlap but not contained
         "non_swr": COLORS["Non-Local"],
     }
     segment_labels = {
@@ -1109,8 +1124,11 @@ def plot_event_timing_offsets(
     standalone = axes is None
     if standalone:
         fig, axes = plt.subplots(
-            1, 2, figsize=(5.0, 2.2),
-            sharey=True, constrained_layout=True,
+            1,
+            2,
+            figsize=(5.0, 2.2),
+            sharey=True,
+            constrained_layout=True,
         )
         axes = list(axes)
 
@@ -1148,17 +1166,29 @@ def plot_event_timing_offsets(
 
         median_ms = float(np.median(values_ms))
         ax.axvline(
-            0.0, color="grey", linestyle="-", linewidth=0.75, alpha=0.6,
+            0.0,
+            color="grey",
+            linestyle="-",
+            linewidth=0.75,
+            alpha=0.6,
         )
         ax.axvline(
-            median_ms, color="black", linestyle="--", linewidth=1.0,
+            median_ms,
+            color="black",
+            linestyle="--",
+            linewidth=1.0,
         )
         # Annotate the median as plain text in a top corner rather than a
         # legend. The median line sits near zero (panel centre), so a
         # corner placement keeps the text clear of the dashed line.
         ax.text(
-            0.97, 0.97, f"median {median_ms:+.0f} ms",
-            transform=ax.transAxes, ha="right", va="top", fontsize=6,
+            0.97,
+            0.97,
+            f"median {median_ms:+.0f} ms",
+            transform=ax.transAxes,
+            ha="right",
+            va="top",
+            fontsize=6,
         )
 
         ax.set_xlabel(xlabel)
@@ -1167,102 +1197,6 @@ def plot_event_timing_offsets(
         sns.despine(ax=ax)
 
     ax_start.set_ylabel("Density")
-
-    if standalone:
-        plt.tight_layout()
-
-
-
-def plot_swr_nl_venn_2circle(
-    counts: dict[str, int],
-    ax: plt.Axes | None = None,
-) -> None:
-    """Two-circle Venn of SWR events and immobile non-local events.
-
-    Shows the three-region breakdown:
-
-    - "SWR only"         = SWR events not overlapping any non-local event
-    - "both"             = the shared overlap region
-    - "non-local only"   = immobile non-local events not overlapping any SWR
-
-    Each region's count is annotated along with the percent of its
-    parent population, which makes the ~68% SWR → NL vs ~60% NL → no-SWR
-    asymmetry readable at a glance.
-
-    Parameters
-    ----------
-    counts : dict
-        Output of :func:`compute_swr_nl_event_counts`.
-    ax : matplotlib.axes.Axes, optional
-        Axes to draw on. If None, a standalone figure is created.
-
-    Notes
-    -----
-    The two "shared" counts (``n_swr_with_nl`` vs ``n_nl_immobile_with_swr``)
-    typically differ by <1% because a single SWR can overlap multiple
-    non-local events or vice versa. Their mean is shown as a single
-    number in the overlap region; the caption can clarify.
-
-    """
-    standalone = ax is None
-    if standalone:
-        fig, ax = plt.subplots(figsize=PANEL_SINGLE_SQUARE)
-
-    n_swr = counts.get("n_b", counts.get("n_swr", 0))
-    n_nl = counts.get("n_a", counts.get("n_nl_immobile", 0))
-    n_swr_with_nl = counts.get("n_b_with_a", counts.get("n_swr_with_nl", 0))
-    n_nl_with_swr = counts.get("n_a_with_b", counts.get("n_nl_immobile_with_swr", 0))
-
-    n_swr_only = n_swr - n_swr_with_nl
-    n_nl_only = n_nl - n_nl_with_swr
-    n_shared = (n_swr_with_nl + n_nl_with_swr) // 2
-
-    # Circle geometry in data coordinates; set_aspect("equal") keeps circles
-    # round regardless of panel aspect.
-    r = 1.0
-    c_swr = (-0.55, 0.0)
-    c_nl = (0.55, 0.0)
-
-    circle_swr = mpatches.Circle(
-        c_swr, r, fc=COLORS["SWR"], alpha=0.45, ec="black", lw=0.8,
-    )
-    circle_nl = mpatches.Circle(
-        c_nl, r, fc=COLORS["Non-Local"], alpha=0.45, ec="black", lw=0.8,
-    )
-    ax.add_patch(circle_swr)
-    ax.add_patch(circle_nl)
-
-    # Region counts inside each visible wedge
-    ax.text(
-        -1.1, 0.0, f"{n_swr_only:,}",
-        ha="center", va="center", fontsize=8, fontweight="bold",
-    )
-    ax.text(
-        1.1, 0.0, f"{n_nl_only:,}",
-        ha="center", va="center", fontsize=8, fontweight="bold",
-    )
-    ax.text(
-        0.0, 0.0, f"{n_shared:,}",
-        ha="center", va="center", fontsize=8, fontweight="bold", color="white",
-    )
-
-    # Circle labels above the circles
-    ax.text(
-        c_swr[0], 1.15, f"SWR\n(n={n_swr:,})",
-        ha="center", va="bottom", fontsize=7, fontweight="bold",
-        color=COLORS["SWR"],
-    )
-    ax.text(
-        c_nl[0], 1.15, f"non-local\n(n={n_nl:,})",
-        ha="center", va="bottom", fontsize=7, fontweight="bold",
-        color=COLORS["Non-Local"],
-    )
-
-    # Leave plenty of vertical headroom for the two labels above
-    ax.set_xlim(-2.1, 2.1)
-    ax.set_ylim(-1.3, 1.7)
-    ax.set_aspect("equal")
-    ax.axis("off")
 
     if standalone:
         plt.tight_layout()

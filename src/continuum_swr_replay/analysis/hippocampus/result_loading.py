@@ -29,6 +29,7 @@ Load results only (without detector):
 """
 
 from pathlib import Path
+from typing import Any
 
 import xarray as xr
 from non_local_detector import NonLocalClusterlessDetector
@@ -84,9 +85,50 @@ def load_results(
         Environment configuration (None if load_detector=False)
 
     """
-    epoch_identifier = (
-        f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{decoding_brain_area}"
+    return _load_saved_decode(
+        f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{decoding_brain_area}",
+        NonLocalClusterlessDetector,
+        load_detector=load_detector,
+        non_stationary=non_stationary,
+        ripple_detector_name=ripple_detector_name,
+        training_type=training_type,
+        root=root,
     )
+
+
+def _load_saved_decode(
+    epoch_stem: str,
+    model_class: Any,
+    *,
+    load_detector: bool,
+    non_stationary: bool,
+    ripple_detector_name: str,
+    training_type: str,
+    root: Path,
+) -> tuple[xr.Dataset, Any | None, Environment | None]:
+    """Read one saved decode's results and, optionally, its fitted model.
+
+    Shared by :func:`load_results` and
+    :func:`~continuum_swr_replay.analysis.contfrag.result_loading.load_contfrag_results`,
+    which differ only in ``epoch_stem`` and ``model_class``.
+
+    Parameters
+    ----------
+    epoch_stem : str
+        Epoch identifier before the run suffixes, such as
+        ``"chimi20200212_02_r1_HPC"``.
+    model_class : type
+        Detector class whose ``load_model`` reads the ``_detector.pkl``.
+    load_detector, non_stationary, ripple_detector_name, training_type, root
+        As in :func:`load_results`.
+
+    Returns
+    -------
+    results : xr.Dataset
+    detector : model_class instance or None
+    env : Environment or None
+    """
+    epoch_identifier = epoch_stem
     if ripple_detector_name != "Kay":
         epoch_identifier += f"_{ripple_detector_name}"
     if non_stationary:
@@ -102,9 +144,7 @@ def load_results(
     results = results.set_index(state_bins=state_bin_coord_names)
 
     if load_detector:
-        detector = NonLocalClusterlessDetector.load_model(
-            root / f"{epoch_identifier}_detector.pkl"
-        )
+        detector = model_class.load_model(root / f"{epoch_identifier}_detector.pkl")
         env = detector.environments[0]
     else:
         detector = None

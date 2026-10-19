@@ -23,6 +23,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.session_keys import SESSION_COLUMNS
+
 from ._helpers import stay_indicator_from_patches
 
 # ── 1. Within-event circular time shuffle ──
@@ -116,7 +118,7 @@ def stop_label_shuffle(
     # Guard: stop_table must be a single session. Cross-session
     # shuffle would swap labels between sessions, which is never
     # the intent (reviewer flag #10).
-    session_cols = ["animal", "session_date", "epoch"]
+    session_cols = list(SESSION_COLUMNS)
     available = [c for c in session_cols if c in stop_table.columns]
     if available:
         n_sessions = stop_table[available].drop_duplicates().shape[0]
@@ -209,7 +211,7 @@ def next_arm_circular_shift(
     """
     if rng is None:
         rng = np.random.default_rng()
-    session_cols = ["animal", "session_date", "epoch"]
+    session_cols = list(SESSION_COLUMNS)
     available = [c for c in session_cols if c in event_table.columns]
     if available:
         n_sessions = event_table[available].drop_duplicates().shape[0]

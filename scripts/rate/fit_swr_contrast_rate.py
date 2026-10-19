@@ -136,7 +136,10 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     SWR_CONTRAST_RATE_STOP_COVARS as STOP_COVARS,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
-from continuum_swr_replay.session_keys import SESSION_COLUMNS  # noqa: E402
+from continuum_swr_replay.session_keys import (  # noqa: E402
+    SESSION_COLUMNS,
+    subset_max_per_animal,
+)
 from continuum_swr_replay.table_io import read_table  # noqa: E402
 
 # Only the benign exp()-overflow RuntimeWarning (quasi-separated coefs -> rate ratios)
@@ -653,16 +656,6 @@ def _home_cohort(model: str) -> str:
     return POST_OUTCOME_COHORT if model in POST_OUTCOME_RATE_RUNGS else PRIMARY_COHORT
 
 
-def _subset_max_per_animal(stop: pd.DataFrame, n: int) -> pd.DataFrame:
-    keep = (
-        stop[list(SESSION_COLUMNS)]
-        .drop_duplicates()
-        .groupby("animal", sort=False)
-        .head(n)
-    )
-    return stop.merge(keep, on=list(SESSION_COLUMNS))
-
-
 def _cohort_records(
     models: pd.DataFrame,
     stop: pd.DataFrame,
@@ -1125,7 +1118,7 @@ def main() -> None:
     # table could be regenerated mid-fit and be certified as this fit's input.
     fit_inputs = record_inputs(FIT_INPUTS)
     if args.max_per_animal is not None:
-        stop = _subset_max_per_animal(stop, args.max_per_animal)
+        stop = subset_max_per_animal(stop, args.max_per_animal)
 
     onset_groups = dict(tuple(onsets.groupby(list(SESSION_COLUMNS), sort=False)))
     items = [

@@ -52,6 +52,7 @@ from continuum_swr_replay.data_loaders.constants import (
     TRACK_SEGMENT_TO_PATCH,
     WELL_PATCH_MAPPING,
 )
+from continuum_swr_replay.session_keys import SESSION_COLUMNS
 
 from ._helpers import strict_sum
 from .cohort_selection import select_event_cohort
@@ -86,7 +87,7 @@ _VALID_WELL_ARMS = frozenset(WELL_PATCH_MAPPING.keys())
 
 def _session_keys(df: pd.DataFrame) -> list[str]:
     """Session-key columns present in ``df``."""
-    return [c for c in ("animal", "session_date", "epoch") if c in df.columns]
+    return [c for c in SESSION_COLUMNS if c in df.columns]
 
 
 def _visit_context_ids(event_table: pd.DataFrame) -> pd.Series:
@@ -264,7 +265,7 @@ def _arm_fraction_at(
     ev = event_table.dropna(subset=[target_col]).copy()
     ev[target_col] = ev[target_col].astype(int)
 
-    sess_keys = [c for c in ("animal", "session_date", "epoch") if c in event_arm_table.columns]
+    sess_keys = _session_keys(event_arm_table)
     ea = event_arm_table[[*sess_keys, "event_id", "candidate_arm", "arm_fraction"]]
 
     merged = ev.merge(
@@ -340,9 +341,7 @@ def _ends_at_arm(
     ev = event_table.dropna(subset=[target_col]).copy()
     ev[target_col] = ev[target_col].astype(int)
 
-    sess_keys = [
-        c for c in ("animal", "session_date", "epoch") if c in event_sequence_table.columns
-    ]
+    sess_keys = _session_keys(event_sequence_table)
     last_bin = (
         event_sequence_table.sort_values([*sess_keys, "event_id", "t_in_event"])
         .groupby([*sess_keys, "event_id"], as_index=False)
@@ -419,9 +418,7 @@ def _contains_path(
     ev[source_col] = ev[source_col].astype(int)
     ev[target_col] = ev[target_col].astype(int)
 
-    sess_keys = [
-        c for c in ("animal", "session_date", "epoch") if c in event_sequence_table.columns
-    ]
+    sess_keys = _session_keys(event_sequence_table)
     # Empty ``event_sequence_table`` is a legitimate input
     # (sessions can have events but no in-event timebins yet, e.g.
     # before posterior reconstruction lands). The previous chained
@@ -539,8 +536,10 @@ def chosen_patch_fraction(
     ev = event_table.dropna(subset=["next_patch"]).copy()
     ev["next_patch"] = ev["next_patch"].astype(int)
 
-    sess_keys = [c for c in ("animal", "session_date", "epoch") if c in event_arm_table.columns]
-    ea = event_arm_table[[*sess_keys, "event_id", "candidate_arm", "arm_fraction"]].copy()
+    sess_keys = _session_keys(event_arm_table)
+    ea = event_arm_table[
+        [*sess_keys, "event_id", "candidate_arm", "arm_fraction"]
+    ].copy()
     # Map arm → patch via TRACK_SEGMENT_TO_PATCH.
     ea["arm_patch"] = ea["candidate_arm"].map(TRACK_SEGMENT_TO_PATCH)
 
@@ -609,9 +608,7 @@ def ends_at_next_patch(
     ev = event_table.dropna(subset=["next_patch"]).copy()
     ev["next_patch"] = ev["next_patch"].astype(int)
 
-    sess_keys = [
-        c for c in ("animal", "session_date", "epoch") if c in event_sequence_table.columns
-    ]
+    sess_keys = _session_keys(event_sequence_table)
     last_bin = (
         event_sequence_table.sort_values([*sess_keys, "event_id", "t_in_event"])
         .groupby([*sess_keys, "event_id"], as_index=False)
@@ -667,7 +664,7 @@ def compute_retrospective_metrics(
         ``include_patch=True``, and the ``prev_arm`` mirror when
         ``include_prev=True``.
     """
-    sess_keys = [c for c in ("animal", "session_date", "epoch") if c in event_table.columns]
+    sess_keys = _session_keys(event_table)
     cf = chosen_arm_fraction(event_table, event_arm_table)
     en = ends_at_next(event_table, event_sequence_table)
     cp = contains_path_to_next(event_table, event_sequence_table)

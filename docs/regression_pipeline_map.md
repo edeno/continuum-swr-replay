@@ -338,7 +338,7 @@ Shared fit-diagnostics helpers: convergence, separation, warning capture.
 
 Small shared primitives for the event-table builders.
 
-`single_arm_from_well`, `arm_to_patch`, `stay_indicator_from_patches`, `stay_indicator`, `align_posterior_to_dot`, `safe_mode`, `safe_first`, `strict_first`, `strict_mean`, `strict_sum`, `eq_indicator`, `eq_indicator_or_nan`, `align_count_matrix`, `assert_event_label_alignment`, `assert_single_session_alignment`, `add_arm_fixed_effects`, `build_well_to_arm_map`
+`single_arm_from_well`, `arm_to_patch`, `stay_indicator_from_patches`, `stay_indicator`, `align_posterior_to_dot`, `safe_mode`, `strict_first`, `strict_mean`, `strict_sum`, `eq_indicator`, `eq_indicator_or_nan`, `align_count_matrix`, `assert_event_label_alignment`, `assert_single_session_alignment`, `add_arm_fixed_effects`, `build_well_to_arm_map`
 
 ### `src/continuum_swr_replay/analysis/replay/choice_prediction.py`
 
@@ -362,7 +362,7 @@ Per-session model fitting for the replay content model hierarchy.
 
 The (stop x bin) point-process design and the bases it is built on.
 
-`attach_is_swr_to_onsets`, `raised_cosine_history_basis`, `reward_basis_from_lags`, `reward_kernel_weights`, `reconstruct_reward_kernels`, `reconstruct_self_history_kernels`, `aggregate_to_timebins`
+`attach_is_swr_to_onsets`, `raised_cosine_history_basis`, `reward_basis_from_lags`, `reward_kernel_weights`, `reconstruct_reward_kernels`, `reconstruct_self_history_kernels`, `reward_kernel_rate_ratios`, `self_history_rate_ratios`, `aggregate_to_timebins`
 
 ### `src/continuum_swr_replay/analysis/replay/per_bin_rate_model.py`
 
@@ -486,7 +486,7 @@ Convert the materialized canonical tables from pickle to parquet.
 
 Build canonical replay-content tables from ContFrag decoding results.
 
-`contfrag_table_basenames`, `find_sessions`, `build_parser`, `configure_paths`, `main`
+`contfrag_table_basenames`, `publish_contfrag_tables`, `find_sessions`, `build_parser`, `configure_paths`, `main`
 
 ### `scripts/decoding/prepare_replay_content_data.py`
 
@@ -588,7 +588,7 @@ Plot the per-bin conditional-intensity ladder (Family B) from its tidy output.
 
 Six-panel summary figure for the per-bin rate ladder (Family B).
 
-`reward_kernel_rate_ratios`, `build_parser`, `main`
+`build_parser`, `main`
 
 ### `scripts/rate/plot_uncertainty_rate.py`
 
@@ -600,7 +600,7 @@ Plot replay rate vs uncertainty/value by population from the tidy fit output.
 
 Summarize the per-bin conditional-intensity ladder (Family B) effects.
 
-`section_baseline`, `section_coef`, `self_history_rate_ratios`, `section_kernel`, `reward_kernel_rate_ratios`, `section_reward_kernel`, `section_selfhistory`, `section_ladder`, `build_parser`, `main`
+`section_baseline`, `section_coef`, `section_kernel`, `section_reward_kernel`, `section_selfhistory`, `section_ladder`, `build_parser`, `main`
 
 ## Aggregation
 
@@ -664,6 +664,12 @@ Per-event replay-trajectory rollups, shared by both event-table builders.
 
 Artifact I/O, provenance gating, and the diagnostics that check the tables and the fits.
 
+### `scripts/qa/_report.py`
+
+Report helpers shared by the QA scripts: the run's command line, markdown tables.
+
+_No module-level public symbols._
+
 ### `scripts/qa/analyze_event_spike_evidence.py`
 
 Spike-evidence reality analysis for non-SWR non-local events.
@@ -674,13 +680,13 @@ Spike-evidence reality analysis for non-SWR non-local events.
 
 Audit a candidate event-patch table against its pre-change reference.
 
-`sha256`, `assert_row_and_column_order`, `real_arm_bins`, `assert_fraction_definition`, `assert_matches_arm_fractions`, `main`
+`assert_row_and_column_order`, `real_arm_bins`, `assert_fraction_definition`, `assert_matches_arm_fractions`, `main`
 
 ### `scripts/qa/audit_stop_table_reward_history.py`
 
 Audit a candidate stop table against its pre-change reference.
 
-`sha256`, `assert_row_and_column_order`, `incomplete_share`, `assert_prefix_per_session`, `main`
+`assert_row_and_column_order`, `incomplete_share`, `assert_prefix_per_session`, `main`
 
 ### `scripts/qa/check_data_availability.py`
 

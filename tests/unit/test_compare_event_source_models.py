@@ -63,18 +63,16 @@ def test_rate_models_drop_response_leaking_is_swr_stop():
     # it is tautological with a per-stop event count that overlaps SWRs.
     compare = _load_compare_script()
 
-    for source in ("SWR", "MUA", "non_local"):
-        models = compare._rate_models_for_source(source)
-        # The null plus the reward-history basis rung; the response-leaking
-        # is_swr_stop term (R3) stays dropped for every source.
-        assert tuple(models) == ("R0", "R1")
-        assert "R3" not in models
+    # The null plus the reward-history basis rung; the response-leaking
+    # is_swr_stop term (R3) stays dropped for every source.
+    assert tuple(compare._RATE_MODELS) == ("R0", "R1")
+    assert "R3" not in compare._RATE_MODELS
 
 
 def test_choice_swr_split_is_separate_and_skipped_for_swr_source():
     compare = _load_compare_script()
 
-    assert tuple(compare._choice_models_for_source("SWR")) == (
+    assert tuple(compare._CHOICE_MODELS) == (
         "C_replay_only",
         "C_behavior",
         "C_full",

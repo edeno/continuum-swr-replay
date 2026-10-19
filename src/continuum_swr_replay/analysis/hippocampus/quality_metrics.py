@@ -85,7 +85,7 @@ import warnings
 import numpy as np
 import pandas as pd
 from scipy import stats
-from scipy.ndimage import label
+from scipy.ndimage import find_objects, label
 
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
@@ -132,6 +132,50 @@ def _analysed_rows(data: pd.DataFrame) -> np.ndarray:
     return analysed_bins(data)
 
 
+def _run_slices(labeled: np.ndarray) -> list[slice]:
+    """The slice of each run ``scipy.ndimage.label`` numbered, in label order.
+
+    On a 1-D mask each label is one contiguous run, so label ``i`` is exactly
+    the bins of the ``i - 1``-th slice.
+
+    Parameters
+    ----------
+    labeled : np.ndarray of int, shape (n_time,)
+        Labels from ``label`` with at least one run.
+
+    Returns
+    -------
+    list of slice
+        One slice per label ``1..n_runs``.
+    """
+    return [run for (run,) in find_objects(labeled)]
+
+
+def _run_durations_sec(
+    labeled: np.ndarray, times: np.ndarray, sampling_frequency: float
+) -> np.ndarray:
+    """Duration of each labelled run: last minus first bin time, plus one bin.
+
+    Parameters
+    ----------
+    labeled : np.ndarray of int, shape (n_time,)
+        Labels from ``label`` with at least one run.
+    times : np.ndarray, shape (n_time,)
+        Bin times in seconds.
+    sampling_frequency : float
+        Bins per second.
+
+    Returns
+    -------
+    np.ndarray, shape (n_runs,)
+        Duration in seconds, in label order.
+    """
+    runs = _run_slices(labeled)
+    first = np.array([run.start for run in runs])
+    last = np.array([run.stop - 1 for run in runs])
+    return times[last] - times[first] + 1.0 / sampling_frequency
+
+
 def compute_local_decoding_error(
     data: pd.DataFrame,
     local_prob_threshold: float = 0.5,
@@ -169,7 +213,8 @@ def compute_local_decoding_error(
 
     if local_data.empty:
         return pd.DataFrame(
-            columns=group_cols + ["median_error_cm", "p90_error_cm", "mean_error_cm", "n_local_bins"]
+            columns=group_cols
+            + ["median_error_cm", "p90_error_cm", "mean_error_cm", "n_local_bins"]
         )
 
     return (
@@ -227,10 +272,15 @@ def compute_state_fraction_during_movement(
 
     if not is_moving_full.any():
         return pd.DataFrame(
-            columns=group_cols + [
-                "local_fraction", "nospike_fraction",
-                "nonlocal_continuous_fraction", "nonlocal_fragmented_fraction",
-                "n_moving_bins", "max_collapse_duration_sec", "n_collapse_episodes",
+            columns=group_cols
+            + [
+                "local_fraction",
+                "nospike_fraction",
+                "nonlocal_continuous_fraction",
+                "nonlocal_fragmented_fraction",
+                "n_moving_bins",
+                "max_collapse_duration_sec",
+                "n_collapse_episodes",
             ]
         )
 
@@ -259,17 +309,12 @@ def compute_state_fraction_during_movement(
         # contiguous moving stretch and merge two 1-bin events into
         # one 3-second event.
         collapsed_and_moving = (
-            (group["Local_prob"] < local_prob_threshold).to_numpy()
-            & is_moving
-        )
+            group["Local_prob"] < local_prob_threshold
+        ).to_numpy() & is_moving
         times = group.index.to_numpy()
         labeled, n_episodes = label(collapsed_and_moving)
         if n_episodes > 0:
-            episode_durations = np.array([
-                times[labeled == i][-1] - times[labeled == i][0]
-                + 1.0 / sampling_frequency
-                for i in range(1, n_episodes + 1)
-            ])
+            episode_durations = _run_durations_sec(labeled, times, sampling_frequency)
             result["max_collapse_duration_sec"] = float(episode_durations.max())
             result["n_collapse_episodes"] = n_episodes
         else:
@@ -278,9 +323,14 @@ def compute_state_fraction_during_movement(
 
         return pd.Series(result)
 
-    return data.groupby(group_cols, sort=False).apply(
-        _session_stats, include_groups=False,
-    ).reset_index()
+    return (
+        data.groupby(group_cols, sort=False)
+        .apply(
+            _session_stats,
+            include_groups=False,
+        )
+        .reset_index()
+    )
 
 
 def compute_non_local_during_movement(
@@ -325,7 +375,8 @@ def compute_non_local_during_movement(
 
     if not is_moving_full.any():
         return pd.DataFrame(
-            columns=group_cols + [
+            columns=group_cols
+            + [
                 "nonlocal_movement_rate_per_min",
                 "nonlocal_movement_mean_duration_ms",
                 "nonlocal_movement_median_duration_ms",
@@ -341,13 +392,15 @@ def compute_non_local_during_movement(
         is_moving = (group["head_speed"] > speed_threshold).to_numpy() & analysed
         n_moving = int(is_moving.sum())
         if n_moving == 0:
-            return pd.Series({
-                "nonlocal_movement_rate_per_min": 0.0,
-                "nonlocal_movement_mean_duration_ms": 0.0,
-                "nonlocal_movement_median_duration_ms": 0.0,
-                "nonlocal_movement_fraction": 0.0,
-                "n_nonlocal_movement_events": 0,
-            })
+            return pd.Series(
+                {
+                    "nonlocal_movement_rate_per_min": 0.0,
+                    "nonlocal_movement_mean_duration_ms": 0.0,
+                    "nonlocal_movement_median_duration_ms": 0.0,
+                    "nonlocal_movement_fraction": 0.0,
+                    "n_nonlocal_movement_events": 0,
+                }
+            )
 
         nonlocal_prob = (
             group["Non-Local_Continuous_prob"] + group["Non-Local_Fragmented_prob"]
@@ -356,39 +409,45 @@ def compute_non_local_during_movement(
         # as gaps that break event runs. Filtering first treated 5/0/5 cm/s
         # as one contiguous moving stretch and merged separate events.
         is_nonlocal_and_moving = (
-            (nonlocal_prob > non_local_threshold).to_numpy() & is_moving
-        )
+            nonlocal_prob > non_local_threshold
+        ).to_numpy() & is_moving
         times = group.index.to_numpy()
         labeled, n_events = label(is_nonlocal_and_moving)
 
         total_duration_min = n_moving / sampling_frequency / 60.0
 
         if n_events > 0:
-            durations_sec = np.array([
-                times[labeled == i][-1] - times[labeled == i][0]
-                + 1.0 / sampling_frequency
-                for i in range(1, n_events + 1)
-            ])
+            durations_sec = _run_durations_sec(labeled, times, sampling_frequency)
             durations_ms = durations_sec * 1000.0
-            return pd.Series({
-                "nonlocal_movement_rate_per_min": n_events / total_duration_min,
-                "nonlocal_movement_mean_duration_ms": durations_ms.mean(),
-                "nonlocal_movement_median_duration_ms": np.median(durations_ms),
-                "nonlocal_movement_fraction": is_nonlocal_and_moving.sum() / n_moving,
-                "n_nonlocal_movement_events": n_events,
-            })
+            return pd.Series(
+                {
+                    "nonlocal_movement_rate_per_min": n_events / total_duration_min,
+                    "nonlocal_movement_mean_duration_ms": durations_ms.mean(),
+                    "nonlocal_movement_median_duration_ms": np.median(durations_ms),
+                    "nonlocal_movement_fraction": is_nonlocal_and_moving.sum()
+                    / n_moving,
+                    "n_nonlocal_movement_events": n_events,
+                }
+            )
         else:
-            return pd.Series({
-                "nonlocal_movement_rate_per_min": 0.0,
-                "nonlocal_movement_mean_duration_ms": 0.0,
-                "nonlocal_movement_median_duration_ms": 0.0,
-                "nonlocal_movement_fraction": 0.0,
-                "n_nonlocal_movement_events": 0,
-            })
+            return pd.Series(
+                {
+                    "nonlocal_movement_rate_per_min": 0.0,
+                    "nonlocal_movement_mean_duration_ms": 0.0,
+                    "nonlocal_movement_median_duration_ms": 0.0,
+                    "nonlocal_movement_fraction": 0.0,
+                    "n_nonlocal_movement_events": 0,
+                }
+            )
 
-    return data.groupby(group_cols, sort=False).apply(
-        _session_stats, include_groups=False,
-    ).reset_index()
+    return (
+        data.groupby(group_cols, sort=False)
+        .apply(
+            _session_stats,
+            include_groups=False,
+        )
+        .reset_index()
+    )
 
 
 def compute_behavior_state_breakdown(
@@ -473,24 +532,31 @@ def compute_behavior_state_breakdown(
         else:
             imm_local = imm_nospike = imm_nlc = imm_nlf = np.nan
 
-        return pd.Series({
-            "running_fraction": n_running / n_total if n_total > 0 else np.nan,
-            "immobile_fraction": n_immobile / n_total if n_total > 0 else np.nan,
-            "n_running_bins": n_running,
-            "n_immobile_bins": n_immobile,
-            "n_total_bins": n_total,
-            "immobile_local_fraction": imm_local,
-            "immobile_nospike_fraction": imm_nospike,
-            "immobile_nonlocal_continuous_fraction": imm_nlc,
-            "immobile_nonlocal_fragmented_fraction": imm_nlf,
-            "immobile_nonlocal_fraction": (
-                imm_nlc + imm_nlf if np.isfinite(imm_nlc) else np.nan
-            ),
-        })
+        return pd.Series(
+            {
+                "running_fraction": n_running / n_total if n_total > 0 else np.nan,
+                "immobile_fraction": n_immobile / n_total if n_total > 0 else np.nan,
+                "n_running_bins": n_running,
+                "n_immobile_bins": n_immobile,
+                "n_total_bins": n_total,
+                "immobile_local_fraction": imm_local,
+                "immobile_nospike_fraction": imm_nospike,
+                "immobile_nonlocal_continuous_fraction": imm_nlc,
+                "immobile_nonlocal_fragmented_fraction": imm_nlf,
+                "immobile_nonlocal_fraction": (
+                    imm_nlc + imm_nlf if np.isfinite(imm_nlc) else np.nan
+                ),
+            }
+        )
 
-    return data.groupby(group_cols, sort=False).apply(
-        _session_stats, include_groups=False,
-    ).reset_index()
+    return (
+        data.groupby(group_cols, sort=False)
+        .apply(
+            _session_stats,
+            include_groups=False,
+        )
+        .reset_index()
+    )
 
 
 def compute_bout_nonlocal_dominance(
@@ -567,13 +633,15 @@ def compute_bout_nonlocal_dominance(
         running_mask = (group["head_speed"] > speed_threshold).to_numpy() & analysed
         labeled, n_raw_bouts = label(running_mask)
         if n_raw_bouts == 0:
-            return pd.Series({
-                "n_running_bouts": 0,
-                "n_running_bouts_nonlocal_dominant": 0,
-                "frac_running_bouts_nonlocal_dominant": np.nan,
-                "max_bout_nonlocal_fraction": np.nan,
-                "median_bout_local_fraction": np.nan,
-            })
+            return pd.Series(
+                {
+                    "n_running_bouts": 0,
+                    "n_running_bouts_nonlocal_dominant": 0,
+                    "frac_running_bouts_nonlocal_dominant": np.nan,
+                    "max_bout_nonlocal_fraction": np.nan,
+                    "median_bout_local_fraction": np.nan,
+                }
+            )
 
         local = group["Local_prob"].to_numpy()
         nonlocal_prob = (
@@ -583,37 +651,45 @@ def compute_bout_nonlocal_dominance(
 
         bout_nonlocal_means: list[float] = []
         bout_local_means: list[float] = []
-        for i in range(1, n_raw_bouts + 1):
-            m = labeled == i
-            if int(m.sum()) < min_bout_bins:
+        for run in _run_slices(labeled):
+            if run.stop - run.start < min_bout_bins:
                 continue
-            bout_nonlocal_means.append(float(nonlocal_prob[m].mean()))
-            bout_local_means.append(float(local[m].mean()))
+            bout_nonlocal_means.append(float(nonlocal_prob[run].mean()))
+            bout_local_means.append(float(local[run].mean()))
 
         n_bouts = len(bout_nonlocal_means)
         if n_bouts == 0:
-            return pd.Series({
-                "n_running_bouts": 0,
-                "n_running_bouts_nonlocal_dominant": 0,
-                "frac_running_bouts_nonlocal_dominant": np.nan,
-                "max_bout_nonlocal_fraction": np.nan,
-                "median_bout_local_fraction": np.nan,
-            })
+            return pd.Series(
+                {
+                    "n_running_bouts": 0,
+                    "n_running_bouts_nonlocal_dominant": 0,
+                    "frac_running_bouts_nonlocal_dominant": np.nan,
+                    "max_bout_nonlocal_fraction": np.nan,
+                    "median_bout_local_fraction": np.nan,
+                }
+            )
 
         bout_nl = np.asarray(bout_nonlocal_means)
         bout_lc = np.asarray(bout_local_means)
         n_dominant = int((bout_nl > bout_nonlocal_threshold).sum())
-        return pd.Series({
-            "n_running_bouts": n_bouts,
-            "n_running_bouts_nonlocal_dominant": n_dominant,
-            "frac_running_bouts_nonlocal_dominant": n_dominant / n_bouts,
-            "max_bout_nonlocal_fraction": float(bout_nl.max()),
-            "median_bout_local_fraction": float(np.median(bout_lc)),
-        })
+        return pd.Series(
+            {
+                "n_running_bouts": n_bouts,
+                "n_running_bouts_nonlocal_dominant": n_dominant,
+                "frac_running_bouts_nonlocal_dominant": n_dominant / n_bouts,
+                "max_bout_nonlocal_fraction": float(bout_nl.max()),
+                "median_bout_local_fraction": float(np.median(bout_lc)),
+            }
+        )
 
-    return data.groupby(group_cols, sort=False).apply(
-        _session_stats, include_groups=False,
-    ).reset_index()
+    return (
+        data.groupby(group_cols, sort=False)
+        .apply(
+            _session_stats,
+            include_groups=False,
+        )
+        .reset_index()
+    )
 
 
 def compute_running_error_tail(
@@ -680,24 +756,33 @@ def compute_running_error_tail(
         err = group["abs_err"].to_numpy()
         valid = err[np.isfinite(err)]
         if valid.size == 0:
-            return pd.Series({
-                "p90_running_local_error_cm": np.nan,
-                "p99_running_local_error_cm": np.nan,
-                "frac_running_local_error_gt20cm": np.nan,
-                "frac_running_local_error_gt50cm": np.nan,
-                "n_running_local_bins": 0,
-            })
-        return pd.Series({
-            "p90_running_local_error_cm": float(np.percentile(valid, 90)),
-            "p99_running_local_error_cm": float(np.percentile(valid, 99)),
-            "frac_running_local_error_gt20cm": float((valid > 20).mean()),
-            "frac_running_local_error_gt50cm": float((valid > 50).mean()),
-            "n_running_local_bins": int(valid.size),
-        })
+            return pd.Series(
+                {
+                    "p90_running_local_error_cm": np.nan,
+                    "p99_running_local_error_cm": np.nan,
+                    "frac_running_local_error_gt20cm": np.nan,
+                    "frac_running_local_error_gt50cm": np.nan,
+                    "n_running_local_bins": 0,
+                }
+            )
+        return pd.Series(
+            {
+                "p90_running_local_error_cm": float(np.percentile(valid, 90)),
+                "p99_running_local_error_cm": float(np.percentile(valid, 99)),
+                "frac_running_local_error_gt20cm": float((valid > 20).mean()),
+                "frac_running_local_error_gt50cm": float((valid > 50).mean()),
+                "n_running_local_bins": int(valid.size),
+            }
+        )
 
-    return subset.groupby(group_cols, sort=False).apply(
-        _session_stats, include_groups=False,
-    ).reset_index()
+    return (
+        subset.groupby(group_cols, sort=False)
+        .apply(
+            _session_stats,
+            include_groups=False,
+        )
+        .reset_index()
+    )
 
 
 def compute_error_by_track_segment(
@@ -735,7 +820,8 @@ def compute_error_by_track_segment(
 
     if local_data.empty:
         return pd.DataFrame(
-            columns=group_cols + ["track_segment_id", "median_error_cm", "n_bins", "segment_fraction"]
+            columns=group_cols
+            + ["track_segment_id", "median_error_cm", "n_bins", "segment_fraction"]
         )
 
     segment_group_cols = group_cols + ["track_segment_id"]
@@ -754,7 +840,9 @@ def compute_error_by_track_segment(
     )
 
     segment_stats = segment_stats.merge(session_totals, on=group_cols)
-    segment_stats["segment_fraction"] = segment_stats["n_bins"] / segment_stats["session_total_bins"]
+    segment_stats["segment_fraction"] = (
+        segment_stats["n_bins"] / segment_stats["session_total_bins"]
+    )
     segment_stats = segment_stats.drop(columns="session_total_bins")
 
     return segment_stats
@@ -803,9 +891,14 @@ def compute_no_spike_firing_correspondence(
             rho, pvalue = stats.spearmanr(nospike[valid], mua[valid])
         return pd.Series({"nospike_mua_rho": rho, "nospike_mua_pvalue": pvalue})
 
-    return data.groupby(group_cols, sort=False).apply(
-        _session_corr, include_groups=False,
-    ).reset_index()
+    return (
+        data.groupby(group_cols, sort=False)
+        .apply(
+            _session_corr,
+            include_groups=False,
+        )
+        .reset_index()
+    )
 
 
 def compute_non_local_event_context(
@@ -873,9 +966,14 @@ def compute_non_local_event_context(
 
     if non_local.empty:
         return pd.DataFrame(
-            columns=group_cols + [
-                "n_events", "frac_swr", "frac_theta", "frac_neither",
-                "theta_mrl", "theta_mean_angle",
+            columns=group_cols
+            + [
+                "n_events",
+                "frac_swr",
+                "frac_theta",
+                "frac_neither",
+                "theta_mrl",
+                "theta_mean_angle",
             ]
         )
 
@@ -897,10 +995,14 @@ def compute_non_local_event_context(
             return float("nan")
         return float(np.angle(np.mean(np.exp(1j * finite))))
 
-    event_summary = non_local.groupby(event_group_cols, sort=False).agg(
-        mean_theta_power=("theta_power_zscore", "mean"),
-        circular_mean_theta_phase=("theta_phase", _circular_mean),
-    ).reset_index()
+    event_summary = (
+        non_local.groupby(event_group_cols, sort=False)
+        .agg(
+            mean_theta_power=("theta_power_zscore", "mean"),
+            circular_mean_theta_phase=("theta_phase", _circular_mean),
+        )
+        .reset_index()
+    )
 
     # Strict positive-duration interval overlap with any SWR. The
     # previous label-based ``(SWR_event > 0).any()`` aggregator counted
@@ -932,9 +1034,8 @@ def compute_non_local_event_context(
         event_summary["has_swr"] = False
 
     event_summary["is_swr"] = event_summary["has_swr"]
-    event_summary["is_theta"] = (
-        ~event_summary["has_swr"]
-        & (event_summary["mean_theta_power"] > theta_power_threshold)
+    event_summary["is_theta"] = ~event_summary["has_swr"] & (
+        event_summary["mean_theta_power"] > theta_power_threshold
     )
     event_summary["is_neither"] = ~event_summary["is_swr"] & ~event_summary["is_theta"]
 
@@ -971,9 +1072,14 @@ def compute_non_local_event_context(
 
         return pd.Series(result)
 
-    return event_summary.groupby(group_cols, sort=False).apply(
-        _session_context, include_groups=False,
-    ).reset_index()
+    return (
+        event_summary.groupby(group_cols, sort=False)
+        .apply(
+            _session_context,
+            include_groups=False,
+        )
+        .reset_index()
+    )
 
 
 def compute_local_state_collapse_details(
@@ -1022,9 +1128,15 @@ def compute_local_state_collapse_details(
 
     if not is_moving_full.any():
         return pd.DataFrame(
-            columns=group_cols + [
-                "episode_id", "start_time", "end_time", "duration_sec",
-                "mean_hpd", "mean_error_cm", "median_nonlocal_prob",
+            columns=group_cols
+            + [
+                "episode_id",
+                "start_time",
+                "end_time",
+                "duration_sec",
+                "mean_hpd",
+                "mean_error_cm",
+                "median_nonlocal_prob",
                 "classification",
             ]
         )
@@ -1041,25 +1153,25 @@ def compute_local_state_collapse_details(
         # separate 1-bin episodes.
         analysed = _analysed_rows(group)
         is_moving = (group["head_speed"] > speed_threshold).to_numpy() & analysed
-        collapsed = (
-            (group["Local_prob"] < local_prob_threshold).to_numpy() & is_moving
-        )
+        collapsed = (group["Local_prob"] < local_prob_threshold).to_numpy() & is_moving
         labeled, n_episodes = label(collapsed)
 
         if n_episodes == 0:
             continue
 
         session_median_hpd = group.loc[analysed, "hpd"].median()
-        error = group["ahead_behind_distance"].abs()
-        nonlocal_prob = group["Non-Local_Continuous_prob"] + group["Non-Local_Fragmented_prob"]
+        error = group["ahead_behind_distance"].abs().to_numpy()
+        nonlocal_prob = (
+            group["Non-Local_Continuous_prob"] + group["Non-Local_Fragmented_prob"]
+        ).to_numpy()
+        hpd = group["hpd"].to_numpy()
         times = group.index.to_numpy()
 
-        for i in range(1, n_episodes + 1):
-            mask = labeled == i
-            episode_times = times[mask]
-            episode_hpd = group["hpd"].to_numpy()[mask]
-            episode_error = error.to_numpy()[mask]
-            episode_nonlocal = nonlocal_prob.to_numpy()[mask]
+        for i, run in enumerate(_run_slices(labeled), start=1):
+            episode_times = times[run]
+            episode_hpd = hpd[run]
+            episode_error = error[run]
+            episode_nonlocal = nonlocal_prob[run]
 
             mean_hpd = float(np.nanmean(episode_hpd))
             mean_error = float(np.nanmean(episode_error))
@@ -1069,23 +1181,32 @@ def compute_local_state_collapse_details(
             )
 
             episode = dict(zip(group_cols, keys, strict=True))
-            episode.update({
-                "episode_id": i,
-                "start_time": float(episode_times[0]),
-                "end_time": float(episode_times[-1]),
-                "duration_sec": float(episode_times[-1] - episode_times[0]) + 1.0 / sampling_frequency,
-                "mean_hpd": mean_hpd,
-                "mean_error_cm": mean_error,
-                "median_nonlocal_prob": float(np.nanmedian(episode_nonlocal)),
-                "classification": classification,
-            })
+            episode.update(
+                {
+                    "episode_id": i,
+                    "start_time": float(episode_times[0]),
+                    "end_time": float(episode_times[-1]),
+                    "duration_sec": float(episode_times[-1] - episode_times[0])
+                    + 1.0 / sampling_frequency,
+                    "mean_hpd": mean_hpd,
+                    "mean_error_cm": mean_error,
+                    "median_nonlocal_prob": float(np.nanmedian(episode_nonlocal)),
+                    "classification": classification,
+                }
+            )
             all_episodes.append(episode)
 
     if not all_episodes:
         return pd.DataFrame(
-            columns=group_cols + [
-                "episode_id", "start_time", "end_time", "duration_sec",
-                "mean_hpd", "mean_error_cm", "median_nonlocal_prob",
+            columns=group_cols
+            + [
+                "episode_id",
+                "start_time",
+                "end_time",
+                "duration_sec",
+                "mean_hpd",
+                "mean_error_cm",
+                "median_nonlocal_prob",
                 "classification",
             ]
         )
@@ -1180,9 +1301,14 @@ def compute_calibration_curve(
         group["is_monotonic_decreasing"] = is_monotonic
         return group
 
-    return binned.groupby(group_cols, sort=False).apply(
-        _add_session_stats, include_groups=False,
-    ).reset_index()
+    return (
+        binned.groupby(group_cols, sort=False)
+        .apply(
+            _add_session_stats,
+            include_groups=False,
+        )
+        .reset_index()
+    )
 
 
 def compute_session_quality_summary(
@@ -1257,33 +1383,45 @@ def compute_session_quality_summary(
     _analysed_rows(data)
 
     error_df = compute_local_decoding_error(
-        data, local_prob_threshold=local_prob_threshold, group_cols=group_cols,
+        data,
+        local_prob_threshold=local_prob_threshold,
+        group_cols=group_cols,
     )
 
     state_df = compute_state_fraction_during_movement(
-        data, speed_threshold=speed_threshold,
+        data,
+        speed_threshold=speed_threshold,
         local_prob_threshold=local_prob_threshold,
-        sampling_frequency=sampling_frequency, group_cols=group_cols,
+        sampling_frequency=sampling_frequency,
+        group_cols=group_cols,
     )
 
     nonlocal_move_df = compute_non_local_during_movement(
-        data, speed_threshold=speed_threshold,
+        data,
+        speed_threshold=speed_threshold,
         non_local_threshold=non_local_threshold,
-        sampling_frequency=sampling_frequency, group_cols=group_cols,
+        sampling_frequency=sampling_frequency,
+        group_cols=group_cols,
     )
 
     behavior_state_df = compute_behavior_state_breakdown(
-        data, speed_threshold=speed_threshold, group_cols=group_cols,
+        data,
+        speed_threshold=speed_threshold,
+        group_cols=group_cols,
     )
 
     bout_dominance_df = compute_bout_nonlocal_dominance(
-        data, speed_threshold=speed_threshold,
-        sampling_frequency=sampling_frequency, group_cols=group_cols,
+        data,
+        speed_threshold=speed_threshold,
+        sampling_frequency=sampling_frequency,
+        group_cols=group_cols,
     )
 
     running_error_df = compute_running_error_tail(
-        data, speed_threshold=speed_threshold,
-        local_prob_threshold=local_prob_threshold, group_cols=group_cols,
+        data,
+        speed_threshold=speed_threshold,
+        local_prob_threshold=local_prob_threshold,
+        group_cols=group_cols,
     )
 
     nospike_df = compute_no_spike_firing_correspondence(data, group_cols=group_cols)
@@ -1305,9 +1443,7 @@ def compute_session_quality_summary(
         calib_session = pd.DataFrame(columns=group_cols + calib_cols)
     else:
         calib_session = (
-            calib_df.groupby(group_cols, sort=False)
-            .first()[calib_cols]
-            .reset_index()
+            calib_df.groupby(group_cols, sort=False).first()[calib_cols].reset_index()
         )
 
     summary = error_df
@@ -1331,19 +1467,24 @@ def compute_session_quality_summary(
         return condition(summary[col]).fillna(False)
 
     summary["flag_high_error"] = _flag(
-        "median_error_cm", lambda x: x > error_flag_threshold_cm,
+        "median_error_cm",
+        lambda x: x > error_flag_threshold_cm,
     )
     summary["flag_local_collapse"] = _flag(
-        "local_fraction", lambda x: x < local_fraction_flag_threshold,
+        "local_fraction",
+        lambda x: x < local_fraction_flag_threshold,
     )
     summary["flag_nospike_wrong_sign"] = _flag(
-        "nospike_mua_rho", lambda x: x > 0,
+        "nospike_mua_rho",
+        lambda x: x > 0,
     )
     summary["flag_poor_calibration"] = _flag(
-        "calibration_slope", lambda x: x >= 0,
+        "calibration_slope",
+        lambda x: x >= 0,
     )
     summary["flag_low_swr_overlap"] = _flag(
-        "frac_swr", lambda x: x < swr_overlap_flag_threshold,
+        "frac_swr",
+        lambda x: x < swr_overlap_flag_threshold,
     )
     summary["flag_bout_nonlocal_dominant"] = _flag(
         "frac_running_bouts_nonlocal_dominant",

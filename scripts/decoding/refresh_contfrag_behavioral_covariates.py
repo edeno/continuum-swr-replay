@@ -21,6 +21,7 @@ import pandas as pd
 from prepare_contfrag_replay_content_data import (
     contfrag_table_basenames,
     find_sessions,
+    publish_contfrag_tables,
 )
 
 from continuum_swr_replay.analysis.contfrag.tables import (
@@ -34,13 +35,9 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
 from continuum_swr_replay.analysis.hippocampus.swr_source import (
     read_dot_with_swr_source,
     require_swr_source,
-    stamp_swr_source,
 )
 from continuum_swr_replay.analysis.replay import build_event_patch_table
 from continuum_swr_replay.analysis.replay import prepare_data as replay_prepare_data
-from continuum_swr_replay.analysis.replay.covariate_registry import (
-    stamp_covariate_schema,
-)
 from continuum_swr_replay.analysis.replay.covariates import load_contingency
 from continuum_swr_replay.analysis.replay.summaries import (
     arm_fraction_from_event_total,
@@ -51,8 +48,7 @@ from continuum_swr_replay.analysis.replay.table_contracts import (
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
-from continuum_swr_replay.table_io import publish_canonical, read_table
-from continuum_swr_replay.table_parity import BASENAME_TO_TABLE
+from continuum_swr_replay.table_io import read_table
 
 LOGGER = logging.getLogger(__name__)
 EVENT_POSTERIOR_COLUMNS = (
@@ -211,7 +207,10 @@ def refresh_contfrag_behavioral_covariates(
     # The posterior aggregates are carried on event ids that hash the SWR
     # labels, so the source bundle must come from the SWR source the rebuild
     # reads: another source's events are other events.
-    for name, frame in (("event_table", old_event_all), ("event_arm_table", old_arm_all)):
+    for name, frame in (
+        ("event_table", old_event_all),
+        ("event_arm_table", old_arm_all),
+    ):
         require_swr_source(frame, what=f"{source_dir / basenames[name]}")
     validate_event_arm_table(old_arm_all, event_table=old_event_all)
     contingency = load_contingency(
@@ -291,26 +290,14 @@ def refresh_contfrag_behavioral_covariates(
         raise ValueError("rebuilt stop/event count conservation failed")
 
     # Rebuilt from decode frames read through the SWR source, so stamped with it.
-    tables = {
-        "event_table": stamp_covariate_schema(event_table, table="event"),
-        "event_arm_table": stamp_covariate_schema(
-            event_arm_table, table="event_arm"
-        ),
-        "event_patch_table": stamp_covariate_schema(
-            event_patch_table, table="event_patch"
-        ),
-        "stop_table": stamp_covariate_schema(stop_table, table="stop"),
-    }
-    for frame in tables.values():
-        stamp_swr_source(frame)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    for name, frame in tables.items():
-        # publish_canonical is the one write door (re-stamp idempotent, atomic).
-        path = publish_canonical(
-            frame, output_dir, table=BASENAME_TO_TABLE[name], basename=basenames[name]
-        )
-        LOGGER.info("saved %s -> %s (%d rows)", name, path, len(frame))
-    return tables
+    return publish_contfrag_tables(
+        event_table,
+        event_arm_table,
+        event_patch_table,
+        stop_table,
+        output_dir=output_dir,
+        basenames=basenames,
+    )
 
 
 def main() -> None:
@@ -319,9 +306,7 @@ def main() -> None:
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--replay-content-dir", required=True, type=Path)
     parser.add_argument("--event-source", required=True, choices=("SWR", "MUA"))
-    parser.add_argument(
-        "--brain-area", required=True, choices=("HPC", "mPFC", "OFC")
-    )
+    parser.add_argument("--brain-area", required=True, choices=("HPC", "mPFC", "OFC"))
     parser.add_argument(
         "--expected-sessions",
         type=int,

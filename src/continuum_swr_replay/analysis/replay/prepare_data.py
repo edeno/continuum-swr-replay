@@ -42,6 +42,7 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
 from continuum_swr_replay.analysis.hippocampus.swr_source import (
     read_dot_with_swr_source,
     stamp_swr_source,
+    swr_epoch_id,
 )
 from continuum_swr_replay.analysis.replay._tables_common import (
     EVENT_ARM_STANDARDIZED_COLS,
@@ -54,6 +55,7 @@ from continuum_swr_replay.analysis.replay.posterior_io import (
     load_conditional_posterior,
 )
 from continuum_swr_replay.analysis.replay.retrospective import (
+    _session_keys,
     compute_retrospective_metrics,
 )
 from continuum_swr_replay.analysis.replay.standardization import (
@@ -79,6 +81,7 @@ from continuum_swr_replay.data_loaders.trials import (
     validate_port_experience_pump_audit,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.session_keys import SESSION_COLUMNS
 from continuum_swr_replay.table_io import (
     parquet_path,
     publish_canonical,
@@ -145,7 +148,7 @@ def find_sessions(max_per_animal: int | None = None) -> list[dict]:
         # The NWB stem ends in an 8-digit date, so the animal id is everything
         # before it (``j16`` keeps its digits).
         animal = animal_date[:-8]
-        session_id = f"{animal_date}_{epoch}_HPC"
+        session_id = swr_epoch_id(nwb_file_name, epoch)
         results_path = PROCESSED_DATA_DIR / f"{session_id}_results.nc"
         by_animal.setdefault(animal, []).append(
             {
@@ -476,9 +479,7 @@ def _process_session(
     # than inside build_event_table. This replaces the previously
     # standalone post-hoc pass for the per-event columns.
     if event_sequence_table is not None and len(event_table) > 0:
-        sess_keys = [
-            c for c in ("animal", "session_date", "epoch") if c in event_table.columns
-        ]
+        sess_keys = _session_keys(event_table)
         retro = compute_retrospective_metrics(
             event_table, event_arm_table, event_sequence_table
         )
@@ -603,9 +604,7 @@ def populate_behavioral_context_cache(
         )
 
 
-_STOP_SPLIT_COLUMNS = frozenset(
-    {"n_nonlocal_swr_events", "n_nonlocal_non_swr_events"}
-)
+_STOP_SPLIT_COLUMNS = frozenset({"n_nonlocal_swr_events", "n_nonlocal_non_swr_events"})
 
 
 def _refuse_to_clobber_complete_stop_table(output_dir: Path) -> None:
@@ -682,9 +681,7 @@ def build_stop_table_scope(
     stop_table = pd.concat(frames, ignore_index=True)
     if stop_table["stop_id"].isna().any() or stop_table["stop_id"].duplicated().any():
         raise ValueError("stop-only build requires globally unique nonmissing stop_id")
-    observed_sessions = stop_table[
-        ["animal", "session_date", "epoch"]
-    ].drop_duplicates()
+    observed_sessions = stop_table[list(SESSION_COLUMNS)].drop_duplicates()
     if len(observed_sessions) != len(sessions):
         raise ValueError(
             f"stop-only build retained {len(observed_sessions)} of "
@@ -694,7 +691,9 @@ def build_stop_table_scope(
     output_dir.mkdir(parents=True, exist_ok=True)
     # Built above from decode frames read through the SWR source.
     stamp_swr_source(stop_table)
-    path = publish_canonical(stop_table, output_dir, table="stop", basename="stop_table")
+    path = publish_canonical(
+        stop_table, output_dir, table="stop", basename="stop_table"
+    )
     logging.info("saved stop_table -> %s (%d rows)", path, len(stop_table))
     return stop_table
 
@@ -1002,7 +1001,7 @@ def run_prepare_data(args: argparse.Namespace) -> None:
         event_sequence_table_all,
     ) = _assemble_canonical_tables(*collected)
 
-    session_cols = ["animal", "session_date", "epoch"]
+    session_cols = list(SESSION_COLUMNS)
     logging.info(
         "events: %d, event_arm rows: %d, stops: %d, sessions: %d",
         len(event_table_all),

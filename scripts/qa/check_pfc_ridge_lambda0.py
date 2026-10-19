@@ -33,7 +33,6 @@ Usage::
 from __future__ import annotations
 
 import argparse
-import shlex
 import sys
 from pathlib import Path
 
@@ -42,7 +41,10 @@ import pandas as pd
 from numpy.typing import NDArray
 from patsy import dmatrix
 
-REPO = Path(__file__).resolve().parents[2]
+# Sibling-script import: run as a script, only this file's directory is on
+# sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from scripts.qa._report import _invocation  # noqa: E402
 
 #: Tolerances the batched fitter was accepted at against statsmodels on the
 #: three gate sessions. Reused unchanged: this is the same solver, with the
@@ -118,6 +120,7 @@ def audited_designs(
             "matched_control",
         )
     }
+
     def stack(*names: str) -> NDArray:
         return np.concatenate([constant, *(convolved[n] for n in names)], axis=1)
 
@@ -126,9 +129,7 @@ def audited_designs(
         "non_local_no_SWR": stack("non_local_no_SWR"),
         "non_local_SWR": stack("non_local_SWR"),
         "SWR": stack("SWR"),
-        "non_local_SWR + non_local_no_SWR": stack(
-            "non_local_no_SWR", "non_local_SWR"
-        ),
+        "non_local_SWR + non_local_no_SWR": stack("non_local_no_SWR", "non_local_SWR"),
         "SWR + non_local_no_SWR": stack("SWR", "non_local_no_SWR"),
         "non_local": stack("non_local"),
         "matched_control": stack("matched_control"),
@@ -182,9 +183,7 @@ def rebuild_session(
     animal_date, epoch = session.rsplit("_", 2)[0], "_".join(session.split("_")[-2:])
     nwb_file_name = f"{animal_date}_.nwb"
 
-    cohort_stops, _ = load_session_stop_cohort(
-        nwb_file_name, epoch, cohort="at_well"
-    )
+    cohort_stops, _ = load_session_stop_cohort(nwb_file_name, epoch, cohort="at_well")
     results, _, _ = load_results(
         nwb_file_name, epoch, decoding_brain_area="HPC", load_detector=False
     )
@@ -294,17 +293,20 @@ def compare_session(session: str, diagnostics_dir: Path) -> pd.DataFrame:
                 "n_converged_both": int(both.sum()),
                 "n_well_posed": int(well_posed.sum()),
                 "max_abs_dparams_well_posed": (
-                    float(np.nanmax(difference[well_posed])) if well_posed.any()
+                    float(np.nanmax(difference[well_posed]))
+                    if well_posed.any()
                     else np.nan
                 ),
                 "max_abs_ddeviance_well_posed": (
                     float(np.nanmax(deviance_difference[well_posed]))
-                    if well_posed.any() else np.nan
+                    if well_posed.any()
+                    else np.nan
                 ),
                 "n_separated": int((both & separated).sum()),
                 "max_abs_beta_separated": (
                     float(np.nanmax(np.abs(basis_params[both & separated])))
-                    if (both & separated).any() else np.nan
+                    if (both & separated).any()
+                    else np.nan
                 ),
             }
         )
@@ -313,6 +315,7 @@ def compare_session(session: str, diagnostics_dir: Path) -> pd.DataFrame:
 
 def _md(frame: pd.DataFrame) -> str:
     """A markdown table, missing values as an empty cell."""
+
     def cell(value: object) -> str:
         if isinstance(value, str):
             return value
@@ -386,16 +389,6 @@ def build_report(per_model: pd.DataFrame, diagnostics_dir: Path) -> str:
         f"Reference diagnostics read from `{diagnostics_dir}`.\n",
     ]
     return "\n".join(lines)
-
-
-def _invocation() -> str:
-    """This run's command line, relative to the repo root and shell-quoted."""
-    script = Path(sys.argv[0])
-    try:
-        script = script.resolve().relative_to(REPO)
-    except ValueError:
-        pass
-    return shlex.join(["uv", "run", "python", str(script), *sys.argv[1:]])
 
 
 def main() -> None:

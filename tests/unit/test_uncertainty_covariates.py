@@ -22,6 +22,7 @@ from continuum_swr_replay.analysis.replay.covariates import (
     canonical_port_value_history,
     canonical_trial_switch_history,
 )
+from continuum_swr_replay.session_keys import subset_max_per_animal
 from continuum_swr_replay.table_io import read_table, table_exists
 
 _SPEC = importlib.util.spec_from_file_location(
@@ -985,7 +986,7 @@ def test_runner_smoke():
     ]
     stop = stop.merge(qcols, on="stop_id", how="inner", validate="many_to_one")
     stop = fur._drop_first_session_per_animal(stop)
-    stop = fur._subset_max_per_animal(stop, 1)
+    stop = subset_max_per_animal(stop, 1, sort_sessions=True)
 
     models = fur.fit_uncertainty_rate(stop, onsets)
     assert len(models) > 0

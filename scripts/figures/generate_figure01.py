@@ -43,6 +43,7 @@ from matplotlib.offsetbox import AnchoredOffsetbox, HPacker, TextArea
 from non_local_detector import NonLocalSortedSpikesDetector
 from non_local_detector.simulate.sorted_spikes_simulation import make_simulated_data
 
+from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
 from continuum_swr_replay.figure_utilities import (
     PAGE_HEIGHT,
     TWO_COLUMN,
@@ -71,7 +72,7 @@ STATE_COLORS = {
 STATE_NAMES_SHORT = ["Local", "No-Spike", "Continuous", "Fragmented"]
 STATE_COLORS_SHORT = [WONG[5], "#999999", WONG[1], WONG[6]]
 ANIMAL_POS_COLOR = "magenta"
-NON_LOCAL_PROB_THRESHOLD = 0.8
+NON_LOCAL_PROB_THRESHOLD = DEFAULT_NON_LOCAL_THRESHOLD
 
 # Stickiness from the real fitted detectors. The installed non_local_detector
 # default [1e6, 1e6, 300, 300] makes EM prune Local->No-Spike to ~0, hiding the
@@ -218,9 +219,16 @@ def plot_state_diagram(ax):
         )
         ax.add_patch(circle)
         ax.text(
-            cx, cy, state_name,
-            ha="center", va="center", fontsize=6.5, fontweight="bold",
-            color="white", zorder=11, linespacing=0.9,
+            cx,
+            cy,
+            state_name,
+            ha="center",
+            va="center",
+            fontsize=6.5,
+            fontweight="bold",
+            color="white",
+            zorder=11,
+            linespacing=0.9,
         )
 
     # Self-loop arrows routed to the outside corners so they remain legible
@@ -256,7 +264,8 @@ def plot_state_diagram(ax):
         start = (cx + radius * spec["start"][0], cy + radius * spec["start"][1])
         end = (cx + radius * spec["end"][0], cy + radius * spec["end"][1])
         arrow = mpatches.FancyArrowPatch(
-            start, end,
+            start,
+            end,
             arrowstyle="->,head_length=3.5,head_width=2.2",
             connectionstyle=f"arc3,rad={spec['rad']}",
             mutation_scale=1,
@@ -269,8 +278,14 @@ def plot_state_diagram(ax):
         lx = cx + radius * spec["label"][0]
         ly = cy + radius * spec["label"][1]
         ax.text(
-            lx, ly, self_probs[state_name],
-            ha="center", va="center", fontsize=5.5, color="black", alpha=0.8,
+            lx,
+            ly,
+            self_probs[state_name],
+            ha="center",
+            va="center",
+            fontsize=5.5,
+            color="black",
+            alpha=0.8,
             zorder=13,
         )
 
@@ -313,7 +328,7 @@ def _draw_scenario_overlay(ax, x, likelihood, animal_pos, scenario_kind):
     leader arrows), placed at scenario-specific positions that sit
     inside whitespace and clearly identify the curve.
     """
-    local_color = STATE_COLORS_SHORT[0]    # blue
+    local_color = STATE_COLORS_SHORT[0]  # blue
     nospike_color = STATE_COLORS_SHORT[1]  # gray
     # Non-Local in panel (b) merges the Continuous and Fragmented states;
     # use the collapsed non-local color shared with panels A and D.
@@ -344,9 +359,7 @@ def _draw_scenario_overlay(ax, x, likelihood, animal_pos, scenario_kind):
         # the bin-less No-Spike likelihood clearly winning.
         nospike_scale = 0.30
         broad_nonlocal = np.exp(-0.5 * ((x - animal_pos) / 0.50) ** 2)
-        broad_local_kernel = 0.70 + 0.30 * np.exp(
-            -0.5 * ((x - animal_pos) / 0.40) ** 2
-        )
+        broad_local_kernel = 0.70 + 0.30 * np.exp(-0.5 * ((x - animal_pos) / 0.40) ** 2)
         nonlocal_curve = nospike_scale * (0.82 + 0.18 * broad_nonlocal)
         local_curve = nonlocal_curve * broad_local_kernel
         nospike_y = 0.70
@@ -355,7 +368,8 @@ def _draw_scenario_overlay(ax, x, likelihood, animal_pos, scenario_kind):
 
     # Non-Local drawn first so Local's fill sits on top where they overlap.
     ax.fill_between(
-        x, nonlocal_curve,
+        x,
+        nonlocal_curve,
         facecolor=nonlocal_color,
         linewidth=0.0,
         alpha=0.25,
@@ -369,17 +383,20 @@ def _draw_scenario_overlay(ax, x, likelihood, animal_pos, scenario_kind):
     # dependence), unlike the Local/Non-Local curves which are functions of x.
     ax.axhline(nospike_y, color=nospike_color, linewidth=1.2, linestyle="--")
 
-    ax.axvline(animal_pos, color=ANIMAL_POS_COLOR, linewidth=0.8,
-               linestyle="-")
+    ax.axvline(animal_pos, color=ANIMAL_POS_COLOR, linewidth=0.8, linestyle="-")
     animal_label_y = {
         "local": 1.10,
         "nonlocal": 0.98,
         "nospike": 1.10,
     }
     ax.text(
-        animal_pos + 0.035, animal_label_y[scenario_kind], "Animal Position",
-        color=ANIMAL_POS_COLOR, fontsize=5.5,
-        ha="left", va="center",
+        animal_pos + 0.035,
+        animal_label_y[scenario_kind],
+        "Animal Position",
+        color=ANIMAL_POS_COLOR,
+        fontsize=5.5,
+        ha="left",
+        va="center",
     )
 
     ax.set_xlim(0, 1)
@@ -396,25 +413,31 @@ def _draw_scenario_overlay(ax, x, likelihood, animal_pos, scenario_kind):
     # overlap with other curves or the animal-position line.
     label_specs = {
         "local": [
-            ("Local",     0.72, 0.82, "left",   local_color),
-            ("Non-Local", 0.72, 0.55, "left",   nonlocal_color),
-            ("No-Spike",  0.97, 0.18, "right",  nospike_color),
+            ("Local", 0.72, 0.82, "left", local_color),
+            ("Non-Local", 0.72, 0.55, "left", nonlocal_color),
+            ("No-Spike", 0.97, 0.18, "right", nospike_color),
         ],
         "nonlocal": [
             ("Non-Local", 0.40, 1.12, "center", nonlocal_color),
-            ("Local",     0.72, 0.42, "left",   local_color),
-            ("No-Spike",  0.97, 0.18, "right",  nospike_color),
+            ("Local", 0.72, 0.42, "left", local_color),
+            ("No-Spike", 0.97, 0.18, "right", nospike_color),
         ],
         "nospike": [
-            ("No-Spike",  0.97, 0.78, "right",  nospike_color),
-            ("Non-Local", 0.72, 0.30, "left",   nonlocal_color),
-            ("Local",     0.40, 0.50, "center", local_color),
+            ("No-Spike", 0.97, 0.78, "right", nospike_color),
+            ("Non-Local", 0.72, 0.30, "left", nonlocal_color),
+            ("Local", 0.40, 0.50, "center", local_color),
         ],
     }
     for name, lx, ly, ha, color in label_specs[scenario_kind]:
         ax.text(
-            lx, ly, name, color=color, fontsize=6.5, fontweight="bold",
-            ha=ha, va="center",
+            lx,
+            ly,
+            name,
+            color=color,
+            fontsize=6.5,
+            fontweight="bold",
+            ha=ha,
+            va="center",
         )
 
 
@@ -465,7 +488,11 @@ def plot_observation_models(fig, gs_slot):
     for col, (header, animal_pos, scenario_kind) in enumerate(scenarios):
         scen_ax = fig.add_subplot(gs_outer[0, col])
         _draw_scenario_overlay(
-            scen_ax, x, likelihood, animal_pos, scenario_kind,
+            scen_ax,
+            x,
+            likelihood,
+            animal_pos,
+            scenario_kind,
         )
         scen_ax.set_title(header, fontsize=7, fontweight="bold", pad=2)
         all_axes.append(scen_ax)
@@ -499,7 +526,8 @@ def plot_transition_kernels(fig, gs_slot):
     group_left = side_margin / (4 + 2 * side_margin)
     group_right = 1 - group_left
     gs_inner = gs_slot.subgridspec(
-        2, 6,
+        2,
+        6,
         height_ratios=[0.13, 1.0],
         width_ratios=[side_margin, 1, 1, 1, 1, side_margin],
         hspace=0.03,
@@ -582,9 +610,13 @@ def plot_transition_kernels(fig, gs_slot):
         elif config["kind"] == "uniform":
             trans = np.ones((n_bins, n_bins)) / n_bins
             sub_ax.imshow(
-                trans, aspect="equal", cmap="magma",
-                vmin=0, vmax=0.15,
-                interpolation="nearest", origin="lower",
+                trans,
+                aspect="equal",
+                cmap="magma",
+                vmin=0,
+                vmax=0.15,
+                interpolation="nearest",
+                origin="lower",
             )
             if config.get("show_local_anchor", False):
                 anchor_y = n_bins * 0.67
@@ -616,9 +648,13 @@ def plot_transition_kernels(fig, gs_slot):
             # Shared vmax so the uniform panels and Gaussian band are visually
             # comparable while No-Spike remains visibly non-spatial.
             sub_ax.imshow(
-                trans, aspect="equal", cmap="magma",
-                vmin=0, vmax=0.15,
-                interpolation="nearest", origin="lower",
+                trans,
+                aspect="equal",
+                cmap="magma",
+                vmin=0,
+                vmax=0.15,
+                interpolation="nearest",
+                origin="lower",
             )
 
         if config["kind"] == "scalar":
@@ -633,13 +669,22 @@ def plot_transition_kernels(fig, gs_slot):
         sub_ax.set_yticks([])
 
         sub_ax.set_title(
-            config["name"], fontsize=5.5, color=config["color"],
-            fontweight="bold", pad=3, linespacing=0.9,
+            config["name"],
+            fontsize=5.5,
+            color=config["color"],
+            fontweight="bold",
+            pad=3,
+            linespacing=0.9,
         )
         sub_ax.text(
-            0.5, -0.04, config["subtitle"],
-            ha="center", va="top", fontsize=5,
-            transform=sub_ax.transAxes, color="#555555",
+            0.5,
+            -0.04,
+            config["subtitle"],
+            ha="center",
+            va="top",
+            fontsize=5,
+            transform=sub_ax.transAxes,
+            color="#555555",
             style="italic",
         )
 
@@ -654,6 +699,7 @@ def plot_transition_kernels(fig, gs_slot):
 # ═══════════════════════════════════════════════════════════════════════════
 # Panel D — Simulated Data + Decoding (single composite panel)
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def get_non_local_probability(results):
     """Return P(Non-Local Continuous) + P(Non-Local Fragmented)."""
@@ -688,7 +734,8 @@ def shade_non_local_intervals(axes, intervals):
     for ax in axes:
         for start, end in intervals:
             ax.axvspan(
-                start, end,
+                start,
+                end,
                 color=COLORS["Non-Local"],
                 alpha=0.14,
                 linewidth=0,
@@ -723,8 +770,12 @@ def plot_spike_raster(ax, spike_times, detector):
     """Spike raster sorted by place field peak."""
     sorted_spikes, _ = sort_neurons_by_place_field(spike_times, detector)
     ax.eventplot(
-        sorted_spikes, lineoffsets=1, linelengths=0.8,
-        colors="black", linewidths=0.3, zorder=4,
+        sorted_spikes,
+        lineoffsets=1,
+        linelengths=0.8,
+        colors="black",
+        linewidths=0.3,
+        zorder=4,
     )
     ax.set_ylabel("Neuron", fontsize=7, labelpad=4)
     ax.set_yticks([1, len(spike_times)])
@@ -743,14 +794,24 @@ def plot_posterior(ax, time, position, results):
 
     vmax = max(np.percentile(nl_pos[nl_pos > 0], 99), 1e-6)
     ax.pcolormesh(
-        time, pos_coord, nl_pos.T,
-        cmap="bone_r", vmin=0, vmax=vmax, rasterized=True, zorder=1,
+        time,
+        pos_coord,
+        nl_pos.T,
+        cmap="bone_r",
+        vmin=0,
+        vmax=vmax,
+        rasterized=True,
+        zorder=1,
     )
     # Magenta for the animal's true position, consistent with the position line
     # in panel B and avoiding collision with WONG[1] used for Continuous state.
     ax.plot(
-        time, position, color=ANIMAL_POS_COLOR,
-        linewidth=0.8, alpha=0.9, zorder=4,
+        time,
+        position,
+        color=ANIMAL_POS_COLOR,
+        linewidth=0.8,
+        alpha=0.9,
+        zorder=4,
     )
     ax.set_ylabel("Decoded\nposition\n(cm)", fontsize=7, labelpad=4)
     ax.tick_params(labelsize=5.5, labelbottom=False)
@@ -760,9 +821,13 @@ def plot_state_probabilities(ax, time, results):
     """Plot the four raw HMM state probabilities."""
     state_probs = results["acausal_state_probabilities"].values
 
-    for i, (name, color) in enumerate(zip(
-        STATE_NAMES_SHORT, STATE_COLORS_SHORT, strict=True,
-    )):
+    for i, (name, color) in enumerate(
+        zip(
+            STATE_NAMES_SHORT,
+            STATE_COLORS_SHORT,
+            strict=True,
+        )
+    ):
         ax.plot(
             time,
             state_probs[:, i],
@@ -881,7 +946,8 @@ def plot_speed(ax, time, speed):
         f"{MAX_SPEED_THRESHOLD_CM_PER_SEC:g} cm/s",
         ha="right",
         va="bottom",
-        fontsize=5, alpha=0.7,
+        fontsize=5,
+        alpha=0.7,
     )
     ax.set_ylabel("Speed\n(cm/s)", fontsize=7, labelpad=4)
     ax.set_xlabel("Time (s)", fontsize=7)
@@ -913,8 +979,14 @@ def generate_figure(n_neurons=30, seed=42):
     # --- Simulate and decode ---
     print(f"Simulating {n_neurons} neurons...")
     (
-        speed, position, spike_times, time, event_times,
-        sampling_frequency, is_event, place_fields,
+        speed,
+        position,
+        spike_times,
+        time,
+        event_times,
+        sampling_frequency,
+        is_event,
+        place_fields,
     ) = make_simulated_data(n_neurons=n_neurons)
 
     # Extend the no-spike event (event index 3) to NO_SPIKE_EVENT_LEN by removing
@@ -950,7 +1022,8 @@ def generate_figure(n_neurons=30, seed=42):
     )
     non_local_prob = get_non_local_probability(results)
     non_local_intervals = get_threshold_crossing_intervals(
-        time, non_local_prob > NON_LOCAL_PROB_THRESHOLD,
+        time,
+        non_local_prob > NON_LOCAL_PROB_THRESHOLD,
     )
 
     # --- Create figure ---
@@ -960,10 +1033,12 @@ def generate_figure(n_neurons=30, seed=42):
     # simulated example. The model rows get enough height for readable labels,
     # while panel D remains a compact worked example.
     fig_height = min(TWO_COLUMN * 1.18, PAGE_HEIGHT)
-    fig = plt.figure(figsize=(TWO_COLUMN, fig_height), dpi=450,
-                     constrained_layout=True)
+    fig = plt.figure(figsize=(TWO_COLUMN, fig_height), dpi=450, constrained_layout=True)
     fig.set_constrained_layout_pads(
-        w_pad=0.02, h_pad=0.02, wspace=0.03, hspace=0.03,
+        w_pad=0.02,
+        h_pad=0.02,
+        wspace=0.03,
+        hspace=0.03,
     )
 
     # 3 rows: model structure | transition kernels | simulated example.
@@ -971,7 +1046,9 @@ def generate_figure(n_neurons=30, seed=42):
     # heatmaps are uniform (solid color, no internal structure), so
     # large cells waste space.
     gs_main = GridSpec(
-        3, 1, figure=fig,
+        3,
+        1,
+        figure=fig,
         height_ratios=[0.70, 0.55, 1.50],
         hspace=0.16,
     )
@@ -981,7 +1058,8 @@ def generate_figure(n_neurons=30, seed=42):
     # No-Spike-wins). width_ratios are tuned so Panel A can carry the
     # transition topology without crowding Panel B's likelihood scenarios.
     gs_row0 = gs_main[0].subgridspec(
-        2, 2,
+        2,
+        2,
         height_ratios=[0.12, 1.0],
         hspace=0.03,
         wspace=0.14,
@@ -1004,7 +1082,10 @@ def generate_figure(n_neurons=30, seed=42):
 
     # ── Row 2: Simulated Example (d) — single panel, 5 sub-rows ──
     gs_row2 = gs_main[2].subgridspec(
-        5, 1, height_ratios=[0.65, 0.95, 0.58, 0.58, 0.38], hspace=0.10,
+        5,
+        1,
+        height_ratios=[0.65, 0.95, 0.58, 0.58, 0.38],
+        hspace=0.10,
     )
 
     ax_raster = fig.add_subplot(gs_row2[0])
@@ -1042,10 +1123,13 @@ def generate_figure(n_neurons=30, seed=42):
 
 def main():
     parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--output-dir", type=Path, default=Path("paper/figures/figure01"),
+        "--output-dir",
+        type=Path,
+        default=Path("paper/figures/figure01"),
     )
     parser.add_argument("--n-neurons", type=int, default=30)
     parser.add_argument("--seed", type=int, default=42)

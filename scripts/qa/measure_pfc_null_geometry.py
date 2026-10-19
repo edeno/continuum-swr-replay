@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
@@ -60,6 +61,11 @@ from continuum_swr_replay.analysis.pfc.heldout import (
     null_draw_seeds,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+
+# Sibling-script import: run as a script, only this file's directory is on
+# sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from scripts.qa._report import _md  # noqa: E402
 
 #: Column carrying the observed statistic each empirical p-value was read
 #: against, per class. The engagement test is keyed by its pair name.
@@ -84,36 +90,6 @@ PVALUE_COLUMN = {
     "non_local_SWR": "non_local_SWR: p_heldout",
     "engagement": ("matched_control + non_local_no_SWR vs. matched_control: p_heldout"),
 }
-
-
-def _cell(value: object, float_format: str) -> str:
-    """One markdown cell: missing renders blank, a count renders as a count."""
-    if value is None:
-        return ""
-    if isinstance(value, str):
-        return value
-    if pd.isna(value):
-        return ""
-    if isinstance(value, float):
-        return float_format.format(value)
-    return str(value)
-
-
-def _md(frame: pd.DataFrame, float_format: str = "{:.4g}") -> str:
-    """A markdown table, with missing values rendered as an empty cell."""
-    if frame.empty:
-        return "_(no rows)_\n"
-    columns = {
-        name: [_cell(value, float_format) for value in frame[name]]
-        for name in frame.columns
-    }
-    header = "| " + " | ".join(str(name) for name in columns) + " |"
-    rule = "| " + " | ".join("---" for _ in columns) + " |"
-    body = [
-        "| " + " | ".join(cells[i] for cells in columns.values()) + " |"
-        for i in range(len(frame))
-    ]
-    return "\n".join([header, rule, *body]) + "\n"
 
 
 def bundle_paths(data_dir: Path) -> list[Path]:

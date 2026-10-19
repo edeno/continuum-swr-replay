@@ -465,7 +465,7 @@ def _arm_colors(edge_order: list, arm_of_edge: dict) -> dict:
     The track/strip color each edge by its position in ``edge_order`` (tab10);
     map that back to the arm id so the content bar uses the same color per arm.
     """
-    edge_colors = _track_edge_colors(len(edge_order))
+    edge_colors = _track_edge_colors()
     colors = {}
     for i, (n1, n2) in enumerate(edge_order):
         arm = arm_of_edge.get(frozenset((n1, n2)))
@@ -485,7 +485,7 @@ def _arm_strip_labels(track_graph, edge_order: list, env) -> list:
     the content bars use. (The ``TRACK_SEGMENT_TO_EDGE_ID`` constant is *not*
     used; it does not match this env's edge_id numbering.)
     """
-    edge_colors = _track_edge_colors(len(edge_order))
+    edge_colors = _track_edge_colors()
     arm_of_edge = _arm_of_edge_map()
     df = env.place_bin_centers_nodes_df_
     lp_by_eid = (

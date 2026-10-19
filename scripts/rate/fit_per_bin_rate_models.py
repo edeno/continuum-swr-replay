@@ -115,7 +115,10 @@ from continuum_swr_replay.analysis.replay.per_bin_rate_model import (  # noqa: E
     _design_columns,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
-from continuum_swr_replay.session_keys import SESSION_COLUMNS  # noqa: E402
+from continuum_swr_replay.session_keys import (  # noqa: E402
+    SESSION_COLUMNS,
+    subset_max_per_animal,
+)
 from continuum_swr_replay.table_io import read_table  # noqa: E402
 
 # Separated self-history coefficients legitimately overflow exp() (-> 0 / inf
@@ -408,16 +411,6 @@ def fit_per_bin_rate_models(
     return result
 
 
-def _subset_max_per_animal(stop_table: pd.DataFrame, n: int) -> pd.DataFrame:
-    keep = (
-        stop_table[list(SESSION_COLUMNS)]
-        .drop_duplicates()
-        .groupby("animal", sort=False)
-        .head(n)
-    )
-    return stop_table.merge(keep, on=list(SESSION_COLUMNS))
-
-
 def _stop_level_design_columns(spec, stop: pd.DataFrame) -> list[str]:
     """A spec's design columns as they exist on the stop table.
 
@@ -598,7 +591,7 @@ def main() -> None:
         cohort_report["counts_before"],
     )
     if args.max_per_animal is not None:
-        stop = _subset_max_per_animal(stop, args.max_per_animal)
+        stop = subset_max_per_animal(stop, args.max_per_animal)
 
     logger.info(
         "Fitting per-bin ladder %s (+CV=%s, +GOF=%s) x %s over %d sessions "

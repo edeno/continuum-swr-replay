@@ -232,8 +232,9 @@ def epoch_id(nwb_file_name: str, epoch_name: str) -> str:
     """``{stem}_{epoch}_HPC``, the decoders' name for the epoch's CA1 data.
 
     ``epoch_id("chimi20200225_.nwb", "02_r1")`` is ``"chimi20200225_02_r1_HPC"``.
+    The other runners import it from here; the rule is ``swr_source.swr_epoch_id``.
     """
-    return f"{nwb_file_name.removesuffix('_.nwb')}_{epoch_name}_HPC"
+    return swr_source.swr_epoch_id(nwb_file_name, epoch_name)
 
 
 def output_paths(identifier: str, output_dir: Path) -> dict[str, Path]:

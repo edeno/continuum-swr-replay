@@ -33,6 +33,7 @@ __all__ = [
     "session_key_set",
     "n_sessions",
     "session_key_frame",
+    "subset_max_per_animal",
 ]
 
 
@@ -64,3 +65,30 @@ def session_key_frame(
     """The distinct session-key rows of ``frame``, columns in canonical order."""
     cols = _require(frame, columns)
     return frame.loc[:, cols].drop_duplicates().reset_index(drop=True)
+
+
+def subset_max_per_animal(
+    frame: pd.DataFrame, n: int, *, sort_sessions: bool = False
+) -> pd.DataFrame:
+    """Keep only the rows of the first ``n`` sessions per animal (smoke mode).
+
+    Parameters
+    ----------
+    frame : pd.DataFrame
+        Rows carrying the ``SESSION_COLUMNS``.
+    n : int
+        Sessions kept per animal.
+    sort_sessions : bool
+        If False, an animal's first sessions are the first to appear in
+        ``frame``'s row order; if True, the first in sorted session-key order.
+
+    Returns
+    -------
+    pd.DataFrame
+        The kept rows, in ``frame``'s order, with a fresh index.
+    """
+    keep = frame[list(SESSION_COLUMNS)].drop_duplicates()
+    if sort_sessions:
+        keep = keep.sort_values(list(SESSION_COLUMNS))
+    keep = keep.groupby("animal", sort=False).head(n)
+    return frame.merge(keep, on=list(SESSION_COLUMNS))

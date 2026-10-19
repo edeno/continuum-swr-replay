@@ -45,6 +45,7 @@ from non_local_detector.simulate.sorted_spikes_simulation import (
     make_simulated_data,
 )
 
+from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import (
     MemorylessSequenceConfig,
 )
@@ -201,7 +202,7 @@ events are added."""
 SHUFFLE_RUN_SEED = 20260922
 """Seeds the place-cell identity shuffle, as in the sweep."""
 
-NON_LOCAL_PROB_THRESHOLD = 0.8
+NON_LOCAL_PROB_THRESHOLD = DEFAULT_NON_LOCAL_THRESHOLD
 NON_LOCAL_MINIMUM_DURATION_S = 0.015
 """The project's non-local event definition, as in
 `analysis/hippocampus/event_detection.get_confident_times`: non-local

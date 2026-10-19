@@ -28,8 +28,10 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
+from continuum_swr_replay.session_keys import SESSION_COLUMNS
 
 from ._helpers import strict_mean, strict_sum
+from .retrospective import _session_keys
 
 __all__ = [
     "StopSummaryConfig",
@@ -77,8 +79,10 @@ def _select_arm_fractions(
     ``event_table``, which is where it originates) telling us which
     arm to look up per event.
     """
-    sess_keys = [c for c in ("animal", "session_date", "epoch") if c in event_arm_table.columns]
-    keep = event_arm_table[[*sess_keys, "event_id", "candidate_arm", arm_col, "arm_fraction"]]
+    sess_keys = _session_keys(event_arm_table)
+    keep = event_arm_table[
+        [*sess_keys, "event_id", "candidate_arm", arm_col, "arm_fraction"]
+    ]
     matched = keep[keep["candidate_arm"] == keep[arm_col]]
     return matched[[*sess_keys, "event_id", "arm_fraction"]].rename(
         columns={"arm_fraction": f"frac_on_{arm_col}"}
@@ -93,7 +97,7 @@ def _per_event_best_arm(
     Only well arms are considered (trunk arms have no rate). Ties
     resolved by taking the lowest arm id.
     """
-    sess_keys = ["animal", "session_date", "epoch"]
+    sess_keys = list(SESSION_COLUMNS)
     well_only = event_arm_table[event_arm_table["candidate_arm"].isin(well_arms)]
     # Keep only events where at least one well arm has a non-NaN rate.
     valid = well_only.dropna(subset=["reward_fraction_candidate_arm_last10_visits"])
@@ -101,7 +105,12 @@ def _per_event_best_arm(
         return pd.DataFrame(columns=[*sess_keys, "event_id", "best_arm"])
     best = (
         valid.sort_values(
-            [*sess_keys, "event_id", "reward_fraction_candidate_arm_last10_visits", "candidate_arm"],
+            [
+                *sess_keys,
+                "event_id",
+                "reward_fraction_candidate_arm_last10_visits",
+                "candidate_arm",
+            ],
             ascending=[True, True, True, True, False, True],
         )
         .groupby([*sess_keys, "event_id"], sort=False)
@@ -113,7 +122,7 @@ def _per_event_best_arm(
 
 def _frac_on_best(event_arm_table: pd.DataFrame, best: pd.DataFrame) -> pd.DataFrame:
     """Per-event ``arm_fraction`` at ``arm == best_arm``."""
-    sess_keys = ["animal", "session_date", "epoch"]
+    sess_keys = list(SESSION_COLUMNS)
     if best.empty:
         return pd.DataFrame(columns=[*sess_keys, "event_id", "frac_on_best"])
     merged = event_arm_table.merge(best, on=[*sess_keys, "event_id"], how="inner")
@@ -149,7 +158,7 @@ def stop_replay_summary(
     count is ``n_selected_events``; the summary exposes the more specific
     derived name ``n_events_with_replay``.
     """
-    sess_keys = ["animal", "session_date", "epoch"]
+    sess_keys = list(SESSION_COLUMNS)
 
     # Short-circuit when there are no events at all: stop_table flows
     # straight through with all frac_on_<role> columns as NaN.
@@ -240,9 +249,7 @@ def stop_replay_summary(
     # NaN, indistinguishable from a confidently-zero replay.
     patch_sums = (
         ea_p.dropna(subset=["_arm_patch"])
-        .groupby([*sess_keys, "event_id", "_arm_patch"], as_index=False)[
-            "arm_fraction"
-        ]
+        .groupby([*sess_keys, "event_id", "_arm_patch"], as_index=False)["arm_fraction"]
         .agg(strict_sum)
         .rename(columns={"arm_fraction": "_patch_frac", "_arm_patch": "_patch"})
     )
@@ -428,7 +435,7 @@ def fit_is_stay_logistic_per_session(
     """
     import statsmodels.api as sm
 
-    sess_keys = ["animal", "session_date", "epoch"]
+    sess_keys = list(SESSION_COLUMNS)
     out_rows = []
     for sess_key, g in stop_summary.groupby(sess_keys, dropna=False):
         animal, day, epoch = sess_key
@@ -553,7 +560,7 @@ def fit_is_stay_pooled_gee(
     from statsmodels.genmod.families import Binomial
     from statsmodels.genmod.generalized_estimating_equations import GEE
 
-    sess_keys = ["animal", "session_date", "epoch"]
+    sess_keys = list(SESSION_COLUMNS)
     sub = stop_summary.dropna(subset=[content_col, outcome_col, target_col]).copy()
 
     base = {

@@ -59,6 +59,7 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
+from continuum_swr_replay.analysis.hippocampus.artifacts.masks import merge_intervals
 from continuum_swr_replay.analysis.pfc.batched_glm import (
     DEFAULT_NULL_DESIGN_BATCH_SIZE,
     PreparedHeldoutResponse,
@@ -69,7 +70,7 @@ from continuum_swr_replay.analysis.pfc.glm import (
     DEFAULT_MATCHED_CONTROL_ATTEMPTS,
     EVENT_CLASSES,
     MATCHED_CONTROL_SOURCE_CLASS,
-    _merge_windows,
+    _contiguous_true_runs,
     _overlaps_any,
     convolve_event_basis,
     event_onset_counts,
@@ -191,16 +192,6 @@ class ControlDrawNull(NamedTuple):
     engagement_overlap: NDArray
 
 
-def _contiguous_runs(mask: NDArray) -> NDArray:
-    """Half-open ``[start, stop)`` bounds of each contiguous True run."""
-    flat = np.asarray(mask, dtype=bool)
-    if flat.size == 0:
-        return np.empty((0, 2), dtype=np.int64)
-    padded = np.concatenate([[False], flat, [False]])
-    edges = np.flatnonzero(padded[1:] != padded[:-1])
-    return edges.reshape(-1, 2).astype(np.int64)
-
-
 def assign_blocked_folds(
     fit_mask: pd.Series | NDArray,
     n_folds: int,
@@ -251,7 +242,7 @@ def assign_blocked_folds(
         blocks, or if ``support_radius_bins`` is negative.
     """
     mask = np.asarray(fit_mask, dtype=bool)
-    runs = _contiguous_runs(mask)
+    runs = _contiguous_true_runs(mask)
     if support_radius_bins < 0:
         raise ValueError(
             f"support_radius_bins must be non-negative, got {support_radius_bins}"
@@ -567,9 +558,8 @@ def overlapping_fraction(
     windows : pandas.DataFrame
         ``start_time`` / ``end_time`` of the drawn windows.
     starts, ends : NDArray, shape (n_windows,)
-        Ascending, non-overlapping bounds to test against, as
-        :func:`~continuum_swr_replay.analysis.pfc.glm._merge_windows` returns
-        them.
+        Ascending, non-overlapping bounds to test against: the columns of
+        :func:`~continuum_swr_replay.analysis.hippocampus.artifacts.masks.merge_intervals`.
 
     Returns
     -------
@@ -850,10 +840,10 @@ def control_draw_null(
             )
         else:
             baseline_deviance = score_design_batch(baseline_design[None, :, :])[0]
-        baseline_starts, baseline_ends = _merge_windows(
+        baseline_starts, baseline_ends = merge_intervals(
             baseline_control["start_time"].to_numpy(dtype=float),
             baseline_control["end_time"].to_numpy(dtype=float),
-        )
+        ).T
         full_engagement_name = f"matched_control + {engagement_class}"
         if n_tested[engagement_class] == 0:
             observed_engagement = np.full(n_units, np.nan)

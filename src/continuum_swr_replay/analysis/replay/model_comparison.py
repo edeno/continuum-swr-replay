@@ -14,6 +14,8 @@ import numpy as np
 import pandas as pd
 from scipy.stats import chi2, wilcoxon
 
+from continuum_swr_replay.session_keys import SESSION_COLUMNS
+
 from .model_specs import MODEL_HIERARCHY
 
 # Fit-scale metadata carried from the per-session frames onto the comparison and
@@ -97,7 +99,7 @@ def compare_nested_models(
         all-stops fit are about different populations.
     """
     if session_cols is None:
-        session_cols = ["animal", "session_date", "epoch"]
+        session_cols = list(SESSION_COLUMNS)
 
     # Accept both "ll" (legacy binomial) and "llf" (conditional Poisson)
     ll_col = "llf" if "llf" in parent_results.columns else "ll"
@@ -307,7 +309,10 @@ def summarize_comparison(
     # agree on the sign is the claim a reader should weigh.
     if "animal" in comparison_df.columns:
         per_animal = (
-            comparison_df.assign(_d=daic).dropna(subset=["_d"]).groupby("animal")["_d"].median()
+            comparison_df.assign(_d=daic)
+            .dropna(subset=["_d"])
+            .groupby("animal")["_d"]
+            .median()
         )
         result["delta_aic_animal_median"] = (
             float(per_animal.median()) if len(per_animal) else np.nan
