@@ -64,9 +64,12 @@ _FITTED_CLASSES = {
     "bandit": NonLocalClusterlessDetector,
     "contfrag": ContFragClusterlessClassifier,
 }
+_SHARED_MODULE = "scripts.decoding._decode_runner"
+"""The flow both decoder scripts run, each with its ``RUNNER`` record."""
 #: Modules that bind the Spyglass stub when imported under it.
 _STUB_BOUND_MODULES = (
     "continuum_swr_replay.data_loaders.bandit_task",
+    _SHARED_MODULE,
     *_DECODER_MODULES.values(),
 )
 
@@ -111,7 +114,8 @@ def _capture_fit(monkeypatch, detector_class: type) -> dict[str, Any]:
 
 
 def _perform_decoding(module: types.ModuleType, **kwargs: Any):
-    """Run a script's ``perform_decoding`` on two bins and a dummy (track-less) environment."""
+    """Run the shared ``perform_decoding`` with a script's ``RUNNER`` on two bins
+    and a dummy (track-less) environment."""
     time = np.array([0.0, BIN_S])
     position_info = pd.DataFrame(
         {
@@ -121,7 +125,8 @@ def _perform_decoding(module: types.ModuleType, **kwargs: Any):
         },
         index=pd.Index(time, name="time"),
     )
-    return module.perform_decoding(
+    return sys.modules[_SHARED_MODULE].perform_decoding(
+        module.RUNNER,
         logging.getLogger(__name__),
         [np.array([0.001])],
         [np.zeros((1, 4))],

@@ -7,6 +7,10 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
 ## `decoding/` — produce the decoded data + event/stop tables
 - `run_decoding_bandit.py` — continuum decoding for the bandit task (HPC/mPFC/OFC).
 - `run_decoding_contfrag.py` — decoding for the ContFrag (SWR/MUA) event sources.
+- `_decode_runner.py` — not a script: the flow both decode runners share (the HPC
+  masks and SWR source, fit, save, resume), imported as `scripts.decoding._decode_runner`;
+  each runner's `RUNNER` record holds what differs. Only the NonLocal runner keeps an
+  HPC decode's per-bin log-likelihood (`hpc_log_likelihood`).
 - `run_memoryless_detection.py` — the Widloski & Foster sliding-window detector
   on each HPC epoch's saved decode, with its encoding-pair shuffle; one row per
   candidate sequence (spec 02). Loads the marks from the Spyglass database

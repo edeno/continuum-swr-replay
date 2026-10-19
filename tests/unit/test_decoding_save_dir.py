@@ -2,7 +2,8 @@
 and take their masks and SWR labels from the SWR source.
 
 ``run_decoding_bandit.py`` (NonLocal) and ``run_decoding_contfrag.py``
-(ContFrag) write into ``--save_dir``, which defaults to ``Processed-Data``. A
+(ContFrag) share their flow (``scripts/decoding/_decode_runner.py``), each with
+its own ``RUNNER`` record, and write into ``--save_dir``, which defaults to ``Processed-Data``. A
 rerun over the same folder resumes from it: the results are read back from that
 folder, never the canonical one, and only ``data_over_time`` is rewritten,
 because the reopened ``results.nc`` is still open lazily (Review Focus 1 of the
@@ -39,6 +40,7 @@ synthetic epoch.
 
 from __future__ import annotations
 
+import dataclasses
 import functools
 import hashlib
 import importlib
@@ -108,7 +110,6 @@ class Decoder:
     """What the tests need to know about one decoder script."""
 
     module_name: str
-    loader_name: str
     epoch_identifier: str
     data_over_time_name: str
     save_kwargs: dict[str, Any] = field(default_factory=dict)
@@ -120,7 +121,6 @@ class Decoder:
 DECODERS = {
     "nonlocal": Decoder(
         module_name="scripts.decoding.run_decoding_bandit",
-        loader_name="load_results",
         epoch_identifier="testrat20990101_02_r1_HPC",
         data_over_time_name="testrat20990101_02_r1_HPC_80_data_over_time.pkl",
         save_kwargs={"non_local_threshold": 0.8},
@@ -128,15 +128,18 @@ DECODERS = {
     ),
     "contfrag": Decoder(
         module_name="scripts.decoding.run_decoding_contfrag",
-        loader_name="load_contfrag_results",
         epoch_identifier="testrat20990101_02_r1_HPC_contfrag",
         data_over_time_name="testrat20990101_02_r1_HPC_contfrag_data_over_time.pkl",
     ),
 }
 
+SHARED_MODULE = "scripts.decoding._decode_runner"
+"""The flow both scripts run (``run_decode``), with its own module globals."""
+
 #: Modules that bind the Spyglass stub when imported under it.
 _STUB_BOUND_MODULES = (
     "continuum_swr_replay.data_loaders.bandit_task",
+    SHARED_MODULE,
     *(decoder.module_name for decoder in DECODERS.values()),
 )
 
@@ -144,6 +147,8 @@ _STUB_BOUND_MODULES = (
 @dataclass(frozen=True)
 class Decoders:
     modules: dict[str, types.ModuleType]
+    flow: types.ModuleType
+    """``_decode_runner``: the names ``run_decode`` reads are patched here."""
     canonical: Path
     """Where each script's ``PROCESSED_DATA_DIR`` global points during the test."""
 
@@ -156,7 +161,8 @@ def decoders(monkeypatch, tmp_path):
     time, which opens a DataJoint connection. The modules imported here that
     bind the stub are forgotten afterwards, so a later import gets the real ones.
 
-    Each script's ``PROCESSED_DATA_DIR`` global is pointed at an empty folder under
+    Each script's ``PROCESSED_DATA_DIR`` global, and the shared flow's, is
+    pointed at an empty folder under
     ``tmp_path``. That catches code that writes through the global. It does not
     change the defaults bound at definition time, so every test passes
     ``save_dir`` itself.
@@ -174,9 +180,10 @@ def decoders(monkeypatch, tmp_path):
         key: importlib.import_module(decoder.module_name)
         for key, decoder in DECODERS.items()
     }
+    flow = importlib.import_module(SHARED_MODULE)
     canonical = tmp_path / "canonical"
     canonical.mkdir()
-    for module in modules.values():
+    for module in (*modules.values(), flow):
         monkeypatch.setattr(module, "PROCESSED_DATA_DIR", canonical)
     use_swr_source(
         monkeypatch,
@@ -188,7 +195,7 @@ def decoders(monkeypatch, tmp_path):
         write_artifact_run(tmp_path / "artifact_run", {SWR_EPOCH: ARTIFACT_CORES}),
     )
 
-    yield Decoders(modules=modules, canonical=canonical)
+    yield Decoders(modules=modules, flow=flow, canonical=canonical)
 
     for name in fresh:
         sys.modules.pop(name, None)
@@ -378,24 +385,32 @@ def _run_decode(module: types.ModuleType, decoder: Decoder, tmp_path: Path, **kw
     )
 
 
+def _replace_runner(monkeypatch, module: types.ModuleType, **changes: Any) -> None:
+    """Give the script's ``RUNNER`` record `changes` (its loader, its aggregation)."""
+    monkeypatch.setattr(module, "RUNNER", dataclasses.replace(module.RUNNER, **changes))
+
+
 def _patch_fresh_decode(
-    monkeypatch, module: types.ModuleType, tmp_path: Path, fresh: _WritesPlaceholders
+    monkeypatch, flow: types.ModuleType, tmp_path: Path, fresh: _WritesPlaceholders
 ) -> None:
-    """Make ``run_decode`` decode afresh into `fresh`, with nothing real loaded."""
-    monkeypatch.setattr(module, "load_data", lambda *args, **kwargs: _session_data())
-    monkeypatch.setattr(module, "get_training_timepoints", lambda *args, **kwargs: None)
+    """Make ``run_decode`` decode afresh into `fresh`, with nothing real loaded.
+
+    `flow` is ``_decode_runner``, whose globals ``run_decode`` reads.
+    """
+    monkeypatch.setattr(flow, "load_data", lambda *args, **kwargs: _session_data())
+    monkeypatch.setattr(flow, "get_training_timepoints", lambda *args, **kwargs: None)
     monkeypatch.setattr(
-        module,
+        flow,
         "hpc_decode_masks",
         lambda *args, **kwargs: decoding_common.HpcDecodeMasks(
             np.zeros(2, dtype=bool), np.ones(2, dtype=bool), {"stand_in": True}
         ),
     )
     monkeypatch.setattr(
-        module, "perform_decoding", lambda *args, **kwargs: (fresh, fresh, fresh)
+        flow, "perform_decoding", lambda *args, **kwargs: (fresh, fresh, fresh)
     )
     monkeypatch.setattr(
-        module,
+        flow,
         "organize_results",
         lambda *args, **kwargs: (_GuardedFrame(tmp_path), None),
     )
@@ -655,9 +670,11 @@ def test_run_decode_reloads_from_save_dir(decoders, monkeypatch, tmp_path, key):
         loaded.append(kwargs)
         raise Reloaded
 
-    monkeypatch.setattr(module, "load_data", lambda *args, **kwargs: _session_data())
-    monkeypatch.setattr(module, "results_exist", results_exist)
-    monkeypatch.setattr(module, decoder.loader_name, loader)
+    monkeypatch.setattr(
+        decoders.flow, "load_data", lambda *args, **kwargs: _session_data()
+    )
+    monkeypatch.setattr(decoders.flow, "results_exist", results_exist)
+    _replace_runner(monkeypatch, module, load_saved=loader)
 
     failed = _run_decode(module, decoder, tmp_path, save_dir=save_dir)
 
@@ -668,11 +685,11 @@ def test_run_decode_reloads_from_save_dir(decoders, monkeypatch, tmp_path, key):
 
 @pytest.mark.parametrize("key", list(DECODERS))
 def test_resume_rewrites_only_data_over_time(decoders, tmp_path, key):
-    decoder, module = DECODERS[key], decoders.modules[key]
+    decoder = DECODERS[key]
     before = _write_saved_files(tmp_path, decoder.epoch_identifier)
     data_over_time = _GuardedFrame(tmp_path)
 
-    module.save_results_and_model(
+    decoders.flow.save_results_and_model(
         logging.getLogger(__name__),
         _RefusesToSave(),
         _RefusesToSave(),
@@ -704,10 +721,12 @@ def test_run_decode_resume_keeps_saved_files(decoders, monkeypatch, tmp_path, ke
         roots.append(kwargs["root"])
         return _RefusesToSave(_saved_attrs()), _RefusesToSave(), _RefusesToSave()
 
-    monkeypatch.setattr(module, "load_data", lambda *args, **kwargs: _session_data())
-    monkeypatch.setattr(module, decoder.loader_name, loader)
     monkeypatch.setattr(
-        module,
+        decoders.flow, "load_data", lambda *args, **kwargs: _session_data()
+    )
+    _replace_runner(monkeypatch, module, load_saved=loader)
+    monkeypatch.setattr(
+        decoders.flow,
         "organize_results",
         lambda *args, **kwargs: (_GuardedFrame(tmp_path), None),
     )
@@ -751,17 +770,19 @@ def test_a_resume_refuses_results_made_under_other_masks(
     def organize_results(*args: Any, **kwargs: Any) -> None:
         raise AssertionError("a resume organized results decoded under other masks")
 
-    monkeypatch.setattr(module, "load_data", lambda *args, **kwargs: _session_data())
     monkeypatch.setattr(
+        decoders.flow, "load_data", lambda *args, **kwargs: _session_data()
+    )
+    _replace_runner(
+        monkeypatch,
         module,
-        decoder.loader_name,
-        lambda *args, **kwargs: (
+        load_saved=lambda *args, **kwargs: (
             _RefusesToSave(saved),
             _RefusesToSave(),
             _RefusesToSave(),
         ),
     )
-    monkeypatch.setattr(module, "organize_results", organize_results)
+    monkeypatch.setattr(decoders.flow, "organize_results", organize_results)
 
     failed = _run_decode(module, decoder, tmp_path, save_dir=save_dir)
 
@@ -780,7 +801,9 @@ def test_a_resume_refuses_results_made_under_other_masks(
 def test_save_dir_is_created(decoders, monkeypatch, tmp_path, key):
     decoder, module = DECODERS[key], decoders.modules[key]
     save_dir = tmp_path / "staging" / "redecode"
-    _patch_fresh_decode(monkeypatch, module, tmp_path, _WritesPlaceholders(tmp_path))
+    _patch_fresh_decode(
+        monkeypatch, decoders.flow, tmp_path, _WritesPlaceholders(tmp_path)
+    )
 
     failed = _run_decode(module, decoder, tmp_path, save_dir=save_dir)
 
@@ -799,7 +822,7 @@ def test_fresh_save_stamps_provenance_into_results(
     """The record outlives the epoch log, which a later resume rewrites."""
     decoder, module = DECODERS[key], decoders.modules[key]
     fresh = _WritesPlaceholders(tmp_path)
-    _patch_fresh_decode(monkeypatch, module, tmp_path, fresh)
+    _patch_fresh_decode(monkeypatch, decoders.flow, tmp_path, fresh)
 
     failed = _run_decode(module, decoder, tmp_path, save_dir=tmp_path / "staging")
 
@@ -813,7 +836,7 @@ def test_a_failed_write_leaves_no_final_file(decoders, monkeypatch, tmp_path, ke
     """A write that dies part way leaves nothing ``results_exist`` would trust."""
     decoder, module = DECODERS[key], decoders.modules[key]
     save_dir = tmp_path / "staging"
-    _patch_fresh_decode(monkeypatch, module, tmp_path, _FailsMidWrite(tmp_path))
+    _patch_fresh_decode(monkeypatch, decoders.flow, tmp_path, _FailsMidWrite(tmp_path))
 
     failed = _run_decode(module, decoder, tmp_path, save_dir=save_dir)
 
@@ -898,7 +921,7 @@ def test_epoch_log_has_one_provenance_line(decoders, monkeypatch, tmp_path, key)
     def load_data(*args: Any, **kwargs: Any) -> None:
         raise RuntimeError("the header is all this test reads")
 
-    monkeypatch.setattr(module, "load_data", load_data)
+    monkeypatch.setattr(decoders.flow, "load_data", load_data)
 
     _run_decode(module, decoder, tmp_path, save_dir=tmp_path / "staging")
 
@@ -944,17 +967,17 @@ def test_run_decode_closes_spyglass_nwb_files_when_asked(
     fail, and its log ends with how many."""
     decoder, module = DECODERS[key], decoders.modules[key]
     release = _ReleaseRecorder()
-    monkeypatch.setattr(module, "release_nwb_files", release)
+    monkeypatch.setattr(decoders.flow, "release_nwb_files", release)
     if outcome == "ok":
         _patch_fresh_decode(
-            monkeypatch, module, tmp_path, _WritesPlaceholders(tmp_path)
+            monkeypatch, decoders.flow, tmp_path, _WritesPlaceholders(tmp_path)
         )
     else:
 
         def load_data(*args: Any, **kwargs: Any) -> None:
             raise RuntimeError("simulated: an NWB file could not be read")
 
-        monkeypatch.setattr(module, "load_data", load_data)
+        monkeypatch.setattr(decoders.flow, "load_data", load_data)
 
     failed = _run_decode(
         module, decoder, tmp_path, save_dir=tmp_path / "staging", release_nwb=True
@@ -973,8 +996,10 @@ def test_run_decode_leaves_spyglass_nwb_files_open_by_default(
     """Called on its own, an epoch may share its process with other readers."""
     decoder, module = DECODERS[key], decoders.modules[key]
     release = _ReleaseRecorder()
-    monkeypatch.setattr(module, "release_nwb_files", release)
-    _patch_fresh_decode(monkeypatch, module, tmp_path, _WritesPlaceholders(tmp_path))
+    monkeypatch.setattr(decoders.flow, "release_nwb_files", release)
+    _patch_fresh_decode(
+        monkeypatch, decoders.flow, tmp_path, _WritesPlaceholders(tmp_path)
+    )
 
     failed = _run_decode(module, decoder, tmp_path, save_dir=tmp_path / "staging")
 
@@ -1004,7 +1029,9 @@ def test_a_failed_release_leaves_the_epochs_result(
     monkeypatch.setitem(sys.modules, "spyglass.utils", utils)
     monkeypatch.setitem(sys.modules, "spyglass.utils.nwb_helper_fn", helper)
     save_dir = tmp_path / "staging"
-    _patch_fresh_decode(monkeypatch, module, tmp_path, _WritesPlaceholders(tmp_path))
+    _patch_fresh_decode(
+        monkeypatch, decoders.flow, tmp_path, _WritesPlaceholders(tmp_path)
+    )
 
     failed = _run_decode(module, decoder, tmp_path, save_dir=save_dir, release_nwb=True)
 
@@ -1061,16 +1088,16 @@ def test_an_hpc_decode_masks_artifacts_and_leaves_swrs_out_of_encoding(
         loads.append(kwargs)
         return {**_session_data(), "position_info": _decode_position_info()}
 
-    signature = inspect.signature(module.perform_decoding)
+    signature = inspect.signature(decoders.flow.perform_decoding)
 
     def perform_decoding(*args: Any, **kwargs: Any) -> tuple:
         decodes.append(signature.bind(*args, **kwargs))
         return fresh, fresh, fresh
 
-    monkeypatch.setattr(module, "load_data", load_data)
-    monkeypatch.setattr(module, "perform_decoding", perform_decoding)
+    monkeypatch.setattr(decoders.flow, "load_data", load_data)
+    monkeypatch.setattr(decoders.flow, "perform_decoding", perform_decoding)
     monkeypatch.setattr(
-        module,
+        decoders.flow,
         "organize_results",
         lambda *args, **kwargs: (_GuardedFrame(tmp_path), None),
     )
@@ -1091,6 +1118,7 @@ def test_an_hpc_decode_masks_artifacts_and_leaves_swrs_out_of_encoding(
         load["ripple_power"]["artifact_intervals"].to_numpy(), [MASK_INTERVAL]
     )
     (bound,) = decodes
+    assert bound.arguments["runner"] is module.RUNNER
     missing = _on_decode_grid(MASK_INTERVAL)
     np.testing.assert_array_equal(bound.arguments["is_missing"], missing)
     np.testing.assert_array_equal(
@@ -1120,7 +1148,7 @@ def test_an_hpc_decode_refuses_to_run_without_both_runs(
     def load_data(*args: Any, **kwargs: Any) -> None:
         raise AssertionError("an HPC decode loaded data without both runs")
 
-    monkeypatch.setattr(module, "load_data", load_data)
+    monkeypatch.setattr(decoders.flow, "load_data", load_data)
 
     failed = _run_decode(module, decoder, tmp_path, save_dir=tmp_path / "staging")
 
@@ -1143,7 +1171,7 @@ def test_an_hpc_decode_refuses_an_inventory_masked_by_another_artifact_run(
     def load_data(*args: Any, **kwargs: Any) -> None:
         raise AssertionError("an HPC decode loaded data on an unmasked inventory")
 
-    monkeypatch.setattr(module, "load_data", load_data)
+    monkeypatch.setattr(decoders.flow, "load_data", load_data)
 
     failed = _run_decode(module, decoder, tmp_path, save_dir=tmp_path / "staging")
 
@@ -1195,16 +1223,15 @@ def test_an_hpc_decodes_swr_labels_are_the_sources(
         },
         index=pd.Index(DECODE_TIME, name="time"),
     )
-    aggregator = (
-        "get_data_over_time" if key == "nonlocal" else "get_contfrag_data_over_time"
-    )
-    monkeypatch.setattr(
-        module, aggregator, lambda *args, **kwargs: (aggregated.copy(), None)
+    _replace_runner(
+        monkeypatch,
+        module,
+        aggregate=lambda *args, **kwargs: (aggregated.copy(), None),
     )
     results = xr.Dataset(coords={"time": DECODE_TIME})
 
-    data_over_time, _ = module.organize_results(
-        {}, results, None, NWB_FILE_NAME, EPOCH_NAME, brain_area
+    data_over_time, _ = decoders.flow.organize_results(
+        module.RUNNER, {}, results, None, NWB_FILE_NAME, EPOCH_NAME, brain_area
     )
 
     if brain_area == "mPFC":
@@ -1253,16 +1280,15 @@ def test_an_hpc_decode_keeps_every_event_it_decoded(decoders, monkeypatch, key):
         },
         index=pd.Index(DECODE_TIME, name="time"),
     )
-    aggregator = (
-        "get_data_over_time" if key == "nonlocal" else "get_contfrag_data_over_time"
-    )
-    monkeypatch.setattr(
-        module, aggregator, lambda *args, **kwargs: (aggregated.copy(), None)
+    _replace_runner(
+        monkeypatch,
+        module,
+        aggregate=lambda *args, **kwargs: (aggregated.copy(), None),
     )
     results = xr.Dataset(coords={"time": DECODE_TIME})
 
-    data_over_time, _ = module.organize_results(
-        {}, results, None, NWB_FILE_NAME, EPOCH_NAME, "HPC"
+    data_over_time, _ = decoders.flow.organize_results(
+        module.RUNNER, {}, results, None, NWB_FILE_NAME, EPOCH_NAME, "HPC"
     )
 
     column = next(iter(columns))
@@ -1280,13 +1306,15 @@ def test_perform_decoding_passes_is_missing_to_the_decoder(decoders, monkeypatch
             calls.append(kwargs)
             return "results"
 
-    factory = "create_detector" if key == "nonlocal" else "create_contfrag_detector"
-    monkeypatch.setattr(module, factory, lambda *args, **kwargs: Detector())
-    monkeypatch.setattr(module, "Environment", lambda **kwargs: "environment")
+    monkeypatch.setattr(
+        decoders.flow, "create_detector", lambda *args, **kwargs: Detector()
+    )
+    monkeypatch.setattr(decoders.flow, "Environment", lambda **kwargs: "environment")
     is_training = np.array([True, False, True])
     is_missing = np.array([False, True, False])
 
-    module.perform_decoding(
+    decoders.flow.perform_decoding(
+        module.RUNNER,
         logging.getLogger(__name__),
         [np.array([0.1])],
         [np.zeros((1, 4))],
@@ -1302,6 +1330,51 @@ def test_perform_decoding_passes_is_missing_to_the_decoder(decoders, monkeypatch
     (kwargs,) = calls
     assert kwargs["is_missing"] is is_missing
     assert kwargs["is_training"] is is_training
+
+
+@pytest.mark.parametrize("brain_area", ["HPC", "mPFC"])
+@pytest.mark.parametrize("key", list(DECODERS))
+def test_only_a_nonlocal_hpc_decode_keeps_its_log_likelihood(
+    decoders, monkeypatch, key, brain_area
+):
+    """The NonLocal runner's HPC decode asks the detector for its per-bin
+    log-likelihood, which the spike-evidence analysis reads from results.nc;
+    the ContFrag runner's does not, nor does any PFC decode. The two runners
+    differ here on purpose (each ``RUNNER.hpc_log_likelihood``)."""
+    module = decoders.modules[key]
+    calls = []
+
+    class Detector:
+        def estimate_parameters(self, **kwargs: Any) -> str:
+            calls.append(kwargs)
+            return "results"
+
+    monkeypatch.setattr(
+        decoders.flow, "create_detector", lambda *args, **kwargs: Detector()
+    )
+    monkeypatch.setattr(decoders.flow, "Environment", lambda **kwargs: "environment")
+
+    decoders.flow.perform_decoding(
+        module.RUNNER,
+        logging.getLogger(__name__),
+        [np.array([0.1])],
+        [np.zeros((1, 4))],
+        _decode_position_info().iloc[:3],
+        None,
+        None,
+        None,
+        np.ones(3, dtype=bool),
+        brain_area=brain_area,
+    )
+
+    (kwargs,) = calls
+    expected = (
+        {"return_outputs": "log_likelihood"}
+        if key == "nonlocal" and brain_area == "HPC"
+        else {}
+    )
+    assert {k: v for k, v in kwargs.items() if k == "return_outputs"} == expected
+    assert module.RUNNER.hpc_log_likelihood is (key == "nonlocal")
 
 
 def _stand_in_batch(monkeypatch, tmp_path, *, has_cuda: bool, cluster: Callable):

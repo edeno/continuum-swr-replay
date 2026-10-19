@@ -458,6 +458,12 @@ Quantify the non-local/SWR overlap sub-cases on real data.
 
 `quantify_session`, `print_report`, `main`
 
+### `scripts/decoding/_decode_runner.py`
+
+The flow both decode runners share, and the record of what differs.
+
+`DecodeRunner`, `algorithm_params`, `create_detector`, `perform_decoding`, `save_results_and_model`, `organize_results`, `run_decode`, `parse_decode_args`
+
 ### `scripts/decoding/assemble_contfrag_shards.py`
 
 Assemble disjoint per-animal ContFrag shards into one canonical bundle.
@@ -522,13 +528,13 @@ Run Carey's candidate detector on every epoch's CA1 LFP and multiunit spikes.
 
 Main script for running continuum neural decoding on spatial bandit task data.
 
-`create_detector`, `perform_decoding`, `save_results_and_model`, `organize_results`, `generate_figurl`, `run_decode`, `main`
+`nonlocal_detector_kwargs`, `generate_figurl`, `run_decode`, `main`
 
 ### `scripts/decoding/run_decoding_contfrag.py`
 
 Run Continuous-Fragmented (ContFrag) decoding on spatial bandit task data.
 
-`create_contfrag_detector`, `perform_decoding`, `save_results_and_model`, `organize_results`, `run_decode`, `main`
+`contfrag_detector_kwargs`, `run_decode`, `main`
 
 ### `scripts/decoding/write_regeneration_manifest.py`
 
