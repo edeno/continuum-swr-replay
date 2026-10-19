@@ -106,6 +106,7 @@ from continuum_swr_replay.data_loaders.position import (  # noqa: E402
 from continuum_swr_replay.data_loaders.spikes import get_hpc_marks  # noqa: E402
 from continuum_swr_replay.decoding_common import (  # noqa: E402
     filter_epoch_info,
+    parse_run_id,
     provenance_record,
     raise_open_file_limit,
     release_nwb_files,
@@ -113,7 +114,6 @@ from continuum_swr_replay.decoding_common import (  # noqa: E402
 )
 from continuum_swr_replay.parameters import ROOT_DIR  # noqa: E402
 from scripts.decoding.run_swr_detection import (  # noqa: E402
-    RUN_ID_PATTERN,
     array_sha256,
     epoch_id,
     json_ready,
@@ -434,18 +434,12 @@ def main(argv: list[str] | None = None) -> None:
     )
     parser.add_argument(
         "--run-id",
+        type=parse_run_id,
         help="The run's folder under --output-root: letters, digits, '.', '_' "
         "and '-'. Defaults to the first 12 characters of git rev-parse HEAD.",
     )
     parser.add_argument("--output-root", type=Path, default=OUTPUT_ROOT)
     args = parser.parse_args(argv)
-    if args.run_id is not None and (
-        not RUN_ID_PATTERN.fullmatch(args.run_id) or args.run_id in {".", ".."}
-    ):
-        parser.error(
-            f"--run-id {args.run_id!r} must name one folder: letters, digits, '.', "
-            "'_' and '-', and not '.' or '..'."
-        )
 
     # before the cluster starts: its worker processes inherit this limit
     old_soft, new_soft = raise_open_file_limit()

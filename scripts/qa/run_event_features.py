@@ -168,9 +168,11 @@ from continuum_swr_replay.analysis.inventory_comparison.selection import (  # no
     rejection_stages,
 )
 from continuum_swr_replay.decoding_common import (  # noqa: E402
+    parse_run_id,
     provenance_record,
     raise_open_file_limit,
     release_nwb_files,
+    replace_outputs,
     setup_logger,
     write_atomically,
 )
@@ -179,7 +181,6 @@ from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
 from continuum_swr_replay.table_io import (  # noqa: E402
     read_table,
     sha256_file,
-    write_table,
 )
 from scripts.decoding import run_carey_detection as carey  # noqa: E402
 from scripts.decoding.run_memoryless_detection import (  # noqa: E402
@@ -191,7 +192,6 @@ from scripts.decoding.run_memoryless_detection import (  # noqa: E402
     output_paths as memoryless_outputs,
 )
 from scripts.decoding.run_swr_detection import (  # noqa: E402
-    RUN_ID_PATTERN,
     epoch_id,
     json_ready,
     run_epochs,
@@ -317,33 +317,9 @@ def output_path(identifier: str, output_dir: Path, name: str) -> Path:
     return output_dir / f"{identifier}_{name}.parquet"
 
 
-def replace_outputs(
-    identifier: str,
-    output_dir: Path,
-    tables: Mapping[str, pd.DataFrame],
-    stamp: Mapping[str, str],
-) -> dict[str, dict[str, str]]:
-    """Write an epoch's tables and remove the ones it did not make.
-
-    Returns each written file's ``path`` and ``sha256``, by name. A write that
-    fails removes every table of the epoch, so none is left from a part set.
-    """
-    written = {}
-    try:
-        for name in TABLE_DTYPES:
-            path = output_path(identifier, output_dir, name)
-            if name not in tables:
-                path.unlink(missing_ok=True)
-                continue
-            frame = swr_source.stamp_swr_source(tables[name])
-            frame.attrs |= stamp
-            write_table(frame, path)
-            written[name] = {"path": str(path), "sha256": sha256_file(path)}
-    except BaseException:
-        for name in TABLE_DTYPES:
-            output_path(identifier, output_dir, name).unlink(missing_ok=True)
-        raise
-    return written
+def output_paths(identifier: str, output_dir: Path) -> dict[str, Path]:
+    """Every table an epoch can write, by name."""
+    return {name: output_path(identifier, output_dir, name) for name in TABLE_DTYPES}
 
 
 def _row_mask(n_time: int, first: NDArray, n_rows: NDArray) -> NDArray[np.bool_]:
@@ -727,12 +703,15 @@ def run_epoch(
             decode_sha256=record["decode"]["sha256"],
         )
         record |= {"status": "ok", **found}
-        record["outputs"] = replace_outputs(identifier, output_dir, tables, stamp)
+        record["outputs"] = replace_outputs(
+            output_paths(identifier, output_dir),
+            comparison.stamped_tables(tables, stamp),
+        )
     except _EpochRefused as refused:
-        replace_outputs(identifier, output_dir, {}, stamp)
+        replace_outputs(output_paths(identifier, output_dir), {})
         record = _failed(record, reason=str(refused))
     except Exception as error:  # noqa: BLE001 - recorded; the run goes on
-        replace_outputs(identifier, output_dir, {}, stamp)
+        replace_outputs(output_paths(identifier, output_dir), {})
         record = _failed(record, error=repr(error), traceback=traceback.format_exc())
     record["provenance"] = dict(provenance)
     record["wall_clock_s"] = clock.perf_counter() - started
@@ -872,6 +851,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--inventory-run-id",
         required=True,
+        type=parse_run_id,
         help="The comparison run folder's name, such as afeb897d850f.",
     )
     parser.add_argument("--animal", help="Only this animal's epochs, such as chimi.")
@@ -894,12 +874,6 @@ def main(argv: list[str] | None = None) -> None:
         "--overwrite", action="store_true", help="Redo epochs already written."
     )
     args = parser.parse_args(argv)
-    value = args.inventory_run_id
-    if not RUN_ID_PATTERN.fullmatch(value) or value in {".", ".."}:
-        parser.error(
-            f"--inventory-run-id {value!r} must name one folder: letters, digits, "
-            "'.', '_' and '-', and not '.' or '..'."
-        )
     if args.epoch_id is not None and any(
         value is not None for value in (args.animal, args.date, args.epoch)
     ):

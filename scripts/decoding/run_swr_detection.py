@@ -138,7 +138,6 @@ import functools
 import hashlib
 import json
 import math
-import re
 import resource
 import sys
 import time as clock
@@ -207,22 +206,20 @@ from continuum_swr_replay.data_loaders.position import get_epoch_position_info
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.decoding_common import (
     filter_epoch_info,
+    parse_run_id,
     provenance_record,
     raise_open_file_limit,
     release_nwb_files,
+    replace_outputs,
     setup_logger,
     write_atomically,
 )
 from continuum_swr_replay.parameters import ROOT_DIR
-from continuum_swr_replay.table_io import sha256_file, write_table
 
 OUTPUT_ROOT = swr_source.SWR_INVENTORY_ROOT
 """Where the run folders go: where the paper's SWR source reads them."""
 PRODUCED_BY = "scripts/decoding/run_swr_detection.py"
 DESIGN_SPEC = "docs/design/2026-10-03-full-pipeline-refresh-design.md"
-
-RUN_ID_PATTERN = re.compile(r"[A-Za-z0-9._-]+")
-"""A run id names one folder under ``--output-root``: no path separator."""
 
 SPYGLASS_INPUTS_KAY = "kay_spyglass_inputs"
 """The Kay check's name for Kay run on Spyglass's own inputs (version only)."""
@@ -905,50 +902,6 @@ def _detect(
     return record, tables
 
 
-def write_json(path: Path, content: object) -> None:
-    """Write strict JSON (no NaN or infinity) through a temporary file."""
-    text = json.dumps(content, allow_nan=False)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    write_atomically(path, lambda temporary: temporary.write_text(text))
-
-
-def replace_outputs(
-    identifier: str, output_dir: Path, outputs: Mapping[str, pd.DataFrame | dict]
-) -> dict[str, dict[str, str]]:
-    """Write an epoch's outputs and remove its others.
-
-    The folder then matches the manifest: a detector that failed this time,
-    or a Yu sidecar that was not made, keeps no file from an earlier run.
-
-    Parameters
-    ----------
-    identifier : str
-        The epoch's ``epoch_id``.
-    output_dir : Path
-        The run's folder.
-    outputs : Mapping
-        By ``output_paths`` name: a table, written as parquet with its
-        ``attrs``, or the Yu sidecar's content, written as strict JSON.
-
-    Returns
-    -------
-    dict
-        Each written file's ``path`` and ``sha256``, by name.
-    """
-    written = {}
-    for name, path in output_paths(identifier, output_dir).items():
-        if name not in outputs:
-            path.unlink(missing_ok=True)
-            continue
-        content = outputs[name]
-        if isinstance(content, pd.DataFrame):
-            write_table(content, path)
-        else:
-            write_json(path, content)
-        written[name] = {"path": str(path), "sha256": sha256_file(path)}
-    return written
-
-
 def run_epoch(
     nwb_file_name: str,
     epoch_name: str,
@@ -1016,9 +969,11 @@ def run_epoch(
             fetch_spyglass_kay_inputs=fetch_spyglass_kay_inputs,
             fir_filter=fir_filter,
         )
-        record["outputs"] = replace_outputs(identifier, output_dir, tables)
+        record["outputs"] = replace_outputs(
+            output_paths(identifier, output_dir), tables
+        )
     except Exception as error:  # noqa: BLE001 - recorded; the run goes on
-        replace_outputs(identifier, output_dir, {})
+        replace_outputs(output_paths(identifier, output_dir), {})
         record = {
             "status": "failed",
             "error": repr(error),
@@ -1270,18 +1225,12 @@ def main(argv: list[str] | None = None) -> None:
     )
     parser.add_argument(
         "--run-id",
+        type=parse_run_id,
         help="The run's folder under --output-root: letters, digits, '.', '_' "
         "and '-'. Defaults to the first 12 characters of git rev-parse HEAD.",
     )
     parser.add_argument("--output-root", type=Path, default=OUTPUT_ROOT)
     args = parser.parse_args(argv)
-    if args.run_id is not None and (
-        not RUN_ID_PATTERN.fullmatch(args.run_id) or args.run_id in {".", ".."}
-    ):
-        parser.error(
-            f"--run-id {args.run_id!r} must name one folder: letters, digits, '.', "
-            "'_' and '-', and not '.' or '..'."
-        )
 
     # before the cluster starts: its worker processes inherit this limit
     old_soft, new_soft = raise_open_file_limit()

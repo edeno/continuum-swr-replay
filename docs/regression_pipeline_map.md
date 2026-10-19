@@ -516,7 +516,7 @@ Detect LFP and spike artifacts in every epoch's CA1 data, on CPU.
 
 Run Carey's candidate detector on every epoch's CA1 LFP and multiunit spikes.
 
-`output_paths`, `swr_run_inputs`, `decode_marks`, `observation_table`, `replace_outputs`, `run_epoch`, `summary`, `run_settings`, `main`, `run`
+`output_paths`, `swr_run_inputs`, `decode_marks`, `observation_table`, `run_epoch`, `summary`, `run_settings`, `main`, `run`
 
 ### `scripts/decoding/run_decoding_bandit.py`
 
@@ -794,13 +794,13 @@ Report one inventory comparison run: its counts per session and per animal.
 
 Event features of every compared event, one epoch per task.
 
-`output_path`, `replace_outputs`, `evidence_rows`, `memoryless_input_mismatch`, `epoch_tables`, `run_epoch`, `summary`, `run_settings`, `main`, `run`
+`output_path`, `output_paths`, `evidence_rows`, `memoryless_input_mismatch`, `epoch_tables`, `run_epoch`, `summary`, `run_settings`, `main`, `run`
 
 ### `scripts/qa/run_inventory_comparison.py`
 
 Compare the replay-detection inventories, one epoch at a time.
 
-`decode_path`, `epoch_inventories`, `compare_epoch`, `bounds_mismatch`, `output_path`, `replace_outputs`, `run_epoch`, `summary`, `run_settings`, `select_epochs`, `main`, `run`
+`decode_path`, `epoch_inventories`, `compare_epoch`, `bounds_mismatch`, `output_path`, `output_paths`, `stamped_tables`, `run_epoch`, `summary`, `run_settings`, `select_epochs`, `main`, `run`
 
 ### `scripts/qa/run_quality_metrics.py`
 

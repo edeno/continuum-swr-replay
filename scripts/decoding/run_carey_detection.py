@@ -64,7 +64,7 @@ import resource
 import sys
 import time as clock
 import traceback
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -106,14 +106,16 @@ from continuum_swr_replay.data_loaders.position import (  # noqa: E402
 )
 from continuum_swr_replay.decoding_common import (  # noqa: E402
     filter_epoch_info,
+    parse_run_id,
     provenance_record,
     raise_open_file_limit,
     release_nwb_files,
+    replace_outputs,
     setup_logger,
     write_atomically,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR  # noqa: E402
-from continuum_swr_replay.table_io import sha256_file, write_table  # noqa: E402
+from continuum_swr_replay.table_io import sha256_file  # noqa: E402
 from scripts.decoding.run_memoryless_detection import (  # noqa: E402
     MARKS_RULE,
     input_paths,
@@ -126,7 +128,6 @@ from scripts.decoding.run_memoryless_detection import (  # noqa: E402
     OUTPUT_ROOT as MEMORYLESS_ROOT,
 )
 from scripts.decoding.run_swr_detection import (  # noqa: E402
-    RUN_ID_PATTERN,
     array_sha256,
     epoch_artifact_intervals,
     epoch_id,
@@ -403,23 +404,6 @@ def _detect(
     return record, {"events": events, "observed": observed}
 
 
-def replace_outputs(
-    identifier: str, output_dir: Path, tables: Mapping[str, pd.DataFrame]
-) -> dict[str, dict[str, str]]:
-    """Write an epoch's tables and remove the ones it did not make.
-
-    Returns each written file's ``path`` and ``sha256``, by name.
-    """
-    written = {}
-    for name, path in output_paths(identifier, output_dir).items():
-        if name not in tables:
-            path.unlink(missing_ok=True)
-            continue
-        write_table(tables[name], path)
-        written[name] = {"path": str(path), "sha256": sha256_file(path)}
-    return written
-
-
 def run_epoch(
     nwb_file_name: str,
     epoch_name: str,
@@ -476,9 +460,11 @@ def run_epoch(
             fetch_swr_inputs=fetch_swr_inputs,
             fetch_marks=fetch_marks,
         )
-        record["outputs"] = replace_outputs(identifier, output_dir, tables)
+        record["outputs"] = replace_outputs(
+            output_paths(identifier, output_dir), tables
+        )
     except Exception as error:  # noqa: BLE001 - recorded; the run goes on
-        replace_outputs(identifier, output_dir, {})
+        replace_outputs(output_paths(identifier, output_dir), {})
         record = {
             "status": "failed",
             "error": repr(error),
@@ -574,18 +560,12 @@ def main(argv: list[str] | None = None) -> None:
     )
     parser.add_argument(
         "--run-id",
+        type=parse_run_id,
         help="The run's folder under --output-root: letters, digits, '.', '_' "
         "and '-'. Defaults to the first 12 characters of git rev-parse HEAD.",
     )
     parser.add_argument("--output-root", type=Path, default=OUTPUT_ROOT)
     args = parser.parse_args(argv)
-    if args.run_id is not None and (
-        not RUN_ID_PATTERN.fullmatch(args.run_id) or args.run_id in {".", ".."}
-    ):
-        parser.error(
-            f"--run-id {args.run_id!r} must name one folder: letters, digits, '.', "
-            "'_' and '-', and not '.' or '..'."
-        )
 
     # before the cluster starts: its worker processes inherit this limit
     old_soft, new_soft = raise_open_file_limit()

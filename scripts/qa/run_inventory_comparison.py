@@ -174,14 +174,15 @@ from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_epoch_ids,
 )
 from continuum_swr_replay.decoding_common import (  # noqa: E402
+    parse_run_id,
     provenance_record,
+    replace_outputs,
     write_atomically,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR  # noqa: E402
 from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
-from continuum_swr_replay.table_io import sha256_file, write_table  # noqa: E402
+from continuum_swr_replay.table_io import sha256_file  # noqa: E402
 from scripts.decoding.run_swr_detection import (  # noqa: E402
-    RUN_ID_PATTERN,
     json_ready,
     run_lock,
 )
@@ -593,33 +594,23 @@ def output_path(identifier: str, output_dir: Path, name: str) -> Path:
     return output_dir / f"{identifier}_{name}.parquet"
 
 
-def replace_outputs(
-    identifier: str,
-    output_dir: Path,
-    tables: Mapping[str, pd.DataFrame],
-    stamp: Mapping[str, str],
-) -> dict[str, dict[str, str]]:
-    """Write an epoch's tables and remove the ones it did not make.
+def output_paths(identifier: str, output_dir: Path) -> dict[str, Path]:
+    """Every table an epoch can write, by name."""
+    return {name: output_path(identifier, output_dir, name) for name in TABLE_DTYPES}
 
-    Returns each written file's ``path`` and ``sha256``, by name. A write that
-    fails removes every table of the epoch, so none is left from a part set.
+
+def stamped_tables(
+    tables: Mapping[str, pd.DataFrame], stamp: Mapping[str, str]
+) -> Mapping[str, pd.DataFrame]:
+    """Stamp each table (in place, and return them) with the SWR source and `stamp`.
+
+    The SWR source's stamp (``swr_source.stamp_swr_source``) goes first, then
+    `stamp`'s keys are merged into each table's ``attrs``.
     """
-    written = {}
-    try:
-        for name in TABLE_DTYPES:
-            path = output_path(identifier, output_dir, name)
-            if name not in tables:
-                path.unlink(missing_ok=True)
-                continue
-            frame = swr_source.stamp_swr_source(tables[name])
-            frame.attrs |= stamp
-            write_table(frame, path)
-            written[name] = {"path": str(path), "sha256": sha256_file(path)}
-    except BaseException:
-        for name in TABLE_DTYPES:
-            output_path(identifier, output_dir, name).unlink(missing_ok=True)
-        raise
-    return written
+    for frame in tables.values():
+        swr_source.stamp_swr_source(frame)
+        frame.attrs |= stamp
+    return tables
 
 
 def run_epoch(
@@ -659,7 +650,7 @@ def run_epoch(
         bounds = (float(time[0]), float(time[-1]))
         reason = bounds_mismatch(identifier, bounds)
         if reason is not None:
-            replace_outputs(identifier, output_dir, {}, stamp)
+            replace_outputs(output_paths(identifier, output_dir), {})
             raise _EpochRefused(reason)
         tables = compare_epoch(
             dot,
@@ -688,7 +679,9 @@ def run_epoch(
                 for detector in DETECTORS
                 if not observed[detector]
             },
-            "outputs": replace_outputs(identifier, output_dir, tables, stamp),
+            "outputs": replace_outputs(
+                output_paths(identifier, output_dir), stamped_tables(tables, stamp)
+            ),
         }
     except _EpochRefused as refused:
         record = {
@@ -698,7 +691,7 @@ def run_epoch(
             "epoch_bounds_s": list(bounds),
         }
     except Exception as error:  # noqa: BLE001 - recorded; the run goes on
-        replace_outputs(identifier, output_dir, {}, stamp)
+        replace_outputs(output_paths(identifier, output_dir), {})
         record = {
             "status": "failed",
             "error": repr(error),
@@ -805,10 +798,16 @@ def main(argv: list[str] | None = None) -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
-        "--carey-run-id", required=True, help="The Carey run folder's name."
+        "--carey-run-id",
+        required=True,
+        type=parse_run_id,
+        help="The Carey run folder's name.",
     )
     parser.add_argument(
-        "--memoryless-run-id", required=True, help="The memoryless run folder's name."
+        "--memoryless-run-id",
+        required=True,
+        type=parse_run_id,
+        help="The memoryless run folder's name.",
     )
     parser.add_argument("--animal", help="Only this animal's epochs, such as chimi.")
     parser.add_argument(
@@ -825,19 +824,11 @@ def main(argv: list[str] | None = None) -> None:
     )
     parser.add_argument(
         "--run-id",
+        type=parse_run_id,
         help="The run's folder: letters, digits, '.', '_' and '-'. Defaults to the "
         "first 12 characters of git rev-parse HEAD.",
     )
     args = parser.parse_args(argv)
-    for option in ("carey_run_id", "memoryless_run_id", "run_id"):
-        value = getattr(args, option)
-        if value is not None and (
-            not RUN_ID_PATTERN.fullmatch(value) or value in {".", ".."}
-        ):
-            parser.error(
-                f"--{option.replace('_', '-')} {value!r} must name one folder: "
-                "letters, digits, '.', '_' and '-', and not '.' or '..'."
-            )
     if args.epoch_id is not None and any(
         value is not None for value in (args.animal, args.date, args.epoch)
     ):

@@ -93,14 +93,18 @@ def test_a_failure_after_the_tables_keeps_no_field_of_an_ok_record(
     }
     calls = []
 
-    def failing_write(identifier, output_dir, tables, stamp):
-        calls.append(tables)
-        if tables:
+    def failing_write(paths, outputs):
+        calls.append(outputs)
+        if outputs:
             raise OSError("disk full")
         return {}
 
     monkeypatch.setattr(runner, "replace_outputs", failing_write)
-    monkeypatch.setattr(runner, "epoch_tables", lambda *a, **k: (found, {"x": 1}))
+    monkeypatch.setattr(
+        runner,
+        "epoch_tables",
+        lambda *a, **k: (found, {"features": pd.DataFrame({"x": [1]})}),
+    )
 
     record = runner.run_epoch(
         "sim20200101_.nwb",

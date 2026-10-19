@@ -15,10 +15,11 @@ import json
 import logging
 import logging.config
 import os
+import re
 import resource
 import subprocess
 import sys
-from argparse import ArgumentParser, Namespace
+from argparse import ArgumentParser, ArgumentTypeError, Namespace
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -51,6 +52,7 @@ from continuum_swr_replay.parameters import (
     WAVEFORM_STD,
     TrainingType,
 )
+from continuum_swr_replay.table_io import sha256_file, write_table
 from continuum_swr_replay.types import ClusterlessParams, SortedSpikesParams
 
 _logger = logging.getLogger(__name__)
@@ -448,6 +450,86 @@ def write_atomically(path: Path, write: Callable[[Path], object]) -> None:
         os.replace(temporary, path)
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def write_json(path: Path, content: object) -> None:
+    """Write strict JSON (no NaN or infinity) through a temporary file."""
+    text = json.dumps(content, allow_nan=False)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_atomically(path, lambda temporary: temporary.write_text(text))
+
+
+def replace_outputs(
+    paths: Mapping[str, Path], outputs: Mapping[str, pd.DataFrame | Mapping]
+) -> dict[str, dict[str, str]]:
+    """Write an epoch's outputs and remove its others; on a failure, remove all.
+
+    The folder then matches the manifest: an output not made this time keeps
+    no file from an earlier run, and a write that fails (or is interrupted)
+    removes every one of `paths` before re-raising, so no part set is left.
+
+    Parameters
+    ----------
+    paths : Mapping[str, Path]
+        Every file the epoch can write, by output name.
+    outputs : Mapping[str, pd.DataFrame | Mapping]
+        By name in `paths`: a table, written as parquet with its ``attrs``
+        (``table_io.write_table``), or any other content, written as strict
+        JSON (``write_json``). A name not in `paths` is not written.
+
+    Returns
+    -------
+    dict[str, dict[str, str]]
+        Each written file's ``path`` and ``sha256``, by name.
+    """
+    written = {}
+    try:
+        for name, path in paths.items():
+            if name not in outputs:
+                path.unlink(missing_ok=True)
+                continue
+            content = outputs[name]
+            if isinstance(content, pd.DataFrame):
+                write_table(content, path)
+            else:
+                write_json(path, content)
+            written[name] = {"path": str(path), "sha256": sha256_file(path)}
+    except BaseException:
+        for path in paths.values():
+            path.unlink(missing_ok=True)
+        raise
+    return written
+
+
+RUN_ID_PATTERN = re.compile(r"[A-Za-z0-9._-]+")
+"""A run id names one folder under its output root: no path separator."""
+
+
+def parse_run_id(value: str) -> str:
+    """Return `value` if it names one run folder: an argparse ``type``.
+
+    Parameters
+    ----------
+    value : str
+        The option's value, such as ``"a1b2c3d4e5f6"``.
+
+    Returns
+    -------
+    str
+        `value`, unchanged.
+
+    Raises
+    ------
+    ArgumentTypeError
+        Unless `value` is letters, digits, ``.``, ``_`` and ``-`` only, and
+        not ``.`` or ``..``; argparse reports it as a usage error (exit 2).
+    """
+    if not RUN_ID_PATTERN.fullmatch(value) or value in {".", ".."}:
+        raise ArgumentTypeError(
+            f"{value!r} must name one folder: letters, digits, '.', '_' and '-', "
+            "and not '.' or '..'."
+        )
+    return value
 
 
 def provenance_record(repo: Path) -> dict[str, Any]:
