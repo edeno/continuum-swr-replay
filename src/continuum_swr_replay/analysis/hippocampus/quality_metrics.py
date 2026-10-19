@@ -93,10 +93,6 @@ from continuum_swr_replay.analysis.constants import (
 )
 from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 
-from .event_immobility import (
-    filter_event_labels_by_speed,
-    validate_nonlocal_event_probability_contract,
-)
 from .swr_source import analysed_bins
 
 logger = logging.getLogger(__name__)
@@ -906,7 +902,6 @@ def compute_non_local_event_context(
     theta_power_threshold: float = 2.0,
     group_cols: list[str] | None = None,
     event_col: str = "non_local_event",
-    non_local_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
 ) -> pd.DataFrame:
     """Classify events by neural context (SWR, theta, neither).
 
@@ -922,16 +917,15 @@ def compute_non_local_event_context(
     Parameters
     ----------
     data : pd.DataFrame
-        ``data_over_time`` DataFrame.
+        ``data_over_time`` DataFrame, read through the SWR source, which holds
+        its event labels to the whole-event speed rule and the Non-Local
+        probability contract.
     theta_power_threshold : float, optional
         Z-score threshold for high theta power.
     group_cols : list[str] | None, optional
         Session grouping columns.
     event_col : str, optional
         Event label column, by default ``"non_local_event"``.
-    non_local_threshold : float, optional
-        Minimum combined Non-Local posterior required at every labeled bin.
-        This must match the threshold used to create ``non_local_event``.
 
     Returns
     -------
@@ -949,20 +943,8 @@ def compute_non_local_event_context(
     # could only cut an event, never drop it.
     _analysed_rows(data)
 
-    if event_col == "non_local_event":
-        validate_nonlocal_event_probability_contract(
-            data,
-            probability_threshold=non_local_threshold,
-        )
     event_group_cols = group_cols + [event_col]
-    event_cols = [event_col]
-    if "SWR_event" in data.columns and "SWR_event" not in event_cols:
-        event_cols.append("SWR_event")
-    eligible_data = filter_event_labels_by_speed(
-        data, event_cols, group_cols=group_cols
-    )
-
-    non_local = eligible_data.loc[eligible_data[event_col] > 0]
+    non_local = data.loc[data[event_col] > 0]
 
     if non_local.empty:
         return pd.DataFrame(
@@ -1015,12 +997,12 @@ def compute_non_local_event_context(
 
     swr_overlap_keys = (
         event_strict_overlap_keys(
-            eligible_data,
+            data,
             event_col,
             "SWR_event",
             session_cols=tuple(group_cols),
         )
-        if "SWR_event" in eligible_data.columns
+        if "SWR_event" in data.columns
         else set()
     )
     if swr_overlap_keys:
@@ -1429,7 +1411,6 @@ def compute_session_quality_summary(
     context_df = compute_non_local_event_context(
         data,
         theta_power_threshold=theta_power_threshold,
-        non_local_threshold=non_local_threshold,
         group_cols=group_cols,
     )
 

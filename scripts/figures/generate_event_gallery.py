@@ -85,7 +85,6 @@ from continuum_swr_replay.analysis.hippocampus.event_detection import (
     strict_overlap_matrix,
 )
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (
-    filter_event_labels_by_speed,
     intervals_from_labels,
 )
 from continuum_swr_replay.analysis.hippocampus.event_table import (
@@ -234,15 +233,6 @@ def _catalog_one_epoch(pkl_path: Path) -> pd.DataFrame:
     dot["Non-Local_prob"] = (
         dot["Non-Local_Continuous_prob"] + dot["Non-Local_Fragmented_prob"]
     )
-    eligible_dot = filter_event_labels_by_speed(
-        dot,
-        [
-            column
-            for column in ("non_local_event", "SWR_event", "MUA_event")
-            if column in dot
-        ],
-    )
-
     ct = build_classified_nonlocal_event_table(dot)
     rows: list[dict] = []
 
@@ -253,7 +243,7 @@ def _catalog_one_epoch(pkl_path: Path) -> pd.DataFrame:
         ct = ct[ct["whole_event_speed_eligible"]].copy()
         ev_dur = (ct["event_end"] - ct["event_start"]).to_numpy()
 
-        swr_intervals = intervals_from_labels(eligible_dot, "SWR_event")
+        swr_intervals = intervals_from_labels(dot, "SWR_event")
         swr_starts = swr_intervals["start_time"].to_numpy()
         swr_ends = swr_intervals["end_time"].to_numpy()
 
@@ -299,7 +289,7 @@ def _catalog_one_epoch(pkl_path: Path) -> pd.DataFrame:
             rows.append(common)
 
         # swr_not_nonlocal: SWR intervals overlapping no non-local event.
-        nl_intervals = intervals_from_labels(eligible_dot, "non_local_event")
+        nl_intervals = intervals_from_labels(dot, "non_local_event")
         nl_starts = nl_intervals["start_time"].to_numpy()
         nl_ends = nl_intervals["end_time"].to_numpy()
         if len(swr_intervals):

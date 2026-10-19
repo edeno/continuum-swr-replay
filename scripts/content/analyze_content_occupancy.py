@@ -58,8 +58,6 @@ from continuum_swr_replay.analysis.hippocampus.event_detection import (  # noqa:
 )
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (  # noqa: E402
     EventDefinitionError,
-    filter_event_labels_by_speed,
-    validate_nonlocal_event_probability_contract,
 )
 from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
     analysed_bins,
@@ -155,16 +153,15 @@ def session_content_distances(epoch_id: str) -> tuple[np.ndarray, np.ndarray, np
     nearest reward well. Returns ``None`` if too few wells are localizable.
     """
     thr_int = int(round(NON_LOCAL_THRESHOLD * 100))
+    # The read refuses labels that break the speed rule or the probability
+    # contract.
     dot = read_dot_with_swr_source(
-        PROCESSED_DATA_DIR / f"{epoch_id}_{thr_int}_data_over_time.pkl"
+        PROCESSED_DATA_DIR / f"{epoch_id}_{thr_int}_data_over_time.pkl",
+        non_local_threshold=NON_LOCAL_THRESHOLD,
     )
     # Validate the persisted cohort before any auxiliary load or early-return
     # path can turn corruption into an ordinary missing-data skip.
     validate_dot_event_contract(dot)
-    validate_nonlocal_event_probability_contract(
-        dot,
-        probability_threshold=NON_LOCAL_THRESHOLD,
-    )
     env = joblib.load(PROCESSED_DATA_DIR / f"{epoch_id}_environment.pkl")
     # The fit flag is not persisted, but the grid + track graph are intact.
     env._is_fitted = True
@@ -180,21 +177,12 @@ def session_content_distances(epoch_id: str) -> tuple[np.ndarray, np.ndarray, np
     well_bins = [int(np.argmin(np.abs(pos - wl))) for wl in well_lin]
     nearest_well_dist = dist_matrix[:, well_bins].min(1)  # (n_interior,)
 
-    # Retain validation at the business-logic boundary as defense in depth for
-    # direct callers that may later refactor the entry path above.
-    validate_nonlocal_event_probability_contract(
-        dot,
-        probability_threshold=NON_LOCAL_THRESHOLD,
-    )
-    eligible_dot = filter_event_labels_by_speed(
-        dot, ["non_local_event", "SWR_event"]
-    )
-    event = eligible_dot["non_local_event"].to_numpy() > 0
+    event = dot["non_local_event"].to_numpy() > 0
     # Assign every bin of a Non-Local event to one group using the canonical
     # strict event-level overlap rule. A raw per-bin SWR mask would split a
     # partially overlapping event between both groups.
     is_swr = event_strict_overlap_mask(
-        eligible_dot, "non_local_event", "SWR_event"
+        dot, "non_local_event", "SWR_event"
     ).to_numpy()
     map_estimate = dot["map_estimate"].to_numpy()
     d_animal = np.abs(dot["ahead_behind_distance"].to_numpy())

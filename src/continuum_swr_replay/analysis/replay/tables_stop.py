@@ -28,7 +28,6 @@ from ._helpers import (
 )
 from ._tables_common import (
     _STOP_TABLE_BUILD_COLUMNS,
-    _filter_external_event_labels,
     _in_event_mask,
 )
 from .bouts import (
@@ -133,7 +132,6 @@ def build_stop_table(
         dot["Non-Local_Continuous_prob"].to_numpy()
         + dot["Non-Local_Fragmented_prob"].to_numpy()
     )
-    dot = _filter_external_event_labels(dot, speed_threshold)
     nonlocal_event_mask = _in_event_mask(
         dot, speed_threshold, nonlocal_threshold
     ).to_numpy()

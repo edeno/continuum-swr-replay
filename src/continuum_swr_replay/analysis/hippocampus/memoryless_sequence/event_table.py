@@ -435,9 +435,10 @@ def canonical_swr_intervals(
 ) -> pd.DataFrame:
     """The SWR intervals the canonical event table classifies against.
 
-    The same two steps ``build_classified_nonlocal_event_table`` takes, in the
-    same order: every ``SWR_event`` label during which the animal moves is
-    zeroed whole, then each surviving label's bounds are its first and last
+    The same two steps the canonical table's SWRs take, in the same order:
+    every ``SWR_event`` label during which the animal moves is zeroed whole
+    (the read does this at the canonical threshold), then each surviving
+    label's bounds are its first and last
     sample. The two cohorts are then labeled against one interval table, which
     calling the same classifier on different intervals would not give.
 
@@ -459,6 +460,9 @@ def canonical_swr_intervals(
     """
     if data_over_time.groupby(list(SESSION_COLUMNS_DAY)).ngroups != 1:
         raise ValueError("canonical_swr_intervals reads one epoch at a time.")
+    # A no-op at the canonical threshold, where the read already gated the
+    # SWRs; kept so the SWR cohort follows the detector's configured speed
+    # threshold (MemorylessConfig.speed_threshold_cm_per_s) when it is stricter.
     qualified = filter_event_labels_by_speed(
         data_over_time, ["SWR_event"], speed_threshold=speed_threshold
     )
@@ -516,8 +520,8 @@ def build_memoryless_event_table(
     swr_intervals : DataFrame or None
         Columns ``SWR_event``, ``start_time``, ``end_time``: the speed-qualified,
         sampled SWR intervals, built as ``build_classified_nonlocal_event_table``
-        builds them (``filter_event_labels_by_speed`` then
-        ``intervals_from_labels``). None when SWR labels are unavailable.
+        builds them (the read's speed-gated labels, then
+        ``intervals_from_labels``; :func:`canonical_swr_intervals`). None when SWR labels are unavailable.
     swr_observed_intervals : ndarray, shape (n_intervals, 2), or None
         Closed intervals over which SWR labels were observed: the SWR source's
         stretches (``swr_source.swr_observed_stretches``). Required with

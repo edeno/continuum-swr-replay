@@ -92,6 +92,7 @@ from numpy.typing import NDArray
 
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    DEFAULT_NON_LOCAL_THRESHOLD,
 )
 from continuum_swr_replay.analysis.hippocampus.artifacts.io import (
     ArtifactRunError,
@@ -119,6 +120,8 @@ from continuum_swr_replay.analysis.hippocampus.event_eligibility import (
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     build_speed_eligible_event_cohort,
     intervals_from_labels,
+    validate_nonlocal_event_probability_contract,
+    validate_whole_event_immobility_contract,
 )
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
@@ -822,13 +825,25 @@ def swr_event_labels(
     return _keep_labels(labels, kept)
 
 
-def _frame_epoch(dot: pd.DataFrame, what: str) -> tuple[str, NDArray]:
+def _frame_epoch(
+    dot: pd.DataFrame,
+    what: str,
+    non_local_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
+) -> tuple[str, NDArray]:
     """The one epoch a frame holds, as the inventory's id, and its time axis.
 
     The time axis is the index, read nowhere else: every reader downstream
     (``intervals_from_labels``, the event tables) takes time from the index,
     and an event's first and last row as its bounds, so the index must
     increase. A ``time`` column would be a second axis and is refused.
+
+    The decode's own labels (:data:`LABEL_COLUMNS`), which the read passes on,
+    are checked here too, once for every consumer: each event is immobile as a
+    whole (``event_immobility``, the canonical threshold), and each non-local
+    event's bins have a summed Non-Local posterior above
+    `non_local_threshold`. The decoder made them so, so a frame that breaks
+    either is stale and is refused, never clipped. ``SWR_event`` is the
+    source's own and its speed rule is a drop (``moving``), in :func:`_drops`.
     """
     missing = [c for c in (*SESSION_COLUMNS_DAY, "head_speed") if c not in dot.columns]
     if missing:
@@ -842,6 +857,13 @@ def _frame_epoch(dot: pd.DataFrame, what: str) -> tuple[str, NDArray]:
         )
     if not dot.index.is_monotonic_increasing:
         raise ValueError(f"{what}: data_over_time's time index does not increase")
+    if "non_local_event" in dot.columns:
+        validate_nonlocal_event_probability_contract(
+            dot, probability_threshold=non_local_threshold
+        )
+    for column in LABEL_COLUMNS:
+        if column in dot.columns:
+            validate_whole_event_immobility_contract(dot, column)
     animal, day, epoch = sessions.iloc[0]
     time = dot.index.to_numpy()
     return swr_epoch_id(f"{animal}{day}_.nwb", str(epoch)), np.asarray(time, float)
@@ -961,6 +983,10 @@ def artifact_event_drops(dot: pd.DataFrame) -> pd.DataFrame:
     ValueError
         If the frame holds more than one epoch, lacks a needed column, has a
         ``time`` column or a time index that does not increase.
+    EventDefinitionError
+        If a ``non_local_event`` or ``MUA_event`` label breaks the whole-event
+        immobility rule, or a non-local label has a bin not above the default
+        probability threshold (:func:`with_swr_source`).
     SwrSourceError
         If the epoch cannot be served.
     """
@@ -1031,7 +1057,10 @@ def _normalize_outside_mask(frame: pd.DataFrame, in_mask: NDArray[np.bool_]) -> 
 
 
 def with_swr_source(
-    dot: pd.DataFrame, *, drop_masked_events: bool = True
+    dot: pd.DataFrame,
+    *,
+    drop_masked_events: bool = True,
+    non_local_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
 ) -> pd.DataFrame:
     """One epoch's ``data_over_time`` with its SWR labels from this source,
     and every event cohort held to the one analysed-time rule.
@@ -1047,6 +1076,10 @@ def with_swr_source(
         for a decoder saving its own frame, which keeps every event it decoded
         (its SWR labels still leave out the SWRs in the mask, as the inventory
         does).
+    non_local_threshold : float
+        The posterior threshold the frame's ``non_local_event`` labels were
+        made at (the ``_80_`` in a decode's file name is 0.8). Every labeled
+        bin's summed Non-Local posterior must be above it.
 
     Returns
     -------
@@ -1077,15 +1110,25 @@ def with_swr_source(
         With no artifact run configured, every other label and column is the
         decode's.
 
+        Every event label it hands out holds whole events the speed rule
+        admits (every sampled speed finite and below 4 cm/s), and every
+        non-local label's bins are above `non_local_threshold`, so a consumer
+        neither re-filters nor re-validates them.
+
     Raises
     ------
     ValueError
         If the frame holds more than one epoch, lacks a needed column, has a
         ``time`` column or a time index that does not increase.
+    EventDefinitionError
+        If a ``non_local_event`` or ``MUA_event`` label breaks the whole-event
+        immobility rule, or a ``non_local_event`` label has a bin whose summed
+        Non-Local posterior is not finite and above `non_local_threshold`: a
+        stale frame, to regenerate.
     SwrSourceError
         If the epoch cannot be served.
     """
-    epoch_id, time = _frame_epoch(dot, "with_swr_source")
+    epoch_id, time = _frame_epoch(dot, "with_swr_source", non_local_threshold)
     source = _epoch_source(epoch_id)
     masking = drop_masked_events and len(source.artifacts) > 0
     drops, swr_labels = _drops(epoch_id, source, dot, time)
@@ -1203,14 +1246,18 @@ def excluded_intervals_by_session(sessions: pd.DataFrame) -> pd.DataFrame:
     return pd.concat(parts, ignore_index=True)[columns]
 
 
-def read_dot_with_swr_source(path: str | Path) -> pd.DataFrame:
+def read_dot_with_swr_source(
+    path: str | Path, *, non_local_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD
+) -> pd.DataFrame:
     """Read a decode's ``data_over_time`` pickle for analysis.
 
     :func:`with_swr_source` on the pickle: every analysis reader of a decode
     frame goes through here, so none sees the decode's stored-ripple labels.
+    `non_local_threshold` is the one the file was decoded at (its name's
+    ``_80_``), as :func:`with_swr_source`.
     """
     frame: Any = pd.read_pickle(path)
-    return with_swr_source(frame)
+    return with_swr_source(frame, non_local_threshold=non_local_threshold)
 
 
 def analysed_bins(frame: pd.DataFrame) -> NDArray[np.bool_]:

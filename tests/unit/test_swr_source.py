@@ -718,7 +718,11 @@ class TestEveryCohortHonoursTheMask:
     their ``event_id``)."""
 
     def _nonlocal_dot(self) -> pd.DataFrame:
-        return _dot(non_local_event=_labels(NON_LOCAL), MUA_event=_labels(MUA))
+        return _dot(
+            non_local_event=_labels(NON_LOCAL),
+            MUA_event=_labels(MUA),
+            **{"Non-Local_Continuous_prob": 0.9, "Non-Local_Fragmented_prob": 0.0},
+        )
 
     def _contfrag_dot(self) -> pd.DataFrame:
         return _dot(MUA_event=_labels(MUA), Continuous_prob=0.5, Fragmented_prob=0.5)
@@ -810,7 +814,7 @@ class TestEveryCohortHonoursTheMask:
         """Only an event dropped for excluded time drops the events that overlap
         it, and only once: without MUA 4, non-local 6 is kept."""
         _artifacts(tmp_path, monkeypatch, ARTIFACTS)
-        dot = _dot(non_local_event=_labels(NON_LOCAL), MUA_event=_labels(MUA[:3]))
+        dot = self._nonlocal_dot().assign(MUA_event=_labels(MUA[:3]))
 
         out = with_swr_source(dot)
 
@@ -855,6 +859,92 @@ class TestEveryCohortHonoursTheMask:
             DropReason.SPEED_UNKNOWN,
             DropReason.NO_SPEED_SAMPLE,
         }
+
+
+class TestTheLabelContract:
+    """The read checks the decode's own labels once, for every consumer: each
+    event is immobile as a whole, and each non-local event's bins are above the
+    probability threshold the frame was decoded at. A frame that breaks either
+    is stale and is refused, in both modes and in the drops; it is never
+    clipped. An SWR that moves is the source's own, and is dropped (``moving``,
+    :class:`TestWhichEventsCount`)."""
+
+    def _frame(self, **columns) -> pd.DataFrame:
+        frame = {
+            "non_local_event": _labels(NON_LOCAL[:1]),
+            "MUA_event": _labels(MUA[2:3]),
+            "Non-Local_Continuous_prob": 0.9,
+            "Non-Local_Fragmented_prob": 0.0,
+            **columns,
+        }
+        return _dot(**frame)
+
+    def test_a_frame_that_keeps_the_contract_is_read(self, inventory):
+        out = with_swr_source(self._frame())
+
+        assert sorted(set(out["non_local_event"]) - {0}) == [1]
+        assert sorted(set(out["MUA_event"]) - {0}) == [1]
+
+    @pytest.mark.parametrize("column", ["non_local_event", "MUA_event"])
+    @pytest.mark.parametrize("drop_masked_events", [True, False])
+    def test_a_label_that_moves_is_refused(self, inventory, column, drop_masked_events):
+        moving = _labels([(102.40, 102.60)])  # speed 10 cm/s from 102.0 to 102.5
+        dot = self._frame(**{column: moving})
+
+        with pytest.raises(EventDefinitionError, match="immobility contract"):
+            with_swr_source(dot, drop_masked_events=drop_masked_events)
+        with pytest.raises(EventDefinitionError, match="immobility contract"):
+            swr_source.artifact_event_drops(dot)
+
+    def test_a_label_with_untracked_speed_is_refused(self, inventory):
+        dot = self._frame(MUA_event=_labels([(103.05, 103.08)]))  # speed NaN
+
+        with pytest.raises(EventDefinitionError, match="immobility contract"):
+            with_swr_source(dot)
+
+    @pytest.mark.parametrize("probability", [0.8, 0.5, np.nan, np.inf])
+    def test_a_nonlocal_bin_at_or_below_the_threshold_is_refused(
+        self, inventory, probability
+    ):
+        dot = self._frame()
+        bin_in_event = np.flatnonzero(dot["non_local_event"].to_numpy() > 0)[3]
+        dot.iloc[bin_in_event, dot.columns.get_loc("Non-Local_Continuous_prob")] = (
+            probability
+        )
+
+        with pytest.raises(EventDefinitionError, match="probability-threshold"):
+            with_swr_source(dot)
+
+    def test_the_threshold_is_the_one_the_frame_was_decoded_at(
+        self, inventory, tmp_path
+    ):
+        dot = self._frame(**{"Non-Local_Continuous_prob": 0.6})
+        path = tmp_path / f"{EPOCH}_50_data_over_time.pkl"
+        dot.to_pickle(path)
+
+        with pytest.raises(EventDefinitionError, match="probability-threshold"):
+            with_swr_source(dot)
+        out = with_swr_source(dot, non_local_threshold=0.5)
+        assert sorted(set(out["non_local_event"]) - {0}) == [1]
+        read = read_dot_with_swr_source(path, non_local_threshold=0.5)
+        pd.testing.assert_series_equal(read["non_local_event"], out["non_local_event"])
+
+    def test_a_contfrag_frame_has_no_probability_contract(self, inventory):
+        dot = _dot(
+            MUA_event=_labels(MUA[2:3]), Continuous_prob=0.5, Fragmented_prob=0.5
+        )
+
+        out = with_swr_source(dot)
+
+        assert sorted(set(out["MUA_event"]) - {0}) == [1]
+
+    def test_every_label_it_hands_out_is_one_the_speed_rule_admits(self, inventory):
+        out = with_swr_source(self._frame())
+
+        for column in ("SWR_event", "non_local_event", "MUA_event"):
+            pd.testing.assert_series_equal(
+                filter_event_labels_by_speed(out, [column])[column], out[column]
+            )
 
 
 # --------------------------------------------------------------------------

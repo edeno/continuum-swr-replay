@@ -26,15 +26,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from ..constants import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-    DEFAULT_NON_LOCAL_THRESHOLD,
-)
 from ..hippocampus.artifacts.masks import overlaps_intervals
-from ..hippocampus.event_immobility import (
-    filter_event_labels_by_speed,
-    validate_nonlocal_event_probability_contract,
-)
 from ..hippocampus.swr_source import excluded_intervals_of
 from .bouts import assign_bout, immobility_bout_intervals
 from .covariate_registry import stamp_covariate_schema
@@ -50,10 +42,11 @@ time, so the sparse table keeps them."""
 def _event_onset_times(dot: pd.DataFrame, times: np.ndarray, col: str) -> np.ndarray:
     """Sorted onset time (first labelled bin) of each event in ``col``.
 
-    All three sources arrive after the same atomic whole-event speed filter.
-    Non-Local labels additionally require every event bin to clear the saved
-    probability threshold. An absent event column (e.g. ``MUA_event`` on older
-    decodes) yields no onsets; the dense builder then zero-fills that count.
+    All three sources arrive held to the same atomic whole-event speed rule,
+    and Non-Local labels to the saved probability threshold, by the read
+    (``swr_source.with_swr_source``). An absent event column (e.g.
+    ``MUA_event`` on older decodes) yields no onsets; the dense builder then
+    zero-fills that count.
     """
     if col not in dot.columns:
         return np.array([], dtype=float)
@@ -96,27 +89,12 @@ def _session_keys(dot: pd.DataFrame) -> tuple[str, int, str]:
 def build_event_onset_table(
     dot: pd.DataFrame,
     pump_times: np.ndarray,
-    *,
-    nonlocal_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
 ) -> pd.DataFrame:
     """Sparse per-onset table (one row per SWR / non-local / MUA onset in a stop).
 
-    ``nonlocal_threshold`` must match the threshold used to create
-    ``dot``'s Non-Local labels — it is validated, not re-applied. Family A
-    (``replay/tables_event.py``) threads the same parameter; keep the two in
-    step or the families will disagree on which sessions are admissible.
+    ``dot`` is a frame read through ``swr_source.with_swr_source``, which holds
+    its event labels to the speed rule and the Non-Local probability contract.
     """
-    if "non_local_event" in dot:
-        validate_nonlocal_event_probability_contract(
-            dot,
-            probability_threshold=nonlocal_threshold,
-        )
-    event_cols = [column for column in EVENT_TYPES.values() if column in dot]
-    dot = filter_event_labels_by_speed(
-        dot,
-        event_cols,
-        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-    )
     animal, day, epoch = _session_keys(dot)
     times = dot.index.to_numpy()
     bout_starts, bout_ends = immobility_bout_intervals(dot)
@@ -175,12 +153,10 @@ def build_stop_timebin_table(
     pump_times: np.ndarray,
     *,
     bin_s: float = 0.004,
-    nonlocal_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
 ) -> pd.DataFrame:
     """Dense per-(stop, bin) table at ``bin_s`` resolution (default 4 ms).
 
-    ``nonlocal_threshold`` must match the threshold used to create ``dot``'s
-    Non-Local labels — see :func:`build_event_onset_table`. A bin
+    ``dot`` is a read frame, as :func:`build_event_onset_table`. A bin
     ``[left, min(left + bin_s, stop end)]`` that touches the epoch's excluded
     time (``swr_source.excluded_intervals``; closed) is not analysed and has
     no row; the other bins keep their ``bin_in_stop``. An event kept by the
@@ -188,17 +164,6 @@ def build_stop_timebin_table(
     its onset stays in the sparse table and is counted, per event type, in
     ``attrs[ONSETS_IN_EXCLUDED_BINS_ATTR]``.
     """
-    if "non_local_event" in dot:
-        validate_nonlocal_event_probability_contract(
-            dot,
-            probability_threshold=nonlocal_threshold,
-        )
-    event_cols = [column for column in EVENT_TYPES.values() if column in dot]
-    dot = filter_event_labels_by_speed(
-        dot,
-        event_cols,
-        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-    )
     animal, day, epoch = _session_keys(dot)
     times = dot.index.to_numpy()
     speed = dot["head_speed"].to_numpy()

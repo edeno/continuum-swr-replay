@@ -35,6 +35,9 @@ from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
     artifact_intervals,
     interval_mask,
 )
+from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+    EventDefinitionError,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
     CLUSTERLESS_LIKELIHOOD_KEYS,
 )
@@ -451,13 +454,13 @@ def test_a_bin_with_an_exact_zero_occupancy_is_still_checked_against_the_stored_
     assert "do not reproduce results.nc" in record["error"]
 
 
-def test_a_decoded_event_the_rule_drops_stays_out_of_the_running_fits(
+def test_a_running_nonlocal_label_is_refused_before_anything_is_fit(
     simulated, tmp_path
 ):
-    """The review's probe: a running non-local event at 10.2-10.3 s lies in the
-    0.3-s reach of the mask at [9.9, 10.1] s, outside the mask. The analysed-time
-    rule drops it, but it is decoded non-local content: it is in no running-only
-    training mask, and the record counts it."""
+    """The review's probe, a running non-local event at 10.2-10.3 s, breaks the
+    decoder's own definition (every sampled speed below 4 cm/s; every bin above
+    the probability threshold). No decode makes one, so the read refuses the
+    frame as stale (swr_source.with_swr_source) and nothing is fit on it."""
     decode_dir = decode_copy(simulated, tmp_path)
     path = decode_dir / f"{EPOCH}_80_data_over_time.pkl"
     dot = pd.read_pickle(path)
@@ -466,18 +469,13 @@ def test_a_decoded_event_the_rule_drops_stays_out_of_the_running_fits(
     assert (dot.head_speed.to_numpy()[event] >= 4.0).all()  # running
     dot.iloc[np.flatnonzero(event), dot.columns.get_loc("non_local_event")] = 1
     dot.to_pickle(path)
-    # the rule drops it from the frame analyses read
-    assert not swr_source.read_dot_with_swr_source(path).non_local_event[event].any()
+    with pytest.raises(EventDefinitionError):
+        swr_source.read_dot_with_swr_source(path)
 
     record = run(decode_dir, tmp_path / "out", simulated[1])
 
-    assert record["status"] == "ok", record.get("traceback")
-    running_only = record["running_only"]
-    assert running_only["event_bins"] == int(event.sum())
-    assert running_only["event_bins_at_running_speed"] == int(event.sum())
-    for name in ("run", "runcv0", "runcv1"):
-        assert running_only[name]["event_bins_in_training_bins"] == 0
-        assert running_only[name]["event_bins_in_library_span"] == 0
+    assert record["status"] == "failed"
+    assert "non_local_event labels violate" in record["error"]
 
 
 def test_a_decode_without_the_sources_masks_fails_before_the_marks_load(
@@ -568,27 +566,6 @@ def test_marks_that_are_not_the_decodes_fail_the_epoch(simulated, tmp_path):
     assert "does not reproduce the stored encoding model" in record["error"]
     paths = runner.output_paths(EPOCH, tmp_path / "out")
     assert not paths["windows"].exists() and not paths["validation"].exists()
-
-
-def test_an_event_bin_at_running_speed_is_left_out_of_the_running_fits(
-    simulated, tmp_path
-):
-    decode_dir = decode_copy(simulated, tmp_path)
-    path = decode_dir / f"{EPOCH}_80_data_over_time.pkl"
-    dot = pd.read_pickle(path)
-    running = np.flatnonzero(dot.head_speed.to_numpy() >= 4.0)[100]
-    dot.iloc[running, dot.columns.get_loc("non_local_event")] = 1
-    dot.to_pickle(path)
-
-    record = run(decode_dir, tmp_path / "out", simulated[1])
-
-    assert record["status"] == "ok", record.get("traceback")
-    running_only = record["running_only"]
-    assert running_only["event_bins_at_running_speed"] == 1
-    assert running_only["running_bins_left_out_near_events"] == 5
-    for name in ("run", "runcv0", "runcv1"):
-        assert running_only[name]["event_bins_in_training_bins"] == 0
-        assert running_only[name]["event_bins_in_library_span"] == 0
 
 
 def test_the_loader_builds_the_decodes_masks_from_the_swr_source(

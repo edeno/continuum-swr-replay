@@ -118,9 +118,8 @@ def session(monkeypatch, tmp_path):
         }
 
     patched = {
-        "read_dot_with_swr_source": lambda _path: dot,
+        "read_dot_with_swr_source": lambda _path, **_kwargs: dot,
         "validate_dot_event_contract": lambda _dot: None,
-        "validate_nonlocal_event_probability_contract": lambda *_a, **_k: None,
         "build_session_events": lambda _dot: EVENTS.copy(),
         "load_encoding": load_encoding,
         "load_marks": lambda *_a: ([], []),

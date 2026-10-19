@@ -29,9 +29,6 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.hippocampus.event_immobility import (
-    EventDefinitionError,
-)
 from continuum_swr_replay.analysis.replay.timebin_tables import (
     build_event_onset_table,
     build_stop_timebin_table,
@@ -139,119 +136,6 @@ def test_missing_mua_column_tolerated(two_bout_dot):
     assert int(dense["n_mua_events"].sum()) == 0
     # the other event types are unaffected.
     assert int(dense["n_nonlocal_events"].sum()) == 3
-
-
-def test_invalid_nonlocal_probability_labels_fail_loud():
-    """Timebin tables must not silently drop stale Non-Local labels."""
-    t = np.round(np.arange(20) * 0.01, 2)  # one immobile bout, t 0.00..0.19
-    swr = np.zeros(20, dtype=int)
-    nl = np.zeros(20, dtype=int)
-    nlprob = np.zeros(20)
-    # low-prob non_local co-located with an SWR -> non_local masked, SWR kept
-    nl[5:7] = 1
-    nlprob[5:7] = 0.5  # below the 0.8 non-local threshold
-    swr[5:7] = 1
-    # a separate high-prob non_local -> kept, so the mask is discriminating
-    nl[12:14] = 2
-    nlprob[12:14] = 0.9
-
-    speed = np.full(20, 1.0)
-    speed[5] = 10.0  # probability validation must happen before speed filtering
-    dot = pd.DataFrame(
-        {
-            "animal": "x",
-            "day": 1,
-            "epoch": "02_r1",
-            "head_speed": speed,
-            "SWR_event": swr,
-            "non_local_event": nl,
-            "MUA_event": 0,
-            "Non-Local_Continuous_prob": nlprob,
-            "Non-Local_Fragmented_prob": 0.0,
-        },
-        index=t,
-    )
-    with pytest.raises(EventDefinitionError, match="probability-threshold contract"):
-        build_event_onset_table(dot, np.array([]))
-    with pytest.raises(EventDefinitionError, match="probability-threshold contract"):
-        build_stop_timebin_table(dot, np.array([]), bin_s=0.01)
-
-
-def test_custom_nonlocal_threshold_accepts_labels_built_at_that_threshold():
-    """Family B must validate at the threshold that created the labels.
-
-    Family A (``replay/tables_event.py``) already threads ``nonlocal_threshold``.
-    With it hard-coded here, a ``_50_data_over_time`` file raised on
-    perfectly valid labels while Family A accepted them.
-    """
-    t = np.round(np.arange(20) * 0.01, 2)
-    nl = np.zeros(20, dtype=int)
-    nlprob = np.zeros(20)
-    nl[5:7] = 1
-    nlprob[5:7] = 0.6  # valid at 0.5, invalid at the 0.8 default
-    dot = pd.DataFrame(
-        {
-            "animal": "x",
-            "day": 1,
-            "epoch": "02_r1",
-            "head_speed": np.full(20, 1.0),
-            "SWR_event": 0,
-            "non_local_event": nl,
-            "MUA_event": 0,
-            "Non-Local_Continuous_prob": nlprob,
-            "Non-Local_Fragmented_prob": 0.0,
-        },
-        index=t,
-    )
-
-    # Default threshold rejects these labels ...
-    with pytest.raises(EventDefinitionError, match="probability-threshold contract"):
-        build_event_onset_table(dot, np.array([]))
-
-    # ... and the matching threshold accepts them, keeping the event.
-    onset = build_event_onset_table(dot, np.array([]), nonlocal_threshold=0.5)
-    assert (onset["event_type"] == "non_local").sum() == 1
-
-    dense = build_stop_timebin_table(
-        dot, np.array([]), bin_s=0.01, nonlocal_threshold=0.5
-    )
-    assert len(dense) > 0
-
-
-def test_all_sources_exclude_a_movement_spanning_event_atomically():
-    """One fast interior bin removes the same event from sparse and dense rates."""
-    t = np.round(np.arange(40) * 0.01, 2)
-    speed = np.full(40, 1.0)
-    speed[6] = 10.0
-    labels = np.zeros(40, dtype=int)
-    labels[4:9] = 1  # invalid event spanning the mobile sample
-    labels[20:23] = 2  # valid event
-    probability = np.where(labels > 0, 0.9, 0.0)
-    dot = pd.DataFrame(
-        {
-            "animal": "x",
-            "day": 1,
-            "epoch": "02_r1",
-            "head_speed": speed,
-            "SWR_event": labels,
-            "non_local_event": labels,
-            "MUA_event": labels,
-            "Non-Local_Continuous_prob": probability,
-            "Non-Local_Fragmented_prob": 0.0,
-        },
-        index=t,
-    )
-
-    onset = build_event_onset_table(dot, np.array([]))
-    dense = build_stop_timebin_table(dot, np.array([]), bin_s=0.01)
-
-    for event_type, count_col in (
-        ("SWR", "n_swr_events"),
-        ("non_local", "n_nonlocal_events"),
-        ("MUA", "n_mua_events"),
-    ):
-        assert int((onset["event_type"] == event_type).sum()) == 1
-        assert int(dense[count_col].sum()) == 1
 
 
 def test_onsets_in_excluded_bins_are_counted_not_lost(two_bout_dot, monkeypatch):

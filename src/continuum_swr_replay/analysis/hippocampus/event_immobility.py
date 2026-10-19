@@ -119,11 +119,9 @@ def filter_event_labels_by_speed(
 ) -> pd.DataFrame:
     """Return a copy with every ineligible event label set atomically to zero.
 
-    Non-Local probability validation is a separate operation because this
-    generic speed helper is also used for detector-only frames that do not
-    carry decoder posterior columns. Scientific consumers of saved Non-Local
-    labels must call :func:`validate_nonlocal_event_probability_contract`
-    before this function.
+    A frame read through ``swr_source.with_swr_source`` already holds only
+    eligible events at the canonical threshold, so this is for a stricter
+    threshold than the read's, or for a frame that was not read that way.
     """
     # Share untouched column blocks: pooled data-over-time frames can be many
     # gigabytes. Each event-label column is replaced with its own copied array,
@@ -144,6 +142,52 @@ def filter_event_labels_by_speed(
     return filtered
 
 
+def validate_whole_event_immobility_contract(
+    data: pd.DataFrame,
+    event_col: str,
+    *,
+    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+) -> None:
+    """Fail when a saved event label holds a sample the immobility rule rejects.
+
+    Saved labels are created from whole-event-immobile intervals, so an
+    ineligible label is a stale or malformed artifact. It is refused, not
+    zeroed: zeroing it would silently change the cohort.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Carrying ``event_col``, ``head_speed`` and the session columns
+        (:data:`DEFAULT_EVENT_GROUP_COLS`).
+    event_col : str
+        The label column to check.
+    speed_threshold : float
+        cm/s; the rule is strictly ``<``.
+
+    Raises
+    ------
+    EventDefinitionError
+        If any labeled event has a sampled speed that is not finite and below
+        `speed_threshold`.
+    """
+    labels = data[event_col].to_numpy()
+    active = labels > 0
+    if not active.any():
+        return
+    immobile = whole_event_immobility_mask(
+        data, event_col, speed_threshold=speed_threshold
+    ).to_numpy()
+    invalid = active & ~immobile
+    if invalid.any():
+        invalid_ids = sorted(pd.unique(labels[invalid]).tolist())
+        raise EventDefinitionError(
+            f"{event_col} labels violate the whole-event immobility "
+            f"contract (all speeds finite and < {speed_threshold:g} cm/s); "
+            f"invalid event labels: {invalid_ids[:10]}. Regenerate the "
+            "data-over-time file with the unified event definition."
+        )
+
+
 def validate_nonlocal_event_probability_contract(
     data: pd.DataFrame,
     *,
@@ -159,8 +203,9 @@ def validate_nonlocal_event_probability_contract(
     Non-Local labels are created from complete runs whose summed posterior is
     strictly above the configured threshold. A stale or malformed artifact
     must not be clipped per bin or admitted by only some downstream consumers;
-    every active label is therefore validated atomically before speed filtering.
-    Unlabeled bins are intentionally ignored.
+    every active label is therefore validated atomically, once, where the
+    frame is read (``swr_source.with_swr_source``). Unlabeled bins are
+    intentionally ignored.
     """
     threshold = float(probability_threshold)
     if not np.isfinite(threshold):
@@ -407,5 +452,6 @@ __all__ = [
     "filter_event_intervals_by_speed",
     "intervals_from_labels",
     "validate_nonlocal_event_probability_contract",
+    "validate_whole_event_immobility_contract",
     "whole_event_immobility_mask",
 ]

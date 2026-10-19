@@ -48,7 +48,7 @@ def test_content_occupancy_validates_dot_before_environment_load(monkeypatch):
     monkeypatch.setattr(
         analyze_content_occupancy,
         "read_dot_with_swr_source",
-        lambda _path: _noncontiguous_dot(),
+        lambda _path, **_kwargs: _noncontiguous_dot(),
     )
     monkeypatch.setattr(
         analyze_content_occupancy.joblib,
@@ -93,7 +93,7 @@ def test_spike_evidence_validates_dot_before_encoding_load(monkeypatch, tmp_path
     monkeypatch.setattr(
         analyze_event_spike_evidence,
         "read_dot_with_swr_source",
-        lambda _path: _noncontiguous_dot(),
+        lambda _path, **_kwargs: _noncontiguous_dot(),
     )
     monkeypatch.setattr(
         analyze_event_spike_evidence,

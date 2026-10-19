@@ -200,8 +200,8 @@ def load_session_swr_intervals(
     so its ``SWR_event`` labels are the direct Kay inventory's, not the
     decode's stored ripples. The intervals are then built exactly as
     :func:`~continuum_swr_replay.analysis.hippocampus.event_table.build_classified_nonlocal_event_table`
-    builds them -- the labels gated atomically by the canonical whole-event
-    immobility rule, then reduced to their sampled bounds -- so the population
+    builds them -- the labels, which the read gated atomically by the canonical
+    whole-event immobility rule, reduced to their sampled bounds -- so the population
     here and the population the canonical ``is_swr`` column was computed against
     are the same one.
 
@@ -215,7 +215,8 @@ def load_session_swr_intervals(
         Cached decode frame to read; defaults to
         :func:`session_data_over_time_path`.
     non_local_threshold : float
-        Threshold tag of the cached frame, used only to name it.
+        Threshold tag of the cached frame: it names the frame, and the read
+        checks the frame's Non-Local labels against it.
     speed_threshold : float
         Immobility threshold in cm/s. The rule is strictly ``<``.
 
@@ -252,7 +253,13 @@ def load_session_swr_intervals(
             "the canonical SWR population and cannot be re-detected here"
         )
 
-    dot = swr_source.read_dot_with_swr_source(path)
+    dot = swr_source.read_dot_with_swr_source(
+        path, non_local_threshold=non_local_threshold
+    )
+    # The read already gates SWRs at the canonical threshold, so at the default
+    # this changes nothing. It is kept for a stricter `speed_threshold`, which
+    # diagnose_pfc_event_definition.py takes on its command line; a looser one
+    # cannot re-admit SWRs the read dropped.
     gated = filter_event_labels_by_speed(
         dot, ["SWR_event"], speed_threshold=speed_threshold
     )

@@ -70,9 +70,13 @@ SHIFTED, NO_DECODE = "sim20200101_06_r3_HPC", "sim20200101_08_r4_HPC"
 TIME = np.round(np.arange(30_001) * 0.002, 6)
 SPEED = np.where((TIME >= 20.0) & (TIME < 25.0), 10.0, 1.0)
 
-NON_LOCAL = [(5.0, 5.3), (10.0, 10.2), (21.0, 21.3), (41.1, 41.15), (51.0, 51.2)]
-"""The state-space events; the one at 21.0 s is during the movement bout."""
-KAY = [(5.05, 5.1), (30.0, 30.1)]
+NON_LOCAL = [(5.0, 5.3), (10.0, 10.2), (41.1, 41.15), (51.0, 51.2)]
+"""The state-space events, all still: the decoder labels only events that are
+immobile as a whole, and the read (``swr_source.with_swr_source``) refuses a
+moving ``non_local_event`` label as a stale frame. The moving event is Kay's."""
+KAY = [(5.05, 5.1), (21.0, 21.05), (30.0, 30.1)]
+"""Kay's SWRs; the one at 21.0 s is during the movement bout, so it stays in
+Kay's inventory flagged moving (``whole_event_speed_eligible`` False)."""
 MASKED_KAY = [(5.05, 5.1), (29.52, 29.58), (30.0, 30.1)]
 MASKED_KARLSSON = [(29.5, 29.7)]
 STORED_BAND = [(0.0, 50.0), (52.0, 60.0)]
@@ -290,14 +294,21 @@ class TestTheWorkedEpoch:
     def test_each_detectors_counts_and_own_exposure(self, run):
         counts = table(run, WORKED, "counts").set_index("detector")
 
+        # No moving state-space event: the decoder never labels one, and the
+        # read refuses a frame that has one (it was [5, 1, 4] when this fixture
+        # carried a moving non-local label at 21.0 s; that event is now Kay's).
         assert counts.loc[
             "state_space", ["n_native", "n_moving", "n_eligible"]
-        ].tolist() == [5, 1, 4]
+        ].tolist() == [4, 0, 4]
+        assert counts.loc["kay", ["n_native", "n_moving", "n_eligible"]].tolist() == [
+            3,
+            1,
+            2,
+        ]
         assert counts.loc[
             "memoryless", ["n_native", "n_set_aside", "n_eligible"]
         ].tolist() == [2, 1, 1]
         assert counts.loc["memoryless_criteria", "n_native"] == 3
-        assert counts.loc["kay", "n_eligible"] == 2
         assert (
             counts.n_native.tolist()
             == (counts.n_eligible + counts.n_moving + counts.n_set_aside).tolist()
@@ -322,6 +333,7 @@ class TestTheWorkedEpoch:
         inventory = table(run, WORKED, "inventory")
 
         moving = at(inventory, "event_start_s", 21.0)
+        assert moving.detector == "kay"
         assert not moving.whole_event_speed_eligible
         assert pd.isna(moving.component_id)
         # the components leave the criteria twin's two kept events out

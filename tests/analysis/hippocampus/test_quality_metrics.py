@@ -287,30 +287,15 @@ class TestComputeNoSpikeFiringCorrespondence:
 
 
 class TestComputeNonLocalEventContext:
-    def test_accepts_labels_created_at_custom_nonlocal_threshold(
-        self, session_with_events
-    ):
-        """The validator must use the threshold that created the labels."""
-        data = session_with_events.copy()
-        active = data["non_local_event"].to_numpy() > 0
-        data.loc[active, "Non-Local_Continuous_prob"] = 0.6
-        data.loc[active, "Non-Local_Fragmented_prob"] = 0.0
-
-        result = compute_non_local_event_context(
-            data,
-            non_local_threshold=0.5,
-        )
-
-        assert result["n_events"].iloc[0] == 3
-
     def test_custom_group_cols_scope_reused_event_labels(self):
-        """Eligibility and overlap grouping must use the caller's session key."""
+        """Overlap grouping must use the caller's session key."""
         data = pd.DataFrame(
             {
                 "session": ["a", "a", "a", "b", "b", "b"],
                 "non_local_event": [1, 1, 0, 1, 1, 0],
-                "SWR_event": [0, 0, 0, 0, 0, 0],
-                "head_speed": [1.0, 1.0, 1.0, 1.0, 5.0, 1.0],
+                # Only session b's label 1 overlaps an SWR.
+                "SWR_event": [0, 0, 0, 3, 3, 0],
+                "head_speed": [1.0] * 6,
                 "Non-Local_Continuous_prob": [0.9, 0.9, 0.0, 0.9, 0.9, 0.0],
                 "Non-Local_Fragmented_prob": [0.0] * 6,
                 "theta_power_zscore": [0.0] * 6,
@@ -320,12 +305,12 @@ class TestComputeNonLocalEventContext:
             index=[0.0, 0.1, 0.2, 0.0, 0.1, 0.2],
         )
 
-        # Keep the established positional API for ``group_cols`` covered:
-        # adding a new optional threshold must not silently shift this argument.
+        # Keep the established positional API for ``group_cols`` covered.
         result = compute_non_local_event_context(data, 2.0, ["session"])
 
-        assert result["session"].tolist() == ["a"]
-        assert result["n_events"].tolist() == [1]
+        assert result["session"].tolist() == ["a", "b"]
+        assert result["n_events"].tolist() == [1, 1]
+        assert result["frac_swr"].tolist() == [0.0, 1.0]
 
     def test_classifies_swr_theta_neither(self, session_with_events):
         result = compute_non_local_event_context(
@@ -526,28 +511,6 @@ class TestComputeNonLocalEventContext:
             f"frac_swr={out['frac_swr'].iloc[0]} — boundary-touch SWR "
             "must not be classified as SWR-associated."
         )
-
-    def test_movement_spanning_swr_does_not_enter_event_context(self):
-        """An overlapping SWR is absent when any of its own bins is mobile."""
-        df = _with_valid_nonlocal_probabilities(pd.DataFrame(
-            {
-                "animal": ["a"] * 4,
-                "day": [1] * 4,
-                "epoch": ["e1"] * 4,
-                "non_local_event": [0, 1, 1, 1],
-                "SWR_event": [2, 2, 2, 2],
-                "head_speed": [5.0, 0.0, 0.0, 0.0],
-                "theta_phase": [np.nan] * 4,
-                "theta_power_zscore": [0.0] * 4,
-                "in_excluded_time": False,
-            },
-            index=[0.0, 0.5, 1.0, 1.5],
-        ))
-
-        out = compute_non_local_event_context(df)
-
-        assert out["n_events"].iloc[0] == 1
-        assert out["frac_swr"].iloc[0] == 0.0
 
     def test_all_nan_theta_phases_yield_nan_session_stats(self):
         """Sanity: if every theta event has only NaN phase samples,

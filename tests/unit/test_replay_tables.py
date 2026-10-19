@@ -883,47 +883,9 @@ class TestEventTableInvariants:
             "label_event_end",
         } & set(event.columns)
 
-    @pytest.mark.parametrize("external_col", ["SWR_event", "MUA_event"])
-    def test_movement_spanning_external_event_is_excluded(
-        self, tiny_session, external_col
-    ):
-        """A mobile SWR/MUA cannot mark an immobile non-local event.
-
-        The external event overhangs the non-local window into mobile
-        bins, so the whole-event rule rejects it while the non-local
-        event itself stays eligible. Without the shared speed filter in
-        ``_filter_external_event_labels`` / ``event_table`` the overhang
-        is invisible and the flag flips to ``True``.
-        """
-        dot, env, trials, graph = tiny_session
-        dot = dot.copy()
-        dot[external_col] = 0
-        # Event 1 spans bins 20-29 (head_speed 1.0). Bins 30-32 sit
-        # outside it at head_speed 10.0, so the external event is
-        # movement-spanning while event 1 remains immobile.
-        dot.iloc[20:33, dot.columns.get_loc(external_col)] = 1
-        assert dot["head_speed"].to_numpy()[30:33].min() > 4.0
-
-        event = build_event_table(dot, env, trials, graph)
-        event_1 = event.loc[event["non_local_event"] == 1].iloc[0]
-
-        flag = "is_swr" if external_col == "SWR_event" else "is_mua"
-        assert bool(event_1[flag]) is False
-
-    @pytest.mark.parametrize("external_col", ["SWR_event", "MUA_event"])
-    def test_stop_table_excludes_movement_spanning_external_event(
-        self, tiny_session, external_col
-    ):
-        """Stop-level counts use the same speed-eligible cohort."""
-        dot, env, trials, graph = tiny_session
-        dot = dot.copy()
-        dot[external_col] = 0
-        dot.iloc[20:33, dot.columns.get_loc(external_col)] = 1
-
-        stop = build_stop_table(dot, trials, graph)
-
-        count_col = "n_swr_events" if external_col == "SWR_event" else "n_mua_events"
-        assert stop[count_col].sum() == 0
+    # A movement-spanning SWR or MUA event never reaches these builders: the
+    # read drops the SWR and refuses the MUA label
+    # (tests/unit/test_swr_source.py::TestTheLabelContract).
 
     def test_nonlocal_prob_within_unit_interval(self, tiny_session):
         # ``nonlocal_prob`` values in [0, 1]. Exposed here via

@@ -76,8 +76,6 @@ from continuum_swr_replay.analysis.hippocampus.event_detection import (  # noqa:
 )
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (  # noqa: E402
     EventDefinitionError,
-    filter_event_labels_by_speed,
-    validate_nonlocal_event_probability_contract,
 )
 from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: E402
     UNDERFLOW_OCCUPANCY_FLOOR,
@@ -185,14 +183,10 @@ def build_session_events(dot: pd.DataFrame) -> pd.DataFrame:
     ).to_numpy()
     immobile = dot["head_speed"].to_numpy() < IMMOBILITY_CM_PER_S
     ab = dot["ahead_behind_distance"].to_numpy()
-    validate_nonlocal_event_probability_contract(
-        dot,
-        probability_threshold=NON_LOCAL_THRESHOLD,
-    )
-    eligible = filter_event_labels_by_speed(dot, ["non_local_event", "SWR_event"])
-    nonlocal_labels = eligible["non_local_event"].to_numpy()
+    # The read holds the labels to the speed rule and the probability contract.
+    nonlocal_labels = dot["non_local_event"].to_numpy()
     is_swr_event = event_strict_overlap_mask(
-        eligible, "non_local_event", "SWR_event"
+        dot, "non_local_event", "SWR_event"
     ).to_numpy()
 
     rows = []
@@ -353,16 +347,15 @@ def analyze_session(
     figures (``pos``, ``gpi``, ``t``, ``mape``, ``lin``, etc.).
     """
     thr_int = int(round(NON_LOCAL_THRESHOLD * 100))
+    # The read refuses labels that break the speed rule or the probability
+    # contract.
     dot = read_dot_with_swr_source(
-        PROCESSED_DATA_DIR / f"{epoch_id}_{thr_int}_data_over_time.pkl"
+        PROCESSED_DATA_DIR / f"{epoch_id}_{thr_int}_data_over_time.pkl",
+        non_local_threshold=NON_LOCAL_THRESHOLD,
     )
     # Validate before loading encoding data so a missing/corrupt auxiliary
     # artifact cannot mask malformed event labels as an ordinary session skip.
     validate_dot_event_contract(dot)
-    validate_nonlocal_event_probability_contract(
-        dot,
-        probability_threshold=NON_LOCAL_THRESHOLD,
-    )
     enc = load_encoding(epoch_id)
     env, encargs, pos, gpi = enc["env"], enc["encargs"], enc["pos"], enc["gpi"]
     gpi_peak_pos = float(pos[np.argmax(gpi)])

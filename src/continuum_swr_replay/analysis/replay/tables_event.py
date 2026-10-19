@@ -44,7 +44,6 @@ from ._helpers import (
 from ._tables_common import (
     _EVENT_SEQUENCE_TABLE_BUILD_COLUMNS,
     _EVENT_TABLE_BUILD_COLUMNS,
-    _filter_external_event_labels,
     _in_event_mask,
     _prepare_dot,
 )
@@ -135,7 +134,6 @@ def _annotate_dot_for_events(
     epoch = str(dot["epoch"].iloc[0])
 
     dot = _prepare_dot(dot, env)
-    dot = _filter_external_event_labels(dot, speed_threshold)
     mua_overlap_keys = (
         event_strict_overlap_keys(dot, "non_local_event", "MUA_event")
         if "MUA_event" in dot.columns

@@ -48,41 +48,25 @@ def test_main_converts_filename_threshold_and_forwards_it(monkeypatch, tmp_path)
     received, summary_kwargs = calls["summary"]
     assert received is data
     assert summary_kwargs["non_local_threshold"] == 0.5
-    plotted_data, plotted_summary, plot_kwargs = calls["plot"]
+    plotted_data, plotted_summary, _ = calls["plot"]
     assert plotted_data is data
     assert plotted_summary is summary
-    assert plot_kwargs["non_local_threshold"] == 0.5
 
 
-def test_plot_diagnostics_forwards_threshold_to_event_context(monkeypatch, tmp_path):
-    seen: dict[str, float] = {}
+def test_load_all_sessions_reads_at_the_filename_threshold(monkeypatch, tmp_path):
+    """``_50_`` files are read, and their labels checked, at probability 0.5."""
+    path = tmp_path / "a20200101_02_r1_HPC_50_data_over_time.pkl"
+    seen: dict[str, object] = {}
 
-    for helper_name in (
-        "_plot_error_distribution",
-        "_plot_state_fractions",
-        "_plot_nonlocal_movement",
-        "_plot_calibration_curves",
-        "_plot_nospike_correlation",
-        "_plot_segment_error",
-    ):
-        monkeypatch.setattr(quality_script, helper_name, lambda *_: None)
+    def _read(received, *, non_local_threshold):
+        seen["read"] = (received, non_local_threshold)
+        return pd.DataFrame({"animal": ["a"], "day": [1], "epoch": ["02_r1"]})
 
-    def _plot_event_context(_data, _output_path, *, non_local_threshold):
-        seen["threshold"] = non_local_threshold
-
-    monkeypatch.setattr(quality_script, "_plot_event_context", _plot_event_context)
     monkeypatch.setattr(
-        quality_script.figure_utilities,
-        "set_figure_defaults",
-        lambda **_: None,
+        quality_script, "analysed_decode_files", lambda _dir, _suffix: [path]
     )
-    monkeypatch.setattr(quality_script, "FIGURE_DIR", tmp_path)
+    monkeypatch.setattr(quality_script, "read_dot_with_swr_source", _read)
 
-    quality_script.plot_diagnostics(
-        pd.DataFrame(),
-        pd.DataFrame(),
-        output_dir="diagnostics",
-        non_local_threshold=0.5,
-    )
+    quality_script.load_all_sessions(threshold=50)
 
-    assert seen["threshold"] == 0.5
+    assert seen["read"] == (path, 0.5)

@@ -208,33 +208,6 @@ def test_non_swr(dot):
     assert np.isnan(ev["matched_swr_end"])
 
 
-def test_movement_spanning_swr_does_not_mark_an_immobile_event(dot):
-    """A mobile SWR is not part of the comparison population.
-
-    swr11 [95, 120] contains ev1 [100, 110]. Making swr11's leading
-    overhang mobile leaves ev1 itself immobile, so the whole-event rule
-    must drop swr11 and reclassify ev1 as ``non_swr``. Callers such as
-    ``generate_figure02`` and the event gallery invoke this builder
-    directly on unfiltered ``data_over_time``, so the SWR speed filter
-    here is the only thing enforcing that.
-    """
-    dot = dot.copy()
-    session = dot["epoch"] == "01_r1"
-    speed = dot["head_speed"].to_numpy()
-    session_rows = np.flatnonzero(session.to_numpy())
-    # Samples 95-99: inside swr11, outside ev1.
-    speed[session_rows[95:100]] = 10.0
-    dot["head_speed"] = speed
-
-    table = build_classified_nonlocal_event_table(dot)
-    ev = _row(table, "01_r1", 1)
-
-    assert ev["whole_event_speed_eligible"]  # ev1 itself stays immobile
-    assert ev["overlap_class"] == "non_swr"
-    assert not ev["is_swr"]
-    assert pd.isna(ev["matched_swr_event"])
-
-
 def test_boundary_touch_is_non_swr(dot):
     # swr4 ends exactly at ev5's start; zero positive-duration overlap.
     table = build_classified_nonlocal_event_table(dot)

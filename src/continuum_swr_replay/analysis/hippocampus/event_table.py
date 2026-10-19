@@ -66,7 +66,6 @@ from .event_detection import (
 )
 from .event_immobility import (
     event_speeds_are_immobile,
-    filter_event_labels_by_speed,
     intervals_from_labels,
     validate_nonlocal_event_probability_contract,
 )
@@ -200,7 +199,8 @@ def build_classified_nonlocal_event_table(
         ``Non-Local_Fragmented_prob``.
     speed_threshold : float
         Immobility threshold (cm/s) used for the canonical whole-event flag
-        and the legacy endpoint diagnostic.
+        and the legacy endpoint diagnostic. The SWRs are the read's, gated at
+        the canonical threshold.
     nonlocal_threshold : float
         Minimum combined Non-Local posterior required at every labeled bin.
         This must match the threshold used to create or validate the primary
@@ -222,8 +222,8 @@ def build_classified_nonlocal_event_table(
     -----
     Events are built over the *full* set of timebins carrying each Non-Local
     label so their speed eligibility remains directly inspectable. SWR
-    intervals are restricted atomically by the canonical whole-event speed
-    rule and then derived from ``dot["SWR_event"]`` labels via
+    intervals, which the read restricted atomically by the canonical
+    whole-event speed rule, are derived from ``dot["SWR_event"]`` labels via
     :func:`intervals_from_labels` and are session-scoped, so cross-session
     leakage is impossible by construction.
 
@@ -251,15 +251,10 @@ def build_classified_nonlocal_event_table(
 
     column_order = list(_CLASSIFIED_EVENT_TABLE_COLUMNS)
 
-    # SWR coincidence uses the same globally qualified SWR population as its
-    # own event tables. Preserve Non-Local rows here so this diagnostic table
-    # can report their eligibility flag; model builders validate that flag.
-    overlap_dot = filter_event_labels_by_speed(
-        dot,
-        ["SWR_event"],
-        speed_threshold=speed_threshold,
-    )
-    overlap_sessions = overlap_dot.groupby(list(SESSION_COLUMNS_DAY), sort=False)
+    # SWR coincidence uses the read's SWR population, which the speed rule
+    # already gated (``swr_source.with_swr_source`` drops a moving SWR), as
+    # every event table does.
+    overlap_sessions = dot.groupby(list(SESSION_COLUMNS_DAY), sort=False)
 
     if (dot["non_local_event"] > 0).sum() == 0:
         return pd.DataFrame(columns=column_order)

@@ -70,6 +70,9 @@ from continuum_swr_replay import decoding_common
 from continuum_swr_replay.analysis.contfrag import result_loading as contfrag_loading
 from continuum_swr_replay.analysis.hippocampus import result_loading as hpc_loading
 from continuum_swr_replay.analysis.hippocampus import swr_source
+from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+    EventDefinitionError,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from tests.unit._swr_inventory_fixtures import (
     ARTIFACT_RUN_ID,
@@ -1265,7 +1268,11 @@ def test_an_hpc_decode_keeps_every_event_it_decoded(decoders, monkeypatch, key):
     near = _on_decode_grid((MASK_INTERVAL[1] + 0.1, MASK_INTERVAL[1] + 0.15))
     labels = np.where(near, 1, 0)
     columns = (
-        {"non_local_event": labels}
+        {
+            "non_local_event": labels,
+            "Non-Local_Continuous_prob": 0.9,
+            "Non-Local_Fragmented_prob": 0.0,
+        }
         if key == "nonlocal"
         else {"MUA_event": labels, "Continuous_prob": 0.5, "Fragmented_prob": 0.5}
     )
@@ -1294,6 +1301,42 @@ def test_an_hpc_decode_keeps_every_event_it_decoded(decoders, monkeypatch, key):
     column = next(iter(columns))
     np.testing.assert_array_equal(data_over_time[column], labels)
     assert not swr_source.with_swr_source(data_over_time)[column].any()
+
+
+def test_an_hpc_decode_checks_its_labels_at_its_own_threshold(decoders, monkeypatch):
+    """The read on the decoder's own frame checks the non-local labels against
+    the threshold they were made at, not the default."""
+    module = decoders.modules["nonlocal"]
+    labels = np.where(_on_decode_grid((101.0, 101.05)), 1, 0)
+    aggregated = pd.DataFrame(
+        {
+            "SWR_event": 0,
+            "animal": "testrat",
+            "day": 20990101,
+            "epoch": EPOCH_NAME,
+            "head_speed": np.zeros(DECODE_TIME.size),
+            "non_local_event": labels,
+            "Non-Local_Continuous_prob": 0.6,  # above 0.5, below the 0.8 default
+            "Non-Local_Fragmented_prob": 0.0,
+        },
+        index=pd.Index(DECODE_TIME, name="time"),
+    )
+    _replace_runner(
+        monkeypatch,
+        module,
+        aggregate=lambda *args, **kwargs: (aggregated.copy(), None),
+    )
+    results = xr.Dataset(coords={"time": DECODE_TIME})
+
+    data_over_time, _ = decoders.flow.organize_results(
+        module.RUNNER, {}, results, None, NWB_FILE_NAME, EPOCH_NAME, "HPC", 0.5
+    )
+
+    np.testing.assert_array_equal(data_over_time["non_local_event"], labels)
+    with pytest.raises(EventDefinitionError, match="probability-threshold"):
+        decoders.flow.organize_results(
+            module.RUNNER, {}, results, None, NWB_FILE_NAME, EPOCH_NAME, "HPC", 0.8
+        )
 
 
 @pytest.mark.parametrize("key", list(DECODERS))

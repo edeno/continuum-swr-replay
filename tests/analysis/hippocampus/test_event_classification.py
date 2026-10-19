@@ -183,14 +183,6 @@ class TestGetEventTypes:
             result["SWR_event_events_no_non_local_event"]["SWR_event"].unique()
         )
 
-    def test_invalid_saved_nonlocal_probability_fails_loud(self):
-        df = _make_data_over_time()
-        bad_row = df.index[df["non_local_event"] == 1][5]
-        df.loc[bad_row, "Non-Local_Continuous_prob"] = 0.5
-
-        with pytest.raises(ValueError, match="probability-threshold contract"):
-            get_event_types(df)
-
 
 class TestSelectTypicalEventByClass:
     """select_typical_event_by_class precomputed-peak_prob path."""

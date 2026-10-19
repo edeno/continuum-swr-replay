@@ -99,10 +99,9 @@ loads either): the non-local events are the session's rows of the shipped event
 table (`Processed-Data/replay_content/event_table.parquet` — `event_id`,
 `event_start_s`/`event_end_s`, `is_swr`, `occupancy_state`), and the SWR
 intervals are the `SWR_event` labels of the cached
-`{epoch_identifier_HPC}_80_data_over_time.pkl` frame, speed-gated and reduced to
-their sampled bounds by the same two helpers
-(`filter_event_labels_by_speed`, `intervals_from_labels`) the hippocampal event
-table calls. The SWR split is that table's own `is_swr` column — strict
+`{epoch_identifier_HPC}_80_data_over_time.pkl` frame, speed-gated by the read
+(`swr_source.with_swr_source`) and reduced to their sampled bounds by
+`intervals_from_labels`, as the hippocampal event table reads them. The SWR split is that table's own `is_swr` column — strict
 positive-duration overlap with those same labels — so a Figure 4 event and a
 content- or rate-family event with the same `event_id` are one event, classified
 one way; `data["ripple_times"]` no longer enters any fit path. Events are

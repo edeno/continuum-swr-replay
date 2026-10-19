@@ -12,10 +12,8 @@ from __future__ import annotations
 import pandas as pd
 
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (
-    EventDefinitionError,
-    filter_event_labels_by_speed,
     validate_nonlocal_event_probability_contract,
-    whole_event_immobility_mask,
+    validate_whole_event_immobility_contract,
 )
 from continuum_swr_replay.data_loaders.constants import (
     ALL_ARMS,
@@ -69,9 +67,11 @@ def _in_event_mask(
     """Return complete bins of Non-Local labels that satisfy their contract.
 
     Event labels are created upstream from probability-thresholded intervals
-    and whole-event immobility. This function validates that contract and then
-    returns complete labeled events. It never clips individual bins, because
-    doing so can split one event across stops and silently alter its duration.
+    and whole-event immobility, and the read (``swr_source.with_swr_source``)
+    refuses a frame that breaks either. This guard checks the same contract
+    again for a builder called on a frame read another way, then returns
+    complete labeled events. It never clips individual bins, because doing so
+    can split one event across stops and silently alter its duration.
     """
     active = dot["non_local_event"].to_numpy() > 0
     if not active.any():
@@ -87,39 +87,11 @@ def _in_event_mask(
         probability_threshold=nonlocal_threshold,
     )
 
-    immobile = whole_event_immobility_mask(
-        dot,
-        "non_local_event",
-        speed_threshold=speed_threshold,
-    ).to_numpy()
-    invalid_speed = active & ~immobile
-    if invalid_speed.any():
-        invalid_ids = sorted(
-            pd.unique(dot.loc[invalid_speed, "non_local_event"]).tolist()
-        )
-        raise EventDefinitionError(
-            "non_local_event labels violate the whole-event immobility "
-            f"contract (all speeds finite and < {speed_threshold:g} cm/s); "
-            f"invalid event labels: {invalid_ids[:10]}. Regenerate the "
-            "data-over-time file with the unified event definition."
-        )
+    validate_whole_event_immobility_contract(
+        dot, "non_local_event", speed_threshold=speed_threshold
+    )
 
     return pd.Series(active, index=dot.index)
-
-
-def _filter_external_event_labels(
-    dot: pd.DataFrame,
-    speed_threshold: float,
-) -> pd.DataFrame:
-    """Apply the shared atomic speed rule to SWR/MUA labels when present."""
-    event_cols = [column for column in ("SWR_event", "MUA_event") if column in dot]
-    if not event_cols:
-        return dot
-    return filter_event_labels_by_speed(
-        dot,
-        event_cols,
-        speed_threshold=speed_threshold,
-    )
 
 
 # ── Public API ──

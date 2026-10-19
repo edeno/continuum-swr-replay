@@ -19,7 +19,6 @@ from scipy.stats import sem
 from continuum_swr_replay.analysis.constants import (
     BINS_DURATION_MS,
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-    DEFAULT_NON_LOCAL_THRESHOLD,
 )
 from continuum_swr_replay.analysis.hippocampus import (
     compute_calibration_curve,
@@ -31,10 +30,6 @@ from continuum_swr_replay.analysis.hippocampus import (
 )
 from continuum_swr_replay.analysis.hippocampus.event_detection import (
     event_strict_overlap_mask,
-)
-from continuum_swr_replay.analysis.hippocampus.event_immobility import (
-    filter_event_labels_by_speed,
-    validate_nonlocal_event_probability_contract,
 )
 from continuum_swr_replay.analysis.hippocampus.swr_source import analysed_bins
 from continuum_swr_replay.figure_utilities import (
@@ -408,24 +403,17 @@ def plot_swr_zscore_by_state(
 
 def _nonlocal_swr_event_bin_masks(
     data_over_time: pd.DataFrame,
-    *,
-    nonlocal_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
 ) -> tuple[pd.Series, pd.Series]:
-    """Return whole-event SWR/non-SWR masks for eligible Non-Local bins.
+    """Return whole-event SWR/non-SWR masks for Non-Local event bins.
 
-    ``nonlocal_threshold`` must match the threshold used to create the
-    labels; it is validated, not re-applied.
+    The frame is read through the SWR source (``load_data_over_time``), whose
+    labels hold only eligible events: every one immobile as a whole, and every
+    Non-Local one above the probability threshold.
     """
-    validate_nonlocal_event_probability_contract(
-        data_over_time,
-        probability_threshold=nonlocal_threshold,
+    active = data_over_time["non_local_event"] > 0
+    is_swr_event = event_strict_overlap_mask(
+        data_over_time, "non_local_event", "SWR_event"
     )
-    eligible = filter_event_labels_by_speed(
-        data_over_time,
-        ["non_local_event", "SWR_event"],
-    )
-    active = eligible["non_local_event"] > 0
-    is_swr_event = event_strict_overlap_mask(eligible, "non_local_event", "SWR_event")
     return active & is_swr_event, active & ~is_swr_event
 
 
@@ -436,8 +424,6 @@ def plot_replay_speed_by_swr(
     formats: list[str] | None = None,
     dpi: int = 300,
     ax: plt.Axes | None = None,
-    *,
-    nonlocal_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
 ) -> None:
     """Plot replay speed distribution by SWR overlap status.
 
@@ -458,10 +444,7 @@ def plot_replay_speed_by_swr(
 
     bins = np.arange(0, 3000, 100)
 
-    swr_mask, no_swr_mask = _nonlocal_swr_event_bin_masks(
-        data_over_time,
-        nonlocal_threshold=nonlocal_threshold,
-    )
+    swr_mask, no_swr_mask = _nonlocal_swr_event_bin_masks(data_over_time)
     ax.hist(
         data_over_time.loc[swr_mask, "map_speed"],
         bins=bins,
@@ -500,8 +483,6 @@ def plot_replay_position_by_swr(
     formats: list[str] | None = None,
     dpi: int = 300,
     ax: plt.Axes | None = None,
-    *,
-    nonlocal_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
 ) -> None:
     """Plot replay position distribution by SWR overlap status.
 
@@ -523,10 +504,7 @@ def plot_replay_position_by_swr(
     unique_positions = data_over_time["max_linear_position"].unique()
     bins = int(np.nanmedian(unique_positions[~np.isnan(unique_positions)]) / 2)
 
-    swr_mask, no_swr_mask = _nonlocal_swr_event_bin_masks(
-        data_over_time,
-        nonlocal_threshold=nonlocal_threshold,
-    )
+    swr_mask, no_swr_mask = _nonlocal_swr_event_bin_masks(data_over_time)
     ax.hist(
         data_over_time.loc[swr_mask, "map_estimate"]
         / data_over_time.loc[swr_mask, "max_linear_position"],

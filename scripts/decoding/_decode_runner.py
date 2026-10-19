@@ -332,8 +332,11 @@ def organize_results(
         # SWR_event from the SWR source, so the decode's provenance is the
         # analyses' source: the stored ripples' labels and counts are replaced.
         # The decode keeps every event it decoded; the analyses' read drops
-        # the ones the artifact mask reaches, each with its reason.
-        data_over_time = with_swr_source(data_over_time, drop_masked_events=False)
+        # the ones the artifact mask reaches, each with its reason. Its labels
+        # are checked against the threshold they were made at.
+        data_over_time = with_swr_source(
+            data_over_time, drop_masked_events=False, **threshold
+        )
 
     return data_over_time, posterior
 

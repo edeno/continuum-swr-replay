@@ -25,7 +25,6 @@ from continuum_swr_replay.analysis.hippocampus.event_detection import (
     event_strict_overlap_keys,
 )
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (
-    filter_event_labels_by_speed,
     whole_event_immobility_mask,
 )
 
@@ -151,28 +150,16 @@ def _in_contfrag_event_mask(
     labels in ``docs/known_issues/degenerate_mua_events.md`` are the
     motivating case.
 
-    On a frame that already went through ``_filter_contfrag_event_labels``
-    or a speed-eligible cohort builder this is a no-op; it excludes
-    nothing further. The historical ~0.5% SWR / ~0.7% MUA exclusion
-    happens upstream at cohort construction.
+    On a frame read through ``swr_source.with_swr_source`` this is a no-op;
+    it excludes nothing further. The read holds every label to the rule (an
+    SWR that moves is dropped, a moving MUA label is refused), and the
+    historical ~0.5% SWR / ~0.7% MUA exclusion happens upstream at cohort
+    construction.
     """
     event_col = _resolve_event_col(event_source)
     return whole_event_immobility_mask(
         dot,
         event_col,
-        speed_threshold=speed_threshold,
-    )
-
-
-def _filter_contfrag_event_labels(
-    dot: pd.DataFrame,
-    speed_threshold: float,
-) -> pd.DataFrame:
-    """Apply the same whole-event rule to both external detector labels."""
-    event_cols = [column for column in ("SWR_event", "MUA_event") if column in dot]
-    return filter_event_labels_by_speed(
-        dot,
-        event_cols,
         speed_threshold=speed_threshold,
     )
 
@@ -305,7 +292,6 @@ def build_contfrag_event_table(
     event_col = _resolve_event_col(event_source)
 
     dot = _prepare_contfrag_dot(dot, env)
-    dot = _filter_contfrag_event_labels(dot, speed_threshold)
     other_event_col = "MUA_event" if event_col == "SWR_event" else "SWR_event"
     other_overlap_keys = (
         event_strict_overlap_keys(dot, event_col, other_event_col)
@@ -604,7 +590,6 @@ def build_contfrag_event_arm_table(
     n_events = len(event_table)
 
     dot = _prepare_contfrag_dot(dot, env)
-    dot = _filter_contfrag_event_labels(dot, speed_threshold)
     in_event = _in_contfrag_event_mask(dot, speed_threshold, event_source)
     ev = dot.loc[in_event]
 
@@ -770,7 +755,8 @@ def build_contfrag_stop_table(
 
     event_col = _resolve_event_col(event_source)
 
-    dot = _filter_contfrag_event_labels(dot, speed_threshold)
+    # add_trial_context writes its columns into the frame it is given.
+    dot = dot.copy(deep=False)
     dot = add_trial_context(dot, trials, port_experiences)
     dot["nearest_well_distance_cm"] = nearest_well_distance_cm(dot, track_graph)
 
