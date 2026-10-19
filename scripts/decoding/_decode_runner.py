@@ -38,13 +38,12 @@ from continuum_swr_replay.data_loaders import (
     get_training_timepoints,
     load_data,
 )
+from continuum_swr_replay.decode_files import decode_paths, non_local_threshold_percent
 from continuum_swr_replay.decoding_common import (
     DecodingConfig,
-    decode_paths,
     hpc_artifact_intervals,
     hpc_decode_masks,
     hpc_ripple_power_inputs,
-    non_local_threshold_percent,
     provenance_record,
     release_nwb_files,
     require_hpc_decode_sources,

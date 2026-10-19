@@ -53,7 +53,7 @@ from continuum_swr_replay.analysis.hippocampus.swr_source import (
     swr_event_labels,
 )
 from continuum_swr_replay.data_loaders import load_data
-from continuum_swr_replay.decoding_common import decode_paths
+from continuum_swr_replay.decode_files import decode_paths
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")

@@ -169,8 +169,8 @@ from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
 from continuum_swr_replay.data_loaders.utils import (  # noqa: E402
     parse_epoch_identifier,
 )
+from continuum_swr_replay.decode_files import decode_paths  # noqa: E402
 from continuum_swr_replay.decoding_common import (  # noqa: E402
-    decode_paths,
     hpc_artifact_intervals,
     hpc_decode_masks,
     provenance_record,

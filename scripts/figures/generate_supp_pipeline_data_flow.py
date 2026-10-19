@@ -45,7 +45,7 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
 from continuum_swr_replay.analysis.replay.spatial_mapping import (
     map_estimate_to_arm,
 )
-from continuum_swr_replay.decoding_common import decode_paths
+from continuum_swr_replay.decode_files import decode_paths
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.table_io import read_table
 

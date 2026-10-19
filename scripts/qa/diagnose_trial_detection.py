@@ -30,7 +30,7 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
 from continuum_swr_replay.data_loaders import load_data
-from continuum_swr_replay.decoding_common import decode_paths
+from continuum_swr_replay.decode_files import decode_paths
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.types import SessionDataKeys
 

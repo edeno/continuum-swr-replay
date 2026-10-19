@@ -47,7 +47,7 @@ _LAZY_IMPORTS: list[str] = [
     # The one epoch-identifier parser, read by offline decode-file readers.
     "from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier",
     # The one decode-file naming rule, read by the same offline readers.
-    "from continuum_swr_replay.decoding_common import decode_paths",
+    "from continuum_swr_replay.decode_files import decode_paths",
     # ``analysis/*`` leaf modules. The hippocampus leaves used to drag
     # ``data_aggregation`` (which imports ``get_labels`` → spyglass);
     # the PFC leaves used to be poisoned by the eager re-export from
@@ -95,6 +95,55 @@ def test_no_lazy_import_loads_spyglass():
     )
     assert result.returncode == 0, (
         f"lazy-import contract broken.\n"
+        f"stdout: {result.stdout}\nstderr: {result.stderr}"
+    )
+    assert "OK" in result.stdout
+
+
+# Readers of a decode folder that do not load the decode runners' scheduler.
+# Each one was free of ``dask.distributed`` and ``dask_cuda`` at 736e18b
+# (``state_evidence.terms`` was not: its package imports ``decoding_common``,
+# so it is not listed). They read the decode files' names from the leaf
+# ``decode_files``, never from ``decoding_common``.
+_NO_SCHEDULER_IMPORTS: list[str] = [
+    "import continuum_swr_replay.decode_files",
+    "import continuum_swr_replay.analysis.pfc.canonical_events",
+    "import continuum_swr_replay.analysis.hippocampus.result_loading",
+    "import continuum_swr_replay.analysis.hippocampus.data_aggregation",
+    "import continuum_swr_replay.analysis.contfrag.data_aggregation",
+    "import continuum_swr_replay.analysis.replay.prepare_data",
+]
+
+
+def test_decode_file_readers_do_not_load_the_dask_scheduler():
+    """Run each reader import in one fresh interpreter; fail on the first one
+    that puts ``dask.distributed`` or ``dask_cuda`` into ``sys.modules``."""
+    code = textwrap.dedent(
+        """
+        import sys
+        imports = {imports!r}
+        for stmt in imports:
+            exec(stmt, {{}})
+            leaked = sorted(
+                m for m in sys.modules
+                if m in ("dask.distributed", "dask_cuda")
+                or m.startswith("dask_cuda.")
+            )
+            if leaked:
+                print(f"LEAKED after {{stmt!r}}: {{','.join(leaked)}}")
+                sys.exit(1)
+        print("OK")
+        """
+    ).format(imports=_NO_SCHEDULER_IMPORTS)
+
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        timeout=180,  # a hang guard, as above
+    )
+    assert result.returncode == 0, (
+        f"a decode-file reader loads the dask scheduler.\n"
         f"stdout: {result.stdout}\nstderr: {result.stderr}"
     )
     assert "OK" in result.stdout

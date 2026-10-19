@@ -97,7 +97,7 @@ from continuum_swr_replay.analysis.inventory_comparison.overlap import (  # noqa
     UNMATCHED,
 )
 from continuum_swr_replay.data_loaders.lfp import get_ripple_band_inputs  # noqa: E402
-from continuum_swr_replay.decoding_common import decode_paths  # noqa: E402
+from continuum_swr_replay.decode_files import decode_paths  # noqa: E402
 from continuum_swr_replay.figure_utilities import WONG  # noqa: E402
 from continuum_swr_replay.parameters import COLORS, FIGURE_DIR  # noqa: E402
 from continuum_swr_replay.table_io import read_table  # noqa: E402

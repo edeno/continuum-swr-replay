@@ -145,7 +145,7 @@ from scipy.stats import zscore
 
 from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
-from continuum_swr_replay.decoding_common import data_over_time_suffix
+from continuum_swr_replay.decode_files import data_over_time_suffix
 
 from ...types import SessionData
 from .epoch_normalizers import run_speed_baseline as epoch_run_speed_baseline

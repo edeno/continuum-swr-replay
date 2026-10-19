@@ -181,8 +181,8 @@ from continuum_swr_replay.data_loaders.utils import (
     parse_epoch_identifier,
     parse_nwb_filename,
 )
+from continuum_swr_replay.decode_files import decode_paths
 from continuum_swr_replay.decoding_common import (
-    decode_paths,
     provenance_record,
     raise_open_file_limit,
     release_nwb_files,

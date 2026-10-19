@@ -171,3 +171,24 @@ def test_the_event_gallery_catalogs_only_analysed_epochs(tmp_path):
         event_gallery.list_epoch_pkls(
             _folder(tmp_path / "other", "_80_data_over_time.pkl", (PENDING,))
         )
+
+
+def test_the_event_gallery_names_an_analysed_epoch_it_leaves_out(tmp_path, caplog):
+    folder = _folder(tmp_path, "_80_data_over_time.pkl", (ANALYSED[0], PENDING))
+
+    with caplog.at_level("WARNING"):
+        pkls = event_gallery.list_epoch_pkls(folder)
+
+    assert pkls == [folder / f"{ANALYSED[0]}_80_data_over_time.pkl"]
+    assert "1 of the 2 analysed epochs" in caplog.text
+    assert ANALYSED[1] in caplog.text
+    assert PENDING not in caplog.text
+
+
+def test_the_event_gallery_is_quiet_when_every_analysed_epoch_is_there(
+    tmp_path, caplog
+):
+    with caplog.at_level("WARNING"):
+        event_gallery.list_epoch_pkls(_folder(tmp_path, "_80_data_over_time.pkl"))
+
+    assert "left out" not in caplog.text

@@ -71,11 +71,7 @@ from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_decode_files,
 )
 from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier  # noqa: E402
-from continuum_swr_replay.decoding_common import (  # noqa: E402
-    DecodePaths,
-    decode_paths,
-    non_local_threshold_percent,
-)
+from continuum_swr_replay.decode_files import decode_paths  # noqa: E402
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
 from continuum_swr_replay.table_io import read_table, table_exists  # noqa: E402
 
@@ -115,15 +111,6 @@ def animal_from_epoch_id(epoch_id: str) -> str:
     return parse_epoch_identifier(epoch_id).animal
 
 
-def _decode_paths(epoch_id: str) -> DecodePaths:
-    """The epoch's decode files, ``data_over_time`` named for NON_LOCAL_THRESHOLD."""
-    return decode_paths(
-        epoch_id,
-        PROCESSED_DATA_DIR,
-        threshold_percent=non_local_threshold_percent(NON_LOCAL_THRESHOLD),
-    )
-
-
 def find_sessions(animal: str | None) -> list[str]:
     """Analysed HPC epoch identifiers with data_over_time + environment present.
 
@@ -135,7 +122,7 @@ def find_sessions(animal: str | None) -> list[str]:
         epoch_id = env.name.removesuffix("_environment.pkl")
         if animal is not None and not epoch_id.startswith(animal):
             continue
-        if _decode_paths(epoch_id).data_over_time.exists():
+        if decode_paths(epoch_id, PROCESSED_DATA_DIR).data_over_time.exists():
             out.append(epoch_id)
     return out
 
@@ -167,7 +154,7 @@ def session_content_distances(
     (``ahead_behind_distance``) and ``d_well`` is the track distance to the
     nearest reward well. Returns ``None`` if too few wells are localizable.
     """
-    paths = _decode_paths(epoch_id)
+    paths = decode_paths(epoch_id, PROCESSED_DATA_DIR)
     # The read refuses labels that break the speed rule or the probability
     # contract.
     dot = read_dot_with_swr_source(

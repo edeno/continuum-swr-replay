@@ -111,9 +111,12 @@ from continuum_swr_replay.analysis.replay.posterior_io import (
 from continuum_swr_replay.analysis.replay.tables_arm_patch import build_event_arm_table
 from continuum_swr_replay.analysis.replay.tables_event import build_event_table
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
-from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
+from continuum_swr_replay.data_loaders.epoch_register import (
+    analysed_decode_files,
+    analysed_epoch_ids,
+)
 from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier
-from continuum_swr_replay.decoding_common import data_over_time_suffix, decode_paths
+from continuum_swr_replay.decode_files import data_over_time_suffix, decode_paths
 from continuum_swr_replay.parameters import COLORS, PROCESSED_DATA_DIR
 from continuum_swr_replay.visualization.plots import (
     _track_edge_colors,
@@ -174,11 +177,29 @@ def list_epoch_pkls(data_dir: Path) -> list[Path]:
 
     The epoch register's analysed epochs (``analysed_decode_files``), never a
     glob, so a pending or excluded epoch's decode in the folder is not shown.
+    An analysed epoch whose frame is not in `data_dir` is left out with a
+    warning that names it (the sample then differs from a full folder's).
+
+    Raises
+    ------
+    FileNotFoundError
+        If no analysed epoch's frame is in `data_dir`.
     """
     suffix = data_over_time_suffix()
     pkls = analysed_decode_files(data_dir, suffix)
     if not pkls:
         raise FileNotFoundError(f"No analysed epoch's *{suffix} found in {data_dir}")
+    found = {pkl.name.removesuffix(suffix) for pkl in pkls}
+    missing = [epoch_id for epoch_id in analysed_epoch_ids() if epoch_id not in found]
+    if missing:
+        logging.warning(
+            "%d of the %d analysed epochs have no *%s in %s, left out: %s",
+            len(missing),
+            len(missing) + len(pkls),
+            suffix,
+            data_dir,
+            ", ".join(missing),
+        )
     return pkls
 
 

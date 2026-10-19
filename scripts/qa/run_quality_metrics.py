@@ -37,7 +37,7 @@ from continuum_swr_replay.analysis.hippocampus.swr_source import (
     read_dot_with_swr_source,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
-from continuum_swr_replay.decoding_common import data_over_time_suffix
+from continuum_swr_replay.decode_files import data_over_time_suffix
 from continuum_swr_replay.parameters import (
     FIGURE_DIR,
     PROCESSED_DATA_DIR,

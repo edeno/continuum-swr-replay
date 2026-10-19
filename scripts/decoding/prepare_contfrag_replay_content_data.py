@@ -65,7 +65,7 @@ from continuum_swr_replay.analysis.replay.covariate_registry import (
 from continuum_swr_replay.analysis.replay.covariates import load_contingency
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
-from continuum_swr_replay.decoding_common import decode_paths
+from continuum_swr_replay.decode_files import decode_paths
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.table_io import publish_canonical
 from continuum_swr_replay.table_parity import BASENAME_TO_TABLE

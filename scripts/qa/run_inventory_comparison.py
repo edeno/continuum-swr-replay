@@ -173,8 +173,8 @@ from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_epoch_ids,
 )
 from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier  # noqa: E402
+from continuum_swr_replay.decode_files import decode_paths  # noqa: E402
 from continuum_swr_replay.decoding_common import (  # noqa: E402
-    decode_paths,
     parse_run_id,
     provenance_record,
     replace_outputs,

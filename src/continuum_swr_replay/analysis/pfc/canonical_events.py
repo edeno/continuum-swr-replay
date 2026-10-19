@@ -47,7 +47,7 @@ from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     intervals_from_labels,
 )
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
-from continuum_swr_replay.decoding_common import (
+from continuum_swr_replay.decode_files import (
     decode_paths,
     non_local_threshold_percent,
 )
@@ -178,7 +178,7 @@ def session_data_over_time_path(
     """Path of one session's cached per-bin decode frame.
 
     The threshold tag in the name is the one the decoder wrote
-    (:func:`~continuum_swr_replay.decoding_common.non_local_threshold_percent`),
+    (:func:`~continuum_swr_replay.decode_files.non_local_threshold_percent`),
     so a run reads the labels that were cut at the threshold it asks for rather
     than whichever file exists.
     """
