@@ -10,6 +10,9 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
+from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+    require_canonical_speed_threshold,
+)
 from continuum_swr_replay.data_loaders.constants import (
     ALL_ARMS,
     TRACK_SEGMENT_TO_PATCH,
@@ -101,7 +104,14 @@ def build_event_arm_table(
     pd.DataFrame
         Columns: see :data:`_EVENT_ARM_TABLE_COLUMNS`. Empty (correct
         schema) if ``event_table`` is empty.
+
+    Raises
+    ------
+    ValueError
+        If `speed_threshold` is not the canonical
+        ``DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC``.
     """
+    require_canonical_speed_threshold(speed_threshold, "build_event_arm_table")
     canonical_column_order = list(_EVENT_ARM_TABLE_BUILD_COLUMNS)
     if len(event_table) == 0:
         return stamp_covariate_schema(

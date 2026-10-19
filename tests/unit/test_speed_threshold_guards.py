@@ -61,6 +61,14 @@ def _call_builder(name: str, speed_threshold: float):
         "build_event_sequence_table": lambda: replay.build_event_sequence_table(
             dot, env, replay._tiny_posterior(dot), speed_threshold=speed_threshold
         ),
+        "build_event_arm_table": lambda: replay.build_event_arm_table(
+            replay.build_event_table(dot, env, trials, graph),
+            dot,
+            env,
+            trials,
+            graph,
+            speed_threshold=speed_threshold,
+        ),
         "build_stop_table": lambda: replay.build_stop_table(
             dot, trials, graph, speed_threshold=speed_threshold
         ),
@@ -88,6 +96,7 @@ BUILDERS = (
     "build_classified_nonlocal_event_table",
     "build_event_table",
     "build_event_sequence_table",
+    "build_event_arm_table",
     "build_stop_table",
     "build_contfrag_event_table",
     "build_contfrag_event_arm_table",
