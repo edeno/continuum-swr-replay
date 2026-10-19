@@ -39,6 +39,10 @@ import pandas as pd
 import xarray as xr
 from ripple_detection.core import segment_boolean_series
 
+from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+    intervals_from_labels,
+)
+
 # Interval-arithmetic tolerance for floating-point noise (1 μs). Used in
 # classify_swr_overlap_geometry when comparing an event's duration to
 # the total duration of its SWR coverage.
@@ -134,9 +138,45 @@ def positive_duration_interval_mask(
     return np.isfinite(starts) & np.isfinite(ends) & (ends > starts)
 
 
-def _is_positive_duration_interval(start: float, end: float) -> bool:
-    """Scalar counterpart of :func:`positive_duration_interval_mask`."""
-    return bool(np.isfinite(start) and np.isfinite(end) and end > start)
+def strict_overlap_matrix(
+    starts: np.ndarray,
+    ends: np.ndarray,
+    other_starts: np.ndarray,
+    other_ends: np.ndarray,
+) -> np.ndarray:
+    """Pairwise strict positive-duration overlap between two interval sets.
+
+    This is the one definition of "strict overlap" used by every SWR-overlap
+    consumer (:func:`get_overlap_times`, :func:`classify_swr_overlap`,
+    :func:`classify_swr_overlap_geometry`, :func:`event_strict_overlap_keys`
+    and the classified event table's SWR matcher).
+
+    Parameters
+    ----------
+    starts, ends : np.ndarray, shape (n_intervals,)
+        Bounds of the primary intervals, in seconds.
+    other_starts, other_ends : np.ndarray, shape (n_other,)
+        Bounds of the intervals tested against, in seconds.
+
+    Returns
+    -------
+    np.ndarray of bool, shape (n_intervals, n_other)
+        ``True`` where both intervals are finite with strictly positive
+        duration (:func:`positive_duration_interval_mask`) and they share
+        positive duration: ``other_end > start`` and ``other_start < end``.
+        Intervals that only touch at a boundary share zero duration and are
+        ``False``; a zero-duration interval overlaps nothing.
+    """
+    starts = np.asarray(starts, dtype=float)
+    ends = np.asarray(ends, dtype=float)
+    other_starts = np.asarray(other_starts, dtype=float)
+    other_ends = np.asarray(other_ends, dtype=float)
+    return (
+        positive_duration_interval_mask(starts, ends)[:, None]
+        & positive_duration_interval_mask(other_starts, other_ends)[None, :]
+        & (other_ends[None, :] > starts[:, None])
+        & (other_starts[None, :] < ends[:, None])
+    )
 
 
 def event_strict_overlap_keys(
@@ -150,11 +190,15 @@ def event_strict_overlap_keys(
     """Per-(session, primary_id) keys whose interval strictly overlaps any other event.
 
     For each event of ``primary_col`` (id > 0) in each session, derive
-    its [first, last] timestamp interval from the timebin labels and
-    test strict positive-duration overlap against every event of
+    its [first, last] timestamp interval from the timebin labels
+    (:func:`~continuum_swr_replay.analysis.hippocampus.event_immobility.intervals_from_labels`,
+    read on the frame's time index) and test strict positive-duration
+    overlap (:func:`strict_overlap_matrix`) against every event of
     ``other_col`` in the same session. Returns the set of
     ``(*session_cols, primary_id)`` tuples that pass the strict-overlap
-    test.
+    test. These are the bounds and the predicate the canonical classified
+    event table uses, so for Non-Local x SWR the keys are exactly its
+    ``is_swr`` events.
 
     ``other_data`` draws ``other_col`` bounds from a different frame than
     the primary; it defaults to using ``data_over_time`` for both sides,
@@ -178,49 +222,34 @@ def event_strict_overlap_keys(
     """
     sess = list(session_cols)
 
-    def _bounds(df: pd.DataFrame, ec: str) -> pd.DataFrame:
-        active = df[df[ec] > 0]
-        if len(active) == 0:
-            return pd.DataFrame(columns=[*sess, ec, "_start", "_end"])
-        bounds = (
-            active.reset_index(names="_t")
-            .groupby([*sess, ec])
-            .agg(_start=("_t", "min"), _end=("_t", "max"))
-            .reset_index()
-        )
-        valid = positive_duration_interval_mask(
-            bounds["_start"].to_numpy(),
-            bounds["_end"].to_numpy(),
-        )
-        return bounds.loc[valid]
+    def _session_intervals(df: pd.DataFrame, ec: str) -> dict[tuple, pd.DataFrame]:
+        # Only the label column is passed on, so the bounds always come from
+        # the frame's time index (the samples the labels were written on).
+        active = df[df[ec] > 0][[*sess, ec]]
+        return {
+            (key if isinstance(key, tuple) else (key,)): intervals_from_labels(
+                grp[[ec]], ec
+            )
+            for key, grp in active.groupby(sess, sort=False)
+        }
 
-    p_bounds = _bounds(data_over_time, primary_col)
     o_source = data_over_time if other_data is None else other_data
-    o_bounds = _bounds(o_source, other_col)
+    o_intervals = _session_intervals(o_source, other_col)
     keys: set[tuple] = set()
-    if p_bounds.empty or o_bounds.empty:
+    if not o_intervals:
         return keys
 
-    for sk, p_grp in p_bounds.groupby(sess, sort=False):
-        sk = sk if isinstance(sk, tuple) else (sk,)
-        mask = np.ones(len(o_bounds), dtype=bool)
-        for col, val in zip(sess, sk, strict=True):
-            mask &= o_bounds[col].to_numpy() == val
-        o_grp = o_bounds.loc[mask]
-        if o_grp.empty:
+    for sk, p_grp in _session_intervals(data_over_time, primary_col).items():
+        o_grp = o_intervals.get(sk)
+        if o_grp is None:
             continue
-        p_starts = p_grp["_start"].to_numpy()
-        p_ends = p_grp["_end"].to_numpy()
-        o_starts = o_grp["_start"].to_numpy()
-        o_ends = o_grp["_end"].to_numpy()
-        ovl = (
-            (p_ends[:, None] > o_starts[None, :])
-            & (p_starts[:, None] < o_ends[None, :])
+        hit = strict_overlap_matrix(
+            p_grp["start_time"].to_numpy(),
+            p_grp["end_time"].to_numpy(),
+            o_grp["start_time"].to_numpy(),
+            o_grp["end_time"].to_numpy(),
         ).any(axis=1)
-        p_ids = p_grp[primary_col].to_numpy()
-        for i, hit in enumerate(ovl):
-            if hit:
-                keys.add((*sk, p_ids[i]))
+        keys.update((*sk, event_id) for event_id in p_grp[primary_col].to_numpy()[hit])
     return keys
 
 
@@ -307,18 +336,11 @@ def get_overlap_times(
     ev_starts = non_local_times["start_time"].to_numpy(dtype=float)
     ev_ends = non_local_times["end_time"].to_numpy(dtype=float)
 
-    valid_swrs = positive_duration_interval_mask(swr_starts, swr_ends)
-    valid_events = positive_duration_interval_mask(ev_starts, ev_ends)
-
     # For each non-local event, True if any ripple has a strict
-    # positive-duration intersection. Vectorized via broadcasting:
-    # shape (n_events, n_ripples).
-    has_overlap = (
-        valid_events[:, None]
-        & valid_swrs[None, :]
-        & (swr_ends[None, :] > ev_starts[:, None])
-        & (swr_starts[None, :] < ev_ends[:, None])
-    ).any(axis=1)
+    # positive-duration intersection.
+    has_overlap = strict_overlap_matrix(ev_starts, ev_ends, swr_starts, swr_ends).any(
+        axis=1
+    )
 
     overlap_non_local_times = non_local_times.iloc[has_overlap]
     no_overlap_non_local_times = non_local_times.iloc[~has_overlap]
@@ -381,21 +403,18 @@ def classify_swr_overlap(
     classes: list[str] = []
     swr_starts = ripple_times["start_time"].to_numpy(dtype=float)
     swr_ends = ripple_times["end_time"].to_numpy(dtype=float)
-    valid_swrs = positive_duration_interval_mask(swr_starts, swr_ends)
+    # Strict positive-duration overlap. Boundary contact
+    # (swr_end == event.start or swr_start == event.end) shares zero duration
+    # with the event and is excluded; a zero- (or negative-) duration event
+    # overlaps nothing, so it is non-SWR even if an SWR spans its instant.
+    overlaps = strict_overlap_matrix(
+        non_local_events["start_time"].to_numpy(dtype=float),
+        non_local_events["end_time"].to_numpy(dtype=float),
+        swr_starts,
+        swr_ends,
+    )
 
-    for ev in non_local_events.itertuples():
-        # A zero- (or negative-) duration event has no positive duration to
-        # overlap, so it is non-SWR under the strict convention even if an
-        # SWR spans its instant.
-        if not _is_positive_duration_interval(ev.start_time, ev.end_time):
-            classes.append("non_swr")
-            continue
-        # Strict positive-duration overlap. Boundary contact
-        # (swr_end == event.start or swr_start == event.end) shares
-        # zero duration with the event and is excluded.
-        overlap_mask = valid_swrs & (swr_ends > ev.start_time) & (
-            swr_starts < ev.end_time
-        )
+    for ev, overlap_mask in zip(non_local_events.itertuples(), overlaps, strict=True):
         if not overlap_mask.any():
             classes.append("non_swr")
             continue
@@ -403,9 +422,7 @@ def classify_swr_overlap(
         # equality is allowed for containment (an SWR exactly aligned
         # with the event still "contains" it).
         contained_mask = (
-            overlap_mask
-            & (swr_starts <= ev.start_time)
-            & (swr_ends >= ev.end_time)
+            overlap_mask & (swr_starts <= ev.start_time) & (swr_ends >= ev.end_time)
         )
         if contained_mask.any():
             classes.append("swr_contained")
@@ -540,7 +557,18 @@ def classify_swr_overlap_geometry(
     """
     swr_starts = ripple_times["start_time"].to_numpy(dtype=float)
     swr_ends = ripple_times["end_time"].to_numpy(dtype=float)
-    valid_swrs = positive_duration_interval_mask(swr_starts, swr_ends)
+    # Strict positive-duration overlap (see ``classify_swr_overlap`` for
+    # rationale): a SWR that only touches a boundary of the event shares zero
+    # duration and is not an overlap. A zero- (or negative-) duration event
+    # overlaps nothing, so it is non-SWR regardless of any SWR spanning its
+    # instant; without that, the open-interval test would treat a point
+    # strictly inside an SWR as contained.
+    overlaps = strict_overlap_matrix(
+        non_local_events["start_time"].to_numpy(dtype=float),
+        non_local_events["end_time"].to_numpy(dtype=float),
+        swr_starts,
+        swr_ends,
+    )
 
     n_events = len(non_local_events)
     classes: list[str] = [""] * n_events
@@ -550,25 +578,7 @@ def classify_swr_overlap_geometry(
     event_has_non_swr_time_arr = np.zeros(n_events, dtype=bool)
 
     for i, ev in enumerate(non_local_events.itertuples()):
-        # A zero- (or negative-) duration event has no positive duration to
-        # overlap, so under the strict positive-duration convention it is
-        # non-SWR regardless of any SWR spanning its instant. Without this
-        # guard the open-interval ``overlap_mask`` below would treat a
-        # point strictly inside an SWR as contained.
-        if not _is_positive_duration_interval(ev.start_time, ev.end_time):
-            classes[i] = "non_swr"
-            subclasses[i] = "no_overlap"
-            event_has_non_swr_time_arr[i] = True
-            continue
-
-        # Strict positive-duration overlap (see ``classify_swr_overlap``
-        # for rationale): a SWR that only touches a boundary of the
-        # event shares zero duration and is not an overlap.
-        overlap_mask = (
-            valid_swrs
-            & (swr_ends > ev.start_time)
-            & (swr_starts < ev.end_time)
-        )
+        overlap_mask = overlaps[i]
         n_overlap = int(overlap_mask.sum())
         n_overlap_arr[i] = n_overlap
 
@@ -582,9 +592,8 @@ def classify_swr_overlap_geometry(
         overlapping_ends = swr_ends[overlap_mask]
 
         # Any single SWR fully contains this event?
-        containing_mask = (
-            (overlapping_starts <= ev.start_time)
-            & (overlapping_ends >= ev.end_time)
+        containing_mask = (overlapping_starts <= ev.start_time) & (
+            overlapping_ends >= ev.end_time
         )
         if containing_mask.any():
             classes[i] = "swr_contained"
@@ -594,9 +603,8 @@ def classify_swr_overlap_geometry(
             continue
 
         # Neither contained. Decide among the partial-overlap subclasses.
-        strict_contained_mask = (
-            (overlapping_starts > ev.start_time)
-            & (overlapping_ends < ev.end_time)
+        strict_contained_mask = (overlapping_starts > ev.start_time) & (
+            overlapping_ends < ev.end_time
         )
         contains_any_swr = bool(strict_contained_mask.any())
         contains_any_swr_arr[i] = contains_any_swr

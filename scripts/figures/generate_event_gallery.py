@@ -82,7 +82,7 @@ from continuum_swr_replay.analysis.constants import (
 )
 from continuum_swr_replay.analysis.hippocampus import load_results
 from continuum_swr_replay.analysis.hippocampus.event_detection import (
-    positive_duration_interval_mask,
+    strict_overlap_matrix,
 )
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     filter_event_labels_by_speed,
@@ -186,22 +186,11 @@ def _intervals_overlap_any(
 ) -> np.ndarray:
     """Boolean mask: each [starts, ends] interval overlaps any [other_*] interval.
 
-    Half-open overlap test ``s < oe and os < e`` over all pairs. Sizes are
-    small per session (hundreds), so the dense broadcast is fine.
+    Strict positive-duration overlap (:func:`strict_overlap_matrix`) over all
+    pairs. Sizes are small per session (hundreds), so the dense broadcast is
+    fine.
     """
-    starts = np.asarray(starts, dtype=float)
-    ends = np.asarray(ends, dtype=float)
-    other_starts = np.asarray(other_starts, dtype=float)
-    other_ends = np.asarray(other_ends, dtype=float)
-    valid = positive_duration_interval_mask(starts, ends)
-    valid_other = positive_duration_interval_mask(other_starts, other_ends)
-    if not valid_other.any():
-        return np.zeros(len(starts), dtype=bool)
-    s = starts[:, None]
-    e = ends[:, None]
-    os = other_starts[valid_other][None, :]
-    oe = other_ends[valid_other][None, :]
-    return valid & ((s < oe) & (os < e)).any(axis=1)
+    return strict_overlap_matrix(starts, ends, other_starts, other_ends).any(axis=1)
 
 
 def _min_gap_to_intervals(

@@ -62,7 +62,7 @@ from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 from .event_detection import (
     classify_swr_overlap,
     classify_swr_overlap_geometry,
-    positive_duration_interval_mask,
+    strict_overlap_matrix,
 )
 from .event_immobility import (
     event_speeds_are_immobile,
@@ -144,16 +144,14 @@ def _match_swr(
     if overlap_class == "non_swr":
         return (None, np.nan, np.nan)
 
-    # Strict positive-duration overlap — byte-for-byte the predicate
-    # classify_swr_overlap_geometry uses, applied to the same SWR
-    # intervals. swr_contained additionally requires a single containing
-    # SWR (boundary equality allowed), matching the classifier's
+    # Strict positive-duration overlap — the predicate
+    # classify_swr_overlap_geometry uses (strict_overlap_matrix), applied to
+    # the same SWR intervals. swr_contained additionally requires a single
+    # containing SWR (boundary equality allowed), matching the classifier's
     # containment test.
-    overlap_mask = (
-        positive_duration_interval_mask(swr_starts, swr_ends)
-        & (swr_ends > event_start)
-        & (swr_starts < event_end)
-    )
+    overlap_mask = strict_overlap_matrix(
+        np.array([event_start]), np.array([event_end]), swr_starts, swr_ends
+    )[0]
     if overlap_class == "swr_contained":
         candidate_mask = (
             overlap_mask & (swr_starts <= event_start) & (swr_ends >= event_end)

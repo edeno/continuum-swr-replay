@@ -74,7 +74,7 @@ Analysis functions for manipulating and characterizing detected events.
 
 Detection and analysis of neural events (ripples, non-local states).
 
-`get_confident_times`, `positive_duration_interval_mask`, `event_strict_overlap_keys`, `event_strict_overlap_mask`, `get_overlap_times`, `classify_swr_overlap`, `merged_interval_duration`, `classify_swr_overlap_geometry`, `select_typical_event_by_class`
+`get_confident_times`, `positive_duration_interval_mask`, `strict_overlap_matrix`, `event_strict_overlap_keys`, `event_strict_overlap_mask`, `get_overlap_times`, `classify_swr_overlap`, `merged_interval_duration`, `classify_swr_overlap_geometry`, `select_typical_event_by_class`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/event_eligibility.py`
 
