@@ -103,6 +103,7 @@ from continuum_swr_replay.table_io import read_table  # noqa: E402
 from continuum_swr_replay.visualization.plots import (  # noqa: E402
     plot_linear_track_graph_strip,
 )
+from scripts.decoding import run_memoryless_detection as memoryless_runner  # noqa: E402
 from scripts.decoding.run_carey_detection import decode_marks  # noqa: E402
 from scripts.qa import run_inventory_comparison as runner  # noqa: E402
 
@@ -142,15 +143,42 @@ PENDING_SENTENCE = (
 SPREAD_RTOL = 1e-2
 """How far a recomputed spread or jump may sit from the stored one, relative.
 
-The stored statistics were computed on a GPU, these on a CPU; one GPU setting
+The stored statistics were computed on a GPU under the memoryless run's XLA
+flags, and these are too (:func:`use_memoryless_device`); one GPU setting
 against another moved spreads by up to 3.5e-3 relative (the memoryless run's
-``known_limits``); on the pilot epoch these sat within 3.3e-3. Also how near
-its threshold a spread or jump must be for its gate to flip."""
+``known_limits``). On a CPU the pilot epoch's sat within 3.3e-3, and the 8
+Phase 4 windows a CPU refused within 6e-3; on the GPU those 8 sat within
+4.5e-4. Also how near its threshold a spread or jump must be for its gate to
+flip."""
 CENTER_TIE_RTOL = 1e-3
 """How near the minimum the stored center's spread, under the recomputed
 posterior, must be for the center to move: a tie between two bins, which a
 device's rounding breaks either way. On the pilot epoch 59 of 14,360 windows
-moved, each to the next bin, within 3e-5."""
+moved, each to the next bin, within 3e-5. On a CPU, 8 of Phase 4's 160 example
+figures (run 30cf1cc432e9) moved a center by up to 2.2e-3; on the GPU, under
+the memoryless run's flags, their centers moved within 3e-5."""
+
+
+def use_memoryless_device() -> None:
+    """Recompute where the memoryless run computed: a GPU, under its XLA flags.
+
+    Near-tied window centers are broken by the device's rounding, so a CPU
+    moves more of them than the check allows. ``JAX_PLATFORMS``, if set, still
+    wins. Call before JAX starts its backend, which reads ``XLA_FLAGS`` once.
+    """
+    os.environ["XLA_FLAGS"] = memoryless_runner.xla_flags()
+    os.environ.setdefault("JAX_PLATFORMS", "cuda")
+    jax.config.update("jax_platforms", os.environ["JAX_PLATFORMS"])
+
+
+def recompute_device() -> dict[str, str]:
+    """The device the windows are recomputed on and its XLA flags, for the
+    manifest."""
+    return {
+        "device": str(jax.devices()[0]),
+        "xla_flags": os.environ.get("XLA_FLAGS", ""),
+    }
+
 
 GATE_ROWS: Mapping[str, str] = MappingProxyType(
     {
@@ -453,7 +481,8 @@ def recompute_windows(
         centers that moved to a tied bin; the spread, jump and kept gates'
         ``_flips``; ``spread_max_rel_diff``, and ``jump_max_rel_diff`` over
         the jumps no tie moved, where both are finite; and for every stored
-        candidate inside the windows, its ``dispersion_cm`` and
+        candidate inside the windows, its ``dispersion_cm`` (recomputed from
+        the stored center where a center moved to a tie) and
         ``mean_posterior_spread_cm``, stored and recomputed.
 
     Raises
@@ -583,10 +612,12 @@ def recompute_windows(
     inside = np.flatnonzero(
         (candidates.runs[:, 0] >= first) & (candidates.runs[:, 1] <= last)
     )
+    # a dispersion reads the centers, so a center moved to a tie would move it
+    # too; it reads the stored center there, as the jump check sets those aside
     recomputed_dispersion = sequence_dispersion_cm(
         candidates.runs[inside] - first,
         decisions.gates.kept,
-        decisions.center_index,
+        np.where(moved & tied, old_center, full.center_index)[:n],
         inputs.bin_distance_cm,
     )
     check["candidates"] = []
@@ -983,6 +1014,7 @@ def write_examples(run_dir: Path, figure_dir: Path) -> list[dict[str, Any]]:
                     "memoryless_check": {
                         "spread_rtol": SPREAD_RTOL,
                         "center_tie_rtol": CENTER_TIE_RTOL,
+                        **recompute_device(),
                     },
                     "pending": PENDING,
                     "figures": records,
@@ -1013,10 +1045,7 @@ def main(argv: list[str] | None = None) -> None:
         "replay_detection_comparison/inventory/.",
     )
     args = parser.parse_args(argv)
-    # CPU only: the plotted windows are few. JAX read its environment when
-    # imported, so the platform is set through its config too.
-    os.environ.setdefault("JAX_PLATFORMS", "cpu")
-    jax.config.update("jax_platforms", os.environ["JAX_PLATFORMS"])
+    use_memoryless_device()
     run_dir = runner.OUTPUT_ROOT / args.run_id
     if not (run_dir / "manifest.json").exists():
         sys.exit(f"No inventory run manifest at {run_dir}.")

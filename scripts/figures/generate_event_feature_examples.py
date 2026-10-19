@@ -33,14 +33,12 @@ Usage:
 
 import argparse
 import json
-import os
 import sys
 from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
-import jax
 import numpy as np
 import pandas as pd
 
@@ -492,6 +490,7 @@ def write_examples(
                         "spread_rtol": inventory_examples.SPREAD_RTOL,
                         "center_tie_rtol": inventory_examples.CENTER_TIE_RTOL,
                     },
+                        **inventory_examples.recompute_device(),
                     "pending": inventory_examples.PENDING,
                     "figures": records,
                 }
@@ -531,10 +530,7 @@ def main(argv: list[str] | None = None) -> None:
         "replay_detection_comparison/event_features/.",
     )
     args = parser.parse_args(argv)
-    # CPU only: the plotted windows are few. JAX read its environment when
-    # imported, so the platform is set through its config too.
-    os.environ.setdefault("JAX_PLATFORMS", "cpu")
-    jax.config.update("jax_platforms", os.environ["JAX_PLATFORMS"])
+    inventory_examples.use_memoryless_device()
     run_dir = features_runner.OUTPUT_ROOT / args.run_id
     if not (run_dir / "manifest.json").exists():
         sys.exit(f"No event features run manifest at {run_dir}.")
