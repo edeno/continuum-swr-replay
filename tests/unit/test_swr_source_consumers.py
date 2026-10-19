@@ -819,6 +819,9 @@ DECODE_FRAME_READERS = {
     "scripts/figures/generate_inventory_examples.py": (
         "grid, speed, posterior and position; its events are the comparison's tables"
     ),
+    "scripts/qa/run_event_features.py": (
+        "reads it through with_swr_source; its events are the comparison's tables"
+    ),
 }
 
 
