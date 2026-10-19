@@ -21,26 +21,6 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
 
-def parse_epoch_identifier(epoch_id: str) -> tuple[str, str, str]:
-    """Split ``{animal}{date}_{epoch}_{brain_area}`` into load_data arguments.
-
-    Parameters
-    ----------
-    epoch_id : str
-        e.g. ``"chimi20200213_02_r1_HPC"``.
-
-    Returns
-    -------
-    nwb_file_name, epoch_name, brain_area : str
-        e.g. ``("chimi20200213_.nwb", "02_r1", "HPC")``.
-    """
-    parts = epoch_id.split("_")
-    nwb_file_name = f"{parts[0]}_.nwb"
-    epoch_name = f"{parts[1]}_{parts[2]}"
-    brain_area = parts[3]
-    return nwb_file_name, epoch_name, brain_area
-
-
 def load_detector(epoch_id: str, decode_dir: Path = PROCESSED_DATA_DIR) -> Any:
     """The decode's saved detector, its encoding environment marked fitted.
 

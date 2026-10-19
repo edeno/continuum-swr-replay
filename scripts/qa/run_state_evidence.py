@@ -151,7 +151,6 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: 
     load_detector,
     nearest_interior_bins,
     paired_bouts,
-    parse_epoch_identifier,
     per_tetrode_terms,
     regimes,
     saved_decode_masks,
@@ -168,7 +167,7 @@ from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_decode_files,
 )
 from continuum_swr_replay.data_loaders.utils import (  # noqa: E402
-    parse_nwb_filename,
+    parse_epoch_identifier,
 )
 from continuum_swr_replay.decoding_common import (  # noqa: E402
     hpc_artifact_intervals,
@@ -404,7 +403,12 @@ def load_marks_and_training_mask(epoch_id: str) -> dict:
     from continuum_swr_replay.data_loaders import load_data
     from continuum_swr_replay.types import SessionDataKeys as K
 
-    nwb_file_name, epoch_name, brain_area = parse_epoch_identifier(epoch_id)
+    key = parse_epoch_identifier(epoch_id)
+    nwb_file_name, epoch_name, brain_area = (
+        key.nwb_file_name,
+        key.epoch_name,
+        key.brain_area,
+    )
     data = load_data(
         nwb_file_name,
         epoch_name,
@@ -919,7 +923,7 @@ def label_set_table(
     s, e = windows.s.to_numpy(), windows.e.to_numpy()
     cumulative_speed = np.r_[0.0, np.cumsum(np.where(np.isfinite(speed), speed, 0.0))]
     table.insert(0, "epoch_id", epoch_id)
-    table.insert(1, "animal", parse_nwb_filename(f"{epoch_id.split('_')[0]}_.nwb")[0])
+    table.insert(1, "animal", parse_epoch_identifier(epoch_id).animal)
     for k, (column, value) in enumerate(label_set.columns.items()):
         table.insert(2 + k, column, value)
     table["start_time"] = time[s]

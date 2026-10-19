@@ -118,7 +118,7 @@ import os
 import sys
 import traceback
 from collections.abc import Callable, Iterable, Iterator
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from datetime import UTC, datetime
 from importlib.metadata import version
 from pathlib import Path
@@ -177,7 +177,11 @@ from continuum_swr_replay.analysis.hippocampus.swr_source import (
 from continuum_swr_replay.analysis.replay.fit_provenance import git_hash
 from continuum_swr_replay.data_loaders.epoch_register import epochs_to_run
 from continuum_swr_replay.data_loaders.spikes import filter_spike_times, get_hpc_marks
-from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
+from continuum_swr_replay.data_loaders.utils import (
+    EpochKey,
+    parse_epoch_identifier,
+    parse_nwb_filename,
+)
 from continuum_swr_replay.decoding_common import (
     provenance_record,
     raise_open_file_limit,
@@ -193,18 +197,6 @@ DESIGN_SPEC = "docs/design/replay_detection_comparison/02-memoryless-sequence.md
 NON_LOCAL_THRESHOLD_PERCENT = round(100 * DEFAULT_NON_LOCAL_THRESHOLD)
 """The ``data_over_time`` file is named for the decode's non-local threshold."""
 
-DEFAULT_SWR_DEFINITION = "Kay"
-"""A decode run with the default ripple detector adds no suffix to its identifier."""
-
-OTHER_RIPPLE_DETECTORS = ("Karlsson", "Yu")
-"""The ripple detectors whose name a decode would append; Kay's it does not.
-
-No decode carries ``_Yu`` yet; it is listed so the day one does, the runner
-reads it as a ripple detector and not as a name no decode writes."""
-
-DEFAULT_TRAINING_TYPE = "no_ripple"
-"""The training type a decode does not append to its identifier."""
-
 MARKS_RULE = (
     "load_data: get_hpc_marks (tetrode sort groups; coincident spikes counted) "
     "then filter_spike_times over the decode's time span"
@@ -213,72 +205,6 @@ MARKS_RULE = (
 
 MARKS_RULE_TAG = "loader"
 """:data:`MARKS_RULE`'s name in a marks cache file; another rule needs another tag."""
-
-
-@dataclass(frozen=True)
-class EpochKey:
-    """What an epoch identifier says about the decode it names."""
-
-    epoch_id: str
-    nwb_file_name: str
-    epoch_name: str
-    brain_area: str
-    swr_definition: str
-    contfrag: bool
-    non_stationary: bool
-    training_type: str
-
-    @property
-    def is_canonical(self) -> bool:
-        """The decode the comparison uses: Kay's SWRs, no_ripple, stationary."""
-        return (
-            not self.contfrag
-            and self.swr_definition == DEFAULT_SWR_DEFINITION
-            and not self.non_stationary
-            and self.training_type == DEFAULT_TRAINING_TYPE
-        )
-
-
-def parse_epoch_identifier(epoch_id: str) -> EpochKey:
-    """Split ``{animal}{date}_{epoch}_{brain_area}`` and any decode suffixes.
-
-    Suffixes come in the order ``run_decoding_bandit.py`` and
-    ``run_decoding_contfrag.py`` append them: ``_contfrag``, a ripple detector
-    other than Kay, ``_non_stationary``, and a training type other than
-    ``no_ripple``. Anything else is refused rather than read as, say, a
-    ripple detector called ``all``.
-    """
-    parts = epoch_id.split("_")
-    if len(parts) < 4 or not all(parts):
-        raise ValueError(
-            f"{epoch_id!r} is not {{animal}}{{date}}_{{epoch}}_{{brain_area}} with "
-            f"optional decode suffixes."
-        )
-    stem, number, replicate, brain_area, *rest = parts
-    contfrag = rest[:1] == ["contfrag"]
-    rest = rest[1:] if contfrag else rest
-    swr_definition = DEFAULT_SWR_DEFINITION
-    if rest and rest[0] in OTHER_RIPPLE_DETECTORS:
-        swr_definition, rest = rest[0], rest[1:]
-    non_stationary = rest[:2] == ["non", "stationary"]
-    rest = rest[2:] if non_stationary else rest
-    training_type = DEFAULT_TRAINING_TYPE
-    if rest[:1] == ["all"]:
-        training_type, rest = "all", rest[1:]
-    if rest:
-        raise ValueError(
-            f"{epoch_id!r} ends in {'_'.join(rest)!r}, which no decode appends."
-        )
-    return EpochKey(
-        epoch_id=epoch_id,
-        nwb_file_name=f"{stem}_.nwb",
-        epoch_name=f"{number}_{replicate}",
-        brain_area=brain_area,
-        swr_definition=swr_definition,
-        contfrag=contfrag,
-        non_stationary=non_stationary,
-        training_type=training_type,
-    )
 
 
 def input_paths(epoch_id: str, root: Path) -> dict[str, Path]:
@@ -382,8 +308,8 @@ def select_epochs(
     ----------
     epoch_ids : list of str
     date : int or None
-        Such as ``20200225``: the last 8 characters of the NWB file's stem, as
-        ``prepare_data.py`` reads them, so ``j1620210707`` is 20210707. None
+        Such as ``20200225``: the identifier's ``EpochKey.date``, the last 8
+        digits of the NWB file's stem, so ``j1620210707`` is 20210707. None
         keeps every date.
     epoch : str or None
         Such as ``02_r1``, the identifier's epoch name. None keeps every epoch.
@@ -399,8 +325,7 @@ def select_epochs(
     selected = []
     for epoch_id in epoch_ids:
         key = parse_epoch_identifier(epoch_id)
-        stem = key.nwb_file_name.removesuffix("_.nwb")
-        if (date is None or int(stem[-8:]) == date) and (
+        if (date is None or key.date == date) and (
             epoch is None or key.epoch_name == epoch
         ):
             selected.append(epoch_id)

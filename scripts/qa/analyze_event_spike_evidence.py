@@ -82,7 +82,6 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: 
     event_likelihood,
     load_encoding,
     nearest_interior_bins,
-    parse_epoch_identifier,
     subnormal_occupancy_bin_mask,
 )
 from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
@@ -92,6 +91,7 @@ from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_decode_files,
 )
+from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier  # noqa: E402
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
 
 # --- Parameters (provisional; see spec) ---------------------------------------
@@ -123,9 +123,9 @@ def animal_from_epoch_id(epoch_id: str) -> str:
     """``"chimi20200213_02_r1_HPC"`` -> ``"chimi"``, ``"j1620210709_..."`` -> ``"j16"``.
 
     The NWB stem ends in an 8-digit date, so the animal id is everything before
-    it (``j16`` keeps its digits), as in ``prepare_data``.
+    it (``j16`` keeps its digits), as :func:`parse_epoch_identifier` reads it.
     """
-    return epoch_id.split("_")[0][:-8]
+    return parse_epoch_identifier(epoch_id).animal
 
 
 def find_sessions(animal: str | None) -> list[str]:
@@ -254,11 +254,11 @@ def load_marks(epoch_id: str, cache_dir: Path) -> tuple[list, list]:
         return joblib.load(cache)
     from continuum_swr_replay.data_loaders import load_data
 
-    nwb, epoch_name, brain_area = parse_epoch_identifier(epoch_id)
-    data = load_data(nwb, epoch_name)
+    key = parse_epoch_identifier(epoch_id)
+    data = load_data(key.nwb_file_name, key.epoch_name)
     marks = (
-        data["spike_times"][brain_area],
-        data["spike_waveform_features"][brain_area],
+        data["spike_times"][key.brain_area],
+        data["spike_waveform_features"][key.brain_area],
     )
     joblib.dump(marks, cache)
     return marks

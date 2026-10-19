@@ -104,6 +104,7 @@ from continuum_swr_replay.data_loaders.lfp import get_ripple_band_inputs  # noqa
 from continuum_swr_replay.data_loaders.position import (  # noqa: E402
     get_epoch_position_info,
 )
+from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier  # noqa: E402
 from continuum_swr_replay.decoding_common import (  # noqa: E402
     filter_epoch_info,
     parse_run_id,
@@ -122,7 +123,6 @@ from scripts.decoding.run_memoryless_detection import (  # noqa: E402
     load_marks,
     marks_cache_path,
     marks_sha256,
-    parse_epoch_identifier,
 )
 from scripts.decoding.run_memoryless_detection import (  # noqa: E402
     OUTPUT_ROOT as MEMORYLESS_ROOT,

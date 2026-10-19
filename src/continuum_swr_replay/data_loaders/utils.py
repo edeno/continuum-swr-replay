@@ -18,6 +18,9 @@ get_labels
     Efficiently labels time points with event IDs using vectorized binary search.
 parse_nwb_filename
     Extracts animal name and date from NWB filenames.
+parse_epoch_identifier
+    Splits an epoch identifier ``{animal}{date}_{epoch}_{brain_area}`` and its
+    decode suffixes into an :class:`EpochKey`.
 
 Features
 --------
@@ -59,6 +62,7 @@ from __future__ import annotations
 
 import re
 import warnings
+from dataclasses import dataclass
 from functools import cache
 from typing import TYPE_CHECKING
 
@@ -137,6 +141,118 @@ def parse_nwb_filename(filename: str) -> tuple[str, int]:
     date = int(match.group(2))
 
     return animal, date
+
+
+DEFAULT_SWR_DEFINITION = "Kay"
+"""A decode run with the default ripple detector adds no suffix to its identifier."""
+
+OTHER_RIPPLE_DETECTORS = ("Karlsson", "Yu")
+"""The ripple detectors whose name a decode would append; Kay's it does not.
+
+No decode carries ``_Yu`` yet; it is listed so the day one does, the parser
+reads it as a ripple detector and not as a name no decode writes."""
+
+DEFAULT_TRAINING_TYPE = "no_ripple"
+"""The training type a decode does not append to its identifier."""
+
+
+@dataclass(frozen=True)
+class EpochKey:
+    """What an epoch identifier says about the decode it names."""
+
+    epoch_id: str
+    nwb_file_name: str
+    epoch_name: str
+    brain_area: str
+    swr_definition: str
+    contfrag: bool
+    non_stationary: bool
+    training_type: str
+
+    @property
+    def animal(self) -> str:
+        """The animal, as :func:`parse_nwb_filename` reads ``nwb_file_name``."""
+        return parse_nwb_filename(self.nwb_file_name)[0]
+
+    @property
+    def date(self) -> int:
+        """The recording date ``YYYYMMDD``, as :func:`parse_nwb_filename` reads it."""
+        return parse_nwb_filename(self.nwb_file_name)[1]
+
+    @property
+    def is_canonical(self) -> bool:
+        """The decode the comparison uses: Kay's SWRs, no_ripple, stationary."""
+        return (
+            not self.contfrag
+            and self.swr_definition == DEFAULT_SWR_DEFINITION
+            and not self.non_stationary
+            and self.training_type == DEFAULT_TRAINING_TYPE
+        )
+
+
+def parse_epoch_identifier(epoch_id: str) -> EpochKey:
+    """Split ``{animal}{date}_{epoch}_{brain_area}`` and any decode suffixes.
+
+    Suffixes come in the order ``run_decoding_bandit.py`` and
+    ``run_decoding_contfrag.py`` append them: ``_contfrag``, a ripple detector
+    other than Kay, ``_non_stationary``, and a training type other than
+    ``no_ripple``. Anything else is refused rather than read as, say, a
+    ripple detector called ``all``.
+
+    Parameters
+    ----------
+    epoch_id : str
+        Such as ``"j1620210707_02_r1_HPC"`` or ``"chimi20200212_02_r1_mPFC_contfrag"``.
+
+    Returns
+    -------
+    EpochKey
+        ``animal`` and ``date`` are read from the NWB stem only when asked for,
+        so a stem :func:`parse_nwb_filename` refuses is refused there.
+
+    Raises
+    ------
+    ValueError
+        If `epoch_id` has fewer than four ``_``-separated parts, an empty one,
+        or a suffix no decode appends.
+
+    Examples
+    --------
+    >>> key = parse_epoch_identifier("j1620210707_02_r1_HPC_contfrag")
+    >>> key.animal, key.date, key.epoch_name, key.brain_area, key.contfrag
+    ('j16', 20210707, '02_r1', 'HPC', True)
+    """
+    parts = epoch_id.split("_")
+    if len(parts) < 4 or not all(parts):
+        raise ValueError(
+            f"{epoch_id!r} is not {{animal}}{{date}}_{{epoch}}_{{brain_area}} with "
+            f"optional decode suffixes."
+        )
+    stem, number, replicate, brain_area, *rest = parts
+    contfrag = rest[:1] == ["contfrag"]
+    rest = rest[1:] if contfrag else rest
+    swr_definition = DEFAULT_SWR_DEFINITION
+    if rest and rest[0] in OTHER_RIPPLE_DETECTORS:
+        swr_definition, rest = rest[0], rest[1:]
+    non_stationary = rest[:2] == ["non", "stationary"]
+    rest = rest[2:] if non_stationary else rest
+    training_type = DEFAULT_TRAINING_TYPE
+    if rest[:1] == ["all"]:
+        training_type, rest = "all", rest[1:]
+    if rest:
+        raise ValueError(
+            f"{epoch_id!r} ends in {'_'.join(rest)!r}, which no decode appends."
+        )
+    return EpochKey(
+        epoch_id=epoch_id,
+        nwb_file_name=f"{stem}_.nwb",
+        epoch_name=f"{number}_{replicate}",
+        brain_area=brain_area,
+        swr_definition=swr_definition,
+        contfrag=contfrag,
+        non_stationary=non_stationary,
+        training_type=training_type,
+    )
 
 
 def session_restriction() -> list[dict[str, str]]:

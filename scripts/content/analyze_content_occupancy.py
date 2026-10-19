@@ -70,6 +70,7 @@ from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_decode_files,
 )
+from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier  # noqa: E402
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
 from continuum_swr_replay.table_io import read_table, table_exists  # noqa: E402
 
@@ -91,23 +92,22 @@ DEFAULT_OUTPUT_DIR = _REPO_ROOT / "paper" / "figures" / "content_occupancy"
 GROUPS = ("nonSWR", "SWR")
 GROUP_COLORS = {"nonSWR": "#0072B2", "SWR": "#009E73"}
 QUADRANTS = ("remote_well", "own_well", "remote_path", "near_off")
-QUADRANT_LABELS = ("remote\nreward well", "own well\n(near animal)", "remote\npath", "near,\noff-well")
+QUADRANT_LABELS = (
+    "remote\nreward well",
+    "own well\n(near animal)",
+    "remote\npath",
+    "near,\noff-well",
+)
 
 
 # --- Session helpers ----------------------------------------------------------
-def parse_epoch_identifier(epoch_id: str) -> tuple[str, str, str]:
-    """Split ``{animal}{date}_{epoch}_{brain_area}`` into (nwb, epoch, area)."""
-    parts = epoch_id.split("_")
-    return f"{parts[0]}_.nwb", f"{parts[1]}_{parts[2]}", parts[3]
-
-
 def animal_from_epoch_id(epoch_id: str) -> str:
     """``"chimi20200213_02_r1_HPC"`` -> ``"chimi"``, ``"j1620210709_..."`` -> ``"j16"``.
 
     The NWB stem ends in an 8-digit date, so the animal id is everything before
-    it (``j16`` keeps its digits), as in ``prepare_data``.
+    it (``j16`` keeps its digits), as :func:`parse_epoch_identifier` reads it.
     """
-    return epoch_id.split("_")[0][:-8]
+    return parse_epoch_identifier(epoch_id).animal
 
 
 def find_sessions(animal: str | None) -> list[str]:
@@ -144,7 +144,9 @@ def _well_positions(dot: pd.DataFrame) -> list[float]:
     return wells
 
 
-def session_content_distances(epoch_id: str) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+def session_content_distances(
+    epoch_id: str,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
     """Track distances for non-local event timebins in one session.
 
     Returns ``(d_animal, d_well, is_swr)`` over non-local immobile timebins, where
@@ -173,7 +175,9 @@ def session_content_distances(epoch_id: str) -> tuple[np.ndarray, np.ndarray, np
         return None
 
     # Per-interior-bin track distance to the nearest reward well.
-    dist_matrix = np.asarray(env.get_distances_to_interior_bins(pos[:, None]))  # (n_int, n_int)
+    dist_matrix = np.asarray(
+        env.get_distances_to_interior_bins(pos[:, None])
+    )  # (n_int, n_int)
     well_bins = [int(np.argmin(np.abs(pos - wl))) for wl in well_lin]
     nearest_well_dist = dist_matrix[:, well_bins].min(1)  # (n_interior,)
 
@@ -181,16 +185,16 @@ def session_content_distances(epoch_id: str) -> tuple[np.ndarray, np.ndarray, np
     # Assign every bin of a Non-Local event to one group using the canonical
     # strict event-level overlap rule. A raw per-bin SWR mask would split a
     # partially overlapping event between both groups.
-    is_swr = event_strict_overlap_mask(
-        dot, "non_local_event", "SWR_event"
-    ).to_numpy()
+    is_swr = event_strict_overlap_mask(dot, "non_local_event", "SWR_event").to_numpy()
     map_estimate = dot["map_estimate"].to_numpy()
     d_animal = np.abs(dot["ahead_behind_distance"].to_numpy())
     content_bin = np.argmin(np.abs(pos[None, :] - map_estimate[:, None]), axis=1)
     d_well = nearest_well_dist[content_bin]
 
     # Guard against non-finite d_well (e.g. Inf from a disconnected graph component).
-    valid = event & np.isfinite(map_estimate) & np.isfinite(d_animal) & np.isfinite(d_well)
+    valid = (
+        event & np.isfinite(map_estimate) & np.isfinite(d_animal) & np.isfinite(d_well)
+    )
     return d_animal[valid], d_well[valid], is_swr[valid]
 
 
@@ -233,7 +237,9 @@ def arm_occupancy(animal: str | None = None) -> pd.DataFrame | None:
 
 
 # --- Analysis -----------------------------------------------------------------
-def analyze(sessions: list[str]) -> tuple[pd.DataFrame, dict[str, np.ndarray], dict[str, np.ndarray]]:
+def analyze(
+    sessions: list[str],
+) -> tuple[pd.DataFrame, dict[str, np.ndarray], dict[str, np.ndarray]]:
     """Process sessions; return per-session quadrant rows + accumulated 2D and 1D histograms."""
     hist2d = {k: np.zeros((len(XE) - 1, len(YE) - 1)) for k in GROUPS}
     dwell_hist = {k: np.zeros(len(DWE) - 1) for k in GROUPS}
@@ -261,11 +267,18 @@ def analyze(sessions: list[str]) -> tuple[pd.DataFrame, dict[str, np.ndarray], d
                 continue
             hist2d[group] += np.histogram2d(da, dw, bins=[XE, YE])[0]
             dwell_hist[group] += np.histogram(dw, bins=DWE)[0]
-            row = {"epoch_id": epoch_id, "animal": animal_from_epoch_id(epoch_id), "group": group, "n": len(da)}
+            row = {
+                "epoch_id": epoch_id,
+                "animal": animal_from_epoch_id(epoch_id),
+                "group": group,
+                "n": len(da),
+            }
             row.update(quadrant_fractions(da, dw))
             rows.append(row)
     if n_dropped:
-        print(f"  dropped {n_dropped} session(s): <{MIN_WELLS} reward wells localizable")
+        print(
+            f"  dropped {n_dropped} session(s): <{MIN_WELLS} reward wells localizable"
+        )
     return pd.DataFrame(rows), hist2d, dwell_hist
 
 
@@ -276,7 +289,9 @@ def _wavg(g: pd.DataFrame, col: str) -> float:
 
 
 # --- Figures ------------------------------------------------------------------
-def render(metrics: pd.DataFrame, hist2d: dict, dwell_hist: dict, output_dir: Path) -> None:
+def render(
+    metrics: pd.DataFrame, hist2d: dict, dwell_hist: dict, output_dir: Path
+) -> None:
     """Quadrant bar, 2D animal-vs-well, distance-to-well, and arm occupancy."""
     import matplotlib
 
@@ -291,15 +306,29 @@ def render(metrics: pd.DataFrame, hist2d: dict, dwell_hist: dict, output_dir: Pa
     width = 0.38
     for i, group in enumerate(GROUPS):
         g = metrics[metrics.group == group]
-        ax.bar(x + (i - 0.5) * width, [_wavg(g, q) for q in QUADRANTS], width, label=group, color=GROUP_COLORS[group])
+        ax.bar(
+            x + (i - 0.5) * width,
+            [_wavg(g, q) for q in QUADRANTS],
+            width,
+            label=group,
+            color=GROUP_COLORS[group],
+        )
     for j, q in enumerate(QUADRANTS):  # per-animal non-SWR dots
-        pa = metrics[metrics.group == "nonSWR"].groupby("animal").apply(lambda gg, q=q: _wavg(gg, q))
-        ax.scatter([x[j] - 0.5 * width] * len(pa), pa.to_numpy(), color="k", s=14, zorder=3)
+        pa = (
+            metrics[metrics.group == "nonSWR"]
+            .groupby("animal")
+            .apply(lambda gg, q=q: _wavg(gg, q))
+        )
+        ax.scatter(
+            [x[j] - 0.5 * width] * len(pa), pa.to_numpy(), color="k", s=14, zorder=3
+        )
     ax.set_xticks(x)
     ax.set_xticklabels(QUADRANT_LABELS)
     ax.set_ylabel("fraction of content mass")
     ax.legend()
-    ax.set_title(f"Content quadrants — track distance (far>{FAR_CM:.0f} cm, at-well<{AT_WELL_CM:.0f} cm)")
+    ax.set_title(
+        f"Content quadrants — track distance (far>{FAR_CM:.0f} cm, at-well<{AT_WELL_CM:.0f} cm)"
+    )
     fig.tight_layout()
     fig.savefig(output_dir / "content_quadrants.png", dpi=140)
     plt.close(fig)
@@ -313,7 +342,9 @@ def render(metrics: pd.DataFrame, hist2d: dict, dwell_hist: dict, output_dir: Pa
         ax.set_xlabel("content → animal (cm)")
         ax.set_title(f"{group} content")
     axs[0].set_ylabel("content → nearest reward well (cm)")
-    fig.suptitle("Non-local content: distance from animal vs to reward well (track distance, log counts)")
+    fig.suptitle(
+        "Non-local content: distance from animal vs to reward well (track distance, log counts)"
+    )
     fig.tight_layout(rect=[0, 0, 1, 0.95])
     fig.savefig(output_dir / "content_animal_vs_well.png", dpi=140)
     plt.close(fig)
@@ -323,7 +354,9 @@ def render(metrics: pd.DataFrame, hist2d: dict, dwell_hist: dict, output_dir: Pa
     centers = (DWE[:-1] + DWE[1:]) / 2
     for group in GROUPS:
         h = dwell_hist[group]
-        ax.plot(centers, h / h.sum(), "-o", ms=3, color=GROUP_COLORS[group], label=group)
+        ax.plot(
+            centers, h / h.sum(), "-o", ms=3, color=GROUP_COLORS[group], label=group
+        )
     ax.axvline(AT_WELL_CM, color="r", ls="--", lw=1)
     ax.set_xlabel("track distance to nearest reward well (cm)")
     ax.set_ylabel("density")
@@ -339,7 +372,13 @@ def render(metrics: pd.DataFrame, hist2d: dict, dwell_hist: dict, output_dir: Pa
         fig, ax = plt.subplots(figsize=(8, 4.5))
         arms = np.arange(9)
         for i, group in enumerate(GROUPS):
-            ax.bar(arms + (i - 0.5) * width, occ[group].reindex(range(9)).fillna(0), width, label=group, color=GROUP_COLORS[group])
+            ax.bar(
+                arms + (i - 0.5) * width,
+                occ[group].reindex(range(9)).fillna(0),
+                width,
+                label=group,
+                color=GROUP_COLORS[group],
+            )
         for xx in range(N_LEAF_ARMS):
             ax.axvspan(xx - 0.5, xx + 0.5, color="gold", alpha=0.05)
         ax.set_xticks(arms)
@@ -356,7 +395,9 @@ def render(metrics: pd.DataFrame, hist2d: dict, dwell_hist: dict, output_dir: Pa
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     g = parser.add_mutually_exclusive_group(required=True)
-    g.add_argument("--epoch-identifier", help="single session, e.g. chimi20200213_02_r1_HPC")
+    g.add_argument(
+        "--epoch-identifier", help="single session, e.g. chimi20200213_02_r1_HPC"
+    )
     g.add_argument("--animal", help="all HPC sessions for this animal")
     g.add_argument("--all", action="store_true", help="every HPC session")
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
@@ -376,19 +417,30 @@ def main() -> None:
         return
     args.output_dir.mkdir(parents=True, exist_ok=True)
     metrics.to_csv(args.output_dir / "content_occupancy_per_session.csv", index=False)
-    np.savez(args.output_dir / "content_occupancy_2dhist.npz", xe=XE, ye=YE,
-             nonSWR=hist2d["nonSWR"], SWR=hist2d["SWR"],
-             dwe=DWE, dwell_nonSWR=dwell_hist["nonSWR"], dwell_SWR=dwell_hist["SWR"])
+    np.savez(
+        args.output_dir / "content_occupancy_2dhist.npz",
+        xe=XE,
+        ye=YE,
+        nonSWR=hist2d["nonSWR"],
+        SWR=hist2d["SWR"],
+        dwe=DWE,
+        dwell_nonSWR=dwell_hist["nonSWR"],
+        dwell_SWR=dwell_hist["SWR"],
+    )
     render(metrics, hist2d, dwell_hist, args.output_dir)
 
-    print(f"\nWrote per-session metrics ({len(metrics)} rows) + 2D histogram + figures to {args.output_dir}")
+    print(
+        f"\nWrote per-session metrics ({len(metrics)} rows) + 2D histogram + figures to {args.output_dir}"
+    )
     print("\nQuadrant fractions (n-weighted):")
     for group in GROUPS:
         g = metrics[metrics.group == group]
         print(f"  {group}: " + ", ".join(f"{q}={_wavg(g, q):.2f}" for q in QUADRANTS))
     print("\nPer-animal non-SWR (within-animal):")
-    pa = metrics[metrics.group == "nonSWR"].groupby("animal").apply(
-        lambda gg: pd.Series({q: _wavg(gg, q) for q in QUADRANTS})
+    pa = (
+        metrics[metrics.group == "nonSWR"]
+        .groupby("animal")
+        .apply(lambda gg: pd.Series({q: _wavg(gg, q) for q in QUADRANTS}))
     )
     print(pa.round(2).to_string())
 

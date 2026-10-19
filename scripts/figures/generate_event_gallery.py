@@ -110,6 +110,7 @@ from continuum_swr_replay.analysis.replay.posterior_io import (
 from continuum_swr_replay.analysis.replay.tables_arm_patch import build_event_arm_table
 from continuum_swr_replay.analysis.replay.tables_event import build_event_table
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
+from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier
 from continuum_swr_replay.parameters import COLORS, PROCESSED_DATA_DIR
 from continuum_swr_replay.visualization.plots import (
     _track_edge_colors,
@@ -156,11 +157,13 @@ def epoch_id_from_pkl(pkl_path: Path) -> str:
 
 
 def parse_epoch_id(epoch_id: str) -> tuple[str, str]:
-    """``chimi20200213_02_r1`` -> (``chimi20200213_.nwb``, ``02_r1``)."""
-    tokens = epoch_id.split("_")
-    epoch_name = "_".join(tokens[-2:])
-    nwb_stem = "_".join(tokens[:-2])
-    return f"{nwb_stem}_.nwb", epoch_name
+    """``chimi20200213_02_r1`` -> (``chimi20200213_.nwb``, ``02_r1``).
+
+    The gallery's ids are its ``*_HPC_80_data_over_time.pkl`` stems less the
+    ``_HPC``, which is put back to read them as epoch identifiers.
+    """
+    key = parse_epoch_identifier(f"{epoch_id}_HPC")
+    return key.nwb_file_name, key.epoch_name
 
 
 def list_epoch_pkls(data_dir: Path) -> list[Path]:

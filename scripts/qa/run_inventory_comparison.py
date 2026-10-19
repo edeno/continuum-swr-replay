@@ -173,6 +173,7 @@ from continuum_swr_replay.analysis.inventory_comparison.swr_matrix import (  # n
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_epoch_ids,
 )
+from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier  # noqa: E402
 from continuum_swr_replay.decoding_common import (  # noqa: E402
     parse_run_id,
     provenance_record,
@@ -769,8 +770,8 @@ def run_settings(carey_run_id: str, memoryless_run_id: str) -> dict:
 
 def _epoch_parts(identifier: str) -> tuple[str, int, str]:
     """``(animal, date, epoch)`` of ``{animal}{date}_{epoch}_HPC``."""
-    stem, rest = identifier.split("_", 1)
-    return stem[:-8], int(stem[-8:]), rest.removesuffix("_HPC")
+    key = parse_epoch_identifier(identifier)
+    return key.animal, key.date, key.epoch_name
 
 
 def select_epochs(args: argparse.Namespace) -> list[str]:

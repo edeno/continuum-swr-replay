@@ -6,7 +6,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.data_loaders.utils import get_labels, parse_nwb_filename
+from continuum_swr_replay.data_loaders.utils import (
+    DEFAULT_SWR_DEFINITION,
+    get_labels,
+    parse_epoch_identifier,
+    parse_nwb_filename,
+)
 
 
 class TestGetLabels:
@@ -34,10 +39,12 @@ class TestGetLabels:
         time = pd.Index(np.linspace(0, 20, 201))
 
         # Three events
-        events = pd.DataFrame({
-            "start_time": [2.0, 8.0, 15.0],
-            "end_time": [4.0, 10.0, 17.0],
-        })
+        events = pd.DataFrame(
+            {
+                "start_time": [2.0, 8.0, 15.0],
+                "end_time": [4.0, 10.0, 17.0],
+            }
+        )
 
         result = get_labels(events, time)
 
@@ -81,10 +88,12 @@ class TestGetLabels:
         time = pd.Index(np.linspace(0, 50, 501))
 
         # Create 5 events
-        events = pd.DataFrame({
-            "start_time": [1.0, 11.0, 21.0, 31.0, 41.0],
-            "end_time": [3.0, 13.0, 23.0, 33.0, 43.0],
-        })
+        events = pd.DataFrame(
+            {
+                "start_time": [1.0, 11.0, 21.0, 31.0, 41.0],
+                "end_time": [3.0, 13.0, 23.0, 33.0, 43.0],
+            }
+        )
 
         result = get_labels(events, time)
 
@@ -111,10 +120,12 @@ class TestGetLabels:
         time = pd.Index(np.arange(0, 10, 0.001))  # 1ms resolution
 
         # Very short events (10ms each)
-        events = pd.DataFrame({
-            "start_time": [1.0, 5.0],
-            "end_time": [1.01, 5.01],
-        })
+        events = pd.DataFrame(
+            {
+                "start_time": [1.0, 5.0],
+                "end_time": [1.01, 5.01],
+            }
+        )
 
         result = get_labels(events, time)
 
@@ -131,10 +142,12 @@ class TestGetLabels:
         time = pd.Index(np.linspace(0, 10, 101))
 
         # Adjacent events
-        events = pd.DataFrame({
-            "start_time": [2.0, 5.0],
-            "end_time": [5.0, 8.0],
-        })
+        events = pd.DataFrame(
+            {
+                "start_time": [2.0, 5.0],
+                "end_time": [5.0, 8.0],
+            }
+        )
 
         result = get_labels(events, time)
 
@@ -174,15 +187,110 @@ class TestParseNwbFilename:
     @pytest.mark.parametrize(
         "bad_filename",
         [
-            "chimi20200212.nwb",   # missing underscore
+            "chimi20200212.nwb",  # missing underscore
             "chimi20200212_.txt",  # wrong extension
-            "chimi2020021_.nwb",   # date with < 8 digits
-            "20200212_.nwb",       # no animal name
+            "chimi2020021_.nwb",  # date with < 8 digits
+            "20200212_.nwb",  # no animal name
         ],
     )
     def test_invalid_format_raises(self, bad_filename):
         with pytest.raises(ValueError, match="Invalid NWB filename format"):
             parse_nwb_filename(bad_filename)
+
+
+class TestParseEpochIdentifier:
+    """The one parser of epoch identifiers and their decode suffixes."""
+
+    def test_the_canonical_decode_carries_kay_swrs(self):
+        key = parse_epoch_identifier("chimi20200212_02_r1_HPC")
+
+        assert key.nwb_file_name == "chimi20200212_.nwb"
+        assert key.epoch_name == "02_r1"
+        assert key.brain_area == "HPC"
+        assert key.swr_definition == DEFAULT_SWR_DEFINITION == "Kay"
+        assert key.is_canonical
+
+    @pytest.mark.parametrize(
+        ("suffix", "expected"),
+        [
+            ("_Karlsson", {"swr_definition": "Karlsson"}),
+            ("_all", {"training_type": "all"}),
+            ("_non_stationary", {"non_stationary": True}),
+            ("_contfrag", {"contfrag": True}),
+            (
+                "_contfrag_Karlsson_non_stationary_all",
+                {
+                    "contfrag": True,
+                    "swr_definition": "Karlsson",
+                    "non_stationary": True,
+                    "training_type": "all",
+                },
+            ),
+        ],
+    )
+    def test_each_decode_suffix_is_read_in_the_order_it_is_appended(
+        self, suffix, expected
+    ):
+        """As run_decoding_bandit.py and run_decoding_contfrag.py append them."""
+        key = parse_epoch_identifier("chimi20200212_02_r1_HPC" + suffix)
+
+        assert {name: getattr(key, name) for name in expected} == expected
+        assert key.brain_area == "HPC"
+        assert not key.is_canonical
+
+    @pytest.mark.parametrize(
+        "bad",
+        [
+            "chimi20200212_02",
+            "a__c_d",
+            "chimi20200212_02_r1_HPC_Kay",
+            "x_02_r1_HPC_all_Karlsson",
+        ],
+    )
+    def test_a_name_no_decode_writes_is_refused(self, bad):
+        """Including suffixes out of order, and an explicit Kay, which no
+        decode appends."""
+        with pytest.raises(ValueError):
+            parse_epoch_identifier(bad)
+
+    @pytest.mark.parametrize(
+        ("epoch_id", "animal", "date", "epoch_name", "brain_area"),
+        [
+            ("chimi20200212_02_r1_HPC", "chimi", 20200212, "02_r1", "HPC"),
+            ("j1620210707_04_r2_HPC", "j16", 20210707, "04_r2", "HPC"),
+            ("peanut20201125_10_r5_HPC", "peanut", 20201125, "10_r5", "HPC"),
+            ("senor20201031_06_r3_HPC", "senor", 20201031, "06_r3", "HPC"),
+            ("wilbur20210329_02_r1_HPC", "wilbur", 20210329, "02_r1", "HPC"),
+            ("j1620210706_02_r1_mPFC", "j16", 20210706, "02_r1", "mPFC"),
+            ("chimi20200223_08_r4_OFC", "chimi", 20200223, "08_r4", "OFC"),
+            ("j1620210710_14_r7_HPC_contfrag", "j16", 20210710, "14_r7", "HPC"),
+            ("j1620210710_14_r7_mPFC_contfrag", "j16", 20210710, "14_r7", "mPFC"),
+            ("j1620210707_02_r1_HPC_non_stationary", "j16", 20210707, "02_r1", "HPC"),
+        ],
+    )
+    def test_every_animal_keeps_its_id_and_date(
+        self, epoch_id, animal, date, epoch_name, brain_area
+    ):
+        """``j16`` keeps its digits; the date is the stem's last 8, an int."""
+        key = parse_epoch_identifier(epoch_id)
+
+        assert (key.animal, key.date, key.epoch_name, key.brain_area) == (
+            animal,
+            date,
+            epoch_name,
+            brain_area,
+        )
+        assert type(key.date) is int
+        assert key.nwb_file_name == f"{epoch_id.split('_')[0]}_.nwb"
+        assert parse_nwb_filename(key.nwb_file_name) == (key.animal, key.date)
+
+    def test_a_stem_without_a_date_is_refused_when_its_animal_is_read(self):
+        """The suffixes parse; the stem is read only for ``animal``/``date``."""
+        key = parse_epoch_identifier("x_02_r1_HPC")
+
+        assert key.epoch_name == "02_r1"
+        with pytest.raises(ValueError, match="Invalid NWB filename format"):
+            _ = key.animal
 
 
 # Note: get_epoch_info() caching is validated through integration tests.

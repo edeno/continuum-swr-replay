@@ -80,6 +80,7 @@ from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
 from continuum_swr_replay.data_loaders.trials import (
     validate_port_experience_pump_audit,
 )
+from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
 from continuum_swr_replay.table_io import (
@@ -144,10 +145,7 @@ def find_sessions(max_per_animal: int | None = None) -> list[dict]:
     """
     by_animal: dict[str, list] = {}
     for nwb_file_name, epoch in analysed_epochs().index:
-        animal_date = nwb_file_name.removesuffix("_.nwb")
-        # The NWB stem ends in an 8-digit date, so the animal id is everything
-        # before it (``j16`` keeps its digits).
-        animal = animal_date[:-8]
+        animal = parse_nwb_filename(nwb_file_name)[0]
         session_id = swr_epoch_id(nwb_file_name, epoch)
         results_path = PROCESSED_DATA_DIR / f"{session_id}_results.nc"
         by_animal.setdefault(animal, []).append(

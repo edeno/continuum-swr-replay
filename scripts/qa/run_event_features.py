@@ -167,6 +167,7 @@ from continuum_swr_replay.analysis.inventory_comparison.selection import (  # no
     REJECTION_DTYPES,
     rejection_stages,
 )
+from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier  # noqa: E402
 from continuum_swr_replay.decoding_common import (  # noqa: E402
     parse_run_id,
     provenance_record,
@@ -186,7 +187,6 @@ from scripts.decoding import run_carey_detection as carey  # noqa: E402
 from scripts.decoding.run_memoryless_detection import (  # noqa: E402
     MARKS_RULE,
     marks_sha256,
-    parse_epoch_identifier,
 )
 from scripts.decoding.run_memoryless_detection import (  # noqa: E402
     output_paths as memoryless_outputs,

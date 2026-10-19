@@ -414,7 +414,7 @@ Stage 6: replay content × reward outcome → behavioral change.
 
 Content occupancy of non-local events — where the decoded activity represents.
 
-`parse_epoch_identifier`, `animal_from_epoch_id`, `find_sessions`, `session_content_distances`, `quadrant_fractions`, `arm_occupancy`, `analyze`, `render`, `main`
+`animal_from_epoch_id`, `find_sessions`, `session_content_distances`, `quadrant_fractions`, `arm_occupancy`, `analyze`, `render`, `main`
 
 ### `scripts/content/analyze_uncertainty_content.py`
 
@@ -884,7 +884,7 @@ Summary statistics of the per-window table, over epochs nested in animals.
 
 Per-tetrode likelihood terms, and the encodings and decode files they come from.
 
-`parse_epoch_identifier`, `load_detector`, `encoding_inputs`, `load_encoding`, `encoding_comparison`, `event_likelihood`, `nearest_interior_bins`, `interior_bin_mask`, `subnormal_occupancy_bin_mask`, `TetrodeTerms`, `per_tetrode_terms`, `time_folds`, `training_spike_bins`
+`load_detector`, `encoding_inputs`, `load_encoding`, `encoding_comparison`, `event_likelihood`, `nearest_interior_bins`, `interior_bin_mask`, `subnormal_occupancy_bin_mask`, `TetrodeTerms`, `per_tetrode_terms`, `time_folds`, `training_spike_bins`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/state_evidence/windows.py`
 

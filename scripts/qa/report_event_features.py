@@ -82,6 +82,7 @@ from continuum_swr_replay.analysis.inventory_comparison.selection import (  # no
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_epoch_ids,
 )
+from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier  # noqa: E402
 from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
 from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
 from continuum_swr_replay.table_io import read_table  # noqa: E402
@@ -549,8 +550,8 @@ def _ok(manifest: Mapping) -> list[str]:
 
 def _session_of(identifier: str) -> tuple[str, int, str]:
     """``(animal, day, epoch)`` of ``{animal}{day}_{epoch}_HPC``."""
-    stem, number, replicate = identifier.split("_")[:3]
-    return stem[:-8], int(stem[-8:]), f"{number}_{replicate}"
+    key = parse_epoch_identifier(identifier)
+    return key.animal, key.date, key.epoch_name
 
 
 def read_inputs(

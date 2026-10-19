@@ -64,6 +64,7 @@ from continuum_swr_replay.analysis.replay.covariate_registry import (
 )
 from continuum_swr_replay.analysis.replay.covariates import load_contingency
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
+from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.table_io import publish_canonical
 from continuum_swr_replay.table_parity import BASENAME_TO_TABLE
@@ -176,9 +177,7 @@ def find_sessions(
     by_animal: dict[str, list] = {}
     for nwb_file_name, epoch in analysed_epochs().index:
         animal_date = nwb_file_name.removesuffix("_.nwb")
-        # The NWB stem ends in an 8-digit date, so the animal id is everything
-        # before it (``j16`` keeps its digits).
-        animal = animal_date[:-8]
+        animal = parse_nwb_filename(nwb_file_name)[0]
         session_id = f"{animal_date}_{epoch}_{brain_area}_contfrag"
         dot_file = PROCESSED_DATA_DIR / f"{session_id}_data_over_time.pkl"
         env_file = PROCESSED_DATA_DIR / f"{session_id}_environment.pkl"

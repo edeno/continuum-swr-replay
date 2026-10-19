@@ -40,16 +40,15 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
     ENCODING_KEY,
 )
 from continuum_swr_replay.data_loaders import spikes
+from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier
 from continuum_swr_replay.decoding_common import provenance_record
 from continuum_swr_replay.parameters import ROOT_DIR
 from continuum_swr_replay.table_io import read_table
 from scripts.decoding.run_memoryless_detection import (
-    DEFAULT_SWR_DEFINITION,
     find_epochs,
     input_paths,
     main,
     marks_cache_path,
-    parse_epoch_identifier,
     run_one,
 )
 from tests.unit._memoryless_clusterless_epoch import (
@@ -141,60 +140,6 @@ def set_xla_flags(monkeypatch, value: str | None) -> None:
         monkeypatch.delenv("XLA_FLAGS", raising=False)
     else:
         monkeypatch.setenv("XLA_FLAGS", value)
-
-
-class TestParseEpochIdentifier:
-    def test_the_canonical_decode_carries_kay_swrs(self):
-        key = parse_epoch_identifier("chimi20200212_02_r1_HPC")
-
-        assert key.nwb_file_name == "chimi20200212_.nwb"
-        assert key.epoch_name == "02_r1"
-        assert key.brain_area == "HPC"
-        assert key.swr_definition == DEFAULT_SWR_DEFINITION == "Kay"
-        assert key.is_canonical
-
-    @pytest.mark.parametrize(
-        ("suffix", "expected"),
-        [
-            ("_Karlsson", {"swr_definition": "Karlsson"}),
-            ("_all", {"training_type": "all"}),
-            ("_non_stationary", {"non_stationary": True}),
-            ("_contfrag", {"contfrag": True}),
-            (
-                "_contfrag_Karlsson_non_stationary_all",
-                {
-                    "contfrag": True,
-                    "swr_definition": "Karlsson",
-                    "non_stationary": True,
-                    "training_type": "all",
-                },
-            ),
-        ],
-    )
-    def test_each_decode_suffix_is_read_in_the_order_it_is_appended(
-        self, suffix, expected
-    ):
-        """As run_decoding_bandit.py and run_decoding_contfrag.py append them."""
-        key = parse_epoch_identifier("chimi20200212_02_r1_HPC" + suffix)
-
-        assert {name: getattr(key, name) for name in expected} == expected
-        assert key.brain_area == "HPC"
-        assert not key.is_canonical
-
-    @pytest.mark.parametrize(
-        "bad",
-        [
-            "chimi20200212_02",
-            "a__c_d",
-            "chimi20200212_02_r1_HPC_Kay",
-            "x_02_r1_HPC_all_Karlsson",
-        ],
-    )
-    def test_a_name_no_decode_writes_is_refused(self, bad):
-        """Including suffixes out of order, and an explicit Kay, which no
-        decode appends."""
-        with pytest.raises(ValueError):
-            parse_epoch_identifier(bad)
 
 
 class TestSelectEpochs:

@@ -47,6 +47,7 @@ from continuum_swr_replay.analysis.replay.table_contracts import (
     validate_event_patch_table,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
+from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
 from continuum_swr_replay.table_io import read_table
 
@@ -227,10 +228,8 @@ def refresh_contfrag_behavioral_covariates(
         )
     descriptors = []
     for descriptor in find_sessions(brain_area=brain_area):
-        animal_date = descriptor["nwb_file_name"].replace("_.nwb", "")
         session = (
-            animal_date[:-8],
-            int(animal_date[-8:]),
+            *parse_nwb_filename(descriptor["nwb_file_name"]),
             descriptor["epoch_name"],
         )
         if session in source_sessions:
@@ -245,9 +244,10 @@ def refresh_contfrag_behavioral_covariates(
     arms: list[pd.DataFrame] = []
     stops: list[pd.DataFrame] = []
     for index, descriptor in enumerate(descriptors, start=1):
-        animal_date = descriptor["nwb_file_name"].replace("_.nwb", "")
-        animal = animal_date[:-8]
-        session = (animal, int(animal_date[-8:]), descriptor["epoch_name"])
+        session = (
+            *parse_nwb_filename(descriptor["nwb_file_name"]),
+            descriptor["epoch_name"],
+        )
         if session not in source_sessions:
             raise ValueError(f"posterior source is missing session {session}")
         old_event = _source_session(old_event_all, session)
