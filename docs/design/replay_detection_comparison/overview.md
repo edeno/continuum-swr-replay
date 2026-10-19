@@ -195,7 +195,12 @@ cell. Four adaptations are recorded:
    than sorted cells.
 2. The Hilbert configuration is used, not the published spectral one. The paper's
    published candidates used a spectral ripple score built from hand-picked ripples, which
-   this dataset does not have.
+   this dataset does not have. The threshold changes with it. The published candidates
+   (`precand.m:19-24`) keep the joint score, rescaled to a mean of 0.5, above 4 (eight
+   times its mean), with event bounds at that same level. We use the Hilbert wrapper's
+   rule (`GenCandidateEvents.m:58-59, 164-168`): the joint score is z-scored, events are
+   bounded where it exceeds 1 and kept if it peaks above 3. Its effect against the
+   published rule is not measured (SWR detector audit, 2026-10-19).
 3. The ripple signal is the stored 150–250 Hz band averaged over the tetrodes rule R-T
    kept, as the package averages channels for Kay, Karlsson and Yu. The original reads one
    channel in 140–250 Hz.
