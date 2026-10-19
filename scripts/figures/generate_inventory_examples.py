@@ -163,12 +163,14 @@ def use_memoryless_device() -> None:
     """Recompute where the memoryless run computed: a GPU, under its XLA flags.
 
     Near-tied window centers are broken by the device's rounding, so a CPU
-    moves more of them than the check allows. ``JAX_PLATFORMS``, if set, still
-    wins. Call before JAX starts its backend, which reads ``XLA_FLAGS`` once.
+    moves more of them than the check allows. The GPU is set over any
+    ``JAX_PLATFORMS``, since modules imported here pin the CPU when imported
+    (``scripts/qa/run_state_evidence.py``); with no GPU, JAX raises. Call
+    before JAX starts its backend, which reads ``XLA_FLAGS`` once.
     """
     os.environ["XLA_FLAGS"] = memoryless_runner.xla_flags()
-    os.environ.setdefault("JAX_PLATFORMS", "cuda")
-    jax.config.update("jax_platforms", os.environ["JAX_PLATFORMS"])
+    os.environ["JAX_PLATFORMS"] = "cuda"
+    jax.config.update("jax_platforms", "cuda")
 
 
 def recompute_device() -> dict[str, str]:

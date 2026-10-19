@@ -335,3 +335,24 @@ def test_a_center_moved_off_a_tie_still_refuses_the_figure(monkeypatch) -> None:
 
     with pytest.raises(ValueError, match="1 centers moved off a tie"):
         examples.recompute_windows(inputs, 0, 2)
+
+
+def test_the_recompute_runs_on_the_gpu_even_when_an_import_pinned_the_cpu(
+    monkeypatch,
+) -> None:
+    """Modules the examples import set JAX_PLATFORMS=cpu when imported
+    (scripts/qa/run_state_evidence.py); the recompute still asks JAX for the
+    GPU, under the memoryless run's XLA flags."""
+    monkeypatch.setenv("JAX_PLATFORMS", "cpu")
+    monkeypatch.setenv("XLA_FLAGS", "")
+    updates = []
+    monkeypatch.setattr(
+        examples.jax.config, "update", lambda *args: updates.append(args)
+    )
+
+    examples.use_memoryless_device()
+
+    assert updates == [("jax_platforms", "cuda")]
+    assert examples.os.environ["JAX_PLATFORMS"] == "cuda"
+    for flag in examples.memoryless_runner.REQUIRED_XLA_FLAGS:
+        assert flag in examples.os.environ["XLA_FLAGS"].split()
