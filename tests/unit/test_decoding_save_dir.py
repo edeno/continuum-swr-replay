@@ -1417,7 +1417,44 @@ def test_only_a_nonlocal_hpc_decode_keeps_its_log_likelihood(
         else {}
     )
     assert {k: v for k, v in kwargs.items() if k == "return_outputs"} == expected
-    assert module.RUNNER.hpc_log_likelihood is (key == "nonlocal")
+
+
+@pytest.mark.parametrize("key", list(DECODERS))
+def test_each_runner_aggregates_and_reloads_with_its_own_decode_functions(
+    decoders, key
+):
+    """A runner whose ``aggregate`` or ``load_saved`` were swapped would build
+    its frame from, or resume on, the other decode's results without a word.
+    Each runner's record is pinned by name."""
+    from continuum_swr_replay.analysis.contfrag.data_aggregation import (
+        get_contfrag_data_over_time,
+    )
+    from continuum_swr_replay.analysis.contfrag.result_loading import (
+        load_contfrag_results,
+    )
+    from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+        get_data_over_time,
+    )
+    from continuum_swr_replay.analysis.hippocampus.result_loading import (
+        load_results,
+    )
+
+    expected = {
+        "nonlocal": (get_data_over_time, load_results, "", True),
+        "contfrag": (
+            get_contfrag_data_over_time,
+            load_contfrag_results,
+            "_contfrag",
+            False,
+        ),
+    }[key]
+    runner = decoders.modules[key].RUNNER
+    assert (
+        runner.aggregate,
+        runner.load_saved,
+        runner.file_suffix,
+        runner.hpc_log_likelihood,
+    ) == expected
 
 
 def _stand_in_batch(monkeypatch, tmp_path, *, has_cuda: bool, cluster: Callable):
