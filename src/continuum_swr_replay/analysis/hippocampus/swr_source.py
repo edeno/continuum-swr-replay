@@ -120,6 +120,7 @@ from continuum_swr_replay.analysis.hippocampus.event_eligibility import (
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     build_speed_eligible_event_cohort,
     intervals_from_labels,
+    require_time_index,
     validate_nonlocal_event_probability_contract,
     validate_whole_event_immobility_contract,
 )
@@ -834,8 +835,10 @@ def _frame_epoch(
 
     The time axis is the index, read nowhere else: every reader downstream
     (``intervals_from_labels``, the event tables) takes time from the index,
-    and an event's first and last row as its bounds, so the index must
-    increase. A ``time`` column would be a second axis and is refused.
+    and an event's first and last row as its bounds, so the index must be a
+    float time axis that strictly increases
+    (``event_immobility.require_time_index``). A ``time`` column would be a
+    second axis and is refused.
 
     The decode's own labels (:data:`LABEL_COLUMNS`), which the read passes on,
     are checked here too, once for every consumer: each event is immobile as a
@@ -851,12 +854,7 @@ def _frame_epoch(
     sessions = dot[list(SESSION_COLUMNS_DAY)].drop_duplicates()
     if len(sessions) != 1:
         raise ValueError(f"{what} reads one epoch at a time, not {len(sessions)}")
-    if "time" in dot.columns:
-        raise ValueError(
-            f"{what}: data_over_time has a 'time' column; its time is the index"
-        )
-    if not dot.index.is_monotonic_increasing:
-        raise ValueError(f"{what}: data_over_time's time index does not increase")
+    require_time_index(dot, what)
     if "non_local_event" in dot.columns:
         validate_nonlocal_event_probability_contract(
             dot, probability_threshold=non_local_threshold
@@ -982,7 +980,8 @@ def artifact_event_drops(dot: pd.DataFrame) -> pd.DataFrame:
     ------
     ValueError
         If the frame holds more than one epoch, lacks a needed column, has a
-        ``time`` column or a time index that does not increase.
+        ``time`` column, or its index is not a float time axis that strictly
+        increases (``event_immobility.require_time_index``).
     EventDefinitionError
         If a ``non_local_event`` or ``MUA_event`` label breaks the whole-event
         immobility rule, or a non-local label has a bin not above the default
@@ -1119,7 +1118,8 @@ def with_swr_source(
     ------
     ValueError
         If the frame holds more than one epoch, lacks a needed column, has a
-        ``time`` column or a time index that does not increase.
+        ``time`` column, or its index is not a float time axis that strictly
+        increases (``event_immobility.require_time_index``).
     EventDefinitionError
         If a ``non_local_event`` or ``MUA_event`` label breaks the whole-event
         immobility rule, or a ``non_local_event`` label has a bin whose summed

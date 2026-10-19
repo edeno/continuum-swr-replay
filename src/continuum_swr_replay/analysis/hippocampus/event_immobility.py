@@ -53,6 +53,48 @@ def _validate_speed_threshold(speed_threshold: float) -> float:
     return threshold
 
 
+def require_time_index(frame: pd.DataFrame, what: str) -> None:
+    """Refuse a frame whose index is not one epoch's time axis.
+
+    A decode frame's time is its index, in seconds, and nothing else: every
+    reader takes an event's bounds from its first and last labelled row. A
+    frame that lost that index (``reset_index(drop=True)``, a concat with
+    ``ignore_index=True``) would have its row numbers read as seconds, and a
+    ``time`` column would be a second time axis, so both are refused.
+
+    Parameters
+    ----------
+    frame : pd.DataFrame
+        The frame to check.
+    what : str
+        The caller's name, for the message.
+
+    Raises
+    ------
+    ValueError
+        If `frame` has a ``time`` column, an index that is not float (a
+        ``RangeIndex`` or other integer index among them), or an index that
+        is not strictly increasing.
+    """
+    index = frame.index
+    if "time" in frame.columns:
+        raise ValueError(
+            f"{what}: the frame has a 'time' column, a second time axis; set the "
+            "time index instead (frame.set_index('time'))"
+        )
+    if isinstance(index, pd.RangeIndex) or not pd.api.types.is_float_dtype(index):
+        raise ValueError(
+            f"{what}: the frame's index ({type(index).__name__}, dtype "
+            f"{index.dtype}) is not a float time axis in seconds; set the time "
+            "index (the decode frame's own, as get_data_over_time saves it)"
+        )
+    if not (index.is_monotonic_increasing and index.is_unique):
+        raise ValueError(
+            f"{what}: the frame's time index is not strictly increasing; pass one "
+            "epoch at a time, sorted by time, with no repeated timestamp"
+        )
+
+
 def require_canonical_speed_threshold(
     speed_threshold: float, where: str, *, allow_stricter: bool = False
 ) -> None:
@@ -361,12 +403,20 @@ def intervals_from_labels(
     """Return sampled interval bounds for each positive event label.
 
     Time is the frame's index, the decode frame's one time axis
-    (``swr_source.with_swr_source`` checks it); any column is ignored. Bounds
-    therefore describe the exact samples used by downstream tables, rather
-    than the detector's continuous threshold-crossing bounds.
+    (:func:`require_time_index`: float, strictly increasing, no ``time``
+    column). Bounds therefore describe the exact samples used by downstream
+    tables, rather than the detector's continuous threshold-crossing bounds.
+
+    Raises
+    ------
+    KeyError
+        If `label_col` is missing.
+    ValueError
+        If the frame's index is not a time axis (:func:`require_time_index`).
     """
     if label_col not in session_df.columns:
         raise KeyError(f"session_df is missing required column: {label_col!r}")
+    require_time_index(session_df, "intervals_from_labels")
 
     is_active = session_df[label_col].to_numpy() > 0
     active = session_df.loc[is_active, [label_col]]
@@ -499,6 +549,7 @@ __all__ = [
     "filter_event_intervals_by_speed",
     "intervals_from_labels",
     "require_canonical_speed_threshold",
+    "require_time_index",
     "validate_nonlocal_event_probability_contract",
     "validate_whole_event_immobility_contract",
     "whole_event_immobility_mask",

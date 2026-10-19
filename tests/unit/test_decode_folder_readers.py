@@ -73,7 +73,8 @@ def _frame(epoch_id: str) -> pd.DataFrame:
             "Non-Local_Continuous_prob": [0.1, 0.2],
             "Non-Local_Fragmented_prob": [0.3, 0.4],
             "ahead_behind_distance": [-1.0, 2.0],
-        }
+        },
+        index=pd.Index([100.0, 100.002], name="time"),
     )
 
 

@@ -583,7 +583,7 @@ class TestAnAnalysisFrame:
 
     def test_a_time_index_that_does_not_increase_is_refused(self, inventory):
         """Readers take an event's first and last row as its bounds."""
-        with pytest.raises(ValueError, match="does not increase"):
+        with pytest.raises(ValueError, match="not strictly increasing"):
             with_swr_source(_dot().iloc[::-1])
 
     def test_one_epoch_at_a_time(self, inventory):
@@ -878,6 +878,30 @@ class TestTheLabelContract:
             **columns,
         }
         return _dot(**frame)
+
+    @pytest.mark.parametrize(
+        ("lose_the_axis", "message"),
+        [
+            # reset_index(drop=True) / concat(ignore_index=True): row numbers
+            (lambda f: f.reset_index(drop=True), "RangeIndex"),
+            (lambda f: f.set_axis(np.arange(len(f)) * 2), "dtype int64"),
+            (lambda f: f.reset_index(), "'time' column"),
+            (lambda f: pd.concat([f.iloc[:10], f.iloc[9:]]), "strictly increasing"),
+        ],
+        ids=["range_index", "integer_index", "time_column", "repeated_time"],
+    )
+    def test_a_frame_without_its_time_axis_is_refused(
+        self, inventory, lose_the_axis, message
+    ):
+        """Row numbers read as seconds would match no SWR and no excluded
+        time, silently; the read refuses the frame and says what to do."""
+        dot = lose_the_axis(self._frame())
+
+        with pytest.raises(ValueError, match=message) as refused:
+            with_swr_source(dot)
+        assert "time" in str(refused.value)
+        with pytest.raises(ValueError, match=message):
+            swr_source.artifact_event_drops(dot)
 
     def test_a_frame_that_keeps_the_contract_is_read(self, inventory):
         out = with_swr_source(self._frame())

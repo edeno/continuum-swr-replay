@@ -44,9 +44,7 @@ def _make_data_over_time(
     for i, start in enumerate(event_starts[:n_non_local]):
         df.loc[start : start + 20, "non_local_event"] = i + 1
 
-    df["Non-Local_Continuous_prob"] = np.where(
-        df["non_local_event"] > 0, 0.9, 0.1
-    )
+    df["Non-Local_Continuous_prob"] = np.where(df["non_local_event"] > 0, 0.9, 0.1)
     df["Non-Local_Fragmented_prob"] = 0.0
 
     # Place SWR events (overlapping with first non-local)
@@ -64,6 +62,8 @@ def _make_data_over_time(
     if n_mua > 1:
         df.loc[800:810, "MUA_event"] = 2  # no overlap with NL
 
+    # The labels were placed by row number; a decode frame's index is its time.
+    df.index = pd.Index(np.arange(n_time) / 500.0, name="time")
     return df
 
 

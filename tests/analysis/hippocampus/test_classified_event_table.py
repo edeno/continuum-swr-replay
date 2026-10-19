@@ -356,19 +356,35 @@ def test_intervals_from_labels_accepts_index_time_and_retains_label():
     assert swr3["end_time"] == pytest.approx(20 * DT)
 
 
-def test_intervals_from_labels_reads_the_index_not_a_time_column():
-    n = 100
-    frame = _blank_session("m", 1, "01_r1", n=n)
-    # A stray column that disagrees with the index is not a time axis.
+def test_intervals_from_labels_refuses_a_time_column():
+    # A stray column that disagrees with the index would be a second time axis.
+    frame = _blank_session("m", 1, "01_r1", n=100)
     frame["time"] = frame.index.to_numpy() + 10.0
     _label(frame, "SWR_event", {1: (5, 15)})
-    intervals = intervals_from_labels(frame, "SWR_event")
 
-    assert list(intervals.columns) == ["SWR_event", "start_time", "end_time"]
-    row = intervals.iloc[0]
-    assert row["SWR_event"] == 1
-    assert row["start_time"] == pytest.approx(5 * DT)
-    assert row["end_time"] == pytest.approx(15 * DT)
+    with pytest.raises(ValueError, match="'time' column.*set the time index"):
+        intervals_from_labels(frame, "SWR_event")
+
+
+@pytest.mark.parametrize(
+    ("lose_the_axis", "message"),
+    [
+        (lambda f: f.reset_index(drop=True), "RangeIndex"),
+        (lambda f: f.set_axis(np.arange(len(f))), "dtype int64"),
+        (lambda f: f.iloc[::-1], "strictly increasing"),
+        (lambda f: pd.concat([f.iloc[:10], f.iloc[9:]]), "strictly increasing"),
+    ],
+    ids=["range_index", "integer_index", "decreasing", "repeated_time"],
+)
+def test_intervals_from_labels_refuses_a_frame_without_its_time_axis(
+    lose_the_axis, message
+):
+    # Row numbers read as seconds would give plausible, wrong bounds.
+    frame = _blank_session("m", 1, "01_r1", n=100)
+    _label(frame, "SWR_event", {1: (5, 15)})
+
+    with pytest.raises(ValueError, match=message):
+        intervals_from_labels(lose_the_axis(frame), "SWR_event")
 
 
 def test_intervals_from_labels_empty_returns_schema():
@@ -529,12 +545,8 @@ def test_assert_drawn_matches_label_passes_when_consistent():
 
 
 def test_events_and_swrs_are_read_on_the_one_time_index():
-    # Event timing and the SWR intervals both read the index. A stray "time"
-    # column that disagrees with it (here a reversed copy) is read by
-    # neither: read as the axis, it would reverse the event's bounds and
-    # leave it non_swr.
+    # Event timing and the SWR intervals both read the index.
     frame = _blank_session("m", 1, "01_r1", n=400)
-    frame["time"] = frame.index.to_numpy()[::-1]
     _label(frame, "non_local_event", {1: (100, 110)})
     _label(frame, "SWR_event", {1: (95, 120)})
     table = build_classified_nonlocal_event_table(frame)
@@ -542,6 +554,13 @@ def test_events_and_swrs_are_read_on_the_one_time_index():
     assert ev["overlap_class"] == "swr_contained"
     assert ev["event_start"] == pytest.approx(100 * DT)
     assert ev["matched_swr_start"] == pytest.approx(95 * DT)
+
+    # A stray "time" column that disagrees with it (here a reversed copy)
+    # would be a second axis: read as the axis, it would reverse the event's
+    # bounds and leave it non_swr. It is refused, not ignored.
+    frame["time"] = frame.index.to_numpy()[::-1]
+    with pytest.raises(ValueError, match="'time' column"):
+        build_classified_nonlocal_event_table(frame)
 
 
 def test_zero_duration_event_inside_swr_is_non_swr():
