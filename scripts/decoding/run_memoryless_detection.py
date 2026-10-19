@@ -566,8 +566,6 @@ def run_one(
     encoding_model = load_clusterless_encoding_model(inputs["detector"])
     # SWR labels from the one SWR source, whichever decode variant this is
     data_over_time = read_dot_with_swr_source(inputs["data_over_time"])
-    if "time" in data_over_time.columns:
-        data_over_time = data_over_time.set_index("time")
     identity = SequenceIdentity(
         animal=str(_one_value(data_over_time, "animal")),
         day=int(_one_value(data_over_time, "day")),

@@ -576,15 +576,15 @@ class TestAnAnalysisFrame:
         np.testing.assert_array_equal(dot["SWR_event"].to_numpy(), stale)
         assert dot["n_SWR"].eq(99).all()
 
-    def test_a_time_column_is_the_axis_when_there_is_one(self, inventory):
-        dot = _dot().reset_index()
+    def test_a_time_column_is_refused(self, inventory):
+        """The index is the one time axis; a ``time`` column would be a second."""
+        with pytest.raises(ValueError, match="'time' column"):
+            with_swr_source(_dot().reset_index())
 
-        out = with_swr_source(dot)
-
-        np.testing.assert_array_equal(
-            out["SWR_event"].to_numpy(),
-            swr_event_labels(TIME, EPOCH, speed=_speed()),
-        )
+    def test_a_time_index_that_does_not_increase_is_refused(self, inventory):
+        """Readers take an event's first and last row as its bounds."""
+        with pytest.raises(ValueError, match="does not increase"):
+            with_swr_source(_dot().iloc[::-1])
 
     def test_one_epoch_at_a_time(self, inventory):
         dot = pd.concat([_dot(), _dot(epoch="04_r2")])

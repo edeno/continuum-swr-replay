@@ -219,11 +219,7 @@ def decode_marks(
     detector_sha256 = sha256_file(paths["detector"])
     encoding_model = load_clusterless_encoding_model(paths["detector"])
     data_over_time = pd.read_pickle(paths["data_over_time"])
-    time = (
-        data_over_time["time"]
-        if "time" in data_over_time.columns
-        else data_over_time.index
-    ).to_numpy(dtype=np.float64)
+    time = data_over_time.index.to_numpy(dtype=np.float64)
     span_s = (float(time[0]), float(time[-1]))
     del data_over_time
     key = parse_epoch_identifier(identifier)

@@ -167,14 +167,11 @@ class RowTraces:
         Parameters
         ----------
         dot : pd.DataFrame
-            The decode frame, one row per grid sample, its times in a ``time``
-            column or the index.
+            The decode frame, one row per grid sample, its times the index.
         spike_times : sequence of NDArray, each shape (n_spikes,)
             Spike times in seconds, one array per tetrode.
         """
-        time = np.asarray(
-            dot["time"] if "time" in dot.columns else dot.index, dtype=np.float64
-        )
+        time = np.asarray(dot.index, dtype=np.float64)
         return cls(
             time=time,
             spike_counts=tetrode_spike_counts(spike_times, time),

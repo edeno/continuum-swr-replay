@@ -333,8 +333,7 @@ def _speed_trace(dot: pd.DataFrame) -> tuple[NDArray, NDArray]:
     ValueError
         The grid does not step by ``SAMPLE_INTERVAL_S``.
     """
-    time = dot["time"] if "time" in dot.columns else dot.index
-    time = np.asarray(time, dtype=np.float64)
+    time = dot.index.to_numpy(dtype=np.float64)
     step = float(np.median(np.diff(time)))
     if not np.isclose(step, SAMPLE_INTERVAL_S, rtol=0.0, atol=1e-5):
         raise ValueError(

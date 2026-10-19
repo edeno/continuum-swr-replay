@@ -285,7 +285,7 @@ def label_drop_reasons(
     Parameters
     ----------
     frame : pd.DataFrame
-        One epoch, time-indexed or with a ``time`` column, carrying
+        One epoch, time-indexed, carrying
         `event_col` (0 outside events).
     event_col : str
         Such as ``"non_local_event"`` or ``"MUA_event"``.

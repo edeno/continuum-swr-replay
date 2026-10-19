@@ -823,15 +823,27 @@ def swr_event_labels(
 
 
 def _frame_epoch(dot: pd.DataFrame, what: str) -> tuple[str, NDArray]:
-    """The one epoch a frame holds, as the inventory's id, and its time axis."""
+    """The one epoch a frame holds, as the inventory's id, and its time axis.
+
+    The time axis is the index, read nowhere else: every reader downstream
+    (``intervals_from_labels``, the event tables) takes time from the index,
+    and an event's first and last row as its bounds, so the index must
+    increase. A ``time`` column would be a second axis and is refused.
+    """
     missing = [c for c in (*SESSION_COLUMNS_DAY, "head_speed") if c not in dot.columns]
     if missing:
         raise ValueError(f"{what}: data_over_time lacks columns {missing}")
     sessions = dot[list(SESSION_COLUMNS_DAY)].drop_duplicates()
     if len(sessions) != 1:
         raise ValueError(f"{what} reads one epoch at a time, not {len(sessions)}")
+    if "time" in dot.columns:
+        raise ValueError(
+            f"{what}: data_over_time has a 'time' column; its time is the index"
+        )
+    if not dot.index.is_monotonic_increasing:
+        raise ValueError(f"{what}: data_over_time's time index does not increase")
     animal, day, epoch = sessions.iloc[0]
-    time = dot["time"].to_numpy() if "time" in dot.columns else dot.index.to_numpy()
+    time = dot.index.to_numpy()
     return swr_epoch_id(f"{animal}{day}_.nwb", str(epoch)), np.asarray(time, float)
 
 
@@ -932,9 +944,9 @@ def artifact_event_drops(dot: pd.DataFrame) -> pd.DataFrame:
     Parameters
     ----------
     dot : pd.DataFrame
-        One epoch's decode frame as the decoder saved it (time-indexed or with
-        a ``time`` column), carrying ``animal``, ``day``, ``epoch`` and
-        ``head_speed``.
+        One epoch's decode frame as the decoder saved it, indexed by
+        increasing time (no ``time`` column), carrying ``animal``, ``day``,
+        ``epoch`` and ``head_speed``.
 
     Returns
     -------
@@ -947,7 +959,8 @@ def artifact_event_drops(dot: pd.DataFrame) -> pd.DataFrame:
     Raises
     ------
     ValueError
-        If the frame holds more than one epoch, or lacks a needed column.
+        If the frame holds more than one epoch, lacks a needed column, has a
+        ``time`` column or a time index that does not increase.
     SwrSourceError
         If the epoch cannot be served.
     """
@@ -1026,8 +1039,8 @@ def with_swr_source(
     Parameters
     ----------
     dot : pd.DataFrame
-        One epoch's decode frame, time-indexed (or with a ``time`` column),
-        carrying ``animal``, ``day``, ``epoch`` and ``head_speed``.
+        One epoch's decode frame, indexed by increasing time (no ``time``
+        column), carrying ``animal``, ``day``, ``epoch`` and ``head_speed``.
     drop_masked_events : bool
         True (every analysis read): every event the rule drops
         (:func:`artifact_event_drops`) has its label zeroed whole. False only
@@ -1067,7 +1080,8 @@ def with_swr_source(
     Raises
     ------
     ValueError
-        If the frame holds more than one epoch, or lacks a needed column.
+        If the frame holds more than one epoch, lacks a needed column, has a
+        ``time`` column or a time index that does not increase.
     SwrSourceError
         If the epoch cannot be served.
     """

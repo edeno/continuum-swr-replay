@@ -192,7 +192,8 @@ def build_classified_nonlocal_event_table(
     Parameters
     ----------
     dot : pd.DataFrame
-        Time-indexed ``data_over_time`` slice for one or more sessions, read
+        ``data_over_time`` slice for one or more sessions, its time the index
+        (increasing within a session, as the SWR source's read checks), read
         through the SWR source so that ``SWR_event`` is the paper's SWRs. Must
         carry ``animal``, ``day``, ``epoch``, ``non_local_event``,
         ``SWR_event``, ``head_speed``, ``Non-Local_Continuous_prob``,
@@ -249,16 +250,6 @@ def build_classified_nonlocal_event_table(
     )
 
     column_order = list(_CLASSIFIED_EVENT_TABLE_COLUMNS)
-
-    # Single canonical time source. Event timing below reads ``g.index``
-    # while :func:`intervals_from_labels` prefers a ``"time"`` column when
-    # one is present. If a frame carried both a ``"time"`` column and a
-    # different index, the two reads would classify events against
-    # different timebases. Promote a ``"time"`` column to the index so
-    # both paths read the same axis (no-op for production data_over_time,
-    # which is already time-indexed with no ``"time"`` column).
-    if "time" in dot.columns:
-        dot = dot.set_index("time")
 
     # SWR coincidence uses the same globally qualified SWR population as its
     # own event tables. Preserve Non-Local rows here so this diagnostic table

@@ -48,8 +48,7 @@ def _validate_speed_threshold(speed_threshold: float) -> float:
     threshold = float(speed_threshold)
     if not np.isfinite(threshold) or threshold <= 0:
         raise ValueError(
-            "speed_threshold must be finite and positive, "
-            f"got {speed_threshold!r}"
+            f"speed_threshold must be finite and positive, got {speed_threshold!r}"
         )
     return threshold
 
@@ -65,9 +64,7 @@ def event_speeds_are_immobile(
     if values.ndim != 1:
         raise ValueError("speed must be one-dimensional")
     return bool(
-        values.size > 0
-        and np.isfinite(values).all()
-        and (values < threshold).all()
+        values.size > 0 and np.isfinite(values).all() and (values < threshold).all()
     )
 
 
@@ -100,13 +97,11 @@ def whole_event_immobility_mask(
         return pd.Series(mask, index=data.index, name=f"{event_col}_is_immobile")
 
     active_groups = data.loc[active, key_cols].reset_index(drop=True)
-    active_groups["_sample_is_immobile"] = (
-        np.isfinite(speed[active]) & (speed[active] < threshold)
+    active_groups["_sample_is_immobile"] = np.isfinite(speed[active]) & (
+        speed[active] < threshold
     )
     event_is_immobile = (
-        active_groups.groupby(key_cols, sort=False, dropna=False)[
-            "_sample_is_immobile"
-        ]
+        active_groups.groupby(key_cols, sort=False, dropna=False)["_sample_is_immobile"]
         .transform("all")
         .to_numpy(dtype=bool)
     )
@@ -170,8 +165,7 @@ def validate_nonlocal_event_probability_contract(
     threshold = float(probability_threshold)
     if not np.isfinite(threshold):
         raise ValueError(
-            "probability_threshold must be finite, "
-            f"got {probability_threshold!r}"
+            f"probability_threshold must be finite, got {probability_threshold!r}"
         )
     if event_col not in data.columns:
         raise KeyError(f"data is missing required column: {event_col!r}")
@@ -187,9 +181,7 @@ def validate_nonlocal_event_probability_contract(
     probability = np.zeros(len(data), dtype=float)
     for column in probability_cols:
         probability += data[column].to_numpy(dtype=float)
-    invalid = active & ~(
-        np.isfinite(probability) & (probability > threshold)
-    )
+    invalid = active & ~(np.isfinite(probability) & (probability > threshold))
     if invalid.any():
         invalid_ids = sorted(pd.unique(labels[invalid]).tolist())
         raise EventDefinitionError(
@@ -276,24 +268,22 @@ def intervals_from_labels(
 ) -> pd.DataFrame:
     """Return sampled interval bounds for each positive event label.
 
-    Time is taken from a ``time`` column when present and otherwise from the
-    frame index. Bounds therefore describe the exact samples used by downstream
-    tables, rather than the detector's continuous threshold-crossing bounds.
+    Time is the frame's index, the decode frame's one time axis
+    (``swr_source.with_swr_source`` checks it); any column is ignored. Bounds
+    therefore describe the exact samples used by downstream tables, rather
+    than the detector's continuous threshold-crossing bounds.
     """
     if label_col not in session_df.columns:
         raise KeyError(f"session_df is missing required column: {label_col!r}")
 
-    if "time" in session_df.columns:
-        frame = session_df
-    else:
-        frame = session_df.reset_index(names="time")
-
-    active = frame.loc[frame[label_col] > 0]
+    is_active = session_df[label_col].to_numpy() > 0
+    active = session_df.loc[is_active, [label_col]]
     if active.empty:
         return pd.DataFrame(columns=[label_col, "start_time", "end_time"])
 
     return (
-        active.groupby(label_col, sort=True)["time"]
+        active.assign(time=active.index.to_numpy())
+        .groupby(label_col, sort=True)["time"]
         .agg(start_time="min", end_time="max")
         .reset_index()
     )
@@ -371,11 +361,12 @@ def build_speed_eligible_event_cohort(
     collisions = np.flatnonzero(coverage > 1)
     if collisions.size:
         first_collision = int(collisions[0])
-        source_ids = np.flatnonzero(
-            has_samples
-            & (starts <= first_collision)
-            & (ends > first_collision)
-        ) + 1
+        source_ids = (
+            np.flatnonzero(
+                has_samples & (starts <= first_collision) & (ends > first_collision)
+            )
+            + 1
+        )
         raise EventDefinitionError(
             f"{event_col} same-source event intervals overlap on the sampled "
             f"time axis at t={time_values[first_collision]:.9g}; source event "

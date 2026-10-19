@@ -430,13 +430,6 @@ def _ms_event_id(identity: SequenceIdentity, runs: NDArray) -> NDArray:
     return np.asarray(hashed, dtype=np.int64)
 
 
-def _time_indexed(data_over_time: pd.DataFrame) -> pd.DataFrame:
-    """Read time from a ``time`` column when there is one, as the canonical table does."""
-    if "time" in data_over_time.columns:
-        return data_over_time.set_index("time")
-    return data_over_time
-
-
 def canonical_swr_intervals(
     data_over_time: pd.DataFrame, *, speed_threshold: float
 ) -> pd.DataFrame:
@@ -451,7 +444,7 @@ def canonical_swr_intervals(
     Parameters
     ----------
     data_over_time : DataFrame
-        One epoch, time-indexed or with a ``time`` column, carrying
+        One epoch, time-indexed, carrying
         ``SWR_event``, ``head_speed`` and the session columns: a frame read
         through the SWR source (``swr_source.read_dot_with_swr_source``), whose
         ``SWR_event`` is the direct Kay inventory's, as the canonical table's is.
@@ -464,11 +457,10 @@ def canonical_swr_intervals(
         Columns ``SWR_event``, ``start_time``, ``end_time``.
 
     """
-    frame = _time_indexed(data_over_time)
-    if frame.groupby(list(SESSION_COLUMNS_DAY)).ngroups != 1:
+    if data_over_time.groupby(list(SESSION_COLUMNS_DAY)).ngroups != 1:
         raise ValueError("canonical_swr_intervals reads one epoch at a time.")
     qualified = filter_event_labels_by_speed(
-        frame, ["SWR_event"], speed_threshold=speed_threshold
+        data_over_time, ["SWR_event"], speed_threshold=speed_threshold
     )
     return intervals_from_labels(qualified, "SWR_event")
 
@@ -487,9 +479,8 @@ def observed_intervals(data_over_time: pd.DataFrame, column: str) -> NDArray:
         First and last sample time of each run of observed samples.
 
     """
-    frame = _time_indexed(data_over_time)
-    time = frame.index.to_numpy(dtype=np.float64)
-    observed = np.isfinite(frame[column].to_numpy(dtype=np.float64))
+    time = data_over_time.index.to_numpy(dtype=np.float64)
+    observed = np.isfinite(data_over_time[column].to_numpy(dtype=np.float64))
     edges = np.diff(observed.astype(np.int8), prepend=0, append=0)
     first = np.flatnonzero(edges == 1)
     last = np.flatnonzero(edges == -1) - 1

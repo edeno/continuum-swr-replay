@@ -151,8 +151,7 @@ def _epoch(dot: pd.DataFrame) -> _Epoch:
     if len(sessions) != 1:
         raise ValueError(f"An adapter reads one epoch at a time, not {len(sessions)}.")
     animal, day, epoch = sessions.iloc[0]
-    time = dot["time"].to_numpy() if "time" in dot.columns else dot.index.to_numpy()
-    time = np.asarray(time, dtype=np.float64)
+    time = dot.index.to_numpy(dtype=np.float64)
     return _Epoch(
         session=SessionIdentity(
             animal=str(animal), day=int(day), epoch=str(epoch), brain_area=BRAIN_AREA

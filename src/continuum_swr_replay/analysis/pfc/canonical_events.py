@@ -253,12 +253,6 @@ def load_session_swr_intervals(
         )
 
     dot = swr_source.read_dot_with_swr_source(path)
-    # ``intervals_from_labels`` prefers a ``time`` column and the speed rule
-    # reads the index; promote a ``time`` column so both read one axis, as the
-    # canonical builder does.
-    if "time" in dot.columns:
-        dot = dot.set_index("time")
-
     gated = filter_event_labels_by_speed(
         dot, ["SWR_event"], speed_threshold=speed_threshold
     )

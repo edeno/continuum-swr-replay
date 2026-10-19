@@ -115,9 +115,7 @@ def _label(frame: pd.DataFrame, col: str, windows: dict[int, tuple[int, int]]) -
         arr[lo : hi + 1] = label_id
     frame[col] = arr
     if col == "non_local_event":
-        frame.loc[
-            frame[col] > 0, "Non-Local_Continuous_prob"
-        ] = 0.9
+        frame.loc[frame[col] > 0, "Non-Local_Continuous_prob"] = 0.9
 
 
 @pytest.fixture
@@ -126,9 +124,7 @@ def dot() -> pd.DataFrame:
     s1 = _blank_session("m", 1, "01_r1", n=1000)
     _label(s1, "non_local_event", _EVENTS_1)
     _label(s1, "SWR_event", _SWRS_1)
-    s1.loc[
-        s1["non_local_event"] > 0, "Non-Local_Continuous_prob"
-    ] = 0.9
+    s1.loc[s1["non_local_event"] > 0, "Non-Local_Continuous_prob"] = 0.9
 
     # ev6: fast middle, immobile endpoints.
     speed = s1["head_speed"].to_numpy()
@@ -148,9 +144,7 @@ def dot() -> pd.DataFrame:
     # ``non_swr``; a leak would label it ``swr_contained``.
     s2 = _blank_session("m", 1, "02_r2", n=200)
     _label(s2, "non_local_event", {1: (100, 110)})
-    s2.loc[
-        s2["non_local_event"] > 0, "Non-Local_Continuous_prob"
-    ] = 0.9
+    s2.loc[s2["non_local_event"] > 0, "Non-Local_Continuous_prob"] = 0.9
 
     return pd.concat([s1, s2])
 
@@ -287,7 +281,9 @@ def test_max_speed_vs_endpoints(dot):
     # expected value independently from the fixture's speed profile.
     s1_event6 = dot.loc[(dot["epoch"] == "01_r1") & (dot["non_local_event"] == 6)]
     assert ev["animal_mean_speed_cm_s"] == pytest.approx(s1_event6["head_speed"].mean())
-    assert ev["animal_mean_speed_cm_s"] != pytest.approx(ev["animal_max_speed_cm_s"])  # genuinely averaged
+    assert ev["animal_mean_speed_cm_s"] != pytest.approx(
+        ev["animal_max_speed_cm_s"]
+    )  # genuinely averaged
 
 
 def test_timing_columns(dot):
@@ -295,7 +291,9 @@ def test_timing_columns(dot):
     ev = _row(table, "01_r1", 1)  # samples [100, 110] -> 11 bins
     assert ev["event_start"] == pytest.approx(100 * DT)
     assert ev["event_end"] == pytest.approx(110 * DT)
-    assert ev["event_duration"] == pytest.approx(11 * DT)  # (n_bins) * DT, incl. final bin
+    assert ev["event_duration"] == pytest.approx(
+        11 * DT
+    )  # (n_bins) * DT, incl. final bin
     # Midpoint is times[len(times) // 2] -> 11 bins picks index 5 = sample 105.
     assert ev["event_midpoint_time"] == pytest.approx(105 * DT)
 
@@ -304,8 +302,15 @@ def test_single_timebin_event_collapse(dot):
     table = build_classified_nonlocal_event_table(dot)
     ev = _row(table, "01_r1", 7)
     assert ev["event_start"] == ev["event_end"]
-    assert ev["event_duration"] == pytest.approx(DT)  # single-bin event spans one bin width
-    assert ev["animal_max_speed_cm_s"] == ev["animal_mean_speed_cm_s"] == ev["animal_start_speed_cm_s"] == ev["animal_end_speed_cm_s"]
+    assert ev["event_duration"] == pytest.approx(
+        DT
+    )  # single-bin event spans one bin width
+    assert (
+        ev["animal_max_speed_cm_s"]
+        == ev["animal_mean_speed_cm_s"]
+        == ev["animal_start_speed_cm_s"]
+        == ev["animal_end_speed_cm_s"]
+    )
 
 
 def test_multiple_sessions_no_leak(dot):
@@ -347,6 +352,7 @@ def test_empty_session():
     assert table.empty
     assert table.columns.tolist() == EXPECTED_CLASSIFIED_COLUMNS
 
+
 def test_no_overlapping_pairs_schema():
     # Events exist; no SWR labels anywhere -> every event is non_swr and
     # the matched-SWR columns carry the right NA dtypes.
@@ -377,10 +383,11 @@ def test_intervals_from_labels_accepts_index_time_and_retains_label():
     assert swr3["end_time"] == pytest.approx(20 * DT)
 
 
-def test_intervals_from_labels_accepts_time_column():
+def test_intervals_from_labels_reads_the_index_not_a_time_column():
     n = 100
-    frame = _blank_session("m", 1, "01_r1", n=n).reset_index()  # "time" column
-    assert "time" in frame.columns
+    frame = _blank_session("m", 1, "01_r1", n=n)
+    # A stray column that disagrees with the index is not a time axis.
+    frame["time"] = frame.index.to_numpy() + 10.0
     _label(frame, "SWR_event", {1: (5, 15)})
     intervals = intervals_from_labels(frame, "SWR_event")
 
@@ -548,13 +555,13 @@ def test_assert_drawn_matches_label_passes_when_consistent():
     assert_drawn_class_matches_ripples(chosen, ripple_times)  # must not raise
 
 
-def test_time_column_and_rangeindex_use_one_timebase():
-    # A frame with a "time" COLUMN and a default RangeIndex must classify
-    # events against the same axis the SWR intervals use. Under the old
-    # bug (event timing from the index, SWR intervals from the "time"
-    # column) this event would be non_swr; unified, it is swr_contained.
-    frame = _blank_session("m", 1, "01_r1", n=400).reset_index()  # "time" column
-    assert "time" in frame.columns
+def test_events_and_swrs_are_read_on_the_one_time_index():
+    # Event timing and the SWR intervals both read the index. A stray "time"
+    # column that disagrees with it (here a reversed copy) is read by
+    # neither: read as the axis, it would reverse the event's bounds and
+    # leave it non_swr.
+    frame = _blank_session("m", 1, "01_r1", n=400)
+    frame["time"] = frame.index.to_numpy()[::-1]
     _label(frame, "non_local_event", {1: (100, 110)})
     _label(frame, "SWR_event", {1: (95, 120)})
     table = build_classified_nonlocal_event_table(frame)

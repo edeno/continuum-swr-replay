@@ -227,7 +227,7 @@ def build_session_events(dot: pd.DataFrame) -> pd.DataFrame:
 
     # the null is analysed time too: no baseline window touches excluded time
     # (the artifact mask widened by 0.3 s; the low-non-local label is decoded)
-    time = dot["time"].to_numpy() if "time" in dot.columns else dot.index.to_numpy()
+    time = dot.index.to_numpy()
     observed = ~interval_mask(time, excluded_intervals_of(dot))
     for s, e in _contiguous_spans((nlp < NON_EVENT_THRESHOLD) & immobile & observed):
         n_bins = e - s + 1

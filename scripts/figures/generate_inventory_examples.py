@@ -396,8 +396,6 @@ def load_epoch(identifier: str, *, run_dir: Path, memoryless_dir: Path) -> Epoch
         kept.
     """
     dot = pd.read_pickle(runner.decode_path(identifier))
-    if "time" in dot.columns:
-        dot = dot.set_index("time")
     time = dot.index.to_numpy(dtype=np.float64)
     marks = decode_marks(identifier)
     encoding_model = marks["encoding_model"]

@@ -547,15 +547,6 @@ class TestCanonicalSwrIntervals:
 
         assert intervals.SWR_event.tolist() == [1]
 
-    def test_a_time_column_is_the_time_axis(self):
-        labels = np.zeros(60, dtype=int)
-        labels[10:20] = 1
-        frame = data_over_time(SWR_event=labels).reset_index()
-
-        intervals = canonical_swr_intervals(frame, speed_threshold=4.0)
-
-        assert intervals.start_time.iloc[0] == pytest.approx(frame.time.iloc[10])
-
     def test_more_than_one_epoch_is_refused(self):
         frame = pd.concat([data_over_time(), data_over_time().assign(epoch="04_r2")])
 
