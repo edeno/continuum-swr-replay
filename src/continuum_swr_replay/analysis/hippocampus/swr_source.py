@@ -944,7 +944,9 @@ def _drops(
     return drops, swr_labels
 
 
-def artifact_event_drops(dot: pd.DataFrame) -> pd.DataFrame:
+def artifact_event_drops(
+    dot: pd.DataFrame, *, non_local_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD
+) -> pd.DataFrame:
     """Every event of one epoch's decode frame, with its reason to leave.
 
     The reasons :func:`with_swr_source` acts on, the one rule
@@ -967,6 +969,9 @@ def artifact_event_drops(dot: pd.DataFrame) -> pd.DataFrame:
         One epoch's decode frame as the decoder saved it, indexed by
         increasing time (no ``time`` column), carrying ``animal``, ``day``,
         ``epoch`` and ``head_speed``.
+    non_local_threshold : float
+        The threshold the frame was decoded at; its non-local labels are
+        checked against it, as :func:`with_swr_source` checks them.
 
     Returns
     -------
@@ -984,22 +989,25 @@ def artifact_event_drops(dot: pd.DataFrame) -> pd.DataFrame:
         increases (``event_immobility.require_time_index``).
     EventDefinitionError
         If a ``non_local_event`` or ``MUA_event`` label breaks the whole-event
-        immobility rule, or a non-local label has a bin not above the default
-        probability threshold (:func:`with_swr_source`).
+        immobility rule, or a non-local label has a bin not above
+        `non_local_threshold` (:func:`with_swr_source`).
     SwrSourceError
         If the epoch cannot be served.
     """
-    epoch_id, time = _frame_epoch(dot, "artifact_event_drops")
+    epoch_id, time = _frame_epoch(dot, "artifact_event_drops", non_local_threshold)
     drops, _ = _drops(epoch_id, _epoch_source(epoch_id), dot, time)
     return drops
 
 
-def read_artifact_event_drops(path: str | Path) -> pd.DataFrame:
+def read_artifact_event_drops(
+    path: str | Path, *, non_local_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD
+) -> pd.DataFrame:
     """:func:`artifact_event_drops` of a decode's ``data_over_time`` pickle, as
     the decoder saved it: for a consumer that needs the dropped events
-    themselves (an exposure count, a control window, a re-detected cohort)."""
+    themselves (an exposure count, a control window, a re-detected cohort).
+    `non_local_threshold` is the frame's, as for :func:`read_dot_with_swr_source`."""
     frame: Any = pd.read_pickle(path)
-    return artifact_event_drops(frame)
+    return artifact_event_drops(frame, non_local_threshold=non_local_threshold)
 
 
 def dropped_for_excluded_time(drops: pd.DataFrame) -> pd.DataFrame:

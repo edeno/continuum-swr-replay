@@ -1673,8 +1673,10 @@ def render_epoch(
         epoch_name,
         ripple_power=ripple_power_inputs(swr_epoch_id(nwb_file_name, epoch_name)),
     )
+    # The frame, the results and the posterior all come from `data_dir`, so an
+    # event's frame and posterior are one decode's.
     results, detector, env = load_results(
-        nwb_file_name, epoch_name, decoding_brain_area="HPC"
+        nwb_file_name, epoch_name, decoding_brain_area="HPC", root=data_dir
     )
 
     # ``dot`` is always loaded: it is cheap relative to load_data and the
@@ -1693,7 +1695,7 @@ def render_epoch(
     arm_table = None
     if (sel["category"] != "swr_not_nonlocal").any():
         posterior = load_conditional_posterior(
-            decode_paths(f"{epoch_id}_HPC", PROCESSED_DATA_DIR).results
+            decode_paths(f"{epoch_id}_HPC", data_dir).results
         )
         event_table = build_event_table(
             dot,

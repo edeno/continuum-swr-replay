@@ -92,11 +92,16 @@ from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_decode_files,
 )
 from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier  # noqa: E402
-from continuum_swr_replay.decode_files import decode_paths  # noqa: E402
+from continuum_swr_replay.decode_files import (  # noqa: E402
+    decode_paths,
+    non_local_threshold_percent,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
 
 # --- Parameters (provisional; see spec) ---------------------------------------
 NON_LOCAL_THRESHOLD = DEFAULT_NON_LOCAL_THRESHOLD
+# the data_over_time file the threshold names (``_80_``)
+THRESHOLD_PERCENT = non_local_threshold_percent(NON_LOCAL_THRESHOLD)
 NON_EVENT_THRESHOLD = 0.2  # non-local prob below this = clearly local (baseline)
 IMMOBILITY_CM_PER_S = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 CLOSE_CM = 40.0  # mean |ahead-behind| below this = "close" subset
@@ -140,7 +145,9 @@ def find_sessions(animal: str | None) -> list[str]:
         epoch_id = det.name.removesuffix("_detector.pkl")
         if animal is not None and not epoch_id.startswith(animal):
             continue
-        paths = decode_paths(epoch_id, PROCESSED_DATA_DIR)
+        paths = decode_paths(
+            epoch_id, PROCESSED_DATA_DIR, threshold_percent=THRESHOLD_PERCENT
+        )
         if paths.results.exists() and paths.data_over_time.exists():
             out.append(epoch_id)
     return out
@@ -346,7 +353,9 @@ def analyze_session(
     # The read refuses labels that break the speed rule or the probability
     # contract.
     dot = read_dot_with_swr_source(
-        decode_paths(epoch_id, PROCESSED_DATA_DIR).data_over_time,
+        decode_paths(
+            epoch_id, PROCESSED_DATA_DIR, threshold_percent=THRESHOLD_PERCENT
+        ).data_over_time,
         non_local_threshold=NON_LOCAL_THRESHOLD,
     )
     # Validate before loading encoding data so a missing/corrupt auxiliary

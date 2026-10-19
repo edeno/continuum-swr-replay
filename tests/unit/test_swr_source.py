@@ -953,6 +953,21 @@ class TestTheLabelContract:
         read = read_dot_with_swr_source(path, non_local_threshold=0.5)
         pd.testing.assert_series_equal(read["non_local_event"], out["non_local_event"])
 
+    def test_the_drops_take_the_frames_threshold_too(self, inventory, tmp_path):
+        """A frame decoded at 0.5 reads at 0.5 in the drops as in the read."""
+        dot = self._frame(**{"Non-Local_Continuous_prob": 0.6})
+        path = tmp_path / f"{EPOCH}_50_data_over_time.pkl"
+        dot.to_pickle(path)
+
+        with pytest.raises(EventDefinitionError, match="probability-threshold"):
+            swr_source.artifact_event_drops(dot)
+        drops = swr_source.artifact_event_drops(dot, non_local_threshold=0.5)
+        pd.testing.assert_frame_equal(
+            swr_source.read_artifact_event_drops(path, non_local_threshold=0.5),
+            drops,
+        )
+        assert (drops["event_col"] == "non_local_event").sum() == 1
+
     def test_a_contfrag_frame_has_no_probability_contract(self, inventory):
         dot = _dot(
             MUA_event=_labels(MUA[2:3]), Continuous_prob=0.5, Fragmented_prob=0.5

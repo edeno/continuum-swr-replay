@@ -31,6 +31,7 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     load_data_over_time,
 )
 from continuum_swr_replay.data_loaders import epoch_register
+from continuum_swr_replay.decode_files import non_local_threshold_percent
 from tests.unit._swr_inventory_fixtures import RUN_ID, write_swr_inventory
 
 ANALYSED = ("a20200101_02_r1_HPC", "b20200102_04_r2_HPC")
@@ -193,3 +194,72 @@ def test_the_event_gallery_is_quiet_when_every_analysed_epoch_is_there(
         event_gallery.list_epoch_pkls(_folder(tmp_path, "_80_data_over_time.pkl"))
 
     assert "left out" not in caplog.text
+
+
+@pytest.mark.parametrize("script", [content_occupancy, spike_evidence])
+def test_a_scan_names_the_file_its_threshold_validates(script, tmp_path, monkeypatch):
+    """The file a scan reads is the one its ``NON_LOCAL_THRESHOLD`` names, the
+    threshold the read then checks its labels at."""
+    assert script.THRESHOLD_PERCENT == non_local_threshold_percent(
+        script.NON_LOCAL_THRESHOLD
+    )
+    folder = tmp_path / "decodes"
+    folder.mkdir()
+    for suffix in (
+        "_environment.pkl",
+        "_detector.pkl",
+        "_results.nc",
+        "_50_data_over_time.pkl",
+    ):
+        (folder / f"{ANALYSED[0]}{suffix}").touch()
+    monkeypatch.setattr(script, "PROCESSED_DATA_DIR", folder)
+
+    assert script.find_sessions(None) == []
+    monkeypatch.setattr(script, "THRESHOLD_PERCENT", 50)
+    assert script.find_sessions(None) == [ANALYSED[0]]
+
+
+def test_the_event_gallery_renders_from_one_decode_folder(tmp_path, monkeypatch):
+    """An event's frame, results and posterior all come from ``--data-dir``,
+    never a frame from one decode and a posterior from another."""
+    gallery = tmp_path / "gallery"
+    gallery.mkdir()
+    pd.DataFrame({"epoch_id": ["a20200101_02_r1"], "category": ["non_swr"]}).to_parquet(
+        gallery / "_catalog.parquet"
+    )
+    data_dir = tmp_path / "staging"
+    read = {}
+
+    class _Stop(Exception):
+        pass
+
+    def load_conditional_posterior(path):
+        read["posterior"] = path
+        raise _Stop
+
+    monkeypatch.setattr(event_gallery, "load_data", lambda *a, **k: {})
+    monkeypatch.setattr(event_gallery, "ripple_power_inputs", lambda epoch_id: None)
+    monkeypatch.setattr(
+        event_gallery,
+        "load_results",
+        lambda *a, root, **k: read.setdefault("results", root) and (None, None, None),
+    )
+    monkeypatch.setattr(
+        event_gallery,
+        "read_dot_with_swr_source",
+        lambda path: read.setdefault("frame", path),
+    )
+    monkeypatch.setattr(event_gallery, "immobility_bout_intervals", lambda dot: None)
+    monkeypatch.setattr(event_gallery, "swr_intervals", lambda dot: None)
+    monkeypatch.setattr(
+        event_gallery, "load_conditional_posterior", load_conditional_posterior
+    )
+
+    with pytest.raises(_Stop):
+        event_gallery.render_epoch("a20200101_02_r1", data_dir, gallery, False)
+
+    assert read == {
+        "results": data_dir,
+        "frame": data_dir / "a20200101_02_r1_HPC_80_data_over_time.pkl",
+        "posterior": data_dir / "a20200101_02_r1_HPC_results.nc",
+    }

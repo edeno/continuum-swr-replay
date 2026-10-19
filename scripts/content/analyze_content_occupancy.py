@@ -71,12 +71,17 @@ from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_decode_files,
 )
 from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier  # noqa: E402
-from continuum_swr_replay.decode_files import decode_paths  # noqa: E402
+from continuum_swr_replay.decode_files import (  # noqa: E402
+    decode_paths,
+    non_local_threshold_percent,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
 from continuum_swr_replay.table_io import read_table, table_exists  # noqa: E402
 
 # --- Parameters ---------------------------------------------------------------
 NON_LOCAL_THRESHOLD = DEFAULT_NON_LOCAL_THRESHOLD
+# the data_over_time file the threshold names (``_80_``)
+THRESHOLD_PERCENT = non_local_threshold_percent(NON_LOCAL_THRESHOLD)
 IMMOBILITY_CM_PER_S = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 FAR_CM = 20.0  # content track-distance from animal above this = "far/remote"
 AT_WELL_CM = 20.0  # content track-distance to nearest well below this = "at a well"
@@ -122,7 +127,9 @@ def find_sessions(animal: str | None) -> list[str]:
         epoch_id = env.name.removesuffix("_environment.pkl")
         if animal is not None and not epoch_id.startswith(animal):
             continue
-        if decode_paths(epoch_id, PROCESSED_DATA_DIR).data_over_time.exists():
+        if decode_paths(
+            epoch_id, PROCESSED_DATA_DIR, threshold_percent=THRESHOLD_PERCENT
+        ).data_over_time.exists():
             out.append(epoch_id)
     return out
 
@@ -154,7 +161,9 @@ def session_content_distances(
     (``ahead_behind_distance``) and ``d_well`` is the track distance to the
     nearest reward well. Returns ``None`` if too few wells are localizable.
     """
-    paths = decode_paths(epoch_id, PROCESSED_DATA_DIR)
+    paths = decode_paths(
+        epoch_id, PROCESSED_DATA_DIR, threshold_percent=THRESHOLD_PERCENT
+    )
     # The read refuses labels that break the speed rule or the probability
     # contract.
     dot = read_dot_with_swr_source(

@@ -2816,7 +2816,8 @@ def run_session(
         swr_source.read_artifact_event_drops(
             session_data_over_time_path(
                 nwb_file_name, epoch_name, non_local_threshold=non_local_threshold
-            )
+            ),
+            non_local_threshold=non_local_threshold,
         )
     )
     event_counts["n_artifact_dropped_events"] = int(len(artifact_dropped))
