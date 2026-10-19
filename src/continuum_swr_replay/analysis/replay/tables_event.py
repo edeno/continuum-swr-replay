@@ -15,6 +15,9 @@ from continuum_swr_replay.analysis.constants import (
 from continuum_swr_replay.analysis.hippocampus.event_detection import (
     event_strict_overlap_keys,
 )
+from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+    require_canonical_speed_threshold,
+)
 from continuum_swr_replay.analysis.hippocampus.event_table import (
     build_classified_nonlocal_event_table,
 )
@@ -607,8 +610,8 @@ def build_event_table(
     track_graph : networkx.Graph
         Session track graph; edges carry ``edge_id``.
     speed_threshold : float
-        Head-speed threshold for immobility (cm/s). Default matches the
-        project-wide constant.
+        Head-speed threshold for immobility (cm/s). Only the project-wide
+        constant is accepted: the read gates the SWR and MUA labels at it.
     nonlocal_threshold : float
         Non-local state probability threshold. Default matches the
         project-wide constant.
@@ -619,6 +622,12 @@ def build_event_table(
         One row per event with the columns documented below. Empty
         frame (correct columns, zero rows) if the session has no
         qualifying events.
+
+    Raises
+    ------
+    ValueError
+        If `speed_threshold` is not the canonical
+        ``DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC``.
 
     Columns
     -------
@@ -688,6 +697,7 @@ def build_event_table(
     a trip. They are excluded from the content models because the well-visit
     construct is undefined there, not because the animal was running.
     """
+    require_canonical_speed_threshold(speed_threshold, "build_event_table")
     dot, session_key, mua_overlap_keys, bout_starts, bout_ends = (
         _annotate_dot_for_events(
             dot, env, trials, port_experiences, track_graph, speed_threshold
@@ -774,7 +784,8 @@ def build_event_sequence_table(
         :func:`posterior_io.load_conditional_posterior`. Must have the
         same time length as ``dot``.
     speed_threshold, nonlocal_threshold : float
-        Same defaults as :func:`build_event_table`. Keeping the two
+        Same defaults as :func:`build_event_table` (``speed_threshold``
+        accepts only the canonical value there and here). Keeping the two
         filters in lockstep is important: ``event_sequence_table`` and
         ``event_table`` must cover exactly the same in-event rows, or
         joins across them drift.
@@ -799,6 +810,7 @@ def build_event_sequence_table(
     :func:`build_event_table`'s posterior-dependent columns — no
     arithmetic difference can leak between the two tables.
     """
+    require_canonical_speed_threshold(speed_threshold, "build_event_sequence_table")
     if "animal" not in dot.columns:
         raise KeyError("dot must carry 'animal' column (set by get_data_over_time)")
     animal = str(dot["animal"].iloc[0])

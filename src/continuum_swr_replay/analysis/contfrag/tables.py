@@ -25,6 +25,7 @@ from continuum_swr_replay.analysis.hippocampus.event_detection import (
     event_strict_overlap_keys,
 )
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+    require_canonical_speed_threshold,
     whole_event_immobility_mask,
 )
 
@@ -271,7 +272,8 @@ def build_contfrag_event_table(
     conditional_posterior : xr.DataArray, optional
         Combined posterior for posterior-dependent columns.
     speed_threshold : float
-        Head-speed threshold for immobility (cm/s).
+        Head-speed threshold for immobility (cm/s). Only the canonical value
+        is accepted: the read gates the other detector's labels at it.
 
     Returns
     -------
@@ -280,7 +282,14 @@ def build_contfrag_event_table(
         plus ContFrag-specific: ``continuous_prob_mean``,
         ``fragmented_prob_mean``, ``dominant_state`` (ties go to
         Continuous), ``continuous_fraction``.
+
+    Raises
+    ------
+    ValueError
+        If `speed_threshold` is not the canonical
+        ``DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC``.
     """
+    require_canonical_speed_threshold(speed_threshold, "build_contfrag_event_table")
     if "animal" not in dot.columns:
         raise KeyError(
             "dot must carry 'animal' column (set by get_contfrag_data_over_time)"
@@ -572,13 +581,20 @@ def build_contfrag_event_arm_table(
     conditional_posterior : xr.DataArray, optional
         Combined posterior for arm_posterior_mass.
     speed_threshold : float
-        Head-speed threshold for immobility.
+        Head-speed threshold for immobility; only the canonical value.
 
     Returns
     -------
     pd.DataFrame
         Columns: see ``_contfrag_event_arm_table_columns()``.
+
+    Raises
+    ------
+    ValueError
+        If `speed_threshold` is not the canonical
+        ``DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC``.
     """
+    require_canonical_speed_threshold(speed_threshold, "build_contfrag_event_arm_table")
     event_col = _resolve_event_col(event_source)
     canonical_column_order = _contfrag_event_arm_table_build_columns(event_source)
     if len(event_table) == 0:
@@ -740,13 +756,20 @@ def build_contfrag_stop_table(
     event_source : {"SWR", "MUA"}
         Which external detector defines events.
     speed_threshold : float
-        Head-speed threshold for immobility.
+        Head-speed threshold for immobility; only the canonical value.
 
     Returns
     -------
     pd.DataFrame
         Columns: see ``_CONTFRAG_STOP_TABLE_COLUMNS``.
+
+    Raises
+    ------
+    ValueError
+        If `speed_threshold` is not the canonical
+        ``DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC``.
     """
+    require_canonical_speed_threshold(speed_threshold, "build_contfrag_stop_table")
     if "animal" not in dot.columns:
         raise KeyError("dot must carry 'animal' column")
     animal = str(dot["animal"].iloc[0])

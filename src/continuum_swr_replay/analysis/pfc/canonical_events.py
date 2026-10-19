@@ -45,6 +45,7 @@ from continuum_swr_replay.analysis.hippocampus import swr_source
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     filter_event_labels_by_speed,
     intervals_from_labels,
+    require_canonical_speed_threshold,
 )
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.decode_files import (
@@ -224,7 +225,9 @@ def load_session_swr_intervals(
         Threshold tag of the cached frame: it names the frame, and the read
         checks the frame's Non-Local labels against it.
     speed_threshold : float
-        Immobility threshold in cm/s. The rule is strictly ``<``.
+        Immobility threshold in cm/s. The rule is strictly ``<``. The
+        canonical value or a stricter (lower) one: the read already gated the
+        SWRs at the canonical value, so a looser one could not re-admit them.
 
     Returns
     -------
@@ -242,10 +245,15 @@ def load_session_swr_intervals(
     FileNotFoundError
         If the cached frame does not exist.
     ValueError
-        If the frame lacks ``head_speed`` or the session columns.
+        If `speed_threshold` is looser (higher) than the canonical
+        ``DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC``, or the frame lacks
+        ``head_speed`` or the session columns.
     SwrSourceError
         If the SWR source cannot serve the session.
     """
+    require_canonical_speed_threshold(
+        speed_threshold, "load_session_swr_intervals", allow_stricter=True
+    )
     path = (
         session_data_over_time_path(
             nwb_file_name, epoch_name, non_local_threshold=non_local_threshold
@@ -265,7 +273,7 @@ def load_session_swr_intervals(
     # The read already gates SWRs at the canonical threshold, so at the default
     # this changes nothing. It is kept for a stricter `speed_threshold`, which
     # diagnose_pfc_event_definition.py takes on its command line; a looser one
-    # cannot re-admit SWRs the read dropped.
+    # cannot re-admit SWRs the read dropped, so it is refused above.
     gated = filter_event_labels_by_speed(
         dot, ["SWR_event"], speed_threshold=speed_threshold
     )

@@ -10,6 +10,9 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
+from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+    require_canonical_speed_threshold,
+)
 from continuum_swr_replay.analysis.hippocampus.swr_source import (
     excluded_intervals_of,
 )
@@ -120,7 +123,14 @@ def build_stop_table(
     -------
     pd.DataFrame
         Columns: see :data:`_STOP_TABLE_COLUMNS`.
+
+    Raises
+    ------
+    ValueError
+        If `speed_threshold` is not the canonical
+        ``DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC``.
     """
+    require_canonical_speed_threshold(speed_threshold, "build_stop_table")
     if "animal" not in dot.columns:
         raise KeyError("dot must carry 'animal' column (set by get_data_over_time)")
     animal = str(dot["animal"].iloc[0])

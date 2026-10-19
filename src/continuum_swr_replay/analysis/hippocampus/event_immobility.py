@@ -53,6 +53,53 @@ def _validate_speed_threshold(speed_threshold: float) -> float:
     return threshold
 
 
+def require_canonical_speed_threshold(
+    speed_threshold: float, where: str, *, allow_stricter: bool = False
+) -> None:
+    """Refuse a speed threshold the read's SWR and MUA cohorts do not follow.
+
+    The read (``swr_source.with_swr_source``) gates the SWR and MUA labels at
+    the canonical :data:`DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC`, once for
+    every consumer. A builder that gated its own events at another value would
+    classify them against SWRs and MUA events gated at the canonical one, a
+    mixed cohort, so it refuses the value instead.
+
+    Parameters
+    ----------
+    speed_threshold : float
+        The caller's threshold, cm/s.
+    where : str
+        The caller's name, for the message.
+    allow_stricter : bool
+        Accept a threshold below the canonical one too: for a filter that
+        re-gates the read's SWRs itself, which can drop SWRs the read kept but
+        cannot re-admit ones it dropped.
+
+    Raises
+    ------
+    ValueError
+        If `speed_threshold` is not the canonical value (or, with
+        `allow_stricter`, is above it).
+    """
+    canonical = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
+    threshold = float(speed_threshold)
+    if allow_stricter and threshold <= canonical:
+        return
+    if threshold == canonical:
+        return
+    accepted = (
+        f"{canonical:g} cm/s or a stricter (lower) value"
+        if allow_stricter
+        else f"the canonical {canonical:g} cm/s"
+    )
+    raise ValueError(
+        f"{where}: speed_threshold={speed_threshold!r} cm/s is not supported; "
+        f"pass {accepted}. The read (swr_source.with_swr_source) gates the "
+        f"SWR and MUA labels at {canonical:g} cm/s, so another value would "
+        "mix speed cohorts."
+    )
+
+
 def event_speeds_are_immobile(
     speed: Sequence[float] | np.ndarray,
     *,
@@ -451,6 +498,7 @@ __all__ = [
     "filter_event_labels_by_speed",
     "filter_event_intervals_by_speed",
     "intervals_from_labels",
+    "require_canonical_speed_threshold",
     "validate_nonlocal_event_probability_contract",
     "validate_whole_event_immobility_contract",
     "whole_event_immobility_mask",

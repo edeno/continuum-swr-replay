@@ -304,7 +304,10 @@ def get_command_line_arguments() -> argparse.Namespace:
         "--immobility-threshold",
         type=float,
         default=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-        help="Speed threshold in cm/s for the whole-event immobility rule",
+        help=(
+            "Speed threshold in cm/s for the whole-event immobility rule: the "
+            "canonical value or a stricter (lower) one"
+        ),
     )
     parser.add_argument(
         "--non-local-threshold",

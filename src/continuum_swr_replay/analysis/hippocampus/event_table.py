@@ -67,6 +67,7 @@ from .event_detection import (
 from .event_immobility import (
     event_speeds_are_immobile,
     intervals_from_labels,
+    require_canonical_speed_threshold,
     validate_nonlocal_event_probability_contract,
 )
 
@@ -199,8 +200,8 @@ def build_classified_nonlocal_event_table(
         ``Non-Local_Fragmented_prob``.
     speed_threshold : float
         Immobility threshold (cm/s) used for the canonical whole-event flag
-        and the legacy endpoint diagnostic. The SWRs are the read's, gated at
-        the canonical threshold.
+        and the legacy endpoint diagnostic. Only the canonical value is
+        accepted: the SWRs are the read's, gated at it.
     nonlocal_threshold : float
         Minimum combined Non-Local posterior required at every labeled bin.
         This must match the threshold used to create or validate the primary
@@ -217,6 +218,12 @@ def build_classified_nonlocal_event_table(
         overlap_class, overlap_subclass, n_swrs_overlapping,
         matched_swr_event, matched_swr_start, matched_swr_end``.
         Empty frame (correct columns, zero rows) if no events.
+
+    Raises
+    ------
+    ValueError
+        If `speed_threshold` is not the canonical
+        ``DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC``.
 
     Notes
     -----
@@ -236,6 +243,9 @@ def build_classified_nonlocal_event_table(
         validate_event_ids,
     )
 
+    require_canonical_speed_threshold(
+        speed_threshold, "build_classified_nonlocal_event_table"
+    )
     missing = [c for c in _REQUIRED_DOT_COLUMNS if c not in dot.columns]
     if missing:
         raise KeyError(

@@ -60,6 +60,7 @@ from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     event_speeds_are_immobile,
     filter_event_labels_by_speed,
     intervals_from_labels,
+    require_canonical_speed_threshold,
 )
 
 # the canonical matched-SWR rule itself, not a copy that could drift from it
@@ -435,12 +436,15 @@ def canonical_swr_intervals(
 ) -> pd.DataFrame:
     """The SWR intervals the canonical event table classifies against.
 
-    The same two steps the canonical table's SWRs take, in the same order:
-    every ``SWR_event`` label during which the animal moves is zeroed whole
-    (the read does this at the canonical threshold), then each surviving
-    label's bounds are its first and last
-    sample. The two cohorts are then labeled against one interval table, which
-    calling the same classifier on different intervals would not give.
+    At the canonical threshold, the same two steps the canonical table's SWRs
+    take, in the same order: every ``SWR_event`` label during which the animal
+    moves is zeroed whole (the read does this at the canonical threshold),
+    then each surviving label's bounds are its first and last sample. A
+    stricter threshold zeroes, in addition, the SWRs the read kept that it
+    rejects; a looser one is refused, because it could not re-admit the SWRs
+    the read dropped. The two cohorts are then labeled against one interval
+    table, which calling the same classifier on different intervals would not
+    give.
 
     Parameters
     ----------
@@ -450,14 +454,23 @@ def canonical_swr_intervals(
         through the SWR source (``swr_source.read_dot_with_swr_source``), whose
         ``SWR_event`` is the direct Kay inventory's, as the canonical table's is.
     speed_threshold : float
-        cm/s; the canonical immobility threshold.
+        cm/s; the canonical immobility threshold, or a stricter (lower) one.
 
     Returns
     -------
     swr_intervals : DataFrame
         Columns ``SWR_event``, ``start_time``, ``end_time``.
 
+    Raises
+    ------
+    ValueError
+        If `speed_threshold` is looser (higher) than the canonical
+        ``DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC``, or the frame holds more
+        than one epoch.
     """
+    require_canonical_speed_threshold(
+        speed_threshold, "canonical_swr_intervals", allow_stricter=True
+    )
     if data_over_time.groupby(list(SESSION_COLUMNS_DAY)).ngroups != 1:
         raise ValueError("canonical_swr_intervals reads one epoch at a time.")
     # A no-op at the canonical threshold, where the read already gated the

@@ -86,7 +86,7 @@ One analysed-time rule for every event cohort, exposure, bin and window.
 
 Canonical whole-event immobility rules for neural event cohorts.
 
-`EventDefinitionError`, `event_speeds_are_immobile`, `whole_event_immobility_mask`, `filter_event_labels_by_speed`, `validate_whole_event_immobility_contract`, `validate_nonlocal_event_probability_contract`, `filter_event_intervals_by_speed`, `intervals_from_labels`, `build_speed_eligible_event_cohort`
+`EventDefinitionError`, `require_canonical_speed_threshold`, `event_speeds_are_immobile`, `whole_event_immobility_mask`, `filter_event_labels_by_speed`, `validate_whole_event_immobility_contract`, `validate_nonlocal_event_probability_contract`, `filter_event_intervals_by_speed`, `intervals_from_labels`, `build_speed_eligible_event_cohort`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/event_table.py`
 
