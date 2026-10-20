@@ -66,7 +66,8 @@ INVENTORY_DTYPES: Mapping[str, object] = MappingProxyType(
 STATE_SPACE = "state_space"
 MEMORYLESS = "memoryless"
 MEMORYLESS_CRITERIA = "memoryless_criteria"
-
+"""The memoryless detector's ``replay_criteria`` cohort, compared as an
+inventory of its own."""
 
 MEMORYLESS_COHORTS: Mapping[str, str] = MappingProxyType(
     {"published": "shuffle_pass", "replay_criteria": "is_replay"}
