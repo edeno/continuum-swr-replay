@@ -36,7 +36,7 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.inventory_comparison.intervals import (
+from continuum_swr_replay.intervals import (
     contains,
     intersect,
     normalize,

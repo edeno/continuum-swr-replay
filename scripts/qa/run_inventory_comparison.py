@@ -132,10 +132,6 @@ from continuum_swr_replay.analysis.inventory_comparison.components import (  # n
     COMPONENT_DTYPES,
     overlap_components,
 )
-from continuum_swr_replay.analysis.inventory_comparison.intervals import (  # noqa: E402
-    contains,
-    total_duration,
-)
 from continuum_swr_replay.analysis.inventory_comparison.overlap import (  # noqa: E402
     DIRECTIONAL_DTYPES,
     PAIR_DTYPES,
@@ -179,6 +175,10 @@ from continuum_swr_replay.decoding_common import (  # noqa: E402
     provenance_record,
     replace_outputs,
     write_atomically,
+)
+from continuum_swr_replay.intervals import (  # noqa: E402
+    contains,
+    total_duration,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR  # noqa: E402
 from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY  # noqa: E402

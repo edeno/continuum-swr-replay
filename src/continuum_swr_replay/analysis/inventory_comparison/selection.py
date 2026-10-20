@@ -83,11 +83,6 @@ from continuum_swr_replay.analysis.inventory_comparison.features import (
     interval_rows,
     middle_row,
 )
-from continuum_swr_replay.analysis.inventory_comparison.intervals import (
-    intersect,
-    normalize,
-    subtract,
-)
 from continuum_swr_replay.analysis.inventory_comparison.overlap import (
     MATCHED,
     UNKNOWN,
@@ -101,6 +96,11 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import (
     MEMORYLESS,
     MEMORYLESS_COHORTS,
     _event_keys,
+)
+from continuum_swr_replay.intervals import (
+    intersect,
+    normalize,
+    subtract,
 )
 from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 

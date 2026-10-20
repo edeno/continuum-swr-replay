@@ -42,13 +42,6 @@ from continuum_swr_replay.analysis.inventory_comparison.features import (
     RowTraces,
     interval_rows,
 )
-from continuum_swr_replay.analysis.inventory_comparison.intervals import (
-    contains,
-    intersect,
-    subtract,
-    total_duration,
-    union,
-)
 from continuum_swr_replay.analysis.inventory_comparison.overlap import Coverage
 from continuum_swr_replay.analysis.inventory_comparison.selection import (
     BASELINE_DTYPES,
@@ -66,6 +59,13 @@ from continuum_swr_replay.analysis.inventory_comparison.selection import (
     matched_baselines,
     rejection_stages,
     window_room,
+)
+from continuum_swr_replay.intervals import (
+    contains,
+    intersect,
+    subtract,
+    total_duration,
+    union,
 )
 
 SESSION = ("sim", 20200101, "02_r1")

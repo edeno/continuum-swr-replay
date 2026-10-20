@@ -38,10 +38,6 @@ from continuum_swr_replay.analysis.inventory_comparison.cells import (
 from continuum_swr_replay.analysis.inventory_comparison.components import (
     overlap_components,
 )
-from continuum_swr_replay.analysis.inventory_comparison.intervals import (
-    intersect,
-    total_duration,
-)
 from continuum_swr_replay.analysis.inventory_comparison.overlap import (
     SET_ASIDE_DTYPES,
     Coverage,
@@ -65,6 +61,10 @@ from continuum_swr_replay.analysis.inventory_comparison.swr_matrix import (
     paired_labels,
     swr_label_matrix,
     swr_labels,
+)
+from continuum_swr_replay.intervals import (
+    intersect,
+    total_duration,
 )
 
 EPOCH = SessionIdentity(animal="sim", day=20200101, epoch="02_r1", brain_area="HPC")

@@ -24,17 +24,17 @@ from types import MappingProxyType
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.inventory_comparison.intervals import (
-    intersect,
-    total_duration,
-    union,
-)
 from continuum_swr_replay.analysis.inventory_comparison.overlap import (
     MATCHED,
     UNKNOWN,
     UNMATCHED,
     Coverage,
     validate_detectors,
+)
+from continuum_swr_replay.intervals import (
+    intersect,
+    total_duration,
+    union,
 )
 from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 

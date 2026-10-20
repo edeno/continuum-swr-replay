@@ -22,12 +22,6 @@ from continuum_swr_replay.analysis.inventory_comparison.availability import (
     stored_coverage,
     window_supported,
 )
-from continuum_swr_replay.analysis.inventory_comparison.intervals import (
-    contains,
-    intersect,
-    subtract,
-    total_duration,
-)
 from continuum_swr_replay.analysis.inventory_comparison.overlap import (
     SET_ASIDE_DTYPES,
     Coverage,
@@ -40,6 +34,12 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import (
     SessionIdentity,
     combine_inventories,
     inventory_from_intervals,
+)
+from continuum_swr_replay.intervals import (
+    contains,
+    intersect,
+    subtract,
+    total_duration,
 )
 
 SESSION = SessionIdentity(animal="sim", day=20200101, epoch="02_r1", brain_area="HPC")

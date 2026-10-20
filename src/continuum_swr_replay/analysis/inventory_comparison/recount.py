@@ -23,11 +23,11 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.inventory_comparison.intervals import contains
 from continuum_swr_replay.analysis.inventory_comparison.overlap import (
     Coverage,
     validate_detectors,
 )
+from continuum_swr_replay.intervals import contains
 from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 
 __all__ = ["FRAGMENT_GAPS_S", "RECOUNT_DTYPES", "merge_fragments"]

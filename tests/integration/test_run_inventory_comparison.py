@@ -41,10 +41,6 @@ from continuum_swr_replay.analysis.inventory_comparison.availability import (
 from continuum_swr_replay.analysis.inventory_comparison.cells import (
     membership_against,
 )
-from continuum_swr_replay.analysis.inventory_comparison.intervals import (
-    intersect,
-    total_duration,
-)
 from continuum_swr_replay.analysis.inventory_comparison.overlap import (
     PAIR_DTYPES,
     directional_agreement,
@@ -52,6 +48,10 @@ from continuum_swr_replay.analysis.inventory_comparison.overlap import (
 )
 from continuum_swr_replay.analysis.inventory_comparison.populations import (
     rebuild_matches,
+)
+from continuum_swr_replay.intervals import (
+    intersect,
+    total_duration,
 )
 from continuum_swr_replay.table_io import read_table, sha256_file
 from tests.unit._swr_inventory_fixtures import (

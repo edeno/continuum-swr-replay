@@ -23,17 +23,17 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.inventory_comparison.intervals import (
-    contains,
-    intersect,
-    total_duration,
-)
 from continuum_swr_replay.analysis.inventory_comparison.overlap import (
     MATCHED,
     UNKNOWN,
     UNMATCHED,
     Coverage,
     validate_detectors,
+)
+from continuum_swr_replay.intervals import (
+    contains,
+    intersect,
+    total_duration,
 )
 from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 

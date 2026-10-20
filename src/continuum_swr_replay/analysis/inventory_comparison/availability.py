@@ -36,18 +36,18 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
 from continuum_swr_replay.analysis.hippocampus import swr_source
-from continuum_swr_replay.analysis.inventory_comparison.intervals import (
-    intersect,
-    normalize,
-    subtract,
-    total_duration,
-)
 from continuum_swr_replay.analysis.inventory_comparison.overlap import (
     Coverage,
     set_aside_events,
     validate_detectors,
 )
 from continuum_swr_replay.analysis.inventory_comparison.schema import SessionIdentity
+from continuum_swr_replay.intervals import (
+    intersect,
+    normalize,
+    subtract,
+    total_duration,
+)
 from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 
 __all__ = [
