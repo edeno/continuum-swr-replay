@@ -2,13 +2,36 @@
 
 Analysis scripts grouped by domain. Run from the repo root, e.g.
 `uv run python scripts/rate/fit_per_bin_rate_models.py`. Scripts import the package
-(`continuum_swr_replay`) and read/write `Processed-Data/`. Shared code belongs in the
-package, so a script does not import another script, with two documented exceptions:
-the `_`-prefixed shared modules (`decoding/_decode_runner.py`, `qa/_report.py`), which
-exist to be imported, and the existing `from scripts.… import …` lines, by which a
-report, figure or QA script reuses another script's constants, output paths and helpers
-(usually those of the runner whose output it reads). Run from the repo root so
+(`continuum_swr_replay`) and read/write `Processed-Data/`. Run from the repo root so
 `scripts` is importable.
+
+**Only `_`-prefixed modules are importable by other scripts.** Shared code belongs in
+the package, or in a `_`-prefixed module beside the scripts that share it
+(`decoding/_decode_runner.py`, `qa/_report.py`). A script that is not `_`-prefixed is
+never imported by another script or by `src/`; tests may import any script.
+[`tests/unit/test_no_new_script_imports.py`](../tests/unit/test_no_new_script_imports.py)
+enforces this. Its `ALLOWED` table is the current exception list, and it only
+shrinks:
+- the detection-comparison family: `figures/generate_event_feature_examples.py`,
+  `figures/generate_inventory_examples.py`, `qa/report_event_features.py`,
+  `qa/report_inventory_comparison.py` and `qa/run_event_features.py` import
+  `qa/run_inventory_comparison.py` (run layout, detector roster, decode helpers) and
+  each other; `figures/generate_inventory_examples.py` and `qa/run_event_features.py`
+  also import `decoding/run_carey_detection.py`, the first also
+  `decoding/run_memoryless_detection.py` and the second
+  `qa/analyze_event_spike_evidence.py`;
+- the memoryless sweep family: `qa/sweep_memoryless_controls.py`,
+  `qa/sweep_memoryless_heldout.py` and `qa/compare_memoryless_to_reference.py` import
+  `qa/sweep_memoryless_detection.py` (and the reference check also
+  `qa/memoryless_reference.py` and `figures/generate_memoryless_comparison.py`);
+- `exploratory/_content_cohort_control.py`, which runs
+  `content/fit_swr_contrast_content.py` with its cohort rule bypassed.
+
+The exploratory scripts that unit tests pin (`_verify_harmonization_parity.py`,
+`_statescript_contingency.py`, `_augment_data_over_time.py`,
+`_trunk_zscore_extract.py`, `_trunk_zscore_timebin.py`) stay in `exploratory/` as
+documented exceptions to "unsupported one-off": their leading underscore already makes
+them importable.
 
 ## `decoding/` — produce the decoded data + event/stop tables
 - `run_decoding_bandit.py` — continuum decoding for the bandit task (HPC/mPFC/OFC).
@@ -123,7 +146,10 @@ report, figure or QA script reuses another script's constants, output paths and 
 
 ## `qa/` — diagnostics / validation
 - `_report.py` — not a script: the run's command line (`_invocation`) and the markdown
-  table (`_md`) that several QA reports share, imported as `scripts.qa._report`.
+  table (`_md`) that several QA reports share, and what the two detection-comparison
+  reports share (the pending marking of the memoryless inventories, caption and
+  quantile wording, `read_run`, pooling sessions within an animal), imported as
+  `scripts.qa._report`.
 - `run_refits.py` — reruns the CPU fits for Q2, Q3b and Q4 and the figures that read them,
   in dependency order. Each run is pinned to its own CPUs from `--cpus` (default: all this
   process may use), and OMP/MKL/OpenBLAS/numba threads are capped per run. Runs are named
@@ -295,4 +321,6 @@ report, figure or QA script reuses another script's constants, output paths and 
 
 ## `exploratory/` — unsupported one-offs
 Scratch scripts (`_*.py`): diagnostics, ad-hoc plots, verification checks. Not part of the
-audited pipeline; outputs go to `.claude/research/*_outputs/`. May be stale.
+audited pipeline; outputs go to `.claude/research/*_outputs/`. May be stale. The
+exceptions are the five that unit tests pin (listed at the top of this file), which
+must keep passing their tests.
