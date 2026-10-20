@@ -1,7 +1,7 @@
 """Regression test: cross-session FDR must not be poisoned
 by a NaN p-value from a single role.
 
-``run_stay_leave.cross_session_role_summary`` runs one Wilcoxon per role
+``learning.cross_session_role_summary`` runs one Wilcoxon per role
 and corrects across roles. It sets ``p = nan`` when ``wilcoxon`` raises
 ``ValueError`` (e.g. all-zero β_inter samples on some SciPy versions).
 ``multipletests`` returns an all-NaN adjusted-p vector when *any* input is NaN,
@@ -20,8 +20,11 @@ import pytest
 from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
-from scripts.behavior import run_stay_leave as runner
-from scripts.behavior.run_stay_leave import ROLES, cross_session_role_summary
+from continuum_swr_replay.analysis.replay import learning
+from continuum_swr_replay.analysis.replay.learning import (
+    ROLES,
+    cross_session_role_summary,
+)
 
 #: Enough sessions for a role to be testable at all.
 N_SESSIONS = 8
@@ -60,7 +63,7 @@ class TestStage6FdrNanPropagation:
                 raise ValueError("zero_method 'wilcox' and 'pratt' do not work")
             return wilcoxon(sample)
 
-        monkeypatch.setattr(runner, "wilcoxon", refuse_zero_samples)
+        monkeypatch.setattr(learning, "wilcoxon", refuse_zero_samples)
         coefs = _coefs(
             {
                 "current": _betas(0.0),

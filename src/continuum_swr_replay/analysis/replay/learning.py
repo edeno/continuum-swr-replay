@@ -12,6 +12,8 @@ Two stop-level analyses:
    regression of ``is_stay`` on ``is_omitted_outcome * frac_on_<role>``.
    Returns coefficients suitable for cross-session aggregation
    (Wilcoxon, sign agreement).
+3. :func:`cross_session_role_summary` — that aggregation: per role, the
+   Wilcoxon on the per-session interaction, BH-FDR across the roles.
 
 The k-trial visit-rate-change analysis is intentionally not in this
 module yet; it requires trial-level joins not present in the canonical
@@ -26,6 +28,8 @@ from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
+from scipy.stats import wilcoxon
+from statsmodels.stats.multitest import multipletests
 
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
@@ -648,3 +652,82 @@ def fit_is_stay_pooled_gee(
     base["p_inter"] = float(pvals[3])
     base["status"] = "ok"
     return base
+
+
+# The content roles Stage 6 reads the stay decision on: four arm roles, and the
+# same four at the patch grain.
+ARM_ROLES = ("current", "prev", "last_rewarded", "best")
+PATCH_ROLES = ("current_patch", "prev_patch", "last_rewarded_patch", "best_patch")
+ROLES = ARM_ROLES + PATCH_ROLES
+
+
+def cross_session_role_summary(coefs: pd.DataFrame) -> pd.DataFrame:
+    """Wilcoxon on each role's per-session interaction, FDR-corrected across roles.
+
+    This is the statistic Stage 6 is read on, so it lives in one function: the
+    run logs it, and an audit re-derives it from a saved bundle -- including a
+    bundle fit on another population -- with the same code rather than a second
+    implementation that can drift.
+
+    Parameters
+    ----------
+    coefs : pandas.DataFrame
+        Per-session fits as ``fit_is_stay_logistic_per_session`` returns them,
+        concatenated over roles: ``role``, ``status`` and ``beta_inter``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per role in :data:`ROLES`, in that order:
+        ``role``, ``n_sessions`` (converged sessions with a finite
+        ``beta_inter``), ``median_beta_inter``, ``n_pos``, ``n_neg``, ``p``,
+        ``p_fdr``, and ``status`` (``"ok"`` or ``"too_few_sessions"``). A role
+        with fewer than five sessions is not testable and is excluded from the
+        correction as well as from the test.
+    """
+    converged = coefs[coefs["status"] == "ok"]
+    rows = []
+    for role in ROLES:
+        sub = converged[converged["role"] == role].dropna(subset=["beta_inter"])
+        if len(sub) < 5:
+            rows.append(
+                {
+                    "role": role,
+                    "n_sessions": len(sub),
+                    "median_beta_inter": np.nan,
+                    "n_pos": int((sub["beta_inter"] > 0).sum()),
+                    "n_neg": int((sub["beta_inter"] < 0).sum()),
+                    "p": np.nan,
+                    "status": "too_few_sessions",
+                }
+            )
+            continue
+        try:
+            _, p = wilcoxon(sub["beta_inter"])
+        except ValueError:
+            # SciPy refuses an all-zero sample; that is a failed test, not a
+            # p-value, and must not become one below.
+            p = float("nan")
+        rows.append(
+            {
+                "role": role,
+                "n_sessions": len(sub),
+                "median_beta_inter": float(sub["beta_inter"].median()),
+                "n_pos": int((sub["beta_inter"] > 0).sum()),
+                "n_neg": int((sub["beta_inter"] < 0).sum()),
+                "p": p,
+                "status": "ok",
+            }
+        )
+    summary = pd.DataFrame(rows)
+    summary["p_fdr"] = np.nan
+    # ``multipletests`` returns an all-NaN vector if ANY input is NaN, so a
+    # single role that failed its test would otherwise erase every other role's
+    # FDR. Correct the finite p-values and pass NaN through for the rest.
+    testable = (summary["status"] == "ok") & np.isfinite(summary["p"])
+    if testable.any():
+        _, p_fdr, _, _ = multipletests(
+            summary.loc[testable, "p"].to_numpy(dtype=float), method="fdr_bh"
+        )
+        summary.loc[testable, "p_fdr"] = p_fdr
+    return summary

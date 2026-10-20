@@ -6,8 +6,8 @@ needs the same table for a bundle it did *not* just fit -- a backed-up bundle
 from before a cohort change, or the ``_allstops`` sensitivity bundle next to the
 canonical one -- so that a before/after comparison is two readings of one
 statistic rather than two implementations of it. This script is that reading:
-it calls the runner's own
-:func:`~scripts.behavior.run_stay_leave.cross_session_role_summary`.
+it calls the function the runner logs,
+:func:`~continuum_swr_replay.analysis.replay.learning.cross_session_role_summary`.
 
 Usage::
 
@@ -19,19 +19,12 @@ Usage::
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
 
 import pandas as pd
 
-# Sibling-script import: the statistic is read with the runner's own function,
-# never a second copy of it. Run as a script, only this file's directory is on
-# sys.path.
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
-from scripts.behavior.run_stay_leave import (  # noqa: E402
-    cross_session_role_summary,
-)
+# The statistic is read with the runner's own function, never a second copy.
+from continuum_swr_replay.analysis.replay.learning import cross_session_role_summary
 
 
 def main() -> None:

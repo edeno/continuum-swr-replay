@@ -44,9 +44,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 import pandas as pd
-from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
 from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
@@ -59,6 +57,8 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
     write_fit_provenance,
 )
 from continuum_swr_replay.analysis.replay.learning import (
+    ROLES,
+    cross_session_role_summary,
     fit_is_stay_logistic_per_session,
     fit_is_stay_pooled_gee,
     stop_replay_summary,
@@ -92,10 +92,6 @@ FIT_INPUTS = {
 #: not offered: every role this stage conditions on (current/prev/last-rewarded
 #: arm) is defined from a well the animal has arrived at.
 STOP_COHORTS = ("at_well", "all_stops")
-
-ARM_ROLES = ("current", "prev", "last_rewarded", "best")
-PATCH_ROLES = ("current_patch", "prev_patch", "last_rewarded_patch", "best_patch")
-ROLES = ARM_ROLES + PATCH_ROLES
 
 
 def summary_path(stop_cohort: str) -> Path:
@@ -144,78 +140,6 @@ def _content_col_for(role: str, stratum: str) -> str:
     if stratum == "all":
         return f"frac_on_{role}"
     return f"frac_on_{role}_{stratum}"
-
-
-def cross_session_role_summary(coefs: pd.DataFrame) -> pd.DataFrame:
-    """Wilcoxon on each role's per-session interaction, FDR-corrected across roles.
-
-    This is the statistic Stage 6 is read on, so it lives in one function: the
-    run logs it, and an audit re-derives it from a saved bundle -- including a
-    bundle fit on another population -- with the same code rather than a second
-    implementation that can drift.
-
-    Parameters
-    ----------
-    coefs : pandas.DataFrame
-        Per-session fits as ``fit_is_stay_logistic_per_session`` returns them,
-        concatenated over roles: ``role``, ``status`` and ``beta_inter``.
-
-    Returns
-    -------
-    pandas.DataFrame
-        One row per role in :data:`ROLES`, in that order:
-        ``role``, ``n_sessions`` (converged sessions with a finite
-        ``beta_inter``), ``median_beta_inter``, ``n_pos``, ``n_neg``, ``p``,
-        ``p_fdr``, and ``status`` (``"ok"`` or ``"too_few_sessions"``). A role
-        with fewer than five sessions is not testable and is excluded from the
-        correction as well as from the test.
-    """
-    converged = coefs[coefs["status"] == "ok"]
-    rows = []
-    for role in ROLES:
-        sub = converged[converged["role"] == role].dropna(subset=["beta_inter"])
-        if len(sub) < 5:
-            rows.append(
-                {
-                    "role": role,
-                    "n_sessions": len(sub),
-                    "median_beta_inter": np.nan,
-                    "n_pos": int((sub["beta_inter"] > 0).sum()),
-                    "n_neg": int((sub["beta_inter"] < 0).sum()),
-                    "p": np.nan,
-                    "status": "too_few_sessions",
-                }
-            )
-            continue
-        try:
-            _, p = wilcoxon(sub["beta_inter"])
-        except ValueError:
-            # SciPy refuses an all-zero sample; that is a failed test, not a
-            # p-value, and must not become one below.
-            p = float("nan")
-        rows.append(
-            {
-                "role": role,
-                "n_sessions": len(sub),
-                "median_beta_inter": float(sub["beta_inter"].median()),
-                "n_pos": int((sub["beta_inter"] > 0).sum()),
-                "n_neg": int((sub["beta_inter"] < 0).sum()),
-                "p": p,
-                "status": "ok",
-            }
-        )
-    summary = pd.DataFrame(rows)
-    summary["p_fdr"] = np.nan
-    # ``multipletests`` returns an all-NaN vector if ANY input is NaN, so a
-    # single role that failed its test would otherwise erase every other role's
-    # FDR. Correct the finite p-values and pass NaN through for the rest.
-    testable = (summary["status"] == "ok") & np.isfinite(summary["p"])
-    if testable.any():
-        _, p_fdr, _, _ = multipletests(
-            summary.loc[testable, "p"].to_numpy(dtype=float), method="fdr_bh"
-        )
-        summary.loc[testable, "p_fdr"] = p_fdr
-    return summary
 
 
 def log_cross_session_role_summary(summary: pd.DataFrame) -> None:

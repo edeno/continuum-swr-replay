@@ -432,7 +432,7 @@ Stage 5B: per-session retrospective replay-content alignment.
 
 Stage 6: replay content × reward outcome → behavioral change.
 
-`summary_path`, `fit_path`, `write_summary_provenance`, `cross_session_role_summary`, `log_cross_session_role_summary`, `main`
+`summary_path`, `fit_path`, `write_summary_provenance`, `log_cross_session_role_summary`, `main`
 
 ### `scripts/content/analyze_content_occupancy.py`
 
@@ -652,7 +652,7 @@ Shared audited aggregation for the is_swr contrast ladders (rate + content).
 
 Replay content × reward outcome → behavioral change.
 
-`StopSummaryConfig`, `stop_replay_summary`, `fit_is_stay_logistic_per_session`, `fit_is_stay_pooled_gee`
+`StopSummaryConfig`, `stop_replay_summary`, `fit_is_stay_logistic_per_session`, `fit_is_stay_pooled_gee`, `cross_session_role_summary`
 
 ### `src/continuum_swr_replay/analysis/replay/model_checking.py`
 
