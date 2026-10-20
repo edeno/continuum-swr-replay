@@ -484,11 +484,13 @@ def test_schema_stamp_declares_and_requires_its_exact_scope() -> None:
         reg.require_covariate_schema(mislabeled, table="qvals")
 
 
+@pytest.mark.real_data
 def test_materialized_tables_are_canonical_after_regeneration() -> None:
     """A regenerated artifact must satisfy the canonical schema contract.
 
     Legacy materialized tables are expected on a source-only rename checkout;
-    they are not evidence about the new producer schema and must be regenerated.
+    they are not evidence about the new producer schema and must be regenerated,
+    so under ``-m real_data`` they fail this test.
     """
     pytest.importorskip("pandas")
 
@@ -503,7 +505,7 @@ def test_materialized_tables_are_canonical_after_regeneration() -> None:
         "event": rc / "event_table",
     }
     if not all(table_exists(p) for p in tables.values()):
-        pytest.skip("canonical tables not materialized")
+        pytest.fail("canonical tables not materialized")
     frames = {table: read_table(path) for table, path in tables.items()}
     legacy = [
         table
@@ -514,6 +516,6 @@ def test_materialized_tables_are_canonical_after_regeneration() -> None:
         )
     ]
     if legacy:
-        pytest.skip(f"materialized tables require canonical regeneration: {legacy}")
+        pytest.fail(f"materialized tables require canonical regeneration: {legacy}")
     for table, frame in frames.items():
         reg.require_covariate_schema(frame, table=table)

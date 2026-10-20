@@ -9,8 +9,8 @@ plan's ``test_z_reference_refreshed`` guards.
 Durable formulation: rather than diff against transient pre-encode backup values, assert
 the persisted reference **equals the current leaf-support table's** ``np.nanmean`` /
 ``np.nanstd`` — structural-zero trunks do not identify the scientific unit — and that
-``<col>_z`` is exactly ``(raw - ref_mean) / ref_std``. Marked slow; skips if the
-materialized tables are absent.
+``<col>_z`` is exactly ``(raw - ref_mean) / ref_std``. Marked slow and real_data;
+fails if the materialized tables are absent or stale.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ from continuum_swr_replay.analysis.replay.standardization import load_reference
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.table_io import read_table, table_exists
 
-pytestmark = pytest.mark.slow
+pytestmark = [pytest.mark.slow, pytest.mark.integration, pytest.mark.real_data]
 
 _RC = PROCESSED_DATA_DIR / "replay_content"
 _EVENT_ARM = _RC / "event_arm_table.pkl"
@@ -42,14 +42,14 @@ _ENCODED_COL = "reward_fraction_candidate_arm_last10_visits"
 def _require(path: Path):
     """Guard a plain file (the JSON reference), which has no columnar sibling."""
     if not path.exists():
-        pytest.skip(f"materialized file not present: {path}")
+        pytest.fail(f"materialized file not present: {path}")
     return path
 
 
 def _require_table(path: Path):
     """Guard a canonical table, which may be on disk in either format."""
     if not table_exists(path):
-        pytest.skip(f"materialized table not present: {path}")
+        pytest.fail(f"materialized table not present: {path}")
     return path
 
 
@@ -58,7 +58,7 @@ def _load():
     try:
         require_covariate_schema(ea, table="event_arm")
     except ValueError as error:
-        pytest.skip(f"materialized table requires canonical regeneration: {error}")
+        pytest.fail(f"materialized table requires canonical regeneration: {error}")
     ref = load_reference(_require(_EVENT_ARM_REF))
     return ea, ref
 
@@ -72,7 +72,7 @@ def test_reference_matches_encoded_table_moments():
     ea, ref = _load()
     assert _ENCODED_COL in ref, f"{_ENCODED_COL} missing from reference"
     if ref[_ENCODED_COL].get("support") != "leaf_arms":
-        pytest.skip(
+        pytest.fail(
             "materialized reference predates leaf-support scaling; regenerate tables"
         )
     leaf = ea["candidate_arm"].isin(range(6))
@@ -98,7 +98,9 @@ def test_z_equals_reference_transform():
         raw = ea[col].to_numpy(dtype=float)
         z = ea[zc].to_numpy(dtype=float)
         finite = np.isfinite(raw)
-        np.testing.assert_allclose((raw[finite] - mu) / sd, z[finite], rtol=1e-9, atol=1e-9)
+        np.testing.assert_allclose(
+            (raw[finite] - mu) / sd, z[finite], rtol=1e-9, atol=1e-9
+        )
         # NaN raw -> NaN _z (the encode leaves no-trial-history rows NaN)
         assert np.isnan(z[~finite]).all()
 
@@ -114,4 +116,6 @@ def test_encode_signature_present():
     x = ea[_ENCODED_COL].to_numpy(dtype=float)
     n_zero = int((x == 0.0).sum())
     n_nan = int(np.isnan(x).sum())
-    assert n_zero > n_nan, f"expected encode zeros to dominate NaN (zeros={n_zero}, nan={n_nan})"
+    assert n_zero > n_nan, (
+        f"expected encode zeros to dominate NaN (zeros={n_zero}, nan={n_nan})"
+    )

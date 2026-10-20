@@ -13,8 +13,8 @@ counts under test are the ones it computes and ``run_session`` only forwards;
 calling it directly keeps this test to a data load rather than a full GLM fit
 over every neuron in the session.
 
-Skips when no materialized session inputs are on disk or Spyglass is
-unreachable, so it is a no-op on hosts without data access.
+Needs materialized session inputs on disk and a reachable Spyglass, so it is
+opt-in (``-m real_data``) and fails when either is missing.
 """
 
 from __future__ import annotations
@@ -31,38 +31,28 @@ from continuum_swr_replay.analysis.pfc.glm import build_session_event_sets
 from continuum_swr_replay.analysis.replay import prepare_data as pdm
 from continuum_swr_replay.analysis.replay.cohort_selection import events_in_stops
 
-pytestmark = pytest.mark.slow
+pytestmark = [pytest.mark.slow, pytest.mark.integration, pytest.mark.real_data]
 
 
 def test_the_event_sets_are_the_shipped_tables_rows_for_that_session():
     from continuum_swr_replay.analysis.hippocampus import load_results
 
-    try:
-        sessions = [s for s in pdm.find_sessions(max_per_animal=1) if s["results_file"]]
-    except Exception as exc:  # noqa: BLE001 - no data access -> skip, not fail
-        pytest.skip(f"session listing unavailable: {exc}")
-    if not sessions:
-        pytest.skip("no session with decode results on disk")
+    sessions = [s for s in pdm.find_sessions(max_per_animal=1) if s["results_file"]]
+    assert sessions, "no session with decode results on disk"
     session = sessions[0]
     nwb_file_name, epoch_name = session["nwb_file_name"], session["epoch_name"]
 
-    try:
-        canonical_events, _ = load_session_canonical_events(nwb_file_name, epoch_name)
-        swr_intervals, _ = load_session_swr_intervals(nwb_file_name, epoch_name)
-        cohort_stops, _ = load_session_stop_cohort(nwb_file_name, epoch_name)
-    except (FileNotFoundError, ValueError) as exc:
-        pytest.skip(f"canonical inputs unavailable for {nwb_file_name}: {exc}")
+    canonical_events, _ = load_session_canonical_events(nwb_file_name, epoch_name)
+    swr_intervals, _ = load_session_swr_intervals(nwb_file_name, epoch_name)
+    cohort_stops, _ = load_session_stop_cohort(nwb_file_name, epoch_name)
 
-    try:
-        # importing the loader already needs Spyglass
-        from continuum_swr_replay.data_loaders import load_data
+    # importing the loader already needs Spyglass
+    from continuum_swr_replay.data_loaders import load_data
 
-        results, _, _ = load_results(
-            nwb_file_name, epoch_name, decoding_brain_area="HPC", load_detector=False
-        )
-        data = load_data(nwb_file_name, epoch_name)
-    except Exception as exc:  # noqa: BLE001 - Spyglass down / data gap -> skip
-        pytest.skip(f"session load unavailable: {exc}")
+    results, _, _ = load_results(
+        nwb_file_name, epoch_name, decoding_brain_area="HPC", load_detector=False
+    )
+    data = load_data(nwb_file_name, epoch_name)
 
     event_times, counts = build_session_event_sets(
         data,

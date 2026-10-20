@@ -9,8 +9,8 @@ Spyglass (``from_cache=False``), once served entirely from the cache
 ``_process_session``'s control flow (e.g. reordering the cache write relative to a
 builder) that broke cache/no-cache parity would fail here.
 
-Skips when no materialized session inputs are on disk or Spyglass is unreachable (the
-cold pass needs ``load_data``), so it is a no-op on hosts without data access.
+Needs materialized session inputs on disk and a reachable Spyglass (the cold pass needs
+``load_data``), so it is opt-in (``-m real_data``) and fails when either is missing.
 """
 
 from __future__ import annotations
@@ -21,18 +21,14 @@ import pytest
 from continuum_swr_replay.analysis.replay import prepare_data as pdm
 from continuum_swr_replay.analysis.replay.covariates import load_contingency
 
-pytestmark = pytest.mark.slow
+pytestmark = [pytest.mark.slow, pytest.mark.integration, pytest.mark.real_data]
 
 _FRAMES = ("event_table", "event_arm_table", "stop_table", "event_sequence_table")
 
 
 def test_process_session_cache_parity(tmp_path, monkeypatch):
-    try:
-        sessions = pdm.find_sessions(max_per_animal=1)
-    except Exception as exc:  # noqa: BLE001 - no data access -> skip, not fail
-        pytest.skip(f"session listing unavailable: {exc}")
-    if not sessions:
-        pytest.skip("no materialized session inputs on disk")
+    sessions = pdm.find_sessions(max_per_animal=1)
+    assert sessions, "no materialized session inputs on disk"
     session = sessions[0]
 
     # Isolate the cache so the test never touches the canonical _session_cache.
@@ -45,14 +41,10 @@ def test_process_session_cache_parity(tmp_path, monkeypatch):
         stale = ("legacy or mismatched covariate schema", "covariate schema version")
         if not any(reason in str(exc) for reason in stale):
             raise
-        pytest.skip(f"materialized qvals requires canonical regeneration: {exc}")
+        pytest.fail(f"materialized qvals requires canonical regeneration: {exc}")
 
-    try:
-        cold = pdm._process_session(session, contingency=cont, from_cache=False)
-    except Exception as e:  # noqa: BLE001 - Spyglass down / data gap -> skip, not fail
-        pytest.skip(f"cold Spyglass load unavailable: {e}")
-    if cold is None:
-        pytest.skip("session could not be loaded (missing trials/track_graph)")
+    cold = pdm._process_session(session, contingency=cont, from_cache=False)
+    assert cold is not None, "session could not be loaded (missing trials/track_graph)"
 
     # Cache must now exist; warm pass reads it (no Spyglass).
     assert pdm.behavioral_context_cache_path(session).exists()

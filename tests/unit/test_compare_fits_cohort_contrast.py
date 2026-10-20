@@ -751,9 +751,7 @@ def test_per_stop_source_note_marks_the_stand_in_all_stops_ladder(tmp_path):
     assert per_stop_source_note({}) == ""
 
 
-def test_absent_all_stops_per_stop_ladder_falls_back_to_the_backup(
-    cohort_fits, tmp_path
-):
+def _collect_with_absent_all_stops(cohort_fits, tmp_path):
     at_well_bin = tmp_path / "all_models.pkl"
     cohort_fits["at_well"].to_pickle(at_well_bin)
     at_well_stop = tmp_path / "per_stop.pkl"
@@ -764,13 +762,37 @@ def test_absent_all_stops_per_stop_ladder_falls_back_to_the_backup(
         {},
         {"at_well": at_well_stop, "all_stops": tmp_path / "absent_allstops.pkl"},
     )
-
     assert inputs["per-stop (at_well)"] == at_well_stop
-    if PER_STOP_ALL_STOPS_FALLBACK.exists():
-        assert inputs["per-stop (all_stops)"] == PER_STOP_ALL_STOPS_FALLBACK
+    return per_stop, inputs
+
+
+@pytest.mark.parametrize("backup_on_disk", [True, False])
+def test_absent_all_stops_per_stop_ladder_falls_back_to_the_backup(
+    cohort_fits, tmp_path, monkeypatch, backup_on_disk
+):
+    backup = tmp_path / "backup" / "all_models.pkl"
+    if backup_on_disk:
+        backup.parent.mkdir()
+        _per_stop_fits(PER_STOP_DELTAS).to_pickle(backup)
+    monkeypatch.setattr("scripts.qa.compare_fits.PER_STOP_ALL_STOPS_FALLBACK", backup)
+
+    per_stop, inputs = _collect_with_absent_all_stops(cohort_fits, tmp_path)
+
+    if backup_on_disk:
+        assert inputs["per-stop (all_stops)"] == backup
         assert set(per_stop) == {"at_well", "all_stops"}
     else:  # the backup is data, not code, so a bare checkout has only at-well
         assert set(per_stop) == {"at_well"}
+
+
+@pytest.mark.real_data
+def test_the_real_all_stops_backup_is_the_fallback(cohort_fits, tmp_path):
+    assert PER_STOP_ALL_STOPS_FALLBACK.exists(), PER_STOP_ALL_STOPS_FALLBACK
+
+    per_stop, inputs = _collect_with_absent_all_stops(cohort_fits, tmp_path)
+
+    assert inputs["per-stop (all_stops)"] == PER_STOP_ALL_STOPS_FALLBACK
+    assert set(per_stop) == {"at_well", "all_stops"}
 
 
 def test_arrival_shape_table_labels_every_cohort_it_stacks(cohort_fits):

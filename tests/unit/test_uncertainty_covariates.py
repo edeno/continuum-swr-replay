@@ -927,6 +927,7 @@ def test_complete_case_gate_blocks_rewarded_only_uncertainty_fit(
 
 
 @pytest.mark.slow
+@pytest.mark.real_data
 def test_runner_smoke():
     """End-to-end runner on one post-exposure session per animal.
 
@@ -943,7 +944,7 @@ def test_runner_smoke():
     rc = PROCESSED_DATA_DIR / "replay_content"
     qvals_path = rc / "models_per_bin_rate" / "qvals_table.pkl"
     if not table_exists(qvals_path):
-        pytest.skip(
+        pytest.fail(
             "qvals_table not present (run "
             "`uv run python scripts/behavior/build_qvals_table.py --write` first)"
         )
@@ -957,7 +958,7 @@ def test_runner_smoke():
         "completed_trial_reward",
     }
     if not canonical_columns.issubset(stop.columns):
-        pytest.skip("canonical stop_table.pkl has not been regenerated")
+        pytest.fail("canonical stop_table.pkl has not been regenerated")
     onset_table = read_table(rc / "event_onset_table.pkl")
     event_table = read_table(rc / "event_table.pkl")
     # The helper freezes the shared natural-session cohort and warns about any
@@ -974,7 +975,7 @@ def test_runner_smoke():
     # mirroring the runner's main().
     qvals = read_table(qvals_path)
     if "outcome_known_time" not in qvals:
-        pytest.skip(
+        pytest.fail(
             "qvals_table.pkl predates physical post-outcome timing; regenerate it"
         )
     qcols = qvals[

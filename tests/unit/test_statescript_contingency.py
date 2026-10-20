@@ -184,17 +184,18 @@ def test_stop_before_first_block_is_dropped():
 
 
 @pytest.mark.slow
+@pytest.mark.real_data
 def test_real_session_parse():
     from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
     stop_table_path = PROCESSED_DATA_DIR / "replay_content" / "stop_table.pkl"
     if not table_exists(stop_table_path):
-        pytest.skip("canonical stop table not materialized")
+        pytest.fail("canonical stop table not materialized")
     stop_table = read_table(stop_table_path)
     try:
         require_covariate_schema(stop_table, table="stop")
     except ValueError as exc:
-        pytest.skip(f"canonical stop table requires regeneration: {exc}")
+        pytest.fail(f"canonical stop table requires regeneration: {exc}")
     # >= 3 sessions across >= 2 animals that exist in stop_table.
     targets = [
         ("chimi", 20200213, "02_r1"),

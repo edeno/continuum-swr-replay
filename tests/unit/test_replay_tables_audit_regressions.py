@@ -261,6 +261,7 @@ def test_trial_context_is_not_taken_from_the_in_progress_trip():
     assert np.isnan(out["is_rewarded_outcome"].iloc[0])
 
 
+@pytest.mark.real_data
 def test_arm_uncertainty_z_is_unit_sd_on_the_support_that_identifies_it():
     """``<col>_z`` must have unit SD on the rows that carry information.
 
@@ -274,9 +275,9 @@ def test_arm_uncertainty_z_is_unit_sd_on_the_support_that_identifies_it():
         "Processed-Data/replay_content/standardization_reference.json"
     )
     if not table_exists(tables):
-        pytest.skip("materialized event_arm_table.pkl not available")
+        pytest.fail("materialized event_arm_table.pkl not available")
     if not reference_path.exists():
-        pytest.skip("leaf-support standardization reference not available")
+        pytest.fail("leaf-support standardization reference not available")
     reference = load_reference(reference_path)
     if (
         reference.get("reward_belief_variance_candidate_arm_preoutcome", {}).get(
@@ -284,7 +285,7 @@ def test_arm_uncertainty_z_is_unit_sd_on_the_support_that_identifies_it():
         )
         != "leaf_arms"
     ):
-        pytest.skip(
+        pytest.fail(
             "materialized arm_uncertainty_z predates leaf-support scaling; "
             "regenerate canonical tables"
         )
@@ -297,6 +298,7 @@ def test_arm_uncertainty_z_is_unit_sd_on_the_support_that_identifies_it():
 
 
 @pytest.mark.slow
+@pytest.mark.real_data
 def test_rate_ladder_rungs_share_a_cohort():
     """Rungs compared by AIC must be fit on the same rows, clock by clock.
 
@@ -309,11 +311,11 @@ def test_rate_ladder_rungs_share_a_cohort():
     two clocks on ``time_clock`` metadata. AIC scales with n: a rung fit to
     fewer bins than its comparison partner would gain mechanically.
 
-    Reads the materialized fits (hence ``slow``; unit runs use ``-m "not slow"``).
+    Reads the materialized fits (hence ``slow`` and ``real_data``).
     """
     fits = Path("Processed-Data/replay_content/models_per_bin_rate/all_models.pkl")
     if not fits.exists():
-        pytest.skip("materialized per-bin rate fits not available")
+        pytest.fail("materialized per-bin rate fits not available")
 
     df = pd.read_pickle(fits)
     df = df[df["outcome"] == "non_local"] if "outcome" in df.columns else df

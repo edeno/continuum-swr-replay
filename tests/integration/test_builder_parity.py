@@ -7,7 +7,8 @@ round-trip (F5): a reference computed from the full table, re-applied to a one-s
 slice, must match the materialized ``_z`` for that slice — a per-session *recompute*
 would not (that is why the parity gate must apply the frozen reference).
 
-Marked slow: reads the full materialized tables. Skips if they are absent.
+Marked slow and real_data: reads the full materialized tables, and fails if they
+are absent or stale.
 
 Scope note — the **raw (non-``_z``) column** one-session rebuild parity (rebuild one
 session's ``event_arm_table`` and diff its non-``_z`` columns against the materialized
@@ -41,7 +42,7 @@ from continuum_swr_replay.analysis.replay.standardization import (
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.table_io import read_table, table_exists
 
-pytestmark = pytest.mark.slow
+pytestmark = [pytest.mark.slow, pytest.mark.integration, pytest.mark.real_data]
 
 _RC = PROCESSED_DATA_DIR / "replay_content"
 _EVENT_ARM = _RC / "event_arm_table.pkl"
@@ -52,12 +53,12 @@ _QVALS_REF = _RC / "models_per_bin_rate" / "qvals_standardization_reference.json
 
 def _require(path: Path, *, table: str):
     if not table_exists(path):
-        pytest.skip(f"materialized table not present: {path}")
+        pytest.fail(f"materialized table not present: {path}")
     frame = read_table(path)
     try:
         require_covariate_schema(frame, table=table)
     except ValueError as error:
-        pytest.skip(f"materialized table requires canonical regeneration: {error}")
+        pytest.fail(f"materialized table requires canonical regeneration: {error}")
     return frame
 
 
@@ -73,13 +74,15 @@ def test_folded_standardization_reproduces_materialized_z(path, cols):
     assert cols, f"no standardized columns to check in {path.name}"
     if path == _EVENT_ARM:
         if not _EVENT_ARM_REF.exists():
-            pytest.skip("leaf-support reference not written; regenerate event-arm table")
+            pytest.fail(
+                "leaf-support reference not written; regenerate event-arm table"
+            )
         current_reference = load_reference(_EVENT_ARM_REF)
         if any(
             current_reference.get(column, {}).get("support") != "leaf_arms"
             for column in cols
         ):
-            pytest.skip(
+            pytest.fail(
                 "materialized event-arm z columns predate leaf-support scaling; "
                 "regenerate canonical tables"
             )
@@ -95,7 +98,8 @@ def test_folded_standardization_reproduces_materialized_z(path, cols):
         np.testing.assert_allclose(
             recomputed[f"{c}_z"].to_numpy(),
             df[f"{c}_z"].to_numpy(),
-            atol=1e-10, equal_nan=True,
+            atol=1e-10,
+            equal_nan=True,
             err_msg=f"folded _z drifted from materialized for {c} in {path.name}",
         )
 
@@ -109,13 +113,13 @@ def test_folded_standardization_reproduces_materialized_z(path, cols):
 )
 def test_persisted_reference_reproduces_materialized_z(table_path, ref_path, cols):
     """F5 frozen-reference gate: apply the PERSISTED reference JSON to the materialized
-    raw columns and match the materialized _z within atol=1e-10. Skips (does not pass)
-    until the operational rebuild has written the reference — so an absent/stale
-    reference cannot silently pass."""
+    raw columns and match the materialized _z within atol=1e-10. Fails until the
+    operational rebuild has written the reference — so an absent/stale reference
+    cannot silently pass."""
     table = "event_arm" if table_path == _EVENT_ARM else "qvals"
     df = _require(table_path, table=table)
     if not ref_path.exists():
-        pytest.skip(
+        pytest.fail(
             f"reference not written yet: {ref_path} (run the full builder rebuild)"
         )
     reference = load_reference(ref_path)
@@ -123,14 +127,14 @@ def test_persisted_reference_reproduces_materialized_z(table_path, ref_path, col
         not {"support", "n_reference_rows"}.issubset(reference.get(column, {}))
         for column in cols
     ):
-        pytest.skip(
+        pytest.fail(
             f"materialized {ref_path.name} predates support-aware reference "
             "metadata; regenerate its owning table"
         )
     if table_path == _EVENT_ARM and any(
         reference.get(column, {}).get("support") != "leaf_arms" for column in cols
     ):
-        pytest.skip(
+        pytest.fail(
             "materialized event-arm reference predates leaf-support scaling; "
             "regenerate canonical tables"
         )
@@ -140,7 +144,8 @@ def test_persisted_reference_reproduces_materialized_z(table_path, ref_path, col
         np.testing.assert_allclose(
             applied[f"{c}_z"].to_numpy(),
             df[f"{c}_z"].to_numpy(),
-            atol=1e-10, equal_nan=True,
+            atol=1e-10,
+            equal_nan=True,
             err_msg=f"persisted-reference _z mismatch for {c} in {table_path.name}",
         )
 
@@ -151,16 +156,16 @@ def test_frozen_reference_matches_on_one_session_slice():
     mean/SD). Uses the persisted reference when available, else the table-derived one."""
     df = _require(_EVENT_ARM, table="event_arm")
     cols = [
-        c for c in EVENT_ARM_STANDARDIZED_COLS
+        c
+        for c in EVENT_ARM_STANDARDIZED_COLS
         if c in df.columns and f"{c}_z" in df.columns
     ]
     if _EVENT_ARM_REF.exists():
         reference = load_reference(_EVENT_ARM_REF)
         if any(
-            reference.get(column, {}).get("support") != "leaf_arms"
-            for column in cols
+            reference.get(column, {}).get("support") != "leaf_arms" for column in cols
         ):
-            pytest.skip(
+            pytest.fail(
                 "materialized event-arm reference predates leaf-support scaling; "
                 "regenerate canonical tables"
             )
@@ -182,6 +187,7 @@ def test_frozen_reference_matches_on_one_session_slice():
         np.testing.assert_allclose(
             applied[f"{c}_z"].to_numpy(),
             df.loc[mask, f"{c}_z"].to_numpy(),
-            atol=1e-10, equal_nan=True,
+            atol=1e-10,
+            equal_nan=True,
             err_msg=f"frozen-reference _z mismatch for {c}",
         )

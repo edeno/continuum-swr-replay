@@ -318,14 +318,17 @@ def test_reward_groupby_drops_nan_reward():
 
 @pytest.fixture(scope="module")
 def session_slice():
-    """One real session's onset / event / stop rows (skip if data absent)."""
+    """One real session's onset / event / stop rows (fails if data absent).
+
+    Only ``real_data`` tests may request it.
+    """
     paths = {
         name: RC / f"{name}.pkl"
         for name in ("event_onset_table", "event_table", "stop_table")
     }
     for p in paths.values():
         if not table_exists(p):
-            pytest.skip(f"missing {p}")
+            pytest.fail(f"missing {p}")
     onset = read_table(paths["event_onset_table"])
     event = read_table(paths["event_table"])
     stop = read_table(paths["stop_table"])
@@ -337,7 +340,7 @@ def session_slice():
         try:
             require_covariate_schema(frame, table=table)
         except ValueError as exc:
-            pytest.skip(f"canonical artifacts require regeneration: {exc}")
+            pytest.fail(f"canonical artifacts require regeneration: {exc}")
 
     # Pick the session with the most non-local onsets for a meaningful slice.
     sc = ["animal", "session_date", "epoch"]
@@ -351,6 +354,7 @@ def session_slice():
     return onset_s, event_s, stop_s
 
 
+@pytest.mark.real_data
 def test_attach_is_swr_match_rate(session_slice):
     onset_s, event_s, stop_s = session_slice
     tagged = attach_is_swr_to_onsets(onset_s, event_s)
@@ -446,6 +450,7 @@ def test_attach_is_swr_rejects_mismatch_inside_a_shared_session():
         attach_is_swr_to_onsets(onsets, events)
 
 
+@pytest.mark.real_data
 def test_attach_is_swr_does_not_mutate(session_slice):
     onset_s, event_s, _ = session_slice
     before = onset_s.copy()

@@ -1,57 +1,86 @@
 # Test Suite
 
-The full suite is offline-friendly (no DataJoint / VPN required) and runs in
-under a minute on the dev machine.
+The last full run took about 31 min for 5,128 tests on the dev server. A plain
+`uv run pytest` needs no lab VPN, DataJoint connection or `Processed-Data`: the
+tests that do are marked `real_data` and are skipped unless you ask for them.
 
 ## Quick start
 
 ```bash
 uv sync --extra dev
-uv run pytest                              # full suite (~37 s)
-uv run pytest -m "not slow"                # fast subset (~28 s, skips 3 statistical tests)
+uv run pytest -q -p no:cacheprovider       # full suite; real-data tests skipped
+uv run pytest -m real_data                 # only the real-data tests
+uv run pytest -m "not slow"                # skip the slow tests
 uv run pytest tests/unit/test_spikes.py    # one file
 uv run pytest -k "coincident"              # by name pattern
 uv run pytest -vv                          # verbose, with full assertion diffs
 uv run pytest --lf                         # rerun only last-failed tests
 ```
 
-The ``slow`` marker is applied to the handful of Monte Carlo /
-Tier-B statistical tests (SE coverage, calibration sweeps) that run
-40+ replicates of a simulated estimator fit. CI runs everything; the
-``-m "not slow"`` form is for tight local cycles.
+`pytest-xdist` is not installed, so there is no `-n`. A full check is the two
+runs together: the default run, then `-m real_data` on a host with the data.
+
+## Markers
+
+The markers are registered in `pyproject.toml` (`[tool.pytest.ini_options]`).
+
+- **`real_data`**: the test reads `Processed-Data/` (`PROCESSED_DATA_DIR`),
+  `/stelmo`, a raw NWB file or the Spyglass/DataJoint database.
+  - The root [`conftest.py`](conftest.py) skips it unless the `-m` expression
+    names `real_data`. The skip reason is `real_data: opt in with -m real_data`.
+  - Under `-m real_data` the test runs. Missing or stale data fails it rather
+    than skipping it: opting in means the data must be there.
+  - Every other test runs with no artifact run configured
+    (`swr_source.ARTIFACT_INTERVALS_RUN_ID` is None). A `real_data` test gets the
+    committed run back, so the canonical tables pass their SWR-source check.
+  - A test that reads only a small fixture committed under `tests/` is not real
+    data. In a file that mixes the two, mark the real-data tests, not the file.
+  - The hook is pinned by [`unit/test_markers.py`](unit/test_markers.py).
+- **`integration`**: every tracked file in `tests/integration/` sets it with
+  `pytestmark`. These tests run a whole runner or pipeline path, mostly on
+  synthetic inputs. Deselect them with `-m "not integration"`.
+- **`slow`**: Monte Carlo and statistical tests (SE coverage, calibration
+  sweeps) and the end-to-end tests. Deselect them with `-m "not slow"`.
+
+Markers combine as usual: `-m "real_data and not slow"`.
 
 The package roots (`continuum_swr_replay/__init__.py`,
-`continuum_swr_replay/data_loaders/__init__.py`,
-`continuum_swr_replay/analysis/hippocampus/__init__.py`) re-export loader
-functions through PEP 562 `__getattr__`, and modules with Spyglass
-dependencies defer those imports into the functions that actually need them.
-The lazy contract is pinned by [`tests/unit/test_lazy_imports.py`](unit/test_lazy_imports.py)
-— a regression there reintroduces the import-time DataJoint hang on no-VPN
-machines.
+`continuum_swr_replay/data_loaders/__init__.py` and the `analysis` package
+`__init__`s) re-export through PEP 562 `__getattr__`, and modules with Spyglass
+dependencies defer those imports into the functions that need them. The lazy
+contract is pinned by [`tests/unit/test_lazy_imports.py`](unit/test_lazy_imports.py).
+A regression there brings back the import-time DataJoint hang on machines
+without the VPN.
 
 The Spyglass-touching loader functions (`load_data`, `get_epoch_info`,
 `get_training_timepoints`, `get_labels`, `get_theta`, `get_ripple`,
-`get_hpc_marks`, `get_pfc_spike_times`, `get_electrode_group_info`, and
-`analysis.pfc.glm.run_session`) require the lab VPN at *call* time. No tests
-in this suite invoke them — the offline slice tests the pure helpers and
-analysis layer.
+`get_hpc_marks`, `get_pfc_spike_times`, `get_electrode_group_info` and
+`analysis.pfc.glm.run_session`) need the lab VPN when they are called. Only
+`real_data` tests call them for real; the other tests replace them with
+`monkeypatch` or test the pure helpers.
 
 ## Layout
 
 ```
 tests/
-├── conftest.py              # shared fixtures (track graphs, mock spikes, etc.)
-├── unit/                    # function-level tests, the bulk of the suite
-├── analysis/                # tests grouped by analysis module
-│   ├── hippocampus/         # event analysis, quality metrics, triggered analysis
-│   └── pfc/                 # GLM, GLM pipeline, load_population
+├── conftest.py              # shared fixtures and the real_data hook
+├── unit/                    # the bulk of the suite, still mostly flat
+├── analysis/                # tests that mirror src/continuum_swr_replay/analysis/
+│   ├── hippocampus/
+│   └── pfc/
 ├── visualization/           # plotting helpers (figure_panels, palettes, etc.)
+├── integration/             # whole-runner and pipeline tests (marker: integration)
 ├── property/                # hypothesis-based invariants
+├── baselines/               # figure-baseline manifest (see its README)
 └── benchmarks/              # microbenchmarks (run manually)
 ```
 
-`tests/integration/` is reserved for future DB-gated tests. The `integration`
-pytest marker is registered in `pyproject.toml` but currently unused.
+**Where a test goes.** New tests mirror `src`: the tests of
+`src/continuum_swr_replay/analysis/replay/x.py` go in
+`tests/analysis/replay/test_x.py`, and those of `data_loaders/` in
+`tests/data_loaders/`. Tests of `scripts/` modules go under `tests/scripts/`.
+Existing files in `tests/unit/` move to the mirrored place when their module is
+next touched. There is no big-bang move.
 
 ## Fixtures
 

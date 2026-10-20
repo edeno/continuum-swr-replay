@@ -125,6 +125,7 @@ testpaths = ["tests"]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+    "real_data: reads Processed-Data, a raw NWB file or the Spyglass DB; skipped unless run with '-m real_data'",
 ]
 
 [build-system]

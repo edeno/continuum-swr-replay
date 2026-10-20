@@ -61,7 +61,7 @@ from tests.unit._swr_inventory_fixtures import (
     write_swr_inventory,
 )
 
-pytestmark = pytest.mark.slow
+pytestmark = [pytest.mark.slow, pytest.mark.integration]
 
 ANIMAL, DAY = "sim", 20200101
 EPOCHS = {"02_r1": "sim20200101_02_r1_HPC", "04_r2": "sim20200101_04_r2_HPC"}

@@ -369,11 +369,12 @@ def test_replay_beats_the_matched_control_for_a_replay_tracking_neuron(
 
 
 @pytest.mark.slow
+@pytest.mark.real_data
 def test_a_real_session_writes_the_control_array_and_records_its_draw(tmp_path):
     """The bundle a real session writes carries the control and its provenance.
 
-    Skips when no session inputs are on disk or Spyglass is unreachable, so it
-    is a no-op on hosts without data access.
+    Needs session inputs on disk and a reachable Spyglass, so it is opt-in
+    (``-m real_data``) and fails when either is missing.
     """
     import importlib.util
     import json
@@ -391,12 +392,8 @@ def test_a_real_session_writes_the_control_array_and_records_its_draw(tmp_path):
     runner = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(runner)
 
-    try:
-        sessions = [s for s in pdm.find_sessions(max_per_animal=1) if s["results_file"]]
-    except Exception as exc:  # noqa: BLE001 - no data access -> skip
-        pytest.skip(f"session listing unavailable: {exc}")
-    if not sessions:
-        pytest.skip("no session with decode results on disk")
+    sessions = [s for s in pdm.find_sessions(max_per_animal=1) if s["results_file"]]
+    assert sessions, "no session with decode results on disk"
 
     # A session with no mPFC units writes arrays and a sidecar but never scores
     # anything, so it carries none of the inference the skip check asks about.
@@ -423,7 +420,7 @@ def test_a_real_session_writes_the_control_array_and_records_its_draw(tmp_path):
         if artifact.exists() and len(pd.read_pickle(artifact)):
             break
     else:
-        pytest.skip(
+        pytest.fail(
             "no listed session fit any mPFC unit (Spyglass, canonical inputs "
             f"or mPFC units unavailable); see {tmp_path / 'logs'}"
         )
@@ -468,6 +465,8 @@ def test_a_real_session_writes_the_control_array_and_records_its_draw(tmp_path):
         fold_seed=record["fold_seed"],
         n_control_draws=record["n_control_draws"],
         control_draw_seed=record["control_draw_seed"],
+        swr_interval_source=record["swr_interval_source"],
+        swr_events_sha256=record["swr_events_sha256"],
     )
 
 

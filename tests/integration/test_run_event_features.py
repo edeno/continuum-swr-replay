@@ -104,7 +104,7 @@ from tests.unit._swr_inventory_fixtures import (
     write_swr_inventory,
 )
 
-pytestmark = pytest.mark.slow
+pytestmark = [pytest.mark.slow, pytest.mark.integration]
 
 EPOCHS = {
     "02_r1": "sim20200101_02_r1_HPC",
