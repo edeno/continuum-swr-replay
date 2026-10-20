@@ -63,6 +63,7 @@ __all__ = [
     "contiguous_true_runs",
     "covered_seconds",
     "get_spikecount_per_time_bin",
+    "as_frame",
     "interval_mask",
     "intersect",
     "masked_seconds",
@@ -255,7 +256,20 @@ def merge_intervals(
     return np.column_stack([starts[first], np.maximum.reduceat(ends, first)])
 
 
-def _as_frame(intervals: NDArray[np.float64]) -> pd.DataFrame:
+def as_frame(intervals: NDArray[np.float64]) -> pd.DataFrame:
+    """An ``(n, 2)`` interval array as a ``start_time`` / ``end_time`` frame.
+
+    Parameters
+    ----------
+    intervals : NDArray, shape (n_intervals, 2)
+        Start and end of each interval, in seconds.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns ``start_time`` and ``end_time`` (float64, seconds), in the
+        array's order.
+    """
     return pd.DataFrame(
         {
             "start_time": intervals[:, 0].astype(np.float64),
@@ -395,7 +409,7 @@ def pad_intervals(intervals: pd.DataFrame, distance_s: float) -> pd.DataFrame:
         raise ValueError(f"a padding distance must be finite and >= 0: {distance_s}")
     starts = intervals["start_time"].to_numpy(dtype=np.float64) - distance_s
     ends = intervals["end_time"].to_numpy(dtype=np.float64) + distance_s
-    return _as_frame(merge_intervals(starts, ends))
+    return as_frame(merge_intervals(starts, ends))
 
 
 def overlaps_intervals(

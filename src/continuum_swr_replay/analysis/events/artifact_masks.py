@@ -26,7 +26,7 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.intervals import _as_frame, merge_intervals
+from continuum_swr_replay.intervals import as_frame, merge_intervals
 
 __all__ = [
     "PADDING_S",
@@ -124,4 +124,4 @@ def artifact_intervals(cores: pd.DataFrame, span: tuple[float, float]) -> pd.Dat
     starts = np.maximum(cores["core_start"].to_numpy(dtype=np.float64) - pad, span[0])
     ends = np.minimum(cores["core_end"].to_numpy(dtype=np.float64) + pad, span[1])
     inside = starts <= ends
-    return _as_frame(merge_intervals(starts[inside], ends[inside]))
+    return as_frame(merge_intervals(starts[inside], ends[inside]))

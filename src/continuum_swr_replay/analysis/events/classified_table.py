@@ -112,7 +112,7 @@ _CLASSIFIED_EVENT_TABLE_COLUMNS: tuple[str, ...] = (
 )
 
 
-def _match_swr(
+def match_swr(
     overlap_class: str,
     event_start: float,
     event_end: float,
@@ -163,7 +163,7 @@ def _match_swr(
         raise RuntimeError(
             f"event [{event_start}, {event_end}] classified {overlap_class!r} "
             f"but no SWR satisfies the matcher's overlap predicate — "
-            f"classify_swr_overlap_geometry and _match_swr have diverged."
+            f"classify_swr_overlap_geometry and match_swr have diverged."
         )
     chosen = int(idx[np.argmin(swr_starts[idx])])  # earliest by start time
     return (
@@ -322,7 +322,7 @@ def build_classified_nonlocal_event_table(
         swr_starts = swr_intervals["start_time"].to_numpy()
         swr_ends = swr_intervals["end_time"].to_numpy()
         matched = [
-            _match_swr(
+            match_swr(
                 cls,
                 ev_start,
                 ev_end,

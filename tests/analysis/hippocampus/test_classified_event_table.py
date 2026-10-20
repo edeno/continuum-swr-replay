@@ -18,10 +18,10 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.events.classified_table import (
-    _match_swr,
     assert_drawn_class_matches_ripples,
     build_classified_nonlocal_event_table,
     intervals_from_labels,
+    match_swr,
 )
 from continuum_swr_replay.analysis.events.immobility import (
     EventDefinitionError,
@@ -581,7 +581,7 @@ def test_zero_duration_event_inside_swr_is_non_swr():
 
 def test_match_swr_ignores_earlier_point_interval():
     """Representative matching uses the classifier's duration-valid SWR set."""
-    matched = _match_swr(
+    matched = match_swr(
         "swr_partial",
         0.0,
         2.0,

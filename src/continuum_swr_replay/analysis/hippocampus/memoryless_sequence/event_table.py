@@ -51,7 +51,7 @@ import pandas as pd
 from numpy.typing import NDArray
 
 # the canonical matched-SWR rule itself, not a copy that could drift from it
-from continuum_swr_replay.analysis.events.classified_table import _match_swr
+from continuum_swr_replay.analysis.events.classified_table import match_swr
 from continuum_swr_replay.analysis.events.detection import (
     classify_swr_overlap_geometry,
 )
@@ -358,7 +358,7 @@ def _swr_columns(
     swr_ends = swr_intervals["end_time"].to_numpy(dtype=np.float64)
     for row, index in enumerate(np.flatnonzero(covered)):
         overlap_class = classified["overlap_class"].iloc[row]
-        label, matched_start, matched_end = _match_swr(
+        label, matched_start, matched_end = match_swr(
             overlap_class, starts[index], ends[index], labels, swr_starts, swr_ends
         )
         columns["is_swr"][index] = overlap_class != "non_swr"
