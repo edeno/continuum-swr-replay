@@ -373,11 +373,10 @@ def test_load_data_masks_the_mua_of_the_areas_it_is_given(bandit_task, monkeypat
 
 
 class TestTheLoadersIntervalRulesAreTheMasks:
-    """The loader keeps its own copy of the closed membership rule
-    (``_in_intervals``), tied here to ``intervals.interval_mask``. Event
-    dropping calls ``intervals.overlaps_intervals`` (the event overlap of the
-    one eligibility rule), as ``swr_inventories.drop_overlapping_events``
-    does."""
+    """The loader's closed membership rule is ``intervals.interval_mask``
+    itself. Event dropping calls ``intervals.overlaps_intervals`` (the event
+    overlap of the one eligibility rule), as
+    ``swr_inventories.drop_overlapping_events`` does."""
 
     TIME = np.round(np.arange(0.0, 2.0, 0.001), 3)
     """A 1 kHz grid, so interval and event bounds land on samples exactly."""
@@ -416,15 +415,6 @@ class TestTheLoadersIntervalRulesAreTheMasks:
         )
         cases.append((pd.DataFrame({"start_time": [], "end_time": []}), cases[0][1]))
         return cases
-
-    def test_membership_is_interval_mask(self):
-        from continuum_swr_replay.data_loaders.lfp import _in_intervals
-        from continuum_swr_replay.intervals import interval_mask
-
-        for intervals, _ in self._cases():
-            np.testing.assert_array_equal(
-                _in_intervals(self.TIME, intervals), interval_mask(self.TIME, intervals)
-            )
 
     def test_event_overlap_is_the_detectors_and_the_sources(self):
         from continuum_swr_replay.analysis.hippocampus.swr_inventories import (

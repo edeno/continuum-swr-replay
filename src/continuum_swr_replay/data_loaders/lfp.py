@@ -79,7 +79,7 @@ from scipy.stats import zscore
 # pure helpers (``get_multiunit``, ``get_multiunit_hse``,
 # ``filter_ripple_lfp_time``) — and the unit tests that exercise them
 # — stay offline-importable on machines without VPN.
-from ..intervals import overlaps_intervals
+from ..intervals import interval_mask, overlaps_intervals
 from ..parameters import (
     HSE_CLOSE_EVENT_THRESHOLD_SEC,
     HSE_MINIMUM_DURATION_SEC,
@@ -423,7 +423,7 @@ def with_ripple_power(
         time,
         band.to_numpy(dtype=np.float64)[:, kept],
         float(ripple_power["sampling_frequency"]),
-        _in_intervals(time, ripple_power["artifact_intervals"]),
+        interval_mask(time, ripple_power["artifact_intervals"]),
     )
     return {
         **ripple_data,
@@ -729,33 +729,6 @@ def get_ripple_band_inputs(nwb_file_name: str, epoch_name: str) -> RippleBandInp
     }
 
 
-def _in_intervals(
-    time: NDArray[np.float64], intervals: pd.DataFrame
-) -> NDArray[np.bool_]:
-    """True at each time inside any closed ``[start_time, end_time]`` interval.
-
-    Parameters
-    ----------
-    time : NDArray, shape (n_time,)
-        Ascending seconds.
-    intervals : pd.DataFrame
-        ``start_time`` and ``end_time`` in seconds; any order, may overlap.
-
-    Returns
-    -------
-    NDArray of bool, shape (n_time,)
-    """
-    first = np.searchsorted(
-        time, intervals["start_time"].to_numpy(dtype=float), side="left"
-    )
-    stop = np.searchsorted(time, intervals["end_time"].to_numpy(dtype=float), "right")
-    coverage = np.zeros(time.size + 1, dtype=np.int64)
-    np.add.at(coverage, first, 1)
-    np.add.at(coverage, stop, -1)
-    inside: NDArray[np.bool_] = np.cumsum(coverage[:-1]) > 0
-    return inside
-
-
 def get_multiunit_hse(
     spike_times: list[NDArray[np.float64]],
     speed: NDArray[np.float64],
@@ -828,7 +801,7 @@ def get_multiunit_hse(
     is_artifact = (
         np.zeros(bin_time.shape, dtype=bool)
         if artifact_intervals is None
-        else _in_intervals(bin_time, artifact_intervals)
+        else interval_mask(bin_time, artifact_intervals)
     )
     observed_rate = multiunit_firing_rate.to_numpy()[~is_artifact]
     mean = np.nanmean(observed_rate) if observed_rate.size else np.nan
