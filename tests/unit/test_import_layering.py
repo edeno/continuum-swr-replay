@@ -16,7 +16,8 @@ plain edge rather than as an ``ImportError`` from a cycle:
 3. ``analysis/hippocampus`` must not import ``analysis/replay``, except for the
    one leaf module the event tables genuinely share (``event_ids``).
 
-Five more rules are checked over the package-level import graph
+Six more rules are checked over the module import graph
+(:func:`module_edges`) and the package graph built from it
 (:func:`package_graph`). Each holds today only up to a known-violations
 allowlist (:data:`KNOWN_VIOLATIONS`) that the code-organization plan works
 down to empty. A rule fails on a violation the allowlist does not name AND on
@@ -27,13 +28,21 @@ edges are removed, never go stale:
   plotting code.
 - ``src_imports_no_scripts``: the package does not import the ``scripts/``
   tree.
-- ``foundation_imports_no_upper_layer``: the foundation modules
-  (:data:`FOUNDATION`) import no ``analysis``, ``visualization`` or
-  ``scripts``.
+- ``analysis_imports_no_decoding_common``: analysis code does not import
+  the decode-run driver (``decoding_common``).
+- ``foundation_imports_only_foundation``: a foundation module
+  (:data:`FOUNDATION`) imports, from within the package, only other
+  foundation modules, and nothing from ``scripts``.
 - ``hippocampus_imports_no_pfc_or_inventory_comparison``: the hippocampus
   package does not reach sideways into those two analysis packages.
 - ``no_package_cycles``: the package graph is acyclic. Its entries are
-  package-level edges (not module-level ones) that lie on a cycle.
+  package-level edges (not module-level ones) that lie on a cycle, so a new
+  module edge along a package pair it already lists is invisible to it. The
+  back edges that close today's cycles are pinned at module level instead,
+  by the other rules: hippocampus -> replay by rule 3, hippocampus -> pfc and
+  -> inventory_comparison by the hippocampus rule, hippocampus ->
+  decoding_common by the decoding_common rule, and table_io -> * by the
+  foundation rule.
 
 Imports inside functions count: a function-local import is how a cycle is
 usually hidden, and it is still a dependency.
@@ -182,15 +191,15 @@ def test_hippocampus_imports_only_shared_replay_leaves() -> None:
 # The package-level graph and the rules checked over it.
 # ---------------------------------------------------------------------------
 
-#: Package nodes (see :func:`package_of`) that form the foundation layer: they
-#: import nothing from ``analysis``, ``visualization`` or ``scripts``. Later
-#: tasks of the code-organization plan add the new foundation homes here.
+#: Package nodes (see :func:`package_of`) that form the foundation layer: within
+#: the package they import only each other, and they import nothing from
+#: ``scripts``. Later tasks of the code-organization plan add the new
+#: foundation homes here.
 FOUNDATION = frozenset(
     {
         "data_loaders",
         "decode_files",
         "decoding_transitions",
-        "figure_utilities",
         "parameters",
         "session_keys",
         "table_io",
@@ -206,7 +215,11 @@ FOUNDATION = frozenset(
 KNOWN_VIOLATIONS: dict[str, set[tuple[str, str]]] = {
     "analysis_imports_no_visualization": set(),
     "src_imports_no_scripts": set(),
-    "foundation_imports_no_upper_layer": {
+    "analysis_imports_no_decoding_common": {
+        ("analysis.hippocampus.artifacts.detect", "decoding_common"),
+        ("analysis.hippocampus.state_evidence.io", "decoding_common"),
+    },
+    "foundation_imports_only_foundation": {
         ("decode_files", "analysis.constants"),
         ("table_io", "analysis.hippocampus.swr_source"),
         ("table_io", "analysis.replay.covariate_registry"),
@@ -408,6 +421,7 @@ def _starts_with(module: str, *prefixes: str) -> bool:
 def rule_violations(root: Path = SRC) -> dict[str, set[tuple[str, str]]]:
     """Each graph rule's current violations, keyed like :data:`KNOWN_VIOLATIONS`."""
     edges = module_edges(root)
+    index = _module_index(root)
     return {
         "analysis_imports_no_visualization": {
             (a, b)
@@ -417,11 +431,19 @@ def rule_violations(root: Path = SRC) -> dict[str, set[tuple[str, str]]]:
         "src_imports_no_scripts": {
             (a, b) for a, b in edges if _starts_with(b, "scripts")
         },
-        "foundation_imports_no_upper_layer": {
+        "analysis_imports_no_decoding_common": {
+            (a, b)
+            for a, b in edges
+            if _starts_with(a, "analysis") and _starts_with(b, "decoding_common")
+        },
+        "foundation_imports_only_foundation": {
             (a, b)
             for a, b in edges
             if package_of(a) in FOUNDATION
-            and _starts_with(b, "analysis", "visualization", "scripts")
+            and (
+                (b in index and package_of(b) not in FOUNDATION)
+                or _starts_with(b, "scripts")
+            )
         },
         "hippocampus_imports_no_pfc_or_inventory_comparison": {
             (a, b)
@@ -464,7 +486,11 @@ def test_graph_rules_see_function_local_imports_and_cycles(tmp_path: Path) -> No
     """A cycle closed by a lazy, function-local import is still a cycle.
 
     The same synthetic tree checks that a relative import resolves to the
-    module it names and that an import of ``scripts`` is seen.
+    module it names, that an import of ``scripts`` is seen, that analysis
+    reaching ``decoding_common`` is seen, and that a foundation module
+    importing any non-foundation module of the package -- not only
+    ``analysis`` -- is seen, while one importing another foundation module
+    is not.
     """
     root = tmp_path / "continuum_swr_replay"
     for package in ("analysis/alpha", "analysis/beta", "visualization"):
@@ -480,6 +506,14 @@ def test_graph_rules_see_function_local_imports_and_cycles(tmp_path: Path) -> No
         "def f():\n    from ..alpha.a import x\n    from ...visualization import v\n"
     )
     (root / "visualization" / "v.py").write_text("")
+    (root / "decoding_common.py").write_text("")
+    (root / "analysis" / "alpha" / "d.py").write_text(
+        "def g():\n    from ... import decoding_common\n"
+    )
+    (root / "types.py").write_text("")
+    (root / "parameters.py").write_text(
+        "from . import types\nfrom .decoding_common import run\n"
+    )
 
     found = rule_violations(root)
     assert found["no_package_cycles"] == {
@@ -490,3 +524,9 @@ def test_graph_rules_see_function_local_imports_and_cycles(tmp_path: Path) -> No
         ("analysis.beta.b", "visualization.v")
     }
     assert found["src_imports_no_scripts"] == {("analysis.beta.b", "scripts.qa.tool")}
+    assert found["analysis_imports_no_decoding_common"] == {
+        ("analysis.alpha.d", "decoding_common")
+    }
+    assert found["foundation_imports_only_foundation"] == {
+        ("parameters", "decoding_common")
+    }
