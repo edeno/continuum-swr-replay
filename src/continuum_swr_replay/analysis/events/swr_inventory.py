@@ -19,14 +19,15 @@ What this module fixes
   :data:`SWR_INVENTORY_RUN_ID` and nothing else.
 - **Which artifacts**: :data:`ARTIFACT_INTERVALS_RUN_ID` under
   ``paths.ARTIFACT_INTERVALS_DIR``, the artifact detector's run
-  (``scripts/decoding/run_artifact_detection.py``). It is None today: no
-  artifact is masked. Every function here resolves an epoch's artifact
-  intervals itself (:func:`artifact_intervals`), so no caller passes them and
-  every caller gets the same ones: the one artifact mask, the detector's cores
-  padded by ``artifact_masks.PADDING_S``. The SWR runner, MUA detection, the
-  decoders and the ripple-power covariate (:func:`ripple_power_inputs`) use the
-  mask itself; every analysis consumer uses *excluded time*, the mask widened
-  by ``eligibility.ARTIFACT_REACH_S`` (``analysed_time.excluded_intervals``).
+  (``scripts/decoding/run_artifact_detection.py``). It is set (runbook R9's
+  run); None would mean no artifact is masked. Every function here resolves an
+  epoch's artifact intervals itself (:func:`artifact_intervals`), so no caller
+  passes them and every caller gets the same ones: the one artifact mask, the
+  detector's cores padded by ``artifact_masks.PADDING_S``. The SWR runner, MUA
+  detection, the decoders and the ripple-power covariate
+  (:func:`ripple_power_inputs`) use the mask itself; every analysis consumer
+  uses *excluded time*, the mask widened by ``eligibility.ARTIFACT_REACH_S``
+  (``analysed_time.excluded_intervals``).
 - **The source's name** (:func:`swr_source_name`): the detector, the inventory
   run and the artifact run, such as ``kay@056eee0dcb5a+artifacts@fbbff144a123``. Every
   table built from these labels is stamped with it

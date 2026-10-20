@@ -1,8 +1,9 @@
 """The canonical tables' schema, row ids, on-disk format and parity checks.
 
-A foundation package: its modules import numpy, pandas, pyarrow and each other,
-and nothing from ``analysis``, so any tool that needs a row key, the covariate
-registry or a table read loads none of the analysis code.
+A foundation package: its modules import numpy, pandas, pyarrow, each other
+and the other foundation modules (``paths``, ``data_loaders``), and nothing
+from ``analysis``, so any tool that needs a row key, the covariate registry or
+a table read loads none of the analysis code.
 
 - ``io``: the on-disk format (parquet with ``attrs``) and ``publish_canonical``,
   the one write door for a canonical table.

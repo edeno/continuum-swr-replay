@@ -218,7 +218,7 @@ source.
   An older decode's, and any `load_data` call made without those inputs, is still
   Spyglass's consensus over every CA1 tetrode.
 - **Every cohort of an analysis frame** follows one analysed-time rule since Task 18
-  (`event_eligibility`). `with_swr_source` drops whole every SWR, MUA or non-local event
+  (`events.eligibility`). `with_swr_source` drops whole every SWR, MUA or non-local event
   in excluded time, which is the mask widened by 0.3 s (`excluded_intervals`). It also
   drops any kept event that overlaps an SWR or MUA event dropped there.
   `artifact_event_drops` gives each event's reason, and `swr_observed` is False in
