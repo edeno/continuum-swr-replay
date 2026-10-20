@@ -8,6 +8,7 @@ don't require cross-file coordination.
 from __future__ import annotations
 
 import os
+import re
 
 # The suite runs on a shared GPU host, and JAX preallocates most of every card
 # it can see the first time it is used. A test must never do that to somebody
@@ -42,9 +43,10 @@ def pytest_collection_modifyitems(config, items):
     A real-data test reads ``Processed-Data``, a raw NWB file or the Spyglass
     database. Skipping them by default makes a plain ``pytest`` test the same
     code on every machine. Under ``-m real_data`` they run, and missing data
-    fails them rather than skipping them.
+    fails them rather than skipping them. The marker must appear as a whole
+    word, so a marker such as ``real_data_lite`` is not an opt-in.
     """
-    if "real_data" in (config.getoption("-m") or ""):
+    if re.search(r"\breal_data\b", config.getoption("-m") or ""):
         return
     skip = pytest.mark.skip(reason=REAL_DATA_SKIP_REASON)
     for item in items:
@@ -87,6 +89,11 @@ def real_data_sees_the_configured_artifact_run(
     The canonical tables record the SWR source they were built from, and the
     readers refuse a table whose source differs from the configured one. With
     the run forced to None, every canonical table would be refused.
+
+    This fixture is function-scoped, so it reaches the test function only. A
+    module- or session-scoped fixture in a ``real_data`` module still sees
+    None; one that reads a table through ``swr_source.with_swr_source`` must
+    set the run itself.
     """
     if request.node.get_closest_marker("real_data") is None:
         return

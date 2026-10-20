@@ -55,3 +55,24 @@ def test_a_wider_expression_naming_real_data_runs_everything(project):
     )
 
     result.assert_outcomes(passed=2)
+
+
+def test_not_real_data_deselects_the_real_data_tests(project):
+    result = project.runpytest("-p", "no:cacheprovider", "-m", "not real_data")
+
+    result.assert_outcomes(passed=1, deselected=1)
+
+
+def test_real_data_and_not_slow_runs_the_fast_real_data_tests(project):
+    result = project.runpytest("-p", "no:cacheprovider", "-m", "real_data and not slow")
+
+    result.assert_outcomes(passed=1, deselected=1)
+
+
+def test_a_marker_whose_name_contains_real_data_is_not_an_opt_in(project):
+    """``real_data_lite`` is another marker; naming it does not opt in."""
+    result = project.runpytest(
+        "-p", "no:cacheprovider", "-rs", "-m", "not real_data_lite"
+    )
+
+    result.assert_outcomes(passed=1, skipped=1)
