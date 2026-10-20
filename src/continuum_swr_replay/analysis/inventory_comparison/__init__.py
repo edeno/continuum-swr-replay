@@ -26,4 +26,6 @@ with per-detector denominators.
   tables, and the populations of compared events they define.
 - ``selection``: matched baseline windows for the evidence score, drawn from
   the shared exposure outside every event.
+- ``kay_version``: the Kay version check, a direct Kay inventory's events
+  matched against the canonical Spyglass ones.
 """

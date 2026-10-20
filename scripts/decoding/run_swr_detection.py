@@ -188,10 +188,12 @@ from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
     best_ripple_channel,
     drop_overlapping_events,
     gap_free_stretches,
-    kay_version_check,
     run_swr_detectors,
     yu_diagnostics,
     zero_phase_bandpass,
+)
+from continuum_swr_replay.analysis.inventory_comparison.kay_version import (
+    kay_version_check,
 )
 from continuum_swr_replay.analysis.inventory_comparison.schema import SessionIdentity
 from continuum_swr_replay.data_loaders.epoch_register import epochs_to_run

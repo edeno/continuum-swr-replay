@@ -56,12 +56,14 @@ from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
     design_bandpass_sos,
     drop_overlapping_events,
     gap_free_stretches,
-    kay_version_check,
     odd_window_samples,
     run_swr_detectors,
     settling_samples,
     yu_diagnostics,
     zero_phase_bandpass,
+)
+from continuum_swr_replay.analysis.inventory_comparison.kay_version import (
+    kay_version_check,
 )
 from continuum_swr_replay.analysis.inventory_comparison.schema import SessionIdentity
 

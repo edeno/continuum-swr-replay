@@ -17,7 +17,7 @@ plain edge rather than as an ``ImportError`` from a cycle:
    module the event tables shared (``event_ids``) now lives in the foundation
    ``tables`` package.
 
-Six more rules are checked over the module import graph
+Seven more rules are checked over the module import graph
 (:func:`module_edges`) and the package graph built from it
 (:func:`package_graph`). Each holds today only up to a known-violations
 allowlist (:data:`KNOWN_VIOLATIONS`) that the code-organization plan works
@@ -229,27 +229,15 @@ KNOWN_VIOLATIONS: dict[str, set[tuple[str, str]]] = {
     "foundation_imports_only_foundation": {
         ("decode_files", "analysis.constants"),
     },
-    "hippocampus_imports_no_pfc_or_inventory_comparison": {
-        (
-            "analysis.hippocampus.swr_inventories",
-            "analysis.inventory_comparison.overlap",
-        ),
-        (
-            "analysis.hippocampus.swr_inventories",
-            "analysis.inventory_comparison.schema",
-        ),
-    },
+    "hippocampus_imports_no_pfc_or_inventory_comparison": set(),
     "events_imports_only_foundation": set(),
-    # One cycle: hippocampus <-> inventory_comparison, closed by the back edge
-    # hippocampus -> inventory_comparison (code-organization review, F2).
-    # (hippocampus <-> pfc left with the spike binning, Task 4; hippocampus ->
-    # replay and table_io -> replay with the tables package, Task 5; the
-    # replay and decoding_common cycles through hippocampus with the event
-    # substrate's move to analysis.events, Task 6.)
-    "no_package_cycles": {
-        ("analysis.hippocampus", "analysis.inventory_comparison"),
-        ("analysis.inventory_comparison", "analysis.hippocampus"),
-    },
+    # No package cycles (code-organization review, F2). hippocampus <-> pfc
+    # left with the spike binning, Task 4; hippocampus -> replay and table_io
+    # -> replay with the tables package, Task 5; the replay and
+    # decoding_common cycles through hippocampus with the event substrate's
+    # move to analysis.events, and hippocampus <-> inventory_comparison with
+    # kay_version_check's move to inventory_comparison, Task 6.
+    "no_package_cycles": set(),
 }
 
 
