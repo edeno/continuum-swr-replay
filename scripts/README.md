@@ -7,7 +7,7 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
 
 **Only `_`-prefixed modules are importable by other scripts.** Shared code belongs in
 the package, or in a `_`-prefixed module beside the scripts that share it
-(`decoding/_decode_runner.py`, `qa/_report.py`). A script that is not `_`-prefixed is
+(`decoding/_decode_runner.py`, `detection/_report.py`, `qa/_report.py`). A script that is not `_`-prefixed is
 never imported by another script or by `src/`; tests may import any script.
 [`tests/unit/test_no_new_script_imports.py`](../tests/unit/test_no_new_script_imports.py)
 enforces this. Its `ALLOWED` table is the current exception list, and it only
@@ -42,6 +42,9 @@ them importable.
   HPC decode's per-bin log-likelihood (`hpc_log_likelihood`).
 
 ## `detection/` — event detectors and the detection comparison
+- `_report.py` — not a script: what the two detection-comparison reports share (the
+  pending marking of the memoryless inventories, caption and quantile wording,
+  `read_run`, pooling sessions within an animal), imported as `scripts.detection._report`.
 - `run_artifact_detection.py` — the artifact mask: LFP and spike artifacts in every
   epoch's CA1 data, on CPU (S blocks, reference and CA1 steps, synchronous spike
   lines; `docs/design/2026-10-09-artifact-detection.md`).
@@ -225,10 +228,7 @@ them importable.
 
 ## `qa/` — parity, audits, checks and doc writers
 - `_report.py` — not a script: the run's command line (`_invocation`) and the markdown
-  table (`_md`) that several QA reports share, and what the two detection-comparison
-  reports share (the pending marking of the memoryless inventories, caption and
-  quantile wording, `read_run`, pooling sessions within an animal), imported as
-  `scripts.qa._report`.
+  table (`_md`) that several QA and PFC reports share, imported as `scripts.qa._report`.
 - `run_refits.py` — reruns the CPU fits for Q2, Q3b and Q4 and the figures that read them,
   in dependency order. Each run is pinned to its own CPUs from `--cpus` (default: all this
   process may use), and OMP/MKL/OpenBLAS/numba threads are capped per run. Runs are named

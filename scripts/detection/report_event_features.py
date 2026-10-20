@@ -93,10 +93,7 @@ from continuum_swr_replay.tables.io import read_table  # noqa: E402
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
 from scripts.detection import run_event_features as features_runner  # noqa: E402
 from scripts.detection import run_inventory_comparison as comparison  # noqa: E402
-from scripts.figures.generate_inventory_examples import (  # noqa: E402
-    detector_color,
-)
-from scripts.qa._report import (  # noqa: E402
+from scripts.detection._report import (  # noqa: E402
     MEMBERSHIPS,
     PENDING,
     PENDING_DETECTORS,
@@ -110,6 +107,9 @@ from scripts.qa._report import (  # noqa: E402
     read_run,
     summed,
     with_pending,
+)
+from scripts.figures.generate_inventory_examples import (  # noqa: E402
+    detector_color,
 )
 
 PRODUCED_BY = "scripts/detection/report_event_features.py"

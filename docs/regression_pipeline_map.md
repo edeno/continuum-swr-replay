@@ -694,6 +694,12 @@ Per-event replay-trajectory rollups, shared by both event-table builders.
 
 Artifact I/O, provenance gating, and the diagnostics that check the tables and the fits.
 
+### `scripts/detection/_report.py`
+
+What the two detection-comparison reports share.
+
+`caption_with_pending`, `session_names`, `read_run`, `with_pending`, `ratio`, `pool_sessions`, `per_session`, `summed`
+
 ### `scripts/detection/analyze_event_spike_evidence.py`
 
 Spike-evidence reality analysis for non-SWR non-local events.
@@ -744,9 +750,9 @@ Does each detector's content reproduce in cells it never saw?
 
 ### `scripts/qa/_report.py`
 
-Report helpers shared by the QA scripts: the run's command line, markdown tables.
+Report helpers shared by the QA and PFC audit scripts: the run's command line, markdown tables.
 
-`caption_with_pending`, `session_names`, `read_run`, `with_pending`, `ratio`, `pool_sessions`, `per_session`, `summed`
+_No module-level public symbols._
 
 ### `scripts/qa/audit_event_patch_fraction.py`
 

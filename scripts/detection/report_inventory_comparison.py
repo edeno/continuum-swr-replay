@@ -57,7 +57,7 @@ from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
 from continuum_swr_replay.runs.cli import parse_run_id  # noqa: E402
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
 from scripts.detection import run_inventory_comparison as runner  # noqa: E402
-from scripts.qa._report import (  # noqa: E402
+from scripts.detection._report import (  # noqa: E402
     MEMBERSHIPS,
     PENDING,
     PENDING_DETECTORS,
