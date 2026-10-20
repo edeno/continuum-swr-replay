@@ -21,10 +21,12 @@ with the offending import statement.
 
 from __future__ import annotations
 
+import ast
 import importlib
 import subprocess
 import sys
 import textwrap
+from pathlib import Path
 
 import pytest
 
@@ -241,3 +243,119 @@ def test_an_unknown_name_is_an_attribute_error():
     module = importlib.import_module("continuum_swr_replay.analysis.replay")
     with pytest.raises(AttributeError, match="no_such_name"):
         module.no_such_name  # noqa: B018
+
+
+_SRC = Path(__file__).resolve().parents[2] / "src" / "continuum_swr_replay"
+
+#: The package ``__init__``s that re-export lazily, relative to ``_SRC``.
+_LAZY_INITS = (
+    "__init__.py",
+    "data_loaders/__init__.py",
+    "analysis/hippocampus/__init__.py",
+    "analysis/pfc/__init__.py",
+    "analysis/replay/__init__.py",
+)
+
+
+def _lazy_exports_and_type_checking_imports(
+    init: Path,
+) -> tuple[set[tuple[str, str, str]], set[tuple[str, str, str]]]:
+    """``(module, attribute, bound name)`` triples, read statically from ``init``.
+
+    The first set is what ``_LAZY_EXPORTS`` promises; the second is what the
+    ``if TYPE_CHECKING:`` block imports. Modules are absolute dotted names.
+    """
+    package_parts = [_SRC.name, *init.parent.relative_to(_SRC).parts]
+    package = ".".join(package_parts)
+    tree = ast.parse(init.read_text(), filename=str(init))
+
+    exports: set[tuple[str, str, str]] | None = None
+    imports: set[tuple[str, str, str]] = set()
+    for node in tree.body:
+        if (
+            isinstance(node, ast.Assign)
+            and any(
+                isinstance(t, ast.Name) and t.id == "_LAZY_EXPORTS"
+                for t in node.targets
+            )
+        ) or (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "_LAZY_EXPORTS"
+        ):
+            exports = set()
+            for name, target in ast.literal_eval(node.value).items():
+                module, attribute = (
+                    target if isinstance(target, tuple) else (target, name)
+                )
+                if not module.startswith(f"{_SRC.name}."):
+                    module = f"{package}.{module}"
+                exports.add((module, attribute, name))
+        elif (
+            isinstance(node, ast.If)
+            and isinstance(node.test, ast.Name)
+            and node.test.id == "TYPE_CHECKING"
+        ):
+            for statement in ast.walk(node):
+                if not isinstance(statement, ast.ImportFrom):
+                    continue
+                if statement.level == 0:
+                    module = statement.module or ""
+                else:
+                    kept = package_parts[: len(package_parts) - (statement.level - 1)]
+                    module = ".".join(
+                        [*kept, *([statement.module] if statement.module else [])]
+                    )
+                for alias in statement.names:
+                    imports.add((module, alias.name, alias.asname or alias.name))
+    assert exports, f"{init}: no _LAZY_EXPORTS found; the check would be vacuous"
+    return exports, imports
+
+
+@pytest.mark.parametrize("init", _LAZY_INITS)
+def test_every_lazy_export_has_a_type_checking_mirror(init):
+    """Each ``_LAZY_EXPORTS`` target is imported under ``TYPE_CHECKING`` too.
+
+    The import-layering scan (``test_import_layering.module_edges``) sees a
+    lazy export's dependency only through that mirror: ``_LAZY_EXPORTS`` holds
+    strings, which ``ast`` does not read as imports. A missing mirror hides
+    the edge from every layering rule.
+    """
+    exports, imports = _lazy_exports_and_type_checking_imports(_SRC / init)
+    missing = sorted(exports - imports)
+    assert not missing, (
+        f"{init}: lazy exports with no TYPE_CHECKING import "
+        "(module, attribute, bound name):\n" + "\n".join(map(str, missing))
+    )
+
+
+def test_the_lazy_init_list_is_complete():
+    """Every ``__init__`` that defines ``_LAZY_EXPORTS`` is in the mirror check."""
+    found = {
+        str(p.relative_to(_SRC))
+        for p in _SRC.rglob("__init__.py")
+        if "_LAZY_EXPORTS" in p.read_text()
+    }
+    assert found == set(_LAZY_INITS)
+
+
+def test_a_missing_type_checking_mirror_is_caught(tmp_path, monkeypatch):
+    """A lazy export whose ``TYPE_CHECKING`` import was dropped is reported."""
+    package = tmp_path / "continuum_swr_replay" / "pkg"
+    package.mkdir(parents=True)
+    init = package / "__init__.py"
+    init.write_text(
+        '_LAZY_EXPORTS = {"f": "mod", "g": ("mod", "_g"), '
+        '"h": "continuum_swr_replay.other"}\n'
+        "if TYPE_CHECKING:\n"
+        "    from .mod import f\n"
+        "    from .mod import g\n"  # the alias is missing: binds _g as g
+    )
+    monkeypatch.setattr(
+        sys.modules[__name__], "_SRC", tmp_path / "continuum_swr_replay"
+    )
+    exports, imports = _lazy_exports_and_type_checking_imports(init)
+    assert sorted(exports - imports) == [
+        ("continuum_swr_replay.other", "h", "h"),
+        ("continuum_swr_replay.pkg.mod", "_g", "g"),
+    ]
