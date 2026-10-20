@@ -246,7 +246,7 @@ The previously recorded Δ82/Δ250 magnitudes predate the unified speed
 gating and **must be re-derived** before being cited.
 
 The replay-content `build_event_table` in
-`analysis/replay/tables_event.py` (re-exported from `tables.py`) builds on
+`analysis/replay/tables_event.py` builds on
 top of this. The classified columns are merged in on `event_id`; the
 classified pass's timing columns arrive renamed `label_event_start` /
 `_end` / `_duration` / `_midpoint_time`, are checked bit-for-bit against
