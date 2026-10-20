@@ -169,6 +169,7 @@ from continuum_swr_replay.analysis.inventory_comparison.recount import (  # noqa
 from continuum_swr_replay.analysis.inventory_comparison.schema import (  # noqa: E402
     INVENTORY_DTYPES,
     STATE_SPACE,
+    typed_table,
 )
 from continuum_swr_replay.analysis.inventory_comparison.selection import (  # noqa: E402
     REJECTION_COHORTS,
@@ -620,9 +621,9 @@ def epoch_tables(
         for cohort in REJECTION_COHORTS
     ]
     tables = {
-        "features": comparison._typed([features], FEATURE_DTYPES),
-        "pair_membership": comparison._typed([matches], MATCH_DTYPES),
-        "rejection": comparison._typed(rejection, REJECTION_DTYPES),
+        "features": typed_table([features], FEATURE_DTYPES),
+        "pair_membership": typed_table([matches], MATCH_DTYPES),
+        "rejection": typed_table(rejection, REJECTION_DTYPES),
     }
     record = {
         "memoryless_available": run is not None,

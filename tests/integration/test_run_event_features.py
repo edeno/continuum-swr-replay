@@ -74,6 +74,7 @@ from continuum_swr_replay.analysis.inventory_comparison.populations import (
 )
 from continuum_swr_replay.analysis.inventory_comparison.schema import (
     INVENTORY_DTYPES,
+    typed_table,
 )
 from continuum_swr_replay.analysis.inventory_comparison.selection import (
     REJECTION_COHORTS,
@@ -686,7 +687,7 @@ def test_every_table_keeps_its_dtypes_through_a_write_and_read(run):
 def test_an_empty_epoch_keeps_the_declared_dtypes(tmp_path):
     for name, dtypes in runner.TABLE_DTYPES.items():
         path = tmp_path / f"{name}.parquet"
-        write_table(comparison._typed([], dtypes), path)
+        write_table(typed_table([], dtypes), path)
         read = read_table(path)
         assert read.empty and read.dtypes.to_dict() == dtypes_of(dtypes), name
 

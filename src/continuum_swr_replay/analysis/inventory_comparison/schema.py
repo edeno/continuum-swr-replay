@@ -65,6 +65,8 @@ INVENTORY_DTYPES: Mapping[str, object] = MappingProxyType(
 
 STATE_SPACE = "state_space"
 MEMORYLESS = "memoryless"
+MEMORYLESS_CRITERIA = "memoryless_criteria"
+
 
 MEMORYLESS_COHORTS: Mapping[str, str] = MappingProxyType(
     {"published": "shuffle_pass", "replay_criteria": "is_replay"}
@@ -507,3 +509,18 @@ def from_memoryless_table(table: pd.DataFrame, *, cohort: str) -> pd.DataFrame:
         }
     )
     return _finish(frame)
+
+
+def typed_table(
+    frames: Iterable[pd.DataFrame], dtypes: Mapping[str, object]
+) -> pd.DataFrame:
+    """The frames in one table with the columns and dtypes given."""
+    rows = [frame for frame in frames if len(frame)]
+    table = (
+        pd.concat(rows, ignore_index=True)
+        if rows
+        else pd.DataFrame(
+            {name: pd.Series(dtype=dtype) for name, dtype in dtypes.items()}
+        )
+    )
+    return table[list(dtypes)].astype(dict(dtypes)).reset_index(drop=True)

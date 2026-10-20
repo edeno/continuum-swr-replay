@@ -28,10 +28,9 @@ Usage:
 """
 
 import argparse
-import json
 import os
 import sys
-from collections.abc import Callable, Collection, Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from itertools import combinations
 from pathlib import Path
 from types import MappingProxyType
@@ -51,17 +50,29 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import matplotlib.ticker  # noqa: E402
 
-from continuum_swr_replay.analysis.inventory_comparison.schema import (  # noqa: E402
-    MEMORYLESS,
-)
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_epoch_ids,
 )
 from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
 from continuum_swr_replay.runs.cli import parse_run_id  # noqa: E402
-from continuum_swr_replay.tables.io import read_table  # noqa: E402
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
 from scripts.qa import run_inventory_comparison as runner  # noqa: E402
+from scripts.qa._report import (  # noqa: E402
+    MEMBERSHIPS,
+    PENDING,
+    PENDING_DETECTORS,
+    PENDING_SENTENCE,
+    QUANTILE_COLUMNS,
+    QUANTILES,
+    caption_with_pending,
+    per_session,
+    pool_sessions,
+    ratio,
+    read_run,
+    session_names,
+    summed,
+    with_pending,
+)
 
 PRODUCED_BY = "scripts/qa/report_inventory_comparison.py"
 FIGURE_ROOT = FIGURE_DIR / "inventory_comparison"
@@ -69,16 +80,6 @@ REPORT_DIR = "report"
 """The report's folder inside the inventory run's."""
 SESSION = list(SESSION_COLUMNS_DAY)
 
-PENDING = "pending the Phase 2 pilot checks"
-PENDING_DETECTORS = frozenset({MEMORYLESS, runner.MEMORYLESS_CRITERIA})
-PENDING_SENTENCE = (
-    "Every row or column with a memoryless or memoryless_criteria inventory is "
-    f"marked {PENDING} (in tables, the pending column; in figures, †)."
-)
-QUANTILES: Mapping[str, float] = MappingProxyType(
-    {"q10": 0.1, "q25": 0.25, "median": 0.5, "q75": 0.75, "q90": 0.9}
-)
-MEMBERSHIPS = ("matched", "unmatched", "unknown")
 AGREEMENTS = ("agree", "disagree", "unknown")
 
 _ANIMAL_SUMS = (
@@ -88,14 +89,6 @@ _ANIMAL_SUMS = (
     "unavailable_sessions, and n_sessions counts the sessions summed."
 )
 _SESSION_ROWS = "Per session (one analysed epoch, nested in its animal)."
-_QUANTILE_COLUMNS = (
-    "Each distribution is given as its count of finite values (_n), its 10th, "
-    "25th, 50th, 75th and 90th percentiles and its maximum."
-)
-
-
-def _caption(*sentences: str) -> str:
-    return " ".join((*sentences, PENDING_SENTENCE))
 
 
 _TOPICS: Mapping[str, tuple[str, str, str]] = MappingProxyType(
@@ -154,7 +147,7 @@ _TOPICS: Mapping[str, tuple[str, str, str]] = MappingProxyType(
             "the matching relation; they are not event counts. "
             "n_a_within_shared_exposure and n_b_within_shared_exposure count "
             "the pairs whose first or second event lies wholly inside the "
-            "pair's shared exposure. " + _QUANTILE_COLUMNS,
+            "pair's shared exposure. " + QUANTILE_COLUMNS,
             _SESSION_ROWS,
             "Per animal, the pairs of all its sessions pooled.",
         ),
@@ -178,7 +171,7 @@ _TOPICS: Mapping[str, tuple[str, str, str]] = MappingProxyType(
             "source event's start, offset_difference_s the target's end less "
             "the source's end, so a target that wraps its source has a negative "
             "onset and a positive offset difference. Pair counts describe the "
-            "matching relation; they are not event counts. " + _QUANTILE_COLUMNS,
+            "matching relation; they are not event counts. " + QUANTILE_COLUMNS,
             _SESSION_ROWS,
             "Per animal, the pairs of all its sessions pooled.",
         ),
@@ -259,7 +252,7 @@ _TOPICS: Mapping[str, tuple[str, str, str]] = MappingProxyType(
             "memoryless event is also a criteria event, so with both a "
             "component would count one detector twice): their sizes (n_events, n_detectors) and spans "
             "(span_s, first onset to last offset). Components are diagnostics, "
-            "not event intervals. " + _QUANTILE_COLUMNS,
+            "not event intervals. " + QUANTILE_COLUMNS,
             _SESSION_ROWS,
             "Per animal, the components of all its sessions pooled.",
         ),
@@ -268,17 +261,17 @@ _TOPICS: Mapping[str, tuple[str, str, str]] = MappingProxyType(
 
 TABLE_CAPTIONS: Mapping[str, str] = MappingProxyType(
     {
-        "epochs": _caption(
+        "epochs": caption_with_pending(
             "Every epoch of the run: ok or failed (with the manifest's reason "
             "or error), and the detectors unavailable in each ok epoch. The "
             "analysed epochs the run does not hold are counted in report.md."
         ),
-        "unavailable_detectors": _caption(
+        "unavailable_detectors": caption_with_pending(
             "Each session and detector with no observed time, and the reason "
             "its observation table gives."
         ),
         **{
-            f"{topic}_{level}": _caption(what, detail)
+            f"{topic}_{level}": caption_with_pending(what, detail)
             for topic, (what, by_session, by_animal) in _TOPICS.items()
             for level, detail in (("by_session", by_session), ("by_animal", by_animal))
         },
@@ -288,34 +281,34 @@ TABLE_CAPTIONS: Mapping[str, str] = MappingProxyType(
 
 FIGURE_CAPTIONS: Mapping[str, str] = MappingProxyType(
     {
-        "native_durations.png": _caption(
+        "native_durations.png": caption_with_pending(
             "Native duration distributions per detector, before any view split "
             "by duration: interval_span_s and native_duration_s of each "
             "detector's compared events, pooled over every session, on "
             "logarithmic bins from 1 ms to 10 s; values outside that range are "
             "drawn in the edge bins. n is the number of compared events."
         ),
-        "directional_agreement.png": _caption(
+        "directional_agreement.png": caption_with_pending(
             "Directional agreement per animal: the proportion of the source "
             "detector's eligible events (rows) that overlap any event of the "
             "target detector (columns), n_matched over n_eligible summed over "
             "the animal's available sessions. Grey: no eligible events. "
             "Counts in directional_by_animal.csv."
         ),
-        "overlap_distributions.png": _caption(
+        "overlap_distributions.png": caption_with_pending(
             "Overlap length (intersection_s) and IoU of every overlapping pair "
             "of events, by detector pair, pooled over every session: the median "
             "(dot) and the 10th to 90th percentiles (bar); n is the number of "
             "pairs, which describe the matching relation, not events."
         ),
-        "swr_matrix.png": _caption(
+        "swr_matrix.png": caption_with_pending(
             "The SWR label matrix per animal: non_swr_fraction of each sequence "
             "cohort (rows) under each SWR definition (columns), n_non_swr over "
             "n_eligible summed over the animal's available sessions, printed in "
             "each cell to two places; the counts are in "
             "swr_matrix_by_animal.csv. Grey: no eligible events."
         ),
-        "components.png": _caption(
+        "components.png": caption_with_pending(
             "Overlap-graph components over the eight inventories without "
             "memoryless_criteria, pooled over every session: the number of "
             "events in each (left) and its span, first onset to last offset "
@@ -325,54 +318,6 @@ FIGURE_CAPTIONS: Mapping[str, str] = MappingProxyType(
     }
 )
 """Every figure, by file name, with its caption."""
-
-
-def session_names(frame: pd.DataFrame) -> pd.Series:
-    """``{animal}{day}_{epoch}`` of each row."""
-    return (
-        frame.animal.astype(str) + frame.day.astype(str) + "_" + frame.epoch.astype(str)
-    )
-
-
-def read_run(
-    run_dir: Path,
-    table_dtypes: Mapping[str, Mapping[str, object]] | None = None,
-    output_path: Callable[[str, Path, str], Path] | None = None,
-) -> tuple[dict, dict[str, pd.DataFrame]]:
-    """The run's manifest and every table of its ``ok`` epochs, concatenated.
-
-    Parameters
-    ----------
-    run_dir : Path
-    table_dtypes : mapping, optional
-        Each table's columns and dtypes; the comparison runner's
-        (``run_inventory_comparison.TABLE_DTYPES``) by default.
-    output_path : callable, optional
-        ``(epoch id, run folder, table name) -> path`` of the runner that
-        wrote the run; the comparison runner's by default.
-
-    Returns
-    -------
-    manifest : dict
-    tables : dict of str to DataFrame
-        By name, with the runner's columns and dtypes.
-    """
-    table_dtypes = runner.TABLE_DTYPES if table_dtypes is None else table_dtypes
-    output_path = runner.output_path if output_path is None else output_path
-    manifest: dict = json.loads((run_dir / "manifest.json").read_text())
-    ok = sorted(
-        identifier
-        for identifier, record in manifest["epochs"].items()
-        if record["status"] == "ok"
-    )
-    tables = {
-        name: runner._typed(
-            (read_table(output_path(identifier, run_dir, name)) for identifier in ok),
-            dtypes,
-        )
-        for name, dtypes in table_dtypes.items()
-    }
-    return manifest, tables
 
 
 def epoch_status(manifest: Mapping) -> pd.DataFrame:
@@ -420,92 +365,6 @@ def detector_availability(observations: pd.DataFrame) -> pd.DataFrame:
     out = pd.concat([available, reasons.reindex(available.index)], axis=1)
     out["reason"] = out.reason.where(~out.available, "").fillna("")
     return out.reset_index()
-
-
-def with_pending(
-    frame: pd.DataFrame,
-    columns: Sequence[str] = (),
-    groups: Mapping[str, Mapping[str, Collection[str]]] = MappingProxyType({}),
-) -> pd.DataFrame:
-    """``frame`` with ``pending``: :data:`PENDING` on rows a memoryless
-    inventory enters, else empty.
-
-    Parameters
-    ----------
-    frame : DataFrame
-    columns : sequence of str
-        Columns naming a detector or cohort.
-    groups : mapping
-        Column -> {value: the detectors it stands for}, for a column naming a
-        set of detectors, such as a comparison or a cell.
-    """
-    marked = np.zeros(len(frame), dtype=bool)
-    for column in columns:
-        marked |= frame[column].isin(PENDING_DETECTORS).to_numpy()
-    for column, members in groups.items():
-        pending = {
-            value
-            for value, detectors in members.items()
-            if PENDING_DETECTORS & set(detectors)
-        }
-        marked |= frame[column].isin(pending).to_numpy()
-    return frame.assign(pending=np.where(marked, PENDING, ""))
-
-
-def _ratio(numerator: pd.Series, denominator: pd.Series) -> pd.Series:
-    """``numerator / denominator``, NaN where the denominator is not positive."""
-    denominator = denominator.astype(np.float64)
-    return numerator.astype(np.float64) / denominator.where(denominator > 0)
-
-
-def pool_sessions(
-    frame: pd.DataFrame,
-    *,
-    by: Sequence[str],
-    sums: Sequence[str],
-    available: pd.Series | np.ndarray,
-) -> pd.DataFrame:
-    """Each animal's sums over its available sessions, by ``by``.
-
-    Parameters
-    ----------
-    frame : DataFrame
-        One row per session and ``by`` group, with ``animal``, ``day`` and
-        ``epoch``.
-    by : sequence of str
-        The columns to pool within, besides ``animal``.
-    sums : sequence of str
-        The count and seconds columns to sum.
-    available : boolean array, shape (len(frame),)
-        Whether a row's session enters the sums.
-
-    Returns
-    -------
-    DataFrame
-        One row per animal and ``by`` group in ``frame``: ``n_sessions`` (the
-        sessions summed), the sums (zero where no session was available), and
-        ``unavailable_sessions``, the other sessions' names joined by ``"; "``.
-    """
-    keys = ["animal", *by]
-    work = frame.assign(
-        _session=session_names(frame), _available=np.asarray(available, dtype=bool)
-    )
-    every = work.groupby(keys).size().index
-    kept = work[work._available].groupby(keys)
-    pooled = pd.concat(
-        [kept._session.nunique().rename("n_sessions"), kept[list(sums)].sum()], axis=1
-    ).reindex(every)
-    listed = (
-        work[~work._available]
-        .groupby(keys)
-        ._session.agg(lambda names: "; ".join(sorted(set(names))))
-        .rename("unavailable_sessions")
-        .reindex(every)
-    )
-    pooled = pooled.fillna(0).astype(
-        {"n_sessions": np.int64} | {column: frame[column].dtype for column in sums}
-    )
-    return pd.concat([pooled, listed.fillna("")], axis=1).reset_index()
 
 
 def _distribution(
@@ -570,7 +429,7 @@ def counts_by_animal(by_session: pd.DataFrame) -> pd.DataFrame:
     )
     notes = by_session.groupby("detector").native_note.first()
     return pooled.assign(
-        rate_per_s=_ratio(pooled.n_in_exposure, pooled.exposure_s),
+        rate_per_s=ratio(pooled.n_in_exposure, pooled.exposure_s),
         native_note=pooled.detector.map(notes).fillna(""),
     )
 
@@ -598,7 +457,7 @@ def directional_by_animal(
         sums=DIRECTIONAL_SUMS,
         available=directional.available,
     )
-    return pooled.assign(proportion_matched=_ratio(pooled.n_matched, pooled.n_eligible))
+    return pooled.assign(proportion_matched=ratio(pooled.n_matched, pooled.n_eligible))
 
 
 COVERED_FRACTIONS = (0.5, 0.9)
@@ -697,7 +556,7 @@ def _with_proportions(frame: pd.DataFrame) -> pd.DataFrame:
     """``frame`` with ``p_<x>`` = ``n_<x>`` / ``n_eligible`` for each count."""
     return frame.assign(
         **{
-            "p_" + c.removeprefix("n_"): _ratio(frame[c], frame.n_eligible)
+            "p_" + c.removeprefix("n_"): ratio(frame[c], frame.n_eligible)
             for c in MATCH_STRENGTH_COUNTS
         }
     )
@@ -780,7 +639,7 @@ def swr_matrix_by_animal(matrix: pd.DataFrame) -> pd.DataFrame:
         sums=["n_events", "n_eligible", "n_excluded", "n_swr", "n_non_swr"],
         available=matrix.available,
     )
-    return pooled.assign(non_swr_fraction=_ratio(pooled.n_non_swr, pooled.n_eligible))
+    return pooled.assign(non_swr_fraction=ratio(pooled.n_non_swr, pooled.n_eligible))
 
 
 def matrix_population(matrix: pd.DataFrame) -> pd.DataFrame:
@@ -930,13 +789,6 @@ def labels_by_animal(by_session: pd.DataFrame, table: str) -> pd.DataFrame:
     )
 
 
-def _per_session(frame: pd.DataFrame) -> pd.DataFrame:
-    """``frame`` with each row's session name after the session columns."""
-    return frame.assign(session=session_names(frame))[
-        [*SESSION, "session", *(c for c in frame.columns if c not in SESSION)]
-    ]
-
-
 def _count_by(
     frame: pd.DataFrame, keys: Sequence[str], column: str, values: Sequence[str]
 ) -> pd.DataFrame:
@@ -947,15 +799,6 @@ def _count_by(
         .agg(n=(column, "size"), **{f"n_{v}": (f"n_{v}", "sum") for v in values})
         .reset_index()
     )
-
-
-def _summed(
-    by_session: pd.DataFrame, by: Sequence[str], sums: Sequence[str]
-) -> pd.DataFrame:
-    """Sums over every session of each animal, none left out."""
-    return pool_sessions(
-        by_session, by=by, sums=sums, available=np.ones(len(by_session), dtype=bool)
-    ).drop(columns="unavailable_sessions")
 
 
 def report_tables(
@@ -971,7 +814,7 @@ def report_tables(
     out: dict[str, pd.DataFrame] = {
         "epochs": epoch_status(manifest),
         "unavailable_detectors": with_pending(
-            _per_session(availability[~availability.available]), ["detector"]
+            per_session(availability[~availability.available]), ["detector"]
         ),
     }
 
@@ -982,7 +825,7 @@ def report_tables(
             compared, [*keys, "detector"], durations, "n_events"
         )
     counts = counts_by_session(tables["counts"], availability)
-    out["counts_by_session"] = _per_session(counts)
+    out["counts_by_session"] = per_session(counts)
     out["counts_by_animal"] = counts_by_animal(counts)
 
     set_aside = (
@@ -992,19 +835,17 @@ def report_tables(
         .rename("n_events")
         .reset_index()
     )
-    out["set_aside_by_session"] = _per_session(set_aside)
-    out["set_aside_by_animal"] = _summed(
-        set_aside, ["detector", "reason"], ["n_events"]
-    )
+    out["set_aside_by_session"] = per_session(set_aside)
+    out["set_aside_by_animal"] = summed(set_aside, ["detector", "reason"], ["n_events"])
 
     exclusion = tables["exclusion_by_reason"]
-    out["exclusion_by_session"] = _per_session(exclusion)
-    out["exclusion_by_animal"] = _summed(
+    out["exclusion_by_session"] = per_session(exclusion)
+    out["exclusion_by_animal"] = summed(
         exclusion, ["comparison", "reason"], ["seconds"]
     )
 
     directional = tables["directional"]
-    out["directional_by_session"] = _per_session(directional)
+    out["directional_by_session"] = per_session(directional)
     out["directional_by_animal"] = directional_by_animal(directional)
 
     pairs = tables["pairs"]
@@ -1022,7 +863,7 @@ def report_tables(
         out[f"overlap_{level}"] = spread.merge(within, on=group, how="left")
 
     strength = match_strength_by_session(pairs, directional)
-    out["match_strength_by_session"] = _per_session(strength)
+    out["match_strength_by_session"] = per_session(strength)
     out["match_strength_by_animal"] = match_strength_by_animal(strength)
     oriented = oriented_pairs(pairs)
     oriented = oriented[oriented.source_within_shared_exposure]
@@ -1035,7 +876,7 @@ def report_tables(
         )
 
     coverage = tables["time_coverage"]
-    out["time_coverage_by_session"] = _per_session(coverage)
+    out["time_coverage_by_session"] = per_session(coverage)
     pooled = pool_sessions(
         coverage,
         by=pairs_of,
@@ -1043,8 +884,8 @@ def report_tables(
         available=coverage.available,
     )
     out["time_coverage_by_animal"] = pooled.assign(
-        union_fraction=_ratio(pooled.union_s, pooled.shared_exposure_s),
-        intersection_fraction=_ratio(pooled.intersection_s, pooled.shared_exposure_s),
+        union_fraction=ratio(pooled.union_s, pooled.shared_exposure_s),
+        intersection_fraction=ratio(pooled.intersection_s, pooled.shared_exposure_s),
     )
 
     recounted = settings["recount"]["detector"]
@@ -1063,15 +904,15 @@ def report_tables(
     both = both[
         (both.source_detector == recounted) | (both.target_detector == recounted)
     ]
-    out["recount_by_session"] = _per_session(both)
+    out["recount_by_session"] = per_session(both)
     out["recount_by_animal"] = directional_by_animal(both, by=["segmentation"])
 
     cells = cells_by_session(tables["cells"], availability, cell_sources)
-    out["cells_by_session"] = _per_session(cells)
+    out["cells_by_session"] = per_session(cells)
     out["cells_by_animal"] = cells_by_animal(cells)
 
     undetected = tables["no_detector_time"]
-    out["no_detector_time_by_session"] = _per_session(undetected)
+    out["no_detector_time_by_session"] = per_session(undetected)
     pooled = pool_sessions(
         undetected,
         by=[],
@@ -1079,20 +920,20 @@ def report_tables(
         available=undetected.available,
     )
     out["no_detector_time_by_animal"] = pooled.assign(
-        undetected_fraction=_ratio(pooled.undetected_s, pooled.shared_exposure_s)
+        undetected_fraction=ratio(pooled.undetected_s, pooled.shared_exposure_s)
     )
 
     matrix = tables["swr_matrix"]
-    out["swr_matrix_by_session"] = _per_session(matrix)
+    out["swr_matrix_by_session"] = per_session(matrix)
     out["swr_matrix_by_animal"] = swr_matrix_by_animal(matrix)
 
     paired = paired_labels_by_session(tables["paired_labels"], matrix)
-    out["paired_labels_by_session"] = _per_session(paired)
+    out["paired_labels_by_session"] = per_session(paired)
     out["paired_labels_by_animal"] = labels_by_animal(paired, "paired_labels")
     disagreement = definition_disagreement_by_session(
         tables["definition_disagreement"], matrix
     )
-    out["definition_disagreement_by_session"] = _per_session(disagreement)
+    out["definition_disagreement_by_session"] = per_session(disagreement)
     out["definition_disagreement_by_animal"] = labels_by_animal(
         disagreement, "definition_disagreement"
     )
@@ -1391,7 +1232,7 @@ def write_report(run_dir: Path, figure_root: Path) -> dict[str, list[Path]]:
     dict
         ``tables`` and ``figures``: the paths written.
     """
-    manifest, tables = read_run(run_dir)
+    manifest, tables = read_run(run_dir, runner.TABLE_DTYPES, runner.output_path)
     out = report_tables(manifest, tables)
     run_id = run_dir.name
     figure_dir = figure_root / run_id

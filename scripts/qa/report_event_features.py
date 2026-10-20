@@ -77,6 +77,7 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import (  # noqa:
     MEMORYLESS,
     STATE_SPACE,
     _event_keys,
+    typed_table,
 )
 from continuum_swr_replay.analysis.inventory_comparison.selection import (  # noqa: E402
     REJECTION_DTYPES,
@@ -95,19 +96,19 @@ from scripts.figures.generate_inventory_examples import (  # noqa: E402
 )
 from scripts.qa import run_event_features as features_runner  # noqa: E402
 from scripts.qa import run_inventory_comparison as comparison  # noqa: E402
-from scripts.qa.report_inventory_comparison import (  # noqa: E402
-    _QUANTILE_COLUMNS,
+from scripts.qa._report import (  # noqa: E402
     MEMBERSHIPS,
     PENDING,
     PENDING_DETECTORS,
     PENDING_SENTENCE,
+    QUANTILE_COLUMNS,
     QUANTILES,
-    _caption,
-    _per_session,
-    _ratio,
-    _summed,
+    caption_with_pending,
+    per_session,
     pool_sessions,
+    ratio,
     read_run,
+    summed,
     with_pending,
 )
 
@@ -309,7 +310,7 @@ def _feature_topic(group: str, columns: Sequence[str], stratified: bool) -> str:
         what += " " + _LFP_MUA
     if group == "evidence":
         what += " " + _EVIDENCE_NOTE
-    return " ".join((what, _POPULATIONS, _QUANTILE_COLUMNS))
+    return " ".join((what, _POPULATIONS, QUANTILE_COLUMNS))
 
 
 _TOPICS: Mapping[str, tuple[str, str, str]] = MappingProxyType(
@@ -352,7 +353,7 @@ _TOPICS: Mapping[str, tuple[str, str, str]] = MappingProxyType(
             "and by spikes_per_row bin ("
             + ", ".join(SPIKES_PER_ROW_LABELS)
             + "; each bin closed on the left; an interval with no row is in "
-            "none). " + _EVIDENCE_NOTE + " " + _POPULATIONS + " " + _QUANTILE_COLUMNS,
+            "none). " + _EVIDENCE_NOTE + " " + _POPULATIONS + " " + QUANTILE_COLUMNS,
             _SESSION_ROWS,
             _ANIMAL_EVENTS,
         ),
@@ -408,7 +409,7 @@ _TOPICS: Mapping[str, tuple[str, str, str]] = MappingProxyType(
             + "), their evidence_dll and their spikes_per_row. "
             + _EVIDENCE_NOTE
             + " "
-            + _QUANTILE_COLUMNS,
+            + QUANTILE_COLUMNS,
             "Per session (one analysed epoch, nested in its animal).",
             _ANIMAL_SUMS + " The quantiles pool the animal's events.",
         ),
@@ -417,13 +418,13 @@ _TOPICS: Mapping[str, tuple[str, str, str]] = MappingProxyType(
 
 TABLE_CAPTIONS: Mapping[str, str] = MappingProxyType(
     {
-        "epochs": _caption(
+        "epochs": caption_with_pending(
             "Every epoch of the run: ok or failed (with the manifest's reason "
             "or error), and whether the memoryless run observed it. The "
             "analysed epochs the run does not hold are counted in report.md."
         ),
         **{
-            f"{topic}_{level}": _caption(what, detail)
+            f"{topic}_{level}": caption_with_pending(what, detail)
             for topic, (what, by_session, by_animal) in _TOPICS.items()
             for level, detail in (("by_session", by_session), ("by_animal", by_animal))
         },
@@ -448,7 +449,7 @@ DECODER_PAIRS = (
 
 FIGURE_CAPTIONS: Mapping[str, str] = MappingProxyType(
     {
-        "feature_distributions.png": _caption(
+        "feature_distributions.png": caption_with_pending(
             "Feature distributions of the two decoders' pairwise populations, "
             "per animal (rows): state_space events matched and unmatched by "
             "memoryless†, and memoryless† events matched and unmatched by "
@@ -457,7 +458,7 @@ FIGURE_CAPTIONS: Mapping[str, str] = MappingProxyType(
             "of the animal's events pooled. Colors by detector family. Counts "
             "in features_*_by_animal.csv."
         ),
-        "rejection_stages.png": _caption(
+        "rejection_stages.png": caption_with_pending(
             "Rejection stages of the state_space events unmatched by each "
             "memoryless cohort (panels), per animal (rows) and exclusive stage "
             "(columns, in the detector's order): the fraction of those events "
@@ -467,13 +468,13 @@ FIGURE_CAPTIONS: Mapping[str, str] = MappingProxyType(
             "label and never drawn as a stage. Counts in "
             "rejection_by_animal.csv."
         ),
-        "comparator_only.png": _caption(
+        "comparator_only.png": caption_with_pending(
             "Comparator-only events per animal (panels): each detector's "
             "events unmatched by state_space, by ss_disagreement class, as "
             "fractions of them, printed where the bar has room; n counts the "
             "events. Counts in comparator_only_by_animal.csv."
         ),
-        "evidence_by_stratum.png": _caption(
+        "evidence_by_stratum.png": caption_with_pending(
             "Spike evidence (evidence_dll) by duration stratum, per detector "
             "(panels), every compared event: the median (marker, one per "
             "animal) and the 25th to 75th percentiles (bar) of the animal's "
@@ -481,7 +482,7 @@ FIGURE_CAPTIONS: Mapping[str, str] = MappingProxyType(
             + _EVIDENCE_NOTE
             + " Counts in features_evidence_by_stratum_by_animal.csv."
         ),
-        "evidence_by_spikes.png": _caption(
+        "evidence_by_spikes.png": caption_with_pending(
             "Spike evidence (evidence_dll) against spikes per row, per detector "
             "(panels), every compared event: in each spikes_per_row bin, the "
             "median (marker, one per animal) and the 25th to 75th percentiles "
@@ -569,7 +570,7 @@ def read_inputs(
     memoryless_dir = memoryless_root / runs["memoryless"]
     ok = _ok(manifest)
     tables = {
-        name: comparison._typed(
+        name: typed_table(
             (
                 read_table(comparison.output_path(identifier, inventory_dir, name))
                 for identifier in ok
@@ -578,7 +579,7 @@ def read_inputs(
         )
         for name in ("cells", "directional")
     }
-    tables["memoryless_events"] = comparison._typed(
+    tables["memoryless_events"] = typed_table(
         (
             read_table(
                 memoryless_outputs(identifier, memoryless_dir)["events"],
@@ -652,10 +653,7 @@ def _with_context_shares(frame: pd.DataFrame) -> pd.DataFrame:
         if c.startswith("n_") and c not in ("n_events", "n_sessions")
     ]
     return frame.assign(
-        **{
-            "p_" + c.removeprefix("n_"): _ratio(frame[c], frame.n_events)
-            for c in counts
-        }
+        **{"p_" + c.removeprefix("n_"): ratio(frame[c], frame.n_events) for c in counts}
     )
 
 
@@ -723,7 +721,7 @@ def feature_tables(
                     frame, [*keys, *POPULATION, *by], columns, "n_events"
                 )
                 if level == "by_session":
-                    table = _per_session(table)
+                    table = per_session(table)
                 name = f"features_{group}{'_by_stratum' if by else ''}_{level}"
                 out[name] = _mark(table, every_row=group == "ms")
     return out
@@ -892,7 +890,7 @@ def rejection_by_session(rejection: pd.DataFrame) -> pd.DataFrame:
 def rejection_by_animal(by_session: pd.DataFrame) -> pd.DataFrame:
     """The rejection counts summed per animal, cohort and membership; the
     reasons stay missing on the ``unknown`` rows."""
-    pooled = _summed(
+    pooled = summed(
         by_session.astype(dict.fromkeys(REJECTION_REASON_COUNTS, "Int64")),
         ["cohort", "membership"],
         REJECTION_SUMS,
@@ -1093,22 +1091,22 @@ def report_tables(
 
     missing = missing_by_session(populations, features)
     kept = ~missing.feature.isin(never_missing(missing)).to_numpy()
-    out["missing_by_session"] = _per_session(_at_session(missing[kept]))
-    out["missing_by_animal"] = _summed(
+    out["missing_by_session"] = per_session(_at_session(missing[kept]))
+    out["missing_by_animal"] = summed(
         missing, [*POPULATION, "feature"], ["n", "n_missing"]
     )
     context = context_by_session(populations, features)
-    out["context_by_session"] = _with_context_shares(_per_session(_at_session(context)))
+    out["context_by_session"] = _with_context_shares(per_session(_at_session(context)))
     out["context_by_animal"] = _with_context_shares(
-        _summed(context, POPULATION, [c for c in context.columns if c.startswith("n_")])
+        summed(context, POPULATION, [c for c in context.columns if c.startswith("n_")])
     )
     coverage = evidence_coverage_by_session(features)
-    out["evidence_coverage_by_session"] = _per_session(coverage).assign(
-        spikes_per_row=lambda t: _ratio(t.n_spikes, t.n_rows)
+    out["evidence_coverage_by_session"] = per_session(coverage).assign(
+        spikes_per_row=lambda t: ratio(t.n_spikes, t.n_rows)
     )
-    out["evidence_coverage_by_animal"] = _summed(
+    out["evidence_coverage_by_animal"] = summed(
         coverage, ["detector"], [c for c in coverage.columns if c.startswith("n_")]
-    ).assign(spikes_per_row=lambda t: _ratio(t.n_spikes, t.n_rows))
+    ).assign(spikes_per_row=lambda t: ratio(t.n_spikes, t.n_rows))
     for level, keys, rows in (
         ("by_session", SESSION, _at_session(populations)),
         ("by_animal", ["animal"], populations),
@@ -1122,16 +1120,16 @@ def report_tables(
             "n_events",
         )
         out[f"evidence_by_spikes_{level}"] = (
-            _per_session(table) if level == "by_session" else table
+            per_session(table) if level == "by_session" else table
         )
 
     rejection = rejection_by_session(tables["rejection"])
-    out["rejection_by_session"] = _per_session(rejection)
+    out["rejection_by_session"] = per_session(rejection)
     out["rejection_by_animal"] = rejection_by_animal(rejection)
     cohort = memoryless_cohort_by_session(
         tables["memoryless_events"], features, manifest
     )
-    out["memoryless_cohort_by_session"] = _per_session(cohort)
+    out["memoryless_cohort_by_session"] = per_session(cohort)
     out["memoryless_cohort_by_animal"] = pool_sessions(
         cohort, by=["scope"], sums=COHORT_COUNTS, available=cohort.available
     )
@@ -1139,11 +1137,11 @@ def report_tables(
     events = comparator_only_events(populations, features)
     keys = [*SESSION, "detector", "ss_disagreement"]
     counts = _comparator_counts(events, keys)
-    out["comparator_only_by_session"] = _per_session(
+    out["comparator_only_by_session"] = per_session(
         comparator_only_table(counts, events, SESSION)
     )
     out["comparator_only_by_animal"] = comparator_only_table(
-        _summed(counts, ["detector", "ss_disagreement"], COMPARATOR_COUNTS),
+        summed(counts, ["detector", "ss_disagreement"], COMPARATOR_COUNTS),
         events,
         ["animal"],
     )

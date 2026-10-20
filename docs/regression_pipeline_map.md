@@ -698,7 +698,7 @@ Artifact I/O, provenance gating, and the diagnostics that check the tables and t
 
 Report helpers shared by the QA scripts: the run's command line, markdown tables.
 
-_No module-level public symbols._
+`caption_with_pending`, `session_names`, `read_run`, `with_pending`, `ratio`, `pool_sessions`, `per_session`, `summed`
 
 ### `scripts/qa/analyze_event_spike_evidence.py`
 
@@ -818,7 +818,7 @@ Report one event features run: its features per session and per animal.
 
 Report one inventory comparison run: its counts per session and per animal.
 
-`session_names`, `read_run`, `epoch_status`, `detector_availability`, `with_pending`, `pool_sessions`, `counts_by_session`, `counts_by_animal`, `directional_by_animal`, `oriented_pairs`, `match_strength_by_session`, `match_strength_by_animal`, `cells_by_session`, `cells_by_animal`, `swr_matrix_by_animal`, `matrix_population`, `paired_labels_by_session`, `definition_disagreement_by_session`, `labels_by_animal`, `report_tables`, `draw_figures`, `write_report`, `main`
+`epoch_status`, `detector_availability`, `counts_by_session`, `counts_by_animal`, `directional_by_animal`, `oriented_pairs`, `match_strength_by_session`, `match_strength_by_animal`, `cells_by_session`, `cells_by_animal`, `swr_matrix_by_animal`, `matrix_population`, `paired_labels_by_session`, `definition_disagreement_by_session`, `labels_by_animal`, `report_tables`, `draw_figures`, `write_report`, `main`
 
 ### `scripts/qa/run_event_features.py`
 

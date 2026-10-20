@@ -80,7 +80,7 @@ import resource
 import sys
 import time as clock
 import traceback
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 from itertools import combinations
 from pathlib import Path
 from types import MappingProxyType
@@ -153,8 +153,10 @@ from continuum_swr_replay.analysis.inventory_comparison.recount import (
 from continuum_swr_replay.analysis.inventory_comparison.schema import (
     INVENTORY_DTYPES,
     MEMORYLESS,
+    MEMORYLESS_CRITERIA,
     STATE_SPACE,
     combine_inventories,
+    typed_table,
 )
 from continuum_swr_replay.analysis.inventory_comparison.swr_matrix import (
     DISAGREEMENT_DTYPES,
@@ -197,7 +199,6 @@ DECODE_ROOT = PROCESSED_DATA_DIR
 PRODUCED_BY = "scripts/qa/run_inventory_comparison.py"
 DESIGN_SPEC = "docs/design/replay_detection_comparison/03-inventory-comparison.md"
 
-MEMORYLESS_CRITERIA = "memoryless_criteria"
 ROSTER: Mapping[str, str | None] = MappingProxyType(
     {
         **dict.fromkeys(SWR_DETECTORS),
@@ -307,21 +308,6 @@ bridging ones."""
 def decode_path(identifier: str) -> Path:
     """The canonical decode's ``data_over_time`` pickle (``decode_paths``)."""
     return decode_paths(identifier, DECODE_ROOT).data_over_time
-
-
-def _typed(
-    frames: Iterable[pd.DataFrame], dtypes: Mapping[str, object]
-) -> pd.DataFrame:
-    """The frames in one table with the columns and dtypes given."""
-    rows = [frame for frame in frames if len(frame)]
-    table = (
-        pd.concat(rows, ignore_index=True)
-        if rows
-        else pd.DataFrame(
-            {name: pd.Series(dtype=dtype) for name, dtype in dtypes.items()}
-        )
-    )
-    return table[list(dtypes)].astype(dict(dtypes)).reset_index(drop=True)
 
 
 def _speed_trace(dot: pd.DataFrame) -> tuple[NDArray, NDArray]:
@@ -459,10 +445,10 @@ def compare_epoch(
         carey_dir=carey_dir,
         memoryless_dir=memoryless_dir,
     )
-    observations = _typed(
+    observations = typed_table(
         (tables.observations for tables in inventories.values()), OBSERVATION_DTYPES
     )
-    dropped = _typed(
+    dropped = typed_table(
         (tables.set_aside for tables in inventories.values()), SET_ASIDE_DTYPES
     )
     animal, day, epoch = observations[list(SESSION_COLUMNS_DAY)].iloc[0]
@@ -479,7 +465,7 @@ def compare_epoch(
         tables.inventory for tables in inventories.values()
     )
     kept, coverage, bridging = remove_bridging_events(eligible, coverage)
-    set_aside = _typed([dropped, _bridging_set_aside(bridging)], SET_ASIDE_DTYPES)
+    set_aside = typed_table([dropped, _bridging_set_aside(bridging)], SET_ASIDE_DTYPES)
 
     pairs = overlap_pairs(kept)
     matches = event_matches(kept, pairs, coverage, detectors=DETECTORS)
@@ -559,7 +545,9 @@ def compare_epoch(
         "paired_labels": [paired_labels(pairs, labels, cohorts=SEQUENCE_COHORTS)],
         "definition_disagreement": [definition_disagreement(labels)],
     }
-    out = {name: _typed(tables[name], dtypes) for name, dtypes in TABLE_DTYPES.items()}
+    out = {
+        name: typed_table(tables[name], dtypes) for name, dtypes in TABLE_DTYPES.items()
+    }
     out["inventory"] = out["inventory"].sort_values(
         ["detector", "event_start_s"], kind="stable", ignore_index=True
     )
