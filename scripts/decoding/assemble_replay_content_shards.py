@@ -23,17 +23,9 @@ from continuum_swr_replay.analysis.hippocampus.swr_source import (
 from continuum_swr_replay.analysis.replay._tables_common import (
     EVENT_ARM_STANDARDIZED_COLS,
 )
-from continuum_swr_replay.analysis.replay.covariate_registry import (
-    stamp_covariate_schema,
-)
 from continuum_swr_replay.analysis.replay.covariates import load_contingency
 from continuum_swr_replay.analysis.replay.prepare_data import (
     _assert_value_block_matches_source,
-)
-from continuum_swr_replay.analysis.replay.standardization import (
-    assert_standardized_present,
-    attach_standardized,
-    save_reference,
 )
 from continuum_swr_replay.analysis.replay.table_contracts import (
     validate_event_arm_table,
@@ -45,11 +37,19 @@ from continuum_swr_replay.analysis.replay.tables_arm_patch import (
 from continuum_swr_replay.analysis.replay.tables_stop import add_nonlocal_swr_split
 from continuum_swr_replay.data_loaders.constants import WELL_ARMS
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
-from continuum_swr_replay.session_keys import (
+from continuum_swr_replay.tables.covariate_registry import (
+    stamp_covariate_schema,
+)
+from continuum_swr_replay.tables.io import publish_canonical, read_table
+from continuum_swr_replay.tables.parity import BASENAME_TO_TABLE
+from continuum_swr_replay.tables.session_keys import (
     session_key_set as _session_keys,
 )
-from continuum_swr_replay.table_io import publish_canonical, read_table
-from continuum_swr_replay.table_parity import BASENAME_TO_TABLE
+from continuum_swr_replay.tables.standardization import (
+    assert_standardized_present,
+    attach_standardized,
+    save_reference,
+)
 
 LOGGER = logging.getLogger(__name__)
 INPUT_TABLES = (

@@ -154,12 +154,6 @@ Shared whole-unit complete-case cohort selection.
 
 `freeze_common_cohort`, `stop_cohort_suffix`, `select_stop_cohort`, `select_event_cohort`, `stop_interval_mask`, `events_in_stops`
 
-### `src/continuum_swr_replay/analysis/replay/event_ids.py`
-
-Stable row identities: the ``event_id`` and ``stop_id`` hashes.
-
-`hash_event_id`, `validate_event_ids`, `hash_stop_id`
-
 ### `src/continuum_swr_replay/analysis/replay/prepare_data.py`
 
 Build the four canonical replay-content tables across all sessions.
@@ -196,6 +190,18 @@ Within-stop time-binned tables (Part B).
 
 `build_event_onset_table`, `build_stop_timebin_table`
 
+### `src/continuum_swr_replay/tables/event_ids.py`
+
+Stable row identities: the ``event_id`` and ``stop_id`` hashes.
+
+`hash_event_id`, `validate_event_ids`, `hash_stop_id`
+
+### `src/continuum_swr_replay/tables/session_keys.py`
+
+The natural key for one recording session: (animal, session_date, epoch).
+
+`session_key_set`, `n_sessions`, `session_key_frame`, `subset_max_per_animal`
+
 ## Covariates
 
 Predictor construction: the timing clocks, the history blocks, the candidate-arm block, standardization, and the name registry.
@@ -205,12 +211,6 @@ Predictor construction: the timing clocks, the history blocks, the candidate-arm
 Which per-event response the content ladders are fit on.
 
 `resolve_response_column`, `default_response_for_estimator`, `resolve_response_choice`, `validate_fraction_response`, `renormalize_fraction_over_candidates`
-
-### `src/continuum_swr_replay/analysis/replay/covariate_registry.py`
-
-Covariate naming contract -- the runtime half of the 2026-08-21 rename.
-
-`row_keys`, `Entry`, `derived_columns`, `canonical_names`, `RegistryError`, `validate`, `RenamePlan`, `plan_rename`, `apply_rename`, `canonicalize_numerical_paths`, `canonical_output_name`, `rename_dynamic_columns`, `assert_canonical_vocabulary`, `assert_unique_scientific_rows`, `stamp_covariate_schema`, `require_covariate_schema`, `finalize_covariate_schema`
 
 ### `src/continuum_swr_replay/analysis/replay/covariate_timing.py`
 
@@ -290,12 +290,6 @@ Map decoded replay positions to spatial units (arms, patches).
 
 `map_estimate_to_patch`, `map_estimate_to_arm`, `arm_to_well`, `well_to_arm_set`
 
-### `src/continuum_swr_replay/analysis/replay/standardization.py`
-
-Pooled-global standardization of continuous covariates (`<col>_z`).
-
-`attach_standardized`, `assert_standardized_present`, `assert_standardized_matches_reference`, `z_reference_path`, `save_reference`, `load_reference`
-
 ### `src/continuum_swr_replay/analysis/replay/uncertainty.py`
 
 Per-event decoder-confidence summaries from the arm-marginal posterior.
@@ -307,6 +301,18 @@ Per-event decoder-confidence summaries from the arm-marginal posterior.
 Model-light estimands for reward-belief uncertainty and replay content.
 
 `assign_within_arm_quantiles`, `build_trial_leaf_table`, `hierarchical_quartile_profile`, `paired_quartile_contrasts`, `summarize_mu_coefficients`, `within_arm_horserace`, `summarize_horserace`
+
+### `src/continuum_swr_replay/tables/covariate_registry.py`
+
+Covariate naming contract -- the runtime half of the 2026-08-21 rename.
+
+`row_keys`, `Entry`, `derived_columns`, `canonical_names`, `RegistryError`, `validate`, `RenamePlan`, `plan_rename`, `apply_rename`, `canonicalize_numerical_paths`, `canonical_output_name`, `rename_dynamic_columns`, `assert_canonical_vocabulary`, `assert_unique_scientific_rows`, `stamp_covariate_schema`, `require_covariate_schema`, `finalize_covariate_schema`
+
+### `src/continuum_swr_replay/tables/standardization.py`
+
+Pooled-global standardization of continuous covariates (`<col>_z`).
+
+`attach_standardized`, `assert_standardized_present`, `assert_standardized_matches_reference`, `z_reference_path`, `save_reference`, `load_reference`
 
 ## Specs
 
@@ -904,7 +910,19 @@ Load the conditional non-local posterior from a decoder results file.
 
 `load_conditional_posterior`
 
-### `src/continuum_swr_replay/analysis/replay/versions.py`
+### `src/continuum_swr_replay/tables/io.py`
+
+On-disk format for the canonical analysis tables.
+
+`sha256_file`, `umask_file_mode`, `publish_canonical`, `parquet_path`, `resolved_table_path`, `write_table`, `read_table`, `read_attrs`, `table_exists`
+
+### `src/continuum_swr_replay/tables/parity.py`
+
+Keyed table-to-table parity checks shared across the pipeline.
+
+`diff_table`, `compare_table_roots`
+
+### `src/continuum_swr_replay/tables/versions.py`
 
 Centralized schema/version literals for the covariate pipeline.
 

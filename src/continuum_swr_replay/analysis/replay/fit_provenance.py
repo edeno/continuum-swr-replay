@@ -35,7 +35,7 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 
-from continuum_swr_replay.table_io import parquet_path, read_attrs, sha256_file
+from continuum_swr_replay.tables.io import parquet_path, read_attrs, sha256_file
 
 __all__ = [
     "fit_provenance_path",
@@ -179,7 +179,7 @@ def record_inputs(inputs: dict[str, Path]) -> dict[str, InputRecord]:
     ----------
     inputs : dict of str to Path
         Display name -> path of each table the fit was built from. A ``.pkl``
-        path is resolved through ``table_io.parquet_path`` so the hashed file
+        path is resolved through ``tables.io.parquet_path`` so the hashed file
         is the one ``read_table`` actually read.
 
     Returns

@@ -118,7 +118,7 @@ from continuum_swr_replay.intervals import (  # noqa: E402
     masked_seconds,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR  # noqa: E402
-from continuum_swr_replay.table_io import sha256_file  # noqa: E402
+from continuum_swr_replay.tables.io import sha256_file  # noqa: E402
 from scripts.decoding.run_memoryless_detection import (  # noqa: E402
     MARKS_RULE,
     input_paths,

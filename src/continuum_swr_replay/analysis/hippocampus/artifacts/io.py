@@ -29,7 +29,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.table_io import sha256_file, umask_file_mode, write_table
+from continuum_swr_replay.tables.io import sha256_file, umask_file_mode, write_table
 
 __all__ = [
     "CORES_SUFFIX",

@@ -44,7 +44,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     MU_UNCERTAINTY_CURATED_COVARIATES,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
-from continuum_swr_replay.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 # Single source of truth: the curated covariate set is part of the MU_uncertainty
 # spec in model_specs and the populations are defined in the fitter; import them

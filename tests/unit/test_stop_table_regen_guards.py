@@ -18,7 +18,7 @@ import pytest
 from continuum_swr_replay.analysis.replay.prepare_data import (
     _refuse_to_clobber_complete_stop_table,
 )
-from continuum_swr_replay.table_io import write_table
+from continuum_swr_replay.tables.io import write_table
 from scripts.decoding.regenerate_stop_table import _assert_matches_event_table
 
 

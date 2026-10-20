@@ -57,7 +57,7 @@ from continuum_swr_replay.analysis.inventory_comparison.selection import (  # no
 )
 from continuum_swr_replay.decoding_common import parse_run_id  # noqa: E402
 from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
-from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
 from scripts.figures import (  # noqa: E402
     generate_inventory_examples as inventory_examples,
 )

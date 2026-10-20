@@ -28,7 +28,7 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
 from continuum_swr_replay.data_loaders.utils import get_labels
-from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
 logger = logging.getLogger(__name__)
 

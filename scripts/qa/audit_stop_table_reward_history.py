@@ -3,7 +3,7 @@
 
 The reward-history basis columns are *added* to the stop table; nothing about
 the stop definition changes. This script proves that: the shared keyed-parity
-core (``table_parity.diff_table``) checks every pre-existing column with the
+core (``tables.parity.diff_table``) checks every pre-existing column with the
 four new ones declared as expected additions, so any drift in a pre-existing
 column, any undeclared new column, and any row-count or key-set change raise.
 On top of that this script pins what is specific to the stop table and to the
@@ -28,14 +28,14 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.replay.covariate_registry import row_keys
 from continuum_swr_replay.analysis.replay.model_specs import (
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_INCOMPLETE,
 )
-from continuum_swr_replay.session_keys import SESSION_COLUMNS
-from continuum_swr_replay.table_io import read_table, sha256_file
-from continuum_swr_replay.table_parity import diff_table
+from continuum_swr_replay.tables.covariate_registry import row_keys
+from continuum_swr_replay.tables.io import read_table, sha256_file
+from continuum_swr_replay.tables.parity import diff_table
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 DEFAULT_ADDED_COLUMNS = (*REWARD_HISTORY_COLUMNS, REWARD_HISTORY_INCOMPLETE)
 

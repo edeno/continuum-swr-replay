@@ -77,7 +77,7 @@ from continuum_swr_replay.analysis.inventory_comparison.selection import (
 )
 from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier
 from continuum_swr_replay.decoding_common import write_atomically
-from continuum_swr_replay.table_io import read_table, sha256_file, write_table
+from continuum_swr_replay.tables.io import read_table, sha256_file, write_table
 from scripts.decoding.run_memoryless_detection import (
     input_paths,
     marks_cache_path,

@@ -49,9 +49,6 @@ from continuum_swr_replay.analysis.replay.cohort_selection import (
     select_stop_cohort,
     stop_cohort_suffix,
 )
-from continuum_swr_replay.analysis.replay.covariate_registry import (
-    require_covariate_schema,
-)
 from continuum_swr_replay.analysis.replay.covariate_timing import (
     assert_predictor_timing,
 )
@@ -70,8 +67,14 @@ from continuum_swr_replay.analysis.replay.per_stop_rate_model import (
     fit_per_stop_rate_model,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.session_keys import SESSION_COLUMNS, subset_max_per_animal
-from continuum_swr_replay.table_io import read_table
+from continuum_swr_replay.tables.covariate_registry import (
+    require_covariate_schema,
+)
+from continuum_swr_replay.tables.io import read_table
+from continuum_swr_replay.tables.session_keys import (
+    SESSION_COLUMNS,
+    subset_max_per_animal,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)

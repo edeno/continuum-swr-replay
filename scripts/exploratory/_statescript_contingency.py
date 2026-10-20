@@ -39,12 +39,12 @@ import re
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.replay.covariate_registry import (
-    require_covariate_schema,
-)
 from continuum_swr_replay.data_loaders.constants import WELL_PATCH_MAPPING
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.table_io import read_table
+from continuum_swr_replay.tables.covariate_registry import (
+    require_covariate_schema,
+)
+from continuum_swr_replay.tables.io import read_table
 
 logger = logging.getLogger(__name__)
 

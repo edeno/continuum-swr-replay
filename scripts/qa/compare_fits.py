@@ -88,8 +88,8 @@ from continuum_swr_replay.analysis.replay.per_bin_design import (
     reconstruct_reward_kernels,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.session_keys import SESSION_COLUMNS
-from continuum_swr_replay.table_io import read_table, sha256_file, table_exists
+from continuum_swr_replay.tables.io import read_table, sha256_file, table_exists
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 # Sibling-script import: run as a script, only this file's directory is on
 # sys.path.

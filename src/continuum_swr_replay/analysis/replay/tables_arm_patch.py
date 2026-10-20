@@ -18,6 +18,7 @@ from continuum_swr_replay.data_loaders.constants import (
     TRACK_SEGMENT_TO_PATCH,
     WELL_ARMS,
 )
+from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schema
 
 from ._helpers import (
     align_count_matrix as _align_count_matrix,
@@ -37,7 +38,6 @@ from ._tables_common import (
     _in_event_mask,
     _prepare_dot,
 )
-from .covariate_registry import stamp_covariate_schema
 from .covariates.candidate_arm import (
     attach_candidate_arm_covariates,
     broadcast_candidate_arms,

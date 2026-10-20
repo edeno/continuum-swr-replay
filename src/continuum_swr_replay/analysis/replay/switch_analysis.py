@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
-from continuum_swr_replay.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from ._helpers import strict_mean, strict_sum
 from .choice_prediction import predict_arm_fractions

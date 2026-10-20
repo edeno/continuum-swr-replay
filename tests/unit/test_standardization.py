@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.replay.standardization import (
+from continuum_swr_replay.tables.standardization import (
     assert_standardized_matches_reference,
     assert_standardized_present,
     attach_standardized,

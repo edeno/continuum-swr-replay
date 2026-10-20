@@ -64,9 +64,6 @@ from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
     read_dot_with_swr_source,
     require_swr_source,
 )
-from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
-    require_covariate_schema,
-)
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_decode_files,
 )
@@ -76,7 +73,10 @@ from continuum_swr_replay.decode_files import (  # noqa: E402
     non_local_threshold_percent,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
-from continuum_swr_replay.table_io import read_table, table_exists  # noqa: E402
+from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
+    require_covariate_schema,
+)
+from continuum_swr_replay.tables.io import read_table, table_exists  # noqa: E402
 
 # --- Parameters ---------------------------------------------------------------
 NON_LOCAL_THRESHOLD = DEFAULT_NON_LOCAL_THRESHOLD

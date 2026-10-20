@@ -102,7 +102,7 @@ from continuum_swr_replay.intervals import (
     normalize,
     subtract,
 )
-from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
 __all__ = [
     "BASELINE_DTYPES",

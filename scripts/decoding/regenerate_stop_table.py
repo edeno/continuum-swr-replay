@@ -31,22 +31,22 @@ from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
     stamp_swr_source,
 )
 from continuum_swr_replay.analysis.replay import build_stop_table  # noqa: E402
-from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
-    require_covariate_schema,
-    stamp_covariate_schema,
-)
 from continuum_swr_replay.analysis.replay.prepare_data import find_sessions
 from continuum_swr_replay.analysis.replay.tables_stop import (  # noqa: E402
     add_nonlocal_swr_split,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
-from continuum_swr_replay.session_keys import session_key_set
-from continuum_swr_replay.table_io import (
+from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
+    require_covariate_schema,
+    stamp_covariate_schema,
+)
+from continuum_swr_replay.tables.io import (
     publish_canonical,
     read_table,
     table_exists,
     write_table,
 )
+from continuum_swr_replay.tables.session_keys import session_key_set
 from continuum_swr_replay.types import SessionDataKeys  # noqa: E402
 
 logging.basicConfig(

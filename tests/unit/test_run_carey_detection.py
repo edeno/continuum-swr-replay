@@ -27,7 +27,7 @@ import scripts.decoding.run_carey_detection as runner
 from continuum_swr_replay.analysis.hippocampus import swr_source
 from continuum_swr_replay.analysis.hippocampus.swr_inventories import CAREY_SETTINGS
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
-from continuum_swr_replay.table_io import read_table, sha256_file
+from continuum_swr_replay.tables.io import read_table, sha256_file
 from scripts.decoding.run_carey_detection import main, run_epoch
 from scripts.decoding.run_swr_detection import array_sha256, epoch_id
 from tests.unit._swr_inventory_fixtures import write_artifact_run

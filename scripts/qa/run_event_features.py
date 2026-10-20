@@ -178,11 +178,11 @@ from continuum_swr_replay.intervals import (  # noqa: E402
     interval_mask,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR  # noqa: E402
-from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
-from continuum_swr_replay.table_io import (  # noqa: E402
+from continuum_swr_replay.tables.io import (  # noqa: E402
     read_table,
     sha256_file,
 )
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
 from scripts.decoding import run_carey_detection as carey  # noqa: E402
 from scripts.decoding.run_memoryless_detection import (  # noqa: E402
     MARKS_RULE,

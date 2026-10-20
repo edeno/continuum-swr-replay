@@ -1,6 +1,6 @@
 """Behavioral tests for the canonical-table storage layer.
 
-Every canonical table now goes through :mod:`continuum_swr_replay.table_io`, so
+Every canonical table now goes through :mod:`continuum_swr_replay.tables.io`, so
 a silent fidelity loss here corrupts every downstream fit at once. These tests
 pin the properties the analysis code actually relies on: values, dtypes and
 ``attrs`` survive a round-trip; a parquet table wins over a stale pickle beside
@@ -18,7 +18,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.hippocampus.swr_source import require_swr_source
-from continuum_swr_replay.table_io import (
+from continuum_swr_replay.tables.io import (
     parquet_path,
     publish_canonical,
     read_table,
@@ -255,7 +255,7 @@ def test_publish_canonical_keeps_the_swr_stamp_and_needs_none_for_qvals(tmp_path
 
 def test_publish_canonical_stamps_and_writes(tmp_path):
     """publish_canonical stamps the schema and writes; equals a manual stamp+write."""
-    from continuum_swr_replay.analysis.replay.covariate_registry import (
+    from continuum_swr_replay.tables.covariate_registry import (
         stamp_covariate_schema,
     )
 
@@ -341,6 +341,6 @@ def test_no_module_reads_a_canonical_table_with_read_pickle():
                     offenders.append(f"{path.relative_to(repo_root)}:{number}")
 
     assert not offenders, (
-        "canonical tables must be read via table_io.read_table, not pd.read_pickle: "
+        "canonical tables must be read via tables.io.read_table, not pd.read_pickle: "
         + ", ".join(offenders)
     )

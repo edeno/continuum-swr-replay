@@ -23,7 +23,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from ._helpers import stay_indicator_from_patches
 

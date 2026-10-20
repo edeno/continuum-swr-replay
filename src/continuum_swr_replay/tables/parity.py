@@ -16,8 +16,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.replay.covariate_registry import row_keys
-from continuum_swr_replay.table_io import read_table
+from continuum_swr_replay.tables.covariate_registry import row_keys
+from continuum_swr_replay.tables.io import read_table
 
 __all__ = [
     "BASENAME_TO_TABLE",

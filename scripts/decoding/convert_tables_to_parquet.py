@@ -32,7 +32,7 @@ from pathlib import Path
 import pandas as pd
 
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.table_io import parquet_path, read_table, write_table
+from continuum_swr_replay.tables.io import parquet_path, read_table, write_table
 
 LOGGER = logging.getLogger(__name__)
 

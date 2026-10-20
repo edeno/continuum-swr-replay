@@ -59,11 +59,6 @@ from continuum_swr_replay.analysis.replay.retrospective import (
     _session_keys,
     compute_retrospective_metrics,
 )
-from continuum_swr_replay.analysis.replay.standardization import (
-    assert_standardized_present,
-    attach_standardized,
-    save_reference,
-)
 from continuum_swr_replay.analysis.replay.tables_arm_patch import (
     build_event_arm_table,
     build_event_patch_table,
@@ -84,11 +79,16 @@ from continuum_swr_replay.data_loaders.trials import (
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.decode_files import decode_paths
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.session_keys import SESSION_COLUMNS
-from continuum_swr_replay.table_io import (
+from continuum_swr_replay.tables.io import (
     parquet_path,
     publish_canonical,
     umask_file_mode,
+)
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.tables.standardization import (
+    assert_standardized_present,
+    attach_standardized,
+    save_reference,
 )
 from continuum_swr_replay.types import SessionDataKeys
 
@@ -102,7 +102,7 @@ OUTPUT_DIR = PROCESSED_DATA_DIR / "replay_content"
 # Per-session cache of the Spyglass-sourced behavioral context and track graph.
 # Populated on every full run; consumed by --from-cache to skip load_data.
 SESSION_CACHE_DIR = OUTPUT_DIR / "_session_cache"
-from continuum_swr_replay.analysis.replay.versions import (  # noqa: E402
+from continuum_swr_replay.tables.versions import (  # noqa: E402
     BEHAVIORAL_CONTEXT_CACHE_VERSION,  # value centralized in versions.py
     assert_versions_compatible,
 )
@@ -353,7 +353,7 @@ def load_behavioral_context(
                 )
             # mkstemp created tmp_path at 0600; restore the umask-respecting
             # mode a plain write would have produced so other readers of the
-            # shared cache dir keep access (see table_io.umask_file_mode).
+            # shared cache dir keep access (see tables.io.umask_file_mode).
             os.chmod(tmp_path, umask_file_mode())
             os.replace(tmp_path, cache_path)
         except BaseException:

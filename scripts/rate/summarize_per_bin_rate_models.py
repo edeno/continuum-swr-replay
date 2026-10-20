@@ -45,7 +45,7 @@ from continuum_swr_replay.analysis.replay.per_bin_design import (
     self_history_rate_ratios,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P
-from continuum_swr_replay.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 RC = P / "replay_content"
 ALL_MODELS = RC / "models_per_bin_rate" / "all_models.pkl"

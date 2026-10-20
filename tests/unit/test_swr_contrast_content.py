@@ -25,7 +25,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (
 from continuum_swr_replay.analysis.replay.model_specs import (
     SWR_CONTRAST_CONTENT_PATCH_LADDER as PATCH_LADDER,
 )
-from continuum_swr_replay.analysis.replay.standardization import attach_standardized
+from continuum_swr_replay.tables.standardization import attach_standardized
 from scripts.content import fit_swr_contrast_content as mod
 
 

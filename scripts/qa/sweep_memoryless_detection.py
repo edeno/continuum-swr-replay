@@ -94,7 +94,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics im
     normalize_windows,
 )
 from continuum_swr_replay.parameters import LOCAL_POSITION_STD, PROCESSED_DATA_DIR
-from continuum_swr_replay.table_io import write_table
+from continuum_swr_replay.tables.io import write_table
 
 DECODE_BIN_STRIDE = 3
 N_NEURONS = 25

@@ -28,7 +28,7 @@ from continuum_swr_replay.analysis.inventory_comparison.overlap import (
     validate_detectors,
 )
 from continuum_swr_replay.intervals import contains
-from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
 __all__ = ["FRAGMENT_GAPS_S", "RECOUNT_DTYPES", "merge_fragments"]
 

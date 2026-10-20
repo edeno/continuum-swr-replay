@@ -44,7 +44,7 @@ from continuum_swr_replay.intervals import (
     total_duration,
     union,
 )
-from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
 __all__ = [
     "DIRECTIONAL_DTYPES",

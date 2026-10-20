@@ -22,11 +22,11 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.hippocampus.swr_source import stamp_swr_source
-from continuum_swr_replay.analysis.replay.covariate_registry import (
+from continuum_swr_replay.analysis.replay.fit_provenance import fit_provenance_path
+from continuum_swr_replay.tables.covariate_registry import (
     stamp_covariate_schema,
 )
-from continuum_swr_replay.analysis.replay.fit_provenance import fit_provenance_path
-from continuum_swr_replay.table_io import read_table
+from continuum_swr_replay.tables.io import read_table
 from scripts.behavior import run_stay_leave as runner
 
 SESSION = {"animal": "a", "session_date": 1, "epoch": "02_r1"}

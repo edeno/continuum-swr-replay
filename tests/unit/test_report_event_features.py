@@ -24,7 +24,7 @@ from continuum_swr_replay.analysis.inventory_comparison.features import (
 from continuum_swr_replay.analysis.inventory_comparison.selection import (
     REJECTION_DTYPES,
 )
-from continuum_swr_replay.table_io import write_table
+from continuum_swr_replay.tables.io import write_table
 from scripts.decoding.run_memoryless_detection import (
     output_paths as memoryless_outputs,
 )

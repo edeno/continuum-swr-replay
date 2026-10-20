@@ -22,14 +22,14 @@ from continuum_swr_replay.analysis.replay import (
     attach_is_swr_to_onsets,
     raised_cosine_history_basis,
 )
-from continuum_swr_replay.analysis.replay.covariate_registry import (
-    require_covariate_schema,
-)
 from continuum_swr_replay.analysis.replay.covariates.history.reward_history import (
     reward_basis_from_lags,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.table_io import read_table, table_exists
+from continuum_swr_replay.tables.covariate_registry import (
+    require_covariate_schema,
+)
+from continuum_swr_replay.tables.io import read_table, table_exists
 
 RC = PROCESSED_DATA_DIR / "replay_content"
 

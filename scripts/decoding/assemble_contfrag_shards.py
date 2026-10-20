@@ -22,10 +22,10 @@ from continuum_swr_replay.analysis.replay.table_contracts import (
     validate_event_patch_table,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
-from continuum_swr_replay.session_keys import (
+from continuum_swr_replay.tables.io import read_table
+from continuum_swr_replay.tables.session_keys import (
     session_key_set as _session_keys,
 )
-from continuum_swr_replay.table_io import read_table
 
 
 def assemble_contfrag_shards(

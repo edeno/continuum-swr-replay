@@ -38,6 +38,11 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from continuum_swr_replay.tables.covariate_registry import (
+    COVARIATE_SCHEMA_VERSION,
+    stamp_covariate_schema,
+)
+
 __all__ = [
     "read_table",
     "read_attrs",
@@ -144,13 +149,6 @@ def publish_canonical(
         If `table` is one of :data:`SWR_SOURCE_TABLES` and no
         `require_swr_source` is given.
     """
-    # Function-local import: covariate_registry's consumers import table_io, so
-    # a module-level import here would close a cycle.
-    from continuum_swr_replay.analysis.replay.covariate_registry import (
-        COVARIATE_SCHEMA_VERSION,
-        stamp_covariate_schema,
-    )
-
     if table in SWR_SOURCE_TABLES:
         if require_swr_source is None:
             raise TypeError(

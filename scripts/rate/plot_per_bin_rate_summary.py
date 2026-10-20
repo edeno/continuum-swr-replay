@@ -32,9 +32,6 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     POPULATIONS,
     attach_is_swr_to_onsets,
 )
-from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
-    require_covariate_schema,
-)
 from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
     require_fresh_inputs,
 )
@@ -54,7 +51,10 @@ from continuum_swr_replay.intervals import (  # noqa: E402
     covered_seconds,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
-from continuum_swr_replay.table_io import read_table
+from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
+    require_covariate_schema,
+)
+from continuum_swr_replay.tables.io import read_table
 
 RC = P / "replay_content"
 ALL_MODELS = RC / "models_per_bin_rate" / "all_models.pkl"

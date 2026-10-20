@@ -34,7 +34,7 @@ from continuum_swr_replay.data_loaders.constants import (
     TRACK_SEGMENT_TO_PATCH,
     WELL_ARMS,
 )
-from continuum_swr_replay.table_io import write_table
+from continuum_swr_replay.tables.io import write_table
 from scripts.content import fit_replay_content_models as mod
 
 # the runner resolves its directories, and /tmp is itself a symlink on macOS

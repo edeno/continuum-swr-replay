@@ -23,11 +23,11 @@ import sys
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.replay.covariate_registry import (
+from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.table_io import read_table
+from continuum_swr_replay.tables.io import read_table
 
 RC = PROCESSED_DATA_DIR / "replay_content"
 PARQUET = sys.argv[1] if len(sys.argv) > 1 else (

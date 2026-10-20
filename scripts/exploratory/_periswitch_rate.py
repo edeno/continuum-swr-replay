@@ -36,11 +36,11 @@ import statsmodels.api as sm
 from statsmodels.genmod.cov_struct import Independence
 from statsmodels.genmod.generalized_estimating_equations import GEE
 
-from continuum_swr_replay.analysis.replay.covariate_registry import (
+from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.table_io import read_table
+from continuum_swr_replay.tables.io import read_table
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 warnings.filterwarnings("ignore")

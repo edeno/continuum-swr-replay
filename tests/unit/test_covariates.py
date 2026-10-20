@@ -15,15 +15,15 @@ import continuum_swr_replay.analysis.replay as replay_pkg
 from continuum_swr_replay.analysis.replay import (
     _helpers,
     covariates,
-    event_ids,
     per_bin_design,
-)
-from continuum_swr_replay.analysis.replay.covariate_registry import (
-    stamp_covariate_schema,
 )
 from continuum_swr_replay.analysis.replay.covariates.history import (
     diagnostics,
     value_uncertainty,
+)
+from continuum_swr_replay.tables import event_ids
+from continuum_swr_replay.tables.covariate_registry import (
+    stamp_covariate_schema,
 )
 from tests.unit._port_experience_fixtures import port_experiences_from_trials
 

@@ -28,6 +28,8 @@ from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     require_canonical_speed_threshold,
     whole_event_immobility_mask,
 )
+from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schema
+from continuum_swr_replay.tables.event_ids import hash_stop_id
 
 from ...data_loaders.constants import ALL_ARMS
 from ...parameters import PLACE_BIN_SIZE_1D
@@ -52,7 +54,6 @@ from ..replay.bouts import (
     summarize_bout_location,
     time_since_stop,
 )
-from ..replay.covariate_registry import stamp_covariate_schema
 from ..replay.covariates import (
     add_trial_context,
     recent_trial_reward_rate,
@@ -67,7 +68,6 @@ from ..replay.design_constants import (
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_INCOMPLETE,
 )
-from ..replay.event_ids import hash_stop_id
 from ..replay.spatial_mapping import map_estimate_to_arm
 from ..replay.summaries import (
     arm_count_hard,

@@ -30,7 +30,7 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from .covariate_timing import assert_predictor_timing
 

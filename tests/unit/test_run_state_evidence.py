@@ -46,7 +46,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (
     nearest_interior_bins,
 )
 from continuum_swr_replay.intervals import interval_mask
-from continuum_swr_replay.table_io import read_table
+from continuum_swr_replay.tables.io import read_table
 from scripts.qa import run_state_evidence as runner
 from tests.unit._memoryless_clusterless_epoch import _y_track
 from tests.unit._swr_inventory_fixtures import (

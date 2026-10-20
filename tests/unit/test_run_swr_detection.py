@@ -42,7 +42,7 @@ from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
     best_ripple_channel,
 )
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
-from continuum_swr_replay.table_io import (
+from continuum_swr_replay.tables.io import (
     read_attrs,
     read_table,
     sha256_file,

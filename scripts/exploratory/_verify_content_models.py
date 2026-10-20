@@ -14,7 +14,7 @@ from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 RC = PROCESSED_DATA_DIR / "replay_content"
 SC = list(SESSION_COLUMNS)

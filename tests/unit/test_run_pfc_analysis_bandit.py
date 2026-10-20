@@ -18,7 +18,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.replay import fit_provenance
-from continuum_swr_replay.table_io import write_table
+from continuum_swr_replay.tables.io import write_table
 
 _SPEC = importlib.util.spec_from_file_location(
     "run_pfc_analysis_bandit",

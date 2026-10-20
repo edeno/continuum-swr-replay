@@ -43,9 +43,6 @@ import numpy as np
 import pandas as pd
 from matplotlib.gridspec import GridSpec
 
-from continuum_swr_replay.analysis.replay.covariate_registry import (
-    require_covariate_schema,
-)
 from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_PER_STOP_RATE,
     N_REWARD_LAGS,
@@ -54,7 +51,10 @@ from continuum_swr_replay.analysis.replay.per_stop_rate_model import (
     fit_per_stop_rate_model,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR
-from continuum_swr_replay.table_io import read_table
+from continuum_swr_replay.tables.covariate_registry import (
+    require_covariate_schema,
+)
+from continuum_swr_replay.tables.io import read_table
 
 plt.rcParams.update({"pdf.fonttype": 42, "ps.fonttype": 42,
                      "font.family": "sans-serif",

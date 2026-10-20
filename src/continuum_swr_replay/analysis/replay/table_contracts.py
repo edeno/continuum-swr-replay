@@ -24,14 +24,14 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import ALL_ARMS, TRACK_SEGMENT_TO_PATCH
-from continuum_swr_replay.session_keys import SESSION_COLUMNS
-
-from ._tables_common import EVENT_ARM_STANDARDIZED_COLS
-from .content_response import validate_fraction_response
-from .standardization import (
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.tables.standardization import (
     assert_standardized_matches_reference,
     load_reference,
 )
+
+from ._tables_common import EVENT_ARM_STANDARDIZED_COLS
+from .content_response import validate_fraction_response
 from .summaries import PROBABILITY_ROW_SUM_ATOL
 
 _PATCHES = (1, 2, 3)

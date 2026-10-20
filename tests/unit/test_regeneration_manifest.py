@@ -119,7 +119,7 @@ def test_validate_model_bundle_rejects_nonfinite_fit_statistics(
 # ---------------------------------------------------------------------------
 # Baseline parity gate (_verify_baseline)
 # ---------------------------------------------------------------------------
-from continuum_swr_replay.table_io import write_table  # noqa: E402
+from continuum_swr_replay.tables.io import write_table  # noqa: E402
 from scripts.decoding.write_regeneration_manifest import _verify_baseline  # noqa: E402
 
 

@@ -126,8 +126,11 @@ from continuum_swr_replay.intervals import (
     subtract_intervals,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.session_keys import SESSION_COLUMNS, SESSION_COLUMNS_DAY
-from continuum_swr_replay.table_io import sha256_file
+from continuum_swr_replay.tables.io import sha256_file
+from continuum_swr_replay.tables.session_keys import (
+    SESSION_COLUMNS,
+    SESSION_COLUMNS_DAY,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -325,7 +328,7 @@ def stamp_swr_source(frame: pd.DataFrame) -> pd.DataFrame:
 
     Only a producer that built the frame from decode frames read through this
     source stamps it; ``publish_canonical`` refuses a table of
-    ``table_io.SWR_SOURCE_TABLES`` without the current stamp.
+    ``tables.io.SWR_SOURCE_TABLES`` without the current stamp.
     """
     frame.attrs[SWR_SOURCE_ATTR] = swr_source_name()
     return frame

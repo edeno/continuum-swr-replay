@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.replay.covariate_registry import (
+from continuum_swr_replay.tables.covariate_registry import (
     finalize_covariate_schema,
 )
 from scripts.exploratory import _verify_harmonization_parity as parity

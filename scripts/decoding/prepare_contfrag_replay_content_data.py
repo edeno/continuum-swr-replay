@@ -60,16 +60,16 @@ from continuum_swr_replay.analysis.hippocampus.swr_source import (
 )
 from continuum_swr_replay.analysis.replay import build_event_patch_table
 from continuum_swr_replay.analysis.replay import prepare_data as replay_prepare_data
-from continuum_swr_replay.analysis.replay.covariate_registry import (
-    stamp_covariate_schema,
-)
 from continuum_swr_replay.analysis.replay.covariates import load_contingency
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.decode_files import decode_paths
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.table_io import publish_canonical
-from continuum_swr_replay.table_parity import BASENAME_TO_TABLE
+from continuum_swr_replay.tables.covariate_registry import (
+    stamp_covariate_schema,
+)
+from continuum_swr_replay.tables.io import publish_canonical
+from continuum_swr_replay.tables.parity import BASENAME_TO_TABLE
 
 logging.basicConfig(
     level=logging.INFO,
@@ -153,7 +153,7 @@ def find_sessions(
     One brain area at a time: ``run_decoding_contfrag.py`` writes per-area files,
     and the saved tables would collide on event_id / stop_id across areas,
     because the canonical hashes do not include brain_area (see
-    ``analysis.replay.event_ids.hash_event_id`` / ``hash_stop_id``).
+    ``tables.event_ids.hash_event_id`` / ``hash_stop_id``).
 
     The sessions are ``analysed_epochs()``, in ``session_id`` order within each
     animal, the animals in order. For HPC, recorded in every analysed epoch, an

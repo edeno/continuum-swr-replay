@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import chi2, wilcoxon
 
-from continuum_swr_replay.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from .model_specs import MODEL_HIERARCHY
 

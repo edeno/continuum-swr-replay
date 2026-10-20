@@ -32,7 +32,7 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
     fit_provenance_path,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.table_io import parquet_path
+from continuum_swr_replay.tables.io import parquet_path
 
 _SIDECAR_SUFFIX = ".provenance.json"
 DEFAULT_ROOT = Path(PROCESSED_DATA_DIR) / "replay_content"

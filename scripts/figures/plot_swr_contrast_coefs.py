@@ -39,9 +39,6 @@ from continuum_swr_replay.analysis.replay.contrast_aggregation import (
     load_per_sd_scale,
     separated_for_term,
 )
-from continuum_swr_replay.analysis.replay.covariate_registry import (
-    require_covariate_schema,
-)
 from continuum_swr_replay.analysis.replay.fit_provenance import require_fresh_inputs
 from continuum_swr_replay.analysis.replay.model_specs import (
     POST_OUTCOME_COHORT,
@@ -49,7 +46,10 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     PRIMARY_COHORT,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.table_io import read_table
+from continuum_swr_replay.tables.covariate_registry import (
+    require_covariate_schema,
+)
+from continuum_swr_replay.tables.io import read_table
 
 RC = PROCESSED_DATA_DIR / "replay_content"
 OUT = Path("paper/figures/swr_contrast")

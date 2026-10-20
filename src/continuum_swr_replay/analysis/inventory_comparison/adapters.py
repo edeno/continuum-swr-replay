@@ -77,10 +77,10 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import (
     inventory_from_intervals,
     validate_inventory,
 )
-from continuum_swr_replay.analysis.replay.event_ids import hash_event_id
 from continuum_swr_replay.intervals import intersect, interval_mask
-from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
-from continuum_swr_replay.table_io import sha256_file
+from continuum_swr_replay.tables.event_ids import hash_event_id
+from continuum_swr_replay.tables.io import sha256_file
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
 __all__ = [
     "NATIVE_IS_ELIGIBLE",

@@ -53,7 +53,7 @@ from continuum_swr_replay.analysis.replay.per_bin_design import (  # noqa: E402
     reconstruct_self_history_kernels,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
-from continuum_swr_replay.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 RC = P / "replay_content"
 ALL_MODELS = RC / "models_per_bin_rate" / "all_models.pkl"

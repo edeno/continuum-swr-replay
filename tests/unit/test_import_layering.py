@@ -13,8 +13,9 @@ plain edge rather than as an ``ImportError`` from a cycle:
 2. ``data_loaders`` must not import ``analysis``. Loading is upstream of every
    analysis; the reverse edge makes the loaders unusable on their own and
    invites an import cycle.
-3. ``analysis/hippocampus`` must not import ``analysis/replay``, except for the
-   one leaf module the event tables genuinely share (``event_ids``).
+3. ``analysis/hippocampus`` must not import ``analysis/replay``. The one leaf
+   module the event tables shared (``event_ids``) now lives in the foundation
+   ``tables`` package.
 
 Six more rules are checked over the module import graph
 (:func:`module_edges`) and the package graph built from it
@@ -41,8 +42,8 @@ edges are removed, never go stale:
   back edges that close today's cycles are pinned at module level instead,
   by the other rules: hippocampus -> replay by rule 3, hippocampus ->
   inventory_comparison (and -> pfc) by the hippocampus rule, hippocampus ->
-  decoding_common by the decoding_common rule, and table_io -> * by the
-  foundation rule.
+  decoding_common by the decoding_common rule, and a foundation module's
+  edges by the foundation rule.
 
 Imports inside functions count: a function-local import is how a cycle is
 usually hidden, and it is still a dependency.
@@ -59,8 +60,9 @@ import pytest
 SRC = Path(__file__).resolve().parents[2] / "src" / "continuum_swr_replay"
 assert SRC.is_dir(), f"package root not found at {SRC}; the scan would be vacuous"
 
-#: The only ``analysis.replay`` modules the hippocampus package may import.
-HIPPOCAMPUS_ALLOWED_REPLAY_MODULES = frozenset({"event_ids"})
+#: The only ``analysis.replay`` modules the hippocampus package may import:
+#: none, since ``event_ids`` moved to ``tables``.
+HIPPOCAMPUS_ALLOWED_REPLAY_MODULES: frozenset[str] = frozenset()
 
 
 def _imported_modules(path: Path, root: Path) -> list[str]:
@@ -166,7 +168,7 @@ def test_data_loaders_do_not_import_analysis() -> None:
 
 
 def test_hippocampus_imports_only_shared_replay_leaves() -> None:
-    """Rule 3: the hippocampus package shares only ``event_ids``."""
+    """Rule 3: the hippocampus package imports nothing from ``analysis/replay``."""
     target = "continuum_swr_replay.analysis.replay"
     allowed = {f"{target}.{name}" for name in HIPPOCAMPUS_ALLOWED_REPLAY_MODULES}
 
@@ -202,9 +204,7 @@ FOUNDATION = frozenset(
         "decoding_transitions",
         "intervals",
         "parameters",
-        "session_keys",
-        "table_io",
-        "table_parity",
+        "tables",
         "types",
     }
 )
@@ -222,8 +222,6 @@ KNOWN_VIOLATIONS: dict[str, set[tuple[str, str]]] = {
     },
     "foundation_imports_only_foundation": {
         ("decode_files", "analysis.constants"),
-        ("table_io", "analysis.replay.covariate_registry"),
-        ("table_parity", "analysis.replay.covariate_registry"),
     },
     "hippocampus_imports_no_pfc_or_inventory_comparison": {
         (
@@ -236,25 +234,19 @@ KNOWN_VIOLATIONS: dict[str, set[tuple[str, str]]] = {
         ),
     },
     # One strongly connected component: hippocampus, inventory_comparison,
-    # replay, decoding_common and table_io. Its two-package cycles
-    # (code-organization review, F2) are closed by the back edges
-    # hippocampus -> inventory_comparison, -> replay (event_ids) and
-    # -> decoding_common, and table_io -> replay; every
-    # other edge here is listed because it lies inside that component.
-    # (hippocampus <-> pfc left with the spike binning, Task 4.)
+    # replay and decoding_common. Its two-package cycles (code-organization
+    # review, F2) are closed by the back edges hippocampus ->
+    # inventory_comparison and -> decoding_common; every other edge here is
+    # listed because it lies inside that component. (hippocampus <-> pfc left
+    # with the spike binning, Task 4; hippocampus -> replay and table_io ->
+    # replay with the tables package, Task 5.)
     "no_package_cycles": {
         ("analysis.hippocampus", "analysis.inventory_comparison"),
-        ("analysis.hippocampus", "analysis.replay"),
         ("analysis.hippocampus", "decoding_common"),
-        ("analysis.hippocampus", "table_io"),
         ("analysis.inventory_comparison", "analysis.hippocampus"),
         ("analysis.inventory_comparison", "analysis.replay"),
-        ("analysis.inventory_comparison", "table_io"),
         ("analysis.replay", "analysis.hippocampus"),
-        ("analysis.replay", "table_io"),
         ("decoding_common", "analysis.hippocampus"),
-        ("decoding_common", "table_io"),
-        ("table_io", "analysis.replay"),
     },
 }
 

@@ -29,14 +29,14 @@ from continuum_swr_replay.analysis.replay.covariates import (
 from continuum_swr_replay.analysis.replay.covariates import (
     visit_recency_all_events as _visit_recency_all_events,
 )
-from continuum_swr_replay.analysis.replay.standardization import load_reference
 from continuum_swr_replay.analysis.replay.tables_arm_patch import (
     build_event_arm_table as _build_event_arm_table,
 )
 from continuum_swr_replay.analysis.replay.tables_event import (
     build_event_table as _build_event_table,
 )
-from continuum_swr_replay.table_io import read_table, table_exists
+from continuum_swr_replay.tables.io import read_table, table_exists
+from continuum_swr_replay.tables.standardization import load_reference
 from tests.unit._port_experience_fixtures import port_experiences_from_trials
 
 from .test_replay_tables import (

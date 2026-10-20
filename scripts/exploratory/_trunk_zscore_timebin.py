@@ -20,11 +20,11 @@ import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
 
-from continuum_swr_replay.analysis.replay.covariate_registry import (
+from continuum_swr_replay.analysis.replay.spatial_mapping import map_estimate_to_arm
+from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
-from continuum_swr_replay.analysis.replay.spatial_mapping import map_estimate_to_arm
-from continuum_swr_replay.table_io import read_table
+from continuum_swr_replay.tables.io import read_table
 
 PD = Path("Processed-Data")
 TRUNK = {6, 7, 8}

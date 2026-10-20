@@ -25,6 +25,13 @@ from continuum_swr_replay.data_loaders.constants import (
     ALL_ARMS,
 )
 from continuum_swr_replay.parameters import PLACE_BIN_SIZE_1D
+from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schema
+from continuum_swr_replay.tables.event_ids import (
+    hash_event_id as _hash_event_id,
+)
+from continuum_swr_replay.tables.event_ids import (
+    hash_stop_id as _hash_stop_id,
+)
 
 from ._helpers import (
     align_posterior_to_dot as _align_posterior_to_dot,
@@ -62,16 +69,9 @@ from .bouts import (
 from .bouts import (
     time_since_stop as _time_since_stop,
 )
-from .covariate_registry import stamp_covariate_schema
 from .covariates import (
     add_trial_context,
     summarize_behavioral_location,
-)
-from .event_ids import (
-    hash_event_id as _hash_event_id,
-)
-from .event_ids import (
-    hash_stop_id as _hash_stop_id,
 )
 from .summaries import (
     arm_map_from_posterior,

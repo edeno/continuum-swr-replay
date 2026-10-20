@@ -68,7 +68,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics im
     normalize_windows,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.table_io import write_table
+from continuum_swr_replay.tables.io import write_table
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.figures.generate_memoryless_comparison import (  # noqa: E402

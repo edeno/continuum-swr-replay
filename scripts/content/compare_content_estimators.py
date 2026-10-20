@@ -104,8 +104,8 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     SWR_CONTRAST_CONTENT_ARM_LADDER as ARM_LADDER,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
-from continuum_swr_replay.session_keys import SESSION_COLUMNS  # noqa: E402
-from continuum_swr_replay.table_io import write_table  # noqa: E402
+from continuum_swr_replay.tables.io import write_table  # noqa: E402
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS  # noqa: E402
 
 # Sibling-script import: the cohort this comparison runs on is the shipped
 # contrast runner's own at-well cohort, assembled by its own helpers rather than

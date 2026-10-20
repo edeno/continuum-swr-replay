@@ -15,14 +15,11 @@ from __future__ import annotations
 
 import pandas as pd
 
-# The canonical session columns, in join order. These are the first three
-# segments of every table's registered row key
-# (``covariate_registry._ROW_KEYS``); that equality is enforced by
-# ``tests/unit/test_session_keys.py`` rather than imported here, because
-# importing ``covariate_registry`` at module load would pull in the heavy
-# ``analysis.replay`` package (tables -> covariates) and those modules import
-# this one -- a cycle. A literal plus a test is the one definition without it.
-SESSION_COLUMNS: tuple[str, ...] = ("animal", "session_date", "epoch")
+from continuum_swr_replay.tables.covariate_registry import row_keys
+
+# The canonical session columns, in join order: the first three segments of
+# every table's registered row key (``covariate_registry._ROW_KEYS``).
+SESSION_COLUMNS: tuple[str, ...] = row_keys(table="event")[:3]
 
 # The hippocampus event table's date column is ``day``, not ``session_date``.
 SESSION_COLUMNS_DAY: tuple[str, ...] = ("animal", "day", "epoch")

@@ -8,8 +8,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.replay.covariate_registry import row_keys
-from continuum_swr_replay.session_keys import (
+from continuum_swr_replay.tables.covariate_registry import row_keys
+from continuum_swr_replay.tables.session_keys import (
     SESSION_COLUMNS,
     SESSION_COLUMNS_DAY,
     n_sessions,

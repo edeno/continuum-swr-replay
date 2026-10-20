@@ -48,9 +48,6 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     fit_per_bin_rate_model,
     freeze_per_bin_cohort,
 )
-from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
-    require_covariate_schema,
-)
 from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
     require_fresh_inputs,
 )
@@ -58,8 +55,11 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     longest_history_window_s,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
-from continuum_swr_replay.session_keys import SESSION_COLUMNS
-from continuum_swr_replay.table_io import read_table
+from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
+    require_covariate_schema,
+)
+from continuum_swr_replay.tables.io import read_table
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 RC = P / "replay_content"
 ALL_MODELS = RC / "models_per_bin_rate" / "all_models.pkl"

@@ -191,7 +191,7 @@ from continuum_swr_replay.intervals import (
     masked_seconds,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR
-from continuum_swr_replay.table_io import sha256_file, write_table
+from continuum_swr_replay.tables.io import sha256_file, write_table
 
 OUTPUT_ROOT = PROCESSED_DATA_DIR / "replay_detection_comparison" / "memoryless"
 DESIGN_SPEC = "docs/design/replay_detection_comparison/02-memoryless-sequence.md"

@@ -17,7 +17,7 @@ from scipy.sparse import coo_array
 from scipy.sparse.csgraph import connected_components
 
 from continuum_swr_replay.analysis.inventory_comparison.overlap import validate_pairs
-from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
 __all__ = ["COMPONENT_DTYPES", "overlap_components"]
 

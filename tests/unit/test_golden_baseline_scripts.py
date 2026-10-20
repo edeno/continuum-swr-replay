@@ -33,7 +33,7 @@ def _stop_frame(value: float) -> pd.DataFrame:
 
 
 def _write(root: Path, value: float) -> None:
-    from continuum_swr_replay.table_io import write_table
+    from continuum_swr_replay.tables.io import write_table
 
     root.mkdir(parents=True, exist_ok=True)
     write_table(_stop_frame(value), root / "stop_table")

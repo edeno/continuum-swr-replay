@@ -52,15 +52,15 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     cross_validate_per_bin_rate_model,
     fit_per_bin_rate_model,
 )
-from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
-    require_covariate_schema,
-)
 from continuum_swr_replay.analysis.replay.per_bin_design import (  # noqa: E402
     POPULATIONS,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
-from continuum_swr_replay.session_keys import SESSION_COLUMNS  # noqa: E402
-from continuum_swr_replay.table_io import read_table  # noqa: E402
+from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
+    require_covariate_schema,
+)
+from continuum_swr_replay.tables.io import read_table  # noqa: E402
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS  # noqa: E402
 
 warnings.filterwarnings("ignore")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")

@@ -58,13 +58,13 @@ from matplotlib.colors import BoundaryNorm, ListedColormap
 from matplotlib.gridspec import GridSpec
 from matplotlib.lines import Line2D
 
-from continuum_swr_replay.analysis.replay.covariate_registry import (
-    require_covariate_schema,
-)
 from continuum_swr_replay.analysis.replay.covariates import add_uncertainty_covariates
 from continuum_swr_replay.analysis.replay.model_specs import N_REWARD_LAGS
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR
-from continuum_swr_replay.table_io import read_table
+from continuum_swr_replay.tables.covariate_registry import (
+    require_covariate_schema,
+)
+from continuum_swr_replay.tables.io import read_table
 from continuum_swr_replay.visualization.palettes import patch_grouped_arm_palette
 
 # Publication-friendly text: sans-serif with editable (Type-42) fonts so a PDF

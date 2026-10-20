@@ -35,8 +35,8 @@ from continuum_swr_replay.analysis.replay.fitting import (
 from continuum_swr_replay.analysis.replay.simulation import (
     simulate_dirichlet_multinomial_counts,
 )
-from continuum_swr_replay.session_keys import SESSION_COLUMNS
-from continuum_swr_replay.table_io import read_table, write_table
+from continuum_swr_replay.tables.io import read_table, write_table
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 from scripts.content import compare_content_estimators as mod
 
 SC = list(SESSION_COLUMNS)

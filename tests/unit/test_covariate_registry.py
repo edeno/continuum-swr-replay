@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from continuum_swr_replay.analysis.replay import covariate_registry as reg
+from continuum_swr_replay.tables import covariate_registry as reg
 
 REPO = Path(__file__).resolve().parents[2]
 NAMING_SCHEME = REPO / "docs/design/2026-08-21-covariate-naming-scheme.md"
@@ -494,7 +494,7 @@ def test_materialized_tables_are_canonical_after_regeneration() -> None:
     """
     pytest.importorskip("pandas")
 
-    from continuum_swr_replay.table_io import read_table, table_exists
+    from continuum_swr_replay.tables.io import read_table, table_exists
 
     rc = Path("Processed-Data/replay_content")
     tables = {

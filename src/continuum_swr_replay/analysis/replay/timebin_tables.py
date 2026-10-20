@@ -26,11 +26,12 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schema
+from continuum_swr_replay.tables.event_ids import hash_stop_id
+
 from ...intervals import overlaps_intervals
 from ..hippocampus.swr_source import excluded_intervals_of
 from .bouts import assign_bout, immobility_bout_intervals
-from .covariate_registry import stamp_covariate_schema
-from .event_ids import hash_stop_id
 
 EVENT_TYPES = {"SWR": "SWR_event", "non_local": "non_local_event", "MUA": "MUA_event"}
 ONSETS_IN_EXCLUDED_BINS_ATTR = "onsets_in_excluded_bins_by_event_type"

@@ -54,10 +54,6 @@ from continuum_swr_replay.analysis.replay.cohort_selection import (
     select_stop_cohort,
     stop_cohort_suffix,
 )
-from continuum_swr_replay.analysis.replay.covariate_registry import (
-    COVARIATE_SCHEMA_VERSION,
-    require_covariate_schema,
-)
 from continuum_swr_replay.analysis.replay.fit_provenance import (
     record_inputs,
     write_fit_provenance,
@@ -68,7 +64,11 @@ from continuum_swr_replay.analysis.replay.learning import (
     stop_replay_summary,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.table_io import read_table
+from continuum_swr_replay.tables.covariate_registry import (
+    COVARIATE_SCHEMA_VERSION,
+    require_covariate_schema,
+)
+from continuum_swr_replay.tables.io import read_table
 
 logging.basicConfig(
     level=logging.INFO,

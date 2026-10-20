@@ -13,8 +13,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.table_io import write_table
-from continuum_swr_replay.table_parity import compare_table_roots, diff_table
+from continuum_swr_replay.tables.io import write_table
+from continuum_swr_replay.tables.parity import compare_table_roots, diff_table
 
 
 def _stop_frame(value: float) -> pd.DataFrame:

@@ -19,7 +19,7 @@ import pytest
 
 import scripts.figures.generate_inventory_examples as examples
 import scripts.qa.run_inventory_comparison as runner
-from continuum_swr_replay.table_io import write_table
+from continuum_swr_replay.tables.io import write_table
 
 SEED = 7
 

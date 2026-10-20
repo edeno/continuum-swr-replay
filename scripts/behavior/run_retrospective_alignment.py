@@ -45,16 +45,16 @@ from continuum_swr_replay.analysis.replay import (
     retrospective_alignment_with_shuffle,
 )
 from continuum_swr_replay.analysis.replay.cohort_selection import STOP_COHORT_RULES
-from continuum_swr_replay.analysis.replay.covariate_registry import (
-    require_covariate_schema,
-)
 from continuum_swr_replay.analysis.replay.fit_provenance import (
     record_inputs,
     write_fit_provenance,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.session_keys import SESSION_COLUMNS
-from continuum_swr_replay.table_io import read_table
+from continuum_swr_replay.tables.covariate_registry import (
+    require_covariate_schema,
+)
+from continuum_swr_replay.tables.io import read_table
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 logging.basicConfig(
     level=logging.INFO,

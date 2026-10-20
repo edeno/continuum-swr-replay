@@ -67,7 +67,7 @@ from continuum_swr_replay.analysis.inventory_comparison.heldout import (  # noqa
     poor_coverage_fold,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
-from continuum_swr_replay.table_io import write_table  # noqa: E402
+from continuum_swr_replay.tables.io import write_table  # noqa: E402
 from scripts.qa import sweep_memoryless_controls as controls  # noqa: E402
 from scripts.qa import sweep_memoryless_detection as sweep  # noqa: E402
 

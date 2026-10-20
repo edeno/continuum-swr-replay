@@ -21,7 +21,7 @@ import pandas as pd
 from continuum_swr_replay.analysis.replay.cohort_selection import select_stop_cohort
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.table_io import parquet_path, read_table, sha256_file
+from continuum_swr_replay.tables.io import parquet_path, read_table, sha256_file
 
 __all__ = ["DEFAULT_STOP_TABLE_PATH", "load_session_stop_cohort"]
 

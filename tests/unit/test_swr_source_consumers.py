@@ -47,7 +47,7 @@ from continuum_swr_replay.analysis.hippocampus.swr_source import (
 )
 from continuum_swr_replay.data_loaders import epoch_register
 from continuum_swr_replay.intervals import interval_mask
-from continuum_swr_replay.table_io import read_table, sha256_file, write_table
+from continuum_swr_replay.tables.io import read_table, sha256_file, write_table
 from tests.unit._swr_inventory_fixtures import (
     ARTIFACT_RUN_ID,
     RUN_ID,

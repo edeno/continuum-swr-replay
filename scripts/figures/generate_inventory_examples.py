@@ -101,7 +101,7 @@ from continuum_swr_replay.intervals import (  # noqa: E402
     interval_mask,
 )
 from continuum_swr_replay.parameters import COLORS, FIGURE_DIR  # noqa: E402
-from continuum_swr_replay.table_io import read_table  # noqa: E402
+from continuum_swr_replay.tables.io import read_table  # noqa: E402
 from continuum_swr_replay.visualization.plots import (  # noqa: E402
     plot_linear_track_graph_strip,
 )

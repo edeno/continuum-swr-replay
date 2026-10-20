@@ -74,15 +74,13 @@ src/continuum_swr_replay/
 │   ├── pfc/               #   mPFC/OFC unit analysis
 │   ├── replay/            #   replay content/rate tables, model ladders, fitters
 │   └── constants.py       #   analysis constants and defaults
+├── tables/                # canonical tables: schema, row ids, parquet I/O, parity
 ├── visualization/         # Plotting utilities
 ├── decode_files.py        # the naming rule for a decode's files
 ├── decoding_common.py     # shared utilities for the decoding scripts
 ├── decoding_transitions.py # the decoders' discrete-transition settings
 ├── figure_utilities.py    # publication-figure helpers
 ├── parameters.py          # global parameters, PROCESSED_DATA_DIR, COLORS
-├── session_keys.py        # the (animal, session_date, epoch) session key
-├── table_io.py            # on-disk format of the canonical tables
-├── table_parity.py        # keyed table-to-table parity checks
 └── types.py               # shared type definitions
 
 scripts/                   # Analysis scripts, grouped by domain — see scripts/README.md

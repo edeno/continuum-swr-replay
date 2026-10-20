@@ -15,14 +15,14 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.replay.covariate_registry import (
-    require_covariate_schema,
-)
 from continuum_swr_replay.data_loaders.constants import (
     ALL_ARMS,
     WELL_ARMS,
 )
-from continuum_swr_replay.table_io import read_table, table_exists
+from continuum_swr_replay.tables.covariate_registry import (
+    require_covariate_schema,
+)
+from continuum_swr_replay.tables.io import read_table, table_exists
 
 _P_REWARD_PORT_COLS = [f"task_reward_probability_port_{i}" for i in range(6)]
 _Q_PORT_COLS = [f"reward_belief_mean_port_{i}" for i in range(6)]

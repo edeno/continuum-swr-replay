@@ -36,9 +36,6 @@ from continuum_swr_replay.analysis.hippocampus.swr_source import (
     read_dot_with_swr_source,
     require_swr_source,
 )
-from continuum_swr_replay.analysis.replay.covariate_registry import (
-    require_covariate_schema,
-)
 from continuum_swr_replay.analysis.replay.fit_provenance import (
     require_fresh_inputs,
 )
@@ -47,7 +44,10 @@ from continuum_swr_replay.analysis.replay.spatial_mapping import (
 )
 from continuum_swr_replay.decode_files import decode_paths
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.table_io import read_table
+from continuum_swr_replay.tables.covariate_registry import (
+    require_covariate_schema,
+)
+from continuum_swr_replay.tables.io import read_table
 
 RC = PROCESSED_DATA_DIR / "replay_content"
 # The panel draws the fitted M3 arm model, so it is gated on the same table the

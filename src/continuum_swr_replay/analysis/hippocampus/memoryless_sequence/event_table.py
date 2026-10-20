@@ -75,7 +75,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics im
     dispersion_cm,
 )
 from continuum_swr_replay.data_loaders.constants import BRAIN_AREAS
-from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
 __all__ = [
     "MEMORYLESS_EVENT_TABLE_DTYPES",

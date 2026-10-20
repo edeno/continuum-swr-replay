@@ -52,7 +52,7 @@ from continuum_swr_replay.data_loaders.constants import (
     TRACK_SEGMENT_TO_PATCH,
     WELL_PATCH_MAPPING,
 )
-from continuum_swr_replay.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from ._helpers import strict_sum
 from .cohort_selection import select_event_cohort

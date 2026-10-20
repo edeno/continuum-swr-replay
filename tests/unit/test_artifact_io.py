@@ -24,7 +24,7 @@ from continuum_swr_replay.analysis.hippocampus.artifacts.io import (
     write_cores,
     write_manifest,
 )
-from continuum_swr_replay.table_io import read_attrs, sha256_file
+from continuum_swr_replay.tables.io import read_attrs, sha256_file
 
 EPOCH = "chimi20200225_02_r1_HPC"
 SPAN = (1.58e9, 1.58e9 + 1200.0)

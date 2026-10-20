@@ -25,8 +25,8 @@ from continuum_swr_replay.analysis.replay.covariates import (
 from continuum_swr_replay.analysis.replay.model_specs import (
     MU_UNCERTAINTY_CURATED_COVARIATES,
 )
-from continuum_swr_replay.session_keys import subset_max_per_animal
-from continuum_swr_replay.table_io import read_table, table_exists
+from continuum_swr_replay.tables.io import read_table, table_exists
+from continuum_swr_replay.tables.session_keys import subset_max_per_animal
 
 _SPEC = importlib.util.spec_from_file_location(
     "fit_uncertainty_rate",

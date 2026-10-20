@@ -32,7 +32,7 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
     write_fit_provenance,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.table_io import write_table
+from continuum_swr_replay.tables.io import write_table
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RATE = REPO_ROOT / "scripts" / "rate"

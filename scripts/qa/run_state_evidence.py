@@ -180,7 +180,7 @@ from continuum_swr_replay.intervals import (  # noqa: E402
     interval_mask,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR  # noqa: E402
-from continuum_swr_replay.table_io import read_table, write_table  # noqa: E402
+from continuum_swr_replay.tables.io import read_table, write_table  # noqa: E402
 
 PRODUCED_BY = "scripts/qa/run_state_evidence.py"
 SEED = 20261004

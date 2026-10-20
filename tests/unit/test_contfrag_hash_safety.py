@@ -74,7 +74,7 @@ _hash_contfrag_event_id = _load_function(
     "_hash_contfrag_event_id",
     extra_top_level_names=("_EVENT_SOURCE_TO_COL", "_resolve_event_col"),
 )
-hash_stop_id = _load_function("analysis/replay/event_ids.py", "hash_stop_id")
+hash_stop_id = _load_function("tables/event_ids.py", "hash_stop_id")
 
 
 def _two_row_event_frame(event_col: str) -> pd.DataFrame:

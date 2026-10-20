@@ -45,7 +45,7 @@ from continuum_swr_replay.analysis.replay.tables_stop import build_stop_table
 from continuum_swr_replay.analysis.replay.timebin_tables import (
     build_stop_timebin_table,
 )
-from continuum_swr_replay.table_io import SWR_SOURCE_TABLES
+from continuum_swr_replay.tables.io import SWR_SOURCE_TABLES
 from tests.unit._port_experience_fixtures import port_experiences_from_trials
 from tests.unit._swr_inventory_fixtures import write_artifact_run
 
@@ -758,7 +758,7 @@ def _swr_tables_read_unchecked(path: Path) -> list[str]:
     """Each frame a script reads as an SWR-source table without checking its source.
 
     A frame is read as one where ``require_covariate_schema`` names a table of
-    ``table_io.SWR_SOURCE_TABLES``; its source is checked where
+    ``tables.io.SWR_SOURCE_TABLES``; its source is checked where
     ``require_swr_source`` is called on the same expression in the same function.
     """
     unchecked = []

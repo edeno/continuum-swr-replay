@@ -57,7 +57,8 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_NON_LOCAL_THRESHOLD,
     DEFAULT_SAMPLING_FREQUENCY_HZ,
 )
-from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
+from continuum_swr_replay.tables.event_ids import hash_event_id, validate_event_ids
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
 from .event_detection import (
     classify_swr_overlap,
@@ -70,15 +71,6 @@ from .event_immobility import (
     require_canonical_speed_threshold,
     validate_nonlocal_event_probability_contract,
 )
-
-# NOTE: ``hash_event_id`` / ``validate_event_ids`` live in
-# ``analysis/replay/event_ids``. Importing them at module load would close a
-# cycle — ``replay/__init__`` eagerly imports the replay table builders, which
-# imports this module — so they are imported lazily inside
-# :func:`build_classified_nonlocal_event_table` instead. The natural
-# dependency direction (replay builds on hippocampus) stays at module
-# scope; only this upward reference is deferred to call time.
-
 
 _REQUIRED_DOT_COLUMNS = (
     "animal",
@@ -238,11 +230,6 @@ def build_classified_nonlocal_event_table(
     ``event_duration`` are in seconds; the four ``*_speed`` columns are in
     cm/s.
     """
-    from continuum_swr_replay.analysis.replay.event_ids import (
-        hash_event_id,
-        validate_event_ids,
-    )
-
     require_canonical_speed_threshold(
         speed_threshold, "build_classified_nonlocal_event_table"
     )

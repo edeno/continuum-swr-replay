@@ -51,22 +51,25 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (
     cohort_record,
     write_cohort_audit,
 )
-from continuum_swr_replay.analysis.replay.covariate_registry import (
-    require_covariate_schema,
-)
 from continuum_swr_replay.analysis.replay.covariate_timing import (
     assert_predictor_timing,
 )
 from continuum_swr_replay.analysis.replay.covariates import add_uncertainty_covariates
-from continuum_swr_replay.analysis.replay.standardization import (
+from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.tables.covariate_registry import (
+    require_covariate_schema,
+)
+from continuum_swr_replay.tables.io import read_table
+from continuum_swr_replay.tables.session_keys import (
+    SESSION_COLUMNS,
+    subset_max_per_animal,
+)
+from continuum_swr_replay.tables.standardization import (
     Reference,
     attach_standardized,
     save_reference,
     z_reference_path,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.session_keys import SESSION_COLUMNS, subset_max_per_animal
-from continuum_swr_replay.table_io import read_table
 
 RC = PROCESSED_DATA_DIR / "replay_content"
 SC = list(SESSION_COLUMNS)

@@ -29,7 +29,7 @@ from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
     artifact_intervals,
 )
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
-from continuum_swr_replay.table_io import read_attrs, sha256_file
+from continuum_swr_replay.tables.io import read_attrs, sha256_file
 from tests.unit._artifact_synthetic import FS, NOISE, SyntheticEpoch
 
 NWB_FILE_NAME = "sim20200101_.nwb"

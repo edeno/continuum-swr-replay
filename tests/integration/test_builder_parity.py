@@ -32,15 +32,15 @@ from continuum_swr_replay.analysis.behavior.qvals_table import QVALS_STANDARDIZE
 from continuum_swr_replay.analysis.replay._tables_common import (
     EVENT_ARM_STANDARDIZED_COLS,
 )
-from continuum_swr_replay.analysis.replay.covariate_registry import (
+from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
-from continuum_swr_replay.analysis.replay.standardization import (
+from continuum_swr_replay.tables.io import read_table, table_exists
+from continuum_swr_replay.tables.standardization import (
     attach_standardized,
     load_reference,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.table_io import read_table, table_exists
 
 pytestmark = [pytest.mark.slow, pytest.mark.integration, pytest.mark.real_data]
 

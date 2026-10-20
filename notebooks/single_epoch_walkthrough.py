@@ -132,7 +132,7 @@ from continuum_swr_replay.analysis.replay.posterior_io import (
 from continuum_swr_replay.analysis.replay.retrospective import (
     compute_retrospective_metrics,
 )
-from continuum_swr_replay.analysis.replay.standardization import (
+from continuum_swr_replay.tables.standardization import (
     attach_standardized,
     load_reference,
 )

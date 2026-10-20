@@ -43,7 +43,7 @@ from continuum_swr_replay.data_loaders import spikes
 from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier
 from continuum_swr_replay.decoding_common import provenance_record
 from continuum_swr_replay.parameters import ROOT_DIR
-from continuum_swr_replay.table_io import read_table
+from continuum_swr_replay.tables.io import read_table
 from scripts.decoding.run_memoryless_detection import (
     find_epochs,
     input_paths,

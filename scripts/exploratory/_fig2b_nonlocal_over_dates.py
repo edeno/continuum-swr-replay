@@ -34,7 +34,7 @@ from continuum_swr_replay.analysis.hippocampus.event_table import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC as SPEED_THR,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s",
                     datefmt="%H:%M:%S")

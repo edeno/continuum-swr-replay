@@ -21,10 +21,10 @@ from continuum_swr_replay.analysis.hippocampus.swr_source import (
     SwrSourceError,
     stamp_swr_source,
 )
-from continuum_swr_replay.analysis.replay.covariate_registry import (
+from continuum_swr_replay.tables.covariate_registry import (
     stamp_covariate_schema,
 )
-from continuum_swr_replay.analysis.replay.standardization import (
+from continuum_swr_replay.tables.standardization import (
     attach_standardized,
     load_reference,
     save_reference,

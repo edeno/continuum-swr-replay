@@ -73,7 +73,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation im
     without,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
-from continuum_swr_replay.table_io import write_table  # noqa: E402
+from continuum_swr_replay.tables.io import write_table  # noqa: E402
 from scripts.qa import sweep_memoryless_detection as sweep  # noqa: E402
 
 BURST_DURATION_S = (0.08, 0.20, 0.50)

@@ -43,7 +43,7 @@ from continuum_swr_replay.parameters import (
     PROCESSED_DATA_DIR,
     SAMPLING_FREQUENCY,
 )
-from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
 RAW_STATS_JOIN_COLS = list(SESSION_COLUMNS_DAY)
 RAW_STATS_DATA_COLS = list(RAW_STAT_COLUMNS) + list(TRANSITION_MATRIX_COLUMNS)

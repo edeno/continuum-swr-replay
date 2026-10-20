@@ -25,8 +25,8 @@ from pathlib import Path
 import pyarrow.parquet as pq
 
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.table_io import parquet_path, sha256_file
-from continuum_swr_replay.table_parity import CANONICAL_TABLE_BASENAMES
+from continuum_swr_replay.tables.io import parquet_path, sha256_file
+from continuum_swr_replay.tables.parity import CANONICAL_TABLE_BASENAMES
 
 # Sibling-script import: the leaf bundle's name is derived from the fitting
 # runner's own helper rather than spelled out here, so the freeze cannot go on

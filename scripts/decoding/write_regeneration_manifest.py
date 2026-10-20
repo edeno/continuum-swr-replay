@@ -24,32 +24,32 @@ from continuum_swr_replay.analysis.hippocampus.swr_source import (
 from continuum_swr_replay.analysis.replay._tables_common import (
     EVENT_ARM_STANDARDIZED_COLS,
 )
-from continuum_swr_replay.analysis.replay.standardization import (
-    assert_standardized_matches_reference,
-    load_reference,
-)
 from continuum_swr_replay.analysis.replay.table_contracts import (
     validate_event_arm_table,
     validate_event_patch_table,
 )
-from continuum_swr_replay.analysis.replay.versions import MANIFEST_SCHEMA
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
-from continuum_swr_replay.session_keys import (
-    SESSION_COLUMNS,
-)
-from continuum_swr_replay.session_keys import (
-    n_sessions as _sessions,
-)
-from continuum_swr_replay.session_keys import (
-    session_key_set as _session_keys,
-)
-from continuum_swr_replay.table_io import (
+from continuum_swr_replay.tables.io import (
     SWR_SOURCE_TABLES,
     read_attrs,
     read_table,
     sha256_file,
 )
-from continuum_swr_replay.table_parity import diff_table
+from continuum_swr_replay.tables.parity import diff_table
+from continuum_swr_replay.tables.session_keys import (
+    SESSION_COLUMNS,
+)
+from continuum_swr_replay.tables.session_keys import (
+    n_sessions as _sessions,
+)
+from continuum_swr_replay.tables.session_keys import (
+    session_key_set as _session_keys,
+)
+from continuum_swr_replay.tables.standardization import (
+    assert_standardized_matches_reference,
+    load_reference,
+)
+from continuum_swr_replay.tables.versions import MANIFEST_SCHEMA
 
 MODEL_VALIDATION_BUNDLES = {
     "replay": ("base_arm", "base_patch", "belief_arm", "belief_patch"),
@@ -98,7 +98,7 @@ def _require_one_swr_source(roots: Mapping[str, Path]) -> str:
     """Every SWR-bearing candidate table carries the configured SWR source's stamp.
 
     Every parquet table under `roots` whose covariate-schema table is one of
-    ``table_io.SWR_SOURCE_TABLES`` must be stamped ``swr_source_name()``:
+    ``tables.io.SWR_SOURCE_TABLES`` must be stamped ``swr_source_name()``:
     a release mixing SWR sources, or built from an earlier one, is refused.
 
     Returns

@@ -25,17 +25,10 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.hippocampus.swr_source import require_swr_source
-from continuum_swr_replay.analysis.replay.covariate_registry import (
-    require_covariate_schema,
-)
 from continuum_swr_replay.analysis.replay.fit_provenance import (
     require_fresh_inputs,
 )
 from continuum_swr_replay.analysis.replay.model_specs import LEAF_ONLY_N_CATEGORIES
-from continuum_swr_replay.analysis.replay.standardization import (
-    assert_standardized_matches_reference,
-    load_reference,
-)
 from continuum_swr_replay.analysis.replay.uncertainty_content import (
     build_trial_leaf_table,
     hierarchical_quartile_profile,
@@ -45,7 +38,14 @@ from continuum_swr_replay.analysis.replay.uncertainty_content import (
     within_arm_horserace,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.table_io import read_table, table_exists
+from continuum_swr_replay.tables.covariate_registry import (
+    require_covariate_schema,
+)
+from continuum_swr_replay.tables.io import read_table, table_exists
+from continuum_swr_replay.tables.standardization import (
+    assert_standardized_matches_reference,
+    load_reference,
+)
 
 # Sibling-script import: the Mu bundle name is derived from the fitting runner's
 # own helpers, so this reader cannot drift from where the belief chain publishes

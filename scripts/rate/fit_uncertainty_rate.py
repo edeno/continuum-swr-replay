@@ -81,9 +81,6 @@ from continuum_swr_replay.analysis.replay.cohort_selection import (  # noqa: E40
     select_stop_cohort,
     stop_cohort_suffix,
 )
-from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
-    require_covariate_schema,
-)
 from continuum_swr_replay.analysis.replay.covariate_timing import (  # noqa: E402
     assert_predictor_timing,
 )
@@ -107,18 +104,21 @@ from continuum_swr_replay.analysis.replay.per_bin_design import (  # noqa: E402
 from continuum_swr_replay.analysis.replay.per_bin_rate_model import (  # noqa: E402
     _design_columns,
 )
-from continuum_swr_replay.analysis.replay.standardization import (  # noqa: E402
+from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
+from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
+    require_covariate_schema,
+)
+from continuum_swr_replay.tables.io import read_table  # noqa: E402
+from continuum_swr_replay.tables.session_keys import (  # noqa: E402
+    SESSION_COLUMNS,
+    subset_max_per_animal,
+)
+from continuum_swr_replay.tables.standardization import (  # noqa: E402
     Reference,
     attach_standardized,
     save_reference,
     z_reference_path,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
-from continuum_swr_replay.session_keys import (  # noqa: E402
-    SESSION_COLUMNS,
-    subset_max_per_animal,
-)
-from continuum_swr_replay.table_io import read_table  # noqa: E402
 
 # This runner's names for the model_specs blocks it fits and standardizes.
 FITTED_COVARIATES = MU_UNCERTAINTY_COVARIATES

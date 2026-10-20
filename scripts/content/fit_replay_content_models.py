@@ -96,9 +96,6 @@ from continuum_swr_replay.analysis.replay.content_response import (
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (
     unidentified_for_term,
 )
-from continuum_swr_replay.analysis.replay.covariate_registry import (
-    require_covariate_schema,
-)
 from continuum_swr_replay.analysis.replay.covariate_timing import (
     assert_predictor_timing,
 )
@@ -143,8 +140,11 @@ from continuum_swr_replay.analysis.replay.table_contracts import (
     validate_requested_standardization,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.session_keys import SESSION_COLUMNS
-from continuum_swr_replay.table_io import read_table, table_exists
+from continuum_swr_replay.tables.covariate_registry import (
+    require_covariate_schema,
+)
+from continuum_swr_replay.tables.io import read_table, table_exists
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 # Map event source to model hierarchy and input directory
 _EVENT_SOURCE_CONFIG = {

@@ -16,7 +16,7 @@ import pytest
 
 from continuum_swr_replay import decoding_common
 from continuum_swr_replay.decoding_common import parse_run_id, replace_outputs
-from continuum_swr_replay.table_io import read_table, sha256_file
+from continuum_swr_replay.tables.io import read_table, sha256_file
 
 
 def _paths(tmp_path):

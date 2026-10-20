@@ -4,7 +4,7 @@
 The refactor safety net: a change that is supposed to preserve results must
 regenerate canonical tables that are byte-identical to the frozen baseline. This
 raises on any structural or value drift in any canonical table, using the shared
-keyed-parity core (``table_parity.compare_table_roots``) so it speaks the same
+keyed-parity core (``tables.parity.compare_table_roots``) so it speaks the same
 language as the regeneration manifest's baseline gate.
 
 Exact by default (``atol=0``); pass ``--expected-drift-columns`` only when a
@@ -40,8 +40,8 @@ import logging
 from pathlib import Path
 
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.table_io import read_table
-from continuum_swr_replay.table_parity import (
+from continuum_swr_replay.tables.io import read_table
+from continuum_swr_replay.tables.parity import (
     CANONICAL_TABLE_BASENAMES,
     compare_table_roots,
 )

@@ -98,9 +98,6 @@ from continuum_swr_replay.analysis.replay.contrast_aggregation import (
     aggregate_contrast,
     specs_from_ladder,
 )
-from continuum_swr_replay.analysis.replay.covariate_registry import (
-    require_covariate_schema,
-)
 from continuum_swr_replay.analysis.replay.covariate_timing import (
     assert_predictor_timing,
 )
@@ -144,16 +141,19 @@ from continuum_swr_replay.analysis.replay.model_specs import (
 from continuum_swr_replay.analysis.replay.model_specs import (
     SWR_CONTRAST_CONTENT_PATCH_LADDER as PATCH_LADDER,
 )
-from continuum_swr_replay.analysis.replay.standardization import (
+from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.tables.covariate_registry import (
+    require_covariate_schema,
+)
+from continuum_swr_replay.tables.io import read_table
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.tables.standardization import (
     assert_standardized_matches_reference,
     attach_standardized,
     load_reference,
     save_reference,
     z_reference_path,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.session_keys import SESSION_COLUMNS
-from continuum_swr_replay.table_io import read_table
 
 # Quasi-separated coefficients legitimately overflow exp() when rate ratios are formed
 # outside the fit (RuntimeWarning). Convergence/perfect-separation warnings are recorded

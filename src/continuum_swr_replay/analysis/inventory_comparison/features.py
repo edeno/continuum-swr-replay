@@ -51,7 +51,7 @@ from continuum_swr_replay.analysis.inventory_comparison.recount import (
 )
 from continuum_swr_replay.analysis.inventory_comparison.schema import STATE_SPACE
 from continuum_swr_replay.analysis.replay.cohort_selection import events_in_stops
-from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
 __all__ = [
     "DURATION_STRATA_S",

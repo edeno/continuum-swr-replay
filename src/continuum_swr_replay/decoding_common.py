@@ -51,7 +51,7 @@ from continuum_swr_replay.parameters import (
     WAVEFORM_STD,
     TrainingType,
 )
-from continuum_swr_replay.table_io import sha256_file, write_table
+from continuum_swr_replay.tables.io import sha256_file, write_table
 from continuum_swr_replay.types import ClusterlessParams, SortedSpikesParams
 
 _logger = logging.getLogger(__name__)
@@ -470,7 +470,7 @@ def replace_outputs(
         Every file the epoch can write, by output name.
     outputs : Mapping[str, pd.DataFrame | Mapping]
         By name in `paths`: a table, written as parquet with its ``attrs``
-        (``table_io.write_table``), or any other content, written as strict
+        (``tables.io.write_table``), or any other content, written as strict
         JSON (``write_json``).
 
     Returns

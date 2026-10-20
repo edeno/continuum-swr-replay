@@ -181,8 +181,8 @@ from continuum_swr_replay.intervals import (  # noqa: E402
     total_duration,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR  # noqa: E402
-from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
-from continuum_swr_replay.table_io import sha256_file  # noqa: E402
+from continuum_swr_replay.tables.io import sha256_file  # noqa: E402
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
 from scripts.decoding.run_swr_detection import (  # noqa: E402
     json_ready,
     run_lock,

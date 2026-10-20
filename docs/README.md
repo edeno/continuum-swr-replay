@@ -184,7 +184,7 @@ Three tiers:
    The canonical tables (events, event-arms, event-patches, sequences, stops) are
    built by `scripts/decoding/prepare_replay_content_data.py`, and `qvals_table` by
    `scripts/behavior/build_qvals_table.py`. They
-   are **parquet**; read and write them through `continuum_swr_replay.table_io`
+   are **parquet**; read and write them through `continuum_swr_replay.tables.io`
    (`read_table` / `write_table`), never `pd.read_pickle`. Fitted-model artifacts
    (`all_models.pkl` and friends) hold live statsmodels objects and stay pickled.
    Superseded table pickles are kept under `_pickle_archive/`; nothing reads them.

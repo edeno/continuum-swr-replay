@@ -104,9 +104,6 @@ from continuum_swr_replay.analysis.replay.cohort_selection import (  # noqa: E40
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (  # noqa: E402
     aggregate_contrast,
 )
-from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
-    require_covariate_schema,
-)
 from continuum_swr_replay.analysis.replay.covariate_timing import (  # noqa: E402
     assert_predictor_timing,
 )
@@ -135,11 +132,14 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     SWR_CONTRAST_RATE_STOP_COVARS as STOP_COVARS,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
-from continuum_swr_replay.session_keys import (  # noqa: E402
+from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
+    require_covariate_schema,
+)
+from continuum_swr_replay.tables.io import read_table  # noqa: E402
+from continuum_swr_replay.tables.session_keys import (  # noqa: E402
     SESSION_COLUMNS,
     subset_max_per_animal,
 )
-from continuum_swr_replay.table_io import read_table  # noqa: E402
 
 # Only the benign exp()-overflow RuntimeWarning (quasi-separated coefs -> rate ratios)
 # is silenced. Convergence/separation are recorded per fit as flags inside _fit (see

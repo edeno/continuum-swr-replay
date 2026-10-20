@@ -96,9 +96,6 @@ from continuum_swr_replay.analysis.replay.cohort_selection import (  # noqa: E40
     select_stop_cohort,
     stop_cohort_suffix,
 )
-from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
-    require_covariate_schema,
-)
 from continuum_swr_replay.analysis.replay.covariate_timing import (  # noqa: E402
     DERIVED_COVARIATE_SOURCES,
     assert_predictor_timing,
@@ -114,11 +111,14 @@ from continuum_swr_replay.analysis.replay.per_bin_rate_model import (  # noqa: E
     _design_columns,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
-from continuum_swr_replay.session_keys import (  # noqa: E402
+from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
+    require_covariate_schema,
+)
+from continuum_swr_replay.tables.io import read_table  # noqa: E402
+from continuum_swr_replay.tables.session_keys import (  # noqa: E402
     SESSION_COLUMNS,
     subset_max_per_animal,
 )
-from continuum_swr_replay.table_io import read_table  # noqa: E402
 
 # Separated self-history coefficients legitimately overflow exp() (-> 0 / inf
 # RR); these are median-robust at read time and are not fit failures. Convergence /

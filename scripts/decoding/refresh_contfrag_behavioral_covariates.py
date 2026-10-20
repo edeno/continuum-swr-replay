@@ -48,8 +48,8 @@ from continuum_swr_replay.analysis.replay.table_contracts import (
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
-from continuum_swr_replay.session_keys import SESSION_COLUMNS
-from continuum_swr_replay.table_io import read_table
+from continuum_swr_replay.tables.io import read_table
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 LOGGER = logging.getLogger(__name__)
 EVENT_POSTERIOR_COLUMNS = (

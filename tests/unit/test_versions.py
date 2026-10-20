@@ -4,15 +4,15 @@ from __future__ import annotations
 
 import pytest
 
-from continuum_swr_replay.analysis.replay import versions
+from continuum_swr_replay.tables import versions
 
 
 def test_reexports_match_centralized_values():
-    from continuum_swr_replay.analysis.replay.covariate_registry import (
-        COVARIATE_SCHEMA_VERSION,
-    )
     from continuum_swr_replay.analysis.replay.prepare_data import (
         BEHAVIORAL_CONTEXT_CACHE_VERSION,
+    )
+    from continuum_swr_replay.tables.covariate_registry import (
+        COVARIATE_SCHEMA_VERSION,
     )
 
     assert COVARIATE_SCHEMA_VERSION == versions.COVARIATE_SCHEMA_VERSION
@@ -47,7 +47,7 @@ def test_mismatched_cache_version_raises():
 def test_require_schema_rejects_old_version():
     """An old stamp raises through ``require_covariate_schema``."""
     pd = pytest.importorskip("pandas")
-    from continuum_swr_replay.analysis.replay import covariate_registry as reg
+    from continuum_swr_replay.tables import covariate_registry as reg
 
     frame = reg.stamp_covariate_schema(
         pd.DataFrame({"stop_id": [1], "task_reward_probability_chosen_arm": [0.5]}),

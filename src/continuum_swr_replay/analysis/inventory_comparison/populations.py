@@ -57,7 +57,7 @@ from continuum_swr_replay.analysis.inventory_comparison.overlap import (
     event_matches,
     flag_pairs,
 )
-from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
 __all__ = [
     "ALL",

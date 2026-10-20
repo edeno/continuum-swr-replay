@@ -14,10 +14,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.replay.covariate_registry import (
+from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
-from continuum_swr_replay.table_io import read_table, table_exists
+from continuum_swr_replay.tables.io import read_table, table_exists
 
 _SPEC = importlib.util.spec_from_file_location(
     "_statescript_contingency",

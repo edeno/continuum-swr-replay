@@ -53,7 +53,7 @@ from continuum_swr_replay.intervals import (
     intersect,
     total_duration,
 )
-from continuum_swr_replay.table_io import read_table, sha256_file
+from continuum_swr_replay.tables.io import read_table, sha256_file
 from tests.unit._swr_inventory_fixtures import (
     kay_events,
     use_swr_source,

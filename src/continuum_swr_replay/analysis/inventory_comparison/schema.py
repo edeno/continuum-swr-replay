@@ -27,7 +27,7 @@ from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     event_speeds_are_immobile,
 )
 from continuum_swr_replay.data_loaders.constants import BRAIN_AREAS
-from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
 __all__ = [
     "INVENTORY_DTYPES",

@@ -13,7 +13,7 @@ from continuum_swr_replay.analysis.replay.design_constants import (
 from continuum_swr_replay.data_loaders.constants import (
     WELL_ARMS,
 )
-from continuum_swr_replay.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from ._common import _prepare_port_experiences
 

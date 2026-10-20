@@ -57,9 +57,6 @@ from continuum_swr_replay.analysis.replay.cohort_selection import (
     _sorted_unit_ids,
     freeze_common_cohort,
 )
-from continuum_swr_replay.analysis.replay.covariate_registry import (
-    require_covariate_schema,
-)
 from continuum_swr_replay.analysis.replay.covariate_timing import (
     assert_predictor_timing,
 )
@@ -67,8 +64,11 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     DESCRIPTIVE_CONTENT_RUNGS,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.session_keys import SESSION_COLUMNS
-from continuum_swr_replay.table_io import read_table
+from continuum_swr_replay.tables.covariate_registry import (
+    require_covariate_schema,
+)
+from continuum_swr_replay.tables.io import read_table
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S"

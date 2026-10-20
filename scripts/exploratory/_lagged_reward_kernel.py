@@ -24,9 +24,6 @@ warnings.filterwarnings("ignore")
 from continuum_swr_replay.analysis.replay import (  # noqa: E402
     trial_outcome_times,
 )
-from continuum_swr_replay.analysis.replay.covariate_registry import (  # noqa: E402
-    require_covariate_schema,
-)
 from continuum_swr_replay.analysis.replay.per_stop_rate_model import (  # noqa: E402
     fit_per_stop_rate_model,
 )
@@ -35,7 +32,10 @@ from continuum_swr_replay.analysis.replay.prepare_data import (  # noqa: E402
 )
 from continuum_swr_replay.data_loaders import load_data  # noqa: E402
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
-from continuum_swr_replay.table_io import read_table  # noqa: E402
+from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
+    require_covariate_schema,
+)
+from continuum_swr_replay.tables.io import read_table  # noqa: E402
 from continuum_swr_replay.types import SessionDataKeys  # noqa: E402
 
 K = 5

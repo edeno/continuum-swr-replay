@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.pfc.cohort import load_session_stop_cohort
-from continuum_swr_replay.table_io import write_table
+from continuum_swr_replay.tables.io import write_table
 
 
 @pytest.fixture
@@ -64,7 +64,7 @@ def test_the_report_hashes_the_table_that_was_read(stop_table_path):
         "j1620210706_.nwb", "02_r1", stop_table_path=stop_table_path
     )
 
-    from continuum_swr_replay.table_io import sha256_file
+    from continuum_swr_replay.tables.io import sha256_file
 
     assert report["stop_table"] == str(stop_table_path)
     assert report["stop_table_sha256"] == sha256_file(stop_table_path)

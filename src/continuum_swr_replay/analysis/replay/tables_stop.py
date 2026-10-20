@@ -16,6 +16,10 @@ from continuum_swr_replay.analysis.hippocampus.event_immobility import (
 from continuum_swr_replay.analysis.hippocampus.swr_source import (
     excluded_intervals_of,
 )
+from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schema
+from continuum_swr_replay.tables.event_ids import (
+    hash_stop_id as _hash_stop_id,
+)
 
 from ._helpers import (
     arm_to_patch as _arm_to_patch,
@@ -48,7 +52,6 @@ from .bouts import (
 from .bouts import (
     summarize_bout_location as _summarize_bout_location,
 )
-from .covariate_registry import stamp_covariate_schema
 from .covariates import (
     add_trial_context,
     lagged_trial_rewards,
@@ -59,9 +62,6 @@ from .design_constants import (
     N_REWARD_LAGS,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_INCOMPLETE,
-)
-from .event_ids import (
-    hash_stop_id as _hash_stop_id,
 )
 
 

@@ -18,7 +18,11 @@ import numpy as np
 import pandas as pd
 from scipy.special import betaln, digamma
 
-from continuum_swr_replay.analysis.replay.covariate_registry import (
+from continuum_swr_replay.data_loaders.trial_clocks import (
+    outcome_known_time_from_task_visit,
+)
+from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.tables.covariate_registry import (
     apply_rename,
     canonicalize_numerical_paths,
     plan_rename,
@@ -26,16 +30,12 @@ from continuum_swr_replay.analysis.replay.covariate_registry import (
     require_covariate_schema,
     stamp_covariate_schema,
 )
-from continuum_swr_replay.analysis.replay.standardization import (
+from continuum_swr_replay.tables.io import publish_canonical, read_table
+from continuum_swr_replay.tables.standardization import (
     assert_standardized_present,
     attach_standardized,
     save_reference,
 )
-from continuum_swr_replay.data_loaders.trial_clocks import (
-    outcome_known_time_from_task_visit,
-)
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.table_io import publish_canonical, read_table
 
 from ._spatial_bandit_rl import make_full_beta_bernoulli_dv_df
 

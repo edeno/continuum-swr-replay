@@ -25,7 +25,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import WELL_ARMS
-from continuum_swr_replay.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from ._fit_diagnostics import (
     NUISANCE_TERMS,
@@ -84,7 +84,7 @@ def _require_session_unique_ids(
             f"sessions, but {len(bad)} value(s) appear in multiple "
             f"(animal, day, epoch) tuples (e.g. {sample}). Use the "
             "canonical hashed IDs from "
-            "``analysis.replay.event_ids.hash_event_id`` / "
+            "``tables.event_ids.hash_event_id`` / "
             "``hash_stop_id`` (or the ContFrag equivalents) before "
             "calling this helper."
         )

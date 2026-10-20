@@ -5,8 +5,8 @@ simulation utilities, and model comparison/checking helpers used across
 the replay content analysis pipeline.
 
 Note: public names are exposed through PEP 562 ``__getattr__``, so importing a
-leaf submodule (e.g. ``continuum_swr_replay.analysis.replay.event_ids``) does
-not run the whole package. The eager re-exports used to: they pulled in
+leaf submodule (e.g. ``analysis.replay.design_constants``) does not run the
+whole package. The eager re-exports used to: they pulled in
 ``non_local_detector``, JAX and statsmodels through ``tables_arm_patch`` and
 the fitters, so every consumer of a row key or a cohort rule paid ~4.5 s and
 loaded JAX. A name is imported from its submodule on first access.

@@ -3,7 +3,7 @@
 
 ``patch_fraction`` is *added* to the event-patch table; nothing about the patch
 definition or any pre-existing aggregate changes. This script proves that: the
-shared keyed-parity core (``table_parity.diff_table``) checks every pre-existing
+shared keyed-parity core (``tables.parity.diff_table``) checks every pre-existing
 column with the new one declared as an expected addition, so any drift in a
 pre-existing column, any undeclared new column, and any row-count or key-set
 change raise. On top of that this script pins what is specific to the patch
@@ -32,10 +32,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.replay.covariate_registry import row_keys
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
-from continuum_swr_replay.table_io import read_table, sha256_file
-from continuum_swr_replay.table_parity import diff_table
+from continuum_swr_replay.tables.covariate_registry import row_keys
+from continuum_swr_replay.tables.io import read_table, sha256_file
+from continuum_swr_replay.tables.parity import diff_table
 
 DEFAULT_ADDED_COLUMNS = ("patch_fraction",)
 # patch_fraction divides an exact integer count by an exact integer total, so

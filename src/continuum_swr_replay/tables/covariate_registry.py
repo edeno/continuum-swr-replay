@@ -63,10 +63,10 @@ _RENAMING = frozenset({"rename", "alias", "canonicalize"})  # produce a canonica
 # window/norm/percentile idiom where the number reads as part of the word.
 _DIGIT_IDIOM_STEMS = ("last", "k", "l", "p", "log")  # last10, k10, l1, p90, log1p
 
-# The version value is centralized in analysis/replay/versions.py (with the
+# The version value is centralized in tables/versions.py (with the
 # related cache/manifest literals, reviewed together); re-exported here so the
 # many importers of covariate_registry.COVARIATE_SCHEMA_VERSION are unaffected.
-from continuum_swr_replay.analysis.replay.versions import (  # noqa: E402
+from continuum_swr_replay.tables.versions import (  # noqa: E402
     COVARIATE_SCHEMA_VERSION,
     assert_versions_compatible,
 )

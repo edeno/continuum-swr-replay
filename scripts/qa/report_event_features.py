@@ -85,8 +85,8 @@ from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
 from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier  # noqa: E402
 from continuum_swr_replay.decoding_common import parse_run_id  # noqa: E402
 from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
-from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
-from continuum_swr_replay.table_io import read_table  # noqa: E402
+from continuum_swr_replay.tables.io import read_table  # noqa: E402
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
 from scripts.decoding.run_memoryless_detection import (  # noqa: E402
     output_paths as memoryless_outputs,
 )

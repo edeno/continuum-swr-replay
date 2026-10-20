@@ -47,7 +47,7 @@ from continuum_swr_replay.analysis.hippocampus.swr_source import (
     swr_observed_stretches,
     with_swr_source,
 )
-from continuum_swr_replay.table_io import sha256_file
+from continuum_swr_replay.tables.io import sha256_file
 from tests.unit._swr_inventory_fixtures import (
     ARTIFACT_RUN_ID,
     RUN_ID,

@@ -45,13 +45,13 @@ from matplotlib.lines import Line2D
 
 from continuum_swr_replay.analysis.replay._helpers import add_arm_fixed_effects
 from continuum_swr_replay.analysis.replay.choice_prediction import predict_arm_fractions
-from continuum_swr_replay.analysis.replay.covariate_registry import (
-    require_covariate_schema,
-)
 from continuum_swr_replay.analysis.replay.fitting import fit_conditional_poisson
 from continuum_swr_replay.analysis.replay.model_specs import MODEL_HIERARCHY
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR
-from continuum_swr_replay.table_io import read_table
+from continuum_swr_replay.tables.covariate_registry import (
+    require_covariate_schema,
+)
+from continuum_swr_replay.tables.io import read_table
 from continuum_swr_replay.visualization.palettes import patch_grouped_arm_palette
 
 plt.rcParams.update({"pdf.fonttype": 42, "ps.fonttype": 42,
