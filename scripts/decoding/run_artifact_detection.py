@@ -146,6 +146,8 @@ def run_settings() -> dict[str, Any]:
                 "marks": "get_hpc_marks after the coincidence filter, spikes in "
                 "the span",
             },
+            # frozen: recorded in run manifests and compared on resume; do not
+            # rename (``masks.PADDING_S`` is now ``artifact_masks.PADDING_S``).
             "ood_reference": "per tetrode, the epoch's marks outside the S, "
             "T-ref and T-ca1 cores padded into the one artifact mask "
             "(masks.PADDING_S); the spike's own event (the same tetrode's marks "

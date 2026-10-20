@@ -1073,6 +1073,9 @@ def run_settings() -> dict:
         "seed": SEED,
         "halves_seed": HALVES_SEED,
         "n_partitions": 10,
+        # frozen: recorded in run manifests and compared on resume; do not
+        # rename (``swr_source.excluded_intervals`` is now
+        # ``analysed_time.excluded_intervals``).
         "regimes": "immobile head_speed < 4 cm/s, running > 10 cm/s; none in "
         "excluded time (swr_source.excluded_intervals)",
         "bouts": "P(state) > 0.8, >= 5 bins, <= 1500 per state x regime, "
