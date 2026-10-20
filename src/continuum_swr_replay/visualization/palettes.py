@@ -1,6 +1,10 @@
-"""Arm color palettes for replay-content visualizations.
+"""The project's colour palettes.
 
-Two palettes live here:
+- :data:`COLORS` — one colour per event type and decoder state (SWR, MUA,
+  Non-Local, Local, No-Spike, ...), used by every figure.
+- :data:`CONTFRAG_COLORS` — the Continuous/Fragmented classifier's two states.
+
+Two arm palettes live here too:
 
 - :func:`build_arm_color_map` — the legacy palette of
   ``scripts/plot_replay_content_time_slice.py`` (removed in 82b66d0). Samples
@@ -26,11 +30,30 @@ from numpy.typing import NDArray
 
 from continuum_swr_replay.data_loaders.constants import (
     ALL_ARMS,
+    LEAF_ARMS,
     TRACK_SEGMENT_TO_PATCH,
-    WELL_PATCH_MAPPING,
 )
 
-_LEAF_ARMS = set(WELL_PATCH_MAPPING.keys())  # arms touching a well: 0-5
+_LEAF_ARMS = set(LEAF_ARMS)  # arms touching a well: 0-5
+
+COLORS: dict[str, str] = {
+    "SWR": "#d95f02",
+    "MUA": "#7570b3",
+    "Non-Local": "#1b9e77",
+    "Local": "#add8e6",  # Soft Blue for Local
+    "No-Spike": "#b0b0b0",  # Light Gray for No-Spike
+    "All Events": "#d9d9d9",  # Light Gray for background/all-events reference
+    # Joint SWR + non-SWR-non-local model bar in Figure 4's AIC
+    # comparison. Same Dark2 family as SWR/MUA/Non-Local.
+    "Combined": "#e6ab02",
+}
+"""Colour scheme for plotting the event types and decoder states."""
+
+CONTFRAG_COLORS: dict[str, str] = {
+    "Continuous": "#1b9e77",  # Teal green (smooth trajectory)
+    "Fragmented": "#d95f02",  # Orange (disjointed representation)
+}
+"""Colours of the ContFrag classifier's Continuous and Fragmented states."""
 
 
 def build_arm_color_map(

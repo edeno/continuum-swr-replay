@@ -121,7 +121,7 @@ if TYPE_CHECKING:
     from matplotlib.lines import Line2D
     from numpy.typing import NDArray
 
-from continuum_swr_replay.parameters import COLORS
+from continuum_swr_replay.visualization.palettes import COLORS
 
 
 def _setup_line(

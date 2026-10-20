@@ -33,7 +33,7 @@ import seaborn as sns
 
 import continuum_swr_replay.figure_utilities as figure_utilities
 from continuum_swr_replay.figure_utilities import PANEL_SINGLE, save_figure
-from continuum_swr_replay.parameters import COLORS
+from continuum_swr_replay.visualization.palettes import COLORS
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%d-%b-%y %H:%M:%S"

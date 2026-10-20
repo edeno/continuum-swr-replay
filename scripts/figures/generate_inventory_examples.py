@@ -103,10 +103,11 @@ from continuum_swr_replay.figure_utilities import WONG  # noqa: E402
 from continuum_swr_replay.intervals import (  # noqa: E402
     interval_mask,
 )
-from continuum_swr_replay.parameters import COLORS, FIGURE_DIR  # noqa: E402
+from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
 from continuum_swr_replay.runs.cli import parse_run_id  # noqa: E402
 from continuum_swr_replay.runs.io import json_ready  # noqa: E402
 from continuum_swr_replay.tables.io import read_table  # noqa: E402
+from continuum_swr_replay.visualization.palettes import COLORS  # noqa: E402
 from continuum_swr_replay.visualization.plots import (  # noqa: E402
     plot_linear_track_graph_strip,
 )

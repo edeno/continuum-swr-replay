@@ -16,7 +16,7 @@ from statsmodels.stats.multitest import multipletests
 from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_HIERARCHY,
 )
-from continuum_swr_replay.parameters import COLORS
+from continuum_swr_replay.visualization.palettes import COLORS
 
 
 def plot_model_hierarchy_comparison(

@@ -681,7 +681,7 @@ stop_table.head()
 # %%
 # check that trials make sense
 from matplotlib.patches import Patch
-from continuum_swr_replay.parameters import COLORS
+from continuum_swr_replay.visualization.palettes import COLORS
 
 from continuum_swr_replay.data_loaders import WELL_PATCH_MAPPING
 from continuum_swr_replay.visualization import plot_graph_as_1D
@@ -827,7 +827,7 @@ axs[3].set_ylabel("Non-local prob")
 # %%
 # check that trials make sense
 from matplotlib.patches import Patch
-from continuum_swr_replay.parameters import COLORS
+from continuum_swr_replay.visualization.palettes import COLORS
 
 from continuum_swr_replay.data_loaders import WELL_PATCH_MAPPING
 from continuum_swr_replay.visualization import plot_graph_as_1D

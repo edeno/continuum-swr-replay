@@ -43,11 +43,8 @@ from continuum_swr_replay.figure_utilities import (
     get_figure_size,
     save_figure,
 )
-from continuum_swr_replay.parameters import (
-    COLORS,
-    PROCESSED_DATA_DIR,
-    SAMPLING_FREQUENCY,
-)
+from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, SAMPLING_FREQUENCY
+from continuum_swr_replay.visualization.palettes import COLORS
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%d-%b-%y %H:%M:%S"

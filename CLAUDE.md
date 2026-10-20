@@ -78,10 +78,10 @@ src/continuum_swr_replay/
 ├── decoding/              # decode configs, transitions, file names, the results.nc reader
 ├── runs/                  # run infrastructure: atomic writes, provenance, CLI, batch loops
 ├── tables/                # canonical tables: schema, row ids, parquet I/O, parity
-├── visualization/         # Plotting utilities
+├── visualization/         # Plotting utilities; palettes.py holds COLORS
 ├── figure_utilities.py    # publication-figure helpers
 ├── intervals.py           # interval algebra: overlap conventions, masks, spike binning
-├── parameters.py          # global parameters, PROCESSED_DATA_DIR, COLORS
+├── parameters.py          # global parameters, PROCESSED_DATA_DIR
 ├── paths.py               # output locations, canonical table names, table_path()
 └── types.py               # shared type definitions
 

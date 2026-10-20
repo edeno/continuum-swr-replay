@@ -17,7 +17,8 @@ import seaborn as sns
 from scipy.ndimage import label
 
 import continuum_swr_replay.figure_utilities as figure_utilities
-from continuum_swr_replay.parameters import COLORS, PROCESSED_DATA_DIR
+from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.visualization.palettes import COLORS
 
 # Output directory for baseline figures
 OUTPUT_DIR = Path("tests/baselines/figure02")

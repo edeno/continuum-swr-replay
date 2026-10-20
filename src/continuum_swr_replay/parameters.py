@@ -39,8 +39,6 @@ PROBABILITY_THRESHOLDS : list
 DEFAULT_NON_LOCAL_THRESHOLD : float
     Default probability threshold (0.8) for classifying non-local events; the
     canonical decode's ``data_over_time`` file is named for it.
-COLORS : dict
-    Color scheme for plotting different event types.
 
 Classes
 -------
@@ -56,6 +54,7 @@ See Also
 --------
 continuum_swr_replay.types : TypedDict definitions for data structures
 continuum_swr_replay.data_loaders.constants : Task-specific constants
+continuum_swr_replay.visualization.palettes : COLORS, the event-type colours
 
 Examples
 --------
@@ -165,23 +164,6 @@ class TrainingType(str, Enum):
         return self.value
 
 
-COLORS = {
-    "SWR": "#d95f02",
-    "MUA": "#7570b3",
-    "Non-Local": "#1b9e77",
-    "Local": "#add8e6",  # Soft Blue for Local
-    "No-Spike": "#b0b0b0",  # Light Gray for No-Spike
-    "All Events": "#d9d9d9",  # Light Gray for background/all-events reference
-    # Joint SWR + non-SWR-non-local model bar in Figure 4's AIC
-    # comparison. Same Dark2 family as SWR/MUA/Non-Local.
-    "Combined": "#e6ab02",
-}
-
-CONTFRAG_COLORS = {
-    "Continuous": "#1b9e77",  # Teal green (smooth trajectory)
-    "Fragmented": "#d95f02",  # Orange (disjointed representation)
-}
-
 __all__ = [
     # Sampling and thresholds
     "SAMPLING_FREQUENCY",
@@ -208,7 +190,4 @@ __all__ = [
     "CONTFRAG_DETECTOR_CONFIG",
     # Enums
     "TrainingType",
-    # Color schemes
-    "COLORS",
-    "CONTFRAG_COLORS",
 ]

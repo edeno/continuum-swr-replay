@@ -58,13 +58,14 @@ from continuum_swr_replay.figure_utilities import (
     label_panels,
     save_figure,
 )
-from continuum_swr_replay.parameters import COLORS, PROCESSED_DATA_DIR
+from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.visualization.figure_panels import (
     plot_calibration_curve,
     plot_event_duration_distribution,
     plot_state_fractions_by_movement,
     plot_triggered_averages,
 )
+from continuum_swr_replay.visualization.palettes import COLORS
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s",

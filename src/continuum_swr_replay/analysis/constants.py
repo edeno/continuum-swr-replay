@@ -14,7 +14,7 @@ Import constants as needed::
 
 Notes
 -----
-- Color definitions are in continuum_swr_replay.parameters.COLORS
+- Color definitions are in continuum_swr_replay.visualization.palettes.COLORS
 - NWB file lists and other data parameters are in continuum_swr_replay.parameters
 - This module focuses on analysis-specific constants shared across figure scripts
 

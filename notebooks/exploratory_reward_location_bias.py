@@ -36,11 +36,9 @@ from continuum_swr_replay.data_loaders.constants import (
     NWB_FILES,
     TRACK_SEGMENT_TO_PATCH,
 )
-from continuum_swr_replay.parameters import (
-    COLORS,
-    PROCESSED_DATA_DIR,
-)
+from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.types import SessionDataKeys
+from continuum_swr_replay.visualization.palettes import COLORS
 
 figure_utilities.set_figure_defaults(context="paper")
 warnings.filterwarnings("ignore")

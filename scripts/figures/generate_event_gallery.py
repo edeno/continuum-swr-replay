@@ -119,7 +119,8 @@ from continuum_swr_replay.data_loaders.epoch_register import (
 )
 from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier
 from continuum_swr_replay.decoding.files import data_over_time_suffix, decode_paths
-from continuum_swr_replay.parameters import COLORS, PROCESSED_DATA_DIR
+from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.visualization.palettes import COLORS
 from continuum_swr_replay.visualization.plots import (
     _track_edge_colors,
     plot_acausal_probabilities,

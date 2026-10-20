@@ -101,7 +101,8 @@ from continuum_swr_replay.figure_utilities import (
     label_panels,
     save_figure,
 )
-from continuum_swr_replay.parameters import COLORS, PROCESSED_DATA_DIR
+from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.visualization.palettes import COLORS
 
 figure_utilities.set_figure_defaults(context="paper")
 warnings.filterwarnings("ignore")

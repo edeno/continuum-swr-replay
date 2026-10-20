@@ -16,11 +16,8 @@ from scipy.stats import sem
 
 import continuum_swr_replay.figure_utilities as figure_utilities
 from continuum_swr_replay.figure_utilities import save_figure
-from continuum_swr_replay.parameters import (
-    COLORS,
-    PROCESSED_DATA_DIR,
-    SAMPLING_FREQUENCY,
-)
+from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, SAMPLING_FREQUENCY
+from continuum_swr_replay.visualization.palettes import COLORS
 
 os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "1.00"
 

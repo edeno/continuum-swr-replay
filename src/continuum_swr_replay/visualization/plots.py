@@ -133,7 +133,7 @@ if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from numpy.typing import NDArray
 
-from continuum_swr_replay.parameters import COLORS
+from continuum_swr_replay.visualization.palettes import COLORS
 
 
 def plot_peri_event_probability(

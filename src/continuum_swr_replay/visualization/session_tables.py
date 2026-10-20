@@ -97,9 +97,10 @@ from continuum_swr_replay.data_loaders.constants import (
     ALL_ARMS as _ALL_ARMS,
 )
 from continuum_swr_replay.data_loaders.constants import (
+    TRUNK_ARMS,
     WELL_PATCH_MAPPING,
 )
-from continuum_swr_replay.parameters import COLORS
+from continuum_swr_replay.visualization.palettes import COLORS
 
 from .palettes import patch_grouped_arm_palette
 from .plots import (
@@ -111,8 +112,7 @@ from .plots import (
     plot_spike_times,
 )
 
-_LEAF_ARMS: frozenset[int] = frozenset(range(6))
-_TRUNK_ARMS: frozenset[int] = frozenset(set(_ALL_ARMS) - _LEAF_ARMS)
+_TRUNK_ARMS: frozenset[int] = frozenset(TRUNK_ARMS)
 _COLLECTION_THRESHOLD = 128
 _ZERO_CELL_COLOR = "#f2f2f2"
 _MISSING_CELL_COLOR = "#969696"

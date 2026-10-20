@@ -37,10 +37,8 @@ from continuum_swr_replay.figure_utilities import (
     get_figure_size,
     save_figure,
 )
-from continuum_swr_replay.parameters import (
-    COLORS,
-    SAMPLING_FREQUENCY,
-)
+from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
+from continuum_swr_replay.visualization.palettes import COLORS
 from continuum_swr_replay.visualization.plots import (
     plot_acausal_probabilities,
     plot_conditional_non_local_posterior,

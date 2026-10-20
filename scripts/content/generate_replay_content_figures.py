@@ -29,8 +29,8 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
 from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_HIERARCHY,
 )
-from continuum_swr_replay.parameters import COLORS
 from continuum_swr_replay.paths import MODEL_DIRS, REPLAY_CONTENT_DIR, table_path
+from continuum_swr_replay.visualization.palettes import COLORS
 from continuum_swr_replay.visualization.replay_content_plots import (
     plot_behavior_prediction_results,
     plot_coefficient_forest,

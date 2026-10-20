@@ -53,10 +53,10 @@ from continuum_swr_replay.figure_utilities import (
     set_figure_defaults,
 )
 from continuum_swr_replay.parameters import (
-    COLORS,
     LOCAL_POSITION_STD,
     MAX_SPEED_THRESHOLD_CM_PER_SEC,
 )
+from continuum_swr_replay.visualization.palettes import COLORS
 
 warnings.filterwarnings("ignore")
 
