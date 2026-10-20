@@ -79,6 +79,7 @@ from scipy.stats import zscore
 # pure helpers (``get_multiunit``, ``get_multiunit_hse``,
 # ``filter_ripple_lfp_time``) — and the unit tests that exercise them
 # — stay offline-importable on machines without VPN.
+from ..intervals import overlaps_intervals
 from ..parameters import (
     HSE_CLOSE_EVENT_THRESHOLD_SEC,
     HSE_MINIMUM_DURATION_SEC,
@@ -755,17 +756,6 @@ def _in_intervals(
     return inside
 
 
-def _overlap_any(events: pd.DataFrame, intervals: pd.DataFrame) -> NDArray[np.bool_]:
-    """Events whose closed interval shares any time with a closed interval."""
-    starts = events["start_time"].to_numpy(dtype=float)[:, np.newaxis]
-    ends = events["end_time"].to_numpy(dtype=float)[:, np.newaxis]
-    overlaps: NDArray[np.bool_] = (
-        (starts <= intervals["end_time"].to_numpy(dtype=float)[np.newaxis, :])
-        & (intervals["start_time"].to_numpy(dtype=float)[np.newaxis, :] <= ends)
-    ).any(axis=1)
-    return overlaps
-
-
 def get_multiunit_hse(
     spike_times: list[NDArray[np.float64]],
     speed: NDArray[np.float64],
@@ -787,8 +777,9 @@ def get_multiunit_hse(
         not to be trusted, such as the artifact mask. Their bins
         are left out of the detector's normalization (``normalization_mask``)
         and of the z-scored rate's mean and SD, and an event that shares any
-        time with one is dropped, the rest renumbered 1..n. The spike counts
-        themselves are not changed. None, or no rows, masks nothing.
+        time with one (``intervals.overlaps_intervals``) is dropped, the rest
+        renumbered 1..n. The spike counts themselves are not changed. None, or
+        no rows, masks nothing.
 
     Returns
     -------
@@ -873,7 +864,13 @@ def get_multiunit_hse(
         normalization_mask=None if not is_artifact.any() else ~is_artifact,
     )
     if artifact_intervals is not None and len(artifact_intervals):
-        hse_times = hse_times.loc[~_overlap_any(hse_times, artifact_intervals)]
+        hse_times = hse_times.loc[
+            ~overlaps_intervals(
+                hse_times["start_time"].to_numpy(dtype=float),
+                hse_times["end_time"].to_numpy(dtype=float),
+                artifact_intervals,
+            )
+        ]
         hse_times.index = pd.RangeIndex(1, len(hse_times) + 1, name="event_number")
 
     return hse_times, multiunit_firing_rate, multiunit_rate_zscore

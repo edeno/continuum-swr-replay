@@ -117,7 +117,10 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import (
     SessionIdentity,
     inventory_from_intervals,
 )
-from continuum_swr_replay.intervals import get_spikecount_per_time_bin
+from continuum_swr_replay.intervals import (
+    get_spikecount_per_time_bin,
+    overlaps_intervals,
+)
 from continuum_swr_replay.types import RippleBandInputs
 
 ZUGARO_BAND_HZ: tuple[float, float] = (120.0, 180.0)
@@ -661,10 +664,11 @@ def drop_overlapping_events(
 ) -> tuple[pd.DataFrame, int]:
     """Drop the events that share any time with an interval; renumber the rest.
 
-    Both are closed, so an event that only touches an interval at an instant is
-    dropped too, as ``swr_source`` drops an event touching an artifact. The
-    kept events are renumbered 1..n in ``event_number``, which an inventory's
-    reader (``swr_source``) takes as the event's label.
+    Both are closed (``intervals.overlaps_intervals``), so an event that only
+    touches an interval at an instant is dropped too, as ``swr_source`` drops an
+    event touching an artifact. The kept events are renumbered 1..n in
+    ``event_number``, which an inventory's reader (``swr_source``) takes as the
+    event's label.
 
     Parameters
     ----------
@@ -679,15 +683,17 @@ def drop_overlapping_events(
         The other rows, unchanged and in order, indexed by ``event_number``
         1..n.
     n_dropped : int
+
+    Raises
+    ------
+    ValueError
+        If an event or interval bound is NaN or a start is after its end.
     """
-    starts = events["start_time"].to_numpy(dtype=float)
-    ends = events["end_time"].to_numpy(dtype=float)
-    interval_starts = intervals["start_time"].to_numpy(dtype=float)
-    interval_ends = intervals["end_time"].to_numpy(dtype=float)
-    overlaps = (
-        (starts[:, np.newaxis] <= interval_ends[np.newaxis, :])
-        & (interval_starts[np.newaxis, :] <= ends[:, np.newaxis])
-    ).any(axis=1)
+    overlaps = overlaps_intervals(
+        events["start_time"].to_numpy(dtype=float),
+        events["end_time"].to_numpy(dtype=float),
+        intervals,
+    )
     kept = events.loc[~overlaps].copy()
     kept.index = pd.RangeIndex(1, len(kept) + 1, name="event_number")
     return kept, int(np.count_nonzero(overlaps))

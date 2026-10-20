@@ -373,11 +373,11 @@ def test_load_data_masks_the_mua_of_the_areas_it_is_given(bandit_task, monkeypat
 
 
 class TestTheLoadersIntervalRulesAreTheMasks:
-    """``data_loaders`` may not import ``analysis``, so the loader keeps its own
-    copies of the closed-interval rules. These tie them to the originals:
-    ``intervals.interval_mask`` for membership, and
-    ``swr_inventories.drop_overlapping_events`` and ``intervals.overlaps_intervals``
-    (the event overlap of the one eligibility rule) for dropping."""
+    """The loader keeps its own copy of the closed membership rule
+    (``_in_intervals``), tied here to ``intervals.interval_mask``. Event
+    dropping calls ``intervals.overlaps_intervals`` (the event overlap of the
+    one eligibility rule), as ``swr_inventories.drop_overlapping_events``
+    does."""
 
     TIME = np.round(np.arange(0.0, 2.0, 0.001), 3)
     """A 1 kHz grid, so interval and event bounds land on samples exactly."""
@@ -430,22 +430,14 @@ class TestTheLoadersIntervalRulesAreTheMasks:
         from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
             drop_overlapping_events,
         )
-        from continuum_swr_replay.data_loaders.lfp import _overlap_any
         from continuum_swr_replay.intervals import overlaps_intervals
 
         for intervals, events in self._cases():
-            overlaps = _overlap_any(events, intervals)
+            overlaps = overlaps_intervals(
+                events.start_time.to_numpy(), events.end_time.to_numpy(), intervals
+            )
             kept, n_dropped = drop_overlapping_events(events, intervals)
             assert n_dropped == int(overlaps.sum())
             np.testing.assert_array_equal(
                 kept.to_numpy(), events.loc[~overlaps].to_numpy()
             )
-            if len(events) and len(intervals):
-                np.testing.assert_array_equal(
-                    overlaps,
-                    overlaps_intervals(
-                        events.start_time.to_numpy(),
-                        events.end_time.to_numpy(),
-                        intervals,
-                    ),
-                )
