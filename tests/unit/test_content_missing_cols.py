@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import pandas as pd
 
+from continuum_swr_replay.analysis.replay import contrast_aggregation
 from scripts.content import fit_swr_contrast_content as mod
 
 
@@ -30,7 +31,10 @@ def test_missing_predictor_is_clean_skip(monkeypatch):
     monkeypatch.setattr(mod, "fit_conditional_poisson", fake_fit)
 
     out, audit = mod._fit_session(
-        df, ["reward_belief_mean_candidate_arm_preoutcome"], response_col="arm_count_hard", n_categories=9
+        df,
+        ["reward_belief_mean_candidate_arm_preoutcome"],
+        response_col="arm_count_hard",
+        n_categories=9,
     )
 
     assert out is None
@@ -50,14 +54,24 @@ def test_qvals_gap_drop_is_bucketed_separately(monkeypatch):
         {
             "event_id": [1, 1, 1, 2, 2, 2],
             "arm_count_hard": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
-            "reward_belief_mean_candidate_arm_preoutcome": [float("nan"), 0.2, 0.3, 0.1, 0.4, 0.5],
+            "reward_belief_mean_candidate_arm_preoutcome": [
+                float("nan"),
+                0.2,
+                0.3,
+                0.1,
+                0.4,
+                0.5,
+            ],
         }
     )
-    monkeypatch.setattr(mod, "MIN_EVENTS", 1)
+    monkeypatch.setattr(contrast_aggregation, "MIN_EVENTS", 1)
     monkeypatch.setattr(mod, "fit_conditional_poisson", lambda *a, **k: {"n_events": 1})
 
     out, audit = mod._fit_session(
-        df, ["reward_belief_mean_candidate_arm_preoutcome"], response_col="arm_count_hard", n_categories=9
+        df,
+        ["reward_belief_mean_candidate_arm_preoutcome"],
+        response_col="arm_count_hard",
+        n_categories=9,
     )
     assert out is not None
     assert audit["n_drop_qvals_gap"] == 1  # event 1

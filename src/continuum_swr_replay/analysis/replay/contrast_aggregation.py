@@ -20,12 +20,22 @@ also carry a standardized (per-1-SD) form (``std_*``); binary predictors are
 per-category; and the reward-history basis features are weighted reward fractions
 in [0, 1], so their coefficients are reported per unit of the fraction (factor 1.0,
 ``per_unit``) rather than per SD.
+
+The second half of the module assembles the content contrast ladder's cohorts:
+it reads the canonical tables (:data:`CONTENT_FIT_INPUTS`), attaches the design
+columns and the fit-time ``_z`` reference (:func:`assemble_arm`,
+:func:`assemble_patch`), freezes the per-SD scales before the outcome stratum
+(:func:`prepare_cohorts`), and applies the per-session cohort rules
+(:func:`prepare_session`). ``scripts/content/fit_swr_contrast_content.py`` and
+``scripts/content/compare_content_estimators.py`` both fit on these cohorts, so
+the rules live here rather than in either script.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Mapping
 from pathlib import Path
 
 import numpy as np
@@ -33,9 +43,24 @@ import pandas as pd
 from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
+from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
+from continuum_swr_replay.analysis.events.cohort_selection import select_event_cohort
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
+from continuum_swr_replay.tables.covariate_registry import require_covariate_schema
+from continuum_swr_replay.tables.io import read_table
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.tables.standardization import (
+    assert_standardized_matches_reference,
+    attach_standardized,
+    load_reference,
+)
+
 from ._fit_diagnostics import SEPARATION_COEF_ABS
+from ._helpers import add_arm_fixed_effects
+from .cohort_audit import QVALS_GAP_COLS
+from .covariates import add_uncertainty_covariates
 from .fitting import parse_unidentified_terms
-from .model_specs import REWARD_HISTORY_COLUMNS
+from .model_specs import LEAF_ONLY_N_CATEGORIES, REWARD_HISTORY_COLUMNS
 
 # Above this share of unidentified session fits, a term's aggregate is a
 # statement about the identified minority and is not emitted at all. The share
@@ -330,7 +355,10 @@ def pct_significant_sessions(
 
 
 def aggregate_contrast(
-    res: pd.DataFrame, specs: list[tuple[str, str, str]], level: str, sd: dict | None = None
+    res: pd.DataFrame,
+    specs: list[tuple[str, str, str]],
+    level: str,
+    sd: dict | None = None,
 ) -> pd.DataFrame:
     """Aggregate per-session coefficients into one audited row per spec.
 
@@ -436,11 +464,13 @@ def aggregate_contrast(
         # without diagnostics) are treated as not-flagged.
         n_nonconverged = (
             int((s_all["converged"] == False).sum())  # noqa: E712 (NaN must not count)
-            if "converged" in s_all.columns else 0
+            if "converged" in s_all.columns
+            else 0
         )
         n_separated = (
             int((s_all["separated"] == True).sum())  # noqa: E712
-            if "separated" in s_all.columns else 0
+            if "separated" in s_all.columns
+            else 0
         )
         rows.append(
             {
@@ -483,7 +513,8 @@ def aggregate_contrast(
     if n_dropped_total:
         logger.info(
             "%s: dropped %d quasi-separated/NaN session-fits before aggregating",
-            level, n_dropped_total,
+            level,
+            n_dropped_total,
         )
     # BH-FDR of the (descriptive) session signed-rank p, across rungs per population.
     df["session_signrank_fdr_q"] = np.nan
@@ -505,6 +536,604 @@ def specs_from_ladder(ladder: dict, key_term: dict) -> list[tuple[str, str, str]
         if term is None:
             continue
         scope = ladder[name][1]
-        for pop in (["all"] if scope == "pooled" else ["all", "SWR", "nonSWR"]):
+        for pop in ["all"] if scope == "pooled" else ["all", "SWR", "nonSWR"]:
             specs.append((name, pop, term))
     return specs
+
+
+# ── Content contrast cohort assembly ──
+
+#: Fewest surviving events a session needs before the content contrast fits it.
+MIN_EVENTS = 18
+
+
+# The tables every content contrast fit is built from. Their hashes go into the
+# provenance sidecar of each artifact the content contrast runner writes, and the
+# readers of those artifacts check the same mapping, so a regenerated table
+# cannot be read through coefficients that predate it.
+CONTENT_FIT_INPUTS = {
+    "event_arm_table": table_path("event_arm_table", REPLAY_CONTENT_DIR, fmt="pkl"),
+    "event_patch_table": table_path("event_patch_table", REPLAY_CONTENT_DIR, fmt="pkl"),
+    "stop_table": table_path("stop_table", REPLAY_CONTENT_DIR, fmt="pkl"),
+    "qvals_table": table_path("qvals_table", REPLAY_CONTENT_DIR, fmt="pkl"),
+}
+
+
+# event-level scalars z-scored (so :is_current coefs are per-SD & comparable)
+_ZSCALARS = [
+    "rpe_postoutcome",
+    "relative_value_switch_minus_stay_preoutcome",
+    "reward_belief_differential_entropy_leaf_mean_preoutcome",
+    "reward_belief_mean_update_l1_all_ports_postoutcome",
+    "periswitch_index_trials",
+    "trials_since_block_change",
+    "patch_switch_fraction_last5_completed_trips",
+]
+
+
+# Fit-time standardization: one support label for every ``_z`` these assemblers
+# make.
+# The moments are taken over the FULL assembled cohort (before the smoke subset and
+# before the outcome stratum), so the strata share one per-SD unit and their
+# coefficients stay comparable. The reference is persisted beside each artifact.
+_FIT_SUPPORT_LABEL = "fit_cohort_all_rows"
+
+# Event-length control. SWR-coupled events are the longer ones, and a longer
+# trajectory visits more arms, so ``swr_x_is_current_arm`` partly reads "longer
+# events leave the current arm" unless event length is in the design. The control
+# is z(log n_nonlocal_bins) crossed with the indicator it modulates.
+LOG_EVENT_LENGTH = "log_n_nonlocal_bins"
+_LOG1P_STOP_TIME = "log1p_time_since_stop_start_s"
+
+_ARM_Z_SOURCES = (*_ZSCALARS, _LOG1P_STOP_TIME, LOG_EVENT_LENGTH)
+_PATCH_Z_SOURCES = (
+    "periswitch_index_trials",
+    "patch_switch_fraction_last5_completed_trips",
+    _LOG1P_STOP_TIME,
+    LOG_EVENT_LENGTH,
+)
+
+# Current outcome strata. Rewarded and omitted events differ in their SWR share, so
+# the contrast is refit within each; an event whose outcome is not yet known belongs
+# to neither.
+OUTCOME_STRATA = ("all", "rewarded", "omitted")
+
+
+def _standardize(frame: pd.DataFrame, cols) -> tuple[pd.DataFrame, dict]:
+    """Attach ``<col>_z`` over the fit cohort and return the reference used."""
+    return attach_standardized(frame, list(cols), support_label=_FIT_SUPPORT_LABEL)
+
+
+def _attach_log_event_length(frame: pd.DataFrame) -> pd.DataFrame:
+    """Attach ``log_n_nonlocal_bins``; refuse an event shorter than one bin.
+
+    Every materialized non-local event spans at least one decoder bin by
+    construction, so a zero/negative/missing count is a broken table, not a
+    zero-length event -- and ``log`` would silently emit -inf/NaN for it.
+    """
+    n_bins = pd.to_numeric(frame["n_nonlocal_bins"], errors="coerce").to_numpy(
+        dtype=float
+    )
+    bad = ~np.isfinite(n_bins) | (n_bins < 1)
+    if bad.any():
+        raise ValueError(
+            f"n_nonlocal_bins must be finite and >= 1 on every event; "
+            f"{int(bad.sum())} of {len(n_bins)} rows violate it "
+            f"(min={np.nanmin(n_bins)})"
+        )
+    frame[LOG_EVENT_LENGTH] = np.log(n_bins)
+    return frame
+
+
+def select_outcome_stratum(ev: pd.DataFrame, stratum: str) -> tuple[pd.DataFrame, dict]:
+    """Restrict a cohort to one current-outcome stratum.
+
+    Parameters
+    ----------
+    ev : pandas.DataFrame
+        Event-grain cohort carrying ``event_id``, ``is_rewarded_outcome`` and
+        ``is_swr`` (one row per event x candidate arm/patch).
+    stratum : {"all", "rewarded", "omitted"}
+        ``"all"`` keeps every event. ``"rewarded"`` keeps
+        ``is_rewarded_outcome == 1``, ``"omitted"`` keeps ``== 0``; an event whose
+        outcome is not yet known is in neither.
+
+    Returns
+    -------
+    (frame, audit)
+        The restricted frame and the event-grain counts, including the
+        unknown-outcome events split by ``is_swr`` so the exclusion is reported.
+    """
+    if stratum not in OUTCOME_STRATA:
+        raise ValueError(
+            f"unknown outcome stratum {stratum!r}; expected one of {OUTCOME_STRATA}"
+        )
+    events = ev.drop_duplicates("event_id")
+    outcome = pd.to_numeric(
+        events["is_rewarded_outcome"].astype("object"), errors="coerce"
+    )
+    unknown = outcome.isna()
+    is_swr = events["is_swr"].astype("object").astype(bool)
+    if stratum == "all":
+        kept = ev
+    else:
+        wanted = 1.0 if stratum == "rewarded" else 0.0
+        keep_ids = set(events.loc[~unknown & (outcome == wanted), "event_id"])
+        kept = ev[ev["event_id"].isin(keep_ids)]
+    audit = {
+        "stratum": stratum,
+        "n_events_in": int(len(events)),
+        "n_events_kept": int(kept["event_id"].nunique()),
+        "n_events_unknown_outcome": int(unknown.sum()),
+        "n_events_unknown_outcome_swr": int((unknown & is_swr).sum()),
+        "n_events_unknown_outcome_non_swr": int((unknown & ~is_swr).sum()),
+    }
+    return kept, audit
+
+
+# Raw-scale per-arm covariates whose coefficients the aggregation restates per SD
+# (``aggregate_contrast``'s ``std_factor``). Their SDs are frozen over the FULL
+# assembled cohort, like the ``_z`` reference, so a stratified refit reports effects
+# in the same unit as the pooled one. The patch ladder's key terms are all binary or
+# already standardized, so it has no raw-scale term to rescale.
+_ARM_SD_TERMS = (
+    "reward_belief_mean_candidate_arm_preoutcome",
+    "reward_fraction_candidate_arm_last10_visits",
+    "task_reward_probability_candidate_arm",
+)
+_PATCH_SD_TERMS: tuple[str, ...] = ()
+
+# Row support for the per-arm SD unit. Every one of ``_ARM_SD_TERMS`` is a
+# leaf-derived belief/reward quantity that is a STRUCTURAL ZERO on the three trunk
+# arms, and the rungs that carry them are fitted on the leaves (see
+# ``LEAF_ONLY_CONTRAST_RUNGS``). Taking the SD over all nine candidates therefore
+# states the effect per SD of a spread the fitted rows never see -- measured on the
+# canonical cohort, the trunk zeros inflate the arm-value SD by 2.1x, which would
+# shrink every per-SD value effect by the same factor.
+_ARM_SD_SUPPORT_LABEL = "leaf_arms"
+_PATCH_SD_SUPPORT_LABEL = _FIT_SUPPORT_LABEL
+
+
+def _leaf_arm_rows(frame: pd.DataFrame) -> pd.DataFrame:
+    """The six leaf-arm rows of an arm cohort; the trunks carry structural zeros."""
+    if "candidate_arm" not in frame.columns:
+        raise KeyError(
+            "arm cohort has no 'candidate_arm' column; the per-SD unit cannot be "
+            "restricted to the leaf arms it is read on"
+        )
+    return frame[
+        pd.to_numeric(frame["candidate_arm"], errors="coerce") < LEAF_ONLY_N_CATEGORIES
+    ]
+
+
+def _sd_reference(frame: pd.DataFrame, cols) -> dict:
+    """Pooled SD of each raw covariate present in ``frame`` (the per-SD unit)."""
+    return {
+        c: float(np.nanstd(frame[c].to_numpy(dtype=float)))
+        for c in cols
+        if c in frame.columns
+    }
+
+
+def prepare_cohorts(
+    ev: pd.DataFrame,
+    pt: pd.DataFrame,
+    *,
+    outcome_stratum: str,
+    max_per_animal: int | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame, dict, dict]:
+    """Freeze the cohort-wide per-SD scales, then apply the stratum and smoke subset.
+
+    Order is load-bearing: the SDs (like the ``_z`` reference the assemblers
+    return) are estimated on the FULL cohorts, so the ``rewarded`` and ``omitted``
+    refits state their per-SD effects in the same unit as the pooled fit instead of
+    each rescaling to its own stratum.
+
+    Parameters
+    ----------
+    ev, pt : pandas.DataFrame
+        The fully assembled arm and patch cohorts.
+    outcome_stratum : {"all", "rewarded", "omitted"}
+        Current-outcome stratum to fit.
+    max_per_animal : int, optional
+        Smoke subset: keep the first N sessions per animal.
+
+    Returns
+    -------
+    (ev, pt, scale, stratum_audit)
+        The selected cohorts, the frozen per-SD scales (each with the row support it
+        was taken over -- ``leaf_arms`` for the arm cohort), and the outcome-stratum
+        event counts.
+    """
+    scale = {
+        # Support is recorded per cohort because they differ: the arm SDs are taken
+        # over the leaf arms only (the trunks are structural zeros for every term the
+        # aggregation rescales), the patch SDs over all rows.
+        "arm_cohort_support": _ARM_SD_SUPPORT_LABEL,
+        "arm_cohort": _sd_reference(_leaf_arm_rows(ev), _ARM_SD_TERMS),
+        "patch_cohort_support": _PATCH_SD_SUPPORT_LABEL,
+        "patch_cohort": _sd_reference(pt, _PATCH_SD_TERMS),
+    }
+    ev, stratum_audit = select_outcome_stratum(ev, outcome_stratum)
+    if outcome_stratum != "all":
+        # One stratum, one event set: the patch cohort follows the arm cohort's
+        # events rather than re-deriving the outcome on patch rows.
+        pt = pt[pt["event_id"].isin(set(ev["event_id"]))]
+    if max_per_animal is not None:
+        keep = (
+            ev[list(SESSION_COLUMNS)]
+            .drop_duplicates()
+            .groupby("animal", sort=False)
+            .head(max_per_animal)
+        )
+        ev = ev.merge(keep, on=list(SESSION_COLUMNS))
+        pt = pt.merge(keep, on=list(SESSION_COLUMNS))
+    return ev, pt, scale, stratum_audit
+
+
+def _cohort_log(label: str, report: dict) -> None:
+    """Log one cohort selection at the grain the content contrast reports it on."""
+    logger.info(
+        "%s cohort = %s (%s): %d -> %d events (%.1f%% retained); dropped events "
+        "by state %s",
+        label,
+        report["cohort"],
+        report["rule"],
+        report["n_events_before"],
+        report["n_events_after"],
+        100 * report["n_events_after"] / max(report["n_events_before"], 1),
+        {
+            state: count
+            for state, count in report["counts_before"].items()
+            if state not in report["counts_after"]
+        },
+    )
+
+
+def assemble_arm(
+    fit_inputs: Mapping[str, Path], reference_path: Path
+) -> tuple[pd.DataFrame, dict]:
+    """Load the arm cohort and attach its design columns and ``_z`` reference.
+
+    Parameters
+    ----------
+    fit_inputs : Mapping[str, Path]
+        Table name -> path; the event-arm, stop and qvals tables are read from
+        it (:data:`CONTENT_FIT_INPUTS` for the canonical fit).
+    reference_path : Path
+        The tables' ``standardization_reference.json``, against which the
+        persisted ``arm_uncertainty_z`` is validated.
+
+    Returns
+    -------
+    (ev, reference)
+        The at-well arm cohort with its design columns, and the fit-time
+        standardization reference actually used.
+    """
+    ev = read_table(fit_inputs["event_arm_table"])
+    require_covariate_schema(ev, table="event_arm")
+    require_swr_source(ev, what=str(fit_inputs["event_arm_table"]))
+    # Cohort: at-well events, stated here rather than left to fall out of the
+    # complete-case filter. Every rung carrying `is_current_arm` already lost the
+    # off-well events that way (it is NaN off a well), so for those this is a
+    # no-op; the arm-fixed-effects rung carries no location predictor and so was
+    # being fit on a LARGER population than the rungs it is the null for. Stating
+    # the cohort once puts the whole ladder -- and the rate family, which applies
+    # the same rule to its stop table -- on one population.
+    ev, arm_cohort = select_event_cohort(ev, cohort="at_well")
+    _cohort_log("ARM", arm_cohort)
+    if not reference_path.exists():
+        raise FileNotFoundError(
+            f"{reference_path} is required to validate arm_uncertainty_z; "
+            "regenerate the canonical replay-content tables"
+        )
+    try:
+        assert_standardized_matches_reference(
+            ev,
+            ("reward_belief_variance_candidate_arm_preoutcome",),
+            load_reference(reference_path),
+            support_label="leaf_arms",
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError(
+            "event_arm_table arm_uncertainty_z has a stale or invalid "
+            "standardization reference; regenerate the canonical table and "
+            f"reference before fitting: {exc}"
+        ) from exc
+    add_arm_fixed_effects(ev)
+    stop = read_table(fit_inputs["stop_table"])
+    require_covariate_schema(stop, table="stop")
+    require_swr_source(stop, what=str(fit_inputs["stop_table"]))
+    stop = add_uncertainty_covariates(stop)
+    q = read_table(fit_inputs["qvals_table"])
+    require_covariate_schema(q, table="qvals")
+    ev = ev.merge(
+        stop[
+            [
+                "stop_id",
+                "known_reward_outcome_lag_1",
+                "patch_switch_fraction_last5_completed_trips",
+            ]
+        ],
+        on="stop_id",
+        how="left",
+    )
+    ev = ev.merge(
+        q[
+            [
+                "stop_id",
+                "rpe_postoutcome",
+                "relative_value_switch_minus_stay_preoutcome",
+                "reward_belief_differential_entropy_leaf_mean_preoutcome",
+                "reward_belief_mean_update_l1_all_ports_postoutcome",
+                "periswitch_index_trials",
+                "is_periswitch_post",
+                "trials_since_block_change",
+            ]
+        ],
+        on="stop_id",
+        how="left",
+    )
+    return _attach_arm_design_columns(ev)
+
+
+def _attach_arm_design_columns(ev: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+    """Standardize the arm cohort's scalars and build every interaction product.
+
+    Parameters
+    ----------
+    ev : pandas.DataFrame
+        Arm cohort (one row per event x candidate arm) carrying the raw event
+        scalars, ``n_nonlocal_bins``, ``time_since_stop_start_s``, and the arm
+        indicators.
+
+    Returns
+    -------
+    (ev, reference)
+        ``ev`` with the ``<col>_z`` columns and interaction products appended, and
+        the standardization reference actually used (persisted beside the fit).
+    """
+    ev[_LOG1P_STOP_TIME] = np.log1p(ev["time_since_stop_start_s"].to_numpy(dtype=float))
+    _attach_log_event_length(ev)
+    ev, z_reference = _standardize(ev, _ARM_Z_SOURCES)
+    cur = ev["is_current_arm"].to_numpy(dtype=float)
+    prev = ev["is_prev_arm"].to_numpy(dtype=float)
+    swr = ev["is_swr"].to_numpy(dtype=float)
+    # State-modulation interactions spell out both canonical factors.
+    ev["rpe_postoutcome_z_x_is_current_arm"] = cur * ev["rpe_postoutcome_z"]
+    ev["relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm"] = (
+        cur * ev["relative_value_switch_minus_stay_preoutcome_z"]
+    )
+    ev["reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm"] = (
+        cur * ev["reward_belief_differential_entropy_leaf_mean_preoutcome_z"]
+    )
+    ev["reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm"] = (
+        cur * ev["reward_belief_mean_update_l1_all_ports_postoutcome_z"]
+    )
+    # context interactions
+    ev["periswitch_index_trials_z_x_is_current_arm"] = (
+        cur * ev["periswitch_index_trials_z"]
+    )
+    ev["is_periswitch_post_x_is_current_arm"] = cur * ev["is_periswitch_post"].to_numpy(
+        dtype=float
+    )
+    ev["periswitch_index_trials_z_x_is_periswitch_post_x_is_current_arm"] = (
+        cur
+        * ev["periswitch_index_trials_z"]
+        * ev["is_periswitch_post"].to_numpy(dtype=float)
+    )
+    ev["trials_since_block_change_z_x_is_current_arm"] = (
+        cur * ev["trials_since_block_change_z"]
+    )
+    ev["patch_switch_fraction_last5_completed_trips_z_x_is_current_arm"] = (
+        cur * ev["patch_switch_fraction_last5_completed_trips_z"]
+    )
+    # within-stop-time duration control (z(log1p t) : is_current)
+    ev["log1p_time_since_stop_start_s_z_x_is_current_arm"] = (
+        cur * ev[f"{_LOG1P_STOP_TIME}_z"]
+    )
+    # event-length control (z(log n bins) : is_current / : is_prev)
+    ev["log_n_nonlocal_bins_z_x_is_current_arm"] = cur * ev[f"{LOG_EVENT_LENGTH}_z"]
+    ev["log_n_nonlocal_bins_z_x_is_prev_arm"] = prev * ev[f"{LOG_EVENT_LENGTH}_z"]
+    # SWR interactions inherit the canonical base-covariate spelling.
+    ev["swr_x_reward_belief_mean_candidate_arm_preoutcome"] = swr * ev[
+        "reward_belief_mean_candidate_arm_preoutcome"
+    ].to_numpy(dtype=float)
+    ev["swr_x_reward_belief_variance_candidate_arm_preoutcome_z"] = swr * ev[
+        "reward_belief_variance_candidate_arm_preoutcome_z"
+    ].to_numpy(dtype=float)
+    return ev, z_reference
+
+
+def assemble_patch(
+    arm_ev: pd.DataFrame, fit_inputs: Mapping[str, Path]
+) -> tuple[pd.DataFrame, dict]:
+    """Load the patch cohort and attach its design columns and ``_z`` reference.
+
+    Parameters
+    ----------
+    arm_ev : pandas.DataFrame
+        The assembled arm cohort, which maps each event to its stop and carries
+        the event-level time and length the patch table lacks.
+    fit_inputs : Mapping[str, Path]
+        Table name -> path; the event-patch, stop and qvals tables are read from
+        it.
+
+    Returns
+    -------
+    (pt, reference)
+        The at-well patch cohort with its design columns, and the fit-time
+        standardization reference actually used.
+    """
+    pt = read_table(fit_inputs["event_patch_table"])
+    require_covariate_schema(pt, table="event_patch")
+    require_swr_source(pt, what=str(fit_inputs["event_patch_table"]))
+    pt, patch_cohort = select_event_cohort(pt, cohort="at_well")
+    _cohort_log("PATCH", patch_cohort)
+    # patch table lacks stop_id: map event_id -> stop_id from the arm table
+    e2s = arm_ev[["event_id", "stop_id"]].drop_duplicates("event_id")
+    pt = pt.merge(e2s, on="event_id", how="left")
+    # Within-stop time and event length are event-level (constant across
+    # arms/patches within an event); carry them for the duration and
+    # event-length controls.
+    e2t = arm_ev[
+        ["event_id", "time_since_stop_start_s", "n_nonlocal_bins"]
+    ].drop_duplicates("event_id")
+    pt = pt.merge(e2t, on="event_id", how="left")
+    stop = read_table(fit_inputs["stop_table"])
+    require_covariate_schema(stop, table="stop")
+    require_swr_source(stop, what=str(fit_inputs["stop_table"]))
+    stop = add_uncertainty_covariates(stop)
+    q = read_table(fit_inputs["qvals_table"])
+    require_covariate_schema(q, table="qvals")
+    pt = pt.merge(
+        stop[["stop_id", "patch_switch_fraction_last5_completed_trips"]],
+        on="stop_id",
+        how="left",
+    )
+    pt = pt.merge(q[["stop_id", "periswitch_index_trials"]], on="stop_id", how="left")
+    return _attach_patch_design_columns(pt)
+
+
+def _attach_patch_design_columns(pt: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+    """Standardize the patch cohort's scalars and build every interaction product.
+
+    The patch cohort is its own standardization scope: the same-named arm-cohort
+    entries are computed over a different set of rows and must not be reused here.
+
+    Parameters
+    ----------
+    pt : pandas.DataFrame
+        Patch cohort (one row per event x candidate patch) carrying the raw patch
+        scalars, ``n_nonlocal_bins``, ``time_since_stop_start_s``, and the patch
+        indicators.
+
+    Returns
+    -------
+    (pt, reference)
+        ``pt`` with the ``<col>_z`` columns and interaction products appended, and
+        the standardization reference actually used.
+    """
+    pt[_LOG1P_STOP_TIME] = np.log1p(pt["time_since_stop_start_s"].to_numpy(dtype=float))
+    _attach_log_event_length(pt)
+    pt, z_reference = _standardize(pt, _PATCH_Z_SOURCES)
+    cp = pt["is_current_patch"].to_numpy(float)
+    pp = pt["is_prev_patch"].to_numpy(float)
+    swr = pt["is_swr"].to_numpy(float)
+    pt["periswitch_index_trials_z_x_is_current_patch"] = (
+        cp * pt["periswitch_index_trials_z"]
+    )
+    # Patch analogues of the arm within-stop-time and event-length controls.
+    pt["log1p_time_since_stop_start_s_z_x_is_current_patch"] = (
+        cp * pt[f"{_LOG1P_STOP_TIME}_z"]
+    )
+    pt["log_n_nonlocal_bins_z_x_is_current_patch"] = cp * pt[f"{LOG_EVENT_LENGTH}_z"]
+    pt["log_n_nonlocal_bins_z_x_is_prev_patch"] = pp * pt[f"{LOG_EVENT_LENGTH}_z"]
+    pt["patch_switch_fraction_last5_completed_trips_z_x_is_current_patch"] = (
+        cp * pt["patch_switch_fraction_last5_completed_trips_z"]
+    )
+    pt["swr_x_is_current_patch"] = swr * cp
+    return pt, z_reference
+
+
+# Event-level columns carried for the cohort-audit drop profile (mechanism A vs B).
+_PROFILE_COLS = (
+    "time_since_stop_start_s",
+    "is_rewarded_outcome",
+    "reward_belief_mean_candidate_arm_preoutcome",
+    "relative_value_switch_minus_stay_preoutcome",
+)
+
+
+def prepare_session(
+    g: pd.DataFrame, predictors: list[str], *, response_col: str
+) -> tuple[pd.DataFrame | None, dict]:
+    """Apply the event-level cohort rules to one session, before any fit.
+
+    Returns ``(fittable_rows_or_None, prep)``. ``prep`` carries the event-level
+    cohort counts (``n_in`` and the mutually exclusive ``n_drop_qvals_gap`` /
+    ``n_drop_own_predictor_missing`` / ``n_drop_zero_response``), the surviving
+    event count, a skip ``reason``, and a one-row-per-dropped-event ``dropped``
+    frame for the profile.
+
+    Separated from the fit itself because the Dirichlet-multinomial fits a whole
+    ladder's worth of sessions in one batch, and the cohort rules that decide
+    which rows it may see must be the same ones the conditional Poisson applies.
+
+    A session missing a required predictor column is a clean, auditable skip
+    (``reason="missing:<cols>"`` → ``n_excluded_session``), never a fitter call
+    with absent columns.
+    """
+    n_in = int(g["event_id"].nunique()) if "event_id" in g.columns else 0
+    empty = g.iloc[0:0]
+    required = [response_col, "event_id", *predictors]
+    missing = [c for c in required if c not in g.columns]
+    if missing:
+        return None, {
+            "n_in": n_in,
+            "n_qvals": 0,
+            "n_own": 0,
+            "n_zero": 0,
+            "n_surv": n_in,
+            "dropped": empty,
+            "reason": f"missing:{','.join(missing)}",
+        }
+
+    # Split NaN-dropped events into the qvals gap (mechanism B) vs own-predictor
+    # missingness (mechanism A), qvals taking priority so the buckets stay disjoint.
+    qvals_preds = [c for c in predictors if c in QVALS_GAP_COLS]
+    # The response is not a predictor. An event whose response is undefined --
+    # every candidate NaN, which is what a leaf-only event with no leaf mass
+    # renormalizes to -- has no allocation to fit, and that is a response drop,
+    # not predictor missingness. Keeping it out of this split books it under
+    # n_drop_zero_response below, as the ladder's cohort audit does.
+    other_cols = [c for c in predictors if c not in QVALS_GAP_COLS]
+    qvals_nan = (
+        set(g.loc[g[qvals_preds].isna().any(axis=1), "event_id"])
+        if qvals_preds
+        else set()
+    )
+    other_nan = (
+        set(g.loc[g[other_cols].isna().any(axis=1), "event_id"])
+        if other_cols
+        else set()
+    )
+    other_nan -= qvals_nan
+    n_qvals, n_own = len(qvals_nan), len(other_nan)
+    dropped_events = qvals_nan | other_nan
+
+    # Preserve the full candidate set within every retained event (row-wise NaN drops
+    # would shrink an event's arm/patch set and desync it from the null's n_categories).
+    surv = g[~g["event_id"].isin(dropped_events)]
+    # skipna=False: an event missing the response on any candidate has no
+    # defined allocation, and fitting the candidates it does have would shrink
+    # its candidate set out of step with the null's n_categories. Undefined and
+    # empty allocations are the same drop -- there is nothing to fit.
+    totals = surv.groupby("event_id")[response_col].agg(
+        lambda values: values.sum(skipna=False)
+    )
+    zero_events = set(totals[totals.isna() | totals.le(0)].index)
+    n_zero = len(zero_events)
+    surv = surv[~surv["event_id"].isin(zero_events)]
+    n_surv = int(surv["event_id"].nunique())
+
+    dropped = _dropped_event_rows(g, dropped_events | zero_events)
+    prep = {
+        "n_in": n_in,
+        "n_qvals": n_qvals,
+        "n_own": n_own,
+        "n_zero": n_zero,
+        "n_surv": n_surv,
+        "dropped": dropped,
+        "reason": "",
+    }
+    if n_surv < MIN_EVENTS:
+        return None, {**prep, "reason": "too_few"}
+    return surv, prep
+
+
+def _dropped_event_rows(g: pd.DataFrame, event_ids: set) -> pd.DataFrame:
+    """One row per dropped event, profile columns only (for drop_profile)."""
+    cols = [c for c in _PROFILE_COLS if c in g.columns]
+    sub = g[g["event_id"].isin(event_ids)]
+    return sub.drop_duplicates("event_id")[cols] if cols else g.iloc[0:0]

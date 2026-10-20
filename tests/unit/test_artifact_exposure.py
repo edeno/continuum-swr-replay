@@ -703,6 +703,16 @@ def test_every_per_bin_runner_checks_its_tables_source():
 # --------------------------------------------------------------------------
 
 SCRIPTS = Path(__file__).resolve().parents[2] / "scripts"
+# The content contrast scripts read their tables through this module's
+# ``assemble_arm`` / ``assemble_patch``, so the checks are made there.
+CONTRAST_ASSEMBLY = (
+    SCRIPTS.parent
+    / "src"
+    / "continuum_swr_replay"
+    / "analysis"
+    / "replay"
+    / "contrast_aggregation.py"
+)
 
 #: The SWR-derived columns a fit or analysis reads from a stored table.
 SWR_COLUMNS = re.compile(
@@ -818,6 +828,9 @@ def test_every_fit_runner_reading_swr_columns_checks_its_tables_source():
         text = path.read_text()
         if not SWR_COLUMNS.search(text):
             continue
-        assert "require_covariate_schema(" in text, path.name
-        assert "require_swr_source(" in text, path.name
-        assert _swr_tables_read_unchecked(path) == [], path.name
+        readers = [path, *([CONTRAST_ASSEMBLY] if "assemble_arm(" in text else [])]
+        read_text = "".join(reader.read_text() for reader in readers)
+        assert "require_covariate_schema(" in read_text, path.name
+        assert "require_swr_source(" in read_text, path.name
+        for reader in readers:
+            assert _swr_tables_read_unchecked(reader) == [], (path.name, reader.name)

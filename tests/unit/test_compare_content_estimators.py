@@ -557,8 +557,8 @@ def test_the_concentration_figure_is_optional_but_the_provenance_is_not(
     were written and BEFORE the provenance sidecar, leaving artifacts no reader
     could date or trace back to their inputs.
     """
-    monkeypatch.setattr(mod, "_assemble_arm", lambda: (cohort.copy(), {}))
-    monkeypatch.setattr(mod, "_assemble_patch", lambda ev: (cohort.copy(), {}))
+    monkeypatch.setattr(mod, "assemble_arm", lambda *args: (cohort.copy(), {}))
+    monkeypatch.setattr(mod, "assemble_patch", lambda *args: (cohort.copy(), {}))
     monkeypatch.setattr(
         mod,
         "prepare_cohorts",

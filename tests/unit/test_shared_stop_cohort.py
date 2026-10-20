@@ -24,8 +24,8 @@ from continuum_swr_replay.analysis.events.cohort_selection import (
     select_stop_cohort,
     stop_cohort_suffix,
 )
+from continuum_swr_replay.analysis.replay import contrast_aggregation
 from scripts.content import fit_replay_content_models as content_mod
-from scripts.content import fit_swr_contrast_content as contrast_mod
 from scripts.rate import fit_per_bin_rate_models as per_bin_mod
 from scripts.rate import fit_per_stop_rate_models as per_stop_mod
 from scripts.rate import fit_swr_contrast_rate as contrast_rate_mod
@@ -187,7 +187,7 @@ def test_at_well_events_are_the_location_predictor_complete_case():
 def test_content_runners_route_through_the_shared_rule():
     """Both content runners hold the shared function, not a private copy."""
     assert content_mod.select_event_cohort is select_event_cohort
-    assert contrast_mod.select_event_cohort is select_event_cohort
+    assert contrast_aggregation.select_event_cohort is select_event_cohort
 
 
 def test_content_runner_cohort_step_refuses_a_table_without_the_column():

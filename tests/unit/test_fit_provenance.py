@@ -23,6 +23,9 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.replay import fit_outputs, fit_provenance
+from continuum_swr_replay.analysis.replay.contrast_aggregation import (
+    CONTENT_FIT_INPUTS,
+)
 from continuum_swr_replay.analysis.replay.fit_provenance import (
     check_fit_provenance,
     fit_provenance_path,
@@ -39,6 +42,14 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 RATE = REPO_ROOT / "scripts" / "rate"
 CONTENT = REPO_ROOT / "scripts" / "content"
 FIGURES = REPO_ROOT / "scripts" / "figures"
+CONTRAST_AGGREGATION = (
+    REPO_ROOT
+    / "src"
+    / "continuum_swr_replay"
+    / "analysis"
+    / "replay"
+    / "contrast_aggregation.py"
+)
 
 
 def _sha256(path: Path) -> str:
@@ -462,15 +473,17 @@ def _read_table_paths(path: Path, constants: dict[str, object]) -> set[Path]:
 
 
 # Each fitter and the readers of the artifacts it writes, with the module-level
-# name each one declares its input mapping under.
+# name each one declares its input mapping under. The content contrast runner is
+# not listed: its tables are read in ``contrast_aggregation``'s assemblers, and
+# ``test_content_contrast_fits_record_every_table_they_read`` covers it.
 FITTERS = [
     RATE / "fit_per_bin_rate_models.py",
     RATE / "fit_per_stop_rate_models.py",
     RATE / "fit_swr_contrast_rate.py",
     RATE / "fit_uncertainty_rate.py",
-    CONTENT / "fit_swr_contrast_content.py",
 ]
-# (reader, name of its input mapping, the fitter that writes what it reads).
+# (reader, name of its input mapping, the fitter that writes what it reads: a
+# script, whose ``FIT_INPUTS`` it records, or the recorded mapping itself).
 # ``plot_swr_contrast_coefs`` draws its figures at import, so its constants are
 # read from source rather than imported.
 READERS = [
@@ -507,7 +520,7 @@ READERS = [
     (
         FIGURES / "plot_swr_contrast_coefs.py",
         "SWR_CONTRAST_CONTENT_INPUTS",
-        CONTENT / "fit_swr_contrast_content.py",
+        CONTENT_FIT_INPUTS,
     ),
 ]
 RUNS_AT_IMPORT = {"plot_swr_contrast_coefs.py"}
@@ -518,7 +531,7 @@ RUNS_AT_IMPORT = {"plot_swr_contrast_coefs.py"}
 )
 def test_readers_check_the_same_inputs_the_fitter_recorded(reader, mapping, fitter):
     """A reader checking a different table set than the fitter recorded is blind."""
-    expected = _load_script(fitter).FIT_INPUTS
+    expected = _load_script(fitter).FIT_INPUTS if isinstance(fitter, Path) else fitter
     declared = (
         _module_constants(reader)
         if reader.name in RUNS_AT_IMPORT
@@ -668,6 +681,47 @@ def test_fitters_record_every_table_they_read(fitter):
     constants = _module_constants(fitter)
 
     assert _read_table_paths(fitter, constants) == set(constants["FIT_INPUTS"].values())
+
+
+def _mapping_arguments(path: Path) -> dict[str, list[str]]:
+    """The mapping each ``record_inputs`` / ``assemble_*`` call in ``path`` is handed."""
+    position = {"record_inputs": 0, "assemble_arm": 0, "assemble_patch": 1}
+    found: dict[str, list[str]] = {name: [] for name in position}
+    for node in ast.walk(ast.parse(path.read_text())):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id in position
+        ):
+            found[node.func.id].append(ast.unparse(node.args[position[node.func.id]]))
+    return found
+
+
+@pytest.mark.parametrize(
+    "script",
+    [
+        CONTENT / "fit_swr_contrast_content.py",
+        CONTENT / "compare_content_estimators.py",
+    ],
+    ids=lambda path: path.stem,
+)
+def test_content_contrast_fits_record_every_table_they_read(script):
+    """The content contrast tables are read by ``contrast_aggregation``'s
+    assemblers, through the mapping they are handed. Each script that fits on
+    those cohorts hands them ``CONTENT_FIT_INPUTS``, records that same mapping,
+    and reads no table of its own, so a table cannot reach the fit without
+    reaching the sidecar."""
+    assembled = _read_table_paths(
+        CONTRAST_AGGREGATION, {"fit_inputs": CONTENT_FIT_INPUTS}
+    )
+
+    assert assembled == set(CONTENT_FIT_INPUTS.values())
+    assert _read_table_paths(script, {}) == set()
+    assert _mapping_arguments(script) == {
+        "record_inputs": ["CONTENT_FIT_INPUTS"],
+        "assemble_arm": ["CONTENT_FIT_INPUTS"],
+        "assemble_patch": ["CONTENT_FIT_INPUTS"],
+    }
 
 
 def test_data_flow_figure_gates_the_arm_model_it_draws():

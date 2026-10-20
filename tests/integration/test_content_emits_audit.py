@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.replay import contrast_aggregation
 from continuum_swr_replay.analysis.replay.cohort_audit import (
     DROP_FIELDS,
     write_cohort_audit,
@@ -59,7 +60,7 @@ def _synthetic_arm_events(n_sessions=3, n_events=12, qvals_gap_events=2, seed=0)
 
 
 def test_run_emits_reconciling_cohort_audit(tmp_path, monkeypatch):
-    monkeypatch.setattr(mod, "MIN_EVENTS", 3)
+    monkeypatch.setattr(contrast_aggregation, "MIN_EVENTS", 3)
     ev = _synthetic_arm_events()
     ladder = {
         "C0_base": (["is_current_arm"], "split"),  # no value covariate

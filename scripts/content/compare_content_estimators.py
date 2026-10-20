@@ -71,6 +71,18 @@ from continuum_swr_replay.analysis.replay._fit_diagnostics import (  # noqa: E40
 from continuum_swr_replay.analysis.replay.content_response import (  # noqa: E402
     renormalize_fraction_over_candidates,
 )
+
+# The cohort this comparison runs on is the shipped contrast runner's own at-well
+# cohort, assembled by the same helpers rather than re-derived here, so the two
+# cannot drift.
+from continuum_swr_replay.analysis.replay.contrast_aggregation import (  # noqa: E402
+    CONTENT_FIT_INPUTS,
+    MIN_EVENTS,
+    assemble_arm,
+    assemble_patch,
+    prepare_cohorts,
+    prepare_session,
+)
 from continuum_swr_replay.analysis.replay.dirichlet_multinomial import (  # noqa: E402
     DEFAULT_MIN_EVENTS_SESSION_PHI,
     DEFAULT_N_JOBS,
@@ -106,21 +118,6 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
 from continuum_swr_replay.paths import REPLAY_CONTENT_DIR
 from continuum_swr_replay.tables.io import write_table  # noqa: E402
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS  # noqa: E402
-
-# Sibling-script import: the cohort this comparison runs on is the shipped
-# contrast runner's own at-well cohort, assembled by its own helpers rather than
-# re-derived here, so the two cannot drift. Run as a script, only this file's
-# directory is on sys.path.
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
-from scripts.content.fit_swr_contrast_content import (  # noqa: E402
-    FIT_INPUTS,
-    MIN_EVENTS,
-    _assemble_arm,
-    _assemble_patch,
-    _prepare_session,
-    prepare_cohorts,
-)
 
 # Quasi-separated coefficients legitimately overflow exp() outside the fit. Fit
 # quality itself is carried per fit as converged/separated flags, so only the
@@ -390,10 +387,10 @@ def _shared_session_rows(
         shared count, and a skip ``reason`` when there is nothing to fit.
     """
     predictors = list(predictors)
-    fraction_rows, fraction_prep = _prepare_session(
+    fraction_rows, fraction_prep = prepare_session(
         frame, predictors, response_col=fraction_col
     )
-    count_rows, count_prep = _prepare_session(frame, predictors, response_col=count_col)
+    count_rows, count_prep = prepare_session(frame, predictors, response_col=count_col)
     info = {
         "n_events_in": int(fraction_prep["n_in"]),
         "n_events_fraction": int(fraction_prep["n_surv"]),
@@ -1263,9 +1260,11 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
 
     logger.info("loading the at-well arm cohort")
-    ev, _z_reference = _assemble_arm()
-    pt, _patch_z_reference = _assemble_patch(ev)
-    inputs = record_inputs(FIT_INPUTS)
+    ev, _z_reference = assemble_arm(
+        CONTENT_FIT_INPUTS, RC / "standardization_reference.json"
+    )
+    pt, _patch_z_reference = assemble_patch(ev, CONTENT_FIT_INPUTS)
+    inputs = record_inputs(CONTENT_FIT_INPUTS)
     ev, _pt, _scale, stratum_audit = prepare_cohorts(
         ev, pt, outcome_stratum="all", max_per_animal=args.max_per_animal
     )

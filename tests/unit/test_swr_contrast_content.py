@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.replay import contrast_aggregation
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (
     aggregate_contrast,
 )
@@ -61,7 +62,7 @@ def arm_frame() -> pd.DataFrame:
             ),
         }
     )
-    for column in mod._ZSCALARS:
+    for column in contrast_aggregation._ZSCALARS:
         frame[column] = np.repeat(rng.normal(size=n_events), n_arms)
     return frame
 
@@ -95,7 +96,7 @@ def patch_frame() -> pd.DataFrame:
 def test_arm_length_products_are_the_standardized_log_length_times_the_indicator(
     arm_frame,
 ):
-    designed, _reference = mod._attach_arm_design_columns(arm_frame)
+    designed, _reference = contrast_aggregation._attach_arm_design_columns(arm_frame)
 
     expected_z = _z(np.log(arm_frame["n_nonlocal_bins"].to_numpy(dtype=float)))
     np.testing.assert_allclose(
@@ -123,7 +124,9 @@ def test_arm_length_products_are_the_standardized_log_length_times_the_indicator
 def test_patch_length_products_are_the_standardized_log_length_times_the_indicator(
     patch_frame,
 ):
-    designed, _reference = mod._attach_patch_design_columns(patch_frame)
+    designed, _reference = contrast_aggregation._attach_patch_design_columns(
+        patch_frame
+    )
 
     expected_z = _z(np.log(patch_frame["n_nonlocal_bins"].to_numpy(dtype=float)))
     np.testing.assert_allclose(
@@ -147,15 +150,23 @@ def test_patch_length_products_are_the_standardized_log_length_times_the_indicat
 @pytest.mark.parametrize(
     ("helper", "frame_name", "sources"),
     [
-        ("_attach_arm_design_columns", "arm_frame", mod._ARM_Z_SOURCES),
-        ("_attach_patch_design_columns", "patch_frame", mod._PATCH_Z_SOURCES),
+        (
+            "_attach_arm_design_columns",
+            "arm_frame",
+            contrast_aggregation._ARM_Z_SOURCES,
+        ),
+        (
+            "_attach_patch_design_columns",
+            "patch_frame",
+            contrast_aggregation._PATCH_Z_SOURCES,
+        ),
     ],
 )
 def test_persisted_reference_reproduces_every_standardized_column(
     helper, frame_name, sources, request
 ):
     frame = request.getfixturevalue(frame_name)
-    designed, reference = getattr(mod, helper)(frame.copy())
+    designed, reference = getattr(contrast_aggregation, helper)(frame.copy())
 
     assert set(reference) == set(sources)
     for source in sources:
@@ -176,13 +187,13 @@ def test_persisted_reference_reproduces_every_standardized_column(
 def test_event_length_below_one_bin_is_refused(arm_frame, bad):
     arm_frame.loc[3, "n_nonlocal_bins"] = bad
     with pytest.raises(ValueError, match="n_nonlocal_bins"):
-        mod._attach_arm_design_columns(arm_frame)
+        contrast_aggregation._attach_arm_design_columns(arm_frame)
 
 
 def test_event_length_missing_is_refused(arm_frame):
     arm_frame.loc[3, "n_nonlocal_bins"] = np.nan
     with pytest.raises(ValueError, match="n_nonlocal_bins"):
-        mod._attach_arm_design_columns(arm_frame)
+        contrast_aggregation._attach_arm_design_columns(arm_frame)
 
 
 @pytest.fixture
@@ -199,9 +210,9 @@ def outcome_frame() -> pd.DataFrame:
 
 
 def test_outcome_strata_partition_the_known_outcome_events(outcome_frame):
-    rewarded, _ = mod.select_outcome_stratum(outcome_frame, "rewarded")
-    omitted, _ = mod.select_outcome_stratum(outcome_frame, "omitted")
-    everything, _ = mod.select_outcome_stratum(outcome_frame, "all")
+    rewarded, _ = contrast_aggregation.select_outcome_stratum(outcome_frame, "rewarded")
+    omitted, _ = contrast_aggregation.select_outcome_stratum(outcome_frame, "omitted")
+    everything, _ = contrast_aggregation.select_outcome_stratum(outcome_frame, "all")
 
     rewarded_events = set(rewarded["event_id"])
     omitted_events = set(omitted["event_id"])
@@ -216,7 +227,7 @@ def test_outcome_strata_partition_the_known_outcome_events(outcome_frame):
 
 
 def test_outcome_stratum_audit_counts_unknown_outcome_by_swr(outcome_frame):
-    _, audit = mod.select_outcome_stratum(outcome_frame, "rewarded")
+    _, audit = contrast_aggregation.select_outcome_stratum(outcome_frame, "rewarded")
 
     assert audit["stratum"] == "rewarded"
     assert audit["n_events_in"] == 5
@@ -225,14 +236,14 @@ def test_outcome_stratum_audit_counts_unknown_outcome_by_swr(outcome_frame):
     assert audit["n_events_unknown_outcome_swr"] == 1
     assert audit["n_events_unknown_outcome_non_swr"] == 0
 
-    _, all_audit = mod.select_outcome_stratum(outcome_frame, "all")
+    _, all_audit = contrast_aggregation.select_outcome_stratum(outcome_frame, "all")
     assert all_audit["n_events_kept"] == 5
     assert all_audit["n_events_unknown_outcome"] == 1
 
 
 def test_unknown_outcome_stratum_is_refused(outcome_frame):
     with pytest.raises(ValueError, match="outcome stratum"):
-        mod.select_outcome_stratum(outcome_frame, "rewarded_only")
+        contrast_aggregation.select_outcome_stratum(outcome_frame, "rewarded_only")
 
 
 @pytest.mark.parametrize(
@@ -331,7 +342,7 @@ def test_per_sd_scale_is_frozen_over_the_full_cohort(stratum):
         np.nanstd(ev["reward_belief_mean_candidate_arm_preoutcome"].to_numpy(float))
     )
 
-    selected, _selected_pt, scale, _audit = mod.prepare_cohorts(
+    selected, _selected_pt, scale, _audit = contrast_aggregation.prepare_cohorts(
         ev.copy(), pt.copy(), outcome_stratum=stratum
     )
 
@@ -356,10 +367,10 @@ def test_per_sd_scale_is_frozen_over_the_full_cohort(stratum):
 
 def test_per_sd_scale_survives_the_smoke_subset():
     ev, pt = _outcome_split_cohorts()
-    _, _, full_scale, _ = mod.prepare_cohorts(
+    _, _, full_scale, _ = contrast_aggregation.prepare_cohorts(
         ev.copy(), pt.copy(), outcome_stratum="all"
     )
-    smoke_ev, _, smoke_scale, _ = mod.prepare_cohorts(
+    smoke_ev, _, smoke_scale, _ = contrast_aggregation.prepare_cohorts(
         ev.copy(), pt.copy(), outcome_stratum="rewarded", max_per_animal=1
     )
 
@@ -390,7 +401,9 @@ def test_per_sd_scale_ignores_trunk_arms():
     )
     assert all_rows_sd > 10 * leaf_sd
 
-    _, _, scale, _ = mod.prepare_cohorts(with_trunks, pt.copy(), outcome_stratum="all")
+    _, _, scale, _ = contrast_aggregation.prepare_cohorts(
+        with_trunks, pt.copy(), outcome_stratum="all"
+    )
 
     assert scale["arm_cohort_support"] == "leaf_arms"
     assert scale["arm_cohort"][
@@ -405,7 +418,9 @@ def test_provenance_records_the_frozen_per_sd_scale():
     import argparse
 
     ev, pt = _outcome_split_cohorts()
-    _, _, scale, audit = mod.prepare_cohorts(ev, pt, outcome_stratum="rewarded")
+    _, _, scale, audit = contrast_aggregation.prepare_cohorts(
+        ev, pt, outcome_stratum="rewarded"
+    )
     prov = mod._provenance(
         argparse.Namespace(
             max_per_animal=None,
@@ -489,7 +504,7 @@ def test_every_ladder_predictor_reaches_the_assembled_design(
             frame[column] = 0.0
     assert not set(built) & set(frame.columns), "a product was seeded, not built"
 
-    designed, _reference = getattr(mod, helper)(frame)
+    designed, _reference = getattr(contrast_aggregation, helper)(frame)
 
     assert set(built) <= set(designed.columns)
     missing = predictors - set(designed.columns)

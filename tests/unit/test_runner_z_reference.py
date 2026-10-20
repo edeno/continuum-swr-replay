@@ -19,6 +19,7 @@ import pytest
 
 from continuum_swr_replay.analysis.events.analysed_time import stamp_swr_source
 from continuum_swr_replay.analysis.events.swr_inventory import SwrSourceError
+from continuum_swr_replay.analysis.replay import contrast_aggregation
 from continuum_swr_replay.tables.covariate_registry import (
     stamp_covariate_schema,
 )
@@ -83,11 +84,13 @@ def test_provenance_includes_fit_time_z_reference():
 
 def test_declared_sources_cover_every_standardization_the_runner_makes():
     """A new fit-time ``_z`` must be declared, or its moments go unrecorded."""
-    assert set(mod._ARM_Z_SOURCES) == set(mod._ZSCALARS) | {
+    assert set(contrast_aggregation._ARM_Z_SOURCES) == set(
+        contrast_aggregation._ZSCALARS
+    ) | {
         "log1p_time_since_stop_start_s",
         "log_n_nonlocal_bins",
     }
-    assert set(mod._PATCH_Z_SOURCES) == {
+    assert set(contrast_aggregation._PATCH_Z_SOURCES) == {
         "periswitch_index_trials",
         "patch_switch_fraction_last5_completed_trips",
         "log1p_time_since_stop_start_s",
@@ -97,7 +100,7 @@ def test_declared_sources_cover_every_standardization_the_runner_makes():
 
 def test_patch_cohort_is_its_own_standardization_scope():
     """The patch reference is estimated on patch rows, not inherited from the arms."""
-    _, reference = mod._attach_patch_design_columns(_patch_frame())
+    _, reference = contrast_aggregation._attach_patch_design_columns(_patch_frame())
     frame = _patch_frame()
     for source in ("periswitch_index_trials", "log_n_nonlocal_bins"):
         values = (
@@ -111,18 +114,20 @@ def test_patch_cohort_is_its_own_standardization_scope():
 
 def test_reference_round_trips_through_the_sidecar(tmp_path):
     """Reloading the persisted sidecar reproduces the fit's ``_z`` exactly."""
-    designed, reference = mod._attach_patch_design_columns(_patch_frame())
+    designed, reference = contrast_aggregation._attach_patch_design_columns(
+        _patch_frame()
+    )
     path = mod.z_reference_path(tmp_path / "swr_contrast_content_patch.pkl")
     save_reference(reference, path)
 
     assert path.name == "swr_contrast_content_patch.z_reference.json"
     replayed, _ = attach_standardized(
-        designed.loc[:, list(mod._PATCH_Z_SOURCES)].copy(),
-        list(mod._PATCH_Z_SOURCES),
+        designed.loc[:, list(contrast_aggregation._PATCH_Z_SOURCES)].copy(),
+        list(contrast_aggregation._PATCH_Z_SOURCES),
         reference=load_reference(path),
         support_label="fit_cohort_all_rows",
     )
-    for source in mod._PATCH_Z_SOURCES:
+    for source in contrast_aggregation._PATCH_Z_SOURCES:
         np.testing.assert_allclose(
             replayed[f"{source}_z"].to_numpy(),
             designed[f"{source}_z"].to_numpy(),
@@ -130,9 +135,7 @@ def test_reference_round_trips_through_the_sidecar(tmp_path):
         )
 
 
-def test_swr_content_assembly_rejects_legacy_uncertainty_reference(
-    tmp_path, monkeypatch
-):
+def test_swr_content_assembly_rejects_legacy_uncertainty_reference(tmp_path):
     """The contrast runner cannot consume the shipped nine-arm uncertainty unit."""
     frame = pd.DataFrame(
         {
@@ -158,14 +161,15 @@ def test_swr_content_assembly_rejects_legacy_uncertainty_reference(
             }
         )
     )
-    monkeypatch.setattr(mod, "RC", tmp_path)
-    # the table is read through FIT_INPUTS, which was built from RC at import
-    monkeypatch.setitem(
-        mod.FIT_INPUTS, "event_arm_table", tmp_path / "event_arm_table.pkl"
-    )
+    fit_inputs = {
+        **contrast_aggregation.CONTENT_FIT_INPUTS,
+        "event_arm_table": tmp_path / "event_arm_table.pkl",
+    }
 
     with pytest.raises(ValueError, match="stale or invalid"):
-        mod._assemble_arm()
+        contrast_aggregation.assemble_arm(
+            fit_inputs, tmp_path / "standardization_reference.json"
+        )
 
 
 def test_swr_content_assembly_refuses_a_table_from_another_swr_source(
@@ -175,13 +179,18 @@ def test_swr_content_assembly_refuses_a_table_from_another_swr_source(
     frame = pd.DataFrame({"event_id": [1], "candidate_arm": [0]})
     frame.attrs["swr_source"] = "kay@another_run+artifacts@none"
     frame.to_pickle(tmp_path / "event_arm_table.pkl")
-    monkeypatch.setitem(
-        mod.FIT_INPUTS, "event_arm_table", tmp_path / "event_arm_table.pkl"
+    fit_inputs = {
+        **contrast_aggregation.CONTENT_FIT_INPUTS,
+        "event_arm_table": tmp_path / "event_arm_table.pkl",
+    }
+    monkeypatch.setattr(
+        contrast_aggregation, "require_covariate_schema", lambda *a, **k: None
     )
-    monkeypatch.setattr(mod, "require_covariate_schema", lambda *a, **k: None)
 
     with pytest.raises(SwrSourceError, match="another_run"):
-        mod._assemble_arm()
+        contrast_aggregation.assemble_arm(
+            fit_inputs, tmp_path / "standardization_reference.json"
+        )
 
 
 @pytest.mark.parametrize(
@@ -190,7 +199,7 @@ def test_swr_content_assembly_refuses_a_table_from_another_swr_source(
 )
 def test_fit_time_standardization_rejects_invalid_support(values, message):
     with pytest.raises(ValueError, match=message):
-        mod._standardize(
+        contrast_aggregation._standardize(
             pd.DataFrame({"periswitch_index_trials": values}),
             ["periswitch_index_trials"],
         )

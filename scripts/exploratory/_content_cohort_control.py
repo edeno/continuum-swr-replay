@@ -93,9 +93,11 @@ def main() -> None:
     sys.argv = runner_argv
 
     import scripts.content.fit_swr_contrast_content as runner
+    from continuum_swr_replay.analysis.replay import contrast_aggregation
 
     runner.RC = out_root
-    runner.select_event_cohort = bypass_event_cohort
+    # The cohort rule is applied where the cohorts are assembled.
+    contrast_aggregation.select_event_cohort = bypass_event_cohort
     runner.main()
 
 

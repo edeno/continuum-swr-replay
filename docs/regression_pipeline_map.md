@@ -468,7 +468,7 @@ Fit the replay content model hierarchy (M0-M6) on pre-computed data.
 
 Fit the beta-bernoulli replay-CONTENT ladder (arm + patch), is_swr version.
 
-`resolve_concentration_cols`, `select_outcome_stratum`, `prepare_cohorts`, `main`
+`resolve_concentration_cols`, `main`
 
 ### `scripts/content/generate_replay_content_figures.py`
 
@@ -646,7 +646,7 @@ Per-model cohort / drop-profile audit records.
 
 Shared audited aggregation for the is_swr contrast ladders (rate + content).
 
-`load_per_sd_scale`, `std_factor`, `separated_for_term`, `unidentified_for_term`, `session_se`, `typical_session_se`, `pct_significant_sessions`, `aggregate_contrast`, `specs_from_ladder`
+`load_per_sd_scale`, `std_factor`, `separated_for_term`, `unidentified_for_term`, `session_se`, `typical_session_se`, `pct_significant_sessions`, `aggregate_contrast`, `specs_from_ladder`, `select_outcome_stratum`, `prepare_cohorts`, `assemble_arm`, `assemble_patch`, `prepare_session`
 
 ### `src/continuum_swr_replay/analysis/replay/learning.py`
 
