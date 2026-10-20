@@ -69,6 +69,11 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
+
+# Called through the module, not bound by name, so a patch on
+# ``swr_inventory.artifact_intervals`` / ``swr_source_files`` /
+# ``swr_source_name`` reaches every caller here too.
+from continuum_swr_replay.analysis.events import swr_inventory
 from continuum_swr_replay.analysis.events.eligibility import (
     EXCLUDED_TIME_REASONS,
     DropReason,
@@ -95,10 +100,7 @@ from continuum_swr_replay.analysis.events.swr_inventory import (
     _epoch_source,
     _EpochSource,
     _read_observed,
-    artifact_intervals,
     swr_epoch_id,
-    swr_source_files,
-    swr_source_name,
 )
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.intervals import (
@@ -210,7 +212,7 @@ def stamp_swr_source(frame: pd.DataFrame) -> pd.DataFrame:
     source stamps it; ``publish_canonical`` refuses a table of
     ``tables.io.SWR_SOURCE_TABLES`` without the current stamp.
     """
-    frame.attrs[SWR_SOURCE_ATTR] = swr_source_name()
+    frame.attrs[SWR_SOURCE_ATTR] = swr_inventory.swr_source_name()
     return frame
 
 
@@ -230,11 +232,11 @@ def require_swr_source(frame: pd.DataFrame, *, what: str) -> None:
         If its stamp is missing or names another source.
     """
     stamp = frame.attrs.get(SWR_SOURCE_ATTR)
-    if stamp != swr_source_name():
+    if stamp != swr_inventory.swr_source_name():
         raise SwrSourceError(
             f"{what} was built from SWR source {stamp!r}, not the configured "
-            f"{swr_source_name()!r}; regenerate it (and its atomic set) from the "
-            "current source"
+            f"{swr_inventory.swr_source_name()!r}; regenerate it (and its atomic "
+            "set) from the current source"
         )
 
 
@@ -262,7 +264,7 @@ def excluded_intervals(epoch_id: str) -> pd.DataFrame:
     SwrSourceError
         As :func:`artifact_intervals`.
     """
-    return excluded_time(artifact_intervals(epoch_id))
+    return excluded_time(swr_inventory.artifact_intervals(epoch_id))
 
 
 def swr_observed_stretches(epoch_id: str) -> NDArray[np.float64]:
@@ -278,7 +280,7 @@ def swr_observed_stretches(epoch_id: str) -> NDArray[np.float64]:
     ndarray, shape (n_stretches, 2)
         First and last time (seconds) of each stretch, closed.
     """
-    files = swr_source_files(epoch_id)
+    files = swr_inventory.swr_source_files(epoch_id)
     return subtract_intervals(
         _read_observed(files["observed"]["path"]), excluded_intervals(epoch_id)
     )

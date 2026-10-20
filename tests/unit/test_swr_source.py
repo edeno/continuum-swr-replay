@@ -36,7 +36,10 @@ from continuum_swr_replay.analysis.events.artifact_intervals import (
     read_manifest,
     write_manifest,
 )
-from continuum_swr_replay.analysis.events.eligibility import DropReason
+from continuum_swr_replay.analysis.events.eligibility import (
+    DropReason,
+    excluded_time,
+)
 from continuum_swr_replay.analysis.events.immobility import (
     EventDefinitionError,
     build_speed_eligible_event_cohort,
@@ -674,6 +677,21 @@ class TestTheStamp:
 
         with pytest.raises(SwrSourceError):
             require_swr_source(frame, what="the event table")
+
+
+def test_a_patch_on_swr_inventory_reaches_analysed_time(monkeypatch):
+    """``analysed_time`` calls the source's functions through ``swr_inventory``,
+    so one patch there reaches the stamp, its check and excluded time."""
+    monkeypatch.setattr(swr_inventory, "swr_source_name", lambda: "patched@source")
+    frame = stamp_swr_source(pd.DataFrame())
+    assert frame.attrs["swr_source"] == "patched@source"
+    require_swr_source(frame, what="the patched table")
+
+    cores = pd.DataFrame({"start_time": [10.0], "end_time": [12.0]})
+    monkeypatch.setattr(swr_inventory, "artifact_intervals", lambda epoch_id: cores)
+    pd.testing.assert_frame_equal(
+        analysed_time.excluded_intervals(EPOCH), excluded_time(cores)
+    )
 
 
 @pytest.mark.parametrize("module", ["swr_inventory", "analysed_time"])
