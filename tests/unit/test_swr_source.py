@@ -49,7 +49,7 @@ from continuum_swr_replay.analysis.events.swr_inventory import (
     read_swr_inventory,
     swr_events,
 )
-from continuum_swr_replay.tables.io import sha256_file
+from continuum_swr_replay.runs.io import sha256_file
 from tests.unit._swr_inventory_fixtures import (
     ARTIFACT_RUN_ID,
     RUN_ID,

@@ -27,9 +27,13 @@ import pytest
 from dask.distributed import Client, LocalCluster
 
 import scripts.decoding.run_memoryless_detection as runner
-from continuum_swr_replay import decoding_common
 from continuum_swr_replay.analysis.events import swr_inventory
 from continuum_swr_replay.analysis.events.eligibility import artifact_drop_reasons
+from continuum_swr_replay.analysis.hippocampus import detection_inputs
+from continuum_swr_replay.analysis.hippocampus.detection_inputs import (
+    input_paths,
+    marks_cache_path,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
     MEMORYLESS_EVENT_TABLE_DTYPES,
     MemorylessSequenceConfig,
@@ -39,16 +43,10 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
 )
 from continuum_swr_replay.data_loaders import spikes
 from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier
-from continuum_swr_replay.decoding_common import provenance_record
 from continuum_swr_replay.parameters import ROOT_DIR
+from continuum_swr_replay.runs.provenance import provenance_record
 from continuum_swr_replay.tables.io import read_table
-from scripts.decoding.run_memoryless_detection import (
-    find_epochs,
-    input_paths,
-    main,
-    marks_cache_path,
-    run_one,
-)
+from scripts.decoding.run_memoryless_detection import find_epochs, main, run_one
 from tests.unit._memoryless_clusterless_epoch import (
     SAMPLING_FREQUENCY,
     _StandInDetector,
@@ -679,8 +677,8 @@ class TestLoadMarks:
         """``get_hpc_marks``, then ``filter_spike_times`` over the decode's
         span, both as ``load_data`` calls them: a spike outside the span goes,
         an electrode left with none is dropped, and each mark keeps its spike."""
-        assert runner.get_hpc_marks is spikes.get_hpc_marks
-        assert runner.filter_spike_times is spikes.filter_spike_times
+        assert detection_inputs.get_hpc_marks is spikes.get_hpc_marks
+        assert detection_inputs.filter_spike_times is spikes.filter_spike_times
         raw_times = [
             np.array([5.0, 12.0, 15.0]),  # one spike before the span
             np.array([1.0, 25.0]),  # every spike outside it
@@ -697,9 +695,9 @@ class TestLoadMarks:
             calls.append(nwb_file_name)
             return raw_times, raw_marks
 
-        monkeypatch.setattr(runner, "get_hpc_marks", get_hpc_marks)
+        monkeypatch.setattr(detection_inputs, "get_hpc_marks", get_hpc_marks)
 
-        times, marks = runner.load_marks(KEY, tmp_path, SPAN_S, "a" * 64)
+        times, marks = detection_inputs.load_marks(KEY, tmp_path, SPAN_S, "a" * 64)
 
         assert calls == [KEY.nwb_file_name]
         assert [t.tolist() for t in times] == [[12.0, 15.0], [10.0, 18.0, 20.0]]
@@ -718,11 +716,11 @@ class TestLoadMarks:
             # each load's marks say which load made them
             return [np.array([15.0])], [np.full((1, 4), float(len(calls)))]
 
-        monkeypatch.setattr(runner, "get_hpc_marks", get_hpc_marks)
+        monkeypatch.setattr(detection_inputs, "get_hpc_marks", get_hpc_marks)
 
-        first = runner.load_marks(KEY, tmp_path, SPAN_S, "a" * 64)
-        second = runner.load_marks(KEY, tmp_path, SPAN_S, "b" * 64)
-        first_again = runner.load_marks(KEY, tmp_path, SPAN_S, "a" * 64)
+        first = detection_inputs.load_marks(KEY, tmp_path, SPAN_S, "a" * 64)
+        second = detection_inputs.load_marks(KEY, tmp_path, SPAN_S, "b" * 64)
+        first_again = detection_inputs.load_marks(KEY, tmp_path, SPAN_S, "a" * 64)
 
         assert len(calls) == 2
         assert first[1][0][0, 0] == 1.0
@@ -744,9 +742,9 @@ class TestLoadMarks:
             calls.append(nwb_file_name)
             return [np.array([15.0])], [np.full((1, 4), 7.0)]
 
-        monkeypatch.setattr(runner, "get_hpc_marks", get_hpc_marks)
+        monkeypatch.setattr(detection_inputs, "get_hpc_marks", get_hpc_marks)
 
-        times, marks = runner.load_marks(KEY, tmp_path, SPAN_S, "a" * 64)
+        times, marks = detection_inputs.load_marks(KEY, tmp_path, SPAN_S, "a" * 64)
 
         assert calls == [KEY.nwb_file_name]
         assert [t.tolist() for t in times] == [[15.0]]
@@ -758,7 +756,7 @@ class TestLoadMarks:
         is written through a temporary file, so a worker killed part way
         leaves at most that file."""
         monkeypatch.setattr(
-            runner,
+            detection_inputs,
             "get_hpc_marks",
             lambda nwb_file_name: ([np.array([15.0])], [np.full((1, 4), 7.0)]),
         )
@@ -767,10 +765,10 @@ class TestLoadMarks:
             Path(filename).write_bytes(b"half a pickle")
             raise OSError("simulated: the write was cut short")
 
-        monkeypatch.setattr(runner.joblib, "dump", interrupted_dump)
+        monkeypatch.setattr(detection_inputs.joblib, "dump", interrupted_dump)
 
         with pytest.raises(OSError, match="cut short"):
-            runner.load_marks(KEY, tmp_path, SPAN_S, "a" * 64)
+            detection_inputs.load_marks(KEY, tmp_path, SPAN_S, "a" * 64)
 
         assert list(tmp_path.iterdir()) == []
 
@@ -790,10 +788,10 @@ class TestLoadMarks:
         assert given == [detector_sha256]
         assert record["inputs"]["detector"]["sha256"] == detector_sha256
         assert record["marks"] == {
-            "rule": runner.MARKS_RULE,
+            "rule": detection_inputs.MARKS_RULE,
             "detector_sha256": detector_sha256,
             "cache": f"{EPOCH_ID}_loader_{detector_sha256[:16]}_marks.pkl",
-            "sha256": runner.marks_sha256(
+            "sha256": detection_inputs.marks_sha256(
                 epoch.spike_times, epoch.spike_waveform_features
             ),
         }
@@ -823,7 +821,7 @@ class TestMain:
         def get_hpc_marks(nwb_file_name):
             raise AssertionError(f"the marks cache missed for {nwb_file_name}")
 
-        monkeypatch.setattr(runner, "get_hpc_marks", get_hpc_marks)
+        monkeypatch.setattr(detection_inputs, "get_hpc_marks", get_hpc_marks)
 
     @pytest.fixture(autouse=True)
     def no_cuda_cluster(self, monkeypatch):
@@ -832,7 +830,7 @@ class TestMain:
         def refuse(**kwargs):
             raise AssertionError(f"a CUDA cluster was started with {kwargs}")
 
-        monkeypatch.setattr(decoding_common, "LocalCUDACluster", refuse, raising=False)
+        monkeypatch.setattr(runner, "cuda_cluster_class", lambda: refuse)
 
     @pytest.fixture(autouse=True)
     def no_register(self, monkeypatch):
@@ -885,10 +883,7 @@ class TestMain:
                 local_directory=kwargs["local_directory"],
             )
 
-        monkeypatch.setattr(decoding_common, "HAS_CUDA", True)
-        monkeypatch.setattr(
-            decoding_common, "LocalCUDACluster", in_process_cluster, raising=False
-        )
+        monkeypatch.setattr(runner, "cuda_cluster_class", lambda: in_process_cluster)
         # the scheduler keeps its scratch in dask's temporary directory,
         # whatever the workers are given
         with dask.config.set({"temporary-directory": str(tmp_path / "dask-temporary")}):
@@ -1284,7 +1279,7 @@ class TestMain:
         self, decode_root, tmp_path, monkeypatch
     ):
         """Before anything is written."""
-        monkeypatch.setattr(decoding_common, "HAS_CUDA", False)
+        monkeypatch.setattr(runner, "cuda_cluster_class", lambda: None)
 
         with pytest.raises(SystemExit, match="dask_cuda"):
             self.cli(decode_root, tmp_path, "--cuda_visible_devices", "0")
@@ -1743,9 +1738,7 @@ class TestWorkerThreads:
                 local_directory=kwargs["local_directory"],
             )
 
-        monkeypatch.setattr(
-            decoding_common, "LocalCUDACluster", worker_processes, raising=False
-        )
+        monkeypatch.setattr(runner, "cuda_cluster_class", lambda: worker_processes)
         monkeypatch.setattr(runner, "available_cpus", lambda: 13)
         with dask.config.set({"temporary-directory": str(tmp_path / "dask-temporary")}):
             with (
@@ -1818,9 +1811,7 @@ class TestWorkerXlaFlags:
                 local_directory=kwargs["local_directory"],
             )
 
-        monkeypatch.setattr(
-            decoding_common, "LocalCUDACluster", worker_processes, raising=False
-        )
+        monkeypatch.setattr(runner, "cuda_cluster_class", lambda: worker_processes)
         with dask.config.set({"temporary-directory": str(tmp_path / "dask-temporary")}):
             with (
                 runner.cuda_cluster(
@@ -1856,9 +1847,7 @@ class TestWorkerXlaFlags:
                 local_directory=kwargs["local_directory"],
             )
 
-        monkeypatch.setattr(
-            decoding_common, "LocalCUDACluster", worker_processes, raising=False
-        )
+        monkeypatch.setattr(runner, "cuda_cluster_class", lambda: worker_processes)
         with dask.config.set({"temporary-directory": str(tmp_path / "dask-temporary")}):
             with (
                 runner.cuda_cluster(

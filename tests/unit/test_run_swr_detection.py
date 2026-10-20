@@ -43,12 +43,9 @@ from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
     best_ripple_channel,
 )
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
-from continuum_swr_replay.tables.io import (
-    read_attrs,
-    read_table,
-    sha256_file,
-    write_table,
-)
+from continuum_swr_replay.runs import batch
+from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.tables.io import read_attrs, read_table, write_table
 from scripts.decoding.run_swr_detection import (
     epoch_id,
     main,
@@ -1617,37 +1614,6 @@ def test_the_run_reads_and_records_the_configured_artifact_run(
     assert ran == [EPOCH_NAME]
 
 
-def test_an_error_its_worker_cannot_return_is_recorded(tmp_path, monkeypatch):
-    """A task that dies instead of returning its record is recorded as failed,
-    and the other epoch still finishes."""
-
-    def task(nwb_file_name, epoch_name, run_epoch_kwargs, log_directory):
-        if epoch_name == "04_r2":
-            raise RuntimeError("simulated: the worker died")
-        return {"status": "ok"}
-
-    monkeypatch.setattr(runner, "_run_epoch_logged", task)
-    monkeypatch.chdir(tmp_path)
-    with dask.config.set({"temporary-directory": str(tmp_path / "dask-temporary")}):
-        records = dict(
-            runner.run_epochs(
-                [(NWB_FILE_NAME, "02_r1"), (NWB_FILE_NAME, "04_r2")],
-                {"output_dir": tmp_path / "out"},
-                lambda: LocalCluster(
-                    n_workers=2,
-                    processes=False,
-                    dashboard_address=":0",
-                    local_directory=str(tmp_path / "dask-scratch"),
-                ),
-            )
-        )
-
-    failed = records.pop(epoch_id(NWB_FILE_NAME, "04_r2"))
-    assert failed["status"] == "failed"
-    assert failed["error"] == repr(RuntimeError("simulated: the worker died"))
-    assert records == {epoch_id(NWB_FILE_NAME, "02_r1"): {"status": "ok"}}
-
-
 _HOLD_LOCK = """
 import fcntl, sys, time
 handle = open(sys.argv[1], "a")
@@ -1710,7 +1676,7 @@ def test_a_lock_that_cannot_be_taken_raises_as_itself(
     def no_locks(handle, operation):
         raise OSError(errno.ENOLCK, "No locks available")
 
-    monkeypatch.setattr(runner.fcntl, "lockf", no_locks)
+    monkeypatch.setattr(batch.fcntl, "lockf", no_locks)
 
     with pytest.raises(OSError, match="No locks available"):
         _cli(tmp_path)
@@ -1751,7 +1717,7 @@ def test_each_epoch_task_closes_the_nwb_files_spyglass_opened(
         return {"status": "skipped", "reason": "simulated"}
 
     monkeypatch.setattr(runner, "run_epoch", run_epoch)
-    monkeypatch.setattr(runner, "release_nwb_files", release_nwb_files)
+    monkeypatch.setattr(batch, "release_nwb_files", release_nwb_files)
 
     def task():
         return runner._run_epoch_logged(

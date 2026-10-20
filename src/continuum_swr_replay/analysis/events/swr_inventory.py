@@ -72,7 +72,7 @@ from continuum_swr_replay.analysis.events.eligibility import (
 )
 from continuum_swr_replay.intervals import subtract_intervals
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.tables.io import sha256_file
+from continuum_swr_replay.runs.io import sha256_file
 
 __all__ = [
     "ARTIFACT_INTERVALS_ROOT",

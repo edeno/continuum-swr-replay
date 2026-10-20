@@ -25,7 +25,8 @@ from pathlib import Path
 import pyarrow.parquet as pq
 
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.tables.io import parquet_path, sha256_file
+from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.tables.io import parquet_path
 from continuum_swr_replay.tables.parity import CANONICAL_TABLE_BASENAMES
 
 # Sibling-script import: the leaf bundle's name is derived from the fitting
@@ -44,9 +45,7 @@ RC = PROCESSED_DATA_DIR / "replay_content"
 
 # qvals lives one level down; the rest sit at the replay_content root.
 _TABLE_RELPATHS = {
-    name: (
-        "models_per_bin_rate/qvals_table" if name == "qvals_table" else name
-    )
+    name: ("models_per_bin_rate/qvals_table" if name == "qvals_table" else name)
     for name in CANONICAL_TABLE_BASENAMES
 }
 # Every fitted bundle the baseline is supposed to cover. ``models_event_grain``

@@ -19,8 +19,6 @@ file still has.
 from __future__ import annotations
 
 import json
-import os
-import tempfile
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -29,7 +27,11 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.tables.io import sha256_file, umask_file_mode, write_table
+from continuum_swr_replay.analysis.events.artifact_masks import (
+    artifact_intervals as padded_cores,
+)
+from continuum_swr_replay.runs.io import sha256_file, write_json
+from continuum_swr_replay.tables.io import write_table
 
 __all__ = [
     "CORES_SUFFIX",
@@ -39,6 +41,7 @@ __all__ = [
     "EpochCores",
     "cores_path",
     "empty_cores",
+    "epoch_artifact_intervals",
     "make_cores",
     "read_epoch_cores",
     "read_manifest",
@@ -192,20 +195,7 @@ def write_manifest(run_dir: Path, manifest: Mapping[str, Any]) -> None:
     ValueError
         If the content holds NaN or infinity (strict JSON has neither).
     """
-    text = json.dumps(manifest, indent=2, allow_nan=False)
-    run_dir = Path(run_dir)
-    run_dir.mkdir(parents=True, exist_ok=True)
-    handle, temporary = tempfile.mkstemp(
-        dir=run_dir, prefix=f".{MANIFEST_NAME}.", suffix=".tmp"
-    )
-    try:
-        with os.fdopen(handle, "w") as file:
-            file.write(text)
-        # mkstemp makes the file owner-only; give it a plain create's mode
-        os.chmod(temporary, umask_file_mode())
-        os.replace(temporary, run_dir / MANIFEST_NAME)
-    finally:
-        Path(temporary).unlink(missing_ok=True)
+    write_json(Path(run_dir) / MANIFEST_NAME, manifest, indent=2)
 
 
 def read_manifest(run_dir: Path) -> dict[str, Any]:
@@ -279,3 +269,35 @@ def read_epoch_cores(run_dir: Path, epoch_id: str) -> EpochCores:
         raise ArtifactRunError(f"{epoch_id}: the artifact run records no span")
     cores = validate_cores(pd.read_parquet(path), str(path))
     return EpochCores(cores=cores, span=(float(span[0]), float(span[1])))
+
+
+def epoch_artifact_intervals(
+    artifact_dir: Path | None, identifier: str
+) -> pd.DataFrame:
+    """The epoch's artifact mask, from an artifact run folder.
+
+    The run's cores for the epoch padded by ``PADDING_S``, merged and clipped to
+    the run's span, closed: the mask every stage uses.
+
+    Parameters
+    ----------
+    artifact_dir : Path or None
+        The artifact run folder; None when no run is configured.
+    identifier : str
+        The epoch's id, such as ``"chimi20200225_02_r1_HPC"``.
+
+    Returns
+    -------
+    pd.DataFrame
+        ``start_time`` and ``end_time`` in seconds; no rows when no run is
+        configured or the epoch has no artifacts.
+
+    Raises
+    ------
+    ArtifactRunError
+        If the run cannot serve the epoch (:func:`read_epoch_cores`).
+    """
+    if artifact_dir is None:
+        return pd.DataFrame({"start_time": [], "end_time": []}, dtype=np.float64)
+    epoch = read_epoch_cores(artifact_dir, identifier)
+    return padded_cores(epoch.cores, epoch.span)

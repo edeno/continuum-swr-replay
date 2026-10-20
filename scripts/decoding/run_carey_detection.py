@@ -75,68 +75,61 @@ import scipy
 from dask.distributed import LocalCluster
 from numpy.typing import NDArray
 
-# Sibling-script import: run as a script, only this file's directory is on
-# sys.path.
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
-from continuum_swr_replay.analysis.events import swr_inventory  # noqa: E402
-from continuum_swr_replay.analysis.events.artifact_masks import (  # noqa: E402
+from continuum_swr_replay.analysis.events import swr_inventory
+from continuum_swr_replay.analysis.events.artifact_intervals import (
+    epoch_artifact_intervals,
+)
+from continuum_swr_replay.analysis.events.artifact_masks import (
     PADDING_S,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (  # noqa: E402
-    load_clusterless_encoding_model,
-)
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (  # noqa: E402
-    check_marks_match_encoding,
-)
-from continuum_swr_replay.analysis.hippocampus.swr_inventories import (  # noqa: E402
-    CAREY_SETTINGS,
-    carey_observed_stretches,
-    run_carey_detector,
-    tetrode_spike_counts,
-)
-from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
-    epochs_to_run,
-)
-from continuum_swr_replay.data_loaders.lfp import get_ripple_band_inputs  # noqa: E402
-from continuum_swr_replay.data_loaders.position import (  # noqa: E402
-    get_epoch_position_info,
-)
-from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier  # noqa: E402
-from continuum_swr_replay.decoding_common import (  # noqa: E402
-    filter_epoch_info,
-    parse_run_id,
-    provenance_record,
-    raise_open_file_limit,
-    release_nwb_files,
-    replace_outputs,
-    setup_logger,
-    write_atomically,
-)
-from continuum_swr_replay.intervals import (  # noqa: E402
-    interval_mask,
-    masked_seconds,
-)
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR  # noqa: E402
-from continuum_swr_replay.tables.io import sha256_file  # noqa: E402
-from scripts.decoding.run_memoryless_detection import (  # noqa: E402
+from continuum_swr_replay.analysis.hippocampus.detection_inputs import (
+    MARKS_CACHE_DIR,
     MARKS_RULE,
     input_paths,
     load_marks,
     marks_cache_path,
     marks_sha256,
 )
-from scripts.decoding.run_memoryless_detection import (  # noqa: E402
-    OUTPUT_ROOT as MEMORYLESS_ROOT,
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
+    load_clusterless_encoding_model,
 )
-from scripts.decoding.run_swr_detection import (  # noqa: E402
-    array_sha256,
-    epoch_artifact_intervals,
-    epoch_id,
-    json_ready,
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
+    check_marks_match_encoding,
+)
+from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
+    CAREY_SETTINGS,
+    carey_observed_stretches,
+    run_carey_detector,
+    tetrode_spike_counts,
+)
+from continuum_swr_replay.data_loaders.epoch_register import (
+    epochs_to_run,
+)
+from continuum_swr_replay.data_loaders.lfp import get_ripple_band_inputs
+from continuum_swr_replay.data_loaders.position import (
+    get_epoch_position_info,
+)
+from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier
+from continuum_swr_replay.intervals import (
+    interval_mask,
+    masked_seconds,
+)
+from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR
+from continuum_swr_replay.runs.batch import (
+    raise_open_file_limit,
+    run_epoch_logged,
     run_epochs,
     run_lock,
 )
+from continuum_swr_replay.runs.cli import filter_epoch_info, parse_run_id
+from continuum_swr_replay.runs.io import (
+    array_sha256,
+    json_ready,
+    replace_outputs,
+    sha256_file,
+    write_json,
+)
+from continuum_swr_replay.runs.provenance import provenance_record
 
 OUTPUT_ROOT = PROCESSED_DATA_DIR / "replay_detection_comparison" / "carey"
 PRODUCED_BY = "scripts/decoding/run_carey_detection.py"
@@ -144,8 +137,6 @@ DESIGN_SPEC = "docs/design/replay_detection_comparison/03-inventory-comparison.m
 
 DECODE_ROOT = PROCESSED_DATA_DIR
 """Where the canonical HPC decodes are, whose marks Carey reads."""
-MARKS_CACHE_DIR = MEMORYLESS_ROOT / "marks_cache"
-"""The memoryless runner's marks cache, keyed by the decode's detector file."""
 
 CONFIGURATION = (
     "the package's default Hilbert configuration of Carey_candidate_detector, "
@@ -278,7 +269,7 @@ def _detect(
     fetch_marks: Callable,
 ) -> tuple[dict, dict[str, pd.DataFrame]]:
     """One epoch's record, and its tables to write (none for a failed epoch)."""
-    identifier = epoch_id(nwb_file_name, epoch_name)
+    identifier = swr_inventory.swr_epoch_id(nwb_file_name, epoch_name)
     inputs = fetch_inputs(nwb_file_name, epoch_name)
     position_info = fetch_position(nwb_file_name, epoch_name)["position_info"]
     position_time = position_info.index.to_numpy(dtype=np.float64)
@@ -446,7 +437,7 @@ def run_epoch(
         ``traceback``. A failed epoch's outputs are removed.
     """
     started = clock.perf_counter()
-    identifier = epoch_id(nwb_file_name, epoch_name)
+    identifier = swr_inventory.swr_epoch_id(nwb_file_name, epoch_name)
     try:
         record, tables = _detect(
             nwb_file_name,
@@ -499,23 +490,15 @@ def _run_epoch_logged(
     When the epoch ends, pass or fail, the NWB files Spyglass opened for it are
     closed (``release_nwb_files``): the workers run one task at a time.
     """
-    identifier = epoch_id(nwb_file_name, epoch_name)
-    log = setup_logger(
-        name_logfile=f"{identifier}_carey",
-        path_logfile=log_directory / f"{identifier}_carey.log",
+    identifier = swr_inventory.swr_epoch_id(nwb_file_name, epoch_name)
+    return run_epoch_logged(
+        lambda log: run_epoch(nwb_file_name, epoch_name, **run_epoch_kwargs),
+        log_name=f"{identifier}_carey",
+        log_path=log_directory / f"{identifier}_carey.log",
+        start=f"{identifier}: run {run_epoch_kwargs}",
+        describe=summary,
+        log_provenance=True,
     )
-    log.info("%s: run %s", identifier, run_epoch_kwargs)
-    try:
-        record = run_epoch(nwb_file_name, epoch_name, **run_epoch_kwargs)
-    finally:
-        log.info("closed %d NWB files Spyglass held open", release_nwb_files())
-    if "provenance" in record:
-        log.info("PROVENANCE %s", json.dumps(record["provenance"], sort_keys=True))
-    if record["status"] == "failed":
-        log.error("%s\n%s", summary(record), record.get("traceback", ""))
-    else:
-        log.info("%s", summary(record))
-    return record
 
 
 def run_settings(provenance: dict, artifact_run_id: str | None) -> dict:
@@ -604,7 +587,8 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
         records = previous["epochs"]
 
     def write_manifest() -> None:
-        text = json.dumps(
+        write_json(
+            manifest_path,
             {
                 "produced_by": PRODUCED_BY,
                 "run_id": run_id,
@@ -613,13 +597,11 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
                 "epochs": records,
             },
             indent=2,
-            allow_nan=False,
         )
-        write_atomically(manifest_path, lambda path: path.write_text(text))
 
     to_run = []
     for nwb_file_name, epoch_name in epochs:
-        identifier = epoch_id(nwb_file_name, epoch_name)
+        identifier = swr_inventory.swr_epoch_id(nwb_file_name, epoch_name)
         if records.get(identifier, {}).get("status") == "ok" and not args.overwrite:
             print(f"{identifier}: already written", flush=True)
         else:
@@ -644,14 +626,18 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
         "artifact_dir": artifact_dir,
     }
     # the workers only return records: this process alone writes the manifest
-    for number, (identifier, record) in enumerate(
-        run_epochs(
-            to_run,
+    log_directory = Path.cwd() / "logs"
+    tasks = {
+        swr_inventory.swr_epoch_id(nwb_file_name, epoch_name): (
+            nwb_file_name,
+            epoch_name,
             run_epoch_kwargs,
-            cluster_factory,
-            task=_run_epoch_logged,
-            key_prefix="carey",
-        ),
+            log_directory,
+        )
+        for nwb_file_name, epoch_name in to_run
+    }
+    for number, (identifier, record) in enumerate(
+        run_epochs(tasks, _run_epoch_logged, cluster_factory, key_prefix="carey"),
         start=1,
     ):
         records[identifier] = record

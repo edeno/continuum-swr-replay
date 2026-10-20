@@ -45,7 +45,8 @@ from continuum_swr_replay.analysis.events.classified_table import (
 from continuum_swr_replay.analysis.events.swr_inventory import SwrSourceError
 from continuum_swr_replay.data_loaders import epoch_register
 from continuum_swr_replay.intervals import interval_mask
-from continuum_swr_replay.tables.io import read_table, sha256_file, write_table
+from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.tables.io import read_table, write_table
 from tests.unit._swr_inventory_fixtures import (
     ARTIFACT_RUN_ID,
     RUN_ID,

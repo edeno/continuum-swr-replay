@@ -10,7 +10,7 @@ and ``environment.pkl``. The decode runners write these names
 A leaf module: it imports only the standard library and
 ``analysis.constants``, so an offline table builder or figure that reads a
 decode folder does not pull in the decode runners' infrastructure
-(``decoding_common``: dask, its distributed scheduler, CUDA). It sits outside
+(``runs.batch``'s dask, its distributed scheduler, CUDA). It sits outside
 ``data_loaders``, which must not import ``analysis``.
 """
 

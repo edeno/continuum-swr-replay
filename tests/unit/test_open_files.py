@@ -27,7 +27,7 @@ from pathlib import Path
 
 import pytest
 
-from continuum_swr_replay import decoding_common
+from continuum_swr_replay.runs import batch
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -69,11 +69,11 @@ def test_release_closes_spyglass_cache_and_returns_how_many(monkeypatch):
     open_files = {f"/data/file_{i}.nwb": ("io", "nwbfile") for i in range(3)}
     calls = _stub_spyglass(monkeypatch, open_files)
 
-    assert decoding_common.release_nwb_files() == 3
+    assert batch.release_nwb_files() == 3
     assert calls == ["close_nwb_files"]
     assert open_files == {}
 
-    assert decoding_common.release_nwb_files() == 0
+    assert batch.release_nwb_files() == 0
     assert calls == ["close_nwb_files"] * 2
 
 
@@ -84,8 +84,8 @@ def test_a_release_that_fails_warns_and_returns_minus_one(monkeypatch, caplog):
         monkeypatch, open_files, close_error=OSError("simulated: close failed")
     )
 
-    with caplog.at_level(logging.WARNING, logger=decoding_common.__name__):
-        assert decoding_common.release_nwb_files() == -1
+    with caplog.at_level(logging.WARNING, logger=batch.__name__):
+        assert batch.release_nwb_files() == -1
 
     assert calls == ["close_nwb_files"]
     (record,) = caplog.records
@@ -96,12 +96,12 @@ def test_a_release_that_fails_warns_and_returns_minus_one(monkeypatch, caplog):
 def test_a_missing_cache_name_warns_once_and_still_closes(monkeypatch, caplog):
     """If Spyglass renames its private cache, the count is unknown (-1), but the
     files are still closed through its public ``close_nwb_files``."""
-    monkeypatch.setattr(decoding_common, "_warned_cache_name_missing", False)
+    monkeypatch.setattr(batch, "_warned_cache_name_missing", False)
     calls = _stub_spyglass(monkeypatch, None)
 
-    with caplog.at_level(logging.WARNING, logger=decoding_common.__name__):
-        assert decoding_common.release_nwb_files() == -1
-        assert decoding_common.release_nwb_files() == -1
+    with caplog.at_level(logging.WARNING, logger=batch.__name__):
+        assert batch.release_nwb_files() == -1
+        assert batch.release_nwb_files() == -1
 
     assert calls == ["close_nwb_files"] * 2
     (record,) = caplog.records
@@ -115,15 +115,13 @@ def _limits_after(monkeypatch, soft: int, hard: int, target: int) -> tuple:
     did not ask).
     """
     asked = []
+    monkeypatch.setattr(batch.resource, "getrlimit", lambda resource: (soft, hard))
     monkeypatch.setattr(
-        decoding_common.resource, "getrlimit", lambda resource: (soft, hard)
-    )
-    monkeypatch.setattr(
-        decoding_common.resource,
+        batch.resource,
         "setrlimit",
         lambda resource, limits: asked.append(limits),
     )
-    returned = decoding_common.raise_open_file_limit(target)
+    returned = batch.raise_open_file_limit(target)
     return returned, (asked[0] if asked else None)
 
 
@@ -175,19 +173,19 @@ def test_release_closes_a_file_the_installed_spyglass_cached(tmp_path):
     with pynwb.NWBHDF5IO(str(path), mode="w") as io:
         io.write(nwbfile)
 
-    decoding_common.release_nwb_files()  # start from an empty cache
+    batch.release_nwb_files()  # start from an empty cache
     nwb_helper_fn.get_nwb_file(str(path))
     assert _open_descriptors_to(path) == 1
     assert str(path) in vars(nwb_helper_fn)["__open_nwb_files"]
 
-    assert decoding_common.release_nwb_files() == 1
+    assert batch.release_nwb_files() == 1
     assert _open_descriptors_to(path) == 0
     assert vars(nwb_helper_fn)["__open_nwb_files"] == {}
 
 
 _LIMITS = """
 import json, resource, sys
-from continuum_swr_replay.decoding_common import raise_open_file_limit
+from continuum_swr_replay.runs.batch import raise_open_file_limit
 
 soft, hard = (int(value) for value in sys.argv[1:3])
 resource.setrlimit(resource.RLIMIT_NOFILE, (soft, hard))

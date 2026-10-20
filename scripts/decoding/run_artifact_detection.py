@@ -75,54 +75,45 @@ import scipy
 from dask.distributed import LocalCluster
 from numpy.typing import NDArray
 
-# Sibling-script import: run as a script, only this file's directory is on
-# sys.path.
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
-from continuum_swr_replay.analysis.events.artifact_intervals import (  # noqa: E402
+from continuum_swr_replay.analysis.events.artifact_intervals import (
     cores_path,
     write_cores,
     write_manifest,
 )
-from continuum_swr_replay.analysis.events.artifact_masks import (  # noqa: E402
+from continuum_swr_replay.analysis.events.artifact_masks import (
     PADDING_S,
     artifact_intervals,
 )
-from continuum_swr_replay.analysis.events.swr_inventory import (  # noqa: E402
+from continuum_swr_replay.analysis.events.swr_inventory import (
     ARTIFACT_INTERVALS_ROOT,
+    swr_epoch_id,
 )
-from continuum_swr_replay.analysis.hippocampus.artifacts import detect  # noqa: E402
-from continuum_swr_replay.analysis.hippocampus.artifacts.detect import (  # noqa: E402
+from continuum_swr_replay.analysis.hippocampus.artifacts import detect
+from continuum_swr_replay.analysis.hippocampus.artifacts.detect import (
     detect_artifacts,
 )
-from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
+from continuum_swr_replay.data_loaders.epoch_register import (
     analysed_epochs,
     pending_epochs,
 )
-from continuum_swr_replay.data_loaders.lfp import get_ripple_band_inputs  # noqa: E402
-from continuum_swr_replay.data_loaders.position import (  # noqa: E402
+from continuum_swr_replay.data_loaders.lfp import get_ripple_band_inputs
+from continuum_swr_replay.data_loaders.position import (
     get_epoch_position_info,
 )
-from continuum_swr_replay.data_loaders.spikes import get_hpc_marks  # noqa: E402
-from continuum_swr_replay.decoding_common import (  # noqa: E402
-    filter_epoch_info,
-    parse_run_id,
-    provenance_record,
-    raise_open_file_limit,
-    release_nwb_files,
-    setup_logger,
-)
-from continuum_swr_replay.intervals import (  # noqa: E402
+from continuum_swr_replay.data_loaders.spikes import get_hpc_marks
+from continuum_swr_replay.intervals import (
     masked_seconds,
 )
-from continuum_swr_replay.parameters import ROOT_DIR  # noqa: E402
-from scripts.decoding.run_swr_detection import (  # noqa: E402
-    array_sha256,
-    epoch_id,
-    json_ready,
+from continuum_swr_replay.parameters import ROOT_DIR
+from continuum_swr_replay.runs.batch import (
+    raise_open_file_limit,
+    run_epoch_logged,
     run_epochs,
     run_lock,
 )
+from continuum_swr_replay.runs.cli import filter_epoch_info, parse_run_id
+from continuum_swr_replay.runs.io import array_sha256, json_ready
+from continuum_swr_replay.runs.provenance import provenance_record
 
 OUTPUT_ROOT = ARTIFACT_INTERVALS_ROOT
 """Where the run folders go: where the SWR source reads them."""
@@ -318,7 +309,7 @@ def run_epoch(
         ``error`` and ``traceback`` (the epoch's file is then removed).
     """
     started = clock.perf_counter()
-    identifier = epoch_id(nwb_file_name, epoch_name)
+    identifier = swr_epoch_id(nwb_file_name, epoch_name)
     path = cores_path(output_dir, identifier)
     try:
         record, cores = _detect(
@@ -374,21 +365,15 @@ def _run_epoch_logged(
     When the epoch ends, pass or fail, the NWB files Spyglass opened for it are
     closed (``release_nwb_files``): the workers run one task at a time.
     """
-    identifier = epoch_id(nwb_file_name, epoch_name)
-    log = setup_logger(
-        name_logfile=f"{identifier}_artifacts",
-        path_logfile=log_directory / f"{identifier}_artifacts.log",
+    identifier = swr_epoch_id(nwb_file_name, epoch_name)
+    return run_epoch_logged(
+        lambda log: run_epoch(nwb_file_name, epoch_name, **run_epoch_kwargs),
+        log_name=f"{identifier}_artifacts",
+        log_path=log_directory / f"{identifier}_artifacts.log",
+        start=f"{identifier}: run {run_epoch_kwargs}",
+        describe=summary,
+        log_provenance=False,
     )
-    log.info("%s: run %s", identifier, run_epoch_kwargs)
-    try:
-        record = run_epoch(nwb_file_name, epoch_name, **run_epoch_kwargs)
-    finally:
-        log.info("closed %d NWB files Spyglass held open", release_nwb_files())
-    if record["status"] == "failed":
-        log.error("%s\n%s", summary(record), record.get("traceback", ""))
-    else:
-        log.info("%s", summary(record))
-    return record
 
 
 def register_epochs(include_pending: bool, pending_only: bool) -> pd.DataFrame:
@@ -493,7 +478,7 @@ def run(args: argparse.Namespace, output_dir: Path) -> None:
 
     to_run = []
     for nwb_file_name, epoch_name in epochs:
-        identifier = epoch_id(nwb_file_name, epoch_name)
+        identifier = swr_epoch_id(nwb_file_name, epoch_name)
         if records.get(identifier, {}).get("status") == "ok" and not args.overwrite:
             print(f"{identifier}: already written", flush=True)
         else:
@@ -513,14 +498,18 @@ def run(args: argparse.Namespace, output_dir: Path) -> None:
     )
     failed = []
     run_epoch_kwargs = {"output_dir": output_dir, "run_id": run_id}
-    for number, (identifier, record) in enumerate(
-        run_epochs(
-            to_run,
+    log_directory = Path.cwd() / "logs"
+    tasks = {
+        swr_epoch_id(nwb_file_name, epoch_name): (
+            nwb_file_name,
+            epoch_name,
             run_epoch_kwargs,
-            cluster_factory,
-            task=_run_epoch_logged,
-            key_prefix="artifacts",
-        ),
+            log_directory,
+        )
+        for nwb_file_name, epoch_name in to_run
+    }
+    for number, (identifier, record) in enumerate(
+        run_epochs(tasks, _run_epoch_logged, cluster_factory, key_prefix="artifacts"),
         start=1,
     ):
         records[identifier] = record

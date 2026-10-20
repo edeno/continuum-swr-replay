@@ -17,9 +17,7 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import pickle
-import tempfile
 import time
 from pathlib import Path
 
@@ -79,10 +77,10 @@ from continuum_swr_replay.data_loaders.trials import (
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.decode_files import decode_paths
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.runs.io import write_atomically
 from continuum_swr_replay.tables.io import (
     parquet_path,
     publish_canonical,
-    umask_file_mode,
 )
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 from continuum_swr_replay.tables.standardization import (
@@ -334,31 +332,19 @@ def load_behavioral_context(
         cache_path.parent.mkdir(parents=True, exist_ok=True)
         # Atomic write: two sibling shards can target this shared cache dir, and
         # a crash or concurrent write to the same path would otherwise leave a
-        # truncated pickle that the next read fails on. Write to a
-        # same-directory temp file and os.replace into place.
-        handle, tmp_name = tempfile.mkstemp(
-            dir=cache_path.parent, prefix=f".{cache_path.name}.", suffix=".tmp"
-        )
-        tmp_path = Path(tmp_name)
-        try:
-            with os.fdopen(handle, "wb") as f:
-                pickle.dump(
-                    {
-                        "cache_schema_version": BEHAVIORAL_CONTEXT_CACHE_VERSION,
-                        "trials": trials,
-                        "port_experiences": port_experiences,
-                        "track_graph": track_graph,
-                    },
-                    f,
-                )
-            # mkstemp created tmp_path at 0600; restore the umask-respecting
-            # mode a plain write would have produced so other readers of the
-            # shared cache dir keep access (see tables.io.umask_file_mode).
-            os.chmod(tmp_path, umask_file_mode())
-            os.replace(tmp_path, cache_path)
-        except BaseException:
-            tmp_path.unlink(missing_ok=True)
-            raise
+        # truncated pickle that the next read fails on.
+        context = {
+            "cache_schema_version": BEHAVIORAL_CONTEXT_CACHE_VERSION,
+            "trials": trials,
+            "port_experiences": port_experiences,
+            "track_graph": track_graph,
+        }
+
+        def write_cache(path: Path) -> None:
+            with path.open("wb") as f:
+                pickle.dump(context, f)
+
+        write_atomically(cache_path, write_cache)
     return trials, port_experiences, track_graph, False
 
 

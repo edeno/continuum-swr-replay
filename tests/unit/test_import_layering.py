@@ -207,6 +207,7 @@ FOUNDATION = frozenset(
         "decoding_transitions",
         "intervals",
         "parameters",
+        "runs",
         "tables",
         "types",
     }

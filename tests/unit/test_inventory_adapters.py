@@ -45,7 +45,7 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import (
     from_classified_nonlocal_table,
     validate_inventory,
 )
-from continuum_swr_replay.tables.io import sha256_file
+from continuum_swr_replay.runs.io import sha256_file
 from tests.unit._swr_inventory_fixtures import (
     RUN_ID,
     kay_events,

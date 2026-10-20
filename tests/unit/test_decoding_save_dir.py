@@ -61,6 +61,7 @@ from types import MappingProxyType
 from typing import Any
 
 import dask
+import dask.distributed
 import numpy as np
 import pandas as pd
 import pytest
@@ -74,6 +75,8 @@ from continuum_swr_replay.analysis.events.immobility import (
 )
 from continuum_swr_replay.analysis.hippocampus import result_loading as hpc_loading
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.runs import batch, cli, provenance
+from continuum_swr_replay.runs import io as runs_io
 from tests.unit._swr_inventory_fixtures import (
     ARTIFACT_RUN_ID,
     RUN_ID,
@@ -209,7 +212,7 @@ def decoders(monkeypatch, tmp_path):
 
 
 def _parse(argv: list[str]) -> Namespace:
-    return decoding_common.add_common_args(ArgumentParser()).parse_args(argv)
+    return cli.add_common_args(ArgumentParser()).parse_args(argv)
 
 
 def _one_epoch(pending_only: bool = False) -> pd.DataFrame:
@@ -458,31 +461,26 @@ def test_run_batch_refuses_cpu_fallback(monkeypatch, tmp_path):
     def no_decode(**kwargs: Any) -> None:
         raise AssertionError("run_batch decoded")
 
-    monkeypatch.setattr(decoding_common, "HAS_CUDA", False)
-    monkeypatch.setattr(decoding_common, "LocalCluster", _no_cluster)
-    monkeypatch.setattr(decoding_common, "LocalCUDACluster", _no_cluster, raising=False)
+    monkeypatch.setattr(batch, "cuda_cluster_class", lambda: None)
+    monkeypatch.setattr(dask.distributed, "LocalCluster", _no_cluster)
     scratch = tmp_path / "scratch"
 
     with pytest.raises(RuntimeError, match="dask_cuda"):
-        decoding_common.run_batch(
-            no_decode, _parse(["--local_scratch_dir", str(scratch)])
-        )
+        batch.run_batch(no_decode, _parse(["--local_scratch_dir", str(scratch)]))
     assert not scratch.exists()
 
 
 @pytest.mark.parametrize(
-    ("has_cuda", "flags", "cluster_name", "unused_cluster_name"),
+    ("has_cuda", "flags"),
     [
-        (False, ["--allow_cpu"], "LocalCluster", "LocalCUDACluster"),
+        (False, ["--allow_cpu"]),
         # The GPU path, with LocalCUDACluster replaced: the refusal must not fire.
-        (True, [], "LocalCUDACluster", "LocalCluster"),
+        (True, []),
     ],
     ids=["cpu_allowed", "cuda"],
 )
-def test_run_batch_passes_save_dir(
-    monkeypatch, tmp_path, has_cuda, flags, cluster_name, unused_cluster_name
-):
-    local_cluster = decoding_common.LocalCluster
+def test_run_batch_passes_save_dir(monkeypatch, tmp_path, has_cuda, flags):
+    local_cluster = dask.distributed.LocalCluster
     clusters = []
 
     def in_process_cluster(**kwargs: Any):
@@ -498,14 +496,8 @@ def test_run_batch_passes_save_dir(
         )
         return clusters[-1]
 
-    monkeypatch.setattr(decoding_common, "HAS_CUDA", has_cuda)
-    monkeypatch.setattr(
-        decoding_common, cluster_name, in_process_cluster, raising=False
-    )
-    monkeypatch.setattr(
-        decoding_common, unused_cluster_name, _no_cluster, raising=False
-    )
-    monkeypatch.setattr(decoding_common, "epochs_to_run", _one_epoch)
+    _stand_in_clusters(monkeypatch, has_cuda=has_cuda, cluster=in_process_cluster)
+    monkeypatch.setattr(batch, "epochs_to_run", _one_epoch)
     # run_batch sets this variable and makes logs/ in the working directory;
     # monkeypatch restores both after the test.
     monkeypatch.setenv("XLA_PYTHON_CLIENT_MEM_FRACTION", "0.99")
@@ -526,7 +518,7 @@ def test_run_batch_passes_save_dir(
     # (the system temp folder by default), whatever the workers are given.
     with dask.config.set({"temporary-directory": str(tmp_path / "dask-temporary")}):
         try:
-            decoding_common.run_batch(functools.partial(_record_kwargs, record), args)
+            batch.run_batch(functools.partial(_record_kwargs, record), args)
         finally:
             for cluster in clusters:
                 cluster.close()
@@ -551,6 +543,29 @@ class _Client:
         return None
 
 
+def _stand_in_clusters(monkeypatch, *, has_cuda: bool, cluster: Callable) -> None:
+    """``run_batch`` gets `cluster` for the path `has_cuda` picks, and fails the
+    test if it starts the other one.
+
+    ``run_batch`` imports dask when it starts a cluster, so the stand-ins go
+    where it reads them: ``cuda_cluster_class`` (None when dask_cuda does not
+    import) and ``dask.distributed.LocalCluster``.
+    """
+    monkeypatch.setattr(
+        batch, "cuda_cluster_class", lambda: cluster if has_cuda else None
+    )
+    monkeypatch.setattr(
+        dask.distributed, "LocalCluster", _no_cluster if has_cuda else cluster
+    )
+
+
+def _no_dask_scheduler(monkeypatch) -> None:
+    """No client and no scheduler: each epoch's call runs as it is built."""
+    monkeypatch.setattr(dask.distributed, "Client", _Client)
+    monkeypatch.setattr(dask, "delayed", lambda function: function)
+    monkeypatch.setattr(dask, "compute", lambda *outcomes: outcomes)
+
+
 def test_run_batch_resolves_a_relative_save_dir(monkeypatch, tmp_path):
     """A relative ``--save_dir`` reaches each epoch's decode as an absolute path.
 
@@ -559,18 +574,9 @@ def test_run_batch_resolves_a_relative_save_dir(monkeypatch, tmp_path):
     dask itself are stand-ins: each epoch's call runs here, as it is built.
     """
     calls: list[dict[str, Any]] = []
-    monkeypatch.setattr(decoding_common, "HAS_CUDA", False)
-    monkeypatch.setattr(decoding_common, "LocalCluster", lambda **kwargs: object())
-    monkeypatch.setattr(decoding_common, "LocalCUDACluster", _no_cluster, raising=False)
-    monkeypatch.setattr(decoding_common, "Client", _Client)
-    monkeypatch.setattr(
-        decoding_common,
-        "dask",
-        types.SimpleNamespace(
-            delayed=lambda function: function, compute=lambda *outcomes: outcomes
-        ),
-    )
-    monkeypatch.setattr(decoding_common, "epochs_to_run", _one_epoch)
+    _stand_in_clusters(monkeypatch, has_cuda=False, cluster=lambda **kwargs: object())
+    _no_dask_scheduler(monkeypatch)
+    monkeypatch.setattr(batch, "epochs_to_run", _one_epoch)
     # run_batch sets this variable and makes logs/ in the working directory;
     # monkeypatch restores both after the test.
     monkeypatch.setenv("XLA_PYTHON_CLIENT_MEM_FRACTION", "0.99")
@@ -579,7 +585,7 @@ def test_run_batch_resolves_a_relative_save_dir(monkeypatch, tmp_path):
         ["--allow_cpu", "--save_dir", "staging", "--local_scratch_dir", "scratch"]
     )
 
-    decoding_common.run_batch(lambda **kwargs: calls.append(kwargs), args)
+    batch.run_batch(lambda **kwargs: calls.append(kwargs), args)
 
     (kwargs,) = calls
     assert kwargs["save_dir"].is_absolute()
@@ -861,7 +867,7 @@ def test_write_atomically_keeps_the_old_file_when_a_write_fails(tmp_path):
         raise OSError("disk full")
 
     with pytest.raises(OSError, match="disk full"):
-        decoding_common.write_atomically(path, half_write)
+        runs_io.write_atomically(path, half_write)
 
     assert path.read_bytes() == b"the previous run"
     assert [entry.name for entry in tmp_path.iterdir()] == [path.name]
@@ -873,7 +879,7 @@ def test_write_atomically_keeps_the_old_file_when_a_write_fails(tmp_path):
 
 
 def test_provenance_record_fields():
-    record = decoding_common.provenance_record(REPO_ROOT)
+    record = provenance.provenance_record(REPO_ROOT)
 
     assert set(record) == PROVENANCE_KEYS
     assert re.fullmatch(r"[0-9a-f]{40}", record["commit"])
@@ -888,12 +894,12 @@ def test_provenance_dirty_ignores_untracked_files(tmp_path):
     git = _git_repo(tmp_path)
     (tmp_path / "notes.txt").write_text("untracked")
 
-    clean = decoding_common.provenance_record(tmp_path)
+    clean = provenance.provenance_record(tmp_path)
     assert clean["commit"] == git("rev-parse", "HEAD")
     assert clean["dirty"] is False
 
     (tmp_path / "uv.lock").write_text("edited")
-    assert decoding_common.provenance_record(tmp_path)["dirty"] is True
+    assert provenance.provenance_record(tmp_path)["dirty"] is True
 
 
 def test_provenance_never_writes_the_git_index(tmp_path):
@@ -909,7 +915,7 @@ def test_provenance_never_writes_the_git_index(tmp_path):
     index = tmp_path / ".git" / "index"
     before = _sha256(index)
 
-    decoding_common.provenance_record(tmp_path)
+    provenance.provenance_record(tmp_path)
     assert _sha256(index) == before
 
     # The control: a plain status does refresh and rewrite this index.
@@ -936,7 +942,7 @@ def test_epoch_log_has_one_provenance_line(decoders, monkeypatch, tmp_path, key)
     logged = json.loads(payload)
     assert payload == json.dumps(logged, sort_keys=True)
     # Other work shares this tree, so dirty can change between the two calls.
-    now = decoding_common.provenance_record(REPO_ROOT)
+    now = provenance.provenance_record(REPO_ROOT)
     assert set(logged) == set(now) == PROVENANCE_KEYS
     assert isinstance(logged["dirty"], bool)
     assert {k: v for k, v in logged.items() if k != "dirty"} == {
@@ -1463,24 +1469,10 @@ def _stand_in_batch(monkeypatch, tmp_path, *, has_cuda: bool, cluster: Callable)
     Each epoch's call runs here, as it is built. The open-file limit is left
     alone unless the test replaces ``raise_open_file_limit`` itself.
     """
-    used, unused = (
-        ("LocalCUDACluster", "LocalCluster")
-        if has_cuda
-        else ("LocalCluster", "LocalCUDACluster")
-    )
-    monkeypatch.setattr(decoding_common, "HAS_CUDA", has_cuda)
-    monkeypatch.setattr(decoding_common, used, cluster, raising=False)
-    monkeypatch.setattr(decoding_common, unused, _no_cluster, raising=False)
-    monkeypatch.setattr(decoding_common, "Client", _Client)
-    monkeypatch.setattr(
-        decoding_common,
-        "dask",
-        types.SimpleNamespace(
-            delayed=lambda function: function, compute=lambda *outcomes: outcomes
-        ),
-    )
-    monkeypatch.setattr(decoding_common, "epochs_to_run", _one_epoch)
-    monkeypatch.setattr(decoding_common, "raise_open_file_limit", lambda: (1024, 65536))
+    _stand_in_clusters(monkeypatch, has_cuda=has_cuda, cluster=cluster)
+    _no_dask_scheduler(monkeypatch)
+    monkeypatch.setattr(batch, "epochs_to_run", _one_epoch)
+    monkeypatch.setattr(batch, "raise_open_file_limit", lambda: (1024, 65536))
     # run_batch sets this variable and makes logs/ in the working directory;
     # monkeypatch restores both after the test.
     monkeypatch.setenv("XLA_PYTHON_CLIENT_MEM_FRACTION", "0.99")
@@ -1508,7 +1500,7 @@ def test_run_batch_closes_nwb_files_only_on_one_task_workers(
     _stand_in_batch(monkeypatch, tmp_path, has_cuda=has_cuda, cluster=cluster)
     args = _parse([*flags, "--save_dir", "staging", "--local_scratch_dir", "scratch"])
 
-    decoding_common.run_batch(lambda **kwargs: calls.append(kwargs), args)
+    batch.run_batch(lambda **kwargs: calls.append(kwargs), args)
 
     (kwargs,) = calls
     assert kwargs["release_nwb"] is has_cuda
@@ -1539,16 +1531,16 @@ def test_run_batch_selects_its_epochs_through_the_register(
     _stand_in_batch(
         monkeypatch, tmp_path, has_cuda=True, cluster=lambda **kwargs: object()
     )
-    monkeypatch.setattr(decoding_common, "epochs_to_run", epochs_to_run)
+    monkeypatch.setattr(batch, "epochs_to_run", epochs_to_run)
     args = _parse([*flags, "--save_dir", "staging", "--local_scratch_dir", "scratch"])
 
-    decoding_common.run_batch(lambda **kwargs: calls.append(kwargs), args)
+    batch.run_batch(lambda **kwargs: calls.append(kwargs), args)
 
     assert asked == [pending_only]
     assert [(call["nwb_file_name"], call["epoch_name"]) for call in calls] == [
         (NWB_FILE_NAME, EPOCH_NAME)
     ]
-    assert not hasattr(decoding_common, "get_epoch_info")
+    assert not hasattr(batch, "get_epoch_info")
 
 
 def test_pending_epochs_are_never_decoded_into_the_canonical_folder(
@@ -1562,15 +1554,15 @@ def test_pending_epochs_are_never_decoded_into_the_canonical_folder(
         raise AssertionError("epochs were selected")
 
     _stand_in_batch(monkeypatch, tmp_path, has_cuda=True, cluster=_no_cluster)
-    monkeypatch.setattr(decoding_common, "epochs_to_run", must_not_select)
+    monkeypatch.setattr(batch, "epochs_to_run", must_not_select)
     canonical = tmp_path / "Processed-Data"
-    monkeypatch.setattr(decoding_common, "PROCESSED_DATA_DIR", canonical)
+    monkeypatch.setattr(batch, "PROCESSED_DATA_DIR", canonical)
     args = _parse(
         ["--pending-only", "--save_dir", str(canonical), "--local_scratch_dir", "s"]
     )
 
     with pytest.raises(ValueError, match="staging"):
-        decoding_common.run_batch(lambda **kwargs: None, args)
+        batch.run_batch(lambda **kwargs: None, args)
 
 
 def test_run_batch_raises_the_open_file_limit_before_its_cluster(
@@ -1588,10 +1580,10 @@ def test_run_batch_raises_the_open_file_limit_before_its_cluster(
         return 1024, 65536
 
     _stand_in_batch(monkeypatch, tmp_path, has_cuda=True, cluster=cluster)
-    monkeypatch.setattr(decoding_common, "raise_open_file_limit", raise_open_file_limit)
+    monkeypatch.setattr(batch, "raise_open_file_limit", raise_open_file_limit)
     args = _parse(["--save_dir", "staging", "--local_scratch_dir", "scratch"])
 
-    decoding_common.run_batch(lambda **kwargs: None, args)
+    batch.run_batch(lambda **kwargs: None, args)
 
     assert order == ["limit", "cluster"]
     assert "open-file soft limit 1024 -> 65536" in capsys.readouterr().out

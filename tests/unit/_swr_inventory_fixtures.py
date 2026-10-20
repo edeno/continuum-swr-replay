@@ -26,7 +26,7 @@ from continuum_swr_replay.analysis.events.artifact_intervals import (
     write_cores,
     write_manifest,
 )
-from continuum_swr_replay.tables.io import sha256_file
+from continuum_swr_replay.runs.io import sha256_file
 
 RUN_ID = "testrun0001"
 ARTIFACT_RUN_ID = "testartifacts01"

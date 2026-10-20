@@ -55,8 +55,9 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import (  # noqa:
 from continuum_swr_replay.analysis.inventory_comparison.selection import (  # noqa: E402
     REJECTION_COHORTS,
 )
-from continuum_swr_replay.decoding_common import parse_run_id  # noqa: E402
 from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
+from continuum_swr_replay.runs.cli import parse_run_id  # noqa: E402
+from continuum_swr_replay.runs.io import json_ready  # noqa: E402
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
 from scripts.figures import (  # noqa: E402
     generate_inventory_examples as inventory_examples,
@@ -470,7 +471,7 @@ def write_examples(
     figure_dir.mkdir(parents=True, exist_ok=True)
     (figure_dir / "manifest.json").write_text(
         json.dumps(
-            inventory_examples.runner.json_ready(
+            json_ready(
                 {
                     "produced_by": PRODUCED_BY,
                     "event_features_run_id": run_id,

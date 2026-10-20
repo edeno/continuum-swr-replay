@@ -46,6 +46,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (
     nearest_interior_bins,
 )
 from continuum_swr_replay.intervals import interval_mask
+from continuum_swr_replay.runs import batch
 from continuum_swr_replay.tables.io import read_table
 from scripts.qa import run_state_evidence as runner
 from tests.unit._memoryless_clusterless_epoch import _y_track
@@ -905,7 +906,7 @@ def test_each_epoch_task_closes_the_nwb_files_spyglass_opened(
         return {"status": "ok"}
 
     monkeypatch.setattr(runner, "run_epoch", run_epoch)
-    monkeypatch.setattr(runner, "release_nwb_files", release_nwb_files)
+    monkeypatch.setattr(batch, "release_nwb_files", release_nwb_files)
 
     def task():
         return runner._run_epoch_logged(EPOCH, {}, tmp_path / "logs")

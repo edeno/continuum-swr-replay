@@ -105,6 +105,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 import argparse  # noqa: E402
 import copy  # noqa: E402
+import functools  # noqa: E402
 import json  # noqa: E402
 import resource  # noqa: E402
 import sys  # noqa: E402
@@ -143,7 +144,6 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: 
     event_likelihood,
     held_out_evidence,
     interior_bin_mask,
-    json_ready,
     keyed_rng,
     load_detector,
     nearest_interior_bins,
@@ -158,7 +158,6 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: 
     training_spike_bins,
     window_evidence,
     window_folds,
-    write_json,
 )
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_epoch_ids,
@@ -170,16 +169,24 @@ from continuum_swr_replay.decode_files import decode_paths  # noqa: E402
 from continuum_swr_replay.decoding_common import (  # noqa: E402
     hpc_artifact_intervals,
     hpc_decode_masks,
-    provenance_record,
-    raise_open_file_limit,
-    release_nwb_files,
-    setup_logger,
-    write_atomically,
 )
 from continuum_swr_replay.intervals import (  # noqa: E402
     interval_mask,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR  # noqa: E402
+from continuum_swr_replay.runs.batch import (  # noqa: E402
+    raise_open_file_limit,
+    run_epoch_logged,
+)
+from continuum_swr_replay.runs.batch import (  # noqa: E402
+    run_epochs as batch_run_epochs,
+)
+from continuum_swr_replay.runs.io import (  # noqa: E402
+    json_ready,
+    write_atomically,
+    write_json,
+)
+from continuum_swr_replay.runs.provenance import provenance_record  # noqa: E402
 from continuum_swr_replay.tables.io import read_table, write_table  # noqa: E402
 
 PRODUCED_BY = "scripts/qa/run_state_evidence.py"
@@ -1156,7 +1163,7 @@ def run_epoch(
     record["worker_peak_rss_gib"] = usage.ru_maxrss / 2**20
     ready: dict = json_ready(record)
     if ready["status"] == "ok":
-        write_json(paths["validation"], ready)
+        write_json(paths["validation"], ready, indent=1, default=str)
     return ready
 
 
@@ -1167,56 +1174,43 @@ def _run_epoch_logged(epoch_id: str, kwargs: dict, log_dir: Path) -> dict:
     Spyglass are closed (``release_nwb_files``): ``run_epochs``'s workers run one
     task at a time (``threads_per_worker=1``), so no other epoch reads them.
     """
-    logger = setup_logger(
-        name_logfile=f"{epoch_id}_state_evidence",
-        path_logfile=log_dir / f"{epoch_id}.log",
+
+    def describe(record: dict) -> str:
+        if record["status"] == "failed":
+            return record["error"]
+        return f"{epoch_id}: {record['status']}"
+
+    return run_epoch_logged(
+        lambda logger: run_epoch(epoch_id, log=logger.info, **kwargs),
+        log_name=f"{epoch_id}_state_evidence",
+        log_path=log_dir / f"{epoch_id}.log",
+        start=f"{epoch_id}: start",
+        describe=describe,
+        log_provenance=False,
     )
-    logger.info("%s: start", epoch_id)
-    try:
-        record = run_epoch(epoch_id, log=logger.info, **kwargs)
-    finally:
-        logger.info("closed %d NWB files Spyglass held open", release_nwb_files())
-    if record["status"] == "failed":
-        logger.error("%s\n%s", record["error"], record["traceback"])
-    else:
-        logger.info("%s: %s", epoch_id, record["status"])
-    return record
 
 
 def run_epochs(
     epochs: list[str], kwargs: dict, n_workers: int
 ) -> Iterator[tuple[str, dict]]:
     """Each epoch on its own dask CPU worker; yield records as they finish."""
-    from dask.distributed import Client, LocalCluster, as_completed
-
     if not epochs:
         return
+    from dask.distributed import LocalCluster
+
     log_dir = kwargs["output_dir"] / "logs"
-    with (
-        LocalCluster(
-            n_workers=n_workers,
-            processes=True,
-            threads_per_worker=1,
-            dashboard_address=":0",  # any free port: 8787 is often taken here
-        ) as cluster,
-        Client(cluster) as client,
-    ):
-        futures = {
-            client.submit(
-                _run_epoch_logged, epoch_id, kwargs, log_dir, key=epoch_id
-            ): epoch_id
-            for epoch_id in epochs
-        }
-        for future in as_completed(futures):
-            try:
-                record = future.result()
-            except Exception as error:  # noqa: BLE001 - the worker could not return
-                record = {
-                    "status": "failed",
-                    "error": repr(error),
-                    "traceback": "".join(traceback.format_exception(error)),
-                }
-            yield futures[future], record
+    cluster_factory = functools.partial(
+        LocalCluster,
+        n_workers=n_workers,
+        processes=True,
+        threads_per_worker=1,
+        dashboard_address=":0",  # any free port: 8787 is often taken here
+    )
+    yield from batch_run_epochs(
+        {epoch_id: (epoch_id, kwargs, log_dir) for epoch_id in epochs},
+        _run_epoch_logged,
+        cluster_factory,
+    )
 
 
 # --- summary --------------------------------------------------------------------------
@@ -1708,6 +1702,8 @@ def main(argv: list[str] | None = None) -> None:
                 "recomputed": dict(sorted(recomputed.items())),
                 "epochs": {k: records[k] for k in sorted(records)},
             },
+            indent=1,
+            default=str,
         )
 
     print(

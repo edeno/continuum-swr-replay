@@ -18,13 +18,16 @@ from continuum_swr_replay.analysis.events.artifact_intervals import (
     ArtifactRunError,
     cores_path,
     empty_cores,
+    epoch_artifact_intervals,
     make_cores,
     read_epoch_cores,
     read_manifest,
     write_cores,
     write_manifest,
 )
-from continuum_swr_replay.tables.io import read_attrs, sha256_file
+from continuum_swr_replay.analysis.events.artifact_masks import artifact_intervals
+from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.tables.io import read_attrs
 
 EPOCH = "chimi20200225_02_r1_HPC"
 SPAN = (1.58e9, 1.58e9 + 1200.0)
@@ -169,3 +172,18 @@ class TestReadingAnEpoch:
 
         with pytest.raises(ArtifactRunError, match="sha256"):
             read_epoch_cores(directory, EPOCH)
+
+
+def test_epoch_artifact_intervals_is_the_padded_mask_or_none(tmp_path):
+    """The detection runners' mask: the run's cores padded by ``PADDING_S``
+    and clipped to the span; no rows when no run is configured."""
+    directory, _ = _run(tmp_path)
+
+    mask = epoch_artifact_intervals(directory, EPOCH)
+
+    expected = artifact_intervals(_cores(), SPAN)
+    pd.testing.assert_frame_equal(mask, expected)
+    assert len(mask) > 0
+    empty = epoch_artifact_intervals(None, EPOCH)
+    assert list(empty.columns) == ["start_time", "end_time"]
+    assert empty.empty and (empty.dtypes == np.float64).all()

@@ -111,7 +111,6 @@ Usage:
 import argparse
 import contextlib
 import functools
-import hashlib
 import json
 import logging
 import os
@@ -128,11 +127,9 @@ import dask
 import joblib
 import numpy as np
 import pandas as pd
-from dask.distributed import Client, as_completed
 from distributed.deploy import Cluster
 from numpy.typing import NDArray
 
-from continuum_swr_replay import decoding_common
 from continuum_swr_replay.analysis.events.analysed_time import (
     dropped_for_excluded_time,
     read_artifact_event_drops,
@@ -145,6 +142,15 @@ from continuum_swr_replay.analysis.events.swr_inventory import (
     swr_epoch_id,
     swr_source_files,
     swr_source_name,
+)
+from continuum_swr_replay.analysis.hippocampus.detection_inputs import (
+    MARKS_CACHE_DIR,
+    MARKS_RULE,
+    input_paths,
+    load_marks,
+    marks_cache_path,
+    marks_sha256,
+    memoryless_output_paths,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
     MemorylessSequenceConfig,
@@ -173,46 +179,30 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics im
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import git_hash
 from continuum_swr_replay.data_loaders.epoch_register import epochs_to_run
-from continuum_swr_replay.data_loaders.spikes import filter_spike_times, get_hpc_marks
 from continuum_swr_replay.data_loaders.utils import (
     EpochKey,
     parse_epoch_identifier,
     parse_nwb_filename,
-)
-from continuum_swr_replay.decode_files import decode_paths
-from continuum_swr_replay.decoding_common import (
-    parse_run_id,
-    provenance_record,
-    raise_open_file_limit,
-    release_nwb_files,
-    setup_logger,
-    write_atomically,
 )
 from continuum_swr_replay.intervals import (
     interval_mask,
     masked_seconds,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR
-from continuum_swr_replay.tables.io import sha256_file, write_table
+from continuum_swr_replay.runs.batch import (
+    cuda_cluster_class,
+    raise_open_file_limit,
+    release_nwb_files,
+    setup_logger,
+)
+from continuum_swr_replay.runs.batch import run_epochs as batch_run_epochs
+from continuum_swr_replay.runs.cli import parse_run_id
+from continuum_swr_replay.runs.io import sha256_file, write_atomically
+from continuum_swr_replay.runs.provenance import provenance_record
+from continuum_swr_replay.tables.io import write_table
 
 OUTPUT_ROOT = PROCESSED_DATA_DIR / "replay_detection_comparison" / "memoryless"
 DESIGN_SPEC = "docs/design/replay_detection_comparison/02-memoryless-sequence.md"
-MARKS_RULE = (
-    "load_data: get_hpc_marks (tetrode sort groups; coincident spikes counted) "
-    "then filter_spike_times over the decode's time span"
-)
-"""How the marks are read, for the manifest: as ``load_data`` read them."""
-
-MARKS_RULE_TAG = "loader"
-""":data:`MARKS_RULE`'s name in a marks cache file; another rule needs another tag."""
-
-
-def input_paths(epoch_id: str, root: Path) -> dict[str, Path]:
-    """The two saved decode artifacts the detector reads (``decode_paths``)."""
-    paths = decode_paths(epoch_id, root)
-    return {"detector": paths.detector, "data_over_time": paths.data_over_time}
-
-
 NOT_ANALYSED = "not an analysed epoch in the epoch register"
 """Why a decode under ``--root`` is left out when the register does not analyse
 its epoch."""
@@ -329,74 +319,6 @@ def select_epochs(
     return selected
 
 
-def marks_cache_path(key: EpochKey, cache_dir: Path, detector_sha256: str) -> Path:
-    """Where one decode's marks are cached under :data:`MARKS_RULE`.
-
-    The name carries the rule's tag and the first 16 hex digits of the decode's
-    ``_detector.pkl`` sha256, so a cache made for another decode of the epoch,
-    or under another rule, is never read.
-    """
-    return (
-        cache_dir / f"{key.epoch_id}_{MARKS_RULE_TAG}_{detector_sha256[:16]}_marks.pkl"
-    )
-
-
-def load_marks(
-    key: EpochKey,
-    cache_dir: Path,
-    span_s: tuple[float, float],
-    detector_sha256: str,
-) -> tuple[list[NDArray], list[NDArray]]:
-    """A decode's HPC spike times and marks, read as ``load_data`` read them.
-
-    ``get_hpc_marks``, then ``filter_spike_times`` over the decode's time span:
-    ``load_data`` filters over the position grid, which is the decode's grid.
-    Cached per decode file (:func:`marks_cache_path`), written atomically, so a
-    worker stopped part way never leaves half a cache for a rerun to read.
-
-    Parameters
-    ----------
-    key : EpochKey
-        The decode.
-    cache_dir : Path
-        Where the marks are cached.
-    span_s : tuple of float
-        First and last time of the decode's grid, in seconds; spikes on either
-        end are kept.
-    detector_sha256 : str
-        sha256 of the decode's ``_detector.pkl``, which keys the cache.
-
-    Returns
-    -------
-    spike_times : list of ndarray, each shape (n_spikes,)
-    spike_waveform_features : list of ndarray, each shape (n_spikes, n_features)
-        One per tetrode with a spike in ``span_s``, in ``get_hpc_marks``'s order.
-    """
-    cache = marks_cache_path(key, cache_dir, detector_sha256)
-    if cache.exists():
-        cached: tuple[list[NDArray], list[NDArray]] = joblib.load(cache)
-        return cached
-    spike_times, spike_waveform_features = get_hpc_marks(key.nwb_file_name)
-    in_span_times, in_span_features = filter_spike_times(
-        {"HPC": spike_times},
-        {"HPC": spike_waveform_features},
-        np.asarray(span_s, dtype=np.float64),
-    )
-    marks = (in_span_times["HPC"], in_span_features["HPC"])
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    write_atomically(cache, lambda path: joblib.dump(marks, path))
-    return marks
-
-
-def marks_sha256(spike_times: list, spike_waveform_features: list) -> str:
-    """One hash of every electrode's spike times and marks, in order."""
-    digest = hashlib.sha256()
-    for times, features in zip(spike_times, spike_waveform_features, strict=True):
-        digest.update(np.ascontiguousarray(times, dtype=np.float64).tobytes())
-        digest.update(np.ascontiguousarray(features, dtype=np.float64).tobytes())
-    return digest.hexdigest()
-
-
 def _one_value(frame: pd.DataFrame, column: str) -> Any:
     values = pd.unique(frame[column])
     if len(values) != 1:
@@ -404,15 +326,6 @@ def _one_value(frame: pd.DataFrame, column: str) -> Any:
             f"data_over_time holds {len(values)} values of {column!r}, not one."
         )
     return values[0]
-
-
-def output_paths(epoch_id: str, output_dir: Path) -> dict[str, Path]:
-    return {
-        "events": output_dir / f"{epoch_id}_memoryless_events.parquet",
-        "shuffle_draws": output_dir / f"{epoch_id}_memoryless_shuffle_draws.parquet",
-        "observed": output_dir / f"{epoch_id}_memoryless_observed.parquet",
-        "candidates": output_dir / f"{epoch_id}_memoryless_candidates.pkl",
-    }
 
 
 def observation_table(
@@ -537,7 +450,7 @@ def run_one(
         ),
     )
 
-    outputs = output_paths(epoch_id, output_dir)
+    outputs = memoryless_output_paths(epoch_id, output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     observed = observation_table(time, swr_observed, config, missing_windows)
     for frame in (detection.table, detection.shuffle_draws, observed):
@@ -936,7 +849,7 @@ def cuda_cluster(
         environment_holding(worker_environ),
         dask.config.set({"distributed.nanny.pre-spawn-environ": environ}),
     ):
-        cluster: Cluster = decoding_common.LocalCUDACluster(
+        cluster: Cluster = cuda_cluster_class()(
             CUDA_VISIBLE_DEVICES=cuda_visible_devices,
             local_directory=local_directory,
         )
@@ -979,23 +892,13 @@ def run_epochs(
         return
     log_directory = Path.cwd() / "logs"
     git_commit = run_one_kwargs["provenance"]["git_commit"]
-    with cluster_factory() as cluster, Client(cluster) as client:
-        futures = {
-            client.submit(
-                _run_one_logged,
-                epoch_id,
-                run_one_kwargs,
-                log_directory,
-                key=f"memoryless-{epoch_id}",
-            ): epoch_id
-            for epoch_id in epoch_ids
-        }
-        for future in as_completed(futures):
-            try:
-                record = future.result()
-            except Exception as error:  # noqa: BLE001 - the worker could not return it
-                record = _failure_record(error, git_commit)
-            yield futures[future], record
+    yield from batch_run_epochs(
+        {epoch_id: (epoch_id, run_one_kwargs, log_directory) for epoch_id in epoch_ids},
+        _run_one_logged,
+        cluster_factory,
+        key_prefix="memoryless",
+        lost=functools.partial(_failure_record, git_commit=git_commit),
+    )
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -1035,7 +938,7 @@ def main(argv: list[str] | None = None) -> None:
     )
     parser.add_argument("--root", type=Path, default=PROCESSED_DATA_DIR)
     parser.add_argument("--output-root", type=Path, default=OUTPUT_ROOT)
-    parser.add_argument("--cache-dir", type=Path, default=OUTPUT_ROOT / "marks_cache")
+    parser.add_argument("--cache-dir", type=Path, default=MARKS_CACHE_DIR)
     parser.add_argument(
         "--overwrite", action="store_true", help="Redo epochs already written."
     )
@@ -1066,7 +969,7 @@ def main(argv: list[str] | None = None) -> None:
             f"--n-shuffles must be at least {MINIMUM_N_SHUFFLES}, so that a "
             f"p-value at or below {SIGNIFICANCE_LEVEL} is possible."
         )
-    if args.cuda_visible_devices is not None and not decoding_common.HAS_CUDA:
+    if args.cuda_visible_devices is not None and cuda_cluster_class() is None:
         sys.exit(
             "--cuda_visible_devices needs dask_cuda, which is not importable. "
             "Install dask-cuda by hand (see docs/README.md), or leave out "

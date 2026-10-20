@@ -128,7 +128,8 @@ each epoch enters as one value, and the animal is the unit of replication.
 Modules: :mod:`.terms` (per-tetrode terms, encodings, decode files),
 :mod:`.windows` (regimes, bouts, matched and calibration windows, tetrode
 halves, partners), :mod:`.evidence` (window evidence) and :mod:`.summary`;
-:mod:`.io` writes the runners' JSON records.
+:mod:`.io` reads the runners' code version and the decode's masks (their JSON
+records are written with ``runs.io``).
 """
 
 from continuum_swr_replay.analysis.hippocampus.state_evidence.evidence import (
@@ -137,9 +138,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.evidence import (
 )
 from continuum_swr_replay.analysis.hippocampus.state_evidence.io import (
     code_version,
-    json_ready,
     saved_decode_masks,
-    write_json,
 )
 from continuum_swr_replay.analysis.hippocampus.state_evidence.summary import (
     CALIBRATION_METRICS,
@@ -237,7 +236,6 @@ __all__ = [
     "held_out_evidence",
     "hierarchical_bootstrap_ci",
     "interior_bin_mask",
-    "json_ready",
     "keyed_rng",
     "load_detector",
     "load_encoding",
@@ -260,5 +258,4 @@ __all__ = [
     "subnormal_occupancy_bin_mask",
     "window_evidence",
     "window_folds",
-    "write_json",
 ]

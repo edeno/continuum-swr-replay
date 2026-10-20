@@ -94,6 +94,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics im
     normalize_windows,
 )
 from continuum_swr_replay.parameters import LOCAL_POSITION_STD, PROCESSED_DATA_DIR
+from continuum_swr_replay.runs.provenance import git
 from continuum_swr_replay.tables.io import write_table
 
 DECODE_BIN_STRIDE = 3
@@ -727,19 +728,13 @@ def run_cell(recording, means, path_cm, midpoint_cm, duration_s, rate_hz, at_s, 
 def git_commit() -> str:
     """The commit this ran from, so a saved table can be tied back to the code."""
     try:
-        described = subprocess.run(
-            ["git", "describe", "--always", "--dirty", "--abbrev=12"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
+        commit = git(Path.cwd(), "describe", "--always", "--dirty", "--abbrev=12")
     except (OSError, subprocess.CalledProcessError) as error:
         print(
             f"warning: git commit unknown ({error}); recording 'unknown'",
             file=sys.stderr,
         )
         return "unknown"
-    commit = described.stdout.strip()
     if commit.endswith("-dirty"):
         print(
             f"warning: the working tree has uncommitted changes ({commit}); the "

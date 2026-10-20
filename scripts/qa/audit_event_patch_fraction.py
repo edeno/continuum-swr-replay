@@ -33,8 +33,9 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
+from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.tables.covariate_registry import row_keys
-from continuum_swr_replay.tables.io import read_table, sha256_file
+from continuum_swr_replay.tables.io import read_table
 from continuum_swr_replay.tables.parity import diff_table
 
 DEFAULT_ADDED_COLUMNS = ("patch_fraction",)

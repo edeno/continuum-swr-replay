@@ -62,6 +62,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import matplotlib.ticker  # noqa: E402
 
+from continuum_swr_replay.analysis.hippocampus.detection_inputs import (  # noqa: E402
+    memoryless_output_paths as memoryless_outputs,
+)
 from continuum_swr_replay.analysis.inventory_comparison.populations import (  # noqa: E402
     ALL,
     BASELINE,
@@ -83,13 +86,10 @@ from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_epoch_ids,
 )
 from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier  # noqa: E402
-from continuum_swr_replay.decoding_common import parse_run_id  # noqa: E402
 from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
+from continuum_swr_replay.runs.cli import parse_run_id  # noqa: E402
 from continuum_swr_replay.tables.io import read_table  # noqa: E402
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
-from scripts.decoding.run_memoryless_detection import (  # noqa: E402
-    output_paths as memoryless_outputs,
-)
 from scripts.figures.generate_inventory_examples import (  # noqa: E402
     detector_color,
 )

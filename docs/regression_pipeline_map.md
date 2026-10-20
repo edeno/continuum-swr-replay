@@ -38,7 +38,7 @@ The analysed-time read point: a decode frame held to the one analysed-time rule.
 
 The artifact run folder: one cores file per epoch, and the run's manifest.
 
-`ArtifactRunError`, `EpochCores`, `cores_path`, `empty_cores`, `make_cores`, `validate_cores`, `write_cores`, `write_manifest`, `read_manifest`, `read_epoch_cores`
+`ArtifactRunError`, `EpochCores`, `cores_path`, `empty_cores`, `make_cores`, `validate_cores`, `write_cores`, `write_manifest`, `read_manifest`, `read_epoch_cores`, `epoch_artifact_intervals`
 
 ### `src/continuum_swr_replay/analysis/events/artifact_masks.py`
 
@@ -105,6 +105,12 @@ The artifact detector's features: S window spectra, J5 and L20 steps, spike line
 Aggregation of analysis results over time.
 
 `theta_power_zscore`, `validate_required_session_data_keys`, `validate_results_position_time_alignment`, `align_results_to_position`, `validate_dot_event_contract`, `get_data_over_time`, `load_data_over_time`, `get_event_types`, `compute_swr_overlap_class_counts`, `compute_swr_nl_event_counts`
+
+### `src/continuum_swr_replay/analysis/hippocampus/detection_inputs.py`
+
+What the replay detection runners read from a saved HPC decode and from each other.
+
+`input_paths`, `marks_cache_path`, `load_marks`, `marks_sha256`, `memoryless_output_paths`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/event_analysis.py`
 
@@ -882,9 +888,9 @@ Held-out evidence of every window, by tetrode half (see the package notes).
 
 ### `src/continuum_swr_replay/analysis/hippocampus/state_evidence/io.py`
 
-Strict JSON records, code versions and the decode's stamp, shared by the state-evidence runners.
+Code versions and the decode's stamp, shared by the state-evidence runners.
 
-`json_ready`, `write_json`, `code_version`, `saved_decode_masks`
+`code_version`, `saved_decode_masks`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/state_evidence/summary.py`
 
@@ -920,7 +926,7 @@ Load the conditional non-local posterior from a decoder results file.
 
 On-disk format for the canonical analysis tables.
 
-`sha256_file`, `umask_file_mode`, `publish_canonical`, `parquet_path`, `resolved_table_path`, `write_table`, `read_table`, `read_attrs`, `table_exists`
+`umask_file_mode`, `publish_canonical`, `parquet_path`, `resolved_table_path`, `write_table`, `read_table`, `read_attrs`, `table_exists`
 
 ### `src/continuum_swr_replay/tables/parity.py`
 

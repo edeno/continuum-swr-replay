@@ -308,7 +308,7 @@ def test_the_module_imports_outside_a_git_checkout(
 def test_git_hash_never_writes_the_git_index(tmp_path):
     """By default ``git status`` refreshes the index and writes it back under a
     lock. The Widloski runner records its commit in a checkout that other work
-    commits in, so, like ``decoding_common.provenance_record``, it must not write.
+    commits in, so, like ``runs.provenance.provenance_record``, it must not write.
     """
     git = _git_repo(tmp_path)
     tracked = tmp_path / "tracked.txt"

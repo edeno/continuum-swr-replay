@@ -32,8 +32,9 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_INCOMPLETE,
 )
+from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.tables.covariate_registry import row_keys
-from continuum_swr_replay.tables.io import read_table, sha256_file
+from continuum_swr_replay.tables.io import read_table
 from continuum_swr_replay.tables.parity import diff_table
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 

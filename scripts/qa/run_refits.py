@@ -238,13 +238,6 @@ def run_env(run: Run) -> dict[str, str]:
     return env
 
 
-def _git(*args: str) -> str:
-    out = subprocess.run(
-        ["git", "--no-optional-locks", *args], cwd=REPO, capture_output=True, text=True
-    )
-    return out.stdout.strip()
-
-
 def _now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
 
@@ -271,9 +264,14 @@ def schedule(
     free = list(cpus)
     codes: dict[str, int | None] = {r.name: None for r in runs}
     blocked: set[str] = set()
-    commit = _git("rev-parse", "HEAD")
-    dirty = bool(_git("status", "--porcelain", "--untracked-files=no"))
     from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+    from continuum_swr_replay.runs.provenance import git
+
+    # check=False: a refit batch records an empty commit rather than not running
+    commit = git(REPO, "rev-parse", "HEAD", check=False)
+    dirty = bool(
+        git(REPO, "status", "--porcelain", "--untracked-files=no", check=False)
+    )
 
     def record(run: Run, **fields) -> None:
         body = {

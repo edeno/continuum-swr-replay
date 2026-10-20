@@ -48,6 +48,10 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
 from continuum_swr_replay.analysis.events import analysed_time, swr_inventory
+from continuum_swr_replay.analysis.hippocampus.detection_inputs import (
+    input_paths,
+    marks_cache_path,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
     MemorylessSequenceConfig,
 )
@@ -76,14 +80,9 @@ from continuum_swr_replay.analysis.inventory_comparison.selection import (
     REJECTION_DTYPES,
 )
 from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier
-from continuum_swr_replay.decoding_common import write_atomically
-from continuum_swr_replay.tables.io import read_table, sha256_file, write_table
-from scripts.decoding.run_memoryless_detection import (
-    input_paths,
-    marks_cache_path,
-    run_one,
-)
-from scripts.decoding.run_swr_detection import json_ready
+from continuum_swr_replay.runs.io import json_ready, sha256_file, write_atomically
+from continuum_swr_replay.tables.io import read_table, write_table
+from scripts.decoding.run_memoryless_detection import run_one
 from tests.integration.test_run_inventory_comparison import (
     ANIMAL,
     CAREY_RUN,

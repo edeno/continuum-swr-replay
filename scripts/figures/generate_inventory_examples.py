@@ -98,12 +98,13 @@ from continuum_swr_replay.analysis.inventory_comparison.overlap import (  # noqa
 )
 from continuum_swr_replay.data_loaders.lfp import get_ripple_band_inputs  # noqa: E402
 from continuum_swr_replay.decode_files import decode_paths  # noqa: E402
-from continuum_swr_replay.decoding_common import parse_run_id  # noqa: E402
 from continuum_swr_replay.figure_utilities import WONG  # noqa: E402
 from continuum_swr_replay.intervals import (  # noqa: E402
     interval_mask,
 )
 from continuum_swr_replay.parameters import COLORS, FIGURE_DIR  # noqa: E402
+from continuum_swr_replay.runs.cli import parse_run_id  # noqa: E402
+from continuum_swr_replay.runs.io import json_ready  # noqa: E402
 from continuum_swr_replay.tables.io import read_table  # noqa: E402
 from continuum_swr_replay.visualization.plots import (  # noqa: E402
     plot_linear_track_graph_strip,
@@ -1007,7 +1008,7 @@ def write_examples(run_dir: Path, figure_dir: Path) -> list[dict[str, Any]]:
     figure_dir.mkdir(parents=True, exist_ok=True)
     (figure_dir / "manifest.json").write_text(
         json.dumps(
-            runner.json_ready(
+            json_ready(
                 {
                     "produced_by": PRODUCED_BY,
                     "inventory_run_id": run_id,

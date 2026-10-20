@@ -29,7 +29,9 @@ from continuum_swr_replay.analysis.events.artifact_masks import (
     artifact_intervals,
 )
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
-from continuum_swr_replay.tables.io import read_attrs, sha256_file
+from continuum_swr_replay.runs import batch
+from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.tables.io import read_attrs
 from tests.unit._artifact_synthetic import FS, NOISE, SyntheticEpoch
 
 NWB_FILE_NAME = "sim20200101_.nwb"
@@ -512,7 +514,7 @@ def test_each_epoch_task_closes_the_nwb_files_spyglass_opened(
         return {"status": "ok"}
 
     monkeypatch.setattr(runner, "run_epoch", run_epoch)
-    monkeypatch.setattr(runner, "release_nwb_files", release_nwb_files)
+    monkeypatch.setattr(batch, "release_nwb_files", release_nwb_files)
 
     def task():
         return runner._run_epoch_logged(

@@ -26,7 +26,6 @@ have no columnar representation; those stay pickled.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import tempfile
@@ -53,17 +52,7 @@ __all__ = [
     "resolved_table_path",
     "table_exists",
     "umask_file_mode",
-    "sha256_file",
 ]
-
-
-def sha256_file(path: str | Path, *, chunk_bytes: int = 1 << 20) -> str:
-    """Return the hex sha256 of a file, read in chunks (no whole-file load)."""
-    digest = hashlib.sha256()
-    with Path(path).open("rb") as stream:
-        for chunk in iter(lambda: stream.read(chunk_bytes), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 _ATTRS_KEY = b"continuum_swr_replay.attrs"
@@ -214,7 +203,10 @@ def write_table(frame: pd.DataFrame, path: str | Path, **kwargs: Any) -> Path:
     # loudly fail on. The temp file shares the destination directory so
     # ``os.replace`` is a same-filesystem atomic rename. This matters for the
     # multi-table regeneration reducers, where a half-written table would break
-    # the atomic event/stop table set.
+    # the atomic event/stop table set. It is the same write as
+    # ``runs.io.write_atomically``, kept here because ``runs`` imports this
+    # module (``replace_outputs`` writes its tables with ``write_table``), so
+    # this one cannot import ``runs`` back.
     handle, tmp_name = tempfile.mkstemp(
         dir=out.parent, prefix=f".{out.name}.", suffix=".tmp"
     )

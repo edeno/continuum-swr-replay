@@ -132,18 +132,14 @@ Usage:
 """
 
 import argparse
-import errno
-import fcntl
 import functools
-import hashlib
 import json
 import math
 import resource
 import sys
 import time as clock
 import traceback
-from collections.abc import Callable, Iterator, Mapping
-from contextlib import contextmanager
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -151,16 +147,16 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import scipy
-from dask.distributed import Client, LocalCluster, as_completed
-from distributed.deploy import Cluster
+from dask.distributed import LocalCluster
 from numpy.typing import NDArray
 from ripple_detection import Kay_ripple_detector
 
 from continuum_swr_replay.analysis.events import swr_inventory
-from continuum_swr_replay.analysis.events.artifact_intervals import read_epoch_cores
+from continuum_swr_replay.analysis.events.artifact_intervals import (
+    epoch_artifact_intervals,
+)
 from continuum_swr_replay.analysis.events.artifact_masks import (
     PADDING_S,
-    artifact_intervals,
 )
 from continuum_swr_replay.analysis.hippocampus.ripple_tetrodes import (
     COUPLING_CUT,
@@ -204,21 +200,25 @@ from continuum_swr_replay.data_loaders.lfp import (
 )
 from continuum_swr_replay.data_loaders.position import get_epoch_position_info
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
-from continuum_swr_replay.decoding_common import (
-    filter_epoch_info,
-    parse_run_id,
-    provenance_record,
-    raise_open_file_limit,
-    release_nwb_files,
-    replace_outputs,
-    setup_logger,
-    write_atomically,
-)
 from continuum_swr_replay.intervals import (
     interval_mask,
     masked_seconds,
 )
 from continuum_swr_replay.parameters import ROOT_DIR
+from continuum_swr_replay.runs.batch import (
+    raise_open_file_limit,
+    run_epoch_logged,
+    run_epochs,
+    run_lock,
+)
+from continuum_swr_replay.runs.cli import filter_epoch_info, parse_run_id
+from continuum_swr_replay.runs.io import (
+    array_sha256,
+    json_ready,
+    replace_outputs,
+    write_json,
+)
+from continuum_swr_replay.runs.provenance import provenance_record
 
 OUTPUT_ROOT = swr_inventory.SWR_INVENTORY_ROOT
 """Where the run folders go: where the paper's SWR source reads them."""
@@ -233,7 +233,7 @@ def epoch_id(nwb_file_name: str, epoch_name: str) -> str:
     """``{stem}_{epoch}_HPC``, the decoders' name for the epoch's CA1 data.
 
     ``epoch_id("chimi20200225_.nwb", "02_r1")`` is ``"chimi20200225_02_r1_HPC"``.
-    The other runners import it from here; the rule is ``swr_inventory.swr_epoch_id``.
+    The rule is ``swr_inventory.swr_epoch_id``, which the other runners call.
     """
     return swr_inventory.swr_epoch_id(nwb_file_name, epoch_name)
 
@@ -395,31 +395,6 @@ def measured_rate(time: NDArray, values: NDArray) -> float:
     return n_steps / elapsed if elapsed > 0 else math.nan
 
 
-def array_sha256(values: NDArray) -> str:
-    """The sha256 of an array's float64 bytes, in C order."""
-    return hashlib.sha256(
-        np.ascontiguousarray(values, dtype=np.float64).data
-    ).hexdigest()
-
-
-def json_ready(value: Any) -> Any:
-    """``value`` in strict JSON types, for the manifest.
-
-    Mappings (``MappingProxyType`` included) become dicts with string keys;
-    arrays, lists and tuples become lists; numpy scalars become Python ones;
-    and a non-finite float becomes None.
-    """
-    if isinstance(value, Mapping):
-        return {str(key): json_ready(item) for key, item in value.items()}
-    if isinstance(value, list | tuple | np.ndarray):
-        return [json_ready(item) for item in value]
-    if isinstance(value, np.generic):
-        value = value.item()
-    if isinstance(value, float) and not math.isfinite(value):
-        return None
-    return value
-
-
 def choose_zugaro_channel(
     raw_referenced: NDArray,
     time: NDArray,
@@ -532,38 +507,6 @@ def detection_channels(
     """
     check_one_channel_per_tetrode(electrode_group_names)
     return select_ripple_tetrodes(ripple_band, speed, unobserved, sampling_frequency)
-
-
-def epoch_artifact_intervals(
-    artifact_dir: Path | None, identifier: str
-) -> pd.DataFrame:
-    """The epoch's artifact mask, from an artifact run folder.
-
-    The run's cores for the epoch padded by ``PADDING_S``, merged and clipped to
-    the run's span, closed: the mask every stage uses.
-
-    Parameters
-    ----------
-    artifact_dir : Path or None
-        The artifact run folder; None when no run is configured.
-    identifier : str
-        The epoch's ``epoch_id``.
-
-    Returns
-    -------
-    pd.DataFrame
-        ``start_time`` and ``end_time`` in seconds; no rows when no run is
-        configured or the epoch has no artifacts.
-
-    Raises
-    ------
-    ArtifactRunError
-        If the run cannot serve the epoch (``read_epoch_cores``).
-    """
-    if artifact_dir is None:
-        return pd.DataFrame({"start_time": [], "end_time": []}, dtype=np.float64)
-    epoch = read_epoch_cores(artifact_dir, identifier)
-    return artifact_intervals(epoch.cores, epoch.span)
 
 
 def filter_detected_events(
@@ -1041,90 +984,14 @@ def _run_epoch_logged(
     (``threads_per_worker=1``), so no other epoch in the process reads them.
     """
     identifier = epoch_id(nwb_file_name, epoch_name)
-    log = setup_logger(
-        name_logfile=f"{identifier}_swr",
-        path_logfile=log_directory / f"{identifier}_swr.log",
+    return run_epoch_logged(
+        lambda log: run_epoch(nwb_file_name, epoch_name, **run_epoch_kwargs),
+        log_name=f"{identifier}_swr",
+        log_path=log_directory / f"{identifier}_swr.log",
+        start=f"{identifier}: run {run_epoch_kwargs}",
+        describe=summary,
+        log_provenance=True,
     )
-    log.info("%s: run %s", identifier, run_epoch_kwargs)
-    try:
-        record = run_epoch(nwb_file_name, epoch_name, **run_epoch_kwargs)
-    finally:
-        log.info("closed %d NWB files Spyglass held open", release_nwb_files())
-    if "provenance" in record:
-        log.info("PROVENANCE %s", json.dumps(record["provenance"], sort_keys=True))
-    if record["status"] == "failed":
-        log.error("%s\n%s", summary(record), record.get("traceback", ""))
-    else:
-        log.info("%s", summary(record))
-    return record
-
-
-def run_epochs(
-    epochs: list[tuple[str, str]],
-    run_epoch_kwargs: dict,
-    cluster_factory: Callable[[], Cluster],
-    *,
-    task: Callable[[str, str, dict, Path], dict] | None = None,
-    key_prefix: str = "swr",
-) -> Iterator[tuple[str, dict]]:
-    """Run each epoch as its own dask task; yield each record as it finishes.
-
-    Nothing here writes the manifest: the caller does, after each record, so
-    it has a single writer.
-
-    Parameters
-    ----------
-    epochs : list of (str, str)
-        ``(nwb_file_name, epoch_name)`` pairs, each named once.
-    run_epoch_kwargs : dict
-        Every keyword of ``run_epoch`` to pass.
-    cluster_factory : Callable
-        Makes the cluster, closed after the last record; none is made for no
-        epochs. Its workers should run one task at a time: ``setup_logger``
-        reconfigures logging for the whole worker process.
-    task : Callable, optional
-        ``(nwb_file_name, epoch_name, run_epoch_kwargs, log_directory) ->
-        record``, one epoch's dask task; this module's ``_run_epoch_logged``
-        when None. Another runner (the artifact runner) passes its own.
-    key_prefix : str, optional
-        The dask key of an epoch's task is ``{key_prefix}-{epoch_id}``.
-
-    Yields
-    ------
-    epoch_id : str
-    record : dict
-        The task's record, in the order the epochs finish; ``status``
-        ``"failed"`` with the error when the task could not return one, as
-        when its worker died.
-    """
-    if not epochs:
-        return
-    if task is None:
-        task = _run_epoch_logged
-    log_directory = Path.cwd() / "logs"
-    with cluster_factory() as cluster, Client(cluster) as client:
-        futures = {}
-        for nwb_file_name, epoch_name in epochs:
-            identifier = epoch_id(nwb_file_name, epoch_name)
-            future = client.submit(
-                task,
-                nwb_file_name,
-                epoch_name,
-                run_epoch_kwargs,
-                log_directory,
-                key=f"{key_prefix}-{identifier}",
-            )
-            futures[future] = identifier
-        for future in as_completed(futures):
-            try:
-                record = future.result()
-            except Exception as error:  # noqa: BLE001 - the task could not return
-                record = {
-                    "status": "failed",
-                    "error": repr(error),
-                    "traceback": "".join(traceback.format_exception(error)),
-                }
-            yield futures[future], record
 
 
 def run_settings(provenance: dict, artifact_run_id: str | None) -> dict:
@@ -1176,31 +1043,6 @@ def run_settings(provenance: dict, artifact_run_id: str | None) -> dict:
         }
     )
     return settings
-
-
-@contextmanager
-def run_lock(output_dir: Path) -> Iterator[None]:
-    """Hold the run folder's lock for the block, or exit if another run has it.
-
-    A non-blocking exclusive ``fcntl.lockf`` on ``output_dir / ".lock"``. Two
-    runs sharing a run id would each rewrite the manifest from their own
-    records, and the last to write would drop the other's. Only a lock held
-    elsewhere stops the run with that message; any other failure to lock, such
-    as a network file system without a lock manager, raises as itself.
-    """
-    output_dir.mkdir(parents=True, exist_ok=True)
-    path = output_dir / ".lock"
-    with path.open("a") as handle:
-        try:
-            fcntl.lockf(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError as error:
-            if error.errno not in (errno.EACCES, errno.EAGAIN):
-                raise
-            sys.exit(
-                f"Another run holds {path}: run {output_dir.name} is being "
-                "written. Wait for it to finish, or pick another --run-id."
-            )
-        yield  # the lock goes when the file closes
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -1287,7 +1129,8 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
         records = previous["epochs"]
 
     def write_manifest() -> None:
-        text = json.dumps(
+        write_json(
+            manifest_path,
             {
                 "produced_by": PRODUCED_BY,
                 "run_id": run_id,
@@ -1296,9 +1139,7 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
                 "epochs": records,
             },
             indent=2,
-            allow_nan=False,
         )
-        write_atomically(manifest_path, lambda path: path.write_text(text))
 
     to_run = []
     for nwb_file_name, epoch_name in epochs:
@@ -1329,8 +1170,19 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
         "artifact_dir": artifact_dir,
     }
     # the workers only return records: this process alone writes the manifest
+    log_directory = Path.cwd() / "logs"
+    tasks = {
+        epoch_id(nwb_file_name, epoch_name): (
+            nwb_file_name,
+            epoch_name,
+            run_epoch_kwargs,
+            log_directory,
+        )
+        for nwb_file_name, epoch_name in to_run
+    }
     for number, (identifier, record) in enumerate(
-        run_epochs(to_run, run_epoch_kwargs, cluster_factory), start=1
+        run_epochs(tasks, _run_epoch_logged, cluster_factory, key_prefix="swr"),
+        start=1,
     ):
         records[identifier] = record
         print(f"[{number}/{len(to_run)}] {identifier}: {summary(record)}", flush=True)

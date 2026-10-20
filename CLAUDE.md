@@ -75,10 +75,11 @@ src/continuum_swr_replay/
 │   ├── pfc/               #   mPFC/OFC unit analysis
 │   ├── replay/            #   replay content/rate tables, model ladders, fitters
 │   └── constants.py       #   analysis constants and defaults
+├── runs/                  # run infrastructure: atomic writes, provenance, CLI, batch loops
 ├── tables/                # canonical tables: schema, row ids, parquet I/O, parity
 ├── visualization/         # Plotting utilities
 ├── decode_files.py        # the naming rule for a decode's files
-├── decoding_common.py     # shared utilities for the decoding scripts
+├── decoding_common.py     # decode configs and the HPC decode masks
 ├── decoding_transitions.py # the decoders' discrete-transition settings
 ├── figure_utilities.py    # publication-figure helpers
 ├── intervals.py           # interval algebra: overlap conventions, masks, spike binning

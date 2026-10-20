@@ -122,17 +122,17 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
     git_hash as loaded_commit,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
-from continuum_swr_replay.decoding_common import (
-    raise_open_file_limit,
-    release_nwb_files,
-    setup_logger,
-    write_atomically,
-)
 from continuum_swr_replay.parameters import (
     MAX_SPEED_THRESHOLD_CM_PER_SEC,
     PROCESSED_DATA_DIR,
     SAMPLING_FREQUENCY,
 )
+from continuum_swr_replay.runs.batch import (
+    raise_open_file_limit,
+    release_nwb_files,
+    setup_logger,
+)
+from continuum_swr_replay.runs.io import write_atomically
 
 #: Populations the PFC GLMs may be fit on. ``at_well`` is the canonical shared
 #: cohort and publishes the unsuffixed artifact names; ``all_stops`` applies no

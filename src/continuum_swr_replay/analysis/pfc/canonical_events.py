@@ -53,7 +53,8 @@ from continuum_swr_replay.decode_files import (
     non_local_threshold_percent,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.tables.io import read_table, resolved_table_path, sha256_file
+from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.tables.io import read_table, resolved_table_path
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 __all__ = [

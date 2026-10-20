@@ -92,20 +92,16 @@ from numpy.typing import NDArray
 
 # CPU only: the package imports JAX, which this comparison never needs.
 os.environ.setdefault("JAX_PLATFORMS", "cpu")
-# Sibling-script import: run as a script, only this file's directory is on
-# sys.path.
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
-from continuum_swr_replay.analysis.constants import (  # noqa: E402
+from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
-from continuum_swr_replay.analysis.events import (  # noqa: E402
+from continuum_swr_replay.analysis.events import (
     analysed_time,
 )
 from continuum_swr_replay.analysis.events import (
     swr_inventory as source_inventory,
 )
-from continuum_swr_replay.analysis.inventory_comparison.adapters import (  # noqa: E402
+from continuum_swr_replay.analysis.inventory_comparison.adapters import (
     CAREY,
     MUA,
     NATIVE_IS_ELIGIBLE,
@@ -117,7 +113,7 @@ from continuum_swr_replay.analysis.inventory_comparison.adapters import (  # noq
     state_space_inventory,
     swr_inventory,
 )
-from continuum_swr_replay.analysis.inventory_comparison.availability import (  # noqa: E402
+from continuum_swr_replay.analysis.inventory_comparison.availability import (
     EXCLUSION_DTYPES,
     GAP_FACTOR,
     OBSERVATION_DTYPES,
@@ -127,17 +123,17 @@ from continuum_swr_replay.analysis.inventory_comparison.availability import (  #
     sample_runs,
     still_intervals,
 )
-from continuum_swr_replay.analysis.inventory_comparison.cells import (  # noqa: E402
+from continuum_swr_replay.analysis.inventory_comparison.cells import (
     CELL_DTYPES,
     NO_DETECTOR_DTYPES,
     membership_against,
     no_detector_time,
 )
-from continuum_swr_replay.analysis.inventory_comparison.components import (  # noqa: E402
+from continuum_swr_replay.analysis.inventory_comparison.components import (
     COMPONENT_DTYPES,
     overlap_components,
 )
-from continuum_swr_replay.analysis.inventory_comparison.overlap import (  # noqa: E402
+from continuum_swr_replay.analysis.inventory_comparison.overlap import (
     DIRECTIONAL_DTYPES,
     PAIR_DTYPES,
     SET_ASIDE_DTYPES,
@@ -150,17 +146,17 @@ from continuum_swr_replay.analysis.inventory_comparison.overlap import (  # noqa
     set_aside_events,
     time_coverage,
 )
-from continuum_swr_replay.analysis.inventory_comparison.recount import (  # noqa: E402
+from continuum_swr_replay.analysis.inventory_comparison.recount import (
     FRAGMENT_GAPS_S,
     merge_fragments,
 )
-from continuum_swr_replay.analysis.inventory_comparison.schema import (  # noqa: E402
+from continuum_swr_replay.analysis.inventory_comparison.schema import (
     INVENTORY_DTYPES,
     MEMORYLESS,
     STATE_SPACE,
     combine_inventories,
 )
-from continuum_swr_replay.analysis.inventory_comparison.swr_matrix import (  # noqa: E402
+from continuum_swr_replay.analysis.inventory_comparison.swr_matrix import (
     DISAGREEMENT_DTYPES,
     LABEL_DTYPES,
     MATRIX_DTYPES,
@@ -170,28 +166,26 @@ from continuum_swr_replay.analysis.inventory_comparison.swr_matrix import (  # n
     swr_label_matrix,
     swr_labels,
 )
-from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
+from continuum_swr_replay.data_loaders.epoch_register import (
     analysed_epoch_ids,
 )
-from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier  # noqa: E402
-from continuum_swr_replay.decode_files import decode_paths  # noqa: E402
-from continuum_swr_replay.decoding_common import (  # noqa: E402
-    parse_run_id,
-    provenance_record,
-    replace_outputs,
-    write_atomically,
-)
-from continuum_swr_replay.intervals import (  # noqa: E402
+from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier
+from continuum_swr_replay.decode_files import decode_paths
+from continuum_swr_replay.intervals import (
     contains,
     total_duration,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR  # noqa: E402
-from continuum_swr_replay.tables.io import sha256_file  # noqa: E402
-from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
-from scripts.decoding.run_swr_detection import (  # noqa: E402
+from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR
+from continuum_swr_replay.runs.batch import run_lock
+from continuum_swr_replay.runs.cli import parse_run_id
+from continuum_swr_replay.runs.io import (
     json_ready,
-    run_lock,
+    replace_outputs,
+    sha256_file,
+    write_json,
 )
+from continuum_swr_replay.runs.provenance import provenance_record
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
 COMPARISON_ROOT = PROCESSED_DATA_DIR / "replay_detection_comparison"
 OUTPUT_ROOT = COMPARISON_ROOT / "inventory"
@@ -877,7 +871,8 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
         records = previous["epochs"]
 
     def write_manifest() -> None:
-        text = json.dumps(
+        write_json(
+            manifest_path,
             {
                 "produced_by": PRODUCED_BY,
                 "run_id": output_dir.name,
@@ -886,9 +881,7 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
                 "epochs": records,
             },
             indent=2,
-            allow_nan=False,
         )
-        write_atomically(manifest_path, lambda path: path.write_text(text))
 
     to_run = []
     for identifier in epochs:

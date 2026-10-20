@@ -146,7 +146,7 @@ once its decodes exist and its entry is changed to `analysed`.
 
 | stage | reads |
 |---|---|
-| NonLocal and ContFrag decoders (`decoding_common.run_batch`) | `epochs_to_run(args.pending_only)`. `--pending-only` refuses the canonical `Processed-Data` folder as `--save_dir`. |
+| NonLocal and ContFrag decoders (`runs.batch.run_batch`) | `epochs_to_run(args.pending_only)`. `--pending-only` refuses the canonical `Processed-Data` folder as `--save_dir`. |
 | artifact runner (`run_artifact_detection.py`) | `analysed_epochs(include_pending=..., include_sustained_noise=True)`: the analysed epochs, the pending ones with `--include-pending`, and always the `SUSTAINED_NOISE` ones, so that a new run re-tests them. `--pending-only` runs the pending ones alone. |
 | SWR runner (`run_swr_detection.py`) | `epochs_to_run(args.pending_only)`; no skip list of its own |
 | Widloski runner (`run_memoryless_detection.py`, `--all` / `--animal`) | `epochs_to_run(args.pending_only)`. An epoch it selects with no decode under `--root` is run and recorded as failed. A decode of any other epoch is left out and recorded as skipped. `--epoch-id` runs what it names. |

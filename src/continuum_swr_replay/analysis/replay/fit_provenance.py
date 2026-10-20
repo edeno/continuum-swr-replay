@@ -35,7 +35,9 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 
-from continuum_swr_replay.tables.io import parquet_path, read_attrs, sha256_file
+from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.runs.provenance import git_commit, git_dirty
+from continuum_swr_replay.tables.io import parquet_path, read_attrs
 
 __all__ = [
     "fit_provenance_path",
@@ -72,28 +74,15 @@ def _read_git_hash(root: Path) -> str:
     """Return the commit checked out at `root`, suffixed ``-dirty`` if modified.
 
     ``git rev-parse HEAD``, plus ``-dirty`` when
-    ``git status --porcelain --untracked-files=no`` is non-empty. Untracked
-    files do not count as dirty: they cannot change how the code ran.
-    ``status`` runs with ``--no-optional-locks``, as in
-    ``decoding_common.provenance_record``: by default it refreshes the index
-    and writes it back under a lock, and the runners that record this commit
-    run in a checkout that other work commits in.
+    ``git status --porcelain --untracked-files=no`` is non-empty
+    (``runs.provenance.git_commit`` and ``git_dirty``). Untracked files do not
+    count as dirty: they cannot change how the code ran. git runs with
+    ``--no-optional-locks``: by default ``status`` refreshes the index and
+    writes it back under a lock, and the runners that record this commit run
+    in a checkout that other work commits in.
     """
-    head = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        cwd=root,
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout.strip()
-    porcelain = subprocess.run(
-        ["git", "--no-optional-locks", "status", "--porcelain", "--untracked-files=no"],
-        cwd=root,
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout.strip()
-    return f"{head}-dirty" if porcelain else head
+    head = git_commit(root)
+    return f"{head}-dirty" if git_dirty(root) else head
 
 
 # The checkout is read once, when this module is imported, because that is when

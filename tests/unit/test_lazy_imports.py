@@ -109,15 +109,17 @@ def test_no_lazy_import_loads_spyglass():
 
 
 # Readers of a decode folder that do not load the decode runners' scheduler.
-# Each one was free of ``dask.distributed`` and ``dask_cuda`` at 736e18b
-# (``state_evidence.terms`` was not: its package imports ``decoding_common``,
-# so it is not listed). They read the decode files' names from the leaf
-# ``decode_files``, never from ``decoding_common``.
+# Each one was free of ``dask.distributed`` and ``dask_cuda`` at 736e18b, but
+# ``state_evidence.terms``, whose package imported ``decoding_common``, which
+# imported dask until the run infrastructure moved to ``runs`` (whose
+# ``batch`` imports dask only inside the functions that start a cluster). They
+# read the decode files' names from the leaf ``decode_files``.
 _NO_SCHEDULER_IMPORTS: list[str] = [
     "import continuum_swr_replay.decode_files",
     "import continuum_swr_replay.analysis.pfc.canonical_events",
     "import continuum_swr_replay.analysis.hippocampus.result_loading",
     "import continuum_swr_replay.analysis.hippocampus.data_aggregation",
+    "import continuum_swr_replay.analysis.hippocampus.state_evidence.terms",
     "import continuum_swr_replay.analysis.contfrag.data_aggregation",
     "import continuum_swr_replay.analysis.replay.prepare_data",
 ]
@@ -179,6 +181,11 @@ JAX_FREE: list[str] = [
     "continuum_swr_replay.analysis.pfc.cohort",
     "continuum_swr_replay.analysis.replay.model_specs",
     "continuum_swr_replay.intervals",
+    "continuum_swr_replay.runs",
+    "continuum_swr_replay.runs.io",
+    "continuum_swr_replay.runs.cli",
+    "continuum_swr_replay.runs.provenance",
+    "continuum_swr_replay.runs.batch",
 ]
 
 #: Leaf modules that should be JAX-free but are not yet, each with the import
@@ -241,6 +248,41 @@ def test_intervals_imports_only_numpy_and_pandas():
             and m not in ("continuum_swr_replay", "continuum_swr_replay.intervals")
         )
         print("LEAKED" if leaked or ours else "OK", leaked[:10], ours[:10])
+        """
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        timeout=180,  # a hang guard, as above
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.startswith("OK"), result.stdout
+
+
+def test_runs_loads_no_dask_and_no_analysis():
+    """The foundation run infrastructure loads no dask at import (``batch``
+    imports it inside the functions that start a cluster), no JAX chain, no
+    Spyglass, and no ``analysis`` module."""
+    code = textwrap.dedent(
+        """
+        import sys
+        import continuum_swr_replay.runs
+        import continuum_swr_replay.runs.batch
+        import continuum_swr_replay.runs.cli
+        import continuum_swr_replay.runs.io
+        import continuum_swr_replay.runs.provenance
+        heavy = ("dask", "distributed", "dask_cuda", "jax", "non_local_detector",
+                 "statsmodels", "spyglass")
+        leaked = sorted(
+            m for m in sys.modules
+            if any(m == h or m.startswith(h + ".") for h in heavy)
+        )
+        analysis = sorted(
+            m for m in sys.modules
+            if m.startswith("continuum_swr_replay.analysis")
+        )
+        print("LEAKED" if leaked or analysis else "OK", leaked[:10], analysis[:10])
         """
     )
     result = subprocess.run(

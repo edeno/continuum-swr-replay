@@ -1,4 +1,4 @@
-"""The runners' shared epoch-output writer and run-id check (``decoding_common``).
+"""The runners' shared epoch-output writer and run-id check (``runs.io``, ``runs.cli``).
 
 ``replace_outputs`` leaves an epoch's folder holding exactly the outputs it was
 given, or, when a write fails, none of them. ``parse_run_id`` is the argparse
@@ -14,9 +14,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay import decoding_common
-from continuum_swr_replay.decoding_common import parse_run_id, replace_outputs
-from continuum_swr_replay.tables.io import read_table, sha256_file
+from continuum_swr_replay.runs import io as runs_io
+from continuum_swr_replay.runs.cli import parse_run_id
+from continuum_swr_replay.runs.io import replace_outputs, sha256_file
+from continuum_swr_replay.tables.io import read_table
 
 
 def _paths(tmp_path):
@@ -96,7 +97,7 @@ def test_an_interrupted_write_rolls_back_too(tmp_path, monkeypatch):
     """A KeyboardInterrupt mid-set leaves no part set either."""
     paths = _paths(tmp_path)
     _previous_run(paths)
-    real_write_table = decoding_common.write_table
+    real_write_table = runs_io.write_table
     calls = []
 
     def interrupted_second_write(frame, path):
@@ -105,7 +106,7 @@ def test_an_interrupted_write_rolls_back_too(tmp_path, monkeypatch):
             raise KeyboardInterrupt
         return real_write_table(frame, path)
 
-    monkeypatch.setattr(decoding_common, "write_table", interrupted_second_write)
+    monkeypatch.setattr(runs_io, "write_table", interrupted_second_write)
 
     with pytest.raises(KeyboardInterrupt):
         replace_outputs(paths, {"events": _frame(), "observed": _frame()})

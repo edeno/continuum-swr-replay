@@ -158,7 +158,7 @@ is re-measured on a smoke run before its stage is launched.
   `non_local_detector` `2d730c3` and Spyglass `18b2bff`.
 - **dask-cuda.** `dask_cuda` is not installed (the review found `find_spec` returns None),
   so `run_batch` falls back to a CPU `LocalCluster` and ignores `--cuda_visible_devices`
-  (`decoding_common.py:23-28, 235-241`). Install the locked version
+  (`decoding_common.py:23-28, 235-241` then; now `runs/batch.py`). Install the locked version
   (`uv pip install "dask-cuda==25.10.0"`) and confirm `import dask_cuda`. `run_batch` and the
   Widloski driver are changed to refuse a device list when `dask_cuda` is missing.
 - **Smoke under the pin.** Run `get_ripple` (Spyglass's `RippleTimesV1` read and
@@ -196,7 +196,7 @@ output (`run_decoding_contfrag.py:50-71, 300-345`). They run in parallel on disj
 GPUs, from one commit.
 
 - **Staging.**
-  - Add a `--save_dir` option to both decoders through `decoding_common.add_common_args`,
+  - Add a `--save_dir` option to both decoders through `decoding_common.add_common_args` (now `runs.cli.add_common_args`),
     defaulting to `PROCESSED_DATA_DIR`, which is hard-coded today (`parameters.py:79-81`).
   - Decodes write to `Processed-Data/_staging_redecode_YYYYMMDD/`, so the canonical folder
     never holds a mix of versions.
@@ -733,8 +733,8 @@ The **before/after report** covers:
 ## Code changes
 
 1. **Decoders:**
-   - `decoding_common` gains `--save_dir` and `--allow_cpu`, and `run_batch` refuses a
-     device list when `dask_cuda` is missing;
+   - `decoding_common` (now `runs.cli` and `runs.batch`) gains `--save_dir` and
+     `--allow_cpu`, and `run_batch` refuses a device list when `dask_cuda` is missing;
    - both decoders create `save_dir`, resume from it, and on resume rewrite only
      `data_over_time`;
    - both log the per-epoch provenance;

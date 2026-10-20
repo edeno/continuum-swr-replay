@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import subprocess
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
@@ -27,12 +26,9 @@ from continuum_swr_replay.analysis.replay.table_contracts import (
     validate_event_patch_table,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
-from continuum_swr_replay.tables.io import (
-    SWR_SOURCE_TABLES,
-    read_attrs,
-    read_table,
-    sha256_file,
-)
+from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.runs.provenance import git, git_commit, git_dirty
+from continuum_swr_replay.tables.io import SWR_SOURCE_TABLES, read_attrs, read_table
 from continuum_swr_replay.tables.parity import diff_table
 from continuum_swr_replay.tables.session_keys import (
     SESSION_COLUMNS,
@@ -53,16 +49,6 @@ MODEL_VALIDATION_BUNDLES = {
     "replay": ("base_arm", "base_patch", "belief_arm", "belief_patch"),
     "contfrag": ("mua_arm", "mua_patch", "swr_arm", "swr_patch"),
 }
-
-
-def _git(*args: str) -> str:
-    result = subprocess.run(  # noqa: S603
-        ["git", *args],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    return result.stdout.strip()
 
 
 def _inventory_file(path: Path, root: Path) -> dict[str, object]:
@@ -512,14 +498,16 @@ def write_manifest(
         ]
         for label, root in roots.items()
     }
-    tracked_dirty = bool(_git("status", "--porcelain", "--untracked-files=no"))
-    untracked = _git("ls-files", "--others", "--exclude-standard").splitlines()
+    # the work tree the manifest describes is the one it runs in, as uv.lock below
+    repo = Path.cwd()
+    tracked_dirty = git_dirty(repo)
+    untracked = git(repo, "ls-files", "--others", "--exclude-standard").splitlines()
     manifest = {
         "manifest_schema": MANIFEST_SCHEMA,
         "status": "validated_candidate_not_promoted",
         "generated_utc": datetime.now(UTC).isoformat(),
         "source": {
-            "git_commit": _git("rev-parse", "HEAD"),
+            "git_commit": git_commit(repo),
             "tracked_dirty": tracked_dirty,
             "untracked_paths_present": sorted(untracked),
             "uv_lock_sha256": sha256_file(Path("uv.lock")),

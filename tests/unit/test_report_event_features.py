@@ -18,6 +18,9 @@ import pandas as pd
 import pytest
 
 import scripts.qa.report_event_features as report
+from continuum_swr_replay.analysis.hippocampus.detection_inputs import (
+    memoryless_output_paths as memoryless_outputs,
+)
 from continuum_swr_replay.analysis.inventory_comparison.features import (
     DURATION_STRATUM_LABELS,
 )
@@ -25,9 +28,6 @@ from continuum_swr_replay.analysis.inventory_comparison.selection import (
     REJECTION_DTYPES,
 )
 from continuum_swr_replay.tables.io import write_table
-from scripts.decoding.run_memoryless_detection import (
-    output_paths as memoryless_outputs,
-)
 from scripts.qa import run_event_features as features_runner
 from scripts.qa import run_inventory_comparison as comparison
 
