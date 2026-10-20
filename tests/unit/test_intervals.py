@@ -279,3 +279,71 @@ def test_spike_binning_uses_left_edges_and_keeps_the_last_bin():
         np.array([-1.0, 0.0, 0.5, 1.0, 2.5, 3.0, 3.5]), np.array([0.0, 1.0, 2.0, 3.0])
     )
     assert counts.tolist() == [2, 1, 1, 1]
+
+
+class TestClosedIntervalsRefuseMalformedBounds:
+    """NaN bounds and start > end raise, naming the rows, in every
+    closed-interval function. Before, one NaN row merged into its neighbour:
+    ``merge_intervals([nan, 4], [nan, 5])`` gave ``[[4, nan]]``, hiding
+    ``[4, 5]`` from overlap, coverage and subtraction."""
+
+    BAD = {
+        "nan start": (np.nan, 2.0),
+        "nan end": (1.0, np.nan),
+        "inverted": (3.0, 1.0),
+    }
+
+    CALLS = {
+        "merge_intervals": lambda iv: merge_intervals(
+            iv.start_time.to_numpy(), iv.end_time.to_numpy()
+        ),
+        "interval_mask": lambda iv: interval_mask(np.array([4.5]), iv),
+        "subtract_intervals": lambda iv: subtract_intervals(
+            np.array([[0.0, 10.0]]), iv
+        ),
+        "masked_seconds": masked_seconds,
+        "pad_intervals": lambda iv: pad_intervals(iv, 0.1),
+        "overlaps_intervals": lambda iv: overlaps_intervals(
+            np.array([4.5]), np.array([4.6]), iv
+        ),
+        "covered_seconds": lambda iv: covered_seconds(
+            np.array([4.5]), np.array([4.6]), iv
+        ),
+    }
+
+    @pytest.mark.parametrize("function", sorted(CALLS))
+    @pytest.mark.parametrize("bad", sorted(BAD))
+    def test_every_closed_function_refuses_a_bad_interval(self, bad, function):
+        intervals = frame((4.0, 5.0), self.BAD[bad])
+        with pytest.raises(ValueError, match=r"NaN bound or start > end.* 1: "):
+            self.CALLS[function](intervals)
+
+    @pytest.mark.parametrize("bad", sorted(BAD))
+    def test_a_bad_queried_stretch_is_refused(self, bad):
+        s, e = self.BAD[bad]
+        starts, ends = np.array([0.0, s]), np.array([1.0, e])
+        with pytest.raises(ValueError, match="overlaps_intervals stretches"):
+            overlaps_intervals(starts, ends, frame((0, 1)))
+        with pytest.raises(ValueError, match="covered_seconds stretches"):
+            covered_seconds(starts, ends, frame((0, 1)))
+        with pytest.raises(ValueError, match="subtract_intervals stretches"):
+            subtract_intervals(np.column_stack([starts, ends]), frame((0, 1)))
+
+    def test_the_message_counts_every_bad_row_and_shows_five(self):
+        starts = np.arange(8.0)
+        with pytest.raises(ValueError, match=r"8 interval\(s\).*, and 3 more"):
+            merge_intervals(starts, starts - 1.0)
+
+    def test_infinite_and_zero_length_bounds_are_well_formed(self):
+        np.testing.assert_array_equal(
+            merge_intervals(np.array([-np.inf, 2.0]), np.array([1.0, 2.0])),
+            [[-np.inf, 1.0], [2.0, 2.0]],
+        )
+
+    def test_the_open_test_and_the_interval_sets_are_unchanged(self):
+        # overlaps_open moved with its semantics; the interval sets drop
+        # malformed rows by design (normalize), and refuse only when strict.
+        assert not overlaps_open(np.nan, 1.0, np.array([0.0]), np.array([2.0]))
+        np.testing.assert_array_equal(
+            normalize(np.array([[np.nan, 1.0], [3.0, 1.0], [4.0, 5.0]])), [[4.0, 5.0]]
+        )

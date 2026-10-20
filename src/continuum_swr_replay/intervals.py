@@ -22,7 +22,10 @@ instead.
 ``start_time`` / ``end_time`` DataFrame (or start and end arrays), closed: a
 time on an endpoint is inside, and intervals that touch merge. This is the
 convention of the artifact mask and of excluded time
-(``analysis/hippocampus/artifacts/masks.py``, ``event_eligibility``).
+(``analysis/hippocampus/artifacts/masks.py``, ``event_eligibility``). They
+refuse an interval with a NaN bound or with ``start > end`` (``ValueError``,
+naming the rows): such an interval has no closed reading, and merging one
+would silently hide its neighbours.
 
 **Overlap conventions.** "Overlap" means four different things in the
 project. Each has its own name, so the choice is visible at each caller:
@@ -192,6 +195,33 @@ def contains(intervals: NDArray, starts: NDArray, ends: NDArray) -> NDArray:
 # ---------------------------------------------------------------------------
 
 
+def _require_bounds(
+    starts: NDArray[np.float64], ends: NDArray[np.float64], what: str
+) -> None:
+    """Raise unless every interval has two non-NaN bounds and ``start <= end``.
+
+    Parameters
+    ----------
+    starts, ends : ndarray, shape (n,)
+    what : str
+        The function and argument, for the message.
+
+    Raises
+    ------
+    ValueError
+        Naming the offending rows (the first five, and how many in all).
+    """
+    bad = np.isnan(starts) | np.isnan(ends) | (starts > ends)
+    if bad.any():
+        rows = np.flatnonzero(bad)
+        shown = ", ".join(f"{i}: [{starts[i]!r}, {ends[i]!r}]" for i in rows[:5])
+        more = f", and {rows.size - 5} more" if rows.size > 5 else ""
+        raise ValueError(
+            f"{what}: {rows.size} interval(s) with a NaN bound or start > end "
+            f"(row: [start, end]) {shown}{more}"
+        )
+
+
 def merge_intervals(
     starts: NDArray[np.float64], ends: NDArray[np.float64]
 ) -> NDArray[np.float64]:
@@ -206,9 +236,15 @@ def merge_intervals(
     -------
     ndarray, shape (n_merged, 2)
         Disjoint ``[start, end]`` rows, sorted, with a gap between each.
+
+    Raises
+    ------
+    ValueError
+        If a bound is NaN or a start is after its end.
     """
     starts = np.asarray(starts, dtype=np.float64)
     ends = np.asarray(ends, dtype=np.float64)
+    _require_bounds(starts, ends, "merge_intervals")
     if starts.size == 0:
         return np.empty((0, 2), dtype=np.float64)
     order = np.argsort(starts, kind="stable")
@@ -244,9 +280,17 @@ def interval_mask(
     Returns
     -------
     ndarray of bool, shape (n_time,)
+
+    Raises
+    ------
+    ValueError
+        If an interval bound is NaN or a start is after its end.
     """
     values = np.asarray(time, dtype=np.float64)
     starts = intervals["start_time"].to_numpy(dtype=np.float64)
+    _require_bounds(
+        starts, intervals["end_time"].to_numpy(dtype=np.float64), "interval_mask"
+    )
     if starts.size == 0:
         return np.zeros(values.shape, dtype=bool)
     order = np.argsort(starts, kind="stable")
@@ -281,8 +325,14 @@ def subtract_intervals(
     -------
     ndarray, shape (n_pieces, 2)
         The remaining pieces, stretch by stretch, in time order within each.
+
+    Raises
+    ------
+    ValueError
+        If a stretch or interval bound is NaN or a start is after its end.
     """
     stretches = np.asarray(stretches, dtype=np.float64).reshape(-1, 2)
+    _require_bounds(stretches[:, 0], stretches[:, 1], "subtract_intervals stretches")
     removed = merge_intervals(
         intervals["start_time"].to_numpy(dtype=np.float64),
         intervals["end_time"].to_numpy(dtype=np.float64),
@@ -302,7 +352,11 @@ def subtract_intervals(
 
 
 def masked_seconds(intervals: pd.DataFrame) -> float:
-    """Total length of `intervals` in seconds, overlaps counted once."""
+    """Total length of `intervals` in seconds, overlaps counted once.
+
+    Raises ``ValueError`` on a NaN bound or a start after its end
+    (:func:`merge_intervals`).
+    """
     merged = merge_intervals(
         intervals["start_time"].to_numpy(dtype=np.float64),
         intervals["end_time"].to_numpy(dtype=np.float64),
@@ -334,7 +388,8 @@ def pad_intervals(intervals: pd.DataFrame, distance_s: float) -> pd.DataFrame:
     Raises
     ------
     ValueError
-        If the distance is negative or not finite.
+        If the distance is negative or not finite, or an interval bound is NaN
+        or a start is after its end.
     """
     if not (np.isfinite(distance_s) and distance_s >= 0):
         raise ValueError(f"a padding distance must be finite and >= 0: {distance_s}")
@@ -361,9 +416,16 @@ def overlaps_intervals(
     Returns
     -------
     ndarray of bool, shape (n,)
+
+    Raises
+    ------
+    ValueError
+        If a bound (of a stretch or an interval) is NaN or a start is after
+        its end.
     """
     starts = np.asarray(starts, dtype=np.float64)
     ends = np.asarray(ends, dtype=np.float64)
+    _require_bounds(starts, ends, "overlaps_intervals stretches")
     merged = merge_intervals(
         intervals["start_time"].to_numpy(dtype=np.float64),
         intervals["end_time"].to_numpy(dtype=np.float64),
@@ -398,9 +460,16 @@ def covered_seconds(
     Returns
     -------
     ndarray of float64, shape (n,)
+
+    Raises
+    ------
+    ValueError
+        If a bound (of a stretch or an interval) is NaN or a start is after
+        its end.
     """
     starts = np.asarray(starts, dtype=np.float64)
     ends = np.asarray(ends, dtype=np.float64)
+    _require_bounds(starts, ends, "covered_seconds stretches")
     merged = merge_intervals(
         intervals["start_time"].to_numpy(dtype=np.float64),
         intervals["end_time"].to_numpy(dtype=np.float64),
