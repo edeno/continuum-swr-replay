@@ -100,15 +100,15 @@ from continuum_swr_replay.analysis.events.swr_inventory import (
     swr_epoch_id,
 )
 from continuum_swr_replay.analysis.hippocampus import load_results
+from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
+    load_conditional_posterior,
+)
 from continuum_swr_replay.analysis.replay.bouts import (
     immobility_bout_intervals,
 )
 from continuum_swr_replay.analysis.replay.covariates import (
     trial_arrival_times,
     trial_outcome_times,
-)
-from continuum_swr_replay.analysis.replay.posterior_io import (
-    load_conditional_posterior,
 )
 from continuum_swr_replay.analysis.replay.tables_arm_patch import build_event_arm_table
 from continuum_swr_replay.analysis.replay.tables_event import build_event_table
@@ -118,7 +118,7 @@ from continuum_swr_replay.data_loaders.epoch_register import (
     analysed_epoch_ids,
 )
 from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier
-from continuum_swr_replay.decode_files import data_over_time_suffix, decode_paths
+from continuum_swr_replay.decoding.files import data_over_time_suffix, decode_paths
 from continuum_swr_replay.parameters import COLORS, PROCESSED_DATA_DIR
 from continuum_swr_replay.visualization.plots import (
     _track_edge_colors,

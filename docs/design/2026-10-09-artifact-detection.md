@@ -333,7 +333,7 @@ From C2 §1a (versions as fetched 2026-10-09) and the literature review:
 - **Its readers:**
   - `swr_inventory.artifact_intervals(epoch_id)` returns the mask. `swr_observed_mask` and
     `swr_observed_stretches` leave it out.
-  - `decoding_common.hpc_artifact_intervals` gives the same mask to the decoders and MUA.
+  - `decode_masks.hpc_artifact_intervals` gives the same mask to the decoders and MUA.
   - The SWR runner pads the run's cores the same way.
 
 ## Validation

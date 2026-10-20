@@ -48,7 +48,7 @@ from continuum_swr_replay.analysis.events.immobility import (
     require_canonical_speed_threshold,
 )
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
-from continuum_swr_replay.decode_files import (
+from continuum_swr_replay.decoding.files import (
     decode_paths,
     non_local_threshold_percent,
 )
@@ -180,7 +180,7 @@ def session_data_over_time_path(
     """Path of one session's cached per-bin decode frame.
 
     The threshold tag in the name is the one the decoder wrote
-    (:func:`~continuum_swr_replay.decode_files.non_local_threshold_percent`),
+    (:func:`~continuum_swr_replay.decoding.files.non_local_threshold_percent`),
     so a run reads the labels that were cut at the threshold it asks for rather
     than whichever file exists.
     """

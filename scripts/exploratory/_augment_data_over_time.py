@@ -33,7 +33,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import xarray as xr
 from non_local_detector.environment import Environment
 
 from continuum_swr_replay.analysis.contfrag.posterior_analysis import (
@@ -43,6 +42,7 @@ from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
     get_conditional_non_local_posterior,
     get_map_step_distance,
 )
+from continuum_swr_replay.decoding.results import open_results
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
 NEW_COLUMNS = ("step_distance", "run_speed_baseline")
@@ -60,10 +60,7 @@ def _step_distance_from_results(
 ) -> np.ndarray:
     """Exact per-timebin step distance from the saved posterior (argmax MAP)."""
     suffix = "" if scenario.startswith("nonlocal") else "_contfrag"
-    with xr.open_dataset(
-        PROCESSED_DATA_DIR / f"{base}{suffix}_results.nc", engine="h5netcdf"
-    ) as results:
-        results = results.set_index(state_bins=list(results["state_bins"].coords))
+    with open_results(PROCESSED_DATA_DIR / f"{base}{suffix}_results.nc") as results:
         if scenario.startswith("nonlocal"):
             posterior = get_conditional_non_local_posterior(results)
         else:

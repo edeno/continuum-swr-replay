@@ -31,7 +31,7 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     load_data_over_time,
 )
 from continuum_swr_replay.data_loaders import epoch_register
-from continuum_swr_replay.decode_files import non_local_threshold_percent
+from continuum_swr_replay.decoding.files import non_local_threshold_percent
 from tests.unit._swr_inventory_fixtures import RUN_ID, write_swr_inventory
 
 ANALYSED = ("a20200101_02_r1_HPC", "b20200102_04_r2_HPC")

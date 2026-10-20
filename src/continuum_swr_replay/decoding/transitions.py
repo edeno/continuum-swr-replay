@@ -85,7 +85,7 @@ NON_STATIONARY_REFUSAL: Final[str] = (
     "transitions cannot be saved (the fitted detector does not pickle, "
     "LorenFrankLab/non_local_detector#50) and add their Dirichlet transition prior "
     "at every time bin instead of once (#51). Decode with the stationary "
-    "transitions pinned in continuum_swr_replay.decoding_transitions until both "
+    "transitions pinned in continuum_swr_replay.decoding.transitions until both "
     "are fixed."
 )
 """Why both decoders (NonLocal and ContFrag) refuse ``--non_stationary``."""

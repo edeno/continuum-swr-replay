@@ -1,7 +1,7 @@
 # Decoder discrete-transition prior (decision R10: setting P30-B)
 
 **Status (2026-10-04):** decided by the project lead after validation on the five pilot
-epochs. Implemented in `src/continuum_swr_replay/decoding_transitions.py`, the only place
+epochs. Implemented in `src/continuum_swr_replay/decoding/transitions.py`, the only place
 the values live. Part of the full pipeline refresh
 ([2026-10-03-full-pipeline-refresh-design.md](2026-10-03-full-pipeline-refresh-design.md));
 the re-decode runs from the commit that adds this pin.

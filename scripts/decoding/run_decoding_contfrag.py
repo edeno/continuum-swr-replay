@@ -45,8 +45,8 @@ from continuum_swr_replay.analysis.contfrag import (
     get_contfrag_data_over_time,
     load_contfrag_results,
 )
-from continuum_swr_replay.decoding_common import DecodingConfig
-from continuum_swr_replay.decoding_transitions import contfrag_transition_settings
+from continuum_swr_replay.decoding.config import DecodingConfig
+from continuum_swr_replay.decoding.transitions import contfrag_transition_settings
 from continuum_swr_replay.parameters import (
     CONTFRAG_DETECTOR_CONFIG,
     PROCESSED_DATA_DIR,

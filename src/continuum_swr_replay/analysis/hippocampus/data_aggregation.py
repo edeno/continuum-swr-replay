@@ -158,7 +158,7 @@ from continuum_swr_replay.analysis.events.immobility import (
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
-from continuum_swr_replay.decode_files import data_over_time_suffix
+from continuum_swr_replay.decoding.files import data_over_time_suffix
 
 from ...types import SessionData
 from .posterior_analysis import (

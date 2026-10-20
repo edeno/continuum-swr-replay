@@ -1,20 +1,20 @@
-"""Shared utilities for decoding scripts.
+"""The HPC decode's masks, from the paper's SWR source.
 
-Contains the decode configuration and the HPC decode's masks, which both
-``run_decoding_bandit.py`` (NonLocal 4-state detector) and
-``run_decoding_contfrag.py`` (ContFrag 2-state classifier) use: ``is_missing``
-(the artifact run's mask) and ``is_training`` (that mask and every event of the
-Kay inventory left out), both from the paper's SWR source
+Both ``run_decoding_bandit.py`` (NonLocal 4-state detector) and
+``run_decoding_contfrag.py`` (ContFrag 2-state classifier) use them:
+``is_missing`` (the artifact run's mask) and ``is_training`` (that mask and
+every event of the Kay inventory left out), both from the paper's SWR source
 (``analysis/events/swr_inventory.py``). An HPC decode refuses to start unless
-the source names both runs (``require_hpc_decode_sources``). The run
-infrastructure the decoders share (atomic writes, provenance, the command line
-and the batch loop) is in ``continuum_swr_replay.runs``.
+the source names both runs (``require_hpc_decode_sources``). The decode's
+configuration, file names and results reader are in
+``continuum_swr_replay.decoding``; the run infrastructure the decoders share
+(atomic writes, provenance, the command line and the batch loop) is in
+``continuum_swr_replay.runs``.
 """
 
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -23,61 +23,8 @@ from numpy.typing import NDArray
 
 from continuum_swr_replay.analysis.events import swr_inventory
 from continuum_swr_replay.analysis.events.artifact_masks import PADDING_S
-from continuum_swr_replay.decode_files import decode_paths
 from continuum_swr_replay.intervals import interval_mask
-from continuum_swr_replay.parameters import (
-    BLOCK_SIZE,
-    LOCAL_POSITION_STD,
-    POSITION_STD,
-    WAVEFORM_STD,
-    TrainingType,
-)
-from continuum_swr_replay.types import ClusterlessParams, SortedSpikesParams
-
-
-@dataclass(frozen=True)
-class DecodingConfig:
-    """Encoding-likelihood configuration shared by every detector family.
-
-    ``position_std``, ``waveform_std``, and ``block_size`` configure the
-    encoding-model likelihood (the ``*_algorithm_params`` dict) and apply
-    to both the NonLocal 4-state detector and the ContFrag 2-state
-    classifier. State-specific detector arguments live on subclasses —
-    see :class:`NonLocalDecodingConfig`.
-    """
-
-    position_std: float = POSITION_STD
-    block_size: int = BLOCK_SIZE
-    waveform_std: float = WAVEFORM_STD
-
-    def to_clusterless_params(self) -> ClusterlessParams:
-        """Get parameters for clusterless decoding (HPC)."""
-        return {
-            "position_std": self.position_std,
-            "waveform_std": self.waveform_std,
-            "block_size": self.block_size,
-        }
-
-    def to_sorted_spikes_params(self) -> SortedSpikesParams:
-        """Get parameters for sorted spikes decoding (mPFC/OFC)."""
-        return {
-            "position_std": self.position_std,
-            "block_size": self.block_size,
-        }
-
-
-@dataclass(frozen=True)
-class NonLocalDecodingConfig(DecodingConfig):
-    """Decoding config for the NonLocal 4-state detector.
-
-    Adds ``local_position_std``, a detector-level argument that controls
-    the Local state's spatial representation. It is passed directly to the
-    detector constructor (not through ``to_*_params``). The ContFrag
-    2-state classifier has no Local state, so it uses the base
-    :class:`DecodingConfig` instead of this subclass.
-    """
-
-    local_position_std: float = LOCAL_POSITION_STD
+from continuum_swr_replay.parameters import TrainingType
 
 
 def require_hpc_decode_sources() -> None:
@@ -310,17 +257,3 @@ def hpc_decode_masks(
         "encoding_removed_swr_s": int(np.count_nonzero(is_swr)) * bin_s,
     }
     return HpcDecodeMasks(is_missing=is_missing, is_training=is_training, record=record)
-
-
-def results_exist(
-    save_folder: Path,
-    epoch_identifier: str,
-    overwrite: bool,
-) -> bool:
-    """Check if results, detector, and environment files exist."""
-    if overwrite:
-        return False
-
-    paths = decode_paths(epoch_identifier, save_folder)
-    required_files = [paths.results, paths.detector, paths.environment]
-    return all(f.exists() for f in required_files)

@@ -24,13 +24,16 @@ import numpy as np
 
 from continuum_swr_replay.data_loaders.constants import OMISSION_KNOWN_LATENCY_SEC
 from continuum_swr_replay.parameters import (
+    DEFAULT_NON_LOCAL_THRESHOLD as DEFAULT_NON_LOCAL_THRESHOLD,
+)
+from continuum_swr_replay.parameters import (
     MAX_SPEED_THRESHOLD_CM_PER_SEC,
     SAMPLING_FREQUENCY,
 )
 
-# Event detection thresholds
-DEFAULT_NON_LOCAL_THRESHOLD = 0.8
-"""Default probability threshold for classifying non-local events (0-1)."""
+# Event detection thresholds: DEFAULT_NON_LOCAL_THRESHOLD is
+# :data:`continuum_swr_replay.parameters.DEFAULT_NON_LOCAL_THRESHOLD`, re-exported
+# here for the analysis code that reads it from this module.
 
 # The omission latency itself is a loading-side task constant (see
 # ``data_loaders.constants``); the semantics string that reports it is an

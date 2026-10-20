@@ -67,13 +67,14 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from continuum_swr_replay import decoding_common
 from continuum_swr_replay.analysis.contfrag import result_loading as contfrag_loading
 from continuum_swr_replay.analysis.events import analysed_time, swr_inventory
 from continuum_swr_replay.analysis.events.immobility import (
     EventDefinitionError,
 )
+from continuum_swr_replay.analysis.hippocampus import decode_masks
 from continuum_swr_replay.analysis.hippocampus import result_loading as hpc_loading
+from continuum_swr_replay.decoding import files as decoding_files
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.runs import batch, cli, provenance
 from continuum_swr_replay.runs import io as runs_io
@@ -408,7 +409,7 @@ def _patch_fresh_decode(
     monkeypatch.setattr(
         flow,
         "hpc_decode_masks",
-        lambda *args, **kwargs: decoding_common.HpcDecodeMasks(
+        lambda *args, **kwargs: decode_masks.HpcDecodeMasks(
             np.zeros(2, dtype=bool), np.ones(2, dtype=bool), {"stand_in": True}
         ),
     )
@@ -614,7 +615,7 @@ def _record_reads(monkeypatch, detector_class: type) -> list[Path]:
     """Make ``xr.open_dataset`` and ``detector_class.load_model`` record their paths."""
     reads = []
 
-    def open_dataset(path: Path, engine: str) -> xr.Dataset:
+    def open_dataset(path: Path, engine: str, **kwargs) -> xr.Dataset:
         reads.append(Path(path))
         return _saved_results()
 
@@ -855,7 +856,7 @@ def test_a_failed_write_leaves_no_final_file(decoders, monkeypatch, tmp_path, ke
         f"{stem}_detector.pkl",
         f"{stem}_results.nc",
     ]
-    assert not decoding_common.results_exist(save_dir, stem, overwrite=False)
+    assert not decoding_files.results_exist(save_dir, stem, overwrite=False)
 
 
 def test_write_atomically_keeps_the_old_file_when_a_write_fails(tmp_path):

@@ -1,6 +1,6 @@
 """The HPC decoders' masks: ``is_missing`` and ``is_training`` from the SWR source.
 
-``decoding_common.hpc_artifact_intervals`` and ``hpc_decode_masks`` build them
+``decode_masks.hpc_artifact_intervals`` and ``hpc_decode_masks`` build them
 from the configured Kay inventory and artifact run, here synthetic run folders
 written as the runners write them. Offline: nothing touches Spyglass or
 ``Processed-Data``.
@@ -12,9 +12,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay import decoding_common
 from continuum_swr_replay.analysis.events import swr_inventory
-from continuum_swr_replay.decoding_common import (
+from continuum_swr_replay.analysis.hippocampus import decode_masks
+from continuum_swr_replay.analysis.hippocampus.decode_masks import (
     hpc_artifact_intervals,
     hpc_decode_masks,
     require_hpc_decode_sources,
@@ -154,7 +154,7 @@ def test_both_run_ids_unset_are_named(monkeypatch):
     monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", None)
 
     with pytest.raises(ValueError) as refused:
-        decoding_common.require_hpc_decode_sources()
+        decode_masks.require_hpc_decode_sources()
 
     assert "SWR_INVENTORY_RUN_ID and swr_inventory.ARTIFACT_INTERVALS_RUN_ID" in str(
         refused.value
@@ -176,7 +176,7 @@ def test_an_inventory_masked_by_another_artifact_run_is_refused(
     use_swr_source(monkeypatch, inventory, artifacts)
 
     for refuse in (
-        decoding_common.require_hpc_decode_sources,
+        decode_masks.require_hpc_decode_sources,
         lambda: hpc_artifact_intervals(NWB_FILE_NAME, EPOCH_NAME),
     ):
         with pytest.raises(ValueError) as refused:
@@ -187,7 +187,7 @@ def test_an_inventory_masked_by_another_artifact_run_is_refused(
 
 
 def test_an_inventory_masked_by_the_configured_artifact_run_is_accepted(sources):
-    decoding_common.require_hpc_decode_sources()
+    decode_masks.require_hpc_decode_sources()
 
 
 def test_a_configured_run_missing_the_epoch_is_refused(tmp_path, monkeypatch):

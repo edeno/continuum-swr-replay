@@ -1,4 +1,4 @@
-"""The one naming rule for a decode's files (``decode_files.decode_paths``).
+"""The one naming rule for a decode's files (``decoding.files.decode_paths``).
 
 The decode runners write these names and every reader builds them through the
 same function, so the names are pinned here as literal strings: a change to the
@@ -12,13 +12,13 @@ from pathlib import Path
 
 import pytest
 
-from continuum_swr_replay.decode_files import (
+from continuum_swr_replay.decoding.files import (
     DEFAULT_NON_LOCAL_THRESHOLD_PERCENT,
     data_over_time_suffix,
     decode_paths,
     non_local_threshold_percent,
+    results_exist,
 )
-from continuum_swr_replay.decoding_common import results_exist
 
 ROOT = Path("/decodes")
 

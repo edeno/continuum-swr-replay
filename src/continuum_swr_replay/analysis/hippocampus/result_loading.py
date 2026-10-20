@@ -35,7 +35,8 @@ import xarray as xr
 from non_local_detector import NonLocalClusterlessDetector
 from non_local_detector.environment import Environment
 
-from continuum_swr_replay.decode_files import decode_paths
+from continuum_swr_replay.decoding.files import decode_paths
+from continuum_swr_replay.decoding.results import open_results
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
 
@@ -138,9 +139,7 @@ def _load_saved_decode(
         epoch_identifier += f"_{training_type}"
 
     paths = decode_paths(epoch_identifier, root)
-    results = xr.open_dataset(paths.results, engine="h5netcdf")
-    state_bin_coord_names = list(results["state_bins"].coords)
-    results = results.set_index(state_bins=state_bin_coord_names)
+    results = open_results(paths.results)
 
     if load_detector:
         detector = model_class.load_model(paths.detector)

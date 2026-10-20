@@ -2,7 +2,7 @@
 
 The decoders used to leave these settings to ``non_local_detector``'s defaults,
 which changed after April (+32 % non-local events on identical inputs).
-``decoding_transitions`` now holds every value: setting P30-B for the NonLocal
+``decoding.transitions`` now holds every value: setting P30-B for the NonLocal
 detector (decision R10, ``docs/design/2026-10-04-decoder-transition-prior.md``)
 and, for the ContFrag classifier, the values C0 constructed. C0 is commit
 ``de15650``, the decode code just before this pin.
@@ -35,9 +35,9 @@ from non_local_detector.discrete_state_transitions import (
     get_transition_prior,
 )
 
-from continuum_swr_replay import decoding_transitions
-from continuum_swr_replay.decoding_common import DecodingConfig
-from continuum_swr_replay.decoding_transitions import (
+from continuum_swr_replay.decoding import transitions
+from continuum_swr_replay.decoding.config import DecodingConfig
+from continuum_swr_replay.decoding.transitions import (
     contfrag_transition_settings,
     nonlocal_transition_settings,
 )
@@ -150,7 +150,7 @@ def _no_batch(*args: Any, **kwargs: Any) -> None:
 def test_rows_sum_to_one_and_expected_stays_are_the_dwell_times() -> None:
     matrix = nonlocal_transition_settings()["discrete_transition_type"].values
 
-    assert decoding_transitions.BIN_S == BIN_S
+    assert transitions.BIN_S == BIN_S
     np.testing.assert_allclose(matrix.sum(axis=1), 1.0, rtol=0, atol=1e-12)
     expected_stay_s = BIN_S / (1 - np.diag(matrix))
     np.testing.assert_allclose(expected_stay_s, [3.0, 0.1, 0.1, 0.1], rtol=1e-9)

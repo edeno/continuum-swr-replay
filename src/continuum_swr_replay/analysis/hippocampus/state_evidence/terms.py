@@ -18,7 +18,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
     CLUSTERLESS_LIKELIHOOD_KEYS,
     ENCODING_KEY,
 )
-from continuum_swr_replay.decode_files import decode_paths
+from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
 

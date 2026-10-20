@@ -124,7 +124,7 @@ from continuum_swr_replay.analysis.replay.per_stop_rate_model import (
     cross_validate_per_stop_rate_model,
     fit_per_stop_rate_model,
 )
-from continuum_swr_replay.analysis.replay.posterior_io import (
+from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
     load_conditional_posterior,
 )
 from continuum_swr_replay.analysis.replay.retrospective import (

@@ -40,7 +40,7 @@ from continuum_swr_replay.analysis.hippocampus.hpc_raw_stats import (
 )
 from continuum_swr_replay.data_loaders.bandit_task import load_data
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
-from continuum_swr_replay.decode_files import decode_paths
+from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.types import DataLoadingPreset
 

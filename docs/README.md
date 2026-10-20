@@ -78,7 +78,7 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     `DESIGN_SPEC`.
   - [design/2026-10-04-decoder-transition-prior.md](design/2026-10-04-decoder-transition-prior.md)
     — decision R10: the decoders' discrete-transition prior (setting P30-B), its sources
-    and sensitivity; the values live in `decoding_transitions.py`.
+    and sensitivity; the values live in `decoding/transitions.py`.
   - [design/2026-10-09-swr-source.md](design/2026-10-09-swr-source.md) — the paper's
     one SWR source: the direct ripple_detection 2.0 Kay inventory, its comparison with
     the stored `RippleTimesV1` events, the interface every SWR consumer reads, and the

@@ -36,6 +36,9 @@ DETECTOR_CONFIG : dict
     Maps brain area names to detector class names and types.
 PROBABILITY_THRESHOLDS : list
     Probability thresholds for posterior analysis [0.50, 0.80, 0.95].
+DEFAULT_NON_LOCAL_THRESHOLD : float
+    Default probability threshold (0.8) for classifying non-local events; the
+    canonical decode's ``data_over_time`` file is named for it.
 COLORS : dict
     Color scheme for plotting different event types.
 
@@ -124,6 +127,9 @@ CONTFRAG_DETECTOR_CONFIG: Final[dict[str, tuple[str, str]]] = {
 
 PROBABILITY_THRESHOLDS: Final[list[float]] = [0.50, 0.80, 0.95]
 
+DEFAULT_NON_LOCAL_THRESHOLD: Final[float] = 0.8
+"""Default probability threshold for classifying non-local events (0-1)."""
+
 
 class TrainingType(str, Enum):
     """Types of training data selection for decoder.
@@ -181,6 +187,7 @@ __all__ = [
     "SAMPLING_FREQUENCY",
     "MAX_SPEED_THRESHOLD_CM_PER_SEC",
     "PROBABILITY_THRESHOLDS",
+    "DEFAULT_NON_LOCAL_THRESHOLD",
     # HSE detection parameters
     "HSE_MINIMUM_DURATION_SEC",
     "HSE_ZSCORE_THRESHOLD",

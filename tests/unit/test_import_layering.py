@@ -17,7 +17,7 @@ plain edge rather than as an ``ImportError`` from a cycle:
    module the event tables shared (``event_ids``) now lives in the foundation
    ``tables`` package.
 
-Seven more rules are checked over the module import graph
+Six more rules are checked over the module import graph
 (:func:`module_edges`) and the package graph built from it
 (:func:`package_graph`). Each holds today only up to a known-violations
 allowlist (:data:`KNOWN_VIOLATIONS`) that the code-organization plan works
@@ -29,8 +29,6 @@ edges are removed, never go stale:
   plotting code.
 - ``src_imports_no_scripts``: the package does not import the ``scripts/``
   tree.
-- ``analysis_imports_no_decoding_common``: analysis code does not import
-  the decode-run driver (``decoding_common``).
 - ``foundation_imports_only_foundation``: a foundation module
   (:data:`FOUNDATION`) imports, from within the package, only other
   foundation modules, and nothing from ``scripts``.
@@ -44,9 +42,8 @@ edges are removed, never go stale:
   module edge along a package pair it already lists is invisible to it. The
   back edges that close today's cycles are pinned at module level instead,
   by the other rules: hippocampus -> replay by rule 3, hippocampus ->
-  inventory_comparison (and -> pfc) by the hippocampus rule, hippocampus ->
-  decoding_common by the decoding_common rule, and a foundation or events
-  module's edges by the foundation and events rules.
+  inventory_comparison (and -> pfc) by the hippocampus rule, and a foundation
+  or events module's edges by the foundation and events rules.
 
 Imports inside functions count: a function-local import is how a cycle is
 usually hidden, and it is still a dependency.
@@ -203,8 +200,7 @@ def test_hippocampus_imports_only_shared_replay_leaves() -> None:
 FOUNDATION = frozenset(
     {
         "data_loaders",
-        "decode_files",
-        "decoding_transitions",
+        "decoding",
         "intervals",
         "parameters",
         "runs",
@@ -223,19 +219,13 @@ EVENTS_MAY_IMPORT = frozenset({"analysis.events", "analysis.constants"})
 KNOWN_VIOLATIONS: dict[str, set[tuple[str, str]]] = {
     "analysis_imports_no_visualization": set(),
     "src_imports_no_scripts": set(),
-    "analysis_imports_no_decoding_common": {
-        ("analysis.hippocampus.artifacts.detect", "decoding_common"),
-        ("analysis.hippocampus.state_evidence.io", "decoding_common"),
-    },
-    "foundation_imports_only_foundation": {
-        ("decode_files", "analysis.constants"),
-    },
+    "foundation_imports_only_foundation": set(),
     "hippocampus_imports_no_pfc_or_inventory_comparison": set(),
     "events_imports_only_foundation": set(),
     # No package cycles (code-organization review, F2). hippocampus <-> pfc
     # left with the spike binning, Task 4; hippocampus -> replay and table_io
-    # -> replay with the tables package, Task 5; the replay and
-    # decoding_common cycles through hippocampus with the event substrate's
+    # -> replay with the tables package, Task 5; the replay and decode-driver
+    # cycles through hippocampus with the event substrate's
     # move to analysis.events, and hippocampus <-> inventory_comparison with
     # kay_version_check's move to inventory_comparison, Task 6.
     "no_package_cycles": set(),
@@ -409,11 +399,6 @@ def rule_violations(root: Path = SRC) -> dict[str, set[tuple[str, str]]]:
         "src_imports_no_scripts": {
             (a, b) for a, b in edges if _starts_with(b, "scripts")
         },
-        "analysis_imports_no_decoding_common": {
-            (a, b)
-            for a, b in edges
-            if _starts_with(a, "analysis") and _starts_with(b, "decoding_common")
-        },
         "foundation_imports_only_foundation": {
             (a, b)
             for a, b in edges
@@ -478,8 +463,8 @@ def test_graph_rules_see_function_local_imports_and_cycles(tmp_path: Path) -> No
     """A cycle closed by a lazy, function-local import is still a cycle.
 
     The same synthetic tree checks that a relative import resolves to the
-    module it names, that an import of ``scripts`` is seen, that analysis
-    reaching ``decoding_common`` is seen, and that a foundation module
+    module it names, that an import of ``scripts`` is seen, and that a
+    foundation module
     importing any non-foundation module of the package -- not only
     ``analysis`` -- is seen, while one importing another foundation module
     is not.
@@ -498,13 +483,10 @@ def test_graph_rules_see_function_local_imports_and_cycles(tmp_path: Path) -> No
         "def f():\n    from ..alpha.a import x\n    from ...visualization import v\n"
     )
     (root / "visualization" / "v.py").write_text("")
-    (root / "decoding_common.py").write_text("")
-    (root / "analysis" / "alpha" / "d.py").write_text(
-        "def g():\n    from ... import decoding_common\n"
-    )
+    (root / "driver.py").write_text("")
     (root / "types.py").write_text("")
     (root / "parameters.py").write_text(
-        "from . import types\nfrom .decoding_common import run\n"
+        "from . import types\nfrom .driver import run\n"
     )
 
     found = rule_violations(root)
@@ -516,12 +498,7 @@ def test_graph_rules_see_function_local_imports_and_cycles(tmp_path: Path) -> No
         ("analysis.beta.b", "visualization.v")
     }
     assert found["src_imports_no_scripts"] == {("analysis.beta.b", "scripts.qa.tool")}
-    assert found["analysis_imports_no_decoding_common"] == {
-        ("analysis.alpha.d", "decoding_common")
-    }
-    assert found["foundation_imports_only_foundation"] == {
-        ("parameters", "decoding_common")
-    }
+    assert found["foundation_imports_only_foundation"] == {("parameters", "driver")}
 
 
 def test_events_rule_allows_only_foundation_constants_and_itself(

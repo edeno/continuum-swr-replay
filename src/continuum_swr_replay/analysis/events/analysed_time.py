@@ -47,7 +47,7 @@ decoders since Task 17a already holds the source's SWR labels: its
 ``organize_results`` reads the frame through :func:`with_swr_source` (keeping
 every event it decoded, ``drop_masked_events=False``), so the decode's
 provenance is this source, and its encoding leaves out every event of this
-inventory and the artifact mask (``decoding_common.hpc_decode_masks``). In an older
+inventory and the artifact mask (``decode_masks.hpc_decode_masks``). In an older
 decode, or a PFC decode, ``SWR_event`` (from ``RippleTimesV1``, written by
 ``get_data_over_time``) stays in the pickle as the decode's provenance and never
 reaches an analysis, and neither do the decode's stored-ripple counts

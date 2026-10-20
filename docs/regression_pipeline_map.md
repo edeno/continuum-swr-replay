@@ -106,6 +106,12 @@ Aggregation of analysis results over time.
 
 `theta_power_zscore`, `validate_required_session_data_keys`, `validate_results_position_time_alignment`, `align_results_to_position`, `validate_dot_event_contract`, `get_data_over_time`, `load_data_over_time`, `get_event_types`, `compute_swr_overlap_class_counts`, `compute_swr_nl_event_counts`
 
+### `src/continuum_swr_replay/analysis/hippocampus/decode_masks.py`
+
+The HPC decode's masks, from the paper's SWR source.
+
+`require_hpc_decode_sources`, `require_saved_decode_masks`, `hpc_artifact_intervals`, `hpc_ripple_power_inputs`, `HpcDecodeMasks`, `hpc_decode_masks`
+
 ### `src/continuum_swr_replay/analysis/hippocampus/detection_inputs.py`
 
 What the replay detection runners read from a saved HPC decode and from each other.
@@ -128,7 +134,7 @@ Raw-data quality statistics for hippocampal clusterless decoding.
 
 Analysis of decoded posterior distributions.
 
-`get_conditional_non_local_posterior`, `get_map_step_distance`, `step_distance_from_nodes`, `map_estimate_to_map_nodes`, `get_map_speed`, `get_posterior_stats`
+`get_conditional_non_local_posterior`, `load_conditional_posterior`, `get_map_step_distance`, `step_distance_from_nodes`, `map_estimate_to_map_nodes`, `get_map_speed`, `get_posterior_stats`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/quality_metrics.py`
 
@@ -916,11 +922,17 @@ Sidecar records tying a fitted artifact to the tables it was fit on.
 
 `fit_provenance_path`, `git_hash`, `record_inputs`, `write_fit_provenance`, `check_fit_provenance`, `require_fresh_inputs`
 
-### `src/continuum_swr_replay/analysis/replay/posterior_io.py`
+### `src/continuum_swr_replay/decoding/files.py`
 
-Load the conditional non-local posterior from a decoder results file.
+The one naming rule for a decode's files.
 
-`load_conditional_posterior`
+`non_local_threshold_percent`, `data_over_time_suffix`, `DecodePaths`, `decode_paths`, `results_exist`
+
+### `src/continuum_swr_replay/decoding/results.py`
+
+The one reader of a decode's ``{epoch_identifier}_results.nc``.
+
+`open_results`
 
 ### `src/continuum_swr_replay/tables/io.py`
 

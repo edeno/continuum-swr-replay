@@ -52,7 +52,7 @@ _LAZY_IMPORTS: list[str] = [
     # The one epoch-identifier parser, read by offline decode-file readers.
     "from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier",
     # The one decode-file naming rule, read by the same offline readers.
-    "from continuum_swr_replay.decode_files import decode_paths",
+    "from continuum_swr_replay.decoding.files import decode_paths",
     # ``analysis/*`` leaf modules. The hippocampus leaves used to drag
     # ``data_aggregation`` (which imports ``get_labels`` → spyglass);
     # the PFC leaves used to be poisoned by the eager re-export from
@@ -110,12 +110,14 @@ def test_no_lazy_import_loads_spyglass():
 
 # Readers of a decode folder that do not load the decode runners' scheduler.
 # Each one was free of ``dask.distributed`` and ``dask_cuda`` at 736e18b, but
-# ``state_evidence.terms``, whose package imported ``decoding_common``, which
-# imported dask until the run infrastructure moved to ``runs`` (whose
+# ``state_evidence.terms``, whose package imported the old decode driver
+# module, which imported dask until the run infrastructure moved to ``runs`` (whose
 # ``batch`` imports dask only inside the functions that start a cluster). They
-# read the decode files' names from the leaf ``decode_files``.
+# read the decode files' names from the leaf ``decoding.files``, and open
+# ``results.nc`` through ``decoding.results``.
 _NO_SCHEDULER_IMPORTS: list[str] = [
-    "import continuum_swr_replay.decode_files",
+    "import continuum_swr_replay.decoding.files",
+    "import continuum_swr_replay.decoding.results",
     "import continuum_swr_replay.analysis.pfc.canonical_events",
     "import continuum_swr_replay.analysis.hippocampus.result_loading",
     "import continuum_swr_replay.analysis.hippocampus.data_aggregation",
@@ -186,6 +188,11 @@ JAX_FREE: list[str] = [
     "continuum_swr_replay.runs.cli",
     "continuum_swr_replay.runs.provenance",
     "continuum_swr_replay.runs.batch",
+    # ``decoding.transitions`` is not here: it imports ``non_local_detector``.
+    "continuum_swr_replay.decoding",
+    "continuum_swr_replay.decoding.files",
+    "continuum_swr_replay.decoding.config",
+    "continuum_swr_replay.decoding.results",
 ]
 
 #: Leaf modules that should be JAX-free but are not yet, each with the import

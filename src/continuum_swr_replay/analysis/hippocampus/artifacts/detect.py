@@ -53,6 +53,7 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
+from continuum_swr_replay import parameters
 from continuum_swr_replay.analysis.events.artifact_intervals import (
     empty_cores,
     make_cores,
@@ -74,7 +75,6 @@ from continuum_swr_replay.analysis.hippocampus.artifacts.features import (
     window_centers,
     window_valid,
 )
-from continuum_swr_replay.decoding_common import DecodingConfig
 from continuum_swr_replay.intervals import interval_mask
 
 __all__ = [
@@ -185,8 +185,9 @@ off rule P. SpikeInterface 0.99.1's default refractory period is 1 ms
 (``qualitymetrics`` ``rp_violation``, ``curation.get_potential_auto_merge``),
 and it treats one unit's spikes within 0.3 ms as one spike detected twice
 (``curation.remove_duplicated_spikes``, ``censored_period_ms``)."""
-WAVEFORM_STD: float = DecodingConfig().waveform_std
-"""The decoder's mark-kernel bandwidth (µV), read from its settings."""
+WAVEFORM_STD: float = parameters.WAVEFORM_STD
+"""The decoder's mark-kernel bandwidth (µV), read from its settings
+(``parameters.WAVEFORM_STD``, ``DecodingConfig``'s default)."""
 
 # --- merging T signatures (report §1.2) ---------------------------------------
 T_MERGE_S = 0.05

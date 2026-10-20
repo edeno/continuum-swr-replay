@@ -51,7 +51,7 @@ for the April values).
 | change | first in |
 |---|---|
 | Coincident-spike fix: the coincidence count now includes each cluster's leading spike (`64bf585`). About 0.07 % more HPC marks are dropped (259 of about 358,000 on chimi20200225_02_r1) | first re-decode |
-| P30-B discrete transitions, pinned in `decoding_transitions.py` (R10; [note](../design/2026-10-04-decoder-transition-prior.md)). The library's defaults are not used | first re-decode |
+| P30-B discrete transitions, pinned in `decoding/transitions.py` (R10; [note](../design/2026-10-04-decoder-transition-prior.md)). The library's defaults are not used | first re-decode |
 | Local state is a 2.5 cm Gaussian, not the exact position (`ded292e`) | first re-decode |
 | Non-local events need 7 bins at the 500 Hz grid, not 9 (R9; `minimum_sample_count(time, 0.015)` is 7 on every epoch) | first re-decode |
 | Artifact bins are missing data: `is_missing` is set, so the bin's log-likelihood is 0 | R11 |

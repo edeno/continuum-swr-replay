@@ -13,7 +13,10 @@ import json
 from pathlib import Path
 
 from continuum_swr_replay.analysis.events import swr_inventory
-from continuum_swr_replay.decoding_common import require_saved_decode_masks
+from continuum_swr_replay.analysis.hippocampus.decode_masks import (
+    require_saved_decode_masks,
+)
+from continuum_swr_replay.decoding.results import open_results
 
 
 def code_version(provenance: dict) -> dict:
@@ -38,9 +41,9 @@ def saved_decode_masks(results_path: Path) -> dict:
 
     State evidence and the half decodes score a canonical HPC decode made with
     the configured SWR source's masks (R11 on): its ``results.nc`` carries the
-    ``decode_masks`` the decoder stamps (``decoding_common.hpc_decode_masks``),
+    ``decode_masks`` the decoder stamps (``decode_masks.hpc_decode_masks``),
     naming the configured inventory and artifact runs
-    (``decoding_common.require_saved_decode_masks`` checks them). Read from the
+    (``decode_masks.require_saved_decode_masks`` checks them). Read from the
     file's attributes alone, before anything is loaded.
 
     Parameters
@@ -60,9 +63,7 @@ def saved_decode_masks(results_path: Path) -> dict:
         other runs; the message says to rerun once R11's decodes are in the
         decode folder, which no ``--overwrite`` of these runners can replace.
     """
-    import xarray as xr
-
-    with xr.open_dataset(results_path, engine="h5netcdf") as results:
+    with open_results(results_path) as results:
         attrs = dict(results.attrs)
     try:
         require_saved_decode_masks(attrs, str(results_path))

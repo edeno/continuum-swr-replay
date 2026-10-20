@@ -34,21 +34,24 @@ import xarray as xr
 from non_local_detector.environment import Environment
 
 from continuum_swr_replay.analysis.events.analysed_time import with_swr_source
-from continuum_swr_replay.data_loaders import (
-    get_training_timepoints,
-    load_data,
-)
-from continuum_swr_replay.decode_files import decode_paths, non_local_threshold_percent
-from continuum_swr_replay.decoding_common import (
-    DecodingConfig,
+from continuum_swr_replay.analysis.hippocampus.decode_masks import (
     hpc_artifact_intervals,
     hpc_decode_masks,
     hpc_ripple_power_inputs,
     require_hpc_decode_sources,
     require_saved_decode_masks,
+)
+from continuum_swr_replay.data_loaders import (
+    get_training_timepoints,
+    load_data,
+)
+from continuum_swr_replay.decoding.config import DecodingConfig
+from continuum_swr_replay.decoding.files import (
+    decode_paths,
+    non_local_threshold_percent,
     results_exist,
 )
-from continuum_swr_replay.decoding_transitions import NON_STATIONARY_REFUSAL
+from continuum_swr_replay.decoding.transitions import NON_STATIONARY_REFUSAL
 from continuum_swr_replay.parameters import (
     PLACE_BIN_SIZE_1D,
     PLACE_BIN_SIZE_2D,

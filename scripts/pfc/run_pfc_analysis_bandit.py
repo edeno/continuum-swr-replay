@@ -297,7 +297,7 @@ def results_exist(
 ) -> bool:
     """Check if this session's bundle already exists *for this population*.
 
-    Distinct from ``_decoding_common.results_exist`` because the PFC
+    Distinct from ``decoding.files.results_exist`` because the PFC
     pipeline writes a different set of files (modulation .npy arrays
     plus a single .pkl) than the decoder pipeline (results .nc, detector
     .pkl, environment .pkl). The file names alone never settle it. A bundle

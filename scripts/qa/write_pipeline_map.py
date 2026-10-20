@@ -30,6 +30,7 @@ ROOTS: tuple[str, ...] = (
     "src/continuum_swr_replay/analysis/events",
     "src/continuum_swr_replay/analysis/behavior",
     "src/continuum_swr_replay/tables",
+    "src/continuum_swr_replay/decoding",
     "scripts/behavior",
     "scripts/decoding",
     "scripts/content",
@@ -133,7 +134,8 @@ STAGES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         "Artifact I/O, provenance gating, and the diagnostics that check the "
         "tables and the fits.",
         (
-            "*/analysis/replay/posterior_io.py",
+            "*/decoding/results.py",
+            "*/decoding/files.py",
             "*/analysis/replay/fit_provenance.py",
             "*/tables/versions.py",
             "*/tables/io.py",
@@ -153,8 +155,11 @@ _UNASSIGNED_BLURB = (
 
 # Packages under a mapped root that carry no data from a decoded session to a
 # fitted regression: the replay-detection comparison lives beside the
-# pipeline, not on it.
+# pipeline, not on it; the decode's own settings act before a session is
+# decoded.
 EXCLUDED_PREFIXES: tuple[str, ...] = (
+    "src/continuum_swr_replay/decoding/config.py",
+    "src/continuum_swr_replay/decoding/transitions.py",
     "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/",
     "src/continuum_swr_replay/analysis/hippocampus/swr_inventories.py",
     "src/continuum_swr_replay/analysis/inventory_comparison/",

@@ -97,7 +97,8 @@ from continuum_swr_replay.analysis.inventory_comparison.overlap import (  # noqa
     UNMATCHED,
 )
 from continuum_swr_replay.data_loaders.lfp import get_ripple_band_inputs  # noqa: E402
-from continuum_swr_replay.decode_files import decode_paths  # noqa: E402
+from continuum_swr_replay.decoding.files import decode_paths  # noqa: E402
+from continuum_swr_replay.decoding.results import open_results  # noqa: E402
 from continuum_swr_replay.figure_utilities import WONG  # noqa: E402
 from continuum_swr_replay.intervals import (  # noqa: E402
     interval_mask,
@@ -444,12 +445,10 @@ def load_epoch(identifier: str, *, run_dir: Path, memoryless_dir: Path) -> Epoch
         identifier=identifier,
         time=time,
         dot=dot,
-        # h5netcdf, as the decode wrote it: the netCDF4 library fails on this
-        # file once Spyglass has loaded its own HDF5
-        results=xr.open_dataset(
-            decode_paths(identifier, runner.DECODE_ROOT).results,
-            engine="h5netcdf",
-            cache=False,
+        # h5netcdf, as the decode wrote it (open_results): the netCDF4 library
+        # fails on this file once Spyglass has loaded its own HDF5
+        results=open_results(
+            decode_paths(identifier, runner.DECODE_ROOT).results, cache=False
         ),
         spike_times=marks["spike_times"],
         spike_waveform_features=marks["spike_waveform_features"],

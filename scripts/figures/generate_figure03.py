@@ -63,7 +63,7 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     validate_results_position_time_alignment,
 )
 from continuum_swr_replay.data_loaders import load_data
-from continuum_swr_replay.decode_files import decode_paths
+from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.figure_utilities import (
     PAGE_HEIGHT,
     TWO_COLUMN,

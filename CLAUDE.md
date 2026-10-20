@@ -70,17 +70,15 @@ src/continuum_swr_replay/
 │   ├── behavior/          #   behavioral-model covariates (qvals_table)
 │   ├── contfrag/          #   Continuous-Fragmented classifier analysis
 │   ├── events/            #   analysed-time rule, SWR source, event eligibility, classified event table, cohorts
-│   ├── hippocampus/       #   decode aggregation, posterior/quality metrics, SWR inventories, artifact detector
+│   ├── hippocampus/       #   decode masks and aggregation, posterior/quality metrics, SWR inventories, artifact detector
 │   ├── inventory_comparison/ # event inventories from different detectors compared
 │   ├── pfc/               #   mPFC/OFC unit analysis
 │   ├── replay/            #   replay content/rate tables, model ladders, fitters
 │   └── constants.py       #   analysis constants and defaults
+├── decoding/              # decode configs, transitions, file names, the results.nc reader
 ├── runs/                  # run infrastructure: atomic writes, provenance, CLI, batch loops
 ├── tables/                # canonical tables: schema, row ids, parquet I/O, parity
 ├── visualization/         # Plotting utilities
-├── decode_files.py        # the naming rule for a decode's files
-├── decoding_common.py     # decode configs and the HPC decode masks
-├── decoding_transitions.py # the decoders' discrete-transition settings
 ├── figure_utilities.py    # publication-figure helpers
 ├── intervals.py           # interval algebra: overlap conventions, masks, spike binning
 ├── parameters.py          # global parameters, PROCESSED_DATA_DIR, COLORS

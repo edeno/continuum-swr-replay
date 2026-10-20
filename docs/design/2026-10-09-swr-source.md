@@ -205,7 +205,7 @@ source.
   `RippleTimesV1` ripples when this note was written; the two definitions overlap 93 %.
   Since Task 17a (the lead's decision of 2026-10-09, with the re-decode), an HPC decode
   leaves out every event of this inventory and the artifact mask instead
-  (`decoding_common.hpc_decode_masks`), and refuses to start unless both run ids are set.
+  (`decode_masks.hpc_decode_masks`), and refuses to start unless both run ids are set.
 - **`get_data_over_time` still writes the stored ripples' `SWR_event`.** It is an older
   decode's (and a PFC decode's) provenance. An HPC decode since Task 17a reads its frame
   through `with_swr_source` in `organize_results`, so its own `SWR_event` is this

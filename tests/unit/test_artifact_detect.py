@@ -22,7 +22,7 @@ from continuum_swr_replay.analysis.hippocampus.artifacts.features import (
     persistent_step_count,
     robust_jump,
 )
-from continuum_swr_replay.decoding_common import DecodingConfig
+from continuum_swr_replay.decoding.config import DecodingConfig
 from tests.unit._artifact_synthetic import FS, N_TETRODES, NOISE, SyntheticEpoch
 
 

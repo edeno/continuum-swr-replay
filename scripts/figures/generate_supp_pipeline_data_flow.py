@@ -42,7 +42,7 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
 from continuum_swr_replay.analysis.replay.spatial_mapping import (
     map_estimate_to_arm,
 )
-from continuum_swr_replay.decode_files import decode_paths
+from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,

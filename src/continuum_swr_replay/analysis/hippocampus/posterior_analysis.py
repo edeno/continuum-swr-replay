@@ -15,6 +15,8 @@ get_conditional_non_local_posterior
     Extract and normalize posterior probability conditioned on being in the non-local
     state (combining continuous and fragmented non-local states). This isolates the
     spatial representation during replay.
+load_conditional_posterior
+    The same, read from a decode's ``results.nc`` (``decoding.results.open_results``).
 get_map_speed
     Compute the speed of the decoded position over time using the maximum a posteriori
     (MAP) estimate. Useful for distinguishing stationary replay from trajectory sweeps.
@@ -58,6 +60,7 @@ Examples
 
 """
 
+from pathlib import Path
 from typing import Literal
 
 import networkx as nx
@@ -76,6 +79,7 @@ from non_local_detector.model_checking.highest_posterior_density import (
 )
 from ripple_detection.core import gaussian_smooth
 
+from ...decoding.results import open_results
 from ...types import SessionData
 
 
@@ -117,6 +121,36 @@ def get_conditional_non_local_posterior(results: xr.Dataset) -> xr.DataArray:
 
     # Type ignore: xarray operations return Any but result is DataArray
     return conditional_posterior  # type: ignore[no-any-return]
+
+
+def load_conditional_posterior(results_path: str | Path) -> xr.DataArray:
+    """Read a decode's ``results.nc`` and return the conditional non-local posterior.
+
+    Parameters
+    ----------
+    results_path : str | Path
+        Path to ``{epoch_identifier}_results.nc`` saved by the decoder.
+
+    Returns
+    -------
+    xr.DataArray
+        Shape ``(time, position)`` — a proper probability distribution
+        over place bins per timebin, conditioned on the non-local state
+        (:func:`get_conditional_non_local_posterior`). Place bins that
+        include junction (``edge_id == -1``) placeholders are still
+        present; downstream code excludes them via
+        ``summaries.posterior_to_arm_marginal``.
+
+    Notes
+    -----
+    The file is read by ``decoding.results.open_results``, which rebuilds
+    the ``state_bins`` multi-index the netCDF round-trip drops, so
+    ``posterior.sel(state="Non-Local Continuous")`` resolves.
+
+    The returned DataArray is lazy-loaded if the file is chunked; call
+    ``.load()`` on the caller side if eager materialization is desired.
+    """
+    return get_conditional_non_local_posterior(open_results(results_path))
 
 
 def _map_node_ids(

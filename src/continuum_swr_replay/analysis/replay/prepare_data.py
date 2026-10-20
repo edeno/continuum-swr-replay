@@ -43,15 +43,15 @@ from continuum_swr_replay.analysis.events.swr_inventory import swr_epoch_id
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     validate_dot_event_contract,
 )
+from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
+    load_conditional_posterior,
+)
 from continuum_swr_replay.analysis.replay._tables_common import (
     EVENT_ARM_STANDARDIZED_COLS,
 )
 from continuum_swr_replay.analysis.replay.covariates import (
     assert_qvals_aligned,
     load_contingency,
-)
-from continuum_swr_replay.analysis.replay.posterior_io import (
-    load_conditional_posterior,
 )
 from continuum_swr_replay.analysis.replay.retrospective import (
     _session_keys,
@@ -75,7 +75,7 @@ from continuum_swr_replay.data_loaders.trials import (
     validate_port_experience_pump_audit,
 )
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
-from continuum_swr_replay.decode_files import decode_paths
+from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.runs.io import write_atomically
 from continuum_swr_replay.tables.io import (

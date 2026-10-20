@@ -165,9 +165,16 @@ def simulate_decode(directory: Path) -> dict:
     log_likelihood = np.zeros((n_time, len(state)), dtype=np.float32)
     log_likelihood[:, n_bins + 1 : 2 * n_bins + 1][:, interior] = non_local
     log_likelihood[is_missing] = 0.0  # as the library's predict leaves them
+    centers = np.arange(n_bins, dtype=float)
+    # each state bin's place (NaN for No-Spike's one), as the decoders save it
+    bin_position = np.concatenate([centers, [np.nan], centers, centers])
     xr.Dataset(
         {"log_likelihood": (("time", "state_bins"), log_likelihood)},
-        coords={"time": time, "state": ("state_bins", state)},
+        coords={
+            "time": time,
+            "state": ("state_bins", state),
+            "position": ("state_bins", bin_position),
+        },
         # the masks' record an HPC decode stamps (hpc_decode_masks)
         attrs={"decode_masks": json.dumps(SAVED_DECODE_MASKS, sort_keys=True)},
     ).to_netcdf(directory / f"{EPOCH}_results.nc", engine="h5netcdf")

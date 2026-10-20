@@ -7,11 +7,10 @@ and ``environment.pkl``. The decode runners write these names
 (``scripts/decoding/_decode_runner.py``) and every reader builds them through
 :func:`decode_paths`, so a reader names what was written.
 
-A leaf module: it imports only the standard library and
-``analysis.constants``, so an offline table builder or figure that reads a
-decode folder does not pull in the decode runners' infrastructure
-(``runs.batch``'s dask, its distributed scheduler, CUDA). It sits outside
-``data_loaders``, which must not import ``analysis``.
+A leaf module: it imports only the standard library and ``parameters``, so an
+offline table builder or figure that reads a decode folder does not pull in the
+decode runners' infrastructure (``runs.batch``'s dask, its distributed
+scheduler, CUDA).
 """
 
 from __future__ import annotations
@@ -19,7 +18,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import NamedTuple
 
-from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
+from continuum_swr_replay.parameters import DEFAULT_NON_LOCAL_THRESHOLD
 
 
 def non_local_threshold_percent(non_local_threshold: float) -> int:
@@ -97,3 +96,17 @@ def decode_paths(
         detector=root / f"{epoch_identifier}_detector.pkl",
         environment=root / f"{epoch_identifier}_environment.pkl",
     )
+
+
+def results_exist(
+    save_folder: Path,
+    epoch_identifier: str,
+    overwrite: bool,
+) -> bool:
+    """Check if results, detector, and environment files exist."""
+    if overwrite:
+        return False
+
+    paths = decode_paths(epoch_identifier, save_folder)
+    required_files = [paths.results, paths.detector, paths.environment]
+    return all(f.exists() for f in required_files)

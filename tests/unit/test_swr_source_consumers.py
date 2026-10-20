@@ -755,7 +755,7 @@ STORED_RIPPLE_READERS = {
     "src/continuum_swr_replay/data_loaders/bandit_task.py": "load_data's decode input",
     "src/continuum_swr_replay/data_loaders/utils.py": (
         "get_training_timepoints: the PFC decoders' no_ripple encoding mask (the "
-        "HPC decoders' comes from the source, decoding_common.hpc_decode_masks)"
+        "HPC decoders' comes from the source, decode_masks.hpc_decode_masks)"
     ),
     "src/continuum_swr_replay/data_loaders/constants.py": "register evidence, prose",
     "src/continuum_swr_replay/analysis/events/swr_inventory.py": (

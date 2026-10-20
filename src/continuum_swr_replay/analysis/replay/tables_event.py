@@ -577,7 +577,7 @@ def build_event_table(
     that single ``event_start_s``.
 
     ``conditional_posterior`` is optional. When supplied (e.g., from
-    :func:`posterior_io.load_conditional_posterior`), five additional columns
+    :func:`posterior_analysis.load_conditional_posterior`), five additional columns
     are populated: ``posterior_peak_mean``, ``posterior_entropy_mean``, and
     ``posterior_hpd_arm_count_mean_coverage_{50,80,95}pct``. When not supplied
     those columns are ``NaN`` so the schema is stable across call sites.
@@ -781,7 +781,7 @@ def build_event_sequence_table(
         :func:`summaries.posterior_to_arm_marginal`).
     conditional_posterior : xr.DataArray
         Shape ``(time, position)`` — from
-        :func:`posterior_io.load_conditional_posterior`. Must have the
+        :func:`posterior_analysis.load_conditional_posterior`. Must have the
         same time length as ``dot``.
     speed_threshold, nonlocal_threshold : float
         Same defaults as :func:`build_event_table` (``speed_threshold``

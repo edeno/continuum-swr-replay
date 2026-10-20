@@ -24,7 +24,7 @@ Per epoch (a dask CPU worker each):
    the decode set the mask's bins missing (their stored log-likelihood is 0),
    and their spikes are an artifact's.
 3. **Marks** and the decode's masks, through the project's loader
-   (``load_data``; read-only Spyglass) and ``decoding_common.hpc_decode_masks``,
+   (``load_data``; read-only Spyglass) and ``decode_masks.hpc_decode_masks``,
    as the decoder built them: the training bins leave out the Kay inventory's
    events and the artifact mask, and the mask's bins are missing. Its time axis
    must be the decode's, and refitting the encoding model on it with those
@@ -122,6 +122,10 @@ import pandas as pd  # noqa: E402
 from numpy.typing import NDArray  # noqa: E402
 
 from continuum_swr_replay.analysis.events import analysed_time  # noqa: E402
+from continuum_swr_replay.analysis.hippocampus.decode_masks import (  # noqa: E402
+    hpc_artifact_intervals,
+    hpc_decode_masks,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (  # noqa: E402
     interior_bin_distances_cm,
 )
@@ -165,11 +169,8 @@ from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
 from continuum_swr_replay.data_loaders.utils import (  # noqa: E402
     parse_epoch_identifier,
 )
-from continuum_swr_replay.decode_files import decode_paths  # noqa: E402
-from continuum_swr_replay.decoding_common import (  # noqa: E402
-    hpc_artifact_intervals,
-    hpc_decode_masks,
-)
+from continuum_swr_replay.decoding.files import decode_paths  # noqa: E402
+from continuum_swr_replay.decoding.results import open_results  # noqa: E402
 from continuum_swr_replay.intervals import (  # noqa: E402
     interval_mask,
 )
@@ -399,7 +400,7 @@ def canonical_epochs(decode_dir: Path) -> list[str]:
 def load_marks_and_training_mask(epoch_id: str) -> dict:
     """Marks, the position axis and the decode's masks, from ``load_data``.
 
-    The masks are ``decoding_common.hpc_decode_masks``' for a ``no_ripple``
+    The masks are ``decode_masks.hpc_decode_masks``' for a ``no_ripple``
     decode, from the configured SWR source, as the decoder built them.
 
     Returns
@@ -449,9 +450,7 @@ def stored_log_likelihood(
     ndarray, shape (n_bins, n_interior_bins)
         The prior-excluded clusterless log-likelihood the decode used.
     """
-    import xarray as xr
-
-    with xr.open_dataset(path, engine="h5netcdf") as results:  # as the decode wrote it
+    with open_results(path) as results:
         state = results["state"].values
         idx = np.flatnonzero(state == "Non-Local Continuous")
         if idx.size != interior.size or not (np.diff(idx) == 1).all():
