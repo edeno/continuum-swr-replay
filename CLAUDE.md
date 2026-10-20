@@ -212,8 +212,9 @@ bins), so no non-local event is clipped. From that window it derives
 timing, per-event speed summaries, peak non-local probability, the 3-way
 `overlap_class` (and 6-way `overlap_subclass`), and the matched SWR.
 
-**One analysed-time rule.** *Excluded time* is the artifact mask widened by
-0.3 s on each side (`swr_source.excluded_intervals`; the rule is in
+**One analysed-time rule.** *Excluded time* is the artifact mask
+(`analysis/events/artifact_masks.py`) widened by 0.3 s on each side
+(`analysis/events/analysed_time.py:excluded_intervals`; the rule is in
 `analysis/events/eligibility.py`). Nothing inside it is analysed.
 An event of any kind (non-local, SWR, MUA, ContFrag label, Widloski), an
 exposure second, a time bin with its history window, and a peri-event window
@@ -223,8 +224,9 @@ be immobile as a whole: every sampled speed finite and below 4 cm/s
 event is dropped too, because its overlap class is unknown.
 
 The rule is applied once, where a decode frame is read
-(`swr_source.with_swr_source`), so every table inherits it. Each dropped
-event keeps a reason (`swr_source.artifact_event_drops`), and kept events
+(`analysis/events/analysed_time.py:with_swr_source`), so every table
+inherits it. Each dropped event keeps a reason
+(`analysis/events/analysed_time.py:artifact_event_drops`), and kept events
 keep their labels and `event_id`. A stop's `immobility_duration_s` is its
 span less the excluded seconds in it, so it is no longer
 `stop_end - stop_start`.
@@ -467,4 +469,4 @@ Logs are written to `logs/{epoch_identifier}.log` with git hash for reproducibil
 - Position data uses DLC tracking when available, falls back to older tracking methods
 - Some sessions may lack certain interval types (wrapped in try/except in data loading)
 - Check for empty spike data before running decoding (`if not data["spike_times"]`)
-- Artifacts: one detector (`analysis/hippocampus/artifacts/`, run `swr_source.ARTIFACT_INTERVALS_RUN_ID`) masks sustained ripple-band noise (S blocks), step artifacts and synchronous spike lines; see `docs/design/2026-10-09-artifact-detection.md`. An epoch with an S block is left out whole (epoch register reason `SUSTAINED_NOISE`).
+- Artifacts: one detector (`analysis/hippocampus/artifacts/`, run `analysis/events/swr_inventory.py:ARTIFACT_INTERVALS_RUN_ID`) masks sustained ripple-band noise (S blocks), step artifacts and synchronous spike lines; see `docs/design/2026-10-09-artifact-detection.md`. An epoch with an S block is left out whole (epoch register reason `SUSTAINED_NOISE`).

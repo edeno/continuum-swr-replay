@@ -9,10 +9,8 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from continuum_swr_replay.analysis.events.swr_source import (
-    excluded_intervals,
-    swr_epoch_id,
-)
+from continuum_swr_replay.analysis.events.analysed_time import excluded_intervals
+from continuum_swr_replay.analysis.events.swr_inventory import swr_epoch_id
 from continuum_swr_replay.intervals import overlaps_intervals
 
 logger = logging.getLogger(__name__)
@@ -68,7 +66,7 @@ def get_signal_windows(
     -----
     - Excluded time (the artifact mask widened by 0.3 s) is not analysed: an
       event whose window touches the epoch's excluded time
-      (``swr_source.excluded_intervals``; closed) is dropped whole, and its row
+      (``analysed_time.excluded_intervals``; closed) is dropped whole, and its row
       is not returned.
     - Windows are centered on event times
     - Missing data filled with NaN (occurs for events near data boundaries)

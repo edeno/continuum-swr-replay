@@ -110,7 +110,7 @@ def _process_ripple_data(
 ) -> None:
     """Process raw ripple data and add to result dict.
 
-    With `ripple_power` (``swr_source.ripple_power_inputs``), both consensus
+    With `ripple_power` (``swr_inventory.ripple_power_inputs``), both consensus
     traces are the SWR source's covariate on the band within the position
     span (``lfp.with_ripple_power``); without it, Spyglass's.
     """
@@ -265,7 +265,7 @@ def load_data(
         (``lfp.get_multiunit_hse``). The HPC decoders pass the artifact mask
         for HPC; by default nothing is masked.
     ripple_power : Mapping, optional
-        The SWR source's ripple-power inputs (``swr_source.ripple_power_inputs``:
+        The SWR source's ripple-power inputs (``swr_inventory.ripple_power_inputs``:
         the inventory's band and kept tetrodes, its sampling rate and the
         artifact mask). Given, ``ripple_consensus_trace`` and
         ``zscored_ripple_consensus_trace`` are the Kay detector's consensus over

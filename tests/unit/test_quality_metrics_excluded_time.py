@@ -1,6 +1,6 @@
 """The decode-quality summaries leave excluded time out (task 26b, F2).
 
-``swr_source.with_swr_source`` marks each bin of a read frame with
+``analysed_time.with_swr_source`` marks each bin of a read frame with
 ``in_excluded_time``. Every ``compute_*`` in ``quality_metrics`` requires that
 column. A point-wise statistic gives the same answer as on the frame with those
 rows removed. A run-labelling function (collapse episodes, non-local runs during

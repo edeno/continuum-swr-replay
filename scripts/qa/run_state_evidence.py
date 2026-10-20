@@ -11,7 +11,7 @@ Per epoch (a dask CPU worker each):
 1. **Decode.** ``{epoch}_results.nc`` must carry the ``decode_masks`` of the
    configured SWR source's runs (``saved_decode_masks``): a decode made before
    R11 is refused before anything is loaded. ``{epoch}_80_data_over_time.pkl``,
-   read through the SWR source (``swr_source.with_swr_source``), gives the time
+   read through the SWR source (``analysed_time.with_swr_source``), gives the time
    axis, head position and speed, linear position and the four state
    probabilities; its own non-local event labels, as the decoder wrote them
    (before the analysed-time rule), give the event bins the running-only
@@ -19,7 +19,7 @@ Per epoch (a dask CPU worker each):
    model and ``no_spike_rate``. The probabilities must be finite and sum to 1.
 2. **Windows.** Each state's confident bouts and their matched windows, and the
    calibration windows (``build_windows``), seeded by ``(SEED, epoch_id)``. A
-   bin in excluded time (``swr_source.excluded_intervals``: the artifact mask
+   bin in excluded time (``analysed_time.excluded_intervals``: the artifact mask
    widened by 0.3 s) is in no regime, so every window lies wholly outside it:
    the decode set the mask's bins missing (their stored log-likelihood is 0),
    and their spikes are an artifact's.
@@ -120,7 +120,7 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 from numpy.typing import NDArray  # noqa: E402
 
-from continuum_swr_replay.analysis.events import swr_source  # noqa: E402
+from continuum_swr_replay.analysis.events import analysed_time  # noqa: E402
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (  # noqa: E402
     interior_bin_distances_cm,
 )
@@ -644,14 +644,14 @@ def epoch_table(
     # every event the decoder labelled, the ones the analysed-time rule drops
     # too: decoded non-local content stays out of the running-only encodings
     in_event = (
-        swr_source.with_swr_source(saved, drop_masked_events=False)[
+        analysed_time.with_swr_source(saved, drop_masked_events=False)[
             "non_local_event"
         ].to_numpy()
         > 0
     )
-    dot = swr_source.with_swr_source(saved)
+    dot = analysed_time.with_swr_source(saved)
     del saved
-    excluded = swr_source.excluded_intervals_of(dot)
+    excluded = analysed_time.excluded_intervals_of(dot)
     time = dot.index.to_numpy(dtype=float)
     speed = dot["head_speed"].to_numpy(dtype=float)
     linear = dot["linear_position"].to_numpy(dtype=float)

@@ -20,7 +20,7 @@ import pandas as pd
 import pytest
 from ripple_detection import Kay_ripple_detector
 
-from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events import swr_inventory
 from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
     DETECTOR_SETTINGS,
 )
@@ -169,12 +169,12 @@ class TestTheSourcesInputs:
         artifacts = write_artifact_run(
             tmp_path / "artifacts", {epoch_id: [("S", 3.0, 4.0)]}
         )
-        monkeypatch.setattr(swr_source, "SWR_INVENTORY_ROOT", inventory.parent)
-        monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", inventory.name)
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_ROOT", artifacts.parent)
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", artifacts.name)
+        monkeypatch.setattr(swr_inventory, "SWR_INVENTORY_ROOT", inventory.parent)
+        monkeypatch.setattr(swr_inventory, "SWR_INVENTORY_RUN_ID", inventory.name)
+        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_ROOT", artifacts.parent)
+        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", artifacts.name)
 
-        inputs = swr_source.ripple_power_inputs(epoch_id)
+        inputs = swr_inventory.ripple_power_inputs(epoch_id)
 
         assert inputs["band_electrode_ids"] == [0, 4, 12]
         assert inputs["kept_electrode_ids"] == [4, 12]
@@ -193,10 +193,10 @@ class TestTheSourcesInputs:
         manifest["epochs"][epoch_id]["electrode_ids"] = [0, 4, 12]
         manifest["epochs"][epoch_id]["sampling"] = {"nominal": 1000.0}
         (inventory / "manifest.json").write_text(json.dumps(manifest))
-        monkeypatch.setattr(swr_source, "SWR_INVENTORY_ROOT", inventory.parent)
-        monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", inventory.name)
+        monkeypatch.setattr(swr_inventory, "SWR_INVENTORY_ROOT", inventory.parent)
+        monkeypatch.setattr(swr_inventory, "SWR_INVENTORY_RUN_ID", inventory.name)
 
-        inputs = swr_source.ripple_power_inputs(epoch_id)
+        inputs = swr_inventory.ripple_power_inputs(epoch_id)
 
         assert inputs["band_electrode_ids"] == inputs["kept_electrode_ids"]
         assert inputs["artifact_intervals"].empty

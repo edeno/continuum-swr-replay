@@ -182,7 +182,7 @@ def test_verify_baseline_raises_on_structural_drift(tmp_path: Path):
 # ---------------------------------------------------------------------------
 # One SWR source per release (_require_one_swr_source)
 # ---------------------------------------------------------------------------
-from continuum_swr_replay.analysis.events.swr_source import (  # noqa: E402
+from continuum_swr_replay.analysis.events.swr_inventory import (  # noqa: E402
     swr_source_name,
 )
 from scripts.decoding.write_regeneration_manifest import (  # noqa: E402

@@ -30,7 +30,7 @@ from non_local_detector.likelihoods.clusterless_kde import (
 )
 from track_linearization import get_linearized_position
 
-from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events import analysed_time
 from continuum_swr_replay.analysis.events.artifact_masks import artifact_intervals
 from continuum_swr_replay.analysis.events.immobility import (
     EventDefinitionError,
@@ -276,7 +276,7 @@ def test_an_epoch_is_validated_and_written(simulated, tmp_path):
     assert not [c for c in table if "left_out" in c]
     assert "left_out_selection" not in record["windows"]
     # excluded time is no window's, and no masked bin is in a running-only fit
-    excluded = interval_mask(TIME, swr_source.excluded_intervals(EPOCH))
+    excluded = interval_mask(TIME, analysed_time.excluded_intervals(EPOCH))
     assert excluded[2801:3199].all() and excluded[4801:5199].all()
     reach = np.r_[0, np.cumsum(excluded)]
     assert (reach[table.e.to_numpy() + 1] == reach[table.s.to_numpy()]).all()
@@ -458,7 +458,7 @@ def test_a_running_nonlocal_label_is_refused_before_anything_is_fit(
     """The review's probe, a running non-local event at 10.2-10.3 s, breaks the
     decoder's own definition (every sampled speed below 4 cm/s; every bin above
     the probability threshold). No decode makes one, so the read refuses the
-    frame as stale (swr_source.with_swr_source) and nothing is fit on it."""
+    frame as stale (analysed_time.with_swr_source) and nothing is fit on it."""
     decode_dir = decode_copy(simulated, tmp_path)
     path = decode_dir / f"{EPOCH}_80_data_over_time.pkl"
     dot = pd.read_pickle(path)
@@ -468,7 +468,7 @@ def test_a_running_nonlocal_label_is_refused_before_anything_is_fit(
     dot.iloc[np.flatnonzero(event), dot.columns.get_loc("non_local_event")] = 1
     dot.to_pickle(path)
     with pytest.raises(EventDefinitionError):
-        swr_source.read_dot_with_swr_source(path)
+        analysed_time.read_dot_with_swr_source(path)
 
     record = run(decode_dir, tmp_path / "out", simulated[1])
 

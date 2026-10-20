@@ -32,7 +32,7 @@ import scripts.qa.run_inventory_comparison as runner
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
-from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events import analysed_time, swr_inventory
 from continuum_swr_replay.analysis.inventory_comparison.availability import (
     coverage_from_observations,
     still_intervals,
@@ -72,7 +72,7 @@ SPEED = np.where((TIME >= 20.0) & (TIME < 25.0), 10.0, 1.0)
 
 NON_LOCAL = [(5.0, 5.3), (10.0, 10.2), (41.1, 41.15), (51.0, 51.2)]
 """The state-space events, all still: the decoder labels only events that are
-immobile as a whole, and the read (``swr_source.with_swr_source``) refuses a
+immobile as a whole, and the read (``analysed_time.with_swr_source``) refuses a
 moving ``non_local_event`` label as a stale frame. The moving event is Kay's."""
 KAY = [(5.05, 5.1), (21.0, 21.05), (30.0, 30.1)]
 """Kay's SWRs; the one at 21.0 s is during the movement bout, so it stays in
@@ -176,7 +176,7 @@ def write_memoryless_run(root: Path) -> None:
             "is_replay": True,
             "shuffle_pass": [True, True, False],
             "n_shuffles": 100,
-            "swr_definition": swr_source.swr_source_name(),
+            "swr_definition": swr_inventory.swr_source_name(),
             "artifact_drop_reason": [None, None, None],
         }
     )
@@ -564,12 +564,12 @@ class TestTheStoredTablesRebuildTheComparison:
             return seen["matches"]
 
         saved = pd.read_pickle(runner.decode_path(identifier))
-        dot = swr_source.with_swr_source(saved)
+        dot = analysed_time.with_swr_source(saved)
         with pytest.MonkeyPatch.context() as patch:
             patch.setattr(runner, "event_matches", spy)
             runner.compare_epoch(
                 dot,
-                swr_source.artifact_event_drops(saved),
+                analysed_time.artifact_event_drops(saved),
                 decode_run_id="decode",
                 carey_dir=runner.CAREY_ROOT / CAREY_RUN,
                 memoryless_dir=runner.MEMORYLESS_ROOT / MEMORYLESS_RUN,
@@ -691,12 +691,12 @@ def test_the_manifest_records_the_inputs_and_each_epoch(run):
 
     settings = manifest["settings"]
     assert settings["input_runs"] == {
-        "swr": swr_source.SWR_INVENTORY_RUN_ID,
+        "swr": swr_inventory.SWR_INVENTORY_RUN_ID,
         "carey": CAREY_RUN,
         "memoryless": MEMORYLESS_RUN,
-        "artifacts": swr_source.ARTIFACT_INTERVALS_RUN_ID,
+        "artifacts": swr_inventory.ARTIFACT_INTERVALS_RUN_ID,
     }
-    assert settings["swr_source"] == swr_source.swr_source_name()
+    assert settings["swr_source"] == swr_inventory.swr_source_name()
     assert settings["roster"]["memoryless"] == "published"
     assert settings["roster"]["memoryless_criteria"] == "replay_criteria"
     assert set(settings["native_is_eligible"]) == {"mua", "state_space"}

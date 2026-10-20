@@ -313,7 +313,7 @@ def package_of(module: str) -> str:
     """The package node of a module name relative to the package root.
 
     The first dotted component, except that ``analysis.<pkg>`` is its own node
-    (``analysis.events.swr_source`` -> ``analysis.events``,
+    (``analysis.events.analysed_time`` -> ``analysis.events``,
     ``analysis.constants`` -> ``analysis.constants``). The root package is
     ``""``.
     """

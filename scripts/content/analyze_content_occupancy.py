@@ -50,16 +50,16 @@ from continuum_swr_replay.analysis.constants import (  # noqa: E402
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
+from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
+    analysed_bins,
+    read_dot_with_swr_source,
+    require_swr_source,
+)
 from continuum_swr_replay.analysis.events.detection import (  # noqa: E402
     event_strict_overlap_mask,
 )
 from continuum_swr_replay.analysis.events.immobility import (  # noqa: E402
     EventDefinitionError,
-)
-from continuum_swr_replay.analysis.events.swr_source import (  # noqa: E402
-    analysed_bins,
-    read_dot_with_swr_source,
-    require_swr_source,
 )
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (  # noqa: E402
     validate_dot_event_contract,

@@ -24,7 +24,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.events.swr_source import require_swr_source
+from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.analysis.replay.fit_provenance import (
     require_fresh_inputs,
 )

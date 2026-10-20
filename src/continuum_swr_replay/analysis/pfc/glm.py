@@ -1110,7 +1110,7 @@ def process_neuron(
         column here; direct callers may continue to pass spike times only.
     in_excluded_time : NDArray, shape (n_time,), optional
         True at the bins in the session's excluded time (the artifact mask
-        widened by 0.3 s, ``swr_source.excluded_intervals``). They are left out
+        widened by 0.3 s, ``analysed_time.excluded_intervals``). They are left out
         of ``run_avg_firing_rate`` and
         ``immobility_avg_firing_rate_all_immobile``; ``fit_mask`` already
         leaves them out of the fit. None leaves no bin out.
@@ -1487,7 +1487,7 @@ def build_session_fit_mask(
     immobility_threshold : float
         Speed threshold for immobility (cm/s).
     excluded_intervals : pandas.DataFrame, optional
-        The session's excluded time (``swr_source.excluded_intervals``):
+        The session's excluded time (``analysed_time.excluded_intervals``):
         ``start_time`` and ``end_time``, absolute seconds, closed. None
         excludes nothing.
     basis_half_window_s : float, optional
@@ -1695,7 +1695,7 @@ def build_session_event_sets(
     Both populations are canonical and are read, not re-detected here: the
     non-local events are rows of the shipped event table and the SWR intervals
     are the SWR source's speed-gated ``SWR_event`` labels (the direct Kay
-    inventory, :mod:`continuum_swr_replay.analysis.events.swr_source`), both
+    inventory, :mod:`continuum_swr_replay.analysis.events.swr_inventory`), both
     loaded by :mod:`continuum_swr_replay.analysis.pfc.canonical_events`. The SWR
     split is
     the event table's own ``is_swr`` column -- strict positive-duration overlap
@@ -1955,7 +1955,7 @@ def artifact_dropped_events(drops: pd.DataFrame) -> pd.DataFrame:
     Parameters
     ----------
     drops : pandas.DataFrame
-        ``swr_source.artifact_event_drops`` of the session's decode frame.
+        ``analysed_time.artifact_event_drops`` of the session's decode frame.
 
     Returns
     -------
@@ -2576,7 +2576,7 @@ def run_session(
     # import time. Keeping them function-local lets the rest of the
     # module (pure GLM helpers + design-matrix builders) stay
     # offline-importable for unit tests.
-    from continuum_swr_replay.analysis.events import swr_source
+    from continuum_swr_replay.analysis.events import analysed_time, swr_inventory
     from continuum_swr_replay.analysis.hippocampus import load_results
     from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
         align_results_to_position,
@@ -2662,8 +2662,8 @@ def run_session(
     # Excluded time (the artifact mask widened by 0.3 s) is not analysed. No
     # fitted bin's peri-event basis window reaches it, and no running bin's
     # theta phase is read from it.
-    excluded = swr_source.excluded_intervals(
-        swr_source.swr_epoch_id(nwb_file_name, epoch_name)
+    excluded = analysed_time.excluded_intervals(
+        swr_inventory.swr_epoch_id(nwb_file_name, epoch_name)
     )
     is_immobile, fit_mask, bin_counts = build_session_fit_mask(
         data["position_info"],
@@ -2726,11 +2726,11 @@ def run_session(
         fit_mask=fit_mask,
         basis_half_window_s=float(np.abs(fit_lags).max()) / sampling_frequency,
     )
-    # The events the one analysed-time rule dropped (``swr_source``): fitted
+    # The events the one analysed-time rule dropped (``analysed_time``): fitted
     # bins near one are fit with its regressor missing, which is counted, and
     # no matched control may land on one.
     artifact_dropped = artifact_dropped_events(
-        swr_source.read_artifact_event_drops(
+        analysed_time.read_artifact_event_drops(
             session_data_over_time_path(
                 nwb_file_name, epoch_name, non_local_threshold=non_local_threshold
             ),

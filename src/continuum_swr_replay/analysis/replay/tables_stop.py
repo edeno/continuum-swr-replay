@@ -10,11 +10,9 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
+from continuum_swr_replay.analysis.events.analysed_time import excluded_intervals_of
 from continuum_swr_replay.analysis.events.immobility import (
     require_canonical_speed_threshold,
-)
-from continuum_swr_replay.analysis.events.swr_source import (
-    excluded_intervals_of,
 )
 from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schema
 from continuum_swr_replay.tables.event_ids import (
@@ -83,7 +81,7 @@ def build_stop_table(
 
     ``immobility_duration_s`` is the stop's exposure: ``stop_end -
     stop_start`` less the epoch's excluded time inside the stop
-    (``swr_source.excluded_intervals``, the artifact mask widened by 0.3 s;
+    (``analysed_time.excluded_intervals``, the artifact mask widened by 0.3 s;
     nothing with no artifact run). A stop wholly inside it has zero exposure.
     The stop's location, segment and distance summaries (``occupancy_state``,
     ``at_well``, ``occupancy_well_id``, ``modal_observed_track_segment_id``,

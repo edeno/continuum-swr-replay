@@ -26,7 +26,7 @@ import scripts.qa.run_quality_metrics as quality_metrics
 from continuum_swr_replay.analysis.contfrag.data_aggregation import (
     load_contfrag_data_over_time,
 )
-from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events import swr_inventory
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     load_data_over_time,
 )
@@ -57,8 +57,8 @@ def source(tmp_path, monkeypatch):
     """The decode frames are read through the SWR source: an empty inventory."""
     root = tmp_path / "swr"
     write_swr_inventory(root, {epoch_id: [] for epoch_id in (*ANALYSED, PENDING)})
-    monkeypatch.setattr(swr_source, "SWR_INVENTORY_ROOT", root)
-    monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", RUN_ID)
+    monkeypatch.setattr(swr_inventory, "SWR_INVENTORY_ROOT", root)
+    monkeypatch.setattr(swr_inventory, "SWR_INVENTORY_RUN_ID", RUN_ID)
 
 
 def _frame(epoch_id: str) -> pd.DataFrame:

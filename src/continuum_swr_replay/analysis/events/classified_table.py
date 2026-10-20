@@ -35,8 +35,8 @@ takes a time-indexed ``data_over_time`` slice and emits, per event:
 SWR intervals are derived from ``SWR_event`` timebin labels after applying
 the same whole-event speed criterion used for Non-Local and MUA populations.
 The labels are the paper's SWR source's: callers read a decode's frame through
-:func:`~continuum_swr_replay.analysis.events.swr_source.read_dot_with_swr_source`
-(or :func:`~continuum_swr_replay.analysis.events.swr_source.with_swr_source`),
+:func:`~continuum_swr_replay.analysis.events.analysed_time.read_dot_with_swr_source`
+(or :func:`~continuum_swr_replay.analysis.events.analysed_time.with_swr_source`),
 which puts the direct Kay inventory's labels in ``SWR_event`` in place of the
 decode's stored ``RippleTimesV1`` ones. This is the same label source used by
 the Figure 2 bar / triggered-average / timing panels and by the replay-content
@@ -249,7 +249,7 @@ def build_classified_nonlocal_event_table(
     column_order = list(_CLASSIFIED_EVENT_TABLE_COLUMNS)
 
     # SWR coincidence uses the read's SWR population, which the speed rule
-    # already gated (``swr_source.with_swr_source`` drops a moving SWR), as
+    # already gated (``analysed_time.with_swr_source`` drops a moving SWR), as
     # every event table does.
     overlap_sessions = dot.groupby(list(SESSION_COLUMNS_DAY), sort=False)
 
@@ -368,7 +368,7 @@ def assert_drawn_class_matches_ripples(
     shades the SWR spans of the same session. Both must come from one SWR
     population: the shading is the session's SWR source intervals, the sampled
     bounds of the source-read ``SWR_event`` labels
-    (``swr_source.swr_intervals``), which are the intervals the class was
+    (``analysed_time.swr_intervals``), which are the intervals the class was
     computed against. Reclassifying each example against the drawn spans must
     therefore give its header class back; if it does not, the spans come from
     another population (the stored ``ripple_times``, say, or another session),
@@ -411,6 +411,6 @@ def assert_drawn_class_matches_ripples(
             f"{rows.to_string(index=False)}\n"
             "The drawn SWR span would contradict the column header. The spans "
             "must be the session's SWR source intervals "
-            "(swr_source.swr_intervals on the source-read data_over_time), the "
+            "(analysed_time.swr_intervals on the source-read data_over_time), the "
             "ones the classes were computed against."
         )

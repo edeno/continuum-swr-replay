@@ -4,7 +4,7 @@ Every family in this paper must describe the same events. The hippocampal
 content and rate ladders read the shipped event table
 (``Processed-Data/replay_content/event_table.parquet``) and the speed-gated
 ``SWR_event`` labels of the SWR source
-(:mod:`~continuum_swr_replay.analysis.events.swr_source`, the direct Kay
+(:mod:`~continuum_swr_replay.analysis.events.swr_inventory`, the direct Kay
 inventory) on the cached ``*_HPC_80_data_over_time.pkl`` frame's grid; this
 module is the one place the PFC path loads those, so no PFC script re-detects
 non-local events or re-splits them on a separately detected ripple population.
@@ -41,7 +41,7 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
-from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events import analysed_time, swr_inventory
 from continuum_swr_replay.analysis.events.immobility import (
     filter_event_labels_by_speed,
     intervals_from_labels,
@@ -121,7 +121,7 @@ def load_session_canonical_events(
         If the table lacks the session or event columns.
     SwrSourceError
         If the table was not built from the configured SWR source
-        (``swr_source.require_swr_source``). Its ``is_swr`` column is combined
+        (``analysed_time.require_swr_source``). Its ``is_swr`` column is combined
         with :func:`load_session_swr_intervals`' live source intervals, so the
         two must be one source.
     ValueError
@@ -136,7 +136,7 @@ def load_session_canonical_events(
     animal, session_date = parse_nwb_filename(nwb_file_name)
 
     event_table = read_table(path)
-    swr_source.require_swr_source(event_table, what=f"the event table at {path}")
+    analysed_time.require_swr_source(event_table, what=f"the event table at {path}")
     missing = [
         column
         for column in (*SESSION_COLUMNS, *_EVENT_COLUMNS)
@@ -203,7 +203,7 @@ def load_session_swr_intervals(
     """Load one session's SWR intervals: the SWR source's, on the cached frame's grid.
 
     The cached decode frame is read through the SWR source
-    (:func:`~continuum_swr_replay.analysis.events.swr_source.read_dot_with_swr_source`),
+    (:func:`~continuum_swr_replay.analysis.events.analysed_time.read_dot_with_swr_source`),
     so its ``SWR_event`` labels are the direct Kay inventory's, not the
     decode's stored ripples. The intervals are then built exactly as
     :func:`~continuum_swr_replay.analysis.events.classified_table.build_classified_nonlocal_event_table`
@@ -267,7 +267,7 @@ def load_session_swr_intervals(
             "the canonical SWR population and cannot be re-detected here"
         )
 
-    dot = swr_source.read_dot_with_swr_source(
+    dot = analysed_time.read_dot_with_swr_source(
         path, non_local_threshold=non_local_threshold
     )
     # The read already gates SWRs at the canonical threshold, so at the default
@@ -309,7 +309,7 @@ def canonical_event_provenance(
         "immobility_inequality": "<",
         "canonical_event_table_path": str(event_table_path),
         "canonical_event_table_sha256": event_table_sha256,
-        "swr_interval_source": swr_source.swr_source_name(),
+        "swr_interval_source": swr_inventory.swr_source_name(),
         "swr_events_path": None if swr_events_path is None else str(swr_events_path),
         "swr_events_sha256": swr_events_sha256,
         "data_over_time_path": str(data_over_time_path),
@@ -327,10 +327,10 @@ def session_swr_events_file(
     then fails loudly.
     """
     try:
-        return swr_source.swr_source_files(
-            swr_source.swr_epoch_id(nwb_file_name, epoch_name)
+        return swr_inventory.swr_source_files(
+            swr_inventory.swr_epoch_id(nwb_file_name, epoch_name)
         )["events"]
-    except swr_source.SwrSourceError:
+    except swr_inventory.SwrSourceError:
         return {"path": None, "sha256": None}
 
 

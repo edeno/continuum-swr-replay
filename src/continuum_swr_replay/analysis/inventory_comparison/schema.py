@@ -22,7 +22,7 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events import swr_inventory
 from continuum_swr_replay.analysis.events.immobility import (
     event_speeds_are_immobile,
 )
@@ -425,7 +425,7 @@ def from_memoryless_table(table: pd.DataFrame, *, cohort: str) -> pd.DataFrame:
         not shuffled, an artifact run is configured and the table has no
         ``artifact_drop_reason`` (it was made before the rule), or the table's
         ``swr_definition`` is not the configured source
-        (``swr_source.swr_source_name()``): another artifact run (no run
+        (``swr_inventory.swr_source_name()``): another artifact run (no run
         included) would make its ``artifact_drop_reason`` read another mask,
         and another inventory run its SWR labels another inventory's.
 
@@ -470,14 +470,14 @@ def from_memoryless_table(table: pd.DataFrame, *, cohort: str) -> pd.DataFrame:
         # a candidate in excluded time is not analysed: in no cohort
         # not in place: the flag's array can be the caller's column itself
         selected = selected & table["artifact_drop_reason"].isna().to_numpy()
-    elif swr_source.ARTIFACT_INTERVALS_RUN_ID is not None:
+    elif swr_inventory.ARTIFACT_INTERVALS_RUN_ID is not None:
         raise ValueError(
             "The memoryless table has no artifact_drop_reason column, but the "
-            f"artifact run {swr_source.ARTIFACT_INTERVALS_RUN_ID!r} is "
+            f"artifact run {swr_inventory.ARTIFACT_INTERVALS_RUN_ID!r} is "
             "configured: a table made before the analysed-time rule would read "
             "its candidates in excluded time as kept. Rerun the detector."
         )
-    configured = swr_source.swr_source_name()
+    configured = swr_inventory.swr_source_name()
     built_from = {str(name) for name in table["swr_definition"].unique()}
     if any(name != configured for name in built_from):
         raise ValueError(

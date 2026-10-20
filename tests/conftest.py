@@ -63,7 +63,7 @@ def pytest_collection_modifyitems(config, items):
 def no_configured_artifact_run():
     """Every test starts with no artifact run configured.
 
-    ``swr_source.ARTIFACT_INTERVALS_RUN_ID`` names a real run under
+    ``swr_inventory.ARTIFACT_INTERVALS_RUN_ID`` names a real run under
     Processed-Data. A unit test must not read it, so every test and every
     module-scoped fixture sees None unless a test sets a run of its own (most
     use a ``tmp_path`` run; ``monkeypatch`` restores None after it). Session
@@ -72,11 +72,11 @@ def no_configured_artifact_run():
     ``test_swr_source.TestTheConfiguredInventory``. Yields that committed value,
     which ``real_data`` tests get back.
     """
-    from continuum_swr_replay.analysis.events import swr_source
+    from continuum_swr_replay.analysis.events import swr_inventory
 
-    configured = swr_source.ARTIFACT_INTERVALS_RUN_ID
+    configured = swr_inventory.ARTIFACT_INTERVALS_RUN_ID
     with pytest.MonkeyPatch.context() as patch:
-        patch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", None)
+        patch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", None)
         yield configured
 
 
@@ -92,15 +92,15 @@ def real_data_sees_the_configured_artifact_run(
 
     This fixture is function-scoped, so it reaches the test function only. A
     module- or session-scoped fixture in a ``real_data`` module still sees
-    None; one that reads a table through ``swr_source.with_swr_source`` must
+    None; one that reads a table through ``analysed_time.with_swr_source`` must
     set the run itself.
     """
     if request.node.get_closest_marker("real_data") is None:
         return
-    from continuum_swr_replay.analysis.events import swr_source
+    from continuum_swr_replay.analysis.events import swr_inventory
 
     monkeypatch.setattr(
-        swr_source, "ARTIFACT_INTERVALS_RUN_ID", no_configured_artifact_run
+        swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", no_configured_artifact_run
     )
 
 

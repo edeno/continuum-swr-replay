@@ -23,7 +23,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.contfrag.tables import build_contfrag_stop_table
-from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events import analysed_time, swr_inventory
 from continuum_swr_replay.analysis.replay.tables_stop import build_stop_table
 from tests.unit._port_experience_fixtures import port_experiences_from_trials
 from tests.unit._swr_inventory_fixtures import write_artifact_run
@@ -97,7 +97,7 @@ def _tables() -> dict[str, pd.DataFrame]:
 def _outside_rows_of_stop_c() -> np.ndarray:
     """By hand: stop C's rows outside the closed excluded intervals."""
     excluded = np.zeros(TIME.size, dtype=bool)
-    for start, end in swr_source.excluded_intervals(EPOCH_ID).to_numpy():
+    for start, end in analysed_time.excluded_intervals(EPOCH_ID).to_numpy():
         excluded |= (TIME >= start) & (TIME <= end)
     return (TIME >= 3.0) & (TIME <= 7.0) & ~excluded
 
@@ -109,8 +109,8 @@ def tables(tmp_path, monkeypatch) -> dict[str, dict[str, pd.DataFrame]]:
     (``"masked"``). The source stays configured for the test."""
     all_rows = _tables()
     directory = write_artifact_run(tmp_path / "artifacts", {EPOCH_ID: CORES})
-    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_ROOT", directory.parent)
-    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
+    monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_ROOT", directory.parent)
+    monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
     return {"all_rows": all_rows, "masked": _tables()}
 
 

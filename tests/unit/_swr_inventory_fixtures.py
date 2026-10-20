@@ -6,7 +6,7 @@
 ``{epoch_id}_swr_observed.parquet``, with the sha256 of each in the record, as
 ``run_swr_detection.py`` writes them. ``write_artifact_run`` writes an artifact
 run folder as ``run_artifact_detection.py`` writes it (one cores file per epoch
-and a manifest), which ``swr_source.artifact_intervals`` reads, and
+and a manifest), which ``swr_inventory.artifact_intervals`` reads, and
 ``use_swr_source`` points the source's configured constants at both. Offline:
 nothing here touches Spyglass or ``Processed-Data``.
 """
@@ -168,10 +168,10 @@ def write_artifact_run(
 def use_swr_source(monkeypatch, inventory: Path, artifacts: Path | None = None) -> None:
     """Point the SWR source at a written inventory run folder (and artifact run
     folder, if given), as its configured constants would."""
-    from continuum_swr_replay.analysis.events import swr_source
+    from continuum_swr_replay.analysis.events import swr_inventory
 
-    monkeypatch.setattr(swr_source, "SWR_INVENTORY_ROOT", inventory.parent)
-    monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", inventory.name)
+    monkeypatch.setattr(swr_inventory, "SWR_INVENTORY_ROOT", inventory.parent)
+    monkeypatch.setattr(swr_inventory, "SWR_INVENTORY_RUN_ID", inventory.name)
     if artifacts is not None:
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_ROOT", artifacts.parent)
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", artifacts.name)
+        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_ROOT", artifacts.parent)
+        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", artifacts.name)

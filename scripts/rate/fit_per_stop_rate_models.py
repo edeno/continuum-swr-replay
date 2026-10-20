@@ -38,13 +38,13 @@ import sys
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.analysis.events.cohort_selection import (
     STOP_COHORTS,
     freeze_common_cohort,
     select_stop_cohort,
     stop_cohort_suffix,
 )
-from continuum_swr_replay.analysis.events.swr_source import require_swr_source
 from continuum_swr_replay.analysis.replay.cohort_audit import (
     cohort_record,
     write_cohort_audit,

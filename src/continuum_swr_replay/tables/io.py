@@ -80,7 +80,7 @@ SWR_SOURCE_TABLES = frozenset(
     }
 )
 """The canonical tables (covariate-schema keys) built from decode frames read
-through the SWR source (``swr_source``); ``publish_canonical`` refuses one
+through the SWR source (``analysed_time``); ``publish_canonical`` refuses one
 without the source's current stamp. qvals, built from behavior alone, is the
 one canonical table that is not among them. event_sequence holds no SWR column
 but is published with its atomic set, so it carries the set's stamp."""
@@ -134,9 +134,9 @@ def publish_canonical(
 
     A table built from SWR labels (:data:`SWR_SOURCE_TABLES`) must also carry
     the SWR source's current stamp, which only its producer can give it
-    (``swr_source.stamp_swr_source``, after reading its decode frames through
+    (``analysed_time.stamp_swr_source``, after reading its decode frames through
     the source). The producer passes the source's check,
-    ``swr_source.require_swr_source``, as `require_swr_source`. A table
+    ``analysed_time.require_swr_source``, as `require_swr_source`. A table
     without the stamp, or with another source's, is refused, and so is a call
     that publishes one of these tables without the check, so no canonical
     table lands without naming the SWRs it was built from. The check comes
@@ -153,7 +153,7 @@ def publish_canonical(
         if require_swr_source is None:
             raise TypeError(
                 f"the {table} table is built from SWR labels; pass "
-                "require_swr_source=swr_source.require_swr_source to publish it"
+                "require_swr_source=analysed_time.require_swr_source to publish it"
             )
         require_swr_source(frame, what=f"the {table} table to publish")
 

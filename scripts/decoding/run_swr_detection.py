@@ -19,7 +19,7 @@ Per epoch:
    ``filter_ripple_lfp_time`` drops them, and ``head_speed`` is interpolated
    linearly onto the LFP times.
 3. **Artifacts.** The epoch's artifact intervals are the configured artifact
-   run's cores (``swr_source.ARTIFACT_INTERVALS_RUN_ID``, read once when the
+   run's cores (``swr_inventory.ARTIFACT_INTERVALS_RUN_ID``, read once when the
    run starts and recorded in its settings) padded by the one table every
    stage uses (``events.artifact_masks.PADDING_S``: S by 1 s, a step with an LFP
    signature by 0.3 s, a spike-only line by 0.1 s). Their time is the artifact
@@ -156,7 +156,7 @@ from distributed.deploy import Cluster
 from numpy.typing import NDArray
 from ripple_detection import Kay_ripple_detector
 
-from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events import swr_inventory
 from continuum_swr_replay.analysis.events.artifact_intervals import read_epoch_cores
 from continuum_swr_replay.analysis.events.artifact_masks import (
     PADDING_S,
@@ -220,7 +220,7 @@ from continuum_swr_replay.intervals import (
 )
 from continuum_swr_replay.parameters import ROOT_DIR
 
-OUTPUT_ROOT = swr_source.SWR_INVENTORY_ROOT
+OUTPUT_ROOT = swr_inventory.SWR_INVENTORY_ROOT
 """Where the run folders go: where the paper's SWR source reads them."""
 PRODUCED_BY = "scripts/decoding/run_swr_detection.py"
 DESIGN_SPEC = "docs/design/2026-10-03-full-pipeline-refresh-design.md"
@@ -233,9 +233,9 @@ def epoch_id(nwb_file_name: str, epoch_name: str) -> str:
     """``{stem}_{epoch}_HPC``, the decoders' name for the epoch's CA1 data.
 
     ``epoch_id("chimi20200225_.nwb", "02_r1")`` is ``"chimi20200225_02_r1_HPC"``.
-    The other runners import it from here; the rule is ``swr_source.swr_epoch_id``.
+    The other runners import it from here; the rule is ``swr_inventory.swr_epoch_id``.
     """
-    return swr_source.swr_epoch_id(nwb_file_name, epoch_name)
+    return swr_inventory.swr_epoch_id(nwb_file_name, epoch_name)
 
 
 def output_paths(identifier: str, output_dir: Path) -> dict[str, Path]:
@@ -1266,7 +1266,7 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
     run_id = output_dir.name
     # read once, here: the workers are other processes, and every epoch of the
     # run must be masked by the same artifact run
-    artifact_dir = swr_source.artifact_intervals_dir()
+    artifact_dir = swr_inventory.artifact_intervals_dir()
     settings = run_settings(
         provenance, None if artifact_dir is None else artifact_dir.name
     )

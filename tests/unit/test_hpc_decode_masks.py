@@ -13,7 +13,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay import decoding_common
-from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events import swr_inventory
 from continuum_swr_replay.decoding_common import (
     hpc_artifact_intervals,
     hpc_decode_masks,
@@ -141,7 +141,7 @@ def test_the_record_names_the_sources_and_the_seconds(sources):
 @pytest.mark.parametrize("unset", ["SWR_INVENTORY_RUN_ID", "ARTIFACT_INTERVALS_RUN_ID"])
 def test_an_unset_run_id_is_refused(sources, monkeypatch, unset):
     """Fail closed: an HPC decode needs both runs named."""
-    monkeypatch.setattr(swr_source, unset, None)
+    monkeypatch.setattr(swr_inventory, unset, None)
 
     with pytest.raises(ValueError, match=unset):
         require_hpc_decode_sources()
@@ -150,13 +150,13 @@ def test_an_unset_run_id_is_refused(sources, monkeypatch, unset):
 
 
 def test_both_run_ids_unset_are_named(monkeypatch):
-    monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", None)
-    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", None)
+    monkeypatch.setattr(swr_inventory, "SWR_INVENTORY_RUN_ID", None)
+    monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", None)
 
     with pytest.raises(ValueError) as refused:
         decoding_common.require_hpc_decode_sources()
 
-    assert "SWR_INVENTORY_RUN_ID and swr_source.ARTIFACT_INTERVALS_RUN_ID" in str(
+    assert "SWR_INVENTORY_RUN_ID and swr_inventory.ARTIFACT_INTERVALS_RUN_ID" in str(
         refused.value
     )
 
@@ -199,5 +199,5 @@ def test_a_configured_run_missing_the_epoch_is_refused(tmp_path, monkeypatch):
     )
     use_swr_source(monkeypatch, inventory, artifacts)
 
-    with pytest.raises(swr_source.SwrSourceError, match="not in the artifact run"):
+    with pytest.raises(swr_inventory.SwrSourceError, match="not in the artifact run"):
         hpc_artifact_intervals(NWB_FILE_NAME, EPOCH_NAME)

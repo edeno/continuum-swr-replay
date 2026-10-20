@@ -34,11 +34,11 @@ from pathlib import Path
 
 import pandas as pd
 
+from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.analysis.events.cohort_selection import (
     _sorted_unit_ids,
     freeze_common_cohort,
 )
-from continuum_swr_replay.analysis.events.swr_source import require_swr_source
 from continuum_swr_replay.analysis.replay import (
     MODEL_CHOICE,
     MODEL_PATCH,

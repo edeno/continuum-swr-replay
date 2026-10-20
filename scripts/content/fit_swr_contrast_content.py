@@ -70,10 +70,10 @@ import numpy as np
 import pandas as pd
 from scipy.stats import wilcoxon
 
+from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.analysis.events.cohort_selection import (
     select_event_cohort,
 )
-from continuum_swr_replay.analysis.events.swr_source import require_swr_source
 from continuum_swr_replay.analysis.replay._helpers import (
     add_arm_fixed_effects,
 )

@@ -13,7 +13,7 @@ from typing import Any
 
 import numpy as np
 
-from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events import swr_inventory
 from continuum_swr_replay.decoding_common import (
     require_saved_decode_masks,
     write_atomically,
@@ -118,8 +118,8 @@ def saved_decode_masks(results_path: Path) -> dict:
         require_saved_decode_masks(attrs, str(results_path))
     except ValueError as error:
         configured = {
-            "swr_inventory_run_id": swr_source.SWR_INVENTORY_RUN_ID,
-            "artifact_run_id": swr_source.ARTIFACT_INTERVALS_RUN_ID,
+            "swr_inventory_run_id": swr_inventory.SWR_INVENTORY_RUN_ID,
+            "artifact_run_id": swr_inventory.ARTIFACT_INTERVALS_RUN_ID,
         }
         stamp = attrs.get("decode_masks")
         if stamp is None:

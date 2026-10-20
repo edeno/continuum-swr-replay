@@ -61,15 +61,15 @@ import pandas as pd
 from matplotlib.gridspec import GridSpec
 
 import continuum_swr_replay.figure_utilities as figure_utilities
+from continuum_swr_replay.analysis.events.analysed_time import swr_intervals
 from continuum_swr_replay.analysis.events.classified_table import (
     assert_drawn_class_matches_ripples,
     build_classified_nonlocal_event_table,
 )
 from continuum_swr_replay.analysis.events.detection import select_typical_event_by_class
-from continuum_swr_replay.analysis.events.swr_source import (
+from continuum_swr_replay.analysis.events.swr_inventory import (
     ripple_power_inputs,
     swr_epoch_id,
-    swr_intervals,
     swr_source_name,
 )
 from continuum_swr_replay.analysis.hippocampus import (

@@ -13,7 +13,7 @@ on either side of it, since an event is speed-eligible when the samples inside
 it are still. Comparisons between detectors use the intersection of their
 exposures.
 
-Excluded time (``swr_source.excluded_intervals``: the artifact mask widened by
+Excluded time (``analysed_time.excluded_intervals``: the artifact mask widened by
 0.3 s) is not analysed, so the reader of the observation tables
 (:func:`coverage_from_observations`) removes it from every detector's observed
 time, and so from its exposure. The tables themselves stay a record of what
@@ -35,7 +35,7 @@ from numpy.typing import NDArray
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
-from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events import analysed_time
 from continuum_swr_replay.analysis.inventory_comparison.overlap import (
     Coverage,
     set_aside_events,
@@ -364,7 +364,7 @@ def coverage_from_observations(
 
     One origin for both representations of what a detector observed: the
     ``available`` stretches less the epoch's excluded time
-    (``swr_source.excluded_intervals``) become ``observed``, and their
+    (``analysed_time.excluded_intervals``) become ``observed``, and their
     intersection with the epoch's still intervals becomes ``exposure``. A
     detector's candidates in excluded time are dropped from its cohort, so its
     rate's denominator loses that time too, for every detector alike; with no
@@ -407,7 +407,7 @@ def coverage_from_observations(
         )
         if session not in excluded:
             excluded[session] = (
-                swr_source.excluded_intervals_of(group)[["start_time", "end_time"]]
+                analysed_time.excluded_intervals_of(group)[["start_time", "end_time"]]
                 .to_numpy(dtype=np.float64)
                 .reshape(-1, 2)
             )
@@ -538,7 +538,7 @@ def exclusion_by_reason(
     for session, epoch_rows in observations.groupby(list(SESSION_COLUMNS_DAY)):
         span = np.array([[epoch_rows.start_s.min(), epoch_rows.end_s.max()]])
         excluded = _intervals(
-            swr_source.excluded_intervals_of(epoch_rows), "start_time", "end_time"
+            analysed_time.excluded_intervals_of(epoch_rows), "start_time", "end_time"
         )
         known = speed_known.get(session, empty)
         not_still = [

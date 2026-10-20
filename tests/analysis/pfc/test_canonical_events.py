@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events import analysed_time, swr_inventory
 from continuum_swr_replay.analysis.events.immobility import (
     filter_event_labels_by_speed,
     intervals_from_labels,
@@ -45,7 +45,7 @@ def event_table_path(tmp_path):
         }
     )
     path = tmp_path / "event_table.parquet"
-    write_table(swr_source.stamp_swr_source(frame), path)
+    write_table(analysed_time.stamp_swr_source(frame), path)
     return path
 
 
@@ -132,14 +132,14 @@ class TestLoadSessionCanonicalEvents:
             frame.attrs["swr_source"] = stamp
         write_table(frame, event_table_path)
 
-        with pytest.raises(swr_source.SwrSourceError, match="event table"):
+        with pytest.raises(swr_inventory.SwrSourceError, match="event table"):
             load_session_canonical_events(
                 "j1620210706_.nwb", "02_r1", event_table_path=event_table_path
             )
 
     def test_a_table_from_the_configured_swr_source_is_read(self, event_table_path):
         assert read_table(event_table_path).attrs["swr_source"] == (
-            swr_source.swr_source_name()
+            swr_inventory.swr_source_name()
         )
 
         events, _ = load_session_canonical_events(
@@ -158,7 +158,7 @@ class TestLoadSessionCanonicalEvents:
             }
         )
         path = tmp_path / "event_table.parquet"
-        write_table(swr_source.stamp_swr_source(frame), path)
+        write_table(analysed_time.stamp_swr_source(frame), path)
 
         with pytest.raises(KeyError, match="event_start_s"):
             load_session_canonical_events(
@@ -178,8 +178,8 @@ class TestLoadSessionSwrIntervals:
         def write(intervals):
             root = tmp_path / "swr"
             write_swr_inventory(root, {"j1620210706_02_r1_HPC": intervals})
-            monkeypatch.setattr(swr_source, "SWR_INVENTORY_ROOT", root)
-            monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", RUN_ID)
+            monkeypatch.setattr(swr_inventory, "SWR_INVENTORY_ROOT", root)
+            monkeypatch.setattr(swr_inventory, "SWR_INVENTORY_RUN_ID", RUN_ID)
 
         return write
 
@@ -202,7 +202,7 @@ class TestLoadSessionSwrIntervals:
 
         expected = intervals_from_labels(
             filter_event_labels_by_speed(
-                swr_source.with_swr_source(dot), ["SWR_event"], speed_threshold=4.0
+                analysed_time.with_swr_source(dot), ["SWR_event"], speed_threshold=4.0
             ),
             "SWR_event",
         )
@@ -271,7 +271,7 @@ class TestCanonicalEventInputHashes:
         import continuum_swr_replay.analysis.pfc.canonical_events as module
 
         monkeypatch.setattr(module, "PROCESSED_DATA_DIR", tmp_path)
-        monkeypatch.setattr(swr_source, "SWR_INVENTORY_ROOT", tmp_path / "swr")
+        monkeypatch.setattr(swr_inventory, "SWR_INVENTORY_ROOT", tmp_path / "swr")
 
         provenance = canonical_event_input_hashes(
             "j1620210706_.nwb", "02_r1", event_table_path=tmp_path / "absent.parquet"
@@ -290,8 +290,8 @@ class TestCanonicalEventInputHashes:
 
         monkeypatch.setattr(module, "PROCESSED_DATA_DIR", tmp_path)
         write_swr_inventory(tmp_path / "swr", {"j1620210706_02_r1_HPC": []})
-        monkeypatch.setattr(swr_source, "SWR_INVENTORY_ROOT", tmp_path / "swr")
-        monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", RUN_ID)
+        monkeypatch.setattr(swr_inventory, "SWR_INVENTORY_ROOT", tmp_path / "swr")
+        monkeypatch.setattr(swr_inventory, "SWR_INVENTORY_RUN_ID", RUN_ID)
         dot = _synthetic_dot([0, 1, 1, 0], [1.0, 1.0, 1.0, 1.0])
         dot_path = tmp_path / "j1620210706_02_r1_HPC_80_data_over_time.pkl"
         dot.to_pickle(dot_path)

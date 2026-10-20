@@ -88,7 +88,7 @@ sequence, or significance criterion is a detection outcome, not missing coverage
 Record the source masks and timing conventions in the manifest.
 
 The reader of the observation tables (`availability.coverage_from_observations`) first
-removes excluded time (`swr_source.excluded_intervals`: the artifact mask widened by
+removes excluded time (`analysed_time.excluded_intervals`: the artifact mask widened by
 0.3 s) from every detector's observed intervals, since no detector's events there are
 analysed; the tables themselves record what each detector read. Intersect each
 detector's observed intervals with the shared finite-speed < 4 cm/s eligibility mask

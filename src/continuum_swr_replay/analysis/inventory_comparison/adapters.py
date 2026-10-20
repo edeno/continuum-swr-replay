@@ -7,8 +7,8 @@ analysed-time rule sets aside, with their reasons. The accounting modules do
 no IO; the readers of recorded outputs are here.
 
 Every adapter reads one epoch's canonical decode frame, read once through the
-SWR source (``swr_source.read_dot_with_swr_source``), and its drops, read once
-from the same pickle (``swr_source.read_artifact_event_drops``): the frame as
+SWR source (``analysed_time.read_dot_with_swr_source``), and its drops, read once
+from the same pickle (``analysed_time.read_artifact_event_drops``): the frame as
 saved, never ``artifact_event_drops`` of the read frame, whose dropped labels
 are already gone. The frame's ``head_speed`` on its grid is the one speed
 trace, and the grid's first and last time are the epoch's bounds.
@@ -17,8 +17,8 @@ An event is set aside, and leaves the inventory, when the one rule drops it
 for excluded time (``artifact``, ``near_artifact``) or for overlapping an SWR
 or MUA event dropped for excluded time (``overlaps_dropped_event``). That
 second pass reads every event at its bounds sampled on the decode grid, as
-``swr_source`` reads the paper's SWRs, so Kay's kept events are exactly the
-ones ``swr_source.with_swr_source`` keeps. A moving event stays in the inventory with ``whole_event_speed_eligible`` False. So a
+``analysed_time`` reads the paper's SWRs, so Kay's kept events are exactly the
+ones ``analysed_time.with_swr_source`` keeps. A moving event stays in the inventory with ``whole_event_speed_eligible`` False. So a
 detector's native count is its inventory's rows plus its set-aside rows.
 
 A run whose record for the epoch cannot be used (no manifest, the epoch not in
@@ -43,7 +43,8 @@ from numpy.typing import NDArray
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
-from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events import analysed_time
+from continuum_swr_replay.analysis.events import swr_inventory as source_inventory
 from continuum_swr_replay.analysis.events.classified_table import (
     build_classified_nonlocal_event_table,
 )
@@ -145,7 +146,7 @@ class _Epoch(NamedTuple):
 
 def _epoch(dot: pd.DataFrame) -> _Epoch:
     """The one epoch a frame read through the SWR source holds."""
-    swr_source.require_swr_source(dot, what="the decode frame")
+    analysed_time.require_swr_source(dot, what="the decode frame")
     sessions = dot[list(SESSION_COLUMNS_DAY)].drop_duplicates()
     if len(sessions) != 1:
         raise ValueError(f"An adapter reads one epoch at a time, not {len(sessions)}.")
@@ -155,7 +156,7 @@ def _epoch(dot: pd.DataFrame) -> _Epoch:
         session=SessionIdentity(
             animal=str(animal), day=int(day), epoch=str(epoch), brain_area=BRAIN_AREA
         ),
-        epoch_id=swr_source.swr_epoch_id(f"{animal}{day}_.nwb", str(epoch)),
+        epoch_id=source_inventory.swr_epoch_id(f"{animal}{day}_.nwb", str(epoch)),
         time=time,
         speed=dot["head_speed"].to_numpy(dtype=np.float64),
         bounds=(float(time[0]), float(time[-1])),
@@ -238,7 +239,7 @@ def _run_files(
 ) -> tuple[dict[str, Path], dict]:
     """The epoch's files in a run folder, checked against its manifest.
 
-    The check ``swr_source.swr_source_files`` makes for Kay, for any run
+    The check ``swr_inventory.swr_source_files`` makes for Kay, for any run
     folder: the epoch's record must be ``ok`` or ``partial``, ``detector`` (if
     given) must be ``ok`` in its ``detectors``, and each file must exist with
     the sha256 the manifest recorded for it; an output with no sha256 is a
@@ -283,7 +284,7 @@ def _run_files(
     if record is None:
         raise _Unavailable(f"{epoch_id} is not in run {run_dir.name}")
     status = record.get("status")
-    if status not in swr_source.USABLE_STATUSES:
+    if status not in source_inventory.USABLE_STATUSES:
         why = record.get("error") or record.get("reason") or "no reason recorded"
         raise _Unavailable(f"{status}: {str(why)[:200]}")
     if detector is not None:
@@ -309,7 +310,7 @@ def _run_files(
 
 def _numbered_events(path: Path) -> pd.DataFrame:
     """An LFP detector's events, indexed ``event_number`` 1..n, as
-    ``swr_source`` requires of Kay's.
+    ``swr_inventory`` requires of Kay's.
 
     Raises
     ------
@@ -326,7 +327,7 @@ def _numbered_events(path: Path) -> pd.DataFrame:
 
 def _sampled_bounds(intervals: pd.DataFrame, epoch: _Epoch) -> NDArray:
     """Each interval's first and last sample on the decode grid, as
-    ``swr_source`` samples the SWRs for the rule's second pass.
+    ``analysed_time`` samples the SWRs for the rule's second pass.
 
     Returns
     -------
@@ -335,7 +336,7 @@ def _sampled_bounds(intervals: pd.DataFrame, epoch: _Epoch) -> NDArray:
     """
     time_index = pd.Index(epoch.time, name="time")
     # labels are the intervals' row ordinals, 1..n
-    labels = swr_source._speed_eligible_labels(
+    labels = analysed_time._speed_eligible_labels(
         intervals[["start_time", "end_time"]],
         time_index,
         epoch.speed,
@@ -352,15 +353,15 @@ def _sampled_bounds(intervals: pd.DataFrame, epoch: _Epoch) -> NDArray:
 
 
 def _dropped_on_grid(drops: pd.DataFrame, epoch: _Epoch) -> pd.DataFrame:
-    """``swr_source.dropped_for_excluded_time`` at the bounds ``swr_source``
+    """``analysed_time.dropped_for_excluded_time`` at the bounds ``analysed_time``
     reads them: each SWR's sampled on the grid (the drops hold the
     inventory's), each labelled event's as the drops hold them."""
     sampled = drops.copy()
-    is_swr = (sampled["event_col"] == swr_source.SWR_LABEL_COLUMN).to_numpy()
+    is_swr = (sampled["event_col"] == source_inventory.SWR_LABEL_COLUMN).to_numpy()
     sampled.loc[is_swr, ["start_time", "end_time"]] = _sampled_bounds(
         sampled.loc[is_swr], epoch
     )
-    dropped = swr_source.dropped_for_excluded_time(sampled)
+    dropped = analysed_time.dropped_for_excluded_time(sampled)
     return dropped[np.isfinite(dropped["start_time"].to_numpy(dtype=np.float64))]
 
 
@@ -375,7 +376,7 @@ def _lfp_inventory(
     """An LFP detector's events under the one rule: excluded time with the
     artifact mask and the speed rule (``event_drop_reasons``), then its second
     pass on the grid-sampled bounds of each kept event and of the SWR and MUA
-    events dropped for excluded time, as ``swr_source`` makes it.
+    events dropped for excluded time, as ``analysed_time`` makes it.
 
     Two events sharing a sample of the grid cannot both be labelled on it, so
     the second pass cannot read them: the detector is then unavailable for the
@@ -387,7 +388,7 @@ def _lfp_inventory(
         events[["start_time", "end_time"]],
         speed=epoch.speed,
         time=epoch.time,
-        artifacts=swr_source.artifact_intervals(epoch.epoch_id),
+        artifacts=source_inventory.artifact_intervals(epoch.epoch_id),
     )
     try:
         sampled = _sampled_bounds(events, epoch)
@@ -442,7 +443,7 @@ def swr_inventory(
     dot : DataFrame
         The epoch's decode frame, read through the SWR source.
     drops : DataFrame
-        ``swr_source.read_artifact_event_drops`` of the decode pickle, the
+        ``analysed_time.read_artifact_event_drops`` of the decode pickle, the
         frame as saved; never ``artifact_event_drops`` of the read frame,
         whose dropped labels are already gone.
 
@@ -450,7 +451,7 @@ def swr_inventory(
     -------
     InventoryTables
         Kay's eligible events are exactly the paper's SWRs, the ones
-        ``swr_source.with_swr_source`` keeps in the same frame.
+        ``analysed_time.with_swr_source`` keeps in the same frame.
 
     """
     if detector not in SWR_DETECTORS:
@@ -469,7 +470,7 @@ def swr_inventory(
         events = _numbered_events(files[detector])
     except _Unavailable as why:
         return _unavailable(epoch, detector, run_dir.name, str(why))
-    scope = "zugaro" if detector == "zugaro" else swr_source.OBSERVED_SCOPE
+    scope = "zugaro" if detector == "zugaro" else source_inventory.OBSERVED_SCOPE
     observed = pd.read_parquet(files["swr_observed"])
     stretches = observed.loc[observed["scope"] == scope, ["start_s", "end_s"]]
     return _lfp_inventory(detector, run_dir, events, stretches.to_numpy(), epoch, drops)
@@ -518,7 +519,9 @@ def _label_set_aside(
 
 
 def _outside_mask(epoch: _Epoch) -> NDArray:
-    mask = interval_mask(epoch.time, swr_source.artifact_intervals(epoch.epoch_id))
+    mask = interval_mask(
+        epoch.time, source_inventory.artifact_intervals(epoch.epoch_id)
+    )
     outside: NDArray = ~mask
     return outside
 
@@ -538,7 +541,7 @@ def mua_inventory(
     dot : DataFrame
         The epoch's decode frame, read through the SWR source.
     drops : DataFrame
-        ``swr_source.read_artifact_event_drops`` of the decode pickle, the
+        ``analysed_time.read_artifact_event_drops`` of the decode pickle, the
         frame as saved; never ``artifact_event_drops`` of the read frame,
         whose dropped labels are already gone.
     run_id : str
@@ -719,7 +722,7 @@ def memoryless_inventory(
         The epoch's decode frame, read through the SWR source (for its
         session, bounds and speed).
     drops : DataFrame
-        ``swr_source.read_artifact_event_drops`` of the decode pickle, as for
+        ``analysed_time.read_artifact_event_drops`` of the decode pickle, as for
         :func:`swr_inventory`.
 
     Returns

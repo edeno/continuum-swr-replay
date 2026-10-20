@@ -68,7 +68,7 @@ import xarray as xr
 
 from continuum_swr_replay import decoding_common
 from continuum_swr_replay.analysis.contfrag import result_loading as contfrag_loading
-from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events import analysed_time, swr_inventory
 from continuum_swr_replay.analysis.events.immobility import (
     EventDefinitionError,
 )
@@ -1113,7 +1113,7 @@ def test_an_hpc_decode_masks_artifacts_and_leaves_swrs_out_of_encoding(
         load["mua_artifact_intervals"]["HPC"].to_numpy(), [MASK_INTERVAL]
     )
     # the ripple-power covariate is the source's: its kept tetrodes, the mask
-    expected = swr_source.ripple_power_inputs(SWR_EPOCH)
+    expected = swr_inventory.ripple_power_inputs(SWR_EPOCH)
     assert {
         k: v for k, v in load["ripple_power"].items() if k != "artifact_intervals"
     } == {k: v for k, v in expected.items() if k != "artifact_intervals"}
@@ -1146,7 +1146,7 @@ def test_an_hpc_decode_refuses_to_run_without_both_runs(
 ):
     """Fail closed: nothing is loaded, the epoch fails, and its log says why."""
     decoder, module = DECODERS[key], decoders.modules[key]
-    monkeypatch.setattr(swr_source, unset, None)
+    monkeypatch.setattr(swr_inventory, unset, None)
 
     def load_data(*args: Any, **kwargs: Any) -> None:
         raise AssertionError("an HPC decode loaded data without both runs")
@@ -1156,7 +1156,7 @@ def test_an_hpc_decode_refuses_to_run_without_both_runs(
     failed = _run_decode(module, decoder, tmp_path, save_dir=tmp_path / "staging")
 
     assert failed == decoder.epoch_identifier
-    assert f"swr_source.{unset}" in _log(tmp_path, decoder)
+    assert f"swr_inventory.{unset}" in _log(tmp_path, decoder)
 
 
 @pytest.mark.parametrize("key", list(DECODERS))
@@ -1169,7 +1169,7 @@ def test_an_hpc_decode_refuses_an_inventory_masked_by_another_artifact_run(
     unmasked = write_swr_inventory(
         tmp_path / "unmasked_inventory", {SWR_EPOCH: SWR_EVENTS}
     )
-    monkeypatch.setattr(swr_source, "SWR_INVENTORY_ROOT", unmasked.parent)
+    monkeypatch.setattr(swr_inventory, "SWR_INVENTORY_ROOT", unmasked.parent)
 
     def load_data(*args: Any, **kwargs: Any) -> None:
         raise AssertionError("an HPC decode loaded data on an unmasked inventory")
@@ -1192,13 +1192,13 @@ def test_main_refuses_an_hpc_batch_without_both_runs(
     module = decoders.modules[key]
     batches = []
     monkeypatch.setattr(module, "run_batch", lambda *args, **kw: batches.append(args))
-    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", None)
+    monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", None)
 
     monkeypatch.setattr(sys, "argv", ["decoder"])
     with pytest.raises(SystemExit) as stopped:
         module.main()
     assert stopped.value.code == 2
-    assert "swr_source.ARTIFACT_INTERVALS_RUN_ID" in capsys.readouterr().err
+    assert "swr_inventory.ARTIFACT_INTERVALS_RUN_ID" in capsys.readouterr().err
     assert batches == []
 
     monkeypatch.setattr(sys, "argv", ["decoder", "--brain_area", "mPFC"])
@@ -1242,7 +1242,7 @@ def test_an_hpc_decodes_swr_labels_are_the_sources(
         return
     np.testing.assert_array_equal(
         data_over_time["SWR_event"],
-        swr_source.swr_event_labels(
+        analysed_time.swr_event_labels(
             DECODE_TIME, SWR_EPOCH, speed=np.zeros(DECODE_TIME.size)
         ),
     )
@@ -1252,12 +1252,12 @@ def test_an_hpc_decodes_swr_labels_are_the_sources(
     # widened by 0.3 s, is not observed, and nothing after it is
     np.testing.assert_array_equal(
         data_over_time["swr_observed"],
-        swr_source.swr_observed_mask(DECODE_TIME, SWR_EPOCH),
+        analysed_time.swr_observed_mask(DECODE_TIME, SWR_EPOCH),
     )
     observed = data_over_time["swr_observed"].to_numpy()
     assert not observed[_on_decode_grid((103.4, 104.6))].any()
     assert observed[_on_decode_grid((104.61, 105.3))].all()
-    assert data_over_time.attrs["swr_source"] == swr_source.swr_source_name()
+    assert data_over_time.attrs["swr_source"] == swr_inventory.swr_source_name()
 
 
 @pytest.mark.parametrize("key", list(DECODERS))
@@ -1300,7 +1300,7 @@ def test_an_hpc_decode_keeps_every_event_it_decoded(decoders, monkeypatch, key):
 
     column = next(iter(columns))
     np.testing.assert_array_equal(data_over_time[column], labels)
-    assert not swr_source.with_swr_source(data_over_time)[column].any()
+    assert not analysed_time.with_swr_source(data_over_time)[column].any()
 
 
 def test_an_hpc_decode_checks_its_labels_at_its_own_threshold(decoders, monkeypatch):

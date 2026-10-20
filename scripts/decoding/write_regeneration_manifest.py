@@ -17,10 +17,8 @@ import pyarrow.parquet as pq
 from continuum_swr_replay.analysis.behavior.qvals_table import (
     QVALS_STANDARDIZED_COLS,
 )
-from continuum_swr_replay.analysis.events.swr_source import (
-    SWR_SOURCE_ATTR,
-    swr_source_name,
-)
+from continuum_swr_replay.analysis.events.analysed_time import SWR_SOURCE_ATTR
+from continuum_swr_replay.analysis.events.swr_inventory import swr_source_name
 from continuum_swr_replay.analysis.replay._tables_common import (
     EVENT_ARM_STANDARDIZED_COLS,
 )

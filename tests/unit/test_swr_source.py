@@ -20,32 +20,34 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events import analysed_time, swr_inventory
+from continuum_swr_replay.analysis.events.analysed_time import (
+    read_dot_with_swr_source,
+    require_swr_source,
+    stamp_swr_source,
+    swr_event_labels,
+    swr_intervals,
+    swr_observed_mask,
+    swr_observed_stretches,
+    with_swr_source,
+)
 from continuum_swr_replay.analysis.events.artifact_intervals import (
     cores_path,
     read_manifest,
     write_manifest,
 )
+from continuum_swr_replay.analysis.events.eligibility import DropReason
 from continuum_swr_replay.analysis.events.immobility import (
     EventDefinitionError,
     build_speed_eligible_event_cohort,
     filter_event_labels_by_speed,
     intervals_from_labels,
 )
-from continuum_swr_replay.analysis.events.swr_source import (
-    DropReason,
+from continuum_swr_replay.analysis.events.swr_inventory import (
     SwrSourceError,
     artifact_intervals,
-    read_dot_with_swr_source,
     read_swr_inventory,
-    require_swr_source,
-    stamp_swr_source,
-    swr_event_labels,
     swr_events,
-    swr_intervals,
-    swr_observed_mask,
-    swr_observed_stretches,
-    with_swr_source,
 )
 from continuum_swr_replay.tables.io import sha256_file
 from tests.unit._swr_inventory_fixtures import (
@@ -98,54 +100,56 @@ def _artifacts(tmp_path, monkeypatch, cores, span=(0.0, 1e6)) -> None:
     """Configure an artifact run whose cores for EPOCH are `cores`
     (``(signatures, core_start, core_end)``)."""
     directory = write_artifact_run(tmp_path / "artifacts", {EPOCH: cores}, span=span)
-    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_ROOT", directory.parent)
-    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
+    monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_ROOT", directory.parent)
+    monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
 
 
-CONFIGURED_ARTIFACT_RUN_ID = swr_source.ARTIFACT_INTERVALS_RUN_ID
+CONFIGURED_ARTIFACT_RUN_ID = swr_inventory.ARTIFACT_INTERVALS_RUN_ID
 """The committed value, read at import: the suite's autouse fixture sets the
 module's to None for every test (tests/conftest.py)."""
 
 
 class TestTheConfiguredInventory:
     def test_the_run_id_and_detector_are_the_r3_kay_inventory(self, monkeypatch):
-        assert swr_source.SWR_INVENTORY_RUN_ID == "056eee0dcb5a"
-        assert swr_source.SWR_DETECTOR == "kay"
-        assert swr_source.swr_inventory_dir() == (
-            swr_source.SWR_INVENTORY_ROOT / swr_source.SWR_INVENTORY_RUN_ID
+        assert swr_inventory.SWR_INVENTORY_RUN_ID == "056eee0dcb5a"
+        assert swr_inventory.SWR_DETECTOR == "kay"
+        assert swr_inventory.swr_inventory_dir() == (
+            swr_inventory.SWR_INVENTORY_ROOT / swr_inventory.SWR_INVENTORY_RUN_ID
         )
         assert CONFIGURED_ARTIFACT_RUN_ID == "fbbff144a123"
         monkeypatch.setattr(
-            swr_source, "ARTIFACT_INTERVALS_RUN_ID", CONFIGURED_ARTIFACT_RUN_ID
+            swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", CONFIGURED_ARTIFACT_RUN_ID
         )
-        assert swr_source.artifact_intervals_dir() == (
-            swr_source.ARTIFACT_INTERVALS_ROOT / "fbbff144a123"
+        assert swr_inventory.artifact_intervals_dir() == (
+            swr_inventory.ARTIFACT_INTERVALS_ROOT / "fbbff144a123"
         )
-        assert swr_source.swr_source_name() == (
+        assert swr_inventory.swr_source_name() == (
             "kay@056eee0dcb5a+artifacts@fbbff144a123"
         )
 
     def test_the_folders_and_name_follow_the_constants_when_they_change(
         self, monkeypatch
     ):
-        monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", "rerun_masked")
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", "task16")
+        monkeypatch.setattr(swr_inventory, "SWR_INVENTORY_RUN_ID", "rerun_masked")
+        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", "task16")
 
-        assert swr_source.swr_inventory_dir().name == "rerun_masked"
-        assert swr_source.artifact_intervals_dir() == (
-            swr_source.ARTIFACT_INTERVALS_ROOT / "task16"
+        assert swr_inventory.swr_inventory_dir().name == "rerun_masked"
+        assert swr_inventory.artifact_intervals_dir() == (
+            swr_inventory.ARTIFACT_INTERVALS_ROOT / "task16"
         )
-        assert swr_source.swr_source_name() == "kay@rerun_masked+artifacts@task16"
+        assert swr_inventory.swr_source_name() == "kay@rerun_masked+artifacts@task16"
 
     def test_a_source_name_says_which_artifact_run_it_was_built_under(
         self, monkeypatch
     ):
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", "task16")
-        assert swr_source.artifact_run_of(swr_source.swr_source_name()) == "task16"
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", None)
-        assert swr_source.artifact_run_of(swr_source.swr_source_name()) is None
+        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", "task16")
+        assert (
+            swr_inventory.artifact_run_of(swr_inventory.swr_source_name()) == "task16"
+        )
+        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", None)
+        assert swr_inventory.artifact_run_of(swr_inventory.swr_source_name()) is None
         # a name from before the artifact run was recorded in it: no run
-        assert swr_source.artifact_run_of("Kay") is None
+        assert swr_inventory.artifact_run_of("Kay") is None
 
     def test_the_run_id_is_written_in_one_module(self):
         # A literal anywhere else would survive the switch to R3's rerun.
@@ -153,16 +157,16 @@ class TestTheConfiguredInventory:
             str(path.relative_to(REPO))
             for folder in ("src", "scripts")
             for path in (REPO / folder).rglob("*.py")
-            if swr_source.SWR_INVENTORY_RUN_ID in path.read_text()
+            if swr_inventory.SWR_INVENTORY_RUN_ID in path.read_text()
             or CONFIGURED_ARTIFACT_RUN_ID in path.read_text()
         )
 
-        assert holders == ["src/continuum_swr_replay/analysis/events/swr_source.py"]
+        assert holders == ["src/continuum_swr_replay/analysis/events/swr_inventory.py"]
 
     def test_the_swr_runner_writes_where_the_source_reads(self):
         import scripts.decoding.run_swr_detection as runner
 
-        assert runner.OUTPUT_ROOT == swr_source.SWR_INVENTORY_ROOT
+        assert runner.OUTPUT_ROOT == swr_inventory.SWR_INVENTORY_ROOT
 
     def test_the_configured_folder_is_read_when_called(self, inventory):
         events = read_swr_inventory(EPOCH)
@@ -184,7 +188,7 @@ class TestTheConfiguredInventory:
             assert not {"artifact_intervals", "inventory_dir"} & parameters
 
     def test_the_epoch_id_is_the_hpc_one(self):
-        assert swr_source.swr_epoch_id("j1620210706_.nwb", "02_r1") == EPOCH
+        assert swr_inventory.swr_epoch_id("j1620210706_.nwb", "02_r1") == EPOCH
 
 
 class TestWhichEpochsAreServed:
@@ -299,7 +303,7 @@ class TestTheArtifactIntervals:
 
         assert list(intervals.columns) == ["start_time", "end_time"]
         assert intervals.empty
-        assert swr_source.swr_source_name().endswith("+artifacts@none")
+        assert swr_inventory.swr_source_name().endswith("+artifacts@none")
 
     def test_a_configured_run_is_read_by_epoch_and_named(
         self, inventory, tmp_path, monkeypatch
@@ -309,7 +313,7 @@ class TestTheArtifactIntervals:
         np.testing.assert_allclose(
             artifact_intervals(EPOCH).to_numpy(), np.array(ARTIFACT_INTERVALS)
         )
-        assert swr_source.swr_source_name() == (
+        assert swr_inventory.swr_source_name() == (
             f"kay@{RUN_ID}+artifacts@{ARTIFACT_RUN_ID}"
         )
 
@@ -344,7 +348,7 @@ class TestTheArtifactIntervals:
     ):
         # A missing file must not read as an epoch without artifacts.
         _artifacts(tmp_path, monkeypatch, ARTIFACTS)
-        cores_path(swr_source.artifact_intervals_dir(), EPOCH).unlink()
+        cores_path(swr_inventory.artifact_intervals_dir(), EPOCH).unlink()
 
         with pytest.raises(SwrSourceError, match="no artifact intervals"):
             swr_events(EPOCH, speed=pd.Series(_speed(), index=TIME))
@@ -364,7 +368,7 @@ class TestTheArtifactIntervals:
         self, inventory, tmp_path, monkeypatch
     ):
         _artifacts(tmp_path, monkeypatch, ARTIFACTS)
-        path = cores_path(swr_source.artifact_intervals_dir(), EPOCH)
+        path = cores_path(swr_inventory.artifact_intervals_dir(), EPOCH)
         pd.read_parquet(path).iloc[:1].to_parquet(path)
 
         with pytest.raises(SwrSourceError, match="sha256"):
@@ -374,7 +378,7 @@ class TestTheArtifactIntervals:
         self, inventory, tmp_path, monkeypatch
     ):
         _artifacts(tmp_path, monkeypatch, ARTIFACTS)
-        directory = swr_source.artifact_intervals_dir()
+        directory = swr_inventory.artifact_intervals_dir()
         path = cores_path(directory, EPOCH)
         pd.DataFrame({"start_time": [1.0], "end_time": [2.0]}).to_parquet(path)
         manifest = read_manifest(directory)
@@ -515,7 +519,7 @@ class TestCoverage:
             (TIME >= 102.0) & (TIME <= 109.0)
         )
         in_excluded = np.zeros(TIME.size, dtype=bool)
-        for start, end in swr_source.excluded_intervals(EPOCH).to_numpy():
+        for start, end in analysed_time.excluded_intervals(EPOCH).to_numpy():
             in_excluded |= (TIME >= start) & (TIME <= end)
         # 0.8 s each; the padded bounds fall a hair off the grid
         assert in_excluded.sum() == 2 * 399
@@ -616,18 +620,18 @@ class TestAnAnalysisFrame:
         self, inventory, monkeypatch
     ):
         calls = []
-        original = swr_source.swr_source_files
+        original = swr_inventory.swr_source_files
 
         def counted(epoch_id):
             calls.append(epoch_id)
             return original(epoch_id)
 
-        monkeypatch.setattr(swr_source, "swr_source_files", counted)
+        monkeypatch.setattr(swr_inventory, "swr_source_files", counted)
 
         out = with_swr_source(_dot())
 
         assert calls == [EPOCH]
-        assert out.attrs["swr_source"] == swr_source.swr_source_name()
+        assert out.attrs["swr_source"] == swr_inventory.swr_source_name()
 
     def test_its_intervals_are_the_labels_sampled_bounds(self, inventory):
         out = with_swr_source(_dot())
@@ -666,15 +670,16 @@ class TestTheStamp:
 
     def test_a_new_artifact_run_retires_every_stamp(self, inventory, monkeypatch):
         frame = stamp_swr_source(pd.DataFrame())
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", "task16")
+        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", "task16")
 
         with pytest.raises(SwrSourceError):
             require_swr_source(frame, what="the event table")
 
 
-def test_the_module_names_no_stored_ripple_source():
-    text = (REPO / "src/continuum_swr_replay/analysis/events/swr_source.py").read_text()
-    code = re.sub(r'""".*?"""', "", text, flags=re.S)
+@pytest.mark.parametrize("module", ["swr_inventory", "analysed_time"])
+def test_the_module_names_no_stored_ripple_source(module):
+    path = REPO / f"src/continuum_swr_replay/analysis/events/{module}.py"
+    code = re.sub(r'""".*?"""', "", path.read_text(), flags=re.S)
 
     assert "RippleTimesV1" not in code
     assert "ripple_times" not in code
@@ -729,15 +734,15 @@ class TestEveryCohortHonoursTheMask:
         _artifacts(tmp_path, monkeypatch, ARTIFACTS)
 
         np.testing.assert_allclose(
-            swr_source.excluded_intervals(EPOCH).to_numpy(), EXCLUDED_INTERVALS
+            analysed_time.excluded_intervals(EPOCH).to_numpy(), EXCLUDED_INTERVALS
         )
         np.testing.assert_allclose(
-            swr_source.excluded_intervals_of(_dot()).to_numpy(), EXCLUDED_INTERVALS
+            analysed_time.excluded_intervals_of(_dot()).to_numpy(), EXCLUDED_INTERVALS
         )
         sessions = pd.DataFrame(
             {"animal": ["j16"], "session_date": [20210706], "epoch": ["02_r1"]}
         )
-        by_session = swr_source.excluded_intervals_by_session(sessions)
+        by_session = analysed_time.excluded_intervals_by_session(sessions)
         assert list(by_session.columns) == [
             "animal",
             "session_date",
@@ -771,7 +776,7 @@ class TestEveryCohortHonoursTheMask:
     ):
         _artifacts(tmp_path, monkeypatch, ARTIFACTS)
 
-        drops = swr_source.artifact_event_drops(self._nonlocal_dot())
+        drops = analysed_time.artifact_event_drops(self._nonlocal_dot())
 
         def _reasons(column):
             rows = drops.loc[drops["event_col"] == column]
@@ -794,8 +799,8 @@ class TestEveryCohortHonoursTheMask:
         swrs = _reasons("SWR_event")
         assert swrs[5] == swrs[6] == DropReason.ARTIFACT
         assert swrs[3] == DropReason.MOVING
-        assert list(drops.columns) == swr_source.DROP_COLUMNS
-        dropped = swr_source.dropped_for_excluded_time(drops)
+        assert list(drops.columns) == analysed_time.DROP_COLUMNS
+        dropped = analysed_time.dropped_for_excluded_time(drops)
         assert sorted(zip(dropped["event_col"], dropped["label"], strict=True)) == [
             ("MUA_event", 1),
             ("MUA_event", 2),
@@ -849,7 +854,7 @@ class TestEveryCohortHonoursTheMask:
 
         for column in ("non_local_event", "MUA_event"):
             pd.testing.assert_series_equal(out[column], dot[column])
-        reasons = swr_source.artifact_event_drops(dot)["drop_reason"].dropna()
+        reasons = analysed_time.artifact_event_drops(dot)["drop_reason"].dropna()
         assert set(reasons) <= {
             DropReason.MOVING,
             DropReason.SPEED_UNKNOWN,
@@ -897,7 +902,7 @@ class TestTheLabelContract:
             with_swr_source(dot)
         assert "time" in str(refused.value)
         with pytest.raises(ValueError, match=message):
-            swr_source.artifact_event_drops(dot)
+            analysed_time.artifact_event_drops(dot)
 
     def test_a_frame_that_keeps_the_contract_is_read(self, inventory):
         out = with_swr_source(self._frame())
@@ -914,7 +919,7 @@ class TestTheLabelContract:
         with pytest.raises(EventDefinitionError, match="immobility contract"):
             with_swr_source(dot, drop_masked_events=drop_masked_events)
         with pytest.raises(EventDefinitionError, match="immobility contract"):
-            swr_source.artifact_event_drops(dot)
+            analysed_time.artifact_event_drops(dot)
 
     def test_a_label_with_untracked_speed_is_refused(self, inventory):
         dot = self._frame(MUA_event=_labels([(103.05, 103.08)]))  # speed NaN
@@ -956,10 +961,10 @@ class TestTheLabelContract:
         dot.to_pickle(path)
 
         with pytest.raises(EventDefinitionError, match="probability-threshold"):
-            swr_source.artifact_event_drops(dot)
-        drops = swr_source.artifact_event_drops(dot, non_local_threshold=0.5)
+            analysed_time.artifact_event_drops(dot)
+        drops = analysed_time.artifact_event_drops(dot, non_local_threshold=0.5)
         pd.testing.assert_frame_equal(
-            swr_source.read_artifact_event_drops(path, non_local_threshold=0.5),
+            analysed_time.read_artifact_event_drops(path, non_local_threshold=0.5),
             drops,
         )
         assert (drops["event_col"] == "non_local_event").sum() == 1
@@ -1004,7 +1009,7 @@ class TestTheExcludedTimeColumn:
         self, inventory, tmp_path, monkeypatch
     ):
         _artifacts(tmp_path, monkeypatch, ARTIFACTS)
-        excluded = swr_source.excluded_intervals(EPOCH)
+        excluded = analysed_time.excluded_intervals(EPOCH)
         # the grid holds every interval's exact endpoints, so closedness shows
         time = np.unique(np.r_[TIME, excluded.to_numpy().ravel()])
         dot = pd.DataFrame(
@@ -1044,7 +1049,7 @@ class TestTheExcludedTimeColumn:
 
         np.testing.assert_array_equal(
             out["in_excluded_time"].to_numpy(),
-            _closed_mask(swr_source.excluded_intervals(EPOCH), TIME),
+            _closed_mask(analysed_time.excluded_intervals(EPOCH), TIME),
         )
 
     def test_a_contfrag_frame_read_from_its_pickle_carries_it(
@@ -1059,7 +1064,7 @@ class TestTheExcludedTimeColumn:
 
         np.testing.assert_array_equal(
             out["in_excluded_time"].to_numpy(),
-            _closed_mask(swr_source.excluded_intervals(EPOCH), TIME),
+            _closed_mask(analysed_time.excluded_intervals(EPOCH), TIME),
         )
 
 
@@ -1071,15 +1076,15 @@ class TestTheAnalysedBins:
         frame = pd.DataFrame({"in_excluded_time": [False, True, True, False]})
 
         np.testing.assert_array_equal(
-            swr_source.analysed_bins(frame), [True, False, False, True]
+            analysed_time.analysed_bins(frame), [True, False, False, True]
         )
-        assert "analysed_bins" in swr_source.__all__
+        assert "analysed_bins" in analysed_time.__all__
 
     def test_a_frame_without_the_column_is_refused(self):
         with pytest.raises(
             KeyError, match="in_excluded_time.*read_dot_with_swr_source"
         ):
-            swr_source.analysed_bins(pd.DataFrame({"head_speed": [0.0]}))
+            analysed_time.analysed_bins(pd.DataFrame({"head_speed": [0.0]}))
 
     @pytest.mark.parametrize(
         "values",
@@ -1094,7 +1099,7 @@ class TestTheAnalysedBins:
         frame = pd.DataFrame({"in_excluded_time": pd.Series(values, dtype=object)})
 
         with pytest.raises(TypeError, match="in_excluded_time"):
-            swr_source.analysed_bins(frame)
+            analysed_time.analysed_bins(frame)
 
 
 def _raw_theta_power() -> np.ndarray:
@@ -1149,7 +1154,7 @@ class TestTheNormalizers:
 
         assert np.isnan(theta[in_mask]).all()
         # the reach of the mask is outside it: finite there
-        reach = _closed_mask(swr_source.excluded_intervals(EPOCH), TIME) & ~in_mask
+        reach = _closed_mask(analysed_time.excluded_intervals(EPOCH), TIME) & ~in_mask
         assert np.isfinite(theta[reach]).all()
 
     def test_theta_is_the_raw_power_z_scored_outside_the_mask(
@@ -1257,9 +1262,9 @@ def test_the_decodes_event_counts_are_dropped(inventory, drop_masked_events):
         "n_non_local_MUA": 7,
         "n_non_local_no_MUA": 6,
     }
-    assert set(counts) == set(swr_source.DECODE_EVENT_COUNT_COLUMNS)
+    assert set(counts) == set(analysed_time.DECODE_EVENT_COUNT_COLUMNS)
 
     out = with_swr_source(_dot(**counts), drop_masked_events=drop_masked_events)
 
     assert not set(counts) & set(out.columns)
-    assert not set(swr_source.DECODE_SWR_COUNT_COLUMNS) & set(out.columns)
+    assert not set(analysed_time.DECODE_SWR_COUNT_COLUMNS) & set(out.columns)

@@ -9,7 +9,7 @@ state classifications are internally consistent.
 All functions operate on the ``data_over_time`` DataFrame produced by
 :func:`~continuum_swr_replay.analysis.hippocampus.get_data_over_time`,
 which is already saved as pickle files for all sessions, read through the SWR
-source (``swr_source.read_dot_with_swr_source``, or ``load_data_over_time``).
+source (``analysed_time.read_dot_with_swr_source``, or ``load_data_over_time``).
 
 Excluded time
 -------------
@@ -91,7 +91,7 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
-from continuum_swr_replay.analysis.events.swr_source import analysed_bins
+from continuum_swr_replay.analysis.events.analysed_time import analysed_bins
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
 logger = logging.getLogger(__name__)
@@ -111,7 +111,7 @@ def _analysed_rows(data: pd.DataFrame) -> np.ndarray:
     ----------
     data : pd.DataFrame
         A ``data_over_time`` frame read through the SWR source, which adds
-        ``in_excluded_time`` (``swr_source.with_swr_source``).
+        ``in_excluded_time`` (``analysed_time.with_swr_source``).
 
     Returns
     -------
@@ -121,7 +121,7 @@ def _analysed_rows(data: pd.DataFrame) -> np.ndarray:
     Raises
     ------
     KeyError, TypeError
-        As :func:`~.swr_source.analysed_bins`, which this is: a missing or
+        As :func:`~.analysed_time.analysed_bins`, which this is: a missing or
         non-boolean column is refused.
     """
     return analysed_bins(data)

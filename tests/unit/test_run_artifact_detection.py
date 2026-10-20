@@ -19,7 +19,7 @@ import pytest
 from dask.distributed import LocalCluster
 
 import scripts.decoding.run_artifact_detection as runner
-from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events import swr_inventory
 from continuum_swr_replay.analysis.events.artifact_intervals import (
     CORE_COLUMNS,
     cores_path,
@@ -229,11 +229,11 @@ def test_lfp_columns_that_are_not_band_and_references_in_id_order_fail(tmp_path)
 
 
 def test_the_runner_writes_where_the_source_reads():
-    assert runner.OUTPUT_ROOT == swr_source.ARTIFACT_INTERVALS_ROOT
+    assert runner.OUTPUT_ROOT == swr_inventory.ARTIFACT_INTERVALS_ROOT
 
 
 def test_the_source_reads_a_run_the_runner_wrote(tmp_path, monkeypatch):
-    """End to end: the runner's file and manifest are what ``swr_source`` reads,
+    """End to end: the runner's file and manifest are what ``swr_inventory`` reads,
     and it pads them into the one mask."""
     epoch = _artifact_epoch()
     output_dir = tmp_path / "artifacts" / "run0001"
@@ -242,12 +242,12 @@ def test_the_source_reads_a_run_the_runner_wrote(tmp_path, monkeypatch):
     runner.write_manifest(
         output_dir, {"run_id": "run0001", "epochs": {EPOCH_ID: record}}
     )
-    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_ROOT", output_dir.parent)
-    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", "run0001")
+    monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_ROOT", output_dir.parent)
+    monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", "run0001")
 
     stored = read_epoch_cores(output_dir, EPOCH_ID)
     pd.testing.assert_frame_equal(
-        swr_source.artifact_intervals(EPOCH_ID),
+        swr_inventory.artifact_intervals(EPOCH_ID),
         artifact_intervals(stored.cores, stored.span),
     )
 

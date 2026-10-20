@@ -24,7 +24,7 @@ from patsy import dmatrix
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-from continuum_swr_replay.analysis.events.swr_source import (  # noqa: E402
+from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
     excluded_intervals_by_session,
     require_swr_source,
 )
@@ -98,7 +98,7 @@ def _lag_exposure(stop, edges):
 
     The clock is the stop's own (``stop_end - stop_start``): a stop covers lag
     bin ``[e, e + dt)`` from ``stop_start + e`` to its end, less the excluded
-    seconds there (``swr_source.excluded_intervals_by_session``). Its
+    seconds there (``analysed_time.excluded_intervals_by_session``). Its
     ``immobility_duration_s`` is already net of excluded time, so it is not a
     length on this clock.
     """

@@ -152,11 +152,11 @@ def rebuild_session(
         DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
         DEFAULT_NON_LOCAL_THRESHOLD,
     )
-    from continuum_swr_replay.analysis.events.swr_source import (
+    from continuum_swr_replay.analysis.events.analysed_time import (
         excluded_intervals,
         read_artifact_event_drops,
-        swr_epoch_id,
     )
+    from continuum_swr_replay.analysis.events.swr_inventory import swr_epoch_id
     from continuum_swr_replay.analysis.hippocampus import load_results
     from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
         align_results_to_position,

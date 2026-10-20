@@ -13,7 +13,7 @@ Per epoch:
 1. **Band.** The stored ripple band (``get_ripple_band_inputs``) is cut to the
    position span (``get_epoch_position_info``), as the SWR runner cuts it, and
    subset to the tetrodes the SWR source run's rule R-T kept
-   (``swr_source.ripple_power_inputs``). The epoch is refused, and nothing is
+   (``swr_inventory.ripple_power_inputs``). The epoch is refused, and nothing is
    written, unless the band holds that run's electrodes and the sha256 of the
    times and of the kept band are the ones that run recorded
    (``input_sha256["time"]`` and ``["ripple_band"]``): the same inputs, byte
@@ -79,7 +79,7 @@ from numpy.typing import NDArray
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from continuum_swr_replay.analysis.events import swr_source  # noqa: E402
+from continuum_swr_replay.analysis.events import swr_inventory  # noqa: E402
 from continuum_swr_replay.analysis.events.artifact_masks import (  # noqa: E402
     PADDING_S,
 )
@@ -179,7 +179,7 @@ def output_paths(identifier: str, output_dir: Path) -> dict[str, Path]:
 def swr_run_inputs(identifier: str) -> dict[str, Any]:
     """What the SWR source run read for the epoch.
 
-    ``swr_source.ripple_power_inputs`` (the band's and the kept electrodes, the
+    ``swr_inventory.ripple_power_inputs`` (the band's and the kept electrodes, the
     rate and the position span), with the run's ``input_sha256`` record.
 
     Raises
@@ -187,9 +187,9 @@ def swr_run_inputs(identifier: str) -> dict[str, Any]:
     SwrSourceError
         If the run does not serve the epoch.
     """
-    inputs = swr_source.ripple_power_inputs(identifier)
+    inputs = swr_inventory.ripple_power_inputs(identifier)
     manifest = json.loads(
-        (swr_source.swr_inventory_dir() / "manifest.json").read_text()
+        (swr_inventory.swr_inventory_dir() / "manifest.json").read_text()
     )
     with_hashes: dict[str, Any] = inputs | {
         "input_sha256": manifest["epochs"][identifier]["input_sha256"]
@@ -292,7 +292,7 @@ def _detect(
     ripple_band = inputs["ripple_band"][first:stop]
 
     swr_run = fetch_swr_inputs(identifier)
-    swr_run_id = swr_source.SWR_INVENTORY_RUN_ID
+    swr_run_id = swr_inventory.SWR_INVENTORY_RUN_ID
     electrode_ids = np.asarray(inputs["electrode_ids"], dtype=np.int64)
     kept_ids = np.asarray(swr_run["kept_electrode_ids"], dtype=np.int64)
     kept = np.isin(electrode_ids, kept_ids)
@@ -527,7 +527,7 @@ def run_settings(provenance: dict, artifact_run_id: str | None) -> dict:
             "carey_settings": CAREY_SETTINGS,
             "adaptations": ADAPTATIONS,
             "ripple_detection_commit": provenance["ripple_detection_commit"],
-            "swr_run_id": swr_source.SWR_INVENTORY_RUN_ID,
+            "swr_run_id": swr_inventory.SWR_INVENTORY_RUN_ID,
             "artifacts": {"run_id": artifact_run_id, "padding_s": PADDING_S},
             "marks_rule": MARKS_RULE,
             "grid": GRID,
@@ -584,7 +584,7 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
     """``main``'s run, under the run folder's lock."""
     run_id = output_dir.name
     # read once, here: every epoch of the run is masked by the same artifact run
-    artifact_dir = swr_source.artifact_intervals_dir()
+    artifact_dir = swr_inventory.artifact_intervals_dir()
     settings = run_settings(
         provenance, None if artifact_dir is None else artifact_dir.name
     )

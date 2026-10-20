@@ -9,13 +9,13 @@ The SWR runner, MUA detection and both HPC decoders use the mask (Task 17a), and
 Widloski runner (Task 17b: the mask's bins are missing in its likelihood). Task 18
 applies one analysed-time rule (the lead, 2026-10-10;
 `analysis/events/eligibility.py`). *Excluded time* is the mask widened by
-0.3 s on each side (`swr_source.excluded_intervals`). An event of any kind, an exposure
+0.3 s on each side (`analysed_time.excluded_intervals`). An event of any kind, an exposure
 second, a time bin with its history window, and a peri-event window are analysed only
 wholly outside it. A kept event that overlaps an SWR or MUA event dropped there is
 dropped too. Inputs read the mask itself: the decoders' missing bins, the detectors'
 normalization, and the ripple-power covariate. The covariate is the Kay detector's own
 consensus over rule R-T's tetrodes, with the mask out of its normalization
-(`data_loaders/lfp.with_ripple_power`). **Not yet applied:** `swr_source.ARTIFACT_INTERVALS_RUN_ID` stays
+(`data_loaders/lfp.with_ripple_power`). **Not yet applied:** `swr_inventory.ARTIFACT_INTERVALS_RUN_ID` stays
 None until runbook R9 runs the detector on all epochs and sets it.
 
 **Sources** (all under `.claude/research/refresh_artifact_detector/`):
@@ -76,7 +76,7 @@ the giant-day events.
   - the Widloski runner and every analysis.
 - **Artifact time is unobserved.**
   - An event of any kind that overlaps the mask leaves every cohort; it is not counted as
-    non-SWR. `swr_source`'s coverage (`swr_observed_*`) excludes the mask.
+    non-SWR. `analysed_time`'s coverage (`swr_observed_*`) excludes the mask.
   - The mask's time leaves every rate exposure, and every normalization leaves it out.
 - **No post-step second.** No rodent lab we read pads after an artifact. The Buzsáki lab's
   `bz_FindRipples` drops flagged events and pads nothing. Ripple-band power does stay below its
@@ -331,7 +331,7 @@ From C2 §1a (versions as fetched 2026-10-09) and the literature review:
   - The position span the SWR runner uses.
   - `get_hpc_marks`, after the coincidence filter.
 - **Its readers:**
-  - `swr_source.artifact_intervals(epoch_id)` returns the mask. `swr_observed_mask` and
+  - `swr_inventory.artifact_intervals(epoch_id)` returns the mask. `swr_observed_mask` and
     `swr_observed_stretches` leave it out.
   - `decoding_common.hpc_artifact_intervals` gives the same mask to the decoders and MUA.
   - The SWR runner pads the run's cores the same way.

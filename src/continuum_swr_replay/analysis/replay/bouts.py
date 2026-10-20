@@ -149,7 +149,7 @@ def bout_exposure_s(
     bout_starts, bout_ends : np.ndarray, shape (n_bouts,)
         Seconds, from :func:`immobility_bout_intervals`.
     excluded : pd.DataFrame
-        The epoch's excluded time (``swr_source.excluded_intervals``):
+        The epoch's excluded time (``analysed_time.excluded_intervals``):
         ``start_time`` and ``end_time``, closed.
 
     Returns
@@ -190,7 +190,7 @@ def summarize_bout_location(
     track_graph : nx.Graph
         Session track graph, for the well's arm.
     excluded : pd.DataFrame
-        The epoch's excluded time (``swr_source.excluded_intervals``):
+        The epoch's excluded time (``analysed_time.excluded_intervals``):
         ``start_time`` and ``end_time``, closed.
 
     Returns

@@ -127,7 +127,7 @@ def artifact_drop_reasons(
         closed.
     dropped : pd.DataFrame, optional
         The SWR and MUA events dropped for excluded time
-        (``swr_source.dropped_for_excluded_time``), for a cohort not read
+        (``analysed_time.dropped_for_excluded_time``), for a cohort not read
         through the source (events re-detected from a posterior, Widloski
         events): an event every other rule keeps that overlaps one is
         ``overlaps_dropped_event``.

@@ -5,7 +5,7 @@
 `scripts/decoding/run_swr_detection.py` (`detection_channels`) once per epoch, before any of
 the four detectors (Task 17b of the full pipeline refresh,
 [2026-10-03-full-pipeline-refresh-design.md](2026-10-03-full-pipeline-refresh-design.md)).
-**Not yet applied:** the configured SWR inventory (`swr_source.SWR_INVENTORY_RUN_ID`) predates
+**Not yet applied:** the configured SWR inventory (`swr_inventory.SWR_INVENTORY_RUN_ID`) predates
 the rule; the next SWR runner run applies it. The reference veto R-rip was studied and is not
 used. Companion note: [2026-10-09-artifact-detection.md](2026-10-09-artifact-detection.md) (the
 artifact mask).

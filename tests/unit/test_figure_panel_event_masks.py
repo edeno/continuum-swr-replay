@@ -12,7 +12,7 @@ from continuum_swr_replay.visualization.figure_panels import (
 
 def test_partial_overlap_assigns_whole_event():
     # A frame as the read hands it over: the speed rule and the probability
-    # contract are the read's (swr_source.with_swr_source), so every label
+    # contract are the read's (analysed_time.with_swr_source), so every label
     # here is an eligible event.
     data = pd.DataFrame(
         {

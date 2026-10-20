@@ -18,6 +18,7 @@ import pandas as pd
 import xarray as xr
 from non_local_detector.environment import Environment
 
+from continuum_swr_replay.analysis.events.analysed_time import read_dot_with_swr_source
 from continuum_swr_replay.analysis.events.detection import get_overlap_times
 from continuum_swr_replay.analysis.events.epoch_normalizers import (
     run_speed_baseline as epoch_run_speed_baseline,
@@ -25,7 +26,6 @@ from continuum_swr_replay.analysis.events.epoch_normalizers import (
 from continuum_swr_replay.analysis.events.immobility import (
     build_speed_eligible_event_cohort,
 )
-from continuum_swr_replay.analysis.events.swr_source import read_dot_with_swr_source
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     theta_power_zscore,
     validate_required_session_data_keys,
@@ -202,7 +202,7 @@ def load_contfrag_data_over_time(data_dir: Path) -> pd.DataFrame:
 
     The epochs are the epoch register's analysed ones
     (``epoch_register.analysed_decode_files``), never a glob of `data_dir`. Each
-    is read through the SWR source (``swr_source.read_dot_with_swr_source``):
+    is read through the SWR source (``analysed_time.read_dot_with_swr_source``):
     ``SWR_event`` is the direct Kay inventory's labels.
 
     Parameters

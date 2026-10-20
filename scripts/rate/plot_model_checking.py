@@ -32,7 +32,7 @@ from non_local_detector.model_checking.sorted_spikes import (  # noqa: E402
     point_process_residuals,
 )
 
-from continuum_swr_replay.analysis.events.swr_source import (  # noqa: E402
+from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
     require_swr_source,
 )
 from continuum_swr_replay.analysis.replay import (  # noqa: E402

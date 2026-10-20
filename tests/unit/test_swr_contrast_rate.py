@@ -22,7 +22,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.events.swr_source import stamp_swr_source
+from continuum_swr_replay.analysis.events.analysed_time import stamp_swr_source
 from continuum_swr_replay.analysis.replay import (
     BIN_S,
     N_HISTORY_BASIS,

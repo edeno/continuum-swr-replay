@@ -654,9 +654,9 @@ def drop_overlapping_events(
     """Drop the events that share any time with an interval; renumber the rest.
 
     Both are closed (``intervals.overlaps_intervals``), so an event that only
-    touches an interval at an instant is dropped too, as ``swr_source`` drops an
+    touches an interval at an instant is dropped too, as ``analysed_time`` drops an
     event touching an artifact. The kept events are renumbered 1..n in
-    ``event_number``, which an inventory's reader (``swr_source``) takes as the
+    ``event_number``, which an inventory's reader (``swr_inventory``) takes as the
     event's label.
 
     Parameters

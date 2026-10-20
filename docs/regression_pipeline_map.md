@@ -28,6 +28,12 @@ Per-stop RL-model values via DataJoint — canonical, complete, timestamp-aligne
 
 `peri_switch_index`, `add_experienced_value_columns`, `add_beta_belief_entropy`, `canonicalize_behavior_model_columns`, `assign_stops_to_trials`, `build_animal`, `run_build_qvals_table`
 
+### `src/continuum_swr_replay/analysis/events/analysed_time.py`
+
+The analysed-time read point: a decode frame held to the one analysed-time rule.
+
+`stamp_swr_source`, `require_swr_source`, `excluded_intervals`, `swr_observed_stretches`, `swr_observed_mask`, `swr_event_labels`, `artifact_event_drops`, `read_artifact_event_drops`, `dropped_for_excluded_time`, `with_swr_source`, `excluded_intervals_of`, `excluded_intervals_by_session`, `read_dot_with_swr_source`, `analysed_bins`, `swr_intervals`
+
 ### `src/continuum_swr_replay/analysis/events/artifact_intervals.py`
 
 The artifact run folder: one cores file per epoch, and the run's manifest.
@@ -76,11 +82,11 @@ Canonical whole-event immobility rules for neural event cohorts.
 
 `EventDefinitionError`, `require_time_index`, `require_canonical_speed_threshold`, `event_speeds_are_immobile`, `whole_event_immobility_mask`, `filter_event_labels_by_speed`, `validate_whole_event_immobility_contract`, `validate_nonlocal_event_probability_contract`, `filter_event_intervals_by_speed`, `intervals_from_labels`, `build_speed_eligible_event_cohort`
 
-### `src/continuum_swr_replay/analysis/events/swr_source.py`
+### `src/continuum_swr_replay/analysis/events/swr_inventory.py`
 
 The paper's one SWR source: the direct ripple_detection 2.0 Kay inventory.
 
-`SwrSourceError`, `swr_inventory_dir`, `artifact_intervals_dir`, `swr_source_name`, `artifact_run_of`, `stamp_swr_source`, `require_swr_source`, `swr_epoch_id`, `swr_source_files`, `ripple_power_inputs`, `artifact_intervals`, `excluded_intervals`, `read_swr_inventory`, `swr_observed_stretches`, `swr_observed_mask`, `swr_events`, `swr_event_labels`, `artifact_event_drops`, `read_artifact_event_drops`, `dropped_for_excluded_time`, `with_swr_source`, `excluded_intervals_of`, `excluded_intervals_by_session`, `read_dot_with_swr_source`, `analysed_bins`, `swr_intervals`
+`SwrSourceError`, `swr_inventory_dir`, `artifact_intervals_dir`, `swr_source_name`, `artifact_run_of`, `swr_epoch_id`, `swr_source_files`, `ripple_power_inputs`, `artifact_intervals`, `read_swr_inventory`, `swr_events`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/artifacts/detect.py`
 

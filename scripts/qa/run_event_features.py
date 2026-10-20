@@ -107,7 +107,10 @@ from continuum_swr_replay.analysis.constants import (  # noqa: E402
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
-from continuum_swr_replay.analysis.events import swr_source  # noqa: E402
+from continuum_swr_replay.analysis.events import (  # noqa: E402
+    analysed_time,
+    swr_inventory,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (  # noqa: E402
     CandidateSequences,
 )
@@ -398,7 +401,7 @@ def _memoryless_run(
             f"The stored memoryless windows of {identifier} are not the decode grid's."
         )
     # the run's is_missing: a bin inside a closed interval of the mask
-    is_missing = interval_mask(time, swr_source.artifact_intervals(identifier))
+    is_missing = interval_mask(time, swr_inventory.artifact_intervals(identifier))
     undecoded = windows_holding(
         is_missing[:-1], config.window_n_samples, config.stride_n_samples
     )
@@ -491,7 +494,7 @@ def epoch_tables(
         run is not the comparison's.
     """
     saved = pd.read_pickle(comparison.decode_path(identifier))
-    dot = swr_source.with_swr_source(saved)
+    dot = analysed_time.with_swr_source(saved)
     del saved
     # raises unless the grid's median step is SAMPLE_INTERVAL_S, the step
     # interval_features is given
@@ -803,7 +806,7 @@ def run_settings(inventory_run_id: str, inventory: Mapping[str, Any]) -> dict:
                 "inventory": inventory_run_id,
                 **inventory["settings"]["input_runs"],
             },
-            "swr_source": swr_source.swr_source_name(),
+            "swr_source": swr_inventory.swr_source_name(),
             # relative, so a worktree whose Processed-Data links to the same
             # folder records the same settings
             "stop_table": {
@@ -902,8 +905,8 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
     inventory = json.loads(inventory_manifest.read_text())
     input_runs = inventory["settings"]["input_runs"]
     current = {
-        "swr": swr_source.SWR_INVENTORY_RUN_ID,
-        "artifacts": swr_source.ARTIFACT_INTERVALS_RUN_ID,
+        "swr": swr_inventory.SWR_INVENTORY_RUN_ID,
+        "artifacts": swr_inventory.ARTIFACT_INTERVALS_RUN_ID,
     }
     if {name: input_runs[name] for name in current} != current:
         sys.exit(
@@ -911,11 +914,11 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
             f"{input_runs['swr']} and artifact run {input_runs['artifacts']}; the "
             f"SWR source is {current['swr']} and {current['artifacts']}."
         )
-    if inventory["settings"]["swr_source"] != swr_source.swr_source_name():
+    if inventory["settings"]["swr_source"] != swr_inventory.swr_source_name():
         sys.exit(
             f"Comparison run {args.inventory_run_id} read SWR source "
             f"{inventory['settings']['swr_source']}; the SWR source is "
-            f"{swr_source.swr_source_name()}."
+            f"{swr_inventory.swr_source_name()}."
         )
     memoryless_dir = MEMORYLESS_ROOT / input_runs["memoryless"]
     if not (memoryless_dir / "manifest.json").exists():

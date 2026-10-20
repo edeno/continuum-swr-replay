@@ -4,7 +4,6 @@ Each detector's events brought onto one schema, the time each detector
 observed, every overlap between inventories, and the counts built from them,
 with per-detector denominators.
 
-- ``intervals``: arithmetic on sets of closed intervals.
 - ``schema``: the common inventory table and its builders.
 - ``availability``: what each detector observed, and its exposure.
 - ``overlap``: overlap pairs, per-event membership, directional agreement,

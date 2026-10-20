@@ -9,7 +9,7 @@ per-detector denominators. Design:
 The roster (:data:`ROSTER`):
 
 - the SWR detectors ``kay``, ``karlsson``, ``yu`` and ``zugaro`` (the SWR
-  source run, ``swr_source.SWR_INVENTORY_RUN_ID``) and ``carey``
+  source run, ``swr_inventory.SWR_INVENTORY_RUN_ID``) and ``carey``
   (``--carey-run-id``), the five SWR definitions;
 - ``mua`` and ``state_space``, from the canonical decode frame;
 - ``memoryless`` (cohort ``published``) and ``memoryless_criteria`` (cohort
@@ -18,8 +18,8 @@ The roster (:data:`ROSTER`):
 Per epoch:
 
 1. **Decode.** The canonical decode's ``data_over_time`` pickle is read once:
-   its drops (``swr_source.artifact_event_drops``) from the frame as saved,
-   and the frame through the SWR source (``swr_source.with_swr_source``). Its
+   its drops (``analysed_time.artifact_event_drops``) from the frame as saved,
+   and the frame through the SWR source (``analysed_time.with_swr_source``). Its
    sha256 is recorded, and its first 12 characters name the decode in the
    ``mua`` and ``state_space`` tables.
 2. **Inventories.** Each adapter returns its inventory, its observation table
@@ -99,7 +99,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from continuum_swr_replay.analysis.constants import (  # noqa: E402
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
-from continuum_swr_replay.analysis.events import swr_source  # noqa: E402
+from continuum_swr_replay.analysis.events import (  # noqa: E402
+    analysed_time,
+)
+from continuum_swr_replay.analysis.events import (
+    swr_inventory as source_inventory,
+)
 from continuum_swr_replay.analysis.inventory_comparison.adapters import (  # noqa: E402
     CAREY,
     MUA,
@@ -351,7 +356,7 @@ def epoch_inventories(
     memoryless_dir: Path,
 ) -> dict[str, InventoryTables]:
     """Every inventory of the roster for the frame's epoch, by detector."""
-    swr_dir = swr_source.swr_inventory_dir()
+    swr_dir = source_inventory.swr_inventory_dir()
     tables = {
         detector: swr_inventory(swr_dir, detector, dot=dot, drops=drops)
         for detector in SWR_DETECTORS
@@ -439,7 +444,7 @@ def compare_epoch(
     dot : DataFrame
         The epoch's decode frame, read through the SWR source.
     drops : DataFrame
-        ``swr_source.artifact_event_drops`` of the frame as saved.
+        ``analysed_time.artifact_event_drops`` of the frame as saved.
     decode_run_id : str
         Names the decode in the ``mua`` and ``state_space`` tables.
     carey_dir, memoryless_dir : Path
@@ -577,13 +582,13 @@ def bounds_mismatch(identifier: str, bounds: tuple[float, float]) -> str | None:
     record's ``position_span_s``), within :data:`BOUNDS_TOLERANCE_S`: every
     detector is compared over that one span.
     """
-    span = swr_source.ripple_power_inputs(identifier)["position_span_s"]
+    span = source_inventory.ripple_power_inputs(identifier)["position_span_s"]
     if np.allclose(bounds, span, rtol=0.0, atol=BOUNDS_TOLERANCE_S):
         return None
     return (
         f"The decode grid spans {bounds[0]!r} to {bounds[1]!r} s, not the position "
         f"span {span[0]!r} to {span[1]!r} s SWR run "
-        f"{swr_source.SWR_INVENTORY_RUN_ID} cut its band to; the detectors would "
+        f"{source_inventory.SWR_INVENTORY_RUN_ID} cut its band to; the detectors would "
         "not share one epoch."
     )
 
@@ -602,11 +607,11 @@ def stamped_tables(
 ) -> Mapping[str, pd.DataFrame]:
     """Stamp each table (in place, and return them) with the SWR source and `stamp`.
 
-    The SWR source's stamp (``swr_source.stamp_swr_source``) goes first, then
+    The SWR source's stamp (``analysed_time.stamp_swr_source``) goes first, then
     `stamp`'s keys are merged into each table's ``attrs``.
     """
     for frame in tables.values():
-        swr_source.stamp_swr_source(frame)
+        analysed_time.stamp_swr_source(frame)
         frame.attrs |= stamp
     return tables
 
@@ -641,8 +646,8 @@ def run_epoch(
         path = decode_path(identifier)
         decode_sha256 = sha256_file(path)
         saved = pd.read_pickle(path)
-        drops = swr_source.artifact_event_drops(saved)
-        dot = swr_source.with_swr_source(saved)
+        drops = analysed_time.artifact_event_drops(saved)
+        dot = analysed_time.with_swr_source(saved)
         del saved
         time, _ = _speed_trace(dot)
         bounds = (float(time[0]), float(time[-1]))
@@ -727,12 +732,12 @@ def run_settings(carey_run_id: str, memoryless_run_id: str) -> dict:
     settings: dict = json_ready(
         {
             "input_runs": {
-                "swr": swr_source.SWR_INVENTORY_RUN_ID,
+                "swr": source_inventory.SWR_INVENTORY_RUN_ID,
                 "carey": carey_run_id,
                 "memoryless": memoryless_run_id,
-                "artifacts": swr_source.ARTIFACT_INTERVALS_RUN_ID,
+                "artifacts": source_inventory.ARTIFACT_INTERVALS_RUN_ID,
             },
-            "swr_source": swr_source.swr_source_name(),
+            "swr_source": source_inventory.swr_source_name(),
             "roster": ROSTER,
             "swr_definitions": SWR_DEFINITIONS,
             "swr_cohorts": SEQUENCE_COHORTS,

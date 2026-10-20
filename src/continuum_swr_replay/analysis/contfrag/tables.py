@@ -21,6 +21,7 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_SAMPLING_FREQUENCY_HZ,
 )
+from continuum_swr_replay.analysis.events.analysed_time import excluded_intervals_of
 from continuum_swr_replay.analysis.events.detection import (
     event_strict_overlap_keys,
 )
@@ -28,7 +29,6 @@ from continuum_swr_replay.analysis.events.immobility import (
     require_canonical_speed_threshold,
     whole_event_immobility_mask,
 )
-from continuum_swr_replay.analysis.events.swr_source import excluded_intervals_of
 from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schema
 from continuum_swr_replay.tables.event_ids import hash_stop_id
 
@@ -151,7 +151,7 @@ def _in_contfrag_event_mask(
     labels in ``docs/known_issues/degenerate_mua_events.md`` are the
     motivating case.
 
-    On a frame read through ``swr_source.with_swr_source`` this is a no-op;
+    On a frame read through ``analysed_time.with_swr_source`` this is a no-op;
     it excludes nothing further. The read holds every label to the rule (an
     SWR that moves is dropped, a moving MUA label is refused), and the
     historical ~0.5% SWR / ~0.7% MUA exclusion happens upstream at cohort

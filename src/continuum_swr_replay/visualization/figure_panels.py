@@ -20,10 +20,10 @@ from continuum_swr_replay.analysis.constants import (
     BINS_DURATION_MS,
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
+from continuum_swr_replay.analysis.events.analysed_time import analysed_bins
 from continuum_swr_replay.analysis.events.detection import (
     event_strict_overlap_mask,
 )
-from continuum_swr_replay.analysis.events.swr_source import analysed_bins
 from continuum_swr_replay.analysis.hippocampus import (
     compute_calibration_curve,
     compute_local_decoding_error,

@@ -46,7 +46,7 @@ import pandas as pd
 from scipy.stats import skew, wilcoxon
 
 from continuum_swr_replay.analysis.constants import OUTCOME_TIME_SEMANTICS
-from continuum_swr_replay.analysis.events.swr_source import require_swr_source
+from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.analysis.replay.cohort_audit import (
     cohort_record,
     write_cohort_audit,

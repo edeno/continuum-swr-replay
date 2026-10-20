@@ -7,7 +7,7 @@ Not a script. ``run_decoding_bandit.py`` (the NonLocal 4-state detector) and
 classes and arguments, its config, its aggregation and loader, its file
 suffix and its log lines, and hands it to :func:`run_decode`.
 
-An HPC decode, in either runner, reads the SWR source (``swr_source``): it
+An HPC decode, in either runner, reads the SWR source (``swr_inventory``): it
 refuses to start unless the source names both its Kay inventory and its
 artifact run (``hpc_artifact_intervals``, and ``parse_decode_args`` before a
 batch), masks MUA detection and ``is_missing`` with the artifact run, leaves
@@ -33,7 +33,7 @@ import pandas as pd
 import xarray as xr
 from non_local_detector.environment import Environment
 
-from continuum_swr_replay.analysis.events.swr_source import with_swr_source
+from continuum_swr_replay.analysis.events.analysed_time import with_swr_source
 from continuum_swr_replay.data_loaders import (
     get_training_timepoints,
     load_data,
@@ -285,7 +285,7 @@ def organize_results(
     ``runner.aggregate`` gets ``non_local_threshold`` unless it is None.
 
     For HPC, ``data_over_time`` is then read through the SWR source
-    (``swr_source.with_swr_source``): ``SWR_event`` holds the configured Kay
+    (``analysed_time.with_swr_source``): ``SWR_event`` holds the configured Kay
     inventory's labels and ``swr_observed`` its coverage, and the stored
     ripples' labels and counts are gone.
     """
@@ -361,7 +361,7 @@ def run_decode(
     results in <save_dir>``, reads them back from ``save_dir`` and rewrites only
     ``data_over_time``.
 
-    An HPC decode reads the SWR source (``swr_source``) and refuses to start
+    An HPC decode reads the SWR source (``swr_inventory``) and refuses to start
     unless it names both its Kay inventory and its artifact run
     (``hpc_artifact_intervals``). Its artifact mask, the one every stage uses,
     masks MUA detection (``load_data``) and is its ``is_missing``; its encoding

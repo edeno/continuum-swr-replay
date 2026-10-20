@@ -2,7 +2,7 @@
 
 ``two_sessions`` holds two sessions on a 500 Hz grid, as ``load_data_over_time``
 concatenates them, each with the ``in_excluded_time`` column the read adds
-(``swr_source.with_swr_source``). Session ``a`` has three excluded stretches,
+(``analysed_time.with_swr_source``). Session ``a`` has three excluded stretches,
 filled with values that change every statistic if they are counted:
 
 - bins 200-249: moving and local, with a 200 cm error;

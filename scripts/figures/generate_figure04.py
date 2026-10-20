@@ -56,10 +56,12 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_NON_LOCAL_THRESHOLD,
     DEFAULT_SAMPLING_FREQUENCY_HZ,
 )
-from continuum_swr_replay.analysis.events.cohort_selection import stop_cohort_suffix
-from continuum_swr_replay.analysis.events.swr_source import (
+from continuum_swr_replay.analysis.events.analysed_time import (
     excluded_intervals,
     read_artifact_event_drops,
+)
+from continuum_swr_replay.analysis.events.cohort_selection import stop_cohort_suffix
+from continuum_swr_replay.analysis.events.swr_inventory import (
     ripple_power_inputs,
     swr_epoch_id,
 )

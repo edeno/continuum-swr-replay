@@ -5,7 +5,7 @@ Contains the common infrastructure used by both ``run_decoding_bandit.py``
 2-state classifier), among it the HPC decode's masks: ``is_missing`` (the
 artifact run's mask) and ``is_training`` (that mask and every event of the Kay
 inventory left out), both from the paper's SWR source
-(``analysis/events/swr_source.py``). An HPC decode refuses to start unless
+(``analysis/events/swr_inventory.py``). An HPC decode refuses to start unless
 the source names both runs (``require_hpc_decode_sources``).
 """
 
@@ -38,7 +38,7 @@ try:
 except ImportError:
     HAS_CUDA = False
 
-from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events import swr_inventory
 from continuum_swr_replay.analysis.events.artifact_masks import PADDING_S
 from continuum_swr_replay.data_loaders.epoch_register import epochs_to_run
 from continuum_swr_replay.decode_files import decode_paths
@@ -109,8 +109,8 @@ def require_hpc_decode_sources() -> None:
     its inventory was masked with its artifact run.
 
     The decode's ``is_missing``, encoding exclusion, MUA detection and
-    ``SWR_event`` read ``swr_source.SWR_INVENTORY_RUN_ID`` (the Kay inventory)
-    and ``swr_source.ARTIFACT_INTERVALS_RUN_ID`` (the artifact run). Either
+    ``SWR_event`` read ``swr_inventory.SWR_INVENTORY_RUN_ID`` (the Kay inventory)
+    and ``swr_inventory.ARTIFACT_INTERVALS_RUN_ID`` (the artifact run). Either
     left unset would decode without the masks, so it is refused (fail closed).
     The inventory's manifest names the artifact run the SWR runner masked its
     events with (``settings.artifacts.run_id``; absent from a run made before
@@ -126,9 +126,9 @@ def require_hpc_decode_sources() -> None:
         the inventory has no manifest.
     """
     unset = [
-        f"swr_source.{name}"
+        f"swr_inventory.{name}"
         for name in ("SWR_INVENTORY_RUN_ID", "ARTIFACT_INTERVALS_RUN_ID")
-        if getattr(swr_source, name) is None
+        if getattr(swr_inventory, name) is None
     ]
     if unset:
         raise ValueError(
@@ -136,22 +136,22 @@ def require_hpc_decode_sources() -> None:
             "mask, encoding exclusion and SWR labels come from named runs; "
             "refusing to decode without them."
         )
-    manifest_path = swr_source.swr_inventory_dir() / "manifest.json"
+    manifest_path = swr_inventory.swr_inventory_dir() / "manifest.json"
     if not manifest_path.exists():
         raise ValueError(f"no SWR inventory manifest at {manifest_path}")
     manifest = json.loads(manifest_path.read_text())
     masked_with = manifest.get("settings", {}).get("artifacts", {}).get("run_id")
-    if masked_with != swr_source.ARTIFACT_INTERVALS_RUN_ID:
+    if masked_with != swr_inventory.ARTIFACT_INTERVALS_RUN_ID:
         recorded = (
             "no artifact run"
             if masked_with is None
             else f"artifact run {masked_with!r}"
         )
         raise ValueError(
-            f"The SWR inventory {swr_source.SWR_INVENTORY_RUN_ID!r} was masked with "
+            f"The SWR inventory {swr_inventory.SWR_INVENTORY_RUN_ID!r} was masked with "
             f"{recorded}, but the configured artifact run is "
-            f"{swr_source.ARTIFACT_INTERVALS_RUN_ID!r}: rerun the SWR runner with the "
-            "configured artifact run and set swr_source.SWR_INVENTORY_RUN_ID to it; "
+            f"{swr_inventory.ARTIFACT_INTERVALS_RUN_ID!r}: rerun the SWR runner with the "
+            "configured artifact run and set swr_inventory.SWR_INVENTORY_RUN_ID to it; "
             "refusing to decode."
         )
 
@@ -186,8 +186,8 @@ def require_saved_decode_masks(attrs: Mapping[str, Any], what: str) -> None:
         )
     record = json.loads(stamp)
     configured = {
-        "swr_inventory_run_id": swr_source.SWR_INVENTORY_RUN_ID,
-        "artifact_run_id": swr_source.ARTIFACT_INTERVALS_RUN_ID,
+        "swr_inventory_run_id": swr_inventory.SWR_INVENTORY_RUN_ID,
+        "artifact_run_id": swr_inventory.ARTIFACT_INTERVALS_RUN_ID,
     }
     saved = {name: record.get(name) for name in configured}
     if saved != configured:
@@ -210,7 +210,7 @@ def hpc_artifact_intervals(nwb_file_name: str, epoch_name: str) -> pd.DataFrame:
     pd.DataFrame
         ``start_time`` and ``end_time`` in seconds, closed, disjoint and in
         time order: the run's cores padded by ``PADDING_S``, the one mask
-        every stage uses (``swr_source.artifact_intervals``).
+        every stage uses (``swr_inventory.artifact_intervals``).
 
     Raises
     ------
@@ -220,14 +220,14 @@ def hpc_artifact_intervals(nwb_file_name: str, epoch_name: str) -> pd.DataFrame:
         If the artifact run cannot serve the epoch.
     """
     require_hpc_decode_sources()
-    return swr_source.artifact_intervals(
-        swr_source.swr_epoch_id(nwb_file_name, epoch_name)
+    return swr_inventory.artifact_intervals(
+        swr_inventory.swr_epoch_id(nwb_file_name, epoch_name)
     )
 
 
 def hpc_ripple_power_inputs(nwb_file_name: str, epoch_name: str) -> dict[str, Any]:
     """The SWR source's ripple-power inputs for ``load_data``, from the
-    configured runs (``swr_source.ripple_power_inputs``).
+    configured runs (``swr_inventory.ripple_power_inputs``).
 
     With them the decode's ``SWR_zscore`` is the Kay detector's consensus over
     the tetrodes rule R-T kept for the configured inventory, z-scored with the
@@ -241,8 +241,8 @@ def hpc_ripple_power_inputs(nwb_file_name: str, epoch_name: str) -> dict[str, An
         If the inventory or the artifact run cannot serve the epoch.
     """
     require_hpc_decode_sources()
-    return swr_source.ripple_power_inputs(
-        swr_source.swr_epoch_id(nwb_file_name, epoch_name)
+    return swr_inventory.ripple_power_inputs(
+        swr_inventory.swr_epoch_id(nwb_file_name, epoch_name)
     )
 
 
@@ -304,11 +304,11 @@ def hpc_decode_masks(
     """
     require_hpc_decode_sources()
     training_type = TrainingType(training_type)
-    epoch_id = swr_source.swr_epoch_id(nwb_file_name, epoch_name)
+    epoch_id = swr_inventory.swr_epoch_id(nwb_file_name, epoch_name)
     time = position_info.index.to_numpy(dtype=np.float64)
     is_missing = interval_mask(time, artifact_mask)
     if training_type == TrainingType.NO_RIPPLE:
-        events = swr_source.read_swr_inventory(epoch_id)
+        events = swr_inventory.read_swr_inventory(epoch_id)
         is_swr = interval_mask(time, events)
         n_events: int | None = len(events)
     else:
@@ -319,9 +319,9 @@ def hpc_decode_masks(
     n_missing = int(np.count_nonzero(is_missing))
     n_removed = int(np.count_nonzero(~is_training))
     record = {
-        "swr_source": swr_source.swr_source_name(),
-        "swr_inventory_run_id": swr_source.SWR_INVENTORY_RUN_ID,
-        "artifact_run_id": swr_source.ARTIFACT_INTERVALS_RUN_ID,
+        "swr_source": swr_inventory.swr_source_name(),
+        "swr_inventory_run_id": swr_inventory.SWR_INVENTORY_RUN_ID,
+        "artifact_run_id": swr_inventory.ARTIFACT_INTERVALS_RUN_ID,
         "padding_s": dict(PADDING_S),
         "training_type": training_type.value,
         "n_bins": int(time.size),

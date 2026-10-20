@@ -65,13 +65,15 @@ from concurrent.futures import ProcessPoolExecutor, as_completed  # noqa: E402
 
 import pandas as pd  # noqa: E402
 
+from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
+    require_swr_source,
+)
 from continuum_swr_replay.analysis.events.cohort_selection import (  # noqa: E402
     STOP_COHORTS,
     select_stop_cohort,
     stop_cohort_suffix,
 )
-from continuum_swr_replay.analysis.events.swr_source import (  # noqa: E402
-    require_swr_source,
+from continuum_swr_replay.analysis.events.swr_inventory import (  # noqa: E402
     swr_source_name,
 )
 from continuum_swr_replay.analysis.replay import (  # noqa: E402

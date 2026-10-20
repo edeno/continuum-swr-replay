@@ -6,7 +6,7 @@ The Widloski & Foster sliding-window detector, ported in
 epoch's saved clusterless decode: the encoding model from
 ``{epoch_id}_detector.pkl``, the decode grid, position and speed from
 ``{epoch_id}_80_data_over_time.pkl``, the SWR labels and where they were
-observed from the paper's SWR source (``analysis/events/swr_source.py``,
+observed from the paper's SWR source (``analysis/events/swr_inventory.py``,
 the direct Kay inventory, on that grid), and the spike marks read as
 ``load_data`` read them for the decode (``MARKS_RULE``): ``get_hpc_marks``,
 then ``filter_spike_times`` over the decode's time span.
@@ -14,7 +14,7 @@ Both procedures therefore read one encoding model. The decode's encoding
 model already leaves out the artifact mask (the decoders' encoding exclusion),
 but this detector computes its own likelihood over every bin, so the runner
 marks the mask's bins on the decode grid missing (``is_missing``, the decoders'
-rule: a bin inside a closed interval of ``swr_source.artifact_intervals``).
+rule: a bin inside a closed interval of ``swr_inventory.artifact_intervals``).
 No window holding one is decoded, no candidate touches one, and neither the
 shuffle null nor any normalization reads them (``memoryless_sequence.epoch``).
 A candidate in excluded time (the mask widened by
@@ -133,14 +133,16 @@ from distributed.deploy import Cluster
 from numpy.typing import NDArray
 
 from continuum_swr_replay import decoding_common
-from continuum_swr_replay.analysis.events.swr_source import (
-    artifact_intervals,
+from continuum_swr_replay.analysis.events.analysed_time import (
     dropped_for_excluded_time,
     read_artifact_event_drops,
     read_dot_with_swr_source,
     stamp_swr_source,
-    swr_epoch_id,
     swr_observed_stretches,
+)
+from continuum_swr_replay.analysis.events.swr_inventory import (
+    artifact_intervals,
+    swr_epoch_id,
     swr_source_files,
     swr_source_name,
 )

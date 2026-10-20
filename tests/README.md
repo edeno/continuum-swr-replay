@@ -39,12 +39,12 @@ The markers are registered in `pyproject.toml` (`[tool.pytest.ini_options]`).
   - Under `-m real_data` the test runs. Missing or stale data fails it rather
     than skipping it: opting in means the data must be there.
   - Every other test runs with no artifact run configured
-    (`continuum_swr_replay.analysis.events.swr_source.ARTIFACT_INTERVALS_RUN_ID`
+    (`continuum_swr_replay.analysis.events.swr_inventory.ARTIFACT_INTERVALS_RUN_ID`
     is None). A `real_data` test gets the
     committed run back, so the canonical tables pass their SWR-source check.
     That restore is a function-scoped fixture: a module- or session-scoped
     fixture in a `real_data` module still sees None, and one that reads a
-    table through `swr_source.with_swr_source` must set the run itself.
+    table through `analysed_time.with_swr_source` must set the run itself.
   - A test that reads only a small fixture committed under `tests/` is not real
     data. In a file that mixes the two, mark the real-data tests, not the file.
   - The hook is pinned by [`unit/test_markers.py`](unit/test_markers.py).

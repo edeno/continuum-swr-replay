@@ -21,7 +21,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.events.swr_source import (
+from continuum_swr_replay.analysis.events.analysed_time import (
     excluded_intervals_by_session,
 )
 from continuum_swr_replay.intervals import overlaps_intervals
@@ -572,7 +572,7 @@ def aggregate_to_timebins(
         Each session's excluded time: ``animal``, ``session_date``,
         ``epoch``, ``start_time`` and ``end_time`` (absolute seconds, closed).
         None (the default) reads it for ``stop_table``'s sessions from the SWR
-        source, ``swr_source.excluded_intervals_by_session(stop_table)``; with
+        source, ``analysed_time.excluded_intervals_by_session(stop_table)``; with
         no artifact run configured that has no rows. A frame with no rows (such
         as :data:`NO_EXCLUDED_TIME`, for synthetic sessions the source does not
         serve) masks nothing and leaves ``attrs`` without the excluded counts.
@@ -640,7 +640,7 @@ def aggregate_to_timebins(
     SwrSourceError
         With the default ``excluded_intervals``, if an artifact run is
         configured but does not serve one of ``stop_table``'s sessions (as
-        ``swr_source.artifact_intervals``).
+        ``swr_inventory.artifact_intervals``).
 
     Notes
     -----

@@ -36,12 +36,12 @@ except ImportError:  # pragma: no cover - datajoint always present in practice
         """Placeholder so the skip clause is well-formed without datajoint."""
 
 
-from continuum_swr_replay.analysis.events.swr_source import (
+from continuum_swr_replay.analysis.events.analysed_time import (
     read_dot_with_swr_source,
     require_swr_source,
     stamp_swr_source,
-    swr_epoch_id,
 )
+from continuum_swr_replay.analysis.events.swr_inventory import swr_epoch_id
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     validate_dot_event_contract,
 )

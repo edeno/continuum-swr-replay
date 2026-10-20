@@ -139,7 +139,7 @@ report, figure or QA script reuses another script's constants, output paths and 
   the five SWR definitions (`kay`, `karlsson`, `yu`, `zugaro`, `carey`), `mua`, `state_space`, and the
   Widloski detector under two cohorts (`memoryless`, cohort `published`; `memoryless_criteria`, cohort
   `replay_criteria`). Takes the Carey run (`--carey-run-id`) and the memoryless run
-  (`--memoryless-run-id`); the SWR run is the one `swr_source` pins. Per epoch it writes, as one set,
+  (`--memoryless-run-id`); the SWR run is the one `swr_inventory` pins. Per epoch it writes, as one set,
   the inventories, observation tables, every overlap pair, directional agreement, time coverage,
   components, the fragment recount, the three cells, the SWR label matrix (three sequence cohorts
   under five SWR definitions) and excluded time by reason, to

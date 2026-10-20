@@ -27,7 +27,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.contfrag.tables import build_contfrag_stop_table
-from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events import analysed_time, swr_inventory
 from continuum_swr_replay.analysis.pfc.glm import build_session_fit_mask
 from continuum_swr_replay.analysis.replay.model_specs import (
     BIN_S,
@@ -126,11 +126,13 @@ def _trials() -> pd.DataFrame:
 def masked(tmp_path, monkeypatch):
     """The source's artifact run holds CORES for the test epoch."""
     directory = write_artifact_run(tmp_path / "artifacts", {EPOCH_ID: CORES})
-    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_ROOT", directory.parent)
-    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
-    np.testing.assert_allclose(swr_source.artifact_intervals(EPOCH_ID).to_numpy(), MASK)
+    monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_ROOT", directory.parent)
+    monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
     np.testing.assert_allclose(
-        swr_source.excluded_intervals(EPOCH_ID).to_numpy(), EXCLUDED
+        swr_inventory.artifact_intervals(EPOCH_ID).to_numpy(), MASK
+    )
+    np.testing.assert_allclose(
+        analysed_time.excluded_intervals(EPOCH_ID).to_numpy(), EXCLUDED
     )
 
 
@@ -160,8 +162,8 @@ class TestStopExposure:
     def test_only_exposure_and_location_change(self, tmp_path, monkeypatch, table):
         unmasked = _stop_tables()[table]
         directory = write_artifact_run(tmp_path / "artifacts", {EPOCH_ID: CORES})
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_ROOT", directory.parent)
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
+        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_ROOT", directory.parent)
+        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
 
         masked_stops = _stop_tables()[table]
 
@@ -198,7 +200,7 @@ class TestTheDenseTimebinTable:
 
     def test_with_no_artifact_run_it_is_unchanged(self, masked, monkeypatch):
         masked_bins = build_stop_timebin_table(_dot(), np.array([]), bin_s=0.5)
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", None)
+        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", None)
 
         unmasked = build_stop_timebin_table(_dot(), np.array([]), bin_s=0.5)
 
@@ -380,11 +382,13 @@ class TestFamilyBDesign:
         directory = write_artifact_run(
             tmp_path / "artifacts", {"m20200101_04_r2_HPC": CORES}
         )
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_ROOT", directory.parent)
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
+        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_ROOT", directory.parent)
+        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
         stops, onsets = _design_inputs()
 
-        with pytest.raises(swr_source.SwrSourceError, match="not in the artifact run"):
+        with pytest.raises(
+            swr_inventory.SwrSourceError, match="not in the artifact run"
+        ):
             aggregate_to_timebins(stops, onsets, bin_s=0.5, tmax=20.0)
         design = aggregate_to_timebins(
             stops, onsets, bin_s=0.5, tmax=20.0, excluded_intervals=NO_EXCLUDED_TIME
@@ -559,7 +563,7 @@ class TestNoArtifactsChangeNothing:
             [(TIME >= 4.0) & (TIME <= 4.05), (TIME >= 6.0) & (TIME <= 6.05)], [1, 2], 0
         )
         dot["Non-Local_Continuous_prob"] = np.where(labels > 0, 0.9, 0.0)
-        read = swr_source.with_swr_source(dot)
+        read = analysed_time.with_swr_source(dot)
         trials = _trials()
         experiences = port_experiences_from_trials(trials, prepend_initial=True)
         stops = build_stop_table(read, trials, experiences, _graph())
@@ -575,7 +579,7 @@ class TestNoArtifactsChangeNothing:
                 onsets[onsets.event_type == "non_local"].dropna(subset=["stop_id"]),
                 bin_s=0.5,
                 tmax=20.0,
-                excluded_intervals=swr_source.excluded_intervals_by_session(stops),
+                excluded_intervals=analysed_time.excluded_intervals_by_session(stops),
                 history_window_s=1.0,
             ),
         }

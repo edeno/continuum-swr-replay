@@ -1,6 +1,6 @@
 """A builder's ``speed_threshold`` cannot split the speed cohorts.
 
-The read (``swr_source.with_swr_source``) gates the SWR and MUA labels at the
+The read (``analysed_time.with_swr_source``) gates the SWR and MUA labels at the
 canonical 4 cm/s, once for every consumer. A table builder that gated its own
 events at another value would classify them against SWRs and MUA events gated
 at 4 cm/s, so every builder refuses a non-default value. The two filters that

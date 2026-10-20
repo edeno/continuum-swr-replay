@@ -55,9 +55,7 @@ from continuum_swr_replay.analysis.events.classified_table import _match_swr
 from continuum_swr_replay.analysis.events.detection import (
     classify_swr_overlap_geometry,
 )
-from continuum_swr_replay.analysis.events.eligibility import (
-    artifact_drop_reasons,
-)
+from continuum_swr_replay.analysis.events.eligibility import artifact_drop_reasons
 from continuum_swr_replay.analysis.events.immobility import (
     event_speeds_are_immobile,
     filter_event_labels_by_speed,
@@ -450,7 +448,7 @@ def canonical_swr_intervals(
     data_over_time : DataFrame
         One epoch, time-indexed, carrying
         ``SWR_event``, ``head_speed`` and the session columns: a frame read
-        through the SWR source (``swr_source.read_dot_with_swr_source``), whose
+        through the SWR source (``analysed_time.read_dot_with_swr_source``), whose
         ``SWR_event`` is the direct Kay inventory's, as the canonical table's is.
     speed_threshold : float
         cm/s; the canonical immobility threshold, or a stricter (lower) one.
@@ -487,7 +485,7 @@ def observed_intervals(data_over_time: pd.DataFrame, column: str) -> NDArray:
     Not for SWR labels: ``SWR_event`` is an integer and never NaN, so a
     stretch of missing LFP would read as observed and not an SWR. Where SWR
     detection was observed is the SWR source's
-    (``swr_source.swr_observed_stretches``), which the runner passes.
+    (``analysed_time.swr_observed_stretches``), which the runner passes.
 
     Returns
     -------
@@ -536,24 +534,24 @@ def build_memoryless_event_table(
         ``intervals_from_labels``; :func:`canonical_swr_intervals`). None when SWR labels are unavailable.
     swr_observed_intervals : ndarray, shape (n_intervals, 2), or None
         Closed intervals over which SWR labels were observed: the SWR source's
-        stretches (``swr_source.swr_observed_stretches``). Required with
+        stretches (``analysed_time.swr_observed_stretches``). Required with
         ``swr_intervals``; an event not wholly inside one is ``unknown``.
     swr_definition : str
-        Which SWR source the labels come from: ``swr_source.swr_source_name()``,
+        Which SWR source the labels come from: ``swr_inventory.swr_source_name()``,
         such as ``"kay@<run id>+artifacts@none"``.
     shuffle_results : mapping of int to ShuffleResult, or None
         Keyed by candidate index. Must cover exactly the candidates that meet
         both replay criteria, as :func:`shuffle_eligible` returns them. None
         when the shuffle was not run.
     artifact_intervals : DataFrame or None
-        The epoch's artifact mask (``swr_source.artifact_intervals``):
+        The epoch's artifact mask (``swr_inventory.artifact_intervals``):
         ``start_time`` and ``end_time``, closed. Each candidate's
         ``artifact_drop_reason`` is read from its ``[event_start_s,
         event_end_s]`` against excluded time (the mask widened by
         ``ARTIFACT_REACH_S``). None masks nothing.
     dropped_events : DataFrame or None
         The SWR and MUA events dropped for excluded time
-        (``swr_source.dropped_for_excluded_time``): a candidate otherwise kept
+        (``analysed_time.dropped_for_excluded_time``): a candidate otherwise kept
         that overlaps one is ``"overlaps_dropped_event"``. None checks none.
 
     Returns

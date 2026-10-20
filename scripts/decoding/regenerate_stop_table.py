@@ -25,7 +25,7 @@ import time
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.events.swr_source import (  # noqa: E402
+from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
     read_dot_with_swr_source,
     require_swr_source,
     stamp_swr_source,

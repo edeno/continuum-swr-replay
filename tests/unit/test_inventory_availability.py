@@ -403,16 +403,16 @@ class TestExcludedTime:
 
     @pytest.fixture
     def masked(self, tmp_path, monkeypatch):
-        from continuum_swr_replay.analysis.events import swr_source
+        from continuum_swr_replay.analysis.events import analysed_time, swr_inventory
         from tests.unit._swr_inventory_fixtures import write_artifact_run
 
         directory = write_artifact_run(
             tmp_path / "artifacts", {self.EPOCH_ID: self.CORES}
         )
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_ROOT", directory.parent)
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
+        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_ROOT", directory.parent)
+        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
         np.testing.assert_allclose(
-            swr_source.excluded_intervals(self.EPOCH_ID).to_numpy(), self.EXCLUDED
+            analysed_time.excluded_intervals(self.EPOCH_ID).to_numpy(), self.EXCLUDED
         )
 
     def _observations(self) -> tuple[pd.DataFrame, dict]:
@@ -445,9 +445,9 @@ class TestExcludedTime:
         return pd.concat(tables, ignore_index=True), stretches
 
     def test_every_detectors_exposure_is_its_stretches_less_excluded_time(self, masked):
-        from continuum_swr_replay.analysis.events import swr_source
+        from continuum_swr_replay.analysis.events import analysed_time
 
-        excluded = swr_source.excluded_intervals(self.EPOCH_ID).to_numpy()
+        excluded = analysed_time.excluded_intervals(self.EPOCH_ID).to_numpy()
         observations, stretches = self._observations()
 
         coverage = coverage_from_observations(

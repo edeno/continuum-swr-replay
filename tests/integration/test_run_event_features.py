@@ -47,7 +47,7 @@ import scripts.qa.run_inventory_comparison as comparison
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
-from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events import analysed_time, swr_inventory
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
     MemorylessSequenceConfig,
 )
@@ -475,7 +475,9 @@ class TestTheWorkedEpoch:
         compared = compared_events(inputs, WORKED)
         names = ("observations", "set_aside", "inventory", "pairs", "directional")
         tables = {name: stored(inputs, WORKED, name) for name in (*names, "cells")}
-        dot = swr_source.with_swr_source(pd.read_pickle(comparison.decode_path(WORKED)))
+        dot = analysed_time.with_swr_source(
+            pd.read_pickle(comparison.decode_path(WORKED))
+        )
         time, speed = comparison._speed_trace(dot)
         still = {
             (ANIMAL, DAY, "02_r1"): still_intervals(
@@ -663,7 +665,7 @@ def test_an_epoch_with_no_compared_event_writes_empty_typed_tables(run):
 
 
 def test_a_comparison_under_another_swr_source_is_refused(run, monkeypatch):
-    monkeypatch.setattr(swr_source, "swr_source_name", lambda: "yu@other+none")
+    monkeypatch.setattr(swr_inventory, "swr_source_name", lambda: "yu@other+none")
 
     with pytest.raises(
         SystemExit,
@@ -707,10 +709,10 @@ def test_the_manifest_records_the_inputs_and_the_rules(run):
 
     assert settings["input_runs"] == {
         "inventory": INVENTORY_RUN,
-        "swr": swr_source.SWR_INVENTORY_RUN_ID,
+        "swr": swr_inventory.SWR_INVENTORY_RUN_ID,
         "carey": CAREY_RUN,
         "memoryless": MEMORYLESS_RUN,
-        "artifacts": swr_source.ARTIFACT_INTERVALS_RUN_ID,
+        "artifacts": swr_inventory.ARTIFACT_INTERVALS_RUN_ID,
     }
     assert settings["evidence"]["remote_cm"] == runner.REMOTE_CM == 100.0
     assert settings["evidence"]["block_rows"] == runner.BLOCK_ROWS

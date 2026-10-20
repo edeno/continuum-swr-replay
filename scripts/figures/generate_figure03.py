@@ -37,23 +37,23 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
+from continuum_swr_replay.analysis.events.analysed_time import (
+    dropped_for_excluded_time,
+    read_artifact_event_drops,
+    swr_intervals,
+)
 from continuum_swr_replay.analysis.events.detection import (
     get_confident_times,
     get_overlap_times,
 )
-from continuum_swr_replay.analysis.events.eligibility import (
-    artifact_drop_reasons,
-)
+from continuum_swr_replay.analysis.events.eligibility import artifact_drop_reasons
 from continuum_swr_replay.analysis.events.immobility import (
     build_speed_eligible_event_cohort,
 )
-from continuum_swr_replay.analysis.events.swr_source import (
+from continuum_swr_replay.analysis.events.swr_inventory import (
     artifact_intervals,
-    dropped_for_excluded_time,
-    read_artifact_event_drops,
     ripple_power_inputs,
     swr_epoch_id,
-    swr_intervals,
 )
 from continuum_swr_replay.analysis.hippocampus import (
     load_data_over_time,

@@ -37,14 +37,12 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events import analysed_time, swr_inventory
+from continuum_swr_replay.analysis.events.analysed_time import swr_event_labels
 from continuum_swr_replay.analysis.events.classified_table import (
     build_classified_nonlocal_event_table,
 )
-from continuum_swr_replay.analysis.events.swr_source import (
-    SwrSourceError,
-    swr_event_labels,
-)
+from continuum_swr_replay.analysis.events.swr_inventory import SwrSourceError
 from continuum_swr_replay.data_loaders import epoch_register
 from continuum_swr_replay.intervals import interval_mask
 from continuum_swr_replay.tables.io import read_table, sha256_file, write_table
@@ -137,7 +135,7 @@ def assert_source_labels(frame: pd.DataFrame) -> None:
     assert "n_SWR" not in frame.columns
     # excluded time (the mask widened by 0.3 s) is not analysed: neither SWR
     # nor non-SWR
-    ((start, end),) = swr_source.excluded_intervals(EPOCH_ID).to_numpy()
+    ((start, end),) = analysed_time.excluded_intervals(EPOCH_ID).to_numpy()
     in_excluded = (TIME >= start) & (TIME <= end)
     assert in_excluded.any()
     np.testing.assert_array_equal(frame["swr_observed"].to_numpy(), ~in_excluded)
@@ -238,7 +236,7 @@ def test_the_event_tables_is_swr_follows_the_source(source):
     )
 
     stored = build_classified_nonlocal_event_table(dot)
-    new = build_classified_nonlocal_event_table(swr_source.with_swr_source(dot))
+    new = build_classified_nonlocal_event_table(analysed_time.with_swr_source(dot))
 
     assert stored["is_swr"].tolist() == [False, True]
     assert new["is_swr"].tolist() == [True, False]
@@ -556,8 +554,8 @@ def test_the_replay_tables_are_published_with_the_sources_stamp(
     )
 
     assert {name: attrs["swr_source"] for name, attrs in published.items()} == {
-        "stop_table": swr_source.swr_source_name(),
-        "event_table": swr_source.swr_source_name(),
+        "stop_table": swr_inventory.swr_source_name(),
+        "event_table": swr_inventory.swr_source_name(),
     }
 
 
@@ -580,7 +578,7 @@ def test_the_stop_only_bootstrap_publishes_with_the_sources_stamp(
     )
 
     stop = read_table(tmp_path / "out" / "stop_table")
-    assert stop.attrs["swr_source"] == swr_source.swr_source_name()
+    assert stop.attrs["swr_source"] == swr_inventory.swr_source_name()
 
 
 def test_the_timebin_tables_are_published_with_the_sources_stamp(
@@ -611,8 +609,8 @@ def test_the_timebin_tables_are_published_with_the_sources_stamp(
     script.main()
 
     assert stamps == {
-        "event_onset": swr_source.swr_source_name(),
-        "stop_timebin": swr_source.swr_source_name(),
+        "event_onset": swr_inventory.swr_source_name(),
+        "stop_timebin": swr_inventory.swr_source_name(),
     }
 
 
@@ -644,11 +642,11 @@ def test_the_stop_shard_assembly_needs_every_shard_from_the_source(
 
     shards = []
     for index, stamp in enumerate(
-        (swr_source.swr_source_name(), STALE if stale_shard else None)
+        (swr_inventory.swr_source_name(), STALE if stale_shard else None)
     ):
         shard = tmp_path / f"shard{index}"
         shard.mkdir()
-        frame = _stop_frame(stamp or swr_source.swr_source_name())
+        frame = _stop_frame(stamp or swr_inventory.swr_source_name())
         frame["epoch"] = f"0{2 * index + 2}_r{index + 1}"
         frame["stop_id"] = index + 1
         write_table(frame, shard / "stop_table.parquet")
@@ -664,7 +662,7 @@ def test_the_stop_shard_assembly_needs_every_shard_from_the_source(
             shards, output_dir=tmp_path / "out", expected_sessions=2
         )
         assembled = read_table(tmp_path / "out" / "stop_table")
-        assert assembled.attrs["swr_source"] == swr_source.swr_source_name()
+        assert assembled.attrs["swr_source"] == swr_inventory.swr_source_name()
 
 
 def test_the_content_occupancy_refuses_an_arm_table_from_another_source(
@@ -759,7 +757,10 @@ STORED_RIPPLE_READERS = {
         "HPC decoders' comes from the source, decoding_common.hpc_decode_masks)"
     ),
     "src/continuum_swr_replay/data_loaders/constants.py": "register evidence, prose",
-    "src/continuum_swr_replay/analysis/events/swr_source.py": (
+    "src/continuum_swr_replay/analysis/events/swr_inventory.py": (
+        "prose naming what it replaces"
+    ),
+    "src/continuum_swr_replay/analysis/events/analysed_time.py": (
         "prose naming what it replaces"
     ),
     "src/continuum_swr_replay/types.py": "load_data's return types",
@@ -798,7 +799,7 @@ STORED_RIPPLE_READERS = {
 #: Files outside ``scripts/figures/archive`` that unpickle a
 #: decode frame without the source, and why none of them reads its SWRs.
 DECODE_FRAME_READERS = {
-    "src/continuum_swr_replay/analysis/events/swr_source.py": "the reader",
+    "src/continuum_swr_replay/analysis/events/analysed_time.py": "the reader",
     "scripts/qa/run_state_evidence.py": (
         "reads it through with_swr_source, and keeps the decoder's own non-local "
         "labels so every decoded event stays out of the running-only encodings"
@@ -907,7 +908,7 @@ def test_the_spike_evidence_baseline_lies_outside_excluded_time(source):
     windows = [(100.20, 100.24), (101.72, 101.76), (102.20, 102.24), (103.00, 103.04)]
     for start, end in windows:  # short, clearly local stretches
         probability[(TIME >= start) & (TIME <= end)] = 0.0
-    dot = swr_source.with_swr_source(
+    dot = analysed_time.with_swr_source(
         decode_frame(**{"Non-Local_Continuous_prob": probability})
     )
 
@@ -917,6 +918,6 @@ def test_the_spike_evidence_baseline_lies_outside_excluded_time(source):
     # the stretch at 101.72 is cut where excluded time begins; the one at
     # 102.20 lies in it and is gone
     np.testing.assert_allclose(TIME[baseline.s.to_numpy()], [100.20, 101.72, 103.00])
-    excluded = swr_source.excluded_intervals(EPOCH_ID)
+    excluded = analysed_time.excluded_intervals(EPOCH_ID)
     for s, e in zip(baseline.s, baseline.e, strict=True):
         assert not interval_mask(TIME[s : e + 1], excluded).any()

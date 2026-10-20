@@ -13,9 +13,7 @@ from prepare_contfrag_replay_content_data import (
     publish_contfrag_tables,
 )
 
-from continuum_swr_replay.analysis.events.swr_source import (
-    require_swr_source,
-)
+from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.analysis.replay import build_event_patch_table
 from continuum_swr_replay.analysis.replay.table_contracts import (
     validate_event_arm_table,

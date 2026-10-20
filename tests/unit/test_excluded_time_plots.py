@@ -96,7 +96,7 @@ STRICT = {
 
 @pytest.mark.parametrize("name", STRICT)
 def test_a_filter_refuses_a_column_that_is_not_boolean(name):
-    """The same check as the quality metrics (``swr_source.analysed_bins``).
+    """The same check as the quality metrics (``analysed_time.analysed_bins``).
     Cast to bool, a None would read as analysed and a NaN as excluded."""
     frame = two_sessions()
     frame["in_excluded_time"] = frame["in_excluded_time"].astype(object)
