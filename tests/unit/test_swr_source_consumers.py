@@ -781,7 +781,7 @@ STORED_RIPPLE_READERS = {
     ),
     "src/continuum_swr_replay/visualization/figurl.py": "the decode's figurl view",
     "src/continuum_swr_replay/visualization/plots.py": "decode-session plots",
-    "src/continuum_swr_replay/visualization/session_tables.py": "prose",
+    "src/continuum_swr_replay/visualization/session_tables/__init__.py": "prose",
     "src/continuum_swr_replay/visualization/animation.py": "docstring example",
     "src/continuum_swr_replay/visualization/__init__.py": "docstring example",
     "scripts/decoding/run_decoding_bandit.py": "the decode's figurl view",

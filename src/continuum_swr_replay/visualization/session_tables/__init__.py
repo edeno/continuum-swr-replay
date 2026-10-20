@@ -102,8 +102,8 @@ from continuum_swr_replay.data_loaders.constants import (
 )
 from continuum_swr_replay.visualization.palettes import COLORS
 
-from .palettes import patch_grouped_arm_palette
-from .plots import (
+from ..palettes import patch_grouped_arm_palette
+from ..plots import (
     plot_acausal_probabilities,
     plot_conditional_non_local_posterior,
     plot_multiunit_firing,
