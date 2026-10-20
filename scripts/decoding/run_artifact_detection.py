@@ -25,10 +25,11 @@ Per epoch, read only:
    is the epoch's own marks outside the LFP signatures.
 
 Each epoch writes, under ``Processed-Data/artifact_intervals/<run_id>/``,
-``{epoch_id}_artifact_intervals.parquet``: its cores (``io.CORE_COLUMNS``), no
-rows when it has no artifact. A reader pads the cores into the one artifact
-mask (``masks.PADDING_S``), as ``swr_source.artifact_intervals`` does. A failed
-epoch keeps no file.
+``{epoch_id}_artifact_intervals.parquet``: its cores
+(``events.artifact_intervals.CORE_COLUMNS``), no rows when it has no artifact.
+A reader pads the cores into the one artifact mask
+(``events.artifact_masks.PADDING_S``), as ``swr_source.artifact_intervals``
+does. A failed epoch keeps no file.
 
 ``manifest.json`` beside them holds the run's settings (every constant and
 the padding table) and one record per epoch: its status, span, input row
@@ -78,21 +79,21 @@ from numpy.typing import NDArray
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from continuum_swr_replay.analysis.hippocampus.artifacts import detect  # noqa: E402
-from continuum_swr_replay.analysis.hippocampus.artifacts.detect import (  # noqa: E402
-    detect_artifacts,
-)
-from continuum_swr_replay.analysis.hippocampus.artifacts.io import (  # noqa: E402
+from continuum_swr_replay.analysis.events.artifact_intervals import (  # noqa: E402
     cores_path,
     write_cores,
     write_manifest,
 )
-from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (  # noqa: E402
+from continuum_swr_replay.analysis.events.artifact_masks import (  # noqa: E402
     PADDING_S,
     artifact_intervals,
 )
-from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
+from continuum_swr_replay.analysis.events.swr_source import (  # noqa: E402
     ARTIFACT_INTERVALS_ROOT,
+)
+from continuum_swr_replay.analysis.hippocampus.artifacts import detect  # noqa: E402
+from continuum_swr_replay.analysis.hippocampus.artifacts.detect import (  # noqa: E402
+    detect_artifacts,
 )
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_epochs,

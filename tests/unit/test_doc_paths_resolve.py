@@ -83,7 +83,7 @@ ALLOWLIST: dict[tuple[str, str], str] = {
 }
 
 #: Package subdirectories a doc may cite by package-relative path
-#: (``analysis/hippocampus/event_table.py``). Add each new top-level package
+#: (``analysis/events/classified_table.py``). Add each new top-level package
 #: here when it is created (the code-organization plan's ``tables/``, ``runs/``
 #: and ``decoding/``).
 PACKAGE_DIRS = ("analysis", "data_loaders", "visualization")
@@ -292,8 +292,8 @@ def test_path_pattern_boundaries() -> None:
         return [m.group(1) for m in _PACKAGE_PATH.finditer(s)]
 
     assert package_found(
-        "`analysis/hippocampus/event_table.py:build_classified_nonlocal_event_table`"
-    ) == ["analysis/hippocampus/event_table.py"]
+        "`analysis/events/classified_table.py:build_classified_nonlocal_event_table`"
+    ) == ["analysis/events/classified_table.py"]
     assert package_found("in data_loaders/constants.py.") == [
         "data_loaders/constants.py"
     ]

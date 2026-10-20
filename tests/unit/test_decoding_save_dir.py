@@ -68,11 +68,11 @@ import xarray as xr
 
 from continuum_swr_replay import decoding_common
 from continuum_swr_replay.analysis.contfrag import result_loading as contfrag_loading
-from continuum_swr_replay.analysis.hippocampus import result_loading as hpc_loading
-from continuum_swr_replay.analysis.hippocampus import swr_source
-from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events.immobility import (
     EventDefinitionError,
 )
+from continuum_swr_replay.analysis.hippocampus import result_loading as hpc_loading
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from tests.unit._swr_inventory_fixtures import (
     ARTIFACT_RUN_ID,

@@ -1,7 +1,7 @@
 # One SWR source: the direct ripple_detection 2.0 Kay inventory
 
 **Status (2026-10-09):** decided by the project lead on 2026-10-05; implemented in
-`src/continuum_swr_replay/analysis/hippocampus/swr_source.py`, the only place the source is
+`src/continuum_swr_replay/analysis/events/swr_source.py`, the only place the source is
 configured. Part of the full pipeline refresh
 ([2026-10-03-full-pipeline-refresh-design.md](2026-10-03-full-pipeline-refresh-design.md),
 Task 15). Artifact masking (Task 16) plugs into the hook described below.
@@ -70,7 +70,7 @@ What the comparison shows:
 
 ## Interface
 
-`analysis/hippocampus/swr_source.py`:
+`analysis/events/swr_source.py`:
 
 - **`SWR_INVENTORY_RUN_ID`, `SWR_DETECTOR` (`"kay"`), `SWR_INVENTORY_ROOT`.** These are
   the only definitions. The SWR runner writes under the same `SWR_INVENTORY_ROOT`.
@@ -126,7 +126,7 @@ What the comparison shows:
   - `speed_unknown`.
 
   The kept events pass the canonical whole-event immobility rule
-  (`event_immobility.filter_event_intervals_by_speed`): every head-speed sample of the
+  (`immobility.filter_event_intervals_by_speed`): every head-speed sample of the
   decode grid in `[start, end]` is finite and below 4 cm/s. The non-local and MUA cohorts
   use the same rule. The speed is the decode grid's `head_speed`. The inventory's own speed
   summaries are on LFP-interpolated samples, so they are not the canonical rule's samples.

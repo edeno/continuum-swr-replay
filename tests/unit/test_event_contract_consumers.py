@@ -7,7 +7,7 @@ import sys
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+from continuum_swr_replay.analysis.events.immobility import (
     EventDefinitionError,
 )
 from scripts.content import analyze_content_occupancy

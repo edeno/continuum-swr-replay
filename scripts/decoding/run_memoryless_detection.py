@@ -6,7 +6,7 @@ The Widloski & Foster sliding-window detector, ported in
 epoch's saved clusterless decode: the encoding model from
 ``{epoch_id}_detector.pkl``, the decode grid, position and speed from
 ``{epoch_id}_80_data_over_time.pkl``, the SWR labels and where they were
-observed from the paper's SWR source (``analysis/hippocampus/swr_source.py``,
+observed from the paper's SWR source (``analysis/events/swr_source.py``,
 the direct Kay inventory, on that grid), and the spike marks read as
 ``load_data`` read them for the decode (``MARKS_RULE``): ``get_hpc_marks``,
 then ``filter_spike_times`` over the decode's time span.
@@ -18,7 +18,7 @@ rule: a bin inside a closed interval of ``swr_source.artifact_intervals``).
 No window holding one is decoded, no candidate touches one, and neither the
 shuffle null nor any normalization reads them (``memoryless_sequence.epoch``).
 A candidate in excluded time (the mask widened by
-``event_eligibility.ARTIFACT_REACH_S``), or overlapping an SWR or MUA event
+``events.eligibility.ARTIFACT_REACH_S``), or overlapping an SWR or MUA event
 dropped for it, keeps its row with an ``artifact_drop_reason`` and is in no
 cohort.
 ``check_marks_match_encoding`` refuses them unless every mark the encoding
@@ -133,6 +133,17 @@ from distributed.deploy import Cluster
 from numpy.typing import NDArray
 
 from continuum_swr_replay import decoding_common
+from continuum_swr_replay.analysis.events.swr_source import (
+    artifact_intervals,
+    dropped_for_excluded_time,
+    read_artifact_event_drops,
+    read_dot_with_swr_source,
+    stamp_swr_source,
+    swr_epoch_id,
+    swr_observed_stretches,
+    swr_source_files,
+    swr_source_name,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
     MemorylessSequenceConfig,
     SequenceIdentity,
@@ -157,17 +168,6 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle impor
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
     windows_holding,
-)
-from continuum_swr_replay.analysis.hippocampus.swr_source import (
-    artifact_intervals,
-    dropped_for_excluded_time,
-    read_artifact_event_drops,
-    read_dot_with_swr_source,
-    stamp_swr_source,
-    swr_epoch_id,
-    swr_observed_stretches,
-    swr_source_files,
-    swr_source_name,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import git_hash
 from continuum_swr_replay.data_loaders.epoch_register import epochs_to_run
@@ -581,7 +581,7 @@ def run_one(
             "masked_s": masked_seconds(artifact_mask.clip(time[0], time[-1])),
             "n_missing_bins": int(np.count_nonzero(is_missing)),
             "n_missing_windows": int(np.count_nonzero(missing_windows)),
-            # candidates the mask reaches, in no cohort (event_eligibility)
+            # candidates the mask reaches, in no cohort (events.eligibility)
             "n_dropped": {
                 reason: int((table["artifact_drop_reason"] == reason).sum())
                 for reason in ("artifact", "near_artifact", "overlaps_dropped_event")

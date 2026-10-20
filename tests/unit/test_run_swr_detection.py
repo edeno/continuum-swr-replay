@@ -36,7 +36,8 @@ from ripple_detection import Kay_ripple_detector, filter_ripple_band
 from ripple_detection.simulate import simulate_session, simulate_time
 
 import scripts.decoding.run_swr_detection as runner
-from continuum_swr_replay.analysis.hippocampus import swr_inventories, swr_source
+from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.hippocampus import swr_inventories
 from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
     NoUsableChannelError,
     best_ripple_channel,

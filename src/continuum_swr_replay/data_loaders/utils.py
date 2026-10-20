@@ -73,7 +73,7 @@ import pandas as pd
 # than at module top level. Importing ``spyglass.common`` opens a
 # DataJoint connection at import time, which would re-couple every
 # offline caller of ``utils`` (notably ``get_labels``, used by
-# ``analysis.hippocampus.event_detection`` and friends) to the live
+# ``analysis.events.detection`` and friends) to the live
 # database. Keeping it function-local means leaf imports stay offline
 # and only ``get_epoch_info`` actually requires DataJoint.
 

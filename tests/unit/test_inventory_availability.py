@@ -403,7 +403,7 @@ class TestExcludedTime:
 
     @pytest.fixture
     def masked(self, tmp_path, monkeypatch):
-        from continuum_swr_replay.analysis.hippocampus import swr_source
+        from continuum_swr_replay.analysis.events import swr_source
         from tests.unit._swr_inventory_fixtures import write_artifact_run
 
         directory = write_artifact_run(
@@ -445,7 +445,7 @@ class TestExcludedTime:
         return pd.concat(tables, ignore_index=True), stretches
 
     def test_every_detectors_exposure_is_its_stretches_less_excluded_time(self, masked):
-        from continuum_swr_replay.analysis.hippocampus import swr_source
+        from continuum_swr_replay.analysis.events import swr_source
 
         excluded = swr_source.excluded_intervals(self.EPOCH_ID).to_numpy()
         observations, stretches = self._observations()

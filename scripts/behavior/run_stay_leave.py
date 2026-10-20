@@ -49,11 +49,11 @@ import pandas as pd
 from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
-from continuum_swr_replay.analysis.hippocampus.swr_source import require_swr_source
-from continuum_swr_replay.analysis.replay.cohort_selection import (
+from continuum_swr_replay.analysis.events.cohort_selection import (
     select_stop_cohort,
     stop_cohort_suffix,
 )
+from continuum_swr_replay.analysis.events.swr_source import require_swr_source
 from continuum_swr_replay.analysis.replay.fit_provenance import (
     record_inputs,
     write_fit_provenance,

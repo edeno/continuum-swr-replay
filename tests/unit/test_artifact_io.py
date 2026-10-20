@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.hippocampus.artifacts.io import (
+from continuum_swr_replay.analysis.events.artifact_intervals import (
     CORE_COLUMNS,
     ArtifactRunError,
     cores_path,

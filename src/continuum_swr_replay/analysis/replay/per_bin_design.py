@@ -21,7 +21,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.hippocampus.swr_source import (
+from continuum_swr_replay.analysis.events.swr_source import (
     excluded_intervals_by_session,
 )
 from continuum_swr_replay.intervals import overlaps_intervals

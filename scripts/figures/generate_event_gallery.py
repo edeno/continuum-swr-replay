@@ -81,23 +81,23 @@ import continuum_swr_replay.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
-from continuum_swr_replay.analysis.hippocampus import load_results
-from continuum_swr_replay.analysis.hippocampus.event_detection import (
-    strict_overlap_matrix,
-)
-from continuum_swr_replay.analysis.hippocampus.event_immobility import (
-    intervals_from_labels,
-)
-from continuum_swr_replay.analysis.hippocampus.event_table import (
+from continuum_swr_replay.analysis.events.classified_table import (
     build_classified_nonlocal_event_table,
 )
-from continuum_swr_replay.analysis.hippocampus.swr_source import (
+from continuum_swr_replay.analysis.events.detection import (
+    strict_overlap_matrix,
+)
+from continuum_swr_replay.analysis.events.immobility import (
+    intervals_from_labels,
+)
+from continuum_swr_replay.analysis.events.swr_source import (
     excluded_intervals_of,
     read_dot_with_swr_source,
     ripple_power_inputs,
     swr_epoch_id,
     swr_intervals,
 )
+from continuum_swr_replay.analysis.hippocampus import load_results
 from continuum_swr_replay.analysis.replay.bouts import (
     immobility_bout_intervals,
 )

@@ -205,7 +205,7 @@ SHUFFLE_RUN_SEED = 20260922
 NON_LOCAL_PROB_THRESHOLD = DEFAULT_NON_LOCAL_THRESHOLD
 NON_LOCAL_MINIMUM_DURATION_S = 0.015
 """The project's non-local event definition, as in
-`analysis/hippocampus/event_detection.get_confident_times`: non-local
+`analysis/events/detection.get_confident_times`: non-local
 probability above 0.8 for at least 15 ms.
 
 The state-space model is otherwise left on the library's defaults. Figure 1

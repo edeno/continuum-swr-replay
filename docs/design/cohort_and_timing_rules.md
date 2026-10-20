@@ -17,7 +17,7 @@ The rungs themselves, in R notation, are in
 ## Shared stop cohort
 
 **The rule.** Every rate and content runner selects its population through one
-function, `analysis.replay.cohort_selection.select_stop_cohort` (stop grain) or
+function, `analysis.events.cohort_selection.select_stop_cohort` (stop grain) or
 its sibling `select_event_cohort` (event grain), on the canonical
 `occupancy_state` column:
 

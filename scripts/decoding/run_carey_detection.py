@@ -79,8 +79,8 @@ from numpy.typing import NDArray
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from continuum_swr_replay.analysis.hippocampus import swr_source  # noqa: E402
-from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (  # noqa: E402
+from continuum_swr_replay.analysis.events import swr_source  # noqa: E402
+from continuum_swr_replay.analysis.events.artifact_masks import (  # noqa: E402
     PADDING_S,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (  # noqa: E402

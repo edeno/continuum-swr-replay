@@ -262,7 +262,7 @@ reviewed blind were not SWRs.
   events and only 37–79 % at unrewarded ports, and lowers j16's featureless share only from
   43 % to 33 % (`c1c_speed_padded.csv`).
 - **No visit-onset or padded-speed rule is added.** The canonical whole-event immobility rule
-  (every sample < 4 cm/s, `event_immobility.py`) is unchanged.
+  (every sample < 4 cm/s, `analysis/events/immobility.py`) is unchanged.
 
 ## Limits
 

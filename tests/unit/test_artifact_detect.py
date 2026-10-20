@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.events.artifact_intervals import CORE_COLUMNS
 from continuum_swr_replay.analysis.hippocampus.artifacts import detect
 from continuum_swr_replay.analysis.hippocampus.artifacts.detect import (
     detect_artifacts,
@@ -21,7 +22,6 @@ from continuum_swr_replay.analysis.hippocampus.artifacts.features import (
     persistent_step_count,
     robust_jump,
 )
-from continuum_swr_replay.analysis.hippocampus.artifacts.io import CORE_COLUMNS
 from continuum_swr_replay.decoding_common import DecodingConfig
 from tests.unit._artifact_synthetic import FS, N_TETRODES, NOISE, SyntheticEpoch
 

@@ -15,7 +15,7 @@ import json
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.hippocampus.swr_source import stamp_swr_source
+from continuum_swr_replay.analysis.events.swr_source import stamp_swr_source
 from scripts.rate import fit_uncertainty_rate as mod
 
 _STATES = ("at_well", "at_well", "in_transit", "in_transit", "mixed", "at_well")

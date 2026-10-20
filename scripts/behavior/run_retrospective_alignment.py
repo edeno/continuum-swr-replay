@@ -39,12 +39,12 @@ import time
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.hippocampus.swr_source import require_swr_source
+from continuum_swr_replay.analysis.events.cohort_selection import STOP_COHORT_RULES
+from continuum_swr_replay.analysis.events.swr_source import require_swr_source
 from continuum_swr_replay.analysis.replay import (
     at_well_event_cohort,
     retrospective_alignment_with_shuffle,
 )
-from continuum_swr_replay.analysis.replay.cohort_selection import STOP_COHORT_RULES
 from continuum_swr_replay.analysis.replay.fit_provenance import (
     record_inputs,
     write_fit_provenance,

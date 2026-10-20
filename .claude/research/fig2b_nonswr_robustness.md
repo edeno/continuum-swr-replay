@@ -19,7 +19,7 @@ events, and the rest of the dataset does not show the pattern.
 - Panel b source: `build_classified_nonlocal_event_table(data_over_time)` →
   filter `endpoints_speed_below_thresh` → tally `overlap_class`
   (`compute_swr_overlap_class_counts`, immobile-only).
-  - `event_table.py:206`, `data_aggregation.py:540`.
+  - `events/classified_table.py:206`, `data_aggregation.py:540`.
 - `data_over_time` = concat of 218 `*_HPC_80_data_over_time.pkl` files
   (NonLocal 4-state, 0.80 threshold). Animals: chimi(45), j16(58),
   peanut(13), senor(58), wilbur(44). One row per timebin; carries

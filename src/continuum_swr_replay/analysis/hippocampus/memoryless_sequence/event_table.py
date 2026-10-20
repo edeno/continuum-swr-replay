@@ -12,7 +12,7 @@ replay criteria, as the reference tests every such candidate, so
 whose immobility rule is stricter than the reference's per-window gate. A
 candidate that was not shuffled has ``n_shuffles == 0``. A fourth column,
 ``artifact_drop_reason``, applies the project's one analysed-time rule
-(``event_eligibility``): a candidate sharing time with the artifact mask
+(``events.eligibility``): a candidate sharing time with the artifact mask
 (``"artifact"``), within ``ARTIFACT_REACH_S`` of it (``"near_artifact"``), or
 overlapping an SWR or MUA event dropped for either (``"overlaps_dropped_event"``)
 is in no cohort; it is None for every other candidate.
@@ -50,21 +50,20 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.hippocampus.event_detection import (
+# the canonical matched-SWR rule itself, not a copy that could drift from it
+from continuum_swr_replay.analysis.events.classified_table import _match_swr
+from continuum_swr_replay.analysis.events.detection import (
     classify_swr_overlap_geometry,
 )
-from continuum_swr_replay.analysis.hippocampus.event_eligibility import (
+from continuum_swr_replay.analysis.events.eligibility import (
     artifact_drop_reasons,
 )
-from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+from continuum_swr_replay.analysis.events.immobility import (
     event_speeds_are_immobile,
     filter_event_labels_by_speed,
     intervals_from_labels,
     require_canonical_speed_threshold,
 )
-
-# the canonical matched-SWR rule itself, not a copy that could drift from it
-from continuum_swr_replay.analysis.hippocampus.event_table import _match_swr
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (
     CandidateSequences,
 )

@@ -2,7 +2,7 @@
 
 Excluded time is the artifact mask widened by ``ARTIFACT_REACH_S`` on each
 side. An event of any kind is analysed only when the whole event is immobile
-(``event_immobility``) and lies wholly outside excluded time; a kept event that
+(``events.immobility``) and lies wholly outside excluded time; a kept event that
 overlaps an SWR or MUA event dropped for excluded time is dropped too. A
 dropped event keeps its reason. Offline.
 """
@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.hippocampus.event_eligibility import (
+from continuum_swr_replay.analysis.events.eligibility import (
     ARTIFACT_REACH_S,
     EXCLUDED_TIME_REASONS,
     DropReason,

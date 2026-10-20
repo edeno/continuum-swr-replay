@@ -30,9 +30,9 @@ from non_local_detector.likelihoods.clusterless_kde import (
 )
 from track_linearization import get_linearized_position
 
-from continuum_swr_replay.analysis.hippocampus import swr_source
-from continuum_swr_replay.analysis.hippocampus.artifacts.masks import artifact_intervals
-from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events.artifact_masks import artifact_intervals
+from continuum_swr_replay.analysis.events.immobility import (
     EventDefinitionError,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (

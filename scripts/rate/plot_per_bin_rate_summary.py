@@ -24,7 +24,7 @@ from patsy import dmatrix
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
+from continuum_swr_replay.analysis.events.swr_source import (  # noqa: E402
     excluded_intervals_by_session,
     require_swr_source,
 )

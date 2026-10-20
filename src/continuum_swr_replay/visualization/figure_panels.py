@@ -20,6 +20,10 @@ from continuum_swr_replay.analysis.constants import (
     BINS_DURATION_MS,
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
+from continuum_swr_replay.analysis.events.detection import (
+    event_strict_overlap_mask,
+)
+from continuum_swr_replay.analysis.events.swr_source import analysed_bins
 from continuum_swr_replay.analysis.hippocampus import (
     compute_calibration_curve,
     compute_local_decoding_error,
@@ -28,10 +32,6 @@ from continuum_swr_replay.analysis.hippocampus import (
     get_event_start_end_times,
     get_signal_windows,
 )
-from continuum_swr_replay.analysis.hippocampus.event_detection import (
-    event_strict_overlap_mask,
-)
-from continuum_swr_replay.analysis.hippocampus.swr_source import analysed_bins
 from continuum_swr_replay.figure_utilities import (
     PANEL_SINGLE,
     get_figure_size,

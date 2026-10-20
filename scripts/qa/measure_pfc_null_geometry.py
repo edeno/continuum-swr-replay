@@ -210,14 +210,14 @@ def session_window_sets(
     drawn : dict of str to list of pandas.DataFrame
         The rebuilt null draws per class, one frame per draw.
     """
-    from continuum_swr_replay.analysis.hippocampus import load_results
-    from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
-        align_results_to_position,
-    )
-    from continuum_swr_replay.analysis.hippocampus.swr_source import (
+    from continuum_swr_replay.analysis.events.swr_source import (
         excluded_intervals,
         read_artifact_event_drops,
         swr_epoch_id,
+    )
+    from continuum_swr_replay.analysis.hippocampus import load_results
+    from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+        align_results_to_position,
     )
     from continuum_swr_replay.analysis.pfc.canonical_events import (
         load_session_canonical_events,

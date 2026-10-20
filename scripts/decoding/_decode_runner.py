@@ -33,7 +33,7 @@ import pandas as pd
 import xarray as xr
 from non_local_detector.environment import Environment
 
-from continuum_swr_replay.analysis.hippocampus.swr_source import with_swr_source
+from continuum_swr_replay.analysis.events.swr_source import with_swr_source
 from continuum_swr_replay.data_loaders import (
     get_training_timepoints,
     load_data,

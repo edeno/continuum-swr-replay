@@ -5,7 +5,7 @@ Contains the common infrastructure used by both ``run_decoding_bandit.py``
 2-state classifier), among it the HPC decode's masks: ``is_missing`` (the
 artifact run's mask) and ``is_training`` (that mask and every event of the Kay
 inventory left out), both from the paper's SWR source
-(``analysis/hippocampus/swr_source.py``). An HPC decode refuses to start unless
+(``analysis/events/swr_source.py``). An HPC decode refuses to start unless
 the source names both runs (``require_hpc_decode_sources``).
 """
 
@@ -38,8 +38,8 @@ try:
 except ImportError:
     HAS_CUDA = False
 
-from continuum_swr_replay.analysis.hippocampus import swr_source
-from continuum_swr_replay.analysis.hippocampus.artifacts.masks import PADDING_S
+from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events.artifact_masks import PADDING_S
 from continuum_swr_replay.data_loaders.epoch_register import epochs_to_run
 from continuum_swr_replay.decode_files import decode_paths
 from continuum_swr_replay.intervals import interval_mask

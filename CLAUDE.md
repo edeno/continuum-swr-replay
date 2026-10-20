@@ -69,7 +69,8 @@ src/continuum_swr_replay/
 ├── analysis/              # Analysis modules
 │   ├── behavior/          #   behavioral-model covariates (qvals_table)
 │   ├── contfrag/          #   Continuous-Fragmented classifier analysis
-│   ├── hippocampus/       #   event tables and eligibility, SWR source, artifacts
+│   ├── events/            #   analysed-time rule, SWR source, event eligibility, classified event table, cohorts
+│   ├── hippocampus/       #   decode aggregation, posterior/quality metrics, SWR inventories, artifact detector
 │   ├── inventory_comparison/ # event inventories from different detectors compared
 │   ├── pfc/               #   mPFC/OFC unit analysis
 │   ├── replay/            #   replay content/rate tables, model ladders, fitters
@@ -80,6 +81,7 @@ src/continuum_swr_replay/
 ├── decoding_common.py     # shared utilities for the decoding scripts
 ├── decoding_transitions.py # the decoders' discrete-transition settings
 ├── figure_utilities.py    # publication-figure helpers
+├── intervals.py           # interval algebra: overlap conventions, masks, spike binning
 ├── parameters.py          # global parameters, PROCESSED_DATA_DIR, COLORS
 └── types.py               # shared type definitions
 
@@ -202,7 +204,7 @@ Spike times are organized as lists of arrays: `spike_times[brain_area][sort_grou
 
 The single source of truth for a non-local event's timing and its
 SWR-overlap classification is
-`analysis/hippocampus/event_table.py:build_classified_nonlocal_event_table`.
+`analysis/events/classified_table.py:build_classified_nonlocal_event_table`.
 It produces one row per non-local event over the *full* event-label
 window: the label's probability contract is **validated, not re-filtered**
 (a violation raises `EventDefinitionError` rather than silently dropping
@@ -212,12 +214,12 @@ timing, per-event speed summaries, peak non-local probability, the 3-way
 
 **One analysed-time rule.** *Excluded time* is the artifact mask widened by
 0.3 s on each side (`swr_source.excluded_intervals`; the rule is in
-`analysis/hippocampus/event_eligibility.py`). Nothing inside it is analysed.
+`analysis/events/eligibility.py`). Nothing inside it is analysed.
 An event of any kind (non-local, SWR, MUA, ContFrag label, Widloski), an
 exposure second, a time bin with its history window, and a peri-event window
 are used only when they lie wholly outside excluded time. An event must also
 be immobile as a whole: every sampled speed finite and below 4 cm/s
-(`event_immobility.py`). A kept event that overlaps a dropped SWR or MUA
+(`analysis/events/immobility.py`). A kept event that overlaps a dropped SWR or MUA
 event is dropped too, because its overlap class is unknown.
 
 The rule is applied once, where a decode frame is read

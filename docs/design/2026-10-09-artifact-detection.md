@@ -8,7 +8,7 @@ stage, thresholds placed by one rule, and no post-step second. Implemented in
 The SWR runner, MUA detection and both HPC decoders use the mask (Task 17a), and so does the
 Widloski runner (Task 17b: the mask's bins are missing in its likelihood). Task 18
 applies one analysed-time rule (the lead, 2026-10-10;
-`analysis/hippocampus/event_eligibility.py`). *Excluded time* is the mask widened by
+`analysis/events/eligibility.py`). *Excluded time* is the mask widened by
 0.3 s on each side (`swr_source.excluded_intervals`). An event of any kind, an exposure
 second, a time bin with its history window, and a peri-event window are analysed only
 wholly outside it. A kept event that overlaps an SWR or MUA event dropped there is
@@ -69,7 +69,7 @@ the giant-day events.
   suspect.
 - **Thresholds by one rule (rule P, below).**
 - **One mask for everything.** The detector stores unpadded cores and their evidence. One table
-  (`masks.PADDING_S`) pads them into the mask. The same mask feeds:
+  (`artifact_masks.PADDING_S`) pads them into the mask. The same mask feeds:
   - the SWR detectors' normalization and event drops;
   - MUA detection;
   - the decoders' `is_missing` and encoding exclusion;
@@ -239,7 +239,7 @@ reviewing every spike-only core.
 
 ## The mask
 
-`masks.PADDING_S`, the one table:
+`artifact_masks.PADDING_S`, the one table:
 
 | Core | Padding (each side) | The measurement behind it |
 |---|---|---|
@@ -310,10 +310,10 @@ From C2 §1a (versions as fetched 2026-10-09) and the literature review:
     `spike_ood`;
   - `detect_artifacts(time, ca1_lfp, reference_lfp, spike_times, spike_marks,
     sampling_frequency, *, valid=None) -> pd.DataFrame`, which returns the unpadded cores.
-- **`artifacts/masks.py`:** `PADDING_S`, `artifact_intervals(cores, span)` (the mask).
+- **`events/artifact_masks.py`:** `PADDING_S`, `artifact_intervals(cores, span)` (the mask).
   The generic closed-interval functions it uses (`interval_mask(time, intervals)`,
   `subtract_intervals`, `masked_seconds`) are in `src/continuum_swr_replay/intervals.py`.
-- **`artifacts/io.py`:**
+- **`events/artifact_intervals.py`:**
   - the cores file (`CORE_COLUMNS`: `kind`, `signatures`, `core_start`, `core_end`, `spec_max`,
     `n_windows`, `ref_j5_max`, `ca1_frac_max`, `spk_frac_max`, `spk_ood_max`) and the manifest;
   - `read_epoch_cores` checks the manifest's run id, the epoch's status and the file's sha256.

@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.replay.cohort_selection import (
+from continuum_swr_replay.analysis.events.cohort_selection import (
     STOP_COHORT_RULES,
     events_in_stops,
     freeze_common_cohort,

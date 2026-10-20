@@ -14,6 +14,7 @@ import pytest
 import statsmodels.api as sm
 from patsy import dmatrix
 
+from continuum_swr_replay.analysis.events.cohort_selection import select_stop_cohort
 from continuum_swr_replay.analysis.pfc.glm import (
     NESTED_MODEL_PAIRS,
     _fit_immobility_models,
@@ -39,7 +40,6 @@ from continuum_swr_replay.analysis.pfc.glm import (
 from continuum_swr_replay.analysis.pfc.glm import (
     test_theta_modulation as run_theta_modulation_test,
 )
-from continuum_swr_replay.analysis.replay.cohort_selection import select_stop_cohort
 
 
 def spike_counts_of(spike_times, time_axis):

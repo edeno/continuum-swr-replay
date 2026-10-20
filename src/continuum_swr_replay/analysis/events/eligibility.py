@@ -1,11 +1,11 @@
 """One analysed-time rule for every event cohort, exposure, bin and window.
 
-**Excluded time** is the one artifact mask (``artifacts.masks``) widened by
+**Excluded time** is the one artifact mask (``artifact_masks``) widened by
 :data:`ARTIFACT_REACH_S` on each side (:func:`excluded_time`). An event of any
 kind (non-local, SWR, MUA, ContFrag label, Widloski) enters a cohort only when
 
 - the whole event is immobile: every speed sample in its closed interval is
-  finite and strictly below the threshold (``event_immobility``); and
+  finite and strictly below the threshold (``immobility``); and
 - it lies wholly outside excluded time (closed intervals: touching counts). An
   event in the mask itself is ``artifact``; one within the reach of it is
   ``near_artifact``. Either way it is unobserved: not an SWR, not a non-SWR
@@ -35,7 +35,7 @@ from numpy.typing import NDArray
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
-from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+from continuum_swr_replay.analysis.events.immobility import (
     filter_event_intervals_by_speed,
     intervals_from_labels,
 )

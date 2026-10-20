@@ -37,7 +37,7 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 import pytest  # noqa: E402
 
-from continuum_swr_replay.analysis.hippocampus import swr_source  # noqa: E402
+from continuum_swr_replay.analysis.events import swr_source  # noqa: E402
 from scripts.figures import generate_supp_pipeline_data_flow as flow  # noqa: E402
 from tests.unit._swr_inventory_fixtures import (  # noqa: E402
     use_swr_source,

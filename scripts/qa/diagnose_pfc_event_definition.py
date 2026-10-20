@@ -56,15 +56,15 @@ def build_old_event_sets(
     rule on both populations, and the SWR split taken as overlap with
     ``data["ripple_times"]``.
     """
-    from continuum_swr_replay.analysis.hippocampus import (
+    from continuum_swr_replay.analysis.events.detection import (
         get_confident_times,
         get_overlap_times,
     )
+    from continuum_swr_replay.analysis.events.immobility import (
+        build_speed_eligible_event_cohort,
+    )
     from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
         align_results_to_position,
-    )
-    from continuum_swr_replay.analysis.hippocampus.event_immobility import (
-        build_speed_eligible_event_cohort,
     )
 
     results, position_info, _ = align_results_to_position(

@@ -10,10 +10,10 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
-from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+from continuum_swr_replay.analysis.events.immobility import (
     require_canonical_speed_threshold,
 )
-from continuum_swr_replay.analysis.hippocampus.swr_source import (
+from continuum_swr_replay.analysis.events.swr_source import (
     excluded_intervals_of,
 )
 from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schema

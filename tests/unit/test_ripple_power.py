@@ -20,7 +20,7 @@ import pandas as pd
 import pytest
 from ripple_detection import Kay_ripple_detector
 
-from continuum_swr_replay.analysis.hippocampus import swr_source
+from continuum_swr_replay.analysis.events import swr_source
 from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
     DETECTOR_SETTINGS,
 )

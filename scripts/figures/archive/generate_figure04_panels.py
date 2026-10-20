@@ -46,10 +46,10 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_NON_LOCAL_THRESHOLD,
     DEFAULT_SAMPLING_FREQUENCY_HZ,
 )
-from continuum_swr_replay.analysis.hippocampus import (
+from continuum_swr_replay.analysis.hippocampus import load_results
+from continuum_swr_replay.analysis.events.detection import (
     get_confident_times,
     get_overlap_times,
-    load_results,
 )
 from continuum_swr_replay.analysis.pfc import (
     fit_immobility_models,

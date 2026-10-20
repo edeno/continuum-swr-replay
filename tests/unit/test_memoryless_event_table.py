@@ -23,7 +23,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.hippocampus.event_detection import (
+from continuum_swr_replay.analysis.events.detection import (
     classify_swr_overlap_geometry,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import (

@@ -35,8 +35,8 @@ takes a time-indexed ``data_over_time`` slice and emits, per event:
 SWR intervals are derived from ``SWR_event`` timebin labels after applying
 the same whole-event speed criterion used for Non-Local and MUA populations.
 The labels are the paper's SWR source's: callers read a decode's frame through
-:func:`~continuum_swr_replay.analysis.hippocampus.swr_source.read_dot_with_swr_source`
-(or :func:`~continuum_swr_replay.analysis.hippocampus.swr_source.with_swr_source`),
+:func:`~continuum_swr_replay.analysis.events.swr_source.read_dot_with_swr_source`
+(or :func:`~continuum_swr_replay.analysis.events.swr_source.with_swr_source`),
 which puts the direct Kay inventory's labels in ``SWR_event`` in place of the
 decode's stored ``RippleTimesV1`` ones. This is the same label source used by
 the Figure 2 bar / triggered-average / timing panels and by the replay-content
@@ -60,12 +60,12 @@ from continuum_swr_replay.analysis.constants import (
 from continuum_swr_replay.tables.event_ids import hash_event_id, validate_event_ids
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
-from .event_detection import (
+from .detection import (
     classify_swr_overlap,
     classify_swr_overlap_geometry,
     strict_overlap_matrix,
 )
-from .event_immobility import (
+from .immobility import (
     event_speeds_are_immobile,
     intervals_from_labels,
     require_canonical_speed_threshold,

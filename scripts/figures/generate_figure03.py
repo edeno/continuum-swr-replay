@@ -37,28 +37,30 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
-from continuum_swr_replay.analysis.hippocampus import (
+from continuum_swr_replay.analysis.events.detection import (
     get_confident_times,
     get_overlap_times,
-    load_data_over_time,
-    load_results,
 )
-from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
-    validate_results_position_time_alignment,
-)
-from continuum_swr_replay.analysis.hippocampus.event_eligibility import (
+from continuum_swr_replay.analysis.events.eligibility import (
     artifact_drop_reasons,
 )
-from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+from continuum_swr_replay.analysis.events.immobility import (
     build_speed_eligible_event_cohort,
 )
-from continuum_swr_replay.analysis.hippocampus.swr_source import (
+from continuum_swr_replay.analysis.events.swr_source import (
     artifact_intervals,
     dropped_for_excluded_time,
     read_artifact_event_drops,
     ripple_power_inputs,
     swr_epoch_id,
     swr_intervals,
+)
+from continuum_swr_replay.analysis.hippocampus import (
+    load_data_over_time,
+    load_results,
+)
+from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+    validate_results_position_time_alignment,
 )
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.decode_files import decode_paths

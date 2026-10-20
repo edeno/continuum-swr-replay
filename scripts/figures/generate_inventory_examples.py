@@ -71,7 +71,7 @@ from continuum_swr_replay.analysis.constants import (  # noqa: E402
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
-from continuum_swr_replay.analysis.hippocampus import swr_source  # noqa: E402
+from continuum_swr_replay.analysis.events import swr_source  # noqa: E402
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (  # noqa: E402
     CandidateSequences,
     WindowDecisions,

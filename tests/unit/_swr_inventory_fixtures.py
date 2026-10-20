@@ -20,7 +20,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.hippocampus.artifacts.io import (
+from continuum_swr_replay.analysis.events.artifact_intervals import (
     cores_path,
     make_cores,
     write_cores,
@@ -168,7 +168,7 @@ def write_artifact_run(
 def use_swr_source(monkeypatch, inventory: Path, artifacts: Path | None = None) -> None:
     """Point the SWR source at a written inventory run folder (and artifact run
     folder, if given), as its configured constants would."""
-    from continuum_swr_replay.analysis.hippocampus import swr_source
+    from continuum_swr_replay.analysis.events import swr_source
 
     monkeypatch.setattr(swr_source, "SWR_INVENTORY_ROOT", inventory.parent)
     monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", inventory.name)

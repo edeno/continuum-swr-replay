@@ -120,7 +120,7 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 from numpy.typing import NDArray  # noqa: E402
 
-from continuum_swr_replay.analysis.hippocampus import swr_source  # noqa: E402
+from continuum_swr_replay.analysis.events import swr_source  # noqa: E402
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (  # noqa: E402
     interior_bin_distances_cm,
 )

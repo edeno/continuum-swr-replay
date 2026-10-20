@@ -28,6 +28,60 @@ Per-stop RL-model values via DataJoint — canonical, complete, timestamp-aligne
 
 `peri_switch_index`, `add_experienced_value_columns`, `add_beta_belief_entropy`, `canonicalize_behavior_model_columns`, `assign_stops_to_trials`, `build_animal`, `run_build_qvals_table`
 
+### `src/continuum_swr_replay/analysis/events/artifact_intervals.py`
+
+The artifact run folder: one cores file per epoch, and the run's manifest.
+
+`ArtifactRunError`, `EpochCores`, `cores_path`, `empty_cores`, `make_cores`, `validate_cores`, `write_cores`, `write_manifest`, `read_manifest`, `read_epoch_cores`
+
+### `src/continuum_swr_replay/analysis/events/artifact_masks.py`
+
+The artifact mask: the detector's cores, padded from one table.
+
+`core_class`, `artifact_intervals`
+
+### `src/continuum_swr_replay/analysis/events/classified_table.py`
+
+Canonical per-non-local-event classification table.
+
+`build_classified_nonlocal_event_table`, `assert_drawn_class_matches_ripples`
+
+### `src/continuum_swr_replay/analysis/events/cohort_selection.py`
+
+Shared whole-unit complete-case cohort selection.
+
+`freeze_common_cohort`, `stop_cohort_suffix`, `select_stop_cohort`, `select_event_cohort`, `stop_interval_mask`, `events_in_stops`
+
+### `src/continuum_swr_replay/analysis/events/detection.py`
+
+Detection and analysis of neural events (ripples, non-local states).
+
+`get_confident_times`, `positive_duration_interval_mask`, `strict_overlap_matrix`, `event_strict_overlap_keys`, `event_strict_overlap_mask`, `get_overlap_times`, `classify_swr_overlap`, `merged_interval_duration`, `classify_swr_overlap_geometry`, `select_typical_event_by_class`
+
+### `src/continuum_swr_replay/analysis/events/eligibility.py`
+
+One analysed-time rule for every event cohort, exposure, bin and window.
+
+`DropReason`, `excluded_time`, `artifact_drop_reasons`, `overlaps_dropped_events`, `event_drop_reasons`, `label_drop_reasons`, `drop_labels`
+
+### `src/continuum_swr_replay/analysis/events/epoch_normalizers.py`
+
+An epoch's run-speed baseline, shared by the decoders and the read path.
+
+`run_speed_baseline`
+
+### `src/continuum_swr_replay/analysis/events/immobility.py`
+
+Canonical whole-event immobility rules for neural event cohorts.
+
+`EventDefinitionError`, `require_time_index`, `require_canonical_speed_threshold`, `event_speeds_are_immobile`, `whole_event_immobility_mask`, `filter_event_labels_by_speed`, `validate_whole_event_immobility_contract`, `validate_nonlocal_event_probability_contract`, `filter_event_intervals_by_speed`, `intervals_from_labels`, `build_speed_eligible_event_cohort`
+
+### `src/continuum_swr_replay/analysis/events/swr_source.py`
+
+The paper's one SWR source: the direct ripple_detection 2.0 Kay inventory.
+
+`SwrSourceError`, `swr_inventory_dir`, `artifact_intervals_dir`, `swr_source_name`, `artifact_run_of`, `stamp_swr_source`, `require_swr_source`, `swr_epoch_id`, `swr_source_files`, `ripple_power_inputs`, `artifact_intervals`, `excluded_intervals`, `read_swr_inventory`, `swr_observed_stretches`, `swr_observed_mask`, `swr_events`, `swr_event_labels`, `artifact_event_drops`, `read_artifact_event_drops`, `dropped_for_excluded_time`, `with_swr_source`, `excluded_intervals_of`, `excluded_intervals_by_session`, `read_dot_with_swr_source`, `analysed_bins`, `swr_intervals`
+
 ### `src/continuum_swr_replay/analysis/hippocampus/artifacts/detect.py`
 
 The artifact detector: its constants and its four rules.
@@ -40,59 +94,17 @@ The artifact detector's features: S window spectra, J5 and L20 steps, spike line
 
 `robust_scale`, `window_valid`, `window_centers`, `window_band_power`, `channel_specificity`, `level_jump`, `level_shift`, `robust_jump`, `reference_jump`, `persistent_step_count`, `nearest_mark_distance`, `spike_lines`
 
-### `src/continuum_swr_replay/analysis/hippocampus/artifacts/io.py`
-
-The artifact run folder: one cores file per epoch, and the run's manifest.
-
-`ArtifactRunError`, `EpochCores`, `cores_path`, `empty_cores`, `make_cores`, `validate_cores`, `write_cores`, `write_manifest`, `read_manifest`, `read_epoch_cores`
-
-### `src/continuum_swr_replay/analysis/hippocampus/artifacts/masks.py`
-
-The artifact mask: the detector's cores, padded from one table.
-
-`core_class`, `artifact_intervals`
-
 ### `src/continuum_swr_replay/analysis/hippocampus/data_aggregation.py`
 
 Aggregation of analysis results over time.
 
 `theta_power_zscore`, `validate_required_session_data_keys`, `validate_results_position_time_alignment`, `align_results_to_position`, `validate_dot_event_contract`, `get_data_over_time`, `load_data_over_time`, `get_event_types`, `compute_swr_overlap_class_counts`, `compute_swr_nl_event_counts`
 
-### `src/continuum_swr_replay/analysis/hippocampus/epoch_normalizers.py`
-
-An epoch's run-speed baseline, shared by the decoders and the read path.
-
-`run_speed_baseline`
-
 ### `src/continuum_swr_replay/analysis/hippocampus/event_analysis.py`
 
 Analysis functions for manipulating and characterizing detected events.
 
 `get_immobile_events`, `get_event_start_end_times`, `get_event_durations_ms`
-
-### `src/continuum_swr_replay/analysis/hippocampus/event_detection.py`
-
-Detection and analysis of neural events (ripples, non-local states).
-
-`get_confident_times`, `positive_duration_interval_mask`, `strict_overlap_matrix`, `event_strict_overlap_keys`, `event_strict_overlap_mask`, `get_overlap_times`, `classify_swr_overlap`, `merged_interval_duration`, `classify_swr_overlap_geometry`, `select_typical_event_by_class`
-
-### `src/continuum_swr_replay/analysis/hippocampus/event_eligibility.py`
-
-One analysed-time rule for every event cohort, exposure, bin and window.
-
-`DropReason`, `excluded_time`, `artifact_drop_reasons`, `overlaps_dropped_events`, `event_drop_reasons`, `label_drop_reasons`, `drop_labels`
-
-### `src/continuum_swr_replay/analysis/hippocampus/event_immobility.py`
-
-Canonical whole-event immobility rules for neural event cohorts.
-
-`EventDefinitionError`, `require_time_index`, `require_canonical_speed_threshold`, `event_speeds_are_immobile`, `whole_event_immobility_mask`, `filter_event_labels_by_speed`, `validate_whole_event_immobility_contract`, `validate_nonlocal_event_probability_contract`, `filter_event_intervals_by_speed`, `intervals_from_labels`, `build_speed_eligible_event_cohort`
-
-### `src/continuum_swr_replay/analysis/hippocampus/event_table.py`
-
-Canonical per-non-local-event classification table.
-
-`build_classified_nonlocal_event_table`, `assert_drawn_class_matches_ripples`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/hpc_raw_stats.py`
 
@@ -124,12 +136,6 @@ Rule R-T: per epoch, keep the CA1 band tetrodes that ripple with the rest.
 
 `TetrodeSelection`, `TetrodeSelectionError`, `check_one_channel_per_tetrode`, `select_ripple_tetrodes`
 
-### `src/continuum_swr_replay/analysis/hippocampus/swr_source.py`
-
-The paper's one SWR source: the direct ripple_detection 2.0 Kay inventory.
-
-`SwrSourceError`, `swr_inventory_dir`, `artifact_intervals_dir`, `swr_source_name`, `artifact_run_of`, `stamp_swr_source`, `require_swr_source`, `swr_epoch_id`, `swr_source_files`, `ripple_power_inputs`, `artifact_intervals`, `excluded_intervals`, `read_swr_inventory`, `swr_observed_stretches`, `swr_observed_mask`, `swr_events`, `swr_event_labels`, `artifact_event_drops`, `read_artifact_event_drops`, `dropped_for_excluded_time`, `with_swr_source`, `excluded_intervals_of`, `excluded_intervals_by_session`, `read_dot_with_swr_source`, `analysed_bins`, `swr_intervals`
-
 ### `src/continuum_swr_replay/analysis/hippocampus/triggered_analysis.py`
 
 Event-triggered analysis utilities for extracting signal windows around events.
@@ -147,12 +153,6 @@ _No module-level public symbols._
 Immobility bouts: where a stop begins and ends, and what falls inside one.
 
 `nearest_well_distance_cm`, `immobility_bout_intervals`, `bout_exposure_s`, `summarize_bout_location`, `time_since_stop`, `assign_bout`
-
-### `src/continuum_swr_replay/analysis/replay/cohort_selection.py`
-
-Shared whole-unit complete-case cohort selection.
-
-`freeze_common_cohort`, `stop_cohort_suffix`, `select_stop_cohort`, `select_event_cohort`, `stop_interval_mask`, `events_in_stops`
 
 ### `src/continuum_swr_replay/analysis/replay/prepare_data.py`
 

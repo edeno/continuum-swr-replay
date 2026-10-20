@@ -32,7 +32,7 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
-from continuum_swr_replay.analysis.hippocampus.swr_source import (
+from continuum_swr_replay.analysis.events.swr_source import (
     read_dot_with_swr_source,
     require_swr_source,
 )

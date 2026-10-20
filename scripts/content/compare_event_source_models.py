@@ -34,7 +34,11 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.hippocampus.swr_source import require_swr_source
+from continuum_swr_replay.analysis.events.cohort_selection import (
+    _sorted_unit_ids,
+    freeze_common_cohort,
+)
+from continuum_swr_replay.analysis.events.swr_source import require_swr_source
 from continuum_swr_replay.analysis.replay import (
     MODEL_CHOICE,
     MODEL_PATCH,
@@ -52,10 +56,6 @@ from continuum_swr_replay.analysis.replay import (
 from continuum_swr_replay.analysis.replay.cohort_audit import (
     records_from_common_cohort_provenance,
     write_cohort_audit,
-)
-from continuum_swr_replay.analysis.replay.cohort_selection import (
-    _sorted_unit_ids,
-    freeze_common_cohort,
 )
 from continuum_swr_replay.analysis.replay.covariate_timing import (
     assert_predictor_timing,

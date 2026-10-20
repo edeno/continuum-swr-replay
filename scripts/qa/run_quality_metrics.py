@@ -22,6 +22,9 @@ import numpy as np
 import pandas as pd
 
 import continuum_swr_replay.figure_utilities as figure_utilities
+from continuum_swr_replay.analysis.events.swr_source import (
+    read_dot_with_swr_source,
+)
 from continuum_swr_replay.analysis.hippocampus.hpc_raw_stats import (
     RAW_STAT_COLUMNS,
     TRANSITION_MATRIX_COLUMNS,
@@ -32,9 +35,6 @@ from continuum_swr_replay.analysis.hippocampus.quality_metrics import (
     compute_error_by_track_segment,
     compute_non_local_event_context,
     compute_session_quality_summary,
-)
-from continuum_swr_replay.analysis.hippocampus.swr_source import (
-    read_dot_with_swr_source,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
 from continuum_swr_replay.decode_files import data_over_time_suffix

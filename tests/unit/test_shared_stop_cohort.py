@@ -17,7 +17,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.replay.cohort_selection import (
+from continuum_swr_replay.analysis.events.cohort_selection import (
     STOP_COHORT_RULES,
     STOP_COHORTS,
     select_event_cohort,

@@ -161,7 +161,7 @@ class TestAdapters:
     def _no_artifact_run(self, monkeypatch):
         """The tables here are built from the inventory run "inventory" with no
         artifact run; read them under that source."""
-        from continuum_swr_replay.analysis.hippocampus import swr_source
+        from continuum_swr_replay.analysis.events import swr_source
 
         monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", "inventory")
         monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", None)
@@ -302,7 +302,7 @@ class TestAdapters:
         self, monkeypatch
     ):
         """It would read its candidates in excluded time as kept."""
-        from continuum_swr_replay.analysis.hippocampus import swr_source
+        from continuum_swr_replay.analysis.events import swr_source
         from tests.unit.test_memoryless_event_table import build, make_recording
 
         table = build(make_recording(), swr_definition=NO_ARTIFACT_RUN).drop(
@@ -318,7 +318,7 @@ class TestAdapters:
         """Its artifact_drop_reason reads another mask: a table built with no
         run is refused under a run, one built under a run under another or
         under none. The message names both sources."""
-        from continuum_swr_replay.analysis.hippocampus import swr_source
+        from continuum_swr_replay.analysis.events import swr_source
         from tests.unit.test_memoryless_event_table import build, make_recording
 
         recording = make_recording()
@@ -341,7 +341,7 @@ class TestAdapters:
     def test_a_table_built_from_another_inventory_run_is_refused(self, monkeypatch):
         """Its SWR labels, and so its candidates' SWR classes, are another
         inventory's; so is a table from before the source had a name."""
-        from continuum_swr_replay.analysis.hippocampus import swr_source
+        from continuum_swr_replay.analysis.events import swr_source
         from tests.unit.test_memoryless_event_table import build, make_recording
 
         recording = make_recording()

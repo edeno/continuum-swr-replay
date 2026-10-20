@@ -11,10 +11,10 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from continuum_swr_replay.analysis.hippocampus.data_aggregation import get_event_types
-from continuum_swr_replay.analysis.hippocampus.event_detection import (
+from continuum_swr_replay.analysis.events.detection import (
     select_typical_event_by_class,
 )
+from continuum_swr_replay.analysis.hippocampus.data_aggregation import get_event_types
 
 
 def _make_data_over_time(

@@ -21,7 +21,7 @@ and onset tables. Across the 218 HPC sessions the stop-level totals are slightly
 > +~0.2 % (Δ82) / +~0.75 % (Δ250) were measured before the
 > `unified-event-immobility` change, when SWR/MUA labels were **not**
 > speed-gated. Both grains now draw from the same whole-event
-> speed-eligible cohort (`analysis/hippocampus/event_immobility.py`), so
+> speed-eligible cohort (`analysis/events/immobility.py`), so
 > both sides of the comparison moved. **Re-derive these numbers before
 > citing them.** The *direction* of the effect and the rule below are
 > unchanged: the two rules still differ, so the counts still must not be
@@ -29,7 +29,7 @@ and onset tables. Across the 218 HPC sessions the stop-level totals are slightly
 
 > **SWR source (2026-10-09).** Both grains now read their SWR labels from one source,
 > the direct ripple_detection 2.0 Kay inventory
-> (`analysis/hippocampus/swr_source.py`; design note
+> (`analysis/events/swr_source.py`; design note
 > [../design/2026-10-09-swr-source.md](../design/2026-10-09-swr-source.md)), in place
 > of Spyglass's stored `RippleTimesV1` events. The per-bin label convention is
 > unchanged (closed intervals, whole-event speed gate, source event numbers), and so
@@ -37,7 +37,7 @@ and onset tables. Across the 218 HPC sessions the stop-level totals are slightly
 
 > **One analysed-time rule (2026-10-10, Task 18).** With an artifact run configured
 > (`swr_source.ARTIFACT_INTERVALS_RUN_ID`), both grains follow one rule
-> (`analysis/hippocampus/event_eligibility.py`). *Excluded time* is the artifact mask
+> (`analysis/events/eligibility.py`). *Excluded time* is the artifact mask
 > widened by 0.3 s on each side (`swr_source.excluded_intervals`). The rule below
 > (do not cross-substitute) still holds:
 >

@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+from continuum_swr_replay.analysis.events.immobility import (
     EventDefinitionError,
     build_speed_eligible_event_cohort,
     event_speeds_are_immobile,
@@ -286,7 +286,7 @@ def test_speed_filter_logs_how_many_intervals_it_removed(caplog):
 
     with caplog.at_level(
         logging.INFO,
-        logger="continuum_swr_replay.analysis.hippocampus.event_immobility",
+        logger="continuum_swr_replay.analysis.events.immobility",
     ):
         kept = filter_event_intervals_by_speed(events, speed=speed, time=time)
 

@@ -22,8 +22,8 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.hippocampus import swr_source
-from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events.immobility import (
     event_speeds_are_immobile,
 )
 from continuum_swr_replay.data_loaders.constants import BRAIN_AREAS

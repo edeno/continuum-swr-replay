@@ -19,10 +19,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.hippocampus.event_table import (
+from continuum_swr_replay.analysis.events.classified_table import (
     build_classified_nonlocal_event_table,
 )
-from continuum_swr_replay.analysis.hippocampus.swr_source import (
+from continuum_swr_replay.analysis.events.swr_source import (
     artifact_event_drops,
     with_swr_source,
 )
@@ -642,7 +642,7 @@ class TestTheStateSpaceInventory:
 
 class TestTheMemorylessInventory:
     def _run(self, tmp_path, n_shuffles=100):
-        from continuum_swr_replay.analysis.hippocampus import swr_source
+        from continuum_swr_replay.analysis.events import swr_source
 
         table = memoryless_table(swr_source.swr_source_name(), n_shuffles)
         return write_memoryless_run(tmp_path / "memoryless", table)
@@ -692,7 +692,7 @@ class TestTheMemorylessInventory:
         bounds overlap it, but its last sample is 105.500: on the grid it only
         touches MUA 2 and is kept. Candidate 17 overlaps dropped Kay 3 on the
         grid though its stored reason is None, and is set aside."""
-        from continuum_swr_replay.analysis.hippocampus import swr_source
+        from continuum_swr_replay.analysis.events import swr_source
 
         table = memoryless_table(swr_source.swr_source_name())
         extra = table.iloc[[0, 0]].assign(
@@ -785,7 +785,7 @@ class TestTheMemorylessInventory:
             )
 
     def test_an_empty_table_keeps_the_schema(self, epoch, tmp_path):
-        from continuum_swr_replay.analysis.hippocampus import swr_source
+        from continuum_swr_replay.analysis.events import swr_source
 
         table = memoryless_table(swr_source.swr_source_name()).iloc[0:0]
         run = write_memoryless_run(tmp_path / "memoryless", table)

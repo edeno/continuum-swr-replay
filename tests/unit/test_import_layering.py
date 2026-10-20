@@ -36,14 +36,17 @@ edges are removed, never go stale:
   foundation modules, and nothing from ``scripts``.
 - ``hippocampus_imports_no_pfc_or_inventory_comparison``: the hippocampus
   package does not reach sideways into those two analysis packages.
+- ``events_imports_only_foundation``: the analysed-time and event substrate
+  (``analysis.events``) imports, from within the package, only foundation
+  modules, ``analysis.constants`` and itself, and nothing from ``scripts``.
 - ``no_package_cycles``: the package graph is acyclic. Its entries are
   package-level edges (not module-level ones) that lie on a cycle, so a new
   module edge along a package pair it already lists is invisible to it. The
   back edges that close today's cycles are pinned at module level instead,
   by the other rules: hippocampus -> replay by rule 3, hippocampus ->
   inventory_comparison (and -> pfc) by the hippocampus rule, hippocampus ->
-  decoding_common by the decoding_common rule, and a foundation module's
-  edges by the foundation rule.
+  decoding_common by the decoding_common rule, and a foundation or events
+  module's edges by the foundation and events rules.
 
 Imports inside functions count: a function-local import is how a cycle is
 usually hidden, and it is still a dependency.
@@ -209,6 +212,9 @@ FOUNDATION = frozenset(
     }
 )
 
+#: Package nodes, besides the foundation, that ``analysis.events`` may import.
+EVENTS_MAY_IMPORT = frozenset({"analysis.events", "analysis.constants"})
+
 #: Edges each rule tolerates today, as ``(importer, imported)`` pairs of
 #: module names relative to the package root (``no_package_cycles`` holds
 #: package-node pairs instead). Entries are only ever deleted: each one names
@@ -233,20 +239,16 @@ KNOWN_VIOLATIONS: dict[str, set[tuple[str, str]]] = {
             "analysis.inventory_comparison.schema",
         ),
     },
-    # One strongly connected component: hippocampus, inventory_comparison,
-    # replay and decoding_common. Its two-package cycles (code-organization
-    # review, F2) are closed by the back edges hippocampus ->
-    # inventory_comparison and -> decoding_common; every other edge here is
-    # listed because it lies inside that component. (hippocampus <-> pfc left
-    # with the spike binning, Task 4; hippocampus -> replay and table_io ->
-    # replay with the tables package, Task 5.)
+    "events_imports_only_foundation": set(),
+    # One cycle: hippocampus <-> inventory_comparison, closed by the back edge
+    # hippocampus -> inventory_comparison (code-organization review, F2).
+    # (hippocampus <-> pfc left with the spike binning, Task 4; hippocampus ->
+    # replay and table_io -> replay with the tables package, Task 5; the
+    # replay and decoding_common cycles through hippocampus with the event
+    # substrate's move to analysis.events, Task 6.)
     "no_package_cycles": {
         ("analysis.hippocampus", "analysis.inventory_comparison"),
-        ("analysis.hippocampus", "decoding_common"),
         ("analysis.inventory_comparison", "analysis.hippocampus"),
-        ("analysis.inventory_comparison", "analysis.replay"),
-        ("analysis.replay", "analysis.hippocampus"),
-        ("decoding_common", "analysis.hippocampus"),
     },
 }
 
@@ -323,7 +325,7 @@ def package_of(module: str) -> str:
     """The package node of a module name relative to the package root.
 
     The first dotted component, except that ``analysis.<pkg>`` is its own node
-    (``analysis.hippocampus.swr_source`` -> ``analysis.hippocampus``,
+    (``analysis.events.swr_source`` -> ``analysis.events``,
     ``analysis.constants`` -> ``analysis.constants``). The root package is
     ``""``.
     """
@@ -438,6 +440,19 @@ def rule_violations(root: Path = SRC) -> dict[str, set[tuple[str, str]]]:
             if _starts_with(a, "analysis.hippocampus")
             and _starts_with(b, "analysis.pfc", "analysis.inventory_comparison")
         },
+        "events_imports_only_foundation": {
+            (a, b)
+            for a, b in edges
+            if package_of(a) == "analysis.events"
+            and (
+                (
+                    b in index
+                    and package_of(b) not in FOUNDATION
+                    and package_of(b) not in EVENTS_MAY_IMPORT
+                )
+                or _starts_with(b, "scripts")
+            )
+        },
         "no_package_cycles": _cycle_edges(package_graph(root)),
     }
 
@@ -446,6 +461,7 @@ def test_the_graph_is_not_vacuous() -> None:
     """The scan sees the packages the rules are about, and their known edges."""
     graph = package_graph()
     for node in (
+        "analysis.events",
         "analysis.hippocampus",
         "analysis.replay",
         "analysis.pfc",
@@ -516,4 +532,36 @@ def test_graph_rules_see_function_local_imports_and_cycles(tmp_path: Path) -> No
     }
     assert found["foundation_imports_only_foundation"] == {
         ("parameters", "decoding_common")
+    }
+
+
+def test_events_rule_allows_only_foundation_constants_and_itself(
+    tmp_path: Path,
+) -> None:
+    """An ``analysis.events`` module may import the foundation,
+    ``analysis.constants`` and its own package; a function-local import of
+    an analysis package, or of ``scripts``, is a violation."""
+    root = tmp_path / "continuum_swr_replay"
+    for package in ("analysis/events", "analysis/hippocampus"):
+        (root / package).mkdir(parents=True)
+        (root / package / "__init__.py").write_text("")
+    (root / "__init__.py").write_text("")
+    (root / "analysis" / "__init__.py").write_text("")
+    (root / "analysis" / "constants.py").write_text("")
+    (root / "intervals.py").write_text("")
+    (root / "analysis" / "hippocampus" / "h.py").write_text("")
+    (root / "analysis" / "events" / "other.py").write_text("")
+    (root / "analysis" / "events" / "e.py").write_text(
+        "from continuum_swr_replay import intervals\n"
+        "from ..constants import X\n"
+        "from .other import Y\n"
+        "import numpy\n"
+        "def f():\n"
+        "    from ..hippocampus import h\n"
+        "    import scripts.qa.tool\n"
+    )
+
+    assert rule_violations(root)["events_imports_only_foundation"] == {
+        ("analysis.events.e", "analysis.hippocampus.h"),
+        ("analysis.events.e", "scripts.qa.tool"),
     }

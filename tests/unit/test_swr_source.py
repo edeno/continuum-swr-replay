@@ -20,19 +20,19 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.hippocampus import swr_source
-from continuum_swr_replay.analysis.hippocampus.artifacts.io import (
+from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events.artifact_intervals import (
     cores_path,
     read_manifest,
     write_manifest,
 )
-from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+from continuum_swr_replay.analysis.events.immobility import (
     EventDefinitionError,
     build_speed_eligible_event_cohort,
     filter_event_labels_by_speed,
     intervals_from_labels,
 )
-from continuum_swr_replay.analysis.hippocampus.swr_source import (
+from continuum_swr_replay.analysis.events.swr_source import (
     DropReason,
     SwrSourceError,
     artifact_intervals,
@@ -157,9 +157,7 @@ class TestTheConfiguredInventory:
             or CONFIGURED_ARTIFACT_RUN_ID in path.read_text()
         )
 
-        assert holders == [
-            "src/continuum_swr_replay/analysis/hippocampus/swr_source.py"
-        ]
+        assert holders == ["src/continuum_swr_replay/analysis/events/swr_source.py"]
 
     def test_the_swr_runner_writes_where_the_source_reads(self):
         import scripts.decoding.run_swr_detection as runner
@@ -675,9 +673,7 @@ class TestTheStamp:
 
 
 def test_the_module_names_no_stored_ripple_source():
-    text = (
-        REPO / "src/continuum_swr_replay/analysis/hippocampus/swr_source.py"
-    ).read_text()
+    text = (REPO / "src/continuum_swr_replay/analysis/events/swr_source.py").read_text()
     code = re.sub(r'""".*?"""', "", text, flags=re.S)
 
     assert "RippleTimesV1" not in code
@@ -1201,7 +1197,7 @@ class TestTheNormalizers:
     def test_the_speed_baseline_is_the_percentile_outside_the_mask(
         self, inventory, tmp_path, monkeypatch
     ):
-        from continuum_swr_replay.analysis.hippocampus.epoch_normalizers import (
+        from continuum_swr_replay.analysis.events.epoch_normalizers import (
             RUN_SPEED_BASELINE_PERCENTILE,
         )
 

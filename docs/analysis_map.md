@@ -39,7 +39,7 @@ after a change to fitting code only, start at step 6.
    - Run `decoding/run_artifact_detection.py` (the artifact mask), then `decoding/run_swr_detection.py` (the
      four SWR inventories).
    - Then set the two run ids the decoders read: `ARTIFACT_INTERVALS_RUN_ID` and `SWR_INVENTORY_RUN_ID` in
-     `src/continuum_swr_replay/analysis/hippocampus/swr_source.py`. A decode refuses to start without them.
+     `src/continuum_swr_replay/analysis/events/swr_source.py`. A decode refuses to start without them.
 3. **Decodes.** `decoding/run_decoding_bandit.py` (non-local detector) and `decoding/run_decoding_contfrag.py`
    (ContFrag), on GPUs.
 4. **Tables**, in this order:

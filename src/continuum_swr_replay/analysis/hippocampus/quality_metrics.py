@@ -91,9 +91,8 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
+from continuum_swr_replay.analysis.events.swr_source import analysed_bins
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
-
-from .swr_source import analysed_bins
 
 logger = logging.getLogger(__name__)
 
@@ -993,7 +992,7 @@ def compute_non_local_event_context(
     # with ``classify_swr_overlap`` / ``get_overlap_times`` and
     # inflates ``frac_swr``. Use the shared event-bound overlap helper
     # so this stays consistent with the rest of the SWR-overlap path.
-    from .event_detection import event_strict_overlap_keys
+    from continuum_swr_replay.analysis.events.detection import event_strict_overlap_keys
 
     swr_overlap_keys = (
         event_strict_overlap_keys(

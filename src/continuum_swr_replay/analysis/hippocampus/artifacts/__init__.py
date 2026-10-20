@@ -4,12 +4,14 @@
   spike lines and out-of-distribution marks).
 - ``detect``: the constants and the four rules (S, T-ref, T-ca1, T-spk);
   ``detect_artifacts`` returns an epoch's unpadded cores with their evidence.
-- ``masks``: the one padding table (``PADDING_S``) and the artifact mask,
-  merged, clipped and closed (``artifact_intervals``).
-- ``io``: the per-epoch cores file and the run manifest.
+
+The padding table (``PADDING_S``) and the artifact mask live in
+``analysis/events/artifact_masks.py``, and the per-epoch cores file and the
+run manifest in ``analysis/events/artifact_intervals.py``; ``detect`` writes
+through the latter.
 
 ``scripts/decoding/run_artifact_detection.py`` runs it per epoch;
-``analysis/hippocampus/swr_source.py`` reads the artifact mask. Design note:
+``analysis/events/swr_source.py`` reads the artifact mask. Design note:
 ``docs/design/2026-10-09-artifact-detection.md``. The submodules are imported
 by name, so reading a mask does not import the detector.
 """

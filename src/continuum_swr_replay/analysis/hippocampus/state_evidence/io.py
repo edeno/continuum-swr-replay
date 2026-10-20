@@ -13,7 +13,7 @@ from typing import Any
 
 import numpy as np
 
-from continuum_swr_replay.analysis.hippocampus import swr_source
+from continuum_swr_replay.analysis.events import swr_source
 from continuum_swr_replay.decoding_common import (
     require_saved_decode_masks,
     write_atomically,

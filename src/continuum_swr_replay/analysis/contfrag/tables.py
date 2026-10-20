@@ -21,19 +21,19 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_SAMPLING_FREQUENCY_HZ,
 )
-from continuum_swr_replay.analysis.hippocampus.event_detection import (
+from continuum_swr_replay.analysis.events.detection import (
     event_strict_overlap_keys,
 )
-from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+from continuum_swr_replay.analysis.events.immobility import (
     require_canonical_speed_threshold,
     whole_event_immobility_mask,
 )
+from continuum_swr_replay.analysis.events.swr_source import excluded_intervals_of
 from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schema
 from continuum_swr_replay.tables.event_ids import hash_stop_id
 
 from ...data_loaders.constants import ALL_ARMS
 from ...parameters import PLACE_BIN_SIZE_1D
-from ..hippocampus.swr_source import excluded_intervals_of
 from ..replay._helpers import (
     align_count_matrix,
     align_posterior_to_dot,
@@ -142,7 +142,7 @@ def _in_contfrag_event_mask(
     """Boolean mask for in-event timebins using external event detectors.
 
     Thin wrapper over
-    :func:`~continuum_swr_replay.analysis.hippocampus.event_immobility.whole_event_immobility_mask`,
+    :func:`~continuum_swr_replay.analysis.events.immobility.whole_event_immobility_mask`,
     which owns the repo-wide definition. What was once a ContFrag-local
     choice — all-immobile rather than per-timebin or endpoints, so that
     movement-spanning events cannot straddle two immobility bouts and

@@ -18,8 +18,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.hippocampus import (
+from continuum_swr_replay.analysis.events.classified_table import (
     build_classified_nonlocal_event_table,
+)
+from continuum_swr_replay.analysis.hippocampus import (
     compute_swr_overlap_class_counts,
     load_data_over_time,
 )

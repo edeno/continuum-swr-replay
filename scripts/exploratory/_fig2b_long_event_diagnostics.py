@@ -21,10 +21,10 @@ from pathlib import Path
 
 import numpy as np
 
-from continuum_swr_replay.analysis.hippocampus import (
+from continuum_swr_replay.analysis.events.classified_table import (
     build_classified_nonlocal_event_table,
-    load_data_over_time,
 )
+from continuum_swr_replay.analysis.hippocampus import load_data_over_time
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s",

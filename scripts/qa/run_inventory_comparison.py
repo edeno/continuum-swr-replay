@@ -99,7 +99,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from continuum_swr_replay.analysis.constants import (  # noqa: E402
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
-from continuum_swr_replay.analysis.hippocampus import swr_source  # noqa: E402
+from continuum_swr_replay.analysis.events import swr_source  # noqa: E402
 from continuum_swr_replay.analysis.inventory_comparison.adapters import (  # noqa: E402
     CAREY,
     MUA,

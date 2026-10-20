@@ -19,10 +19,10 @@ What this module fixes
   artifact is masked. Every function here resolves an epoch's artifact
   intervals itself (:func:`artifact_intervals`), so no caller passes them and
   every caller gets the same ones: the one artifact mask, the detector's cores
-  padded by ``artifacts.masks.PADDING_S``. The SWR runner, MUA detection, the
+  padded by ``artifact_masks.PADDING_S``. The SWR runner, MUA detection, the
   decoders and the ripple-power covariate (:func:`ripple_power_inputs`) use the
   mask itself; every analysis consumer uses *excluded time*, the mask widened
-  by ``event_eligibility.ARTIFACT_REACH_S`` (:func:`excluded_intervals`).
+  by ``eligibility.ARTIFACT_REACH_S`` (:func:`excluded_intervals`).
 - **The source's name** (:func:`swr_source_name`): the detector, the inventory
   run and the artifact run, such as ``kay@056eee0dcb5a+artifacts@fbbff144a123``. Every
   table built from these labels is stamped with it (:func:`stamp_swr_source`),
@@ -34,9 +34,9 @@ What this module fixes
   :class:`SwrSourceError`. The event and observed files are checked against
   the sha256 the manifest recorded for them.
 - **Which events count** (:func:`swr_events`): the project's one
-  analysed-time rule (``event_eligibility``): the whole-event immobility rule
+  analysed-time rule (``eligibility``): the whole-event immobility rule
   (every speed sample in the closed interval finite and strictly below 4 cm/s,
-  ``event_immobility``), the rule of the non-local and MUA cohorts, on the
+  ``immobility``), the rule of the non-local and MUA cohorts, on the
   head speed of the decode grid, and no time shared with excluded time. Every
   dropped event keeps its row and a :class:`DropReason`.
 - **Every cohort of an analysis frame** (:func:`with_swr_source`): every SWR,
@@ -94,17 +94,14 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
-from continuum_swr_replay.analysis.hippocampus.artifacts.io import (
+from continuum_swr_replay.analysis.events.artifact_intervals import (
     ArtifactRunError,
     read_epoch_cores,
 )
-from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
+from continuum_swr_replay.analysis.events.artifact_masks import (
     artifact_intervals as padded_cores,
 )
-from continuum_swr_replay.analysis.hippocampus.epoch_normalizers import (
-    run_speed_baseline,
-)
-from continuum_swr_replay.analysis.hippocampus.event_eligibility import (
+from continuum_swr_replay.analysis.events.eligibility import (
     EXCLUDED_TIME_REASONS,
     DropReason,
     drop_labels,
@@ -113,7 +110,10 @@ from continuum_swr_replay.analysis.hippocampus.event_eligibility import (
     label_drop_reasons,
     overlaps_dropped_events,
 )
-from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+from continuum_swr_replay.analysis.events.epoch_normalizers import (
+    run_speed_baseline,
+)
+from continuum_swr_replay.analysis.events.immobility import (
     build_speed_eligible_event_cohort,
     intervals_from_labels,
     require_time_index,
@@ -203,7 +203,7 @@ Runbook R9's run (2026-10-10, commit fbbff14, all 255 epochs, gate report
 None would mean no artifact is masked (``artifacts@none``). The folder,
 :data:`ARTIFACT_INTERVALS_ROOT` ``/ <run id>``, holds ``manifest.json`` and one
 ``{epoch_id}_artifact_intervals.parquet`` per epoch: the epoch's unpadded
-cores (``artifacts.io.CORE_COLUMNS``), no rows when it has none. A missing
+cores (``artifact_intervals.CORE_COLUMNS``), no rows when it has none. A missing
 file is an error, not an epoch without artifacts.
 """
 
@@ -513,7 +513,7 @@ def _read_observed(path: str) -> NDArray[np.float64]:
 def artifact_intervals(epoch_id: str) -> pd.DataFrame:
     """The epoch's artifact mask, from the one configured run.
 
-    The run's cores for the epoch, padded by ``artifacts.masks.PADDING_S`` (S
+    The run's cores for the epoch, padded by ``artifact_masks.PADDING_S`` (S
     by 1 s, a step with an LFP signature by 0.3 s and a spike-only line by
     0.1 s, on each side), merged and clipped to the epoch's span. Every
     function here uses it, and so do the SWR runner, MUA detection and the HPC
@@ -550,7 +550,7 @@ def artifact_intervals(epoch_id: str) -> pd.DataFrame:
 
 def excluded_intervals(epoch_id: str) -> pd.DataFrame:
     """The epoch's excluded time: :func:`artifact_intervals` widened by
-    ``event_eligibility.ARTIFACT_REACH_S`` on each side, merged.
+    ``eligibility.ARTIFACT_REACH_S`` on each side, merged.
 
     The one function every analysis consumer reads: an event, an exposure
     second, a time bin with its history window and a peri-event window are
@@ -822,12 +822,12 @@ def _frame_epoch(
     (``intervals_from_labels``, the event tables) takes time from the index,
     and an event's first and last row as its bounds, so the index must be a
     float time axis that strictly increases
-    (``event_immobility.require_time_index``). A ``time`` column would be a
+    (``immobility.require_time_index``). A ``time`` column would be a
     second axis and is refused.
 
     The decode's own labels (:data:`LABEL_COLUMNS`), which the read passes on,
     are checked here too, once for every consumer: each event is immobile as a
-    whole (``event_immobility``, the canonical threshold), and each non-local
+    whole (``immobility``, the canonical threshold), and each non-local
     event's bins have a summed Non-Local posterior above
     `non_local_threshold`. The decoder made them so, so a frame that breaks
     either is stale and is refused, never clipped. ``SWR_event`` is the
@@ -935,7 +935,7 @@ def artifact_event_drops(
     """Every event of one epoch's decode frame, with its reason to leave.
 
     The reasons :func:`with_swr_source` acts on, the one rule
-    (``event_eligibility``) on every cohort:
+    (``eligibility``) on every cohort:
 
     - the source's SWRs (:func:`swr_events`: excluded time, then speed);
     - each event of the frame's ``non_local_event`` and ``MUA_event`` labels,
@@ -971,7 +971,7 @@ def artifact_event_drops(
     ValueError
         If the frame holds more than one epoch, lacks a needed column, has a
         ``time`` column, or its index is not a float time axis that strictly
-        increases (``event_immobility.require_time_index``).
+        increases (``immobility.require_time_index``).
     EventDefinitionError
         If a ``non_local_event`` or ``MUA_event`` label breaks the whole-event
         immobility rule, or a non-local label has a bin not above
@@ -1112,7 +1112,7 @@ def with_swr_source(
     ValueError
         If the frame holds more than one epoch, lacks a needed column, has a
         ``time`` column, or its index is not a float time axis that strictly
-        increases (``event_immobility.require_time_index``).
+        increases (``immobility.require_time_index``).
     EventDefinitionError
         If a ``non_local_event`` or ``MUA_event`` label breaks the whole-event
         immobility rule, or a ``non_local_event`` label has a bin whose summed
@@ -1305,7 +1305,7 @@ def swr_intervals(
     """One epoch's SWR intervals from a frame read through this source.
 
     The sampled bounds of the frame's ``SWR_event`` labels
-    (:func:`~continuum_swr_replay.analysis.hippocampus.event_immobility.intervals_from_labels`).
+    (:func:`~continuum_swr_replay.analysis.events.immobility.intervals_from_labels`).
     The labels are already speed-gated and artifact-masked, so these are the
     intervals the event table classifies against; for plots and example
     selection, which must not re-gate on another position frame.

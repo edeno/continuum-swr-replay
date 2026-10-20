@@ -15,7 +15,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.hippocampus.swr_source import (
+from continuum_swr_replay.analysis.events.swr_source import (
     SwrSourceError,
     stamp_swr_source,
 )

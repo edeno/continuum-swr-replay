@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
+from continuum_swr_replay.analysis.events.artifact_masks import (
     PADDING_S,
     artifact_intervals,
     core_class,

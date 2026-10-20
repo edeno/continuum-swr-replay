@@ -72,7 +72,11 @@ import pandas as pd
 from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
-from continuum_swr_replay.analysis.hippocampus.swr_source import require_swr_source
+from continuum_swr_replay.analysis.events.cohort_selection import (
+    freeze_common_cohort,
+    select_event_cohort,
+)
+from continuum_swr_replay.analysis.events.swr_source import require_swr_source
 from continuum_swr_replay.analysis.replay._helpers import add_arm_fixed_effects
 from continuum_swr_replay.analysis.replay.cohort_audit import (
     cohort_record,
@@ -80,10 +84,6 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (
     estimator_skip_note,
     event_drop_buckets,
     write_cohort_audit,
-)
-from continuum_swr_replay.analysis.replay.cohort_selection import (
-    freeze_common_cohort,
-    select_event_cohort,
 )
 from continuum_swr_replay.analysis.replay.content_response import (
     ESTIMATOR_CHOICES,

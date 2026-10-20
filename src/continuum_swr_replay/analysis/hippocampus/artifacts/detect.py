@@ -16,7 +16,7 @@ T signatures at most 50 ms apart merge into one T core (:func:`t_cores`); the
 merge chains, so a core can last longer than 50 ms. Each rule is its own
 function, so a further signature is one more event source.
 :func:`detect_artifacts` runs them on one epoch and returns unpadded cores
-with their evidence; one table pads them into the mask (``masks.PADDING_S``).
+with their evidence; one table pads them into the mask (``events.artifact_masks.PADDING_S``).
 
 By construction no rule can mask a ripple seen on one CA1 electrode alone: S
 needs at least 2 channels for at least 2 s, T-ca1 needs at least 3 channels
@@ -53,6 +53,12 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
+from continuum_swr_replay.analysis.events.artifact_intervals import (
+    empty_cores,
+    make_cores,
+    validate_cores,
+)
+from continuum_swr_replay.analysis.events.artifact_masks import artifact_intervals
 from continuum_swr_replay.analysis.hippocampus.artifacts.features import (
     J5_REACH,
     L20_REACH,
@@ -68,12 +74,6 @@ from continuum_swr_replay.analysis.hippocampus.artifacts.features import (
     window_centers,
     window_valid,
 )
-from continuum_swr_replay.analysis.hippocampus.artifacts.io import (
-    empty_cores,
-    make_cores,
-    validate_cores,
-)
-from continuum_swr_replay.analysis.hippocampus.artifacts.masks import artifact_intervals
 from continuum_swr_replay.decoding_common import DecodingConfig
 from continuum_swr_replay.intervals import interval_mask
 
@@ -291,7 +291,7 @@ def s_cores(
     Returns
     -------
     pd.DataFrame
-        Cores in :data:`~continuum_swr_replay.analysis.hippocampus.artifacts.io.CORE_COLUMNS`,
+        Cores in :data:`~continuum_swr_replay.analysis.events.artifact_intervals.CORE_COLUMNS`,
         kind and signatures ``"S"``, with ``spec_max`` (over the block, gap
         windows included) and ``n_windows``.
     """

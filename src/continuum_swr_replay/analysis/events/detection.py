@@ -7,7 +7,7 @@ Examples
 --------
 Detect non-local events from decoding results:
 
->>> from continuum_swr_replay.analysis.hippocampus import get_confident_times
+>>> from continuum_swr_replay.analysis.events.detection import get_confident_times
 >>> # Combine non-local state probabilities
 >>> non_local_prob = (
 ...     results.acausal_state_probabilities.sel(states="Non-Local Continuous") +
@@ -25,7 +25,7 @@ Detect non-local events from decoding results:
 
 Find events that overlap with ripples:
 
->>> from continuum_swr_replay.analysis.hippocampus import get_overlap_times
+>>> from continuum_swr_replay.analysis.events.detection import get_overlap_times
 >>> overlap_events, no_overlap_events = get_overlap_times(
 ...     non_local_times, ripple_times
 ... )
@@ -39,7 +39,7 @@ import pandas as pd
 import xarray as xr
 from ripple_detection.core import segment_boolean_series
 
-from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+from continuum_swr_replay.analysis.events.immobility import (
     intervals_from_labels,
 )
 
@@ -194,7 +194,7 @@ def event_strict_overlap_keys(
 
     For each event of ``primary_col`` (id > 0) in each session, derive
     its [first, last] timestamp interval from the timebin labels
-    (:func:`~continuum_swr_replay.analysis.hippocampus.event_immobility.intervals_from_labels`,
+    (:func:`~continuum_swr_replay.analysis.events.immobility.intervals_from_labels`,
     read on the frame's time index) and test strict positive-duration
     overlap (:func:`strict_overlap_matrix`) against every event of
     ``other_col`` in the same session. Returns the set of

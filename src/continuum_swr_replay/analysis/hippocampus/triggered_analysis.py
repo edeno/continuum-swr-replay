@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from continuum_swr_replay.analysis.hippocampus.swr_source import (
+from continuum_swr_replay.analysis.events.swr_source import (
     excluded_intervals,
     swr_epoch_id,
 )
@@ -256,7 +256,7 @@ def get_signal_windows(
             event_id_list, names=["animal", "day", "epoch", event_id_col]
         )
     else:
-        # Use RangeIndex for consistency with project patterns (see event_detection.py)
+        # Use RangeIndex for consistency with project patterns (see events/detection.py)
         event_index = pd.RangeIndex(start=0, stop=len(event_id_list), name="event")
 
     return xr.DataArray(

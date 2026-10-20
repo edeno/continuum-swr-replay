@@ -19,13 +19,13 @@ import pytest
 from dask.distributed import LocalCluster
 
 import scripts.decoding.run_artifact_detection as runner
-from continuum_swr_replay.analysis.hippocampus import swr_source
-from continuum_swr_replay.analysis.hippocampus.artifacts.io import (
+from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events.artifact_intervals import (
     CORE_COLUMNS,
     cores_path,
     read_epoch_cores,
 )
-from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
+from continuum_swr_replay.analysis.events.artifact_masks import (
     artifact_intervals,
 )
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename

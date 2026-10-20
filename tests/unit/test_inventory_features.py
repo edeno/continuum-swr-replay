@@ -8,7 +8,7 @@ import xarray as xr
 from non_local_detector.environment import Environment
 from ripple_detection.core import minimum_sample_count
 
-from continuum_swr_replay.analysis.hippocampus.event_detection import (
+from continuum_swr_replay.analysis.events.detection import (
     get_confident_times,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import (

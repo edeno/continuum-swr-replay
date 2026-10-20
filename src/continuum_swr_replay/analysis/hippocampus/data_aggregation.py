@@ -115,7 +115,7 @@ Notes
 See Also
 --------
 continuum_swr_replay.analysis.hippocampus.posterior_analysis : Posterior statistics
-continuum_swr_replay.analysis.hippocampus.event_detection : Event detection functions
+continuum_swr_replay.analysis.events.detection : Event detection functions
 continuum_swr_replay.data_loaders.bandit_task : Session data loading
 
 Examples
@@ -143,27 +143,29 @@ import xarray as xr
 from non_local_detector.environment import Environment
 from scipy.stats import zscore
 
+from continuum_swr_replay.analysis.events.detection import (
+    event_strict_overlap_keys,
+    get_confident_times,
+    get_overlap_times,
+)
+from continuum_swr_replay.analysis.events.epoch_normalizers import (
+    run_speed_baseline as epoch_run_speed_baseline,
+)
+from continuum_swr_replay.analysis.events.immobility import (
+    EventDefinitionError,
+    build_speed_eligible_event_cohort,
+)
+from continuum_swr_replay.analysis.events.swr_source import read_dot_with_swr_source
 from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.decode_files import data_over_time_suffix
 
 from ...types import SessionData
-from .epoch_normalizers import run_speed_baseline as epoch_run_speed_baseline
-from .event_detection import (
-    event_strict_overlap_keys,
-    get_confident_times,
-    get_overlap_times,
-)
-from .event_immobility import (
-    EventDefinitionError,
-    build_speed_eligible_event_cohort,
-)
 from .posterior_analysis import (
     get_conditional_non_local_posterior,
     get_map_step_distance,
     get_posterior_stats,
 )
-from .swr_source import read_dot_with_swr_source
 
 
 def theta_power_zscore(theta_power: np.ndarray) -> np.ndarray:
@@ -895,7 +897,7 @@ def compute_swr_overlap_class_counts(
     """Count immobile non-local events by SWR-overlap class.
 
     Operates on the output of
-    :func:`continuum_swr_replay.analysis.hippocampus.event_table.build_classified_nonlocal_event_table`,
+    :func:`continuum_swr_replay.analysis.events.classified_table.build_classified_nonlocal_event_table`,
     restricted to immobile events (``whole_event_speed_eligible``), and
     tallies the ``overlap_class`` column. The single overlap convention
     (strict positive-duration overlap, "contained" = some single SWR spans

@@ -27,7 +27,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.contfrag.tables import build_contfrag_stop_table
-from continuum_swr_replay.analysis.hippocampus import swr_source
+from continuum_swr_replay.analysis.events import swr_source
 from continuum_swr_replay.analysis.pfc.glm import build_session_fit_mask
 from continuum_swr_replay.analysis.replay.model_specs import (
     BIN_S,
@@ -541,7 +541,7 @@ class TestNoArtifactsChangeNothing:
 
     @staticmethod
     def _outputs(tmp_path) -> dict[str, pd.DataFrame]:
-        from continuum_swr_replay.analysis.hippocampus.event_table import (
+        from continuum_swr_replay.analysis.events.classified_table import (
             build_classified_nonlocal_event_table,
         )
         from continuum_swr_replay.analysis.replay.timebin_tables import (

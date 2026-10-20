@@ -36,7 +36,7 @@ from statsmodels.stats.multitest import multipletests
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
-from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
+from continuum_swr_replay.analysis.events.swr_source import (  # noqa: E402
     require_swr_source,
     swr_source_name,
 )

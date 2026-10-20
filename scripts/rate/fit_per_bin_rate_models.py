@@ -65,7 +65,12 @@ from concurrent.futures import ProcessPoolExecutor, as_completed  # noqa: E402
 
 import pandas as pd  # noqa: E402
 
-from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
+from continuum_swr_replay.analysis.events.cohort_selection import (  # noqa: E402
+    STOP_COHORTS,
+    select_stop_cohort,
+    stop_cohort_suffix,
+)
+from continuum_swr_replay.analysis.events.swr_source import (  # noqa: E402
     require_swr_source,
     swr_source_name,
 )
@@ -90,11 +95,6 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (  # noqa: E402
     cohort_record,
     stop_own_missing,
     write_cohort_audit,
-)
-from continuum_swr_replay.analysis.replay.cohort_selection import (  # noqa: E402
-    STOP_COHORTS,
-    select_stop_cohort,
-    stop_cohort_suffix,
 )
 from continuum_swr_replay.analysis.replay.covariate_timing import (  # noqa: E402
     DERIVED_COVARIATE_SOURCES,

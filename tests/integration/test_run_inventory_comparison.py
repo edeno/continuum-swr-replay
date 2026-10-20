@@ -32,7 +32,7 @@ import scripts.qa.run_inventory_comparison as runner
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
-from continuum_swr_replay.analysis.hippocampus import swr_source
+from continuum_swr_replay.analysis.events import swr_source
 from continuum_swr_replay.analysis.inventory_comparison.availability import (
     coverage_from_observations,
     still_intervals,

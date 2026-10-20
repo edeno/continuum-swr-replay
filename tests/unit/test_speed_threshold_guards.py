@@ -17,13 +17,13 @@ import pytest
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
-from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+from continuum_swr_replay.analysis.events.classified_table import (
+    build_classified_nonlocal_event_table,
+)
+from continuum_swr_replay.analysis.events.immobility import (
     filter_event_labels_by_speed,
     intervals_from_labels,
     require_canonical_speed_threshold,
-)
-from continuum_swr_replay.analysis.hippocampus.event_table import (
-    build_classified_nonlocal_event_table,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.event_table import (
     canonical_swr_intervals,

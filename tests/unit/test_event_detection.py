@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from continuum_swr_replay.analysis.hippocampus.event_detection import (
+from continuum_swr_replay.analysis.events.detection import (
     classify_swr_overlap,
     classify_swr_overlap_geometry,
     event_strict_overlap_keys,
@@ -905,7 +905,7 @@ def test_event_strict_overlap_keys_matches_classified_event_table():
     rule; this pins it across touching, nested, tiled, zero-duration and
     multi-session cases.
     """
-    from continuum_swr_replay.analysis.hippocampus.event_table import (
+    from continuum_swr_replay.analysis.events.classified_table import (
         build_classified_nonlocal_event_table,
     )
 

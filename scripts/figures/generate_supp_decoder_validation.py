@@ -47,11 +47,11 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
+from continuum_swr_replay.analysis.events.swr_source import analysed_bins
 from continuum_swr_replay.analysis.hippocampus import (
     get_event_types,
     load_data_over_time,
 )
-from continuum_swr_replay.analysis.hippocampus.swr_source import analysed_bins
 from continuum_swr_replay.figure_utilities import (
     PAGE_HEIGHT,
     TWO_COLUMN,

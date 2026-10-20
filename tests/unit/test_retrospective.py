@@ -27,7 +27,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.replay.cohort_selection import select_event_cohort
+from continuum_swr_replay.analysis.events.cohort_selection import select_event_cohort
 from continuum_swr_replay.analysis.replay.retrospective import (
     arm_path_well_to_well,
     at_well_event_cohort,

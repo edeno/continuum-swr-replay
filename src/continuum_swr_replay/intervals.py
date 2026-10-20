@@ -22,7 +22,7 @@ instead.
 ``start_time`` / ``end_time`` DataFrame (or start and end arrays), closed: a
 time on an endpoint is inside, and intervals that touch merge. This is the
 convention of the artifact mask and of excluded time
-(``analysis/hippocampus/artifacts/masks.py``, ``event_eligibility``). They
+(``analysis/events/artifact_masks.py``, ``events.eligibility``). They
 refuse an interval with a NaN bound or with ``start > end`` (``ValueError``,
 naming the rows): such an interval has no closed reading, and merging one
 would silently hide its neighbours.
@@ -30,20 +30,20 @@ would silently hide its neighbours.
 **Overlap conventions.** "Overlap" means four different things in the
 project. Each has its own name, so the choice is visible at each caller:
 
-=============  =============================================  ========  ===========================
-convention     predicate                                      touching  zero-length interval
-=============  =============================================  ========  ===========================
-closed         :func:`overlaps_intervals`                     overlaps  overlaps any interval it
-                                                                        shares a time with
-open ``<``     :func:`overlaps_open`                          no        overlaps strictly inside
-strict         ``event_detection.strict_overlap_matrix``;     no        overlaps nothing
+=============  ==============================================  ========  ===========================
+convention     predicate                                       touching  zero-length interval
+=============  ==============================================  ========  ===========================
+closed         :func:`overlaps_intervals`                      overlaps  overlaps any interval it
+                                                                         shares a time with
+open ``<``     :func:`overlaps_open`                           no        overlaps strictly inside
+strict         ``events.detection.strict_overlap_matrix``;     no        overlaps nothing
                the interval sets, through :func:`normalize`
-dropped-event  ``event_eligibility.overlaps_dropped_events``  no        a zero-length dropped
-                                                                        interval is ignored; a
-                                                                        zero-length event strictly
-                                                                        inside a dropped one
-                                                                        overlaps it
-=============  =============================================  ========  ===========================
+dropped-event  ``events.eligibility.overlaps_dropped_events``  no        a zero-length dropped
+                                                                         interval is ignored; a
+                                                                         zero-length event strictly
+                                                                         inside a dropped one
+                                                                         overlaps it
+=============  ==============================================  ========  ===========================
 
 Strict overlap is event-level ``is_swr``: both intervals finite with positive
 duration, and ``other_end > start`` and ``other_start < end``. The open test is
@@ -368,7 +368,7 @@ def pad_intervals(intervals: pd.DataFrame, distance_s: float) -> pd.DataFrame:
     """The intervals widened by one distance on each side, merged.
 
     Excluded time is the artifact mask widened here by
-    ``event_eligibility.ARTIFACT_REACH_S``; the PFC fit widens excluded time
+    ``events.eligibility.ARTIFACT_REACH_S``; the PFC fit widens excluded time
     by its peri-event basis's half-width. A history window, which looks back
     from a bin, widens the bin instead (``per_bin_design``).
 

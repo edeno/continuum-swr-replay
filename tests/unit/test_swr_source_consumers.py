@@ -37,11 +37,11 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from continuum_swr_replay.analysis.hippocampus import swr_source
-from continuum_swr_replay.analysis.hippocampus.event_table import (
+from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events.classified_table import (
     build_classified_nonlocal_event_table,
 )
-from continuum_swr_replay.analysis.hippocampus.swr_source import (
+from continuum_swr_replay.analysis.events.swr_source import (
     SwrSourceError,
     swr_event_labels,
 )
@@ -759,7 +759,7 @@ STORED_RIPPLE_READERS = {
         "HPC decoders' comes from the source, decoding_common.hpc_decode_masks)"
     ),
     "src/continuum_swr_replay/data_loaders/constants.py": "register evidence, prose",
-    "src/continuum_swr_replay/analysis/hippocampus/swr_source.py": (
+    "src/continuum_swr_replay/analysis/events/swr_source.py": (
         "prose naming what it replaces"
     ),
     "src/continuum_swr_replay/types.py": "load_data's return types",
@@ -771,10 +771,10 @@ STORED_RIPPLE_READERS = {
         "get_contfrag_data_over_time: the stored labels, which an HPC decode "
         "replaces with the source's (organize_results)"
     ),
-    "src/continuum_swr_replay/analysis/hippocampus/event_detection.py": (
+    "src/continuum_swr_replay/analysis/events/detection.py": (
         "generic overlap classifiers; 'ripple_times' is a parameter name"
     ),
-    "src/continuum_swr_replay/analysis/hippocampus/event_table.py": (
+    "src/continuum_swr_replay/analysis/events/classified_table.py": (
         "assert_drawn_class_matches_ripples, a parameter of Figure 2's check"
     ),
     "src/continuum_swr_replay/visualization/figurl.py": "the decode's figurl view",
@@ -798,7 +798,7 @@ STORED_RIPPLE_READERS = {
 #: Files outside ``scripts/figures/archive`` that unpickle a
 #: decode frame without the source, and why none of them reads its SWRs.
 DECODE_FRAME_READERS = {
-    "src/continuum_swr_replay/analysis/hippocampus/swr_source.py": "the reader",
+    "src/continuum_swr_replay/analysis/events/swr_source.py": "the reader",
     "scripts/qa/run_state_evidence.py": (
         "reads it through with_swr_source, and keeps the decoder's own non-local "
         "labels so every decoded event stays out of the running-only encodings"

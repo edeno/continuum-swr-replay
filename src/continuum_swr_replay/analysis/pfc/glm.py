@@ -22,13 +22,13 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
-from continuum_swr_replay.analysis.hippocampus.event_eligibility import (
-    EXCLUDED_TIME_REASONS,
-    DropReason,
-)
-from continuum_swr_replay.analysis.replay.cohort_selection import (
+from continuum_swr_replay.analysis.events.cohort_selection import (
     events_in_stops,
     stop_interval_mask,
+)
+from continuum_swr_replay.analysis.events.eligibility import (
+    EXCLUDED_TIME_REASONS,
+    DropReason,
 )
 from continuum_swr_replay.intervals import (
     contiguous_true_runs,
@@ -1695,7 +1695,7 @@ def build_session_event_sets(
     Both populations are canonical and are read, not re-detected here: the
     non-local events are rows of the shipped event table and the SWR intervals
     are the SWR source's speed-gated ``SWR_event`` labels (the direct Kay
-    inventory, :mod:`continuum_swr_replay.analysis.hippocampus.swr_source`), both
+    inventory, :mod:`continuum_swr_replay.analysis.events.swr_source`), both
     loaded by :mod:`continuum_swr_replay.analysis.pfc.canonical_events`. The SWR
     split is
     the event table's own ``is_swr`` column -- strict positive-duration overlap
@@ -2576,7 +2576,8 @@ def run_session(
     # import time. Keeping them function-local lets the rest of the
     # module (pure GLM helpers + design-matrix builders) stay
     # offline-importable for unit tests.
-    from continuum_swr_replay.analysis.hippocampus import load_results, swr_source
+    from continuum_swr_replay.analysis.events import swr_source
+    from continuum_swr_replay.analysis.hippocampus import load_results
     from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
         align_results_to_position,
     )

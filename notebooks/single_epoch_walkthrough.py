@@ -90,13 +90,11 @@ from matplotlib import patheffects
 from matplotlib.lines import Line2D
 
 # --- Data loading + decode outputs ---
+from continuum_swr_replay.analysis.events.cohort_selection import freeze_common_cohort
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     validate_dot_event_contract,
 )
-from continuum_swr_replay.analysis.replay import (
-    add_arm_fixed_effects,
-    freeze_common_cohort,
-)
+from continuum_swr_replay.analysis.replay import add_arm_fixed_effects
 from continuum_swr_replay.analysis.replay.choice_prediction import (
     build_choice_dataset,
     fit_choice_model,

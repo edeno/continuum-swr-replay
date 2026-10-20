@@ -12,8 +12,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.hippocampus import swr_source
-from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events.immobility import (
     filter_event_labels_by_speed,
     intervals_from_labels,
 )

@@ -17,7 +17,7 @@ import pyarrow.parquet as pq
 from continuum_swr_replay.analysis.behavior.qvals_table import (
     QVALS_STANDARDIZED_COLS,
 )
-from continuum_swr_replay.analysis.hippocampus.swr_source import (
+from continuum_swr_replay.analysis.events.swr_source import (
     SWR_SOURCE_ATTR,
     swr_source_name,
 )

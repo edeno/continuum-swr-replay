@@ -28,8 +28,8 @@ from dask.distributed import Client, LocalCluster
 
 import scripts.decoding.run_memoryless_detection as runner
 from continuum_swr_replay import decoding_common
-from continuum_swr_replay.analysis.hippocampus import swr_source
-from continuum_swr_replay.analysis.hippocampus.event_eligibility import (
+from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events.eligibility import (
     artifact_drop_reasons,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (

@@ -25,14 +25,6 @@ _LAZY_EXPORTS = {
     # choice_prediction.
     "build_choice_dataset": "choice_prediction",
     "fit_choice_model": "choice_prediction",
-    # cohort_selection.
-    "STOP_COHORT_ARTIFACT_SUFFIX": "cohort_selection",
-    "STOP_COHORT_RULES": "cohort_selection",
-    "STOP_COHORTS": "cohort_selection",
-    "freeze_common_cohort": "cohort_selection",
-    "select_event_cohort": "cohort_selection",
-    "select_stop_cohort": "cohort_selection",
-    "stop_cohort_suffix": "cohort_selection",
     # covariates.
     "UNCERTAINTY_COVARIATES": "covariates",
     "add_trial_context": "covariates",
@@ -124,9 +116,6 @@ __all__ = [
     "REWARD_HISTORY_COLUMNS",
     "REWARD_HISTORY_N_BASIS",
     "ARRIVAL_CLOCK_COLUMN",
-    "STOP_COHORTS",
-    "STOP_COHORT_ARTIFACT_SUFFIX",
-    "STOP_COHORT_RULES",
     "STOP_COVARIATES",
     "TMAX",
     "TMAX_ARRIVAL",
@@ -151,7 +140,6 @@ __all__ = [
     "fit_dirichlet_multinomial",
     "fit_per_bin_rate_model",
     "fit_per_stop_rate_model",
-    "freeze_common_cohort",
     "apply_arrival_window",
     "freeze_per_bin_cohort",
     "multinomial_log_constant",
@@ -159,9 +147,6 @@ __all__ = [
     "raised_cosine_history_basis",
     "single_arm_from_well",
     "retrospective_alignment_with_shuffle",
-    "select_event_cohort",
-    "select_stop_cohort",
-    "stop_cohort_suffix",
     "summarize_behavioral_location",
     "trial_arrival_times",
     "trial_context_at_times",
@@ -172,15 +157,6 @@ __all__ = [
 if TYPE_CHECKING:  # pragma: no cover - types only
     from ._helpers import add_arm_fixed_effects, single_arm_from_well  # noqa: F401
     from .choice_prediction import build_choice_dataset, fit_choice_model  # noqa: F401
-    from .cohort_selection import (  # noqa: F401
-        STOP_COHORT_ARTIFACT_SUFFIX,
-        STOP_COHORT_RULES,
-        STOP_COHORTS,
-        freeze_common_cohort,
-        select_event_cohort,
-        select_stop_cohort,
-        stop_cohort_suffix,
-    )
     from .covariates import (  # noqa: F401
         UNCERTAINTY_COVARIATES,
         add_trial_context,

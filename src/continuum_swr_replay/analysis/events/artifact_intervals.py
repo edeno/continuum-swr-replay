@@ -5,7 +5,7 @@ A run folder, ``<root>/<run_id>/``, holds:
 - ``{epoch_id}_artifact_intervals.parquet``: the epoch's unpadded cores and
   their evidence (:data:`CORE_COLUMNS`), one row per core; no rows for an
   epoch without artifacts. The file never holds padded intervals: the
-  reader pads the cores into the mask (``masks.artifact_intervals``).
+  reader pads the cores into the mask (``artifact_masks.artifact_intervals``).
 - ``manifest.json``: the run's settings and one record per epoch, with its
   ``status``, its span (``span_s``, the first and last LFP sample the detector
   read) and its file's path and sha256 (``outputs.cores``).

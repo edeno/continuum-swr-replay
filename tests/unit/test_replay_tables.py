@@ -14,7 +14,7 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+from continuum_swr_replay.analysis.events.immobility import (
     EventDefinitionError,
 )
 from continuum_swr_replay.analysis.replay._tables_common import (

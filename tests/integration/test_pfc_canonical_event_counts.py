@@ -22,6 +22,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from continuum_swr_replay.analysis.events.cohort_selection import events_in_stops
 from continuum_swr_replay.analysis.pfc.canonical_events import (
     load_session_canonical_events,
     load_session_swr_intervals,
@@ -29,7 +30,6 @@ from continuum_swr_replay.analysis.pfc.canonical_events import (
 from continuum_swr_replay.analysis.pfc.cohort import load_session_stop_cohort
 from continuum_swr_replay.analysis.pfc.glm import build_session_event_sets
 from continuum_swr_replay.analysis.replay import prepare_data as pdm
-from continuum_swr_replay.analysis.replay.cohort_selection import events_in_stops
 
 pytestmark = [pytest.mark.slow, pytest.mark.integration, pytest.mark.real_data]
 

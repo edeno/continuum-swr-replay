@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+from continuum_swr_replay.analysis.events.immobility import (
     validate_nonlocal_event_probability_contract,
     validate_whole_event_immobility_contract,
 )

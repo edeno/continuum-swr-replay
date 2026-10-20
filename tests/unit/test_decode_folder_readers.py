@@ -26,7 +26,7 @@ import scripts.qa.run_quality_metrics as quality_metrics
 from continuum_swr_replay.analysis.contfrag.data_aggregation import (
     load_contfrag_data_over_time,
 )
-from continuum_swr_replay.analysis.hippocampus import swr_source
+from continuum_swr_replay.analysis.events import swr_source
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     load_data_over_time,
 )

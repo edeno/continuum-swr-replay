@@ -11,8 +11,6 @@ data_aggregation
     with behavioral data.
 event_analysis
     Tools for analyzing individual replay events and their properties.
-event_detection
-    Functions for detecting non-local replay events using probability thresholds.
 posterior_analysis
     Statistical analysis of decoded posterior distributions.
 result_loading
@@ -26,8 +24,6 @@ load_results
     Load saved decoding results from disk for further analysis.
 get_data_over_time
     Aggregate decoding results into a time-indexed DataFrame.
-get_confident_times
-    Detect events where decoder confidence exceeds a threshold.
 get_immobile_events
     Find events occurring during animal immobility periods.
 get_map_speed
@@ -83,16 +79,6 @@ _LAZY_EXPORTS = {
     "get_event_durations_ms": "event_analysis",
     "get_event_start_end_times": "event_analysis",
     "get_immobile_events": "event_analysis",
-    # event_detection.
-    "classify_swr_overlap": "event_detection",
-    "classify_swr_overlap_geometry": "event_detection",
-    "get_confident_times": "event_detection",
-    "get_overlap_times": "event_detection",
-    "select_typical_event_by_class": "event_detection",
-    # event_table — canonical per-non-local-event classification table.
-    "assert_drawn_class_matches_ripples": "event_table",
-    "build_classified_nonlocal_event_table": "event_table",
-    "intervals_from_labels": "event_immobility",
     # hpc_raw_stats.
     "DISCRETE_STATE_ORDER": "hpc_raw_stats",
     "RAW_STAT_COLUMNS": "hpc_raw_stats",
@@ -150,18 +136,6 @@ if TYPE_CHECKING:  # pragma: no cover - types only
         get_event_durations_ms,
         get_event_start_end_times,
         get_immobile_events,
-    )
-    from .event_detection import (  # noqa: F401
-        classify_swr_overlap,
-        classify_swr_overlap_geometry,
-        get_confident_times,
-        get_overlap_times,
-        select_typical_event_by_class,
-    )
-    from .event_immobility import intervals_from_labels  # noqa: F401
-    from .event_table import (  # noqa: F401
-        assert_drawn_class_matches_ripples,
-        build_classified_nonlocal_event_table,
     )
     from .hpc_raw_stats import (  # noqa: F401
         DISCRETE_STATE_ORDER,

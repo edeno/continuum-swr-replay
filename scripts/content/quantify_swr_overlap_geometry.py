@@ -3,10 +3,10 @@
 Runs ``classify_swr_overlap_geometry`` over one or more sessions and prints
 a table of sub-case counts. Useful for Methods-section numbers and for
 auditing what the coarse three-way split aggregates over. The SWRs are the
-paper's SWR source (``analysis/hippocampus/swr_source.py``: the direct Kay
+paper's SWR source (``analysis/events/swr_source.py``: the direct Kay
 inventory), on the decode grid, held to the one analysed-time rule as the
 decode frame's read holds them. The non-local events are re-detected from the
-posterior, so the rule is applied here (``event_eligibility``): an event in
+posterior, so the rule is applied here (``events.eligibility``): an event in
 excluded time (the mask widened by 0.3 s), or overlapping an SWR or MUA event
 dropped for it, is not counted.
 
@@ -30,27 +30,27 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
-from continuum_swr_replay.analysis.hippocampus import (
+from continuum_swr_replay.analysis.events.detection import (
     classify_swr_overlap_geometry,
     get_confident_times,
-    load_results,
 )
-from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
-    validate_results_position_time_alignment,
-)
-from continuum_swr_replay.analysis.hippocampus.event_eligibility import (
+from continuum_swr_replay.analysis.events.eligibility import (
     artifact_drop_reasons,
 )
-from continuum_swr_replay.analysis.hippocampus.event_immobility import (
+from continuum_swr_replay.analysis.events.immobility import (
     build_speed_eligible_event_cohort,
     intervals_from_labels,
 )
-from continuum_swr_replay.analysis.hippocampus.swr_source import (
+from continuum_swr_replay.analysis.events.swr_source import (
     artifact_intervals,
     dropped_for_excluded_time,
     read_artifact_event_drops,
     swr_epoch_id,
     swr_event_labels,
+)
+from continuum_swr_replay.analysis.hippocampus import load_results
+from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+    validate_results_position_time_alignment,
 )
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.decode_files import decode_paths

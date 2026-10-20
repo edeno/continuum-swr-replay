@@ -23,7 +23,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.contfrag.tables import build_contfrag_stop_table
-from continuum_swr_replay.analysis.hippocampus import swr_source
+from continuum_swr_replay.analysis.events import swr_source
 from continuum_swr_replay.analysis.replay.tables_stop import build_stop_table
 from tests.unit._port_experience_fixtures import port_experiences_from_trials
 from tests.unit._swr_inventory_fixtures import write_artifact_run

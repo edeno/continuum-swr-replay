@@ -35,7 +35,7 @@ from numpy.typing import NDArray
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
-from continuum_swr_replay.analysis.hippocampus import swr_source
+from continuum_swr_replay.analysis.events import swr_source
 from continuum_swr_replay.analysis.inventory_comparison.overlap import (
     Coverage,
     set_aside_events,

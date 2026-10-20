@@ -13,7 +13,7 @@ from prepare_contfrag_replay_content_data import (
     publish_contfrag_tables,
 )
 
-from continuum_swr_replay.analysis.hippocampus.swr_source import (
+from continuum_swr_replay.analysis.events.swr_source import (
     require_swr_source,
 )
 from continuum_swr_replay.analysis.replay import build_event_patch_table

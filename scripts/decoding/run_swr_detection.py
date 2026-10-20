@@ -21,7 +21,7 @@ Per epoch:
 3. **Artifacts.** The epoch's artifact intervals are the configured artifact
    run's cores (``swr_source.ARTIFACT_INTERVALS_RUN_ID``, read once when the
    run starts and recorded in its settings) padded by the one table every
-   stage uses (``artifacts.masks.PADDING_S``: S by 1 s, a step with an LFP
+   stage uses (``events.artifact_masks.PADDING_S``: S by 1 s, a step with an LFP
    signature by 0.3 s, a spike-only line by 0.1 s). Their time is the artifact
    mask on the LFP times; with no artifact run configured it is empty. A
    configured run that cannot serve the epoch fails it.
@@ -156,9 +156,9 @@ from distributed.deploy import Cluster
 from numpy.typing import NDArray
 from ripple_detection import Kay_ripple_detector
 
-from continuum_swr_replay.analysis.hippocampus import swr_source
-from continuum_swr_replay.analysis.hippocampus.artifacts.io import read_epoch_cores
-from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
+from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events.artifact_intervals import read_epoch_cores
+from continuum_swr_replay.analysis.events.artifact_masks import (
     PADDING_S,
     artifact_intervals,
 )

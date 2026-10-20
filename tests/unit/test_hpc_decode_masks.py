@@ -13,7 +13,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay import decoding_common
-from continuum_swr_replay.analysis.hippocampus import swr_source
+from continuum_swr_replay.analysis.events import swr_source
 from continuum_swr_replay.decoding_common import (
     hpc_artifact_intervals,
     hpc_decode_masks,

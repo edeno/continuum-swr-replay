@@ -1,6 +1,6 @@
 """Analysis functions for manipulating and characterizing detected events.
 
-This module complements event_detection.py (which detects events from signals)
+This module complements events/detection.py (which detects events from signals)
 by providing functions to analyze, filter, and characterize already-detected events.
 """
 
@@ -15,8 +15,7 @@ import pandas as pd
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
-
-from .event_immobility import event_speeds_are_immobile
+from continuum_swr_replay.analysis.events.immobility import event_speeds_are_immobile
 
 logger = logging.getLogger(__name__)
 

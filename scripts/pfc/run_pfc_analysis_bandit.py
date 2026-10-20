@@ -9,7 +9,7 @@ The analysis pipeline per session:
 1. Load the session's non-local events from the canonical event table
 2. Split them on that table's ``is_swr`` column (strict positive-duration
    overlap with the SWR source's speed-gated ``SWR_event`` labels, the direct
-   Kay inventory of ``analysis/hippocampus/swr_source.py``), so Figure 4
+   Kay inventory of ``analysis/events/swr_source.py``), so Figure 4
    describes the same events, with the same classification, as the content
    and rate families
 3. Fit GLMs for each neuron comparing models: constant, SWR, non-local, combined
@@ -73,6 +73,7 @@ import pandas as pd
 from dask.distributed import Client, LocalCluster
 from numpy.typing import NDArray
 
+from continuum_swr_replay.analysis.events.cohort_selection import stop_cohort_suffix
 from continuum_swr_replay.analysis.pfc import run_session
 from continuum_swr_replay.analysis.pfc.batched_glm import (
     DEFAULT_PENALTY_SIGMA,
@@ -113,7 +114,6 @@ from continuum_swr_replay.analysis.pfc.heldout import (
     null_draw_seeds,
     required_usable_null_draws,
 )
-from continuum_swr_replay.analysis.replay.cohort_selection import stop_cohort_suffix
 from continuum_swr_replay.analysis.replay.fit_provenance import (
     fit_provenance_path,
     write_fit_provenance,

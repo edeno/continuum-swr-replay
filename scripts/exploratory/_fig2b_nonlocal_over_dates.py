@@ -23,16 +23,16 @@ import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
 
-from continuum_swr_replay.analysis.hippocampus import (
-    build_classified_nonlocal_event_table,
-    load_data_over_time,
-)
-from continuum_swr_replay.analysis.hippocampus.event_immobility import (
-    filter_event_labels_by_speed,
-)
-from continuum_swr_replay.analysis.hippocampus.event_table import (
+from continuum_swr_replay.analysis.events.classified_table import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC as SPEED_THR,
 )
+from continuum_swr_replay.analysis.events.classified_table import (
+    build_classified_nonlocal_event_table,
+)
+from continuum_swr_replay.analysis.events.immobility import (
+    filter_event_labels_by_speed,
+)
+from continuum_swr_replay.analysis.hippocampus import load_data_over_time
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 

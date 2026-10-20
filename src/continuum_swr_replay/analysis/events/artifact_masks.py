@@ -1,6 +1,7 @@
 """The artifact mask: the detector's cores, padded from one table.
 
-The detector stores unpadded cores (``detect.detect_artifacts``). One table,
+The detector stores unpadded cores
+(``hippocampus.artifacts.detect.detect_artifacts``). One table,
 :data:`PADDING_S`, pads them, and :func:`artifact_intervals` gives the one mask
 every part of the project uses: the SWR detectors' normalization and event
 drops, MUA detection, the decoders (``is_missing`` and the encoding
@@ -11,7 +12,7 @@ Intervals are closed, ``[start_time, end_time]`` in seconds, the project's
 convention: a time on an endpoint is masked. The generic closed-interval
 functions (merging, membership, subtraction, padding, overlap and coverage)
 live in :mod:`continuum_swr_replay.intervals`; ``intervals.pad_intervals``
-widens the mask into excluded time (``event_eligibility.excluded_time``), and
+widens the mask into excluded time (``eligibility.excluded_time``), and
 excluded time by a peri-event window's half-width. Design note:
 ``docs/design/2026-10-09-artifact-detection.md``.
 """
