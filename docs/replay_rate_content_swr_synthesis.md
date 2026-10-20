@@ -13,8 +13,8 @@ content claims registry [../paper/claims_table.md](../paper/claims_table.md).
 > was already fit on at the event grain, so a rate claim and a content claim
 > about non-SWR replay are now claims about the same events
 > ([design/cohort_and_timing_rules.md](design/cohort_and_timing_rules.md);
-> [audits/2026-09-12-rate-cohort-atwell.md](audits/2026-09-12-rate-cohort-atwell.md),
-> [audits/2026-09-12-content-cohort-comparison.md](audits/2026-09-12-content-cohort-comparison.md)).
+> [2026-09-12-rate-cohort-atwell.md](../.claude/docs/reviews/2026-09-12-rate-cohort-atwell.md),
+> [2026-09-12-content-cohort-comparison.md](../.claude/docs/reviews/2026-09-12-content-cohort-comparison.md)).
 > The rate numbers moved the most: the non-SWR stream's immediate reward
 > component rises once the in-transit stops — which carried a disproportionate
 > share of non-SWR onsets — leave the cohort, so the reward dissociation is
@@ -29,10 +29,10 @@ content claims registry [../paper/claims_table.md](../paper/claims_table.md).
 > the audits report them. The rate ladders were refit on **2026-09-06** with a
 > smooth past-only reward-history basis, boundary-recomputed reward features,
 > per-coefficient separation judging and shared-row rung scoring
-> ([audits/2026-09-06-rate-refit-arrival-clock.md](audits/2026-09-06-rate-refit-arrival-clock.md));
+> ([2026-09-06-rate-refit-arrival-clock.md](../.claude/docs/reviews/2026-09-06-rate-refit-arrival-clock.md));
 > the content ladders were refit on **2026-09-05** onto the per-event allocation
 > fraction with event-clustered standard errors
-> ([audits/2026-09-05-content-refit-comparison.md](audits/2026-09-05-content-refit-comparison.md)).
+> ([2026-09-05-content-refit-comparison.md](../.claude/docs/reviews/2026-09-05-content-refit-comparison.md)).
 > Any quantity this document still carries that was **not** re-derived from those
 > refits is marked **PENDING** and must not be cited; where a claim rested on a
 > rung that no longer exists, the claim is marked retired in place rather than
@@ -227,7 +227,7 @@ exist. Those ladders were refit on 2026-09-06 alongside the main ladder and now
 carry the raised-cosine basis and per-coefficient separation judging, but the
 audit reports only fit counts and separation shares for them, not coefficients —
 see [per_bin_rate_results.md](per_bin_rate_results.md) §5 and
-[audits/2026-09-06-rate-refit-arrival-clock.md](audits/2026-09-06-rate-refit-arrival-clock.md)
+[2026-09-06-rate-refit-arrival-clock.md](../.claude/docs/reviews/2026-09-06-rate-refit-arrival-clock.md)
 ("is_swr-contrast"). Note also that separation is heavy there: **64.7 %** of the
 contrast cohort's post-outcome fits and **68.4 %** of its primary fits carry a
 separated non-nuisance term, and `is_swr:reward_history_rcos_1` is flagged in
@@ -791,12 +791,13 @@ with their estimand named.
   `scripts/content/compare_content_estimators.py`;
   audits by `scripts/qa/compare_fits.py`.
 - Contingency: `scripts/behavior/fetch_spatial_bandit_behavior.sh`,
-  `scripts/_bandit_csv_contingency.py`.
+  `scripts/_bandit_csv_contingency.py` (removed in d56e265; the contingency columns now come
+  from `qvals_table`, built by `scripts/behavior/build_qvals_table.py`).
 - Reality check on reward-modulated content: `scripts/qa/analyze_event_spike_evidence.py`
   (now emits per-event `start_time`) + `scripts/exploratory/_reality_reward_test.py`;
   content destination: `scripts/exploratory/_content_patch_destination.py`.
 - Audits behind the current numbers:
-  [audits/2026-09-06-rate-refit-arrival-clock.md](audits/2026-09-06-rate-refit-arrival-clock.md),
-  [audits/2026-09-05-content-refit-comparison.md](audits/2026-09-05-content-refit-comparison.md),
-  [audits/2026-09-05-cs5-response-by-design-factorial.md](audits/2026-09-05-cs5-response-by-design-factorial.md),
+  [2026-09-06-rate-refit-arrival-clock.md](../.claude/docs/reviews/2026-09-06-rate-refit-arrival-clock.md),
+  [2026-09-05-content-refit-comparison.md](../.claude/docs/reviews/2026-09-05-content-refit-comparison.md),
+  [2026-09-05-cs5-response-by-design-factorial.md](../.claude/docs/reviews/2026-09-05-cs5-response-by-design-factorial.md),
   [design/content_estimator_comparison.md](design/content_estimator_comparison.md).

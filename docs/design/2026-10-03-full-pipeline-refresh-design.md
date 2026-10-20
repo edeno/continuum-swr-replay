@@ -2,7 +2,7 @@
 
 **Status (2026-10-12): the refresh is done and audited.** The final audit passed (17 of 17
 checks), and the report is
-[docs/audits/2026-10-12-full-pipeline-refresh.md](../audits/2026-10-12-full-pipeline-refresh.md).
+[.claude/docs/reviews/2026-10-12-full-pipeline-refresh.md](../../.claude/docs/reviews/2026-10-12-full-pipeline-refresh.md).
 The implementation plan is `.claude/docs/plans/full-pipeline-refresh/PLAN.md`. What the re-decode
 changed, and where the backups are, is in
 [the known issue](../known_issues/2026-10-12-full-redecode-r11.md).
@@ -547,7 +547,7 @@ does not depend on the decoder and is reused (`prepare_data.py:230-233`).
 2. **`qvals_table`.** `build_qvals_table.py --replay-content-dir <staging> --write`, about
    12 min; it reads the live `alison_*` DataJoint schemas. It must follow the stop table:
    built before it once, it left a whole session missing
-   (`docs/audits/2026-08-25-covariate-regen-staging-audit.md`).
+   (`.claude/docs/reviews/2026-08-25-covariate-regen-staging-audit.md`).
 3. **Replay tables.**
    `prepare_replay_content_data.py --from-cache --output-dir <staging> --behavior-cache-dir replay_content/_session_cache --contingency-dir <staging>`.
    - Runtime: about 1.5 h serially, or about 36 min as five per-animal shards followed by
@@ -690,8 +690,9 @@ against editing the Figure 1–4 scripts stands.
 
 ## Stage 8: same-data audit and before/after report
 
-A new `scripts/qa/audit_refresh_consistency.py` writes `audit.json` beside the outputs,
-summarized in `docs/audits/YYYY-MM-DD-full-pipeline-refresh.md`. It checks:
+A new `scripts/qa/audit_refresh_consistency.py` (removed in e5ab464, after its one use)
+writes `audit.json` beside the outputs, summarized in
+`.claude/docs/reviews/YYYY-MM-DD-full-pipeline-refresh.md`. It checks:
 
 1. **Commit and environment.** One commit, a clean tree and one `uv.lock` hash across every
    decode log (Stage 1 records them per epoch), or an explicit list of exceptions with
@@ -747,7 +748,8 @@ The **before/after report** covers:
    - `data_loaders/position.py` gains the position helper shared with `load_data`.
 5. **New `analysis/hippocampus/swr_inventories.py`.**
 6. **New `scripts/decoding/run_swr_detection.py`.**
-7. **New `scripts/qa/audit_refresh_consistency.py`,** including the Stage 5 tables manifest.
+7. **New `scripts/qa/audit_refresh_consistency.py` (removed in e5ab464, after its one use),**
+   including the Stage 5 tables manifest.
 
 Every change comes with the tests listed under its stage. Unit tests run offline: any module
 that imports Spyglass at import time is stubbed in `sys.modules`, as

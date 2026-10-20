@@ -59,7 +59,7 @@ which the arrival rungs put into the frozen union). Counts from
 `models_per_stop_rate/all_models_cohort_audit.csv` and
 `models_per_bin_rate/per_bin_rate_cohort_audit.csv`; the three cohorts are placed
 side by side in
-[`../audits/2026-09-12-rate-cohort-atwell.md`](../audits/2026-09-12-rate-cohort-atwell.md).
+[`2026-09-12-rate-cohort-atwell.md`](../../.claude/docs/reviews/2026-09-12-rate-cohort-atwell.md).
 
 **Nesting, and its residual.** Every event in the content cohort lies in a stop
 in the rate cohort. The converse does not hold exactly: 609 events sit in
@@ -120,7 +120,7 @@ Corpus-wide that is **6 non-local events and 4 SWRs** out of the 15,143 and
 **92.3%** of the immobile bins (19,732,623 of 21,384,252), and the onset rule
 keeps **91.9%** of the non-local events (15,143 of 16,477) and 93.6% of the SWRs
 (11,997 of 12,821); the per-session table is in
-[`../audits/2026-09-14-pfc-atwell-cohort.md`](../audits/2026-09-14-pfc-atwell-cohort.md);
+[`2026-09-14-pfc-atwell-cohort.md`](../../.claude/docs/reviews/2026-09-14-pfc-atwell-cohort.md);
 those counts were measured on bundles cut with the earlier run-time event
 construction, which on this population labels the same events the same way —
 identical event count and identical SWR-coupled count in **71 of 71** sessions,

@@ -275,7 +275,7 @@ def align_results_to_position(
 
     **What the trim removed, on the mPFC corpus** (27 of 71 sessions trimmed,
     always at the tail; measured 2026-09-14 and recorded in
-    ``docs/audits/2026-09-14-pfc-atwell-cohort.md``): no non-local event begins
+    ``.claude/docs/reviews/2026-09-14-pfc-atwell-cohort.md``): no non-local event begins
     in a dropped tail and none straddles its leading edge (0 of either, in all
     27); the stops overlapping the two largest tails -- 135.2 s in
     ``wilbur20210329_16_r8`` and 76.1 s in ``j1620210706_10_r5`` -- are

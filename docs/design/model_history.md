@@ -201,7 +201,7 @@ Two standing qualifications on that table:
   rows above describe the pre-basis ladder: `R1` is a different specification
   from the one classified parity-only, and the per-bin reward rungs changed with
   it. The old→new comparison is in
-  [`../audits/2026-09-04-rate-refit-comparison.md`](../audits/2026-09-04-rate-refit-comparison.md).
+  [`2026-09-04-rate-refit-comparison.md`](../../.claude/docs/reviews/2026-09-04-rate-refit-comparison.md).
 
 ## Primary arm-level hierarchy: arm fixed effects, the retired reward-memory rung, SWR splits (moved 2026-09-06)
 

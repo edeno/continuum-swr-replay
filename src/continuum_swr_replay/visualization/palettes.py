@@ -2,8 +2,8 @@
 
 Two palettes live here:
 
-- :func:`build_arm_color_map` — the legacy palette used by
-  ``scripts/plot_replay_content_time_slice.py``. Samples
+- :func:`build_arm_color_map` — the legacy palette of
+  ``scripts/plot_replay_content_time_slice.py`` (removed in 82b66d0). Samples
   ``matplotlib.colormaps['tab10']`` in the order the track graph was
   linearized. Categorical, not patch-aware.
 - :func:`patch_grouped_arm_palette` — the palette ``plot_session_tables``
@@ -40,8 +40,8 @@ def build_arm_color_map(
     """Legacy tab10 palette keyed by arm ID, ordered by linearized edges.
 
     Direct port of the helper previously inlined in
-    ``scripts/plot_replay_content_time_slice.py``. Samples ``tab10``
-    in the order ``edge_order`` iterates the track graph's edges;
+    ``scripts/plot_replay_content_time_slice.py`` (removed in 82b66d0).
+    Samples ``tab10`` in the order ``edge_order`` iterates the track graph's edges;
     keeps the visual consistency between arm markers and the 1D track
     overlay in that script.
 
@@ -70,9 +70,7 @@ def build_arm_color_map(
     for edge_ind, edge in enumerate(edge_order):
         eid = track_graph.edges[tuple(edge)].get("edge_id")
         if eid is not None:
-            arm_color_map[int(eid)] = tuple(
-                edge_colors[edge_ind % len(edge_colors)]
-            )
+            arm_color_map[int(eid)] = tuple(edge_colors[edge_ind % len(edge_colors)])
 
     for arm in ALL_ARMS:
         if arm not in arm_color_map:

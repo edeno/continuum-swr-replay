@@ -65,12 +65,25 @@ uv run pytest
 
 ```
 src/continuum_swr_replay/
-├── data_loaders/          # Data loading from Spyglass/NWB
-│   └── bandit_task.py        # Main data loader for spatial bandit task
+├── data_loaders/          # Data loading from Spyglass/NWB (load_data in bandit_task.py)
 ├── analysis/              # Analysis modules
-│   ├── hippocampus/      # Hippocampus-specific analysis
-│   └── pfc/              # Prefrontal cortex analysis
-└── visualization/         # Visualization utilities
+│   ├── behavior/          #   behavioral-model covariates (qvals_table)
+│   ├── contfrag/          #   Continuous-Fragmented classifier analysis
+│   ├── hippocampus/       #   event tables and eligibility, SWR source, artifacts
+│   ├── inventory_comparison/ # event inventories from different detectors compared
+│   ├── pfc/               #   mPFC/OFC unit analysis
+│   ├── replay/            #   replay content/rate tables, model ladders, fitters
+│   └── constants.py       #   analysis constants and defaults
+├── visualization/         # Plotting utilities
+├── decode_files.py        # the naming rule for a decode's files
+├── decoding_common.py     # shared utilities for the decoding scripts
+├── decoding_transitions.py # the decoders' discrete-transition settings
+├── figure_utilities.py    # publication-figure helpers
+├── parameters.py          # global parameters, PROCESSED_DATA_DIR, COLORS
+├── session_keys.py        # the (animal, session_date, epoch) session key
+├── table_io.py            # on-disk format of the canonical tables
+├── table_parity.py        # keyed table-to-table parity checks
+└── types.py               # shared type definitions
 
 scripts/                   # Analysis scripts, grouped by domain — see scripts/README.md
 ├── decoding/  rate/  content/  behavior/  figures/  qa/  pfc/
@@ -81,8 +94,9 @@ docs/                      # Published reference — see docs/README.md for the 
 └── known_issues/
 .claude/docs/              # Agent-process docs (not scientific record)
 ├── plans/                #   phased implementation plans
-└── reviews/              #   code/methods review reports
+└── reviews/              #   code/methods review reports and point-in-time audits
 .claude/research/          # Exploratory scratch analyses + *_outputs/ figures
+tests/                     # pytest suite — see tests/README.md
 ```
 
 > Documentation homes are indexed in [docs/README.md](docs/README.md): published/scientific
@@ -427,7 +441,7 @@ Multiple sessions are processed in parallel using `dask.delayed` and `dask.compu
 
 ### Output Files
 
-Results are saved to `PROCESSED_DATA_DIR` (defined in `src.parameters`):
+Results are saved to `PROCESSED_DATA_DIR` (defined in `continuum_swr_replay.parameters`):
 
 - `{epoch_identifier}_results.nc` - Decoding results (xarray Dataset)
 - `{epoch_identifier}_detector.pkl` - Fitted detector model
@@ -443,7 +457,7 @@ Logs are written to `logs/{epoch_identifier}.log` with git hash for reproducibil
 3. **Epoch identifiers**: `{animal}{date}_{epoch}_{brain_area}` (e.g., "chimi20200212_02_r1_HPC")
 4. **Brain area names**: Use "HPC", "mPFC", "OFC" (exact capitalization matters)
 5. **Interval naming**: Spyglass uses " noPrePostTrialTimes" suffix for trimmed intervals
-6. **Track graph**: NetworkX graph where nodes are wells (0-5) and edges are track segments
+6. **Track graph**: NetworkX graph of 10 nodes, where nodes 0–5 are wells (6–8 patch junctions, 9 the center) and edges are track segments
 7. **Index/time alignment**: Use `.loc[start:end]` for time-based slicing, not `.iloc`
 
 ## Notes on Data Quality

@@ -1,7 +1,7 @@
 # The canonical decodes were replaced twice in October 2026
 
 **Status:** done and audited. The final audit passed on 2026-10-12 (17 of 17 checks;
-[report](../audits/2026-10-12-full-pipeline-refresh.md), section 1). Open: a number
+[report](../../.claude/docs/reviews/2026-10-12-full-pipeline-refresh.md), section 1). Open: a number
 written before the refresh comes from the April decodes, or from tables built on them. It is stale
 until it is rerun or requoted (see [What is stale until rerun](#what-is-stale-until-rerun)).
 **Dates:** first swap 2026-10-05; second swap 2026-10-10 18:33 to 2026-10-11 00:17.
@@ -26,7 +26,7 @@ The canonical decodes, tables and refits now rest on the R11 decodes. The output
 ## The backups
 
 Both backups are kept. The refresh's cleanup list leaves them out
-([report](../audits/2026-10-12-full-pipeline-refresh.md), section 8).
+([report](../../.claude/docs/reviews/2026-10-12-full-pipeline-refresh.md), section 8).
 
 - **`Processed-Data/_pre_redecode_backup_20261003/`** holds the April decodes of 218 epochs:
   1,744 files, 8 per epoch (NonLocal and ContFrag `results.nc`, `detector.pkl`,
@@ -79,7 +79,7 @@ The cohort is the epoch register's ([../epoch_register.md](../epoch_register.md)
 ## Effect on the results
 
 The size and the cause of each change are in the
-[audit report](../audits/2026-10-12-full-pipeline-refresh.md), section 3, which copies the
+[audit report](../../.claude/docs/reviews/2026-10-12-full-pipeline-refresh.md), section 3, which copies the
 attribution in `.claude/research/refresh_attribution/r8a_report.md` (section 0; local, not
 tracked). In short:
 

@@ -16,7 +16,7 @@ it stops drifting; add new docs to the matching home.
 | cohort | `docs/epoch_register.md` | which run epochs are analysed, and the reason for every other one (mirrors `data_loaders/epoch_register.py`) |
 | **design spec** (scientific/methodological) | **`docs/design/`** | analysis designs — human-discoverable for collaborators/reviewers |
 | implementation plan (agent process) | `.claude/docs/plans/` | phased execution plans |
-| review (code/methods output) | `.claude/docs/reviews/` | point-in-time review reports |
+| review (code/methods output) | `.claude/docs/reviews/` | point-in-time review reports, and the dated audits (before/after refit comparisons, regeneration and parity checks) |
 | exploratory notes + figures | `.claude/research/` | scratch analyses; `*_outputs/` figures |
 | code map (generated) | `docs/regression_pipeline_map.md` | every pipeline module and the public symbols it defines, by stage |
 | model spec (code) | `src/continuum_swr_replay/analysis/replay/model_specs.py` | single source of truth for all model ladders |
@@ -54,12 +54,31 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
   - [design/builder_test_floor.md](design/builder_test_floor.md) — *reference*: the
     measured value-level test coverage of the covariate builders and the target,
     kept honest by `scripts/qa/mutation_check.py`.
+  - [design/2026-05-27-figure01-revision-design.md](design/2026-05-27-figure01-revision-design.md)
+    — the Figure 1 revision: the No-Spike-wins scenario, spikes shown entering the model,
+    and the corrected transition labels.
+  - [design/2026-06-23-replay-trajectory-metrics-design.md](design/2026-06-23-replay-trajectory-metrics-design.md)
+    — per-event replay trajectory metrics, defined identically for the non-local and
+    ContFrag events; pending an implementation plan.
+  - [design/2026-06-25-non-swr-event-reality-design.md](design/2026-06-25-non-swr-event-reality-design.md)
+    — the spike-evidence test that non-SWR non-local events are real, from the likelihood
+    alone with the prior removed.
+  - [design/2026-06-27-state-space-point-process-event-model.md](design/2026-06-27-state-space-point-process-event-model.md)
+    — a state-space point-process GLM (Czanner et al. 2008) of the event onset train,
+    extending Family B; not implemented.
   - [design/2026-07-13-content-rate-uncertainty-model-ladders.md](design/2026-07-13-content-rate-uncertainty-model-ladders.md)
     — proposed Aim-1 content-allocation, replay-occurrence, event-size, and
     marginal-content ladders in R formula notation.
   - [design/2026-08-21-covariate-naming-scheme.md](design/2026-08-21-covariate-naming-scheme.md)
     — proposed predictor-column names across the four canonical tables,
     code-verified; also flags the duplicate and dead columns the pass found.
+  - [design/2026-10-03-full-pipeline-refresh-design.md](design/2026-10-03-full-pipeline-refresh-design.md)
+    — the October full re-decode, comparison inventories and downstream regeneration; done
+    and audited 2026-10-12. `scripts/decoding/run_swr_detection.py` cites it as its
+    `DESIGN_SPEC`.
+  - [design/2026-10-04-decoder-transition-prior.md](design/2026-10-04-decoder-transition-prior.md)
+    — decision R10: the decoders' discrete-transition prior (setting P30-B), its sources
+    and sensitivity; the values live in `decoding_transitions.py`.
   - [design/2026-10-09-swr-source.md](design/2026-10-09-swr-source.md) — the paper's
     one SWR source: the direct ripple_detection 2.0 Kay inventory, its comparison with
     the stored `RippleTimesV1` events, the interface every SWR consumer reads, and the
@@ -74,6 +93,9 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     events at the ports (study C1), the j16 tetrodes that do not ripple with CA1, the rule
     with its effect and blind checks, why the reference veto and the field's noise-channel
     form are not used, the visit-onset numbers, and the limits.
+  - [design/content_model_design.md](design/content_model_design.md) — the `is_swr`
+    content ladder, parallel to the per-bin rate ladder, on the beta-Bernoulli covariates;
+    implemented in `scripts/content/fit_swr_contrast_content.py`.
   - [design/content_estimator_comparison.md](design/content_estimator_comparison.md)
     — the retired count multinomial vs the shipped per-event fractions vs a
     Dirichlet-multinomial, on one 218-session cohort: what each assumes,
@@ -99,6 +121,9 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     [05](design/replay_detection_comparison/05-validation.md) the parked validation
     studies needed for performance claims. Broad refits and robustness studies do not
     block the initial descriptive report.
+    [memoryless_simulation_controls.md](design/replay_detection_comparison/memoryless_simulation_controls.md)
+    extends the simulated comparison of spec 02 with timing, false positives, multi-part
+    events and a held-out evidence test.
     [detector_comparison.md](design/replay_detection_comparison/detector_comparison.md)
     tabulates every detection method considered, with a verified DOI for every work
     cited;
@@ -135,6 +160,9 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
   - [contains_path_length_confound.md](known_issues/contains_path_length_confound.md) —
     `contains_path_to_next` is 2.8× harder for cross-patch than within-patch trips
     by construction; don't pool across trip types.
+  - [degenerate_mua_events.md](known_issues/degenerate_mua_events.md) — *open*: a few
+    ContFrag `MUA_event` labels span several seconds (up to ~23 s) across a stop, run and
+    stop; worked around, upstream cause not found.
   - [nonlocal_minimum_duration_rounding.md](known_issues/nonlocal_minimum_duration_rounding.md) —
     the non-local 15 ms minimum is really 7 samples (12 ms span), 1.1 % of events;
     fix at the next full rebuild.
@@ -177,7 +205,7 @@ Three tiers:
    `*_intransit` (in-transit stops only, thin — 50 of 218 sessions). Every
    fitted row and provenance sidecar records its `stop_cohort`. See
    [design/cohort_and_timing_rules.md](design/cohort_and_timing_rules.md) and
-   [audits/2026-09-12-rate-cohort-atwell.md](audits/2026-09-12-rate-cohort-atwell.md).
+   [2026-09-12-rate-cohort-atwell.md](../.claude/docs/reviews/2026-09-12-rate-cohort-atwell.md).
 
    (These dir names are terse — a descriptive rename and un-mix of the content directories
    has been considered and deferred; the names above are the ones the runners write.)
@@ -258,7 +286,7 @@ Three tiers:
    (cards 3, 4, 6, 7 and 9), 13 h 52 m to 16 h 59 m of wall clock each. They replaced the
    maximum-likelihood tree, which is kept whole at
    `Processed-Data/_pre_ridge_backup_20260915/`. The before/after is audited in
-   [audits/2026-09-18-pfc-ridge-heldout.md](audits/2026-09-18-pfc-ridge-heldout.md):
+   [2026-09-18-pfc-ridge-heldout.md](../.claude/docs/reviews/2026-09-18-pfc-ridge-heldout.md):
    non-converged fits fall from 14.8% of shipped model fits to **0.28%** (432 of 155,952,
    over 48 neurons); the prior binds on 1.2–2.8% of well-posed units per curve; and the
    two inferences call comparable fractions of a comparable population, which are **not**
@@ -276,10 +304,10 @@ Three tiers:
    backup tree, is mislabelled; whole-model comparisons never read a block and are
    unaffected. See
    [design/cohort_and_timing_rules.md](design/cohort_and_timing_rules.md),
-   [audits/2026-09-14-pfc-atwell-cohort.md](audits/2026-09-14-pfc-atwell-cohort.md) and
-   [audits/2026-09-13-stage5b-stage6-atwell.md](audits/2026-09-13-stage5b-stage6-atwell.md).
+   [2026-09-14-pfc-atwell-cohort.md](../.claude/docs/reviews/2026-09-14-pfc-atwell-cohort.md) and
+   [2026-09-13-stage5b-stage6-atwell.md](../.claude/docs/reviews/2026-09-13-stage5b-stage6-atwell.md).
    The earlier canonical-events rerun is in
-   [audits/2026-09-15-pfc-canonical-rerun.md](audits/2026-09-15-pfc-canonical-rerun.md).
+   [2026-09-15-pfc-canonical-rerun.md](../.claude/docs/reviews/2026-09-15-pfc-canonical-rerun.md).
 
    The batched fitter runs on GPU through the project's `cuda` extra. **`uv.lock` has
    no entries for that extra** — it resolves empty — so the CUDA plugin was installed

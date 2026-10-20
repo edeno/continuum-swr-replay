@@ -269,4 +269,4 @@ across model variants, not held-out LL alone.
 from the saved encoding model + event marks (verified, prototyped end-to-end,
 no re-decode for the recompute path). The decode now also persists
 `log_likelihood` for the decode-pinned all-events read. The engine is built
-(`scripts/analyze_event_spike_evidence.py`, reviewed) and confirmed 5/5 animals.
+(`scripts/qa/analyze_event_spike_evidence.py`, reviewed) and confirmed 5/5 animals.

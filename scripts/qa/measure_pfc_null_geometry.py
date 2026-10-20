@@ -35,7 +35,7 @@ Usage
 -----
 ``uv run python scripts/qa/measure_pfc_null_geometry.py \
     --data-dir Processed-Data --session j1620210710_02_r1 \
-    --session chimi20200223_06_r3 --out docs/audits/<date>-null-geometry.md``
+    --session chimi20200223_06_r3 --out .claude/docs/reviews/<date>-null-geometry.md``
 """
 
 from __future__ import annotations

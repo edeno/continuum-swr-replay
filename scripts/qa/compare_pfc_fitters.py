@@ -27,7 +27,7 @@ Usage::
         --jax-dir /scratch/fitter/jax \\
         --time-file statsmodels:wilbur20210329_02_r1_mPFC:/scratch/.../sm.time \\
         --time-file jax:wilbur20210329_02_r1_mPFC:/scratch/.../jax.time \\
-        --out docs/audits/2026-09-14-pfc-jax-fitter-equivalence.md
+        --out .claude/docs/reviews/2026-09-14-pfc-jax-fitter-equivalence.md
 """
 
 from __future__ import annotations

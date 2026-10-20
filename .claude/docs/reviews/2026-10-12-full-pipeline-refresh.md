@@ -1,7 +1,7 @@
 # Full pipeline refresh: final audit and report
 
 Date: 2026-10-12. Runbook step R8 of
-[`.claude/docs/plans/full-pipeline-refresh/PLAN.md`](../../.claude/docs/plans/full-pipeline-refresh/PLAN.md)
+[`.claude/docs/plans/full-pipeline-refresh/PLAN.md`](../../../.claude/docs/plans/full-pipeline-refresh/PLAN.md)
 (section "R8: audit and report", plus the R13 additions). Written by the R8 agent from the brief
 `.superpowers/sdd/PLAN/r8-brief.md`.
 
@@ -30,7 +30,7 @@ Section 10 has one subsection per follow-up. The update also changed §0, the co
 | D1 | The chimi20200221_08_r4 decode mismatch |
 | V0–V3, X_R10nr, S2pct (§5, §10.10) | The artifact-rule robustness reruns: V0 no mask, V1 detector thresholds ×0.75, V2 ×1.25, V3 the mask widened by 1 s, X_R10nr the R10 SWR labels without the rule, S2pct the >2 % sensitivity |
 | V1–V9 (§6.1, §6.1a) | A different use of the same letters: the numbered conclusion changes |
-| R01–R11, C01–C08, K01–K07, X01–X05, F01–F04, P01–P03, S01–S08 | The refit run ids. They now have names in `scripts/qa/run_refits.py`; [docs/analysis_map.md](../analysis_map.md) maps each id to its name and question |
+| R01–R11, C01–C08, K01–K07, X01–X05, F01–F04, P01–P03, S01–S08 | The refit run ids. They now have names in `scripts/qa/run_refits.py`; [docs/analysis_map.md](../../../docs/analysis_map.md) maps each id to its name and question |
 
 **This report changes no number in any other document.** Section 6 lists the hand-maintained
 doc claims that need new numbers. The project lead reviews them before any doc is requoted
@@ -491,7 +491,7 @@ a one-to-one partner (R8a §4).
 ### 4.6 Held-out spike evidence per decoder state (Task 12)
 
 *Rewritten 2026-10-16.* The R8 text reported only the 5-epoch pilot. F1 has now run Task 12 on the R11
-decodes. Source: [`f1_evidence_report.md`](../../.claude/research/refresh_followup/f1_evidence_report.md)
+decodes. Source: [`f1_evidence_report.md`](../../../.claude/research/refresh_followup/f1_evidence_report.md)
 §1 and §3 (main tree `d29cc3c`, CPU only). Pooled outputs: `.claude/research/refresh_followup/f1_outputs/b_pooled_240/`;
 per-epoch tables: `Processed-Data/_refresh_20261016/state_evidence/per_epoch/`.
 
@@ -501,7 +501,7 @@ per-epoch tables: `Processed-Data/_refresh_20261016/state_evidence/per_epoch/`.
 - **chimi20200221_08_r4 failed** the stored-likelihood gate (max abs 90.45 nats, max rel 1.21). F1 calls the
   cause unknown. D1 found it: the animal never entered patch 1, so the occupancy at bins 71–78 is a float32
   subnormal. The GPU decode keeps subnormals; JAX on the CPU flushes them to zero. The decode is correct; the
-  CPU check is not ([`d1_decode_mismatch_report.md`](../../.claude/research/refresh_followup/d1_decode_mismatch_report.md)).
+  CPU check is not ([`d1_decode_mismatch_report.md`](../../../.claude/research/refresh_followup/d1_decode_mismatch_report.md)).
   Task 29 (`da34665`, `e224a09`) makes the checks leave out bins with 0 < occupancy < 1e-20. This epoch's
   rerun waits for the merge.
 - Every other gate passes in 240/240: exact encoding refit; summed per-tetrode terms reproduce the stored
@@ -680,9 +680,9 @@ listed.
 
 ### 6.1a Follow-up changes to these conclusions (2026-10-16)
 
-Sources: F2 ([`f2_robustness_report.md`](../../.claude/research/refresh_followup/f2_robustness_report.md)),
-R6c ([`r6c_report.md`](../../.claude/research/refresh_r13/r6c_report.md)) and F1
-([`f1_evidence_report.md`](../../.claude/research/refresh_followup/f1_evidence_report.md)). The claim rows of
+Sources: F2 ([`f2_robustness_report.md`](../../../.claude/research/refresh_followup/f2_robustness_report.md)),
+R6c ([`r6c_report.md`](../../../.claude/research/refresh_r13/r6c_report.md)) and F1
+([`f1_evidence_report.md`](../../../.claude/research/refresh_followup/f1_evidence_report.md)). The claim rows of
 6.2–6.4 are not requoted here; they wait for the lead's review.
 
 | # | what changes | evidence | effect on the wording |
@@ -939,7 +939,7 @@ neither pushed nor merged.
 
 ### 10.1 R8a attribution
 
-Source: [`r8a_report.md`](../../.claude/research/refresh_attribution/r8a_report.md) (2026-10-12).
+Source: [`r8a_report.md`](../../../.claude/research/refresh_attribution/r8a_report.md) (2026-10-12).
 
 - **Run:** Stage 1 descriptives and the Stage 2 sandbox ladder on 205 shared epochs. No new run today.
 - **Result:** already in section 3.
@@ -952,7 +952,7 @@ Source: [`r8a_report.md`](../../.claude/research/refresh_attribution/r8a_report.
 
 ### 10.2 F1: spike and state evidence on 242 epochs
 
-Source: [`f1_evidence_report.md`](../../.claude/research/refresh_followup/f1_evidence_report.md).
+Source: [`f1_evidence_report.md`](../../../.claude/research/refresh_followup/f1_evidence_report.md).
 
 - **Run:** (A) the spike-evidence engine `analyze_event_spike_evidence.py` on 242/242 epochs, with a fresh
   marks cache; outputs `paper/figures/reality_r11/`. (B) Task 12's `run_state_evidence.py` on the R11
@@ -975,7 +975,7 @@ Source: [`f1_evidence_report.md`](../../.claude/research/refresh_followup/f1_evi
 
 ### 10.3 F2: robustness and leave-one-out checks
 
-Source: [`f2_robustness_report.md`](../../.claude/research/refresh_followup/f2_robustness_report.md).
+Source: [`f2_robustness_report.md`](../../../.claude/research/refresh_followup/f2_robustness_report.md).
 
 - **Run:** read-only leave-outs of the per-bin M7r immediate reward RR and of the paired dissociation, with
   the summarizer's own functions (reproduces 6.39 / 3.27 / 9.91 / 1.42 and 76.7 % of 240 exactly). One
@@ -992,7 +992,7 @@ Source: [`f2_robustness_report.md`](../../.claude/research/refresh_followup/f2_r
 
 ### 10.4 F3: did the content fits stop short of their optimum?
 
-Source: [`f3_optimizer_report.md`](../../.claude/research/refresh_followup/f3_optimizer_report.md).
+Source: [`f3_optimizer_report.md`](../../../.claude/research/refresh_followup/f3_optimizer_report.md).
 
 - **Run:** Newton refits of all 2,631 shipped headline content fits (C2_base in three populations, CS1,
   CS1nt, CS4, CS4nt, CS5, CS5nt, CS6, CS6nt), read-only. The shipped coefficients reproduce exactly.
@@ -1010,7 +1010,7 @@ Source: [`f3_optimizer_report.md`](../../.claude/research/refresh_followup/f3_op
 
 ### 10.5 Venv drift and the uv re-lock
 
-Sources: [`venv_drift.md`](../../.claude/research/refresh_followup/venv_drift.md); commit `01b3051`; ledger
+Sources: [`venv_drift.md`](../../../.claude/research/refresh_followup/venv_drift.md); commit `01b3051`; ledger
 07:40 PDT.
 
 - **Run:** `uv sync --frozen --dry-run --all-extras` in the main tree (no change made).
@@ -1026,7 +1026,7 @@ Sources: [`venv_drift.md`](../../.claude/research/refresh_followup/venv_drift.md
 
 ### 10.6 Task 13: half-tetrode decodes
 
-Source: [`t13_half_tetrode_report.md`](../../.claude/research/refresh_followup/t13_half_tetrode_report.md).
+Source: [`t13_half_tetrode_report.md`](../../../.claude/research/refresh_followup/t13_half_tetrode_report.md).
 Outputs: `Processed-Data/_refresh_20261016/half_tetrode/`.
 
 - **Run:** 20 half decodes and 2 all-tetrode checks on the 5 pilot epochs, on idle breeze GPUs, from the main
@@ -1047,7 +1047,7 @@ Outputs: `Processed-Data/_refresh_20261016/half_tetrode/`.
 
 ### 10.7 D1: the chimi20200221_08_r4 mismatch
 
-Source: [`d1_decode_mismatch_report.md`](../../.claude/research/refresh_followup/d1_decode_mismatch_report.md).
+Source: [`d1_decode_mismatch_report.md`](../../../.claude/research/refresh_followup/d1_decode_mismatch_report.md).
 
 - **Run:** a read-only rebuild of the whole epoch on the CPU, a per-tetrode breakdown, a numpy float32
   emulation, and an occupancy scan of all 242 epochs.
@@ -1067,9 +1067,9 @@ Source: [`d1_decode_mismatch_report.md`](../../.claude/research/refresh_followup
 
 ### 10.8 Tasks 27, 28 and 29 (code, on `full-pipeline-refresh-code`)
 
-Sources: [`task-27-report.md`](../../.superpowers/sdd/PLAN/task-27-report.md),
-[`task-28-report.md`](../../.superpowers/sdd/PLAN/task-28-report.md),
-[`task-29-report.md`](../../.superpowers/sdd/PLAN/task-29-report.md), and the ledger. All three were reviewed
+Sources: [`task-27-report.md`](../../../.superpowers/sdd/PLAN/task-27-report.md),
+[`task-28-report.md`](../../../.superpowers/sdd/PLAN/task-28-report.md),
+[`task-29-report.md`](../../../.superpowers/sdd/PLAN/task-29-report.md), and the ledger. All three were reviewed
 and approved (ledger 08:50, 13:10 and 14:25 PDT).
 
 - **Task 27** (`b7dc1d6`, `cfb2f4e`, `c0b69fd`; fix round `28e00cc`, `e6e3b9e`, `a4ba6d2`; `ec04edf`):
@@ -1105,7 +1105,7 @@ and approved (ledger 08:50, 13:10 and 14:25 PDT).
 
 ### 10.9 R6c: the content refit with the fixed fitter
 
-Source: [`r6c_report.md`](../../.claude/research/refresh_r13/r6c_report.md).
+Source: [`r6c_report.md`](../../../.claude/research/refresh_r13/r6c_report.md).
 
 - **Run:** 19 runs (C01–C07, K01–K03, X01–X05, F01–F04) from `continuum-swr-replay-run2` at `f05fa4a`, clean,
   CPU only, writing the canonical content bundles; backup `Processed-Data/_pre_r6c_backup_20261016/fits/`
@@ -1125,7 +1125,7 @@ Source: [`r6c_report.md`](../../.claude/research/refresh_r13/r6c_report.md).
 
 ### 10.10 R13 interim: artifact-rule robustness
 
-Source: [`r13_robustness_report.md`](../../.claude/research/refresh_robustness/r13_robustness_report.md).
+Source: [`r13_robustness_report.md`](../../../.claude/research/refresh_robustness/r13_robustness_report.md).
 **Interim:** the lead paused R13 at 13:48 PDT.
 
 - **Run (done):** V0 (no mask, with a sandbox SWR run under R-T and no mask normalisation), V3 (+1 s after each

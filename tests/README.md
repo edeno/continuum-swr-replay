@@ -76,8 +76,8 @@ tests/
 ```
 
 **Where a test goes.** New tests mirror `src`: the tests of
-`src/continuum_swr_replay/analysis/replay/x.py` go in
-`tests/analysis/replay/test_x.py`, and those of `data_loaders/` in
+`src/continuum_swr_replay/analysis/replay/<module>.py` go in
+`tests/analysis/replay/test_<module>.py`, and those of `data_loaders/` in
 `tests/data_loaders/`. Tests of `scripts/` modules go under `tests/scripts/`.
 Existing files in `tests/unit/` move to the mirrored place when their module is
 next touched. There is no big-bang move.

@@ -2,7 +2,7 @@
 
 The decoder writes the full acausal posterior to
 ``{epoch_identifier}_results.nc`` at the end of
-``scripts/run_decoding_bandit.py``. For the arm-level replay content
+``scripts/decoding/run_decoding_bandit.py``. For the arm-level replay content
 analysis we need the conditional non-local posterior — the posterior
 over place bins conditioned on the non-local state — which is derived
 from the acausal posterior by

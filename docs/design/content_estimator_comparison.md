@@ -48,7 +48,7 @@ the animal-bootstrap band.
 > come from that one run, so the table remains an honest like-for-like
 > comparison of likelihoods — but its **fraction** column is the pre-refit value
 > of a coefficient that has since moved. Measured against the refit
-> ([audits/2026-09-12-content-cohort-comparison.md](../audits/2026-09-12-content-cohort-comparison.md)):
+> ([2026-09-12-content-cohort-comparison.md](../../.claude/docs/reviews/2026-09-12-content-cohort-comparison.md)):
 > `C2_base` `is_current_arm` **+0.681 → +0.708**, `CS5_armvalue`
 > `swr_x_reward_belief_mean_candidate_arm_preoutcome` **+0.237 → +0.236**, and
 > `CS1_current` (−0.373), `CS4_armreward` (−1.198) and `CS4nt_armreward`

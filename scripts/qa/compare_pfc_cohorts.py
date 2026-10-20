@@ -22,7 +22,7 @@ the artifacts themselves:
 Usage::
 
     uv run python scripts/qa/compare_pfc_cohorts.py \\
-        --out docs/audits/2026-09-14-pfc-atwell-cohort.md
+        --out .claude/docs/reviews/2026-09-14-pfc-atwell-cohort.md
 
 When the earlier tree also carries provenance sidecars, three further sections
 are written: whether the two trees describe the same events, the unit-by-unit
@@ -33,7 +33,7 @@ and which estimator and device fit each session::
     uv run python scripts/qa/compare_pfc_cohorts.py \\
         --before Processed-Data/_pre_canonical_events_backup_20260914 \\
         --after Processed-Data \\
-        --out docs/audits/2026-09-14-pfc-canonical-rerun.md
+        --out .claude/docs/reviews/2026-09-14-pfc-canonical-rerun.md
 
 When the after tree's sidecars name the penalised estimator, a different
 report is written instead: what the prior did to each unit's peak
@@ -44,7 +44,7 @@ folds, and the sensitivity of the curves to the prior::
     uv run python scripts/qa/compare_pfc_cohorts.py \\
         --before Processed-Data/_pre_ridge_backup \\
         --after Processed-Data \\
-        --out docs/audits/<date>-pfc-ridge-heldout.md
+        --out .claude/docs/reviews/<date>-pfc-ridge-heldout.md
 """
 
 from __future__ import annotations

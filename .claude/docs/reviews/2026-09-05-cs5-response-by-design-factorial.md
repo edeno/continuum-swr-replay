@@ -6,7 +6,7 @@ leaf-only arm cohort assembled by `scripts/content/fit_swr_contrast_content.py` 
 match the canonical CS5 fit). Rung = BASE + `reward_belief_mean_candidate_arm_preoutcome` +
 `swr_x_reward_belief_mean_candidate_arm_preoutcome`; coefficient shown is the SWR interaction.
 
-Purpose: the fraction-response refit (`docs/audits/2026-09-05-content-refit-comparison.md`) moved
+Purpose: the fraction-response refit (`.claude/docs/reviews/2026-09-05-content-refit-comparison.md`) moved
 `CS5_armvalue` from −0.996 (0/5 animals positive) to +0.237 (3/5) while also changing BASEc
 (`_TSC` + event-length products). This factorial separates the three changes.
 

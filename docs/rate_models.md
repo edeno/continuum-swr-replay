@@ -37,7 +37,7 @@ one-population null tested against its split.
 > canonical one, and has **not** been re-derived on this cohort; it is labelled
 > where it appears and must be cited as the all-stops sensitivity, not as the
 > current result. The cohort comparison is
-> [audits/2026-09-12-rate-cohort-atwell.md](audits/2026-09-12-rate-cohort-atwell.md).
+> [2026-09-12-rate-cohort-atwell.md](../.claude/docs/reviews/2026-09-12-rate-cohort-atwell.md).
 
 ## Family A — per-stop rate (the literature-comparable layer)
 
@@ -65,7 +65,7 @@ one-population null tested against its split.
 > outcomes are yet known (the three features are then zero-filled), 0 elsewhere.
 > The flagged stops form an unbroken prefix of every epoch and are 1.296 % of
 > stops / 1.576 % of events
-> ([audits/2026-09-04-stop-table-reward-basis-regen.md](audits/2026-09-04-stop-table-reward-basis-regen.md)).
+> ([2026-09-04-stop-table-reward-basis-regen.md](../.claude/docs/reviews/2026-09-04-stop-table-reward-basis-regen.md)).
 > It is carried as a plain main effect wherever the basis is fit — never inside
 > an `is_swr` expansion, never aggregated, never reported — and it is excluded
 > from the separation judgment (`NUISANCE_TERMS`, below).
@@ -96,7 +96,7 @@ one-population null tested against its split.
   **−1.30** (detected SWR) and **−0.07** (non-local, no SWR) animal-balanced,
   and **−5.37** / **−1.79** / **−2.43** / **−0.44** session-pooled, over 217
   sessions each
-  ([audits/2026-09-12-rate-cohort-atwell.md](audits/2026-09-12-rate-cohort-atwell.md),
+  ([2026-09-12-rate-cohort-atwell.md](../.claude/docs/reviews/2026-09-12-rate-cohort-atwell.md),
   "Family A — per-stop reward step"). The block earns its parameters in **every**
   population here, but by very different margins: **76.0 %** of sessions are
   child-better on the pooled non-local stream (5/5 animals) against **52.1 %**
@@ -173,7 +173,7 @@ offset. Its limitation is exactly that offset — see below.
   costs 515 of the 84,069 well-anchored stops (plus 5 with a missing own
   predictor), leaving **83,549 stops and 6,777,953 bins** in every rung of every
   population (`models_per_bin_rate/per_bin_rate_cohort_audit.csv`;
-  [audits/2026-09-12-rate-cohort-atwell.md](audits/2026-09-12-rate-cohort-atwell.md),
+  [2026-09-12-rate-cohort-atwell.md](../.claude/docs/reviews/2026-09-12-rate-cohort-atwell.md),
   "Cohort size"). Those 515 are the well-anchored stops carrying no
   arrival clock — there are 516, one of which is already among the 5 — which the
   arrival rungs put into the union. The freeze bites harder where
@@ -189,7 +189,7 @@ offset. Its limitation is exactly that offset — see below.
   SWR) and `M5_time` on 218 in every population (fitted rows of
   `models_per_bin_rate/all_models.pkl`; the reward-quantity `n` per population is
   in
-  [audits/2026-09-12-rate-cohort-atwell.md](audits/2026-09-12-rate-cohort-atwell.md)).
+  [2026-09-12-rate-cohort-atwell.md](../.claude/docs/reviews/2026-09-12-rate-cohort-atwell.md)).
   Quote the per-rung, per-population `n`, not a flat 218.
 - **Runner / output:** `scripts/rate/fit_per_bin_rate_models.py`
   (`--workers N` fans sessions over processes) →
@@ -253,7 +253,7 @@ offset. Its limitation is exactly that offset — see below.
   cohort the animal-balanced `rr_immediate` reads **4.91** (detected SWR),
   **2.96** (non-local, all), **6.86** (non-local w/ SWR) and **2.28**
   (non-local, no SWR), 5/5 animals each
-  ([audits/2026-09-12-rate-cohort-atwell.md](audits/2026-09-12-rate-cohort-atwell.md),
+  ([2026-09-12-rate-cohort-atwell.md](../.claude/docs/reviews/2026-09-12-rate-cohort-atwell.md),
   "Reward rate ratios"). Quote one or the other, say which, and say whether it is
   the animal-balanced or the session-pooled summary — `rr_lag1` is published
   both ways (session-pooled **1.228 / 1.214 / 1.408 / 1.086**, animal-balanced
@@ -261,7 +261,7 @@ offset. Its limitation is exactly that offset — see below.
 
   (Everything in this bullet is the well-anchored fit over 218 sessions — see
   [per_bin_rate_results.md](per_bin_rate_results.md) §3 for the full kernel and
-  [audits/2026-09-12-rate-cohort-atwell.md](audits/2026-09-12-rate-cohort-atwell.md)
+  [2026-09-12-rate-cohort-atwell.md](../.claude/docs/reviews/2026-09-12-rate-cohort-atwell.md)
   for what the cohort moved. The smooth reward basis has no per-lag parameter, so the
   lag-1 boost is smaller than the retired per-lag specification reported; the
   ordering and the dissociation are unchanged. The audited SWR-contrast
@@ -369,7 +369,7 @@ SWR is no exception — its supported arrival-clock maximum is at 3.2 s, in the
 same band as the others. The all-stops sensitivity reads 2.2–3.0 s against
 3.0–3.6 s with KS distances 0.06–0.12, so the cross-clock statement does not
 turn on the cohort
-([audits/2026-09-12-rate-cohort-atwell.md](audits/2026-09-12-rate-cohort-atwell.md),
+([2026-09-12-rate-cohort-atwell.md](../.claude/docs/reviews/2026-09-12-rate-cohort-atwell.md),
 "Arrival clock vs stop clock, by cohort").
 
 That last point is a correction worth stating plainly, because the naive
@@ -430,7 +430,7 @@ it was on all stops (91.2 / 90.2 / 85.0 / **81.4 %**), because the bouts the
 window discards most are the in-transit ones the cohort no longer holds (their
 retention is 0.17–0.35). Both the cohort audit and the runner log report it per
 population (`result.attrs["arrival_clock_cohort"]`;
-[audits/2026-09-12-rate-cohort-atwell.md](audits/2026-09-12-rate-cohort-atwell.md),
+[2026-09-12-rate-cohort-atwell.md](../.claude/docs/reviews/2026-09-12-rate-cohort-atwell.md),
 "Arrival-window retention").
 
 **The arrival rungs are themselves rarely cross-validated.** On the
@@ -661,7 +661,7 @@ What the ladder actually shows (218 sessions; the fit numbers below are the
   parent — the per-lag columns are NaN early in an epoch, so the reward rung was
   fit on fewer bins than the null it was compared against — so that step was
   never a like-for-like model comparison
-  ([audits/2026-09-06-rate-refit-arrival-clock.md](audits/2026-09-06-rate-refit-arrival-clock.md)).
+  ([2026-09-06-rate-refit-arrival-clock.md](../.claude/docs/reviews/2026-09-06-rate-refit-arrival-clock.md)).
 - **Possible within-session non-stationarity (preliminary, not established;
   the numbers in this bullet predate the reward-basis refit and were not
   re-derived from it).** The cumulative point-process residual within a session makes slow excursions,

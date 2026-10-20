@@ -993,7 +993,8 @@ MODEL_CHOICE: dict[str, ModelSpec] = {
 
 
 # ── SWR-contrast ladders ────────────────────────────────────────────────────
-# Relocated from scripts/fit_swr_contrast_rate.py and fit_swr_contrast_content.py
+# Relocated from scripts/rate/fit_swr_contrast_rate.py and
+# scripts/content/fit_swr_contrast_content.py
 # so this module is the single source of truth for every model family. The runners
 # import the SWR_CONTRAST_* exports below and keep only their data-assembly/fit code.
 # Reuses the module-level _SPLINE / N_REWARD_LAGS / N_HISTORY_BASIS defined above.

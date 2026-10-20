@@ -27,7 +27,7 @@ Usage::
         --diagnostics-dir <tree of *_mPFC_modulation.fit_diagnostics.npz> \\
         --session j1620210710_02_r1 --session chimi20200223_06_r3 \\
         --session wilbur20210329_02_r1 \\
-        --out docs/audits/2026-09-15-pfc-ridge-lambda0-gate.md
+        --out .claude/docs/reviews/2026-09-15-pfc-ridge-lambda0-gate.md
 """
 
 from __future__ import annotations

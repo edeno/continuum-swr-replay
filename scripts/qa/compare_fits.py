@@ -40,7 +40,7 @@ WITHIN one cohort -- including Family A's per-stop reward step (``R1`` against
 
 Usage:
     uv run python scripts/qa/compare_fits.py
-    uv run python scripts/qa/compare_fits.py --out docs/audits/my-comparison.md
+    uv run python scripts/qa/compare_fits.py --out .claude/docs/reviews/my-comparison.md
     uv run python scripts/qa/compare_fits.py --cohort-contrast
 """
 
@@ -3850,7 +3850,8 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help=(
-            "Report path. Defaults to docs/audits/<today>-rate-refit-comparison.md, "
+            "Report path. Defaults to "
+            ".claude/docs/reviews/<today>-rate-refit-comparison.md, "
             "<today>-content-refit-comparison.md under --content, or "
             "<today>-rate-cohort-atwell.md under --cohort-contrast."
         ),
@@ -3864,11 +3865,12 @@ def main() -> None:
         raise SystemExit("--content and --cohort-contrast are separate modes")
     if args.out is None:
         today = dt.date.today().isoformat()
+        reviews = REPO / ".claude" / "docs" / "reviews"
         if args.cohort_contrast:
-            args.out = REPO / "docs" / "audits" / f"{today}-rate-cohort-atwell.md"
+            args.out = reviews / f"{today}-rate-cohort-atwell.md"
         else:
             kind = "content" if args.content else "rate"
-            args.out = REPO / "docs" / "audits" / f"{today}-{kind}-refit-comparison.md"
+            args.out = reviews / f"{today}-{kind}-refit-comparison.md"
     if args.cohort_contrast:
         run_cohort_contrast_mode(args)
         return

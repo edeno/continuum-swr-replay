@@ -19,7 +19,7 @@ population the content family is fit on at the event grain
 all-stops fit is kept as a sensitivity bundle (`all_models_allstops.pkl`) and
 in-transit stops as their own (`all_models_intransit.pkl`); the three are placed
 side by side in
-[audits/2026-09-12-rate-cohort-atwell.md](audits/2026-09-12-rate-cohort-atwell.md).
+[2026-09-12-rate-cohort-atwell.md](../.claude/docs/reviews/2026-09-12-rate-cohort-atwell.md).
 **The in-transit column there is thin** — only 50 of 218 sessions clear the
 per-bin sample gates on any population — so an in-transit cell showing no effect
 is an absence of evidence, not evidence of absence.
@@ -99,7 +99,7 @@ a cubic B-spline extrapolates over very little exposure and can run away. On
 that interval the across-session median peak sits at 2.63 s (detected SWR),
 2.82 s (non-local, all), 2.31 s (non-local w/ SWR) and 2.68 s (non-local, no
 SWR), each read over 168–217 unflagged fits
-([audits/2026-09-12-rate-cohort-atwell.md](audits/2026-09-12-rate-cohort-atwell.md),
+([2026-09-12-rate-cohort-atwell.md](../.claude/docs/reviews/2026-09-12-rate-cohort-atwell.md),
 "Burst peak of the smooth time course"). On the all-stops fit the non-SWR peak
 sat exactly on the right edge of the readable interval (3.0 s) and could only be
 read as "at or beyond 3 s"; on the well-anchored cohort it is inside the
@@ -129,7 +129,7 @@ broadly the same delay in every population: on this cohort 2.31–2.82 s on `tc`
 against 2.80–3.80 s after arrival, KS distance 0.06–0.11 between the normalized
 curves (on all stops, 2.2–3.0 s against 3.0–3.6 s, KS 0.06–0.12 — the statement
 does not turn on the cohort; both columns are in
-[audits/2026-09-12-rate-cohort-atwell.md](audits/2026-09-12-rate-cohort-atwell.md)).
+[2026-09-12-rate-cohort-atwell.md](../.claude/docs/reviews/2026-09-12-rate-cohort-atwell.md)).
 The arrival
 rungs are heavily flagged (42.9–63.6 % of `M5a_time_arrival` fits carry a
 separated non-nuisance term) and are rarely cross-validated, so they are read
@@ -308,7 +308,7 @@ read from `all_models.pkl`; the other three columns are the summarizer's.)
   **+2.28** on the same four populations. The four-parameter smooth block does
   not pay for itself once the time course and self-history are in the model,
   even though its immediate component is a large and consistent effect (§2)
-  ([audits/2026-09-12-rate-cohort-atwell.md](audits/2026-09-12-rate-cohort-atwell.md),
+  ([2026-09-12-rate-cohort-atwell.md](../.claude/docs/reviews/2026-09-12-rate-cohort-atwell.md),
   "Nested reward steps").
 - **`M9r_rew_x_time` (reward × time) costs CV and does not buy AIC** relative to
   its parent `M7r_time_histcos_rew` (2083 vs 2077; 0.200 vs 0.244 bits/event on

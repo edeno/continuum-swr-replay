@@ -960,7 +960,7 @@ def run_build_qvals_table(args: argparse.Namespace) -> None:
         arm_ok = np.mean(t["chosen_arm"].to_numpy(dtype=float)[at_well] == cur[at_well])
         # ``is_rewarded_outcome`` is frozen at the bout start, which is inside
         # the arrival -> outcome window for about a fifth of at-well stops
-        # (observable at 80.06 % of at-well bout starts; docs/audits/
+        # (observable at 80.06 % of at-well bout starts; .claude/docs/reviews/
         # 2026-09-06-stop-table-clock-columns-regen.md), so it is missing
         # there. Score agreement only where the reference exists and report the
         # comparable share, rather than counting "not yet known" as "wrong".

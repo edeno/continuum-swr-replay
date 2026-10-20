@@ -57,5 +57,6 @@ for resp in ("arm_count_hard", "arm_fraction"):
         )
         print(out[-1], flush=True)
 pd.DataFrame(out).to_csv(
-    Path("docs/audits/2026-09-05-cs5-response-by-design-factorial.csv"), index=False
+    Path(".claude/docs/reviews/2026-09-05-cs5-response-by-design-factorial.csv"),
+    index=False,
 )

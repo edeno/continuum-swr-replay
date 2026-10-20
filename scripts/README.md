@@ -204,7 +204,7 @@ report, figure or QA script reuses another script's constants, output paths and 
   and the `is_swr`-contrast ladder) on the quantities that survive a respecification
   — joint reward step, reward-free goodness of fit, frozen-cohort size, per-rung
   session counts, per-term separation shares — and writes the markdown comparison
-  under `docs/audits/`.
+  under `.claude/docs/reviews/`.
 - `check_fit_provenance.py` — sweeps the whole `models*/` tree and reports which
   fitted artifacts are stale for the tables they read, from the SHA-256 sidecars
   each runner writes.

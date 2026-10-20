@@ -444,7 +444,7 @@ def add_uncertainty_covariates(
 
         # Read the trip's *realized* outcome, not the bout-start-gated flags.
         # A bout at a well begins at arrival, and the outcome is already
-        # observable at 80.06 % of at-well bout starts (docs/audits/
+        # observable at 80.06 % of at-well bout starts (.claude/docs/reviews/
         # 2026-09-06-stop-table-clock-columns-regen.md); the remaining fifth
         # start inside the arrival -> outcome window, where
         # ``is_rewarded_outcome`` is legitimately missing. Gating here would

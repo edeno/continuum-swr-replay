@@ -83,7 +83,7 @@ per-unit statistic, computed at population, per-animal, and per-session level.
 
 ## Findings log
 
-Script: `scripts/_fig2b_robustness_decompose.py`; outputs in
+Script: `scripts/exploratory/_fig2b_robustness_decompose.py`; outputs in
 `.claude/research/fig2b_outputs/` (per_animal.csv, per_session.csv, summary.txt).
 Run 2026-06-17 over 218 sessions / 5 animals / 65,913 immobile non-local events
 (event_id duplicates = 0, so no cross-session collision).
@@ -143,7 +143,7 @@ spurious.
 
 ## Follow-up: does non-local amount vary by date per animal? (SWR-over-learning)
 
-Scripts: `scripts/_fig2b_nonlocal_over_dates.py` (+ `_fig2b_dates_plot.py`).
+Scripts: `scripts/exploratory/_fig2b_nonlocal_over_dates.py` (+ `_fig2b_dates_plot.py`).
 Outputs: `per_session_dated.csv`, `per_animal_date_trends.csv`,
 `date_trends_summary.txt`, `dates_trends.png`. Rates use **immobile minutes** as
 the denominator (events/SWRs are immobility phenomena) so session length / the
@@ -187,7 +187,7 @@ detection threshold stability across days.
 
 ## Follow-up: are the LONG non-SWR events concentrated in certain animals?
 
-Script: `scripts/_fig2b_nonswr_durations.py`. Outputs:
+Script: `scripts/exploratory/_fig2b_nonswr_durations.py`. Outputs:
 `nonswr_durations_per_animal.csv`, `nonswr_longest_events.csv`,
 `nonswr_durations.png`. On the 39,500 immobile non-SWR events.
 

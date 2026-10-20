@@ -61,11 +61,11 @@ canonical tables:
 - so did the ContFrag tables.
 
 The refresh audit of 2026-10-12 passed all 17 of its checks
-([report](../audits/2026-10-12-full-pipeline-refresh.md), section 1). For the three epochs,
+([report](../../.claude/docs/reviews/2026-10-12-full-pipeline-refresh.md), section 1). For the three epochs,
 only the `event_table` counts were re-read; `qvals_table` and the ContFrag tables were not
 re-counted.
 
-`docs/audits/2026-08-25-covariate-regen-staging-audit.md` recorded the recovery in
+`.claude/docs/reviews/2026-08-25-covariate-regen-staging-audit.md` recorded the recovery in
 the Replay and ContFrag tables.
 
 ## What no longer applies
