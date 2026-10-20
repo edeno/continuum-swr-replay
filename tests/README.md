@@ -4,14 +4,6 @@ The last full run took about 31 min for 5,128 tests on the dev server. A plain
 `uv run pytest` needs no lab VPN, DataJoint connection or `Processed-Data`: the
 tests that do are marked `real_data` and are skipped unless you ask for them.
 
-Two synthetic tests are the exception until the code-organization plan's
-Task 12: they import a module that imports Spyglass, so on a host with no
-DataJoint connection they fail with a connection error (the rest of the suite
-still collects and runs):
-
-- `unit/test_run_state_evidence.py::test_the_loader_builds_the_decodes_masks_from_the_swr_source`
-- `unit/test_table_builders_read_the_register.py::test_hpc_raw_stats_run_over_the_registers_analysed_epochs`
-
 ## Quick start
 
 ```bash

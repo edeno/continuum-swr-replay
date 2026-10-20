@@ -594,7 +594,10 @@ def test_the_loader_builds_the_decodes_masks_from_the_swr_source(
             "ripple_times": stored_ripple,
         }
 
-    monkeypatch.setattr(data_loaders, "load_data", load_data)
+    # Set in the package's namespace directly: ``monkeypatch.setattr`` reads the
+    # old value first, and the lazy ``data_loaders.load_data`` would import
+    # ``bandit_task``, which connects to the Spyglass database.
+    monkeypatch.setitem(vars(data_loaders), "load_data", load_data)
 
     loaded = runner.load_marks_and_training_mask(EPOCH)
 

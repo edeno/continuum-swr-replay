@@ -38,7 +38,6 @@ from continuum_swr_replay.analysis.hippocampus.hpc_raw_stats import (
     compute_hpc_raw_stats_single,
     extract_discrete_transition_matrix,
 )
-from continuum_swr_replay.data_loaders.bandit_task import load_data
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
@@ -79,6 +78,10 @@ def _compute_one_session(
     epoch_name: str,
 ) -> dict[str, float]:
     """Compute all raw stats + transition matrix for one epoch."""
+    # Imported here, not at module top: ``bandit_task`` connects to the Spyglass
+    # database on import, and the session list is built without it.
+    from continuum_swr_replay.data_loaders.bandit_task import load_data
+
     row: dict[str, float] = _nan_row()
 
     try:
