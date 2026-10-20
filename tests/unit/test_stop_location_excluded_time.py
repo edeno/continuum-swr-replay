@@ -109,7 +109,7 @@ def tables(tmp_path, monkeypatch) -> dict[str, dict[str, pd.DataFrame]]:
     (``"masked"``). The source stays configured for the test."""
     all_rows = _tables()
     directory = write_artifact_run(tmp_path / "artifacts", {EPOCH_ID: CORES})
-    monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_ROOT", directory.parent)
+    monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_DIR", directory.parent)
     monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
     return {"all_rows": all_rows, "masked": _tables()}
 

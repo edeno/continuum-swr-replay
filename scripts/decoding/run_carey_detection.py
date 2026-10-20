@@ -115,6 +115,7 @@ from continuum_swr_replay.intervals import (
     masked_seconds,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR
+from continuum_swr_replay.paths import DETECTION_COMPARISON_DIR
 from continuum_swr_replay.runs.batch import (
     raise_open_file_limit,
     run_epoch_logged,
@@ -131,7 +132,7 @@ from continuum_swr_replay.runs.io import (
 )
 from continuum_swr_replay.runs.provenance import provenance_record
 
-OUTPUT_ROOT = PROCESSED_DATA_DIR / "replay_detection_comparison" / "carey"
+OUTPUT_ROOT = DETECTION_COMPARISON_DIR / "carey"
 PRODUCED_BY = "scripts/decoding/run_carey_detection.py"
 DESIGN_SPEC = "docs/design/replay_detection_comparison/03-inventory-comparison.md"
 

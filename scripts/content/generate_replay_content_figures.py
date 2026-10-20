@@ -29,7 +29,8 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
 from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_HIERARCHY,
 )
-from continuum_swr_replay.parameters import COLORS, PROCESSED_DATA_DIR
+from continuum_swr_replay.parameters import COLORS
+from continuum_swr_replay.paths import MODEL_DIRS, REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.visualization.replay_content_plots import (
     plot_behavior_prediction_results,
     plot_coefficient_forest,
@@ -55,13 +56,13 @@ logging.basicConfig(
 
 figure_utilities.set_figure_defaults(context="paper")
 
-RC = PROCESSED_DATA_DIR / "replay_content"
-MODEL_DIR = RC / "models"
+RC = REPLAY_CONTENT_DIR
+MODEL_DIR = RC / MODEL_DIRS["content_arm"].name
 ALL_MODELS = MODEL_DIR / "all_models.pkl"
 # The table fit_replay_content_models.py fit the canonical arm bundle on.
 # Checked against each artifact's provenance sidecar before plotting, so a
 # figure cannot be rendered from coefficients that predate the table on disk.
-ALL_MODELS_INPUTS = {"event_arm_table": RC / "event_arm_table.pkl"}
+ALL_MODELS_INPUTS = {"event_arm_table": table_path("event_arm_table", RC, fmt="pkl")}
 OUTPUT_DIR = Path("paper/figures/replay_content")
 
 

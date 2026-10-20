@@ -112,7 +112,11 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
 from continuum_swr_replay.analysis.replay.per_bin_rate_model import (  # noqa: E402
     _design_columns,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
+from continuum_swr_replay.paths import (  # noqa: E402
+    MODEL_DIRS,
+    REPLAY_CONTENT_DIR,
+    table_path,
+)
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
     require_covariate_schema,
 )
@@ -131,15 +135,15 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
-RC = PROCESSED_DATA_DIR / "replay_content"
+RC = REPLAY_CONTENT_DIR
 
 # The tables every fit in this family is built from. The provenance sidecar
 # records their hashes, and the summarizer/plotter check the same mapping, so a
 # regenerated table cannot be read through a fit that predates it.
 FIT_INPUTS = {
-    "stop_table": RC / "stop_table.pkl",
-    "event_onset_table": RC / "event_onset_table.pkl",
-    "event_table": RC / "event_table.pkl",
+    "stop_table": table_path("stop_table", RC, fmt="pkl"),
+    "event_onset_table": table_path("event_onset_table", RC, fmt="pkl"),
+    "event_table": table_path("event_table", RC, fmt="pkl"),
 }
 
 # The ladder is fit on one frozen cohort, so its bins are dropped by its
@@ -558,9 +562,9 @@ def main() -> None:
     for spec in MODEL_PER_BIN_RATE.values():
         assert_predictor_timing(c for c in _design_columns(spec) if c != "count")
 
-    stop = read_table(RC / "stop_table.pkl")
-    onset_table = read_table(RC / "event_onset_table.pkl")
-    event_table = read_table(RC / "event_table.pkl")
+    stop = read_table(table_path("stop_table", RC, fmt="pkl"))
+    onset_table = read_table(table_path("event_onset_table", RC, fmt="pkl"))
+    event_table = read_table(table_path("event_table", RC, fmt="pkl"))
     require_covariate_schema(stop, table="stop")
     require_covariate_schema(onset_table, table="event_onset")
     require_covariate_schema(event_table, table="event")
@@ -615,7 +619,7 @@ def main() -> None:
     # the model comparison invalidates a cross-cohort step on this column.
     models["stop_cohort"] = args.stop_cohort
 
-    out_dir = RC / "models_per_bin_rate"
+    out_dir = RC / MODEL_DIRS["per_bin_rate"].name
     out_dir.mkdir(parents=True, exist_ok=True)
     # `--max-per-animal 0` is still smoke mode, so test the flag, not its value.
     smoke = args.max_per_animal is not None

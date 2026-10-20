@@ -48,6 +48,7 @@ from continuum_swr_replay.analysis.replay.table_contracts import (
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
+from continuum_swr_replay.paths import table_path
 from continuum_swr_replay.tables.io import read_table
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
@@ -215,7 +216,7 @@ def refresh_contfrag_behavioral_covariates(
         require_swr_source(frame, what=f"{source_dir / basenames[name]}")
     validate_event_arm_table(old_arm_all, event_table=old_event_all)
     contingency = load_contingency(
-        replay_content_dir / "models_per_bin_rate" / "qvals_table.pkl"
+        table_path("qvals_table", replay_content_dir, fmt="pkl")
     )
     replay_prepare_data.SESSION_CACHE_DIR = replay_content_dir / "_session_cache"
     source_sessions = set(

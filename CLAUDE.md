@@ -82,6 +82,7 @@ src/continuum_swr_replay/
 ├── figure_utilities.py    # publication-figure helpers
 ├── intervals.py           # interval algebra: overlap conventions, masks, spike binning
 ├── parameters.py          # global parameters, PROCESSED_DATA_DIR, COLORS
+├── paths.py               # output locations, canonical table names, table_path()
 └── types.py               # shared type definitions
 
 scripts/                   # Analysis scripts, grouped by domain — see scripts/README.md

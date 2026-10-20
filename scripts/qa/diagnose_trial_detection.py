@@ -32,6 +32,7 @@ from continuum_swr_replay.analysis.constants import (
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR
 from continuum_swr_replay.types import SessionDataKeys
 
 ARM_COLORS = {
@@ -169,7 +170,7 @@ def figure_trial_sanity(
 
 def figure_predictor_collapse(*, output_dir: Path) -> None:
     """Across all events, quantify how often each predictor collapses with is_current."""
-    ev = pd.read_pickle(PROCESSED_DATA_DIR / "replay_content" / "events.pkl")
+    ev = pd.read_pickle(REPLAY_CONTENT_DIR / "events.pkl")
     ev = ev.copy()
     ev["cur"] = ev["track_segment_id"]
     ev["prev"] = ev["prev_trial_from_well"]

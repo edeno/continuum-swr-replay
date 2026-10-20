@@ -22,21 +22,21 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
     require_covariate_schema,
 )
 from continuum_swr_replay.tables.io import read_table
 
-RC = PROCESSED_DATA_DIR / "replay_content"
+RC = REPLAY_CONTENT_DIR
 OUT = Path(__file__).resolve().parents[2] / ".claude/research/peri_departure_outputs"
 OUT.mkdir(parents=True, exist_ok=True)
 
 
 def main() -> None:
-    ea = read_table(RC / "event_arm_table.pkl")
-    et = read_table(RC / "event_table.pkl")
-    stop = read_table(RC / "stop_table.pkl")
+    ea = read_table(table_path("event_arm_table", RC, fmt="pkl"))
+    et = read_table(table_path("event_table", RC, fmt="pkl"))
+    stop = read_table(table_path("stop_table", RC, fmt="pkl"))
     require_covariate_schema(ea, table="event_arm")
     require_covariate_schema(et, table="event")
     require_covariate_schema(stop, table="stop")

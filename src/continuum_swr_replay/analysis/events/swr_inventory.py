@@ -14,11 +14,11 @@ never the reverse.
 What this module fixes
 ----------------------
 - **Which inventory**: :data:`SWR_INVENTORY_RUN_ID`, the run folder, and
-  :data:`SWR_DETECTOR`, the detector, under :data:`SWR_INVENTORY_ROOT`. They are
+  :data:`SWR_DETECTOR`, the detector, under ``paths.SWR_INVENTORY_ROOT``. They are
   the only place either is written; rerunning R3 is a change of
   :data:`SWR_INVENTORY_RUN_ID` and nothing else.
 - **Which artifacts**: :data:`ARTIFACT_INTERVALS_RUN_ID` under
-  :data:`ARTIFACT_INTERVALS_ROOT`, the artifact detector's run
+  ``paths.ARTIFACT_INTERVALS_DIR``, the artifact detector's run
   (``scripts/decoding/run_artifact_detection.py``). It is None today: no
   artifact is masked. Every function here resolves an epoch's artifact
   intervals itself (:func:`artifact_intervals`), so no caller passes them and
@@ -71,14 +71,12 @@ from continuum_swr_replay.analysis.events.eligibility import (
     excluded_time,
 )
 from continuum_swr_replay.intervals import subtract_intervals
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import ARTIFACT_INTERVALS_DIR, SWR_INVENTORY_ROOT
 from continuum_swr_replay.runs.io import sha256_file
 
 __all__ = [
-    "ARTIFACT_INTERVALS_ROOT",
     "ARTIFACT_INTERVALS_RUN_ID",
     "SWR_DETECTOR",
-    "SWR_INVENTORY_ROOT",
     "SWR_INVENTORY_RUN_ID",
     "SWR_LABEL_COLUMN",
     "SwrSourceError",
@@ -113,10 +111,6 @@ SWR_DETECTOR = "kay"
 2016), with the runner's pinned ``DETECTOR_SETTINGS["kay"]``."""
 
 
-SWR_INVENTORY_ROOT = PROCESSED_DATA_DIR / "replay_detection_comparison" / "swr"
-"""Where the SWR runner writes its run folders, one per run id."""
-
-
 ARTIFACT_INTERVALS_RUN_ID: str | None = "fbbff144a123"
 """The artifact detector's run whose intervals drop overlapping SWRs and leave
 the coverage.
@@ -124,15 +118,11 @@ the coverage.
 Runbook R9's run (2026-10-10, commit fbbff14, all 255 epochs, gate report
 ``.claude/research/refresh_artifact_detector/r9_gate/rerun/r9_regate_report.md``).
 None would mean no artifact is masked (``artifacts@none``). The folder,
-:data:`ARTIFACT_INTERVALS_ROOT` ``/ <run id>``, holds ``manifest.json`` and one
+``paths.ARTIFACT_INTERVALS_DIR / <run id>``, holds ``manifest.json`` and one
 ``{epoch_id}_artifact_intervals.parquet`` per epoch: the epoch's unpadded
 cores (``artifact_intervals.CORE_COLUMNS``), no rows when it has none. A missing
 file is an error, not an epoch without artifacts.
 """
-
-
-ARTIFACT_INTERVALS_ROOT = PROCESSED_DATA_DIR / "artifact_intervals"
-"""Where artifact-interval run folders go, one per run id."""
 
 
 SWR_LABEL_COLUMN = "SWR_event"
@@ -160,7 +150,7 @@ class SwrSourceError(ValueError):
 
 def swr_inventory_dir() -> Path:
     """The run folder of :data:`SWR_INVENTORY_RUN_ID` under
-    :data:`SWR_INVENTORY_ROOT`, read when called."""
+    ``paths.SWR_INVENTORY_ROOT``, read when called."""
     return SWR_INVENTORY_ROOT / SWR_INVENTORY_RUN_ID
 
 
@@ -169,7 +159,7 @@ def artifact_intervals_dir() -> Path | None:
     is unset. Read when called."""
     if ARTIFACT_INTERVALS_RUN_ID is None:
         return None
-    return ARTIFACT_INTERVALS_ROOT / ARTIFACT_INTERVALS_RUN_ID
+    return ARTIFACT_INTERVALS_DIR / ARTIFACT_INTERVALS_RUN_ID
 
 
 def swr_source_name() -> str:

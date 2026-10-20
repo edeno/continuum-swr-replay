@@ -141,7 +141,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (
 from continuum_swr_replay.analysis.replay.model_specs import (
     SWR_CONTRAST_CONTENT_PATCH_LADDER as PATCH_LADDER,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import MODEL_DIRS, REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -164,7 +164,7 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
-RC = PROCESSED_DATA_DIR / "replay_content"
+RC = REPLAY_CONTENT_DIR
 SC = list(SESSION_COLUMNS)
 MIN_EVENTS = 18
 
@@ -186,10 +186,10 @@ _ESTIMATOR_SKIP_CLASSES = ESTIMATOR_SKIP_CLASSES
 # artifacts check the same mapping, so a regenerated table cannot be read
 # through coefficients that predate it.
 FIT_INPUTS = {
-    "event_arm_table": RC / "event_arm_table.pkl",
-    "event_patch_table": RC / "event_patch_table.pkl",
-    "stop_table": RC / "stop_table.pkl",
-    "qvals_table": RC / "models_per_bin_rate" / "qvals_table.pkl",
+    "event_arm_table": table_path("event_arm_table", RC, fmt="pkl"),
+    "event_patch_table": table_path("event_patch_table", RC, fmt="pkl"),
+    "stop_table": table_path("stop_table", RC, fmt="pkl"),
+    "qvals_table": table_path("qvals_table", RC, fmt="pkl"),
 }
 
 
@@ -1411,7 +1411,7 @@ def main() -> None:
             )
 
     sfx = _artifact_suffix(args, response)
-    (RC / "models").mkdir(parents=True, exist_ok=True)
+    (RC / MODEL_DIRS["content_arm"].name).mkdir(parents=True, exist_ok=True)
     # The standardization references are taken over the FULL assembled cohorts,
     # before the outcome stratum and the smoke subset, so every stratum's
     # coefficients are stated in the same per-SD unit.
@@ -1456,7 +1456,9 @@ def main() -> None:
     arm, arm_audit = _run(
         ev, ARM_LADDER, response_col=arm_response, n_categories=9, **fit_kwargs
     )
-    arm_path = RC / "models" / f"swr_contrast_content_arm{sfx}.pkl"
+    arm_path = (
+        RC / MODEL_DIRS["content_arm"].name / f"swr_contrast_content_arm{sfx}.pkl"
+    )
     arm.to_pickle(arm_path)
     write_fit_provenance(arm_path, fit_inputs, estimator, sys.argv, extra=fit_extra)
     save_reference(arm_z_reference, z_reference_path(arm_path))
@@ -1470,7 +1472,9 @@ def main() -> None:
     patch, patch_audit = _run(
         pt, PATCH_LADDER, response_col=patch_response, n_categories=3, **fit_kwargs
     )
-    patch_path = RC / "models" / f"swr_contrast_content_patch{sfx}.pkl"
+    patch_path = (
+        RC / MODEL_DIRS["content_arm"].name / f"swr_contrast_content_patch{sfx}.pkl"
+    )
     patch.to_pickle(patch_path)
     write_fit_provenance(patch_path, fit_inputs, estimator, sys.argv, extra=fit_extra)
     save_reference(patch_z_reference, z_reference_path(patch_path))
@@ -1479,7 +1483,9 @@ def main() -> None:
     # n_modeled at the event grain) + term-level quasi-separation diagnostics.
     write_cohort_audit(
         arm_audit + patch_audit,
-        RC / "models" / f"swr_contrast_content_cohort_audit{sfx}.csv",
+        RC
+        / MODEL_DIRS["content_arm"].name
+        / f"swr_contrast_content_cohort_audit{sfx}.csv",
     )
     term_diag = pd.concat(
         [
@@ -1489,10 +1495,18 @@ def main() -> None:
         ignore_index=True,
     )
     term_diag.to_csv(
-        RC / "models" / f"swr_contrast_content_term_diagnostics{sfx}.csv", index=False
+        RC
+        / MODEL_DIRS["content_arm"].name
+        / f"swr_contrast_content_term_diagnostics{sfx}.csv",
+        index=False,
     )
 
-    logger.info("saved arm=%d patch=%d rows -> %s", len(arm), len(patch), RC / "models")
+    logger.info(
+        "saved arm=%d patch=%d rows -> %s",
+        len(arm),
+        len(patch),
+        RC / MODEL_DIRS["content_arm"].name,
+    )
     print("\n########## ARM ##########")
     _summ(arm, ARM_LADDER, ARM_KEY_TERM)
     print("\n########## PATCH ##########")
@@ -1528,7 +1542,9 @@ def main() -> None:
         ],
         ignore_index=True,
     )
-    audited_path = RC / "models" / f"swr_contrast_content_audited{sfx}.pkl"
+    audited_path = (
+        RC / MODEL_DIRS["content_arm"].name / f"swr_contrast_content_audited{sfx}.pkl"
+    )
     agg.to_pickle(audited_path)
     write_fit_provenance(audited_path, fit_inputs, estimator, sys.argv, extra=fit_extra)
     prov = _provenance(
@@ -1540,11 +1556,15 @@ def main() -> None:
         _renormalized_rungs(arm, patch),
         concentration_cols,
     )
-    (RC / "models" / f"swr_contrast_content_provenance{sfx}.json").write_text(
-        json.dumps(prov, indent=2)
-    )
+    (
+        RC
+        / MODEL_DIRS["content_arm"].name
+        / f"swr_contrast_content_provenance{sfx}.json"
+    ).write_text(json.dumps(prov, indent=2))
     logger.info(
-        "saved audited table (%d rows) + provenance -> %s", len(agg), RC / "models"
+        "saved audited table (%d rows) + provenance -> %s",
+        len(agg),
+        RC / MODEL_DIRS["content_arm"].name,
     )
     print(
         "\n########## AUDITED  (animal-level = primary; session signed-rank = descriptive) ##########"

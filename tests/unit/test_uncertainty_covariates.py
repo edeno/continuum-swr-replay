@@ -25,6 +25,7 @@ from continuum_swr_replay.analysis.replay.covariates import (
 from continuum_swr_replay.analysis.replay.model_specs import (
     MU_UNCERTAINTY_CURATED_COVARIATES,
 )
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.io import read_table, table_exists
 from continuum_swr_replay.tables.session_keys import subset_max_per_animal
 
@@ -939,17 +940,16 @@ def test_runner_smoke():
         REWARD_HISTORY_COLUMNS,
         attach_is_swr_to_onsets,
     )
-    from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
-    rc = PROCESSED_DATA_DIR / "replay_content"
-    qvals_path = rc / "models_per_bin_rate" / "qvals_table.pkl"
+    rc = REPLAY_CONTENT_DIR
+    qvals_path = table_path("qvals_table", rc, fmt="pkl")
     if not table_exists(qvals_path):
         pytest.fail(
             "qvals_table not present (run "
             "`uv run python scripts/behavior/build_qvals_table.py --write` first)"
         )
 
-    stop = read_table(rc / "stop_table.pkl")
+    stop = read_table(table_path("stop_table", rc, fmt="pkl"))
     canonical_columns = {
         "completed_trial_id",
         "completed_trial_arm",
@@ -959,8 +959,8 @@ def test_runner_smoke():
     }
     if not canonical_columns.issubset(stop.columns):
         pytest.fail("canonical stop_table.pkl has not been regenerated")
-    onset_table = read_table(rc / "event_onset_table.pkl")
-    event_table = read_table(rc / "event_table.pkl")
+    onset_table = read_table(table_path("event_onset_table", rc, fmt="pkl"))
+    event_table = read_table(table_path("event_table", rc, fmt="pkl"))
     # The helper freezes the shared natural-session cohort and warns about any
     # independently regenerated onset-only/event-only sessions. Unit tests pin
     # that warning/audit; this slow smoke should continue across the shared

@@ -73,6 +73,7 @@ from continuum_swr_replay.decoding.files import (  # noqa: E402
     non_local_threshold_percent,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path  # noqa: E402
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
     require_covariate_schema,
 )
@@ -230,7 +231,7 @@ def arm_occupancy(animal: str | None = None) -> pd.DataFrame | None:
     Returns a (9-arm x {nonSWR, SWR}) fraction table, or None if the canonical
     ``replay_content/event_arm_table.pkl`` is unavailable.
     """
-    f = PROCESSED_DATA_DIR / "replay_content" / "event_arm_table.pkl"
+    f = table_path("event_arm_table", REPLAY_CONTENT_DIR, fmt="pkl")
     if not table_exists(f):
         return None
     ea = read_table(f)

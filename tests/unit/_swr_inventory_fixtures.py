@@ -141,7 +141,7 @@ def write_artifact_run(
     Parameters
     ----------
     root : Path
-        The folder that holds run folders (``ARTIFACT_INTERVALS_ROOT``'s
+        The folder that holds run folders (``ARTIFACT_INTERVALS_DIR``'s
         stand-in).
     cores : mapping
         Epoch id -> its unpadded cores ``(signatures, core_start, core_end)``,
@@ -173,5 +173,5 @@ def use_swr_source(monkeypatch, inventory: Path, artifacts: Path | None = None) 
     monkeypatch.setattr(swr_inventory, "SWR_INVENTORY_ROOT", inventory.parent)
     monkeypatch.setattr(swr_inventory, "SWR_INVENTORY_RUN_ID", inventory.name)
     if artifacts is not None:
-        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_ROOT", artifacts.parent)
+        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_DIR", artifacts.parent)
         monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", artifacts.name)

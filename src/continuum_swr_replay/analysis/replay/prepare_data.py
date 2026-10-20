@@ -77,6 +77,7 @@ from continuum_swr_replay.data_loaders.trials import (
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.runs.io import write_atomically
 from continuum_swr_replay.tables.io import (
     parquet_path,
@@ -96,7 +97,7 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 
-OUTPUT_DIR = PROCESSED_DATA_DIR / "replay_content"
+OUTPUT_DIR = REPLAY_CONTENT_DIR
 # Per-session cache of the Spyglass-sourced behavioral context and track graph.
 # Populated on every full run; consumed by --from-cache to skip load_data.
 SESSION_CACHE_DIR = OUTPUT_DIR / "_session_cache"
@@ -600,7 +601,7 @@ def _refuse_to_clobber_complete_stop_table(output_dir: Path) -> None:
     build produces. The ``--stop-only`` bootstrap produces a split-less table,
     so overwriting a complete one would silently downgrade it.
     """
-    target = parquet_path(output_dir / "stop_table")
+    target = parquet_path(table_path("stop_table", output_dir, fmt=""))
     if not target.exists():
         return
     if _STOP_SPLIT_COLUMNS.issubset(pq.read_schema(target).names):
@@ -966,7 +967,7 @@ def run_prepare_data(args: argparse.Namespace) -> None:
     # per port to the corresponding candidate-arm fields. The belief mean is
     # the fitted Beta reward belief, not the separate local leaky-Q history.
     # Absent qvals rows leave those fields NaN.
-    contingency_path = contingency_dir / "models_per_bin_rate" / "qvals_table.pkl"
+    contingency_path = table_path("qvals_table", contingency_dir, fmt="pkl")
     contingency = load_contingency(contingency_path)
 
     # Warn if the output directory still holds artifacts from the

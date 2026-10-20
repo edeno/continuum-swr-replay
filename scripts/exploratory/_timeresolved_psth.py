@@ -30,12 +30,16 @@ import matplotlib.pyplot as plt  # noqa: E402
 warnings.filterwarnings("ignore")
 from continuum_swr_replay.analysis.replay import attach_is_swr_to_onsets  # noqa: E402
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
+from continuum_swr_replay.paths import (  # noqa: E402
+    REPLAY_CONTENT_DIR,  # noqa: E402
+    table_path,
+)
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
     require_covariate_schema,
 )
 from continuum_swr_replay.tables.io import read_table  # noqa: E402
 
-RC = P / "replay_content"
+RC = REPLAY_CONTENT_DIR
 BIN_S = 0.004
 TBINS = np.arange(0, 10.01, 0.25)
 CENT = 0.5 * (TBINS[:-1] + TBINS[1:])
@@ -43,13 +47,13 @@ COLORS = {"detected SWR": "k", "non-local w/ SWR": "C3", "non-local NO SWR": "C0
 
 
 def main() -> None:
-    dense = read_table(RC / "stop_timebin_table.pkl")
+    dense = read_table(table_path("stop_timebin_table", RC, fmt="pkl"))
     require_covariate_schema(dense, table="stop_timebin")
     exp_h, _ = np.histogram(dense.t_since_pump.dropna().to_numpy(), TBINS)
     sec = exp_h * BIN_S  # seconds of immobility exposure per t-bin
 
-    onset_source = read_table(RC / "event_onset_table.pkl")
-    events = read_table(RC / "event_table.pkl")
+    onset_source = read_table(table_path("event_onset_table", RC, fmt="pkl"))
+    events = read_table(table_path("event_table", RC, fmt="pkl"))
     require_covariate_schema(onset_source, table="event_onset")
     require_covariate_schema(events, table="event")
     onset = attach_is_swr_to_onsets(onset_source, events)

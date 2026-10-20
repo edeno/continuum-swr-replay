@@ -27,13 +27,13 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
 from continuum_swr_replay.tables.io import read_table
 
-RC = PROCESSED_DATA_DIR / "replay_content"
+RC = REPLAY_CONTENT_DIR
 
 
 def _is_min_ranking(s) -> bool:
@@ -55,7 +55,7 @@ def main() -> int:
         return np.nanmin(v) >= -tol and np.nanmax(v) <= 1 + tol
 
     # ================= stop_table =================
-    st = read_table(RC / "stop_table.pkl")
+    st = read_table(table_path("stop_table", RC, fmt="pkl"))
     require_covariate_schema(st, table="stop")
     print("\n### stop_table (per-stop rate A / rate B input) ###")
     lags = [f"known_reward_outcome_lag_{i}" for i in range(1, 11)]
@@ -91,7 +91,7 @@ def main() -> int:
         check("S", "patch switch fraction in [0,1]", False, f"could not recompute: {e}")
 
     # ================= event_arm_table =================
-    ea = read_table(RC / "event_arm_table.pkl")
+    ea = read_table(table_path("event_arm_table", RC, fmt="pkl"))
     require_covariate_schema(ea, table="event_arm")
     print("\n### event_arm_table (content arm + choice) ###")
     arm = ea["candidate_arm"].to_numpy()
@@ -164,7 +164,7 @@ def main() -> int:
           (ea["arm_count_hard"].to_numpy() >= 0).all(), "")
 
     # ================= event_patch_table =================
-    ep = read_table(RC / "event_patch_table.pkl")
+    ep = read_table(table_path("event_patch_table", RC, fmt="pkl"))
     require_covariate_schema(ep, table="event_patch")
     print("\n### event_patch_table (content patch) ###")
     check("H", "3 patches/event", abs(len(ep) / ep["event_id"].nunique() - 3) < 1e-9, "")
@@ -182,7 +182,7 @@ def main() -> int:
     check("H", "patch_count_hard >= 0", (ep["patch_count_hard"].to_numpy() >= 0).all(), "")
 
     # ================= qvals_table value block =================
-    cont = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
+    cont = read_table(table_path("qvals_table", RC, fmt="pkl"))
     require_covariate_schema(cont, table="qvals")
     print("\n### qvals_table (nominal + model value block) ###")
     check("H", "stop_id unique", cont["stop_id"].is_unique,

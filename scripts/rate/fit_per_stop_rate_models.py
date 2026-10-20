@@ -66,7 +66,7 @@ from continuum_swr_replay.analysis.replay.per_stop_rate_model import (
     cross_validate_per_stop_rate_model,
     fit_per_stop_rate_model,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import MODEL_DIRS, REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -79,10 +79,10 @@ from continuum_swr_replay.tables.session_keys import (
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
-RC = PROCESSED_DATA_DIR / "replay_content"
+RC = REPLAY_CONTENT_DIR
 
 # The table this family is fit on; recorded in the artifact's provenance sidecar.
-FIT_INPUTS = {"stop_table": RC / "stop_table.pkl"}
+FIT_INPUTS = {"stop_table": table_path("stop_table", RC, fmt="pkl")}
 # Per-stop count outcomes (canonical stop_table columns), tagged by `outcome`.
 RESPONSE_COLS = PER_STOP_RATE_OUTCOMES
 OFFSET_COL = "immobility_duration_s"
@@ -255,7 +255,7 @@ def main() -> None:
     for spec in MODEL_PER_STOP_RATE.values():
         assert_predictor_timing(spec.predictors)
 
-    stop = read_table(RC / "stop_table.pkl")
+    stop = read_table(table_path("stop_table", RC, fmt="pkl"))
     require_covariate_schema(stop, table="stop")
     # Its SWR counts (is_swr_stop, n_swr_events, ...) must come from the
     # configured source, artifact run included.
@@ -305,7 +305,7 @@ def main() -> None:
     # the model comparison invalidates a cross-cohort step on this column.
     rate["stop_cohort"] = args.stop_cohort
 
-    out_dir = RC / "models_per_stop_rate"
+    out_dir = RC / MODEL_DIRS["per_stop_rate"].name
     out_dir.mkdir(parents=True, exist_ok=True)
     sfx = stop_cohort_suffix(args.stop_cohort, smoke=args.max_per_animal is not None)
     out = out_dir / f"all_models{sfx}.pkl"

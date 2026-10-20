@@ -25,13 +25,13 @@ from continuum_swr_replay.analysis.replay import (
 from continuum_swr_replay.analysis.replay.covariates.history.reward_history import (
     reward_basis_from_lags,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
 from continuum_swr_replay.tables.io import read_table, table_exists
 
-RC = PROCESSED_DATA_DIR / "replay_content"
+RC = REPLAY_CONTENT_DIR
 
 
 # ── Synthetic fixture for aggregate_to_timebins ──

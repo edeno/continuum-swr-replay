@@ -24,10 +24,13 @@ from pathlib import Path
 
 import pyarrow.parquet as pq
 
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import (
+    CANONICAL_TABLE_BASENAMES,
+    MODEL_DIRS,
+    REPLAY_CONTENT_DIR,
+    table_path,
+)
 from continuum_swr_replay.runs.io import sha256_file
-from continuum_swr_replay.tables.io import parquet_path
-from continuum_swr_replay.tables.parity import CANONICAL_TABLE_BASENAMES
 
 # Sibling-script import: the leaf bundle's name is derived from the fitting
 # runner's own helper rather than spelled out here, so the freeze cannot go on
@@ -41,13 +44,7 @@ from scripts.content.fit_replay_content_models import (  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
-RC = PROCESSED_DATA_DIR / "replay_content"
-
-# qvals lives one level down; the rest sit at the replay_content root.
-_TABLE_RELPATHS = {
-    name: ("models_per_bin_rate/qvals_table" if name == "qvals_table" else name)
-    for name in CANONICAL_TABLE_BASENAMES
-}
+RC = REPLAY_CONTENT_DIR
 # Every fitted bundle the baseline is supposed to cover. ``models_event_grain``
 # is not among them: the event-grain ladder is no longer refit (the fraction
 # ladder serves its purpose) and survives only in backups, so freezing it would
@@ -61,15 +58,15 @@ _TABLE_RELPATHS = {
 # artifacts that live INSIDE ``models`` are copied along with that directory
 # (``copytree`` has no ignore filter); add one here if that ever matters.
 _MODEL_DIRS = (
-    "models",
+    MODEL_DIRS["content_arm"].name,
     "models_swr_T",
     "models_swr_F",
-    "models_patch",
+    MODEL_DIRS["content_patch"].name,
     "models_patch_swr_T",
     "models_patch_swr_F",
     belief_chain_output_subdir(),
-    "models_per_stop_rate",
-    "models_per_bin_rate",
+    MODEL_DIRS["per_stop_rate"].name,
+    MODEL_DIRS["per_bin_rate"].name,
     "uncertainty_content",
     "event_source_comparison",
 )
@@ -86,8 +83,8 @@ def freeze(label: str) -> Path:
         "missing_model_dirs": [],
     }
 
-    for name, relpath in _TABLE_RELPATHS.items():
-        src = parquet_path(RC / relpath)
+    for name in CANONICAL_TABLE_BASENAMES:
+        src = table_path(name, RC)
         if not src.exists():
             raise FileNotFoundError(f"canonical table missing: {src}")
         dst = out / f"{name}.parquet"

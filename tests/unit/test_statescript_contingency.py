@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.paths import table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -186,9 +187,7 @@ def test_stop_before_first_block_is_dropped():
 @pytest.mark.slow
 @pytest.mark.real_data
 def test_real_session_parse():
-    from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-
-    stop_table_path = PROCESSED_DATA_DIR / "replay_content" / "stop_table.pkl"
+    stop_table_path = table_path("stop_table", fmt="pkl")
     if not table_exists(stop_table_path):
         pytest.fail("canonical stop table not materialized")
     stop_table = read_table(stop_table_path)

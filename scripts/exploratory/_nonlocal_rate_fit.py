@@ -50,7 +50,8 @@ from continuum_swr_replay.analysis.replay.model_specs import (
 from continuum_swr_replay.analysis.replay.per_stop_rate_model import (
     fit_per_stop_rate_model,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR
+from continuum_swr_replay.parameters import ROOT_DIR
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -60,7 +61,7 @@ plt.rcParams.update({"pdf.fonttype": 42, "ps.fonttype": 42,
                      "font.family": "sans-serif",
                      "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"]})
 
-RC_DIR = PROCESSED_DATA_DIR / "replay_content"
+RC_DIR = REPLAY_CONTENT_DIR
 DEFAULT_OUT_DIR = ROOT_DIR / ".claude/research/nonlocal_rate_fit_outputs"
 OUTCOMES = {
     "non_local": "n_selected_events",
@@ -268,7 +269,7 @@ def main() -> None:
     p.add_argument("--dpi", type=int, default=150)
     args = p.parse_args()
 
-    st = read_table(RC_DIR / "stop_table.pkl")
+    st = read_table(table_path("stop_table", RC_DIR, fmt="pkl"))
     require_covariate_schema(st, table="stop")
     sub = st[(st.animal == args.animal) & (st.session_date == args.day)
              & (st.epoch == args.epoch)]

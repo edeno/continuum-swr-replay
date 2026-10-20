@@ -26,6 +26,7 @@ from continuum_swr_replay.analysis.replay.table_contracts import (
     validate_event_patch_table,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
+from continuum_swr_replay.paths import MODEL_DIRS, table_path
 from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.runs.provenance import git, git_commit, git_dirty
 from continuum_swr_replay.tables.io import SWR_SOURCE_TABLES, read_attrs, read_table
@@ -289,12 +290,12 @@ def _validate_bounds(
 
 
 def _validate_replay(root: Path, expected_sessions: int) -> dict[str, object]:
-    event = read_table(root / "event_table")
-    arm = read_table(root / "event_arm_table")
-    patch = read_table(root / "event_patch_table")
-    stop = read_table(root / "stop_table")
-    sequence = read_table(root / "event_sequence_table")
-    qvals = read_table(root / "models_per_bin_rate" / "qvals_table")
+    event = read_table(table_path("event_table", root, fmt=""))
+    arm = read_table(table_path("event_arm_table", root, fmt=""))
+    patch = read_table(table_path("event_patch_table", root, fmt=""))
+    stop = read_table(table_path("stop_table", root, fmt=""))
+    sequence = read_table(table_path("event_sequence_table", root, fmt=""))
+    qvals = read_table(table_path("qvals_table", root, fmt=""))
     validate_event_arm_table(arm, event_table=event)
     validate_event_patch_table(patch, event_table=event)
     # stop_id anchors every stop-level join; a null or a cross-session collision
@@ -338,7 +339,9 @@ def _validate_replay(root: Path, expected_sessions: int) -> dict[str, object]:
         qvals,
         QVALS_STANDARDIZED_COLS,
         load_reference(
-            root / "models_per_bin_rate" / "qvals_standardization_reference.json"
+            root
+            / MODEL_DIRS["per_bin_rate"].name
+            / "qvals_standardization_reference.json"
         ),
         support_label="all_rows",
     )
@@ -451,7 +454,7 @@ def write_manifest(
     expected_drift_columns: set[str] | None = None,
 ) -> dict[str, object]:
     """Run promotion-blocking checks and persist one content-addressed manifest."""
-    replay_event = read_table(replay_root / "event_table")
+    replay_event = read_table(table_path("event_table", replay_root, fmt=""))
     contfrag_events = {
         source: read_table(contfrag_root / f"event_table_{source}_HPC")
         for source in ("swr", "mua")

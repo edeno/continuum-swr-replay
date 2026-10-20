@@ -44,16 +44,17 @@ from continuum_swr_replay.analysis.replay.spatial_mapping import (
 )
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import MODEL_DIRS, REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
 from continuum_swr_replay.tables.io import read_table
 
-RC = PROCESSED_DATA_DIR / "replay_content"
+RC = REPLAY_CONTENT_DIR
 # The panel draws the fitted M3 arm model, so it is gated on the same table the
 # content ladder recorded when it fit M3.
-M3_PATH = RC / "models" / "M3.pkl"
-ALL_MODELS_INPUTS = {"event_arm_table": RC / "event_arm_table.pkl"}
+M3_PATH = RC / MODEL_DIRS["content_arm"].name / "M3.pkl"
+ALL_MODELS_INPUTS = {"event_arm_table": table_path("event_arm_table", RC, fmt="pkl")}
 
 # The event's long-format rows, as panel E shows them.
 INDICATOR_COLUMNS = [
@@ -494,12 +495,14 @@ def main() -> None:
     args = build_parser().parse_args()
 
     dot, env = load_session(args.animal, args.day, args.epoch)
-    long_count = read_table(RC / "event_arm_table.pkl")
-    events = read_table(RC / "event_table.pkl")
+    long_count = read_table(table_path("event_arm_table", RC, fmt="pkl"))
+    events = read_table(table_path("event_table", RC, fmt="pkl"))
     require_covariate_schema(long_count, table="event_arm")
     require_covariate_schema(events, table="event")
-    require_swr_source(long_count, what=str(RC / "event_arm_table.pkl"))
-    require_swr_source(events, what=str(RC / "event_table.pkl"))
+    require_swr_source(
+        long_count, what=str(table_path("event_arm_table", RC, fmt="pkl"))
+    )
+    require_swr_source(events, what=str(table_path("event_table", RC, fmt="pkl")))
     require_fresh_inputs(M3_PATH, ALL_MODELS_INPUTS, allow_stale=args.allow_stale)
     m3_fits = pd.read_pickle(M3_PATH)
 

@@ -31,22 +31,26 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import (
+    CONTFRAG_REPLAY_CONTENT_DIR,
+    REPLAY_CONTENT_DIR,
+    table_path,
+)
 from continuum_swr_replay.tables.io import parquet_path, read_table, write_table
 
 LOGGER = logging.getLogger(__name__)
 
-_RC = PROCESSED_DATA_DIR / "replay_content"
-_CF = PROCESSED_DATA_DIR / "contfrag_replay_content"
+_RC = REPLAY_CONTENT_DIR
+_CF = CONTFRAG_REPLAY_CONTENT_DIR
 
 CANONICAL_TABLES: tuple[Path, ...] = (
-    _RC / "event_table.pkl",
-    _RC / "event_arm_table.pkl",
-    _RC / "event_patch_table.pkl",
-    _RC / "event_sequence_table.pkl",
-    _RC / "stop_table.pkl",
-    _RC / "event_onset_table.pkl",
-    _RC / "models_per_bin_rate" / "qvals_table.pkl",
+    table_path("event_table", _RC, fmt="pkl"),
+    table_path("event_arm_table", _RC, fmt="pkl"),
+    table_path("event_patch_table", _RC, fmt="pkl"),
+    table_path("event_sequence_table", _RC, fmt="pkl"),
+    table_path("stop_table", _RC, fmt="pkl"),
+    table_path("event_onset_table", _RC, fmt="pkl"),
+    table_path("qvals_table", _RC, fmt="pkl"),
     *(
         _CF / f"{name}_{source}_HPC.pkl"
         for name in (

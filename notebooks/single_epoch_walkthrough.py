@@ -157,6 +157,7 @@ from continuum_swr_replay.analysis.replay.uncertainty_content import (
 )
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.types import SessionDataKeys
 from continuum_swr_replay.visualization.session_tables import (
     BEHAVIORAL_MODEL_PANELS,
@@ -220,8 +221,7 @@ SESSION_ID = f"{NWB_FILE_NAME.replace('_.nwb', '')}_{EPOCH_NAME}_{BRAIN_AREA}"
 DOT_FILE = PROCESSED_DATA_DIR / f"{SESSION_ID}_80_data_over_time.pkl"
 ENV_FILE = PROCESSED_DATA_DIR / f"{SESSION_ID}_environment.pkl"
 RESULTS_FILE = PROCESSED_DATA_DIR / f"{SESSION_ID}_results.nc"
-REPLAY_CONTENT_DIR = PROCESSED_DATA_DIR / "replay_content"
-QVALS_FILE = REPLAY_CONTENT_DIR / "models_per_bin_rate" / "qvals_table.pkl"
+QVALS_FILE = table_path("qvals_table", fmt="pkl")
 ARM_Z_REFERENCE_FILE = REPLAY_CONTENT_DIR / "standardization_reference.json"
 HORSERACE_COEFS_FILE = (
     REPLAY_CONTENT_DIR

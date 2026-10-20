@@ -66,11 +66,16 @@ from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.results import open_results
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import (
+    BASENAME_TO_TABLE,
+    CONTFRAG_REPLAY_CONTENT_DIR,
+    REPLAY_CONTENT_DIR,
+    table_path,
+)
 from continuum_swr_replay.tables.covariate_registry import (
     stamp_covariate_schema,
 )
 from continuum_swr_replay.tables.io import publish_canonical
-from continuum_swr_replay.tables.parity import BASENAME_TO_TABLE
 
 logging.basicConfig(
     level=logging.INFO,
@@ -142,7 +147,7 @@ def publish_contfrag_tables(
     return tables
 
 
-OUTPUT_DIR = PROCESSED_DATA_DIR / "contfrag_replay_content"
+OUTPUT_DIR = CONTFRAG_REPLAY_CONTENT_DIR
 
 
 def find_sessions(
@@ -399,7 +404,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--replay-content-dir",
         type=Path,
-        default=PROCESSED_DATA_DIR / "replay_content",
+        default=REPLAY_CONTENT_DIR,
         help=(
             "Replay-content root providing qvals and, unless "
             "--behavior-cache-dir is given, the version-matched behavioral "
@@ -482,7 +487,7 @@ def main():
     # Shared per-stop value artifact (qvals_table, exact poke_out alignment).
     # ContFrag's own stop_id mixes in brain_area/event_source, so the builder
     # recomputes the plain (animal,day,epoch,stop_idx) hash for the join.
-    contingency_path = replay_content_dir / "models_per_bin_rate" / "qvals_table.pkl"
+    contingency_path = table_path("qvals_table", replay_content_dir, fmt="pkl")
     contingency = load_contingency(contingency_path)
 
     skipped: list[tuple[str, str, str]] = []

@@ -100,7 +100,7 @@ def _artifacts(tmp_path, monkeypatch, cores, span=(0.0, 1e6)) -> None:
     """Configure an artifact run whose cores for EPOCH are `cores`
     (``(signatures, core_start, core_end)``)."""
     directory = write_artifact_run(tmp_path / "artifacts", {EPOCH: cores}, span=span)
-    monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_ROOT", directory.parent)
+    monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_DIR", directory.parent)
     monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
 
 
@@ -121,7 +121,7 @@ class TestTheConfiguredInventory:
             swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", CONFIGURED_ARTIFACT_RUN_ID
         )
         assert swr_inventory.artifact_intervals_dir() == (
-            swr_inventory.ARTIFACT_INTERVALS_ROOT / "fbbff144a123"
+            swr_inventory.ARTIFACT_INTERVALS_DIR / "fbbff144a123"
         )
         assert swr_inventory.swr_source_name() == (
             "kay@056eee0dcb5a+artifacts@fbbff144a123"
@@ -135,7 +135,7 @@ class TestTheConfiguredInventory:
 
         assert swr_inventory.swr_inventory_dir().name == "rerun_masked"
         assert swr_inventory.artifact_intervals_dir() == (
-            swr_inventory.ARTIFACT_INTERVALS_ROOT / "task16"
+            swr_inventory.ARTIFACT_INTERVALS_DIR / "task16"
         )
         assert swr_inventory.swr_source_name() == "kay@rerun_masked+artifacts@task16"
 

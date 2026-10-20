@@ -66,7 +66,7 @@ from continuum_swr_replay.analysis.inventory_comparison.heldout import (  # noqa
     nearest_window_content,
     poor_coverage_fold,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
+from continuum_swr_replay.paths import DETECTION_COMPARISON_DIR
 from continuum_swr_replay.tables.io import write_table  # noqa: E402
 from scripts.qa import sweep_memoryless_controls as controls  # noqa: E402
 from scripts.qa import sweep_memoryless_detection as sweep  # noqa: E402
@@ -75,9 +75,7 @@ N_PERMUTATIONS = 100
 COVERAGE_SENSITIVITY = (2.0, COVERAGE_FLOOR, 10.0)
 PLACEMENT_SEED = 2
 
-OUT_PATH = (
-    PROCESSED_DATA_DIR / "replay_detection_comparison" / "memoryless_heldout.parquet"
-)
+OUT_PATH = DETECTION_COMPARISON_DIR / "memoryless_heldout.parquet"
 SUMMARY_PATH = Path(
     "docs/design/replay_detection_comparison/detection_heldout_summary.csv"
 )

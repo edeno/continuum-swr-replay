@@ -60,7 +60,8 @@ from matplotlib.lines import Line2D
 
 from continuum_swr_replay.analysis.replay.covariates import add_uncertainty_covariates
 from continuum_swr_replay.analysis.replay.model_specs import N_REWARD_LAGS
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR
+from continuum_swr_replay.parameters import ROOT_DIR
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -80,7 +81,7 @@ plt.rcParams.update({
 ARM_ROW_ORDER = [0, 1, 6, 2, 3, 7, 4, 5, 8]
 ARM_LABEL = {a: (f"arm {a} (trunk)" if a >= 6 else f"arm {a}") for a in ARM_ROW_ORDER}
 PALETTE = patch_grouped_arm_palette()
-RC_DIR = PROCESSED_DATA_DIR / "replay_content"
+RC_DIR = REPLAY_CONTENT_DIR
 DEFAULT_OUT_DIR = ROOT_DIR / ".claude/research/nonlocal_bout_arm_outputs"
 
 
@@ -466,7 +467,7 @@ def main() -> None:
                    help="raster DPI (heatmaps/scatter are rasterized)")
     args = p.parse_args()
 
-    event_arm = read_table(RC_DIR / "event_arm_table.pkl")
+    event_arm = read_table(table_path("event_arm_table", RC_DIR, fmt="pkl"))
     require_covariate_schema(event_arm, table="event_arm")
     # Stop table + RL value-state block, assembled as the SWR-contrast runners
     # do: recent_switch_rate via add_uncertainty_covariates (default
@@ -476,10 +477,10 @@ def main() -> None:
     # absent from qvals are kept and shown masked, rather than dropped by the
     # rate runner's inner join; and covariates are shown raw, not z-scored as
     # the fitters standardize them.
-    stops = read_table(RC_DIR / "stop_table.pkl")
+    stops = read_table(table_path("stop_table", RC_DIR, fmt="pkl"))
     require_covariate_schema(stops, table="stop")
     stops = add_uncertainty_covariates(stops)
-    qvals = read_table(RC_DIR / "models_per_bin_rate" / "qvals_table.pkl")
+    qvals = read_table(table_path("qvals_table", RC_DIR, fmt="pkl"))
     require_covariate_schema(qvals, table="qvals")
     value_state = [
         "periswitch_index_trials",

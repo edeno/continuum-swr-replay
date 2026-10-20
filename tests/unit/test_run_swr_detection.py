@@ -1588,7 +1588,7 @@ def test_the_run_reads_and_records_the_configured_artifact_run(
     the same run id with another artifact run is refused."""
     identifier = epoch_id(NWB_FILE_NAME, EPOCH_NAME)
     artifact_dir = _artifact_run(tmp_path, identifier)
-    monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_ROOT", artifact_dir.parent)
+    monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_DIR", artifact_dir.parent)
     monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", artifact_dir.name)
     monkeypatch.setattr(
         runner,

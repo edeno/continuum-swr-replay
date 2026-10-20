@@ -38,14 +38,14 @@ from continuum_swr_replay.analysis.replay._helpers import (
 from continuum_swr_replay.analysis.replay.covariates import add_uncertainty_covariates
 from continuum_swr_replay.analysis.replay.fitting import fit_conditional_poisson
 from continuum_swr_replay.analysis.replay.model_specs import MODEL_HIERARCHY
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
 from continuum_swr_replay.tables.io import read_table
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
-RC = PROCESSED_DATA_DIR / "replay_content"
+RC = REPLAY_CONTENT_DIR
 SC = list(SESSION_COLUMNS)
 SCALARS = [
     "known_reward_outcome_lag_1",
@@ -61,13 +61,13 @@ REPORT = ["is_current_arm", *INTERACTIONS]
 
 
 def _assemble() -> pd.DataFrame:
-    ev = read_table(RC / "event_arm_table.pkl")
+    ev = read_table(table_path("event_arm_table", RC, fmt="pkl"))
     require_covariate_schema(ev, table="event_arm")
     add_arm_fixed_effects(ev)
-    stop = read_table(RC / "stop_table.pkl")
+    stop = read_table(table_path("stop_table", RC, fmt="pkl"))
     require_covariate_schema(stop, table="stop")
     stop = add_uncertainty_covariates(stop)
-    cont = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
+    cont = read_table(table_path("qvals_table", RC, fmt="pkl"))
     require_covariate_schema(cont, table="qvals")
     ev = ev.merge(stop[["stop_id", "known_reward_outcome_lag_1", "patch_switch_fraction_last5_completed_trips"]],
                   on="stop_id", how="left")

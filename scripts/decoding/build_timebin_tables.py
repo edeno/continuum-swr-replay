@@ -36,7 +36,7 @@ from continuum_swr_replay.analysis.replay.timebin_tables import (  # noqa: E402
     build_stop_timebin_table,
 )
 from continuum_swr_replay.data_loaders import load_data  # noqa: E402
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR
 from continuum_swr_replay.tables.io import publish_canonical  # noqa: E402
 from continuum_swr_replay.tables.session_keys import n_sessions  # noqa: E402
 from continuum_swr_replay.types import SessionDataKeys  # noqa: E402
@@ -45,7 +45,7 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S"
 )
 logger = logging.getLogger(__name__)
-RC = PROCESSED_DATA_DIR / "replay_content"
+RC = REPLAY_CONTENT_DIR
 
 
 def build_one(session: dict) -> tuple[pd.DataFrame, pd.DataFrame] | None:

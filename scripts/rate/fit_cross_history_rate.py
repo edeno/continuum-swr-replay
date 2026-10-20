@@ -58,7 +58,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     MODEL_CROSS_HISTORY_RATE,
     longest_history_window_s,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
+from continuum_swr_replay.paths import MODEL_DIRS, REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
     require_covariate_schema,
 )
@@ -68,7 +68,7 @@ from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
-RC = PROCESSED_DATA_DIR / "replay_content"
+RC = REPLAY_CONTENT_DIR
 
 # Both directions: (response population, cross/predictor population).
 DIRECTIONS = {
@@ -194,17 +194,20 @@ def main() -> None:
     p.add_argument("--write", action="store_true")
     args = p.parse_args()
 
-    stop = read_table(RC / "stop_table.pkl")
-    onset_table = read_table(RC / "event_onset_table.pkl")
-    event_table = read_table(RC / "event_table.pkl")
+    stop_path = table_path("stop_table", RC, fmt="pkl")
+    onset_path = table_path("event_onset_table", RC, fmt="pkl")
+    event_path = table_path("event_table", RC, fmt="pkl")
+    stop = read_table(stop_path)
+    onset_table = read_table(onset_path)
+    event_table = read_table(event_path)
     require_covariate_schema(stop, table="stop")
     require_covariate_schema(onset_table, table="event_onset")
     require_covariate_schema(event_table, table="event")
     # The bins are dropped by the configured source's excluded time, so the
     # tables must come from that source (its artifact run included).
-    require_swr_source(stop, what=str(RC / "stop_table.pkl"))
-    require_swr_source(onset_table, what=str(RC / "event_onset_table.pkl"))
-    require_swr_source(event_table, what=str(RC / "event_table.pkl"))
+    require_swr_source(stop, what=str(stop_path))
+    require_swr_source(onset_table, what=str(onset_path))
+    require_swr_source(event_table, what=str(event_path))
     onsets = attach_is_swr_to_onsets(onset_table, event_table)
     if args.max_per_animal is not None:
         keep = (
@@ -221,7 +224,7 @@ def main() -> None:
     models = fit_cross_history(stop, onsets)
     _summary(models)
     if args.write:
-        out = RC / "models_per_bin_rate" / "cross_history_models.pkl"
+        out = RC / MODEL_DIRS["per_bin_rate"].name / "cross_history_models.pkl"
         models.attrs["swr_source"] = swr_source_name()
         models.to_pickle(out)
         print(f"\nwrote {len(models)} rows -> {out}")

@@ -87,7 +87,7 @@ from continuum_swr_replay.analysis.replay.per_bin_design import (
     aggregate_to_timebins,
     reconstruct_reward_kernels,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import MODEL_DIRS, REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.tables.io import read_table, table_exists
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
@@ -97,7 +97,7 @@ from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.qa._report import _invocation  # noqa: E402
 
-RC = PROCESSED_DATA_DIR / "replay_content"
+RC = REPLAY_CONTENT_DIR
 REPO = Path(__file__).resolve().parents[2]
 SC = list(SESSION_COLUMNS)
 KEY = SC + ["outcome"]
@@ -105,14 +105,14 @@ KEY = SC + ["outcome"]
 DEFAULT_OLD_PER_BIN = (
     RC / "_pre_fix_backup_20260904" / "models_per_bin_rate" / "all_models.pkl"
 )
-DEFAULT_NEW_PER_BIN = RC / "models_per_bin_rate" / "all_models.pkl"
+DEFAULT_NEW_PER_BIN = RC / MODEL_DIRS["per_bin_rate"].name / "all_models.pkl"
 DEFAULT_OLD_PER_STOP = (
     RC
     / "_pre_v5_regression_refit_backup_20260902"
     / "models_per_stop_rate"
     / "all_models.pkl"
 )
-DEFAULT_NEW_PER_STOP = RC / "models_per_stop_rate" / "all_models.pkl"
+DEFAULT_NEW_PER_STOP = RC / MODEL_DIRS["per_stop_rate"].name / "all_models.pkl"
 
 # The term-level separation section compares the SAME specification fit under the
 # fit-level flag and under the per-term flag, so its "before" is the immediately
@@ -123,9 +123,11 @@ DEFAULT_OLD_TERMLEVEL_PER_STOP = (
     TERMLEVEL_BACKUP_ROOT / "models_per_stop_rate" / "all_models.pkl"
 )
 DEFAULT_OLD_CONTRAST = TERMLEVEL_BACKUP / "swr_contrast_rate.pkl"
-DEFAULT_NEW_CONTRAST = RC / "models_per_bin_rate" / "swr_contrast_rate.pkl"
+DEFAULT_NEW_CONTRAST = RC / MODEL_DIRS["per_bin_rate"].name / "swr_contrast_rate.pkl"
 DEFAULT_OLD_AUDITED = TERMLEVEL_BACKUP / "swr_contrast_rate_audited.pkl"
-DEFAULT_NEW_AUDITED = RC / "models_per_bin_rate" / "swr_contrast_rate_audited.pkl"
+DEFAULT_NEW_AUDITED = (
+    RC / MODEL_DIRS["per_bin_rate"].name / "swr_contrast_rate_audited.pkl"
+)
 DEFAULT_OLD_TERMLEVEL_PER_BIN = TERMLEVEL_BACKUP / "all_models.pkl"
 
 # The reward step of each family: (rung, its reward-free parent).
@@ -1617,7 +1619,7 @@ def build_report(
     )
     add(_md(reward_boundary_shift_table(old_bin, new_bin), floatfmt="{:.3f}"))
 
-    stop_path = RC / "stop_table.pkl"
+    stop_path = table_path("stop_table", RC, fmt="pkl")
     if table_exists(stop_path):
         add(
             "\nWhich stops the shift applies to, on the canonical stop table. A "
@@ -2594,7 +2596,7 @@ def collect_content_inputs(
     contrast: dict[str, pd.DataFrame] = {}
     audited = "swr_contrast_content_audited.pkl"
     for root, label in ((old_root, "before"), (new_root, "after")):
-        path = root / "models" / audited
+        path = root / MODEL_DIRS["content_arm"].name / audited
         contrast[f"audited_{label}"] = _read_optional(path)
         if path.exists():
             inputs[f"swr-content audited ({label})"] = path
@@ -2603,13 +2605,17 @@ def collect_content_inputs(
         # The per-session fits, for the design-delta check: the audited
         # aggregate carries one row per term and cannot say which terms a rung
         # was fit with.
-        fits = root / "models" / "swr_contrast_content_arm.pkl"
+        fits = root / MODEL_DIRS["content_arm"].name / "swr_contrast_content_arm.pkl"
         contrast[f"fits_{label}"] = _read_optional(fits)
         if fits.exists():
             inputs[f"swr-content arm fits ({label})"] = fits
     for stratum in CONTRAST_OUTCOME_STRATA:
         sfx = "" if stratum == "all" else f"_{stratum}"
-        path = new_root / "models" / f"swr_contrast_content_audited{sfx}.pkl"
+        path = (
+            new_root
+            / MODEL_DIRS["content_arm"].name
+            / f"swr_contrast_content_audited{sfx}.pkl"
+        )
         if path.exists():
             contrast[f"stratum_{stratum}"] = pd.read_pickle(path)
             inputs[f"swr-content audited ({stratum})"] = path
@@ -2666,21 +2672,23 @@ COHORT_RULE_NOTE = {
     "in_transit": "in-transit stops only — sensitivity bundle",
 }
 DEFAULT_COHORT_PER_BIN = {
-    "at_well": RC / "models_per_bin_rate" / "all_models.pkl",
-    "all_stops": RC / "models_per_bin_rate" / "all_models_allstops.pkl",
-    "in_transit": RC / "models_per_bin_rate" / "all_models_intransit.pkl",
+    "at_well": RC / MODEL_DIRS["per_bin_rate"].name / "all_models.pkl",
+    "all_stops": RC / MODEL_DIRS["per_bin_rate"].name / "all_models_allstops.pkl",
+    "in_transit": RC / MODEL_DIRS["per_bin_rate"].name / "all_models_intransit.pkl",
 }
 DEFAULT_COHORT_CONTRAST = {
-    "at_well": RC / "models_per_bin_rate" / "swr_contrast_rate.pkl",
-    "all_stops": RC / "models_per_bin_rate" / "swr_contrast_rate_allstops.pkl",
+    "at_well": RC / MODEL_DIRS["per_bin_rate"].name / "swr_contrast_rate.pkl",
+    "all_stops": RC
+    / MODEL_DIRS["per_bin_rate"].name
+    / "swr_contrast_rate_allstops.pkl",
 }
 # Family A (per-stop Poisson) is published as one ladder per cohort. Only the
 # canonical at-well fit is written under its own name; the all-stops ladder was
 # never re-published after the well-anchored refit overwrote it, so the pre-refit
 # backup IS the all-stops fit and the section says where it came from.
 DEFAULT_COHORT_PER_STOP = {
-    "at_well": RC / "models_per_stop_rate" / "all_models.pkl",
-    "all_stops": RC / "models_per_stop_rate" / "all_models_allstops.pkl",
+    "at_well": RC / MODEL_DIRS["per_stop_rate"].name / "all_models.pkl",
+    "all_stops": RC / MODEL_DIRS["per_stop_rate"].name / "all_models_allstops.pkl",
 }
 PER_STOP_ALL_STOPS_FALLBACK = (
     RC / "_pre_atwell_backup_20260912" / "models_per_stop_rate" / "all_models.pkl"

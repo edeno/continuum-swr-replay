@@ -599,7 +599,7 @@ class TestRunOne:
             {EPOCH_ID: [("ca1", step_s, step_s)]},
             span=(float(epoch.time[0]), float(epoch.time[-1])),
         )
-        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_ROOT", artifacts.parent)
+        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_DIR", artifacts.parent)
         monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", artifacts.name)
         missing = (epoch.time >= step_s - 0.3) & (epoch.time <= step_s + 0.3)
 

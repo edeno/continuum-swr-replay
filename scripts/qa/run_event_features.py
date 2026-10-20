@@ -180,6 +180,7 @@ from continuum_swr_replay.intervals import (  # noqa: E402
     interval_mask,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR  # noqa: E402
+from continuum_swr_replay.paths import table_path  # noqa: E402
 from continuum_swr_replay.runs.batch import (  # noqa: E402
     raise_open_file_limit,
     run_epoch_logged,
@@ -210,7 +211,7 @@ INVENTORY_ROOT = comparison.OUTPUT_ROOT
 MEMORYLESS_ROOT = comparison.MEMORYLESS_ROOT
 MARKS_CACHE_DIR = carey.MARKS_CACHE_DIR
 """The memoryless runner's marks cache, keyed by the decode's detector file."""
-STOP_TABLE = PROCESSED_DATA_DIR / "replay_content" / "stop_table.parquet"
+STOP_TABLE = table_path("stop_table")
 PRODUCED_BY = "scripts/qa/run_event_features.py"
 DESIGN_SPEC = "docs/design/replay_detection_comparison/04-event-features.md"
 

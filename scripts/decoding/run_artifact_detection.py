@@ -84,10 +84,7 @@ from continuum_swr_replay.analysis.events.artifact_masks import (
     PADDING_S,
     artifact_intervals,
 )
-from continuum_swr_replay.analysis.events.swr_inventory import (
-    ARTIFACT_INTERVALS_ROOT,
-    swr_epoch_id,
-)
+from continuum_swr_replay.analysis.events.swr_inventory import swr_epoch_id
 from continuum_swr_replay.analysis.hippocampus.artifacts import detect
 from continuum_swr_replay.analysis.hippocampus.artifacts.detect import (
     detect_artifacts,
@@ -105,6 +102,7 @@ from continuum_swr_replay.intervals import (
     masked_seconds,
 )
 from continuum_swr_replay.parameters import ROOT_DIR
+from continuum_swr_replay.paths import ARTIFACT_INTERVALS_DIR
 from continuum_swr_replay.runs.batch import (
     raise_open_file_limit,
     run_epoch_logged,
@@ -115,7 +113,7 @@ from continuum_swr_replay.runs.cli import filter_epoch_info, parse_run_id
 from continuum_swr_replay.runs.io import array_sha256, json_ready
 from continuum_swr_replay.runs.provenance import provenance_record
 
-OUTPUT_ROOT = ARTIFACT_INTERVALS_ROOT
+OUTPUT_ROOT = ARTIFACT_INTERVALS_DIR
 """Where the run folders go: where the SWR source reads them."""
 PRODUCED_BY = "scripts/decoding/run_artifact_detection.py"
 DESIGN_SPEC = "docs/design/2026-10-09-artifact-detection.md"

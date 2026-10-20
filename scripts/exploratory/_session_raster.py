@@ -25,13 +25,17 @@ import matplotlib.pyplot as plt  # noqa: E402
 
 warnings.filterwarnings("ignore")
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
+from continuum_swr_replay.paths import (  # noqa: E402
+    REPLAY_CONTENT_DIR,  # noqa: E402
+    table_path,
+)
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
     require_covariate_schema,
 )
 from continuum_swr_replay.tables.io import read_table  # noqa: E402
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS  # noqa: E402
 
-RC = P / "replay_content"
+RC = REPLAY_CONTENT_DIR
 SC = list(SESSION_COLUMNS)
 XMAX = 8.0
 
@@ -193,9 +197,9 @@ def draw(ss: pd.DataFrame, row: pd.Series, populations: list, out_name: str,
 
 
 def main() -> None:
-    onset = read_table(RC / "event_onset_table.pkl")
-    ev = read_table(RC / "event_table.pkl")
-    st = read_table(RC / "stop_table.pkl")
+    onset = read_table(table_path("event_onset_table", RC, fmt="pkl"))
+    ev = read_table(table_path("event_table", RC, fmt="pkl"))
+    st = read_table(table_path("stop_table", RC, fmt="pkl"))
     require_covariate_schema(onset, table="event_onset")
     require_covariate_schema(ev, table="event")
     require_covariate_schema(st, table="stop")

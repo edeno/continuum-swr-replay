@@ -21,7 +21,7 @@ from scipy.special import betaln, digamma
 from continuum_swr_replay.data_loaders.trial_clocks import (
     outcome_known_time_from_task_visit,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import MODEL_DIRS, REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     apply_rename,
     canonicalize_numerical_paths,
@@ -42,7 +42,7 @@ from ._spatial_bandit_rl import make_full_beta_bernoulli_dv_df
 # the vendored DV pipeline inserts many columns one-by-one (Alison's style)
 warnings.filterwarnings("ignore", category=pd.errors.PerformanceWarning)
 
-RC = PROCESSED_DATA_DIR / "replay_content"
+RC = REPLAY_CONTENT_DIR
 ANIMALS = ("chimi", "j16", "peanut", "senor", "wilbur")
 # stop_table uses lowercase animal labels; BehaviorModel capitalizes Senor.
 ANIMAL_SUBJECT = {
@@ -939,7 +939,7 @@ def run_build_qvals_table(args: argparse.Namespace) -> None:
 
     beh = dj.create_virtual_module("alison_behav", "alison_behav")
     rl = dj.create_virtual_module("alison_rlmodel", "alison_rlmodel")
-    st_all = read_table(replay_content_dir / "stop_table.pkl")
+    st_all = read_table(table_path("stop_table", replay_content_dir, fmt="pkl"))
     require_covariate_schema(st_all, table="stop")
 
     parts = []
@@ -1032,14 +1032,14 @@ def run_build_qvals_table(args: argparse.Namespace) -> None:
     if args.write:
         out = publish_canonical(
             tab,
-            replay_content_dir / "models_per_bin_rate",
+            replay_content_dir / MODEL_DIRS["per_bin_rate"].name,
             table="qvals",
             basename="qvals_table",
         )
         save_reference(
             qv_reference,
             replay_content_dir
-            / "models_per_bin_rate"
+            / MODEL_DIRS["per_bin_rate"].name
             / "qvals_standardization_reference.json",
         )
         print(f"\nwrote {len(tab)} rows ({len(z_cols)} _z cols) -> {out}")

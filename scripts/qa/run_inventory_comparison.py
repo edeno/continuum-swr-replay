@@ -176,6 +176,7 @@ from continuum_swr_replay.intervals import (
     total_duration,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR
+from continuum_swr_replay.paths import DETECTION_COMPARISON_DIR
 from continuum_swr_replay.runs.batch import run_lock
 from continuum_swr_replay.runs.cli import parse_run_id
 from continuum_swr_replay.runs.io import (
@@ -187,7 +188,7 @@ from continuum_swr_replay.runs.io import (
 from continuum_swr_replay.runs.provenance import provenance_record
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
-COMPARISON_ROOT = PROCESSED_DATA_DIR / "replay_detection_comparison"
+COMPARISON_ROOT = DETECTION_COMPARISON_DIR
 OUTPUT_ROOT = COMPARISON_ROOT / "inventory"
 CAREY_ROOT = COMPARISON_ROOT / "carey"
 MEMORYLESS_ROOT = COMPARISON_ROOT / "memoryless"

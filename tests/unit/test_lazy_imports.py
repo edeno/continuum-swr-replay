@@ -183,6 +183,7 @@ JAX_FREE: list[str] = [
     "continuum_swr_replay.analysis.pfc.cohort",
     "continuum_swr_replay.analysis.replay.model_specs",
     "continuum_swr_replay.intervals",
+    "continuum_swr_replay.paths",
     "continuum_swr_replay.runs",
     "continuum_swr_replay.runs.io",
     "continuum_swr_replay.runs.cli",

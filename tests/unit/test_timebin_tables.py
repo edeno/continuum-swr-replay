@@ -34,7 +34,7 @@ from continuum_swr_replay.analysis.replay.timebin_tables import (
     build_event_onset_table,
     build_stop_timebin_table,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR
 
 # All sources require whole-event head speed to be finite and < 4 cm/s.
 # Non-Local onsets additionally require every event bin's probability > 0.8.
@@ -289,7 +289,7 @@ def test_output_dir_receives_both_tables(timebin_script, monkeypatch, tmp_path):
     pointed at a folder under ``tmp_path``, after checking its real value.
     """
     script = timebin_script
-    assert script.RC == PROCESSED_DATA_DIR / "replay_content"
+    assert script.RC == REPLAY_CONTENT_DIR
     monkeypatch.setattr(script, "find_sessions", lambda max_per_animal: _SESSIONS)
     monkeypatch.setattr(script, "build_one", _small_tables)
     monkeypatch.setattr(script, "validate", lambda onset, dense, in_excluded: None)

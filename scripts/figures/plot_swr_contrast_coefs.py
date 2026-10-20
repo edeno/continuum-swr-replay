@@ -45,25 +45,25 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     POST_OUTCOME_RATE_RUNGS,
     PRIMARY_COHORT,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import MODEL_DIRS, REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
 from continuum_swr_replay.tables.io import read_table
 
-RC = PROCESSED_DATA_DIR / "replay_content"
+RC = REPLAY_CONTENT_DIR
 OUT = Path("paper/figures/swr_contrast")
 OUT.mkdir(parents=True, exist_ok=True)
 
-SWR_CONTRAST_RATE = RC / "models_per_bin_rate" / "swr_contrast_rate.pkl"
+SWR_CONTRAST_RATE = RC / MODEL_DIRS["per_bin_rate"].name / "swr_contrast_rate.pkl"
 # The tables fit_swr_contrast_rate.py fit that artifact on; checked against its
 # provenance sidecar here, before any table or fit is read, so a figure cannot be
 # drawn from coefficients that predate the tables on disk.
 SWR_CONTRAST_RATE_INPUTS = {
-    "stop_table": RC / "stop_table.pkl",
-    "qvals_table": RC / "models_per_bin_rate" / "qvals_table.pkl",
-    "event_onset_table": RC / "event_onset_table.pkl",
-    "event_table": RC / "event_table.pkl",
+    "stop_table": table_path("stop_table", RC, fmt="pkl"),
+    "qvals_table": table_path("qvals_table", RC, fmt="pkl"),
+    "event_onset_table": table_path("event_onset_table", RC, fmt="pkl"),
+    "event_table": table_path("event_table", RC, fmt="pkl"),
 }
 
 # The per-SD units the audited contrast table states its arm coefficients in.
@@ -71,17 +71,17 @@ SWR_CONTRAST_RATE_INPUTS = {
 # here: the same covariates measured over all nine candidates have a 2.1x larger
 # SD (the trunks are structural zeros), which would shrink every per-SD arm
 # effect in this figure by that factor relative to the audited table.
-SWR_CONTRAST_CONTENT_PROVENANCE = RC / "models" / "swr_contrast_content_provenance.json"
+SWR_CONTRAST_CONTENT_PROVENANCE = RC / MODEL_DIRS["content_arm"].name / "swr_contrast_content_provenance.json"
 
-SWR_CONTRAST_CONTENT_ARM = RC / "models" / "swr_contrast_content_arm.pkl"
-SWR_CONTRAST_CONTENT_PATCH = RC / "models" / "swr_contrast_content_patch.pkl"
+SWR_CONTRAST_CONTENT_ARM = RC / MODEL_DIRS["content_arm"].name / "swr_contrast_content_arm.pkl"
+SWR_CONTRAST_CONTENT_PATCH = RC / MODEL_DIRS["content_arm"].name / "swr_contrast_content_patch.pkl"
 # The tables fit_swr_contrast_content.py fit those two artifacts on, gated the
 # same way as the rate half.
 SWR_CONTRAST_CONTENT_INPUTS = {
-    "event_arm_table": RC / "event_arm_table.pkl",
-    "event_patch_table": RC / "event_patch_table.pkl",
-    "stop_table": RC / "stop_table.pkl",
-    "qvals_table": RC / "models_per_bin_rate" / "qvals_table.pkl",
+    "event_arm_table": table_path("event_arm_table", RC, fmt="pkl"),
+    "event_patch_table": table_path("event_patch_table", RC, fmt="pkl"),
+    "stop_table": table_path("stop_table", RC, fmt="pkl"),
+    "qvals_table": table_path("qvals_table", RC, fmt="pkl"),
 }
 
 
@@ -117,14 +117,14 @@ def _global_sd(covariates):
         add_uncertainty_covariates,
     )
 
-    arm = read_table(RC / "event_arm_table.pkl")
-    qv = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
-    stop = read_table(RC / "stop_table.pkl")
+    arm = read_table(table_path("event_arm_table", RC, fmt="pkl"))
+    qv = read_table(table_path("qvals_table", RC, fmt="pkl"))
+    stop = read_table(table_path("stop_table", RC, fmt="pkl"))
     require_covariate_schema(arm, table="event_arm")
     require_covariate_schema(qv, table="qvals")
     require_covariate_schema(stop, table="stop")
-    require_swr_source(arm, what=str(RC / "event_arm_table.pkl"))
-    require_swr_source(stop, what=str(RC / "stop_table.pkl"))
+    require_swr_source(arm, what=str(table_path("event_arm_table", RC, fmt="pkl")))
+    require_swr_source(stop, what=str(table_path("stop_table", RC, fmt="pkl")))
     stop = add_uncertainty_covariates(stop)
     sd = {}
     for c in covariates:

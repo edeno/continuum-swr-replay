@@ -171,7 +171,7 @@ class TestTheSourcesInputs:
         )
         monkeypatch.setattr(swr_inventory, "SWR_INVENTORY_ROOT", inventory.parent)
         monkeypatch.setattr(swr_inventory, "SWR_INVENTORY_RUN_ID", inventory.name)
-        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_ROOT", artifacts.parent)
+        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_DIR", artifacts.parent)
         monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", artifacts.name)
 
         inputs = swr_inventory.ripple_power_inputs(epoch_id)

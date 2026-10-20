@@ -63,7 +63,7 @@ from continuum_swr_replay.analysis.replay.learning import (
     fit_is_stay_pooled_gee,
     stop_replay_summary,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     COVARIATE_SCHEMA_VERSION,
     require_covariate_schema,
@@ -76,14 +76,14 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 
-INPUT_DIR = PROCESSED_DATA_DIR / "replay_content"
+INPUT_DIR = REPLAY_CONTENT_DIR
 
 #: The canonical tables the per-stop summary is built from, hashed into every
 #: provenance sidecar this script writes.
 FIT_INPUTS = {
-    "stop_table": INPUT_DIR / "stop_table.pkl",
-    "event_table": INPUT_DIR / "event_table.pkl",
-    "event_arm_table": INPUT_DIR / "event_arm_table.pkl",
+    "stop_table": table_path("stop_table", INPUT_DIR, fmt="pkl"),
+    "event_table": table_path("event_table", INPUT_DIR, fmt="pkl"),
+    "event_arm_table": table_path("event_arm_table", INPUT_DIR, fmt="pkl"),
 }
 
 #: Populations Stage 6 may be read on. ``at_well`` is the canonical shared

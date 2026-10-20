@@ -126,7 +126,7 @@ def _trials() -> pd.DataFrame:
 def masked(tmp_path, monkeypatch):
     """The source's artifact run holds CORES for the test epoch."""
     directory = write_artifact_run(tmp_path / "artifacts", {EPOCH_ID: CORES})
-    monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_ROOT", directory.parent)
+    monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_DIR", directory.parent)
     monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
     np.testing.assert_allclose(
         swr_inventory.artifact_intervals(EPOCH_ID).to_numpy(), MASK
@@ -162,7 +162,7 @@ class TestStopExposure:
     def test_only_exposure_and_location_change(self, tmp_path, monkeypatch, table):
         unmasked = _stop_tables()[table]
         directory = write_artifact_run(tmp_path / "artifacts", {EPOCH_ID: CORES})
-        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_ROOT", directory.parent)
+        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_DIR", directory.parent)
         monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
 
         masked_stops = _stop_tables()[table]
@@ -382,7 +382,7 @@ class TestFamilyBDesign:
         directory = write_artifact_run(
             tmp_path / "artifacts", {"m20200101_04_r2_HPC": CORES}
         )
-        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_ROOT", directory.parent)
+        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_DIR", directory.parent)
         monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
         stops, onsets = _design_inputs()
 

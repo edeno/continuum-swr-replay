@@ -39,16 +39,17 @@ import argparse
 import logging
 from pathlib import Path
 
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.tables.io import read_table
-from continuum_swr_replay.tables.parity import (
+from continuum_swr_replay.paths import (
     CANONICAL_TABLE_BASENAMES,
-    compare_table_roots,
+    REPLAY_CONTENT_DIR,
+    table_path,
 )
+from continuum_swr_replay.tables.io import read_table
+from continuum_swr_replay.tables.parity import compare_table_roots
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
-RC = PROCESSED_DATA_DIR / "replay_content"
+RC = REPLAY_CONTENT_DIR
 
 
 def main() -> None:
@@ -92,7 +93,7 @@ def main() -> None:
     # qvals under models_per_bin_rate/; the frozen baseline is flat.
     def read_candidate(basename: str):
         if basename == "qvals_table":
-            return read_table(args.candidate / "models_per_bin_rate" / "qvals_table")
+            return read_table(table_path("qvals_table", args.candidate, fmt=""))
         return read_table(args.candidate / basename)
 
     def read_baseline(basename: str):

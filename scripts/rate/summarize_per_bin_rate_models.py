@@ -44,18 +44,18 @@ from continuum_swr_replay.analysis.replay.per_bin_design import (
     reward_kernel_rate_ratios,
     self_history_rate_ratios,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P
+from continuum_swr_replay.paths import MODEL_DIRS, REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
-RC = P / "replay_content"
-ALL_MODELS = RC / "models_per_bin_rate" / "all_models.pkl"
+RC = REPLAY_CONTENT_DIR
+ALL_MODELS = RC / MODEL_DIRS["per_bin_rate"].name / "all_models.pkl"
 # The tables fit_per_bin_rate_models.py fit all_models.pkl on. Checked against
 # the artifact's provenance sidecar before anything is summarized, so a table
 # regenerated after the fit cannot be reported through the old coefficients.
 ALL_MODELS_INPUTS = {
-    "stop_table": RC / "stop_table.pkl",
-    "event_onset_table": RC / "event_onset_table.pkl",
-    "event_table": RC / "event_table.pkl",
+    "stop_table": table_path("stop_table", RC, fmt="pkl"),
+    "event_onset_table": table_path("event_onset_table", RC, fmt="pkl"),
+    "event_table": table_path("event_table", RC, fmt="pkl"),
 }
 
 SC = list(SESSION_COLUMNS)

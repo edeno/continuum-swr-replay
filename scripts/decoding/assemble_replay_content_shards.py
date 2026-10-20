@@ -37,11 +37,11 @@ from continuum_swr_replay.analysis.replay.tables_arm_patch import (
 from continuum_swr_replay.analysis.replay.tables_stop import add_nonlocal_swr_split
 from continuum_swr_replay.data_loaders.constants import WELL_ARMS
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
+from continuum_swr_replay.paths import BASENAME_TO_TABLE, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     stamp_covariate_schema,
 )
 from continuum_swr_replay.tables.io import publish_canonical, read_table
-from continuum_swr_replay.tables.parity import BASENAME_TO_TABLE
 from continuum_swr_replay.tables.session_keys import (
     session_key_set as _session_keys,
 )
@@ -168,7 +168,7 @@ def assemble_replay_content_shards(
     for frame in tables.values():
         stamp_swr_source(frame)
     contingency = load_contingency(
-        contingency_dir / "models_per_bin_rate" / "qvals_table.pkl"
+        table_path("qvals_table", contingency_dir, fmt="pkl")
     )
     _assert_value_block_matches_source(tables["event_arm_table"], contingency)
 
@@ -195,7 +195,7 @@ def assemble_replay_stop_shards(
     pieces: list[pd.DataFrame] = []
     observed_sessions: set[tuple[object, ...]] = set()
     for shard_dir in shard_dirs:
-        frame = read_table(shard_dir / "stop_table")
+        frame = read_table(table_path("stop_table", shard_dir, fmt=""))
         require_swr_source(frame, what=f"{shard_dir / 'stop_table'}")
         shard_sessions = _session_keys(frame)
         overlap = observed_sessions & shard_sessions

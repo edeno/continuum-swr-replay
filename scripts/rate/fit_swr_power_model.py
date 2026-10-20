@@ -55,7 +55,7 @@ from continuum_swr_replay.analysis.replay.covariate_timing import (
     assert_predictor_timing,
 )
 from continuum_swr_replay.analysis.replay.covariates import add_uncertainty_covariates
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import MODEL_DIRS, REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -71,7 +71,7 @@ from continuum_swr_replay.tables.standardization import (
     z_reference_path,
 )
 
-RC = PROCESSED_DATA_DIR / "replay_content"
+RC = REPLAY_CONTENT_DIR
 SC = list(SESSION_COLUMNS)
 POWER_COL = "ripple_power_z"  # event-mean z-scored consensus ripple power
 PREDICTORS = [
@@ -98,18 +98,18 @@ def _bimodality_coef(x: np.ndarray) -> float:
 
 
 def _assemble() -> pd.DataFrame:
-    ev = read_table(RC / "event_table.pkl")
-    stop = read_table(RC / "stop_table.pkl")
+    ev = read_table(table_path("event_table", RC, fmt="pkl"))
+    stop = read_table(table_path("stop_table", RC, fmt="pkl"))
     # qvals_table (exact stop-start alignment). These are the behavioral
     # model's experienced value and RPE, replacing retired nominal/leaky-Q
     # stand-ins. Keep their canonical names through fitting and persistence.
-    cont = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
+    cont = read_table(table_path("qvals_table", RC, fmt="pkl"))
     require_covariate_schema(ev, table="event")
     require_covariate_schema(stop, table="stop")
     require_covariate_schema(cont, table="qvals")
     # is_swr and ripple_power_z must come from the configured SWR source
-    require_swr_source(ev, what=str(RC / "event_table.pkl"))
-    require_swr_source(stop, what=str(RC / "stop_table.pkl"))
+    require_swr_source(ev, what=str(table_path("event_table", RC, fmt="pkl")))
+    require_swr_source(stop, what=str(table_path("stop_table", RC, fmt="pkl")))
     stop = add_uncertainty_covariates(stop)
     # Many events per stop, one row per stop on both right-hand tables.
     # Without validate= a duplicated stop_id would silently multiply
@@ -445,7 +445,7 @@ def main() -> None:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=RC / "models_per_bin_rate",
+        default=RC / MODEL_DIRS["per_bin_rate"].name,
         help="Directory for the fitted model, its z reference, and the audits.",
     )
     args = parser.parse_args()

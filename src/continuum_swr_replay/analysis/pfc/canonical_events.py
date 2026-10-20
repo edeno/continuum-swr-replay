@@ -53,6 +53,7 @@ from continuum_swr_replay.decoding.files import (
     non_local_threshold_percent,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import table_path
 from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.tables.io import read_table, resolved_table_path
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
@@ -69,7 +70,7 @@ __all__ = [
 ]
 
 #: The canonical per-event table every family's events are read from.
-DEFAULT_EVENT_TABLE_PATH = PROCESSED_DATA_DIR / "replay_content" / "event_table.parquet"
+DEFAULT_EVENT_TABLE_PATH = table_path("event_table")
 
 #: Provenance labels for the two definitions this module fixes. Written to each
 #: run's sidecar so an artifact states which event definition it was fit on.

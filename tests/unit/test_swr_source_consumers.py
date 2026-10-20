@@ -678,7 +678,7 @@ def test_the_content_occupancy_refuses_an_arm_table_from_another_source(
     )
     arm.attrs["swr_source"] = STALE
     write_table(arm, folder / "event_arm_table.parquet")
-    monkeypatch.setattr(occupancy, "PROCESSED_DATA_DIR", tmp_path)
+    monkeypatch.setattr(occupancy, "REPLAY_CONTENT_DIR", folder)
     monkeypatch.setattr(
         occupancy, "require_covariate_schema", lambda frame, table: None
     )

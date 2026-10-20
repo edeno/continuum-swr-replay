@@ -22,6 +22,7 @@ import pytest
 from continuum_swr_replay.analysis.replay.model_specs import (
     default_content_model_names,
 )
+from continuum_swr_replay.paths import MODEL_DIRS
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS_DIR = REPO_ROOT / "scripts"
@@ -33,7 +34,8 @@ def _load_script_helper(filename: str, attr_name: str):
     Parses the script with ``ast`` and exec's only the requested
     function's source so the test does not have to import the
     surrounding ``main()`` / decoder modules (which would pull in
-    Spyglass, networkx, etc., and slow the unit suite).
+    Spyglass, networkx, etc., and slow the unit suite). The function sees
+    the one module global the helpers read, ``paths.MODEL_DIRS``.
     """
     src = (SCRIPTS_DIR / filename).read_text()
     tree = ast.parse(src)
@@ -41,7 +43,7 @@ def _load_script_helper(filename: str, attr_name: str):
         if isinstance(node, ast.FunctionDef) and node.name == attr_name:
             wrapper = ast.Module(body=[node], type_ignores=[])
             ast.fix_missing_locations(wrapper)
-            ns: dict = {}
+            ns: dict = {"MODEL_DIRS": MODEL_DIRS}
             exec(compile(wrapper, filename, "exec"), ns)  # noqa: S102
             return ns[attr_name]
     raise AttributeError(f"{attr_name!r} not found in {filename}")

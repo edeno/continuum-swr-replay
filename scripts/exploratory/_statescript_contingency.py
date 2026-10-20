@@ -40,7 +40,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import WELL_PATCH_MAPPING
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import MODEL_DIRS, REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -441,8 +441,8 @@ def main() -> None:
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 
-    rc = PROCESSED_DATA_DIR / "replay_content"
-    stop_table = read_table(rc / "stop_table.pkl")
+    rc = REPLAY_CONTENT_DIR
+    stop_table = read_table(table_path("stop_table", rc, fmt="pkl"))
     require_covariate_schema(stop_table, table="stop")
 
     session_cols = ["animal", "session_date", "epoch"]
@@ -486,7 +486,7 @@ def main() -> None:
         return
 
     contingency_table = pd.concat(tables, ignore_index=True)
-    out_dir = rc / "models_per_bin_rate"
+    out_dir = rc / MODEL_DIRS["per_bin_rate"].name
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / "contingency_table.pkl"
     contingency_table.to_pickle(out)

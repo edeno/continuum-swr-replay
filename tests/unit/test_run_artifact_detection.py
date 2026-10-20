@@ -231,7 +231,7 @@ def test_lfp_columns_that_are_not_band_and_references_in_id_order_fail(tmp_path)
 
 
 def test_the_runner_writes_where_the_source_reads():
-    assert runner.OUTPUT_ROOT == swr_inventory.ARTIFACT_INTERVALS_ROOT
+    assert runner.OUTPUT_ROOT == swr_inventory.ARTIFACT_INTERVALS_DIR
 
 
 def test_the_source_reads_a_run_the_runner_wrote(tmp_path, monkeypatch):
@@ -244,7 +244,7 @@ def test_the_source_reads_a_run_the_runner_wrote(tmp_path, monkeypatch):
     runner.write_manifest(
         output_dir, {"run_id": "run0001", "epochs": {EPOCH_ID: record}}
     )
-    monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_ROOT", output_dir.parent)
+    monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_DIR", output_dir.parent)
     monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", "run0001")
 
     stored = read_epoch_cores(output_dir, EPOCH_ID)

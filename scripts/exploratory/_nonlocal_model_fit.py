@@ -47,7 +47,8 @@ from continuum_swr_replay.analysis.replay._helpers import add_arm_fixed_effects
 from continuum_swr_replay.analysis.replay.choice_prediction import predict_arm_fractions
 from continuum_swr_replay.analysis.replay.fitting import fit_conditional_poisson
 from continuum_swr_replay.analysis.replay.model_specs import MODEL_HIERARCHY
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR
+from continuum_swr_replay.parameters import ROOT_DIR
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -61,7 +62,7 @@ plt.rcParams.update({"pdf.fonttype": 42, "ps.fonttype": 42,
 ARM_ROW_ORDER = [0, 1, 6, 2, 3, 7, 4, 5, 8]
 ARM_LABEL = {a: (f"arm {a} (trunk)" if a >= 6 else f"arm {a}") for a in ARM_ROW_ORDER}
 PALETTE = patch_grouped_arm_palette()
-RC_DIR = PROCESSED_DATA_DIR / "replay_content"
+RC_DIR = REPLAY_CONTENT_DIR
 DEFAULT_OUT_DIR = ROOT_DIR / ".claude/research/nonlocal_model_fit_outputs"
 
 # Each predictor maps to how it is displayed. "ring" is shown as the current-arm
@@ -332,7 +333,7 @@ def main() -> None:
     p.add_argument("--dpi", type=int, default=150)
     args = p.parse_args()
 
-    ev = read_table(RC_DIR / "event_arm_table.pkl")
+    ev = read_table(table_path("event_arm_table", RC_DIR, fmt="pkl"))
     require_covariate_schema(ev, table="event_arm")
     sub = ev[(ev.animal == args.animal) & (ev.session_date == args.day)
              & (ev.epoch == args.epoch)]

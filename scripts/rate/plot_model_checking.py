@@ -55,20 +55,25 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     longest_history_window_s,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
+from continuum_swr_replay.paths import (
+    MODEL_DIRS,
+    REPLAY_CONTENT_DIR,  # noqa: E402
+    table_path,
+)
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
     require_covariate_schema,
 )
 from continuum_swr_replay.tables.io import read_table
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
-RC = P / "replay_content"
-ALL_MODELS = RC / "models_per_bin_rate" / "all_models.pkl"
+RC = REPLAY_CONTENT_DIR
+ALL_MODELS = RC / MODEL_DIRS["per_bin_rate"].name / "all_models.pkl"
 # The tables fit_per_bin_rate_models.py fit all_models.pkl on; checked against the
 # artifact's provenance sidecar before the fitted GOF columns are read.
 ALL_MODELS_INPUTS = {
-    "stop_table": RC / "stop_table.pkl",
-    "event_onset_table": RC / "event_onset_table.pkl",
-    "event_table": RC / "event_table.pkl",
+    "stop_table": table_path("stop_table", RC, fmt="pkl"),
+    "event_onset_table": table_path("event_onset_table", RC, fmt="pkl"),
+    "event_table": table_path("event_table", RC, fmt="pkl"),
 }
 FIGS = P.parent / "paper" / "figures" / "rate"
 FIGS.mkdir(parents=True, exist_ok=True)
@@ -435,9 +440,9 @@ def main() -> None:
         )
 
     # --- example-session diagnostic quartets (inline refit) ---
-    stop = read_table(RC / "stop_table.pkl")
-    onset_table = read_table(RC / "event_onset_table.pkl")
-    event_table = read_table(RC / "event_table.pkl")
+    stop = read_table(table_path("stop_table", RC, fmt="pkl"))
+    onset_table = read_table(table_path("event_onset_table", RC, fmt="pkl"))
+    event_table = read_table(table_path("event_table", RC, fmt="pkl"))
     require_covariate_schema(stop, table="stop")
     require_covariate_schema(onset_table, table="event_onset")
     require_covariate_schema(event_table, table="event")

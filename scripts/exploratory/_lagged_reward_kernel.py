@@ -31,7 +31,7 @@ from continuum_swr_replay.analysis.replay.prepare_data import (  # noqa: E402
     find_sessions,
 )
 from continuum_swr_replay.data_loaders import load_data  # noqa: E402
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path  # noqa: E402
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
     require_covariate_schema,
 )
@@ -39,7 +39,7 @@ from continuum_swr_replay.tables.io import read_table  # noqa: E402
 from continuum_swr_replay.types import SessionDataKeys  # noqa: E402
 
 K = 5
-RC = PROCESSED_DATA_DIR / "replay_content"
+RC = REPLAY_CONTENT_DIR
 
 
 def lagged_rewards(query_times: np.ndarray, trials: pd.DataFrame, k: int) -> np.ndarray:
@@ -64,7 +64,7 @@ def lagged_rewards(query_times: np.ndarray, trials: pd.DataFrame, k: int) -> np.
 
 def main() -> None:
     n_per = int(sys.argv[1]) if len(sys.argv) > 1 else 2
-    stop = read_table(RC / "stop_table.pkl")
+    stop = read_table(table_path("stop_table", RC, fmt="pkl"))
     require_covariate_schema(stop, table="stop")
     sessions = find_sessions(max_per_animal=n_per)
     preds = [f"known_reward_outcome_lag_{j}" for j in range(1, K + 1)]

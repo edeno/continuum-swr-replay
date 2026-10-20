@@ -72,7 +72,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation im
     placements,
     without,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
+from continuum_swr_replay.paths import DETECTION_COMPARISON_DIR
 from continuum_swr_replay.tables.io import write_table  # noqa: E402
 from scripts.qa import sweep_memoryless_detection as sweep  # noqa: E402
 
@@ -104,9 +104,7 @@ N_RECORDINGS = 8
 spikes, not the trajectory, so every recording pauses in the same places and
 the control reads local coding at the track's end, over eight draws of it."""
 
-OUT_PATH = (
-    PROCESSED_DATA_DIR / "replay_detection_comparison" / "memoryless_controls.parquet"
-)
+OUT_PATH = DETECTION_COMPARISON_DIR / "memoryless_controls.parquet"
 SUMMARY_PATH = Path(
     "docs/design/replay_detection_comparison/detection_controls_summary.csv"
 )

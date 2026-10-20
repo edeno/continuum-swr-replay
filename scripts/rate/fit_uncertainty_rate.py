@@ -106,7 +106,11 @@ from continuum_swr_replay.analysis.replay.per_bin_design import (  # noqa: E402
 from continuum_swr_replay.analysis.replay.per_bin_rate_model import (  # noqa: E402
     _design_columns,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
+from continuum_swr_replay.paths import (  # noqa: E402
+    MODEL_DIRS,
+    REPLAY_CONTENT_DIR,
+    table_path,
+)
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
     require_covariate_schema,
 )
@@ -134,14 +138,14 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
-RC = PROCESSED_DATA_DIR / "replay_content"
+RC = REPLAY_CONTENT_DIR
 
 # The tables `main` reads; recorded in the artifact's provenance sidecar.
 FIT_INPUTS = {
-    "stop_table": RC / "stop_table.pkl",
-    "event_onset_table": RC / "event_onset_table.pkl",
-    "event_table": RC / "event_table.pkl",
-    "qvals_table": RC / "models_per_bin_rate" / "qvals_table.pkl",
+    "stop_table": table_path("stop_table", RC, fmt="pkl"),
+    "event_onset_table": table_path("event_onset_table", RC, fmt="pkl"),
+    "event_table": table_path("event_table", RC, fmt="pkl"),
+    "qvals_table": table_path("qvals_table", RC, fmt="pkl"),
 }
 
 # Nominal schedule covariates, now sourced from qvals_table (derived from Alison's
@@ -598,9 +602,9 @@ def main() -> None:
     smoke = args.max_per_animal is not None
 
     t0 = time.perf_counter()
-    stop = read_table(RC / "stop_table.pkl")
-    onset_table = read_table(RC / "event_onset_table.pkl")
-    event_table = read_table(RC / "event_table.pkl")
+    stop = read_table(table_path("stop_table", RC, fmt="pkl"))
+    onset_table = read_table(table_path("event_onset_table", RC, fmt="pkl"))
+    event_table = read_table(table_path("event_table", RC, fmt="pkl"))
     require_covariate_schema(stop, table="stop")
     require_covariate_schema(onset_table, table="event_onset")
     require_covariate_schema(event_table, table="event")
@@ -621,7 +625,7 @@ def main() -> None:
     # for this model). Keep qvals' canonical RPE name. Inner join: keep
     # only stops mapped to a trial (post-final-trial tails ~1-3% drop out); model
     # DVs are NaN on the first trial of a session -> listwise-dropped at fit.
-    qvals = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
+    qvals = read_table(table_path("qvals_table", RC, fmt="pkl"))
     require_covariate_schema(qvals, table="qvals")
     # Hash the inputs now, not at write time: the fit runs long enough that a
     # table could be regenerated mid-run and be certified as this fit's input.
@@ -726,7 +730,7 @@ def main() -> None:
     # the model comparison invalidates a cross-cohort step on this column.
     models["stop_cohort"] = args.stop_cohort
     out = _write_outputs(
-        RC / "models_per_bin_rate",
+        RC / MODEL_DIRS["per_bin_rate"].name,
         models=models,
         z_reference=z_reference,
         gate_audit=gate_audit,

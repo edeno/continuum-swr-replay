@@ -13,17 +13,17 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
 from continuum_swr_replay.tables.io import read_table
 
-RC = PROCESSED_DATA_DIR / "replay_content"
+RC = REPLAY_CONTENT_DIR
 
 
 def main() -> None:
-    pt = read_table(RC / "event_patch_table.pkl")
+    pt = read_table(table_path("event_patch_table", RC, fmt="pkl"))
     require_covariate_schema(pt, table="event_patch")
     tot = pt.groupby("event_id")["patch_count_hard"].transform("sum")
     pt = pt[tot > 0].copy()

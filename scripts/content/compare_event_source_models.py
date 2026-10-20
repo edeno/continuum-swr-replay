@@ -64,6 +64,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     DESCRIPTIVE_CONTENT_RUNGS,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -579,7 +580,7 @@ def main() -> None:
     src = args.event_source
 
     tables = _load_tables(src, args.brain_area)
-    out_dir = PROCESSED_DATA_DIR / "replay_content" / "event_source_comparison"
+    out_dir = REPLAY_CONTENT_DIR / "event_source_comparison"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # Built once — both patch fits consume it.

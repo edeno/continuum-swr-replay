@@ -49,7 +49,7 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
     record_inputs,
     write_fit_provenance,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -62,14 +62,14 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 
-INPUT_DIR = PROCESSED_DATA_DIR / "replay_content"
+INPUT_DIR = REPLAY_CONTENT_DIR
 OUTPUT_PATH = INPUT_DIR / "stage5b_retrospective.pkl"
 
 #: The tables this analysis is cut from, hashed into the provenance sidecar.
 FIT_INPUTS = {
-    "event_table": INPUT_DIR / "event_table.pkl",
-    "event_arm_table": INPUT_DIR / "event_arm_table.pkl",
-    "event_sequence_table": INPUT_DIR / "event_sequence_table.pkl",
+    "event_table": table_path("event_table", INPUT_DIR, fmt="pkl"),
+    "event_arm_table": table_path("event_arm_table", INPUT_DIR, fmt="pkl"),
+    "event_sequence_table": table_path("event_sequence_table", INPUT_DIR, fmt="pkl"),
 }
 
 #: The only population these metrics are defined on. A retrospective metric

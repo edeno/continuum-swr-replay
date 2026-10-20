@@ -31,11 +31,11 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
     check_fit_provenance,
     fit_provenance_path,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import MODEL_DIRS, REPLAY_CONTENT_DIR
 from continuum_swr_replay.tables.io import parquet_path
 
 _SIDECAR_SUFFIX = ".provenance.json"
-DEFAULT_ROOT = Path(PROCESSED_DATA_DIR) / "replay_content"
+DEFAULT_ROOT = REPLAY_CONTENT_DIR
 
 
 def artifact_for_sidecar(sidecar: Path) -> Path:
@@ -70,7 +70,7 @@ def resolve_input(name: str, sidecar: Path, root: Path) -> Path | None:
     for candidate in (
         sidecar.parent / f"{name}.pkl",
         root / f"{name}.pkl",
-        root / "models_per_bin_rate" / f"{name}.pkl",
+        root / MODEL_DIRS["per_bin_rate"].name / f"{name}.pkl",
     ):
         if parquet_path(candidate).exists() or candidate.exists():
             return candidate

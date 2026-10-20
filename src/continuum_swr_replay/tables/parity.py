@@ -16,28 +16,14 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.paths import BASENAME_TO_TABLE, CANONICAL_TABLE_BASENAMES
 from continuum_swr_replay.tables.covariate_registry import row_keys
 from continuum_swr_replay.tables.io import read_table
 
 __all__ = [
-    "BASENAME_TO_TABLE",
-    "CANONICAL_TABLE_BASENAMES",
     "diff_table",
     "compare_table_roots",
 ]
-
-# On-disk table basename -> the registry table key that owns its row key.
-BASENAME_TO_TABLE: dict[str, str] = {
-    "event_table": "event",
-    "event_arm_table": "event_arm",
-    "event_patch_table": "event_patch",
-    "event_sequence_table": "event_sequence",
-    "stop_table": "stop",
-    "qvals_table": "qvals",
-    "event_onset_table": "event_onset",
-    "stop_timebin_table": "stop_timebin",
-}
-CANONICAL_TABLE_BASENAMES: tuple[str, ...] = tuple(BASENAME_TO_TABLE)
 
 
 def diff_table(

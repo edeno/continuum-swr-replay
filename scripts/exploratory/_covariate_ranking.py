@@ -55,7 +55,11 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
 from continuum_swr_replay.analysis.replay.per_bin_design import (  # noqa: E402
     POPULATIONS,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
+from continuum_swr_replay.paths import (  # noqa: E402
+    MODEL_DIRS,
+    REPLAY_CONTENT_DIR,
+    table_path,
+)
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
     require_covariate_schema,
 )
@@ -66,7 +70,7 @@ warnings.filterwarnings("ignore")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
-RC = PROCESSED_DATA_DIR / "replay_content"
+RC = REPLAY_CONTENT_DIR
 POPULATIONS_TO_FIT = ("swr", "non_local_swr", "non_local_no_swr")
 # Value columns merged from qvals_table at exact stop-start alignment. Preserve
 # their canonical scientific names through fitting and persisted diagnostics.
@@ -136,10 +140,10 @@ def _run_session(keys, stops_g, onsets_g) -> list[dict]:
 
 
 def _load() -> tuple[pd.DataFrame, pd.DataFrame]:
-    stop = read_table(RC / "stop_table.pkl")
+    stop = read_table(table_path("stop_table", RC, fmt="pkl"))
     require_covariate_schema(stop, table="stop")
     stop = add_uncertainty_covariates(stop)
-    cont = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
+    cont = read_table(table_path("qvals_table", RC, fmt="pkl"))
     require_covariate_schema(cont, table="qvals")
     stop = stop.merge(
         cont[["stop_id", *VALUE_COLS]], on="stop_id", how="inner", validate="many_to_one"
@@ -150,8 +154,8 @@ def _load() -> tuple[pd.DataFrame, pd.DataFrame]:
     )
     merged = stop.merge(first, on=list(SESSION_COLUMNS), how="left", indicator=True)
     stop = stop[merged["_merge"].to_numpy() == "left_only"]
-    onset_table = read_table(RC / "event_onset_table.pkl")
-    event_table = read_table(RC / "event_table.pkl")
+    onset_table = read_table(table_path("event_onset_table", RC, fmt="pkl"))
+    event_table = read_table(table_path("event_table", RC, fmt="pkl"))
     require_covariate_schema(onset_table, table="event_onset")
     require_covariate_schema(event_table, table="event")
     onsets = attach_is_swr_to_onsets(onset_table, event_table)
@@ -194,7 +198,7 @@ def main() -> None:
         for keys, g, og in tasks:
             rows.extend(_run_session(keys, g, og))
     df = pd.DataFrame(rows)
-    out = RC / "models_per_bin_rate" / (
+    out = RC / MODEL_DIRS["per_bin_rate"].name / (
         "covariate_ranking_smoke.pkl" if args.max_per_animal else "covariate_ranking.pkl"
     )
     df.to_pickle(out)

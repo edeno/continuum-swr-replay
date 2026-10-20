@@ -36,7 +36,7 @@ import statsmodels.api as sm
 from statsmodels.genmod.cov_struct import Independence
 from statsmodels.genmod.generalized_estimating_equations import GEE
 
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -44,7 +44,7 @@ from continuum_swr_replay.tables.io import read_table
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 warnings.filterwarnings("ignore")
-RC = PROCESSED_DATA_DIR / "replay_content"
+RC = REPLAY_CONTENT_DIR
 SCRATCH = Path("scratch")
 
 
@@ -82,7 +82,7 @@ def rr_table(res, terms):
 
 
 def main():
-    stop = read_table(RC / "stop_table.pkl")
+    stop = read_table(table_path("stop_table", RC, fmt="pkl"))
     require_covariate_schema(stop, table="stop")
     df = prep(stop)
     n_sess = df["session"].nunique()

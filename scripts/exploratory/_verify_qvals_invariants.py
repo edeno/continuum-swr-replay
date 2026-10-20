@@ -26,20 +26,20 @@ import sys
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
 from continuum_swr_replay.tables.io import read_table
 
-RC = PROCESSED_DATA_DIR / "replay_content"
+RC = REPLAY_CONTENT_DIR
 MEAN = [f"reward_belief_mean_port_{i}" for i in range(6)]
 VAR = [f"reward_belief_variance_port_{i}" for i in range(6)]
 
 
 def main() -> int:
-    q = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
-    stop = read_table(RC / "stop_table.pkl")
+    q = read_table(table_path("qvals_table", RC, fmt="pkl"))
+    stop = read_table(table_path("stop_table", RC, fmt="pkl"))
     require_covariate_schema(q, table="qvals")
     require_covariate_schema(stop, table="stop")
     st = stop[

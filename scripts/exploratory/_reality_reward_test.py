@@ -23,13 +23,13 @@ import sys
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
 from continuum_swr_replay.tables.io import read_table
 
-RC = PROCESSED_DATA_DIR / "replay_content"
+RC = REPLAY_CONTENT_DIR
 PARQUET = sys.argv[1] if len(sys.argv) > 1 else (
     "/tmp/claude-39494/reality_reward/event_spike_evidence_metrics.parquet"
 )
@@ -39,7 +39,7 @@ def main() -> None:
     ev = pd.read_parquet(PARQUET)
     if "start_time" not in ev.columns:
         raise SystemExit("parquet lacks start_time — re-run the engine with the patch")
-    stop = read_table(RC / "stop_table.pkl")
+    stop = read_table(table_path("stop_table", RC, fmt="pkl"))
     require_covariate_schema(stop, table="stop")
     stop = stop.assign(
         epoch_id=stop["animal"].astype(str) + stop["session_date"].astype(str)

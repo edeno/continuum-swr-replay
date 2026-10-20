@@ -133,7 +133,11 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     SWR_CONTRAST_RATE_STOP_COVARS as STOP_COVARS,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
+from continuum_swr_replay.paths import (  # noqa: E402
+    MODEL_DIRS,
+    REPLAY_CONTENT_DIR,
+    table_path,
+)
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
     require_covariate_schema,
 )
@@ -184,14 +188,14 @@ _RATE_CONT_COVARS = [
     "reward_belief_differential_entropy_leaf_mean_preoutcome",
     "reward_belief_mean_update_l1_all_ports_postoutcome",
 ]
-RC = PROCESSED_DATA_DIR / "replay_content"
+RC = REPLAY_CONTENT_DIR
 
 # The tables `_load` reads; recorded in each artifact's provenance sidecar.
 FIT_INPUTS = {
-    "stop_table": RC / "stop_table.pkl",
-    "qvals_table": RC / "models_per_bin_rate" / "qvals_table.pkl",
-    "event_onset_table": RC / "event_onset_table.pkl",
-    "event_table": RC / "event_table.pkl",
+    "stop_table": table_path("stop_table", RC, fmt="pkl"),
+    "qvals_table": table_path("qvals_table", RC, fmt="pkl"),
+    "event_onset_table": table_path("event_onset_table", RC, fmt="pkl"),
+    "event_table": table_path("event_table", RC, fmt="pkl"),
 }
 STRATA = ("non_local", "non_local_swr", "non_local_no_swr")
 MIN_BINS, MIN_EVENTS = 200, 20
@@ -560,10 +564,10 @@ def _mask_post_outcome_covariates(
 
 
 def _load(cohort: str) -> tuple[pd.DataFrame, pd.DataFrame, int]:
-    stop = read_table(RC / "stop_table.pkl")
-    q = read_table(RC / "models_per_bin_rate" / "qvals_table.pkl")
-    onset_table = read_table(RC / "event_onset_table.pkl")
-    event_table = read_table(RC / "event_table.pkl")
+    stop = read_table(table_path("stop_table", RC, fmt="pkl"))
+    q = read_table(table_path("qvals_table", RC, fmt="pkl"))
+    onset_table = read_table(table_path("event_onset_table", RC, fmt="pkl"))
+    event_table = read_table(table_path("event_table", RC, fmt="pkl"))
     require_covariate_schema(stop, table="stop")
     require_covariate_schema(q, table="qvals")
     require_covariate_schema(onset_table, table="event_onset")
@@ -1032,7 +1036,7 @@ def _aggregate_only(smoke: bool, cohort: str) -> None:
         apply the per-term drop rule to fits that carry no per-term information.
     """
     suffix = stop_cohort_suffix(cohort, smoke=smoke)
-    out_dir = RC / "models_per_bin_rate"
+    out_dir = RC / MODEL_DIRS["per_bin_rate"].name
     fits_path = out_dir / f"swr_contrast_rate{suffix}.pkl"
     if not fits_path.exists():
         raise SystemExit(f"no per-session fits at {fits_path}; run the fit first")
@@ -1190,7 +1194,7 @@ def main() -> None:
     # the model comparison invalidates a cross-cohort step on this column.
     models["stop_cohort"] = args.stop_cohort
 
-    out_dir = RC / "models_per_bin_rate"
+    out_dir = RC / MODEL_DIRS["per_bin_rate"].name
     out_dir.mkdir(parents=True, exist_ok=True)
     csfx = stop_cohort_suffix(args.stop_cohort, smoke=smoke)
     out = out_dir / f"swr_contrast_rate{csfx}.pkl"

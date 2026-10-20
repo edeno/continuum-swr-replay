@@ -22,7 +22,7 @@ from statsmodels.stats.multitest import multipletests
 from continuum_swr_replay.analysis.replay._helpers import add_arm_fixed_effects
 from continuum_swr_replay.analysis.replay.design_constants import ARM_FE_PREDICTORS
 from continuum_swr_replay.analysis.replay.fitting import fit_conditional_poisson
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import MODEL_DIRS, REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -31,7 +31,7 @@ from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 warnings.filterwarnings("ignore")
-RC = PROCESSED_DATA_DIR / "replay_content"
+RC = REPLAY_CONTENT_DIR
 SESSION = list(SESSION_COLUMNS)
 
 ARM_P = ["is_current_arm", "is_prev_arm", "reward_fraction_candidate_arm_last10_visits", "visit_recency_trials_event_leaf_centered",
@@ -78,7 +78,7 @@ def _pool(coefs_by_pred):
 
 def main():
     # Arm: arm FE + one predictor (conditional Poisson on arm counts).
-    arm_tbl = read_table(RC / "event_arm_table.pkl")
+    arm_tbl = read_table(table_path("event_arm_table", RC, fmt="pkl"))
     require_covariate_schema(arm_tbl, table="event_arm")
     arm_tbl = add_arm_fixed_effects(arm_tbl)
     logging.info("arm univariate fits...")
@@ -88,7 +88,7 @@ def main():
     ))
 
     # Patch: one predictor alone (3-category conditional Poisson).
-    patch_tbl = read_table(RC / "event_patch_table.pkl")
+    patch_tbl = read_table(table_path("event_patch_table", RC, fmt="pkl"))
     require_covariate_schema(patch_tbl, table="event_patch")
     logging.info("patch univariate fits...")
     patch_uni = _pool(_univariate(
@@ -97,14 +97,14 @@ def main():
     ))
 
     # Rate: intercept + one predictor (Poisson w/ log-immobility offset).
-    stop = read_table(RC / "stop_table.pkl")
+    stop = read_table(table_path("stop_table", RC, fmt="pkl"))
     require_covariate_schema(stop, table="stop")
     logging.info("rate univariate fits...")
     rate_uni = _pool(_univariate(stop, RATE_P, lambda g, p: fit_rate_model(g, [p])))
 
     # Joint estimates from the saved full models.
-    arm = joblib.load(RC / "models" / "all_models.pkl")
-    patch = joblib.load(RC / "models_patch" / "all_models.pkl")
+    arm = joblib.load(RC / MODEL_DIRS["content_arm"].name / "all_models.pkl")
+    patch = joblib.load(RC / MODEL_DIRS["content_patch"].name / "all_models.pkl")
     rate = joblib.load(RC / "models_rate" / "all_models.pkl")
 
     def joint(df, model, p):

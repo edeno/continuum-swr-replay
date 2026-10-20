@@ -409,7 +409,7 @@ class TestExcludedTime:
         directory = write_artifact_run(
             tmp_path / "artifacts", {self.EPOCH_ID: self.CORES}
         )
-        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_ROOT", directory.parent)
+        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_DIR", directory.parent)
         monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
         np.testing.assert_allclose(
             analysed_time.excluded_intervals(self.EPOCH_ID).to_numpy(), self.EXCLUDED

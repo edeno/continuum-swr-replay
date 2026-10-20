@@ -26,7 +26,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import (
+    CONTFRAG_REPLAY_CONTENT_DIR,
+    REPLAY_CONTENT_DIR,
+    table_path,
+)
 from continuum_swr_replay.tables.covariate_registry import (
     finalize_covariate_schema,
     require_covariate_schema,
@@ -40,8 +44,8 @@ BASELINE_ROOT = Path(
         "/tmp/continuum-covariate-rename-baseline-20260822",
     )
 )
-RC = PROCESSED_DATA_DIR / "replay_content"
-CF = PROCESSED_DATA_DIR / "contfrag_replay_content"
+RC = REPLAY_CONTENT_DIR
+CF = CONTFRAG_REPLAY_CONTENT_DIR
 
 # label, registry table/grain, immediate pre-rename baseline, regenerated table
 TABLES: tuple[tuple[str, str, Path, Path], ...] = (
@@ -49,25 +53,25 @@ TABLES: tuple[tuple[str, str, Path, Path], ...] = (
         "replay event",
         "event",
         BASELINE_ROOT / "replay/event_table.parquet",
-        RC / "event_table.pkl",
+        table_path("event_table", RC, fmt="pkl"),
     ),
     (
         "replay event_arm",
         "event_arm",
         BASELINE_ROOT / "replay/event_arm_table.parquet",
-        RC / "event_arm_table.pkl",
+        table_path("event_arm_table", RC, fmt="pkl"),
     ),
     (
         "replay event_patch",
         "event_patch",
         BASELINE_ROOT / "replay/event_patch_table.parquet",
-        RC / "event_patch_table.pkl",
+        table_path("event_patch_table", RC, fmt="pkl"),
     ),
     (
         "replay stop",
         "stop",
         BASELINE_ROOT / "replay/stop_table.parquet",
-        RC / "stop_table.pkl",
+        table_path("stop_table", RC, fmt="pkl"),
     ),
     (
         "replay qvals",

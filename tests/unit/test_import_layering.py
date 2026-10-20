@@ -203,6 +203,7 @@ FOUNDATION = frozenset(
         "decoding",
         "intervals",
         "parameters",
+        "paths",
         "runs",
         "tables",
         "types",

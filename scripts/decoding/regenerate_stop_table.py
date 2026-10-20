@@ -35,7 +35,7 @@ from continuum_swr_replay.analysis.replay.prepare_data import find_sessions
 from continuum_swr_replay.analysis.replay.tables_stop import (  # noqa: E402
     add_nonlocal_swr_split,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
     require_covariate_schema,
     stamp_covariate_schema,
@@ -53,7 +53,7 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S"
 )
 logger = logging.getLogger(__name__)
-RC = PROCESSED_DATA_DIR / "replay_content"
+RC = REPLAY_CONTENT_DIR
 
 
 def build_one(session: dict) -> pd.DataFrame | None:
@@ -196,7 +196,7 @@ def main() -> None:
         )
     stop = pd.concat(tables, ignore_index=True)
 
-    event_table = read_table(RC / "event_table.pkl")
+    event_table = read_table(table_path("event_table", RC, fmt="pkl"))
     require_covariate_schema(event_table, table="event")
     # The split joins the shipped event table's is_swr onto stops whose SWR
     # columns were just built from the live source: both must be one source.
@@ -209,7 +209,7 @@ def main() -> None:
     if args.no_save:
         logger.info("--no-save: built %d stops, not written", len(stop))
         return
-    out = RC / "stop_table"
+    out = table_path("stop_table", RC, fmt="")
     if table_exists(out):
         backup = write_table(read_table(out), RC / "stop_table_previous")
         logger.info("backed up existing -> %s", backup.name)

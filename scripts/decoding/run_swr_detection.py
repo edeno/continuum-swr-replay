@@ -205,6 +205,7 @@ from continuum_swr_replay.intervals import (
     masked_seconds,
 )
 from continuum_swr_replay.parameters import ROOT_DIR
+from continuum_swr_replay.paths import SWR_INVENTORY_ROOT
 from continuum_swr_replay.runs.batch import (
     raise_open_file_limit,
     run_epoch_logged,
@@ -220,7 +221,7 @@ from continuum_swr_replay.runs.io import (
 )
 from continuum_swr_replay.runs.provenance import provenance_record
 
-OUTPUT_ROOT = swr_inventory.SWR_INVENTORY_ROOT
+OUTPUT_ROOT = SWR_INVENTORY_ROOT
 """Where the run folders go: where the paper's SWR source reads them."""
 PRODUCED_BY = "scripts/decoding/run_swr_detection.py"
 DESIGN_SPEC = "docs/design/2026-10-03-full-pipeline-refresh-design.md"

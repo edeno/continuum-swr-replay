@@ -20,14 +20,14 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.events.cohort_selection import select_stop_cohort
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import table_path
 from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.tables.io import parquet_path, read_table
 
 __all__ = ["DEFAULT_STOP_TABLE_PATH", "load_session_stop_cohort"]
 
 #: The canonical stop table every family's cohort is cut from.
-DEFAULT_STOP_TABLE_PATH = PROCESSED_DATA_DIR / "replay_content" / "stop_table.parquet"
+DEFAULT_STOP_TABLE_PATH = table_path("stop_table")
 
 
 def load_session_stop_cohort(

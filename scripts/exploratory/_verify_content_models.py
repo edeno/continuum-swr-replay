@@ -13,18 +13,18 @@ import pandas as pd
 from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import MODEL_DIRS, REPLAY_CONTENT_DIR
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
-RC = PROCESSED_DATA_DIR / "replay_content"
+RC = REPLAY_CONTENT_DIR
 SC = list(SESSION_COLUMNS)
 
 # (config label, models dir, models to report)
 CONFIGS = [
-    ("arm ALL", "models", ["M1", "M5", "M6", "M7"]),
+    ("arm ALL", MODEL_DIRS["content_arm"].name, ["M1", "M5", "M6", "M7"]),
     ("arm SWR=T (with-SWR)", "models_swr_T", ["M1", "M5"]),
     ("arm SWR=F (non-SWR)", "models_swr_F", ["M1", "M5"]),
-    ("patch ALL", "models_patch", ["P1", "P4"]),
+    ("patch ALL", MODEL_DIRS["content_patch"].name, ["P1", "P4"]),
     ("patch SWR=T", "models_patch_swr_T", ["P1"]),
     ("patch SWR=F", "models_patch_swr_F", ["P1"]),
 ]

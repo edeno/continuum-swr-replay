@@ -37,7 +37,7 @@ from continuum_swr_replay.analysis.replay.uncertainty_content import (
     summarize_mu_coefficients,
     within_arm_horserace,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -57,7 +57,7 @@ from scripts.content.fit_replay_content_models import (  # noqa: E402
 )
 
 LOGGER = logging.getLogger(__name__)
-DEFAULT_DATA_DIR = PROCESSED_DATA_DIR / "replay_content"
+DEFAULT_DATA_DIR = REPLAY_CONTENT_DIR
 DEFAULT_OUTPUT_DIR = DEFAULT_DATA_DIR / "uncertainty_content"
 DEFAULT_EXAMPLE_SESSION = ("wilbur", "20210329", "08_r4")
 
@@ -69,7 +69,7 @@ def mu_inputs(data_dir: Path) -> dict[str, Path]:
     summarized, so an uncertainty result cannot be built from a rung that
     predates the event-arm table it is being described against.
     """
-    return {"event_arm_table": data_dir / "event_arm_table.pkl"}
+    return {"event_arm_table": table_path("event_arm_table", data_dir, fmt="pkl")}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -315,9 +315,9 @@ def main() -> None:
         format="%(asctime)s [%(levelname)s] %(message)s",
         datefmt="%H:%M:%S",
     )
-    event_arm_path = args.data_dir / "event_arm_table.pkl"
-    stop_path = args.data_dir / "stop_table.pkl"
-    qvals_path = args.data_dir / "models_per_bin_rate" / "qvals_table.pkl"
+    event_arm_path = table_path("event_arm_table", args.data_dir, fmt="pkl")
+    stop_path = table_path("stop_table", args.data_dir, fmt="pkl")
+    qvals_path = table_path("qvals_table", args.data_dir, fmt="pkl")
     standardization_path = args.data_dir / "standardization_reference.json"
     models_dir = resolve_models_dir(args.data_dir, args.models_dir)
     mu_path = models_dir / "Mu.pkl"
