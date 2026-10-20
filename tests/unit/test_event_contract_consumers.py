@@ -11,7 +11,7 @@ from continuum_swr_replay.analysis.events.immobility import (
     EventDefinitionError,
 )
 from scripts.content import analyze_content_occupancy
-from scripts.qa import analyze_event_spike_evidence
+from scripts.detection import analyze_event_spike_evidence
 
 
 def _noncontiguous_dot() -> pd.DataFrame:
@@ -60,9 +60,7 @@ def test_content_occupancy_validates_dot_before_environment_load(monkeypatch):
         analyze_content_occupancy.session_content_distances("a_01_r1_HPC")
 
 
-def test_spike_evidence_main_propagates_event_contract_error(
-    monkeypatch, tmp_path
-):
+def test_spike_evidence_main_propagates_event_contract_error(monkeypatch, tmp_path):
     monkeypatch.setattr(
         analyze_event_spike_evidence,
         "analyze_session",

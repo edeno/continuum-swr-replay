@@ -21,9 +21,9 @@ Outputs (under ``PROCESSED_DATA_DIR/replay_content/``):
 
 Usage::
 
-    uv run python scripts/decoding/prepare_replay_content_data.py              # full run
-    uv run python scripts/decoding/prepare_replay_content_data.py --test       # 2 per animal
-    uv run python scripts/decoding/prepare_replay_content_data.py --from-cache # covariate-only rebuild
+    uv run python scripts/tables/prepare_replay_content_data.py              # full run
+    uv run python scripts/tables/prepare_replay_content_data.py --test       # 2 per animal
+    uv run python scripts/tables/prepare_replay_content_data.py --from-cache # covariate-only rebuild
 
 The run itself is :func:`continuum_swr_replay.analysis.replay.prepare_data.run_prepare_data`;
 this file is its command line.

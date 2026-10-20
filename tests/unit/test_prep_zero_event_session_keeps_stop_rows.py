@@ -66,8 +66,10 @@ def _stop_call_index_and_event_return_index(
                 "event_table" in cond_src
                 and ("Eq" in cond_src or "== 0" in cond_src)
                 and any(
-                    isinstance(s, ast.Return) and s.value is not None
-                    and isinstance(s.value, ast.Constant) and s.value.value is None
+                    isinstance(s, ast.Return)
+                    and s.value is not None
+                    and isinstance(s.value, ast.Constant)
+                    and s.value.value is None
                     for s in stmt.body
                 )
             ):
@@ -86,7 +88,7 @@ def _stop_call_index_and_event_return_index(
             "build_stop_table",
         ),
         (
-            "scripts/decoding/prepare_contfrag_replay_content_data.py",
+            "scripts/tables/prepare_contfrag_replay_content_data.py",
             "build_contfrag_stop_table",
         ),
     ],

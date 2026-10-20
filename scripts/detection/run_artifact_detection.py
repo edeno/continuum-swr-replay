@@ -52,9 +52,9 @@ epoch that fails is recorded with its error and the run goes on; the run then
 exits non-zero.
 
 Usage:
-    python scripts/decoding/run_artifact_detection.py --animal chimi \\
+    python scripts/detection/run_artifact_detection.py --animal chimi \\
         --date 20200225 --epoch 02_r1 --n-workers 1 --output-root <scratch>
-    python scripts/decoding/run_artifact_detection.py --include-pending --n-workers 8
+    python scripts/detection/run_artifact_detection.py --include-pending --n-workers 8
 """
 
 import argparse
@@ -115,7 +115,7 @@ from continuum_swr_replay.runs.provenance import provenance_record
 
 OUTPUT_ROOT = ARTIFACT_INTERVALS_DIR
 """Where the run folders go: where the SWR source reads them."""
-PRODUCED_BY = "scripts/decoding/run_artifact_detection.py"
+PRODUCED_BY = "scripts/detection/run_artifact_detection.py"
 DESIGN_SPEC = "docs/design/2026-10-09-artifact-detection.md"
 
 

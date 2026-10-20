@@ -17,8 +17,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import scripts.detection.run_inventory_comparison as runner
 import scripts.figures.generate_inventory_examples as examples
-import scripts.qa.run_inventory_comparison as runner
 from continuum_swr_replay.tables.io import write_table
 
 SEED = 7
@@ -341,7 +341,7 @@ def test_the_recompute_runs_on_the_gpu_even_when_an_import_pinned_the_cpu(
     monkeypatch,
 ) -> None:
     """Modules the examples import set JAX_PLATFORMS=cpu when imported
-    (scripts/qa/run_state_evidence.py); the recompute still asks JAX for the
+    (scripts/detection/run_state_evidence.py); the recompute still asks JAX for the
     GPU, under the memoryless run's XLA flags."""
     monkeypatch.setenv("JAX_PLATFORMS", "cpu")
     monkeypatch.setenv("XLA_FLAGS", "")

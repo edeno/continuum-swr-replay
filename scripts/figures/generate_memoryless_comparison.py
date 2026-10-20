@@ -6,7 +6,7 @@ project's switching state-space model over the Figure 1 simulation (25 neurons
 here where Figure 1 uses 30, and a plain fit rather than EM), so the two
 procedures can be read against a handful of labeled events.
 
-Lower panels summarize the sweep in `scripts/qa/sweep_memoryless_detection.py`,
+Lower panels summarize the sweep in `scripts/detection/sweep_memoryless_detection.py`,
 which wrote replays of chosen path length, duration, firing rate and distance
 from the animal one at a time into a simulated recording and recorded what each
 detector reported. Those panels read the aggregates the sweep saves, so the
@@ -2392,12 +2392,14 @@ def main() -> None:
     args = parser.parse_args()
 
     config = MemorylessSequenceConfig(sampling_frequency=500.0)
-    summary = read_summary(args.summary, "scripts/qa/sweep_memoryless_detection.py")
+    summary = read_summary(
+        args.summary, "scripts/detection/sweep_memoryless_detection.py"
+    )
     controls = read_summary(
-        args.controls_summary, "scripts/qa/sweep_memoryless_controls.py"
+        args.controls_summary, "scripts/detection/sweep_memoryless_controls.py"
     )
     heldout = read_summary(
-        args.heldout_summary, "scripts/qa/sweep_memoryless_heldout.py"
+        args.heldout_summary, "scripts/detection/sweep_memoryless_heldout.py"
     )
     fig, decoded = make_figure(args.n_neurons, config, summary, controls, heldout)
 

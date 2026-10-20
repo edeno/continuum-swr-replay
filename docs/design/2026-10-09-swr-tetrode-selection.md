@@ -2,7 +2,7 @@
 
 **Status (2026-10-09):** the project lead chose rule R-T on 2026-10-09. Implemented in
 `src/continuum_swr_replay/analysis/hippocampus/ripple_tetrodes.py` and applied by
-`scripts/decoding/run_swr_detection.py` (`detection_channels`) once per epoch, before any of
+`scripts/detection/run_swr_detection.py` (`detection_channels`) once per epoch, before any of
 the four detectors (Task 17b of the full pipeline refresh,
 [2026-10-03-full-pipeline-refresh-design.md](2026-10-03-full-pipeline-refresh-design.md)).
 **Not yet applied:** the configured SWR inventory (`swr_inventory.SWR_INVENTORY_RUN_ID`) predates

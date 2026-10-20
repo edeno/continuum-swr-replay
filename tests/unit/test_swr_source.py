@@ -167,7 +167,7 @@ class TestTheConfiguredInventory:
         assert holders == ["src/continuum_swr_replay/analysis/events/swr_inventory.py"]
 
     def test_the_swr_runner_writes_where_the_source_reads(self):
-        import scripts.decoding.run_swr_detection as runner
+        import scripts.detection.run_swr_detection as runner
 
         assert runner.OUTPUT_ROOT == swr_inventory.SWR_INVENTORY_ROOT
 

@@ -10,8 +10,8 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation im
     piecewise_replay,
     place_field_means,
 )
-from scripts.qa import sweep_memoryless_detection as sweep
-from scripts.qa import sweep_memoryless_heldout as heldout
+from scripts.detection import sweep_memoryless_detection as sweep
+from scripts.detection import sweep_memoryless_heldout as heldout
 
 REPLAY = piecewise_replay(
     [Segment(0.2, 40.0, 60.0)], 2.0, 1000.0, place_field_means(25, 170.0), 60.0

@@ -26,10 +26,10 @@ remains traceable. ``fit_replay_content_models.py`` accepts a matching
 
 Usage::
 
-    uv run python scripts/decoding/prepare_contfrag_replay_content_data.py                    # SWR / HPC
-    uv run python scripts/decoding/prepare_contfrag_replay_content_data.py --event-source MUA # MUA / HPC
-    uv run python scripts/decoding/prepare_contfrag_replay_content_data.py --brain-area mPFC  # SWR / mPFC
-    uv run python scripts/decoding/prepare_contfrag_replay_content_data.py --test             # 2 per animal
+    uv run python scripts/tables/prepare_contfrag_replay_content_data.py                    # SWR / HPC
+    uv run python scripts/tables/prepare_contfrag_replay_content_data.py --event-source MUA # MUA / HPC
+    uv run python scripts/tables/prepare_contfrag_replay_content_data.py --brain-area mPFC  # SWR / mPFC
+    uv run python scripts/tables/prepare_contfrag_replay_content_data.py --test             # 2 per animal
 """
 
 from __future__ import annotations

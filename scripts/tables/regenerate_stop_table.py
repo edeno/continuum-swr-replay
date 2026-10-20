@@ -12,8 +12,8 @@ The stop-bout definition is unchanged, so ``stop_id`` matches the existing
 ``event_table`` row-for-row and the merge is exact.
 
 Usage:
-    uv run python scripts/decoding/regenerate_stop_table.py --max-per-animal 1   # smoke
-    uv run python scripts/decoding/regenerate_stop_table.py                      # full
+    uv run python scripts/tables/regenerate_stop_table.py --max-per-animal 1   # smoke
+    uv run python scripts/tables/regenerate_stop_table.py                      # full
 """
 
 from __future__ import annotations

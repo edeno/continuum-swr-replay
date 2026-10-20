@@ -488,66 +488,6 @@ The flow both decode runners share, and the record of what differs.
 
 `DecodeRunner`, `algorithm_params`, `create_detector`, `perform_decoding`, `save_results_and_model`, `organize_results`, `run_decode`, `parse_decode_args`
 
-### `scripts/decoding/assemble_contfrag_shards.py`
-
-Assemble disjoint per-animal ContFrag shards into one canonical bundle.
-
-`assemble_contfrag_shards`, `main`
-
-### `scripts/decoding/assemble_replay_content_shards.py`
-
-Assemble disjoint Replay table shards into one canonical candidate bundle.
-
-`assemble_replay_content_shards`, `assemble_replay_stop_shards`, `main`
-
-### `scripts/decoding/build_timebin_tables.py`
-
-Build the Part B within-stop time-binned tables over all sessions.
-
-`build_one`, `validate`, `main`
-
-### `scripts/decoding/convert_tables_to_parquet.py`
-
-Convert the materialized canonical tables from pickle to parquet.
-
-`convert`, `main`
-
-### `scripts/decoding/prepare_contfrag_replay_content_data.py`
-
-Build canonical replay-content tables from ContFrag decoding results.
-
-`contfrag_table_basenames`, `publish_contfrag_tables`, `find_sessions`, `build_parser`, `configure_paths`, `main`
-
-### `scripts/decoding/prepare_replay_content_data.py`
-
-Build the four canonical replay-content tables across all sessions.
-
-`main`
-
-### `scripts/decoding/refresh_contfrag_behavioral_covariates.py`
-
-Rebuild ContFrag tables while reusing immutable posterior aggregates.
-
-`refresh_contfrag_behavioral_covariates`, `main`
-
-### `scripts/decoding/regenerate_stop_table.py`
-
-Regenerate ``stop_table.pkl`` with the new count columns.
-
-`build_one`, `validate`, `main`
-
-### `scripts/decoding/run_artifact_detection.py`
-
-Detect LFP and spike artifacts in every epoch's CA1 data, on CPU.
-
-`detector_constants`, `run_settings`, `reference_lfp`, `run_epoch`, `summary`, `register_epochs`, `main`, `run`
-
-### `scripts/decoding/run_carey_detection.py`
-
-Run Carey's candidate detector on every epoch's CA1 LFP and multiunit spikes.
-
-`output_paths`, `swr_run_inputs`, `decode_marks`, `observation_table`, `run_epoch`, `summary`, `run_settings`, `main`, `run`
-
 ### `scripts/decoding/run_decoding_bandit.py`
 
 Main script for running continuum neural decoding on spatial bandit task data.
@@ -560,11 +500,17 @@ Run Continuous-Fragmented (ContFrag) decoding on spatial bandit task data.
 
 `contfrag_detector_kwargs`, `run_decode`, `main`
 
-### `scripts/decoding/write_regeneration_manifest.py`
+### `scripts/detection/run_artifact_detection.py`
 
-Validate candidate covariate bundles and write a release manifest.
+Detect LFP and spike artifacts in every epoch's CA1 data, on CPU.
 
-`write_manifest`, `main`
+`detector_constants`, `run_settings`, `reference_lfp`, `run_epoch`, `summary`, `register_epochs`, `main`, `run`
+
+### `scripts/detection/run_carey_detection.py`
+
+Run Carey's candidate detector on every epoch's CA1 LFP and multiunit spikes.
+
+`output_paths`, `swr_run_inputs`, `decode_marks`, `observation_table`, `run_epoch`, `summary`, `run_settings`, `main`, `run`
 
 ### `scripts/rate/fit_cross_history_rate.py`
 
@@ -632,6 +578,60 @@ Summarize the per-bin conditional-intensity ladder (Family B) effects.
 
 `section_baseline`, `section_coef`, `section_kernel`, `section_reward_kernel`, `section_selfhistory`, `section_ladder`, `build_parser`, `main`
 
+### `scripts/tables/assemble_contfrag_shards.py`
+
+Assemble disjoint per-animal ContFrag shards into one canonical bundle.
+
+`assemble_contfrag_shards`, `main`
+
+### `scripts/tables/assemble_replay_content_shards.py`
+
+Assemble disjoint Replay table shards into one canonical candidate bundle.
+
+`assemble_replay_content_shards`, `assemble_replay_stop_shards`, `main`
+
+### `scripts/tables/build_timebin_tables.py`
+
+Build the Part B within-stop time-binned tables over all sessions.
+
+`build_one`, `validate`, `main`
+
+### `scripts/tables/convert_tables_to_parquet.py`
+
+Convert the materialized canonical tables from pickle to parquet.
+
+`convert`, `main`
+
+### `scripts/tables/prepare_contfrag_replay_content_data.py`
+
+Build canonical replay-content tables from ContFrag decoding results.
+
+`contfrag_table_basenames`, `publish_contfrag_tables`, `find_sessions`, `build_parser`, `configure_paths`, `main`
+
+### `scripts/tables/prepare_replay_content_data.py`
+
+Build the four canonical replay-content tables across all sessions.
+
+`main`
+
+### `scripts/tables/refresh_contfrag_behavioral_covariates.py`
+
+Rebuild ContFrag tables while reusing immutable posterior aggregates.
+
+`refresh_contfrag_behavioral_covariates`, `main`
+
+### `scripts/tables/regenerate_stop_table.py`
+
+Regenerate ``stop_table.pkl`` with the new count columns.
+
+`build_one`, `validate`, `main`
+
+### `scripts/tables/write_regeneration_manifest.py`
+
+Validate candidate covariate bundles and write a release manifest.
+
+`write_manifest`, `main`
+
 ## Aggregation
 
 Across-session and across-animal summaries, contrasts and model comparison over the per-session fits.
@@ -694,17 +694,59 @@ Per-event replay-trajectory rollups, shared by both event-table builders.
 
 Artifact I/O, provenance gating, and the diagnostics that check the tables and the fits.
 
+### `scripts/detection/analyze_event_spike_evidence.py`
+
+Spike-evidence reality analysis for non-SWR non-local events.
+
+`animal_from_epoch_id`, `find_sessions`, `build_session_events`, `load_marks`, `events_with_map_in_left_out_bins`, `event_metrics`, `analyze_session`, `render_session_figures`, `summarize`, `per_animal_medians`, `main`
+
+### `scripts/detection/report_event_features.py`
+
+Report one event features run: its features per session and per animal.
+
+`distribution`, `epoch_status`, `read_inputs`, `without_baseline_rows`, `event_populations`, `context_by_session`, `feature_tables`, `missing_by_session`, `never_missing`, `with_spikes_per_row`, `evidence_coverage_by_session`, `rejection_by_session`, `rejection_by_animal`, `memoryless_cohort_by_session`, `comparator_only_events`, `comparator_only_table`, `stratum_labels`, `report_tables`, `draw_figures`, `write_report`, `main`
+
+### `scripts/detection/report_inventory_comparison.py`
+
+Report one inventory comparison run: its counts per session and per animal.
+
+`epoch_status`, `detector_availability`, `counts_by_session`, `counts_by_animal`, `directional_by_animal`, `oriented_pairs`, `match_strength_by_session`, `match_strength_by_animal`, `cells_by_session`, `cells_by_animal`, `swr_matrix_by_animal`, `matrix_population`, `paired_labels_by_session`, `definition_disagreement_by_session`, `labels_by_animal`, `report_tables`, `draw_figures`, `write_report`, `main`
+
+### `scripts/detection/run_event_features.py`
+
+Event features of every compared event, one epoch per task.
+
+`output_path`, `output_paths`, `evidence_rows`, `memoryless_input_mismatch`, `epoch_tables`, `run_epoch`, `summary`, `run_settings`, `main`, `run`
+
+### `scripts/detection/run_inventory_comparison.py`
+
+Compare the replay-detection inventories, one epoch at a time.
+
+`decode_path`, `epoch_inventories`, `compare_epoch`, `bounds_mismatch`, `output_path`, `output_paths`, `stamped_tables`, `run_epoch`, `summary`, `run_settings`, `select_epochs`, `main`, `run`
+
+### `scripts/detection/run_state_evidence.py`
+
+Held-out spike evidence for each decoder state, on every canonical HPC decode.
+
+`caveats`, `require_cpu`, `decode_files`, `decode_file_stats`, `reuse_reason`, `canonical_epochs`, `load_marks_and_training_mask`, `stored_log_likelihood`, `refit_encoding`, `spikes_in_bins`, `relative_error`, `output_paths`, `LabelSet`, `label_probabilities`, `checked_halves`, `time_held_out_record`, `epoch_table`, `label_set_table`, `running_only_masks`, `run_settings`, `run_epoch`, `run_epochs`, `figure_bouts`, `figure_calibration`, `figure_silence`, `write_csv`, `readme`, `summarize`, `build_parser`, `main`
+
+### `scripts/detection/sweep_memoryless_controls.py`
+
+What each detector does with activity that is not one clean replay.
+
+`usable_intervals`, `truth_path`, `covered_cm`, `detector_events`, `score_trial`, `jump_segments`, `trials`, `run_detectors`, `part_alone_spikes`, `condition_rng`, `run_trials`, `run_no_replay`, `summarize`, `main`
+
+### `scripts/detection/sweep_memoryless_heldout.py`
+
+Does each detector's content reproduce in cells it never saw?
+
+`folds`, `fold_models`, `trials`, `event_truth`, `matches_injection`, `permutations_for`, `score_events`, `run_fold`, `run_no_replay_fold`, `summarize`, `main`
+
 ### `scripts/qa/_report.py`
 
 Report helpers shared by the QA scripts: the run's command line, markdown tables.
 
 `caption_with_pending`, `session_names`, `read_run`, `with_pending`, `ratio`, `pool_sessions`, `per_session`, `summed`
-
-### `scripts/qa/analyze_event_spike_evidence.py`
-
-Spike-evidence reality analysis for non-SWR non-local events.
-
-`animal_from_epoch_id`, `find_sessions`, `build_session_events`, `load_marks`, `events_with_map_in_left_out_bins`, `event_metrics`, `analyze_session`, `render_session_figures`, `summarize`, `per_animal_medians`, `main`
 
 ### `scripts/qa/audit_event_patch_fraction.py`
 
@@ -730,12 +772,6 @@ Report whether every fitted artifact is still current for the tables it read.
 
 `artifact_for_sidecar`, `find_sidecars`, `resolve_input`, `check_artifact`, `propagate_stale`, `format_line`, `main`
 
-### `scripts/qa/check_pfc_ridge_lambda0.py`
-
-Check that the penalised solver reproduces maximum likelihood at lambda = 0.
-
-`audited_basis`, `audited_designs`, `rebuild_session`, `compare_session`, `build_report`, `main`
-
 ### `scripts/qa/compare_fits.py`
 
 Compare a backed-up rate fit against the current one and write a markdown audit.
@@ -747,18 +783,6 @@ Compare a backed-up rate fit against the current one and write a markdown audit.
 Run the port and the reference's own arithmetic on one input, and compare.
 
 `window_counts`, `overlap`, `shuffle_permutations`, `p_values`, `passes`, `compare`, `reference_row`, `fields_and_thresholds`, `compare_variants`, `decode_sweep_cell`, `sweep_totals`, `main`
-
-### `scripts/qa/compare_pfc_cohorts.py`
-
-Write the before/after audit of the mPFC unit-GLM stop cohort.
-
-`read_sidecars`, `runner_code`, `provenance_table`, `bundle_sessions`, `session_cohort_table`, `coverage_summary`, `alignment_prose`, `gate_counts`, `significance_table`, `population_comparison`, `try_read_sidecars`, `same_events_precondition`, `event_count_agreement`, `shared_statistic_differences`, `matched_control_arrays`, `matched_control_significance`, `fitter_table`, `session_fit_counts_table`, `worker_time_table`, `curve_peaks`, `peak_shrinkage`, `shrinkage_table`, `implied_prior_per_lag`, `empirical_bayes_sigma`, `heldout_fraction_table`, `restrict_to_sessions`, `legacy_fdr_table`, `separated_column_table`, `engagement_overlap_table`, `null_window_table`, `fold_spread_table`, `sigma_sensitivity_table`, `estimator_provenance_table`, `rerun_sections`, `build_report`, `geometry_section`, `build_estimator_report`, `main`
-
-### `scripts/qa/compare_pfc_fitters.py`
-
-Write the equivalence audit of the batched JAX fitter against statsmodels.
-
-`bundle_stems`, `load_bundle`, `compare_statistics`, `compare_modulations`, `compare_diagnostics`, `parse_time_file`, `build_report`, `main`
 
 ### `scripts/qa/compare_to_golden_baseline.py`
 
@@ -772,12 +796,6 @@ Compute raw-data QC stats for hippocampal clusterless decoding.
 
 `main`
 
-### `scripts/qa/diagnose_pfc_event_definition.py`
-
-Compare the PFC path's old, run-time event definition against the canonical one.
-
-`build_old_event_sets`, `total_overlap_seconds`, `match_by_overlap`, `build_comparison`, `get_command_line_arguments`, `main`
-
 ### `scripts/qa/diagnose_trial_detection.py`
 
 Diagnostic figures for trial-detection and predictor semantics.
@@ -789,12 +807,6 @@ Diagnostic figures for trial-detection and predictor semantics.
 Freeze the current canonical tables and model outputs as a read-only baseline.
 
 `freeze`, `main`
-
-### `scripts/qa/measure_pfc_null_geometry.py`
-
-What the mPFC held-out null's windows look like, beside the real events.
-
-`bundle_paths`, `session_of`, `read_sidecar`, `spacing_summary`, `draw_spacing_summary`, `session_window_sets`, `spacing_section`, `overlap_section`, `non_positive_section`, `excluded_section`, `main`
 
 ### `scripts/qa/memoryless_reference.py`
 
@@ -808,30 +820,6 @@ Objective AST mutation check for value-critical builder logic.
 
 `check`, `main`
 
-### `scripts/qa/report_event_features.py`
-
-Report one event features run: its features per session and per animal.
-
-`distribution`, `epoch_status`, `read_inputs`, `without_baseline_rows`, `event_populations`, `context_by_session`, `feature_tables`, `missing_by_session`, `never_missing`, `with_spikes_per_row`, `evidence_coverage_by_session`, `rejection_by_session`, `rejection_by_animal`, `memoryless_cohort_by_session`, `comparator_only_events`, `comparator_only_table`, `stratum_labels`, `report_tables`, `draw_figures`, `write_report`, `main`
-
-### `scripts/qa/report_inventory_comparison.py`
-
-Report one inventory comparison run: its counts per session and per animal.
-
-`epoch_status`, `detector_availability`, `counts_by_session`, `counts_by_animal`, `directional_by_animal`, `oriented_pairs`, `match_strength_by_session`, `match_strength_by_animal`, `cells_by_session`, `cells_by_animal`, `swr_matrix_by_animal`, `matrix_population`, `paired_labels_by_session`, `definition_disagreement_by_session`, `labels_by_animal`, `report_tables`, `draw_figures`, `write_report`, `main`
-
-### `scripts/qa/run_event_features.py`
-
-Event features of every compared event, one epoch per task.
-
-`output_path`, `output_paths`, `evidence_rows`, `memoryless_input_mismatch`, `epoch_tables`, `run_epoch`, `summary`, `run_settings`, `main`, `run`
-
-### `scripts/qa/run_inventory_comparison.py`
-
-Compare the replay-detection inventories, one epoch at a time.
-
-`decode_path`, `epoch_inventories`, `compare_epoch`, `bounds_mismatch`, `output_path`, `output_paths`, `stamped_tables`, `run_epoch`, `summary`, `run_settings`, `select_epochs`, `main`, `run`
-
 ### `scripts/qa/run_quality_metrics.py`
 
 Compute decoding quality metrics across all sessions.
@@ -844,12 +832,6 @@ Rerun the CPU model fits and the figures that read them, in dependency order.
 
 `Run`, `select`, `run_env`, `schedule`, `sidecar_times`, `written_artifacts`, `check_provenance`, `print_plan`, `main`
 
-### `scripts/qa/run_state_evidence.py`
-
-Held-out spike evidence for each decoder state, on every canonical HPC decode.
-
-`caveats`, `require_cpu`, `decode_files`, `decode_file_stats`, `reuse_reason`, `canonical_epochs`, `load_marks_and_training_mask`, `stored_log_likelihood`, `refit_encoding`, `spikes_in_bins`, `relative_error`, `output_paths`, `LabelSet`, `label_probabilities`, `checked_halves`, `time_held_out_record`, `epoch_table`, `label_set_table`, `running_only_masks`, `run_settings`, `run_epoch`, `run_epochs`, `figure_bouts`, `figure_calibration`, `figure_silence`, `write_csv`, `readme`, `summarize`, `build_parser`, `main`
-
 ### `scripts/qa/summarize_cohort_audits.py`
 
 Concatenate and flag every ``*_cohort_audit.csv`` under the outputs dir.
@@ -861,18 +843,6 @@ Concatenate and flag every ``*_cohort_audit.csv`` under the outputs dir.
 Print Stage 6's per-role cross-session FDR table for a saved bundle.
 
 `main`
-
-### `scripts/qa/sweep_memoryless_controls.py`
-
-What each detector does with activity that is not one clean replay.
-
-`usable_intervals`, `truth_path`, `covered_cm`, `detector_events`, `score_trial`, `jump_segments`, `trials`, `run_detectors`, `part_alone_spikes`, `condition_rng`, `run_trials`, `run_no_replay`, `summarize`, `main`
-
-### `scripts/qa/sweep_memoryless_heldout.py`
-
-Does each detector's content reproduce in cells it never saw?
-
-`folds`, `fold_models`, `trials`, `event_truth`, `matches_injection`, `permutations_for`, `score_events`, `run_fold`, `run_no_replay_fold`, `summarize`, `main`
 
 ### `scripts/qa/write_epoch_register_doc.py`
 

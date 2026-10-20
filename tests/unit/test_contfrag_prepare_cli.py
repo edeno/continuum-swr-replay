@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pytest
 
-SCRIPT = "scripts.decoding.prepare_contfrag_replay_content_data"
+SCRIPT = "scripts.tables.prepare_contfrag_replay_content_data"
 
 
 @pytest.fixture

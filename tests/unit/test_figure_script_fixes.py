@@ -386,7 +386,7 @@ def test_the_figure03_panel_a_axes_get_the_ticks_and_keep_their_limits(offline):
     "module",
     [
         "scripts.content.analyze_content_occupancy",
-        "scripts.qa.analyze_event_spike_evidence",
+        "scripts.detection.analyze_event_spike_evidence",
     ],
 )
 @pytest.mark.parametrize(

@@ -10,7 +10,7 @@ adapters, per-epoch runner, report and examples are built and tested on simulate
 and the comparison ran on all 242 analysed epochs (run `afeb897d850f`); the event
 features are built, their smoke ran and the pilot ran on 5 epochs (run `86ed2e7fa90a`: 4 `ok`, and peanut, which failed there on a bug at its last window, re-checked `ok` under `f8a6984ae781`); the full run is pending. The Kay, Karlsson, Yu and Zugaro SWR inventories are
 computed directly from the package, on shared CA1 inputs, by
-`scripts/decoding/run_swr_detection.py`, which ran on every epoch in the full pipeline
+`scripts/detection/run_swr_detection.py`, which ran on every epoch in the full pipeline
 refresh (R3, then R10, run `056eee0dcb5a`); Spyglass integration is the
 last step. Inventory 8, Carey, is decided (2026-10-17); its runner is built and tested, and it ran
 on all 242 analysed epochs (run `fa6537e48bcf`).
@@ -25,7 +25,7 @@ register invites the cross-method blending this design forbids.
 
 | spec | scope | status |
 |---|---|---|
-| [01-yu-swr-detector.md](01-yu-swr-detector.md) | SWR detector with a noise-percentile threshold (Yu et al. 2017) | package side implemented; direct project inventory produced by `scripts/decoding/run_swr_detection.py`, run on every epoch in R3 and R10 (run `056eee0dcb5a`); Spyglass integration last |
+| [01-yu-swr-detector.md](01-yu-swr-detector.md) | SWR detector with a noise-percentile threshold (Yu et al. 2017) | package side implemented; direct project inventory produced by `scripts/detection/run_swr_detection.py`, run on every epoch in R3 and R10 (run `056eee0dcb5a`); Spyglass integration last |
 | [02-memoryless-sequence.md](02-memoryless-sequence.md) | Memoryless sliding-window sequence detector (Widloski & Foster 2025) | implemented and tested, shuffle and event table included; ran on all 242 analysed epochs (`d0964cc76ed2-seed20260922`); the pilot checks (null validation, two sensitivities) are still to do |
 | [03-inventory-comparison.md](03-inventory-comparison.md) | Nine inventories (eight detectors) → common schema → N-way overlap accounting | accounting, adapters, per-epoch runner, report and examples implemented and tested on synthetic or simulated epochs; ran on all 242 analysed epochs (run `afeb897d850f`), with its report and examples |
 | [04-event-features.md](04-event-features.md) | Symmetric event characterization and selection diagnostics; threshold robustness as a later follow-up | initial scope agreed; the initial report is implemented (features, evidence, selection, populations, runner, report, examples); the smoke ran (`68f51dabdb3c`) and the pilot ran on 5 epochs (run `86ed2e7fa90a`: 4 `ok`, and peanut, which failed there on a bug at its last window, re-checked `ok` under `f8a6984ae781`); the full run is pending |
@@ -134,14 +134,14 @@ The comparison runner reads the memoryless one under two cohorts, `published` an
 
 | # | Trigger | Family | Method | Status |
 |---|---|---|---|---|
-| 1 | SWR, consensus trace | LFP | `Kay_ripple_detector` | computed directly at the pinned package commit by `scripts/decoding/run_swr_detection.py` (R3, then R10, run `056eee0dcb5a`); it is the paper's SWR source (D7, closed 2026-10-17). The canonical Spyglass `SWR_event` is its version check, not an inventory |
-| 2 | SWR, per-channel with merging | LFP | `Karlsson_ripple_detector` (Karlsson & Frank 2009) | in package; computed directly by `scripts/decoding/run_swr_detection.py` (R3, then R10, run `056eee0dcb5a`) |
-| 3 | SWR, noise-percentile threshold | LFP | `Yu_ripple_detector` (Yu et al. 2017) | in package; computed directly by `scripts/decoding/run_swr_detection.py` (R3, then R10, run `056eee0dcb5a`) — [01](01-yu-swr-detector.md) |
+| 1 | SWR, consensus trace | LFP | `Kay_ripple_detector` | computed directly at the pinned package commit by `scripts/detection/run_swr_detection.py` (R3, then R10, run `056eee0dcb5a`); it is the paper's SWR source (D7, closed 2026-10-17). The canonical Spyglass `SWR_event` is its version check, not an inventory |
+| 2 | SWR, per-channel with merging | LFP | `Karlsson_ripple_detector` (Karlsson & Frank 2009) | in package; computed directly by `scripts/detection/run_swr_detection.py` (R3, then R10, run `056eee0dcb5a`) |
+| 3 | SWR, noise-percentile threshold | LFP | `Yu_ripple_detector` (Yu et al. 2017) | in package; computed directly by `scripts/detection/run_swr_detection.py` (R3, then R10, run `056eee0dcb5a`) — [01](01-yu-swr-detector.md) |
 | 4 | MUA high-synchrony events | population rate | `multiunit_HSE_detector` | exists (`MUA_event`) |
 | 5 | Posterior threshold | decoding | our state-space non-local detection | exists (`non_local_event`) |
-| 6 | Posterior sequence | decoding | Widloski & Foster 2025 | implemented (`memoryless_sequence/`, `scripts/decoding/run_memoryless_detection.py`); ran on all 242 analysed epochs (`d0964cc76ed2-seed20260922`); the pilot checks (null validation, two sensitivities) are still to do — [02](02-memoryless-sequence.md) |
-| 7 | SWR, one channel, two thresholds | LFP | `Zugaro_ripple_detector` (the `FindRipples` lineage: Hirase and Zugaro, FMAToolbox; Csicsvari et al. 1999 as ancestor) | in package; computed directly by `scripts/decoding/run_swr_detection.py` on one CA1 channel per epoch (R3, then R10, run `056eee0dcb5a`) — see below |
-| 8 | Ripple power and multiunit activity jointly | joint LFP × rate | `Carey_candidate_detector` (Carey, Tanaka & van der Meer 2019; vandermeerlab `GenCandidateEvents`) | in package (PR #17; `normalization_mask` since `9766fd4`, pinned from `e1decf2`); decided 2026-10-17; runner `scripts/decoding/run_carey_detection.py` built and tested, and run on all 242 epochs (run `fa6537e48bcf`) — see below |
+| 6 | Posterior sequence | decoding | Widloski & Foster 2025 | implemented (`memoryless_sequence/`, `scripts/detection/run_memoryless_detection.py`); ran on all 242 analysed epochs (`d0964cc76ed2-seed20260922`); the pilot checks (null validation, two sensitivities) are still to do — [02](02-memoryless-sequence.md) |
+| 7 | SWR, one channel, two thresholds | LFP | `Zugaro_ripple_detector` (the `FindRipples` lineage: Hirase and Zugaro, FMAToolbox; Csicsvari et al. 1999 as ancestor) | in package; computed directly by `scripts/detection/run_swr_detection.py` on one CA1 channel per epoch (R3, then R10, run `056eee0dcb5a`) — see below |
+| 8 | Ripple power and multiunit activity jointly | joint LFP × rate | `Carey_candidate_detector` (Carey, Tanaka & van der Meer 2019; vandermeerlab `GenCandidateEvents`) | in package (PR #17; `normalization_mask` since `9766fd4`, pinned from `e1decf2`); decided 2026-10-17; runner `scripts/detection/run_carey_detection.py` built and tested, and run on all 242 epochs (run `fa6537e48bcf`) — see below |
 
 1, 2, 3 and 7 are four different SWR *algorithms*, not four thresholds on one algorithm:
 Kay thresholds a root-sum-of-squares consensus trace, Karlsson detects per channel and
@@ -155,7 +155,7 @@ The `ripple_detection` package supplying 1, 2, 3, 4, 7 and 8 is
 [Eden-Kramer-Lab/ripple_detection](https://github.com/Eden-Kramer-Lab/ripple_detection);
 Spyglass reaches 1 and 2 through `RippleTimesV1`. For the comparison, 1, 2, 3 and 7 are
 computed directly by calling the package at its pinned commit, one epoch at a time, in
-`scripts/decoding/run_swr_detection.py` (the refresh design's Stage 3,
+`scripts/detection/run_swr_detection.py` (the refresh design's Stage 3,
 [2026-10-03-full-pipeline-refresh-design.md](../2026-10-03-full-pipeline-refresh-design.md)).
 Kay, Karlsson and Yu read the same stored CA1 ripple band; Zugaro reads one referenced
 raw channel from the same CA1 electrodes and references. All four share the epoch's

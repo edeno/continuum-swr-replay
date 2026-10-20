@@ -33,6 +33,8 @@ ROOTS: tuple[str, ...] = (
     "src/continuum_swr_replay/decoding",
     "scripts/behavior",
     "scripts/decoding",
+    "scripts/tables",
+    "scripts/detection",
     "scripts/content",
     "scripts/rate",
     "scripts/qa",
@@ -109,6 +111,9 @@ STAGES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         (
             "scripts/behavior/*.py",
             "scripts/decoding/*.py",
+            "scripts/tables/*.py",
+            "scripts/detection/run_artifact_detection.py",
+            "scripts/detection/run_carey_detection.py",
             "scripts/content/*.py",
             "scripts/rate/*.py",
         ),
@@ -142,6 +147,7 @@ STAGES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "*/tables/io.py",
             "*/tables/parity.py",
             "*/analysis/hippocampus/state_evidence/*.py",
+            "scripts/detection/*.py",
             "scripts/qa/*.py",
         ),
     ),
@@ -164,9 +170,9 @@ EXCLUDED_PREFIXES: tuple[str, ...] = (
     "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/",
     "src/continuum_swr_replay/analysis/hippocampus/swr_inventories.py",
     "src/continuum_swr_replay/analysis/inventory_comparison/",
-    "scripts/decoding/run_memoryless_detection.py",
-    "scripts/decoding/run_swr_detection.py",
-    "scripts/qa/sweep_memoryless_detection.py",
+    "scripts/detection/run_memoryless_detection.py",
+    "scripts/detection/run_swr_detection.py",
+    "scripts/detection/sweep_memoryless_detection.py",
 )
 
 

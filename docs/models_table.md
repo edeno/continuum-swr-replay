@@ -390,7 +390,7 @@ PS3  patch_fraction ~ [PS2 terms] + swr_x_is_current_patch + swr_x_is_prev_patch
 ```
 
 ## ContFrag content — arm
-`scripts/decoding/prepare_contfrag_replay_content_data.py` + the content runner,
+`scripts/tables/prepare_contfrag_replay_content_data.py` + the content runner,
 `--event-source {SWR,MUA}`.
 
 Same conditional-Poisson forms as the non-local arm hierarchy, on the ContFrag

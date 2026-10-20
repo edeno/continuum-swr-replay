@@ -461,7 +461,7 @@ None of them has a decode either.
   one helper rather than copying them.
 - **Detection:** a new `analysis/hippocampus/swr_inventories.py`, holding the pinned
   settings, the Zugaro filtering, the input check and the Kay check.
-- **Runner:** a new `scripts/decoding/run_swr_detection.py`.
+- **Runner:** a new `scripts/detection/run_swr_detection.py`.
   - It takes the decoder's options: `--animal`, `--date`, `--epoch`, `--overwrite`.
   - It runs on a dask `LocalCluster` on CPU, with one log per epoch.
   - Each epoch's failure is recorded and the run continues.
@@ -498,7 +498,7 @@ None of them has a decode either.
 
 ## Stage 4: Widloski full run
 
-The runner `scripts/decoding/run_memoryless_detection.py` is extended rather than replaced.
+The runner `scripts/detection/run_memoryless_detection.py` is extended rather than replaced.
 It already has epoch discovery, resume and retry, a per-run manifest that refuses mixed
 settings, and the outputs the Phase 3 adapter reads.
 
@@ -747,7 +747,7 @@ The **before/after report** covers:
    - `data_loaders/lfp.py` gains the ripple-input fetch, sharing `get_ripple`'s keys;
    - `data_loaders/position.py` gains the position helper shared with `load_data`.
 5. **New `analysis/hippocampus/swr_inventories.py`.**
-6. **New `scripts/decoding/run_swr_detection.py`.**
+6. **New `scripts/detection/run_swr_detection.py`.**
 7. **New `scripts/qa/audit_refresh_consistency.py` (removed in e5ab464, after its one use),**
    including the Stage 5 tables manifest.
 

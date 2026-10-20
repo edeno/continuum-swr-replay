@@ -793,7 +793,7 @@ with their estimand named.
 - Contingency: `scripts/behavior/fetch_spatial_bandit_behavior.sh`,
   `scripts/_bandit_csv_contingency.py` (removed in d56e265; the contingency columns now come
   from `qvals_table`, built by `scripts/behavior/build_qvals_table.py`).
-- Reality check on reward-modulated content: `scripts/qa/analyze_event_spike_evidence.py`
+- Reality check on reward-modulated content: `scripts/detection/analyze_event_spike_evidence.py`
   (now emits per-event `start_time`) + `scripts/exploratory/_reality_reward_test.py`;
   content destination: `scripts/exploratory/_content_patch_destination.py`.
 - Audits behind the current numbers:

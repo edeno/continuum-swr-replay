@@ -24,7 +24,7 @@ import pytest
 
 from continuum_swr_replay.analysis.replay import prepare_data as pdm
 
-CONTFRAG_SCRIPT = "scripts.decoding.prepare_contfrag_replay_content_data"
+CONTFRAG_SCRIPT = "scripts.tables.prepare_contfrag_replay_content_data"
 
 
 def _analysed(*keys: tuple[str, str]):

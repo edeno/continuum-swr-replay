@@ -35,7 +35,7 @@ from numpy.typing import NDArray
 from ripple_detection import Kay_ripple_detector, filter_ripple_band
 from ripple_detection.simulate import simulate_session, simulate_time
 
-import scripts.decoding.run_swr_detection as runner
+import scripts.detection.run_swr_detection as runner
 from continuum_swr_replay.analysis.events import swr_inventory
 from continuum_swr_replay.analysis.hippocampus import swr_inventories
 from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
@@ -46,7 +46,7 @@ from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.runs import batch
 from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.tables.io import read_attrs, read_table, write_table
-from scripts.decoding.run_swr_detection import (
+from scripts.detection.run_swr_detection import (
     epoch_id,
     main,
     run_epoch,

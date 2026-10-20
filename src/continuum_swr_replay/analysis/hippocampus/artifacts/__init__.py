@@ -10,7 +10,7 @@ The padding table (``PADDING_S``) and the artifact mask live in
 run manifest in ``analysis/events/artifact_intervals.py``; ``detect`` writes
 through the latter.
 
-``scripts/decoding/run_artifact_detection.py`` runs it per epoch;
+``scripts/detection/run_artifact_detection.py`` runs it per epoch;
 ``analysis/events/swr_inventory.py`` reads the artifact mask. Design note:
 ``docs/design/2026-10-09-artifact-detection.md``. The submodules are imported
 by name, so reading a mask does not import the detector.

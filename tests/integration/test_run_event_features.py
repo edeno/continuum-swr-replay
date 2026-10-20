@@ -42,8 +42,8 @@ from non_local_detector.likelihoods.clusterless_kde import (
     fit_clusterless_kde_encoding_model,
 )
 
-import scripts.qa.run_event_features as runner
-import scripts.qa.run_inventory_comparison as comparison
+import scripts.detection.run_event_features as runner
+import scripts.detection.run_inventory_comparison as comparison
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
@@ -83,7 +83,7 @@ from continuum_swr_replay.analysis.inventory_comparison.selection import (
 from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier
 from continuum_swr_replay.runs.io import json_ready, sha256_file, write_atomically
 from continuum_swr_replay.tables.io import read_table, write_table
-from scripts.decoding.run_memoryless_detection import run_one
+from scripts.detection.run_memoryless_detection import run_one
 from tests.integration.test_run_inventory_comparison import (
     ANIMAL,
     CAREY_RUN,

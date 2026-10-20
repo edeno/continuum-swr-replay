@@ -16,8 +16,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import scripts.qa.report_inventory_comparison as report
-import scripts.qa.run_inventory_comparison as runner
+import scripts.detection.report_inventory_comparison as report
+import scripts.detection.run_inventory_comparison as runner
 
 # the runner's simulated run, built once for this module
 from tests.integration.test_run_inventory_comparison import (  # noqa: F401

@@ -127,7 +127,7 @@ identical event count and identical SWR-coupled count in **71 of 71** sessions,
 median per-session SWR fraction **0.447** either way, and an identical SWR
 population wherever the two constructions were run side by side.
 Reading the canonical table therefore buys traceability, not a different split;
-`scripts/qa/diagnose_pfc_event_definition.py` recomputes the comparison for any
+`scripts/pfc/diagnose_pfc_event_definition.py` recomputes the comparison for any
 session.
 The unit GLM also draws a **matched non-event control** from that same fit
 mask, one window per kept non-local event: the control onset is drawn uniformly
@@ -308,7 +308,7 @@ and per-class total/tested/excluded window counts are in the sidecar. The
 `control_null_event_policy` provenance field prevents older all-event/thinner-null
 bundles from being pooled with this fixed-subset estimand.
 
-**What the draw costs, measured** (`scripts/qa/measure_pfc_null_geometry.py`,
+**What the draw costs, measured** (`scripts/pfc/measure_pfc_null_geometry.py`,
 reported in the batch audit). *Placement.* Control windows are found by
 enumerating legal same-bout, real-event-free onset bins and requiring the onsets
 to be distinct; the auxiliary duration-matching windows of two controls may

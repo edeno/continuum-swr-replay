@@ -158,11 +158,11 @@ the error estimates the real-data held-out results will be read with.
   for the place-less burst, the jumping burst, the two-segment jump and the chain.
 - `memoryless_sequence/scoring.py`: `score_against_injection` accepts a piecewise true
   path that is NaN in gaps; new pure functions for part recovery and segmentation.
-- `scripts/qa/sweep_memoryless_detection.py`: each detector's per-window function is
+- `scripts/detection/sweep_memoryless_detection.py`: each detector's per-window function is
   split into "run: reported events with bounds and decoded positions" and "score", so
   the new script can reuse the first. `summarize` gains paired onset/offset rows by
   duration. Every existing summary row must be unchanged.
-- `scripts/qa/sweep_memoryless_controls.py` (new): runs the conditions above; raw table
+- `scripts/detection/sweep_memoryless_controls.py` (new): runs the conditions above; raw table
   to `Processed-Data/replay_detection_comparison/memoryless_controls.parquet`,
   aggregates and provenance to `detection_controls_summary.csv` beside this file.
   About 580 injected cells plus every no-replay stretch; about a minute at the sweep's
@@ -172,7 +172,7 @@ the error estimates the real-data held-out results will be read with.
   and the evaluation rule as pure functions of event intervals, spike times, a content
   posterior on the decode grid (either estimator) and the evaluation fields, so the real-data pilot applies the same rule
   unchanged.
-- `scripts/qa/sweep_memoryless_heldout.py` (new): the three folds over the injected
+- `scripts/detection/sweep_memoryless_heldout.py` (new): the three folds over the injected
   replays and the conditions above; raw table to `Processed-Data`, aggregates to
   `detection_heldout_summary.csv` beside this file. About 3 x 5100 cells at the sweep's
   0.045 s per cell, near 12 minutes, measured on one seed of one fold first.

@@ -35,8 +35,8 @@ parts' far end at the same place, whatever the jump or the gap. Our detector is 
 after its significance test.
 
 Usage:
-    python scripts/qa/sweep_memoryless_controls.py
-    python scripts/qa/sweep_memoryless_controls.py --n-seeds 1 --out /tmp/pilot.parquet
+    python scripts/detection/sweep_memoryless_controls.py
+    python scripts/detection/sweep_memoryless_controls.py --n-seeds 1 --out /tmp/pilot.parquet
 """
 
 import argparse
@@ -74,7 +74,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation im
 )
 from continuum_swr_replay.paths import DETECTION_COMPARISON_DIR
 from continuum_swr_replay.tables.io import write_table  # noqa: E402
-from scripts.qa import sweep_memoryless_detection as sweep  # noqa: E402
+from scripts.detection import sweep_memoryless_detection as sweep  # noqa: E402
 
 BURST_DURATION_S = (0.08, 0.20, 0.50)
 JUMP_CM = (0.0, 20.0, 40.0, 80.0)
@@ -567,7 +567,7 @@ def main() -> None:
 
     table = pd.concat([trial_table, no_replay], ignore_index=True)
     table.attrs = {
-        "produced_by": "scripts/qa/sweep_memoryless_controls.py",
+        "produced_by": "scripts/detection/sweep_memoryless_controls.py",
         "produced_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "git_commit": sweep.git_commit(),
         "n_seeds": args.n_seeds,

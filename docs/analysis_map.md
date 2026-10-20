@@ -36,7 +36,7 @@ after a change to fitting code only, start at step 6.
 1. **Cohort.** The analysed epochs are the register's (`data_loaders/epoch_register.csv`;
    [epoch_register.md](epoch_register.md)).
 2. **Artifacts and SWRs.**
-   - Run `decoding/run_artifact_detection.py` (the artifact mask), then `decoding/run_swr_detection.py` (the
+   - Run `detection/run_artifact_detection.py` (the artifact mask), then `detection/run_swr_detection.py` (the
      four SWR inventories).
    - Then set the two run ids the decoders read: `ARTIFACT_INTERVALS_RUN_ID` and `SWR_INVENTORY_RUN_ID` in
      `src/continuum_swr_replay/analysis/events/swr_inventory.py`. A decode refuses to start without them.
@@ -44,12 +44,12 @@ after a change to fitting code only, start at step 6.
    (ContFrag), on GPUs.
 4. **Tables**, in this order:
    1. `behavior/fetch_spatial_bandit_behavior.sh`;
-   2. `decoding/prepare_replay_content_data.py --stop-only` (the stop table);
+   2. `tables/prepare_replay_content_data.py --stop-only` (the stop table);
    3. `behavior/build_qvals_table.py --write` (needs the stop table);
-   4. `decoding/prepare_replay_content_data.py` (the event, event × arm, event × patch, sequence and stop
+   4. `tables/prepare_replay_content_data.py` (the event, event × arm, event × patch, sequence and stop
       tables; needs `qvals_table`);
-   5. `decoding/build_timebin_tables.py`;
-   6. `decoding/prepare_contfrag_replay_content_data.py --event-source SWR` and `--event-source MUA`.
+   5. `tables/build_timebin_tables.py`;
+   6. `tables/prepare_contfrag_replay_content_data.py --event-source SWR` and `--event-source MUA`.
 5. **Q1 checks** on the decodes, and the decode-only figures (Figures 1–3, the supplements). See Q1 and Q3a below.
 6. **Fits and the figures that read them**, for Q2, Q3b and Q4: `qa/run_refits.py`.
 7. **PFC** for Q5: `pfc/run_pfc_analysis_bandit.py` on GPUs, then `figures/generate_figure04.py`.
@@ -65,18 +65,18 @@ after a change to fitting code only, start at step 6.
 | The decoder on simulated data | `figures/generate_figure01.py` | Figure 1 | — |
 | The 0.8 threshold, state fractions, calibration, and theta and MUA triggered averages (all in sample) | `figures/generate_supp_decoder_validation.py` | supplement | 10, 5 |
 | Decoding quality per session | `qa/run_quality_metrics.py`, after `qa/compute_hpc_raw_stats.py` | `paper/figures/quality_metrics/` | 10 |
-| Each event's spikes support its decoded location better than a matched baseline | `qa/analyze_event_spike_evidence.py` | `paper/figures/reality/` | 6, 7, 7b, 7c, 9 |
-| Held-out tetrodes support each decoder state (Local, No-Spike, Continuous, Fragmented) | `qa/run_state_evidence.py` | `Processed-Data/_refresh_<date>/state_evidence/` | 7, 9 |
+| Each event's spikes support its decoded location better than a matched baseline | `detection/analyze_event_spike_evidence.py` | `paper/figures/reality/` | 6, 7, 7b, 7c, 9 |
+| Held-out tetrodes support each decoder state (Local, No-Spike, Continuous, Fragmented) | `detection/run_state_evidence.py` | `Processed-Data/_refresh_<date>/state_evidence/` | 7, 9 |
 | The sub-cases of SWR and non-local overlap (for Methods numbers) | `content/quantify_swr_overlap_geometry.py` | printed tables | 4 |
-| Four SWR detectors from shared inputs | `decoding/run_swr_detection.py` | SWR inventories | — (the inputs to 23, 24) |
-| Carey's joint ripple-power and multiunit detector, a fifth SWR definition, on the same CA1 inputs (built and tested; it ran on all 242 epochs, run `fa6537e48bcf`) | `decoding/run_carey_detection.py` | `Processed-Data/replay_detection_comparison/carey/` | — (an input to the detector comparison) |
-| A second sequence detector (Widloski & Foster) on the same decodes | `decoding/run_memoryless_detection.py` | `Processed-Data/replay_detection_comparison/memoryless/` | 21, 22, 25 |
-| That detector on simulated replays of known shape, against an independent re-implementation of the reference code | `qa/sweep_memoryless_detection.py`, `qa/sweep_memoryless_controls.py`, `qa/sweep_memoryless_heldout.py`, `qa/compare_memoryless_to_reference.py` (with `qa/memoryless_reference.py`), `figures/generate_memoryless_comparison.py` | `docs/design/replay_detection_comparison/*.csv`; supplement | — (validates the port) |
-| Nine inventories of each epoch (the five SWR definitions, MUA, the state-space detector, and the Widloski detector under two cohorts) on one substrate: overlap pairs, per-detector denominators, cells, the SWR label matrix. Built and tested; ran on all 242 analysed epochs (run `afeb897d850f`). Widloski columns pending the Phase 2 pilot checks | `qa/run_inventory_comparison.py` | `Processed-Data/replay_detection_comparison/inventory/` | — |
-| That comparison's counts per session and per animal | `qa/report_inventory_comparison.py` | `<inventory run>/report/`; `paper/figures/inventory_comparison/` | — |
+| Four SWR detectors from shared inputs | `detection/run_swr_detection.py` | SWR inventories | — (the inputs to 23, 24) |
+| Carey's joint ripple-power and multiunit detector, a fifth SWR definition, on the same CA1 inputs (built and tested; it ran on all 242 epochs, run `fa6537e48bcf`) | `detection/run_carey_detection.py` | `Processed-Data/replay_detection_comparison/carey/` | — (an input to the detector comparison) |
+| A second sequence detector (Widloski & Foster) on the same decodes | `detection/run_memoryless_detection.py` | `Processed-Data/replay_detection_comparison/memoryless/` | 21, 22, 25 |
+| That detector on simulated replays of known shape, against an independent re-implementation of the reference code | `detection/sweep_memoryless_detection.py`, `detection/sweep_memoryless_controls.py`, `detection/sweep_memoryless_heldout.py`, `qa/compare_memoryless_to_reference.py` (with `qa/memoryless_reference.py`), `figures/generate_memoryless_comparison.py` | `docs/design/replay_detection_comparison/*.csv`; supplement | — (validates the port) |
+| Nine inventories of each epoch (the five SWR definitions, MUA, the state-space detector, and the Widloski detector under two cohorts) on one substrate: overlap pairs, per-detector denominators, cells, the SWR label matrix. Built and tested; ran on all 242 analysed epochs (run `afeb897d850f`). Widloski columns pending the Phase 2 pilot checks | `detection/run_inventory_comparison.py` | `Processed-Data/replay_detection_comparison/inventory/` | — |
+| That comparison's counts per session and per animal | `detection/report_inventory_comparison.py` | `<inventory run>/report/`; `paper/figures/inventory_comparison/` | — |
 | Sampled examples from each cell of that comparison, on one time axis | `figures/generate_inventory_examples.py` | `paper/figures/inventory_comparison/<run id>/examples/` | — |
-| Event features on every compared event of the nine inventories (no baseline windows: dropped by the lead, 2026-10-18): timing, engagement, ripple and MUA on one trace, spatial features, context, and the common spike-evidence score; the populations (shared, unmatched, unknown); the memoryless rejection stage of each ours-only event. Built and tested; the smoke ran (run `68f51dabdb3c`), and the pilot ran on 5 epochs (run `86ed2e7fa90a`: 4 `ok`, and peanut, which failed there on a bug at its last window, re-checked `ok` under `f8a6984ae781`); the full run is pending. Widloski columns and every `ms_*` feature pending the Phase 2 pilot checks | `qa/run_event_features.py` | `Processed-Data/replay_detection_comparison/event_features/` | — |
-| That run's features per session and per animal (counts and quantiles, no verdicts) | `qa/report_event_features.py` | `<event features run>/report/`; `paper/figures/event_features/` | — |
+| Event features on every compared event of the nine inventories (no baseline windows: dropped by the lead, 2026-10-18): timing, engagement, ripple and MUA on one trace, spatial features, context, and the common spike-evidence score; the populations (shared, unmatched, unknown); the memoryless rejection stage of each ours-only event. Built and tested; the smoke ran (run `68f51dabdb3c`), and the pilot ran on 5 epochs (run `86ed2e7fa90a`: 4 `ok`, and peanut, which failed there on a bug at its last window, re-checked `ok` under `f8a6984ae781`); the full run is pending. Widloski columns and every `ms_*` feature pending the Phase 2 pilot checks | `detection/run_event_features.py` | `Processed-Data/replay_detection_comparison/event_features/` | — |
+| That run's features per session and per animal (counts and quantiles, no verdicts) | `detection/report_event_features.py` | `<event features run>/report/`; `paper/figures/event_features/` | — |
 | Sampled comparator-only and ours-only events, with their spike evidence and spikes per row | `figures/generate_event_feature_examples.py` | `paper/figures/event_features/<run id>/examples/` | — |
 | Single decoded events, for checking categories by eye | `figures/generate_event_gallery.py`, `figures/run_event_gallery.sh` | `event_gallery/` | — |
 
@@ -165,7 +165,7 @@ A decision-grain rebuild of the choice models is planned:
 |---|---|
 | `qa/check_data_availability.py`, `qa/diagnose_trial_detection.py` | Input checks per session |
 | `qa/check_fit_provenance.py` | Is each fit current for the tables it read (`run_refits.py` runs it) |
-| `qa/compare_fits.py`, `qa/compare_pfc_cohorts.py` | Old against new fits, when code or tables change |
+| `qa/compare_fits.py`, `pfc/compare_pfc_cohorts.py` | Old against new fits, when code or tables change |
 | `figures/generate_supp_pipeline_schematic.py`, `figures/generate_supp_pipeline_data_flow.py` | The pipeline supplement figures (the second reads `models/M3.pkl`, so the driver redraws it) |
 | `figures/generate_all_figures.py` | Figures 1–4 in one go |
 

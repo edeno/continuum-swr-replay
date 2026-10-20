@@ -2,7 +2,7 @@
 """Sampled comparator-only and ours-only events of one event features run.
 
 Reads the per-epoch ``features``, ``pair_membership`` and ``rejection`` tables
-that ``scripts/qa/run_event_features.py`` wrote for the run's ``ok`` epochs,
+that ``scripts/detection/run_event_features.py`` wrote for the run's ``ok`` epochs,
 and the ``cells`` and ``directional`` tables of the inventory comparison run
 it read, and draws events from two populations by :data:`SAMPLING_RULE`.
 Design: ``docs/design/replay_detection_comparison/04-event-features.md``
@@ -59,12 +59,12 @@ from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
 from continuum_swr_replay.runs.cli import parse_run_id  # noqa: E402
 from continuum_swr_replay.runs.io import json_ready  # noqa: E402
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
+from scripts.detection import report_event_features as report  # noqa: E402
+from scripts.detection import run_event_features as features_runner  # noqa: E402
+from scripts.detection.run_inventory_comparison import CELL_DETECTORS  # noqa: E402
 from scripts.figures import (  # noqa: E402
     generate_inventory_examples as inventory_examples,
 )
-from scripts.qa import report_event_features as report  # noqa: E402
-from scripts.qa import run_event_features as features_runner  # noqa: E402
-from scripts.qa.run_inventory_comparison import CELL_DETECTORS  # noqa: E402
 
 PRODUCED_BY = "scripts/figures/generate_event_feature_examples.py"
 FIGURE_ROOT = FIGURE_DIR / "event_features"

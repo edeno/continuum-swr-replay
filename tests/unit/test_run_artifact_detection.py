@@ -18,7 +18,7 @@ import pandas as pd
 import pytest
 from dask.distributed import LocalCluster
 
-import scripts.decoding.run_artifact_detection as runner
+import scripts.detection.run_artifact_detection as runner
 from continuum_swr_replay.analysis.events import swr_inventory
 from continuum_swr_replay.analysis.events.artifact_intervals import (
     CORE_COLUMNS,

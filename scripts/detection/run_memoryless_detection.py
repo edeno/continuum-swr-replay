@@ -96,15 +96,15 @@ last 8 characters of the NWB file's stem, so ``j1620210707`` was recorded on
 20210707; the epoch is a name such as ``02_r1``.
 
 Usage:
-    python scripts/decoding/run_memoryless_detection.py --run-seed 20260922 \\
+    python scripts/detection/run_memoryless_detection.py --run-seed 20260922 \\
         --epoch-id chimi20200212_02_r1_HPC
-    python scripts/decoding/run_memoryless_detection.py --run-seed 20260922 \\
+    python scripts/detection/run_memoryless_detection.py --run-seed 20260922 \\
         --animal chimi
-    python scripts/decoding/run_memoryless_detection.py --run-seed 20260922 \\
+    python scripts/detection/run_memoryless_detection.py --run-seed 20260922 \\
         --animal chimi --no-shuffle      # the detector alone, much faster
-    python scripts/decoding/run_memoryless_detection.py --run-seed 20260922 \\
+    python scripts/detection/run_memoryless_detection.py --run-seed 20260922 \\
         --animal chimi --date 20200212 --epoch 02_r1
-    python scripts/decoding/run_memoryless_detection.py --run-seed 20260922 \\
+    python scripts/detection/run_memoryless_detection.py --run-seed 20260922 \\
         --all --cuda_visible_devices 0,1,2,3   # an epoch at a time on each GPU
 """
 
@@ -997,7 +997,7 @@ def main(argv: list[str] | None = None) -> None:
     )
     settings = run_settings(args.run_seed, shuffle, args.n_shuffles, config, commit)
     provenance = {
-        "produced_by": "scripts/decoding/run_memoryless_detection.py",
+        "produced_by": "scripts/detection/run_memoryless_detection.py",
         "git_commit": commit,
         "run_id": run_id,
     }

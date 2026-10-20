@@ -10,7 +10,7 @@ session with two immobility bouts separated by a movement gap:
 * an absent event column (older decodes without ``MUA_event``) is tolerated,
 * a session with no immobility returns the empty schema.
 
-It also covers ``scripts/decoding/build_timebin_tables.py --output-dir``, which
+It also covers ``scripts/tables/build_timebin_tables.py --output-dir``, which
 sends both tables to a staging directory instead of ``replay_content/``. The
 script is imported offline with ``spyglass`` stubbed, as
 ``test_decoding_save_dir.py`` does, and its ``find_sessions``, ``build_one``,
@@ -230,7 +230,7 @@ def test_empty_session_returns_schema(two_bout_dot):
 #: Modules that bind the Spyglass stub when imported under it.
 _STUB_BOUND_MODULES = (
     "continuum_swr_replay.data_loaders.bandit_task",
-    "scripts.decoding.build_timebin_tables",
+    "scripts.tables.build_timebin_tables",
 )
 #: Two synthetic sessions: no real decode has these names.
 _SESSIONS = [
@@ -257,7 +257,7 @@ def timebin_script(monkeypatch):
     fresh = [name for name in _STUB_BOUND_MODULES if name not in sys.modules]
     load_data_was_cached = "load_data" in vars(data_loaders)
 
-    yield importlib.import_module("scripts.decoding.build_timebin_tables")
+    yield importlib.import_module("scripts.tables.build_timebin_tables")
 
     for name in fresh:
         sys.modules.pop(name, None)

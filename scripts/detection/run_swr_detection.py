@@ -126,9 +126,9 @@ An epoch that fails is recorded with its error and the run goes on; the run
 then exits non-zero.
 
 Usage:
-    python scripts/decoding/run_swr_detection.py --animal chimi --date 20200225 \\
+    python scripts/detection/run_swr_detection.py --animal chimi --date 20200225 \\
         --epoch 02_r1 --n-workers 1
-    python scripts/decoding/run_swr_detection.py --n-workers 8   # every epoch
+    python scripts/detection/run_swr_detection.py --n-workers 8   # every epoch
 """
 
 import argparse
@@ -223,7 +223,7 @@ from continuum_swr_replay.runs.provenance import provenance_record
 
 OUTPUT_ROOT = SWR_INVENTORY_ROOT
 """Where the run folders go: where the paper's SWR source reads them."""
-PRODUCED_BY = "scripts/decoding/run_swr_detection.py"
+PRODUCED_BY = "scripts/detection/run_swr_detection.py"
 DESIGN_SPEC = "docs/design/2026-10-03-full-pipeline-refresh-design.md"
 
 SPYGLASS_INPUTS_KAY = "kay_spyglass_inputs"

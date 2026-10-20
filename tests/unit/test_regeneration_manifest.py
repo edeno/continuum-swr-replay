@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from scripts.decoding.write_regeneration_manifest import _validate_model_bundle
+from scripts.tables.write_regeneration_manifest import _validate_model_bundle
 
 
 def _fit_rows() -> pd.DataFrame:
@@ -47,9 +47,9 @@ def _write_bundle(directory: Path, results: pd.DataFrame) -> None:
             "n_modeled": [27, 27],
         }
     ).to_csv(directory / "all_models_cohort_audit.csv", index=False)
-    pd.DataFrame(
-        {"parent": ["M0"], "child": ["M1"], "n_sessions": [2]}
-    ).to_pickle(directory / "model_comparison.pkl")
+    pd.DataFrame({"parent": ["M0"], "child": ["M1"], "n_sessions": [2]}).to_pickle(
+        directory / "model_comparison.pkl"
+    )
 
 
 def test_validate_model_bundle_requires_one_exact_common_session_block(
@@ -71,12 +71,7 @@ def test_validate_model_bundle_rejects_rung_specific_session_loss(
     tmp_path: Path,
 ) -> None:
     results = _fit_rows()
-    results = results.loc[
-        ~(
-            results["model"].eq("M1")
-            & results["animal"].eq("b")
-        )
-    ]
+    results = results.loc[~(results["model"].eq("M1") & results["animal"].eq("b"))]
     bundle = tmp_path / "bundle"
     _write_bundle(bundle, results)
     pd.DataFrame(
@@ -120,23 +115,33 @@ def test_validate_model_bundle_rejects_nonfinite_fit_statistics(
 # Baseline parity gate (_verify_baseline)
 # ---------------------------------------------------------------------------
 from continuum_swr_replay.tables.io import write_table  # noqa: E402
-from scripts.decoding.write_regeneration_manifest import _verify_baseline  # noqa: E402
+from scripts.tables.write_regeneration_manifest import _verify_baseline  # noqa: E402
 
 
-def _write_replay_bundle(directory: Path, *, reward_fraction: float, n_events: int = 4) -> None:
+def _write_replay_bundle(
+    directory: Path, *, reward_fraction: float, n_events: int = 4
+) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     event = pd.DataFrame(
-        {"event_id": np.arange(n_events, dtype=np.int64), "peak": np.linspace(0.5, 0.9, n_events)}
+        {
+            "event_id": np.arange(n_events, dtype=np.int64),
+            "peak": np.linspace(0.5, 0.9, n_events),
+        }
     )
     arm = pd.DataFrame(
         {
             "event_id": np.repeat(np.arange(n_events, dtype=np.int64), 2),
             "candidate_arm": np.tile([0, 1], n_events),
-            "reward_fraction_candidate_arm_last10_visits": np.full(n_events * 2, reward_fraction),
+            "reward_fraction_candidate_arm_last10_visits": np.full(
+                n_events * 2, reward_fraction
+            ),
         }
     )
     stop = pd.DataFrame(
-        {"stop_id": np.arange(n_events, dtype=np.int64), "immobility_time": np.full(n_events, 1.0)}
+        {
+            "stop_id": np.arange(n_events, dtype=np.int64),
+            "immobility_time": np.full(n_events, 1.0),
+        }
     )
     write_table(event, directory / "event_table")
     write_table(arm, directory / "event_arm_table")
@@ -156,7 +161,9 @@ def test_verify_baseline_raises_on_undeclared_drift(tmp_path: Path):
     _write_replay_bundle(tmp_path / "base", reward_fraction=0.5)
     _write_replay_bundle(tmp_path / "cand", reward_fraction=0.7)  # regressed column
     with pytest.raises(ValueError, match="undeclared"):
-        _verify_baseline(tmp_path / "cand", tmp_path / "base", expected_drift_columns=set())
+        _verify_baseline(
+            tmp_path / "cand", tmp_path / "base", expected_drift_columns=set()
+        )
 
 
 def test_verify_baseline_passes_when_drift_declared(tmp_path: Path):
@@ -174,9 +181,13 @@ def test_verify_baseline_passes_when_drift_declared(tmp_path: Path):
 
 def test_verify_baseline_raises_on_structural_drift(tmp_path: Path):
     _write_replay_bundle(tmp_path / "base", reward_fraction=0.5, n_events=4)
-    _write_replay_bundle(tmp_path / "cand", reward_fraction=0.5, n_events=5)  # key set differs
+    _write_replay_bundle(
+        tmp_path / "cand", reward_fraction=0.5, n_events=5
+    )  # key set differs
     with pytest.raises(ValueError, match="row"):
-        _verify_baseline(tmp_path / "cand", tmp_path / "base", expected_drift_columns=set())
+        _verify_baseline(
+            tmp_path / "cand", tmp_path / "base", expected_drift_columns=set()
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -185,7 +196,7 @@ def test_verify_baseline_raises_on_structural_drift(tmp_path: Path):
 from continuum_swr_replay.analysis.events.swr_inventory import (  # noqa: E402
     swr_source_name,
 )
-from scripts.decoding.write_regeneration_manifest import (  # noqa: E402
+from scripts.tables.write_regeneration_manifest import (  # noqa: E402
     _require_one_swr_source,
 )
 

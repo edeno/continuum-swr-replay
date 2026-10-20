@@ -2447,7 +2447,7 @@ class TestTheRetiredEventConstructionIsGone:
     path. It reads a separately detected ripple population and re-detects
     non-local events, which is exactly the drift from the content and rate
     families that reading the canonical table removes. Its only home is
-    ``scripts/qa/diagnose_pfc_event_definition.py``, which exists to compare
+    ``scripts/pfc/diagnose_pfc_event_definition.py``, which exists to compare
     the two."""
 
     RETIRED = ('data["ripple_times"]', "get_overlap_times", "get_confident_times")

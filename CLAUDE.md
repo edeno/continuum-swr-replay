@@ -86,7 +86,7 @@ src/continuum_swr_replay/
 └── types.py               # shared type definitions
 
 scripts/                   # Analysis scripts, grouped by domain — see scripts/README.md
-├── decoding/  rate/  content/  behavior/  figures/  qa/  pfc/
+├── decoding/  detection/  tables/  rate/  content/  behavior/  figures/  qa/  pfc/
 └── exploratory/           #   unsupported one-offs (_*.py)
 paper/figures/<topic>/     # Publication figures in topic subdirs (no loose files)
 docs/                      # Published reference — see docs/README.md for the doc-type→home scheme

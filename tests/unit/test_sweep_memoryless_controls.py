@@ -10,8 +10,8 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation im
     piecewise_replay,
     place_field_means,
 )
-from scripts.qa import sweep_memoryless_controls as controls
-from scripts.qa import sweep_memoryless_detection as sweep
+from scripts.detection import sweep_memoryless_controls as controls
+from scripts.detection import sweep_memoryless_detection as sweep
 
 MEANS = place_field_means(25, 170.0)
 

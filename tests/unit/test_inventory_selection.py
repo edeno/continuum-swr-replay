@@ -941,7 +941,7 @@ class TestRejectionStages:
             )
 
     def test_the_cohorts_are_the_comparisons(self):
-        import scripts.qa.run_inventory_comparison as runner
+        import scripts.detection.run_inventory_comparison as runner
 
         assert {name: runner.ROSTER[name] for name in REJECTION_COHORTS} == dict(
             REJECTION_COHORTS

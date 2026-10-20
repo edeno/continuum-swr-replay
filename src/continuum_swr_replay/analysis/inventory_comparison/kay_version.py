@@ -3,7 +3,7 @@
 ``kay_version_check`` marks each event of a direct Kay inventory (Kay at the
 pinned ``ripple_detection`` commit) and of the canonical Spyglass one matched,
 added or missed, by strict positive-duration overlap (``overlap_pairs``). The
-SWR runner (``scripts/decoding/run_swr_detection.py``) writes its rows per
+SWR runner (``scripts/detection/run_swr_detection.py``) writes its rows per
 epoch.
 """
 

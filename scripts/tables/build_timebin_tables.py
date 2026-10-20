@@ -10,8 +10,8 @@ covariate schema, and save:
 - ``stop_timebin_table.parquet`` (dense, ~one row per (stop, 4 ms bin))
 
 Usage:
-    uv run python scripts/decoding/build_timebin_tables.py --max-per-animal 1   # smoke
-    uv run python scripts/decoding/build_timebin_tables.py                      # full
+    uv run python scripts/tables/build_timebin_tables.py --max-per-animal 1   # smoke
+    uv run python scripts/tables/build_timebin_tables.py                      # full
 """
 
 from __future__ import annotations

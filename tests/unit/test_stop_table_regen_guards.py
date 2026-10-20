@@ -1,7 +1,7 @@
 """Fail-closed guards on the two stop-table writers that hit the prod root.
 
 Both ``prepare_data.build_stop_table_scope`` (the ``--stop-only`` qvals
-bootstrap) and ``scripts/decoding/regenerate_stop_table.py`` write straight to
+bootstrap) and ``scripts/tables/regenerate_stop_table.py`` write straight to
 the canonical ``replay_content`` root, outside the staged manifest gate. These
 tests pin the two ways that can corrupt the atomic event/stop set: the
 bootstrap downgrading a complete table to a split-less one, and the
@@ -19,7 +19,7 @@ from continuum_swr_replay.analysis.replay.prepare_data import (
     _refuse_to_clobber_complete_stop_table,
 )
 from continuum_swr_replay.tables.io import write_table
-from scripts.decoding.regenerate_stop_table import _assert_matches_event_table
+from scripts.tables.regenerate_stop_table import _assert_matches_event_table
 
 
 def _complete_stop_table() -> pd.DataFrame:
@@ -101,12 +101,20 @@ def test_regen_parity_rejects_a_missing_session():
 def test_regen_parity_rejects_an_orphan_event_stop_id():
     """Same sessions, but an event references a stop_id the rebuild dropped."""
     stop = pd.DataFrame(
-        {"animal": ["chimi"], "session_date": [20200212], "epoch": ["02_r1"],
-         "stop_id": [10]}
+        {
+            "animal": ["chimi"],
+            "session_date": [20200212],
+            "epoch": ["02_r1"],
+            "stop_id": [10],
+        }
     )
     event = pd.DataFrame(
-        {"animal": ["chimi"], "session_date": [20200212], "epoch": ["02_r1"],
-         "stop_id": [999]}
+        {
+            "animal": ["chimi"],
+            "session_date": [20200212],
+            "epoch": ["02_r1"],
+            "stop_id": [999],
+        }
     )
 
     with pytest.raises(ValueError, match="absent from the rebuilt"):
@@ -115,8 +123,12 @@ def test_regen_parity_rejects_an_orphan_event_stop_id():
 
 def test_regen_parity_rejects_duplicate_stop_id():
     stop = pd.DataFrame(
-        {"animal": ["chimi", "chimi"], "session_date": [20200212, 20200212],
-         "epoch": ["02_r1", "02_r1"], "stop_id": [10, 10]}
+        {
+            "animal": ["chimi", "chimi"],
+            "session_date": [20200212, 20200212],
+            "epoch": ["02_r1", "02_r1"],
+            "stop_id": [10, 10],
+        }
     )
     event = stop.iloc[:1].copy()
 
@@ -127,12 +139,20 @@ def test_regen_parity_rejects_duplicate_stop_id():
 def test_regen_parity_ignores_nan_event_stop_ids():
     """event_table stop_id has no nulls in practice, but guard tolerates them."""
     stop = pd.DataFrame(
-        {"animal": ["chimi"], "session_date": [20200212], "epoch": ["02_r1"],
-         "stop_id": [10]}
+        {
+            "animal": ["chimi"],
+            "session_date": [20200212],
+            "epoch": ["02_r1"],
+            "stop_id": [10],
+        }
     )
     event = pd.DataFrame(
-        {"animal": ["chimi", "chimi"], "session_date": [20200212, 20200212],
-         "epoch": ["02_r1", "02_r1"], "stop_id": [10, np.nan]}
+        {
+            "animal": ["chimi", "chimi"],
+            "session_date": [20200212, 20200212],
+            "epoch": ["02_r1", "02_r1"],
+            "stop_id": [10, np.nan],
+        }
     )
 
     _assert_matches_event_table(stop, event)  # NaN dropped, 10 present -> OK

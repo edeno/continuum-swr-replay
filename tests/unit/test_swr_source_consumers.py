@@ -299,7 +299,7 @@ def test_the_stop_only_bootstrap_builds_on_the_sources_labels(
 def test_the_contfrag_tables_build_on_the_sources_labels(
     source, saved_decode, monkeypatch, offline
 ):
-    script = offline("scripts.decoding.prepare_contfrag_replay_content_data")
+    script = offline("scripts.tables.prepare_contfrag_replay_content_data")
     seen: list = []
     monkeypatch.setattr(script, "validate_dot_event_contract", recorder(seen))
 
@@ -312,7 +312,7 @@ def test_the_contfrag_tables_build_on_the_sources_labels(
 def test_the_contfrag_covariate_refresh_builds_on_the_sources_labels(
     source, saved_decode, monkeypatch, offline
 ):
-    monkeypatch.syspath_prepend(str(REPO / "scripts" / "decoding"))
+    monkeypatch.syspath_prepend(str(REPO / "scripts" / "tables"))
     offline("prepare_contfrag_replay_content_data")
     script = offline("refresh_contfrag_behavioral_covariates")
     seen: list = []
@@ -334,7 +334,7 @@ def test_the_contfrag_covariate_refresh_builds_on_the_sources_labels(
 def test_the_timebin_tables_build_on_the_sources_labels(
     source, saved_decode, monkeypatch, offline
 ):
-    script = offline("scripts.decoding.build_timebin_tables")
+    script = offline("scripts.tables.build_timebin_tables")
     seen: list = []
     monkeypatch.setattr(script, "load_data", lambda *args, **kwargs: {})
     monkeypatch.setattr(script, "build_event_onset_table", recorder(seen))
@@ -348,7 +348,7 @@ def test_the_timebin_tables_build_on_the_sources_labels(
 def test_the_stop_table_rebuild_builds_on_the_sources_labels(
     source, saved_decode, monkeypatch, offline
 ):
-    script = offline("scripts.decoding.regenerate_stop_table")
+    script = offline("scripts.tables.regenerate_stop_table")
     data_loaders = importlib.import_module("continuum_swr_replay.data_loaders")
     monkeypatch.setattr(
         data_loaders,
@@ -393,7 +393,7 @@ def test_the_content_occupancy_scan_reads_the_sources_labels(
 def test_the_spike_evidence_scan_reads_the_sources_labels(
     source, monkeypatch, tmp_path
 ):
-    import scripts.qa.analyze_event_spike_evidence as spike_evidence
+    import scripts.detection.analyze_event_spike_evidence as spike_evidence
 
     decode_frame().to_pickle(tmp_path / f"{EPOCH_ID}_80_data_over_time.pkl")
     monkeypatch.setattr(spike_evidence, "PROCESSED_DATA_DIR", tmp_path)
@@ -585,7 +585,7 @@ def test_the_stop_only_bootstrap_publishes_with_the_sources_stamp(
 def test_the_timebin_tables_are_published_with_the_sources_stamp(
     source, monkeypatch, offline, tmp_path
 ):
-    script = offline("scripts.decoding.build_timebin_tables")
+    script = offline("scripts.tables.build_timebin_tables")
     key = {"animal": "j16", "session_date": 20210706, "epoch": EPOCH}
     session = {"nwb_file_name": NWB, "epoch_name": EPOCH}
     monkeypatch.setattr(script, "find_sessions", lambda max_per_animal: [session])
@@ -618,7 +618,7 @@ def test_the_timebin_tables_are_published_with_the_sources_stamp(
 def test_the_stop_table_rebuild_refuses_an_event_table_from_another_source(
     source, monkeypatch, offline, tmp_path
 ):
-    script = offline("scripts.decoding.regenerate_stop_table")
+    script = offline("scripts.tables.regenerate_stop_table")
     event_table = _stop_frame(STALE)
     monkeypatch.setattr(
         script, "find_sessions", lambda max_per_animal: [{"nwb_file_name": NWB}]
@@ -636,8 +636,8 @@ def test_the_stop_table_rebuild_refuses_an_event_table_from_another_source(
 def test_the_stop_shard_assembly_needs_every_shard_from_the_source(
     source, monkeypatch, tmp_path, stale_shard
 ):
-    monkeypatch.syspath_prepend(str(REPO / "scripts" / "decoding"))
-    from scripts.decoding.assemble_replay_content_shards import (
+    monkeypatch.syspath_prepend(str(REPO / "scripts" / "tables"))
+    from scripts.tables.assemble_replay_content_shards import (
         assemble_replay_stop_shards,
     )
 
@@ -690,7 +690,7 @@ def test_the_content_occupancy_refuses_an_arm_table_from_another_source(
 def test_the_widloski_runner_stamps_its_table(source):
     # The runner stamps its events table as the canonical tables are stamped;
     # its own run is tested in test_run_memoryless_detection.py.
-    text = (REPO / "scripts/decoding/run_memoryless_detection.py").read_text()
+    text = (REPO / "scripts/detection/run_memoryless_detection.py").read_text()
 
     assert "stamp_swr_source(detection.table)" in text
 
@@ -785,9 +785,9 @@ STORED_RIPPLE_READERS = {
     "src/continuum_swr_replay/visualization/animation.py": "docstring example",
     "src/continuum_swr_replay/visualization/__init__.py": "docstring example",
     "scripts/decoding/run_decoding_bandit.py": "the decode's figurl view",
-    "scripts/decoding/run_swr_detection.py": "the Kay version check against it",
+    "scripts/detection/run_swr_detection.py": "the Kay version check against it",
     "scripts/qa/check_data_availability.py": "which decode inputs load",
-    "scripts/qa/diagnose_pfc_event_definition.py": (
+    "scripts/pfc/diagnose_pfc_event_definition.py": (
         "reproduces the retired PFC event definition on purpose"
     ),
     # The figures set ``data["ripple_times"]`` from the source before drawing
@@ -801,12 +801,12 @@ STORED_RIPPLE_READERS = {
 #: decode frame without the source, and why none of them reads its SWRs.
 DECODE_FRAME_READERS = {
     "src/continuum_swr_replay/analysis/events/analysed_time.py": "the reader",
-    "scripts/qa/run_state_evidence.py": (
+    "scripts/detection/run_state_evidence.py": (
         "reads it through with_swr_source, and keeps the decoder's own non-local "
         "labels so every decoded event stays out of the running-only encodings"
     ),
     "scripts/qa/diagnose_trial_detection.py": "position and trials",
-    "scripts/qa/compare_pfc_cohorts.py": "PFC bundles; names data_over_time_sha256",
+    "scripts/pfc/compare_pfc_cohorts.py": "PFC bundles; names data_over_time_sha256",
     "scripts/figures/generate_supp_pipeline_data_flow.py": (
         "reads its decode frame through read_dot_with_swr_source; read_pickle "
         "reads the M3 fit"
@@ -814,17 +814,17 @@ DECODE_FRAME_READERS = {
     "scripts/exploratory/_augment_data_over_time.py": "adds posterior columns",
     "scripts/exploratory/_trunk_zscore_extract.py": "SWR_zscore and MUA_zscore",
     "scripts/exploratory/_trunk_zscore_timebin.py": "SWR_zscore and MUA_zscore",
-    "scripts/qa/run_inventory_comparison.py": (
+    "scripts/detection/run_inventory_comparison.py": (
         "reads it through with_swr_source; artifact_event_drops of the frame as "
         "saved, from the one read its sha256 names"
     ),
-    "scripts/decoding/run_carey_detection.py": (
+    "scripts/detection/run_carey_detection.py": (
         "the grid's first and last time, the span the marks are loaded over"
     ),
     "scripts/figures/generate_inventory_examples.py": (
         "grid, speed, posterior and position; its events are the comparison's tables"
     ),
-    "scripts/qa/run_event_features.py": (
+    "scripts/detection/run_event_features.py": (
         "reads it through with_swr_source; its events are the comparison's tables"
     ),
 }
@@ -903,7 +903,7 @@ def test_the_spike_evidence_baseline_lies_outside_excluded_time(source):
     """The null's matched non-event windows are analysed time too: none may
     touch excluded time [101.75, 102.55] (the configured mask widened by
     0.3 s)."""
-    from scripts.qa import analyze_event_spike_evidence as spike_evidence
+    from scripts.detection import analyze_event_spike_evidence as spike_evidence
 
     probability = np.full(TIME.size, 0.5)
     windows = [(100.20, 100.24), (101.72, 101.76), (102.20, 102.24), (103.00, 103.04)]

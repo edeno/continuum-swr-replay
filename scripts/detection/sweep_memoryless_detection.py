@@ -28,8 +28,8 @@ Sorted spikes on a linear track. The clusterless likelihood and the branched
 track are not covered here.
 
 Usage:
-    python scripts/qa/sweep_memoryless_detection.py
-    python scripts/qa/sweep_memoryless_detection.py --n-seeds 2 --out /tmp/pilot.parquet
+    python scripts/detection/sweep_memoryless_detection.py
+    python scripts/detection/sweep_memoryless_detection.py --n-seeds 2 --out /tmp/pilot.parquet
 """
 
 import argparse
@@ -1094,7 +1094,7 @@ def main() -> None:
 
     table = pd.DataFrame(rows)
     table.attrs = {
-        "produced_by": "scripts/qa/sweep_memoryless_detection.py",
+        "produced_by": "scripts/detection/sweep_memoryless_detection.py",
         "produced_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "git_commit": git_commit(),
         "design_spec": "docs/design/replay_detection_comparison/02-memoryless-sequence.md",

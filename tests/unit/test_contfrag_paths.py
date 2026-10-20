@@ -55,7 +55,7 @@ _load_script_module = _load_script_helper
 
 
 contfrag_table_basenames = _load_script_module(
-    "decoding/prepare_contfrag_replay_content_data.py", "contfrag_table_basenames"
+    "tables/prepare_contfrag_replay_content_data.py", "contfrag_table_basenames"
 )
 
 

@@ -25,8 +25,8 @@ it, for each class and fold: the error rates held-out results on recordings
 will be read with.
 
 Usage:
-    python scripts/qa/sweep_memoryless_heldout.py
-    python scripts/qa/sweep_memoryless_heldout.py --n-seeds 1 --folds A --out /tmp/pilot.parquet
+    python scripts/detection/sweep_memoryless_heldout.py
+    python scripts/detection/sweep_memoryless_heldout.py --n-seeds 1 --folds A --out /tmp/pilot.parquet
 """
 
 import argparse
@@ -68,8 +68,8 @@ from continuum_swr_replay.analysis.inventory_comparison.heldout import (  # noqa
 )
 from continuum_swr_replay.paths import DETECTION_COMPARISON_DIR
 from continuum_swr_replay.tables.io import write_table  # noqa: E402
-from scripts.qa import sweep_memoryless_controls as controls  # noqa: E402
-from scripts.qa import sweep_memoryless_detection as sweep  # noqa: E402
+from scripts.detection import sweep_memoryless_controls as controls  # noqa: E402
+from scripts.detection import sweep_memoryless_detection as sweep  # noqa: E402
 
 N_PERMUTATIONS = 100
 COVERAGE_SENSITIVITY = (2.0, COVERAGE_FLOOR, 10.0)
@@ -474,7 +474,7 @@ def main() -> None:
         )
     table = pd.DataFrame(rows)
     table.attrs = {
-        "produced_by": "scripts/qa/sweep_memoryless_heldout.py",
+        "produced_by": "scripts/detection/sweep_memoryless_heldout.py",
         "produced_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "git_commit": sweep.git_commit(),
         "n_seeds": args.n_seeds,

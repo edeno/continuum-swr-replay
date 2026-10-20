@@ -26,7 +26,7 @@ import pandas as pd
 import pytest
 from dask.distributed import Client, LocalCluster
 
-import scripts.decoding.run_memoryless_detection as runner
+import scripts.detection.run_memoryless_detection as runner
 from continuum_swr_replay.analysis.events import swr_inventory
 from continuum_swr_replay.analysis.events.eligibility import artifact_drop_reasons
 from continuum_swr_replay.analysis.hippocampus import detection_inputs
@@ -46,7 +46,7 @@ from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier
 from continuum_swr_replay.parameters import ROOT_DIR
 from continuum_swr_replay.runs.provenance import provenance_record
 from continuum_swr_replay.tables.io import read_table
-from scripts.decoding.run_memoryless_detection import find_epochs, main, run_one
+from scripts.detection.run_memoryless_detection import find_epochs, main, run_one
 from tests.unit._memoryless_clusterless_epoch import (
     SAMPLING_FREQUENCY,
     _StandInDetector,
@@ -982,7 +982,7 @@ class TestMain:
         must not be made with others under the same run."""
         self.cli(decode_root, tmp_path)
         monkeypatch.setattr(
-            "scripts.decoding.run_memoryless_detection.version",
+            "scripts.detection.run_memoryless_detection.version",
             lambda name: "0.0.0-upgraded",
         )
 

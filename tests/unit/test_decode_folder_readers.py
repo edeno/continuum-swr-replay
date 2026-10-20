@@ -20,8 +20,8 @@ import pandas as pd
 import pytest
 
 import scripts.content.analyze_content_occupancy as content_occupancy
+import scripts.detection.analyze_event_spike_evidence as spike_evidence
 import scripts.figures.generate_event_gallery as event_gallery
-import scripts.qa.analyze_event_spike_evidence as spike_evidence
 import scripts.qa.run_quality_metrics as quality_metrics
 from continuum_swr_replay.analysis.contfrag.data_aggregation import (
     load_contfrag_data_over_time,

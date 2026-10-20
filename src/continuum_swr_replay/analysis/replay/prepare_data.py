@@ -4,13 +4,13 @@ Thin driver over the per-grain table builders in
 ``continuum_swr_replay.analysis.replay.tables_event`` / ``tables_stop`` /
 ``tables_arm_patch``. :func:`run_prepare_data` is the whole run; the
 command-line front end that resolves its arguments is
-``scripts/decoding/prepare_replay_content_data.py``, which is also where the
+``scripts/tables/prepare_replay_content_data.py``, which is also where the
 outputs, the flags, and the ``--from-cache`` contract are documented.
 
 Also the home of the session-scope and behavioral-cache helpers
 (:func:`find_sessions`, :func:`load_behavioral_context`,
 :func:`populate_behavioral_context_cache`, :data:`SESSION_CACHE_DIR`) that the
-other ``scripts/decoding`` drivers share.
+other ``scripts/tables`` drivers share.
 """
 
 from __future__ import annotations

@@ -18,8 +18,8 @@ pickle, so they stay readable exactly as they are.
 
 Usage
 -----
-    python scripts/decoding/convert_tables_to_parquet.py            # dry run
-    python scripts/decoding/convert_tables_to_parquet.py --apply
+    python scripts/tables/convert_tables_to_parquet.py            # dry run
+    python scripts/tables/convert_tables_to_parquet.py --apply
 """
 
 from __future__ import annotations

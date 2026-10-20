@@ -207,7 +207,7 @@ def perform_decoding(
         if runner.hpc_log_likelihood:
             # Persist the per-timebin log-likelihood alongside the posterior so
             # the spike-evidence reality analysis
-            # (scripts/qa/analyze_event_spike_evidence.py) can read it instead
+            # (scripts/detection/analyze_event_spike_evidence.py) can read it instead
             # of recomputing the likelihood per event. Adds a
             # (n_time, n_state_bins) `log_likelihood` data_var to results.nc.
             estimate_params["return_outputs"] = "log_likelihood"

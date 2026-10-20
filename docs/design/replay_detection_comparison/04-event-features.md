@@ -77,7 +77,7 @@ include supported comparator-only activity as well as questionable ours-only act
 ### Common spike-evidence diagnostic
 
 Reuse the likelihood backend and spatial mapping in
-`scripts/qa/analyze_event_spike_evidence.py`, applying a common diagnostic to every
+`scripts/detection/analyze_event_spike_evidence.py`, applying a common diagnostic to every
 inventory: mean native-bin log-likelihood difference between the best remote real bin
 and the animal's position. Define remote bins using the same track-distance cutoff
 (`REMOTE_CM`, currently 100 cm) for every interval and record it in the configuration.

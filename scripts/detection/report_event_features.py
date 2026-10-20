@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Report one event features run: its features per session and per animal.
 
-Reads the per-epoch tables ``scripts/qa/run_event_features.py`` wrote for the
+Reads the per-epoch tables ``scripts/detection/run_event_features.py`` wrote for the
 run's ``ok`` epochs (``features``, ``pair_membership``, ``rejection``) and its
 ``manifest.json``, the stored ``cells`` and ``directional`` tables of the
 inventory comparison run it read, and the memoryless run's candidate tables.
@@ -36,7 +36,7 @@ or as the B or a cell's test of a population) and every ``ms_*`` feature carry
 The report states counts only.
 
 Usage:
-    python scripts/qa/report_event_features.py --run-id <event features run id>
+    python scripts/detection/report_event_features.py --run-id <event features run id>
 """
 
 import argparse
@@ -91,11 +91,11 @@ from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
 from continuum_swr_replay.runs.cli import parse_run_id  # noqa: E402
 from continuum_swr_replay.tables.io import read_table  # noqa: E402
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
+from scripts.detection import run_event_features as features_runner  # noqa: E402
+from scripts.detection import run_inventory_comparison as comparison  # noqa: E402
 from scripts.figures.generate_inventory_examples import (  # noqa: E402
     detector_color,
 )
-from scripts.qa import run_event_features as features_runner  # noqa: E402
-from scripts.qa import run_inventory_comparison as comparison  # noqa: E402
 from scripts.qa._report import (  # noqa: E402
     MEMBERSHIPS,
     PENDING,
@@ -112,7 +112,7 @@ from scripts.qa._report import (  # noqa: E402
     with_pending,
 )
 
-PRODUCED_BY = "scripts/qa/report_event_features.py"
+PRODUCED_BY = "scripts/detection/report_event_features.py"
 OUTPUT_ROOT = features_runner.OUTPUT_ROOT
 """Where the event features runs are."""
 INVENTORY_ROOT = features_runner.INVENTORY_ROOT

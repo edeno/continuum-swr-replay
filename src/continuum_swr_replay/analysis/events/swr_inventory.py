@@ -19,7 +19,7 @@ What this module fixes
   :data:`SWR_INVENTORY_RUN_ID` and nothing else.
 - **Which artifacts**: :data:`ARTIFACT_INTERVALS_RUN_ID` under
   ``paths.ARTIFACT_INTERVALS_DIR``, the artifact detector's run
-  (``scripts/decoding/run_artifact_detection.py``). It is set (runbook R9's
+  (``scripts/detection/run_artifact_detection.py``). It is set (runbook R9's
   run); None would mean no artifact is masked. Every function here resolves an
   epoch's artifact intervals itself (:func:`artifact_intervals`), so no caller
   passes them and every caller gets the same ones: the one artifact mask, the

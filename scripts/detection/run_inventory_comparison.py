@@ -68,7 +68,7 @@ narrowed by ``--animal``, ``--date`` and ``--epoch``, or the one
 ``--epoch-id``, run one at a time in this process.
 
 Usage:
-    python scripts/qa/run_inventory_comparison.py --carey-run-id <run id> \\
+    python scripts/detection/run_inventory_comparison.py --carey-run-id <run id> \\
         --memoryless-run-id d0964cc76ed2-seed20260922 \\
         --epoch-id chimi20200225_02_r1_HPC
 """
@@ -196,7 +196,7 @@ CAREY_ROOT = COMPARISON_ROOT / "carey"
 MEMORYLESS_ROOT = COMPARISON_ROOT / "memoryless"
 DECODE_ROOT = PROCESSED_DATA_DIR
 """Where the canonical HPC decodes are."""
-PRODUCED_BY = "scripts/qa/run_inventory_comparison.py"
+PRODUCED_BY = "scripts/detection/run_inventory_comparison.py"
 DESIGN_SPEC = "docs/design/replay_detection_comparison/03-inventory-comparison.md"
 
 ROSTER: Mapping[str, str | None] = MappingProxyType(

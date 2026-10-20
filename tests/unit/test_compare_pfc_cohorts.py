@@ -29,7 +29,7 @@ from continuum_swr_replay.analysis.pfc.load_population import (
     HELDOUT_USABLE_DRAW_COLUMNS,
     MATCHED_NULL_OBSERVED_COLUMNS,
 )
-from scripts.qa.compare_pfc_cohorts import (
+from scripts.pfc.compare_pfc_cohorts import (
     FDR_TESTS,
     MATCHED_CONTROL_TESTS,
     NESTED_MODEL_PAIRS,
@@ -541,13 +541,13 @@ class TestReport:
             min_firing_rate=1.0,
             alpha=0.05,
             notes=["A note the caller supplied."],
-            command="uv run python scripts/qa/compare_pfc_cohorts.py",
+            command="uv run python scripts/pfc/compare_pfc_cohorts.py",
         )
 
         assert "do not hold the same sessions" in report
         assert "j1620210706_10_r5" in report
         assert "A note the caller supplied." in report
-        assert "Command: `uv run python scripts/qa/compare_pfc_cohorts.py`" in report
+        assert "Command: `uv run python scripts/pfc/compare_pfc_cohorts.py`" in report
         # The headline restriction, computed from the sidecars.
         assert "1,900 of 3,000" in report
         assert "240 of 300" in report
@@ -562,7 +562,7 @@ def test_provenance_marks_no_alignment_block_when_no_sidecar_has_one():
             "written_at": ["2026-09-13T18:00:00Z", "2026-09-13T19:00:00Z"],
         }
     )
-    from scripts.qa.compare_pfc_cohorts import provenance_table
+    from scripts.pfc.compare_pfc_cohorts import provenance_table
 
     table = provenance_table(sidecars)
     assert set(table["alignment_block"]) == {"no"}
@@ -1295,7 +1295,9 @@ class TestPeakShrinkage:
 
         assert set(table["units"]) == {"separated", "well posed"}
         assert (table["n_prior_binds"] <= table["n_units"]).all()
-        assert not [warning for warning in recwarn if warning.category is RuntimeWarning]
+        assert not [
+            warning for warning in recwarn if warning.category is RuntimeWarning
+        ]
 
 
 class TestEstimatorTables:
@@ -1596,7 +1598,7 @@ class TestTheLambdaZeroGateRebuildsTheAuditedBasis:
 
         spec = importlib.util.spec_from_file_location(
             "check_pfc_ridge_lambda0",
-            _REPO / "scripts" / "qa" / "check_pfc_ridge_lambda0.py",
+            _REPO / "scripts" / "pfc" / "check_pfc_ridge_lambda0.py",
         )
         gate = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(gate)

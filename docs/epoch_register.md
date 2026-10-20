@@ -175,7 +175,7 @@ file. The helper reads only the register, not the database.
 the canonical folder holding only analysed epochs' decodes, which the audit's
 `decode_folder` check enforces.
 
-`scripts/qa/measure_pfc_null_geometry.py` globs the PFC runner's `*_mPFC_modulation.pkl`
+`scripts/pfc/measure_pfc_null_geometry.py` globs the PFC runner's `*_mPFC_modulation.pkl`
 bundles, not the decode folder, so the `decode_folder` check does not cover it. It relies
 on the PFC runner, which writes bundles only for the analysed PFC cohort (see "PFC
 subset"). No check removes a bundle left in that folder from an earlier cohort.

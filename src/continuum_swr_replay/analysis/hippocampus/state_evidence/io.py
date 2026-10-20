@@ -4,7 +4,7 @@ Their strict JSON records go through ``runs.io.json_ready`` and
 ``runs.io.write_json``.
 
 It imports nothing that holds JAX to a device. The CPU state-evidence runner
-(``scripts/qa/run_state_evidence.py``) uses it.
+(``scripts/detection/run_state_evidence.py``) uses it.
 """
 
 from __future__ import annotations

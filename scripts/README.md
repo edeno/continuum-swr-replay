@@ -13,16 +13,16 @@ never imported by another script or by `src/`; tests may import any script.
 enforces this. Its `ALLOWED` table is the current exception list, and it only
 shrinks:
 - the detection-comparison family: `figures/generate_event_feature_examples.py`,
-  `figures/generate_inventory_examples.py`, `qa/report_event_features.py`,
-  `qa/report_inventory_comparison.py` and `qa/run_event_features.py` import
-  `qa/run_inventory_comparison.py` (run layout, detector roster, decode helpers) and
-  each other; `figures/generate_inventory_examples.py` and `qa/run_event_features.py`
-  also import `decoding/run_carey_detection.py`, the first also
-  `decoding/run_memoryless_detection.py` and the second
-  `qa/analyze_event_spike_evidence.py`;
-- the memoryless sweep family: `qa/sweep_memoryless_controls.py`,
-  `qa/sweep_memoryless_heldout.py` and `qa/compare_memoryless_to_reference.py` import
-  `qa/sweep_memoryless_detection.py` (and the reference check also
+  `figures/generate_inventory_examples.py`, `detection/report_event_features.py`,
+  `detection/report_inventory_comparison.py` and `detection/run_event_features.py` import
+  `detection/run_inventory_comparison.py` (run layout, detector roster, decode helpers) and
+  each other; `figures/generate_inventory_examples.py` and `detection/run_event_features.py`
+  also import `detection/run_carey_detection.py`, the first also
+  `detection/run_memoryless_detection.py` and the second
+  `detection/analyze_event_spike_evidence.py`;
+- the memoryless sweep family: `detection/sweep_memoryless_controls.py`,
+  `detection/sweep_memoryless_heldout.py` and `qa/compare_memoryless_to_reference.py` import
+  `detection/sweep_memoryless_detection.py` (and the reference check also
   `qa/memoryless_reference.py` and `figures/generate_memoryless_comparison.py`);
 - `exploratory/_content_cohort_control.py`, which runs
   `content/fit_swr_contrast_content.py` with its cohort rule bypassed.
@@ -33,22 +33,18 @@ The exploratory scripts that unit tests pin (`_verify_harmonization_parity.py`,
 documented exceptions to "unsupported one-off": their leading underscore already makes
 them importable.
 
-## `decoding/` — produce the decoded data + event/stop tables
+## `decoding/` — the decoders
 - `run_decoding_bandit.py` — continuum decoding for the bandit task (HPC/mPFC/OFC).
 - `run_decoding_contfrag.py` — decoding for the ContFrag (SWR/MUA) event sources.
 - `_decode_runner.py` — not a script: the flow both decode runners share (the HPC
   masks and SWR source, fit, save, resume), imported as `scripts.decoding._decode_runner`;
   each runner's `RUNNER` record holds what differs. Only the NonLocal runner keeps an
   HPC decode's per-bin log-likelihood (`hpc_log_likelihood`).
-- `run_memoryless_detection.py` — the Widloski & Foster sliding-window detector
-  on each HPC epoch's saved decode, with its encoding-pair shuffle; one row per
-  candidate sequence (spec 02). Loads the marks from the Spyglass database
-  unless `--cache-dir` already holds them; a failing epoch is recorded and the
-  rest run; `run.log` and `manifest.json` sit beside the outputs. `--date` and
-  `--epoch` narrow `--epoch-id`, `--animal` or `--all`. With
-  `--cuda_visible_devices` the epochs run in parallel on a dask
-  `LocalCUDACluster`, one epoch per GPU at a time, each logging to
-  `logs/{epoch_id}_memoryless.log`; only the main process writes the manifest.
+
+## `detection/` — event detectors and the detection comparison
+- `run_artifact_detection.py` — the artifact mask: LFP and spike artifacts in every
+  epoch's CA1 data, on CPU (S blocks, reference and CA1 steps, synchronous spike
+  lines; `docs/design/2026-10-09-artifact-detection.md`).
 - `run_swr_detection.py` — the four SWR inventories (Kay, Karlsson, Yu and Zugaro, from
   `ripple_detection` at its pinned commit) for every epoch, on shared CA1 inputs: the
   stored ripple band, the referenced raw LFP behind it, and `load_data`'s speed and time
@@ -77,11 +73,94 @@ them importable.
   epochs already `ok` unless `--overwrite` is given. Built and tested; it ran on all 242 epochs
   (run `fa6537e48bcf`). Imports the SWR runner's and the
   memoryless runner's helpers (the exception to the rule above).
+- `run_memoryless_detection.py` — the Widloski & Foster sliding-window detector
+  on each HPC epoch's saved decode, with its encoding-pair shuffle; one row per
+  candidate sequence (spec 02). Loads the marks from the Spyglass database
+  unless `--cache-dir` already holds them; a failing epoch is recorded and the
+  rest run; `run.log` and `manifest.json` sit beside the outputs. `--date` and
+  `--epoch` narrow `--epoch-id`, `--animal` or `--all`. With
+  `--cuda_visible_devices` the epochs run in parallel on a dask
+  `LocalCUDACluster`, one epoch per GPU at a time, each logging to
+  `logs/{epoch_id}_memoryless.log`; only the main process writes the manifest.
+- `run_inventory_comparison.py` — compares nine inventories of each analysed epoch on one substrate:
+  the five SWR definitions (`kay`, `karlsson`, `yu`, `zugaro`, `carey`), `mua`, `state_space`, and the
+  Widloski detector under two cohorts (`memoryless`, cohort `published`; `memoryless_criteria`, cohort
+  `replay_criteria`). Takes the Carey run (`--carey-run-id`) and the memoryless run
+  (`--memoryless-run-id`); the SWR run is the one `swr_inventory` pins. Per epoch it writes, as one set,
+  the inventories, observation tables, every overlap pair, directional agreement, time coverage,
+  components, the fragment recount, the three cells, the SWR label matrix (three sequence cohorts
+  under five SWR definitions) and excluded time by reason, to
+  `replay_detection_comparison/inventory/<run_id>/`. A run with no usable record reads `unavailable`,
+  never empty; a failed epoch writes nothing. `--animal`, `--date`, `--epoch` or `--epoch-id` narrow
+  the epochs, which run one at a time; a rerun skips the epochs already `ok` unless `--overwrite` is
+  given. Built and tested on simulated epochs; ran on all 242 analysed epochs (run `afeb897d850f`). The Widloski columns
+  are pending the Phase 2 pilot checks.
+- `report_inventory_comparison.py` — the counts of one comparison run, per session and per animal
+  (sums of counts and seconds, never averages of proportions; `unavailable` sessions listed, not
+  pooled; `unknown` never counted as `unmatched` or non-SWR). Tables go to `<inventory run>/report/`
+  with a `report.md`; figures to `paper/figures/inventory_comparison/<run_id>/` with `captions.md`.
+  Counts only, no verdicts; every Widloski row and caption is marked pending the Phase 2 pilot checks.
+- `run_event_features.py` — the event features of every compared event of the nine inventories, on the
+  decode grid by one rule (no baseline windows: dropped by the lead, 2026-10-18). Takes the comparison run
+  (`--inventory-run-id`); the memoryless run is the one its manifest names. Per epoch it rebuilds the
+  pairwise memberships from the stored tables and fails unless they reproduce the stored `directional`
+  and `cells`. It then writes, as one set, the `features` table (timing, engagement, one ripple and MUA
+  trace, `ss_*` and `ms_*` spatial features, context, and the common spike-evidence score), the
+  `pair_membership` table and the `rejection` table (the memoryless rejection stage of each
+  state-space event), to `replay_detection_comparison/event_features/<run_id>/`. An epoch the
+  memoryless run has no record for has `ms_*` missing and its memberships `unknown`. `--animal`,
+  `--date`, `--epoch` or `--epoch-id` narrow the epochs; `--n-workers` sets the worker processes; a
+  rerun skips the epochs already `ok` unless `--overwrite` is given. Built and tested on simulated
+  epochs; the one-epoch smoke ran (run `68f51dabdb3c`), and the pilot ran on 5 epochs (run `86ed2e7fa90a`: 4 `ok`, and peanut, which failed there on a bug at its last window, re-checked `ok` under `f8a6984ae781`); the full run is pending. The
+  Widloski columns and every `ms_*` feature are pending the Phase 2 pilot checks.
+- `report_event_features.py` — the features of one event features run, per session and per animal
+  (sums of counts, never averages of proportions; quantiles of the events; `unknown` never counted as
+  `unmatched`; the evidence beside the spikes per row, with no baseline). Tables go to `<features run>/report/` with a `report.md`;
+  figures to `paper/figures/event_features/<run_id>/` with `captions.md`. Counts only, no verdicts;
+  every Widloski row and caption is marked pending the Phase 2 pilot checks.
+- `run_state_evidence.py` — held-out spike evidence for each decoder state (Local, No-Spike,
+  Non-Local Continuous / Fragmented) on every canonical HPC decode: confident bouts against
+  matched random windows, and calibration curves over random 20 ms windows, scored by a
+  tetrode half the choice did not see (10 seeded half-partitions x 2 directions), primarily
+  under a 2-fold time-held-out running-only refit (alternating 30 s blocks, each window scored
+  by the fold without its centre bin), and secondarily under a running-only refit on every
+  running bin and the decode's own encoding. Method and caveats: the package
+  `src/continuum_swr_replay/analysis/hippocampus/state_evidence/`. Per epoch it checks that the
+  reloaded marks refit the stored encoding exactly, that the per-tetrode terms reproduce
+  `results.nc` and the library's likelihood, and that no event bin is in a running-only fit,
+  then writes a per-window parquet and a validation JSON; then the summary CSVs, three figures,
+  `manifest.json` (a recorded reason for every skipped, failed or recomputed epoch) and a
+  `README.md`. `--epochs`, `--decode-dir` (default `Processed-Data/`; without `--epochs`, every
+  `*_HPC` epoch with a decode file there), `--output-dir` (default
+  `Processed-Data/_refresh_<date>/state_evidence/`, the only place written), `--n-workers`
+  dask CPU workers, `--window-level-stats`; a rerun reuses an epoch only when its commit, run
+  settings and decode files (size, mtime) all match, unless `--overwrite`.
+- `analyze_event_spike_evidence.py` — the spike-evidence reality check: does each
+  non-SWR non-local event's prior-excluded spike likelihood favour its decoded
+  location over the animal's, above a matched immobility baseline.
+- `sweep_memoryless_detection.py` — injects replays of chosen path, duration, rate and
+  distance into a simulated recording and scores both detectors by one rule; writes the raw
+  table to `Processed-Data/` and the aggregates to
+  `docs/design/replay_detection_comparison/detection_sweep_summary.csv` (about six minutes).
+- `sweep_memoryless_controls.py`, `sweep_memoryless_heldout.py` — what each detector
+  does with activity that is not one clean replay (no replay, place-less bursts,
+  jumps and chains), and whether its content reproduces in held-out cells; they write
+  `docs/design/replay_detection_comparison/detection_{controls,heldout}_summary.csv`.
+
+## `tables/` — the event, stop and time-bin tables
 - `prepare_replay_content_data.py` — build the canonical replay-content tables
   (event / event-arm / event-patch / event-sequence / stop) across all sessions.
 - `regenerate_stop_table.py` — rebuild the per-stop immobility table.
 - `build_timebin_tables.py` — build the per-(stop×bin) design tables.
 - `prepare_contfrag_replay_content_data.py` — assemble ContFrag content tables.
+- `assemble_replay_content_shards.py`, `assemble_contfrag_shards.py` — assemble
+  disjoint per-animal table shards into one canonical candidate bundle.
+- `refresh_contfrag_behavioral_covariates.py` — rebuild the ContFrag tables, reusing
+  the immutable posterior aggregates of a preserved bundle.
+- `write_regeneration_manifest.py` — validate candidate covariate bundles and write
+  the release manifest.
+- `convert_tables_to_parquet.py` — the one-time pickle-to-parquet migration of the
+  materialized tables.
 
 ## `rate/` — event-rate models + their plots
 - `fit_per_bin_rate_models.py`, `fit_per_stop_rate_models.py` — Family B / A rate ladders.
@@ -144,7 +223,7 @@ them importable.
   marked pending the Phase 2 pilot checks. Built and tested; not yet run on a real features run.
 - `archive/` — retired figure scripts (not linted; kept for provenance).
 
-## `qa/` — diagnostics / validation
+## `qa/` — parity, audits, checks and doc writers
 - `_report.py` — not a script: the run's command line (`_invocation`) and the markdown
   table (`_md`) that several QA reports share, and what the two detection-comparison
   reports share (the pending marking of the memoryless inventories, caption and
@@ -161,65 +240,8 @@ them importable.
   `check_fit_provenance.py` checks every artifact the runs wrote. Set
   `CSR_PROCESSED_DATA_DIR` to read and write another data root. It does not run the
   decodes, the tables, the Q1 checks or the PFC unit GLM. See `docs/analysis_map.md`.
-- `run_inventory_comparison.py` — compares nine inventories of each analysed epoch on one substrate:
-  the five SWR definitions (`kay`, `karlsson`, `yu`, `zugaro`, `carey`), `mua`, `state_space`, and the
-  Widloski detector under two cohorts (`memoryless`, cohort `published`; `memoryless_criteria`, cohort
-  `replay_criteria`). Takes the Carey run (`--carey-run-id`) and the memoryless run
-  (`--memoryless-run-id`); the SWR run is the one `swr_inventory` pins. Per epoch it writes, as one set,
-  the inventories, observation tables, every overlap pair, directional agreement, time coverage,
-  components, the fragment recount, the three cells, the SWR label matrix (three sequence cohorts
-  under five SWR definitions) and excluded time by reason, to
-  `replay_detection_comparison/inventory/<run_id>/`. A run with no usable record reads `unavailable`,
-  never empty; a failed epoch writes nothing. `--animal`, `--date`, `--epoch` or `--epoch-id` narrow
-  the epochs, which run one at a time; a rerun skips the epochs already `ok` unless `--overwrite` is
-  given. Built and tested on simulated epochs; ran on all 242 analysed epochs (run `afeb897d850f`). The Widloski columns
-  are pending the Phase 2 pilot checks.
-- `report_inventory_comparison.py` — the counts of one comparison run, per session and per animal
-  (sums of counts and seconds, never averages of proportions; `unavailable` sessions listed, not
-  pooled; `unknown` never counted as `unmatched` or non-SWR). Tables go to `<inventory run>/report/`
-  with a `report.md`; figures to `paper/figures/inventory_comparison/<run_id>/` with `captions.md`.
-  Counts only, no verdicts; every Widloski row and caption is marked pending the Phase 2 pilot checks.
-- `run_event_features.py` — the event features of every compared event of the nine inventories, on the
-  decode grid by one rule (no baseline windows: dropped by the lead, 2026-10-18). Takes the comparison run
-  (`--inventory-run-id`); the memoryless run is the one its manifest names. Per epoch it rebuilds the
-  pairwise memberships from the stored tables and fails unless they reproduce the stored `directional`
-  and `cells`. It then writes, as one set, the `features` table (timing, engagement, one ripple and MUA
-  trace, `ss_*` and `ms_*` spatial features, context, and the common spike-evidence score), the
-  `pair_membership` table and the `rejection` table (the memoryless rejection stage of each
-  state-space event), to `replay_detection_comparison/event_features/<run_id>/`. An epoch the
-  memoryless run has no record for has `ms_*` missing and its memberships `unknown`. `--animal`,
-  `--date`, `--epoch` or `--epoch-id` narrow the epochs; `--n-workers` sets the worker processes; a
-  rerun skips the epochs already `ok` unless `--overwrite` is given. Built and tested on simulated
-  epochs; the one-epoch smoke ran (run `68f51dabdb3c`), and the pilot ran on 5 epochs (run `86ed2e7fa90a`: 4 `ok`, and peanut, which failed there on a bug at its last window, re-checked `ok` under `f8a6984ae781`); the full run is pending. The
-  Widloski columns and every `ms_*` feature are pending the Phase 2 pilot checks.
-- `report_event_features.py` — the features of one event features run, per session and per animal
-  (sums of counts, never averages of proportions; quantiles of the events; `unknown` never counted as
-  `unmatched`; the evidence beside the spikes per row, with no baseline). Tables go to `<features run>/report/` with a `report.md`;
-  figures to `paper/figures/event_features/<run_id>/` with `captions.md`. Counts only, no verdicts;
-  every Widloski row and caption is marked pending the Phase 2 pilot checks.
 - `check_data_availability.py`, `diagnose_trial_detection.py`, `compute_hpc_raw_stats.py`,
-  `run_quality_metrics.py`, `analyze_event_spike_evidence.py` (spike-evidence reality check).
-- `run_state_evidence.py` — held-out spike evidence for each decoder state (Local, No-Spike,
-  Non-Local Continuous / Fragmented) on every canonical HPC decode: confident bouts against
-  matched random windows, and calibration curves over random 20 ms windows, scored by a
-  tetrode half the choice did not see (10 seeded half-partitions x 2 directions), primarily
-  under a 2-fold time-held-out running-only refit (alternating 30 s blocks, each window scored
-  by the fold without its centre bin), and secondarily under a running-only refit on every
-  running bin and the decode's own encoding. Method and caveats: the package
-  `src/continuum_swr_replay/analysis/hippocampus/state_evidence/`. Per epoch it checks that the
-  reloaded marks refit the stored encoding exactly, that the per-tetrode terms reproduce
-  `results.nc` and the library's likelihood, and that no event bin is in a running-only fit,
-  then writes a per-window parquet and a validation JSON; then the summary CSVs, three figures,
-  `manifest.json` (a recorded reason for every skipped, failed or recomputed epoch) and a
-  `README.md`. `--epochs`, `--decode-dir` (default `Processed-Data/`; without `--epochs`, every
-  `*_HPC` epoch with a decode file there), `--output-dir` (default
-  `Processed-Data/_refresh_<date>/state_evidence/`, the only place written), `--n-workers`
-  dask CPU workers, `--window-level-stats`; a rerun reuses an epoch only when its commit, run
-  settings and decode files (size, mtime) all match, unless `--overwrite`.
-- `sweep_memoryless_detection.py` — injects replays of chosen path, duration, rate and
-  distance into a simulated recording and scores both detectors by one rule; writes the raw
-  table to `Processed-Data/` and the aggregates to
-  `docs/design/replay_detection_comparison/detection_sweep_summary.csv` (about six minutes).
+  `run_quality_metrics.py`.
 - `compare_memoryless_to_reference.py` — runs the memoryless port beside
   `memoryless_reference.py`, an independent re-implementation of the Widloski & Foster
   reference's sorted-cell arithmetic, on the Figure 1 simulation step by step and on
@@ -249,6 +271,28 @@ them importable.
   symbol-anchored map of the modules carrying a decoded session to a fitted
   regression, read out of the source with `ast`; `--check` fails on drift, as
   `tests/unit/test_pipeline_map_is_current.py` does.
+- `summarize_stage6_fdr.py` — prints Stage 6's per-role cross-session FDR table for
+  any saved `stage6_is_stay_logistic*.pkl`, using the runner's own statistic, so a
+  before/after comparison across populations reads one implementation.
+
+## `pfc/` — PFC responses to the events (Q5) and their audits
+- `run_pfc_analysis_bandit.py` takes `--stop-cohort`: the well-anchored stop cohort the
+  hippocampal rate and content ladders are read on is the default (`at_well`, canonical
+  artifact names), and `all_stops` publishes an unrestricted sensitivity bundle under
+  `_allstops` names. It fits the unit GLMs under a Gaussian prior on the
+  event-basis coefficients and scores them out of fold: `--penalty-sigma` (the prior
+  standard deviation on the log-rate scale; another value writes a `_sigma<value>`
+  sensitivity bundle and draws no null), `--n-folds` (blocked over whole immobility
+  runs, with runs whose ±250 ms kernel supports overlap joined into one block before
+  assignment), `--n-control-draws` with `--fold-seed` / `--control-draw-seed` (derived
+  from the session key unless given, so a lone refit reproduces the batch's split and
+  null). The canonical batch is **σ = 3**, **K = 5** and **R = 1,000** — a plus-one
+  p-value floor of 1/1,001 — and every requested draw must be usable for a unit's
+  p-value to be reported; the 20-draw floor is for deliberately shortened
+  diagnostics. It takes `--gpu N` / `--allow-cpu` to say which card it may take on a shared
+  host. A batch runs as one process per card — `--n_workers 1 --gpu N --sessions
+  <partition file>` — because one card handed to several workers is refused, and the
+  same card handed twice to one process is ignored.
 - `compare_pfc_cohorts.py` — writes the mPFC unit-GLM before/after audit: per-session
   bins and events on either side of the stop cohort (from the bundles' own provenance
   sidecars), the decode/position alignment trim, the leading-edge coverage diagnostic,
@@ -280,9 +324,6 @@ them importable.
   reads: the two event counts, how many events change SWR class once the lists are
   matched by overlap, the start-time shifts, and how many reclassifications are
   partial-overlap cases the two split rules may legitimately disagree on.
-- `summarize_stage6_fdr.py` — prints Stage 6's per-role cross-session FDR table for
-  any saved `stage6_is_stay_logistic*.pkl`, using the runner's own statistic, so a
-  before/after comparison across populations reads one implementation.
 - `check_pfc_ridge_lambda0.py` — writes the audit that the penalised solver with
   its penalty set to zero is still the maximum-likelihood one: it rebuilds each
   gate session's design *as it stood when the reference was fit* (the basis that
@@ -300,27 +341,44 @@ them importable.
   runner no longer offers the unpenalised per-neuron backend, so this compares two
   archived trees rather than two runs anyone can make now.
 
-## `pfc/` — PFC responses to the events (Q5)
-- `run_pfc_analysis_bandit.py` takes `--stop-cohort`: the well-anchored stop cohort the
-  hippocampal rate and content ladders are read on is the default (`at_well`, canonical
-  artifact names), and `all_stops` publishes an unrestricted sensitivity bundle under
-  `_allstops` names. It fits the unit GLMs under a Gaussian prior on the
-  event-basis coefficients and scores them out of fold: `--penalty-sigma` (the prior
-  standard deviation on the log-rate scale; another value writes a `_sigma<value>`
-  sensitivity bundle and draws no null), `--n-folds` (blocked over whole immobility
-  runs, with runs whose ±250 ms kernel supports overlap joined into one block before
-  assignment), `--n-control-draws` with `--fold-seed` / `--control-draw-seed` (derived
-  from the session key unless given, so a lone refit reproduces the batch's split and
-  null). The canonical batch is **σ = 3**, **K = 5** and **R = 1,000** — a plus-one
-  p-value floor of 1/1,001 — and every requested draw must be usable for a unit's
-  p-value to be reported; the 20-draw floor is for deliberately shortened
-  diagnostics. It takes `--gpu N` / `--allow-cpu` to say which card it may take on a shared
-  host. A batch runs as one process per card — `--n_workers 1 --gpu N --sessions
-  <partition file>` — because one card handed to several workers is refused, and the
-  same card handed twice to one process is ignored.
-
 ## `exploratory/` — unsupported one-offs
 Scratch scripts (`_*.py`): diagnostics, ad-hoc plots, verification checks. Not part of the
 audited pipeline; outputs go to `.claude/research/*_outputs/`. May be stale. The
 exceptions are the five that unit tests pin (listed at the top of this file), which
 must keep passing their tests.
+
+## Moved scripts (2026-10)
+
+`scripts/` was regrouped by pipeline on 2026-10-20. Nothing is left at the old paths;
+outputs written before the move still record the old path in their provenance.
+An old path is marked "(removed: moved)" so the doc-path test does not look for it.
+
+| Old path | New path |
+|---|---|
+| `scripts/decoding/run_swr_detection.py` (removed: moved) | `scripts/detection/run_swr_detection.py` |
+| `scripts/decoding/run_carey_detection.py` (removed: moved) | `scripts/detection/run_carey_detection.py` |
+| `scripts/decoding/run_memoryless_detection.py` (removed: moved) | `scripts/detection/run_memoryless_detection.py` |
+| `scripts/decoding/run_artifact_detection.py` (removed: moved) | `scripts/detection/run_artifact_detection.py` |
+| `scripts/qa/run_inventory_comparison.py` (removed: moved) | `scripts/detection/run_inventory_comparison.py` |
+| `scripts/qa/report_inventory_comparison.py` (removed: moved) | `scripts/detection/report_inventory_comparison.py` |
+| `scripts/qa/run_event_features.py` (removed: moved) | `scripts/detection/run_event_features.py` |
+| `scripts/qa/report_event_features.py` (removed: moved) | `scripts/detection/report_event_features.py` |
+| `scripts/qa/run_state_evidence.py` (removed: moved) | `scripts/detection/run_state_evidence.py` |
+| `scripts/qa/sweep_memoryless_detection.py` (removed: moved) | `scripts/detection/sweep_memoryless_detection.py` |
+| `scripts/qa/sweep_memoryless_controls.py` (removed: moved) | `scripts/detection/sweep_memoryless_controls.py` |
+| `scripts/qa/sweep_memoryless_heldout.py` (removed: moved) | `scripts/detection/sweep_memoryless_heldout.py` |
+| `scripts/qa/analyze_event_spike_evidence.py` (removed: moved) | `scripts/detection/analyze_event_spike_evidence.py` |
+| `scripts/decoding/prepare_replay_content_data.py` (removed: moved) | `scripts/tables/prepare_replay_content_data.py` |
+| `scripts/decoding/prepare_contfrag_replay_content_data.py` (removed: moved) | `scripts/tables/prepare_contfrag_replay_content_data.py` |
+| `scripts/decoding/regenerate_stop_table.py` (removed: moved) | `scripts/tables/regenerate_stop_table.py` |
+| `scripts/decoding/build_timebin_tables.py` (removed: moved) | `scripts/tables/build_timebin_tables.py` |
+| `scripts/decoding/assemble_replay_content_shards.py` (removed: moved) | `scripts/tables/assemble_replay_content_shards.py` |
+| `scripts/decoding/assemble_contfrag_shards.py` (removed: moved) | `scripts/tables/assemble_contfrag_shards.py` |
+| `scripts/decoding/convert_tables_to_parquet.py` (removed: moved) | `scripts/tables/convert_tables_to_parquet.py` |
+| `scripts/decoding/write_regeneration_manifest.py` (removed: moved) | `scripts/tables/write_regeneration_manifest.py` |
+| `scripts/decoding/refresh_contfrag_behavioral_covariates.py` (removed: moved) | `scripts/tables/refresh_contfrag_behavioral_covariates.py` |
+| `scripts/qa/compare_pfc_cohorts.py` (removed: moved) | `scripts/pfc/compare_pfc_cohorts.py` |
+| `scripts/qa/compare_pfc_fitters.py` (removed: moved) | `scripts/pfc/compare_pfc_fitters.py` |
+| `scripts/qa/check_pfc_ridge_lambda0.py` (removed: moved) | `scripts/pfc/check_pfc_ridge_lambda0.py` |
+| `scripts/qa/measure_pfc_null_geometry.py` (removed: moved) | `scripts/pfc/measure_pfc_null_geometry.py` |
+| `scripts/qa/diagnose_pfc_event_definition.py` (removed: moved) | `scripts/pfc/diagnose_pfc_event_definition.py` |

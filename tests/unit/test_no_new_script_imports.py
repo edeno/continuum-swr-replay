@@ -43,55 +43,55 @@ ALLOWED: dict[tuple[str, str], str] = {
     ): _INVENTORY,
     (
         "scripts/figures/generate_event_feature_examples.py",
-        "scripts.qa.report_event_features",
+        "scripts.detection.report_event_features",
     ): _INVENTORY,
     (
         "scripts/figures/generate_event_feature_examples.py",
-        "scripts.qa.run_event_features",
+        "scripts.detection.run_event_features",
     ): _INVENTORY,
     (
         "scripts/figures/generate_event_feature_examples.py",
-        "scripts.qa.run_inventory_comparison",
+        "scripts.detection.run_inventory_comparison",
     ): _INVENTORY,
     (
         "scripts/figures/generate_inventory_examples.py",
-        "scripts.decoding.run_carey_detection",
+        "scripts.detection.run_carey_detection",
     ): _INVENTORY,
     (
         "scripts/figures/generate_inventory_examples.py",
-        "scripts.decoding.run_memoryless_detection",
+        "scripts.detection.run_memoryless_detection",
     ): _INVENTORY,
     (
         "scripts/figures/generate_inventory_examples.py",
-        "scripts.qa.run_inventory_comparison",
+        "scripts.detection.run_inventory_comparison",
     ): _INVENTORY,
     (
-        "scripts/qa/report_event_features.py",
+        "scripts/detection/report_event_features.py",
         "scripts.figures.generate_inventory_examples",
     ): _INVENTORY,
     (
-        "scripts/qa/report_event_features.py",
-        "scripts.qa.run_event_features",
+        "scripts/detection/report_event_features.py",
+        "scripts.detection.run_event_features",
     ): _INVENTORY,
     (
-        "scripts/qa/report_event_features.py",
-        "scripts.qa.run_inventory_comparison",
+        "scripts/detection/report_event_features.py",
+        "scripts.detection.run_inventory_comparison",
     ): _INVENTORY,
     (
-        "scripts/qa/report_inventory_comparison.py",
-        "scripts.qa.run_inventory_comparison",
+        "scripts/detection/report_inventory_comparison.py",
+        "scripts.detection.run_inventory_comparison",
     ): _INVENTORY,
     (
-        "scripts/qa/run_event_features.py",
-        "scripts.decoding.run_carey_detection",
+        "scripts/detection/run_event_features.py",
+        "scripts.detection.run_carey_detection",
     ): _INVENTORY,
     (
-        "scripts/qa/run_event_features.py",
-        "scripts.qa.analyze_event_spike_evidence",
+        "scripts/detection/run_event_features.py",
+        "scripts.detection.analyze_event_spike_evidence",
     ): _INVENTORY,
     (
-        "scripts/qa/run_event_features.py",
-        "scripts.qa.run_inventory_comparison",
+        "scripts/detection/run_event_features.py",
+        "scripts.detection.run_inventory_comparison",
     ): _INVENTORY,
     (
         "scripts/qa/compare_memoryless_to_reference.py",
@@ -103,26 +103,26 @@ ALLOWED: dict[tuple[str, str], str] = {
     ): _MEMORYLESS,
     (
         "scripts/qa/compare_memoryless_to_reference.py",
-        "scripts.qa.sweep_memoryless_detection",
+        "scripts.detection.sweep_memoryless_detection",
     ): _MEMORYLESS,
     (
-        "scripts/qa/sweep_memoryless_controls.py",
-        "scripts.qa.sweep_memoryless_detection",
+        "scripts/detection/sweep_memoryless_controls.py",
+        "scripts.detection.sweep_memoryless_detection",
     ): _MEMORYLESS,
     (
-        "scripts/qa/sweep_memoryless_heldout.py",
-        "scripts.qa.sweep_memoryless_controls",
+        "scripts/detection/sweep_memoryless_heldout.py",
+        "scripts.detection.sweep_memoryless_controls",
     ): _MEMORYLESS,
     (
-        "scripts/qa/sweep_memoryless_heldout.py",
-        "scripts.qa.sweep_memoryless_detection",
+        "scripts/detection/sweep_memoryless_heldout.py",
+        "scripts.detection.sweep_memoryless_detection",
     ): _MEMORYLESS,
 }
 
 
 def _target(module: str, name: str | None) -> str:
     """The module an import binds: ``module``, or ``module.name`` when ``name``
-    is itself a module (``from scripts.qa import run_event_features``)."""
+    is itself a module (``from scripts.detection import run_event_features``)."""
     if name is None:
         return module
     package = REPO.joinpath(*module.split("."))
@@ -188,24 +188,25 @@ def test_the_rule_reads_the_module_not_the_imported_name(tmp_path):
     assert _is_importable("scripts.qa._report")
     assert _is_importable("scripts.decoding._decode_runner")
     assert _is_importable("scripts.exploratory._statescript_contingency")
-    assert not _is_importable("scripts.qa.report_inventory_comparison")
+    assert not _is_importable("scripts.detection.report_inventory_comparison")
     assert (
-        _target("scripts.qa", "run_event_features") == "scripts.qa.run_event_features"
+        _target("scripts.detection", "run_event_features")
+        == "scripts.detection.run_event_features"
     )
     assert (
-        _target("scripts.qa.report_inventory_comparison", "_caption")
-        == "scripts.qa.report_inventory_comparison"
+        _target("scripts.detection.report_inventory_comparison", "_caption")
+        == "scripts.detection.report_inventory_comparison"
     )
 
     probe = tmp_path / "probe.py"
     probe.write_text(
         "from scripts.qa import _report\n"
-        "from scripts.qa.report_inventory_comparison import _private\n"
+        "from scripts.detection.report_inventory_comparison import _private\n"
         "def run():\n"
         "    import scripts.content.fit_replay_content_models as fitter\n"
     )
     assert _script_imports(probe) == {
         "scripts.qa._report",
-        "scripts.qa.report_inventory_comparison",
+        "scripts.detection.report_inventory_comparison",
         "scripts.content.fit_replay_content_models",
     }

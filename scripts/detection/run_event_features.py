@@ -68,7 +68,7 @@ CPU threads follow the process's CPU affinity, so pin the run with
 All memoryless results are pending the Phase 2 pilot checks.
 
 Usage:
-    JAX_PLATFORMS=cpu taskset -c 56-71 python scripts/qa/run_event_features.py \\
+    JAX_PLATFORMS=cpu taskset -c 56-71 python scripts/detection/run_event_features.py \\
         --inventory-run-id afeb897d850f --epoch-id chimi20200225_02_r1_HPC \\
         --n-workers 1
 """
@@ -198,13 +198,13 @@ from continuum_swr_replay.runs.io import (  # noqa: E402
 from continuum_swr_replay.runs.provenance import provenance_record  # noqa: E402
 from continuum_swr_replay.tables.io import read_table  # noqa: E402
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
-from scripts.decoding import run_carey_detection as carey  # noqa: E402
-from scripts.qa import run_inventory_comparison as comparison  # noqa: E402
+from scripts.detection import run_carey_detection as carey  # noqa: E402
+from scripts.detection import run_inventory_comparison as comparison  # noqa: E402
 
 # the spike-evidence script installs ignore filters for whole warning classes
 # when imported; they stay inside this block, out of the run and its workers
 with warnings.catch_warnings():
-    from scripts.qa.analyze_event_spike_evidence import REMOTE_CM  # noqa: E402
+    from scripts.detection.analyze_event_spike_evidence import REMOTE_CM  # noqa: E402
 
 OUTPUT_ROOT = comparison.COMPARISON_ROOT / "event_features"
 INVENTORY_ROOT = comparison.OUTPUT_ROOT
@@ -213,7 +213,7 @@ MEMORYLESS_ROOT = comparison.MEMORYLESS_ROOT
 MARKS_CACHE_DIR = carey.MARKS_CACHE_DIR
 """The memoryless runner's marks cache, keyed by the decode's detector file."""
 STOP_TABLE = table_path("stop_table")
-PRODUCED_BY = "scripts/qa/run_event_features.py"
+PRODUCED_BY = "scripts/detection/run_event_features.py"
 DESIGN_SPEC = "docs/design/replay_detection_comparison/04-event-features.md"
 
 GRID_RULE = (

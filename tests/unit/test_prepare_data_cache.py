@@ -19,7 +19,7 @@ import pytest
 
 import continuum_swr_replay.data_loaders as dl
 from continuum_swr_replay.analysis.replay import prepare_data as pdm
-from scripts.decoding import prepare_replay_content_data as prepare_cli
+from scripts.tables import prepare_replay_content_data as prepare_cli
 
 
 @pytest.fixture

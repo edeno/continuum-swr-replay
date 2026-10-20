@@ -2,7 +2,7 @@
 """Sampled examples from each cell of one inventory comparison run.
 
 Reads the ``cells`` and ``inventory`` tables that
-``scripts/qa/run_inventory_comparison.py`` wrote for the run's ``ok`` epochs
+``scripts/detection/run_inventory_comparison.py`` wrote for the run's ``ok`` epochs
 and draws events from each cell by :data:`SAMPLING_RULE`. Design:
 ``docs/design/replay_detection_comparison/03-inventory-comparison.md``
 (Reporting, item 5).
@@ -111,9 +111,11 @@ from continuum_swr_replay.visualization.palettes import COLORS  # noqa: E402
 from continuum_swr_replay.visualization.plots import (  # noqa: E402
     plot_linear_track_graph_strip,
 )
-from scripts.decoding import run_memoryless_detection as memoryless_runner  # noqa: E402
-from scripts.decoding.run_carey_detection import decode_marks  # noqa: E402
-from scripts.qa import run_inventory_comparison as runner  # noqa: E402
+from scripts.detection import run_inventory_comparison as runner  # noqa: E402
+from scripts.detection import (
+    run_memoryless_detection as memoryless_runner,  # noqa: E402
+)
+from scripts.detection.run_carey_detection import decode_marks  # noqa: E402
 
 PRODUCED_BY = "scripts/figures/generate_inventory_examples.py"
 FIGURE_ROOT = FIGURE_DIR / "inventory_comparison"
@@ -173,7 +175,7 @@ def use_memoryless_device() -> None:
     Near-tied window centers are broken by the device's rounding, so a CPU
     moves more of them than the check allows. The GPU is set over any
     ``JAX_PLATFORMS``, since modules imported here pin the CPU when imported
-    (``scripts/qa/run_state_evidence.py``); with no GPU, JAX raises. Call
+    (``scripts/detection/run_state_evidence.py``); with no GPU, JAX raises. Call
     before JAX starts its backend, which reads ``XLA_FLAGS`` once.
     """
     os.environ["XLA_FLAGS"] = memoryless_runner.xla_flags()

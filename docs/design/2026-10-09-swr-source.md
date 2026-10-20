@@ -10,7 +10,7 @@ Task 15). Artifact masking (Task 16) plugs into the hook described below.
 ## Decision
 
 Every SWR label of the paper comes from the Kay inventory that the SWR runner
-(`scripts/decoding/run_swr_detection.py`, refresh stage R3) writes. Spyglass's stored
+(`scripts/detection/run_swr_detection.py`, refresh stage R3) writes. Spyglass's stored
 `RippleTimesV1` events are no longer an analysis source. This covers `SWR_event`,
 the event table's `is_swr` / `overlap_class` / matched SWR, the stop table's
 `is_swr_stop` / `n_swr_events`, the timebin tables' SWR onsets, the ContFrag SWR-event

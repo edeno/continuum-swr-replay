@@ -74,7 +74,7 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     code-verified; also flags the duplicate and dead columns the pass found.
   - [design/2026-10-03-full-pipeline-refresh-design.md](design/2026-10-03-full-pipeline-refresh-design.md)
     — the October full re-decode, comparison inventories and downstream regeneration; done
-    and audited 2026-10-12. `scripts/decoding/run_swr_detection.py` cites it as its
+    and audited 2026-10-12. `scripts/detection/run_swr_detection.py` cites it as its
     `DESIGN_SPEC`.
   - [design/2026-10-04-decoder-transition-prior.md](design/2026-10-04-decoder-transition-prior.md)
     — decision R10: the decoders' discrete-transition prior (setting P30-B), its sources
@@ -138,7 +138,7 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     Status: the memoryless sequence detector of spec 02, its significance shuffle,
     its per-epoch runner, its simulated-replay sweep and supplemental figure are
     implemented and tested (`analysis/hippocampus/memoryless_sequence/`,
-    `scripts/decoding/run_memoryless_detection.py`); the inventory comparison's
+    `scripts/detection/run_memoryless_detection.py`); the inventory comparison's
     accounting of spec 03 is implemented and tested on synthetic inventories
     (`analysis/inventory_comparison/`). Not yet done: the real-data pilot, the
     comparison's per-detector adapters and runner, the Yu detector's project
@@ -182,7 +182,7 @@ Three tiers:
 1. **Result DATA** (`.parquet`/`.pkl`/`.nc`, gitignored) under `Processed-Data/replay_content/`:
 
    The canonical tables (events, event-arms, event-patches, sequences, stops) are
-   built by `scripts/decoding/prepare_replay_content_data.py`, and `qvals_table` by
+   built by `scripts/tables/prepare_replay_content_data.py`, and `qvals_table` by
    `scripts/behavior/build_qvals_table.py`. They
    are **parquet**; read and write them through `continuum_swr_replay.tables.io`
    (`read_table` / `write_table`), never `pd.read_pickle`. Fitted-model artifacts
@@ -293,7 +293,7 @@ Three tiers:
    over 48 neurons); the prior binds on 1.2–2.8% of well-posed units per curve; and the
    two inferences call comparable fractions of a comparable population, which are **not**
    comparable test by test. That audit also carries the null's geometry
-   (`scripts/qa/measure_pfc_null_geometry.py`): the engagement null's draws land on the
+   (`scripts/pfc/measure_pfc_null_geometry.py`): the engagement null's draws land on the
    shipped control they are entered beside on a median 11.0% of their windows, 7–10% of
    the units called at raw p < .05 have no positive held-out improvement of their own,
    and 0.3–1.4% of a class's events have no legal within-bout control and enter neither

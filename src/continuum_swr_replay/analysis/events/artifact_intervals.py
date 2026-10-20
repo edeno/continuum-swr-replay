@@ -10,7 +10,7 @@ A run folder, ``<root>/<run_id>/``, holds:
   ``status``, its span (``span_s``, the first and last LFP sample the detector
   read) and its file's path and sha256 (``outputs.cores``).
 
-``scripts/decoding/run_artifact_detection.py`` writes it; ``swr_inventory`` reads
+``scripts/detection/run_artifact_detection.py`` writes it; ``swr_inventory`` reads
 it through :func:`read_epoch_cores`, which serves an epoch only from a manifest
 that names the folder, holds the epoch as ``ok``, and records the sha256 the
 file still has.

@@ -53,7 +53,7 @@ dask ``LocalCluster`` of ``--n-workers`` processes, each epoch logging to
 ``logs/{epoch_id}_carey.log`` under the working directory.
 
 Usage:
-    python scripts/decoding/run_carey_detection.py --animal chimi --date 20200225 \\
+    python scripts/detection/run_carey_detection.py --animal chimi --date 20200225 \\
         --epoch 02_r1 --n-workers 1
 """
 
@@ -133,7 +133,7 @@ from continuum_swr_replay.runs.io import (
 from continuum_swr_replay.runs.provenance import provenance_record
 
 OUTPUT_ROOT = DETECTION_COMPARISON_DIR / "carey"
-PRODUCED_BY = "scripts/decoding/run_carey_detection.py"
+PRODUCED_BY = "scripts/detection/run_carey_detection.py"
 DESIGN_SPEC = "docs/design/replay_detection_comparison/03-inventory-comparison.md"
 
 DECODE_ROOT = PROCESSED_DATA_DIR

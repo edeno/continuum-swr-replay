@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import scripts.qa.report_event_features as report
+import scripts.detection.report_event_features as report
 from continuum_swr_replay.analysis.hippocampus.detection_inputs import (
     memoryless_output_paths as memoryless_outputs,
 )
@@ -28,8 +28,8 @@ from continuum_swr_replay.analysis.inventory_comparison.selection import (
     REJECTION_DTYPES,
 )
 from continuum_swr_replay.tables.io import write_table
-from scripts.qa import run_event_features as features_runner
-from scripts.qa import run_inventory_comparison as comparison
+from scripts.detection import run_event_features as features_runner
+from scripts.detection import run_inventory_comparison as comparison
 
 DAY = 20200101
 DETECTORS = ("kay", "state_space", "memoryless", "memoryless_criteria")
@@ -973,7 +973,7 @@ def test_every_feature_group_names_columns_of_the_features_table():
 
 
 def test_the_distribution_reads_the_inventory_reports_quantiles():
-    from scripts.qa import report_inventory_comparison as inventory_report
+    from scripts.detection import report_inventory_comparison as inventory_report
 
     rng = np.random.default_rng(0)
     frame = pd.DataFrame(

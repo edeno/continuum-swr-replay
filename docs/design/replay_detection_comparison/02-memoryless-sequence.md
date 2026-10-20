@@ -3,7 +3,7 @@
 *Design spec, now implemented; not yet run on recorded data. `config.py`, `statistics.py`,
 `detect.py`, `likelihood.py`, `simulation.py`, `scoring.py`, `shuffle.py`,
 `event_table.py` and `epoch.py` exist and are tested, and
-`scripts/decoding/run_memoryless_detection.py` runs them per recorded epoch. The decodes
+`scripts/detection/run_memoryless_detection.py` runs them per recorded epoch. The decodes
 are not on the development machine, so the real-data pilot is the next step. The
 comparison between inventories lives in `analysis/inventory_comparison/`
 ([03](03-inventory-comparison.md)). The sections on what the port does on simulated
@@ -426,7 +426,7 @@ measurement, and worth checking on real data:
 
 ### Parameter sweep over injected replays
 
-`scripts/qa/sweep_memoryless_detection.py` writes made-up replays into the
+`scripts/detection/sweep_memoryless_detection.py` writes made-up replays into the
 spike trains of the simulated recording, one at a time, each with a path
 length, duration, firing rate and distance from the animal's own place that we
 choose. Because the right answer is known, what each detector reports can be
@@ -668,7 +668,7 @@ answers were the same either way.
 
 ### Activity that is not one clean replay
 
-`scripts/qa/sweep_memoryless_controls.py` runs both detectors, through the sweep's own
+`scripts/detection/sweep_memoryless_controls.py` runs both detectors, through the sweep's own
 run steps, on activity designed in
 [memoryless_simulation_controls.md](memoryless_simulation_controls.md); every number is
 in `detection_controls_summary.csv`. Our detector is read two ways: its non-local events
@@ -713,7 +713,7 @@ continuous state alone.
 
 ### Held-out evidence on simulated data
 
-`scripts/qa/sweep_memoryless_heldout.py` tries the held-out test of spec 05 where the
+`scripts/detection/sweep_memoryless_heldout.py` tries the held-out test of spec 05 where the
 truth is known: both detectors run on discovery cells alone, in three folds (two
 interleaved with the roles swapped, one whose evaluation cells cover half the track),
 over every injected replay and controls trial, and every event is scored on the
@@ -788,7 +788,7 @@ parameter choice.
 ### Summary: what the port misses, and what it over-calls
 
 *measured* means a script or test in this repository produces the number:
-`scripts/qa/sweep_memoryless_detection.py` and its summary CSV, or one of the
+`scripts/detection/sweep_memoryless_detection.py` and its summary CSV, or one of the
 `test_memoryless_*` files. *from the criteria* means it follows from the
 thresholds and is not demonstrated. Rows marked *measured elsewhere* were run
 during this work but by scratch scripts that were not kept, so they cannot be
@@ -930,7 +930,7 @@ The comparison itself (interval-pair table, event summaries, selection diagnosti
 per-session and per-animal comparisons) belongs to [03](03-inventory-comparison.md) and
 is not part of this subpackage.
 
-`scripts/decoding/run_memoryless_detection.py` is the per-epoch runner: it reads each
+`scripts/detection/run_memoryless_detection.py` is the per-epoch runner: it reads each
 epoch's saved decode, calls `run_epoch`, and writes the tables and a run manifest.
 
 **Spike marks.** The runner reads them through the project's loader, with the two
@@ -958,7 +958,7 @@ writes `manifest.json`, after each epoch finishes, and each epoch logs to
 run on. A device list is refused when `dask_cuda` is not importable. The full run:
 
 ```bash
-uv run python scripts/decoding/run_memoryless_detection.py --run-seed 20260922 \
+uv run python scripts/detection/run_memoryless_detection.py --run-seed 20260922 \
     --all --cuda_visible_devices <cards>
 ```
 
@@ -1149,7 +1149,7 @@ not additional acceptance criteria.
 ## Failure behavior
 
 No silent fallbacks. Missing `detector.pkl` or a missing `("", 0)` encoding key raises,
-following `scripts/qa/analyze_event_spike_evidence.py`. An epoch with no eligible
+following `scripts/detection/analyze_event_spike_evidence.py`. An epoch with no eligible
 immobility returns an empty frame with correct columns **and explicit dtypes** —
 `build_classified_nonlocal_event_table`'s empty return is all-object, and concatenating
 such frames across epochs silently yields object columns; the memoryless table must not

@@ -3,7 +3,7 @@
 **Status (2026-10-09):** the project lead chose this design on 2026-10-09: one mask for every
 stage, thresholds placed by one rule, and no post-step second. Implemented in
 `src/continuum_swr_replay/analysis/hippocampus/artifacts/` and
-`scripts/decoding/run_artifact_detection.py` (Task 16 of the full pipeline refresh,
+`scripts/detection/run_artifact_detection.py` (Task 16 of the full pipeline refresh,
 [2026-10-03-full-pipeline-refresh-design.md](2026-10-03-full-pipeline-refresh-design.md)).
 The SWR runner, MUA detection and both HPC decoders use the mask (Task 17a), and so does the
 Widloski runner (Task 17b: the mask's bins are missing in its likelihood). Task 18
@@ -317,7 +317,7 @@ From C2 §1a (versions as fetched 2026-10-09) and the literature review:
   - the cores file (`CORE_COLUMNS`: `kind`, `signatures`, `core_start`, `core_end`, `spec_max`,
     `n_windows`, `ref_j5_max`, `ca1_frac_max`, `spk_frac_max`, `spk_ood_max`) and the manifest;
   - `read_epoch_cores` checks the manifest's run id, the epoch's status and the file's sha256.
-- **The runner, `scripts/decoding/run_artifact_detection.py`:** CPU only.
+- **The runner, `scripts/detection/run_artifact_detection.py`:** CPU only.
   - Epochs come from the register (`--include-pending`, `--pending-only`).
   - It writes `Processed-Data/artifact_intervals/<run_id>/{epoch_id}_artifact_intervals.parquet`
     (empty for a clean epoch) and `manifest.json`.

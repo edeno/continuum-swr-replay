@@ -17,7 +17,7 @@ Two inputs. The Figure 1 simulation of
 step, so a disagreement can be placed: the posterior, each window's center,
 spread and gates, the candidate sequences, their duration, dispersion and
 replay verdict, and the p-values. Every cell of
-``scripts/qa/sweep_memoryless_detection.py`` is then run through both, and
+``scripts/detection/sweep_memoryless_detection.py`` is then run through both, and
 the candidates and verdicts are totalled, for the acceptance decisions on
 thousands of candidates rather than a handful. Neither is scored against the
 injected replay: the question is whether the port decides as the reference
@@ -71,20 +71,17 @@ from continuum_swr_replay.paths import DETECTION_COMPARISON_DIR
 from continuum_swr_replay.tables.io import write_table
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from scripts.detection import sweep_memoryless_detection as sweep  # noqa: E402
 from scripts.figures.generate_memoryless_comparison import (  # noqa: E402
     SHUFFLE_RUN_SEED,
     simulate_and_decode,
 )
 from scripts.qa import memoryless_reference as reference  # noqa: E402
-from scripts.qa import sweep_memoryless_detection as sweep  # noqa: E402
 
 SUMMARY_PATH = Path(
     "docs/design/replay_detection_comparison/reference_check_summary.csv"
 )
-OUT_PATH = (
-    DETECTION_COMPARISON_DIR
-    / "memoryless_reference_check.parquet"
-)
+OUT_PATH = DETECTION_COMPARISON_DIR / "memoryless_reference_check.parquet"
 FIGURE_SEED = ShuffleSeed(run=SHUFFLE_RUN_SEED, session="figure-one-simulation")
 """The figure's seed, so both procedures see the same cell permutations."""
 

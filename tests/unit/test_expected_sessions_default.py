@@ -57,7 +57,7 @@ SCRIPTS: dict[str, tuple[str, list[str]]] = {
         ["--replay-root", "replay", "--contfrag-root", "contfrag", "--output", "out"],
     ),
 }
-"""Script (under ``scripts/decoding``) -> the function its ``main`` hands
+"""Script (under ``scripts/tables``) -> the function its ``main`` hands
 ``expected_sessions`` to, and the arguments it requires."""
 
 
@@ -81,8 +81,8 @@ def test_the_default_expected_sessions_is_the_registers_analysed_count(
         register, index=False
     )
     monkeypatch.setattr(epoch_register, "REGISTER_PATH", register)
-    monkeypatch.syspath_prepend(str(REPO / "scripts" / "decoding"))
-    module = importlib.import_module(f"scripts.decoding.{script}")
+    monkeypatch.syspath_prepend(str(REPO / "scripts" / "tables"))
+    module = importlib.import_module(f"scripts.tables.{script}")
     function, argv = SCRIPTS[script]
     seen: dict[str, object] = {}
 
@@ -102,8 +102,8 @@ def test_the_default_expected_sessions_is_the_registers_analysed_count(
 @pytest.mark.parametrize("script", list(SCRIPTS))
 def test_the_help_says_the_default_is_the_hpc_cohort(script, monkeypatch, capsys):
     """For ``--brain-area mPFC`` or ``OFC`` the default is not the area's count."""
-    monkeypatch.syspath_prepend(str(REPO / "scripts" / "decoding"))
-    module = importlib.import_module(f"scripts.decoding.{script}")
+    monkeypatch.syspath_prepend(str(REPO / "scripts" / "tables"))
+    module = importlib.import_module(f"scripts.tables.{script}")
     monkeypatch.setattr(sys, "argv", [script, "--help"])
 
     with pytest.raises(SystemExit):

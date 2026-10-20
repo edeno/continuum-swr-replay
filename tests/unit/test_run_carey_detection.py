@@ -23,14 +23,14 @@ from dask.distributed import LocalCluster
 from ripple_detection import filter_ripple_band
 from ripple_detection.simulate import simulate_session, simulate_time
 
-import scripts.decoding.run_carey_detection as runner
+import scripts.detection.run_carey_detection as runner
 from continuum_swr_replay.analysis.events import swr_inventory
 from continuum_swr_replay.analysis.hippocampus.swr_inventories import CAREY_SETTINGS
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.runs.io import array_sha256, sha256_file
 from continuum_swr_replay.tables.io import read_table
-from scripts.decoding.run_carey_detection import main, run_epoch
-from scripts.decoding.run_swr_detection import epoch_id
+from scripts.detection.run_carey_detection import main, run_epoch
+from scripts.detection.run_swr_detection import epoch_id
 from tests.unit._swr_inventory_fixtures import write_artifact_run
 
 FS = 1000.0

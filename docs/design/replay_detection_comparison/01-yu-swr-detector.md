@@ -3,7 +3,7 @@
 *Design spec. Status (2026-10-03): revised after review. Package side implemented
 (`ripple_detection` at commit 659cc91 and later: `Yu_ripple_detector`; the project pins
 `68e1784`). The project-side inventory is computed directly from the package (§Producing
-the inventory, direct path) by `scripts/decoding/run_swr_detection.py`, which runs all four
+the inventory, direct path) by `scripts/detection/run_swr_detection.py`, which runs all four
 SWR detectors on shared inputs; it is implemented and tested offline, not yet run on
 recorded data. The Spyglass steps are deferred to the end.*
 *Governing rule and cross-cutting decisions: [overview.md](overview.md).*
@@ -264,7 +264,7 @@ parameters, and the Spyglass path is accepted only if it reproduces the direct i
 
 ### Direct path (now)
 
-`scripts/decoding/run_swr_detection.py` produces this path for all four SWR detectors at
+`scripts/detection/run_swr_detection.py` produces this path for all four SWR detectors at
 once (Kay, Karlsson, Yu and Zugaro) on shared inputs, as Stage 3 of the refresh design
 ([2026-10-03-full-pipeline-refresh-design.md](../2026-10-03-full-pipeline-refresh-design.md))
 specifies. It is implemented and tested offline, not yet run on recorded data.

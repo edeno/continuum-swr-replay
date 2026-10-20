@@ -21,7 +21,7 @@ Reported per session:
 
 Usage::
 
-    uv run python scripts/qa/diagnose_pfc_event_definition.py \\
+    uv run python scripts/pfc/diagnose_pfc_event_definition.py \\
         --animal wilbur --date 20210329 --epoch 02_r1
 """
 

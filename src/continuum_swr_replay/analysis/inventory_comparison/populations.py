@@ -1,6 +1,6 @@
 """The populations of compared events, from the comparison's stored tables.
 
-The comparison runner (``scripts/qa/run_inventory_comparison.py``) stores each
+The comparison runner (``scripts/detection/run_inventory_comparison.py``) stores each
 epoch's observations, set-aside events, inventory, pairs, directional
 agreement and cells, but not the per-event memberships. :func:`rebuild_matches`
 recomputes them (``event_matches``) from the stored tables, and refuses an

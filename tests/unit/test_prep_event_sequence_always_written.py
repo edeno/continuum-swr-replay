@@ -43,7 +43,7 @@ from continuum_swr_replay.tables.io import read_table, write_table
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 # The build lives in the package; its command line is
-# scripts/decoding/prepare_replay_content_data.py.
+# scripts/tables/prepare_replay_content_data.py.
 PREPARE_DATA = REPO_ROOT / "src/continuum_swr_replay/analysis/replay/prepare_data.py"
 
 

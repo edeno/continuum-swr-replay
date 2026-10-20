@@ -256,7 +256,7 @@ def read_table(path: str | Path, columns: list[str] | None = None) -> pd.DataFra
             raise FileNotFoundError(
                 f"no table at {parquet} or {pickle} -- was it built? "
                 "The canonical tables are produced by "
-                "scripts/decoding/prepare_replay_content_data.py"
+                "scripts/tables/prepare_replay_content_data.py"
             )
         frame = pd.read_pickle(pickle)
         return frame if columns is None else frame[columns]
