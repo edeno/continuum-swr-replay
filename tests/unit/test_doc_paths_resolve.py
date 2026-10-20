@@ -22,8 +22,7 @@ A path written with a placeholder (``scripts/qa/<name>.py``) or a glob
 ``(removed in <commit>)`` right after it, and is not checked.
 
 Historical records are not checked: implementation plans
-(``.claude/docs/plans/``, and ``plans/``, where the April 2026 plans were kept
-before that home existed), review and audit reports (``.claude/docs/reviews/``)
+(``.claude/docs/plans/``), review and audit reports (``.claude/docs/reviews/``)
 and the known-issues log (``docs/known_issues/``) describe the tree as it was
 when they were written.
 
@@ -48,9 +47,6 @@ assert (SRC / PACKAGE / "__init__.py").is_file(), f"package not found under {SRC
 #: Tracked docs under these prefixes are historical and not checked.
 HISTORICAL_PREFIXES = (
     ".claude/docs/plans/",
-    # Implementation plans from April 2026, kept here before .claude/docs/plans/
-    # existed; the same doc type, and as historical.
-    "plans/",
     ".claude/docs/reviews/",
     "docs/known_issues/",
 )
