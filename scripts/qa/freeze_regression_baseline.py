@@ -19,11 +19,13 @@ import argparse
 import json
 import logging
 import shutil
-import sys
 from pathlib import Path
 
 import pyarrow.parquet as pq
 
+from continuum_swr_replay.analysis.replay.fit_outputs import (
+    belief_chain_output_subdir,
+)
 from continuum_swr_replay.paths import (
     CANONICAL_TABLE_BASENAMES,
     MODEL_SUBDIRS,
@@ -31,16 +33,6 @@ from continuum_swr_replay.paths import (
     table_path,
 )
 from continuum_swr_replay.runs.io import sha256_file
-
-# Sibling-script import: the leaf bundle's name is derived from the fitting
-# runner's own helper rather than spelled out here, so the freeze cannot go on
-# skipping a ladder whose directory name changed. Run as a script, only this
-# file's directory is on sys.path.
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
-from scripts.content.fit_replay_content_models import (  # noqa: E402
-    belief_chain_output_subdir,
-)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)

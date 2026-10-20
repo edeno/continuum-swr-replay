@@ -37,7 +37,11 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
+import pandas as pd
+
 from continuum_swr_replay.data_loaders.constants import N_LEAF_ARMS
+
+from .content_response import renormalize_fraction_over_candidates
 
 # Shared with the covariate builders, which must not import this module: see
 # ``design_constants`` for why the numbers live there and not here. Re-exported
@@ -1471,6 +1475,109 @@ def leaf_only_predictors(predictors) -> list[str]:
     """Drop the arm fixed effects that are structurally zero on a leaf-only fit."""
     dropped = set(ARM_FE_PREDICTORS) - set(LEAF_ONLY_ARM_FE_PREDICTORS)
     return [p for p in predictors if p not in dropped]
+
+
+def rung_predictors(spec: ModelSpec, leaf_only: bool) -> list[str]:
+    """Predictors one rung is fitted with, under the run's candidate set.
+
+    On a leaf-only fit the arm dummies for arms 5-7 are identically zero (arm 5
+    becomes the reference and the two trunk dummies have no rows left), so the
+    design is rank-deficient unless they are dropped.
+
+    Parameters
+    ----------
+    spec : ModelSpec
+        The rung's specification.
+    leaf_only : bool
+        Whether the fit conditions on the six leaf arms.
+
+    Returns
+    -------
+    list[str]
+        Column names for this rung's design matrix.
+    """
+    predictors = list(spec.predictors)
+    return leaf_only_predictors(predictors) if leaf_only else predictors
+
+
+def restrict_to_leaf_arms(long_df: pd.DataFrame) -> pd.DataFrame:
+    """Keep only the six leaf-arm candidate rows of every event.
+
+    The trunk rows are dropped, not folded into the leaves: each retained row
+    keeps the allocation it had over the nine candidates, so an event whose
+    replay ran along a trunk contributes correspondingly less mass to the
+    conditional likelihood.
+
+    Parameters
+    ----------
+    long_df : pd.DataFrame
+        Long-format event × candidate-arm frame carrying ``candidate_arm``.
+
+    Returns
+    -------
+    pd.DataFrame
+        The leaf-arm rows, with a fresh index.
+
+    Raises
+    ------
+    ValueError
+        If ``candidate_arm`` is absent.
+    """
+    if "candidate_arm" not in long_df.columns:
+        raise ValueError(
+            "A leaf-only fit needs the candidate_arm column to identify the leaf "
+            f"rows; columns are {list(long_df.columns)}."
+        )
+    leaves = long_df["candidate_arm"] < LEAF_ONLY_N_CATEGORIES
+    return long_df.loc[leaves].reset_index(drop=True)
+
+
+def leaf_only_cohort(
+    long_df: pd.DataFrame,
+    *,
+    response_col: str,
+    response: str,
+    event_col: str = "event_id",
+) -> tuple[pd.DataFrame, bool]:
+    """Restrict a cohort to the leaf arms and put its response on that support.
+
+    A fraction is a share of the event's whole nine-arm mass, and the
+    conditional likelihood weights an event by the total it carries, so keeping
+    the persisted fractions after dropping the trunk rows would weight an event
+    by its leaf share. That share is not balanced across the comparisons these
+    ladders exist for -- SWR events put a substantially larger part of their
+    bins on the trunks than non-SWR events do -- so it is rescaled to unit mass
+    over the six leaves. A count response is left alone: weighting an event by
+    its number of decoded timebins is what the count response means.
+
+    Parameters
+    ----------
+    long_df : pd.DataFrame
+        Long-format event x candidate-arm cohort, all nine arms.
+    response_col : str
+        The resolved response column.
+    response : str
+        The ``--response`` value the column came from, one of
+        :data:`~continuum_swr_replay.analysis.replay.content_response.RESPONSE_CHOICES`.
+    event_col : str, optional
+        Event grouping key.
+
+    Returns
+    -------
+    pd.DataFrame
+        The leaf-arm rows, with the response rescaled when it is a fraction.
+    bool
+        Whether the response was rescaled, for the fit rows and the provenance.
+    """
+    leaves = restrict_to_leaf_arms(long_df)
+    if response != "fraction":
+        return leaves, False
+    return (
+        renormalize_fraction_over_candidates(
+            leaves, response_col=response_col, event_col=event_col
+        ),
+        True,
+    )
 
 
 DESCRIPTIVE_CONTENT_RUNGS = frozenset(

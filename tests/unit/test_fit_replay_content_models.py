@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.replay import fit_outputs, model_specs
 from continuum_swr_replay.analysis.replay.cohort_audit import event_drop_buckets
 from continuum_swr_replay.analysis.replay.fit_provenance import (
     check_fit_provenance,
@@ -137,7 +138,7 @@ def test_subset_may_not_target_another_configurations_canonical_bundle() -> None
 
 
 def test_canonical_bundle_names_cover_every_suffix_variant() -> None:
-    names = mod.canonical_output_subdirs()
+    names = fit_outputs.canonical_output_subdirs()
     assert {"models", "models_patch"} <= names
     assert {"models_swr_T", "models_patch_swr_F"} <= names
     assert {"models_event_grain", "models_swr_T_event_grain"} <= names
@@ -346,17 +347,17 @@ def test_undecoded_events_are_reported_as_zero_response_drops() -> None:
 def test_hard_count_runs_publish_to_their_own_bundle() -> None:
     config = mod._resolve_run_config(_args(response="hard_count"))
     assert config.output_dir == CONTENT_IN / "models_hard_count"
-    assert "models_hard_count" in mod.canonical_output_subdirs()
-    assert "models_patch_hard_count" in mod.canonical_output_subdirs()
+    assert "models_hard_count" in fit_outputs.canonical_output_subdirs()
+    assert "models_patch_hard_count" in fit_outputs.canonical_output_subdirs()
 
 
 def test_fraction_runs_keep_the_unsuffixed_canonical_bundle() -> None:
     assert (
-        mod.canonical_output_subdir("non_local", "HPC", "arm", "all", "timebin")
+        fit_outputs.canonical_output_subdir("non_local", "HPC", "arm", "all", "timebin")
         == "models"
     )
     assert (
-        mod.canonical_output_subdir(
+        fit_outputs.canonical_output_subdir(
             "non_local", "HPC", "arm", "all", "timebin", "fraction"
         )
         == "models"
@@ -511,8 +512,8 @@ def test_logit_run_headline_is_also_event_scale() -> None:
 
 
 def test_scale_label_refuses_to_claim_a_scale_it_does_not_know() -> None:
-    assert mod.scale_label(None) == "unlabelled scale"
-    assert mod.scale_label("some_new_estimator") == "unlabelled scale"
+    assert fit_outputs.scale_label(None) == "unlabelled scale"
+    assert fit_outputs.scale_label("some_new_estimator") == "unlabelled scale"
 
 
 # ── Provenance ──
@@ -575,9 +576,9 @@ def test_leaf_only_run_publishes_to_its_own_bundle() -> None:
     """A six-arm fit is a different likelihood, so it gets a different bundle."""
     config = mod._resolve_run_config(_args(leaf_only=True))
     assert config.output_dir == CONTENT_IN / "models_leaf"
-    assert "models_leaf" in mod.canonical_output_subdirs()
-    assert "models_swr_T_leaf" in mod.canonical_output_subdirs()
-    assert "models_hard_count_leaf" in mod.canonical_output_subdirs()
+    assert "models_leaf" in fit_outputs.canonical_output_subdirs()
+    assert "models_swr_T_leaf" in fit_outputs.canonical_output_subdirs()
+    assert "models_hard_count_leaf" in fit_outputs.canonical_output_subdirs()
 
 
 def test_leaf_only_fits_six_candidates_not_nine() -> None:
@@ -589,7 +590,7 @@ def test_leaf_only_fits_six_candidates_not_nine() -> None:
 def test_leaf_only_drops_the_trunk_arm_fixed_effects_from_every_rung() -> None:
     """Arms 6 and 7 are identically zero on leaves; the ladder must not carry them."""
     for name, spec in mod.MODEL_HIERARCHY.items():
-        predictors = mod.rung_predictors(spec, leaf_only=True)
+        predictors = model_specs.rung_predictors(spec, leaf_only=True)
         assert "is_candidate_arm_5" not in predictors, name
         assert "is_candidate_arm_6" not in predictors, name
         assert "is_candidate_arm_7" not in predictors, name
@@ -604,15 +605,17 @@ def test_leaf_only_drops_the_trunk_arm_fixed_effects_from_every_rung() -> None:
                 "is_candidate_arm_7",
             }
         ], name
-        assert mod.rung_predictors(spec, leaf_only=False) == list(spec.predictors)
+        assert model_specs.rung_predictors(spec, leaf_only=False) == list(
+            spec.predictors
+        )
 
-    arm_fe = mod.rung_predictors(mod.MODEL_HIERARCHY["M0a"], leaf_only=True)
+    arm_fe = model_specs.rung_predictors(mod.MODEL_HIERARCHY["M0a"], leaf_only=True)
     assert arm_fe == [f"is_candidate_arm_{i}" for i in range(5)]
 
 
 def test_leaf_only_cohort_keeps_the_six_leaf_rows_of_every_event() -> None:
     table = _canonical_arm_table(n_events=3)
-    leaves = mod.restrict_to_leaf_arms(table)
+    leaves = model_specs.restrict_to_leaf_arms(table)
 
     assert sorted(leaves["candidate_arm"].unique()) == [0, 1, 2, 3, 4, 5]
     assert leaves.groupby("event_id").size().eq(6).all()
@@ -627,7 +630,7 @@ def test_leaf_only_cohort_keeps_the_six_leaf_rows_of_every_event() -> None:
 
 def test_leaf_only_cohort_needs_the_candidate_arm_column() -> None:
     with pytest.raises(ValueError, match="candidate_arm"):
-        mod.restrict_to_leaf_arms(
+        model_specs.restrict_to_leaf_arms(
             _canonical_arm_table().drop(columns=["candidate_arm"])
         )
 
@@ -637,7 +640,7 @@ def test_leaf_only_is_refused_on_the_patch_hierarchy() -> None:
     with pytest.raises(ValueError, match="--leaf-only"):
         mod._resolve_run_config(_args(hierarchy="patch", leaf_only=True))
     with pytest.raises(ValueError, match="leaf"):
-        mod.canonical_output_subdir(
+        fit_outputs.canonical_output_subdir(
             "non_local", "HPC", "patch", "all", "timebin", "fraction", leaf_only=True
         )
 
@@ -707,7 +710,7 @@ def _table_with_trunk_mass(trunk_only_event: str | None = None) -> pd.DataFrame:
 def test_leaf_fractions_are_rescaled_to_unit_mass_per_event() -> None:
     """Without this an event's weight is its leaf share, not one observation."""
     table = _table_with_trunk_mass()
-    leaves, renormalized = mod.leaf_only_cohort(
+    leaves, renormalized = model_specs.leaf_only_cohort(
         table, response_col="arm_fraction", response="fraction"
     )
 
@@ -724,7 +727,7 @@ def test_leaf_fractions_are_rescaled_to_unit_mass_per_event() -> None:
 
 def test_leaf_only_count_response_keeps_its_timebin_counts() -> None:
     table = _table_with_trunk_mass()
-    leaves, renormalized = mod.leaf_only_cohort(
+    leaves, renormalized = model_specs.leaf_only_cohort(
         table, response_col="arm_count_hard", response="hard_count"
     )
 
@@ -736,7 +739,7 @@ def test_leaf_only_count_response_keeps_its_timebin_counts() -> None:
 
 def test_event_with_only_trunk_mass_becomes_a_zero_response_drop() -> None:
     """It has no leaf allocation to fit, and the audit must say so."""
-    leaves, _renormalized = mod.leaf_only_cohort(
+    leaves, _renormalized = model_specs.leaf_only_cohort(
         _table_with_trunk_mass(trunk_only_event="e1"),
         response_col="arm_fraction",
         response="fraction",
@@ -769,7 +772,9 @@ def test_partially_defined_event_has_no_total_to_rescale_by() -> None:
     ] = np.nan
 
     with pytest.raises(ValueError, match="not summing to 1.0"):
-        mod.leaf_only_cohort(table, response_col="arm_fraction", response="fraction")
+        model_specs.leaf_only_cohort(
+            table, response_col="arm_fraction", response="fraction"
+        )
 
 
 def test_renormalized_leaf_bundles_say_so_in_their_provenance(tmp_path) -> None:
@@ -798,7 +803,7 @@ def test_renormalized_leaf_bundles_say_so_in_their_provenance(tmp_path) -> None:
 def test_leaf_only_ladder_fits_six_categories_on_the_rescaled_response() -> None:
     """End to end on simulated data: six-category null, and the rows say so."""
     sim = _simulated_session("arm_fraction").rename(columns={"arm_id": "candidate_arm"})
-    long_df, renormalized = mod.leaf_only_cohort(
+    long_df, renormalized = model_specs.leaf_only_cohort(
         sim, response_col="arm_fraction", response="fraction"
     )
     complete = long_df.groupby("event_id")["arm_fraction"].transform(
@@ -842,7 +847,7 @@ def test_leaf_only_ladder_fits_six_categories_on_the_rescaled_response() -> None
 def test_dm_bundle_is_suffixed_last_and_named_in_the_canonical_set() -> None:
     """The overdispersed ladder never publishes over the conditional bundle."""
     assert (
-        mod.canonical_output_subdir(
+        fit_outputs.canonical_output_subdir(
             "non_local",
             "HPC",
             "arm",
@@ -857,7 +862,7 @@ def test_dm_bundle_is_suffixed_last_and_named_in_the_canonical_set() -> None:
     # ``_dm`` is appended after every other suffix, so stripping it names the
     # conditional bundle this fit is the counterpart of.
     assert (
-        mod.canonical_output_subdir(
+        fit_outputs.canonical_output_subdir(
             "non_local",
             "HPC",
             "arm",
@@ -869,7 +874,7 @@ def test_dm_bundle_is_suffixed_last_and_named_in_the_canonical_set() -> None:
         )
         == "models_swr_T_leaf_dm"
     )
-    subdirs = mod.canonical_output_subdirs()
+    subdirs = fit_outputs.canonical_output_subdirs()
     assert {"models", "models_hard_count", "models_dm", "models_leaf_dm"} <= subdirs
     assert "models_patch_dm" in subdirs
     # The count response is the estimator's own, so it is not named twice.
@@ -907,7 +912,10 @@ def test_dm_parser_defaults() -> None:
 
 
 def test_dm_numbers_are_labelled_a_full_event_likelihood() -> None:
-    assert mod.scale_label("dirichlet_multinomial") == "event-scale (full likelihood)"
+    assert (
+        fit_outputs.scale_label("dirichlet_multinomial")
+        == "event-scale (full likelihood)"
+    )
 
 
 def _dm_session(

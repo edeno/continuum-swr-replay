@@ -22,7 +22,7 @@ from types import ModuleType
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.replay import fit_provenance
+from continuum_swr_replay.analysis.replay import fit_outputs, fit_provenance
 from continuum_swr_replay.analysis.replay.fit_provenance import (
     check_fit_provenance,
     fit_provenance_path,
@@ -608,7 +608,11 @@ def test_content_ladder_readers_gate_the_canonical_bundle():
     bundle = (
         fitter.PROCESSED_DATA_DIR
         / "replay_content"
-        / (fitter.canonical_output_subdir("non_local", "HPC", "arm", "all", "timebin"))
+        / (
+            fit_outputs.canonical_output_subdir(
+                "non_local", "HPC", "arm", "all", "timebin"
+            )
+        )
     )
 
     assert figures.MODEL_DIR == bundle
@@ -625,7 +629,7 @@ def test_uncertainty_reader_defaults_to_the_bundle_the_belief_chain_writes():
     fitter = _load_script(CONTENT / "fit_replay_content_models.py")
     uncertainty = _load_script(CONTENT / "analyze_uncertainty_content.py")
     runner_args = fitter._build_arg_parser().parse_args(
-        ["--leaf-only", "--models", ",".join(fitter.BELIEF_CHAIN_MODEL_NAMES)]
+        ["--leaf-only", "--models", ",".join(fit_outputs.BELIEF_CHAIN_MODEL_NAMES)]
     )
     expected = fitter._resolve_run_config(runner_args).output_dir
 

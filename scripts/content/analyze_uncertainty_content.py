@@ -18,13 +18,15 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
+from continuum_swr_replay.analysis.replay.fit_outputs import (
+    belief_chain_output_subdir,
+)
 from continuum_swr_replay.analysis.replay.fit_provenance import (
     require_fresh_inputs,
 )
@@ -45,15 +47,6 @@ from continuum_swr_replay.tables.io import read_table, table_exists
 from continuum_swr_replay.tables.standardization import (
     assert_standardized_matches_reference,
     load_reference,
-)
-
-# Sibling-script import: the Mu bundle name is derived from the fitting runner's
-# own helpers, so this reader cannot drift from where the belief chain publishes
-# Mu.pkl. Run as a script, only this file's directory is on sys.path.
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
-from scripts.content.fit_replay_content_models import (  # noqa: E402
-    belief_chain_output_subdir,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -189,7 +182,9 @@ def _select_example_session(trial_leaf: pd.DataFrame) -> dict[str, str]:
         n_events=("n_events", "sum"),
     )
     uncertainty_range = (
-        trial_leaf.groupby(["session_id", "candidate_arm"], observed=True)["reward_belief_variance_candidate_arm_preoutcome"]
+        trial_leaf.groupby(["session_id", "candidate_arm"], observed=True)[
+            "reward_belief_variance_candidate_arm_preoutcome"
+        ]
         .agg(lambda x: x.max() - x.min())
         .groupby("session_id")
         .median()
@@ -522,9 +517,7 @@ def main() -> None:
     horserace.to_csv(
         args.output_dir / "horserace_session_coefficients.csv", index=False
     )
-    horserace_summary.to_csv(
-        args.output_dir / "horserace_summary.csv", index=False
-    )
+    horserace_summary.to_csv(args.output_dir / "horserace_summary.csv", index=False)
     (args.output_dir / "cohort_audit.json").write_text(
         json.dumps(audit, indent=2, sort_keys=True)
     )

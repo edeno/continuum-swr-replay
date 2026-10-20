@@ -346,7 +346,7 @@ _No module-level public symbols._
 
 Model definitions for replay content analysis.
 
-`ModelSpec`, `default_content_model_names`, `PerBinRateModelSpec`, `longest_history_window_s`, `leaf_only_predictors`
+`ModelSpec`, `default_content_model_names`, `PerBinRateModelSpec`, `longest_history_window_s`, `leaf_only_predictors`, `rung_predictors`, `restrict_to_leaf_arms`, `leaf_only_cohort`
 
 ## Fitters
 
@@ -462,7 +462,7 @@ Run the replay-content analysis suite on one event source and save fits.
 
 Fit the replay content model hierarchy (M0-M6) on pre-computed data.
 
-`resolve_contfrag_paths`, `canonical_output_subdir`, `canonical_output_subdirs`, `partial_ladder_subdir`, `belief_chain_output_subdir`, `fit_n_categories`, `rung_predictors`, `restrict_to_leaf_arms`, `leaf_only_cohort`, `content_fit_inputs`, `prepare_canonical_fit_request`, `fit_model_per_session`, `scale_label`, `print_model_results`, `format_comparison_table`, `run_content_fit`, `main`
+`fit_n_categories`, `content_fit_inputs`, `prepare_canonical_fit_request`, `fit_model_per_session`, `print_model_results`, `format_comparison_table`, `run_content_fit`, `main`
 
 ### `scripts/content/fit_swr_contrast_content.py`
 
@@ -915,6 +915,12 @@ Per-tetrode likelihood terms, and the encodings and decode files they come from.
 Speed regimes and the windows scored: bouts, matched windows, calibration windows.
 
 `keyed_rng`, `regimes`, `state_bouts`, `matched_windows`, `calibration_windows`, `build_windows`, `tetrode_halves`, `null_partners`, `window_folds`
+
+### `src/continuum_swr_replay/analysis/replay/fit_outputs.py`
+
+Where content-ladder fits land, and how their numbers are read.
+
+`resolve_contfrag_paths`, `canonical_output_subdir`, `canonical_output_subdirs`, `partial_ladder_subdir`, `belief_chain_output_subdir`, `scale_label`, `frame_estimator`
 
 ### `src/continuum_swr_replay/analysis/replay/fit_provenance.py`
 

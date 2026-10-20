@@ -5,7 +5,8 @@ These tests pin the path-resolution logic so the wiring between
 ``event_arm_table_{source}_{brain_area}.pkl``) and
 ``fit_replay_content_models.py`` (which resolves
 ``--event-source`` + ``--brain-area`` into matching reads + a
-distinct ``models_{source}_{brain_area}/`` output dir) cannot
+distinct ``models_{source}_{brain_area}/`` output dir, through
+``analysis.replay.fit_outputs.resolve_contfrag_paths``) cannot
 silently regress.
 
 The helpers exercised here are pure string formatting; they do not
@@ -19,6 +20,7 @@ from pathlib import Path
 
 import pytest
 
+from continuum_swr_replay.analysis.replay.fit_outputs import resolve_contfrag_paths
 from continuum_swr_replay.analysis.replay.model_specs import (
     default_content_model_names,
 )
@@ -52,9 +54,6 @@ def _load_script_helper(filename: str, attr_name: str):
 _load_script_module = _load_script_helper
 
 
-resolve_contfrag_paths = _load_script_module(
-    "content/fit_replay_content_models.py", "resolve_contfrag_paths"
-)
 contfrag_table_basenames = _load_script_module(
     "decoding/prepare_contfrag_replay_content_data.py", "contfrag_table_basenames"
 )

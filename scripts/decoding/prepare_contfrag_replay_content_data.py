@@ -91,7 +91,7 @@ def contfrag_table_basenames(event_source: str, brain_area: str) -> dict[str, st
     """Return the canonical ContFrag table basenames for one (source, area).
 
     The fitter resolves its inputs through the matching helper
-    ``resolve_contfrag_paths`` in ``fit_replay_content_models.py``;
+    ``resolve_contfrag_paths`` in ``analysis/replay/fit_outputs.py``;
     keeping the format string in one place lets a unit test pin the
     prep ↔ fitter contract.
     """
