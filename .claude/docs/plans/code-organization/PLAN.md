@@ -38,6 +38,7 @@ Status: in progress (branch `code-organization-2026-10-19`, from master 470a393)
   - Compare against `/tmp/claude-39494/-cumulus-edeno-continuum-swr-replay/abb6ddbf-eeb3-43b5-9505-88838c9b5af2/scratchpad/golden_e70ab12/rc` with `compare_table_roots`, at atol=0, for all 7 rebuilt tables.
 - **Moves use `git mv`,** so rename detection keeps history. A move and a behaviour change never share a commit.
 - **Rewrite imports with a script, not by hand.** Each move task keeps its codemod in scratchpad and reports its output. After the codemod, check with grep that the old dotted path appears nowhere in tracked files. Docs and docstrings count as tracked files.
+- **Grep bare references too.** Grep tracked `*.md` and docstrings for bare `<old_module_basename>.` references, such as `swr_source.with_swr_source`. Rewrite those that name the moved module, and list them in the report. Phase-A review I2 found that `test_doc_paths_resolve` cannot see these references.
 - **These paths do not move:**
   - `analysis.hippocampus.memoryless_sequence.config` and `.detect` (pickled, Q5);
   - `analysis.pfc.load_population`, `analysis.replay.model_specs` and `analysis.replay.per_bin_design`, which the lead's untracked WIP `scripts/figures/generate_replay_story_figures.py` imports.
