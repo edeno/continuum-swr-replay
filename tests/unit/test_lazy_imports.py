@@ -61,7 +61,9 @@ _LAZY_IMPORTS: list[str] = [
     "from continuum_swr_replay.analysis.hippocampus.event_analysis import get_event_start_end_times",
     "from continuum_swr_replay.analysis.hippocampus.event_detection import get_confident_times",
     "from continuum_swr_replay.analysis.pfc.load_population import _extract_animal",
-    "from continuum_swr_replay.analysis.pfc.glm import get_spikecount_per_time_bin",
+    "from continuum_swr_replay.analysis.pfc.glm import process_neuron",
+    # The foundation interval algebra and spike binning.
+    "from continuum_swr_replay.intervals import get_spikecount_per_time_bin",
 ]
 
 
@@ -173,6 +175,7 @@ JAX_FREE: list[str] = [
     "continuum_swr_replay.table_parity",
     "continuum_swr_replay.analysis.pfc.cohort",
     "continuum_swr_replay.analysis.replay.model_specs",
+    "continuum_swr_replay.intervals",
 ]
 
 #: Leaf modules that should be JAX-free but are not yet, each with the import
@@ -215,6 +218,36 @@ def test_leaf_modules_do_not_load_jax():
         f"stdout: {result.stdout}\nstderr: {result.stderr}"
     )
     assert "OK" in result.stdout
+
+
+def test_intervals_imports_only_numpy_and_pandas():
+    """The foundation interval module loads no dask (phase-A review M12), no
+    JAX chain, and no other module of this package."""
+    code = textwrap.dedent(
+        """
+        import sys
+        import continuum_swr_replay.intervals
+        heavy = ("dask", "jax", "non_local_detector", "statsmodels", "spyglass")
+        leaked = sorted(
+            m for m in sys.modules
+            if any(m == h or m.startswith(h + ".") for h in heavy)
+        )
+        ours = sorted(
+            m for m in sys.modules
+            if m.startswith("continuum_swr_replay")
+            and m not in ("continuum_swr_replay", "continuum_swr_replay.intervals")
+        )
+        print("LEAKED" if leaked or ours else "OK", leaked[:10], ours[:10])
+        """
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        timeout=180,  # a hang guard, as above
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.startswith("OK"), result.stdout
 
 
 def test_jax_free_lists_are_disjoint():

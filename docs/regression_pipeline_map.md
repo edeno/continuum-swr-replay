@@ -50,7 +50,7 @@ The artifact run folder: one cores file per epoch, and the run's manifest.
 
 The artifact mask: the detector's cores, padded from one table.
 
-`core_class`, `merge_intervals`, `artifact_intervals`, `interval_mask`, `subtract_intervals`, `masked_seconds`, `pad_intervals`, `overlaps_intervals`, `covered_seconds`
+`core_class`, `artifact_intervals`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/data_aggregation.py`
 

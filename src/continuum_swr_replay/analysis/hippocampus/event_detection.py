@@ -149,7 +149,10 @@ def strict_overlap_matrix(
     This is the one definition of "strict overlap" used by every SWR-overlap
     consumer (:func:`get_overlap_times`, :func:`classify_swr_overlap`,
     :func:`classify_swr_overlap_geometry`, :func:`event_strict_overlap_keys`
-    and the classified event table's SWR matcher).
+    and the classified event table's SWR matcher). The closed and open
+    overlap tests are in :mod:`continuum_swr_replay.intervals`
+    (``overlaps_intervals``, ``overlaps_open``), whose docstring tabulates the
+    conventions.
 
     Parameters
     ----------

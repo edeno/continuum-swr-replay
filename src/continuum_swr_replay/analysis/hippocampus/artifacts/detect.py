@@ -73,11 +73,9 @@ from continuum_swr_replay.analysis.hippocampus.artifacts.io import (
     make_cores,
     validate_cores,
 )
-from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
-    artifact_intervals,
-    interval_mask,
-)
+from continuum_swr_replay.analysis.hippocampus.artifacts.masks import artifact_intervals
 from continuum_swr_replay.decoding_common import DecodingConfig
+from continuum_swr_replay.intervals import interval_mask
 
 __all__ = [
     "CONSTANT_NAMES",

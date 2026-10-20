@@ -72,9 +72,6 @@ from continuum_swr_replay.analysis.constants import (  # noqa: E402
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
 from continuum_swr_replay.analysis.hippocampus import swr_source  # noqa: E402
-from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (  # noqa: E402
-    interval_mask,
-)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (  # noqa: E402
     CandidateSequences,
     WindowDecisions,
@@ -100,6 +97,9 @@ from continuum_swr_replay.data_loaders.lfp import get_ripple_band_inputs  # noqa
 from continuum_swr_replay.decode_files import decode_paths  # noqa: E402
 from continuum_swr_replay.decoding_common import parse_run_id  # noqa: E402
 from continuum_swr_replay.figure_utilities import WONG  # noqa: E402
+from continuum_swr_replay.intervals import (  # noqa: E402
+    interval_mask,
+)
 from continuum_swr_replay.parameters import COLORS, FIGURE_DIR  # noqa: E402
 from continuum_swr_replay.table_io import read_table  # noqa: E402
 from continuum_swr_replay.visualization.plots import (  # noqa: E402

@@ -59,7 +59,6 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.hippocampus.artifacts.masks import merge_intervals
 from continuum_swr_replay.analysis.pfc.batched_glm import (
     DEFAULT_NULL_DESIGN_BATCH_SIZE,
     PreparedHeldoutResponse,
@@ -70,11 +69,14 @@ from continuum_swr_replay.analysis.pfc.glm import (
     DEFAULT_MATCHED_CONTROL_ATTEMPTS,
     EVENT_CLASSES,
     MATCHED_CONTROL_SOURCE_CLASS,
-    _contiguous_true_runs,
-    _overlaps_any,
     convolve_event_basis,
     event_onset_counts,
     make_matched_control_times,
+)
+from continuum_swr_replay.intervals import (
+    contiguous_true_runs,
+    merge_intervals,
+    overlaps_open,
 )
 
 #: Smallest Monte Carlo sample used for a reported empirical p-value. Below
@@ -242,7 +244,7 @@ def assign_blocked_folds(
         blocks, or if ``support_radius_bins`` is negative.
     """
     mask = np.asarray(fit_mask, dtype=bool)
-    runs = _contiguous_true_runs(mask)
+    runs = contiguous_true_runs(mask)
     if support_radius_bins < 0:
         raise ValueError(
             f"support_radius_bins must be non-negative, got {support_radius_bins}"
@@ -559,7 +561,7 @@ def overlapping_fraction(
         ``start_time`` / ``end_time`` of the drawn windows.
     starts, ends : NDArray, shape (n_windows,)
         Ascending, non-overlapping bounds to test against: the columns of
-        :func:`~continuum_swr_replay.analysis.hippocampus.artifacts.masks.merge_intervals`.
+        :func:`~continuum_swr_replay.intervals.merge_intervals`.
 
     Returns
     -------
@@ -569,7 +571,7 @@ def overlapping_fraction(
     if not len(windows):
         return float("nan")
     hits = sum(
-        _overlaps_any(float(start), float(end), starts, ends)
+        overlaps_open(float(start), float(end), starts, ends)
         for start, end in zip(
             windows["start_time"].to_numpy(dtype=float),
             windows["end_time"].to_numpy(dtype=float),

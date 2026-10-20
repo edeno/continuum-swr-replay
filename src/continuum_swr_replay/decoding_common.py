@@ -39,12 +39,10 @@ except ImportError:
     HAS_CUDA = False
 
 from continuum_swr_replay.analysis.hippocampus import swr_source
-from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
-    PADDING_S,
-    interval_mask,
-)
+from continuum_swr_replay.analysis.hippocampus.artifacts.masks import PADDING_S
 from continuum_swr_replay.data_loaders.epoch_register import epochs_to_run
 from continuum_swr_replay.decode_files import decode_paths
+from continuum_swr_replay.intervals import interval_mask
 from continuum_swr_replay.parameters import (
     BLOCK_SIZE,
     LOCAL_POSITION_STD,

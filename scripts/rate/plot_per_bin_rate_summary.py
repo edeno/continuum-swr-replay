@@ -24,9 +24,6 @@ from patsy import dmatrix
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (  # noqa: E402
-    covered_seconds,
-)
 from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
     excluded_intervals_by_session,
     require_swr_source,
@@ -52,6 +49,9 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
 from continuum_swr_replay.analysis.replay.per_bin_design import (  # noqa: E402
     reward_kernel_rate_ratios,
     self_history_rate_ratios,
+)
+from continuum_swr_replay.intervals import (  # noqa: E402
+    covered_seconds,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
 from continuum_swr_replay.table_io import read_table

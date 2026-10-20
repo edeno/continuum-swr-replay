@@ -101,10 +101,6 @@ from continuum_swr_replay.analysis.hippocampus.artifacts.io import (
 from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
     artifact_intervals as padded_cores,
 )
-from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
-    interval_mask,
-    subtract_intervals,
-)
 from continuum_swr_replay.analysis.hippocampus.epoch_normalizers import (
     run_speed_baseline,
 )
@@ -125,6 +121,10 @@ from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     validate_whole_event_immobility_contract,
 )
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
+from continuum_swr_replay.intervals import (
+    interval_mask,
+    subtract_intervals,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.session_keys import SESSION_COLUMNS, SESSION_COLUMNS_DAY
 from continuum_swr_replay.table_io import sha256_file

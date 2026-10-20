@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from continuum_swr_replay.analysis.pfc.glm import get_spikecount_per_time_bin
+from continuum_swr_replay.intervals import get_spikecount_per_time_bin
 
 
 class TestPfcSpikeBinningLastBinReachable:
@@ -21,9 +21,7 @@ class TestPfcSpikeBinningLastBinReachable:
         spike_times = np.array([3.0])
         counts = get_spikecount_per_time_bin(spike_times, time)
         assert counts.shape == (4,)
-        assert counts[-1] == 1, (
-            f"expected count 1 in last bin, got {counts.tolist()}"
-        )
+        assert counts[-1] == 1, f"expected count 1 in last bin, got {counts.tolist()}"
 
     def test_two_spikes_split_between_penultimate_and_last(self):
         time = np.array([0.0, 1.0, 2.0, 3.0])

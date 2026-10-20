@@ -375,8 +375,8 @@ def test_load_data_masks_the_mua_of_the_areas_it_is_given(bandit_task, monkeypat
 class TestTheLoadersIntervalRulesAreTheMasks:
     """``data_loaders`` may not import ``analysis``, so the loader keeps its own
     copies of the closed-interval rules. These tie them to the originals:
-    ``artifacts.masks.interval_mask`` for membership, and
-    ``swr_inventories.drop_overlapping_events`` and ``masks.overlaps_intervals``
+    ``intervals.interval_mask`` for membership, and
+    ``swr_inventories.drop_overlapping_events`` and ``intervals.overlaps_intervals``
     (the event overlap of the one eligibility rule) for dropping."""
 
     TIME = np.round(np.arange(0.0, 2.0, 0.001), 3)
@@ -418,10 +418,8 @@ class TestTheLoadersIntervalRulesAreTheMasks:
         return cases
 
     def test_membership_is_interval_mask(self):
-        from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
-            interval_mask,
-        )
         from continuum_swr_replay.data_loaders.lfp import _in_intervals
+        from continuum_swr_replay.intervals import interval_mask
 
         for intervals, _ in self._cases():
             np.testing.assert_array_equal(
@@ -429,13 +427,11 @@ class TestTheLoadersIntervalRulesAreTheMasks:
             )
 
     def test_event_overlap_is_the_detectors_and_the_sources(self):
-        from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
-            overlaps_intervals,
-        )
         from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
             drop_overlapping_events,
         )
         from continuum_swr_replay.data_loaders.lfp import _overlap_any
+        from continuum_swr_replay.intervals import overlaps_intervals
 
         for intervals, events in self._cases():
             overlaps = _overlap_any(events, intervals)

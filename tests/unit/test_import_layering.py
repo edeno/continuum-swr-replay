@@ -39,8 +39,8 @@ edges are removed, never go stale:
   package-level edges (not module-level ones) that lie on a cycle, so a new
   module edge along a package pair it already lists is invisible to it. The
   back edges that close today's cycles are pinned at module level instead,
-  by the other rules: hippocampus -> replay by rule 3, hippocampus -> pfc and
-  -> inventory_comparison by the hippocampus rule, hippocampus ->
+  by the other rules: hippocampus -> replay by rule 3, hippocampus ->
+  inventory_comparison (and -> pfc) by the hippocampus rule, hippocampus ->
   decoding_common by the decoding_common rule, and table_io -> * by the
   foundation rule.
 
@@ -200,6 +200,7 @@ FOUNDATION = frozenset(
         "data_loaders",
         "decode_files",
         "decoding_transitions",
+        "intervals",
         "parameters",
         "session_keys",
         "table_io",
@@ -234,26 +235,22 @@ KNOWN_VIOLATIONS: dict[str, set[tuple[str, str]]] = {
             "analysis.hippocampus.swr_inventories",
             "analysis.inventory_comparison.schema",
         ),
-        ("analysis.hippocampus.swr_inventories", "analysis.pfc.glm"),
     },
     # One strongly connected component: hippocampus, inventory_comparison,
-    # pfc, replay, decoding_common and table_io. Its six two-package cycles
+    # replay, decoding_common and table_io. Its two-package cycles
     # (code-organization review, F2) are closed by the back edges
-    # hippocampus -> pfc, -> inventory_comparison, -> replay (event_ids) and
+    # hippocampus -> inventory_comparison, -> replay (event_ids) and
     # -> decoding_common, and table_io -> hippocampus and -> replay; every
     # other edge here is listed because it lies inside that component.
+    # (hippocampus <-> pfc left with the spike binning, Task 4.)
     "no_package_cycles": {
         ("analysis.hippocampus", "analysis.inventory_comparison"),
-        ("analysis.hippocampus", "analysis.pfc"),
         ("analysis.hippocampus", "analysis.replay"),
         ("analysis.hippocampus", "decoding_common"),
         ("analysis.hippocampus", "table_io"),
         ("analysis.inventory_comparison", "analysis.hippocampus"),
         ("analysis.inventory_comparison", "analysis.replay"),
         ("analysis.inventory_comparison", "table_io"),
-        ("analysis.pfc", "analysis.hippocampus"),
-        ("analysis.pfc", "analysis.replay"),
-        ("analysis.pfc", "table_io"),
         ("analysis.replay", "analysis.hippocampus"),
         ("analysis.replay", "table_io"),
         ("decoding_common", "analysis.hippocampus"),

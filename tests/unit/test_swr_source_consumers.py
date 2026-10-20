@@ -38,7 +38,6 @@ import pytest
 import xarray as xr
 
 from continuum_swr_replay.analysis.hippocampus import swr_source
-from continuum_swr_replay.analysis.hippocampus.artifacts.masks import interval_mask
 from continuum_swr_replay.analysis.hippocampus.event_table import (
     build_classified_nonlocal_event_table,
 )
@@ -47,6 +46,7 @@ from continuum_swr_replay.analysis.hippocampus.swr_source import (
     swr_event_labels,
 )
 from continuum_swr_replay.data_loaders import epoch_register
+from continuum_swr_replay.intervals import interval_mask
 from continuum_swr_replay.table_io import read_table, sha256_file, write_table
 from tests.unit._swr_inventory_fixtures import (
     ARTIFACT_RUN_ID,

@@ -18,7 +18,7 @@ import pandas as pd
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
-from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
+from continuum_swr_replay.intervals import (
     covered_seconds,
     interval_mask,
 )

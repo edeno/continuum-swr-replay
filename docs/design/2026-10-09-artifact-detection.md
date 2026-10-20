@@ -310,8 +310,9 @@ From C2 §1a (versions as fetched 2026-10-09) and the literature review:
     `spike_ood`;
   - `detect_artifacts(time, ca1_lfp, reference_lfp, spike_times, spike_marks,
     sampling_frequency, *, valid=None) -> pd.DataFrame`, which returns the unpadded cores.
-- **`artifacts/masks.py`:** `PADDING_S`, `artifact_intervals(cores, span)` (the mask),
-  `interval_mask(time, intervals)`, `subtract_intervals`, `masked_seconds`.
+- **`artifacts/masks.py`:** `PADDING_S`, `artifact_intervals(cores, span)` (the mask).
+  The generic closed-interval functions it uses (`interval_mask(time, intervals)`,
+  `subtract_intervals`, `masked_seconds`) are in `src/continuum_swr_replay/intervals.py`.
 - **`artifacts/io.py`:**
   - the cores file (`CORE_COLUMNS`: `kind`, `signatures`, `core_start`, `core_end`, `spec_max`,
     `n_windows`, `ref_j5_max`, `ca1_frac_max`, `spk_frac_max`, `spk_ood_max`) and the manifest;

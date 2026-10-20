@@ -65,9 +65,6 @@ from continuum_swr_replay.analysis.constants import (  # noqa: E402
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
-from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (  # noqa: E402
-    interval_mask,
-)
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (  # noqa: E402
     validate_dot_event_contract,
 )
@@ -95,6 +92,9 @@ from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier  # no
 from continuum_swr_replay.decode_files import (  # noqa: E402
     decode_paths,
     non_local_threshold_percent,
+)
+from continuum_swr_replay.intervals import (  # noqa: E402
+    interval_mask,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
 

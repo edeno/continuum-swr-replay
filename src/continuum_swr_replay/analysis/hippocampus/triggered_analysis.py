@@ -9,13 +9,11 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
-    overlaps_intervals,
-)
 from continuum_swr_replay.analysis.hippocampus.swr_source import (
     excluded_intervals,
     swr_epoch_id,
 )
+from continuum_swr_replay.intervals import overlaps_intervals
 
 logger = logging.getLogger(__name__)
 

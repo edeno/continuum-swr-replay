@@ -44,7 +44,6 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
 from continuum_swr_replay.analysis.hippocampus import swr_source
-from continuum_swr_replay.analysis.hippocampus.artifacts.masks import interval_mask
 from continuum_swr_replay.analysis.hippocampus.event_eligibility import (
     EXCLUDED_TIME_REASONS,
     DropReason,
@@ -79,7 +78,7 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import (
     validate_inventory,
 )
 from continuum_swr_replay.analysis.replay.event_ids import hash_event_id
-from continuum_swr_replay.intervals import intersect
+from continuum_swr_replay.intervals import intersect, interval_mask
 from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY
 from continuum_swr_replay.table_io import sha256_file
 

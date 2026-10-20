@@ -21,12 +21,10 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
-    overlaps_intervals,
-)
 from continuum_swr_replay.analysis.hippocampus.swr_source import (
     excluded_intervals_by_session,
 )
+from continuum_swr_replay.intervals import overlaps_intervals
 from continuum_swr_replay.session_keys import SESSION_COLUMNS
 
 from .design_constants import (

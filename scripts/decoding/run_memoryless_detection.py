@@ -133,10 +133,6 @@ from distributed.deploy import Cluster
 from numpy.typing import NDArray
 
 from continuum_swr_replay import decoding_common
-from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
-    interval_mask,
-    masked_seconds,
-)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
     MemorylessSequenceConfig,
     SequenceIdentity,
@@ -189,6 +185,10 @@ from continuum_swr_replay.decoding_common import (
     release_nwb_files,
     setup_logger,
     write_atomically,
+)
+from continuum_swr_replay.intervals import (
+    interval_mask,
+    masked_seconds,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR
 from continuum_swr_replay.table_io import sha256_file, write_table

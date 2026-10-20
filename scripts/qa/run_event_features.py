@@ -108,9 +108,6 @@ from continuum_swr_replay.analysis.constants import (  # noqa: E402
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
 from continuum_swr_replay.analysis.hippocampus import swr_source  # noqa: E402
-from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (  # noqa: E402
-    interval_mask,
-)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (  # noqa: E402
     CandidateSequences,
 )
@@ -176,6 +173,9 @@ from continuum_swr_replay.decoding_common import (  # noqa: E402
     replace_outputs,
     setup_logger,
     write_atomically,
+)
+from continuum_swr_replay.intervals import (  # noqa: E402
+    interval_mask,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR  # noqa: E402
 from continuum_swr_replay.session_keys import SESSION_COLUMNS_DAY  # noqa: E402

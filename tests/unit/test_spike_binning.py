@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from continuum_swr_replay.analysis.pfc.glm import get_spikecount_per_time_bin
+from continuum_swr_replay.intervals import get_spikecount_per_time_bin
 
 
 class TestGetSpikecountPerTimeBin:

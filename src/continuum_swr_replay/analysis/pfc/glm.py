@@ -22,11 +22,6 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
-from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
-    interval_mask,
-    merge_intervals,
-    pad_intervals,
-)
 from continuum_swr_replay.analysis.hippocampus.event_eligibility import (
     EXCLUDED_TIME_REASONS,
     DropReason,
@@ -35,51 +30,22 @@ from continuum_swr_replay.analysis.replay.cohort_selection import (
     events_in_stops,
     stop_interval_mask,
 )
+from continuum_swr_replay.intervals import (
+    contiguous_true_runs,
+    get_spikecount_per_time_bin,
+    interval_mask,
+    merge_intervals,
+    pad_intervals,
+)
 
 # ``load_data`` and the hippocampus helpers below open a Spyglass /
 # DataJoint connection at import time. We defer those imports into
 # ``run_session`` (the only function that uses them) so that the pure
-# helpers in this module — ``get_spikecount_per_time_bin``,
-# ``process_neuron``, the design-matrix builders — stay offline-
+# helpers in this module — ``process_neuron``, the design-matrix
+# builders — stay offline-
 # importable for unit tests on machines without VPN.
 
 logger = logging.getLogger(__name__)
-
-
-def get_spikecount_per_time_bin(spike_times: NDArray, time: NDArray) -> NDArray:
-    """Bin spike times into time bins.
-
-    Parameters
-    ----------
-    spike_times : NDArray, shape (n_spikes,)
-        Spike times in seconds.
-    time : NDArray, shape (n_time_bins,)
-        Time bin starts (left edges) in seconds — i.e. each ``time[i]``
-        is the start of bin ``i``, not its center. Matches the
-        sample-bin-start convention used by the data loader's
-        multiunit pipeline. Spike ``s`` is assigned to bin ``i`` where
-        ``time[i] <= s < time[i+1]``; spikes at exactly ``time[-1]``
-        fall in the last bin.
-
-    Returns
-    -------
-    NDArray, shape (n_time_bins,)
-        Spike counts per time bin.
-
-    """
-    spike_times = spike_times[
-        np.logical_and(spike_times >= time[0], spike_times <= time[-1])
-    ]
-    # ``np.digitize(s, time[1:])`` produces indices ``0..N-1`` against
-    # a ``minlength=N`` bincount, so all output bins are reachable.
-    # The previous ``time[1:-1]`` form maxed out at index ``N-2``,
-    # leaving the final bin unreachable: e.g. with
-    # ``time=[0,1,2,3]``, spikes at 2.5 and 3.0 both landed in bin 2
-    # and bin 3 stayed at zero.
-    return np.bincount(
-        np.digitize(spike_times, time[1:]),
-        minlength=time.shape[0],
-    )
 
 
 def reindex_by(
@@ -1954,27 +1920,6 @@ def matched_control_seed(nwb_file_name: str, epoch_name: str) -> int:
     return int.from_bytes(digest[:8], "little")
 
 
-def _contiguous_true_runs(mask: NDArray) -> NDArray:
-    """Half-open ``[start, stop)`` sample bounds of each contiguous True run.
-
-    Parameters
-    ----------
-    mask : NDArray of bool, shape (n_time,)
-
-    Returns
-    -------
-    NDArray of int, shape (n_runs, 2)
-        One row per run; ``mask[start:stop]`` is all True and is bounded by
-        False (or by the array's ends) on both sides.
-    """
-    flat = np.asarray(mask, dtype=bool)
-    if flat.size == 0:
-        return np.empty((0, 2), dtype=np.int64)
-    padded = np.concatenate([[False], flat, [False]])
-    edges = np.flatnonzero(padded[1:] != padded[:-1])
-    return edges.reshape(-1, 2).astype(np.int64)
-
-
 def _bout_containing(runs: NDArray, index: int) -> int:
     """Row of ``runs`` whose half-open bounds contain ``index``, or ``-1``.
 
@@ -1982,7 +1927,7 @@ def _bout_containing(runs: NDArray, index: int) -> int:
     ----------
     runs : NDArray of int, shape (n_runs, 2)
         Ascending, non-overlapping half-open bounds, as
-        :func:`_contiguous_true_runs` returns them.
+        :func:`contiguous_true_runs` returns them.
     index : int
         Sample index to locate.
 
@@ -1997,35 +1942,6 @@ def _bout_containing(runs: NDArray, index: int) -> int:
     if row < 0 or index >= int(runs[row, 1]):
         return -1
     return row
-
-
-def _overlaps_any(
-    start_time: float, end_time: float, starts: NDArray, ends: NDArray
-) -> bool:
-    """Whether ``[start_time, end_time)`` overlaps any of the given windows.
-
-    Windows are half-open, so abutting one exactly is not an overlap.
-
-    Parameters
-    ----------
-    start_time, end_time : float
-        Window bounds in seconds.
-    starts, ends : NDArray, shape (n_windows,)
-        Ascending, non-overlapping window bounds (the columns of
-        :func:`~continuum_swr_replay.analysis.hippocampus.artifacts.masks.merge_intervals`). ``ends`` is then ascending too, so the only window that
-        can reach past ``start_time`` among those starting before ``end_time``
-        is the last of them.
-
-    Returns
-    -------
-    bool
-    """
-    if len(starts) == 0:
-        return False
-    n_starting_before = int(np.searchsorted(starts, end_time, side="left"))
-    if n_starting_before == 0:
-        return False
-    return bool(ends[n_starting_before - 1] > start_time)
 
 
 #: The decode-frame cohorts whose dropped events the PFC path counts and keeps
@@ -2183,7 +2099,7 @@ def make_matched_control_times(
         If ``event_times`` lacks one of the four event classes.
     """
     times = np.asarray(is_immobile.index, dtype=float)
-    runs = _contiguous_true_runs(np.asarray(is_immobile, dtype=bool))
+    runs = contiguous_true_runs(np.asarray(is_immobile, dtype=bool))
 
     source = event_times[MATCHED_CONTROL_SOURCE_CLASS]
     windows = [event_times[name] for name in EVENT_CLASSES]

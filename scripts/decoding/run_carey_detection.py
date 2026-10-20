@@ -82,8 +82,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from continuum_swr_replay.analysis.hippocampus import swr_source  # noqa: E402
 from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (  # noqa: E402
     PADDING_S,
-    interval_mask,
-    masked_seconds,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (  # noqa: E402
     load_clusterless_encoding_model,
@@ -114,6 +112,10 @@ from continuum_swr_replay.decoding_common import (  # noqa: E402
     replace_outputs,
     setup_logger,
     write_atomically,
+)
+from continuum_swr_replay.intervals import (  # noqa: E402
+    interval_mask,
+    masked_seconds,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR  # noqa: E402
 from continuum_swr_replay.table_io import sha256_file  # noqa: E402

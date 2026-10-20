@@ -31,10 +31,7 @@ from non_local_detector.likelihoods.clusterless_kde import (
 from track_linearization import get_linearized_position
 
 from continuum_swr_replay.analysis.hippocampus import swr_source
-from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
-    artifact_intervals,
-    interval_mask,
-)
+from continuum_swr_replay.analysis.hippocampus.artifacts.masks import artifact_intervals
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     EventDefinitionError,
 )
@@ -48,6 +45,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (
     interior_bin_mask,
     nearest_interior_bins,
 )
+from continuum_swr_replay.intervals import interval_mask
 from continuum_swr_replay.table_io import read_table
 from scripts.qa import run_state_evidence as runner
 from tests.unit._memoryless_clusterless_epoch import _y_track

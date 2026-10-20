@@ -44,7 +44,7 @@ from continuum_swr_replay.analysis.replay.cohort_selection import select_stop_co
 
 def spike_counts_of(spike_times, time_axis):
     """The binned counts ``process_neuron`` derives from the same spike times."""
-    from continuum_swr_replay.analysis.pfc.glm import get_spikecount_per_time_bin
+    from continuum_swr_replay.intervals import get_spikecount_per_time_bin
 
     return get_spikecount_per_time_bin(spike_times, np.asarray(time_axis))
 
@@ -150,7 +150,7 @@ def poisson_spike_times(time_axis):
 
 @pytest.fixture
 def spike_count(poisson_spike_times, time_axis):
-    from continuum_swr_replay.analysis.pfc.glm import get_spikecount_per_time_bin
+    from continuum_swr_replay.intervals import get_spikecount_per_time_bin
 
     return get_spikecount_per_time_bin(poisson_spike_times, time_axis)
 
@@ -2150,7 +2150,7 @@ class TestProcessNeuronFitMask:
         position_info,
         sampling_frequency,
     ):
-        from continuum_swr_replay.analysis.pfc.glm import get_spikecount_per_time_bin
+        from continuum_swr_replay.intervals import get_spikecount_per_time_bin
 
         dm, spline_basis, lag_time = _make_design_matrices(
             simple_event_times,

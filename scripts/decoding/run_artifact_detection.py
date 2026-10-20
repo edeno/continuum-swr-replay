@@ -90,7 +90,6 @@ from continuum_swr_replay.analysis.hippocampus.artifacts.io import (  # noqa: E4
 from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (  # noqa: E402
     PADDING_S,
     artifact_intervals,
-    masked_seconds,
 )
 from continuum_swr_replay.analysis.hippocampus.swr_source import (  # noqa: E402
     ARTIFACT_INTERVALS_ROOT,
@@ -111,6 +110,9 @@ from continuum_swr_replay.decoding_common import (  # noqa: E402
     raise_open_file_limit,
     release_nwb_files,
     setup_logger,
+)
+from continuum_swr_replay.intervals import (  # noqa: E402
+    masked_seconds,
 )
 from continuum_swr_replay.parameters import ROOT_DIR  # noqa: E402
 from scripts.decoding.run_swr_detection import (  # noqa: E402

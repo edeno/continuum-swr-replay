@@ -17,6 +17,8 @@ from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
     PADDING_S,
     artifact_intervals,
     core_class,
+)
+from continuum_swr_replay.intervals import (
     covered_seconds,
     interval_mask,
     masked_seconds,

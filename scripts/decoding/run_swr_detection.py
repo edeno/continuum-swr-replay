@@ -161,8 +161,6 @@ from continuum_swr_replay.analysis.hippocampus.artifacts.io import read_epoch_co
 from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
     PADDING_S,
     artifact_intervals,
-    interval_mask,
-    masked_seconds,
 )
 from continuum_swr_replay.analysis.hippocampus.ripple_tetrodes import (
     COUPLING_CUT,
@@ -213,6 +211,10 @@ from continuum_swr_replay.decoding_common import (
     replace_outputs,
     setup_logger,
     write_atomically,
+)
+from continuum_swr_replay.intervals import (
+    interval_mask,
+    masked_seconds,
 )
 from continuum_swr_replay.parameters import ROOT_DIR
 

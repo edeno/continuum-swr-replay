@@ -1,6 +1,11 @@
-"""Interval sets: unions, intersections and containment of time intervals.
+"""Interval algebra: the one home of the project's interval primitives.
 
-An interval is a closed ``[start, end]`` in seconds; a set is an array of
+Times are seconds. An interval is ``[start, end]``. Two families live here,
+with the array and DataFrame signatures their callers use, beside the overlap
+predicates, the runs of a boolean mask and spike binning.
+
+**Interval sets** (:func:`normalize`, :func:`union`, :func:`intersect`,
+:func:`subtract`, :func:`total_duration`, :func:`contains`) work on arrays of
 shape ``(n, 2)``. Every function that returns intervals returns a normalized
 set: sorted by start, disjoint, with overlapping or touching intervals joined
 into one, and with any interval of no duration, or with a missing or inverted
@@ -10,12 +15,68 @@ Dropping an inverted or non-finite bound is right for the outputs of interval
 arithmetic, where an empty intersection appears as an inverted pair; for an
 input a caller means to be well formed, ``normalize(..., strict=True)`` raises
 instead.
+
+**Closed intervals** (:func:`merge_intervals`, :func:`interval_mask`,
+:func:`subtract_intervals`, :func:`masked_seconds`, :func:`pad_intervals`,
+:func:`overlaps_intervals`, :func:`covered_seconds`) take intervals as a
+``start_time`` / ``end_time`` DataFrame (or start and end arrays), closed: a
+time on an endpoint is inside, and intervals that touch merge. This is the
+convention of the artifact mask and of excluded time
+(``analysis/hippocampus/artifacts/masks.py``, ``event_eligibility``).
+
+**Overlap conventions.** "Overlap" means four different things in the
+project. Each has its own name, so the choice is visible at each caller:
+
+=============  =============================================  ========  ===========================
+convention     predicate                                      touching  zero-length interval
+=============  =============================================  ========  ===========================
+closed         :func:`overlaps_intervals`                     overlaps  overlaps any interval it
+                                                                        shares a time with
+open ``<``     :func:`overlaps_open`                          no        overlaps strictly inside
+strict         ``event_detection.strict_overlap_matrix``;     no        overlaps nothing
+               the interval sets, through :func:`normalize`
+dropped-event  ``event_eligibility.overlaps_dropped_events``  no        a zero-length dropped
+                                                                        interval is ignored; a
+                                                                        zero-length event strictly
+                                                                        inside a dropped one
+                                                                        overlaps it
+=============  =============================================  ========  ===========================
+
+Strict overlap is event-level ``is_swr``: both intervals finite with positive
+duration, and ``other_end > start`` and ``other_start < end``. The open test is
+the same comparison without the duration check; it agrees with strict overlap
+on intervals of positive duration. Membership of a time point is closed
+(:func:`interval_mask`).
 """
 
+from __future__ import annotations
+
 import numpy as np
+import pandas as pd
 from numpy.typing import NDArray
 
-__all__ = ["contains", "intersect", "normalize", "subtract", "total_duration", "union"]
+__all__ = [
+    "contains",
+    "contiguous_true_runs",
+    "covered_seconds",
+    "get_spikecount_per_time_bin",
+    "interval_mask",
+    "intersect",
+    "masked_seconds",
+    "merge_intervals",
+    "normalize",
+    "overlaps_intervals",
+    "overlaps_open",
+    "pad_intervals",
+    "subtract",
+    "subtract_intervals",
+    "total_duration",
+    "union",
+]
+
+# ---------------------------------------------------------------------------
+# Interval sets: arrays of shape (n, 2), normalized.
+# ---------------------------------------------------------------------------
 
 
 def _pairs(intervals: NDArray) -> NDArray:
@@ -124,3 +185,337 @@ def contains(intervals: NDArray, starts: NDArray, ends: NDArray) -> NDArray:
         found & (normalized[safe, 0] <= starts) & (ends <= normalized[safe, 1])
     )
     return within
+
+
+# ---------------------------------------------------------------------------
+# Closed intervals: start_time / end_time frames.
+# ---------------------------------------------------------------------------
+
+
+def merge_intervals(
+    starts: NDArray[np.float64], ends: NDArray[np.float64]
+) -> NDArray[np.float64]:
+    """Merge closed intervals that overlap or touch, in time order.
+
+    Parameters
+    ----------
+    starts, ends : ndarray, shape (n_intervals,)
+        Seconds; ``ends >= starts``.
+
+    Returns
+    -------
+    ndarray, shape (n_merged, 2)
+        Disjoint ``[start, end]`` rows, sorted, with a gap between each.
+    """
+    starts = np.asarray(starts, dtype=np.float64)
+    ends = np.asarray(ends, dtype=np.float64)
+    if starts.size == 0:
+        return np.empty((0, 2), dtype=np.float64)
+    order = np.argsort(starts, kind="stable")
+    starts, ends = starts[order], ends[order]
+    reach = np.maximum.accumulate(ends)
+    # closed: a start on the running end touches it, so it merges
+    first = np.flatnonzero(np.r_[True, starts[1:] > reach[:-1]])
+    return np.column_stack([starts[first], np.maximum.reduceat(ends, first)])
+
+
+def _as_frame(intervals: NDArray[np.float64]) -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "start_time": intervals[:, 0].astype(np.float64),
+            "end_time": intervals[:, 1].astype(np.float64),
+        }
+    )
+
+
+def interval_mask(
+    time: NDArray[np.float64] | pd.Index, intervals: pd.DataFrame
+) -> NDArray[np.bool_]:
+    """True at each time inside any interval, endpoints included.
+
+    Parameters
+    ----------
+    time : array-like, shape (n_time,)
+        Seconds, in any order.
+    intervals : pd.DataFrame
+        ``start_time`` and ``end_time`` (seconds), closed; any order, and they
+        may overlap.
+
+    Returns
+    -------
+    ndarray of bool, shape (n_time,)
+    """
+    values = np.asarray(time, dtype=np.float64)
+    starts = intervals["start_time"].to_numpy(dtype=np.float64)
+    if starts.size == 0:
+        return np.zeros(values.shape, dtype=bool)
+    order = np.argsort(starts, kind="stable")
+    starts = starts[order]
+    reach = np.maximum.accumulate(
+        intervals["end_time"].to_numpy(dtype=np.float64)[order]
+    )
+    # the last interval starting at or before each time; inside one iff the
+    # furthest end among intervals starting by then reaches the time
+    last = np.searchsorted(starts, values, side="right") - 1
+    mask: NDArray[np.bool_] = (last >= 0) & (values <= reach[np.maximum(last, 0)])
+    return mask
+
+
+def subtract_intervals(
+    stretches: NDArray[np.float64], intervals: pd.DataFrame
+) -> NDArray[np.float64]:
+    """Closed stretches less closed intervals, as closed stretches.
+
+    A piece's bounds next to a removed interval are the floats just outside
+    it (``np.nextafter``), so a time lies in the result exactly when it lies in
+    a stretch and in no interval, endpoints included.
+
+    Parameters
+    ----------
+    stretches : ndarray, shape (n_stretches, 2)
+        ``[start, end]`` rows, seconds, closed.
+    intervals : pd.DataFrame
+        ``start_time`` and ``end_time`` (seconds), closed.
+
+    Returns
+    -------
+    ndarray, shape (n_pieces, 2)
+        The remaining pieces, stretch by stretch, in time order within each.
+    """
+    stretches = np.asarray(stretches, dtype=np.float64).reshape(-1, 2)
+    removed = merge_intervals(
+        intervals["start_time"].to_numpy(dtype=np.float64),
+        intervals["end_time"].to_numpy(dtype=np.float64),
+    )
+    if removed.size == 0:
+        return stretches.copy()
+    before = np.nextafter(removed[:, 0], -np.inf)
+    after = np.nextafter(removed[:, 1], np.inf)
+    pieces = []
+    for start, end in stretches:
+        hit = (removed[:, 0] <= end) & (removed[:, 1] >= start)
+        lows = np.r_[start, after[hit]]
+        highs = np.r_[before[hit], end]
+        keep = lows <= highs
+        pieces.append(np.column_stack([lows[keep], highs[keep]]))
+    return np.concatenate(pieces).reshape(-1, 2)
+
+
+def masked_seconds(intervals: pd.DataFrame) -> float:
+    """Total length of `intervals` in seconds, overlaps counted once."""
+    merged = merge_intervals(
+        intervals["start_time"].to_numpy(dtype=np.float64),
+        intervals["end_time"].to_numpy(dtype=np.float64),
+    )
+    return float(np.sum(merged[:, 1] - merged[:, 0]))
+
+
+def pad_intervals(intervals: pd.DataFrame, distance_s: float) -> pd.DataFrame:
+    """The intervals widened by one distance on each side, merged.
+
+    Excluded time is the artifact mask widened here by
+    ``event_eligibility.ARTIFACT_REACH_S``; the PFC fit widens excluded time
+    by its peri-event basis's half-width. A history window, which looks back
+    from a bin, widens the bin instead (``per_bin_design``).
+
+    Parameters
+    ----------
+    intervals : pd.DataFrame
+        ``start_time`` and ``end_time`` (seconds), closed; any order.
+    distance_s : float
+        Seconds added before each start and after each end.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns ``start_time`` and ``end_time`` (float64, seconds), closed,
+        disjoint and in time order.
+
+    Raises
+    ------
+    ValueError
+        If the distance is negative or not finite.
+    """
+    if not (np.isfinite(distance_s) and distance_s >= 0):
+        raise ValueError(f"a padding distance must be finite and >= 0: {distance_s}")
+    starts = intervals["start_time"].to_numpy(dtype=np.float64) - distance_s
+    ends = intervals["end_time"].to_numpy(dtype=np.float64) + distance_s
+    return _as_frame(merge_intervals(starts, ends))
+
+
+def overlaps_intervals(
+    starts: NDArray[np.float64], ends: NDArray[np.float64], intervals: pd.DataFrame
+) -> NDArray[np.bool_]:
+    """True for each closed ``[start, end]`` sharing any time with an interval.
+
+    Both sides are closed, so a stretch that only touches an interval at one
+    instant overlaps it.
+
+    Parameters
+    ----------
+    starts, ends : ndarray, shape (n,)
+        Seconds; ``ends >= starts``.
+    intervals : pd.DataFrame
+        ``start_time`` and ``end_time`` (seconds), closed; any order.
+
+    Returns
+    -------
+    ndarray of bool, shape (n,)
+    """
+    starts = np.asarray(starts, dtype=np.float64)
+    ends = np.asarray(ends, dtype=np.float64)
+    merged = merge_intervals(
+        intervals["start_time"].to_numpy(dtype=np.float64),
+        intervals["end_time"].to_numpy(dtype=np.float64),
+    )
+    if merged.size == 0:
+        return np.zeros(starts.shape, dtype=bool)
+    # the last merged interval starting at or before each end; the merged
+    # intervals are disjoint and sorted, so an earlier one ends earlier still
+    last = np.searchsorted(merged[:, 0], ends, side="right") - 1
+    overlaps: NDArray[np.bool_] = (last >= 0) & (
+        merged[np.maximum(last, 0), 1] >= starts
+    )
+    return overlaps
+
+
+def covered_seconds(
+    starts: NDArray[np.float64], ends: NDArray[np.float64], intervals: pd.DataFrame
+) -> NDArray[np.float64]:
+    """Seconds of each ``[start, end]`` that the intervals cover.
+
+    Overlapping intervals are counted once. Exactly 0.0 where no interval
+    reaches a stretch, so ``span - covered_seconds(...)`` is the span itself
+    when nothing is masked.
+
+    Parameters
+    ----------
+    starts, ends : ndarray, shape (n,)
+        Seconds; ``ends >= starts``.
+    intervals : pd.DataFrame
+        ``start_time`` and ``end_time`` (seconds), closed; any order.
+
+    Returns
+    -------
+    ndarray of float64, shape (n,)
+    """
+    starts = np.asarray(starts, dtype=np.float64)
+    ends = np.asarray(ends, dtype=np.float64)
+    merged = merge_intervals(
+        intervals["start_time"].to_numpy(dtype=np.float64),
+        intervals["end_time"].to_numpy(dtype=np.float64),
+    )
+    if merged.size == 0:
+        return np.zeros(starts.shape, dtype=np.float64)
+    lengths = merged[:, 1] - merged[:, 0]
+    before = np.concatenate([[0.0], np.cumsum(lengths)])
+
+    def _covered_until(time: NDArray[np.float64]) -> NDArray[np.float64]:
+        # masked seconds in (-inf, time]: every interval starting by then, the
+        # last of them only up to `time`
+        n_started = np.searchsorted(merged[:, 0], time, side="right")
+        last = np.maximum(n_started - 1, 0)
+        partial = np.clip(time - merged[last, 0], 0.0, lengths[last])
+        until: NDArray[np.float64] = np.where(
+            n_started > 0, before[last] + partial, 0.0
+        )
+        return until
+
+    covered: NDArray[np.float64] = _covered_until(ends) - _covered_until(starts)
+    return np.where(overlaps_intervals(starts, ends, intervals), covered, 0.0)
+
+
+# ---------------------------------------------------------------------------
+# The open overlap test, runs of a mask, spike binning.
+# ---------------------------------------------------------------------------
+
+
+def overlaps_open(
+    start_time: float, end_time: float, starts: NDArray, ends: NDArray
+) -> bool:
+    """Whether the open test holds for any window: ``window_start < end_time``
+    and ``window_end > start_time``.
+
+    Abutting a window exactly is not an overlap. There is no duration check,
+    so a zero-length window, or a zero-length ``[start_time, end_time]``,
+    strictly inside the other overlaps it (strict overlap would say it overlaps
+    nothing; see the conventions table in this module's docstring). The PFC
+    fit calls this its half-open test.
+
+    Parameters
+    ----------
+    start_time, end_time : float
+        Window bounds in seconds.
+    starts, ends : NDArray, shape (n_windows,)
+        Ascending, non-overlapping window bounds (the columns of
+        :func:`merge_intervals`). ``ends`` is then ascending too, so the only
+        window that can reach past ``start_time`` among those starting before
+        ``end_time`` is the last of them.
+
+    Returns
+    -------
+    bool
+    """
+    if len(starts) == 0:
+        return False
+    n_starting_before = int(np.searchsorted(starts, end_time, side="left"))
+    if n_starting_before == 0:
+        return False
+    return bool(ends[n_starting_before - 1] > start_time)
+
+
+def contiguous_true_runs(mask: NDArray) -> NDArray:
+    """Half-open ``[start, stop)`` sample bounds of each contiguous True run.
+
+    Parameters
+    ----------
+    mask : NDArray of bool, shape (n_time,)
+
+    Returns
+    -------
+    NDArray of int, shape (n_runs, 2)
+        One row per run; ``mask[start:stop]`` is all True and is bounded by
+        False (or by the array's ends) on both sides.
+    """
+    flat = np.asarray(mask, dtype=bool)
+    if flat.size == 0:
+        return np.empty((0, 2), dtype=np.int64)
+    padded = np.concatenate([[False], flat, [False]])
+    edges = np.flatnonzero(padded[1:] != padded[:-1])
+    return edges.reshape(-1, 2).astype(np.int64)
+
+
+def get_spikecount_per_time_bin(spike_times: NDArray, time: NDArray) -> NDArray:
+    """Bin spike times into time bins.
+
+    Parameters
+    ----------
+    spike_times : NDArray, shape (n_spikes,)
+        Spike times in seconds.
+    time : NDArray, shape (n_time_bins,)
+        Time bin starts (left edges) in seconds — i.e. each ``time[i]``
+        is the start of bin ``i``, not its center. Matches the
+        sample-bin-start convention used by the data loader's
+        multiunit pipeline. Spike ``s`` is assigned to bin ``i`` where
+        ``time[i] <= s < time[i+1]``; spikes at exactly ``time[-1]``
+        fall in the last bin.
+
+    Returns
+    -------
+    NDArray, shape (n_time_bins,)
+        Spike counts per time bin.
+
+    """
+    spike_times = spike_times[
+        np.logical_and(spike_times >= time[0], spike_times <= time[-1])
+    ]
+    # ``np.digitize(s, time[1:])`` produces indices ``0..N-1`` against
+    # a ``minlength=N`` bincount, so all output bins are reachable.
+    # The previous ``time[1:-1]`` form maxed out at index ``N-2``,
+    # leaving the final bin unreachable: e.g. with
+    # ``time=[0,1,2,3]``, spikes at 2.5 and 3.0 both landed in bin 2
+    # and bin 3 stayed at zero.
+    return np.bincount(
+        np.digitize(spike_times, time[1:]),
+        minlength=time.shape[0],
+    )

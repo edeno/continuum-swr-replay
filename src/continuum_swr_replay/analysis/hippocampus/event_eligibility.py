@@ -35,13 +35,13 @@ from numpy.typing import NDArray
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
-from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (
-    overlaps_intervals,
-    pad_intervals,
-)
 from continuum_swr_replay.analysis.hippocampus.event_immobility import (
     filter_event_intervals_by_speed,
     intervals_from_labels,
+)
+from continuum_swr_replay.intervals import (
+    overlaps_intervals,
+    pad_intervals,
 )
 
 __all__ = [
@@ -161,9 +161,14 @@ def overlaps_dropped_events(
 ) -> NDArray[np.bool_]:
     """True for each event that overlaps a dropped event.
 
-    Overlap is ``is_swr``'s: a positive-duration dropped interval with
-    ``dropped_end > start`` and ``dropped_start < end``, so an event only
-    touching a dropped one at an instant keeps a known (``non_swr``) class.
+    Overlap is the open test ``dropped_end > start`` and
+    ``dropped_start < end`` against the dropped intervals of positive
+    duration, so an event only touching a dropped one at an instant keeps a
+    known (``non_swr``) class. It is not quite strict (``is_swr``'s) overlap:
+    a zero-length dropped interval is ignored, but the event's own duration is
+    not checked, so a zero-length event strictly inside a dropped one
+    overlaps it. The conventions table in :mod:`continuum_swr_replay.intervals`
+    sets this one beside the others.
 
     Parameters
     ----------

@@ -117,7 +117,7 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import (
     SessionIdentity,
     inventory_from_intervals,
 )
-from continuum_swr_replay.analysis.pfc.glm import get_spikecount_per_time_bin
+from continuum_swr_replay.intervals import get_spikecount_per_time_bin
 from continuum_swr_replay.types import RippleBandInputs
 
 ZUGARO_BAND_HZ: tuple[float, float] = (120.0, 180.0)

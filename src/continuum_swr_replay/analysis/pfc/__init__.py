@@ -24,8 +24,6 @@ make_matched_control_times
 process_neuron
     Fit GLM to relate single neuron activity to task/behavioral covariates.
     Primary entry point for single-unit analysis.
-get_spikecount_per_time_bin
-    Convert spike times to binned spike counts for GLM fitting.
 
 Internal Functions
 ------------------
@@ -38,6 +36,7 @@ Analysis Workflow
 -----------------
 1. Load neural data (sorted units from mPFC/OFC)
 2. Bin spike times at desired temporal resolution
+   (``continuum_swr_replay.intervals.get_spikecount_per_time_bin``)
 3. Create design matrices with task variables as predictors
 4. Fit GLMs to identify neurons modulated by:
    - Hippocampal replay events
@@ -76,7 +75,6 @@ _LAZY_EXPORTS = {
     "build_session_event_sets": ("glm", "build_session_event_sets"),
     "build_session_fit_mask": ("glm", "build_session_fit_mask"),
     "fit_immobility_models": ("glm", "_fit_immobility_models"),
-    "get_spikecount_per_time_bin": ("glm", "get_spikecount_per_time_bin"),
     "make_design_matrices": ("glm", "_make_design_matrices"),
     "make_matched_control_times": ("glm", "make_matched_control_times"),
     "matched_control_seed": ("glm", "matched_control_seed"),
@@ -103,7 +101,6 @@ __all__ = [
     "fit_immobility_models",
     "build_session_event_sets",
     "build_session_fit_mask",
-    "get_spikecount_per_time_bin",
     "make_matched_control_times",
     "matched_control_seed",
     "process_neuron",
@@ -116,7 +113,6 @@ if TYPE_CHECKING:  # pragma: no cover - types only
         MatchedControlDraw,
         build_session_event_sets,
         build_session_fit_mask,
-        get_spikecount_per_time_bin,
         make_matched_control_times,
         matched_control_seed,
         process_neuron,

@@ -121,9 +121,6 @@ import pandas as pd  # noqa: E402
 from numpy.typing import NDArray  # noqa: E402
 
 from continuum_swr_replay.analysis.hippocampus import swr_source  # noqa: E402
-from continuum_swr_replay.analysis.hippocampus.artifacts.masks import (  # noqa: E402
-    interval_mask,
-)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (  # noqa: E402
     interior_bin_distances_cm,
 )
@@ -178,6 +175,9 @@ from continuum_swr_replay.decoding_common import (  # noqa: E402
     release_nwb_files,
     setup_logger,
     write_atomically,
+)
+from continuum_swr_replay.intervals import (  # noqa: E402
+    interval_mask,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR  # noqa: E402
 from continuum_swr_replay.table_io import read_table, write_table  # noqa: E402

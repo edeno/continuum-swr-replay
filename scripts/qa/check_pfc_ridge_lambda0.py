@@ -176,9 +176,9 @@ def rebuild_session(
     from continuum_swr_replay.analysis.pfc.glm import (
         DEFAULT_BASIS_HALF_WINDOW_S,
         artifact_dropped_events,
-        get_spikecount_per_time_bin,
     )
     from continuum_swr_replay.data_loaders import load_data
+    from continuum_swr_replay.intervals import get_spikecount_per_time_bin
 
     animal_date, epoch = session.rsplit("_", 2)[0], "_".join(session.split("_")[-2:])
     nwb_file_name = f"{animal_date}_.nwb"

@@ -26,7 +26,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from ..hippocampus.artifacts.masks import overlaps_intervals
+from ...intervals import overlaps_intervals
 from ..hippocampus.swr_source import excluded_intervals_of
 from .bouts import assign_bout, immobility_bout_intervals
 from .covariate_registry import stamp_covariate_schema
