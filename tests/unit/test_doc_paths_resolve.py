@@ -3,10 +3,13 @@
 Docs name scripts and modules by path, and a module move that leaves a doc
 behind sends the reader to a file that is not there. This test reads every
 tracked ``*.md`` (``git ls-files``, so untracked drafts are ignored) and checks
-three kinds of reference:
+four kinds of reference:
 
 - a file path ``scripts/...py``, resolved against the repo root;
 - a file path ``src/continuum_swr_replay/...py``, resolved the same way;
+- a package-relative file path ``analysis/...py`` (or under another
+  :data:`PACKAGE_DIRS` directory), resolved against
+  ``src/continuum_swr_replay/`` -- the form CLAUDE.md uses for modules;
 - a dotted name ``continuum_swr_replay.a.b`` inside backticks (an inline code
   span or a fenced code block). It must name a module or package, or a name
   that module defines. Names are found statically with ``ast`` -- a top-level
@@ -83,11 +86,22 @@ ALLOWLIST: dict[tuple[str, str], str] = {
     ): "skill-relative: .claude/skills/scientific-presentations/scripts/",
 }
 
+#: Package subdirectories a doc may cite by package-relative path
+#: (``analysis/hippocampus/event_table.py``). Add each new top-level package
+#: here when it is created (the code-organization plan's ``tables/``, ``runs/``
+#: and ``decoding/``).
+PACKAGE_DIRS = ("analysis", "data_loaders", "visualization")
+
 #: A repo-relative file path. The lookbehind stops a match inside a longer path
 #: (``tests/scripts/x.py``); a leading ``./`` or ``../`` is allowed and dropped.
 _FILE_PATH = re.compile(
     r"(?<![\w/.-])(?:\.\.?/)*"
     r"((?:scripts|src/continuum_swr_replay)/[\w./-]*\.py)(?![\w])"
+)
+#: A package-relative file path. The same lookbehind keeps it from matching the
+#: tail of ``src/continuum_swr_replay/analysis/...`` or ``tests/analysis/...``.
+_PACKAGE_PATH = re.compile(
+    rf"(?<![\w/.-])((?:{'|'.join(PACKAGE_DIRS)})/[\w./-]*\.py)(?![\w])"
 )
 _DOTTED = re.compile(r"(?<![\w.])continuum_swr_replay(?:\.\w+)+")
 _INLINE_CODE = re.compile(r"`([^`]+)`")
@@ -221,6 +235,11 @@ def _references(doc: str) -> list[tuple[int, str]]:
                 continue
             if not (REPO / m.group(1)).is_file():
                 bad.append((lineno, m.group(1)))
+        for m in _PACKAGE_PATH.finditer(line):
+            if _REMOVED.match(line[m.end() :]):
+                continue
+            if not (SRC / PACKAGE / m.group(1)).is_file():
+                bad.append((lineno, m.group(1)))
     for lineno, span in _code_spans(text):
         for m in _DOTTED.finditer(span):
             if not _resolves(m.group(0)):
@@ -272,6 +291,20 @@ def test_path_pattern_boundaries() -> None:
     ]
     assert found("tests/scripts/x.py") == []
     assert found("scripts/qa/<name>.py and scripts/figures/*.py") == []
+
+    def package_found(s: str) -> list[str]:
+        return [m.group(1) for m in _PACKAGE_PATH.finditer(s)]
+
+    assert package_found(
+        "`analysis/hippocampus/event_table.py:build_classified_nonlocal_event_table`"
+    ) == ["analysis/hippocampus/event_table.py"]
+    assert package_found("in data_loaders/constants.py.") == [
+        "data_loaders/constants.py"
+    ]
+    assert package_found("src/continuum_swr_replay/analysis/x.py") == []
+    assert package_found("tests/analysis/pfc/test_x.py") == []
+    assert package_found("scripts/analysis/x.py") == []
+
     line = "`scripts/qa/gone.py` (removed in abc1234)"
     m = next(_FILE_PATH.finditer(line))
     assert _REMOVED.match(line[m.end() :])

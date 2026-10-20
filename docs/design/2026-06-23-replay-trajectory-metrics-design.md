@@ -232,7 +232,7 @@ Cost: adding Tier-1 columns requires regenerating the `data_over_time` pkls
 - Merge `path_continuity` and the retrospective metrics into the canonical
   event tables (they exist but are currently standalone).
 - Apply identical definitions in both `build_event_table`
-  (`analysis/replay/tables.py`) and `build_contfrag_event_table`
+  (`analysis/replay/tables_event.py`) and `build_contfrag_event_table`
   (`analysis/contfrag/tables.py`); factor shared logic so the two scenarios
   cannot drift.
 
