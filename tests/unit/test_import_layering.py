@@ -14,7 +14,29 @@ plain edge rather than as an ``ImportError`` from a cycle:
    analysis; the reverse edge makes the loaders unusable on their own and
    invites an import cycle.
 3. ``analysis/hippocampus`` must not import ``analysis/replay``, except for the
-   two leaf modules the event tables genuinely share.
+   one leaf module the event tables genuinely share (``event_ids``).
+
+Five more rules are checked over the package-level import graph
+(:func:`package_graph`). Each holds today only up to a known-violations
+allowlist (:data:`KNOWN_VIOLATIONS`) that the code-organization plan works
+down to empty. A rule fails on a violation the allowlist does not name AND on
+an allowlist entry that no longer occurs, so the allowlist can only shrink as
+edges are removed, never go stale:
+
+- ``analysis_imports_no_visualization``: analysis code does not import
+  plotting code.
+- ``src_imports_no_scripts``: the package does not import the ``scripts/``
+  tree.
+- ``foundation_imports_no_upper_layer``: the foundation modules
+  (:data:`FOUNDATION`) import no ``analysis``, ``visualization`` or
+  ``scripts``.
+- ``hippocampus_imports_no_pfc_or_inventory_comparison``: the hippocampus
+  package does not reach sideways into those two analysis packages.
+- ``no_package_cycles``: the package graph is acyclic. Its entries are
+  package-level edges (not module-level ones) that lie on a cycle.
+
+Imports inside functions count: a function-local import is how a cycle is
+usually hidden, and it is still a dependency.
 """
 
 from __future__ import annotations
@@ -23,11 +45,13 @@ import ast
 from collections.abc import Callable
 from pathlib import Path
 
+import pytest
+
 SRC = Path(__file__).resolve().parents[2] / "src" / "continuum_swr_replay"
 assert SRC.is_dir(), f"package root not found at {SRC}; the scan would be vacuous"
 
 #: The only ``analysis.replay`` modules the hippocampus package may import.
-HIPPOCAMPUS_ALLOWED_REPLAY_MODULES = frozenset({"bouts", "event_ids"})
+HIPPOCAMPUS_ALLOWED_REPLAY_MODULES = frozenset({"event_ids"})
 
 
 def _imported_modules(path: Path, root: Path) -> list[str]:
@@ -133,7 +157,7 @@ def test_data_loaders_do_not_import_analysis() -> None:
 
 
 def test_hippocampus_imports_only_shared_replay_leaves() -> None:
-    """Rule 3: the hippocampus package shares only ``bouts`` and ``event_ids``."""
+    """Rule 3: the hippocampus package shares only ``event_ids``."""
     target = "continuum_swr_replay.analysis.replay"
     allowed = {f"{target}.{name}" for name in HIPPOCAMPUS_ALLOWED_REPLAY_MODULES}
 
@@ -152,3 +176,317 @@ def test_hippocampus_imports_only_shared_replay_leaves() -> None:
         f"{sorted(HIPPOCAMPUS_ALLOWED_REPLAY_MODULES)} from analysis/replay:\n"
         + "\n".join(violations)
     )
+
+
+# ---------------------------------------------------------------------------
+# The package-level graph and the rules checked over it.
+# ---------------------------------------------------------------------------
+
+#: Package nodes (see :func:`package_of`) that form the foundation layer: they
+#: import nothing from ``analysis``, ``visualization`` or ``scripts``. Later
+#: tasks of the code-organization plan add the new foundation homes here.
+FOUNDATION = frozenset(
+    {
+        "data_loaders",
+        "decode_files",
+        "decoding_transitions",
+        "figure_utilities",
+        "parameters",
+        "session_keys",
+        "table_io",
+        "table_parity",
+        "types",
+    }
+)
+
+#: Edges each rule tolerates today, as ``(importer, imported)`` pairs of
+#: module names relative to the package root (``no_package_cycles`` holds
+#: package-node pairs instead). Entries are only ever deleted: each one names
+#: an edge a later task removes.
+KNOWN_VIOLATIONS: dict[str, set[tuple[str, str]]] = {
+    "analysis_imports_no_visualization": set(),
+    "src_imports_no_scripts": set(),
+    "foundation_imports_no_upper_layer": {
+        ("decode_files", "analysis.constants"),
+        ("table_io", "analysis.hippocampus.swr_source"),
+        ("table_io", "analysis.replay.covariate_registry"),
+        ("table_parity", "analysis.replay.covariate_registry"),
+    },
+    "hippocampus_imports_no_pfc_or_inventory_comparison": {
+        (
+            "analysis.hippocampus.swr_inventories",
+            "analysis.inventory_comparison.overlap",
+        ),
+        (
+            "analysis.hippocampus.swr_inventories",
+            "analysis.inventory_comparison.schema",
+        ),
+        ("analysis.hippocampus.swr_inventories", "analysis.pfc.glm"),
+    },
+    # One strongly connected component: hippocampus, inventory_comparison,
+    # pfc, replay, decoding_common and table_io. Its six two-package cycles
+    # (code-organization review, F2) are closed by the back edges
+    # hippocampus -> pfc, -> inventory_comparison, -> replay (event_ids) and
+    # -> decoding_common, and table_io -> hippocampus and -> replay; every
+    # other edge here is listed because it lies inside that component.
+    "no_package_cycles": {
+        ("analysis.hippocampus", "analysis.inventory_comparison"),
+        ("analysis.hippocampus", "analysis.pfc"),
+        ("analysis.hippocampus", "analysis.replay"),
+        ("analysis.hippocampus", "decoding_common"),
+        ("analysis.hippocampus", "table_io"),
+        ("analysis.inventory_comparison", "analysis.hippocampus"),
+        ("analysis.inventory_comparison", "analysis.replay"),
+        ("analysis.inventory_comparison", "table_io"),
+        ("analysis.pfc", "analysis.hippocampus"),
+        ("analysis.pfc", "analysis.replay"),
+        ("analysis.pfc", "table_io"),
+        ("analysis.replay", "analysis.hippocampus"),
+        ("analysis.replay", "table_io"),
+        ("decoding_common", "analysis.hippocampus"),
+        ("decoding_common", "table_io"),
+        ("table_io", "analysis.hippocampus"),
+        ("table_io", "analysis.replay"),
+    },
+}
+
+
+def _module_index(root: Path) -> dict[str, Path]:
+    """Every module under ``root`` by dotted name relative to ``root``.
+
+    A package's ``__init__.py`` is named after the package; the root package
+    itself is ``""``.
+    """
+    index: dict[str, Path] = {}
+    for path in sorted(root.rglob("*.py")):
+        if "__pycache__" in path.parts:
+            continue
+        parts = list(path.relative_to(root).with_suffix("").parts)
+        if parts[-1] == "__init__":
+            parts = parts[:-1]
+        index[".".join(parts)] = path
+    assert index, f"no modules under {root}; the graph would be vacuous"
+    return index
+
+
+def _relative(name: str, root: Path) -> str | None:
+    """``name`` relative to the package root, or None outside the package."""
+    if name == root.name:
+        return ""
+    prefix = f"{root.name}."
+    return name[len(prefix) :] if name.startswith(prefix) else None
+
+
+def module_edges(root: Path = SRC) -> set[tuple[str, str]]:
+    """Every ``(importer, imported)`` module edge, both relative to ``root``.
+
+    An import is resolved to the most specific module it names:
+    ``from pkg.mod import name`` is an edge to ``pkg.mod``, and
+    ``from pkg import mod`` is an edge to ``pkg.mod`` when ``mod`` is a module.
+    Imports from outside the package are kept under their absolute name, so a
+    ``scripts.x`` import surfaces as ``("…", "scripts.x")``. Imports inside
+    functions and ``TYPE_CHECKING`` blocks count.
+    """
+    index = _module_index(root)
+    edges: set[tuple[str, str]] = set()
+    for importer, path in index.items():
+        package_parts = [root.name, *path.relative_to(root).parts[:-1]]
+        tree = ast.parse(path.read_text(), filename=str(path))
+        for node in ast.walk(tree):
+            targets: list[str] = []
+            if isinstance(node, ast.Import):
+                targets = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                if node.level == 0:
+                    base = node.module or ""
+                else:
+                    kept = package_parts[: len(package_parts) - (node.level - 1)]
+                    base = ".".join([*kept, *([node.module] if node.module else [])])
+                for alias in node.names:
+                    child = _relative(f"{base}.{alias.name}", root)
+                    targets.append(f"{base}.{alias.name}" if child in index else base)
+            for target in targets:
+                relative = _relative(target, root)
+                if relative is None:
+                    edges.add((importer, target))
+                    continue
+                # A name that is not itself a module (a typo'd or removed path)
+                # falls back to its longest prefix that is one.
+                while relative not in index and "." in relative:
+                    relative = relative.rsplit(".", 1)[0]
+                if relative != importer:
+                    edges.add((importer, relative))
+    return edges
+
+
+def package_of(module: str) -> str:
+    """The package node of a module name relative to the package root.
+
+    The first dotted component, except that ``analysis.<pkg>`` is its own node
+    (``analysis.hippocampus.swr_source`` -> ``analysis.hippocampus``,
+    ``analysis.constants`` -> ``analysis.constants``). The root package is
+    ``""``.
+    """
+    parts = module.split(".")
+    if parts[0] == "analysis" and len(parts) > 1:
+        return ".".join(parts[:2])
+    return parts[0]
+
+
+def package_graph(root: Path = SRC) -> dict[str, set[str]]:
+    """Package node -> the other package nodes it imports, within ``root``."""
+    index = _module_index(root)
+    graph: dict[str, set[str]] = {package_of(m): set() for m in index}
+    for importer, imported in module_edges(root):
+        if imported not in index:
+            continue
+        a, b = package_of(importer), package_of(imported)
+        if a != b:
+            graph[a].add(b)
+    return graph
+
+
+def _strongly_connected_components(graph: dict[str, set[str]]) -> list[set[str]]:
+    """Tarjan's algorithm, iteratively; every node appears in one component."""
+    index_of: dict[str, int] = {}
+    lowlink: dict[str, int] = {}
+    on_stack: set[str] = set()
+    stack: list[str] = []
+    components: list[set[str]] = []
+    counter = 0
+    for start in sorted(graph):
+        if start in index_of:
+            continue
+        work = [(start, iter(sorted(graph[start])))]
+        index_of[start] = lowlink[start] = counter
+        counter += 1
+        stack.append(start)
+        on_stack.add(start)
+        while work:
+            node, children = work[-1]
+            for child in children:
+                if child not in index_of:
+                    index_of[child] = lowlink[child] = counter
+                    counter += 1
+                    stack.append(child)
+                    on_stack.add(child)
+                    work.append((child, iter(sorted(graph[child]))))
+                    break
+                if child in on_stack:
+                    lowlink[node] = min(lowlink[node], index_of[child])
+            else:
+                work.pop()
+                if work:
+                    parent = work[-1][0]
+                    lowlink[parent] = min(lowlink[parent], lowlink[node])
+                if lowlink[node] == index_of[node]:
+                    component: set[str] = set()
+                    while True:
+                        member = stack.pop()
+                        on_stack.discard(member)
+                        component.add(member)
+                        if member == node:
+                            break
+                    components.append(component)
+    return components
+
+
+def _cycle_edges(graph: dict[str, set[str]]) -> set[tuple[str, str]]:
+    """Every package edge whose two ends lie on a common cycle."""
+    edges: set[tuple[str, str]] = set()
+    for component in _strongly_connected_components(graph):
+        if len(component) < 2:
+            continue
+        edges |= {(a, b) for a in component for b in graph[a] if b in component}
+    return edges
+
+
+def _starts_with(module: str, *prefixes: str) -> bool:
+    return any(module == p or module.startswith(f"{p}.") for p in prefixes)
+
+
+def rule_violations(root: Path = SRC) -> dict[str, set[tuple[str, str]]]:
+    """Each graph rule's current violations, keyed like :data:`KNOWN_VIOLATIONS`."""
+    edges = module_edges(root)
+    return {
+        "analysis_imports_no_visualization": {
+            (a, b)
+            for a, b in edges
+            if _starts_with(a, "analysis") and _starts_with(b, "visualization")
+        },
+        "src_imports_no_scripts": {
+            (a, b) for a, b in edges if _starts_with(b, "scripts")
+        },
+        "foundation_imports_no_upper_layer": {
+            (a, b)
+            for a, b in edges
+            if package_of(a) in FOUNDATION
+            and _starts_with(b, "analysis", "visualization", "scripts")
+        },
+        "hippocampus_imports_no_pfc_or_inventory_comparison": {
+            (a, b)
+            for a, b in edges
+            if _starts_with(a, "analysis.hippocampus")
+            and _starts_with(b, "analysis.pfc", "analysis.inventory_comparison")
+        },
+        "no_package_cycles": _cycle_edges(package_graph(root)),
+    }
+
+
+def test_the_graph_is_not_vacuous() -> None:
+    """The scan sees the packages the rules are about, and their known edges."""
+    graph = package_graph()
+    for node in (
+        "analysis.hippocampus",
+        "analysis.replay",
+        "analysis.pfc",
+        "data_loaders",
+    ):
+        assert node in graph, f"{node} missing from the package graph"
+    assert "analysis.hippocampus" in graph["analysis.replay"]
+    assert set(FOUNDATION) <= set(graph), sorted(set(FOUNDATION) - set(graph))
+
+
+@pytest.mark.parametrize("rule", sorted(KNOWN_VIOLATIONS))
+def test_layering_rule(rule: str) -> None:
+    """A rule's violations are exactly its known, allowlisted ones."""
+    violations = rule_violations()[rule]
+    new = violations - KNOWN_VIOLATIONS[rule]
+    stale = KNOWN_VIOLATIONS[rule] - violations
+    assert not new, f"{rule}: new violations:\n" + "\n".join(map(str, sorted(new)))
+    assert not stale, (
+        f"{rule}: allowlisted edges that no longer occur; delete them from "
+        "KNOWN_VIOLATIONS:\n" + "\n".join(map(str, sorted(stale)))
+    )
+
+
+def test_graph_rules_see_function_local_imports_and_cycles(tmp_path: Path) -> None:
+    """A cycle closed by a lazy, function-local import is still a cycle.
+
+    The same synthetic tree checks that a relative import resolves to the
+    module it names and that an import of ``scripts`` is seen.
+    """
+    root = tmp_path / "continuum_swr_replay"
+    for package in ("analysis/alpha", "analysis/beta", "visualization"):
+        (root / package).mkdir(parents=True)
+        (root / package / "__init__.py").write_text("")
+    (root / "__init__.py").write_text("")
+    (root / "analysis" / "__init__.py").write_text("")
+    (root / "analysis" / "alpha" / "a.py").write_text(
+        "from continuum_swr_replay.analysis.beta import b\n"
+    )
+    (root / "analysis" / "beta" / "b.py").write_text(
+        "import scripts.qa.tool\n"
+        "def f():\n    from ..alpha.a import x\n    from ...visualization import v\n"
+    )
+    (root / "visualization" / "v.py").write_text("")
+
+    found = rule_violations(root)
+    assert found["no_package_cycles"] == {
+        ("analysis.alpha", "analysis.beta"),
+        ("analysis.beta", "analysis.alpha"),
+    }
+    assert found["analysis_imports_no_visualization"] == {
+        ("analysis.beta.b", "visualization.v")
+    }
+    assert found["src_imports_no_scripts"] == {("analysis.beta.b", "scripts.qa.tool")}

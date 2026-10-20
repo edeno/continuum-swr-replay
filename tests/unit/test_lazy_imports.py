@@ -21,9 +21,12 @@ with the offending import statement.
 
 from __future__ import annotations
 
+import importlib
 import subprocess
 import sys
 import textwrap
+
+import pytest
 
 # Every import statement here must complete in a fresh interpreter
 # without dragging ``spyglass.*`` into ``sys.modules``. Comments after
@@ -84,10 +87,11 @@ def test_no_lazy_import_loads_spyglass():
         [sys.executable, "-c", code],
         capture_output=True,
         text=True,
-        # Guards against a hang, not against slowness. The import chain costs
-        # ~46 s on this machine, dominated by third-party packages pulled in
-        # through the package __init__: non_local_detector (~22 s) and
-        # statsmodels.api (~8 s), measured with `python -X importtime`. The
+        # Guards against a hang, not against slowness. The import chain cost
+        # ~46 s on this machine when the replay package __init__ was eager,
+        # dominated by non_local_detector (~22 s) and statsmodels.api (~8 s),
+        # measured with `python -X importtime`; the fitting and glm leaves
+        # still pull both in. The
         # old 30 s budget failed whenever the filesystem cache was cold, which
         # reads as a broken lazy-import contract when the contract is fine
         # (the subprocess exits 0 and prints OK).
@@ -147,3 +151,93 @@ def test_decode_file_readers_do_not_load_the_dask_scheduler():
         f"stdout: {result.stdout}\nstderr: {result.stderr}"
     )
     assert "OK" in result.stdout
+
+
+# Leaf modules other packages import for a row key, a cohort rule, a column
+# registry or a model ladder. Each one is free of JAX, ``non_local_detector``
+# and ``statsmodels`` now that the replay and PFC package ``__init__``s are
+# lazy; before, every one of them cost ~4.5 s and loaded all three (the
+# code-organization review, F1). The two package roots are listed first: a
+# re-export made eager again would load the heavy chain for every leaf.
+JAX_FREE: list[str] = [
+    "continuum_swr_replay.analysis.replay",
+    "continuum_swr_replay.analysis.pfc",
+    "continuum_swr_replay.analysis.replay.event_ids",
+    "continuum_swr_replay.analysis.replay.cohort_selection",
+    "continuum_swr_replay.analysis.replay.covariate_registry",
+    "continuum_swr_replay.analysis.replay.versions",
+    "continuum_swr_replay.analysis.replay.standardization",
+    "continuum_swr_replay.analysis.replay.design_constants",
+    "continuum_swr_replay.table_parity",
+    "continuum_swr_replay.analysis.pfc.cohort",
+    "continuum_swr_replay.analysis.replay.model_specs",
+]
+
+#: Leaf modules that should be JAX-free but are not yet, each with the import
+#: chain that loads JAX. Empty: every leaf above is clean.
+JAX_FREE_PENDING: dict[str, str] = {}
+
+_HEAVY_MODULES = ("jax", "non_local_detector", "statsmodels")
+
+
+def test_leaf_modules_do_not_load_jax():
+    """Import every ``JAX_FREE`` module in one fresh interpreter; fail on the
+    first one that puts JAX, ``non_local_detector`` or ``statsmodels`` into
+    ``sys.modules``."""
+    code = textwrap.dedent(
+        """
+        import importlib
+        import sys
+        heavy = {heavy!r}
+        for module in {modules!r}:
+            importlib.import_module(module)
+            leaked = sorted(
+                m for m in sys.modules
+                if any(m == h or m.startswith(h + ".") for h in heavy)
+            )
+            if leaked:
+                print(f"LEAKED after importing {{module}}: {{','.join(leaked[:10])}}")
+                sys.exit(1)
+        print("OK")
+        """
+    ).format(heavy=_HEAVY_MODULES, modules=JAX_FREE)
+
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        timeout=180,  # a hang guard, as above
+    )
+    assert result.returncode == 0, (
+        f"a JAX-free leaf module loads a heavy dependency.\n"
+        f"stdout: {result.stdout}\nstderr: {result.stderr}"
+    )
+    assert "OK" in result.stdout
+
+
+def test_jax_free_lists_are_disjoint():
+    assert not set(JAX_FREE) & set(JAX_FREE_PENDING)
+
+
+@pytest.mark.parametrize(
+    "package",
+    ["continuum_swr_replay.analysis.replay", "continuum_swr_replay.analysis.pfc"],
+)
+def test_every_lazy_export_imports_by_name(package):
+    """``from <package> import <name>`` works for every name in ``__all__``,
+    and binds the object its submodule defines."""
+    module = importlib.import_module(package)
+    assert set(module.__all__) == set(module._LAZY_EXPORTS)
+    for name in module.__all__:
+        namespace: dict[str, object] = {}
+        exec(f"from {package} import {name}", namespace)  # noqa: S102
+        target = module._LAZY_EXPORTS[name]
+        submodule, attribute = target if isinstance(target, tuple) else (target, name)
+        defining = importlib.import_module(f"{package}.{submodule}")
+        assert namespace[name] is getattr(defining, attribute), name
+
+
+def test_an_unknown_name_is_an_attribute_error():
+    module = importlib.import_module("continuum_swr_replay.analysis.replay")
+    with pytest.raises(AttributeError, match="no_such_name"):
+        module.no_such_name  # noqa: B018

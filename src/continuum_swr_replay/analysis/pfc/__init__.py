@@ -60,22 +60,42 @@ Examples
 
 """
 
-from continuum_swr_replay.analysis.pfc.glm import (
-    MatchedControlDraw,
-    build_session_event_sets,
-    build_session_fit_mask,
-    get_spikecount_per_time_bin,
-    make_matched_control_times,
-    matched_control_seed,
-    process_neuron,
-    run_session,
-)
-from continuum_swr_replay.analysis.pfc.glm import (
-    _fit_immobility_models as fit_immobility_models,
-)
-from continuum_swr_replay.analysis.pfc.glm import (
-    _make_design_matrices as make_design_matrices,
-)
+from __future__ import annotations
+
+import importlib
+from typing import TYPE_CHECKING
+
+# Public names are exposed through PEP 562 ``__getattr__`` so that importing a
+# leaf submodule (e.g. ``continuum_swr_replay.analysis.pfc.cohort``) does not
+# run ``glm``, which imports dask and statsmodels at module top level and,
+# through the replay and hippocampus packages, ``non_local_detector`` and JAX.
+
+#: Exported name -> (submodule of this package, attribute it is bound to).
+_LAZY_EXPORTS = {
+    "MatchedControlDraw": ("glm", "MatchedControlDraw"),
+    "build_session_event_sets": ("glm", "build_session_event_sets"),
+    "build_session_fit_mask": ("glm", "build_session_fit_mask"),
+    "fit_immobility_models": ("glm", "_fit_immobility_models"),
+    "get_spikecount_per_time_bin": ("glm", "get_spikecount_per_time_bin"),
+    "make_design_matrices": ("glm", "_make_design_matrices"),
+    "make_matched_control_times": ("glm", "make_matched_control_times"),
+    "matched_control_seed": ("glm", "matched_control_seed"),
+    "process_neuron": ("glm", "process_neuron"),
+    "run_session": ("glm", "run_session"),
+}
+
+
+def __getattr__(name: str):
+    """Import an exported name from its submodule on first attribute access."""
+    target = _LAZY_EXPORTS.get(name)
+    if target is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module_name, attribute = target
+    module = importlib.import_module(f"{__name__}.{module_name}")
+    attr = getattr(module, attribute)
+    globals()[name] = attr
+    return attr
+
 
 __all__ = [
     "MatchedControlDraw",
@@ -89,3 +109,18 @@ __all__ = [
     "process_neuron",
     "run_session",
 ]
+
+
+if TYPE_CHECKING:  # pragma: no cover - types only
+    from .glm import (  # noqa: F401
+        MatchedControlDraw,
+        build_session_event_sets,
+        build_session_fit_mask,
+        get_spikecount_per_time_bin,
+        make_matched_control_times,
+        matched_control_seed,
+        process_neuron,
+        run_session,
+    )
+    from .glm import _fit_immobility_models as fit_immobility_models  # noqa: F401
+    from .glm import _make_design_matrices as make_design_matrices  # noqa: F401
