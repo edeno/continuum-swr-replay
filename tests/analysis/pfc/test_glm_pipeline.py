@@ -2356,14 +2356,14 @@ class TestProcessNeuronExcludedTime:
         )
 
     def test_the_session_runner_passes_excluded_time(self):
-        """``run_session`` gives every neuron the session's excluded bins."""
+        """``run_session``'s neuron stage gives every neuron the excluded bins."""
         import ast
         import inspect
         import textwrap
 
-        from continuum_swr_replay.analysis.pfc.session import run_session
+        from continuum_swr_replay.analysis.pfc.session import _fit_session_neurons
 
-        tree = ast.parse(textwrap.dedent(inspect.getsource(run_session)))
+        tree = ast.parse(textwrap.dedent(inspect.getsource(_fit_session_neurons)))
         neuron_args = next(
             node
             for node in ast.walk(tree)

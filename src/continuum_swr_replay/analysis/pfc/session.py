@@ -7,7 +7,7 @@ and one session (``run_session``).
 """
 
 import logging
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 import dask
@@ -40,6 +40,7 @@ from continuum_swr_replay.analysis.pfc.fit import (
     test_theta_modulation,
 )
 from continuum_swr_replay.analysis.pfc.matched_control import (
+    MatchedControlDraw,
     artifact_dropped_events,
     make_matched_control_times,
     matched_control_seed,
@@ -321,23 +322,14 @@ def process_neuron(
             sampling_frequency=sampling_frequency,
             design=theta_design,
         )
-        neuron_stats["run_avg_firing_rate"] = (
-            neuron_spike_count[running_bins].mean() * sampling_frequency
-        )
-
-        # Get immobility SWR/non-local statistics. This is the mean rate over
-        # the bins the models are actually fit on, so the downstream
-        # minimum-firing-rate inclusion gate screens the sample the estimates
-        # come from rather than a wider one. The column name is the same across
-        # cohorts, so the rate over every immobile bin outside excluded time is
-        # carried alongside it: the pair makes a bundle's cohort readable from
-        # the table itself (the two are equal exactly when no stop restriction
-        # was applied).
-        neuron_stats["immobility_avg_firing_rate"] = (
-            neuron_spike_count[fit_mask].mean() * sampling_frequency
-        )
-        neuron_stats["immobility_avg_firing_rate_all_immobile"] = (
-            neuron_spike_count[immobile_bins].mean() * sampling_frequency
+        neuron_stats.update(
+            _firing_rates(
+                neuron_spike_count,
+                running_bins,
+                fit_mask,
+                immobile_bins,
+                sampling_frequency,
+            )
         )
 
         results, _ = _fit_immobility_models(
@@ -357,11 +349,7 @@ def process_neuron(
         # still has a ``SWR`` fit that says something. Failing the whole neuron
         # would discard that, and would do it silently -- the neuron would come
         # back with firing rates and no statistics at all.
-        failed_models = {
-            name
-            for name, res in results.items()
-            if np.any(np.isnan(res.params)) or not bool(getattr(res, "converged", True))
-        }
+        failed_models = _failed_models(results)
         if failed_models:
             _logger.warning(
                 "No usable fit for models %s (NaN parameters, or no "
@@ -374,177 +362,33 @@ def process_neuron(
         if fit_diagnostics_out is not None:
             fit_diagnostics_out.update(_fit_diagnostics(results))
 
-        # Detect non-estimable models. ``_make_conv_spline_basis``
-        # builds spline regressors for every event class regardless
-        # of whether that class has any events; an empty event class
-        # leaves its spline columns all-zero, so the design matrix is
-        # rank-deficient against the intercept. The fitter still
-        # returns finite (zero) parameters for those columns and
-        # finite degenerate LR / fractional-deviance values, so the
-        # failed-fit check above doesn't catch them. Mark every
-        # rank-deficient design as non-estimable up front and route
-        # the affected deviance fractions and modulation
-        # extractions to NaN below — so downstream consumers can
-        # tell "absent event class" from "estimated zero effect".
-        non_estimable_models = set(failed_models)
-        for name, design in immobility_design_matrices.items():
-            X_im = design[fit_mask]
-            if X_im.shape[0] == 0:
-                non_estimable_models.add(name)
-                continue
-            # The rank is a property of the design, which every neuron of a
-            # session shares, so a session-level caller supplies it rather than
-            # paying for the same decomposition once per neuron.
-            rank = (
-                np.linalg.matrix_rank(X_im)
-                if design_ranks is None
-                else design_ranks[name]
-            )
-            if rank < X_im.shape[1]:
-                non_estimable_models.add(name)
+        non_estimable_models = _non_estimable_models(
+            failed_models, immobility_design_matrices, fit_mask, design_ranks
+        )
 
-        ## Effect sizes: the deviance each nested pair's added regressors buy
-        # frac_null_dev: (reduced - full) / constant deviance
-        #   = fraction of total deviance uniquely explained by added regressors
-        # frac_explained_dev: (reduced - full) / (constant - full)
-        #   = fraction of full model's explained deviance due to added
-        #     regressors
-        #
-        # These are ratios of deviances, not tests. No likelihood ratio and no
-        # AIC is computed here: the fits carry a prior on the event-basis
-        # coefficients, so a likelihood ratio has no chi-square reference
-        # distribution at any stated degrees of freedom and an AIC has no
-        # stated number of parameters. What the models are compared by is the
-        # held-out deviance the runner scores them on.
-        for model1, model2 in NESTED_MODEL_PAIRS:
-            test_name = f"{model1} vs. {model2}"
-            if (
-                model1 in non_estimable_models
-                or model2 in non_estimable_models
-                or "constant" in non_estimable_models
-            ):
-                neuron_stats[f"{test_name}: frac_null_dev"] = np.nan
-                neuron_stats[f"{test_name}: frac_explained_dev"] = np.nan
-            else:
-                neuron_stats[f"{test_name}: frac_null_dev"] = get_frac_null_deviance(
-                    results[model1], results[model2], results["constant"]
-                )
-                neuron_stats[f"{test_name}: frac_explained_dev"] = (
-                    get_frac_explained_deviance(
-                        results[model1], results[model2], results["constant"]
-                    )
-                )
+        neuron_stats.update(_deviance_fractions(results, non_estimable_models))
 
-        ## Modulation time courses
-        # Share fits with the deviance-fraction path so neuron_stats and
-        # the modulation arrays can never disagree due to divergent
-        # IRLS convergence. When the source model is non-estimable
-        # (rank-deficient design — typically an absent event class),
-        # the spline-by-coefficient product would silently emit a
-        # zero curve from statsmodels' degenerate fit; route those
-        # to NaN so consumers can tell "absent event class" from
-        # "estimated zero modulation".
-        n_basis_functions = spline_basis.shape[1]
-        nan_modulation = np.full(spline_basis.shape[0], np.nan)
-
-        # SWR-controlled model: SWR and non-SWR replay modulation
-        # controlling for all whole-event-speed-eligible ripples
-        if "SWR + non_local_no_SWR" in non_estimable_models:
-            swr_modulation = nan_modulation
-            no_swr_modulation = nan_modulation
-            neuron_stats["SWR_max_mod"] = np.nan
-            neuron_stats["SWR_max_mod_time"] = np.nan
-            neuron_stats["non_local_no_SWR_max_mod"] = np.nan
-            neuron_stats["non_local_no_SWR_max_mod_time"] = np.nan
-        else:
-            swr_ctrl_params = results["SWR + non_local_no_SWR"].params
-            swr_modulation = spline_basis @ swr_ctrl_params[1 : n_basis_functions + 1]
-            no_swr_modulation = spline_basis @ swr_ctrl_params[n_basis_functions + 1 :]
-
-            swr_max_mod_ind = np.argmax(np.abs(swr_modulation))
-            neuron_stats["SWR_max_mod"] = swr_modulation[swr_max_mod_ind]
-            neuron_stats["SWR_max_mod_time"] = lag_time[swr_max_mod_ind]
-
-            no_swr_max_mod_ind = np.argmax(np.abs(no_swr_modulation))
-            neuron_stats["non_local_no_SWR_max_mod"] = no_swr_modulation[
-                no_swr_max_mod_ind
-            ]
-            neuron_stats["non_local_no_SWR_max_mod_time"] = lag_time[no_swr_max_mod_ind]
-
-        # Replay-split model: SWR-replay and non-SWR replay modulation
-        # controlling for replay-coincident ripples only. The blocks are read
-        # in the order ``_make_design_matrices`` concatenates them --
-        # ``[constant, non_local_no_SWR, non_local_SWR]`` -- which is NOT the
-        # order the model's name lists them in. Reading them by the name's
-        # order is exactly the bug this comment exists to prevent: between
-        # 2026-04-24 and 2026-09-15 each curve carried the other class's
-        # kernel, and so did ``non_local_SWR_max_mod`` and
-        # ``non_local_no_SWR_split_max_mod``.
-        if "non_local_SWR + non_local_no_SWR" in non_estimable_models:
-            non_local_swr_modulation = nan_modulation
-            non_local_no_swr_modulation = nan_modulation
-            neuron_stats["non_local_SWR_max_mod"] = np.nan
-            neuron_stats["non_local_SWR_max_mod_time"] = np.nan
-            neuron_stats["non_local_no_SWR_split_max_mod"] = np.nan
-            neuron_stats["non_local_no_SWR_split_max_mod_time"] = np.nan
-        else:
-            replay_split_params = results["non_local_SWR + non_local_no_SWR"].params
-            non_local_no_swr_modulation = (
-                spline_basis @ replay_split_params[1 : n_basis_functions + 1]
-            )
-            non_local_swr_modulation = (
-                spline_basis @ replay_split_params[n_basis_functions + 1 :]
-            )
-
-            non_local_swr_max_ind = np.argmax(np.abs(non_local_swr_modulation))
-            neuron_stats["non_local_SWR_max_mod"] = non_local_swr_modulation[
-                non_local_swr_max_ind
-            ]
-            neuron_stats["non_local_SWR_max_mod_time"] = lag_time[non_local_swr_max_ind]
-
-            non_local_no_swr_max_ind = np.argmax(np.abs(non_local_no_swr_modulation))
-            neuron_stats["non_local_no_SWR_split_max_mod"] = (
-                non_local_no_swr_modulation[non_local_no_swr_max_ind]
-            )
-            neuron_stats["non_local_no_SWR_split_max_mod_time"] = lag_time[
-                non_local_no_swr_max_ind
-            ]
-
-        # Matched-control model: the non-event baseline's own peri-window
-        # modulation, taken from the joint engagement model so it is the
-        # baseline response after accounting for real non-SWR replay --
-        # the same model the engagement comparison is run on.
-        if "matched_control + non_local_no_SWR" in non_estimable_models:
-            matched_control_modulation = nan_modulation
-            neuron_stats["matched_control_max_mod"] = np.nan
-            neuron_stats["matched_control_max_mod_time"] = np.nan
-        else:
-            engagement_params = results["matched_control + non_local_no_SWR"].params
-            matched_control_modulation = (
-                spline_basis @ engagement_params[1 : n_basis_functions + 1]
-            )
-            matched_control_max_ind = np.argmax(np.abs(matched_control_modulation))
-            neuron_stats["matched_control_max_mod"] = matched_control_modulation[
-                matched_control_max_ind
-            ]
-            neuron_stats["matched_control_max_mod_time"] = lag_time[
-                matched_control_max_ind
-            ]
+        (
+            modulation_stats,
+            swr_modulation,
+            no_swr_modulation,
+            non_local_swr_modulation,
+            non_local_no_swr_modulation,
+            matched_control_modulation,
+        ) = _modulation_curves(results, non_estimable_models, spline_basis, lag_time)
+        neuron_stats.update(modulation_stats)
 
     except (ValueError, np.linalg.LinAlgError):
         _logger.warning(
             "GLM fitting failed for neuron; falling back to firing rates only",
             exc_info=True,
         )
-        neuron_stats = {}
-        neuron_stats["run_avg_firing_rate"] = (
-            neuron_spike_count[running_bins].mean() * sampling_frequency
-        )
-        neuron_stats["immobility_avg_firing_rate"] = (
-            neuron_spike_count[fit_mask].mean() * sampling_frequency
-        )
-        neuron_stats["immobility_avg_firing_rate_all_immobile"] = (
-            neuron_spike_count[immobile_bins].mean() * sampling_frequency
+        neuron_stats = _firing_rates(
+            neuron_spike_count,
+            running_bins,
+            fit_mask,
+            immobile_bins,
+            sampling_frequency,
         )
         nan_modulation = np.full(spline_basis.shape[0], np.nan)
         swr_modulation = nan_modulation
@@ -553,6 +397,299 @@ def process_neuron(
         non_local_no_swr_modulation = nan_modulation
         matched_control_modulation = nan_modulation
 
+    return (
+        neuron_stats,
+        swr_modulation,
+        no_swr_modulation,
+        non_local_swr_modulation,
+        non_local_no_swr_modulation,
+        matched_control_modulation,
+    )
+
+
+def _firing_rates(
+    neuron_spike_count: NDArray,
+    running_bins: NDArray,
+    fit_mask: pd.Series,
+    immobile_bins: NDArray,
+    sampling_frequency: float,
+) -> dict[str, float]:
+    """One neuron's descriptive firing rates, in Hz.
+
+    Parameters
+    ----------
+    neuron_spike_count : NDArray, shape (n_time,)
+        Spike counts on the session's time bins.
+    running_bins : NDArray of bool, shape (n_time,)
+        Moving bins outside excluded time.
+    fit_mask : pd.Series of bool, shape (n_time,)
+        Bins the immobility models are fit on.
+    immobile_bins : NDArray of bool, shape (n_time,)
+        Immobile bins outside excluded time, cohort or not.
+    sampling_frequency : float
+        Bins per second.
+
+    Returns
+    -------
+    dict
+        ``run_avg_firing_rate``, ``immobility_avg_firing_rate`` and
+        ``immobility_avg_firing_rate_all_immobile``, in that order.
+    """
+    neuron_stats: dict[str, float] = {}
+    neuron_stats["run_avg_firing_rate"] = (
+        neuron_spike_count[running_bins].mean() * sampling_frequency
+    )
+
+    # Get immobility SWR/non-local statistics. This is the mean rate over
+    # the bins the models are actually fit on, so the downstream
+    # minimum-firing-rate inclusion gate screens the sample the estimates
+    # come from rather than a wider one. The column name is the same across
+    # cohorts, so the rate over every immobile bin outside excluded time is
+    # carried alongside it: the pair makes a bundle's cohort readable from
+    # the table itself (the two are equal exactly when no stop restriction
+    # was applied).
+    neuron_stats["immobility_avg_firing_rate"] = (
+        neuron_spike_count[fit_mask].mean() * sampling_frequency
+    )
+    neuron_stats["immobility_avg_firing_rate_all_immobile"] = (
+        neuron_spike_count[immobile_bins].mean() * sampling_frequency
+    )
+    return neuron_stats
+
+
+def _failed_models(results: Mapping[str, Any]) -> set[str]:
+    """Models whose fit has NaN parameters or never converged."""
+    return {
+        name
+        for name, res in results.items()
+        if np.any(np.isnan(res.params)) or not bool(getattr(res, "converged", True))
+    }
+
+
+def _non_estimable_models(
+    failed_models: set[str],
+    immobility_design_matrices: Mapping[str, NDArray],
+    fit_mask: pd.Series,
+    design_ranks: Mapping[str, int] | None,
+) -> set[str]:
+    """The failed models plus every model whose design is rank-deficient.
+
+    Parameters
+    ----------
+    failed_models : set of str
+        Models with no usable fit (:func:`_failed_models`).
+    immobility_design_matrices : Mapping[str, NDArray]
+        Design matrices keyed by model name, each ``(n_time, n_features)``.
+    fit_mask : pd.Series of bool, shape (n_time,)
+        Bins the models are fit on.
+    design_ranks : Mapping[str, int] or None
+        Each design's rank on ``fit_mask``, or None to compute it here.
+
+    Returns
+    -------
+    set of str
+    """
+    # Detect non-estimable models. ``_make_conv_spline_basis``
+    # builds spline regressors for every event class regardless
+    # of whether that class has any events; an empty event class
+    # leaves its spline columns all-zero, so the design matrix is
+    # rank-deficient against the intercept. The fitter still
+    # returns finite (zero) parameters for those columns and
+    # finite degenerate LR / fractional-deviance values, so the
+    # failed-fit check (``_failed_models``) doesn't catch them. Mark every
+    # rank-deficient design as non-estimable up front so the caller routes
+    # the affected deviance fractions and modulation
+    # extractions to NaN — so downstream consumers can
+    # tell "absent event class" from "estimated zero effect".
+    non_estimable_models = set(failed_models)
+    for name, design in immobility_design_matrices.items():
+        X_im = design[fit_mask]
+        if X_im.shape[0] == 0:
+            non_estimable_models.add(name)
+            continue
+        # The rank is a property of the design, which every neuron of a
+        # session shares, so a session-level caller supplies it rather than
+        # paying for the same decomposition once per neuron.
+        rank = (
+            np.linalg.matrix_rank(X_im) if design_ranks is None else design_ranks[name]
+        )
+        if rank < X_im.shape[1]:
+            non_estimable_models.add(name)
+    return non_estimable_models
+
+
+def _deviance_fractions(
+    results: Mapping[str, Any], non_estimable_models: set[str]
+) -> dict[str, float]:
+    """``frac_null_dev`` and ``frac_explained_dev`` of every nested model pair.
+
+    Parameters
+    ----------
+    results : Mapping[str, Any]
+        Fitted results keyed by model name.
+    non_estimable_models : set of str
+        Models whose pairs are reported as NaN.
+
+    Returns
+    -------
+    dict
+        ``"{full} vs. {reduced}: frac_null_dev"`` and ``...: frac_explained_dev``
+        for each pair of :data:`NESTED_MODEL_PAIRS`, in its order.
+    """
+    neuron_stats: dict[str, float] = {}
+    ## Effect sizes: the deviance each nested pair's added regressors buy
+    # frac_null_dev: (reduced - full) / constant deviance
+    #   = fraction of total deviance uniquely explained by added regressors
+    # frac_explained_dev: (reduced - full) / (constant - full)
+    #   = fraction of full model's explained deviance due to added
+    #     regressors
+    #
+    # These are ratios of deviances, not tests. No likelihood ratio and no
+    # AIC is computed here: the fits carry a prior on the event-basis
+    # coefficients, so a likelihood ratio has no chi-square reference
+    # distribution at any stated degrees of freedom and an AIC has no
+    # stated number of parameters. What the models are compared by is the
+    # held-out deviance the runner scores them on.
+    for model1, model2 in NESTED_MODEL_PAIRS:
+        test_name = f"{model1} vs. {model2}"
+        if (
+            model1 in non_estimable_models
+            or model2 in non_estimable_models
+            or "constant" in non_estimable_models
+        ):
+            neuron_stats[f"{test_name}: frac_null_dev"] = np.nan
+            neuron_stats[f"{test_name}: frac_explained_dev"] = np.nan
+        else:
+            neuron_stats[f"{test_name}: frac_null_dev"] = get_frac_null_deviance(
+                results[model1], results[model2], results["constant"]
+            )
+            neuron_stats[f"{test_name}: frac_explained_dev"] = (
+                get_frac_explained_deviance(
+                    results[model1], results[model2], results["constant"]
+                )
+            )
+    return neuron_stats
+
+
+def _modulation_curves(
+    results: Mapping[str, Any],
+    non_estimable_models: set[str],
+    spline_basis: NDArray,
+    lag_time: NDArray,
+) -> tuple[dict[str, float], NDArray, NDArray, NDArray, NDArray, NDArray]:
+    """The peri-event modulation curves and their peaks, from the fitted models.
+
+    Parameters
+    ----------
+    results : Mapping[str, Any]
+        Fitted results keyed by model name.
+    non_estimable_models : set of str
+        Models whose curves and peaks are NaN.
+    spline_basis : NDArray, shape (n_lags, n_basis)
+        Spline basis the event coefficients multiply.
+    lag_time : NDArray, shape (n_lags,)
+        Lag of each basis row, in seconds.
+
+    Returns
+    -------
+    neuron_stats : dict
+        The ``*_max_mod`` and ``*_max_mod_time`` statistics.
+    swr_modulation, no_swr_modulation, non_local_swr_modulation, \
+non_local_no_swr_modulation, matched_control_modulation : NDArray, shape (n_lags,)
+        As :func:`process_neuron` returns them.
+    """
+    neuron_stats: dict[str, float] = {}
+    ## Modulation time courses
+    # Share fits with the deviance-fraction path so neuron_stats and
+    # the modulation arrays can never disagree due to divergent
+    # IRLS convergence. When the source model is non-estimable
+    # (rank-deficient design — typically an absent event class),
+    # the spline-by-coefficient product would silently emit a
+    # zero curve from statsmodels' degenerate fit; route those
+    # to NaN so consumers can tell "absent event class" from
+    # "estimated zero modulation".
+    n_basis_functions = spline_basis.shape[1]
+    nan_modulation = np.full(spline_basis.shape[0], np.nan)
+
+    # SWR-controlled model: SWR and non-SWR replay modulation
+    # controlling for all whole-event-speed-eligible ripples
+    if "SWR + non_local_no_SWR" in non_estimable_models:
+        swr_modulation = nan_modulation
+        no_swr_modulation = nan_modulation
+        neuron_stats["SWR_max_mod"] = np.nan
+        neuron_stats["SWR_max_mod_time"] = np.nan
+        neuron_stats["non_local_no_SWR_max_mod"] = np.nan
+        neuron_stats["non_local_no_SWR_max_mod_time"] = np.nan
+    else:
+        swr_ctrl_params = results["SWR + non_local_no_SWR"].params
+        swr_modulation = spline_basis @ swr_ctrl_params[1 : n_basis_functions + 1]
+        no_swr_modulation = spline_basis @ swr_ctrl_params[n_basis_functions + 1 :]
+
+        swr_max_mod_ind = np.argmax(np.abs(swr_modulation))
+        neuron_stats["SWR_max_mod"] = swr_modulation[swr_max_mod_ind]
+        neuron_stats["SWR_max_mod_time"] = lag_time[swr_max_mod_ind]
+
+        no_swr_max_mod_ind = np.argmax(np.abs(no_swr_modulation))
+        neuron_stats["non_local_no_SWR_max_mod"] = no_swr_modulation[no_swr_max_mod_ind]
+        neuron_stats["non_local_no_SWR_max_mod_time"] = lag_time[no_swr_max_mod_ind]
+
+    # Replay-split model: SWR-replay and non-SWR replay modulation
+    # controlling for replay-coincident ripples only. The blocks are read
+    # in the order ``_make_design_matrices`` concatenates them --
+    # ``[constant, non_local_no_SWR, non_local_SWR]`` -- which is NOT the
+    # order the model's name lists them in. Reading them by the name's
+    # order is exactly the bug this comment exists to prevent: between
+    # 2026-04-24 and 2026-09-15 each curve carried the other class's
+    # kernel, and so did ``non_local_SWR_max_mod`` and
+    # ``non_local_no_SWR_split_max_mod``.
+    if "non_local_SWR + non_local_no_SWR" in non_estimable_models:
+        non_local_swr_modulation = nan_modulation
+        non_local_no_swr_modulation = nan_modulation
+        neuron_stats["non_local_SWR_max_mod"] = np.nan
+        neuron_stats["non_local_SWR_max_mod_time"] = np.nan
+        neuron_stats["non_local_no_SWR_split_max_mod"] = np.nan
+        neuron_stats["non_local_no_SWR_split_max_mod_time"] = np.nan
+    else:
+        replay_split_params = results["non_local_SWR + non_local_no_SWR"].params
+        non_local_no_swr_modulation = (
+            spline_basis @ replay_split_params[1 : n_basis_functions + 1]
+        )
+        non_local_swr_modulation = (
+            spline_basis @ replay_split_params[n_basis_functions + 1 :]
+        )
+
+        non_local_swr_max_ind = np.argmax(np.abs(non_local_swr_modulation))
+        neuron_stats["non_local_SWR_max_mod"] = non_local_swr_modulation[
+            non_local_swr_max_ind
+        ]
+        neuron_stats["non_local_SWR_max_mod_time"] = lag_time[non_local_swr_max_ind]
+
+        non_local_no_swr_max_ind = np.argmax(np.abs(non_local_no_swr_modulation))
+        neuron_stats["non_local_no_SWR_split_max_mod"] = non_local_no_swr_modulation[
+            non_local_no_swr_max_ind
+        ]
+        neuron_stats["non_local_no_SWR_split_max_mod_time"] = lag_time[
+            non_local_no_swr_max_ind
+        ]
+
+    # Matched-control model: the non-event baseline's own peri-window
+    # modulation, taken from the joint engagement model so it is the
+    # baseline response after accounting for real non-SWR replay --
+    # the same model the engagement comparison is run on.
+    if "matched_control + non_local_no_SWR" in non_estimable_models:
+        matched_control_modulation = nan_modulation
+        neuron_stats["matched_control_max_mod"] = np.nan
+        neuron_stats["matched_control_max_mod_time"] = np.nan
+    else:
+        engagement_params = results["matched_control + non_local_no_SWR"].params
+        matched_control_modulation = (
+            spline_basis @ engagement_params[1 : n_basis_functions + 1]
+        )
+        matched_control_max_ind = np.argmax(np.abs(matched_control_modulation))
+        neuron_stats["matched_control_max_mod"] = matched_control_modulation[
+            matched_control_max_ind
+        ]
+        neuron_stats["matched_control_max_mod_time"] = lag_time[matched_control_max_ind]
     return (
         neuron_stats,
         swr_modulation,
@@ -869,25 +1006,196 @@ def run_session(
     :func:`matched_control_seed` derives from the session key -- a refit of one
     session redraws the batch's control population exactly.
     """
-    # Deferred imports: these helpers open Spyglass / DataJoint at
-    # import time. Keeping them function-local lets the rest of the
-    # module (pure GLM helpers + design-matrix builders) stay
-    # offline-importable for unit tests.
-    from continuum_swr_replay.analysis.events import analysed_time, swr_inventory
-    from continuum_swr_replay.analysis.hippocampus import load_results
-    from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
-        align_results_to_position,
+    _check_session_arguments(
+        fitter, penalty_sigma, immobility_threshold, non_local_threshold
     )
-    from continuum_swr_replay.analysis.pfc.canonical_events import (
-        DEFAULT_EVENT_TABLE_PATH,
-        canonical_event_provenance,
-        load_session_canonical_events,
-        load_session_swr_intervals,
-        session_data_over_time_path,
-        session_swr_events_file,
-    )
-    from continuum_swr_replay.data_loaders import load_data
 
+    logger = logging.getLogger(
+        format_epoch_identifier(nwb_file_name, epoch_name, brain_area)
+    )
+
+    results, data, position_info, alignment_counts = _load_aligned_session(
+        nwb_file_name, epoch_name, logger
+    )
+
+    position_time = position_info.index
+    time = position_time.to_numpy(dtype=float)
+
+    # Fit with wider lag window (±250ms) so spline boundary artifacts
+    # fall outside the reported window (±200ms). The returned modulation
+    # arrays are trimmed to the reporting window after fitting.
+    fit_lags = np.arange(-125, 126, 1)
+    report_lags = np.arange(-100, 101, 1)
+
+    data, excluded, is_immobile, fit_mask, bin_counts = _session_fit_population(
+        data,
+        nwb_file_name,
+        epoch_name,
+        cohort_stops=cohort_stops,
+        stop_cohort=stop_cohort,
+        immobility_threshold=immobility_threshold,
+        logger=logger,
+    )
+
+    (
+        event_times,
+        event_counts,
+        event_provenance,
+        artifact_dropped,
+        control_seed,
+        control_draw,
+    ) = _session_events(
+        data,
+        results,
+        nwb_file_name,
+        epoch_name,
+        time=time,
+        fit_mask=fit_mask,
+        fit_lags=fit_lags,
+        sampling_frequency=sampling_frequency,
+        cohort_stops=cohort_stops,
+        stop_cohort=stop_cohort,
+        non_local_threshold=non_local_threshold,
+        immobility_threshold=immobility_threshold,
+        logger=logger,
+    )
+    n_matched_control = int(len(control_draw.times))
+    cohort_info = {
+        **bin_counts,
+        **event_counts,
+        **event_provenance,
+        **fitter_provenance(fitter),
+        # Filled in after the fits: how many of the shipped fits ran to
+        # ``maxiter`` without settling. ``None`` when no neuron was fit at all,
+        # or on the statsmodels path, which never reaches the batched fitter.
+        "n_model_fits": None,
+        "n_nonconverged_model_fits": None,
+        "n_neurons_with_nonconverged_model": None,
+        "matched_control_seed": control_seed,
+        "n_matched_control": n_matched_control,
+        "n_matched_control_unplaced": control_draw.n_unplaced,
+        "n_matched_control_onset_outside_fitted_bout": (
+            control_draw.n_onset_outside_fitted_bout
+        ),
+        "n_matched_control_bout_saturated": control_draw.n_bout_saturated,
+        "alignment": alignment_counts,
+    }
+    _log_session_events(event_counts, cohort_info, control_seed, logger)
+
+    logger.info("Building design matrices...")
+    immobility_design_matrices, spline_basis, lag_time = _make_design_matrices(
+        event_times,
+        data["position_info"],
+        sampling_frequency=sampling_frequency,
+        lags=fit_lags,
+    )
+
+    if brain_area not in data["spike_times"] or not data["spike_times"][brain_area]:
+        logger.warning("No %s neurons found for this session", brain_area)
+        empty = np.empty((0, 0))
+        return pd.DataFrame(), empty, empty, empty, empty, empty, cohort_info
+
+    spike_times = data["spike_times"][brain_area]
+    # The JAX fit, held-out scorer and serial per-neuron summaries all consume
+    # the same binned response. Bin it once instead of repeating the histogram
+    # pass up to three times over every unit.
+    session_counts = None
+    if fitter == "jax" or scoring_out is not None:
+        session_counts = np.column_stack(
+            [get_spikecount_per_time_bin(neuron, time) for neuron in spike_times]
+        ).astype(float)
+
+    if scoring_out is not None:
+        # Handed over, not rebuilt: an out-of-fold score has to be taken on the
+        # bins, events and designs the shipped fit used, and reassembling them
+        # from the same functions would cost a second load of the session and
+        # could drift from what was fit.
+        scoring_out.update(
+            {
+                "fit_mask": fit_mask,
+                "counts": session_counts,
+                "designs": immobility_design_matrices,
+                "spline_basis": spline_basis,
+                "lag_time": lag_time,
+                "lags": fit_lags,
+                "event_times": event_times,
+                "artifact_dropped": artifact_dropped,
+            }
+        )
+
+    result, fit_counts, n_neurons = _fit_session_neurons(
+        spike_times,
+        data,
+        time=time,
+        is_immobile=is_immobile,
+        fit_mask=fit_mask,
+        excluded=excluded,
+        immobility_design_matrices=immobility_design_matrices,
+        spline_basis=spline_basis,
+        lag_time=lag_time,
+        brain_area=brain_area,
+        fitter=fitter,
+        penalty_sigma=penalty_sigma,
+        run_parallel=run_parallel,
+        session_counts=session_counts,
+        fit_diagnostics_out=fit_diagnostics_out,
+        logger=logger,
+    )
+    cohort_info.update(fit_counts)
+    if fit_counts["n_nonconverged_model_fits"]:
+        logger.info(
+            "%d of %d shipped model fits ran to maxiter without converging, "
+            "over %d of %d neurons. Each is non-estimable for its neuron: "
+            "every statistic that reads it is NaN, and this count is the only "
+            "record of what was dropped.",
+            fit_counts["n_nonconverged_model_fits"],
+            fit_counts["n_model_fits"],
+            fit_counts["n_neurons_with_nonconverged_model"],
+            n_neurons,
+        )
+
+    (
+        neuron_stats,
+        swr_modulation,
+        no_swr_modulation,
+        non_local_swr_modulation,
+        non_local_no_swr_modulation,
+        matched_control_modulation,
+    ) = _stack_session_outputs(result, lag_time, report_lags, sampling_frequency)
+
+    neuron_stats["nwb_file_name"] = nwb_file_name
+    neuron_stats["epoch_name"] = epoch_name
+    neuron_stats["brain_area"] = brain_area
+    neuron_stats["stop_cohort"] = stop_cohort
+
+    logger.info("Session complete: %d neurons analyzed", len(neuron_stats))
+
+    return (
+        neuron_stats,
+        swr_modulation,
+        no_swr_modulation,
+        non_local_swr_modulation,
+        non_local_no_swr_modulation,
+        matched_control_modulation,
+        cohort_info,
+    )
+
+
+def _check_session_arguments(
+    fitter: str,
+    penalty_sigma: float | None,
+    immobility_threshold: float,
+    non_local_threshold: float,
+) -> None:
+    """Refuse the :func:`run_session` arguments the canonical events cannot honour.
+
+    Raises
+    ------
+    ValueError
+        If ``penalty_sigma`` is given for a backend with no penalised path, or
+        either threshold differs from the one the canonical events were cut and
+        speed-gated at.
+    """
     _check_fitter(fitter)
     if penalty_sigma is not None and fitter != "jax":
         raise ValueError(
@@ -913,9 +1221,31 @@ def run_session(
             "honoured here."
         )
 
-    logger = logging.getLogger(
-        format_epoch_identifier(nwb_file_name, epoch_name, brain_area)
+
+def _load_aligned_session(
+    nwb_file_name: str, epoch_name: str, logger: logging.Logger
+) -> tuple[Any, dict[str, Any], pd.DataFrame, dict[str, Any]]:
+    """The session's HPC decode and data, trimmed to their shared timestamps.
+
+    Returns
+    -------
+    results : xarray.Dataset
+        HPC decoding results, on the shared axis.
+    data : dict
+        :func:`~continuum_swr_replay.data_loaders.load_data`'s output, its
+        ``position_info`` replaced by the aligned one.
+    position_info : pd.DataFrame
+        The aligned position frame (``data["position_info"]``).
+    alignment_counts : dict
+        What the alignment dropped, from ``align_results_to_position``.
+    """
+    # Deferred: opens Spyglass / DataJoint at import time (see the note at
+    # the top of this module).
+    from continuum_swr_replay.analysis.hippocampus import load_results
+    from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+        align_results_to_position,
     )
+    from continuum_swr_replay.data_loaders import load_data
 
     logger.info("Loading HPC decoding results...")
     results, _, _ = load_results(
@@ -947,14 +1277,34 @@ def run_session(
             alignment_counts["dropped_at"],
         )
 
-    position_time = position_info.index
-    time = position_time.to_numpy(dtype=float)
+    return results, data, position_info, alignment_counts
 
-    # Fit with wider lag window (±250ms) so spline boundary artifacts
-    # fall outside the reported window (±200ms). The returned modulation
-    # arrays are trimmed to the reporting window after fitting.
-    fit_lags = np.arange(-125, 126, 1)
-    report_lags = np.arange(-100, 101, 1)
+
+def _session_fit_population(
+    data: dict[str, Any],
+    nwb_file_name: str,
+    epoch_name: str,
+    cohort_stops: pd.DataFrame | None,
+    stop_cohort: str,
+    immobility_threshold: float,
+    logger: logging.Logger,
+) -> tuple[dict[str, Any], NDArray, pd.Series, pd.Series, dict[str, int]]:
+    """The bins a session's models are fit on, and its excluded time.
+
+    Returns
+    -------
+    data : dict
+        ``data`` with theta phase set to NaN inside excluded time.
+    excluded : NDArray, shape (n_intervals, 2)
+        The session's excluded intervals, in seconds.
+    is_immobile, fit_mask : pd.Series of bool, shape (n_time,)
+        From :func:`build_session_fit_mask`.
+    bin_counts : dict
+        Its bin counts.
+    """
+    # Deferred: opens Spyglass / DataJoint at import time (see the note at
+    # the top of this module).
+    from continuum_swr_replay.analysis.events import analysed_time, swr_inventory
 
     # Excluded time (the artifact mask widened by 0.3 s) is not analysed. No
     # fitted bin's peri-event basis window reaches it, and no running bin's
@@ -989,6 +1339,63 @@ def run_session(
         bin_counts["n_bins_fit"],
         bin_counts["n_bins_fit"] / bin_counts["n_bins_total"],
         bin_counts["n_bins_total"],
+    )
+
+    return data, excluded, is_immobile, fit_mask, bin_counts
+
+
+def _session_events(
+    data: dict[str, Any],
+    results: Any,
+    nwb_file_name: str,
+    epoch_name: str,
+    time: NDArray,
+    fit_mask: pd.Series,
+    fit_lags: NDArray,
+    sampling_frequency: float,
+    cohort_stops: pd.DataFrame | None,
+    stop_cohort: str,
+    non_local_threshold: float,
+    immobility_threshold: float,
+    logger: logging.Logger,
+) -> tuple[
+    dict[str, pd.DataFrame],
+    dict[str, Any],
+    dict[str, Any],
+    pd.DataFrame,
+    int,
+    MatchedControlDraw,
+]:
+    """The session's event sets, artifact-dropped events and matched control.
+
+    The matched non-event control is drawn against the event sets and the
+    events the analysed-time rule dropped.
+
+    Returns
+    -------
+    event_times : dict of pd.DataFrame
+        From :func:`build_session_event_sets`, with ``"matched_control"`` added.
+    event_counts : dict
+        Its counts, plus the artifact-dropped event counts.
+    event_provenance : dict
+        Paths and hashes of the canonical event inputs.
+    artifact_dropped : pd.DataFrame
+        From :func:`artifact_dropped_events`.
+    control_seed : int
+        From :func:`matched_control_seed`.
+    control_draw : MatchedControlDraw
+        From :func:`make_matched_control_times`.
+    """
+    # Deferred: opens Spyglass / DataJoint at import time (see the note at
+    # the top of this module).
+    from continuum_swr_replay.analysis.events import analysed_time
+    from continuum_swr_replay.analysis.pfc.canonical_events import (
+        DEFAULT_EVENT_TABLE_PATH,
+        canonical_event_provenance,
+        load_session_canonical_events,
+        load_session_swr_intervals,
+        session_data_over_time_path,
+        session_swr_events_file,
     )
 
     logger.info("Loading canonical non-local events (stop cohort: %s)...", stop_cohort)
@@ -1053,27 +1460,24 @@ def run_session(
         avoid=artifact_dropped,
     )
     event_times["matched_control"] = control_draw.times
-    n_matched_control = int(len(control_draw.times))
-    cohort_info = {
-        **bin_counts,
-        **event_counts,
-        **event_provenance,
-        **fitter_provenance(fitter),
-        # Filled in after the fits: how many of the shipped fits ran to
-        # ``maxiter`` without settling. ``None`` when no neuron was fit at all,
-        # or on the statsmodels path, which never reaches the batched fitter.
-        "n_model_fits": None,
-        "n_nonconverged_model_fits": None,
-        "n_neurons_with_nonconverged_model": None,
-        "matched_control_seed": control_seed,
-        "n_matched_control": n_matched_control,
-        "n_matched_control_unplaced": control_draw.n_unplaced,
-        "n_matched_control_onset_outside_fitted_bout": (
-            control_draw.n_onset_outside_fitted_bout
-        ),
-        "n_matched_control_bout_saturated": control_draw.n_bout_saturated,
-        "alignment": alignment_counts,
-    }
+
+    return (
+        event_times,
+        event_counts,
+        event_provenance,
+        artifact_dropped,
+        control_seed,
+        control_draw,
+    )
+
+
+def _log_session_events(
+    event_counts: Mapping[str, Any],
+    cohort_info: Mapping[str, Any],
+    control_seed: int,
+    logger: logging.Logger,
+) -> None:
+    """Log the session's event counts and its matched-control placement."""
     logger.info(
         "Events in cohort: %d/%d non-local (%d with SWR, %d without SWR), %d/%d SWRs",
         event_counts["n_nonlocal_after"],
@@ -1104,47 +1508,36 @@ def run_session(
         event_counts["n_swr_intervals_outside_frame"],
     )
 
-    logger.info("Building design matrices...")
-    immobility_design_matrices, spline_basis, lag_time = _make_design_matrices(
-        event_times,
-        data["position_info"],
-        sampling_frequency=sampling_frequency,
-        lags=fit_lags,
-    )
 
-    if brain_area not in data["spike_times"] or not data["spike_times"][brain_area]:
-        logger.warning("No %s neurons found for this session", brain_area)
-        empty = np.empty((0, 0))
-        return pd.DataFrame(), empty, empty, empty, empty, empty, cohort_info
+def _fit_session_neurons(
+    spike_times: list[NDArray],
+    data: dict[str, Any],
+    time: NDArray,
+    is_immobile: pd.Series,
+    fit_mask: pd.Series,
+    excluded: NDArray,
+    immobility_design_matrices: Mapping[str, NDArray],
+    spline_basis: NDArray,
+    lag_time: NDArray,
+    brain_area: str,
+    fitter: str,
+    penalty_sigma: float | None,
+    run_parallel: bool,
+    session_counts: NDArray | None,
+    fit_diagnostics_out: dict[str, Any] | None,
+    logger: logging.Logger,
+) -> tuple[Sequence[tuple], dict[str, int | None], int]:
+    """Fit every neuron of the session: batched prefit, then ``process_neuron``.
 
-    spike_times = data["spike_times"][brain_area]
-    # The JAX fit, held-out scorer and serial per-neuron summaries all consume
-    # the same binned response. Bin it once instead of repeating the histogram
-    # pass up to three times over every unit.
-    session_counts = None
-    if fitter == "jax" or scoring_out is not None:
-        session_counts = np.column_stack(
-            [get_spikecount_per_time_bin(neuron, time) for neuron in spike_times]
-        ).astype(float)
-
-    if scoring_out is not None:
-        # Handed over, not rebuilt: an out-of-fold score has to be taken on the
-        # bins, events and designs the shipped fit used, and reassembling them
-        # from the same functions would cost a second load of the session and
-        # could drift from what was fit.
-        scoring_out.update(
-            {
-                "fit_mask": fit_mask,
-                "counts": session_counts,
-                "designs": immobility_design_matrices,
-                "spline_basis": spline_basis,
-                "lag_time": lag_time,
-                "lags": fit_lags,
-                "event_times": event_times,
-                "artifact_dropped": artifact_dropped,
-            }
-        )
-
+    Returns
+    -------
+    result : list of tuple
+        :func:`process_neuron`'s output for each neuron, in unit order.
+    fit_counts : dict
+        From :func:`shipped_fit_counts`; ``None`` values on the statsmodels
+        path.
+    n_neurons : int
+    """
     n_neurons = len(spike_times)
     logger.info(
         "Fitting GLMs for %d %s neurons (fitter=%s, parallel=%s)...",
@@ -1255,19 +1648,26 @@ def run_session(
         fit_diagnostics_out.update(
             _stack_fit_diagnostics(neuron_diagnostics, immobility_design_matrices)
         )
-    cohort_info.update(fit_counts)
-    if fit_counts["n_nonconverged_model_fits"]:
-        logger.info(
-            "%d of %d shipped model fits ran to maxiter without converging, "
-            "over %d of %d neurons. Each is non-estimable for its neuron: "
-            "every statistic that reads it is NaN, and this count is the only "
-            "record of what was dropped.",
-            fit_counts["n_nonconverged_model_fits"],
-            fit_counts["n_model_fits"],
-            fit_counts["n_neurons_with_nonconverged_model"],
-            n_neurons,
-        )
 
+    return result, fit_counts, n_neurons
+
+
+def _stack_session_outputs(
+    result: Sequence[tuple],
+    lag_time: NDArray,
+    report_lags: NDArray,
+    sampling_frequency: float,
+) -> tuple[pd.DataFrame, NDArray, NDArray, NDArray, NDArray, NDArray]:
+    """Stack the per-neuron outputs and trim the curves to the report window.
+
+    Returns
+    -------
+    neuron_stats : pd.DataFrame
+        One row per neuron.
+    swr_modulation, no_swr_modulation, non_local_swr_modulation, \
+non_local_no_swr_modulation, matched_control_modulation : NDArray
+        Each ``(n_report_lags, n_neurons)``.
+    """
     (
         neuron_stats_list,
         swr_modulation_list,
@@ -1295,13 +1695,6 @@ def run_session(
     non_local_no_swr_modulation = non_local_no_swr_modulation[report_mask]
     matched_control_modulation = matched_control_modulation[report_mask]
 
-    neuron_stats["nwb_file_name"] = nwb_file_name
-    neuron_stats["epoch_name"] = epoch_name
-    neuron_stats["brain_area"] = brain_area
-    neuron_stats["stop_cohort"] = stop_cohort
-
-    logger.info("Session complete: %d neurons analyzed", len(neuron_stats))
-
     return (
         neuron_stats,
         swr_modulation,
@@ -1309,5 +1702,4 @@ def run_session(
         non_local_swr_modulation,
         non_local_no_swr_modulation,
         matched_control_modulation,
-        cohort_info,
     )
