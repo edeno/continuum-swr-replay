@@ -39,7 +39,7 @@ after the final fix wave (an interval ending on the grid's last sample no longer
 dropped the baseline comparison from Phase 4 (2026-10-18; D8). Phase 5 deferred,
 Phase 6 parked, Phase 7 last.
 The full pipeline refresh and its audit are in
-[docs/audits/2026-10-12-full-pipeline-refresh.md](../../../../docs/audits/2026-10-12-full-pipeline-refresh.md).
+[docs/audits/2026-10-12-full-pipeline-refresh.md](../../reviews/2026-10-12-full-pipeline-refresh.md).
 
 The scientific design lives in
 [docs/design/replay_detection_comparison/](../../../../docs/design/replay_detection_comparison/)

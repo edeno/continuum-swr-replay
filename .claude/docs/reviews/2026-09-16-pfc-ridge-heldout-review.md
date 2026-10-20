@@ -16,7 +16,7 @@ below (the corrected three-session GPU gate and the full R = 1,000 endurance gat
 maximum-likelihood tree it replaced is kept whole at `Processed-Data/_pre_ridge_backup_20260915`.
 Non-converged fits fell from 14.8 % of shipped model fits to 0.28 % (432 of 155,952, over 48
 neurons). The before/after audit is
-[docs/audits/2026-09-18-pfc-ridge-heldout.md](../../../docs/audits/2026-09-18-pfc-ridge-heldout.md),
+[docs/audits/2026-09-18-pfc-ridge-heldout.md](2026-09-18-pfc-ridge-heldout.md),
 Figure 4 is regenerated from these bundles and claim 20 is requoted from that audit.
 
 Three properties of the null were measured afterwards rather than assumed
