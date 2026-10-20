@@ -19,7 +19,6 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.pfc.glm import MATCHED_CONTROL_PLACEMENT_METHOD
 from continuum_swr_replay.analysis.pfc.heldout import (
     CONTROL_NULL_EVENT_POLICY,
     DEFAULT_CONTROL_DRAWS,
@@ -28,6 +27,9 @@ from continuum_swr_replay.analysis.pfc.load_population import (
     HELDOUT_P_COLUMNS,
     HELDOUT_USABLE_DRAW_COLUMNS,
     MATCHED_NULL_OBSERVED_COLUMNS,
+)
+from continuum_swr_replay.analysis.pfc.matched_control import (
+    MATCHED_CONTROL_PLACEMENT_METHOD,
 )
 from scripts.pfc.compare_pfc_cohorts import (
     FDR_TESTS,
@@ -1594,7 +1596,7 @@ class TestTheLambdaZeroGateRebuildsTheAuditedBasis:
     def test_the_audited_basis_keeps_patsys_last_boundary_function(self):
         import importlib.util
 
-        from continuum_swr_replay.analysis.pfc.glm import event_basis_functions
+        from continuum_swr_replay.analysis.pfc.design import event_basis_functions
 
         spec = importlib.util.spec_from_file_location(
             "check_pfc_ridge_lambda0",

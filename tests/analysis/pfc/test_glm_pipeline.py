@@ -15,30 +15,36 @@ import statsmodels.api as sm
 from patsy import dmatrix
 
 from continuum_swr_replay.analysis.events.cohort_selection import select_stop_cohort
-from continuum_swr_replay.analysis.pfc.glm import (
-    NESTED_MODEL_PAIRS,
-    _fit_immobility_models,
+from continuum_swr_replay.analysis.pfc.design import (
     _make_design_matrices,
-    _prefit_session,
     build_theta_design,
     convolve_event_basis,
     event_basis_functions,
     event_onset_counts,
+)
+from continuum_swr_replay.analysis.pfc.fit import (
+    _fit_immobility_models,
     fit_models_batched,
     fitter_provenance,
+    model_penalties,
+)
+from continuum_swr_replay.analysis.pfc.fit import (
+    test_theta_modulation as run_theta_modulation_test,
+)
+from continuum_swr_replay.analysis.pfc.matched_control import make_matched_control_times
+from continuum_swr_replay.analysis.pfc.modulation import (
+    NESTED_MODEL_PAIRS,
     get_frac_explained_deviance,
     get_frac_null_deviance,
     is_separated,
-    make_matched_control_times,
-    model_penalties,
     peak_log_modulation,
     peak_modulation_se,
     prior_binds,
+)
+from continuum_swr_replay.analysis.pfc.session import (
+    _prefit_session,
     process_neuron,
     shipped_fit_counts,
-)
-from continuum_swr_replay.analysis.pfc.glm import (
-    test_theta_modulation as run_theta_modulation_test,
 )
 
 
@@ -1698,7 +1704,7 @@ class TestBuildSessionFitMask:
     def test_fit_mask_is_immobility_inside_the_cohort_stop(
         self, position_info, is_immobile, cohort_stops
     ):
-        from continuum_swr_replay.analysis.pfc.glm import build_session_fit_mask
+        from continuum_swr_replay.analysis.pfc.event_sets import build_session_fit_mask
 
         returned_immobile, fit_mask, counts = build_session_fit_mask(
             position_info, cohort_stops=cohort_stops, stop_cohort="at_well"
@@ -1726,7 +1732,7 @@ class TestBuildSessionFitMask:
     def test_all_stops_reproduces_the_immobility_mask_bit_for_bit(
         self, position_info, is_immobile
     ):
-        from continuum_swr_replay.analysis.pfc.glm import build_session_fit_mask
+        from continuum_swr_replay.analysis.pfc.event_sets import build_session_fit_mask
 
         _, fit_mask, counts = build_session_fit_mask(
             position_info, stop_cohort="all_stops"
@@ -1736,7 +1742,7 @@ class TestBuildSessionFitMask:
         assert counts["n_bins_fit"] == counts["n_bins_immobile"]
 
     def test_a_cohort_without_stops_is_refused(self, position_info):
-        from continuum_swr_replay.analysis.pfc.glm import build_session_fit_mask
+        from continuum_swr_replay.analysis.pfc.event_sets import build_session_fit_mask
 
         with pytest.raises(ValueError, match="cohort_stops"):
             build_session_fit_mask(position_info, stop_cohort="at_well")
@@ -1817,7 +1823,9 @@ class TestBuildSessionEventSets:
     def test_only_events_starting_inside_a_cohort_stop_survive(
         self, position_info, cohort_stops
     ):
-        from continuum_swr_replay.analysis.pfc.glm import build_session_event_sets
+        from continuum_swr_replay.analysis.pfc.event_sets import (
+            build_session_event_sets,
+        )
 
         data, results = _synthetic_session(
             position_info, self.EVENT_WINDOWS, self.RIPPLE_WINDOWS
@@ -1848,7 +1856,7 @@ class TestBuildSessionEventSets:
         assert len(event_times["non_local_no_SWR"]) == 0
 
     def test_all_stops_keeps_every_speed_eligible_event(self, position_info):
-        from continuum_swr_replay.analysis.pfc.glm import (
+        from continuum_swr_replay.analysis.pfc.event_sets import (
             build_session_event_sets,
             build_session_fit_mask,
         )
@@ -1875,7 +1883,9 @@ class TestBuildSessionEventSets:
         assert counts["n_ripple_dropped_overlapping_fit"] == 0
 
     def test_a_cohort_without_stops_is_refused(self, position_info):
-        from continuum_swr_replay.analysis.pfc.glm import build_session_event_sets
+        from continuum_swr_replay.analysis.pfc.event_sets import (
+            build_session_event_sets,
+        )
 
         data, results = _synthetic_session(
             position_info, self.EVENT_WINDOWS, self.RIPPLE_WINDOWS
@@ -1897,7 +1907,9 @@ class TestBuildSessionEventSets:
         # (inclusive interval overlap against ``ripple_times``) called such an
         # event SWR-coupled; the canonical rule requires positive-duration
         # overlap and calls it non-SWR. The column, not the intervals, decides.
-        from continuum_swr_replay.analysis.pfc.glm import build_session_event_sets
+        from continuum_swr_replay.analysis.pfc.event_sets import (
+            build_session_event_sets,
+        )
 
         boundary_windows = [(2.0, 2.2), (2.4, 2.6)]
         boundary_ripples = [(2.2, 2.3), (2.4, 2.5)]
@@ -1929,7 +1941,9 @@ class TestBuildSessionEventSets:
     def test_the_event_set_names_are_the_four_the_designs_are_keyed_on(
         self, position_info, cohort_stops
     ):
-        from continuum_swr_replay.analysis.pfc.glm import build_session_event_sets
+        from continuum_swr_replay.analysis.pfc.event_sets import (
+            build_session_event_sets,
+        )
 
         data, results = _synthetic_session(
             position_info, self.EVENT_WINDOWS, self.RIPPLE_WINDOWS
@@ -1958,7 +1972,9 @@ class TestBuildSessionEventSets:
         # the end of the aligned position frame has no bins to be modelled on,
         # so it is dropped -- and counted, because it means the two axes
         # disagree over more than an empty tail.
-        from continuum_swr_replay.analysis.pfc.glm import build_session_event_sets
+        from continuum_swr_replay.analysis.pfc.event_sets import (
+            build_session_event_sets,
+        )
 
         data, results = _synthetic_session(
             position_info, self.EVENT_WINDOWS, self.RIPPLE_WINDOWS
@@ -1984,7 +2000,7 @@ class TestBuildSessionEventSets:
         # An event beginning 0.1 s before the kept stop starts is dropped by the
         # onset rule, but its +/-0.25 s basis would have covered fitted bins
         # inside the stop. That is the gap the diagnostic exists to size.
-        from continuum_swr_replay.analysis.pfc.glm import (
+        from continuum_swr_replay.analysis.pfc.event_sets import (
             build_session_event_sets,
             build_session_fit_mask,
         )
@@ -2020,7 +2036,9 @@ class TestBuildSessionEventSets:
     def test_the_diagnostic_is_none_when_no_fit_mask_is_given(
         self, position_info, cohort_stops
     ):
-        from continuum_swr_replay.analysis.pfc.glm import build_session_event_sets
+        from continuum_swr_replay.analysis.pfc.event_sets import (
+            build_session_event_sets,
+        )
 
         data, results = _synthetic_session(
             position_info, self.EVENT_WINDOWS, self.RIPPLE_WINDOWS
@@ -2041,7 +2059,7 @@ class TestBuildSessionEventSets:
 
 class TestCountEventsCoveringFitBins:
     def test_only_onsets_within_the_window_of_a_fitted_bin_count(self):
-        from continuum_swr_replay.analysis.pfc.glm import (
+        from continuum_swr_replay.analysis.pfc.event_sets import (
             count_events_covering_fit_bins,
         )
 
@@ -2060,7 +2078,7 @@ class TestCountEventsCoveringFitBins:
         assert counted == 3
 
     def test_no_onsets_counts_zero(self):
-        from continuum_swr_replay.analysis.pfc.glm import (
+        from continuum_swr_replay.analysis.pfc.event_sets import (
             count_events_covering_fit_bins,
         )
 
@@ -2074,7 +2092,7 @@ class TestCountEventsCoveringFitBins:
         )
 
     def test_an_empty_fit_mask_counts_zero(self):
-        from continuum_swr_replay.analysis.pfc.glm import (
+        from continuum_swr_replay.analysis.pfc.event_sets import (
             count_events_covering_fit_bins,
         )
 
@@ -2304,12 +2322,12 @@ class TestProcessNeuronExcludedTime:
         monkeypatch,
     ):
         """The fallback path, rates only, applies the same masks."""
-        from continuum_swr_replay.analysis.pfc import glm
+        from continuum_swr_replay.analysis.pfc import session
 
         def _fail(*args, **kwargs):
             raise ValueError("no fit")
 
-        monkeypatch.setattr(glm, "_fit_immobility_models", _fail)
+        monkeypatch.setattr(session, "_fit_immobility_models", _fail)
         in_excluded, spikes = self._inputs(time_axis, poisson_spike_times)
         immobile = is_immobile.to_numpy()
         fs = sampling_frequency
@@ -2343,7 +2361,7 @@ class TestProcessNeuronExcludedTime:
         import inspect
         import textwrap
 
-        from continuum_swr_replay.analysis.pfc.glm import run_session
+        from continuum_swr_replay.analysis.pfc.session import run_session
 
         tree = ast.parse(textwrap.dedent(inspect.getsource(run_session)))
         neuron_args = next(
@@ -2372,7 +2390,7 @@ class TestAlignmentIsIdentityOnMatchedAxes:
 
     @classmethod
     def _fit(cls, data, results, position_info, sampling_frequency, spike_count):
-        from continuum_swr_replay.analysis.pfc.glm import (
+        from continuum_swr_replay.analysis.pfc.event_sets import (
             build_session_event_sets,
             build_session_fit_mask,
         )

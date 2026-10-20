@@ -61,7 +61,7 @@ _LAZY_IMPORTS: list[str] = [
     "from continuum_swr_replay.analysis.hippocampus.event_analysis import get_event_start_end_times",
     "from continuum_swr_replay.analysis.events.detection import get_confident_times",
     "from continuum_swr_replay.analysis.pfc.load_population import _extract_animal",
-    "from continuum_swr_replay.analysis.pfc.glm import process_neuron",
+    "from continuum_swr_replay.analysis.pfc.session import process_neuron",
     # The foundation interval algebra and spike binning.
     "from continuum_swr_replay.intervals import get_spikecount_per_time_bin",
 ]
@@ -94,7 +94,7 @@ def test_no_lazy_import_loads_spyglass():
         # Guards against a hang, not against slowness. The import chain cost
         # ~46 s on this machine when the replay package __init__ was eager,
         # dominated by non_local_detector (~22 s) and statsmodels.api (~8 s),
-        # measured with `python -X importtime`; the fitting and glm leaves
+        # measured with `python -X importtime`; the fitting and pfc.session leaves
         # still pull both in. The
         # old 30 s budget failed whenever the filesystem cache was cold, which
         # reads as a broken lazy-import contract when the contract is fine

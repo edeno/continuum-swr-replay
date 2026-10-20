@@ -90,17 +90,8 @@ from continuum_swr_replay.analysis.pfc.cohort import (
     DEFAULT_STOP_TABLE_PATH,
     load_session_stop_cohort,
 )
-from continuum_swr_replay.analysis.pfc.glm import (
-    EVENT_CLASSES,
-    MATCHED_CONTROL_PLACEMENT_METHOD,
-    NESTED_MODEL_PAIRS,
-    REPORT_HALF_WINDOW_S,
-    is_separated,
-    model_penalties,
-    peak_log_modulation,
-    peak_modulation_se,
-    prior_binds,
-)
+from continuum_swr_replay.analysis.pfc.event_sets import EVENT_CLASSES
+from continuum_swr_replay.analysis.pfc.fit import model_penalties
 from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
 from continuum_swr_replay.analysis.pfc.heldout import (
     CONTROL_NULL_EVENT_POLICY,
@@ -113,6 +104,17 @@ from continuum_swr_replay.analysis.pfc.heldout import (
     empirical_pvalue,
     null_draw_seeds,
     required_usable_null_draws,
+)
+from continuum_swr_replay.analysis.pfc.matched_control import (
+    MATCHED_CONTROL_PLACEMENT_METHOD,
+)
+from continuum_swr_replay.analysis.pfc.modulation import (
+    NESTED_MODEL_PAIRS,
+    REPORT_HALF_WINDOW_S,
+    is_separated,
+    peak_log_modulation,
+    peak_modulation_se,
+    prior_binds,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import (
     fit_provenance_path,

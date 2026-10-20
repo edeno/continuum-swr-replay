@@ -29,12 +29,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.pfc.glm import (
-    _make_design_matrices,
+from continuum_swr_replay.analysis.pfc.design import _make_design_matrices
+from continuum_swr_replay.analysis.pfc.matched_control import (
     make_matched_control_times,
     matched_control_seed,
-    process_neuron,
 )
+from continuum_swr_replay.analysis.pfc.session import process_neuron
 
 SAMPLING_FREQUENCY = 500.0
 
@@ -497,7 +497,9 @@ class TestEventsTheAnalysedTimeRuleDropped:
         pd.testing.assert_frame_equal(plain.times, empty.times)
 
     def test_the_dropped_events_are_the_non_local_events_and_swrs(self):
-        from continuum_swr_replay.analysis.pfc.glm import artifact_dropped_events
+        from continuum_swr_replay.analysis.pfc.matched_control import (
+            artifact_dropped_events,
+        )
 
         drops = pd.DataFrame(
             {

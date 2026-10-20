@@ -47,7 +47,12 @@ Analysis Workflow
 
 See Also
 --------
-continuum_swr_replay.analysis.pfc.glm : GLM implementation details
+continuum_swr_replay.analysis.pfc.session : Per-neuron and per-session GLM fits
+continuum_swr_replay.analysis.pfc.design : Event bases and design matrices
+continuum_swr_replay.analysis.pfc.fit : Fitters, penalties and fit diagnostics
+continuum_swr_replay.analysis.pfc.modulation : Deviance and modulation statistics
+continuum_swr_replay.analysis.pfc.event_sets : Fit masks and event sets
+continuum_swr_replay.analysis.pfc.matched_control : Matched non-event controls
 continuum_swr_replay.data_loaders.spikes : Spike data loading for sorted units
 continuum_swr_replay.analysis.hippocampus : Hippocampal replay analysis
 
@@ -66,20 +71,20 @@ from typing import TYPE_CHECKING
 
 # Public names are exposed through PEP 562 ``__getattr__`` so that importing a
 # leaf submodule (e.g. ``continuum_swr_replay.analysis.pfc.cohort``) does not
-# run ``glm``, which imports dask and statsmodels at module top level and,
-# through the replay and hippocampus packages, ``non_local_detector`` and JAX.
+# run ``session``, which imports dask and (through ``fit``) statsmodels at
+# module top level.
 
 #: Exported name -> (submodule of this package, attribute it is bound to).
 _LAZY_EXPORTS = {
-    "MatchedControlDraw": ("glm", "MatchedControlDraw"),
-    "build_session_event_sets": ("glm", "build_session_event_sets"),
-    "build_session_fit_mask": ("glm", "build_session_fit_mask"),
-    "fit_immobility_models": ("glm", "_fit_immobility_models"),
-    "make_design_matrices": ("glm", "_make_design_matrices"),
-    "make_matched_control_times": ("glm", "make_matched_control_times"),
-    "matched_control_seed": ("glm", "matched_control_seed"),
-    "process_neuron": ("glm", "process_neuron"),
-    "run_session": ("glm", "run_session"),
+    "MatchedControlDraw": ("matched_control", "MatchedControlDraw"),
+    "build_session_event_sets": ("event_sets", "build_session_event_sets"),
+    "build_session_fit_mask": ("event_sets", "build_session_fit_mask"),
+    "fit_immobility_models": ("fit", "_fit_immobility_models"),
+    "make_design_matrices": ("design", "_make_design_matrices"),
+    "make_matched_control_times": ("matched_control", "make_matched_control_times"),
+    "matched_control_seed": ("matched_control", "matched_control_seed"),
+    "process_neuron": ("session", "process_neuron"),
+    "run_session": ("session", "run_session"),
 }
 
 
@@ -109,14 +114,15 @@ __all__ = [
 
 
 if TYPE_CHECKING:  # pragma: no cover - types only
-    from .glm import (  # noqa: F401
-        MatchedControlDraw,
+    from .design import _make_design_matrices as make_design_matrices  # noqa: F401
+    from .event_sets import (  # noqa: F401
         build_session_event_sets,
         build_session_fit_mask,
+    )
+    from .fit import _fit_immobility_models as fit_immobility_models  # noqa: F401
+    from .matched_control import (  # noqa: F401
+        MatchedControlDraw,
         make_matched_control_times,
         matched_control_seed,
-        process_neuron,
-        run_session,
     )
-    from .glm import _fit_immobility_models as fit_immobility_models  # noqa: F401
-    from .glm import _make_design_matrices as make_design_matrices  # noqa: F401
+    from .session import process_neuron, run_session  # noqa: F401

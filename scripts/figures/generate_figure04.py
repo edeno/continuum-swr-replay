@@ -84,17 +84,15 @@ from continuum_swr_replay.analysis.pfc.canonical_events import (
     session_data_over_time_path,
 )
 from continuum_swr_replay.analysis.pfc.cohort import load_session_stop_cohort
-from continuum_swr_replay.analysis.pfc.glm import (
-    DEFAULT_BASIS_HALF_WINDOW_S,
-    artifact_dropped_events,
-    model_penalties,
-)
+from continuum_swr_replay.analysis.pfc.event_sets import DEFAULT_BASIS_HALF_WINDOW_S
+from continuum_swr_replay.analysis.pfc.fit import model_penalties
 from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
 from continuum_swr_replay.analysis.pfc.heldout import DEFAULT_CONTROL_DRAWS
 from continuum_swr_replay.analysis.pfc.load_population import (
     load_population_data,
     significant_fraction,
 )
+from continuum_swr_replay.analysis.pfc.matched_control import artifact_dropped_events
 from continuum_swr_replay.figure_utilities import (
     PAGE_HEIGHT,
     TWO_COLUMN,

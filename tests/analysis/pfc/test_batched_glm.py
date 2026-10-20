@@ -28,7 +28,7 @@ from continuum_swr_replay.analysis.pfc.batched_glm import (
     prepare_heldout_response,
     score_poisson_designs_heldout,
 )
-from continuum_swr_replay.analysis.pfc.glm import (
+from continuum_swr_replay.analysis.pfc.design import (
     convolve_event_basis,
     event_basis_functions,
 )
@@ -844,7 +844,7 @@ class TestImpliedPriorSd:
     @staticmethod
     def basis(n_basis=11, n_lags=251):
         """A partition of unity, as the event basis is."""
-        from continuum_swr_replay.analysis.pfc.glm import event_basis_functions
+        from continuum_swr_replay.analysis.pfc.design import event_basis_functions
 
         spline_basis, lag_time, _ = event_basis_functions(np.arange(-125, 126), 500.0)
         assert spline_basis.shape == (n_lags, n_basis)

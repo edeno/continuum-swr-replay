@@ -65,12 +65,14 @@ from continuum_swr_replay.analysis.pfc.batched_glm import (
     prepare_heldout_response,
     score_poisson_designs_heldout,
 )
-from continuum_swr_replay.analysis.pfc.glm import (
-    DEFAULT_MATCHED_CONTROL_ATTEMPTS,
-    EVENT_CLASSES,
-    MATCHED_CONTROL_SOURCE_CLASS,
+from continuum_swr_replay.analysis.pfc.design import (
     convolve_event_basis,
     event_onset_counts,
+)
+from continuum_swr_replay.analysis.pfc.event_sets import EVENT_CLASSES
+from continuum_swr_replay.analysis.pfc.matched_control import (
+    DEFAULT_MATCHED_CONTROL_ATTEMPTS,
+    MATCHED_CONTROL_SOURCE_CLASS,
     make_matched_control_times,
 )
 from continuum_swr_replay.intervals import (
@@ -497,7 +499,7 @@ def null_draw_seeds(control_seed: int, n_draws: int) -> NDArray:
     ----------
     control_seed : int
         The session's matched-control seed, from
-        :func:`~continuum_swr_replay.analysis.pfc.glm.matched_control_seed`.
+        :func:`~continuum_swr_replay.analysis.pfc.matched_control.matched_control_seed`.
     n_draws : int
         Number of draws, ``R``.
 
@@ -612,7 +614,7 @@ def control_draw_null(
     same statistic.
 
     For each event class and each draw seed, this then re-runs
-    :func:`~continuum_swr_replay.analysis.pfc.glm.make_matched_control_times`
+    :func:`~continuum_swr_replay.analysis.pfc.matched_control.make_matched_control_times`
     with **that class's tested events as the source**, so the draw carries the
     tested onset count and durations, drawn from the same fitted bouts and
     avoiding all real events (every class's windows, including the ones being
@@ -625,7 +627,7 @@ def control_draw_null(
     event_times : Mapping[str, pandas.DataFrame]
         The session's event classes, as the matched-control draw needs them:
         the four of
-        :data:`~continuum_swr_replay.analysis.pfc.glm.EVENT_CLASSES`, each with
+        :data:`~continuum_swr_replay.analysis.pfc.event_sets.EVENT_CLASSES`, each with
         ``start_time`` / ``end_time``.
     fit_mask : pandas.Series of bool, shape (n_time,)
         The bins the models are fit on, indexed by sample time in seconds.
@@ -684,7 +686,7 @@ def control_draw_null(
     avoid : pandas.DataFrame, optional
         Further windows no control may overlap (``start_time`` / ``end_time``,
         seconds): the events the analysed-time rule dropped
-        (:func:`~continuum_swr_replay.analysis.pfc.glm.artifact_dropped_events`),
+        (:func:`~continuum_swr_replay.analysis.pfc.matched_control.artifact_dropped_events`),
         as ``run_session`` passes them to the shipped control. The subset
         selection and every draw avoid them, so the null's controls avoid what
         the observed control avoids.

@@ -10,7 +10,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.pfc.glm import reindex_by
+from continuum_swr_replay.analysis.pfc.design import reindex_by
 
 
 class TestReindexByTolerance:
@@ -28,7 +28,9 @@ class TestReindexByTolerance:
 
         assert len(result) == 3
         # All values should be present (5.0 matches to 2.0)
-        assert not np.isnan(result.iloc[2]), "Without tolerance, distant point should match"
+        assert not np.isnan(result.iloc[2]), (
+            "Without tolerance, distant point should match"
+        )
 
     def test_reindex_with_tolerance_rejects_distant_points(self):
         """With tolerance, distant points should become NaN."""
@@ -43,7 +45,9 @@ class TestReindexByTolerance:
         assert result.iloc[0] == 1.0, "0.1 should match to 0.0 (distance 0.1)"
         assert result.iloc[1] == 2.0, "1.1 should match to 1.0 (distance 0.1)"
         # Distant point should be NaN
-        assert np.isnan(result.iloc[2]), "5.0 should be NaN (distance 3.0 > tolerance 0.5)"
+        assert np.isnan(result.iloc[2]), (
+            "5.0 should be NaN (distance 3.0 > tolerance 0.5)"
+        )
 
     def test_reindex_tolerance_exact_match(self):
         """Exact matches should always work regardless of tolerance."""
@@ -56,21 +60,24 @@ class TestReindexByTolerance:
 
     def test_reindex_tolerance_with_dataframe(self):
         """Tolerance should work with DataFrames too."""
-        data = pd.DataFrame({
-            'a': [1.0, 2.0, 3.0],
-            'b': [10.0, 20.0, 30.0],
-        }, index=[0.0, 1.0, 2.0])
+        data = pd.DataFrame(
+            {
+                "a": [1.0, 2.0, 3.0],
+                "b": [10.0, 20.0, 30.0],
+            },
+            index=[0.0, 1.0, 2.0],
+        )
         new_index = pd.Index([0.1, 0.9, 5.0])
 
         result = reindex_by(data, new_index, tolerance=0.2)
 
         assert result.shape == (3, 2)
         # Close points match
-        assert result.iloc[0]['a'] == 1.0
-        assert result.iloc[1]['a'] == 2.0
+        assert result.iloc[0]["a"] == 1.0
+        assert result.iloc[1]["a"] == 2.0
         # Distant point is NaN
-        assert np.isnan(result.iloc[2]['a'])
-        assert np.isnan(result.iloc[2]['b'])
+        assert np.isnan(result.iloc[2]["a"])
+        assert np.isnan(result.iloc[2]["b"])
 
     def test_reindex_tolerance_zero_rejects_all_non_exact(self):
         """Zero tolerance should only allow exact matches."""
@@ -85,16 +92,19 @@ class TestReindexByTolerance:
 
     def test_reindex_preserves_column_order(self):
         """DataFrame columns should be preserved after reindexing."""
-        data = pd.DataFrame({
-            'col_z': [1.0, 2.0],
-            'col_a': [3.0, 4.0],
-            'col_m': [5.0, 6.0],
-        }, index=[0.0, 1.0])
+        data = pd.DataFrame(
+            {
+                "col_z": [1.0, 2.0],
+                "col_a": [3.0, 4.0],
+                "col_m": [5.0, 6.0],
+            },
+            index=[0.0, 1.0],
+        )
         new_index = pd.Index([0.5])
 
         result = reindex_by(data, new_index, tolerance=0.6)
 
-        assert list(result.columns) == ['col_z', 'col_a', 'col_m']
+        assert list(result.columns) == ["col_z", "col_a", "col_m"]
 
     def test_reindex_empty_input(self):
         """Empty input should return empty output."""
@@ -147,9 +157,7 @@ class TestReindexByTolerance:
         result = reindex_by(spike_counts, position_time, tolerance=0.5)
 
         assert len(result) == len(position_time)
-        expected = np.array(
-            [1.0, 4.0, 9.0, np.nan, 16.0, np.nan, 36.0]
-        )
+        expected = np.array([1.0, 4.0, 9.0, np.nan, 16.0, np.nan, 36.0])
         np.testing.assert_array_equal(result.to_numpy(), expected)
 
     def test_reindex_without_tolerance_raises_warning(self):
@@ -177,7 +185,6 @@ class TestReindexByTolerance:
 
             # Filter out any unrelated warnings
             tolerance_warnings = [
-                warning for warning in w
-                if "tolerance=None" in str(warning.message)
+                warning for warning in w if "tolerance=None" in str(warning.message)
             ]
             assert len(tolerance_warnings) == 0

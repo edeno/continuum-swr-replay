@@ -15,7 +15,6 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.pfc.batched_glm import DEFAULT_PENALTY_SIGMA
-from continuum_swr_replay.analysis.pfc.glm import MATCHED_CONTROL_PLACEMENT_METHOD
 from continuum_swr_replay.analysis.pfc.heldout import (
     CONTROL_NULL_EVENT_POLICY,
     DEFAULT_CONTROL_DRAWS,
@@ -26,6 +25,9 @@ from continuum_swr_replay.analysis.pfc.load_population import (
     MATCHED_NULL_OBSERVED_COLUMNS,
     _extract_animal,
     load_population_data,
+)
+from continuum_swr_replay.analysis.pfc.matched_control import (
+    MATCHED_CONTROL_PLACEMENT_METHOD,
 )
 
 

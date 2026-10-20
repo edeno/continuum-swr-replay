@@ -50,15 +50,15 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.pfc.glm import (
-    EVENT_CLASSES,
-    MATCHED_CONTROL_SOURCE_CLASS,
-    make_matched_control_times,
-    matched_control_seed,
-)
+from continuum_swr_replay.analysis.pfc.event_sets import EVENT_CLASSES
 from continuum_swr_replay.analysis.pfc.heldout import (
     _matchable_subset_seed,
     null_draw_seeds,
+)
+from continuum_swr_replay.analysis.pfc.matched_control import (
+    MATCHED_CONTROL_SOURCE_CLASS,
+    make_matched_control_times,
+    matched_control_seed,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
@@ -225,11 +225,13 @@ def session_window_sets(
         session_data_over_time_path,
     )
     from continuum_swr_replay.analysis.pfc.cohort import load_session_stop_cohort
-    from continuum_swr_replay.analysis.pfc.glm import (
+    from continuum_swr_replay.analysis.pfc.event_sets import (
         DEFAULT_BASIS_HALF_WINDOW_S,
-        artifact_dropped_events,
         build_session_event_sets,
         build_session_fit_mask,
+    )
+    from continuum_swr_replay.analysis.pfc.matched_control import (
+        artifact_dropped_events,
     )
     from continuum_swr_replay.data_loaders import load_data
 

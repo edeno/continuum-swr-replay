@@ -24,12 +24,14 @@ import pandas as pd
 from scipy.stats import false_discovery_control
 
 from continuum_swr_replay.analysis.pfc.batched_glm import DEFAULT_PENALTY_SIGMA
-from continuum_swr_replay.analysis.pfc.glm import MATCHED_CONTROL_PLACEMENT_METHOD
 from continuum_swr_replay.analysis.pfc.heldout import (
     CONTROL_NULL_EVENT_POLICY,
     DEFAULT_CONTROL_DRAWS,
     EMPIRICAL_PVALUE_METHOD,
     required_usable_null_draws,
+)
+from continuum_swr_replay.analysis.pfc.matched_control import (
+    MATCHED_CONTROL_PLACEMENT_METHOD,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import fit_provenance_path
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
@@ -347,7 +349,7 @@ def load_population_data(
 
         # Sessions with no surviving neurons in this brain area save
         # placeholder arrays of shape ``(0, 0)`` (see ``run_session``
-        # in analysis/pfc/glm.py). hstack would silently broadcast a
+        # in analysis/pfc/session.py). hstack would silently broadcast a
         # ``(0, 0)`` array against the expected ``(n_lag_times, k)``,
         # producing a 0-row population matrix and breaking every
         # downstream consumer. Skip such sessions explicitly.

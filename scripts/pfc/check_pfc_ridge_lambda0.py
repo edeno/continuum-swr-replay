@@ -79,7 +79,7 @@ def audited_basis(lags: NDArray, sampling_frequency: float) -> NDArray:
     -------
     NDArray, shape (n_lags, n_basis)
     """
-    from continuum_swr_replay.analysis.pfc.glm import KNOT_SPACING_S
+    from continuum_swr_replay.analysis.pfc.design import KNOT_SPACING_S
 
     lag_time = np.asarray(lags, dtype=float) / sampling_frequency
     knots = np.arange(lag_time[0], lag_time[-1], KNOT_SPACING_S)[1:]
@@ -102,7 +102,7 @@ def audited_designs(
     Only the basis width differs from today's; the models and the order their
     blocks are concatenated in are unchanged.
     """
-    from continuum_swr_replay.analysis.pfc.glm import (
+    from continuum_swr_replay.analysis.pfc.design import (
         convolve_event_basis,
         event_onset_counts,
     )
@@ -173,8 +173,8 @@ def rebuild_session(
         session_data_over_time_path,
     )
     from continuum_swr_replay.analysis.pfc.cohort import load_session_stop_cohort
-    from continuum_swr_replay.analysis.pfc.glm import (
-        DEFAULT_BASIS_HALF_WINDOW_S,
+    from continuum_swr_replay.analysis.pfc.event_sets import DEFAULT_BASIS_HALF_WINDOW_S
+    from continuum_swr_replay.analysis.pfc.matched_control import (
         artifact_dropped_events,
     )
     from continuum_swr_replay.data_loaders import load_data

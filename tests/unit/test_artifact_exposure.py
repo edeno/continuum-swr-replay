@@ -28,7 +28,7 @@ import pytest
 
 from continuum_swr_replay.analysis.contfrag.tables import build_contfrag_stop_table
 from continuum_swr_replay.analysis.events import analysed_time, swr_inventory
-from continuum_swr_replay.analysis.pfc.glm import build_session_fit_mask
+from continuum_swr_replay.analysis.pfc.event_sets import build_session_fit_mask
 from continuum_swr_replay.analysis.replay.model_specs import (
     BIN_S,
     MODEL_PER_BIN_RATE,

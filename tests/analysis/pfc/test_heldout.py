@@ -19,7 +19,7 @@ from continuum_swr_replay.analysis.pfc.batched_glm import (
     make_ridge_penalty,
     prepare_heldout_response,
 )
-from continuum_swr_replay.analysis.pfc.glm import (
+from continuum_swr_replay.analysis.pfc.design import (
     convolve_event_basis,
     event_basis_functions,
     event_onset_counts,
@@ -659,7 +659,7 @@ class TestControlDrawNull:
 
     def test_a_classs_draws_have_that_classs_durations(self, null_session):
         """Duration matching, read off the drawn windows themselves."""
-        from continuum_swr_replay.analysis.pfc.glm import (
+        from continuum_swr_replay.analysis.pfc.matched_control import (
             MATCHED_CONTROL_SOURCE_CLASS,
             make_matched_control_times,
         )

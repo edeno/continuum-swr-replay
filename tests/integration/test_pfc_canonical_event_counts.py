@@ -28,7 +28,7 @@ from continuum_swr_replay.analysis.pfc.canonical_events import (
     load_session_swr_intervals,
 )
 from continuum_swr_replay.analysis.pfc.cohort import load_session_stop_cohort
-from continuum_swr_replay.analysis.pfc.glm import build_session_event_sets
+from continuum_swr_replay.analysis.pfc.event_sets import build_session_event_sets
 from continuum_swr_replay.analysis.replay import prepare_data as pdm
 
 pytestmark = [pytest.mark.slow, pytest.mark.integration, pytest.mark.real_data]

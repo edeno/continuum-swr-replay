@@ -59,7 +59,7 @@ without the VPN.
 The Spyglass-touching loader functions (`load_data`, `get_epoch_info`,
 `get_training_timepoints`, `get_labels`, `get_theta`, `get_ripple`,
 `get_hpc_marks`, `get_pfc_spike_times`, `get_electrode_group_info` and
-`analysis.pfc.glm.run_session`) need the lab VPN when they are called. Only
+`analysis.pfc.session.run_session`) need the lab VPN when they are called. Only
 `real_data` tests call them for real; the other tests replace them with
 `monkeypatch` or test the pure helpers.
 
