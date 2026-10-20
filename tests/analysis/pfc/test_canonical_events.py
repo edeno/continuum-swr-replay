@@ -24,6 +24,9 @@ from continuum_swr_replay.analysis.pfc.canonical_events import (
     load_session_swr_intervals,
     session_data_over_time_path,
 )
+from continuum_swr_replay.data_loaders.constants import NWB_FILES
+from continuum_swr_replay.data_loaders.epoch_register import read_register
+from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.tables.io import read_table, write_table
 from tests.unit._swr_inventory_fixtures import RUN_ID, write_swr_inventory
@@ -263,6 +266,37 @@ class TestSessionDataOverTimePath:
         )
 
         assert path.name == "j1620210706_02_r1_HPC_80_data_over_time.pkl"
+
+    @pytest.mark.parametrize(
+        "bad_filename",
+        [
+            "j1620210706.nwb",  # missing underscore
+            "j1620210706_",  # no extension
+            "chimi2020021_.nwb",  # date with < 8 digits
+            "20210706_.nwb",  # no animal name
+            "a_.nwbx_.nwb",  # an extension inside the stem
+            "j1620210706_02_r1_HPC",  # an epoch identifier, not a file name
+            "",
+        ],
+    )
+    def test_a_malformed_nwb_file_name_is_refused(self, tmp_path, bad_filename):
+        """Refused at once, not later as a cached frame that does not exist."""
+        with pytest.raises(ValueError, match="Invalid NWB filename format"):
+            session_data_over_time_path(bad_filename, "02_r1", data_dir=tmp_path)
+
+    def test_every_register_epoch_and_nwb_file_is_accepted(self, tmp_path):
+        """All 553 register epochs (any status) and every ``NWB_FILES`` entry
+        get the frame name the pre-Task-11 ``{animal}{date}_...`` spelling gave."""
+        epochs = [key for key in read_register().index if key[1] != "*"]
+        assert len(epochs) == 553
+        epochs += [(nwb_file_name, "02_r1") for nwb_file_name in NWB_FILES]
+
+        for nwb_file_name, epoch in epochs:
+            animal, date = parse_nwb_filename(nwb_file_name)
+            path = session_data_over_time_path(nwb_file_name, epoch, data_dir=tmp_path)
+            assert (
+                path == tmp_path / f"{animal}{date}_{epoch}_HPC_80_data_over_time.pkl"
+            )
 
 
 class TestCanonicalEventInputHashes:

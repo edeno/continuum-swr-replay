@@ -187,7 +187,14 @@ def session_data_over_time_path(
     (:func:`~continuum_swr_replay.decoding.files.non_local_threshold_percent`),
     so a run reads the labels that were cut at the threshold it asks for rather
     than whichever file exists.
+
+    Raises
+    ------
+    ValueError
+        If `nwb_file_name` is not ``{animal}{YYYYMMDD}_.nwb``. It is checked
+        here, so a malformed name fails at once rather than as a missing file.
     """
+    parse_nwb_filename(nwb_file_name)
     directory = PROCESSED_DATA_DIR if data_dir is None else Path(data_dir)
     return decode_paths(
         format_epoch_identifier(nwb_file_name, epoch_name, "HPC"),
