@@ -213,7 +213,13 @@ def main() -> None:
     if table_exists(out):
         backup = write_table(read_table(out), RC / "stop_table_previous")
         logger.info("backed up existing -> %s", backup.name)
-    out = publish_canonical(stop, RC, table="stop", basename="stop_table")
+    out = publish_canonical(
+        stop,
+        RC,
+        table="stop",
+        basename="stop_table",
+        require_swr_source=require_swr_source,
+    )
     logger.info("saved %d stops -> %s", len(stop), out)
 
 

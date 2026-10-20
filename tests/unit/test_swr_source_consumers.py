@@ -543,9 +543,12 @@ def test_the_replay_tables_are_published_with_the_sources_stamp(
     monkeypatch.setattr(
         prepare_data,
         "publish_canonical",
-        lambda frame, path, *, table, basename: published.setdefault(
-            basename, dict(frame.attrs)
-        ),
+        lambda frame,
+        path,
+        *,
+        table,
+        basename,
+        require_swr_source: published.setdefault(basename, dict(frame.attrs)),
     )
 
     prepare_data._publish_canonical_tables(
@@ -597,7 +600,7 @@ def test_the_timebin_tables_are_published_with_the_sources_stamp(
     monkeypatch.setattr(
         script,
         "publish_canonical",
-        lambda frame, path, *, table, basename: stamps.setdefault(
+        lambda frame, path, *, table, basename, require_swr_source: stamps.setdefault(
             table, frame.attrs.get("swr_source")
         ),
     )

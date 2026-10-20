@@ -144,7 +144,6 @@ __all__ = [
     "SWR_LABEL_COLUMN",
     "SWR_OBSERVED_COLUMN",
     "SWR_SOURCE_ATTR",
-    "SWR_SOURCE_TABLES",
     "SwrSourceError",
     "analysed_bins",
     "artifact_event_drops",
@@ -225,23 +224,6 @@ It is not ``swr_observed``, which is also False at gaps in the stored band."""
 SWR_SOURCE_ATTR = "swr_source"
 """The ``attrs`` key (kept in a parquet table's metadata) that names the SWR
 source a frame or table was built from: :func:`swr_source_name`."""
-
-SWR_SOURCE_TABLES = frozenset(
-    {
-        "event",
-        "event_arm",
-        "event_patch",
-        "event_sequence",
-        "stop",
-        "event_onset",
-        "stop_timebin",
-    }
-)
-"""The canonical tables (covariate-schema keys) built from decode frames read
-through this source; ``publish_canonical`` refuses one without the current
-stamp. qvals, built from behavior alone, is the one canonical table that is
-not among them. event_sequence holds no SWR column but is published with its
-atomic set, so it carries the set's stamp."""
 
 OBSERVED_SCOPE = "stored_band"
 """The ``swr_observed`` scope of the band Kay reads."""
@@ -343,7 +325,7 @@ def stamp_swr_source(frame: pd.DataFrame) -> pd.DataFrame:
 
     Only a producer that built the frame from decode frames read through this
     source stamps it; ``publish_canonical`` refuses a table of
-    :data:`SWR_SOURCE_TABLES` without the current stamp.
+    ``table_io.SWR_SOURCE_TABLES`` without the current stamp.
     """
     frame.attrs[SWR_SOURCE_ATTR] = swr_source_name()
     return frame

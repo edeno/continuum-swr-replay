@@ -222,7 +222,6 @@ KNOWN_VIOLATIONS: dict[str, set[tuple[str, str]]] = {
     },
     "foundation_imports_only_foundation": {
         ("decode_files", "analysis.constants"),
-        ("table_io", "analysis.hippocampus.swr_source"),
         ("table_io", "analysis.replay.covariate_registry"),
         ("table_parity", "analysis.replay.covariate_registry"),
     },
@@ -240,7 +239,7 @@ KNOWN_VIOLATIONS: dict[str, set[tuple[str, str]]] = {
     # replay, decoding_common and table_io. Its two-package cycles
     # (code-organization review, F2) are closed by the back edges
     # hippocampus -> inventory_comparison, -> replay (event_ids) and
-    # -> decoding_common, and table_io -> hippocampus and -> replay; every
+    # -> decoding_common, and table_io -> replay; every
     # other edge here is listed because it lies inside that component.
     # (hippocampus <-> pfc left with the spike binning, Task 4.)
     "no_package_cycles": {
@@ -255,7 +254,6 @@ KNOWN_VIOLATIONS: dict[str, set[tuple[str, str]]] = {
         ("analysis.replay", "table_io"),
         ("decoding_common", "analysis.hippocampus"),
         ("decoding_common", "table_io"),
-        ("table_io", "analysis.hippocampus"),
         ("table_io", "analysis.replay"),
     },
 }

@@ -41,6 +41,7 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
 )
 from continuum_swr_replay.analysis.hippocampus.swr_source import (
     read_dot_with_swr_source,
+    require_swr_source,
     stamp_swr_source,
     swr_epoch_id,
 )
@@ -691,7 +692,11 @@ def build_stop_table_scope(
     # Built above from decode frames read through the SWR source.
     stamp_swr_source(stop_table)
     path = publish_canonical(
-        stop_table, output_dir, table="stop", basename="stop_table"
+        stop_table,
+        output_dir,
+        table="stop",
+        basename="stop_table",
+        require_swr_source=require_swr_source,
     )
     logging.info("saved stop_table -> %s (%d rows)", path, len(stop_table))
     return stop_table
@@ -904,7 +909,13 @@ def _publish_canonical_tables(frames: tuple) -> None:
             logging.info("  %s: skipped (no data)", basename)
             continue
         stamp_swr_source(frame)
-        path = publish_canonical(frame, OUTPUT_DIR, table=table_key, basename=basename)
+        path = publish_canonical(
+            frame,
+            OUTPUT_DIR,
+            table=table_key,
+            basename=basename,
+            require_swr_source=require_swr_source,
+        )
         logging.info("saved %s → %s (%d rows)", basename, path, len(frame))
 
 

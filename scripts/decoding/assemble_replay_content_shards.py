@@ -60,8 +60,6 @@ INPUT_TABLES = (
 )
 
 
-
-
 def assemble_replay_content_shards(
     shard_dirs: list[Path],
     *,
@@ -180,7 +178,11 @@ def assemble_replay_content_shards(
         # publish_canonical is the one write door; it re-stamps (idempotent) and
         # writes atomically so an unstamped canonical table cannot be persisted.
         path = publish_canonical(
-            frame, output_dir, table=BASENAME_TO_TABLE[name], basename=name
+            frame,
+            output_dir,
+            table=BASENAME_TO_TABLE[name],
+            basename=name,
+            require_swr_source=require_swr_source,
         )
         LOGGER.info("saved %s -> %s (%d rows)", name, path, len(frame))
     return tables
@@ -214,7 +216,13 @@ def assemble_replay_stop_shards(
         raise ValueError("assembled stop table requires unique nonmissing stop_id")
     output_dir.mkdir(parents=True, exist_ok=True)
     stamp_swr_source(stop_table)
-    path = publish_canonical(stop_table, output_dir, table="stop", basename="stop_table")
+    path = publish_canonical(
+        stop_table,
+        output_dir,
+        table="stop",
+        basename="stop_table",
+        require_swr_source=require_swr_source,
+    )
     LOGGER.info("saved stop_table -> %s (%d rows)", path, len(stop_table))
     return stop_table
 

@@ -30,6 +30,7 @@ import hashlib
 import json
 import os
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +43,7 @@ __all__ = [
     "read_attrs",
     "write_table",
     "publish_canonical",
+    "SWR_SOURCE_TABLES",
     "parquet_path",
     "resolved_table_path",
     "table_exists",
@@ -60,6 +62,23 @@ def sha256_file(path: str | Path, *, chunk_bytes: int = 1 << 20) -> str:
 
 
 _ATTRS_KEY = b"continuum_swr_replay.attrs"
+
+SWR_SOURCE_TABLES = frozenset(
+    {
+        "event",
+        "event_arm",
+        "event_patch",
+        "event_sequence",
+        "stop",
+        "event_onset",
+        "stop_timebin",
+    }
+)
+"""The canonical tables (covariate-schema keys) built from decode frames read
+through the SWR source (``swr_source``); ``publish_canonical`` refuses one
+without the source's current stamp. qvals, built from behavior alone, is the
+one canonical table that is not among them. event_sequence holds no SWR column
+but is published with its atomic set, so it carries the set's stamp."""
 
 
 def umask_file_mode() -> int:
@@ -85,6 +104,7 @@ def publish_canonical(
     *,
     table: str,
     basename: str | None = None,
+    require_swr_source: Callable[..., None] | None = None,
 ) -> Path:
     """Stamp, validate, and atomically write a canonical table.
 
@@ -107,24 +127,36 @@ def publish_canonical(
     full-frame ``isna``/``duplicated`` passes in ``stamp_covariate_schema`` --
     and is written as-is; the stamp is the record that it was validated.
 
-    A table built from SWR labels (``swr_source.SWR_SOURCE_TABLES``) must also
-    carry the SWR source's current stamp, which only its producer can give it
+    A table built from SWR labels (:data:`SWR_SOURCE_TABLES`) must also carry
+    the SWR source's current stamp, which only its producer can give it
     (``swr_source.stamp_swr_source``, after reading its decode frames through
-    the source). One without it, or with another source's, is refused, so no
-    canonical table lands without naming the SWRs it was built from.
+    the source). The producer passes the source's check,
+    ``swr_source.require_swr_source``, as `require_swr_source`. A table
+    without the stamp, or with another source's, is refused, and so is a call
+    that publishes one of these tables without the check, so no canonical
+    table lands without naming the SWRs it was built from. The check comes
+    from the caller because this module is foundation code and imports no
+    analysis code.
+
+    Raises
+    ------
+    TypeError
+        If `table` is one of :data:`SWR_SOURCE_TABLES` and no
+        `require_swr_source` is given.
     """
-    # Function-local imports: covariate_registry's and swr_source's consumers
-    # import table_io, so a module-level import here would close a cycle.
-    from continuum_swr_replay.analysis.hippocampus.swr_source import (
-        SWR_SOURCE_TABLES,
-        require_swr_source,
-    )
+    # Function-local import: covariate_registry's consumers import table_io, so
+    # a module-level import here would close a cycle.
     from continuum_swr_replay.analysis.replay.covariate_registry import (
         COVARIATE_SCHEMA_VERSION,
         stamp_covariate_schema,
     )
 
     if table in SWR_SOURCE_TABLES:
+        if require_swr_source is None:
+            raise TypeError(
+                f"the {table} table is built from SWR labels; pass "
+                "require_swr_source=swr_source.require_swr_source to publish it"
+            )
         require_swr_source(frame, what=f"the {table} table to publish")
 
     already_stamped = (

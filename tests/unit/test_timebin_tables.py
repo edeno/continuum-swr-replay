@@ -23,6 +23,7 @@ from __future__ import annotations
 import importlib
 import sys
 import types
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
@@ -294,7 +295,14 @@ def test_output_dir_receives_both_tables(timebin_script, monkeypatch, tmp_path):
     monkeypatch.setattr(script, "validate", lambda onset, dense, in_excluded: None)
     published: list[tuple[Path, str]] = []
 
-    def record(frame: pd.DataFrame, path: Path, *, table: str, basename: str) -> Path:
+    def record(
+        frame: pd.DataFrame,
+        path: Path,
+        *,
+        table: str,
+        basename: str,
+        require_swr_source: Callable[..., None],
+    ) -> Path:
         if not Path(path).resolve().is_relative_to(tmp_path.resolve()):
             raise AssertionError(f"refusing to publish outside the test folder: {path}")
         published.append((Path(path), table))
@@ -347,7 +355,14 @@ def test_published_dense_table_keeps_its_stamp_and_sums_the_excluded_onsets(
     )
     published: dict[str, pd.DataFrame] = {}
 
-    def record(frame: pd.DataFrame, path: Path, *, table: str, basename: str) -> Path:
+    def record(
+        frame: pd.DataFrame,
+        path: Path,
+        *,
+        table: str,
+        basename: str,
+        require_swr_source: Callable[..., None],
+    ) -> Path:
         published[table] = frame
         return Path(path) / f"{basename}.parquet"
 

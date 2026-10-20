@@ -55,6 +55,7 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
 )
 from continuum_swr_replay.analysis.hippocampus.swr_source import (
     read_dot_with_swr_source,
+    require_swr_source,
     stamp_swr_source,
 )
 from continuum_swr_replay.analysis.replay import build_event_patch_table
@@ -130,7 +131,11 @@ def publish_contfrag_tables(
     for name, frame in tables.items():
         # publish_canonical is the one write door (re-stamp idempotent, atomic).
         path = publish_canonical(
-            frame, output_dir, table=BASENAME_TO_TABLE[name], basename=basenames[name]
+            frame,
+            output_dir,
+            table=BASENAME_TO_TABLE[name],
+            basename=basenames[name],
+            require_swr_source=require_swr_source,
         )
         logging.info("saved %s -> %s (%d rows)", name, path, len(frame))
     return tables
@@ -601,7 +606,13 @@ def main():
     ):
         # Built here from decode frames read through the SWR source.
         stamp_swr_source(frame)
-        path = publish_canonical(frame, output_dir, table=table_key, basename=name)
+        path = publish_canonical(
+            frame,
+            output_dir,
+            table=table_key,
+            basename=name,
+            require_swr_source=require_swr_source,
+        )
         logging.info("saved %s -> %s (%d rows)", name, path, len(frame))
 
     logging.info("total time: %ds", int(time.time() - t0))

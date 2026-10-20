@@ -26,6 +26,7 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.hippocampus.swr_source import (
     read_dot_with_swr_source,
+    require_swr_source,
     stamp_swr_source,
 )
 from continuum_swr_replay.analysis.replay.prepare_data import find_sessions
@@ -174,12 +175,14 @@ def main() -> None:
         args.output_dir,
         table="event_onset",
         basename="event_onset_table",
+        require_swr_source=require_swr_source,
     )
     publish_canonical(
         stamp_swr_source(dense),
         args.output_dir,
         table="stop_timebin",
         basename="stop_timebin_table",
+        require_swr_source=require_swr_source,
     )
     logger.info(
         "saved %d onsets -> event_onset_table.parquet, "

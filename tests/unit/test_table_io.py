@@ -17,6 +17,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.hippocampus.swr_source import require_swr_source
 from continuum_swr_replay.table_io import (
     parquet_path,
     publish_canonical,
@@ -210,7 +211,23 @@ def test_publish_canonical_refuses_an_swr_table_from_another_source(tmp_path, st
         frame.attrs["swr_source"] = stamp
 
     with pytest.raises(SwrSourceError, match="the stop table to publish"):
-        publish_canonical(frame, tmp_path, table="stop", basename="stop_table")
+        publish_canonical(
+            frame,
+            tmp_path,
+            table="stop",
+            basename="stop_table",
+            require_swr_source=require_swr_source,
+        )
+    assert not (tmp_path / "stop_table.parquet").exists()
+
+
+def test_publish_canonical_refuses_an_swr_table_without_the_source_check(tmp_path):
+    """The caller must hand over the SWR source's check for an SWR table; a
+    stamped frame published without it is refused, not written unchecked."""
+    with pytest.raises(TypeError, match="require_swr_source"):
+        publish_canonical(
+            _valid_stop_frame(), tmp_path, table="stop", basename="stop_table"
+        )
     assert not (tmp_path / "stop_table.parquet").exists()
 
 
@@ -219,7 +236,11 @@ def test_publish_canonical_keeps_the_swr_stamp_and_needs_none_for_qvals(tmp_path
 
     stop = read_table(
         publish_canonical(
-            _valid_stop_frame(), tmp_path, table="stop", basename="stop_table"
+            _valid_stop_frame(),
+            tmp_path,
+            table="stop",
+            basename="stop_table",
+            require_swr_source=require_swr_source,
         )
     )
     qvals = read_table(
@@ -239,7 +260,13 @@ def test_publish_canonical_stamps_and_writes(tmp_path):
     )
 
     frame = _valid_stop_frame()
-    path = publish_canonical(frame, tmp_path, table="stop", basename="stop_table")
+    path = publish_canonical(
+        frame,
+        tmp_path,
+        table="stop",
+        basename="stop_table",
+        require_swr_source=require_swr_source,
+    )
     loaded = read_table(path)
 
     assert loaded.attrs.get("covariate_schema_table") == "stop"
@@ -255,13 +282,23 @@ def test_publish_canonical_rejects_duplicate_rows(tmp_path):
     bad = _valid_stop_frame()
     bad.loc[1, "stop_id"] = 10  # duplicate stop_id
     with pytest.raises(ValueError):
-        publish_canonical(bad, tmp_path, table="stop", basename="stop_table")
+        publish_canonical(
+            bad,
+            tmp_path,
+            table="stop",
+            basename="stop_table",
+            require_swr_source=require_swr_source,
+        )
     assert not (tmp_path / "stop_table.parquet").exists()
 
 
 def test_publish_canonical_basename_override(tmp_path):
     path = publish_canonical(
-        _valid_stop_frame(), tmp_path, table="stop", basename="renamed"
+        _valid_stop_frame(),
+        tmp_path,
+        table="stop",
+        basename="renamed",
+        require_swr_source=require_swr_source,
     )
     assert path == parquet_path(tmp_path / "renamed")
     assert path.exists()

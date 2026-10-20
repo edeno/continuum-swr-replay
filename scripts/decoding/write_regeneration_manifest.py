@@ -19,7 +19,6 @@ from continuum_swr_replay.analysis.behavior.qvals_table import (
 )
 from continuum_swr_replay.analysis.hippocampus.swr_source import (
     SWR_SOURCE_ATTR,
-    SWR_SOURCE_TABLES,
     swr_source_name,
 )
 from continuum_swr_replay.analysis.replay._tables_common import (
@@ -44,15 +43,18 @@ from continuum_swr_replay.session_keys import (
 from continuum_swr_replay.session_keys import (
     session_key_set as _session_keys,
 )
-from continuum_swr_replay.table_io import read_attrs, read_table, sha256_file
+from continuum_swr_replay.table_io import (
+    SWR_SOURCE_TABLES,
+    read_attrs,
+    read_table,
+    sha256_file,
+)
 from continuum_swr_replay.table_parity import diff_table
 
 MODEL_VALIDATION_BUNDLES = {
     "replay": ("base_arm", "base_patch", "belief_arm", "belief_patch"),
     "contfrag": ("mua_arm", "mua_patch", "swr_arm", "swr_patch"),
 }
-
-
 
 
 def _git(*args: str) -> str:
@@ -85,10 +87,6 @@ def _inventory_file(path: Path, root: Path) -> dict[str, object]:
     return record
 
 
-
-
-
-
 def _json_session_keys(keys: set[tuple[object, ...]]) -> list[dict[str, object]]:
     return [
         dict(zip(SESSION_COLUMNS, key, strict=True))
@@ -100,7 +98,7 @@ def _require_one_swr_source(roots: Mapping[str, Path]) -> str:
     """Every SWR-bearing candidate table carries the configured SWR source's stamp.
 
     Every parquet table under `roots` whose covariate-schema table is one of
-    ``swr_source.SWR_SOURCE_TABLES`` must be stamped ``swr_source_name()``:
+    ``table_io.SWR_SOURCE_TABLES`` must be stamped ``swr_source_name()``:
     a release mixing SWR sources, or built from an earlier one, is refused.
 
     Returns
@@ -265,9 +263,11 @@ def _validate_model_bundles(
     for label, root in (("replay", replay_root), ("contfrag", contfrag_root)):
         validation_root = root / "models_validation"
         expected_names = MODEL_VALIDATION_BUNDLES[label]
-        observed_names = sorted(
-            path.name for path in validation_root.iterdir() if path.is_dir()
-        ) if validation_root.is_dir() else []
+        observed_names = (
+            sorted(path.name for path in validation_root.iterdir() if path.is_dir())
+            if validation_root.is_dir()
+            else []
+        )
         if observed_names != sorted(expected_names):
             raise ValueError(
                 f"{validation_root} has incomplete validation bundles: "
