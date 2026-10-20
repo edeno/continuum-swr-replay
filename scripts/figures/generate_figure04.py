@@ -93,7 +93,6 @@ from continuum_swr_replay.analysis.pfc.load_population import (
     significant_fraction,
 )
 from continuum_swr_replay.analysis.replay.cohort_selection import stop_cohort_suffix
-from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.figure_utilities import (
     PAGE_HEIGHT,
     TWO_COLUMN,
@@ -507,6 +506,10 @@ def generate_figure(
     results_hpc, _, _ = load_results(
         nwb_file_name, epoch_name, decoding_brain_area="HPC"
     )
+    # Imported here: data_loaders.load_data imports Spyglass, which opens a
+    # DataJoint connection, and the module must import on a host without one.
+    from continuum_swr_replay.data_loaders import load_data
+
     # the ripple trace is the source's (the Kay consensus over R-T's tetrodes)
     data = load_data(
         nwb_file_name,
