@@ -35,6 +35,8 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+from continuum_swr_replay.data_loaders.constants import N_PORTS
+
 # ---------------------------------------------------------------------------
 # Migration actions
 # ---------------------------------------------------------------------------
@@ -203,15 +205,15 @@ REGISTRY: tuple[Entry, ...] = (
             canonical=f"reward_belief_mean_port_{i}",
             notes="old Beta index i maps to port i-1; tol atol=1e-15 rtol=1e-12",
         )
-        for i in range(6)
+        for i in range(N_PORTS)
     ],
     *[
         _rename(f"betadist_var{i + 1}", f"reward_belief_variance_port_{i}", "qvals")
-        for i in range(6)
+        for i in range(N_PORTS)
     ],
     *[
         _rename(f"p_reward_port{i}", f"task_reward_probability_port_{i}", "qvals")
-        for i in range(6)
+        for i in range(N_PORTS)
     ],
     *[
         _rename(

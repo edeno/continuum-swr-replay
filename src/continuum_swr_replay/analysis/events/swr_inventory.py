@@ -70,6 +70,7 @@ from continuum_swr_replay.analysis.events.eligibility import (
     event_drop_reasons,
     excluded_time,
 )
+from continuum_swr_replay.data_loaders.utils import format_epoch_identifier
 from continuum_swr_replay.intervals import subtract_intervals
 from continuum_swr_replay.paths import ARTIFACT_INTERVALS_DIR, SWR_INVENTORY_ROOT
 from continuum_swr_replay.runs.io import sha256_file
@@ -191,7 +192,7 @@ def swr_epoch_id(nwb_file_name: str, epoch_name: str) -> str:
     SWRs are detected on CA1's LFP, so the id is the HPC one whatever area an
     analysis decodes.
     """
-    return f"{nwb_file_name.removesuffix('_.nwb')}_{epoch_name}_HPC"
+    return format_epoch_identifier(nwb_file_name, epoch_name, "HPC")
 
 
 def swr_source_files(epoch_id: str) -> dict[str, dict[str, str]]:

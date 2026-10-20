@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
+from continuum_swr_replay.analysis.constants import DEFAULT_SAMPLING_FREQUENCY_HZ
 from continuum_swr_replay.analysis.events.analysed_time import excluded_intervals
 from continuum_swr_replay.analysis.events.swr_inventory import swr_epoch_id
 from continuum_swr_replay.intervals import overlaps_intervals
@@ -22,7 +23,7 @@ def get_signal_windows(
     signal_cols: list[str],
     time_col: str = "start_time",
     window_sec: float = 2.0,
-    sampling_frequency: float = 500.0,
+    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY_HZ,
     event_id_col: str | None = None,
 ) -> xr.DataArray:
     """Extract signal windows around event times.

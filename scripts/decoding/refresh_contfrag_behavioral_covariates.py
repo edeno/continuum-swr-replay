@@ -47,7 +47,10 @@ from continuum_swr_replay.analysis.replay.table_contracts import (
     validate_event_patch_table,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
-from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
+from continuum_swr_replay.data_loaders.utils import (
+    format_epoch_identifier,
+    parse_nwb_filename,
+)
 from continuum_swr_replay.paths import table_path
 from continuum_swr_replay.tables.io import read_table
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
@@ -127,7 +130,7 @@ def _rebuild_session(
     nwb = descriptor["nwb_file_name"]
     epoch = descriptor["epoch_name"]
     brain_area = descriptor["brain_area"]
-    cache_key = f"{nwb.replace('_.nwb', '')}_{epoch}_{brain_area}"
+    cache_key = format_epoch_identifier(nwb, epoch, brain_area)
     trials, experiences, graph, _ = replay_prepare_data.load_behavioral_context(
         {
             "nwb_file_name": nwb,

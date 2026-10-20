@@ -62,7 +62,10 @@ from continuum_swr_replay.analysis.replay import build_event_patch_table
 from continuum_swr_replay.analysis.replay import prepare_data as replay_prepare_data
 from continuum_swr_replay.analysis.replay.covariates import load_contingency
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
-from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
+from continuum_swr_replay.data_loaders.utils import (
+    format_epoch_identifier,
+    parse_nwb_filename,
+)
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.results import open_results
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
@@ -188,9 +191,10 @@ def find_sessions(
     """
     by_animal: dict[str, list] = {}
     for nwb_file_name, epoch in analysed_epochs().index:
-        animal_date = nwb_file_name.removesuffix("_.nwb")
         animal = parse_nwb_filename(nwb_file_name)[0]
-        session_id = f"{animal_date}_{epoch}_{brain_area}_contfrag"
+        session_id = format_epoch_identifier(
+            nwb_file_name, epoch, brain_area, "_contfrag"
+        )
         paths = decode_paths(session_id, PROCESSED_DATA_DIR, threshold_percent=None)
         dot_file = paths.data_over_time
         env_file = paths.environment
@@ -270,7 +274,7 @@ def _process_session(
     # mismatch) the cache is the only way this pipeline runs at all. The cache
     # is keyed by the NonLocal session_id, which is this one without the
     # ``_contfrag`` suffix.
-    cache_key = f"{nwb.replace('_.nwb', '')}_{epoch}_{brain_area}"
+    cache_key = format_epoch_identifier(nwb, epoch, brain_area)
     trials, port_experiences, track_graph, _ = (
         replay_prepare_data.load_behavioral_context(
             {

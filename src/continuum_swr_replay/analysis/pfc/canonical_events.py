@@ -47,7 +47,10 @@ from continuum_swr_replay.analysis.events.immobility import (
     intervals_from_labels,
     require_canonical_speed_threshold,
 )
-from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
+from continuum_swr_replay.data_loaders.utils import (
+    format_epoch_identifier,
+    parse_nwb_filename,
+)
 from continuum_swr_replay.decoding.files import (
     decode_paths,
     non_local_threshold_percent,
@@ -185,10 +188,9 @@ def session_data_over_time_path(
     so a run reads the labels that were cut at the threshold it asks for rather
     than whichever file exists.
     """
-    animal, session_date = parse_nwb_filename(nwb_file_name)
     directory = PROCESSED_DATA_DIR if data_dir is None else Path(data_dir)
     return decode_paths(
-        f"{animal}{session_date}_{epoch_name}_HPC",
+        format_epoch_identifier(nwb_file_name, epoch_name, "HPC"),
         directory,
         threshold_percent=non_local_threshold_percent(non_local_threshold),
     ).data_over_time

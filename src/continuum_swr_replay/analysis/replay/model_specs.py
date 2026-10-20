@@ -37,6 +37,8 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
+from continuum_swr_replay.data_loaders.constants import N_LEAF_ARMS
+
 # Shared with the covariate builders, which must not import this module: see
 # ``design_constants`` for why the numbers live there and not here. Re-exported
 # below so ``from ...model_specs import BIN_S`` keeps working.
@@ -1455,7 +1457,7 @@ LEAF_ONLY_CONTRAST_RUNGS = frozenset(
         "CS6nt_armuncert",
     }
 )
-LEAF_ONLY_N_CATEGORIES = 6
+LEAF_ONLY_N_CATEGORIES = N_LEAF_ARMS
 # Arm fixed effects for a leaf-only fit: five dummies for six leaves, arm 5 the
 # reference. The nine-arm set (is_candidate_arm_0..7) is rank-deficient once the trunks are
 # gone -- is_candidate_arm_6 and is_candidate_arm_7 are then identically zero -- so a leaf-only rung

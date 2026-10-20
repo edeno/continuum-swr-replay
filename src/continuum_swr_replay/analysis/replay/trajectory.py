@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from ...data_loaders.constants import TRACK_SEGMENT_TO_PATCH
+from ...data_loaders.constants import TRACK_SEGMENT_TO_PATCH, TRUNK_ARMS
 from ..hippocampus.posterior_analysis import map_estimate_to_map_nodes
 from .spatial import arm_adjacency, path_continuity
 from .summaries import _group_by_event
@@ -23,7 +23,7 @@ from .summaries import _group_by_event
 RollupResult = tuple[np.ndarray, dict[str, np.ndarray]]
 
 #: trunk arms join the three patch junctions to the centre of the track
-_TRUNK_ARMS = frozenset({6, 7, 8})
+_TRUNK_ARMS = frozenset(TRUNK_ARMS)
 
 #: per-event columns produced identically for both scenarios (parity target).
 SHARED_TRAJECTORY_COLUMNS: tuple[str, ...] = (

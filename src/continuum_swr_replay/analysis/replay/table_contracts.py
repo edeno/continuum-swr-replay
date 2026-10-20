@@ -23,7 +23,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.data_loaders.constants import ALL_ARMS, TRACK_SEGMENT_TO_PATCH
+from continuum_swr_replay.data_loaders.constants import (
+    ALL_ARMS,
+    LEAF_ARMS,
+    N_LEAF_ARMS,
+    TRACK_SEGMENT_TO_PATCH,
+)
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 from continuum_swr_replay.tables.standardization import (
     assert_standardized_matches_reference,
@@ -231,13 +236,13 @@ def _require_response_conservation(frame: pd.DataFrame) -> None:
 
 
 def _require_uniform_leaf_support(frame: pd.DataFrame) -> None:
-    leaf = frame[frame["candidate_arm"].isin(range(6))]
+    leaf = frame[frame["candidate_arm"].isin(LEAF_ARMS)]
     for column in _LEAF_SUPPORT_COLUMNS:
         if column not in leaf:
             continue
         finite = np.isfinite(pd.to_numeric(leaf[column], errors="coerce"))
         support = finite.groupby(leaf["event_id"], sort=False).sum()
-        partial = support[(support != 0) & (support != 6)]
+        partial = support[(support != 0) & (support != N_LEAF_ARMS)]
         if not partial.empty:
             raise ValueError(
                 f"event_arm has partial leaf support for {column!r} in "

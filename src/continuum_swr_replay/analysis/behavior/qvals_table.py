@@ -18,6 +18,8 @@ import numpy as np
 import pandas as pd
 from scipy.special import betaln, digamma
 
+from continuum_swr_replay.data_loaders.constants import port_columns
+from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
 from continuum_swr_replay.data_loaders.trial_clocks import (
     outcome_known_time_from_task_visit,
 )
@@ -43,7 +45,6 @@ from ._spatial_bandit_rl import make_full_beta_bernoulli_dv_df
 warnings.filterwarnings("ignore", category=pd.errors.PerformanceWarning)
 
 RC = REPLAY_CONTENT_DIR
-ANIMALS = ("chimi", "j16", "peanut", "senor", "wilbur")
 # stop_table uses lowercase animal labels; BehaviorModel capitalizes Senor.
 ANIMAL_SUBJECT = {
     "chimi": "chimi",
@@ -84,8 +85,8 @@ COVARIATES = [
     "rpe_postoutcome_abs",
     # expected value (per port / patch / belief mean)
     *[f"decision_value_patch_{i}" for i in range(1, 4)],
-    *[f"reward_belief_mean_port_{i}" for i in range(6)],
-    *[f"reward_belief_variance_port_{i}" for i in range(6)],
+    *port_columns("reward_belief_mean"),
+    *port_columns("reward_belief_variance"),
     # decision variables: Stay / Switch / Relative (DeltaV)
     "stay_value_preoutcome",
     "switch_value_preoutcome",
@@ -131,8 +132,8 @@ _REQUIRED_MODEL_CONTRACT_COVARIATES = (
     "chosen_arm",
     "reward_belief_mean_chosen_arm_preoutcome",
     "rpe_postoutcome_abs",
-    *[f"reward_belief_mean_port_{i}" for i in range(6)],
-    *[f"reward_belief_variance_port_{i}" for i in range(6)],
+    *port_columns("reward_belief_mean"),
+    *port_columns("reward_belief_variance"),
 )
 
 # The vendored decision-variable code uses adjacent model rows for these
@@ -174,7 +175,7 @@ NOMINAL_COVARIATES = [
     "is_periswitch_post",
     # per-port nominal p(R); the content/contfrag builders map task_reward_probability_port_{arm}
     # -> p_reward_arm (attach_contingency_value_block).
-    *[f"task_reward_probability_port_{i}" for i in range(6)],
+    *port_columns("task_reward_probability"),
 ]
 # leaf 1-6 (0-indexed arm) -> patch (WELL_PATCH_MAPPING); for the nominal patch value.
 WELL_PATCH = np.array([0, 0, 1, 1, 2, 2])
@@ -842,9 +843,9 @@ def _validate_qvals_output(tab: pd.DataFrame) -> None:
         "reward_belief_mean_chosen_arm_preoutcome",
         "rpe_postoutcome_abs",
         *REQUIRED_FITTED_MODEL_COVARIATES,
-        *[f"task_reward_probability_port_{i}" for i in range(6)],
-        *[f"reward_belief_mean_port_{i}" for i in range(6)],
-        *[f"reward_belief_variance_port_{i}" for i in range(6)],
+        *port_columns("task_reward_probability"),
+        *port_columns("reward_belief_mean"),
+        *port_columns("reward_belief_variance"),
         "reward_belief_differential_entropy_leaf_mean_preoutcome",
         "outcome_known_time",
         "qvals_context_time",
@@ -863,8 +864,8 @@ def _validate_qvals_output(tab: pd.DataFrame) -> None:
     probability_cols = [
         "task_reward_probability_chosen_arm",
         "reward_belief_mean_chosen_arm_preoutcome",
-        *[f"task_reward_probability_port_{i}" for i in range(6)],
-        *[f"reward_belief_mean_port_{i}" for i in range(6)],
+        *port_columns("task_reward_probability"),
+        *port_columns("reward_belief_mean"),
     ]
     probability_values = tab[probability_cols].to_numpy(dtype=float)
     if not np.isfinite(probability_values).all():
@@ -878,7 +879,7 @@ def _validate_qvals_output(tab: pd.DataFrame) -> None:
         # Differential entropy is legitimately negative for concentrated Beta
         # distributions and has a maximum of zero for the uniform Beta(1, 1).
         raise ValueError("beta_reward_entropy must be finite and no greater than zero")
-    variance_cols = [f"reward_belief_variance_port_{i}" for i in range(6)]
+    variance_cols = port_columns("reward_belief_variance")
     variances = tab[variance_cols].to_numpy(dtype=float)
     if (
         not np.isfinite(variances).all()
@@ -935,7 +936,7 @@ def _to_canonical_qvals(tab: pd.DataFrame) -> pd.DataFrame:
 def run_build_qvals_table(args: argparse.Namespace) -> None:
     """Build every requested animal's qvals rows, validate, and optionally publish."""
     replay_content_dir = args.replay_content_dir.resolve()
-    animals = [args.animal] if args.animal else list(ANIMALS)
+    animals = [args.animal] if args.animal else list(analysed_animals())
 
     beh = dj.create_virtual_module("alison_behav", "alison_behav")
     rl = dj.create_virtual_module("alison_rlmodel", "alison_rlmodel")

@@ -64,6 +64,7 @@ from continuum_swr_replay.analysis.events.immobility import (  # noqa: E402
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (  # noqa: E402
     validate_dot_event_contract,
 )
+from continuum_swr_replay.data_loaders.constants import N_LEAF_ARMS  # noqa: E402
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_decode_files,
 )
@@ -86,7 +87,6 @@ THRESHOLD_PERCENT = non_local_threshold_percent(NON_LOCAL_THRESHOLD)
 IMMOBILITY_CM_PER_S = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 FAR_CM = 20.0  # content track-distance from animal above this = "far/remote"
 AT_WELL_CM = 20.0  # content track-distance to nearest well below this = "at a well"
-N_LEAF_ARMS = 6  # arms 0-5 terminate at reward wells; 6-8 are trunk
 MIN_WELLS = 4  # require this many wells localizable in a session
 MIN_IMMOBILE_BINS = 50  # per leaf arm, to estimate the well position
 

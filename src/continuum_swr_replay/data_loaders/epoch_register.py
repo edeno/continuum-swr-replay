@@ -59,7 +59,7 @@ from typing import NamedTuple
 
 import pandas as pd
 
-from .utils import get_epoch_info
+from .utils import format_epoch_identifier, get_epoch_info, parse_nwb_filename
 
 REGISTER_PATH = Path(__file__).with_name("epoch_register.csv")
 """The committed register, one row per (nwb_file_name, epoch)."""
@@ -453,8 +453,23 @@ def analysed_epoch_ids(register: pd.DataFrame | None = None) -> list[str]:
         register = read_register()
     analysed = register.index[register["status"] == Status.ANALYSED]
     return sorted(
-        f"{name.removesuffix('_.nwb')}_{epoch}_HPC" for name, epoch in analysed
+        format_epoch_identifier(name, epoch, "HPC") for name, epoch in analysed
     )
+
+
+def analysed_animals(register: pd.DataFrame | None = None) -> tuple[str, ...]:
+    """The animals with an analysed epoch, in register order.
+
+    Read from the register alone, like :func:`analysed_epoch_ids`, so a script
+    that lists the cohort's animals needs no database. The register is sorted
+    by NWB file name, so the order is alphabetical:
+    ``("chimi", "j16", "peanut", "senor", "wilbur")``.
+    """
+    if register is None:
+        register = read_register()
+    analysed = register.index[register["status"] == Status.ANALYSED]
+    animals = (parse_nwb_filename(name)[0] for name, _ in analysed)
+    return tuple(dict.fromkeys(animals))
 
 
 def analysed_decode_files(

@@ -73,6 +73,8 @@ import pandas as pd
 from numpy.typing import NDArray
 from scipy.interpolate import interp1d
 
+from ..parameters import SAMPLING_FREQUENCY
+
 # Opt in to future pandas behavior: fillna on object dtype will no longer
 # silently downcast. This suppresses the FutureWarning.
 pd.set_option("future.no_silent_downcasting", True)
@@ -481,7 +483,7 @@ def make_task_variables(
     position_info: pd.DataFrame,
     trials_df: pd.DataFrame,
     track_graph: nx.Graph,
-    sampling_frequency: float = 500.0,
+    sampling_frequency: float = SAMPLING_FREQUENCY,
     omission_shifts: list[int] | None = None,
     patch_change_shifts: list[int] | None = None,
     parallel: bool = False,

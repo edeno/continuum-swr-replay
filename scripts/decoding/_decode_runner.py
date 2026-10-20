@@ -45,6 +45,7 @@ from continuum_swr_replay.data_loaders import (
     get_training_timepoints,
     load_data,
 )
+from continuum_swr_replay.data_loaders.utils import format_epoch_identifier
 from continuum_swr_replay.decoding.config import DecodingConfig
 from continuum_swr_replay.decoding.files import (
     decode_paths,
@@ -387,9 +388,8 @@ def run_decode(
         ``None`` on success or graceful skip; the ``epoch_identifier``
         on caught exception so ``run_batch`` can aggregate failures.
     """
-    epoch_identifier = (
-        f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{brain_area}"
-        f"{runner.file_suffix}"
+    epoch_identifier = format_epoch_identifier(
+        nwb_file_name, epoch_name, brain_area, runner.file_suffix
     )
     if ripple_detector_name != "Kay":
         epoch_identifier += f"_{ripple_detector_name}"

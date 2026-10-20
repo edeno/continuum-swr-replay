@@ -58,6 +58,7 @@ from pathlib import Path
 # import time.
 from continuum_swr_replay.analysis.replay import prepare_data
 from continuum_swr_replay.analysis.replay.prepare_data import run_prepare_data
+from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
@@ -69,7 +70,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-per-animal", type=int, default=None)
     parser.add_argument(
         "--animal",
-        choices=("chimi", "j16", "peanut", "senor", "wilbur"),
+        choices=analysed_animals(),
         default=None,
         help="Restrict this invocation to one animal's sessions.",
     )

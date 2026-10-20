@@ -18,6 +18,7 @@ import pandas as pd
 import xarray as xr
 from non_local_detector.environment import Environment
 
+from continuum_swr_replay.analysis.constants import DEFAULT_SAMPLING_FREQUENCY_HZ
 from continuum_swr_replay.analysis.events.analysed_time import read_dot_with_swr_source
 from continuum_swr_replay.analysis.events.detection import get_overlap_times
 from continuum_swr_replay.analysis.events.epoch_normalizers import (
@@ -47,7 +48,7 @@ def get_contfrag_data_over_time(
     nwb_file_name: str,
     epoch_name: str,
     brain_area: str = "HPC",
-    sampling_frequency: float = 500.0,
+    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY_HZ,
 ) -> tuple[pd.DataFrame, xr.DataArray]:
     """Aggregate ContFrag decoding results into time-indexed DataFrame.
 

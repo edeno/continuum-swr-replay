@@ -35,6 +35,7 @@ import xarray as xr
 from non_local_detector import NonLocalClusterlessDetector
 from non_local_detector.environment import Environment
 
+from continuum_swr_replay.data_loaders.utils import format_epoch_identifier
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.results import open_results
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
@@ -88,7 +89,7 @@ def load_results(
 
     """
     return _load_saved_decode(
-        f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{decoding_brain_area}",
+        format_epoch_identifier(nwb_file_name, epoch_name, decoding_brain_area),
         NonLocalClusterlessDetector,
         load_detector=load_detector,
         non_stationary=non_stationary,

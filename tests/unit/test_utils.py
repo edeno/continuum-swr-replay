@@ -8,6 +8,7 @@ import pytest
 
 from continuum_swr_replay.data_loaders.utils import (
     DEFAULT_SWR_DEFINITION,
+    format_epoch_identifier,
     get_labels,
     parse_epoch_identifier,
     parse_nwb_filename,
@@ -291,6 +292,24 @@ class TestParseEpochIdentifier:
         assert key.epoch_name == "02_r1"
         with pytest.raises(ValueError, match="Invalid NWB filename format"):
             _ = key.animal
+
+
+class TestFormatEpochIdentifier:
+    """The inverse of parse_epoch_identifier."""
+
+    def test_it_joins_the_stem_epoch_area_and_suffix(self):
+        assert (
+            format_epoch_identifier("j1620210706_.nwb", "02_r1", "mPFC", "_contfrag")
+            == "j1620210706_02_r1_mPFC_contfrag"
+        )
+        assert format_epoch_identifier("chimi20200212_.nwb", "02_r1", "HPC") == (
+            "chimi20200212_02_r1_HPC"
+        )
+
+    def test_only_a_trailing_nwb_extension_is_removed(self):
+        assert format_epoch_identifier("a_.nwbx_.nwb", "02_r1", "HPC") == (
+            "a_.nwbx_02_r1_HPC"
+        )
 
 
 # Note: get_epoch_info() caching is validated through integration tests.

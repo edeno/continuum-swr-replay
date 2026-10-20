@@ -21,6 +21,8 @@ parse_nwb_filename
 parse_epoch_identifier
     Splits an epoch identifier ``{animal}{date}_{epoch}_{brain_area}`` and its
     decode suffixes into an :class:`EpochKey`.
+format_epoch_identifier
+    Builds an epoch identifier, the inverse of ``parse_epoch_identifier``.
 
 Features
 --------
@@ -253,6 +255,39 @@ def parse_epoch_identifier(epoch_id: str) -> EpochKey:
         non_stationary=non_stationary,
         training_type=training_type,
     )
+
+
+def format_epoch_identifier(
+    nwb_file_name: str, epoch: str, brain_area: str, suffix: str = ""
+) -> str:
+    """Build ``{animal}{date}_{epoch}_{brain_area}{suffix}``, the epoch identifier.
+
+    The inverse of :func:`parse_epoch_identifier`. Only a trailing ``_.nwb`` is
+    removed from `nwb_file_name`.
+
+    Parameters
+    ----------
+    nwb_file_name : str
+        Such as ``"chimi20200212_.nwb"``.
+    epoch : str
+        Such as ``"02_r1"``.
+    brain_area : str
+        ``"HPC"``, ``"mPFC"`` or ``"OFC"``.
+    suffix : str, optional
+        Decode suffixes, each with its leading ``_``, in the order
+        :func:`parse_epoch_identifier` reads them, such as ``"_contfrag"`` or
+        ``"_non_stationary"``. None by default.
+
+    Returns
+    -------
+    str
+
+    Examples
+    --------
+    >>> format_epoch_identifier("chimi20200212_.nwb", "02_r1", "mPFC", "_contfrag")
+    'chimi20200212_02_r1_mPFC_contfrag'
+    """
+    return f"{nwb_file_name.removesuffix('_.nwb')}_{epoch}_{brain_area}{suffix}"
 
 
 def session_restriction() -> list[dict[str, str]]:

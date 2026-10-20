@@ -32,6 +32,7 @@ from continuum_swr_replay.data_loaders.epoch_register import (
     EpochRegisterError,
     Reason,
     Status,
+    analysed_animals,
     analysed_decode_files,
     analysed_epoch_ids,
     analysed_epochs,
@@ -43,7 +44,11 @@ from continuum_swr_replay.data_loaders.epoch_register import (
     register_reason,
     select_epochs,
 )
-from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
+from continuum_swr_replay.data_loaders.utils import (
+    format_epoch_identifier,
+    parse_epoch_identifier,
+    parse_nwb_filename,
+)
 
 AUDIT_KEYS = (
     Path(__file__).resolve().parent
@@ -480,3 +485,50 @@ def test_get_epoch_info_restricts_session_to_the_admitted_descriptions(monkeypat
         utils.get_epoch_info.cache_clear()
 
     assert seen == [utils.session_restriction()]
+
+
+# --------------------------------------------------------------------------
+# analysed_animals, format_epoch_identifier over the committed cohort
+# --------------------------------------------------------------------------
+
+
+def test_the_analysed_animals_are_the_cohorts_in_register_order():
+    """The five animals, alphabetical because the register sorts by file name."""
+    assert analysed_animals() == ("chimi", "j16", "peanut", "senor", "wilbur")
+
+
+def test_an_animal_with_no_analysed_epoch_is_not_listed(small_register):
+    """``b`` has only pending and excluded epochs, ``c`` a session-wide exclusion."""
+    assert analysed_animals() == ("a",)
+
+
+@pytest.mark.parametrize("brain_area", ["HPC", "mPFC", "OFC"])
+@pytest.mark.parametrize(
+    "suffix",
+    ["", "_contfrag", "_non_stationary", "_contfrag_non_stationary"],
+)
+def test_every_analysed_epoch_id_round_trips_through_the_parser(
+    monkeypatch, brain_area, suffix
+):
+    """format_epoch_identifier is the parser's inverse on every analysed epoch,
+    and gives the string the inline ``.replace('_.nwb', '')`` formatters did."""
+    register = read_register()
+    keys = [key for key in register.index if key[1] != "*"]
+    _listing(monkeypatch, keys)
+    epochs = list(analysed_epochs().index)
+    assert len(epochs) == (register["status"] == Status.ANALYSED).sum()
+
+    for nwb_file_name, epoch in epochs:
+        epoch_id = format_epoch_identifier(nwb_file_name, epoch, brain_area, suffix)
+        key = parse_epoch_identifier(epoch_id)
+
+        assert epoch_id == (
+            f"{nwb_file_name.replace('_.nwb', '')}_{epoch}_{brain_area}{suffix}"
+        )
+        assert (key.nwb_file_name, key.epoch_name, key.brain_area) == (
+            nwb_file_name,
+            epoch,
+            brain_area,
+        )
+        assert key.contfrag == suffix.startswith("_contfrag")
+        assert key.non_stationary == suffix.endswith("_non_stationary")

@@ -29,6 +29,7 @@ import pandas as pd
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
+from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
 from continuum_swr_replay.paths import REPLAY_CONTENT_DIR
 
 
@@ -82,7 +83,7 @@ SET_FIGURE_DEFAULTS, SAVE_FIGURE, LABEL_PANELS, WONG = _load_paper_figure_tools(
 
 DEFAULT_RESULTS_DIR = REPLAY_CONTENT_DIR / "uncertainty_content"
 DEFAULT_OUTPUT_DIR = Path("paper/figures/uncertainty_content")
-ANIMAL_ORDER = ["chimi", "j16", "peanut", "senor", "wilbur"]
+ANIMAL_ORDER = list(analysed_animals())
 ANIMAL_COLORS = dict(zip(ANIMAL_ORDER, [WONG[i] for i in [1, 2, 3, 5, 7]], strict=True))
 ANIMAL_MARKERS = dict(zip(ANIMAL_ORDER, ["o", "s", "^", "D", "P"], strict=True))
 SCOPE_COLORS = {"all": "#666666", "unchosen": WONG[5]}

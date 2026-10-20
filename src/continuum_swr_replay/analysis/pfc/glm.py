@@ -21,6 +21,7 @@ from patsy import dmatrix
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
+    DEFAULT_SAMPLING_FREQUENCY_HZ,
 )
 from continuum_swr_replay.analysis.events.cohort_selection import (
     events_in_stops,
@@ -30,6 +31,7 @@ from continuum_swr_replay.analysis.events.eligibility import (
     EXCLUDED_TIME_REASONS,
     DropReason,
 )
+from continuum_swr_replay.data_loaders.utils import format_epoch_identifier
 from continuum_swr_replay.intervals import (
     contiguous_true_runs,
     get_spikecount_per_time_bin,
@@ -115,7 +117,7 @@ THETA_FORMULA = "1 + np.cos(theta_phase) + np.sin(theta_phase)"
 def build_theta_design(
     theta_phase: pd.Series,
     is_immobile: pd.Series,
-    sampling_frequency: float = 500.0,
+    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY_HZ,
 ) -> tuple[NDArray, NDArray]:
     """The running-bin mask and theta design the theta test is fit on.
 
@@ -282,7 +284,7 @@ def test_theta_modulation(
     theta_phase: pd.Series,
     is_immobile: pd.Series,
     neuron_spike_count: NDArray,
-    sampling_frequency: float = 500.0,
+    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY_HZ,
     *,
     design: tuple[NDArray, NDArray] | None = None,
 ) -> tuple[float, float]:
@@ -2617,7 +2619,7 @@ def run_session(
         )
 
     logger = logging.getLogger(
-        f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{brain_area}"
+        format_epoch_identifier(nwb_file_name, epoch_name, brain_area)
     )
 
     logger.info("Loading HPC decoding results...")

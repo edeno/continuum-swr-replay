@@ -79,6 +79,8 @@ from non_local_detector.model_checking.highest_posterior_density import (
 )
 from ripple_detection.core import gaussian_smooth
 
+from continuum_swr_replay.analysis.constants import DEFAULT_SAMPLING_FREQUENCY_HZ
+
 from ...decoding.results import open_results
 from ...types import SessionData
 
@@ -371,7 +373,7 @@ def get_map_speed(
     posterior: xr.DataArray | np.ndarray,
     track_graph_with_bin_centers_edges: nx.Graph,
     place_bin_center_ind_to_node: np.ndarray,
-    sampling_frequency: float = 500.0,
+    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY_HZ,
     smooth_sigma: float = 0.0025,
 ) -> np.ndarray:
     """Compute speed of the most likely decoded position.

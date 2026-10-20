@@ -240,6 +240,43 @@ visualization must share a single definition — reordering it silently
 reinterprets every per-arm coefficient.
 """
 
+LEAF_ARMS: tuple[int, ...] = (0, 1, 2, 3, 4, 5)
+"""The leaf arms, ascending: each joins one reward well to its patch junction.
+
+Arm ``i`` ends at well ``i``, so these are also the well (port) ids.
+"""
+
+TRUNK_ARMS: tuple[int, ...] = (6, 7, 8)
+"""The trunk arms, ascending: each joins a patch junction to the centre."""
+
+N_LEAF_ARMS: int = len(LEAF_ARMS)
+"""The number of leaf arms, six."""
+
+N_PORTS: int = len(WELL_ARMS)
+"""The number of reward wells (ports), six."""
+
+
+def port_columns(prefix: str) -> list[str]:
+    """The per-port column names ``{prefix}_port_0`` .. ``{prefix}_port_5``.
+
+    Parameters
+    ----------
+    prefix : str
+        Such as ``"reward_belief_mean"``.
+
+    Returns
+    -------
+    list[str]
+        One name per port, in port order (length :data:`N_PORTS`).
+
+    Examples
+    --------
+    >>> port_columns("reward_belief_mean")[:2]
+    ['reward_belief_mean_port_0', 'reward_belief_mean_port_1']
+    """
+    return [f"{prefix}_port_{i}" for i in range(N_PORTS)]
+
+
 OMISSION_KNOWN_LATENCY_SEC: float = 0.30
 """Seconds after destination poke-in by which an omission is established.
 

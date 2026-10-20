@@ -122,6 +122,7 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
     git_hash as loaded_commit,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
+from continuum_swr_replay.data_loaders.utils import format_epoch_identifier
 from continuum_swr_replay.parameters import (
     MAX_SPEED_THRESHOLD_CM_PER_SEC,
     PROCESSED_DATA_DIR,
@@ -837,7 +838,7 @@ def drop_retired_statistics(neuron_stats: pd.DataFrame) -> pd.DataFrame:
 
 def session_identifier(nwb_file_name: str, epoch_name: str, brain_area: str) -> str:
     """The session's name in its artifacts and its log: ``wilbur20210329_02_r1_mPFC``."""
-    return f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{brain_area}"
+    return format_epoch_identifier(nwb_file_name, epoch_name, brain_area)
 
 
 def run_analysis(

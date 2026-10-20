@@ -45,6 +45,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     POST_OUTCOME_RATE_RUNGS,
     PRIMARY_COHORT,
 )
+from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
 from continuum_swr_replay.paths import MODEL_DIRS, REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
@@ -152,7 +153,7 @@ SD = {
     ),
     **load_per_sd_scale(SWR_CONTRAST_CONTENT_PROVENANCE, "arm_cohort"),
 }
-ANIM = ["chimi", "j16", "peanut", "senor", "wilbur"]
+ANIM = list(analysed_animals())
 CMAP = dict(zip(ANIM, plt.cm.tab10(np.linspace(0, 0.5, 5)), strict=True))
 RNG = np.random.default_rng(0)
 

@@ -69,7 +69,7 @@ from continuum_swr_replay.analysis.replay.tables_stop import (
     add_nonlocal_swr_split,
     build_stop_table,
 )
-from continuum_swr_replay.data_loaders.constants import WELL_ARMS
+from continuum_swr_replay.data_loaders.constants import WELL_ARMS, port_columns
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
 from continuum_swr_replay.data_loaders.trials import (
     validate_port_experience_pump_audit,
@@ -501,7 +501,7 @@ def _assert_value_block_matches_source(
     """
     if contingency is None or event_arm_table.empty:
         return
-    port_cols = [f"reward_belief_mean_port_{i}" for i in range(6)]
+    port_cols = port_columns("reward_belief_mean")
     if not set(port_cols).issubset(contingency.columns):
         return
     if contingency["stop_id"].isna().any() or contingency["stop_id"].duplicated().any():

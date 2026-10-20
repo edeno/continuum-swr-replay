@@ -18,15 +18,16 @@ import pandas as pd
 from continuum_swr_replay.data_loaders.constants import (
     ALL_ARMS,
     WELL_ARMS,
+    port_columns,
 )
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
 from continuum_swr_replay.tables.io import read_table, table_exists
 
-_P_REWARD_PORT_COLS = [f"task_reward_probability_port_{i}" for i in range(6)]
-_Q_PORT_COLS = [f"reward_belief_mean_port_{i}" for i in range(6)]
-_BETADIST_VAR_COLS = [f"reward_belief_variance_port_{i}" for i in range(6)]
+_P_REWARD_PORT_COLS = port_columns("task_reward_probability")
+_Q_PORT_COLS = port_columns("reward_belief_mean")
+_BETADIST_VAR_COLS = port_columns("reward_belief_variance")
 
 
 def load_contingency(path: Path) -> pd.DataFrame | None:

@@ -645,6 +645,8 @@ def _contrast_plotting_namespace() -> dict:
     """
     import matplotlib.pyplot as plt
 
+    from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
+
     tree = ast.parse(CONTRAST_SCRIPT.read_text())
     kept = []
     for node in tree.body:
@@ -677,6 +679,7 @@ def _contrast_plotting_namespace() -> dict:
         "np": np,
         "pd": pd,
         "plt": plt,
+        "analysed_animals": analysed_animals,
         "std_factor": std_factor,
         "sessions": sessions,
     }

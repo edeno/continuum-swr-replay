@@ -45,15 +45,15 @@ import argparse
 from pathlib import Path
 
 from continuum_swr_replay.analysis.behavior.qvals_table import (
-    ANIMALS,
     RC,
     run_build_qvals_table,
 )
+from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
 
 
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--animal", choices=ANIMALS, default=None)
+    p.add_argument("--animal", choices=analysed_animals(), default=None)
     p.add_argument("--write", action="store_true")
     p.add_argument(
         "--replay-content-dir",

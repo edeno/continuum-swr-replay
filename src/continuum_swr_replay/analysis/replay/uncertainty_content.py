@@ -30,16 +30,14 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.data_loaders.constants import LEAF_ARMS, port_columns
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from .covariate_timing import assert_predictor_timing
 
 LOGGER = logging.getLogger(__name__)
 
-LEAF_ARMS: tuple[int, ...] = tuple(range(6))
-UNCERTAINTY_COLUMNS: tuple[str, ...] = tuple(
-    f"reward_belief_variance_port_{arm}" for arm in LEAF_ARMS
-)
+UNCERTAINTY_COLUMNS: tuple[str, ...] = tuple(port_columns("reward_belief_variance"))
 RESPONSE_COLUMNS: Mapping[str, str] = {
     "arm_count_hard": "hard_count",
     "arm_count_soft": "soft_count",
@@ -822,7 +820,6 @@ def summarize_horserace(coefficients: pd.DataFrame) -> pd.DataFrame:
 __all__ = [
     "EVENT_SHARE_COLUMNS",
     "HORSERACE_PREDICTORS",
-    "LEAF_ARMS",
     "LEAF_FRACTION_COLUMNS",
     "RESPONSE_COLUMNS",
     "SHARE_COLUMNS",
