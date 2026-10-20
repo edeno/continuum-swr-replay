@@ -50,7 +50,7 @@ The artifact mask: the detector's cores, padded from one table.
 
 Canonical per-non-local-event classification table.
 
-`build_classified_nonlocal_event_table`, `assert_drawn_class_matches_ripples`
+`match_swr`, `build_classified_nonlocal_event_table`, `assert_drawn_class_matches_ripples`
 
 ### `src/continuum_swr_replay/analysis/events/cohort_selection.py`
 
