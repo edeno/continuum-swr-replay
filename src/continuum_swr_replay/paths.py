@@ -111,7 +111,8 @@ def table_path(
     ``qvals_table`` sits one level down, in the per-bin rate model directory;
     every other table sits at `root`. That is the layout of every pipeline
     root (the canonical one and a staging one alike); a frozen golden baseline
-    is flat and is read by ``root / name`` instead.
+    is flat and is read by ``root / name`` instead, which is also the default
+    reader of ``tables.parity.compare_table_roots``.
 
     Parameters
     ----------

@@ -135,7 +135,9 @@ def compare_table_roots(
     different on-disk layouts (e.g. a candidate that nests ``qvals_table`` under
     ``models_per_bin_rate/`` and a flat baseline) are expressed where the
     asymmetry lives rather than inferred from a path prefix. Both default to
-    ``read_table(root / basename)``.
+    ``read_table(root / basename)``, the flat layout of a frozen baseline. A
+    pipeline root nests ``qvals_table`` (``paths.table_path``), so read one
+    with ``lambda name: read_table(table_path(name, root, fmt=""))``.
 
     A table absent under either root raises ``FileNotFoundError`` (via the
     reader) rather than being skipped -- a partial baseline is a hard error, not

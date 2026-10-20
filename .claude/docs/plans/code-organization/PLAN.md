@@ -57,7 +57,7 @@ Status: in progress (branch `code-organization-2026-10-19`, from master 470a393)
   - No GPU decodes; the GPUs are shared.
   - Never `git stash`, `reset --hard`, `checkout -- <file>` or `clean`.
 - **Layering.** After this plan, `tests/unit/test_import_layering.py` enforces:
-  - foundation (`intervals`, `paths`, `tables`, `runs`, `decoding`, `decode_files`, `parameters`, `types`/its rename, `data_loaders`) imports no `analysis`, `visualization` or `scripts`;
+  - foundation (`intervals`, `paths`, `tables`, `runs`, `decoding`, `parameters`, `types`/its rename, `data_loaders`) imports no `analysis`, `visualization` or `scripts`;
   - `analysis.events` imports only foundation and itself;
   - `analysis` imports no `visualization`;
   - `src` imports no `scripts`;
