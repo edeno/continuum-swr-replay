@@ -26,7 +26,7 @@ from continuum_swr_replay.analysis.replay.table_contracts import (
     validate_event_patch_table,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
-from continuum_swr_replay.paths import MODEL_DIRS, table_path
+from continuum_swr_replay.paths import model_dir, table_path
 from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.runs.provenance import git, git_commit, git_dirty
 from continuum_swr_replay.tables.io import SWR_SOURCE_TABLES, read_attrs, read_table
@@ -339,9 +339,7 @@ def _validate_replay(root: Path, expected_sessions: int) -> dict[str, object]:
         qvals,
         QVALS_STANDARDIZED_COLS,
         load_reference(
-            root
-            / MODEL_DIRS["per_bin_rate"].name
-            / "qvals_standardization_reference.json"
+            model_dir("per_bin_rate", root) / "qvals_standardization_reference.json"
         ),
         support_label="all_rows",
     )

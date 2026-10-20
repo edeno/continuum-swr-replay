@@ -56,8 +56,8 @@ from continuum_swr_replay.analysis.replay.per_bin_design import (  # noqa: E402
     POPULATIONS,
 )
 from continuum_swr_replay.paths import (  # noqa: E402
-    MODEL_DIRS,
     REPLAY_CONTENT_DIR,
+    model_dir,
     table_path,
 )
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
@@ -198,7 +198,7 @@ def main() -> None:
         for keys, g, og in tasks:
             rows.extend(_run_session(keys, g, og))
     df = pd.DataFrame(rows)
-    out = RC / MODEL_DIRS["per_bin_rate"].name / (
+    out = model_dir("per_bin_rate", RC) / (
         "covariate_ranking_smoke.pkl" if args.max_per_animal else "covariate_ranking.pkl"
     )
     df.to_pickle(out)

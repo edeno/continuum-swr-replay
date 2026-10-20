@@ -55,7 +55,7 @@ from continuum_swr_replay.analysis.replay.covariate_timing import (
     assert_predictor_timing,
 )
 from continuum_swr_replay.analysis.replay.covariates import add_uncertainty_covariates
-from continuum_swr_replay.paths import MODEL_DIRS, REPLAY_CONTENT_DIR, table_path
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, model_dir, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -445,7 +445,7 @@ def main() -> None:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=RC / MODEL_DIRS["per_bin_rate"].name,
+        default=model_dir("per_bin_rate", RC),
         help="Directory for the fitted model, its z reference, and the audits.",
     )
     args = parser.parse_args()

@@ -23,7 +23,7 @@ from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
 from continuum_swr_replay.data_loaders.trial_clocks import (
     outcome_known_time_from_task_visit,
 )
-from continuum_swr_replay.paths import MODEL_DIRS, REPLAY_CONTENT_DIR, table_path
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, model_dir, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     apply_rename,
     canonicalize_numerical_paths,
@@ -1033,14 +1033,13 @@ def run_build_qvals_table(args: argparse.Namespace) -> None:
     if args.write:
         out = publish_canonical(
             tab,
-            replay_content_dir / MODEL_DIRS["per_bin_rate"].name,
+            model_dir("per_bin_rate", replay_content_dir),
             table="qvals",
             basename="qvals_table",
         )
         save_reference(
             qv_reference,
-            replay_content_dir
-            / MODEL_DIRS["per_bin_rate"].name
+            model_dir("per_bin_rate", replay_content_dir)
             / "qvals_standardization_reference.json",
         )
         print(f"\nwrote {len(tab)} rows ({len(z_cols)} _z cols) -> {out}")

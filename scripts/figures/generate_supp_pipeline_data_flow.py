@@ -44,7 +44,7 @@ from continuum_swr_replay.analysis.replay.spatial_mapping import (
 )
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.paths import MODEL_DIRS, REPLAY_CONTENT_DIR, table_path
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, model_dir, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -53,7 +53,7 @@ from continuum_swr_replay.tables.io import read_table
 RC = REPLAY_CONTENT_DIR
 # The panel draws the fitted M3 arm model, so it is gated on the same table the
 # content ladder recorded when it fit M3.
-M3_PATH = RC / MODEL_DIRS["content_arm"].name / "M3.pkl"
+M3_PATH = model_dir("content_arm", RC) / "M3.pkl"
 ALL_MODELS_INPUTS = {"event_arm_table": table_path("event_arm_table", RC, fmt="pkl")}
 
 # The event's long-format rows, as panel E shows them.

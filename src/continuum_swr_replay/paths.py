@@ -22,9 +22,10 @@ __all__ = [
     "CANONICAL_TABLE_BASENAMES",
     "CONTFRAG_REPLAY_CONTENT_DIR",
     "DETECTION_COMPARISON_DIR",
-    "MODEL_DIRS",
+    "MODEL_SUBDIRS",
     "REPLAY_CONTENT_DIR",
     "SWR_INVENTORY_ROOT",
+    "model_dir",
     "table_path",
 ]
 
@@ -43,20 +44,50 @@ SWR_INVENTORY_ROOT = DETECTION_COMPARISON_DIR / "swr"
 ARTIFACT_INTERVALS_DIR = PROCESSED_DATA_DIR / "artifact_intervals"
 """Where artifact-interval run folders go, one per run id."""
 
-MODEL_DIRS: dict[str, Path] = {
-    "content_arm": REPLAY_CONTENT_DIR / "models",
-    "content_patch": REPLAY_CONTENT_DIR / "models_patch",
+MODEL_SUBDIRS: dict[str, str] = {
+    "content_arm": "models",
+    "content_patch": "models_patch",
     # Besides the per-bin rate ladder this directory holds ``qvals_table``,
     # ``swr_contrast_rate``, ``uncertainty_rate`` and ``swr_power_model``; its
     # rename is deferred (lead decision Q7).
-    "per_bin_rate": REPLAY_CONTENT_DIR / "models_per_bin_rate",
-    "per_stop_rate": REPLAY_CONTENT_DIR / "models_per_stop_rate",
+    "per_bin_rate": "models_per_bin_rate",
+    "per_stop_rate": "models_per_stop_rate",
 }
-"""The fitted-model directories under :data:`REPLAY_CONTENT_DIR`, by contents.
+"""The fitted-model directories, by contents, relative to a replay-content root.
 
-A directory under another root (a staging root, a backup) is that root joined
-with the entry's ``.name``.
+:func:`model_dir` joins one to a root; use it rather than joining by hand.
 """
+
+
+def model_dir(key: str, root: Path = REPLAY_CONTENT_DIR) -> Path:
+    """Return fitted-model directory `key` under `root`.
+
+    Parameters
+    ----------
+    key : str
+        One of :data:`MODEL_SUBDIRS`.
+    root : Path, optional
+        The replay-content root (the canonical one, a staging root, a backup);
+        :data:`REPLAY_CONTENT_DIR` by default. The default is bound at import,
+        so a test redirects by passing its own root, not by patching this
+        module.
+
+    Returns
+    -------
+    Path
+
+    Raises
+    ------
+    KeyError
+        If `key` is not a fitted-model directory.
+    """
+    if key not in MODEL_SUBDIRS:
+        raise KeyError(
+            f"{key!r} is not a fitted-model directory; expected one of "
+            f"{tuple(MODEL_SUBDIRS)}"
+        )
+    return root / MODEL_SUBDIRS[key]
+
 
 # On-disk table basename -> the registry table key that owns its row key.
 BASENAME_TO_TABLE: dict[str, str] = {
@@ -107,7 +138,5 @@ def table_path(
             f"{name!r} is not a canonical table; expected one of "
             f"{CANONICAL_TABLE_BASENAMES}"
         )
-    directory = (
-        root / MODEL_DIRS["per_bin_rate"].name if name == "qvals_table" else root
-    )
+    directory = model_dir("per_bin_rate", root) if name == "qvals_table" else root
     return directory / (f"{name}.{fmt}" if fmt else name)

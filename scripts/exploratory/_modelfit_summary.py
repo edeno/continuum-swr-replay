@@ -38,7 +38,7 @@ import pandas as pd
 from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
-from continuum_swr_replay.paths import MODEL_DIRS, REPLAY_CONTENT_DIR
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, model_dir
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
@@ -83,13 +83,13 @@ RATE_PREDICTORS = [
 
 
 def load_arm_fits() -> pd.DataFrame:
-    df = joblib.load(RC / MODEL_DIRS["content_arm"].name / "all_models.pkl")
+    df = joblib.load(model_dir("content_arm", RC) / "all_models.pkl")
     return df[df["model"].isin(ARM_ORDER)].copy()
 
 
 def load_patch_fits() -> pd.DataFrame:
     """Per-session P0–P4 fits with CV-LL (persisted by fit_replay_content_models --cv)."""
-    return joblib.load(RC / MODEL_DIRS["content_patch"].name / "all_models.pkl")
+    return joblib.load(model_dir("content_patch", RC) / "all_models.pkl")
 
 
 def load_rate_fits() -> pd.DataFrame:

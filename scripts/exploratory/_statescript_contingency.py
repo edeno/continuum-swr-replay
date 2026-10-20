@@ -40,7 +40,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import WELL_PATCH_MAPPING
-from continuum_swr_replay.paths import MODEL_DIRS, REPLAY_CONTENT_DIR, table_path
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, model_dir, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -486,7 +486,7 @@ def main() -> None:
         return
 
     contingency_table = pd.concat(tables, ignore_index=True)
-    out_dir = rc / MODEL_DIRS["per_bin_rate"].name
+    out_dir = model_dir("per_bin_rate", rc)
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / "contingency_table.pkl"
     contingency_table.to_pickle(out)

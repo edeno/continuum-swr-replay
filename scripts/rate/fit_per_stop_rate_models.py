@@ -66,7 +66,7 @@ from continuum_swr_replay.analysis.replay.per_stop_rate_model import (
     cross_validate_per_stop_rate_model,
     fit_per_stop_rate_model,
 )
-from continuum_swr_replay.paths import MODEL_DIRS, REPLAY_CONTENT_DIR, table_path
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, model_dir, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -305,7 +305,7 @@ def main() -> None:
     # the model comparison invalidates a cross-cohort step on this column.
     rate["stop_cohort"] = args.stop_cohort
 
-    out_dir = RC / MODEL_DIRS["per_stop_rate"].name
+    out_dir = model_dir("per_stop_rate", RC)
     out_dir.mkdir(parents=True, exist_ok=True)
     sfx = stop_cohort_suffix(args.stop_cohort, smoke=args.max_per_animal is not None)
     out = out_dir / f"all_models{sfx}.pkl"

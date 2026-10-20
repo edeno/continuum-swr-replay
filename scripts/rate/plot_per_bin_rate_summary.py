@@ -52,8 +52,8 @@ from continuum_swr_replay.intervals import (  # noqa: E402
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
 from continuum_swr_replay.paths import (
-    MODEL_DIRS,
     REPLAY_CONTENT_DIR,  # noqa: E402
+    model_dir,
     table_path,
 )
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
@@ -62,7 +62,7 @@ from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
 from continuum_swr_replay.tables.io import read_table
 
 RC = REPLAY_CONTENT_DIR
-ALL_MODELS = RC / MODEL_DIRS["per_bin_rate"].name / "all_models.pkl"
+ALL_MODELS = model_dir("per_bin_rate", RC) / "all_models.pkl"
 # The tables fit_per_bin_rate_models.py fit all_models.pkl on; checked against the
 # artifact's provenance sidecar before any panel is drawn.
 ALL_MODELS_INPUTS = {

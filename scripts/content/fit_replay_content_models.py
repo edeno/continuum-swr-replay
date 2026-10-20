@@ -140,7 +140,7 @@ from continuum_swr_replay.analysis.replay.table_contracts import (
     validate_requested_standardization,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.paths import MODEL_DIRS
+from continuum_swr_replay.paths import MODEL_SUBDIRS
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -252,8 +252,8 @@ def resolve_contfrag_paths(
     """
     if event_source == "non_local":
         if hierarchy_kind == "patch":
-            return "event_patch_table", MODEL_DIRS["content_patch"].name
-        return "event_arm_table", MODEL_DIRS["content_arm"].name
+            return "event_patch_table", MODEL_SUBDIRS["content_patch"]
+        return "event_arm_table", MODEL_SUBDIRS["content_arm"]
 
     base_table = (
         f"event_patch_table_{event_source.lower()}"
@@ -263,9 +263,9 @@ def resolve_contfrag_paths(
     table_name = f"{base_table}_{brain_area}"
 
     base_subdir = (
-        MODEL_DIRS["content_patch"].name
+        MODEL_SUBDIRS["content_patch"]
         if hierarchy_kind == "patch"
-        else MODEL_DIRS["content_arm"].name
+        else MODEL_SUBDIRS["content_arm"]
     )
     output_subdir = f"{base_subdir}_{event_source.lower()}_{brain_area}"
     return table_name, output_subdir

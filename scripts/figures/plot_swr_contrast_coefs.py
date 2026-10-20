@@ -46,7 +46,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     PRIMARY_COHORT,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
-from continuum_swr_replay.paths import MODEL_DIRS, REPLAY_CONTENT_DIR, table_path
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, model_dir, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -56,7 +56,7 @@ RC = REPLAY_CONTENT_DIR
 OUT = Path("paper/figures/swr_contrast")
 OUT.mkdir(parents=True, exist_ok=True)
 
-SWR_CONTRAST_RATE = RC / MODEL_DIRS["per_bin_rate"].name / "swr_contrast_rate.pkl"
+SWR_CONTRAST_RATE = model_dir("per_bin_rate", RC) / "swr_contrast_rate.pkl"
 # The tables fit_swr_contrast_rate.py fit that artifact on; checked against its
 # provenance sidecar here, before any table or fit is read, so a figure cannot be
 # drawn from coefficients that predate the tables on disk.
@@ -72,10 +72,10 @@ SWR_CONTRAST_RATE_INPUTS = {
 # here: the same covariates measured over all nine candidates have a 2.1x larger
 # SD (the trunks are structural zeros), which would shrink every per-SD arm
 # effect in this figure by that factor relative to the audited table.
-SWR_CONTRAST_CONTENT_PROVENANCE = RC / MODEL_DIRS["content_arm"].name / "swr_contrast_content_provenance.json"
+SWR_CONTRAST_CONTENT_PROVENANCE = model_dir("content_arm", RC) / "swr_contrast_content_provenance.json"
 
-SWR_CONTRAST_CONTENT_ARM = RC / MODEL_DIRS["content_arm"].name / "swr_contrast_content_arm.pkl"
-SWR_CONTRAST_CONTENT_PATCH = RC / MODEL_DIRS["content_arm"].name / "swr_contrast_content_patch.pkl"
+SWR_CONTRAST_CONTENT_ARM = model_dir("content_arm", RC) / "swr_contrast_content_arm.pkl"
+SWR_CONTRAST_CONTENT_PATCH = model_dir("content_arm", RC) / "swr_contrast_content_patch.pkl"
 # The tables fit_swr_contrast_content.py fit those two artifacts on, gated the
 # same way as the rate half.
 SWR_CONTRAST_CONTENT_INPUTS = {

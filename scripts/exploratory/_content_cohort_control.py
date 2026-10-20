@@ -48,7 +48,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.paths import MODEL_DIRS
+from continuum_swr_replay.paths import model_dir
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -83,7 +83,7 @@ def main() -> None:
             "[extra runner args...]"
         )
     out_root = Path(sys.argv[1]).resolve()
-    if not (out_root / MODEL_DIRS["content_arm"].name).is_dir():
+    if not (model_dir("content_arm", out_root)).is_dir():
         raise SystemExit(
             f"{out_root}/models must exist and {out_root} must mirror "
             "replay_content (see this module's docstring)"

@@ -43,7 +43,7 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     MU_UNCERTAINTY_CURATED_COVARIATES,
 )
-from continuum_swr_replay.paths import MODEL_DIRS
+from continuum_swr_replay.paths import model_dir
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 # Single source of truth: the curated covariate set is part of the MU_uncertainty
@@ -183,7 +183,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = build_parser().parse_args()
 
-    rc = MODEL_DIRS["per_bin_rate"]
+    rc = model_dir("per_bin_rate")
     fname = "uncertainty_rate_smoke.pkl" if args.smoke else "uncertainty_rate.pkl"
     require_fresh_inputs(
         rc / fname, UNCERTAINTY_RATE_INPUTS, allow_stale=args.allow_stale

@@ -107,8 +107,8 @@ from continuum_swr_replay.analysis.replay.per_bin_rate_model import (  # noqa: E
     _design_columns,
 )
 from continuum_swr_replay.paths import (  # noqa: E402
-    MODEL_DIRS,
     REPLAY_CONTENT_DIR,
+    model_dir,
     table_path,
 )
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
@@ -730,7 +730,7 @@ def main() -> None:
     # the model comparison invalidates a cross-cohort step on this column.
     models["stop_cohort"] = args.stop_cohort
     out = _write_outputs(
-        RC / MODEL_DIRS["per_bin_rate"].name,
+        model_dir("per_bin_rate", RC),
         models=models,
         z_reference=z_reference,
         gate_audit=gate_audit,

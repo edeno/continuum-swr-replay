@@ -141,7 +141,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (
 from continuum_swr_replay.analysis.replay.model_specs import (
     SWR_CONTRAST_CONTENT_PATCH_LADDER as PATCH_LADDER,
 )
-from continuum_swr_replay.paths import MODEL_DIRS, REPLAY_CONTENT_DIR, table_path
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, model_dir, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -1411,7 +1411,7 @@ def main() -> None:
             )
 
     sfx = _artifact_suffix(args, response)
-    (RC / MODEL_DIRS["content_arm"].name).mkdir(parents=True, exist_ok=True)
+    (model_dir("content_arm", RC)).mkdir(parents=True, exist_ok=True)
     # The standardization references are taken over the FULL assembled cohorts,
     # before the outcome stratum and the smoke subset, so every stratum's
     # coefficients are stated in the same per-SD unit.
@@ -1456,9 +1456,7 @@ def main() -> None:
     arm, arm_audit = _run(
         ev, ARM_LADDER, response_col=arm_response, n_categories=9, **fit_kwargs
     )
-    arm_path = (
-        RC / MODEL_DIRS["content_arm"].name / f"swr_contrast_content_arm{sfx}.pkl"
-    )
+    arm_path = model_dir("content_arm", RC) / f"swr_contrast_content_arm{sfx}.pkl"
     arm.to_pickle(arm_path)
     write_fit_provenance(arm_path, fit_inputs, estimator, sys.argv, extra=fit_extra)
     save_reference(arm_z_reference, z_reference_path(arm_path))
@@ -1472,9 +1470,7 @@ def main() -> None:
     patch, patch_audit = _run(
         pt, PATCH_LADDER, response_col=patch_response, n_categories=3, **fit_kwargs
     )
-    patch_path = (
-        RC / MODEL_DIRS["content_arm"].name / f"swr_contrast_content_patch{sfx}.pkl"
-    )
+    patch_path = model_dir("content_arm", RC) / f"swr_contrast_content_patch{sfx}.pkl"
     patch.to_pickle(patch_path)
     write_fit_provenance(patch_path, fit_inputs, estimator, sys.argv, extra=fit_extra)
     save_reference(patch_z_reference, z_reference_path(patch_path))
@@ -1483,9 +1479,7 @@ def main() -> None:
     # n_modeled at the event grain) + term-level quasi-separation diagnostics.
     write_cohort_audit(
         arm_audit + patch_audit,
-        RC
-        / MODEL_DIRS["content_arm"].name
-        / f"swr_contrast_content_cohort_audit{sfx}.csv",
+        model_dir("content_arm", RC) / f"swr_contrast_content_cohort_audit{sfx}.csv",
     )
     term_diag = pd.concat(
         [
@@ -1495,8 +1489,7 @@ def main() -> None:
         ignore_index=True,
     )
     term_diag.to_csv(
-        RC
-        / MODEL_DIRS["content_arm"].name
+        model_dir("content_arm", RC)
         / f"swr_contrast_content_term_diagnostics{sfx}.csv",
         index=False,
     )
@@ -1505,7 +1498,7 @@ def main() -> None:
         "saved arm=%d patch=%d rows -> %s",
         len(arm),
         len(patch),
-        RC / MODEL_DIRS["content_arm"].name,
+        model_dir("content_arm", RC),
     )
     print("\n########## ARM ##########")
     _summ(arm, ARM_LADDER, ARM_KEY_TERM)
@@ -1543,7 +1536,7 @@ def main() -> None:
         ignore_index=True,
     )
     audited_path = (
-        RC / MODEL_DIRS["content_arm"].name / f"swr_contrast_content_audited{sfx}.pkl"
+        model_dir("content_arm", RC) / f"swr_contrast_content_audited{sfx}.pkl"
     )
     agg.to_pickle(audited_path)
     write_fit_provenance(audited_path, fit_inputs, estimator, sys.argv, extra=fit_extra)
@@ -1557,14 +1550,12 @@ def main() -> None:
         concentration_cols,
     )
     (
-        RC
-        / MODEL_DIRS["content_arm"].name
-        / f"swr_contrast_content_provenance{sfx}.json"
+        model_dir("content_arm", RC) / f"swr_contrast_content_provenance{sfx}.json"
     ).write_text(json.dumps(prov, indent=2))
     logger.info(
         "saved audited table (%d rows) + provenance -> %s",
         len(agg),
-        RC / MODEL_DIRS["content_arm"].name,
+        model_dir("content_arm", RC),
     )
     print(
         "\n########## AUDITED  (animal-level = primary; session signed-rank = descriptive) ##########"

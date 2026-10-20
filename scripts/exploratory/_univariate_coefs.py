@@ -22,7 +22,7 @@ from statsmodels.stats.multitest import multipletests
 from continuum_swr_replay.analysis.replay._helpers import add_arm_fixed_effects
 from continuum_swr_replay.analysis.replay.design_constants import ARM_FE_PREDICTORS
 from continuum_swr_replay.analysis.replay.fitting import fit_conditional_poisson
-from continuum_swr_replay.paths import MODEL_DIRS, REPLAY_CONTENT_DIR, table_path
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, model_dir, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -103,8 +103,8 @@ def main():
     rate_uni = _pool(_univariate(stop, RATE_P, lambda g, p: fit_rate_model(g, [p])))
 
     # Joint estimates from the saved full models.
-    arm = joblib.load(RC / MODEL_DIRS["content_arm"].name / "all_models.pkl")
-    patch = joblib.load(RC / MODEL_DIRS["content_patch"].name / "all_models.pkl")
+    arm = joblib.load(model_dir("content_arm", RC) / "all_models.pkl")
+    patch = joblib.load(model_dir("content_patch", RC) / "all_models.pkl")
     rate = joblib.load(RC / "models_rate" / "all_models.pkl")
 
     def joint(df, model, p):

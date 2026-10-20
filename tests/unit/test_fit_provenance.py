@@ -32,7 +32,7 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
     write_fit_provenance,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.paths import MODEL_DIRS, REPLAY_CONTENT_DIR, table_path
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, model_dir, table_path
 from continuum_swr_replay.tables.io import write_table
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -422,7 +422,7 @@ def _module_constants(path: Path) -> dict[str, object]:
         "P": PROCESSED_DATA_DIR,
         "Path": Path,
         "REPLAY_CONTENT_DIR": REPLAY_CONTENT_DIR,
-        "MODEL_DIRS": MODEL_DIRS,
+        "model_dir": model_dir,
         "table_path": table_path,
     }
     for node in ast.parse(path.read_text()).body:

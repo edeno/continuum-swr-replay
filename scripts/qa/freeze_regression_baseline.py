@@ -26,7 +26,7 @@ import pyarrow.parquet as pq
 
 from continuum_swr_replay.paths import (
     CANONICAL_TABLE_BASENAMES,
-    MODEL_DIRS,
+    MODEL_SUBDIRS,
     REPLAY_CONTENT_DIR,
     table_path,
 )
@@ -58,15 +58,15 @@ RC = REPLAY_CONTENT_DIR
 # artifacts that live INSIDE ``models`` are copied along with that directory
 # (``copytree`` has no ignore filter); add one here if that ever matters.
 _MODEL_DIRS = (
-    MODEL_DIRS["content_arm"].name,
+    MODEL_SUBDIRS["content_arm"],
     "models_swr_T",
     "models_swr_F",
-    MODEL_DIRS["content_patch"].name,
+    MODEL_SUBDIRS["content_patch"],
     "models_patch_swr_T",
     "models_patch_swr_F",
     belief_chain_output_subdir(),
-    MODEL_DIRS["per_stop_rate"].name,
-    MODEL_DIRS["per_bin_rate"].name,
+    MODEL_SUBDIRS["per_stop_rate"],
+    MODEL_SUBDIRS["per_bin_rate"],
     "uncertainty_content",
     "event_source_comparison",
 )

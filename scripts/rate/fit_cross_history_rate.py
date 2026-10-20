@@ -58,7 +58,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     MODEL_CROSS_HISTORY_RATE,
     longest_history_window_s,
 )
-from continuum_swr_replay.paths import MODEL_DIRS, REPLAY_CONTENT_DIR, table_path
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, model_dir, table_path
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
     require_covariate_schema,
 )
@@ -224,7 +224,7 @@ def main() -> None:
     models = fit_cross_history(stop, onsets)
     _summary(models)
     if args.write:
-        out = RC / MODEL_DIRS["per_bin_rate"].name / "cross_history_models.pkl"
+        out = model_dir("per_bin_rate", RC) / "cross_history_models.pkl"
         models.attrs["swr_source"] = swr_source_name()
         models.to_pickle(out)
         print(f"\nwrote {len(models)} rows -> {out}")

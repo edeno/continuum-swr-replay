@@ -134,8 +134,8 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     SWR_CONTRAST_RATE_STOP_COVARS as STOP_COVARS,
 )
 from continuum_swr_replay.paths import (  # noqa: E402
-    MODEL_DIRS,
     REPLAY_CONTENT_DIR,
+    model_dir,
     table_path,
 )
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
@@ -1036,7 +1036,7 @@ def _aggregate_only(smoke: bool, cohort: str) -> None:
         apply the per-term drop rule to fits that carry no per-term information.
     """
     suffix = stop_cohort_suffix(cohort, smoke=smoke)
-    out_dir = RC / MODEL_DIRS["per_bin_rate"].name
+    out_dir = model_dir("per_bin_rate", RC)
     fits_path = out_dir / f"swr_contrast_rate{suffix}.pkl"
     if not fits_path.exists():
         raise SystemExit(f"no per-session fits at {fits_path}; run the fit first")
@@ -1194,7 +1194,7 @@ def main() -> None:
     # the model comparison invalidates a cross-cohort step on this column.
     models["stop_cohort"] = args.stop_cohort
 
-    out_dir = RC / MODEL_DIRS["per_bin_rate"].name
+    out_dir = model_dir("per_bin_rate", RC)
     out_dir.mkdir(parents=True, exist_ok=True)
     csfx = stop_cohort_suffix(args.stop_cohort, smoke=smoke)
     out = out_dir / f"swr_contrast_rate{csfx}.pkl"

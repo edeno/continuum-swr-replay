@@ -189,7 +189,7 @@ Three tiers:
    (`all_models.pkl` and friends) hold live statsmodels objects and stay pickled.
    Superseded table pickles are kept under `_pickle_archive/`; nothing reads them.
    Code spells these locations through `continuum_swr_replay.paths`
-   (`REPLAY_CONTENT_DIR`, `MODEL_DIRS`, `table_path(name, root)`), not inline.
+   (`REPLAY_CONTENT_DIR`, `model_dir(key, root)`, `table_path(name, root)`), not inline.
 
    | dir | producer | holds |
    |---|---|---|

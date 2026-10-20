@@ -31,13 +31,39 @@ def test_roots_equal_the_literals_they_replaced():
     assert paths.ARTIFACT_INTERVALS_DIR == PROCESSED_DATA_DIR / "artifact_intervals"
 
 
-def test_model_dirs_equal_the_literals_they_replaced():
-    assert paths.MODEL_DIRS == {
-        "content_arm": RC / "models",
-        "content_patch": RC / "models_patch",
-        "per_bin_rate": RC / "models_per_bin_rate",
-        "per_stop_rate": RC / "models_per_stop_rate",
-    }
+MODEL_LITERALS = {
+    "content_arm": "models",
+    "content_patch": "models_patch",
+    "per_bin_rate": "models_per_bin_rate",
+    "per_stop_rate": "models_per_stop_rate",
+}
+
+
+def test_model_subdirs_equal_the_literals_they_replaced():
+    assert paths.MODEL_SUBDIRS == MODEL_LITERALS
+
+
+@pytest.mark.parametrize("key", sorted(MODEL_LITERALS))
+def test_model_dir_under_the_default_and_a_staging_root(key):
+    assert paths.model_dir(key) == RC / MODEL_LITERALS[key]
+    root = Path("/staging/root")
+    assert paths.model_dir(key, root) == root / MODEL_LITERALS[key]
+
+
+def test_model_dir_keeps_a_nested_subdir_whole(monkeypatch):
+    # The old ``root / MODEL_DIRS[k].name`` idiom kept only the last component.
+    monkeypatch.setitem(paths.MODEL_SUBDIRS, "per_bin_rate", "models/per_bin_rate")
+    root = Path("/staging/root")
+    assert paths.model_dir("per_bin_rate", root) == root / "models" / "per_bin_rate"
+    assert paths.table_path("qvals_table", root) == (
+        root / "models" / "per_bin_rate" / "qvals_table.parquet"
+    )
+
+
+@pytest.mark.parametrize("key", ["models", "per_bin", "content", ""])
+def test_model_dir_refuses_an_unknown_key(key):
+    with pytest.raises(KeyError, match="not a fitted-model directory"):
+        paths.model_dir(key)
 
 
 def test_registry_is_the_one_parity_reads():
