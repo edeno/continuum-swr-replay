@@ -2,7 +2,7 @@
 
 A foundation package: it imports the standard library, numpy, xarray,
 ``non_local_detector`` and the other foundation modules (``parameters``,
-``types``), and nothing from ``analysis``. The HPC decode's masks read the SWR
+``schemas``), and nothing from ``analysis``. The HPC decode's masks read the SWR
 source, so they live above it, in ``analysis.hippocampus.decode_masks``.
 
 - ``config``: the encoding-likelihood configs (``DecodingConfig``,

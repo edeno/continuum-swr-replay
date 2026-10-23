@@ -116,7 +116,7 @@ from continuum_swr_replay.intervals import (
     get_spikecount_per_time_bin,
     overlaps_intervals,
 )
-from continuum_swr_replay.types import RippleBandInputs
+from continuum_swr_replay.schemas import RippleBandInputs
 
 ZUGARO_BAND_HZ: tuple[float, float] = (120.0, 180.0)
 """Hz: the Databank files' ``FindRipples`` band (single-pass -3 dB edges)."""

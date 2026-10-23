@@ -48,7 +48,7 @@ Notes
 
 See Also
 --------
-continuum_swr_replay.types : ThetaData, RippleData, RippleBandInputs,
+continuum_swr_replay.schemas : ThetaData, RippleData, RippleBandInputs,
     MultiunitData TypedDicts
 continuum_swr_replay.data_loaders.spikes : Spike data loading
 
@@ -86,7 +86,7 @@ from ..parameters import (
     HSE_ZSCORE_THRESHOLD,
     MAX_SPEED_THRESHOLD_CM_PER_SEC,
 )
-from ..types import MultiunitData, RippleBandInputs, RippleData, ThetaData
+from ..schemas import MultiunitData, RippleBandInputs, RippleData, ThetaData
 
 KAY_SMOOTHING_SIGMA_S = 0.004
 """The Kay consensus's Gaussian smoothing, in seconds: the SWR runner's

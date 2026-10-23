@@ -158,7 +158,7 @@ from continuum_swr_replay.analysis.replay.uncertainty_content import (
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
-from continuum_swr_replay.types import SessionDataKeys
+from continuum_swr_replay.schemas import SessionDataKeys
 from continuum_swr_replay.visualization.session_tables import (
     BEHAVIORAL_MODEL_PANELS,
     plot_session_tables,

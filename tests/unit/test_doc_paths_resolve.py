@@ -282,8 +282,8 @@ def test_path_pattern_boundaries() -> None:
         return [m.group(1) for m in _FILE_PATH.finditer(s)]
 
     assert found("see ../scripts/qa/x.py.") == ["scripts/qa/x.py"]
-    assert found("[a](src/continuum_swr_replay/types.py)") == [
-        "src/continuum_swr_replay/types.py"
+    assert found("[a](src/continuum_swr_replay/schemas.py)") == [
+        "src/continuum_swr_replay/schemas.py"
     ]
     assert found("tests/scripts/x.py") == []
     assert found("scripts/qa/<name>.py and scripts/figures/*.py") == []

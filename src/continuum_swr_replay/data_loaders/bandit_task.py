@@ -46,7 +46,7 @@ if TYPE_CHECKING:
     import numpy as np
     from numpy.typing import NDArray
 
-    from ..types import (
+    from ..schemas import (
         DIOEventData,
         PositionInfoDict,
         RippleData,
@@ -84,7 +84,7 @@ def _process_spike_data(
 
     Filters spike times to position bounds and adds requested keys to result.
     """
-    from ..types import SessionDataKeys
+    from ..schemas import SessionDataKeys
 
     spike_data["spike_times"], spike_data["spike_waveform_features"] = (
         filter_spike_times(
@@ -152,7 +152,7 @@ def _process_multiunit_data(
     ``artifact_intervals`` (by brain area) are masked as ``get_multiunit``
     masks them.
     """
-    from ..types import SessionDataKeys
+    from ..schemas import SessionDataKeys
 
     if not any(
         should_load(key)
@@ -179,7 +179,7 @@ def _process_behavioral_data(
     result: dict[str, Any],
 ) -> None:
     """Process DIO events and compute behavioral data (well visits, trials, task variables)."""
-    from ..types import SessionDataKeys
+    from ..schemas import SessionDataKeys
 
     # Add DIO events to result if requested
     for key, value in dio_events.items():
@@ -285,7 +285,7 @@ def load_data(
         - Behavioral data: well_visits, trials, task_variables
         - Metadata: electrode_group_info
 
-        See `continuum_swr_replay.analysis.hippocampus.types.SessionData` for
+        See `continuum_swr_replay.schemas.SessionData` for
         complete field documentation.
 
     See Also
@@ -305,7 +305,7 @@ def load_data(
 
     Load minimal data for basic decoding:
 
-    >>> from continuum_swr_replay.types import DataLoadingPreset
+    >>> from continuum_swr_replay.schemas import DataLoadingPreset
     >>> data = load_data("chimi20200212_.nwb", "02_r1",
     ...                  include=DataLoadingPreset.MINIMAL)
     >>> data.keys()
@@ -314,7 +314,7 @@ def load_data(
 
     Load custom subset of data:
 
-    >>> from continuum_swr_replay.types import SessionDataKeys
+    >>> from continuum_swr_replay.schemas import SessionDataKeys
     >>> data = load_data(
     ...     "chimi20200212_.nwb", "02_r1",
     ...     include={SessionDataKeys.POSITION_INFO, SessionDataKeys.SPIKE_TIMES, SessionDataKeys.RIPPLE_TIMES, SessionDataKeys.TRIALS}
@@ -378,7 +378,7 @@ def load_data(
     2   1242.456   1242.598   0.142
 
     """
-    from ..types import SessionDataKeys
+    from ..schemas import SessionDataKeys
 
     # Helper to check if we should load this key
     def should_load(key: str) -> bool:

@@ -14,7 +14,7 @@ from continuum_swr_replay.parameters import (
     POSITION_STD,
     WAVEFORM_STD,
 )
-from continuum_swr_replay.types import ClusterlessParams, SortedSpikesParams
+from continuum_swr_replay.schemas import ClusterlessParams, SortedSpikesParams
 
 
 @dataclass(frozen=True)

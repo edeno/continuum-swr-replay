@@ -39,7 +39,7 @@ from continuum_swr_replay.data_loaders import load_data  # noqa: E402
 from continuum_swr_replay.paths import REPLAY_CONTENT_DIR
 from continuum_swr_replay.tables.io import publish_canonical  # noqa: E402
 from continuum_swr_replay.tables.session_keys import n_sessions  # noqa: E402
-from continuum_swr_replay.types import SessionDataKeys  # noqa: E402
+from continuum_swr_replay.schemas import SessionDataKeys  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S"

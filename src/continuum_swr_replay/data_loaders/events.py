@@ -55,7 +55,7 @@ Notes
 See Also
 --------
 continuum_swr_replay.data_loaders.trials : Trial construction from DIO events
-continuum_swr_replay.types : DIOEventData TypedDict
+continuum_swr_replay.schemas : DIOEventData TypedDict
 
 Examples
 --------
@@ -70,7 +70,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from ..types import DIOEventData
+from ..schemas import DIOEventData
 
 # Ignore warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="pynwb")

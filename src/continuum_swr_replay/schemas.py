@@ -152,7 +152,7 @@ class SessionDataKeys(StrEnum):
 
     Examples
     --------
-    >>> from continuum_swr_replay.types import SessionDataKeys
+    >>> from continuum_swr_replay.schemas import SessionDataKeys
     >>> data = load_data(...)
     >>> position_info = data[SessionDataKeys.POSITION_INFO]  # Instead of data["position_info"]
     >>> spike_times = data[SessionDataKeys.SPIKE_TIMES]      # Instead of data["spike_times"]
@@ -221,14 +221,14 @@ class DataLoadingPreset:
     Examples
     --------
     >>> from continuum_swr_replay.data_loaders.bandit_task import load_data
-    >>> from continuum_swr_replay.types import DataLoadingPreset
+    >>> from continuum_swr_replay.schemas import DataLoadingPreset
     >>>
     >>> # Load minimal data for basic decoding
     >>> data = load_data("chimi20200212_.nwb", "02_r1",
     ...                  include=DataLoadingPreset.MINIMAL)
     >>>
     >>> # Extend a preset with custom keys
-    >>> from continuum_swr_replay.types import SessionDataKeys
+    >>> from continuum_swr_replay.schemas import SessionDataKeys
     >>> custom = DataLoadingPreset.NEURAL | {SessionDataKeys.TRIALS, SessionDataKeys.TASK_VARIABLES}
     >>> data = load_data("chimi20200212_.nwb", "02_r1", include=custom)
 

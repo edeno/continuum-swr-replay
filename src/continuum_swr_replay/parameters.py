@@ -52,7 +52,7 @@ modified.
 
 See Also
 --------
-continuum_swr_replay.types : TypedDict definitions for data structures
+continuum_swr_replay.schemas : TypedDict definitions for data structures
 continuum_swr_replay.data_loaders.constants : Task-specific constants
 continuum_swr_replay.visualization.palettes : COLORS, the event-type colours
 

@@ -79,6 +79,7 @@ from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.runs.io import write_atomically
+from continuum_swr_replay.schemas import SessionDataKeys
 from continuum_swr_replay.tables.io import (
     parquet_path,
     publish_canonical,
@@ -89,7 +90,6 @@ from continuum_swr_replay.tables.standardization import (
     attach_standardized,
     save_reference,
 )
-from continuum_swr_replay.types import SessionDataKeys
 
 logging.basicConfig(
     level=logging.INFO,

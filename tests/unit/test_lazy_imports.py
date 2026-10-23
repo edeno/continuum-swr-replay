@@ -37,7 +37,7 @@ import pytest
 _LAZY_IMPORTS: list[str] = [
     # Package roots.
     "import continuum_swr_replay",
-    "from continuum_swr_replay.types import DataLoadingPreset",
+    "from continuum_swr_replay.schemas import DataLoadingPreset",
     # ``data_loaders/*`` pure helpers. The Spyglass-touching loaders
     # in the same modules (``get_hpc_marks``, ``get_theta``,
     # ``get_position_info``, ``load_dios``, …) must keep their

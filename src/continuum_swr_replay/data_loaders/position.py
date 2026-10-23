@@ -37,7 +37,7 @@ import pandas as pd
 from numpy.typing import NDArray
 from track_linearization import get_linearized_position
 
-from ..types import PositionInfoDict
+from ..schemas import PositionInfoDict
 from .constants import TRACK_SEGMENT_TO_PATCH
 
 logger = logging.getLogger(__name__)

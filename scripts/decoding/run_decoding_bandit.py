@@ -57,7 +57,7 @@ from continuum_swr_replay.parameters import (
 )
 from continuum_swr_replay.runs.batch import run_batch
 from continuum_swr_replay.runs.cli import add_common_args
-from continuum_swr_replay.types import SessionData
+from continuum_swr_replay.schemas import SessionData
 from continuum_swr_replay.visualization.figurl import (
     create_interactive_1D_decoding_figurl,
 )

@@ -82,7 +82,7 @@ from ripple_detection.core import gaussian_smooth
 from continuum_swr_replay.analysis.constants import DEFAULT_SAMPLING_FREQUENCY_HZ
 
 from ...decoding.results import open_results
-from ...types import SessionData
+from ...schemas import SessionData
 
 
 def get_conditional_non_local_posterior(results: xr.Dataset) -> xr.DataArray:

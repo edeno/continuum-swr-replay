@@ -36,7 +36,7 @@ from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
     require_covariate_schema,
 )
 from continuum_swr_replay.tables.io import read_table  # noqa: E402
-from continuum_swr_replay.types import SessionDataKeys  # noqa: E402
+from continuum_swr_replay.schemas import SessionDataKeys  # noqa: E402
 
 K = 5
 RC = REPLAY_CONTENT_DIR

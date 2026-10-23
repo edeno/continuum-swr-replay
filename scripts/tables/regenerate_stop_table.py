@@ -47,7 +47,7 @@ from continuum_swr_replay.tables.io import (
     write_table,
 )
 from continuum_swr_replay.tables.session_keys import session_key_set
-from continuum_swr_replay.types import SessionDataKeys  # noqa: E402
+from continuum_swr_replay.schemas import SessionDataKeys  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S"
