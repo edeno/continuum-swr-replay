@@ -21,7 +21,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
     interior_bin_distances_cm,
     window_midpoints_s,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
     dispersion_cm,
     windows_holding,
 )

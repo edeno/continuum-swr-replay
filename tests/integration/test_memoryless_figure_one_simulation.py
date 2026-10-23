@@ -60,7 +60,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation im
     inject_replay,
     stray_window_spikes,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
     aggregate_windows,
     normalize_windows,
 )
@@ -690,7 +690,7 @@ class TestOneWindowFarAway:
         assert decoded.place_bin_centers_cm[center[0]] < 40.0
 
     def test_the_call_rests_on_that_window(self, decoded, sequence):
-        from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
+        from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
             NO_CENTER,
             dispersion_cm,
         )

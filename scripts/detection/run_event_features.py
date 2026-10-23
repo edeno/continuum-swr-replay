@@ -127,7 +127,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
     interior_bin_distances_cm,
     window_midpoints_s,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (  # noqa: E402
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (  # noqa: E402
     windows_holding,
 )
 from continuum_swr_replay.analysis.hippocampus.state_evidence.terms import (  # noqa: E402

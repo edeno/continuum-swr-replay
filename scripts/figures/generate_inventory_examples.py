@@ -88,7 +88,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (  # noqa: E402
     candidate_window_log_likelihood,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (  # noqa: E402
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (  # noqa: E402
     normalize_windows,
     windows_holding,
 )

@@ -5,7 +5,7 @@ import warnings
 import numpy as np
 import pytest
 
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
     NO_CENTER,
     aggregate_windows,
     dispersion_cm,
@@ -162,7 +162,7 @@ class TestCenterAndSpread:
     def test_the_answer_does_not_depend_on_the_block_size(self, monkeypatch):
         """The search runs in blocks of windows to bound memory."""
         from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
-            statistics,
+            window_statistics,
         )
 
         rng = np.random.default_rng(0)
@@ -172,7 +172,7 @@ class TestCenterAndSpread:
         distance = straight_track(12)
         whole = window_center_and_spread(posterior, distance)
 
-        monkeypatch.setattr(statistics, "_WINDOW_CHUNK", 7)
+        monkeypatch.setattr(window_statistics, "_WINDOW_CHUNK", 7)
         blocked = window_center_and_spread(posterior, distance)
 
         np.testing.assert_array_equal(blocked[0], whole[0])

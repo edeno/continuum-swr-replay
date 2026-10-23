@@ -43,7 +43,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle impor
     ShuffleSeed,
     shuffle_candidate,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
     aggregate_windows,
     normalize_windows,
     windows_holding,

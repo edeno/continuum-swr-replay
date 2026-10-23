@@ -5,7 +5,7 @@ what it needs from the encoding model is the spike log-likelihood per time
 sample and place bin, with no transition or state prior mixed in. That is what
 ``predict_clusterless_kde_log_likelihood`` returns for ``is_local=False``, and
 it is additive over time: a window's log-likelihood is the sum of its rows.
-:func:`~...statistics.aggregate_windows` relies on that, so the additivity is
+:func:`~...window_statistics.aggregate_windows` relies on that, so the additivity is
 tested against a direct marked-process sum rather than assumed.
 
 **The final row.** ``get_spike_time_bin_ind`` assigns spikes with
@@ -400,7 +400,7 @@ def window_midpoints_s(time: NDArray, config: MemorylessSequenceConfig) -> NDArr
     -------
     midpoint_s : ndarray, shape (n_windows,)
         One per window whose full support is present, matching
-        :func:`~...statistics.aggregate_windows`.
+        :func:`~...window_statistics.aggregate_windows`.
 
     """
     time = np.asarray(time, dtype=np.float64)

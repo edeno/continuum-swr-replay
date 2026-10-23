@@ -88,7 +88,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation im
     placements,
     without,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
     aggregate_windows,
     dispersion_cm,
     normalize_windows,

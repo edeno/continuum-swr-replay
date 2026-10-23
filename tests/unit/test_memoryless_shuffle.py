@@ -35,7 +35,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle impor
     unchanged_window_pairs,
     unmoved_center_pairs,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
     aggregate_windows,
     normalize_windows,
     window_center_and_spread,

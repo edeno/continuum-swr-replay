@@ -209,6 +209,7 @@ doc-path test does not look for it. The source of truth is
 | `analysis/hippocampus/event_eligibility.py` (removed: moved) | `analysis/events/eligibility.py` |
 | `analysis/hippocampus/event_immobility.py` (removed: moved) | `analysis/events/immobility.py` |
 | `analysis/hippocampus/epoch_normalizers.py` (removed: moved) | `analysis/events/epoch_normalizers.py` |
+| `analysis/hippocampus/memoryless_sequence/statistics.py` (removed: renamed) | `analysis/hippocampus/memoryless_sequence/window_statistics.py` |
 | `analysis/hippocampus/swr_inventories.py` (removed: renamed) | `analysis/hippocampus/swr_detectors.py` (it runs the four direct SWR detectors) |
 | `analysis/replay/cohort_selection.py` (removed: moved) | `analysis/events/cohort_selection.py` |
 | `analysis/inventory_comparison/intervals.py` (removed: moved) | `intervals.py` |

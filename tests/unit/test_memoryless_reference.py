@@ -20,7 +20,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle impor
     sorted_candidate_window_log_likelihood,
     unmoved_center_pairs,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
     aggregate_windows,
     normalize_windows,
 )

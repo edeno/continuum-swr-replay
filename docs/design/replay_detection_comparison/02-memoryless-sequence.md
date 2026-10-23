@@ -1,6 +1,6 @@
 # Memoryless sliding-window sequence detection (Widloski & Foster 2025)
 
-*Design spec, now implemented; not yet run on recorded data. `config.py`, `statistics.py`,
+*Design spec, now implemented; not yet run on recorded data. `config.py`, `window_statistics.py`,
 `detect.py`, `likelihood.py`, `simulation.py`, `scoring.py`, `shuffle.py`,
 `event_table.py` and `epoch.py` exist and are tested, and
 `scripts/detection/run_memoryless_detection.py` runs them per recorded epoch. The decodes
@@ -918,7 +918,7 @@ Named for what it does; the citation lives in docstrings, not the module path.
 |---|---|---|
 | `config.py` | frozen dataclass of every threshold — the `Analysis_Information.mat` equivalent, one source of truth | — |
 | `likelihood.py` | prior-excluded `(n_time, n_interior_bins)` log-likelihood on the native 2 ms grid | `detector.pkl`; a `results.nc` path was designed (D7) and is not built |
-| `statistics.py` | pure functions: window aggregation, normalization, center / spread / jump / dispersion | numpy, bin-distance matrix |
+| `window_statistics.py` | pure functions: window aggregation, normalization, center / spread / jump / dispersion | numpy, bin-distance matrix |
 | `detect.py` | bin filter → sequence assembly → merge → criteria → `CandidateSequences`, retaining rejection diagnostics | the above |
 | `simulation.py` | inject a replay of known shape into a simulated recording; place it clear of movement | numpy |
 | `scoring.py` | the one rule both detectors are scored by against an injected replay | numpy |

@@ -21,9 +21,6 @@ ALLOWLIST: dict[str, str] = {
         "preloaded at interpreter startup, so runs/io.py, tables/io.py and "
         "state_evidence/io.py cannot shadow it"
     ),
-    "statistics": (
-        "memoryless_sequence/statistics.py, kept by the lead's Phase D decision"
-    ),
 }
 
 
@@ -47,7 +44,7 @@ def test_import_ast_succeeds_from_inside_the_package_directory():
 def test_every_package_directory_is_walked():
     dirs = _package_dirs()
     assert PACKAGE_DIR in dirs
-    assert PACKAGE_DIR / "analysis" / "hippocampus" / "memoryless_sequence" in dirs
+    assert PACKAGE_DIR / "analysis" / "hippocampus" / "state_evidence" in dirs
 
 
 def test_no_module_in_any_package_directory_has_a_stdlib_name():

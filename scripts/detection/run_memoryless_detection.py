@@ -174,7 +174,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle impor
     MINIMUM_N_SHUFFLES,
     SIGNIFICANCE_LEVEL,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
     windows_holding,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import git_hash

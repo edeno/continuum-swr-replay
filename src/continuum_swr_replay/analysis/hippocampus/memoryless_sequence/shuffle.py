@@ -81,7 +81,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
     validate_time_grid,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
     aggregate_windows,
     forward_jumps_cm,
     normalize_windows,

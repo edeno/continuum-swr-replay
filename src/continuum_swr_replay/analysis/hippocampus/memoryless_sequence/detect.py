@@ -34,7 +34,7 @@ from numpy.typing import NDArray
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import (
     MemorylessSequenceConfig,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
     NO_CENTER,
     dispersion_cm,
     forward_jumps_cm,

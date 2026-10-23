@@ -68,7 +68,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
     ShuffleResult,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
     dispersion_cm,
 )
 from continuum_swr_replay.data_loaders.constants import BRAIN_AREAS

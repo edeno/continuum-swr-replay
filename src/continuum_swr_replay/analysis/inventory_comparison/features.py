@@ -40,7 +40,7 @@ from continuum_swr_replay.analysis.events.cohort_selection import events_in_stop
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (
     CandidateSequences,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
     NO_CENTER,
     dispersion_cm,
 )

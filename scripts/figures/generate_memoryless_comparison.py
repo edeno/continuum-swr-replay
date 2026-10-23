@@ -72,7 +72,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation im
     stray_window_spikes,
     without,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
     NO_CENTER,
     aggregate_windows,
     dispersion_cm,

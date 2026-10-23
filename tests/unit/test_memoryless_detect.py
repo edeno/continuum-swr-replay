@@ -21,7 +21,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import
     sequence_duration_s,
     window_decisions,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
     NO_CENTER,
     forward_jumps_cm,
     window_center_and_spread,

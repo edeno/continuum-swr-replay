@@ -33,7 +33,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
     window_midpoints_s,
     with_reference_rate_floor,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics import (
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
     aggregate_windows,
 )
 from tests.unit._memoryless_clusterless_epoch import (
