@@ -36,7 +36,7 @@ convention     predicate                                       touching  zero-le
 closed         :func:`overlaps_intervals`                      overlaps  overlaps any interval it
                                                                          shares a time with
 open ``<``     :func:`overlaps_open`                           no        overlaps strictly inside
-strict         ``events.detection.strict_overlap_matrix``;     no        overlaps nothing
+strict         ``nonlocal_detection.strict_overlap_matrix``;   no        overlaps nothing
                the interval sets, through :func:`normalize`
 dropped-event  ``events.eligibility.overlaps_dropped_events``  no        a zero-length dropped
                                                                          interval is ignored; a

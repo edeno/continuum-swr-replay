@@ -58,12 +58,6 @@ Shared whole-unit complete-case cohort selection.
 
 `freeze_common_cohort`, `stop_cohort_suffix`, `select_stop_cohort`, `select_event_cohort`, `stop_interval_mask`, `events_in_stops`
 
-### `src/continuum_swr_replay/analysis/events/detection.py`
-
-Detection and analysis of neural events (ripples, non-local states).
-
-`get_confident_times`, `positive_duration_interval_mask`, `strict_overlap_matrix`, `event_strict_overlap_keys`, `event_strict_overlap_mask`, `get_overlap_times`, `classify_swr_overlap`, `merged_interval_duration`, `classify_swr_overlap_geometry`, `select_typical_event_by_class`
-
 ### `src/continuum_swr_replay/analysis/events/eligibility.py`
 
 One analysed-time rule for every event cohort, exposure, bin and window.
@@ -81,6 +75,12 @@ An epoch's run-speed baseline, shared by the decoders and the read path.
 Canonical whole-event immobility rules for neural event cohorts.
 
 `EventDefinitionError`, `require_time_index`, `require_canonical_speed_threshold`, `event_speeds_are_immobile`, `whole_event_immobility_mask`, `filter_event_labels_by_speed`, `validate_whole_event_immobility_contract`, `validate_nonlocal_event_probability_contract`, `filter_event_intervals_by_speed`, `intervals_from_labels`, `build_speed_eligible_event_cohort`
+
+### `src/continuum_swr_replay/analysis/events/nonlocal_detection.py`
+
+Detection and analysis of neural events (ripples, non-local states).
+
+`get_confident_times`, `positive_duration_interval_mask`, `strict_overlap_matrix`, `event_strict_overlap_keys`, `event_strict_overlap_mask`, `get_overlap_times`, `classify_swr_overlap`, `merged_interval_duration`, `classify_swr_overlap_geometry`, `select_typical_event_by_class`
 
 ### `src/continuum_swr_replay/analysis/events/swr_source.py`
 

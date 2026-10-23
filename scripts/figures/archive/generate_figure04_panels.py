@@ -47,7 +47,7 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_SAMPLING_FREQUENCY_HZ,
 )
 from continuum_swr_replay.analysis.hippocampus import load_results
-from continuum_swr_replay.analysis.events.detection import (
+from continuum_swr_replay.analysis.events.nonlocal_detection import (
     get_confident_times,
     get_overlap_times,
 )

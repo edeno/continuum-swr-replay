@@ -15,11 +15,11 @@ from continuum_swr_replay.analysis.constants import (
 from continuum_swr_replay.analysis.events.classified_table import (
     build_classified_nonlocal_event_table,
 )
-from continuum_swr_replay.analysis.events.detection import (
-    event_strict_overlap_keys,
-)
 from continuum_swr_replay.analysis.events.immobility import (
     require_canonical_speed_threshold,
+)
+from continuum_swr_replay.analysis.events.nonlocal_detection import (
+    event_strict_overlap_keys,
 )
 from continuum_swr_replay.data_loaders.constants import (
     ALL_ARMS,

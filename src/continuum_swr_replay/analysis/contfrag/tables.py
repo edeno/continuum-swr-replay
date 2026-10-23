@@ -22,12 +22,12 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_SAMPLING_FREQUENCY_HZ,
 )
 from continuum_swr_replay.analysis.events.analysed_time import excluded_intervals_of
-from continuum_swr_replay.analysis.events.detection import (
-    event_strict_overlap_keys,
-)
 from continuum_swr_replay.analysis.events.immobility import (
     require_canonical_speed_threshold,
     whole_event_immobility_mask,
+)
+from continuum_swr_replay.analysis.events.nonlocal_detection import (
+    event_strict_overlap_keys,
 )
 from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schema
 from continuum_swr_replay.tables.event_ids import hash_stop_id

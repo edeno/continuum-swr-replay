@@ -35,14 +35,14 @@ from continuum_swr_replay.analysis.events.analysed_time import (
     read_artifact_event_drops,
     swr_event_labels,
 )
-from continuum_swr_replay.analysis.events.detection import (
-    classify_swr_overlap_geometry,
-    get_confident_times,
-)
 from continuum_swr_replay.analysis.events.eligibility import artifact_drop_reasons
 from continuum_swr_replay.analysis.events.immobility import (
     build_speed_eligible_event_cohort,
     intervals_from_labels,
+)
+from continuum_swr_replay.analysis.events.nonlocal_detection import (
+    classify_swr_overlap_geometry,
+    get_confident_times,
 )
 from continuum_swr_replay.analysis.events.swr_source import (
     artifact_intervals,

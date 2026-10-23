@@ -87,7 +87,7 @@ from non_local_detector.visualization.figurl_1D import create_1D_decode_view
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.events.detection import get_confident_times
+from continuum_swr_replay.analysis.events.nonlocal_detection import get_confident_times
 from continuum_swr_replay.analysis.hippocampus import (
     get_conditional_non_local_posterior,
 )

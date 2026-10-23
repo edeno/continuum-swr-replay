@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from continuum_swr_replay.analysis.events.detection import (
+from continuum_swr_replay.analysis.events.nonlocal_detection import (
     classify_swr_overlap,
     classify_swr_overlap_geometry,
     event_strict_overlap_keys,

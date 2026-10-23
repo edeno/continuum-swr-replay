@@ -21,7 +21,7 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
 from continuum_swr_replay.analysis.events.analysed_time import analysed_bins
-from continuum_swr_replay.analysis.events.detection import (
+from continuum_swr_replay.analysis.events.nonlocal_detection import (
     event_strict_overlap_mask,
 )
 from continuum_swr_replay.analysis.hippocampus import (

@@ -205,7 +205,7 @@ doc-path test does not look for it. The source of truth is
 | `analysis/hippocampus/artifacts/io.py` (removed: moved) | `analysis/events/artifact_intervals.py` |
 | `analysis/hippocampus/artifacts/masks.py` (removed: split) | `analysis/events/artifact_masks.py` (`PADDING_S`, `core_class`, `artifact_intervals`, the signature sets); the generic interval functions (`merge_intervals`, `interval_mask`, `subtract_intervals`, `masked_seconds`, `pad_intervals`, `overlaps_intervals`, `covered_seconds`) are in `intervals.py` |
 | `analysis/hippocampus/event_table.py` (removed: moved) | `analysis/events/classified_table.py` |
-| `analysis/hippocampus/event_detection.py` (removed: moved) | `analysis/events/detection.py` |
+| `analysis/hippocampus/event_detection.py` (removed: moved) | `analysis/events/nonlocal_detection.py` |
 | `analysis/hippocampus/event_eligibility.py` (removed: moved) | `analysis/events/eligibility.py` |
 | `analysis/hippocampus/event_immobility.py` (removed: moved) | `analysis/events/immobility.py` |
 | `analysis/hippocampus/epoch_normalizers.py` (removed: moved) | `analysis/events/epoch_normalizers.py` |

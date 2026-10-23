@@ -52,15 +52,15 @@ from numpy.typing import NDArray
 
 # the canonical matched-SWR rule itself, not a copy that could drift from it
 from continuum_swr_replay.analysis.events.classified_table import match_swr
-from continuum_swr_replay.analysis.events.detection import (
-    classify_swr_overlap_geometry,
-)
 from continuum_swr_replay.analysis.events.eligibility import artifact_drop_reasons
 from continuum_swr_replay.analysis.events.immobility import (
     event_speeds_are_immobile,
     filter_event_labels_by_speed,
     intervals_from_labels,
     require_canonical_speed_threshold,
+)
+from continuum_swr_replay.analysis.events.nonlocal_detection import (
+    classify_swr_overlap_geometry,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (
     CandidateSequences,

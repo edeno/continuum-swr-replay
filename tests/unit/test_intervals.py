@@ -12,11 +12,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.events.detection import (
-    strict_overlap_matrix,
-)
 from continuum_swr_replay.analysis.events.eligibility import (
     overlaps_dropped_events,
+)
+from continuum_swr_replay.analysis.events.nonlocal_detection import (
+    strict_overlap_matrix,
 )
 from continuum_swr_replay.intervals import (
     contains,

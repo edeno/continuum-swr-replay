@@ -7,7 +7,7 @@ Examples
 --------
 Detect non-local events from decoding results:
 
->>> from continuum_swr_replay.analysis.events.detection import get_confident_times
+>>> from continuum_swr_replay.analysis.events.nonlocal_detection import get_confident_times
 >>> # Combine non-local state probabilities
 >>> non_local_prob = (
 ...     results.acausal_state_probabilities.sel(states="Non-Local Continuous") +
@@ -25,7 +25,7 @@ Detect non-local events from decoding results:
 
 Find events that overlap with ripples:
 
->>> from continuum_swr_replay.analysis.events.detection import get_overlap_times
+>>> from continuum_swr_replay.analysis.events.nonlocal_detection import get_overlap_times
 >>> overlap_events, no_overlap_events = get_overlap_times(
 ...     non_local_times, ripple_times
 ... )

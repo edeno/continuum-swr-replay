@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from continuum_swr_replay.analysis.events.detection import (
+from continuum_swr_replay.analysis.events.nonlocal_detection import (
     select_typical_event_by_class,
 )
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import get_event_types

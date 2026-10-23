@@ -55,11 +55,11 @@ from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
     read_dot_with_swr_source,
     require_swr_source,
 )
-from continuum_swr_replay.analysis.events.detection import (  # noqa: E402
-    event_strict_overlap_mask,
-)
 from continuum_swr_replay.analysis.events.immobility import (  # noqa: E402
     EventDefinitionError,
+)
+from continuum_swr_replay.analysis.events.nonlocal_detection import (  # noqa: E402
+    event_strict_overlap_mask,
 )
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (  # noqa: E402
     validate_dot_event_contract,

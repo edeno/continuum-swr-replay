@@ -59,7 +59,7 @@ _LAZY_IMPORTS: list[str] = [
     # ``analysis/pfc/__init__.py``.
     "from continuum_swr_replay.analysis.replay.fitting import fit_conditional_poisson",
     "from continuum_swr_replay.analysis.hippocampus.event_analysis import get_event_start_end_times",
-    "from continuum_swr_replay.analysis.events.detection import get_confident_times",
+    "from continuum_swr_replay.analysis.events.nonlocal_detection import get_confident_times",
     "from continuum_swr_replay.analysis.pfc.load_population import _extract_animal",
     "from continuum_swr_replay.analysis.pfc.session import process_neuron",
     # The foundation interval algebra and spike binning.

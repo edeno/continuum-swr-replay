@@ -89,11 +89,11 @@ from continuum_swr_replay.analysis.events.analysed_time import (
 from continuum_swr_replay.analysis.events.classified_table import (
     build_classified_nonlocal_event_table,
 )
-from continuum_swr_replay.analysis.events.detection import (
-    strict_overlap_matrix,
-)
 from continuum_swr_replay.analysis.events.immobility import (
     intervals_from_labels,
+)
+from continuum_swr_replay.analysis.events.nonlocal_detection import (
+    strict_overlap_matrix,
 )
 from continuum_swr_replay.analysis.events.swr_source import (
     ripple_power_inputs,

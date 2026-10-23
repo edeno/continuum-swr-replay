@@ -66,7 +66,9 @@ from continuum_swr_replay.analysis.events.classified_table import (
     assert_drawn_class_matches_ripples,
     build_classified_nonlocal_event_table,
 )
-from continuum_swr_replay.analysis.events.detection import select_typical_event_by_class
+from continuum_swr_replay.analysis.events.nonlocal_detection import (
+    select_typical_event_by_class,
+)
 from continuum_swr_replay.analysis.events.swr_source import (
     ripple_power_inputs,
     swr_epoch_id,

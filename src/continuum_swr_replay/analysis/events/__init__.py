@@ -11,7 +11,8 @@ analyses that use it:
   ``artifact_event_drops``).
 - ``eligibility``: excluded time and which events lie wholly outside it.
 - ``immobility``: the whole-event speed rule and labelled event intervals.
-- ``detection``: non-local event detection and SWR-overlap classification.
+- ``nonlocal_detection``: non-local event detection and SWR-overlap
+  classification.
 - ``classified_table``: the canonical per-non-local-event table
   (``build_classified_nonlocal_event_table``).
 - ``epoch_normalizers``: an epoch's run-speed baseline, recomputed outside

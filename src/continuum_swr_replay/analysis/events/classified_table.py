@@ -60,16 +60,16 @@ from continuum_swr_replay.analysis.constants import (
 from continuum_swr_replay.tables.event_ids import hash_event_id, validate_event_ids
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
-from .detection import (
-    classify_swr_overlap,
-    classify_swr_overlap_geometry,
-    strict_overlap_matrix,
-)
 from .immobility import (
     event_speeds_are_immobile,
     intervals_from_labels,
     require_canonical_speed_threshold,
     validate_nonlocal_event_probability_contract,
+)
+from .nonlocal_detection import (
+    classify_swr_overlap,
+    classify_swr_overlap_geometry,
+    strict_overlap_matrix,
 )
 
 _REQUIRED_DOT_COLUMNS = (

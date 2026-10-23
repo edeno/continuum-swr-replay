@@ -125,7 +125,7 @@ event."""
 NON_LOCAL_PROB_THRESHOLD = DEFAULT_NON_LOCAL_THRESHOLD
 NON_LOCAL_MINIMUM_DURATION_S = 0.015
 """The project's non-local event definition, as in
-``analysis/events/detection.get_confident_times``: non-local
+``analysis/events/nonlocal_detection.get_confident_times``: non-local
 probability above 0.8 for at least 15 ms. The state-space detector is held to
 its own published rule here, as the sliding window is held to its."""
 

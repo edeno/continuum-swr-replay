@@ -773,7 +773,7 @@ STORED_RIPPLE_READERS = {
         "get_contfrag_data_over_time: the stored labels, which an HPC decode "
         "replaces with the source's (organize_results)"
     ),
-    "src/continuum_swr_replay/analysis/events/detection.py": (
+    "src/continuum_swr_replay/analysis/events/nonlocal_detection.py": (
         "generic overlap classifiers; 'ripple_times' is a parameter name"
     ),
     "src/continuum_swr_replay/analysis/events/classified_table.py": (

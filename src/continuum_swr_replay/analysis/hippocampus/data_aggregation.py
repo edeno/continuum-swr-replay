@@ -115,7 +115,7 @@ Notes
 See Also
 --------
 continuum_swr_replay.analysis.hippocampus.posterior_analysis : Posterior statistics
-continuum_swr_replay.analysis.events.detection : Event detection functions
+continuum_swr_replay.analysis.events.nonlocal_detection : Event detection functions
 continuum_swr_replay.data_loaders.bandit_task : Session data loading
 
 Examples
@@ -144,17 +144,17 @@ from non_local_detector.environment import Environment
 from scipy.stats import zscore
 
 from continuum_swr_replay.analysis.events.analysed_time import read_dot_with_swr_source
-from continuum_swr_replay.analysis.events.detection import (
-    event_strict_overlap_keys,
-    get_confident_times,
-    get_overlap_times,
-)
 from continuum_swr_replay.analysis.events.epoch_normalizers import (
     run_speed_baseline as epoch_run_speed_baseline,
 )
 from continuum_swr_replay.analysis.events.immobility import (
     EventDefinitionError,
     build_speed_eligible_event_cohort,
+)
+from continuum_swr_replay.analysis.events.nonlocal_detection import (
+    event_strict_overlap_keys,
+    get_confident_times,
+    get_overlap_times,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename

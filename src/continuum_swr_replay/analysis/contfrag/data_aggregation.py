@@ -20,13 +20,13 @@ from non_local_detector.environment import Environment
 
 from continuum_swr_replay.analysis.constants import DEFAULT_SAMPLING_FREQUENCY_HZ
 from continuum_swr_replay.analysis.events.analysed_time import read_dot_with_swr_source
-from continuum_swr_replay.analysis.events.detection import get_overlap_times
 from continuum_swr_replay.analysis.events.epoch_normalizers import (
     run_speed_baseline as epoch_run_speed_baseline,
 )
 from continuum_swr_replay.analysis.events.immobility import (
     build_speed_eligible_event_cohort,
 )
+from continuum_swr_replay.analysis.events.nonlocal_detection import get_overlap_times
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     theta_power_zscore,
     validate_required_session_data_keys,

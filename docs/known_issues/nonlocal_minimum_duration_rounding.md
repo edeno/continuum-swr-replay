@@ -5,7 +5,7 @@
 
 ## What
 
-`get_confident_times` (`analysis/events/detection.py`) keeps runs of
+`get_confident_times` (`analysis/events/nonlocal_detection.py`) keeps runs of
 non-local probability > 0.8 that last at least `minimum_duration=0.015`. The run
 length goes through `ripple_detection.core.minimum_sample_count`. That function
 rounds halves up, so 15 ms at 500 Hz (7.5 samples) is meant to give 8 samples.

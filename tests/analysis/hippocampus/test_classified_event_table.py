@@ -566,7 +566,7 @@ def test_events_and_swrs_are_read_on_the_one_time_index():
 def test_zero_duration_event_inside_swr_is_non_swr():
     # A point event [1.0, 1.0] strictly inside an SWR has no positive
     # duration to overlap; the strict convention classifies it non_swr.
-    from continuum_swr_replay.analysis.events.detection import (
+    from continuum_swr_replay.analysis.events.nonlocal_detection import (
         classify_swr_overlap,
         classify_swr_overlap_geometry,
     )
