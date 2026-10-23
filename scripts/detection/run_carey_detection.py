@@ -173,11 +173,8 @@ def swr_run_inputs(identifier: str) -> dict[str, Any]:
         If the run does not serve the epoch.
     """
     inputs = swr_source.ripple_power_inputs(identifier)
-    manifest = json.loads(
-        (swr_source.swr_inventory_dir() / "manifest.json").read_text()
-    )
     with_hashes: dict[str, Any] = inputs | {
-        "input_sha256": manifest["epochs"][identifier]["input_sha256"]
+        "input_sha256": swr_source.swr_inventory_record(identifier)["input_sha256"]
     }
     return with_hashes
 

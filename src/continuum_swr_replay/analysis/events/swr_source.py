@@ -86,6 +86,7 @@ __all__ = [
     "artifact_run_of",
     "classify",
     "epoch_source",
+    "inventory_manifest",
     "read_observed",
     "read_swr_inventory",
     "ripple_power_inputs",
@@ -93,6 +94,7 @@ __all__ = [
     "swr_events",
     "swr_inventory_dir",
     "swr_inventory_paths",
+    "swr_inventory_record",
     "swr_source_files",
     "swr_source_name",
 ]
@@ -239,6 +241,27 @@ def swr_inventory_paths(
     return paths
 
 
+def inventory_manifest() -> dict[str, Any]:
+    """The SWR inventory run's manifest, checked to name its folder.
+
+    Raises
+    ------
+    SwrSourceError
+        If the run folder has no manifest, or it names another run.
+    """
+    directory = swr_inventory_dir()
+    manifest_path = directory / "manifest.json"
+    if not manifest_path.exists():
+        raise SwrSourceError(f"no SWR inventory manifest at {manifest_path}")
+    manifest: dict[str, Any] = json.loads(manifest_path.read_text())
+    if manifest.get("run_id") != directory.name:
+        raise SwrSourceError(
+            f"{manifest_path} is run {manifest.get('run_id')!r}, not the folder's "
+            f"{directory.name!r}"
+        )
+    return manifest
+
+
 def swr_source_files(epoch_id: str) -> dict[str, dict[str, str]]:
     """The epoch's Kay events and observed stretches, checked against the manifest.
 
@@ -260,17 +283,27 @@ def swr_source_files(epoch_id: str) -> dict[str, dict[str, str]]:
         without a Kay inventory; or if a file is missing or its sha256 is not
         the one the manifest recorded.
     """
+    return _checked_inventory(epoch_id)[0]
+
+
+def swr_inventory_record(epoch_id: str) -> dict[str, Any]:
+    """The epoch's manifest record, once :func:`swr_source_files`' checks pass.
+
+    Raises
+    ------
+    SwrSourceError
+        As :func:`swr_source_files`.
+    """
+    return _checked_inventory(epoch_id)[1]
+
+
+def _checked_inventory(
+    epoch_id: str,
+) -> tuple[dict[str, dict[str, str]], dict[str, Any]]:
+    """:func:`swr_source_files`' files and the record they were checked against,
+    from one read of the manifest."""
     directory = swr_inventory_dir()
-    manifest_path = directory / "manifest.json"
-    if not manifest_path.exists():
-        raise SwrSourceError(f"no SWR inventory manifest at {manifest_path}")
-    manifest = json.loads(manifest_path.read_text())
-    if manifest.get("run_id") != directory.name:
-        raise SwrSourceError(
-            f"{manifest_path} is run {manifest.get('run_id')!r}, not the folder's "
-            f"{directory.name!r}"
-        )
-    record = manifest.get("epochs", {}).get(epoch_id)
+    record = inventory_manifest().get("epochs", {}).get(epoch_id)
     if record is None:
         raise SwrSourceError(
             f"{epoch_id} is not in the SWR inventory {directory}; run the SWR "
@@ -303,7 +336,7 @@ def swr_source_files(epoch_id: str) -> dict[str, dict[str, str]]:
                 f"{str(expected)[:12]} the manifest recorded"
             )
         files[name] = {"path": str(path), "sha256": sha}
-    return files
+    return files, record
 
 
 def ripple_power_inputs(epoch_id: str) -> dict[str, Any]:
@@ -334,9 +367,8 @@ def ripple_power_inputs(epoch_id: str) -> dict[str, Any]:
     SwrSourceError
         As :func:`swr_source_files` and :func:`artifact_intervals`.
     """
-    swr_source_files(epoch_id)  # the epoch is served, and its files unchanged
-    manifest = json.loads((swr_inventory_dir() / "manifest.json").read_text())
-    record = manifest["epochs"][epoch_id]
+    # the epoch is served, and its files unchanged
+    record = swr_inventory_record(epoch_id)
     kept = [int(electrode) for electrode in record["electrode_ids"]]
     selection = record.get("tetrode_selection")
     band = (
