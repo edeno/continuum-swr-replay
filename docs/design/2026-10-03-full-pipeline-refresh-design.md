@@ -589,7 +589,8 @@ does not depend on the decoder and is reused (`prepare_data.py:230-233`).
    2. Copy the staged files in with `cp -p`. The list of files is written down beforehand,
       including `standardization_reference.json` and
       `models_per_bin_rate/qvals_standardization_reference.json`, which the fitters require
-      (`table_contracts.py:396`).
+      (`table_contracts.py:396`). (Note 2026-10-23: `qvals_table.parquet` and
+      `qvals_standardization_reference.json` now sit at the `replay_content` root.)
 
 **Shortcuts not to use, because each is invalid after a re-decode:**
 

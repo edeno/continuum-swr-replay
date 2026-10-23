@@ -1,7 +1,8 @@
-"""Detection and analysis of neural events (ripples, non-local states).
+"""Non-local event detection and the SWR-overlap classification of those events.
 
-This module provides functions for detecting confident neural events from
-probability distributions and analyzing event overlap patterns.
+``get_confident_times`` finds the intervals where a decoded state's probability
+stays above a threshold (the non-local events); the rest of the module
+classifies how each event overlaps the SWRs. It detects no ripples itself.
 
 Examples
 --------

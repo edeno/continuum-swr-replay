@@ -78,7 +78,7 @@ Canonical whole-event immobility rules for neural event cohorts.
 
 ### `src/continuum_swr_replay/analysis/events/nonlocal_detection.py`
 
-Detection and analysis of neural events (ripples, non-local states).
+Non-local event detection and the SWR-overlap classification of those events.
 
 `get_confident_times`, `positive_duration_interval_mask`, `strict_overlap_matrix`, `event_strict_overlap_keys`, `event_strict_overlap_mask`, `get_overlap_times`, `classify_swr_overlap`, `merged_interval_duration`, `classify_swr_overlap_geometry`, `select_typical_event_by_class`
 

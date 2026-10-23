@@ -231,8 +231,8 @@ doc-path test does not look for it. The source of truth is
 Names that left a module that still exists:
 
 - `COLORS` and `CONTFRAG_COLORS`: from `parameters.py` to `visualization/palettes.py`.
-- `kay_version_check`: from `analysis/hippocampus/swr_detectors.py` to
-  `analysis/inventory_comparison/kay_version.py`.
+- `kay_version_check`: from `swr_inventories.py` (now
+  `analysis/hippocampus/swr_detectors.py`) to `analysis/inventory_comparison/kay_version.py`.
 
 Renamed functions: `inventory_comparison.adapters.swr_inventory` is now
 `swr_detector_inventory` (it reads any one of the four SWR detectors' inventories).
@@ -272,8 +272,13 @@ Three tiers:
 
    | dir | producer | holds |
    |---|---|---|
-   | `models_per_bin_rate/` | `scripts/rate/fit_per_bin_rate_models.py` | per-bin rate fits only: `all_models.pkl` (Family-B ladder), `swr_contrast_rate.pkl`, `uncertainty_rate.pkl`, `cross_history_models.pkl` |
+   | `models_per_bin_rate/` | `scripts/rate/fit_per_bin_rate_models.py`, `fit_swr_contrast_rate.py`, `fit_uncertainty_rate.py`, `fit_cross_history_rate.py` | the per-bin rate fits: `all_models.pkl` (Family-B ladder), `swr_contrast_rate.pkl`, `uncertainty_rate.pkl`, `cross_history_models.pkl`; plus three exploratory one-offs nothing supported reads (`contingency_table.pkl`, `contingency_csv_alpha.json`, `covariate_ranking.pkl`) |
    | `models_per_event_swr_power/` | `scripts/rate/fit_swr_power_model.py` | the per-event ripple-power model `swr_power_model.pkl`, its `.z_reference_by_session.json` and its two audits |
+
+   Since 2026-10-23 `qvals_table` and its reference sit at the root and the power model in
+   its own folder; symlinks at the old `models_per_bin_rate/` paths serve older worktrees
+   until cleanup, and the hazard and its check are in the "Phase D disk move" entry of
+   [the code-organization plan](../.claude/docs/plans/code-organization/PLAN.md).
    | `models_per_stop_rate/` | `scripts/rate/fit_per_stop_rate_models.py` | Family-A per-stop ladder |
    | `models/`, `models_patch/` | `scripts/content/fit_replay_content_models.py` (arm / patch) | the default content ladders — arm `M0`, `M0a`, `M1`–`M6`; patch `P0`–`P3` — on the at-well events, plus the opt-in value/uncertainty rungs (`Mv`, `Mu`, `Mvu`, `Pv`) when named with `--models`; also holds `swr_contrast_content_{arm,patch}.pkl` |
    | `models_swr_{T,F}/`, `models_patch_swr_{T,F}/` | same, `--swr-subset T\|F` | content split by SWR (T) / non-SWR (F) |
