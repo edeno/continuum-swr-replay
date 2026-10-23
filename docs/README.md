@@ -172,8 +172,8 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
 `src/continuum_swr_replay/` is layered. Code may import from its own layer and the
 layers below it, never from a layer above:
 
-1. **Foundation**: `data_loaders/`, `decoding/`, `intervals.py`, `parameters.py`,
-   `paths.py`, `runs/`, `schemas.py`, `tables/`. A foundation module imports only
+1. **Foundation**: `data_loaders/`, `data_types.py`, `decoding/`, `intervals.py`,
+   `parameters.py`, `paths.py`, `runs/`, `tables/`. A foundation module imports only
    other foundation modules.
 2. **`analysis/events/`**, the analysed-time rule and the event substrate. It imports
    only the foundation, `analysis/constants.py` (which itself imports only the
@@ -224,7 +224,7 @@ doc-path test does not look for it. The source of truth is
 | `table_io.py` (removed: moved) | `tables/io.py`; `sha256_file` is in `runs/io.py` |
 | `table_parity.py` (removed: moved) | `tables/parity.py`; `BASENAME_TO_TABLE` and `CANONICAL_TABLE_BASENAMES` are in `paths.py` |
 | `session_keys.py` (removed: moved) | `tables/session_keys.py` |
-| `types.py` (removed: renamed) | `schemas.py` |
+| `types.py` (removed: renamed) | `data_types.py` |
 | `visualization/session_tables.py` (removed: split) | the `visualization/session_tables/` package, so the import path is unchanged: `plot_session_tables`, `register_panel` and the panel lists are in its `__init__.py`; the private panel code is in `visualization/session_tables/_common.py`, `visualization/session_tables/arm_covariates.py`, `visualization/session_tables/patch_covariates.py`, `visualization/session_tables/responses.py` and `visualization/session_tables/stop_covariates.py` |
 
 Names that left a module that still exists:

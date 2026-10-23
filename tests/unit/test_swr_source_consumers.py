@@ -764,7 +764,7 @@ STORED_RIPPLE_READERS = {
     "src/continuum_swr_replay/analysis/events/analysed_time.py": (
         "prose naming what it replaces"
     ),
-    "src/continuum_swr_replay/schemas.py": "load_data's return types",
+    "src/continuum_swr_replay/data_types.py": "load_data's return types",
     "src/continuum_swr_replay/analysis/hippocampus/data_aggregation.py": (
         "get_data_over_time: the stored labels, which an HPC decode replaces "
         "with the source's (organize_results)"

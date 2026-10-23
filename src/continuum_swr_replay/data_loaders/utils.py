@@ -43,7 +43,7 @@ See Also
 continuum_swr_replay.data_loaders.bandit_task : Main data loading orchestration
 continuum_swr_replay.data_loaders.constants : NWB_FILES list and task constants
 continuum_swr_replay.parameters : TrainingType enum definition
-continuum_swr_replay.schemas : SessionData TypedDict
+continuum_swr_replay.data_types : SessionData TypedDict
 
 Examples
 --------
@@ -80,7 +80,7 @@ import pandas as pd
 # and only ``get_epoch_info`` actually requires DataJoint.
 
 if TYPE_CHECKING:
-    from ..schemas import SessionData
+    from ..data_types import SessionData
 
 from ..parameters import TrainingType
 from .constants import (

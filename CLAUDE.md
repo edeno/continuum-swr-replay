@@ -83,7 +83,7 @@ src/continuum_swr_replay/
 ├── intervals.py           # interval algebra: overlap conventions, masks, spike binning
 ├── parameters.py          # global parameters, PROCESSED_DATA_DIR
 ├── paths.py               # output locations, canonical table names, table_path()
-└── schemas.py             # shared type definitions
+└── data_types.py          # shared type definitions
 
 scripts/                   # Analysis scripts, grouped by domain — see scripts/README.md
 ├── decoding/  detection/  tables/  rate/  content/  behavior/  figures/  qa/  pfc/

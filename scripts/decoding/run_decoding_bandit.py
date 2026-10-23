@@ -48,6 +48,7 @@ import xarray as xr
 from non_local_detector import NonLocalClusterlessDetector, NonLocalSortedSpikesDetector
 
 from continuum_swr_replay.analysis.hippocampus import get_data_over_time, load_results
+from continuum_swr_replay.data_types import SessionData
 from continuum_swr_replay.decoding.config import NonLocalDecodingConfig
 from continuum_swr_replay.decoding.transitions import nonlocal_transition_settings
 from continuum_swr_replay.parameters import (
@@ -57,7 +58,6 @@ from continuum_swr_replay.parameters import (
 )
 from continuum_swr_replay.runs.batch import run_batch
 from continuum_swr_replay.runs.cli import add_common_args
-from continuum_swr_replay.schemas import SessionData
 from continuum_swr_replay.visualization.figurl import (
     create_interactive_1D_decoding_figurl,
 )

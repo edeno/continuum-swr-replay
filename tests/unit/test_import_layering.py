@@ -205,7 +205,7 @@ FOUNDATION = frozenset(
         "parameters",
         "paths",
         "runs",
-        "schemas",
+        "data_types",
         "tables",
     }
 )
@@ -485,9 +485,9 @@ def test_graph_rules_see_function_local_imports_and_cycles(tmp_path: Path) -> No
     )
     (root / "visualization" / "v.py").write_text("")
     (root / "driver.py").write_text("")
-    (root / "schemas.py").write_text("")
+    (root / "data_types.py").write_text("")
     (root / "parameters.py").write_text(
-        "from . import schemas\nfrom .driver import run\n"
+        "from . import data_types\nfrom .driver import run\n"
     )
 
     found = rule_violations(root)

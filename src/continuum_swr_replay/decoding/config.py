@@ -8,13 +8,13 @@
 
 from dataclasses import dataclass
 
+from continuum_swr_replay.data_types import ClusterlessParams, SortedSpikesParams
 from continuum_swr_replay.parameters import (
     BLOCK_SIZE,
     LOCAL_POSITION_STD,
     POSITION_STD,
     WAVEFORM_STD,
 )
-from continuum_swr_replay.schemas import ClusterlessParams, SortedSpikesParams
 
 
 @dataclass(frozen=True)

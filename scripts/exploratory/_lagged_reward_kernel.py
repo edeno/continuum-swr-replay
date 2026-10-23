@@ -31,8 +31,8 @@ from continuum_swr_replay.analysis.replay.prepare_data import (  # noqa: E402
     find_sessions,
 )
 from continuum_swr_replay.data_loaders import load_data  # noqa: E402
+from continuum_swr_replay.data_types import SessionDataKeys  # noqa: E402
 from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path  # noqa: E402
-from continuum_swr_replay.schemas import SessionDataKeys  # noqa: E402
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
     require_covariate_schema,
 )

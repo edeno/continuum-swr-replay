@@ -57,7 +57,7 @@ from scipy.ndimage import label
 # defer those imports into the DB-loading function bodies so that
 # pure helpers (``detect_coincident_spikes``, ``filter_spike_times``)
 # stay offline-importable for unit tests on machines without VPN.
-from ..schemas import SpikeDataDict
+from ..data_types import SpikeDataDict
 
 logger = logging.getLogger(__name__)
 

@@ -411,7 +411,7 @@ def load_marks_and_training_mask(epoch_id: str) -> dict:
         time bin).
     """
     from continuum_swr_replay.data_loaders import load_data
-    from continuum_swr_replay.schemas import SessionDataKeys as K
+    from continuum_swr_replay.data_types import SessionDataKeys as K
 
     key = parse_epoch_identifier(epoch_id)
     nwb_file_name, epoch_name, brain_area = (

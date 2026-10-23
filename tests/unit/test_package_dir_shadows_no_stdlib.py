@@ -4,7 +4,7 @@ A tool run with its working directory inside ``src/continuum_swr_replay/`` puts
 that directory first on ``sys.path``. A module there named like a
 standard-library one (the old ``types.py``) is then imported in its place:
 ``python -c "import ast"`` failed with a partially-initialized-module
-``ImportError``. The module is ``schemas.py`` now.
+``ImportError``. The module is ``data_types.py`` now.
 """
 
 import subprocess

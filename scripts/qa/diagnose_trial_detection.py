@@ -30,10 +30,10 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
 from continuum_swr_replay.data_loaders import load_data
+from continuum_swr_replay.data_types import SessionDataKeys
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.paths import REPLAY_CONTENT_DIR
-from continuum_swr_replay.schemas import SessionDataKeys
 
 ARM_COLORS = {
     0: "#1f77b4",

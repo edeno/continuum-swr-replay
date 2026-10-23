@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import continuum_swr_replay.schemas as project_types
+import continuum_swr_replay.data_types as project_types
 from continuum_swr_replay.data_loaders import lfp
 from continuum_swr_replay.data_loaders.lfp import filter_ripple_lfp_time
 

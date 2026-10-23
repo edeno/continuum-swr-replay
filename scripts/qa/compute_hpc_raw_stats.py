@@ -39,9 +39,9 @@ from continuum_swr_replay.analysis.hippocampus.hpc_raw_stats import (
     extract_discrete_transition_matrix,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
+from continuum_swr_replay.data_types import DataLoadingPreset
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.schemas import DataLoadingPreset
 
 logging.basicConfig(
     level=logging.INFO,

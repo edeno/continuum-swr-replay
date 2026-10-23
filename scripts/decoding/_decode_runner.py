@@ -46,6 +46,7 @@ from continuum_swr_replay.data_loaders import (
     load_data,
 )
 from continuum_swr_replay.data_loaders.utils import format_epoch_identifier
+from continuum_swr_replay.data_types import SessionData
 from continuum_swr_replay.decoding.config import DecodingConfig
 from continuum_swr_replay.decoding.files import (
     decode_paths,
@@ -62,7 +63,6 @@ from continuum_swr_replay.parameters import (
 from continuum_swr_replay.runs.batch import release_nwb_files, setup_logger
 from continuum_swr_replay.runs.io import write_atomically
 from continuum_swr_replay.runs.provenance import provenance_record
-from continuum_swr_replay.schemas import SessionData
 
 
 @dataclass(frozen=True)

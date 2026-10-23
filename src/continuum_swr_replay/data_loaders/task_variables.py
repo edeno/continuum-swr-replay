@@ -52,7 +52,7 @@ See Also
 --------
 continuum_swr_replay.data_loaders.trials : Trial construction from task events
 continuum_swr_replay.data_loaders.constants : Track graph structure and mappings
-continuum_swr_replay.schemas : TaskVariables TypedDict
+continuum_swr_replay.data_types : TaskVariables TypedDict
 
 Examples
 --------

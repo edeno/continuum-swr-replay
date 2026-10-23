@@ -94,7 +94,7 @@ See Also
 --------
 continuum_swr_replay.data_loaders.events : DIO event loading
 continuum_swr_replay.data_loaders.constants : WELL_PATCH_MAPPING
-continuum_swr_replay.schemas : WellNodeData TypedDict
+continuum_swr_replay.data_types : WellNodeData TypedDict
 
 Examples
 --------
@@ -114,7 +114,7 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 
-from ..schemas import WellNodeData
+from ..data_types import WellNodeData
 from .constants import POKE_EVENT_TO_WELL, PUMP_EVENT_TO_WELL, WELL_PATCH_MAPPING
 from .trial_clocks import outcome_known_time_from_task_visit
 

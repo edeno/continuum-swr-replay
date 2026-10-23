@@ -179,7 +179,7 @@ def _reconstruct_reward_rate_arm(n_sessions: int) -> None:
     from continuum_swr_replay.analysis.replay import trial_outcome_times
     from continuum_swr_replay.analysis.replay._helpers import build_well_to_arm_map
     from continuum_swr_replay.data_loaders import load_data
-    from continuum_swr_replay.schemas import SessionDataKeys
+    from continuum_swr_replay.data_types import SessionDataKeys
 
     ea = read_table(table_path("event_arm_table", RC, fmt="pkl"))
     et = read_table(table_path("event_table", RC, fmt="pkl"))

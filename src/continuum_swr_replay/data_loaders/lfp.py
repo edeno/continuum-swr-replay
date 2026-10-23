@@ -48,7 +48,7 @@ Notes
 
 See Also
 --------
-continuum_swr_replay.schemas : ThetaData, RippleData, RippleBandInputs,
+continuum_swr_replay.data_types : ThetaData, RippleData, RippleBandInputs,
     MultiunitData TypedDicts
 continuum_swr_replay.data_loaders.spikes : Spike data loading
 
@@ -74,6 +74,8 @@ from ripple_detection import (
 )
 from scipy.stats import zscore
 
+from ..data_types import MultiunitData, RippleBandInputs, RippleData, ThetaData
+
 # ``spyglass.{lfp,ripple}`` imports open a DataJoint connection at
 # import time. Defer them into the DB-loading function bodies so that
 # pure helpers (``get_multiunit``, ``get_multiunit_hse``,
@@ -86,7 +88,6 @@ from ..parameters import (
     HSE_ZSCORE_THRESHOLD,
     MAX_SPEED_THRESHOLD_CM_PER_SEC,
 )
-from ..schemas import MultiunitData, RippleBandInputs, RippleData, ThetaData
 
 KAY_SMOOTHING_SIGMA_S = 0.004
 """The Kay consensus's Gaussian smoothing, in seconds: the SWR runner's
