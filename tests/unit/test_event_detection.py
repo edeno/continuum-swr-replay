@@ -17,9 +17,9 @@ from continuum_swr_replay.analysis.events.nonlocal_detection import (
     event_strict_overlap_keys,
     get_confident_times,
     get_overlap_times,
-    merged_interval_duration,
     strict_overlap_matrix,
 )
+from continuum_swr_replay.intervals import total_duration
 
 
 def _prob_array(
@@ -947,12 +947,18 @@ def test_event_strict_overlap_keys_reads_the_time_index():
     assert event_strict_overlap_keys(data, "primary_event", "other_event") == set()
 
 
+def merged_interval_duration(starts: np.ndarray, ends: np.ndarray) -> float:
+    """The union length ``classify_swr_overlap_geometry`` computes per event."""
+    return total_duration(np.column_stack([starts, ends]))
+
+
 class TestMergedIntervalDuration:
     """Direct coverage for the interval union behind ``event_has_non_swr_time``.
 
-    This logic was inline in ``classify_swr_overlap_geometry``'s per-event loop
-    and reachable only through the multi-SWR overlap branch, so breaking the
-    merge (never merging, always merging) left the whole suite green.
+    ``classify_swr_overlap_geometry`` takes it from ``intervals.total_duration``
+    in its per-event loop, reachable only through the multi-SWR overlap branch,
+    so breaking the merge (never merging, always merging) would leave the
+    classifier's own tests green.
     """
 
     def test_single_interval_is_its_own_duration(self):
