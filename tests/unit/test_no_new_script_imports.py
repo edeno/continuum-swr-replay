@@ -3,9 +3,10 @@
 Shared code belongs in the package (``src/continuum_swr_replay``) or in a
 ``_``-prefixed module beside the scripts that share it, such as
 ``scripts/qa/_report.py``. This test fails on any ``from scripts.<path> import``
-or ``import scripts.<path>`` in ``scripts/`` or ``src/`` whose target module has
-no ``_``-prefixed component, unless the (importing file, target module) pair is
-in :data:`ALLOWED`. Tests may import scripts.
+or ``import scripts.<path>`` in ``scripts/`` whose target module has no
+``_``-prefixed component, unless the (importing file, target module) pair is in
+:data:`ALLOWED`. Tests may import scripts. The package may not import
+``scripts`` at all (``test_import_layering``'s ``src_imports_no_scripts``).
 
 :data:`ALLOWED` is the current exception list and only shrinks: an entry whose
 import is gone fails the test, so moving shared code out removes its entry.
@@ -14,11 +15,12 @@ import is gone fails the test, so moving shared code out removes its entry.
 
 from __future__ import annotations
 
-import ast
+import functools
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[2]
-ROOTS = (REPO / "scripts", REPO / "src")
+from tests.unit._imports import REPO, imported_modules, module_index
+
+SCRIPTS = REPO / "scripts"
 
 _INVENTORY = (
     "the detection-comparison family: the report, the feature runner and the "
@@ -120,35 +122,9 @@ ALLOWED: dict[tuple[str, str], str] = {
 }
 
 
-def _target(module: str, name: str | None) -> str:
-    """The module an import binds: ``module``, or ``module.name`` when ``name``
-    is itself a module (``from scripts.detection import run_event_features``)."""
-    if name is None:
-        return module
-    package = REPO.joinpath(*module.split("."))
-    if (package / f"{name}.py").is_file() or (package / name).is_dir():
-        return f"{module}.{name}"
-    return module
-
-
-def _script_imports(path: Path) -> set[str]:
-    """Every ``scripts.*`` module ``path`` imports, at any depth."""
-    targets = set()
-    for node in ast.walk(ast.parse(path.read_text(), filename=str(path))):
-        if isinstance(node, ast.Import):
-            targets |= {
-                alias.name
-                for alias in node.names
-                if alias.name.split(".")[0] == "scripts"
-            }
-        elif (
-            isinstance(node, ast.ImportFrom)
-            and node.level == 0
-            and node.module
-            and node.module.split(".")[0] == "scripts"
-        ):
-            targets |= {_target(node.module, alias.name) for alias in node.names}
-    return targets
+def _script_imports(path: Path, root: Path = SCRIPTS) -> set[str]:
+    """Every ``scripts.*`` module ``path`` (a file under ``root``) imports."""
+    return {m for m in imported_modules(path, root) if m.split(".")[0] == "scripts"}
 
 
 def _is_importable(target: str) -> bool:
@@ -156,14 +132,14 @@ def _is_importable(target: str) -> bool:
     return any(part.startswith("_") for part in target.split(".")[1:])
 
 
-def _forbidden_imports() -> set[tuple[str, str]]:
-    return {
-        (str(path.relative_to(REPO)), target)
-        for root in ROOTS
-        for path in sorted(root.rglob("*.py"))
-        for target in _script_imports(path)
+@functools.cache
+def _forbidden_imports(root: Path = SCRIPTS) -> frozenset[tuple[str, str]]:
+    return frozenset(
+        (str(path.relative_to(root.parent)), target)
+        for path in module_index(root).values()
+        for target in _script_imports(path, root)
         if not _is_importable(target)
-    }
+    )
 
 
 def test_no_script_imports_another_script_outside_the_allowlist():
@@ -189,24 +165,32 @@ def test_the_rule_reads_the_module_not_the_imported_name(tmp_path):
     assert _is_importable("scripts.decoding._decode_runner")
     assert _is_importable("scripts.exploratory._statescript_contingency")
     assert not _is_importable("scripts.detection.report_inventory_comparison")
-    assert (
-        _target("scripts.detection", "run_event_features")
-        == "scripts.detection.run_event_features"
-    )
-    assert (
-        _target("scripts.detection.report_inventory_comparison", "_caption")
-        == "scripts.detection.report_inventory_comparison"
-    )
 
-    probe = tmp_path / "probe.py"
+    root = tmp_path / "scripts"
+    for module in (
+        "qa/_report.py",
+        "detection/report_inventory_comparison.py",
+        "detection/run_event_features.py",
+        "content/fit_replay_content_models.py",
+    ):
+        (root / module).parent.mkdir(parents=True, exist_ok=True)
+        (root / module).write_text("")
+    probe = root / "qa" / "probe.py"
     probe.write_text(
         "from scripts.qa import _report\n"
+        "from scripts.detection import run_event_features\n"
         "from scripts.detection.report_inventory_comparison import _private\n"
         "def run():\n"
         "    import scripts.content.fit_replay_content_models as fitter\n"
     )
-    assert _script_imports(probe) == {
+    assert _script_imports(probe, root) == {
         "scripts.qa._report",
+        "scripts.detection.run_event_features",
         "scripts.detection.report_inventory_comparison",
         "scripts.content.fit_replay_content_models",
+    }
+    assert _forbidden_imports(root) == {
+        ("scripts/qa/probe.py", "scripts.detection.run_event_features"),
+        ("scripts/qa/probe.py", "scripts.detection.report_inventory_comparison"),
+        ("scripts/qa/probe.py", "scripts.content.fit_replay_content_models"),
     }
