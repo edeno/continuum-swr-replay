@@ -176,8 +176,6 @@ THREAD_VARS = (
     "OPENBLAS_NUM_THREADS",
     "NUMBA_NUM_THREADS",
 )
-#: Fit roots whose provenance sidecars are checked, relative to the data root.
-FIT_ROOTS = ("replay_content", "contfrag_replay_content")
 _SIDECAR = ".provenance.json"
 _SKIPPED_DIRS = ("_backup", "_archive", "_pre_", "_staging", "_golden")
 
@@ -387,17 +385,30 @@ def written_artifacts(root: Path, before: dict[Path, float]) -> list[Path]:
     return artifacts
 
 
+def fit_roots() -> dict[str, Path]:
+    """The fit roots whose provenance sidecars are checked, by name.
+
+    Imported here, not at the top, so the scheduler loads no package code.
+    """
+    from continuum_swr_replay.paths import (
+        CONTFRAG_REPLAY_CONTENT_DIR,
+        REPLAY_CONTENT_DIR,
+    )
+
+    return {
+        "replay_content": REPLAY_CONTENT_DIR,
+        "contfrag_replay_content": CONTFRAG_REPLAY_CONTENT_DIR,
+    }
+
+
 def check_provenance(log_dir: Path, before: dict[str, dict[Path, float]]) -> int:
     """``check_fit_provenance.py`` on what the runs wrote; the worst exit code.
 
     Only the artifacts whose sidecar changed from ``before`` (per fit root) are checked, so a bundle no run
     makes any more (left on disk) cannot fail a run that did not touch it.
     """
-    from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-
     worst = 0
-    for name in FIT_ROOTS:
-        root = Path(PROCESSED_DATA_DIR) / name
+    for name, root in fit_roots().items():
         artifacts = (
             written_artifacts(root, before.get(name, {})) if root.is_dir() else []
         )
@@ -494,9 +505,7 @@ def main(argv: list[str] | None = None) -> int:
     log_dir = (
         args.log_dir or REPO / "logs" / f"refits_{datetime.now(UTC):%Y%m%dT%H%M%S}"
     )
-    from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-
-    roots = {name: Path(PROCESSED_DATA_DIR) / name for name in FIT_ROOTS}
+    roots = fit_roots()
     before = {n: sidecar_times(r) for n, r in roots.items() if r.is_dir()}
     # A SIGTERM or SIGHUP leaves through schedule's cleanup, which stops the runs.
     for sig in (signal.SIGTERM, signal.SIGHUP):

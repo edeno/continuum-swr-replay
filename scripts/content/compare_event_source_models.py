@@ -63,8 +63,7 @@ from continuum_swr_replay.analysis.replay.covariate_timing import (
 from continuum_swr_replay.analysis.replay.model_specs import (
     DESCRIPTIVE_CONTENT_RUNGS,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR
+from continuum_swr_replay.paths import CONTFRAG_REPLAY_CONTENT_DIR, REPLAY_CONTENT_DIR
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -90,9 +89,9 @@ SESS = list(SESSION_COLUMNS)
 # The ContFrag sources are per-brain-area; the brain area is appended at
 # load time so mPFC/OFC outputs aren't silently read as HPC.
 _SOURCES = {
-    "non_local": ("replay_content", None),
-    "SWR": ("contfrag_replay_content", "swr"),
-    "MUA": ("contfrag_replay_content", "mua"),
+    "non_local": (REPLAY_CONTENT_DIR, None),
+    "SWR": (CONTFRAG_REPLAY_CONTENT_DIR, "swr"),
+    "MUA": (CONTFRAG_REPLAY_CONTENT_DIR, "mua"),
 }
 
 
@@ -171,7 +170,7 @@ def _comparison_output_path(out_dir: Path, event_source: str, brain_area: str) -
 
 def _load_tables(event_source: str, brain_area: str) -> dict[str, pd.DataFrame]:
     """Load event / event_arm / stop tables for an event source."""
-    sub, stem = _SOURCES[event_source]
+    d, stem = _SOURCES[event_source]
     effective_area = _effective_brain_area(event_source, brain_area)
     if stem is None:
         suffix = ""  # non-local replay content is HPC clusterless only
@@ -182,7 +181,6 @@ def _load_tables(event_source: str, brain_area: str) -> dict[str, pd.DataFrame]:
             )
     else:
         suffix = f"_{stem}_{effective_area}"
-    d = PROCESSED_DATA_DIR / sub
     tables = {}
     for short, base in [
         ("event_table", "event_table"),
