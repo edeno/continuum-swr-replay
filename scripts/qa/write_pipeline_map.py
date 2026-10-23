@@ -38,6 +38,7 @@ ROOTS: tuple[str, ...] = (
     "scripts/content",
     "scripts/rate",
     "scripts/qa",
+    "scripts/pfc",
 )
 
 # Pipeline stages, in flow order. Each module is assigned to the first stage
@@ -149,6 +150,7 @@ STAGES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "*/analysis/hippocampus/state_evidence/*.py",
             "scripts/detection/*.py",
             "scripts/qa/*.py",
+            "scripts/pfc/*.py",
         ),
     ),
 )
@@ -163,7 +165,8 @@ _UNASSIGNED_BLURB = (
 # Packages under a mapped root that carry no data from a decoded session to a
 # fitted regression: the replay-detection comparison lives beside the
 # pipeline, not on it; the decode's own settings act before a session is
-# decoded.
+# decoded. ``scripts/pfc`` is mapped for its audit scripts (which lived in
+# ``scripts/qa`` until the 2026-10 move); its batch runner was never mapped.
 EXCLUDED_PREFIXES: tuple[str, ...] = (
     "src/continuum_swr_replay/decoding/config.py",
     "src/continuum_swr_replay/decoding/transitions.py",
@@ -173,6 +176,7 @@ EXCLUDED_PREFIXES: tuple[str, ...] = (
     "scripts/detection/run_memoryless_detection.py",
     "scripts/detection/run_swr_detection.py",
     "scripts/detection/sweep_memoryless_detection.py",
+    "scripts/pfc/run_pfc_analysis_bandit.py",
 )
 
 

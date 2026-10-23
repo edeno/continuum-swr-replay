@@ -748,6 +748,36 @@ Does each detector's content reproduce in cells it never saw?
 
 `folds`, `fold_models`, `trials`, `event_truth`, `matches_injection`, `permutations_for`, `score_events`, `run_fold`, `run_no_replay_fold`, `summarize`, `main`
 
+### `scripts/pfc/check_pfc_ridge_lambda0.py`
+
+Check that the penalised solver reproduces maximum likelihood at lambda = 0.
+
+`audited_basis`, `audited_designs`, `rebuild_session`, `compare_session`, `build_report`, `main`
+
+### `scripts/pfc/compare_pfc_cohorts.py`
+
+Write the before/after audit of the mPFC unit-GLM stop cohort.
+
+`read_sidecars`, `runner_code`, `provenance_table`, `bundle_sessions`, `session_cohort_table`, `coverage_summary`, `alignment_prose`, `gate_counts`, `significance_table`, `population_comparison`, `try_read_sidecars`, `same_events_precondition`, `event_count_agreement`, `shared_statistic_differences`, `matched_control_arrays`, `matched_control_significance`, `fitter_table`, `session_fit_counts_table`, `worker_time_table`, `curve_peaks`, `peak_shrinkage`, `shrinkage_table`, `implied_prior_per_lag`, `empirical_bayes_sigma`, `heldout_fraction_table`, `restrict_to_sessions`, `legacy_fdr_table`, `separated_column_table`, `engagement_overlap_table`, `null_window_table`, `fold_spread_table`, `sigma_sensitivity_table`, `estimator_provenance_table`, `rerun_sections`, `build_report`, `geometry_section`, `build_estimator_report`, `main`
+
+### `scripts/pfc/compare_pfc_fitters.py`
+
+Write the equivalence audit of the batched JAX fitter against statsmodels.
+
+`bundle_stems`, `load_bundle`, `compare_statistics`, `compare_modulations`, `compare_diagnostics`, `parse_time_file`, `build_report`, `main`
+
+### `scripts/pfc/diagnose_pfc_event_definition.py`
+
+Compare the PFC path's old, run-time event definition against the canonical one.
+
+`build_old_event_sets`, `total_overlap_seconds`, `match_by_overlap`, `build_comparison`, `get_command_line_arguments`, `main`
+
+### `scripts/pfc/measure_pfc_null_geometry.py`
+
+What the mPFC held-out null's windows look like, beside the real events.
+
+`bundle_paths`, `session_of`, `read_sidecar`, `spacing_summary`, `draw_spacing_summary`, `session_window_sets`, `spacing_section`, `overlap_section`, `non_positive_section`, `excluded_section`, `main`
+
 ### `scripts/qa/_report.py`
 
 Report helpers shared by the QA and PFC audit scripts: the run's command line, markdown tables.
