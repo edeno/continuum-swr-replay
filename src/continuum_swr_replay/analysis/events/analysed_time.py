@@ -95,7 +95,7 @@ from continuum_swr_replay.analysis.events.immobility import (
 from continuum_swr_replay.analysis.events.swr_source import (
     SWR_LABEL_COLUMN,
     SwrSourceError,
-    swr_epoch_id,
+    swr_epoch_id_of_session,
 )
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.intervals import as_frame, interval_mask
@@ -408,7 +408,7 @@ def _frame_epoch(
             validate_whole_event_immobility_contract(dot, column)
     animal, day, epoch = sessions.iloc[0]
     time = dot.index.to_numpy()
-    return swr_epoch_id(f"{animal}{day}_.nwb", str(epoch)), np.asarray(time, float)
+    return swr_epoch_id_of_session(animal, day, epoch), np.asarray(time, float)
 
 
 def _drops(
@@ -760,7 +760,7 @@ def excluded_intervals_of(frame: pd.DataFrame) -> pd.DataFrame:
             f"excluded_intervals_of reads one epoch at a time, not {len(sessions)}"
         )
     animal, day, epoch = sessions[0]
-    return excluded_intervals(swr_epoch_id(f"{animal}{day}_.nwb", str(epoch)))
+    return excluded_intervals(swr_epoch_id_of_session(animal, day, epoch))
 
 
 def excluded_intervals_by_session(sessions: pd.DataFrame) -> pd.DataFrame:
@@ -785,7 +785,7 @@ def excluded_intervals_by_session(sessions: pd.DataFrame) -> pd.DataFrame:
     """
     keys = sessions[list(SESSION_COLUMNS)].drop_duplicates()
     parts = [
-        excluded_intervals(swr_epoch_id(f"{animal}{day}_.nwb", str(epoch))).assign(
+        excluded_intervals(swr_epoch_id_of_session(animal, day, epoch)).assign(
             animal=animal, session_date=day, epoch=epoch
         )
         for animal, day, epoch in keys.itertuples(index=False)

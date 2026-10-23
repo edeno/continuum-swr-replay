@@ -91,6 +91,7 @@ __all__ = [
     "read_swr_inventory",
     "ripple_power_inputs",
     "swr_epoch_id",
+    "swr_epoch_id_of_session",
     "swr_events",
     "swr_inventory_dir",
     "swr_inventory_paths",
@@ -260,6 +261,15 @@ def inventory_manifest() -> dict[str, Any]:
             f"{directory.name!r}"
         )
     return manifest
+
+
+def swr_epoch_id_of_session(animal: str, day: object, epoch: object) -> str:
+    """:func:`swr_epoch_id` of a table's session key (animal, session date, epoch).
+
+    ``swr_epoch_id_of_session("chimi", 20200225, "02_r1")`` is
+    ``"chimi20200225_02_r1_HPC"``.
+    """
+    return swr_epoch_id(f"{animal}{day}_.nwb", str(epoch))
 
 
 def swr_source_files(epoch_id: str) -> dict[str, dict[str, str]]:

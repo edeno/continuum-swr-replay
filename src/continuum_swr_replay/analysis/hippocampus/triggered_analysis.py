@@ -11,7 +11,7 @@ import xarray as xr
 
 from continuum_swr_replay.analysis.constants import DEFAULT_SAMPLING_FREQUENCY_HZ
 from continuum_swr_replay.analysis.events.analysed_time import excluded_intervals
-from continuum_swr_replay.analysis.events.swr_source import swr_epoch_id
+from continuum_swr_replay.analysis.events.swr_source import swr_epoch_id_of_session
 from continuum_swr_replay.intervals import overlaps_intervals
 
 logger = logging.getLogger(__name__)
@@ -135,7 +135,7 @@ def get_signal_windows(
             logger.debug(f"No events found for {animal}/{day}/{epoch}, skipping")
             continue
 
-        excluded = excluded_intervals(swr_epoch_id(f"{animal}{day}_.nwb", str(epoch)))
+        excluded = excluded_intervals(swr_epoch_id_of_session(animal, day, epoch))
         if len(excluded):
             centers = session_events[time_col].to_numpy(dtype=float)
             touches = overlaps_intervals(

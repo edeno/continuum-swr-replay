@@ -159,7 +159,7 @@ def _epoch(dot: pd.DataFrame) -> _Epoch:
         session=SessionIdentity(
             animal=str(animal), day=int(day), epoch=str(epoch), brain_area=BRAIN_AREA
         ),
-        epoch_id=swr_source.swr_epoch_id(f"{animal}{day}_.nwb", str(epoch)),
+        epoch_id=swr_source.swr_epoch_id_of_session(animal, day, epoch),
         time=time,
         speed=dot["head_speed"].to_numpy(dtype=np.float64),
         bounds=(float(time[0]), float(time[-1])),

@@ -140,6 +140,7 @@ from continuum_swr_replay.analysis.events.analysed_time import (
 from continuum_swr_replay.analysis.events.swr_source import (
     artifact_intervals,
     swr_epoch_id,
+    swr_epoch_id_of_session,
     swr_source_files,
     swr_source_name,
 )
@@ -419,7 +420,7 @@ def run_one(
     speed = data_over_time["head_speed"].to_numpy(dtype=np.float64)
     midpoint_s = window_midpoints_s(time[:-1], config)
     # where the source's detector read a gap-free stored band
-    swr_epoch = swr_epoch_id(f"{identity.animal}{identity.day}_.nwb", identity.epoch)
+    swr_epoch = swr_epoch_id_of_session(identity.animal, identity.day, identity.epoch)
     swr_observed = swr_observed_stretches(swr_epoch)
     swr_files = swr_source_files(swr_epoch)
     # the one artifact mask, on the decode grid, as the decoders' is_missing
