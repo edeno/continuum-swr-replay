@@ -497,8 +497,9 @@ def run_epoch_task(
     """One dask task: ``run_epoch(nwb_file_name, epoch_name, **run_epoch_kwargs)``,
     logged to ``log_directory / "{epoch id}_{tag}.log"`` (:func:`run_epoch_logged`).
 
-    A runner binds everything after ``*`` with ``functools.partial`` (picklable
-    for dask) and hands the result to :func:`run_epochs`, whose entries are
+    A runner calls it from a module-level ``_run_epoch_logged`` that passes its
+    own ``run_epoch``, looked up at call time so a test can patch it, and hands
+    that function to :func:`run_epochs`, whose entries are
     ``(nwb_file_name, epoch_name, run_epoch_kwargs, log_directory)``.
 
     Parameters

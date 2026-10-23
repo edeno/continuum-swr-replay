@@ -213,11 +213,15 @@ def test_publish_swr_table_refuses_an_swr_table_from_another_source(tmp_path, st
     assert not (tmp_path / "stop_table.parquet").exists()
 
 
-def test_publish_canonical_refuses_an_swr_table_without_a_source_stamp(tmp_path):
+@pytest.mark.parametrize("stamp", ["missing", None])
+def test_publish_canonical_refuses_an_swr_table_without_a_source_stamp(tmp_path, stamp):
     """The foundation door alone still refuses an SWR table that names no
-    SWR source, pointing at publish_swr_table; nothing is written."""
+    SWR source (no stamp, or a None one), pointing at publish_swr_table;
+    nothing is written."""
     frame = _valid_stop_frame()
     frame.attrs.pop("swr_source")
+    if stamp != "missing":
+        frame.attrs["swr_source"] = stamp
     with pytest.raises(TypeError, match="publish_swr_table"):
         publish_canonical(frame, tmp_path, table="stop", basename="stop_table")
     assert not (tmp_path / "stop_table.parquet").exists()

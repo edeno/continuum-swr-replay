@@ -154,14 +154,15 @@ def hpc_ripple_power_inputs(nwb_file_name: str, epoch_name: str) -> dict[str, An
     the tetrodes rule R-T kept for the configured inventory, z-scored with the
     artifact mask left out and NaN inside it.
 
-    Called after :func:`hpc_artifact_intervals`, which checks the source's runs
-    (``require_hpc_decode_sources``) once for the decode.
-
     Raises
     ------
+    ValueError
+        If the source's runs are not set or do not match
+        (``require_hpc_decode_sources``).
     SwrSourceError
         If the inventory or the artifact run cannot serve the epoch.
     """
+    require_hpc_decode_sources()
     return swr_source.ripple_power_inputs(
         swr_source.swr_epoch_id(nwb_file_name, epoch_name)
     )
@@ -205,8 +206,7 @@ def hpc_decode_masks(
     position_info : pd.DataFrame
         The decode's position, indexed by time in seconds: the decode grid.
     artifact_mask : pd.DataFrame
-        ``hpc_artifact_intervals``' table for the epoch; that call checked the
-        source's runs (``require_hpc_decode_sources``) for the decode.
+        ``hpc_artifact_intervals``' table for the epoch.
     training_type : str or TrainingType
         ``"no_ripple"`` or ``"all"``.
 
@@ -220,10 +220,12 @@ def hpc_decode_masks(
     Raises
     ------
     ValueError
-        If `training_type` is not one of the two.
+        If the source's runs are not set or do not match
+        (``require_hpc_decode_sources``), or `training_type` is not one of the two.
     SwrSourceError
         If the inventory cannot serve the epoch.
     """
+    require_hpc_decode_sources()
     training_type = TrainingType(training_type)
     epoch_id = swr_source.swr_epoch_id(nwb_file_name, epoch_name)
     time = position_info.index.to_numpy(dtype=np.float64)

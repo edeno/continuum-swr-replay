@@ -274,16 +274,31 @@ Three tiers:
    |---|---|---|
    | `models_per_bin_rate/` | `scripts/rate/fit_per_bin_rate_models.py`, `fit_swr_contrast_rate.py`, `fit_uncertainty_rate.py`, `fit_cross_history_rate.py` | the per-bin rate fits: `all_models.pkl` (Family-B ladder), `swr_contrast_rate.pkl`, `uncertainty_rate.pkl`, `cross_history_models.pkl`; plus three exploratory one-offs nothing supported reads (`contingency_table.pkl`, `contingency_csv_alpha.json`, `covariate_ranking.pkl`) |
    | `models_per_event_swr_power/` | `scripts/rate/fit_swr_power_model.py` | the per-event ripple-power model `swr_power_model.pkl`, its `.z_reference_by_session.json` and its two audits |
-
-   Since 2026-10-23 `qvals_table` and its reference sit at the root and the power model in
-   its own folder; symlinks at the old `models_per_bin_rate/` paths serve older worktrees
-   until cleanup, and the hazard and its check are in the "Phase D disk move" entry of
-   [the code-organization plan](../.claude/docs/plans/code-organization/PLAN.md).
    | `models_per_stop_rate/` | `scripts/rate/fit_per_stop_rate_models.py` | Family-A per-stop ladder |
    | `models/`, `models_patch/` | `scripts/content/fit_replay_content_models.py` (arm / patch) | the default content ladders — arm `M0`, `M0a`, `M1`–`M6`; patch `P0`–`P3` — on the at-well events, plus the opt-in value/uncertainty rungs (`Mv`, `Mu`, `Mvu`, `Pv`) when named with `--models`; also holds `swr_contrast_content_{arm,patch}.pkl` |
    | `models_swr_{T,F}/`, `models_patch_swr_{T,F}/` | same, `--swr-subset T\|F` | content split by SWR (T) / non-SWR (F) |
    | `models_dm/` | same, `--estimator dirichlet_multinomial` | the M0–M6 arm ladder refit as a Dirichlet-multinomial (count response + fitted within-event concentration); the matching contrast bundles `swr_contrast_content_{arm,patch,audited}_dm{,_rewarded,_omitted,_len}.pkl` sit in `models/` beside their conditional twins |
    | `content_estimator_comparison/` | `scripts/content/compare_content_estimators.py` | the three-estimator comparison on one shared cohort — `content_estimator_comparison.parquet`, `_summary.csv`, `content_estimator_bootstrap.csv`, `_skips.csv`. Read with [design/content_estimator_comparison.md](design/content_estimator_comparison.md) |
+
+   Since 2026-10-23 `qvals_table` and its reference sit at the root and the power model in
+   its own folder; symlinks at the old `models_per_bin_rate/` paths serve older worktrees
+   until cleanup, and the hazard and its check are in the "Phase D disk move" entry of
+   [the code-organization plan](../.claude/docs/plans/code-organization/PLAN.md).
+
+   The tables are built from the upstream runs below. Each location is a
+   `continuum_swr_replay.paths` constant (or `parameters.PROCESSED_DATA_DIR`); a run
+   folder's `manifest.json` names its inputs and settings.
+
+   | location | constant | producer | holds |
+   |---|---|---|---|
+   | `Processed-Data/` (root) | `parameters.PROCESSED_DATA_DIR` | `scripts/decoding/run_decoding_bandit.py`, `run_decoding_contfrag.py` | the per-epoch decodes: `*_results.nc`, `*_detector.pkl`, `*_environment.pkl`, `*_data_over_time.pkl` (file names: `decoding/files.py:decode_paths`) |
+   | `artifact_intervals/<run_id>/` | `ARTIFACT_INTERVALS_DIR` | `scripts/detection/run_artifact_detection.py` | the artifact intervals each epoch's excluded time is built from |
+   | `replay_detection_comparison/swr/<run_id>/` | `SWR_INVENTORY_ROOT` | `scripts/detection/run_swr_detection.py` | the SWR inventories (Kay and the other detectors) |
+   | `replay_detection_comparison/memoryless/<run_id>/` | `MEMORYLESS_ROOT` | `scripts/detection/run_memoryless_detection.py` | the memoryless sequence detector's events |
+   | `replay_detection_comparison/carey/<run_id>/` | `CAREY_ROOT` | `scripts/detection/run_carey_detection.py` | the Carey detector's events |
+   | `replay_detection_comparison/inventory/<run_id>/` | `INVENTORY_COMPARISON_ROOT` | `scripts/detection/run_inventory_comparison.py` | the detectors' inventories compared |
+   | `replay_detection_comparison/event_features/<run_id>/` | `EVENT_FEATURES_ROOT` | `scripts/detection/run_event_features.py` | per-event features for the comparison |
+   | `contfrag_replay_content/` | `CONTFRAG_REPLAY_CONTENT_DIR` | `scripts/tables/prepare_contfrag_replay_content_data.py` | the replay-content tables built from the Continuous-Fragmented decodes |
 
    Both rate families are fit on the **well-anchored stop cohort** — the same
    population the content family is fit on at the event grain — and an

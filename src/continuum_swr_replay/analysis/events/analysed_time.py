@@ -143,10 +143,6 @@ False with no artifact run. A reader that summarises bins leaves these rows out.
 It is not ``swr_observed``, which is also False at gaps in the stored band."""
 
 
-"""The ``attrs`` key (kept in a parquet table's metadata) that names the SWR
-source a frame or table was built from: :func:`swr_source_name`."""
-
-
 DECODE_SWR_COUNT_COLUMNS = (
     "n_SWR",
     "n_non_local_SWR",
@@ -201,8 +197,8 @@ def stamp_swr_source(frame: pd.DataFrame) -> pd.DataFrame:
     """Stamp `frame` (in place, and return it) as built from this source.
 
     Only a producer that built the frame from decode frames read through this
-    source stamps it; ``publish_canonical`` refuses a table of
-    ``tables.io.SWR_SOURCE_TABLES`` without the current stamp.
+    source stamps it; :func:`publish_swr_table` and the table readers refuse a
+    table of ``tables.io.SWR_SOURCE_TABLES`` without the current stamp.
     """
     frame.attrs[SWR_SOURCE_ATTR] = swr_source.swr_source_name()
     return frame
