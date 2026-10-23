@@ -101,6 +101,7 @@ tests/                     # pytest suite — see tests/README.md
 
 > Documentation homes are indexed in [docs/README.md](docs/README.md): published/scientific
 > docs live in `docs/` (incl. design specs in `docs/design/`); agent-process/scratch under `.claude/`.
+> The import layering rules and the 2026-10 old→new module map are in [docs/README.md](docs/README.md) ("Code layout").
 > **All model ladders (rate, content, is_swr-contrast) are defined in one place —
 > `src/continuum_swr_replay/analysis/replay/model_specs.py`** (the single source of truth;
 > `docs/models_table.md` mirrors it, its rung sets enforced by
