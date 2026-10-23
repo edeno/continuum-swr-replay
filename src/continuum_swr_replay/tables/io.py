@@ -43,6 +43,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from continuum_swr_replay.paths import CANONICAL_TABLES
 from continuum_swr_replay.tables.covariate_registry import (
     COVARIATE_SCHEMA_VERSION,
     stamp_covariate_schema,
@@ -64,17 +65,7 @@ __all__ = [
 
 _ATTRS_KEY = b"continuum_swr_replay.attrs"
 
-SWR_SOURCE_TABLES = frozenset(
-    {
-        "event",
-        "event_arm",
-        "event_patch",
-        "event_sequence",
-        "stop",
-        "event_onset",
-        "stop_timebin",
-    }
-)
+SWR_SOURCE_TABLES = frozenset(CANONICAL_TABLES) - {"qvals"}
 """The canonical tables (covariate-schema keys) built from decode frames read
 through the SWR source (``analysed_time``); ``publish_canonical`` refuses one
 without the source's current stamp. qvals, built from behavior alone, is the

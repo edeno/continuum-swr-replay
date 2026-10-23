@@ -5,9 +5,10 @@ One place spells where the pipeline's outputs live, so moving an output
 through every reader and writer. Every constant is a path under
 :data:`~continuum_swr_replay.parameters.PROCESSED_DATA_DIR`.
 
-The canonical tables are named by :data:`CANONICAL_TABLE_BASENAMES`;
-:func:`table_path` turns a name and a root into the file, and refuses a name
-outside the registry.
+The canonical tables are named once, by :data:`CANONICAL_TABLES`; their
+basenames (:data:`CANONICAL_TABLE_BASENAMES`), ``tables.io.SWR_SOURCE_TABLES``
+and the covariate registry's row keys follow from it. :func:`table_path` turns
+a name and a root into the file, and refuses a name outside the registry.
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 __all__ = [
     "ARTIFACT_INTERVALS_DIR",
     "BASENAME_TO_TABLE",
+    "CANONICAL_TABLES",
     "CANONICAL_TABLE_BASENAMES",
     "CONTFRAG_REPLAY_CONTENT_DIR",
     "DETECTION_COMPARISON_DIR",
@@ -87,17 +89,25 @@ def model_dir(key: str, root: Path = REPLAY_CONTENT_DIR) -> Path:
     return root / MODEL_SUBDIRS[key]
 
 
-# On-disk table basename -> the registry table key that owns its row key.
+CANONICAL_TABLES: tuple[str, ...] = (
+    "event",
+    "event_arm",
+    "event_patch",
+    "event_sequence",
+    "stop",
+    "qvals",
+    "event_onset",
+    "stop_timebin",
+)
+"""The canonical tables, by covariate-registry key, in the order every
+freeze, manifest and parity sweep iterates them. The one list: the registry's
+row keys (``tables.covariate_registry``) must name the same tables."""
+
 BASENAME_TO_TABLE: dict[str, str] = {
-    "event_table": "event",
-    "event_arm_table": "event_arm",
-    "event_patch_table": "event_patch",
-    "event_sequence_table": "event_sequence",
-    "stop_table": "stop",
-    "qvals_table": "qvals",
-    "event_onset_table": "event_onset",
-    "stop_timebin_table": "stop_timebin",
+    f"{table}_table": table for table in CANONICAL_TABLES
 }
+"""On-disk table basename -> the registry table key that owns its row key."""
+
 CANONICAL_TABLE_BASENAMES: tuple[str, ...] = tuple(BASENAME_TO_TABLE)
 
 

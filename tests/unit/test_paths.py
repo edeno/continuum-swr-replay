@@ -81,6 +81,22 @@ def test_registry_is_the_one_parity_reads():
     )
 
 
+def test_the_one_table_list_names_the_registry_row_keys_and_swr_tables():
+    from continuum_swr_replay.tables import covariate_registry
+    from continuum_swr_replay.tables.io import SWR_SOURCE_TABLES
+
+    assert set(covariate_registry._ROW_KEYS) == set(paths.CANONICAL_TABLES)
+    assert SWR_SOURCE_TABLES == {
+        "event",
+        "event_arm",
+        "event_patch",
+        "event_sequence",
+        "stop",
+        "event_onset",
+        "stop_timebin",
+    }
+
+
 @pytest.mark.parametrize("name", paths.CANONICAL_TABLE_BASENAMES)
 @pytest.mark.parametrize("fmt", ["parquet", "pkl", ""])
 def test_table_path_for_every_registry_name(name, fmt):
