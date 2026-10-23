@@ -11,10 +11,10 @@ A regression here would re-introduce the hang that
 ``timeout 8 uv run python -c "from continuum_swr_replay.analysis.replay.fitting import fit_conditional_poisson"``
 used to hit on no-VPN machines.
 
-All listed imports run in a single subprocess (rather than one per
-import) because subprocess startup dominates the actual work —
-~13 s across 13 separate tests vs ~2 s for one combined run.
-Sequential ordering matters: once ``spyglass.*`` lands in
+Each heavy-import check runs all of its imports in a single subprocess
+(rather than one per import) because subprocess startup dominates the
+actual work — ~13 s across 13 separate tests vs ~2 s for one combined run.
+Sequential ordering matters: once a forbidden module lands in
 ``sys.modules`` it stays, so the first leak surfaces immediately
 with the offending import statement.
 """
@@ -30,14 +30,56 @@ from pathlib import Path
 import pytest
 
 from tests.unit._imports import (
+    FOUNDATION,
     SRC,
     defined_names,
     lazy_exports,
     module_edges,
     module_index,
+    package_of,
     parse,
     relative_name,
 )
+
+_LEAK_CHECK = textwrap.dedent(
+    """
+    import sys
+    for statements, forbidden in {steps!r}:
+        for stmt in statements:
+            exec(stmt, {{}})
+            leaked = sorted(
+                m for m in sys.modules
+                if any(m == f or m.startswith(f + ".") for f in forbidden)
+            )
+            if leaked:
+                print(f"LEAKED after {{stmt!r}}: {{','.join(leaked[:10])}}")
+                sys.exit(1)
+    print("OK")
+    """
+)
+
+
+def _assert_imports_avoid(*steps: tuple[list[str], tuple[str, ...]]) -> None:
+    """Run each ``(import statements, forbidden modules)`` step, in order, in
+    one fresh interpreter; fail on the first statement after which a forbidden
+    module (or a submodule of one) is in ``sys.modules``."""
+    result = subprocess.run(
+        [sys.executable, "-c", _LEAK_CHECK.format(steps=list(steps))],
+        capture_output=True,
+        text=True,
+        # Guards against a hang, not against slowness. The import chain cost
+        # ~46 s on this machine when the replay package __init__ was eager,
+        # dominated by non_local_detector (~22 s) and statsmodels.api (~8 s),
+        # measured with `python -X importtime`; the fitting and pfc.session leaves
+        # still pull both in. The
+        # old 30 s budget failed whenever the filesystem cache was cold, which
+        # reads as a broken lazy-import contract when the contract is fine
+        # (the subprocess exits 0 and prints OK).
+        timeout=180,
+    )
+    assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
+    assert "OK" in result.stdout
+
 
 # Every import statement here must complete in a fresh interpreter
 # without dragging ``spyglass.*`` into ``sys.modules``. Comments after
@@ -77,44 +119,8 @@ _LAZY_IMPORTS: list[str] = [
 
 
 def test_no_lazy_import_loads_spyglass():
-    """Run every contracted lazy import in one fresh interpreter; fail
-    on the first one that puts ``spyglass.*`` into ``sys.modules``."""
-    code = textwrap.dedent(
-        """
-        import sys
-        imports = {imports!r}
-        for stmt in imports:
-            exec(stmt, {{}})
-            leaked = sorted(
-                m for m in sys.modules
-                if m == "spyglass" or m.startswith("spyglass.")
-            )
-            if leaked:
-                print(f"LEAKED after {{stmt!r}}: {{','.join(leaked)}}")
-                sys.exit(1)
-        print("OK")
-        """
-    ).format(imports=_LAZY_IMPORTS)
-
-    result = subprocess.run(
-        [sys.executable, "-c", code],
-        capture_output=True,
-        text=True,
-        # Guards against a hang, not against slowness. The import chain cost
-        # ~46 s on this machine when the replay package __init__ was eager,
-        # dominated by non_local_detector (~22 s) and statsmodels.api (~8 s),
-        # measured with `python -X importtime`; the fitting and pfc.session leaves
-        # still pull both in. The
-        # old 30 s budget failed whenever the filesystem cache was cold, which
-        # reads as a broken lazy-import contract when the contract is fine
-        # (the subprocess exits 0 and prints OK).
-        timeout=180,
-    )
-    assert result.returncode == 0, (
-        f"lazy-import contract broken.\n"
-        f"stdout: {result.stdout}\nstderr: {result.stderr}"
-    )
-    assert "OK" in result.stdout
+    """No contracted lazy import puts ``spyglass.*`` into ``sys.modules``."""
+    _assert_imports_avoid((_LAZY_IMPORTS, ("spyglass",)))
 
 
 # Readers of a decode folder that do not load the decode runners' scheduler.
@@ -137,175 +143,90 @@ _NO_SCHEDULER_IMPORTS: list[str] = [
 
 
 def test_decode_file_readers_do_not_load_the_dask_scheduler():
-    """Run each reader import in one fresh interpreter; fail on the first one
-    that puts ``dask.distributed`` or ``dask_cuda`` into ``sys.modules``."""
-    code = textwrap.dedent(
-        """
-        import sys
-        imports = {imports!r}
-        for stmt in imports:
-            exec(stmt, {{}})
-            leaked = sorted(
-                m for m in sys.modules
-                if m in ("dask.distributed", "dask_cuda")
-                or m.startswith("dask_cuda.")
-            )
-            if leaked:
-                print(f"LEAKED after {{stmt!r}}: {{','.join(leaked)}}")
-                sys.exit(1)
-        print("OK")
-        """
-    ).format(imports=_NO_SCHEDULER_IMPORTS)
+    """No decode-file reader puts ``dask.distributed`` or ``dask_cuda`` into
+    ``sys.modules``."""
+    _assert_imports_avoid((_NO_SCHEDULER_IMPORTS, ("dask.distributed", "dask_cuda")))
 
-    result = subprocess.run(
-        [sys.executable, "-c", code],
-        capture_output=True,
-        text=True,
-        timeout=180,  # a hang guard, as above
-    )
-    assert result.returncode == 0, (
-        f"a decode-file reader loads the dask scheduler.\n"
-        f"stdout: {result.stdout}\nstderr: {result.stderr}"
-    )
-    assert "OK" in result.stdout
 
+#: Every foundation module, relative to the package root.
+_FOUNDATION_MODULES = sorted(
+    m for m in module_index(SRC) if package_of(m) in FOUNDATION
+)
+
+#: Foundation modules the JAX-free check does not import, and why.
+NOT_JAX_FREE = {
+    "decoding.transitions": "imports non_local_detector",
+    "data_loaders.bandit_task": (
+        "imports spyglass.common, which connects to DataJoint at import"
+    ),
+}
 
 # Leaf modules other packages import for a row key, a cohort rule, a column
-# registry or a model ladder. Each one is free of JAX, ``non_local_detector``
-# and ``statsmodels`` now that the replay and PFC package ``__init__``s are
-# lazy; before, every one of them cost ~4.5 s and loaded all three (the
+# registry or a model ladder, and every foundation module but those in
+# ``NOT_JAX_FREE``. Each one is free of JAX, ``non_local_detector`` and
+# ``statsmodels`` now that the replay and PFC package ``__init__``s are lazy;
+# before, every analysis leaf cost ~4.5 s and loaded all three (the
 # code-organization review, F1). The two package roots are listed first: a
 # re-export made eager again would load the heavy chain for every leaf.
 JAX_FREE: list[str] = [
     "continuum_swr_replay.analysis.replay",
     "continuum_swr_replay.analysis.pfc",
-    "continuum_swr_replay.tables",
-    "continuum_swr_replay.tables.io",
-    "continuum_swr_replay.tables.parity",
-    "continuum_swr_replay.tables.session_keys",
-    "continuum_swr_replay.tables.covariate_registry",
-    "continuum_swr_replay.tables.versions",
-    "continuum_swr_replay.tables.event_ids",
-    "continuum_swr_replay.tables.standardization",
     "continuum_swr_replay.analysis.events.cohort_selection",
     "continuum_swr_replay.analysis.replay.design_constants",
     "continuum_swr_replay.analysis.pfc.cohort",
     "continuum_swr_replay.analysis.replay.model_specs",
-    "continuum_swr_replay.intervals",
-    "continuum_swr_replay.paths",
-    "continuum_swr_replay.runs",
-    "continuum_swr_replay.runs.io",
-    "continuum_swr_replay.runs.cli",
-    "continuum_swr_replay.runs.provenance",
-    "continuum_swr_replay.runs.batch",
-    # ``decoding.transitions`` is not here: it imports ``non_local_detector``.
-    "continuum_swr_replay.decoding",
-    "continuum_swr_replay.decoding.files",
-    "continuum_swr_replay.decoding.config",
-    "continuum_swr_replay.decoding.results",
+    *(
+        f"continuum_swr_replay.{m}"
+        for m in _FOUNDATION_MODULES
+        if m not in NOT_JAX_FREE
+    ),
 ]
 
-_HEAVY_MODULES = ("jax", "non_local_detector", "statsmodels")
+
+def test_not_jax_free_names_foundation_modules():
+    assert set(NOT_JAX_FREE) <= set(_FOUNDATION_MODULES)
+    assert "continuum_swr_replay.tables.io" in JAX_FREE
 
 
 def test_leaf_modules_do_not_load_jax():
-    """Import every ``JAX_FREE`` module in one fresh interpreter; fail on the
-    first one that puts JAX, ``non_local_detector`` or ``statsmodels`` into
-    ``sys.modules``."""
-    code = textwrap.dedent(
-        """
-        import importlib
-        import sys
-        heavy = {heavy!r}
-        for module in {modules!r}:
-            importlib.import_module(module)
-            leaked = sorted(
-                m for m in sys.modules
-                if any(m == h or m.startswith(h + ".") for h in heavy)
-            )
-            if leaked:
-                print(f"LEAKED after importing {{module}}: {{','.join(leaked[:10])}}")
-                sys.exit(1)
-        print("OK")
-        """
-    ).format(heavy=_HEAVY_MODULES, modules=JAX_FREE)
-
-    result = subprocess.run(
-        [sys.executable, "-c", code],
-        capture_output=True,
-        text=True,
-        timeout=180,  # a hang guard, as above
+    """No ``JAX_FREE`` module puts JAX, ``non_local_detector`` or
+    ``statsmodels`` into ``sys.modules``."""
+    _assert_imports_avoid(
+        (
+            [f"import {m}" for m in JAX_FREE],
+            ("jax", "non_local_detector", "statsmodels"),
+        )
     )
-    assert result.returncode == 0, (
-        f"a JAX-free leaf module loads a heavy dependency.\n"
-        f"stdout: {result.stdout}\nstderr: {result.stderr}"
-    )
-    assert "OK" in result.stdout
 
 
-def test_intervals_imports_only_numpy_and_pandas():
+def test_intervals_and_runs_load_no_dask():
     """The foundation interval module loads no dask (phase-A review M12), no
-    JAX chain, and no other module of this package."""
-    code = textwrap.dedent(
-        """
-        import sys
-        import continuum_swr_replay.intervals
-        heavy = ("dask", "jax", "non_local_detector", "statsmodels", "spyglass")
-        leaked = sorted(
-            m for m in sys.modules
-            if any(m == h or m.startswith(h + ".") for h in heavy)
-        )
-        ours = sorted(
-            m for m in sys.modules
-            if m.startswith("continuum_swr_replay")
-            and m not in ("continuum_swr_replay", "continuum_swr_replay.intervals")
-        )
-        print("LEAKED" if leaked or ours else "OK", leaked[:10], ours[:10])
-        """
-    )
-    result = subprocess.run(
-        [sys.executable, "-c", code],
-        capture_output=True,
-        text=True,
-        timeout=180,  # a hang guard, as above
-    )
-    assert result.returncode == 0, result.stderr
-    assert result.stdout.startswith("OK"), result.stdout
+    JAX chain, no Spyglass and no other module of this package. Then the run
+    infrastructure loads no dask at import either (``batch`` imports it inside
+    the functions that start a cluster), no JAX chain and no Spyglass.
 
-
-def test_runs_loads_no_dask_and_no_analysis():
-    """The foundation run infrastructure loads no dask at import (``batch``
-    imports it inside the functions that start a cluster), no JAX chain, no
-    Spyglass, and no ``analysis`` module."""
-    code = textwrap.dedent(
-        """
-        import sys
-        import continuum_swr_replay.runs
-        import continuum_swr_replay.runs.batch
-        import continuum_swr_replay.runs.cli
-        import continuum_swr_replay.runs.io
-        import continuum_swr_replay.runs.provenance
-        heavy = ("dask", "distributed", "dask_cuda", "jax", "non_local_detector",
-                 "statsmodels", "spyglass")
-        leaked = sorted(
-            m for m in sys.modules
-            if any(m == h or m.startswith(h + ".") for h in heavy)
+    One interpreter checks both; ``intervals`` goes first, so the package
+    modules ``runs`` loads cannot hide behind it.
+    """
+    heavy = ("dask", "distributed", "dask_cuda", "jax", "non_local_detector")
+    heavy += ("statsmodels", "spyglass")
+    other_packages = tuple(
+        f"continuum_swr_replay.{top}"
+        for top in sorted(
+            {m.split(".")[0] for m in module_index(SRC)} - {"", "intervals"}
         )
-        analysis = sorted(
-            m for m in sys.modules
-            if m.startswith("continuum_swr_replay.analysis")
-        )
-        print("LEAKED" if leaked or analysis else "OK", leaked[:10], analysis[:10])
-        """
     )
-    result = subprocess.run(
-        [sys.executable, "-c", code],
-        capture_output=True,
-        text=True,
-        timeout=180,  # a hang guard, as above
+    _assert_imports_avoid(
+        (["import continuum_swr_replay.intervals"], heavy + other_packages),
+        (
+            [
+                f"import continuum_swr_replay.{m}"
+                for m in _FOUNDATION_MODULES
+                if package_of(m) == "runs"
+            ],
+            heavy,
+        ),
     )
-    assert result.returncode == 0, result.stderr
-    assert result.stdout.startswith("OK"), result.stdout
 
 
 @pytest.mark.parametrize(

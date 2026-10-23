@@ -16,6 +16,36 @@ REPO = Path(__file__).resolve().parents[2]
 SRC = REPO / "src" / "continuum_swr_replay"
 assert SRC.is_dir(), f"package root not found at {SRC}; the scan would be vacuous"
 
+#: Package nodes (see :func:`package_of`) that form the foundation layer: within
+#: the package they import only each other, and they import nothing from
+#: ``scripts`` (``test_import_layering``).
+FOUNDATION = frozenset(
+    {
+        "data_loaders",
+        "decoding",
+        "intervals",
+        "parameters",
+        "paths",
+        "runs",
+        "data_types",
+        "tables",
+    }
+)
+
+
+def package_of(module: str) -> str:
+    """The package node of a module name relative to the package root.
+
+    The first dotted component, except that ``analysis.<pkg>`` is its own node
+    (``analysis.events.analysed_time`` -> ``analysis.events``,
+    ``analysis.constants`` -> ``analysis.constants``). The root package is
+    ``""``.
+    """
+    parts = module.split(".")
+    if parts[0] == "analysis" and len(parts) > 1:
+        return ".".join(parts[:2])
+    return parts[0]
+
 
 @functools.cache
 def parse(path: Path) -> ast.Module:

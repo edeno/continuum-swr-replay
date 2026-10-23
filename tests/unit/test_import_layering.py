@@ -42,40 +42,16 @@ from pathlib import Path
 
 import pytest
 
-from tests.unit._imports import SRC, module_edges, module_index
-
-#: Package nodes (see :func:`package_of`) that form the foundation layer: within
-#: the package they import only each other, and they import nothing from
-#: ``scripts``.
-FOUNDATION = frozenset(
-    {
-        "data_loaders",
-        "decoding",
-        "intervals",
-        "parameters",
-        "paths",
-        "runs",
-        "data_types",
-        "tables",
-    }
+from tests.unit._imports import (
+    FOUNDATION,
+    SRC,
+    module_edges,
+    module_index,
+    package_of,
 )
 
 #: Package nodes, besides the foundation, that ``analysis.events`` may import.
 EVENTS_MAY_IMPORT = frozenset({"analysis.events", "analysis.constants"})
-
-
-def package_of(module: str) -> str:
-    """The package node of a module name relative to the package root.
-
-    The first dotted component, except that ``analysis.<pkg>`` is its own node
-    (``analysis.events.analysed_time`` -> ``analysis.events``,
-    ``analysis.constants`` -> ``analysis.constants``). The root package is
-    ``""``.
-    """
-    parts = module.split(".")
-    if parts[0] == "analysis" and len(parts) > 1:
-        return ".".join(parts[:2])
-    return parts[0]
 
 
 def package_graph(root: Path = SRC) -> dict[str, set[str]]:
