@@ -46,10 +46,11 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 
 #: The questions this driver's runs answer; keys are the first part of a run's
-#: name. Q1 (are the events real), Q3a (what the events are like) and Q5 (PFC)
-#: have no CPU fit here.
+#: name. Q1 (are the events real) and Q5 (PFC) have no CPU fit here; of Q3a
+#: (what the events are like) only the SWR-coupling model is one.
 QUESTIONS = {
     "rate": "Q2. How often do non-local events occur, and what drives the rate, for SWR against non-SWR events?",
+    "coupling": "Q3a. What are the events like: location, speed, extent, certainty, duration, SWR coupling?",
     "content": "Q3b. What do the events represent (arm or patch), what shapes that, and does it differ for SWR events?",
     "behavior": "Q4. Does content relate to what the animal does next?",
 }
@@ -106,7 +107,7 @@ RUNS: tuple[Run, ...] = (
     _run("rate.swr_contrast.at_well", f"{_RC} --stop-cohort at_well --workers 16", 16),
     _run("rate.swr_contrast.all_stops", f"{_RC} --stop-cohort all_stops --workers 16", 16),
     _run("rate.uncertainty.at_well", "scripts/rate/fit_uncertainty_rate.py --stop-cohort at_well", 1),
-    _run("rate.ripple_power", "scripts/rate/fit_swr_power_model.py", 1),
+    _run("coupling.ripple_power", "scripts/coupling/fit_swr_power_model.py", 1),
     # No worker flag: its parallelism is BLAS threads.
     _run("rate.cross_history", "scripts/rate/fit_cross_history_rate.py --write", 8, threads=8),
     _fig("rate.fig.per_bin_ladder", "scripts/rate/plot_per_bin_rate_models.py", ["rate.per_bin.at_well"]),

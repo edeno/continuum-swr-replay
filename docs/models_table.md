@@ -454,7 +454,7 @@ replaces them. Trade-off: the replay coefficient is no longer cleanly controlled
 for distance.
 
 ## SWR power (auxiliary)
-`scripts/rate/fit_swr_power_model.py` — per-session `lm`, predictors z-scored per
+`scripts/coupling/fit_swr_power_model.py` — per-session `lm`, predictors z-scored per
 session.
 
 ```r

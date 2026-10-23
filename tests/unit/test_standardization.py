@@ -305,7 +305,8 @@ def test_runner_references_written(tmp_path):
     Exercises each runner's real output-writing block, so deleting its
     ``save_reference`` call fails here rather than passing silently.
     """
-    from scripts.rate import fit_swr_power_model, fit_uncertainty_rate
+    from scripts.coupling import fit_swr_power_model
+    from scripts.rate import fit_uncertainty_rate
 
     frame = pd.DataFrame({"a": [1.0, 2.0, 4.0, 8.0]})
     _, flat_reference = attach_standardized(

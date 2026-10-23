@@ -116,7 +116,7 @@ def test_every_swr_power_output_resolves_under_its_own_model_dir(tmp_path):
     """The per-event ripple-power model is not a per-bin rate fit."""
     import pandas as pd
 
-    from scripts.rate import fit_swr_power_model as mod
+    from scripts.coupling import fit_swr_power_model as mod
 
     assert mod.OUTPUT_DIR == RC / "models_per_event_swr_power"
     assert mod.OUTPUT_DIR == paths.model_dir("per_event_swr_power")
@@ -148,7 +148,7 @@ def test_table_path_refuses_a_name_outside_the_registry(name):
 
 
 def test_the_swr_power_command_line_writes_under_its_own_model_dir():
-    from scripts.rate import fit_swr_power_model as mod
+    from scripts.coupling import fit_swr_power_model as mod
 
     assert mod.build_parser().parse_args([]).output_dir == (
         RC / "models_per_event_swr_power"

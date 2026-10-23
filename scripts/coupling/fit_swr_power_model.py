@@ -33,8 +33,8 @@ coefficients), its z reference and two audits beside it.
 
 Usage::
 
-    uv run python scripts/rate/fit_swr_power_model.py                    # full
-    uv run python scripts/rate/fit_swr_power_model.py --max-per-animal 1 # smoke
+    uv run python scripts/coupling/fit_swr_power_model.py                    # full
+    uv run python scripts/coupling/fit_swr_power_model.py --max-per-animal 1 # smoke
 """
 
 from __future__ import annotations

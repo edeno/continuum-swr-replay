@@ -170,9 +170,12 @@ them importable.
 ## `rate/` — event-rate models + their plots
 - `fit_per_bin_rate_models.py`, `fit_per_stop_rate_models.py` — Family B / A rate ladders.
 - `fit_swr_contrast_rate.py` — the `is_swr`-contrast per-bin ladder (G0–G8 / S0–S10).
-- `fit_uncertainty_rate.py`, `fit_cross_history_rate.py`, `fit_swr_power_model.py` — MU / cross-history / SWR-power models.
+- `fit_uncertainty_rate.py`, `fit_cross_history_rate.py` — MU / cross-history rate models.
 - `plot_per_bin_rate_models.py`, `plot_per_bin_rate_summary.py`, `plot_model_checking.py`, `plot_uncertainty_rate.py` — rate figures.
 - `summarize_per_bin_rate_models.py` — generates `docs/per_bin_rate_results.md`.
+
+## `coupling/` — SWR-coupling strength of the events
+- `fit_swr_power_model.py` — each non-local event's ripple power (`ripple_power_z`) against the behavioral covariates: how strongly an event is SWR-coupled, beside the rate (how often) and content (what) layers.
 
 ## `content/` — replay content / choice models
 - `fit_replay_content_models.py` — arm/patch content hierarchy (M0–M7 / P0–P4), per `is_swr` split.
@@ -373,6 +376,7 @@ An old path is marked "(removed: moved)" so the doc-path test does not look for 
 | `scripts/decoding/prepare_replay_content_data.py` (removed: moved) | `scripts/tables/prepare_replay_content_data.py` |
 | `scripts/decoding/prepare_contfrag_replay_content_data.py` (removed: moved) | `scripts/tables/prepare_contfrag_replay_content_data.py` |
 | `scripts/decoding/regenerate_stop_table.py` (removed: moved) | `scripts/tables/regenerate_stop_table.py` |
+| `scripts/rate/fit_swr_power_model.py` (removed: moved) | `scripts/coupling/fit_swr_power_model.py` |
 | `scripts/decoding/build_timebin_tables.py` (removed: moved) | `scripts/tables/build_timebin_tables.py` |
 | `scripts/decoding/assemble_replay_content_shards.py` (removed: moved) | `scripts/tables/assemble_replay_content_shards.py` |
 | `scripts/decoding/assemble_contfrag_shards.py` (removed: moved) | `scripts/tables/assemble_contfrag_shards.py` |

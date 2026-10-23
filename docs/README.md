@@ -273,7 +273,7 @@ Three tiers:
    | dir | producer | holds |
    |---|---|---|
    | `models_per_bin_rate/` | `scripts/rate/fit_per_bin_rate_models.py`, `fit_swr_contrast_rate.py`, `fit_uncertainty_rate.py`, `fit_cross_history_rate.py` | the per-bin rate fits: `all_models.pkl` (Family-B ladder), `swr_contrast_rate.pkl`, `uncertainty_rate.pkl`, `cross_history_models.pkl`; plus three exploratory one-offs nothing supported reads (`contingency_table.pkl`, `contingency_csv_alpha.json`, `covariate_ranking.pkl`) |
-   | `models_per_event_swr_power/` | `scripts/rate/fit_swr_power_model.py` | the per-event ripple-power model `swr_power_model.pkl`, its `.z_reference_by_session.json` and its two audits |
+   | `models_per_event_swr_power/` | `scripts/coupling/fit_swr_power_model.py` | the per-event ripple-power model `swr_power_model.pkl`, its `.z_reference_by_session.json` and its two audits |
    | `models_per_stop_rate/` | `scripts/rate/fit_per_stop_rate_models.py` | Family-A per-stop ladder |
    | `models/`, `models_patch/` | `scripts/content/fit_replay_content_models.py` (arm / patch) | the default content ladders — arm `M0`, `M0a`, `M1`–`M6`; patch `P0`–`P3` — on the at-well events, plus the opt-in value/uncertainty rungs (`Mv`, `Mu`, `Mvu`, `Pv`) when named with `--models`; also holds `swr_contrast_content_{arm,patch}.pkl` |
    | `models_swr_{T,F}/`, `models_patch_swr_{T,F}/` | same, `--swr-subset T\|F` | content split by SWR (T) / non-SWR (F) |
@@ -281,9 +281,9 @@ Three tiers:
    | `content_estimator_comparison/` | `scripts/content/compare_content_estimators.py` | the three-estimator comparison on one shared cohort — `content_estimator_comparison.parquet`, `_summary.csv`, `content_estimator_bootstrap.csv`, `_skips.csv`. Read with [design/content_estimator_comparison.md](design/content_estimator_comparison.md) |
 
    Since 2026-10-23 `qvals_table` and its reference sit at the root and the power model in
-   its own folder; symlinks at the old `models_per_bin_rate/` paths serve older worktrees
-   until cleanup, and the hazard and its check are in the "Phase D disk move" entry of
-   [the code-organization plan](../.claude/docs/plans/code-organization/PLAN.md).
+   its own folder; nothing is left at the old `models_per_bin_rate/` paths (the move is the
+   "Phase D disk move" entry of
+   [the code-organization plan](../.claude/docs/plans/code-organization/PLAN.md)).
 
    The tables are built from the upstream runs below. Each location is a
    `continuum_swr_replay.paths` constant (or `parameters.PROCESSED_DATA_DIR`); a run

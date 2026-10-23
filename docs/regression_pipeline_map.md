@@ -482,6 +482,12 @@ Quantify the non-local/SWR overlap sub-cases on real data.
 
 `quantify_session`, `print_report`, `main`
 
+### `scripts/coupling/fit_swr_power_model.py`
+
+Per-event SWR-coupling strength (ripple power) vs behavioral covariates.
+
+`fit_power_model`, `build_parser`, `main`
+
 ### `scripts/decoding/_decode_runner.py`
 
 The flow both decode runners share, and the record of what differs.
@@ -535,12 +541,6 @@ Fit the per-stop replay-rate hierarchy (R0-R1) and persist it.
 Fit the per-bin non-local rate models, `is_swr` version (see docs/models_table.md).
 
 `main`
-
-### `scripts/rate/fit_swr_power_model.py`
-
-Per-event SWR-coupling strength (ripple power) vs behavioral covariates.
-
-`fit_power_model`, `build_parser`, `main`
 
 ### `scripts/rate/fit_uncertainty_rate.py`
 

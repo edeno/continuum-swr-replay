@@ -37,6 +37,7 @@ ROOTS: tuple[str, ...] = (
     "scripts/detection",
     "scripts/content",
     "scripts/rate",
+    "scripts/coupling",
     "scripts/qa",
     "scripts/pfc",
 )
@@ -117,6 +118,7 @@ STAGES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "scripts/detection/run_carey_detection.py",
             "scripts/content/*.py",
             "scripts/rate/*.py",
+            "scripts/coupling/*.py",
         ),
     ),
     (

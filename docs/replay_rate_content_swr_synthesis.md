@@ -238,7 +238,7 @@ its excluded share.
 
 `ripple_power_z` (event-mean consensus ripple power — the signal the Kay detector
 thresholds, so `is_swr` is its thresholded version). Per-event regression
-(`scripts/rate/fit_swr_power_model.py`). **Scope note:** this layer was **not**
+(`scripts/coupling/fit_swr_power_model.py`). **Scope note:** this layer was **not**
 part of the 2026-09 refit wave — its numbers are unchanged and have not been
 re-audited against the current tables, so treat them as provisional beside the
 restated rate and content numbers.
@@ -785,7 +785,7 @@ with their estimand named.
   `scripts/rate/fit_swr_contrast_rate.py`; summaries
   `scripts/rate/summarize_per_bin_rate_models.py`, plots
   `scripts/rate/plot_per_bin_rate_models.py`.
-- Coupling: `scripts/rate/fit_swr_power_model.py`.
+- Coupling: `scripts/coupling/fit_swr_power_model.py`.
 - Content: `scripts/content/fit_replay_content_models.py`,
   `scripts/content/fit_swr_contrast_content.py`,
   `scripts/content/compare_content_estimators.py`;

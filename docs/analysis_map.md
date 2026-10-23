@@ -104,16 +104,16 @@ There are two model families; see [rate_models.md](rate_models.md):
 | Rate per stop | `rate.per_stop.{at_well,all_stops}` | `rate/fit_per_stop_rate_models.py` | — | 19c |
 | How SWR and non-SWR rates differ, term by term, paired within session | `rate.swr_contrast.{at_well,all_stops}` | `rate/fit_swr_contrast_rate.py` | `content.fig.swr_contrast_coefs` | 19c, 19f |
 | Rate against arm uncertainty and value | `rate.uncertainty.at_well` | `rate/fit_uncertainty_rate.py` | `rate.fig.uncertainty` | — |
-| Ripple power as a continuous mark of SWR coupling | `rate.ripple_power` | `rate/fit_swr_power_model.py` | — | — |
 | Whether one stream's history drives the other's rate | `rate.cross_history` | `rate/fit_cross_history_rate.py` | — (no result written yet) | — |
 
-## Q3a. What are the events like: location, speed, extent, certainty, duration?
+## Q3a. What are the events like: location, speed, extent, certainty, duration, SWR coupling?
 
 | What it measures | Script | Figure | Claims |
 |---|---|---|---|
 | Replay speed by SWR status | `figures/generate_figure03.py` | Figure 3c | 15 |
 | Where content sits relative to the animal and to reward wells | `content/analyze_content_occupancy.py`; `figures/generate_figure03.py` | `paper/figures/content_occupancy/`; Figure 3d | 13, 14 |
 | Event duration by detector | `figures/generate_supp_decoder_validation.py` | supplement d | 18 |
+| SWR-coupling strength (ripple power as a continuous mark) against the behavioral covariates; run `coupling.ripple_power` | `coupling/fit_swr_power_model.py` | — | — |
 
 **No tracked script:**
 - 16 (extent);
@@ -189,7 +189,7 @@ The 2026-10 refresh (its R6 and R7 stages) named runs by code:
 | R05, R06 | `rate.swr_contrast.{at_well,all_stops}` | X01 | `content.estimator_comparison` |
 | R07, R08 | removed | X02 | `content.uncertainty` |
 | R09 | `rate.uncertainty.at_well` | X03–X05 | `behavior.event_source_suite.{non_local,swr,mua}` |
-| R10 | `rate.ripple_power` | F01–F04 | `content.event_source.{swr_arm,swr_patch,mua_arm,mua_patch}` |
+| R10 | `coupling.ripple_power` | F01–F04 | `content.event_source.{swr_arm,swr_patch,mua_arm,mua_patch}` |
 | R11 | `rate.cross_history` | P01–P03 | `behavior.retrospective.{all,swr,non_swr}` |
 | C01 | `content.arm_ladder.all_arms` | S01–S08 | `behavior.stay_leave.*` |
 | C02 | `content.arm_ladder.leaf_arms` | C03 | `content.patch_ladder.all_events` |

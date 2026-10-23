@@ -183,7 +183,7 @@ def test_uncertainty_records_reconcile_and_sessions_in_is_prefirstdrop():
 
 
 def test_swr_power_records_split_qvals_and_own():
-    from scripts.rate import fit_swr_power_model as mod
+    from scripts.coupling import fit_swr_power_model as mod
 
     rng = np.random.default_rng(0)
     n = 200
@@ -225,7 +225,7 @@ def test_swr_power_missing_timing_is_attributed_not_absorbed():
     so its absence is an own-predictor gap. A physically pre-outcome
     event is neither -- it is a real event the gate excludes.
     """
-    from scripts.rate import fit_swr_power_model as mod
+    from scripts.coupling import fit_swr_power_model as mod
 
     rng = np.random.default_rng(0)
     n = 200
@@ -259,7 +259,7 @@ def test_swr_power_missing_timing_is_attributed_not_absorbed():
 
 def test_swr_power_gate_requires_timing_columns():
     """The gate names the missing columns instead of raising KeyError."""
-    from scripts.rate import fit_swr_power_model as mod
+    from scripts.coupling import fit_swr_power_model as mod
 
     df = pd.DataFrame(
         {
@@ -276,7 +276,7 @@ def test_swr_power_gate_requires_timing_columns():
 
 def test_swr_power_gate_treats_equality_as_eligible():
     """An event starting exactly at the outcome boundary is kept."""
-    from scripts.rate import fit_swr_power_model as mod
+    from scripts.coupling import fit_swr_power_model as mod
 
     df = pd.DataFrame(
         {
@@ -294,7 +294,7 @@ def test_swr_power_gate_treats_equality_as_eligible():
 
 
 def test_swr_power_gate_suppresses_session_when_one_outcome_vanishes():
-    from scripts.rate import fit_swr_power_model as mod
+    from scripts.coupling import fit_swr_power_model as mod
 
     rng = np.random.default_rng(1)
     df = pd.DataFrame(
@@ -323,7 +323,7 @@ def test_swr_power_gate_suppresses_session_when_one_outcome_vanishes():
 @pytest.mark.parametrize("invalid_value", [np.nan, np.inf, -np.inf])
 def test_swr_power_complete_case_guard_blocks_rewarded_only_fit(invalid_value):
     """A non-finite sole omission cannot disappear inside the OLS fit."""
-    from scripts.rate import fit_swr_power_model as mod
+    from scripts.coupling import fit_swr_power_model as mod
 
     rng = np.random.default_rng(2)
     n_rewarded = 31
