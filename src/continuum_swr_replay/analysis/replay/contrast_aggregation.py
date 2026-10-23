@@ -45,7 +45,11 @@ from statsmodels.stats.multitest import multipletests
 
 from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.analysis.events.cohort_selection import select_event_cohort
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
+from continuum_swr_replay.paths import (
+    REPLAY_CONTENT_DIR,
+    STANDARDIZATION_REFERENCE,
+    table_path,
+)
 from continuum_swr_replay.tables.covariate_registry import require_covariate_schema
 from continuum_swr_replay.tables.io import read_table
 from continuum_swr_replay.tables.session_keys import (
@@ -789,18 +793,20 @@ def _cohort_log(label: str, report: dict) -> None:
 
 
 def assemble_arm(
-    fit_inputs: Mapping[str, Path], reference_path: Path
+    fit_inputs: Mapping[str, Path] = CONTENT_FIT_INPUTS,
+    reference_path: Path = REPLAY_CONTENT_DIR / STANDARDIZATION_REFERENCE,
 ) -> tuple[pd.DataFrame, dict]:
     """Load the arm cohort and attach its design columns and ``_z`` reference.
 
     Parameters
     ----------
-    fit_inputs : Mapping[str, Path]
+    fit_inputs : Mapping[str, Path], optional
         Table name -> path; the event-arm, stop and qvals tables are read from
-        it (:data:`CONTENT_FIT_INPUTS` for the canonical fit).
-    reference_path : Path
-        The tables' ``standardization_reference.json``, against which the
-        persisted ``arm_uncertainty_z`` is validated.
+        it. :data:`CONTENT_FIT_INPUTS`, the canonical fit's, by default.
+    reference_path : Path, optional
+        The tables' standardization reference, against which the persisted
+        ``arm_uncertainty_z`` is validated; the canonical root's
+        (``paths.STANDARDIZATION_REFERENCE``) by default.
 
     Returns
     -------
@@ -945,7 +951,7 @@ def _attach_arm_design_columns(ev: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
 
 
 def assemble_patch(
-    arm_ev: pd.DataFrame, fit_inputs: Mapping[str, Path]
+    arm_ev: pd.DataFrame, fit_inputs: Mapping[str, Path] = CONTENT_FIT_INPUTS
 ) -> tuple[pd.DataFrame, dict]:
     """Load the patch cohort and attach its design columns and ``_z`` reference.
 
@@ -954,9 +960,9 @@ def assemble_patch(
     arm_ev : pandas.DataFrame
         The assembled arm cohort, which maps each event to its stop and carries
         the event-level time and length the patch table lacks.
-    fit_inputs : Mapping[str, Path]
+    fit_inputs : Mapping[str, Path], optional
         Table name -> path; the event-patch, stop and qvals tables are read from
-        it.
+        it. :data:`CONTENT_FIT_INPUTS` by default.
 
     Returns
     -------

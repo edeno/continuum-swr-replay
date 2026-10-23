@@ -37,7 +37,11 @@ from continuum_swr_replay.analysis.replay.tables_arm_patch import (
 from continuum_swr_replay.analysis.replay.tables_stop import add_nonlocal_swr_split
 from continuum_swr_replay.data_loaders.constants import WELL_ARMS
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
-from continuum_swr_replay.paths import BASENAME_TO_TABLE, table_path
+from continuum_swr_replay.paths import (
+    BASENAME_TO_TABLE,
+    STANDARDIZATION_REFERENCE,
+    table_path,
+)
 from continuum_swr_replay.tables.covariate_registry import (
     stamp_covariate_schema,
 )
@@ -173,7 +177,7 @@ def assemble_replay_content_shards(
     _assert_value_block_matches_source(tables["event_arm_table"], contingency)
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    save_reference(reference, output_dir / "standardization_reference.json")
+    save_reference(reference, output_dir / STANDARDIZATION_REFERENCE)
     for name, frame in tables.items():
         # publish_canonical is the one write door; it re-stamps (idempotent) and
         # writes atomically so an unstamped canonical table cannot be persisted.

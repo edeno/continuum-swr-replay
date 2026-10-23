@@ -24,7 +24,11 @@ from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
 from continuum_swr_replay.data_loaders.trial_clocks import (
     outcome_known_time_from_task_visit,
 )
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
+from continuum_swr_replay.paths import (
+    QVALS_STANDARDIZATION_REFERENCE,
+    REPLAY_CONTENT_DIR,
+    table_path,
+)
 from continuum_swr_replay.tables.covariate_registry import (
     apply_rename,
     canonicalize_numerical_paths,
@@ -944,9 +948,10 @@ def write_qvals_outputs(
     the replay-content root, beside the other canonical tables. Returns the
     table's path.
     """
-    directory = table_path("qvals_table", replay_content_dir).parent
-    out = publish_canonical(tab, directory, table="qvals", basename="qvals_table")
-    save_reference(reference, directory / "qvals_standardization_reference.json")
+    out = publish_canonical(
+        tab, replay_content_dir, table="qvals", basename="qvals_table"
+    )
+    save_reference(reference, replay_content_dir / QVALS_STANDARDIZATION_REFERENCE)
     return out
 
 

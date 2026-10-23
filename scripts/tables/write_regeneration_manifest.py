@@ -26,7 +26,11 @@ from continuum_swr_replay.analysis.replay.table_contracts import (
     validate_event_patch_table,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
-from continuum_swr_replay.paths import table_path
+from continuum_swr_replay.paths import (
+    QVALS_STANDARDIZATION_REFERENCE,
+    STANDARDIZATION_REFERENCE,
+    table_path,
+)
 from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.runs.provenance import git, git_commit, git_dirty
 from continuum_swr_replay.tables.io import SWR_SOURCE_TABLES, read_attrs, read_table
@@ -332,13 +336,13 @@ def _validate_replay(root: Path, expected_sessions: int) -> dict[str, object]:
     assert_standardized_matches_reference(
         arm,
         EVENT_ARM_STANDARDIZED_COLS,
-        load_reference(root / "standardization_reference.json"),
+        load_reference(root / STANDARDIZATION_REFERENCE),
         support_label="leaf_arms",
     )
     assert_standardized_matches_reference(
         qvals,
         QVALS_STANDARDIZED_COLS,
-        load_reference(root / "qvals_standardization_reference.json"),
+        load_reference(root / QVALS_STANDARDIZATION_REFERENCE),
         support_label="all_rows",
     )
     if qvals["stop_id"].isna().any() or qvals["stop_id"].duplicated().any():

@@ -10,6 +10,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import importlib.util
+import inspect
 import json
 import os
 import re
@@ -684,7 +685,11 @@ def test_fitters_record_every_table_they_read(fitter):
 
 
 def _mapping_arguments(path: Path) -> dict[str, list[str]]:
-    """The mapping each ``record_inputs`` / ``assemble_*`` call in ``path`` is handed."""
+    """The mapping each ``record_inputs`` / ``assemble_*`` call in ``path`` is handed.
+
+    An assembler called without one reads its default, ``CONTENT_FIT_INPUTS``
+    (pinned by ``test_the_assemblers_default_to_the_content_fit_inputs``).
+    """
     position = {"record_inputs": 0, "assemble_arm": 0, "assemble_patch": 1}
     found: dict[str, list[str]] = {name: [] for name in position}
     for node in ast.walk(ast.parse(path.read_text())):
@@ -693,8 +698,26 @@ def _mapping_arguments(path: Path) -> dict[str, list[str]]:
             and isinstance(node.func, ast.Name)
             and node.func.id in position
         ):
-            found[node.func.id].append(ast.unparse(node.args[position[node.func.id]]))
+            index = position[node.func.id]
+            keyword = [k.value for k in node.keywords if k.arg == "fit_inputs"]
+            argument = (
+                node.args[index]
+                if len(node.args) > index
+                else (keyword[0] if keyword else ast.Name("CONTENT_FIT_INPUTS"))
+            )
+            found[node.func.id].append(ast.unparse(argument))
     return found
+
+
+def test_the_assemblers_default_to_the_content_fit_inputs():
+    from continuum_swr_replay.analysis.replay import contrast_aggregation
+
+    for assembler in (
+        contrast_aggregation.assemble_arm,
+        contrast_aggregation.assemble_patch,
+    ):
+        default = inspect.signature(assembler).parameters["fit_inputs"].default
+        assert default is CONTENT_FIT_INPUTS
 
 
 @pytest.mark.parametrize(

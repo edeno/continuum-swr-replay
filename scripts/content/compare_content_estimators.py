@@ -1262,9 +1262,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
 
     logger.info("loading the at-well arm cohort")
-    ev, _z_reference = assemble_arm(
-        CONTENT_FIT_INPUTS, RC / "standardization_reference.json"
-    )
+    ev, _z_reference = assemble_arm()
     inputs = record_inputs(CONTENT_FIT_INPUTS)
     # Only the arm cohort is compared, so the patch cohort is not assembled:
     # this is prepare_cohorts' arm half, for the "all" stratum.

@@ -78,7 +78,11 @@ from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.data_types import SessionDataKeys
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
+from continuum_swr_replay.paths import (
+    REPLAY_CONTENT_DIR,
+    STANDARDIZATION_REFERENCE,
+    table_path,
+)
 from continuum_swr_replay.tables.io import (
     parquet_path,
     publish_canonical,
@@ -867,7 +871,7 @@ def _standardize_event_arm(
         support_mask=leaf_support,
         support_label="leaf_arms",
     )
-    save_reference(z_reference, OUTPUT_DIR / "standardization_reference.json")
+    save_reference(z_reference, OUTPUT_DIR / STANDARDIZATION_REFERENCE)
     # Rebuild-completeness guard: a future refactor must not silently drop the _z
     # columns (the exact regression this phase fixes).
     assert_standardized_present(

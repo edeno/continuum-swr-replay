@@ -853,10 +853,8 @@ def main() -> None:
     # The standardization references are taken over the FULL assembled cohorts,
     # before the outcome stratum and the smoke subset, so every stratum's
     # coefficients are stated in the same per-SD unit.
-    ev, arm_z_reference = assemble_arm(
-        CONTENT_FIT_INPUTS, RC / "standardization_reference.json"
-    )
-    pt, patch_z_reference = assemble_patch(ev, CONTENT_FIT_INPUTS)
+    ev, arm_z_reference = assemble_arm()
+    pt, patch_z_reference = assemble_patch(ev)
     # Hash the tables now, while they are the ones being fit: the ladder runs
     # for long enough that a table could be regenerated before the artifacts are
     # written, and a sidecar hashed at write time would certify bytes no fit saw.

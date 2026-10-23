@@ -25,7 +25,9 @@ __all__ = [
     "CONTFRAG_REPLAY_CONTENT_DIR",
     "DETECTION_COMPARISON_DIR",
     "MODEL_SUBDIRS",
+    "QVALS_STANDARDIZATION_REFERENCE",
     "REPLAY_CONTENT_DIR",
+    "STANDARDIZATION_REFERENCE",
     "SWR_INVENTORY_ROOT",
     "model_dir",
     "table_path",
@@ -109,6 +111,13 @@ BASENAME_TO_TABLE: dict[str, str] = {
 """On-disk table basename -> the registry table key that owns its row key."""
 
 CANONICAL_TABLE_BASENAMES: tuple[str, ...] = tuple(BASENAME_TO_TABLE)
+
+STANDARDIZATION_REFERENCE = "standardization_reference.json"
+"""The replay-content tables' ``_z`` standardization reference, beside them at
+a replay-content root."""
+
+QVALS_STANDARDIZATION_REFERENCE = "qvals_standardization_reference.json"
+"""``qvals_table``'s ``_z`` standardization reference, beside it at the root."""
 
 
 def table_path(

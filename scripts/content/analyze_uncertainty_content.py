@@ -39,7 +39,11 @@ from continuum_swr_replay.analysis.replay.uncertainty_content import (
     summarize_mu_coefficients,
     within_arm_horserace,
 )
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
+from continuum_swr_replay.paths import (
+    REPLAY_CONTENT_DIR,
+    STANDARDIZATION_REFERENCE,
+    table_path,
+)
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -313,7 +317,7 @@ def main() -> None:
     event_arm_path = table_path("event_arm_table", args.data_dir, fmt="pkl")
     stop_path = table_path("stop_table", args.data_dir, fmt="pkl")
     qvals_path = table_path("qvals_table", args.data_dir, fmt="pkl")
-    standardization_path = args.data_dir / "standardization_reference.json"
+    standardization_path = args.data_dir / STANDARDIZATION_REFERENCE
     models_dir = resolve_models_dir(args.data_dir, args.models_dir)
     mu_path = models_dir / "Mu.pkl"
     for path in [event_arm_path, stop_path, qvals_path]:

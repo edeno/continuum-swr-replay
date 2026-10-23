@@ -29,6 +29,7 @@ from continuum_swr_replay.data_loaders.constants import (
     N_LEAF_ARMS,
     TRACK_SEGMENT_TO_PATCH,
 )
+from continuum_swr_replay.paths import STANDARDIZATION_REFERENCE
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 from continuum_swr_replay.tables.standardization import (
     assert_standardized_matches_reference,
@@ -412,7 +413,7 @@ def validate_requested_standardization(
     if not sources:
         return
 
-    reference_path = input_dir / "standardization_reference.json"
+    reference_path = input_dir / STANDARDIZATION_REFERENCE
     if not reference_path.exists():
         raise FileNotFoundError(
             f"Requested standardized predictor(s) {[f'{c}_z' for c in sources]} "
