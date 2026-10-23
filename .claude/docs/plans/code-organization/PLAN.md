@@ -520,3 +520,4 @@ The lead's goal for this branch: an outside scientist can understand the analysi
 - `KNOWN_VIOLATIONS` must be empty, or each remaining entry must have a reason the lead accepts.
 - Archive the ledger next to this plan.
 - No merge to master without the lead's approval.
+- **Phase D disk move (done 2026-10-23, controller, lead-approved).** `qvals_table.parquet` and `qvals_standardization_reference.json` moved to the root of `replay_content/` and of 6 staging roots; the 4 `swr_power_*` files moved to `replay_content/models_per_event_swr_power/`. Hashes and mtimes unchanged. A relative symlink sits at every old path, because the `covariate-explorer`, `phase3` and `phase4-run` worktrees share `Processed-Data/` and still read the old paths. **Cleanup:** once those branches are on the merged master, delete the symlinks: `find Processed-Data -path '*models_per_bin_rate/*' -type l \( -name 'qvals_*' -o -name 'swr_power_*' \) -delete`.
