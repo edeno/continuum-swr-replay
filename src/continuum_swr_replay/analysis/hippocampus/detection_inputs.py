@@ -34,6 +34,7 @@ __all__ = [
     "MARKS_CACHE_DIR",
     "MARKS_RULE",
     "MARKS_RULE_TAG",
+    "carey_output_paths",
     "input_paths",
     "load_marks",
     "marks_cache_path",
@@ -127,6 +128,18 @@ def marks_sha256(spike_times: list, spike_waveform_features: list) -> str:
         digest.update(np.ascontiguousarray(times, dtype=np.float64).tobytes())
         digest.update(np.ascontiguousarray(features, dtype=np.float64).tobytes())
     return digest.hexdigest()
+
+
+def carey_output_paths(epoch_id: str, output_dir: Path) -> dict[str, Path]:
+    """Every file a Carey run writes for one epoch, by output name.
+
+    The one spelling of them: ``run_carey_detection`` writes these files and
+    the inventory comparison reads them.
+    """
+    return {
+        "events": output_dir / f"{epoch_id}_carey_events.parquet",
+        "observed": output_dir / f"{epoch_id}_carey_observed.parquet",
+    }
 
 
 def memoryless_output_paths(epoch_id: str, output_dir: Path) -> dict[str, Path]:

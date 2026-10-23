@@ -85,6 +85,7 @@ from continuum_swr_replay.analysis.events.artifact_masks import (
 from continuum_swr_replay.analysis.hippocampus.detection_inputs import (
     MARKS_CACHE_DIR,
     MARKS_RULE,
+    carey_output_paths,
     input_paths,
     load_marks,
     marks_cache_path,
@@ -158,14 +159,6 @@ GRID = (
 )
 """The rate is the band's own, not asserted here: the time hash ties the
 samples to the SWR run's, and each record keeps the nominal rate."""
-
-
-def output_paths(identifier: str, output_dir: Path) -> dict[str, Path]:
-    """Every file an epoch writes, by name."""
-    return {
-        "events": output_dir / f"{identifier}_carey_events.parquet",
-        "observed": output_dir / f"{identifier}_carey_observed.parquet",
-    }
 
 
 def swr_run_inputs(identifier: str) -> dict[str, Any]:
@@ -451,10 +444,10 @@ def run_epoch(
             fetch_marks=fetch_marks,
         )
         record["outputs"] = replace_outputs(
-            output_paths(identifier, output_dir), tables
+            carey_output_paths(identifier, output_dir), tables
         )
     except Exception as error:  # noqa: BLE001 - recorded; the run goes on
-        replace_outputs(output_paths(identifier, output_dir), {})
+        replace_outputs(carey_output_paths(identifier, output_dir), {})
         record = {
             "status": "failed",
             "error": repr(error),

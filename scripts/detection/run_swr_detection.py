@@ -241,11 +241,7 @@ def epoch_id(nwb_file_name: str, epoch_name: str) -> str:
 
 def output_paths(identifier: str, output_dir: Path) -> dict[str, Path]:
     """Every file an epoch can write, keyed by detector or table name."""
-    paths = {
-        name: output_dir / f"{identifier}_{name}_events.parquet"
-        for name in DETECTOR_SETTINGS
-    }
-    paths["swr_observed"] = output_dir / f"{identifier}_swr_observed.parquet"
+    paths = swr_source.swr_inventory_paths(identifier, output_dir, DETECTOR_SETTINGS)
     paths["kay_version_check"] = output_dir / f"{identifier}_kay_version_check.parquet"
     paths["yu_diagnostics"] = output_dir / f"{identifier}_yu_diagnostics.json"
     return paths

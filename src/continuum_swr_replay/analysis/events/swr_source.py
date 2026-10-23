@@ -49,6 +49,7 @@ What this module fixes
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -91,6 +92,7 @@ __all__ = [
     "swr_epoch_id",
     "swr_events",
     "swr_inventory_dir",
+    "swr_inventory_paths",
     "swr_source_files",
     "swr_source_name",
 ]
@@ -204,6 +206,39 @@ def swr_epoch_id(nwb_file_name: str, epoch_name: str) -> str:
     return format_epoch_identifier(nwb_file_name, epoch_name, "HPC")
 
 
+def swr_inventory_paths(
+    epoch_id: str, run_dir: Path, detectors: Iterable[str]
+) -> dict[str, Path]:
+    """The SWR runner's inventory files for one epoch, in a run folder.
+
+    The one spelling of them: the runner writes these files
+    (``run_swr_detection.output_paths``), and this module and the inventory
+    comparison read them.
+
+    Parameters
+    ----------
+    epoch_id : str
+        Such as ``"chimi20200225_02_r1_HPC"``.
+    run_dir : Path
+        The run folder.
+    detectors : iterable of str
+        The detectors whose event files to name, in order.
+
+    Returns
+    -------
+    dict[str, Path]
+        ``{detector: {epoch_id}_{detector}_events.parquet}`` for each detector,
+        then ``"swr_observed"``: ``{epoch_id}_swr_observed.parquet``; the keys
+        are the manifest's output names.
+    """
+    paths = {
+        detector: run_dir / f"{epoch_id}_{detector}_events.parquet"
+        for detector in detectors
+    }
+    paths["swr_observed"] = run_dir / f"{epoch_id}_swr_observed.parquet"
+    return paths
+
+
 def swr_source_files(epoch_id: str) -> dict[str, dict[str, str]]:
     """The epoch's Kay events and observed stretches, checked against the manifest.
 
@@ -254,10 +289,10 @@ def swr_source_files(epoch_id: str) -> dict[str, dict[str, str]]:
             f"without a {SWR_DETECTOR} inventory: "
             f"{record.get('detectors', {}).get(SWR_DETECTOR)!r}"
         )
+    inventory = swr_inventory_paths(epoch_id, directory, (SWR_DETECTOR,))
     files = {}
     for name, key in (("events", SWR_DETECTOR), ("observed", "swr_observed")):
-        suffix = f"_{SWR_DETECTOR}_events" if name == "events" else "_swr_observed"
-        path = directory / f"{epoch_id}{suffix}.parquet"
+        path = inventory[key]
         if not path.exists():
             raise SwrSourceError(f"{epoch_id}: {path.name} is missing from {directory}")
         sha = sha256_file(path)

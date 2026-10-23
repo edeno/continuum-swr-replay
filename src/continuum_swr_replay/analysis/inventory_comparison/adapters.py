@@ -57,6 +57,10 @@ from continuum_swr_replay.analysis.events.immobility import (
     EventDefinitionError,
     intervals_from_labels,
 )
+from continuum_swr_replay.analysis.hippocampus.detection_inputs import (
+    carey_output_paths,
+    memoryless_output_paths,
+)
 from continuum_swr_replay.analysis.inventory_comparison.availability import (
     missing_run_table,
     observation_table,
@@ -461,8 +465,10 @@ def swr_detector_inventory(
             run_dir,
             epoch.epoch_id,
             {
-                detector: f"{epoch.epoch_id}_{detector}_events.parquet",
-                "swr_observed": f"{epoch.epoch_id}_swr_observed.parquet",
+                name: path.name
+                for name, path in swr_source.swr_inventory_paths(
+                    epoch.epoch_id, run_dir, (detector,)
+                ).items()
             },
             detector=detector,
         )
@@ -490,8 +496,8 @@ def carey_inventory(
             run_dir,
             epoch.epoch_id,
             {
-                "events": f"{epoch.epoch_id}_carey_events.parquet",
-                "observed": f"{epoch.epoch_id}_carey_observed.parquet",
+                name: path.name
+                for name, path in carey_output_paths(epoch.epoch_id, run_dir).items()
             },
         )
         events = _numbered_events(files["events"])
@@ -742,8 +748,8 @@ def memoryless_inventory(
             run_dir,
             epoch.epoch_id,
             {
-                "events": f"{epoch.epoch_id}_memoryless_events.parquet",
-                "observed": f"{epoch.epoch_id}_memoryless_observed.parquet",
+                name: memoryless_output_paths(epoch.epoch_id, run_dir)[name].name
+                for name in ("events", "observed")
             },
             hashed=False,
         )

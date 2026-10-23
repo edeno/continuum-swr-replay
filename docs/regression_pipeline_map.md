@@ -86,7 +86,7 @@ Non-local event detection and the SWR-overlap classification of those events.
 
 The paper's one SWR source: the direct ripple_detection 2.0 Kay inventory.
 
-`SwrSourceError`, `swr_inventory_dir`, `artifact_intervals_dir`, `swr_source_name`, `artifact_run_of`, `swr_epoch_id`, `swr_source_files`, `ripple_power_inputs`, `read_observed`, `artifact_intervals`, `EpochSource`, `epoch_source`, `read_swr_inventory`, `classify`, `swr_events`
+`SwrSourceError`, `swr_inventory_dir`, `artifact_intervals_dir`, `swr_source_name`, `artifact_run_of`, `swr_epoch_id`, `swr_inventory_paths`, `swr_source_files`, `ripple_power_inputs`, `read_observed`, `artifact_intervals`, `EpochSource`, `epoch_source`, `read_swr_inventory`, `classify`, `swr_events`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/artifacts/detect.py`
 
@@ -116,7 +116,7 @@ The HPC decode's masks, from the paper's SWR source.
 
 What the replay detection runners read from a saved HPC decode and from each other.
 
-`input_paths`, `marks_cache_path`, `load_marks`, `marks_sha256`, `memoryless_output_paths`
+`input_paths`, `marks_cache_path`, `load_marks`, `marks_sha256`, `carey_output_paths`, `memoryless_output_paths`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/event_analysis.py`
 
@@ -510,7 +510,7 @@ Detect LFP and spike artifacts in every epoch's CA1 data, on CPU.
 
 Run Carey's candidate detector on every epoch's CA1 LFP and multiunit spikes.
 
-`output_paths`, `swr_run_inputs`, `decode_marks`, `observation_table`, `run_epoch`, `summary`, `run_settings`, `main`, `run`
+`swr_run_inputs`, `decode_marks`, `observation_table`, `run_epoch`, `summary`, `run_settings`, `main`, `run`
 
 ### `scripts/rate/fit_cross_history_rate.py`
 
