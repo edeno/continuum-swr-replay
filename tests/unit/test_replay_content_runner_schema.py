@@ -22,6 +22,12 @@ from continuum_swr_replay.tables.standardization import (
 from scripts.content import fit_replay_content_models as runner
 
 
+def _use_data_root(monkeypatch, root):
+    """Point every event source's input directory under `root`, keeping its name."""
+    for config in runner._EVENT_SOURCE_CONFIG.values():
+        monkeypatch.setitem(config, "input_dir", root / config["input_dir"].name)
+
+
 def _partial_ladder_dir(input_dir, *rungs: str):
     """Where a run that fits only ``rungs`` publishes.
 
@@ -135,7 +141,7 @@ def test_stale_canonical_table_aborts_before_fit_or_output(tmp_path, monkeypatch
     def _fit_must_not_run(*args, **kwargs):
         pytest.fail("schema validation must run before model fitting")
 
-    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(runner, "fit_model_per_session", _fit_must_not_run)
     monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py", "--models", "M0"])
 
@@ -152,7 +158,7 @@ def test_legacy_file_is_not_an_implicit_canonical_fallback(tmp_path, monkeypatch
     pd.DataFrame({"event_uid": [1], "arm_count": [1]}).to_pickle(
         input_dir / "long_count.pkl"
     )
-    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py", "--models", "M0"])
 
     with pytest.raises(FileNotFoundError, match="Legacy fallback is disabled"):
@@ -193,7 +199,7 @@ def test_a_table_from_another_swr_source_is_refused(tmp_path, monkeypatch):
     def _fit_must_not_run(*args, **kwargs):
         pytest.fail("the source check must run before model fitting")
 
-    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(runner, "fit_model_per_session", _fit_must_not_run)
     monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py", "--models", "M0"])
 
@@ -208,7 +214,7 @@ def test_complete_requested_run_writes_every_requested_result(tmp_path, monkeypa
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
     _canonical_arm_table().to_pickle(input_dir / "event_arm_table.pkl")
-    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py", "--models", "M0"])
 
     runner.main()
@@ -248,7 +254,7 @@ def test_complete_default_ladder_is_dispatched_without_dropping_rungs(
             }
         )
 
-    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(runner, "fit_model_per_session", _record_fit)
     monkeypatch.setattr(
         runner, "run_full_hierarchy_comparison", lambda *args, **kwargs: pd.DataFrame()
@@ -274,7 +280,7 @@ def test_missing_requested_predictor_rejects_the_whole_ladder(tmp_path, monkeypa
     def _fit_must_not_run(*args, **kwargs):
         pytest.fail("the complete ladder must validate before fitting")
 
-    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(runner, "fit_model_per_session", _fit_must_not_run)
     monkeypatch.setattr(
         sys,
@@ -322,7 +328,7 @@ def test_uncertainty_model_rejects_legacy_all_arm_standardization(
     def _fit_must_not_run(*args, **kwargs):
         pytest.fail("standardization validation must run before model fitting")
 
-    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(runner, "fit_model_per_session", _fit_must_not_run)
     monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py", "--models", "Mu"])
 
@@ -367,7 +373,7 @@ def test_numeric_current_indicator_off_well_fails_closed(tmp_path, monkeypatch):
     def _fit_must_not_run(*args, **kwargs):
         pytest.fail("location contract validation must run before fitting")
 
-    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(runner, "fit_model_per_session", _fit_must_not_run)
     monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py", "--models", "M0"])
 
@@ -537,7 +543,7 @@ def test_late_empty_rung_aborts_without_publishing_any_output(tmp_path, monkeypa
             }
         )
 
-    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(runner, "fit_model_per_session", _fit_with_empty_late_rung)
     monkeypatch.setattr(
         sys,
@@ -574,7 +580,7 @@ def test_late_fit_exception_leaves_existing_output_unchanged(tmp_path, monkeypat
             }
         )
 
-    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(runner, "fit_model_per_session", _fit_then_raise)
     monkeypatch.setattr(
         sys,
@@ -595,7 +601,7 @@ def test_successful_publish_replaces_stale_output_directory(tmp_path, monkeypatc
     output_dir.mkdir(parents=True)
     (output_dir / "M7.pkl").write_bytes(b"stale later rung")
     _canonical_arm_table().to_pickle(input_dir / "event_arm_table.pkl")
-    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py", "--models", "M0"])
 
     runner.main()
@@ -623,7 +629,7 @@ def test_fit_result_must_report_exact_frozen_cohort_size(tmp_path, monkeypatch):
             }
         )
 
-    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(runner, "fit_model_per_session", _wrong_cohort_size)
     monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py", "--models", "M0"])
 
@@ -658,7 +664,7 @@ def test_published_ladder_uses_intersection_of_successful_sessions(
             )
         return pd.DataFrame(rows)
 
-    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(
         runner, "fit_model_per_session", _fit_with_one_late_session_failure
     )
@@ -691,7 +697,7 @@ def test_requested_cv_failure_aborts_without_publishing(tmp_path, monkeypatch):
     input_dir.mkdir()
     # Two events are enough for the null primary fit but not 5-fold CV.
     _canonical_arm_table().to_pickle(input_dir / "event_arm_table.pkl")
-    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(
         sys,
         "argv",
@@ -725,7 +731,7 @@ def test_requested_cv_metadata_is_required_at_publication(tmp_path, monkeypatch)
             }
         )
 
-    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(runner, "fit_model_per_session", _primary_without_cv)
     monkeypatch.setattr(
         sys,
@@ -745,7 +751,7 @@ def test_complete_requested_cv_is_published_with_primary_fit(tmp_path, monkeypat
     # Five-fold CV requires at least ten events; exercise the real null-model
     # fit and CV path rather than only a mocked result dictionary.
     _canonical_arm_table(n_events=10).to_pickle(input_dir / "event_arm_table.pkl")
-    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(
         sys,
         "argv",
@@ -779,7 +785,7 @@ def test_requested_logit_failure_aborts_without_publishing(tmp_path, monkeypatch
     input_dir.mkdir()
     _canonical_arm_table().to_pickle(input_dir / "event_arm_table.pkl")
 
-    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(
         runner,
         "fit_model_per_session",
@@ -805,7 +811,7 @@ def test_complete_requested_logit_is_staged_with_primary_fit(tmp_path, monkeypat
     input_dir.mkdir()
     _canonical_arm_table().to_pickle(input_dir / "event_arm_table.pkl")
 
-    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(
         runner,
         "fit_model_per_session",
@@ -844,7 +850,7 @@ def test_published_bundle_carries_the_hash_of_the_table_it_was_fit_on(
     input_dir.mkdir()
     table = input_dir / "event_arm_table.pkl"
     _canonical_arm_table().to_pickle(table)
-    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py", "--models", "M0"])
 
     runner.main()
@@ -867,7 +873,7 @@ def test_count_run_publishes_beside_the_fraction_bundle(tmp_path, monkeypatch):
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
     _canonical_arm_table().to_pickle(input_dir / "event_arm_table.pkl")
-    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", tmp_path)
+    _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(
         sys,
         "argv",
