@@ -545,6 +545,7 @@ class TestTheReportOnTheRunnersTables:
 
     def test_main_reads_the_run_named(self, run, tmp_path, monkeypatch):  # noqa: F811
         monkeypatch.setattr(report, "FIGURE_ROOT", tmp_path / "figures")
+        monkeypatch.setattr(report, "INVENTORY_COMPARISON_ROOT", run.parent)
 
         report.main(["--run-id", run.name])
 

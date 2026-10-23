@@ -104,6 +104,10 @@ from continuum_swr_replay.intervals import (  # noqa: E402
     interval_mask,
 )
 from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
+from continuum_swr_replay.paths import (  # noqa: E402
+    INVENTORY_COMPARISON_ROOT,
+    MEMORYLESS_ROOT,
+)
 from continuum_swr_replay.runs.cli import parse_run_id  # noqa: E402
 from continuum_swr_replay.runs.io import json_ready  # noqa: E402
 from continuum_swr_replay.tables.io import read_table  # noqa: E402
@@ -968,7 +972,7 @@ def write_examples(run_dir: Path, figure_dir: Path) -> list[dict[str, Any]]:
         ignore_index=True,
     )
     drawn = draw_examples(cells)
-    memoryless_dir = runner.MEMORYLESS_ROOT / settings["input_runs"]["memoryless"]
+    memoryless_dir = MEMORYLESS_ROOT / settings["input_runs"]["memoryless"]
     run_id = run_dir.name
     records = []
     for identifier, group in drawn.groupby("epoch_id", sort=True):
@@ -1055,7 +1059,7 @@ def main(argv: list[str] | None = None) -> None:
     )
     args = parser.parse_args(argv)
     use_memoryless_device()
-    run_dir = runner.OUTPUT_ROOT / args.run_id
+    run_dir = INVENTORY_COMPARISON_ROOT / args.run_id
     if not (run_dir / "manifest.json").exists():
         sys.exit(f"No inventory run manifest at {run_dir}.")
     figure_dir = FIGURE_ROOT / args.run_id / EXAMPLES_DIR

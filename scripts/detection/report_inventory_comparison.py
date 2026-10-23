@@ -54,6 +54,7 @@ from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_epoch_ids,
 )
 from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
+from continuum_swr_replay.paths import INVENTORY_COMPARISON_ROOT  # noqa: E402
 from continuum_swr_replay.runs.cli import parse_run_id  # noqa: E402
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
 from scripts.detection import run_inventory_comparison as runner  # noqa: E402
@@ -1287,7 +1288,7 @@ def main(argv: list[str] | None = None) -> None:
         "replay_detection_comparison/inventory/.",
     )
     args = parser.parse_args(argv)
-    run_dir = runner.OUTPUT_ROOT / args.run_id
+    run_dir = INVENTORY_COMPARISON_ROOT / args.run_id
     if not (run_dir / "manifest.json").exists():
         sys.exit(f"No inventory run manifest at {run_dir}.")
     written = write_report(run_dir, FIGURE_ROOT)

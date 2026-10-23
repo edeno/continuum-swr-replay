@@ -88,6 +88,11 @@ from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
 )
 from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier  # noqa: E402
 from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
+from continuum_swr_replay.paths import (  # noqa: E402
+    EVENT_FEATURES_ROOT,
+    INVENTORY_COMPARISON_ROOT,
+    MEMORYLESS_ROOT,
+)
 from continuum_swr_replay.runs.cli import parse_run_id  # noqa: E402
 from continuum_swr_replay.tables.io import read_table  # noqa: E402
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
@@ -113,10 +118,9 @@ from scripts.figures.generate_inventory_examples import (  # noqa: E402
 )
 
 PRODUCED_BY = "scripts/detection/report_event_features.py"
-OUTPUT_ROOT = features_runner.OUTPUT_ROOT
+OUTPUT_ROOT = EVENT_FEATURES_ROOT
 """Where the event features runs are."""
-INVENTORY_ROOT = features_runner.INVENTORY_ROOT
-MEMORYLESS_ROOT = features_runner.MEMORYLESS_ROOT
+INVENTORY_ROOT = INVENTORY_COMPARISON_ROOT
 FIGURE_ROOT = FIGURE_DIR / "event_features"
 REPORT_DIR = "report"
 """The report's folder inside the run's."""

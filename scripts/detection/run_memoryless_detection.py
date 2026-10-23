@@ -190,7 +190,7 @@ from continuum_swr_replay.intervals import (
     masked_seconds,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR
-from continuum_swr_replay.paths import DETECTION_COMPARISON_DIR
+from continuum_swr_replay.paths import MEMORYLESS_ROOT
 from continuum_swr_replay.runs.batch import (
     cuda_cluster_class,
     raise_open_file_limit,
@@ -203,7 +203,7 @@ from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.runs.provenance import provenance_record
 from continuum_swr_replay.tables.io import write_atomically, write_table
 
-OUTPUT_ROOT = DETECTION_COMPARISON_DIR / "memoryless"
+OUTPUT_ROOT = MEMORYLESS_ROOT
 DESIGN_SPEC = "docs/design/replay_detection_comparison/02-memoryless-sequence.md"
 NOT_ANALYSED = "not an analysed epoch in the epoch register"
 """Why a decode under ``--root`` is left out when the register does not analyse

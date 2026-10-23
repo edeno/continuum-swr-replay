@@ -56,6 +56,11 @@ from continuum_swr_replay.analysis.inventory_comparison.selection import (  # no
     REJECTION_COHORTS,
 )
 from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
+from continuum_swr_replay.paths import (  # noqa: E402
+    EVENT_FEATURES_ROOT,
+    INVENTORY_COMPARISON_ROOT,
+    MEMORYLESS_ROOT,
+)
 from continuum_swr_replay.runs.cli import parse_run_id  # noqa: E402
 from continuum_swr_replay.runs.io import json_ready  # noqa: E402
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
@@ -383,11 +388,9 @@ def write_examples(
         or ``not_written``.
     """
     inventory_root = (
-        features_runner.INVENTORY_ROOT if inventory_root is None else inventory_root
+        INVENTORY_COMPARISON_ROOT if inventory_root is None else inventory_root
     )
-    memoryless_root = (
-        features_runner.MEMORYLESS_ROOT if memoryless_root is None else memoryless_root
-    )
+    memoryless_root = MEMORYLESS_ROOT if memoryless_root is None else memoryless_root
     manifest, tables = report.read_run(
         run_dir, features_runner.TABLE_DTYPES, features_runner.output_path
     )
@@ -535,7 +538,7 @@ def main(argv: list[str] | None = None) -> None:
     )
     args = parser.parse_args(argv)
     inventory_examples.use_memoryless_device()
-    run_dir = features_runner.OUTPUT_ROOT / args.run_id
+    run_dir = EVENT_FEATURES_ROOT / args.run_id
     if not (run_dir / "manifest.json").exists():
         sys.exit(f"No event features run manifest at {run_dir}.")
     figure_dir = FIGURE_ROOT / args.run_id / EXAMPLES_DIR

@@ -27,7 +27,7 @@ from numpy.typing import NDArray
 from continuum_swr_replay.data_loaders.spikes import filter_spike_times, get_hpc_marks
 from continuum_swr_replay.data_loaders.utils import EpochKey
 from continuum_swr_replay.decoding.files import decode_paths
-from continuum_swr_replay.paths import DETECTION_COMPARISON_DIR
+from continuum_swr_replay.paths import MEMORYLESS_ROOT
 from continuum_swr_replay.tables.io import write_atomically
 
 __all__ = [
@@ -51,7 +51,7 @@ MARKS_RULE = (
 MARKS_RULE_TAG = "loader"
 """:data:`MARKS_RULE`'s name in a marks cache file; another rule needs another tag."""
 
-MARKS_CACHE_DIR = DETECTION_COMPARISON_DIR / "memoryless" / "marks_cache"
+MARKS_CACHE_DIR = MEMORYLESS_ROOT / "marks_cache"
 """Where the runners cache the marks by default: the memoryless runner's
 ``--cache-dir`` default, which the Carey and event-feature runners share."""
 

@@ -20,10 +20,14 @@ from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 __all__ = [
     "ARTIFACT_INTERVALS_DIR",
     "BASENAME_TO_TABLE",
+    "CAREY_ROOT",
     "CANONICAL_TABLES",
     "CANONICAL_TABLE_BASENAMES",
     "CONTFRAG_REPLAY_CONTENT_DIR",
     "DETECTION_COMPARISON_DIR",
+    "EVENT_FEATURES_ROOT",
+    "INVENTORY_COMPARISON_ROOT",
+    "MEMORYLESS_ROOT",
     "MODEL_SUBDIRS",
     "QVALS_STANDARDIZATION_REFERENCE",
     "REPLAY_CONTENT_DIR",
@@ -44,6 +48,18 @@ DETECTION_COMPARISON_DIR = PROCESSED_DATA_DIR / "replay_detection_comparison"
 
 SWR_INVENTORY_ROOT = DETECTION_COMPARISON_DIR / "swr"
 """Where the SWR runner writes its run folders, one per run id."""
+
+MEMORYLESS_ROOT = DETECTION_COMPARISON_DIR / "memoryless"
+"""Where the memoryless runner writes its run folders (and its marks cache)."""
+
+CAREY_ROOT = DETECTION_COMPARISON_DIR / "carey"
+"""Where the Carey runner writes its run folders."""
+
+INVENTORY_COMPARISON_ROOT = DETECTION_COMPARISON_DIR / "inventory"
+"""Where the inventory-comparison runner writes its run folders."""
+
+EVENT_FEATURES_ROOT = DETECTION_COMPARISON_DIR / "event_features"
+"""Where the event-feature runner writes its run folders."""
 
 ARTIFACT_INTERVALS_DIR = PROCESSED_DATA_DIR / "artifact_intervals"
 """Where artifact-interval run folders go, one per run id."""

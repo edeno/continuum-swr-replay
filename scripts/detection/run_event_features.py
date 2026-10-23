@@ -181,7 +181,12 @@ from continuum_swr_replay.intervals import (  # noqa: E402
     interval_mask,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR  # noqa: E402
-from continuum_swr_replay.paths import table_path  # noqa: E402
+from continuum_swr_replay.paths import (  # noqa: E402
+    EVENT_FEATURES_ROOT,
+    INVENTORY_COMPARISON_ROOT,
+    MEMORYLESS_ROOT,
+    table_path,
+)
 from continuum_swr_replay.runs.batch import (  # noqa: E402
     raise_open_file_limit,
     run_epoch_logged,
@@ -206,10 +211,9 @@ from scripts.detection import run_inventory_comparison as comparison  # noqa: E4
 with warnings.catch_warnings():
     from scripts.detection.analyze_event_spike_evidence import REMOTE_CM  # noqa: E402
 
-OUTPUT_ROOT = comparison.COMPARISON_ROOT / "event_features"
-INVENTORY_ROOT = comparison.OUTPUT_ROOT
+OUTPUT_ROOT = EVENT_FEATURES_ROOT
+INVENTORY_ROOT = INVENTORY_COMPARISON_ROOT
 """Where the comparison runs are."""
-MEMORYLESS_ROOT = comparison.MEMORYLESS_ROOT
 MARKS_CACHE_DIR = carey.MARKS_CACHE_DIR
 """The memoryless runner's marks cache, keyed by the decode's detector file."""
 STOP_TABLE = table_path("stop_table")
