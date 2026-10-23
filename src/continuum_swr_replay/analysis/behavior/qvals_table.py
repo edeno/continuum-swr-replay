@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import warnings
+from pathlib import Path
 from typing import Any
 
 import datajoint as dj
@@ -34,6 +35,7 @@ from continuum_swr_replay.tables.covariate_registry import (
 )
 from continuum_swr_replay.tables.io import publish_canonical, read_table
 from continuum_swr_replay.tables.standardization import (
+    Reference,
     assert_standardized_present,
     attach_standardized,
     save_reference,
@@ -933,6 +935,21 @@ def _to_canonical_qvals(tab: pd.DataFrame) -> pd.DataFrame:
     return stamp_covariate_schema(tab, table="qvals")
 
 
+def write_qvals_outputs(
+    tab: pd.DataFrame, reference: Reference, replay_content_dir: Path
+) -> Path:
+    """Publish ``qvals_table`` and its standardization reference.
+
+    Both go where :func:`~continuum_swr_replay.paths.table_path` puts the table:
+    the replay-content root, beside the other canonical tables. Returns the
+    table's path.
+    """
+    directory = table_path("qvals_table", replay_content_dir).parent
+    out = publish_canonical(tab, directory, table="qvals", basename="qvals_table")
+    save_reference(reference, directory / "qvals_standardization_reference.json")
+    return out
+
+
 def run_build_qvals_table(args: argparse.Namespace) -> None:
     """Build every requested animal's qvals rows, validate, and optionally publish."""
     replay_content_dir = args.replay_content_dir.resolve()
@@ -1031,13 +1048,5 @@ def run_build_qvals_table(args: argparse.Namespace) -> None:
     z_cols = [f"{c}_z" for c in QVALS_STANDARDIZED_COLS if c in tab.columns]
 
     if args.write:
-        out = publish_canonical(
-            tab,
-            replay_content_dir,
-            table="qvals",
-            basename="qvals_table",
-        )
-        save_reference(
-            qv_reference, replay_content_dir / "qvals_standardization_reference.json"
-        )
+        out = write_qvals_outputs(tab, qv_reference, replay_content_dir)
         print(f"\nwrote {len(tab)} rows ({len(z_cols)} _z cols) -> {out}")

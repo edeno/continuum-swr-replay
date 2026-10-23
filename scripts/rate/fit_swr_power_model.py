@@ -433,7 +433,8 @@ def _write_outputs(
     return out
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
+    """The command line: smoke mode and the output directory."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--max-per-animal",
@@ -450,7 +451,11 @@ def main() -> None:
         default=OUTPUT_DIR,
         help="Directory for the fitted model, its z reference, and the audits.",
     )
-    args = parser.parse_args()
+    return parser
+
+
+def main() -> None:
+    args = build_parser().parse_args()
     # `--max-per-animal 0` is still smoke mode, so test the flag, not its value.
     smoke = args.max_per_animal is not None
 

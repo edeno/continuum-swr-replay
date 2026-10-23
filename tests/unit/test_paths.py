@@ -129,3 +129,35 @@ def test_every_swr_power_output_resolves_under_its_own_model_dir(tmp_path):
 def test_table_path_refuses_a_name_outside_the_registry(name):
     with pytest.raises(KeyError, match="not a canonical table"):
         paths.table_path(name)
+
+
+def test_the_swr_power_command_line_writes_under_its_own_model_dir():
+    from scripts.rate import fit_swr_power_model as mod
+
+    assert mod.build_parser().parse_args([]).output_dir == (
+        RC / "models_per_event_swr_power"
+    )
+
+
+def test_the_qvals_builder_writes_beside_the_other_canonical_tables(monkeypatch):
+    from continuum_swr_replay.analysis.behavior import qvals_table as builder
+
+    written = {}
+    monkeypatch.setattr(
+        builder,
+        "publish_canonical",
+        lambda frame, path, *, table, basename: written.setdefault(
+            "table", Path(path) / f"{basename}.parquet"
+        ),
+    )
+    monkeypatch.setattr(
+        builder, "save_reference", lambda ref, path: written.setdefault("ref", path)
+    )
+    root = Path("/staging/root")
+
+    builder.write_qvals_outputs(None, {}, root)
+
+    assert written == {
+        "table": paths.table_path("qvals_table", root),
+        "ref": root / "qvals_standardization_reference.json",
+    }

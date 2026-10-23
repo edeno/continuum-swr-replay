@@ -26,7 +26,7 @@ Beta-Bernoulli decision-variable covariates — VENDORED VERBATIM from Alison Co
 
 Per-stop RL-model values via DataJoint — canonical, complete, timestamp-aligned.
 
-`peri_switch_index`, `add_experienced_value_columns`, `add_beta_belief_entropy`, `canonicalize_behavior_model_columns`, `assign_stops_to_trials`, `build_animal`, `run_build_qvals_table`
+`peri_switch_index`, `add_experienced_value_columns`, `add_beta_belief_entropy`, `canonicalize_behavior_model_columns`, `assign_stops_to_trials`, `build_animal`, `write_qvals_outputs`, `run_build_qvals_table`
 
 ### `src/continuum_swr_replay/analysis/events/analysed_time.py`
 
@@ -540,7 +540,7 @@ Fit the per-bin non-local rate models, `is_swr` version (see docs/models_table.m
 
 Per-event SWR-coupling strength (ripple power) vs behavioral covariates.
 
-`fit_power_model`, `main`
+`fit_power_model`, `build_parser`, `main`
 
 ### `scripts/rate/fit_uncertainty_rate.py`
 
