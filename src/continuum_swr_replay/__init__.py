@@ -38,11 +38,7 @@ _LAZY_EXPORTS = {
     "get_training_timepoints": "continuum_swr_replay.data_loaders",
 }
 
-__all__ = [
-    "load_data",
-    "get_epoch_info",
-    "get_training_timepoints",
-]
+__all__ = sorted(_LAZY_EXPORTS)
 
 
 def __getattr__(name: str):

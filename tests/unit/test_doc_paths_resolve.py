@@ -39,6 +39,8 @@ import re
 import subprocess
 from pathlib import Path
 
+from tests.unit._imports import defined_names, parse
+
 REPO = Path(__file__).resolve().parents[2]
 SRC = REPO / "src"
 PACKAGE = "continuum_swr_replay"
@@ -139,58 +141,9 @@ def _code_spans(text: str) -> list[tuple[int, str]]:
     return spans
 
 
-def _top_level_statements(body: list[ast.stmt]) -> list[ast.stmt]:
-    """Module-level statements, looking inside ``if``/``try`` blocks."""
-    out: list[ast.stmt] = []
-    for node in body:
-        if isinstance(node, ast.If):
-            out.extend(_top_level_statements(node.body + node.orelse))
-        elif isinstance(node, ast.Try):
-            handlers = [s for h in node.handlers for s in h.body]
-            out.extend(
-                _top_level_statements(
-                    node.body + handlers + node.orelse + node.finalbody
-                )
-            )
-        else:
-            out.append(node)
-    return out
-
-
-def _defined_names(body: list[ast.stmt]) -> dict[str, ast.stmt]:
-    """Names bound by ``body``, each mapped to the statement that binds it."""
-    names: dict[str, ast.stmt] = {}
-    for node in _top_level_statements(body):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            names[node.name] = node
-        elif isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
-            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-            for target in targets:
-                for sub in ast.walk(target):
-                    if isinstance(sub, ast.Name):
-                        names[sub.id] = node
-            value = node.value
-            if (
-                isinstance(node, ast.Assign)
-                and any(
-                    isinstance(t, ast.Name) and t.id == "_LAZY_EXPORTS"
-                    for t in node.targets
-                )
-                and isinstance(value, ast.Dict)
-            ):
-                for key in value.keys:
-                    if isinstance(key, ast.Constant) and isinstance(key.value, str):
-                        names[key.value] = node
-        elif isinstance(node, (ast.Import, ast.ImportFrom)):
-            for alias in node.names:
-                bound = alias.asname or alias.name.split(".")[0]
-                names[bound] = node
-    return names
-
-
 @functools.cache
 def _module_names(path: Path) -> dict[str, ast.stmt]:
-    return _defined_names(ast.parse(path.read_text(), filename=str(path)).body)
+    return defined_names(parse(path).body)
 
 
 def _resolves(dotted: str) -> bool:
@@ -215,7 +168,7 @@ def _resolves(dotted: str) -> bool:
     if node is None:
         return False
     if len(rest) > 1 and isinstance(node, ast.ClassDef):
-        return rest[1] in _defined_names(node.body)
+        return rest[1] in defined_names(node.body)
     # A deeper attribute of a function, a constant or an imported name is not
     # followed; the first component is the part a module move breaks.
     return True

@@ -21,7 +21,6 @@ with the offending import statement.
 
 from __future__ import annotations
 
-import ast
 import importlib
 import subprocess
 import sys
@@ -29,6 +28,16 @@ import textwrap
 from pathlib import Path
 
 import pytest
+
+from tests.unit._imports import (
+    SRC,
+    defined_names,
+    lazy_exports,
+    module_edges,
+    module_index,
+    parse,
+    relative_name,
+)
 
 # Every import statement here must complete in a fresh interpreter
 # without dragging ``spyglass.*`` into ``sys.modules``. Comments after
@@ -196,10 +205,6 @@ JAX_FREE: list[str] = [
     "continuum_swr_replay.decoding.results",
 ]
 
-#: Leaf modules that should be JAX-free but are not yet, each with the import
-#: chain that loads JAX. Empty: every leaf above is clean.
-JAX_FREE_PENDING: dict[str, str] = {}
-
 _HEAVY_MODULES = ("jax", "non_local_detector", "statsmodels")
 
 
@@ -303,10 +308,6 @@ def test_runs_loads_no_dask_and_no_analysis():
     assert result.stdout.startswith("OK"), result.stdout
 
 
-def test_jax_free_lists_are_disjoint():
-    assert not set(JAX_FREE) & set(JAX_FREE_PENDING)
-
-
 @pytest.mark.parametrize(
     "package",
     ["continuum_swr_replay.analysis.replay", "continuum_swr_replay.analysis.pfc"],
@@ -315,7 +316,6 @@ def test_every_lazy_export_imports_by_name(package):
     """``from <package> import <name>`` works for every name in ``__all__``,
     and binds the object its submodule defines."""
     module = importlib.import_module(package)
-    assert set(module.__all__) == set(module._LAZY_EXPORTS)
     for name in module.__all__:
         namespace: dict[str, object] = {}
         exec(f"from {package} import {name}", namespace)  # noqa: S102
@@ -331,117 +331,53 @@ def test_an_unknown_name_is_an_attribute_error():
         module.no_such_name  # noqa: B018
 
 
-_SRC = Path(__file__).resolve().parents[2] / "src" / "continuum_swr_replay"
-
-#: The package ``__init__``s that re-export lazily, relative to ``_SRC``.
-_LAZY_INITS = (
-    "__init__.py",
-    "data_loaders/__init__.py",
-    "analysis/hippocampus/__init__.py",
-    "analysis/pfc/__init__.py",
-    "analysis/replay/__init__.py",
-)
+#: Every package ``__init__`` that re-exports lazily.
+_LAZY_INITS = sorted(p for p in SRC.rglob("__init__.py") if lazy_exports(p, SRC))
 
 
-def _lazy_exports_and_type_checking_imports(
-    init: Path,
-) -> tuple[set[tuple[str, str, str]], set[tuple[str, str, str]]]:
-    """``(module, attribute, bound name)`` triples, read statically from ``init``.
+def _unresolved_exports(init: Path, root: Path) -> list[tuple[str, str, str]]:
+    """``(name, module, attribute)`` for each ``_LAZY_EXPORTS`` entry of ``init``
+    whose module is not one under ``root`` or does not bind the attribute."""
+    index = module_index(root)
+    unresolved = []
+    for name, (module, attribute) in lazy_exports(init, root).items():
+        path = index.get(relative_name(module, root))
+        if path is None or attribute not in defined_names(parse(path).body):
+            unresolved.append((name, module, attribute))
+    return unresolved
 
-    The first set is what ``_LAZY_EXPORTS`` promises; the second is what the
-    ``if TYPE_CHECKING:`` block imports. Modules are absolute dotted names.
+
+def test_the_lazy_inits_are_found():
+    assert SRC / "analysis" / "replay" / "__init__.py" in _LAZY_INITS
+    assert SRC / "data_loaders" / "__init__.py" in _LAZY_INITS
+
+
+@pytest.mark.parametrize("init", _LAZY_INITS, ids=lambda p: str(p.relative_to(SRC)))
+def test_every_lazy_export_names_a_defined_attribute(init):
+    """Each ``_LAZY_EXPORTS`` target binds its attribute, checked statically.
+
+    Nothing is imported, so the exports whose modules need Spyglass are
+    covered offline too.
     """
-    package_parts = [_SRC.name, *init.parent.relative_to(_SRC).parts]
-    package = ".".join(package_parts)
-    tree = ast.parse(init.read_text(), filename=str(init))
-
-    exports: set[tuple[str, str, str]] | None = None
-    imports: set[tuple[str, str, str]] = set()
-    for node in tree.body:
-        if (
-            isinstance(node, ast.Assign)
-            and any(
-                isinstance(t, ast.Name) and t.id == "_LAZY_EXPORTS"
-                for t in node.targets
-            )
-        ) or (
-            isinstance(node, ast.AnnAssign)
-            and isinstance(node.target, ast.Name)
-            and node.target.id == "_LAZY_EXPORTS"
-        ):
-            exports = set()
-            for name, target in ast.literal_eval(node.value).items():
-                module, attribute = (
-                    target if isinstance(target, tuple) else (target, name)
-                )
-                if not module.startswith(f"{_SRC.name}."):
-                    module = f"{package}.{module}"
-                exports.add((module, attribute, name))
-        elif (
-            isinstance(node, ast.If)
-            and isinstance(node.test, ast.Name)
-            and node.test.id == "TYPE_CHECKING"
-        ):
-            for statement in ast.walk(node):
-                if not isinstance(statement, ast.ImportFrom):
-                    continue
-                if statement.level == 0:
-                    module = statement.module or ""
-                else:
-                    kept = package_parts[: len(package_parts) - (statement.level - 1)]
-                    module = ".".join(
-                        [*kept, *([statement.module] if statement.module else [])]
-                    )
-                for alias in statement.names:
-                    imports.add((module, alias.name, alias.asname or alias.name))
-    assert exports, f"{init}: no _LAZY_EXPORTS found; the check would be vacuous"
-    return exports, imports
+    assert not _unresolved_exports(init, SRC)
 
 
-@pytest.mark.parametrize("init", _LAZY_INITS)
-def test_every_lazy_export_has_a_type_checking_mirror(init):
-    """Each ``_LAZY_EXPORTS`` target is imported under ``TYPE_CHECKING`` too.
-
-    The import-layering scan (``test_import_layering.module_edges``) sees a
-    lazy export's dependency only through that mirror: ``_LAZY_EXPORTS`` holds
-    strings, which ``ast`` does not read as imports. A missing mirror hides
-    the edge from every layering rule.
-    """
-    exports, imports = _lazy_exports_and_type_checking_imports(_SRC / init)
-    missing = sorted(exports - imports)
-    assert not missing, (
-        f"{init}: lazy exports with no TYPE_CHECKING import "
-        "(module, attribute, bound name):\n" + "\n".join(map(str, missing))
-    )
-
-
-def test_the_lazy_init_list_is_complete():
-    """Every ``__init__`` that defines ``_LAZY_EXPORTS`` is in the mirror check."""
-    found = {
-        str(p.relative_to(_SRC))
-        for p in _SRC.rglob("__init__.py")
-        if "_LAZY_EXPORTS" in p.read_text()
-    }
-    assert found == set(_LAZY_INITS)
-
-
-def test_a_missing_type_checking_mirror_is_caught(tmp_path, monkeypatch):
-    """A lazy export whose ``TYPE_CHECKING`` import was dropped is reported."""
-    package = tmp_path / "continuum_swr_replay" / "pkg"
+def test_a_lazy_export_is_an_import_edge_and_a_bad_one_is_caught(tmp_path):
+    """The layering scan sees each ``_LAZY_EXPORTS`` target as an import, with
+    no ``TYPE_CHECKING`` mirror, and a target that binds nothing is reported."""
+    root = tmp_path / "continuum_swr_replay"
+    package = root / "pkg"
     package.mkdir(parents=True)
-    init = package / "__init__.py"
-    init.write_text(
+    (root / "__init__.py").write_text("")
+    (root / "other.py").write_text("h = 1\n")
+    (package / "mod.py").write_text("def f():\n    pass\n\n\ndef _g():\n    pass\n")
+    (package / "__init__.py").write_text(
         '_LAZY_EXPORTS = {"f": "mod", "g": ("mod", "_g"), '
-        '"h": "continuum_swr_replay.other"}\n'
-        "if TYPE_CHECKING:\n"
-        "    from .mod import f\n"
-        "    from .mod import g\n"  # the alias is missing: binds _g as g
+        '"h": "continuum_swr_replay.other", "k": "mod", "m": "gone"}\n'
     )
-    monkeypatch.setattr(
-        sys.modules[__name__], "_SRC", tmp_path / "continuum_swr_replay"
-    )
-    exports, imports = _lazy_exports_and_type_checking_imports(init)
-    assert sorted(exports - imports) == [
-        ("continuum_swr_replay.other", "h", "h"),
-        ("continuum_swr_replay.pkg.mod", "_g", "g"),
+
+    assert module_edges(root) == {("pkg", "pkg.mod"), ("pkg", "other")}
+    assert _unresolved_exports(package / "__init__.py", root) == [
+        ("k", "continuum_swr_replay.pkg.mod", "k"),
+        ("m", "continuum_swr_replay.pkg.gone", "m"),
     ]

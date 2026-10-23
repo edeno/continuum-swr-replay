@@ -100,17 +100,7 @@ def __getattr__(name: str):
     return attr
 
 
-__all__ = [
-    "MatchedControlDraw",
-    "make_design_matrices",
-    "fit_immobility_models",
-    "build_session_event_sets",
-    "build_session_fit_mask",
-    "make_matched_control_times",
-    "matched_control_seed",
-    "process_neuron",
-    "run_session",
-]
+__all__ = sorted(_LAZY_EXPORTS)
 
 
 if TYPE_CHECKING:  # pragma: no cover - types only

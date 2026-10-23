@@ -42,12 +42,92 @@ def module_index(root: Path) -> dict[str, Path]:
     return index
 
 
-def _relative(name: str, root: Path) -> str | None:
+def relative_name(name: str, root: Path) -> str | None:
     """``name`` relative to ``root``, or None outside it."""
     if name == root.name:
         return ""
     prefix = f"{root.name}."
     return name[len(prefix) :] if name.startswith(prefix) else None
+
+
+def _top_level_statements(body: list[ast.stmt]) -> list[ast.stmt]:
+    """Module-level statements, looking inside ``if``/``try`` blocks."""
+    out: list[ast.stmt] = []
+    for node in body:
+        if isinstance(node, ast.If):
+            out.extend(_top_level_statements(node.body + node.orelse))
+        elif isinstance(node, ast.Try):
+            handlers = [s for h in node.handlers for s in h.body]
+            out.extend(
+                _top_level_statements(
+                    node.body + handlers + node.orelse + node.finalbody
+                )
+            )
+        else:
+            out.append(node)
+    return out
+
+
+def defined_names(body: list[ast.stmt]) -> dict[str, ast.stmt]:
+    """Names bound by ``body``, each mapped to the statement that binds it.
+
+    A top-level ``def``/``class``/assignment/import binds a name, and so does
+    each key of a package's ``_LAZY_EXPORTS`` table.
+    """
+    names: dict[str, ast.stmt] = {}
+    for node in _top_level_statements(body):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            names[node.name] = node
+        elif isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            for target in targets:
+                for sub in ast.walk(target):
+                    if isinstance(sub, ast.Name):
+                        names[sub.id] = node
+            value = node.value
+            if (
+                isinstance(node, ast.Assign)
+                and any(
+                    isinstance(t, ast.Name) and t.id == "_LAZY_EXPORTS"
+                    for t in node.targets
+                )
+                and isinstance(value, ast.Dict)
+            ):
+                for key in value.keys:
+                    if isinstance(key, ast.Constant) and isinstance(key.value, str):
+                        names[key.value] = node
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            for alias in node.names:
+                bound = alias.asname or alias.name.split(".")[0]
+                names[bound] = node
+    return names
+
+
+def lazy_exports(init: Path, root: Path) -> dict[str, tuple[str, str]]:
+    """``init``'s ``_LAZY_EXPORTS`` table as ``name -> (module, attribute)``.
+
+    A target is a submodule relative to the package or an absolute module
+    name, either plain (the attribute is the exported name) or as a
+    ``(module, attribute)`` pair; modules come back absolute. Empty when
+    ``init`` has no ``_LAZY_EXPORTS``.
+    """
+    package = ".".join([root.name, *init.relative_to(root).parts[:-1]])
+    for node in parse(init).body:
+        targets = node.targets if isinstance(node, ast.Assign) else []
+        if isinstance(node, ast.AnnAssign):
+            targets = [node.target]
+        if any(isinstance(t, ast.Name) and t.id == "_LAZY_EXPORTS" for t in targets):
+            table = ast.literal_eval(node.value)
+            break
+    else:
+        return {}
+    exports: dict[str, tuple[str, str]] = {}
+    for name, target in table.items():
+        module, attribute = target if isinstance(target, tuple) else (target, name)
+        if relative_name(module, root) is None:
+            module = f"{package}.{module}"
+        exports[name] = (module, attribute)
+    return exports
 
 
 @functools.cache
@@ -58,7 +138,9 @@ def imported_modules(path: Path, root: Path) -> frozenset[str]:
     ``from pkg.mod import name`` names ``pkg.mod``, and ``from pkg import mod``
     names ``pkg.mod`` when ``mod`` is a module under ``root``. Imports from
     outside ``root`` keep the name they are written with. Imports inside
-    functions and ``TYPE_CHECKING`` blocks count.
+    functions and ``TYPE_CHECKING`` blocks count, and so does each target of a
+    package's ``_LAZY_EXPORTS`` table (:func:`lazy_exports`), an import
+    deferred to first attribute access.
 
     Relative imports are resolved against the module's CONTAINING package,
     which for both ``mod.py`` and ``pkg/__init__.py`` is the directory the file
@@ -68,22 +150,24 @@ def imported_modules(path: Path, root: Path) -> frozenset[str]:
     """
     index = module_index(root)
     package_parts = [root.name, *path.relative_to(root).parts[:-1]]
-    targets: list[str] = []
+    # (module, name imported from it, or None for ``import module``)
+    imports: list[tuple[str, str | None]] = list(lazy_exports(path, root).values())
     for node in ast.walk(parse(path)):
         if isinstance(node, ast.Import):
-            targets.extend(alias.name for alias in node.names)
+            imports.extend((alias.name, None) for alias in node.names)
         elif isinstance(node, ast.ImportFrom):
             if node.level == 0:
                 base = node.module or ""
             else:
                 kept = package_parts[: len(package_parts) - (node.level - 1)]
                 base = ".".join([*kept, *([node.module] if node.module else [])])
-            for alias in node.names:
-                child = f"{base}.{alias.name}"
-                targets.append(child if _relative(child, root) in index else base)
+            imports.extend((base, alias.name) for alias in node.names)
     modules: set[str] = set()
-    for target in targets:
-        relative = _relative(target, root)
+    for base, name in imports:
+        target = base if name is None else f"{base}.{name}"
+        if relative_name(target, root) not in index:
+            target = base
+        relative = relative_name(target, root)
         if relative is None:
             modules.add(target)
             continue
@@ -106,7 +190,7 @@ def module_edges(root: Path = SRC) -> frozenset[tuple[str, str]]:
     edges: set[tuple[str, str]] = set()
     for importer, path in module_index(root).items():
         for module in imported_modules(path, root):
-            relative = _relative(module, root)
+            relative = relative_name(module, root)
             imported = module if relative is None else relative
             if imported != importer:
                 edges.add((importer, imported))

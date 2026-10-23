@@ -34,10 +34,7 @@ __all__ = [
     "NWB_FILES",
     "TRACK_SEGMENT_TO_PATCH",
     "WELL_PATCH_MAPPING",
-    "get_epoch_info",
-    "get_labels",
-    "get_training_timepoints",
-    "load_data",
+    *sorted(_LAZY_EXPORTS),
 ]
 
 
