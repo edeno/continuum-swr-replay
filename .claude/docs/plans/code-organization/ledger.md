@@ -150,3 +150,34 @@ Final fix wave: DONE (10d9db09, 600d94a7, c7f97e8b, a3883ef7, c8ed8c23): pipelin
 Ruling: no scoped re-review of the final fix wave — docs, import order and map roots only, all test-pinned; lead prefers fewer reviews — cost if wrong: a doc wording issue.
 Final: -m real_data suite at 6e511d39 — 19 passed, 0 failed, 2:09:44 (scratchpad/final_org/pytest_realdata_6e511d39.txt)
 Final: branch complete, not merged — merge into master awaits the lead's approval
+
+## Phase D (2026-10-23)
+
+Phases A–C and the final fix wave: complete — see .claude/docs/plans/code-organization/ledger.md (archived, through a0cf6ab1).
+Phase D: lead 2026-10-23 "Do it in this branch" — goal: an outside scientist can understand the analysis by reading the code.
+Ruling: keep runs/io.py, tables/io.py, state_evidence/io.py — io is preloaded at startup so they cannot shadow (final review M10) and package.io is a common pattern — cost if wrong: one more rename later.
+Ruling: keep memoryless_sequence/statistics.py — renaming breaks the 706 memoryless candidate pickles (Q5) — cost if wrong: it shadows statistics when run from inside its directory, now pinned by an allowlist.
+Ruling: names — events/swr_inventory→swr_source, hippocampus/swr_inventories→swr_detectors, events/detection→nonlocal_detection, schemas→data_types, adapters.swr_inventory()→source_swr_inventory() — each says what the module does — cost if wrong: one more rename.
+Ruling: Tasks 17 and 18 go to one implementer, one after the other — disjoint except docs/README.md — cost if wrong: none.
+Task 17+18: dispatched (BASE be88764e, implementer a2a88dcb920738c7c, opus)
+Lead 2026-10-23 04:15: "You can move the files in this case" — controller runs the Task 17 mv list (Processed-Data, this move only) after Task 17 is committed and the list is checked; implementer still never writes into Processed-Data/.
+Task 17+18: DONE_WITH_CONCERNS (41bdfaed T17; c10223b2, fca8c683, 14f69a86, 9ec5f367, a02b2049 renames; 4691953d shadow test; 15dbe9a7 docs): GOLDEN IDENTICAL after T17 and at HEAD; 10,351-pickle byte scan: no old path referenced (control 706); full suite 7 known failures, 5,291 passed, 19 skipped.
+Ruling (corrects the earlier keep): rename memoryless_sequence/statistics.py → window_statistics.py — the 706 candidate pickles reference only .config and .detect (implementer's scan); the earlier "pinned by Q5" was wrong — cost if wrong: none found; a pickle outside the scan would fail to load loudly.
+Disk move (controller, lead-approved): canonical root + 6 staging roots — qvals_table.parquet + qvals_standardization_reference.json → root; canonical swr_power_* (4 files) → models_per_event_swr_power/. sha256 + mtime identical (scratchpad/phaseD/disk_move.log). replay_content_regen_staging_pre_v4_2333f07 left as a frozen snapshot.
+Ruling: relative symlinks left at every old path — covariate-explorer, phase3, phase4-run worktrees share Processed-Data and run code that reads the old paths; a symlink is the same file, so no stale copy — cost if wrong: 18 symlinks to remove later. Remove once those branches are on the merged master.
+After move: check_fit_provenance on the canonical root 93/93 fresh with new code.
+Task 18b: DONE (2e55b21b statistics → window_statistics; 6549f9b7 docs range): 737 targeted passed; not on the table path.
+Task 17: complete
+Task 18: complete
+Phase D review: dispatched (be88764e..ee0f9ca1, opus, ac2be43c33af07f26)
+Phase D review: With fixes — 0 Critical; I1 provenance/manifest/freeze tools see old layout via symlinks; I2 an old-branch write (os.replace) silently breaks a symlink; I3 source_swr_inventory misnames a reader of any detector; M1–M5 docs/tests; M6 swr_power script lives in scripts/rate (noted) (phase-D-review.md)
+Ruling: I1 fix — canonical table names resolve at the root only in check_fit_provenance; write_regeneration_manifest and freeze_regression_baseline skip symlinks; tests for each — cost if wrong: none.
+Ruling: I2 — keep the symlinks (old worktrees still read them) and add the hazard + a must-print-nothing find check to the PLAN cleanup entry and docs/README "Where results live" — a guard in new code against old-branch writes would be a special case for a transitional state — cost if wrong: an old-branch rebuild leaves a stale root copy until someone runs the check.
+Ruling: I3 — rename to swr_detector_inventory; the earlier name was the controller's ruling, not the lead's, and "source" means Kay in this package — cost if wrong: one more rename.
+Ruling: M1–M5 fixed in the wave; M6 flagged for the lead (moving scripts/rate/fit_swr_power_model.py changes its pipeline id) — cost if wrong: a per-event model stays under scripts/rate/.
+Phase D fix wave: dispatched to the implementer (resume)
+Phase D fix wave: DONE_WITH_CONCERNS (42240716 I1, 81d035af I3, 7c9f9f0f I2+M1–M4, 294a9e89 M5): 420 targeted passed, ruff clean; no GOLDEN rerun (nothing on the table path changed behaviour).
+Ruling: accept the implementer's I2 check (loop over the 7 symlinked roots, -maxdepth 1 ! -type l) over the controller's whole-tree find — the whole-tree find hits 53 real files in backups/golden baselines by design and could never print nothing — cost if wrong: none; the cleanup delete still matches exactly the 18 symlinks (checked).
+Ruling: no scoped re-review of the fix wave — each fix test-pinned, lead prefers fewer reviews — cost if wrong: a doc wording issue.
+Phase D: default suite at 294a9e89 — 7 known failures only, 5,296 passed, 19 skipped, 29:23. -m real_data not rerun: Phase D changes are renames (pure, imports exercised at collection, which imports the real_data test modules too) and output paths now pinned by unit tests.
+Phase D: complete. Branch complete, not merged — merge awaits the lead.
