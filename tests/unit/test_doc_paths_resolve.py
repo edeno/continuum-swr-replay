@@ -7,9 +7,10 @@ four kinds of reference:
 
 - a file path ``scripts/...py``, resolved against the repo root;
 - a file path ``src/continuum_swr_replay/...py``, resolved the same way;
-- a package-relative file path ``analysis/...py`` (or under another
-  :data:`PACKAGE_DIRS` directory), resolved against
-  ``src/continuum_swr_replay/`` -- the form CLAUDE.md uses for modules;
+- a bare file path ``analysis/...py`` that starts with a package directory
+  (:data:`PACKAGE_DIRS`), resolved against ``src/continuum_swr_replay/`` --
+  the form CLAUDE.md uses for modules -- or against ``scripts/``, whose
+  ``tables/`` and ``decoding/`` share those names;
 - a dotted name ``continuum_swr_replay.a.b`` inside backticks (an inline code
   span or a fenced code block). It must name a module or package, or a name
   that module defines. Names are found statically with ``ast`` -- a top-level
@@ -24,11 +25,8 @@ A path written with a placeholder (``scripts/qa/<name>.py``) or a glob
 Historical records are not checked: implementation plans
 (``.claude/docs/plans/``), review and audit reports (``.claude/docs/reviews/``)
 and the known-issues log (``docs/known_issues/``) describe the tree as it was
-when they were written.
-
-A reference that cannot be fixed goes in :data:`ALLOWLIST` with the reason.
-The test also fails on an allowlist entry that no longer occurs, so the list
-can only shrink.
+when they were written. Nor are the vendored agent skills
+(``.claude/skills/``), which name files relative to the skill's own directory.
 """
 
 from __future__ import annotations
@@ -51,44 +49,14 @@ HISTORICAL_PREFIXES = (
     ".claude/docs/plans/",
     ".claude/docs/reviews/",
     "docs/known_issues/",
+    ".claude/skills/",
 )
 
-#: ``(doc path, reference) -> why it stays``. Keyed without line numbers, so
-#: editing a doc elsewhere does not invalidate an entry.
-ALLOWLIST: dict[tuple[str, str], str] = {
-    # The vendored agent skills name files relative to the skill's own
-    # directory, not the repo root.
-    (
-        ".claude/skills/scientific-figures-paper/SKILL.md",
-        "scripts/figure_utilities.py",
-    ): "skill-relative: .claude/skills/scientific-figures-paper/scripts/",
-    (
-        ".claude/skills/scientific-figures-paper/SKILL.md",
-        "scripts/figsizing.py",
-    ): "skill-relative, and the vendored skill does not ship it",
-    (
-        ".claude/skills/scientific-figures-paper/SKILL.md",
-        "scripts/label_panels.py",
-    ): "skill-relative, and the vendored skill does not ship it",
-    (
-        ".claude/skills/scientific-figures-paper/SKILL.md",
-        "scripts/color_palettes.py",
-    ): "skill-relative, and the vendored skill does not ship it",
-    (
-        ".claude/skills/scientific-presentations/SKILL.md",
-        "scripts/validate_presentation.py",
-    ): "skill-relative: .claude/skills/scientific-presentations/scripts/",
-    (
-        ".claude/skills/scientific-presentations/references/design_checklist.md",
-        "scripts/validate_presentation.py",
-    ): "skill-relative: .claude/skills/scientific-presentations/scripts/",
-}
-
-#: Package subdirectories a doc may cite by package-relative path
-#: (``analysis/events/classified_table.py``). Add each new top-level package
-#: here when it is created (the code-organization plan's ``tables/``, ``runs/``
-#: and ``decoding/``).
-PACKAGE_DIRS = ("analysis", "data_loaders", "visualization")
+#: Package subdirectories a doc may cite by bare path
+#: (``analysis/events/classified_table.py``).
+PACKAGE_DIRS = tuple(
+    sorted(p.parent.name for p in (SRC / PACKAGE).glob("*/__init__.py"))
+)
 
 #: A repo-relative file path. The lookbehind stops a match inside a longer path
 #: (``tests/scripts/x.py``); a leading ``./`` or ``../`` is allowed and dropped.
@@ -187,7 +155,10 @@ def _references(doc: str) -> list[tuple[int, str]]:
         for m in _PACKAGE_PATH.finditer(line):
             if _REMOVED.match(line[m.end() :]):
                 continue
-            if not (SRC / PACKAGE / m.group(1)).is_file():
+            if not any(
+                (base / m.group(1)).is_file()
+                for base in (SRC / PACKAGE, REPO / "scripts")
+            ):
                 bad.append((lineno, m.group(1)))
     for lineno, span in _code_spans(text):
         for m in _DOTTED.finditer(span):
@@ -197,21 +168,14 @@ def _references(doc: str) -> list[tuple[int, str]]:
 
 
 def test_every_cited_path_resolves() -> None:
-    unresolved: list[str] = []
-    seen: set[tuple[str, str]] = set()
-    for doc in _tracked_docs():
-        for lineno, ref in _references(doc):
-            seen.add((doc, ref))
-            if (doc, ref) not in ALLOWLIST:
-                unresolved.append(f"{doc}:{lineno}: {ref}")
-    stale = sorted(f"{doc}: {ref}" for doc, ref in set(ALLOWLIST) - seen)
+    unresolved = [
+        f"{doc}:{lineno}: {ref}"
+        for doc in _tracked_docs()
+        for lineno, ref in _references(doc)
+    ]
     assert not unresolved, (
         f"{len(unresolved)} doc reference(s) name no existing file, module or "
-        "attribute. Point each at the current path, or add it to ALLOWLIST with "
-        "the reason:\n  " + "\n  ".join(unresolved)
-    )
-    assert not stale, (
-        "ALLOWLIST entries that no longer occur; remove them:\n  " + "\n  ".join(stale)
+        "attribute. Point each at the current path:\n  " + "\n  ".join(unresolved)
     )
 
 
