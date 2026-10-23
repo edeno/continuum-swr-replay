@@ -99,7 +99,8 @@ What the comparison shows:
     event-sequence, stop, event-onset and stop-timebin tables, Replay and ContFrag alike,
     and the Widloski events table. Only qvals does not.
   - Its producer stamps it after reading its decode frames through the source.
-  - `publish_canonical` refuses such a table without the current stamp.
+  - `publish_swr_table` (`analysed_time`) refuses such a table without the current stamp;
+    `publish_canonical` refuses one with no stamp.
   - The shard assemblers and the ContFrag covariate refresh refuse an input stamped with
     another source.
   - `record-tables` (Task 10) records the tables' stamp as `inputs["swr_source"]`, and the

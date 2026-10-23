@@ -35,8 +35,8 @@ except ImportError:  # pragma: no cover - datajoint always present in practice
 
 
 from continuum_swr_replay.analysis.events.analysed_time import (
+    publish_swr_table,
     read_dot_with_swr_source,
-    require_swr_source,
     stamp_swr_source,
 )
 from continuum_swr_replay.analysis.events.swr_source import swr_epoch_id
@@ -85,7 +85,6 @@ from continuum_swr_replay.paths import (
 )
 from continuum_swr_replay.tables.io import (
     parquet_path,
-    publish_canonical,
     write_atomically,
 )
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
@@ -682,12 +681,11 @@ def build_stop_table_scope(
     output_dir.mkdir(parents=True, exist_ok=True)
     # Built above from decode frames read through the SWR source.
     stamp_swr_source(stop_table)
-    path = publish_canonical(
+    path = publish_swr_table(
         stop_table,
         output_dir,
         table="stop",
         basename="stop_table",
-        require_swr_source=require_swr_source,
     )
     logging.info("saved stop_table -> %s (%d rows)", path, len(stop_table))
     return stop_table
@@ -900,12 +898,11 @@ def _publish_canonical_tables(frames: tuple) -> None:
             logging.info("  %s: skipped (no data)", basename)
             continue
         stamp_swr_source(frame)
-        path = publish_canonical(
+        path = publish_swr_table(
             frame,
             OUTPUT_DIR,
             table=table_key,
             basename=basename,
-            require_swr_source=require_swr_source,
         )
         logging.info("saved %s → %s (%d rows)", basename, path, len(frame))
 

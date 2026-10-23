@@ -51,8 +51,8 @@ from continuum_swr_replay.analysis.contfrag.tables import (
     build_contfrag_stop_table,
 )
 from continuum_swr_replay.analysis.events.analysed_time import (
+    publish_swr_table,
     read_dot_with_swr_source,
-    require_swr_source,
     stamp_swr_source,
 )
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
@@ -78,7 +78,6 @@ from continuum_swr_replay.paths import (
 from continuum_swr_replay.tables.covariate_registry import (
     stamp_covariate_schema,
 )
-from continuum_swr_replay.tables.io import publish_canonical
 
 logging.basicConfig(
     level=logging.INFO,
@@ -138,13 +137,13 @@ def publish_contfrag_tables(
         stamp_swr_source(frame)
     output_dir.mkdir(parents=True, exist_ok=True)
     for name, frame in tables.items():
-        # publish_canonical is the one write door (re-stamp idempotent, atomic).
-        path = publish_canonical(
+        # The one write door: the source check, then publish_canonical (re-stamp
+        # idempotent, atomic).
+        path = publish_swr_table(
             frame,
             output_dir,
             table=BASENAME_TO_TABLE[name],
             basename=basenames[name],
-            require_swr_source=require_swr_source,
         )
         logging.info("saved %s -> %s (%d rows)", name, path, len(frame))
     return tables
@@ -611,12 +610,11 @@ def main():
     ):
         # Built here from decode frames read through the SWR source.
         stamp_swr_source(frame)
-        path = publish_canonical(
+        path = publish_swr_table(
             frame,
             output_dir,
             table=table_key,
             basename=name,
-            require_swr_source=require_swr_source,
         )
         logging.info("saved %s -> %s (%d rows)", name, path, len(frame))
 

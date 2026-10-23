@@ -25,8 +25,8 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.events.analysed_time import (
+    publish_swr_table,
     read_dot_with_swr_source,
-    require_swr_source,
     stamp_swr_source,
 )
 from continuum_swr_replay.analysis.replay.prepare_data import find_sessions
@@ -38,7 +38,6 @@ from continuum_swr_replay.analysis.replay.timebin_tables import (  # noqa: E402
 from continuum_swr_replay.data_loaders import load_data  # noqa: E402
 from continuum_swr_replay.data_types import SessionDataKeys  # noqa: E402
 from continuum_swr_replay.paths import REPLAY_CONTENT_DIR
-from continuum_swr_replay.tables.io import publish_canonical  # noqa: E402
 from continuum_swr_replay.tables.session_keys import n_sessions  # noqa: E402
 
 logging.basicConfig(
@@ -168,21 +167,20 @@ def main() -> None:
             "--no-save: onsets=%d, dense bins=%d, not written", len(onset), len(dense)
         )
         return
-    # publish_canonical stamps + writes atomically; the one canonical write door.
+    # publish_swr_table checks the source; publish_canonical stamps and writes
+    # atomically.
     # Both were built from decode frames read through the SWR source.
-    publish_canonical(
+    publish_swr_table(
         stamp_swr_source(onset),
         args.output_dir,
         table="event_onset",
         basename="event_onset_table",
-        require_swr_source=require_swr_source,
     )
-    publish_canonical(
+    publish_swr_table(
         stamp_swr_source(dense),
         args.output_dir,
         table="stop_timebin",
         basename="stop_timebin_table",
-        require_swr_source=require_swr_source,
     )
     logger.info(
         "saved %d onsets -> event_onset_table.parquet, "

@@ -16,7 +16,6 @@ import pyarrow.parquet as pq
 from continuum_swr_replay.analysis.behavior.qvals_table import (
     QVALS_STANDARDIZED_COLS,
 )
-from continuum_swr_replay.analysis.events.analysed_time import SWR_SOURCE_ATTR
 from continuum_swr_replay.analysis.events.swr_source import swr_source_name
 from continuum_swr_replay.analysis.replay._tables_common import (
     EVENT_ARM_STANDARDIZED_COLS,
@@ -33,7 +32,12 @@ from continuum_swr_replay.paths import (
 )
 from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.runs.provenance import git, git_commit, git_dirty
-from continuum_swr_replay.tables.io import SWR_SOURCE_TABLES, read_attrs, read_table
+from continuum_swr_replay.tables.io import (
+    SWR_SOURCE_ATTR,
+    SWR_SOURCE_TABLES,
+    read_attrs,
+    read_table,
+)
 from continuum_swr_replay.tables.parity import diff_table
 from continuum_swr_replay.tables.session_keys import (
     SESSION_COLUMNS,

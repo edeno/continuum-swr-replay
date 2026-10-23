@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
+from continuum_swr_replay.analysis.events.analysed_time import publish_swr_table
 from continuum_swr_replay.tables.io import (
     parquet_path,
     publish_canonical,
@@ -199,7 +199,7 @@ def _valid_stop_frame() -> pd.DataFrame:
 
 
 @pytest.mark.parametrize("stamp", [None, "kay@earlier+artifacts@none"])
-def test_publish_canonical_refuses_an_swr_table_from_another_source(tmp_path, stamp):
+def test_publish_swr_table_refuses_an_swr_table_from_another_source(tmp_path, stamp):
     """A table built from SWR labels must name the configured SWR source."""
     from continuum_swr_replay.analysis.events.swr_source import SwrSourceError
 
@@ -209,23 +209,17 @@ def test_publish_canonical_refuses_an_swr_table_from_another_source(tmp_path, st
         frame.attrs["swr_source"] = stamp
 
     with pytest.raises(SwrSourceError, match="the stop table to publish"):
-        publish_canonical(
-            frame,
-            tmp_path,
-            table="stop",
-            basename="stop_table",
-            require_swr_source=require_swr_source,
-        )
+        publish_swr_table(frame, tmp_path, table="stop", basename="stop_table")
     assert not (tmp_path / "stop_table.parquet").exists()
 
 
-def test_publish_canonical_refuses_an_swr_table_without_the_source_check(tmp_path):
-    """The caller must hand over the SWR source's check for an SWR table; a
-    stamped frame published without it is refused, not written unchecked."""
-    with pytest.raises(TypeError, match="require_swr_source"):
-        publish_canonical(
-            _valid_stop_frame(), tmp_path, table="stop", basename="stop_table"
-        )
+def test_publish_canonical_refuses_an_swr_table_without_a_source_stamp(tmp_path):
+    """The foundation door alone still refuses an SWR table that names no
+    SWR source, pointing at publish_swr_table; nothing is written."""
+    frame = _valid_stop_frame()
+    frame.attrs.pop("swr_source")
+    with pytest.raises(TypeError, match="publish_swr_table"):
+        publish_canonical(frame, tmp_path, table="stop", basename="stop_table")
     assert not (tmp_path / "stop_table.parquet").exists()
 
 
@@ -233,12 +227,8 @@ def test_publish_canonical_keeps_the_swr_stamp_and_needs_none_for_qvals(tmp_path
     from continuum_swr_replay.analysis.events.swr_source import swr_source_name
 
     stop = read_table(
-        publish_canonical(
-            _valid_stop_frame(),
-            tmp_path,
-            table="stop",
-            basename="stop_table",
-            require_swr_source=require_swr_source,
+        publish_swr_table(
+            _valid_stop_frame(), tmp_path, table="stop", basename="stop_table"
         )
     )
     qvals = read_table(
@@ -258,13 +248,7 @@ def test_publish_canonical_stamps_and_writes(tmp_path):
     )
 
     frame = _valid_stop_frame()
-    path = publish_canonical(
-        frame,
-        tmp_path,
-        table="stop",
-        basename="stop_table",
-        require_swr_source=require_swr_source,
-    )
+    path = publish_canonical(frame, tmp_path, table="stop", basename="stop_table")
     loaded = read_table(path)
 
     assert loaded.attrs.get("covariate_schema_table") == "stop"
@@ -280,23 +264,13 @@ def test_publish_canonical_rejects_duplicate_rows(tmp_path):
     bad = _valid_stop_frame()
     bad.loc[1, "stop_id"] = 10  # duplicate stop_id
     with pytest.raises(ValueError):
-        publish_canonical(
-            bad,
-            tmp_path,
-            table="stop",
-            basename="stop_table",
-            require_swr_source=require_swr_source,
-        )
+        publish_canonical(bad, tmp_path, table="stop", basename="stop_table")
     assert not (tmp_path / "stop_table.parquet").exists()
 
 
 def test_publish_canonical_basename_override(tmp_path):
     path = publish_canonical(
-        _valid_stop_frame(),
-        tmp_path,
-        table="stop",
-        basename="renamed",
-        require_swr_source=require_swr_source,
+        _valid_stop_frame(), tmp_path, table="stop", basename="renamed"
     )
     assert path == parquet_path(tmp_path / "renamed")
     assert path.exists()

@@ -23,7 +23,6 @@ from __future__ import annotations
 import importlib
 import sys
 import types
-from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
@@ -284,7 +283,7 @@ def test_output_dir_receives_both_tables(timebin_script, monkeypatch, tmp_path):
 
     The sessions are synthetic, ``build_one`` returns small frames instead of
     reading a decode and calling ``load_data``, ``validate`` is a no-op, and
-    ``publish_canonical`` records the directory it is given instead of writing,
+    ``publish_swr_table`` records the directory it is given instead of writing,
     refusing any directory outside ``tmp_path``. For the default case ``RC`` is
     pointed at a folder under ``tmp_path``, after checking its real value.
     """
@@ -301,14 +300,13 @@ def test_output_dir_receives_both_tables(timebin_script, monkeypatch, tmp_path):
         *,
         table: str,
         basename: str,
-        require_swr_source: Callable[..., None],
     ) -> Path:
         if not Path(path).resolve().is_relative_to(tmp_path.resolve()):
             raise AssertionError(f"refusing to publish outside the test folder: {path}")
         published.append((Path(path), table))
         return Path(path) / f"{basename}.parquet"
 
-    monkeypatch.setattr(script, "publish_canonical", record)
+    monkeypatch.setattr(script, "publish_swr_table", record)
 
     monkeypatch.setattr(
         sys, "argv", ["build_timebin_tables.py", "--output-dir", str(tmp_path)]
@@ -361,12 +359,11 @@ def test_published_dense_table_keeps_its_stamp_and_sums_the_excluded_onsets(
         *,
         table: str,
         basename: str,
-        require_swr_source: Callable[..., None],
     ) -> Path:
         published[table] = frame
         return Path(path) / f"{basename}.parquet"
 
-    monkeypatch.setattr(script, "publish_canonical", record)
+    monkeypatch.setattr(script, "publish_swr_table", record)
     monkeypatch.setattr(
         sys, "argv", ["build_timebin_tables.py", "--output-dir", str(tmp_path)]
     )

@@ -26,6 +26,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
+    publish_swr_table,
     read_dot_with_swr_source,
     require_swr_source,
     stamp_swr_source,
@@ -42,7 +43,6 @@ from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
     stamp_covariate_schema,
 )
 from continuum_swr_replay.tables.io import (
-    publish_canonical,
     read_table,
     table_exists,
     write_table,
@@ -213,12 +213,11 @@ def main() -> None:
     if table_exists(out):
         backup = write_table(read_table(out), RC / "stop_table_previous")
         logger.info("backed up existing -> %s", backup.name)
-    out = publish_canonical(
+    out = publish_swr_table(
         stop,
         RC,
         table="stop",
         basename="stop_table",
-        require_swr_source=require_swr_source,
     )
     logger.info("saved %d stops -> %s", len(stop), out)
 

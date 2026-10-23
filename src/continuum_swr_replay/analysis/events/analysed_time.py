@@ -99,6 +99,7 @@ from continuum_swr_replay.analysis.events.swr_source import (
 )
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.intervals import as_frame, interval_mask
+from continuum_swr_replay.tables.io import SWR_SOURCE_ATTR, publish_canonical
 from continuum_swr_replay.tables.session_keys import (
     SESSION_COLUMNS,
     SESSION_COLUMNS_DAY,
@@ -111,11 +112,11 @@ __all__ = [
     "DECODE_SWR_COUNT_COLUMNS",
     "IN_EXCLUDED_TIME_COLUMN",
     "SWR_OBSERVED_COLUMN",
-    "SWR_SOURCE_ATTR",
     "analysed_bins",
     "artifact_event_drops",
     "dropped_for_excluded_time",
     "excluded_intervals",
+    "publish_swr_table",
     "excluded_intervals_by_session",
     "excluded_intervals_of",
     "read_artifact_event_drops",
@@ -142,7 +143,6 @@ False with no artifact run. A reader that summarises bins leaves these rows out.
 It is not ``swr_observed``, which is also False at gaps in the stored band."""
 
 
-SWR_SOURCE_ATTR = "swr_source"
 """The ``attrs`` key (kept in a parquet table's metadata) that names the SWR
 source a frame or table was built from: :func:`swr_source_name`."""
 
@@ -230,6 +230,38 @@ def require_swr_source(frame: pd.DataFrame, *, what: str) -> None:
             f"{swr_source.swr_source_name()!r}; regenerate it (and its atomic "
             "set) from the current source"
         )
+
+
+def publish_swr_table(
+    frame: pd.DataFrame,
+    path: str | Path,
+    *,
+    table: str,
+    basename: str | None = None,
+) -> Path:
+    """Publish a canonical table built from this source's SWR labels.
+
+    :func:`require_swr_source` first (the frame must carry this source's
+    current stamp), then ``tables.io.publish_canonical`` stamps the covariate
+    schema and writes it atomically.
+
+    Parameters
+    ----------
+    frame : pd.DataFrame
+    path : str or Path
+        The directory with `basename`, or the file without.
+    table : str
+        The covariate-schema key, one of ``tables.io.SWR_SOURCE_TABLES``.
+    basename : str, optional
+
+    Raises
+    ------
+    SwrSourceError
+        If the frame's stamp is missing or names another source; nothing is
+        written.
+    """
+    require_swr_source(frame, what=f"the {table} table to publish")
+    return publish_canonical(frame, path, table=table, basename=basename)
 
 
 def excluded_intervals(epoch_id: str) -> pd.DataFrame:
