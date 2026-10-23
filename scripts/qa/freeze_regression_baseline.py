@@ -59,6 +59,7 @@ _MODEL_DIRS = (
     belief_chain_output_subdir(),
     MODEL_SUBDIRS["per_stop_rate"],
     MODEL_SUBDIRS["per_bin_rate"],
+    MODEL_SUBDIRS["per_event_swr_power"],
     "uncertainty_content",
     "event_source_comparison",
 )

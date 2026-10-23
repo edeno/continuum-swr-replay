@@ -77,7 +77,7 @@ TABLES: tuple[tuple[str, str, Path, Path], ...] = (
         "replay qvals",
         "qvals",
         BASELINE_ROOT / "replay/qvals_table.parquet",
-        RC / "models_per_bin_rate/qvals_table.pkl",
+        RC / "qvals_table.pkl",
     ),
     (
         "contfrag SWR event_arm",

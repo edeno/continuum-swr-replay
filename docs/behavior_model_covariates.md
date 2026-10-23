@@ -6,7 +6,7 @@ keyed by `stop_id` (joins to `stop_table.parquet`).
 
 - **Generator:** [`analysis/behavior/qvals_table.py`](../src/continuum_swr_replay/analysis/behavior/qvals_table.py)
   — run `uv run python scripts/behavior/build_qvals_table.py --write`.
-- **Output:** `Processed-Data/replay_content/models_per_bin_rate/qvals_table.parquet`
+- **Output:** `Processed-Data/replay_content/qvals_table.parquet`
   (gitignored data artifact; regenerate from the script).
 - **Decision-variable functions:** vendored verbatim from Alison Comrie's
   `rl_helpers.py` →

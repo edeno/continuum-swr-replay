@@ -255,7 +255,9 @@ Three tiers:
 
    The canonical tables (events, event-arms, event-patches, sequences, stops) are
    built by `scripts/tables/prepare_replay_content_data.py`, and `qvals_table` by
-   `scripts/behavior/build_qvals_table.py`. They
+   `scripts/behavior/build_qvals_table.py`. All of them sit at the root, beside
+   their standardization references (`standardization_reference.json`,
+   `qvals_standardization_reference.json`). They
    are **parquet**; read and write them through `continuum_swr_replay.tables.io`
    (`read_table` / `write_table`), never `pd.read_pickle`. Fitted-model artifacts
    (`all_models.pkl` and friends) hold live statsmodels objects and stay pickled.
@@ -265,7 +267,8 @@ Three tiers:
 
    | dir | producer | holds |
    |---|---|---|
-   | `models_per_bin_rate/` | `scripts/rate/fit_per_bin_rate_models.py` | `all_models.pkl` (Family-B ladder); also holds `qvals_table.parquet`, `swr_contrast_rate.pkl`, `uncertainty_rate.pkl`, `swr_power_model.pkl` |
+   | `models_per_bin_rate/` | `scripts/rate/fit_per_bin_rate_models.py` | per-bin rate fits only: `all_models.pkl` (Family-B ladder), `swr_contrast_rate.pkl`, `uncertainty_rate.pkl`, `cross_history_models.pkl` |
+   | `models_per_event_swr_power/` | `scripts/rate/fit_swr_power_model.py` | the per-event ripple-power model `swr_power_model.pkl`, its `.z_reference_by_session.json` and its two audits |
    | `models_per_stop_rate/` | `scripts/rate/fit_per_stop_rate_models.py` | Family-A per-stop ladder |
    | `models/`, `models_patch/` | `scripts/content/fit_replay_content_models.py` (arm / patch) | the default content ladders — arm `M0`, `M0a`, `M1`–`M6`; patch `P0`–`P3` — on the at-well events, plus the opt-in value/uncertainty rungs (`Mv`, `Mu`, `Mvu`, `Pv`) when named with `--models`; also holds `swr_contrast_content_{arm,patch}.pkl` |
    | `models_swr_{T,F}/`, `models_patch_swr_{T,F}/` | same, `--swr-subset T\|F` | content split by SWR (T) / non-SWR (F) |

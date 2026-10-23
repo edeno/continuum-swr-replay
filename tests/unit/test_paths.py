@@ -35,6 +35,7 @@ MODEL_LITERALS = {
     "content_arm": "models",
     "content_patch": "models_patch",
     "per_bin_rate": "models_per_bin_rate",
+    "per_event_swr_power": "models_per_event_swr_power",
     "per_stop_rate": "models_per_stop_rate",
 }
 
@@ -55,9 +56,6 @@ def test_model_dir_keeps_a_nested_subdir_whole(monkeypatch):
     monkeypatch.setitem(paths.MODEL_SUBDIRS, "per_bin_rate", "models/per_bin_rate")
     root = Path("/staging/root")
     assert paths.model_dir("per_bin_rate", root) == root / "models" / "per_bin_rate"
-    assert paths.table_path("qvals_table", root) == (
-        root / "models" / "per_bin_rate" / "qvals_table.parquet"
-    )
 
 
 @pytest.mark.parametrize("key", ["models", "per_bin", "content", ""])
@@ -86,19 +84,43 @@ def test_registry_is_the_one_parity_reads():
 @pytest.mark.parametrize("name", paths.CANONICAL_TABLE_BASENAMES)
 @pytest.mark.parametrize("fmt", ["parquet", "pkl", ""])
 def test_table_path_for_every_registry_name(name, fmt):
-    directory = RC / "models_per_bin_rate" if name == "qvals_table" else RC
+    # Every canonical table, qvals_table included, sits at the root it names.
     file = f"{name}.{fmt}" if fmt else name
-    assert paths.table_path(name, fmt=fmt) == directory / file
+    assert paths.table_path(name, fmt=fmt) == RC / file
     root = Path("/staging/root")
-    directory = root / "models_per_bin_rate" if name == "qvals_table" else root
-    assert paths.table_path(name, root, fmt=fmt) == directory / file
+    assert paths.table_path(name, root, fmt=fmt) == root / file
 
 
 def test_table_path_defaults_to_parquet_under_replay_content():
     assert paths.table_path("stop_table") == RC / "stop_table.parquet"
-    assert paths.table_path("qvals_table") == (
-        RC / "models_per_bin_rate" / "qvals_table.parquet"
+    assert paths.table_path("qvals_table") == RC / "qvals_table.parquet"
+
+
+def test_every_swr_power_output_resolves_under_its_own_model_dir(tmp_path):
+    """The per-event ripple-power model is not a per-bin rate fit."""
+    import pandas as pd
+
+    from scripts.rate import fit_swr_power_model as mod
+
+    assert mod.OUTPUT_DIR == RC / "models_per_event_swr_power"
+    assert mod.OUTPUT_DIR == paths.model_dir("per_event_swr_power")
+    out_dir = paths.model_dir("per_event_swr_power", tmp_path)
+    mod._write_outputs(
+        out_dir,
+        coefs=pd.DataFrame({"a": [1.0]}),
+        z_reference={},
+        gate_audit=pd.DataFrame({"animal": ["chimi"]}),
+        cohort_records=[{"model": "swr_power", "n_in": 1}],
+        smoke=False,
     )
+    written = {p.relative_to(tmp_path).as_posix() for p in tmp_path.rglob("*")}
+    assert written == {
+        "models_per_event_swr_power",
+        "models_per_event_swr_power/swr_power_model.pkl",
+        "models_per_event_swr_power/swr_power_model.z_reference_by_session.json",
+        "models_per_event_swr_power/swr_power_post_outcome_gate_audit.csv",
+        "models_per_event_swr_power/swr_power_cohort_audit.csv",
+    }
 
 
 @pytest.mark.parametrize(

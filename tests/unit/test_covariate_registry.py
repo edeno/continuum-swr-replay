@@ -501,7 +501,7 @@ def test_materialized_tables_are_canonical_after_regeneration() -> None:
         "event_arm": rc / "event_arm_table",
         "event_patch": rc / "event_patch_table",
         "stop": rc / "stop_table",
-        "qvals": rc / "models_per_bin_rate" / "qvals_table",
+        "qvals": rc / "qvals_table",
         "event": rc / "event_table",
     }
     if not all(table_exists(p) for p in tables.values()):

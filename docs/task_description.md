@@ -67,7 +67,7 @@ them. It combines spatial memory with probabilistic decision-making.
   So the non-canonical mass is overwhelmingly **structural** — early-training
   configurations built from canonical values but without the best-patch structure —
   not exotic probabilities. Both figures were measured on the shipped
-  `Processed-Data/replay_content/models_per_bin_rate/qvals_table.parquet`
+  `Processed-Data/replay_content/qvals_table.parquet`
   (105 359 stops; `task_reward_probability_port_{0..5}`).
 
   The rig-side control files (`/stelmo/alison/<animal>/<animal>_py_done/*.py`) gave the

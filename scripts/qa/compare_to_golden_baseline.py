@@ -42,9 +42,7 @@ from pathlib import Path
 from continuum_swr_replay.paths import (
     CANONICAL_TABLE_BASENAMES,
     REPLAY_CONTENT_DIR,
-    table_path,
 )
-from continuum_swr_replay.tables.io import read_table
 from continuum_swr_replay.tables.parity import compare_table_roots
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
@@ -89,16 +87,6 @@ def main() -> None:
         if name
     )
 
-    # Two basename-keyed readers, one per root's layout: the candidate nests
-    # qvals under models_per_bin_rate/; the frozen baseline is flat.
-    def read_candidate(basename: str):
-        if basename == "qvals_table":
-            return read_table(table_path("qvals_table", args.candidate, fmt=""))
-        return read_table(args.candidate / basename)
-
-    def read_baseline(basename: str):
-        return read_table(args.baseline / basename)
-
     report = compare_table_roots(
         args.candidate,
         args.baseline,
@@ -106,8 +94,6 @@ def main() -> None:
         expected_drift_columns=frozenset(args.expected_drift_columns),
         expected_added_columns=expected_added_columns,
         atol=args.atol,
-        read_candidate=read_candidate,
-        read_baseline=read_baseline,
     )
     # Undeclared drift already raised inside diff_table (uncaught -> nonzero
     # exit). Anything left in the report is drift the caller explicitly allowed

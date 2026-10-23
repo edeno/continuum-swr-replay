@@ -32,7 +32,7 @@ from continuum_swr_replay.analysis.behavior.qvals_table import QVALS_STANDARDIZE
 from continuum_swr_replay.analysis.replay._tables_common import (
     EVENT_ARM_STANDARDIZED_COLS,
 )
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, model_dir, table_path
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -48,7 +48,7 @@ _RC = REPLAY_CONTENT_DIR
 _EVENT_ARM = table_path("event_arm_table", _RC, fmt="pkl")
 _EVENT_ARM_REF = _RC / "standardization_reference.json"
 _QVALS = table_path("qvals_table", _RC, fmt="pkl")
-_QVALS_REF = model_dir("per_bin_rate", _RC) / "qvals_standardization_reference.json"
+_QVALS_REF = _RC / "qvals_standardization_reference.json"
 
 
 def _require(path: Path, *, table: str):

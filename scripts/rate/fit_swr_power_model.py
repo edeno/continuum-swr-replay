@@ -28,7 +28,8 @@ shared-latent coupling between occurrence and power. Those are deferred to a joi
 treatment. ``ripple_power_z`` here is the event-mean; a peri-onset peak (the
 detector's actual criterion) is the better summary and is left as a follow-up.
 
-Output: ``models_per_bin_rate/swr_power_model.pkl`` (per-session coefficients).
+Output: ``models_per_event_swr_power/swr_power_model.pkl`` (per-session
+coefficients), its z reference and two audits beside it.
 
 Usage::
 
@@ -72,6 +73,7 @@ from continuum_swr_replay.tables.standardization import (
 )
 
 RC = REPLAY_CONTENT_DIR
+OUTPUT_DIR = model_dir("per_event_swr_power", RC)
 SC = list(SESSION_COLUMNS)
 POWER_COL = "ripple_power_z"  # event-mean z-scored consensus ripple power
 PREDICTORS = [
@@ -445,7 +447,7 @@ def main() -> None:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=model_dir("per_bin_rate", RC),
+        default=OUTPUT_DIR,
         help="Directory for the fitted model, its z reference, and the audits.",
     )
     args = parser.parse_args()

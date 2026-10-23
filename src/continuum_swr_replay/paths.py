@@ -1,9 +1,9 @@
 """Output locations and the canonical table-name registry.
 
 One place spells where the pipeline's outputs live, so moving an output
-(staging, a backup, the deferred ``models_per_bin_rate/`` rename) is a change
-here rather than a hunt through every reader and writer. Every constant is a
-path under :data:`~continuum_swr_replay.parameters.PROCESSED_DATA_DIR`.
+(staging, a backup, a renamed directory) is a change here rather than a hunt
+through every reader and writer. Every constant is a path under
+:data:`~continuum_swr_replay.parameters.PROCESSED_DATA_DIR`.
 
 The canonical tables are named by :data:`CANONICAL_TABLE_BASENAMES`;
 :func:`table_path` turns a name and a root into the file, and refuses a name
@@ -47,10 +47,8 @@ ARTIFACT_INTERVALS_DIR = PROCESSED_DATA_DIR / "artifact_intervals"
 MODEL_SUBDIRS: dict[str, str] = {
     "content_arm": "models",
     "content_patch": "models_patch",
-    # Besides the per-bin rate ladder this directory holds ``qvals_table``,
-    # ``swr_contrast_rate``, ``uncertainty_rate`` and ``swr_power_model``; its
-    # rename is deferred (lead decision Q7).
     "per_bin_rate": "models_per_bin_rate",
+    "per_event_swr_power": "models_per_event_swr_power",
     "per_stop_rate": "models_per_stop_rate",
 }
 """The fitted-model directories, by contents, relative to a replay-content root.
@@ -108,11 +106,8 @@ def table_path(
 ) -> Path:
     """Return the file of canonical table `name` under `root`.
 
-    ``qvals_table`` sits one level down, in the per-bin rate model directory;
-    every other table sits at `root`. That is the layout of every pipeline
-    root (the canonical one and a staging one alike); a frozen golden baseline
-    is flat and is read by ``root / name`` instead, which is also the default
-    reader of ``tables.parity.compare_table_roots``.
+    Every canonical table sits at `root`, so a pipeline root (the canonical
+    one, a staging one) and a frozen golden baseline share one flat layout.
 
     Parameters
     ----------
@@ -139,5 +134,4 @@ def table_path(
             f"{name!r} is not a canonical table; expected one of "
             f"{CANONICAL_TABLE_BASENAMES}"
         )
-    directory = model_dir("per_bin_rate", root) if name == "qvals_table" else root
-    return directory / (f"{name}.{fmt}" if fmt else name)
+    return root / (f"{name}.{fmt}" if fmt else name)

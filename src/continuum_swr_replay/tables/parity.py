@@ -131,13 +131,11 @@ def compare_table_roots(
 ) -> dict[str, dict[str, object]]:
     """Diff every named canonical table under two roots, keyed by its row key.
 
-    Each side is read by its own basename-keyed reader, so two roots with
-    different on-disk layouts (e.g. a candidate that nests ``qvals_table`` under
-    ``models_per_bin_rate/`` and a flat baseline) are expressed where the
-    asymmetry lives rather than inferred from a path prefix. Both default to
-    ``read_table(root / basename)``, the flat layout of a frozen baseline. A
-    pipeline root nests ``qvals_table`` (``paths.table_path``), so read one
-    with ``lambda name: read_table(table_path(name, root, fmt=""))``.
+    Each side is read by its own basename-keyed reader, so a root with a
+    different on-disk layout is expressed where the asymmetry lives rather than
+    inferred from a path prefix. Both default to ``read_table(root / basename)``,
+    the flat layout every pipeline root and frozen baseline shares
+    (``paths.table_path``).
 
     A table absent under either root raises ``FileNotFoundError`` (via the
     reader) rather than being skipped -- a partial baseline is a hard error, not

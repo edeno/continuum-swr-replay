@@ -36,7 +36,8 @@ Usage: uv run python scripts/behavior/build_qvals_table.py [--animal A] [--write
 The build itself is
 ``continuum_swr_replay.analysis.behavior.qvals_table.run_build_qvals_table``;
 this file is its command line.
-Output: Processed-Data/replay_content/models_per_bin_rate/qvals_table.pkl
+Output: Processed-Data/replay_content/qvals_table.parquet and
+qvals_standardization_reference.json beside it.
 """
 
 from __future__ import annotations

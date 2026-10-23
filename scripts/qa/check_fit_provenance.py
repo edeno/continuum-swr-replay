@@ -31,7 +31,7 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
     check_fit_provenance,
     fit_provenance_path,
 )
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, model_dir
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR
 from continuum_swr_replay.tables.io import parquet_path
 
 _SIDECAR_SUFFIX = ".provenance.json"
@@ -62,15 +62,13 @@ def resolve_input(name: str, sidecar: Path, root: Path) -> Path | None:
     """Locate the table a sidecar recorded under ``name``.
 
     Sidecars record input names, not paths. Canonical tables live at the
-    ``replay_content`` root, ``qvals_table`` under ``models_per_bin_rate``, and
-    an aggregate-only run's input is the fit beside it -- so search the
-    sidecar's own directory, then the root, then the per-bin rate directory,
-    and return the first candidate that exists in either table form.
+    ``replay_content`` root and an aggregate-only run's input is the fit beside
+    it -- so search the sidecar's own directory, then the root, and return the
+    first candidate that exists in either table form.
     """
     for candidate in (
         sidecar.parent / f"{name}.pkl",
         root / f"{name}.pkl",
-        model_dir("per_bin_rate", root) / f"{name}.pkl",
     ):
         if parquet_path(candidate).exists() or candidate.exists():
             return candidate
