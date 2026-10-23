@@ -37,8 +37,8 @@ from ripple_detection.simulate import simulate_session, simulate_time
 
 import scripts.detection.run_swr_detection as runner
 from continuum_swr_replay.analysis.events import swr_source
-from continuum_swr_replay.analysis.hippocampus import swr_inventories
-from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
+from continuum_swr_replay.analysis.hippocampus import swr_detectors
+from continuum_swr_replay.analysis.hippocampus.swr_detectors import (
     NoUsableChannelError,
     best_ripple_channel,
 )
@@ -77,7 +77,7 @@ LFP_CONVERSION = 1.95e-7
 SPYGLASS_KAY_PARAMETERS = {
     "speed_name": "head_speed",
     "ripple_detection_algorithm": "Kay_ripple_detector",
-    "ripple_detection_params": dict(swr_inventories.DETECTOR_SETTINGS["kay"]),
+    "ripple_detection_params": dict(swr_detectors.DETECTOR_SETTINGS["kay"]),
 }
 """Spyglass's stored ``"default"`` ripple parameters, equal to the direct Kay's."""
 
@@ -475,7 +475,7 @@ def test_one_detector_failing_makes_the_epoch_partial(tmp_path, monkeypatch, fai
     paths = _outputs(output_dir, identifier)
     if failing == "karlsson":
         error = RuntimeError("simulated Karlsson failure")
-        monkeypatch.setattr(swr_inventories, "Karlsson_ripple_detector", _raise(error))
+        monkeypatch.setattr(swr_detectors, "Karlsson_ripple_detector", _raise(error))
         failed = "karlsson"
     else:
         error = NoUsableChannelError("simulated: every channel is below the guard")
@@ -518,7 +518,7 @@ def test_every_detector_failing_fails_the_epoch(tmp_path, monkeypatch):
     }
     for name, error in errors.items():
         detector = f"{name.capitalize()}_ripple_detector"
-        monkeypatch.setattr(swr_inventories, detector, _raise(error))
+        monkeypatch.setattr(swr_detectors, detector, _raise(error))
 
     record = run_epoch(
         NWB_FILE_NAME,
@@ -637,9 +637,9 @@ def test_unusable_candidates_are_excluded_and_written_as_null(tmp_path):
         _outputs(output_dir, epoch_id(NWB_FILE_NAME, EPOCH_NAME))["swr_observed"]
     )
     zugaro = observed.loc[observed.scope == "zugaro", ["start_s", "end_s"]]
-    edge = swr_inventories.settling_samples(
-        swr_inventories.design_bandpass_sos(
-            FS, swr_inventories.ZUGARO_BAND_HZ, swr_inventories.ZUGARO_FILTER_ORDER
+    edge = swr_detectors.settling_samples(
+        swr_detectors.design_bandpass_sos(
+            FS, swr_detectors.ZUGARO_BAND_HZ, swr_detectors.ZUGARO_FILTER_ORDER
         ),
         FS,
     )
@@ -692,7 +692,7 @@ def test_lfp_outside_the_position_span_is_dropped(tmp_path):
         np.asarray(ripple_lfps),
         np.asarray(speed),
         sampling_frequency,
-        **swr_inventories.DETECTOR_SETTINGS["kay"],
+        **swr_detectors.DETECTOR_SETTINGS["kay"],
     )
     inside = (on_spyglass_inputs.start_time >= span[0]) & (
         on_spyglass_inputs.end_time <= span[1]
@@ -723,7 +723,7 @@ def test_zugaro_events_over_150_ms_are_counted(tmp_path, monkeypatch):
             index=pd.Index(np.arange(1, len(durations) + 1), name="event_number"),
         )
 
-    monkeypatch.setattr(swr_inventories, "Zugaro_ripple_detector", zugaro)
+    monkeypatch.setattr(swr_detectors, "Zugaro_ripple_detector", zugaro)
 
     record = run_epoch(
         NWB_FILE_NAME,
@@ -869,7 +869,7 @@ def test_with_no_kay_comparison_left_the_summary_claims_none(tmp_path, monkeypat
     """The direct Kay fails and Spyglass's inputs cannot be read: no comparison
     is left, no Kay-check table is written, and the summary prints no Kay check."""
     monkeypatch.setattr(
-        swr_inventories,
+        swr_detectors,
         "Kay_ripple_detector",
         _raise(RuntimeError("simulated Kay failure")),
     )
@@ -952,7 +952,7 @@ def test_zugaro_dropped_count_is_read_after_the_channel_error(tmp_path, monkeypa
             {"start_time": start, "end_time": start + durations, "duration": durations}
         )
 
-    monkeypatch.setattr(swr_inventories, "Zugaro_ripple_detector", zugaro)
+    monkeypatch.setattr(swr_detectors, "Zugaro_ripple_detector", zugaro)
 
     record = run_epoch(
         NWB_FILE_NAME,
@@ -1050,13 +1050,13 @@ def _recording_detectors(monkeypatch) -> dict:
         "yu": "Yu_ripple_detector",
         "zugaro": "Zugaro_ripple_detector",
     }.items():
-        detector = getattr(swr_inventories, attribute)
+        detector = getattr(swr_detectors, attribute)
 
         def recording(*args, _name=name, _detector=detector, **settings):
             masks[_name] = settings.get("normalization_mask")
             return _detector(*args, **settings)
 
-        monkeypatch.setattr(swr_inventories, attribute, recording)
+        monkeypatch.setattr(swr_detectors, attribute, recording)
     return masks
 
 
@@ -1222,13 +1222,13 @@ def _recording_signals(monkeypatch) -> dict:
         "karlsson": "Karlsson_ripple_detector",
         "yu": "Yu_ripple_detector",
     }.items():
-        detector = getattr(swr_inventories, attribute)
+        detector = getattr(swr_detectors, attribute)
 
         def recording(time, signal, *args, _name=name, _detector=detector, **kw):
             signals[_name] = np.array(signal)
             return _detector(time, signal, *args, **kw)
 
-        monkeypatch.setattr(swr_inventories, attribute, recording)
+        monkeypatch.setattr(swr_detectors, attribute, recording)
     return signals
 
 
@@ -1458,7 +1458,7 @@ def test_a_failed_epoch_is_recorded_and_the_rest_run(
     )
     assert manifest["settings"]["detectors"] == {
         name: dict(settings)
-        for name, settings in swr_inventories.DETECTOR_SETTINGS.items()
+        for name, settings in swr_detectors.DETECTOR_SETTINGS.items()
     }
     assert manifest["settings"]["tetrode_selection"] == {
         "rule": "R-T",
@@ -1570,7 +1570,7 @@ def test_a_rerun_with_other_settings_is_refused(
     )
     ran = _with_fakes(monkeypatch)
     _cli(tmp_path)
-    changed = {name: dict(s) for name, s in swr_inventories.DETECTOR_SETTINGS.items()}
+    changed = {name: dict(s) for name, s in swr_detectors.DETECTOR_SETTINGS.items()}
     changed["kay"]["zscore_threshold"] = 3.0
     monkeypatch.setattr(runner, "DETECTOR_SETTINGS", MappingProxyType(changed))
 

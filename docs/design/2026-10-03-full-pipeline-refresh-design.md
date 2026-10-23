@@ -459,7 +459,7 @@ None of them has a decode either.
 
 - **Input fetch:** `data_loaders/lfp.py`, sharing `get_ripple`'s restriction keys through
   one helper rather than copying them.
-- **Detection:** a new `analysis/hippocampus/swr_inventories.py`, holding the pinned
+- **Detection:** a new `analysis/hippocampus/swr_detectors.py`, holding the pinned
   settings, the Zugaro filtering, the input check and the Kay check.
 - **Runner:** a new `scripts/detection/run_swr_detection.py`.
   - It takes the decoder's options: `--animal`, `--date`, `--epoch`, `--overwrite`.
@@ -746,7 +746,7 @@ The **before/after report** covers:
 4. **Data loaders:**
    - `data_loaders/lfp.py` gains the ripple-input fetch, sharing `get_ripple`'s keys;
    - `data_loaders/position.py` gains the position helper shared with `load_data`.
-5. **New `analysis/hippocampus/swr_inventories.py`.**
+5. **New `analysis/hippocampus/swr_detectors.py`.**
 6. **New `scripts/detection/run_swr_detection.py`.**
 7. **New `scripts/qa/audit_refresh_consistency.py` (removed in e5ab464, after its one use),**
    including the Stage 5 tables manifest.

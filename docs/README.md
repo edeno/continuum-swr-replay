@@ -209,6 +209,7 @@ doc-path test does not look for it. The source of truth is
 | `analysis/hippocampus/event_eligibility.py` (removed: moved) | `analysis/events/eligibility.py` |
 | `analysis/hippocampus/event_immobility.py` (removed: moved) | `analysis/events/immobility.py` |
 | `analysis/hippocampus/epoch_normalizers.py` (removed: moved) | `analysis/events/epoch_normalizers.py` |
+| `analysis/hippocampus/swr_inventories.py` (removed: renamed) | `analysis/hippocampus/swr_detectors.py` (it runs the four direct SWR detectors) |
 | `analysis/replay/cohort_selection.py` (removed: moved) | `analysis/events/cohort_selection.py` |
 | `analysis/inventory_comparison/intervals.py` (removed: moved) | `intervals.py` |
 | `analysis/pfc/glm.py` (removed: split) | `analysis/pfc/design.py`, `analysis/pfc/event_sets.py`, `analysis/pfc/fit.py`, `analysis/pfc/matched_control.py`, `analysis/pfc/modulation.py` and `analysis/pfc/session.py` (`process_neuron`, `run_session`); `get_spikecount_per_time_bin` is in `intervals.py`. Git does not detect the rename: `git log --follow -M30% -- src/continuum_swr_replay/analysis/pfc/session.py` reaches the history of `glm.py` |
@@ -229,7 +230,7 @@ doc-path test does not look for it. The source of truth is
 Names that left a module that still exists:
 
 - `COLORS` and `CONTFRAG_COLORS`: from `parameters.py` to `visualization/palettes.py`.
-- `kay_version_check`: from `analysis/hippocampus/swr_inventories.py` to
+- `kay_version_check`: from `analysis/hippocampus/swr_detectors.py` to
   `analysis/inventory_comparison/kay_version.py`.
 
 New `src/` modules that took code out of `scripts/`: `analysis/hippocampus/detection_inputs.py`

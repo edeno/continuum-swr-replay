@@ -25,7 +25,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.terms import (
     encoding_inputs,
     nearest_interior_bins,
 )
-from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
+from continuum_swr_replay.analysis.hippocampus.swr_detectors import (
     tetrode_spike_counts,
 )
 from continuum_swr_replay.analysis.inventory_comparison.evidence import (

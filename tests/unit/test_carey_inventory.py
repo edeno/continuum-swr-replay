@@ -18,8 +18,8 @@ from numpy.typing import NDArray
 from ripple_detection import Carey_candidate_detector, filter_ripple_band
 from ripple_detection.simulate import simulate_session, simulate_time
 
-from continuum_swr_replay.analysis.hippocampus import swr_inventories
-from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
+from continuum_swr_replay.analysis.hippocampus import swr_detectors
+from continuum_swr_replay.analysis.hippocampus.swr_detectors import (
     CAREY_SETTINGS,
     DETECTOR_SETTINGS,
     carey_observed_stretches,
@@ -186,7 +186,7 @@ def test_the_mask_leaves_the_scaling_and_drops_what_it_overlaps(monkeypatch):
         calls.append(settings)
         return Carey_candidate_detector(*args, **settings)
 
-    monkeypatch.setattr(swr_inventories, "Carey_candidate_detector", spy)
+    monkeypatch.setattr(swr_detectors, "Carey_candidate_detector", spy)
 
     events = run_carey_detector(
         epoch.time, epoch.band, counts, epoch.speed, FS, unobserved=unobserved

@@ -2,7 +2,7 @@
 """Run the four SWR detectors on every epoch's CA1 LFP, from shared inputs.
 
 Kay, Karlsson, Yu and Zugaro, from ``ripple_detection`` at its pinned commit,
-each with its own settings (``swr_inventories.DETECTOR_SETTINGS``), on one
+each with its own settings (``swr_detectors.DETECTOR_SETTINGS``), on one
 epoch's shared inputs: the stored CA1 ripple band and the referenced raw LFP
 behind it (``get_ripple_band_inputs``), and the head speed and time span that
 ``load_data`` uses (``get_epoch_position_info``). Design: Stage 3 of
@@ -169,7 +169,7 @@ from continuum_swr_replay.analysis.hippocampus.ripple_tetrodes import (
     check_one_channel_per_tetrode,
     select_ripple_tetrodes,
 )
-from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
+from continuum_swr_replay.analysis.hippocampus.swr_detectors import (
     CHANNEL_SELECTION_BAND_HZ,
     CHANNEL_SELECTION_FILTER_ORDER,
     CHANNEL_SELECTION_RMS_WINDOW_S,

@@ -25,7 +25,7 @@ from ripple_detection.simulate import simulate_session, simulate_time
 
 import scripts.detection.run_carey_detection as runner
 from continuum_swr_replay.analysis.events import swr_source
-from continuum_swr_replay.analysis.hippocampus.swr_inventories import CAREY_SETTINGS
+from continuum_swr_replay.analysis.hippocampus.swr_detectors import CAREY_SETTINGS
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.runs.io import array_sha256, sha256_file
 from continuum_swr_replay.tables.io import read_table

@@ -1,4 +1,4 @@
-"""Tests for ``swr_inventories``: the Zugaro filter and its channel choice, the
+"""Tests for ``swr_detectors``: the Zugaro filter and its channel choice, the
 four detectors' settings and run, Yu's threshold diagnostics, the check that
 the stored ripple band reproduces from its raw input, and the Kay version
 check.
@@ -37,8 +37,8 @@ from ripple_detection.simulate import simulate_session, simulate_time
 from scipy.ndimage import uniform_filter1d
 from scipy.signal import butter, filtfilt, sosfilt, sosfiltfilt, sosfreqz
 
-from continuum_swr_replay.analysis.hippocampus import swr_inventories
-from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
+from continuum_swr_replay.analysis.hippocampus import swr_detectors
+from continuum_swr_replay.analysis.hippocampus.swr_detectors import (
     CHANNEL_SELECTION_BAND_HZ,
     CHANNEL_SELECTION_FILTER_ORDER,
     CHANNEL_SELECTION_RMS_WINDOW_S,
@@ -728,7 +728,7 @@ def test_a_failing_detector_does_not_hide_the_others(monkeypatch):
     def failing_yu(*args, **kwargs):
         raise failure
 
-    monkeypatch.setattr(swr_inventories, "Yu_ripple_detector", failing_yu)
+    monkeypatch.setattr(swr_detectors, "Yu_ripple_detector", failing_yu)
     epoch = _simulated_epoch((150, 175))
 
     results = _run_on(epoch)
@@ -763,7 +763,7 @@ def test_each_detector_reads_its_own_input_and_settings(monkeypatch):
     zugaro_events = _events_with_durations([0.149, 0.150, 0.151])
     for name, attribute in detectors.items():
         events = zugaro_events if name == "zugaro" else _events_with_durations([0.2])
-        monkeypatch.setattr(swr_inventories, attribute, recorder(name, events))
+        monkeypatch.setattr(swr_detectors, attribute, recorder(name, events))
     time = _regular_time(100)
     band = np.ones((100, 3))
     zugaro_lfp = np.ones((100, 1))
@@ -845,7 +845,7 @@ def test_the_artifact_mask_leaves_every_detectors_normalization(monkeypatch):
         "yu": "Yu_ripple_detector",
         "zugaro": "Zugaro_ripple_detector",
     }.items():
-        monkeypatch.setattr(swr_inventories, attribute, recorder(name))
+        monkeypatch.setattr(swr_detectors, attribute, recorder(name))
     time = _regular_time(100)
     speed = np.zeros(100)
     speed[60:70] = 10.0
@@ -887,7 +887,7 @@ def test_without_an_artifact_mask_no_normalization_mask_is_passed(monkeypatch):
         calls["kay"] = settings
         return _events_with_durations([0.05])
 
-    monkeypatch.setattr(swr_inventories, "Kay_ripple_detector", kay)
+    monkeypatch.setattr(swr_detectors, "Kay_ripple_detector", kay)
     time = _regular_time(100)
 
     run_swr_detectors(time, np.ones((100, 3)), np.ones((100, 1)), np.zeros(100), FS)
@@ -1037,7 +1037,7 @@ def test_yu_diagnostics_write_a_non_finite_scalar_as_none(monkeypatch):
         return dataclasses.replace(diagnostics, flank_ratio=np.inf)
 
     monkeypatch.setattr(
-        swr_inventories, "noise_threshold_diagnostics", infinite_flank_ratio
+        swr_detectors, "noise_threshold_diagnostics", infinite_flank_ratio
     )
     epoch = _simulated_epoch((150, 175))
 
@@ -1056,7 +1056,7 @@ def test_yu_diagnostics_refuse_a_zscore_per_channel_they_do_not_follow(monkeypat
     """
     settings = dict(DETECTOR_SETTINGS)
     settings["yu"] = {**DETECTOR_SETTINGS["yu"], "zscore_per_channel": False}
-    monkeypatch.setattr(swr_inventories, "DETECTOR_SETTINGS", settings)
+    monkeypatch.setattr(swr_detectors, "DETECTOR_SETTINGS", settings)
     epoch = _simulated_epoch((150, 175))
 
     with pytest.raises(ValueError, match="zscore_per_channel"):

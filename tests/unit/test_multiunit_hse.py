@@ -376,7 +376,7 @@ class TestTheLoadersIntervalRulesAreTheMasks:
     """The loader's closed membership rule is ``intervals.interval_mask``
     itself. Event dropping calls ``intervals.overlaps_intervals`` (the event
     overlap of the one eligibility rule), as
-    ``swr_inventories.drop_overlapping_events`` does."""
+    ``swr_detectors.drop_overlapping_events`` does."""
 
     TIME = np.round(np.arange(0.0, 2.0, 0.001), 3)
     """A 1 kHz grid, so interval and event bounds land on samples exactly."""
@@ -417,7 +417,7 @@ class TestTheLoadersIntervalRulesAreTheMasks:
         return cases
 
     def test_event_overlap_is_the_detectors_and_the_sources(self):
-        from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
+        from continuum_swr_replay.analysis.hippocampus.swr_detectors import (
             drop_overlapping_events,
         )
         from continuum_swr_replay.intervals import overlaps_intervals

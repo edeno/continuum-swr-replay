@@ -44,7 +44,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.statistics im
     NO_CENTER,
     dispersion_cm,
 )
-from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
+from continuum_swr_replay.analysis.hippocampus.swr_detectors import (
     tetrode_spike_counts,
 )
 from continuum_swr_replay.analysis.inventory_comparison.recount import (

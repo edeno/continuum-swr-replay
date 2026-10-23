@@ -90,7 +90,7 @@ from ..schemas import MultiunitData, RippleBandInputs, RippleData, ThetaData
 
 KAY_SMOOTHING_SIGMA_S = 0.004
 """The Kay consensus's Gaussian smoothing, in seconds: the SWR runner's
-``swr_inventories.DETECTOR_SETTINGS["kay"]["smoothing_sigma"]`` (a test holds
+``swr_detectors.DETECTOR_SETTINGS["kay"]["smoothing_sigma"]`` (a test holds
 the two equal; ``data_loaders`` may not import ``analysis``)."""
 
 KAY_MINIMUM_DURATION_S = 0.015

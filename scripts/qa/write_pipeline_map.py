@@ -171,7 +171,7 @@ EXCLUDED_PREFIXES: tuple[str, ...] = (
     "src/continuum_swr_replay/decoding/config.py",
     "src/continuum_swr_replay/decoding/transitions.py",
     "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/",
-    "src/continuum_swr_replay/analysis/hippocampus/swr_inventories.py",
+    "src/continuum_swr_replay/analysis/hippocampus/swr_detectors.py",
     "src/continuum_swr_replay/analysis/inventory_comparison/",
     "scripts/detection/run_memoryless_detection.py",
     "scripts/detection/run_swr_detection.py",

@@ -3,7 +3,7 @@
 
 ``Carey_candidate_detector`` from ``ripple_detection`` at its pinned commit, in
 the package's default Hilbert configuration with tetrodes as units
-(``swr_inventories.CAREY_SETTINGS``), run by ``run_carey_detector`` on the SWR
+(``swr_detectors.CAREY_SETTINGS``), run by ``run_carey_detector`` on the SWR
 runner's inputs. Its four adaptations of the published detector are recorded
 in the run's settings (``ADAPTATIONS``). Design:
 ``docs/design/replay_detection_comparison/03-inventory-comparison.md``.
@@ -96,7 +96,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
     check_marks_match_encoding,
 )
-from continuum_swr_replay.analysis.hippocampus.swr_inventories import (
+from continuum_swr_replay.analysis.hippocampus.swr_detectors import (
     CAREY_SETTINGS,
     carey_observed_stretches,
     run_carey_detector,
