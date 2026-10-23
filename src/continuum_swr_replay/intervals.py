@@ -514,10 +514,10 @@ def covered_seconds(
 
 
 def overlaps_open(
-    start_time: float, end_time: float, starts: NDArray, ends: NDArray
-) -> bool:
-    """Whether the open test holds for any window: ``window_start < end_time``
-    and ``window_end > start_time``.
+    start_times: NDArray, end_times: NDArray, starts: NDArray, ends: NDArray
+) -> NDArray[np.bool_]:
+    """Whether the open test holds, for each query, against any window:
+    ``window_start < end_time`` and ``window_end > start_time``.
 
     Abutting a window exactly is not an overlap. There is no duration check,
     so a zero-length window, or a zero-length ``[start_time, end_time]``,
@@ -527,24 +527,26 @@ def overlaps_open(
 
     Parameters
     ----------
-    start_time, end_time : float
-        Window bounds in seconds.
+    start_times, end_times : NDArray, shape (n_queries,)
+        Query bounds in seconds.
     starts, ends : NDArray, shape (n_windows,)
         Ascending, non-overlapping window bounds (the columns of
         :func:`merge_intervals`). ``ends`` is then ascending too, so the only
-        window that can reach past ``start_time`` among those starting before
-        ``end_time`` is the last of them.
+        window that can reach past a query's start among those starting before
+        its end is the last of them.
 
     Returns
     -------
-    bool
+    NDArray of bool, shape (n_queries,)
     """
+    start_times = np.asarray(start_times, dtype=np.float64)
+    end_times = np.asarray(end_times, dtype=np.float64)
     if len(starts) == 0:
-        return False
-    n_starting_before = int(np.searchsorted(starts, end_time, side="left"))
-    if n_starting_before == 0:
-        return False
-    return bool(ends[n_starting_before - 1] > start_time)
+        return np.zeros(start_times.shape, dtype=bool)
+    n_starting_before = np.searchsorted(starts, end_times, side="left")
+    last_end = np.asarray(ends)[np.maximum(n_starting_before - 1, 0)]
+    overlaps: NDArray[np.bool_] = (n_starting_before > 0) & (last_end > start_times)
+    return overlaps
 
 
 def contiguous_true_runs(mask: NDArray) -> NDArray:

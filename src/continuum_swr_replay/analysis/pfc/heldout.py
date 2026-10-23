@@ -572,15 +572,14 @@ def overlapping_fraction(
     """
     if not len(windows):
         return float("nan")
-    hits = sum(
-        overlaps_open(float(start), float(end), starts, ends)
-        for start, end in zip(
+    return float(
+        overlaps_open(
             windows["start_time"].to_numpy(dtype=float),
             windows["end_time"].to_numpy(dtype=float),
-            strict=True,
-        )
+            starts,
+            ends,
+        ).mean()
     )
-    return float(hits / len(windows))
 
 
 def control_draw_null(

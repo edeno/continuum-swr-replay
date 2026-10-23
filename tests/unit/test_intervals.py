@@ -214,21 +214,39 @@ class TestClosedIntervalEdgeCases:
         np.testing.assert_array_equal(covered, [0.0, 1.0, 0.0])
 
 
+def _open(start: float, end: float, starts, ends) -> bool:
+    """``overlaps_open`` for one query."""
+    result = overlaps_open(np.array([start]), np.array([end]), starts, ends)
+    assert result.shape == (1,) and result.dtype == bool
+    return bool(result[0])
+
+
 class TestTheOpenOverlapTest:
     STARTS = np.array([1.0, 4.0])
     ENDS = np.array([2.0, 4.0])
 
+    def test_each_query_is_answered(self):
+        np.testing.assert_array_equal(
+            overlaps_open(
+                np.array([2.0, 3.5, 1.2, 0.0]),
+                np.array([3.0, 4.5, 1.8, 1.0]),
+                self.STARTS,
+                self.ENDS,
+            ),
+            [False, True, True, False],
+        )
+
     def test_abutting_is_not_an_overlap(self):
-        assert not overlaps_open(2.0, 3.0, self.STARTS, self.ENDS)
-        assert not overlaps_open(0.0, 1.0, self.STARTS, self.ENDS)
+        assert not _open(2.0, 3.0, self.STARTS, self.ENDS)
+        assert not _open(0.0, 1.0, self.STARTS, self.ENDS)
 
     def test_a_zero_length_window_strictly_inside_overlaps(self):
-        assert overlaps_open(3.5, 4.5, self.STARTS, self.ENDS)
-        assert overlaps_open(1.5, 1.5, self.STARTS, self.ENDS)
+        assert _open(3.5, 4.5, self.STARTS, self.ENDS)
+        assert _open(1.5, 1.5, self.STARTS, self.ENDS)
 
     def test_nested_and_empty(self):
-        assert overlaps_open(1.2, 1.8, self.STARTS, self.ENDS)
-        assert not overlaps_open(1.2, 1.8, np.array([]), np.array([]))
+        assert _open(1.2, 1.8, self.STARTS, self.ENDS)
+        assert not _open(1.2, 1.8, np.array([]), np.array([]))
 
 
 def test_the_four_overlap_conventions_side_by_side():
@@ -244,7 +262,7 @@ def test_the_four_overlap_conventions_side_by_side():
         query = (np.array([s]), np.array([e]))
         got[name] = (
             bool(overlaps_intervals(*query, frame((o_s, o_e)))[0]),
-            overlaps_open(s, e, np.array([o_s]), np.array([o_e])),
+            _open(s, e, np.array([o_s]), np.array([o_e])),
             bool(strict_overlap_matrix(*query, np.array([o_s]), np.array([o_e]))[0, 0]),
             bool(overlaps_dropped_events(*query, frame((o_s, o_e)))[0]),
         )
@@ -343,7 +361,7 @@ class TestClosedIntervalsRefuseMalformedBounds:
     def test_the_open_test_and_the_interval_sets_are_unchanged(self):
         # overlaps_open moved with its semantics; the interval sets drop
         # malformed rows by design (normalize), and refuse only when strict.
-        assert not overlaps_open(np.nan, 1.0, np.array([0.0]), np.array([2.0]))
+        assert not _open(np.nan, 1.0, np.array([0.0]), np.array([2.0]))
         np.testing.assert_array_equal(
             normalize(np.array([[np.nan, 1.0], [3.0, 1.0], [4.0, 5.0]])), [[4.0, 5.0]]
         )
