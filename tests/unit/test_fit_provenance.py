@@ -605,9 +605,7 @@ def test_content_ladder_readers_check_the_table_the_ladder_records():
     that declaration is checked against the helper the fitter itself uses.
     """
     fitter = _load_script(CONTENT / "fit_replay_content_models.py")
-    expected = fitter.content_fit_inputs(
-        fitter.PROCESSED_DATA_DIR / "replay_content", "event_arm_table"
-    )
+    expected = fitter.content_fit_inputs(fitter.REPLAY_CONTENT_DIR, "event_arm_table")
     figures = _load_script(CONTENT / "generate_replay_content_figures.py")
     uncertainty = _load_script(CONTENT / "analyze_uncertainty_content.py")
 
@@ -619,14 +617,8 @@ def test_content_ladder_readers_gate_the_canonical_bundle():
     """The gated artifacts live in the directory a full fraction run publishes."""
     fitter = _load_script(CONTENT / "fit_replay_content_models.py")
     figures = _load_script(CONTENT / "generate_replay_content_figures.py")
-    bundle = (
-        fitter.PROCESSED_DATA_DIR
-        / "replay_content"
-        / (
-            fit_outputs.canonical_output_subdir(
-                "non_local", "HPC", "arm", "all", "timebin"
-            )
-        )
+    bundle = fitter.REPLAY_CONTENT_DIR / (
+        fit_outputs.canonical_output_subdir("non_local", "HPC", "arm", "all", "timebin")
     )
 
     assert figures.MODEL_DIR == bundle
@@ -754,14 +746,10 @@ def test_data_flow_figure_gates_the_arm_model_it_draws():
     """The pipeline figure plots fitted M3 coefficients, so it is gated too."""
     figure = _load_script(FIGURES / "generate_supp_pipeline_data_flow.py")
     fitter = _load_script(CONTENT / "fit_replay_content_models.py")
-    expected = fitter.content_fit_inputs(
-        fitter.PROCESSED_DATA_DIR / "replay_content", "event_arm_table"
-    )
+    expected = fitter.content_fit_inputs(fitter.REPLAY_CONTENT_DIR, "event_arm_table")
 
     assert figure.ALL_MODELS_INPUTS == expected
-    assert figure.M3_PATH == fitter.PROCESSED_DATA_DIR / (
-        "replay_content/models/M3.pkl"
-    )
+    assert figure.M3_PATH == fitter.REPLAY_CONTENT_DIR / "models" / "M3.pkl"
     assert figure.build_parser().parse_args([]).allow_stale is False
     assert figure.build_parser().parse_args(["--allow-stale"]).allow_stale is True
 

@@ -37,7 +37,7 @@ from pathlib import Path
 
 from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.runs.provenance import git_commit, git_dirty
-from continuum_swr_replay.tables.io import parquet_path, read_attrs
+from continuum_swr_replay.tables.io import parquet_path, read_attrs, resolved_table_path
 
 __all__ = [
     "fit_provenance_path",
@@ -134,13 +134,10 @@ def _resolve_input(path: str | Path) -> Path:
     FileNotFoundError
         If neither the parquet nor the pickle form exists.
     """
-    parquet = parquet_path(path)
-    if parquet.exists():
-        return parquet
-    pickle = Path(path).with_suffix(".pkl")
-    if pickle.exists():
-        return pickle
-    raise FileNotFoundError(f"no input table at {parquet} or {pickle}")
+    resolved = resolved_table_path(path)
+    if not resolved.exists():
+        raise FileNotFoundError(f"no input table at {parquet_path(path)} or {resolved}")
+    return resolved
 
 
 def _input_record(path: str | Path) -> InputRecord:

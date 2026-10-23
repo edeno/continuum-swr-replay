@@ -31,8 +31,12 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
     check_fit_provenance,
     fit_provenance_path,
 )
-from continuum_swr_replay.paths import CANONICAL_TABLE_BASENAMES, REPLAY_CONTENT_DIR
-from continuum_swr_replay.tables.io import parquet_path
+from continuum_swr_replay.paths import (
+    CANONICAL_TABLE_BASENAMES,
+    REPLAY_CONTENT_DIR,
+    table_path,
+)
+from continuum_swr_replay.tables.io import parquet_path, table_exists
 
 _SIDECAR_SUFFIX = ".provenance.json"
 DEFAULT_ROOT = REPLAY_CONTENT_DIR
@@ -69,11 +73,11 @@ def resolve_input(name: str, sidecar: Path, root: Path) -> Path | None:
     Returns the first candidate that exists in either table form.
     """
     if name in CANONICAL_TABLE_BASENAMES:
-        candidates: tuple[Path, ...] = (root / f"{name}.pkl",)
+        candidates: tuple[Path, ...] = (table_path(name, root, fmt="pkl"),)
     else:
         candidates = (sidecar.parent / f"{name}.pkl", root / f"{name}.pkl")
     for candidate in candidates:
-        if parquet_path(candidate).exists() or candidate.exists():
+        if table_exists(candidate):
             return candidate
     return None
 
