@@ -158,7 +158,8 @@ def _plot_trial_rail(ax: Axes, ctx: _PanelContext) -> None:
         ax.set_ylim(-0.5, 5.5)
         return
 
-    ordered = trials.sort_values("start_time", kind="stable").reset_index(drop=True)
+    # keep the trial ids: the port-experience stream names trips by them
+    ordered = trials.sort_values("start_time", kind="stable")
     start_times = ordered["start_time"].to_numpy(dtype=float)
     if not np.isfinite(start_times).all() or np.any(np.diff(start_times) < 0):
         raise ValueError(
@@ -172,7 +173,7 @@ def _plot_trial_rail(ax: Axes, ctx: _PanelContext) -> None:
         raise ValueError("canonical trial cutoff times must be finite")
 
     drew_interval = False
-    for trial_idx, row in ordered.iterrows():
+    for trial_idx, (_, row) in enumerate(ordered.iterrows()):
         transit_start = max(float(row["start_time"]), lo)
         transit_end = min(float(completion_times[trial_idx]), hi)
         if transit_end > transit_start:

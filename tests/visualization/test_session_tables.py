@@ -193,6 +193,36 @@ class TestTrialRail:
         assert not any("no trials" in text.get_text() for text in ax.texts)
         plt.close(fig)
 
+    def test_rail_keeps_trial_numbers_that_start_at_one(self):
+        """Real trial tables are indexed by ``trial_number`` from 1, and the
+        port-experience stream names trips by that number; the rail draws the
+        same segments as for trials numbered from 0."""
+
+        def rails(trials: pd.DataFrame) -> list[tuple[list[float], list[float]]]:
+            fig, ax = plt.subplots()
+            _plot_trial_rail(ax, _ctx_with_trials(trials, (0.0, 20.0)))
+            segments = [
+                (
+                    np.asarray(line.get_xdata(), dtype=float).tolist(),
+                    np.asarray(line.get_ydata(), dtype=float).tolist(),
+                )
+                for line in ax.lines
+                if line.get_color() == "#333333"
+            ]
+            plt.close(fig)
+            return segments
+
+        from_zero = self._timed_trials()
+        from_one = from_zero.set_axis(pd.Index([1, 2], name="trial_number"))
+        assert (
+            rails(from_one)
+            == rails(from_zero)
+            == [
+                ([6.0, 10.0], [1.0, 1.0]),
+                ([18.0, 20.0], [3.0, 3.0]),
+            ]
+        )
+
     @staticmethod
     def _timed_trials() -> pd.DataFrame:
         """Trips whose start, arrival, and interval-end times are distinct."""
