@@ -167,6 +167,78 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     the non-local 15 ms minimum is really 7 samples (12 ms span), 1.1 % of events;
     fix at the next full rebuild.
 
+## Code layout
+
+`src/continuum_swr_replay/` is layered. Code may import from its own layer and the
+layers below it, never from a layer above:
+
+1. **Foundation**: `data_loaders/`, `decoding/`, `intervals.py`, `parameters.py`,
+   `paths.py`, `runs/`, `schemas.py`, `tables/`. A foundation module imports only
+   other foundation modules.
+2. **`analysis/events/`**, the analysed-time rule and the event substrate. It imports
+   only the foundation, `analysis/constants.py` (which itself imports only the
+   foundation) and itself.
+3. **The other `analysis/` packages** (`hippocampus/`, `replay/`, `pfc/`, `behavior/`,
+   `contfrag/`, `inventory_comparison/`). `hippocampus/` never imports `pfc/` or
+   `inventory_comparison/`. No `analysis/` code imports `visualization/`.
+4. **`visualization/`** (with `figure_utilities.py`), then **`scripts/`** on top.
+   Nothing in `src/` imports `scripts/`.
+
+There are no package cycles. `tests/unit/test_import_layering.py` enforces all of
+this (it also keeps `data_loaders/` from importing `analysis/`, `hippocampus/` from
+importing `replay/`, and the covariate builders from importing `model_specs.py`). Its
+allowlists of known violations are empty and can only shrink.
+
+### Moved modules (2026-10)
+
+The code-organization branch (`470a393..6e511d39`) moved, renamed or split the
+modules below. **There are no compatibility shims**: the old import paths raise
+`ModuleNotFoundError`, so code outside this repo (notebooks, old scripts) must update
+its imports. Paths are under `src/continuum_swr_replay/`; the import path is the file
+path with `/` as `.` and no `.py`. An old path is marked "(removed: …)" so the
+doc-path test does not look for it. The source of truth is
+`git diff -M --name-status 470a393..6e511d39 -- src/`.
+
+| Old module | New home |
+|---|---|
+| `analysis/hippocampus/swr_source.py` (removed: split) | `analysis/events/analysed_time.py` (the analysed-time read point: `excluded_intervals`, `with_swr_source`, `artifact_event_drops`, `swr_event_labels`, …) and `analysis/events/swr_inventory.py` (the SWR inventory read: `SWR_INVENTORY_RUN_ID`, `ARTIFACT_INTERVALS_RUN_ID`, `read_swr_inventory`, `swr_events`, `SwrSourceError`, …). `ARTIFACT_INTERVALS_ROOT` is now `paths.ARTIFACT_INTERVALS_DIR`; `SWR_INVENTORY_ROOT` is in `paths.py`; `SWR_SOURCE_TABLES` is in `tables/io.py` |
+| `analysis/hippocampus/artifacts/io.py` (removed: moved) | `analysis/events/artifact_intervals.py` |
+| `analysis/hippocampus/artifacts/masks.py` (removed: split) | `analysis/events/artifact_masks.py` (`PADDING_S`, `core_class`, `artifact_intervals`, the signature sets); the generic interval functions (`merge_intervals`, `interval_mask`, `subtract_intervals`, `masked_seconds`, `pad_intervals`, `overlaps_intervals`, `covered_seconds`) are in `intervals.py` |
+| `analysis/hippocampus/event_table.py` (removed: moved) | `analysis/events/classified_table.py` |
+| `analysis/hippocampus/event_detection.py` (removed: moved) | `analysis/events/detection.py` |
+| `analysis/hippocampus/event_eligibility.py` (removed: moved) | `analysis/events/eligibility.py` |
+| `analysis/hippocampus/event_immobility.py` (removed: moved) | `analysis/events/immobility.py` |
+| `analysis/hippocampus/epoch_normalizers.py` (removed: moved) | `analysis/events/epoch_normalizers.py` |
+| `analysis/replay/cohort_selection.py` (removed: moved) | `analysis/events/cohort_selection.py` |
+| `analysis/inventory_comparison/intervals.py` (removed: moved) | `intervals.py` |
+| `analysis/pfc/glm.py` (removed: split) | `analysis/pfc/design.py`, `analysis/pfc/event_sets.py`, `analysis/pfc/fit.py`, `analysis/pfc/matched_control.py`, `analysis/pfc/modulation.py` and `analysis/pfc/session.py` (`process_neuron`, `run_session`); `get_spikecount_per_time_bin` is in `intervals.py`. Git does not detect the rename: `git log --follow -M30% -- src/continuum_swr_replay/analysis/pfc/session.py` reaches the history of `glm.py` |
+| `analysis/replay/posterior_io.py` (removed: moved) | `load_conditional_posterior` is in `analysis/hippocampus/posterior_analysis.py` |
+| `analysis/replay/covariate_registry.py` (removed: moved) | `tables/covariate_registry.py` |
+| `analysis/replay/event_ids.py` (removed: moved) | `tables/event_ids.py` |
+| `analysis/replay/standardization.py` (removed: moved) | `tables/standardization.py` |
+| `analysis/replay/versions.py` (removed: moved) | `tables/versions.py` |
+| `decode_files.py` (removed: moved) | `decoding/files.py` |
+| `decoding_transitions.py` (removed: moved) | `decoding/transitions.py` |
+| `decoding_common.py` (removed: split) | `decoding/config.py` (`DecodingConfig`, `NonLocalDecodingConfig`); `decoding/files.py` (`results_exist`); `analysis/hippocampus/decode_masks.py` (`hpc_decode_masks`, `HpcDecodeMasks` and the other HPC decode-mask functions); `runs/batch.py` (`run_batch`, `setup_logger`, `release_nwb_files`, `raise_open_file_limit`); `runs/cli.py` (`parse_run_id`, `RUN_ID_PATTERN`, `add_common_args`, `filter_epoch_info`); `runs/io.py` (`write_atomically`, `write_json`, `replace_outputs`); `runs/provenance.py` (`provenance_record`) |
+| `table_io.py` (removed: moved) | `tables/io.py`; `sha256_file` is in `runs/io.py` |
+| `table_parity.py` (removed: moved) | `tables/parity.py`; `BASENAME_TO_TABLE` and `CANONICAL_TABLE_BASENAMES` are in `paths.py` |
+| `session_keys.py` (removed: moved) | `tables/session_keys.py` |
+| `types.py` (removed: renamed) | `schemas.py` |
+| `visualization/session_tables.py` (removed: split) | the `visualization/session_tables/` package, so the import path is unchanged: `plot_session_tables`, `register_panel` and the panel lists are in its `__init__.py`; the private panel code is in `visualization/session_tables/_common.py`, `visualization/session_tables/arm_covariates.py`, `visualization/session_tables/patch_covariates.py`, `visualization/session_tables/responses.py` and `visualization/session_tables/stop_covariates.py` |
+
+Names that left a module that still exists:
+
+- `COLORS` and `CONTFRAG_COLORS`: from `parameters.py` to `visualization/palettes.py`.
+- `kay_version_check`: from `analysis/hippocampus/swr_inventories.py` to
+  `analysis/inventory_comparison/kay_version.py`.
+
+New `src/` modules that took code out of `scripts/`: `analysis/hippocampus/detection_inputs.py`
+(the detection runners' shared inputs), `analysis/replay/fit_outputs.py` (the content
+fitter's output naming), and functions added to `analysis/replay/learning.py` (Stage 6's
+role summary) and `analysis/replay/contrast_aggregation.py` (the contrast-content cohort
+assembly). Script moves are listed in [scripts/README.md](../scripts/README.md)
+("Moved scripts (2026-10)").
+
 ## Figure outputs
 
 - **`paper/figures/<topic>/`** — publication figures only, in topic subdirs (main-text
