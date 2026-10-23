@@ -97,9 +97,7 @@ from continuum_swr_replay.analysis.constants import (
 )
 from continuum_swr_replay.analysis.events import (
     analysed_time,
-)
-from continuum_swr_replay.analysis.events import (
-    swr_source as source_inventory,
+    swr_source,
 )
 from continuum_swr_replay.analysis.inventory_comparison.adapters import (
     CAREY,
@@ -110,8 +108,8 @@ from continuum_swr_replay.analysis.inventory_comparison.adapters import (
     carey_inventory,
     memoryless_inventory,
     mua_inventory,
+    source_swr_inventory,
     state_space_inventory,
-    swr_inventory,
 )
 from continuum_swr_replay.analysis.inventory_comparison.availability import (
     EXCLUSION_DTYPES,
@@ -337,9 +335,9 @@ def epoch_inventories(
     memoryless_dir: Path,
 ) -> dict[str, InventoryTables]:
     """Every inventory of the roster for the frame's epoch, by detector."""
-    swr_dir = source_inventory.swr_inventory_dir()
+    swr_dir = swr_source.swr_inventory_dir()
     tables = {
-        detector: swr_inventory(swr_dir, detector, dot=dot, drops=drops)
+        detector: source_swr_inventory(swr_dir, detector, dot=dot, drops=drops)
         for detector in SWR_DETECTORS
     }
     tables[CAREY] = carey_inventory(carey_dir, dot=dot, drops=drops)
@@ -565,13 +563,13 @@ def bounds_mismatch(identifier: str, bounds: tuple[float, float]) -> str | None:
     record's ``position_span_s``), within :data:`BOUNDS_TOLERANCE_S`: every
     detector is compared over that one span.
     """
-    span = source_inventory.ripple_power_inputs(identifier)["position_span_s"]
+    span = swr_source.ripple_power_inputs(identifier)["position_span_s"]
     if np.allclose(bounds, span, rtol=0.0, atol=BOUNDS_TOLERANCE_S):
         return None
     return (
         f"The decode grid spans {bounds[0]!r} to {bounds[1]!r} s, not the position "
         f"span {span[0]!r} to {span[1]!r} s SWR run "
-        f"{source_inventory.SWR_INVENTORY_RUN_ID} cut its band to; the detectors would "
+        f"{swr_source.SWR_INVENTORY_RUN_ID} cut its band to; the detectors would "
         "not share one epoch."
     )
 
@@ -715,12 +713,12 @@ def run_settings(carey_run_id: str, memoryless_run_id: str) -> dict:
     settings: dict = json_ready(
         {
             "input_runs": {
-                "swr": source_inventory.SWR_INVENTORY_RUN_ID,
+                "swr": swr_source.SWR_INVENTORY_RUN_ID,
                 "carey": carey_run_id,
                 "memoryless": memoryless_run_id,
-                "artifacts": source_inventory.ARTIFACT_INTERVALS_RUN_ID,
+                "artifacts": swr_source.ARTIFACT_INTERVALS_RUN_ID,
             },
-            "swr_source": source_inventory.swr_source_name(),
+            "swr_source": swr_source.swr_source_name(),
             "roster": ROSTER,
             "swr_definitions": SWR_DEFINITIONS,
             "swr_cohorts": SEQUENCE_COHORTS,

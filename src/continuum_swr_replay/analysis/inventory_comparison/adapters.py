@@ -43,8 +43,7 @@ from numpy.typing import NDArray
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
-from continuum_swr_replay.analysis.events import analysed_time
-from continuum_swr_replay.analysis.events import swr_source as source_inventory
+from continuum_swr_replay.analysis.events import analysed_time, swr_source
 from continuum_swr_replay.analysis.events.classified_table import (
     build_classified_nonlocal_event_table,
 )
@@ -90,8 +89,8 @@ __all__ = [
     "carey_inventory",
     "memoryless_inventory",
     "mua_inventory",
+    "source_swr_inventory",
     "state_space_inventory",
-    "swr_inventory",
 ]
 
 SWR_DETECTORS = ("kay", "karlsson", "yu", "zugaro")
@@ -156,7 +155,7 @@ def _epoch(dot: pd.DataFrame) -> _Epoch:
         session=SessionIdentity(
             animal=str(animal), day=int(day), epoch=str(epoch), brain_area=BRAIN_AREA
         ),
-        epoch_id=source_inventory.swr_epoch_id(f"{animal}{day}_.nwb", str(epoch)),
+        epoch_id=swr_source.swr_epoch_id(f"{animal}{day}_.nwb", str(epoch)),
         time=time,
         speed=dot["head_speed"].to_numpy(dtype=np.float64),
         bounds=(float(time[0]), float(time[-1])),
@@ -284,7 +283,7 @@ def _run_files(
     if record is None:
         raise _Unavailable(f"{epoch_id} is not in run {run_dir.name}")
     status = record.get("status")
-    if status not in source_inventory.USABLE_STATUSES:
+    if status not in swr_source.USABLE_STATUSES:
         why = record.get("error") or record.get("reason") or "no reason recorded"
         raise _Unavailable(f"{status}: {str(why)[:200]}")
     if detector is not None:
@@ -357,7 +356,7 @@ def _dropped_on_grid(drops: pd.DataFrame, epoch: _Epoch) -> pd.DataFrame:
     reads them: each SWR's sampled on the grid (the drops hold the
     inventory's), each labelled event's as the drops hold them."""
     sampled = drops.copy()
-    is_swr = (sampled["event_col"] == source_inventory.SWR_LABEL_COLUMN).to_numpy()
+    is_swr = (sampled["event_col"] == swr_source.SWR_LABEL_COLUMN).to_numpy()
     sampled.loc[is_swr, ["start_time", "end_time"]] = _sampled_bounds(
         sampled.loc[is_swr], epoch
     )
@@ -388,7 +387,7 @@ def _lfp_inventory(
         events[["start_time", "end_time"]],
         speed=epoch.speed,
         time=epoch.time,
-        artifacts=source_inventory.artifact_intervals(epoch.epoch_id),
+        artifacts=swr_source.artifact_intervals(epoch.epoch_id),
     )
     try:
         sampled = _sampled_bounds(events, epoch)
@@ -426,7 +425,7 @@ def _lfp_inventory(
     )
 
 
-def swr_inventory(
+def source_swr_inventory(
     run_dir: Path, detector: str, *, dot: pd.DataFrame, drops: pd.DataFrame
 ) -> InventoryTables:
     """One SWR detector's inventory from the SWR runner's run folder.
@@ -470,7 +469,7 @@ def swr_inventory(
         events = _numbered_events(files[detector])
     except _Unavailable as why:
         return _unavailable(epoch, detector, run_dir.name, str(why))
-    scope = "zugaro" if detector == "zugaro" else source_inventory.OBSERVED_SCOPE
+    scope = "zugaro" if detector == "zugaro" else swr_source.OBSERVED_SCOPE
     observed = pd.read_parquet(files["swr_observed"])
     stretches = observed.loc[observed["scope"] == scope, ["start_s", "end_s"]]
     return _lfp_inventory(detector, run_dir, events, stretches.to_numpy(), epoch, drops)
@@ -483,7 +482,7 @@ def carey_inventory(
 
     ``{epoch_id}_carey_events.parquet`` and its observed stretches,
     ``{epoch_id}_carey_observed.parquet`` (scope ``carey``), under the same rule as the SWR
-    inventories (:func:`swr_inventory`, whose parameters these are).
+    inventories (:func:`source_swr_inventory`, whose parameters these are).
     """
     epoch = _epoch(dot)
     try:
@@ -519,9 +518,7 @@ def _label_set_aside(
 
 
 def _outside_mask(epoch: _Epoch) -> NDArray:
-    mask = interval_mask(
-        epoch.time, source_inventory.artifact_intervals(epoch.epoch_id)
-    )
+    mask = interval_mask(epoch.time, swr_source.artifact_intervals(epoch.epoch_id))
     outside: NDArray = ~mask
     return outside
 
@@ -723,7 +720,7 @@ def memoryless_inventory(
         session, bounds and speed).
     drops : DataFrame
         ``analysed_time.read_artifact_event_drops`` of the decode pickle, as for
-        :func:`swr_inventory`.
+        :func:`source_swr_inventory`.
 
     Returns
     -------

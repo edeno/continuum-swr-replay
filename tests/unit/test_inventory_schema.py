@@ -162,11 +162,11 @@ class TestAdapters:
         """The tables here are built from the inventory run "inventory" with no
         artifact run; read them under that source."""
         from continuum_swr_replay.analysis.events import (
-            swr_source as source_inventory,
+            swr_source,
         )
 
-        monkeypatch.setattr(source_inventory, "SWR_INVENTORY_RUN_ID", "inventory")
-        monkeypatch.setattr(source_inventory, "ARTIFACT_INTERVALS_RUN_ID", None)
+        monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", "inventory")
+        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", None)
 
     def test_our_canonical_table_keeps_its_native_duration_apart(self):
         """Its duration adds one sample width to the span; the span does not."""
@@ -305,7 +305,7 @@ class TestAdapters:
     ):
         """It would read its candidates in excluded time as kept."""
         from continuum_swr_replay.analysis.events import (
-            swr_source as source_inventory,
+            swr_source,
         )
         from tests.unit.test_memoryless_event_table import build, make_recording
 
@@ -313,7 +313,7 @@ class TestAdapters:
             columns="artifact_drop_reason"
         )
         assert len(from_memoryless_table(table, cohort="replay_criteria")) == 2
-        monkeypatch.setattr(source_inventory, "ARTIFACT_INTERVALS_RUN_ID", "a_run")
+        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", "a_run")
 
         with pytest.raises(ValueError, match="artifact_drop_reason"):
             from_memoryless_table(table, cohort="replay_criteria")
@@ -323,7 +323,7 @@ class TestAdapters:
         run is refused under a run, one built under a run under another or
         under none. The message names both sources."""
         from continuum_swr_replay.analysis.events import (
-            swr_source as source_inventory,
+            swr_source,
         )
         from tests.unit.test_memoryless_event_table import build, make_recording
 
@@ -335,12 +335,12 @@ class TestAdapters:
         with pytest.raises(ValueError, match="artifacts@run_a"):
             from_memoryless_table(under_a, cohort="replay_criteria")
 
-        monkeypatch.setattr(source_inventory, "ARTIFACT_INTERVALS_RUN_ID", "run_a")
+        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", "run_a")
         assert len(from_memoryless_table(under_a, cohort="replay_criteria")) == 2
         with pytest.raises(ValueError, match="'kay@inventory\\+artifacts@run_a'"):
             from_memoryless_table(under_none, cohort="replay_criteria")
 
-        monkeypatch.setattr(source_inventory, "ARTIFACT_INTERVALS_RUN_ID", "run_b")
+        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", "run_b")
         with pytest.raises(ValueError, match="'kay@inventory\\+artifacts@run_b'"):
             from_memoryless_table(under_a, cohort="replay_criteria")
 
@@ -348,7 +348,7 @@ class TestAdapters:
         """Its SWR labels, and so its candidates' SWR classes, are another
         inventory's; so is a table from before the source had a name."""
         from continuum_swr_replay.analysis.events import (
-            swr_source as source_inventory,
+            swr_source,
         )
         from tests.unit.test_memoryless_event_table import build, make_recording
 
@@ -360,7 +360,7 @@ class TestAdapters:
             with pytest.raises(ValueError, match="kay@inventory\\+artifacts@none"):
                 from_memoryless_table(table, cohort="replay_criteria")
 
-        monkeypatch.setattr(source_inventory, "SWR_INVENTORY_RUN_ID", "other")
+        monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", "other")
         assert len(from_memoryless_table(other, cohort="replay_criteria")) == 2
 
     def test_the_adapter_reads_what_the_memoryless_builder_writes(self):

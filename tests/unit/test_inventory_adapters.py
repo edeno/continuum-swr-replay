@@ -31,8 +31,8 @@ from continuum_swr_replay.analysis.inventory_comparison.adapters import (
     carey_inventory,
     memoryless_inventory,
     mua_inventory,
+    source_swr_inventory,
     state_space_inventory,
-    swr_inventory,
 )
 from continuum_swr_replay.analysis.inventory_comparison.availability import (
     OBSERVATION_DTYPES,
@@ -281,7 +281,7 @@ def _check_dtypes(tables) -> None:
 
 class TestTheSwrInventories:
     def test_every_event_is_in_the_inventory_or_set_aside_with_its_reason(self, epoch):
-        tables = swr_inventory(
+        tables = source_swr_inventory(
             epoch["swr_run"], "kay", dot=epoch["dot"], drops=epoch["drops"]
         )
 
@@ -312,7 +312,7 @@ class TestTheSwrInventories:
         assert set(tables.inventory.run_id) == {RUN_ID}
 
     def test_kay_keeps_exactly_the_papers_cohort(self, epoch):
-        tables = swr_inventory(
+        tables = source_swr_inventory(
             epoch["swr_run"], "kay", dot=epoch["dot"], drops=epoch["drops"]
         )
 
@@ -321,7 +321,7 @@ class TestTheSwrInventories:
         assert kept.event_key.tolist() == [f"kay:{PREFIX}:{n}" for n in labels]
 
     def test_an_event_overlapping_a_dropped_kay_swr_is_set_aside(self, epoch):
-        tables = swr_inventory(
+        tables = source_swr_inventory(
             epoch["swr_run"], "karlsson", dot=epoch["dot"], drops=epoch["drops"]
         )
 
@@ -346,10 +346,10 @@ class TestTheSwrInventories:
         karlsson = [*KARLSSON[:3], late, KARLSSON[3]]
         epoch = write_epoch(tmp_path, monkeypatch, kay=kay, karlsson=karlsson)
 
-        kay_tables = swr_inventory(
+        kay_tables = source_swr_inventory(
             epoch["swr_run"], "kay", dot=epoch["dot"], drops=epoch["drops"]
         )
-        karlsson_tables = swr_inventory(
+        karlsson_tables = source_swr_inventory(
             epoch["swr_run"], "karlsson", dot=epoch["dot"], drops=epoch["drops"]
         )
 
@@ -364,10 +364,10 @@ class TestTheSwrInventories:
         }
 
     def test_the_observed_time_is_the_detectors_scope(self, epoch):
-        kay = swr_inventory(
+        kay = source_swr_inventory(
             epoch["swr_run"], "kay", dot=epoch["dot"], drops=epoch["drops"]
         ).observations
-        zugaro = swr_inventory(
+        zugaro = source_swr_inventory(
             epoch["swr_run"], "zugaro", dot=epoch["dot"], drops=epoch["drops"]
         ).observations
 
@@ -383,7 +383,7 @@ class TestTheSwrInventories:
         )
 
     def test_an_empty_inventory_keeps_the_schema(self, epoch):
-        tables = swr_inventory(
+        tables = source_swr_inventory(
             epoch["swr_run"], "yu", dot=epoch["dot"], drops=epoch["drops"]
         )
 
@@ -393,7 +393,7 @@ class TestTheSwrInventories:
 
     def test_an_unknown_detector_is_refused(self, epoch):
         with pytest.raises(ValueError, match="detector"):
-            swr_inventory(
+            source_swr_inventory(
                 epoch["swr_run"], "long", dot=epoch["dot"], drops=epoch["drops"]
             )
 
@@ -413,7 +413,7 @@ class TestAnUnusableRecordReadsUnavailable:
         path = epoch["swr_run"] / f"{EPOCH}_karlsson_events.parquet"
         kay_events(KARLSSON[:2]).to_parquet(path)
 
-        tables = swr_inventory(
+        tables = source_swr_inventory(
             epoch["swr_run"], "karlsson", dot=epoch["dot"], drops=epoch["drops"]
         )
 
@@ -426,7 +426,7 @@ class TestAnUnusableRecordReadsUnavailable:
             lambda epochs: epochs[EPOCH]["outputs"].pop("karlsson"),
         )
 
-        tables = swr_inventory(
+        tables = source_swr_inventory(
             epoch["swr_run"], "karlsson", dot=epoch["dot"], drops=epoch["drops"]
         )
 
@@ -435,7 +435,7 @@ class TestAnUnusableRecordReadsUnavailable:
     def test_a_record_without_its_detectors(self, epoch):
         edit_record(epoch["swr_run"], lambda epochs: epochs[EPOCH].pop("detectors"))
 
-        tables = swr_inventory(
+        tables = source_swr_inventory(
             epoch["swr_run"], "zugaro", dot=epoch["dot"], drops=epoch["drops"]
         )
 
@@ -451,7 +451,7 @@ class TestAnUnusableRecordReadsUnavailable:
 
         edit_record(epoch["swr_run"], rehash)
 
-        tables = swr_inventory(
+        tables = source_swr_inventory(
             epoch["swr_run"], "karlsson", dot=epoch["dot"], drops=epoch["drops"]
         )
 
@@ -464,10 +464,10 @@ class TestAnUnusableRecordReadsUnavailable:
         karlsson = [*KARLSSON[:3], (107.010, 107.020), (107.020, 107.030)]
         epoch = write_epoch(tmp_path, monkeypatch, karlsson=karlsson)
 
-        tables = swr_inventory(
+        tables = source_swr_inventory(
             epoch["swr_run"], "karlsson", dot=epoch["dot"], drops=epoch["drops"]
         )
-        kay = swr_inventory(
+        kay = source_swr_inventory(
             epoch["swr_run"], "kay", dot=epoch["dot"], drops=epoch["drops"]
         )
 
@@ -477,7 +477,7 @@ class TestAnUnusableRecordReadsUnavailable:
     def test_a_missing_file(self, epoch):
         (epoch["swr_run"] / f"{EPOCH}_swr_observed.parquet").unlink()
 
-        tables = swr_inventory(
+        tables = source_swr_inventory(
             epoch["swr_run"], "kay", dot=epoch["dot"], drops=epoch["drops"]
         )
 
@@ -506,10 +506,10 @@ class TestAnUnusableRecordReadsUnavailable:
         manifest["epochs"][EPOCH]["detectors"]["yu"] = "failed"
         manifest_path.write_text(json.dumps(manifest))
 
-        yu = swr_inventory(
+        yu = source_swr_inventory(
             epoch["swr_run"], "yu", dot=epoch["dot"], drops=epoch["drops"]
         )
-        kay = swr_inventory(
+        kay = source_swr_inventory(
             epoch["swr_run"], "kay", dot=epoch["dot"], drops=epoch["drops"]
         )
 
@@ -643,10 +643,10 @@ class TestTheStateSpaceInventory:
 class TestTheMemorylessInventory:
     def _run(self, tmp_path, n_shuffles=100):
         from continuum_swr_replay.analysis.events import (
-            swr_source as source_inventory,
+            swr_source,
         )
 
-        table = memoryless_table(source_inventory.swr_source_name(), n_shuffles)
+        table = memoryless_table(swr_source.swr_source_name(), n_shuffles)
         return write_memoryless_run(tmp_path / "memoryless", table)
 
     def test_each_cohort_under_the_callers_name(self, epoch, tmp_path):
@@ -695,10 +695,10 @@ class TestTheMemorylessInventory:
         touches MUA 2 and is kept. Candidate 17 overlaps dropped Kay 3 on the
         grid though its stored reason is None, and is set aside."""
         from continuum_swr_replay.analysis.events import (
-            swr_source as source_inventory,
+            swr_source,
         )
 
-        table = memoryless_table(source_inventory.swr_source_name())
+        table = memoryless_table(swr_source.swr_source_name())
         extra = table.iloc[[0, 0]].assign(
             ms_event_id=[16, 17],
             event_start_s=[105.300, 103.500],
@@ -790,10 +790,10 @@ class TestTheMemorylessInventory:
 
     def test_an_empty_table_keeps_the_schema(self, epoch, tmp_path):
         from continuum_swr_replay.analysis.events import (
-            swr_source as source_inventory,
+            swr_source,
         )
 
-        table = memoryless_table(source_inventory.swr_source_name()).iloc[0:0]
+        table = memoryless_table(swr_source.swr_source_name()).iloc[0:0]
         run = write_memoryless_run(tmp_path / "memoryless", table)
 
         tables = memoryless_inventory(
