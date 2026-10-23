@@ -10,6 +10,12 @@ refuses NaN and infinity.
 The parquet tables themselves are written by ``tables.io.write_table``, which
 keeps its own atomic write: ``tables`` is below this package (this module
 imports it), so it cannot call back up into here.
+
+The module is named ``io`` like the standard-library module on purpose: the
+interpreter loads ``io`` at startup, so a tool run from inside this directory
+still gets the standard one, and ``<package>.io`` is a common name for a
+package's file handling (``tests/unit/test_package_dir_shadows_no_stdlib.py``
+allowlists it).
 """
 
 from __future__ import annotations

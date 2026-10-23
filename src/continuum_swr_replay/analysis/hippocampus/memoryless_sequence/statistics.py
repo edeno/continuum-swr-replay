@@ -14,6 +14,10 @@ ordinary center of mass and standard deviation.
 
 A missing center is carried as the sentinel ``NO_CENTER`` rather than NaN, so
 centers stay an integer index into the bins.
+
+The name shadows the standard-library ``statistics`` when a tool runs from
+inside this directory. It is kept by the lead's code-organization decision
+(Phase D); ``tests/unit/test_package_dir_shadows_no_stdlib.py`` allowlists it.
 """
 
 import numpy as np

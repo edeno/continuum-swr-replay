@@ -22,6 +22,12 @@ pandas metadata and need no help.
 Only dataframes belong here. Fitted models, detectors, environments and the
 session cache hold live objects (statsmodels results, NetworkX graphs) that
 have no columnar representation; those stay pickled.
+
+The module is named ``io`` like the standard-library module on purpose: the
+interpreter loads ``io`` at startup, so a tool run from inside this directory
+still gets the standard one, and ``<package>.io`` is a common name for a
+package's file handling (``tests/unit/test_package_dir_shadows_no_stdlib.py``
+allowlists it).
 """
 
 from __future__ import annotations
