@@ -78,10 +78,14 @@ __all__ = [
     "SWR_DETECTOR",
     "SWR_INVENTORY_RUN_ID",
     "SWR_LABEL_COLUMN",
+    "EpochSource",
     "SwrSourceError",
     "artifact_intervals",
     "artifact_intervals_dir",
     "artifact_run_of",
+    "classify",
+    "epoch_source",
+    "read_observed",
     "read_swr_inventory",
     "ripple_power_inputs",
     "swr_epoch_id",
@@ -135,7 +139,6 @@ OBSERVED_SCOPE = "stored_band"
 
 USABLE_STATUSES = ("ok", "partial")
 """Manifest statuses this source serves, given a Kay inventory."""
-
 
 
 class SwrSourceError(ValueError):
@@ -337,7 +340,7 @@ def _read_events(epoch_id: str, path: str) -> pd.DataFrame:
     return events
 
 
-def _read_observed(path: str) -> NDArray[np.float64]:
+def read_observed(path: str) -> NDArray[np.float64]:
     observed = pd.read_parquet(path)
     band = observed.loc[observed["scope"] == OBSERVED_SCOPE, ["start_s", "end_s"]]
     stretches: NDArray[np.float64] = band.to_numpy(dtype=np.float64).reshape(-1, 2)
@@ -377,7 +380,7 @@ def artifact_intervals(epoch_id: str) -> pd.DataFrame:
 
 
 @dataclass(frozen=True)
-class _EpochSource:
+class EpochSource:
     """What the source holds for one epoch, read with one manifest check."""
 
     events: pd.DataFrame
@@ -386,13 +389,13 @@ class _EpochSource:
     artifacts: pd.DataFrame
 
 
-def _epoch_source(epoch_id: str) -> _EpochSource:
+def epoch_source(epoch_id: str) -> EpochSource:
     files = swr_source_files(epoch_id)
     artifacts = artifact_intervals(epoch_id)
-    return _EpochSource(
+    return EpochSource(
         events=_read_events(epoch_id, files["events"]["path"]),
         observed=subtract_intervals(
-            _read_observed(files["observed"]["path"]), excluded_time(artifacts)
+            read_observed(files["observed"]["path"]), excluded_time(artifacts)
         ),
         artifacts=artifacts,
     )
@@ -419,9 +422,9 @@ def read_swr_inventory(epoch_id: str) -> pd.DataFrame:
     return _read_events(epoch_id, files["events"]["path"])
 
 
-def _classify(
+def classify(
     epoch_id: str,
-    source: _EpochSource,
+    source: EpochSource,
     speed: pd.Series,
     speed_threshold: float,
 ) -> pd.DataFrame:
@@ -485,4 +488,4 @@ def swr_events(
         If the epoch cannot be served (:func:`swr_source_files`,
         :func:`artifact_intervals`).
     """
-    return _classify(epoch_id, _epoch_source(epoch_id), speed, speed_threshold)
+    return classify(epoch_id, epoch_source(epoch_id), speed, speed_threshold)

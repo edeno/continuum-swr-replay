@@ -86,7 +86,7 @@ Non-local event detection and the SWR-overlap classification of those events.
 
 The paper's one SWR source: the direct ripple_detection 2.0 Kay inventory.
 
-`SwrSourceError`, `swr_inventory_dir`, `artifact_intervals_dir`, `swr_source_name`, `artifact_run_of`, `swr_epoch_id`, `swr_source_files`, `ripple_power_inputs`, `artifact_intervals`, `read_swr_inventory`, `swr_events`
+`SwrSourceError`, `swr_inventory_dir`, `artifact_intervals_dir`, `swr_source_name`, `artifact_run_of`, `swr_epoch_id`, `swr_source_files`, `ripple_power_inputs`, `read_observed`, `artifact_intervals`, `EpochSource`, `epoch_source`, `read_swr_inventory`, `classify`, `swr_events`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/artifacts/detect.py`
 

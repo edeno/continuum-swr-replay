@@ -72,7 +72,7 @@ from continuum_swr_replay.analysis.constants import (
 
 # Called through the module, not bound by name, so a patch on
 # ``swr_source.artifact_intervals`` / ``swr_source_files`` /
-# ``swr_source_name`` reaches every caller here too.
+# ``swr_source_name`` / ``epoch_source`` reaches every caller here too.
 from continuum_swr_replay.analysis.events import swr_source
 from continuum_swr_replay.analysis.events.eligibility import (
     EXCLUDED_TIME_REASONS,
@@ -95,17 +95,10 @@ from continuum_swr_replay.analysis.events.immobility import (
 from continuum_swr_replay.analysis.events.swr_source import (
     SWR_LABEL_COLUMN,
     SwrSourceError,
-    _classify,
-    _epoch_source,
-    _EpochSource,
-    _read_observed,
     swr_epoch_id,
 )
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
-from continuum_swr_replay.intervals import (
-    interval_mask,
-    subtract_intervals,
-)
+from continuum_swr_replay.intervals import as_frame, interval_mask
 from continuum_swr_replay.tables.session_keys import (
     SESSION_COLUMNS,
     SESSION_COLUMNS_DAY,
@@ -279,20 +272,7 @@ def swr_observed_stretches(epoch_id: str) -> NDArray[np.float64]:
     ndarray, shape (n_stretches, 2)
         First and last time (seconds) of each stretch, closed.
     """
-    files = swr_source.swr_source_files(epoch_id)
-    return subtract_intervals(
-        _read_observed(files["observed"]["path"]), excluded_intervals(epoch_id)
-    )
-
-
-def _mask(
-    stretches: NDArray[np.float64], time: NDArray | pd.Index
-) -> NDArray[np.bool_]:
-    values = np.asarray(time, dtype=float)
-    observed = np.zeros(values.shape, dtype=bool)
-    for start, end in stretches:
-        observed |= (values >= start) & (values <= end)
-    return observed
+    return swr_source.epoch_source(epoch_id).observed
 
 
 def swr_observed_mask(time: NDArray | pd.Index, epoch_id: str) -> NDArray[np.bool_]:
@@ -305,7 +285,7 @@ def swr_observed_mask(time: NDArray | pd.Index, epoch_id: str) -> NDArray[np.boo
         Seconds, such as a decode grid.
     epoch_id : str
     """
-    return _mask(swr_observed_stretches(epoch_id), time)
+    return interval_mask(time, as_frame(swr_observed_stretches(epoch_id)))
 
 
 def _speed_eligible_labels(
@@ -379,9 +359,9 @@ def swr_event_labels(
         else pd.Index(np.asarray(time, dtype=float), name="time")
     )
     speed_values = np.asarray(speed, dtype=float)
-    events = _classify(
+    events = swr_source.classify(
         epoch_id,
-        _epoch_source(epoch_id),
+        swr_source.epoch_source(epoch_id),
         pd.Series(speed_values, index=time_index),
         speed_threshold,
     )
@@ -432,7 +412,7 @@ def _frame_epoch(
 
 
 def _drops(
-    epoch_id: str, source: _EpochSource, dot: pd.DataFrame, time: NDArray
+    epoch_id: str, source: swr_source.EpochSource, dot: pd.DataFrame, time: NDArray
 ) -> tuple[pd.DataFrame, NDArray[np.int64]]:
     """Every event of the frame with its reason, and the speed-eligible SWR
     labels on its grid.
@@ -443,7 +423,7 @@ def _drops(
     """
     time_index = pd.Index(time, name="time")
     speed_values = dot["head_speed"].to_numpy(dtype=float)
-    swrs = _classify(
+    swrs = swr_source.classify(
         epoch_id,
         source,
         pd.Series(speed_values, index=time_index),
@@ -559,7 +539,7 @@ def artifact_event_drops(
         If the epoch cannot be served.
     """
     epoch_id, time = _frame_epoch(dot, "artifact_event_drops", non_local_threshold)
-    drops, _ = _drops(epoch_id, _epoch_source(epoch_id), dot, time)
+    drops, _ = _drops(epoch_id, swr_source.epoch_source(epoch_id), dot, time)
     return drops
 
 
@@ -701,7 +681,7 @@ def with_swr_source(
         If the epoch cannot be served.
     """
     epoch_id, time = _frame_epoch(dot, "with_swr_source", non_local_threshold)
-    source = _epoch_source(epoch_id)
+    source = swr_source.epoch_source(epoch_id)
     masking = drop_masked_events and len(source.artifacts) > 0
     drops, swr_labels = _drops(epoch_id, source, dot, time)
     if masking:
@@ -724,7 +704,7 @@ def with_swr_source(
         if column in out.columns:
             del out[column]
     out[SWR_LABEL_COLUMN] = _keep_labels(swr_labels, kept_swrs)
-    out[SWR_OBSERVED_COLUMN] = _mask(source.observed, time)
+    out[SWR_OBSERVED_COLUMN] = interval_mask(time, as_frame(source.observed))
     out[IN_EXCLUDED_TIME_COLUMN] = interval_mask(time, excluded_time(source.artifacts))
     if len(source.artifacts) > 0:
         _normalize_outside_mask(out, interval_mask(time, source.artifacts))
