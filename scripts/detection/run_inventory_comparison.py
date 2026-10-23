@@ -108,8 +108,8 @@ from continuum_swr_replay.analysis.inventory_comparison.adapters import (
     carey_inventory,
     memoryless_inventory,
     mua_inventory,
-    source_swr_inventory,
     state_space_inventory,
+    swr_detector_inventory,
 )
 from continuum_swr_replay.analysis.inventory_comparison.availability import (
     EXCLUSION_DTYPES,
@@ -337,7 +337,7 @@ def epoch_inventories(
     """Every inventory of the roster for the frame's epoch, by detector."""
     swr_dir = swr_source.swr_inventory_dir()
     tables = {
-        detector: source_swr_inventory(swr_dir, detector, dot=dot, drops=drops)
+        detector: swr_detector_inventory(swr_dir, detector, dot=dot, drops=drops)
         for detector in SWR_DETECTORS
     }
     tables[CAREY] = carey_inventory(carey_dir, dot=dot, drops=drops)

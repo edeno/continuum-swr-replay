@@ -89,8 +89,8 @@ __all__ = [
     "carey_inventory",
     "memoryless_inventory",
     "mua_inventory",
-    "source_swr_inventory",
     "state_space_inventory",
+    "swr_detector_inventory",
 ]
 
 SWR_DETECTORS = ("kay", "karlsson", "yu", "zugaro")
@@ -425,7 +425,7 @@ def _lfp_inventory(
     )
 
 
-def source_swr_inventory(
+def swr_detector_inventory(
     run_dir: Path, detector: str, *, dot: pd.DataFrame, drops: pd.DataFrame
 ) -> InventoryTables:
     """One SWR detector's inventory from the SWR runner's run folder.
@@ -482,7 +482,7 @@ def carey_inventory(
 
     ``{epoch_id}_carey_events.parquet`` and its observed stretches,
     ``{epoch_id}_carey_observed.parquet`` (scope ``carey``), under the same rule as the SWR
-    inventories (:func:`source_swr_inventory`, whose parameters these are).
+    inventories (:func:`swr_detector_inventory`, whose parameters these are).
     """
     epoch = _epoch(dot)
     try:
@@ -720,7 +720,7 @@ def memoryless_inventory(
         session, bounds and speed).
     drops : DataFrame
         ``analysed_time.read_artifact_event_drops`` of the decode pickle, as for
-        :func:`source_swr_inventory`.
+        :func:`swr_detector_inventory`.
 
     Returns
     -------

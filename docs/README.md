@@ -234,6 +234,9 @@ Names that left a module that still exists:
 - `kay_version_check`: from `analysis/hippocampus/swr_detectors.py` to
   `analysis/inventory_comparison/kay_version.py`.
 
+Renamed functions: `inventory_comparison.adapters.swr_inventory` is now
+`swr_detector_inventory` (it reads any one of the four SWR detectors' inventories).
+
 New `src/` modules that took code out of `scripts/`: `analysis/hippocampus/detection_inputs.py`
 (the detection runners' shared inputs), `analysis/replay/fit_outputs.py` (the content
 fitter's output naming), and functions added to `analysis/replay/learning.py` (Stage 6's
