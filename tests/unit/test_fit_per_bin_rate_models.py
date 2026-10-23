@@ -449,12 +449,12 @@ def test_unknown_cohort_is_refused_by_the_parser(monkeypatch, capsys):
 def test_tables_from_another_swr_source_are_refused(monkeypatch, stubbed_run):
     """The bins are dropped by the configured source's excluded time, so tables
     made under another source (another artifact run, say) would mix two masks."""
-    from continuum_swr_replay.analysis.events import swr_inventory
+    from continuum_swr_replay.analysis.events import swr_source
 
     monkeypatch.setattr(fprm.sys, "argv", ["fit_per_bin_rate_models.py"])
-    monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", "another_run")
+    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", "another_run")
 
-    with pytest.raises(swr_inventory.SwrSourceError, match="another_run"):
+    with pytest.raises(swr_source.SwrSourceError, match="another_run"):
         fprm.main()
 
 

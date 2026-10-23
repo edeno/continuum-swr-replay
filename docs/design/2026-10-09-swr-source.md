@@ -1,7 +1,7 @@
 # One SWR source: the direct ripple_detection 2.0 Kay inventory
 
 **Status (2026-10-09):** decided by the project lead on 2026-10-05; implemented in
-`src/continuum_swr_replay/analysis/events/swr_inventory.py`, the only place the source is
+`src/continuum_swr_replay/analysis/events/swr_source.py`, the only place the source is
 configured, and read through
 `src/continuum_swr_replay/analysis/events/analysed_time.py`. Part of the full
 pipeline refresh ([2026-10-03-full-pipeline-refresh-design.md](2026-10-03-full-pipeline-refresh-design.md),
@@ -71,7 +71,7 @@ What the comparison shows:
 
 ## Interface
 
-`analysis/events/swr_inventory.py` (the inventory, its run ids and the source's name) and
+`analysis/events/swr_source.py` (the inventory, its run ids and the source's name) and
 `analysis/events/analysed_time.py` (the stamp, excluded time and the decode-frame read point):
 
 - **`SWR_INVENTORY_RUN_ID`, `SWR_DETECTOR` (`"kay"`), `SWR_INVENTORY_ROOT`.** These are
@@ -214,7 +214,7 @@ source.
 - **`SWR_zscore`** is a signal, not a label, and the inventory ships no trace. Since
   Task 18 an HPC decode's `SWR_zscore` is the Kay detector's own consensus over the
   tetrodes rule R-T kept for this inventory, z-scored with the artifact mask left out and
-  NaN inside it (`swr_inventory.ripple_power_inputs`, `data_loaders/lfp.with_ripple_power`).
+  NaN inside it (`swr_source.ripple_power_inputs`, `data_loaders/lfp.with_ripple_power`).
   An older decode's, and any `load_data` call made without those inputs, is still
   Spyglass's consensus over every CA1 tetrode.
 - **Every cohort of an analysis frame** follows one analysed-time rule since Task 18

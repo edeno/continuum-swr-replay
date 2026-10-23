@@ -39,7 +39,7 @@ import pytest  # noqa: E402
 
 from continuum_swr_replay.analysis.events import (  # noqa: E402
     analysed_time,
-    swr_inventory,
+    swr_source,
 )
 from scripts.figures import generate_supp_pipeline_data_flow as flow  # noqa: E402
 from tests.unit._swr_inventory_fixtures import (  # noqa: E402
@@ -257,13 +257,13 @@ def test_the_figure02_cache_is_keyed_on_a_version_token(offline, tmp_path):
     # the name before the token: a cache written with it is not read again
     v1 = (
         "wilbur20210329_02_r1_figure02_whole_event_speed_v1_"
-        f"{swr_inventory.swr_source_name()}_cache.joblib"
+        f"{swr_source.swr_source_name()}_cache.joblib"
     )
     assert path.parent == tmp_path / "intermediates"
     assert path.name != v1
     assert f"_v{figure02.FIGURE02_CACHE_VERSION}_" in path.name
     assert figure02.FIGURE02_CACHE_VERSION >= 2
-    assert swr_inventory.swr_source_name() in path.name
+    assert swr_source.swr_source_name() in path.name
 
 
 def _register(path: Path, epochs: list[str]) -> Path:

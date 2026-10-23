@@ -214,7 +214,7 @@ def session_window_sets(
         excluded_intervals,
         read_artifact_event_drops,
     )
-    from continuum_swr_replay.analysis.events.swr_inventory import swr_epoch_id
+    from continuum_swr_replay.analysis.events.swr_source import swr_epoch_id
     from continuum_swr_replay.analysis.hippocampus import load_results
     from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
         align_results_to_position,

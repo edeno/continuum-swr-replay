@@ -1,14 +1,14 @@
 """The analysed-time read point: a decode frame held to the one analysed-time rule.
 
 The SWR source itself (which inventory, which artifact run, which epochs it
-serves, the source's name) is ``swr_inventory``. This module reads it and
+serves, the source's name) is ``swr_source``. This module reads it and
 applies the project's one analysed-time rule (``eligibility``) to every cohort
 of an analysis frame.
 
 What this module fixes
 ----------------------
 - **Excluded time** (:func:`excluded_intervals`): the epoch's artifact mask
-  (``swr_inventory.artifact_intervals``) widened by
+  (``swr_source.artifact_intervals``) widened by
   ``eligibility.ARTIFACT_REACH_S`` on each side, the intervals every analysis
   consumer reads; :func:`excluded_intervals_of` and
   :func:`excluded_intervals_by_session` give them for a frame or a table.
@@ -71,9 +71,9 @@ from continuum_swr_replay.analysis.constants import (
 )
 
 # Called through the module, not bound by name, so a patch on
-# ``swr_inventory.artifact_intervals`` / ``swr_source_files`` /
+# ``swr_source.artifact_intervals`` / ``swr_source_files`` /
 # ``swr_source_name`` reaches every caller here too.
-from continuum_swr_replay.analysis.events import swr_inventory
+from continuum_swr_replay.analysis.events import swr_source
 from continuum_swr_replay.analysis.events.eligibility import (
     EXCLUDED_TIME_REASONS,
     DropReason,
@@ -92,7 +92,7 @@ from continuum_swr_replay.analysis.events.immobility import (
     validate_nonlocal_event_probability_contract,
     validate_whole_event_immobility_contract,
 )
-from continuum_swr_replay.analysis.events.swr_inventory import (
+from continuum_swr_replay.analysis.events.swr_source import (
     _ARTIFACT_COLUMNS,
     SWR_LABEL_COLUMN,
     SwrSourceError,
@@ -212,7 +212,7 @@ def stamp_swr_source(frame: pd.DataFrame) -> pd.DataFrame:
     source stamps it; ``publish_canonical`` refuses a table of
     ``tables.io.SWR_SOURCE_TABLES`` without the current stamp.
     """
-    frame.attrs[SWR_SOURCE_ATTR] = swr_inventory.swr_source_name()
+    frame.attrs[SWR_SOURCE_ATTR] = swr_source.swr_source_name()
     return frame
 
 
@@ -232,10 +232,10 @@ def require_swr_source(frame: pd.DataFrame, *, what: str) -> None:
         If its stamp is missing or names another source.
     """
     stamp = frame.attrs.get(SWR_SOURCE_ATTR)
-    if stamp != swr_inventory.swr_source_name():
+    if stamp != swr_source.swr_source_name():
         raise SwrSourceError(
             f"{what} was built from SWR source {stamp!r}, not the configured "
-            f"{swr_inventory.swr_source_name()!r}; regenerate it (and its atomic "
+            f"{swr_source.swr_source_name()!r}; regenerate it (and its atomic "
             "set) from the current source"
         )
 
@@ -257,14 +257,14 @@ def excluded_intervals(epoch_id: str) -> pd.DataFrame:
     -------
     pd.DataFrame
         ``start_time`` and ``end_time`` (seconds), closed, disjoint and in time
-        order; no rows while ``swr_inventory.ARTIFACT_INTERVALS_RUN_ID`` is unset.
+        order; no rows while ``swr_source.ARTIFACT_INTERVALS_RUN_ID`` is unset.
 
     Raises
     ------
     SwrSourceError
         As :func:`artifact_intervals`.
     """
-    return excluded_time(swr_inventory.artifact_intervals(epoch_id))
+    return excluded_time(swr_source.artifact_intervals(epoch_id))
 
 
 def swr_observed_stretches(epoch_id: str) -> NDArray[np.float64]:
@@ -280,7 +280,7 @@ def swr_observed_stretches(epoch_id: str) -> NDArray[np.float64]:
     ndarray, shape (n_stretches, 2)
         First and last time (seconds) of each stretch, closed.
     """
-    files = swr_inventory.swr_source_files(epoch_id)
+    files = swr_source.swr_source_files(epoch_id)
     return subtract_intervals(
         _read_observed(files["observed"]["path"]), excluded_intervals(epoch_id)
     )
@@ -341,7 +341,7 @@ def swr_event_labels(
     speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 ) -> NDArray[np.int64]:
     """The per-bin ``SWR_event`` labels on a decode time grid, by the SWR
-    cohort's own rule (``swr_inventory.swr_events``).
+    cohort's own rule (``swr_source.swr_events``).
 
     The convention ``get_data_over_time`` has written since the unified
     immobility change, and the table builders read:
@@ -360,7 +360,7 @@ def swr_event_labels(
     speed : array-like, shape (n_time,)
         Head speed on `time` (cm/s).
     speed_threshold : float
-        As ``swr_inventory.swr_events``.
+        As ``swr_source.swr_events``.
 
     Returns
     -------
@@ -517,7 +517,7 @@ def artifact_event_drops(
     The reasons :func:`with_swr_source` acts on, the one rule
     (``eligibility``) on every cohort:
 
-    - the source's SWRs (``swr_inventory.swr_events``: excluded time, then speed);
+    - the source's SWRs (``swr_source.swr_events``: excluded time, then speed);
     - each event of the frame's ``non_local_event`` and ``MUA_event`` labels,
       read at its sampled bounds, with excluded time's reasons (the labels were
       speed-qualified when the decode was made);

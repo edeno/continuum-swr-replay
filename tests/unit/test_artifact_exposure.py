@@ -27,7 +27,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.contfrag.tables import build_contfrag_stop_table
-from continuum_swr_replay.analysis.events import analysed_time, swr_inventory
+from continuum_swr_replay.analysis.events import analysed_time, swr_source
 from continuum_swr_replay.analysis.pfc.event_sets import build_session_fit_mask
 from continuum_swr_replay.analysis.replay.model_specs import (
     BIN_S,
@@ -126,11 +126,9 @@ def _trials() -> pd.DataFrame:
 def masked(tmp_path, monkeypatch):
     """The source's artifact run holds CORES for the test epoch."""
     directory = write_artifact_run(tmp_path / "artifacts", {EPOCH_ID: CORES})
-    monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_DIR", directory.parent)
-    monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
-    np.testing.assert_allclose(
-        swr_inventory.artifact_intervals(EPOCH_ID).to_numpy(), MASK
-    )
+    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_DIR", directory.parent)
+    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
+    np.testing.assert_allclose(swr_source.artifact_intervals(EPOCH_ID).to_numpy(), MASK)
     np.testing.assert_allclose(
         analysed_time.excluded_intervals(EPOCH_ID).to_numpy(), EXCLUDED
     )
@@ -162,8 +160,8 @@ class TestStopExposure:
     def test_only_exposure_and_location_change(self, tmp_path, monkeypatch, table):
         unmasked = _stop_tables()[table]
         directory = write_artifact_run(tmp_path / "artifacts", {EPOCH_ID: CORES})
-        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_DIR", directory.parent)
-        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
+        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_DIR", directory.parent)
+        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
 
         masked_stops = _stop_tables()[table]
 
@@ -200,7 +198,7 @@ class TestTheDenseTimebinTable:
 
     def test_with_no_artifact_run_it_is_unchanged(self, masked, monkeypatch):
         masked_bins = build_stop_timebin_table(_dot(), np.array([]), bin_s=0.5)
-        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", None)
+        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", None)
 
         unmasked = build_stop_timebin_table(_dot(), np.array([]), bin_s=0.5)
 
@@ -382,13 +380,11 @@ class TestFamilyBDesign:
         directory = write_artifact_run(
             tmp_path / "artifacts", {"m20200101_04_r2_HPC": CORES}
         )
-        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_DIR", directory.parent)
-        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
+        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_DIR", directory.parent)
+        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
         stops, onsets = _design_inputs()
 
-        with pytest.raises(
-            swr_inventory.SwrSourceError, match="not in the artifact run"
-        ):
+        with pytest.raises(swr_source.SwrSourceError, match="not in the artifact run"):
             aggregate_to_timebins(stops, onsets, bin_s=0.5, tmax=20.0)
         design = aggregate_to_timebins(
             stops, onsets, bin_s=0.5, tmax=20.0, excluded_intervals=NO_EXCLUDED_TIME

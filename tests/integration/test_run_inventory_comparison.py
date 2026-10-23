@@ -32,7 +32,7 @@ import scripts.detection.run_inventory_comparison as runner
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
-from continuum_swr_replay.analysis.events import analysed_time, swr_inventory
+from continuum_swr_replay.analysis.events import analysed_time, swr_source
 from continuum_swr_replay.analysis.inventory_comparison.availability import (
     coverage_from_observations,
     still_intervals,
@@ -177,7 +177,7 @@ def write_memoryless_run(root: Path) -> None:
             "is_replay": True,
             "shuffle_pass": [True, True, False],
             "n_shuffles": 100,
-            "swr_definition": swr_inventory.swr_source_name(),
+            "swr_definition": swr_source.swr_source_name(),
             "artifact_drop_reason": [None, None, None],
         }
     )
@@ -692,12 +692,12 @@ def test_the_manifest_records_the_inputs_and_each_epoch(run):
 
     settings = manifest["settings"]
     assert settings["input_runs"] == {
-        "swr": swr_inventory.SWR_INVENTORY_RUN_ID,
+        "swr": swr_source.SWR_INVENTORY_RUN_ID,
         "carey": CAREY_RUN,
         "memoryless": MEMORYLESS_RUN,
-        "artifacts": swr_inventory.ARTIFACT_INTERVALS_RUN_ID,
+        "artifacts": swr_source.ARTIFACT_INTERVALS_RUN_ID,
     }
-    assert settings["swr_source"] == swr_inventory.swr_source_name()
+    assert settings["swr_source"] == swr_source.swr_source_name()
     assert settings["roster"]["memoryless"] == "published"
     assert settings["roster"]["memoryless_criteria"] == "replay_criteria"
     assert set(settings["native_is_eligible"]) == {"mua", "state_space"}

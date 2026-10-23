@@ -95,7 +95,7 @@ from continuum_swr_replay.analysis.events.detection import (
 from continuum_swr_replay.analysis.events.immobility import (
     intervals_from_labels,
 )
-from continuum_swr_replay.analysis.events.swr_inventory import (
+from continuum_swr_replay.analysis.events.swr_source import (
     ripple_power_inputs,
     swr_epoch_id,
 )

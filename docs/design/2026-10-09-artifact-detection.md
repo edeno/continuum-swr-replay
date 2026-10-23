@@ -15,7 +15,7 @@ wholly outside it. A kept event that overlaps an SWR or MUA event dropped there 
 dropped too. Inputs read the mask itself: the decoders' missing bins, the detectors'
 normalization, and the ripple-power covariate. The covariate is the Kay detector's own
 consensus over rule R-T's tetrodes, with the mask out of its normalization
-(`data_loaders/lfp.with_ripple_power`). **Not yet applied:** `swr_inventory.ARTIFACT_INTERVALS_RUN_ID` stays
+(`data_loaders/lfp.with_ripple_power`). **Not yet applied:** `swr_source.ARTIFACT_INTERVALS_RUN_ID` stays
 None until runbook R9 runs the detector on all epochs and sets it.
 
 **Sources** (all under `.claude/research/refresh_artifact_detector/`):
@@ -331,7 +331,7 @@ From C2 §1a (versions as fetched 2026-10-09) and the literature review:
   - The position span the SWR runner uses.
   - `get_hpc_marks`, after the coincidence filter.
 - **Its readers:**
-  - `swr_inventory.artifact_intervals(epoch_id)` returns the mask. `swr_observed_mask` and
+  - `swr_source.artifact_intervals(epoch_id)` returns the mask. `swr_observed_mask` and
     `swr_observed_stretches` leave it out.
   - `decode_masks.hpc_artifact_intervals` gives the same mask to the decoders and MUA.
   - The SWR runner pads the run's cores the same way.

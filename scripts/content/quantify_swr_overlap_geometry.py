@@ -3,7 +3,7 @@
 Runs ``classify_swr_overlap_geometry`` over one or more sessions and prints
 a table of sub-case counts. Useful for Methods-section numbers and for
 auditing what the coarse three-way split aggregates over. The SWRs are the
-paper's SWR source (``analysis/events/swr_inventory.py``: the direct Kay
+paper's SWR source (``analysis/events/swr_source.py``: the direct Kay
 inventory), on the decode grid, held to the one analysed-time rule as the
 decode frame's read holds them. The non-local events are re-detected from the
 posterior, so the rule is applied here (``events.eligibility``): an event in
@@ -44,7 +44,7 @@ from continuum_swr_replay.analysis.events.immobility import (
     build_speed_eligible_event_cohort,
     intervals_from_labels,
 )
-from continuum_swr_replay.analysis.events.swr_inventory import (
+from continuum_swr_replay.analysis.events.swr_source import (
     artifact_intervals,
     swr_epoch_id,
 )

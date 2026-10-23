@@ -37,12 +37,12 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from continuum_swr_replay.analysis.events import analysed_time, swr_inventory
+from continuum_swr_replay.analysis.events import analysed_time, swr_source
 from continuum_swr_replay.analysis.events.analysed_time import swr_event_labels
 from continuum_swr_replay.analysis.events.classified_table import (
     build_classified_nonlocal_event_table,
 )
-from continuum_swr_replay.analysis.events.swr_inventory import SwrSourceError
+from continuum_swr_replay.analysis.events.swr_source import SwrSourceError
 from continuum_swr_replay.data_loaders import epoch_register
 from continuum_swr_replay.intervals import interval_mask
 from continuum_swr_replay.runs.io import sha256_file
@@ -555,8 +555,8 @@ def test_the_replay_tables_are_published_with_the_sources_stamp(
     )
 
     assert {name: attrs["swr_source"] for name, attrs in published.items()} == {
-        "stop_table": swr_inventory.swr_source_name(),
-        "event_table": swr_inventory.swr_source_name(),
+        "stop_table": swr_source.swr_source_name(),
+        "event_table": swr_source.swr_source_name(),
     }
 
 
@@ -579,7 +579,7 @@ def test_the_stop_only_bootstrap_publishes_with_the_sources_stamp(
     )
 
     stop = read_table(tmp_path / "out" / "stop_table")
-    assert stop.attrs["swr_source"] == swr_inventory.swr_source_name()
+    assert stop.attrs["swr_source"] == swr_source.swr_source_name()
 
 
 def test_the_timebin_tables_are_published_with_the_sources_stamp(
@@ -610,8 +610,8 @@ def test_the_timebin_tables_are_published_with_the_sources_stamp(
     script.main()
 
     assert stamps == {
-        "event_onset": swr_inventory.swr_source_name(),
-        "stop_timebin": swr_inventory.swr_source_name(),
+        "event_onset": swr_source.swr_source_name(),
+        "stop_timebin": swr_source.swr_source_name(),
     }
 
 
@@ -643,11 +643,11 @@ def test_the_stop_shard_assembly_needs_every_shard_from_the_source(
 
     shards = []
     for index, stamp in enumerate(
-        (swr_inventory.swr_source_name(), STALE if stale_shard else None)
+        (swr_source.swr_source_name(), STALE if stale_shard else None)
     ):
         shard = tmp_path / f"shard{index}"
         shard.mkdir()
-        frame = _stop_frame(stamp or swr_inventory.swr_source_name())
+        frame = _stop_frame(stamp or swr_source.swr_source_name())
         frame["epoch"] = f"0{2 * index + 2}_r{index + 1}"
         frame["stop_id"] = index + 1
         write_table(frame, shard / "stop_table.parquet")
@@ -663,7 +663,7 @@ def test_the_stop_shard_assembly_needs_every_shard_from_the_source(
             shards, output_dir=tmp_path / "out", expected_sessions=2
         )
         assembled = read_table(tmp_path / "out" / "stop_table")
-        assert assembled.attrs["swr_source"] == swr_inventory.swr_source_name()
+        assert assembled.attrs["swr_source"] == swr_source.swr_source_name()
 
 
 def test_the_content_occupancy_refuses_an_arm_table_from_another_source(
@@ -758,7 +758,7 @@ STORED_RIPPLE_READERS = {
         "HPC decoders' comes from the source, decode_masks.hpc_decode_masks)"
     ),
     "src/continuum_swr_replay/data_loaders/constants.py": "register evidence, prose",
-    "src/continuum_swr_replay/analysis/events/swr_inventory.py": (
+    "src/continuum_swr_replay/analysis/events/swr_source.py": (
         "prose naming what it replaces"
     ),
     "src/continuum_swr_replay/analysis/events/analysed_time.py": (

@@ -379,7 +379,7 @@ def with_ripple_power(
     ripple_data : RippleData
         As ``filter_ripple_lfp_time`` returns it.
     ripple_power : Mapping
-        ``swr_inventory.ripple_power_inputs``: ``band_electrode_ids`` and
+        ``swr_source.ripple_power_inputs``: ``band_electrode_ids`` and
         ``kept_electrode_ids`` (the inventory's), ``sampling_frequency`` (Hz)
         and ``artifact_intervals`` (closed, seconds).
     band_electrode_ids : NDArray of int, shape (n_channels,)

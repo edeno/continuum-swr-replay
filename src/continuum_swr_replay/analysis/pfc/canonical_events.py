@@ -4,7 +4,7 @@ Every family in this paper must describe the same events. The hippocampal
 content and rate ladders read the shipped event table
 (``Processed-Data/replay_content/event_table.parquet``) and the speed-gated
 ``SWR_event`` labels of the SWR source
-(:mod:`~continuum_swr_replay.analysis.events.swr_inventory`, the direct Kay
+(:mod:`~continuum_swr_replay.analysis.events.swr_source`, the direct Kay
 inventory) on the cached ``*_HPC_80_data_over_time.pkl`` frame's grid; this
 module is the one place the PFC path loads those, so no PFC script re-detects
 non-local events or re-splits them on a separately detected ripple population.
@@ -41,7 +41,7 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
-from continuum_swr_replay.analysis.events import analysed_time, swr_inventory
+from continuum_swr_replay.analysis.events import analysed_time, swr_source
 from continuum_swr_replay.analysis.events.immobility import (
     filter_event_labels_by_speed,
     intervals_from_labels,
@@ -320,7 +320,7 @@ def canonical_event_provenance(
         "immobility_inequality": "<",
         "canonical_event_table_path": str(event_table_path),
         "canonical_event_table_sha256": event_table_sha256,
-        "swr_interval_source": swr_inventory.swr_source_name(),
+        "swr_interval_source": swr_source.swr_source_name(),
         "swr_events_path": None if swr_events_path is None else str(swr_events_path),
         "swr_events_sha256": swr_events_sha256,
         "data_over_time_path": str(data_over_time_path),
@@ -338,10 +338,10 @@ def session_swr_events_file(
     then fails loudly.
     """
     try:
-        return swr_inventory.swr_source_files(
-            swr_inventory.swr_epoch_id(nwb_file_name, epoch_name)
+        return swr_source.swr_source_files(
+            swr_source.swr_epoch_id(nwb_file_name, epoch_name)
         )["events"]
-    except swr_inventory.SwrSourceError:
+    except swr_source.SwrSourceError:
         return {"path": None, "sha256": None}
 
 

@@ -29,14 +29,14 @@ and onset tables. Across the 218 HPC sessions the stop-level totals are slightly
 
 > **SWR source (2026-10-09).** Both grains now read their SWR labels from one source,
 > the direct ripple_detection 2.0 Kay inventory
-> (`analysis/events/swr_inventory.py`; design note
+> (`analysis/events/swr_source.py`; design note
 > [../design/2026-10-09-swr-source.md](../design/2026-10-09-swr-source.md)), in place
 > of Spyglass's stored `RippleTimesV1` events. The per-bin label convention is
 > unchanged (closed intervals, whole-event speed gate, source event numbers), and so
 > are the per-grain rules below. Any re-derived Δ must be measured on the new source.
 
 > **One analysed-time rule (2026-10-10, Task 18).** With an artifact run configured
-> (`swr_inventory.ARTIFACT_INTERVALS_RUN_ID`), both grains follow one rule
+> (`swr_source.ARTIFACT_INTERVALS_RUN_ID`), both grains follow one rule
 > (`analysis/events/eligibility.py`). *Excluded time* is the artifact mask
 > widened by 0.3 s on each side (`analysed_time.excluded_intervals`). The rule below
 > (do not cross-substitute) still holds:

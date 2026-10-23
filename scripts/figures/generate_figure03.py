@@ -50,7 +50,7 @@ from continuum_swr_replay.analysis.events.eligibility import artifact_drop_reaso
 from continuum_swr_replay.analysis.events.immobility import (
     build_speed_eligible_event_cohort,
 )
-from continuum_swr_replay.analysis.events.swr_inventory import (
+from continuum_swr_replay.analysis.events.swr_source import (
     artifact_intervals,
     ripple_power_inputs,
     swr_epoch_id,

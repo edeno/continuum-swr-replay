@@ -63,7 +63,7 @@ def pytest_collection_modifyitems(config, items):
 def no_configured_artifact_run():
     """Every test starts with no artifact run configured.
 
-    ``swr_inventory.ARTIFACT_INTERVALS_RUN_ID`` names a real run under
+    ``swr_source.ARTIFACT_INTERVALS_RUN_ID`` names a real run under
     Processed-Data. A unit test must not read it, so every test and every
     module-scoped fixture sees None unless a test sets a run of its own (most
     use a ``tmp_path`` run; ``monkeypatch`` restores None after it). Session
@@ -72,11 +72,11 @@ def no_configured_artifact_run():
     ``test_swr_source.TestTheConfiguredInventory``. Yields that committed value,
     which ``real_data`` tests get back.
     """
-    from continuum_swr_replay.analysis.events import swr_inventory
+    from continuum_swr_replay.analysis.events import swr_source
 
-    configured = swr_inventory.ARTIFACT_INTERVALS_RUN_ID
+    configured = swr_source.ARTIFACT_INTERVALS_RUN_ID
     with pytest.MonkeyPatch.context() as patch:
-        patch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", None)
+        patch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", None)
         yield configured
 
 
@@ -97,10 +97,10 @@ def real_data_sees_the_configured_artifact_run(
     """
     if request.node.get_closest_marker("real_data") is None:
         return
-    from continuum_swr_replay.analysis.events import swr_inventory
+    from continuum_swr_replay.analysis.events import swr_source
 
     monkeypatch.setattr(
-        swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", no_configured_artifact_run
+        swr_source, "ARTIFACT_INTERVALS_RUN_ID", no_configured_artifact_run
     )
 
 

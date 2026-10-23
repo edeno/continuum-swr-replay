@@ -9,7 +9,7 @@ per-detector denominators. Design:
 The roster (:data:`ROSTER`):
 
 - the SWR detectors ``kay``, ``karlsson``, ``yu`` and ``zugaro`` (the SWR
-  source run, ``swr_inventory.SWR_INVENTORY_RUN_ID``) and ``carey``
+  source run, ``swr_source.SWR_INVENTORY_RUN_ID``) and ``carey``
   (``--carey-run-id``), the five SWR definitions;
 - ``mua`` and ``state_space``, from the canonical decode frame;
 - ``memoryless`` (cohort ``published``) and ``memoryless_criteria`` (cohort
@@ -99,7 +99,7 @@ from continuum_swr_replay.analysis.events import (
     analysed_time,
 )
 from continuum_swr_replay.analysis.events import (
-    swr_inventory as source_inventory,
+    swr_source as source_inventory,
 )
 from continuum_swr_replay.analysis.inventory_comparison.adapters import (
     CAREY,

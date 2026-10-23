@@ -82,7 +82,7 @@ Canonical whole-event immobility rules for neural event cohorts.
 
 `EventDefinitionError`, `require_time_index`, `require_canonical_speed_threshold`, `event_speeds_are_immobile`, `whole_event_immobility_mask`, `filter_event_labels_by_speed`, `validate_whole_event_immobility_contract`, `validate_nonlocal_event_probability_contract`, `filter_event_intervals_by_speed`, `intervals_from_labels`, `build_speed_eligible_event_cohort`
 
-### `src/continuum_swr_replay/analysis/events/swr_inventory.py`
+### `src/continuum_swr_replay/analysis/events/swr_source.py`
 
 The paper's one SWR source: the direct ripple_detection 2.0 Kay inventory.
 

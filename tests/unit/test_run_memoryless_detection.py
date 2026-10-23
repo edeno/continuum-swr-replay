@@ -27,7 +27,7 @@ import pytest
 from dask.distributed import Client, LocalCluster
 
 import scripts.detection.run_memoryless_detection as runner
-from continuum_swr_replay.analysis.events import swr_inventory
+from continuum_swr_replay.analysis.events import swr_source
 from continuum_swr_replay.analysis.events.eligibility import artifact_drop_reasons
 from continuum_swr_replay.analysis.hippocampus import detection_inputs
 from continuum_swr_replay.analysis.hippocampus.detection_inputs import (
@@ -327,8 +327,8 @@ def write_swr_source(root, *, swrs=None, observed=None):
 
 
 def use_swr_source(monkeypatch, root):
-    monkeypatch.setattr(swr_inventory, "SWR_INVENTORY_ROOT", root)
-    monkeypatch.setattr(swr_inventory, "SWR_INVENTORY_RUN_ID", RUN_ID)
+    monkeypatch.setattr(swr_source, "SWR_INVENTORY_ROOT", root)
+    monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", RUN_ID)
 
 
 @pytest.fixture(scope="module")
@@ -445,7 +445,7 @@ class TestRunOne:
         assert (table.day == 20200101).all()
         assert (table.epoch == "02_r1").all()
         assert (table.brain_area == "HPC").all()
-        assert (table.swr_definition == swr_inventory.swr_source_name()).all()
+        assert (table.swr_definition == swr_source.swr_source_name()).all()
         # the saved labels are complete, so nothing is unknown
         assert not (table.overlap_class == "unknown").any()
 
@@ -468,10 +468,10 @@ class TestRunOne:
         assert len(known) > 0
         assert known.is_swr.astype(bool).all()
         assert (known.overlap_class == "swr_contained").all()
-        assert record["swr_source"]["name"] == swr_inventory.swr_source_name()
+        assert record["swr_source"]["name"] == swr_source.swr_source_name()
         assert record["swr_source"]["name"].startswith(f"kay@{RUN_ID}+")
         assert len(record["swr_source"]["events"]["sha256"]) == 64
-        assert table.attrs["swr_source"] == swr_inventory.swr_source_name()
+        assert table.attrs["swr_source"] == swr_source.swr_source_name()
 
     def test_every_input_is_hashed(self, decode_root, tmp_path):
         record = run(decode_root, tmp_path)
@@ -599,8 +599,8 @@ class TestRunOne:
             {EPOCH_ID: [("ca1", step_s, step_s)]},
             span=(float(epoch.time[0]), float(epoch.time[-1])),
         )
-        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_DIR", artifacts.parent)
-        monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", artifacts.name)
+        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_DIR", artifacts.parent)
+        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", artifacts.name)
         missing = (epoch.time >= step_s - 0.3) & (epoch.time <= step_s + 0.3)
 
         record = run(decode_root, tmp_path)

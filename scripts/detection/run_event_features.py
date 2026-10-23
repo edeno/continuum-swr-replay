@@ -110,7 +110,7 @@ from continuum_swr_replay.analysis.constants import (  # noqa: E402
 )
 from continuum_swr_replay.analysis.events import (  # noqa: E402
     analysed_time,
-    swr_inventory,
+    swr_source,
 )
 from continuum_swr_replay.analysis.hippocampus.detection_inputs import (  # noqa: E402
     MARKS_RULE,
@@ -400,7 +400,7 @@ def _memoryless_run(
             f"The stored memoryless windows of {identifier} are not the decode grid's."
         )
     # the run's is_missing: a bin inside a closed interval of the mask
-    is_missing = interval_mask(time, swr_inventory.artifact_intervals(identifier))
+    is_missing = interval_mask(time, swr_source.artifact_intervals(identifier))
     undecoded = windows_holding(
         is_missing[:-1], config.window_n_samples, config.stride_n_samples
     )
@@ -676,7 +676,7 @@ def run_epoch(
         outputs are removed.
     """
     started = clock.perf_counter()
-    identifier = swr_inventory.swr_epoch_id(nwb_file_name, epoch_name)
+    identifier = swr_source.swr_epoch_id(nwb_file_name, epoch_name)
     stamp = {
         "produced_by": PRODUCED_BY,
         "run_id": output_dir.name,
@@ -757,7 +757,7 @@ def _run_epoch_logged(
     When the epoch ends, pass or fail, the NWB files Spyglass opened for it
     (a marks cache miss reads Spyglass) are closed (``release_nwb_files``).
     """
-    identifier = swr_inventory.swr_epoch_id(nwb_file_name, epoch_name)
+    identifier = swr_source.swr_epoch_id(nwb_file_name, epoch_name)
     log_name = f"{identifier}_event_features"
     record = run_epoch_logged(
         lambda log: run_epoch(nwb_file_name, epoch_name, **run_epoch_kwargs),
@@ -801,7 +801,7 @@ def run_settings(inventory_run_id: str, inventory: Mapping[str, Any]) -> dict:
                 "inventory": inventory_run_id,
                 **inventory["settings"]["input_runs"],
             },
-            "swr_source": swr_inventory.swr_source_name(),
+            "swr_source": swr_source.swr_source_name(),
             # relative, so a worktree whose Processed-Data links to the same
             # folder records the same settings
             "stop_table": {
@@ -900,8 +900,8 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
     inventory = json.loads(inventory_manifest.read_text())
     input_runs = inventory["settings"]["input_runs"]
     current = {
-        "swr": swr_inventory.SWR_INVENTORY_RUN_ID,
-        "artifacts": swr_inventory.ARTIFACT_INTERVALS_RUN_ID,
+        "swr": swr_source.SWR_INVENTORY_RUN_ID,
+        "artifacts": swr_source.ARTIFACT_INTERVALS_RUN_ID,
     }
     if {name: input_runs[name] for name in current} != current:
         sys.exit(
@@ -909,11 +909,11 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
             f"{input_runs['swr']} and artifact run {input_runs['artifacts']}; the "
             f"SWR source is {current['swr']} and {current['artifacts']}."
         )
-    if inventory["settings"]["swr_source"] != swr_inventory.swr_source_name():
+    if inventory["settings"]["swr_source"] != swr_source.swr_source_name():
         sys.exit(
             f"Comparison run {args.inventory_run_id} read SWR source "
             f"{inventory['settings']['swr_source']}; the SWR source is "
-            f"{swr_inventory.swr_source_name()}."
+            f"{swr_source.swr_source_name()}."
         )
     memoryless_dir = MEMORYLESS_ROOT / input_runs["memoryless"]
     if not (memoryless_dir / "manifest.json").exists():
@@ -983,7 +983,7 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
     # the workers only return records: this process alone writes the manifest
     log_directory = Path.cwd() / "logs"
     tasks = {
-        swr_inventory.swr_epoch_id(nwb_file_name, epoch_name): (
+        swr_source.swr_epoch_id(nwb_file_name, epoch_name): (
             nwb_file_name,
             epoch_name,
             run_epoch_kwargs,

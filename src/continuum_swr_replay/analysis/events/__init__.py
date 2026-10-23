@@ -4,7 +4,7 @@ One rule decides which time is analysed and which events are kept, and these
 modules hold it, below the hippocampus, replay, PFC and inventory-comparison
 analyses that use it:
 
-- ``swr_inventory``: the paper's one SWR source, the Kay inventory read with
+- ``swr_source``: the paper's one SWR source, the Kay inventory read with
   its run ids, the artifact mask and the source's name.
 - ``analysed_time``: excluded time and the read point that applies the
   analysed-time rule to a decode frame (``with_swr_source``,

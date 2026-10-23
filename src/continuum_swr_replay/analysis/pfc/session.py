@@ -1304,13 +1304,13 @@ def _session_fit_population(
     """
     # Deferred: opens Spyglass / DataJoint at import time (see the note at
     # the top of this module).
-    from continuum_swr_replay.analysis.events import analysed_time, swr_inventory
+    from continuum_swr_replay.analysis.events import analysed_time, swr_source
 
     # Excluded time (the artifact mask widened by 0.3 s) is not analysed. No
     # fitted bin's peri-event basis window reaches it, and no running bin's
     # theta phase is read from it.
     excluded = analysed_time.excluded_intervals(
-        swr_inventory.swr_epoch_id(nwb_file_name, epoch_name)
+        swr_source.swr_epoch_id(nwb_file_name, epoch_name)
     )
     is_immobile, fit_mask, bin_counts = build_session_fit_mask(
         data["position_info"],

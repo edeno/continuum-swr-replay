@@ -44,7 +44,7 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
 from continuum_swr_replay.analysis.events import analysed_time
-from continuum_swr_replay.analysis.events import swr_inventory as source_inventory
+from continuum_swr_replay.analysis.events import swr_source as source_inventory
 from continuum_swr_replay.analysis.events.classified_table import (
     build_classified_nonlocal_event_table,
 )
@@ -239,7 +239,7 @@ def _run_files(
 ) -> tuple[dict[str, Path], dict]:
     """The epoch's files in a run folder, checked against its manifest.
 
-    The check ``swr_inventory.swr_source_files`` makes for Kay, for any run
+    The check ``swr_source.swr_source_files`` makes for Kay, for any run
     folder: the epoch's record must be ``ok`` or ``partial``, ``detector`` (if
     given) must be ``ok`` in its ``detectors``, and each file must exist with
     the sha256 the manifest recorded for it; an output with no sha256 is a
@@ -310,7 +310,7 @@ def _run_files(
 
 def _numbered_events(path: Path) -> pd.DataFrame:
     """An LFP detector's events, indexed ``event_number`` 1..n, as
-    ``swr_inventory`` requires of Kay's.
+    ``swr_source`` requires of Kay's.
 
     Raises
     ------

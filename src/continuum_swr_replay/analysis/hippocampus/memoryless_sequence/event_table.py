@@ -537,14 +537,14 @@ def build_memoryless_event_table(
         stretches (``analysed_time.swr_observed_stretches``). Required with
         ``swr_intervals``; an event not wholly inside one is ``unknown``.
     swr_definition : str
-        Which SWR source the labels come from: ``swr_inventory.swr_source_name()``,
+        Which SWR source the labels come from: ``swr_source.swr_source_name()``,
         such as ``"kay@<run id>+artifacts@none"``.
     shuffle_results : mapping of int to ShuffleResult, or None
         Keyed by candidate index. Must cover exactly the candidates that meet
         both replay criteria, as :func:`shuffle_eligible` returns them. None
         when the shuffle was not run.
     artifact_intervals : DataFrame or None
-        The epoch's artifact mask (``swr_inventory.artifact_intervals``):
+        The epoch's artifact mask (``swr_source.artifact_intervals``):
         ``start_time`` and ``end_time``, closed. Each candidate's
         ``artifact_drop_reason`` is read from its ``[event_start_s,
         event_end_s]`` against excluded time (the mask widened by

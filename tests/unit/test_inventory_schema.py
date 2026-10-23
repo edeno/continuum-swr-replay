@@ -162,7 +162,7 @@ class TestAdapters:
         """The tables here are built from the inventory run "inventory" with no
         artifact run; read them under that source."""
         from continuum_swr_replay.analysis.events import (
-            swr_inventory as source_inventory,
+            swr_source as source_inventory,
         )
 
         monkeypatch.setattr(source_inventory, "SWR_INVENTORY_RUN_ID", "inventory")
@@ -305,7 +305,7 @@ class TestAdapters:
     ):
         """It would read its candidates in excluded time as kept."""
         from continuum_swr_replay.analysis.events import (
-            swr_inventory as source_inventory,
+            swr_source as source_inventory,
         )
         from tests.unit.test_memoryless_event_table import build, make_recording
 
@@ -323,7 +323,7 @@ class TestAdapters:
         run is refused under a run, one built under a run under another or
         under none. The message names both sources."""
         from continuum_swr_replay.analysis.events import (
-            swr_inventory as source_inventory,
+            swr_source as source_inventory,
         )
         from tests.unit.test_memoryless_event_table import build, make_recording
 
@@ -348,7 +348,7 @@ class TestAdapters:
         """Its SWR labels, and so its candidates' SWR classes, are another
         inventory's; so is a table from before the source had a name."""
         from continuum_swr_replay.analysis.events import (
-            swr_inventory as source_inventory,
+            swr_source as source_inventory,
         )
         from tests.unit.test_memoryless_event_table import build, make_recording
 

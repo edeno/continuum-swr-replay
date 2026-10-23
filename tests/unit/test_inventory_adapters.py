@@ -643,7 +643,7 @@ class TestTheStateSpaceInventory:
 class TestTheMemorylessInventory:
     def _run(self, tmp_path, n_shuffles=100):
         from continuum_swr_replay.analysis.events import (
-            swr_inventory as source_inventory,
+            swr_source as source_inventory,
         )
 
         table = memoryless_table(source_inventory.swr_source_name(), n_shuffles)
@@ -695,7 +695,7 @@ class TestTheMemorylessInventory:
         touches MUA 2 and is kept. Candidate 17 overlaps dropped Kay 3 on the
         grid though its stored reason is None, and is set aside."""
         from continuum_swr_replay.analysis.events import (
-            swr_inventory as source_inventory,
+            swr_source as source_inventory,
         )
 
         table = memoryless_table(source_inventory.swr_source_name())
@@ -790,7 +790,7 @@ class TestTheMemorylessInventory:
 
     def test_an_empty_table_keeps_the_schema(self, epoch, tmp_path):
         from continuum_swr_replay.analysis.events import (
-            swr_inventory as source_inventory,
+            swr_source as source_inventory,
         )
 
         table = memoryless_table(source_inventory.swr_source_name()).iloc[0:0]

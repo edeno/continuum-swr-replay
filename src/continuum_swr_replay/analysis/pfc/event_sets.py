@@ -268,7 +268,7 @@ def build_session_event_sets(
     Both populations are canonical and are read, not re-detected here: the
     non-local events are rows of the shipped event table and the SWR intervals
     are the SWR source's speed-gated ``SWR_event`` labels (the direct Kay
-    inventory, :mod:`continuum_swr_replay.analysis.events.swr_inventory`), both
+    inventory, :mod:`continuum_swr_replay.analysis.events.swr_source`), both
     loaded by :mod:`continuum_swr_replay.analysis.pfc.canonical_events`. The SWR
     split is
     the event table's own ``is_swr`` column -- strict positive-duration overlap

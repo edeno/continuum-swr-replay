@@ -470,4 +470,4 @@ Logs are written to `logs/{epoch_identifier}.log` with git hash for reproducibil
 - Position data uses DLC tracking when available, falls back to older tracking methods
 - Some sessions may lack certain interval types (wrapped in try/except in data loading)
 - Check for empty spike data before running decoding (`if not data["spike_times"]`)
-- Artifacts: one detector (`analysis/hippocampus/artifacts/`, run `analysis/events/swr_inventory.py:ARTIFACT_INTERVALS_RUN_ID`) masks sustained ripple-band noise (S blocks), step artifacts and synchronous spike lines; see `docs/design/2026-10-09-artifact-detection.md`. An epoch with an S block is left out whole (epoch register reason `SUSTAINED_NOISE`).
+- Artifacts: one detector (`analysis/hippocampus/artifacts/`, run `analysis/events/swr_source.py:ARTIFACT_INTERVALS_RUN_ID`) masks sustained ripple-band noise (S blocks), step artifacts and synchronous spike lines; see `docs/design/2026-10-09-artifact-detection.md`. An epoch with an S block is left out whole (epoch register reason `SUSTAINED_NOISE`).

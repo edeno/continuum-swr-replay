@@ -24,7 +24,7 @@ from ripple_detection import filter_ripple_band
 from ripple_detection.simulate import simulate_session, simulate_time
 
 import scripts.detection.run_carey_detection as runner
-from continuum_swr_replay.analysis.events import swr_inventory
+from continuum_swr_replay.analysis.events import swr_source
 from continuum_swr_replay.analysis.hippocampus.swr_inventories import CAREY_SETTINGS
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.runs.io import array_sha256, sha256_file
@@ -310,7 +310,7 @@ def test_inputs_other_than_the_swr_runs_fail_the_epoch_and_write_nothing(
 
     assert record["status"] == "failed"
     assert f"{name} hash" in record["reason"]
-    assert swr_inventory.SWR_INVENTORY_RUN_ID in record["reason"]
+    assert swr_source.SWR_INVENTORY_RUN_ID in record["reason"]
     assert not any(path.exists() for path in _outputs(output_dir).values())
 
 
@@ -419,7 +419,7 @@ def driver(tmp_path, monkeypatch):
     Returns the epochs ``run_epoch`` ran, in order.
     """
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(swr_inventory, "ARTIFACT_INTERVALS_RUN_ID", None)
+    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", None)
     animal, date = parse_nwb_filename(NWB_FILE_NAME)
     monkeypatch.setattr(
         runner,
@@ -479,7 +479,7 @@ def test_the_manifest_records_the_settings_and_the_epoch(tmp_path, driver):
 
     settings = manifest["settings"]
     assert settings["carey_settings"] == dict(CAREY_SETTINGS)
-    assert settings["swr_run_id"] == swr_inventory.SWR_INVENTORY_RUN_ID
+    assert settings["swr_run_id"] == swr_source.SWR_INVENTORY_RUN_ID
     assert settings["artifacts"]["run_id"] is None
     assert len(settings["adaptations"]) == 4
     assert "tetrodes as units" in settings["configuration"]

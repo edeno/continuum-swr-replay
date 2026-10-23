@@ -200,7 +200,7 @@ The audit runs these checks on the register:
   `not_checked` names.
 - `sustained_noise`: among the analysed, pending and `SUSTAINED_NOISE` epochs, those
   with at least one S core in the configured artifact run
-  (`swr_inventory.artifact_intervals_dir()`) are exactly the `SUSTAINED_NOISE` ones. An
+  (`swr_source.artifact_intervals_dir()`) are exactly the `SUSTAINED_NOISE` ones. An
   S epoch the register does not exclude for it fails, and so does a `SUSTAINED_NOISE`
   epoch the run gives no S core, or an epoch whose cores the run cannot serve.
 

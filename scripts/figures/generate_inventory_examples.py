@@ -73,7 +73,7 @@ from continuum_swr_replay.analysis.constants import (  # noqa: E402
 )
 from continuum_swr_replay.analysis.events import (  # noqa: E402
     analysed_time,
-    swr_inventory,
+    swr_source,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (  # noqa: E402
     CandidateSequences,
@@ -425,14 +425,14 @@ def load_epoch(identifier: str, *, run_dir: Path, memoryless_dir: Path) -> Epoch
             f"decode grid of {identifier} makes {n_windows}."
         )
     # the runner's is_missing: a bin inside a closed interval of the mask
-    is_missing = interval_mask(time, swr_inventory.artifact_intervals(identifier))
+    is_missing = interval_mask(time, swr_source.artifact_intervals(identifier))
     missing_windows = windows_holding(
         is_missing[:-1], config.window_n_samples, config.stride_n_samples
     )
 
     animal, day, epoch = (str(dot[c].iloc[0]) for c in ("animal", "day", "epoch"))
     band = get_ripple_band_inputs(f"{animal}{day}_.nwb", epoch)
-    kept_ids = swr_inventory.ripple_power_inputs(identifier)["kept_electrode_ids"]
+    kept_ids = swr_source.ripple_power_inputs(identifier)["kept_electrode_ids"]
     kept = np.isin(band["electrode_ids"], kept_ids)
     if kept.sum() != len(kept_ids):
         raise ValueError(

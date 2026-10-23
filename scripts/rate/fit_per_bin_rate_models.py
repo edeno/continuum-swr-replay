@@ -73,7 +73,7 @@ from continuum_swr_replay.analysis.events.cohort_selection import (  # noqa: E40
     select_stop_cohort,
     stop_cohort_suffix,
 )
-from continuum_swr_replay.analysis.events.swr_inventory import (  # noqa: E402
+from continuum_swr_replay.analysis.events.swr_source import (  # noqa: E402
     swr_source_name,
 )
 from continuum_swr_replay.analysis.replay import (  # noqa: E402

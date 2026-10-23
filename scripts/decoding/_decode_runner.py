@@ -7,7 +7,7 @@ Not a script. ``run_decoding_bandit.py`` (the NonLocal 4-state detector) and
 classes and arguments, its config, its aggregation and loader, its file
 suffix and its log lines, and hands it to :func:`run_decode`.
 
-An HPC decode, in either runner, reads the SWR source (``swr_inventory``): it
+An HPC decode, in either runner, reads the SWR source (``swr_source``): it
 refuses to start unless the source names both its Kay inventory and its
 artifact run (``hpc_artifact_intervals``, and ``parse_decode_args`` before a
 batch), masks MUA detection and ``is_missing`` with the artifact run, leaves
@@ -364,7 +364,7 @@ def run_decode(
     results in <save_dir>``, reads them back from ``save_dir`` and rewrites only
     ``data_over_time``.
 
-    An HPC decode reads the SWR source (``swr_inventory``) and refuses to start
+    An HPC decode reads the SWR source (``swr_source``) and refuses to start
     unless it names both its Kay inventory and its artifact run
     (``hpc_artifact_intervals``). Its artifact mask, the one every stage uses,
     masks MUA detection (``load_data``) and is its ``is_missing``; its encoding

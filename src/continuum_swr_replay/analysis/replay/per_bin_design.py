@@ -640,7 +640,7 @@ def aggregate_to_timebins(
     SwrSourceError
         With the default ``excluded_intervals``, if an artifact run is
         configured but does not serve one of ``stop_table``'s sessions (as
-        ``swr_inventory.artifact_intervals``).
+        ``swr_source.artifact_intervals``).
 
     Notes
     -----

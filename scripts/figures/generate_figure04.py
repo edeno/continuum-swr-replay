@@ -61,7 +61,7 @@ from continuum_swr_replay.analysis.events.analysed_time import (
     read_artifact_event_drops,
 )
 from continuum_swr_replay.analysis.events.cohort_selection import stop_cohort_suffix
-from continuum_swr_replay.analysis.events.swr_inventory import (
+from continuum_swr_replay.analysis.events.swr_source import (
     ripple_power_inputs,
     swr_epoch_id,
 )

@@ -28,7 +28,7 @@ Each epoch writes, under ``Processed-Data/artifact_intervals/<run_id>/``,
 ``{epoch_id}_artifact_intervals.parquet``: its cores
 (``events.artifact_intervals.CORE_COLUMNS``), no rows when it has no artifact.
 A reader pads the cores into the one artifact mask
-(``events.artifact_masks.PADDING_S``), as ``swr_inventory.artifact_intervals``
+(``events.artifact_masks.PADDING_S``), as ``swr_source.artifact_intervals``
 does. A failed epoch keeps no file.
 
 ``manifest.json`` beside them holds the run's settings (every constant and
@@ -84,7 +84,7 @@ from continuum_swr_replay.analysis.events.artifact_masks import (
     PADDING_S,
     artifact_intervals,
 )
-from continuum_swr_replay.analysis.events.swr_inventory import swr_epoch_id
+from continuum_swr_replay.analysis.events.swr_source import swr_epoch_id
 from continuum_swr_replay.analysis.hippocampus.artifacts import detect
 from continuum_swr_replay.analysis.hippocampus.artifacts.detect import (
     detect_artifacts,

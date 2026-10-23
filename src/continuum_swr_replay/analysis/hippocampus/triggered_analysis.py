@@ -11,7 +11,7 @@ import xarray as xr
 
 from continuum_swr_replay.analysis.constants import DEFAULT_SAMPLING_FREQUENCY_HZ
 from continuum_swr_replay.analysis.events.analysed_time import excluded_intervals
-from continuum_swr_replay.analysis.events.swr_inventory import swr_epoch_id
+from continuum_swr_replay.analysis.events.swr_source import swr_epoch_id
 from continuum_swr_replay.intervals import overlaps_intervals
 
 logger = logging.getLogger(__name__)

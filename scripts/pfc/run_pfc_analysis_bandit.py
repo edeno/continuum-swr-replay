@@ -9,7 +9,7 @@ The analysis pipeline per session:
 1. Load the session's non-local events from the canonical event table
 2. Split them on that table's ``is_swr`` column (strict positive-duration
    overlap with the SWR source's speed-gated ``SWR_event`` labels, the direct
-   Kay inventory of ``analysis/events/swr_inventory.py``), so Figure 4
+   Kay inventory of ``analysis/events/swr_source.py``), so Figure 4
    describes the same events, with the same classification, as the content
    and rate families
 3. Fit GLMs for each neuron comparing models: constant, SWR, non-local, combined

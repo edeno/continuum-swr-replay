@@ -201,7 +201,7 @@ def _valid_stop_frame() -> pd.DataFrame:
 @pytest.mark.parametrize("stamp", [None, "kay@earlier+artifacts@none"])
 def test_publish_canonical_refuses_an_swr_table_from_another_source(tmp_path, stamp):
     """A table built from SWR labels must name the configured SWR source."""
-    from continuum_swr_replay.analysis.events.swr_inventory import SwrSourceError
+    from continuum_swr_replay.analysis.events.swr_source import SwrSourceError
 
     frame = _valid_stop_frame()
     frame.attrs.pop("swr_source")
@@ -230,7 +230,7 @@ def test_publish_canonical_refuses_an_swr_table_without_the_source_check(tmp_pat
 
 
 def test_publish_canonical_keeps_the_swr_stamp_and_needs_none_for_qvals(tmp_path):
-    from continuum_swr_replay.analysis.events.swr_inventory import swr_source_name
+    from continuum_swr_replay.analysis.events.swr_source import swr_source_name
 
     stop = read_table(
         publish_canonical(
