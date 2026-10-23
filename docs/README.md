@@ -191,13 +191,13 @@ allowlists of known violations are empty and can only shrink.
 
 ### Moved modules (2026-10)
 
-The code-organization branch (`470a393..4691953d`) moved, renamed or split the
+The code-organization branch (`470a393..2e55b21b`) moved, renamed or split the
 modules below. **There are no compatibility shims**: the old import paths raise
 `ModuleNotFoundError`, so code outside this repo (notebooks, old scripts) must update
 its imports. Paths are under `src/continuum_swr_replay/`; the import path is the file
 path with `/` as `.` and no `.py`. An old path is marked "(removed: …)" so the
 doc-path test does not look for it. The source of truth is
-`git diff -M --name-status 470a393..4691953d -- src/`.
+`git diff -M --name-status 470a393..2e55b21b -- src/`.
 
 | Old module | New home |
 |---|---|
