@@ -93,7 +93,6 @@ from continuum_swr_replay.analysis.events.immobility import (
     validate_whole_event_immobility_contract,
 )
 from continuum_swr_replay.analysis.events.swr_source import (
-    _ARTIFACT_COLUMNS,
     SWR_LABEL_COLUMN,
     SwrSourceError,
     _classify,
@@ -811,7 +810,7 @@ def excluded_intervals_by_session(sessions: pd.DataFrame) -> pd.DataFrame:
         )
         for animal, day, epoch in keys.itertuples(index=False)
     ]
-    columns = [*SESSION_COLUMNS, *_ARTIFACT_COLUMNS]
+    columns = [*SESSION_COLUMNS, "start_time", "end_time"]
     if not parts:
         return pd.DataFrame({column: [] for column in columns}).astype(
             {"start_time": float, "end_time": float}

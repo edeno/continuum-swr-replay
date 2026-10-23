@@ -62,10 +62,7 @@ from continuum_swr_replay.analysis.constants import (
 )
 from continuum_swr_replay.analysis.events.artifact_intervals import (
     ArtifactRunError,
-    read_epoch_cores,
-)
-from continuum_swr_replay.analysis.events.artifact_masks import (
-    artifact_intervals as padded_cores,
+    epoch_artifact_intervals,
 )
 from continuum_swr_replay.analysis.events.eligibility import (
     event_drop_reasons,
@@ -139,8 +136,6 @@ OBSERVED_SCOPE = "stored_band"
 USABLE_STATUSES = ("ok", "partial")
 """Manifest statuses this source serves, given a Kay inventory."""
 
-
-_ARTIFACT_COLUMNS = ["start_time", "end_time"]
 
 
 class SwrSourceError(ValueError):
@@ -375,16 +370,10 @@ def artifact_intervals(epoch_id: str) -> pd.DataFrame:
         epoch (not run, failed, another run's folder), its file is missing or
         changed since the run, or the cores are malformed.
     """
-    directory = artifact_intervals_dir()
-    if directory is None:
-        return pd.DataFrame(
-            {column: np.empty(0, dtype=float) for column in _ARTIFACT_COLUMNS}
-        )
     try:
-        epoch = read_epoch_cores(directory, epoch_id)
+        return epoch_artifact_intervals(artifact_intervals_dir(), epoch_id)
     except ArtifactRunError as error:
         raise SwrSourceError(str(error)) from error
-    return padded_cores(epoch.cores, epoch.span)
 
 
 @dataclass(frozen=True)
