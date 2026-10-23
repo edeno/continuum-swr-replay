@@ -60,6 +60,23 @@ MODEL_VALIDATION_BUNDLES = {
 }
 
 
+def _release_files(root: Path, pattern: str = "*") -> list[Path]:
+    """The files under `root` matching `pattern` that belong to its release.
+
+    A folder whose name starts with ``_`` below the root holds backups, golden
+    baselines, staging runs, caches or archives, not the release, so its files
+    are left out. So is a symlink: one left at an output's old path names a
+    file the release already holds at its real path.
+    """
+    return [
+        path
+        for path in sorted(root.rglob(pattern))
+        if path.is_file()
+        and not path.is_symlink()
+        and not any(part.startswith("_") for part in path.relative_to(root).parts[:-1])
+    ]
+
+
 def _inventory_file(path: Path, root: Path) -> dict[str, object]:
     record: dict[str, object] = {
         "path": str(path.relative_to(root)),
@@ -90,7 +107,8 @@ def _json_session_keys(keys: set[tuple[object, ...]]) -> list[dict[str, object]]
 def _require_one_swr_source(roots: Mapping[str, Path]) -> str:
     """Every SWR-bearing candidate table carries the configured SWR source's stamp.
 
-    Every parquet table under `roots` whose covariate-schema table is one of
+    Every parquet release table under `roots` (:func:`_release_files`) whose
+    covariate-schema table is one of
     ``tables.io.SWR_SOURCE_TABLES`` must be stamped ``swr_source_name()``:
     a release mixing SWR sources, or built from an earlier one, is refused.
 
@@ -108,7 +126,7 @@ def _require_one_swr_source(roots: Mapping[str, Path]) -> str:
     wrong = {
         str(path): attrs.get(SWR_SOURCE_ATTR)
         for root in roots.values()
-        for path in sorted(root.rglob("*.parquet"))
+        for path in _release_files(root, "*.parquet")
         if (attrs := read_attrs(path)).get("covariate_schema_table")
         in SWR_SOURCE_TABLES
         and attrs.get(SWR_SOURCE_ATTR) != expected
@@ -450,18 +468,13 @@ def _verify_baseline(
 def _inventory_files(
     roots: Mapping[str, Path], *, output: Path
 ) -> dict[str, list[dict[str, object]]]:
-    """Each root's parquet and JSON files, and its model-validation bundles.
-
-    A symlink is skipped: one left at an output's old path names a file the
-    inventory already lists at its real path.
-    """
+    """Each root's parquet and JSON release files (:func:`_release_files`), and
+    its model-validation bundles."""
     return {
         label: [
             _inventory_file(path, root)
-            for path in sorted(root.rglob("*"))
-            if path.is_file()
-            and not path.is_symlink()
-            and path.resolve() != output.resolve()
+            for path in _release_files(root)
+            if path.resolve() != output.resolve()
             and (
                 path.suffix in {".parquet", ".json"}
                 or (

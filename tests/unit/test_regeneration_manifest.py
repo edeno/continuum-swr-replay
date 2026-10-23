@@ -245,3 +245,25 @@ def test_the_file_inventory_skips_a_symlink_at_an_old_path(tmp_path: Path):
     assert [record["path"] for record in files["replay"]] == [
         "qvals_standardization_reference.json"
     ]
+
+
+def test_the_release_leaves_out_underscore_folders(tmp_path: Path):
+    """Backups, golden baselines, staging runs and caches sit in ``_`` folders
+    below a root; the inventory and the SWR-source check leave them out."""
+    from scripts.tables.write_regeneration_manifest import _inventory_files
+
+    root = tmp_path / "replay"
+    (root / "models").mkdir(parents=True)
+    (root / "models" / "fit.json").write_text("{}")
+    _table(root / "event_table.parquet", "event", swr_source_name())
+    for folder in ("_pre_v5_regen_backup_20260829", "_golden_baseline_v5"):
+        _table(root / folder / "event_table.parquet", "event", "kay@earlier")
+        (root / folder / "standardization_reference.json").write_text("{}")
+
+    files = _inventory_files({"replay": root}, output=tmp_path / "manifest.json")
+
+    assert [record["path"] for record in files["replay"]] == [
+        "event_table.parquet",
+        "models/fit.json",
+    ]
+    assert _require_one_swr_source({"replay": root}) == swr_source_name()
