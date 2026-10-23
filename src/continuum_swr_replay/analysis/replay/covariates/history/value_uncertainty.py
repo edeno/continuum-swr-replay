@@ -306,6 +306,101 @@ def _omission_streak(reward_lag_matrix: np.ndarray) -> np.ndarray:
     return out
 
 
+def validate_uncertainty_inputs(
+    stop_table: pd.DataFrame,
+    *,
+    switch_window: int = CANONICAL_SWITCH_WINDOW,
+    q_alpha: float = CANONICAL_LEAKY_Q_ALPHA,
+) -> None:
+    """Every check :func:`add_uncertainty_covariates` makes, without its columns.
+
+    For a reader that needs the stop table's canonical history validated but
+    reads neither ``omission_streak`` nor ``wsls_deviation``.
+
+    Raises
+    ------
+    KeyError, ValueError
+        As :func:`add_uncertainty_covariates`.
+    """
+    _validated_stop_table(stop_table, switch_window=switch_window, q_alpha=q_alpha)
+
+
+def _validated_stop_table(
+    stop_table: pd.DataFrame, *, switch_window: int, q_alpha: float
+) -> pd.DataFrame:
+    """A copy of ``stop_table`` with its reward lags numeric, once every check
+    of :func:`add_uncertainty_covariates` passes (per session, in its order)."""
+    if switch_window != CANONICAL_SWITCH_WINDOW:
+        raise ValueError(
+            "noncanonical switch_window requires recomputation from the full "
+            "trials table; a stop table cannot recover visits without stops"
+        )
+    if not np.isfinite(q_alpha) or q_alpha != CANONICAL_LEAKY_Q_ALPHA:
+        raise ValueError(
+            "noncanonical q_alpha requires recomputation from the full trials "
+            "table; a stop table cannot recover visits without stops"
+        )
+
+    required = (
+        *SESSION_COLUMNS,
+        "stop_idx",
+        "completed_trial_id",
+        "completed_trial_arm",
+        "did_last_completed_trip_switch_patch",
+        # wsls_deviation reads the *realized* outcome, not the gated flags --
+        # validate the column actually consumed. The gated primitive is retained
+        # because a stop table lacking it predates the outcome clock entirely.
+        "completed_trial_reward",
+        "is_rewarded_outcome",
+        "is_stay",
+        "patch_switch_fraction_last5_completed_trips",
+        "leaky_q_value_diff",
+    )
+    missing = [column for column in required if column not in stop_table]
+    if missing:
+        raise KeyError(
+            "uncertainty covariates require canonical stop-table columns "
+            f"{missing}; regenerate stop_table.pkl"
+        )
+
+    out = stop_table.copy()
+    expected_lag_cols = [
+        f"known_reward_outcome_lag_{j}" for j in range(1, N_REWARD_LAGS + 1)
+    ]
+    observed_lag_cols = [
+        c for c in out.columns if c.startswith("known_reward_outcome_lag_")
+    ]
+    duplicate_lags = sorted(
+        {column for column in observed_lag_cols if observed_lag_cols.count(column) > 1}
+    )
+    if set(observed_lag_cols) != set(expected_lag_cols) or duplicate_lags:
+        missing_lags = [c for c in expected_lag_cols if c not in observed_lag_cols]
+        unexpected_lags = [c for c in observed_lag_cols if c not in expected_lag_cols]
+        raise KeyError(
+            "omission_streak requires the exact contiguous canonical reward-lag "
+            f"schema {expected_lag_cols}; missing={missing_lags}, "
+            f"unexpected={unexpected_lags}, duplicates={duplicate_lags}"
+        )
+    raw_lags = out[expected_lag_cols]
+    numeric_lags = raw_lags.apply(pd.to_numeric, errors="coerce")
+    if (raw_lags.notna() & numeric_lags.isna()).to_numpy().any():
+        raise ValueError("reward lag values must be numeric binary 0/1 or NaN")
+    finite_lags = numeric_lags.to_numpy(dtype=float)
+    finite_values = finite_lags[np.isfinite(finite_lags)]
+    if not np.isin(finite_values, (0.0, 1.0)).all():
+        raise ValueError("reward lag values must be binary 0/1 or NaN")
+    out.loc[:, expected_lag_cols] = numeric_lags
+
+    for _, idx in out.groupby(list(SESSION_COLUMNS), sort=False).groups.items():
+        g = out.loc[idx].sort_values("stop_idx")
+        _completed_visit_context(g)
+        stay = g["is_stay"].to_numpy(dtype=float)
+        finite_stay = stay[np.isfinite(stay)]
+        if not np.isin(finite_stay, (0.0, 1.0)).all():
+            raise ValueError("is_stay must be binary whenever it is known")
+    return out
+
+
 def add_uncertainty_covariates(
     stop_table: pd.DataFrame,
     *,
@@ -371,74 +466,18 @@ def add_uncertainty_covariates(
         Copy of ``stop_table`` with canonical upstream history validated and
         the stop-local ``omission_streak`` and ``wsls_deviation`` columns added.
     """
-    if switch_window != CANONICAL_SWITCH_WINDOW:
-        raise ValueError(
-            "noncanonical switch_window requires recomputation from the full "
-            "trials table; a stop table cannot recover visits without stops"
-        )
-    if not np.isfinite(q_alpha) or q_alpha != CANONICAL_LEAKY_Q_ALPHA:
-        raise ValueError(
-            "noncanonical q_alpha requires recomputation from the full trials "
-            "table; a stop table cannot recover visits without stops"
-        )
-
-    required = (
-        *SESSION_COLUMNS,
-        "stop_idx",
-        "completed_trial_id",
-        "completed_trial_arm",
-        "did_last_completed_trip_switch_patch",
-        # wsls_deviation reads the *realized* outcome, not the gated flags --
-        # validate the column actually consumed. The gated primitive is retained
-        # because a stop table lacking it predates the outcome clock entirely.
-        "completed_trial_reward",
-        "is_rewarded_outcome",
-        "is_stay",
-        "patch_switch_fraction_last5_completed_trips",
-        "leaky_q_value_diff",
+    out = _validated_stop_table(
+        stop_table, switch_window=switch_window, q_alpha=q_alpha
     )
-    missing = [column for column in required if column not in stop_table]
-    if missing:
-        raise KeyError(
-            "uncertainty covariates require canonical stop-table columns "
-            f"{missing}; regenerate stop_table.pkl"
-        )
-
-    out = stop_table.copy()
     expected_lag_cols = [
         f"known_reward_outcome_lag_{j}" for j in range(1, N_REWARD_LAGS + 1)
     ]
-    observed_lag_cols = [
-        c for c in out.columns if c.startswith("known_reward_outcome_lag_")
-    ]
-    duplicate_lags = sorted(
-        {column for column in observed_lag_cols if observed_lag_cols.count(column) > 1}
-    )
-    if set(observed_lag_cols) != set(expected_lag_cols) or duplicate_lags:
-        missing_lags = [c for c in expected_lag_cols if c not in observed_lag_cols]
-        unexpected_lags = [c for c in observed_lag_cols if c not in expected_lag_cols]
-        raise KeyError(
-            "omission_streak requires the exact contiguous canonical reward-lag "
-            f"schema {expected_lag_cols}; missing={missing_lags}, "
-            f"unexpected={unexpected_lags}, duplicates={duplicate_lags}"
-        )
-    raw_lags = out[expected_lag_cols]
-    numeric_lags = raw_lags.apply(pd.to_numeric, errors="coerce")
-    if (raw_lags.notna() & numeric_lags.isna()).to_numpy().any():
-        raise ValueError("reward lag values must be numeric binary 0/1 or NaN")
-    finite_lags = numeric_lags.to_numpy(dtype=float)
-    finite_values = finite_lags[np.isfinite(finite_lags)]
-    if not np.isin(finite_values, (0.0, 1.0)).all():
-        raise ValueError("reward lag values must be binary 0/1 or NaN")
-    out.loc[:, expected_lag_cols] = numeric_lags
-
     omission = pd.Series(np.nan, index=out.index, dtype=float)
     wsls = pd.Series(np.nan, index=out.index, dtype=float)
 
     for _, idx in out.groupby(list(SESSION_COLUMNS), sort=False).groups.items():
         g = out.loc[idx].sort_values("stop_idx")
         pos = g.index
-        _completed_visit_context(g)
 
         omission.loc[pos] = _omission_streak(g[expected_lag_cols].to_numpy(dtype=float))
 
@@ -455,9 +494,6 @@ def add_uncertainty_covariates(
         # the outcome is clocked. See covariate_timing.FUTURE_REFERENCING.
         outcome = g["completed_trial_reward"].to_numpy(dtype=float)
         stay = g["is_stay"].to_numpy(dtype=float)
-        finite_stay = stay[np.isfinite(stay)]
-        if not np.isin(finite_stay, (0.0, 1.0)).all():
-            raise ValueError("is_stay must be binary whenever it is known")
         win_stay = (outcome == 1.0) & (stay == 1.0)
         lose_shift = (outcome == 0.0) & (stay == 0.0)
         wsls_vals = np.where(win_stay | lose_shift, 0.0, 1.0)

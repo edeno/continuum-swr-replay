@@ -698,14 +698,15 @@ def _mapping_arguments(path: Path) -> dict[str, list[str]]:
 
 
 @pytest.mark.parametrize(
-    "script",
+    ("script", "assemblers"),
     [
-        CONTENT / "fit_swr_contrast_content.py",
-        CONTENT / "compare_content_estimators.py",
+        (CONTENT / "fit_swr_contrast_content.py", ("assemble_arm", "assemble_patch")),
+        # compares the arm cohort alone, so it assembles no patch cohort
+        (CONTENT / "compare_content_estimators.py", ("assemble_arm",)),
     ],
-    ids=lambda path: path.stem,
+    ids=lambda value: value.stem if isinstance(value, Path) else None,
 )
-def test_content_contrast_fits_record_every_table_they_read(script):
+def test_content_contrast_fits_record_every_table_they_read(script, assemblers):
     """The content contrast tables are read by ``contrast_aggregation``'s
     assemblers, through the mapping they are handed. Each script that fits on
     those cohorts hands them ``CONTENT_FIT_INPUTS``, records that same mapping,
@@ -720,7 +721,9 @@ def test_content_contrast_fits_record_every_table_they_read(script):
     assert _mapping_arguments(script) == {
         "record_inputs": ["CONTENT_FIT_INPUTS"],
         "assemble_arm": ["CONTENT_FIT_INPUTS"],
-        "assemble_patch": ["CONTENT_FIT_INPUTS"],
+        "assemble_patch": (
+            ["CONTENT_FIT_INPUTS"] if "assemble_patch" in assemblers else []
+        ),
     }
 
 

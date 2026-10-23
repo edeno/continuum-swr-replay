@@ -288,7 +288,7 @@ Canonical qvals value-block and arm-uncertainty joins.
 
 Value and uncertainty covariates computed from the behavioral stream: the canonical leaky-Q value history and the model-free behavioral-uncertainty covariates.
 
-`canonical_port_value_history`, `canonical_trial_switch_history`, `add_uncertainty_covariates`
+`canonical_port_value_history`, `canonical_trial_switch_history`, `validate_uncertainty_inputs`, `add_uncertainty_covariates`
 
 ### `src/continuum_swr_replay/analysis/replay/covariates/history/visit_recency.py`
 

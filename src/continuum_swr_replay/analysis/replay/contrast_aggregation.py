@@ -62,7 +62,7 @@ from continuum_swr_replay.tables.standardization import (
 from ._fit_diagnostics import SEPARATION_COEF_ABS
 from ._helpers import add_arm_fixed_effects
 from .cohort_audit import QVALS_GAP_COLS
-from .covariates import add_uncertainty_covariates
+from .covariates.history.value_uncertainty import validate_uncertainty_inputs
 from .fitting import parse_unidentified_terms
 from .model_specs import LEAF_ONLY_N_CATEGORIES, REWARD_HISTORY_COLUMNS
 
@@ -842,7 +842,8 @@ def assemble_arm(
     stop = read_table(fit_inputs["stop_table"])
     require_covariate_schema(stop, table="stop")
     require_swr_source(stop, what=str(fit_inputs["stop_table"]))
-    stop = add_uncertainty_covariates(stop)
+    # The two columns it would add are read by no fit here; its checks are kept.
+    validate_uncertainty_inputs(stop)
     q = read_table(fit_inputs["qvals_table"])
     require_covariate_schema(q, table="qvals")
     ev = ev.merge(
@@ -981,7 +982,6 @@ def assemble_patch(
     stop = read_table(fit_inputs["stop_table"])
     require_covariate_schema(stop, table="stop")
     require_swr_source(stop, what=str(fit_inputs["stop_table"]))
-    stop = add_uncertainty_covariates(stop)
     q = read_table(fit_inputs["qvals_table"])
     require_covariate_schema(q, table="qvals")
     pt = pt.merge(

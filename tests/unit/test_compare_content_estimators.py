@@ -558,11 +558,8 @@ def test_the_concentration_figure_is_optional_but_the_provenance_is_not(
     could date or trace back to their inputs.
     """
     monkeypatch.setattr(mod, "assemble_arm", lambda *args: (cohort.copy(), {}))
-    monkeypatch.setattr(mod, "assemble_patch", lambda *args: (cohort.copy(), {}))
     monkeypatch.setattr(
-        mod,
-        "prepare_cohorts",
-        lambda ev, pt, **kwargs: (ev, pt, {}, {"stratum": "all"}),
+        mod, "select_outcome_stratum", lambda ev, stratum: (ev, {"stratum": "all"})
     )
     monkeypatch.setattr(mod, "record_inputs", lambda inputs: {})
     monkeypatch.setattr(mod, "run_comparison", lambda *args, **kwargs: one_rung)

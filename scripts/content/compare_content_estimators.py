@@ -79,9 +79,8 @@ from continuum_swr_replay.analysis.replay.contrast_aggregation import (  # noqa:
     CONTENT_FIT_INPUTS,
     MIN_EVENTS,
     assemble_arm,
-    assemble_patch,
-    prepare_cohorts,
     prepare_session,
+    select_outcome_stratum,
 )
 from continuum_swr_replay.analysis.replay.dirichlet_multinomial import (  # noqa: E402
     DEFAULT_MIN_EVENTS_SESSION_PHI,
@@ -117,7 +116,10 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
 )
 from continuum_swr_replay.paths import REPLAY_CONTENT_DIR
 from continuum_swr_replay.tables.io import write_table  # noqa: E402
-from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS  # noqa: E402
+from continuum_swr_replay.tables.session_keys import (  # noqa: E402
+    SESSION_COLUMNS,
+    subset_max_per_animal,
+)
 
 # Quasi-separated coefficients legitimately overflow exp() outside the fit. Fit
 # quality itself is carried per fit as converged/separated flags, so only the
@@ -1263,11 +1265,12 @@ def main(argv: Sequence[str] | None = None) -> None:
     ev, _z_reference = assemble_arm(
         CONTENT_FIT_INPUTS, RC / "standardization_reference.json"
     )
-    pt, _patch_z_reference = assemble_patch(ev, CONTENT_FIT_INPUTS)
     inputs = record_inputs(CONTENT_FIT_INPUTS)
-    ev, _pt, _scale, stratum_audit = prepare_cohorts(
-        ev, pt, outcome_stratum="all", max_per_animal=args.max_per_animal
-    )
+    # Only the arm cohort is compared, so the patch cohort is not assembled:
+    # this is prepare_cohorts' arm half, for the "all" stratum.
+    ev, stratum_audit = select_outcome_stratum(ev, "all")
+    if args.max_per_animal is not None:
+        ev = subset_max_per_animal(ev, args.max_per_animal)
     logger.info(
         "cohort: %d events over %d sessions",
         ev["event_id"].nunique(),
