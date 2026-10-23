@@ -48,7 +48,11 @@ from continuum_swr_replay.analysis.events.cohort_selection import select_event_c
 from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import require_covariate_schema
 from continuum_swr_replay.tables.io import read_table
-from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.tables.session_keys import (
+    SESSION_COLUMNS,
+    session_key_frame,
+    subset_max_per_animal,
+)
 from continuum_swr_replay.tables.standardization import (
     assert_standardized_matches_reference,
     attach_standardized,
@@ -760,14 +764,8 @@ def prepare_cohorts(
         # events rather than re-deriving the outcome on patch rows.
         pt = pt[pt["event_id"].isin(set(ev["event_id"]))]
     if max_per_animal is not None:
-        keep = (
-            ev[list(SESSION_COLUMNS)]
-            .drop_duplicates()
-            .groupby("animal", sort=False)
-            .head(max_per_animal)
-        )
-        ev = ev.merge(keep, on=list(SESSION_COLUMNS))
-        pt = pt.merge(keep, on=list(SESSION_COLUMNS))
+        ev = subset_max_per_animal(ev, max_per_animal)
+        pt = pt.merge(session_key_frame(ev), on=list(SESSION_COLUMNS))
     return ev, pt, scale, stratum_audit
 
 
