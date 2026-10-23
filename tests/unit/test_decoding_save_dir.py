@@ -77,7 +77,7 @@ from continuum_swr_replay.analysis.hippocampus import result_loading as hpc_load
 from continuum_swr_replay.decoding import files as decoding_files
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.runs import batch, cli, provenance
-from continuum_swr_replay.runs import io as runs_io
+from continuum_swr_replay.tables.io import write_atomically
 from tests.unit._swr_inventory_fixtures import (
     ARTIFACT_RUN_ID,
     RUN_ID,
@@ -868,7 +868,7 @@ def test_write_atomically_keeps_the_old_file_when_a_write_fails(tmp_path):
         raise OSError("disk full")
 
     with pytest.raises(OSError, match="disk full"):
-        runs_io.write_atomically(path, half_write)
+        write_atomically(path, half_write)
 
     assert path.read_bytes() == b"the previous run"
     assert [entry.name for entry in tmp_path.iterdir()] == [path.name]

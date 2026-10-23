@@ -184,11 +184,14 @@ from continuum_swr_replay.runs.batch import (  # noqa: E402
 )
 from continuum_swr_replay.runs.io import (  # noqa: E402
     json_ready,
-    write_atomically,
     write_json,
 )
 from continuum_swr_replay.runs.provenance import provenance_record  # noqa: E402
-from continuum_swr_replay.tables.io import read_table, write_table  # noqa: E402
+from continuum_swr_replay.tables.io import (  # noqa: E402
+    read_table,
+    write_atomically,
+    write_table,
+)
 
 PRODUCED_BY = "scripts/detection/run_state_evidence.py"
 SEED = 20261004

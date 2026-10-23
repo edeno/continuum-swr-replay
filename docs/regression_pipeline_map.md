@@ -950,7 +950,7 @@ The one reader of a decode's ``{epoch_identifier}_results.nc``.
 
 On-disk format for the canonical analysis tables.
 
-`umask_file_mode`, `publish_canonical`, `parquet_path`, `resolved_table_path`, `write_table`, `read_table`, `read_attrs`, `table_exists`
+`umask_file_mode`, `publish_canonical`, `parquet_path`, `resolved_table_path`, `write_table`, `write_atomically`, `read_table`, `read_attrs`, `table_exists`
 
 ### `src/continuum_swr_replay/tables/parity.py`
 

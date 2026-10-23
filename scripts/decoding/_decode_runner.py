@@ -61,8 +61,8 @@ from continuum_swr_replay.parameters import (
     ROOT_DIR,
 )
 from continuum_swr_replay.runs.batch import release_nwb_files, setup_logger
-from continuum_swr_replay.runs.io import write_atomically
 from continuum_swr_replay.runs.provenance import provenance_record
+from continuum_swr_replay.tables.io import write_atomically
 
 
 @dataclass(frozen=True)

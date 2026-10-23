@@ -221,7 +221,7 @@ doc-path test does not look for it. The source of truth is
 | `analysis/replay/versions.py` (removed: moved) | `tables/versions.py` |
 | `decode_files.py` (removed: moved) | `decoding/files.py` |
 | `decoding_transitions.py` (removed: moved) | `decoding/transitions.py` |
-| `decoding_common.py` (removed: split) | `decoding/config.py` (`DecodingConfig`, `NonLocalDecodingConfig`); `decoding/files.py` (`results_exist`); `analysis/hippocampus/decode_masks.py` (`hpc_decode_masks`, `HpcDecodeMasks` and the other HPC decode-mask functions); `runs/batch.py` (`run_batch`, `setup_logger`, `release_nwb_files`, `raise_open_file_limit`); `runs/cli.py` (`parse_run_id`, `RUN_ID_PATTERN`, `add_common_args`, `filter_epoch_info`); `runs/io.py` (`write_atomically`, `write_json`, `replace_outputs`); `runs/provenance.py` (`provenance_record`) |
+| `decoding_common.py` (removed: split) | `decoding/config.py` (`DecodingConfig`, `NonLocalDecodingConfig`); `decoding/files.py` (`results_exist`); `analysis/hippocampus/decode_masks.py` (`hpc_decode_masks`, `HpcDecodeMasks` and the other HPC decode-mask functions); `runs/batch.py` (`run_batch`, `setup_logger`, `release_nwb_files`, `raise_open_file_limit`); `runs/cli.py` (`parse_run_id`, `RUN_ID_PATTERN`, `add_common_args`, `filter_epoch_info`); `tables/io.py` (`write_atomically`); `runs/io.py` (`write_json`, `replace_outputs`); `runs/provenance.py` (`provenance_record`) |
 | `table_io.py` (removed: moved) | `tables/io.py`; `sha256_file` is in `runs/io.py` |
 | `table_parity.py` (removed: moved) | `tables/parity.py`; `BASENAME_TO_TABLE` and `CANONICAL_TABLE_BASENAMES` are in `paths.py` |
 | `session_keys.py` (removed: moved) | `tables/session_keys.py` |

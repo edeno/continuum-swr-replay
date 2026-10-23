@@ -28,7 +28,7 @@ from continuum_swr_replay.data_loaders.spikes import filter_spike_times, get_hpc
 from continuum_swr_replay.data_loaders.utils import EpochKey
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.paths import DETECTION_COMPARISON_DIR
-from continuum_swr_replay.runs.io import write_atomically
+from continuum_swr_replay.tables.io import write_atomically
 
 __all__ = [
     "MARKS_CACHE_DIR",

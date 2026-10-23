@@ -1,15 +1,12 @@
 """How a run writes its files: atomically, as strict JSON, and with their hashes.
 
 Every runner's outputs, manifests and caches are written through
-:func:`write_atomically`, so a crash or a kill never leaves a half-written file
-under its final name, and a reader that trusts any file that exists (a resume,
-a cache) never reads one. :func:`replace_outputs` writes one epoch's files as a
-set. Records go through :func:`json_ready` before :func:`write_json`, which
-refuses NaN and infinity.
-
-The parquet tables themselves are written by ``tables.io.write_table``, which
-keeps its own atomic write: ``tables`` is below this package (this module
-imports it), so it cannot call back up into here.
+``tables.io.write_atomically`` (the one atomic write, below this package so
+``tables.io.write_table`` shares it), so a crash or a kill never leaves a
+half-written file under its final name, and a reader that trusts any file that
+exists (a resume, a cache) never reads one. :func:`replace_outputs` writes one
+epoch's files as a set. Records go through :func:`json_ready` before
+:func:`write_json`, which refuses NaN and infinity.
 
 The module is named ``io`` like the standard-library module on purpose: the
 interpreter loads ``io`` at startup, so a tool run from inside this directory
@@ -23,8 +20,6 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-import os
-import tempfile
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
@@ -33,14 +28,13 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.tables.io import umask_file_mode, write_table
+from continuum_swr_replay.tables.io import write_atomically, write_table
 
 __all__ = [
     "array_sha256",
     "json_ready",
     "replace_outputs",
     "sha256_file",
-    "write_atomically",
     "write_json",
 ]
 
@@ -77,47 +71,6 @@ def json_ready(value: Any) -> Any:
     if isinstance(value, float) and not math.isfinite(value):
         return None
     return value
-
-
-def write_atomically(path: Path, write: Callable[[Path], object]) -> None:
-    """Write `path` through a temporary file beside it, so it is never half-written.
-
-    A reader that trusts any file that exists (``results_exist``, a marks
-    cache, a resumed manifest) must never meet a truncated file under the
-    final name after a crash mid-write.
-
-    Parameters
-    ----------
-    path : Path
-        The final file. Its folder must exist.
-    write : Callable[[Path], object]
-        Writes the whole file to the path it is given (for example
-        ``detector.save_model``), overwriting the empty file there.
-
-    Notes
-    -----
-    `write` gets ``.{name}.<random>.tmp`` in the same folder, made by
-    ``tempfile.mkstemp``, so two writers of one path, in any process or
-    thread, never share it. Only after `write` returns is the file given the
-    mode a plain create would have (``tables.io.umask_file_mode``: mkstemp
-    makes it owner-only) and moved onto `path` with ``os.replace``, which is
-    atomic within a filesystem. If `write` raises, the temporary file is
-    removed and `path` is left as it was. The temporary name does not end in
-    the final suffix, so a ``*_environment.pkl``-style glob never picks it
-    up, even after a hard kill.
-    """
-    path = Path(path)
-    handle, name = tempfile.mkstemp(
-        dir=path.parent, prefix=f".{path.name}.", suffix=".tmp"
-    )
-    os.close(handle)
-    temporary = Path(name)
-    try:
-        write(temporary)
-        os.chmod(temporary, umask_file_mode())
-        os.replace(temporary, path)
-    finally:
-        temporary.unlink(missing_ok=True)
 
 
 def write_json(

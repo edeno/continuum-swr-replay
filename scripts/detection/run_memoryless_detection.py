@@ -198,9 +198,9 @@ from continuum_swr_replay.runs.batch import (
 )
 from continuum_swr_replay.runs.batch import run_epochs as batch_run_epochs
 from continuum_swr_replay.runs.cli import parse_run_id
-from continuum_swr_replay.runs.io import sha256_file, write_atomically
+from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.runs.provenance import provenance_record
-from continuum_swr_replay.tables.io import write_table
+from continuum_swr_replay.tables.io import write_atomically, write_table
 
 OUTPUT_ROOT = DETECTION_COMPARISON_DIR / "memoryless"
 DESIGN_SPEC = "docs/design/replay_detection_comparison/02-memoryless-sequence.md"

@@ -20,10 +20,9 @@ from continuum_swr_replay.runs.io import (
     array_sha256,
     json_ready,
     sha256_file,
-    write_atomically,
     write_json,
 )
-from continuum_swr_replay.tables.io import umask_file_mode
+from continuum_swr_replay.tables.io import umask_file_mode, write_atomically
 
 
 def test_json_ready_gives_strict_json_types():

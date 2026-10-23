@@ -135,7 +135,7 @@ from continuum_swr_replay.runs.batch import (
     release_nwb_files,
     setup_logger,
 )
-from continuum_swr_replay.runs.io import write_atomically
+from continuum_swr_replay.tables.io import write_atomically
 
 #: Populations the PFC GLMs may be fit on. ``at_well`` is the canonical shared
 #: cohort and publishes the unsuffixed artifact names; ``all_stops`` applies no

@@ -58,6 +58,7 @@ __all__ = [
     "resolved_table_path",
     "table_exists",
     "umask_file_mode",
+    "write_atomically",
 ]
 
 
@@ -204,30 +205,53 @@ def write_table(frame: pd.DataFrame, path: str | Path, **kwargs: Any) -> Path:
     table = table.replace_schema_metadata(metadata)
 
     kwargs.setdefault("compression", "zstd")
-    # Atomic write: a crash or kill mid-write leaves the destination untouched
-    # rather than a truncated parquet that a later read would silently accept or
-    # loudly fail on. The temp file shares the destination directory so
-    # ``os.replace`` is a same-filesystem atomic rename. This matters for the
-    # multi-table regeneration reducers, where a half-written table would break
-    # the atomic event/stop table set. It is the same write as
-    # ``runs.io.write_atomically``, kept here because ``runs`` imports this
-    # module (``replace_outputs`` writes its tables with ``write_table``), so
-    # this one cannot import ``runs`` back.
-    handle, tmp_name = tempfile.mkstemp(
-        dir=out.parent, prefix=f".{out.name}.", suffix=".tmp"
+    # Atomic: a half-written table would break the regeneration reducers'
+    # atomic event/stop table set.
+    write_atomically(out, lambda temporary: pq.write_table(table, temporary, **kwargs))
+    return out
+
+
+def write_atomically(path: Path, write: Callable[[Path], object]) -> None:
+    """Write `path` through a temporary file beside it, so it is never half-written.
+
+    A reader that trusts any file that exists (``results_exist``, a marks
+    cache, a resumed manifest, a canonical table) must never meet a truncated
+    file under the final name after a crash mid-write. Every atomic write of
+    the project goes through here: :func:`write_table`, and ``runs.io``'s
+    ``write_json`` and ``replace_outputs``.
+
+    Parameters
+    ----------
+    path : Path
+        The final file. Its folder must exist.
+    write : Callable[[Path], object]
+        Writes the whole file to the path it is given (for example
+        ``detector.save_model``), overwriting the empty file there.
+
+    Notes
+    -----
+    `write` gets ``.{name}.<random>.tmp`` in the same folder, made by
+    ``tempfile.mkstemp``, so two writers of one path, in any process or
+    thread, never share it. Only after `write` returns is the file given the
+    mode a plain create would have (:func:`umask_file_mode`: mkstemp makes it
+    owner-only) and moved onto `path` with ``os.replace``, which is atomic
+    within a filesystem. If `write` raises, the temporary file is removed and
+    `path` is left as it was. The temporary name does not end in the final
+    suffix, so a ``*_environment.pkl``-style glob never picks it up, even
+    after a hard kill.
+    """
+    path = Path(path)
+    handle, name = tempfile.mkstemp(
+        dir=path.parent, prefix=f".{path.name}.", suffix=".tmp"
     )
     os.close(handle)
-    tmp = Path(tmp_name)
+    temporary = Path(name)
     try:
-        pq.write_table(table, tmp, **kwargs)
-        # mkstemp created tmp at 0600; restore the umask-respecting mode a plain
-        # write would have produced before promoting it (see umask_file_mode).
-        os.chmod(tmp, umask_file_mode())
-        os.replace(tmp, out)
-    except BaseException:
-        tmp.unlink(missing_ok=True)
-        raise
-    return out
+        write(temporary)
+        os.chmod(temporary, umask_file_mode())
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def read_table(path: str | Path, columns: list[str] | None = None) -> pd.DataFrame:
