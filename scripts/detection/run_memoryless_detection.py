@@ -200,7 +200,7 @@ from continuum_swr_replay.runs.batch import (
 from continuum_swr_replay.runs.batch import run_epochs as batch_run_epochs
 from continuum_swr_replay.runs.cli import parse_run_id
 from continuum_swr_replay.runs.io import sha256_file
-from continuum_swr_replay.runs.provenance import provenance_record
+from continuum_swr_replay.runs.provenance import produced_by, provenance_record
 from continuum_swr_replay.tables.io import write_atomically, write_table
 
 OUTPUT_ROOT = MEMORYLESS_ROOT
@@ -1008,7 +1008,7 @@ def main(argv: list[str] | None = None) -> None:
     )
     settings = run_settings(args.run_seed, shuffle, args.n_shuffles, config, commit)
     provenance = {
-        "produced_by": "scripts/detection/run_memoryless_detection.py",
+        "produced_by": produced_by(__file__),
         "git_commit": commit,
         "run_id": run_id,
     }

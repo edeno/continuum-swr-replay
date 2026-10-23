@@ -94,6 +94,7 @@ from continuum_swr_replay.paths import (  # noqa: E402
     MEMORYLESS_ROOT,
 )
 from continuum_swr_replay.runs.cli import parse_run_id  # noqa: E402
+from continuum_swr_replay.runs.provenance import produced_by  # noqa: E402
 from continuum_swr_replay.tables.io import read_table  # noqa: E402
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
 from scripts.detection import run_event_features as features_runner  # noqa: E402
@@ -117,7 +118,7 @@ from scripts.figures.generate_inventory_examples import (  # noqa: E402
     detector_color,
 )
 
-PRODUCED_BY = "scripts/detection/report_event_features.py"
+PRODUCED_BY = produced_by(__file__)
 OUTPUT_ROOT = EVENT_FEATURES_ROOT
 """Where the event features runs are."""
 INVENTORY_ROOT = INVENTORY_COMPARISON_ROOT

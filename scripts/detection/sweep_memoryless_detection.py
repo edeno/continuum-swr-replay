@@ -95,7 +95,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statis
 )
 from continuum_swr_replay.parameters import LOCAL_POSITION_STD
 from continuum_swr_replay.paths import DETECTION_COMPARISON_DIR
-from continuum_swr_replay.runs.provenance import git
+from continuum_swr_replay.runs.provenance import git, produced_by
 from continuum_swr_replay.tables.io import write_table
 
 DECODE_BIN_STRIDE = 3
@@ -1094,7 +1094,7 @@ def main() -> None:
 
     table = pd.DataFrame(rows)
     table.attrs = {
-        "produced_by": "scripts/detection/sweep_memoryless_detection.py",
+        "produced_by": produced_by(__file__),
         "produced_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "git_commit": git_commit(),
         "design_spec": "docs/design/replay_detection_comparison/02-memoryless-sequence.md",

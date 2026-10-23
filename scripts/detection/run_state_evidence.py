@@ -186,14 +186,17 @@ from continuum_swr_replay.runs.io import (  # noqa: E402
     json_ready,
     write_json,
 )
-from continuum_swr_replay.runs.provenance import provenance_record  # noqa: E402
+from continuum_swr_replay.runs.provenance import (  # noqa: E402
+    produced_by,
+    provenance_record,
+)
 from continuum_swr_replay.tables.io import (  # noqa: E402
     read_table,
     write_atomically,
     write_table,
 )
 
-PRODUCED_BY = "scripts/detection/run_state_evidence.py"
+PRODUCED_BY = produced_by(__file__)
 SEED = 20261004
 """Names every window and partner draw, with the epoch id."""
 RUNNING_ENCODING_MIN_SPEED_CM_S = 4.0

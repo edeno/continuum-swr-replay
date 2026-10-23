@@ -110,6 +110,7 @@ from continuum_swr_replay.paths import (  # noqa: E402
 )
 from continuum_swr_replay.runs.cli import parse_run_id  # noqa: E402
 from continuum_swr_replay.runs.io import json_ready  # noqa: E402
+from continuum_swr_replay.runs.provenance import produced_by  # noqa: E402
 from continuum_swr_replay.tables.io import read_table  # noqa: E402
 from continuum_swr_replay.visualization.palettes import COLORS  # noqa: E402
 from continuum_swr_replay.visualization.plots import (  # noqa: E402
@@ -121,7 +122,7 @@ from scripts.detection import (
 )
 from scripts.detection.run_carey_detection import decode_marks  # noqa: E402
 
-PRODUCED_BY = "scripts/figures/generate_inventory_examples.py"
+PRODUCED_BY = produced_by(__file__)
 FIGURE_ROOT = FIGURE_DIR / "inventory_comparison"
 EXAMPLES_DIR = "examples"
 """The examples' folder inside the run's figure folder."""

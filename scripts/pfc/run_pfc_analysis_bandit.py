@@ -135,6 +135,7 @@ from continuum_swr_replay.runs.batch import (
     release_nwb_files,
     setup_logger,
 )
+from continuum_swr_replay.runs.provenance import produced_by
 from continuum_swr_replay.tables.io import write_atomically
 
 #: Populations the PFC GLMs may be fit on. ``at_well`` is the canonical shared
@@ -1670,7 +1671,7 @@ def write_cohort_record(
     partition's share only. The union is the bundles on disk.
     """
     record = {
-        "produced_by": "scripts/pfc/run_pfc_analysis_bandit.py",
+        "produced_by": produced_by(__file__),
         "git_hash": git_hash,
         "n_analysed": n_analysed,
         "n_pfc_cohort": len(pfc_cohort),

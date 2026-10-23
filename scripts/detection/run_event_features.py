@@ -200,7 +200,10 @@ from continuum_swr_replay.runs.io import (  # noqa: E402
     sha256_file,
     write_json,
 )
-from continuum_swr_replay.runs.provenance import provenance_record  # noqa: E402
+from continuum_swr_replay.runs.provenance import (  # noqa: E402
+    produced_by,
+    provenance_record,
+)
 from continuum_swr_replay.tables.io import read_table  # noqa: E402
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
 from scripts.detection import run_carey_detection as carey  # noqa: E402
@@ -217,7 +220,7 @@ INVENTORY_ROOT = INVENTORY_COMPARISON_ROOT
 MARKS_CACHE_DIR = carey.MARKS_CACHE_DIR
 """The memoryless runner's marks cache, keyed by the decode's detector file."""
 STOP_TABLE = table_path("stop_table")
-PRODUCED_BY = "scripts/detection/run_event_features.py"
+PRODUCED_BY = produced_by(__file__)
 DESIGN_SPEC = "docs/design/replay_detection_comparison/04-event-features.md"
 
 GRID_RULE = (

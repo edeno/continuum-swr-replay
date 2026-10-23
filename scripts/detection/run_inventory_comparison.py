@@ -189,13 +189,13 @@ from continuum_swr_replay.runs.io import (
     sha256_file,
     write_json,
 )
-from continuum_swr_replay.runs.provenance import provenance_record
+from continuum_swr_replay.runs.provenance import produced_by, provenance_record
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
 OUTPUT_ROOT = INVENTORY_COMPARISON_ROOT
 DECODE_ROOT = PROCESSED_DATA_DIR
 """Where the canonical HPC decodes are."""
-PRODUCED_BY = "scripts/detection/run_inventory_comparison.py"
+PRODUCED_BY = produced_by(__file__)
 DESIGN_SPEC = "docs/design/replay_detection_comparison/03-inventory-comparison.md"
 
 ROSTER: Mapping[str, str | None] = MappingProxyType(

@@ -63,6 +63,7 @@ from continuum_swr_replay.paths import (  # noqa: E402
 )
 from continuum_swr_replay.runs.cli import parse_run_id  # noqa: E402
 from continuum_swr_replay.runs.io import json_ready  # noqa: E402
+from continuum_swr_replay.runs.provenance import produced_by  # noqa: E402
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
 from scripts.detection import report_event_features as report  # noqa: E402
 from scripts.detection import run_event_features as features_runner  # noqa: E402
@@ -71,7 +72,7 @@ from scripts.figures import (  # noqa: E402
     generate_inventory_examples as inventory_examples,
 )
 
-PRODUCED_BY = "scripts/figures/generate_event_feature_examples.py"
+PRODUCED_BY = produced_by(__file__)
 FIGURE_ROOT = FIGURE_DIR / "event_features"
 EXAMPLES_DIR = "examples"
 """The examples' folder inside the run's figure folder."""

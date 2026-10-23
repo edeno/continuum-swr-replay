@@ -111,11 +111,11 @@ from continuum_swr_replay.runs.batch import (
 )
 from continuum_swr_replay.runs.cli import filter_epoch_info, parse_run_id
 from continuum_swr_replay.runs.io import array_sha256, json_ready
-from continuum_swr_replay.runs.provenance import provenance_record
+from continuum_swr_replay.runs.provenance import produced_by, provenance_record
 
 OUTPUT_ROOT = ARTIFACT_INTERVALS_DIR
 """Where the run folders go: where the SWR source reads them."""
-PRODUCED_BY = "scripts/detection/run_artifact_detection.py"
+PRODUCED_BY = produced_by(__file__)
 DESIGN_SPEC = "docs/design/2026-10-09-artifact-detection.md"
 
 

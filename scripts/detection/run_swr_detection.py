@@ -219,11 +219,11 @@ from continuum_swr_replay.runs.io import (
     replace_outputs,
     write_json,
 )
-from continuum_swr_replay.runs.provenance import provenance_record
+from continuum_swr_replay.runs.provenance import produced_by, provenance_record
 
 OUTPUT_ROOT = SWR_INVENTORY_ROOT
 """Where the run folders go: where the paper's SWR source reads them."""
-PRODUCED_BY = "scripts/detection/run_swr_detection.py"
+PRODUCED_BY = produced_by(__file__)
 DESIGN_SPEC = "docs/design/2026-10-03-full-pipeline-refresh-design.md"
 
 SPYGLASS_INPUTS_KAY = "kay_spyglass_inputs"

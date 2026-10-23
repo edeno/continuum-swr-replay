@@ -68,6 +68,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statis
     normalize_windows,
 )
 from continuum_swr_replay.paths import DETECTION_COMPARISON_DIR
+from continuum_swr_replay.runs.provenance import produced_by
 from continuum_swr_replay.tables.io import write_table
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -564,7 +565,7 @@ def main() -> None:
         [figure_one.assign(input="figure_one"), swept.assign(input="sweep")]
     ).reset_index()[["input", "measure", *VARIANTS]]
     provenance = {
-        "produced_by": "scripts/qa/compare_memoryless_to_reference.py",
+        "produced_by": produced_by(__file__),
         "git_commit": sweep.git_commit(),
         "n_sweep_seeds": str(args.n_seeds),
     }

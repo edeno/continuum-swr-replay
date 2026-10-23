@@ -11,6 +11,11 @@ and ``src/`` with ``ast`` and checks each string literal that is
 
 against ``git ls-files``. Values that are not literals (``PRODUCED_BY`` itself,
 ``provenance["produced_by"]``) are not strings and are skipped.
+
+Runners now derive their producer from their own file
+(``runs.provenance.produced_by(__file__)``), so a move cannot leave it stale;
+:func:`test_every_derived_producer_is_the_scripts_own_tracked_path` checks
+each such call site.
 """
 
 from __future__ import annotations
@@ -18,6 +23,10 @@ from __future__ import annotations
 import ast
 import subprocess
 from pathlib import Path
+
+import pytest
+
+from continuum_swr_replay.runs.provenance import produced_by
 
 REPO = Path(__file__).resolve().parents[2]
 ROOTS = (REPO / "scripts", REPO / "src")
@@ -68,8 +77,8 @@ def _all_recorded() -> list[tuple[str, int, str]]:
 
 def test_every_recorded_path_is_a_tracked_file():
     recorded = _all_recorded()
-    # the runners that stamp their outputs; an empty scan would pass vacuously
-    assert len(recorded) >= 20, recorded
+    # the runners' design specs; an empty scan would pass vacuously
+    assert len(recorded) >= 5, recorded
 
     tracked = _tracked()
     missing = [entry for entry in recorded if entry[2] not in tracked]
@@ -94,3 +103,37 @@ def test_the_scan_finds_names_and_dict_keys():
         "docs/b.md",
         "scripts/c.py",
     ]
+
+
+def _derives_its_producer(source: str) -> bool:
+    """Whether ``source`` calls ``produced_by(__file__)``."""
+    return any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "produced_by"
+        and [ast.unparse(arg) for arg in node.args] == ["__file__"]
+        for node in ast.walk(ast.parse(source))
+    )
+
+
+def test_every_derived_producer_is_the_scripts_own_tracked_path():
+    derived = [
+        path
+        for path in sorted((REPO / "scripts").rglob("*.py"))
+        if "__pycache__" not in path.parts and _derives_its_producer(path.read_text())
+    ]
+    # the runners that stamp their outputs; an empty scan would pass vacuously
+    assert len(derived) >= 15, derived
+
+    tracked = _tracked()
+    for path in derived:
+        relative = path.relative_to(REPO).as_posix()
+        assert produced_by(path) == relative
+        assert relative in tracked
+
+
+def test_produced_by_is_the_path_from_the_scripts_folder(tmp_path):
+    script = tmp_path / "checkout" / "scripts" / "detection" / "run_x.py"
+    assert produced_by(script) == "scripts/detection/run_x.py"
+    with pytest.raises(ValueError, match="not under a scripts folder"):
+        produced_by(tmp_path / "elsewhere.py")

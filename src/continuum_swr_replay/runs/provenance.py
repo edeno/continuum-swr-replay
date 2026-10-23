@@ -16,7 +16,27 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-__all__ = ["git", "git_commit", "git_dirty", "provenance_record"]
+__all__ = ["git", "git_commit", "git_dirty", "produced_by", "provenance_record"]
+
+
+def produced_by(file: str | Path) -> str:
+    """A script's path in the repository, as its outputs record it.
+
+    ``produced_by(__file__)`` in ``scripts/detection/run_swr_detection.py`` is
+    ``"scripts/detection/run_swr_detection.py"``: the path from the script's
+    ``scripts`` folder down, so a moved script records where it now is, in
+    whichever checkout or worktree runs it.
+
+    Raises
+    ------
+    ValueError
+        If `file` is not under a ``scripts`` folder.
+    """
+    parts = Path(file).resolve().parts
+    if "scripts" not in parts:
+        raise ValueError(f"{file} is not under a scripts folder")
+    start = len(parts) - 1 - parts[::-1].index("scripts")
+    return "/".join(parts[start:])
 
 
 def git(repo: Path, *args: str, check: bool = True) -> str:

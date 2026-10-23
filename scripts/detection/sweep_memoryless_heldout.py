@@ -67,6 +67,7 @@ from continuum_swr_replay.analysis.inventory_comparison.heldout import (  # noqa
     poor_coverage_fold,
 )
 from continuum_swr_replay.paths import DETECTION_COMPARISON_DIR
+from continuum_swr_replay.runs.provenance import produced_by  # noqa: E402
 from continuum_swr_replay.tables.io import write_table  # noqa: E402
 from scripts.detection import sweep_memoryless_controls as controls  # noqa: E402
 from scripts.detection import sweep_memoryless_detection as sweep  # noqa: E402
@@ -474,7 +475,7 @@ def main() -> None:
         )
     table = pd.DataFrame(rows)
     table.attrs = {
-        "produced_by": "scripts/detection/sweep_memoryless_heldout.py",
+        "produced_by": produced_by(__file__),
         "produced_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "git_commit": sweep.git_commit(),
         "n_seeds": args.n_seeds,

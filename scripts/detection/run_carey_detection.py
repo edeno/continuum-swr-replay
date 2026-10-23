@@ -131,10 +131,10 @@ from continuum_swr_replay.runs.io import (
     sha256_file,
     write_json,
 )
-from continuum_swr_replay.runs.provenance import provenance_record
+from continuum_swr_replay.runs.provenance import produced_by, provenance_record
 
 OUTPUT_ROOT = CAREY_ROOT
-PRODUCED_BY = "scripts/detection/run_carey_detection.py"
+PRODUCED_BY = produced_by(__file__)
 DESIGN_SPEC = "docs/design/replay_detection_comparison/03-inventory-comparison.md"
 
 DECODE_ROOT = PROCESSED_DATA_DIR
