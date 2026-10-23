@@ -36,6 +36,7 @@ from continuum_swr_replay.analysis.replay.tables_stop import (  # noqa: E402
     add_nonlocal_swr_split,
 )
 from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
+from continuum_swr_replay.schemas import SessionDataKeys  # noqa: E402
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
     require_covariate_schema,
     stamp_covariate_schema,
@@ -47,7 +48,6 @@ from continuum_swr_replay.tables.io import (
     write_table,
 )
 from continuum_swr_replay.tables.session_keys import session_key_set
-from continuum_swr_replay.schemas import SessionDataKeys  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S"
