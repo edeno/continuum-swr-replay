@@ -10,7 +10,9 @@ the package, or in a `_`-prefixed module beside the scripts that share it
 (`decoding/_decode_runner.py`, `detection/_report.py`, `qa/_report.py`). A script that is not `_`-prefixed is
 never imported by another script or by `src/`; tests may import any script.
 [`tests/unit/test_no_new_script_imports.py`](../tests/unit/test_no_new_script_imports.py)
-enforces this. Its `ALLOWED` table is the current exception list, and it only
+enforces this for scripts, and
+[`tests/unit/test_import_layering.py`](../tests/unit/test_import_layering.py) for `src/`.
+The first test's `ALLOWED` table is the current exception list, and it only
 shrinks:
 - the detection-comparison family: `figures/generate_event_feature_examples.py`,
   `figures/generate_inventory_examples.py`, `detection/report_event_features.py`,

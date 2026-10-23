@@ -186,8 +186,8 @@ layers below it, never from a layer above:
 
 There are no package cycles. `tests/unit/test_import_layering.py` enforces all of
 this (it also keeps `data_loaders/` from importing `analysis/`, `hippocampus/` from
-importing `replay/`, and the covariate builders from importing `model_specs.py`). Its
-allowlists of known violations are empty and can only shrink.
+importing `replay/`, and the covariate builders from importing `model_specs.py`). It
+has no allowlist: any violation fails.
 
 ### Moved modules (2026-10)
 
