@@ -151,14 +151,24 @@ class SwrSourceError(ValueError):
 
 
 def swr_inventory_dir() -> Path:
-    """The run folder of :data:`SWR_INVENTORY_RUN_ID` under
-    ``paths.SWR_INVENTORY_ROOT``, read when called."""
+    """The run folder of :data:`SWR_INVENTORY_RUN_ID` under this module's
+    ``SWR_INVENTORY_ROOT`` (imported from ``paths``).
+
+    Both names are this module's globals, read when called, so a patch on
+    ``swr_inventory.SWR_INVENTORY_ROOT`` reaches this function; a patch on
+    ``paths.SWR_INVENTORY_ROOT`` does not."""
     return SWR_INVENTORY_ROOT / SWR_INVENTORY_RUN_ID
 
 
 def artifact_intervals_dir() -> Path | None:
     """The artifact run folder, or None while :data:`ARTIFACT_INTERVALS_RUN_ID`
-    is unset. Read when called."""
+    is unset.
+
+    The folder is :data:`ARTIFACT_INTERVALS_RUN_ID` under this module's
+    ``ARTIFACT_INTERVALS_DIR`` (imported from ``paths``). Both names are this
+    module's globals, read when called, so a patch on
+    ``swr_inventory.ARTIFACT_INTERVALS_DIR`` reaches this function; a patch on
+    ``paths.ARTIFACT_INTERVALS_DIR`` does not."""
     if ARTIFACT_INTERVALS_RUN_ID is None:
         return None
     return ARTIFACT_INTERVALS_DIR / ARTIFACT_INTERVALS_RUN_ID
