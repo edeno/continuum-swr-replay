@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-Status: complete, not merged (branch `code-organization-2026-10-19`, from master 470a393). Ledger: ledger.md; final review: final-review.md.
+Status: Phase D in progress (branch `code-organization-2026-10-19`, from master 470a393). Ledger: ledger.md; final review: final-review.md.
 
 **Goal:** Give the package a foundation layer. Shared infrastructure stops living inside leaf analysis packages, the six package-level import cycles go away, and a researcher can find each rule in one place.
 
@@ -475,6 +475,43 @@ Status: complete, not merged (branch `code-organization-2026-10-19`, from master
 - [ ] **Step 1:** `git mv`, run the codemod and grep.
 - [ ] **Step 2:** Add a test: `cd src/continuum_swr_replay && python -c "import ast"` succeeds. That is the review's repro.
 - [ ] **Step 3: Verify** targeted tests and the layering test, then commit.
+
+## Phase D — names and homes a reader can trust (lead, 2026-10-23)
+
+The lead's goal for this branch: an outside scientist can understand the analysis by reading the code. Phase D removes three places where a name or a location says something that is not true.
+
+### Task 17: Each output lives in the folder that names it
+
+**Why.** `table_path()` special-cases `qvals_table`, the one canonical table stored inside the per-bin rate-model folder (`paths.py:142`). `swr_power_model` (a per-event ripple-power model) also sits in `models_per_bin_rate/`. Everything else there is a per-bin rate fit, so the folder name is right once these two leave.
+
+**Files:** `src/continuum_swr_replay/paths.py`, `analysis/behavior/qvals_table.py`, `scripts/tables/write_regeneration_manifest.py`, `scripts/rate/fit_swr_power_model.py`, every reader of these files (grep `qvals_table`, `qvals_standardization_reference`, `swr_power_model`, `swr_power_cohort_audit`, `swr_power_post_outcome_gate_audit`, `z_reference_by_session`), `docs/README.md` ("Where results live"), the tests that pin paths.
+
+- [ ] **Step 1: Failing tests.** `table_path(name, root)` is `root / f"{name}.{fmt}"` for every canonical table, `qvals_table` included. `model_dir("per_event_swr_power", root)` is `root / "models_per_event_swr_power"`. Every swr_power output resolves under it.
+- [ ] **Step 2:** `qvals_table.parquet` and `qvals_standardization_reference.json` are read and written at the replay-content root, beside the other six tables. Delete the special case. Add `"per_event_swr_power": "models_per_event_swr_power"` to `MODEL_SUBDIRS` and move every swr_power output there. Remove the `MODEL_SUBDIRS` comment about the deferred rename; `models_per_bin_rate` now holds only per-bin rate fits and keeps its name.
+- [ ] **Step 3: Provenance check.** Find every recorded path or hash that names the old locations (fit provenance JSONs, the regeneration manifest, `check_fit_provenance.py`, resume settings). A frozen record of the past stays as written. Anything compared at run time must still pass against files at the new locations; report each case and how it resolves.
+- [ ] **Step 4: Verify.** GOLDEN IDENTICAL from a scratch staging root (the golden baseline is flat and unaffected). Targeted tests, layering, doc paths.
+- [ ] **Step 5: The disk move.** Never write into `Processed-Data/`. Write the exact `mv` commands for the canonical root (and any staging root with these files) to the report. The lead runs them. Backups (`*.bak_*`, `*_pre*_2026*`, `_pre_*_backup_*`) stay where they are. The exploratory outputs (`contingency_table.pkl`, `contingency_csv_alpha.json`, `covariate_ranking.pkl`) stay: unsupported one-offs.
+
+### Task 18: Names that do not collide
+
+**Why.** Final review M3: a reader opens the wrong file.
+
+**Renames (`git mv`, codemod, grep; one commit per rename):**
+- `analysis/events/swr_inventory.py` → `analysis/events/swr_source.py`. Its docstring opens "The paper's one SWR source".
+- `analysis/hippocampus/swr_inventories.py` → `analysis/hippocampus/swr_detectors.py`. It runs the four direct detectors.
+- `analysis/events/detection.py` → `analysis/events/nonlocal_detection.py`. It is non-local event detection and SWR-overlap classification, not the SWR detectors of `scripts/detection/`. If its contents show that name is wrong, pick a name from what it does and report why.
+- `schemas.py` → `data_types.py`. It holds the TypedDicts for loaded session data and decoder parameters, not table schemas. `inventory_comparison/schema.py` keeps its name.
+- The `inventory_comparison.adapters.swr_inventory` function → `source_swr_inventory`. Four files already import it `as source_inventory`; drop those aliases.
+
+**Kept, with the reason in a docstring:**
+- `runs/io.py`, `tables/io.py`, `state_evidence/io.py`: `io` is loaded during interpreter startup, so they cannot shadow it (final review M10), and `package.io` is a common pattern.
+- `memoryless_sequence/statistics.py`: renaming it breaks unpickling of the memoryless candidate pickles (Q5). It does shadow `statistics` when a tool runs from inside its directory.
+
+- [ ] **Step 1: Pickle check first.** Scan every pickle under `Processed-Data/` (read-only) for the four old module paths, with a positive control (`memoryless_sequence`). A rename whose old path appears in a pickle stops and is reported, not done.
+- [ ] **Step 2:** Each rename: `git mv`, codemod, grep for the old dotted path and the bare `<basename>.` form in tracked files, docs included. Frozen manifest strings compared on resume stay as written (list them).
+- [ ] **Step 3:** Extend the stdlib-shadow test to walk every package directory, with an allowlist `{io: preloaded at startup, statistics: pickled (Q5)}`. A new shadowing module fails it.
+- [ ] **Step 4:** Update the old→new table in `docs/README.md` ("Code layout"), `tests/unit/test_import_layering.py` and `test_lazy_imports.py` sets, and CLAUDE.md paths (path updates only).
+- [ ] **Step 5: Verify.** GOLDEN IDENTICAL, targeted tests, layering, doc paths, ruff.
 
 ## End of plan
 
