@@ -859,3 +859,23 @@ def test_sweep_skips_backup_directories(sweep_tree, capsys):
     _, out = _run_sweep(["--root", str(sweep_tree)], capsys)
 
     assert "_pre_phase3_backup" not in out
+
+
+def test_a_canonical_input_resolves_at_the_root_not_beside_the_sidecar(tmp_path):
+    """A copy or symlink at a table's old place does not shadow the canonical one."""
+    module = _load_script(QA / "check_fit_provenance.py")
+    root = tmp_path / "replay_content"
+    per_bin = root / "models_per_bin_rate"
+    per_bin.mkdir(parents=True)
+    (root / "qvals_table.parquet").write_bytes(b"canonical")
+    (per_bin / "qvals_table.parquet").symlink_to(root / "qvals_table.parquet")
+    (per_bin / "swr_contrast_rate.pkl").write_bytes(b"fit")
+    sidecar = per_bin / "swr_contrast_rate_audited.provenance.json"
+
+    assert module.resolve_input("qvals_table", sidecar, root) == (
+        root / "qvals_table.pkl"
+    )
+    # A non-canonical input (an aggregate-only run's fit) is the file beside it.
+    assert module.resolve_input("swr_contrast_rate", sidecar, root) == (
+        per_bin / "swr_contrast_rate.pkl"
+    )

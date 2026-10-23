@@ -42,12 +42,18 @@ def _write(root: Path, value: float) -> None:
 def _compare(candidate: Path, baseline: Path) -> subprocess.CompletedProcess:
     return subprocess.run(
         [
-            sys.executable, str(_COMPARE),
-            "--candidate", str(candidate),
-            "--baseline", str(baseline),
-            "--tables", "stop_table",
+            sys.executable,
+            str(_COMPARE),
+            "--candidate",
+            str(candidate),
+            "--baseline",
+            str(baseline),
+            "--tables",
+            "stop_table",
         ],
-        capture_output=True, text=True, cwd=REPO,
+        capture_output=True,
+        text=True,
+        cwd=REPO,
     )
 
 
@@ -83,11 +89,43 @@ def test_compare_allows_declared_drift(tmp_path):
     _write(candidate, 9.0)
     result = subprocess.run(
         [
-            sys.executable, str(_COMPARE),
-            "--candidate", str(candidate), "--baseline", str(baseline),
-            "--tables", "stop_table",
-            "--expected-drift-columns", "n_selected_events",
+            sys.executable,
+            str(_COMPARE),
+            "--candidate",
+            str(candidate),
+            "--baseline",
+            str(baseline),
+            "--tables",
+            "stop_table",
+            "--expected-drift-columns",
+            "n_selected_events",
         ],
-        capture_output=True, text=True, cwd=REPO,
+        capture_output=True,
+        text=True,
+        cwd=REPO,
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_a_frozen_baseline_copies_no_symlink(tmp_path, monkeypatch):
+    """A symlink left at an output's old path is not frozen as a second copy."""
+    import importlib
+
+    from continuum_swr_replay.paths import CANONICAL_TABLE_BASENAMES, table_path
+
+    freeze = importlib.import_module("scripts.qa.freeze_regression_baseline")
+    root = tmp_path / "replay_content"
+    per_bin = root / "models_per_bin_rate"
+    per_bin.mkdir(parents=True)
+    for name in CANONICAL_TABLE_BASENAMES:
+        pd.DataFrame({"x": [1]}).to_parquet(table_path(name, root))
+    (per_bin / "all_models.pkl").write_bytes(b"fit")
+    (per_bin / "qvals_table.parquet").symlink_to(root / "qvals_table.parquet")
+    monkeypatch.setattr(freeze, "RC", root)
+
+    out = freeze.freeze("test")
+
+    assert sorted(p.name for p in (out / "models_per_bin_rate").iterdir()) == [
+        "all_models.pkl"
+    ]
+    assert (out / "qvals_table.parquet").is_file()

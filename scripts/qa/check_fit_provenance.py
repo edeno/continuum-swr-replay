@@ -31,7 +31,7 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
     check_fit_provenance,
     fit_provenance_path,
 )
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR
+from continuum_swr_replay.paths import CANONICAL_TABLE_BASENAMES, REPLAY_CONTENT_DIR
 from continuum_swr_replay.tables.io import parquet_path
 
 _SIDECAR_SUFFIX = ".provenance.json"
@@ -61,15 +61,18 @@ def find_sidecars(root: Path) -> list[Path]:
 def resolve_input(name: str, sidecar: Path, root: Path) -> Path | None:
     """Locate the table a sidecar recorded under ``name``.
 
-    Sidecars record input names, not paths. Canonical tables live at the
-    ``replay_content`` root and an aggregate-only run's input is the fit beside
-    it -- so search the sidecar's own directory, then the root, and return the
-    first candidate that exists in either table form.
+    Sidecars record input names, not paths. A canonical table
+    (:data:`~continuum_swr_replay.paths.CANONICAL_TABLE_BASENAMES`) is looked up
+    at the ``replay_content`` root only, so a copy or a symlink at an old place
+    beside the sidecar cannot stand in for it. Any other input is an
+    aggregate-only run's fit, looked up beside the sidecar, then at the root.
+    Returns the first candidate that exists in either table form.
     """
-    for candidate in (
-        sidecar.parent / f"{name}.pkl",
-        root / f"{name}.pkl",
-    ):
+    if name in CANONICAL_TABLE_BASENAMES:
+        candidates: tuple[Path, ...] = (root / f"{name}.pkl",)
+    else:
+        candidates = (sidecar.parent / f"{name}.pkl", root / f"{name}.pkl")
+    for candidate in candidates:
         if parquet_path(candidate).exists() or candidate.exists():
             return candidate
     return None

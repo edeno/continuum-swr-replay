@@ -228,3 +228,20 @@ def test_a_release_with_a_table_from_another_swr_source_is_refused(
 
     with pytest.raises(ValueError, match="event_table_swr_HPC"):
         _require_one_swr_source(roots)
+
+
+def test_the_file_inventory_skips_a_symlink_at_an_old_path(tmp_path: Path):
+    from scripts.tables.write_regeneration_manifest import _inventory_files
+
+    root = tmp_path / "replay"
+    (root / "models_per_bin_rate").mkdir(parents=True)
+    (root / "qvals_standardization_reference.json").write_text("{}")
+    (root / "models_per_bin_rate" / "qvals_standardization_reference.json").symlink_to(
+        root / "qvals_standardization_reference.json"
+    )
+
+    files = _inventory_files({"replay": root}, output=tmp_path / "manifest.json")
+
+    assert [record["path"] for record in files["replay"]] == [
+        "qvals_standardization_reference.json"
+    ]

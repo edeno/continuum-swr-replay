@@ -65,6 +65,11 @@ _MODEL_DIRS = (
 )
 
 
+def _symlinks(directory: str, names: list[str]) -> list[str]:
+    """The entries of ``directory`` that are symlinks (a ``copytree`` ignore)."""
+    return [name for name in names if (Path(directory) / name).is_symlink()]
+
+
 def freeze(label: str) -> Path:
     out = RC / f"_golden_baseline_{label}"
     if out.exists():
@@ -100,7 +105,8 @@ def freeze(label: str) -> Path:
                 RC,
             )
             continue
-        shutil.copytree(src, out / model_dir)
+        # A symlink left at an output's old path is not frozen as a second copy.
+        shutil.copytree(src, out / model_dir, ignore=_symlinks)
         manifest["model_dirs"].append(model_dir)
         logger.info("froze model dir %s", model_dir)
 

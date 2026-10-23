@@ -439,6 +439,33 @@ def _verify_baseline(
     return report
 
 
+def _inventory_files(
+    roots: Mapping[str, Path], *, output: Path
+) -> dict[str, list[dict[str, object]]]:
+    """Each root's parquet and JSON files, and its model-validation bundles.
+
+    A symlink is skipped: one left at an output's old path names a file the
+    inventory already lists at its real path.
+    """
+    return {
+        label: [
+            _inventory_file(path, root)
+            for path in sorted(root.rglob("*"))
+            if path.is_file()
+            and not path.is_symlink()
+            and path.resolve() != output.resolve()
+            and (
+                path.suffix in {".parquet", ".json"}
+                or (
+                    "models_validation" in path.parts
+                    and path.suffix in {".pkl", ".csv"}
+                )
+            )
+        ]
+        for label, root in roots.items()
+    }
+
+
 def write_manifest(
     *,
     replay_root: Path,
@@ -481,22 +508,7 @@ def write_manifest(
         )
     roots = {"replay": replay_root, "contfrag": contfrag_root}
     swr_source = _require_one_swr_source(roots)
-    files = {
-        label: [
-            _inventory_file(path, root)
-            for path in sorted(root.rglob("*"))
-            if path.is_file()
-            and path.resolve() != output.resolve()
-            and (
-                path.suffix in {".parquet", ".json"}
-                or (
-                    "models_validation" in path.parts
-                    and path.suffix in {".pkl", ".csv"}
-                )
-            )
-        ]
-        for label, root in roots.items()
-    }
+    files = _inventory_files(roots, output=output)
     # the work tree the manifest describes is the one it runs in, as uv.lock below
     repo = Path.cwd()
     tracked_dirty = git_dirty(repo)
