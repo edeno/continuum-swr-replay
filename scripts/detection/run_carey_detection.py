@@ -119,7 +119,7 @@ from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR
 from continuum_swr_replay.paths import DETECTION_COMPARISON_DIR
 from continuum_swr_replay.runs.batch import (
     raise_open_file_limit,
-    run_epoch_logged,
+    run_epoch_task,
     run_epochs,
     run_lock,
 )
@@ -476,18 +476,22 @@ def summary(record: dict) -> str:
 def _run_epoch_logged(
     nwb_file_name: str, epoch_name: str, run_epoch_kwargs: dict, log_directory: Path
 ) -> dict:
-    """One dask task: ``run_epoch``, logged to ``logs/{epoch_id}_carey.log``.
+    """One dask task: ``run_epoch``, logged to ``logs/{epoch_id}_carey.log``; the
+    NWB files Spyglass opened for it are closed when it ends, pass or fail
+    (``runs.batch.run_epoch_task``).
 
-    When the epoch ends, pass or fail, the NWB files Spyglass opened for it are
-    closed (``release_nwb_files``): the workers run one task at a time.
+    A module function, so dask sends it by reference and it reads ``run_epoch``
+    when it runs.
     """
-    identifier = swr_source.swr_epoch_id(nwb_file_name, epoch_name)
-    return run_epoch_logged(
-        lambda log: run_epoch(nwb_file_name, epoch_name, **run_epoch_kwargs),
-        log_name=f"{identifier}_carey",
-        log_path=log_directory / f"{identifier}_carey.log",
-        start=f"{identifier}: run {run_epoch_kwargs}",
+    return run_epoch_task(
+        nwb_file_name,
+        epoch_name,
+        run_epoch_kwargs,
+        log_directory,
+        tag="carey",
+        run_epoch=run_epoch,
         describe=summary,
+        epoch_id=swr_source.swr_epoch_id,
         log_provenance=True,
     )
 

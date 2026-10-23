@@ -195,7 +195,7 @@ from continuum_swr_replay.runs.batch import (
     cuda_cluster_class,
     raise_open_file_limit,
     release_nwb_files,
-    setup_logger,
+    run_epoch_logged,
 )
 from continuum_swr_replay.runs.batch import run_epochs as batch_run_epochs
 from continuum_swr_replay.runs.cli import parse_run_id
@@ -462,7 +462,9 @@ def run_one(
     write_table(detection.table, outputs["events"])
     write_table(detection.shuffle_draws, outputs["shuffle_draws"])
     write_table(observed, outputs["observed"])
-    joblib.dump(detection.candidates, outputs["candidates"])
+    write_atomically(
+        outputs["candidates"], lambda path: joblib.dump(detection.candidates, path)
+    )
 
     table = detection.table
     gates = detection.candidates.decisions.gates
@@ -740,29 +742,37 @@ def _failure_record(error: BaseException, git_commit: str) -> dict:
 
 
 def _run_one_logged(epoch_id: str, run_one_kwargs: dict, log_directory: Path) -> dict:
-    """One dask task: :func:`run_one`, logged to the epoch's own file.
+    """One dask task: :func:`run_one`, logged to the epoch's own file
+    (``run_epoch_logged``).
 
     A failure is returned rather than raised, so that it is recorded and the
     other epochs run on. Either way the epoch ends by closing the NWB files
-    Spyglass opened for its marks (``release_nwb_files``): a
-    ``LocalCUDACluster`` worker runs one task at a time, so no other epoch in
-    the process reads them.
+    Spyglass opened for its marks: a ``LocalCUDACluster`` worker runs one task
+    at a time, so no other epoch in the process reads them.
     """
-    log = setup_logger(
-        name_logfile=f"{epoch_id}_memoryless",
-        path_logfile=log_directory / f"{epoch_id}_memoryless.log",
-    )
     git_commit = run_one_kwargs["provenance"]["git_commit"]
-    log.info("%s: run %s, commit %s", epoch_id, run_one_kwargs["run_id"], git_commit)
-    try:
-        record = run_one(epoch_id, **run_one_kwargs)
-    except Exception as error:  # noqa: BLE001 - one epoch must not stop the rest
-        log.exception("failed")
-        return _failure_record(error, git_commit)
-    finally:
-        log.info("closed %d NWB files Spyglass held open", release_nwb_files())
-    log.info("%s", _counts(record))
-    return record
+
+    def run(log: logging.Logger) -> dict:
+        try:
+            return run_one(epoch_id, **run_one_kwargs)
+        except Exception as error:  # noqa: BLE001 - one epoch must not stop the rest
+            return _failure_record(error, git_commit)
+
+    return run_epoch_logged(
+        run,
+        log_name=f"{epoch_id}_memoryless",
+        log_path=log_directory / f"{epoch_id}_memoryless.log",
+        start=f"{epoch_id}: run {run_one_kwargs['run_id']}, commit {git_commit}",
+        describe=_describe,
+        log_provenance=False,
+    )
+
+
+def _describe(record: dict) -> str:
+    """The epoch's log summary: its counts, or its error when it failed."""
+    if record["status"] == "failed":
+        return f"failed: {record['error']}"
+    return _counts(record)
 
 
 THREAD_VARIABLES = ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS")

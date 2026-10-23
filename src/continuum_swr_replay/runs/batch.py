@@ -45,6 +45,7 @@ __all__ = [
     "release_nwb_files",
     "run_batch",
     "run_epoch_logged",
+    "run_epoch_task",
     "run_epochs",
     "run_lock",
     "setup_logger",
@@ -480,6 +481,55 @@ def run_epoch_logged(
     else:
         log.info("%s", describe(record))
     return record
+
+
+def run_epoch_task(
+    nwb_file_name: str,
+    epoch_name: str,
+    run_epoch_kwargs: dict,
+    log_directory: Path,
+    *,
+    tag: str,
+    run_epoch: Callable[..., dict],
+    describe: Callable[[dict], str],
+    epoch_id: Callable[[str, str], str],
+    log_provenance: bool,
+) -> dict:
+    """One dask task: ``run_epoch(nwb_file_name, epoch_name, **run_epoch_kwargs)``,
+    logged to ``log_directory / "{epoch id}_{tag}.log"`` (:func:`run_epoch_logged`).
+
+    A runner binds everything after ``*`` with ``functools.partial`` (picklable
+    for dask) and hands the result to :func:`run_epochs`, whose entries are
+    ``(nwb_file_name, epoch_name, run_epoch_kwargs, log_directory)``.
+
+    Parameters
+    ----------
+    nwb_file_name, epoch_name : str
+    run_epoch_kwargs : dict
+        Passed to `run_epoch`; logged in the start line.
+    log_directory : Path
+    tag : str
+        The runner's log suffix, such as ``"swr"``.
+    run_epoch : Callable
+        The runner's epoch body; returns the epoch's record.
+    describe : Callable
+        The record's one-line summary (:func:`run_epoch_logged`).
+    epoch_id : Callable
+        The epoch's id from its NWB file and epoch names (the runner passes
+        ``swr_source.swr_epoch_id``; this package imports no analysis code).
+    log_provenance : bool
+        As :func:`run_epoch_logged`.
+    """
+    identifier = epoch_id(nwb_file_name, epoch_name)
+    log_name = f"{identifier}_{tag}"
+    return run_epoch_logged(
+        lambda log: run_epoch(nwb_file_name, epoch_name, **run_epoch_kwargs),
+        log_name=log_name,
+        log_path=log_directory / f"{log_name}.log",
+        start=f"{identifier}: run {run_epoch_kwargs}",
+        describe=describe,
+        log_provenance=log_provenance,
+    )
 
 
 @contextmanager

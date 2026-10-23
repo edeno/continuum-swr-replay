@@ -44,6 +44,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
 from continuum_swr_replay.data_loaders import spikes
 from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier
 from continuum_swr_replay.parameters import ROOT_DIR
+from continuum_swr_replay.runs import batch
 from continuum_swr_replay.runs.provenance import provenance_record
 from continuum_swr_replay.tables.io import read_table
 from scripts.detection.run_memoryless_detection import find_epochs, main, run_one
@@ -1491,7 +1492,10 @@ class TestMain:
             closed.append(True)
             return 14
 
+        # an epoch task closes them through runs.batch.run_epoch_logged; the
+        # in-process loop through the runner's own import
         monkeypatch.setattr(runner, "release_nwb_files", release_nwb_files)
+        monkeypatch.setattr(batch, "release_nwb_files", release_nwb_files)
         return closed
 
     @pytest.mark.parametrize("outcome", ["ok", "raises"])
