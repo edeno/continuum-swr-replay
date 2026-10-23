@@ -200,7 +200,7 @@ def assemble_replay_stop_shards(
     pieces: list[pd.DataFrame] = []
     observed_sessions: set[tuple[object, ...]] = set()
     for shard_dir in shard_dirs:
-        frame = read_table(table_path("stop_table", shard_dir, fmt=""))
+        frame = read_table(table_path("stop_table", shard_dir))
         require_swr_source(frame, what=f"{shard_dir / 'stop_table'}")
         shard_sessions = _session_keys(frame)
         overlap = observed_sessions & shard_sessions

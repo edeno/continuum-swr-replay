@@ -10,7 +10,7 @@ the column is in an explicitly declared allowlist.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
@@ -126,19 +126,14 @@ def compare_table_roots(
     expected_drift_columns: frozenset[str] = frozenset(),
     expected_added_columns: Sequence[str] = (),
     atol: float = 1e-9,
-    read_candidate: Callable[[str], pd.DataFrame] | None = None,
-    read_baseline: Callable[[str], pd.DataFrame] | None = None,
 ) -> dict[str, dict[str, object]]:
     """Diff every named canonical table under two roots, keyed by its row key.
 
-    Each side is read by its own basename-keyed reader, so a root with a
-    different on-disk layout is expressed where the asymmetry lives rather than
-    inferred from a path prefix. Both default to ``read_table(root / basename)``,
-    the flat layout every pipeline root and frozen baseline shares
-    (``paths.table_path``).
+    Both roots share the flat layout every pipeline root and frozen baseline
+    has (``paths.table_path``): each table is ``read_table(root / basename)``.
 
-    A table absent under either root raises ``FileNotFoundError`` (via the
-    reader) rather than being skipped -- a partial baseline is a hard error, not
+    A table absent under either root raises ``FileNotFoundError`` (via
+    ``read_table``) rather than being skipped -- a partial baseline is a hard error, not
     a pass. Raises ``ValueError`` on the first table that drifts in an undeclared
     column.
 
@@ -149,16 +144,12 @@ def compare_table_roots(
     not carry is simply not matched, so declaring one table's new columns does
     not weaken the check on the others.
     """
-    if read_candidate is None:
-        read_candidate = lambda name: read_table(candidate_root / name)  # noqa: E731
-    if read_baseline is None:
-        read_baseline = lambda name: read_table(baseline_root / name)  # noqa: E731
     report: dict[str, dict[str, object]] = {}
     for basename in table_basenames:
         keys = list(row_keys(table=BASENAME_TO_TABLE[basename]))
         report[basename] = diff_table(
-            read_candidate(basename),
-            read_baseline(basename),
+            read_table(candidate_root / basename),
+            read_table(baseline_root / basename),
             keys=keys,
             label=f"baseline parity: {basename}",
             expected_drift_columns=expected_drift_columns,

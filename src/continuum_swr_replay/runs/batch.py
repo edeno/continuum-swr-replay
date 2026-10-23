@@ -38,7 +38,6 @@ from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.runs.cli import filter_epoch_info
 
 __all__ = [
-    "SkipChecksumFilter",
     "cuda_cluster_class",
     "lost_epoch_record",
     "raise_open_file_limit",
@@ -56,7 +55,7 @@ _warned_cache_name_missing = False
 """Whether ``release_nwb_files`` has said Spyglass's cache name is gone."""
 
 
-class SkipChecksumFilter(logging.Filter):
+class _SkipChecksumFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         return "Skipped checksum" not in record.getMessage()
 
@@ -79,7 +78,7 @@ def setup_logger(
         "disable_existing_loggers": False,
         "filters": {
             "skip_checksum": {
-                "()": SkipChecksumFilter,
+                "()": _SkipChecksumFilter,
             },
         },
         "formatters": {

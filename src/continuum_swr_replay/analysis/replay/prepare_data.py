@@ -84,7 +84,6 @@ from continuum_swr_replay.paths import (
     table_path,
 )
 from continuum_swr_replay.tables.io import (
-    parquet_path,
     write_atomically,
 )
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
@@ -604,7 +603,7 @@ def _refuse_to_clobber_complete_stop_table(output_dir: Path) -> None:
     build produces. The ``--stop-only`` bootstrap produces a split-less table,
     so overwriting a complete one would silently downgrade it.
     """
-    target = parquet_path(table_path("stop_table", output_dir, fmt=""))
+    target = table_path("stop_table", output_dir)
     if not target.exists():
         return
     if _STOP_SPLIT_COLUMNS.issubset(pq.read_schema(target).names):

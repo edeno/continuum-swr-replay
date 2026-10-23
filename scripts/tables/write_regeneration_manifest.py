@@ -298,12 +298,12 @@ def _validate_bounds(
 
 
 def _validate_replay(root: Path, expected_sessions: int) -> dict[str, object]:
-    event = read_table(table_path("event_table", root, fmt=""))
-    arm = read_table(table_path("event_arm_table", root, fmt=""))
-    patch = read_table(table_path("event_patch_table", root, fmt=""))
-    stop = read_table(table_path("stop_table", root, fmt=""))
-    sequence = read_table(table_path("event_sequence_table", root, fmt=""))
-    qvals = read_table(table_path("qvals_table", root, fmt=""))
+    event = read_table(table_path("event_table", root))
+    arm = read_table(table_path("event_arm_table", root))
+    patch = read_table(table_path("event_patch_table", root))
+    stop = read_table(table_path("stop_table", root))
+    sequence = read_table(table_path("event_sequence_table", root))
+    qvals = read_table(table_path("qvals_table", root))
     validate_event_arm_table(arm, event_table=event)
     validate_event_patch_table(patch, event_table=event)
     # stop_id anchors every stop-level join; a null or a cross-session collision
@@ -485,7 +485,13 @@ def write_manifest(
     expected_drift_columns: set[str] | None = None,
 ) -> dict[str, object]:
     """Run promotion-blocking checks and persist one content-addressed manifest."""
-    replay_event = read_table(table_path("event_table", replay_root, fmt=""))
+    # the work tree the manifest describes is the one it runs in, as uv.lock below;
+    # a dirty one is refused before any table is read or hashed
+    repo = Path.cwd()
+    tracked_dirty = git_dirty(repo)
+    if tracked_dirty:
+        raise ValueError("tracked working tree is dirty; refusing release manifest")
+    replay_event = read_table(table_path("event_table", replay_root))
     contfrag_events = {
         source: read_table(contfrag_root / f"event_table_{source}_HPC")
         for source in ("swr", "mua")
@@ -517,9 +523,6 @@ def write_manifest(
     roots = {"replay": replay_root, "contfrag": contfrag_root}
     swr_source = _require_one_swr_source(roots)
     files = _inventory_files(roots, output=output)
-    # the work tree the manifest describes is the one it runs in, as uv.lock below
-    repo = Path.cwd()
-    tracked_dirty = git_dirty(repo)
     untracked = git(repo, "ls-files", "--others", "--exclude-standard").splitlines()
     manifest = {
         "manifest_schema": MANIFEST_SCHEMA,
@@ -566,8 +569,6 @@ def write_manifest(
         },
         "files": files,
     }
-    if tracked_dirty:
-        raise ValueError("tracked working tree is dirty; refusing release manifest")
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
     return manifest

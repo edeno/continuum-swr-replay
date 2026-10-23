@@ -1201,9 +1201,9 @@ def _run_epoch_logged(epoch_id: str, kwargs: dict, log_dir: Path) -> dict:
 def run_epochs(
     epochs: list[str], kwargs: dict, n_workers: int
 ) -> Iterator[tuple[str, dict]]:
-    """Each epoch on its own dask CPU worker; yield records as they finish."""
-    if not epochs:
-        return
+    """Each epoch on its own dask CPU worker; yield records as they finish.
+
+    No epochs make no cluster (``runs.batch.run_epochs``)."""
     from dask.distributed import LocalCluster
 
     log_dir = kwargs["output_dir"] / "logs"

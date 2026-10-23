@@ -209,7 +209,7 @@ def main() -> None:
     if args.no_save:
         logger.info("--no-save: built %d stops, not written", len(stop))
         return
-    out = table_path("stop_table", RC, fmt="")
+    out = table_path("stop_table", RC)
     if table_exists(out):
         backup = write_table(read_table(out), RC / "stop_table_previous")
         logger.info("backed up existing -> %s", backup.name)

@@ -9,12 +9,13 @@ detection runner records the fuller :func:`provenance_record`.
 
 from __future__ import annotations
 
-import hashlib
 import importlib.metadata
 import json
 import subprocess
 from pathlib import Path
 from typing import Any
+
+from continuum_swr_replay.runs.io import sha256_file
 
 __all__ = ["git", "git_commit", "git_dirty", "produced_by", "provenance_record"]
 
@@ -121,7 +122,7 @@ def provenance_record(repo: Path) -> dict[str, Any]:
     return {
         "commit": git_commit(repo),
         "dirty": git_dirty(repo),
-        "uv_lock_sha256": hashlib.sha256((repo / "uv.lock").read_bytes()).hexdigest(),
+        "uv_lock_sha256": sha256_file(repo / "uv.lock"),
         "ripple_detection_commit": vcs_info.get("commit_id"),
         "non_local_detector_version": importlib.metadata.version("non-local-detector"),
         "cuda_plugin_version": cuda_plugin_version,

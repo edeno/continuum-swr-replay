@@ -151,9 +151,7 @@ def table_path(
     root : Path, optional
         The replay-content root; :data:`REPLAY_CONTENT_DIR` by default.
     fmt : str, optional
-        The file suffix without its dot (``"parquet"`` or ``"pkl"``). An empty
-        string returns the bare basename, which ``tables.io.read_table`` and
-        ``write_table`` resolve to the parquet file.
+        The file suffix without its dot (``"parquet"`` or ``"pkl"``).
 
     Returns
     -------
@@ -169,4 +167,4 @@ def table_path(
             f"{name!r} is not a canonical table; expected one of "
             f"{CANONICAL_TABLE_BASENAMES}"
         )
-    return root / (f"{name}.{fmt}" if fmt else name)
+    return root / f"{name}.{fmt}"
