@@ -176,11 +176,15 @@ def detect_coincident_spikes(
     # Preserve all original sort group indices so the output aligns 1:1 with the input.
     # Sort groups that lost all spikes get empty arrays.
     filtered_spike_times = [
-        grouped_spike_times[i] if i in grouped_spike_times.index else np.array([], dtype=np.float64)
+        grouped_spike_times[i]
+        if i in grouped_spike_times.index
+        else np.array([], dtype=np.float64)
         for i in range(n_sort_groups)
     ]
     filtered_time_bin_ind = [
-        grouped_time_bin_ind[i] if i in grouped_time_bin_ind.index else np.array([], dtype=np.intp)
+        grouped_time_bin_ind[i]
+        if i in grouped_time_bin_ind.index
+        else np.array([], dtype=np.intp)
         for i in range(n_sort_groups)
     ]
 
@@ -289,7 +293,9 @@ def _get_tetrode_sort_group_ids(
         else:
             logger.warning(
                 "Excluding sort group %d from %s: %d electrodes (not a tetrode)",
-                sg_id, nwb_file_name, n_electrodes,
+                sg_id,
+                nwb_file_name,
+                n_electrodes,
             )
 
     return tetrode_ids
@@ -337,13 +343,16 @@ def get_hpc_marks(
     else:
         # Fall back to alternative parameter name
         restriction = {**restriction_base, "sorter_params_name": "default_clusterless"}
+    logger.info(
+        "Clusterless marks for %s use sorter_params_name %r",
+        nwb_file_name,
+        restriction["sorter_params_name"],
+    )
 
     # Filter to tetrode sort groups only
     tetrode_sg_ids = _get_tetrode_sort_group_ids(nwb_file_name, restriction)
     if not tetrode_sg_ids:
-        raise ValueError(
-            f"No tetrode sort groups found for {nwb_file_name!r}"
-        )
+        raise ValueError(f"No tetrode sort groups found for {nwb_file_name!r}")
 
     tetrode_restriction = [
         {**restriction, "sort_group_id": sg_id} for sg_id in sorted(tetrode_sg_ids)
@@ -480,7 +489,9 @@ def get_spike_data(nwb_file_name: str) -> SpikeDataDict:
             if len(spike_times[brain_area]) < 1:
                 del spike_times[brain_area]
         except ValueError as e:
-            logger.debug("No %s data available for %s: %s", brain_area, nwb_file_name, e)
+            logger.debug(
+                "No %s data available for %s: %s", brain_area, nwb_file_name, e
+            )
 
     return {
         "spike_times": spike_times,

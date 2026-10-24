@@ -49,6 +49,7 @@ from continuum_swr_replay.data_loaders.utils import format_epoch_identifier
 from continuum_swr_replay.data_types import SessionData
 from continuum_swr_replay.decoding.config import DecodingConfig
 from continuum_swr_replay.decoding.files import (
+    decode_identifier,
     decode_paths,
     non_local_threshold_percent,
     results_exist,
@@ -388,15 +389,14 @@ def run_decode(
         ``None`` on success or graceful skip; the ``epoch_identifier``
         on caught exception so ``run_batch`` can aggregate failures.
     """
-    epoch_identifier = format_epoch_identifier(
-        nwb_file_name, epoch_name, brain_area, runner.file_suffix
+    epoch_identifier = decode_identifier(
+        format_epoch_identifier(
+            nwb_file_name, epoch_name, brain_area, runner.file_suffix
+        ),
+        ripple_detector_name=ripple_detector_name,
+        non_stationary=non_stationary,
+        training_type=training_type,
     )
-    if ripple_detector_name != "Kay":
-        epoch_identifier += f"_{ripple_detector_name}"
-    if non_stationary:
-        epoch_identifier += "_non_stationary"
-    if training_type != "no_ripple":
-        epoch_identifier += f"_{training_type}"
 
     logger = setup_logger(
         name_logfile=epoch_identifier,

@@ -36,7 +36,7 @@ from non_local_detector import NonLocalClusterlessDetector
 from non_local_detector.environment import Environment
 
 from continuum_swr_replay.data_loaders.utils import format_epoch_identifier
-from continuum_swr_replay.decoding.files import decode_paths
+from continuum_swr_replay.decoding.files import decode_identifier, decode_paths
 from continuum_swr_replay.decoding.results import open_results
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
@@ -131,13 +131,12 @@ def _load_saved_decode(
     detector : model_class instance or None
     env : Environment or None
     """
-    epoch_identifier = epoch_stem
-    if ripple_detector_name != "Kay":
-        epoch_identifier += f"_{ripple_detector_name}"
-    if non_stationary:
-        epoch_identifier += "_non_stationary"
-    if training_type != "no_ripple":
-        epoch_identifier += f"_{training_type}"
+    epoch_identifier = decode_identifier(
+        epoch_stem,
+        ripple_detector_name=ripple_detector_name,
+        non_stationary=non_stationary,
+        training_type=training_type,
+    )
 
     paths = decode_paths(epoch_identifier, root)
     results = open_results(paths.results)

@@ -7,7 +7,8 @@ manuscript by running each figure generation script in sequence.
 Figures generated:
 - Figure 1: Switching state-space model (simulated example)
 - Figure 2: Model works on real data (example + distributions + triggered avg)
-- Figure 3: Events outside SWR/MUA (example + z-score + Venn + speed + position)
+- Figure 3: Events outside SWRs (non-SWR example + SWR z-score by state +
+  replay speed + replayed position, SWR vs non-SWR)
 - Figure 4: PFC responds regardless (GLM + population heatmaps + significance)
 
 Usage:

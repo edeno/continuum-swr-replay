@@ -159,6 +159,10 @@ from continuum_swr_replay.analysis.events.nonlocal_detection import (
 from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.decoding.files import data_over_time_suffix
+from continuum_swr_replay.parameters import (
+    DEFAULT_NON_LOCAL_THRESHOLD,
+    SAMPLING_FREQUENCY,
+)
 
 from ...data_types import SessionData
 from .posterior_analysis import (
@@ -525,13 +529,23 @@ def get_data_over_time(
     nwb_file_name: str,
     epoch_name: str,
     brain_area: str = "HPC",
-    sampling_frequency: int = 500,
-    non_local_threshold: float = 0.8,
+    sampling_frequency: int = SAMPLING_FREQUENCY,
+    non_local_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
 ) -> tuple[pd.DataFrame, xr.DataArray]:
     """Aggregate all analysis data into time-indexed DataFrame.
 
     Combines decoding results, event detection, posterior statistics,
     and behavioral data into a single DataFrame aligned by time.
+
+    The frame's ``SWR_event`` labels and its SWR counts (``n_SWR``,
+    ``n_non_local_SWR``, ``n_non_local_no_SWR``, ``n_SWR_MUA``,
+    ``n_SWR_no_MUA``) come from ``data["ripple_times"]``, the stored Spyglass
+    ``RippleTimesV1`` ripples, not from the paper's pinned SWR inventory. Read
+    through ``analysed_time.with_swr_source`` (or, for a saved file,
+    ``analysed_time.read_dot_with_swr_source``), ``SWR_event`` is replaced by
+    the pinned inventory's labels and every decode count column is dropped.
+    Callers must read the frame that way; its own ``SWR_event`` and ``n_SWR``
+    are provenance only.
 
     Parameters
     ----------
@@ -548,9 +562,10 @@ def get_data_over_time(
     brain_area : str, optional
         Brain area for analysis, by default "HPC"
     sampling_frequency : int, optional
-        Samples per second, by default 500
+        Samples per second, by default ``SAMPLING_FREQUENCY`` (500)
     non_local_threshold : float, optional
-        Probability threshold for non-local classification, by default 0.8
+        Probability threshold for non-local classification, by default
+        ``DEFAULT_NON_LOCAL_THRESHOLD`` (0.8)
 
     Returns
     -------

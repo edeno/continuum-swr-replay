@@ -52,6 +52,7 @@ from continuum_swr_replay.data_types import SessionData
 from continuum_swr_replay.decoding.config import NonLocalDecodingConfig
 from continuum_swr_replay.decoding.transitions import nonlocal_transition_settings
 from continuum_swr_replay.parameters import (
+    DEFAULT_NON_LOCAL_THRESHOLD,
     DETECTOR_CONFIG,
     PROCESSED_DATA_DIR,
     SAMPLING_FREQUENCY,
@@ -144,10 +145,10 @@ def run_decode(
     epoch_name: str,
     log_directory: str = "",
     overwrite: bool = False,
-    create_figurl: bool = True,
+    create_figurl: bool = False,
     training_type: str = "no_ripple",
     non_stationary: bool = False,
-    non_local_threshold: float = 0.8,
+    non_local_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
     ripple_detector_name: str = "Kay",
     brain_area: str = "HPC",
     save_dir: Path = PROCESSED_DATA_DIR,
@@ -186,7 +187,9 @@ def run_decode(
 def main() -> None:
     """Main entry point for batch decoding analysis."""
     parser = add_common_args(ArgumentParser())
-    parser.add_argument("--non_local_threshold", type=float, default=0.8)
+    parser.add_argument(
+        "--non_local_threshold", type=float, default=DEFAULT_NON_LOCAL_THRESHOLD
+    )
     parser.add_argument("--create_figurl", action="store_true")
     args = _decode_runner.parse_decode_args(parser)
 

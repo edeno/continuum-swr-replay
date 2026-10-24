@@ -74,10 +74,13 @@ STATE_COLORS_SHORT = [WONG[5], "#999999", WONG[1], WONG[6]]
 ANIMAL_POS_COLOR = "magenta"
 NON_LOCAL_PROB_THRESHOLD = DEFAULT_NON_LOCAL_THRESHOLD
 
-# Stickiness from the real fitted detectors. The installed non_local_detector
-# default [1e6, 1e6, 300, 300] makes EM prune Local->No-Spike to ~0, hiding the
-# No-Spike state; this value keeps it alive and matches the real pipeline.
-REAL_DISCRETE_TRANSITION_STICKINESS = np.array([30.0, 100000.0, 30.0, 200.0])
+# A demo value for the simulation, chosen so EM keeps the No-Spike state alive:
+# with the installed non_local_detector default stickiness
+# [1e5, 1e5, 300, 300], EM prunes Local->No-Spike to ~0 on the simulated data
+# and the No-Spike state disappears from panel D. It is NOT the real decode's
+# prior: the real decodes use setting P30-B
+# (``continuum_swr_replay.decoding.transitions.nonlocal_transition_settings``).
+DEMO_DISCRETE_TRANSITION_STICKINESS = np.array([30.0, 100000.0, 30.0, 200.0])
 
 # Decode every Nth sample so the demo bin width (~2 ms) matches the real
 # pipeline; the simulator emits 1500 Hz, which starves the No-Spike evidence.
@@ -86,6 +89,27 @@ DECODE_BIN_STRIDE = 3
 # Lengthen the simulator's 0.5 s no-spike event so the No-Spike state clears the
 # transition-driven edge ramps and reads at full strength in panel D.
 NO_SPIKE_EVENT_LEN = 0.75
+
+
+def make_example_detector():
+    """The unfitted detector panel D fits, and whose transitions panel A shows.
+
+    Returns
+    -------
+    NonLocalSortedSpikesDetector
+        Sorted-spikes KDE likelihood, ``LOCAL_POSITION_STD`` Local kernel, the
+        library's default initial discrete transition matrix and
+        ``DEMO_DISCRETE_TRANSITION_STICKINESS``.
+    """
+    return NonLocalSortedSpikesDetector(
+        sorted_spikes_algorithm="sorted_spikes_kde",
+        sorted_spikes_algorithm_params={
+            "position_std": 6.0,
+            "block_size": int(2**8),
+        },
+        local_position_std=LOCAL_POSITION_STD,
+        discrete_transition_stickiness=DEMO_DISCRETE_TRANSITION_STICKINESS,
+    )
 
 
 def add_panel_header(ax, title):
@@ -112,9 +136,11 @@ def add_panel_header(ax, title):
 def plot_state_diagram(ax):
     """Draw 4-state diagram with transition arrows.
 
-    States arranged in a 2x2 grid. Self-loop probabilities are pulled
-    from the detector defaults, and all cross-state transitions are shown
-    as bidirectional connections.
+    States arranged in a 2x2 grid. Self-loop probabilities are the
+    diagonal of the initial discrete transition matrix of the detector
+    panel D fits (``make_example_detector``), i.e. EM's starting point
+    before fitting; all cross-state transitions are shown as bidirectional
+    connections.
 
     The data limits and gridspec width ratios are tuned so Panel A
     carries the transition topology at roughly the same visual scale as
@@ -138,12 +164,13 @@ def plot_state_diagram(ax):
         "Non-Local\nFragmented": (0.75, 0.20),
     }
 
-    default_detector = NonLocalSortedSpikesDetector()
-    transition_matrix = np.asarray(default_detector.discrete_transition_type.values)
+    # Panel D's detector configuration, unfitted: its initial transitions.
+    example_detector = make_example_detector()
+    transition_matrix = np.asarray(example_detector.discrete_transition_type.values)
     self_probs = {
         state_name.replace("Non-Local ", "Non-Local\n"): f"{prob:.2f}"
         for state_name, prob in zip(
-            default_detector.state_names, np.diag(transition_matrix), strict=True
+            example_detector.state_names, np.diag(transition_matrix), strict=True
         )
     }
 
@@ -960,7 +987,7 @@ def plot_speed(ax, time, speed):
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def generate_figure(n_neurons=30, seed=42):
+def generate_figure(n_neurons=30, seed=0):
     """Generate complete Figure 1.
 
     Parameters
@@ -968,14 +995,14 @@ def generate_figure(n_neurons=30, seed=42):
     n_neurons : int
         Number of neurons to simulate.
     seed : int
-        Random seed for reproducibility.
+        Seed of ``make_simulated_data``'s random generator. The default, 0, is
+        the simulator's own default, which the figure has always been drawn
+        with.
 
     Returns
     -------
     fig : matplotlib.figure.Figure
     """
-    np.random.seed(seed)
-
     # --- Simulate and decode ---
     print(f"Simulating {n_neurons} neurons...")
     (
@@ -987,7 +1014,7 @@ def generate_figure(n_neurons=30, seed=42):
         sampling_frequency,
         is_event,
         place_fields,
-    ) = make_simulated_data(n_neurons=n_neurons)
+    ) = make_simulated_data(n_neurons=n_neurons, seed=seed)
 
     # Extend the no-spike event (event index 3) to NO_SPIKE_EVENT_LEN by removing
     # spikes over the longer window and holding it out of training.
@@ -1004,15 +1031,7 @@ def generate_figure(n_neurons=30, seed=42):
     is_event = is_event[::DECODE_BIN_STRIDE]
 
     print("Fitting detector and estimating parameters (EM)...")
-    detector = NonLocalSortedSpikesDetector(
-        sorted_spikes_algorithm="sorted_spikes_kde",
-        sorted_spikes_algorithm_params={
-            "position_std": 6.0,
-            "block_size": int(2**8),
-        },
-        local_position_std=LOCAL_POSITION_STD,
-        discrete_transition_stickiness=REAL_DISCRETE_TRANSITION_STICKINESS,
-    )
+    detector = make_example_detector()
     results = detector.estimate_parameters(
         position_time=time,
         position=position,
@@ -1132,7 +1151,12 @@ def main():
         default=Path("paper/figures/figure01"),
     )
     parser.add_argument("--n-neurons", type=int, default=30)
-    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=0,
+        help="Seed of the simulated data's random generator (default 0).",
+    )
     parser.add_argument("--dpi", type=int, default=450)
     parser.add_argument("--show", action="store_true")
 

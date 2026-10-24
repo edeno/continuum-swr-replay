@@ -43,7 +43,7 @@ supplementary "Decoder validation" figure.
 Usage
 -----
     python scripts/figures/generate_figure02.py
-    python scripts/figures/generate_figure02.py --nwb-file-name chimi20200212_.nwb --epoch-name 02_r1
+    python scripts/figures/generate_figure02.py --nwb-file-name wilbur20210329_.nwb --epoch-name 02_r1
 """
 
 from __future__ import annotations
@@ -82,8 +82,15 @@ from continuum_swr_replay.analysis.hippocampus import (
     load_results,
 )
 from continuum_swr_replay.data_loaders import load_data
-from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
-from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
+from continuum_swr_replay.data_loaders.epoch_register import (
+    analysed_decode_files,
+    analysed_epoch_ids,
+)
+from continuum_swr_replay.data_loaders.utils import (
+    format_epoch_identifier,
+    parse_nwb_filename,
+)
+from continuum_swr_replay.decoding.files import data_over_time_suffix, decode_paths
 from continuum_swr_replay.figure_utilities import (
     PAGE_HEIGHT,
     TWO_COLUMN,
@@ -109,15 +116,15 @@ from continuum_swr_replay.visualization.plots import (
 TRIGGERED_SIGNALS = ["Non-Local_prob", "SWR_zscore"]
 
 # The render cache's version, part of its file name. The name also carries the
-# SWR source's name and a fingerprint of the epoch register's analysed epochs
-# (the cohort panels b-e summarise), so a new SWR inventory, artifact run or
-# register change makes a new cache by itself. Bump this whenever the cached
-# values could change for any other reason: a change to
-# ``_compute_figure_inputs`` or to a library function it calls (the read through
-# the SWR source, the event classification, the triggered averages,
-# ``compute_local_decoding_error``), or to the decodes themselves. Without a
-# bump the figure is drawn from the old cache, unless ``--force-recompute`` is
-# passed.
+# SWR source's name, a fingerprint of the epoch register's analysed epochs
+# (the cohort panels b-e summarise) and a fingerprint of the decode files read
+# (``_decode_files_fingerprint``: path, size and mtime), so a new SWR inventory,
+# artifact run, register change or rewritten decode makes a new cache by itself.
+# Bump this whenever the cached values could change for any other reason: a
+# change to ``_compute_figure_inputs`` or to a library function it calls (the
+# read through the SWR source, the event classification, the triggered
+# averages, ``compute_local_decoding_error``). Without a bump the figure is
+# drawn from the old cache, unless ``--force-recompute`` is passed.
 # 1: the cache named ``..._figure02_whole_event_speed_v1_...``.
 # 2: panel e's decoding error leaves excluded time out (task 26b).
 FIGURE02_CACHE_VERSION = 2
@@ -182,9 +189,36 @@ def pick_example_events(
 # ---------------------------------------------------------------------------
 
 
-def _figure02_cache_path(
+def _decode_files_fingerprint(
     nwb_file_name: str, epoch_name: str, data_dir: Path
-) -> Path:
+) -> str:
+    """SHA-256 over the decode files ``_compute_figure_inputs`` reads.
+
+    The files are the analysed epochs' ``data_over_time`` (as
+    ``load_data_over_time`` finds them) and the example session's HPC
+    ``results.nc`` and ``detector.pkl`` (as ``load_results`` names them), all
+    in `data_dir`. Each contributes its path, size and ``st_mtime_ns``, or
+    ``missing``, so the fingerprint is a stat per file, not a read.
+    """
+    example = decode_paths(
+        format_epoch_identifier(nwb_file_name, epoch_name, "HPC"), data_dir
+    )
+    files = [
+        *analysed_decode_files(data_dir, data_over_time_suffix()),
+        example.results,
+        example.detector,
+    ]
+    lines = []
+    for path in files:
+        if path.exists():
+            stat = path.stat()
+            lines.append(f"{path}\t{stat.st_size}\t{stat.st_mtime_ns}")
+        else:
+            lines.append(f"{path}\tmissing")
+    return hashlib.sha256("\n".join(lines).encode()).hexdigest()
+
+
+def _figure02_cache_path(nwb_file_name: str, epoch_name: str, data_dir: Path) -> Path:
     """Path for the cached Figure-2 render inputs (joblib bundle).
 
     A single joblib bundle is used rather than netCDF because the bundle
@@ -197,11 +231,13 @@ def _figure02_cache_path(
     # ``load_data_over_time`` reads every analysed epoch, so the cohort is the
     # register's analysed epochs.
     cohort = hashlib.sha256("\n".join(analysed_epoch_ids()).encode()).hexdigest()
+    decodes = _decode_files_fingerprint(nwb_file_name, epoch_name, data_dir)
     return (
         data_dir
         / "intermediates"
         / f"{animal}{day}_{epoch_name}_figure02_v{FIGURE02_CACHE_VERSION}_"
-        f"{swr_source_name()}_register{cohort[:12]}_cache.joblib"
+        f"{swr_source_name()}_register{cohort[:12]}_decodes{decodes[:12]}"
+        "_cache.joblib"
     )
 
 
@@ -231,7 +267,7 @@ def _compute_figure_inputs(
         )
     )
     results, detector, env = load_results(
-        nwb_file_name, epoch_name, decoding_brain_area="HPC"
+        nwb_file_name, epoch_name, decoding_brain_area="HPC", root=data_dir
     )
 
     logging.info("Loading aggregated data for stats panels...")
@@ -324,7 +360,10 @@ def _compute_figure_inputs(
 
     logging.info("Computing triggered-average curves (panel c)...")
     triggered_curves = compute_triggered_average_curves(
-        data_over_time, event_types, TRIGGERED_SIGNALS, time_col="start_time",
+        data_over_time,
+        event_types,
+        TRIGGERED_SIGNALS,
+        time_col="start_time",
     )
 
     logging.info("Computing per-session decoding error (panel e)...")
