@@ -3,7 +3,7 @@
 
 Family B is the point-process counterpart to the per-stop rate hierarchy
 (``fit_per_stop_rate_models.py``). Where Family A fits one Poisson GLM per stop
-with a ``log(immobility_time)`` dwell offset, here every model is fit on the
+with a ``log(immobility_duration_s)`` dwell offset, here every model is fit on the
 canonical (stop x bin) design from ``aggregate_to_timebins`` with a
 ``log(exposure)`` offset, modelling the within-stop time course explicitly.
 
@@ -11,10 +11,14 @@ The WHOLE ladder runs at one bin width (``BIN_S = 0.015``): for each
 (session, outcome) the design is built ONCE — carrying the reward-history
 basis and the self-history lags — then frozen to one cohort with
 ``freeze_per_bin_cohort`` over the union of every rung's design columns, and
-every ``MODEL_PER_BIN_RATE`` model (M0_const..M9r_rew_x_time) is fit against
-that frozen design (each ``formula()`` selects its own columns). The freeze is
-what makes the nested AIC / CV / GOF comparison valid: AIC scales with the
-number of rows, so a rung fit to fewer bins would win mechanically. The
+every ``MODEL_PER_BIN_RATE`` model is fit against that frozen design (each
+``formula()`` selects its own columns): the stop-clock ladder M0_const, M1_rew,
+M5_time, M3r_histcos, M6r_time_histcos, M7r_time_histcos_rew and
+M9r_rew_x_time, and the arrival-clock sub-ladder M0a_const_arrival,
+M5a_time_arrival and M7ra_time_arrival_histcos_rew, which is fit on the arrival
+window carved out of the same frozen cohort. The freeze is what makes the
+nested AIC / CV / GOF comparison valid: AIC scales with the number of rows, so
+a rung fit to fewer bins would win mechanically. The
 fitters raise rather than drop rows, and this runner additionally asserts that
 freezing the shipped ladder removes zero stops (every column it needs is
 complete on the canonical stop table by construction). Designs are built per
@@ -29,6 +33,26 @@ arm/patch/per-stop ``all_models.pkl`` so the families concatenate on
 The four outcomes (``POPULATIONS``) are detected SWR, all non-local, and the
 non-local SWR / no-SWR split — the pooled ``non_local`` is the one-population
 null tested against its split.
+
+How Family A (``fit_per_stop_rate_models.py``) and Family B (this script) differ
+on the same stop. Family A gives the stop one row: its whole-stop event count
+from ``stop_table``, a ``log(immobility_duration_s)`` offset, and the
+reward-history basis evaluated once at bout start. Family B never reads the
+dense ``stop_timebin_table``: ``aggregate_to_timebins`` cuts the stop into
+``BIN_S`` = 15 ms bins over its first ``TMAX`` = 4 s only, counts the onsets of
+``event_onset_table`` per bin with a ``log(exposure)`` offset, and in the bins at
+or past the stop's outcome boundary (``outcome_known_time_s``) shifts the
+reward-history lag vector by one, so those bins see the trip's own reward or
+omission (a bout that spans a well arrival is never shifted). Onsets after the
+first 4 s count toward A but not toward B.
+
+Outputs: ``models_per_bin_rate/all_models{sfx}.pkl`` (one row per (session,
+outcome, model)), its ``.provenance.json`` sidecar, and
+``per_bin_rate_cohort_audit{sfx}.csv``; ``sfx`` is empty for the default
+``at_well`` cohort, ``_allstops`` / ``_intransit`` otherwise, with ``_smoke``
+appended in smoke mode. Family A writes
+``models_per_stop_rate/all_models{sfx}.pkl`` and
+``all_models{sfx}_cohort_audit.csv``.
 
 Inference note. The self-history block absorbs within-stop autocorrelation, so
 the per-bin likelihood is better calibrated than a naive independent-bin count
@@ -331,11 +355,21 @@ def fit_per_bin_rate_models(
     as ``result.attrs["arrival_clock_cohort"]``.
     """
     onset_groups = dict(tuple(onsets.groupby(list(SESSION_COLUMNS), sort=False)))
+    stop_groups = stop_table.groupby(list(SESSION_COLUMNS), sort=False)
     items = [
         (keys, stops_g, onset_groups[keys])
-        for keys, stops_g in stop_table.groupby(list(SESSION_COLUMNS), sort=False)
+        for keys, stops_g in stop_groups
         if keys in onset_groups
     ]
+    # A stop-session with no onset rows is not fit at all; name it rather than
+    # let it vanish from the ladder unremarked.
+    no_onsets = [keys for keys in stop_groups.groups if keys not in onset_groups]
+    if no_onsets:
+        logger.warning(
+            "Skipping %d stop-session(s) with no event onsets: %s",
+            len(no_onsets),
+            ", ".join("_".join(map(str, keys)) for keys in no_onsets),
+        )
 
     rows: list[dict] = []
     none_counts: Counter = Counter()

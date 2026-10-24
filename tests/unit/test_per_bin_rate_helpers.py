@@ -819,3 +819,33 @@ FROZEN_COLUMNS = [
     "cross_hist_rcos_1",
 ]
 FROZEN_DIGEST = "7a2311d8acfde43383573a07f6da8a08c7220eb6797a38a3bb962c3dc014fc3c"
+
+
+# ── The optional branches say whether they ran ──
+
+_DESIGN_LOGGER = "continuum_swr_replay.analysis.replay.per_bin_design"
+
+
+def test_aggregate_logs_the_optional_branches_it_applied(arrival_clock_stops, caplog):
+    """A stop table carrying the clock and shift inputs reports both as applied."""
+    stops, onsets = arrival_clock_stops
+    with caplog.at_level("INFO", logger=_DESIGN_LOGGER):
+        _aggregate_with_clocks(stops, onsets)
+    messages = [r.getMessage() for r in caplog.records if r.name == _DESIGN_LOGGER]
+    assert messages == [
+        "aggregate_to_timebins: per-bin arrival/outcome clocks applied; "
+        "outcome-boundary reward-history shift applied"
+    ]
+
+
+def test_aggregate_logs_the_optional_branches_it_skipped(two_stop_design, caplog):
+    """Without their inputs the branches are named as skipped, not left silent."""
+    stops, onsets = two_stop_design
+    with caplog.at_level("INFO", logger=_DESIGN_LOGGER):
+        aggregate_to_timebins(stops, onsets, bin_s=0.1, tmax=0.5, reward_basis=True)
+        aggregate_to_timebins(stops, onsets, bin_s=0.1, tmax=0.5)
+    messages = [r.getMessage() for r in caplog.records if r.name == _DESIGN_LOGGER]
+    assert len(messages) == 2
+    assert "arrival/outcome clocks skipped (stop table lacks" in messages[0]
+    assert "reward-history shift skipped (stop table lacks" in messages[0]
+    assert "reward-history shift not requested (reward_basis=False)" in messages[1]

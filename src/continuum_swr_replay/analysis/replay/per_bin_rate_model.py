@@ -7,8 +7,8 @@ is the per-bin onset ``count`` and the offset is ``log(exposure)`` (seconds of
 immobility in the bin), so ``exp(intercept)`` is the per-bin onset rate.
 
 How this differs from ``per_stop_rate_model.py`` (Family A): that model fits one
-row per stop with a ``log(immobility_time)`` dwell offset, averaging the whole
-stop into a single rate; here the within-stop time course is modelled
+row per stop with a ``log(immobility_duration_s)`` dwell offset, averaging the
+whole stop into a single rate; here the within-stop time course is modelled
 explicitly by a ``bs(tc)`` spline and the equal-exposure offset, and the same-
 event self-history (refractoriness / bursting) is carried as autoregressive
 ``onset_lag{j}`` terms. The two families answer complementary questions: Family
@@ -85,7 +85,10 @@ def _design_columns(spec: PerBinRateModelSpec) -> list[str]:
     if spec.time_spline or spec.reward_time_interaction:
         cols.append("tc" if spec.time_clock == "stop" else ARRIVAL_CLOCK_COLUMN)
     if spec.reward_basis:
-        cols += [*REWARD_HISTORY_COLUMNS[: spec.reward_basis], REWARD_HISTORY_INCOMPLETE]
+        cols += [
+            *REWARD_HISTORY_COLUMNS[: spec.reward_basis],
+            REWARD_HISTORY_INCOMPLETE,
+        ]
     if spec.reward_time_interaction and not spec.reward_basis:
         cols.append(REWARD_HISTORY_COLUMNS[0])
     if spec.reward_rate:
@@ -166,9 +169,7 @@ def freeze_per_bin_cohort(
 
     missing = [c for c in (*required, "stop_id") if c not in design.columns]
     if missing:
-        raise KeyError(
-            f"freeze_per_bin_cohort missing required column(s): {missing}"
-        )
+        raise KeyError(f"freeze_per_bin_cohort missing required column(s): {missing}")
 
     keep = design[required].notna().all(axis=1) & (design["exposure"] > 0)
     frozen = design.loc[keep].reset_index(drop=True)
@@ -372,16 +373,22 @@ def fit_per_bin_rate_model(
     if len(df) < min_bins or n_events < min_events:
         logger.debug(
             "%s: too few data (%d bins, %d events; need %d/%d)",
-            spec.name, len(df), n_events, min_bins, min_events,
+            spec.name,
+            len(df),
+            n_events,
+            min_bins,
+            min_events,
         )
         return None
-    # Reward coefficients are unidentified without contrast in the immediate
-    # reward-history component.
+    # Reward coefficients are unidentified without contrast in the first
+    # reward-history basis component (the recent-reward fraction).
     immediate = REWARD_HISTORY_COLUMNS[0]
     if (spec.reward_basis or spec.reward_time_interaction) and (
         df[immediate].nunique() < 2
     ):
-        logger.debug("%s: <2 %s levels, reward terms unidentified", spec.name, immediate)
+        logger.debug(
+            "%s: <2 %s levels, reward terms unidentified", spec.name, immediate
+        )
         return None
 
     offset = np.log(df["exposure"].to_numpy(dtype=float))
@@ -425,9 +432,11 @@ def fit_per_bin_rate_model(
         "aic": float(result.aic),
         "deviance": float(result.deviance),
         "dispersion": float(result.deviance / df_resid) if df_resid > 0 else np.nan,
-        # distinct stops that actually contributed >=1 retained bin to the fit — the
-        # modeled-cohort count for the stop-grain audit (bins were already dropped for
-        # NaN predictors / exposure<=0 above, and immobility<=0 stops never entered).
+        # distinct stops that contributed >=1 bin to the fit — the modeled-cohort
+        # count for the stop-grain audit. The fitter drops no rows: a design with
+        # a missing predictor or exposure<=0 raised above
+        # (require_frozen_per_bin_design), and immobility<=0 stops never entered
+        # the design.
         "n_stops": int(df["stop_id"].nunique()),
         **{
             f"sd_{name}": float(s)
@@ -514,8 +523,9 @@ def cross_validate_per_bin_rate_model(
         is_train = df["stop_id"].isin(train_stops).to_numpy()
         tr, te = df[is_train], df[~is_train]
         if len(te) == 0 or int((tr["count"] > 0).sum()) < 1:
-            logger.debug("CV %s: degenerate fold (empty test or zero train events)",
-                         spec.name)
+            logger.debug(
+                "CV %s: degenerate fold (empty test or zero train events)", spec.name
+            )
             return None
         off_tr = np.log(tr["exposure"].to_numpy(dtype=float))
         off_te = np.log(te["exposure"].to_numpy(dtype=float))

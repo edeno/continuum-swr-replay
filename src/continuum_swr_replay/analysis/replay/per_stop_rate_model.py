@@ -3,7 +3,7 @@
 Tests whether the NUMBER of replay events per stop depends on
 behavioral context, independently of replay CONTENT. The response is
 ``n_selected_events`` (count of the table's selected event source per stop); the offset is
-``log(immobility_time)`` so that coefficients are interpretable as
+``log(immobility_duration_s)`` so that coefficients are interpretable as
 multiplicative changes in event rate per second of immobility.
 
 Model hierarchy (``MODEL_PER_STOP_RATE`` in ``model_specs.py``):

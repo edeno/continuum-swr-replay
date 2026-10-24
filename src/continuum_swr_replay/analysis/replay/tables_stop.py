@@ -77,7 +77,7 @@ def build_stop_table(
     The stop-level canonical view of the session. Every contiguous
     immobility bout (defined by ``head_speed < speed_threshold``) becomes a
     row, regardless of whether any non-local event fired during it. The
-    hurdle occurrence model requires the zero-event rows.
+    per-stop rate models (Family A) need the zero-event rows.
 
     ``immobility_duration_s`` is the stop's exposure: ``stop_end -
     stop_start`` less the epoch's excluded time inside the stop
@@ -96,18 +96,19 @@ def build_stop_table(
     :func:`build_event_table`'s ``stop_id`` row-for-row, so the two
     tables join cleanly.
 
-    Deferred to later chunks: aggregated replay-summary columns
-    (Σ ``arm_count_hard`` per arm, etc.) that require
-    ``event_arm_table``.
+    The table carries no replay-content summaries (e.g. Σ ``arm_count_hard``
+    per arm); those live in ``event_arm_table``.
 
     Note
     ----
     Single-sample bouts — when the animal dips below the speed
-    threshold for exactly one timebin — yield ``immobility_time == 0``
-    rows. They are kept as-is here; ``stop_table`` is the raw
-    canonical frame and downstream consumers decide whether to filter
-    them (e.g., the hurdle logistic, which uses
-    ``log(immobility_time)``, will need to exclude or clip them).
+    threshold for exactly one timebin — and stops wholly inside excluded
+    time yield ``immobility_duration_s == 0`` rows. They are kept as-is
+    here; ``stop_table`` is the raw canonical frame and downstream
+    consumers decide whether to filter them. Both rate families leave
+    them out: the per-stop fit's cohort freeze drops a non-positive
+    ``log(immobility_duration_s)`` offset, and ``aggregate_to_timebins``
+    gives such a stop no bins.
 
 
     Parameters

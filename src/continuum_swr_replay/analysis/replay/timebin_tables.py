@@ -8,11 +8,15 @@ reward at both within- and across-stop scales):
   (SWR / non-local / MUA), with absolute ``onset_time``, ``t_since_stop_onset``,
   the continuous ``t_since_pump`` (carries across the movement gaps), and the
   within-stop inter-onset interval. For autocorrelation and the time-course
-  numerator.
+  numerator, and the onset input of every Family-B per-bin rate fit.
 
 - :func:`build_stop_timebin_table` — **dense**: one row per (stop, ``bin_s``-wide
-  bin), with onset counts, the same two clocks, ``is_reward_stop`` and mean
-  ``head_speed``. The equal-exposure substrate for the per-bin onset-rate model.
+  bin, 4 ms by default), with onset counts, the same two clocks,
+  ``is_reward_stop`` and mean ``head_speed``. An equal-exposure grid for the
+  exploratory time-course scripts (``scripts/exploratory/_timeresolved_psth.py``).
+  The Family-B rate fits do not read it: they rebuild their own 15 ms
+  (stop x bin) design from ``stop_table`` and the sparse onset table
+  (``per_bin_design.aggregate_to_timebins``).
 
 Both recompute immobility bouts from ``dot`` with the canonical helpers, so
 ``stop_id`` matches ``build_stop_table`` row-for-row. Movement is absence of

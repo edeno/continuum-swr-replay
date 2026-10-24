@@ -667,6 +667,30 @@ def aggregate_to_timebins(
         c in stop_table.columns
         for c in (*_OUTCOME_SHIFT_STOP_COLUMNS, *_ARRIVAL_SPAN_STOP_COLUMNS)
     )
+    # Both branches switch off without a word when their inputs are absent, so
+    # say which ran: a design built without them is a different design.
+    missing_clock = [
+        c for c in _ARRIVAL_CLOCK_STOP_COLUMNS if c not in stop_table.columns
+    ]
+    missing_shift = [
+        c
+        for c in dict.fromkeys(
+            (*_OUTCOME_SHIFT_STOP_COLUMNS, *_ARRIVAL_SPAN_STOP_COLUMNS)
+        )
+        if c not in stop_table.columns
+    ]
+    logger.info(
+        "aggregate_to_timebins: per-bin arrival/outcome clocks %s; "
+        "outcome-boundary reward-history shift %s",
+        "applied" if emit_clocks else f"skipped (stop table lacks {missing_clock})",
+        "applied"
+        if shift_at_outcome
+        else (
+            f"skipped (stop table lacks {missing_shift})"
+            if reward_basis
+            else "not requested (reward_basis=False)"
+        ),
+    )
     if excluded_intervals is None:
         excluded_intervals = excluded_intervals_by_session(stop_table)
     # an empty mask masks nothing, so a stop table without bounds still builds

@@ -3,7 +3,8 @@
 
 The visual companion to ``docs/per_bin_rate_results.md`` — reads
 ``models_per_bin_rate/all_models.pkl`` and renders, per event-type population:
-baseline rate (M0), the immediate reward-history dissociation (M7), the
+baseline rate (M0), the recent-reward dissociation on the first reward-history
+basis coefficient (M7), the
 reconstructed reward kernel and the self-history kernel (M7), the
 model-comparison ladder (ΔAIC + CV bits/event), and the slow reward-history
 component by population (M7).
@@ -50,7 +51,7 @@ from continuum_swr_replay.analysis.replay.per_bin_design import (  # noqa: E402
 from continuum_swr_replay.intervals import (  # noqa: E402
     covered_seconds,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
+from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
 from continuum_swr_replay.paths import (
     REPLAY_CONTENT_DIR,  # noqa: E402
     model_dir,
@@ -70,8 +71,7 @@ ALL_MODELS_INPUTS = {
     "event_onset_table": table_path("event_onset_table", RC, fmt="pkl"),
     "event_table": table_path("event_table", RC, fmt="pkl"),
 }
-FIGS = P.parent / "paper" / "figures" / "rate"
-FIGS.mkdir(parents=True, exist_ok=True)
+FIGS = FIGURE_DIR / "rate"
 STYLE = {  # outcome -> (label, color)
     "swr": ("detected SWR", "k"),
     "non_local": ("non-local (all)", "C2"),
@@ -87,6 +87,8 @@ POPS4 = ["swr", "non_local", "non_local_swr", "non_local_no_swr"]
 POPS3 = ["swr", "non_local_swr", "non_local_no_swr"]
 SHORT = ["SWR", "NL\nw/SWR", "NL\nno-SWR"]
 FULL = "M7r_time_histcos_rew"
+# First reward-history basis coefficient (a recent-reward fraction weighted
+# toward the newest outcomes, not lag 1 alone); the "IMMEDIATE" name is legacy.
 IMMEDIATE_COEF = f"coef_{REWARD_HISTORY_COLUMNS[0]}"
 SLOW_COEF = f"coef_{REWARD_HISTORY_COLUMNS[-1]}"
 # Panel B's margin beyond the lowest and highest whisker: a factor in RR, applied
@@ -270,8 +272,8 @@ def _panel_reward1(ax, df):
         if low <= np.log(m * 10.0**e) <= high
     ]
     ax.set_yticks(np.log(rate_ratios), labels=[f"{r:g}" for r in rate_ratios])
-    ax.set_ylabel("immediate reward RR (per session, log scale)")
-    ax.set_title("B. Immediate reward-history component (M7r, controlled)")
+    ax.set_ylabel("recent-reward RR, first history basis (per session, log scale)")
+    ax.set_title("B. First reward-history basis component (M7r, controlled)")
 
 
 def _panel_reward_kernel(ax, df):

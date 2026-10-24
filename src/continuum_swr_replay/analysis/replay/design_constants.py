@@ -77,11 +77,13 @@ RECENCY_SPLINE_COLUMNS: tuple[str, ...] = (
 # The smooth replacement for the ten per-lag dummies: the same known-outcome lag
 # vector projected onto log-spaced raised-cosine bumps, each normalized over the
 # lags actually known at the query time. Features are weighted reward fractions
-# in [0, 1] (coefficients per unit rate, not per SD); feature 0 is the immediate
-# component. ``REWARD_HISTORY_INCOMPLETE`` flags stops whose slowest bump has no
-# known outcome in its support (fewer than two known outcomes) and whose features
-# were therefore zero-filled -- a structural-missingness nuisance main effect, not
-# a behavioral quantity to report.
+# in [0, 1] (coefficients per unit rate, not per SD). Feature 0 is the
+# recent-reward component: its bump weights the newest outcomes most (about
+# 0.33 / 0.26 / 0.17 / 0.11 on lags 1-4 when all ten are known), so it is not the
+# lag-1 outcome alone. ``REWARD_HISTORY_INCOMPLETE`` flags stops whose slowest
+# bump has no known outcome in its support (fewer than two known outcomes) and
+# whose features were therefore zero-filled -- a structural-missingness nuisance
+# main effect, not a behavioral quantity to report.
 REWARD_HISTORY_N_LAGS = 10
 REWARD_HISTORY_N_BASIS = 3
 REWARD_HISTORY_COLUMNS = (
@@ -102,7 +104,11 @@ N_REWARD_LAGS = REWARD_HISTORY_N_LAGS
 # and AIC / CV / deviance / GOF are directly comparable (fine bins are required
 # anyway for the self-history term and time-rescaling GOF).
 BIN_S = 0.015  # 15 ms — ladder-wide (refractory <60 ms, bursty ~100 ms)
-TMAX = 4.0  # model only the first 4 s of each stop (see overview Non-Goals)
+# Family B models only the first TMAX seconds of each stop. Onsets later in a
+# stop (about a fifth of them) are right-truncated out of the counts, so every
+# Family-B result is conditional on the first 4 s; the long tail is left for a
+# larger window or a censoring term (docs/rate_models.md, "Family B truncates").
+TMAX = 4.0
 # Fixed interior knots (seconds) for the within-stop time-course spline, with
 # boundary knots pinned to [0, TMAX]. Fixed (not data-driven quantile) knots make
 # the spline basis a deterministic function of tc: the fitted curve is

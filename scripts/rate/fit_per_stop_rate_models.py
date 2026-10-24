@@ -2,7 +2,7 @@
 """Fit the per-stop replay-rate hierarchy (R0-R1) and persist it.
 
 The rate models are ordinary Poisson GLMs on per-stop event counts with a
-``log(immobility_time)`` offset (see ``per_stop_rate_model.fit_per_stop_rate_model``) — a
+``log(immobility_duration_s)`` offset (see ``per_stop_rate_model.fit_per_stop_rate_model``) — a
 different model family from the conditional arm/patch hierarchies, so they
 live outside ``fit_replay_content_models.py``. This script fits R0-R1
 per session from the saved ``stop_table.pkl``, adds K-fold cross-validated
@@ -20,9 +20,31 @@ all read directly from the canonical ``stop_table`` columns:
 - ``non_local_no_swr`` -> ``n_nonlocal_non_swr_events`` : non-local events without a SWR.
 
 Fitting each MODEL_PER_STOP_RATE model on each outcome is an outcome *variant* of the specs,
-not a new model. Replicates the canonical SWR-rate-vs-reward result (reward /
-omission, recent reward history) on detected ripples, then asks whether the
-non-SWR non-local events share those rate effects.
+not a new model. Tests the canonical SWR-rate-vs-reward relation on detected
+ripples through recent reward history only -- R1 has no current-trip reward /
+omission term, because those are post-outcome quantities (``model_specs``,
+"Rate models") -- then asks whether the non-SWR non-local events share that
+rate effect.
+
+How Family A (this script) and Family B (``fit_per_bin_rate_models.py``) differ
+on the same stop. Family A gives the stop one row: its whole-stop event count
+(the ``stop_table`` columns above), a ``log(immobility_duration_s)`` offset, and
+the reward-history basis evaluated once at bout start, so the whole stop carries
+one history. Family B cuts the same stop into ``BIN_S`` = 15 ms bins over its
+first ``TMAX`` = 4 s only, counts onsets per bin from ``event_onset_table`` with
+a ``log(exposure)`` offset, adds a time-since-stop spline and self-history, and
+in the bins at or past the stop's outcome boundary (``outcome_known_time_s``)
+shifts the reward-history lag vector by one so they see the trip's own reward
+or omission (a bout that spans a well arrival is never shifted). Onsets after
+the first 4 s count toward A but not toward B.
+
+Outputs: ``models_per_stop_rate/all_models{sfx}.pkl`` (one row per (outcome,
+model, session) for R0-R1), its ``.provenance.json`` sidecar, and
+``all_models{sfx}_cohort_audit.csv``; ``sfx`` is empty for the default
+``at_well`` cohort, ``_allstops`` / ``_intransit`` otherwise, with ``_smoke``
+appended in smoke mode. Family B writes
+``models_per_bin_rate/all_models{sfx}.pkl`` and
+``per_bin_rate_cohort_audit{sfx}.csv``.
 
 Usage:
     uv run python scripts/rate/fit_per_stop_rate_models.py                    # full

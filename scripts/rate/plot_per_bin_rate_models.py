@@ -14,8 +14,10 @@ controlled for the within-stop time course and the same-event clustering:
 * ``reward_kernel_basis.png`` -- the reward rate-ratio kernel over lags 1-10
   reconstructed from the three raised-cosine basis coefficients per
   population (per-session median and IQR, with the per-animal medians drawn
-  through them), and the immediate-component dissociation between
-  SWR-coupled and non-SWR non-local events.
+  through them), and the dissociation between SWR-coupled and non-SWR
+  non-local events on the first reward-history basis coefficient
+  (``reward_history_rcos_0``, a recent-reward fraction weighted toward the
+  newest outcomes: about 0.33 / 0.26 / 0.17 / 0.11 on lags 1-4).
 * ``selfhistory_autocorr.png`` -- the within-stop self-history rate ratio
   over lags 1..10, reconstructed from the four raised-cosine basis
   coefficients: refractory (<1) at short lags, bursty (>1) at ~100 ms.
@@ -52,7 +54,7 @@ from continuum_swr_replay.analysis.replay.per_bin_design import (  # noqa: E402
     reconstruct_reward_kernels,
     reconstruct_self_history_kernels,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
+from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
 from continuum_swr_replay.paths import (
     REPLAY_CONTENT_DIR,  # noqa: E402
     model_dir,
@@ -70,8 +72,7 @@ ALL_MODELS_INPUTS = {
     "event_onset_table": table_path("event_onset_table", RC, fmt="pkl"),
     "event_table": table_path("event_table", RC, fmt="pkl"),
 }
-FIGS = P.parent / "paper" / "figures" / "rate"
-FIGS.mkdir(parents=True, exist_ok=True)
+FIGS = FIGURE_DIR / "rate"
 SC = list(SESSION_COLUMNS)
 MODEL = "M7r_time_histcos_rew"
 
@@ -108,6 +109,9 @@ def _self_history_kernel(
     return out
 
 
+# The first raised-cosine reward-history basis coefficient. Its feature is a
+# reward fraction weighted toward the newest outcomes (about 0.33 / 0.26 / 0.17 /
+# 0.11 on lags 1-4), not the lag-1 outcome alone; the "IMMEDIATE" name is legacy.
 IMMEDIATE_COEF = f"coef_{REWARD_HISTORY_COLUMNS[0]}"
 
 
@@ -216,8 +220,10 @@ def plot_reward_kernel(m7: pd.DataFrame) -> None:
         patch.set_facecolor(POP_STYLE[oc][1])
         patch.set_alpha(0.4)
     ax.axhline(1, color="0.5", ls=":")
-    ax.set_ylabel("immediate reward effect — RR per unit (per session)")
-    # The immediate component is a rate ratio per unit of a 0-1 reward fraction,
+    ax.set_ylabel(
+        "recent-reward effect (first history basis) — RR per unit (per session)"
+    )
+    # The first basis coefficient is a rate ratio per unit of a 0-1 reward fraction,
     # so the per-session spread is multiplicative and covers orders of
     # magnitude; a linear axis truncates the upper boxes.
     ax.set_yscale("log")
@@ -235,7 +241,7 @@ def plot_reward_kernel(m7: pd.DataFrame) -> None:
     pa = mrg.assign(d=diff).groupby("animal")["d"].median()
     pval = wilcoxon(mrg[f"{IMMEDIATE_COEF}_s"], mrg[f"{IMMEDIATE_COEF}_n"]).pvalue
     ax.set_title(
-        f"Immediate reward effect by population\n"
+        f"Recent-reward effect (first history basis) by population\n"
         f"NL-SWR > NL-no-SWR: {(diff > 0).mean():.0%} of {len(mrg)}, "
         f"{(pa > 0).sum()}/{mrg.animal.nunique()} animals, p={pval:.1e}"
     )
@@ -248,7 +254,7 @@ def plot_reward_kernel(m7: pd.DataFrame) -> None:
     for oc in order:
         v = m7[m7.outcome == oc][IMMEDIATE_COEF].dropna()
         print(
-            f"  {POP_STYLE[oc][0]:18s}: immediate RR={np.exp(v.median()):.2f} (n={len(v)})"
+            f"  {POP_STYLE[oc][0]:18s}: first-basis RR={np.exp(v.median()):.2f} (n={len(v)})"
         )
 
 

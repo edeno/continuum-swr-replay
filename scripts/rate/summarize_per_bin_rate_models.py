@@ -7,8 +7,11 @@ non-local-without-SWR), the fitted effects across the model ladder with
 across-session significance and the cross-population comparisons:
 
 1. Baseline rate (M0_const): events / s of immobility, and which type is higher.
-2. Reward lag-1 (M1 raw, M7 controlled): does each type respond, and how the
-   effect compares across types.
+2. Recent-reward effect on the first reward-history basis coefficient
+   ``reward_history_rcos_0`` (M1_rew raw, M7r controlled): a reward fraction
+   weighted toward the newest outcomes (about 0.33 / 0.26 / 0.17 / 0.11 on lags
+   1-4), not the lag-1 outcome alone. Does each type respond, and how does the
+   effect compare across types.
 3. Reward kernel lags 1-10 (M7r): boost-then-suppression shape, per type.
 4. Self-history kernel lags 1-10 (M3r_histcos raw, M7r controlled): refractory
    window and burstiness peak, compared across types. Both are reconstructed
@@ -67,6 +70,8 @@ LABEL = {
     "non_local_no_swr": "NL no-SWR",
 }
 FULL = "M7r_time_histcos_rew"
+# First reward-history basis coefficient (a recent-reward fraction weighted
+# toward the newest outcomes, not lag 1 alone); the "IMMEDIATE" name is legacy.
 IMMEDIATE_COEF = f"coef_{REWARD_HISTORY_COLUMNS[0]}"
 
 
@@ -235,10 +240,12 @@ def main():
     section_baseline(df)
 
     section_coef(
-        "2. IMMEDIATE REWARD COMPONENT (raw, uncontrolled)", "M1_rew", IMMEDIATE_COEF
+        "2. RECENT-REWARD EFFECT, FIRST HISTORY BASIS (raw, uncontrolled)",
+        "M1_rew",
+        IMMEDIATE_COEF,
     )
     section_coef(
-        "2. IMMEDIATE REWARD COMPONENT (controlled: time+history)",
+        "2. RECENT-REWARD EFFECT, FIRST HISTORY BASIS (controlled: time+history)",
         FULL,
         IMMEDIATE_COEF,
     )

@@ -141,10 +141,13 @@ def main() -> None:
         if (i + 1) % 20 == 0:
             logger.info("  %d/%d (%.0fs)", i + 1, len(sessions), time.time() - t0)
 
-    # Fail closed. These tables are joined to event/stop tables on stop keys and
-    # feed every Family-B rate fit; a silently dropped session would ship a
-    # timebin table covering fewer sessions than its siblings, which no
-    # downstream fitter (they only check the schema stamp) would catch.
+    # Fail closed. These tables are joined to event/stop tables on stop keys;
+    # the onset table feeds every Family-B rate fit (which rebuilds its own
+    # 15 ms bins from stop_table, so it never reads the dense table) and the
+    # dense table feeds the exploratory time-course scripts. A silently dropped
+    # session would ship a timebin table covering fewer sessions than its
+    # siblings, which no downstream reader (they only check the schema stamp)
+    # would catch.
     if failures:
         raise RuntimeError(
             f"{len(failures)} of {len(sessions)} session(s) failed to build a "

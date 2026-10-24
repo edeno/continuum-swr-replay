@@ -518,3 +518,28 @@ def test_saved_frame_does_not_depend_on_the_order_sessions_finish(
     pd.testing.assert_frame_equal(
         parallel, parallel.sort_values(key, ignore_index=True)
     )
+
+
+def test_stop_sessions_without_onsets_are_named_not_dropped_silently(
+    monkeypatch, caplog
+):
+    """A stop-session with no onset rows is skipped, and the skip is logged."""
+    stop, onsets = _sessions_frame()
+    silent = tuple(stop.iloc[0][list(fprm.SESSION_COLUMNS)])
+    onsets = onsets[
+        ~(
+            onsets[list(fprm.SESSION_COLUMNS)]
+            == pd.Series(silent, index=fprm.SESSION_COLUMNS)
+        ).all(axis=1)
+    ]
+    monkeypatch.setattr(fprm, "_fit_one_session", _fake_fit_one_session)
+    with caplog.at_level("WARNING", logger=fprm.logger.name):
+        out = fprm.fit_per_bin_rate_models(stop, onsets, workers=1)
+
+    warnings = [r.getMessage() for r in caplog.records if r.levelname == "WARNING"]
+    assert warnings == [
+        "Skipping 1 stop-session(s) with no event onsets: " + "_".join(map(str, silent))
+    ]
+    fitted = set(map(tuple, out[list(fprm.SESSION_COLUMNS)].drop_duplicates().values))
+    assert silent not in fitted
+    assert len(fitted) == stop.groupby(list(fprm.SESSION_COLUMNS)).ngroups - 1

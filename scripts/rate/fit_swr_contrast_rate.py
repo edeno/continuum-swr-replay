@@ -122,6 +122,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     POST_OUTCOME_COVARIATES,
     POST_OUTCOME_RATE_RUNGS,
     PRIMARY_COHORT,
+    REWARD_HISTORY_COLUMNS,
     longest_history_window_s,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
@@ -158,7 +159,7 @@ logger = logging.getLogger(__name__)
 # Audited-aggregation key terms, mirroring the content ladder. G-rungs add one
 # dimension each (fit per population); S-rungs carry the is_swr:<dimension> contrast.
 _G_KEY = {
-    "G0_base": "reward_history_rcos_0",
+    "G0_base": REWARD_HISTORY_COLUMNS[0],
     "G1_periswitch": "periswitch_index_trials",
     "G2_block": "trials_since_block_change",
     "G3_switchrate": "patch_switch_fraction_last5_completed_trips",
@@ -168,7 +169,7 @@ _G_KEY = {
     "G7_update": "reward_belief_mean_update_l1_all_ports_postoutcome",
 }
 _S_KEY = {
-    "S1_rew": "is_swr:reward_history_rcos_0",
+    "S1_rew": f"is_swr:{REWARD_HISTORY_COLUMNS[0]}",
     "S3_periswitch": "is_swr:periswitch_index_trials",
     "S4_block": "is_swr:trials_since_block_change",
     "S5_switchrate": "is_swr:patch_switch_fraction_last5_completed_trips",
@@ -250,8 +251,8 @@ def _fit(
     if len(df) < MIN_BINS or n_events < MIN_EVENTS:
         return None, "too_few"
     if (
-        "reward_history_rcos_0" in need_cols
-        and df["reward_history_rcos_0"].nunique() < 2
+        REWARD_HISTORY_COLUMNS[0] in need_cols
+        and df[REWARD_HISTORY_COLUMNS[0]].nunique() < 2
     ):
         return None, "no_reward_contrast"  # reward terms unidentified without contrast
     offset = np.log(df["exposure"].to_numpy(dtype=float))
